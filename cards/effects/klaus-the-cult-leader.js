@@ -31,6 +31,28 @@ const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Klaus, the Cult Leader';
 
 module.exports = {
+  /**
+   * Held-Vertrag (wie Rafflesia): Klaus zieht Decay + Summoning Magic
+   * zu sich — sein Platzierungs-Trigger (Decay-Cast → Kreatur aus der
+   * Hand) und die Double-School-Spells des Mischief-Kerns (Chilly
+   * Wizard, Banner Bearer: Decay 2 + Summoning 2) hängen daran. Die
+   * gelernten abilityPriors aus dünnen Verlust-Datensätzen drückten
+   * genau diese Attaches ins Negative (Korrelation "langes Setup →
+   * verlor gegen Rush"), womit der Pilot den Deck-Kern aushungerte.
+   * Bonus deckelt bei Schulstufe 2 — darüber ist der Slot wertvoller
+   * für Necromancy/Toughness.
+   */
+  cpuAbilityAttachBonus(engine, pi, heroIdx, abilityName) {
+    if (abilityName !== 'Decay Magic' && abilityName !== 'Summoning Magic') return 0;
+    try {
+      const school = abilityName === 'Decay Magic' ? 'Decay Magic' : 'Summoning Magic';
+      const zones = engine.gs.players[pi]?.abilityZones?.[heroIdx];
+      const lvl = engine.countAbilitiesForSchool ? engine.countAbilitiesForSchool(school, zones) : 0;
+      return lvl >= 2 ? 0 : 200;
+    } catch { return 200; }
+  },
+
+
   activeIn: ['hero'],
 
   hooks: {

@@ -1,0 +1,400 @@
+{
+  "deck": "Bloody King Zi",
+  "heroes": [
+    "Cooldin, King of Coolness",
+    "Timeless King Zi",
+    "Kazena, the Storming Rebel"
+  ],
+  "games": 1292,
+  "trainWinRate": "75.1%",
+  "trainedAt": "2026-07-19T16:44:13.146Z",
+  "meanTurns": 9.4,
+  "cardValues": {
+    "Diver Helmet": 85.4,
+    "Leadership": 8,
+    "Performance": 8,
+    "Chaos Magic": 8,
+    "Alchemic Journal": 25.3,
+    "Elixir of Quickness": 22.2,
+    "Play Money": 8,
+    "Pyroblast": 61.6,
+    "Magnetic Glove": 38.3,
+    "Treasure Chest": 8,
+    "Chain Lightning": 78.6,
+    "Flame Avalanche": 53.4,
+    "Magnetic Potion": 38.9,
+    "Disruption Ray": 24.2,
+    "Giga Steroids": 27.7,
+    "Elixir of Immortality": 42.4
+  },
+  "timing": {
+    "Diver Helmet": {
+      "early": 0.75,
+      "mid": 1.25,
+      "late": 1
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Alchemic Journal": {
+      "early": 0.82,
+      "mid": 1.18,
+      "late": 1
+    },
+    "Elixir of Quickness": {
+      "early": 0.92,
+      "mid": 1.08,
+      "late": 1
+    },
+    "Pyroblast": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Glove": {
+      "early": 0.86,
+      "mid": 1.14,
+      "late": 1
+    },
+    "Treasure Chest": {
+      "early": 0.9,
+      "mid": 1.1,
+      "late": 1
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Disruption Ray": {
+      "early": 0.95,
+      "mid": 1.05,
+      "late": 1
+    },
+    "Giga Steroids": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Elixir of Immortality": {
+      "early": 0.85,
+      "mid": 1.15,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Leadership|dc:Chaos Magic": 4.1,
+    "Leadership|dc:Trial of Dominance": 4.1,
+    "Performance|dc:Alchemic Journal": 5.2,
+    "Performance|dc:Chaos Magic": 4.2,
+    "Performance|dc:Giga Steroids": 4.2,
+    "Performance|Resuscitation Potion": 4.8,
+    "Chaos Magic|Treasure Chest": 6.1,
+    "Play Money|dc:Giga Steroids": 4,
+    "Magnetic Potion|Play Money": 4.8,
+    "Chain Lightning|dc:Pyroblast": 5.2,
+    "Chain Lightning|dc:Alchemic Journal": 8.3,
+    "Chain Lightning|dc:Play Money": 5.6,
+    "Chain Lightning|dc:Chaos Magic": 7.3,
+    "Magnetic Potion|Trial of Dominance": 7.7,
+    "Giga Steroids|dc:Chain Lightning": 6.4,
+    "Giga Steroids|dc:Tea": 6.9,
+    "Elixir of Immortality|dc:Chaos Magic": 4.7,
+    "Elixir of Immortality|dc:Pyroblast": 4.9,
+    "Elixir of Immortality|dc:Play Money": 4.8,
+    "Elixir of Immortality|dc:Leadership": 5.6,
+    "Fireball|dc:Pyroblast": 4.2,
+    "Fireball|dc:Chaos Magic": 5.9
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Leadership": 7.1,
+      "Chaos Magic": 7.7,
+      "Alchemic Journal": 7.4,
+      "Elixir of Quickness": 6.5,
+      "Play Money": 10,
+      "Magnetic Glove": 6.6,
+      "Treasure Chest": 7.5,
+      "Chain Lightning": 6.3,
+      "Disruption Ray": 8.9,
+      "Elixir of Immortality": 6.5,
+      "Fireball": 7.5,
+      "Trial of Dominance": 8.6
+    },
+    "spell": {
+      "Chain Lightning": -6.3,
+      "Magnetic Potion": -7,
+      "Disruption Ray": -11.2,
+      "Fireball": 8.6,
+      "Tea": 7.1
+    }
+  },
+  "casterDeltas": {
+    "Chaos Magic": {
+      "Timeless King Zi": -7.1,
+      "Cooldin, King of Coolness": 9.8
+    },
+    "Pyroblast": {
+      "Timeless King Zi": -6.7,
+      "Cooldin, King of Coolness": 12.3,
+      "Kazena, the Storming Rebel": -12.6
+    },
+    "Chain Lightning": {
+      "Cooldin, King of Coolness": 14.2,
+      "Kazena, the Storming Rebel": -13.1
+    },
+    "Fireball": {
+      "Cooldin, King of Coolness": 18.9
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Performance": -4.6,
+      "Play Money": 11.7,
+      "Treasure Chest": 7.4,
+      "Giga Steroids": -5.2,
+      "Gathering Storm": 9.8
+    },
+    "ahead": {
+      "Play Money": -16,
+      "Treasure Chest": -15.1,
+      "Chain Lightning": 13.3
+    }
+  },
+  "standingEvalThreshold": 691,
+  "deckoutGuard": {
+    "Magnetic Glove": -20
+  },
+  "deckoutDangerSize": 6,
+  "menuOfferRules": {
+    "Timeless King Zi→Chaos Magic": -8,
+    "Timeless King Zi→Fireball": -4.3,
+    "Timeless King Zi→Flame Avalanche": 10.6,
+    "Timeless King Zi→Pyroblast": 5.1,
+    "Timeless King Zi→Disruption Ray": -6.5,
+    "Timeless King Zi→Trial of Dominance": -5.7,
+    "Timeless King Zi→Gathering Storm": 5.4
+  },
+  "menuOfferRulesByCluster": {
+    "aggro": {
+      "Timeless King Zi→Chaos Magic": -15,
+      "Timeless King Zi→Fireball": -10.4,
+      "Timeless King Zi→Flame Avalanche": -7.5,
+      "Timeless King Zi→Pyroblast": -10.5,
+      "Timeless King Zi→Chain Lightning": -11.8,
+      "Timeless King Zi→Disruption Ray": -12.1,
+      "Timeless King Zi→Trial of Dominance": -10.6,
+      "Timeless King Zi→Gathering Storm": -8.4
+    },
+    "swarm": {
+      "Timeless King Zi→Chaos Magic": 15,
+      "Timeless King Zi→Fireball": 11.8,
+      "Timeless King Zi→Flame Avalanche": 9.9,
+      "Timeless King Zi→Pyroblast": 9.2,
+      "Timeless King Zi→Chain Lightning": 14.4,
+      "Timeless King Zi→Disruption Ray": 13,
+      "Timeless King Zi→Trial of Dominance": 11.4,
+      "Timeless King Zi→Gathering Storm": 6.6
+    },
+    "spell": {
+      "Timeless King Zi→Flame Avalanche": -6.4,
+      "Timeless King Zi→Chain Lightning": -4.5,
+      "Timeless King Zi→Gathering Storm": 15
+    },
+    "mixed": {
+      "Timeless King Zi→Pyroblast": 6.5,
+      "Timeless King Zi→Disruption Ray": 3.7,
+      "Timeless King Zi→Trial of Dominance": 3.1
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "ahead": {
+      "Timeless King Zi→Chaos Magic": 15,
+      "Timeless King Zi→Fireball": 15,
+      "Timeless King Zi→Flame Avalanche": 15,
+      "Timeless King Zi→Pyroblast": 15,
+      "Timeless King Zi→Chain Lightning": 15,
+      "Timeless King Zi→Disruption Ray": 15,
+      "Timeless King Zi→Trial of Dominance": 12.6,
+      "Timeless King Zi→Gathering Storm": 10.6
+    },
+    "behind": {
+      "Timeless King Zi→Fireball": -15,
+      "Timeless King Zi→Flame Avalanche": -12.2,
+      "Timeless King Zi→Pyroblast": -8.7,
+      "Timeless King Zi→Chain Lightning": -8.9,
+      "Timeless King Zi→Disruption Ray": -15,
+      "Timeless King Zi→Trial of Dominance": -3,
+      "Timeless King Zi→Gathering Storm": -12.7
+    }
+  },
+  "targetPriors": {
+    "Pyroblast": {
+      "side:own": -20,
+      "kind:creature": -14.9
+    },
+    "Disruption Ray": {
+      "side:own": -20
+    },
+    "Fireball": {
+      "hp:min": -10.1
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 20,
+      "st:hero-caster": 9.5,
+      "st:poison2+": -5.6,
+      "st:frozen-hero": 20,
+      "st:3+": 3.1
+    }
+  },
+  "tutorPickRules": {
+    "Timeless King Zi→Chaos Magic": -7,
+    "Timeless King Zi→Fireball": -4,
+    "Timeless King Zi→Flame Avalanche": 7,
+    "Timeless King Zi→Disruption Ray": -4.1,
+    "Timeless King Zi→Trial of Dominance": -4.7,
+    "Timeless King Zi→Gathering Storm": 3.8,
+    "Magnetic Glove→Magnetic Glove": -20,
+    "Magnetic Glove→Leadership": -20,
+    "Magnetic Glove→Pyroblast": 7.1,
+    "Magnetic Glove→Flame Avalanche": -3,
+    "Magnetic Glove→Gathering Storm": -8.7,
+    "Magnetic Glove→Fireball": 6.7,
+    "Magnetic Glove→Chain Lightning": -11.4,
+    "Magnetic Glove→Chaos Magic": 11.4,
+    "Magnetic Glove→Blood Rock": -20,
+    "Magnetic Glove→Diver Helmet": 13.7,
+    "Magnetic Potion→Magnetic Glove": 16.2,
+    "Magnetic Potion→Alchemic Journal": 6.1,
+    "Magnetic Potion→Leadership": -14.4,
+    "Magnetic Potion→Flame Avalanche": -6.7,
+    "Magnetic Potion→Tea": -20,
+    "Magnetic Potion→Gathering Storm": -20,
+    "Magnetic Potion→Pyroblast": 5,
+    "Magnetic Potion→Trial of Dominance": -20,
+    "Magnetic Potion→Play Money": -5,
+    "Magnetic Potion→Giga Steroids": -13.8,
+    "Magnetic Potion→Disruption Ray": 15.6,
+    "Magnetic Potion→Diver Helmet": 7.6,
+    "Magnetic Potion→Chain Lightning": -14.4,
+    "Elixir of Immortality→Timeless King Zi": 20,
+    "Alchemic Journal — Choose a Potion→Magnetic Potion": 6.5,
+    "Alchemic Journal — Choose a Potion→Elixir of Immortality": -4,
+    "Alchemic Journal — Choose a Potion→Resuscitation Potion": -2.2,
+    "Alchemic Journal — Choose a Potion→Elixir of Quickness": 3.3,
+    "Enigma, the Seller of Secrets→Chain Lightning": 9.7,
+    "Enigma, the Seller of Secrets→Gathering Storm": 20,
+    "Enigma, the Seller of Secrets→Leadership": -5.8,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 6.6,
+    "Enigma, the Seller of Secrets→Treasure Chest": -17.9,
+    "Enigma, the Seller of Secrets→Flame Avalanche": -10,
+    "Enigma, the Seller of Secrets→Disruption Ray": 16.1,
+    "Enigma, the Seller of Secrets→Giga Steroids": 6.4,
+    "Enigma, the Seller of Secrets→Alchemic Journal": 5.8,
+    "Enigma, the Seller of Secrets→Pyroblast": 20,
+    "Enigma, the Seller of Secrets→Performance": 4.5,
+    "Enigma, the Seller of Secrets→Tea": 2.7,
+    "Enigma, the Seller of Secrets→Diver Helmet": -10.8,
+    "Enigma, the Seller of Secrets→Blood Rock": -20,
+    "Magic Lamp→Critical Strike": -8,
+    "Magic Lamp→Acid Vial": -14.8,
+    "Magic Lamp→Divine Gift of the Guardian": 20,
+    "Magic Amethyst→Leadership": 5.6,
+    "Magic Amethyst→Magic Arts": -20
+  },
+  "abilityPriors": {
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness≥2": 150,
+    "Leadership@Cooldin, King of Coolness≥3": 150,
+    "Magic Arts@Timeless King Zi": 150,
+    "Magic Arts@Timeless King Zi≥2": -60,
+    "Magic Arts@Timeless King Zi≥3": 77,
+    "Trade@Timeless King Zi": 150,
+    "Adventurousness@Kazena, the Storming Rebel": 150,
+    "Support Magic@Kazena, the Storming Rebel": 150,
+    "Adventurousness@Kazena, the Storming Rebel≥2": 150,
+    "Support Magic@Kazena, the Storming Rebel≥2": -60,
+    "Leadership@Kazena, the Storming Rebel": 150,
+    "Leadership@Kazena, the Storming Rebel≥2": -60,
+    "Leadership@Kazena, the Storming Rebel≥3": 150,
+    "Leadership@Timeless King Zi": -60,
+    "Leadership@Timeless King Zi≥2": -60,
+    "Alchemy@Cooldin, King of Coolness≥2": 49.5,
+    "Trade@Timeless King Zi≥2": -60,
+    "Leadership@Timeless King Zi≥3": -60
+  },
+  "equipPriors": {
+    "Diver Helmet@Kazena, the Storming Rebel": 150,
+    "Diver Helmet@Timeless King Zi": 150,
+    "Diver Helmet@Cooldin, King of Coolness": 135.3
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Elixir of Immortality→Cooldin, King of Coolness": 30,
+    "Resuscitation Potion→Timeless King Zi": 30,
+    "Elixir of Immortality→Timeless King Zi": 30,
+    "Resuscitation Potion→Kazena, the Storming Rebel": 30,
+    "Elixir of Immortality→Kazena, the Storming Rebel": 30,
+    "Resuscitation Potion→Cooldin, King of Coolness": 30
+  },
+  "reviveAbilities": {
+    "Elixir of Immortality→Alchemy": 30,
+    "Elixir of Immortality→Leadership": 30,
+    "Resuscitation Potion→Magic Arts": 30,
+    "Resuscitation Potion→Trade": 30,
+    "Elixir of Immortality→Magic Arts": 30,
+    "Elixir of Immortality→Trade": 30,
+    "Resuscitation Potion→Support Magic": 30,
+    "Resuscitation Potion→Adventurousness": 30,
+    "Elixir of Immortality→Adventurousness": 30,
+    "Elixir of Immortality→Support Magic": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Leadership": 30
+  },
+  "startHandValues": {
+    "Play Money": -2.3,
+    "Diver Helmet": 6,
+    "Flame Avalanche": -4.2,
+    "Disruption Ray": 1.2,
+    "Alchemic Journal": 1.2,
+    "Giga Steroids": 1.7,
+    "Pyroblast": -3.1,
+    "Chaos Magic": -2.1,
+    "Gathering Storm": -1.5,
+    "Tea": 1.4,
+    "Chain Lightning": -4.5,
+    "Fireball": 2.4
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "54%",
+    "winAfterMull": "75.2%",
+    "winAfterKeep": "74.9%"
+  },
+  "heroEffectTiming": {
+    "Cooldin, King of Coolness@hand:0-1": -3.2,
+    "Kazena, the Storming Rebel@hand:0-1": -15,
+    "Cooldin, King of Coolness@hand:4+": 4.6,
+    "Cooldin, King of Coolness@hand:2-3": 5.8,
+    "Timeless King Zi@hand:0-1": -3.6
+  },
+  "boardPairs": {
+    "Leadership|Magic Arts": -5.8,
+    "Leadership|Trade": -6.2,
+    "Diver Helmet|Gathering Storm": 15,
+    "Gathering Storm|Magic Arts": 15,
+    "Gathering Storm|Trade": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

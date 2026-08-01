@@ -107,8 +107,14 @@ module.exports = {
     const targetLink = chain[targetIndex];
     if (!targetLink) return;
 
+    // Animation auf dem CASTER-Helden (gleicher Fund wie bei "The
+    // Master's Plan": `heroIdx: 0` war fest verdrahtet, der Puls lief
+    // also immer über dem linken Helden). Der eigene Chain-Link trägt
+    // den Caster; Fallback 0 hält die Animation im Zweifel am Laufen.
+    const selfLink = chain[myIndex];
+    const casterHeroIdx = selfLink?.casterHeroIdx ?? selfLink?.heroIdx ?? 0;
     engine._broadcastEvent('play_zone_animation', {
-      type: 'lunar_eclipse_pulse', owner: pi, heroIdx: 0, zoneSlot: -1,
+      type: 'lunar_eclipse_pulse', owner: pi, heroIdx: casterHeroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
 

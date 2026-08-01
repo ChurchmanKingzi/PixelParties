@@ -23,6 +23,21 @@ const ABILITY_NAME = 'Performance';
 module.exports = {
   inherentAction: harpyformerInherentAction,
 
+  cpuMeta: {
+    // ── Ausspiel-Vorfahrt: muss die ERSTE Kreatur des Zuges sein ────
+    // Der Gratis-Zusatzaktions-Vertrag der Harpyformer greift NUR,
+    // solange `_creaturesSummonedThisTurn === 0`. Kommt irgendeine
+    // andere Kreatur zuerst, ist die Gratis-Aktion für diesen Zug
+    // ersatzlos verloren — das ist keine Wertfrage, sondern eine
+    // KAUSALE Bedingung, genau der Fall, für den die Vorfahrt gebaut
+    // wurde (der Wert-Term geht nur mit Faktor 0.1 in den Score ein und
+    // könnte ein negatives Reihenfolge-Gewicht nie überstimmen).
+    // Beide Harpyformer tragen dieselbe Stufe; welcher von beiden
+    // innerhalb der Stufe zuerst kommt, entscheidet das gelernte
+    // Ranking.
+    playOrderPriority: 100,
+  },
+
   /**
    * CPU brain override for Ska's on-summon "Deal 50 damage to your
    * host hero to tutor Performance?" confirm.
@@ -104,6 +119,7 @@ module.exports = {
       catch { return CONFIRM; } // snapshot failed — default confirm
 
       let hostAliveAfter = true;
+      const prevInMctsSim = engine._inMctsSim;
       engine._inMctsSim = true;
       engine.enterFastMode();
       try {
@@ -143,7 +159,11 @@ module.exports = {
         hostAliveAfter = true;
       } finally {
         try { engine.restore(snap); } catch {}
-        engine._inMctsSim = false;
+        // Restore statt hart false: innerhalb eines äußeren Rollouts
+        // (Gegner-Sim fragt diesen Confirm ab) darf der Sim-Marker des
+        // äußeren Scopes nicht gelöscht werden — sonst greifen dessen
+        // Sim-Guards (onGameOver, Driver-Sperre) nicht mehr.
+        engine._inMctsSim = prevInMctsSim;
         engine.exitFastMode();
       }
       return hostAliveAfter ? CONFIRM : DECLINE;

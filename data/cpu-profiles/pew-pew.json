@@ -1,0 +1,302 @@
+{
+  "deck": "Pew-Pew!",
+  "heroes": [
+    "Kazena, the Storming Rebel",
+    "Bow Sniper Darge",
+    "Treasure Huntress Semi"
+  ],
+  "games": 1292,
+  "trainWinRate": "59%",
+  "trainedAt": "2026-07-20T03:38:08.206Z",
+  "meanTurns": 17.7,
+  "cardValues": {
+    "Fighting": 8,
+    "Flame Arrow": 57.9,
+    "Poisoned Arrow": 49.7,
+    "Rainbow's Arrow": 42.7,
+    "Arrow Slit": 28.7,
+    "Golden Arrow": 30.2,
+    "Heavy Hit": 46.3,
+    "Leadership": 8,
+    "Archer": 8,
+    "Quick Attack": 40.6,
+    "Angelfeather Arrow": 55.4,
+    "Hammer Throw": 30.3,
+    "Treasure Chest": 8,
+    "Bomb Arrow": 36.7,
+    "Ferocious Tiger Kick": 90.8,
+    "Golden Ankh": 8
+  },
+  "timing": {
+    "Fighting": {
+      "early": 0.85,
+      "mid": 1.15,
+      "late": 1
+    },
+    "Flame Arrow": {
+      "early": 0.75,
+      "mid": 0.86,
+      "late": 1.3
+    },
+    "Poisoned Arrow": {
+      "early": 0.75,
+      "mid": 0.79,
+      "late": 1.3
+    },
+    "Rainbow's Arrow": {
+      "early": 0.75,
+      "mid": 0.83,
+      "late": 1.3
+    },
+    "Arrow Slit": {
+      "early": 0.75,
+      "mid": 0.86,
+      "late": 1.3
+    },
+    "Golden Arrow": {
+      "early": 0.75,
+      "mid": 0.84,
+      "late": 1.3
+    },
+    "Heavy Hit": {
+      "early": 0.75,
+      "mid": 0.81,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.3
+    },
+    "Archer": {
+      "early": 0.75,
+      "mid": 0.95,
+      "late": 1.3
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 0.98,
+      "late": 1.3
+    },
+    "Angelfeather Arrow": {
+      "early": 0.75,
+      "mid": 0.85,
+      "late": 1.3
+    },
+    "Hammer Throw": {
+      "early": 0.75,
+      "mid": 0.99,
+      "late": 1.29
+    },
+    "Treasure Chest": {
+      "early": 0.75,
+      "mid": 1.22,
+      "late": 1.3
+    },
+    "Bomb Arrow": {
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
+    },
+    "Ferocious Tiger Kick": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    }
+  },
+  "pairBonuses": {
+    "Leadership|Racket Arrow": 6.4,
+    "Racket Arrow|Treasure Chest": 4.4
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Fighting": -11.8,
+      "Flame Arrow": -8.1,
+      "Poisoned Arrow": -9,
+      "Rainbow's Arrow": -12.6,
+      "Arrow Slit": -10.4,
+      "Golden Arrow": -12,
+      "Heavy Hit": -10.8,
+      "Leadership": -12.7,
+      "Archer": -12.2,
+      "Quick Attack": -10.7,
+      "Angelfeather Arrow": -10,
+      "Hammer Throw": -10.1,
+      "Treasure Chest": -11.5,
+      "Bomb Arrow": -8.8,
+      "Racket Arrow": -17.9,
+      "Ferocious Tiger Kick": -9.2
+    },
+    "swarm": {
+      "Fighting": 6.6,
+      "Flame Arrow": 6.2,
+      "Rainbow's Arrow": 6,
+      "Arrow Slit": 6.1,
+      "Golden Arrow": 6.2,
+      "Leadership": 6.8,
+      "Archer": 6.3,
+      "Treasure Chest": 6.2,
+      "Bomb Arrow": 6.3
+    },
+    "spell": {
+      "Flame Arrow": -11.8,
+      "Poisoned Arrow": -10.3,
+      "Arrow Slit": -9.7,
+      "Golden Arrow": -8.8,
+      "Heavy Hit": -7.6,
+      "Leadership": -8.5,
+      "Quick Attack": -8.3,
+      "Angelfeather Arrow": -11.4,
+      "Treasure Chest": -8,
+      "Bomb Arrow": -13.4,
+      "Racket Arrow": -11.1,
+      "Ferocious Tiger Kick": -13.6
+    }
+  },
+  "casterDeltas": {
+    "Quick Attack": {
+      "Bow Sniper Darge": -4
+    },
+    "Ferocious Tiger Kick": {
+      "Bow Sniper Darge": 5.9,
+      "Kazena, the Storming Rebel": -8
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Angelfeather Arrow": -3,
+      "Treasure Chest": 8.4,
+      "Ferocious Tiger Kick": -9.9
+    },
+    "ahead": {
+      "Heavy Hit": 5.1,
+      "Treasure Chest": -12.4
+    }
+  },
+  "standingEvalThreshold": 850,
+  "deckoutGuard": {
+    "Fighting": -20
+  },
+  "deckoutDangerSize": 10,
+  "targetPriors": {
+    "Heavy Hit": {
+      "side:own": -20,
+      "kind:creature": -13
+    },
+    "Quick Attack": {
+      "side:own": -20,
+      "hp:max": -9.5,
+      "kind:creature": -10.1
+    },
+    "Hammer Throw": {
+      "kind:creature": -7.7,
+      "side:own": -18
+    },
+    "Archer": {
+      "frozen": -6.2
+    },
+    "Ferocious Tiger Kick": {
+      "kind:creature": -14.5,
+      "side:own": -15.1,
+      "hp:min": -13.6,
+      "hp:max": -13.5
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": -15
+  },
+  "tutorPickRules": {
+    "Chain a Reaction?→Flame Arrow": 3,
+    "Chain a Reaction?→Poisoned Arrow": -2.6,
+    "Chain a Reaction?→Arrow Slit": -2.3,
+    "Chain a Reaction?→Golden Arrow": -2.4,
+    "Magic Lamp→Decay Magic": -10.9,
+    "Magic Lamp→Cataclysm": -20,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Bamboo Staff": -20,
+    "Magic Lamp→Acid Vial": 2.9,
+    "Magic Lamp→Alchemy": 13.4,
+    "Magic Lamp→Chain Lightning": -20,
+    "Magic Lamp→Critical Strike": -19.2,
+    "Magic Lamp→Icy Slime": 9.2,
+    "Enigma, the Seller of Secrets→Bomb Arrow": 19.5,
+    "Enigma, the Seller of Secrets→Hammer Throw": -8,
+    "Enigma, the Seller of Secrets→Rainbow's Arrow": -2.3,
+    "Enigma, the Seller of Secrets→Arrow Slit": -9.8,
+    "Enigma, the Seller of Secrets→Golden Arrow": 7.1,
+    "Enigma, the Seller of Secrets→Ferocious Tiger Kick": -17,
+    "Enigma, the Seller of Secrets→Archer": 9.5,
+    "Enigma, the Seller of Secrets→Leadership": -8.6,
+    "Enigma, the Seller of Secrets→Treasure Chest": -3.2,
+    "Enigma, the Seller of Secrets→Flame Arrow": -5.2,
+    "Enigma, the Seller of Secrets→Angelfeather Arrow": 15.4,
+    "Enigma, the Seller of Secrets→Heavy Hit": 10.3,
+    "Enigma, the Seller of Secrets→Golden Ankh": -7.2
+  },
+  "abilityPriors": {
+    "Adventurousness@Kazena, the Storming Rebel": 150,
+    "Support Magic@Kazena, the Storming Rebel": 80.4,
+    "Leadership@Kazena, the Storming Rebel": -60,
+    "Adventurousness@Bow Sniper Darge": 150,
+    "Fighting@Bow Sniper Darge": 47,
+    "Leadership@Bow Sniper Darge": 150,
+    "Adventurousness@Treasure Huntress Semi": -60,
+    "Adventurousness@Treasure Huntress Semi≥2": 27.6,
+    "Leadership@Treasure Huntress Semi": 150,
+    "Leadership@Treasure Huntress Semi≥2": 150,
+    "Leadership@Bow Sniper Darge≥2": -60,
+    "Fighting@Kazena, the Storming Rebel": 42.2,
+    "Leadership@Treasure Huntress Semi≥3": 150,
+    "Leadership@Kazena, the Storming Rebel≥2": -60,
+    "Leadership@Kazena, the Storming Rebel≥3": -60,
+    "Leadership@Bow Sniper Darge≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {
+    "Hammer Throw|item@1": -18
+  },
+  "reviveTargets": {
+    "Golden Ankh→Kazena, the Storming Rebel": 30,
+    "Golden Ankh→Treasure Huntress Semi": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Adventurousness": 30,
+    "Golden Ankh→Fighting": 30,
+    "Golden Ankh→Leadership": 30,
+    "Golden Ankh→Support Magic": 30
+  },
+  "startHandValues": {
+    "Poisoned Arrow": -1.7,
+    "Fighting": 3.6,
+    "Flame Arrow": -1.4,
+    "Golden Arrow": 2.8,
+    "Archer": 2.3,
+    "Golden Ankh": -5.5,
+    "Bomb Arrow": -2.2,
+    "Arrow Slit": -2,
+    "Heavy Hit": -3.9,
+    "Leadership": 4.2,
+    "Hammer Throw": -1.7,
+    "Racket Arrow": -3.5
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "25.7%",
+    "winAfterMull": "59%",
+    "winAfterKeep": "59%"
+  },
+  "heroEffectTiming": {
+    "Kazena, the Storming Rebel@hand:2-3": 4,
+    "Kazena, the Storming Rebel@hand:0-1": 4.1
+  },
+  "boardPairs": {
+    "Adventurousness|Archer": 9.5,
+    "Adventurousness|Support Magic": 15,
+    "Leadership|Support Magic": -15,
+    "Fighting|Leadership": 15,
+    "Archer|Fighting": 15,
+    "Fighting|Support Magic": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

@@ -1,0 +1,486 @@
+{
+  "deck": "Man's Best Friends",
+  "heroes": [
+    "Ingo, Investor of Evil",
+    "Orthos, the Loyal Guard Dog",
+    "Alice, the Puppeteer Girl"
+  ],
+  "games": 1360,
+  "trainWinRate": "45.4%",
+  "trainedAt": "2026-07-25T08:02:16.555Z",
+  "meanTurns": 19.9,
+  "cardValues": {
+    "Alchemy": 8,
+    "Loyal Bone Dog": 8,
+    "Loyal Rottweiler": 30.9,
+    "Loyal Terrier": 8,
+    "Magnetic Potion": 24,
+    "Book of Doom": 100,
+    "Elixir of Quickness": 27.1,
+    "Loyal Hountriever": 48.2,
+    "Performance": 8,
+    "Magic Lamp": 39.8,
+    "Magnetic Glove": 57.6,
+    "Loyal Pinpom": 18.5,
+    "Beer": 45.8,
+    "Cute Cheese": 8,
+    "Loyal Labradoodle": 8,
+    "Wheels": 48.1,
+    "Monster in a Bottle": 33.6
+  },
+  "timing": {
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Loyal Bone Dog": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.15
+    },
+    "Loyal Rottweiler": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.18
+    },
+    "Loyal Terrier": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Magnetic Potion": {
+      "early": 1,
+      "mid": 1.11,
+      "late": 0.89
+    },
+    "Book of Doom": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 1,
+      "mid": 1.09,
+      "late": 0.91
+    },
+    "Loyal Hountriever": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.21
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.27
+    },
+    "Magic Lamp": {
+      "early": 1,
+      "mid": 0.96,
+      "late": 1.04
+    },
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.26,
+      "late": 1.3
+    },
+    "Loyal Pinpom": {
+      "early": 0.76,
+      "mid": 1.3,
+      "late": 0.8
+    },
+    "Beer": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Loyal Labradoodle": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.87,
+      "late": 1.13
+    }
+  },
+  "pairBonuses": {
+    "Loyal Bone Dog|dc:Elixir of Quickness": 4.5,
+    "Performance|Resuscitation Potion": 4.4,
+    "Divine Gift of the Guardian|Resuscitation Potion": 4.1
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Elixir of Quickness": -11.4,
+      "Performance": -9.1,
+      "Loyal Bone Dog": -7.6,
+      "Divine Gift of the Guardian": -18.4,
+      "Beer": -5.3,
+      "Cute Cheese": -6.5,
+      "Resuscitation Potion": -6.1
+    },
+    "ahead": {
+      "Book of Doom": 6.7,
+      "Alchemy": 6.9
+    }
+  },
+  "standingEvalThreshold": 978,
+  "deckoutGuard": {
+    "Loyal Hountriever": -20,
+    "Loyal Pinpom": -19.1,
+    "Loyal Bone Dog": -18
+  },
+  "deckoutDangerSize": 6,
+  "menuOfferRules": {
+    "Magic Lamp→Alchemy": -6.4,
+    "Magic Lamp→Beer": 8.2,
+    "Magic Lamp→Book of Doom": 8.1,
+    "Magic Lamp→Divine Gift of the Guardian": -8.6,
+    "Magic Lamp→Loyal Bone Dog": -7.5,
+    "Magic Lamp→Loyal Labradoodle": 3.5,
+    "Magic Lamp→Loyal Terrier": -11.4,
+    "Magic Lamp→Loyal Pinpom": 4.6,
+    "Magic Lamp→Loyal Rottweiler": -5.7,
+    "Magic Lamp→Performance": -20,
+    "Magic Lamp→Magnetic Glove": 20
+  },
+  "menuOfferRulesByCluster": {
+    "spell": {
+      "Magic Lamp→Alchemy": 4.9,
+      "Magic Lamp→Beer": 8.4,
+      "Magic Lamp→Book of Doom": 4.2,
+      "Magic Lamp→Divine Gift of the Guardian": -3.3,
+      "Magic Lamp→Loyal Bone Dog": 4.7,
+      "Magic Lamp→Loyal Hountriever": 10,
+      "Magic Lamp→Loyal Labradoodle": 11.6,
+      "Magic Lamp→Loyal Pinpom": -6.1,
+      "Magic Lamp→Dark Gear": 15
+    },
+    "aggro": {
+      "Magic Lamp→Alchemy": -15,
+      "Magic Lamp→Beer": -15,
+      "Magic Lamp→Book of Doom": -15,
+      "Magic Lamp→Divine Gift of the Guardian": -15,
+      "Magic Lamp→Loyal Bone Dog": -12.8,
+      "Magic Lamp→Loyal Hountriever": -8.8,
+      "Magic Lamp→Loyal Labradoodle": -15,
+      "Magic Lamp→Loyal Pinpom": -15,
+      "Magic Lamp→Dark Gear": -15,
+      "Magic Lamp→Loyal Rottweiler": 3.6,
+      "Magic Lamp→Performance": -10.9
+    },
+    "swarm": {
+      "Magic Lamp→Alchemy": 15,
+      "Magic Lamp→Beer": 15,
+      "Magic Lamp→Book of Doom": 15,
+      "Magic Lamp→Divine Gift of the Guardian": 15,
+      "Magic Lamp→Loyal Bone Dog": 12.4,
+      "Magic Lamp→Loyal Hountriever": 8.5,
+      "Magic Lamp→Loyal Labradoodle": 10.3,
+      "Magic Lamp→Loyal Terrier": 15,
+      "Magic Lamp→Loyal Pinpom": 15,
+      "Magic Lamp→Dark Gear": 8.4,
+      "Magic Lamp→Loyal Rottweiler": -4.8
+    },
+    "mixed": {
+      "Magic Lamp→Book of Doom": 4.2,
+      "Magic Lamp→Loyal Hountriever": -7.2,
+      "Magic Lamp→Loyal Labradoodle": 5.6,
+      "Magic Lamp→Loyal Terrier": -15,
+      "Magic Lamp→Loyal Pinpom": 15,
+      "Magic Lamp→Dark Gear": -3.3
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Alchemy": -15,
+      "Magic Lamp→Beer": -15,
+      "Magic Lamp→Book of Doom": -15,
+      "Magic Lamp→Divine Gift of the Guardian": -6.8,
+      "Magic Lamp→Loyal Bone Dog": -12.2,
+      "Magic Lamp→Loyal Hountriever": -15,
+      "Magic Lamp→Loyal Labradoodle": -15,
+      "Magic Lamp→Loyal Pinpom": -15,
+      "Magic Lamp→Dark Gear": -15,
+      "Magic Lamp→Loyal Rottweiler": -11.1,
+      "Magic Lamp→Performance": -15
+    },
+    "ahead": {
+      "Magic Lamp→Alchemy": 15,
+      "Magic Lamp→Beer": 15,
+      "Magic Lamp→Book of Doom": 15,
+      "Magic Lamp→Divine Gift of the Guardian": 15,
+      "Magic Lamp→Dark Gear": 15
+    }
+  },
+  "targetPriors": {
+    "Alice, the Puppeteer Girl": {
+      "kind:creature": -6.4
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -13.5,
+      "side:own": -9.7,
+      "kind:creature": -12
+    },
+    "Slippery Narw": {
+      "side:opp": 6
+    },
+    "Biomancy Token": {
+      "kind:creature": -13.6,
+      "hp:max": -6.6,
+      "hp:min": -11.9
+    },
+    "Elven Archer": {
+      "hp:max": -20
+    }
+  },
+  "reactionRules": {
+    "Loyal Bone Dog": {
+      "early": 5.3,
+      "mid": 9.4,
+      "late": 4.5
+    }
+  },
+  "statusHealRules": {
+    "Beer": {
+      "st:stun-hero": -5.7,
+      "st:hero-caster": -6.7,
+      "st:2": -11.6,
+      "st:3+": -10.6,
+      "st:poison2+": -11.7,
+      "st:frozen-hero": 10.6
+    },
+    "Coffee": {
+      "st:hero-caster": 20
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -4.9,
+    "plc:slack:1": 4.8,
+    "plc:slack:2+": 5.5,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Monster in a Bottle→Loyal Rottweiler": 7.8,
+    "Monster in a Bottle→Loyal Bone Dog": 3.6,
+    "Monster in a Bottle→Loyal Hountriever": -5.3,
+    "Monster in a Bottle→Loyal Labradoodle": -3.3,
+    "Monster in a Bottle→Loyal Shepherd": -3.7,
+    "Monster in a Bottle→Loyal Pinpom": -15.5,
+    "Magic Lamp→Alchemy": 2.2,
+    "Magic Lamp→Beer": 6.2,
+    "Magic Lamp→Book of Doom": 5.9,
+    "Magic Lamp→Divine Gift of the Guardian": -7.5,
+    "Magic Lamp→Loyal Bone Dog": -4,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Loyal Hountriever": -2,
+    "Magic Lamp→Loyal Labradoodle": 2.7,
+    "Magic Lamp→Loyal Terrier": -8,
+    "Magic Lamp→Loyal Pinpom": 5.9,
+    "Magic Lamp→Dark Gear": -4.2,
+    "Magic Lamp→Decay Magic": -20,
+    "Magic Lamp→Cataclysm": -20,
+    "Magic Lamp→Loyal Shepherd": 4.3,
+    "Magic Lamp→Loyal Rottweiler": -3.5,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Elixir of Immortality": -20,
+    "Magic Lamp→Chain Lightning": -20,
+    "Magic Lamp→Cloudy Slime": 7.2,
+    "Magic Lamp→Divine Punishment": -4.1,
+    "Magic Lamp→Performance": -11.6,
+    "Magic Lamp→Magnetic Glove": 20,
+    "Magic Lamp→Fiery Slime": -20,
+    "Magic Lamp→Defending the Gate": -20,
+    "Magic Lamp→Coffee": -20,
+    "Magic Lamp→Destruction Magic": -20,
+    "Loyal Rottweiler→Loyal Rottweiler": 9.3,
+    "Loyal Rottweiler→Loyal Labradoodle": -4.3,
+    "Loyal Rottweiler→Loyal Terrier": -8.4,
+    "Loyal Rottweiler→Loyal Bone Dog": 2.6,
+    "Magnetic Glove→Loyal Hountriever": -7.7,
+    "Magnetic Glove→Book of Doom": -6,
+    "Magnetic Glove→Performance": -12.4,
+    "Magnetic Glove→Loyal Rottweiler": 10.1,
+    "Magnetic Glove→Loyal Labradoodle": 5.2,
+    "Magnetic Glove→Alchemy": 10.5,
+    "Magnetic Glove→The Yeeting": -11.1,
+    "Magnetic Glove→Loyal Terrier": -3.3,
+    "Magnetic Glove→Loyal Pinpom": -10.9,
+    "Magnetic Glove→Dark Gear": 7.2,
+    "Magnetic Glove→Divine Gift of the Guardian": 8.2,
+    "Magnetic Glove→Beer": 6.2,
+    "Magnetic Glove→Magnetic Glove": -17.9,
+    "Magnetic Glove→Loyal Bone Dog": -3.6,
+    "Magnetic Glove→Loyal Shepherd": 10.3,
+    "Loyal Pinpom→Loyal Terrier": -2.5,
+    "Loyal Pinpom→Loyal Pinpom": -2,
+    "Loyal Pinpom→Loyal Rottweiler": -10.6,
+    "Loyal Pinpom→Loyal Labradoodle": 7.3,
+    "Loyal Pinpom→Loyal Bone Dog": -3.2,
+    "Loyal Pinpom→Loyal Hountriever": 11.5,
+    "Orthos, the Loyal Guard Dog→Loyal Pinpom": -4.7,
+    "Orthos, the Loyal Guard Dog→Loyal Hountriever": 6.3,
+    "Orthos, the Loyal Guard Dog→Loyal Rottweiler": 5.6,
+    "Orthos, the Loyal Guard Dog→Loyal Shepherd": -9,
+    "Orthos, the Loyal Guard Dog→Loyal Labradoodle": -2.8,
+    "Cute Cheese→Loyal Hountriever": 2.3,
+    "Cute Cheese→Loyal Bone Dog": 4.8,
+    "Cute Cheese→Loyal Labradoodle": -3.3,
+    "Magnetic Potion→Loyal Pinpom": -5.4,
+    "Magnetic Potion→Loyal Bone Dog": -15.8,
+    "Magnetic Potion→Beer": -3.7,
+    "Magnetic Potion→Loyal Labradoodle": -4.1,
+    "Magnetic Potion→Book of Doom": 14.7,
+    "Magnetic Potion→Performance": 12.4,
+    "Magnetic Potion→Divine Gift of the Guardian": -20,
+    "Magnetic Potion→The Yeeting": 16.8,
+    "Magnetic Potion→Alchemy": 3.9,
+    "Magnetic Potion→Loyal Terrier": -10.2,
+    "Magnetic Potion→Loyal Shepherd": 7.8,
+    "Magnetic Potion→Loyal Hountriever": -10.6,
+    "Magnetic Potion→Loyal Rottweiler": 9.5,
+    "Magnetic Potion→Wheels": -4.1,
+    "Magnetic Potion→Magnetic Glove": -11.4,
+    "Loyal Shepherd→Loyal Terrier": -3.4,
+    "Loyal Shepherd→Loyal Hountriever": -2.9,
+    "Loyal Shepherd→Loyal Pinpom": -3.1,
+    "Loyal Shepherd→Loyal Labradoodle": 8.4,
+    "Enigma, the Seller of Secrets→Book of Doom": -4.4,
+    "Enigma, the Seller of Secrets→Cute Cheese": 6.4,
+    "Enigma, the Seller of Secrets→Loyal Hountriever": 6.5,
+    "Enigma, the Seller of Secrets→Alchemy": 7.7,
+    "Enigma, the Seller of Secrets→Performance": -7.2,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -15.7,
+    "Enigma, the Seller of Secrets→Loyal Rottweiler": -4.6,
+    "Enigma, the Seller of Secrets→Loyal Terrier": 4.2,
+    "Enigma, the Seller of Secrets→Wheels": 5.1,
+    "Enigma, the Seller of Secrets→The Yeeting": -9.9,
+    "Enigma, the Seller of Secrets→Loyal Shepherd": 18.7,
+    "Enigma, the Seller of Secrets→Loyal Labradoodle": -10.1,
+    "Enigma, the Seller of Secrets→Loyal Bone Dog": -5.3,
+    "Enigma, the Seller of Secrets→Beer": -2.5,
+    "Enigma, the Seller of Secrets→Loyal Pinpom": 4.2,
+    "Slippery Narw→Loyal Labradoodle": 8.9,
+    "Slippery Narw→Loyal Bone Dog": 16,
+    "Slippery Narw→Loyal Terrier": -3.1,
+    "Slippery Narw→Loyal Pinpom": -15.5,
+    "Magic Amethyst→Destruction Magic": 4.4,
+    "Magic Amethyst→Summoning Magic": 14.7,
+    "Magic Amethyst→Alchemy": -7,
+    "Guardian Beast Hu→Rain of Arrows": 9
+  },
+  "abilityPriors": {
+    "Summoning Magic@Ingo, Investor of Evil": 150,
+    "Wealth@Ingo, Investor of Evil": 150,
+    "Alchemy@Ingo, Investor of Evil": -60,
+    "Summoning Magic@Orthos, the Loyal Guard Dog": 150,
+    "Summoning Magic@Orthos, the Loyal Guard Dog≥2": -60,
+    "Toughness@Orthos, the Loyal Guard Dog": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": 150,
+    "Alchemy@Orthos, the Loyal Guard Dog": -60,
+    "Alchemy@Alice, the Puppeteer Girl": -60,
+    "Wealth@Ingo, Investor of Evil≥2": -45.8,
+    "Alchemy@Ingo, Investor of Evil≥2": -60,
+    "Alchemy@Ingo, Investor of Evil≥3": -60,
+    "Summoning Magic@Ingo, Investor of Evil≥2": -60,
+    "Toughness@Orthos, the Loyal Guard Dog≥2": 124.1,
+    "Alchemy@Alice, the Puppeteer Girl≥2": 150,
+    "Alchemy@Orthos, the Loyal Guard Dog≥2": 12.8,
+    "Alchemy@Orthos, the Loyal Guard Dog≥3": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl≥2": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl≥2": 49.1,
+    "Summoning Magic@Ingo, Investor of Evil≥3": -60,
+    "Toughness@Orthos, the Loyal Guard Dog≥3": -45.2,
+    "Wealth@Ingo, Investor of Evil≥3": -60,
+    "Alchemy@Alice, the Puppeteer Girl≥3": 150,
+    "Summoning Magic@Orthos, the Loyal Guard Dog≥3": 150
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30,
+    "Resuscitation Potion→Ingo, Investor of Evil": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Wealth": 30
+  },
+  "startHandValues": {
+    "The Yeeting": -2.7,
+    "Loyal Rottweiler": 3.4,
+    "Loyal Bone Dog": 6.1,
+    "Alchemy": -1,
+    "Loyal Terrier": -1.3,
+    "Loyal Hountriever": 2.2,
+    "Loyal Shepherd": 6.7,
+    "Dark Gear": -1.2,
+    "Cute Cheese": -3.9,
+    "Loyal Pinpom": 3.8,
+    "Wheels": -4.5,
+    "Magnetic Glove": -1.3,
+    "Beer": -2.9,
+    "Divine Gift of the Guardian": 2.2,
+    "Performance": -2.1,
+    "Loyal Labradoodle": 3
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "11.3%",
+    "winAfterMull": "42.9%",
+    "winAfterKeep": "45.7%"
+  },
+  "heroEffectTiming": {
+    "Alice, the Puppeteer Girl@hand:4+": 9.3,
+    "Alice, the Puppeteer Girl@hand:2-3": 2.7,
+    "Alice, the Puppeteer Girl@hand:0-1": 3.2
+  },
+  "boardPairs": {
+    "Loyal Rottweiler|Summoning Magic": -4.5,
+    "Summoning Magic|Wealth": 14.8,
+    "Alchemy|Summoning Magic": 15,
+    "Loyal Terrier|Summoning Magic": 4.3,
+    "Destruction Magic|Loyal Terrier": 13.3,
+    "Destruction Magic|Summoning Magic": 15,
+    "Loyal Pinpom|Summoning Magic": 3.7,
+    "Destruction Magic|Loyal Hountriever": 15,
+    "Destruction Magic|Loyal Pinpom": 12,
+    "Destruction Magic|Loyal Bone Dog": 8.2,
+    "Metal Harpyformer|Summoning Magic": 9.2,
+    "Destruction Magic|Loyal Shepherd": 9.1,
+    "Archer|Summoning Magic": -10.1,
+    "Loyal Labradoodle|Loyal Rottweiler": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.633,
+      "n": 109,
+      "values": {
+        "Deepsea Primordium": 0.367,
+        "Hell Fox": -0.258,
+        "Cloudy Slime": -0.133,
+        "Ska Harpyformer": -0.133
+      }
+    },
+    "Bill, the Angry Auctioneer": {
+      "baseline": 0.564,
+      "n": 55,
+      "values": {
+        "The Sun Sword": -0.181,
+        "Sacred Hammer of the Volcano": -0.064,
+        "Legendary Sword of a Barbarian King": 0.294,
+        "Summoning Circle": 0.294,
+        "Wanted Poster": -0.314
+      }
+    }
+  }
+}

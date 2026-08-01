@@ -1,0 +1,344 @@
+{
+  "deck": "Sacrificial Demons",
+  "heroes": [
+    "Elana, the Rocky Rebel",
+    "Calamitusk, the Chaorc War Chief",
+    "Asriel, the Sapling Sacrificer"
+  ],
+  "games": 1148,
+  "trainWinRate": "38.9%",
+  "trainedAt": "2026-07-25T01:13:33.603Z",
+  "meanTurns": 16.4,
+  "cardValues": {
+    "Summoning Magic": 8,
+    "Chaorc Corpse Cannibal": 32.8,
+    "Harpyformer Choir": 8,
+    "Occultism": 8,
+    "Bouldor Demon": 8,
+    "Infernous Demon": 8,
+    "Temple of Sacrifice": 22.8,
+    "Guardian of Teocuilatl": 51,
+    "Chaorc Ruin Mourner": 100,
+    "Chaorc Friendly Fireballer": 30.4,
+    "Suspicious Monster": 69.3,
+    "Golden Ankh": 23.6,
+    "Fireball": 88.9,
+    "Herbithorn Demon": 8,
+    "Divine Gift of the Deepsea": 25,
+    "Serpentous Demon": 8,
+    "Hydrogen Demon": 8
+  },
+  "timing": {
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.22,
+      "late": 1.3
+    },
+    "Chaorc Corpse Cannibal": {
+      "early": 0.75,
+      "mid": 0.98,
+      "late": 1.3
+    },
+    "Harpyformer Choir": {
+      "early": 0.75,
+      "mid": 1.16,
+      "late": 1.3
+    },
+    "Occultism": {
+      "early": 0.75,
+      "mid": 1.08,
+      "late": 1.3
+    },
+    "Bouldor Demon": {
+      "early": 1.07,
+      "mid": 1.05,
+      "late": 0.89
+    },
+    "Infernous Demon": {
+      "early": 1,
+      "mid": 1.05,
+      "late": 0.95
+    },
+    "Guardian of Teocuilatl": {
+      "early": 0.75,
+      "mid": 1.2,
+      "late": 1.29
+    },
+    "Chaorc Ruin Mourner": {
+      "early": 1,
+      "mid": 0.78,
+      "late": 1.22
+    },
+    "Chaorc Friendly Fireballer": {
+      "early": 0.81,
+      "mid": 1.15,
+      "late": 1.04
+    },
+    "Suspicious Monster": {
+      "early": 1,
+      "mid": 0.91,
+      "late": 1.09
+    },
+    "Fireball": {
+      "early": 1,
+      "mid": 0.78,
+      "late": 1.22
+    },
+    "Herbithorn Demon": {
+      "early": 1,
+      "mid": 1.05,
+      "late": 0.95
+    },
+    "Hydrogen Demon": {
+      "early": 1,
+      "mid": 1.03,
+      "late": 0.97
+    }
+  },
+  "pairBonuses": {},
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Chaorc Cannon Fodder": -7.4,
+      "Chaorc Ruin Mourner": 6.8,
+      "Golden Ankh": -6.8,
+      "Fireball": 11.3,
+      "Chaorc Rider Warg": -8.5,
+      "Hydrogen Demon": -6.2
+    },
+    "ahead": {
+      "Bouldor Demon": -19,
+      "Chaorc Rider Warg": -20,
+      "Serpentous Demon": -16.8
+    }
+  },
+  "standingEvalThreshold": 905,
+  "deckoutGuard": {
+    "Infernous Demon": -18.1,
+    "Herbithorn Demon": -13.4,
+    "Serpentous Demon": -16.7,
+    "Hydrogen Demon": -19.6,
+    "Bouldor Demon": -20,
+    "Chaorc Rider Warg": -16.1,
+    "Chosen Sacrifice": -12.8
+  },
+  "deckoutDangerSize": 6,
+  "targetPriors": {
+    "Occultism": {
+      "dmgred": 6.3
+    },
+    "Infernous Demon": {
+      "side:own": -20,
+      "frozen": -20
+    },
+    "Chaorc Ruin Mourner": {
+      "kind:creature": -11.2,
+      "side:own": -17.2,
+      "hp:max": -9.6,
+      "dmgred": -10.4
+    },
+    "Suspicious Monster": {
+      "hp:min": -8.6,
+      "hp:max": -9,
+      "side:own": -20,
+      "kind:creature": -18.7,
+      "frozen": 20
+    },
+    "Fireball": {
+      "hp:min": -11.9,
+      "kind:creature": -18.3,
+      "frozen": 10,
+      "dmgred": 20
+    }
+  },
+  "placementRules": {
+    "plc:slack:1": 1.6,
+    "plc:slack:2+": -2.7
+  },
+  "tutorPickRules": {
+    "Calamitusk, the Chaorc War Chief→Chaorc Cannon Fodder": -5.2,
+    "Calamitusk, the Chaorc War Chief→Chaorc Ruin Mourner": 13.5,
+    "Calamitusk, the Chaorc War Chief→Chaorc Pyre Grill Master": -6,
+    "Calamitusk, the Chaorc War Chief→Chaorc Rider Warg": -5.7,
+    "Calamitusk, the Chaorc War Chief→Chaorc Corpse Cannibal": -6.5,
+    "Divine Gift of the Deepsea→Herbithorn Demon": -14.3,
+    "Divine Gift of the Deepsea→Chosen Sacrifice": 4.4,
+    "Divine Gift of the Deepsea→Harpyformer Choir": -7.1,
+    "Divine Gift of the Deepsea→Serpentous Demon": 4.8,
+    "Divine Gift of the Deepsea→Guardian of Teocuilatl": -5.6,
+    "Divine Gift of the Deepsea→Chaorc Friendly Fireballer": -2.6,
+    "Divine Gift of the Deepsea→Chaorc Pyre Grill Master": -20,
+    "Divine Gift of the Deepsea→Chaorc Corpse Cannibal": 2.2,
+    "Divine Gift of the Deepsea→Infernous Demon": -14.9,
+    "Divine Gift of the Deepsea→Hydrogen Demon": -3.2,
+    "Divine Gift of the Deepsea→Chaorc Ruin Mourner": 20,
+    "Magic Lamp→Acid Vial": 10.4,
+    "Magic Lamp→Alchemy": 20,
+    "Magic Lamp→Chain Lightning": -10.3,
+    "Magic Lamp→Decay Magic": -17.4,
+    "Herbithorn Demon→Harpyformer Choir": 4.4,
+    "Herbithorn Demon→Summoning Magic": -12.4,
+    "Herbithorn Demon→Deepsea Idol": 4.3,
+    "Herbithorn Demon→Serpentous Demon": 3.8,
+    "Herbithorn Demon→Chaorc Corpse Cannibal": 4.9,
+    "Herbithorn Demon→Dark Gear": -20,
+    "Herbithorn Demon→Ferocious Tiger Kick": -16.6,
+    "Herbithorn Demon→Divine Gift of the Deepsea": -9.3,
+    "Herbithorn Demon→Chaorc Rider Warg": -17.4,
+    "Herbithorn Demon→Bouldor Demon": 20,
+    "Herbithorn Demon→Divine Gift of Fire": -20,
+    "Herbithorn Demon→Chosen Sacrifice": -20,
+    "Herbithorn Demon→Book of Doom": -14.2,
+    "Herbithorn Demon→Hydrogen Demon": -17.9,
+    "Herbithorn Demon→Guardian of Teocuilatl": -4.6,
+    "Herbithorn Demon→Infernous Demon": -16.9,
+    "Herbithorn Demon→Chaorc Pyre Grill Master": -13.7,
+    "Herbithorn Demon→Chaorc Ruin Mourner": 20,
+    "Herbithorn Demon→Chain Lightning": 4.7,
+    "Herbithorn Demon→Chaorc Friendly Fireballer": 8.3,
+    "Herbithorn Demon→Suspicious Monster": -4.4,
+    "Herbithorn Demon→Golden Ankh": -6,
+    "Herbithorn Demon→Martyry": 5,
+    "The Cosmic Depths→Chaorc Ruin Mourner": 10.3,
+    "The Cosmic Depths→Chaorc Rider Warg": -17.3,
+    "The Cosmic Depths→Harpyformer Choir": -9.1,
+    "The Cosmic Depths→Chosen Sacrifice": 7.7,
+    "Enigma, the Seller of Secrets→Golden Ankh": -3.2,
+    "Enigma, the Seller of Secrets→Herbithorn Demon": -8.7,
+    "Enigma, the Seller of Secrets→Chaorc Corpse Cannibal": -6,
+    "Enigma, the Seller of Secrets→Chosen Sacrifice": 4.3,
+    "Enigma, the Seller of Secrets→Deepsea Idol": -6.1,
+    "Enigma, the Seller of Secrets→Occultism": 2.5,
+    "Enigma, the Seller of Secrets→Chaorc Friendly Fireballer": -8,
+    "Enigma, the Seller of Secrets→Harpyformer Choir": 2.8,
+    "Enigma, the Seller of Secrets→Chaorc Pyre Grill Master": 12.3,
+    "Enigma, the Seller of Secrets→Chaorc Ruin Mourner": -7.7,
+    "Enigma, the Seller of Secrets→Serpentous Demon": -9.7,
+    "Enigma, the Seller of Secrets→Hydrogen Demon": -11.3,
+    "Enigma, the Seller of Secrets→Infernous Demon": -2.3,
+    "Enigma, the Seller of Secrets→Guardian of Teocuilatl": 6.4,
+    "Enigma, the Seller of Secrets→Suspicious Monster": 20,
+    "Enigma, the Seller of Secrets→Fireball": -10.1,
+    "Magic Amethyst→Summoning Magic": 20,
+    "Magic Amethyst→Occultism": -20
+  },
+  "abilityPriors": {
+    "Summoning Magic@Elana, the Rocky Rebel": -60,
+    "Summoning Magic@Elana, the Rocky Rebel≥2": -60,
+    "Summoning Magic@Elana, the Rocky Rebel≥3": -60,
+    "Creativity@Elana, the Rocky Rebel": 110.1,
+    "Creativity@Elana, the Rocky Rebel≥2": 150,
+    "Cannibalism@Calamitusk, the Chaorc War Chief": -60,
+    "Leadership@Calamitusk, the Chaorc War Chief": 150,
+    "Summoning Magic@Calamitusk, the Chaorc War Chief": 150,
+    "Summoning Magic@Calamitusk, the Chaorc War Chief≥2": 150,
+    "Summoning Magic@Asriel, the Sapling Sacrificer": -60,
+    "Summoning Magic@Asriel, the Sapling Sacrificer≥2": 150,
+    "Summoning Magic@Asriel, the Sapling Sacrificer≥3": 147.1,
+    "Occultism@Asriel, the Sapling Sacrificer≥2": 80.7,
+    "Occultism@Asriel, the Sapling Sacrificer≥3": 150,
+    "Occultism@Elana, the Rocky Rebel": -60,
+    "Summoning Magic@Calamitusk, the Chaorc War Chief≥3": -60,
+    "Occultism@Calamitusk, the Chaorc War Chief": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Elana, the Rocky Rebel": -15,
+    "Golden Ankh→Calamitusk, the Chaorc War Chief": 30,
+    "Golden Ankh→Asriel, the Sapling Sacrificer": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Creativity": 30,
+    "Golden Ankh→Cannibalism": 30,
+    "Golden Ankh→Leadership": 30,
+    "Golden Ankh→Occultism": 30
+  },
+  "startHandValues": {
+    "Summoning Magic": -1.5,
+    "Bouldor Demon": -3.2,
+    "Temple of Sacrifice": -1.8,
+    "Serpentous Demon": -6.3,
+    "Chosen Sacrifice": -1.9,
+    "Hydrogen Demon": 4.1,
+    "Occultism": 3,
+    "Chaorc Ruin Mourner": 1.8,
+    "Golden Ankh": -2.5,
+    "Herbithorn Demon": 5.6,
+    "Guardian of Teocuilatl": 4.2,
+    "Chaorc Friendly Fireballer": 2.4,
+    "Chaorc Pyre Grill Master": 6.3,
+    "Chaorc Corpse Cannibal": -1.4,
+    "Fireball": -1.8,
+    "Chaorc Rider Warg": 2,
+    "Chaorc Cannon Fodder": 3.7,
+    "Suspicious Monster": 6.5,
+    "Divine Gift of the Deepsea": 5.1
+  },
+  "mulliganStats": {
+    "games": 1148,
+    "mullRate": "70.9%",
+    "winAfterMull": "39.8%",
+    "winAfterKeep": "36.8%"
+  },
+  "heroEffectTiming": {
+    "Calamitusk, the Chaorc War Chief@hand:4+": 4.4,
+    "Elana, the Rocky Rebel@hand:2-3": 7.1,
+    "Elana, the Rocky Rebel@hand:0-1": 5.2,
+    "Calamitusk, the Chaorc War Chief@hand:0-1": 13.2
+  },
+  "boardPairs": {
+    "Chaorc Pyre Grill Master|Summoning Magic": -5.6,
+    "Chaorc Pyre Grill Master|Creativity": -15,
+    "Infernous Demon|Summoning Magic": -4,
+    "Cannibalism|Summoning Magic": 13.8,
+    "Chaorc Ruin Mourner|Occultism": 13.9,
+    "Occultism|Summoning Magic": 15,
+    "Bouldor Demon|Summoning Magic": -6.3,
+    "Chaorc Friendly Fireballer|Chaorc Rider Warg": -15,
+    "Guardian of Teocuilatl|Leadership": -10.5,
+    "Guardian of Teocuilatl|Summoning Magic": 6.2,
+    "Creativity|Occultism": 14.8,
+    "Guardian of Teocuilatl|Occultism": 15,
+    "Chaorc Corpse Cannibal|Summoning Magic": 3.9,
+    "Cannibalism|Chaorc Pyre Grill Master": 15,
+    "Chaorc Pyre Grill Master|Leadership": 15,
+    "Herbithorn Demon|Summoning Magic": -4.3,
+    "Chaorc Pyre Grill Master|Occultism": -15,
+    "Leadership|Serpentous Demon": -11.9,
+    "Cannibalism|Guardian of Teocuilatl": -10.5,
+    "Cannibalism|Occultism": -15,
+    "Leadership|Occultism": -15,
+    "Infernous Demon|Serpentous Demon": -15,
+    "Occultism|Serpentous Demon": 11.7,
+    "Summoning Magic|Suspicious Monster": 11.8,
+    "Bouldor Demon|Occultism": 12.3,
+    "Chaorc Friendly Fireballer|Harpyformer Choir": -15,
+    "Cannibalism|Harpyformer Choir": -15,
+    "Harpyformer Choir|Leadership": -15,
+    "Harpyformer Choir|Occultism": 15,
+    "Chaorc Rider Warg|Herbithorn Demon": -15,
+    "Chaorc Corpse Cannibal|Occultism": 15,
+    "Chosen Sacrifice|Creativity": 15,
+    "Harpyformer Choir|Herbithorn Demon": -15,
+    "Harpyformer Choir|Serpentous Demon": -15,
+    "Chaorc Cannon Fodder|Chaorc Friendly Fireballer": -15,
+    "Chaorc Cannon Fodder|Occultism": -15,
+    "Bouldor Demon|Cannibalism": -15,
+    "Bouldor Demon|Leadership": -15,
+    "Chaorc Cannon Fodder|Harpyformer Choir": -15,
+    "Bouldor Demon|Chaorc Corpse Cannibal": -15,
+    "Chaorc Friendly Fireballer|Serpentous Demon": 15,
+    "Bouldor Demon|Guardian of Teocuilatl": 15,
+    "Guardian of Teocuilatl|Hydrogen Demon": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.286,
+      "n": 35,
+      "values": {
+        "Deepsea Primordium": 0.339
+      }
+    }
+  }
+}

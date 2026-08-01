@@ -1,0 +1,361 @@
+{
+  "deck": "Elven Vanguard",
+  "heroes": [
+    "Barker, the Monster Tamer",
+    "Maya, the Nature Fairy",
+    "Tharx, the Never-Losing General"
+  ],
+  "games": 1248,
+  "trainWinRate": "64.7%",
+  "trainedAt": "2026-07-20T02:47:14.264Z",
+  "meanTurns": 19.2,
+  "cardValues": {
+    "Elven Archer": 23,
+    "Necromancy": 18.4,
+    "Aggressive Town Guard": 56.7,
+    "Toughness": 8,
+    "Elven Forager": 8,
+    "Wheels": 59.8,
+    "Performance": 8,
+    "Elven Druid": 17.5,
+    "Summoning Magic": 23,
+    "Elven Leader": 79.9,
+    "Elven Rider": 23.5,
+    "Psychic Scout": 8,
+    "Magnetic Glove": 81
+  },
+  "timing": {
+    "Elven Archer": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Necromancy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Aggressive Town Guard": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Toughness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Elven Forager": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.2
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.84,
+      "late": 1.16
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Elven Druid": {
+      "early": 0.75,
+      "mid": 1.27,
+      "late": 1.06
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.29,
+      "late": 1.3
+    },
+    "Elven Leader": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.09
+    },
+    "Elven Rider": {
+      "early": 0.75,
+      "mid": 0.85,
+      "late": 1.3
+    },
+    "Psychic Scout": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Glove": {
+      "early": 1,
+      "mid": 0.94,
+      "late": 1.06
+    }
+  },
+  "pairBonuses": {
+    "Juice|dc:Performance": 7.6
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Elven Archer": -10.9,
+      "Necromancy": -10.7,
+      "Aggressive Town Guard": -10.6,
+      "Toughness": -11.1,
+      "Elven Forager": -9.9,
+      "Wheels": -9.9,
+      "Performance": -12.2,
+      "Elven Druid": -6.5,
+      "Summoning Magic": -12.3,
+      "Beer": -12.5,
+      "Elven Leader": -9.1,
+      "Elven Rider": -12.7,
+      "Psychic Scout": -10.1,
+      "Magnetic Glove": -9.8,
+      "Juice": -12.9,
+      "Deepsea Idol": -8.9
+    },
+    "swarm": {
+      "Elven Archer": 7.3,
+      "Necromancy": 8.4,
+      "Aggressive Town Guard": 7.9,
+      "Toughness": 8.5,
+      "Elven Forager": 7.8,
+      "Wheels": 8.5,
+      "Performance": 8.3,
+      "Elven Druid": 6.7,
+      "Summoning Magic": 9.1,
+      "Beer": 9.5,
+      "Elven Rider": 6.7,
+      "Golden Ankh": 11.5,
+      "Psychic Scout": 6.3,
+      "Magnetic Glove": 8.1,
+      "Snow Cannon": 14.8,
+      "Juice": 17.5,
+      "Deepsea Idol": 11.5
+    },
+    "spell": {
+      "Performance": 6.4,
+      "Elven Druid": 10,
+      "Elven Rider": 6.9,
+      "Juice": 17.3
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Elven Forager": 7.6,
+      "Wheels": -5.7,
+      "Elven Rider": -5.9,
+      "Psychic Scout": 6,
+      "Magnetic Glove": -7.4,
+      "Snow Cannon": -17.5
+    },
+    "ahead": {
+      "Elven Forager": -12.5,
+      "Elven Leader": -7,
+      "Juice": 20
+    }
+  },
+  "standingEvalThreshold": 1066,
+  "targetPriors": {
+    "Elven Archer": {
+      "hp:max": -7.7
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -9.4
+    },
+    "Juice": {
+      "hp:min": -20,
+      "frozen": 8,
+      "kind:creature": 6.8
+    }
+  },
+  "statusHealRules": {
+    "Beer": {
+      "st:2": -13.8,
+      "st:1": 8,
+      "st:frozen-hero": -3.8,
+      "st:3+": -2.2,
+      "st:stun-hero": 19.1
+    },
+    "Juice": {
+      "st:stun-hero": 19.7,
+      "st:frozen-hero": -10.2,
+      "st:poison2+": -5.2
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -3.1,
+    "plc:slack:1": 3.7,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Necromancy→Aggressive Town Guard": -7.7,
+    "Necromancy→Elven Forager": -4.6,
+    "Necromancy→Elven Druid": 12.6,
+    "Necromancy→Elven Leader": 8.5,
+    "Elven Druid→Elven Forager": -6.9,
+    "Elven Druid→Elven Leader": 10.5,
+    "Elven Druid→Elven Archer": -9.7,
+    "Elven Rider→Elven Archer": 3.9,
+    "Elven Rider→Elven Forager": -4.1,
+    "Magic Lamp→Acid Vial": 4.2,
+    "Magic Lamp→Cataclysm": -20,
+    "Magic Lamp→Alchemy": 14.8,
+    "Magic Lamp→Chain Lightning": -16.2,
+    "Magic Lamp→Decay Magic": 6.6,
+    "Magic Lamp→Elixir of Immortality": 8.1,
+    "Magic Lamp→Fighting": -7.5,
+    "Training→Performance": -19,
+    "Training→Summoning Magic": -3,
+    "Training→Necromancy": 18.5,
+    "Training→Toughness": 5.6,
+    "Magnetic Glove→Elven Forager": -2.1,
+    "Magnetic Glove→Aggressive Town Guard": 9.9,
+    "Magnetic Glove→Elven Druid": -4.5,
+    "Magnetic Glove→Summoning Magic": 11.2,
+    "Magnetic Glove→Beer": -2,
+    "Magnetic Glove→Elven Rider": -20,
+    "Magnetic Glove→Toughness": -20,
+    "Magnetic Glove→Psychic Scout": -2.2,
+    "Magnetic Glove→Golden Ankh": 13.9,
+    "Magnetic Glove→Elven Leader": -15.4,
+    "Magnetic Glove→Performance": -19.1,
+    "Magnetic Glove→Deepsea Idol": -10,
+    "Magnetic Glove→Wheels": -14.7,
+    "Magnetic Glove→Elven Archer": -3.8,
+    "Magnetic Glove→Boots of Hermes": -18.9,
+    "Magnetic Glove→Necromancy": 9.9,
+    "Magnetic Glove→Snow Cannon": 20,
+    "The Cosmic Depths→Aggressive Town Guard": 8.7,
+    "The Cosmic Depths→Elven Druid": -14.6,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 8.8,
+    "Enigma, the Seller of Secrets→Elven Leader": -17.9,
+    "Enigma, the Seller of Secrets→Elven Archer": 6.6,
+    "Enigma, the Seller of Secrets→Elven Druid": -2.6,
+    "Enigma, the Seller of Secrets→Deepsea Idol": 3.5,
+    "Enigma, the Seller of Secrets→Golden Ankh": -6.6,
+    "Enigma, the Seller of Secrets→Necromancy": -11.4,
+    "Enigma, the Seller of Secrets→Snow Cannon": -6.1,
+    "Enigma, the Seller of Secrets→Boots of Hermes": -9.7,
+    "Enigma, the Seller of Secrets→Performance": 10.7,
+    "Enigma, the Seller of Secrets→Juice": 16.1,
+    "Enigma, the Seller of Secrets→Elven Rider": 9.2,
+    "Enigma, the Seller of Secrets→Aggressive Town Guard": -7.5,
+    "Enigma, the Seller of Secrets→Toughness": -9.3,
+    "Enigma, the Seller of Secrets→Psychic Scout": 5.9,
+    "Magic Amethyst→Necromancy": 20,
+    "Magic Amethyst→Summoning Magic": -2.9,
+    "Magic Amethyst→Leadership": -20
+  },
+  "abilityPriors": {
+    "Summoning Magic@Barker, the Monster Tamer": 150,
+    "Summoning Magic@Barker, the Monster Tamer≥2": -60,
+    "Training@Barker, the Monster Tamer": 150,
+    "Training@Barker, the Monster Tamer≥2": -60,
+    "Necromancy@Barker, the Monster Tamer": -60,
+    "Necromancy@Barker, the Monster Tamer≥2": 150,
+    "Necromancy@Barker, the Monster Tamer≥3": -60,
+    "Friendship@Maya, the Nature Fairy": 150,
+    "Friendship@Maya, the Nature Fairy≥2": 143.9,
+    "Summoning Magic@Maya, the Nature Fairy": 150,
+    "Toughness@Maya, the Nature Fairy": -60,
+    "Toughness@Maya, the Nature Fairy≥2": -60,
+    "Necromancy@Tharx, the Never-Losing General": -60,
+    "Necromancy@Tharx, the Never-Losing General≥2": 150,
+    "Necromancy@Tharx, the Never-Losing General≥3": 150,
+    "Leadership@Tharx, the Never-Losing General": 150,
+    "Leadership@Tharx, the Never-Losing General≥2": 150,
+    "Leadership@Tharx, the Never-Losing General≥3": -60,
+    "Summoning Magic@Tharx, the Never-Losing General": -60,
+    "Summoning Magic@Tharx, the Never-Losing General≥2": 22.5,
+    "Toughness@Barker, the Monster Tamer": -60,
+    "Necromancy@Maya, the Nature Fairy": 150,
+    "Necromancy@Maya, the Nature Fairy≥2": 150,
+    "Toughness@Tharx, the Never-Losing General": 150,
+    "Summoning Magic@Maya, the Nature Fairy≥2": 150,
+    "Necromancy@Maya, the Nature Fairy≥3": 150,
+    "Toughness@Tharx, the Never-Losing General≥2": 150,
+    "Toughness@Tharx, the Never-Losing General≥3": -60,
+    "Summoning Magic@Maya, the Nature Fairy≥3": 104.1,
+    "Summoning Magic@Barker, the Monster Tamer≥3": -60,
+    "Training@Barker, the Monster Tamer≥3": 62.4,
+    "Toughness@Barker, the Monster Tamer≥2": 150,
+    "Toughness@Barker, the Monster Tamer≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Maya, the Nature Fairy": 30,
+    "Golden Ankh→Tharx, the Never-Losing General": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Friendship": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Necromancy": 30,
+    "Golden Ankh→Leadership": 30
+  },
+  "startHandValues": {
+    "Magnetic Glove": 3.9,
+    "Psychic Scout": -1.2,
+    "Beer": -1,
+    "Elven Leader": 4.4,
+    "Performance": -3.1,
+    "Elven Druid": -7.6,
+    "Golden Ankh": 5.9,
+    "Elven Rider": 1.8,
+    "Toughness": 1.3,
+    "Snow Cannon": -4.1
+  },
+  "mulliganStats": {
+    "games": 1248,
+    "mullRate": "17%",
+    "winAfterMull": "59%",
+    "winAfterKeep": "65.9%"
+  },
+  "heroEffectTiming": {
+    "Tharx, the Never-Losing General@hand:0-1": -2.8
+  },
+  "boardPairs": {
+    "Aggressive Town Guard|Summoning Magic": 9.6,
+    "Elven Leader|Summoning Magic": 15,
+    "Elven Leader|Training": -6.5,
+    "Necromancy|Summoning Magic": 11.4,
+    "Elven Archer|Elven Forager": -9,
+    "Elven Archer|Elven Rider": -7.7,
+    "Elven Archer|Friendship": 7.1,
+    "Elven Forager|Friendship": 15,
+    "Elven Forager|Toughness": -10.4,
+    "Aggressive Town Guard|Elven Forager": 6.5,
+    "Aggressive Town Guard|Leadership": 15,
+    "Leadership|Summoning Magic": 11.3,
+    "Elven Rider|Psychic Scout": -15,
+    "Psychic Scout|Summoning Magic": 3.2,
+    "Toughness|Training": -6.6,
+    "Friendship|Necromancy": 8.6,
+    "Elven Archer|Elven Druid": -10.4,
+    "Elven Druid|Friendship": 13.2,
+    "Elven Druid|Summoning Magic": 3.3,
+    "Aggressive Town Guard|Friendship": 8.8,
+    "Aggressive Town Guard|Toughness": 11.3,
+    "Elven Forager|Psychic Scout": -13.3,
+    "Elven Forager|Training": -13.7,
+    "Elven Archer|Leadership": 6.8,
+    "Elven Leader|Friendship": 15,
+    "Elven Forager|Elven Leader": -12.5,
+    "Elven Druid|Leadership": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.683,
+      "n": 385,
+      "values": {
+        "Elven Archer": -0.083,
+        "Elven Forager": -0.104,
+        "Deepsea Primordium": 0.317,
+        "Cloudy Slime": -0.183,
+        "Ska Harpyformer": -0.1,
+        "Grunge Harpyformer": 0.031
+      }
+    }
+  }
+}

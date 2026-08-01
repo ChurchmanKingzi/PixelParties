@@ -41,6 +41,11 @@ module.exports = {
       const target = await ctx.promptDamageTarget({
         side: 'any', types: ['hero', 'creature'],
         title: CARD_NAME,
+        // CPU-Vertrag: deklariert den anzuwendenden Status, damit der
+        // Ziel-Picker immune Ziele aussortiert (Als Demo: Stun an
+        // negative_status_immune-Bill wäre verschwendet).
+        appliesStatus: 'stunned',
+        dealsDamage: false,
         description: 'Choose a target to Stun for 1 turn.',
         confirmLabel: '💫 Stun!',
         confirmClass: 'btn-info',

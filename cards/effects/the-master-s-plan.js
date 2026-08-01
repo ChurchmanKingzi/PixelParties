@@ -89,10 +89,18 @@ module.exports = {
     const targetLink = chain[targetIndex];
     if (!targetLink) return;
 
-    // Animation — dark mastermind flash
+    // Animation — dark mastermind flash on the CASTER's Hero.
+    // Als Bugreport: hier stand `heroIdx: 0` fest verdrahtet, die
+    // schwarze Wolke erschien also immer über dem linken Helden, egal
+    // wer gecastet hat. Der eigene Chain-Link trägt den Caster
+    // (`casterHeroIdx`/`heroIdx`, von beiden Link-Erzeugern gesetzt —
+    // Surprise- wie Hand-Reaktion); Fallback bleibt 0, damit die
+    // Animation im Zweifel überhaupt läuft.
+    const selfLink = chain[myIndex];
+    const casterHeroIdx = selfLink?.casterHeroIdx ?? selfLink?.heroIdx ?? 0;
     engine._broadcastEvent('play_zone_animation', {
       type: 'plague_smoke', owner: pi,
-      heroIdx: 0, zoneSlot: -1,
+      heroIdx: casterHeroIdx, zoneSlot: -1,
     });
     await engine._delay(500);
 

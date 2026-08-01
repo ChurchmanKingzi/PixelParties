@@ -11,6 +11,11 @@
 
 module.exports = {
   isPotion: true,
+  // `reviveCard`: Ohne besiegten eigenen Helden ist die Karte als
+  // Suchziel/Handkarte wertlos — _cpu.js (reviveCardSituation) deckelt
+  // sie dann hart, statt den kontextfreien gelernten cardValue gelten
+  // zu lassen. Kein `reviveTemporary`: der Revive ist permanent.
+  cpuMeta: { reviveCard: true },
   isTargetingArtifact: true, // Uses the targeting flow
 
   canActivate(gs, pi) {

@@ -57,7 +57,10 @@ module.exports = {
    * @param {object} cardData - The card whose level is being checked.
    * @returns {number} levels to subtract (0 if not applicable).
    */
-  reduceCardLevel(cardData) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx, evalOpts) {
+    // Kartentext: "in your hand and deck" — Discard-Pfade (Necromancy-
+    // Rebuy via pileSide:'discard') sind explizit NICHT abgedeckt.
+    if (evalOpts?.pileSide === 'discard') return 0;
     return isElvenCreature(cardData) ? 1 : 0;
   },
 };

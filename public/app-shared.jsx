@@ -1147,6 +1147,62 @@ async function loadCardDB() {
   setTimeout(preloadAllCardArt, 5000);
 }
 
+// ===== HELDEN-ANZEIGENAME (Titel abtrennen) =====
+// Ausnahmen für Kartennamen, bei denen die Syntax-Regeln unten das
+// Falsche liefern würden — jeder Eintrag ist eine bewusste Design-
+// Entscheidung von Al, kein Workaround.
+const HERO_NAME_OVERRIDES = {
+  // Namen, die als GANZES der Eigenname sind (Wortspiele) — hier greift
+  // Regel 3 sonst und schnitte den ersten Teil weg.
+  'Mary Crestmas': 'Mary Crestmas',
+  'Saint Nicolas': 'Saint Nicolas',
+  'Santa Klaus': 'Santa Klaus',
+  // Honorifikum vor dem Namen: Regel 1 nähme alles vor dem Komma. Bei
+  // Crestina soll nur der Eigenname stehen (Als Ruling — Ziel ist ein
+  // KURZES Label, das vollständig ins Namensfeld passt). "Lord Mithuru"
+  // bleibt bewusst mit Honorifikum.
+  'Fairy Queen Crestina, the Creation Fairy': 'Crestina',
+  'True Fairy Crestina, the Primordial Goddess': 'Crestina',
+};
+
+/**
+ * Extrahiert den reinen NAMEN eines Helden aus seinem Kartennamen —
+ * für Stellen, an denen ein Held als Person auftritt (CPU-Gegner-Label)
+ * statt als Karte. Zweck ist ein KURZES Label: der volle Kartenname
+ * wird im Namensfeld sonst abgeschnitten.
+ *
+ * Als Syntax-Regeln (Titel steht uneinheitlich vorn oder hinten):
+ *   1. "[Name], [Titel]"     → alles VOR dem ersten Komma
+ *      "Maya, the Nature Fairy" → "Maya"
+ *      "Luna Pele, the Flame Dancer" → "Luna Pele"   (mehrwortig)
+ *      "Champion, the Stormbringer"  → "Champion"    (einwortig)
+ *   2. "[Name] the [Titel]"  → alles VOR dem ersten " the "
+ *      "Tarleinn the Traveler" → "Tarleinn"
+ *      (Komma-loser Zwilling von Regel 1 — der Titel hängt hinten dran.)
+ *   3. sonst "[Titel] [Name]" → das letzte Wort
+ *      "Bomb Berserker Bartas" → "Bartas"
+ *
+ * Regel 3 deckt die 35 Karten ab, die WEDER Komma NOCH " the " haben —
+ * sie fallen durch die beiden von Al genannten Regeln.
+ *
+ * Der Rückgabewert fällt defensiv auf den vollen Kartennamen zurück,
+ * wenn die Extraktion leer ausginge.
+ */
+function heroDisplayName(fullName) {
+  if (!fullName || typeof fullName !== 'string') return fullName || '';
+  const name = fullName.trim();
+  if (HERO_NAME_OVERRIDES[name]) return HERO_NAME_OVERRIDES[name];
+  // Regel 1 — Komma trennt Name von Titel.
+  const comma = name.indexOf(',');
+  if (comma > 0) return name.slice(0, comma).trim() || name;
+  // Regel 2 — " the " trennt Name von nachgestelltem Titel.
+  const viaThe = name.match(/^(.+?)\s+the\s+/i);
+  if (viaThe) return viaThe[1].trim() || name;
+  // Regel 3 — Titel vorn, Name am Ende (letztes Wort).
+  const parts = name.split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : name;
+}
+
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
@@ -1768,6 +1824,7 @@ window.emitSocket = emitSocket;
 window.socket = socket;
 window.loadCardDB = loadCardDB;
 window.cardImageUrl = cardImageUrl;
+window.heroDisplayName = heroDisplayName;
 window.skinImageUrl = skinImageUrl;
 window.isDeckLegal = isDeckLegal;
 window.countInDeck = countInDeck;

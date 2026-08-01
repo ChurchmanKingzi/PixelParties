@@ -2068,6 +2068,13 @@ const CPU_MESSAGES = {
     heroKilled: "...",
     middleHeroKilled: "...",
   },
+  'sample-Structure Deck Elven Vanguard': { // Maya, the Nature Fairy
+    greeting: "Hey hey~",
+    victory: "Hi-hi, my daughter will be so proud~",
+    defeat: "N'awww, what will the trees say now...?",
+    heroKilled: "Ah - nooo, that stings!",
+    middleHeroKilled: "Welp, back to the earth I go...",
+  },
   'sample-Structure Deck Flying Sparks': { // Lilly, the Charming Infiltrator
     greeting: "Heyyyy, sweetie 💕",
     victory: "Hihi... thanks for the win, your cards were *delightful*. Think I'll keep 'em~",
@@ -2632,6 +2639,57 @@ app.post('/api/shop/buy-random-structure-deck', authMiddleware, async (req, res)
     name: pick.name,
     coverCard: pick.coverCard || '',
   });
+});
+
+// POST /api/cheat/unlock-all — Als Cheatcode (Hauptmenü: Tasten 1-2-3-4-5
+// nacheinander): schaltet sofort ALLE CPU-Gegner und ALLE Structure
+// Decks frei. Zweck: Daten sammeln für/gegen beliebige Decks, ohne den
+// regulären Progressions-Weg (Siege → Unlocks → Shop-Käufe) zu gehen.
+// Gäste bleiben ausgeschlossen — konsistent mit dem Guest-Design
+// ("ephemeral, never unlock"). Idempotent: erneutes Eingeben schaltet
+// nichts doppelt frei (INSERT OR IGNORE bzw. Owned-Filter).
+app.post('/api/cheat/unlock-all', authMiddleware, async (req, res) => {
+  try {
+    const u = await db.get('SELECT is_guest FROM users WHERE id = ?', [req.user.userId]);
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    if (u.is_guest) return res.status(403).json({ error: 'Guests cannot unlock content — please register first!' });
+
+    const decks = loadSampleDecks();
+
+    // Alle CPU-Gegner (jedes Sample-Deck ist ein Gegner).
+    const before = await getUnlockedOpponentIds(req.user.userId);
+    let newOpponents = 0;
+    for (const d of decks) {
+      if (before.has(d.id)) continue;
+      await db.run(
+        'INSERT OR IGNORE INTO unlocked_opponents (user_id, opponent_deck_id, is_initial) VALUES (?, ?, 0)',
+        [req.user.userId, d.id]
+      );
+      newOpponents++;
+    }
+
+    // Alle Structure Decks (Shop-Besitz, ohne SC-Kosten).
+    const ownedRows = await db.all(
+      "SELECT item_id FROM user_shop_items WHERE user_id = ? AND item_type = 'structure_deck'",
+      [req.user.userId]
+    );
+    const owned = new Set(ownedRows.map(r => r.item_id));
+    let newStructures = 0;
+    for (const d of decks) {
+      if (!d.isStructure || !d.structureId || owned.has(d.structureId)) continue;
+      await db.run(
+        'INSERT INTO user_shop_items (id, user_id, item_type, item_id) VALUES (?, ?, ?, ?)',
+        [uuidv4(), req.user.userId, 'structure_deck', d.structureId]
+      );
+      newStructures++;
+    }
+
+    console.log(`[cheat] unlock-all: user ${req.user.userId} → +${newOpponents} Gegner, +${newStructures} Structure Decks`);
+    res.json({ ok: true, newOpponents, newStructures });
+  } catch (err) {
+    console.error('[cheat] unlock-all failed:', err);
+    res.status(500).json({ error: 'Unlock failed' });
+  }
 });
 
 // POST /api/decks/set-default-sample — pin an unlocked sample/structure deck as default.
@@ -3349,6 +3407,7 @@ function sendGameState(room, playerIdx, extra) {
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
+      drawLocked: ps.drawLocked || false,
       flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
       // Giga Steroids — owner-wide second-Action grant for effect
@@ -3357,6 +3416,20 @@ function sendGameState(room, playerIdx, extra) {
       // the "On Steroids" buff badge in the top-of-board strip.
       onSteroids: ps.onSteroids || false,
       creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
+      // Reiner Zieh-Lock (Sacred Jewel): graut nur Karten mit
+      // blockedByDrawLock — Search-Karten bleiben spielbar.
+      drawLockBlockedCards: (ps.drawLocked && pi === playerIdx) ? (() => {
+        const blocked = new Set();
+        const dlDB = getCardDB();
+        for (const cn of ps.hand) {
+          const scr = loadCardEffect(cn);
+          if (!scr?.blockedByDrawLock) continue;
+          const cd = dlDB[cn];
+          if (cd?.cardType === 'Ability' || cd?.cardType === 'Creature') continue;
+          blocked.add(cn);
+        }
+        return [...blocked];
+      })() : [],
       handLockBlockedCards: (ps.handLocked && pi === playerIdx) ? (() => {
         const blocked = new Set();
         const handCardDB = getCardDB();
@@ -3459,6 +3532,9 @@ function sendGameState(room, playerIdx, extra) {
     isPuzzle: gs.isPuzzle || false,
     isTutorial: gs.isTutorial || false,
     isCpuBattle: room.type === 'singleplayer',
+    // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
+    // Endung). null → der Client nimmt das generische Kampfthema.
+    cpuBgm: cpuBgmForRoom(room),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     // Compute fresh per-sync so per-turn gates (Deepsea `canSummon`,
     // etc.) flip to "blocked" the moment the first copy is summoned.
@@ -3834,6 +3910,21 @@ function sendGameState(room, playerIdx, extra) {
     activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
     activatableAreas: room.engine ? room.engine.getActivatableAreas(playerIdx) : [],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
+    // Abilities, die als Joker auf einem fremden Schul-Stapel mitzählen
+    // (Performance). Der Client spiegelt die Schulzählung der Engine für
+    // seine Drop-Zonen-Hervorhebung und kannte diese Regel bisher NICHT —
+    // dadurch blieben Zonen dunkel, obwohl der Server den Zug erlaubt
+    // (Als Report: Greatmaw Remora Lv2 auf Ingo mit Summoning Magic 1 +
+    // Performance; Klick funktionierte, Drag&Drop nicht). Aus den
+    // Kartenskripten abgeleitet statt hartkodiert.
+    wildcardAbilities: wildcardAbilityNames(),
+    // Per-Hero-Liste der Creatures, deren Level-/Schul-Anforderung der
+    // Hero OHNE karten-seitigen Platzierungs-Bypass erfüllt. Der
+    // Klick-Picker ("welcher Hero beschwört das?") bevorzugt diese
+    // Heroes und fällt nur auf `heroPlayableCards` zurück, wenn keiner
+    // regulär qualifiziert — sonst listet er bei Karten wie Chilly
+    // Wizard alle lebenden Heroes (Als Bugreport).
+    heroStrictLevelCards: room.engine ? room.engine.getHeroStrictLevelCards(playerIdx) : {},
     // Cross-side-playable Creature names — cards whose script exports
     // `playOnAnyHeroSide: true` AND at least one OWN Hero appears as a
     // valid host in `heroPlayableCards.own`. The client uses this to
@@ -4007,6 +4098,7 @@ function sendSpectatorGameState(room) {
       potionLocked: ps.potionLocked || false,
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
+      drawLocked: ps.drawLocked || false,
       flashbanged: ps._flashbangedDebuff || false,
       forsaken: ps._discardToDeleteActive || false,
       // Giga Steroids — owner-wide second-Action grant for effect
@@ -4055,6 +4147,9 @@ function sendSpectatorGameState(room) {
     isPuzzle: gs.isPuzzle || false,
     isTutorial: gs.isTutorial || false,
     isCpuBattle: room.type === 'singleplayer',
+    // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
+    // Endung). null → der Client nimmt das generische Kampfthema.
+    cpuBgm: cpuBgmForRoom(room),
     setScore: room.setScore || [0, 0], format: room.format || 1, winsNeeded: room.winsNeeded || 1,
     summonBlocked: gs.summonBlocked || [],
     customPlacementCards: [],
@@ -4135,6 +4230,7 @@ function sendSpectatorGameState(room) {
     activatablePermanents: [],
     activatableAreas: [],
     heroPlayableCards: { own: {}, charmed: {} },
+    heroStrictLevelCards: {},
     crossSidePlayableCards: [],
     crossSidePlayableArtifacts: [],
     freeSideEquipArtifacts: [],
@@ -4596,8 +4692,116 @@ function endCpuBattle(room, winnerIdx, reason) {
 
 // CPU turn driver. Delegates to the brain module in cards/effects/_cpu.js.
 // Passes the room and the set of action helpers the brain is allowed to call.
-const { runCpuTurn, installCpuBrain, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain } = require('./cards/effects/_cpu');
+const { runCpuTurn, installCpuBrain, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, seedExploreAttempts } = require('./cards/effects/_cpu');
+// ═══════════════════════════════════════════════════════════════════
+//  GEGNERSPEZIFISCHE BATTLE-THEMES (1.8.)
+// ═══════════════════════════════════════════════════════════════════
+// In public/music liegt je CPU-Gegner ein `bgm_<slug>.ogg`. Der Slug ist
+// der NAME des mittleren Helden OHNE dessen Titel, kleingeschrieben und
+// ohne Leerzeichen.
+//
+// Der Titel steht dabei mal HINTEN ("Tarleinn the Traveler" → tarleinn,
+// "Nero Zira, the Mastermind" → nerozira) und mal VORNE ("Bomb Berserker
+// Bartas" → bartas, "Idej Lord Daiyo" → daiyo, "Timeless King Zi" → zi),
+// und manche Namen sind zweiteilig ("Luna Pele" → lunapele). Aus dem
+// Heldennamen allein ist der Slug also NICHT ableitbar — deshalb wird
+// gegen die tatsächlich vorhandenen Dateien gematcht.
+//
+// VERFAHREN: alle zusammenhängenden Wortfolgen des Heldennamens bilden,
+// die längste nehmen, für die eine Datei existiert. Bewusst NICHT über
+// Teilstrings des zusammengezogenen Namens — das ergab einen echten
+// Fehltreffer ("Ort-hos-the-l-oyal" enthält "hel" und hätte Hels Thema
+// für Orthos gespielt). Über alle 220 Helden der Datenbank geprüft:
+// keine Fehltreffer; die verbleibenden Mehrfachtreffer sind Varianten
+// derselben Figur (Beato → Beato, the Eternal Butterfly) und teilen ihr
+// Thema zu Recht.
+const BGM_GENERIC = new Set(['battle', 'battle1', 'battle2', 'battle3', 'menu', 'menu_diamond', 'shop', 'shop_diamond', 'login', 'puzzle']);
+// Der Ordner wird gecached, aber NICHT eingefroren: kommen Themes dazu
+// (z.B. bgm_nao.ogg / bgm_orthos.ogg), sollen sie ohne Serverneustart
+// greifen. Ausschlag gibt die mtime des VERZEICHNISSES — die ändert sich
+// beim Anlegen oder Löschen einer Datei darin. Der stat-Aufruf ist
+// zusätzlich zeitgedrosselt, damit er nicht an jedem Zustands-Sync hängt.
+let _bgmSlugCache = null;
+let _bgmSlugMtime = -1;
+let _bgmSlugCheckedAt = 0;
+const BGM_RESCAN_MS = 5000;
+function bgmAvailableSlugs() {
+  const dir = path.join(__dirname, 'public', 'music');
+  const now = Date.now();
+  if (_bgmSlugCache && now - _bgmSlugCheckedAt < BGM_RESCAN_MS) return _bgmSlugCache;
+  _bgmSlugCheckedAt = now;
+  let mtime = -1;
+  try { mtime = fs.statSync(dir).mtimeMs; } catch { /* kein Musikordner */ }
+  if (_bgmSlugCache && mtime === _bgmSlugMtime) return _bgmSlugCache;
+  const out = new Set();
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      const m = /^bgm_(.+)\.(ogg|mp3|wav)$/i.exec(f);
+      if (m && !BGM_GENERIC.has(m[1].toLowerCase())) out.add(m[1].toLowerCase());
+    }
+  } catch { /* kein Musikordner → generisches Thema */ }
+  _bgmSlugCache = out;
+  _bgmSlugMtime = mtime;
+  return out;
+}
+function bgmSlugForHero(heroName) {
+  if (!heroName) return null;
+  const slugs = bgmAvailableSlugs();
+  if (slugs.size === 0) return null;
+  const toks = String(heroName).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  let best = null;
+  for (let i = 0; i < toks.length; i++) {
+    for (let j = i + 1; j <= toks.length; j++) {
+      const cand = toks.slice(i, j).join('');
+      if (slugs.has(cand) && (!best || cand.length > best.length)) best = cand;
+    }
+  }
+  return best;
+}
+/** Namen aller Abilities mit `isWildcardAbility` (einmal ermittelt). */
+let _wildcardAbilCache = null;
+function wildcardAbilityNames() {
+  if (_wildcardAbilCache) return _wildcardAbilCache;
+  const out = [];
+  try {
+    for (const c of getCardDB ? Object.values(getCardDB()) : []) {
+      if (c.cardType !== 'Ability') continue;
+      if (loadCardEffect(c.name)?.isWildcardAbility) out.push(c.name);
+    }
+  } catch { /* Anzeige-Hilfe, nie Abbruchgrund */ }
+  _wildcardAbilCache = out;
+  return out;
+}
+
+/** Thema des CPU-Gegners in diesem Raum — null bei PvP oder ohne Datei. */
+function cpuBgmForRoom(room) {
+  try {
+    if (!room || room.type !== 'singleplayer' || !room.engine) return null;
+    // Einmal je Raum auflösen: der mittlere Held wechselt während einer
+    // Partie nicht, und der Zustands-Snapshot läuft sehr oft. `null`
+    // wird als '' gemerkt, damit auch der Negativfall nicht bei jedem
+    // Sync erneut sucht.
+    if (room._cpuBgmMemo !== undefined) return room._cpuBgmMemo || null;
+    const cpuIdx = room.engine._cpuPlayerIdx;
+    if (!(cpuIdx >= 0)) return null;   // noch nicht initialisiert → nicht merken
+    // Mittlerer Held (Index 1) — das ist die Figur, nach der die Dateien
+    // benannt sind, und zugleich die im Avatar-Portrait gezeigte.
+    const hero = room.gameState?.players?.[cpuIdx]?.heroes?.[1];
+    if (!hero?.name) return null;      // Zustand noch nicht aufgebaut
+    room._cpuBgmMemo = bgmSlugForHero(hero.name) || '';
+    // Einmal je Kampf in die Konsole — macht in einem Blick entscheidbar,
+    // ob die Server-Seite liefert. Ohne diese Zeile war beim ersten
+    // Feldtest nicht unterscheidbar, ob der Slug fehlt, der Client ihn
+    // ignoriert oder schlicht ein alter Serverprozess läuft.
+    console.log(`[bgm] CPU-Gegner "${hero.name}" → `
+      + (room._cpuBgmMemo ? `Theme "${room._cpuBgmMemo}"` : 'KEIN Theme')
+      + ` (${bgmAvailableSlugs().size} Themes im Ordner)`);
+    return room._cpuBgmMemo || null;
+  } catch { return null; }
+}
+
 function makeCpuDriver(room) {
+
   return async function cpuTurn(engine) {
     try {
       await runCpuTurn(engine, {
@@ -4689,8 +4893,26 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Ability') return false;
 
+  // ── ASCENDED-ONLY-ABILITIES DURCHSETZEN (1.8.) ─────────────────────
+  // `ascendedHeroOnly` markiert Abilities, deren Kartentext das Anlegen
+  // auf einen Ascended Hero beschränkt ("You can only attach this
+  // Ability to an Ascended Hero" — aktuell Smugness). Das Flag wurde
+  // bisher NUR gelesen, um dem Client `ascendedOnlyAbilities` zu
+  // schicken; dort graut app-board.jsx die Handkarte aus. Serverseitig
+  // gab es keine Prüfung — die CPU konsultiert das Flag nicht und legte
+  // die Ability an beliebige Helden an, ein manipulierter Client
+  // ebenfalls. Dieselbe Signatur wie `neverPlayable`, gefunden im
+  // Vertrags-Sweep vom 1.8.
+  //
+  // Die Prüfung spiegelt exakt die des Clients (Kartentyp des Helden),
+  // damit Ausgrauen und Ablehnen nie auseinanderlaufen. Bewusst NUR
+  // dieser Hand-Play-Pfad: server-getriebene Attach-Prompts haben ihre
+  // eigenen Regeln (vgl. `allowRestricted` beim Client).
+
   const hero = ps.heroes[heroIdx];
   if (!hero || !hero.name || hero.hp <= 0) return false;
+  if (loadCardEffect(cardName)?.ascendedHeroOnly
+      && getCardDB()[hero.name]?.cardType !== 'Ascended Hero') return false;
   // Divine Gift of Skill grants up to 4 extra ability attachments to the
   // chosen hero this turn. Standard slot is consumed first; bonuses fill
   // additional plays beyond it.
@@ -4811,7 +5033,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
     await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'ability', heroIdx });
     await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'ability', toHeroIdx: heroIdx });
   } catch (err) {
-    console.error('[Engine] doPlayAbility hooks error:', err.message);
+    console.error('[Engine] doPlayAbility hooks error:', err.message, err.stack);
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -4834,6 +5056,26 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
+
+  // ── HAND-SPERRE DURCHSETZEN (1.8.) ─────────────────────────────────
+  // `neverPlayable` markiert Karten, die aus der HAND wirkungslos sind
+  // und nur über einen anderen Weg ins Spiel kommen (Coolness-Stapel,
+  // Discard, Reaktionsfenster). Bisher wurde das Flag AUSSCHLIESSLICH an
+  // den Client gereicht (`neverPlayableCards`), um die Karte auszugrauen
+  // — eine reine Anzeige. Weder der Server noch das CPU-Gehirn haben es
+  // je geprüft.
+  //
+  // Folge, belegt in Als Mitschnitt vom 1.8.: die CPU equipte
+  // "Swellpnir, Mount of Coolness" in Zug 1 direkt aus der Hand
+  // (`artifact_equipped`, cost 0) und bekam die Zusatzaktion
+  // (`second_action_granted`) — obwohl der Coolness-Stapel da noch leer
+  // war (erster `coolness_stack_push` erst 23 Ereignisse später).
+  // Betrifft nicht nur Swellpnir/Modnir, sondern alle 20 Karten mit
+  // diesem Flag.
+  //
+  // Die Prüfung gehört auf den SERVER, nicht nur in die CPU: ein
+  // manipulierter Client könnte den Zug sonst genauso schicken.
+  if (loadCardEffect(cardName)?.neverPlayable) return false;
 
   // Artifact-Creature hybrids whose script declares
   // `placesOnOpponentBoard: true` (Powder Keg etc.) accept the drag-
@@ -5303,6 +5545,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // explicitly below the moment effect resolution finishes (so the
   // engine's own auto-advance to Main Phase 2 isn't blocked by its own
   // counter), and the finally serves as a double-release-safe safety net.
+    // Stale-flag safety net — mirror of the engine-side resolution starts:
+  // clear a leaked `_spellNegatedByEffect` when an OUTERMOST spell
+  // resolution begins (see preDamageMultiTargetWindow's depth-0 notes).
+  if ((gs._spellResolutionDepth || 0) === 0) delete gs._spellNegatedByEffect;
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   // Resolving-Spell name stack: paired with the depth counter so
   // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
@@ -6407,25 +6653,43 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
 }
 
 async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider, viaDragDrop }) {
-  if (!room?.engine || !room.gameState) return false;
+  // ── ABLEHNUNGS-TELEMETRIE (30.7.) ──────────────────────────────────
+  // Die CPU sah bisher nur `false` und konnte "server-nein" nicht weiter
+  // aufschlüsseln. Genau daran hing die Diagnose der ungeklärten Karten
+  // (Werewolf 416, Pirate 272, Mummy 211, Primordium 161 Fehlschläge im
+  // v107-Lauf). Statt die Ablehnungsgründe CPU-seitig NACHZUBAUEN — exakt
+  // der Fehler, der zu den v103- und v108-Asymmetrien geführt hat —
+  // meldet der Server ihn jetzt selbst. Reiner Schreibzugriff auf ein
+  // Diagnosefeld, kein Verhaltenseinfluss, Rückgabewert unverändert
+  // `false`. In MCTS-Rollouts stumm.
+  const _no = (label, detail) => {
+    try {
+      if (room?.engine && !room.engine._inMctsSim) {
+        room.engine._playRefusal = { label, detail: detail || null, cardName };
+      }
+    } catch { /* Telemetrie darf nie stören */ }
+    return false;
+  };
+  if (!room?.engine || !room.gameState) return _no('kein-raum');
   const gs = room.gameState;
+  try { room.engine._playRefusal = null; } catch { }
 
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot });
-  if (!v) return false;
+  if (!v) return _no('validate-nein');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
-  if (ps.summonLocked) return false;
+  if (ps.summonLocked) return _no('summon-locked');
   const freshBlocked = room.engine.getSummonBlocked(pi);
-  if (freshBlocked.includes(cardName)) return false;
+  if (freshBlocked.includes(cardName)) return _no('summon-blocked');
   // Per-Hero `canSummon` gate. `getSummonBlocked` only refuses when
   // NO capable Hero accepts the card (card-wide check, cardHeroIdx
   // = -1) — that lets archetype rules like Gigantisaurs slip through
   // when ONE Hero is occupied but another is free. Re-run the per-
   // Hero check against the specific destination so e.g. Chimera /
   // Pteranos / Spinor refuse a Hero that already hosts a Gigantisaur.
-  if (!room.engine.isCreatureSummonable(cardName, pi, heroIdx)) return false;
+  if (!room.engine.isCreatureSummonable(cardName, pi, heroIdx)) return _no('cansummon-nein');
   const creatureHero = ps.heroes?.[heroIdx];
-  if (creatureHero?.statuses?.charmed) return false;
+  if (creatureHero?.statuses?.charmed) return _no('held-charmed');
 
   // Reaction-subtype Creatures are exempt from the action-economy
   // machinery — see the Spell/Attack path for the rationale.
@@ -6440,11 +6704,27 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     || ((ps._bonusMainActions || 0) > 0 && actionsPlayedThisPhase === 1)
   );
   const actionAlreadyUsed = isActionPhase && (ps.heroesActedThisTurn?.length > 0) && !hasBonusAction;
-  if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction && !isReactionSubtype) return false;
+  if ((isMainPhase || actionAlreadyUsed) && !usingAdditional && !isInherentAction && !isReactionSubtype) {
+    // Feinaufschlüsselung: WARUM stand keine Aktion zur Verfügung?
+    // Trennt "Main Phase ohne Grant" von "Aktion schon verbraucht"
+    // und hält fest, ob überhaupt ein Grant existierte.
+    return _no('keine-aktion', (isMainPhase ? 'mainphase' : 'aktion-verbraucht')
+      + (additionalTypeId ? '+grant-da' : '+kein-grant'));
+  }
 
   if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
   const totalZones = ps.supportZones[heroIdx].length;
-  if (zoneSlot < 0 || zoneSlot >= totalZones) return false;
+  if (zoneSlot < 0 || zoneSlot >= totalZones) return _no('slot-ungueltig');
+  // Intent flags are PER-PLAY: whichever branch below sets its flag also
+  // clears the sibling. Without this, a stale flag from an earlier play
+  // (Deepsea Castle / DDG have no tryBouncePlace consumer; the negated /
+  // fizzle / cancel exits below never cleaned up either) survived into
+  // the next play — and a stale `_requestedNormalSummonSlot` made
+  // tryBouncePlace skip an EXPLICIT occupied-slot swap request, so the
+  // creature got relocated by summonCreature into a free zone instead
+  // (Als Bugreport: swap targeting an occupied slot summoned into a
+  // free Support Zone whenever a Primordium grant round had extra
+  // plays in flight).
   if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) {
     const occCardScript = loadCardEffect(cardName);
     let allowOccupied = false;
@@ -6455,7 +6735,8 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         console.error('[canPlaceOnOccupiedSlot]', cardName, err.message);
       }
     }
-    if (!allowOccupied) return false;
+    if (!allowOccupied) return _no('slot-besetzt');
+    delete ps._requestedNormalSummonSlot;
     ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
   } else {
     // Player picked an EMPTY slot — they want a regular summon into this
@@ -6463,8 +6744,11 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // hooks (tryBouncePlace for Deepsea) can short-circuit and let the
     // normal placeCreature path run instead of prompting to bounce an
     // on-board Deepsea. Flag is cleared either by the hook that reads it
-    // or, as a safety net, at turn start. Co-exists with the bounce-place
-    // flag — only one of the two is ever set for a given play.
+    // or, as a safety net, at turn start. The sibling bounce-place flag
+    // is cleared here so a stale one from an earlier play can't leak
+    // into this fresh empty-slot intent (mirror of the occupied branch
+    // above).
+    delete ps._requestedBouncePlaceSlot;
     ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot };
   }
 
@@ -6472,8 +6756,27 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   let consumedInst = null;
   if (usingAdditional) {
     consumedInst = room.engine.consumeAdditionalAction(pi, additionalTypeId, additionalActionProvider || null);
-    if (!consumedInst) return false;
+    if (!consumedInst) return _no('grant-weg');
     additionalConsumed = true;
+    // ── KREDIT-WEITERGABE (31.7.) ─────────────────────────────────────
+    // Der Nutzen eines Enablers erscheint in den Daten NIE als sein
+    // eigener Play, sondern als der Play der Karte, die er finanziert
+    // hat. Die Regression schreibt den Ertrag dem Nutznießer gut — und
+    // kann dem Enabler zum Ausgleich sogar ein negatives Gewicht geben.
+    // Genau diese Signatur zeigt das Deepsea-Profil: Werewolf 95.5,
+    // Deepsea Primordium 8 (Boden), obwohl Primordium die Werewolf-Plays
+    // überhaupt erst bezahlt.
+    // Hier wird der GEBER festgehalten, damit der Recorder ihn an das
+    // Trigger-Ereignis hängen und der Trainer den Ertrag anteilig
+    // zurückschreiben kann. Reine Telemetrie.
+    try {
+      room.engine._grantProvider = {
+        name: consumedInst.name || null,
+        forCard: cardName,
+        turn: room.gameState?.turn || 0,
+        owner: pi,
+      };
+    } catch { /* nie stören */ }
   }
 
   const nthCreature = ps.hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
@@ -6524,7 +6827,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     delete ps._requestedBouncePlaceSlot;
     delete ps._requestedNormalSummonSlot;
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-    return false;
+    return _no('summon-fehlgeschlagen');
   }
   let _heroCostFinalized = false;
 
@@ -7322,6 +7625,18 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       actionCost: !!isActionCost,
     });
 
+    // Hero-Effekt-Timing-Lernkanal: Aktivierungs-ENTSCHEIDUNG mit
+    // Handgrößen-Bucket des Aktivierers stempeln (auch wenn der Gegner
+    // gleich negiert — die Timing-Entscheidung war so getroffen).
+    // Nur live; MCTS-Rollouts erzeugen keine Lerndaten.
+    if (!room.engine._inMctsSim) {
+      const _hl = gs.players[pi]?.hand?.length ?? 0;
+      const _hb = _hl <= 1 ? '0-1' : _hl <= 3 ? '2-3' : '4+';
+      (room.engine._heroEffectLog = room.engine._heroEffectLog || []).push({
+        pi, hero: hero.baseName || hero.name, bucket: _hb,
+      });
+    }
+
     const chainResult = await room.engine.executeCardWithChain({
       cardName: chosen.name, owner: pi, cardType: 'Hero', goldCost: 0, resolve: null,
       fromBoard: true,
@@ -7721,6 +8036,12 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // gold but doesn't resolve, so no recycle).
   const keepInHand = !chainResult.negated && cardType === 'Artifact'
     && chainResult.resolveResult?.keepInHand === true;
+  if (keepInHand) {
+    // Play-Beleg für keepInHand-Gems im TARGETING-Pfad (Magic Amethyst
+    // läuft über die potionTargeting-Session hierher — der andere
+    // keepInHand-Zweig bei ~8250 deckt nur Nicht-Targeting-Artefakte).
+    room.engine.log('gem_kept_in_hand', { player: ps.username, card: potionName });
+  }
   if (hi >= 0 && !keepInHand) {
     ps.hand.splice(hi, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
@@ -7748,6 +8069,22 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       checkPotionLock(ps, gs, pi);
     } else {
       pilePs.discardPile.push(potionName);
+      // Targeting Artifacts (Snow Cannon, Magnetic Glove, Golden Ankh,
+      // The Yeeting, …) resolve through THIS shared potion-targeting
+      // flow, not through doUseArtifactEffect — without this fire they
+      // are invisible to afterArtifactUsed observers (training
+      // recorder). Board-placing artifacts (_spellPlacedOnBoard) are
+      // deliberately excluded above: they get recorded via
+      // onCardEnterZone and would double-count here.
+      if (cardType === 'Artifact' && !chainResult.negated) {
+        try {
+          await room.engine.runHooks('afterArtifactUsed', {
+            artifactName: potionName, playerIdx: pi, _skipReactionCheck: true,
+          });
+        } catch (err) {
+          console.error('[Engine] afterArtifactUsed hook error:', err.message);
+        }
+      }
     }
   } else if (hi >= 0 && keepInHand) {
     // Card stays in hand — still counts as a played-from-hand card
@@ -8034,6 +8371,19 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
         }
       }
     } else {
+      // Selbst-splicende Potions (Elixir of Quickness räumt sich in
+      // resolve() eigenhändig aus der Hand, getResolvingHandIndex ist
+      // danach -1): afterPotionUsed muss TROTZDEM feuern — sonst sind
+      // Karten-Listener (Saint Nicolas, Lizbeth, Biomancy) und der
+      // Trainings-Recorder für diese Potions blind. Kein Pile-Push
+      // hier: die Karte hat ihren Zonen-Transfer bereits selbst erledigt.
+      if (!chainResult.negated && !chainResult.resolveResult?.cancelled) {
+        await room.engine.runHooks('afterPotionUsed', {
+          potionName: cardName, potionOwner: pi,
+          fromHandIndex: -1,
+          placed: !!chainResult.resolveResult?.placed, _skipReactionCheck: true,
+        });
+      }
       if (!chainResult.negated && !chainResult.resolveResult?.placed) checkPotionLock(ps, gs, pi);
     }
   } catch (err) {
@@ -8063,6 +8413,26 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
 
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
+
+  // ── HAND-SPERRE DURCHSETZEN (1.8.) ─────────────────────────────────
+  // `neverPlayable` markiert Karten, die aus der HAND wirkungslos sind
+  // und nur über einen anderen Weg ins Spiel kommen (Coolness-Stapel,
+  // Discard, Reaktionsfenster). Bisher wurde das Flag AUSSCHLIESSLICH an
+  // den Client gereicht (`neverPlayableCards`), um die Karte auszugrauen
+  // — eine reine Anzeige. Weder der Server noch das CPU-Gehirn haben es
+  // je geprüft.
+  //
+  // Folge, belegt in Als Mitschnitt vom 1.8.: die CPU equipte
+  // "Swellpnir, Mount of Coolness" in Zug 1 direkt aus der Hand
+  // (`artifact_equipped`, cost 0) und bekam die Zusatzaktion
+  // (`second_action_granted`) — obwohl der Coolness-Stapel da noch leer
+  // war (erster `coolness_stack_push` erst 23 Ereignisse später).
+  // Betrifft nicht nur Swellpnir/Modnir, sondern alle 20 Karten mit
+  // diesem Flag.
+  //
+  // Die Prüfung gehört auf den SERVER, nicht nur in die CPU: ein
+  // manipulierter Client könnte den Zug sonst genauso schicken.
+  if (loadCardEffect(cardName)?.neverPlayable) return false;
   if ((cardData.subtype || '').toLowerCase() === 'equipment') return false;
 
   // Rusting Crystal aura — doubles the base cost BEFORE reductions.
@@ -8158,7 +8528,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
         resolve: async () => await script.resolve(room.engine, pi, [], []),
       });
     } catch (err) {
-      console.error('[Engine] Artifact resolve error:', err.message);
+      console.error('[Engine] Artifact resolve error:', err.stack || err.message); // Stack statt nur Message — ohne ihn war der Täter (Ushabti) nicht auffindbar
       chainResult = { negated: false, chainFormed: false };
     }
     await room.engine._delay(100);
@@ -8180,6 +8550,21 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       delete ps._nextArtifactCostReductionTurn;
     }
 
+    // Universal "artifact resolved" observer hook. One-shot / targeting
+    // Artifacts never enter a board zone, so onCardEnterZone can't see
+    // them — this is the ONLY signal that e.g. Magnetic Glove or Golden
+    // Ankh was actually used. Observers only (training recorder, future
+    // passive listeners); _skipReactionCheck so no reaction window opens.
+    if (!chainResult.negated) {
+      try {
+        await room.engine.runHooks('afterArtifactUsed', {
+          artifactName: cardName, playerIdx: pi, _skipReactionCheck: true,
+        });
+      } catch (err) {
+        console.error('[Engine] afterArtifactUsed hook error:', err.message);
+      }
+    }
+
     const currentIdx = getResolvingHandIndex(ps);
     ps._resolvingCard = null;
     if (currentIdx >= 0) {
@@ -8194,6 +8579,10 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       const keepInHand = !chainResult.negated && chainResult.resolveResult?.keepInHand === true;
       if (keepInHand) {
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        // keepInHand-Gems erzeugen keinen ZoneEnter für die Karte selbst —
+        // dieses Event ist die Play-Quelle für Recorder/Einsatz-Report
+        // (schloss die Amethyst-Unterzählung: 3/700 trotz realer Plays).
+        room.engine.log('gem_kept_in_hand', { player: ps.username, card: cardName });
       } else {
         ps.hand.splice(currentIdx, 1);
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
@@ -9536,6 +9925,31 @@ async function startGameEngine(room, roomId, activePlayer, afterInit) {
   // BEFORE onBeforeHandDraw fires — otherwise a Hero with an onBeforeHandDraw
   // prompt (Bill) would try to prompt the CPU's non-existent socket.
   if (afterInit) afterInit(room.engine);
+
+  // ── DEMO-AUFNAHME, ZENTRAL FÜR ALLE SPIELARTEN (1.8.) ─────────────
+  // Vorher hing der Recorder nur am Singleplayer-Pfad. PvP-Partien sind
+  // für das CPU-Training aber mindestens so wertvoll — zwei Menschen
+  // liefern Entscheidungen, die kein Selbstspiel erzeugt.
+  //
+  // Der Einhängepunkt liegt HIER statt an den fünf Aufrufstellen
+  // (start_game, request_rematch, rematch_first_choice,
+  // advanceToNextGame, cubeStartMatch): eine Stelle kann nicht
+  // vergessen werden. `afterInit` läuft davor, damit der SP-Pfad seine
+  // onGameOver-Kette schon gesetzt hat und der Recorder sich daran
+  // hängen kann.
+  if (demoRecordingEnabled() && !room.engine._demoRecorderAttached) {
+    try {
+      room.engine._demoRecorderAttached = true;
+      require('./cards/effects/_demo-recorder').attachDemoRecorder(room.engine, {
+        pilotIdx: 0,
+        firstPlayer: activePlayer,
+        // 'sp' = Mensch gegen CPU (Spieler 0 ist der Mensch),
+        // 'pvp' = zwei Menschen (pilotIdx 0 ist dann schlicht Spieler 0).
+        mode: room.type === 'singleplayer' ? 'sp' : 'pvp',
+        roomId,
+      });
+    } catch (e) { console.error('[demo-recorder] Attach fehlgeschlagen:', e.message); }
+  }
 
   // Fire onBeforeHandDraw hook (Bill, etc.) — before starting hands are drawn
   await room.engine.runHooks('onBeforeHandDraw', {});
@@ -11832,7 +12246,26 @@ io.on('connection', (socket) => {
   });
 
   // ── Singleplayer CPU battle ──
-  async function createCpuBattle({ playerDeckId, cpuDeckId }) {
+  /**
+ * Ist die Demo-Aufnahme aktiv? **Standard: JA.**
+ *
+ * Seit dem Live-Betrieb (Render) sollen ALLE Partien aufgezeichnet
+ * werden, damit auch fremde Spieler Daten liefern. Abschalten geht
+ * ausdrücklich über `PP_DEMO_RECORD=0` (auch `false`/`off`/`no`).
+ *
+ * Die frühere Logik war umgekehrt (nur AN bei gesetzter Variable) und
+ * akzeptierte die Variable zusätzlich als Prozessargument, weil sie
+ * einmal per npm-Argument statt als Env gesetzt worden war — beides
+ * bleibt kompatibel.
+ */
+function demoRecordingEnabled() {
+  const raw = process.env.PP_DEMO_RECORD
+    ?? (process.argv.find(a => /^PP_DEMO_RECORD=/.test(a)) || '').split('=')[1];
+  if (raw == null || raw === '') return true;          // Standard: an
+  return !/^(0|false|off|no|nein)$/i.test(String(raw).trim());
+}
+
+async function createCpuBattle({ playerDeckId, cpuDeckId }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
 
@@ -11917,6 +12350,12 @@ io.on('connection', (socket) => {
       engine.onGameOver = (r, winnerIdx, reason) => endCpuBattle(r, winnerIdx, reason);
       engine._cpuPlayerIdx = 1;
       installCpuBrain(engine);
+      // Demo-Recorder (Als Pilot-Spiele): zeichnet menschlich gespielte
+      // Singleplayer-Partien Play-by-Play auf — Aktivierung über
+      // PP_DEMO_RECORD=1, Mensch ist Spieler 0. Hängt sich NACH der
+      // onGameOver-Zuweisung ein und kettet sich daran.
+      // (Die Demo-Aufnahme hängt jetzt zentral in startGameEngine —
+      //  siehe dort. Hier nichts mehr zu tun.)
       console.log(`[SP trace] afterInit — brain installed, _cpuPlayerIdx=${engine._cpuPlayerIdx}`);
     });
     console.log(`[SP trace] startGameEngine returned — mulliganPending=${room.gameState.mulliganPending}`);
@@ -12361,6 +12800,12 @@ io.on('connection', (socket) => {
               console.error('[self-play] mulligan check threw:', err.message);
             }
             room.gameState.mulliganDecisions[pi] = mull;
+            // Starthand-Lernkanal: finale Hand NACH der Entscheidung
+            // stempeln (bei Mulligan unten nach dem Redraw überschrieben).
+            room.engine._startHandInfo = room.engine._startHandInfo || {};
+            room.engine._startHandInfo[pi] = {
+              hand: [...room.gameState.players[pi].hand], mulliganed: mull,
+            };
             if (mull) {
               const ps = room.gameState.players[pi];
               const cardDB = getCardDB();
@@ -12389,6 +12834,8 @@ io.on('connection', (socket) => {
                 if (ps.potionDeck.length === 0) break;
                 ps.hand.push(ps.potionDeck.shift());
               }
+              // Redraw abgeschlossen — Starthand-Stempel aktualisieren.
+              room.engine._startHandInfo[pi] = { hand: [...ps.hand], mulliganed: true };
             }
           }
           room.gameState.mulliganPending = false;
@@ -13966,13 +14413,605 @@ function sanitizeRoom(room, forUser) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  HEADLESS TRAINING MODE (PP_TRAIN=1)
+//  Runs a pinned deck against the full sample-deck field WITHOUT
+//  opening a socket server, recording per-game training data via
+//  cards/effects/_train-recorder.js. Invoked from the START block
+//  below instead of server.listen().
+//
+//    PP_TRAIN=1 PP_TRAIN_GAMES=300 node server.js
+//    PP_TRAIN_DECK="Suicide Bombers"   (default)
+//    PP_TRAIN_HORIZON=2                (rollout horizon during training;
+//                                       lower = faster games)
+//    PP_TRAIN_OUT=data/training/<auto>.jsonl
+//
+//  Mirrors runOneSelfPlayGame (the socket-triggered test runner) in
+//  slimmed form — same room shape, same engine bootstrap, same smart
+//  mulligan, same watchdogs — but module-scope so it needs no
+//  authenticated socket. PP_DISABLE_PROFILES is forced ON so data
+//  collection always reflects the UN-profiled baseline policy (no
+//  feedback loop between the profile being trained and its own
+//  training data).
+// ═══════════════════════════════════════════════════════════════════
+const { attachTrainingRecorder } = require('./cards/effects/_train-recorder');
+
+// Tatsächliches V8-Heap-Limit in MB (respektiert --max-old-space-size).
+// Grundlage der Trainings-Heap-Wächter: feste Schwellen passten weder zu
+// 4-GB- noch zu 8-GB-Läufen.
+function _trainHeapLimitMB() {
+  try { return Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576); }
+  catch { return 4096; }
+}
+
+async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts = {}) {  const snapshotDeck = (d) => JSON.parse(JSON.stringify({
+    mainDeck: d.mainDeck || [], heroes: d.heroes || [],
+    potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [],
+    skins: d.skins || {},
+  }));
+  const decks = pinnedIdx === 0 ? [pinnedDeck, oppDeck] : [oppDeck, pinnedDeck];
+  const roomId = 'train-' + uuidv4().substring(0, 8);
+  const room = {
+    id: roomId, host: 'training', hostId: 'training',
+    type: 'singleplayer', format: 1, winsNeeded: 1, setScore: [0, 0],
+    playerPw: null, specPw: null,
+    players: [
+      { username: 'CPU-A', userId: 'cpu-train-a-' + roomId, socketId: null, deckId: 'train-a' },
+      { username: 'CPU-B', userId: 'cpu-train-b-' + roomId, socketId: null, deckId: 'train-b' },
+    ],
+    spectators: [], status: 'waiting', created: Date.now(),
+    gameState: null, chatHistory: [], privateChatHistory: {},
+    _currentDecks: [snapshotDeck(decks[0]), snapshotDeck(decks[1])],
+    _deckNames: [decks[0].name || '?', decks[1].name || '?'],
+  };
+  rooms.set(roomId, room);
+  await setupGameState(room);
+  const firstPlayer = Math.random() < 0.5 ? 0 : 1;
+
+  return new Promise((resolve) => {
+    let done = false;
+    let recorder = null;
+    let startGamePromise = null;
+    let watchdogInterval = null;
+    let hardTimeoutTimer = null;
+    const finish = (winnerIdx, reason) => {
+      if (done) return;
+      done = true;
+      if (watchdogInterval) { clearInterval(watchdogInterval); watchdogInterval = null; }
+      if (trailInterval) { clearInterval(trailInterval); trailInterval = null; }
+      if (hardTimeoutTimer) { clearTimeout(hardTimeoutTimer); hardTimeoutTimer = null; }
+      for (const p of room.players) activeGames.delete(p.userId);
+      const record = recorder
+        ? recorder.finish(winnerIdx, reason)
+        : { outcome: null, reason: 'recorder-missing' };
+      const drain = startGamePromise
+        ? Promise.race([startGamePromise.catch(() => {}), new Promise(r => setTimeout(r, 2000))])
+        : Promise.resolve();
+      drain.then(() => {
+        const eng = room.engine;
+        if (eng) { eng.onGameOver = null; eng._cpuDriver = null; }
+        room._currentDecks = null;
+        rooms.delete(roomId);
+        resolve(record);
+      });
+    };
+
+    // ── HEAP-SPUR AUF PLATTE (31.7.) ─────────────────────────────────
+    // Ein OOM tötet den Prozess ohne catch/finally — alles, was nur im
+    // Speicher steht, ist weg. Die Brotkrume nennt bereits das Match;
+    // sie bekommt jetzt zusätzlich eine ROLLIERENDE SPUR der letzten ~40
+    // Sekunden. Damit ist nach dem Absturz ablesbar, WELCHER Zähler
+    // explodiert ist (Aktionslog, Karteninstanzen, Snapshots, Hooks) und
+    // ab welchem Zug / welcher Phase.
+    //
+    // Warum das nötig ist, obwohl es Heap-Wächter GIBT: der Inline-Check
+    // in runHooks liegt HINTER `if (this._turnHooksKilled) return;`.
+    // Sobald das CPU-Zeitlimit oder die Hook-Obergrenze einmal getroffen
+    // hat, ist er für den Rest des Zuges stumm — jede weitere Allokation
+    // läuft dann unbeobachtet bis zum Prozesstod. Der Sampler hängt an
+    // keiner dieser Bedingungen.
+    //
+    // Ein blockierter Event-Loop kann während des Bursts selbst nicht
+    // mehr samplen — die Spur zeigt dann den ANLAUF bis zum Einfrieren,
+    // und genau der beantwortet die Frage.
+    let trailInterval = null;
+    if (gameOpts.trailPath) {
+      const RING = 80;               // 80 × 500 ms ≈ 40 s Rückschau
+      const samples = [];
+      const probes = [];             // synchrone Sonden-Treffer (Burst)
+      const t0 = Date.now();
+      const flush = () => {
+        try {
+          fs.writeFileSync(gameOpts.trailPath, JSON.stringify({
+            ...(gameOpts.trailHead || {}),
+            heapTrail: samples,
+            ...(probes.length ? { heapProbes: probes } : {}),
+          }), { encoding: 'utf-8' });
+        } catch { /* Forensik darf nie stören */ }
+      };
+      const sample = () => {
+        if (done) return;
+        try {
+          const mu = process.memoryUsage();
+          const eng = room.engine, gs = room.gameState;
+          samples.push({
+            ms: Date.now() - t0,
+            heap: Math.round(mu.heapUsed / 1048576),
+            rss: Math.round(mu.rss / 1048576),
+            t: gs?.turn ?? null,
+            ph: gs?.currentPhase ?? null,
+            ap: gs?.activePlayer ?? null,
+            log: eng?.actionLog?.length ?? null,
+            inst: eng?.cardInstances?.length ?? null,
+            snaps: eng?._snapshotsTaken ?? null,
+            hooks: eng?._hooksFiredThisTurn ?? null,
+            fb: eng?._cloneFallbacks ?? null,
+            killed: eng?._turnHooksKilled ? 1 : 0,
+          });
+          if (samples.length > RING) samples.splice(0, samples.length - RING);
+          flush();
+        } catch { /* Forensik darf nie stören */ }
+      };
+      // SOFORT einen Punkt setzen und JEDEN Tick schreiben. Der Absturz
+      // vom 31.7. (Spiel 2, Sitz 1) hinterließ GAR KEINE Spur, weil der
+      // alte Takt erst nach 4 Ticks = 2 s schrieb und das Spiel vorher
+      // starb. Eine ~10-KB-Datei zweimal je Sekunde ist billiger als ein
+      // verlorener Absturz.
+      sample();
+      trailInterval = setInterval(sample, 500);
+      if (trailInterval.unref) trailInterval.unref();
+      // SYNCHRONE SONDE: die Engine meldet je 100 MB Heap-Zuwachs — auch
+      // dann, wenn der Event-Loop blockiert ist und `sample()` nie wieder
+      // drankommt. Das ist der einzige Kanal, der einen synchronen Burst
+      // von innen beschreibt (mit Hook-Namen, Zug, Phase, Snapshot-Zahl).
+      gameOpts.attachProbeSink = (engine) => {
+        engine._crashTrailSink = (rec) => {
+          probes.push({ ms: Date.now() - t0, ...rec });
+          if (probes.length > 60) probes.splice(0, probes.length - 60);
+          flush();
+        };
+      };
+    }
+
+    startGameEngine(room, roomId, firstPlayer, (engine) => {
+      engine._isSelfPlay = true;
+      engine._cpuPlayerIdx = firstPlayer;
+      // Sonden-Sink so früh wie möglich anhängen — der Burst kann schon
+      // in den ersten Sekunden zuschlagen (gemessen: Spiel 2 starb, bevor
+      // der zeitgesteuerte Sampler überhaupt geschrieben hatte).
+      if (typeof gameOpts.attachProbeSink === 'function') gameOpts.attachProbeSink(engine);
+      // Spiegel-A/B (PP_TRAIN_AB): Profil nur für die designierte Seite
+      // aktivieren — die Gegenseite pilotiert mit dem reinen
+      // MCTS-Baseline-Gehirn. Muss VOR der ersten Profil-Abfrage
+      // (Mulligan / Zug 1) gesetzt sein.
+      if (gameOpts.profileAllowedSide != null) {
+        engine._profileAllowedSide = gameOpts.profileAllowedSide;
+      }
+      installCpuBrain(engine);
+      recorder = attachTrainingRecorder(engine, {
+        pinnedIdx,
+        pinnedName: pinnedDeck.name,
+        opponentName: oppDeck.name,
+        firstPlayer,
+        // Card-pool allowlist — see recorder for why controller-based
+        // attribution alone is not enough.
+        allowedNames: new Set([
+          ...(pinnedDeck.mainDeck || []),
+          ...(pinnedDeck.potionDeck || []),
+        ]),
+      });
+      engine.onGameOver = (_room, winnerIdx, reason) => {
+        if (room.gameState && !room.gameState.result) {
+          room.gameState.result = { winnerIdx, reason };
+        }
+        finish(winnerIdx, reason);
+      };
+    }).then(async () => {
+      room.engine._cpuDriver = makeCpuDriver(room);
+      // Smart auto-mulligan for both sides — same flow as self-play.
+      if (room.gameState.mulliganDecisions) {
+        for (const pi of [0, 1]) {
+          let mull = false;
+          try {
+            room.engine._cpuPlayerIdx = pi;
+            mull = shouldMulliganStartingHand(room.engine, pi);
+          } catch (err) {
+            console.error('[train] mulligan check threw:', err.message);
+          }
+          room.gameState.mulliganDecisions[pi] = mull;
+          if (mull) {
+            const ps = room.gameState.players[pi];
+            const cardDB = getCardDB();
+            const handSize = ps.hand.length;
+            let potionCount = 0;
+            for (const card of ps.hand) {
+              const cd = cardDB[card];
+              if (cd?.cardType === 'Potion') { ps.potionDeck.push(card); potionCount++; }
+              else { ps.mainDeck.push(card); }
+            }
+            ps.hand.length = 0;
+            const shuf = (arr) => {
+              for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+              }
+            };
+            shuf(ps.mainDeck);
+            shuf(ps.potionDeck);
+            const mainToDraw = handSize - potionCount;
+            for (let i = 0; i < mainToDraw; i++) {
+              if (ps.mainDeck.length === 0) break;
+              ps.hand.push(ps.mainDeck.shift());
+            }
+            for (let i = 0; i < potionCount; i++) {
+              if (ps.potionDeck.length === 0) break;
+              ps.hand.push(ps.potionDeck.shift());
+            }
+          }
+          // Starthand-Lernkanal: finale Hand nach Entscheidung/Redraw
+          // stempeln — der Trainings-Recorder liest das in finish().
+          room.engine._startHandInfo = room.engine._startHandInfo || {};
+          room.engine._startHandInfo[pi] = {
+            hand: [...room.gameState.players[pi].hand], mulliganed: mull,
+          };
+        }
+        room.gameState.mulliganPending = false;
+        delete room.gameState.mulliganDecisions;
+      }
+      room.engine.enterFastMode();
+      startGamePromise = room.engine.startGame()
+        .then(() => {
+          if (!done) {
+            const w = room.gameState?.result?.winnerIdx;
+            finish(w != null ? w : -1, room.gameState?.result?.reason || 'no-result');
+          }
+        })
+        .catch(err => {
+          console.error('[train] engine.startGame error:', err.message);
+          if (!done) finish(-1, 'error: ' + err.message);
+        });
+    }).catch(err => {
+      console.error('[train] setup error:', err.message);
+      if (!done) finish(-1, 'setup-error: ' + err.message);
+    });
+
+    // Watchdogs — turn-stall + max-turns + hard timeout, mirroring self-play.
+    let lastTurn = -1, stallTicks = 0;
+    watchdogInterval = setInterval(() => {
+      if (done) return;
+      const gs = room.gameState;
+      if (!gs) return;
+      if ((gs.turn || 0) >= 400) { finish(-1, `max-turns@${gs.turn}`); return; }
+      if (gs.turn === lastTurn) {
+        // 80 Ticks (~120 s) statt 20 (~30 s): Die alte Schwelle lag exakt
+        // auf dem 30-s-Karten-Hardcap — beide feuerten zeitgleich und der
+        // Watchdog beendete das GANZE Spiel, bevor der Hardcap den
+        // hängenden Play abandonnen und das Spiel retten konnte
+        // (beobachtet: Slip 'n Slide „stalled@turn4"). Mit 120 s greift
+        // die Kette Hardcap → Aufräumen → Weiterspielen zuerst; echte
+        // Deadlocks räumt der Watchdog weiterhin ab.
+        if (++stallTicks >= 80) finish(-1, `stalled@turn${gs.turn}`);
+      } else { stallTicks = 0; lastTurn = gs.turn; }
+      // Heap watchdog — abort the game before the OS OOM-killer takes the
+      // whole batch. Schwelle leitet sich aus dem TATSÄCHLICHEN
+      // V8-Heap-Limit ab (31.7.): der feste Default 2000 passte weder zu
+      // 4-GB- noch zu 8-GB-Läufen. 55% des Limits lässt genug Luft, damit
+      // GC den abgebrochenen Spielzustand noch einräumen kann.
+      // PP_TRAIN_HEAP_MB überschreibt weiterhin hart.
+      const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+      const heapCap = parseInt(process.env.PP_TRAIN_HEAP_MB || '', 10)
+        || Math.round(_trainHeapLimitMB() * 0.55);
+      if (heapMB >= heapCap) {
+        console.error(`[train heap-watchdog] abort at ${heapMB}MB (cap ${heapCap}) — ${room._deckNames.join(' vs ')}`);
+        finish(-1, `heap-abort@${heapMB}MB`);
+      }
+    }, 1500);
+    // Env-konfigurierbar (PP_GAME_TIMEOUT_MS): Mirror-Matches mit vollem
+    // MCTS-Budget können die 5 Minuten allein durch Wandzeit pro Zug
+    // reißen, obwohl die Zuglänge normal ist — für Benchmark-Duelle/
+    // langsame Maschinen anhebbar. Default bleibt 5 Minuten.
+    const gameTimeoutMs = (() => {
+      const env = parseInt(process.env.PP_GAME_TIMEOUT_MS || '', 10);
+      return Number.isFinite(env) && env > 0 ? env : 5 * 60 * 1000;
+    })();
+    hardTimeoutTimer = setTimeout(() => { if (!done) finish(-1, 'timeout'); }, gameTimeoutMs);
+  });
+}
+
+async function runTrainingBatch() {
+  // Force-off learned profiles during data collection (see header note) —
+  // EXCEPT in eval mode (PP_TRAIN_EVAL=1), which runs the identical batch
+  // WITH profiles active so a trained profile can be A/B-verified against
+  // the same opponent field that produced its training data. Eval-mode
+  // games are written to a separate file and should NOT be fed back into
+  // training (off-baseline policy).
+  const evalMode = process.env.PP_TRAIN_EVAL === '1';
+  // Spiegel-A/B (PP_TRAIN_AB=1): gleiches Deck auf beiden Seiten, eine
+  // Seite MIT Profil, die andere mit dem nackten MCTS-Baseline-Gehirn.
+  // Deckstärke kürzt sich raus — gemessen wird reine Pilotenqualität.
+  // Profile müssen laden (keine PP_DISABLE_PROFILES), die Seiten-Maske
+  // im Game-Runner beschränkt sie auf die designierte Seite.
+  const abMode = process.env.PP_TRAIN_AB === '1';
+  // PP_TRAIN_OPP_PROFILES=1: Self-Play-Iteration — die GEGNER pilotieren
+  // mit ihren trainierten Profilen (sofern vorhanden und nicht
+  // quarantänisiert), die gepinnte Sammel-Seite bleibt Baseline +
+  // Exploration. Stärkere Gegner → härtere Trainingsdaten. Bewusst NUR
+  // gegner-seitig: Die eigene Seite mit Profil sammeln zu lassen (echte
+  // Policy-Iteration) würde Konfundierungs-Bias über Generationen
+  // VERSTÄRKEN statt korrigieren. Records werden mit oppProfiles
+  // gestempelt — Generationen nicht in derselben Resume-Datei mischen.
+  const oppProfiles = process.env.PP_TRAIN_OPP_PROFILES === '1' && !evalMode && !abMode;
+  if (!evalMode && !abMode && !oppProfiles) process.env.PP_DISABLE_PROFILES = '1';
+  // ε-Exploration (siehe _cpu.js exploreRoll): nur für Datensammlung.
+  // In Eval-Läufen wird sie vom Helper ohnehin hart ignoriert — hier
+  // zusätzlich laut warnen, damit ein versehentlich gesetztes Flag
+  // nicht stillschweigend wirkungslos bleibt.
+  const exploreEps = parseFloat(process.env.PP_TRAIN_EXPLORE || '0') || 0;
+  if ((evalMode || abMode) && exploreEps > 0) {
+    console.warn('[train] ⚠️  PP_TRAIN_EXPLORE ist in EVAL-/A/B-Läufen deaktiviert (gemessen wird die echte Policy)');
+    delete process.env.PP_TRAIN_EXPLORE;
+  }
+  setCpuVerbose(process.env.PP_TRAIN_VERBOSE === '1');
+  const horizon = parseInt(process.env.PP_TRAIN_HORIZON || '2', 10);
+  setRolloutHorizon(horizon);
+  let count = parseInt(process.env.PP_TRAIN_GAMES || '200', 10); // ggf. unten via PP_TRAIN_GAMES_MULT überschrieben
+  const pinName = process.env.PP_TRAIN_DECK || 'Suicide Bombers';
+
+  const samples = loadSampleDecks().filter(d =>
+    d && Array.isArray(d.heroes) && d.heroes.length > 0
+    && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const pinned = samples.find(d => norm(d.name).includes(norm(pinName)) || norm(pinName).includes(norm(d.name)));
+  if (!pinned) {
+    console.error(`[train] pinned deck not found: "${pinName}" — available: ${samples.map(d => d.name).join(', ')}`);
+    process.exit(1);
+  }
+  // PP_TRAIN_OPP: optionaler Gegner-Filter (Substring, kommasepariert) —
+  // für gezielte Matchup-Tests und Bug-Reproduktion.
+  const oppFilter = (process.env.PP_TRAIN_OPP || '').split(',').map(norm).filter(Boolean);
+  let opponents = abMode ? [pinned] : samples.filter(d => d !== pinned);
+  if (!abMode && oppFilter.length > 0) {
+    opponents = opponents.filter(d => oppFilter.some(f => norm(d.name).includes(f) || f.includes(norm(d.name))));
+    if (opponents.length === 0) { console.error('[train] PP_TRAIN_OPP matcht keinen Gegner'); process.exit(1); }
+    console.log(`[train] Gegner-Filter aktiv: ${opponents.map(d => d.name).join(', ')}`);
+  }
+  // PP_TRAIN_SKIP_OPP: Gegner per Substring AUSSCHLIESSEN — für Matchups,
+  // die das Sandbox-Zeitfenster sprengen (Big Stomp/Slip) und separat
+  // mit reduziertem Budget bewertet werden. Kommasepariert.
+  const skipFilter = (process.env.PP_TRAIN_SKIP_OPP || '').split(',').map(norm).filter(Boolean);
+  if (!abMode && skipFilter.length > 0) {
+    opponents = opponents.filter(d => !skipFilter.some(f => norm(d.name).includes(f)));
+    console.log(`[train] Gegner uebersprungen: ${skipFilter.join(', ')} — ${opponents.length} verbleiben`);
+    // Ohne diesen Guard lief die Schleife mit leerer Gegnerliste weiter:
+    // `opponents[i % 0]` ist undefined → "Cannot read properties of
+    // undefined (reading 'name')". Sauber aussteigen statt zu werfen —
+    // der Aufrufer (train-iterative) unterscheidet exit 2 von einem
+    // echten Absturz.
+    if (opponents.length === 0) {
+      console.error('[train] PP_TRAIN_SKIP_OPP hat ALLE Gegner ausgeschlossen — nichts zu sammeln.');
+      process.exit(2);
+    }
+  }
+  // Vielfachen-Modus: PP_TRAIN_GAMES_MULT=k → Spiele = k × Gegnerzahl.
+  // Garantiert exakte Rotations-Vielfache (jeder Gegner gleich oft),
+  // auch wenn sich der Deck-Pool ändert — sonst bekommen die ersten
+  // Gegner des letzten Teilzyklus systematisch mehr Spiele.
+  const gamesMult = parseInt(process.env.PP_TRAIN_GAMES_MULT || '0', 10);
+  if (gamesMult > 0 && opponents.length > 0) {
+    count = gamesMult * opponents.length;
+    console.log(`[train] PP_TRAIN_GAMES_MULT=${gamesMult} → ${count} Spiele (${gamesMult} × ${opponents.length} Gegner)`);
+  }
+  console.log(abMode
+    ? `[train] A/B-SPIEGEL: "${pinned.name}" (Profil) vs "${pinned.name}" (Baseline), ${count} games, horizon=${horizon}`
+    : `[train] "${pinned.name}" vs ${opponents.length} opponents, ${count} games, horizon=${horizon}${(!evalMode && exploreEps > 0) ? `, explore ε=${exploreEps}` : ''}${oppProfiles ? ', GEGNER-PROFILE AN (Self-Play-Iteration)' : ''}`);
+
+  const outDir = path.join(__dirname, 'data', 'training');
+  fs.mkdirSync(outDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const outPath = process.env.PP_TRAIN_OUT
+    || path.join(outDir, `${norm(pinned.name)}-${abMode ? 'AB-' : evalMode ? 'EVAL-' : ''}${stamp}.jsonl`);
+  console.log(`[train] ${abMode ? 'A/B MODE (Profil vs Baseline im Spiegel)' : evalMode ? 'EVAL MODE (profiles ON)' : 'data collection (profiles OFF)'} — writing → ${outPath}`);
+
+  // ── Resumability ──
+  // If the output file already exists, continue from its line count.
+  // Completed games are appendFileSync'd one-by-one, so a crash (OOM,
+  // power loss) only costs the in-flight game: relaunching with the same
+  // PP_TRAIN_OUT picks up where the batch died, and the opponent
+  // round-robin stays aligned because it's indexed by the same counter.
+  let startIdx = 0;
+  // Bilanz der bereits in der Datei stehenden Spiele. Ohne diese Zählung
+  // startet die laufende W/L-Anzeige nach jedem Wiederanlauf bei 0 und
+  // die DONE-Zeile meldet nur die Spiele DIESES Prozesses — nach einem
+  // OOM also grob zu wenig (gemessen: Datei 1W-3L, DONE meldete 0W-2L).
+  // Die Spiele selbst waren nie weg, nur die Anzeige.
+  let resumedWins = 0, resumedLosses = 0, resumedTies = 0;
+  try {
+    if (fs.existsSync(outPath)) {
+      const lines = fs.readFileSync(outPath, { encoding: 'utf-8' })
+        .split('\n').filter(l => l.trim());
+      startIdx = lines.length;
+      if (startIdx > 0) {
+        for (const line of lines) {
+          try {
+            const g = JSON.parse(line);
+            if (g.outcome === 1) resumedWins++;
+            else if (g.outcome === 0) resumedLosses++;
+            else resumedTies++;
+          } catch { /* korrupte Zeile → ignorieren */ }
+        }
+        console.log(`[train] resuming — ${startIdx} games already in output `
+          + `(${resumedWins}W-${resumedLosses}L-${resumedTies}T übernommen)`);
+      }
+      // ε-Exploration: Novelty-Zähler mit den historischen Play-Summen
+      // aus der Resume-Datei seeden, damit "novel" wirklich "über den
+      // ganzen Datensatz nie gespielt" heißt — nicht bloß "seit dem
+      // letzten Prozessstart nicht dran gewesen".
+      if (exploreEps > 0 && !evalMode && startIdx > 0) {
+        const seed = Object.create(null);
+        for (const line of lines) {
+          try {
+            const g = JSON.parse(line);
+            for (const [name, b] of Object.entries(g.plays || {})) {
+              seed[name] = (seed[name] || 0) + (b.early || 0) + (b.mid || 0) + (b.late || 0);
+            }
+          } catch { /* korrupte Zeile → ignorieren */ }
+        }
+        seedExploreAttempts(seed);
+        console.log(`[train] Novelty-Seed aus ${startIdx} Spielen: ${Object.keys(seed).length} Karten`);
+      }
+    }
+  } catch { startIdx = 0; resumedWins = 0; resumedLosses = 0; resumedTies = 0; }
+
+  let wins = resumedWins, losses = resumedLosses, ties = resumedTies;
+  const t0 = Date.now();
+  for (let i = startIdx; i < count; i++) {
+    // Round-robin opponents so every archetype contributes equally;
+    // alternate the pinned deck's seat so first-player advantage and
+    // seat-dependent quirks average out.
+    const opp = opponents[i % opponents.length];
+    const pinnedIdx = i % 2;
+    // ── ABSTURZ-ATTRIBUTION (31.7.) ──────────────────────────────────
+    // Ein OOM tötet den PROZESS — kein catch, kein finally, kein Log
+    // darüber, welches Match gerade lief. Die Konsole zeigt dann nur
+    // das zuletzt FERTIGE Spiel, und die Ursache muss über den
+    // Round-Robin-Index zurückgerechnet werden (so wurde der
+    // Mawstruck-Absturz bei exakt 34 Spielen gefunden: Spiel 35 war
+    // immer dasselbe Matchup). Deshalb hinterlässt jedes Spiel VOR dem
+    // Start eine Brotkrume auf der Platte und räumt sie danach weg.
+    // Bleibt sie liegen, hat genau dieses Match den Prozess getötet —
+    // train-iterative.js liest sie und überspringt den Gegner beim
+    // Wiederanlauf.
+    const inflightPath = outPath + '.inflight.json';
+    try {
+      fs.writeFileSync(inflightPath, JSON.stringify({
+        i, game: i + 1, pinned: pinned.name, opponent: opp.name, pinnedIdx,
+        startedAt: new Date().toISOString(),
+      }), { encoding: 'utf-8' });
+    } catch { /* Brotkrume ist Diagnose, nie Abbruchgrund */ }
+    let record;
+    const trailHead = {
+      i, game: i + 1, pinned: pinned.name, opponent: opp.name, pinnedIdx,
+      startedAt: new Date().toISOString(),
+    };
+    try {
+      // Brotkrume + Heap-Spur landen in DERSELBEN Datei: sie wird vor dem
+      // Spiel geschrieben, vom Sampler fortgeschrieben und nach dem
+      // erfolgreichen Append gelöscht. Überlebt sie, enthält sie beides —
+      // das schuldige Match UND den Speicher-Anlauf bis zum Einfrieren.
+      const gOpts = abMode ? { profileAllowedSide: pinnedIdx }
+        : oppProfiles ? { profileAllowedSide: 1 - pinnedIdx } : {};
+      gOpts.trailPath = inflightPath;
+      gOpts.trailHead = trailHead;
+      record = await runHeadlessTrainingGame(pinned, opp, pinnedIdx, gOpts);
+    } catch (err) {
+      console.error(`[train] game ${i + 1} threw:`, err.message);
+      continue;
+    }
+    // Stamp the hero trio as PLAIN NAMES — the runtime profile matcher
+    // keys on sorted hero-name strings. Sample-deck hero entries are
+    // objects ({ hero, ability1, ability2 }); unwrap them.
+    record.heroes = (pinned.heroes || [])
+      .map(h => (h && typeof h === 'object') ? (h.hero || h.name) : h)
+      .filter(Boolean);
+    // Exploration-Stempel: Spiele aus ε-Läufen sind off-policy. Der
+    // Trainer nutzt sie derzeit gleichberechtigt (das ist der Zweck —
+    // Support für unerforschte Karten), aber das Feld erlaubt späteres
+    // Down-Weighting oder getrennte Auswertung.
+    if (!evalMode && !abMode && exploreEps > 0) record.exploreEps = exploreEps;
+    // A/B-Spiele sind Messläufe, NIE Trainingsdaten (der Trainer filtert
+    // abMode-Records zusätzlich hart raus). outcome ist bereits aus
+    // Sicht der Profil-Seite gelabelt (pinnedIdx = profiledIdx).
+    if (abMode) { record.abMode = true; record.profiledIdx = pinnedIdx; }
+    if (oppProfiles) record.oppProfiles = true;
+    fs.appendFileSync(outPath, JSON.stringify(record) + '\n', { encoding: 'utf-8' });
+    // Spiel ist sicher auf der Platte → Brotkrume weg. Bleibt sie
+    // liegen, war dieses Match der Prozess-Killer.
+    try { fs.unlinkSync(inflightPath); } catch { /* schon weg */ }
+    if (record.outcome === 1) wins++;
+    else if (record.outcome === 0) losses++;
+    else ties++;
+    const msg = record.outcome === 1 ? 'WIN ' : record.outcome === 0 ? 'LOSS' : 'TIE ';
+    console.log(`[train] ${i + 1}/${count} ${msg} vs ${opp.name} (${record.turns}t, ${record.reason}) — running ${wins}W-${losses}L-${ties}T`);
+    if (typeof global.gc === 'function' && i % 10 === 9) { try { global.gc(); } catch {} }
+  }
+  const mins = ((Date.now() - t0) / 60000).toFixed(1);
+  if (process.env.PP_COVERAGE === '1' && global.__ppCoverage) {
+    const covPath = (process.env.PP_TRAIN_OUT || 'training.jsonl').replace(/\.jsonl$/, '') + '.coverage.json';
+    try {
+      fs.writeFileSync(covPath, JSON.stringify(global.__ppCoverage, null, 1), 'utf-8');
+      console.log(`[train] coverage → ${covPath} (${Object.keys(global.__ppCoverage).length} Karte|Hook-Schlüssel)`);
+    } catch (err) { console.error('[train] coverage dump failed:', err.message); }
+  }
+  const _resumedTotal = resumedWins + resumedLosses + resumedTies;
+  console.log(`[train] DONE in ${mins}min — ${wins}W-${losses}L-${ties}T`
+    + (_resumedTotal > 0 ? ` (gesamte Datei, davon ${_resumedTotal} aus früheren Anläufen)` : '')
+    + ` → ${outPath}`);
+  if (abMode) {
+    // Gesamtbilanz über die DATEI (nicht nur diesen Prozess) — Resume-
+    // Fortsetzungen zählen mit. 95%-Wald-Intervall als Ehrlichkeits-
+    // anker: bei n=100 ist ±~10 Prozentpunkte normal.
+    try {
+      let W = 0, L = 0, T = 0;
+      for (const line of fs.readFileSync(outPath, { encoding: 'utf-8' }).split('\n')) {
+        if (!line.trim()) continue;
+        const g = JSON.parse(line);
+        if (g.outcome === 1) W++; else if (g.outcome === 0) L++; else T++;
+      }
+      const n = W + L;
+      const p = n > 0 ? W / n : 0;
+      const ci = n > 0 ? 1.96 * Math.sqrt(p * (1 - p) / n) : 0;
+      console.log(`[train] ═══ A/B-ERGEBNIS (gesamte Datei): Profil ${W}W-${L}L-${T}T gegen Baseline ═══`);
+      console.log(`[train] Profil-Winrate im Spiegel: ${(100 * p).toFixed(1)}% ±${(100 * ci).toFixed(1)} (95%-CI, n=${n}) — 50% = kein Effekt`);
+      // A/B-gated Deployment: Das Ergebnis wandert ins Profil-JSON.
+      // Der Profil-Loader quarantänisiert Profile mit nachgewiesen
+      // schädlichem Spiegel-Ergebnis (<48 % bei n≥50) — ein Profil, das
+      // seinen eigenen Akzeptanztest verliert, deployt sich nicht mehr.
+      try {
+        const slug = pinned.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const profPath = path.join(__dirname, 'data', 'cpu-profiles', `${slug}.json`);
+        if (fs.existsSync(profPath)) {
+          const prof = JSON.parse(fs.readFileSync(profPath, { encoding: 'utf-8' }));
+          prof.abResult = {
+            winrate: Math.round(p * 1000) / 1000, wins: W, losses: L, ties: T,
+            games: n, date: new Date().toISOString().slice(0, 10),
+          };
+          fs.writeFileSync(profPath, JSON.stringify(prof, null, 2), { encoding: 'utf-8' });
+          console.log(`[train] A/B-Ergebnis in ${slug}.json geschrieben${p < 0.48 && n >= 50 ? ' — Profil wird ab jetzt QUARANTÄNISIERT' : ''}`);
+        }
+      } catch (err) { console.error('[train] Konnte A/B-Ergebnis nicht ins Profil schreiben:', err.message); }
+    } catch (err) { console.error('[train] A/B-Summary fehlgeschlagen:', err.message); }
+  } else {
+    console.log(`[train] next: node scripts/train-deck-profile.js "${outPath}"`);
+  }
+}
+
 // ===== CATCH-ALL (SPA) =====
 app.get('*', serveIndexHtml);
 
 // ===== START =====
+// Headless training mode — no DB, no socket server. Sample decks come
+// from data/SampleDecks and setupGameState short-circuits on the
+// injected room._currentDecks, so the whole batch runs engine-only.
+if (process.env.PP_TRAIN) {
+  runTrainingBatch()
+    .then(() => process.exit(0))
+    .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
+} else
 initDatabase().then(async () => {
   await purgeAllGuests(); // clear orphaned guest accounts from previous runs
   server.listen(PORT, () => {
+    // Demo-Aufnahme-Banner (Als Pilot-Spiele): beim Start unübersehbar
+    // machen, ob PP_DEMO_RECORD wirkt — der erste Versuch scheiterte
+    // still, weil die Variable als npm-Argument statt Env gesetzt war.
+    if (demoRecordingEnabled()) {
+      console.log('╔══════════════════════════════════════════════════════╗');
+      console.log('║  DEMO-AUFNAHME AKTIV (Standard) — Singleplayer-      ║');
+      console.log('║  Partien werden nach data/demo-games/ aufgezeichnet  ║');
+      console.log('║  Abschalten: PP_DEMO_RECORD=0                        ║');
+      console.log('╚══════════════════════════════════════════════════════╝');
+    } else {
+      console.log('[demo-recorder] deaktiviert (PP_DEMO_RECORD=0)');
+    }
     console.log(`Pixel Parties TCG running on http://localhost:${PORT}`);
   });
 }).catch(err => {

@@ -134,6 +134,18 @@ function _buildEligibleGallery(gs, pi) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
+  // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
+  // Engine-Decline durch. Politik: Equip-Ziel = erster eigener Held (Standard-Equip-Bias greift über die Galerie davor)
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const vt = payload?.validTargets || [];
+    if (vt.length === 0) return undefined;
+    const pick = vt[0];
+    return [typeof pick === 'object' ? pick.id : pick];
+  },
+
+
   isTargetingArtifact: true,
   manualGoldCost: true,
   activeIn: ['hand'],
@@ -254,6 +266,7 @@ module.exports = {
 
     const destIds = await engine.promptEffectTarget(pi, destTargets, {
       title: `Cool Repair — Equip ${equipName}`,
+      source: 'Cool Repair', // Skript-Dispatch trotz dynamischem Titel
       description: `Select a Support Zone to equip ${equipName} to. (Cost: ${repairCost}G)`,
       confirmLabel: '🔧 Equip!',
       confirmClass: 'btn-info',

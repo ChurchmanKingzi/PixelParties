@@ -38,6 +38,12 @@ const SELF_DAMAGE = 50;
 const OPP_DAMAGE  = 200;
 
 module.exports = {
+  // Discard-Fodder: Der Wert liegt AUSSCHLIESSLICH im Hand-Discard-
+  // Trigger — ein proaktiver Play verliert ihn (Necklace: "no effect
+  // when you play it"). Play war strikt schädlich; die CPU behält die
+  // Karte als Discard-Futter (die wertbasierte Abwurf-Wahl wirft
+  // wertlose Play-Karten bevorzugt ab — perfekte Synergie).
+  cpuSkipProactive: true,
   // Listener has to live in hand AND in destination piles, because
   // the engine flips `inst.zone` to 'discard' / 'deleted' BEFORE the
   // hook fires — so an `activeIn: ['hand']` script wouldn't even
@@ -168,6 +174,9 @@ async function fireSkullDamage(ctx, deleted) {
   });
   await engine._delay(200);
 
+  // Zählbarer Einsatz-Beleg (Aktiveffekt-Statistik) — nur bei
+  // tatsächlichem Strike, Skip zählt nicht als Einsatz.
+  engine.log('discard_trigger_fired', { player: gs.players[ownerIdx]?.username, card: CARD_NAME });
   const dmgSource = { name: CARD_NAME, owner: ownerIdx, heroIdx: -1 };
   if (target.type === 'hero') {
     const h = gs.players[target.owner]?.heroes?.[target.heroIdx];

@@ -47,6 +47,18 @@ function buildTutorGallery(engine, pi) {
 }
 
 module.exports = {
+  // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
+  // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
+  // Engine-Decline durch. Politik: irgendein Slide ist besser als kein Slide (erstes legales Ziel); Optimierung ist Trainings-Thema
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const vt = payload?.validTargets || [];
+    if (vt.length === 0) return undefined;
+    const pick = vt[0];
+    return [typeof pick === 'object' ? pick.id : pick];
+  },
+
+
   activeIn: ['support'],
 
   hooks: {
@@ -74,7 +86,7 @@ module.exports = {
           const inst = t.cardInstance;
           if (!inst) return false;
           if (inst.id === ctx.card.id) return false; // not self
-          const cd = cardDB[inst.name];
+          const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
           return !!(cd && hasCardType(cd, 'Creature'));
         },
       });

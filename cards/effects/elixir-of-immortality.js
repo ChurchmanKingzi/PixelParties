@@ -66,6 +66,12 @@ module.exports = {
     ps.permanents.push({ name: 'Elixir of Immortality', id: permId });
 
     const inst = engine._trackCard('Elixir of Immortality', pi, 'permanent', -1, -1);
+    // Play-Beleg für Recorder/Einsatz-Report: "Place openly"-Potions
+    // erzeugen keinen Discard-ZoneEnter — ohne dieses Event war der
+    // Play unsichtbar (0/836 im Report trotz regelmäßiger Nutzung).
+    // Muster analog 'gem_kept_in_hand'; künftige place-open-Potions
+    // feuern dasselbe Event.
+    engine.log('potion_placed_open', { player: ps.username, card: 'Elixir of Immortality' });
     inst.counters.permId = permId;
 
     engine.log('permanent_placed', { card: 'Elixir of Immortality', player: ps.username });

@@ -159,6 +159,15 @@ async function moveCreature(engine, pi, inst, destHeroIdx, destSlot) {
 module.exports = {
   activeIn: ['hand', 'area'],
   areaEffect: true,
+  // alwaysCommit: Die Aktivierung ist KOSTENLOS (kein Action-Cost,
+  // once per turn) und canActivateAreaEffect verlangt bereits einen
+  // legalen Zug. Das MCTS-Gate kann den Wert nicht messen, weil der
+  // innere Multi-Move-Planner im Sim-Modus degradiert (kein Nested-
+  // MCTS, _slippery-shared L213) und dort nichts Sinnvolles bewegt —
+  // das Gate skippte deshalb systematisch eine Gratis-Value-Quelle.
+  // Live plant der echte MCTS-Loop die Züge und bewegt nur bei
+  // Vorteil; immer aktivieren ist also strikt korrekt.
+  cpuMeta: { alwaysCommit: true },
 
   canActivateAreaEffect(ctx) {
     const engine = ctx._engine;

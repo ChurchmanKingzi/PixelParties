@@ -19,6 +19,23 @@ const CARD_NAME = 'Teppes, the Deepsea Vampire';
 const MAX_DRAWS_PER_TURN = 5;
 
 module.exports = {
+  // H1-Vertrag (Vergleichsanalyse): solange dieser Held lebt, sind
+  // Bounce-Platzierungen Wert-Aktionen — Teppes zieht bei Deepsea-Returns nach.
+  // Konsumiert von pickCreatureZoneSlot (_cpu.js).
+  cpuValuesBounces: true,
+
+
+  // Zündungs-Mulligan der Deepsea-Linie (Begründung in _deepsea-shared).
+  // SM-Ausbau-Floor gegen Lern-Drift (Begründung in _deepsea-shared).
+  cpuAbilityPriorFloor(abilityName, targetLevel) {
+    const { deepseaAbilityPriorFloor } = require('./_deepsea-shared');
+    return deepseaAbilityPriorFloor(abilityName, targetLevel);
+  },
+
+  cpuMulliganAdvice(engine, pi, hand) {
+    const { deepseaIgnitionMulliganAdvice } = require('./_deepsea-shared');
+    return deepseaIgnitionMulliganAdvice(engine, pi, hand);
+  },
   activeIn: ['hero'],
 
   // CPU threat assessment (draw supporter). Up to 5 draws/turn triggered by

@@ -189,6 +189,29 @@ module.exports = {
       const creature = ctx.creature;
       if (!creature) return;
 
+      // Als Ruling (Demo vs Cute Commando): Monia reagiert NICHT auf
+      // Effekte, mit denen eine Kreatur sich SELBST betrifft/tötet.
+      // Repro: Cute Cats On-Summon-Selbst-Destroy (Mill-Motor) löste
+      // den Schutz aus — Monia bezahlte eine Handkarte, um den EIGENEN
+      // Effekt ihrer Seite zu blockieren. Der Selbst-Fall ist exakt
+      // erkennbar: die Quelle des Effekts ist dieselbe Karten-Instanz
+      // wie die betroffene Kreatur (ctx.destroyCard(inst) übergibt die
+      // Instanz als source).
+      if (ctx.source && (ctx.source === creature
+        || (ctx.source.id != null && ctx.source.id === creature.id))) return;
+
+      // Als Ruling (1.8., aus der eigenen Demo-Aufnahme): Monia darf
+      // OPFER nicht beschützen. Ein Tribut ist eine Kosten-Zahlung des
+      // eigenen Besitzers, kein fremder Zugriff — sonst ließe sich der
+      // Nutzen einstreichen und der Preis zurückhalten. Im Mitschnitt
+      // bot Monia an, das gerade als Tribut gewählte Greatmaw Remora zu
+      // retten, NACHDEM der Sacrificial Dagger seinen Schaden schon
+      // ausgeteilt hatte. Dieselbe Familie wie der Selbst-Kill-Guard
+      // darüber: Monia schützt vor dem Gegner, nicht vor dem eigenen
+      // Deckplan. `isSacrifice` setzt die Engine beim Bezahlen einer
+      // sacrificeSpec (generischer Vertrag, gilt für jede Opfer-Karte).
+      if (ctx.isSacrifice) return;
+
       const pi = ctx.cardOwner; // Effective controller (auto-resolved for charmed heroes)
       const heroIdx = ctx.cardHeroIdx;
       const hero = gs.players[ctx.cardOriginalOwner]?.heroes?.[heroIdx];

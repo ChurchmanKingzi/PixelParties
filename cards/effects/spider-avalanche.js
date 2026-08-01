@@ -23,7 +23,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
     for (const inst of engine.cardInstances) {
       if (inst.controller !== ownerIdx || inst.zone !== 'support') continue;
-      const cd = cardDB[inst.name];
+      const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (cd && hasCardType(cd, 'Creature')) return true;
     }
     return false;
@@ -63,7 +63,7 @@ module.exports = {
     let creatureCount = 0;
     for (const inst of engine.cardInstances) {
       if (inst.controller !== pi || inst.zone !== 'support') continue;
-      const cd = cardDB[inst.name];
+      const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (cd && hasCardType(cd, 'Creature') && !inst.faceDown) creatureCount++;
     }
 

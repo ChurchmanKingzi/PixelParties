@@ -211,9 +211,36 @@ async function _runMctsSlipperyLoop(engine, pi, collect, opts = {}) {
 
     let best;
     if (options.length === 1 || engine._inMctsSim || typeof mctsPick !== 'function') {
-      // Single option, nested rollout (mctsPickFromOptions would no-op
-      // anyway), or _cpu unavailable — use the first option directly.
+      // Nested rollout (mctsPickFromOptions würde ohnehin no-open) oder
+      // _cpu nicht verfügbar. Verschachteltes MCTS bleibt hier bewusst
+      // unterdrückt (exponentielle Suchzeiten, "nested sim must stay
+      // atomic") — aber statt blind options[0] zu nehmen, wählt ein
+      // GREEDY-Scorer die plausibelste Bewegung, damit äußere Rollouts
+      // den Effektwert näherungsweise sehen statt ihn zu ignorieren:
+      //   1. Kreaturen mit Placement-Trigger zuerst bewegen (der
+      //      "when placed into one of your zones"-Re-Trigger ist der
+      //      Hauptwert eines Slippery-Moves),
+      //   2. sonst Board-Spread: Ziel-Held mit den wenigsten eigenen
+      //      Kreaturen bevorzugen (Flächenschaden-Streuung).
+      // Linear in |options|, keine Suche, keine Zustandsmutation.
       best = options[0];
+      if (options.length > 1) {
+        try {
+          const { loadCardEffect } = require('./_loader');
+          let bestScore = -Infinity;
+          for (const opt of options) {
+            const inst = engine.cardInstances.find(c => c.id === opt.instId);
+            if (!inst) continue;
+            let s = 0;
+            const scr = loadCardEffect(inst.name);
+            if (scr && (scr.onCardEnterZone || scr.onPlaced || scr.onSummon)) s += 100;
+            const destCreatures = engine.cardInstances.filter(c =>
+              c.owner === pi && c.zone === 'support' && c.heroIdx === opt.destHeroIdx).length;
+            s += (3 - Math.min(3, destCreatures)) * 10;
+            if (s > bestScore) { bestScore = s; best = opt; }
+          }
+        } catch { /* Fallback bleibt options[0] */ }
+      }
     } else {
       best = await mctsPick(engine, options, async (eng, opt) => {
         const inst = eng.cardInstances.find(c => c.id === opt.instId);

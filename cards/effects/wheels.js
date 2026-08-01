@@ -4,6 +4,16 @@
 //    Draw 3: Draw 3 cards, then discard 1.
 //    Draw 4: Draw 4 cards, then delete 2.
 //  Hard once per turn.
+//
+//  Both costs route through the engine's
+//  `actionPromptForceDiscard` (Als Multi-
+//  Discard-Ruling): per-card hand→pile flight,
+//  DISCARD_PACE_MS stagger between the two
+//  deletes, delete-rescue gate, batched
+//  ON_DISCARD / ON_DELETE hooks. The mid-
+//  resolution Wheels copy is excluded from the
+//  pick via a PER-PICK `eligibleIndices`
+//  function (indices shift after each splice).
 // ═══════════════════════════════════════════
 
 module.exports = {
@@ -79,63 +89,41 @@ module.exports = {
 
       if ((ps.hand || []).length === 0) return;
 
-      const result = await engine.promptGeneric(pi, {
-        type: 'forceDiscard',
-        count: 1,
+      // Als Multi-Discard-Ruling: über den v53-Engine-Helfer statt des
+      // alten Hand-Splice — der Helfer broadcastet den Hand→Pile-Flug
+      // (play_pile_transfer mit exaktem Hand-Slot), glowt die Quelle
+      // und feuert die ON_DISCARD-Hooks, die der rohe Splice komplett
+      // übersprang (Cute Dog / Glass of Marbles etc. triggerten bei
+      // Wheels-Abwürfen nie).
+      await engine.actionPromptForceDiscard(pi, 1, {
+        source: 'Wheels',
+        selfInflicted: true,
         title: 'Wheels — Draw 3',
         description: 'You must discard 1 card from your hand.',
-        cancellable: false,
-        eligibleIndices: buildEligibleIndices(),
+        eligibleIndices: buildEligibleIndices,
       });
-
-      if (!result || !result.cardName) return;
-      const handIdx = result.handIndex;
-      if (handIdx == null || handIdx < 0 || handIdx >= ps.hand.length || ps.hand[handIdx] !== result.cardName) return;
-      ps.hand.splice(handIdx, 1);
-      ps.discardPile.push(result.cardName);
-      engine.log('force_discard', { player: ps.username, card: result.cardName, by: 'Wheels' });
-      engine.sync();
 
     } else if (choice.optionId === 'draw4') {
       // ── Mode B: Draw 4, Delete 2 ──
       await engine.actionDrawCards(pi, 4);
 
-      for (let d = 0; d < 2; d++) {
-        if ((ps.hand || []).length === 0) break;
-
-        const result = await engine.promptGeneric(pi, {
-          type: 'forceDiscard',
-          count: 1,
-          title: 'Wheels — Draw 4',
-          description: `You must delete ${2 - d} more card${2 - d > 1 ? 's' : ''} from your hand.`,
-          instruction: 'Click a card in your hand to delete it.',
-          cancellable: false,
-          eligibleIndices: buildEligibleIndices(),
-        });
-
-        if (!result || !result.cardName) {
-          // Safety fallback: auto-delete from end
-          const cardName = ps.hand.pop();
-          if (cardName) {
-            ps.deletedPile.push(cardName);
-            engine.log('force_delete', { player: ps.username, card: cardName, by: 'Wheels' });
-          }
-          engine.sync();
-          continue;
-        }
-
-        const handIdx = result.handIndex;
-        if (handIdx != null && handIdx >= 0 && handIdx < ps.hand.length && ps.hand[handIdx] === result.cardName) {
-          ps.hand.splice(handIdx, 1);
-        } else {
-          const fallbackIdx = ps.hand.indexOf(result.cardName);
-          if (fallbackIdx >= 0) ps.hand.splice(fallbackIdx, 1);
-          else continue;
-        }
-        ps.deletedPile.push(result.cardName);
-        engine.log('force_delete', { player: ps.username, card: result.cardName, by: 'Wheels' });
-        engine.sync();
-      }
+      // Als Multi-Discard-Ruling: 2+ Deletes auf einmal laufen
+      // NACHEINANDER mit kurzem Delay von der Hand zum Deleted Pile.
+      // Der v53-Helfer liefert genau das: DISCARD_PACE_MS-Takt
+      // zwischen den Picks (CPU-Burst-Fix), Einzel-Flug je Karte via
+      // play_pile_transfer to:'deleted', Delete-Rescue-Gate
+      // (_tryBeforeDelete — vom alten Hand-Splice übersprungen),
+      // Batch-Zähler + deferred ON_DELETE-Hooks. `eligibleIndices`
+      // als FUNKTION, weil sich der Ausschluss-Index der mid-
+      // resolution Wheels-Kopie nach jedem Splice verschiebt.
+      await engine.actionPromptForceDiscard(pi, 2, {
+        source: 'Wheels',
+        selfInflicted: true,
+        deleteMode: true,
+        title: 'Wheels — Draw 4',
+        instruction: 'Click a card in your hand to delete it.',
+        eligibleIndices: buildEligibleIndices,
+      });
     }
   },
 };

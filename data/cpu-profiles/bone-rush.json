@@ -1,0 +1,410 @@
+{
+  "deck": "Bone Rush",
+  "heroes": [
+    "Cute Nerd Magenta",
+    "Vacarn, the Dark Goblin Necromancer",
+    "Alice, the Puppeteer Girl"
+  ],
+  "games": 1316,
+  "trainWinRate": "45.1%",
+  "trainedAt": "2026-07-23T16:03:43.442Z",
+  "meanTurns": 13.6,
+  "cardValues": {
+    "Inventing": 8,
+    "Summoning Magic": 8,
+    "Divine Gift of Fire": 29.3,
+    "Cosmic Skeleton": 48.6,
+    "Necromancy": 8,
+    "Loyal Bone Dog": 8,
+    "Aggressive Town Guard": 55,
+    "Harpyformer Choir": 26.5,
+    "Skeleton Necromancer": 18.9,
+    "Skeleton Bard": 32.1,
+    "Leadership": 8,
+    "Cute Cheese": 8,
+    "Skeleton Mage": 22.7,
+    "Rain of Arrows": 100
+  },
+  "timing": {
+    "Inventing": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Cosmic Skeleton": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.01
+    },
+    "Necromancy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Loyal Bone Dog": {
+      "early": 0.9,
+      "mid": 1.1,
+      "late": 1
+    },
+    "Aggressive Town Guard": {
+      "early": 0.91,
+      "mid": 1.03,
+      "late": 1.07
+    },
+    "Harpyformer Choir": {
+      "early": 0.82,
+      "mid": 1.05,
+      "late": 1.13
+    },
+    "Skeleton Necromancer": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Skeleton Bard": {
+      "early": 0.87,
+      "mid": 1.13,
+      "late": 1
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1
+    },
+    "Skeleton Mage": {
+      "early": 0.9,
+      "mid": 1.1,
+      "late": 1
+    },
+    "Rain of Arrows": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Divine Gift of Fire|dc:Summoning Magic": 4.1,
+    "Divine Gift of Fire|dc:Skeleton Bard": 4.3,
+    "Leadership|Loyal Bone Dog": 4.1,
+    "Loyal Bone Dog|Resuscitation Potion": 8.6,
+    "Elixir of Quickness|Loyal Bone Dog": 22,
+    "Harpyformer Choir|Resuscitation Potion": 4.6,
+    "Elixir of Quickness|Resuscitation Potion": 8.2,
+    "Skeleton Archer|dc:Skeleton Necromancer": 4.3,
+    "Skeleton Archer|Skeleton Mage": 5.4,
+    "Leadership|dc:Skeleton Skull Bat": 12.9,
+    "Leadership|Resuscitation Potion": 12,
+    "Leadership|Skeleton Healer": 6.7,
+    "Leadership|dc:Golden Ankh": 8.6,
+    "Golden Ankh|dc:Skeleton Mage": 9.2,
+    "Resuscitation Potion|dc:Cute Cheese": 4.8
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Loyal Bone Dog": -6.3,
+      "Rain of Arrows": -7.3
+    },
+    "swarm": {
+      "Resuscitation Potion": 6.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Divine Gift of Fire": 12.2,
+      "Loyal Bone Dog": -9.9,
+      "Elixir of Quickness": -14.8,
+      "Rain of Arrows": 14,
+      "Skeleton Demon": -10.4,
+      "Resuscitation Potion": -12.8
+    }
+  },
+  "standingEvalThreshold": 1153,
+  "targetPriors": {
+    "Cosmic Skeleton": {
+      "hp:max": -8,
+      "kind:creature": -10.1,
+      "side:own": -20,
+      "dmgred": -20
+    },
+    "Alice, the Puppeteer Girl": {
+      "frozen": 13,
+      "dmgred": -19.8
+    },
+    "Burning Skeleton": {
+      "hp:min": -7
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -8.6,
+      "side:own": -8.5,
+      "dmgred": -16.5
+    },
+    "Skeleton Archer": {
+      "kind:creature": -6.2,
+      "side:own": -13.5,
+      "hp:max": -12.6
+    },
+    "Skeleton Healer": {
+      "hp:min": 7.2,
+      "hp:max": -7.6,
+      "side:opp": -7.3
+    },
+    "Skeleton Demon": {
+      "side:opp": 6.5,
+      "healrev": -20
+    },
+    "Occultism": {
+      "hp:max": 8.9
+    },
+    "Skeleton Death Knight": {
+      "hp:min": -13.2
+    }
+  },
+  "reactionRules": {
+    "Loyal Bone Dog": {
+      "late": 7,
+      "early": 5.4,
+      "mid": 8.3
+    }
+  },
+  "impactWeights": {
+    "dmg100": 0.055,
+    "heroKill": 0.165,
+    "creatureKill": 0.021,
+    "loCut": 0.132,
+    "hiCut": 0.264
+  },
+  "impactRules": {
+    "Rain of Arrows": {
+      "low": -24.5,
+      "mid": 5.2,
+      "high": 19.8
+    }
+  },
+  "placementRules": {
+    "plc:slack:2+": 15
+  },
+  "tutorPickRules": {
+    "Monster in a Bottle→Skeleton Necromancer": -11.8,
+    "Monster in a Bottle→Treasure Skeleton": 5.7,
+    "Monster in a Bottle→Skeleton Mage": 5.6,
+    "Monster in a Bottle→Loyal Bone Dog": 5,
+    "Monster in a Bottle→Aggressive Town Guard": 6.6,
+    "Monster in a Bottle→Cosmic Skeleton": -8.3,
+    "Monster in a Bottle→Harpyformer Choir": -20,
+    "Monster in a Bottle→Skeleton Archer": 3.3,
+    "Monster in a Bottle→Burning Skeleton": -10.9,
+    "Monster in a Bottle→Skeleton Bard": 6.8,
+    "Monster in a Bottle→Skeleton Skull Bat": 20,
+    "Monster in a Bottle→Hammer Skeleton": 7.6,
+    "Monster in a Bottle→Skeleton Healer": 20,
+    "Necromancy→Harpyformer Choir": -10.4,
+    "Necromancy→Skeleton Archer": 14.7,
+    "Necromancy→Skeleton Necromancer": 7.5,
+    "Necromancy→Skeleton Mage": 6,
+    "Necromancy→Skeleton Demon": -3.9,
+    "Necromancy→Loyal Bone Dog": 4.3,
+    "Necromancy→Skeleton Healer": 5.2,
+    "Necromancy→Hammer Skeleton": 10.2,
+    "Necromancy→Skeleton Bard": 3.4,
+    "Necromancy→Skeleton Skull Bat": -10.3,
+    "Necromancy→Burning Skeleton": -19.2,
+    "Necromancy→Skeleton Death Knight": 2,
+    "Training→Inventing": -12.3,
+    "Training→Summoning Magic": 3.1,
+    "Training→Necromancy": 9.2,
+    "Cute Cheese→Skeleton Healer": 6.1,
+    "Cute Cheese→Loyal Bone Dog": 14.9,
+    "Cute Cheese→Skeleton Necromancer": 9.7,
+    "Cute Cheese→Skeleton Death Knight": -8.9,
+    "Cute Cheese→Burning Skeleton": -3.7,
+    "Cute Cheese→Hammer Skeleton": -12.3,
+    "Cute Cheese→Harpyformer Choir": -9.9,
+    "Cute Cheese→Skeleton Archer": 15.2,
+    "Cute Cheese→Aggressive Town Guard": -2.2,
+    "Cute Cheese→Treasure Skeleton": -15.7,
+    "Cute Cheese→Skeleton Skull Bat": 11.3,
+    "Cute Cheese→Skeleton Mage": 9.5,
+    "Cute Cheese→Skeleton Bard": -11.9,
+    "Cute Cheese→Skeleton Reaper": -9.9,
+    "Skeleton Necromancer→Skeleton Bard": 8,
+    "Skeleton Necromancer→Skeleton Death Knight": -13.9,
+    "Skeleton Necromancer→Skeleton Reaper": -20,
+    "Skeleton Necromancer→Skeleton Mage": 3,
+    "Skeleton Necromancer→Skeleton Archer": -14.7,
+    "Skeleton Necromancer→Cosmic Skeleton": -5.2,
+    "Skeleton Necromancer→Loyal Bone Dog": 7.1,
+    "Skeleton Necromancer→Treasure Skeleton": 9.1,
+    "Skeleton Necromancer→Skeleton Skull Bat": -2.2,
+    "Skeleton Necromancer→Burning Skeleton": -8.9,
+    "Skeleton Necromancer→Skeleton Healer": 20,
+    "Skeleton Necromancer→Skeleton Demon": 4.7,
+    "Inventing Lv3→Summoning Magic": 8.5,
+    "Enigma, the Seller of Secrets→Cosmic Skeleton": -8.4,
+    "Enigma, the Seller of Secrets→Summoning Magic": -12.2,
+    "Enigma, the Seller of Secrets→Harpyformer Choir": -7.3,
+    "Enigma, the Seller of Secrets→Skeleton Necromancer": 6.8,
+    "Enigma, the Seller of Secrets→Necromancy": 2,
+    "Enigma, the Seller of Secrets→Inventing": -4.7,
+    "Enigma, the Seller of Secrets→Rain of Arrows": -3.2,
+    "Enigma, the Seller of Secrets→Skeleton Archer": -10.2,
+    "Enigma, the Seller of Secrets→Cute Cheese": 10.8,
+    "Enigma, the Seller of Secrets→Glass of Marbles": 15.1,
+    "Enigma, the Seller of Secrets→Mystery Box": -8.4,
+    "Enigma, the Seller of Secrets→Deepsea Idol": -4.6,
+    "Enigma, the Seller of Secrets→Skeleton Mage": 2.2,
+    "Enigma, the Seller of Secrets→Loyal Bone Dog": 8.5,
+    "Enigma, the Seller of Secrets→Skeleton Death Knight": -9.3,
+    "Premonition→Rain of Arrows": 5.3,
+    "Premonition→Golden Ankh": -15.7,
+    "Magic Lamp→Critical Strike": -20,
+    "Magic Lamp→Quick Attack": -20,
+    "The Cosmic Depths→Harpyformer Choir": 19,
+    "The Cosmic Depths→Aggressive Town Guard": -5.4,
+    "Magic Amethyst→Summoning Magic": -5.3,
+    "Magic Amethyst→Destruction Magic": -3
+  },
+  "abilityPriors": {
+    "Charme@Cute Nerd Magenta": 150,
+    "Creativity@Cute Nerd Magenta": 150,
+    "Summoning Magic@Cute Nerd Magenta": 150,
+    "Leadership@Vacarn, the Dark Goblin Necromancer": 150,
+    "Necromancy@Vacarn, the Dark Goblin Necromancer": 150,
+    "Necromancy@Vacarn, the Dark Goblin Necromancer≥2": 150,
+    "Inventing@Vacarn, the Dark Goblin Necromancer": -60,
+    "Destruction Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": 150,
+    "Inventing@Alice, the Puppeteer Girl": 150,
+    "Leadership@Vacarn, the Dark Goblin Necromancer≥2": 150,
+    "Summoning Magic@Vacarn, the Dark Goblin Necromancer": 150,
+    "Inventing@Cute Nerd Magenta": -60,
+    "Inventing@Cute Nerd Magenta≥2": 22.7,
+    "Necromancy@Vacarn, the Dark Goblin Necromancer≥3": -60,
+    "Leadership@Alice, the Puppeteer Girl": 111.5,
+    "Necromancy@Alice, the Puppeteer Girl": 139.7,
+    "Necromancy@Alice, the Puppeteer Girl≥2": 150,
+    "Inventing@Vacarn, the Dark Goblin Necromancer≥2": 150,
+    "Inventing@Alice, the Puppeteer Girl≥2": 100.7,
+    "Inventing@Alice, the Puppeteer Girl≥3": 99.7,
+    "Necromancy@Cute Nerd Magenta": 40.9,
+    "Summoning Magic@Cute Nerd Magenta≥2": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Alice, the Puppeteer Girl": 30,
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30,
+    "Golden Ankh→Vacarn, the Dark Goblin Necromancer": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Destruction Magic": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Golden Ankh→Leadership": 30,
+    "Golden Ankh→Necromancy": 30,
+    "Golden Ankh→Inventing": 30
+  },
+  "startHandValues": {
+    "Mystery Box": -1.1,
+    "Loyal Bone Dog": -4.8,
+    "Rain of Arrows": 2.2,
+    "Aggressive Town Guard": 4.9,
+    "Skeleton Skull Bat": 4,
+    "Cosmic Skeleton": 3.4,
+    "Glass of Marbles": 2.1,
+    "Skeleton Archer": 1.3,
+    "Golden Ankh": -1,
+    "Divine Gift of Fire": 5.9,
+    "Skeleton Death Knight": -4.5,
+    "Treasure Skeleton": -7.2,
+    "Hammer Skeleton": -8.2,
+    "Skeleton Reaper": -7.3,
+    "Harpyformer Choir": 4.3,
+    "Cute Cheese": -1.3,
+    "Deepsea Idol": 4.2,
+    "Skeleton Demon": -20,
+    "Skeleton Healer": -14.9,
+    "Burning Skeleton": 5.3,
+    "Leadership": -2.8
+  },
+  "mulliganStats": {
+    "games": 1316,
+    "mullRate": "6.7%",
+    "winAfterMull": "40.9%",
+    "winAfterKeep": "45.4%"
+  },
+  "heroEffectTiming": {
+    "Alice, the Puppeteer Girl@hand:4+": 7.4,
+    "Cute Nerd Magenta@hand:4+": 4,
+    "Cute Nerd Magenta@hand:2-3": 13.5,
+    "Alice, the Puppeteer Girl@hand:2-3": 15,
+    "Alice, the Puppeteer Girl@hand:0-1": 15,
+    "Cute Nerd Magenta@hand:0-1": -3.5
+  },
+  "boardPairs": {
+    "Burning Skeleton|Charme": -15,
+    "Burning Skeleton|Creativity": -15,
+    "Burning Skeleton|Summoning Magic": 8.7,
+    "Charme|Summoning Magic": 10.9,
+    "Creativity|Summoning Magic": 10.5,
+    "Skeleton Healer|Summoning Magic": 11.8,
+    "Skeleton Bard|Summoning Magic": 9.9,
+    "Skeleton Archer|Summoning Magic": 9.3,
+    "Leadership|Summoning Magic": 9.8,
+    "Necromancy|Summoning Magic": 9.7,
+    "Destruction Magic|Skeleton Bard": 9.5,
+    "Aggressive Town Guard|Destruction Magic": 9.7,
+    "Aggressive Town Guard|Summoning Magic": 6.4,
+    "Inventing|Skeleton Bard": 15,
+    "Aggressive Town Guard|Charme": 6.5,
+    "Skeleton Necromancer|Summoning Magic": 9.9,
+    "Hammer Skeleton|Summoning Magic": 11.3,
+    "Cosmic Skeleton|Destruction Magic": 15,
+    "Destruction Magic|Skeleton Reaper": 13.7,
+    "Charme|Cosmic Skeleton": -13.6,
+    "Cosmic Skeleton|Creativity": -12.9,
+    "Skeleton Mage|Summoning Magic": -15,
+    "Cosmic Skeleton|Inventing": 15,
+    "Burning Skeleton|Destruction Magic": 15,
+    "Skeleton Death Knight|Summoning Magic": 6.4,
+    "Harpyformer Choir|Treasure Skeleton": -15,
+    "Destruction Magic|Treasure Skeleton": 15,
+    "Summoning Magic|Treasure Skeleton": 5.4,
+    "Aggressive Town Guard|Treasure Skeleton": -15,
+    "Charme|Skeleton Skull Bat": -14.2,
+    "Creativity|Skeleton Skull Bat": -14.6,
+    "Skeleton Skull Bat|Summoning Magic": 4.1,
+    "Necromancy|Skeleton Demon": 12.9,
+    "Skeleton Demon|Summoning Magic": -6.4,
+    "Destruction Magic|Skeleton Skull Bat": 15,
+    "Skeleton Mage|Skeleton Reaper": -15,
+    "Skeleton Necromancer|Skeleton Reaper": 15,
+    "Creativity|Skeleton Reaper": -15,
+    "Aggressive Town Guard|Skeleton Death Knight": -15,
+    "Skeleton Mage|Treasure Skeleton": 15,
+    "Aggressive Town Guard|Skeleton Healer": 15,
+    "Destruction Magic|Skeleton Necromancer": 10.2,
+    "Burning Skeleton|Harpyformer Choir": -15,
+    "Harpyformer Choir|Skeleton Reaper": -15,
+    "Hammer Skeleton|Treasure Skeleton": -15,
+    "Skeleton Archer|Skeleton Necromancer": -15,
+    "Skeleton Archer|Skeleton Healer": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.53,
+      "n": 115,
+      "values": {
+        "Deepsea Primordium": 0.277,
+        "Aggressive Town Guard": -0.155,
+        "Hell Fox": -0.405
+      }
+    }
+  }
+}

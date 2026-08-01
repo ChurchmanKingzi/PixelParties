@@ -45,9 +45,11 @@ async function fireSteamEngine(ctx) {
 
   if (!inst || inst.zone !== 'support') return;
   if (ctx.playerIdx !== ctx.cardOwner) return;        // only my discards
-  if (inst.counters?.negated || inst.counters?.nulled) return; // respect negation/nulled
-  const hero = ctx.attachedHero;
-  if (!hero?.name || hero.hp <= 0) return;            // dead hero column → skip
+  // Als Ruling (Kreaturen-Audit): kein Hero-Bezug im Steam-Engine-Text
+  // → nur der Zustand der Kreatur selbst gated (kanonisch via
+  // isCardEffectActive statt des alten attachedHero-Gates; deckt jetzt
+  // auch frozen/stunned/faceDown der Kreatur).
+  if (!engine.isCardEffectActive(inst)) return;
 
   // Hard once-per-turn per creature instance
   if (!inst.counters) inst.counters = {};

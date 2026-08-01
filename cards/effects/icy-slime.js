@@ -37,7 +37,14 @@ module.exports = {
       const target = selected[0];
 
       if (target.type === 'hero') {
-        await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', { appliedBy: ctx.cardOwner, animationType: 'ice_encase' });
+        await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', {
+          // Kartentext: "until the end of your next turn" — bei End-of-
+          // Turn-Ticks und Cast im eigenen Zug = 3 Ticks (Rest eigener
+          // Zug → Gegnerzug → eigener Folgezug). Vorher fehlte die
+          // duration komplett → 1-Zug-Default, der VOR dem eigenen
+          // nächsten Zug ablief und damit nie ein Payoff-Fenster bot.
+          duration: 3,
+          appliedBy: ctx.cardOwner, animationType: 'ice_encase' });
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
         if (inst) {
@@ -47,6 +54,8 @@ module.exports = {
           await engine.applyCreatureStatus(inst, 'frozen', {
             sourceOwner: ctx.cardOwner,
             source: 'Icy Slime',
+            // Kartentext: "until the end of your next turn" (s. Hero-Zweig)
+            frozenDuration: 3,
           });
         }
       }

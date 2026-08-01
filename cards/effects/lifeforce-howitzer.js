@@ -41,6 +41,45 @@ module.exports = {
     return true;
   },
 
+  // ── CPU-Zielwahl (cpuResponse-Intercept, Muster Shield of Life) ────
+  // Der Feuer-Prompt ist cancellable — der generische CPU-Responder
+  // lehnt cancellable Prompts ab, d. h. die CPU verzichtete IMMER auf
+  // den Gratis-Schuss (gleiche Bug-Klasse wie Shield of Life).
+  // Politik: tötbares Gegner-Ziel zuerst (Held vor Kreatur), sonst der
+  // gegnerische Held mit den wenigsten HP. Gratis-Schaden wird nie
+  // liegengelassen — der Once-per-turn verfällt sonst am Zugende.
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    if (payload?.config?.title !== 'Lifeforce Howitzer') return undefined;
+    const pi = payload?.playerIdx;
+    const validTargets = payload?.validTargets || [];
+    if (typeof pi !== 'number' || validTargets.length === 0) return [];
+    const gs = engine.gs;
+    const dmg = payload?.config?.baseDamage || 0;
+
+    let best = null, bestScore = -Infinity;
+    for (const t of validTargets) {
+      if (t.owner === pi) continue; // nur Gegner beschießen
+      let hp = null, isHero = false;
+      if (t.type === 'hero') {
+        const h = gs.players?.[t.owner]?.heroes?.[t.heroIdx];
+        if (!h?.name || h.hp <= 0) continue;
+        hp = h.hp; isHero = true;
+      } else {
+        const inst = t.cardInstance || engine.cardInstances?.find(c =>
+          c.owner === t.owner && c.zone === 'support'
+          && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+        hp = inst?.counters?.currentHp;
+        if (typeof hp !== 'number' || hp <= 0) continue;
+      }
+      const kills = dmg >= hp;
+      // Kill schlägt alles; darunter: Held vor Kreatur, wenig HP zuerst.
+      const score = (kills ? 10000 : 0) + (isHero ? 1000 : 0) - hp;
+      if (score > bestScore) { bestScore = score; best = t; }
+    }
+    return best ? [best.id] : [];
+  },
+
   hooks: {
     /**
      * When any hero is healed, check if it's THIS Howitzer's hero.

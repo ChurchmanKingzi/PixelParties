@@ -24,7 +24,12 @@
 //      support don't double-fire. Per-turn cap
 //      is taken on prompt-SHOW (matches "may"
 //      semantics: declining still spends the
-//      offer).
+//      offer). Visual flow (Als Ruling): the Dog
+//      first lands VISIBLY in the discard pile
+//      (sync + settle before the prompt), then
+//      flies discard → chosen Support Zone via
+//      `play_pile_transfer` (Idej pattern)
+//      before the summon resolves.
 //    • Tutor flow is click-to-discard direct on
 //      the hand UI (matches Cute Hydra's pattern).
 //      First iteration is mandatory; if a 2nd
@@ -246,6 +251,16 @@ module.exports = {
 
   // ── 1. DISCARD-SUMMON ──────────────────────────────────────────
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onDiscard-Confirm: bei EIGENEN Discard-Kosten plan-gedeckt (2/2 gemessen), bei GEGNER-Discard (Handdisruption) aber plan-los → declined. Gratis-Summon, Confirm immer richtig.
+  // Titel-Dispatch scopet den Intercept auf eigene Prompts; andere
+  // Prompt-Typen (Auswahl-Galerien etc.) fallen unberührt durch.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onDiscard: async (ctx) => {
       // Only fire on the just-discarded copy itself — copies in
@@ -274,6 +289,23 @@ module.exports = {
       // Need a hero that can host the summon.
       const hosts = getHostHeroes(engine, pi);
       if (hosts.length === 0) return;
+
+      // Als Ruling: der Hund soll ERST sichtbar wie jede andere
+      // abgeworfene Karte in den Discard wandern und DANN von dort
+      // in seine Support Zone fliegen. Der Pile-Push ist an diesem
+      // Punkt bereits passiert (die Discard-Aktionen pushen VOR dem
+      // Hook-Feuern) — aber ohne Sync hier sieht der Client bei
+      // schnellen Pfaden (CPU-Auto-Confirm via cpuResponse: kein
+      // Prompt, kein Zwischensync) nur EINEN End-Diff "Hand −1,
+      // Board +1" und animiert den Discard nie. Der Sync committet
+      // den Zwischenstand (Hund liegt im Discard), der Client-Diff-
+      // Detector fliegt ihn regulär Hand → Discard, und der Delay
+      // lässt den Flug (~700 ms) landen, bevor Prompt/Summon
+      // weitermachen. Pfade, die ihren Flug selbst broadcasten
+      // (actionDiscardCardsAnimated), bekommen nur den Extra-Beat.
+      // Sim-sicher: sync ist billig, _delay no-opt im Fast Mode.
+      engine.sync();
+      await engine._delay(750);
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -328,6 +360,22 @@ module.exports = {
       if (oldInst && oldInst.zone === 'discard') {
         engine._untrackCard(oldInst.id);
       }
+
+      // Discard → Support-Zone-Flug (Idej-Muster, `_idej-shared`):
+      // Broadcast VOR dem Sync, damit die fliegende Karte spawnt,
+      // während die Pile noch den alten Stand rendert; der Transfer-
+      // Handler blendet den Ziel-Slot ~720 ms aus, sodass der Summon-
+      // Sync die Karte nicht vor der Landung "poppen" lässt. Der
+      // Delay lässt den Flug größtenteils ankommen, bevor der
+      // `summon_effect`-Glow von summonCreatureWithHooks am Slot
+      // zündet — Glow landet dann zeitgleich mit der Karte.
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName: CARD_NAME,
+        from: 'discard', to: 'support',
+        toHeroIdx: chosen.heroIdx, toSlotIdx: chosen.slotIdx,
+      });
+      engine.sync();
+      await engine._delay(650);
 
       // ── Summon with full hooks ──
       await engine.summonCreatureWithHooks(

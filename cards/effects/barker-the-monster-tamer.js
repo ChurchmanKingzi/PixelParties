@@ -42,9 +42,13 @@ module.exports = {
   cpuResponse(engine, kind, promptData) {
     if (kind !== 'generic') return undefined;
     // Barker's onTurnStart "you may tame" gate is a cancellable confirm; the
-    // default brain now declines those (regressed from when undefined meant
-    // auto-confirm), which silently skipped Barker. Confirm it explicitly.
-    if (promptData.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // default brain declines those, which silently skipped Barker. Confirm it
+    // explicitly. KEINE !showCard-Bedingung mehr: promptConfirmEffect
+    // defaultet showCard inzwischen IMMER auf den Kartennamen — die alte
+    // Bedingung war dadurch nie erfüllt und Barker fizzelte still (zweite
+    // Regression über der ersten). Der Dispatch läuft ohnehin nur für
+    // Prompts mit Barkers Titel, ein Pauschal-Confirm ist hier korrekt.
+    if (promptData.type === 'confirm') return { confirmed: true };
     if (promptData.type !== 'cardGallery') return undefined;
     const cards = promptData.cards || [];
     if (!cards.length) return undefined;
@@ -52,6 +56,25 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const cpuIdx = engine._cpuPlayerIdx;
     if (cpuIdx < 0) return undefined;
+
+    // Game-Start-Pick-Lernkanal: gelerntes Ranking > Exploration im
+    // Training > MCTS/Level-Heuristik-Default. options vorab
+    // deck-first sortiert: bei Wert-Gleichstand gewinnt der
+    // Deck-Eintrag (Kartenvorteil — dominant, wird nicht gelernt).
+    {
+      const { gameStartPickDecision } = require('./_deck-profile');
+      // Teildeployment-Schutz: Läuft eine ältere _deck-profile.js ohne
+      // den Kanal, still auf die bestehende Heuristik zurückfallen.
+      if (typeof gameStartPickDecision === 'function') {
+      const pi = typeof promptData.gameStartPi === 'number'
+        ? promptData.gameStartPi : cpuIdx;
+      const deckFirst = [...cards].sort((a, b) =>
+        (a.source === 'deck' ? 0 : 1) - (b.source === 'deck' ? 0 : 1));
+      const picked = gameStartPickDecision(engine, pi, 'Barker, the Monster Tamer',
+        deckFirst, { count: 1 });
+      if (picked) return { cardName: picked[0].name, source: picked[0].source };
+      }
+    }
 
     // Heuristic fallback (sync). Used when MCTS isn't available OR
     // we're already inside an outer rollout (no nested rollouts).
@@ -207,6 +230,7 @@ module.exports = {
       while (true) {
         // Step 2: Pick a creature
         const selected = await ctx.promptCardGallery(eligibleCards, {
+          gameStartPi: pi,
           title: 'Barker, the Monster Tamer',
           description: 'Select a Creature to place.',
           cancellable: true,

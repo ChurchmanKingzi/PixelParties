@@ -41,6 +41,18 @@ const PICKS = 3;
 module.exports = {
   activeIn: ['hero'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onPhaseStart-Confirm (plan-loser Turn-Grenzen-Kontext).
+  // Ohne Intercept declined der Brain-Default cancellable Confirms in
+  // plan-losen Kontexten und der Effekt verpufft still. Der generic-
+  // Dispatch lädt dieses Skript nur für Prompts mit dem eigenen
+  // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onPhaseStart: async (ctx) => {
       const engine  = ctx._engine;
@@ -114,6 +126,7 @@ module.exports = {
       // has already been committed away.
       const result = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+      menuSource: 'Crestina',
         cards: galleryCards,
         selectCount: PICKS,
         minSelect: PICKS,

@@ -42,7 +42,11 @@ module.exports = {
    * to the default brain via the early-return on the title check.
    */
   cpuResponse(engine, kind, payload) {
-    if (kind !== 'target') return undefined;
+    // BEIDE Dispatcher bedienen: der Pfad über `promptEffectTarget`
+    // meldet sich mit 'effectTarget', der ältere Ziel-Pfad mit 'target'.
+    // Die Prüfung stand vorher nur auf 'target' — zusammen mit dem
+    // fehlenden `source` war die Antwort damit doppelt unerreichbar.
+    if (kind !== 'target' && kind !== 'effectTarget') return undefined;
     const { validTargets, config } = payload || {};
     if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
     // Only intervene for the Lv1 ability picker.
@@ -198,6 +202,35 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
       const borrowerKey = isFree ? `free-ability:${abName}:${pi}` : `ability-action:${abName}:${pi}`;
       if (gs.hoptUsed?.[ownerKey] === gs.turn) continue;
       if (gs.hoptUsed?.[borrowerKey] === gs.turn) continue;
+      // ── BEZAHLBARKEIT AUS SICHT DES AUSLEIHERS (1.8., Als Report) ──
+      // Die geborgte Ability wird vom AUSLEIHER bezahlt, nicht vom
+      // Besitzer. Ihre eigene Vorprüfung kennt die Kosten (Alchemy Lv1
+      // verlangt 8 Gold), wurde hier aber nie befragt — deshalb bot der
+      // Picker Alchemy auch bei leerer Kasse an und der Klick verpuffte.
+      //
+      // Der Kontext setzt bewusst `cardOwner: pi` (den Ausleiher), damit
+      // die Prüfung dessen Gold und Vorräte liest. Nur ein explizites
+      // `false` schließt aus — wirft die Karte oder braucht sie mehr
+      // Kontext, bleibt sie wie bisher wählbar.
+      const gate = isFree ? script.canFreeActivate : script.canActivate;
+      if (typeof gate === 'function') {
+        let erlaubt = true;
+        try {
+          const ctx = {
+            _engine: engine, players: gs.players, gs,
+            cardOwner: pi, cardController: pi,
+            // `cardHeroIdx` bleibt bewusst offen: der Held des
+            // AUSLEIHERS ist hier nicht bekannt, und die Kostenprüfungen
+            // lesen ohnehin nur `cardOwner`. Ein Verweis auf eine nicht
+            // vorhandene Variable wäre im try gelandet und hätte die
+            // Prüfung still abgeschaltet — genau die Falle, die in
+            // dieser Sitzung mehrfach zugeschlagen hat.
+            cardName: abName,
+          };
+          erlaubt = gate.call(script, ctx, slot.length) !== false;
+        } catch { erlaubt = true; }
+        if (!erlaubt) continue;
+      }
       results.push({ abName, abLevel: slot.length, ownerHeroIdx: hi, zoneIdx: zi, heroName: h.name, script, isFree });
     }
   }
@@ -249,6 +282,14 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   try {
     selectedIds = await engine.promptEffectTarget(pi, targets, {
       title: `${hero.name} — Charme Lv1`,
+      // Der CPU-Dispatcher löst das Kartenskript über den Prompt-Titel
+      // auf (`loadCardEffect(config.source || config.title)`). Unser
+      // Titel trägt den Heldennamen, ist also KEIN Kartenname — ohne
+      // dieses Feld lief `loadCardEffect("… — Charme Lv1")` ins Leere
+      // und die cpuResponse weiter unten war toter Code. Genau deshalb
+      // kopierte die CPU im Mitschnitt vom 1.8. ein Leadership Lv1,
+      // obwohl sie selbst Leadership 3 besaß.
+      source: 'Charme',
       description: "Click an opponent's Ability to use it as your own.",
       confirmLabel: 'Confirm',
       cancellable: true,
@@ -295,6 +336,13 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
     ability: selectedAb.abName, level: selectedAb.abLevel,
     from: selectedAb.heroName,
   });
+
+  // Als Kosmetik-Ruling: die kopierte Ability erscheint zentral auf
+  // dem Screen (CardRevealOverlay — wie ein Search-Confirm-Fenster,
+  // fadet aber nach 3.5s von selbst aus). Gilt für CPU UND Mensch —
+  // dieser Skript-Pfad läuft für beide; in Sims ist _broadcastEvent
+  // stumm (_fastMode-Guard).
+  engine._broadcastEvent('card_reveal', { cardName: selectedAb.abName, playerIdx: pi });
 
   // Propagate the borrowed ability's cancel return: when an ability
   // returns `false` from its onFreeActivate/onActivate (player backed
@@ -394,6 +442,10 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
     // that follows just swaps the clone for the real card.
     ops.hand.splice(stealHandIdx, 1);
     gs.players[pi].hand.push(cardName);
+    // Instanz mitziehen (siehe _moveHandInstanceOwner): `owner` folgt
+    // dem physischen Besitz, `originalOwner` bleibt — damit geht die
+    // Karte beim Abwerfen/Löschen zurück in die richtige Ablage.
+    engine._moveHandInstanceOwner(oi, pi, cardName);
     const charmerSid = gs.players[pi]?.socketId;
     if (charmerSid && engine.io) {
       engine.io.to(charmerSid).emit('card_reveal', { cardName });

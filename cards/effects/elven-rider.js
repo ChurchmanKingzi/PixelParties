@@ -203,6 +203,16 @@ module.exports = {
       // Also a per-player in-flight guard against overlapping effects
       if (gs[RESOLVING_KEY]?.[pi]) return;
 
+      // Als Playtest-Befund (Multi-Tod): Bei 2+ gleichzeitig sterbenden
+      // Elven läuft dieser Hand-Listener je Todesfall aus einer VOR dem
+      // ersten Replace eingesammelten Liste — nach dem ersten Summon
+      // ist der Rider nicht mehr auf der Hand, der Prompt kam trotzdem
+      // (und lief nach dem Confirm still in den handIdx<0-Gurt).
+      // Frische Prüfung VOR dem Prompt: kein Rider auf der Hand, kein
+      // Prompt. Mehrere Kopien prompten weiterhin je Tod (per Als
+      // Einordnung korrekt so).
+      if (!ps.hand.includes(CARD_NAME)) return;
+
       // ── Prompt the player ──
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',

@@ -58,6 +58,13 @@ module.exports = {
    * Check if Alchemy can be activated right now.
    * Requires enough gold and at least 1 card in potion deck.
    */
+  // Harte CPU-Restriktion (Als Ruling): Alchemy niemals unter Hand-
+  // oder Draw-Lock aktivieren — der Potion-Draw fizzlet dann
+  // (actionDrawFromPotionDeck liefert []), das Gold wäre verschwendet.
+  // CPU-only: Menschen dürfen weiterhin (der Engine-Pfad prüft dieses
+  // Flag bewusst nicht).
+  cpuSkipActivationWhenDrawLocked: true,
+
   canFreeActivate(ctx, level) {
     const ps = ctx.players[ctx.cardOwner];
     const goldCost = level >= 3 ? 0 : level >= 2 ? 4 : 8;

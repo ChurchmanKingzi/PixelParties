@@ -40,6 +40,20 @@ module.exports = {
       if (!cards.length) return { selectedCards: [] };
       const budget = promptData.maxBudget != null ? promptData.maxBudget : 20;
       const maxCount = promptData.selectCount || 2;
+      // Game-Start-Pick-Lernkanal: gelerntes Ranking (WR-Delta je
+      // Equipment) > Exploration im Training > Kosten-Greedy-Default.
+      {
+        const { gameStartPickDecision } = require('./_deck-profile');
+      // Teildeployment-Schutz: Läuft eine ältere _deck-profile.js ohne
+      // den Kanal, still auf die bestehende Heuristik zurückfallen.
+      if (typeof gameStartPickDecision === 'function') {
+        const pi = typeof promptData.gameStartPi === 'number'
+          ? promptData.gameStartPi : engine._cpuPlayerIdx;
+        const picked = gameStartPickDecision(engine, pi, 'Bill, the Angry Auctioneer',
+          cards, { count: maxCount, budget });
+        if (picked) return { selectedCards: picked.map(o => o.name) };
+      }
+      }
       const sorted = [...cards].sort((a, b) => (b.cost || 0) - (a.cost || 0));
       const chosen = [];
       let spent = 0;
@@ -141,6 +155,7 @@ module.exports = {
       if (!confirmed) { gs.heroEffectPending = null; engine.sync(); return; }
 
       const selection = await ctx.promptCardGalleryMulti(eligibleCards, {
+        gameStartPi: pi,
         title: 'Bill, the Angry Auctioneer',
         description: `Select up to ${maxEquips} different Equipment Artifact${maxEquips > 1 ? 's' : ''} to equip.`,
         selectCount: maxEquips,

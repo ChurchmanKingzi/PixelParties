@@ -105,7 +105,11 @@ module.exports = {
    * module: the engine's walker will call any module's bypassHandLimit
    * function if present. This keeps Big Gwen's logic in its module.
    */
-  bypassHandLimit: (engine, playerIdx) => {
+  bypassHandLimit: (engine, playerIdx, context) => {
+    // Design-Klärung (Al): Big Gwen setzt NUR den Pollution-SOFORT-
+    // Abwurf aus ("don't have to delete immediately"). Der reguläre
+    // Rundenende-Check bleibt bestehen — dort niemals bypassen.
+    if (context === 'endOfTurn') return false;
     // Only applies to this Area's owner (not to both players)
     // — we look up the enchantment's active card instance.
     const ownAreas = engine.cardInstances.filter(c =>

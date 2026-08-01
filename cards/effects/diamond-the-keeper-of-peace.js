@@ -26,7 +26,10 @@ module.exports = {
   // so without this Diamond never shields. Shielding (Diamond self-tanks) is
   // her purpose, so accept. (Title must equal the card name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   activeIn: ['hero'],

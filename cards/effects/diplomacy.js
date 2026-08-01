@@ -80,7 +80,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     if (inst.controller !== oppIdx || inst.zone !== 'support') continue;
     if (engine.isCreatureImmune(inst, 'targeting_immune')) continue;
     if (engine.isCreatureImmune(inst, 'control_immune')) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     // Compare against the target's CURRENT level — Whoolmoth-style
     // reducers fire from opp's own board state, so a rebated Whoolmoth

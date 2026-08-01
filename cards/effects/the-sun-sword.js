@@ -41,7 +41,7 @@ function applyFreezeImmunity(engine, pi) {
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     inst.counters.freeze_immune = 1;
     if (!inst.counters.buffs) inst.counters.buffs = {};
@@ -73,7 +73,7 @@ function removeFreezeImmunity(engine, pi) {
   const cardDB = engine._getCardDB();
   for (const inst of engine.cardInstances) {
     if ((inst.controller ?? inst.owner) !== pi || inst.zone !== 'support') continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     if (inst.counters.freeze_immune) delete inst.counters.freeze_immune;
     if (inst.counters.buffs?.freeze_immune?.source === 'The Sun Sword') {
@@ -183,7 +183,7 @@ module.exports = {
 
       // Only Creatures get buffs, not Equipment Artifacts
       const cardDB = ctx._engine._getCardDB();
-      const cd = cardDB[entering.name];
+      const cd = entering.counters?._cardDataOverride || cardDB[entering.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
       // Apply freeze immunity to the entering creature

@@ -71,7 +71,7 @@ function _refreshOwnSide(engine, pi) {
     if (inst.faceDown) continue;
     const ctrl = inst.controller ?? inst.owner;
     if (ctrl !== pi) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     _maybeGrantHaste(engine, inst);
   }

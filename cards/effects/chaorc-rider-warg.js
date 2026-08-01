@@ -50,6 +50,14 @@ function summonableZones(engine, pi) {
 module.exports = {
   activeIn: ['hand', 'support'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // Kern-Trigger "defeated by opponent" ist IMMER plan-los; der Discard-1-Confirm kauft den Sacrificed-Status — im Opferdeck durchweg positiv (Cute-Bird-Muster mit Kosten).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     // ── Part A: react to an ally Creature defeated by the opponent. ──
     onCreatureDeath: async (ctx) => {

@@ -16,6 +16,40 @@
 module.exports = {
   includesHealing: true,
   cpuMeta: { scalesWithSchool: 'Support Magic' },
+  // ── CPU: Nutzlos-Play-Veto (cpuPlayVeto-Vertrag, Muster Heal) ──────
+  // Heilt NUR eigene Ziele, ohne Overheal — bei komplett vollem Board
+  // ist der Zauber wirkungslos. Ausnahme: Friendship ≥ 2 am Caster im
+  // Additional-Pfad (Draw-Rider rechtfertigt den Cast).
+  cpuPlayVeto(engine, pi, heroIdx, ctx2) {
+    const ps = engine.gs?.players?.[pi];
+    if (!ps) return false;
+    // Naos Overheal-Passiv sitzt ZENTRAL in actionHealHero und gilt
+    // damit auch für Healing Melody: Als Nao-Cast overhealt der Zauber
+    // alle eigenen Ziele mit hp <= maxHp — nur bereits over-healte
+    // Ziele (hp > maxHp) bekommen nichts.
+    const caster = ps.heroes?.[heroIdx];
+    const naoCaster = (caster?.baseName || caster?.name || '').startsWith('Nao');
+    if (ctx2?.additional) {
+      for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+        if (slot && slot[0] === 'Friendship' && slot.length >= 2) return false;
+      }
+    }
+    for (const hh of (ps.heroes || [])) {
+      if (!hh?.name || hh.hp <= 0) continue;
+      const max = hh.maxHp || hh.hp;
+      if (naoCaster ? hh.hp <= max : hh.hp < max) return false;
+    }
+    for (const inst of (engine.cardInstances || [])) {
+      if (inst.owner !== pi || inst.zone !== 'support') continue;
+      const cur = inst.counters?.currentHp;
+      const max = inst.counters?.maxHp;
+      const base = inst.counters?.baseHp ?? max;
+      if (typeof cur !== 'number' || typeof max !== 'number' || cur <= 0) continue;
+      if (naoCaster ? cur <= base : cur < max) return false;
+    }
+    return true;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

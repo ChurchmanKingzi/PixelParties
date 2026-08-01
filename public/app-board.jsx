@@ -74,16 +74,33 @@ function TypewriterText({ text, speed = 26 }) {
         const flags = shoutFlags(s.text);
         const children = [];
         let buf = '';
+        // ALL-CAPS-Fix: die Wobble-Buchstaben sind einzelne
+        // inline-block-Spans — für den Zeilenumbruch ist damit JEDER
+        // Buchstabe eine eigene Umbruch-Einheit, Caps-Wörter brachen
+        // mitten im Wort. Zusammenhängende Shout-Buchstaben werden
+        // deshalb in einen whiteSpace:nowrap-Wrapper gruppiert, dann
+        // wandert das Wort wie normale Wörter komplett in die nächste
+        // Zeile (shoutFlags markiert nur [A-Za-z]-Runs, Leerzeichen
+        // trennen die Gruppen also von selbst).
+        let word = null;
+        const flushWord = (idx) => {
+          if (word) {
+            children.push(<span key={'w' + idx} style={{ whiteSpace: 'nowrap' }}>{word}</span>);
+            word = null;
+          }
+        };
         for (let c = 0; c < piece.length; c++) {
           if (flags[c]) {
             if (buf) { children.push(buf); buf = ''; }
-            children.push(
+            (word = word || []).push(
               <span key={'s' + c} className="cpu-shout-letter" style={{ animationDelay: ((offset + c) * -0.07) + 's' }}>{piece[c]}</span>
             );
           } else {
+            flushWord(c);
             buf += piece[c];
           }
         }
+        flushWord(piece.length);
         if (buf) children.push(buf);
         offset += s.text.length;
         return (
@@ -603,7 +620,7 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 // just sets the start / center / end CSS vars and the cardback / face-up
 // images. Auto-removed by the scheduler that mounted it after the
 // keyframes complete.
-function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl }) {
+function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   return (
@@ -612,6 +629,10 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
         '--sx': startX + 'px', '--sy': startY + 'px',
         '--cx': centerX + 'px', '--cy': centerY + 'px',
         '--ex': endX + 'px', '--ey': endY + 'px',
+        // Optional faster reveals (mill_center_reveal) — the CSS
+        // animations read `var(--kfDur, 2000ms)`, so existing users
+        // (Kassaran, Chaos Magic) keep the 2000ms default untouched.
+        ...(durationMs ? { '--kfDur': durationMs + 'ms' } : {}),
       }}>
       <div className="kassaran-flip-inner">
         <div className="kassaran-flip-back">
@@ -1169,7 +1190,7 @@ function FlameStrikeEffect({ x, y }) {
 // The colour comes in as the player's chosen colour.
 function HandAmbiance({ color }) {
   const motes = useMemo(() => {
-    const N = 40;
+    const N = 80;   // doubled from 40 — denser pixel rain over the hand
     const arr = [];
     for (let i = 0; i < N; i++) {
       const dur = 3 + Math.random() * 4;                 // 3–7s drift (snappier)
@@ -1206,6 +1227,60 @@ function HandAmbiance({ color }) {
           }} />
         ))}
       </div>
+    </div>
+  );
+}
+
+// Battlefield ambiance — always-on pixel motes drifting upward across the
+// whole battlefield background, mirroring the visual language of
+// HandAmbiance (small pixel squares, slow rise, subtle opacity) so hand
+// and board read as one continuous atmosphere. Differences vs the hand:
+//   • BACKGROUND layer: mounted as the FIRST child of .board-center with
+//     z-index 0, so every zone / card / area overlay paints on top — the
+//     motes stay strictly behind the play field.
+//   • OWNERSHIP TINT: motes spawning in the bottom half are tinted the
+//     local player's colour, top-half motes the opponent's colour, plus
+//     ~25% white sparkles — the ambiance subtly mirrors side ownership.
+//   • Dimmer + slower than the hand layer so it never competes with
+//     cards for attention.
+// pointer-events: none, respects prefers-reduced-motion (see .board-mote).
+function BoardAmbiance({ colorMe, colorOpp }) {
+  const motes = useMemo(() => {
+    const N = 56;
+    const arr = [];
+    for (let i = 0; i < N; i++) {
+      const dur = 4 + Math.random() * 5;                 // 4–9s — calmer than the hand
+      const top = Math.random() * 100;
+      arr.push({
+        top,
+        left: Math.random() * 100,
+        size: 2 + Math.floor(Math.random() * 3),         // 2–4px pixel squares
+        dur,
+        delay: -Math.random() * dur,                     // mid-cycle stagger
+        dx:   (Math.random() * 2 - 1) * 34,              // -34..34px horizontal drift
+        dy:   -(40 + Math.random() * 130),               // long rise across the field
+        max:  0.14 + Math.random() * 0.22,               // dim — background layer
+        color: Math.random() < 0.25 ? '#ffffff'
+             : (top > 50 ? 'var(--amb-board-me)' : 'var(--amb-board-opp)'),
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <div className="board-ambiance" aria-hidden="true"
+      style={{ '--amb-board-me': colorMe || '#00f0ff', '--amb-board-opp': colorOpp || '#ff5577' }}>
+      {motes.map((p, i) => (
+        <span key={i} className="board-mote" style={{
+          top: p.top + '%', left: p.left + '%',
+          '--p-size': p.size + 'px',
+          '--p-color': p.color,
+          '--p-dur': p.dur + 's',
+          '--p-delay': p.delay + 's',
+          '--p-dx': p.dx + 'px',
+          '--p-dy': p.dy + 'px',
+          '--p-max': p.max,
+        }} />
+      ))}
     </div>
   );
 }
@@ -9228,6 +9303,33 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Equip-Aktivierungs-Flash (Shield of Life / Shield of Death) ──
+  // Pulsierender Glow-Rahmen in Zonengröße über der Equip-Karte, wenn
+  // ihr Effekt feuert. `color` kommt als Broadcast-Extra mit (grün für
+  // Heilung, rot für Vergeltung); Fallback ist neutrales Gold.
+  equip_flash: (() => {
+    return function EquipFlashEffect({ x, y, w, h, color }) {
+      const c = color || '#ffd700';
+      const bw = Math.max(60, w || 80), bh = Math.max(80, h || 110);
+      return (
+        <div style={{ position: 'fixed', left: x - bw / 2, top: y - bh / 2, width: bw, height: bh,
+          pointerEvents: 'none', zIndex: 10050,
+          borderRadius: 10,
+          border: `3px solid ${c}`,
+          boxShadow: `0 0 18px 6px ${c}, inset 0 0 22px 4px ${c}`,
+          animation: 'equipFlashPulse 900ms ease-out forwards' }}>
+          <style>{`
+            @keyframes equipFlashPulse {
+              0%   { opacity: 0; transform: scale(0.85); }
+              20%  { opacity: 1; transform: scale(1.06); }
+              55%  { opacity: 0.9; transform: scale(1.0); }
+              100% { opacity: 0; transform: scale(1.12); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   heal_sparkle: (() => {
     return function HealSparkleEffect({ x, y }) {
       const particles = useMemo(() => Array.from({ length: 36 }, (_, i) => ({
@@ -14741,6 +14843,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
   const oppIdx = myIdx === 0 ? 1 : 0;
+  // Großer Karten-Auftritt (Terror). null = nichts zu zeigen.
+  const [cardShowcase, setCardShowcase] = useState(null);
   const me = gameState.players[myIdx];
   const opp = gameState.players[oppIdx];
   const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
@@ -15474,12 +15578,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const PILE_FLIGHT_STAGGER_MS = 130;
 
   // Helper: create anims from board rects for unmatched pile entries
-  const animsFromBoard = (entries, boardRects, dest, destSelector) => {
+  const animsFromBoard = (entries, boardRects, dest, destSelector, side) => {
     const target = getPileCenter(destSelector);
     if (!target) return [];
+    // ── NUR KARTEN, DIE DAS FELD WIRKLICH VERLASSEN HABEN (1.8.) ─────
+    // Der Detektor ordnet Ablage-Zuwächse über den KARTENNAMEN einer
+    // Board-Position zu — ohne zu prüfen, ob die Karte dort überhaupt
+    // verschwunden ist. Wächst eine Ablage aus anderer Quelle (Handkarte,
+    // Deck) und liegt zufällig eine gleichnamige Karte auf dem Feld, flog
+    // diese los, obwohl sie ruhig weiterliegt.
+    //
+    // Zweimal im Feld beobachtet: (1) Abwurf von "Leadership" aus der Hand,
+    // während eine Kopie auf Monia lag; (2) — die auslösende Meldung —
+    // eine gestohlene "Deepsea Monstrosity" wandert beim Abwurf zurück in
+    // die Ablage des URSPRÜNGLICHEN Besitzers (v130), dessen Ablage wächst
+    // dadurch, und die noch liegende Monstrosity des Gegners flog mit.
+    //
+    // Abhilfe: Budget je Kartenname = Anzahl VOR dem Update (die
+    // aufgezeichneten Rects) minus Anzahl DANACH auf derselben Seite. Nur
+    // so viele Flüge sind erlaubt. Liegt die Karte unverändert da, ist das
+    // Budget 0 und es fliegt nichts.
+    const _pi = side === 'opp' ? oppIdx : myIdx;
+    const _p = gameState.players?.[_pi] || {};
+    const nochDa = {};
+    const zaehle = (cn) => { if (cn) nochDa[cn] = (nochDa[cn] || 0) + 1; };
+    for (const hz of (_p.supportZones || [])) for (const slot of (hz || [])) for (const cn of (slot || [])) zaehle(cn);
+    for (const hz of (_p.abilityZones || [])) for (const slot of (hz || [])) for (const cn of (slot || [])) zaehle(cn);
+    for (const sz of (_p.surpriseZones || [])) for (const cn of (sz || [])) zaehle(cn);
+    const budget = {};
+    const darfFliegen = (key) => {
+      if (budget[key] === undefined) {
+        budget[key] = (boardRects[key]?.length || 0) - (nochDa[key] || 0);
+      }
+      if (budget[key] <= 0) return false;
+      budget[key]--;
+      return true;
+    };
     const anims = [];
     for (const cardName of entries) {
-      let positions = boardRects[cardName];
+      let positions = darfFliegen(cardName) ? boardRects[cardName] : null;
       // Fallback for opp face-down Surprise destroys: the opp's view
       // captured the surprise zone's rect under the placeholder name
       // '?' (server.js sendGameState swaps the real name out for
@@ -15488,7 +15625,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // misses, so we fall back to a `?` rect. This makes the
       // standard board→discard fly-out work for hidden surprises
       // exactly like it does for face-up cards.
-      if ((!positions || positions.length === 0) && boardRects['?']?.length > 0) {
+      if ((!positions || positions.length === 0) && boardRects['?']?.length > 0
+          && darfFliegen('?')) {
         positions = boardRects['?'];
       }
       if (!positions || positions.length === 0) continue;
@@ -15504,9 +15642,90 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return anims;
   };
 
+  // Gap between the discard GROUP and the deleted GROUP of one batch.
+  // Als Kosmetik-Ruling: gehen in derselben Diff-Erkennung je eine Karte
+  // zum Discard und zum Deleted Pile (z.B. Wheels — das Artefakt selbst
+  // wandert in den Discard, die Kosten-Karte ins Deleted), sollen sie
+  // NACHEINANDER fliegen: erst abwerfen, dann deleten. ~350 ms ≈ die
+  // Flugdauer (~400 ms), der Discard landet also gerade, wenn der
+  // Delete startet.
+  const PILE_FLIGHT_GROUP_GAP_MS = 350;
+
+  // Obergrenze der GESAMTEN Flugsequenz: PILE_FLIGHT_MAX_STEPS × den
+  // jeweiligen Standardabstand. Als Ruling: bis ~5 Karten bekommt jede
+  // den vollen Standardabstand; ab der sechsten wird dieselbe
+  // Gesamtdauer gleichmäßig auf alle verteilt, jeder Einzelabstand also
+  // kürzer — statt eines harten Abschneidens verdichtet sich die
+  // Sequenz. Bei 5 Karten: 5 × Standard. Bei 10: jede halb so lang,
+  // Gesamtdauer unverändert.
+  const PILE_FLIGHT_MAX_STEPS = 5;
+  const pileFlightPace = (count, standardMs) => (
+    count > PILE_FLIGHT_MAX_STEPS
+      ? (PILE_FLIGHT_MAX_STEPS * standardMs) / count
+      : standardMs
+  );
+
+  // ── Gemeinsame Flug-Spur für Pile-Flüge ──────────────────────────
+  // Hand/Board → Pile-Flüge entstehen in ZWEI unabhängigen Pfaden: dem
+  // Diff-Detektor (scheduleAnims) und den expliziten
+  // `play_pile_transfer`-Broadcasts (u.a. die getakteten Deletes aus
+  // actionPromptForceDiscard). Treffen beide im selben Frame ein,
+  // starten sie gleichzeitig — Als Fund: der letzte Wheels-Delete und
+  // Wheels' eigene Hand→Discard-Bewegung nach dem Einsatz. Die Spur
+  // merkt sich, bis wann der zuletzt eingeplante Flug läuft; wer
+  // danach kommt, reiht sich dahinter ein (Ankunftsreihenfolge — die
+  // Sortierung Discard-vor-Delete gilt weiterhin INNERHALB eines
+  // Batches). `queued` zählt die Flüge der laufenden Sequenz und setzt
+  // sich zurück, sobald die Spur leerläuft; je voller sie ist, desto
+  // enger rücken die Flüge zusammen (pileFlightPace), und die
+  // Gesamtwartezeit ist auf PILE_FLIGHT_MAX_STEPS × Standardabstand
+  // gedeckelt.
+  //
+  // `count`        — wie viele Flüge dieser Aufruf einbringt (Batch: alle).
+  // `extraSpanMs`  — Eigen-Dauer des Aufrufers (bei Batches die interne
+  //                  Staffelung), auf die der geteilte Abstand folgt.
+  const takePileFlightLane = (count = 1, extraSpanMs = 0) => {
+    const now = Date.now();
+    const lane = pileFlightLaneRef.current;
+    if (now >= (lane.until || 0)) lane.queued = 0;
+    lane.queued += Math.max(1, count);
+    const maxSpan = PILE_FLIGHT_MAX_STEPS * PILE_FLIGHT_GROUP_GAP_MS;
+    const wait = Math.min(Math.max(0, (lane.until || 0) - now), maxSpan);
+    const gap = pileFlightPace(lane.queued, PILE_FLIGHT_GROUP_GAP_MS);
+    lane.until = Math.min(now + maxSpan, now + wait + Math.max(0, extraSpanMs) + gap);
+    return wait;
+  };
+
   // Helper: schedule anim state + pile hiding
   const scheduleAnims = (newAnims, setDiscardHidden, setDeletedHidden) => {
     if (newAnims.length === 0) return;
+    // Reihenfolge & Takt zentral hier, damit ALLE Aufrufer (eigene
+    // Sicht, Gegner-Sicht, Spectator) dieselbe Choreografie bekommen:
+    // erst die Discard-Gruppe in Eingangsreihenfolge, dann — nach
+    // PILE_FLIGHT_GROUP_GAP_MS — die Deleted-Gruppe, innerhalb jeder
+    // Gruppe im PILE_FLIGHT_STAGGER_MS-Takt. Ein Ein-Karten-Batch
+    // behält delay 0, bleibt also unverändert. Überschreibt bewusst die
+    // Vorab-Delays aus `animsFromBoard` — deren Kaskade bleibt relativ
+    // erhalten, wird nur in die Gesamtreihenfolge eingeordnet.
+    const discardGroup = newAnims.filter(a => a.dest !== 'deleted');
+    const deletedGroup = newAnims.filter(a => a.dest === 'deleted');
+    // Takt skaliert mit der Kartenzahl (Als Ruling): bis 5 Karten voller
+    // Standardabstand, darüber wird dieselbe Gesamtdauer auf alle
+    // verteilt — die Choreografie verdichtet sich proportional, statt
+    // immer länger zu werden.
+    const stagger  = pileFlightPace(newAnims.length, PILE_FLIGHT_STAGGER_MS);
+    const groupGap = pileFlightPace(newAnims.length, PILE_FLIGHT_GROUP_GAP_MS);
+    discardGroup.forEach((a, i) => { a.delay = i * stagger; });
+    const deletedBase = discardGroup.length > 0
+      ? (discardGroup.length - 1) * stagger + groupGap
+      : 0;
+    deletedGroup.forEach((a, i) => { a.delay = deletedBase + i * stagger; });
+    // Hinter bereits laufende Flüge des anderen Pfads einreihen (siehe
+    // takePileFlightLane): läuft gerade ein play_pile_transfer-Flug,
+    // startet dieser Batch erst danach statt gleichzeitig.
+    const batchSpan = newAnims.reduce((m, a) => Math.max(m, a.delay || 0), 0);
+    const laneBase = takePileFlightLane(newAnims.length, batchSpan);
+    if (laneBase > 0) newAnims.forEach(a => { a.delay = (a.delay || 0) + laneBase; });
     const dc = newAnims.filter(a => a.dest === 'discard').length;
     const dl = newAnims.filter(a => a.dest === 'deleted').length;
     if (dc > 0) setDiscardHidden(prev => prev + dc);
@@ -15642,7 +15861,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
         // 3. Remaining entries from board
         const br = boardCardRectsRef.current.me || {};
-        const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+        const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]', 'me'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]', 'me')];
         newAnims.push(...boardAnims);
         for (const a of boardAnims) {
           const card = CARDS_BY_NAME[a.cardName];
@@ -15838,7 +16057,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // 2. Remaining entries came from the board — use stored board positions
       const br = boardCardRectsRef.current.me || {};
-      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]')];
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-my-discard]', 'me'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-my-deleted]', 'me')];
       newAnims.push(...boardAnims);
 
       // Trigger creature death effect for board-sourced creatures
@@ -16012,7 +16231,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       // 2. Remaining entries came from the opponent's board
       const br = boardCardRectsRef.current.opp || {};
-      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-opp-discard]'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-opp-deleted]')];
+      const boardAnims = [...animsFromBoard(newDiscardEntries, br, 'discard', '[data-opp-discard]', 'opp'), ...animsFromBoard(newDeletedEntries, br, 'deleted', '[data-opp-deleted]', 'opp')];
       newAnims.push(...boardAnims);
 
       // Trigger creature death effect for board-sourced creatures
@@ -16184,6 +16403,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
+    if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
@@ -16315,6 +16535,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const speechMeRef = useRef(null);
   const [bubbleAnchors, setBubbleAnchors] = useState(null);
   const showEndBubbles = !!result && !result.isPuzzle && typeof result.winnerIdx === 'number';
+  // Divine Gift of Rain: a game that ENDS mid-turn never reaches
+  // switchTurn, so the queued `divine_rain_stop` never fires — fade
+  // the body-level overlay out as soon as the result lands (the
+  // unmount cleanup covers leaving to the menu without a result).
+  useEffect(() => {
+    if (!result) return;
+    const overlay = document.getElementById('divine-rain-overlay');
+    if (!overlay) return;
+    overlay.style.transition = 'opacity 1200ms ease-out';
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 1300);
+  }, [result]);
   useEffect(() => {
     if (!showEndBubbles) { setBubbleAnchors(null); return; }
     const measure = () => {
@@ -16338,7 +16570,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Generic speech-bubble renderer (end-game win/loss lines AND mid-game CPU
   // barks). `tkey` forces a fresh TypewriterText mount so the type-out
   // restarts even when the same text is shown twice in a row.
-  const renderBubbleAt = (msg, color, dir, anchor, tkey, z = 1100) => {
+  const renderBubbleAt = (msg, color, dir, anchor, tkey, z = 1100, fading = false) => {
     if (!msg || !anchor) return null;
     const isUp = dir === 'up'; // tail points up → bubble sits below the avatar
     // Avatars sit at the screen's left edge, so a bubble centered on the
@@ -16353,7 +16585,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const tailLeft = Math.max(14, anchor.x - bubbleLeft);
     return (
       <div style={{ position: 'fixed', left: bubbleLeft, top: isUp ? anchor.bottom + 12 : anchor.top - 12, transform: isUp ? 'none' : 'translateY(-100%)', zIndex: z, pointerEvents: 'none', maxWidth }}>
-        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: 'result-fade-in .5s ease-out' }}>
+        <div style={{ position: 'relative', background: '#15151f', border: '2px solid ' + color, borderRadius: 10, padding: '8px 14px', color: '#fff', fontSize: 15, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, boxShadow: '0 0 16px ' + color + '66', wordBreak: 'normal', overflowWrap: 'break-word', animation: fading ? 'result-fade-out .7s ease-in forwards' : 'result-fade-in .5s ease-out' }}>
           <TypewriterText key={tkey} text={msg} />
           <div style={{ position: 'absolute', left: tailLeft, transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', ...(isUp ? { top: -10, borderBottom: '10px solid ' + color } : { bottom: -10, borderTop: '10px solid ' + color }) }} />
         </div>
@@ -16379,7 +16611,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const r = ref.current?.getBoundingClientRect();
         if (r && r.width > 0) {
           setCpuBark({
-            text, id: Date.now(),
+            text, owner, id: Date.now(),
             dir: owner === oppIdx ? 'up' : 'down',
             anchor: { x: r.left + r.width / 2, top: r.top, bottom: r.bottom },
           });
@@ -16393,10 +16625,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => socket.off('cpu_bark', onBark);
   }, [oppIdx]);
   useEffect(() => {
-    if (!cpuBark) return;
-    const t = setTimeout(() => setCpuBark(c => (c && c.id === cpuBark.id ? null : c)), 4800);
-    return () => clearTimeout(t);
-  }, [cpuBark]);
+    if (!cpuBark || cpuBark.fading) return;
+    // Als Wunsch: nicht hart verschwinden, sondern aus-faden — nach der
+    // Standzeit erst die Fade-Phase (result-fade-out, .7s), dann erst
+    // der State-Reset. Der Glow des Sprechers bleibt bis zum Ende der
+    // Blase stehen und geht mit ihr.
+    const tFade = setTimeout(() => setCpuBark(c => (c && c.id === cpuBark.id ? { ...c, fading: true } : c)), 4100);
+    const tGone = setTimeout(() => setCpuBark(c => (c && c.id === cpuBark.id ? null : c)), 4850);
+    return () => { clearTimeout(tFade); clearTimeout(tGone); };
+  }, [cpuBark && cpuBark.id]);
   // Resolve each side's end-game line once, shared by the bubbles and the
   // avatar highlight below. A side shows its Victory line if it won, its
   // Defeat line if the other side won (nothing on a draw / no message).
@@ -16409,8 +16646,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // instead of dimmed. The bottom hand already sits at z 10000; the opponent
   // row only has z 2, so it otherwise hides behind the veil.
   const endGlow = (won) => 'drop-shadow(0 0 10px ' + (won ? 'var(--success)' : 'var(--danger)') + ')';
-  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) } : undefined;
-  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) } : undefined;
+  // Mid-Game-Bark: solange die Sprechblase steht, leuchtet das Portrait
+  // des Sprechers im Bark-Bernstein (#ffcc44 = Blasenrand). End-Game-
+  // Glow hat Vorrang, weil showEndBubbles die Bark-Blase ohnehin
+  // ausblendet (siehe Render: !showEndBubbles && cpuBark …).
+  // Als Playtest-Befund: beim Greeting (Spielbeginn) leuchtete nichts —
+  // die Blase rendert bei z 9650 ÜBER dem Start-/Mulligan-Overlay, der
+  // Avatar der Gegner-Reihe liegt aber bei z 2 DARUNTER; der Glow war
+  // da, nur unsichtbar. Gleiches Muster wie beim End-Game-Veil (dort
+  // löst es der zIndex-Lift auf 1100). Der Bark-Lift geht auf die
+  // Blasen-Ebene 9650, damit er jedes Zwischen-Overlay schlägt; die
+  // untere eigene Reihe braucht keinen Lift (Hand sitzt bei z 10000).
+  // Als Kosmetik-Ruling: ein barkender CPU-Avatar leuchtet "aktiv" wie
+  // in seinem eigenen Zug — die avatar-active/-inactive-Klassen unten
+  // (Zeilen der beiden Avatar-Reihen) konsultieren oppBarking/meBarking
+  // zusätzlich zu isMyTurn.
+  const oppBarking = !showEndBubbles && cpuBark && cpuBark.owner === oppIdx;
+  const meBarking = !showEndBubbles && cpuBark && cpuBark.owner !== oppIdx;
+  const barkFilter = 'drop-shadow(0 0 10px #ffcc44)';
+  const oppAvatarHighlight = oppBubbleMsg ? { zIndex: 1100, filter: endGlow(endOppWon) }
+    : (oppBarking ? { zIndex: 9650, filter: barkFilter } : undefined);
+  const meAvatarHighlight = meBubbleMsg ? { filter: endGlow(endMeWon) }
+    : (meBarking ? { filter: barkFilter } : undefined);
 
   // ── Hand Shuffle & Sort with FLIP animation ──
   const captureHandRects = () => {
@@ -16728,11 +16985,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Negated heroes contribute no abilities for level-req purposes — only
     // Lv0 creatures without a school requirement can still land on them.
     const abZones = hero.statuses?.negated ? [] : (playerData.abilityZones?.[heroIdx] || []);
+    // Spiegel von `countAbilitiesForSchool` in _engine.js — INKLUSIVE
+    // der Joker-Regel: eine Ability mit `isWildcardAbility` (Performance)
+    // zählt für die Schule, wenn sie auf einem Stapel liegt, dessen BASIS
+    // diese Schule ist. Ohne diese Zeile zählte der Client eine Stufe zu
+    // wenig, sobald ein Level über Performance erreicht wurde — die
+    // Drop-Zonen blieben dunkel, obwohl der Server den Zug erlaubte
+    // (Als Report: Greatmaw Remora Lv2 auf Ingo mit Summoning Magic 1 +
+    // Performance; Klick ging, Drag&Drop nicht). Die Namensliste kommt
+    // vom Server (`wildcardAbilities`), damit hier nichts hartkodiert
+    // ist und eine zweite Joker-Ability automatisch mitgilt.
+    const wildcards = gameState.wildcardAbilities || [];
     const countSchool = (school) => {
       let count = 0;
       for (const slot of abZones) {
         if (!slot || slot.length === 0) continue;
-        for (const ab of slot) if (ab === school) count++;
+        const base = slot[0];
+        for (const ab of slot) {
+          if (ab === school) count++;
+          else if (base === school && wildcards.includes(ab)) count++;
+        }
       }
       return count;
     };
@@ -18096,27 +18368,43 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (slot < 0) continue;
                 eligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
               }
+              // Caster-Filter (Als Bugreport zu Chilly Wizard): dieser
+              // Picker fragt "welcher Hero BESCHWÖRT die Creature?" —
+              // `canHeroPlayCard` beantwortet aber "darf Hero X die Karte
+              // spielen/beherbergen?" und zählt dabei karten-seitige
+              // Platzierungs-Bypässe mit. Chilly Wizards Bypass gilt für
+              // JEDEN eigenen Hero, sobald EIN Geschwister die
+              // Decay+Summoning-Stufe erfüllt → der Picker listete alle
+              // lebenden Heroes ohne Level-Check. `heroStrictLevelCards`
+              // (Server, ohne Platzierungs-Bypass) liefert die echte
+              // Caster-Eignung. Bewusst als PRÄFERENZ, nicht als harter
+              // Filter: qualifiziert kein Hero regulär, trägt der Bypass
+              // die Beschwörung ("500 Piranhas in a Monster Suit" per
+              // Design immer) — dann bleibt die alte Liste stehen.
+              const strictMap = gameState.heroStrictLevelCards || {};
+              const strictEligible = eligible.filter(e => (strictMap[e.idx] || []).includes(cardName));
+              const pickList = strictEligible.length > 0 ? strictEligible : eligible;
               // Cards that opt into a custom host picker (Waitress) skip
               // the generic spellHeroPick panel — their `beforeSummon`
               // runs a richer prompt. Auto-emit with the FIRST eligible
               // hero as a placeholder; the script's prompt makes the
               // actual pick and redirects placement if needed.
               const usesCustomHostPick = (gameState.customHostPickCards || []).includes(cardName);
-              if (eligible.length === 1) {
+              if (pickList.length === 1) {
                 socket.emit('play_creature', {
                   roomId: gameState.roomId, cardName,
-                  handIndex: idx, heroIdx: eligible[0].idx,
-                  zoneSlot: eligible[0].zoneSlot,
+                  handIndex: idx, heroIdx: pickList[0].idx,
+                  zoneSlot: pickList[0].zoneSlot,
                 });
-              } else if (eligible.length > 1) {
+              } else if (pickList.length > 1) {
                 if (usesCustomHostPick) {
                   socket.emit('play_creature', {
                     roomId: gameState.roomId, cardName,
-                    handIndex: idx, heroIdx: eligible[0].idx,
-                    zoneSlot: eligible[0].zoneSlot,
+                    handIndex: idx, heroIdx: pickList[0].idx,
+                    zoneSlot: pickList[0].zoneSlot,
                   });
                 } else {
-                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true });
+                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible: pickList, isCreature: true });
                 }
               }
             }
@@ -18526,6 +18814,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // it ~700 ms after registration so a stale entry can't trap a
   // later real discard of the same name.
   const handToPilePendingMeRef  = useRef({ discard: [], deleted: [] });
+  // Zeitstempel, bis wann der zuletzt eingeplante Pile-Flug läuft —
+  // gemeinsame Spur für Diff-Detektor und play_pile_transfer, damit
+  // Flüge aus beiden Pfaden nacheinander statt gleichzeitig starten
+  // (siehe takePileFlightLane).
+  const pileFlightLaneRef = useRef({ until: 0, queued: 0 });
   const handToPilePendingOppRef = useRef({ discard: [], deleted: [] });
   const stealExpectedOppCountRef = useRef(-1); // opp hand count when stealHiddenOpp was set
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
@@ -18969,6 +19262,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('attach_hero_fly', onAttachHeroFly);
 
+    // Als Kosmetik-Ruling: die Quelle eines Effekts (Held via
+    // data-hero-name, Ability/Support/Handkarte via data-card-name)
+    // pulst golden auf, bevor ihre Abwürfe fliegen — der Spieler sieht,
+    // WELCHER Effekt gleich wirkt. Klassen-Neustart via Reflow, damit
+    // schnelle Folge-Glows sichtbar neu zünden.
+    const onEffectGlow = ({ cardName }) => {
+      if (!cardName) return;
+      try {
+        const sel = `[data-hero-name="${CSS.escape(cardName)}"], [data-card-name="${CSS.escape(cardName)}"]`;
+        document.querySelectorAll(sel).forEach(el => {
+          el.classList.remove('effect-source-glow');
+          void el.offsetWidth;
+          el.classList.add('effect-source-glow');
+          setTimeout(() => { try { el.classList.remove('effect-source-glow'); } catch { } }, 1100);
+        });
+      } catch { /* rein kosmetisch */ }
+    };
+    socket.on('effect_source_glow', onEffectGlow);
     socket.on('card_reveal', onReveal);
     socket.on('deck_search_add', onDeckSearchAdd);
     socket.on('reaction_chain_update', onChainUpdate);
@@ -18985,6 +19296,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
     socket.on('play_zone_animation', onZoneAnim);
+
+    // ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────────
+    // Der Server meldet `play_card_showcase`, wenn eine Karte einen
+    // Auftritt verdient (aktuell Terror beim erzwungenen Zug-Ende).
+    // Rein visuell: Karte mittig einblenden, über `durationMs` wachsen
+    // und ausblenden. Mehrere Auftritte kurz hintereinander ersetzen
+    // einander, statt sich zu stapeln.
+    const onCardShowcase = (d) => {
+      if (!d?.cardName) return;
+      const dur = Math.max(400, Math.min(6000, d.durationMs || 2000));
+      setCardShowcase({ cardName: d.cardName, dur, key: Date.now() });
+      window.setTimeout(() => {
+        setCardShowcase(cur => (cur && cur.cardName === d.cardName ? null : cur));
+      }, dur + 60);
+    };
+    socket.on('play_card_showcase', onCardShowcase);
 
     // Deepsea Spores activation — spawn a full-board particle rain
     // overlay AND fire a per-creature algae/anemone-growth + red glow
@@ -21463,6 +21790,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       document.body.appendChild(overlay);
     };
     socket.on('divine_rain_start', onDivineRainStart);
+    // Stop = fade the overlay out and remove it. Fired by the engine's
+    // turn-end broadcast flush (queueTurnEndBroadcast) at the end of
+    // the turn the rain started in. The unmount cleanup below is the
+    // safety net for games that END mid-turn (no switchTurn → no stop
+    // event) — that's how the overlay used to survive into the menu.
+    const onDivineRainStop = () => {
+      const overlay = document.getElementById('divine-rain-overlay');
+      if (!overlay) return;
+      overlay.style.transition = 'opacity 1200ms ease-out';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 1300);
+    };
+    socket.on('divine_rain_stop', onDivineRainStop);
     const onMoeBomb = () => {
       if (window._playAnimations === false) return;
       if (window.playSFX) window.playSFX('heavy_impact', { category: 'effect' });
@@ -22386,8 +22726,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         card.style.opacity = '1';
         card.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
       }
-      document.body.appendChild(card);
-      setTimeout(() => card.remove(), durationMs + 100);
+      // Pile-Flüge (→ Discard/Deleted) reihen sich in die gemeinsame
+      // Spur ein, damit sie nicht zeitgleich mit einem Flug des
+      // Diff-Detektors starten (Als Fund: letzter Wheels-Delete +
+      // Wheels' eigener Hand→Discard-Flug). Flüge zu Hand/Support/Deck
+      // bleiben ungetaktet — dort gibt es keine Kollision.
+      const usesPileLane = (to === 'discard' || to === 'deleted');
+      const laneDelay = usesPileLane
+        ? takePileFlightLane(1)
+        : 0;
+      const spawnFlight = () => {
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), durationMs + 100);
+      };
+      if (laneDelay > 0) setTimeout(spawnFlight, laneDelay);
+      else spawnFlight();
     };
     socket.on('play_pile_transfer', onPileTransfer);
 
@@ -22528,6 +22881,61 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }, 2000);
     };
     socket.on('chaos_magic_reveal', onChaosMagicReveal);
+
+    // Mill centre reveal (`opts.centerReveal` mills — Cute Cat's
+    // self-mill). ONE event carries all milled cards; each flies
+    // deck → viewport centre face-down, flips face-up, holds briefly,
+    // then flies on to the DISCARD pile (or deleted, per deleteMode) —
+    // Chaos Magic's procedure, but faster (`revealMs`, server default
+    // 1100ms) and staggered strictly one-after-another. The engine
+    // awaits the whole sequence server-side, so the stagger here and
+    // the server pacing line up 1:1.
+    const onMillCenterReveal = ({ owner, cardNames, revealMs, deleteMode }) => {
+      if (!Array.isArray(cardNames) || cardNames.length === 0) return;
+      const isMe    = owner === myIdx;
+      const perCard = revealMs || 1100;
+      // Deck→pile handshake: the piles were already mutated + synced
+      // server-side before this event, so register every card in the
+      // pending bucket — otherwise the pile-growth auto-detector
+      // name-matches them against same-named cards on the board
+      // (typically Abilities) and spawns phantom board→pile flights.
+      const pending = isMe ? deckToDiscardPendingMeRef.current : deckToDiscardPendingOppRef.current;
+      pending[deleteMode ? 'deleted' : 'discard'].push(...cardNames);
+      const deckEl = document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+      if (!deckEl) return;
+      const dr = deckEl.getBoundingClientRect();
+      const sx = dr.left;
+      const sy = dr.top;
+      const cx = window.innerWidth / 2 - 32;
+      const cy = window.innerHeight / 2 - 45;
+      // End point = the destination pile; centre-fade fallback if the
+      // pile element isn't mounted (mirrors onChaosMagicReveal).
+      let ex = cx, ey = cy;
+      const pileSel = isMe
+        ? (deleteMode ? '[data-my-deleted]'  : '[data-my-discard]')
+        : (deleteMode ? '[data-opp-deleted]' : '[data-opp-discard]');
+      const pileEl = document.querySelector(pileSel);
+      if (pileEl) {
+        const pr = pileEl.getBoundingClientRect();
+        ex = pr.left;
+        ey = pr.top;
+      }
+      const cardbackUrl = isMe ? me.cardback : opp.cardback;
+      cardNames.forEach((cardName, i) => {
+        const id = Date.now() + Math.random();
+        setTimeout(() => {
+          setKassaranFlips(prev => [...prev, {
+            id, startX: sx, startY: sy, centerX: cx, centerY: cy,
+            endX: ex, endY: ey, cardName, cardbackUrl,
+            durationMs: perCard,
+          }]);
+          setTimeout(() => {
+            setKassaranFlips(prev => prev.filter(a => a.id !== id));
+          }, perCard);
+        }, i * perCard);
+      });
+    };
+    socket.on('mill_center_reveal', onMillCenterReveal);
 
     // ── Brackle catapult — load (slow) → hold on Brackle → fire ──────────
     // Single event carries source/Brackle/target coords + phase durations.
@@ -23821,7 +24229,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deck_to_deleted', onDeckToDeleted);
     return () => {
-      socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
+      socket.off('effect_source_glow', onEffectGlow); socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('hand_to_board_fly', onHandToBoard);
       socket.off('attach_hero_fly', onAttachHeroFly);
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
@@ -23830,6 +24238,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
       socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
+      socket.off('play_card_showcase', onCardShowcase);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('rain_of_spores_activated', onRainOfSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
@@ -23876,6 +24285,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
       socket.off('divine_rain_start', onDivineRainStart);
+      socket.off('divine_rain_stop', onDivineRainStop);
+      // Hard cleanup: the rain overlay lives on document.body, OUTSIDE
+      // React — leaving the board (game over → menu) unmounts this
+      // component but not the overlay. Remove it unconditionally here.
+      document.getElementById('divine-rain-overlay')?.remove();
       socket.off('moe_bomb_animation', onMoeBomb);
       socket.off('divine_magic_burst', onDivineMagicBurst);
       socket.off('divine_time_rewind', onDivineTimeRewind);
@@ -23883,6 +24297,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_pile_transfer', onPileTransfer);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('chaos_magic_reveal', onChaosMagicReveal);
+      socket.off('mill_center_reveal', onMillCenterReveal);
       socket.off('play_brackle_catapult', onBrackleCatapult);
       socket.off('birthday_present_reveal_start', onBdayPresentStart);
       socket.off('birthday_present_pick_resolved', onBdayPresentResolved);
@@ -23958,7 +24373,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const el = boardCenterRef.current;
     if (!el) return;
     const check = () => {
-      // First compute centering offset WITHOUT scroll mode
+      // This effect has NO dependency array — check() runs after EVERY
+      // render (the turn timer alone re-renders each second). The
+      // measurement below must therefore be side-effect-free for an
+      // actively scrolled board:
+      //   • scrollLeft is saved up front and restored at the end. Two
+      //     things silently destroy it mid-measurement: removing
+      //     can-scroll lets `:not(.can-scroll){overflow-x:clip}` apply,
+      //     and `overflow: clip` hard-resets the scroll offset to 0;
+      //     and during board-flat-measure the plane loses transform +
+      //     overhang padding, scrollWidth momentarily shrinks, and the
+      //     browser CLAMPS scrollLeft down — a clamp that survives the
+      //     restore. Both produced the "scroll right, snap back to far
+      //     left" loop.
+      //   • board-flat-measure is applied BEFORE can-scroll is removed
+      //     (its overflow-x:auto exception keeps the box a scroll
+      //     container throughout, so the clip reset never fires).
+      const prevScrollLeft = el.scrollLeft;
+      // Hysteresis (v16): capture the latch state BEFORE it's cleared —
+      // at the threshold (exactly 3 Flying Islands) a single +4 cutoff
+      // flaps between modes every pass (scrollbar appears → heights
+      // shift → scale/width dip under the line → unlatch → repeat),
+      // which reads as constant interface jitter. Once latched, stay
+      // latched until the layout is clearly under the line.
+      const wasScrollMode = el.classList.contains('can-scroll');
+      // Neutralize the pseudo-3D tilt for the measurement: the enlarged
+      // near edge of the tilted plane inflates scrollWidth by ~10% and
+      // would otherwise latch can-scroll on, which in turn disables the
+      // tilt via CSS — a self-defeating loop. Scroll UX must depend on
+      // LAYOUT width only, so measure flat, then restore.
+      el.classList.add('board-flat-measure');
       el.classList.remove('can-scroll');
       const rect = el.getBoundingClientRect();
       const viewportCenter = window.innerWidth / 2;
@@ -23970,11 +24414,122 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       el.style.setProperty('--center-offset', offset + 'px');
       // Now check if natural content overflows (ignoring transform)
       // Use scrollWidth which reflects content width before transform
-      if (el.scrollWidth > el.clientWidth + 4) {
+      if (el.scrollWidth > el.clientWidth + (wasScrollMode ? -36 : 4)) {
         el.classList.add('can-scroll');
         // In scroll mode, disable centering transform to avoid layout confusion
         el.style.setProperty('--center-offset', '0px');
         if (layout) layout.style.setProperty('--center-offset', '0px');
+      }
+      // ── Anchor-x on the middle hero (v18, Al) ────────────────────
+      // perspective-origin and the zoom's transform-origin default to
+      // 50% of the plane box — with asymmetric Flying Islands the box
+      // center drifts off the middle heroes, so THEY get laterally
+      // skewed while whatever sits at the box center looks straight.
+      // Requirement: the middle hero zones are ALWAYS the unskewed
+      // axis. Measured FLAT (pure layout, incl. the sides' translateX,
+      // which is part of the hero's local position within the plane
+      // box) and published as a px origin for both origins in CSS.
+      const midHero = el.querySelector('[data-hero-zone][data-hero-owner="me"][data-hero-idx="1"]');
+      const planeEl = el.querySelector('.board-plane');
+      if (midHero && planeEl) {
+        const hrFlat = midHero.getBoundingClientRect();
+        const plFlat = planeEl.getBoundingClientRect();
+        // The flat window zeroes the overhang padding (padding-inline: 0
+        // !important), so this measurement is in CONTENT coordinates. At
+        // render time padding-left shifts the content right within the
+        // plane box — without adding it, the unskewed axis sits exactly
+        // padding-left to the LEFT of the hero (the v18 symptom with
+        // islands: "straight point somewhere left, heroes still lean").
+        // Read the live value from the CSS var (unaffected by the flat
+        // toggle); it lags one pass behind the overhang update below,
+        // which the every-render re-run + deadband settles.
+        const padLLive = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
+        const anchorX = hrFlat.left + hrFlat.width / 2 - plFlat.left + padLLive;
+        const prevAnchor = parseFloat(el.style.getPropertyValue('--board-anchor-x')) || -1;
+        if (Math.abs(anchorX - prevAnchor) > 0.5) {
+          el.style.setProperty('--board-anchor-x', anchorX.toFixed(1) + 'px');
+        }
+      }
+      el.classList.remove('board-flat-measure');
+      // ── Middle-hero anchoring (v17, Al) ──────────────────────────
+      // The MIDDLE hero zones are the battlefield's true midpoint —
+      // with asymmetrically placed Flying Islands the board box's
+      // center drifts away from them, so alignment keys on the me-side
+      // middle hero (data-hero-idx=1) instead of the box. Measured
+      // PROJECTED (what the player sees), delta-corrected on top of
+      // the offset already applied, with a deadband because check()
+      // runs every render.
+      if (!el.classList.contains('can-scroll') && midHero) {
+        const hr = midHero.getBoundingClientRect();
+        const delta = viewportCenter - (hr.left + hr.width / 2);
+        if (Math.abs(delta) > 0.5) {
+          const cur = parseFloat(el.style.getPropertyValue('--center-offset')) || 0;
+          const corrected = (cur + delta).toFixed(1) + 'px';
+          el.style.setProperty('--center-offset', corrected);
+          if (layout) layout.style.setProperty('--center-offset', corrected);
+        }
+      }
+      // v18: two-sided, content-based overhang. With the anchor on the
+      // middle hero the projection is no longer symmetric about the
+      // box center — the side farther from the anchor spills more.
+      // Measured from the projected ZONE union (content, never the
+      // box — v17 lesson: a box can't contain its own magnified
+      // projection) against the clip wrapper's layout edges, corrected
+      // by the signed gap each pass. The correction is the measured
+      // gap, not the pad itself, so the recurrence contracts
+      // (|1−f_edge| < 1) instead of diverging; clamps + deadband seal
+      // it.
+      const plane = el.querySelector('.board-plane');
+      if (plane && el.classList.contains('can-scroll')) {
+        const clip = plane.closest('.board-plane-clip');
+        let pLf = Infinity, pRt = -Infinity;
+        plane.querySelectorAll('.board-zone').forEach(z => {
+          const r = z.getBoundingClientRect(); // transform ACTIVE
+          if (!r.width) return;
+          if (r.left < pLf) pLf = r.left;
+          if (r.right > pRt) pRt = r.right;
+        });
+        if (clip && pRt > pLf) {
+          const cr = clip.getBoundingClientRect();
+          const cs = getComputedStyle(plane);
+          const padL = parseFloat(cs.paddingLeft) || 0;
+          const padR = parseFloat(cs.paddingRight) || 0;
+          const contentW = Math.max(1, plane.offsetWidth - padL - padR);
+          const newL = Math.min(contentW, Math.max(0, padL + (cr.left - pLf)));
+          const newR = Math.min(contentW, Math.max(0, padR + (pRt - cr.right)));
+          const prevL = parseFloat(el.style.getPropertyValue('--board-overhang-l')) || 0;
+          const prevR = parseFloat(el.style.getPropertyValue('--board-overhang-r')) || 0;
+          if (Math.abs(newL - prevL) > 0.5) el.style.setProperty('--board-overhang-l', newL.toFixed(1) + 'px');
+          if (Math.abs(newR - prevR) > 0.5) el.style.setProperty('--board-overhang-r', newR.toFixed(1) + 'px');
+        }
+      } else {
+        el.style.setProperty('--board-overhang-l', '0px');
+        el.style.setProperty('--board-overhang-r', '0px');
+      }
+      // Scroll-position management (v17). Two cases:
+      // • FRESH latch (entering the battle screen with a wide board, or
+      //   islands just pushed it over the line): instantly align the
+      //   scroll so the me-side MIDDLE hero sits centered in view — the
+      //   player never sees a scroll happen (direct scrollLeft
+      //   assignment; board-center has no scroll-behavior:smooth).
+      // • Already latched: restore the position the user had before
+      //   this pass, clamped to the FINAL scrollWidth (overhang padding
+      //   re-applied) so a legitimately shrunken board snaps to its new
+      //   right edge instead of past it.
+      if (el.classList.contains('can-scroll')) {
+        const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+        if (!wasScrollMode && midHero) {
+          const hr = midHero.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          // Hero center in CONTENT coordinates (account for whatever
+          // scroll offset is currently applied), then center it.
+          const heroContentX = hr.left + hr.width / 2 - elRect.left + el.scrollLeft;
+          const target = Math.max(0, Math.min(maxScroll, heroContentX - el.clientWidth / 2));
+          el.scrollLeft = target;
+        } else if (prevScrollLeft > 0) {
+          const target = Math.min(prevScrollLeft, maxScroll);
+          if (el.scrollLeft !== target) el.scrollLeft = target;
+        }
       }
     };
     check();
@@ -25254,6 +25809,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.amount}</span> Gold.</span>; }
       if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#cc8844'}}>{entry.amount}</span> Gold.</span>; }
       if (t === 'forced_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
+      // `forced_delete` is what `actionPromptForceDiscard` logs in
+      // deleteMode (Wheels' Draw-4 cost since it moved onto the
+      // helper); mirrors the legacy hand-rolled `force_delete`
+      // renderer below but reads `source` instead of `by`.
+      if (t === 'forced_delete') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {cName(entry.card)}{entry.source ? ` (${entry.source})` : ''}.</span>; }
       if (t === 'discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
       if (t === 'discard_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {entry.count} card{entry.count>1?'s':''}.</span>; }
       if (t === 'delete_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} deleted {entry.count} card{entry.count>1?'s':''}.</span>; }
@@ -27064,25 +27624,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {/* Mid-game CPU bark (hidden once the end-game bubbles take over).
             z 9650 keeps the opening greeting ABOVE the start-of-game dim +
             first-choice panel (z 9600) instead of being occluded by them. */}
-        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650)}
+        {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650, cpuBark.fading)}
         {/* Opponent hand */}
         <div className="game-hand game-hand-opp">
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
             {opp.avatar
-              ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))} />
+              ? <img src={opp.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))} />
               : opp.heroes?.[1]?.name && HeroArtCrop
                 ? (
-                  <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-inactive' : ' avatar-active'))}>
+                  <div className={'game-hand-avatar-crop' + (!result && ((isMyTurn && !oppBarking) ? ' avatar-inactive' : ' avatar-active'))}>
                     <HeroArtCrop heroName={opp.heroes[1].name} width={135} />
                   </div>
                 )
                 : null}
             <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: opp.color }}>{
               // CPU opponents are labelled "CPU" server-side; show their
-              // middle Hero's full name (incl. title) instead so they read
-              // as a character. Falls back to the first living Hero, then CPU.
+              // middle Hero instead so they read as a character. Als
+              // Ruling: nur der NAME, ohne Titel ("Bomb Berserker Bartas"
+              // → "Bartas", "Maya, the Nature Fairy" → "Maya") — siehe
+              // heroDisplayName in app-shared.jsx. Falls back to the
+              // first living Hero, then CPU.
               (gameState.isCpuBattle && opp.username === 'CPU')
-                ? (opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
+                ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
                 : opp.username
             }</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
@@ -27239,6 +27802,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.forsaken) debuffs.push({ key: 'forsaken-opp', icon: '🏴‍☠️', text: `All cards that would go to ${opp.username}'s discard pile are deleted for the rest of the turn.`, color: '#6666aa' });
             if (me.handLocked) debuffs.push({ key: 'hand-me', icon: '🔒', text: 'You cannot draw or search any more cards this turn!', color: '#ff6644' });
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
+            if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#ff6644' });
+            if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#cc8800' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
             if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#dddddd' });
             // Giga Steroids — owner-wide second-Action grant for
@@ -27340,6 +27905,50 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
           <div className="board-center-spacer" />
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative', isolation: 'isolate' }}>
+            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            {/* ── Pseudo-3D ground plane ─────────────────────────────────
+                ONE wrapper around both player sides + the area zones +
+                the mid row, tilted as a single continuous plane via CSS
+                (see "Pseudo-3D battlefield" in style.css). Everything
+                inside — zones, cards, drop previews — lies ON the plane
+                and is angled automatically. The atmosphere layer
+                (BoardAmbiance + area-card backgrounds) lives inside
+                board-plane-clip as flat untransformed siblings of the
+                plane so it spans the full (possibly island-widened)
+                scrollable battlefield; only the permanents column and
+                the summon-lock message stay on .board-center itself.
+                position:relative keeps the plane the containing block
+                for .board-area-zones-center even when the tilt is
+                disabled (mobile / can-scroll fallbacks). */}
+            {/* board-plane-clip: untransformed buffer between the scroll
+                container (.board-center) and the tilted plane. In scroll
+                mode it clips the plane's horizontal TRANSFORM overflow at
+                its own layout edge — the browser otherwise extends the
+                scrollable range by the projected (not layout) width of
+                the plane, ~contentW·f·(f−1)/2 of phantom scroll room
+                past the last zone. The clip edge equals the projected
+                near-edge content width (the overhang padding reserves
+                exactly (f−1)/2 per side), so no visible content is cut. */}
+            <div className="board-plane-clip">
+            {/* ── Atmosphere layer (moved INSIDE board-plane-clip) ────
+                BoardAmbiance + every area-card background overlay used
+                to be absolute inset:0 children of .board-center — but
+                in scroll mode an absolutely positioned child of a
+                scroll container only spans the PADDING BOX (one
+                viewport width at scroll 0), so with Flying-Island
+                boards the backgrounds ended mid-scroll and the widened
+                battlefield showed bare backdrop. The clip wrapper is
+                in-flow and min-width:min-content in scroll mode, i.e.
+                exactly as wide as the widened battlefield — with
+                position:relative on it (style.css), inset:0 overlays
+                now cover the full scrollable field. Paint order vs the
+                plane is preserved: same relative DOM order, and the
+                wrapper (position:relative, z-auto) creates no stacking
+                context, so overlay z-indices still resolve against
+                .board-center exactly as before. */}
+            {/* Ambient pixel motes — FIRST child on purpose: paints behind
+                every zone, card and area overlay (see BoardAmbiance). */}
+            <BoardAmbiance colorMe={me.color} colorOpp={opp.color} />
             {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The Bonegrinder')) || ((gameState.areaZones?.[1] || []).includes('The Bonegrinder'))) && <BonegrinderOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Crystal Well')) || ((gameState.areaZones?.[1] || []).includes('Crystal Well'))) && <CrystalWellOverlay />}
@@ -27392,7 +28001,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               || ((gameState.areaZones?.[1] || []).includes('Wowhalla, the Hall of the Cool')))
               && <WowhallaGearsOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
-            {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
+            <div className="board-plane">
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
               {(() => {
@@ -27477,6 +28086,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
+            </div>{/* /board-plane */}
+            </div>{/* /board-plane-clip */}
             {/* Permanent zones + Coolness Stack — positioned absolutely to avoid layout interference. */}
             {/* The Stack is rendered as a child of the permanents column so it tracks with the */}
             {/* permanent block's position when the column grows (Flying Island, extra permanents). */}
@@ -27716,10 +28327,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <HandAmbiance color={me.color} />
           <div className="game-hand-info" ref={speechMeRef} style={meAvatarHighlight}>
             {me.avatar
-              ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))} />
+              ? <img src={me.avatar} className={'game-hand-avatar game-hand-avatar-big' + (!result && ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))} />
               : me.heroes?.[1]?.name && HeroArtCrop
                 ? (
-                  <div className={'game-hand-avatar-crop' + (!result && (isMyTurn ? ' avatar-active' : ' avatar-inactive'))}>
+                  <div className={'game-hand-avatar-crop' + (!result && ((isMyTurn || meBarking) ? ' avatar-active' : ' avatar-inactive'))}>
                     <HeroArtCrop heroName={me.heroes[1].name} width={135} />
                   </div>
                 )
@@ -28013,7 +28624,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           startX={anim.startX} startY={anim.startY}
           centerX={anim.centerX} centerY={anim.centerY}
           endX={anim.endX} endY={anim.endY}
-          cardName={anim.cardName} cardbackUrl={anim.cardbackUrl} />
+          cardName={anim.cardName} cardbackUrl={anim.cardbackUrl}
+          durationMs={anim.durationMs} />
       ))}
       {brackleCatapults.map(b => (
         <BrackleCatapultCard key={b.id}
@@ -30220,6 +30832,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────
+          Terror beendet den Zug — die Karte erscheint einmal mittig,
+          wächst über zwei Sekunden und blendet dabei aus. Rein
+          dekorativ: `pointerEvents: none`, damit nichts blockiert
+          wird, und ein `key`, damit ein neuer Auftritt die Animation
+          sauber neu startet statt sie fortzusetzen. */}
+      {cardShowcase && (
+        <div
+          key={cardShowcase.key}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 12000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+            animation: `pp-card-showcase ${cardShowcase.dur}ms ease-out forwards`,
+          }}
+        >
+          <BoardCard cardName={cardShowcase.cardName} noTooltip
+            style={{ width: 260, height: 364, filter: 'drop-shadow(0 0 40px rgba(0,0,0,.9))' }} />
         </div>
       )}
     </div>

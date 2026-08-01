@@ -86,7 +86,10 @@ module.exports = {
   // declines cancellable confirms outside a card-cast (onTurnStart trigger),
   // so without this the CPU never plays this disruption. (Title == card name.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   // Fire hooks from hand (the onTurnStart trigger) AND discard (the
@@ -145,6 +148,12 @@ module.exports = {
         owner: pi, cardName: CARD_NAME,
         from: 'hand', to: 'discard',
         fromHandIdx: removeIdx,
+        // Einsatz-Beleg: derselbe Fall wie Jump in the River — die
+        // Karte spielt sich im eigenen Reaktions-Hook aus der Hand,
+        // also feuert afterSpellResolved nicht und ohne Marker bliebe
+        // sie im Report bei 0 Einsätzen. 'sole' zwingend, weil `true`
+        // Spell/Attack bewusst überspringt.
+        asPlay: 'sole',
       });
 
       ps.hand.splice(removeIdx, 1);

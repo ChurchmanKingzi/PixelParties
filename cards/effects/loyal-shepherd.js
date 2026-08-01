@@ -64,6 +64,14 @@ module.exports = {
     },
   },
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onCreatureDeath-Confirm (Gegner-Kill plan-los), Gratis-Effekt.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;

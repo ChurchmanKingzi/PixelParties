@@ -156,6 +156,23 @@ module.exports = {
       .filter(Boolean);
     if (names.length === 0) return undefined;
 
+    // Wertbasierter Pick (Als Auftrag: Wert ≠ Level): Minimiere den
+    // SITUATIVEN Wert der Karte aus Sicht des CASTERS (dessen Profil,
+    // Cluster-/Standing-Deltas, Caster-Deltas via Zi) — der Gegner
+    // gibt Zi das für ZI schwächste Angebot. Fällt ohne CPU-Brain
+    // (menuOwnerIdx fehlt / Estimate nicht installiert) auf die alte
+    // Level-Heuristik zurück.
+    if (typeof engine._cpuEstimateHandValue === 'function'
+        && typeof promptData.menuOwnerIdx === 'number') {
+      let bestN = names[0];
+      let bestV = Infinity;
+      for (const n of names) {
+        let v;
+        try { v = engine._cpuEstimateHandValue(promptData.menuOwnerIdx, n); } catch { v = null; }
+        if (typeof v === 'number' && v < bestV) { bestV = v; bestN = n; }
+      }
+      if (bestV < Infinity) return { cardName: bestN };
+    }
     const cardDB = engine._getCardDB();
     const scoreOf = (n) => {
       const cd = cardDB[n] || {};
@@ -198,6 +215,7 @@ module.exports = {
     // ── Step 1: activator picks exactly 3 (Σlevel ≤ 6) ──
     const result = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
+      menuSource: 'Timeless King Zi',
       cards: spells, // [{ name, level }] — level is the budget cost
       validCounts: [PICK_COUNT],
       maxBudget: MAX_TOTAL_LEVEL,
@@ -258,6 +276,7 @@ module.exports = {
     const oppResult = await engine.promptGeneric(oppIdx, {
       type: 'birthdayPresentPick',
       cards: chosen.slice(),
+      menuOwnerIdx: pi,
       title: CARD_NAME,
       cancellable: false,
     });
@@ -295,6 +314,14 @@ module.exports = {
     //    the visual) ──
     if (!ps.deletedPile) ps.deletedPile = [];
     for (const name of others) ps.deletedPile.push(name);
+    // Menü-Kanal (Als Auftrag): volles Angebot + Gegnerwahl in EINEM
+    // Event — der Trainings-Recorder baut daraus menus[]-Einträge
+    // (Offered/Cast-Listen im Report + menuOfferRules-Lernkanal).
+    engine.log('timeless_king_zi_offer', {
+      player: ps.username,
+      offered: [oppChoice, ...others],
+      chosen: oppChoice,
+    });
     engine.log('timeless_king_zi_delete', { player: ps.username, deleted: others });
     engine.sync();
 

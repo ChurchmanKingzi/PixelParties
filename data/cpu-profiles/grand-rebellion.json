@@ -1,0 +1,318 @@
+{
+  "deck": "Grand Rebellion!",
+  "heroes": [
+    "Johanna, Crusader of Light",
+    "Champion, the Stormbringer",
+    "Cute Nerd Magenta"
+  ],
+  "games": 1359,
+  "trainWinRate": "53.1%",
+  "trainedAt": "2026-07-26T15:24:03.718Z",
+  "meanTurns": 16.4,
+  "cardValues": {
+    "Inventing": 8,
+    "Kirin Firebreath": 63.9,
+    "Giga Steroids": 20.4,
+    "Summoning Magic": 8,
+    "Rebelliokai Timid Tanuki": 16.8,
+    "Rebelliokai Courtly Kirin": 8,
+    "Kappa Sword Slash": 41.2,
+    "Tengu Windstorm": 13.6,
+    "Rebelliokai Backup Bakus": 16,
+    "Rebelliokai Kind Kitsune": 16,
+    "Tanuki Escape": 8,
+    "Rebelliokai Oblivious Oni": 63.1,
+    "Rebelliokai Terror Tengu": 100,
+    "Rebelliokai Camouflaged Kappa": 16.1
+  },
+  "timing": {
+    "Inventing": {
+      "early": 0.75,
+      "mid": 1.07,
+      "late": 1.3
+    },
+    "Kirin Firebreath": {
+      "early": 0.75,
+      "mid": 0.89,
+      "late": 1.3
+    },
+    "Giga Steroids": {
+      "early": 0.81,
+      "mid": 0.99,
+      "late": 1.2
+    },
+    "Summoning Magic": {
+      "early": 0.82,
+      "mid": 1.18,
+      "late": 1
+    },
+    "Rebelliokai Timid Tanuki": {
+      "early": 0.94,
+      "mid": 1.05,
+      "late": 1.01
+    },
+    "Rebelliokai Courtly Kirin": {
+      "early": 0.92,
+      "mid": 0.8,
+      "late": 1.29
+    },
+    "Kappa Sword Slash": {
+      "early": 1,
+      "mid": 0.92,
+      "late": 1.08
+    },
+    "Tengu Windstorm": {
+      "early": 0.91,
+      "mid": 1.02,
+      "late": 1.07
+    },
+    "Rebelliokai Backup Bakus": {
+      "early": 1,
+      "mid": 1.02,
+      "late": 0.98
+    },
+    "Rebelliokai Kind Kitsune": {
+      "early": 1,
+      "mid": 0.98,
+      "late": 1.02
+    },
+    "Rebelliokai Oblivious Oni": {
+      "early": 1,
+      "mid": 1.05,
+      "late": 0.95
+    },
+    "Rebelliokai Camouflaged Kappa": {
+      "early": 0.97,
+      "mid": 1.02,
+      "late": 1.01
+    }
+  },
+  "pairBonuses": {
+    "Kirin Firebreath|dc:Tengu Windstorm": 5,
+    "Rebelliokai Oblivious Oni|Rebelliokai Terror Tengu": 7.2,
+    "Rebelliokai Terror Tengu|dc:Kappa Sword Slash": 4.3,
+    "Rebelliokai Terror Tengu|dc:Kirin Firebreath": 4.3,
+    "Rebelliokai Terror Tengu|dc:Tengu Windstorm": 4
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Rebelliokai Terror Tengu": -8.3
+    }
+  },
+  "casterDeltas": {
+    "Kirin Firebreath": {
+      "Cute Nerd Magenta": -9.5,
+      "Champion, the Stormbringer": 5.6
+    },
+    "Kappa Sword Slash": {
+      "Champion, the Stormbringer": 7.6,
+      "Johanna, Crusader of Light": -8
+    },
+    "Tengu Windstorm": {
+      "Johanna, Crusader of Light": -3.8
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Inventing": -6.6,
+      "Rebelliokai Courtly Kirin": -9.2,
+      "Tanuki Escape": -20,
+      "Rebelliokai Kind Kitsune": -8.8,
+      "Rebelliokai Oblivious Oni": 18.9,
+      "Rebelliokai Terror Tengu": -19
+    },
+    "ahead": {
+      "Tengu Windstorm": -10.8,
+      "Rebelliokai Terror Tengu": 6.8
+    }
+  },
+  "standingEvalThreshold": 967,
+  "deckoutGuard": {
+    "Tanuki Escape": -11.1,
+    "Tengu Windstorm": -9.5,
+    "Rebelliokai Timid Tanuki": -20,
+    "Rebelliokai Kind Kitsune": -15.3,
+    "Rebelliokai Backup Bakus": -14.3
+  },
+  "deckoutDangerSize": 6,
+  "targetPriors": {
+    "Kirin Firebreath": {
+      "kind:creature": -7.2,
+      "side:own": -12
+    },
+    "Kappa Sword Slash": {
+      "side:own": -17.2,
+      "kind:creature": -11.4
+    },
+    "Gathering Storm": {
+      "kind:creature": 17.1
+    },
+    "Divine Gift of The Light": {
+      "kind:creature": -18.9,
+      "kind:hero": 8.7
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 1.6,
+    "plc:slack:1": -2.8,
+    "plc:slack:2+": 1.8,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Rebelliokai Courtly Kirin→Rebelliokai Timid Tanuki": 3.9,
+    "Rebelliokai Courtly Kirin→Rebelliokai Kind Kitsune": 2.5,
+    "Rebelliokai Courtly Kirin→Rebelliokai Camouflaged Kappa": 10.7,
+    "Rebelliokai Courtly Kirin→Rebelliokai Backup Bakus": -9.1,
+    "Magic Lamp→Alchemy": -4.1,
+    "Magic Lamp→Critical Strike": -20,
+    "Tanuki Escape→Rebelliokai Oblivious Oni": -4.3,
+    "Tanuki Escape→Rebelliokai Timid Tanuki": -7.2,
+    "Tanuki Escape→Rebelliokai Camouflaged Kappa": -2.8,
+    "Tanuki Escape→Glass of Marbles": 5.6,
+    "Tanuki Escape→Summoning Magic": 6.8,
+    "Tanuki Escape→Kirin Firebreath": 3.2,
+    "Tanuki Escape→Rebelliokai Terror Tengu": -2.1,
+    "Tanuki Escape→Fighting": -17.9,
+    "Tanuki Escape→Rebelliokai Backup Bakus": -15.1,
+    "Tanuki Escape→Rebelliokai Courtly Kirin": 3.7,
+    "Training→Summoning Magic": 7.3,
+    "Training→Inventing": -7.3,
+    "Rebelliokai Terror Tengu→Rebelliokai Oblivious Oni": 7.9,
+    "Rebelliokai Terror Tengu→Rebelliokai Courtly Kirin": -11.1,
+    "Rebelliokai Terror Tengu→Rebelliokai Terror Tengu": 2.4,
+    "Rebelliokai Terror Tengu→Rebelliokai Backup Bakus": -7.1,
+    "Rebelliokai Terror Tengu→Rebelliokai Kind Kitsune": -8.9,
+    "Rebelliokai Kind Kitsune→Giga Steroids": -16.9,
+    "Rebelliokai Kind Kitsune→Mystery Box": -3.7,
+    "Rebelliokai Kind Kitsune→Glass of Marbles": -14.6,
+    "Rebelliokai Kind Kitsune→Kappa Sword Slash": -5.9,
+    "Rebelliokai Kind Kitsune→Kirin Firebreath": 14.5,
+    "Rebelliokai Kind Kitsune→Tanuki Escape": 16.4,
+    "Inventing Lv3→Rebelliokai Kind Kitsune": -20,
+    "Inventing Lv3→Summoning Magic": 3.4,
+    "Inventing Lv3→Tengu Windstorm": -15.9,
+    "Inventing Lv3→Glass of Marbles": -20,
+    "Inventing Lv3→Kirin Firebreath": -7.3,
+    "Inventing Lv3→Kappa Sword Slash": 11.8,
+    "Inventing Lv3→Rebelliokai Terror Tengu": 4.7,
+    "Inventing Lv3→Rebelliokai Oblivious Oni": 5.4,
+    "Inventing Lv3→Rebelliokai Timid Tanuki": -17.2,
+    "Inventing Lv3→Giga Steroids": 10.5,
+    "Rebelliokai Camouflaged Kappa→Rebelliokai Camouflaged Kappa": -8.9,
+    "Rebelliokai Camouflaged Kappa→Inventing": 2,
+    "Necromancy→Rebelliokai Camouflaged Kappa": -11.4,
+    "Necromancy→Rebelliokai Timid Tanuki": -5.9,
+    "Necromancy→Rebelliokai Oblivious Oni": 19.5,
+    "Necromancy→Rebelliokai Courtly Kirin": 3.1,
+    "Necromancy→Rebelliokai Kind Kitsune": -20,
+    "Necromancy→Rebelliokai Terror Tengu": 8.6,
+    "Enigma, the Seller of Secrets→Kappa Sword Slash": 2.1,
+    "Enigma, the Seller of Secrets→Kirin Firebreath": -7.8,
+    "Enigma, the Seller of Secrets→Rebelliokai Terror Tengu": 5.5,
+    "Enigma, the Seller of Secrets→Tengu Windstorm": 14.6,
+    "Enigma, the Seller of Secrets→Rebelliokai Oblivious Oni": -4.9,
+    "Enigma, the Seller of Secrets→Inventing": -8.5,
+    "Enigma, the Seller of Secrets→Rebelliokai Backup Bakus": -3.4,
+    "Enigma, the Seller of Secrets→Rebelliokai Kind Kitsune": -6.6,
+    "Enigma, the Seller of Secrets→Tanuki Escape": 3.1,
+    "Enigma, the Seller of Secrets→Rebelliokai Courtly Kirin": 2,
+    "Enigma, the Seller of Secrets→Rebelliokai Camouflaged Kappa": -7.2,
+    "Enigma, the Seller of Secrets→Giga Steroids": 4.9,
+    "Enigma, the Seller of Secrets→Glass of Marbles": 6.8,
+    "Premonition→Rebelliokai Courtly Kirin": -20,
+    "Premonition→Summoning Magic": 3.4,
+    "Premonition→Rebelliokai Oblivious Oni": -2,
+    "Premonition→Kirin Firebreath": 4.6,
+    "Premonition→Rebelliokai Terror Tengu": 4,
+    "Premonition→Kappa Sword Slash": -10
+  },
+  "abilityPriors": {
+    "Fighting@Johanna, Crusader of Light": 150,
+    "Support Magic@Johanna, Crusader of Light": 150,
+    "Inventing@Johanna, Crusader of Light": -49.9,
+    "Fighting@Champion, the Stormbringer": 150,
+    "Summoning Magic@Champion, the Stormbringer": 150,
+    "Inventing@Champion, the Stormbringer": -60,
+    "Inventing@Champion, the Stormbringer≥2": -60,
+    "Charme@Cute Nerd Magenta": 150,
+    "Creativity@Cute Nerd Magenta": -55.4,
+    "Summoning Magic@Cute Nerd Magenta": 115.6,
+    "Summoning Magic@Johanna, Crusader of Light": 63,
+    "Inventing@Johanna, Crusader of Light≥2": 115.3,
+    "Inventing@Johanna, Crusader of Light≥3": -60,
+    "Toughness@Champion, the Stormbringer": 150,
+    "Summoning Magic@Cute Nerd Magenta≥2": -60,
+    "Inventing@Cute Nerd Magenta": 107.1,
+    "Inventing@Cute Nerd Magenta≥2": 150,
+    "Inventing@Cute Nerd Magenta≥3": 49.4,
+    "Inventing@Champion, the Stormbringer≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {},
+  "reviveAbilities": {},
+  "startHandValues": {
+    "Rebelliokai Timid Tanuki": 1.8,
+    "Tengu Windstorm": -1.4,
+    "Mystery Box": -3.8,
+    "Rebelliokai Oblivious Oni": 7.6,
+    "Rebelliokai Camouflaged Kappa": 2.4,
+    "Inventing": 3.3,
+    "Summoning Magic": -1.6,
+    "Glass of Marbles": 3,
+    "Giga Steroids": -5,
+    "Rebelliokai Terror Tengu": -4.9
+  },
+  "mulliganStats": {
+    "games": 1359,
+    "mullRate": "52.4%",
+    "winAfterMull": "52.2%",
+    "winAfterKeep": "53.9%"
+  },
+  "heroEffectTiming": {
+    "Cute Nerd Magenta@hand:2-3": -2.2,
+    "Champion, the Stormbringer@hand:2-3": -6.9,
+    "Cute Nerd Magenta@hand:0-1": -4.9,
+    "Champion, the Stormbringer@hand:0-1": -9.1
+  },
+  "boardPairs": {
+    "Fighting|Inventing": -10,
+    "Fighting|Summoning Magic": 13,
+    "Inventing|Summoning Magic": -9.1,
+    "Charme|Rebelliokai Courtly Kirin": -10.4,
+    "Rebelliokai Courtly Kirin|Summoning Magic": 5.6,
+    "Rebelliokai Terror Tengu|Rebelliokai Timid Tanuki": -15,
+    "Rebelliokai Terror Tengu|Summoning Magic": 9.6,
+    "Rebelliokai Terror Tengu|Support Magic": 15,
+    "Inventing|Rebelliokai Terror Tengu": -15,
+    "Rebelliokai Oblivious Oni|Summoning Magic": 15,
+    "Rebelliokai Oblivious Oni|Support Magic": 7.4,
+    "Rebelliokai Timid Tanuki|Summoning Magic": 7.9,
+    "Summoning Magic|Support Magic": 10.4,
+    "Inventing|Toughness": -14.9,
+    "Rebelliokai Courtly Kirin|Rebelliokai Timid Tanuki": -15,
+    "Fighting|Rebelliokai Courtly Kirin": 11.4,
+    "Summoning Magic|Toughness": 14.4,
+    "Charme|Inventing": 8.6,
+    "Creativity|Inventing": 8.3,
+    "Rebelliokai Courtly Kirin|Rebelliokai Kind Kitsune": -15,
+    "Rebelliokai Backup Bakus|Rebelliokai Camouflaged Kappa": -15,
+    "Fighting|Rebelliokai Terror Tengu": 11,
+    "Rebelliokai Backup Bakus|Rebelliokai Terror Tengu": -15,
+    "Rebelliokai Camouflaged Kappa|Support Magic": 15,
+    "Inventing|Rebelliokai Courtly Kirin": -15,
+    "Inventing|Rebelliokai Kind Kitsune": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.644,
+      "n": 90,
+      "values": {
+        "Deepsea Primordium": 0.106,
+        "Hell Fox": -0.144,
+        "Ska Harpyformer": -0.444
+      }
+    }
+  }
+}

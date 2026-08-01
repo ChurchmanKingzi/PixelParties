@@ -263,6 +263,18 @@ module.exports = {
         owner: pi, cardName: spellName,
         from: 'hand', to: 'discard',
         fromHandIdx: finalIdx,
+        // `asPlay: 'sole'` — einziges Play-Signal dieser Karte.
+        // Als Verdachtsfall "Destruction-Spells mit 0% Cast-Rate": der
+        // Cast lief real (2989 Demon's-Gate-Aktivierungen in 1360
+        // Spielen), tauchte im Report aber mit plays 0 auf. Grund: der
+        // Gate castet mit `script.hooks.onPlay(spellCtx)` DIREKT und
+        // umgeht damit die Spell-Pipeline — `afterSpellResolved` feuert
+        // nie, und über diesen Hook zählt der Recorder Spells sonst.
+        // Der Transfer war schon da, trug aber keinen Marker. 'sole'
+        // statt `true`, weil `true` Spell/Attack bewusst überspringt
+        // (Doppelzählung mit afterSpellResolved) — die hier gibt es
+        // gerade NICHT.
+        asPlay: 'sole',
       });
       ps.hand.splice(finalIdx, 1);
       ps.discardPile.push(spellName);

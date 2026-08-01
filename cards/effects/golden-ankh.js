@@ -24,7 +24,12 @@ module.exports = {
   // actually generated value during their forced-life (cards drawn,
   // damage dealt, abilities/effects used). Matches the user spec
   // "only revive if there's a use this turn".
-  cpuMeta: { evaluateThroughTurnEnd: true },
+  // `reviveCard` + `reviveTemporary`: Opt-in für die situative Such-/
+  // Handwert-Bewertung in _cpu.js (reviveCardSituation): ohne toten
+  // eigenen Helden harter Malus statt gelerntem Statikwert; mit totem
+  // Helden, aber ohne Nutzen in DIESER Runde (cpuShouldPlay-Probe
+  // unten) ebenfalls Malus — der Revive hält ja nur bis Rundenende.
+  cpuMeta: { evaluateThroughTurnEnd: true, reviveCard: true, reviveTemporary: true },
 
   /**
    * Pre-plan heuristic — keep the CPU from spending 10 gold + a hand

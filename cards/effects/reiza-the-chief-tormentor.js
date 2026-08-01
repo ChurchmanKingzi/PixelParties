@@ -42,7 +42,7 @@ function allOpponentTargetsPoisoned(gs, oppIdx, engine) {
   for (const inst of engine.cardInstances) {
     if (inst.owner !== oppIdx || inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     hasLivingTarget = true;
     if (!inst.counters.poisoned) return false;

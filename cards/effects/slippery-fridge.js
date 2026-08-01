@@ -121,6 +121,126 @@ module.exports = {
 
   animationType: 'none',
 
+  // ── CPU-Auswahl (cpuResponse-Intercept, Muster Slippery Pengu) ─────
+  // Fridge hatte KEINE eigene CPU-Logik — beide Prompts beantwortete der
+  // generische Responder, dessen Bewertung Ascension-Fortschritt nicht
+  // kennt. Live-Folge (Shadows over Blackport): Fridge zog Equips VON
+  // Arthor weg, statt das zweite Ascension-Equip ZU ihm zu schieben.
+  // Politik, in Prioritätsreihenfolge:
+  //   1. VOLLENDER: Ein eigenes Equip, das ein anderer eigener Held für
+  //      seine Ascension braucht (ascensionNeedsCard), wird dorthin
+  //      bewegt — Arthors Circle von Jenny zu Arthor.
+  //   2. SABOTAGE: Ein gegnerisches Ascension-Item (ascensionItems des
+  //      nicht-aufgestiegenen Trägers) wird von diesem weggezogen.
+  //   3. TRÄGER-SCHUTZ: Eigene Ascension-Items werden NIE vom
+  //      nicht-aufgestiegenen Träger wegbewegt.
+  //   4. Rest: Ziel per gelerntem equipPlacementBonus, sonst uniform.
+  // Keine Rollouts — läuft in MCTS-Sims identisch und billig.
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const config = payload?.config;
+    const title = config?.title || '';
+    const validTargets = payload?.validTargets || [];
+    const pi = payload?.playerIdx;
+    if (typeof pi !== 'number') return undefined;
+    const gs = engine.gs;
+
+    const heroScript = (owner, hi) => {
+      const name = gs.players?.[owner]?.heroes?.[hi]?.name;
+      if (!name) return null;
+      try { return loadCardEffect(name); } catch { return null; }
+    };
+    const heroAlive = (owner, hi) => {
+      const h = gs.players?.[owner]?.heroes?.[hi];
+      return !!(h?.name && h.hp > 0);
+    };
+    const needsForAscension = (owner, hi, equipName) => {
+      if (!heroAlive(owner, hi)) return false;
+      const script = heroScript(owner, hi);
+      if (typeof script?.ascensionNeedsCard !== 'function') return false;
+      try { return !!script.ascensionNeedsCard(equipName, null, engine, owner, hi); }
+      catch { return false; }
+    };
+    const isProtectedOnBearer = (owner, hi, equipName) => {
+      if (!heroAlive(owner, hi)) return false;
+      const script = heroScript(owner, hi);
+      return Array.isArray(script?.ascensionItems) && script.ascensionItems.includes(equipName);
+    };
+    const someOtherHeroNeeds = (owner, srcHi, equipName) => {
+      for (let hi = 0; hi < (gs.players?.[owner]?.heroes || []).length; hi++) {
+        if (hi === srcHi) continue;
+        if (needsForAscension(owner, hi, equipName)) return hi;
+      }
+      return -1;
+    };
+
+    // ── Phase 1: Equip-Wahl ──
+    if (title === 'Slippery Fridge') {
+      const equips = validTargets.filter(t => t.type === 'equip');
+      if (equips.length === 0) return [];
+      // Priorität 1: eigener Vollender-Move
+      for (const t of equips) {
+        if (t.owner !== pi) continue;
+        if (someOtherHeroNeeds(t.owner, t.heroIdx, t.cardName) >= 0) return [t.id];
+      }
+      // Priorität 2: Gegner-Sabotage (Ascension-Item vom Träger wegziehen)
+      for (const t of equips) {
+        if (t.owner === pi) continue;
+        if (isProtectedOnBearer(t.owner, t.heroIdx, t.cardName)) return [t.id];
+      }
+      // Priorität 3: Träger-Schutz — geschützte eigene Equips aus dem Pool
+      const pool = equips.filter(t => !(t.owner === pi && isProtectedOnBearer(t.owner, t.heroIdx, t.cardName)));
+      if (pool.length === 0) return []; // nichts Sinnvolles → cancel, Karte bleibt in der Hand
+      return [pool[Math.floor(Math.random() * pool.length)].id];
+    }
+
+    // ── Phase 2: Ziel-Wahl ──
+    if (title.startsWith('Slippery Fridge — Move ')) {
+      const equipName = title.slice('Slippery Fridge — Move '.length);
+      const heroTargets = validTargets.filter(t => t.type === 'hero');
+      const pickFor = (hi) => {
+        const h = heroTargets.find(t => t.heroIdx === hi);
+        if (h) return [h.id];
+        const z = validTargets.find(t => t.type === 'equip' && t.heroIdx === hi);
+        return z ? [z.id] : null;
+      };
+      const owner = (heroTargets[0] || validTargets[0])?.owner;
+      // Vollender: der Held, der das Equip für seine Ascension braucht
+      if (typeof owner === 'number') {
+        for (const t of heroTargets.length ? heroTargets : validTargets) {
+          if (needsForAscension(owner, t.heroIdx, equipName)) {
+            const picked = pickFor(t.heroIdx);
+            if (picked) return picked;
+          }
+        }
+      }
+      // Gelernte Platzierungs-Priors (nur für eigene Moves sinnvoll)
+      if (owner === pi) {
+        let deckProfile = null;
+        try { deckProfile = require('./_deck-profile'); } catch {}
+        if (deckProfile) {
+          let bestHi = -1, bestV = 4; // Schwelle wie pickHeroForEquip
+          const his = [...new Set(validTargets.map(t => t.heroIdx))];
+          for (const hi of his) {
+            const heroName = gs.players?.[pi]?.heroes?.[hi]?.name;
+            if (!heroName) continue;
+            const v = deckProfile.equipPlacementBonus(engine, pi, equipName, heroName);
+            if (v > bestV) { bestV = v; bestHi = hi; }
+          }
+          if (bestHi >= 0) {
+            const picked = pickFor(bestHi);
+            if (picked) return picked;
+          }
+        }
+      }
+      // Fallback: uniform
+      const t = validTargets[Math.floor(Math.random() * validTargets.length)];
+      return t ? [t.id] : [];
+    }
+
+    return undefined;
+  },
+
   // ── RESOLVE ────────────────────────────
   // Moves exactly ONE Equip Artifact to a different Hero of the same controller.
   // First prompt is cancellable — cancelling returns card to hand.

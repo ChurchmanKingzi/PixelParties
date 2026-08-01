@@ -15,6 +15,43 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
 
+  // ── CPU-Zielwahl (cpuResponse-Intercept, Muster Shield of Life) ────
+  // Der Vergeltungs-Prompt ist cancellable — der generische CPU-
+  // Responder lehnt cancellable Prompts ab, d. h. die CPU verzichtete
+  // IMMER auf die 100 Gratis-Schaden. Politik wie Lifeforce Howitzer:
+  // tötbares Gegner-Ziel zuerst (Held vor Kreatur), sonst der Gegner-
+  // Held mit den wenigsten HP. Eigene Ziele nie (side ist 'any').
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    if (payload?.config?.title !== 'Shield of Death') return undefined;
+    const pi = payload?.playerIdx;
+    const validTargets = payload?.validTargets || [];
+    if (typeof pi !== 'number' || validTargets.length === 0) return [];
+    const gs = engine.gs;
+    const dmg = payload?.config?.baseDamage || 100;
+
+    let best = null, bestScore = -Infinity;
+    for (const t of validTargets) {
+      if (t.owner === pi) continue;
+      let hp = null, isHero = false;
+      if (t.type === 'hero') {
+        const h = gs.players?.[t.owner]?.heroes?.[t.heroIdx];
+        if (!h?.name || h.hp <= 0) continue;
+        hp = h.hp; isHero = true;
+      } else {
+        const inst = t.cardInstance || engine.cardInstances?.find(c =>
+          c.owner === t.owner && c.zone === 'support'
+          && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+        hp = inst?.counters?.currentHp;
+        if (typeof hp !== 'number' || hp <= 0) continue;
+      }
+      const kills = dmg >= hp;
+      const score = (kills ? 10000 : 0) + (isHero ? 1000 : 0) - hp;
+      if (score > bestScore) { bestScore = score; best = t; }
+    }
+    return best ? [best.id] : [];
+  },
+
   hooks: {
     afterDamage: async (ctx) => {
       const engine = ctx._engine;
@@ -77,6 +114,13 @@ module.exports = {
         card.counters.shieldFiredThisTurn = false; // Refund if cancelled
         return;
       }
+
+      // Equip-Karte aufleuchten lassen (rot = Vergeltung)
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'equip_flash', color: '#ef4444',
+        owner: ctx.cardController ?? ctx.cardOwner,
+        heroIdx: card.heroIdx, zoneSlot: card.zoneSlot,
+      });
 
       // Dark skulls animation on target
       engine._broadcastEvent('play_zone_animation', {

@@ -24,7 +24,10 @@ module.exports = {
   // never fires. Negating damage + granting immunity is pure upside. (Title
   // must equal the card name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   activeIn: ['hand'],
@@ -73,6 +76,23 @@ module.exports = {
       // Remove from hand and discard
       const handIdx = ps.hand.indexOf('Divine Gift of the Guardian');
       if (handIdx >= 0) {
+        // Play-Marker für den Trainings-Recorder (Als Befund "DGotG
+        // angeblich NIE eingesetzt"): Diese Karte spielt sich per Hook
+        // selbst aus der Hand — sie läuft weder über eines der 13
+        // Reaktionsfenster der Engine (kein isXReaction-Flag) noch über
+        // afterSpellResolved (sie wird nie regulär gecastet). Ohne
+        // diesen Broadcast existierte KEIN Play-Signal: 0 Plays in
+        // 1292 Spielen, obwohl die Karte in 209 davon nachweislich im
+        // Discard landete. `asPlay: 'sole'` heißt "einziges Signal für
+        // diesen Play" — der Recorder zählt es unabhängig vom Kartentyp,
+        // während das schlichte `asPlay: true` der Engine-Fenster
+        // Spells/Attacks überspringt, weil die zusätzlich über
+        // afterSpellResolved laufen.
+        engine._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName: 'Divine Gift of the Guardian',
+          from: 'hand', to: 'discard', asPlay: 'sole',
+          fromHandIdx: handIdx,
+        });
         ps.hand.splice(handIdx, 1);
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
         ps.discardPile.push('Divine Gift of the Guardian');
@@ -114,6 +134,15 @@ module.exports = {
         inst.counters.buffs.guardian = {
           expiresAtTurn,
           expiresForPlayer: pi,
+          // "…until the BEGINNING of your next turn" — der Schutz endet
+          // AM Rundenbeginn, der Giftschaden dort geht also durch.
+          // Ohne dieses Flag lief der Buff im ZWEITEN Ablauf-Durchgang
+          // (`_processBuffExpiry({ beforeStatusDamage: false })`) und
+          // damit NACH dem Statusschaden — Als Mitschnitt zeigt genau
+          // das: `creature_immune_block … by Poison` in Zug 8, und erst
+          // danach `buff_remove guardian`. Der frühe Durchgang läuft vor
+          // dem Statusschaden (dieselbe Stelle, die Immortal nutzt).
+          expiresBeforeStatusDamage: true,
           clearCountersOnExpire: ['_guardianImmune'],
           source: 'Divine Gift of the Guardian',
         };

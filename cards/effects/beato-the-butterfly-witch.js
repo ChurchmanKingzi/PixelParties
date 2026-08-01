@@ -170,3 +170,36 @@ module.exports = {
     },
   },
 };
+
+// ── CPU-Mulligan-Sonderregel (Hook aus shouldMulliganStartingHand) ────
+// Beatos gesamter Spielplan hängt an der Schulen-Sammlung (5 Schulen →
+// Ascension → Eternal Butterfly → Cardinal Beasts). Messung über 100
+// Trainingsspiele: 66 % Win-Rate MIT Ascension vs. 21 % ohne — eine
+// Starthand ohne Schulen-Diversität ist praktisch ein verlorenes Spiel,
+// selbst wenn sie nach der generischen Spielbarkeits-Zählung "gut"
+// aussieht. Kriterium: distinct Spell-Schulen über alle Lv1-castbaren
+// Spells UND Creatures der Hand (Beato sammelt beide, siehe
+// onCardEnterZone-Hook oben; die Witch castet nur Level 1).
+//   ≤1 Schule  → 'mulligan'  (Plan nicht startbar)
+//   ≥3 Schulen → 'keep'      (Plan läuft — generische Zählung überstimmen)
+//   sonst      → null        (generische Regel entscheidet)
+module.exports.cpuMulliganAdvice = function (engine, pi, hand) {
+  try {
+    const cardDB = engine._getCardDB();
+    const schools = new Set();
+    for (const name of hand || []) {
+      const cd = cardDB[name];
+      if (!cd) continue;
+      if (cd.cardType !== 'Spell' && cd.cardType !== 'Creature') continue;
+      const lvl = typeof cd.level === 'number' ? cd.level : parseInt(cd.level, 10);
+      if (Number.isFinite(lvl) && lvl > 1) continue; // Witch castet nur Lv1
+      if (cd.spellSchool1) schools.add(cd.spellSchool1);
+      if (cd.spellSchool2) schools.add(cd.spellSchool2);
+    }
+    if (schools.size <= 1) return 'mulligan';
+    if (schools.size >= 3) return 'keep';
+    return null;
+  } catch {
+    return null; // Fehler → generische Regel, niemals das Spiel blockieren
+  }
+};

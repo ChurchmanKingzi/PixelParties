@@ -11,6 +11,12 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // Deckout-Prävention (generischer Contract): Diese Ability zieht
+  // Karten, wenn ihrem Helden eine weitere Ability angehängt wird —
+  // Lv1/2/3: 1/2/3 Draws. Konsumiert vom Attach-Draw-Kontext in
+  // _cpu.js (Ability-Platzierungs-Score): bei gefährlich kleinem Deck
+  // werden Attach-Ziele OHNE diesen Trigger bevorzugt.
+  cpuMeta: { attachTriggersDraw: { drawsAtLevel: { 1: 1, 2: 2, 3: 3 } } },
   activeIn: ['ability'],
   // Lizbeth/Smugbeth: auto-mirror disabled. The hook gates on
   // `entering.owner !== ctx.cardOwner` (would only fire when an

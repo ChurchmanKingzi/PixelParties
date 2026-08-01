@@ -129,15 +129,28 @@ function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks
 }
 
 module.exports = {
+  cpuMeta: { statusHealChannel: true }, // Status-Heilungs-Lernkanal (siehe _deck-profile.js)
   isTargetingArtifact: true,
 
-  canActivate: (gs, pi) => {
+  canActivate: (gs, pi, engine) => {
+    // Schnellpfad: Helden-Status.
     const negKeys = getCleansableStatuses();
     const ps = gs.players[pi];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses && negKeys.some(k => hero.statuses[k])) return true;
+    }
+    // BUGFIX: Der Kartentext erlaubt JEDES eigene Ziel ("Choose a
+    // target you control") — Kreaturen-Status (der häufige Fall:
+    // Freezes!) machten Tea spielbar, aber canActivate prüfte nur
+    // Helden. Der CPU-Planner übergibt engine als 3. Argument; damit
+    // deckt die getValidTargets-Prüfung (inkl. Kreaturen) den Rest ab.
+    // Ergebnis vorher: Tea war für die CPU in JEDEM Test unsichtbar,
+    // sobald nur Kreaturen verstatust waren.
+    if (engine) {
+      try { return getOwnStatusedTargets(gs, pi, engine).length > 0; }
+      catch { return false; }
     }
     return false;
   },

@@ -1,0 +1,355 @@
+{
+  "deck": "Cool Gang",
+  "heroes": [
+    "Cooldin, King of Coolness",
+    "Thorad, Strength of Coolness",
+    "Freshya, Beauty of Coolness"
+  ],
+  "games": 1292,
+  "trainWinRate": "80%",
+  "trainedAt": "2026-07-19T22:42:35.609Z",
+  "meanTurns": 20.6,
+  "cardValues": {
+    "Alchemy": 9.4,
+    "Toughness": 8,
+    "Prophecy of Coolness": 70.6,
+    "Elixir of Quickness": 29.3,
+    "Burning Finger": 56.5,
+    "Fighting": 26.6,
+    "Heavy Hit": 30.1,
+    "Elixir of Immortality": 24.6,
+    "Magnetic Potion": 25.8,
+    "Coolness Overcharge": 65,
+    "Swellpnir, Mount of Coolness": 8,
+    "Quick Attack": 85.3,
+    "Hammer Throw": 20.3,
+    "Booby Trap": 8,
+    "Juice": 8,
+    "Ragnarock": 8,
+    "Thieving Strike": 39.8
+  },
+  "timing": {
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Toughness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Prophecy of Coolness": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.27,
+      "late": 1
+    },
+    "Burning Finger": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.81
+    },
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.02
+    },
+    "Heavy Hit": {
+      "early": 1.02,
+      "mid": 1.26,
+      "late": 0.75
+    },
+    "Elixir of Immortality": {
+      "early": 0.9,
+      "mid": 1.1,
+      "late": 1
+    },
+    "Magnetic Potion": {
+      "early": 0.81,
+      "mid": 1.19,
+      "late": 1
+    },
+    "Swellpnir, Mount of Coolness": {
+      "early": 0.75,
+      "mid": 1.27,
+      "late": 1
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Hammer Throw": {
+      "early": 1,
+      "mid": 1.2,
+      "late": 0.8
+    },
+    "Booby Trap": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.18
+    },
+    "Ragnarock": {
+      "early": 0.78,
+      "mid": 1.22,
+      "late": 1
+    },
+    "Thieving Strike": {
+      "early": 1,
+      "mid": 1.23,
+      "late": 0.77
+    }
+  },
+  "pairBonuses": {
+    "Elixir of Immortality|Resuscitation Potion": 5.2,
+    "Elixir of Immortality|dc:Toughness": 4.6,
+    "Booby Trap|dc:Prophecy of Coolness": 4.7,
+    "Booby Trap|Fireshield": 4,
+    "Booby Trap|dc:Alchemy": 6.3,
+    "Fireshield|dc:Juice": 5.6,
+    "Fireshield|dc:Prophecy of Coolness": 4.9,
+    "Fireshield|dc:Toughness": 10.8
+  },
+  "cardValueDeltasByCluster": {
+    "spell": {
+      "Toughness": 7,
+      "Prophecy of Coolness": 6.8,
+      "Elixir of Quickness": 6.7,
+      "Burning Finger": 8.7,
+      "Fighting": 6.3,
+      "Heavy Hit": 6.7,
+      "Elixir of Immortality": 8.6,
+      "Coolness Overcharge": 6,
+      "Divine Gift of Coolness": 7,
+      "Hammer Throw": 10.2,
+      "Booby Trap": 12.4,
+      "Juice": 12.4,
+      "Thieving Strike": 10.5
+    }
+  },
+  "casterDeltas": {
+    "Prophecy of Coolness": {
+      "Cooldin, King of Coolness": 3.2
+    },
+    "Heavy Hit": {
+      "Thorad, Strength of Coolness": 19,
+      "Freshya, Beauty of Coolness": -14.6,
+      "Cooldin, King of Coolness": -18.1
+    },
+    "Quick Attack": {
+      "Thorad, Strength of Coolness": 6.1,
+      "Cooldin, King of Coolness": -9
+    },
+    "Ragnarock": {
+      "Freshya, Beauty of Coolness": -5.2,
+      "Thorad, Strength of Coolness": 5.4
+    },
+    "Hammer Throw": {
+      "Thorad, Strength of Coolness": 12.7,
+      "Freshya, Beauty of Coolness": -10.3,
+      "Cooldin, King of Coolness": -11.2
+    },
+    "Thieving Strike": {
+      "Thorad, Strength of Coolness": 15.5,
+      "Freshya, Beauty of Coolness": -8.2,
+      "Cooldin, King of Coolness": -18.8
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Burning Finger": 4.7,
+      "Coolness Overcharge": 9.3,
+      "Hammer Throw": 7.3
+    },
+    "ahead": {
+      "Prophecy of Coolness": -7,
+      "Magnetic Potion": -4.2,
+      "Coolness Overcharge": -8.9,
+      "Ragnarock": 17.7,
+      "Booby Trap": 7.7,
+      "Thieving Strike": -5.6
+    }
+  },
+  "standingEvalThreshold": 1013,
+  "targetPriors": {
+    "Burning Finger": {
+      "kind:creature": -20,
+      "side:own": -20
+    },
+    "Heavy Hit": {
+      "kind:creature": -11.2,
+      "side:own": -20
+    },
+    "Coolness Overcharge": {
+      "side:own": -6.7
+    },
+    "Quick Attack": {
+      "kind:creature": -10.5,
+      "side:own": -10
+    },
+    "Hammer Throw": {
+      "side:own": -20,
+      "kind:creature": -17.8
+    },
+    "Thieving Strike": {
+      "kind:creature": -20,
+      "side:own": -17.4
+    },
+    "Juice": {
+      "side:opp": 12.3,
+      "frozen": -7.7
+    },
+    "Phoenix Tackle": {
+      "hp:max": -6.1
+    }
+  },
+  "surpriseRules": {
+    "Booby Trap": {
+      "early": 7,
+      "mid": 9.3,
+      "late": 16.4
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:1": 3.8,
+      "st:stun-hero": 5.6,
+      "st:hero-caster": 2.1,
+      "st:poison2+": -5,
+      "st:3+": 11.2,
+      "st:2": -3.6,
+      "st:frozen-hero": 18.1
+    },
+    "Tea": {
+      "st:hero-caster": 18.3
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": -15
+  },
+  "tutorPickRules": {
+    "Prophecy of Coolness→Wowhalla, the Hall of the Cool": 15.8,
+    "Prophecy of Coolness→Toughness": 7.7,
+    "Prophecy of Coolness→Booby Trap": 10.6,
+    "Prophecy of Coolness→Alchemy": -15.3,
+    "Prophecy of Coolness→Ragnarock": -20,
+    "Prophecy of Coolness→Heavy Hit": 7.2,
+    "Prophecy of Coolness→Burning Finger": -2.9,
+    "Prophecy of Coolness→Divine Gift of Coolness": -9.4,
+    "Prophecy of Coolness→Swellpnir, Mount of Coolness": 6.7,
+    "Prophecy of Coolness→Fireshield": -12.6,
+    "Prophecy of Coolness→Prophecy of Coolness": -15.9,
+    "Prophecy of Coolness→Golden Ankh": 8.4,
+    "Magnetic Potion→Coolness Overcharge": -12.7,
+    "Magnetic Potion→Hammer Throw": -2,
+    "Magnetic Potion→Ragnarock": -2,
+    "Magnetic Potion→Juice": 2.2,
+    "Magnetic Potion→Booby Trap": -7.2,
+    "Magnetic Potion→Quick Attack": 7.2,
+    "Magnetic Potion→Fighting": -6.1,
+    "Magnetic Potion→Thieving Strike": 7.6,
+    "Magnetic Potion→Wowhalla, the Hall of the Cool": -18.4,
+    "Magnetic Potion→Burning Finger": 12.7,
+    "Magnetic Potion→Swellpnir, Mount of Coolness": 10.2,
+    "Magnetic Potion→Heavy Hit": 6,
+    "Enigma, the Seller of Secrets→Heavy Hit": -7.5,
+    "Enigma, the Seller of Secrets→Prophecy of Coolness": -3,
+    "Enigma, the Seller of Secrets→Quick Attack": 4.7,
+    "Enigma, the Seller of Secrets→Fireshield": -20,
+    "Enigma, the Seller of Secrets→Swellpnir, Mount of Coolness": 15,
+    "Enigma, the Seller of Secrets→Toughness": 2.1,
+    "Enigma, the Seller of Secrets→Golden Ankh": -16.2,
+    "Enigma, the Seller of Secrets→Juice": -6.9,
+    "Enigma, the Seller of Secrets→Coolness Overcharge": 2.7,
+    "Enigma, the Seller of Secrets→Fighting": 11.8,
+    "Enigma, the Seller of Secrets→Alchemy": 8.7,
+    "Enigma, the Seller of Secrets→Thieving Strike": -3.7,
+    "Enigma, the Seller of Secrets→Divine Gift of Coolness": -20,
+    "Magic Lamp→Alchemy": -6.3,
+    "Magic Lamp→Acid Vial": -20,
+    "Laser Volley→Cooldin, King of Coolness": 10,
+    "Laser Volley→Thorad, Strength of Coolness": -8.2
+  },
+  "abilityPriors": {
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Alchemy@Cooldin, King of Coolness≥2": 150,
+    "Alchemy@Cooldin, King of Coolness≥3": -60,
+    "Leadership@Cooldin, King of Coolness": 129.2,
+    "Destruction Magic@Thorad, Strength of Coolness": 150,
+    "Toughness@Thorad, Strength of Coolness": 150,
+    "Toughness@Thorad, Strength of Coolness≥2": -60,
+    "Fighting@Thorad, Strength of Coolness": 150,
+    "Alchemy@Freshya, Beauty of Coolness": 150,
+    "Alchemy@Freshya, Beauty of Coolness≥2": -60,
+    "Charme@Freshya, Beauty of Coolness": 150,
+    "Fighting@Thorad, Strength of Coolness≥2": 150,
+    "Fighting@Freshya, Beauty of Coolness": -60,
+    "Charme@Freshya, Beauty of Coolness≥2": -60,
+    "Toughness@Freshya, Beauty of Coolness": -48.5,
+    "Fighting@Cooldin, King of Coolness": -60,
+    "Toughness@Thorad, Strength of Coolness≥3": -60,
+    "Fighting@Freshya, Beauty of Coolness≥2": -60,
+    "Fighting@Cooldin, King of Coolness≥2": -60,
+    "Toughness@Cooldin, King of Coolness": 150
+  },
+  "equipPriors": {
+    "Swellpnir, Mount of Coolness@Thorad, Strength of Coolness": 150,
+    "Swellpnir, Mount of Coolness@Freshya, Beauty of Coolness": -60,
+    "Swellpnir, Mount of Coolness@Cooldin, King of Coolness": -60
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Elixir of Immortality→Freshya, Beauty of Coolness": -15
+  },
+  "reviveAbilities": {
+    "Elixir of Immortality→Fighting": -15,
+    "Elixir of Immortality→Charme": -15,
+    "Elixir of Immortality→Alchemy": -15,
+    "Resuscitation Potion→Fighting": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Leadership": 30
+  },
+  "startHandValues": {
+    "Burning Finger": -2.9,
+    "Alchemy": -1.5,
+    "Fireshield": 3.4,
+    "Heavy Hit": -1.8,
+    "Fighting": 2.8,
+    "Booby Trap": 2.1,
+    "Prophecy of Coolness": 2,
+    "Quick Attack": -1.4,
+    "Toughness": -14,
+    "Juice": 2.6,
+    "Ragnarock": 2,
+    "Hammer Throw": 4.9,
+    "Thieving Strike": -2.2,
+    "Divine Gift of Coolness": 6.4
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "19.4%",
+    "winAfterMull": "79.3%",
+    "winAfterKeep": "80.1%"
+  },
+  "heroEffectTiming": {
+    "Freshya, Beauty of Coolness@hand:0-1": 14.8
+  },
+  "boardPairs": {
+    "Destruction Magic|Fighting": 15,
+    "Fighting|Toughness": 15,
+    "Alchemy|Charme": 6.8,
+    "Fighting|Swellpnir, Mount of Coolness": 15,
+    "Divine Gift of Coolness|Toughness": 6.4,
+    "Charme|Fighting": -4.6,
+    "Alchemy|Swellpnir, Mount of Coolness": -7.1,
+    "Alchemy|Destruction Magic": -15,
+    "Leadership|Toughness": 9.8
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

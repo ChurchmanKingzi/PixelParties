@@ -65,6 +65,12 @@ async function tryMillCuteCat(engine, pi) {
   await engine.actionMillCards(pi, MILL_AMOUNT, {
     source: CARD_NAME,
     selfInflicted: true,
+    // Als Ruling (Demo vs Cute Commando): die gemillten Karten fliegen
+    // NACHEINANDER Deck → Bildschirmmitte (Flip, kurzer Hold) →
+    // Discard — Chaos-Magic-Prozedere, nur schneller (Engine-Default
+    // MILL_CENTER_REVEAL_MS statt 2000 ms). Vorher gingen alle
+    // gleichzeitig direkt Deck → Discard.
+    centerReveal: true,
   });
 }
 

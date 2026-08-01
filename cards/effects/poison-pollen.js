@@ -53,7 +53,7 @@ module.exports = {
       // dead-hero creature-targeting fixes).
       for (const inst of engine.cardInstances) {
         if (inst.zone !== 'support' || inst.faceDown) continue;
-        const cd = cardDB[inst.name];
+        const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         const entry = { kind: 'creature', owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, ref: inst };
         if (inst.counters?.stunned)  toPoison.push(entry);

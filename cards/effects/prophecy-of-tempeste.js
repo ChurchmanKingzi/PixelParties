@@ -84,6 +84,22 @@ module.exports = {
     return ownerHasAttachableHero(ps);
   },
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // beforeDamage-Redirect-Confirm (Gegner-Angriff plan-los); Attachment ist bewusste Spieler-Entscheidung, Redirect ist der Kartenzweck (Muster Idej Projection/Gigantisaur Brachion).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') {
+      // Protection-Lernkanal: gelernte Regel > Explorations-Arm (Training)
+      // > Accept-Default. Features kommen als protMeta aus dem Hook.
+      const { protectionDecision } = require('./_deck-profile');
+        if (typeof protectionDecision !== 'function') return { confirmed: true }; // Teildeployment-Schutz
+      const meta = promptData.protMeta || { d: 0, hp: 1 };
+      const pi = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+      return { confirmed: protectionDecision(engine, pi, promptData.title, meta) };
+    }
+    return undefined;
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
@@ -216,6 +232,7 @@ module.exports = {
       const incoming = ctx.amount || 0;
       const confirmed = await engine.promptGeneric(ownerIdx, {
         type: 'confirm',
+        protMeta: { d: incoming, hp: target.hp, pi: ctx.cardOwner },
         title: CARD_NAME,
         message: `${heroName} is about to take ${incoming} damage from ${srcName}. Redirect to ${host.name}? (Capped at ${DAMAGE_CAP})`,
         showCard: CARD_NAME,

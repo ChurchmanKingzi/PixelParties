@@ -1,0 +1,411 @@
+{
+  "deck": "To Attain Divinity",
+  "heroes": [
+    "Barker, the Monster Tamer",
+    "Archibald, the Archmage",
+    "Kazena, the Storming Rebel"
+  ],
+  "games": 1292,
+  "trainWinRate": "51.8%",
+  "trainedAt": "2026-07-20T03:44:14.838Z",
+  "meanTurns": 18.2,
+  "cardValues": {
+    "Hell Fox": 8,
+    "Treasure Chest": 8,
+    "Wisdom": 19.3,
+    "Divinity": 21.7,
+    "Sacrifice to Divinity": 30.7,
+    "Performance": 8,
+    "Ska Harpyformer": 8,
+    "Magic Hammer": 75.6,
+    "Chain Lightning": 100,
+    "Rusty Touch": 9.8
+  },
+  "timing": {
+    "Treasure Chest": {
+      "early": 0.88,
+      "mid": 1.12,
+      "late": 1
+    },
+    "Wisdom": {
+      "early": 0.75,
+      "mid": 1.23,
+      "late": 1.29
+    },
+    "Divinity": {
+      "early": 0.81,
+      "mid": 1.19,
+      "late": 1
+    },
+    "Sacrifice to Divinity": {
+      "early": 0.75,
+      "mid": 1.09,
+      "late": 1.24
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.21
+    },
+    "Ska Harpyformer": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.14
+    },
+    "Magic Hammer": {
+      "early": 0.75,
+      "mid": 0.97,
+      "late": 1.3
+    },
+    "Chain Lightning": {
+      "early": 0.75,
+      "mid": 0.9,
+      "late": 1.3
+    }
+  },
+  "pairBonuses": {
+    "Treasure Chest|dc:Performance": 4.2,
+    "Flame Avalanche|dc:Divine Gift of Sacrifice": 4.6,
+    "Flame Avalanche|dc:Golden Ankh": 4.6,
+    "Flame Avalanche|dc:Martyry": 4.1,
+    "Flame Avalanche|dc:Performance": 6.1,
+    "Eraser Beam|dc:Idol of Crestina": 4.1,
+    "Eraser Beam|dc:Dark Gear": 4.1,
+    "Eraser Beam|Tea": 5.6,
+    "Eraser Beam|dc:Martyry": 4.6,
+    "Divine Gift of Sacrifice|Golden Ankh": 6.6,
+    "Martyry|dc:Prophecy of Tempeste": 10.9,
+    "Martyry|dc:Rusty Touch": 6.1,
+    "Martyry|dc:Divine Gift of Sacrifice": 7.6
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Hell Fox": -12.1,
+      "Treasure Chest": -9.3,
+      "Wisdom": -10.7,
+      "Flame Avalanche": -10.4,
+      "Divinity": -11.1,
+      "Sacrifice to Divinity": -11.7,
+      "Eraser Beam": -12.9,
+      "Performance": -11.4,
+      "Ska Harpyformer": -11.7,
+      "Magic Hammer": -11.5,
+      "Prophecy of Tempeste": -16.2,
+      "Compulsory Body Swap": -6.1,
+      "Chain Lightning": -9.8,
+      "Dark Gear": -13.4,
+      "Rusty Touch": -8.9,
+      "Forbidden Zone": -10.6,
+      "The Yeeting": -7.5,
+      "Divine Gift of Sacrifice": -10.5,
+      "Tea": -6.8,
+      "Guardian Angel": -9.6,
+      "Idol of Crestina": -12.8
+    },
+    "swarm": {
+      "Hell Fox": 9.6,
+      "Treasure Chest": 9.1,
+      "Wisdom": 8.5,
+      "Flame Avalanche": 7.5,
+      "Divinity": 8.5,
+      "Sacrifice to Divinity": 8.2,
+      "Eraser Beam": 8,
+      "Golden Ankh": 8.9,
+      "Performance": 9.2,
+      "Ska Harpyformer": 9.8,
+      "Martyry": 6.8,
+      "Magic Hammer": 7.8,
+      "Prophecy of Tempeste": 10.4,
+      "Chain Lightning": 7.3,
+      "Dark Gear": 9.6,
+      "Rusty Touch": 7.6,
+      "Forbidden Zone": 11,
+      "The Yeeting": 6.1,
+      "Divine Gift of Sacrifice": 12.7,
+      "Tea": 20,
+      "Guardian Angel": 7.9,
+      "Idol of Crestina": 10.3
+    },
+    "spell": {
+      "Treasure Chest": -8.2,
+      "Wisdom": -6.2,
+      "Divinity": -8.1,
+      "Sacrifice to Divinity": -8.9,
+      "Chain Lightning": -9.4,
+      "Rusty Touch": -10.3,
+      "Forbidden Zone": -11.9,
+      "Divine Gift of Sacrifice": -9.9,
+      "Guardian Angel": -11.5
+    }
+  },
+  "casterDeltas": {
+    "Flame Avalanche": {
+      "Archibald, the Archmage": -12.7,
+      "Barker, the Monster Tamer": 9.1,
+      "Kazena, the Storming Rebel": 20
+    },
+    "Eraser Beam": {
+      "Barker, the Monster Tamer": 7
+    },
+    "Magic Hammer": {
+      "Archibald, the Archmage": -9.2,
+      "Barker, the Monster Tamer": 8.8
+    },
+    "Chain Lightning": {
+      "Archibald, the Archmage": -18.3,
+      "Barker, the Monster Tamer": 17.2,
+      "Kazena, the Storming Rebel": 12.7
+    },
+    "Rusty Touch": {
+      "Archibald, the Archmage": -9.4
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Divinity": 3.2,
+      "Magic Hammer": -5.5,
+      "Chain Lightning": -9.9,
+      "Divine Gift of Sacrifice": 10.3,
+      "Tea": -15.1,
+      "Guardian Angel": 12.8
+    },
+    "ahead": {
+      "Divinity": -11.1,
+      "Eraser Beam": 11.8,
+      "Wisdom": -5.5,
+      "Martyry": 20,
+      "Chain Lightning": 12.5,
+      "Guardian Angel": -13.7
+    }
+  },
+  "standingEvalThreshold": 985,
+  "deckoutGuard": {
+    "Ska Harpyformer": -11.3,
+    "Guardian Angel": -19.3,
+    "Treasure Chest": -20
+  },
+  "deckoutDangerSize": 10,
+  "targetPriors": {
+    "Eraser Beam": {
+      "hp:min": -11.4,
+      "kind:creature": -19.3
+    },
+    "Magic Hammer": {
+      "side:own": -20
+    },
+    "Compulsory Body Swap": {
+      "hp:max": -6.7,
+      "hp:min": -16.4
+    },
+    "The Yeeting — Choose Target": {
+      "side:own": -17.2
+    },
+    "Tea — Inflict": {
+      "side:own": 8.5
+    },
+    "Guardian Angel": {
+      "side:opp": -20
+    },
+    "Aggressive Town Guard": {
+      "hp:min": -14
+    },
+    "Biomancy Token": {
+      "hp:min": 10.2
+    }
+  },
+  "surpriseRules": {
+    "Spike Trap": {
+      "early": 20,
+      "mid": 20,
+      "late": 20
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 8.4,
+      "st:frozen-hero": 20,
+      "st:hero-caster": 2.9,
+      "st:2": 5.5,
+      "st:poison2+": 20,
+      "st:stun-hero": 6.4,
+      "st:3+": -5.2
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 7.6,
+    "plc:slack:1": -6.6,
+    "plc:slack:2+": -9,
+    "plc:bigwait": -15
+  },
+  "tutorPickRules": {
+    "Idol of Crestina→The Yeeting": -12,
+    "Idol of Crestina→Sacrifice to Divinity": -9.7,
+    "Idol of Crestina→Martyry": -6.7,
+    "Idol of Crestina→Rusty Touch": -5,
+    "Idol of Crestina→Compulsory Body Swap": 12.8,
+    "Idol of Crestina→Golden Ankh": -14.5,
+    "Idol of Crestina→Chain Lightning": 9,
+    "Idol of Crestina→Tea": -13.3,
+    "Idol of Crestina→Divinity": -9.2,
+    "Idol of Crestina→Idol of Crestina": -7.1,
+    "Idol of Crestina→Performance": -11.8,
+    "Idol of Crestina→Dark Gear": -5.8,
+    "Idol of Crestina→Magic Hammer": 15,
+    "Idol of Crestina→Guardian Angel": 15.7,
+    "Idol of Crestina→Prophecy of Tempeste": -20,
+    "Idol of Crestina→Divine Gift of Sacrifice": -20,
+    "Idol of Crestina→Eraser Beam": -14.9,
+    "Idol of Crestina→Forbidden Zone": 5,
+    "Idol of Crestina→Wisdom": -11.5,
+    "Idol of Crestina→Flame Avalanche": 20,
+    "Hell Fox→Chain Lightning": 4.9,
+    "Hell Fox→Golden Ankh": -9.3,
+    "Hell Fox→Ska Harpyformer": -3,
+    "Hell Fox→Magic Hammer": 6.8,
+    "Hell Fox→Dark Gear": -4.7,
+    "Hell Fox→The Yeeting": 11.4,
+    "Hell Fox→Divine Gift of Sacrifice": -20,
+    "Hell Fox→Sacrifice to Divinity": 7.9,
+    "Hell Fox→Idol of Crestina": 12.4,
+    "Hell Fox→Rusty Touch": -3.3,
+    "Hell Fox→Tea": -14.3,
+    "Hell Fox→Divinity": 14.6,
+    "Hell Fox→Martyry": -3.7,
+    "Hell Fox→Wisdom": -20,
+    "Magic Lamp→Alchemy": 16.4,
+    "Magic Lamp→Acid Vial": -3.3,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Critical Strike": -20,
+    "Training→Performance": -2.5,
+    "Training→Wisdom": 2.5,
+    "Enigma, the Seller of Secrets→Magic Hammer": -11.5,
+    "Enigma, the Seller of Secrets→Chain Lightning": -4.6,
+    "Enigma, the Seller of Secrets→Sacrifice to Divinity": 20,
+    "Enigma, the Seller of Secrets→Wisdom": -8.4,
+    "Enigma, the Seller of Secrets→Guardian Angel": 18.8,
+    "Enigma, the Seller of Secrets→The Yeeting": -13,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": 11.2,
+    "Enigma, the Seller of Secrets→Compulsory Body Swap": -17.9,
+    "Enigma, the Seller of Secrets→Flame Avalanche": -20,
+    "Enigma, the Seller of Secrets→Idol of Crestina": -14.5,
+    "Enigma, the Seller of Secrets→Performance": 6.1,
+    "Enigma, the Seller of Secrets→Divine Gift of Sacrifice": -20,
+    "Enigma, the Seller of Secrets→Divinity": -12.7,
+    "Enigma, the Seller of Secrets→Martyry": 12.2,
+    "Enigma, the Seller of Secrets→Tea": 12,
+    "Enigma, the Seller of Secrets→Rusty Touch": 13,
+    "Enigma, the Seller of Secrets→Eraser Beam": 11.5,
+    "Magic Amethyst→Wisdom": 16.1,
+    "Magic Amethyst→Performance": -11.9
+  },
+  "abilityPriors": {
+    "Summoning Magic@Barker, the Monster Tamer": 87.2,
+    "Training@Barker, the Monster Tamer": 150,
+    "Divinity@Barker, the Monster Tamer": 40.6,
+    "Wisdom@Archibald, the Archmage": 89,
+    "Wisdom@Archibald, the Archmage≥2": 88.7,
+    "Wisdom@Archibald, the Archmage≥3": -11.7,
+    "Adventurousness@Kazena, the Storming Rebel": 42.4,
+    "Support Magic@Kazena, the Storming Rebel": -44,
+    "Divinity@Barker, the Monster Tamer≥2": -38.5,
+    "Support Magic@Kazena, the Storming Rebel≥2": 116.2,
+    "Summoning Magic@Barker, the Monster Tamer≥2": -60,
+    "Summoning Magic@Barker, the Monster Tamer≥3": 150,
+    "Wisdom@Barker, the Monster Tamer": 114.2,
+    "Wisdom@Barker, the Monster Tamer≥2": 45.8,
+    "Wisdom@Barker, the Monster Tamer≥3": 150,
+    "Divinity@Archibald, the Archmage": 36,
+    "Wisdom@Kazena, the Storming Rebel": 44.1,
+    "Wisdom@Kazena, the Storming Rebel≥2": -47.6,
+    "Training@Barker, the Monster Tamer≥2": -60,
+    "Divinity@Barker, the Monster Tamer≥3": 150,
+    "Adventurousness@Kazena, the Storming Rebel≥2": 150,
+    "Divinity@Archibald, the Archmage≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {
+    "Eraser Beam|spell@3+": -7.8,
+    "Eraser Beam|spell@2": 10,
+    "Eraser Beam|spell@1": 10,
+    "Eraser Beam|spell@0": 10
+  },
+  "reviveTargets": {
+    "Golden Ankh→Archibald, the Archmage": 30,
+    "Golden Ankh→Kazena, the Storming Rebel": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Wisdom": 30,
+    "Golden Ankh→Divinity": 30,
+    "Golden Ankh→Adventurousness": 30,
+    "Golden Ankh→Support Magic": 30
+  },
+  "startHandValues": {
+    "Treasure Chest": 3.6,
+    "Flame Avalanche": -1.8,
+    "Wisdom": 4.1,
+    "Idol of Crestina": -7.2,
+    "Martyry": -1.1,
+    "Golden Ankh": -2.4,
+    "Performance": -2.9,
+    "The Yeeting": -1.8,
+    "Sacrifice to Divinity": 2,
+    "Chain Lightning": -2.4,
+    "Rusty Touch": 3.3,
+    "Tea": 4.6,
+    "Guardian Angel": -8.3,
+    "Dark Gear": 1.8,
+    "Divine Gift of Sacrifice": -2.2,
+    "Divinity": 1.5,
+    "Forbidden Zone": -6.6,
+    "Prophecy of Tempeste": 8.2
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "34.4%",
+    "winAfterMull": "46.7%",
+    "winAfterKeep": "54.4%"
+  },
+  "heroEffectTiming": {
+    "Kazena, the Storming Rebel@hand:0-1": 9.9,
+    "Kazena, the Storming Rebel@hand:2-3": 6.4
+  },
+  "boardPairs": {
+    "Divinity|Summoning Magic": -13.4,
+    "Divinity|Training": -14.1,
+    "Summoning Magic|Wisdom": 9.2,
+    "Training|Wisdom": 9,
+    "Divinity|Wisdom": 15,
+    "Adventurousness|Wisdom": 15,
+    "Support Magic|Wisdom": 15,
+    "Adventurousness|Ska Harpyformer": 15,
+    "Ska Harpyformer|Support Magic": 15,
+    "Hell Fox|Pollution Token": -15,
+    "Hell Fox|Summoning Magic": -15,
+    "Hell Fox|Training": -15,
+    "Adventurousness|Pollution Token": 13.4,
+    "Pollution Token|Support Magic": 12.4,
+    "Divinity|Hell Fox": -15,
+    "Guardian Angel|Summoning Magic": 13,
+    "Guardian Angel|Wisdom": -10.1,
+    "Divinity|Guardian Angel": 13,
+    "Guardian Angel|Support Magic": -15
+  },
+  "protectionRules": {
+    "Prophecy of Tempeste": {
+      "ratioThreshold": 0.25
+    }
+  },
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.529,
+      "n": 382,
+      "values": {
+        "Ska Harpyformer": -0.031,
+        "Deepsea Pirate": 0.394,
+        "Hell Fox": -0.052,
+        "Aggressive Town Guard": -0.154,
+        "Grunge Harpyformer": 0.221
+      }
+    }
+  }
+}

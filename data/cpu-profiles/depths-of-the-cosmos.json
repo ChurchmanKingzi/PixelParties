@@ -1,0 +1,264 @@
+{
+  "deck": "Depths of the Cosmos",
+  "heroes": [
+    "Blackstache, Scourge of the Pixel Seas",
+    "Argos, the Eye of the Cosmos",
+    "Cooldin, King of Coolness"
+  ],
+  "games": 1360,
+  "trainWinRate": "36.4%",
+  "trainedAt": "2026-07-23T21:04:29.906Z",
+  "meanTurns": 23.7,
+  "cardValues": {
+    "Alchemy": 31.4,
+    "Magnetic Potion": 37.8,
+    "Gerrymander": 8,
+    "The Cosmic Depths": 8,
+    "Analyzer from the Cosmic Depths": 8,
+    "Elixir of Quickness": 42,
+    "Summoning Magic": 32.7,
+    "Gatherer from the Cosmic Depths": 10.7,
+    "Magnetic Glove": 69.4,
+    "Resuscitation Potion": 33.1,
+    "Invader from the Cosmic Depths": 73.5,
+    "Life-Searcher from the Cosmic Depths": 26.7,
+    "Dark Gear": 45.6
+  },
+  "timing": {
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Gerrymander": {
+      "early": 0.75,
+      "mid": 1.23,
+      "late": 1.3
+    },
+    "Analyzer from the Cosmic Depths": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.3
+    },
+    "Gatherer from the Cosmic Depths": {
+      "early": 0.88,
+      "mid": 0.95,
+      "late": 1.17
+    },
+    "Resuscitation Potion": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Life-Searcher from the Cosmic Depths": {
+      "early": 1,
+      "mid": 0.9,
+      "late": 1.1
+    }
+  },
+  "pairBonuses": {
+    "Magnetic Potion|dc:The Cosmic Depths": 4.1,
+    "Magnetic Potion|dc:Elixir of Quickness": 9.8,
+    "The Cosmic Depths|dc:Gatherer from the Cosmic Depths": 7.4,
+    "Analyzer from the Cosmic Depths|Magnetic Glove": 10,
+    "Summoning Magic|dc:Magnetic Potion": 4.9,
+    "Divine Gift of the Guardian|dc:Dark Gear": 11.9
+  },
+  "cardValueDeltasByCluster": {
+    "spell": {
+      "Divine Gift of the Guardian": 7.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Resuscitation Potion": -6.1,
+      "Divine Gift of the Guardian": -14.2,
+      "Invader from the Cosmic Depths": 10.5
+    }
+  },
+  "standingEvalThreshold": 1528,
+  "targetPriors": {
+    "Invader Token": {
+      "hp:max": -11.9,
+      "dmgred": -8.8
+    }
+  },
+  "reactionRules": {
+    "Cosmic Malfunction": {
+      "mid": -10.8,
+      "early": -10.8,
+      "late": -10.8
+    }
+  },
+  "statusHealRules": {
+    "Coffee": {
+      "st:3+": 11.1,
+      "st:hero-caster": 8.8,
+      "st:2": 11.5,
+      "st:1": 4.7,
+      "st:frozen-hero": 14.3,
+      "st:poison2+": 20
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": 6.2,
+    "plc:slack:2+": 1.6
+  },
+  "tutorPickRules": {
+    "Argos, the Eye of the Cosmos→Gatherer from the Cosmic Depths": -2,
+    "Argos, the Eye of the Cosmos→Invader from the Cosmic Depths": 8,
+    "Argos, the Eye of the Cosmos→Life-Searcher from the Cosmic Depths": -4.3,
+    "The Cosmic Depths→Analyzer from the Cosmic Depths": -6.7,
+    "The Cosmic Depths→Gerrymander": -5.1,
+    "The Cosmic Depths→Life-Searcher from the Cosmic Depths": 11.1,
+    "Magic Lamp→Acid Vial": 20,
+    "Magic Lamp→Cloudy Slime": -9.5,
+    "Magic Lamp→Alchemy": -20,
+    "Magic Lamp→Chain Lightning": 19.9,
+    "Magic Lamp→Critical Strike": -16.8,
+    "Magic Lamp→The Warlord's Bite": -5,
+    "Magnetic Potion→The Cosmic Depths": 20,
+    "Magnetic Potion→Gatherer from the Cosmic Depths": -11.6,
+    "Magnetic Potion→Analyzer from the Cosmic Depths": 20,
+    "Magnetic Potion→Cosmic Malfunction": -20,
+    "Magnetic Potion→Alchemy": -6.6,
+    "Magnetic Potion→Divine Gift of the Guardian": 17.5,
+    "Magnetic Potion→Magnetic Glove": -11.2,
+    "Magnetic Potion→Life-Searcher from the Cosmic Depths": 5.4,
+    "Magnetic Potion→Gerrymander": -6.3,
+    "Magnetic Glove→Summoning Magic": 2.6,
+    "Magnetic Glove→Invader from the Cosmic Depths": -20,
+    "Magnetic Glove→Gerrymander": 20,
+    "Magnetic Glove→Deepsea Idol": 9.1,
+    "Magnetic Glove→Dark Gear": -12.5,
+    "Life-Searcher from the Cosmic Depths→Invader from the Cosmic Depths": 20,
+    "Life-Searcher from the Cosmic Depths→Gatherer from the Cosmic Depths": -7.8,
+    "Life-Searcher from the Cosmic Depths→Analyzer from the Cosmic Depths": -14.4,
+    "Life-Searcher from the Cosmic Depths→Cosmic Malfunction": -10.8,
+    "Life-Searcher from the Cosmic Depths→Life-Searcher from the Cosmic Depths": -20,
+    "Life-Searcher from the Cosmic Depths→The Cosmic Depths": -20,
+    "Enigma, the Seller of Secrets→Deepsea Idol": -11.4,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -7.1,
+    "Enigma, the Seller of Secrets→Alchemy": -6.8,
+    "Enigma, the Seller of Secrets→Analyzer from the Cosmic Depths": 11.9,
+    "Enigma, the Seller of Secrets→Gatherer from the Cosmic Depths": -10.6,
+    "Enigma, the Seller of Secrets→Coffee": 13.8,
+    "Enigma, the Seller of Secrets→Dark Gear": -2,
+    "Enigma, the Seller of Secrets→Cosmic Malfunction": -5.8,
+    "Enigma, the Seller of Secrets→Summoning Magic": 12.2,
+    "Enigma, the Seller of Secrets→Life-Searcher from the Cosmic Depths": 5.8,
+    "Enigma, the Seller of Secrets→The Cosmic Depths": 17,
+    "Magic Amethyst→Alchemy": -7.2,
+    "Magic Amethyst→Summoning Magic": 13.7,
+    "Magic Amethyst→Leadership": -10.4,
+    "Magic Amethyst→Terror": -11.5,
+    "Slippery Narw→Life-Searcher from the Cosmic Depths": 12
+  },
+  "abilityPriors": {
+    "Summoning Magic@Blackstache, Scourge of the Pixel Seas": 150,
+    "Summoning Magic@Blackstache, Scourge of the Pixel Seas≥2": -60,
+    "Summoning Magic@Blackstache, Scourge of the Pixel Seas≥3": -60,
+    "Terror@Blackstache, Scourge of the Pixel Seas": 150,
+    "Terror@Blackstache, Scourge of the Pixel Seas≥2": 150,
+    "Summoning Magic@Argos, the Eye of the Cosmos": 150,
+    "Summoning Magic@Argos, the Eye of the Cosmos≥2": -60,
+    "Summoning Magic@Argos, the Eye of the Cosmos≥3": -60,
+    "Terror@Argos, the Eye of the Cosmos": 150,
+    "Alchemy@Argos, the Eye of the Cosmos": 150,
+    "Alchemy@Argos, the Eye of the Cosmos≥2": 150,
+    "Alchemy@Argos, the Eye of the Cosmos≥3": -60,
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Alchemy@Cooldin, King of Coolness≥2": 150,
+    "Alchemy@Cooldin, King of Coolness≥3": 150,
+    "Leadership@Cooldin, King of Coolness": -60,
+    "Alchemy@Blackstache, Scourge of the Pixel Seas": -60,
+    "Alchemy@Blackstache, Scourge of the Pixel Seas≥2": -60,
+    "Alchemy@Blackstache, Scourge of the Pixel Seas≥3": -60,
+    "Summoning Magic@Cooldin, King of Coolness": -60,
+    "Summoning Magic@Cooldin, King of Coolness≥2": -24.5,
+    "Summoning Magic@Cooldin, King of Coolness≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Blackstache, Scourge of the Pixel Seas": 30,
+    "Resuscitation Potion→Cooldin, King of Coolness": 30,
+    "Resuscitation Potion→Argos, the Eye of the Cosmos": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Resuscitation Potion→Terror": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Leadership": 30
+  },
+  "startHandValues": {
+    "Cosmic Malfunction": 1.5,
+    "Magnetic Glove": 1.3,
+    "Deepsea Idol": 2.2,
+    "Summoning Magic": 1.5,
+    "The Cosmic Depths": -5.1,
+    "Gatherer from the Cosmic Depths": 1.7,
+    "Divine Gift of the Guardian": -3.1,
+    "Gerrymander": -5.9
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "43.9%",
+    "winAfterMull": "37.4%",
+    "winAfterKeep": "35.6%"
+  },
+  "heroEffectTiming": {
+    "Argos, the Eye of the Cosmos@hand:2-3": -6.3,
+    "Cooldin, King of Coolness@hand:2-3": 3.9,
+    "Argos, the Eye of the Cosmos@hand:0-1": -9.1
+  },
+  "boardPairs": {
+    "Analyzer from the Cosmic Depths|Terror": 9.5,
+    "Invader Token|Summoning Magic": 14.3,
+    "Invader Token|Terror": 12,
+    "Gatherer from the Cosmic Depths|Gerrymander": -15,
+    "Alchemy|Analyzer from the Cosmic Depths": 11.3,
+    "Gatherer from the Cosmic Depths|Terror": 13.9,
+    "Alchemy|Gatherer from the Cosmic Depths": 10.8,
+    "Alchemy|Summoning Magic": 13.1,
+    "Alchemy|Terror": 10.1,
+    "Alchemy|Invader Token": 14.5,
+    "Invader Token|Leadership": 15,
+    "Analyzer from the Cosmic Depths|Life-Searcher from the Cosmic Depths": -15,
+    "Leadership|Summoning Magic": 8.5,
+    "Invader from the Cosmic Depths|Summoning Magic": 8.2,
+    "Alchemy|Life-Searcher from the Cosmic Depths": 15,
+    "Gerrymander|Invader from the Cosmic Depths": -15,
+    "Gerrymander|Invader Token": 12.5,
+    "Aggressive Town Guard|Leadership": 15,
+    "Alchemy|Ska Harpyformer": 12.1,
+    "Analyzer from the Cosmic Depths|Metal Harpyformer": -15,
+    "Leadership|Life-Searcher from the Cosmic Depths": 15,
+    "Aggressive Town Guard|Terror": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.343,
+      "n": 70,
+      "values": {
+        "Deepsea Primordium": 0.3
+      }
+    }
+  }
+}

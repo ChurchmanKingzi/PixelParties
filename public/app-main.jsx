@@ -1036,7 +1036,21 @@ function PlayScreen() {
   useEffect(() => {
     if (!gameState) setBgmMode('menu');
     else if (gameState.isPuzzle || gameState.isTutorial) setBgmMode('puzzle');
-    else setBgmMode('battle');
+    // Gegnerspezifisches Thema, wenn der Server eines gemeldet hat
+    // (nur CPU-Kämpfe; PvP behält das generische Kampfthema).
+    else {
+      // Diagnose: einmal je Kampf melden, was im Zustand ankommt. Fehlt
+      // `cpuBgm` ganz, liegt es an der Server-Seite (oder an einem alten
+      // Serverprozess); ist es gesetzt und die Musik stimmt trotzdem
+      // nicht, liegt es am Musik-Manager darunter.
+      const mode = gameState.cpuBgm ? 'battle:' + gameState.cpuBgm : 'battle';
+      if (window.__ppBgmLast !== mode) {
+        window.__ppBgmLast = mode;
+        console.log('[bgm] Zustand: isCpuBattle =', gameState.isCpuBattle,
+          '| cpuBgm =', JSON.stringify(gameState.cpuBgm), '→ Modus', mode);
+      }
+      setBgmMode(mode);
+    }
     return () => setBgmMode('menu');
   }, [gameState, setBgmMode]);
 
@@ -1789,12 +1803,30 @@ function PlayScreen() {
 //  audio on first user interaction.
 // ═══════════════════════════════════════════
 
-const _bgmMenu = typeof Audio !== 'undefined' ? new Audio('/music/bgm_menu.mp3') : null;
-const _bgmBattle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_battle.mp3') : null;
-const _bgmPuzzle = typeof Audio !== 'undefined' ? new Audio('/music/bgm_puzzle.mp3') : null;
-const _bgmShop = typeof Audio !== 'undefined' ? new Audio('/music/bgm_shop.mp3') : null;
-const _bgmTracks = { menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, shop: _bgmShop };
-for (const t of [_bgmMenu, _bgmBattle, _bgmPuzzle, _bgmShop]) {
+// ── DATEIZUORDNUNG DER FESTEN TRACKS ───────────────────────────────
+// An EINER Stelle, damit ein Umkodieren (z.B. wav → ogg) eine Zeile
+// bleibt. Die Endungen sind bewusst unterschiedlich — die Dateien
+// liegen so im Ordner.
+//
+// HINWEIS (1.8.): `bgm_menu.mp3` und `bgm_shop.mp3` gab es GAR NICHT
+// im Ordner; Menü- und Shop-Musik liefen also seit jeher still ins
+// Leere (404). Jetzt zeigen sie auf die tatsächlich vorhandenen
+// Dateien.
+const BGM_FILES = {
+  login:  '/music/bgm_login.wav',
+  menu:   '/music/bgm_menu.wav',
+  battle: '/music/bgm_battle.mp3',
+  puzzle: '/music/bgm_puzzle.mp3',
+  shop:   '/music/bgm_shop.ogg',
+};
+const _mkBgm = (url) => (typeof Audio !== 'undefined' ? new Audio(url) : null);
+const _bgmLogin = _mkBgm(BGM_FILES.login);
+const _bgmMenu = _mkBgm(BGM_FILES.menu);
+const _bgmBattle = _mkBgm(BGM_FILES.battle);
+const _bgmPuzzle = _mkBgm(BGM_FILES.puzzle);
+const _bgmShop = _mkBgm(BGM_FILES.shop);
+const _bgmTracks = { login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, shop: _bgmShop };
+for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmShop]) {
   if (t) {
     t.loop = true;
     // Start from the player's persisted volume (0 if they muted last session)
@@ -1885,9 +1917,105 @@ window._ppDuckBgm = (phase) => {
   }
 };
 
+// ── GEGNERSPEZIFISCHE BATTLE-THEMES (1.8.) ─────────────────────────
+// Ziel-Bezeichner der Form `battle:<slug>` verweisen auf
+// /music/bgm_<slug>.ogg — den Slug bestimmt der SERVER (er kennt Deck
+// und Dateisystem) und liefert ihn als `gameState.cpuBgm`.
+//
+// WICHTIG: es wird KEIN neues Audio-Element erzeugt, sondern die `src`
+// des BESTEHENDEN Kampf-Elements umgeschaltet. Grund (erster Versuch
+// scheiterte genau daran): Chromium/Opera entsperren Audio JE ELEMENT
+// über eine Nutzergeste — der Unlock-Durchlauf beim ersten Klick fasst
+// nur die vier statischen Tracks an. Ein später erzeugtes Element ist
+// nicht entsperrt, `play()` wird abgelehnt, und das sah aus wie eine
+// fehlende Datei. Das Kampf-Element ist bereits entsperrt und bleibt es
+// auch über einen `src`-Wechsel hinweg.
+const BGM_BATTLE_DEFAULT = BGM_FILES.battle;
+function _bgmBattleSrc(url) {
+  const el = _bgmTracks.battle;
+  if (!el) return null;
+  if (el.src && el.src.endsWith(url)) return el;
+  el.onerror = null;
+  el.src = url;
+  // Fehlt die Datei wirklich (404/Decode), zurück auf das generische
+  // Kampfthema — DAS ist der Fall, für den ein Fallback gedacht ist,
+  // nicht eine abgelehnte Wiedergabe.
+  if (url !== BGM_BATTLE_DEFAULT) {
+    el.onerror = () => {
+      el.onerror = null;
+      el.src = BGM_BATTLE_DEFAULT;
+      try { el.load(); el.play().catch(() => {}); } catch {}
+    };
+  }
+  try { el.load(); } catch {}
+  return el;
+}
+function _bgmResolveTrack(target) {
+  if (target === 'battle') return _bgmBattleSrc(BGM_BATTLE_DEFAULT);
+  if (_bgmTracks[target]) return _bgmTracks[target];
+  const m = /^battle:([a-z0-9]+)$/.exec(String(target || ''));
+  if (!m) return null;
+  return _bgmBattleSrc('/music/bgm_' + m[1] + '.ogg');
+}
+
+// ═══════════════════════════════════════════
+//  FEHLERGRENZE (1.8.)
+// ═══════════════════════════════════════════
+// Vorher gab es KEIN componentDidCatch im ganzen Client. Ein Fehler im
+// Render- oder Effekt-Pfad des Spielfelds ließ React den Teilbaum
+// abbrechen — sichtbar wurde daraus ein stilles EINFRIEREN: das Board
+// blieb auf dem letzten gezeichneten Stand stehen, während Socket und
+// Modals weiterliefen. Genau dieses Bild hatte Al mehrfach ("das Spiel
+// hängt"), und es kostete jedes Mal eine Runde Rätselraten.
+//
+// Ab hier wird daraus eine Meldung MIT Stack, Kopierknopf und
+// Neuladen-Schaltfläche. Der Fehler geht zusätzlich als
+// `[client-error]` in die Konsole, damit er auch dann auffindbar ist,
+// wenn jemand die Seite reflexartig neu lädt.
+class GameErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null, info: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) {
+    this.setState({ info });
+    try {
+      console.error('[client-error]', err, info?.componentStack);
+      window.__ppLastClientError = {
+        message: String(err?.message || err),
+        stack: String(err?.stack || ''),
+        componentStack: String(info?.componentStack || ''),
+        at: new Date().toISOString(),
+      };
+    } catch {}
+  }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const e = this.state.err;
+    const text = `${e?.message || e}\n\n${e?.stack || ''}\n\nKomponenten-Stack:${this.state.info?.componentStack || ''}`;
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(10,10,16,.96)',
+        color: '#ffd7d7', padding: '24px', overflow: 'auto', fontFamily: 'monospace', fontSize: 13 }}>
+        <div style={{ fontSize: 18, marginBottom: 10, color: '#ff8080' }}>
+          Das Spielfeld ist auf einen Fehler gelaufen.
+        </div>
+        <div style={{ marginBottom: 14, color: '#ccc', fontFamily: 'inherit' }}>
+          Die Partie läuft auf dem Server weiter — Neuladen bringt dich zurück hinein.
+          Bitte den Text unten mitschicken.
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <button onClick={() => window.location.reload()}
+            style={{ marginRight: 8, padding: '6px 14px' }}>Neu laden</button>
+          <button onClick={() => { try { navigator.clipboard.writeText(text); } catch {} }}
+            style={{ padding: '6px 14px' }}>Fehlertext kopieren</button>
+        </div>
+        <pre style={{ whiteSpace: 'pre-wrap', background: '#000', padding: 12, borderRadius: 6 }}>{text}</pre>
+      </div>
+    );
+  }
+}
+
 function MusicManager({ bgmMode }) {
   const unlocked = useRef(false);
-  const currentTrack = useRef(null); // 'menu' | 'battle' | 'puzzle'
+  const currentTrack = useRef(null); // 'menu' | 'battle' | 'battle:<slug>' | 'puzzle'
 
   const getTargetVol = useCallback(() => {
     if (window._ppGetVolume) return window._ppGetVolume();
@@ -1896,8 +2024,14 @@ function MusicManager({ bgmMode }) {
 
   const switchTrack = useCallback((target) => {
     if (currentTrack.current === target) return;
-    const fadeIn = _bgmTracks[target];
+    // `battle:<slug>` wird bei Bedarf erzeugt; fehlt die Datei, greift
+    // weiter unten der Fallback auf das generische Kampfthema.
+    const fadeIn = _bgmResolveTrack(target);
     if (!fadeIn) return;
+    if (String(target).startsWith('battle')) {
+      console.log('[bgm] switchTrack', JSON.stringify(currentTrack.current), '→',
+        JSON.stringify(target), '| src =', fadeIn.src || '(keine)');
+    }
     // While a fanfare is ducking the BGM (victory / defeat), don't
     // start ANY background music — the fanfare must play uninterrupted
     // by definition. Buffer the requested target on a global slot;
@@ -1910,7 +2044,8 @@ function MusicManager({ bgmMode }) {
       return;
     }
     // Fade out whichever track is currently playing.
-    const fadeOut = Object.entries(_bgmTracks).find(([k, t]) => k !== target && t && !t.paused)?.[1] || null;
+    const fadeOut = Object.entries(_bgmTracks)
+      .find(([, t]) => t && t !== fadeIn && !t.paused)?.[1] || null;
 
     const targetVol = getTargetVol();
 
@@ -2285,6 +2420,18 @@ function App() {
           socket.emit('leave_game', { roomId: state.roomId });
           return;
         }
+        // CPU-Kämpfe rendert der SINGLEPLAYER-Bildschirm, nicht PlayScreen
+        // (der bedient den Mehrspieler-Weg). Bisher landete der
+        // Wiedereinstieg pauschal auf 'play' — nach F5 sah Al deshalb das
+        // Hauptmenü, obwohl der Server die Partie noch hielt. Der Zustand
+        // wird zwischengelegt, weil der SP-Bildschirm seinen eigenen
+        // game_state-Listener erst beim Einhängen registriert und das
+        // Ereignis sonst ins Leere liefe.
+        if (state.isCpuBattle) {
+          window.__ppPendingCpuBattleState = state;
+          setScreen('singleplayer');
+          return;
+        }
         _pendingGameState = state;
         setScreen('play');
       }
@@ -2388,21 +2535,23 @@ function App() {
         <div className="rotate-text">Please rotate your device</div>
         <div className="rotate-sub">Pixel Parties requires landscape orientation for the best experience</div>
       </div>
-      <MusicManager bgmMode={bgmMode} />
+      <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
-      {!user ? <AuthScreen /> :
-        user.isGuest ? <SingleplayerScreen /> :
-        screen === 'menu' ? <MainMenu /> :
-        screen === 'play' ? <PlayScreen /> :
-        screen === 'singleplayer' ? <SingleplayerScreen /> :
-        screen === 'deckbuilder' ? <DeckBuilder /> :
-        screen === 'shop' ? <ShopScreen /> :
-        screen === 'profile' ? <ProfileScreen /> :
-        screen === 'rules' ? <RulesScreen /> :
-        screen === 'puzzle-create' ? <PuzzleCreator /> :
-        <MainMenu />}
+      <GameErrorBoundary>
+        {!user ? <AuthScreen /> :
+          user.isGuest ? <SingleplayerScreen /> :
+          screen === 'menu' ? <MainMenu /> :
+          screen === 'play' ? <PlayScreen /> :
+          screen === 'singleplayer' ? <SingleplayerScreen /> :
+          screen === 'deckbuilder' ? <DeckBuilder /> :
+          screen === 'shop' ? <ShopScreen /> :
+          screen === 'profile' ? <ProfileScreen /> :
+          screen === 'rules' ? <RulesScreen /> :
+          screen === 'puzzle-create' ? <PuzzleCreator /> :
+          <MainMenu />}
+      </GameErrorBoundary>
     </AppContext.Provider>
   );
 }

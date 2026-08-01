@@ -26,6 +26,10 @@ const EYE_NAME  = 'The White Eye';
 const ARTHOR_ASCENSION_ITEMS = ['Legendary Sword of a Barbarian King', 'Summoning Circle'];
 
 module.exports = {
+  // Vertrag für Träger-Schutz (Slippery Fridge & Co.): Diese Equips
+  // gehören zur Ascension-Bedingung — nie vom nicht-aufgestiegenen
+  // Träger wegbewegen.
+  ascensionItems: ARTHOR_ASCENSION_ITEMS,
   activeIn: ['hero'],
   cheatAscensionBlocked: true,
 

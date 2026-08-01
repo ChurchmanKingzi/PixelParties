@@ -21,10 +21,81 @@ const { addDeepseaCounters } = require('./_deepsea-shared');
 const CARD_NAME = 'Siphem, the Deepsea Demon';
 
 module.exports = {
+  // H1-Vertrag (Vergleichsanalyse): solange dieser Held lebt, sind
+  // Bounce-Platzierungen Wert-Aktionen — jeder Bounce einer Deepsea-Kreatur erzeugt einen Siphem-Counter.
+  // Konsumiert von pickCreatureZoneSlot (_cpu.js).
+  cpuValuesBounces: true,
+
+
+  // Zündungs-Mulligan der Deepsea-Linie (Begründung in _deepsea-shared).
+  // SM-Ausbau-Floor gegen Lern-Drift (Begründung in _deepsea-shared).
+  cpuAbilityPriorFloor(abilityName, targetLevel) {
+    const { deepseaAbilityPriorFloor } = require('./_deepsea-shared');
+    return deepseaAbilityPriorFloor(abilityName, targetLevel);
+  },
+
+  cpuMulliganAdvice(engine, pi, hand) {
+    const { deepseaIgnitionMulliganAdvice } = require('./_deepsea-shared');
+    return deepseaIgnitionMulliganAdvice(engine, pi, hand);
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
+
+  /**
+   * Counter-Wahl der CPU (Als Auftrag "schau genau auf Siphem"): Der
+   * generische Options-Default nimmt die ERSTE Option — bei aufsteigender
+   * Liste also immer 1 Counter = 50-Schaden-Tröpfchen, egal wie hoch der
+   * Stapel ist. Gemessen: Siphem-Nutzung korreliert mit 31% WR (vs 14%
+   * ohne), wurde aber so systematisch verschenkt. Politik hier:
+   *   1. Kill verfügbar → minimales n, das das wertvollste tötbare Ziel
+   *      tötet (Held vor Kreatur, bei Helden das mit den meisten HP).
+   *   2. Kein Kill, Stapel ≥ 2 → alles auf den dicksten Gegner-Helden.
+   *      Als Ruling: Siphem soll jede Runde feuern KÖNNEN — Horten ist
+   *      nur bei exakt 1 Counter erlaubt (eine Runde warten, damit aus
+   *      50 Tröpfchen 100+ Druck wird), nie länger.
+   *   3. Genau 1 Counter ohne Kill → abbrechen und eine Runde sparen.
+   * Nur der optionPicker dieses Helden wird beantwortet — die
+   * anschließende Zielwahl läuft über den normalen Target-Chooser samt
+   * targetPriors.
+   */
+  cpuResponse(engine, kind, promptData) {
+    try {
+      if (promptData?.type !== 'optionPicker' || promptData?.title !== CARD_NAME) return undefined;
+      const m = String(promptData.description || '').match(/(\d+) Deepsea Counter/);
+      const count = m ? parseInt(m[1]) : (promptData.options || []).length;
+      if (!(count > 0)) return undefined;
+      const gs = engine.gs;
+      let pi = engine._cpuPlayerIdx;
+      for (let i = 0; i < 2; i++) {
+        if ((gs.players[i]?.heroes || []).some(h => h?.name === CARD_NAME)) { pi = i; break; }
+      }
+      const opp = 1 - pi;
+      const DB = engine._getCardDB();
+      const targets = [];
+      for (const h of (gs.players[opp]?.heroes || [])) {
+        if (h && h.hp > 0) targets.push({ kind: 'hero', hp: h.hp });
+      }
+      for (const inst of (engine.cardInstances || [])) {
+        if (inst.controller !== opp || inst.zone !== 'support' || inst.faceDown) continue;
+        const cd = DB[inst.name];
+        if (!cd || !String(cd.cardType || '').includes('Creature')) continue;
+        const hp = inst.counters?.hp ?? cd.hp ?? 0;
+        if (hp > 0) targets.push({ kind: 'creature', hp });
+      }
+      const killable = targets.filter(t => Math.ceil(t.hp / 50) <= count);
+      if (killable.length) {
+        killable.sort((a, b) =>
+          (a.kind === 'hero' ? 0 : 1) - (b.kind === 'hero' ? 0 : 1) || b.hp - a.hp);
+        const n = Math.ceil(killable[0].hp / 50);
+        return { optionId: 'n-' + n };
+      }
+      if (count >= 2) return { optionId: 'n-' + count };
+      return { cancelled: true };
+    } catch { return undefined; }
+  },
+
 
   // CPU threat assessment (damage supporter). 50 damage × accumulated
   // Deepsea Counters per activation. Counters persist across turns so the

@@ -49,6 +49,40 @@ module.exports = {
   oncePerGame: true,
   oncePerGameKey: ONCE_PER_GAME_KEY,
 
+  // ── CPU-Gate-Bypass ──────────────────────────────────────────────
+  // Als Verdachtsfall (Shadows over Blackport, 1360 Spiele): die Karte
+  // war 739× spielbarer Kandidat am Gate und wurde 5× gespielt — 0.7%
+  // Commit-Quote. KEIN Erfassungsloch (der Verfügbarkeits-Zähler
+  // artifactPicks beweist beides), sondern dieselbe Bewertungslücke wie
+  // bei Flashbang: der gesamte Nutzen liegt im GEGNERZUG ("cannot be
+  // chosen by your opponent during their next turn"). Unmittelbar nach
+  // dem Spielen sieht das Gate nur −4 Gold und eine Handkarte weniger;
+  // der Schutz selbst verändert kein Board und keine HP. Der Skip-Zweig
+  // gewinnt damit praktisch immer.
+  //
+  // `evaluateThroughTurnEnd` hilft hier NICHT (es verlängert nur bis
+  // zum Ende des EIGENEN Zuges, der Schutz wirkt später). Bleibt
+  // alwaysCommit — als FUNKTION, damit die einmal pro Spiel verfügbare
+  // Karte nicht verpufft:
+  //   • Der Kartentext entwertet sich selbst, solange man nur EIN
+  //     legales Ziel hat ("except if it is your only legal target") —
+  //     also erst ab 2 Zielen committen. Das ist keine Heuristik,
+  //     sondern steht wörtlich auf der Karte.
+  //   • Erst ab Zug 3 (gs.turn ≥ 5): in der Eröffnung gibt es noch
+  //     nichts Schützenswertes, und die Karte ist unwiederbringlich.
+  // Sonst greift wieder die normale Bewertung.
+  cpuMeta: {
+    alwaysCommit: (engine, pi) => {
+      try {
+        const gs = engine?.gs;
+        if (!gs) return false;
+        if ((gs.turn || 0) < 5) return false;
+        const targets = module.exports.getValidTargets(gs, pi, engine) || [];
+        return targets.length >= 2;
+      } catch { return false; }
+    },
+  },
+
   canActivate(gs, pi) {
     const ps = gs.players[pi];
     if (!ps) return false;

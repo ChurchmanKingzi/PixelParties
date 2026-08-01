@@ -31,7 +31,10 @@ module.exports = {
     if (!cpuPs) return { damagePerTurn: 0 };
     let stacks = 0;
     for (const h of (cpuPs.heroes || [])) {
-      if (h?.statuses?.poison) stacks += h.statuses.poison;
+      // Engine-Form: statuses.poisoned = { stacks: N } (der alte Lesezugriff
+      // auf statuses.poison lieferte immer 0 → supportYield meldete 0 Schaden).
+      const pz = h?.statuses?.poisoned;
+      if (pz) stacks += (Number(pz.stacks) > 0 ? Number(pz.stacks) : 1);
     }
     return { damagePerTurn: 30 * stacks };
   },

@@ -1,0 +1,389 @@
+{
+  "deck": "Shifting Sandlands",
+  "heroes": [
+    "Nomu, Wanderer of Worlds",
+    "Bakhm, the Desert Digger",
+    "Silent Water Mizune"
+  ],
+  "games": 1292,
+  "trainWinRate": "68.4%",
+  "trainedAt": "2026-07-20T03:46:40.825Z",
+  "meanTurns": 13.9,
+  "cardValues": {
+    "Destruction Magic": 8,
+    "Adventurousness": 19.1,
+    "Noble Mummy Guards": 43.5,
+    "Cosmic Skeleton": 42.1,
+    "Cactus Creature": 8,
+    "Rain of Arrows": 90.8,
+    "Magnetic Glove": 32,
+    "Book of Doom": 50.8,
+    "Defending the Gate": 39,
+    "Cute Cheese": 53.5,
+    "Afflicted Vermin": 75.1,
+    "Summoning Magic": 8,
+    "Pure Advantage Camel": 8,
+    "Mummy Maker Machine": 8,
+    "Telekinesis": 46.2,
+    "Afflicted Pests": 8,
+    "Booby Trap": 18
+  },
+  "timing": {
+    "Adventurousness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Noble Mummy Guards": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Cosmic Skeleton": {
+      "early": 0.86,
+      "mid": 1.21,
+      "late": 0.93
+    },
+    "Rain of Arrows": {
+      "early": 1,
+      "mid": 1.23,
+      "late": 0.77
+    },
+    "Magnetic Glove": {
+      "early": 0.82,
+      "mid": 0.97,
+      "late": 1.21
+    },
+    "Book of Doom": {
+      "early": 0.77,
+      "mid": 1.23,
+      "late": 1
+    },
+    "Defending the Gate": {
+      "early": 0.83,
+      "mid": 1.17,
+      "late": 1
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.13
+    },
+    "Afflicted Vermin": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.02
+    },
+    "Pure Advantage Camel": {
+      "early": 0.97,
+      "mid": 1.03,
+      "late": 1
+    },
+    "Telekinesis": {
+      "early": 0.76,
+      "mid": 1.24,
+      "late": 1
+    },
+    "Booby Trap": {
+      "early": 0.8,
+      "mid": 1.2,
+      "late": 1
+    }
+  },
+  "pairBonuses": {},
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Destruction Magic": -18.3,
+      "Adventurousness": -17.6,
+      "Noble Mummy Guards": -17.2,
+      "Cosmic Skeleton": -15.6,
+      "Cactus Creature": -18.8,
+      "Rain of Arrows": -20,
+      "Ushabti of the Great Pharaoh": -20,
+      "Magnetic Glove": -16.5,
+      "Book of Doom": -16.1,
+      "Defending the Gate": -16.2,
+      "Cute Cheese": -19.5,
+      "Pure Advantage Camel": -20,
+      "Afflicted Vermin": -19.4,
+      "Booby Trap": -19.9,
+      "Telekinesis": -18,
+      "Summoning Magic": -14.2,
+      "Mummy Maker Machine": -17.2,
+      "Afflicted Pests": -15.8,
+      "Treasure Chest": -18,
+      "Spider Avalanche": -20,
+      "Golden Ankh": -10.3
+    },
+    "swarm": {
+      "Destruction Magic": 9.4,
+      "Adventurousness": 9.8,
+      "Noble Mummy Guards": 8.7,
+      "Cosmic Skeleton": 9.2,
+      "Cactus Creature": 13.1,
+      "Rain of Arrows": 11.5,
+      "Ushabti of the Great Pharaoh": 8.7,
+      "Magnetic Glove": 10.2,
+      "Book of Doom": 9.9,
+      "Defending the Gate": 8.6,
+      "Cute Cheese": 11.4,
+      "Pure Advantage Camel": 12.2,
+      "Afflicted Vermin": 7.7,
+      "Booby Trap": 12,
+      "Telekinesis": 9.8,
+      "Summoning Magic": 11.2,
+      "Mummy Maker Machine": 8.9,
+      "Afflicted Pests": 11.7,
+      "Treasure Chest": 10,
+      "Spider Avalanche": 19.9,
+      "Golden Ankh": 15.5
+    },
+    "spell": {
+      "Ushabti of the Great Pharaoh": -7.2,
+      "Golden Ankh": 12.8
+    }
+  },
+  "casterDeltas": {
+    "Telekinesis": {
+      "Bakhm, the Desert Digger": -10.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Cactus Creature": 6.6,
+      "Rain of Arrows": -6.2,
+      "Book of Doom": -3.9,
+      "Cute Cheese": -4.7,
+      "Pure Advantage Camel": 3.1,
+      "Mummy Maker Machine": 10.6,
+      "Treasure Chest": 4.4
+    },
+    "ahead": {
+      "Noble Mummy Guards": 9.5,
+      "Cactus Creature": -15.4,
+      "Book of Doom": 8.8,
+      "Cosmic Skeleton": -5,
+      "Afflicted Vermin": -3.6,
+      "Telekinesis": -5.6,
+      "Treasure Chest": -12.3
+    }
+  },
+  "standingEvalThreshold": 841,
+  "targetPriors": {
+    "Silent Water Mizune": {
+      "hp:min": -12.7
+    },
+    "Bakhm, the Desert Digger": {
+      "hp:max": -9,
+      "side:own": -17.4
+    },
+    "Cosmic Skeleton": {
+      "hp:max": -10.5,
+      "kind:creature": -9.6,
+      "side:own": -16
+    },
+    "Booby Trap": {
+      "hp:max": -12,
+      "side:own": -13.6
+    },
+    "Afflicted Vermin": {
+      "hp:min": 7.2
+    },
+    "Cactus Creature": {
+      "kind:creature": 9.4,
+      "kind:hero": -6.1,
+      "hp:max": -11.2,
+      "frozen": 20,
+      "hp:min": -7.9
+    }
+  },
+  "surpriseRules": {
+    "Noble Mummy Guards": {
+      "early": 13.2,
+      "mid": 20,
+      "late": 18.4
+    },
+    "Pure Advantage Camel": {
+      "early": 11.7,
+      "mid": 10.3,
+      "late": -15.5
+    },
+    "Defending the Gate": {
+      "early": 3.1,
+      "mid": 13.5,
+      "late": 6.1
+    },
+    "Booby Trap": {
+      "early": 11.6,
+      "mid": 19.6,
+      "late": 16.4
+    },
+    "Mummy Maker Machine": {
+      "early": 4.7,
+      "mid": -15.8,
+      "late": 6.1
+    },
+    "Afflicted Vermin": {
+      "early": 9.9,
+      "mid": 12.2,
+      "late": 3.1
+    },
+    "Afflicted Pests": {
+      "mid": -6.2,
+      "late": 9.8
+    },
+    "Spider Avalanche": {
+      "early": 20,
+      "mid": -10.1,
+      "late": 20
+    },
+    "Cactus Creature": {
+      "early": -10.5,
+      "mid": 20,
+      "late": -3.8
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -11,
+    "plc:slack:1": 12.1,
+    "plc:slack:2+": 8
+  },
+  "tutorPickRules": {
+    "Necromancy→Noble Mummy Guards": 2.5,
+    "Necromancy→Mummy Maker Machine": -5.2,
+    "Necromancy→Afflicted Vermin": 4.4,
+    "Necromancy→Afflicted Pests": -7.3,
+    "Necromancy→Pure Advantage Camel": -5.6,
+    "Necromancy→Cosmic Skeleton": -14.4,
+    "Cute Cheese→Mummy Maker Machine": -4.4,
+    "Cute Cheese→Cosmic Skeleton": 3.5,
+    "Cute Cheese→Afflicted Pests": -4.6,
+    "Cute Cheese→Noble Mummy Guards": 5.7,
+    "Cute Cheese→Afflicted Vermin": -3.9,
+    "Magnetic Glove→Summoning Magic": 3.2,
+    "Magnetic Glove→Destruction Magic": -8.1,
+    "Magnetic Glove→Spider Avalanche": 10.3,
+    "Magnetic Glove→Cactus Creature": -7.7,
+    "Magnetic Glove→Booby Trap": 2.8,
+    "Magnetic Glove→Pure Advantage Camel": -10.1,
+    "Magnetic Glove→Rain of Arrows": 2.7,
+    "Magnetic Glove→Telekinesis": 4.8,
+    "Magnetic Glove→Book of Doom": 5.4,
+    "Magnetic Glove→Adventurousness": -10.9,
+    "Magnetic Glove→Afflicted Pests": -20,
+    "Magnetic Glove→Golden Ankh": -20,
+    "Magnetic Glove→Mummy Maker Machine": -15.4,
+    "Magnetic Glove→Ushabti of the Great Pharaoh": -8.7,
+    "Magnetic Glove→Noble Mummy Guards": 6.2,
+    "Magic Lamp→Acid Vial": 11.5,
+    "Magic Lamp→Fighting": -19.5,
+    "Magic Lamp→Chain Lightning": -10.7,
+    "Magic Lamp→Cloud in a Bottle": -20,
+    "The Cosmic Depths→Cactus Creature": 10,
+    "The Cosmic Depths→Noble Mummy Guards": -15.7,
+    "The Cosmic Depths→Cosmic Skeleton": 7.3,
+    "Enigma, the Seller of Secrets→Treasure Chest": -16.2,
+    "Enigma, the Seller of Secrets→Noble Mummy Guards": -12,
+    "Enigma, the Seller of Secrets→Book of Doom": -10.7,
+    "Enigma, the Seller of Secrets→Telekinesis": 4.2,
+    "Enigma, the Seller of Secrets→Adventurousness": -13.1,
+    "Enigma, the Seller of Secrets→Summoning Magic": -8.3,
+    "Enigma, the Seller of Secrets→Pure Advantage Camel": 4,
+    "Enigma, the Seller of Secrets→Spider Avalanche": 13.6,
+    "Enigma, the Seller of Secrets→Mummy Maker Machine": -13.9,
+    "Enigma, the Seller of Secrets→Cosmic Skeleton": 2.8,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 11,
+    "Enigma, the Seller of Secrets→Golden Ankh": -17.5,
+    "Enigma, the Seller of Secrets→Cute Cheese": 6.5,
+    "Enigma, the Seller of Secrets→Defending the Gate": 12.5,
+    "Enigma, the Seller of Secrets→Cactus Creature": 20,
+    "Enigma, the Seller of Secrets→Afflicted Vermin": -8,
+    "Magic Amethyst→Necromancy": -4.1
+  },
+  "abilityPriors": {
+    "Magic Arts@Nomu, Wanderer of Worlds": 42.7,
+    "Training@Nomu, Wanderer of Worlds": 150,
+    "Destruction Magic@Nomu, Wanderer of Worlds": -60,
+    "Necromancy@Bakhm, the Desert Digger": 150,
+    "Terror@Bakhm, the Desert Digger": 150,
+    "Destruction Magic@Bakhm, the Desert Digger": -37.4,
+    "Magic Arts@Silent Water Mizune": 124.8,
+    "Summoning Magic@Silent Water Mizune": 65,
+    "Adventurousness@Silent Water Mizune": -60,
+    "Adventurousness@Silent Water Mizune≥2": 150,
+    "Adventurousness@Silent Water Mizune≥3": 124.9,
+    "Adventurousness@Nomu, Wanderer of Worlds": 111.9,
+    "Adventurousness@Nomu, Wanderer of Worlds≥2": 38.1,
+    "Adventurousness@Nomu, Wanderer of Worlds≥3": 102.1,
+    "Summoning Magic@Bakhm, the Desert Digger": -60,
+    "Adventurousness@Bakhm, the Desert Digger": 150,
+    "Destruction Magic@Silent Water Mizune": 150,
+    "Adventurousness@Bakhm, the Desert Digger≥2": 17.4,
+    "Adventurousness@Bakhm, the Desert Digger≥3": -60,
+    "Summoning Magic@Nomu, Wanderer of Worlds≥2": 150,
+    "Summoning Magic@Nomu, Wanderer of Worlds≥3": 133.4
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Bakhm, the Desert Digger": 30,
+    "Golden Ankh→Silent Water Mizune": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Necromancy": -14.6,
+    "Golden Ankh→Adventurousness": 30,
+    "Golden Ankh→Magic Arts": 30,
+    "Golden Ankh→Summoning Magic": -15,
+    "Golden Ankh→Destruction Magic": 30
+  },
+  "startHandValues": {
+    "Cosmic Skeleton": 3,
+    "Destruction Magic": -1.2,
+    "Adventurousness": 2,
+    "Noble Mummy Guards": 4.1,
+    "Mummy Maker Machine": -3.3,
+    "Summoning Magic": -1.3,
+    "Magnetic Glove": 3.4,
+    "Rain of Arrows": -4.5,
+    "Telekinesis": 1.2,
+    "Spider Avalanche": 1.2,
+    "Treasure Chest": 2.4,
+    "Booby Trap": -5.7,
+    "Afflicted Vermin": 1.3,
+    "Defending the Gate": -8.1,
+    "Golden Ankh": 1.3,
+    "Cactus Creature": 2.5,
+    "Afflicted Pests": 2.7
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "15.5%",
+    "winAfterMull": "72%",
+    "winAfterKeep": "67.8%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Destruction Magic|Magic Arts": 14.1,
+    "Destruction Magic|Training": -7.1,
+    "Necromancy|Noble Mummy Guards": 12.3,
+    "Noble Mummy Guards|Terror": 11.3,
+    "Adventurousness|Pure Advantage Camel": -14.4,
+    "Adventurousness|Summoning Magic": -15,
+    "Adventurousness|Training": 7.9,
+    "Noble Mummy Guards|Summoning Magic": -5.6,
+    "Cosmic Skeleton|Summoning Magic": 5.8,
+    "Adventurousness|Cosmic Skeleton": -10.2,
+    "Afflicted Pests|Noble Mummy Guards": 15,
+    "Cosmic Skeleton|Destruction Magic": 13.9,
+    "Destruction Magic|Summoning Magic": 15,
+    "Cosmic Skeleton|Mummy Maker Machine": -15,
+    "Afflicted Pests|Mummy Maker Machine": 15,
+    "Mummy Token|Summoning Magic": 15,
+    "Magic Arts|Noble Mummy Guards": -7.9,
+    "Cosmic Skeleton|Mummy Token": 15,
+    "Cosmic Skeleton|Necromancy": -15,
+    "Cosmic Skeleton|Terror": -13.8
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

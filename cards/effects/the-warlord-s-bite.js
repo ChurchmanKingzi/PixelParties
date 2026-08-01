@@ -14,6 +14,34 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+
+  /**
+   * Als Venom-Swamp-Befund: die CPU castete Bite, wenn NUR die eigenen
+   * Helden unvergiftet waren, und musste sich dann selbst vergiften
+   * (Iter1: 102 von 421 Zielen eigene Seite). CPU-ONLY-Gate über
+   * cpuShouldPlay — bewusst NICHT spellPlayCondition, das würde die
+   * Karte auch für MENSCHEN grauen (Client-Regel "unplayable must look
+   * unplayable") und die legitime absichtliche Selbstvergiftung
+   * (Fiona-Selbst-Status-Synergie) verbieten. Die CPU spielt Bite erst,
+   * wenn mindestens EIN gegnerisches Ziel unvergiftet ist; mit
+   * verfügbarem Gegner-Ziel wägt die Zielwahl weiter frei ab.
+   */
+  cpuShouldPlay(engine, pi) {
+    try {
+      const gs = engine.gs;
+      const opp = 1 - pi;
+      const ops = gs.players?.[opp];
+      if (!ops) return true;
+      for (const h of (ops.heroes || [])) {
+        if (h && h.name && h.hp > 0 && !h.statuses?.poisoned) return true;
+      }
+      for (const inst of (engine.cardInstances || [])) {
+        if (inst.owner !== opp || inst.zone !== 'support' || inst.faceDown) continue;
+        if (!inst.counters?.poisoned) return true;
+      }
+      return false;
+    } catch { return true; }
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {

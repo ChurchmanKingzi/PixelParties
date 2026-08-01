@@ -33,6 +33,7 @@ function getTargetStatuses(target, engine) {
 }
 
 module.exports = {
+  cpuMeta: { statusHealChannel: true }, // Status-Heilungs-Lernkanal (siehe _deck-profile.js)
   isTargetingArtifact: true,
 
   canActivate: (gs, pi) => {

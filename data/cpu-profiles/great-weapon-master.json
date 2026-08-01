@@ -1,0 +1,342 @@
+{
+  "deck": "Great Weapon Master",
+  "heroes": [
+    "Arthor, the King of Blackport",
+    "Toras, Master of all Weapons",
+    "Fiona, the Princess of Blackport"
+  ],
+  "games": 1360,
+  "trainWinRate": "46.6%",
+  "trainedAt": "2026-07-24T19:53:51.211Z",
+  "meanTurns": 17.7,
+  "cardValues": {
+    "Blade of the Swamp Witch": 8,
+    "Sacred Hammer of the Volcano": 8,
+    "Metal Harpyformer": 8,
+    "Quick Attack": 56,
+    "Fighting": 8,
+    "Sickly Cheese": 8,
+    "Critical Strike": 100,
+    "Golden Ankh": 8,
+    "Thieving Strike": 66.6,
+    "Hammer Throw": 52.6,
+    "Blade of the Frostbringer": 14.8,
+    "Wheels": 24.7,
+    "Earth-Shattering Hammer, Relic of Deri": 8,
+    "Magnetic Glove": 38.9,
+    "Cool Cheese": 14.7,
+    "The Sun Sword": 22.6,
+    "Loot the Leftovers": 13.9,
+    "The Master's Sword": 28.4
+  },
+  "timing": {
+    "Metal Harpyformer": {
+      "early": 0.93,
+      "mid": 1.09,
+      "late": 0.98
+    },
+    "Quick Attack": {
+      "early": 1.11,
+      "mid": 0.89,
+      "late": 1
+    },
+    "Fighting": {
+      "early": 1.13,
+      "mid": 1.02,
+      "late": 0.84
+    },
+    "Sickly Cheese": {
+      "early": 0.88,
+      "mid": 1.22,
+      "late": 0.9
+    },
+    "Critical Strike": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.24
+    },
+    "Thieving Strike": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.3
+    },
+    "Hammer Throw": {
+      "early": 0.83,
+      "mid": 1.05,
+      "late": 1.12
+    },
+    "Wheels": {
+      "early": 0.76,
+      "mid": 1.12,
+      "late": 1.12
+    },
+    "Earth-Shattering Hammer, Relic of Deri": {
+      "early": 1.06,
+      "mid": 1,
+      "late": 0.94
+    },
+    "Magnetic Glove": {
+      "early": 0.8,
+      "mid": 1.02,
+      "late": 1.18
+    },
+    "Cool Cheese": {
+      "early": 1.07,
+      "mid": 1,
+      "late": 0.93
+    },
+    "The Sun Sword": {
+      "early": 1.08,
+      "mid": 1,
+      "late": 0.92
+    },
+    "Loot the Leftovers": {
+      "early": 1.23,
+      "mid": 0.75,
+      "late": 1.12
+    }
+  },
+  "pairBonuses": {
+    "Blade of the Swamp Witch|Quick Attack": 15.3,
+    "Blade of the Swamp Witch|Hammer Throw": 4.6,
+    "Sacred Hammer of the Volcano|dc:Hammer Throw": 4.1,
+    "Sacred Hammer of the Volcano|dc:Golden Ankh": 7.3,
+    "Metal Harpyformer|dc:Golden Ankh": 5.1,
+    "Metal Harpyformer|dc:Controlled Attack": 6.1,
+    "Critical Strike|dc:Divine Gift of Sacrifice": 4.6,
+    "Critical Strike|dc:Sacred Hammer of the Volcano": 5.4,
+    "Critical Strike|dc:The Sun Sword": 6.2,
+    "Thieving Strike|dc:Divine Gift of Sacrifice": 6.2,
+    "Thieving Strike|dc:Smug Coin": 7.5,
+    "Earth-Shattering Hammer, Relic of Deri|Hammer Throw": 5.9,
+    "Hammer Throw|The Master's Sword": 4.7,
+    "Hammer Throw|The Sun Sword": 4.9,
+    "Loot the Leftovers|Smug Coin": 4,
+    "Cool Cheese|Shield of Life": 17,
+    "Loot the Leftovers|dc:Golden Ankh": 5.5,
+    "Loot the Leftovers|dc:Vampiric Sword": 8.7
+  },
+  "casterDeltas": {
+    "Critical Strike": {
+      "Toras, Master of all Weapons": -20,
+      "Fiona, the Princess of Blackport": 20
+    },
+    "Thieving Strike": {
+      "Arthor, the King of Blackport": -14
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Fighting": -6.2,
+      "Sickly Cheese": -7.4,
+      "Critical Strike": 20,
+      "Golden Ankh": -12.3,
+      "Loot the Leftovers": 7.9,
+      "Divine Gift of Sacrifice": -9.3
+    },
+    "ahead": {
+      "Quick Attack": 9.8,
+      "Critical Strike": 14.9,
+      "Thieving Strike": 12,
+      "Hammer Throw": 13.5,
+      "Wheels": 7.4,
+      "Magnetic Glove": 10.5
+    }
+  },
+  "standingEvalThreshold": 915,
+  "targetPriors": {
+    "Critical Strike": {
+      "side:own": -20,
+      "kind:creature": -6.2,
+      "frozen": 8.1
+    },
+    "Thieving Strike": {
+      "hp:min": -6.7,
+      "side:own": -20,
+      "kind:creature": -14.4
+    },
+    "Hammer Throw": {
+      "side:own": -20
+    },
+    "Earth-Shattering Hammer, Relic of Deri": {
+      "side:own": 8.5
+    },
+    "Divine Gift of Sacrifice": {
+      "healrev": 20
+    },
+    "Shield of Death": {
+      "kind:creature": -15.7
+    },
+    "Aggressive Town Guard": {
+      "hp:max": 16.1
+    },
+    "Controlled Attack": {
+      "frozen": 15.5
+    },
+    "Guardian Beast Hou": {
+      "hp:min": 6.1
+    },
+    "Invader Token": {
+      "hp:min": -16.7
+    }
+  },
+  "statusHealRules": {
+    "Coffee": {
+      "st:hero-caster": 20
+    },
+    "Tea": {
+      "st:hero-caster": 2.6
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Sickly Cheese→Loot the Leftovers": -3.9,
+    "Sickly Cheese→Divine Gift of Sacrifice": 4.2,
+    "Magnetic Glove→Smug Coin": -4.5,
+    "Magnetic Glove→Sacred Hammer of the Volcano": -20,
+    "Magnetic Glove→Shield of Life": -16.2,
+    "Magnetic Glove→Shield of Death": -20,
+    "Magnetic Glove→Fighting": -4.4,
+    "Magnetic Glove→Loot the Leftovers": -20,
+    "Magnetic Glove→Thieving Strike": -6.8,
+    "Magnetic Glove→Hammer Throw": -8,
+    "Magnetic Glove→Blade of the Swamp Witch": -15.8,
+    "Magnetic Glove→Critical Strike": 20,
+    "Magnetic Glove→Earth-Shattering Hammer, Relic of Deri": -16.6,
+    "Magnetic Glove→Blade of the Frostbringer": -20,
+    "Magnetic Glove→Vampiric Sword": -2.5,
+    "Magnetic Glove→The Master's Sword": -7.7,
+    "Magnetic Glove→Metal Harpyformer": -4.1,
+    "Magnetic Glove→Controlled Attack": 20,
+    "Magnetic Glove→Quick Attack": -9.4,
+    "Magnetic Glove→The Sun Sword": -10.3,
+    "Magnetic Glove→Wheels": -13.7,
+    "Magnetic Glove→Divine Gift of Sacrifice": -4.4,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Alchemy": 6.8,
+    "Cool Cheese→Critical Strike": 6.3,
+    "Cool Cheese→Hammer Throw": -9.2,
+    "Guardian Beast Long→Magnetic Glove": 9.9,
+    "Enigma, the Seller of Secrets→Cool Cheese": -19.4,
+    "Enigma, the Seller of Secrets→Sickly Cheese": 6.3,
+    "Enigma, the Seller of Secrets→Thieving Strike": 20,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 20,
+    "Enigma, the Seller of Secrets→Wheels": -15.7,
+    "Enigma, the Seller of Secrets→Loot the Leftovers": -16.9,
+    "Enigma, the Seller of Secrets→Fighting": -11,
+    "Enigma, the Seller of Secrets→The Sun Sword": -6,
+    "Enigma, the Seller of Secrets→Blade of the Frostbringer": 2.2,
+    "Enigma, the Seller of Secrets→Quick Attack": 9.6,
+    "Enigma, the Seller of Secrets→Blade of the Swamp Witch": 2.8,
+    "Enigma, the Seller of Secrets→Sacred Hammer of the Volcano": -9.5,
+    "Enigma, the Seller of Secrets→Critical Strike": 3.7,
+    "Enigma, the Seller of Secrets→Earth-Shattering Hammer, Relic of Deri": 12.4,
+    "Enigma, the Seller of Secrets→Vampiric Sword": -20,
+    "Enigma, the Seller of Secrets→Golden Ankh": -20,
+    "Guardian Beast Tu→Guardian Beast Zhu": -19.6,
+    "Magic Amethyst→Fighting": -4.6,
+    "Magic Amethyst→Wealth": 3.9
+  },
+  "abilityPriors": {
+    "Decay Magic@Arthor, the King of Blackport": 150,
+    "Wealth@Arthor, the King of Blackport": 150,
+    "Fighting@Toras, Master of all Weapons": 150,
+    "Fighting@Toras, Master of all Weapons≥2": 150,
+    "Fighting@Toras, Master of all Weapons≥3": 150,
+    "Fighting@Fiona, the Princess of Blackport": 74.2,
+    "Wealth@Fiona, the Princess of Blackport": 150,
+    "Wealth@Fiona, the Princess of Blackport≥2": -60,
+    "Fighting@Fiona, the Princess of Blackport≥2": -60,
+    "Fighting@Arthor, the King of Blackport": -60
+  },
+  "equipPriors": {
+    "Blade of the Swamp Witch@Toras, Master of all Weapons": 150,
+    "Sacred Hammer of the Volcano@Toras, Master of all Weapons": -60,
+    "Blade of the Frostbringer@Toras, Master of all Weapons": 150,
+    "Earth-Shattering Hammer, Relic of Deri@Toras, Master of all Weapons": 150,
+    "Smug Coin@Arthor, the King of Blackport": -60,
+    "Shield of Death@Toras, Master of all Weapons": 150,
+    "Shield of Life@Fiona, the Princess of Blackport": 150,
+    "The Sun Sword@Fiona, the Princess of Blackport": 52.8,
+    "Blade of the Frostbringer@Arthor, the King of Blackport": -60,
+    "The Master's Sword@Toras, Master of all Weapons": 150,
+    "The Sun Sword@Toras, Master of all Weapons": 150,
+    "Blade of the Swamp Witch@Arthor, the King of Blackport": -60,
+    "Earth-Shattering Hammer, Relic of Deri@Fiona, the Princess of Blackport": 71.5,
+    "Sacred Hammer of the Volcano@Fiona, the Princess of Blackport": -22.1,
+    "Smug Coin@Fiona, the Princess of Blackport": -60,
+    "The Master's Sword@Fiona, the Princess of Blackport": 77.6,
+    "Shield of Life@Arthor, the King of Blackport": -60,
+    "The Sun Sword@Arthor, the King of Blackport": -60,
+    "Blade of the Swamp Witch@Fiona, the Princess of Blackport": 150,
+    "Shield of Death@Fiona, the Princess of Blackport": 128,
+    "The Master's Sword@Arthor, the King of Blackport": -60,
+    "Earth-Shattering Hammer, Relic of Deri@Arthor, the King of Blackport": 150,
+    "Sacred Hammer of the Volcano@Arthor, the King of Blackport": -60,
+    "Vampiric Sword@Arthor, the King of Blackport": 150,
+    "Shield of Death@Arthor, the King of Blackport": -60,
+    "Blade of the Frostbringer@Fiona, the Princess of Blackport": -60,
+    "Smug Coin@Toras, Master of all Weapons": 150,
+    "Vampiric Sword@Fiona, the Princess of Blackport": -60,
+    "Shield of Life@Toras, Master of all Weapons": 150
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Arthor, the King of Blackport": 30,
+    "Golden Ankh→Fiona, the Princess of Blackport": 30,
+    "Golden Ankh→Toras, Master of all Weapons": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Decay Magic": 30,
+    "Golden Ankh→Wealth": 30,
+    "Golden Ankh→Fighting": 30
+  },
+  "startHandValues": {
+    "Golden Ankh": -3.4,
+    "Sacred Hammer of the Volcano": -7,
+    "Metal Harpyformer": -2,
+    "Quick Attack": 2.7,
+    "Thieving Strike": 3.2,
+    "Shield of Death": 2.3,
+    "Wheels": -2.5,
+    "Smug Coin": 2.4,
+    "The Master's Sword": 8,
+    "Magnetic Glove": -1.1,
+    "The Sun Sword": 3.8,
+    "Fighting": 2.4,
+    "Earth-Shattering Hammer, Relic of Deri": -6.8,
+    "Sickly Cheese": -1.5,
+    "Loot the Leftovers": -2,
+    "Critical Strike": 7.1,
+    "Divine Gift of Sacrifice": -4.7,
+    "Controlled Attack": -7.2,
+    "Vampiric Sword": -7.4,
+    "Shield of Life": 3
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "42.2%",
+    "winAfterMull": "46.9%",
+    "winAfterKeep": "46.4%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Fighting|Wealth": -4.5,
+    "Fighting|Metal Harpyformer": -15,
+    "Decay Magic|Fighting": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.485,
+      "n": 97,
+      "values": {
+        "Deepsea Primordium": 0.238,
+        "Ska Harpyformer": -0.085
+      }
+    }
+  }
+}

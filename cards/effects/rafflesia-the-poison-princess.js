@@ -53,6 +53,23 @@ function chainTypeId(playerIdx, heroIdx, otherSchool) {
 }
 
 module.exports = {
+  // ── CPU-Sonderregeln (Plague-Court-Pilotierung) ───────────────────
+  // Rafflesias Wert steckt im Chain-Grant: Decay/Support-Spell von IHR
+  // schaltet den Gratis-Folgezauber der anderen Schule frei. Damit die
+  // CPU das Deck korrekt pilotiert: (a) Decay/Support-Spell-Casts von
+  // Rafflesia stehen in der Kandidaten-Sortierung vorn, (b) Decay/
+  // Support-Magic-Abilities werden bevorzugt auf sie gestapelt.
+  // Beide Verträge wirken NUR wenn Rafflesia im Lineup steht.
+  cpuCasterPriority(engine, pi, heroIdx, cardData) {
+    if (!cardData || cardData.cardType !== 'Spell') return 0;
+    const s1 = cardData.spellSchool1, s2 = cardData.spellSchool2;
+    return (s1 === 'Decay Magic' || s1 === 'Support Magic'
+         || s2 === 'Decay Magic' || s2 === 'Support Magic') ? 100 : 0;
+  },
+  cpuAbilityAttachBonus(engine, pi, heroIdx, abilityName) {
+    return (abilityName === 'Decay Magic' || abilityName === 'Support Magic') ? 150 : 0;
+  },
+
   activeIn: ['hero'],
 
   hooks: {

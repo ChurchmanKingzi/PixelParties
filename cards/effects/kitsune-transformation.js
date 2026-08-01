@@ -95,6 +95,8 @@
 //      phase.
 // ═══════════════════════════════════════════
 
+const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
+
 const CARD_NAME    = 'Kitsune Transformation';
 const KITSUNE_NAME = 'Rebelliokai Kind Kitsune';
 const MAX_PICK     = 3;
@@ -103,21 +105,28 @@ const SPELL_SCHOOL = 'Magic Arts';
 /**
  * True when no Magic Arts Spell has been logged for this player on
  * this turn yet. Mirrors `isFirstDMSpellThisTurn` from `fire-bolts.js`
- * but pivots on Magic Arts. MUST be called before any promptGeneric
- * fires — the pending-play-log for this Spell hasn't been written yet
- * at top-of-onPlay, so the scan correctly excludes the current cast.
+ * but pivots on Magic Arts.
+ * IN-FLIGHT-SCHUTZ (siehe _log-scan-shared.js): Bei LIVE-CPU-Plays
+ * feuert der eigene spell_played-Eintrag via maybeFireCpuRevealEarly
+ * VOR onPlay — die alte "pending-play-log ist noch nicht geschrieben"-
+ * Annahme galt nur für Menschen-Plays; die CPU sah sich selbst und
+ * verlor den First-Spell-Rider still. Rückwärts-Scan + Multiset.
  */
 function isFirstMagicArtsSpellThisTurn(engine, playerIdx) {
   const currentTurn = engine.gs.turn;
   const playerName = engine.gs.players[playerIdx]?.username;
   const cardDB = engine._getCardDB();
-  for (const entry of engine.actionLog) {
+  const inFlight = inFlightSpellMultiset(engine);
+  const entries = engine.actionLog;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
     if (entry.turn !== currentTurn) continue;
     if (entry.type !== 'spell_played' && entry.type !== 'immediate_action') continue;
     if (entry.player !== playerName) continue;
     const cd = cardDB[entry.card];
     if (!cd) continue;
     if (cd.spellSchool1 === SPELL_SCHOOL || cd.spellSchool2 === SPELL_SCHOOL) {
+      if (inFlight[entry.card] > 0) { inFlight[entry.card]--; continue; }
       return false;
     }
   }

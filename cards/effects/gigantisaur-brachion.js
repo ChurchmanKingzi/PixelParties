@@ -72,6 +72,26 @@ module.exports = {
     return true;
   },
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // beforeDamage-Confirm (Gegner-Angriff, plan-los).
+  // Ohne Intercept declined der Brain-Default cancellable Confirms in
+  // plan-losen Kontexten und der Effekt verpufft still. Der generic-
+  // Dispatch lädt dieses Skript nur für Prompts mit dem eigenen
+  // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') {
+      // Protection-Lernkanal: gelernte Regel > Explorations-Arm (Training)
+      // > Accept-Default. Features kommen als protMeta aus dem Hook.
+      const { protectionDecision } = require('./_deck-profile');
+        if (typeof protectionDecision !== 'function') return { confirmed: true }; // Teildeployment-Schutz
+      const meta = promptData.protMeta || { d: 0, hp: 1 };
+      const pi = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+      return { confirmed: protectionDecision(engine, pi, promptData.title, meta) };
+    }
+    return undefined;
+  },
+
   hooks: {
     /**
      * Damage redirect — fires on EVERY beforeDamage event the engine
@@ -116,6 +136,7 @@ module.exports = {
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
+        protMeta: { d: amount, hp: target.hp, pi },
         title: CARD_NAME,
         message: `${hostHero.name} is about to take ${amount} damage. Discard 1 card to redirect to ${CARD_NAME}?`,
         showCard: CARD_NAME,

@@ -68,7 +68,7 @@ function hasValidContext(gs, pi, engine) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (cd && hasCardType(cd, 'Creature')) { hasOwnCreature = true; break; }
   }
   if (!hasOwnCreature) return false;
@@ -92,7 +92,7 @@ function getOwnCreatureTargets(engine, pi) {
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     targets.push({
       id: `equip-${pi}-${inst.heroIdx}-${inst.zoneSlot}`,
@@ -168,6 +168,12 @@ async function promptAndApply(engine, pi, promptCtxShim) {
 }
 
 module.exports = {
+  // Zählt als "Spell that places Pollution Tokens" (Als Ruling Juli 2026)
+  // — der Token ist hier Einsatz-KOSTEN ("to use this Spell") statt
+  // Wirkung, gilt aber trotzdem. Praktisch relevant für Mana Beacons
+  // Zusatz-Aktion; Mana Minings Reduktion ist bei Level 0 gegenstandslos.
+  placesPollutionTokens: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Narrow reaction trigger: only fires after an opponent's card has picked

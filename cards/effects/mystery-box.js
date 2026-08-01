@@ -7,9 +7,18 @@
 //  is sent to the discard pile OR deleted
 //  from your DECK, draw 2 cards.
 //
-//  "From your deck" = milled, not discarded
-//  from hand. Triggers on onMill (deleteMode
-//  false or true) when playerIdx === owner.
+//  "From your deck" = milled, NOT discarded
+//  from hand — Als Ruling bestaetigt: diese
+//  Karte ist deck-only, im Gegensatz zu den
+//  Schwesterkarten Glass of Marbles und Skull
+//  Necklace, die laut ihrem Kartentext auf den
+//  HAND-Abwurf triggern. Ein testweise
+//  ergaenzter onDiscard-Hook war falsch und
+//  wurde wieder entfernt (v88 -> v89).
+//  Triggers on onMill (deleteMode false or
+//  true) when playerIdx === owner. In "Grand
+//  Rebellion" liefert Cute Nerd Magenta den
+//  Mill (gezielt, ueber actionMillCards).
 //
 //  HOPT shared across all copies (keyed by
 //  name + player). Active from any zone so
@@ -73,6 +82,11 @@ module.exports = {
       gs.hoptUsed[hoptKey] = gs.turn;
 
       engine.log('mystery_box', { player: gs.players[pi]?.username, trigger: 'mill' });
+      // Zählbarer Einsatz-Beleg (wie bei Glass of Marbles): Abwurf-
+      // Fodder "spielt" man nicht — der Trigger IST der Einsatz. Ohne
+      // dieses Event stand die Karte auch bei echten Auslösern mit
+      // 0 Aktivierungen im Report.
+      engine.log('discard_trigger_fired', { player: gs.players[pi]?.username, card: CARD_NAME });
       await engine.actionDrawCards(pi, 2);
       engine.sync();
     },

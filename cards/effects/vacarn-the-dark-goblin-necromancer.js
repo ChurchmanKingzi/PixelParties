@@ -50,7 +50,7 @@ module.exports = {
       // attachments, Tokens-without-creature-type stay on the
       // discard route per their own conventions.
       const cardDB = ctx._engine._getCardDB();
-      const cd = cardDB[leaving.name];
+      const cd = leaving.counters?._cardDataOverride || cardDB[leaving.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) return;
 
       // Vacarn must still be alive — a dead Vacarn has no Support Zone

@@ -101,6 +101,13 @@ function setupAdditionalAction(engine, pi, heroIdx) {
 
 module.exports = {
   activeIn: ['ability'],
+  // `castTriggersDraw`: Diese Ability zieht Karten, wenn IHR Held einen
+  // passenden Spell (Schule unten) über die Zusatz-Aktion einsetzt —
+  // Lv2: 1 Karte, Lv3: 3 Karten. Konsumiert vom Caster-Draw-Kontext in
+  // _cpu.js (pickHeroForActionCard): Bei gefährlich kleinem Deck werden
+  // Caster OHNE diesen Rider bevorzugt — der Spell wird weiter gespielt,
+  // nur eben vom Helden, bei dem kein Draw feuert (Als Kontext-Regel).
+  cpuMeta: { castTriggersDraw: { school: 'Support Magic', drawsAtLevel: { 2: 1, 3: 3 } } },
   // Lizbeth/Smugbeth: auto-mirror disabled. Friendship's setup uses
   // `getFriendshipLevel(ps, heroIdx)` and `setupAdditionalAction(...)`
   // keyed on the borrower's own (Lizbeth's) heroIdx where Friendship

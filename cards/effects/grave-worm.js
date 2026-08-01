@@ -64,6 +64,16 @@ module.exports = {
   // discard.
   bypassDeadHeroFilter: true,
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onCreatureDeath-Confirm (Revive aus Discard): Gegner-Kills sind plan-los → declined. Kostenloser Revive, Confirm immer richtig.
+  // Titel-Dispatch scopet den Intercept auf eigene Prompts; andere
+  // Prompt-Typen (Auswahl-Galerien etc.) fallen unberührt durch.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     /**
      * On-summon draw 1. Engine fires `onPlay` for any creature
@@ -146,7 +156,7 @@ module.exports = {
       const dyingController = death.controller ?? death.owner;
       if (dyingController !== pi) return;
       const cardDB = engine._getCardDB();
-      const dyingCd = cardDB[death.name];
+      const dyingCd = death.counters?._cardDataOverride || cardDB[death.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!dyingCd || !hasCardType(dyingCd, 'Creature')) return;
 
       // Card text: "sent to the discard pile" — verify the dying

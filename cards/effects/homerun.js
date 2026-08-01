@@ -33,10 +33,15 @@
 //      after the post-target window has fired.
 //
 //  Dedup: per-player `_hrPromptedFor[pi]` is set
-//  in `postTargetCondition` (covers both accept
-//  AND decline paths) and in `preDamageCondition`.
-//  All flags + the mark are cleared at chain-
-//  resolve.
+//  on ACCEPT paths only (`postTargetResolve` /
+//  `preDamageCondition`) — a post-target DECLINE
+//  leaves the strict, amount-aware preDamage
+//  prompt armed for a later qualifying hit in
+//  the same chain (Als CPU-Fehlgriff-Fix). All
+//  flags + the mark are cleared at chain-
+//  resolve. CPU policy via `cpuResponse`:
+//  decline the blind post-target offer, confirm
+//  the strict ≥maxHp preDamage prompt.
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Homerun!';
@@ -63,11 +68,17 @@ module.exports = {
     // target window doesn't yet know the per-target damage amounts
     // (modifiers / arrow boosts / source-script per-target deltas all
     // resolve later).
-    const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
-    if (eligible) {
-      _markPrompted(gs, pi);
-    }
-    return eligible;
+    //
+    // NOTE (Als CPU-Fehlgriff-Fix): the prompt-dedup flag is NO
+    // LONGER set here. Setting it on prompt-SHOW meant a DECLINE
+    // also spent the flag — the strict, amount-aware preDamage
+    // fallback below was then locked out for the whole chain, so
+    // declining the blind post-target offer killed Homerun! even
+    // when a genuinely qualifying ≥maxHp hit arrived later. Now:
+    // accept (postTargetResolve) sets the flag; decline leaves the
+    // strict prompt armed. The post-target window itself fires only
+    // once per source, so this cannot re-prompt for the same offer.
+    return _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
   },
 
   async postTargetResolve(engine, pi, targetedTargets /*, sourceCard, opts */) {
@@ -105,6 +116,39 @@ module.exports = {
 
   // ── Per-hero fallback (direct hero damage paths) ─────────────────
   isPreDamageReaction: true,
+
+  /**
+   * CPU-Politik (Als Report: CPU aktivierte Homerun! auf einen 80er-
+   * Hit gegen einen 400-maxHp-Helden — die generische "fire ASAP"-
+   * Reaktions-Heuristik sagte auf den blinden Post-Target-Confirm Ja
+   * und verbrannte Karte + Kosten für nichts).
+   *
+   *  • Post-Target-Confirm (`_postTargetContext`, KEIN Betrag
+   *    bekannt): IMMER ablehnen. Dank des Dedup-Umbaus oben bleibt
+   *    der strikte preDamage-Prompt scharf und fängt jeden real
+   *    qualifizierenden Hit — mit bekanntem Betrag.
+   *  • preDamage-Confirm (`_preDamageContext` MIT amount): aktivieren
+   *    wenn amount ≥ maxHp. Die Condition garantiert das ohnehin;
+   *    die Aktivierung rettet dann deterministisch einen Helden vor
+   *    dem sicheren KO (amount ≥ maxHp ≥ hp) — kein MCTS nötig.
+   */
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type !== 'confirm') return undefined;
+    if ((promptData?._gerryOriginalTitle || promptData?.title) !== CARD_NAME) return undefined;
+
+    const pre = promptData._preDamageContext;
+    if (!pre) {
+      // Blind post-target offer — the amount is unknown here; the
+      // strict prompt below covers every qualifying hit.
+      return null;
+    }
+    const { targetOwner, targetHeroIdx, amount } = pre;
+    const target = engine.gs?.players?.[targetOwner]?.heroes?.[targetHeroIdx];
+    if (!target) return null;
+    const maxHp = target.maxHp || 0;
+    return (maxHp > 0 && amount >= maxHp) ? { confirmed: true } : null;
+  },
 
   preDamageCondition(gs, pi, _engine, target, _heroIdx, _source, amount, _type) {
     if (_alreadyPrompted(gs, pi)) return false;

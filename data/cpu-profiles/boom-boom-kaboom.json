@@ -1,0 +1,342 @@
+{
+  "deck": "Boom Boom Kaboom!",
+  "heroes": [
+    "Alex, Trainer of Heroes",
+    "Andras, the Human Weapon",
+    "Kazena, the Storming Rebel"
+  ],
+  "games": 1359,
+  "trainWinRate": "72.4%",
+  "trainedAt": "2026-07-24T09:43:07.848Z",
+  "meanTurns": 19.5,
+  "cardValues": {
+    "Cloud Pillow": 8,
+    "Treasure Chest": 8,
+    "Ancient Tech Infinite Energy Core": 28.1,
+    "Toughness": 8,
+    "Fighting": 8,
+    "Muscle Training": 11,
+    "Strong Ox Headbutt": 27.7,
+    "Heavy Hit": 100,
+    "Juice": 8,
+    "Wealth": 8,
+    "Quick Attack": 65.1,
+    "Wheels": 48.9,
+    "Attack": 70.9,
+    "Snow Cannon": 45.2,
+    "Magnetic Glove": 43.9,
+    "Sacred Hammer of the Volcano": 20.8
+  },
+  "timing": {
+    "Cloud Pillow": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.15
+    },
+    "Treasure Chest": {
+      "early": 0.75,
+      "mid": 1.11,
+      "late": 1.18
+    },
+    "Ancient Tech Infinite Energy Core": {
+      "early": 0.79,
+      "mid": 1.1,
+      "late": 1.11
+    },
+    "Toughness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.3
+    },
+    "Muscle Training": {
+      "early": 0.89,
+      "mid": 0.99,
+      "late": 1.12
+    },
+    "Strong Ox Headbutt": {
+      "early": 0.86,
+      "mid": 0.98,
+      "late": 1.16
+    },
+    "Heavy Hit": {
+      "early": 0.75,
+      "mid": 0.86,
+      "late": 1.3
+    },
+    "Juice": {
+      "early": 1,
+      "mid": 0.96,
+      "late": 1.04
+    },
+    "Wealth": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.26
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 1.17,
+      "late": 1.3
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.91,
+      "late": 1.09
+    },
+    "Attack": {
+      "early": 0.75,
+      "mid": 1.1,
+      "late": 1.3
+    },
+    "Magnetic Glove": {
+      "early": 1,
+      "mid": 0.85,
+      "late": 1.15
+    },
+    "Sacred Hammer of the Volcano": {
+      "early": 0.81,
+      "mid": 1.04,
+      "late": 1.15
+    }
+  },
+  "pairBonuses": {
+    "Heavy Hit|dc:Divine Gift of Coolness": 4.3
+  },
+  "casterDeltas": {
+    "Muscle Training": {
+      "Alex, Trainer of Heroes": -3
+    },
+    "Heavy Hit": {
+      "Andras, the Human Weapon": 8.3,
+      "Alex, Trainer of Heroes": -8.3
+    },
+    "Quick Attack": {
+      "Alex, Trainer of Heroes": -3.2
+    },
+    "Attack": {
+      "Kazena, the Storming Rebel": -12.4
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Strong Ox Headbutt": -6.8,
+      "Wheels": -6.2,
+      "Heavy Hit": -10.7,
+      "Juice": -18.8,
+      "Attack": -6,
+      "Snow Cannon": -9.1,
+      "Magnetic Glove": -8.4,
+      "Phalanx Pike": -10.9,
+      "Golden Ankh": -20
+    },
+    "ahead": {
+      "Treasure Chest": 5.7,
+      "Ancient Tech Infinite Energy Core": 5.1,
+      "Toughness": 5.9,
+      "Fighting": 7.2,
+      "Muscle Training": 6.4,
+      "Wheels": 5.7,
+      "Heavy Hit": 6,
+      "Wealth": 5.5,
+      "Quick Attack": 7.5,
+      "Attack": 8,
+      "Divine Gift of Coolness": 7.1,
+      "Snow Cannon": 5.9,
+      "Magnetic Glove": 7.7,
+      "Sacred Hammer of the Volcano": 5.9,
+      "Phalanx Pike": 5.2
+    }
+  },
+  "standingEvalThreshold": 805,
+  "targetPriors": {
+    "Strong Ox Headbutt": {
+      "frozen": 6.4
+    },
+    "Heavy Hit": {
+      "kind:creature": -7
+    },
+    "Quick Attack": {
+      "side:own": -9.7
+    },
+    "Attack": {
+      "side:own": -13.8,
+      "dmgred": -14.6
+    },
+    "Juice": {
+      "side:opp": -10.1,
+      "frozen": -13.6
+    },
+    "Gathering Storm": {
+      "hp:max": 12.4
+    }
+  },
+  "reactionRules": {
+    "Escape": {
+      "lethal": 17.2
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:frozen-hero": 14,
+      "st:stun-hero": -4.5,
+      "st:2": 11,
+      "st:poison2+": -18.1,
+      "st:3+": 20
+    }
+  },
+  "tutorPickRules": {
+    "Magnetic Glove→Sacred Hammer of the Volcano": 19.4,
+    "Magnetic Glove→Phalanx Pike": -8.6,
+    "Magnetic Glove→Heavy Hit": -2.3,
+    "Magnetic Glove→Attack": 4.7,
+    "Magnetic Glove→Juice": -20,
+    "Magnetic Glove→Magnetic Glove": -20,
+    "Magnetic Glove→Escape": -5.1,
+    "Magnetic Glove→Strong Ox Headbutt": 12.8,
+    "Magnetic Glove→Quick Attack": 7.8,
+    "Magnetic Glove→Snow Cannon": -20,
+    "Magnetic Glove→Wheels": -6,
+    "Magnetic Glove→Golden Ankh": -20,
+    "Magnetic Glove→Fighting": -20,
+    "Magnetic Glove→Wealth": 9,
+    "Magnetic Glove→Treasure Chest": -5.8,
+    "Magnetic Glove→Cloud Pillow": 12.3,
+    "Magnetic Glove→Muscle Training": -3.1,
+    "Enigma, the Seller of Secrets→Strong Ox Headbutt": -4.4,
+    "Enigma, the Seller of Secrets→Muscle Training": -8.3,
+    "Enigma, the Seller of Secrets→Golden Ankh": -3.3,
+    "Enigma, the Seller of Secrets→Juice": 5.5,
+    "Enigma, the Seller of Secrets→Ancient Tech Infinite Energy Core": -10.5,
+    "Enigma, the Seller of Secrets→Escape": 3.8,
+    "Enigma, the Seller of Secrets→Fighting": 3.4,
+    "Enigma, the Seller of Secrets→Attack": 7.3,
+    "Enigma, the Seller of Secrets→Heavy Hit": -6.4,
+    "Enigma, the Seller of Secrets→Snow Cannon": 4.3,
+    "Enigma, the Seller of Secrets→Treasure Chest": -14.2,
+    "Enigma, the Seller of Secrets→Cloud Pillow": 15.6,
+    "Enigma, the Seller of Secrets→Quick Attack": 9.1,
+    "Enigma, the Seller of Secrets→Sacred Hammer of the Volcano": -2.2,
+    "Enigma, the Seller of Secrets→Phalanx Pike": 8.7,
+    "Enigma, the Seller of Secrets→Wealth": -20,
+    "Enigma, the Seller of Secrets→Wheels": 20,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -15.1,
+    "Enigma, the Seller of Secrets→Toughness": 5.6,
+    "Magic Lamp→Acid Vial": 20,
+    "Magic Lamp→Critical Strike": -20,
+    "Laser Volley→Andras, the Human Weapon": -11.7,
+    "Laser Volley→Alex, Trainer of Heroes": 16.8,
+    "Laser Volley→Kazena, the Storming Rebel": -3.7
+  },
+  "abilityPriors": {
+    "Fighting@Alex, Trainer of Heroes": 68.6,
+    "Fighting@Alex, Trainer of Heroes≥2": 138.3,
+    "Fighting@Alex, Trainer of Heroes≥3": -60,
+    "Training@Alex, Trainer of Heroes": 62.8,
+    "Fighting@Andras, the Human Weapon": 138.4,
+    "Fighting@Andras, the Human Weapon≥2": 150,
+    "Fighting@Andras, the Human Weapon≥3": 150,
+    "Resistance@Andras, the Human Weapon": 140.7,
+    "Toughness@Andras, the Human Weapon": -60,
+    "Toughness@Andras, the Human Weapon≥2": 150,
+    "Adventurousness@Kazena, the Storming Rebel": 148.4,
+    "Support Magic@Kazena, the Storming Rebel": 72.8,
+    "Wealth@Kazena, the Storming Rebel": 150,
+    "Wealth@Kazena, the Storming Rebel≥2": 150,
+    "Wealth@Kazena, the Storming Rebel≥3": -13.7,
+    "Wealth@Andras, the Human Weapon": -60,
+    "Toughness@Kazena, the Storming Rebel": 41.6,
+    "Fighting@Kazena, the Storming Rebel": -60,
+    "Fighting@Kazena, the Storming Rebel≥2": 31.2,
+    "Wealth@Andras, the Human Weapon≥3": -60,
+    "Toughness@Kazena, the Storming Rebel≥2": -60,
+    "Toughness@Alex, Trainer of Heroes": 113.7,
+    "Fighting@Kazena, the Storming Rebel≥3": -60,
+    "Wealth@Alex, Trainer of Heroes≥2": 150,
+    "Toughness@Alex, Trainer of Heroes≥2": 82.9
+  },
+  "equipPriors": {
+    "Ancient Tech Infinite Energy Core@Alex, Trainer of Heroes": -60,
+    "Sacred Hammer of the Volcano@Andras, the Human Weapon": 150,
+    "Sacred Hammer of the Volcano@Alex, Trainer of Heroes": -31.9,
+    "Ancient Tech Infinite Energy Core@Andras, the Human Weapon": 150,
+    "Phalanx Pike@Alex, Trainer of Heroes": -60,
+    "Phalanx Pike@Andras, the Human Weapon": 150,
+    "Ancient Tech Infinite Energy Core@Kazena, the Storming Rebel": -60,
+    "Sacred Hammer of the Volcano@Kazena, the Storming Rebel": -60
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Andras, the Human Weapon": -15,
+    "Golden Ankh→Alex, Trainer of Heroes": 30,
+    "Golden Ankh→Kazena, the Storming Rebel": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Fighting": 30,
+    "Golden Ankh→Resistance": -15,
+    "Golden Ankh→Toughness": -15,
+    "Golden Ankh→Training": 30,
+    "Golden Ankh→Wealth": 30,
+    "Golden Ankh→Adventurousness": 30,
+    "Golden Ankh→Support Magic": 30
+  },
+  "startHandValues": {
+    "Muscle Training": -5,
+    "Wheels": -1.3,
+    "Ancient Tech Infinite Energy Core": 7.2,
+    "Snow Cannon": -4.4,
+    "Sacred Hammer of the Volcano": 4.3,
+    "Quick Attack": 1.2,
+    "Escape": -4.5,
+    "Golden Ankh": -2.9,
+    "Heavy Hit": 2.1,
+    "Wealth": 1.8,
+    "Magnetic Glove": -7.8,
+    "Attack": -1.7,
+    "Divine Gift of Coolness": 3.4,
+    "Juice": 1.1,
+    "Toughness": 2.5
+  },
+  "mulliganStats": {
+    "games": 1359,
+    "mullRate": "12.1%",
+    "winAfterMull": "75.8%",
+    "winAfterKeep": "71.9%"
+  },
+  "heroEffectTiming": {
+    "Kazena, the Storming Rebel@hand:0-1": 2.6
+  },
+  "boardPairs": {
+    "Ancient Tech Infinite Energy Core|Training": -3,
+    "Fighting|Toughness": 7.8,
+    "Resistance|Toughness": 7,
+    "Adventurousness|Wealth": 7.4,
+    "Support Magic|Wealth": 7.3,
+    "Ancient Tech Infinite Energy Core|Resistance": 3.9,
+    "Fighting|Wealth": -4.8,
+    "Resistance|Wealth": -11.7,
+    "Adventurousness|Toughness": -5,
+    "Support Magic|Toughness": -5.5,
+    "Phalanx Pike|Training": -7,
+    "Divine Gift of Coolness|Resistance": -7.2,
+    "Divine Gift of Coolness|Phalanx Pike": -7.3,
+    "Phalanx Pike|Resistance": 7.9
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.8,
+      "n": 135,
+      "values": {
+        "Deepsea Primordium": 0.082,
+        "Elven Forager": -0.467,
+        "Candlestick Squire": 0.2,
+        "Aggressive Town Guard": -0.3
+      }
+    }
+  }
+}

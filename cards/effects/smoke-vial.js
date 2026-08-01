@@ -33,8 +33,77 @@
 //  blocks are honoured by addHeroStatus).
 // ═══════════════════════════════════════════
 
+// Score-Bonus je Gegner-Held, der durch diesen Wurf NEU geblendet wird.
+// Die Gate-Grundschwelle ist MCTS_ACTIVATION_GATE_THRESHOLD = 3, ein
+// Ziel hebt die Karte also spürbar über die Standard-Hürde, ohne sie zu
+// erzwingen — genau der Stellschrauben-Wert, an dem sich nach dem
+// nächsten Training drehen lässt.
+const BLIND_BONUS_PER_TARGET = 8;
+
+/**
+ * Zählt für die CPU-Heuristik, was dieser Wurf tatsächlich bewirken
+ * würde. `helpers.isTargetImmune` ist die Ziel-Hygiene der CPU (tot,
+ * immun, Baihu-Petrify, gecharmt, submerged, Erstzug-Schild) — bewusst
+ * wiederverwendet, statt die Immunitätsregeln hier zu duplizieren.
+ *
+ * Rückgabe:
+ *   alive      — lebende Gegner-Helden
+ *   covered    — davon nach dem Wurf geblendet (inkl. bereits geblendeter:
+ *                die bleiben geblendet und bekommen die Dauer erneuert)
+ *   fresh      — davon NEU geblendet (das ist der eigentliche Zugewinn)
+ */
+function blindImpact(engine, pi, helpers) {
+  const gs = engine?.gs;
+  const oi = pi === 0 ? 1 : 0;
+  const heroes = gs?.players?.[oi]?.heroes || [];
+  const immune = typeof helpers?.isTargetImmune === 'function'
+    ? helpers.isTargetImmune
+    : null;
+  let alive = 0, covered = 0, fresh = 0;
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const hero = heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    alive++;
+    const already = !!hero.statuses?.blinded;
+    // Ohne Helfer (Aufrufer ohne Bündel) nur der billige Immun-Check —
+    // die Heuristik bleibt dann konservativ statt falsch optimistisch.
+    const blocked = immune
+      ? immune(engine, { type: 'hero', owner: oi, heroIdx: hi })
+      : !!hero.statuses?.immune;
+    if (already) { covered++; continue; }
+    if (blocked) continue;
+    covered++;
+    fresh++;
+  }
+  return { alive, covered, fresh };
+}
+
 module.exports = {
   isPotion: true,
+
+  // ── CPU-Sonderlogik (Als Ruling) ─────────────────────────────────
+  // Smoke Vial gehört zur selben Klasse wie Flashbang: die Wirkung
+  // ("bis zum Ende DEINES nächsten Zuges") entfaltet sich erst im
+  // Gegnerzug, die Sofortbewertung des Gates sieht davon nichts.
+  // Anders als bei Flashbang skaliert der Wert hier aber mit der Lage,
+  // deshalb zweistufig:
+  //   • Vollabdeckung (JEDER lebende Gegner-Held ist danach geblendet
+  //     und mindestens einer davon neu) → auto-commit. Ein kompletter
+  //     Blackout der Gegner-Reihe ist immer den Wurf wert.
+  //   • sonst → Score-Bonus je NEU geblendetem Ziel; das Gate wägt
+  //     weiter ab und lässt die Vial liegen, wenn die Stellung
+  //     dagegenspricht.
+  // Die Zusatzbedingung "mindestens ein neues Blind" verhindert den
+  // Leerwurf, wenn ohnehin schon alle geblendet sind (nur Dauer-Refresh)
+  // — dieselbe Falle wie Flashbangs Doppelwurf.
+  cpuMeta: {
+    alwaysCommit: (engine, pi, helpers) => {
+      const { alive, covered, fresh } = blindImpact(engine, pi, helpers);
+      return alive > 0 && fresh > 0 && covered === alive;
+    },
+    activationScoreBonus: (engine, pi, helpers) =>
+      BLIND_BONUS_PER_TARGET * blindImpact(engine, pi, helpers).fresh,
+  },
 
   canActivate(gs, pi) {
     const oi = pi === 0 ? 1 : 0;

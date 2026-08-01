@@ -11,6 +11,18 @@
 
 module.exports = {
   inherentAction: true,
+  // alwaysCommit (Balance-Präzedenz + Al-Design-Ansage: "vielleicht
+  // DIE stärkste Karte im Deck, sollte mit großer Priorität gespielt
+  // werden"): Der Play ist eine FREIE Zusatzaktion, und der Wert —
+  // Dauerbrand auf ALLE gegnerischen Ziele "for the rest of the
+  // game" — ist ein DoT, dessen Sofort-Delta ≈ 0 ist; kein
+  // Rollout-Horizont sieht die Ticks über zehn Folgezüge. Das Gate
+  // spielte sie deshalb nur in 9% der Spiele. Früh spielen =
+  // maximale Ticks; die once-per-game-Divine-Gift-Restriktion ist
+  // die einzige Ressource. Nebeneffekt: Tutor-Picks (MCTS-bewertet)
+  // sehen nach dem Pick jetzt den sofortigen Gratis-Play im Rollout
+  // → die Karte wird auch aktiver GESUCHT.
+  cpuMeta: { alwaysCommit: true },
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 

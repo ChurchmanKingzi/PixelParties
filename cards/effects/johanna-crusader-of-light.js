@@ -102,7 +102,40 @@ module.exports = {
   // so without this Johanna never tanks for her allies. Her purpose is to
   // absorb damage onto herself, so accept. (Title must equal the card name.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    // Redirect-Confirm: Protection-Lernkanal statt Pauschal-Accept.
+    // Johannas Tank-Job ist richtig, solange sie ihn überlebt — der
+    // ratio-basierte Kanal lehnt lethal/übergroße Redirects ab (sich
+    // selbst zu opfern schützt niemanden: fällt Johanna, fällt die
+    // Immunitäts-Aura gleich mit). Features via protMeta vom
+    // Engine-Hero-Redirect-Prompt; Teildeployment-Guard wie üblich.
+    if (promptData?.type === 'confirm') {
+      try {
+        const { protectionDecision } = require('./_deck-profile');
+        const meta = promptData.protMeta;
+        if (meta) {
+          // Vernunft-Default VOR dem Kanal: lethalen Redirect nie
+          // annehmen — fällt Johanna, fällt die Immunitäts-Aura mit.
+          const d = Number(meta.d) || 0;
+          const hp = Math.max(1, Number(meta.hp) || 1);
+          // hp im meta ist das ZIEL — Johannas eigene HP defensiv holen:
+          let ownHp = 450;
+          try {
+            const pi0 = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+            const me = (engine.gs.players[pi0]?.heroes || []).find(h => h?.name && h.name.startsWith('Johanna'));
+            if (me) ownHp = Math.max(1, me.hp);
+          } catch {}
+          if (Math.ceil(d / 2) >= ownHp) return { confirmed: false };
+          if (typeof protectionDecision === 'function') {
+            const pi = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+            return { confirmed: protectionDecision(engine, pi, promptData.title, meta) };
+          }
+        }
+      } catch {}
+      return { confirmed: true };
+    }
     return undefined;
   },
   activeIn: ['hero'],

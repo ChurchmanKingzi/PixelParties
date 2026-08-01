@@ -101,13 +101,29 @@ function nameToFile(cardName) {
  * Load a card's effect script. Returns the module or null.
  * Results are cached — safe to call repeatedly.
  */
+// Raw-Name-Cache: nameToFile (toLowerCase + 2 Regex-Replaces) lief bei
+// JEDEM Aufruf vor dem Slug-Cache-Check. In heißen Pfaden
+// (_applyCardLevelReductions → _testLevelReqForZones, pro Handkarte ×
+// Zone × MCTS-Rollout-Schritt) dominierte das laut V8-Profil die
+// CPU-Zeit (Slip 'n Slide / Big Stomp >160s pro Spiel). Treffer kosten
+// jetzt einen Map-Lookup; der Slug-Cache bleibt als zweite Ebene für
+// Namensvarianten, die auf denselben Slug normalisieren.
+const rawCache = new Map();
+
 function loadCardEffect(cardName) {
   if (!cardName) return null;
+
+  const rawHit = rawCache.get(cardName);
+  if (rawHit !== undefined) return rawHit;
 
   const normalized = nameToFile(cardName);
 
   // Check cache first
-  if (cache.has(normalized)) return cache.get(normalized);
+  if (cache.has(normalized)) {
+    const mod = cache.get(normalized);
+    rawCache.set(cardName, mod);
+    return mod;
+  }
 
   // Try to load the file
   const filePath = path.join(EFFECTS_DIR, normalized + '.js');
@@ -146,7 +162,15 @@ function loadCardEffect(cardName) {
       // spreads `makeSurpriseCostSummon` would be nulled out here and
       // `loadCardEffect` would return null, breaking highlight + play.
       const hasEngineEntry = (typeof mod.inherentAction === 'function' || mod.inherentAction === true)
-        || typeof mod.beforeSummon === 'function';
+        || typeof mod.beforeSummon === 'function'
+        // Rein passive Engine-Verträge ohne Hooks. `forceEndTurnOnUniqueResolves`
+        // (Terror) wird in _engine.js ausgewertet, stand aber in KEINER der
+        // Erkennungslisten — das Skript überlebte den Filter nur zufällig über
+        // die generische `is*: true`-Regel unten, weil es nebenbei ein
+        // bedeutungsloses `isPassive: true` trug. Beim Aufräumen dieses Flags
+        // (Vertrags-Sweep 1.8.) fiel Terror deshalb komplett aus der Ladung.
+        // Jetzt trägt der ECHTE Vertrag das Skript.
+        || !!mod.forceEndTurnOnUniqueResolves;
       if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
@@ -175,6 +199,7 @@ function loadCardEffect(cardName) {
   }
 
   cache.set(normalized, mod);
+  rawCache.set(cardName, mod);
   return mod;
 }
 

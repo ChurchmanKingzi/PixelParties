@@ -123,6 +123,24 @@ module.exports = {
     if (discardPs) discardPs.discardPile.push(cardName);
     if (inst) engine._untrackCard(inst.id);
 
+    // ── FLUG AN DER RICHTIGEN ZONE VERANKERN (1.8., Als Report) ─────
+    // Bisher gab es hier gar keinen Broadcast; die Animation entstand
+    // aus dem namensbasierten Diff-Detektor des Clients. Verdeckte
+    // Surprises tragen dort alle den Schlüssel '?', also wurde die
+    // LINKESTE Rect genommen — bei einer zweiten Kopie derselben
+    // Surprise flog sichtbar die falsche Karte los.
+    //
+    // Der verankerte Broadcast nennt Zone und Held und unterdrückt
+    // zugleich den Diff-Detektor (er meldet den Abgang vor).
+    const _discardOwner = inst?.originalOwner ?? heroOwner;
+    engine._broadcastEvent('play_pile_transfer', {
+      owner: heroOwner, cardName,
+      from: 'surprise', to: 'discard',
+      fromHeroIdx: heroIdx,
+      ...(_discardOwner !== heroOwner
+        ? { fromOwner: heroOwner, toOwner: _discardOwner } : {}),
+    });
+
     engine.log('surprise_destroyed', {
       card: cardName, by: 'Silent Water Mizune',
       player: gs.players[pi]?.username,

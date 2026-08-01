@@ -96,7 +96,49 @@ function _isEligible(engine, inst, pi) {
   if (!host?.name || host.hp <= 0) return false;
 
   const hoptKey = `creature-effect:${inst.id}`;
-  return engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn;
+  if (engine.gs.hoptUsed?.[hoptKey] !== engine.gs.turn) return false;
+
+  // ── WÜRDE DIE ERSTATTUNG ÜBERHAUPT ETWAS BEWIRKEN? (1.8.) ─────────
+  // Manche Kreaturen führen zusätzlich eine eigene Sperre. Zwei Arten,
+  // und sie müssen unterschiedlich behandelt werden:
+  //
+  //   • INSTANZGENAU (`<key>:<instId>`, z.B. Analyzer) — darf mitgelöst
+  //     werden, wirkt ja nur auf genau diese Karte. Solche Schlüssel
+  //     meldet die Karte über `creatureEffectHoptKeys`.
+  //   • SPIELERWEIT / HART (`<key>:<pi>`, z.B. Greatmaw Shark, Skeleton
+  //     Bard, Rebelliokai Oblivious Oni) — "nur EINE Nutzung pro Runde,
+  //     egal wie viele Kopien". Die darf NICHT gelöst werden: das würde
+  //     alle Kopien freischalten und genau die Regel aushebeln.
+  //
+  // Statt das je Karte zu entscheiden, wird hier simuliert: Schlüssel
+  // versuchsweise entfernen und die Karte SELBST fragen. Sagt ihre
+  // eigene Prüfung weiterhin nein, ist sie kein legales Ziel — der
+  // Spieler kann Field Standard dann gar nicht erst darauf verschwenden.
+  //
+  // Die Simulation ist rein synchron und stellt im `finally` exakt den
+  // Ausgangszustand wieder her (auch das Nicht-Vorhandensein eines
+  // Schlüssels).
+  if (typeof script.canActivateCreatureEffect !== 'function') return true;
+  const gs = engine.gs;
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  const keys = [hoptKey];
+  try {
+    const extra = typeof script.creatureEffectHoptKeys === 'function'
+      ? script.creatureEffectHoptKeys(engine, inst, pi) : null;
+    for (const k of (extra || [])) if (k) keys.push(k);
+  } catch { /* Meldung ist Kür */ }
+  const merk = keys.map(k => [k, Object.prototype.hasOwnProperty.call(gs.hoptUsed, k), gs.hoptUsed[k]]);
+  try {
+    for (const k of keys) delete gs.hoptUsed[k];
+    const probeCtx = engine._createContext(inst, { event: 'canCreatureEffectCheck' });
+    return !!script.canActivateCreatureEffect(probeCtx);
+  } catch {
+    return true;   // Prüfung wirft → wie bisher zulassen
+  } finally {
+    for (const [k, hatte, wert] of merk) {
+      if (hatte) gs.hoptUsed[k] = wert; else delete gs.hoptUsed[k];
+    }
+  }
 }
 
 module.exports = {
@@ -255,6 +297,28 @@ module.exports = {
       if (engine.gs.hoptUsed && engine.gs.hoptUsed[hoptKey] !== undefined) {
         delete engine.gs.hoptUsed[hoptKey];
       }
+      // ── EIGENE SPERREN DER KARTE MITRÄUMEN (1.8., Als Report) ──────
+      // Manche Kreatureffekte führen eine ZUSÄTZLICHE, eigene
+      // Einmal-pro-Zug-Sperre — Greatmaw Shark etwa `greatmaw_shark_
+      // effect:<pi>`, geteilt über alle Kopien eines Spielers. Der
+      // generische Schlüssel oben trifft die nicht, weshalb Field
+      // Standard bei genau diesen Karten wirkungslos blieb (belegt im
+      // Mitschnitt: `field_standard_refire` feuerte, der Hai ließ sich
+      // trotzdem nicht erneut einsetzen).
+      //
+      // Karten melden ihre Extra-Schlüssel über `creatureEffectHoptKeys`
+      // — generisch, damit eine weitere Karte mit eigener Sperre keine
+      // Änderung hier braucht.
+      try {
+        const sc = require('./_loader').loadCardEffect(inst.name);
+        const extra = typeof sc?.creatureEffectHoptKeys === 'function'
+          ? sc.creatureEffectHoptKeys(engine, inst, pi) : null;
+        for (const k of (extra || [])) {
+          if (engine.gs.hoptUsed && engine.gs.hoptUsed[k] !== undefined) {
+            delete engine.gs.hoptUsed[k];
+          }
+        }
+      } catch { /* Extra-Sperren sind Kür, nie Abbruchgrund */ }
       reimbursedNames.push(inst.name);
 
       // Brief "rallying flag" zone animation on the chosen Creature so

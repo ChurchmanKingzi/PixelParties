@@ -1,0 +1,339 @@
+{
+  "deck": "Suicide Bombers",
+  "heroes": [
+    "Ida, the Adept of Destruction",
+    "Bomb Berserker Bartas",
+    "Treasure Huntress Semi"
+  ],
+  "games": 1292,
+  "trainWinRate": "65%",
+  "trainedAt": "2026-07-18T11:56:58.072Z",
+  "meanTurns": 15.4,
+  "cardValues": {
+    "Alchemy": 8,
+    "Elixir of Quickness": 33.4,
+    "Wheels": 8,
+    "Destruction Magic": 8,
+    "Phoenix Tackle": 49.9,
+    "Magnetic Potion": 40,
+    "Magic Hammer": 40,
+    "Fire Bolts": 23.1,
+    "Magnetic Glove": 8.5,
+    "Icebolt": 57,
+    "Resuscitation Potion": 43.4,
+    "Victory Phoenix Cannon": 93.1,
+    "Divine Gift of Fire": 8,
+    "Cloud Pillow": 8,
+    "Flame Avalanche": 76.4,
+    "Pyroblast": 8,
+    "Elixir of Immortality": 43.4
+  },
+  "timing": {
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.76,
+      "mid": 0.87,
+      "late": 1.3
+    },
+    "Wheels": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.3
+    },
+    "Destruction Magic": {
+      "early": 0.75,
+      "mid": 1.22,
+      "late": 1.3
+    },
+    "Phoenix Tackle": {
+      "early": 0.75,
+      "mid": 0.83,
+      "late": 1.3
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.3
+    },
+    "Magic Hammer": {
+      "early": 0.87,
+      "mid": 1.13,
+      "late": 1
+    },
+    "Fire Bolts": {
+      "early": 0.75,
+      "mid": 0.97,
+      "late": 1.3
+    },
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.3
+    },
+    "Icebolt": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Victory Phoenix Cannon": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Cloud Pillow": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1
+    },
+    "Flame Avalanche": {
+      "early": 1,
+      "mid": 0.9,
+      "late": 1.1
+    },
+    "Pyroblast": {
+      "early": 0.84,
+      "mid": 1.16,
+      "late": 1
+    },
+    "Elixir of Immortality": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.25
+    }
+  },
+  "pairBonuses": {
+    "Elixir of Immortality|dc:Flame Avalanche": 4.9,
+    "Phoenix Tackle|dc:Snow Cannon": 5.2,
+    "Magic Hammer|dc:Dark Gear": 4.7,
+    "Pyroblast|Resuscitation Potion": 4.2,
+    "Pyroblast|dc:Snow Cannon": 5.4,
+    "Elixir of Immortality|Wheels": 40
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Wheels": -6.3,
+      "Snow Cannon": -6.7
+    },
+    "swarm": {
+      "Snow Cannon": 8.1,
+      "Golden Ankh": 10.1
+    },
+    "spell": {
+      "Magnetic Potion": -6.4,
+      "Snow Cannon": -10.5,
+      "Divine Gift of Fire": -7.9,
+      "Magnetic Glove": -7.7,
+      "Cloud Pillow": -6.4,
+      "Flame Avalanche": -7.7
+    }
+  },
+  "casterDeltas": {
+    "Magic Hammer": {
+      "Ida, the Adept of Destruction": -15.1,
+      "Bomb Berserker Bartas": 15.3
+    },
+    "Fire Bolts": {
+      "Ida, the Adept of Destruction": -5.1
+    },
+    "Divine Gift of Fire": {
+      "Ida, the Adept of Destruction": -10.5,
+      "Bomb Berserker Bartas": 9.8
+    },
+    "Pyroblast": {
+      "Ida, the Adept of Destruction": 7
+    },
+    "Icebolt": {
+      "Ida, the Adept of Destruction": -10,
+      "Bomb Berserker Bartas": 8
+    },
+    "Victory Phoenix Cannon": {
+      "Bomb Berserker Bartas": 8.8,
+      "Ida, the Adept of Destruction": -11,
+      "Treasure Huntress Semi": 20
+    },
+    "Flame Avalanche": {
+      "Bomb Berserker Bartas": 12.2,
+      "Ida, the Adept of Destruction": -11.7
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Phoenix Tackle": -7.1,
+      "Cloud Pillow": 6.9,
+      "Resuscitation Potion": -6.6
+    },
+    "ahead": {
+      "Beer": -14.7,
+      "Phoenix Tackle": 12.9,
+      "Fire Bolts": 13.3
+    }
+  },
+  "standingEvalThreshold": 742,
+  "targetPriors": {
+    "Phoenix Tackle": {
+      "hp:max": -7.2,
+      "side:own": -20
+    },
+    "Magic Hammer": {
+      "side:own": -20,
+      "frozen": 17.9
+    },
+    "Fire Bolts — Recoil": {
+      "kind:creature": 11.6
+    },
+    "Divine Gift of Fire": {
+      "side:own": -9.2
+    },
+    "Pyroblast": {
+      "side:own": -16.4,
+      "hp:min": -12.6,
+      "kind:creature": -6.2,
+      "hp:max": -11.1,
+      "frozen": 15
+    },
+    "Icebolt": {
+      "hp:max": -9.8,
+      "side:own": -18.5,
+      "frozen": 20
+    },
+    "Victory Phoenix Cannon": {
+      "side:own": -19.7,
+      "hp:min": -8.1,
+      "frozen": 11.1
+    },
+    "Flame Avalanche": {
+      "kind:creature": -7.8,
+      "hp:min": -6.7
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -15.5,
+      "side:own": 7.5
+    },
+    "Biomancy Token": {
+      "hp:min": -18.7,
+      "hp:max": 15.9,
+      "kind:creature": -8.4
+    }
+  },
+  "statusHealRules": {
+    "Beer": {
+      "st:3+": 20,
+      "st:hero-caster": 12.3,
+      "st:1": 2.4,
+      "st:2": 17.9,
+      "st:poison2+": 4,
+      "st:frozen-hero": 11.8,
+      "st:stun-hero": 13.4
+    }
+  },
+  "tutorPickRules": {
+    "Magnetic Potion→Fire Bolts": 2,
+    "Magnetic Potion→Divine Gift of Fire": -16.9,
+    "Magnetic Potion→Dark Gear": -16.8,
+    "Magnetic Potion→Pyroblast": -17.7,
+    "Magnetic Potion→Victory Phoenix Cannon": 10.3,
+    "Magnetic Potion→Flame Avalanche": 3.1,
+    "Magnetic Potion→Beer": -13.9,
+    "Magnetic Potion→Cloud Pillow": -5.1,
+    "Magnetic Potion→Phoenix Tackle": -2.4,
+    "Magnetic Potion→Snow Cannon": -2.2,
+    "Magnetic Glove→Cloud Pillow": -12.3,
+    "Magnetic Glove→Fire Bolts": -20,
+    "Magnetic Glove→Phoenix Tackle": 3.7,
+    "Magnetic Glove→Pyroblast": -12.2,
+    "Magnetic Glove→Snow Cannon": 8.1,
+    "Magnetic Glove→Magic Hammer": -6,
+    "Magnetic Glove→Dark Gear": 6.2,
+    "Magnetic Glove→Icebolt": -7.3,
+    "Magnetic Glove→Flame Avalanche": 3.4,
+    "Magnetic Glove→Victory Phoenix Cannon": 16.4,
+    "Magnetic Glove→Alchemy": -20,
+    "Magnetic Glove→Beer": -5.6,
+    "Victory Phoenix Cannon→Pyroblast": -10.8,
+    "Victory Phoenix Cannon→Phoenix Tackle": 9.3,
+    "Magic Lamp→Chain Lightning": 4.3,
+    "Magic Lamp→Acid Vial": -4.3,
+    "Magic Lamp→Summoning Magic": -4.3,
+    "Magic Lamp→Defending the Gate": 10.2,
+    "Magic Lamp→Coffee": 10.5,
+    "Magic Lamp→Fighting": -14.9,
+    "Magic Lamp→Critical Strike": -20,
+    "Magic Amethyst→Adventurousness": -3.3,
+    "Enigma, the Seller of Secrets→Alchemy": 10.3,
+    "Enigma, the Seller of Secrets→Victory Phoenix Cannon": -10.2,
+    "Enigma, the Seller of Secrets→Magic Hammer": -16.2,
+    "Enigma, the Seller of Secrets→Fire Bolts": 2.2,
+    "Enigma, the Seller of Secrets→Cloud Pillow": -6.3,
+    "Enigma, the Seller of Secrets→Pyroblast": -8.6,
+    "Enigma, the Seller of Secrets→Wheels": 8.9,
+    "Enigma, the Seller of Secrets→Beer": -10.2,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 13,
+    "Enigma, the Seller of Secrets→Divine Gift of Fire": 16.3,
+    "Enigma, the Seller of Secrets→Icebolt": -8.6,
+    "Cute Dog→Victory Phoenix Cannon": -11
+  },
+  "abilityPriors": {
+    "Destruction Magic@Ida, the Adept of Destruction": 150,
+    "Destruction Magic@Bomb Berserker Bartas": 150,
+    "Fighting@Bomb Berserker Bartas": -60,
+    "Alchemy@Bomb Berserker Bartas": 150,
+    "Alchemy@Treasure Huntress Semi": 150,
+    "Adventurousness@Treasure Huntress Semi": 150,
+    "Destruction Magic@Treasure Huntress Semi": -60,
+    "Alchemy@Ida, the Adept of Destruction": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Elixir of Immortality→Bomb Berserker Bartas": -11.3,
+    "Resuscitation Potion→Ida, the Adept of Destruction": 30,
+    "Elixir of Immortality→Ida, the Adept of Destruction": 30,
+    "Resuscitation Potion→Bomb Berserker Bartas": 30,
+    "Elixir of Immortality→Treasure Huntress Semi": 19.4,
+    "Resuscitation Potion→Treasure Huntress Semi": 30
+  },
+  "reviveAbilities": {
+    "Elixir of Immortality→Destruction Magic": 30,
+    "Elixir of Immortality→Fighting": -15,
+    "Elixir of Immortality→Alchemy": 12.6,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Fighting": 30,
+    "Resuscitation Potion→Alchemy": -15,
+    "Elixir of Immortality→Adventurousness": 30,
+    "Golden Ankh→Destruction Magic": 30,
+    "Resuscitation Potion→Adventurousness": 30
+  },
+  "startHandValues": {
+    "Alchemy": 3.2,
+    "Beer": -4.9,
+    "Magic Hammer": -1.9,
+    "Pyroblast": -6.7,
+    "Wheels": 1.7,
+    "Magnetic Glove": 2.4,
+    "Snow Cannon": -4.7,
+    "Golden Ankh": 2.5,
+    "Victory Phoenix Cannon": 1.4,
+    "Cloud Pillow": -1.1,
+    "Fire Bolts": -6.8,
+    "Flame Avalanche": -2.2,
+    "Dark Gear": 2.5,
+    "Divine Gift of Fire": 2.9
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "27.9%",
+    "winAfterMull": "67.6%",
+    "winAfterKeep": "64%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Adventurousness|Alchemy": 10,
+    "Adventurousness|Destruction Magic": 7.4
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

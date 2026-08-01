@@ -1082,6 +1082,32 @@ function LogoParticles() {
 // ═══════════════════════════════════════════
 function MainMenu() {
   const { user, setScreen, setUser, notify, setBgmMode } = useContext(AppContext);
+  // ── Cheatcode (Als Auftrag): 1-2-3-4-5 nacheinander im Hauptmenü
+  // schaltet sofort alle CPU-Gegner + alle Structure Decks frei
+  // (Daten-Sammel-Modus). Puffer hält die letzten 5 Ziffern-Tasten;
+  // jede Nicht-Ziffer setzt zurück. Bewusst ohne UI-Hinweis — es ist
+  // ein Cheatcode. Der Listener lebt nur in dieser Komponente, der
+  // Code wirkt also ausschließlich im Hauptmenü.
+  const cheatBufRef = useRef('');
+  useEffect(() => {
+    const onKey = async (e) => {
+      // Eingabefelder (Chat etc.) nicht abgreifen.
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') { cheatBufRef.current = ''; return; }
+      if (!/^[0-9]$/.test(e.key)) { cheatBufRef.current = ''; return; }
+      cheatBufRef.current = (cheatBufRef.current + e.key).slice(-5);
+      if (cheatBufRef.current !== '12345') return;
+      cheatBufRef.current = '';
+      try {
+        const data = await api('/cheat/unlock-all', { method: 'POST' });
+        notify(`🔓 Cheat activated: +${data.newOpponents} opponents, +${data.newStructures} Structure Decks unlocked!`, 'success');
+      } catch (err) {
+        notify(err.message || 'Cheat failed', 'error');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // ── Menu top-anchor ──
   // Out of the box, .screen-center vertically centers the whole menu
   // (title + buttons + user-info), so when the Puzzle submenu opens
@@ -3795,6 +3821,18 @@ function SingleplayerScreen() {
     return () => { cancelled = true; };
   }, [notify]);
 
+  // Wiedereinstieg nach einem Neuladen: app-main legt den vom Server
+  // gesendeten Zustand hier ab, weil unser eigener game_state-Listener
+  // erst unten beim Einhängen registriert wird und das Ereignis sonst
+  // verloren ginge. Einmal aufnehmen und den Zwischenspeicher leeren.
+  useEffect(() => {
+    const pending = window.__ppPendingCpuBattleState;
+    if (!pending) return;
+    window.__ppPendingCpuBattleState = null;
+    cpuBattleRoom.current = pending.roomId;
+    setCpuBattleState(pending);
+  }, []);
+
   // CPU battle socket listeners
   useEffect(() => {
     const onGameState = (state) => {
@@ -3829,7 +3867,24 @@ function SingleplayerScreen() {
   // BGM
   useEffect(() => {
     if (!setBgmMode) return;
-    if (cpuBattleState && !cpuBattleState.result) setBgmMode('battle');
+    if (cpuBattleState && !cpuBattleState.result) {
+      // Gegnerspezifisches Battle-Theme (1.8.). Der Server bestimmt den
+      // Slug aus dem mittleren Helden des CPU-Decks und liefert ihn als
+      // `cpuBgm`; fehlt er (kein Theme im Ordner), bleibt es beim
+      // generischen Kampfthema.
+      //
+      // HIER ist die Stelle für Singleplayer — der gleichnamige Effekt
+      // in app-main.jsx (PlayScreen) bedient nur den MEHRSPIELER-Weg.
+      // Beim ersten Anlauf hatte ich nur diesen gepatcht, weshalb im
+      // CPU-Kampf weiter `battle` gesetzt wurde.
+      const mode = cpuBattleState.cpuBgm ? 'battle:' + cpuBattleState.cpuBgm : 'battle';
+      if (window.__ppBgmLast !== mode) {
+        window.__ppBgmLast = mode;
+        console.log('[bgm] SP-Zustand: cpuBgm =',
+          JSON.stringify(cpuBattleState.cpuBgm), '→ Modus', mode);
+      }
+      setBgmMode(mode);
+    }
     else if (tutorialAttemptState && !tutorialAttemptState.result) setBgmMode('puzzle');
     else setBgmMode('menu');
     return () => { if (setBgmMode) setBgmMode('menu'); };

@@ -30,6 +30,14 @@ module.exports = {
   // onTurnEnd / onCardLeaveZone fire once placed.
   activeIn: ['hand', 'area'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onCardLeaveZone-Confirm (Coolness-Stack-Zufuhr), Gratis-Ressource.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     /**
      * Self-cast: drop into the caster's Area zone, then seed the

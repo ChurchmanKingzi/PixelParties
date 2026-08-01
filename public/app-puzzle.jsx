@@ -6,6 +6,56 @@
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
 const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
+
+// ── Ambient pixel motes for the Puzzle Creator ─────────────────────────
+// Same visual language as the battle board (reuses the global
+// .board-ambiance / .board-mote CSS and the hand-mote-float keyframes),
+// implemented locally because app-puzzle.js loads BEFORE app-board.js and
+// cannot reference its components.
+//   variant 'board': sparse, dim, long rises — mounted as the FIRST child
+//     of .pz-plane-clip so it paints behind the tilted plane (same layer
+//     order as BoardAmbiance inside .board-plane-clip in battle).
+//   variant 'hand': denser, brighter, short rises — mounted inside the
+//     two hand bars; .board-ambiance's overflow:hidden clips the rise at
+//     the bar edge.
+// Colors mirror the battle defaults (cyan/red + white sparkles) — creator
+// players carry no color identity. Strictly decorative: pointer-events
+// none via the container class.
+function PzAmbiance({ variant }) {
+  const motes = useMemo(() => {
+    const isHand = variant === 'hand';
+    const N = isHand ? 40 : 56;
+    const arr = [];
+    for (let i = 0; i < N; i++) {
+      const dur = (isHand ? 3 : 4) + Math.random() * 5;
+      arr.push({
+        top: Math.random() * 100,
+        left: Math.random() * 100,
+        size: 2 + Math.floor(Math.random() * 3),
+        dur,
+        delay: -Math.random() * dur,
+        dx: (Math.random() * 2 - 1) * (isHand ? 22 : 34),
+        dy: -((isHand ? 20 : 40) + Math.random() * (isHand ? 60 : 130)),
+        max: (isHand ? 0.22 : 0.14) + Math.random() * 0.22,
+        color: Math.random() < 0.25 ? '#ffffff'
+             : (Math.random() < 0.5 ? '#00f0ff' : '#ff5577'),
+      });
+    }
+    return arr;
+  }, [variant]);
+  return (
+    <div className="board-ambiance" aria-hidden="true">
+      {motes.map((p, i) => (
+        <span key={i} className="board-mote" style={{
+          top: p.top + '%', left: p.left + '%',
+          '--p-size': p.size + 'px', '--p-color': p.color,
+          '--p-dur': p.dur + 's', '--p-delay': p.delay + 's',
+          '--p-dx': p.dx + 'px', '--p-dy': p.dy + 'px', '--p-max': p.max,
+        }} />
+      ))}
+    </div>
+  );
+}
 const { GameBoard } = window;
 
 const emptyPlayer = () => ({
@@ -580,21 +630,311 @@ function PuzzleCreator() {
   }, [user?.board]);
 
   // ── Board auto-scaling ──
+  // v8: fixes two v7 bugs Al hit:
+  //   • FLICKER + REVERT (creator): the height shrink only applied while
+  //     currently overflowing — the pass after a shrink measured "fits"
+  //     and reset scale to the width value, oscillating big/small until
+  //     the pass limiter froze it (usually on big). Now every pass
+  //     steers toward the same fixed point min(widthFit, heightFit), so
+  //     the iteration is a contraction and cannot bounce back.
+  //   • TINY ZONES IN TEST MODE: --board-scale lives GLOBALLY on
+  //     documentElement, and entering test mode does not unmount this
+  //     component — only its render output becomes <GameBoard/>. The
+  //     creator's ResizeObserver then fired one last time for the
+  //     detached container with 0×0 → width formula clamped to
+  //     MIN_SCALE 0.5 → and the rAF re-measure chain kept re-asserting
+  //     0.5 for several frames, overriding GameBoard's own correct
+  //     scaler. Guards: bail when the container is detached/zero-sized,
+  //     and the effect now depends on test mode so it disconnects the
+  //     observer and cancels pending rAFs on the mode switch (GameBoard
+  //     owns the variable while mounted; on leaving test mode this
+  //     effect re-runs and takes over again).
+  // The height pass measures the plane's TRANSFORMED bounding box, so
+  // the pseudo-3D projection (vertical compression + near-edge
+  // overhang) is priced in automatically. Labels and min-heights don't
+  // scale linearly with --board-scale, so the fit converges over a few
+  // bounded rAF passes. It also publishes --pz-overhang: with the
+  // plane's top-pivot tilt, the near rows project PAST the layout box
+  // toward the camera — the margin reserves that space so they never
+  // paint over the YOU label / staging hand.
+  const inPuzzleTest = !!puzzleGameState;
+  // Handle for the scaler's updateScale so state-driven effects can
+  // re-kick a fit pass (see the effect after the scaler).
+  const scaleKickRef = useRef(null);
   useEffect(() => {
+    if (inPuzzleTest) return; // GameBoard owns --board-scale in test mode
     const container = boardWrapRef.current;
     if (!container) return;
     const IDEAL_WIDTH = 1000;
     const MIN_SCALE = 0.5;
+    const MAX_SCALE = 1.1;
+    let raf = 0, passes = 0;
     const updateScale = () => {
-      const available = container.clientWidth;
-      const scale = Math.max(MIN_SCALE, Math.min(1.1, available / IDEAL_WIDTH));
-      document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
+      // Detached or collapsed container (mode switch, hidden tab):
+      // never write a scale derived from a 0×0 measurement.
+      if (!container.isConnected || container.clientWidth === 0) return;
+      // Preserve the user's scroll offsets across this pass: during
+      // pz-flat-measure the plane loses transform + overhang padding/
+      // margin, scrollWidth/scrollHeight momentarily shrink, and the
+      // browser CLAMPS the offsets down — a clamp that survives the
+      // restore (same "snap back to far left" loop as on the battle
+      // board). Restored, re-clamped against the FINAL extents, at the
+      // end of the pass.
+      const prevSL = container.scrollLeft;
+      const prevST = container.scrollTop;
+      const widthScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, container.clientWidth / IDEAL_WIDTH));
+      let scale = widthScale;
+      // ── Legit-hscroll detection (v9, rev v13) ──
+      // Measure the column FLAT (tilt neutralized) so only LAYOUT width
+      // counts: transform overflow of the tilted plane must never open
+      // the horizontal scrollbar. Layout overflow is real — Flying
+      // Island zones or a narrow viewport — and switches the wrap into
+      // pz-can-hscroll (tilt stays on + min-content chain, style.css).
+      // IMPORTANT: container.scrollWidth alone cannot detect this. The
+      // wrap's base overflow-x is `clip`, and a clipped box's reported
+      // scrolling area EXCLUDES the clipped-away descendant overflow —
+      // the read never rises above clientWidth, so the scrollbar could
+      // never latch. (The battle detector reads under overflow-x:auto
+      // thanks to its flat-measure exception — that asymmetry is why
+      // battle worked and the creator silently didn't.) The layout
+      // truth lives in the rows instead: row boxes stretch to the
+      // container, but their first→last children span the real content
+      // extent regardless of any ancestor clipping. scrollWidth is
+      // still folded in via max() — in hscroll mode (overflow auto)
+      // it's authoritative and also covers non-row content.
+      container.classList.add('pz-flat-measure');
+      let layoutW = container.scrollWidth;
+      container.querySelectorAll('.pz-board-plane .board-row').forEach(row => {
+        const k = row.children;
+        if (!k.length) return;
+        const w = k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left;
+        if (w > layoutW) layoutW = w;
+      });
+      // Belt: union of every zone rect — structure-independent floor.
+      // Immune to any future row/group wrapper reshuffling: as long as
+      // zones exist, their horizontal span IS the board's layout width.
+      let zMinL = Infinity, zMaxR = -Infinity;
+      container.querySelectorAll('.pz-board-plane .board-zone').forEach(z => {
+        const r = z.getBoundingClientRect();
+        if (r.width === 0) return;
+        if (r.left < zMinL) zMinL = r.left;
+        if (r.right > zMaxR) zMaxR = r.right;
+      });
+      if (zMaxR > zMinL && (zMaxR - zMinL) > layoutW) layoutW = zMaxR - zMinL;
+      container.classList.remove('pz-flat-measure');
+      // Hysteresis (v16): a single +4 threshold flaps when the layout
+      // width sits right at the edge (exactly 3 Flying Islands) —
+      // latching shows the scrollbar → clientHeight shrinks → the
+      // scaler shrinks the board → width drops under the threshold →
+      // unlatch → scrollbar gone → scale back up → relatch, forever
+      // (the constant interface jitter). Once latched, stay latched
+      // until the content is CLEARLY under the line.
+      const wasLatched = container.classList.contains('pz-can-hscroll');
+      const needsHScroll = layoutW > container.clientWidth + (wasLatched ? -36 : 4);
+      // Diagnostics valve: run `window.PP_HSCROLL_DEBUG = true` in the
+      // console to trace why the scrollbar does / doesn't latch.
+      if (window.PP_HSCROLL_DEBUG) {
+        console.log('[pz-hscroll]', {
+          layoutW: Math.round(layoutW),
+          clientWidth: container.clientWidth,
+          needsHScroll,
+          latched: container.classList.contains('pz-can-hscroll'),
+          scale: getComputedStyle(document.documentElement).getPropertyValue('--board-scale').trim(),
+        });
+      }
+      container.classList.toggle('pz-can-hscroll', needsHScroll);
+      const plane = container.querySelector('.pz-board-plane');
+      // v17: overhang from the projected CONTENT extent — absolute
+      // assignment, not incremental. v16 measured the plane BOX
+      // (including its own padding) against the clip box and added the
+      // spill to the padding each pass. That can never converge: a box
+      // whose projection is magnified by f can never contain its own
+      // projection — every pixel of added padding is itself projected
+      // to f pixels of new spill, so the loop diverged geometrically
+      // (pad_{n+1} = f·pad_n + …), ballooning the padding to thousands
+      // of px: gigantic scroll range, and the extreme lateral
+      // perspective displacement smeared the zones into slivers.
+      // The CONTENT's projected extent, in contrast, is finite and
+      // independent of the padding (content sits centered in the box
+      // and the magnification is symmetric about that center), so
+      // needPad = (projectedContent − layoutContent) / 2 is a fixed
+      // point: assigning it absolutely is idempotent and lands in one
+      // pass. Clipping the padding's own projected (empty) region at
+      // the clip wrapper is intentional and harmless.
+      // v18: two-sided overhang — with the anchor on the middle hero
+      // the projection is asymmetric about the box center; the side
+      // farther from the anchor needs more padding. Same content-based
+      // absolute math as v17 (never the box!), per side, corrected by
+      // the measured signed gap (contracting recurrence, |1−f| < 1).
+      if (plane && needsHScroll) {
+        const clipBox = plane.closest('.pz-plane-clip');
+        let pL = Infinity, pR = -Infinity;
+        plane.querySelectorAll('.board-zone').forEach(z => {
+          const r = z.getBoundingClientRect(); // transform ACTIVE
+          if (r.width === 0) return;
+          if (r.left < pL) pL = r.left;
+          if (r.right > pR) pR = r.right;
+        });
+        if (clipBox && pR > pL) {
+          const cr = clipBox.getBoundingClientRect();
+          const cs = getComputedStyle(plane);
+          const padL = parseFloat(cs.paddingLeft) || 0;
+          const padR = parseFloat(cs.paddingRight) || 0;
+          const contentW = Math.max(1, plane.offsetWidth - padL - padR);
+          const newL = Math.min(contentW, Math.max(0, padL + (cr.left - pL)));
+          const newR = Math.min(contentW, Math.max(0, padR + (pR - cr.right)));
+          const prevL = parseFloat(container.style.getPropertyValue('--pz-overhang-l')) || 0;
+          const prevR = parseFloat(container.style.getPropertyValue('--pz-overhang-r')) || 0;
+          if (Math.abs(newL - prevL) > 0.5) container.style.setProperty('--pz-overhang-l', newL.toFixed(1) + 'px');
+          if (Math.abs(newR - prevR) > 0.5) container.style.setProperty('--pz-overhang-r', newR.toFixed(1) + 'px');
+        }
+      } else if (container.style.getPropertyValue('--pz-overhang-l') || container.style.getPropertyValue('--pz-overhang-r')) {
+        container.style.setProperty('--pz-overhang-l', '0px');
+        container.style.setProperty('--pz-overhang-r', '0px');
+      }
+      if (plane) {
+        const cur = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--board-scale')) || 1;
+        const planeRect = plane.getBoundingClientRect(); // transformed extent (flat in hscroll mode)
+        if (planeRect.height > 0) {
+          // Visual overhang of the tilted plane past its layout box.
+          // With margin-bottom set to exactly this value, the plane's
+          // layout consumption equals its visual extent (offsetHeight +
+          // overhang = rect height) — so `needed` below can use the
+          // rect height directly without double counting. Only write on
+          // meaningful change to avoid layout churn.
+          const overhang = Math.max(0, planeRect.height - plane.offsetHeight);
+          const prevOverhang = parseFloat(container.style.getPropertyValue('--pz-overhang')) || 0;
+          if (Math.abs(overhang - prevOverhang) > 0.5) {
+            container.style.setProperty('--pz-overhang', overhang.toFixed(1) + 'px');
+          }
+          // Everything else in the column: hand bars, side labels…
+          // The plane sits inside .pz-plane-clip, which is the actual
+          // DIRECT child of the wrap — compare against that box, or
+          // its offsetHeight (containing the plane) would be added to
+          // othersH and the plane double-counted in `needed`.
+          const planeBox = plane.closest('.pz-plane-clip') || plane;
+          let othersH = 0;
+          for (const child of container.children) {
+            if (child !== planeBox) othersH += child.offsetHeight;
+          }
+          const cs = getComputedStyle(container);
+          const chrome = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+            + (parseFloat(cs.rowGap) || 0) * Math.max(0, container.children.length - 1);
+          const needed = planeRect.height + othersH + chrome;
+          // Fixed point: ALWAYS steer toward the height fit (grow when
+          // there is room, shrink when overflowing), capped by the
+          // width fit — never "reset to width and re-shrink". The 6px
+          // headroom keeps the converged state safely BELOW the
+          // overflow threshold: subpixel rounding of the fit otherwise
+          // leaves a 1–3px scrollHeight excess that surfaces as a
+          // near-immobile vertical scrollbar.
+          const heightFit = cur * ((container.clientHeight - 6) / Math.max(1, needed));
+          scale = Math.max(MIN_SCALE, Math.min(widthScale, heightFit));
+          // ── Visual width fit (v9, responsive) ──
+          // overflow-x is `clip` outside hscroll mode, so the PROJECTED
+          // width of the widest row content must fit the wrap on every
+          // monitor or zones would be cut off. Row boxes stretch to full
+          // width (flex), so measure actual content extent from the
+          // first/last child rects — the near rows magnified by the
+          // projection are automatically the binding case.
+          if (!needsHScroll) {
+            let maxContentW = 0;
+            plane.querySelectorAll('.board-row').forEach(row => {
+              const k = row.children;
+              if (!k.length) return;
+              const w = k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left;
+              if (w > maxContentW) maxContentW = w;
+            });
+            if (maxContentW > 0) {
+              const widthFitVisual = cur * ((container.clientWidth - 6) / maxContentW);
+              scale = Math.max(MIN_SCALE, Math.min(scale, widthFitVisual));
+            }
+          }
+        }
+      }
+      const prev = parseFloat(document.documentElement.style.getPropertyValue('--board-scale')) || 0;
+      // ── Anchor measurement (v21: END of the pass, anchor only) ───
+      // Runs after the latch toggle + overhang updates so the measured
+      // frame is the rendered frame. Fold positions are no longer
+      // measured at all — they are state-derived flow layout (see the
+      // pz-area-fold JSX). Placed BEFORE the scroll restore below: the
+      // flat toggle can clamp a latched scroll offset, and the restore
+      // must run afterwards to repair it.
+      container.classList.add('pz-flat-measure');
+      const heroesMe = container.querySelectorAll('[data-hero-zone][data-hero-owner="me"]');
+      const planeFlat = container.querySelector('.pz-board-plane');
+      if (planeFlat && heroesMe.length >= 3) {
+        const hz = Array.from(heroesMe)
+          .sort((a, b) => +a.dataset.heroIdx - +b.dataset.heroIdx)
+          .map(el => el.getBoundingClientRect());
+        const plFlat = planeFlat.getBoundingClientRect();
+        // Flat measurement = CONTENT coordinates; the origins consume
+        // BOX coordinates — add the live padding-left (v19 lesson).
+        const padLLive = parseFloat(container.style.getPropertyValue('--pz-overhang-l')) || 0;
+        const anchorX = (hz[1].left + hz[1].right) / 2 - plFlat.left + padLLive;
+        const prevAnchor = parseFloat(container.style.getPropertyValue('--pz-anchor-x')) || -1;
+        if (Math.abs(anchorX - prevAnchor) > 0.5) {
+          container.style.setProperty('--pz-anchor-x', anchorX.toFixed(1) + 'px');
+        }
+      }
+      container.classList.remove('pz-flat-measure');
+      // Latch-state change = frame change: force one settle pass so all
+      // measurements re-run against the frame the browser applied.
+      if (wasLatched !== needsHScroll && passes < 5) {
+        passes++;
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(updateScale);
+      }
+      // Restore the scroll offsets saved at the top of the pass,
+      // re-clamped to the final extents (a genuinely shrunken board
+      // lands on its new edge instead of past it).
+      if (prevSL > 0) {
+        const maxSL = Math.max(0, container.scrollWidth - container.clientWidth);
+        const tSL = Math.min(prevSL, maxSL);
+        if (container.scrollLeft !== tSL) container.scrollLeft = tSL;
+      }
+      if (prevST > 0) {
+        const maxST = Math.max(0, container.scrollHeight - container.clientHeight);
+        const tST = Math.min(prevST, maxST);
+        if (container.scrollTop !== tST) container.scrollTop = tST;
+      }
+      if (Math.abs(prev - scale) > 0.003) {
+        document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
+        // Re-measure after the new scale lands (non-linear parts:
+        // labels, min-heights, the projection itself) — bounded.
+        if (passes < 5) {
+          passes++;
+          raf = requestAnimationFrame(updateScale);
+        }
+      } else {
+        passes = 0;
+      }
     };
-    const ro = new ResizeObserver(updateScale);
+    const ro = new ResizeObserver(() => { passes = 0; updateScale(); });
     ro.observe(container);
+    // The wrap's own size doesn't change when its CONTENT grows (hand
+    // bars filling up, rows changing) — observe the column children too
+    // so those changes re-trigger the fit. The scale deadband above
+    // stops the observe→resize→observe feedback once converged.
+    for (const child of container.children) ro.observe(child);
+    // v16: expose the pass for the state-kick effect below. Pure WIDTH
+    // changes of row content (adding/removing island zones) resize NO
+    // observed border box — every observed element stretches to the
+    // wrap's width and keeps its height — so the RO alone can miss the
+    // exact moment the 3rd island crosses the hscroll threshold, and
+    // the fold's area positions would lag one interaction behind.
+    scaleKickRef.current = () => { passes = 0; updateScale(); };
     updateScale();
-    return () => { ro.disconnect(); document.documentElement.style.setProperty('--board-scale', '1'); };
-  }, []);
+    return () => { scaleKickRef.current = null; ro.disconnect(); cancelAnimationFrame(raf); document.documentElement.style.setProperty('--board-scale', '1'); };
+  }, [inPuzzleTest]);
+
+  // Re-run the fit whenever layout-relevant creator state changes —
+  // covers the RO blind spot described above (island zones, area
+  // cards, hand bars all reshaping content without resizing any
+  // observed box).
+  useEffect(() => {
+    if (scaleKickRef.current) scaleKickRef.current();
+  }, [players, areaZones, hand, oppHand]);
 
   const invalidate = useCallback(() => setValidated(false), []);
   // Invalidate whenever hands change (covers add, remove, reorder, drag-drop)
@@ -2080,6 +2420,7 @@ function PuzzleCreator() {
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppHand'); }}
             onDragLeave={() => setDragOverZone(null)}
             onDrop={handleOppHandDrop}>
+            <PzAmbiance variant="hand" />
             <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
             <div className="pz-hand-cards" data-pz-hand="oppHand" style={dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
               {oppHand.map((cardName, i) => {
@@ -2127,22 +2468,66 @@ function PuzzleCreator() {
           </div>
 
           <div className="pz-side-label orbit-font">OPPONENT</div>
+          {/* ── Pseudo-3D ground plane (creator variant) ──────────────
+              Mirrors .board-plane from the battle board: both sides +
+              the area mid-row on one tilted plane, so the creator
+              previews the exact in-battle perspective. Tuning differs
+              (see .pz-board-plane in style.css): the creator has no
+              vertical gap to fill — labels and hand bars sit directly
+              against the rows — so it uses a centered pivot and a much
+              smaller zoom than the battle board. HTML5 drag-&-drop hit
+              testing honours 3D transforms, so all zone onDragOver/
+              onDrop handlers keep working on the projected geometry. */}
+          {/* pz-plane-clip: untransformed buffer between the scroll
+              container (.pz-board-wrap) and the tilted plane — caps the
+              horizontal scroll range at LAYOUT width in hscroll mode
+              (same phantom-range fix as .board-plane-clip on the battle
+              board: the plane's transformed border box would otherwise
+              extend the scrollable region far past the last zone). */}
+          <div className="pz-plane-clip">
+          {/* Ambient motes — FIRST child: paints behind the tilted plane. */}
+          <PzAmbiance variant="board" />
+          <div className="pz-board-plane">
           {renderSide(1, true)}
 
-            {/* Mid-row: 2 area zones positioned to match spacer positions between hero groups */}
-            <div className="board-row" style={{ padding: 'calc(12px * var(--board-scale)) 0' }}>
-              <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
-              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 0, 0, 0) }} {...zh('area', 0, 0, 0)}>
-                {areaZones[0].length > 0 ? <BoardCard cardName={areaZones[0][0]} /> : <div className="board-zone-empty">Your Area</div>}
-              </div>
-              <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
-              <div className="board-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', 1, 0, 0) }} {...zh('area', 1, 0, 0)}>
-                {areaZones[1].length > 0 ? <BoardCard cardName={areaZones[1][0]} /> : <div className="board-zone-empty">Opp Area</div>}
-              </div>
-              <div className="board-hero-group"><div className="board-zone-spacer" /><div className="board-zone-spacer" /><div className="board-zone-spacer" /></div>
+            {/* Mid-row → zero-height fold (battle parity): area zones
+                straddle the fold line and cost NO vertical layout space.
+                v21: positions are derived from STATE, not measured. The
+                measured-variable approach (v16–v20) kept failing on
+                timing: any pass that changed the layout frame (island
+                add/remove, latch flips, scale writes) could leave the
+                CSS vars one frame stale and the zones parked over other
+                columns. This flow layout cannot go stale by
+                construction — each spacer group replicates the hero
+                row's column width exactly (maxLeft + maxRight + 3
+                zone-width elements: left island pads + lead spacer +
+                hero + surprise + right island pads, straight from
+                columnLayout), so the area zones sit in the inter-column
+                gaps for ANY island configuration, re-rendered by React
+                on every state change. z-index lifts the zones above the
+                sibling sides so their halves stay hoverable/droppable. */}
+            <div className="board-row pz-area-fold">
+              {[0, 1, 2].flatMap(hi => {
+                const { maxLeft, maxRight } = columnLayout[hi];
+                const group = (
+                  <div key={'fg' + hi} className="board-hero-group">
+                    {Array.from({ length: maxLeft + maxRight + 3 }).map((_, s) => <div key={s} className="board-zone-spacer" />)}
+                  </div>
+                );
+                if (hi === 2) return [group];
+                const si = hi; // gap 0 → your area, gap 1 → opp area
+                const zone = (
+                  <div key={'az' + si} className="board-zone pz-area-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', si, 0, 0) }} {...zh('area', si, 0, 0)}>
+                    {areaZones[si].length > 0 ? <BoardCard cardName={areaZones[si][0]} /> : <div className="board-zone-empty">{si === 0 ? 'Your Area' : 'Opp Area'}</div>}
+                  </div>
+                );
+                return [group, zone];
+              })}
             </div>
 
             {renderSide(0, false)}
+          </div>{/* /pz-board-plane */}
+          </div>{/* /pz-plane-clip */}
           <div className="pz-side-label orbit-font">YOU</div>
 
           {/* ── Staging Hand: kept inside the board column so it only spans
@@ -2153,6 +2538,7 @@ function PuzzleCreator() {
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('hand'); }}
         onDragLeave={() => setDragOverZone(null)}
         onDrop={handleHandDrop}>
+        <PzAmbiance variant="hand" />
         <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
         <div className="pz-hand-cards" data-pz-hand="hand" style={dragOverZone === 'hand' || dragOverZone === 'hand:hand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
           {hand.map((cardName, i) => {

@@ -241,7 +241,7 @@ function countOwnCreatures(engine, pi) {
     if (inst.faceDown) continue;
     const ctrl = inst.controller ?? inst.owner;
     if (ctrl !== pi) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd) continue;
     if (!hasCardType(cd, 'Creature')) continue;
     n++;
@@ -263,7 +263,7 @@ function countOwnLv0Creatures(engine, pi) {
     if (inst.faceDown) continue;
     const ctrl = inst.controller ?? inst.owner;
     if (ctrl !== pi) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd) continue;
     if (!hasCardType(cd, 'Creature')) continue;
     if ((cd.level ?? -1) !== 0) continue;

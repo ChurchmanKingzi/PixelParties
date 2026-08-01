@@ -1,0 +1,474 @@
+{
+  "deck": "Gather That Storm!",
+  "heroes": [
+    "Nicolas, the Hidden Alchemist",
+    "Tarleinn the Traveler",
+    "Treasure Huntress Semi"
+  ],
+  "games": 1360,
+  "trainWinRate": "77.6%",
+  "trainedAt": "2026-07-23T21:35:28.847Z",
+  "meanTurns": 12.8,
+  "cardValues": {
+    "Magnetic Glove": 19.2,
+    "Elixir of Quickness": 18.9,
+    "Leadership": 8,
+    "Acid Vial": 29.5,
+    "Magic Lamp": 27.8,
+    "Destruction Magic": 8,
+    "Magnetic Potion": 24.5,
+    "Cataclysm": 48.5,
+    "Chain Lightning": 100,
+    "Fire Bomb": 12.9,
+    "Divine Gift of Fire": 12.7,
+    "Cloud in a Bottle": 8,
+    "The Yeeting": 8,
+    "Elixir of Immortality": 8,
+    "Flame Avalanche": 74.2,
+    "Firewall": 40.9,
+    "Tarleinn's Floating Island": 8
+  },
+  "timing": {
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.26,
+      "late": 1.1
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.07
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1
+    },
+    "Magic Lamp": {
+      "early": 0.75,
+      "mid": 1.26,
+      "late": 1
+    },
+    "Destruction Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.1
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Chain Lightning": {
+      "early": 1,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Fire Bomb": {
+      "early": 0.94,
+      "mid": 1.06,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Elixir of Quickness|dc:Magic Lamp": 4.8,
+    "Acid Vial|dc:Cataclysm": 4.4,
+    "Acid Vial|dc:Lifeforce Howitzer": 4.4,
+    "Magic Lamp|dc:Flame Avalanche": 4.3,
+    "Magic Lamp|dc:Cataclysm": 4.1,
+    "Magic Lamp|dc:Firewall": 5.4,
+    "Magnetic Potion|dc:Flame Avalanche": 4.7,
+    "Magnetic Potion|dc:Chain Lightning": 4,
+    "Magnetic Potion|dc:Cataclysm": 5.4,
+    "Magnetic Potion|dc:Firewall": 5.1,
+    "Magnetic Potion|dc:Tarleinn's Floating Island": 4.5,
+    "Tarleinn's Floating Island|dc:Leadership": 6,
+    "Cloud in a Bottle|dc:Flame Avalanche": 4,
+    "Cloud in a Bottle|dc:Chain Lightning": 4,
+    "Cloud in a Bottle|dc:The Yeeting": 4,
+    "Cloud in a Bottle|dc:Firewall": 5.1,
+    "Cloud in a Bottle|dc:Tea": 5.8,
+    "Divine Gift of Fire|dc:Flame Avalanche": 4.4,
+    "Elixir of Immortality|dc:Homerun!": 4.5,
+    "Elixir of Immortality|dc:Tea": 6.6,
+    "Elixir of Immortality|dc:Treasure Hunter's Backpack": 4.5,
+    "Treasure Hunter's Backpack|dc:Cloud in a Bottle": 5.1,
+    "Firewall|Gathering Storm": 5.5
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Cloud in a Bottle": 6.3
+    },
+    "spell": {
+      "Cloud in a Bottle": -6.6,
+      "Resuscitation Potion": -6.7
+    }
+  },
+  "casterDeltas": {
+    "Tarleinn's Floating Island": {
+      "Tarleinn the Traveler": 18.9,
+      "Nicolas, the Hidden Alchemist": -13.3,
+      "Treasure Huntress Semi": -16.8
+    },
+    "Chain Lightning": {
+      "Tarleinn the Traveler": -10.9,
+      "Treasure Huntress Semi": 20
+    },
+    "Divine Gift of Fire": {
+      "Tarleinn the Traveler": -10.5,
+      "Nicolas, the Hidden Alchemist": 12.1
+    },
+    "Flame Avalanche": {
+      "Nicolas, the Hidden Alchemist": 20,
+      "Tarleinn the Traveler": -20,
+      "Treasure Huntress Semi": 20
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Magic Lamp": -6.1,
+      "Leadership": -8,
+      "Lifeforce Howitzer": -11.5,
+      "Elixir of Quickness": -7.8,
+      "Tarleinn's Floating Island": -6.3,
+      "Magnetic Glove": -5.4,
+      "Cloud in a Bottle": -13.3,
+      "Cataclysm": -7.5,
+      "Homerun!": -20,
+      "Resuscitation Potion": -20,
+      "Chain Lightning": 5.9,
+      "Fire Bomb": -9.7,
+      "Snow Cannon": -17,
+      "Elixir of Immortality": -12,
+      "Treasure Hunter's Backpack": -11.5,
+      "Flame Avalanche": 7.6,
+      "The White Eye": -12,
+      "Firewall": -11.8
+    }
+  },
+  "standingEvalThreshold": 821,
+  "menuOfferRules": {
+    "Magic Lamp→Destruction Magic": -8.1,
+    "Magic Lamp→Cloud in a Bottle": 4.6,
+    "Magic Lamp→Cataclysm": -3.7,
+    "Magic Lamp→Chain Lightning": 6.1,
+    "Magic Lamp→Tarleinn's Floating Island": -2.9,
+    "Magic Lamp→Fire Bomb": 6.1,
+    "Magic Lamp→Flame Avalanche": 3.1,
+    "Magic Lamp→Snow Cannon": 9,
+    "Magic Lamp→Elixir of Immortality": -5.7,
+    "Magic Lamp→The White Eye": 7.5,
+    "Magic Lamp→Lifeforce Howitzer": -9.8,
+    "Magic Lamp→Magnetic Glove": 5.7,
+    "Magic Lamp→Firewall": 8.2,
+    "Magic Lamp→Gathering Storm": 14.4,
+    "Magic Lamp→Resuscitation Potion": -14.9,
+    "Magic Lamp→Flashbang": -20,
+    "Magic Lamp→Tea": 4.8,
+    "Magic Lamp→Homerun!": 20
+  },
+  "menuOfferRulesByCluster": {
+    "aggro": {
+      "Magic Lamp→Destruction Magic": -12.6,
+      "Magic Lamp→Acid Vial": -12.9,
+      "Magic Lamp→Cloud in a Bottle": -15,
+      "Magic Lamp→Cataclysm": -14.1,
+      "Magic Lamp→Chain Lightning": -13.6,
+      "Magic Lamp→Dark Gear": -15,
+      "Magic Lamp→Tarleinn's Floating Island": -15,
+      "Magic Lamp→Flame Avalanche": -15,
+      "Magic Lamp→Elixir of Immortality": 3.8,
+      "Magic Lamp→The White Eye": -11.4,
+      "Magic Lamp→Lifeforce Howitzer": -15,
+      "Magic Lamp→Firewall": -15,
+      "Magic Lamp→Gathering Storm": -9.6,
+      "Magic Lamp→Resuscitation Potion": -15,
+      "Magic Lamp→Tea": -15
+    },
+    "swarm": {
+      "Magic Lamp→Destruction Magic": 14.8,
+      "Magic Lamp→Acid Vial": 14.5,
+      "Magic Lamp→Cloud in a Bottle": 14.8,
+      "Magic Lamp→Cataclysm": 11.9,
+      "Magic Lamp→Chain Lightning": 15,
+      "Magic Lamp→Dark Gear": 15,
+      "Magic Lamp→Tarleinn's Floating Island": 15,
+      "Magic Lamp→Flame Avalanche": 15,
+      "Magic Lamp→The White Eye": 15,
+      "Magic Lamp→Firewall": 15,
+      "Magic Lamp→Gathering Storm": 11.2
+    },
+    "spell": {
+      "Magic Lamp→Destruction Magic": -4,
+      "Magic Lamp→Acid Vial": -7.7,
+      "Magic Lamp→Cloud in a Bottle": 10.9,
+      "Magic Lamp→Chain Lightning": -6.5,
+      "Magic Lamp→Tarleinn's Floating Island": -8.2,
+      "Magic Lamp→Flame Avalanche": -6.5,
+      "Magic Lamp→Firewall": -3.8
+    },
+    "mixed": {
+      "Magic Lamp→Acid Vial": 4.6,
+      "Magic Lamp→Cataclysm": 6.1,
+      "Magic Lamp→Dark Gear": 10.4,
+      "Magic Lamp→Fire Bomb": -12.5,
+      "Magic Lamp→Flame Avalanche": 3.6,
+      "Magic Lamp→Firewall": -4.8
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Destruction Magic": -4.7,
+      "Magic Lamp→Acid Vial": -15,
+      "Magic Lamp→Cloud in a Bottle": -10.7,
+      "Magic Lamp→Cataclysm": -8.3,
+      "Magic Lamp→Chain Lightning": -12.5,
+      "Magic Lamp→Dark Gear": -15,
+      "Magic Lamp→Tarleinn's Floating Island": -8.8,
+      "Magic Lamp→Flame Avalanche": -14.1,
+      "Magic Lamp→Elixir of Immortality": -15,
+      "Magic Lamp→The White Eye": -15,
+      "Magic Lamp→Lifeforce Howitzer": -4.7,
+      "Magic Lamp→Firewall": -15,
+      "Magic Lamp→Gathering Storm": -9.3,
+      "Magic Lamp→Resuscitation Potion": -15
+    },
+    "ahead": {
+      "Magic Lamp→Destruction Magic": 15,
+      "Magic Lamp→Acid Vial": 15,
+      "Magic Lamp→Cloud in a Bottle": 15,
+      "Magic Lamp→Cataclysm": 15,
+      "Magic Lamp→Chain Lightning": 15,
+      "Magic Lamp→Dark Gear": 15,
+      "Magic Lamp→Tarleinn's Floating Island": 15,
+      "Magic Lamp→Flame Avalanche": 15,
+      "Magic Lamp→The White Eye": 15,
+      "Magic Lamp→Firewall": 15
+    }
+  },
+  "targetPriors": {
+    "Tarleinn the Traveler": {
+      "dmgred": -16.6,
+      "frozen": -20
+    },
+    "The Yeeting — Choose Target": {
+      "side:own": -11.1
+    },
+    "Tea — Inflict": {
+      "side:own": 6.8
+    },
+    "Treasure Hunter's Backpack — Equip Lifeforce Howitzer": {
+      "hp:min": 9.4
+    },
+    "Steam Dwarf Exterminator": {
+      "hp:min": -6.1
+    }
+  },
+  "surpriseRules": {
+    "Firewall": {
+      "early": 12.1,
+      "mid": 14.4,
+      "late": 7
+    }
+  },
+  "reactionRules": {
+    "Cloud in a Bottle": {
+      "mid": 3.5,
+      "early": 6.1,
+      "late": 13.6
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:3+": -2.8,
+      "st:poison2+": 15.2,
+      "st:2": 12.3,
+      "st:stun-hero": -7.1,
+      "st:frozen-hero": 19.1
+    }
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Destruction Magic": -5.1,
+    "Magic Lamp→Cloud in a Bottle": 4.5,
+    "Magic Lamp→Fighting": -18.8,
+    "Magic Lamp→Dark Gear": -2.3,
+    "Magic Lamp→Beer": -15.5,
+    "Magic Lamp→Tarleinn's Floating Island": -2.8,
+    "Magic Lamp→Flame Avalanche": 2.3,
+    "Magic Lamp→Snow Cannon": 14.1,
+    "Magic Lamp→Elixir of Immortality": -6.4,
+    "Magic Lamp→The White Eye": 6.5,
+    "Magic Lamp→Lifeforce Howitzer": -11.8,
+    "Magic Lamp→Treasure Hunter's Backpack": 5.8,
+    "Magic Lamp→Magnetic Glove": 5.1,
+    "Magic Lamp→Divine Gift of Fire": 4.3,
+    "Magic Lamp→Firewall": 7.8,
+    "Magic Lamp→The Yeeting": -5.2,
+    "Magic Lamp→Gathering Storm": 15.4,
+    "Magic Lamp→Resuscitation Potion": -12.6,
+    "Magic Lamp→Flashbang": -20,
+    "Magic Lamp→Tea": 7.2,
+    "Magic Lamp→Homerun!": 20,
+    "Magic Lamp→Leadership": 3.5,
+    "Magnetic Potion→Destruction Magic": -3.8,
+    "Magnetic Potion→Leadership": -20,
+    "Magnetic Potion→Tea": -7.1,
+    "Magnetic Potion→Chain Lightning": 7.7,
+    "Magnetic Potion→The White Eye": 8.8,
+    "Magnetic Potion→Treasure Hunter's Backpack": 9.3,
+    "Magnetic Potion→Elixir of Immortality": -11.6,
+    "Magnetic Potion→Lifeforce Howitzer": -8.4,
+    "Magnetic Potion→The Yeeting": -9.1,
+    "Magnetic Potion→Gathering Storm": 13,
+    "Magnetic Potion→Cataclysm": 8.8,
+    "Magnetic Potion→Firewall": 11.9,
+    "Magnetic Potion→Fire Bomb": -2,
+    "Magnetic Potion→Homerun!": 20,
+    "Magnetic Potion→Snow Cannon": -3.9,
+    "Magnetic Potion→Tarleinn's Floating Island": -17.6,
+    "Magnetic Potion→Dark Gear": -20,
+    "Magnetic Potion→Acid Vial": 10.2,
+    "Magnetic Potion→Resuscitation Potion": -10.7,
+    "Magnetic Potion→Flashbang": -18.2,
+    "Magnetic Potion→Divine Gift of Fire": -16.6,
+    "Magnetic Potion→Magnetic Glove": -14.9,
+    "Treasure Hunter's Backpack→Lifeforce Howitzer": 3.9,
+    "Treasure Hunter's Backpack→The White Eye": -3.9,
+    "Magnetic Glove→Tea": 18.6,
+    "Magnetic Glove→Chain Lightning": 3,
+    "Magnetic Glove→Dark Gear": -3.3,
+    "Magnetic Glove→Gathering Storm": 11.3,
+    "Magnetic Glove→The White Eye": -4,
+    "Magnetic Glove→Snow Cannon": -5.7,
+    "Magnetic Glove→Fire Bomb": -20,
+    "Magnetic Glove→Treasure Hunter's Backpack": 3.9,
+    "Magnetic Glove→Tarleinn's Floating Island": -16.1,
+    "Magnetic Glove→Acid Vial": 8.6,
+    "Magnetic Glove→Flashbang": -20,
+    "Magnetic Glove→The Yeeting": -20,
+    "Magnetic Glove→Leadership": -5.8,
+    "Magnetic Glove→Divine Gift of Fire": -7.4,
+    "Magnetic Glove→Firewall": 12.8,
+    "Magnetic Glove→Lifeforce Howitzer": -3.8,
+    "Magnetic Glove→Resuscitation Potion": -19.2,
+    "Magnetic Glove→Flame Avalanche": 3.7,
+    "Magnetic Glove→Cloud in a Bottle": 15,
+    "Magnetic Glove→Cataclysm": -18.7,
+    "Magnetic Glove→Elixir of Immortality": 7.3,
+    "Magic Amethyst→Destruction Magic": -20,
+    "Magic Amethyst→Adventurousness": 20,
+    "Enigma, the Seller of Secrets→Snow Cannon": -4.1,
+    "Enigma, the Seller of Secrets→Treasure Hunter's Backpack": -5.7,
+    "Enigma, the Seller of Secrets→Firewall": 19.3,
+    "Enigma, the Seller of Secrets→Gathering Storm": -19.3,
+    "Enigma, the Seller of Secrets→The Yeeting": 10.5,
+    "Enigma, the Seller of Secrets→Tea": 4.5,
+    "Enigma, the Seller of Secrets→Flashbang": 19.1,
+    "Enigma, the Seller of Secrets→Dark Gear": 2.5,
+    "Enigma, the Seller of Secrets→Leadership": 10.5,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 5.5,
+    "Enigma, the Seller of Secrets→Homerun!": 12.1,
+    "Enigma, the Seller of Secrets→Acid Vial": 3.7,
+    "Enigma, the Seller of Secrets→Fire Bomb": -5.5
+  },
+  "abilityPriors": {
+    "Leadership@Nicolas, the Hidden Alchemist": -60,
+    "Leadership@Nicolas, the Hidden Alchemist≥2": -49.8,
+    "Leadership@Nicolas, the Hidden Alchemist≥3": 74.6,
+    "Alchemy@Nicolas, the Hidden Alchemist": 78.8,
+    "Alchemy@Nicolas, the Hidden Alchemist≥2": 150,
+    "Destruction Magic@Tarleinn the Traveler": 150,
+    "Destruction Magic@Tarleinn the Traveler≥2": 150,
+    "Support Magic@Tarleinn the Traveler": -50.5,
+    "Leadership@Tarleinn the Traveler": -26.9,
+    "Destruction Magic@Treasure Huntress Semi": -60,
+    "Destruction Magic@Treasure Huntress Semi≥2": -60,
+    "Adventurousness@Treasure Huntress Semi": 150,
+    "Adventurousness@Treasure Huntress Semi≥2": 150,
+    "Leadership@Treasure Huntress Semi": 150,
+    "Destruction Magic@Nicolas, the Hidden Alchemist": -60,
+    "Leadership@Tarleinn the Traveler≥2": -60,
+    "Leadership@Tarleinn the Traveler≥3": 31.3,
+    "Destruction Magic@Tarleinn the Traveler≥3": 150,
+    "Destruction Magic@Nicolas, the Hidden Alchemist≥2": 93.5,
+    "Destruction Magic@Nicolas, the Hidden Alchemist≥3": 13.8,
+    "Destruction Magic@Treasure Huntress Semi≥3": 150,
+    "Leadership@Treasure Huntress Semi≥2": 50.4,
+    "Leadership@Treasure Huntress Semi≥3": 103.5
+  },
+  "equipPriors": {
+    "Lifeforce Howitzer@Treasure Huntress Semi": -60,
+    "Lifeforce Howitzer@Nicolas, the Hidden Alchemist": 97.8,
+    "The White Eye@Treasure Huntress Semi": -60,
+    "The White Eye@Nicolas, the Hidden Alchemist": -60,
+    "The White Eye@Tarleinn the Traveler": 150,
+    "Lifeforce Howitzer@Tarleinn the Traveler": 32.3
+  },
+  "lockPenalties": {
+    "Destruction Magic|potion@2": 10,
+    "Leadership|potion@2": 8.1,
+    "Destruction Magic|potion@0": -9.6,
+    "Leadership|potion@0": 10,
+    "Leadership|potion@1": -22.8
+  },
+  "reviveTargets": {
+    "Resuscitation Potion→Nicolas, the Hidden Alchemist": 29.3,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": 30,
+    "Elixir of Immortality→Tarleinn the Traveler": 12.1,
+    "Elixir of Immortality→Treasure Huntress Semi": 30,
+    "Resuscitation Potion→Tarleinn the Traveler": 28,
+    "Resuscitation Potion→Treasure Huntress Semi": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Leadership": 5,
+    "Resuscitation Potion→Alchemy": 30,
+    "Elixir of Immortality→Leadership": 30,
+    "Elixir of Immortality→Alchemy": 30,
+    "Elixir of Immortality→Destruction Magic": 30,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Elixir of Immortality→Support Magic": 12.1,
+    "Elixir of Immortality→Adventurousness": 30,
+    "Resuscitation Potion→Support Magic": 22.6,
+    "Resuscitation Potion→Adventurousness": 30
+  },
+  "startHandValues": {
+    "Acid Vial": -1.2,
+    "Resuscitation Potion": 3.1,
+    "Elixir of Quickness": 7.9,
+    "Magic Lamp": -1.8,
+    "Destruction Magic": 3.5,
+    "Firewall": 4.5,
+    "Cloud in a Bottle": -1,
+    "Flame Avalanche": 1.6,
+    "Tea": 1.5,
+    "Dark Gear": -1.6,
+    "Flashbang": -3.1,
+    "Homerun!": -2.3,
+    "Treasure Hunter's Backpack": -8.8,
+    "Chain Lightning": 4.4,
+    "Lifeforce Howitzer": -3.5,
+    "Snow Cannon": -2,
+    "Cataclysm": -3.8,
+    "Tarleinn's Floating Island": -3.7,
+    "Divine Gift of Fire": 3.8
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "41.8%",
+    "winAfterMull": "80%",
+    "winAfterKeep": "76%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Alchemy|Leadership": -4.1,
+    "Destruction Magic|Leadership": -4.4,
+    "Destruction Magic|Gathering Storm": 13.2
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

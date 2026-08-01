@@ -59,7 +59,12 @@ module.exports = {
       const getFreeZones = () => {
         const zones = [];
         const hero = ps.heroes[heroIdx];
-        if (!hero?.name || hero.hp <= 0) return zones;
+        // ── ALS RULING (31.7.) ──────────────────────────────────────
+        // "place"-Effekte setzen KEINEN lebenden Helden voraus — die
+        // Karte wird direkt vom Spieler platziert. Der hp-Filter lieferte
+        // bei totem Helden eine LEERE Zonenliste und ließ den Effekt
+        // still ausfallen, obwohl die Slots noch da sind.
+        if (!hero?.name) return zones;
         const supZones = ps.supportZones[heroIdx] || [];
         for (let s = 0; s < 3; s++) { // Base zones only
           if ((supZones[s] || []).length === 0) {

@@ -1,0 +1,362 @@
+{
+  "deck": "Creepy Crawlies",
+  "heroes": [
+    "Cooldin, King of Coolness",
+    "Alleria, the Queen of Spiders",
+    "Alice, the Puppeteer Girl"
+  ],
+  "games": 1300,
+  "trainWinRate": "43.4%",
+  "trainedAt": "2026-07-23T12:28:22.889Z",
+  "meanTurns": 20.9,
+  "cardValues": {
+    "Spider Hive": 8,
+    "Alchemy": 40.7,
+    "Elixir of Quickness": 45.4,
+    "Crimson Skull Spider": 32.6,
+    "Pure Advantage Camel": 8,
+    "Summoning Magic": 30.5,
+    "Booby Trap": 8,
+    "Rain of Arrows": 75.5,
+    "Leadership": 27.5,
+    "Resuscitation Potion": 38,
+    "Acid Vial": 81.8,
+    "Baby Spider": 47.9,
+    "Spider Avalanche": 8,
+    "Box Spider": 17.8,
+    "Magnetic Potion": 50.2,
+    "Jumper Spider": 8,
+    "Divine Gift of Fire": 49.2
+  },
+  "timing": {
+    "Alchemy": {
+      "early": 0.9,
+      "mid": 1,
+      "late": 1.1
+    },
+    "Elixir of Quickness": {
+      "early": 0.93,
+      "mid": 0.96,
+      "late": 1.11
+    },
+    "Pure Advantage Camel": {
+      "early": 0.75,
+      "mid": 1.05,
+      "late": 1.3
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.2,
+      "late": 1.12
+    },
+    "Booby Trap": {
+      "early": 1,
+      "mid": 0.78,
+      "late": 1.22
+    },
+    "Rain of Arrows": {
+      "early": 0.75,
+      "mid": 0.99,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.07,
+      "late": 1.3
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.05,
+      "late": 1.3
+    },
+    "Baby Spider": {
+      "early": 0.92,
+      "mid": 0.98,
+      "late": 1.11
+    },
+    "Spider Avalanche": {
+      "early": 1,
+      "mid": 0.97,
+      "late": 1.03
+    },
+    "Magnetic Potion": {
+      "early": 0.9,
+      "mid": 1.12,
+      "late": 0.98
+    },
+    "Jumper Spider": {
+      "early": 1,
+      "mid": 0.97,
+      "late": 1.03
+    }
+  },
+  "pairBonuses": {
+    "Spider Hive|dc:Diamond Spider": 15,
+    "Elixir of Quickness|Spider Avalanche": 4.9,
+    "Summoning Magic|dc:Spider Hive": 5.2,
+    "Booby Trap|Diamond Spider": 4.5,
+    "Booby Trap|Magnetic Potion": 4.4,
+    "Acid Vial|Spider Avalanche": 5.8,
+    "Magnetic Potion|Spider Avalanche": 8.7,
+    "Divine Gift of Fire|dc:Leadership": 4.2
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Tharxian Horse": 7.1
+    }
+  },
+  "casterDeltas": {
+    "Booby Trap": {
+      "Alice, the Puppeteer Girl": -6.5
+    },
+    "Spider Avalanche": {
+      "Alice, the Puppeteer Girl": -5.8
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Booby Trap": -10.8,
+      "Spider Avalanche": -11.1,
+      "Magnetic Potion": 6.1,
+      "Divine Gift of Fire": 9,
+      "Box Spider": 7.2,
+      "Tea": -13.1,
+      "Jumper Spider": -12.5
+    },
+    "ahead": {
+      "Rain of Arrows": -8.2,
+      "Baby Spider": -9.1
+    }
+  },
+  "standingEvalThreshold": 1041,
+  "targetPriors": {
+    "Alice, the Puppeteer Girl": {
+      "dmgred": -20
+    },
+    "Booby Trap": {
+      "side:own": -16.4,
+      "hp:max": -9.3,
+      "kind:creature": -8.1
+    },
+    "Tea — Inflict": {
+      "hp:min": -11.5,
+      "kind:creature": 12.2
+    },
+    "The Yeeting — Choose Target": {
+      "side:own": -12.3
+    }
+  },
+  "surpriseRules": {
+    "Pure Advantage Camel": {
+      "early": 4.4,
+      "mid": 5,
+      "late": 11.5
+    },
+    "Booby Trap": {
+      "early": 6,
+      "late": -2.8
+    },
+    "Spider Avalanche": {
+      "early": -6,
+      "mid": 3.2,
+      "late": 14.1
+    },
+    "Jumper Spider": {
+      "early": 5.1,
+      "mid": 7.9,
+      "late": 9.9
+    },
+    "Tharxian Horse": {
+      "early": 20,
+      "mid": 20,
+      "late": 20
+    }
+  },
+  "impactWeights": {
+    "dmg100": 0.036,
+    "heroKill": 0.153,
+    "creatureKill": 0.031,
+    "loCut": 0,
+    "hiCut": 0.065
+  },
+  "impactRules": {
+    "Rain of Arrows": {
+      "low": -12.9,
+      "high": 14.8
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:2": 18.7,
+      "st:1": 2.8,
+      "st:frozen-hero": -13.5,
+      "st:stun-hero": 3.4,
+      "st:poison2+": 16.6,
+      "st:3+": -5.5
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Magnetic Glove→Spider Hive": 3.8,
+    "Magnetic Glove→Divine Gift of Fire": 13.1,
+    "Magnetic Glove→Booby Trap": 19.9,
+    "Magnetic Glove→Baby Spider": -8.5,
+    "Magnetic Glove→Crimson Skull Spider": -20,
+    "Magnetic Glove→The Yeeting": 15.7,
+    "Magnetic Glove→Alchemy": 14.7,
+    "Magnetic Glove→Rain of Arrows": 20,
+    "Trapping (Lv1)→Spider Avalanche": 7.2,
+    "Trapping (Lv1)→Cybug CENTIPEDE": 8,
+    "Trapping (Lv1)→Pure Advantage Camel": 5.1,
+    "Trapping (Lv1)→Booby Trap": -9.9,
+    "Trapping (Lv1)→Cybug BEE": -10.5,
+    "Magnetic Potion→Cybug CENTIPEDE": 3.8,
+    "Magnetic Potion→Box Spider": 3.6,
+    "Magnetic Potion→Jumper Spider": -16,
+    "Magnetic Potion→Tharxian Horse": 4.6,
+    "Magnetic Potion→Alchemy": -7.7,
+    "Magnetic Potion→Pure Advantage Camel": -13.9,
+    "Magnetic Potion→Summoning Magic": -20,
+    "Magnetic Potion→Booby Trap": -15.9,
+    "Magnetic Potion→Divine Gift of Fire": 5.1,
+    "Magnetic Potion→Rain of Arrows": 3,
+    "Magnetic Potion→Diamond Spider": 11.1,
+    "Magnetic Potion→Spider Hive": 6.2,
+    "Magnetic Potion→Cybug BEE": 10.7,
+    "Magnetic Potion→Spider Avalanche": -20,
+    "Magnetic Potion→Crimson Skull Spider": -7.1,
+    "Magnetic Potion→The Yeeting": 20,
+    "Magnetic Potion→Baby Spider": -2.7,
+    "Magnetic Potion→Wheels": 20,
+    "The Cosmic Depths→Baby Spider": 12.4,
+    "Box Spider→Cybug BEE": 9.7,
+    "Box Spider→Jumper Spider": 8.7,
+    "Box Spider→Booby Trap": -2.3,
+    "Box Spider→Cybug CENTIPEDE": -4.7,
+    "Box Spider→Tharxian Horse": -11,
+    "Enigma, the Seller of Secrets→The Yeeting": -14.2,
+    "Enigma, the Seller of Secrets→Booby Trap": -20,
+    "Enigma, the Seller of Secrets→Alchemy": -20,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -5.7,
+    "Enigma, the Seller of Secrets→Pure Advantage Camel": 11.4,
+    "Enigma, the Seller of Secrets→Spider Avalanche": 18.5,
+    "Enigma, the Seller of Secrets→Box Spider": 2.4,
+    "Enigma, the Seller of Secrets→Baby Spider": -6.1,
+    "Enigma, the Seller of Secrets→Tea": -10.6,
+    "Enigma, the Seller of Secrets→Summoning Magic": 6.2,
+    "Enigma, the Seller of Secrets→Tharxian Horse": -8.6,
+    "Enigma, the Seller of Secrets→Crimson Skull Spider": 10.8,
+    "Enigma, the Seller of Secrets→Cybug BEE": -8.5,
+    "Enigma, the Seller of Secrets→Jumper Spider": 12.6,
+    "Enigma, the Seller of Secrets→Diamond Spider": 12.4,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Alchemy": 2.6,
+    "Magic Amethyst→Summoning Magic": 20,
+    "Magic Amethyst→Destruction Magic": -2.1,
+    "Magic Amethyst→Alchemy": -15.7,
+    "Magic Amethyst→Leadership": -12.6
+  },
+  "abilityPriors": {
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Alchemy@Cooldin, King of Coolness≥2": 150,
+    "Alchemy@Cooldin, King of Coolness≥3": -60,
+    "Leadership@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness≥2": 150,
+    "Summoning Magic@Cooldin, King of Coolness": -48.3,
+    "Decay Magic@Alleria, the Queen of Spiders": 150,
+    "Trapping@Alleria, the Queen of Spiders": 150,
+    "Summoning Magic@Alleria, the Queen of Spiders": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": 118.8,
+    "Leadership@Alice, the Puppeteer Girl": 150,
+    "Leadership@Cooldin, King of Coolness≥3": -60,
+    "Alchemy@Alleria, the Queen of Spiders": -60,
+    "Alchemy@Alice, the Puppeteer Girl": -60,
+    "Leadership@Alleria, the Queen of Spiders": -60,
+    "Alchemy@Alice, the Puppeteer Girl≥2": 82.3,
+    "Alchemy@Alleria, the Queen of Spiders≥2": 150,
+    "Leadership@Alice, the Puppeteer Girl≥2": 150,
+    "Leadership@Alice, the Puppeteer Girl≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Cooldin, King of Coolness": 30,
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30,
+    "Resuscitation Potion→Alleria, the Queen of Spiders": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Leadership": 20.5,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Alchemy": 30,
+    "Resuscitation Potion→Decay Magic": 30,
+    "Resuscitation Potion→Trapping": 30
+  },
+  "startHandValues": {
+    "Wheels": 4.2,
+    "Crimson Skull Spider": 5.7,
+    "Spider Hive": -3.9,
+    "Rain of Arrows": -3.3,
+    "Magnetic Glove": -2.2,
+    "Alchemy": 4.7,
+    "Baby Spider": 1.9,
+    "Cybug BEE": -10.1,
+    "Tea": -2.5,
+    "Tharxian Horse": -2.3,
+    "Summoning Magic": 1.8,
+    "Spider Avalanche": -1.8,
+    "Cybug CENTIPEDE": -6.6,
+    "Leadership": -3.1,
+    "Jumper Spider": 1.1,
+    "Divine Gift of Fire": 7.1,
+    "The Yeeting": 1
+  },
+  "mulliganStats": {
+    "games": 1300,
+    "mullRate": "10.2%",
+    "winAfterMull": "40.9%",
+    "winAfterKeep": "43.7%"
+  },
+  "heroEffectTiming": {
+    "Alice, the Puppeteer Girl@hand:4+": 10.4,
+    "Cooldin, King of Coolness@hand:2-3": 2.1,
+    "Alice, the Puppeteer Girl@hand:2-3": 8.4,
+    "Alice, the Puppeteer Girl@hand:0-1": -3.1,
+    "Cooldin, King of Coolness@hand:0-1": -4.8
+  },
+  "boardPairs": {
+    "Alchemy|Leadership": 15,
+    "Alchemy|Summoning Magic": 12.1,
+    "Leadership|Summoning Magic": 14.5,
+    "Decay Magic|Summoning Magic": 8,
+    "Summoning Magic|Trapping": 7.6,
+    "Crimson Skull Spider|Summoning Magic": 10.5,
+    "Crimson Skull Spider|Leadership": 11.6,
+    "Destruction Magic|Leadership": 6.2,
+    "Box Spider|Summoning Magic": 12.5,
+    "Decay Magic|Pure Advantage Camel": 10,
+    "Diamond Spider|Summoning Magic": 12,
+    "Jumper Spider|Summoning Magic": -15,
+    "Box Spider|Crimson Skull Spider": -15
+  },
+  "protectionRules": {
+    "Alleria, the Queen of Spiders": {
+      "ratioThreshold": 0.25
+    }
+  },
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.525,
+      "n": 99,
+      "values": {
+        "Ska Harpyformer": 0.175,
+        "Deepsea Primordium": 0.181
+      }
+    }
+  }
+}

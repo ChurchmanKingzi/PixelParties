@@ -21,11 +21,25 @@ const MAX_CARD_INSTANCES = 2000;
 // spiral" preceding a hard OOM), so the trip never fires until V8 dies.
 // `rss` (resident set size) tracks committed memory and is the real
 // proxy for the `--max-old-space-size` ceiling. We trip on whichever
-// metric crosses first. Defaults assume an 8GB heap; lower limits will
-// trip earlier (which is fine — bandaid is to bail out, not to optimize).
-const HEAP_CHECK_RSS_MB = 4500;
-const HEAP_CHECK_TOTAL_MB = 4000;
-const HEAP_CHECK_USED_MB = 2500;
+// metric crosses first.
+//
+// FIX 31.7. — die Schwellen waren gegen einen 8-GB-Heap geeicht, der
+// Trainings-Sammellauf startet node aber mit --max-old-space-size=4096.
+// Folge: RSS 4500 wurde nie erreicht (V8 stirbt vorher) und heapTotal
+// 4000 erst 130 MB vor dem harten Limit, also mitten in der Todesspirale
+// — der Wächter kam zu spät und der ganze Batch starb statt nur ein
+// Spiel. Die Schwellen leiten sich jetzt aus dem TATSÄCHLICHEN Limit ab
+// (v8.getHeapStatistics().heap_size_limit), sodass sie auf jeder
+// Heap-Größe rechtzeitig greifen. Anteile bewusst großzügig: der Zweck
+// ist auszusteigen, bevor V8 keine Luft mehr zum Aufräumen hat.
+const _HEAP_LIMIT_MB = (() => {
+  try { return Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576); }
+  catch { return 8192; }
+})();
+const _envMB = (name) => { const v = parseInt(process.env[name] || '', 10); return Number.isFinite(v) && v > 0 ? v : null; };
+const HEAP_CHECK_RSS_MB = _envMB('PP_HEAP_RSS_MB') || Math.round(_HEAP_LIMIT_MB * 0.80);
+const HEAP_CHECK_TOTAL_MB = _envMB('PP_HEAP_TOTAL_MB') || Math.round(_HEAP_LIMIT_MB * 0.72);
+const HEAP_CHECK_USED_MB = _envMB('PP_HEAP_USED_MB') || Math.round(_HEAP_LIMIT_MB * 0.60);
 // Per-turn cap on OUTER snapshots — see snapshot()'s comment for what
 // "outer" means (snapshots taken at the LIVE-turn level, not nested
 // inside an already-committed rollout). With the outer-only counter,
@@ -76,7 +90,22 @@ const MAX_HOOKS_PER_TURN = 10000;
 // turns fire well under 100 damage calls; 50,000 is a 500x safety
 // margin that still catches genuine cascades early — long before
 // the heap ceiling is approached.
-const MAX_DAMAGE_CALLS_PER_TURN = 50000;
+const MAX_DAMAGE_CALLS_PER_TURN = parseInt(process.env.PP_DMG_CAP || '50000', 10);
+// Grace-Budget nach einem LIVE-Trip des Damage-Caps: Der Zähler ist pro
+// Live-Zug kumulativ über alle MCTS-Rollouts UND das echte Spiel —
+// rolloutRestOfTurn durchläuft für den laufenden Zug nie startTurn,
+// also teilen sich Recon-Rollouts und Live-Plays dasselbe Budget. Haben
+// teure Sim-Kaskaden (Overheal-Shock-Heal↔Damage-Ping-Pong o. Ä.) das
+// Budget aufgebraucht, warf VORHER jeder nachfolgende Live-Damage-Call
+// dieselbe Exception erneut (beobachtet: doPlayAbility bei 50001,
+// doPlaySpell bei 50002) — der Rest des Zuges war verkrüppelt. Jetzt:
+// Live-Trip → Kaskade bricht ab, Zähler auf (Cap − Grace) → normale
+// Folge-Aktionen (typisch <100 Calls) laufen weiter; jagt DIESELBE
+// Kaskade erneut hoch, trippt sie nach dem Grace-Budget wieder.
+// Hartes Limit: nach 10 Live-Trips im selben Zug keine Grace mehr —
+// Schutz gegen Exception-schluckende Endlosschleifen.
+const LIVE_DAMAGE_CAP_GRACE = 2000;
+const MAX_LIVE_DAMAGE_TRIPS_PER_TURN = 10;
 const CHAIN_TIMEOUT_MS = 30000; // 30s to respond to chain prompt
 const EFFECT_TIMEOUT_MS = 5000; // 5s max for a single effect to execute
 
@@ -101,6 +130,17 @@ const CARD_FLOW_PACE_MS = 250;
 // (see `setDrawAnimCards` in app-board.jsx) so the wait ends exactly
 // when the hand-slot reveal completes.
 const CARD_FLOW_SETTLE_MS = 500;
+// Als Kosmetik-Ruling (Demo vs Cute Commando): Effekt-Abwürfe laufen
+// EINZELN mit ~0.5s Takt, davor leuchtet die Quell-Karte ~0.5s auf —
+// der Spieler soll sehen, WAS WANN durch WELCHEN Effekt abgeworfen
+// wird. Draws behalten bewusst den schnelleren CARD_FLOW_PACE_MS.
+const DISCARD_PACE_MS = 500;
+const EFFECT_GLOW_LEAD_MS = 500;
+// Als Kosmetik-Ruling (Cute Cat vs Cute Commando): Self-Mills, die per
+// `opts.centerReveal` opten, zeigen jede gemillte Karte NACHEINANDER —
+// Deck → Bildschirmmitte (Flip face-up, kurzer Hold) → Discard-Pile.
+// Gleiches Prozedere wie Chaos Magic (dort 2000 ms), nur schneller.
+const MILL_CENTER_REVEAL_MS = 1100;
 
 // ═══════════════════════════════════════════
 //  GENERIC TARGETING FILTER:
@@ -403,6 +443,11 @@ class GameEngine {
     // (after the engine is constructed) won't take effect; that's fine
     // for self-play where the harness sets env before launch.
     this._hookHeapProfileEnabled = process.env.MCTS_HOOK_HEAP_PROFILE === '1';
+    // PP_COVERAGE=1: Effekt-Coverage-Audit — zählt LIVE-Hook-Feuerungen
+    // pro Karte+Hook prozessglobal (global.__ppCoverage). Nachweis, dass
+    // ein Karteneffekt tatsächlich RESOLVED (nicht nur gespielt wurde);
+    // Auswertung durch den Trainingsrunner (Dump nach coverage.json).
+    this._coverageEnabled = process.env.PP_COVERAGE === '1';
     // Throttle flag for the post-overload force-GC. Set when MCTS overload
     // throws this turn; cleared at the next live-turn boundary inside
     // snapshot()'s reset block (alongside `_mctsKilledThisTurn`). The
@@ -863,7 +908,61 @@ class GameEngine {
     }).join(' → ');
   }
 
+  /**
+   * Synchrone Absturz-Sonde (31.7.).
+   *
+   * WARUM: Der zeitgesteuerte Sampler im Trainings-Loop kann einen
+   * VOLLSTÄNDIG SYNCHRONEN Allokations-Burst nicht sehen — `setInterval`
+   * kommt nie dran, solange der Event-Loop blockiert ist. Gemessen am
+   * echten Absturz: letzter Messpunkt 40 MB, Tod bei 4096 MB, der ganze
+   * Anstieg lag zwischen zwei Ticks. Und `await` auf bereits erfüllte
+   * Promises gibt die Kontrolle NICHT an Timer zurück, eine durchlaufende
+   * Hook-Kette blockiert also trotz async.
+   *
+   * DIE SONDE HÄNGT DESHALB AM FORTSCHRITT DER ENGINE, nicht an der Uhr:
+   * sie wird aus runHooks und snapshot() aufgerufen und meldet nur, wenn
+   * der Heap seit der letzten Meldung um PROBE_STEP_MB gewachsen ist. Im
+   * Normalbetrieb (Heap flach) kostet sie eine Zahl-Subtraktion und
+   * schreibt nie; während eines Bursts liefert sie alle 100 MB einen
+   * Datenpunkt MIT Hook-Namen — genau die Information, die bisher fehlte.
+   *
+   * `_crashTrailSink` setzt der Trainings-Loop; ohne Sink ist die Sonde
+   * bis auf den Zähler wirkungslos (Live-Spiele, Tests).
+   */
+  _crashProbe(tag) {
+    const sink = this._crashTrailSink;
+    if (!sink) return;
+    try {
+      const used = process.memoryUsage().heapUsed;
+      const step = this._crashProbeStep || (this._crashProbeStep = 100 * 1048576);
+      if (this._crashProbeLast == null) { this._crashProbeLast = used; return; }
+      if (used - this._crashProbeLast < step) {
+        // Auch RÜCKWÄRTS nachführen, sonst meldet die Sonde nach einem
+        // GC-Tal jeden kleinen Anstieg erneut.
+        if (used < this._crashProbeLast) this._crashProbeLast = used;
+        return;
+      }
+      this._crashProbeLast = used;
+      sink({
+        heap: Math.round(used / 1048576),
+        tag: String(tag || '?').slice(0, 40),
+        t: this.gs?.turn ?? null,
+        ph: this.gs?.currentPhase ?? null,
+        ap: this.gs?.activePlayer ?? null,
+        snaps: this._snapshotsTaken || 0,
+        hooks: this._hooksFiredThisTurn || 0,
+        sim: this._inMctsSim ? 1 : 0,
+        inst: (this.cardInstances || []).length,
+        chain: (this.chain || []).length,
+        pend: (this.pendingTriggers || []).length,
+        fb: this._cloneFallbacks || 0,
+      });
+    } catch { /* Forensik darf nie stören */ }
+  }
+
   snapshot() {
+    this._crashProbe('snapshot');
+    const _snapT0 = (process.env.PP_SNAP_DEBUG === '1') ? process.hrtime.bigint() : null;
     // Per-turn counters — auto-reset only on LIVE turn change. Inside a
     // rollout, `gs.turn` mutates as the sim advances through future
     // turns; without the `!_inMctsSim` gate, the reset fires on each
@@ -935,17 +1034,68 @@ class GameEngine {
       if (typeof v === 'function' || typeof v === 'symbol') return undefined;
       try { return structuredClone(v); }
       catch {
+        // ── JSON-RÜCKFALLPFAD, JETZT GEDECKELT (31.7.) ────────────────
+        // Der Kommentar unten warnt bereits, dass dieser Pfad langsam ist.
+        // Er ist zusätzlich GEFÄHRLICH: `structuredClone` bewahrt
+        // Objekt-Identität, `JSON.stringify` NICHT. Ist derselbe Teilbaum
+        // über mehrere Pfade erreichbar (Prompt → Ziel → CardInstance →
+        // … ), dupliziert JSON ihn je Pfad — bei geschachtelter Mehrfach-
+        // Referenzierung exponentiell. Genau dieses Bild zeigen die drei
+        // Absturz-Spuren vom 31.7.: Heap konstant 38-54 MB, Snapshot-Rate
+        // konstant ~300/s, dann in EINEM Aufruf 4 GB und Prozesstod. Weder
+        // der Intervall-Sampler noch die synchrone Sonde können das sehen,
+        // weil beide Aufrufe KLAMMERN und nicht hineinschauen.
+        //
+        // Der Deckel macht daraus einen sauberen, bereits behandelten
+        // Abbruch: `_mctsOverload` lässt mctsRankCandidates auf die
+        // Heuristik zurückfallen, statt den ganzen Batch zu töten.
+        this._cloneFallbacks = (this._cloneFallbacks || 0) + 1;
+        const CAP = this._cloneValueCap
+          || (this._cloneValueCap = parseInt(process.env.PP_CLONE_MAX_VALUES || '', 10) || 3000000);
+        let seen = 0;
+        const keyHits = new Map();
         // JSON fallback loses Set/Map instances — several game-state
         // fields (ps._deepseaPerTurnSummoned, gs._surpriseCheckedHeroes,
         // ps._oncePerGameUsed) rely on Set methods. Tag and rehydrate
         // Sets and Maps so the fallback preserves them. Functions are
         // dropped (replacer returns undefined → key is omitted).
-        const serialized = JSON.stringify(v, (_k, val) => {
-          if (typeof val === 'function' || typeof val === 'symbol') return undefined;
-          if (val instanceof Set) return { __set__: Array.from(val) };
-          if (val instanceof Map) return { __map__: Array.from(val) };
-          return val;
-        });
+        let serialized;
+        try {
+          serialized = JSON.stringify(v, (_k, val) => {
+            if (++seen > CAP) {
+              const top = [...keyHits.entries()].sort((a, b) => b[1] - a[1])
+                .slice(0, 8).map(([k, n]) => `${k}×${n}`).join(', ');
+              const err = new Error(`CLONE_OVERFLOW: JSON-Rückfallpfad hat ${CAP} Werte `
+                + `überschritten (Snapshot #${this._snapshotsTaken} Zug ${this.gs?.turn} `
+                + `Phase ${this.gs?.currentPhase}). Häufigste Schlüssel: ${top}. `
+                + `Fast sicher ein mehrfach erreichbarer Teilbaum, den JSON je Pfad kopiert.`);
+              err._mctsOverload = true;
+              err._cloneOverflow = true;
+              throw err;
+            }
+            if (_k && keyHits.size < 400) keyHits.set(_k, (keyHits.get(_k) || 0) + 1);
+            if (typeof val === 'function' || typeof val === 'symbol') return undefined;
+            if (val instanceof Set) return { __set__: Array.from(val) };
+            if (val instanceof Map) return { __map__: Array.from(val) };
+            return val;
+          });
+        } catch (err) {
+          if (err && err._cloneOverflow) {
+            try {
+              this._crashTrailSink?.({
+                heap: Math.round(process.memoryUsage().heapUsed / 1048576),
+                tag: 'CLONE_OVERFLOW', t: this.gs?.turn ?? null,
+                ph: this.gs?.currentPhase ?? null, ap: this.gs?.activePlayer ?? null,
+                snaps: this._snapshotsTaken || 0, hooks: this._hooksFiredThisTurn || 0,
+                sim: this._inMctsSim ? 1 : 0, inst: (this.cardInstances || []).length,
+                chain: (this.chain || []).length, pend: (this.pendingTriggers || []).length,
+                note: err.message.slice(0, 400),
+              });
+            } catch { /* Forensik darf nie stören */ }
+            console.error('[clone-overflow]', err.message);
+          }
+          throw err;
+        }
         // Whole value was unserializable (top-level was a function, or all
         // fields were stripped) — return undefined rather than `JSON.parse(undefined)`-ing.
         if (serialized === undefined) return undefined;
@@ -1037,7 +1187,13 @@ class GameEngine {
       try {
         const sizeKb = Math.round(JSON.stringify(result).length / 1024);
         this._trailWrite('snapSize', { note: `snap=${sizeKb}KB inst=${this.cardInstances?.length || 0} snaps=${this._snapshotsTaken}` });
+        if (process.env.PP_SNAP_DEBUG === '1') {
+          console.error(`[SNAP] turn=${this.gs?.turn} snap=${sizeKb}KB inst=${this.cardInstances?.length || 0} snaps=${this._snapshotsTaken} cumSnapMs=${Math.round(this._snapCumMs || 0)}`);
+        }
       } catch { /* ignore stringify failures */ }
+    }
+    if (_snapT0 !== null) {
+      this._snapCumMs = (this._snapCumMs || 0) + Number(process.hrtime.bigint() - _snapT0) / 1e6;
     }
     return result;
   }
@@ -1168,8 +1324,20 @@ class GameEngine {
   }
 
   /** Switch into simulation mode. Silences all pacing, logs, and socket
-   *  emissions. Caller must pair with exitFastMode(). */
+   *  emissions. Caller must pair with exitFastMode(). Nesting-aware:
+   *  a depth counter guarantees that paired enter/exit calls inside an
+   *  outer fast scope (rollout in rollout, mctsPickFromOptions inside a
+   *  self-play game that is fast end-to-end, ...) can never switch the
+   *  outer scope back to UI pacing. Ohne den Zähler killte der ERSTE
+   *  exitFastMode-Aufruf, der NACH einem restore() lief (z. B.
+   *  mctsPickFromOptions: restore im Loop-finally, exit im äußeren
+   *  finally), den globalen Self-Play-Fast-Mode — ab da liefen
+   *  pauseAction/pausePhase (450-600ms) und alle Animations-_delays in
+   *  Echtzeit. Prompt-lastige Decks (Gigantisaur/Slippery) riefen
+   *  mctsPickFromOptions bei jedem Karten-Pick → Big Stomp/Slip 'n
+   *  Slide >160s/Spiel, Trainings-Timeouts. */
   enterFastMode() {
+    this._fastModeDepth = (this._fastModeDepth || 0) + 1;
     if (this._fastMode) return;
     this._fastMode = true;
     // Null out socketIds so any `io.to(sid).emit(...)` call in helpers
@@ -1178,8 +1346,11 @@ class GameEngine {
     for (const ps of this.gs.players) if (ps) ps.socketId = null;
   }
 
-  /** Leave simulation mode and restore socket routing. */
+  /** Leave simulation mode and restore socket routing. Only the exit
+   *  that closes the OUTERMOST enter actually deactivates. */
   exitFastMode() {
+    if ((this._fastModeDepth || 0) > 0) this._fastModeDepth--;
+    if ((this._fastModeDepth || 0) > 0) return; // äußerer Scope bleibt fast
     if (!this._fastMode) return;
     if (this._savedSocketIds) {
       for (let i = 0; i < this.gs.players.length; i++) {
@@ -1229,7 +1400,17 @@ class GameEngine {
       const script = loadCardEffect(cardName);
       if (script?.cpuResponse) {
         const result = script.cpuResponse(this, 'generic', promptData);
-        if (result !== undefined) return result;
+        if (result !== undefined) {
+          // Rückgabeform vereinheitlichen (Audit 30.7.): `promptConfirmEffect`
+          // — der kanonische "you may"-Weg von 49 Karten — liest
+          // `result?.confirmed === true`, schlichte Trigger-Confirms lesen
+          // `if (result)`. Ein blankes `true` erfüllt nur die zweite Form,
+          // die Zusage ging also still verloren. `{confirmed:true}` erfüllt
+          // beide. Hier als letzte Verteidigungslinie, damit auch der Pfad
+          // OHNE installiertes CPU-Brain (Puzzle, Rollouts) korrekt ist.
+          if (promptData.type === 'confirm' && result === true) return { confirmed: true };
+          return result;
+        }
       }
     }
 
@@ -1539,12 +1720,20 @@ class GameEngine {
    * @returns {string[]} Array of selected target IDs
    */
   _getCpuTargetResponse(validTargets, config = {}, _promptedPlayerIdx) {
-    // Card-specific handler
-    const cardName = config.title;
+    // Card-specific handler. `config.source` erlaubt Karten mit
+    // dynamischem Anzeige-Titel (Cool Repair — "Equip X") trotzdem
+    // den Skript-Dispatch auf ihren echten Kartennamen.
+    const cardName = config.source || config.title;
     if (cardName) {
       const script = loadCardEffect(cardName);
       if (script?.cpuResponse) {
-        const result = script.cpuResponse(this, 'effectTarget', { validTargets, config });
+        // playerIdx: der GEPROMPTETE Spieler gehört in den Payload —
+        // Intercepts, die aus Hooks fremder Resolutionen prompten
+        // (Shield of Life aus afterDamage), können ihn nicht aus
+        // engine._cpuPlayerIdx ableiten und cancelten sonst ihre
+        // eigenen Prompts (Shield of Life feuerte deshalb nie).
+        const result = script.cpuResponse(this, 'effectTarget',
+          { validTargets, config, playerIdx: _promptedPlayerIdx });
         if (result !== undefined) return result;
       }
     }
@@ -1955,6 +2144,11 @@ class GameEngine {
    * @returns {object} hookCtx (possibly modified by cards)
    */
   async runHooks(hookName, hookCtx = {}) {
+    // Absturz-Sonde VOR dem Kill-Switch: der Inline-Heap-Check weiter
+    // unten liegt HINTER `_turnHooksKilled` und ist damit stumm, sobald
+    // das CPU-Zeitlimit oder die Hook-Obergrenze einmal getroffen hat.
+    // Die Sonde muss genau dann noch sehen können.
+    this._crashProbe(hookName);
     // TURN-LEVEL kill-switch (survives snapshot/restore): once any
     // rollout OR live play in this real turn tripped the cap, all
     // subsequent runHooks calls this turn no-op. Prevents each rollout
@@ -2227,7 +2421,26 @@ class GameEngine {
       if (hookCtx.cancelled) break; // Allow early cancellation
 
       const hookFn = card.getHook(hookName);
+      // Die Identität einer Instanz kann sich ZWISCHEN dem Sammeln der
+      // Listener (oben, mit `if (!hookFn) return false`) und diesem
+      // Aufruf ändern — Ascension benennt die Hero-Instanz in place um
+      // (`inst.name = cardName; inst.script = null;`), und die neue
+      // Karte implementiert diesen Hook womöglich gar nicht. Gemeldeter
+      // Fall aus dem ML-Training: "Beato, the Butterfly Witch" sammelt
+      // in `onCardEnterZone` Schulen, ihre aszendierte Form "Beato, the
+      // Eternal Butterfly" hat den Hook nicht → getHook liefert null →
+      // `hookFn is not a function`. Überspringen ist zugleich das
+      // korrekte Ruling: die Effekte der aszendierten Form überschreiben
+      // die der schwächeren Form (Regelheft, Ascended Heroes).
+      if (typeof hookFn !== 'function') continue;
       const ctx = this._createContext(card, hookCtx);
+
+      // Effekt-Coverage-Audit (PP_COVERAGE=1, nur live)
+      if (this._coverageEnabled && !this._inMctsSim) {
+        const covKey = (card.name || '?') + '|' + hookName;
+        const cov = (global.__ppCoverage = global.__ppCoverage || Object.create(null));
+        cov[covKey] = (cov[covKey] || 0) + 1;
+      }
 
       // Per-card hook-fire counter — used by `mctsRunOneRollout`'s
       // leak detector to identify which BOARD cards (not just the
@@ -2591,11 +2804,26 @@ class GameEngine {
       async destroyCard(targetCard) {
         return engine.actionDestroyCard(cardInstance, targetCard);
       },
-      async moveCard(targetCard, toZone, toHeroIdx, toSlot) {
-        return engine.actionMoveCard(targetCard, toZone, toHeroIdx, toSlot);
+      async moveCard(targetCard, toZone, toHeroIdx, toSlot, opts = {}) {
+        // Der Kontext kennt seine eigene Karte — Bewegungen tragen damit
+        // automatisch ihren Verursacher, was das CD-Bewegungsfenster
+        // (Cosmic Malfunction) und die Logs korrekt zuordnen lässt.
+        // Überschreibbar via opts, gleiches Muster wie ctx.discardCards.
+        return engine.actionMoveCard(targetCard, toZone, toHeroIdx, toSlot, {
+          source: cardInstance || undefined,
+          sourceOwner: cardInstance ? (cardInstance.controller ?? cardInstance.owner) : undefined,
+          ...opts,
+        });
       },
-      async discardCards(playerIdx, count) {
-        return engine.actionDiscardCards(playerIdx, count);
+      async discardCards(playerIdx, count, opts = {}) {
+        // Als Kosmetik-Ruling: der Kontext kennt seine eigene Karte —
+        // jeder Effekt-Bulk-Discard leuchtet damit automatisch seine
+        // Quelle an (überschreibbar via opts.source).
+        return engine.actionDiscardCards(playerIdx, count, {
+          source: cardInstance?.name || null,
+          sourceOwner: cardInstance?.owner,
+          ...opts,
+        });
       },
       /** Animated multi-discard — see `engine.actionDiscardCardsAnimated`.
        *  Stagger one card per `CARD_FLOW_PACE_MS` (250 ms) with a
@@ -4810,6 +5038,23 @@ class GameEngine {
       const d = this._describeHeapTripDiagnostics();
       const err = new Error(`MCTS_OVERLOAD: per-turn damage-call cap exceeded (${this._damageCallsThisTurn} > ${MAX_DAMAGE_CALLS_PER_TURN}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
       err._mctsOverload = true;
+      // Live-Trip: Grace-Budget statt Dauerblockade (siehe
+      // LIVE_DAMAGE_CAP_GRACE). Sim-Trips behalten das alte Verhalten —
+      // MCTS fängt die Exception und fällt auf die Heuristik zurück.
+      this._liveDamageTripsThisTurn = (this._liveDamageTripsThisTurn || 0) + 1;
+      if (this._liveDamageTripsThisTurn <= MAX_LIVE_DAMAGE_TRIPS_PER_TURN) {
+        // Grace für BEIDE Kontexte: Ein Sim-Trip hinterließe sonst einen
+        // Zähler ≥ Cap, den der anschließende LIVE-Play erbt — und nicht
+        // jeder Sim-Aufrufer fängt MCTS_OVERLOAD (mctsPickFromOptions
+        // aus Karten-Hooks heraus z. B. nicht), die Exception schlägt
+        // dann ohnehin bis in den Live-Handler durch. Sim-Seite bleibt
+        // trotzdem gedeckelt: _mctsKilledThisTurn stoppt weitere
+        // Rollouts, das Trip-Limit begrenzt den Worst Case.
+        this._damageCallsThisTurn = MAX_DAMAGE_CALLS_PER_TURN - LIVE_DAMAGE_CAP_GRACE;
+        if (!this._inMctsSim) {
+          console.warn(`[Engine] ⚠️  Damage-Cap LIVE getrippt (Trip ${this._liveDamageTripsThisTurn}/${MAX_LIVE_DAMAGE_TRIPS_PER_TURN}, Zug ${this.gs?.turn}) — Kaskade abgebrochen, Grace-Budget ${LIVE_DAMAGE_CAP_GRACE} gewährt`);
+        }
+      }
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
@@ -4860,6 +5105,14 @@ class GameEngine {
     // outside the negated Spell's own resolution.
     if (this.gs._spellNegatedByEffect && (this.gs._spellResolutionDepth || 0) > 0) {
       return { dealt: 0, cancelled: true, spellNegated: true };
+    }
+    // Source-bound effect negation (non-spell sources — Divine Gift of
+    // Rain vs DDG's on-summon AoE): the negated SOURCE was registered
+    // in `preDamageMultiTargetWindow`; void its damage here regardless
+    // of spell depth. Keyed to this exact source, so unrelated damage
+    // in the same window is untouched.
+    if (this._isEffectSourceNegated(source)) {
+      return { dealt: 0, cancelled: true, effectNegated: true };
     }
 
     // ── Absolute self-damage immunity (Carris, the Time Keeper) ──
@@ -5359,6 +5612,9 @@ class GameEngine {
     // future "per N damage dealt" effect) get the true HP loss, not the
     // attempted damage.
     const realDealt = Math.min(actualAmount, hpBefore);
+    if (process.env.PP_DMG_DEBUG === '1' && !this._inMctsSim && realDealt > 0 && target?.maxHp !== undefined) {
+      console.error(`[DMG] turn=${this.gs?.turn} ${realDealt} auf ${target.name} (hp ${hpBefore}→${target.hp}) von ${source?.name || '?'}`);
+    }
 
     // Status-tick damage (Burn / Poison) already logged a dedicated
     // styled entry (`burn_damage` / `poison_damage`) in
@@ -6406,7 +6662,11 @@ class GameEngine {
     // the hand-locked debuff and the BEFORE_DRAW_BATCH cancellation
     // hook. Used by Champion, the Stormbringer's "this draw cannot be
     // prevented" forced-draw on the opponent.
-    if (ps.handLocked && !opts._unpreventable) return [];
+    // drawLocked = reiner Zieh-Lock (Sacred Jewel, Als Ruling): sperrt
+    // NUR Draws. Der volle handLocked blockiert zusätzlich Searches/
+    // Tutoren/Adds (searchDeckForNamedCard, actionAddCardFromDeckToHand
+    // …) — dort wird drawLocked bewusst NICHT geprüft.
+    if ((ps.handLocked || ps.drawLocked) && !opts._unpreventable) return [];
 
     // Fire batch-level draw hook (Intrude, etc.) — only for effect draws, not Resource Phase
     if (!opts._skipBatchHook && !opts._unpreventable && this.gs.currentPhase !== PHASES.RESOURCE) {
@@ -6454,7 +6714,12 @@ class GameEngine {
         if (!this.gs.result) {
           const winnerIdx = playerIdx === 0 ? 1 : 0;
           this.log('deck_out_loss', { loser: ps.username, winner: this.gs.players[winnerIdx]?.username });
-          if (this.onGameOver) {
+          if (this._inMctsSim) {
+            // Sim-lokales Game-Over — siehe checkAllHeroesDead: Rollouts
+            // stoppen über gs.result; onGameOver bleibt Live-Spielen
+            // vorbehalten (snapshot/restore revertiert den Stempel).
+            this.gs.result = { winnerIdx, reason: 'deck_out' };
+          } else if (this.onGameOver) {
             this.onGameOver(this.room, winnerIdx, 'deck_out');
           }
         }
@@ -6604,7 +6869,28 @@ class GameEngine {
    * @param {number} count
    * @returns {Promise<void>}
    */
-  async actionDiscardCardsAnimated(playerIdx, count) {
+  /**
+   * Als Kosmetik-Ruling: die QUELLE eines Effekts (Held, Ability,
+   * Artefakt …) leuchtet im Client auf, bevor ihre Abwürfe/Wirkungen
+   * laufen. Broadcast + kurze Vorlauf-Pause; in Sims/Training no-op
+   * (_delay ist dort übersprungen, Broadcast zusätzlich gegated).
+   * Dedupe-Fenster: dieselbe Quelle glüht innerhalb von 1.5s nur
+   * einmal — Effekte, die je Karte einzeln discarden (Schleifen über
+   * actionDiscardHandCard), pulsen sonst pro Karte neu.
+   */
+  async effectSourceGlow(ownerIdx, sourceName) {
+    if (!sourceName || this._inMctsSim) return;
+    const now = Date.now();
+    if (this._lastGlowName === sourceName && (now - (this._lastGlowAt || 0)) < 1500) return;
+    this._lastGlowName = sourceName;
+    this._lastGlowAt = now;
+    try {
+      this._broadcastEvent('effect_source_glow', { playerIdx: ownerIdx, cardName: sourceName });
+    } catch { /* rein kosmetisch */ }
+    await this._delay(EFFECT_GLOW_LEAD_MS);
+  }
+
+  async actionDiscardCardsAnimated(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
     // First-turn protection mirrors actionDiscardCards.
@@ -6614,24 +6900,36 @@ class GameEngine {
     }
     const toDiscard = Math.min(count, ps.hand.length);
     if (toDiscard <= 0) return;
+    if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
     for (let i = 0; i < toDiscard; i++) {
       const cardName = ps.hand.pop();
-      ps.discardPile.push(cardName);
+      const fromHandIdx = ps.hand.length; // Pre-Splice-Index des gepoppten Slots
+      // Gestohlene Karten gehen zurück ins Ursprungs-Deck — siehe
+      // `_handCardPileOwner` und actionDiscardHandCard.
+      const pileOwner = this._handCardPileOwner(playerIdx, cardName);
+      (this.gs.players[pileOwner] || ps).discardPile.push(cardName);
       const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
+      // Expliziter Per-Karte-Flug vom exakten Hand-Slot (gleiches
+      // Muster wie actionPromptForceDiscard): Broadcast VOR sync, der
+      // Client fängt das Slot-Rect, solange React den Slot noch hält.
+      this._broadcastEvent('play_pile_transfer', {
+        owner: playerIdx, cardName, from: 'hand', to: 'discard', fromHandIdx,
+        ...(pileOwner !== playerIdx ? { fromOwner: playerIdx, toOwner: pileOwner } : {}),
+      });
       if (inst) {
         inst.zone = ZONES.DISCARD;
-        this.log('discard', { player: ps.username, card: cardName });
+        if (pileOwner !== playerIdx) inst.owner = pileOwner;
+        this.log('discard', { player: ps.username, card: cardName, source: opts.source || null });
         await this.runHooks(HOOKS.ON_DISCARD, {
           playerIdx, card: inst, cardName, discardedCardName: cardName,
           discardedInstId: inst.id,
           _fromHand: true,
         });
       }
-      // Stagger between discards, sync inside the loop so each card's
-      // hand→discard flight starts on its own beat.
+      // Als Takt: eine Karte nach der anderen, ~0.5s je Karte.
       if (i < toDiscard - 1) {
         this.sync();
-        await this._delay(CARD_FLOW_PACE_MS);
+        await this._delay(DISCARD_PACE_MS);
       }
     }
     // Trailing settle covers the last discard's hand→discard flight
@@ -6650,7 +6948,7 @@ class GameEngine {
     if (!ps) return [];
     // Hand-lock gate — same rule as the main-deck draw path. A locked
     // hand can't receive cards from any source for the rest of the turn.
-    if (ps.handLocked) return [];
+    if (ps.handLocked || ps.drawLocked) return [];   // Potion-Ziehen ist ein Draw → drawLocked greift
 
     // Fire batch-level draw hook (Intrude, etc.)
     if (this.gs.currentPhase !== PHASES.RESOURCE) {
@@ -6867,7 +7165,15 @@ class GameEngine {
       const cd = this._getCardDB()[targetCard.name];
       if (cd && hasCardType(cd, 'Creature')) {
         isCreatureTarget = true;
-        const hookCtx = { creature: targetCard, effectType: 'destroy', source, cancelled: false, _skipReactionCheck: true };
+        const hookCtx = {
+          creature: targetCard, effectType: 'destroy', source, cancelled: false,
+          // Kosten-Zahlung des eigenen Besitzers (Tribut). Der Vertrag ist
+          // generisch: JEDE Schutzkarte kann darauf reagieren; ob sie es
+          // tut, entscheidet die Karte selbst. Ohne dieses Feld sieht ein
+          // Schutz-Hook eine Tribut-Zerstörung wie jede Fremdzerstörung.
+          isSacrifice: !!opts.isSacrifice,
+          _skipReactionCheck: true,
+        };
         await this.runHooks(HOOKS.BEFORE_CREATURE_AFFECTED, hookCtx);
         if (hookCtx.cancelled) {
           this.log('destroy_blocked', { card: targetCard.name, reason: 'creature protection' });
@@ -6939,6 +7245,9 @@ class GameEngine {
     await this.actionMoveCard(targetCard, ZONES.DISCARD, undefined, undefined, {
       fireCreatureDeath: isCreatureTarget,
       deathSource: source,
+      // Das CD-Bewegungsfenster hat actionDestroyCard oben bereits
+      // geöffnet — hier nicht erneut (sonst zwei Prompts je Destroy).
+      _cdChecked: true,
     });
   }
 
@@ -6963,6 +7272,35 @@ class GameEngine {
       await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner,
         opts.deathSource?.name || opts.source?.name || opts.sourceName || null);
       if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) return;
+    }
+
+    // Cosmic-Malfunction-Fenster für EFFEKT-Bewegungen (Als Ruling:
+    // "jeder Bounce, Zurück-ins-Deck-Effekt oder sofortiges Senden zu
+    // Discard/Deleted Pile per Effekt" zählt; Schadenstode ausdrücklich
+    // NICHT, weil der Kartentext "by an opponent's card or effect"
+    // verlangt). Bisher hing das Fenster allein an actionDestroyCard —
+    // Bounces und direkte Zonen-Verschiebungen liefen daran vorbei.
+    //
+    // Bewusst konservativ: es feuert NUR, wenn die Bewegung einem
+    // GEGNERISCHEN Verursacher zugeordnet werden kann (opts.sourceOwner
+    // bzw. ein Source-Objekt mit owner/controller). Ohne Zuordnung
+    // ändert sich nichts — eigene Kosten-Abwürfe (Lunar Eclipse,
+    // Shu Chaku, Charm of Balance) sollen das Fenster nicht öffnen, und
+    // actionMoveCard kennt seinen Auslöser sonst nicht.
+    // `_cdChecked` unterdrückt den Doppelaufruf aus actionDestroyCard,
+    // das sein eigenes Fenster bereits geöffnet hat.
+    if (!opts._cdChecked && fromZone === 'support' && toZone !== fromZone) {
+      const victimSide = cardInstance.controller ?? cardInstance.owner;
+      const src = opts.source;
+      const srcOwner = (typeof opts.sourceOwner === 'number')
+        ? opts.sourceOwner
+        : (typeof src === 'object' && src ? (src.controller ?? src.owner) : undefined);
+      if (typeof srcOwner === 'number' && srcOwner !== victimSide) {
+        const srcName = (typeof src === 'string') ? src : (src?.name || opts.sourceName || null);
+        const cancelled = await this._checkCdMovementHandReactions(
+          cardInstance, { name: srcName, owner: srcOwner }, 'move');
+        if (cancelled) return;
+      }
     }
 
     // Monia-style creature protection for control changes (not destruction — that's handled in actionDestroyCard)
@@ -7268,33 +7606,14 @@ class GameEngine {
     }
   }
 
-  async actionDiscardCards(playerIdx, count) {
-    // First-turn protection blocks forced discard
-    if (this.gs.firstTurnProtectedPlayer === playerIdx) {
-      this.log('discard_blocked', { player: this.gs.players[playerIdx]?.username, reason: 'shielded' });
-      return;
-    }
-    // For now, discard from end of hand. Later: prompt player to choose.
-    const ps = this.gs.players[playerIdx];
-    if (!ps) return;
-    const toDiscard = Math.min(count, ps.hand.length);
-    for (let i = 0; i < toDiscard; i++) {
-      const cardName = ps.hand.pop();
-      ps.discardPile.push(cardName);
-      const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
-      if (inst) {
-        inst.zone = ZONES.DISCARD;
-        this.log('discard', { player: ps.username, card: cardName });
-        await this.runHooks(HOOKS.ON_DISCARD, {
-          playerIdx, card: inst, cardName, discardedCardName: cardName,
-          // See `actionDiscardHandCard` for the rationale — listeners
-          // that need self-detection compare `ctx.discardedInstId`
-          // against their own `ctx.card.id`.
-          discardedInstId: inst.id,
-          _fromHand: true,
-        });
-      }
-    }
+  async actionDiscardCards(playerIdx, count, opts = {}) {
+    // Als Kosmetik-Ruling: der ungetaktete Bulk-Pfad war die Quelle
+    // des "alles fliegt gleichzeitig"-Problems — er delegiert jetzt
+    // an den getakteten Pfad (Glow + 0.5s je Karte + Einzel-Flug vom
+    // Hand-Slot). In Sims/Training identisches Verhalten wie vorher
+    // (_delay und Broadcasts sind dort no-ops). Signatur erweitert um
+    // opts {source, sourceOwner} für Glow + Log-Attribution.
+    return this.actionDiscardCardsAnimated(playerIdx, count, opts);
   }
 
   /**
@@ -7323,6 +7642,12 @@ class GameEngine {
    * @param {boolean} [opts.skipReactionCheck=true]
    */
   async actionDiscardHandCard(playerIdx, cardName, handIdx, opts = {}) {
+    // Als Kosmetik-Ruling: auch Einzel-Abwürfe mit Effekt-Quelle
+    // kündigen sich per Glow an; das Dedupe-Fenster in
+    // effectSourceGlow verhindert Doppel-Pulse bei Karten-Schleifen.
+    if (opts.source && !opts._noGlow) {
+      await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
+    }
     const ps = this.gs.players[playerIdx];
     if (!ps || !cardName) return false;
     let idx = handIdx;
@@ -7331,9 +7656,27 @@ class GameEngine {
       if (idx < 0) return false;
     }
     ps.hand.splice(idx, 1);
-    ps.discardPile.push(cardName);
+    // ── ABLAGE-ROUTING FÜR GESTOHLENE KARTEN (1.8., Als Ruling) ──────
+    // Eine gestohlene Karte gehört beim Ablegen ins Deck ihres
+    // URSPRÜNGLICHEN Besitzers, nicht in die Ablage des Diebs. Der Flug
+    // geht entsprechend von der Hand des Halters zur fremden Ablage —
+    // der Client kann das seit jeher (`fromOwner`/`toOwner` im
+    // play_pile_transfer-Handler), es wurde nur nie genutzt.
+    const pileOwner = this._handCardPileOwner(playerIdx, cardName);
+    const pilePs = this.gs.players[pileOwner] || ps;
+    pilePs.discardPile.push(cardName);
+    if (pileOwner !== playerIdx) {
+      this._broadcastEvent('play_pile_transfer', {
+        cardName, from: 'hand', to: 'discard',
+        fromOwner: playerIdx, toOwner: pileOwner, fromHandIdx: idx,
+      });
+      this.log('stolen_card_returned', {
+        card: cardName, from: ps.username,
+        to: this.gs.players[pileOwner]?.username, via: 'discard',
+      });
+    }
     const inst = this.findCards({ owner: playerIdx, zone: ZONES.HAND, name: cardName })[0];
-    if (inst) inst.zone = ZONES.DISCARD;
+    if (inst) { inst.zone = ZONES.DISCARD; inst.owner = pileOwner; }
     // Participate in the forced-discard batch counter when an outer
     // `withDiscardBatch` wrapper has opened one. This lets effects
     // that mix `actionPromptForceDiscard` and `actionDiscardHandCard`
@@ -7393,6 +7736,13 @@ class GameEngine {
    * @param {object}  [opts]
    * @param {string}  [opts.source]  - Name of the effect causing the mill (for logging).
    * @param {boolean} [opts.deleteMode] - If true, send to deletedPile instead of discardPile.
+   * @param {boolean} [opts.centerReveal] - If true, each milled card is revealed
+   *                  SEQUENTIALLY at screen centre (Chaos-Magic-style flip)
+   *                  before flying to its pile, instead of the direct
+   *                  deck→pile flight. Paced by `opts.centerRevealMs`
+   *                  (default `MILL_CENTER_REVEAL_MS`).
+   * @param {number}  [opts.centerRevealMs] - Per-card reveal duration for
+   *                  `centerReveal` mode.
    * @returns {string[]} The names of cards that were milled.
    */
   async actionMillCards(playerIdx, count, opts = {}) {
@@ -7584,12 +7934,32 @@ class GameEngine {
       : milledCards;
 
     if (nonRedirectedMilled.length > 0) {
-      this._broadcastEvent('deck_to_discard_animation', {
-        owner:        playerIdx,
-        cardNames:    nonRedirectedMilled,
-        deleteMode:   !!opts.deleteMode,
-        holdDuration: opts.holdDuration || 0,
-      });
+      if (opts.centerReveal) {
+        // Sequential centre reveal (opt-in via `opts.centerReveal` —
+        // Cute Cat's self-mill). ONE broadcast carries all cards; the
+        // client staggers one Kassaran-style flip per card (deck →
+        // viewport centre, flip face-up, brief hold, fly on to the
+        // discard/deleted pile). Chaos Magic's procedure, but faster
+        // (MILL_CENTER_REVEAL_MS vs its 2000 ms) and destination-
+        // aware. The engine awaits the full sequence so follow-up
+        // effects/syncs don't run over the reveals. Sim-safe:
+        // `_broadcastEvent` and `_delay` both no-op in fast mode.
+        const revealMs = opts.centerRevealMs || MILL_CENTER_REVEAL_MS;
+        this._broadcastEvent('mill_center_reveal', {
+          owner:      playerIdx,
+          cardNames:  nonRedirectedMilled,
+          deleteMode: !!opts.deleteMode,
+          revealMs,
+        });
+        await this._delay(nonRedirectedMilled.length * revealMs + 150);
+      } else {
+        this._broadcastEvent('deck_to_discard_animation', {
+          owner:        playerIdx,
+          cardNames:    nonRedirectedMilled,
+          deleteMode:   !!opts.deleteMode,
+          holdDuration: opts.holdDuration || 0,
+        });
+      }
     }
 
     if (redirectedToDeleted.length > 0 && !opts.deleteMode) {
@@ -8579,6 +8949,10 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps || (ps.hand || []).length === 0) return;
 
+    // Als Kosmetik-Ruling: Quelle aufleuchten lassen, bevor die
+    // erzwungenen Abwürfe beginnen.
+    if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
+
     const deleteMode = !!opts.deleteMode;
     const pileKey = deleteMode ? 'deletedPile' : 'discardPile';
     const logEvent = deleteMode ? 'forced_delete' : 'forced_discard';
@@ -8612,7 +8986,16 @@ class GameEngine {
           count: 1,
           title: opts.title || opts.source || (deleteMode ? 'Forced Delete' : 'Forced Discard'),
           description: opts.description || `You must ${verb} ${toDiscard - i} more card${toDiscard - i > 1 ? 's' : ''}.`,
-          eligibleIndices: opts.eligibleIndices,
+          instruction: opts.instruction,
+          // `eligibleIndices` may be a FUNCTION — re-evaluated per pick.
+          // Needed by callers that exclude a specific hand slot (Wheels
+          // excluding its own resolving copy): after each splice the
+          // hand indices shift, so a static array captured before the
+          // loop would exclude the WRONG slot from pick 2 onward.
+          // Static arrays keep their existing one-shot semantics.
+          eligibleIndices: typeof opts.eligibleIndices === 'function'
+            ? opts.eligibleIndices()
+            : opts.eligibleIndices,
           cancellable: false,
         });
 
@@ -8645,7 +9028,21 @@ class GameEngine {
               });
             }
             if (!rescuedFromDelete) {
-              ps[pileKey].push(cardName);
+              // Gestohlene Karten zurück ins Ursprungs-Deck (1.8.).
+              const _po = this._handCardPileOwner(playerIdx, cardName);
+              (this.gs.players[_po] || ps)[pileKey].push(cardName);
+              if (_po !== playerIdx) {
+                this._broadcastEvent('play_pile_transfer', {
+                  cardName: cardName, from: 'hand',
+                  to: deleteMode ? 'deleted' : 'discard',
+                  fromOwner: playerIdx, toOwner: _po,
+                });
+                this.log('stolen_card_returned', {
+                  card: cardName, from: ps.username,
+                  to: this.gs.players[_po]?.username,
+                  via: deleteMode ? 'delete' : 'discard',
+                });
+              }
               this.log(logEvent, { player: ps.username, card: cardName, source: opts.source });
               actuallyDiscarded = true;
             }
@@ -8671,7 +9068,21 @@ class GameEngine {
             });
           }
           if (!rescuedFromDelete) {
-            ps[pileKey].push(result.cardName);
+            // Gestohlene Karten zurück ins Ursprungs-Deck (1.8.).
+            const _po = this._handCardPileOwner(playerIdx, result.cardName);
+            (this.gs.players[_po] || ps)[pileKey].push(result.cardName);
+            if (_po !== playerIdx) {
+              this._broadcastEvent('play_pile_transfer', {
+                cardName: result.cardName, from: 'hand',
+                to: deleteMode ? 'deleted' : 'discard',
+                fromOwner: playerIdx, toOwner: _po,
+              });
+              this.log('stolen_card_returned', {
+                card: result.cardName, from: ps.username,
+                to: this.gs.players[_po]?.username,
+                via: deleteMode ? 'delete' : 'discard',
+              });
+            }
             this.log(logEvent, { player: ps.username, card: result.cardName, source: opts.source });
             actuallyDiscarded = true;
           } else {
@@ -8734,6 +9145,15 @@ class GameEngine {
             fromHandIdx: resolvedHandIdx,
             flightStyle: opts.flightStyle,
           });
+        }
+
+        // Als Takt (Kosmetik-Ruling): mehrere erzwungene Abwürfe
+        // laufen ~0.5s versetzt — bei menschlicher Wahl entsteht der
+        // Abstand natürlich, bei CPU-Picks verhinderte erst dieser
+        // Takt den Gleichzeitigkeits-Burst.
+        if (toDiscard > 1 && i < toDiscard - 1 && actuallyDiscarded) {
+          this.sync();
+          await this._delay(DISCARD_PACE_MS);
         }
 
         // Queue onDiscard / onDelete instead of firing immediately —
@@ -8801,8 +9221,10 @@ class GameEngine {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
 
-    // Generic hand-limit bypass (Nomu, Willy, future cards)
-    if (this._shouldBypassHandLimit(playerIdx)) return;
+    // Generic hand-limit bypass (Nomu, Willy, future cards).
+    // `opts.context` unterscheidet Sofort-Check ('immediate', Default)
+    // vom Rundenende-Check ('endOfTurn') — Big Gwen bypasst nur ersteren.
+    if (this._shouldBypassHandLimit(playerIdx, opts.context || 'immediate')) return;
 
     // Compute effective max hand size
     let maxSize = opts.maxSize;
@@ -10908,6 +11330,22 @@ class GameEngine {
     const gs = this.gs;
     if (pi < 0 || pi !== gs.activePlayer) return null;
 
+    // ── HAND-SPERRE (1.8.) ───────────────────────────────────────────
+    // `neverPlayable` markiert Karten, die aus der HAND nichts bewirken
+    // und nur über einen anderen Weg ins Spiel kommen (Coolness-Stapel,
+    // Discard, Reaktionsfenster). Das Flag existierte bisher NUR als
+    // Client-Anzeige (`neverPlayableCards` graut die Handkarte aus) —
+    // Server und CPU-Gehirn haben es nie geprüft. Die CPU spielte sie
+    // deshalb ungehindert (Als Mitschnitt: Swellpnir in Zug 1 aus der
+    // Hand equipt, inkl. Zusatzaktion, bei leerem Coolness-Stapel).
+    // Hier zentral, weil dieser Pfad Spell-, Attack- UND Kreatur-Plays
+    // aus der Hand validiert und zugleich der Kandidaten-Filter des
+    // CPU-Piloten ist. Artefakte laufen an validateActionPlay vorbei
+    // und sind in server.js separat abgesichert.
+    try {
+      if (loadCardEffect(cardName)?.neverPlayable) return null;
+    } catch { /* kein Skript → normal weiter */ }
+
     const isActionPhase = gs.currentPhase === 3;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
     if (!isActionPhase && !isMainPhase) return null;
@@ -11170,6 +11608,7 @@ class GameEngine {
     // beyond its draw effect, and the summon itself is the action; the
     // activated effect is a separate, already-gated step.
     if (script?.blockedByHandLock && ps.handLocked && cardData.cardType !== 'Creature') return null;
+    if (script?.blockedByDrawLock && ps.drawLocked && cardData.cardType !== 'Creature') return null;
 
     // Hero-specific card restrictions (e.g. duplicate attack bans)
     const heroScript = loadCardEffect(hero.name);
@@ -11456,6 +11895,15 @@ class GameEngine {
       // Spell-in-flight counter — gates advancePhase so the active player
       // can't end the turn while this spell is mid-resolve. Bumped before
       // onPlay (which may open targeting prompts) and released in finally.
+            // Stale-flag safety net (Als Rain-vs-DDG-Report follow-up): a
+      // depth-0 negation used to leave `_spellNegatedByEffect` stamped
+      // with nothing to delete it, silently voiding the NEXT spell's
+      // damage. preDamageMultiTargetWindow no longer stamps at depth 0,
+      // and this guard clears any leaked flag when an OUTERMOST
+      // resolution begins (depth 0 -> 1 only — nested casts must keep
+      // an outer negated spell's flag intact).
+      if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
+
       this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
       // Resolving-Spell stack: tracked alongside the depth counter so
       // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
@@ -11727,6 +12175,15 @@ class GameEngine {
       // (parity with the hero-locked variant + server.js doPlaySpell).
       const hadPriorLog = this.gs._spellDamageLog !== undefined;
       if (!hadPriorLog) this.gs._spellDamageLog = [];
+            // Stale-flag safety net (Als Rain-vs-DDG-Report follow-up): a
+      // depth-0 negation used to leave `_spellNegatedByEffect` stamped
+      // with nothing to delete it, silently voiding the NEXT spell's
+      // damage. preDamageMultiTargetWindow no longer stamps at depth 0,
+      // and this guard clears any leaked flag when an OUTERMOST
+      // resolution begins (depth 0 -> 1 only — nested casts must keep
+      // an outer negated spell's flag intact).
+      if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
+
       this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
       // Resolving-Spell stack — see hero-locked variant above for full
       // rationale. Mirrored here so the any-hero immediate-action path
@@ -11964,6 +12421,7 @@ class GameEngine {
         ps.summonLocked = false;
         ps.summonLockExceptGreatmaw = false; // Greatmaw Remora partial lock
         ps.handLocked = false;
+        ps.drawLocked = false;   // reiner Zieh-Lock (Sacred Jewel)
         ps.damageLocked = false;
         ps.goldLocked = false;
         ps.dealtDamageToOpponent = false;
@@ -12072,6 +12530,7 @@ class GameEngine {
     // that turn-internal cascades trip their own cap; cumulative live-
     // turn pressure is captured by the snapshot/heap caps instead.
     this._damageCallsThisTurn = 0;
+    this._liveDamageTripsThisTurn = 0;
     // Reset per-hook heap-delta accumulators (only populated when
     // MCTS_HOOK_HEAP_PROFILE=1; otherwise these stay empty and the
     // reset is a cheap no-op).
@@ -12216,8 +12675,10 @@ class GameEngine {
         // Process forced kills (Golden Ankh, etc.) — un-negatable
         await this._processForceKills();
         await this._delay(300);
-        // Enforce hand size limit — discard down to 10 if over
-        await this.enforceHandLimit(this.gs.activePlayer);
+        // Enforce hand size limit — regulärer Rundenende-Check; Big Gwens
+        // Area-Bypass gilt hier ausdrücklich NICHT (nur der Pollution-
+        // Sofort-Abwurf wird von ihr ausgesetzt).
+        await this.enforceHandLimit(this.gs.activePlayer, { context: 'endOfTurn' });
         await this.switchTurn();
         break;
     }
@@ -12472,6 +12933,33 @@ class GameEngine {
     await this._checkSurpriseOnTurnEnd(this.gs.activePlayer);
     if (this.gs.result) return;
 
+    // Turn-rollover cleanup for additional-action grants whose TYPE
+    // opted in via `expiresAtTurnEnd` (registerAdditionalActionType
+    // config). Runs here — not in a card hook — so the expiry cannot
+    // be dodged by the provider being Stunned/Frozen/Negated (card
+    // hooks are silenced for incapacitated instances). Fixes the
+    // "Deepsea Primordium's bonus summon survives into later turns"
+    // leak; any future 'this turn' grant gets the same guarantee by
+    // setting the flag. Types WITHOUT the flag keep their existing
+    // self-managed lifetimes (legendary sword, second-action tiers).
+    this._expireTurnEndAdditionalActions();
+
+    // Source-bound effect negations live for the negating reaction's
+    // turn only — wipe the registry at rollover so a negated source
+    // can't stay voided into later turns.
+    delete this.gs._negatedEffectSources;
+
+    // Flush queued turn-end broadcasts (generic contract via
+    // `queueTurnEndBroadcast`): cosmetic effects that "persist for the
+    // rest of the turn" (Divine Gift of Rain's overlay) register their
+    // stop event here instead of hoping a card hook fires.
+    if (Array.isArray(this.gs._turnEndBroadcasts) && this.gs._turnEndBroadcasts.length > 0) {
+      for (const b of this.gs._turnEndBroadcasts) {
+        this._broadcastEvent(b.event, b.payload || {});
+      }
+      delete this.gs._turnEndBroadcasts;
+    }
+
     // Puzzle mode: the human player's turn just ended without winning.
     // Before declaring failure, simulate the opponent's start-of-turn status damage
     // (burn/poison) — it should be possible to win via lingering status effects.
@@ -12534,7 +13022,12 @@ class GameEngine {
         this.sync();
         await this._delay(300);
         // Status damage didn't finish them — puzzle failed
-        if (this.onGameOver) this.onGameOver(this.room, this._cpuPlayerIdx, 'puzzle_failed');
+        if (this._inMctsSim) {
+          // Sim-lokal — siehe checkAllHeroesDead.
+          if (!this.gs.result) this.gs.result = { winnerIdx: this._cpuPlayerIdx, reason: 'puzzle_failed' };
+        } else if (this.onGameOver) {
+          this.onGameOver(this.room, this._cpuPlayerIdx, 'puzzle_failed');
+        }
         return;
       }
     }
@@ -12962,6 +13455,44 @@ class GameEngine {
    * (blind face-down), then steal them. Fizzles on Turn-1 protection
    * or empty opp hand.
    */
+  /**
+   * Zieht die Karten-INSTANZ mit, wenn eine Handkarte den Besitzer
+   * wechselt (Charme Lv2, actionStealFromHand, künftige Diebstähle).
+   *
+   * WARUM (1.8., Als Report): Hände sind Namens-Arrays. Ein Diebstahl
+   * spleißte bisher nur den STRING von einer Hand in die andere — die
+   * zugehörige CardInstance blieb beim Bestohlenen. Zwei Folgen:
+   *   • `findCards({ owner: holder, zone: HAND, name })` findet die
+   *     Karte beim neuen Besitzer NICHT, Discard-Hooks laufen ins Leere.
+   *   • Beim Abwerfen landete sie auf der Ablage des NEUEN Besitzers.
+   *     Belegt im Mitschnitt: "Burning Finger" (CPU-Karte) von Kingzi
+   *     gestohlen und per Inventing abgeworfen → Kingzis Ablage.
+   *
+   * `inst.originalOwner` ist genau dafür gedacht ("never changes — for
+   * discard pile routing") und bleibt unangetastet; nur `owner` folgt
+   * dem physischen Besitz. Damit routen Ablage und Löschen automatisch
+   * zurück zum ursprünglichen Deck.
+   *
+   * @returns {object|null} die umgezogene Instanz, falls gefunden
+   */
+  _moveHandInstanceOwner(fromPi, toPi, cardName) {
+    if (fromPi === toPi || !cardName) return null;
+    const inst = this.findCards({ owner: fromPi, zone: ZONES.HAND, name: cardName })[0];
+    if (!inst) return null;
+    inst.owner = toPi;
+    return inst;
+  }
+
+  /**
+   * Wohin gehört diese Handkarte beim Ablegen/Löschen? Normalfall: der
+   * Halter. Gestohlene Karten: ihr Ursprungs-Deck.
+   */
+  _handCardPileOwner(holderIdx, cardName) {
+    const inst = this.findCards({ owner: holderIdx, zone: ZONES.HAND, name: cardName })[0];
+    const orig = inst?.originalOwner;
+    return (orig != null && orig !== holderIdx) ? orig : holderIdx;
+  }
+
   async actionStealFromHand(pi, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[pi];
@@ -13033,6 +13564,10 @@ class GameEngine {
       if (!cardName) continue;
       oppPs.hand.splice(idx, 1);
       ps.hand.push(cardName);
+      // Instanz mitziehen — sonst bleibt die Karte für findCards beim
+      // Bestohlenen und landet später auf DESSEN Ablage statt auf der
+      // des Ursprungs-Decks.
+      this._moveHandInstanceOwner(oppIdx, pi, cardName);
       stolen.push(cardName);
       const inst = this.cardInstances.find(c =>
         c.owner === oppIdx && c.zone === 'hand' && c.name === cardName
@@ -13997,6 +14532,14 @@ class GameEngine {
           await this.actionDestroyCard(
             { name: ctx.cardName, owner: pi, heroIdx: ctx.cardHeroIdx },
             t.cardInstance,
+            // Diese Zerstörung ist eine KOSTEN-ZAHLUNG des Besitzers, kein
+            // fremder Zugriff. Schutzkarten dürfen sie nicht abwehren —
+            // sonst könnte man den Nutzen einstreichen und den Preis
+            // zurückhalten (belegt in Als Mitschnitt vom 1.8.: Monia bot
+            // an, das gerade als Tribut gewählte Greatmaw Remora zu
+            // retten, NACHDEM der Sacrificial Dagger seinen Schaden
+            // bereits ausgeteilt hatte).
+            { isSacrifice: true },
           );
         }
       } catch (err) {
@@ -14570,6 +15113,12 @@ class GameEngine {
         return;
       }
       this.gs._terrorForceEndTurn = playerIdx;
+      // Großer Auftritt: die Karte einmal mittig einblenden, über zwei
+      // Sekunden wachsen und ausblenden lassen. Rein visuell — der
+      // Client rendert `play_card_showcase` und braucht keinen Zustand.
+      this._broadcastEvent('play_card_showcase', {
+        cardName: 'Terror', owner: playerIdx, durationMs: 2000,
+      });
       this.log('terror_triggered', {
         player: this.gs.players[playerIdx]?.username,
         count,
@@ -14671,7 +15220,15 @@ class GameEngine {
    *  - Hero scripts with bypassHandLimit flag (alive, not incapacitated)
    *  - Per-player _noHandLimitUntilTurn (turn-based bypass, e.g. Willy)
    */
-  _shouldBypassHandLimit(playerIdx) {
+  /**
+   * @param {string} [context] - 'immediate' (Pollution-Sofort-Check nach
+   *   Draws) oder 'endOfTurn' (regulärer Abwurf-Check am Rundenende).
+   *   Hero-/Turn-Bypasses (Willy, Nomu) gelten kontextunabhängig; AREA-
+   *   Module (Big Gwen) bekommen den Kontext durchgereicht und können
+   *   selektiv bypassen — Big Gwen schaltet laut Design nur den SOFORT-
+   *   Abwurf der Pollution Tokens ab, nie den Rundenende-Check.
+   */
+  _shouldBypassHandLimit(playerIdx, context = 'immediate') {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
     // Turn-based bypass (Willy, etc.)
@@ -14696,7 +15253,7 @@ class GameEngine {
       const script = loadCardEffect(inst.name);
       if (!script?.bypassHandLimit) continue;
       if (typeof script.bypassHandLimit === 'function') {
-        if (script.bypassHandLimit(this, playerIdx)) return true;
+        if (script.bypassHandLimit(this, playerIdx, context)) return true;
       } else if (script.bypassHandLimit === true) {
         return true;
       }
@@ -14859,9 +15416,23 @@ class GameEngine {
 
       // Prompt the target's owner
       const attackerName = config.title || sourceCard?.name || 'an effect';
+      // Protection-Lernkanal: Kontext-Features für protectionDecision().
+      // baseDamage kennt der Damage-Picker-Config; Ziel-HP defensiv.
+      let _redirHp = 1;
+      try {
+        if (selected?.type === 'hero' && typeof selected.heroIdx === 'number') {
+          _redirHp = Math.max(1, this.gs.players[targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
+        } else if (typeof selected?.hp === 'number') { _redirHp = Math.max(1, selected.hp); }
+      } catch {}
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: cardName,
+        protMeta: { d: Number(config?.baseDamage) || 0, hp: _redirHp, pi: targetOwnerIdx },
+        // showCard: markiert den Prompt als Reaction-Opt-in — ohne das
+        // fiel er am CPU-Reaction-Router (showCard || /activate/-Label)
+        // vorbei in den Decline-Default: Martyry/Challenge/Anti-Magnet
+        // feuerten für die CPU NIE (10 Declines in einem Testspiel).
+        showCard: cardName,
         message: `Your ${selected.cardName} was targeted by ${attackerName}! Activate ${cardName}?`,
         confirmLabel: `⚔️ ${cardName}!`,
         cancelLabel: 'No',
@@ -14904,6 +15475,24 @@ class GameEngine {
         player: ps.username,
       });
 
+      // Observer hook — hand-based redirect cards (Martyry, Challenge)
+      // are functionally Reactions, but this flow never touches the
+      // chain system. DEDICATED hook name on purpose: firing
+      // onReactionActivated here would feed every existing consumer of
+      // that hook (card passives like Archer, brain-side observers,
+      // anything keying on _isReaction) an event from a codepath they
+      // were never written against. afterTargetRedirect is
+      // observation-only by construction — today's sole listener is the
+      // training recorder.
+      try {
+        await this.runHooks('afterTargetRedirect', {
+          redirectCardName: cardName, redirectOwner: targetOwnerIdx,
+          _skipReactionCheck: true,
+        });
+      } catch (err) {
+        console.error('[Engine] afterTargetRedirect hook error:', err.message);
+      }
+
       return result.redirectTo;
     }
 
@@ -14922,9 +15511,17 @@ class GameEngine {
 
       // Prompt the target's owner
       const attackerName = config.title || sourceCard?.name || 'an effect';
+      // Protection-Lernkanal: Features wie beim Hand-Redirect.
+      let _redirHpH = 1;
+      try {
+        if (selected?.type === 'hero' && typeof selected.heroIdx === 'number') {
+          _redirHpH = Math.max(1, this.gs.players[targetOwnerIdx]?.heroes?.[selected.heroIdx]?.hp || 1);
+        } else if (typeof selected?.hp === 'number') { _redirHpH = Math.max(1, selected.hp); }
+      } catch {}
       const confirmed = await this.promptGeneric(targetOwnerIdx, {
         type: 'confirm',
         title: hero.name,
+        protMeta: { d: Number(config?.baseDamage) || 0, hp: _redirHpH, pi: targetOwnerIdx },
         message: `Redirect ${attackerName}?`,
         showCard: sourceCard?.name || null,
         confirmLabel: '🕸️ Redirect!',
@@ -15863,6 +16460,31 @@ class GameEngine {
    *
    * @returns {Promise<{negated: boolean, amountOverride: number|undefined}>}
    */
+  /**
+   * Kontext-Tag für den Reaktions-Fire-Lernkanal (Als Vorgabe: "WANN
+   * eine Negation gespielt wird, muss per ML gelernt werden — 50 Recoil
+   * wären keinen Einsatz wert, 50 LETHAL-Damage aber vielleicht schon").
+   * Ohne diesen Tag könnte der Kanal nur nach Zug-Phase bucketen und
+   * genau die Unterscheidung nicht lernen, auf die es ankommt.
+   *
+   *   lethal = Schaden ≥ aktuelle HP | heavy = ≥ 50% | light
+   *
+   * BEWUSST OHNE Verursacher-Seite: Als Ruling — selbst verursachter
+   * lethal Damage ist genauso hochwertig wie gegnerischer, es zählen
+   * allein Schadensmenge und Tödlichkeit. Das halbiert nebenbei die
+   * Bucket-Zahl, was dem Doppelarm-Lernen Datendichte verschafft.
+   *
+   * Wird vor der Prompt-Schleife gesetzt und danach geleert, damit kein
+   * veralteter Tag in ein fremdes Fenster leckt.
+   */
+  _rxDamageTag(target, source, amount, targetOwner) {
+    try {
+      const hp = target?.hp;
+      if (!(hp > 0) || !(amount > 0)) return null;
+      return amount >= hp ? 'lethal' : (amount * 2 >= hp ? 'heavy' : 'light');
+    } catch { return null; }
+  }
+
   async _checkPreDamageHandReactions(target, source, amount, type) {
     const NULL_RESULT = { negated: false, amountOverride: undefined };
     if (this._inPreDamageReaction) return NULL_RESULT;
@@ -15877,6 +16499,10 @@ class GameEngine {
 
     const targetHeroIdx = this.gs.players[targetOwner]?.heroes?.indexOf(target);
     if (targetHeroIdx < 0) return NULL_RESULT;
+
+    // Schadenskontext für den Reaktions-Lernkanal (siehe _rxDamageTag).
+    this._rxDamageCtx = { tag: this._rxDamageTag(target, source, amount, targetOwner) };
+    try {
 
     const allCards = this._getCardDB();
     const ps = this.gs.players[targetOwner];
@@ -15910,7 +16536,8 @@ class GameEngine {
       const cost = typeof script.dynamicCost === 'function'
         ? (script.dynamicCost(this.gs, targetOwner, this) ?? baseCost)
         : baseCost;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       // Once-per-game gate (mirrors after-damage handler).
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -15927,6 +16554,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(targetOwner, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '✨ Activate!',
@@ -15975,7 +16603,14 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: targetOwner, cardName,
-          from: 'hand', to: destPile,
+// `asPlay: 'sole'` statt `true`: dieses Fenster löst die Karte
+// SELBST auf (script.preDamageResolve o.ä.) und feuert KEIN
+// afterSpellResolved. Der Recorder überspringt bei `true`
+// aber bewusst Spell/Attack, weil er sie dort schon gezählt
+// glaubt — Escape (Attack) und Spectral Armor (Spell) waren
+// dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
+// "einziges Play-Signal dieser Karte" und zählt typunabhängig.
+          from: 'hand', to: destPile, asPlay: 'sole',
           fromHandIdx: actualIdx,
         });
       }
@@ -16037,6 +16672,16 @@ class GameEngine {
       return { negated, amountOverride };
     }
     return NULL_RESULT;
+    } finally {
+      // Review-Fix: das Leeren war im Docstring von _rxDamageTag
+      // versprochen, fehlte aber im Code. Ohne finally überlebt der Tag
+      // dieses Fenster und ersetzt in SPÄTEREN Reaktions-Prompts (z.B.
+      // Boots of Hermes auf eine Surprise, alle Nicht-Schadens-Fenster)
+      // fälschlich den Zug-Phasen-Bucket — deren Trainingsdaten wären
+      // systematisch falsch gebuckets und die gelernten Regeln würden
+      // zur Laufzeit auf dem falschen Bucket nachgeschlagen.
+      this._rxDamageCtx = null;
+    }
   }
 
   /**
@@ -16091,7 +16736,8 @@ class GameEngine {
       const cost = typeof script.dynamicCost === 'function'
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -16106,6 +16752,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(pi, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `Your opponent's ${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '✨ Activate!',
@@ -16127,7 +16774,14 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName,
-          from: 'hand', to: destPile,
+// `asPlay: 'sole'` statt `true`: dieses Fenster löst die Karte
+// SELBST auf (script.preDamageResolve o.ä.) und feuert KEIN
+// afterSpellResolved. Der Recorder überspringt bei `true`
+// aber bewusst Spell/Attack, weil er sie dort schon gezählt
+// glaubt — Escape (Attack) und Spectral Armor (Spell) waren
+// dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
+// "einziges Play-Signal dieser Karte" und zählt typunabhängig.
+          from: 'hand', to: destPile, asPlay: 'sole',
           fromHandIdx: actualIdx,
         });
       }
@@ -16233,7 +16887,8 @@ class GameEngine {
       const cost = typeof script.dynamicCost === 'function'
         ? (script.dynamicCost(this.gs, ownerIdx, this) ?? baseCost)
         : baseCost;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -16248,6 +16903,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(ownerIdx, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '🛡️ Activate!',
@@ -16264,7 +16920,14 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: ownerIdx, cardName,
-          from: 'hand', to: destPile,
+// `asPlay: 'sole'` statt `true`: dieses Fenster löst die Karte
+// SELBST auf (script.preDamageResolve o.ä.) und feuert KEIN
+// afterSpellResolved. Der Recorder überspringt bei `true`
+// aber bewusst Spell/Attack, weil er sie dort schon gezählt
+// glaubt — Escape (Attack) und Spectral Armor (Spell) waren
+// dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
+// "einziges Play-Signal dieser Karte" und zählt typunabhängig.
+          from: 'hand', to: destPile, asPlay: 'sole',
           fromHandIdx: actualIdx,
         });
       }
@@ -16360,7 +17023,8 @@ class GameEngine {
       const cost = typeof script.dynamicCost === 'function'
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -16375,6 +17039,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(pi, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `Your opponent's ${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '🛡️ Activate!',
@@ -16391,7 +17056,14 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName,
-          from: 'hand', to: destPile,
+// `asPlay: 'sole'` statt `true`: dieses Fenster löst die Karte
+// SELBST auf (script.preDamageResolve o.ä.) und feuert KEIN
+// afterSpellResolved. Der Recorder überspringt bei `true`
+// aber bewusst Spell/Attack, weil er sie dort schon gezählt
+// glaubt — Escape (Attack) und Spectral Armor (Spell) waren
+// dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
+// "einziges Play-Signal dieser Karte" und zählt typunabhängig.
+          from: 'hand', to: destPile, asPlay: 'sole',
           fromHandIdx: actualIdx,
         });
       }
@@ -16490,7 +17162,8 @@ class GameEngine {
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -16505,6 +17178,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(ownerIdx, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${tgtName} is about to be defeated by ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '🛡️ Activate!',
@@ -16611,7 +17285,8 @@ class GameEngine {
 
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
-        if (cost > 0 && (ps.gold || 0) < cost) continue;
+        this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         // Check condition
         if (script.afterDamageCondition &&
@@ -16633,6 +17308,7 @@ class GameEngine {
         const confirmed = await this.promptGeneric(reactorIdx, {
           type: 'confirm',
           title: cardName,
+          _handReactionWindow: true,
           message: `${heroName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
           showCard: cardName,
           confirmLabel: '🔥 Activate!',
@@ -16651,7 +17327,7 @@ class GameEngine {
             ? 'deleted' : 'discard';
           this._broadcastEvent('play_pile_transfer', {
             owner: reactorIdx, cardName,
-            from: 'hand', to: destPile,
+            from: 'hand', to: destPile, asPlay: true,
             fromHandIdx: actualIdx,
           });
         }
@@ -16798,7 +17474,8 @@ class GameEngine {
 
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
-        if (cost > 0 && (ps.gold || 0) < cost) continue;
+        this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         if (script.oncePerGame || script.oncePerGameKey) {
           const opgKey = script.oncePerGameKey || cardName;
@@ -16813,6 +17490,7 @@ class GameEngine {
         const confirmed = await this.promptGeneric(ownerIdx, {
           type: 'confirm',
           title: cardName,
+          _handReactionWindow: true,
           message: `${tgtName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
           showCard: cardName,
           confirmLabel: '🔥 Activate!',
@@ -16830,7 +17508,7 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: ownerIdx, cardName,
-          from: 'hand', to: destPile,
+          from: 'hand', to: destPile, asPlay: true,
           fromHandIdx: actualIdx,
         });
         ps.hand.splice(actualIdx, 1);
@@ -16907,6 +17585,32 @@ class GameEngine {
    * first-turn-protected lockout. Only one card may fire per phase; the
    * loop returns immediately after one resolves.
    */
+  /**
+   * Diagnose-Zähler für Hand-Reaktionsfenster (Als Gold-Frage zu
+   * Invisibility Cloak): Reaktions-Artefakte in der Hand erzeugen KEINE
+   * Gold-Nachfrage (computeGoldDemand kennt nur proaktiv spielbare
+   * Artefakte), also gibt die CPU im eigenen Zug herunter aus — und das
+   * Fenster überspringt im Gegnerzug STILL bei zu wenig Gold. Vor einer
+   * Änderung an der Ökonomie wird das Problem hier erst GEMESSEN:
+   *   seen = Fenster geöffnet, Karte lag auf der Hand
+   *   gold = davon mangels Gold verworfen (Bedingung ungeprüft, da das
+   *          Gold-Gate VOR der Bedingungsprüfung greift)
+   * Verallgemeinert das bestehende _batchWindowStats-Muster auf alle
+   * Fenster. Sim-Guard wie dort: Rollouts würden die Zähler fluten.
+   * `ps` statt Spielerindex, weil die Fenster den Index unterschiedlich
+   * benennen (pi / playerIdx / ownerIdx / reactorIdx / targetOwner).
+   */
+  _noteRxWindow(ps, cardName, key) {
+    if (this._inMctsSim || !ps || !cardName) return;
+    const players = this.gs?.players || [];
+    const pi = players[0] === ps ? 0 : (players[1] === ps ? 1 : -1);
+    if (pi < 0) return;
+    if (!this._rxWindowStats) this._rxWindowStats = [Object.create(null), Object.create(null)];
+    const bucket = this._rxWindowStats[pi];
+    const e = bucket[cardName] || (bucket[cardName] = { seen: 0, gold: 0 });
+    if (e[key] != null) e[key]++;
+  }
+
   async _checkResourcePhaseReactions(playerIdx) {
     if (this._inResourcePhaseReaction) return;
 
@@ -16928,7 +17632,8 @@ class GameEngine {
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.resourcePhaseCondition &&
           !script.resourcePhaseCondition(this.gs, playerIdx, this)) continue;
@@ -16936,6 +17641,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(playerIdx, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `Activate ${cardName} at the start of your Resource Phase?`,
         showCard: cardName,
         confirmLabel: '✨ Activate!',
@@ -16953,7 +17659,14 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: playerIdx, cardName,
-          from: 'hand', to: destPile,
+// `asPlay: 'sole'` statt `true`: dieses Fenster löst die Karte
+// SELBST auf (script.preDamageResolve o.ä.) und feuert KEIN
+// afterSpellResolved. Der Recorder überspringt bei `true`
+// aber bewusst Spell/Attack, weil er sie dort schon gezählt
+// glaubt — Escape (Attack) und Spectral Armor (Spell) waren
+// dadurch trotz echter Feuerungen unsichtbar. `sole` heißt
+// "einziges Play-Signal dieser Karte" und zählt typunabhängig.
+          from: 'hand', to: destPile, asPlay: 'sole',
           fromHandIdx: actualIdx,
         });
       }
@@ -17031,7 +17744,8 @@ class GameEngine {
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.postSummonReactionCondition &&
           !script.postSummonReactionCondition(this.gs, summoningPi, this, summonedInst, summonHookCtx)) continue;
@@ -17053,6 +17767,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(summoningPi, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${summonedInst.name} was summoned! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '💥 Activate!',
@@ -17121,6 +17836,25 @@ class GameEngine {
    */
   async _checkCreatureDamageBatchReactions(entries) {
     if (this._inCreatureDamageBatchReaction) return;
+    // Beobachtbarkeit: Zähler laufen IMMER (landen via Recorder im
+    // Trainings-Record als batchWindows — beantwortet die Idol-Frage
+    // auch in normalen Läufen ohne verbose), das Log nur unter verbose.
+    try {
+      if (!this._inMctsSim && entries && entries.length > 0) {
+        if (!this._batchWindowStats) this._batchWindowStats = { calls: 0, ge2: 0, ge2own: [0, 0], outcomes: { handMiss: 0, goldMiss: 0, condMiss: 0, lockMiss: 0, declined: 0, fired: 0 } };
+        this._batchWindowStats.calls++;
+        if (entries.length >= 2) {
+          this._batchWindowStats.ge2++;
+          for (const p of [0, 1]) {
+            if (entries.filter(e => !e.cancelled && e.inst && e.inst.owner === p).length >= 2) this._batchWindowStats.ge2own[p]++;
+          }
+        }
+      }
+      if (process.env.PP_TRAIN_VERBOSE && !this._inMctsSim && entries && entries.length > 0) {
+        const own = [0, 1].map(p => entries.filter(e => !e.cancelled && e.inst && e.inst.owner === p).length);
+        console.log(`[CPU]   [batch-window] ${entries.length} entries (p0:${own[0]} p1:${own[1]})${entries.length < 2 ? ' — zu klein, Fenster bleibt zu' : ''}`);
+      }
+    } catch { /* nie stören */ }
     if (!entries || entries.length < 2) return;
 
     for (let pi = 0; pi < 2; pi++) {
@@ -17132,12 +17866,47 @@ class GameEngine {
         && e.inst && e.inst.owner === pi);
       if (ownDmgEntries.length < 2) continue;
 
+      // ── Same-Source-Gate (Als Ruling, Deepsea-Idol-Kartentext:
+      // "from a single source") ──
+      // Gleichzeitige Poison-Ticks mehrerer Kreaturen laufen als EIN
+      // Batch durch dieses Fenster, sind aber je Kreatur eine EIGENE
+      // Quelle — nur Gleichzeitigkeit macht noch keine gemeinsame
+      // Source. Deshalb zählt die größte Gruppe mit identischer Quelle:
+      //   • Status-Schaden (isStatusDamage): jeder Eintrag ist seine
+      //     eigene Quelle (Als Ruling explizit).
+      //   • Sonst gruppiert die source-Identität; source-lose Einträge
+      //     teilen sich wie bisher einen Topf (ein Effekt, ein Batch —
+      //     Altverhalten für AoE ohne gesetztes source-Feld).
+      // Idol ist der einzige Träger des Fensters, das Gate darf also
+      // hier statt je Karte sitzen.
+      const _bySrc = new Map();
+      for (const e of ownDmgEntries) {
+        const k = e.isStatusDamage ? e : (e.source != null ? e.source : '__no_source__');
+        _bySrc.set(k, (_bySrc.get(k) || 0) + 1);
+      }
+      const _maxSameSource = Math.max(..._bySrc.values());
+      if (_maxSameSource < 2) {
+        try {
+          if (!this._inMctsSim && this._batchWindowStats) {
+            const o = this._batchWindowStats.outcomes;
+            o.srcMiss = (o.srcMiss || 0) + 1;
+          }
+        } catch { /* nie stören */ }
+        continue;
+      }
+
       const ps = this.gs.players[pi];
       if (!ps) continue;
       if (this.gs.firstTurnProtectedPlayer === pi) continue;
 
       const allCards = this._getCardDB();
       const seen = new Set();
+      // Ausgangs-Diagnose: WO stirbt ein geöffnetes eigenes Fenster?
+      // (76 Fenster / 0 Feuerungen im 380er-Lauf — der Report zeigt
+      // mit diesen Zählern den Täter: Karte fehlt / Gold fehlt /
+      // Bedingung / Lock / Prompt abgelehnt.)
+      const _bwOut = !this._inMctsSim ? this._batchWindowStats?.outcomes : null; // Sim-Guard: Rollouts kontaminierten die Zähler (fired=8320 bei 0 echten Plays)
+      let _bwHadCard = false;
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
         if (seen.has(cardName)) continue;
@@ -17145,30 +17914,38 @@ class GameEngine {
 
         const script = loadCardEffect(cardName);
         if (!script?.isCreatureDamageBatchReaction) continue;
+        _bwHadCard = true;
 
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
-        if (cost > 0 && (ps.gold || 0) < cost) continue;
+        if (cost > 0 && (ps.gold || 0) < cost) { if (_bwOut) _bwOut.goldMiss++; continue; }
 
         if (script.creatureDamageBatchCondition &&
-            !script.creatureDamageBatchCondition(this.gs, pi, this, entries)) continue;
+            !script.creatureDamageBatchCondition(this.gs, pi, this, entries)) { if (_bwOut) _bwOut.condMiss++; continue; }
 
         // Reaction Artifact gate (turn-1 lockout, artifact-lock).
         if (cardData?.cardType === 'Artifact'
-            && ps._artifactLockTurn === this.gs.turn) continue;
+            && ps._artifactLockTurn === this.gs.turn) { if (_bwOut) _bwOut.lockMiss++; continue; }
 
         const source = entries[0]?.source;
         const sourceName = source?.name || 'an effect';
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: cardName,
+          _handReactionWindow: true,
           message: `${ownDmgEntries.length} of your Creatures would take damage from ${sourceName}! Activate ${cardName}?`,
           showCard: cardName,
           confirmLabel: '🌊 Negate!',
           cancelLabel: 'No',
           cancellable: true,
         });
-        if (!confirmed) continue;
+        if (!confirmed) { if (_bwOut) _bwOut.declined++; continue; }
+        if (_bwOut) _bwOut.fired++;
+        // Zählbarer Einsatz-Beleg: Der Reaction-Play bucht die Karte
+        // namensbasiert in den Discard (kein ZoneEnter) — ohne dieses
+        // Event war Deepsea Idol trotz 92 realer Feuerungen im
+        // CC-Lauf in JEDEM Report unsichtbar ("nie eingesetzt").
+        this.log('batch_reaction_fired', { player: ps.username, card: cardName });
 
         const actualIdx = ps.hand.indexOf(cardName);
         if (actualIdx < 0) continue;
@@ -17207,6 +17984,7 @@ class GameEngine {
         this.sync();
         break; // One batch reaction per side per batch
       }
+      if (_bwOut && !_bwHadCard) _bwOut.handMiss++;
     }
   }
 
@@ -17238,7 +18016,7 @@ class GameEngine {
     if (!victim) return false;
 
     const cardDB = this._getCardDB();
-    const victimCd = cardDB[victim.name];
+    const victimCd = victim.counters?._cardDataOverride || cardDB[victim.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!victimCd) return false;
     if (victimCd.archetype !== 'Cosmic Depths') return false;
     if (!hasCardType(victimCd, 'Creature')) return false;
@@ -17262,7 +18040,8 @@ class GameEngine {
 
       const cardData = cardDB[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.cdMovementReactionCondition &&
           !script.cdMovementReactionCondition(this.gs, victimOwner, this, victim, source, effectType)) continue;
@@ -17282,6 +18061,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(victimOwner, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${source?.name || "An opponent's effect"} would remove ${victim.name}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '🌌 Negate!',
@@ -17298,6 +18078,27 @@ class GameEngine {
         this.gs._scTracking[victimOwner].cardsPlayedFromHand++;
       }
 
+      // Play-Signal + Handkarten-Flug. Dieses Fenster spliced die Karte
+      // bislang NUR aus der Hand und broadcastete `card_reveal` — es
+      // gab überhaupt keinen `play_pile_transfer`, also weder einen
+      // asPlay-Marker für den Recorder noch eine sichtbare Bewegung der
+      // Karte. Cosmic Malfunction stand deshalb trotz 19 echter
+      // Feuerungen in 1360 Trainingsspielen mit "plays 0" im Report
+      // (Als Verdachtsfall; neunte Fundstelle dieser Art nach Escape &
+      // Co.). `asPlay: 'sole'` = "einziges Play-Signal dieser Karte",
+      // zählt typunabhängig — dieses Fenster löst die Karte über
+      // `cdMovementReactionResolve` selbst auf und feuert nie
+      // afterSpellResolved, bei `true` würde der Recorder Spells
+      // wieder überspringen.
+      {
+        const destPile = (cardData?.cardType === 'Potion' || script?.deleteOnUse)
+          ? 'deleted' : 'discard';
+        this._broadcastEvent('play_pile_transfer', {
+          owner: victimOwner, cardName,
+          from: 'hand', to: destPile, asPlay: 'sole',
+          fromHandIdx: actualIdx,
+        });
+      }
       this._broadcastEvent('card_reveal', { cardName, playerIdx: victimOwner });
       await this._delay(300);
 
@@ -17380,7 +18181,8 @@ class GameEngine {
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oppActionPhaseReactionCondition &&
           !script.oppActionPhaseReactionCondition(this.gs, reactorIdx, this)) continue;
@@ -17403,6 +18205,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(reactorIdx, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `Your opponent entered their Action Phase! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '💥 Activate!',
@@ -18091,8 +18894,56 @@ class GameEngine {
     // `_actionDealDamageImpl` / `processCreatureDamageBatch` voids the
     // negated spell's damage, and RETURN the result so callers can also
     // bail explicitly if they have non-damage side effects.
-    if (ptResult?.effectNegated) this.gs._spellNegatedByEffect = true;
+    //
+    // NON-SPELL sources (Als Divine-Gift-of-Rain-vs-DDG-Report): the
+    // depth-scoped spell flag is DOUBLY wrong outside a spell
+    // resolution — the depth>0 guard never fires (DDG's beforeSummon
+    // AoE ran at depth 0, so the "negated" damage went through
+    // anyway), and the stamped flag is never deleted (the deletes hang
+    // off spell-resolution ends), so it lay in wait and voided the
+    // NEXT spell's damage, whoever cast it. Fix: at depth 0 we don't
+    // touch the spell flag at all; instead the negated SOURCE is
+    // registered in `gs._negatedEffectSources` (keyed by instance id,
+    // falling back to owner:name) and the same two central guards void
+    // any damage from that source. Source-keyed, so unrelated damage
+    // is untouchable; the set is wiped in switchTurn's turn-rollover.
+    // Covers every non-spell window caller (DDG, Qinglong, Hou, Spawn
+    // Mother, Bomblebee, Kit, Explosivo's Sword, Rocket Sneeze)
+    // without per-card bail boilerplate.
+    if (ptResult?.effectNegated) {
+      if ((this.gs._spellResolutionDepth || 0) > 0) {
+        this.gs._spellNegatedByEffect = true;
+      }
+      const key = this._effectNegationKey(source);
+      if (key != null) {
+        if (!this.gs._negatedEffectSources) this.gs._negatedEffectSources = new Set();
+        this.gs._negatedEffectSources.add(key);
+      }
+    }
     return ptResult;
+  }
+
+  /**
+   * Stable identity key for a damage source, used by the source-bound
+   * effect-negation registry (`gs._negatedEffectSources`). Prefers the
+   * tracked instance id; plain-object sources (Qinglong's
+   * `{ name, owner, heroIdx }`) fall back to owner:name.
+   */
+  _effectNegationKey(source) {
+    if (!source) return null;
+    const instId = source.cardInstance?.id ?? source.inst?.id ?? source.id;
+    if (instId != null) return 'inst:' + instId;
+    const owner = source.controller ?? source.owner;
+    if (owner == null || !source.name) return null;
+    return owner + ':' + source.name;
+  }
+
+  /** True iff this source's effect was negated by a post-target reaction. */
+  _isEffectSourceNegated(source) {
+    const set = this.gs._negatedEffectSources;
+    if (!set || set.size === 0) return false;
+    const key = this._effectNegationKey(source);
+    return key != null && set.has(key);
   }
 
   /**
@@ -18174,7 +19025,8 @@ class GameEngine {
         const cost = typeof script.dynamicCost === 'function'
           ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
           : baseCost;
-        if (cost > 0 && (ps.gold || 0) < cost) continue;
+        this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         // Once-per-game check
         if (script.oncePerGame || script.oncePerGameKey) {
@@ -18212,6 +19064,25 @@ class GameEngine {
         const confirmed = await this.promptGeneric(pi, {
           type: 'confirm',
           title: cardName,
+          _handReactionWindow: true,
+          // Structured context for per-card `cpuResponse` heuristics
+          // (generic contract, mirrors `_preDamageContext` on the
+          // per-hero path): the post-target stage doesn't know
+          // per-target AMOUNTS yet, but source + target identities +
+          // damage typing are enough for cards to decide whether this
+          // window is even worth committing in (Homerun! declines
+          // here and waits for the strict amount-aware preDamage
+          // prompt instead — Als 80-vs-400 CPU-Fehlgriff).
+          _postTargetContext: {
+            sourceName: srcName,
+            sourceOwner: sourceCard?.controller ?? sourceCard?.owner ?? -1,
+            targets: targetedHeroes.map(t => ({
+              type: t.type, owner: t.owner, heroIdx: t.heroIdx,
+              slotIdx: t.slotIdx, cardName: t.cardName,
+            })),
+            damageType,
+            dealsDamage,
+          },
           message: `${srcName} is targeting ${targetNames}! Activate ${cardName}?`,
           showCard: cardName,
           confirmLabel: '✨ Activate!',
@@ -18248,7 +19119,7 @@ class GameEngine {
           ? 'deleted' : 'discard';
         this._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName,
-          from: 'hand', to: destPile,
+          from: 'hand', to: destPile, asPlay: true,
           fromHandIdx: consumeIdx,
         });
 
@@ -18398,7 +19269,8 @@ class GameEngine {
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
-      if (cost > 0 && (ps.gold || 0) < cost) continue;
+      this._noteRxWindow(ps, cardName, 'seen');
+        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       // Card-specific condition (HOPT gate etc.)
       if (script.ascensionReactionCondition &&
@@ -18423,6 +19295,7 @@ class GameEngine {
       const confirmed = await this.promptGeneric(pi, {
         type: 'confirm',
         title: cardName,
+        _handReactionWindow: true,
         message: `${ascendedName} just Ascended! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '✨ Activate!',
@@ -18569,6 +19442,42 @@ class GameEngine {
    * a Bakhm hero (flip face-down in place) or a regular hero (move to surprise zone).
    * Returns true if reset succeeded, false if cancelled/failed.
    */
+  /**
+   * Eine Kreatur, die verdeckt in eine Surprise Zone zurückgeht, ist
+   * keine Kreatur auf dem Feld mehr — sie liegt als gesetzte Überraschung
+   * da und tritt beim nächsten Auslösen FRISCH wieder an. Schaden und
+   * Statuseffekte dürfen also nicht mitwandern.
+   *
+   * Belegt in Als Mitschnitt vom 1.8. (Pure Advantage Camel): Zug 3
+   * gesetzt, in Zug 3 von Divine Gift of Fire gebrannt, Zug 4 per
+   * `surpriseCreatureReset` zurück in die Surprise Zone — und in Zug 6
+   * tötete derselbe Burn sie DORT. Kartentext: "move this Creature into
+   * the corresponding Hero's Surprise Zone face-down".
+   *
+   * Bewusst generisch für JEDE Kreatur auf diesem Weg, nicht auf Camel
+   * gemünzt: der Zonenwechsel begründet die Rücksetzung, nicht die Karte.
+   */
+  _resetCreatureForSurpriseZone(inst) {
+    if (!inst?.counters) return;
+    const { STATUS_EFFECTS } = require('./_hooks');
+    const cleared = [];
+    for (const key of Object.keys(STATUS_EFFECTS || {})) {
+      if (!inst.counters[key]) continue;
+      cleared.push(key);
+      delete inst.counters[key];
+      delete inst.counters[key + 'Stacks'];
+      delete inst.counters[key + 'AppliedBy'];
+      delete inst.counters[key + 'Duration'];
+      delete inst.counters[key + 'Cleansable'];
+    }
+    // Schaden zurücknehmen: `currentHp` ist der laufende Wert; ohne ihn
+    // fällt die Karte auf ihre Basis-HP zurück.
+    delete inst.counters.currentHp;
+    if (cleared.length) {
+      this.log('surprise_reset_cleared', { card: inst.name, statuses: cleared });
+    }
+  }
+
   async surpriseCreatureReset(ctx) {
     const inst = ctx.card;
     const heroOwner = ctx.cardHeroOwner;
@@ -18618,6 +19527,7 @@ class GameEngine {
       // Bakhm slot: just flip face-down in place
       inst.faceDown = true;
       inst.knownToOpponent = true;
+      this._resetCreatureForSurpriseZone(inst);
 
       this._broadcastEvent('surprise_reset', { owner: heroOwner, heroIdx, cardName, isBakhmSlot: true, zoneSlot });
       this.log('surprise_reset', { card: cardName, player: ps.username, hero: hero.name, bakhmSlot: true });
@@ -18645,6 +19555,7 @@ class GameEngine {
       inst.zoneSlot = 0;
       inst.faceDown = true;
       inst.knownToOpponent = true;
+      this._resetCreatureForSurpriseZone(inst);
 
       this._broadcastEvent('surprise_reset', { owner: heroOwner, heroIdx, cardName });
       this.log('surprise_reset', { card: cardName, player: ps.username, hero: hero.name });
@@ -18958,6 +19869,25 @@ class GameEngine {
           type: 'gold_sparkle', owner: playerIdx, heroIdx, zoneSlot: bakhmZoneSlot,
         });
         await this._delay(200);
+        // Beschwörungs-Hooks wie im normalen Platzierungs-Zweig (Als
+        // Ruling): das Aufdecken IST die Beschwörung — der Zweig setzt
+        // ja bereits `turnPlayed` und spielt die Summon-Animation. Bis
+        // hierher feuerten nur `onSurpriseCreaturePlaced` und die
+        // Aktivierung selbst, also fehlten sämtliche Zonen-Eintritts-
+        // Zuhörer: Sandy Blob blieb beim Aufdecken einer Kreatur-
+        // Surprise in Bakhms Support Zone stumm, und Beato bekam den
+        // Summoning-Orb nicht. Kein Doppelfeuer: beim SETZEN feuert
+        // `doPlaySurprise` (Bakhm-Pfad) NUR onCardEnterZone mit
+        // faceDown-Instanz, niemals onPlay — und verdeckte Eintritte
+        // sind für Summon-Zuhörer per `enteringCard.faceDown` erkennbar.
+        await this.runHooks('onPlay', {
+          _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: bakhmZoneSlot,
+          _skipReactionCheck: true,
+        });
+        await this.runHooks('onCardEnterZone', {
+          enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
+          _skipReactionCheck: true,
+        });
         await this.runHooks('onSurpriseCreaturePlaced', {
           surpriseCardName: cardName, surpriseOwner: playerIdx, heroIdx,
           zoneSlot: bakhmZoneSlot, cardInstance: inst,
@@ -19463,7 +20393,11 @@ class GameEngine {
         if (sInst) sInst.faceDown = false;
         this._broadcastEvent('surprise_flip', { owner: pi, heroIdx: sHeroIdx, cardName: chosenName });
         this._broadcastEvent('card_reveal', { cardName: chosenName });
-        this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length });
+        // `source` unterscheidet die beiden gleichnamigen Logs: aus der
+        // Surprise-Zone ist es eine ECHTE Aktivierung einer gesetzten
+        // Karte (der Trainings-Recorder zählt nur diese), aus der Hand
+        // ist es ein normaler Cast, den der Recorder schon als Play führt.
+        this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'surprise' });
         if (!this._pendingSurpriseReactionCleanup) this._pendingSurpriseReactionCleanup = [];
         this._pendingSurpriseReactionCleanup.push({
           pi, heroIdx: sHeroIdx, cardName: chosenName, instId: sInst?.id,
@@ -19563,7 +20497,7 @@ class GameEngine {
       if (cost > 0) ps.gold -= cost;
       ps.hand.splice(actualHandIdx, 1);
 
-      this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length });
+      this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'hand' });
       this._broadcastEvent('card_reveal', { cardName: chosenName });
 
       const engine = this;
@@ -19901,7 +20835,68 @@ class GameEngine {
    * }
    */
   registerAdditionalActionType(typeId, config) {
+    // config additionally supports:
+    //   expiresAtTurnEnd?: bool — unspent grants of this type are
+    //   wiped by the engine's turn-rollover cleanup in `switchTurn`
+    //   (see `_expireTurnEndAdditionalActions`). Opt-in per TYPE so
+    //   'this turn' grants (Deepsea Primordium) can't leak across
+    //   turns, while self-managed types keep their lifetimes.
     this._additionalActionTypes[typeId] = config;
+  }
+
+  /**
+   * Queue a cosmetic broadcast to fire at the END of the current turn
+   * (flushed in `switchTurn` after ON_TURN_END + the surprise window,
+   * alongside the additional-action turn-rollover). Generic contract
+   * for "persists for the rest of the turn" visuals — Divine Gift of
+   * Rain queues its `divine_rain_stop` here. Engine-level so the stop
+   * fires even when the queuing card is long gone from the board.
+   * Sim-safe: the flush uses `_broadcastEvent`, which no-ops in fast
+   * mode, and the queue is plain gs state.
+   */
+  queueTurnEndBroadcast(event, payload) {
+    if (!this.gs._turnEndBroadcasts) this.gs._turnEndBroadcasts = [];
+    this.gs._turnEndBroadcasts.push({ event, payload: payload || {} });
+  }
+
+  /**
+   * Turn-rollover cleanup: expire every unspent grant whose registered
+   * type config carries `expiresAtTurnEnd`. Called from `switchTurn`
+   * AFTER ON_TURN_END hooks + the end-of-turn Surprise window resolve,
+   * BEFORE the active-player flip — so 'this turn' grants live through
+   * the entire End Phase but never reach the next turn. Engine-level on
+   * purpose: card hooks are silenced for Stunned/Frozen/Negated
+   * instances, which would let a grant leak exactly when its provider
+   * is incapacitated at turn end.
+   */
+  _expireTurnEndAdditionalActions() {
+    let expiredAny = false;
+    for (const inst of this.cardInstances) {
+      for (const [typeId, avail] of this._instAAEntries(inst)) {
+        if (!(avail > 0)) continue;
+        if (!this._additionalActionTypes[typeId]?.expiresAtTurnEnd) continue;
+        // Legacy scalar-only inst (pre-migration stamp without an
+        // `aaGrants` map): `expireAdditionalActionType` would no-op on
+        // it, so materialise the map entry first — then the shared
+        // expiry + mirror-sync path handles both shapes identically.
+        if (!inst.counters?.aaGrants) {
+          if (!inst.counters) inst.counters = {};
+          inst.counters.aaGrants = { [typeId]: avail };
+        }
+        this.expireAdditionalActionType(inst, typeId);
+        expiredAny = true;
+        this.log('additional_action_expired', {
+          typeId,
+          provider: inst.name,
+          player: this.gs.players[inst.owner]?.username,
+          reason: 'turn_end',
+        });
+      }
+    }
+    // Sync only when something actually expired — clears the client's
+    // ⚡ grant badge (mirrored `additionalActionAvail`) before the
+    // opponent's turn renders.
+    if (expiredAny) this.sync();
   }
 
   // ── Multi-grant additional-action model ──────────────────────────
@@ -20108,6 +21103,56 @@ class GameEngine {
    * @param {number} playerIdx
    * @returns {Object} { 0: [cardName, ...], 1: [...], 2: [...] }
    */
+  /**
+   * Per-Hero-Liste der Handkarten, deren Level-/Schul-Anforderung der
+   * Hero WIRKLICH erfüllt — also ohne die karten-seitigen Platzierungs-
+   * Bypässe (`canBypassLevelReq`). Gegenstück zu `getHeroPlayableCards`,
+   * das die Bypässe bewusst mitzählt ("kann diese Karte überhaupt
+   * gespielt werden?").
+   *
+   * Hintergrund (Als Bugreport zu "Mischief Militia - Chilly Wizard"):
+   * dessen Bypass beantwortet "darf Hero X den Wizard BEHERBERGEN?" mit
+   * ja, sobald irgendein Geschwister-Hero die Decay+Summoning-Stufe
+   * erfüllt — der Kartentext erlaubt ja jede Support Zone als Ziel. Der
+   * Klick-Picker fragt aber "welcher Hero BESCHWÖRT ihn?" und zog seine
+   * Liste aus `heroPlayableCards`, bekam also alle lebenden Heroes.
+   * Diese Map liefert die echte Caster-Eignung; der Client bevorzugt sie
+   * und fällt nur zurück, wenn KEIN Hero regulär qualifiziert (dann
+   * trägt der Bypass die Beschwörung — z.B. "500 Piranhas in a Monster
+   * Suit", das per Design immer bypassed).
+   *
+   * Nur Creatures — die anderen Aktionskarten haben keinen
+   * Platzierungs-Bypass, dort deckt sich die Liste mit
+   * `heroPlayableCards`.
+   */
+  getHeroStrictLevelCards(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    const cardDB = this._getCardDB();
+    const result = {};
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      const strict = [];
+      const seen = new Set();
+      for (const cn of (ps.hand || [])) {
+        if (seen.has(cn)) continue;
+        seen.add(cn);
+        const cd = cardDB[cn];
+        if (!cd || cd.cardType !== 'Creature') continue;
+        try {
+          if (this.heroMeetsLevelReq(playerIdx, hi, cd, { noPlacementBypass: true })) {
+            strict.push(cn);
+          }
+        } catch (err) {
+          console.error(`[getHeroStrictLevelCards] ${hero.name} threw on ${cn}:`, err.message);
+        }
+      }
+      if (strict.length > 0) result[hi] = strict;
+    }
+    return result;
+  }
+
   getHeroBypassSummonCards(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return {};
@@ -20628,6 +21673,7 @@ class GameEngine {
 
         // Generic draw/search lock
         if (script.blockedByHandLock && ps.handLocked) continue;
+        if (script.blockedByDrawLock && ps.drawLocked) continue;
 
         // Distracting Crystal in hand blocks any effect that would
         // shuffle cards from hand / discard / board back to deck —
@@ -22276,7 +23322,7 @@ class GameEngine {
     // false` below.
     if (hero.hp <= 0) {
       const cardScript = loadCardEffect(cardData.name);
-      if (typeof cardScript?.canBypassLevelReq === 'function') {
+      if (typeof cardScript?.canBypassLevelReq === 'function' && !opts.noPlacementBypass) {
         try {
           if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
         } catch (err) {
@@ -22357,7 +23403,7 @@ class GameEngine {
       ? [[]]
       : this._getCandidateAbilityZoneSets(playerIdx, heroIdx);
     for (const abZones of candidates) {
-      if (this._testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones)) return true;
+      if (this._testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones, opts)) return true;
     }
     return false;
   }
@@ -22368,7 +23414,7 @@ class GameEngine {
    * whether `abZones` alone is enough to play `cardData` from `hero`.
    * Side-effect-free.
    */
-  _testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones) {
+  _testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones, evalOpts = {}) {
     // Apply generic pre-reductions (Mana Mining and any future ability
     // that silently lowers spell levels). Abilities opt in by exporting
     // `reduceSpellLevel(cardData, abilityLevel, engine) → number`.
@@ -22377,7 +23423,11 @@ class GameEngine {
     // owns may contribute via `reduceCardLevel(cardData, engine, ownerIdx,
     // inst, heroIdx)`. `heroIdx` lets per-hero reducers (Taio's Sun-Fencer
     // Destruction-Magic discount) gate on the casting Hero.
-    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx);
+    // `evalOpts.pileSide` fließt bis in die reduceCardLevel-Skripte —
+    // Reduktionen mit Zonen-Bindung im Kartentext (Elven Forager:
+    // "in your hand and deck", Bear Rider: "in your hand") können so
+    // Discard-Pfade (Necromancy-Rebuy) korrekt ausnehmen.
+    const level = this._applyCardLevelReductions(cardData, levelAfterAbility, playerIdx, heroIdx, evalOpts);
 
     const schools = [];
     if (cardData.spellSchool1) schools.push(cardData.spellSchool1);
@@ -22405,7 +23455,16 @@ class GameEngine {
     }
 
     const cardScript = loadCardEffect(cardData.name);
-    if (typeof cardScript?.canBypassLevelReq === 'function') {
+    // Als Ruling (Necromancy-Fall): `canBypassLevelReq` ist der
+    // PLATZIERUNGS-Bypass der Deepsea-Linie — der Swap selbst ist die
+    // Levelumgehung. Aufrufer, deren Beschwörung NICHT über eine
+    // Swap-Platzierung läuft (Revivals aus dem Discard: Necromancy &
+    // Geschwister), setzen `noPlacementBypass` und verlangen damit das
+    // echte Schul-Level. Repro des Bugs: Teppes mit Necromancy 2 +
+    // SM 1 konnte eine Lv2-Witch wiederbeleben, weil ein bounce-bares
+    // Deepsea auf dem Board den Bypass scharf schaltete, den das
+    // Revival nie einlöst.
+    if (typeof cardScript?.canBypassLevelReq === 'function' && !evalOpts.noPlacementBypass) {
       try {
         if (cardScript.canBypassLevelReq(this.gs, playerIdx, heroIdx, cardData, this)) return true;
       } catch (err) {
@@ -22961,6 +24020,9 @@ class GameEngine {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero || !hero.name) return;
     if (!hero.statuses) hero.statuses = {};
+    if (process.env.PP_STATUS_DEBUG === '1' && !this._inMctsSim) {
+      console.error(`[STATUS] turn=${this.gs?.turn} +${statusName} → p${playerIdx} ${hero.name} (hp=${hero.hp})`);
+    }
 
     // Anti Magic Enchantment shield: the current spell already "hit" this
     // hero visually, but the enchantment owner spent a charge to nullify
@@ -23310,6 +24372,36 @@ class GameEngine {
           this.log('status_remove', { target: inst.name, status: 'frozen', by: 'duration' });
         }
       }
+      // ── KREATUR-STUN LÄUFT AB (1.8., Als Report) ──────────────────
+      // Helden-Stun wird oben am Zugende des Trägers abgeräumt
+      // (`hero.statuses.stunned`, mit `duration` für Mehrrunden-Effekte).
+      // Für KREATUREN gab es diese Entsprechung nicht: `applyCreatureStatus`
+      // setzt nur das Präsenz-Flag `inst.counters.stunned = 1`, und
+      // abgeräumt wurde bisher ausschließlich `_baihuStunned` (eigener
+      // Zähler) und `frozenDuration`. Ein per Tea, Heavy Hit, Deepsea
+      // Mummy, Ferocious Tiger Kick, Gigantisaur Ankylos, Guardian Beast
+      // Ji oder Lolki gesetzter Kreatur-Stun lief damit NIE aus — er hing
+      // bis eine Karte ihn zufällig entfernte. Belegt in Als Mitschnitt:
+      // Tea stunnt Infected Greatmaw in Zug 5, der Stun überdauert die
+      // eigene Runde.
+      //
+      // Semantik wie beim Helden: der Stun wirkt während der Runde des
+      // Trägers und fällt an deren ENDE. `stunnedDuration` erlaubt
+      // Mehrrunden-Stuns nach dem Muster von `frozenDuration`;
+      // `_baihuStunned` bleibt unberührt (eigener Zähler, eigene Schleife).
+      for (const inst of this.cardInstances) {
+        if (inst.owner !== ap || inst.zone !== 'support') continue;
+        if (!inst.counters?.stunned) continue;
+        if (inst.counters.stunnedDuration > 1) {
+          inst.counters.stunnedDuration--;
+          this.log('status_tick', { target: inst.name, status: 'stunned', remaining: inst.counters.stunnedDuration });
+        } else {
+          delete inst.counters.stunned;
+          delete inst.counters.stunnedDuration;
+          delete inst.counters.stunnedAppliedBy;
+          this.log('status_remove', { target: inst.name, status: 'stunned', by: 'duration' });
+        }
+      }
     } else if (phaseName === 'START') {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
@@ -23619,6 +24711,13 @@ class GameEngine {
     // scoped to the negated Spell's own resolution (depth>0 guard, same
     // as the hero path) so a leaked flag can't void unrelated damage.
     if (this.gs._spellNegatedByEffect && (this.gs._spellResolutionDepth || 0) > 0) return;
+    // Source-bound effect negation (mirror of the hero-damage guard):
+    // drop entries whose SOURCE was negated by a post-target reaction
+    // outside a spell resolution (DDG's on-summon AoE vs Divine Gift
+    // of Rain). Per-entry, so mixed-source batches keep their
+    // unaffected entries.
+    entries = entries.filter(e => !this._isEffectSourceNegated(e.source));
+    if (entries.length === 0) return;
 
     // Per-call heap check (matches the hero damage path). Damage
     // batches are the OTHER recursive entry point — Tempeste's
@@ -23636,6 +24735,23 @@ class GameEngine {
       const d = this._describeHeapTripDiagnostics();
       const err = new Error(`MCTS_OVERLOAD: per-turn damage-call cap exceeded (creature-batch ${this._damageCallsThisTurn} > ${MAX_DAMAGE_CALLS_PER_TURN}) at turn ${this.gs?.turn} phase ${this.gs?.currentPhase}. Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
       err._mctsOverload = true;
+      // Live-Trip: Grace-Budget statt Dauerblockade (siehe
+      // LIVE_DAMAGE_CAP_GRACE). Sim-Trips behalten das alte Verhalten —
+      // MCTS fängt die Exception und fällt auf die Heuristik zurück.
+      this._liveDamageTripsThisTurn = (this._liveDamageTripsThisTurn || 0) + 1;
+      if (this._liveDamageTripsThisTurn <= MAX_LIVE_DAMAGE_TRIPS_PER_TURN) {
+        // Grace für BEIDE Kontexte: Ein Sim-Trip hinterließe sonst einen
+        // Zähler ≥ Cap, den der anschließende LIVE-Play erbt — und nicht
+        // jeder Sim-Aufrufer fängt MCTS_OVERLOAD (mctsPickFromOptions
+        // aus Karten-Hooks heraus z. B. nicht), die Exception schlägt
+        // dann ohnehin bis in den Live-Handler durch. Sim-Seite bleibt
+        // trotzdem gedeckelt: _mctsKilledThisTurn stoppt weitere
+        // Rollouts, das Trip-Limit begrenzt den Worst Case.
+        this._damageCallsThisTurn = MAX_DAMAGE_CALLS_PER_TURN - LIVE_DAMAGE_CAP_GRACE;
+        if (!this._inMctsSim) {
+          console.warn(`[Engine] ⚠️  Damage-Cap LIVE getrippt (Trip ${this._liveDamageTripsThisTurn}/${MAX_LIVE_DAMAGE_TRIPS_PER_TURN}, Zug ${this.gs?.turn}) — Kaskade abgebrochen, Grace-Budget ${LIVE_DAMAGE_CAP_GRACE} gewährt`);
+        }
+      }
       throw err;
     }
     if (this._damageCallsTotal % DAMAGE_HEAP_CHECK_EVERY === 0) {
@@ -25143,7 +26259,18 @@ class GameEngine {
         if (hasLossSuspender) continue;
         const winnerIdx = pi === 0 ? 1 : 0;
         this.log('all_heroes_dead', { loser: ps.username, winner: this.gs.players[winnerIdx].username });
-        if (this.onGameOver) {
+        if (this._inMctsSim) {
+          // Sim-lokales Game-Over: gs.result stempeln, damit Rollout-
+          // Schleifen (rolloutRestOfTurn liest gs.result als Stopp-Signal)
+          // an diesem Punkt anhalten — snapshot/restore setzt es zurück.
+          // onGameOver darf aus einer Simulation heraus NIEMALS feuern:
+          // Beobachtet in hyper-letalen Matchups (Shifting Sandlands vs
+          // Elven Vanguard), wo der 6-Zug-Horizont den Tod einer ganzen
+          // Seite erreicht — das Rollout-Ende beendete via onGameOver →
+          // finish() das ECHTE Trainingsspiel bei Zug 6-8 mit dem
+          // Sim-Ergebnis (Phantom-Losses, 0 echte Plays im Recorder).
+          if (!this.gs.result) this.gs.result = { winnerIdx, reason: 'all_heroes_dead' };
+        } else if (this.onGameOver) {
           this.onGameOver(this.room, winnerIdx, 'all_heroes_dead');
         }
         return;

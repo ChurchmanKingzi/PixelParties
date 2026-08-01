@@ -25,6 +25,14 @@ const CARD_NAME = 'Chaorc Corpse Cannibal';
 module.exports = {
   activeIn: ['hand', 'support'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // Gratis-Summon + Gratis-Draw bei Opfern; Opfer-Trigger können außerhalb des Plans feuern (Karten-Hooks, Gegner-Interaktion).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     // ── Draw clause — board copy, once per turn per instance. ──
     onCreatureSacrificed: async (ctx) => {

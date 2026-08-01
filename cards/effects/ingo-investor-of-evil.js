@@ -16,6 +16,28 @@ const { hasCardType } = require('./_hooks');
 module.exports = {
   activeIn: ['hero'],
 
+  // ── SM-Ausbau-Floor gegen Lern-Drift ────────────────────────────────
+  // Ingo ist der einzige Held des Decks, der mit Summoning Magic
+  // startet — und Greatmaw Remora, der Gratis-Körper-Motor, ist
+  // Level 2. Ohne SM 2 sind 4 von 21 Kreaturen unspielbar, und der
+  // Weg dorthin führt über Performance (Ska Harpyformer tutort sie).
+  // Gemessen (1268 Spiele, Maximallevel über alle Helden):
+  //   SM 1 → 0.09 Remora-Plays/Spiel, WR 19.1%
+  //   SM 2 → 0.66, WR 23.3%
+  //   SM 3 → 0.93, WR 27.2%
+  // Das Training lernte trotzdem `Summoning Magic@Ingo≥2` mit −60,
+  // drehte den eigenen Freischalter also aktiv ab. Es ist dieselbe
+  // Konfundierung wie bei Teppes: Ausbau-Plays korrelieren mit langen
+  // Spielen, lange Spiele mit Niederlagen, und die Regression kann
+  // Fundament nicht von Verschleppung trennen.
+  // Floor als Untergrenze, Lernen bleibt nach oben frei. Level 3 wird
+  // NICHT gefloort — keine Kreatur im Deck verlangt es, das darf der
+  // Trainer frei bewerten.
+  cpuAbilityPriorFloor(abilityName, targetLevel) {
+    if (abilityName !== 'Summoning Magic') return null;
+    return targetLevel <= 2 ? 80 : null;
+  },
+
   // CPU threat assessment (gold supporter). +4 gold per Creature summoned
   // into own side. Scales with the summon-rate proxy used by Pes'zet/Maya.
   supportYield(ctx) {

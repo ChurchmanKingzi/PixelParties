@@ -1,0 +1,423 @@
+{
+  "deck": "Dance of the Butterflies",
+  "heroes": [
+    "Alleria, the Queen of Spiders",
+    "Beato, the Butterfly Witch",
+    "Willy, the Valiant Leprechaun"
+  ],
+  "games": 640,
+  "trainWinRate": "38.8%",
+  "trainedAt": "2026-07-24T15:33:38.939Z",
+  "meanTurns": 16.9,
+  "cardValues": {
+    "Slippery Skates": 21,
+    "Cute Cheese": 8,
+    "Aggressive Town Guard": 37.6,
+    "Controlled Attack": 36.2,
+    "Brilliant Idea": 8,
+    "Jumpscare": 8,
+    "Alchemy": 22.9,
+    "Divine Gift of Creation": 22.8,
+    "Graveyard Gathering": 24,
+    "Elixir of Quickness": 31.2,
+    "Burning Finger": 43.4,
+    "Pure Advantage Camel": 8,
+    "Beato, the Eternal Butterfly": 47.9,
+    "Cardinal Beast Qinglong": 92,
+    "Cardinal Beast Zhuque": 76.6,
+    "Juice": 25.4,
+    "Magnetic Potion": 32.2,
+    "Alchemic Journal": 15.1,
+    "Resuscitation Potion": 45.1,
+    "Magnetic Glove": 26.4
+  },
+  "timing": {
+    "Slippery Skates": {
+      "early": 0.85,
+      "mid": 1.04,
+      "late": 1.11
+    },
+    "Aggressive Town Guard": {
+      "early": 0.85,
+      "mid": 0.86,
+      "late": 1.29
+    },
+    "Brilliant Idea": {
+      "early": 0.98,
+      "mid": 1.02,
+      "late": 1
+    },
+    "Jumpscare": {
+      "early": 1.22,
+      "mid": 0.75,
+      "late": 1.28
+    },
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.08,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.82,
+      "mid": 1.17,
+      "late": 1.01
+    },
+    "Burning Finger": {
+      "early": 0.98,
+      "mid": 0.9,
+      "late": 1.12
+    },
+    "Pure Advantage Camel": {
+      "early": 0.9,
+      "mid": 0.91,
+      "late": 1.2
+    },
+    "Cardinal Beast Qinglong": {
+      "early": 1,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Cardinal Beast Zhuque": {
+      "early": 1,
+      "mid": 1.02,
+      "late": 0.98
+    },
+    "Magnetic Potion": {
+      "early": 0.82,
+      "mid": 1.03,
+      "late": 1.15
+    },
+    "Alchemic Journal": {
+      "early": 0.9,
+      "mid": 1.1,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Cute Cheese|dc:Jumpscare": 4.2,
+    "Aggressive Town Guard|dc:Cardinal Beast Baihu": 5.8,
+    "Booby Trap|Jumpscare": 6.8,
+    "Elixir of Quickness|Jumpscare": 13.5,
+    "Juice|dc:Graveyard Gathering": 4.4,
+    "Juice|dc:Torchure": 4.6,
+    "Divine Gift of Creation|Torchure": 10,
+    "Divine Gift of Creation|dc:Magnetic Glove": 5.8,
+    "Graveyard Gathering|dc:Slippery Skates": 5.5,
+    "Graveyard Gathering|dc:Fireshield": 4.7,
+    "Alchemic Journal|Resuscitation Potion": 5.8,
+    "Burning Finger|dc:Booby Trap": 5.6,
+    "Pure Advantage Camel|dc:Cute Cheese": 4.2,
+    "Magnetic Potion|Pure Advantage Camel": 19.5,
+    "Cardinal Beast Zhuque|Resuscitation Potion": 10,
+    "Magnetic Potion|dc:Booby Trap": 4.8,
+    "Anti Magic Shield|dc:Alchemic Journal": 9.2,
+    "Anti Magic Shield|dc:Fireshield": 20.8,
+    "Anti Magic Shield|dc:Cute Cheese": 12.5,
+    "Booby Trap|Resuscitation Potion": 7.7,
+    "Cardinal Beast Xuanwu|Fireshield": 5.3,
+    "Elixir of Quickness|Magnetic Potion": 14.1
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Anti Magic Shield": 7.2
+    },
+    "spell": {
+      "Cardinal Beast Baihu": 9
+    }
+  },
+  "casterDeltas": {
+    "Burning Finger": {
+      "Beato, the Butterfly Witch": -8.9,
+      "Beato, the Eternal Butterfly": 8.9
+    },
+    "Anti Magic Shield": {
+      "Beato, the Eternal Butterfly": 20,
+      "Beato, the Butterfly Witch": -20
+    },
+    "Fireshield": {
+      "Beato, the Butterfly Witch": -13.4,
+      "Beato, the Eternal Butterfly": 13.4
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Aggressive Town Guard": 9.7,
+      "Jumpscare": -17.9,
+      "Juice": -10.5,
+      "Magnetic Glove": -10.5,
+      "Graveyard Gathering": 16.8,
+      "Burning Finger": 9.5,
+      "Beato, the Eternal Butterfly": 14.8,
+      "Cardinal Beast Qinglong": 17.9,
+      "Torchure": 17.1,
+      "Cardinal Beast Zhuque": 20,
+      "Cardinal Beast Xuanwu": 17.4
+    },
+    "ahead": {
+      "Slippery Skates": 20,
+      "Aggressive Town Guard": 20,
+      "Alchemy": 19.1,
+      "Magnetic Glove": 20,
+      "Wheels": 20,
+      "Elixir of Quickness": 15.2,
+      "Burning Finger": 12.6,
+      "Cardinal Beast Qinglong": 20,
+      "Cardinal Beast Zhuque": 20,
+      "Magnetic Potion": 19,
+      "Divine Gift of Creation": 19.2,
+      "Resuscitation Potion": 20,
+      "Cardinal Beast Xuanwu": 20,
+      "Cardinal Beast Baihu": 19.9
+    }
+  },
+  "standingEvalThreshold": 965,
+  "targetPriors": {
+    "Aggressive Town Guard": {
+      "hp:max": -6.3,
+      "side:own": -7.6
+    },
+    "Cardinal Beast Zhuque": {
+      "hp:min": -6.3,
+      "kind:creature": 7.2
+    },
+    "Cardinal Beast Baihu": {
+      "hp:max": -9.9
+    },
+    "Juice": {
+      "hp:min": -12.1,
+      "hp:max": 7.9
+    }
+  },
+  "surpriseRules": {
+    "Pure Advantage Camel": {
+      "early": 12.8,
+      "mid": 2.5,
+      "late": 11.3
+    },
+    "Jumpscare": {
+      "early": 6.9,
+      "mid": 6.4,
+      "late": 17.9
+    },
+    "Booby Trap": {
+      "early": -4.8,
+      "mid": -3.3,
+      "late": -7.3
+    }
+  },
+  "reactionRules": {
+    "Anti Magic Shield": {
+      "late": -3.8,
+      "early": 2.3,
+      "mid": -5.2
+    },
+    "Fireshield": {
+      "early": 3.7,
+      "mid": -10,
+      "late": -6.5
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:1": -7.7,
+      "st:poison2+": -18,
+      "st:hero-caster": -4.9,
+      "st:stun-hero": 5.3,
+      "st:frozen-hero": -20,
+      "st:3+": -2.1
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -10.2,
+    "plc:bigwait": -5.3,
+    "plc:slack:1": -15,
+    "plc:slack:2+": 11
+  },
+  "tutorPickRules": {
+    "Divine Gift of Creation→Aggressive Town Guard": -8.7,
+    "Divine Gift of Creation→Booby Trap": -3,
+    "Divine Gift of Creation→Burning Finger": 6.2,
+    "Divine Gift of Creation→Graveyard Gathering": 3.2,
+    "Divine Gift of Creation→Anti Magic Shield": -6,
+    "Divine Gift of Creation→Fireshield": 11,
+    "Divine Gift of Creation→Pure Advantage Camel": -16.3,
+    "Divine Gift of Creation→Alchemy": 20,
+    "Divine Gift of Creation→Slippery Skates": 18.3,
+    "Divine Gift of Creation→Cardinal Beast Zhuque": 14.8,
+    "Divine Gift of Creation→Beato, the Eternal Butterfly": 13.6,
+    "Divine Gift of Creation→Jumpscare": 5.3,
+    "Trapping (Lv1)→Jumpscare": -2.4,
+    "Trapping (Lv1)→Pure Advantage Camel": 3.2,
+    "Magnetic Glove→Divine Gift of Creation": -9.6,
+    "Magnetic Glove→Alchemy": 20,
+    "Magnetic Glove→Aggressive Town Guard": -9,
+    "Magnetic Glove→Burning Finger": 17.5,
+    "Magnetic Glove→Pure Advantage Camel": 5.9,
+    "Magnetic Glove→Controlled Attack": -12.4,
+    "Magnetic Glove→Cardinal Beast Zhuque": 20,
+    "Magnetic Glove→Graveyard Gathering": 9.7,
+    "Magnetic Glove→Booby Trap": -17.3,
+    "Magnetic Glove→Fireshield": 3.9,
+    "Magnetic Glove→Slippery Skates": 4.2,
+    "Magnetic Glove→Jumpscare": -20,
+    "Magnetic Glove→Beato, the Eternal Butterfly": -20,
+    "Alchemic Journal — Choose a Potion→Elixir of Quickness": 20,
+    "Alchemic Journal — Choose a Potion→Resuscitation Potion": -20,
+    "Cute Cheese→Cardinal Beast Zhuque": -8.8,
+    "Cute Cheese→Pure Advantage Camel": 10.9,
+    "Cute Cheese→Cardinal Beast Qinglong": -10.2,
+    "Cute Cheese→Aggressive Town Guard": 10.5,
+    "Cute Cheese→Cardinal Beast Xuanwu": 12.8,
+    "Cute Cheese→Cardinal Beast Baihu": -20,
+    "Ascension Bonus — Eternal Butterfly→Burning Finger": -7.9,
+    "Ascension Bonus — Eternal Butterfly→Fireshield": -6.8,
+    "Ascension Bonus — Eternal Butterfly→Cardinal Beast Baihu": 2.7,
+    "Ascension Bonus — Eternal Butterfly→Cardinal Beast Xuanwu": 3.6,
+    "Ascension Bonus — Eternal Butterfly→Cardinal Beast Qinglong": 7.8,
+    "Ascension Bonus — Eternal Butterfly→Cardinal Beast Zhuque": 2.2,
+    "Ascension Bonus — Eternal Butterfly→Aggressive Town Guard": -14.7,
+    "Ascension Bonus — Eternal Butterfly→Torchure": -9.8,
+    "Ascension Bonus — Eternal Butterfly→Divine Gift of Creation": -3.9,
+    "Ascension Bonus — Eternal Butterfly→Anti Magic Shield": -4.5,
+    "Ascension Bonus — Eternal Butterfly→Graveyard Gathering": -20,
+    "Ascension Bonus — Eternal Butterfly→Controlled Attack": 13.3,
+    "Cardinal Beast Xuanwu→Aggressive Town Guard": 19.1,
+    "Cardinal Beast Xuanwu→Pure Advantage Camel": -19.1,
+    "Magnetic Potion→Aggressive Town Guard": -10.2,
+    "Magnetic Potion→Controlled Attack": -6.3,
+    "Magnetic Potion→Burning Finger": 14.9,
+    "Magnetic Potion→Booby Trap": -2.1,
+    "Magnetic Potion→Cardinal Beast Xuanwu": 11.8,
+    "Magnetic Potion→Divine Gift of Creation": 3.9,
+    "Magnetic Potion→Brilliant Idea": -15,
+    "Magnetic Potion→Pure Advantage Camel": -8.2,
+    "Magnetic Potion→Anti Magic Shield": 13.6,
+    "Magnetic Potion→Graveyard Gathering": 14.5,
+    "Magnetic Potion→Alchemy": -20,
+    "Magnetic Potion→Jumpscare": 11.4,
+    "Magnetic Potion→Beato, the Eternal Butterfly": -20,
+    "Magnetic Potion→Cardinal Beast Zhuque": 11.2,
+    "Magnetic Potion→Slippery Skates": -8.4,
+    "Magnetic Potion→Juice": -6.7,
+    "Brilliant Idea→Fireshield": 16.7,
+    "Brilliant Idea→Burning Finger": 5.6,
+    "Brilliant Idea→Slippery Skates": 8.2,
+    "Brilliant Idea→Controlled Attack": -10.2,
+    "Brilliant Idea→Alchemy": -20,
+    "Brilliant Idea→Aggressive Town Guard": 10.4,
+    "Brilliant Idea→Graveyard Gathering": 4.1,
+    "The Cosmic Depths→Pure Advantage Camel": -11.1,
+    "The Cosmic Depths→Aggressive Town Guard": 4.2,
+    "Enigma, the Seller of Secrets→Controlled Attack": -6.9,
+    "Enigma, the Seller of Secrets→Torchure": -5.1,
+    "Enigma, the Seller of Secrets→Cute Cheese": 20,
+    "Enigma, the Seller of Secrets→Alchemy": 14.1,
+    "Enigma, the Seller of Secrets→Graveyard Gathering": -20,
+    "Enigma, the Seller of Secrets→Wheels": 20,
+    "Enigma, the Seller of Secrets→Juice": -4.9,
+    "Enigma, the Seller of Secrets→Alchemic Journal": 9,
+    "Enigma, the Seller of Secrets→Pure Advantage Camel": -4.4,
+    "Magic Amethyst→Magic Arts": 5
+  },
+  "abilityPriors": {
+    "Decay Magic@Alleria, the Queen of Spiders": -60,
+    "Trapping@Alleria, the Queen of Spiders": -60,
+    "Magic Arts@Beato, the Butterfly Witch": -60,
+    "Magic Arts@Beato, the Butterfly Witch≥2": -60,
+    "Luck@Willy, the Valiant Leprechaun": 150,
+    "Alchemy@Willy, the Valiant Leprechaun": 150,
+    "Alchemy@Alleria, the Queen of Spiders": -60,
+    "Alchemy@Beato, the Butterfly Witch": 150,
+    "Wealth@Willy, the Valiant Leprechaun": -10,
+    "Alchemy@Beato, the Eternal Butterfly": 150,
+    "Magic Arts@Beato, the Eternal Butterfly": 150,
+    "Magic Arts@Beato, the Eternal Butterfly≥2": 150,
+    "Alchemy@Willy, the Valiant Leprechaun≥2": -60,
+    "Alchemy@Willy, the Valiant Leprechaun≥3": 150,
+    "Alchemy@Beato, the Eternal Butterfly≥2": 150,
+    "Alchemy@Beato, the Butterfly Witch≥2": -52.3,
+    "Alchemy@Beato, the Eternal Butterfly≥3": 150
+  },
+  "equipPriors": {
+    "Slippery Skates@Beato, the Butterfly Witch": 150,
+    "Slippery Skates@Willy, the Valiant Leprechaun": -60,
+    "Slippery Skates@Beato, the Eternal Butterfly": 150,
+    "Slippery Skates@Alleria, the Queen of Spiders": 136.3
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Beato, the Eternal Butterfly": 30,
+    "Resuscitation Potion→Beato, the Butterfly Witch": -15,
+    "Resuscitation Potion→Alleria, the Queen of Spiders": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Magic Arts": 30,
+    "Resuscitation Potion→Decay Magic": 30,
+    "Resuscitation Potion→Trapping": 30
+  },
+  "startHandValues": {
+    "Beato, the Eternal Butterfly": -1.8,
+    "Juice": -1.1,
+    "Burning Finger": 4.3,
+    "Slippery Skates": -5.8,
+    "Cute Cheese": -5.4,
+    "Divine Gift of Creation": 5.9,
+    "Cardinal Beast Qinglong": 9.5,
+    "Brilliant Idea": 4.6,
+    "Alchemy": 3.4,
+    "Fireshield": -2.6,
+    "Wheels": -7.5,
+    "Cardinal Beast Baihu": 2.2,
+    "Graveyard Gathering": -1.7,
+    "Alchemic Journal": -5.1,
+    "Torchure": -4.4,
+    "Cardinal Beast Xuanwu": -4,
+    "Booby Trap": 1.9,
+    "Cardinal Beast Zhuque": 8.6
+  },
+  "mulliganStats": {
+    "games": 640,
+    "mullRate": "46.3%",
+    "winAfterMull": "37.5%",
+    "winAfterKeep": "39.8%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Alchemy|Magic Arts": 14.8,
+    "Cardinal Beast Qinglong|Luck": 15,
+    "Cardinal Beast Qinglong|Wealth": 15,
+    "Alchemy|Cardinal Beast Qinglong": 9.2,
+    "Cardinal Beast Qinglong|Magic Arts": -14.6,
+    "Cardinal Beast Zhuque|Magic Arts": -14.3,
+    "Cardinal Beast Qinglong|Cardinal Beast Xuanwu": -15,
+    "Aggressive Town Guard|Decay Magic": 15,
+    "Aggressive Town Guard|Trapping": 15,
+    "Cardinal Beast Qinglong|Trapping": -15,
+    "Cardinal Beast Xuanwu|Slippery Skates": 8.2,
+    "Cardinal Beast Baihu|Cardinal Beast Zhuque": -15,
+    "Cardinal Beast Baihu|Luck": 14.6,
+    "Cardinal Beast Baihu|Wealth": 15,
+    "Cardinal Beast Zhuque|Luck": 15,
+    "Cardinal Beast Zhuque|Wealth": 15,
+    "Magic Arts|Pure Advantage Camel": -15,
+    "Cardinal Beast Baihu|Cardinal Beast Qinglong": -15,
+    "Cardinal Beast Baihu|Magic Arts": -15,
+    "Cardinal Beast Baihu|Cardinal Beast Xuanwu": -15,
+    "Cardinal Beast Zhuque|Slippery Skates": -15
+  },
+  "protectionRules": {
+    "Alleria, the Queen of Spiders": {
+      "ratioThreshold": 0
+    }
+  },
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.509,
+      "n": 53,
+      "values": {
+        "Deepsea Primordium": 0.178
+      }
+    }
+  }
+}

@@ -63,7 +63,7 @@ module.exports = {
           ? fromHeroIdxs[i]
           : inst.heroIdx;
         if (fromHi !== selfInst.heroIdx) continue;
-        const cd = cardDB[inst.name];
+        const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         matches++;
       }

@@ -1,0 +1,321 @@
+{
+  "deck": "Join our Cult!",
+  "heroes": [
+    "Tharx, the Never-Losing General",
+    "Klaus, the Cult Leader",
+    "Ingo, Investor of Evil"
+  ],
+  "games": 1360,
+  "trainWinRate": "62.2%",
+  "trainedAt": "2026-07-23T21:34:14.498Z",
+  "meanTurns": 15.8,
+  "cardValues": {
+    "Cute Cheese": 8,
+    "Performance": 8,
+    "Decay Magic": 8,
+    "Leadership": 8,
+    "Magnetic Glove": 79.9,
+    "Alchemy": 8.5,
+    "Cosmic Skeleton": 24.2,
+    "Elixir of Quickness": 23.9,
+    "Fire Bomb": 9,
+    "Mr. Jiggles": 48.8,
+    "Forbidden Zone": 93,
+    "The Master's Plan": 8,
+    "Wheels": 54.4,
+    "Icy Grave": 8,
+    "Acid Vial": 53,
+    "Haressassin": 50.4,
+    "Divine Gift of Forgetting": 50.1
+  },
+  "timing": {
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.3
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Decay Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Glove": {
+      "early": 1,
+      "mid": 0.87,
+      "late": 1.13
+    },
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Cosmic Skeleton": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1.1
+    },
+    "Elixir of Quickness": {
+      "early": 0.76,
+      "mid": 1.21,
+      "late": 1.04
+    },
+    "Mr. Jiggles": {
+      "early": 1,
+      "mid": 1.06,
+      "late": 0.94
+    },
+    "Forbidden Zone": {
+      "early": 1,
+      "mid": 1.23,
+      "late": 0.77
+    },
+    "The Master's Plan": {
+      "early": 1,
+      "mid": 0.8,
+      "late": 1.2
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.95,
+      "late": 1.05
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.3
+    },
+    "Haressassin": {
+      "early": 1,
+      "mid": 0.92,
+      "late": 1.08
+    }
+  },
+  "pairBonuses": {
+    "Cute Cheese|dc:Golden Ankh": 4.5,
+    "Cute Cheese|dc:The Master's Plan": 4.1,
+    "Performance|dc:Divine Gift of Forgetting": 5.1,
+    "Performance|dc:Golden Ankh": 4.2,
+    "Decay Magic|dc:Divine Gift of Forgetting": 4.2,
+    "Leadership|dc:Performance": 4.9,
+    "Leadership|dc:Divine Gift of Forgetting": 5.6,
+    "Leadership|dc:Golden Ankh": 8.6,
+    "Alchemy|dc:Magnetic Glove": 4.3,
+    "Alchemy|dc:Divine Gift of Forgetting": 4.4,
+    "Alchemy|dc:The Master's Plan": 4.4,
+    "Alchemy|dc:Golden Ankh": 5.1,
+    "Alchemy|dc:Fire Bomb": 4.2,
+    "Fire Bomb|dc:Golden Ankh": 4.8,
+    "Crimson Web|Forbidden Zone": 5.3,
+    "Acid Vial|dc:Golden Ankh": 4.6
+  },
+  "casterDeltas": {
+    "Icy Grave": {
+      "Klaus, the Cult Leader": -6,
+      "Tharx, the Never-Losing General": 8.4
+    },
+    "Divine Gift of Forgetting": {
+      "Klaus, the Cult Leader": -8.6,
+      "Tharx, the Never-Losing General": 8
+    },
+    "Forbidden Zone": {
+      "Klaus, the Cult Leader": -10.3,
+      "Tharx, the Never-Losing General": 13.4
+    },
+    "The Master's Plan": {
+      "Klaus, the Cult Leader": -6.2
+    },
+    "Crimson Web": {
+      "Tharx, the Never-Losing General": 20
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Icy Grave": -10.8,
+      "Cute Cheese": -5.4,
+      "Mr. Jiggles": 9.1,
+      "Divine Gift of Forgetting": 9.1,
+      "Forbidden Zone": 10,
+      "The Master's Plan": -8.7,
+      "Haressassin": 7.8,
+      "Crimson Web": -11.8
+    },
+    "ahead": {
+      "Icy Grave": -20,
+      "Cosmic Skeleton": -4.7,
+      "Cute Cheese": 3.3,
+      "Haressassin": -13.9
+    }
+  },
+  "standingEvalThreshold": 982,
+  "targetPriors": {
+    "Cosmic Skeleton": {
+      "kind:creature": -10.8,
+      "side:own": -14.6,
+      "hp:max": -8.5
+    },
+    "Mr. Jiggles": {
+      "hp:min": -6.1,
+      "hp:max": -14.1,
+      "frozen": -17
+    },
+    "Haressassin": {
+      "hp:max": -8.9
+    }
+  },
+  "surpriseRules": {
+    "Crimson Web": {
+      "early": 20,
+      "mid": 20,
+      "late": 20
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -4.5,
+    "plc:slack:1": 4.1,
+    "plc:slack:2+": 9.6
+  },
+  "tutorPickRules": {
+    "Cute Cheese→Haressassin": 3.3,
+    "Cute Cheese→Cosmic Skeleton": 3.6,
+    "Cute Cheese→Mr. Jiggles": -5.8,
+    "Magnetic Glove→Forbidden Zone": 5.8,
+    "Magnetic Glove→Performance": 8.1,
+    "Magnetic Glove→Crimson Web": 7.2,
+    "Magnetic Glove→Wheels": -2.3,
+    "Magnetic Glove→Decay Magic": -12.9,
+    "Magnetic Glove→The Master's Plan": 6.8,
+    "Magnetic Glove→Mr. Jiggles": 9.2,
+    "Magnetic Glove→Alchemy": -20,
+    "Magnetic Glove→Divine Gift of Forgetting": -18.4,
+    "Magnetic Glove→Icy Grave": -11.9,
+    "Magnetic Glove→Golden Ankh": -10.5,
+    "Magnetic Glove→Magnetic Glove": 14.7,
+    "Magnetic Glove→Cute Cheese": -6.7,
+    "The Cosmic Depths→Cosmic Skeleton": 6.6,
+    "The Cosmic Depths→Mr. Jiggles": -16.2,
+    "Magic Lamp→Chain Lightning": 20,
+    "Magic Lamp→Acid Vial": 8,
+    "Magic Lamp→Critical Strike": -13.2,
+    "Enigma, the Seller of Secrets→Decay Magic": 9.3,
+    "Enigma, the Seller of Secrets→Alchemy": -6.1,
+    "Enigma, the Seller of Secrets→The Master's Plan": 5.4,
+    "Enigma, the Seller of Secrets→Cute Cheese": 14.3,
+    "Enigma, the Seller of Secrets→Crimson Web": -11.7,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -14.2,
+    "Enigma, the Seller of Secrets→Performance": -7.4,
+    "Enigma, the Seller of Secrets→Icy Grave": -10.3,
+    "Enigma, the Seller of Secrets→Mr. Jiggles": -4.1,
+    "Enigma, the Seller of Secrets→Cosmic Skeleton": 2.6,
+    "Enigma, the Seller of Secrets→Leadership": 14.6,
+    "Enigma, the Seller of Secrets→Wheels": -5.8,
+    "Enigma, the Seller of Secrets→Haressassin": -10.4,
+    "Magic Amethyst→Decay Magic": -8.3
+  },
+  "abilityPriors": {
+    "Alchemy@Tharx, the Never-Losing General": 150,
+    "Alchemy@Tharx, the Never-Losing General≥2": 57,
+    "Alchemy@Tharx, the Never-Losing General≥3": 150,
+    "Leadership@Tharx, the Never-Losing General": 150,
+    "Leadership@Tharx, the Never-Losing General≥2": 86.1,
+    "Leadership@Tharx, the Never-Losing General≥3": -44,
+    "Decay Magic@Tharx, the Never-Losing General": 150,
+    "Decay Magic@Tharx, the Never-Losing General≥2": 29.9,
+    "Decay Magic@Tharx, the Never-Losing General≥3": 141.7,
+    "Decay Magic@Klaus, the Cult Leader": 150,
+    "Decay Magic@Klaus, the Cult Leader≥2": 69.4,
+    "Decay Magic@Klaus, the Cult Leader≥3": 150,
+    "Summoning Magic@Klaus, the Cult Leader": 123,
+    "Summoning Magic@Klaus, the Cult Leader≥2": 68.6,
+    "Leadership@Klaus, the Cult Leader": 37.4,
+    "Summoning Magic@Ingo, Investor of Evil": 150,
+    "Wealth@Ingo, Investor of Evil": 150,
+    "Wealth@Ingo, Investor of Evil≥2": -60,
+    "Alchemy@Ingo, Investor of Evil": 23.6,
+    "Alchemy@Ingo, Investor of Evil≥2": 150,
+    "Alchemy@Klaus, the Cult Leader": -60,
+    "Summoning Magic@Ingo, Investor of Evil≥2": 150,
+    "Decay Magic@Ingo, Investor of Evil": 118.1,
+    "Decay Magic@Ingo, Investor of Evil≥2": -60,
+    "Decay Magic@Ingo, Investor of Evil≥3": -60,
+    "Leadership@Klaus, the Cult Leader≥2": -60,
+    "Alchemy@Ingo, Investor of Evil≥3": 123.9,
+    "Leadership@Ingo, Investor of Evil": -60,
+    "Summoning Magic@Ingo, Investor of Evil≥3": 137.9,
+    "Alchemy@Klaus, the Cult Leader≥2": 150,
+    "Alchemy@Klaus, the Cult Leader≥3": 47.9,
+    "Wealth@Ingo, Investor of Evil≥3": -60,
+    "Summoning Magic@Klaus, the Cult Leader≥3": 150
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Tharx, the Never-Losing General": 30,
+    "Golden Ankh→Klaus, the Cult Leader": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Alchemy": 30,
+    "Golden Ankh→Leadership": 30,
+    "Golden Ankh→Decay Magic": 30,
+    "Golden Ankh→Summoning Magic": 30
+  },
+  "startHandValues": {
+    "The Master's Plan": -2.5,
+    "Performance": -2.2,
+    "Divine Gift of Forgetting": 1.6,
+    "Cute Cheese": -2.9,
+    "Icy Grave": -7.5,
+    "Alchemy": 3.6,
+    "Leadership": 2.4,
+    "Golden Ankh": -3.6,
+    "Decay Magic": 1.3,
+    "Magnetic Glove": -2.8,
+    "Crimson Web": 1.2,
+    "Mr. Jiggles": 2.3,
+    "Cosmic Skeleton": 1.8
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "54.1%",
+    "winAfterMull": "61%",
+    "winAfterKeep": "63.6%"
+  },
+  "heroEffectTiming": {
+    "Tharx, the Never-Losing General@hand:2-3": 7.7,
+    "Tharx, the Never-Losing General@hand:4+": 9.4
+  },
+  "boardPairs": {
+    "Alchemy|Decay Magic": 5.3,
+    "Decay Magic|Leadership": 15,
+    "Cosmic Skeleton|Haressassin": 10.3,
+    "Cosmic Skeleton|Decay Magic": 15,
+    "Cosmic Skeleton|Summoning Magic": 10.4,
+    "Decay Magic|Mr. Jiggles": 15,
+    "Leadership|Summoning Magic": 14.4,
+    "Cosmic Skeleton|Wealth": -10.2,
+    "Summoning Magic|Wealth": 15,
+    "Alchemy|Summoning Magic": 4.6,
+    "Mr. Jiggles|Wealth": -5.4,
+    "Alchemy|Mr. Jiggles": 5.3
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.81,
+      "n": 84,
+      "values": {
+        "Deepsea Primordium": 0.19,
+        "Ska Harpyformer": 0.107
+      }
+    }
+  }
+}

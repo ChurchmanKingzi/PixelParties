@@ -42,6 +42,33 @@ function _buildAbilityGallery(ps, hi) {
 }
 
 module.exports = {
+  // Gelockertes Commit (Al-Design-Update): Auch schwache Abilities
+  // (Toughness) sind es wert, entfernt zu werden — Amethyst kann
+  // GELOOPT werden: Eine schwache Removal jetzt heißt nächste Runde
+  // eine stärkere. Committe deshalb, sobald irgendein lebender
+  // Gegner-Held überhaupt Abilities trägt (sonst fizzlet der Resolve
+  // ohnehin und das Gate darf sparen). Der abilityDependencyScore
+  // bleibt für die ZIEL-Wahl im Target-Kanal relevant, nicht mehr
+  // fürs Ob.
+  cpuMeta: {
+    alwaysCommit: (engine, pi) => {
+      try {
+        const oppIdx = pi === 0 ? 1 : 0;
+        const oppPs = engine.gs?.players?.[oppIdx];
+        if (!oppPs) return false;
+        for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+          const h = oppPs.heroes[hi];
+          if (!h?.name || h.hp <= 0) continue;
+          const zones = oppPs.abilityZones?.[hi];
+          if (!Array.isArray(zones)) continue;
+          for (const z of zones) {
+            if (Array.isArray(z) ? z.length > 0 : !!z) return true;
+          }
+        }
+      } catch { /* konservativ: Gate entscheidet */ }
+      return false;
+    },
+  },
   isTargetingArtifact: true,
   activeIn: ['hand'],
 

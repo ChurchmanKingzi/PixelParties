@@ -34,7 +34,7 @@ module.exports = {
 
       const engine = ctx._engine;
       const cardDB = engine._getCardDB();
-      const cd = cardDB[entering.name];
+      const cd = entering.counters?._cardDataOverride || cardDB[entering.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd) return;
       if (!hasCardType(cd, 'Creature')) return;
       if (cd.cardType === 'Token') return;

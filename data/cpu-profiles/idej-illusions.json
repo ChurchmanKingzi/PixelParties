@@ -1,0 +1,358 @@
+{
+  "deck": "Idej Illusions",
+  "heroes": [
+    "Lizbeth, the Reaper of the Light",
+    "Idej Lord Daiyo",
+    "Elana, the Rocky Rebel"
+  ],
+  "games": 1360,
+  "trainWinRate": "31%",
+  "trainedAt": "2026-07-24T22:56:39.281Z",
+  "meanTurns": 21.5,
+  "cardValues": {
+    "Performance": 8,
+    "Fighting": 8,
+    "Metal Harpyformer": 23.8,
+    "Ska Harpyformer": 26.7,
+    "Booby Trap": 8,
+    "Quick Attack": 42.6,
+    "Idej Projector": 8,
+    "Dark Gear": 22.5,
+    "Critical Strike": 64.7,
+    "Idej Sword - Kogarasu": 51.2,
+    "Chain Lightning": 93.9
+  },
+  "timing": {
+    "Performance": {
+      "early": 0.75,
+      "mid": 0.97,
+      "late": 1.3
+    },
+    "Fighting": {
+      "early": 0.81,
+      "mid": 1.02,
+      "late": 1.17
+    },
+    "Metal Harpyformer": {
+      "early": 0.75,
+      "mid": 0.95,
+      "late": 1.3
+    },
+    "Ska Harpyformer": {
+      "early": 0.87,
+      "mid": 0.79,
+      "late": 1.3
+    },
+    "Booby Trap": {
+      "early": 1.18,
+      "mid": 0.76,
+      "late": 1.05
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 0.91,
+      "late": 1.3
+    },
+    "Idej Projector": {
+      "early": 1,
+      "mid": 0.79,
+      "late": 1.21
+    },
+    "Critical Strike": {
+      "early": 1,
+      "mid": 0.8,
+      "late": 1.2
+    }
+  },
+  "pairBonuses": {
+    "Chain Lightning|Divine Punishment": 7.5,
+    "Divine Punishment|dc:Fighting": 6.2,
+    "Divine Punishment|Idej Sword - Kogarasu": 7,
+    "Divine Punishment|dc:Critical Strike": 4.9,
+    "Divine Punishment|Guardian Angel": 5.6,
+    "Divine Punishment|dc:Torchure": 5.3,
+    "Martyry|Quick Attack": 5.1,
+    "Eraser Beam|Idej Projector": 4.1,
+    "Idej Projector|dc:Divine Punishment": 4.4,
+    "Idej Projector|dc:Flame Avalanche": 6.8,
+    "Idej Projector|dc:Divine Gift of Sacrifice": 8.5,
+    "Idej Projector|dc:Juice": 4.3,
+    "Idej Projector|dc:Torchure": 7,
+    "Eraser Beam|dc:Idej Projector": 4.5,
+    "Eraser Beam|Juice": 8.1,
+    "Eraser Beam|Idej Sword - Kogarasu": 7.2,
+    "Dark Gear|dc:Booby Trap": 5.6,
+    "Critical Strike|dc:Martyry": 4,
+    "Critical Strike|dc:Divine Punishment": 4.7,
+    "Critical Strike|dc:Idej Projector": 4.5,
+    "Critical Strike|dc:Juice": 6.7,
+    "Critical Strike|dc:Idej Sword - Kogarasu": 4.6,
+    "Chain Lightning|Idej Sword - Kogarasu": 7,
+    "Chain Lightning|Corpse Explosion": 5.6,
+    "Corpse Explosion|dc:Booby Trap": 24.3,
+    "Corpse Explosion|dc:Chain Lightning": 10.5,
+    "Chain Lightning|dc:Booby Trap": 4.8,
+    "Chain Lightning|dc:Quick Attack": 4.3,
+    "Frost Rune|dc:Performance": 4.4
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Torchure": -7.9,
+      "Corpse Explosion": -7.8,
+      "Divinity": 6
+    },
+    "swarm": {
+      "Corpse Explosion": 11.4,
+      "Divinity": -11
+    },
+    "spell": {
+      "Divinity": 10.4
+    }
+  },
+  "casterDeltas": {
+    "Booby Trap": {
+      "Idej Lord Daiyo": -5.4,
+      "Lizbeth, the Reaper of the Light": 6.3
+    },
+    "Quick Attack": {
+      "Idej Lord Daiyo": -3.6,
+      "Lizbeth, the Reaper of the Light": 5.3,
+      "Elana, the Rocky Rebel": -6.6
+    },
+    "Chain Lightning": {
+      "Idej Lord Daiyo": 15,
+      "Lizbeth, the Reaper of the Light": -17.4
+    },
+    "Flame Avalanche": {
+      "Lizbeth, the Reaper of the Light": -18.5,
+      "Idej Lord Daiyo": 19.9
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Performance": 5.2,
+      "Booby Trap": -5.4,
+      "Quick Attack": 5.3,
+      "Guardian Angel": 13.4,
+      "Metal Harpyformer": 7.1,
+      "Critical Strike": 15.9,
+      "Idej Sword - Kogarasu": 11.5,
+      "Compulsory Body Swap": 20,
+      "Chain Lightning": 14.8,
+      "Flame Avalanche": 20,
+      "Frost Rune": 16,
+      "Divinity": -18.5
+    },
+    "ahead": {
+      "Idej Projector": -15,
+      "Critical Strike": -17.2,
+      "Flame Avalanche": -15
+    }
+  },
+  "standingEvalThreshold": 1320,
+  "targetPriors": {
+    "Quick Attack": {
+      "side:own": -7.1
+    },
+    "Eraser Beam": {
+      "hp:min": -6.9,
+      "kind:creature": -12.6
+    },
+    "Guardian Angel": {
+      "side:opp": -6.1,
+      "hp:min": -6.6
+    },
+    "Critical Strike": {
+      "side:own": -12.6,
+      "kind:creature": -7.2
+    },
+    "Torchure": {
+      "hp:max": 10.6,
+      "hp:min": -13.3
+    },
+    "Juice": {
+      "kind:creature": 8.2,
+      "frozen": -15.5,
+      "hp:max": 15,
+      "side:opp": 20
+    },
+    "Slippery Narw": {
+      "side:own": -14
+    }
+  },
+  "surpriseRules": {
+    "Booby Trap": {
+      "early": -12.5,
+      "mid": -4,
+      "late": -3.1
+    }
+  },
+  "reactionRules": {
+    "Corpse Explosion": {
+      "mid": 15.7,
+      "late": 20,
+      "early": 15.7
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:1": -2.2,
+      "st:poison2+": -7.4,
+      "st:hero-caster": -5.1,
+      "st:2": -9,
+      "st:stun-hero": -20,
+      "st:3+": -20
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": -15
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Decay Magic": 18.3,
+    "Magic Lamp→Cataclysm": -18.8,
+    "Magic Lamp→Alchemy": -4.3,
+    "Magic Lamp→Cloudy Slime": -4.8,
+    "Magic Lamp→Fiery Slime": -4,
+    "Magic Lamp→Martyry": -20,
+    "Magic Lamp→Coffee": 20,
+    "Magic Amethyst→Fighting": -6.7,
+    "Magic Amethyst→Performance": -2.5,
+    "Magic Amethyst→Creativity": 6.1,
+    "Magic Amethyst→Support Magic": 5.6,
+    "Magic Amethyst→Resistance": 15.6,
+    "Cute Dog→Chain Lightning": -6,
+    "Cute Dog→Compulsory Body Swap": 10.2,
+    "Cute Dog→Flame Avalanche": -7.4,
+    "Enigma, the Seller of Secrets→Eraser Beam": -9.9,
+    "Enigma, the Seller of Secrets→Juice": 17.8,
+    "Enigma, the Seller of Secrets→Compulsory Body Swap": -5.4,
+    "Enigma, the Seller of Secrets→Idej Sword - Kogarasu": -9.9,
+    "Enigma, the Seller of Secrets→Dark Gear": -8.5,
+    "Enigma, the Seller of Secrets→Divinity": -2.4,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": -6,
+    "Enigma, the Seller of Secrets→Quick Attack": -10.4,
+    "Enigma, the Seller of Secrets→Idej Projector": -6.5,
+    "Enigma, the Seller of Secrets→Flame Avalanche": 20,
+    "Enigma, the Seller of Secrets→Performance": 4.2,
+    "Enigma, the Seller of Secrets→Chain Lightning": 5.4,
+    "Enigma, the Seller of Secrets→Metal Harpyformer": -3.1,
+    "Enigma, the Seller of Secrets→Quetzahuitl, Receiver of Sacrifices": 11.4,
+    "Enigma, the Seller of Secrets→Critical Strike": -3.6,
+    "Enigma, the Seller of Secrets→Fighting": -17.8,
+    "Enigma, the Seller of Secrets→Corpse Explosion": 4,
+    "Enigma, the Seller of Secrets→Guardian Angel": 20,
+    "Enigma, the Seller of Secrets→Frost Rune": 4.1,
+    "Enigma, the Seller of Secrets→Booby Trap": -8.6,
+    "The Cosmic Depths→Ska Harpyformer": 14.2,
+    "The Cosmic Depths→Metal Harpyformer": -14.2,
+    "Slippery Narw→Metal Harpyformer": -20,
+    "Slippery Narw→Ska Harpyformer": 20
+  },
+  "abilityPriors": {
+    "Resistance@Lizbeth, the Reaper of the Light": 150,
+    "Support Magic@Lizbeth, the Reaper of the Light": 150,
+    "Support Magic@Lizbeth, the Reaper of the Light≥2": 150,
+    "Fighting@Lizbeth, the Reaper of the Light": 150,
+    "Wisdom@Idej Lord Daiyo": 150,
+    "Wisdom@Idej Lord Daiyo≥2": -20.7,
+    "Fighting@Elana, the Rocky Rebel": 150,
+    "Fighting@Elana, the Rocky Rebel≥2": -60,
+    "Creativity@Elana, the Rocky Rebel": 150,
+    "Creativity@Elana, the Rocky Rebel≥2": 150,
+    "Creativity@Elana, the Rocky Rebel≥3": 94.8,
+    "Fighting@Idej Lord Daiyo": 150,
+    "Fighting@Idej Lord Daiyo≥2": 150,
+    "Resistance@Lizbeth, the Reaper of the Light≥2": 16,
+    "Support Magic@Lizbeth, the Reaper of the Light≥3": -60,
+    "Resistance@Lizbeth, the Reaper of the Light≥3": 150,
+    "Fighting@Lizbeth, the Reaper of the Light≥2": -60,
+    "Wisdom@Idej Lord Daiyo≥3": 86,
+    "Divinity@Quetzahuitl, Receiver of Sacrifices": -60,
+    "Divinity@Quetzahuitl, Receiver of Sacrifices≥2": -60,
+    "Divinity@Quetzahuitl, Receiver of Sacrifices≥3": -60,
+    "Fighting@Lizbeth, the Reaper of the Light≥3": -19.8
+  },
+  "equipPriors": {
+    "Idej Sword - Kogarasu@Idej Lord Daiyo": 150
+  },
+  "lockPenalties": {
+    "Eraser Beam|spell@2": 10,
+    "Eraser Beam|spell@3+": 10,
+    "Eraser Beam|spell@1": -10.4
+  },
+  "reviveTargets": {},
+  "reviveAbilities": {},
+  "startHandValues": {
+    "Quick Attack": -1.5,
+    "Corpse Explosion": -2.9,
+    "Frost Rune": -3.5,
+    "Fighting": 2.9,
+    "Flame Avalanche": 3.3,
+    "Metal Harpyformer": -2.5,
+    "Dark Gear": -3.1,
+    "Compulsory Body Swap": 2.7,
+    "Guardian Angel": 3.3,
+    "Martyry": -2.6,
+    "Critical Strike": 1.9,
+    "Idej Projector": 1.5,
+    "Eraser Beam": 7.7,
+    "Chain Lightning": -3.4,
+    "Booby Trap": 3.1,
+    "Juice": 1.9,
+    "Divine Punishment": -1.9,
+    "Quetzahuitl, Receiver of Sacrifices": -7.5
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "48.5%",
+    "winAfterMull": "29.3%",
+    "winAfterKeep": "32.7%"
+  },
+  "heroEffectTiming": {
+    "Elana, the Rocky Rebel@hand:2-3": 6.4
+  },
+  "boardPairs": {
+    "Resistance|Support Magic": 3.1,
+    "Fighting|Resistance": 6.4,
+    "Fighting|Support Magic": 6.2,
+    "Ska Harpyformer|Wisdom": 7.9,
+    "Fighting|Metal Harpyformer": 9.4,
+    "Creativity|Metal Harpyformer": 8.7,
+    "Fighting|Wisdom": 3.1,
+    "Metal Harpyformer|Resistance": 12.8,
+    "Metal Harpyformer|Support Magic": 14.2,
+    "Metal Harpyformer|Wisdom": 11.3,
+    "Fighting|Idej Projection": 15,
+    "Idej Projection|Wisdom": 15,
+    "Fighting|Idej Sword - Kogarasu": 15,
+    "Idej Sword - Kogarasu|Wisdom": 15,
+    "Idej Projection|Idej Sword - Kogarasu": 15
+  },
+  "protectionRules": {
+    "Idej Projection": {
+      "ratioThreshold": 0
+    }
+  },
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.34,
+      "n": 106,
+      "values": {
+        "Hell Fox": 0.353,
+        "Ska Harpyformer": 0.16,
+        "Deepsea Primordium": -0.09
+      }
+    },
+    "Bill, the Angry Auctioneer": {
+      "baseline": 0.475,
+      "n": 59,
+      "values": {
+        "The Sun Sword": -0.185,
+        "Wanted Poster": -0.308,
+        "Legendary Sword of a Barbarian King": 0.335,
+        "Summoning Circle": 0.335
+      }
+    }
+  }
+}

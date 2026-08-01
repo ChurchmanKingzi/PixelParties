@@ -19,11 +19,35 @@ module.exports = {
   // the effect a no-op even after the CPU chose to activate it. (Title must
   // equal the card name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   activeIn: ['hero'],
   heroEffect: true,
+
+  /**
+   * Suizid-Bremse (Deckout-Prävention, Als Heal-Burn-Befund): Der
+   * Draw-to-7-Refill ist der Haupt-Deckverbraucher des Archetyps —
+   * Konsum/Zug ≈ ausgegebene Handkarten. Überspringe die Aktivierung,
+   * wenn der Refill das Restdeck (fast) leeren würde: dann ist der
+   * nächste Pflicht-Draw der Deck-Out. Bewusst NUR der harte
+   * Extremfall — die situative Abwägung ("lohnt Ziehen bei Deck=7?")
+   * trifft der Deck-Nähe-Term in evaluateState über die MCTS-Arme,
+   * inklusive der Lethal-Ausnahme.
+   */
+  cpuShouldUseHeroEffect(engine, pi) {
+    const ps = engine.gs?.players?.[pi];
+    if (!ps) return true;
+    const deckLen = ps.mainDeck?.length;
+    if (typeof deckLen !== 'number') return true;
+    const wouldDraw = Math.max(0, 7 - (ps.hand?.length || 0));
+    // Nach dem Refill müssen mindestens 2 Karten liegen bleiben
+    // (der nächste Pflicht-Draw + eine Reserve).
+    return deckLen - wouldDraw >= 2;
+  },
 
   // CPU threat assessment: draws up to 7 cards, averaging ~3 net per turn
   // from mid-turn activation (hand typically at 3–4 before refill).

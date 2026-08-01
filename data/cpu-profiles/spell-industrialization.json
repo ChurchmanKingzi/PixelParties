@@ -1,0 +1,421 @@
+{
+  "deck": "Spell Industrialization",
+  "heroes": [
+    "Cooldin, King of Coolness",
+    "Victorica, the Eternal Empress",
+    "Ingo, Investor of Evil"
+  ],
+  "games": 1292,
+  "trainWinRate": "49.1%",
+  "trainedAt": "2026-07-20T04:32:43.169Z",
+  "meanTurns": 22.4,
+  "cardValues": {
+    "Mana Mining": 8,
+    "Leadership": 8,
+    "Alchemy": 8,
+    "Elixir of Quickness": 8,
+    "Pollution Spewer": 83.5,
+    "Rain of Arrows": 22,
+    "Wheels": 31,
+    "Magnetic Potion": 18.2,
+    "Divine Gift of Fire": 39.9,
+    "Eraser Beam": 45.4,
+    "Pyroblast": 48.5,
+    "Pollution Piranha": 92,
+    "Resuscitation Potion": 8,
+    "Magnetic Glove": 37.6
+  },
+  "timing": {
+    "Mana Mining": {
+      "early": 0.75,
+      "mid": 1.2,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.18,
+      "late": 1.27
+    },
+    "Alchemy": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.17
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.23
+    },
+    "Pollution Spewer": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.14
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.96,
+      "late": 1.04
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.12
+    },
+    "Divine Gift of Fire": {
+      "early": 1.03,
+      "mid": 0.97,
+      "late": 1
+    },
+    "Eraser Beam": {
+      "early": 0.89,
+      "mid": 1.11,
+      "late": 1
+    },
+    "Pyroblast": {
+      "early": 0.75,
+      "mid": 0.88,
+      "late": 1.3
+    },
+    "Pollution Piranha": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.29
+    }
+  },
+  "pairBonuses": {
+    "Mana Mining|Reincarnation": 5.5,
+    "Leadership|Resuscitation Potion": 4,
+    "Leadership|Magic Mirror": 6.1,
+    "Leadership|dc:Goldify": 5.7,
+    "Alchemy|Resuscitation Potion": 5.4,
+    "Alchemy|Rain of Death": 5.3,
+    "Elixir of Quickness|Magic Mirror": 4.2,
+    "Pollution Spewer|Resuscitation Potion": 6.3,
+    "Pollution Spewer|Rain of Arrows": 4.4,
+    "Pollution Piranha|Wheels": 4.2,
+    "Magic Mirror|Wheels": 23.3,
+    "Magnetic Potion|Resuscitation Potion": 7,
+    "Magnetic Potion|dc:Wheels": 5.1,
+    "Eraser Beam|Magnetic Potion": 4.5,
+    "Divine Gift of Fire|Magic Mirror": 7.8,
+    "Eraser Beam|dc:Pollution Spewer": 5.1,
+    "Eraser Beam|dc:Magnetic Glove": 5.4,
+    "Eraser Beam|dc:Pollution Piranha": 7.7,
+    "Eraser Beam|dc:Dark Gear": 4.9,
+    "Eraser Beam|dc:Tea": 4.7,
+    "Goldify|The Great Clock Tower \"Big Gwen\"": 15,
+    "Pollution Piranha|dc:Pyroblast": 5.4,
+    "Pollution Piranha|dc:Dark Gear": 7.9,
+    "Pollution Piranha|dc:Divine Gift of Fire": 6.3,
+    "Pollution Piranha|dc:Goldify": 6,
+    "Reincarnation|dc:Golden Ankh": 14.4,
+    "Magic Mirror|dc:Divine Gift of Fire": 8,
+    "Magic Mirror|dc:Rain of Arrows": 11.2
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Mana Mining": -13,
+      "Leadership": -14.9,
+      "Alchemy": -14.9,
+      "Elixir of Quickness": -14.4,
+      "Pollution Spewer": -15.4,
+      "Rain of Arrows": -19,
+      "Wheels": -14.8,
+      "Magnetic Potion": -14.9,
+      "Divine Gift of Fire": -14.2,
+      "Golden Wings": -18.4,
+      "Eraser Beam": -16,
+      "Pyroblast": -12,
+      "The Great Clock Tower \"Big Gwen\"": -14.4,
+      "Dark Gear": -9.4,
+      "Pollution Piranha": -18,
+      "Goldify": -15.5,
+      "Resuscitation Potion": -6,
+      "Rain of Death": -17.1,
+      "Magnetic Glove": -14.6,
+      "Reincarnation": -17.4,
+      "Magic Mirror": -9.1,
+      "Shard of Chaos": -17.6
+    },
+    "swarm": {
+      "Mana Mining": 8.7,
+      "Leadership": 9.6,
+      "Alchemy": 8.2,
+      "Elixir of Quickness": 9,
+      "Rain of Arrows": 11,
+      "Wheels": 9.3,
+      "Magnetic Potion": 9,
+      "Divine Gift of Fire": 7.8,
+      "Golden Wings": 6.9,
+      "Eraser Beam": 8,
+      "Pyroblast": 6.6,
+      "The Great Clock Tower \"Big Gwen\"": 8.9,
+      "Goldify": 6,
+      "Golden Ankh": 8.8,
+      "Rain of Death": 9.1,
+      "Magnetic Glove": 8.9,
+      "Tea": 6.2
+    },
+    "spell": {
+      "Rain of Arrows": -6.3,
+      "Golden Wings": 9.9,
+      "The Great Clock Tower \"Big Gwen\"": -8.3,
+      "Goldify": -8.9,
+      "Resuscitation Potion": 7.7,
+      "Magnetic Glove": -6.3,
+      "Shard of Chaos": 8.8
+    }
+  },
+  "casterDeltas": {
+    "Pyroblast": {
+      "Cooldin, King of Coolness": 4.2
+    },
+    "Reincarnation": {
+      "Victorica, the Eternal Empress": -19.6,
+      "Ingo, Investor of Evil": 20
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Pollution Spewer": -3.9,
+      "Wheels": -6.2,
+      "Magnetic Potion": 5,
+      "Divine Gift of Fire": 7.7,
+      "Pyroblast": -3.3,
+      "Pollution Piranha": -7.7,
+      "Magic Mirror": 7.2,
+      "Rain of Death": 8.9,
+      "Shard of Chaos": -17
+    },
+    "ahead": {
+      "Elixir of Quickness": -9,
+      "Pollution Spewer": 9.5,
+      "Magnetic Potion": -11,
+      "Divine Gift of Fire": -17.2,
+      "Pollution Piranha": 13,
+      "Goldify": -11.6,
+      "Reincarnation": -15.9
+    }
+  },
+  "standingEvalThreshold": 964,
+  "targetPriors": {
+    "Pollution Spewer": {
+      "hp:min": -7.8,
+      "hp:max": -7.9,
+      "side:own": -18.8
+    },
+    "Eraser Beam": {
+      "kind:creature": -12.8
+    },
+    "Goldify": {
+      "side:own": -6.9,
+      "hp:max": 13,
+      "hp:min": 13
+    },
+    "Pollution Piranha": {
+      "hp:min": -7.4,
+      "side:own": -6.1,
+      "hp:max": -11.3
+    },
+    "Pyroblast": {
+      "side:own": -10.3,
+      "hp:max": -9.8
+    },
+    "Tea — Inflict": {
+      "side:own": -10.5,
+      "kind:creature": 8
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -12.6,
+      "hp:min": 10.1,
+      "kind:creature": 8.4
+    }
+  },
+  "surpriseRules": {
+    "Magic Mirror": {
+      "early": 20,
+      "mid": 20,
+      "late": 20
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 7.1,
+      "st:hero-caster": 9.3,
+      "st:3+": 17.5,
+      "st:2": 15,
+      "st:stun-hero": -4.1,
+      "st:poison2+": 20
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 3.8,
+    "plc:slack:1": -3.8,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Magnetic Potion→Pyroblast": 2.4,
+    "Magnetic Potion→Rain of Arrows": 6.6,
+    "Magnetic Potion→Magic Mirror": -10.6,
+    "Magnetic Potion→Golden Wings": -9.7,
+    "Magnetic Potion→Leadership": -7.1,
+    "Magnetic Potion→Alchemy": -20,
+    "Magnetic Potion→Reincarnation": -2.8,
+    "Magnetic Potion→Eraser Beam": 11.4,
+    "Magnetic Potion→Pollution Piranha": -8.1,
+    "Magnetic Potion→Divine Gift of Fire": -11.6,
+    "Magnetic Potion→Shard of Chaos": 4,
+    "Magnetic Potion→The Great Clock Tower \"Big Gwen\"": 2.4,
+    "Magnetic Potion→Goldify": -9.1,
+    "Magnetic Potion→Rain of Death": -9.1,
+    "Magnetic Potion→Dark Gear": -12,
+    "Magnetic Potion→Golden Ankh": -20,
+    "Magnetic Glove→Eraser Beam": 13.4,
+    "Magnetic Glove→Goldify": -20,
+    "Magnetic Glove→Mana Mining": 13.2,
+    "Magnetic Glove→Pyroblast": -4.8,
+    "Magnetic Glove→Dark Gear": -16.5,
+    "Magnetic Glove→Pollution Spewer": 3,
+    "Magnetic Glove→Tea": -20,
+    "Magnetic Glove→Reincarnation": -8.4,
+    "Magnetic Glove→The Great Clock Tower \"Big Gwen\"": 20,
+    "Magnetic Glove→Rain of Arrows": -20,
+    "Reincarnation — Revive Creature→Pollution Piranha": 8.1,
+    "Reincarnation — Revive Creature→Pollution Spewer": -8.1,
+    "Magic Lamp→Chain Lightning": -13.1,
+    "Magic Lamp→Dark Gear": 20,
+    "Magic Lamp→Acid Vial": -11.4,
+    "Magic Lamp→Critical Strike": 3.3,
+    "Magic Lamp→Elixir of Immortality": 6,
+    "Magic Lamp→Fighting": -5.5,
+    "Magic Amethyst→Leadership": 7.2,
+    "Magic Amethyst→Alchemy": 5,
+    "Magic Amethyst→Mana Mining": -9.7,
+    "Magic Amethyst→Wisdom": -2.7,
+    "Enigma, the Seller of Secrets→Dark Gear": -18.4,
+    "Enigma, the Seller of Secrets→Tea": -2.2,
+    "Enigma, the Seller of Secrets→Eraser Beam": -20,
+    "Enigma, the Seller of Secrets→Leadership": -7.4,
+    "Enigma, the Seller of Secrets→Pollution Spewer": 7,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -3,
+    "Enigma, the Seller of Secrets→Golden Ankh": 9.3,
+    "Enigma, the Seller of Secrets→Wheels": 4.8,
+    "Enigma, the Seller of Secrets→Pyroblast": 9.5,
+    "Enigma, the Seller of Secrets→Pollution Piranha": -2,
+    "Enigma, the Seller of Secrets→Mana Mining": -5.2,
+    "Enigma, the Seller of Secrets→Golden Wings": 10.4,
+    "Enigma, the Seller of Secrets→Alchemy": 9.9,
+    "Enigma, the Seller of Secrets→Goldify": -6.7,
+    "Enigma, the Seller of Secrets→The Great Clock Tower \"Big Gwen\"": 11.3,
+    "Enigma, the Seller of Secrets→Rain of Arrows": 16,
+    "Enigma, the Seller of Secrets→Shard of Chaos": -12.8,
+    "Cute Dog→Magic Mirror": -3.4,
+    "Cute Dog→Rain of Death": 3.4,
+    "Shard of Chaos — Retrieve Artifact→Golden Ankh": -11.5,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Pyroblast": 20,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Pollution Piranha": -20,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Eraser Beam": -10.8
+  },
+  "abilityPriors": {
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Alchemy@Cooldin, King of Coolness≥2": 150,
+    "Alchemy@Cooldin, King of Coolness≥3": -60,
+    "Leadership@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness≥2": -60,
+    "Leadership@Cooldin, King of Coolness≥3": -60,
+    "Mana Mining@Cooldin, King of Coolness": 150,
+    "Mana Mining@Victorica, the Eternal Empress": 53.7,
+    "Mana Mining@Victorica, the Eternal Empress≥2": 150,
+    "Mana Mining@Victorica, the Eternal Empress≥3": -60,
+    "Wisdom@Victorica, the Eternal Empress": -60,
+    "Summoning Magic@Ingo, Investor of Evil": -60,
+    "Wealth@Ingo, Investor of Evil": 150,
+    "Alchemy@Ingo, Investor of Evil": -60,
+    "Alchemy@Ingo, Investor of Evil≥2": 150,
+    "Mana Mining@Cooldin, King of Coolness≥2": 150,
+    "Leadership@Victorica, the Eternal Empress": -60,
+    "Leadership@Ingo, Investor of Evil": 58,
+    "Leadership@Ingo, Investor of Evil≥2": 27.6,
+    "Mana Mining@Ingo, Investor of Evil": 150,
+    "Mana Mining@Ingo, Investor of Evil≥2": -55.7,
+    "Alchemy@Victorica, the Eternal Empress": 150,
+    "Alchemy@Victorica, the Eternal Empress≥2": 89.3,
+    "Alchemy@Victorica, the Eternal Empress≥3": 125.1,
+    "Mana Mining@Ingo, Investor of Evil≥3": -60,
+    "Leadership@Ingo, Investor of Evil≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {
+    "Eraser Beam|spell@0": 10,
+    "Eraser Beam|spell@1": 10,
+    "Eraser Beam|spell@3+": 10
+  },
+  "reviveTargets": {
+    "Resuscitation Potion→Victorica, the Eternal Empress": 30,
+    "Golden Ankh→Victorica, the Eternal Empress": 30,
+    "Resuscitation Potion→Ingo, Investor of Evil": 30,
+    "Resuscitation Potion→Cooldin, King of Coolness": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Mana Mining": 30,
+    "Resuscitation Potion→Wisdom": 30,
+    "Resuscitation Potion→Leadership": 30,
+    "Golden Ankh→Mana Mining": 9.3,
+    "Golden Ankh→Wisdom": 19.6,
+    "Golden Ankh→Leadership": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Resuscitation Potion→Wealth": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Golden Ankh→Alchemy": 30
+  },
+  "startHandValues": {
+    "Golden Ankh": 1.7,
+    "Mana Mining": -1.3,
+    "Dark Gear": 2.5,
+    "Pollution Spewer": 2,
+    "Wheels": 4.6,
+    "Alchemy": 3.1,
+    "The Great Clock Tower \"Big Gwen\"": -2.5,
+    "Pyroblast": -2,
+    "Pollution Piranha": -2,
+    "Rain of Death": -10,
+    "Rain of Arrows": -3.9,
+    "Tea": -4.7,
+    "Golden Wings": -3.1,
+    "Magic Mirror": -2.6,
+    "Eraser Beam": -2.7,
+    "Shard of Chaos": -2.2,
+    "Magnetic Glove": 1.5,
+    "Reincarnation": 3.3,
+    "Goldify": 4.6,
+    "Divine Gift of Fire": 11.9
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "21.6%",
+    "winAfterMull": "47.3%",
+    "winAfterKeep": "49.7%"
+  },
+  "heroEffectTiming": {
+    "Victorica, the Eternal Empress@hand:4+": 15,
+    "Victorica, the Eternal Empress@hand:2-3": 15,
+    "Victorica, the Eternal Empress@hand:0-1": 11.9
+  },
+  "boardPairs": {
+    "Alchemy|Mana Mining": 9.2,
+    "Pollution Spewer|Pollution Token": 12.1,
+    "Pollution Spewer|Summoning Magic": 7.6,
+    "Pollution Spewer|Wealth": 7.3,
+    "Alchemy|Pollution Spewer": 9.8,
+    "Alchemy|Summoning Magic": -12.6,
+    "Alchemy|Wealth": -11.1,
+    "Pollution Piranha|Summoning Magic": -10,
+    "Pollution Piranha|Wealth": -10.1,
+    "Alchemy|Wisdom": 12.6,
+    "Pollution Piranha|Pollution Spewer": 11.6,
+    "Mana Mining|Pollution Piranha": 14.6,
+    "Pollution Piranha|Wisdom": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

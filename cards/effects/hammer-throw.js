@@ -100,10 +100,33 @@ module.exports = {
         const oppIdx = tgtOwner;
         const oppPs = gs.players[oppIdx];
         if (oppPs) {
-          oppPs.itemLocked = true;
-          engine.log('item_locked', {
-            player: oppPs.username, by: 'Hammer Throw',
-          });
+          // ── "A player can only be affected by this effect every other
+          //    turn." (1.8. nachgetragen — die Klausel war nie
+          //    implementiert, nur die Turn-1-Ausnahme.) ──────────────
+          // Belegt in Als Mitschnitt: `item_locked` in den Zügen 3, 5
+          // und 7, also in DREI aufeinanderfolgenden Zügen desselben
+          // Angreifers.
+          //
+          // Die Züge wechseln sich ab und `gs.turn` zählt je Spielerzug
+          // um 1 hoch — die Runden EINES Spielers haben also immer
+          // dieselbe Parität und liegen 2 auseinander. Der Lock trifft
+          // die Runde nach dem Wurf; damit das Opfer dazwischen eine
+          // freie eigene Runde hat, müssen zwischen zwei Anwendungen
+          // mindestens 4 gezählt werden (Wurf in Zug 3 sperrt Zug 4,
+          // nächster erlaubter Wurf in Zug 7 sperrt Zug 8).
+          const last = oppPs._hammerLockTurn;
+          if (last != null && (gs.turn - last) < 4) {
+            engine.log('item_lock_blocked', {
+              player: oppPs.username, by: 'Hammer Throw',
+              reason: 'every-other-turn', lastAppliedTurn: last,
+            });
+          } else {
+            oppPs._hammerLockTurn = gs.turn;
+            oppPs.itemLocked = true;
+            engine.log('item_locked', {
+              player: oppPs.username, by: 'Hammer Throw',
+            });
+          }
         }
       }
 

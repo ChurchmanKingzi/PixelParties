@@ -14,6 +14,20 @@
 
 module.exports = {
   inherentAction: true,
+  // alwaysCommit (Al-Design-Entscheid): Das Legen ist eine FREIE
+  // Zusatzaktion und schaltet die Draw-to-match-Option frei — das
+  // MCTS-Gate sah im Rollout aber nur "Permanent ohne Sofortwert"
+  // (Delta ≈ 0) und skippte den Play in 0/350 Spielen. Ob sich die
+  // AKTIVIERUNG lohnt, prüft weiterhin canActivatePermanent pro Zug
+  // (nur ziehen, wenn der Gegner mehr Handkarten hat).
+  // alwaysCommit: das MCTS-Gate unterschätzte reinen Kartenzug
+  // historisch — Aktivierung feuert daher normalerweise immer.
+  // activationDraws (Deckout-Prävention): Bei gefährlich kleinem Deck
+  // wird der alwaysCommit-Bypass in activateAreaEffects aufgehoben und
+  // das MCTS-Gate entscheidet regulär — der Deck-Nähe-Term in
+  // evaluateState sieht den Draw-to-Parity im Commit-Arm real und
+  // skippt, wenn er in die Deckwand führt.
+  cpuMeta: { alwaysCommit: true, activationDraws: true },
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 

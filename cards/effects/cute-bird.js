@@ -40,6 +40,18 @@ const DISCARD_COST = 2;
 module.exports = {
   activeIn: ['support'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onCreatureDeath-Confirm — bei Gegner-Kill plan-los; der Hook prüft Kosten (2 Handkarten) und Payoff (Phoenix im Deck) bereits VOR dem Prompt, Confirm = "sofern möglich, feuern".
+  // Ohne Intercept declined der Brain-Default cancellable Confirms in
+  // plan-losen Kontexten und der Effekt verpufft still. Der generic-
+  // Dispatch lädt dieses Skript nur für Prompts mit dem eigenen
+  // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;

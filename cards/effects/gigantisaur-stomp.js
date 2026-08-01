@@ -41,7 +41,7 @@ function _heroHasBigCreature(engine, pi, heroIdx) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.heroIdx !== heroIdx) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
     if (maxHp >= HOST_MIN_MAX_HP) return true;

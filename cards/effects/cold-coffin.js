@@ -97,7 +97,13 @@ module.exports = {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
           await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', {
-            duration: 3,
+            // Kartentext: "Freeze it for the rest of the game" — vorher
+            // implementierungsseitig auf 3 Züge gedeckelt (gleiche
+            // Abweichungs-Klasse wie der Icy-Slime-Duration-Bug).
+            // Permanent via nie ablaufender Duration; Status-Heilung
+            // (Waitress/Juice) bleibt laut Text nur für KREATUREN-Ziele
+            // ausgeschlossen, Helden-Freezes sind weiterhin heilbar.
+            duration: 9999,
             appliedBy: pi,
           });
         }

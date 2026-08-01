@@ -72,11 +72,29 @@ function isDeepseaCreature(cardName, engine, inst = null) {
   if (!cd) return false;
   if (cd.cardType !== 'Creature') return false;
 
+  // ── BOARD-ONLY-ZUGEHÖRIGKEIT (Als Ruling 1.8.) ───────────────────
+  // Karten mit `isDeepseaOnBoard` zählen AUSSCHLIESSLICH als Deepsea,
+  // solange sie in einer Support Zone liegen — Infected Squirrel:
+  // "This Creature ON THE BOARD also counts as a 'Deepsea' Creature."
+  //
+  // Diese Prüfung steht bewusst VOR dem Archetyp-Vergleich und
+  // ÜBERSTIMMT ihn: cards.json führt Squirrel als archetype "Deepsea"
+  // (richtig fürs Deckbau-Filtern und die Kartenansicht — es ist eine
+  // Deepsea-Set-Karte), aber die FUNKTIONALE Zugehörigkeit ist laut
+  // Text aufs Feld beschränkt. Ohne den Vorrang hätte die Textklausel
+  // keine Wirkung: der Archetyp-Vergleich hätte in jeder Zone zuerst
+  // gegriffen. Konkret ausgeschlossen sind damit Deepsea Witchs
+  // Deck-Suche, Deepsea Bats' Wiederbelebung aus dem Discard und
+  // Deepsea Primordiums Grant-Filter auf der Hand.
+  //
+  // Bounce-Ziel-Prüfungen sind unberührt — die reichen immer eine
+  // Support-Instanz herein.
+  const boardOnly = loadCardEffect(cardName)?.isDeepseaOnBoard;
+  if (boardOnly) return !!(inst && inst.zone === 'support');
+
   // Direct archetype match.
   if (cd.archetype === DEEPSEA_ARCHETYPE) return true;
 
-  // Infected Squirrel always counts as Deepsea (per its own text).
-  if (cardName === 'Infected Squirrel') return true;
 
   // Deepsea Spores override — "For the rest of the turn, all Creatures on
   // the board are treated as Deepsea Creatures." Applies to Creatures
@@ -183,11 +201,12 @@ function getBounceableDeepseaCreatures(engine, playerIdx, opts = {}) {
       if (opts.excludeInstId && inst.id === opts.excludeInstId) continue;
       if (!isDeepseaCreature(inst.name, engine, inst)) continue;
       // "Not summoned this turn" — strictly less than current turn.
-      // Infected Squirrel is the explicit exception: its card text lets
-      // it be bounced for a Deepsea Creature's effect on the same turn
-      // it was summoned, at the cost of locking the player out of
-      // further summons (applied in tryBouncePlace).
-      if (inst.name !== 'Infected Squirrel' && (inst.turnPlayed || 0) >= turn) continue;
+      // Ausnahme per KARTEN-VERTRAG (`isDeepseaBounceableSameTurn`,
+      // aktuell Infected Squirrel): darf noch in der Beschwörungsrunde
+      // gebounct werden, zum Preis des Beschwörungs-Locks (gesetzt in
+      // tryBouncePlace).
+      if (!loadCardEffect(inst.name)?.isDeepseaBounceableSameTurn
+          && (inst.turnPlayed || 0) >= turn) continue;
       out.push({ inst, heroIdx: hi, slotIdx: si, cardName: inst.name });
     }
   }
@@ -380,17 +399,6 @@ async function tryBouncePlace(ctx) {
   // swap's atomicSwap proceed to place this Creature directly.
   if (ctx._isSwap) return true;
 
-  // Player explicitly dropped this Creature into an EMPTY Support Zone
-  // (server set `_requestedNormalSummonSlot` in doPlayCreature). They
-  // are spending the Action to summon normally, not bounce-swap. Clear
-  // the flag and let placeCreature run without prompting for a bounce
-  // target. If the bounce-place flag is ALSO set somehow, prefer
-  // normal-summon — the empty-slot intent is clearer.
-  if (ps._requestedNormalSummonSlot) {
-    delete ps._requestedNormalSummonSlot;
-    return true;
-  }
-
   // Capture & clear any explicit occupied-slot bounce request UP-FRONT
   // (the server sets ps._requestedBouncePlaceSlot when the player drops /
   // clicks the hand card directly onto an occupied bounceable slot). When
@@ -402,6 +410,25 @@ async function tryBouncePlace(ctx) {
   // clicking a bounce target sent the creature to discard).
   const bounceReq = ps._requestedBouncePlaceSlot || null;
   if (ps._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
+
+  // Player explicitly dropped this Creature into an EMPTY Support Zone
+  // (server set `_requestedNormalSummonSlot` in doPlayCreature). They
+  // are spending the Action to summon normally, not bounce-swap. Clear
+  // the flag and let placeCreature run without prompting for a bounce
+  // target.
+  //
+  // Precedence when BOTH flags are somehow set: the BOUNCE request wins.
+  // doPlayCreature sets exactly one flag per play and clears the sibling,
+  // so a coexisting normal flag can only be a STALE leftover from a play
+  // outside that path — while the bounce request is always freshly set
+  // for THIS play. The old "prefer normal-summon" tie-break was exactly
+  // Als reported bug: a stale normal flag made an explicit occupied-slot
+  // swap fall through to summonCreature, which relocated the creature
+  // into a free Support Zone instead of swapping.
+  if (ps._requestedNormalSummonSlot) {
+    delete ps._requestedNormalSummonSlot;
+    if (!bounceReq) return true;
+  }
 
   const bounceable = getBounceableDeepseaCreatures(engine, pi);
   if (bounceable.length === 0) {
@@ -465,7 +492,7 @@ async function tryBouncePlace(ctx) {
   // its bounce-place caused). The flag is consumed by the standard
   // ps.summonLocked gate in the server's creature-play handler.
   const lockSummonsAfter =
-    bouncedName === 'Infected Squirrel' &&
+    !!loadCardEffect(bouncedName)?.locksSummonsWhenBouncedSameTurn &&
     (bouncedInst.turnPlayed || 0) >= (gs.turn || 0);
 
   // ════════════════════════════════════════════
@@ -620,6 +647,10 @@ async function tryBouncePlace(ctx) {
     zone: 'support', heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
     _skipReactionCheck: true,
     _bypassDeadHeroFilter: landedOnDeadHero,
+    // Quellen-Marker für die On-Summon-Trigger-Metrik (der Recorder
+    // trennt damit Tausch-Wiedereintritte von normalen Beschwörungen).
+    // Rein diagnostisch, keine Regelwirkung.
+    _viaBouncePlace: true,
   });
   await engine.runHooks('onCardEnterZone', {
     enteringCard: newInst, toZone: 'support', toHeroIdx: bouncedHeroIdx,
@@ -713,7 +744,8 @@ function canPlaceOnOccupiedSlotIfBounceable(gs, pi, heroIdx, slotIdx, engine) {
   // Infected Squirrel is the explicit exception: its card text lets it
   // be bounced on the same turn it was summoned (at the cost of
   // locking further summons, applied in tryBouncePlace).
-  if (inst.name !== 'Infected Squirrel' && (inst.turnPlayed || 0) >= (gs.turn || 0)) return false;
+  if (!loadCardEffect(inst.name)?.isDeepseaBounceableSameTurn
+      && (inst.turnPlayed || 0) >= (gs.turn || 0)) return false;
   return true;
 }
 
@@ -745,6 +777,17 @@ function canSummonPerTurnLimit(ctx, cardName) {
 }
 
 function markSummonedPerTurnLimit(ctx, cardName) {
+  // KOPIERTE On-Summon-Effekte zählen NICHT als Beschwörung dieser
+  // Karte. Als Bugreport: Monstrosity bounced ein Primordium, um dessen
+  // On-Summon zu kopieren — dabei lief Primordiums onPlay-Hook durch
+  // und verbrannte sein "nur 1 pro Zug"-Limit, obwohl überhaupt kein
+  // Primordium beschworen wurde (der Kartentext limitiert das
+  // SUMMONEN, nicht das Auslösen des Effekts). Beschworen wurde
+  // Monstrosity — die markiert sich selbst korrekt, bevor sie in ihren
+  // Copy-Zweig abbiegt. Generisch für alle Deepseas mit Rundenlimit
+  // (Bats, Horror Clown, Jack-o'-Lantern, Mummy, Monstrosity,
+  // Primordium …), da alle über diesen Helfer markieren.
+  if (ctx?._monstrosityCopy) return;
   const ps = ctx._engine?.gs?.players?.[ctx.cardOwner];
   if (!ps) return;
   if (!ps._deepseaPerTurnSummoned) ps._deepseaPerTurnSummoned = new Set();
@@ -785,7 +828,7 @@ function ownSupportCreatures(engine, pi) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push(inst);
   }
@@ -966,6 +1009,7 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
     zone: 'support', heroIdx: bouncedHeroIdx, zoneSlot: bouncedSlotIdx,
     _skipReactionCheck: true,
     _bypassDeadHeroFilter: landedOnDeadHero2,
+    _viaBouncePlace: true,
   });
   await engine.runHooks('onCardEnterZone', {
     enteringCard: newInst, toZone: 'support', toHeroIdx: bouncedHeroIdx,
@@ -1002,7 +1046,57 @@ async function reTriggerOnSummon(engine, enteringInst) {
   });
 }
 
+/**
+ * Mulligan-Beratung der Deepsea-Linie (Als Auftrag, Zündungs-Cluster):
+ * 41% der Spiele bouncen nie und stehen bei 9% WR — ihre Signatur sind
+ * Starthände OHNE billigen Zünder (überrepräsentiert: DGotG 1.56×,
+ * Sandy Blob 1.23×; unterrepräsentiert: Primordium 0.80×, Bats 0.82×).
+ * Der generische Mulligan zählt nur Spielbarkeit und die
+ * startHandValues nur Einzelkarten — die KOMPOSITION "kein früher
+ * Deepsea-Body" sehen beide nicht (DGotG steht dort mit +4.9 positiv,
+ * weil es in laufenden Motoren stark ist).
+ *
+ * Zünder := Kreatur der Bounce-Linie (trägt den Platzierungs-Vertrag)
+ * mit Level ≤ 1 — in Zug 1-2 ohne Vorarbeit beschwörbar und sofort
+ * Bounce-Ziel für alles Weitere. 'mulligan' wenn keiner da ist, sonst
+ * null (die generische Regel darf schlechte Hände MIT Zünder weiter
+ * wegwerfen; 'keep' wäre hier zu stark).
+ */
+function deepseaIgnitionMulliganAdvice(engine, pi, hand) {
+  try {
+    const cardDB = engine._getCardDB();
+    for (const cardName of (hand || [])) {
+      const cd = cardDB[cardName];
+      if (!cd || !String(cd.cardType || '').includes('Creature')) continue;
+      if ((cd.level || 0) > 1) continue;
+      let sc = null;
+      try { sc = require('./_loader').loadCardEffect(cardName); } catch { continue; }
+      if (sc && (typeof sc.getBouncePlacementTargets === 'function'
+        || typeof sc.canPlaceOnOccupiedSlot === 'function')) {
+        return null;   // Zünder vorhanden → generische Regel entscheidet
+      }
+    }
+    return 'mulligan';
+  } catch { return null; }
+}
+
+/**
+ * Prior-Floor für den Summoning-Magic-Ausbau der Deepsea-Helden (Als
+ * Hebel a): "Lege früh SM, bis Stufe 2 steht" ist Design-Wissen des
+ * Decks — die Lv2-Kerne (Witch/Werewolf/Monstrosity) hängen daran und
+ * der Swap-Bypass ersetzt den Ausbau nur, wenn schon ein Board liegt.
+ * Stufe 1 und 2 bekommen einen kräftigen Floor, Stufe 3 bleibt dem
+ * Lernen überlassen (dort war das Signal zuletzt sogar positiv).
+ */
+function deepseaAbilityPriorFloor(abilityName, targetLevel) {
+  if (abilityName !== 'Summoning Magic') return null;
+  if (targetLevel <= 2) return 80;
+  return null;
+}
+
 module.exports = {
+  deepseaIgnitionMulliganAdvice,
+  deepseaAbilityPriorFloor,
   DEEPSEA_ARCHETYPE,
   isDeepseaCreature,
   activateDeepseaSpores,

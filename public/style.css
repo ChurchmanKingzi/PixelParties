@@ -3126,6 +3126,21 @@ body {
   box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 20px rgba(0,240,255,.15);
   padding: 12px 24px;
   text-align: center;
+  /* Als Kosmetik-Ruling: ohne Breitenbegrenzung wächst dieses fixed
+     positionierte Panel mit seinem Inhalt — eine lange, einzeilige
+     Beschreibung (Sandy Blobs "Choose an opponent target…", Primordiums
+     Nachfrage) zog es dadurch über das komplette Kampffeld. Der Deckel
+     zwingt den Text in mehrere Zeilen und hält das Panel in lesbarer
+     Breite. 620px ≈ 6 Karten-Minis nebeneinander, die Galerie- und
+     Zonen-Varianten dieses Panels passen also weiterhin hinein; die
+     große Deck-Ansicht nutzt ohnehin ein eigenes Modal.
+     Gilt für ALLE Prompt-Varianten (32 Verwendungen), nicht nur die
+     beiden gemeldeten. */
+  max-width: min(620px, 92vw);
+  box-sizing: border-box;
+  /* Sicherheitsnetz gegen sehr lange Karten-/Spielernamen ohne
+     Leerzeichen, die sonst die Breite wieder aufsprengen würden. */
+  overflow-wrap: anywhere;
 }
 
 /* Damage numbers */
@@ -3463,6 +3478,35 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 @media (prefers-reduced-motion: reduce) {
   .hand-bloom { animation: none; opacity: .55; }
   .hand-mote  { animation: none; opacity: calc(var(--p-max, .4) * .5); transform: none; }
+}
+
+/* ═══ Battlefield ambiance: rising pixel motes behind the zones ═══════
+   Same pixel-mote language as the hand (shares the hand-mote-float
+   keyframes), mounted as the FIRST child of .board-center at z-index 0
+   so all zones / cards / area overlays paint above it. Deliberately
+   dimmer + slower than the hand layer — it is a background, not an
+   effect. See BoardAmbiance in app-board.jsx. */
+.board-ambiance {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.board-mote {
+  position: absolute;
+  width: var(--p-size, 3px);
+  height: var(--p-size, 3px);
+  background: var(--p-color, #ffffff);
+  box-shadow: 0 0 6px var(--p-color, #ffffff);
+  image-rendering: pixelated;
+  opacity: 0;
+  transform: translate(0, 0) scale(.6);
+  animation: hand-mote-float var(--p-dur, 8s) ease-in-out var(--p-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-mote { animation: none; opacity: calc(var(--p-max, .3) * .5); transform: none; }
 }
 .board-player-side {
   flex: 1;
@@ -3852,14 +3896,16 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   pointer-events: none;
   z-index: 10100;
   perspective: 800px;
-  animation: kassaran-flight 2000ms cubic-bezier(.4,.1,.3,1) forwards;
+  /* --kfDur is set inline by KassaranFlipCard when a caller wants a
+     faster reveal (mill_center_reveal); everyone else keeps 2000ms. */
+  animation: kassaran-flight var(--kfDur, 2000ms) cubic-bezier(.4,.1,.3,1) forwards;
 }
 .kassaran-flip-inner {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  animation: kassaran-flip 2000ms ease-in-out forwards;
+  animation: kassaran-flip var(--kfDur, 2000ms) ease-in-out forwards;
 }
 .kassaran-flip-back,
 .kassaran-flip-front {
@@ -9889,11 +9935,106 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* min-width: 0 is the keystone of the whole hscroll feature. The wrap
+     is a flex ITEM of .pz-layout (a ROW), and flex items default to
+     min-width: auto = their intrinsic min-content — which propagates up
+     through pz-plane-clip → plane → sides → rows all the way from the
+     shrink-proof zones. Without this override the wrap can NEVER be
+     narrower than the board content: clientWidth always ≥ content
+     width, needsHScroll is mathematically unreachable, and the excess
+     gets clipped by .pz-layout's overflow:hidden instead (content cut
+     off with no scrollbar — the Flying-Island symptom). With it, the
+     wrap caps at the available column width and genuine overflow
+     becomes measurable + scrollable. */
+  min-width: 0;
   overflow-y: auto;
-  overflow-x: auto;
+  /* overflow-x: clip (was auto) — the tilted plane's near rows project
+     wider than the layout box, which used to surface a phantom
+     horizontal scroll range on EVERY board. Legitimate horizontal
+     scrolling (Flying Island in the Sky adding zones, narrow screens)
+     is re-enabled via .pz-can-hscroll, which the scaler toggles from a
+     FLAT layout measurement (see .pz-flat-measure) so transform
+     overflow can never trigger it. */
+  overflow-x: clip;
   padding: 6px 16px;
   gap: 2px;
+  /* `safe center`: centered while the column fits, but falls back to
+     flex-start the moment it overflows — plain `center` in a scroll
+     container pushes the START of the content (the opponent-hand bar)
+     into an unreachable region above the scrollport. Same failure mode
+     as the horizontal case documented below. The plain `center` line
+     stays as a fallback for engines without `safe` support. */
   justify-content: center;
+  justify-content: safe center;
+}
+/* Measurement mode — toggled synchronously by the scaler for one layout
+   read: neutralizes the tilt so scrollWidth reflects LAYOUT truth only
+   (mirrors board-flat-measure on the battle board). */
+.pz-board-wrap.pz-flat-measure .pz-plane-clip { perspective: none !important; }
+.pz-board-wrap.pz-flat-measure .pz-board-plane {
+  transform: none !important;
+  margin-bottom: 0 !important;
+  padding-inline: 0 !important; /* overhang padding is transform-derived —
+                                   must not count as layout width during
+                                   the flat measurement */
+}
+/* Legit horizontal-scroll mode — layout genuinely wider than the wrap
+   (Flying Island zones / narrow viewports). v10 (Al): the tilt STAYS ON
+   while scrolling — only the unnecessary scrollbar was the issue, not
+   the projection. The min-width chain lets the centered rows expose
+   their full content to the scrollbar instead of cropping it
+   unreachably on the left; --pz-overhang-x (measured by the scaler)
+   additionally reserves the lateral projection overhang of the
+   magnified near rows as real scrollable padding, so their left edge
+   never sits before scroll position 0. */
+.pz-board-wrap.pz-can-hscroll { overflow-x: auto; }
+/* pz-plane-clip — untransformed pass-through wrapper (see JSX comment):
+   mirrors .board-plane-clip on the battle board. In hscroll mode it
+   clips the plane's horizontal TRANSFORM overflow at its own layout
+   edge, capping the scrollable range at layout width — the tilted
+   plane's transformed border box would otherwise extend it by hundreds
+   of phantom pixels. Its layout edge equals the projected near-edge
+   content width (--pz-overhang-x reserves (f−1)/2 per side), so no
+   visible content is cut. overflow-y stays visible: the vertical
+   projection overhang is already reserved as the plane's
+   margin-bottom. */
+.pz-plane-clip {
+  display: flex;
+  flex-direction: column;
+  /* Containing block for the PzAmbiance layer (first child, inset:0) —
+     mirrors the battle board's .board-plane-clip: position:relative +
+     z-index:auto creates no stacking context, so paint order vs the
+     plane stays pure DOM order (ambiance first → behind). */
+  position: relative;
+  /* Content-sized like the plane inside it (v15): with `flex: 1 0
+     auto` this wrapper kept growing into the wrap's leftover height,
+     re-collecting below the now content-sized plane the very slack the
+     fold-parity change removes. */
+  flex: 0 0 auto;
+  /* Direct parent of the plane → perspective must sit here (see
+     .pz-board-wrap note). Origin re-based from the wrap's coordinate
+     space (50% 15% of the full column incl. hand bars/labels) to this
+     box, which spans only the plane: 15% of the wrap lands at the
+     plane's top edge, hence 50% 0%. */
+  perspective: var(--pz-persp);
+  /* x re-anchored on the ME middle hero (v18, battle parity) — see
+     --pz-anchor-x in the scaler. */
+  perspective-origin: var(--pz-anchor-x, 50%) 0%;
+}
+.pz-board-wrap.pz-can-hscroll .pz-plane-clip {
+  min-width: min-content;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+.pz-board-wrap.pz-can-hscroll .pz-board-plane {
+  /* v18: separate sides (asymmetric anchor), measured by the scaler. */
+  padding-left: var(--pz-overhang-l, 0px);
+  padding-right: var(--pz-overhang-r, 0px);
+}
+.pz-board-wrap.pz-can-hscroll .pz-board-plane,
+.pz-board-wrap.pz-can-hscroll .pz-board-plane .board-player-side,
+.pz-board-wrap.pz-can-hscroll .pz-board-plane .board-row {
+  min-width: min-content;
 }
 /* When the puzzle board's natural width exceeds the wrapper, let rows
    shrink to their content width so the horizontal scrollbar can surface
@@ -9937,8 +10078,12 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   padding: 8px 2px;
 }
 .pz-hand-card {
-  width: 48px;
-  height: 67px;
+  /* v6 (Al): battle-sized hand cards — same --card-w/--card-h the
+     in-battle hand uses (86×120 × --board-scale) instead of the old
+     fixed 48×67 thumbnails. The bars (.pz-hand) have min-height only,
+     so they grow with the cards automatically. */
+  width: var(--card-w);
+  height: var(--card-h);
   border: 1px solid var(--bg4);
   border-radius: 3px;
   overflow: hidden;
@@ -11537,6 +11682,258 @@ body:has(.textbox-overlay) .tooltip {
 .board-mid-row {
   transform: translateX(var(--center-offset, 0px));
 }
+
+/* ═══ Pseudo-3D battlefield (YGO-style perspective tilt) ═══════════════
+   .board-plane wraps both player sides + area zones + mid row (see JSX)
+   and is tilted as ONE continuous ground plane. The rotation axis sits
+   near the LOCAL player's rows (transform-origin 82%): their zones stay
+   ~1:1 while the opponent's rows recede hard toward the horizon (~0.72×)
+   — the classic YGO board look. A short perspective (750px) makes the
+   trapezoid pronounced; 1250px at 22° (first attempt) projected to a
+   ~4% shrink and read as "nothing happened".
+   • Cards inside zones lie ON the plane, so any card placed in — or
+     drag-previewed over — a zone is automatically angled with the field.
+   • The cursor-following drag ghost (.hand-floating-card) deliberately
+     stays flat until it snaps into a zone.
+   • Pointer events + getBoundingClientRect honour 3D transforms, so all
+     existing drag-&-drop hit detection and fly-to animations keep
+     working against the projected positions unchanged.
+   • BoardAmbiance, area-atmosphere overlays and the permanents column
+     live OUTSIDE the plane as flat full-bleed layers.
+   • board-flat-measure is toggled by the can-scroll detector in
+     app-board.jsx: the tilted plane's near edge inflates scrollWidth,
+     which would latch can-scroll on and — via the fallback below —
+     disable the tilt itself. Measuring flat breaks that loop (the
+     !important also neutralizes the zoom, which is intended: scroll
+     UX must depend on layout width only).
+   Tune the look in ONE place via the four custom properties:
+   v4 tuning (Al: "gap between top zones and opponent hand still too
+   large — close it and enlarge the zones"): the key change is the
+   pivot moving from 82% to 96%, i.e. onto the local player's BOTTOM
+   row. With the rotation/zoom axis anchored there, increasing the zoom
+   grows the plane exclusively UPWARD into the top gap — the previous
+   pivot made the bottom rows grow downward past the hand instead, so
+   zoom and gap-filling fought each other. Result at 29° / 900px /
+   zoom 1.26: far rows ≈0.90× (was 0.84×), own rows ≈1.06×, bottom row
+   ≈1.26×, top row rises ~100px. The .board-side-opp rule below
+   additionally removes the LAYOUT slack above the opponent rows
+   (justify-content:center kept them vertically centered in the top
+   half). If outer zones ever clip at the sides on narrow boards,
+   lower --board-plane-zoom first. */
+.board-center {
+  --board-tilt: 29deg;
+  --board-persp: 900px;
+  --board-pivot: 96%;   /* rotation/zoom axis — anchored on the bottom row */
+  --board-plane-zoom: 1.26;
+  /* NOTE: perspective itself lives on .board-plane-clip below, NOT here.
+     CSS perspective only applies to DIRECT children — with the clip
+     wrapper between this element and .board-plane, a perspective
+     declared here reaches nothing, and rotateX without perspective
+     degenerates to a flat affine squash (the "board renders top-down
+     2D" regression). Only the tuning custom properties stay here so
+     they inherit everywhere. */
+}
+.board-plane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;   /* containing block for .board-area-zones-center */
+  /* scale() applies before rotateX (right-to-left): zoom happens IN the
+     plane, so far rows shrink-from-enlarged consistently. */
+  transform: rotateX(var(--board-tilt)) scale(var(--board-plane-zoom));
+  /* x-origin follows the same middle-hero anchor as the perspective, so
+     the zoom magnifies about the hero axis instead of shifting content
+     sideways relative to it. */
+  transform-origin: var(--board-anchor-x, 50%) var(--board-pivot);
+  will-change: transform;
+}
+/* Pull the opponent rows to the top of their half — their default
+   justify-content:center left ~40px of layout slack above the hero row,
+   which the projection then widened further. Scoped to the tilted
+   desktop layout only: the mobile media below disables the tilt and has
+   its own flex-start rule, and can-scroll mode stays centered. */
+@media (min-width: 901px) and (min-height: 561px) {
+  .board-center:not(.can-scroll) .board-plane .board-side-opp {
+    justify-content: flex-start;
+    padding-top: calc(10px * var(--board-scale));
+  }
+}
+/* Fallbacks — the projection fights cramped / scrolling layouts, drop it.
+   (rotateX without perspective would still squash vertically, so the
+   transform must be reset too, not just the perspective.) */
+.board-center.board-flat-measure .board-plane-clip { perspective: none; }
+.board-center.board-flat-measure .board-plane {
+  transform: none !important;
+  padding-inline: 0 !important; /* overhang padding is transform-derived —
+                                   must not count as layout width during
+                                   the flat measurement */
+}
+/* During the flat measurement the box must REMAIN a scroll container:
+   check() briefly drops can-scroll each pass (it runs on every render),
+   and without this exception the :not(.can-scroll) clip below would
+   hard-reset the user's scroll offset to 0 every second. */
+.board-center.board-flat-measure:not(.can-scroll) { overflow-x: auto; }
+/* board-plane-clip — untransformed pass-through wrapper between the
+   scroll container and the tilted plane. Normally invisible plumbing;
+   in scroll mode it caps the scrollable range at LAYOUT width: the
+   tilted plane's transformed border box (layout contentW·f, projected
+   contentW·f²) would otherwise extend board-center's scrollable
+   overflow by hundreds of phantom pixels past the last zone. Clipping
+   the x-axis at this wrapper stops that propagation; its layout edge
+   equals the projected near-edge content width (the overhang padding
+   reserves exactly (f−1)/2 per side), so no visible content is lost.
+   overflow-y stays visible — the far rows project upward and are
+   clipped by board-center itself, exactly as before (clip+visible is
+   the one legal mixed overflow pair). */
+.board-plane-clip {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Containing block for the atmosphere overlays (BoardAmbiance + area
+     backgrounds) that live inside this wrapper: in scroll mode the
+     wrapper is min-content wide, so their inset:0 spans the FULL
+     widened battlefield instead of one viewport width. position:
+     relative + z-index:auto creates no stacking context, so the
+     overlays' z-indices keep resolving against .board-center. */
+  position: relative;
+  /* The wrapper is the plane's direct parent, so the perspective MUST
+     sit here (see .board-center note). Its box spans the same area the
+     plane occupied before the wrapper existed — the sides, mid row and
+     overlays are absolute or inside the plane — so 50% 30% references
+     the same visual point as the pre-wrapper tuning. The element's own
+     overflow clipping (scroll mode) does not affect perspective: the
+     child is projected first, clipped after. */
+  perspective: var(--board-persp);
+  /* x re-anchored on the me-side middle hero (v18): --board-anchor-x is
+     published in px by check() so the middle hero is ALWAYS the
+     laterally unskewed axis, however asymmetric islands widen the box. */
+  perspective-origin: var(--board-anchor-x, 50%) 30%;
+}
+.board-center.can-scroll .board-plane-clip {
+  min-width: min-content;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+/* can-scroll keeps the tilt (v10, Al): with extra zones in play (Flying
+   Island in the Sky) the board legitimately scrolls horizontally — the
+   3D projection stays on and the scrollbar appears. The magnified near
+   rows project PAST the plane's layout box sideways; without
+   compensation their left edge would sit in the unreachable region
+   before scroll position 0. check() in app-board.jsx measures that
+   lateral overhang and publishes --board-overhang-x, reserved here as
+   real scrollable padding. min-width: min-content lets the plane grow
+   with its content so the scrollbar exposes all zones. */
+.board-center.can-scroll .board-plane {
+  min-width: min-content;
+  /* v18: separate sides — with the off-center anchor the projection
+     spills asymmetrically; check() measures each side from the
+     projected zone union. */
+  padding-left: var(--board-overhang-l, 0px);
+  padding-right: var(--board-overhang-r, 0px);
+}
+/* Outside scroll mode the tilted plane's near corners protrude a few px
+   past the box — clip instead of exposing a phantom horizontal scroll
+   range (base rule sets overflow-x: auto for the scroll feature). */
+.board-center:not(.can-scroll) { overflow-x: clip; }
+@media (max-width: 900px), (max-height: 560px) {
+  .board-plane-clip { perspective: none; }
+  .board-plane { transform: none; }
+}
+
+/* ── Puzzle-creator variant of the plane ──────────────────────────────
+   Same tilt + perspective as the battle board so the creator previews
+   the in-battle look 1:1, but its OWN pivot/zoom: the creator column
+   packs labels and hand bars directly against the rows, so there is no
+   vertical gap to grow into — a centered pivot with a small zoom keeps
+   the plane inside its slot instead of pushing rows into the OPP-HAND
+   bar (battle values 96% / 1.26 would do exactly that). .pz-board-wrap
+   is a real scroll container (overflow auto both axes), so the zoom
+   stays small enough that the plane's transform overflow doesn't
+   surface phantom scroll range. The test mode is NOT covered here on
+   purpose — it mounts the regular GameBoard and inherits .board-plane. */
+.pz-board-wrap {
+  --pz-tilt: 24deg;      /* milder than battle: the creator plane is much
+                            taller (all rows of both sides), so the same
+                            angle produces far larger displacement */
+  --pz-persp: 1400px;
+  --pz-plane-zoom: 1;
+  /* NOTE: perspective lives on .pz-plane-clip (the plane's DIRECT
+     parent) — declared here it reaches nothing since the clip wrapper
+     sits in between; rotateX without perspective renders as flat 2D.
+     Custom props stay here so they inherit. */
+}
+.pz-board-plane {
+  /* CONTENT-sized plane, battle-parity fold (v15, Al): the previous
+     `flex: 1 0 auto` + `justify-content: space-between` grew the plane
+     into the wrap's leftover height and parked ALL slack in the middle
+     — the two sides drifted apart and the area zones floated in a
+     void. Al's requirement is the battle layout: both hero rows close
+     together at the fold, area zones straddling it half-on-each-side.
+     Row order already guarantees hero rows are fold-adjacent (opp:
+     support→ability→hero, me: hero→ability→support), so packing the
+     plane to content height makes the whole board a tight cluster:
+     opp hand → rows → fold → rows → staging hand, with .pz-board-wrap's
+     `safe center` centering the compact column. Leftover viewport
+     space is consumed by the scaler instead: it grows --board-scale
+     until the projected column fills clientHeight−6 (capped by the
+     width fits), so slack becomes zone size, not gaps — which also
+     keeps the v6 requirement (no gap between top rows and the OPP-HAND
+     bar) intact.
+     TOP pivot (origin 50% 0%): the plane's top edge is ON the rotation
+     axis and does not move — the opponent rows sit flush under their
+     hand bar with NO projection sag, regardless of plane height (the
+     v6 centered pivot sagged the top by ~125px on tall boards). All
+     displacement goes to the bottom instead: the near rows project
+     PAST the layout box toward the camera; the JS scaler in
+     app-puzzle.jsx measures that overhang each pass and reserves it as
+     --pz-overhang margin so the bottom rows never paint over the YOU
+     label / staging hand. */
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  transform: rotateX(var(--pz-tilt)) scale(var(--pz-plane-zoom));
+  transform-origin: var(--pz-anchor-x, 50%) 0%;
+  margin-bottom: var(--pz-overhang, 0px);
+  will-change: transform;
+}
+/* Inside the plane the sides must be content-sized: their global
+   `flex: 1` (basis 0) worked against .pz-board-wrap's definite height,
+   but the plane is content-sized — basis-0 children would collapse to
+   height 0 there. Vertical centering of the whole column is already
+   handled by .pz-board-wrap's justify-content: center. */
+.pz-board-plane .board-player-side {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+/* Zero-height area fold (battle parity, see JSX comment): the row takes
+   no vertical layout space; align-items centers the fixed-height zones
+   on the fold line so they straddle both sides' rows, exactly like the
+   battle overlay. z-index 10 matches .board-area-zones-center — without
+   it the later sibling (player side) paints over the zones' lower half
+   and eats hover/drop events there. */
+.pz-area-fold {
+  height: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 10;
+  /* Small symmetric corridor between the two hero rows — mirrors the
+     battle board's mid-row band. The zones (≈95px·scale tall, centered
+     on the line) still straddle the fold and overlap onto BOTH sides'
+     field halves, as required. */
+  margin-block: calc(12px * var(--board-scale));
+}
+/* v21: fold zones are FLOW children again (state-derived spacer groups
+   position them — see the pz-area-fold JSX); the row's align-items
+   centers the fixed-height zones on the zero-height line, straddling
+   both sides. The measured-absolute variant (v16–v20) is gone: it was
+   inherently prone to one-frame-stale CSS vars on layout-frame
+   changes. */
+@media (max-width: 900px), (max-height: 560px) {
+  .pz-plane-clip { perspective: none; }
+  .pz-board-plane { transform: none; }
+}
 /* ── Opponent hand cards: no offset needed, symmetric margins handle centering ── */
 /* ── Player hand info: absolute so cards center at viewport midpoint ── */
 .game-hand-me .game-hand-info {
@@ -11857,4 +12254,28 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* Active format/selection pills keep a stronger gold fill, still opaque. */
 .modal .btn-format-active {
   background: color-mix(in srgb, #ffd700 22%, var(--bg2)) !important;
+}
+
+
+/* Als Kosmetik-Ruling: Effekt-Quelle leuchtet auf, bevor ihre
+   Abwürfe/Wirkungen laufen (effect_source_glow-Broadcast). */
+.effect-source-glow {
+  animation: effectSourceGlow 1.0s ease-out;
+  z-index: 30;
+}
+@keyframes effectSourceGlow {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 214, 90, 0.0);  filter: brightness(1); }
+  25%  { box-shadow: 0 0 18px 6px rgba(255, 214, 90, 0.95); filter: brightness(1.35); }
+  60%  { box-shadow: 0 0 14px 4px rgba(255, 214, 90, 0.7);  filter: brightness(1.2); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 214, 90, 0.0);  filter: brightness(1); }
+}
+
+/* ── GROSSER KARTEN-AUFTRITT (1.8.) ─────────────────────────────────
+   Terror beendet den Zug: die Karte erscheint mittig, wächst über die
+   volle Dauer und blendet dabei aus. Kurzer Einblendmoment am Anfang,
+   damit sie nicht hart aufpoppt. */
+@keyframes pp-card-showcase {
+  0%   { opacity: 0;    transform: scale(0.75); }
+  8%   { opacity: 1;    transform: scale(1);    }
+  100% { opacity: 0;    transform: scale(2.1);  }
 }

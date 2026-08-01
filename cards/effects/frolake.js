@@ -76,9 +76,14 @@ module.exports = {
 
       if (ctx.activePlayer !== pi) return;
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated || inst.counters?.nulled) return;
-      const hero = ctx.attachedHero;
-      if (!hero?.name || hero.hp <= 0) return;
+      // Als Ruling (Kreaturen-Audit nach dem Sandy-Blob-Fund): der
+      // Kartentext nennt KEINE Hero-Abhängigkeit, also gated nur der
+      // Zustand der Kreatur SELBST — isCardEffectActive ist das
+      // kanonische Gate (faceDown/negated/nulled/frozen/stunned; der
+      // alte Inline-Check kannte frozen/stunned nicht). Das frühere
+      // attachedHero-Gate widersprach Rulebook + Engine-Doktrin
+      // (Kreaturen toter/gestunnter Heroes bleiben aktiv).
+      if (!engine.isCardEffectActive(inst)) return;
 
       const ps = gs.players[pi];
       if (!ps) return;

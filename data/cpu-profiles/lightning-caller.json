@@ -1,0 +1,326 @@
+{
+  "deck": "Lightning Caller",
+  "heroes": [
+    "Fiona, the Princess of Blackport",
+    "Sol Rym, the Thunder Djinn",
+    "Nicolas, the Hidden Alchemist"
+  ],
+  "games": 1360,
+  "trainWinRate": "74.3%",
+  "trainedAt": "2026-07-24T20:38:49.268Z",
+  "meanTurns": 14.5,
+  "cardValues": {
+    "Elixir of Quickness": 16.5,
+    "Horn in a Bottle": 17,
+    "Leadership": 8,
+    "Chain Lightning": 100,
+    "Magnetic Glove": 23.6,
+    "Magnetic Potion": 39.1,
+    "Acid Vial": 38.9,
+    "Butterfly Cloud": 17.7,
+    "Smug Coin": 8,
+    "Wheels": 19.1,
+    "Elixir of Immortality": 8,
+    "Healing Potion": 20.1,
+    "Renewable Energy": 22
+  },
+  "timing": {
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.09
+    },
+    "Horn in a Bottle": {
+      "early": 0.83,
+      "mid": 1.17,
+      "late": 1
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.97
+    },
+    "Chain Lightning": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.24
+    },
+    "Magnetic Glove": {
+      "early": 0.77,
+      "mid": 1.24,
+      "late": 0.99
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.05
+    },
+    "Acid Vial": {
+      "early": 0.81,
+      "mid": 1.22,
+      "late": 0.98
+    },
+    "Butterfly Cloud": {
+      "early": 0.79,
+      "mid": 1.21,
+      "late": 1
+    },
+    "Smug Coin": {
+      "early": 0.8,
+      "mid": 1.2,
+      "late": 1
+    },
+    "Wheels": {
+      "early": 0.83,
+      "mid": 1.29,
+      "late": 0.88
+    },
+    "Renewable Energy": {
+      "early": 1,
+      "mid": 1.13,
+      "late": 0.87
+    }
+  },
+  "pairBonuses": {
+    "Elixir of Quickness|dc:Tears of Creation": 5.6,
+    "Cloud in a Bottle|dc:The Yeeting": 4.5,
+    "Cloud in a Bottle|MOE Bomb": 4.4,
+    "Resuscitation Potion|Tears of Creation": 4.1,
+    "Magnetic Potion|dc:Punch in the Box": 4.3,
+    "Divine Gift of Rain|dc:Tool Freezer": 4.3,
+    "Acid Vial|dc:MOE Bomb": 5,
+    "Butterfly Cloud|dc:MOE Bomb": 4.1,
+    "Butterfly Cloud|dc:Cloud in a Bottle": 4.2,
+    "Renewable Energy|Resuscitation Potion": 4.2,
+    "Elixir of Immortality|dc:Snow Cannon": 4.5
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Divine Gift of Rain": -7.3
+    },
+    "spell": {
+      "MOE Bomb": -12.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Elixir of Quickness": -8.4,
+      "Cloud in a Bottle": -12.9,
+      "The Yeeting": -13.5,
+      "Horn in a Bottle": -12.4,
+      "Leadership": -12.8,
+      "Chain Lightning": 14.6,
+      "Magnetic Glove": -10.1,
+      "Divine Gift of Rain": -20,
+      "Punch in the Box": -20,
+      "Tool Freezer": -20,
+      "Smug Coin": -6.2,
+      "Wheels": -11.4,
+      "Snow Cannon": -18.7,
+      "Resuscitation Potion": -20,
+      "Healing Potion": -14.5,
+      "Dark Gear": 7.1,
+      "Tea": -11.7,
+      "Renewable Energy": -14.1
+    },
+    "ahead": {
+      "Elixir of Quickness": 3.7,
+      "Chain Lightning": 8,
+      "Magnetic Potion": 4.4,
+      "Punch in the Box": -7,
+      "Resuscitation Potion": -12
+    }
+  },
+  "standingEvalThreshold": 776,
+  "targetPriors": {
+    "The Yeeting — Choose Target": {
+      "side:own": -7.8
+    },
+    "Punch in the Box": {
+      "dmgred": -20
+    },
+    "Tea — Inflict": {
+      "frozen": 20
+    },
+    "Aggressive Town Guard": {
+      "hp:min": -18.7
+    },
+    "Cloud in a Bottle": {
+      "hp:max": -8.2
+    }
+  },
+  "reactionRules": {
+    "Cloud in a Bottle": {
+      "early": 2,
+      "mid": 6.1,
+      "late": 8.4
+    },
+    "Divine Gift of Rain": {
+      "early": -2.2,
+      "late": 2.4
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:2": 3.1,
+      "st:hero-caster": 2.2,
+      "st:1": 7.8,
+      "st:stun-hero": 2.4,
+      "st:3+": -14,
+      "st:frozen-hero": 8.5,
+      "st:poison2+": 20
+    }
+  },
+  "tutorPickRules": {
+    "Magnetic Potion→Cloud in a Bottle": -17.7,
+    "Magnetic Potion→Chain Lightning": 13.2,
+    "Magnetic Potion→Smug Coin": -20,
+    "Magnetic Potion→Punch in the Box": -2.1,
+    "Magnetic Potion→Leadership": -16,
+    "Magnetic Potion→Divine Gift of Rain": -18,
+    "Magnetic Potion→Dark Gear": 8.3,
+    "Magnetic Potion→Healing Potion": -3.6,
+    "Magnetic Potion→Butterfly Cloud": -8.6,
+    "Magnetic Potion→Tea": -15.2,
+    "Magnetic Potion→Tool Freezer": -3.2,
+    "Magnetic Potion→The Yeeting": 4,
+    "Magnetic Potion→Wheels": 3,
+    "Magnetic Potion→Snow Cannon": -15.3,
+    "Magnetic Potion→Elixir of Immortality": -20,
+    "Magnetic Potion→Tears of Creation": -20,
+    "Magnetic Potion→Magnetic Glove": -18.5,
+    "Magnetic Potion→Acid Vial": -3.4,
+    "Magnetic Potion→Renewable Energy": 2.7,
+    "Magnetic Potion→MOE Bomb": -20,
+    "Magnetic Potion→Resuscitation Potion": -12.7,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Alchemy": 20,
+    "Magic Lamp→Loyal Bone Dog": 10.5,
+    "Magnetic Glove→Punch in the Box": -18.2,
+    "Magnetic Glove→Divine Gift of Rain": 2.8,
+    "Magnetic Glove→Healing Potion": 5.5,
+    "Magnetic Glove→Smug Coin": -16.4,
+    "Magnetic Glove→Cloud in a Bottle": -20,
+    "Magnetic Glove→Leadership": -6,
+    "Magnetic Glove→Elixir of Immortality": -20,
+    "Magnetic Glove→Snow Cannon": -3.5,
+    "Magnetic Glove→Acid Vial": -7.4,
+    "Magnetic Glove→Chain Lightning": 14.5,
+    "Magnetic Glove→Butterfly Cloud": 7.3,
+    "Magnetic Glove→Resuscitation Potion": -13.2,
+    "Magnetic Glove→Tea": -15.5,
+    "Magnetic Glove→MOE Bomb": -19.1,
+    "Magnetic Glove→Tool Freezer": -8.1,
+    "Magnetic Glove→Tears of Creation": -5.5,
+    "Magnetic Glove→Renewable Energy": -20,
+    "Renewable Energy→The Yeeting": -9.6,
+    "Renewable Energy→Dark Gear": -5.9,
+    "Renewable Energy→Chain Lightning": 7.9,
+    "Renewable Energy→Snow Cannon": -6,
+    "Renewable Energy→Golden Ankh": 5.9,
+    "Renewable Energy→Divine Gift of Rain": -10.8,
+    "Renewable Energy→Punch in the Box": 12.2,
+    "Renewable Energy→Wheels": 3.4,
+    "Renewable Energy→Tool Freezer": -17.9,
+    "Renewable Energy→Tea": -6.2,
+    "Renewable Energy→Alchemy": 7.5,
+    "Renewable Energy→Magnetic Glove": 8.3,
+    "Renewable Energy→MOE Bomb": 7.2,
+    "Renewable Energy→Wealth": 8.3,
+    "Renewable Energy→Renewable Energy": -4.1,
+    "Renewable Energy→Magnetic Potion": -20,
+    "Enigma, the Seller of Secrets→Butterfly Cloud": -4.6,
+    "Enigma, the Seller of Secrets→Tool Freezer": -11.1,
+    "Enigma, the Seller of Secrets→Tea": 9.9,
+    "Enigma, the Seller of Secrets→Smug Coin": 17.8,
+    "Enigma, the Seller of Secrets→Dark Gear": -4.9,
+    "Enigma, the Seller of Secrets→Wheels": 3.3,
+    "Enigma, the Seller of Secrets→Golden Ankh": 14.9,
+    "Enigma, the Seller of Secrets→Cloud in a Bottle": -5.5,
+    "Enigma, the Seller of Secrets→Chain Lightning": 6,
+    "Enigma, the Seller of Secrets→Snow Cannon": 4.1,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -10.6,
+    "Enigma, the Seller of Secrets→The Yeeting": -18.9,
+    "Magic Amethyst→Wisdom": 5.6,
+    "Magic Amethyst→Alchemy": -2.3,
+    "Magic Amethyst→Wealth": -10.7,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": 14.9
+  },
+  "abilityPriors": {
+    "Wealth@Fiona, the Princess of Blackport": 150,
+    "Magic Arts@Sol Rym, the Thunder Djinn": 73.9,
+    "Wisdom@Sol Rym, the Thunder Djinn": 150,
+    "Leadership@Sol Rym, the Thunder Djinn": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist≥2": 150,
+    "Leadership@Fiona, the Princess of Blackport": -60,
+    "Wealth@Fiona, the Princess of Blackport≥2": 67.4,
+    "Leadership@Nicolas, the Hidden Alchemist": 21.6,
+    "Leadership@Nicolas, the Hidden Alchemist≥2": 150,
+    "Leadership@Nicolas, the Hidden Alchemist≥3": 150,
+    "Leadership@Fiona, the Princess of Blackport≥3": 108.3,
+    "Leadership@Sol Rym, the Thunder Djinn≥2": -60,
+    "Leadership@Sol Rym, the Thunder Djinn≥3": 35.9
+  },
+  "equipPriors": {
+    "Smug Coin@Sol Rym, the Thunder Djinn": 46.5,
+    "Smug Coin@Nicolas, the Hidden Alchemist": -60,
+    "Smug Coin@Fiona, the Princess of Blackport": -60
+  },
+  "lockPenalties": {
+    "Leadership|potion@0": -25,
+    "Leadership|potion@1": 10,
+    "Leadership|potion@2": 7.5
+  },
+  "reviveTargets": {
+    "Resuscitation Potion→Sol Rym, the Thunder Djinn": 30,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": 14,
+    "Elixir of Immortality→Sol Rym, the Thunder Djinn": 13,
+    "Resuscitation Potion→Nicolas, the Hidden Alchemist": 30,
+    "Elixir of Immortality→Fiona, the Princess of Blackport": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Wisdom": 30,
+    "Resuscitation Potion→Leadership": 30,
+    "Elixir of Immortality→Alchemy": 23.6,
+    "Elixir of Immortality→Magic Arts": 12.4,
+    "Elixir of Immortality→Wisdom": 8.6,
+    "Resuscitation Potion→Magic Arts": 30,
+    "Elixir of Immortality→Leadership": -15,
+    "Resuscitation Potion→Alchemy": 30,
+    "Elixir of Immortality→Wealth": 30
+  },
+  "startHandValues": {
+    "Tea": 1.7,
+    "The Yeeting": -4,
+    "Elixir of Quickness": -7.1,
+    "Renewable Energy": -2.7,
+    "Acid Vial": 3,
+    "Wheels": 2.3,
+    "Punch in the Box": -5.1,
+    "Dark Gear": 1.5,
+    "Elixir of Immortality": 11.1,
+    "Chain Lightning": 7.1,
+    "Smug Coin": -7.2,
+    "Healing Potion": 1.5,
+    "Tears of Creation": -3.8,
+    "Horn in a Bottle": 10.8,
+    "Divine Gift of Rain": -5.1,
+    "Magnetic Potion": -2,
+    "MOE Bomb": -7.2
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "51.4%",
+    "winAfterMull": "75%",
+    "winAfterKeep": "73.5%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Leadership|Magic Arts": 8.4,
+    "Leadership|Wisdom": 9.1,
+    "Leadership|Wealth": -13.5
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

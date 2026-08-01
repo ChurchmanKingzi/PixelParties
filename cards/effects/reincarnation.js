@@ -84,6 +84,13 @@ module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   placesPollutionTokens: true,
+  // `canReviveDeadHero`: Zählt in _cpu.js (deadHeroCouldCastWithReviveInHand)
+  // als Revive-Quelle für die castGate-Revive-Awareness — ein Spell, den
+  // nur ein toter Held casten könnte, ist mit Reincarnation in der Hand
+  // nur eine Setup-Aktion entfernt. BEWUSST NICHT `reviveCard`: die
+  // Karte hat einen Creature-Zweitmodus und darf ohne tote Helden
+  // keinen Handwert-Malus bekommen.
+  cpuMeta: { canReviveDeadHero: true },
 
   // Gerrymander redirect — pick `restore` (Creature) instead of
   // `revive` (Hero). Reviving a Hero is generally far higher-impact

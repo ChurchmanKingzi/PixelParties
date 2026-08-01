@@ -41,6 +41,42 @@ module.exports = {
   bypassStatusFilter: true,            // self-delete hooks fire even when CC'd
   selfSacrificeableForGreatmaw: true,  // read by _greatmaw-shared's sac filter
 
+  cpuMeta: {
+    // ── Der onPlay-Prompt KOSTET, wenn man ihn bejaht ───────────────
+    // Er fragt "willst du eine deiner Aktionen ausgeben, statt die
+    // Gratis-Zusatzaktion zu nehmen?". Ohne diese Deklaration bejaht
+    // der generische Reaktions-Zweig ("fire ASAP") ihn automatisch,
+    // weil der Prompt `showCard` trägt — die CPU verbrannte damit bei
+    // jedem Remora die einzige Aktion des Zuges für eine Beschwörung,
+    // die sie ohnehin gratis bekam. Das Ablehnen ist hier auch
+    // inhaltlich fast immer richtig: der vermiedene Lock betrifft nur
+    // Nicht-Greatmaw-Beschwörungen, und die Harpyformer sind nach
+    // einem Remora ohnehin nicht mehr "erste Kreatur des Zuges",
+    // kosten also genau die Aktion, die man gerade bezahlt hätte.
+    confirmCostsResource: true,
+
+    // ── Nachhut: Remora schließt spätere Plays aus ──────────────────
+    // "you cannot summon Creatures for the rest of the turn afterwards,
+    // except Greatmaw Creatures" ist dieselbe Form wie bei jeder
+    // anderen cpuDeferUntilLast-Karte. Remora gehört damit HINTER die
+    // Harpyformer (deren Gratis-Aktion nur als erste Kreatur des Zuges
+    // greift) und hinter die Greatmaw-Kreatur, die seine
+    // Gratis-Bedingung überhaupt erst erfüllt.
+    cpuDeferUntilLast: true,
+
+    // ── Enabler-Boden (Designer-Vorgabe) ────────────────────────────
+    // Remora ist der Gratis-Körper-Motor: jeder Körper ist +30 ATK für
+    // Nero Zira, +4 Gold für Ingo, Opfermaterial NOCH IM
+    // BESCHWÖRUNGSZUG (einzige Karte im Deck, die das darf) und damit
+    // ein Infected-Greatmaw-Schlag. Sein Beitrag erscheint in der
+    // Regression aber am Play der NUTZNIESSER-Karte — dieselbe
+    // Kredit-Diebstahl-Signatur, die Deepsea Primordium auf den Boden
+    // drückte. Gemessen (1268 Spiele): WR nach Remora-Plays
+    // 0→21.3%, 2→27.0%, 3→38.5%, 4→55.6%; gelernter Wert stand bei 27.9.
+    // Wirkt nur nach OBEN, das Lernen darf ihn überholen.
+    cardValueFloor: 65,
+  },
+
   // Free additional-Action summon while you control another Greatmaw
   // Creature. Engine evaluates this with (gs, pi, heroIdx, engine).
   inherentAction: (gs, pi, heroIdx, engine) => {

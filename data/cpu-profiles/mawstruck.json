@@ -1,0 +1,359 @@
+{
+  "deck": "Mawstruck",
+  "heroes": [
+    "Ingo, Investor of Evil",
+    "Nero Zira, the Mastermind",
+    "Cool Rescuer Monia"
+  ],
+  "games": 1268,
+  "trainWinRate": "22.9%",
+  "trainedAt": "2026-07-31T20:44:59.196Z",
+  "meanTurns": 19.6,
+  "cardValues": {
+    "Summoning Magic": 8.9,
+    "Performance": 11.4,
+    "Ska Harpyformer": 22.5,
+    "Harpyformer Choir": 43.3,
+    "Wheels": 42.1,
+    "Sacrificial Dagger": 58.2,
+    "Rocket Fist": 66.8,
+    "Greatmaw Remora": 65,
+    "Cute Cheese": 39.2,
+    "Pure Advantage Camel": 8,
+    "Leadership": 15.9,
+    "Golden Ankh": 26.4,
+    "The Yeeting": 26.1,
+    "Magnetic Potion": 29.2,
+    "Greatmaw Shark": 28,
+    "Elixir of Quickness": 28.6,
+    "Field Standard": 34.5,
+    "Infected Greatmaw": 76.6,
+    "Resuscitation Potion": 27.5,
+    "Divine Gift of the Guardian": 12.8,
+    "Tea": 26.7
+  },
+  "timing": {
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1.3
+    },
+    "Performance": {
+      "early": 0.78,
+      "mid": 1.09,
+      "late": 1.13
+    },
+    "Ska Harpyformer": {
+      "early": 0.86,
+      "mid": 1.06,
+      "late": 1.08
+    },
+    "Harpyformer Choir": {
+      "early": 0.85,
+      "mid": 0.99,
+      "late": 1.16
+    },
+    "Wheels": {
+      "early": 1,
+      "mid": 0.94,
+      "late": 1.06
+    },
+    "Sacrificial Dagger": {
+      "early": 0.8,
+      "mid": 1.06,
+      "late": 1.14
+    },
+    "Rocket Fist": {
+      "early": 0.75,
+      "mid": 0.97,
+      "late": 1.3
+    },
+    "Greatmaw Remora": {
+      "early": 0.92,
+      "mid": 0.95,
+      "late": 1.13
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 0.9,
+      "late": 1.3
+    },
+    "Pure Advantage Camel": {
+      "early": 1.28,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 0.98,
+      "late": 1.3
+    },
+    "Golden Ankh": {
+      "early": 1.01,
+      "mid": 1,
+      "late": 0.99
+    },
+    "The Yeeting": {
+      "early": 0.99,
+      "mid": 1.03,
+      "late": 0.98
+    },
+    "Magnetic Potion": {
+      "early": 0.97,
+      "mid": 0.99,
+      "late": 1.04
+    },
+    "Greatmaw Shark": {
+      "early": 0.75,
+      "mid": 1.06,
+      "late": 1.19
+    },
+    "Elixir of Quickness": {
+      "early": 0.98,
+      "mid": 1.02,
+      "late": 1
+    },
+    "Field Standard": {
+      "early": 0.99,
+      "mid": 1.03,
+      "late": 0.98
+    },
+    "Infected Greatmaw": {
+      "early": 1.3,
+      "mid": 0.78,
+      "late": 0.93
+    },
+    "Resuscitation Potion": {
+      "early": 1,
+      "mid": 0.96,
+      "late": 1.04
+    },
+    "Divine Gift of the Guardian": {
+      "early": 1.09,
+      "mid": 0.99,
+      "late": 0.92
+    },
+    "Tea": {
+      "early": 1.01,
+      "mid": 1,
+      "late": 0.99
+    }
+  },
+  "pairBonuses": {
+    "Performance|Resuscitation Potion": 8.4,
+    "Infected Greatmaw|Ska Harpyformer": 4.4,
+    "Divine Gift of the Guardian|Sacrificial Dagger": 7.8,
+    "Rocket Fist|dc:Resuscitation Potion": 4.4,
+    "Greatmaw Remora|dc:Resuscitation Potion": 5.6,
+    "Leadership|dc:Resuscitation Potion": 5.2,
+    "Elixir of Quickness|dc:Field Standard": 6.2,
+    "Cute Cheese|Magnetic Potion": 29.3
+  },
+  "cardValueDeltasByCluster": {
+    "spell": {
+      "Divine Gift of the Guardian": 7.9
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Rocket Fist": 8.5,
+      "Pure Advantage Camel": -5,
+      "Performance": -4.4,
+      "Field Standard": 12.2,
+      "Infected Greatmaw": 5.6
+    }
+  },
+  "standingEvalThreshold": 1358,
+  "targetPriors": {
+    "Rocket Fist": {
+      "dmgred": -6.6,
+      "kind:creature": -8.5,
+      "side:own": -17.4
+    },
+    "Greatmaw Shark — Sacrifice": {
+      "hp:max": 7.4
+    },
+    "Sacrificial Dagger": {
+      "side:own": -6.7
+    },
+    "Infected Greatmaw": {
+      "healrev": -7,
+      "dmgred": -12.8
+    },
+    "Infected Greatmaw — Sacrifice": {
+      "hp:max": -13.6,
+      "hp:min": -18.3
+    }
+  },
+  "surpriseRules": {
+    "Pure Advantage Camel": {
+      "early": 4.9,
+      "mid": 4.7,
+      "late": 2.3
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:2": 8.1,
+      "st:frozen-hero": -11.9,
+      "st:stun-hero": 11.8,
+      "st:poison2+": 10
+    },
+    "Juice": {
+      "st:hero-caster": 7.3
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 1.5,
+    "plc:slack:2+": -3.6,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Cute Cheese→Ska Harpyformer": -6,
+    "Cute Cheese→Harpyformer Choir": 4,
+    "Cute Cheese→Greatmaw Shark": -3.1,
+    "Cute Cheese→Pure Advantage Camel": -3.1,
+    "Cute Cheese→Greatmaw Remora": 3.5,
+    "Magic Lamp→Chain Lightning": -16.2,
+    "Magic Lamp→Alchemy": 4.8,
+    "Magic Lamp→Divine Gift of the Deepsea": 20,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Critical Strike": -20,
+    "Magic Lamp→Demon's Gate": 13.6,
+    "Magnetic Potion→Performance": -2.4,
+    "Magnetic Potion→Summoning Magic": -4,
+    "Magnetic Potion→Sacrificial Dagger": -8.7,
+    "Magnetic Potion→Greatmaw Shark": -17.5,
+    "Magnetic Potion→Tea": 14.4,
+    "Magnetic Potion→Harpyformer Choir": 13.2,
+    "Magnetic Potion→Infected Greatmaw": 5.4,
+    "Magnetic Potion→Rocket Fist": 14.1,
+    "Magnetic Potion→Golden Ankh": -15.2,
+    "Premonition→Sacrificial Dagger": 20,
+    "Premonition→Rocket Fist": -5.9,
+    "Premonition→Summoning Magic": 9.8,
+    "Premonition→Greatmaw Shark": -7,
+    "Premonition→Harpyformer Choir": -2.8,
+    "Premonition→Golden Ankh": -13.6,
+    "Enigma, the Seller of Secrets→Leadership": 7,
+    "Enigma, the Seller of Secrets→Field Standard": -17,
+    "Enigma, the Seller of Secrets→Pure Advantage Camel": -7.3,
+    "Enigma, the Seller of Secrets→Performance": 2.3,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": 16.3,
+    "Enigma, the Seller of Secrets→Harpyformer Choir": -5.6,
+    "Enigma, the Seller of Secrets→Tea": -13.1,
+    "Enigma, the Seller of Secrets→The Yeeting": -4.7,
+    "Enigma, the Seller of Secrets→Cute Cheese": 14.5,
+    "Enigma, the Seller of Secrets→Divine Gift of the Guardian": 9.6,
+    "Enigma, the Seller of Secrets→Rocket Fist": -18.1,
+    "Enigma, the Seller of Secrets→Sacrificial Dagger": -8.6,
+    "Enigma, the Seller of Secrets→Golden Ankh": -11,
+    "Enigma, the Seller of Secrets→Greatmaw Shark": 9.3,
+    "Necromancy→Ska Harpyformer": 8.8,
+    "Necromancy→Infected Greatmaw": -7.1,
+    "Necromancy→Greatmaw Shark": -20,
+    "The Cosmic Depths→Infected Greatmaw": 3.2,
+    "The Cosmic Depths→Greatmaw Shark": -5.5,
+    "The Cosmic Depths→Harpyformer Choir": -7.3,
+    "Magnetic Glove→Rocket Fist": 12.1,
+    "Training→Performance": 8,
+    "Training→Leadership": -14.3,
+    "Training→Summoning Magic": 18
+  },
+  "abilityPriors": {
+    "Summoning Magic@Ingo, Investor of Evil": 150,
+    "Wealth@Ingo, Investor of Evil": -60,
+    "Leadership@Ingo, Investor of Evil": 148.4,
+    "Leadership@Ingo, Investor of Evil≥2": -60,
+    "Leadership@Ingo, Investor of Evil≥3": 150,
+    "Fighting@Nero Zira, the Mastermind": -60,
+    "Fighting@Nero Zira, the Mastermind≥2": 150,
+    "Inventing@Nero Zira, the Mastermind": -36.1,
+    "Summoning Magic@Nero Zira, the Mastermind": 76.5,
+    "Charme@Cool Rescuer Monia": 85.1,
+    "Fighting@Cool Rescuer Monia": -60,
+    "Summoning Magic@Ingo, Investor of Evil≥2": -60,
+    "Summoning Magic@Ingo, Investor of Evil≥3": 62.1,
+    "Leadership@Cool Rescuer Monia": -60,
+    "Leadership@Nero Zira, the Mastermind": -32.4,
+    "Summoning Magic@Cool Rescuer Monia": -60,
+    "Charme@Cool Rescuer Monia≥2": 150,
+    "Leadership@Cool Rescuer Monia≥2": 83.6,
+    "Inventing@Nero Zira, the Mastermind≥2": -60,
+    "Summoning Magic@Nero Zira, the Mastermind≥2": 150,
+    "Leadership@Nero Zira, the Mastermind≥2": 130.2,
+    "Summoning Magic@Cool Rescuer Monia≥2": -28.4,
+    "Leadership@Nero Zira, the Mastermind≥3": 150,
+    "Charme@Cool Rescuer Monia≥3": 44.8
+  },
+  "equipPriors": {
+    "Sacrificial Dagger@Ingo, Investor of Evil": -37.2,
+    "Sacrificial Dagger@Cool Rescuer Monia": -60,
+    "Sacrificial Dagger@Nero Zira, the Mastermind": 150
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Cool Rescuer Monia": 30,
+    "Golden Ankh→Nero Zira, the Mastermind": 17.9,
+    "Golden Ankh→Ingo, Investor of Evil": 19.7,
+    "Resuscitation Potion→Nero Zira, the Mastermind": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Charme": 30,
+    "Golden Ankh→Fighting": 30,
+    "Golden Ankh→Inventing": -15,
+    "Golden Ankh→Summoning Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Golden Ankh→Leadership": 30,
+    "Resuscitation Potion→Fighting": 30,
+    "Resuscitation Potion→Inventing": 30,
+    "Resuscitation Potion→Leadership": 30,
+    "Golden Ankh→Wealth": -15
+  },
+  "startHandValues": {
+    "Wheels": 5.5,
+    "Summoning Magic": -6.8,
+    "Cute Cheese": 1.6,
+    "Golden Ankh": 3.4,
+    "Leadership": -3,
+    "Infected Greatmaw": 2.1,
+    "Rocket Fist": 3.4,
+    "Divine Gift of the Guardian": -5.4
+  },
+  "mulliganStats": {
+    "games": 1268,
+    "mullRate": "24.6%",
+    "winAfterMull": "27.9%",
+    "winAfterKeep": "21.3%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Greatmaw Remora|Summoning Magic": 4.8,
+    "Leadership|Summoning Magic": 5.4,
+    "Leadership|Wealth": 5.8,
+    "Ska Harpyformer|Summoning Magic": -9.2,
+    "Harpyformer Choir|Sacrificial Dagger": -9.4,
+    "Inventing|Sacrificial Dagger": 15,
+    "Inventing|Summoning Magic": 7.3,
+    "Charme|Fighting": 12.5,
+    "Greatmaw Remora|Greatmaw Shark": -15,
+    "Fighting|Leadership": -5,
+    "Charme|Summoning Magic": -6.4,
+    "Fighting|Greatmaw Remora": 14.7,
+    "Charme|Greatmaw Remora": 15,
+    "Charme|Sacrificial Dagger": -12.4,
+    "Pure Advantage Camel|Sacrificial Dagger": -15,
+    "Greatmaw Remora|Infected Greatmaw": -15,
+    "Infected Greatmaw|Inventing": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.14,
+      "n": 57,
+      "values": {
+        "Deepsea Primordium": 0.047
+      }
+    }
+  }
+}

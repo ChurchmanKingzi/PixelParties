@@ -88,7 +88,7 @@ module.exports = {
             if (inst.zone !== 'support') continue;
             if (inst.heroIdx !== tgt.heroIdx) continue;
             // Check cardType from DB
-            const cd = cardDB[inst.name];
+            const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
             if (!cd || !hasCardType(cd, 'Creature')) continue;
             allCreatureEntries.push({
               inst, amount: finalAtk, type: 'attack',

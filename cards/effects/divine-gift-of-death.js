@@ -67,6 +67,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
+  // `reviveCard`: Der CPU-relevante Nutzen ist das Wiederbeleben
+  // EIGENER besiegter Helden — ohne tote eigene Helden deckelt
+  // _cpu.js (reviveCardSituation) den Such-/Handwert hart.
+  cpuMeta: { reviveCard: true },
 
   /**
    * Main-Phase inherent-additional gate. Returns `true` only when:

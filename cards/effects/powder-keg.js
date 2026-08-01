@@ -328,7 +328,7 @@ module.exports = {
         if (inst.heroIdx !== hostHeroIdx) continue;
         if (inst.zoneSlot === ownSlot) continue;
         if (inst.faceDown) continue;
-        const cd = cardDB[inst.name];
+        const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         victims.push(inst);
       }

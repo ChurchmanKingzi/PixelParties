@@ -239,16 +239,12 @@ module.exports = {
       // actionPopCoolnessStackTo; Permanents aren't name-captured — so
       // scope to support / ability / surprise only. See
       // cards/effects/CARD_API.md "Removing a board card to a pile".
-      const _tz = targetInst.zone;
-      if (_tz === 'support' || _tz === 'ability' || _tz === 'surprise') {
-        engine._broadcastEvent('play_pile_transfer', {
-          owner: targetInst.owner,
-          cardName: targetInst.name,
-          from: _tz, to: 'discard',
-          fromHeroIdx: targetInst.heroIdx,
-          fromSlotIdx: targetInst.zoneSlot,
-        });
-      }
+      // KEIN eigener play_pile_transfer: `actionDestroyCard` sendet den
+      // zonenverankerten Flug selbst — und zwar NACH allen Abbruchpfaden
+      // (Immunität, Gate, Monias Schutz). Ein zusätzlicher Broadcast hier
+      // ergäbe einen Doppelflug; stand er wie früher VOR dem Aufruf, flog
+      // die Karte sogar bei einer abgewehrten Zerstörung. Wer eine EIGENE
+      // Leichen-Animation besitzt, übergibt `{ skipPileTransfer: true }`.
       await engine.actionDestroyCard(dmgSource, targetInst);
     }
 

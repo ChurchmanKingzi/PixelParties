@@ -1,0 +1,314 @@
+{
+  "deck": "Shadows over Blackport",
+  "heroes": [
+    "Bill, the Angry Auctioneer",
+    "Arthor, the King of Blackport",
+    "Jenny, the Class Fairy"
+  ],
+  "games": 394,
+  "trainWinRate": "27.7%",
+  "trainedAt": "2026-07-31T16:43:36.043Z",
+  "meanTurns": 15.6,
+  "cardValues": {
+    "Legendary Sword of a Barbarian King": 9,
+    "Summoning Circle": 8,
+    "Nerdy Cheese": 12.7,
+    "Summoning Magic": 21.4,
+    "Fighting": 44.6,
+    "Graveyard Gathering": 18.9,
+    "Perfect Disguise": 16.6,
+    "Slippery Fridge": 13.6,
+    "Arthor, Inheritor of the Barbarian Sword": 100,
+    "Treasure Chest": 10.3,
+    "Boomerang": 18.5,
+    "Vinepire": 33.3,
+    "Voice in your Head": 31.1,
+    "Sleeping Beauty": 28.5,
+    "Golden Ankh": 26.4,
+    "Trial of Coolness": 27.2,
+    "Divine Gift of Sacrifice": 28.6,
+    "Jump in the River": 23.5,
+    "Forceful Revival": 31.5,
+    "Juice": 20.4
+  },
+  "timing": {
+    "Legendary Sword of a Barbarian King": {
+      "early": 0.75,
+      "mid": 1.16,
+      "late": 1.1
+    },
+    "Summoning Circle": {
+      "early": 0.75,
+      "mid": 1.23,
+      "late": 1.27
+    },
+    "Nerdy Cheese": {
+      "early": 0.87,
+      "mid": 1.07,
+      "late": 1.06
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.02
+    },
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.87
+    },
+    "Graveyard Gathering": {
+      "early": 0.95,
+      "mid": 1,
+      "late": 1.05
+    },
+    "Perfect Disguise": {
+      "early": 1,
+      "mid": 0.95,
+      "late": 1.05
+    },
+    "Slippery Fridge": {
+      "early": 0.91,
+      "mid": 1.05,
+      "late": 1.04
+    },
+    "Arthor, Inheritor of the Barbarian Sword": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.08
+    },
+    "Treasure Chest": {
+      "early": 0.81,
+      "mid": 1.13,
+      "late": 1.06
+    },
+    "Boomerang": {
+      "early": 1.01,
+      "mid": 1.01,
+      "late": 0.98
+    },
+    "Vinepire": {
+      "early": 0.95,
+      "mid": 1.05,
+      "late": 1
+    },
+    "Voice in your Head": {
+      "early": 0.99,
+      "mid": 1.02,
+      "late": 0.99
+    },
+    "Sleeping Beauty": {
+      "early": 0.94,
+      "mid": 1.02,
+      "late": 1.04
+    },
+    "Golden Ankh": {
+      "early": 1.02,
+      "mid": 1,
+      "late": 0.98
+    },
+    "Trial of Coolness": {
+      "early": 0.97,
+      "mid": 1,
+      "late": 1.03
+    },
+    "Divine Gift of Sacrifice": {
+      "early": 1,
+      "mid": 0.99,
+      "late": 1
+    },
+    "Jump in the River": {
+      "early": 0.97,
+      "mid": 1.01,
+      "late": 1.02
+    },
+    "Forceful Revival": {
+      "early": 0.99,
+      "mid": 1.05,
+      "late": 0.96
+    },
+    "Juice": {
+      "early": 1.02,
+      "mid": 0.93,
+      "late": 1.05
+    }
+  },
+  "pairBonuses": {
+    "Boomerang|Summoning Circle": 14.5,
+    "Slippery Fridge|Summoning Circle": 7.7,
+    "Juice|Summoning Circle": 8.7,
+    "Jump in the River|Summoning Circle": 7.8,
+    "Juice|Slippery Fridge": 5.5,
+    "Boomerang|dc:Trial of Coolness": 17.5,
+    "Forceful Revival|Legendary Sword of a Barbarian King": 28.4,
+    "Sleeping Beauty|dc:Jump in the River": 4.8,
+    "Sleeping Beauty|dc:Trial of Coolness": 7.2
+  },
+  "cardValueDeltasByCluster": {
+    "spell": {
+      "Perfect Disguise": 6.6
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Arthor, Inheritor of the Barbarian Sword": 19.8,
+      "Vinepire": 13.5,
+      "Trial of Coolness": 20,
+      "The Spawn Mother": 20
+    }
+  },
+  "standingEvalThreshold": 1395,
+  "targetPriors": {
+    "Slippery Fridge — Move Summoning Circle": {
+      "pos:0": -12.6
+    },
+    "Arthor, Inheritor of the Barbarian Sword": {
+      "side:own": -20
+    },
+    "Sleeping Beauty": {
+      "pos:0": -7.8,
+      "pos:2": -7.2
+    },
+    "Trial of Coolness": {
+      "pos:1": 9.2,
+      "kind:creature": -19.5
+    },
+    "Divine Gift of Sacrifice": {
+      "hp:max": -10.8
+    },
+    "Slippery Fridge — Move Legendary Sword of a Barbarian King": {
+      "kind:creature": 12.6
+    },
+    "Aggressive Town Guard": {
+      "pos:2": -13.1
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:frozen-hero": 20,
+      "st:2": 5.2,
+      "st:poison2+": -20,
+      "st:hero-caster": -5.9,
+      "st:3+": -8.6
+    }
+  },
+  "placementRules": {
+    "plc:slack:2+": 6.7,
+    "plc:slack:0": -8.4,
+    "plc:bigwait": -3.4,
+    "plc:slack:1": 11.2
+  },
+  "tutorPickRules": {
+    "Nerdy Cheese→Voice in your Head": -4,
+    "Nerdy Cheese→Graveyard Gathering": 4,
+    "Boomerang→Slippery Fridge": 7.1,
+    "Boomerang→Summoning Circle": -11.4,
+    "Boomerang→Perfect Disguise": -10.2,
+    "Boomerang→Legendary Sword of a Barbarian King": -11,
+    "Boomerang→Nerdy Cheese": -19.4,
+    "Forceful Revival→The Spawn Mother": 20,
+    "Forceful Revival→Vinepire": -20,
+    "Forceful Revival→Sleeping Beauty": 6.7,
+    "Enigma, the Seller of Secrets→Voice in your Head": -18.6,
+    "Enigma, the Seller of Secrets→Forceful Revival": 19,
+    "Enigma, the Seller of Secrets→Sleeping Beauty": -13.1
+  },
+  "abilityPriors": {
+    "Summoning Magic@Bill, the Angry Auctioneer": 150,
+    "Fighting@Jenny, the Class Fairy": -60,
+    "Trade@Bill, the Angry Auctioneer": -60,
+    "Diplomacy@Bill, the Angry Auctioneer": -60,
+    "Decay Magic@Arthor, Inheritor of the Barbarian Sword": 150,
+    "Wealth@Arthor, Inheritor of the Barbarian Sword": -30.6,
+    "Fighting@Arthor, Inheritor of the Barbarian Sword": 150,
+    "Fighting@Arthor, Inheritor of the Barbarian Sword≥2": 98.8,
+    "Fighting@Arthor, Inheritor of the Barbarian Sword≥3": -37.8,
+    "Fighting@Bill, the Angry Auctioneer": 150,
+    "Summoning Magic@Arthor, Inheritor of the Barbarian Sword": -60,
+    "Decay Magic@Arthor, the King of Blackport": -60,
+    "Decay Magic@Bill, the Angry Auctioneer": -60,
+    "Magic Arts@Bill, the Angry Auctioneer": -60,
+    "Wealth@Arthor, the King of Blackport": -60,
+    "Friendship@Jenny, the Class Fairy": -60,
+    "Summoning Magic@Arthor, Inheritor of the Barbarian Sword≥2": -60,
+    "Fighting@Arthor, the King of Blackport": 150,
+    "Magic Arts@Arthor, the King of Blackport": -60,
+    "Summoning Magic@Arthor, the King of Blackport": 85.1,
+    "Magic Arts@Jenny, the Class Fairy": -60,
+    "Friendship@Arthor, Inheritor of the Barbarian Sword": -60,
+    "Decay Magic@Jenny, the Class Fairy": 150,
+    "Friendship@Bill, the Angry Auctioneer": 125.7,
+    "Diplomacy@Arthor, Inheritor of the Barbarian Sword": -38.2,
+    "Friendship@Arthor, the King of Blackport": 42.2,
+    "Summoning Magic@Bill, the Angry Auctioneer≥2": 150,
+    "Diplomacy@Jenny, the Class Fairy": 150,
+    "Magic Arts@Arthor, Inheritor of the Barbarian Sword": 150,
+    "Trade@Jenny, the Class Fairy": -60,
+    "Wealth@Bill, the Angry Auctioneer": 150,
+    "Diplomacy@Arthor, the King of Blackport": -60
+  },
+  "equipPriors": {
+    "Legendary Sword of a Barbarian King@Arthor, the King of Blackport": 58.1,
+    "Summoning Circle@Jenny, the Class Fairy": -60,
+    "Summoning Circle@Arthor, the King of Blackport": 16.4,
+    "Legendary Sword of a Barbarian King@Arthor, Inheritor of the Barbarian Sword": -60,
+    "Legendary Sword of a Barbarian King@Jenny, the Class Fairy": -60,
+    "Legendary Sword of a Barbarian King@Bill, the Angry Auctioneer": -60,
+    "Summoning Circle@Bill, the Angry Auctioneer": 37.1
+  },
+  "lockPenalties": {
+    "Boomerang|item@1": 10,
+    "Boomerang|item@3+": -25,
+    "Boomerang|item@2": 10
+  },
+  "reviveTargets": {
+    "Golden Ankh→Jenny, the Class Fairy": 29,
+    "Golden Ankh→Arthor, Inheritor of the Barbarian Sword": -5
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Fighting": 19.9,
+    "Golden Ankh→Decay Magic": 9.8
+  },
+  "startHandValues": {
+    "Nerdy Cheese": 1.1,
+    "Boomerang": 2,
+    "Fighting": 3.8,
+    "Graveyard Gathering": 4,
+    "Divine Gift of Sacrifice": 1.8,
+    "Juice": -8.8,
+    "Sleeping Beauty": -3,
+    "The Spawn Mother": 3.1,
+    "Golden Ankh": 3.4,
+    "Slippery Fridge": 4.4,
+    "Vinepire": -1.2,
+    "Treasure Chest": 8.1,
+    "Summoning Magic": -2.8,
+    "Forceful Revival": 3.3,
+    "Voice in your Head": -10.2,
+    "Jump in the River": -1.7,
+    "Perfect Disguise": -8.7,
+    "Legendary Sword of a Barbarian King": 3.9,
+    "Trial of Coolness": 6.5
+  },
+  "mulliganStats": {
+    "games": 394,
+    "mullRate": "26.9%",
+    "winAfterMull": "31.1%",
+    "winAfterKeep": "26.4%"
+  },
+  "heroEffectTiming": {
+    "Arthor, Inheritor of the Barbarian Sword@hand:4+": 11.1,
+    "Arthor, Inheritor of the Barbarian Sword@hand:2-3": 14.2
+  },
+  "boardPairs": {
+    "Legendary Sword of a Barbarian King|Summoning Circle": 15,
+    "Fighting|Sleeping Beauty": 15,
+    "Fighting|Wealth": -15,
+    "Fighting|Legendary Sword of a Barbarian King": 15,
+    "Fighting|Trade": -15,
+    "Friendship|Trade": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

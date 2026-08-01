@@ -134,6 +134,23 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   // ── 1. Pull Quetzahuitl out of hand. ──
   const handIdx = ps.hand.indexOf(CARD_NAME);
   if (handIdx < 0) return;
+  // Einsatz-Beleg für den Trainings-Recorder. Als Verdachtsfall
+  // "Quetzahuitl 0% — lehnt die CPU ab?": nein, hier gibt es gar keinen
+  // Prompt, der Abstieg läuft vollautomatisch und funktioniert (gegen
+  // die echte Engine verifiziert). Er war nur unsichtbar: die Karte
+  // wandert Hand → Hero-Zone, ohne je die Play-Pfade zu berühren, und
+  // die drei quetzahuitl_*-Logs stehen nicht in ACT_EVENTS. Ergebnis:
+  // plays 0 trotz realer Abstiege. `asPlay: 'sole'` ist das etablierte
+  // Signal dafür (kein afterSpellResolved, keine Doppelzählung möglich).
+  // Der Client kennt `to: 'hero'` nicht und bricht sauber ab
+  // (`if (!srcEl || !tgtEl) return;`) — die Optik liefert ohnehin die
+  // eigene play_zone_animation des Abstiegs.
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName: CARD_NAME,
+    from: 'hand', to: 'hero',
+    fromHandIdx: handIdx, toHeroIdx: targetHeroIdx,
+    asPlay: 'sole',
+  });
   ps.hand.splice(handIdx, 1);
   if (handInst) {
     engine.cardInstances = engine.cardInstances.filter(c => c.id !== handInst.id);

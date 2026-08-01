@@ -1,0 +1,364 @@
+{
+  "deck": "Crystal Gifts",
+  "heroes": [
+    "Cooldin, King of Coolness",
+    "Mary Crestmas",
+    "Arthor, the King of Blackport"
+  ],
+  "games": 1292,
+  "trainWinRate": "54.3%",
+  "trainedAt": "2026-07-23T09:43:49.290Z",
+  "meanTurns": 16.5,
+  "cardValues": {
+    "Magic Amber": 28.5,
+    "Leadership": 8,
+    "Decay Magic": 8,
+    "Performance": 8,
+    "Crystal Well": 8,
+    "Bottled Lightning": 71.6,
+    "Potion of Greed": 24.9,
+    "Elixir of Quickness": 11.8,
+    "Destruction Magic": 21.6,
+    "Bottled Flame": 42.4,
+    "Laser Volley": 100,
+    "Magnetic Potion": 17.9,
+    "Spike Trap": 8,
+    "The Master's Plan": 43.8,
+    "Slow": 27.2
+  },
+  "timing": {
+    "Magic Amber": {
+      "early": 0.75,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 0.91,
+      "late": 1.3
+    },
+    "Decay Magic": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.3
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
+    },
+    "Bottled Lightning": {
+      "early": 0.75,
+      "mid": 0.85,
+      "late": 1.3
+    },
+    "Potion of Greed": {
+      "early": 0.75,
+      "mid": 0.91,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 0.96,
+      "late": 1.3
+    },
+    "Destruction Magic": {
+      "early": 0.75,
+      "mid": 1.07,
+      "late": 1.3
+    },
+    "Bottled Flame": {
+      "early": 0.92,
+      "mid": 0.93,
+      "late": 1.16
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 0.96,
+      "late": 1.3
+    },
+    "Slow": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.26
+    }
+  },
+  "pairBonuses": {
+    "Loot the Leftovers|Resuscitation Potion": 4.1,
+    "No Retreat!|dc:Rain of Spores": 4.3,
+    "No Retreat!|dc:Potion of Greed": 7.9,
+    "Loot the Leftovers|dc:Mana Absorbing Crystal": 5.1
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Silence": 7.7,
+      "Loot the Leftovers": 8.9
+    },
+    "spell": {
+      "Mana Absorbing Crystal": -8.5,
+      "Laser Volley": -7.3,
+      "Resuscitation Potion": -7
+    }
+  },
+  "casterDeltas": {
+    "Spreading Rumor": {
+      "Arthor, the King of Blackport": -8.8,
+      "Cooldin, King of Coolness": 10.8
+    },
+    "Spike Trap": {
+      "Cooldin, King of Coolness": 20
+    },
+    "The Master's Plan": {
+      "Arthor, the King of Blackport": -20,
+      "Cooldin, King of Coolness": 20
+    },
+    "Slow": {
+      "Arthor, the King of Blackport": -10.7,
+      "Cooldin, King of Coolness": 10.3
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Magic Amber": -13.7,
+      "Leadership": -6.5,
+      "Decay Magic": -9.7,
+      "Performance": -10.3,
+      "Crystal Well": 7.5,
+      "Bottled Lightning": 7.6,
+      "Intrude": -10.4,
+      "Bottled Flame": 16.5,
+      "Spike Trap": -14.3,
+      "Mana Absorbing Crystal": -18.1,
+      "Laser Volley": 10.1,
+      "Slow": -6.7,
+      "Weakening Crystal": -14.2,
+      "Resuscitation Potion": -14.4,
+      "No Retreat!": -15.9,
+      "Loot the Leftovers": -14.7
+    },
+    "ahead": {
+      "Spike Trap": -10,
+      "Mana Absorbing Crystal": -10,
+      "The Master's Plan": -7.6,
+      "Weakening Crystal": -6.9
+    }
+  },
+  "standingEvalThreshold": 1037,
+  "menuOfferRules": {
+    "Magic Lamp→Decay Magic": -20,
+    "Magic Lamp→Destruction Magic": -18.3,
+    "Magic Lamp→Laser Volley": 12.9
+  },
+  "menuOfferRulesByCluster": {
+    "aggro": {
+      "Magic Lamp→Decay Magic": -15
+    },
+    "swarm": {
+      "Magic Lamp→Decay Magic": 15
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Decay Magic": -15
+    }
+  },
+  "targetPriors": {
+    "Divine Gift of Biseria": {
+      "hp:min": -7.9,
+      "kind:creature": 15.9
+    },
+    "Aggressive Town Guard": {
+      "side:opp": 6.2,
+      "side:own": -20,
+      "hp:max": -11.7,
+      "hp:min": 8.8
+    },
+    "Mary Crestmas — Charme Lv3": {
+      "hp:min": -9.3,
+      "hp:max": 18.7
+    },
+    "Invader Token": {
+      "hp:min": -9.7,
+      "kind:creature": -10.3
+    }
+  },
+  "surpriseRules": {
+    "Spike Trap": {
+      "early": 8.3,
+      "mid": 16.1,
+      "late": 9
+    },
+    "Booby Trap": {
+      "early": 20,
+      "mid": 20,
+      "late": 20
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 6.1
+    },
+    "Juice": {
+      "st:hero-caster": 20
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 15,
+    "plc:bigwait": 5.2,
+    "plc:slack:1": -15
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Decay Magic": -3.4,
+    "Magic Lamp→Accusation": 10.3,
+    "Magic Lamp→Destruction Magic": -11.6,
+    "Magic Lamp→Dark Gear": 20,
+    "Magic Lamp→Acid Vial": -16.1,
+    "Magic Lamp→Chain Lightning": 4.8,
+    "Magic Lamp→Critical Strike": -20,
+    "Magic Lamp→Alchemy": -16.8,
+    "Magic Lamp→The Master's Plan": 14.3,
+    "Magic Lamp→Laser Volley": 18.8,
+    "Magic Lamp→Silence": 20,
+    "Magnetic Potion→Leadership": -20,
+    "Magnetic Potion→Decay Magic": -3.5,
+    "Magnetic Potion→Spreading Rumor": -5.3,
+    "Magnetic Potion→Destruction Magic": 11.8,
+    "Magnetic Potion→Accusation": 8.1,
+    "Magnetic Potion→Divine Gift of Biseria": 3.7,
+    "Magnetic Potion→Performance": -9.6,
+    "Magnetic Potion→Spike Trap": -10.1,
+    "Magnetic Potion→Rain of Spores": -19.2,
+    "Magnetic Potion→Silence": 17.3,
+    "Magnetic Potion→Laser Volley": -2.7,
+    "Magnetic Potion→No Retreat!": -4.5,
+    "Magnetic Potion→Magic Amber": -20,
+    "Rain of Spores→Crystal Well": 20,
+    "Rain of Spores→Laser Volley": 20,
+    "Rain of Spores→Distracting Crystal": -7.4,
+    "Rain of Spores→Loot the Leftovers": -20,
+    "Rain of Spores→Deepsea Idol": 20,
+    "Rain of Spores→The Yeeting": -20,
+    "Rain of Spores→Brilliant Idea": 10.6,
+    "Rain of Spores→Arthor, Inheritor of the Barbarian Sword": 20,
+    "Enigma, the Seller of Secrets→Letter of Misinformations": 7.4,
+    "Enigma, the Seller of Secrets→Intrude": -7.9,
+    "Enigma, the Seller of Secrets→Leadership": -2.7,
+    "Enigma, the Seller of Secrets→Slow": 2.6,
+    "Enigma, the Seller of Secrets→Destruction Magic": 3.1,
+    "Enigma, the Seller of Secrets→Spike Trap": 13.8,
+    "Enigma, the Seller of Secrets→Spreading Rumor": -3.8,
+    "Enigma, the Seller of Secrets→Loot the Leftovers": 7.9,
+    "Enigma, the Seller of Secrets→Silence": 20,
+    "Enigma, the Seller of Secrets→No Retreat!": 7.4,
+    "Enigma, the Seller of Secrets→Decay Magic": -8.6,
+    "Enigma, the Seller of Secrets→The Master's Plan": -14.7,
+    "Enigma, the Seller of Secrets→Laser Volley": -9.2,
+    "Enigma, the Seller of Secrets→Rain of Spores": 8.1,
+    "Enigma, the Seller of Secrets→Crystal Well": -7.3,
+    "Enigma, the Seller of Secrets→Weakening Crystal": -2.9,
+    "Enigma, the Seller of Secrets→Divine Gift of Biseria": -13.4,
+    "Laser Volley→Arthor, the King of Blackport": -4.3,
+    "Magnetic Glove→Laser Volley": 2.4
+  },
+  "abilityPriors": {
+    "Alchemy@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness": 150,
+    "Leadership@Cooldin, King of Coolness≥2": 150,
+    "Destruction Magic@Cooldin, King of Coolness": -60,
+    "Charme@Mary Crestmas": 150,
+    "Charme@Mary Crestmas≥2": 150,
+    "Charme@Mary Crestmas≥3": -60,
+    "Decay Magic@Arthor, the King of Blackport": 150,
+    "Decay Magic@Arthor, the King of Blackport≥2": 150,
+    "Decay Magic@Arthor, the King of Blackport≥3": 150,
+    "Wealth@Arthor, the King of Blackport": 150,
+    "Leadership@Arthor, the King of Blackport": 33.9,
+    "Leadership@Cooldin, King of Coolness≥3": 73.8,
+    "Leadership@Mary Crestmas": 132.7,
+    "Leadership@Mary Crestmas≥2": 150,
+    "Destruction Magic@Mary Crestmas": 150,
+    "Destruction Magic@Mary Crestmas≥2": 150,
+    "Destruction Magic@Cooldin, King of Coolness≥2": -60,
+    "Wealth@Arthor, the King of Blackport≥2": 30.8,
+    "Decay Magic@Cooldin, King of Coolness": -60,
+    "Decay Magic@Cooldin, King of Coolness≥2": -60,
+    "Leadership@Arthor, the King of Blackport≥2": 150,
+    "Destruction Magic@Arthor, the King of Blackport": -60,
+    "Decay Magic@Cooldin, King of Coolness≥3": -60,
+    "Decay Magic@Mary Crestmas": -60,
+    "Decay Magic@Mary Crestmas≥2": -60,
+    "Decay Magic@Mary Crestmas≥3": 150,
+    "Destruction Magic@Arthor, the King of Blackport≥2": 150,
+    "Destruction Magic@Mary Crestmas≥3": 150
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Arthor, the King of Blackport": 30,
+    "Resuscitation Potion→Mary Crestmas": 30,
+    "Resuscitation Potion→Cooldin, King of Coolness": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Decay Magic": 30,
+    "Resuscitation Potion→Wealth": 26.4,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Charme": 30,
+    "Resuscitation Potion→Leadership": 30,
+    "Resuscitation Potion→Alchemy": 30
+  },
+  "startHandValues": {
+    "Destruction Magic": 2.7,
+    "Accusation": -5.2,
+    "Intrude": -2.2,
+    "Slow": -1.4,
+    "Weakening Crystal": -6.5,
+    "Spike Trap": 4.4,
+    "Magic Amber": -4.4,
+    "Performance": -5.2,
+    "Rain of Spores": -1.5,
+    "Loot the Leftovers": 1.9,
+    "No Retreat!": -1.3,
+    "Leadership": 1.1,
+    "Distracting Crystal": 6.6,
+    "Laser Volley": 3.8,
+    "Crystal Well": -1.3,
+    "Divine Gift of Biseria": 5.7,
+    "Silence": 3,
+    "Spreading Rumor": 2.3,
+    "Mana Absorbing Crystal": -5.9
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "21.7%",
+    "winAfterMull": "55.4%",
+    "winAfterKeep": "54%"
+  },
+  "heroEffectTiming": {
+    "Cooldin, King of Coolness@hand:2-3": 3.2,
+    "Cooldin, King of Coolness@hand:0-1": 7.3,
+    "Cooldin, King of Coolness@hand:4+": -2.1
+  },
+  "boardPairs": {
+    "Destruction Magic|Leadership": 7,
+    "Decay Magic|Leadership": 11,
+    "Leadership|Wealth": 11.6,
+    "Charme|Leadership": 9.9,
+    "Charme|Destruction Magic": 6.3,
+    "Alchemy|Decay Magic": 10.3,
+    "Decay Magic|Destruction Magic": 6.2,
+    "Aggressive Town Guard|Leadership": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.614,
+      "n": 127,
+      "values": {
+        "Deepsea Primordium": 0.081,
+        "Ska Harpyformer": -0.414,
+        "Hell Fox": -0.364,
+        "Candlestick Squire": 0.261
+      }
+    }
+  }
+}

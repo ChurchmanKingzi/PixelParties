@@ -19,7 +19,7 @@ module.exports = {
   // payoff (free 2/3/4 cards if opp plays the named card next turn)
   // is invisible to the gate but real, and the activation itself is
   // free with no downside.
-  cpuMeta: { alwaysCommit: true },
+  cpuMeta: { alwaysCommit: true, activationDraws: true },
 
   /**
    * On activation: prompt for a card name via cardNamePicker.

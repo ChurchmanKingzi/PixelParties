@@ -1,0 +1,327 @@
+{
+  "deck": "Parts of the Soul",
+  "heroes": [
+    "Cute Nerd Magenta",
+    "Thep, the Court Scribe",
+    "Alice, the Puppeteer Girl"
+  ],
+  "games": 1360,
+  "trainWinRate": "35.4%",
+  "trainedAt": "2026-07-25T05:52:24.195Z",
+  "meanTurns": 16.4,
+  "cardValues": {
+    "Adventurousness": 8,
+    "Soul Shard Ren": 45.2,
+    "Treasure Chest": 8,
+    "Soul Shard Ib": 77.8,
+    "Sandy Blob": 54.7,
+    "Soul Shard Sekhem": 72.4,
+    "Necromancy": 8,
+    "Book of Doom": 31.2,
+    "Soul Shard Ka": 45,
+    "Cute Cheese": 8,
+    "Summoning Magic": 8,
+    "Soul Shard Khet": 49.2,
+    "Soul Shard Shut": 16.5
+  },
+  "timing": {
+    "Adventurousness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Soul Shard Ren": {
+      "early": 0.75,
+      "mid": 1.16,
+      "late": 1.15
+    },
+    "Treasure Chest": {
+      "early": 0.75,
+      "mid": 1.29,
+      "late": 1
+    },
+    "Soul Shard Ib": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.14
+    },
+    "Sandy Blob": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.23
+    },
+    "Soul Shard Sekhem": {
+      "early": 0.75,
+      "mid": 1.21,
+      "late": 1.16
+    },
+    "Necromancy": {
+      "early": 0.75,
+      "mid": 1.17,
+      "late": 1.3
+    },
+    "Book of Doom": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.05
+    },
+    "Soul Shard Ka": {
+      "early": 0.75,
+      "mid": 1.15,
+      "late": 1.19
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Soul Shard Khet": {
+      "early": 0.75,
+      "mid": 1.12,
+      "late": 1.14
+    }
+  },
+  "pairBonuses": {
+    "Adventurousness|Bottled Flame": 5.5,
+    "Treasure Chest|dc:Book of Doom": 4.8,
+    "Treasure Chest|dc:Acid Vial": 9.8,
+    "Treasure Chest|dc:Bottled Lightning": 8.1,
+    "Cute Cheese|dc:Book of Doom": 4.4,
+    "Bottled Flame|Cute Cheese": 10.5,
+    "Bottled Flame|Necromancy": 4.1,
+    "Book of Doom|Resuscitation Potion": 9.5,
+    "Bottled Lightning|dc:Resuscitation Potion": 30
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Bottled Flame": -6.2
+    },
+    "swarm": {
+      "Resuscitation Potion": 7.8
+    },
+    "spell": {
+      "Acid Vial": 6.6,
+      "Bottled Flame": 8.1
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Soul Shard Ib": 5.7,
+      "Resuscitation Potion": -16.2,
+      "Soul Shard Khet": 6.9,
+      "Golden Ankh": -9.8
+    },
+    "ahead": {
+      "Adventurousness": 13.7,
+      "Soul Shard Ren": 15.7,
+      "Soul Shard Ib": 12.8,
+      "Sandy Blob": 12,
+      "Soul Shard Sekhem": 20,
+      "Necromancy": 17.8,
+      "Summoning Magic": 14.9,
+      "Book of Doom": 13.5,
+      "Soul Shard Ka": 14.6,
+      "Soul Shard Khet": 17.3
+    }
+  },
+  "standingEvalThreshold": 1128,
+  "targetPriors": {
+    "Soul Shard Sekhem": {
+      "hp:max": -6.8,
+      "dmgred": -15
+    },
+    "Sandy Blob": {
+      "dmgred": -13.7
+    },
+    "Alice, the Puppeteer Girl": {
+      "dmgred": -20
+    },
+    "Kit, the Shark Researcher": {
+      "kind:hero": -7.7,
+      "kind:creature": 6.1
+    },
+    "Occultism": {
+      "hp:max": -6.1
+    },
+    "Invader Token": {
+      "hp:max": -11.2,
+      "hp:min": -14.1
+    }
+  },
+  "placementRules": {
+    "plc:slack:2+": -2.9,
+    "plc:bigwait": -15
+  },
+  "tutorPickRules": {
+    "Thep, the Court Scribe→Soul Shard Ib": -8.2,
+    "Thep, the Court Scribe→Soul Shard Sekhem": 7.6,
+    "Thep, the Court Scribe→Soul Shard Khet": 4.8,
+    "Thep, the Court Scribe→Soul Shard Shut": 10.2,
+    "Cute Cheese→Soul Shard Sekhem": -2.8,
+    "Cute Cheese→Soul Shard Ka": 19.5,
+    "Cute Cheese→Soul Shard Khet": -2.1,
+    "Cute Cheese→Sandy Blob": 10.2,
+    "Cute Cheese→Soul Shard Shut": -11.8,
+    "Cute Cheese→Soul Shard Ib": -4.3,
+    "Necromancy→Soul Shard Ka": 2.4,
+    "Necromancy→Sandy Blob": -5.8,
+    "Necromancy→Soul Shard Ib": 3.6,
+    "Necromancy→Soul Shard Ren": 5.7,
+    "Necromancy→Soul Shard Shut": -9.2,
+    "Necromancy→Soul Shard Sekhem": 19.7,
+    "Necromancy→Soul Shard Khet": -4.6,
+    "Soul Shard Ka→Sandy Blob": 7,
+    "Soul Shard Ka→Soul Shard Shut": -4.3,
+    "Soul Shard Ka→Soul Shard Ren": -2.3,
+    "Soul Shard Ka→Soul Shard Ib": -9.5,
+    "Magic Lamp→Elixir of Immortality": -20,
+    "Magic Lamp→Loyal Bone Dog": 20,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Decay Magic": 11.7,
+    "Magic Lamp→Alchemy": -3.4,
+    "Magic Lamp→Fighting": 4,
+    "Magic Lamp→The Warlord's Bite": -18.9,
+    "Training→Adventurousness": 6.2,
+    "Training→Summoning Magic": -10.7,
+    "Training→Necromancy": 4.4,
+    "Soul Shard Khet→Sandy Blob": -5,
+    "Soul Shard Khet→Soul Shard Ka": 12.3,
+    "Soul Shard Khet→Soul Shard Ib": -5.3,
+    "Soul Shard Khet→Soul Shard Shut": -8.2,
+    "Soul Shard Khet→Soul Shard Sekhem": 8.7,
+    "Soul Shard Khet→Soul Shard Ren": 10.2,
+    "The Cosmic Depths→Sandy Blob": 9.3,
+    "Enigma, the Seller of Secrets→Adventurousness": -4.8,
+    "Enigma, the Seller of Secrets→Treasure Chest": -3.6,
+    "Enigma, the Seller of Secrets→Book of Doom": 13.7,
+    "Enigma, the Seller of Secrets→Glass of Marbles": -3.7,
+    "Enigma, the Seller of Secrets→Sandy Blob": -8.9,
+    "Enigma, the Seller of Secrets→Necromancy": -2.5,
+    "Enigma, the Seller of Secrets→Soul Shard Khet": -2.2,
+    "Enigma, the Seller of Secrets→Cute Cheese": 6.2,
+    "Enigma, the Seller of Secrets→Summoning Magic": 11.1,
+    "Enigma, the Seller of Secrets→Mystery Box": 20,
+    "Enigma, the Seller of Secrets→Soul Shard Ka": 6.7,
+    "Enigma, the Seller of Secrets→Soul Shard Ib": -10.3,
+    "Enigma, the Seller of Secrets→Soul Shard Sekhem": 5.8,
+    "Enigma, the Seller of Secrets→Soul Shard Shut": -6,
+    "Premonition→Sandy Blob": 7.9,
+    "Premonition→Summoning Magic": 5,
+    "Premonition→Soul Shard Ib": -8.5,
+    "Premonition→Soul Shard Sekhem": -3.4
+  },
+  "abilityPriors": {
+    "Charme@Cute Nerd Magenta": 121.6,
+    "Necromancy@Cute Nerd Magenta": 44.3,
+    "Necromancy@Cute Nerd Magenta≥2": 150,
+    "Necromancy@Cute Nerd Magenta≥3": -12.1,
+    "Summoning Magic@Cute Nerd Magenta": -39.3,
+    "Learning@Thep, the Court Scribe": 150,
+    "Magic Arts@Thep, the Court Scribe": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": 45.7,
+    "Adventurousness@Alice, the Puppeteer Girl": -60,
+    "Adventurousness@Alice, the Puppeteer Girl≥2": -60,
+    "Creativity@Cute Nerd Magenta": 150,
+    "Adventurousness@Thep, the Court Scribe": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl≥2": 150,
+    "Necromancy@Alice, the Puppeteer Girl": 150,
+    "Adventurousness@Cute Nerd Magenta": 88.2,
+    "Adventurousness@Cute Nerd Magenta≥2": -41.8,
+    "Adventurousness@Cute Nerd Magenta≥3": -26.9,
+    "Summoning Magic@Thep, the Court Scribe": -46.9,
+    "Summoning Magic@Thep, the Court Scribe≥2": 61.5,
+    "Necromancy@Alice, the Puppeteer Girl≥2": 150,
+    "Necromancy@Alice, the Puppeteer Girl≥3": 150,
+    "Necromancy@Thep, the Court Scribe": -60,
+    "Necromancy@Thep, the Court Scribe≥2": -60,
+    "Summoning Magic@Cute Nerd Magenta≥2": -60,
+    "Adventurousness@Thep, the Court Scribe≥2": 150,
+    "Adventurousness@Thep, the Court Scribe≥3": 127.6
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Alice, the Puppeteer Girl": 30,
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30,
+    "Golden Ankh→Cute Nerd Magenta": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Destruction Magic": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Necromancy": 30,
+    "Golden Ankh→Adventurousness": 30,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Golden Ankh→Charme": 30,
+    "Golden Ankh→Creativity": 30
+  },
+  "startHandValues": {
+    "Golden Ankh": -4,
+    "Soul Shard Sekhem": 3.7,
+    "Summoning Magic": -2.8,
+    "Treasure Chest": 3.9,
+    "Soul Shard Shut": -4.7,
+    "Mystery Box": -1.6,
+    "Soul Shard Ka": 1.3,
+    "Soul Shard Khet": -4.2,
+    "Cute Cheese": 2.4
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "3.5%",
+    "winAfterMull": "25%",
+    "winAfterKeep": "35.7%"
+  },
+  "heroEffectTiming": {
+    "Cute Nerd Magenta@hand:2-3": 2.2,
+    "Thep, the Court Scribe@hand:2-3": 4.7,
+    "Thep, the Court Scribe@hand:4+": 5.3,
+    "Alice, the Puppeteer Girl@hand:4+": 10.2,
+    "Alice, the Puppeteer Girl@hand:2-3": 10.3,
+    "Cute Nerd Magenta@hand:0-1": 8.8,
+    "Thep, the Court Scribe@hand:0-1": 6.5,
+    "Alice, the Puppeteer Girl@hand:0-1": 11.4
+  },
+  "boardPairs": {
+    "Charme|Sandy Blob": 13.9,
+    "Sandy Blob|Summoning Magic": 10.8,
+    "Necromancy|Summoning Magic": 12.2,
+    "Learning|Soul Shard Ib": -8.9,
+    "Magic Arts|Soul Shard Ib": -9.9,
+    "Destruction Magic|Sandy Blob": 15,
+    "Adventurousness|Sandy Blob": 7.9,
+    "Destruction Magic|Summoning Magic": 15,
+    "Creativity|Sandy Blob": 14,
+    "Charme|Soul Shard Ren": -15,
+    "Creativity|Soul Shard Ren": -15,
+    "Destruction Magic|Necromancy": 11.5,
+    "Soul Shard Khet|Soul Shard Sekhem": 15,
+    "Soul Shard Sekhem|Summoning Magic": 6.8,
+    "Learning|Soul Shard Khet": 10.1,
+    "Magic Arts|Soul Shard Khet": 9.5,
+    "Destruction Magic|Soul Shard Sekhem": 8.3,
+    "Destruction Magic|Soul Shard Ib": 15,
+    "Soul Shard Ib|Summoning Magic": 15,
+    "Adventurousness|Soul Shard Ren": 12.8,
+    "Soul Shard Ka|Soul Shard Shut": -15,
+    "Sandy Blob|Soul Shard Khet": -13.3,
+    "Learning|Necromancy": -7.9,
+    "Magic Arts|Necromancy": -7.2,
+    "Adventurousness|Soul Shard Khet": 9.4,
+    "Charme|Soul Shard Khet": -15,
+    "Creativity|Soul Shard Khet": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.371,
+      "n": 97,
+      "values": {
+        "Deepsea Primordium": 0.155,
+        "Ska Harpyformer": -0.371,
+        "Candlestick Squire": 0.518
+      }
+    }
+  }
+}

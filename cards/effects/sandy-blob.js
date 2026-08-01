@@ -79,12 +79,25 @@ module.exports = {
       //     midpoint split works). Without this second check Sandy Blob
       //     silently ignored DDG even though its on-summon IS firing.
       const cardDB = engine._getCardDB();
-      const cd = cardDB[entering.name];
+      const cd = entering.counters?._cardDataOverride || cardDB[entering.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
       if (!cd || !hasCardType(cd, 'Creature')) return;
       if (cd.cardType === 'Token') return;
+      // VERDECKTE Eintritte sind keine Beschwörung: eine Kreatur-Surprise,
+      // die in eine Bakhm-Support-Zone GESETZT wird, feuert bereits beim
+      // Setzen onCardEnterZone (doPlaySurprise) — da liegt sie aber nur
+      // verdeckt herum. Gezählt wird erst das Aufdecken, das dieselben
+      // Hooks mit face-up-Instanz nachschiebt.
+      if (entering.faceDown) return;
       const enteringScript = loadCardEffect(entering.name);
       const hasOnSummon = !!(enteringScript?.hooks?.onPlay)
-        || typeof enteringScript?.beforeSummon === 'function';
+        || typeof enteringScript?.beforeSummon === 'function'
+        // Kreatur-SURPRISES tragen ihren Beschwörungs-Effekt in
+        // `onSurpriseActivate` (Pure Advantage Camel zieht dort seine
+        // Karte) — hooks.onPlay ist bei ihnen leer. Ohne diesen dritten
+        // Zweig hätte Sandy Blob sie in KEINEM Pfad gesehen, auch nicht
+        // beim regulären Aufdecken aus der Surprise Zone. Als Ruling:
+        // die Aktivierung ist die On-Play-Aktivierung.
+        || typeof enteringScript?.onSurpriseActivate === 'function';
       if (!hasOnSummon) return;
       // Conditional on-summon gate. Cards whose on-summon effect runs
       // ONLY under specific entry conditions (Soul Shards' "summoned
@@ -123,11 +136,21 @@ module.exports = {
       // suppressed before it could run.
       if (entering.counters?.negated || entering.counters?.nulled) return;
 
-      // Sandy Blob must be live on the board.
+      // Sandy Blob must be live on the board — by ITS OWN state only.
+      // Als Bugreport (Demo 22-43-23, T7-T11): der Blob feuerte nie,
+      // während sein Host-Hero (Teppes) tot war — hier stand ein
+      // `attachedHero.hp <= 0`-Gate, das der Engine-Doktrin
+      // widerspricht (isCardEffectActive: "Creatures … remain active
+      // even when the Hero is dead"; Rulebook: Kreaturen toter Heroes
+      // bleiben im Spiel, nur ABILITY-abhängige Effekte sterben mit
+      // dem Hero — Cosmic-Skeleton-Klausel — und Blob braucht keine
+      // Hero-Ability). Hero-Stun/Frozen gaten Kreaturen ebenfalls
+      // nicht (nur die KREATUR-eigenen Statuses zählen).
+      // `isCardEffectActive` ist das kanonische Gate: faceDown /
+      // negated / nulled / frozen / stunned der Kreatur selbst —
+      // frozen/stunned prüfte der alte Inline-Check gar nicht.
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated || inst.counters?.nulled) return;
-      const hero = ctx.attachedHero;
-      if (!hero?.name || hero.hp <= 0) return;
+      if (!engine.isCardEffectActive(inst)) return;
 
       // Per-turn use tracking on the instance (matches Dragon Pilot
       // discharge accounting).

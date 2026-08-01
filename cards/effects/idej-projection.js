@@ -35,6 +35,26 @@ module.exports = {
   // (it has no play-effect) and elsewhere.
   activeIn: ['support'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // beforeDamage-Confirm (Gegner-Angriff, plan-los).
+  // Ohne Intercept declined der Brain-Default cancellable Confirms in
+  // plan-losen Kontexten und der Effekt verpufft still. Der generic-
+  // Dispatch lädt dieses Skript nur für Prompts mit dem eigenen
+  // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') {
+      // Protection-Lernkanal: gelernte Regel > Explorations-Arm (Training)
+      // > Accept-Default. Features kommen als protMeta aus dem Hook.
+      const { protectionDecision } = require('./_deck-profile');
+        if (typeof protectionDecision !== 'function') return { confirmed: true }; // Teildeployment-Schutz
+      const meta = promptData.protMeta || { d: 0, hp: 1 };
+      const pi = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+      return { confirmed: protectionDecision(engine, pi, promptData.title, meta) };
+    }
+    return undefined;
+  },
+
   hooks: {
     beforeDamage: async (ctx) => {
       if (ctx.cancelled) return;
@@ -86,6 +106,7 @@ module.exports = {
         message: `${hero.name || 'Your Hero'} would take ${ctx.amount} damage${fromText}. `
           + 'Discard Idej Projection from it to negate that damage and all associated effects?',
         showCard: showCardName,
+        protMeta: { d: ctx.amount, hp: hero.hp, pi },
         confirmLabel: '🛡️ Negate!',
         cancelLabel: 'No',
         cancellable: true,

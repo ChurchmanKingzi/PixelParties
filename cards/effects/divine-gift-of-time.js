@@ -168,6 +168,22 @@ async function tryTimeRescue(engine, pi, ps, names) {
   // self-discard outside the standard play flow).
   const ti = (ps.hand || []).indexOf(CARD_NAME);
   if (ti >= 0) {
+    // Einsatz-Beleg für den Trainings-Recorder. Genau die Lücke, die
+    // Cosmic Malfunction (v81), Demon's Gate (v86) und Quetzahuitl
+    // (v87) hatten: die Karte spielt sich in ihrem EIGENEN Hook aus der
+    // Hand — direktes splice + push, "außerhalb des Standard-Play-Flows"
+    // wie der Kommentar oben sagt. Damit läuft sie an beiden Zählwegen
+    // vorbei (kein afterSpellResolved, kein asPlay-Transfer), und
+    // `divine_gift_time` steht nicht in ACT_EVENTS — die Karte stünde
+    // also selbst bei echten Feuerungen mit 0 Einsätzen im Report.
+    // `asPlay: 'sole'` ist das etablierte Signal dafür; `true` würde
+    // Spells bewusst überspringen (Doppelzählung mit afterSpellResolved),
+    // die es hier gerade NICHT gibt.
+    engine._broadcastEvent('play_pile_transfer', {
+      owner: pi, cardName: CARD_NAME,
+      from: 'hand', to: 'discard',
+      fromHandIdx: ti, asPlay: 'sole',
+    });
     ps.hand.splice(ti, 1);
     ps.discardPile.push(CARD_NAME);
     const timeInst = engine.cardInstances.find(c =>
@@ -195,7 +211,10 @@ module.exports = {
   // without this it never fires. Recovering discarded cards to hand is pure
   // upside. (Title must equal the card name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   oncePerGame: true,

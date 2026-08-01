@@ -15,6 +15,15 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // evaluateThroughTurnEnd (Al-Diagnose: 614× verfügbar, 4× gespielt):
+  // Pillows Wert liegt im RESTZUG — es halbiert den Recoil der danach
+  // gespielten Selbstschadens-Karten (Phoenix Tackle, Victory Phoenix
+  // Cannon, Fire Bolts) plus den Schaden im Gegnerzug. Das Sofort-Gate
+  // sah nur "−4 Gold, −1 Handkarte, Buff-Marker" und lehnte ab. Mit
+  // Bewertung bis Zugende spielt der Rollout die Attacken MIT halbem
+  // Recoil und der Wert wird sichtbar. (Der Pass-Zeitpunkt stimmt
+  // bereits: Artifacts laufen in MP1, VOR der Action Phase.)
+  cpuMeta: { evaluateThroughTurnEnd: true },
   isTargetingArtifact: true,
 
   canActivate(gs, pi) {

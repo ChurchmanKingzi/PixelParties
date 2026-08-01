@@ -88,7 +88,11 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
     // used to live here predated Divinity / Wisdom on Creatures and
     // silently blocked perfectly legal high-level revivals from any
     // Hero whose host abilities relied on gap coverage to cast.
-    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd, { pileSide: 'discard' })) continue;
+    // Als Ruling: das Revival läuft NICHT über eine Swap-Platzierung —
+    // der Deepsea-Bounce-Bypass darf hier nicht greifen, der Held muss
+    // das echte Schul-Level für die Kreatur haben (Necromancy 2 + SM 1
+    // darf KEINE Lv2-Witch holen).
+    if (!engine.heroMeetsLevelReq(pi, heroIdx, cd, { pileSide: 'discard', noPlacementBypass: true })) continue;
     // Per-card summoning condition (canSummon). Without this, per-turn
     // summon limits ("you can only summon 1 Deepsea Primordium per
     // turn"), uniqueness gates (Cute Phoenix), and sacrifice tributes

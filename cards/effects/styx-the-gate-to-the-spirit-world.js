@@ -29,6 +29,18 @@ const CARD_NAME = 'Styx, the Gate to the Spirit World';
 module.exports = {
   activeIn: ['hero'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onHeroKO-Confirm (feuert im Gegner-Zug, plan-los).
+  // Ohne Intercept declined der Brain-Default cancellable Confirms in
+  // plan-losen Kontexten und der Effekt verpufft still. Der generic-
+  // Dispatch lädt dieses Skript nur für Prompts mit dem eigenen
+  // Kartentitel — Pauschal-Confirm ist damit korrekt gescopet.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onHeroKO: async (ctx) => {
       const engine = ctx._engine;

@@ -9,6 +9,21 @@
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 
 module.exports = {
+  // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
+  // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
+  // Engine-Decline durch. Politik: Stun auf das stärkste GEGNER-Ziel (Held bevorzugt)
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const vt = payload?.validTargets || [];
+    if (vt.length === 0) return undefined;
+    const pi = payload.playerIdx;
+    const oi = pi === 0 ? 1 : 0;
+    const enemyHeroes = vt.filter(t => String(t.id || t).startsWith('hero-' + oi));
+    const pick = enemyHeroes[0] || vt[0];
+    return [typeof pick === 'object' ? pick.id : pick];
+  },
+
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,

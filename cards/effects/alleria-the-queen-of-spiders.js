@@ -19,8 +19,17 @@ module.exports = {
    */
   cpuResponse(engine, promptType, promptData) {
     if (promptType === 'generic') {
-      // Confirm the redirect prompt
-      if (promptData.type === 'confirm') return true;
+      // Redirect-Confirm: Protection-Lernkanal statt Pauschal-Accept —
+      // gelernte Regel (protectionRules) > 50/50-Exploration im
+      // Training > Accept-Default live. Features (Schaden/Ziel-HP)
+      // kommen als protMeta vom Engine-Redirect-Prompt.
+      if (promptData.type === 'confirm') {
+        const { protectionDecision } = require('./_deck-profile');
+        if (typeof protectionDecision !== 'function') return { confirmed: true }; // Teildeployment-Schutz
+        const meta = promptData.protMeta || { d: 0, hp: 1 };
+        const pi = typeof meta.pi === 'number' ? meta.pi : engine._cpuPlayerIdx;
+        return { confirmed: protectionDecision(engine, pi, promptData.title, meta) };
+      }
       // Pick first redirect target from gallery
       if (promptData.type === 'cardGallery') {
         const cards = promptData.cards || [];

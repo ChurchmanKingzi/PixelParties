@@ -47,6 +47,59 @@
 const CARD_NAME = 'Sid, the King of Thieves';
 
 module.exports = {
+  // ── CPU: Steal-Auswahl ────────────────────────────────────────────
+  // Sids Wert ist EXTREM matchup-abhängig — statt eines eigenen
+  // Lernkanals konsumiert er das trainierte Profil des GEGNER-Decks:
+  // dessen cardValues SIND die matchup-spezifische Stärke-Information.
+  // Live: Top-2 der Galerie nach Gegner-Profil-Wert. Training: uniforme
+  // Exploration + Logging via gameStartPickDecision (validierbar über
+  // record.gameStartPicks × oppHeroKey). Ohne Gegner-Profil: Fallback
+  // auf den Galerie-Default (erste Optionen).
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic' || promptData?.type !== 'cardGalleryMulti') return undefined;
+    const cards = promptData.cards || [];
+    if (!cards.length) return undefined;
+    const maxCount = promptData.selectCount || 2;
+    const pi = typeof promptData.gameStartPi === 'number'
+      ? promptData.gameStartPi : engine._cpuPlayerIdx;
+    const prof_mod = require('./_deck-profile');
+    const { gameStartPickDecision, profileForHeroes } = prof_mod;
+    // Teildeployment-Schutz: ältere _deck-profile.js ohne Kanal → Default.
+    if (typeof gameStartPickDecision !== 'function'
+        || typeof profileForHeroes !== 'function') return undefined;
+    const isCollecting = typeof prof_mod.isCollecting === 'function'
+      ? prof_mod.isCollecting : () => process.env.PP_TRAIN === '1';
+    if (isCollecting()) {
+      const picked = gameStartPickDecision(engine, pi, 'Sid, the King of Thieves',
+        cards, { count: maxCount });
+      if (picked) return { selectedCards: picked.map(o => o.name) };
+      return undefined;
+    }
+    try {
+      const oppHeroes = (engine.gs.players[pi === 0 ? 1 : 0]?.heroes || [])
+        .map(h => h?.name).filter(Boolean);
+      const prof = profileForHeroes(oppHeroes);
+      const cv = prof?.cardValues || null;
+      if (cv) {
+        const seen = new Set();
+        const ranked = [...cards]
+          .sort((a, b) => (cv[b.name] || 0) - (cv[a.name] || 0))
+          .filter(c => !seen.has(c.name) && seen.add(c.name))
+          .slice(0, maxCount);
+        if (ranked.length) {
+          if (!engine._inMctsSim) {
+            (engine._gameStartLog = engine._gameStartLog || []).push({
+              card: 'Sid, the King of Thieves', pi,
+              picks: ranked.map(c => c.name), src: 'oppProfile',
+            });
+          }
+          return { selectedCards: ranked.map(c => c.name) };
+        }
+      }
+    } catch {}
+    return undefined;
+  },
+
   activeIn: ['hero'],
 
   hooks: {
@@ -96,6 +149,7 @@ module.exports = {
       try {
         const result = await engine.promptGeneric(pi, {
           type: 'cardGalleryMulti',
+          gameStartPi: pi,
           cards: galleryCards,
           title: CARD_NAME,
           description: `Look at ${ops.username}'s deck. Choose up to ${maxPicks} Card${maxPicks > 1 ? 's' : ''} with different names to openly add to your Hand.`,

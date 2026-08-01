@@ -64,7 +64,7 @@ function heroHasGigantisaur(engine, pi, heroIdx, selfInstId = null) {
     if ((c.controller ?? c.owner) !== pi) continue;
     if (c.heroIdx !== heroIdx) continue;
     if (selfInstId && c.id === selfInstId) continue;
-    const cd = cardDB[c.name];
+    const cd = c.counters?._cardDataOverride || cardDB[c.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd) continue;
     if (cd.archetype === ARCHETYPE && hasCardType(cd, 'Creature')) return true;
   }

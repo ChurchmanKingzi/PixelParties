@@ -26,6 +26,8 @@
 
 // ─── HELPERS ─────────────────────────────
 
+const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
+
 /**
  * Caster-aware Destruction Magic level on a specific hero. Routes
  * through the engine helper so an active `gs._castSchoolOverride`
@@ -57,21 +59,41 @@ function countDM(gs, playerIdx, heroIdx, engine) {
  * by this player this turn by scanning the action log.
  * Checks both normal spell_played and immediate_action entries.
  * Uses the engine's card DB to verify spell school.
+ *
+ * IN-FLIGHT-SCHUTZ: Bei LIVE-CPU-Plays feuert `maybeFireCpuRevealEarly`
+ * den spell_played-Eintrag VOR der Effekt-Resolution (Ankündigung soll
+ * der Animation vorauslaufen) — der Scan sah dadurch den Fire-Bolts-
+ * Eintrag des EIGENEN, gerade laufenden Plays und meldete "nicht erster
+ * DM-Spell" → 50 statt 200 Recoil trotz inhärentem Play (Als Bug-
+ * Report; Menschen-Plays deferren das Reveal, MCTS-Rollouts überspringen
+ * es — die Rollouts rechneten also mit 200, live passierten 50).
+ * Fix: Einträge, deren Karte noch auf dem Resolving-Spell-Stack liegt
+ * (in-flight, nicht fertig resolved), werden — von den NEUESTEN
+ * Einträgen her attribuiert — übersprungen. Ein FRÜHERER, bereits
+ * resolvedeter Fire Bolts dieser Runde ist dann nicht mehr auf dem
+ * Stack und zählt korrekt weiter als "DM-Spell war schon dran".
  */
 function isFirstDMSpellThisTurn(engine, playerIdx) {
   const currentTurn = engine.gs.turn;
   const playerName = engine.gs.players[playerIdx]?.username;
   const cardDB = engine._getCardDB();
-  for (const entry of engine.actionLog) {
+  const inFlight = inFlightSpellMultiset(engine);
+  // Rückwärts iterieren: die neuesten Log-Einträge gehören zu den
+  // in-flight Casts und werden gegen das Multiset verrechnet.
+  const entries = engine.actionLog;
+  let sawEarlierDM = false;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
     if (entry.turn !== currentTurn) continue;
     if (entry.type !== 'spell_played' && entry.type !== 'immediate_action') continue;
     if (entry.player !== playerName) continue;
     const cd = cardDB[entry.card];
-    if (cd && (cd.spellSchool1 === 'Destruction Magic' || cd.spellSchool2 === 'Destruction Magic')) {
-      return false;
-    }
+    if (!cd || (cd.spellSchool1 !== 'Destruction Magic' && cd.spellSchool2 !== 'Destruction Magic')) continue;
+    if (inFlight[entry.card] > 0) { inFlight[entry.card]--; continue; }
+    sawEarlierDM = true;
+    break;
   }
-  return true;
+  return !sawEarlierDM;
 }
 
 /**

@@ -1,0 +1,302 @@
+{
+  "deck": "Poison Torture",
+  "heroes": [
+    "Fiona, the Princess of Blackport",
+    "Reiza, the Chief Tormentor",
+    "Medea, the Swamp Witch"
+  ],
+  "games": 1292,
+  "trainWinRate": "71.7%",
+  "trainedAt": "2026-07-20T03:49:11.877Z",
+  "meanTurns": 21,
+  "cardValues": {
+    "Sickly Cheese": 14.1,
+    "Leadership": 8,
+    "Tea": 39.6,
+    "Elixir of Quickness": 34.5,
+    "Poison Pollen": 34.9,
+    "Wheels": 28.1,
+    "Toxic Trap": 8,
+    "Adventurousness": 12.2,
+    "Quick Attack": 71.1,
+    "Hammer Throw": 85.9,
+    "Elixir of Immortality": 29.2,
+    "Divine Gift of Sacrifice": 36.6,
+    "Magnetic Glove": 33.6,
+    "Intrude": 8,
+    "Fighting": 8,
+    "Loot the Leftovers": 8,
+    "Poison Vial": 78.2
+  },
+  "timing": {
+    "Sickly Cheese": {
+      "early": 0.75,
+      "mid": 1.16,
+      "late": 1.09
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.11,
+      "late": 1.3
+    },
+    "Tea": {
+      "early": 0.87,
+      "mid": 0.96,
+      "late": 1.17
+    },
+    "Elixir of Quickness": {
+      "early": 0.76,
+      "mid": 1.05,
+      "late": 1.19
+    },
+    "Poison Pollen": {
+      "early": 0.82,
+      "mid": 1.05,
+      "late": 1.13
+    },
+    "Wheels": {
+      "early": 0.75,
+      "mid": 1.02,
+      "late": 1.28
+    },
+    "Toxic Trap": {
+      "early": 1,
+      "mid": 1.19,
+      "late": 0.81
+    },
+    "Adventurousness": {
+      "early": 0.75,
+      "mid": 1.02,
+      "late": 1.3
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 0.97,
+      "late": 1.3
+    },
+    "Hammer Throw": {
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
+    },
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.01,
+      "late": 1.3
+    }
+  },
+  "pairBonuses": {
+    "Loot the Leftovers|Sickly Cheese": 5.5,
+    "Loot the Leftovers|Quick Attack": 4.3,
+    "Fighting|dc:Toxic Trap": 4.3,
+    "Fighting|dc:Resuscitation Potion": 6.6,
+    "Loot the Leftovers|dc:Adventurousness": 5
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Sickly Cheese": -6.3,
+      "Leadership": -7.6,
+      "Tea": -6.1,
+      "Elixir of Quickness": -6,
+      "The Yeeting": -7.1,
+      "Adventurousness": -6.1,
+      "Dark Gear": -8.9,
+      "Poison Vial": -7.7
+    },
+    "spell": {
+      "Invisibility Cloak": 6.2
+    }
+  },
+  "casterDeltas": {
+    "Hammer Throw": {
+      "Reiza, the Chief Tormentor": 7.2,
+      "Medea, the Swamp Witch": -8.6,
+      "Fiona, the Princess of Blackport": -6.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Wheels": -3.1,
+      "Toxic Trap": -10.9,
+      "Elixir of Quickness": 4.9,
+      "Quick Attack": 3.2,
+      "Elixir of Immortality": 5.5,
+      "Loot the Leftovers": -17.8
+    },
+    "ahead": {
+      "Toxic Trap": 7.6,
+      "Elixir of Quickness": -7.6,
+      "Resuscitation Potion": 19.2,
+      "Loot the Leftovers": 20
+    }
+  },
+  "standingEvalThreshold": 841,
+  "targetPriors": {
+    "Tea — Inflict": {
+      "kind:creature": 6.3
+    },
+    "The Yeeting — Choose Target": {
+      "side:own": -20
+    },
+    "Quick Attack": {
+      "kind:creature": -8.6,
+      "side:own": -20
+    },
+    "Hammer Throw": {
+      "kind:creature": -8,
+      "side:own": -20,
+      "hp:min": -7,
+      "frozen": -8
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -6.6,
+      "hp:min": -9.3
+    },
+    "Metal Harpyformer": {
+      "side:own": -14.2,
+      "side:opp": 12.4
+    }
+  },
+  "surpriseRules": {
+    "Toxic Trap": {
+      "early": -6.2,
+      "mid": 7.1,
+      "late": 12.1
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:2": 3.4,
+      "st:poison2+": 20,
+      "st:3+": 20,
+      "st:stun-hero": 17.7,
+      "st:frozen-hero": 8.5
+    }
+  },
+  "tutorPickRules": {
+    "Sickly Cheese→Poison Pollen": 4.4,
+    "Sickly Cheese→Toxic Trap": -3.6,
+    "Sickly Cheese→Intrude": -13.3,
+    "Sickly Cheese→Loot the Leftovers": 3.8,
+    "Magic Lamp→Cataclysm": -18,
+    "Magic Lamp→Alchemy": 12.7,
+    "Magic Lamp→Divine Gift of the Guardian": -4.1,
+    "Magic Lamp→Acid Vial": 13.4,
+    "Magic Lamp→Cloudy Slime": 20,
+    "Magic Lamp→Summoning Magic": 20,
+    "Magic Lamp→Loyal Bone Dog": 3.7,
+    "Magic Lamp→Chain Lightning": -5.6,
+    "Magnetic Glove→Adventurousness": -18.5,
+    "Magnetic Glove→Poison Pollen": -14.7,
+    "Magnetic Glove→Quick Attack": 9.1,
+    "Magnetic Glove→Toxic Trap": -13.3,
+    "Magnetic Glove→Fighting": -5.6,
+    "Magnetic Glove→Dark Gear": -6.4,
+    "Magnetic Glove→Invisibility Cloak": -7.4,
+    "Magnetic Glove→The Yeeting": -14.3,
+    "Magnetic Glove→Divine Gift of Sacrifice": -20,
+    "Magnetic Glove→Hammer Throw": 4.6,
+    "Magnetic Glove→Loot the Leftovers": -16,
+    "Magnetic Glove→Tea": -3.6,
+    "Magnetic Glove→Intrude": -17.2,
+    "Magnetic Glove→Leadership": -20,
+    "Magnetic Glove→Sickly Cheese": -20,
+    "Magnetic Glove→Wheels": -13,
+    "Enigma, the Seller of Secrets→Loot the Leftovers": -20,
+    "Enigma, the Seller of Secrets→Hammer Throw": 8.3,
+    "Enigma, the Seller of Secrets→Fighting": 7.1,
+    "Enigma, the Seller of Secrets→Quick Attack": -16.6,
+    "Enigma, the Seller of Secrets→Sickly Cheese": -11.9,
+    "Enigma, the Seller of Secrets→Toxic Trap": -20,
+    "Enigma, the Seller of Secrets→Tea": 11.5,
+    "Enigma, the Seller of Secrets→Intrude": 9.3,
+    "Enigma, the Seller of Secrets→Adventurousness": -5.9,
+    "Enigma, the Seller of Secrets→Dark Gear": 10.1,
+    "Enigma, the Seller of Secrets→Wheels": 16.1,
+    "Enigma, the Seller of Secrets→Poison Pollen": 20
+  },
+  "abilityPriors": {
+    "Leadership@Fiona, the Princess of Blackport": -60,
+    "Leadership@Fiona, the Princess of Blackport≥3": -60,
+    "Wealth@Fiona, the Princess of Blackport": 150,
+    "Wealth@Fiona, the Princess of Blackport≥2": 150,
+    "Adventurousness@Fiona, the Princess of Blackport": -25.2,
+    "Adventurousness@Fiona, the Princess of Blackport≥2": -60,
+    "Decay Magic@Reiza, the Chief Tormentor": 150,
+    "Fighting@Reiza, the Chief Tormentor": 150,
+    "Leadership@Reiza, the Chief Tormentor": -60,
+    "Alchemy@Medea, the Swamp Witch": 150,
+    "Decay Magic@Medea, the Swamp Witch": 150,
+    "Leadership@Medea, the Swamp Witch": 150,
+    "Adventurousness@Fiona, the Princess of Blackport≥3": 41.4,
+    "Adventurousness@Reiza, the Chief Tormentor": 150,
+    "Fighting@Medea, the Swamp Witch": 49.1,
+    "Fighting@Fiona, the Princess of Blackport": -60,
+    "Adventurousness@Reiza, the Chief Tormentor≥2": -60,
+    "Adventurousness@Reiza, the Chief Tormentor≥3": -60,
+    "Leadership@Medea, the Swamp Witch≥2": -60,
+    "Leadership@Medea, the Swamp Witch≥3": 150,
+    "Adventurousness@Medea, the Swamp Witch": 13,
+    "Leadership@Reiza, the Chief Tormentor≥2": -60,
+    "Leadership@Reiza, the Chief Tormentor≥3": 150,
+    "Adventurousness@Medea, the Swamp Witch≥2": -41.6,
+    "Adventurousness@Medea, the Swamp Witch≥3": 150,
+    "Fighting@Reiza, the Chief Tormentor≥2": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Medea, the Swamp Witch": 30,
+    "Elixir of Immortality→Reiza, the Chief Tormentor": 11,
+    "Resuscitation Potion→Reiza, the Chief Tormentor": 30,
+    "Elixir of Immortality→Fiona, the Princess of Blackport": 30,
+    "Resuscitation Potion→Fiona, the Princess of Blackport": 16.7,
+    "Elixir of Immortality→Medea, the Swamp Witch": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Alchemy": 26.8,
+    "Resuscitation Potion→Decay Magic": 30,
+    "Resuscitation Potion→Leadership": -14.8,
+    "Elixir of Immortality→Decay Magic": 30,
+    "Elixir of Immortality→Fighting": 28.7,
+    "Elixir of Immortality→Leadership": 30,
+    "Elixir of Immortality→Adventurousness": 30,
+    "Resuscitation Potion→Adventurousness": 30,
+    "Elixir of Immortality→Wealth": 30,
+    "Resuscitation Potion→Wealth": 30,
+    "Elixir of Immortality→Alchemy": 30
+  },
+  "startHandValues": {
+    "Hammer Throw": 3.7,
+    "Loot the Leftovers": -1.2,
+    "Tea": 2.2,
+    "Invisibility Cloak": 3.3,
+    "Adventurousness": -1.6,
+    "Fighting": -3.9,
+    "Magnetic Glove": -1.2,
+    "Poison Pollen": -1,
+    "The Yeeting": 3.9
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "22.1%",
+    "winAfterMull": "74.4%",
+    "winAfterKeep": "71%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Adventurousness|Leadership": -8.9,
+    "Decay Magic|Fighting": 15,
+    "Alchemy|Leadership": 8.8,
+    "Intrude|Wealth": 4.1,
+    "Adventurousness|Decay Magic": 4.9,
+    "Alchemy|Fighting": -6,
+    "Fighting|Wealth": 4.9,
+    "Decay Magic|Intrude": -4,
+    "Adventurousness|Fighting": 9.6,
+    "Adventurousness|Alchemy": -9,
+    "Alchemy|Intrude": -7.3
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

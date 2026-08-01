@@ -41,6 +41,22 @@ const INVADER_TOKEN = 'Invader Token';
 const HOPT_MOVE  = 'analyzer-move';
 const HOPT_SPAWN = 'analyzer-spawn';
 
+/**
+ * Meldet die eigenen Einmal-pro-Zug-Sperren dieser Karte, damit
+ * Wiederholungs-Effekte (Field Standard) sie mitlösen können.
+ *
+ * Beide Schlüssel sind INSTANZGENAU (`<key>:<instId>`) — das Lösen wirkt
+ * also nur auf genau diese Karte. Genau darin liegt der Unterschied zu
+ * harten, SPIELERWEITEN Sperren wie der von Greatmaw Shark: die dürfen
+ * nicht gelöst werden, weil das alle Kopien freischalten würde.
+ *
+ * Als Ruling (1.8.): der Analyzer darf beide Teil-Effekte zurückbekommen.
+ */
+function creatureEffectHoptKeys(engine, inst) {
+  const id = inst?.id;
+  return id == null ? [] : [`${HOPT_MOVE}:${id}`, `${HOPT_SPAWN}:${id}`];
+}
+
 function hoptUsed(gs, key, instId) {
   return gs.hoptUsed?.[`${key}:${instId}`] === gs.turn;
 }
@@ -212,6 +228,7 @@ async function runSpawn(engine, inst, ctx) {
 }
 
 module.exports = {
+  creatureEffectHoptKeys,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

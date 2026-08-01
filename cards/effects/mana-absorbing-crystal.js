@@ -31,6 +31,10 @@ const CARD_NAME = 'Mana Absorbing Crystal';
 const SELF_DAMAGE = 200;
 
 module.exports = {
+  // CPU: alwaysCommit — Dauer-Aura: Nutzen liegt in GEGNER-Zügen, für das Immediate-Gate unsichtbar (Equipment-Bugklasse).
+  // planArtifactPlay filtert Bezahlbarkeit bereits; entspricht der
+  // dokumentierten Artifact-Politik "played as soon as affordable".
+  cpuMeta: { alwaysCommit: true },
   isTargetingArtifact: true,
   revealOnEnterHand: true,
 

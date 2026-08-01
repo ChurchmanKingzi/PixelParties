@@ -133,6 +133,24 @@ async function doJumpCascade(engine, pi) {
     // ── Remove one copy from hand (committed) ──
     const removeIdx = ps.hand.indexOf('Jump in the River');
     if (removeIdx < 0) break;
+    // Einsatz-Beleg + Hand→Discard-Flug. Gleiche Lücke wie bei Cosmic
+    // Malfunction (v81), Demon's Gate (v86), Quetzahuitl (v87) und
+    // Divine Gift of Time (v90): die Karte spielt sich in ihrem eigenen
+    // Reaktions-Hook aus der Hand (direktes splice + späterer
+    // discardPile.push), berührt also weder afterSpellResolved noch
+    // einen asPlay-Transfer — `jump_in_river`/`jump_negated` stehen
+    // zudem nicht in ACT_EVENTS. Beleg, dass sie real feuert: der
+    // Ziel-Lernkanal zeigt 228 Zielwahlen in 1360 Spielen, während der
+    // Report 0 Einsätze auswies.
+    // Hier VOR dem Splice, damit `fromHandIdx` noch stimmt. Bewusst
+    // auch dann, wenn die Kette die Karte später negiert: sie ist
+    // verbraucht und wandert so oder so in den Discard — negiert
+    // eingesetzt bleibt eingesetzt.
+    engine._broadcastEvent('play_pile_transfer', {
+      owner: pi, cardName: 'Jump in the River',
+      from: 'hand', to: 'discard',
+      fromHandIdx: removeIdx, asPlay: 'sole',
+    });
     ps.hand.splice(removeIdx, 1);
 
     // Untrack the consumed card instance
@@ -201,7 +219,10 @@ module.exports = {
   // reaction-evade a no-op for the CPU. Avoiding damage is beneficial.
   // (Title must equal the card name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   requiresTarget: true,

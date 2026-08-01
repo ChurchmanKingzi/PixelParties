@@ -33,6 +33,18 @@ const CARD_NAME = 'Swellpnir, Mount of Coolness';
 const ALLOWED = ['attack'];
 
 module.exports = {
+  // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
+  // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
+  // Engine-Decline durch. Politik: Coolness-Equip auf den ersten legalen eigenen Helden
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const vt = payload?.validTargets || [];
+    if (vt.length === 0) return undefined;
+    const pick = vt[0];
+    return [typeof pick === 'object' ? pick.id : pick];
+  },
+
+
   isEquip: true,
   playableFromCoolnessStack: true,
   // Hand-grey: Stack-only equip. Plays from hand do nothing.

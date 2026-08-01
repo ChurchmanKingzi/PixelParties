@@ -189,6 +189,13 @@ module.exports = {
       ps.deletedPile.push(spellName);
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: spellName, from: 'discard', to: 'deleted',
+        // Gleiche Lücke wie bei Demon's Gate (Als Verdachtsfall): der
+        // Cast läuft über einen direkten `hooks.onPlay`-Aufruf, also
+        // feuert `afterSpellResolved` nicht und der Recorder sähe den
+        // Einsatz nie. Hier zählt er als eigener Einsatz des Spells —
+        // die Karte wird ja tatsächlich erneut gewirkt, diesmal aus
+        // dem Discard.
+        asPlay: 'sole',
       });
       engine.log('skeleton_priest_delete', { player: ps.username, spell: spellName });
     }

@@ -1,0 +1,493 @@
+{
+  "deck": "Venom Swamp",
+  "heroes": [
+    "Medea, the Swamp Witch",
+    "Zsos'Ssar, the Serpent Warlord",
+    "Fiona, the Princess of Blackport"
+  ],
+  "games": 1292,
+  "trainWinRate": "70%",
+  "trainedAt": "2026-07-22T01:17:19.864Z",
+  "meanTurns": 12.7,
+  "cardValues": {
+    "Alchemic Journal": 8,
+    "Decay Magic": 8,
+    "Wheels": 20.6,
+    "Magic Lamp": 33,
+    "Rap Harpyformer": 8,
+    "Pet Snake": 8,
+    "Divine Punishment": 8,
+    "Poison Vial": 53.3,
+    "The Warlord's Bite": 57.9,
+    "Tea": 78.9,
+    "Poisoned Well": 100,
+    "Acid Vial": 69.5,
+    "Magnetic Potion": 43,
+    "Sickly Cheese": 8,
+    "Magnetic Glove": 15.3,
+    "Coffee": 13.2,
+    "The Master's Plan": 8,
+    "Elixir of Quickness": 33.1,
+    "Venom Infusion": 10.1,
+    "Poison Pollen": 25.1,
+    "Rusty Touch": 18.4
+  },
+  "timing": {
+    "Alchemic Journal": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Decay Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Wheels": {
+      "early": 0.75,
+      "mid": 1.26,
+      "late": 1
+    },
+    "Magic Lamp": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Rap Harpyformer": {
+      "early": 0.75,
+      "mid": 1.25,
+      "late": 1.29
+    },
+    "Pet Snake": {
+      "early": 0.75,
+      "mid": 1.25,
+      "late": 1
+    },
+    "Divine Punishment": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Poison Vial": {
+      "early": 0.75,
+      "mid": 1.25,
+      "late": 1
+    },
+    "The Warlord's Bite": {
+      "early": 0.88,
+      "mid": 0.87,
+      "late": 1.24
+    },
+    "Tea": {
+      "early": 0.82,
+      "mid": 1.18,
+      "late": 1
+    },
+    "Poisoned Well": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.92
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Sickly Cheese": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "The Master's Plan": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.76,
+      "mid": 1.24,
+      "late": 1
+    },
+    "Venom Infusion": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Rusty Touch": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Decay Magic|dc:Resuscitation Potion": 4.2,
+    "Poison Vial|dc:Divine Gift of Sacrifice": 4.8,
+    "Poison Vial|dc:Golden Ankh": 5.3,
+    "Silence|dc:Coffee": 4.1,
+    "Silence|dc:Rusty Touch": 4.4,
+    "Silence|dc:Venom Infusion": 4,
+    "Silence|dc:Divine Gift of Sacrifice": 8.8,
+    "Silence|dc:Golden Ankh": 5.8,
+    "Silence|dc:Poison Vial": 11.7,
+    "Shamanic Curse|dc:Decay Magic": 4.1,
+    "Shamanic Curse|dc:Divine Gift of Sacrifice": 4.1,
+    "Shamanic Curse|dc:Toxic Fumes": 4.4,
+    "Shamanic Curse|dc:Poison Vial": 7.7
+  },
+  "cardValueDeltasByCluster": {
+    "swarm": {
+      "Silence": 6.7,
+      "Rusty Touch": 6.1,
+      "Shamanic Curse": 6.5
+    },
+    "spell": {
+      "Shamanic Curse": -8.2,
+      "Golden Ankh": -7.6
+    }
+  },
+  "casterDeltas": {
+    "The Warlord's Bite": {
+      "Zsos'Ssar, the Serpent Warlord": -12.2,
+      "Medea, the Swamp Witch": 10.8,
+      "Fiona, the Princess of Blackport": 11
+    },
+    "Poisoned Well": {
+      "Zsos'Ssar, the Serpent Warlord": -5.2,
+      "Medea, the Swamp Witch": 5.1
+    },
+    "Stinky Stables": {
+      "Zsos'Ssar, the Serpent Warlord": -8.4
+    },
+    "The Master's Plan": {
+      "Zsos'Ssar, the Serpent Warlord": -20,
+      "Medea, the Swamp Witch": 20
+    },
+    "Venom Infusion": {
+      "Medea, the Swamp Witch": 10.1,
+      "Zsos'Ssar, the Serpent Warlord": -11.7
+    },
+    "Shamanic Curse": {
+      "Medea, the Swamp Witch": 20,
+      "Zsos'Ssar, the Serpent Warlord": -20
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Tea": 8.1,
+      "Poison Pollen": -9.2,
+      "Stinky Stables": -20,
+      "Resuscitation Potion": 16.4,
+      "Venom Infusion": -8,
+      "Golden Ankh": 10.3
+    },
+    "ahead": {
+      "Poisoned Well": 3.6,
+      "Venom Infusion": -5.1
+    }
+  },
+  "standingEvalThreshold": 706,
+  "menuOfferRules": {
+    "Magic Lamp→Decay Magic": -9.3,
+    "Magic Lamp→Divine Gift of Sacrifice": -5,
+    "Magic Lamp→Divine Punishment": -5.8,
+    "Magic Lamp→Coffee": -8.2,
+    "Magic Lamp→Poisoned Well": 2.5,
+    "Magic Lamp→Silence": 6.7,
+    "Magic Lamp→Rap Harpyformer": 10,
+    "Magic Lamp→Golden Ankh": 8.1,
+    "Magic Lamp→The Warlord's Bite": 5.7,
+    "Magic Lamp→Rusty Touch": 13.2,
+    "Magic Lamp→Venom Infusion": -3.3,
+    "Magic Lamp→The Master's Plan": 9.7,
+    "Magic Lamp→Shamanic Curse": 4.4,
+    "Magic Lamp→Stinky Stables": 5.2,
+    "Magic Lamp→Sickly Cheese": 3.1
+  },
+  "menuOfferRulesByCluster": {
+    "spell": {
+      "Magic Lamp→Decay Magic": -6.6,
+      "Magic Lamp→Divine Gift of Sacrifice": 5.8,
+      "Magic Lamp→Poison Pollen": -14.6,
+      "Magic Lamp→Tea": 6.4,
+      "Magic Lamp→The Master's Plan": -9.4,
+      "Magic Lamp→Stinky Stables": 12.1
+    },
+    "mixed": {
+      "Magic Lamp→Decay Magic": 6.8,
+      "Magic Lamp→Divine Gift of Sacrifice": 8.8,
+      "Magic Lamp→Divine Punishment": 3.6,
+      "Magic Lamp→Coffee": 4.4,
+      "Magic Lamp→Pet Snake": 3.3,
+      "Magic Lamp→Poison Pollen": 3.8,
+      "Magic Lamp→Poisoned Well": 11.8,
+      "Magic Lamp→Rap Harpyformer": -7.8,
+      "Magic Lamp→The Warlord's Bite": 9.5,
+      "Magic Lamp→Venom Infusion": 15,
+      "Magic Lamp→Tea": 7.4,
+      "Magic Lamp→Shamanic Curse": -3.5,
+      "Magic Lamp→Stinky Stables": 7
+    },
+    "aggro": {
+      "Magic Lamp→Decay Magic": -11.8,
+      "Magic Lamp→Divine Gift of Sacrifice": -15,
+      "Magic Lamp→Divine Punishment": -10,
+      "Magic Lamp→Coffee": -14.4,
+      "Magic Lamp→Pet Snake": -9.4,
+      "Magic Lamp→Poison Pollen": -12.3,
+      "Magic Lamp→Poisoned Well": -15,
+      "Magic Lamp→Silence": -15,
+      "Magic Lamp→Golden Ankh": -12.3,
+      "Magic Lamp→The Warlord's Bite": -15,
+      "Magic Lamp→Rusty Touch": -4.8,
+      "Magic Lamp→Venom Infusion": -14.4,
+      "Magic Lamp→Tea": -15,
+      "Magic Lamp→Stinky Stables": -15
+    },
+    "swarm": {
+      "Magic Lamp→Decay Magic": 9.5,
+      "Magic Lamp→Divine Gift of Sacrifice": 8.6,
+      "Magic Lamp→Divine Punishment": 6.5,
+      "Magic Lamp→Coffee": 13.9,
+      "Magic Lamp→Pet Snake": 7.1,
+      "Magic Lamp→Poison Pollen": 10.9,
+      "Magic Lamp→Poisoned Well": 11.2,
+      "Magic Lamp→Silence": 15,
+      "Magic Lamp→Rap Harpyformer": 5.4,
+      "Magic Lamp→Golden Ankh": 6.8,
+      "Magic Lamp→The Warlord's Bite": 10.5,
+      "Magic Lamp→Rusty Touch": 3.3,
+      "Magic Lamp→Venom Infusion": 4.7,
+      "Magic Lamp→Tea": 14.1,
+      "Magic Lamp→Stinky Stables": 9.1
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Decay Magic": -15,
+      "Magic Lamp→Divine Gift of Sacrifice": -11.4,
+      "Magic Lamp→Divine Punishment": -15,
+      "Magic Lamp→Coffee": -15,
+      "Magic Lamp→Pet Snake": -8.1,
+      "Magic Lamp→Poison Pollen": -13.8,
+      "Magic Lamp→Poisoned Well": -11.7,
+      "Magic Lamp→Silence": -15,
+      "Magic Lamp→Golden Ankh": -15,
+      "Magic Lamp→The Warlord's Bite": -9.7,
+      "Magic Lamp→Rusty Touch": -15,
+      "Magic Lamp→Venom Infusion": -10.3,
+      "Magic Lamp→Tea": -8.8,
+      "Magic Lamp→The Master's Plan": -15,
+      "Magic Lamp→Stinky Stables": -4.2
+    },
+    "ahead": {
+      "Magic Lamp→Decay Magic": 15,
+      "Magic Lamp→Divine Gift of Sacrifice": 15,
+      "Magic Lamp→Divine Punishment": 15,
+      "Magic Lamp→Coffee": 15,
+      "Magic Lamp→Pet Snake": 15,
+      "Magic Lamp→Poison Pollen": 6.5,
+      "Magic Lamp→Poisoned Well": 15,
+      "Magic Lamp→Silence": 15,
+      "Magic Lamp→Rap Harpyformer": 14.4,
+      "Magic Lamp→Golden Ankh": 15,
+      "Magic Lamp→The Warlord's Bite": 15,
+      "Magic Lamp→Rusty Touch": 15,
+      "Magic Lamp→Venom Infusion": 4.7,
+      "Magic Lamp→Tea": 15,
+      "Magic Lamp→The Master's Plan": 15,
+      "Magic Lamp→Shamanic Curse": 14.6,
+      "Magic Lamp→Stinky Stables": 15
+    }
+  },
+  "targetPriors": {
+    "Zsos'Ssar — Serpent's Cost": {
+      "frozen": -10.6,
+      "healrev": -7.7
+    },
+    "Venom Infusion": {
+      "kind:creature": -6.8
+    },
+    "Rap Harpyformer": {
+      "side:own": -9.2,
+      "kind:creature": -10.4
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 3.7,
+      "st:poison2+": 9.8,
+      "st:hero-caster": 5.7,
+      "st:2": 17.2,
+      "st:3+": 6.7,
+      "st:stun-hero": 20
+    },
+    "Coffee": {
+      "st:poison2+": -5.3,
+      "st:hero-caster": -4.6,
+      "st:2": -7,
+      "st:3+": -8.5,
+      "st:stun-hero": -7.7,
+      "st:frozen-hero": -14.5
+    }
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Decay Magic": -8.7,
+    "Magic Lamp→Divine Gift of Sacrifice": -2.8,
+    "Magic Lamp→Divine Punishment": -4.4,
+    "Magic Lamp→Coffee": -7.7,
+    "Magic Lamp→Poison Pollen": 3.2,
+    "Magic Lamp→Silence": 7.2,
+    "Magic Lamp→Acid Vial": -2.8,
+    "Magic Lamp→Rap Harpyformer": 9.6,
+    "Magic Lamp→Golden Ankh": 3.3,
+    "Magic Lamp→The Warlord's Bite": 3.3,
+    "Magic Lamp→Rusty Touch": 12.1,
+    "Magic Lamp→Alchemy": 20,
+    "Magic Lamp→Venom Infusion": -2.9,
+    "Magic Lamp→Toxic Fumes": -10.9,
+    "Magic Lamp→The Master's Plan": 12.5,
+    "Magic Lamp→Shamanic Curse": 3.1,
+    "Magic Lamp→Stinky Stables": 4,
+    "Magic Lamp→Sickly Cheese": 3.1,
+    "Alchemic Journal — Choose a Potion→Elixir of Quickness": -20,
+    "Alchemic Journal — Choose a Potion→Magnetic Potion": -10,
+    "Alchemic Journal — Choose a Potion→Magic Lamp": -3.5,
+    "Sickly Cheese→The Warlord's Bite": 2.1,
+    "Sickly Cheese→Stinky Stables": -8.3,
+    "Sickly Cheese→Poisoned Well": 5.3,
+    "Sickly Cheese→Shamanic Curse": -8.3,
+    "Sickly Cheese→The Master's Plan": -12.7,
+    "Sickly Cheese→Poison Pollen": 8.5,
+    "Sickly Cheese→Venom Infusion": -5.9,
+    "Sickly Cheese→Silence": -14.2,
+    "Sickly Cheese→Divine Gift of Sacrifice": -7,
+    "Sickly Cheese→Divine Punishment": -5,
+    "Sickly Cheese→Toxic Fumes": 2.7,
+    "Chain a Reaction?→Rusty Touch": 4.1,
+    "Chain a Reaction?→Shamanic Curse": -4.6,
+    "Chain a Reaction?→The Master's Plan": 11.2,
+    "Chain a Reaction?→Silence": -9.3,
+    "Magnetic Potion→Venom Infusion": -12.3,
+    "Magnetic Potion→Rap Harpyformer": 2.5,
+    "Magnetic Potion→Decay Magic": -16.2,
+    "Magnetic Potion→The Master's Plan": -14.5,
+    "Magnetic Potion→Tea": 3.5,
+    "Magnetic Potion→Stinky Stables": 9.3,
+    "Magnetic Potion→The Warlord's Bite": 9.5,
+    "Magnetic Potion→Divine Gift of Sacrifice": -13,
+    "Magnetic Potion→Toxic Fumes": -17,
+    "Magnetic Potion→Silence": -5.6,
+    "Magnetic Potion→Pet Snake": 2,
+    "Magnetic Potion→Shamanic Curse": -17.3,
+    "Magnetic Potion→Poison Pollen": -3.6,
+    "Magnetic Potion→Coffee": -12.8,
+    "Magnetic Potion→Wheels": 3.2,
+    "Magnetic Glove→Poisoned Well": 4.1,
+    "Magnetic Glove→The Master's Plan": -20,
+    "Magnetic Glove→The Warlord's Bite": 5.1,
+    "Magnetic Glove→Divine Punishment": 9,
+    "Magnetic Glove→Silence": -20,
+    "Magnetic Glove→Stinky Stables": 5.5,
+    "Magnetic Glove→Decay Magic": -6.9,
+    "Magnetic Glove→Pet Snake": 9.6,
+    "Magnetic Glove→Rap Harpyformer": -20,
+    "Magnetic Glove→Venom Infusion": 8.7,
+    "Magnetic Glove→Shamanic Curse": -3.4,
+    "Magnetic Glove→Rusty Touch": 6.9,
+    "Magnetic Glove→Divine Gift of Sacrifice": -4,
+    "Magnetic Glove→Golden Ankh": 5.2,
+    "Enigma, the Seller of Secrets→Rusty Touch": 10.7,
+    "Enigma, the Seller of Secrets→Pet Snake": 20,
+    "Enigma, the Seller of Secrets→Rap Harpyformer": -9.8,
+    "Enigma, the Seller of Secrets→Wheels": -8.1,
+    "Enigma, the Seller of Secrets→Divine Punishment": 17.3,
+    "Enigma, the Seller of Secrets→Sickly Cheese": -13.5,
+    "Enigma, the Seller of Secrets→The Master's Plan": 11.6,
+    "Enigma, the Seller of Secrets→Venom Infusion": -6.5,
+    "Enigma, the Seller of Secrets→Coffee": -7.8,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 6,
+    "Enigma, the Seller of Secrets→Stinky Stables": 14.5,
+    "Enigma, the Seller of Secrets→Shamanic Curse": 20,
+    "Enigma, the Seller of Secrets→The Warlord's Bite": 11.1,
+    "Enigma, the Seller of Secrets→Poison Pollen": -9,
+    "Magic Amethyst→Wealth": 5.9
+  },
+  "abilityPriors": {
+    "Alchemy@Medea, the Swamp Witch": 150,
+    "Decay Magic@Medea, the Swamp Witch": 150,
+    "Decay Magic@Zsos'Ssar, the Serpent Warlord": 150,
+    "Decay Magic@Zsos'Ssar, the Serpent Warlord≥2": 150,
+    "Decay Magic@Zsos'Ssar, the Serpent Warlord≥3": 150,
+    "Decay Magic@Fiona, the Princess of Blackport": -60,
+    "Wealth@Fiona, the Princess of Blackport": 150,
+    "Wealth@Fiona, the Princess of Blackport≥2": 150,
+    "Decay Magic@Medea, the Swamp Witch≥3": 77.6,
+    "Decay Magic@Fiona, the Princess of Blackport≥2": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Resuscitation Potion→Zsos'Ssar, the Serpent Warlord": 29,
+    "Resuscitation Potion→Fiona, the Princess of Blackport": 30,
+    "Resuscitation Potion→Medea, the Swamp Witch": 30,
+    "Golden Ankh→Zsos'Ssar, the Serpent Warlord": 30,
+    "Golden Ankh→Medea, the Swamp Witch": 30,
+    "Golden Ankh→Fiona, the Princess of Blackport": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Decay Magic": 30,
+    "Resuscitation Potion→Wealth": 30,
+    "Resuscitation Potion→Alchemy": 30,
+    "Golden Ankh→Decay Magic": 30,
+    "Golden Ankh→Alchemy": 30,
+    "Golden Ankh→Wealth": 30
+  },
+  "startHandValues": {
+    "Tea": 1.1,
+    "Decay Magic": 1,
+    "Alchemic Journal": 2.6,
+    "The Warlord's Bite": 1.9,
+    "Venom Infusion": 1.2,
+    "Poison Pollen": -3.4,
+    "Shamanic Curse": -4.2,
+    "Toxic Fumes": -2.5,
+    "Pet Snake": 3.1,
+    "Rap Harpyformer": -4.2,
+    "Rusty Touch": -2,
+    "The Master's Plan": 2.5,
+    "Coffee": 1.3,
+    "Divine Punishment": -3,
+    "Stinky Stables": -3.6,
+    "Poisoned Well": 1.6
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "44.3%",
+    "winAfterMull": "70.1%",
+    "winAfterKeep": "69.9%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {},
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.812,
+      "n": 154,
+      "values": {
+        "Deepsea Primordium": 0.188,
+        "Elven Archer": -0.062,
+        "Ska Harpyformer": -0.145
+      }
+    }
+  }
+}

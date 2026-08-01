@@ -50,6 +50,7 @@ function getValidTargets(gs, engine) {
 }
 
 module.exports = {
+  cpuMeta: { statusHealChannel: true }, // Status-Heilungs-Lernkanal (siehe _deck-profile.js)
   isReaction: true,
   isTargetingArtifact: true,
   proactivePlay: true,
@@ -112,6 +113,40 @@ module.exports = {
   validateSelection: (selectedIds) => selectedIds && selectedIds.length === 1,
 
   animationType: 'juice_bubbles',
+
+  // ── CPU-Zielwahl (1.8., Als Report) ──────────────────────────────
+  // Der Kartentext erlaubt ausdrücklich JEDES Ziel auf dem Feld, also
+  // liefert `getValidTargets` beide Seiten. Ohne eigene Antwort greift
+  // die generische CPU-Regel "nimm das erste Ziel" — und die traf im
+  // Mitschnitt Als Cool Rescuer Monia: die CPU heilte den GEGNERISCHEN
+  // Helden von Burn.
+  //
+  // Die Karte hatte diese Falle für den PROAKTIVEN Fall schon erkannt
+  // (`canActivate` verlangt ein eigenes cleansables Ziel, siehe Kommentar
+  // oben), nur die Zielwahl selbst blieb ungeschützt.
+  //
+  // Regel: ausschließlich eigene Ziele; darunter zuerst Helden (die
+  // sterben, Kreaturen kommen nach), und unter denen der mit den MEISTEN
+  // negativen Effekten. Findet sich kein eigenes Ziel, gibt die Karte
+  // keine Antwort und die Engine entscheidet wie bisher.
+  cpuResponse(engine, kind, payload) {
+    if (kind !== 'effectTarget') return undefined;
+    const pi = engine._cpuPlayerIdx;
+    if (!(pi >= 0)) return undefined;
+    const vt = (payload?.validTargets || []).filter(t => t && t.owner === pi);
+    if (vt.length === 0) return undefined;
+    const anzahl = (t) => {
+      try {
+        if (t.type === 'hero') {
+          const h = engine.gs.players[t.owner]?.heroes?.[t.heroIdx];
+          return getCleansableStatuses().filter(k => h?.statuses?.[k]).length;
+        }
+        return engine.getCleansableCreatureStatusKeys(t.cardInstance).length;
+      } catch { return 0; }
+    };
+    vt.sort((a, b) => (b.type === 'hero') - (a.type === 'hero') || anzahl(b) - anzahl(a));
+    return [vt[0].id];
+  },
 
   resolve: async (engine, pi, selectedIds, validTargets) => {
     // Determine flow: proactive (selectedIds provided) vs reaction (no selectedIds)

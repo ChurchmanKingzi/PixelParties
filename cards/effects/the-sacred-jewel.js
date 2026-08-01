@@ -38,6 +38,8 @@ module.exports = {
   // draw effect would fizzle with nothing happening, so the server's
   // use_artifact_effect handler refuses activation in that state.
   blockedByHandLock: true,
+  // Auch unter dem eigenen Nach-Cast-Lock grauen (Draw würde fizzlen).
+  blockedByDrawLock: true,
 
   async resolve(engine, pi) {
     const gs = engine.gs;
@@ -60,11 +62,14 @@ module.exports = {
     // to apply.
     await engine.actionDrawCards(pi, 1, { source: CARD_NAME });
     await engine.actionDrawCards(oi, 1, { source: CARD_NAME });
-    ps.handLocked = true;
+    // Als Ruling: das Jewel sperrt NUR Draws, NICHT Searches — deshalb
+    // eigener drawLocked-Status statt des vollen handLocked (der auch
+    // searchDeckForNamedCard/actionAddCardFromDeckToHand blockiert).
+    ps.drawLocked = true;
 
     engine.log('sacred_jewel_draw', {
       player: gs.players[pi]?.username,
-      note: 'both drew 1, caster hand locked for rest of turn',
+      note: 'both drew 1, caster draw-locked for rest of turn',
     });
     engine.sync();
   },

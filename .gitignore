@@ -8,3 +8,33 @@ uploads/cardbacks/*
 !cards/.gitkeep
 .env
 electron/desktop-secrets.json
+
+# ML-Trainingsdaten (groß, wachsend, maschinenspezifisch, reproduzierbar)
+# Beide Ordner legt der Code zur Laufzeit selbst an (mkdirSync recursive),
+# ein .gitkeep ist also nicht nötig. Zur Laufzeit BRAUCHT das Spiel nichts
+# daraus — die gelernten Profile liegen getrennt in data/cpu-profiles/ und
+# bleiben ausdrücklich versioniert.
+data/training/
+data/coverage/
+data/pc/
+
+# Spielaufzeichnungen (seit 1.8. standardmäßig aktiv, wachsen im
+# Live-Betrieb mit jeder Partie). Dauerhaft liegen sie ohnehin in der
+# Datenbank (Tabelle demo_games), die Dateien sind nur der laufende
+# Mitschnitt für die Einfrier-Forensik.
+data/demo-games/
+
+# Absturz-Forensik der Trainingsläufe. Liegt normalerweise neben der
+# jsonl in data/training/ (schon erfasst) — die Regeln greifen auch,
+# wenn PP_TRAIN_OUT woanders hinzeigt.
+*.crash.json
+*.inflight.json
+
+# V8-Heap-Snapshots aus PP_TRAIN_HEAPSNAP=1 — landen im Wurzelverzeichnis
+# und sind je nach Heap-Limit hunderte MB groß.
+*.heapsnapshot
+
+# SQLite-Nebendateien (die DB selbst ist schon ignoriert)
+data/pixel-parties.db-journal
+data/pixel-parties.db-wal
+data/pixel-parties.db-shm

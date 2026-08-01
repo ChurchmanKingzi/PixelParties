@@ -28,6 +28,14 @@ const CARD_NAME = 'Orthos, the Loyal Guard Dog';
 module.exports = {
   activeIn: ['hero'],
 
+  // ── CPU: Confirm-Prompts pauschal bejahen (Barker-Bugklasse) ──────
+  // onCardEnterZone-Confirm, Gratis-Summon-Kaskade.
+  cpuResponse(engine, kind, promptData) {
+    if (kind !== 'generic') return undefined;
+    if (promptData?.type === 'confirm') return { confirmed: true };
+    return undefined;
+  },
+
   hooks: {
     onCardEnterZone: async (ctx) => {
       const entering = ctx.enteringCard;

@@ -53,7 +53,7 @@ function _controlsNoCreatures(engine, pi) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (cd && hasCardType(cd, 'Creature')) return false;
   }
   return true;

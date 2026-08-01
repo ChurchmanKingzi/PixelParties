@@ -47,6 +47,33 @@ const ARMED_KEY  = 'flashbangArmedTurn';
 
 module.exports = {
   isPotion: true,
+
+  // ── CPU-Gate-Bypass ──────────────────────────────────────────────
+  // Als Trainings-Befund (Gather that Storm, 1360 Spiele): Flashbang lag
+  // in 895 Spielen nachweislich auf der Hand — häufiger als Elixir of
+  // Quickness und Magnetic Potion, die 2352× bzw. 2324× gespielt
+  // wurden — und wurde NULL Mal eingesetzt. Ursache: `playPotions`
+  // schickt jede Potion durch `mctsGatedActivation`, und dessen
+  // Bewertung schaut auf die Stellung UNMITTELBAR nach dem Einsatz.
+  // Flashbangs kompletter Wert liegt aber im GEGNERZUG danach — direkt
+  // nach dem Wurf sieht die Bewertung nur eine Karte weniger auf der
+  // Hand und sonst nichts, also gewinnt der Skip-Zweig jedes Mal.
+  // `evaluateThroughTurnEnd` würde nicht reichen: es verlängert die
+  // Bewertung nur bis zum ENDE DES EIGENEN Zuges, der Effekt zündet
+  // aber erst danach. Genau dafür gibt es `alwaysCommit` (dokumentiert
+  // in playPotions: "Future-trigger-Potions, deren Auszahlung die
+  // Sofortbewertung nicht sieht").
+  //
+  // Als Funktion statt hartem `true`, damit die CPU den Wurf nicht
+  // verschwendet: liegt beim Gegner schon ein Flashbang in der Luft,
+  // brächte ein zweiter nichts (dieselbe eine Aktion würde gekappt) —
+  // dann greift wieder die normale Bewertung, die ihn liegen lässt.
+  cpuMeta: {
+    alwaysCommit: (engine, pi) => {
+      const oppIdx = pi === 0 ? 1 : 0;
+      return !engine?.gs?.players?.[oppIdx]?._flashbangedDebuff;
+    },
+  },
   // Hooks must keep firing while sitting in the deleted pile.
   activeIn: ['deleted'],
 

@@ -1119,27 +1119,41 @@ Reference: `_isGateShielded` / `_triggerGateCheck` in `_engine.js`;
 > the wrong slot.
 
 Any card/effect that lets a player **pick a specific board card and
-move it off the board** (destroy → discard/deleted, bounce → deck,
-steal → hand, etc.) **must broadcast an explicit zone-anchored
-`play_pile_transfer` for that exact instance BEFORE the move** (so the
-source slot is still rendered). `actionMoveCard` only auto-emits this
-for support→hand and area→discard — a generic fix there is unsafe
-because cards that own a custom corpse flight (Brackle's catapult)
-would double-animate.
+move it off the board** needs a zone-anchored `play_pile_transfer` for
+that exact instance. **In den meisten Fällen musst du dafür NICHTS tun:**
+
+> **`actionDestroyCard` sendet den verankerten Flug selbst** — und zwar
+> ERST NACH allen Abbruchpfaden (Immunität, Cardinal Beast, First-Turn-
+> Schutz, Gate Shield, Monias `beforeCreatureAffected`). Wird die
+> Zerstörung abgewehrt, fliegt also korrekt nichts.
+
+**Sende hier KEINEN eigenen `play_pile_transfer`.** Ein zusätzlicher
+Broadcast erzeugt einen Doppelflug; steht er wie früher VOR dem Aufruf,
+animiert er die Karte sogar dann weg, wenn die Zerstörung anschließend
+abgewehrt wird (im Feld beobachtet: The Yeeting → Monias Rettung).
 
 ```js
-// BEFORE engine.actionDestroyCard(...) / the manual splice.
-const tz = targetInst.zone; // 'support' | 'ability' | 'surprise'
-if (tz === 'support' || tz === 'ability' || tz === 'surprise') {
-  engine._broadcastEvent('play_pile_transfer', {
-    owner: targetInst.owner,          // or fromOwner/toOwner for cross-side
-    cardName: targetInst.name,
-    from: tz, to: 'discard',          // 'deleted' | 'deck' | 'hand'
-    fromHeroIdx: targetInst.heroIdx,
-    fromSlotIdx: targetInst.zoneSlot, // omit for surprise; use fromPermId for permanents
-  });
-}
+// RICHTIG — die Engine erledigt den Flug:
 await engine.actionDestroyCard(source, targetInst);
+
+// Nur wenn die Karte eine EIGENE Leichen-Animation besitzt
+// (Brackle's Katapult, Berserk):
+await engine.actionDestroyCard(source, targetInst, { skipPileTransfer: true });
+```
+
+**Selbst senden musst du nur, wenn du die Karte MANUELL bewegst**, also
+ohne `actionDestroyCard` — etwa per `splice` + `discardPile.push`
+(Silent Water Mizune, Weird Doll). Dann gilt: Anker vorher merken,
+Broadcast NACH der tatsächlichen Bewegung senden.
+
+```js
+engine._broadcastEvent('play_pile_transfer', {
+  owner: inst.owner,                // oder fromOwner/toOwner cross-side
+  cardName: inst.name,
+  from: 'surprise', to: 'discard',  // 'support' | 'ability' | …
+  fromHeroIdx: inst.heroIdx,
+  fromSlotIdx: inst.zoneSlot,       // bei surprise weglassen
+});
 ```
 
 Scope / exclusions:
@@ -1156,8 +1170,10 @@ zone-anchored flight plays. `to: 'hand'` / `to: 'deck'` have their own
 handled paths.
 
 Reference implementations:
-- **Ralzish**, **The Yeeting** — destroy→discard; emit the broadcast
-  above before `actionDestroyCard` (scoped to support/ability/surprise).
+- **Ralzish**, **The Yeeting**, **_spider-shared** — destroy→discard;
+  sie sendeten den Broadcast früher SELBST und erzeugten damit einen
+  Doppelflug. Seit 1.8. verlassen sie sich auf `actionDestroyCard`.
+  NICHT als Vorlage für eigene Broadcasts nehmen.
 - **Sparkfly Worker** (`_sparkfly-shared.stealBoardCardToHand`) and
   **Tengu Windstorm** (`_bounceToDeck`) — already correct: they emit a
   zone-anchored `play_pile_transfer` (`to: 'hand'` / `to: 'deck'`,

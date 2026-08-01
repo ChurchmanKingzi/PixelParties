@@ -126,9 +126,18 @@ module.exports = {
       // pre-arms `onPileTransfer`'s diff-animator suppression bucket so
       // the card flies exactly once (canonical pattern — see
       // lunatic-cycle-new-moon.js / draw.js).
+      // `asPlay: 'sole'` = einziges Play-Signal dieser Karte für den
+      // Trainings-Recorder (Als Befund "Boots of Hermes nie gespielt",
+      // 0 Plays in 1248 Spielen). Boots spielt sich per Hook
+      // (onSurpriseActivated) selbst aus der Hand: sie nutzt keines der
+      // 13 Reaktionsfenster der Engine, und der direkte hand.splice
+      // unten umgeht den CARD_MOVED-Hook, auf dem die Zonen-Erfassung
+      // des Recorders sitzt. Ohne Marker sah der Recorder nur einen
+      // gewöhnlichen Pile-Transfer und zählte ihn nicht — dieselbe
+      // Klasse wie Divine Gift of the Guardian.
       engine._broadcastEvent('play_pile_transfer', {
         owner: bootsOwner, cardName: CARD_NAME,
-        from: 'hand', to: 'discard', fromHandIdx: handIdx,
+        from: 'hand', to: 'discard', asPlay: 'sole', fromHandIdx: handIdx,
       });
 
       // Commit: Boots leaves hand → discard. Cost is 0, so no gold is

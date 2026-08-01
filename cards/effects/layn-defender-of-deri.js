@@ -123,6 +123,9 @@ module.exports = {
     return 0;
   },
 
+  // Vertrag für Träger-Schutz (Slippery Fridge & Co.).
+  ascensionItems: [LAYN_ASCENSION_ITEM],
+
   // CPU ascension targeting: the Hammer is the only card that progresses Layn.
   ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
     const hero = engine.gs.players[pi]?.heroes?.[hi];

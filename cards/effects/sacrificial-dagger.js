@@ -30,6 +30,16 @@ const CARD_NAME = 'Sacrificial Dagger';
 module.exports = {
   activeIn: ['support'],
 
+  cpuMeta: {
+    // ── ATK-Umsetzer ────────────────────────────────────────────────
+    // Schüttet 1×/Zug je Dagger-Instanz die ATK des ausgerüsteten
+    // Helden als Schaden aus, ausgelöst von jedem eigenen Opfer.
+    // Zusammen mit einer Opfer-Kreatur verdoppelt das den Ertrag jedes
+    // Opfers — gemessen (1268 Spiele) WR nach Dagger-Equips auf den
+    // ATK-Helden: 0→12.3%, 1→22.7%, 2→41.4%, 3→44.0%.
+    atkConversionsPerTurn: 1,
+  },
+
   hooks: {
     onCreatureSacrificed: async (ctx) => {
       const engine = ctx._engine;

@@ -37,6 +37,14 @@ const SHARK_HOPT_KEY = 'greatmaw_shark_effect';
 const sharkHoptUsed = (engine, pi) =>
   engine.gs.hoptUsed?.[`${SHARK_HOPT_KEY}:${pi}`] === engine.gs.turn;
 
+// HINWEIS (1.8.): Hier stand kurzzeitig ein `creatureEffectHoptKeys`,
+// damit Field Standard die Hai-Sperre mitlöst. Das war FALSCH — der
+// Schlüssel gilt SPIELERWEIT über alle Kopien. Ihn zu löschen hätte bei
+// zwei Haien auf dem Feld beide freigeschaltet und damit genau die
+// Regel ausgehebelt, die er schützt ("nur EIN Hai-Effekt pro Runde").
+// Field Standard behandelt harte Sperren jetzt richtig: solche
+// Kreaturen sind schlicht keine legalen Ziele.
+
 /** Living Heroes `pi` controls — eligible buff targets. */
 function livingHeroes(engine, pi) {
   const ps = engine.gs.players[pi];

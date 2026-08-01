@@ -1,0 +1,570 @@
+{
+  "deck": "Bamboo Warrior",
+  "heroes": [
+    "Cute Nerd Magenta",
+    "Xiong, the Bamboo Guardian",
+    "Nicolas, the Hidden Alchemist"
+  ],
+  "games": 1292,
+  "trainWinRate": "74.2%",
+  "trainedAt": "2026-07-22T02:28:49.388Z",
+  "meanTurns": 12.6,
+  "cardValues": {
+    "Fighting": 8,
+    "Quick Attack": 35.8,
+    "Magic Lamp": 26,
+    "Tears of Creation": 9.2,
+    "Bamboo Staff": 95,
+    "Elixir of Quickness": 21.2,
+    "Fire Bomb": 13.7,
+    "Performance": 8,
+    "Metal Harpyformer": 8,
+    "Critical Strike": 100,
+    "Magnetic Potion": 23.9,
+    "Hammer Throw": 17.4,
+    "Acid Vial": 32.5,
+    "Healing Potion": 31.9,
+    "Ska Harpyformer": 8,
+    "Heavy Hit": 13.1
+  },
+  "timing": {
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Quick Attack": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.17
+    },
+    "Magic Lamp": {
+      "early": 0.75,
+      "mid": 1.29,
+      "late": 1
+    },
+    "Tears of Creation": {
+      "early": 0.85,
+      "mid": 1.15,
+      "late": 1
+    },
+    "Bamboo Staff": {
+      "early": 0.75,
+      "mid": 1.06,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Fire Bomb": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.23,
+      "late": 1.28
+    },
+    "Metal Harpyformer": {
+      "early": 0.75,
+      "mid": 1.17,
+      "late": 1.26
+    },
+    "Critical Strike": {
+      "early": 1,
+      "mid": 1.15,
+      "late": 0.85
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Hammer Throw": {
+      "early": 0.88,
+      "mid": 1.12,
+      "late": 1
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Ska Harpyformer": {
+      "early": 0.91,
+      "mid": 1.09,
+      "late": 1
+    },
+    "Heavy Hit": {
+      "early": 0.93,
+      "mid": 1.07,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Elixir of Immortality|dc:Whirlwind Strike": 6.3,
+    "Acid Vial|dc:Whirlwind Strike": 4.7
+  },
+  "casterDeltas": {
+    "Bamboo Staff": {
+      "Cute Nerd Magenta": 4.1
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Elixir of Immortality": 15.2,
+      "Resuscitation Potion": 17.6,
+      "Bamboo Shield": 17.6,
+      "Golden Ankh": 20
+    },
+    "ahead": {
+      "Fighting": 4.7,
+      "Quick Attack": 6.9,
+      "Magic Lamp": 4,
+      "Tears of Creation": 5.3,
+      "Bamboo Staff": 6.8,
+      "Elixir of Quickness": 5.8,
+      "Performance": 5.4,
+      "Metal Harpyformer": 3.8,
+      "Critical Strike": 6.6,
+      "Magnetic Potion": 3.8,
+      "Hammer Throw": 4.5,
+      "Acid Vial": 5.5,
+      "Ska Harpyformer": 4.6
+    }
+  },
+  "standingEvalThreshold": 731,
+  "deckoutGuard": {
+    "Whirlwind Strike": -20
+  },
+  "deckoutDangerSize": 10,
+  "menuOfferRules": {
+    "Magic Lamp→Acid Vial": -3.7,
+    "Magic Lamp→Critical Strike": 7.3,
+    "Magic Lamp→Elixir of Immortality": -12.1,
+    "Magic Lamp→Fighting": -5.1,
+    "Magic Lamp→Bamboo Shield": -3.9,
+    "Magic Lamp→Hammer Throw": -4.1,
+    "Magic Lamp→Bamboo Staff": 4,
+    "Magic Lamp→Heavy Hit": 6.7,
+    "Magic Lamp→Metal Harpyformer": 12.2,
+    "Magic Lamp→Healing Potion": -6.2,
+    "Magic Lamp→Quick Attack": 14,
+    "Magic Lamp→Performance": -16.5,
+    "Magic Lamp→Resuscitation Potion": -19.5,
+    "Magic Lamp→Golden Ankh": -20,
+    "Magic Lamp→Tears of Creation": 6.9,
+    "Magic Lamp→Ska Harpyformer": -8.3,
+    "Magic Lamp→Mystery Box": 4.6,
+    "Magic Lamp→Thieving Strike": -17.7
+  },
+  "menuOfferRulesByCluster": {
+    "spell": {
+      "Magic Lamp→Acid Vial": -5.3,
+      "Magic Lamp→Critical Strike": -5.2,
+      "Magic Lamp→Fighting": -5.7,
+      "Magic Lamp→Fire Bomb": 6.5,
+      "Magic Lamp→Bamboo Shield": -5.3,
+      "Magic Lamp→Hammer Throw": 14.8,
+      "Magic Lamp→Bamboo Staff": -5.1,
+      "Magic Lamp→Heavy Hit": -8.8,
+      "Magic Lamp→Healing Potion": -15,
+      "Magic Lamp→Quick Attack": -11.3,
+      "Magic Lamp→Tears of Creation": 11.3
+    },
+    "mixed": {
+      "Magic Lamp→Acid Vial": 7.7,
+      "Magic Lamp→Critical Strike": 11.8,
+      "Magic Lamp→Elixir of Immortality": 5,
+      "Magic Lamp→Fighting": 9.3,
+      "Magic Lamp→Fire Bomb": 15,
+      "Magic Lamp→Bamboo Shield": 8.8,
+      "Magic Lamp→Hammer Throw": 15,
+      "Magic Lamp→Glass of Marbles": 15,
+      "Magic Lamp→Bamboo Staff": 12.1,
+      "Magic Lamp→Healing Potion": 14.8,
+      "Magic Lamp→Quick Attack": 8.5,
+      "Magic Lamp→Golden Ankh": -8,
+      "Magic Lamp→Tears of Creation": 10.6
+    },
+    "aggro": {
+      "Magic Lamp→Acid Vial": -14.5,
+      "Magic Lamp→Critical Strike": -15,
+      "Magic Lamp→Elixir of Immortality": -15,
+      "Magic Lamp→Fighting": -14.5,
+      "Magic Lamp→Fire Bomb": -15,
+      "Magic Lamp→Bamboo Shield": -6.9,
+      "Magic Lamp→Hammer Throw": -15,
+      "Magic Lamp→Glass of Marbles": -15,
+      "Magic Lamp→Bamboo Staff": -15,
+      "Magic Lamp→Heavy Hit": -6.9,
+      "Magic Lamp→Healing Potion": -15,
+      "Magic Lamp→Quick Attack": -11.5,
+      "Magic Lamp→Resuscitation Potion": -15,
+      "Magic Lamp→Tears of Creation": -15
+    },
+    "swarm": {
+      "Magic Lamp→Acid Vial": 13.1,
+      "Magic Lamp→Critical Strike": 13,
+      "Magic Lamp→Elixir of Immortality": 15,
+      "Magic Lamp→Fighting": 11.7,
+      "Magic Lamp→Fire Bomb": 5.8,
+      "Magic Lamp→Glass of Marbles": 9.4,
+      "Magic Lamp→Bamboo Staff": 14.4,
+      "Magic Lamp→Healing Potion": 13.8,
+      "Magic Lamp→Quick Attack": 11.1,
+      "Magic Lamp→Resuscitation Potion": 9.6,
+      "Magic Lamp→Tears of Creation": 6.5
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Acid Vial": -14.8,
+      "Magic Lamp→Critical Strike": -14.4,
+      "Magic Lamp→Elixir of Immortality": -11.6,
+      "Magic Lamp→Fighting": -5.3,
+      "Magic Lamp→Fire Bomb": -11.2,
+      "Magic Lamp→Bamboo Shield": -15,
+      "Magic Lamp→Hammer Throw": -15,
+      "Magic Lamp→Bamboo Staff": -15,
+      "Magic Lamp→Heavy Hit": -15,
+      "Magic Lamp→Whirlwind Strike": -15,
+      "Magic Lamp→Quick Attack": -15,
+      "Magic Lamp→Resuscitation Potion": -15,
+      "Magic Lamp→Golden Ankh": -15,
+      "Magic Lamp→Tears of Creation": -13.2,
+      "Magic Lamp→Thieving Strike": 12.6
+    },
+    "ahead": {
+      "Magic Lamp→Acid Vial": 15,
+      "Magic Lamp→Critical Strike": 15,
+      "Magic Lamp→Elixir of Immortality": 15,
+      "Magic Lamp→Fighting": 15,
+      "Magic Lamp→Fire Bomb": 15,
+      "Magic Lamp→Bamboo Shield": 15,
+      "Magic Lamp→Hammer Throw": 15,
+      "Magic Lamp→Bamboo Staff": 15,
+      "Magic Lamp→Heavy Hit": 15,
+      "Magic Lamp→Quick Attack": 15,
+      "Magic Lamp→Tears of Creation": 15
+    }
+  },
+  "targetPriors": {
+    "Critical Strike": {
+      "hp:min": -14.6,
+      "kind:creature": -9.1,
+      "side:own": -20
+    },
+    "Hammer Throw": {
+      "kind:creature": -10,
+      "side:own": -11.1
+    },
+    "Biomancy Token": {
+      "frozen": -10.6,
+      "healrev": -19.7
+    },
+    "Metal Harpyformer": {
+      "hp:max": -11.1
+    },
+    "Heavy Hit": {
+      "side:own": -12.9
+    },
+    "Thieving Strike": {
+      "hp:min": -7
+    },
+    "Aggressive Town Guard": {
+      "hp:min": -8.1
+    },
+    "Guardian Beast She": {
+      "hp:min": -9.7
+    }
+  },
+  "reactionRules": {
+    "Bamboo Shield": {
+      "light": 8.1,
+      "mid": 8.1,
+      "late": 20,
+      "lethal": 8.1,
+      "heavy": 8.1,
+      "early": 8.1
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -3.9,
+    "plc:bigwait": 3.7,
+    "plc:slack:2+": 7.7
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Critical Strike": 4.4,
+    "Magic Lamp→Elixir of Immortality": -12.2,
+    "Magic Lamp→Fighting": -4.5,
+    "Magic Lamp→Bamboo Shield": -4.9,
+    "Magic Lamp→Hammer Throw": -3.9,
+    "Magic Lamp→Glass of Marbles": 2.9,
+    "Magic Lamp→Heavy Hit": 8.2,
+    "Magic Lamp→Metal Harpyformer": 9.8,
+    "Magic Lamp→Healing Potion": -5.8,
+    "Magic Lamp→Whirlwind Strike": 3,
+    "Magic Lamp→Quick Attack": 10.3,
+    "Magic Lamp→Performance": -20,
+    "Magic Lamp→Alchemy": -20,
+    "Magic Lamp→Resuscitation Potion": -17.6,
+    "Magic Lamp→Chain Lightning": -6,
+    "Magic Lamp→Golden Ankh": -20,
+    "Magic Lamp→Tears of Creation": 5.8,
+    "Magic Lamp→Ska Harpyformer": -8.5,
+    "Magic Lamp→Mystery Box": 6.4,
+    "Magic Lamp→Thieving Strike": -19.1,
+    "Xiong, the Bamboo Guardian→Mystery Box": -10.1,
+    "Xiong, the Bamboo Guardian→Critical Strike": 11.5,
+    "Xiong, the Bamboo Guardian→Pyroblast": -20,
+    "Xiong, the Bamboo Guardian→Metal Harpyformer": -4.8,
+    "Xiong, the Bamboo Guardian→Destruction Magic": 5.9,
+    "Xiong, the Bamboo Guardian→Whirlwind Strike": 10.9,
+    "Xiong, the Bamboo Guardian→Crimson Skull Spider": 4.2,
+    "Xiong, the Bamboo Guardian→Pure Advantage Camel": -17.1,
+    "Xiong, the Bamboo Guardian→Decay Magic": -3,
+    "Xiong, the Bamboo Guardian→Booby Trap": -2,
+    "Xiong, the Bamboo Guardian→Hammer Throw": 3.2,
+    "Xiong, the Bamboo Guardian→Creativity": -8,
+    "Xiong, the Bamboo Guardian→Thieving Strike": 2.3,
+    "Xiong, the Bamboo Guardian→Wealth": 16.3,
+    "Xiong, the Bamboo Guardian→Divine Gift of Sacrifice": -8.6,
+    "Xiong, the Bamboo Guardian→Ska Harpyformer": -8.3,
+    "Xiong, the Bamboo Guardian→Fighting": -4.5,
+    "Xiong, the Bamboo Guardian→Magic Arts": 2.5,
+    "Xiong, the Bamboo Guardian→Tears of Creation": -16.5,
+    "Xiong, the Bamboo Guardian→Treasure Chest": 9.3,
+    "Xiong, the Bamboo Guardian→Juice": 2.7,
+    "Xiong, the Bamboo Guardian→Glass of Marbles": -5.8,
+    "Xiong, the Bamboo Guardian→Bamboo Shield": -20,
+    "Xiong, the Bamboo Guardian→Sparkfly Worker": -20,
+    "Xiong, the Bamboo Guardian→Guardian Beast Ji": 12.8,
+    "Xiong, the Bamboo Guardian→Guardian Beast Gou": 20,
+    "Xiong, the Bamboo Guardian→Loyal Terrier": -15,
+    "Xiong, the Bamboo Guardian→Leadership": -6.4,
+    "Xiong, the Bamboo Guardian→Deepsea Idol": 11.8,
+    "Xiong, the Bamboo Guardian→Alchemy": -3.2,
+    "Xiong, the Bamboo Guardian→Martyry": 5.4,
+    "Xiong, the Bamboo Guardian→Divine Gift of Fire": -20,
+    "Xiong, the Bamboo Guardian→Divine Gift of the Guardian": 10.9,
+    "Xiong, the Bamboo Guardian→Support Magic": -5,
+    "Xiong, the Bamboo Guardian→Training": -8.1,
+    "Xiong, the Bamboo Guardian→Baby Spider": -2.6,
+    "Xiong, the Bamboo Guardian→Aggressive Town Guard": -9.4,
+    "Xiong, the Bamboo Guardian→Idej Projection": 6.3,
+    "Xiong, the Bamboo Guardian→Sacred Hammer of the Volcano": -4.7,
+    "Xiong, the Bamboo Guardian→Harpyformer Choir": 8.3,
+    "Xiong, the Bamboo Guardian→Cosmic Skeleton": -4.8,
+    "Xiong, the Bamboo Guardian→Cute Cheese": 7.4,
+    "Xiong, the Bamboo Guardian→Controlled Attack": 5,
+    "Xiong, the Bamboo Guardian→Performance": 9.7,
+    "Xiong, the Bamboo Guardian→Golden Ankh": 13.6,
+    "Xiong, the Bamboo Guardian→Book of Doom": 11.2,
+    "Xiong, the Bamboo Guardian→Boiling Oil": 9.7,
+    "Xiong, the Bamboo Guardian→Box Spider": 2.3,
+    "Xiong, the Bamboo Guardian→Soul Shard Ib": -7.8,
+    "Magnetic Potion→Bamboo Staff": -2,
+    "Magnetic Potion→Hammer Throw": 7.5,
+    "Magnetic Potion→Quick Attack": 2.9,
+    "Magnetic Potion→Heavy Hit": -9.8,
+    "Magnetic Potion→Glass of Marbles": -9.1,
+    "Magnetic Potion→Whirlwind Strike": -6,
+    "Magnetic Potion→Fire Bomb": 11.4,
+    "Magnetic Potion→Critical Strike": 14.5,
+    "Magnetic Potion→Tears of Creation": -10.4,
+    "Magnetic Potion→Healing Potion": -4.4,
+    "Magnetic Potion→Metal Harpyformer": 4.9,
+    "Magnetic Potion→Mystery Box": 4,
+    "Magnetic Potion→Acid Vial": -11,
+    "Magnetic Potion→Elixir of Immortality": -17.3,
+    "Magnetic Potion→Bamboo Shield": -20,
+    "Magnetic Potion→Golden Ankh": -20,
+    "Magnetic Potion→Resuscitation Potion": -6.6,
+    "The Cosmic Depths→Metal Harpyformer": 13.8,
+    "The Cosmic Depths→Ska Harpyformer": -13.8,
+    "Necromancy→Metal Harpyformer": -8.4,
+    "Necromancy→Ska Harpyformer": 5.6,
+    "Elixir of Immortality→Metal Harpyformer": 8,
+    "Elixir of Immortality→Ska Harpyformer": 20,
+    "Elixir of Immortality→Cute Nerd Magenta": -20,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": -20,
+    "Enigma, the Seller of Secrets→Glass of Marbles": -13.1,
+    "Enigma, the Seller of Secrets→Magic Lamp": -4.1,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": 16.6,
+    "Enigma, the Seller of Secrets→Critical Strike": -14.7,
+    "Enigma, the Seller of Secrets→Metal Harpyformer": -11.7,
+    "Enigma, the Seller of Secrets→Fighting": 7.1,
+    "Enigma, the Seller of Secrets→Heavy Hit": 5.9,
+    "Enigma, the Seller of Secrets→Hammer Throw": 20,
+    "Enigma, the Seller of Secrets→Fire Bomb": -20,
+    "Enigma, the Seller of Secrets→Tears of Creation": 20,
+    "Enigma, the Seller of Secrets→Golden Ankh": -9.6,
+    "Enigma, the Seller of Secrets→Bamboo Shield": 18.1,
+    "Enigma, the Seller of Secrets→Mystery Box": -6.5,
+    "Enigma, the Seller of Secrets→Bamboo Staff": -3.1,
+    "Enigma, the Seller of Secrets→Quick Attack": -3.8,
+    "Enigma, the Seller of Secrets→Whirlwind Strike": -11.1,
+    "Enigma, the Seller of Secrets→Resuscitation Potion": -20,
+    "Renewable Energy→Mystery Box": 14.8,
+    "Cute Cheese→Metal Harpyformer": 20,
+    "Cute Cheese→Ska Harpyformer": -20,
+    "Premonition→Fighting": -18.9,
+    "Premonition→Critical Strike": -6.1,
+    "Premonition→Bamboo Staff": 5.6,
+    "Training→Performance": 2.4,
+    "Training→Fighting": -2.4,
+    "Magic Amethyst→Fighting": 20,
+    "Magic Amethyst→Performance": -19.1
+  },
+  "abilityPriors": {
+    "Charme@Cute Nerd Magenta": 150,
+    "Creativity@Cute Nerd Magenta": 111.6,
+    "Biomancy@Xiong, the Bamboo Guardian": 150,
+    "Biomancy@Xiong, the Bamboo Guardian≥2": -18.4,
+    "Fighting@Xiong, the Bamboo Guardian": 150,
+    "Fighting@Xiong, the Bamboo Guardian≥2": 150,
+    "Fighting@Xiong, the Bamboo Guardian≥3": 150,
+    "Fighting@Nicolas, the Hidden Alchemist": -60,
+    "Fighting@Nicolas, the Hidden Alchemist≥2": -60,
+    "Fighting@Nicolas, the Hidden Alchemist≥3": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist≥2": 150,
+    "Fighting@Cute Nerd Magenta≥2": 60.2,
+    "Charme@Cute Nerd Magenta≥2": 36,
+    "Creativity@Cute Nerd Magenta≥2": 68,
+    "Charme@Cute Nerd Magenta≥3": -60,
+    "Alchemy@Nicolas, the Hidden Alchemist≥3": 119.9,
+    "Biomancy@Xiong, the Bamboo Guardian≥3": 150,
+    "Fighting@Cute Nerd Magenta≥3": 150,
+    "Creativity@Cute Nerd Magenta≥3": -60
+  },
+  "equipPriors": {
+    "Bamboo Staff@Nicolas, the Hidden Alchemist": 150,
+    "Bamboo Staff@Cute Nerd Magenta": -60,
+    "Bamboo Staff@Xiong, the Bamboo Guardian": 66.6
+  },
+  "lockPenalties": {
+    "Fighting|potion@1": -25,
+    "Bamboo Staff|potion@2": 10,
+    "Performance|potion@1": 9.8,
+    "Fighting|potion@0": -10.6,
+    "Fighting|potion@2": 10,
+    "Fighting|potion@3+": 10,
+    "Quick Attack|potion@1": -22.6,
+    "Metal Harpyformer|potion@1": 10,
+    "Quick Attack|potion@2": 10,
+    "Performance|potion@3+": 10,
+    "Bamboo Staff|potion@0": -25,
+    "Performance|potion@0": 10,
+    "Bamboo Staff|potion@1": 10,
+    "Ska Harpyformer|potion@0": -19.7,
+    "Performance|potion@2": -25,
+    "Ska Harpyformer|potion@1": -22
+  },
+  "reviveTargets": {
+    "Resuscitation Potion→Xiong, the Bamboo Guardian": 22.3,
+    "Resuscitation Potion→Cute Nerd Magenta": 30,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": 30,
+    "Elixir of Immortality→Cute Nerd Magenta": 30,
+    "Resuscitation Potion→Nicolas, the Hidden Alchemist": 30,
+    "Golden Ankh→Xiong, the Bamboo Guardian": 5.8
+  },
+  "reviveAbilities": {
+    "Elixir of Immortality→Fighting": 30,
+    "Resuscitation Potion→Fighting": 30,
+    "Resuscitation Potion→Charme": 28.5,
+    "Resuscitation Potion→Creativity": 13.9,
+    "Elixir of Immortality→Alchemy": 30,
+    "Elixir of Immortality→Charme": 30,
+    "Elixir of Immortality→Creativity": 21.5,
+    "Resuscitation Potion→Alchemy": 30,
+    "Golden Ankh→Biomancy": -13.1,
+    "Golden Ankh→Fighting": 30
+  },
+  "startHandValues": {
+    "Fighting": 1.6,
+    "Quick Attack": 2.3,
+    "Elixir of Immortality": -6.9,
+    "Glass of Marbles": -2.5,
+    "Resuscitation Potion": 2.9,
+    "Bamboo Staff": 2.7,
+    "Hammer Throw": 2.5,
+    "Mystery Box": -6.3,
+    "Metal Harpyformer": -1.1,
+    "Whirlwind Strike": 3.2,
+    "Elixir of Quickness": 4.9,
+    "Magic Lamp": 2.5,
+    "Performance": -2.6,
+    "Thieving Strike": -2.6,
+    "Golden Ankh": -4.5,
+    "Healing Potion": 11.9,
+    "Magnetic Potion": 9.1
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "11.8%",
+    "winAfterMull": "74.5%",
+    "winAfterKeep": "74.2%"
+  },
+  "heroEffectTiming": {
+    "Cute Nerd Magenta@hand:2-3": -3.7,
+    "Cute Nerd Magenta@hand:0-1": -15
+  },
+  "boardPairs": {
+    "Biomancy|Fighting": 15,
+    "Acid Vial|Elixir of Quickness": 9.9,
+    "Biomancy|Elixir of Quickness": 8.2,
+    "Elixir of Quickness|Fighting": 8.4,
+    "Acid Vial|Biomancy": 7.4,
+    "Acid Vial|Fighting": 7.8,
+    "Alchemy|Metal Harpyformer": 5.6,
+    "Acid Vial|Magnetic Potion": 10.5,
+    "Elixir of Quickness|Magnetic Potion": 11.5,
+    "Biomancy|Magnetic Potion": 6.6,
+    "Fighting|Magnetic Potion": 6.7,
+    "Magic Lamp|Tears of Creation": 8.2,
+    "Elixir of Quickness|Magic Lamp": 8.9,
+    "Biomancy|Magic Lamp": 6.1,
+    "Fighting|Magic Lamp": 6.1,
+    "Elixir of Quickness|Tears of Creation": 8.7,
+    "Biomancy|Tears of Creation": 5.5,
+    "Fighting|Tears of Creation": 5.6,
+    "Fire Bomb|Magic Lamp": 9.5,
+    "Biomancy|Fire Bomb": 7.2,
+    "Fighting|Fire Bomb": 7.5,
+    "Acid Vial|Tears of Creation": 9.1,
+    "Fire Bomb|Magnetic Potion": 10.4,
+    "Biomancy|Resuscitation Potion": -4.2,
+    "Fighting|Resuscitation Potion": -4.2,
+    "Alchemy|Summoning Magic": -15,
+    "Magnetic Potion|Tears of Creation": 7.6,
+    "Biomancy|Healing Potion": 8.8,
+    "Fighting|Healing Potion": 8.8,
+    "Magic Lamp|Magnetic Potion": 7.5,
+    "Elixir of Quickness|Fire Bomb": 11.8,
+    "Acid Vial|Fire Bomb": 8.8,
+    "Elixir of Quickness|Healing Potion": 11.8,
+    "Healing Potion|Magnetic Potion": 11.5,
+    "Acid Vial|Magic Lamp": 10.5,
+    "Fire Bomb|Tears of Creation": 6.5,
+    "Acid Vial|Healing Potion": 8.5,
+    "Charme|Summoning Magic": 15,
+    "Creativity|Summoning Magic": 15,
+    "Fire Bomb|Healing Potion": 13.5,
+    "Healing Potion|Magic Lamp": 12.2
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.82,
+      "n": 89,
+      "values": {
+        "Deepsea Primordium": 0.121
+      }
+    }
+  }
+}

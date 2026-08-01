@@ -13,6 +13,10 @@ const { canPlayMagicGem, maybeKeepGemInHand } = require('./_magic-gem-shared');
 const CARD_NAME = 'Magic Amber';
 
 module.exports = {
+  // CPU: alwaysCommit — Sofort-Handdisruption (Gegner discardet) — der Immediate-Score gewichtet Gegner-Handverlust nicht, das Gate lehnte 100% ab.
+  // planArtifactPlay filtert Bezahlbarkeit bereits; entspricht der
+  // dokumentierten Artifact-Politik "played as soon as affordable".
+  cpuMeta: { alwaysCommit: true },
   activeIn: ['hand'],
 
   canActivate(gs, pi) {

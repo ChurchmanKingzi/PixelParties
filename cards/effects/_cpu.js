@@ -10,6 +10,10 @@
 
 const { loadCardEffect } = require('./_loader');
 const { PHASES, getCleansableStatuses } = require('./_hooks');
+// Learned per-deck profiles (ML-trained via scripts/train-deck-profile.js).
+// No-ops when no profile matches the piloted lineup or when
+// PP_DISABLE_PROFILES=1 (training data collection).
+const deckProfile = require('./_deck-profile');
 
 // Small pauses between CPU actions / phase advances so a human spectator
 // can actually follow the sequence. Kept deliberately modest — longer
@@ -50,12 +54,17 @@ const MAX_ROLLOUT_MS = 8000;
 // work running in the background — `_runWithCardHardcap` clears
 // `gs.potionTargeting` as a best-effort recovery so the next CPU action
 // isn't blocked by a stale resolve-state.
-const CARD_HANDLING_HARDCAP_MS = 30000;
+const CARD_HANDLING_HARDCAP_MS = (() => {
+  // Env-Override für Tests/Diagnose (PP_CARD_HARDCAP_MS): erlaubt es,
+  // die graziöse Degradation mit engem Budget kontrolliert zu prüfen.
+  const env = parseInt(process.env.PP_CARD_HARDCAP_MS || '', 10);
+  return Number.isFinite(env) && env > 0 ? env : 30000;
+})();
 
 // DEBUG: force-add "The Yeeting" to the CPU's hand at the start of its
 // second LIVE turn. Used to reliably reproduce the Yeeting CPU-resolution
 // path without waiting on the natural draw. Set to false for normal play.
-const DEBUG_FORCE_YEETING_ON_CPU_TURN_2 = true;
+const DEBUG_FORCE_YEETING_ON_CPU_TURN_2 = false;
 
 // Set to false when the CPU is stable. Keep verbose while we're still shaking
 // out freeze bugs — every major decision point logs so a hang can be traced.
@@ -128,6 +137,82 @@ function stillCpuTurn(engine, cpuIdx) {
  * stamps `_mctsRolloutStartT`; the check trips after MAX_ROLLOUT_MS so
  * the rank loop can move on to the next candidate / variation.
  */
+// ── ε-Exploration für Trainingsdaten (PP_TRAIN_EXPLORE) ─────────────
+// Der fundamentale blinde Fleck der On-Policy-Datensammlung: Die
+// Regression kann nur Linien bewerten, die der Pilot tatsächlich geht.
+// Karten, die der Baseline-Pilot NIE spielt (The Cosmic Depths: 3 Plays
+// in 100 Spielen; Coffee/Deepsea Idol: 0), liefern keinerlei Support —
+// egal wie viele Spiele gesammelt werden. Mit PP_TRAIN_EXPLORE=ε kippt
+// mit Wahrscheinlichkeit ε eine Live-Entscheidung zugunsten einer sonst
+// nicht gewählten Option: die Action Phase probiert einen zufälligen
+// legalen Kandidaten statt des Top-Picks, Main-Phase-Gates committen
+// eine Aktivierung, die sie sonst geskippt hätten. Einzelne Spiele
+// werden dadurch schwächer, aber die Regression bekommt echte
+// "gespielt → Ausgang"-Daten für die unerforschten Karten.
+//
+// Sicherungen: greift NUR in Self-Play (engine._isSelfPlay), NIE in
+// Eval-Läufen (PP_TRAIN_EVAL=1) und NIE innerhalb von MCTS-Rollouts
+// (die Simulationen sollen Kandidaten weiterhin unter der normalen
+// Policy bewerten — exploriert wird nur die LIVE-Entscheidung).
+const EXPLORE_EPS = (() => {
+  const v = parseFloat(process.env.PP_TRAIN_EXPLORE || '0');
+  return Number.isFinite(v) && v > 0 ? Math.min(0.5, v) : 0;
+})();
+// Novelty-Zähler: kartenweise Versuchszählung über die Prozess-Laufzeit.
+// Uniforme ε-Exploration hat sich als zu diffus erwiesen (25-Spiele-Test:
+// The Cosmic Depths trotz ε=0.2 weiterhin 0 Plays — das Budget verpufft
+// an ohnehin gut erforschten Karten). Deshalb wählt die Exploration den
+// Kandidaten mit dem NIEDRIGSTEN Versuchszähler (Ties uniform) statt
+// uniform über alle. Zählt Versuche, nicht Erfolge — eine Karte, deren
+// Play wiederholt fehlschlägt, soll nicht endlos re-exploriert werden.
+// Prozess-lokal: Wrapper-Restarts setzen die Zähler zurück, was die
+// betroffenen Karten kurz erneut exploriert — unschädlich bis nützlich.
+const _exploreAttempts = new Map();
+/**
+ * Seedet die Novelty-Zähler aus historischen Play-Daten (Batch-Runner
+ * liest die Resume-JSONL und übergibt Σ Plays pro Karte). Ohne Seeding
+ * starten nach jedem Prozessstart ALLE Karten bei 0 Versuchen — der
+ * Novelty-Pick würfelt dann uniform zwischen "nie in 100 Spielen
+ * gespielt" und "in diesem Prozess nur noch nicht dran gewesen", und
+ * die ohnehin häufigen Karten fressen die ersten Explores wieder auf
+ * (empirisch: The Cosmic Depths blieb trotz Novelty-Exploration bei 0,
+ * weil Gatherer/Gerrymander/Adventurousness dieselbe "Novelty" hatten).
+ */
+function seedExploreAttempts(counts) {
+  if (!counts) return;
+  for (const [name, n] of Object.entries(counts)) {
+    if (typeof n === 'number' && n > 0) {
+      _exploreAttempts.set(name, Math.max(_exploreAttempts.get(name) || 0, n));
+    }
+  }
+}
+function noteExploreAttempt(engine, cardName) {
+  if (!EXPLORE_EPS || !cardName) return;
+  // NUR Live-Versuche zählen. runActionPhase läuft auch innerhalb der
+  // MCTS-Rollouts — würden simulierte Tries mitgezählt, spiegelten die
+  // Zähler binnen eines Spiels die Policy-Frequenz (beobachtet:
+  // "Novelty"-Picks mit 8-13 Versuchen im ersten Spiel) und das
+  // Neuheits-Signal wäre wertlos.
+  if (engine?._inMctsSim) return;
+  _exploreAttempts.set(cardName, (_exploreAttempts.get(cardName) || 0) + 1);
+}
+function pickNoveltyCandidate(candidates) {
+  let minSeen = Infinity;
+  for (const c of candidates) {
+    const seen = _exploreAttempts.get(c.cardName) || 0;
+    if (seen < minSeen) minSeen = seen;
+  }
+  const pool = candidates.filter(c => (_exploreAttempts.get(c.cardName) || 0) === minSeen);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function exploreRoll(engine) {
+  if (!EXPLORE_EPS) return false;
+  if (process.env.PP_TRAIN_EVAL === '1') return false;
+  if (!engine?._isSelfPlay) return false;
+  if (engine._inMctsSim) return false;
+  return Math.random() < EXPLORE_EPS;
+}
+
 function cpuPastDeadline(engine) {
   const dl = engine?._cpuTurnDeadline;
   if (typeof dl === 'number' && Date.now() >= dl) return true;
@@ -157,24 +242,90 @@ function cpuPastDeadline(engine) {
  */
 async function _runWithCardHardcap(engine, label, fn) {
   const prevCardDeadline = engine._cpuCardDeadline;
-  engine._cpuCardDeadline = Date.now() + CARD_HANDLING_HARDCAP_MS;
+  // Weiche Deadline mit HEADROOM vor dem harten Timer: Vorher waren
+  // beide identisch (t0 + HARDCAP) — die Self-Cancel-Schicht wurde
+  // exakt in dem Moment wahr, in dem der harte Abbruch schon feuerte,
+  // und konnte ihren Job (Exploration trimmen, Play regulär zu Ende
+  // bringen) nie erfüllen. Jetzt kappen die cpuPastDeadline-Guards die
+  // Gate-Variationen / Options-Rollouts bei ~60% des Budgets und der
+  // Play committet mit dem bis dahin besten Ergebnis; der harte Timer
+  // bleibt letzte Verteidigung gegen synchrone Hänger. (Beobachtet:
+  // Magnetic Glove vs Burning Inferno — Gate-Skip + Recon + bis zu 12
+  // Variationen + Live-Galerie-Pick, jede mit Rest-of-Turn-Sim des
+  // aktionsdichten Inferno-Zugs, überschritt gelegentlich 30s →
+  // Komplett-Abbruch des Plays + Timeout-Ties.)
+  engine._cpuCardDeadline = Date.now() + Math.floor(CARD_HANDLING_HARDCAP_MS * 0.6);
   let timerId;
+  let abandoned = false;
+  // Zustands-Snapshot für den Timer-Guard: Zug-beendende Effekte
+  // (Cooldins Area-Play, Gigantisaurs Tribut-Summon) treiben den
+  // FOLGEZUG im selben await-Strang — der gewrappte fn ist dann kein
+  // hängender Play mehr, sondern enthält das legitim weiterlaufende
+  // Spiel. Feuerte der Timer trotzdem, kehrte das Race mitten im
+  // Folgezug zum ALTEN Aufrufer zurück: zwei interleavte Turn-Loops,
+  // doppelte advancePhase-Übergänge, Kollaps → no-result (Slip 'n
+  // Slide vs Big Stomp: reproduzierbar in 2/2 Verbose-Läufen, Doppel-
+  // Logs im Trace). Der Guard bricht deshalb NUR ab, wenn das Spiel
+  // seit Wrap-Start wirklich stillsteht — gleicher Zug, gleicher
+  // aktiver Spieler. Ist es weitergezogen, löst der Timer still auf
+  // und das Race wartet auf das reguläre fn-Ende.
+  const turnAtStart = engine.gs?.turn;
+  const activeAtStart = engine.gs?.activePlayer;
   const timeoutP = new Promise((_, reject) => {
-    timerId = setTimeout(() => reject(new Error(`hardcap:${label}`)), CARD_HANDLING_HARDCAP_MS);
+    timerId = setTimeout(() => {
+      const movedOn = engine.gs
+        && (engine.gs.turn !== turnAtStart || engine.gs.activePlayer !== activeAtStart);
+      if (movedOn) {
+        cpuLog(`      (hardcap ${label}: Spiel ist weitergezogen — Timer entschärft)`);
+        return; // kein Reject: fn enthält das legitim laufende Spiel
+      }
+      reject(new Error(`hardcap:${label}`));
+    }, CARD_HANDLING_HARDCAP_MS);
   });
   try {
     return await Promise.race([Promise.resolve().then(fn), timeoutP]);
   } catch (err) {
     if (err && typeof err.message === 'string' && err.message.startsWith('hardcap:')) {
       console.error(`[CPU] ⚠️  card hardcap hit (${CARD_HANDLING_HARDCAP_MS}ms): ${label} — abandoning play`);
+      // Diagnose-Dump: nennt die heißesten Hooks/Karten des Zuges, damit
+      // ein Hardcap den Verursacher gleich mitliefert (statt nur das
+      // Opfer — das gecappte fn ist oft eine unschuldige Karte, deren
+      // Gate-Rollouts in einen fremden Effektsturm laufen).
+      try {
+        const topOf = (obj) => Object.entries(obj || {})
+          .sort((a, b) => b[1] - a[1]).slice(0, 6)
+          .map(([k, v]) => `${k}:${v}`).join(', ');
+        console.error(`[CPU]    hardcap-diag turn=${engine.gs?.turn} hooksFired=${engine._hooksFiredThisTurn ?? '?'} snapshots=${engine._snapshotsThisTurn ?? '?'}`);
+        console.error(`[CPU]    top hooks: ${topOf(engine._hookHistogramThisTurn)}`);
+        console.error(`[CPU]    top firing cards: ${topOf(engine._hookFiresByCard)}`);
+      } catch { /* Diagnose darf nie den Abbruchpfad stören */ }
       cpuLog(`      !! hardcap ${label}`);
+      abandoned = true;
       try { if (engine.gs?.potionTargeting) engine.gs.potionTargeting = null; } catch {}
       return false;
     }
     throw err;
   } finally {
     clearTimeout(timerId);
-    engine._cpuCardDeadline = prevCardDeadline;
+    // KRITISCH: Beim Hardcap-Abbruch die Deadline NICHT restaurieren.
+    // Der verlassene fn (Zombie) läuft im Hintergrund weiter und cancelt
+    // sich nur über cpuPastDeadline-Checks selbst — ein blindes Restore
+    // hier entwaffnete genau diesen Mechanismus: Der Zombie sah wieder
+    // eine gültige (oder keine) Deadline, rechnete minutenlang weiter
+    // und feuerte am Ende Zustandsübergänge (Cooldins advanceToPhase →
+    // Zugende!) in einen längst weitergezogenen Spielzustand → Kollaps
+    // der Turn-Loop → no-result. (Slip 'n Slide: 4 no-results in 6
+    // Spielen, jedes exakt nach einem hero-effect-h0-Hardcap.)
+    // Stattdessen: Deadline dauerhaft abgelaufen stehen lassen — der
+    // Zombie cancelt an seinem nächsten Check; das nächste Gate setzt
+    // ohnehin eine frische Deadline. Preis: bis dahin brechen auch
+    // reguläre Deadline-Checks früh ab (leicht degradierte CPU-Qualität
+    // direkt nach einem 30s-Hänger — akzeptabel).
+    if (abandoned) {
+      engine._cpuCardDeadline = Date.now() - 1;
+    } else {
+      engine._cpuCardDeadline = prevCardDeadline;
+    }
   }
 }
 
@@ -246,6 +397,52 @@ async function runCpuTurn(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
+  // ── Board-Erweiterung JE BESCHWÖRUNG (Als Definition) ─────────────
+  // Al: "Ein Check nach jeder einzelnen Beschwörung. Sind nach der
+  // Beschwörung mehr Kreaturen on board als vorher? Dann zählt diese
+  // eine Beschwörung als 'Hat das Board erweitert'."
+  // Bewusst NICHT über den ganzen Zug bilanziert — Als Einwand: DDG
+  // verringert die Körperzahl beim Ausspielen (2 Opfer für 1 Körper)
+  // und ist trotzdem immer spielenswert. Eine Zugbilanz würde einen
+  // guten DDG-Zug als Misserfolg werten.
+  // Der Wrapper sitzt EINMAL auf helpers.doPlayCreature und deckt damit
+  // alle fünf Aufrufer ab (Grant-Spender, Discard-sensitiv, Surprise,
+  // Gratis-Pfad, Action Phase) statt fünf Einzelstellen zu pflegen.
+  if (helpers && typeof helpers.doPlayCreature === 'function' && !helpers.__bodyCountWrapped) {
+    const _origPlay = helpers.doPlayCreature;
+    const _countBoard = (pi) => {
+      let k = 0;
+      try {
+        const _p = engine.gs.players[pi];
+        const _db = engine._getCardDB();
+        for (let hi = 0; hi < (_p.heroes || []).length; hi++) {
+          for (let z = 0; z < 3; z++) {
+            const nm = ((_p.supportZones?.[hi] || [])[z] || [])[0];
+            if (!nm) continue;
+            const cd = _db[nm];
+            if (cd && cd.cardType === 'Creature') k++;
+          }
+        }
+      } catch { /* Telemetrie */ }
+      return k;
+    };
+    helpers.doPlayCreature = async (room, pi, spec) => {
+      const before = engine._inMctsSim ? 0 : _countBoard(pi);
+      const res = await _origPlay(room, pi, spec);
+      if (!engine._inMctsSim) {
+        const after = _countBoard(pi);
+        if (after > before) {
+          swapDiag(engine, 'body:beschwoerung-erweitert');
+          if (pi === engine._cpuPlayerIdx) {
+            engine._bodyExpandThisTurn = (engine._bodyExpandThisTurn || 0) + 1;
+          }
+        } else if (after === before) swapDiag(engine, 'body:beschwoerung-neutral');
+        else swapDiag(engine, 'body:beschwoerung-kostet');
+      }
+      return res;
+    };
+    helpers.__bodyCountWrapped = true;
+  }
   if (!stillCpuTurn(engine, cpuIdx)) return;
   if (typeof engine._trailWrite === 'function') {
     // Log the full hand contents (not just the size) so post-mortem
@@ -270,16 +467,73 @@ async function runCpuTurn(engine, helpers) {
   // cost cap inside rollouts.
   if (!engine._inMctsSim) {
     engine._cpuTurnDeadline = turnStartT + MAX_CPU_TURN_MS;
+    // ── Standing-Stempel (Comeback-Kanal) ────────────────────────────
+    // Einmal pro LIVE-Zug: eigene Lage per evaluateState-Differenz
+    // bucketen (behind/even/ahead, Schwelle aus dem Profil — dieselbe
+    // Metrik wie die evalCurve im Training). learnedCardValue liest nur
+    // diesen Stempel (nie selbst evaluieren — es läuft INNERHALB von
+    // evaluateState, das wäre Rekursion). Der Stempel gilt für den
+    // ganzen Zug inkl. aller Rollouts: "Lage bei Entscheidungsbeginn".
+    try {
+      const ev = typeof engine._cpuEvaluateState === 'function'
+        ? engine._cpuEvaluateState(cpuIdx) : null;
+      engine._standingBucket = {
+        turn: gs.turn, pi: cpuIdx,
+        bucket: deckProfile.standingBucketFromEval(engine, cpuIdx, ev),
+      };
+    } catch { engine._standingBucket = null; }
     // DEBUG: force-add Yeeting on the CPU's 2nd LIVE turn. Live-only so
     // nested-rollout re-entries don't double-stamp. Tracked on the engine
     // (not the player state) so snapshot/restore inside MCTS doesn't
     // reset the counter and re-fire the add.
-    if (DEBUG_FORCE_YEETING_ON_CPU_TURN_2) {
+    const _forceCard = process.env.PP_DEBUG_FORCE_CARD
+      || (DEBUG_FORCE_YEETING_ON_CPU_TURN_2 ? 'The Yeeting' : null);
+    if (_forceCard) {
       engine._debugCpuTurnsTaken = (engine._debugCpuTurnsTaken || 0) + 1;
-      if (engine._debugCpuTurnsTaken === 2 && !ps.hand.includes('The Yeeting')) {
-        ps.hand.push('The Yeeting');
-        try { engine._trackCard('The Yeeting', cpuIdx, 'hand'); } catch {}
-        cpuLog(`[DEBUG] force-added "The Yeeting" to CPU hand (CPU turn #2)`);
+      if (engine._debugCpuTurnsTaken === 2 && !ps.hand.includes(_forceCard)) {
+        ps.hand.push(_forceCard);
+        try { engine._trackCard(_forceCard, cpuIdx, 'hand'); } catch {}
+        cpuLog(`[DEBUG] force-added "${_forceCard}" to CPU hand (CPU turn #2)`);
+        engine.sync();
+      }
+      // PP_DEBUG_SCENARIO: kommaseparierte Test-Szenarien, angewandt im
+      // selben Moment wie die Force-Karte (CPU-Zug 2, live). Für Audits
+      // von Karten, deren Bedingungen "natürlich" selten eintreten.
+      //   summonLv3 — Held 0 bekommt Summoning Magic Lv3
+      //   status    — Held 0 bekommt 2 alte Poison-Stacks (appliedTurn -2)
+      //   gold      — CPU-Gold auf 30
+      if (engine._debugCpuTurnsTaken === 2 && process.env.PP_DEBUG_SCENARIO) {
+        const scen = process.env.PP_DEBUG_SCENARIO.split(',');
+        if (scen.includes('summonLv3')) {
+          ps.abilityZones = ps.abilityZones || [];
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            ps.abilityZones[hi] = ps.abilityZones[hi] || [];
+            ps.abilityZones[hi][0] = ['Summoning Magic', 'Summoning Magic', 'Summoning Magic'];
+          }
+          cpuLog('[DEBUG] Szenario summonLv3: ALLE Helden → Summoning Magic Lv3');
+        }
+        if (scen.includes('status')) {
+          const h0 = ps.heroes?.[0];
+          if (h0?.name) {
+            h0.statuses = h0.statuses || {};
+            h0.statuses.poisoned = { stacks: 2, appliedTurn: Math.max(1, gs.turn - 2) };
+            cpuLog('[DEBUG] Szenario status: Held 0 → 2 alte Poison-Stacks');
+          }
+        }
+        if (scen.includes('gold')) { ps.gold = 30; cpuLog('[DEBUG] Szenario gold: 30'); }
+        // school:NAME:LEVEL — beliebige Schule/Ability auf allen Helden
+        for (const sc of scen) {
+          const m = sc.match(/^school:(.+):(\d+)$/);
+          if (!m) continue;
+          ps.abilityZones = ps.abilityZones || [];
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            ps.abilityZones[hi] = ps.abilityZones[hi] || [];
+            ps.abilityZones[hi][1] = Array(parseInt(m[2], 10)).fill(m[1]);
+          }
+          cpuLog(`[DEBUG] Szenario school: alle Helden → ${m[1]} Lv${m[2]}`);
+        }
         engine.sync();
       }
     }
@@ -329,6 +583,33 @@ async function runCpuTurn(engine, helpers) {
     }
   }
 
+  // ── H2 (Vergleichsanalyse): unverbrauchte Summon-Grants hart
+  // ausgeben. Al bestätigt Primordiums Extra-Beschwörung in 100% der
+  // Fälle (5-6×/Spiel, nie abgelehnt); die CPU ließ 26% verfallen —
+  // teils weil die Combo-Schleife den Grant-Typ nicht kannte, teils
+  // weil die Wert-Schwelle Floor-8-Enabler trotz Gratis-Aktion liegen
+  // ließ. Der Grant verfällt am Zugende; ihn zu verschenken ist
+  // praktisch nie richtig (Tempo + Siphem/Teppes-Nebenerträge + H1-
+  // Swap-Präferenz im Slot-Picker greifen zusammen).
+  let grantSafety = 4;
+  while (stillCpuTurn(engine, cpuIdx)
+         && engine.gs.currentPhase === 3
+         && grantSafety-- > 0) {
+    const spend = findSpendableSummonGrantPlay(engine, cpuIdx);
+    // (E2) Findet der v51-Spender einen ausgebbaren Grant? Trennt
+    // "kein Grant/kein Play möglich" von "gefunden, aber gescheitert".
+    swapDiag(engine, spend ? 'grant:spender-findet' : 'grant:spender-leer');
+    if (!spend) break;
+    cpuLog(`→ Summon-Grant-Spender: ${spend.cardName} → Held ${spend.heroIdx}, Slot ${spend.zoneSlot}`);
+    try {
+      await helpers.doPlayCreature(helpers.room, cpuIdx, spend);
+    } catch (err) {
+      cpuLog(`  (Grant-Spender-Play fehlgeschlagen: ${err.message} — Abbruch)`);
+      break;
+    }
+    broadcast(helpers);
+  }
+
   cpuLog(`← Action Phase done (currentPhase=${engine.gs.currentPhase})`);
   if (!stillCpuTurn(engine, cpuIdx)) return;
   // Force-advance if still in Action Phase (no play, or combo ended with the
@@ -364,6 +645,46 @@ async function runCpuTurn(engine, helpers) {
   }
 
   await pausePhase(engine);
+  // ── Board-Erweiterungen des Zuges festhalten (Als Definition) ────
+  // Gezählt wurde JE BESCHWÖRUNG im Wrapper unten; hier nur noch die
+  // Summe des Zuges in Klassen. Al: "Pro Runde MUSS mindestens ein
+  // Wert von 1 bestehen, besser 2 oder mehr."
+  try {
+    if (!engine._inMctsSim && typeof engine._bodyExpandThisTurn === 'number') {
+      const e = engine._bodyExpandThisTurn;
+      swapDiag(engine, `body:erweitert-im-zug:${e >= 3 ? '3plus' : String(e)}`);
+      swapDiag(engine, e >= 1 ? 'body:zug-ok' : 'body:zug-verfehlt');
+      engine._bodyExpandThisTurn = undefined;
+    }
+  } catch { /* Telemetrie */ }
+  // PP_DECK_MONITOR=1: Ressourcen-Telemetrie am Zugende (Deck-Tuning).
+  // Loggt Gold, Handgröße, Zauber in Hand und davon aktuell
+  // unspielbare (kein Held erfüllt Level/Zonen-Anforderung bzw.
+  // Artifact unbezahlbar).
+  if (process.env.PP_DECK_MONITOR === '1' && !engine._inMctsSim) {
+    try {
+      const _ps = engine.gs.players[cpuIdx];
+      const _db = engine._getCardDB();
+      let _spells = 0, _unplayable = 0, _artifacts = 0;
+      for (const n of (_ps.hand || [])) {
+        const cd = _db[n];
+        if (!cd) continue;
+        if (cd.cardType === 'Spell' || cd.cardType === 'Attack') {
+          _spells++;
+          if (listEligibleHeroesForActionCard(engine, cpuIdx, cd).length === 0) _unplayable++;
+        } else if (cd.cardType === 'Artifact') {
+          _artifacts++;
+          if ((Number(cd.cost) || 0) > (_ps.gold || 0)) _unplayable++;
+        }
+      }
+      try {
+        const _hp = (q) => (engine.gs.players[q]?.heroes || []).map(h => h ? (h.hp + (h.defeated ? '†' : '')) : '—').join(',');
+        console.log(`[HPLOG] turn=${engine.gs.turn} p0=[${_hp(0)}] p1=[${_hp(1)}]`);
+      } catch {}
+      console.log(`[MONITOR-HAND] mid=${(_ps.heroes?.[1]?.name || "").slice(0, 4)} cards=${(_ps.hand || []).join("|")}`);
+      console.log(`[MONITOR] mid=${(_ps.heroes?.[1]?.name || "").slice(0, 4)} pi=${cpuIdx} turn=${engine.gs.turn} gold=${_ps.gold} hand=${(_ps.hand || []).length} spells=${_spells} artifacts=${_artifacts} unplayable=${_unplayable}`);
+    } catch {}
+  }
   cpuLog(`advancePhase Main2→End`);
   await engine.advancePhase(cpuIdx);
   broadcast(helpers);
@@ -421,22 +742,24 @@ async function runActionPhase(engine, helpers) {
     // placeSurprises() handles them from the Main Phase. Including them
     // here would let the CPU waste-cast Booby Trap (no effect) or play
     // Pure Advantage Camel / Cactus Creature as a regular creature.
-    if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
+    const _trace = process.env.PP_DEBUG_FORCE_CARD === cardName && !engine._inMctsSim;
+    if ((cd.subtype || '').toLowerCase() === 'surprise') { if (_trace) cpuLog(`[trace] ${cardName}: FILTER subtype=surprise`); continue; }
     // Same Reaction-only opt-out as fireAdditionalActions.
     const script = loadCardEffect(cardName);
-    if (script?.cpuSkipProactive) continue;
-    if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) continue;
+    if (script?.cpuSkipProactive) { if (_trace) cpuLog(`[trace] ${cardName}: FILTER cpuSkipProactive`); continue; }
+    if (!isFirstTurnSafe(engine, cpuIdx, cardName, cd)) { if (_trace) cpuLog(`[trace] ${cardName}: FILTER isFirstTurnSafe`); continue; }
     // Per user spec: if this is an Attack/Spell whose enemy-side targets are
     // ALL immune right now, don't even consider it — better to skip the
     // action entirely than waste a card on an immune target. Creatures are
     // exempt (the body still lands even if their onPlay fizzles).
-    if (!cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cd)) continue;
+    if (!cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cd)) { if (_trace) cpuLog(`[trace] ${cardName}: FILTER cardHasAnyViableEnemyTarget`); continue; }
 
     // Enumerate one candidate per eligible hero — MCTS evaluates hero
     // assignment as a decision dimension instead of collapsing to the
     // heuristic-picked hero. If no hero is eligible, skip the card.
     const eligible = listEligibleHeroesForActionCard(engine, cpuIdx, cd);
-    if (!eligible.length) continue;
+    if (!eligible.length) { if (_trace) cpuLog(`[trace] ${cardName}: FILTER keine eligible Heroes`); continue; }
+    if (_trace) cpuLog(`[trace] ${cardName}: KANDIDAT (heroes=${eligible.map(e=>e.hi).join(',')})`);
 
     // For Creatures: always route to the hero with the LOWEST matching
     // spell-school level among eligible heroes (tightest-fit rule —
@@ -476,6 +799,23 @@ async function runActionPhase(engine, helpers) {
       // burn its real action on a card that should have been free. Defer
       // them entirely to fireAdditionalActions in Main Phase.
       if (v.isInherentAction) continue;
+      // ── Karten-Vertrag cpuPlayVeto ──
+      // Kartenlokale "dieser Play ist gerade nutzlos"-Prüfung (z. B.
+      // Heal ohne verletztes Ziel, ohne Nao-Overheal und ohne
+      // healReversed-Gegner). Eval-Rauschen im MCTS lässt Nutzlos-Plays
+      // sonst gelegentlich über den Pass-Vergleich rutschen — der Veto
+      // nimmt sie aus der Enumeration. additional:false = regulärer
+      // Action-Play (Friendships Draw-Rider zählt hier NICHT, der
+      // hängt am Additional-Action-Grant).
+      {
+        const _vsc = loadCardEffect(cardName);
+        if (typeof _vsc?.cpuPlayVeto === 'function') {
+          let _veto = false;
+          try { _veto = !!_vsc.cpuPlayVeto(engine, cpuIdx, heroIdx, { additional: false }); }
+          catch { _veto = false; }
+          if (_veto) continue;
+        }
+      }
       // `casterAtk` is the casting hero's CURRENT atk stat — used by the
       // candidate-ranking tiebreak so Attack candidates that score
       // similarly under MCTS deterministically resolve to the higher-
@@ -635,12 +975,51 @@ async function runActionPhase(engine, helpers) {
     }
   }
 
+  // ε-Exploration mit Defizit-Trigger. Basis: mit Wahrscheinlichkeit ε
+  // den Novelty-Kandidaten (wenigste bisherige Versuche, historisch
+  // geseedet) an die Spitze ziehen. Verstärkung: Enthält die Liste
+  // einen MASSIV unter-explorierten Kandidaten (≤ max(2, 5 % des
+  // Maximums) bei etablierten Zählern), steigt die Wahrscheinlichkeit
+  // auf min(0.5, 3ε) — sonst verpufft das ε-Budget in den vielen
+  // Phasen, in denen ohnehin nur gut erforschte Karten zur Wahl stehen,
+  // während die seltene Phase mit The-Cosmic-Depths-in-Hand ungenutzt
+  // vorbeizieht (empirisch: 4 % Spielabdeckung ohne Boost).
+  if (candidates.length > 1 && EXPLORE_EPS && !engine._inMctsSim
+      && engine._isSelfPlay && process.env.PP_TRAIN_EVAL !== '1') {
+    let minSeen = Infinity, maxSeen = 0;
+    for (const c of candidates) {
+      const seen = _exploreAttempts.get(c.cardName) || 0;
+      if (seen < minSeen) minSeen = seen;
+      if (seen > maxSeen) maxSeen = seen;
+    }
+    const deficit = maxSeen >= 20 && minSeen <= Math.max(2, Math.floor(maxSeen * 0.05));
+    const p = deficit ? Math.min(0.5, EXPLORE_EPS * 3) : EXPLORE_EPS;
+    if (Math.random() < p) {
+      const novel = pickNoveltyCandidate(candidates);
+      const ri = candidates.indexOf(novel);
+      if (ri > 0) {
+        candidates.splice(ri, 1);
+        candidates.unshift(novel);
+      }
+      cpuLog(`  [explore] Action Phase: Novelty-Kandidat "${candidates[0].cardName}" (${_exploreAttempts.get(candidates[0].cardName) || 0} Versuche${deficit ? ', Defizit-Boost' : ''}) an die Spitze (ε=${EXPLORE_EPS})`);
+    }
+  }
+
+  // Design-Regel (Al): Eine verfügbare Aktion soll, sofern irgendein
+  // Kandidat spielbar ist, IMMER genutzt werden — sie verfallen zu
+  // lassen ist praktisch nie richtig. Deshalb greift der Deadline-Bail
+  // erst NACH dem ersten Play-Versuch: Wenn das (mit Profilen teurere)
+  // Kandidaten-Ranking das Zug-Budget aufgefressen hat, wird der
+  // Top-Kandidat trotzdem noch direkt gespielt (der Play selbst ist
+  // billig — teuer war nur die Bewertung).
+  let attemptedAny = false;
   for (const pick of candidates) {
     if (!stillCpuTurn(engine, cpuIdx)) return false;
-    if (cpuPastDeadline(engine)) {
-      cpuLog(`  Action Phase: turn deadline hit — bailing`);
+    if (cpuPastDeadline(engine) && attemptedAny) {
+      cpuLog(`  Action Phase: turn deadline hit — bailing (nach ${attemptedAny ? 'mind. einem' : 'keinem'} Versuch)`);
       return false;
     }
+    attemptedAny = true;
     if (engine.gs.currentPhase !== 3) {
       cpuLog(`  Action Phase: currentPhase=${engine.gs.currentPhase}, early-exit`);
       return true;
@@ -655,6 +1034,7 @@ async function runActionPhase(engine, helpers) {
     }
     const hoptBefore = abilityHoptKey ? gs.hoptUsed?.[abilityHoptKey] : null;
     cpuLog(`    → Action Phase try: ${pick.cardType} "${pick.cardName}" (lvl ${pick.level}) hero=${pick.heroIdx}${pick.scriptedTargetPlan ? ' [scripted targets]' : ''}`);
+    noteExploreAttempt(engine, pick.cardName);
     await pausePhase(engine);
     // If MCTS found a better target plan than the heuristic, inject it so the
     // real play follows it. The promptEffectTarget override consumes entries
@@ -682,9 +1062,10 @@ async function runActionPhase(engine, helpers) {
         const slotTaken = zoneSlot != null
           && (((ps3.supportZones?.[pick.heroIdx] || [])[zoneSlot] || []).length > 0);
         if (zoneSlot == null || zoneSlot < 0 || slotTaken) {
-          zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx);
+          zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx, pick.cardName);
         }
         if (zoneSlot < 0) { skipCreatureForNoSlot = true; return; }
+        maybeSetCrossSideHint(engine, cpuIdx, pick.cardName);
         await helpers.doPlayCreature(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
@@ -692,6 +1073,7 @@ async function runActionPhase(engine, helpers) {
           zoneSlot,
         });
       } else {
+        noteDamageImpact(engine, cpuIdx, pick.cardName);
         await helpers.doPlaySpell(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
@@ -808,6 +1190,77 @@ async function tryAscend(engine, helpers) {
 }
 
 async function runMainPhase(engine, helpers) {
+  // Swap-Diagnose, Verfügbarkeits-Ebene: EINMAL je eigenem Zug die
+  // Ausgangslage festhalten — wie viele Handkarten könnten überhaupt
+  // einen Zyklus-Zug machen, und existiert ein bounce-bares Ziel?
+  // Erst im Verhältnis dazu ist eine Swap-Rate interpretierbar.
+  try {
+    const _dpi = engine._cpuPlayerIdx;
+    if (!engine._inMctsSim && typeof _dpi === 'number'
+        && (engine._swapDiagTurn || {})[_dpi] !== engine.gs?.turn) {
+      if (!engine._swapDiagTurn) engine._swapDiagTurn = {};
+      engine._swapDiagTurn[_dpi] = engine.gs?.turn;
+      const dps = engine.gs.players[engine._cpuPlayerIdx];
+      const cardDB = engine._getCardDB();
+      let handSwappers = 0, anyTarget = 0;
+      const seen = new Set();
+      for (const cn of (dps?.hand || [])) {
+        if (seen.has(cn)) continue;
+        seen.add(cn);
+        const cd = cardDB[cn];
+        if (!cd || cd.cardType !== 'Creature') continue;
+        const sc = loadCardEffect(cn);
+        if (typeof sc?.canPlaceOnOccupiedSlot !== 'function') continue;
+        handSwappers++;
+        for (let hi = 0; hi < (dps.heroes || []).length && !anyTarget; hi++) {
+          const h = dps.heroes[hi];
+          if (!h?.name || h.hp <= 0) continue;
+          for (let z = 0; z < 3; z++) {
+            if (!((dps.supportZones?.[hi] || [])[z] || []).length) continue;
+            try {
+              if (sc.canPlaceOnOccupiedSlot(engine.gs, engine._cpuPlayerIdx, hi, z, engine)) { anyTarget = 1; break; }
+            } catch { /* Slot unklar */ }
+          }
+        }
+      }
+      // (D) Board-Füllstand: Als Ziel ist "mehr Kreaturen raus", und die
+      // Bounce-Ziele stammen aus genau diesem Bestand. Ohne die Zahl
+      // lässt sich nicht sagen, ob das Board wächst oder stagniert.
+      let boardCreatures = 0, oldCreatures = 0;
+      for (let hi = 0; hi < (dps.heroes || []).length; hi++) {
+        for (let z = 0; z < 3; z++) {
+          const nm = ((dps.supportZones?.[hi] || [])[z] || [])[0];
+          if (!nm) continue;
+          const cd2 = cardDB[nm];
+          if (!cd2 || cd2.cardType !== 'Creature') continue;
+          boardCreatures++;
+          const inst = (engine.cardInstances || []).find(ci => ci
+            && ci.zone === 'support' && ci.heroIdx === hi && ci.zoneSlot === z
+            && (ci.controller ?? ci.owner) === engine._cpuPlayerIdx);
+          if (inst && inst.turnPlayed < engine.gs.turn) oldCreatures++;
+        }
+      }
+      swapDiag(engine, `turn:board:${Math.min(boardCreatures, 6)}`);
+      // Zähler für Board-Erweiterungen dieses Zuges zurücksetzen.
+      engine._bodyExpandThisTurn = 0;
+      swapDiag(engine, `turn:board-old:${Math.min(oldCreatures, 6)}`);
+      // (E) Primordium-Grants: Als "besser 2+ dank Primordium" hängt
+      // daran, dass Grants überhaupt erteilt UND ausgegeben werden.
+      try {
+        let grants = 0;
+        for (const ci of (engine.cardInstances || [])) {
+          if (!ci || ci.zone !== 'support') continue;
+          if ((ci.controller ?? ci.owner) !== engine._cpuPlayerIdx) continue;
+          const g = ci.counters?.aaGrants || {};
+          for (const k in g) if (g[k] > 0) grants += g[k];
+        }
+        if (grants > 0) swapDiag(engine, `turn:grants-offen:${Math.min(grants, 3)}`);
+      } catch { /* Telemetrie */ }
+      swapDiag(engine, `turn:hand-swappers:${Math.min(handSwappers, 4)}`);
+      swapDiag(engine, anyTarget ? 'turn:target-available' : 'turn:no-target');
+      swapDiag(engine, `turn:handsize:${(dps?.hand || []).length >= 7 ? '7+' : 'lt7'}`);
+    }
+  } catch { /* Telemetrie */ }
   for (let guard = 0; guard < 12; guard++) {
     if (cpuPastDeadline(engine)) { cpuLog('  MainPhase: turn deadline hit — bailing'); return; }
     const before = snapshotProgress(engine);
@@ -880,6 +1333,7 @@ async function activateBoardEffects(engine, helpers) {
   await activateFreeAbilities(engine, helpers);
   if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
   await activateCreatureEffects(engine, helpers);
+  await activateAreaEffects(engine, helpers);
   if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
   await activateHeroEffects(engine, helpers);
   if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
@@ -925,6 +1379,28 @@ async function activateHeroEffects(engine, helpers) {
       const script = loadCardEffect(hero.name);
       const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
       let available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      // Zug-beendende Hero-Effekte (heroEffectEndsTurn, z. B. Cooldin)
+      // sind in Main Phase 1 GESPERRT: Ein Feuern dort verschenkt die
+      // Action Phase + MP2. In MP2 (Phase 4) bietet derselbe Pass sie
+      // regulär an — dort kostet das Zugende fast nichts mehr.
+      if (available && script?.heroEffectEndsTurn && gs.currentPhase === 2) {
+        cpuLog(`      hero-effect "${hero.name}": endsTurn — aufgeschoben auf Main Phase 2`);
+        available = false;
+      }
+      // ── Held-Vertrag: cpuShouldUseHeroEffect ─────────────────────────
+      // CPU-seitiges Soft-Gate analog zu cpuShouldPlay: side-effect-freie
+      // Probe, ob die Aktivierung strategisch Sinn ergibt. Erstnutzer:
+      // Kazena (Draw-to-7 überspringen, wenn der Refill das Deck leeren
+      // würde — harte Suizid-Bremse; die weiche Regulierung übernimmt
+      // der Deck-Nähe-Term in evaluateState über die MCTS-Arme).
+      if (available && typeof script?.cpuShouldUseHeroEffect === 'function') {
+        try {
+          available = !!script.cpuShouldUseHeroEffect(engine, cpuIdx, hi);
+        } catch (err) {
+          console.error(`[cpu] cpuShouldUseHeroEffect ${hero.name} threw:`, err.message);
+        }
+        if (!available) cpuLog(`      hero-effect "${hero.name}": cpuShouldUseHeroEffect → skip`);
+      }
       if (available && script.canActivateHeroEffect) {
         try {
           const inst = engine.cardInstances.find(c =>
@@ -1123,6 +1599,14 @@ async function activateFreeAbilities(engine, helpers) {
         if (!script?.freeActivation || !script.onFreeActivate) continue;
         const hoptKey = `free-ability:${abilityName}:${cpuIdx}`;
         if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
+        // Harte CPU-Restriktion (Als Ruling): Draw-Aktivierungen wie
+        // Alchemy NIEMALS unter Hand- oder Draw-Lock zünden — der
+        // Zieh-Teil fizzlet (actionDrawFromPotionDeck liefert []), das
+        // Gold ist verschwendet. Karten opten per
+        // cpuSkipActivationWhenDrawLocked ein; der Engine-Pfad für
+        // Menschen bleibt bewusst unangetastet.
+        if (script.cpuSkipActivationWhenDrawLocked
+            && (gs.players[cpuIdx]?.handLocked || gs.players[cpuIdx]?.drawLocked)) continue;
         // Pre-check `canFreeActivate` so we don't fire the gate on
         // abilities whose activation would self-reject inside
         // `doActivateFreeAbility` (e.g. Alchemy with insufficient
@@ -1158,12 +1642,37 @@ async function activateFreeAbilities(engine, helpers) {
             continue;
           }
         }
-        pick = { heroIdx: hi, zoneIdx: zi, abilityName, key };
-        break;
+        // ── STÄRKSTE KOPIE ZUERST (1.8., Als Report) ──────────────
+        // HOPT für freie Abilities gilt je NAME und Spieler
+        // (`free-ability:<Name>:<pi>`), es feuert also nur EINE Kopie
+        // pro Zug. Gesammelt wurde bisher in Heldenreihenfolge, und die
+        // erste passende gewann.
+        //
+        // Belegt im Mitschnitt: die CPU hatte Leadership DREIFACH auf
+        // Layn (Held 1) und kopierte per Charme zusätzlich ein
+        // Leadership Lv1 von Als Ingo auf Cute Nerd Magenta (Held 0) —
+        // dann feuerte die schwache Kopie und verbrauchte damit die
+        // einzige Nutzung des Zuges (`leadership_shuffle count 1
+        // level 1` statt count 5 aus Lv3).
+        //
+        // Deshalb: Kandidaten sammeln statt beim ersten abzubrechen und
+        // je Ability-Namen die HÖCHSTE Stufe nehmen. Die Reihenfolge
+        // ZWISCHEN verschiedenen Abilities bleibt wie gehabt (der erste
+        // gefundene Name gewinnt) — nur innerhalb desselben Namens wird
+        // aufgestuft.
+        const kandidat = { heroIdx: hi, zoneIdx: zi, abilityName, key, level: slot.length };
+        if (!pick || (pick.abilityName === abilityName && kandidat.level > pick.level)) {
+          pick = kandidat;
+        }
+        // Weiter suchen, solange es noch stärkere Kopien DESSELBEN
+        // Namens geben kann; einen anderen Namen übernehmen wir nicht.
       }
-      if (pick) break;
+      if (pick && pick.level >= 3) break;
     }
     if (!pick) return;
+    if (pick.level > 1) {
+      cpuLog(`      [free-ability] "${pick.abilityName}" Lv${pick.level} auf Held ${pick.heroIdx} gewählt (stärkste Kopie)`);
+    }
 
     const hoptKey = `free-ability:${pick.abilityName}:${cpuIdx}`;
     const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
@@ -1174,8 +1683,11 @@ async function activateFreeAbilities(engine, helpers) {
     // gold→card trades), and (b) cards opting into `cpuMeta.alwaysCommit`
     // (Luck — no immediate state delta, only a future-turn payoff that
     // the eval can't see, but functionally a free reactive draw).
-    const pickAbilityAlwaysCommit = !!pickAbilityScript?.blockedByHandLock
-      || !!pickAbilityScript?.cpuMeta?.alwaysCommit;
+    const pickAbilityAlwaysCommit = liftCommitBypassForDraws(engine, cpuIdx,
+      !!pickAbilityScript?.blockedByHandLock || !!pickAbilityScript?.cpuMeta?.alwaysCommit,
+      // blockedByHandLock markiert Draw-/Tutor-Abilities generisch — am
+      // kleinen Deck sollen genau die durchs reguläre Gate.
+      !!pickAbilityScript?.blockedByHandLock || !!pickAbilityScript?.cpuMeta?.activationDraws);
     const committed = await mctsGatedActivation(engine, helpers, `free-ability ${pick.abilityName}`,
       () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
       { alwaysCommit: pickAbilityAlwaysCommit });
@@ -1183,6 +1695,43 @@ async function activateFreeAbilities(engine, helpers) {
     cpuLog(`      ← free ability "${pick.abilityName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
     if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
     await pauseAction(engine);
+  }
+}
+
+// ── Proaktive Area-Aktivierung ──
+// Die Engine-Infrastruktur (areaEffect-Contract, getActivatableAreas,
+// activateAreaEffect + HOPT) existierte komplett, wurde aber nur vom
+// UI-Klickpfad konsumiert — KEIN CPU-Pass enumerierte Areas als
+// Kandidaten. Folge: Slippery Ice (dessen onAreaEffect sogar einen
+// eigenen MCTS-Multi-Move-Planner mitbringt), Deepsea Castle & Co.
+// waren für Bots unsichtbar. Dieser Pass spiegelt das Muster von
+// activateCreatureEffects: enumerieren → pro Area einmal pro Zug durchs
+// Gate (Rollout misst den echten Wert der Aktivierung).
+async function activateAreaEffects(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  const tried = new Set();
+  for (let safety = 0; safety < 6; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    const areas = (engine.getActivatableAreas(cpuIdx) || [])
+      .filter(a => a.canActivate && !tried.has(`${a.areaName}|${a.areaOwner}`));
+    const pick = areas[0];
+    if (!pick) return;
+    tried.add(`${pick.areaName}|${pick.areaOwner}`);
+    const script = loadCardEffect(pick.areaName);
+    cpuLog(`      → activate area effect "${pick.areaName}" (owner=${pick.areaOwner})`);
+    // alwaysCommit-Bypass wird für draw-Aktivierungen (cpuMeta.
+    // activationDraws, z.B. Divine Gift of Balance) bei gefährlich
+    // kleinem Deck aufgehoben: dann entscheidet das MCTS-Gate regulär,
+    // und der Deck-Nähe-Term in evaluateState sieht den Draw im
+    // Commit-Arm — Aufziehen in die Deckwand wird geskippt, ein
+    // sicherer Value-Draw feuert weiter.
+    const commitBypass = liftCommitBypassForDraws(engine, cpuIdx,
+      script?.cpuMeta?.alwaysCommit, script?.cpuMeta?.activationDraws);
+    const committed = await mctsGatedActivation(engine, helpers, `area-effect ${pick.areaName}`,
+      () => engine.activateAreaEffect(cpuIdx, pick.areaOwner, pick.areaName),
+      { alwaysCommit: commitBypass,
+        evaluateThroughTurnEnd: !!script?.cpuMeta?.evaluateThroughTurnEnd });
+    cpuLog(`      ← area effect "${pick.areaName}" ${committed ? 'OK' : 'SKIPPED'}`);
   }
 }
 
@@ -1249,7 +1798,10 @@ async function activateCreatureEffects(engine, helpers) {
     const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
     const pickScript = loadCardEffect(pick.cardName);
-    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
+    const pickAlwaysCommit = (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
+      ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
+      : !!pickScript?.cpuMeta?.alwaysCommit);
     const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
       () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
@@ -1317,6 +1869,24 @@ function detectDiscardSensitiveSummon(script, engine, pi) {
   return beforeRes && !afterRes;
 }
 
+// ── Impact-Merkmale für den Schadens-Lernkanal ───────────────────────
+// Karten mit `cpuProjectedDamage` melden Schaden + Zielliste; hier
+// entstehen daraus die drei Merkmale, deren RELATIVE Gewichte das Profil
+// im Training selbst ermittelt: Gesamtschaden, Hero-Kills, Creature-Kills.
+// Bewusst getrennt geführt statt vorab verrechnet — welche Währung gilt,
+// soll gelernt und nicht hier hart gesetzt werden.
+function noteDamageImpact(engine, pi, cardName) {
+  try {
+    if (engine._inMctsSim || !cardName) return;
+    // Eine Quelle für Logging UND Verbrauch — sonst driften Trainings-
+    // Merkmale und Laufzeit-Score auseinander.
+    const f = deckProfile.projectImpactFeatures(engine, pi, cardName);
+    if (!f) return;
+    if (!engine._damageImpactLog) engine._damageImpactLog = [];
+    engine._damageImpactLog.push({ pi, c: cardName, t: engine.gs?.turn || 1, dmg: f.dmg, hk: f.hk, ck: f.ck });
+  } catch { /* Telemetrie darf nie stören */ }
+}
+
 async function playDiscardSensitiveCreatures(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
@@ -1362,17 +1932,23 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
         const typeId = engine.findAdditionalActionForCard(cpuIdx, cardName, heroIdx);
         if (!typeId) continue;
       }
-      const zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx);
+      const zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx, cardName);
       if (zoneSlot < 0) continue;
       pick = { cardName, handIdx, heroIdx, zoneSlot };
       break;
     }
     if (!pick) return;
 
+    // Tags der gewählten Karte VOR dem Play (nach dem Play ist sie weg
+    // und das Board verändert — die Lage muss zum Zeitpunkt der
+    // Entscheidung erfasst werden).
+    let _pickTags = null;
+    try { _pickTags = deckProfile.classifyPlayOrderTags(engine, cpuIdx, pick.cardName); } catch {}
     const handLenBefore = ps.hand.length;
     cpuLog(`      → discard-sensitive creature "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
     const actionFn = async () => {
-      await helpers.doPlayCreature(helpers.room, cpuIdx, {
+      maybeSetCrossSideHint(engine, cpuIdx, pick.cardName);
+        await helpers.doPlayCreature(helpers.room, cpuIdx, {
         cardName: pick.cardName,
         handIndex: pick.handIdx,
         heroIdx: pick.heroIdx,
@@ -1389,9 +1965,22 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
     const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
     const committed = await mctsGatedActivation(engine, helpers, `discard-sensitive ${pick.cardName}`, actionFn,
       { alwaysCommit: true, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
+    // Gleiche Falle wie im Zusatz-Aktions-Pfad: dieser Zweig nutzt
+    // denselben pickCreatureZoneSlot und kann damit ebenfalls auf einem
+    // besetzten Slot landen — dann bleibt die Handlänge gleich und ein
+    // geglückter Play würde als Fehlschlag in `tried` wandern. Heute
+    // tragen die Discard-sensitiven Kreaturen (Guardian Beasts) den
+    // Swap-Vertrag nicht, der Fall ist also vorsorglich abgedeckt.
     const shrank = ps.hand.length < handLenBefore;
-    cpuLog(`      ← discard-sensitive "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
-    if (!committed || !shrank) tried.add(pick.cardName + '|' + pick.handIdx);
+    let placed = shrank;
+    if (!placed) {
+      try {
+        placed = (ps.supportZones || []).some(hz => (hz || []).some(sl =>
+          (sl || [])[0] === pick.cardName));
+      } catch {}
+    }
+    cpuLog(`      ← discard-sensitive "${pick.cardName}" ${committed && placed ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || !placed) tried.add(pick.cardName + '|' + pick.handIdx);
     await pauseAction(engine);
   }
 }
@@ -1452,7 +2041,39 @@ async function playArtifacts(engine, helpers) {
     const pickScript = loadCardEffect(pick.cardName);
     const pickIsDrawOnly = !!pickScript?.blockedByHandLock;
     const pickEvalThroughTurnEnd = !!pickScript?.cpuMeta?.evaluateThroughTurnEnd;
-    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    // ── Status-Heilungs-Lernkanal ──
+    // Karten mit cpuMeta.statusHealChannel (Coffee/Tea/Beer/Juice):
+    // gelernte Kontext-Regel > Trainings-Exploration > Gate. Die
+    // finale Entscheidung wird mit Kontext-Tags gestempelt, damit der
+    // Trainer lernt, WANN Status-Heilung die Handkarte wert ist.
+    // Verfügbarkeits-Zähler: Beantwortet für seltene Artifacts die
+    // Diagnose-Frage "nie möglich oder vom Piloten abgelehnt?" ohne
+    // manuelle Einzeluntersuchung (Slippery-Ice/Coffee/Ankh-Klasse).
+    if (!engine._inMctsSim) {
+      if (!engine._artifactPickStats) engine._artifactPickStats = [Object.create(null), Object.create(null)];
+      const st = engine._artifactPickStats[cpuIdx];
+      st[pick.cardName] = (st[pick.cardName] || 0) + 1;
+    }
+    const isStatusHeal = !!pickScript?.cpuMeta?.statusHealChannel;
+    let healTags = null, healDecision = null;
+    if (isStatusHeal) {
+      healTags = deckProfile.classifyStatusHealContext(engine, cpuIdx);
+      healDecision = deckProfile.statusHealDecision(engine, cpuIdx, pick.cardName, healTags);
+      if (healDecision === 'skip') {
+        try {
+          if (!engine._inMctsSim) {
+            if (!engine._statusHealLog) engine._statusHealLog = [];
+            engine._statusHealLog.push({ pi: cpuIdx, c: pick.cardName, t: engine.gs?.turn || 0, tags: healTags, fired: 0 });
+          }
+        } catch { /* nie stören */ }
+        tried.add(pick.cardName);
+        continue;
+      }
+    }
+    // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
+    const pickAlwaysCommit = (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
+      ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
+      : !!pickScript?.cpuMeta?.alwaysCommit);
     // Equipment / Artifact-Creature plays are long-term investments: the
     // body lands on the board and pays off over many turns. The
     // immediate-state gate sees only "−gold −1 hand card +30 slot",
@@ -1465,12 +2086,30 @@ async function playArtifacts(engine, helpers) {
     const pickIsEquipment = pick.kind === 'equipment' || pick.kind === 'artifactCreature';
     const committed = await mctsGatedActivation(engine, helpers, `artifact ${pick.cardName}`, actionFn,
       {
-        alwaysCommit: pickIsDrawOnly || pickIsEquipment || pickAlwaysCommit,
+        alwaysCommit: liftCommitBypassForDraws(engine, cpuIdx, pickIsDrawOnly, true)
+          || pickIsEquipment
+          || liftCommitBypassForDraws(engine, cpuIdx, pickAlwaysCommit, !!pickScript?.cpuMeta?.activationDraws)
+          || healDecision === 'play',
         evaluateThroughTurnEnd: pickEvalThroughTurnEnd,
       });
     const myCardCountAfter = ps.hand.filter(n => n === pick.cardName).length;
-    const consumed = myCardCountAfter < myCardCountBefore;
+    // Magic Gems können per keepInHand in der Hand BLEIBEN (discard einer
+    // anderen Karte) — der Per-Name-Zähler meldet dann fälschlich FAILED
+    // und `tried` sperrte die Karte. Der HOPT-Claim ist das verlässliche
+    // Erfolgssignal: Er wird in maybeKeepGemInHand unconditional gesetzt,
+    // sobald der resolve lief.
+    const hoptClaimedNow = engine.gs.hoptUsed?.[`${pick.cardName}:${cpuIdx}`] === engine.gs.turn;
+    const consumed = (myCardCountAfter < myCardCountBefore) || hoptClaimedNow;
     cpuLog(`      ← artifact "${pick.cardName}" ${committed && consumed ? 'OK' : 'SKIPPED/FAILED'} (hand ${handLenBefore}→${ps.hand.length})`);
+    // Status-Heilungs-Log: finale Entscheidung inkl. Gate-Ausgang.
+    if (isStatusHeal) {
+      try {
+        if (!engine._inMctsSim) {
+          if (!engine._statusHealLog) engine._statusHealLog = [];
+          engine._statusHealLog.push({ pi: cpuIdx, c: pick.cardName, t: engine.gs?.turn || 0, tags: healTags, fired: committed && consumed ? 1 : 0 });
+        }
+      } catch { /* nie stören */ }
+    }
     if (!committed || !consumed) tried.add(pick.cardName);
     await pauseAction(engine);
   }
@@ -1632,6 +2271,22 @@ function pickHeroForEquip(engine, pi, cardName, cardData) {
   // it there first — overrides every other selector.
   const ascHi = ascensionTargetHero(engine, pi, cardName, cardData);
   if (ascHi >= 0 && eligible.includes(ascHi)) return ascHi;
+  // Ascension-Equip, aber der Ziel-Held ist nur wegen VOLLER Support-
+  // Slots nicht eligible (lebt, nicht frozen/charmed): NICHT ausweichen.
+  // Ein Summoning Circle auf Jenny ist eine verbrannte Ascension-
+  // Ressource (1-2 Kopien im Deck!) — lieber in der Hand halten, bis
+  // bei Arthor ein Slot frei wird; Kreaturen sterben ständig. Live
+  // beobachtet in Shadows over Blackport: Circle@Jenny/Bill, sobald
+  // Arthors Zonen belegt waren.
+  if (ascHi >= 0) {
+    const ascHero = ps.heroes[ascHi];
+    const blockedOnlyBySlots = ascHero?.name && ascHero.hp > 0
+      && !ascHero.statuses?.frozen && !ascHero.statuses?.charmed;
+    if (blockedOnlyBySlots) {
+      cpuLog(`      [equip] "${cardName}" ist Ascension-Equip für hero=${ascHi}, dessen Slots sind voll — halte statt auszuweichen`);
+      return -1;
+    }
+  }
 
   // Card-specific preference: Slippery Skates / future equipments can export
   // `cpuPrefersEquipTarget(engine, pi, hi, cardData)` to narrow eligible to
@@ -1661,6 +2316,29 @@ function pickHeroForEquip(engine, pi, cardName, cardData) {
     if (Number.isFinite(maxScore) && maxScore > 0) {
       const top = scored.filter(s => s.score === maxScore).map(s => s.hi);
       return top[Math.floor(Math.random() * top.length)];
+    }
+  }
+
+  // Gelernte Platzierungs-Priors (equipPriors, "Equip@Held"): greifen
+  // NACH der Ascension-Priorität und den kartenseitigen Hooks —
+  // handgeschriebenes Plan-Wissen schlägt Statistik (Butterflies-Lehre).
+  // Nur ein klar positiver Prior übernimmt die Wahl; negative Priors
+  // werden gemieden, indem sie im Vergleich verlieren.
+  {
+    let bestHi = -1, bestV = 0;
+    for (const hi of pool) {
+      const heroName = ps.heroes[hi]?.name;
+      if (!heroName) continue;
+      // Karte→Held-Prior (equipPriors) + gelernte Same-Hero-Synergie
+      // (boardPairs): Howitzer zieht zum Shield-of-Life-Träger, sobald
+      // das Paar in den Trainingsdaten Wirkung gezeigt hat.
+      const v = deckProfile.equipPlacementBonus(engine, pi, cardName, heroName)
+        + deckProfile.boardPairBonus(engine, pi, cardName, hi);
+      if (v > bestV) { bestV = v; bestHi = hi; }
+    }
+    if (bestHi >= 0 && bestV >= 4) {
+      cpuLog(`      [equip] gelernter Platzierungs-Prior: "${cardName}" → hero=${bestHi} (+${bestV.toFixed(1)})`);
+      return bestHi;
     }
   }
 
@@ -1719,6 +2397,7 @@ async function playPotions(engine, helpers) {
     if (!pick) return;
 
     const handLenBefore = ps.hand.length;
+    const potCountBefore = ps.hand.filter(n => n === pick.cardName).length;
     cpuLog(`      → use potion "${pick.cardName}"`);
     const actionFn = async () => {
       await helpers.doUsePotion(helpers.room, cpuIdx, {
@@ -1736,15 +2415,23 @@ async function playPotions(engine, helpers) {
     // any "place this card openly in front of you" effect) opt into
     // alwaysCommit so the gate doesn't refuse them just because the
     // immediate post-play eval doesn't see the multi-turn payoff.
-    const pickAlwaysCommit = !!pickScript?.cpuMeta?.alwaysCommit;
+    // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
+    const pickAlwaysCommit = (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
+      ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
+      : !!pickScript?.cpuMeta?.alwaysCommit);
     const committed = await mctsGatedActivation(engine, helpers, `potion ${pick.cardName}`, actionFn,
       {
         alwaysCommit: pickIsDrawOnly || pickAlwaysCommit,
         evaluateThroughTurnEnd: pickEvalThroughTurnEnd,
       });
-    const shrank = ps.hand.length < handLenBefore;
-    cpuLog(`      ← potion "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
-    if (!committed || !shrank) tried.add(pick.cardName);
+    // Erfolg = diese Potion-Kopie wurde verbraucht. NICHT hand.length —
+    // Draw-Potions (Elixir of Quickness: −1 Potion, +3 Karten) lassen
+    // die Hand NETTO WACHSEN; das alte shrank-Kriterium loggte dann
+    // fälschlich SKIPPED/FAILED und sperrte weitere Kopien via tried.
+    const potCountAfter = ps.hand.filter(n => n === pick.cardName).length;
+    const consumed = potCountAfter < potCountBefore;
+    cpuLog(`      ← potion "${pick.cardName}" ${committed && consumed ? 'OK' : 'SKIPPED/FAILED'}`);
+    if (!committed || !consumed) tried.add(pick.cardName);
     await pauseAction(engine);
   }
 }
@@ -2172,14 +2859,94 @@ async function fireAdditionalActions(engine, helpers) {
     // CPU exhausts all other plays before committing to the
     // turn-ending one.
     const handOrder = [];
-    for (let i = 0; i < ps.hand.length; i++) {
-      const s = loadCardEffect(ps.hand[i]);
-      if (!s?.cpuMeta?.cpuDeferUntilLast) handOrder.push(i);
+    // ── Opfer-Bedingung erfüllt → Karte vorziehen (gelernt) ──────────
+    // Als Ruling: sind die Voraussetzungen für eine Opfer-Beschwörung
+    // gerade erfüllt (bei Deepsea "2 Lv-2-Kreaturen bounce-bar" = "DDG
+    // castbar"), soll die CPU HART diese Karte priorisieren, statt die
+    // Konstellation vorher durch andere Plays aufzulösen. Die Hand wurde
+    // bisher schlicht in Reihenfolge durchlaufen — eine erfüllbare
+    // Opfer-Karte hatte keinerlei Vorrang. Erkannt wird das generisch
+    // über den `sacrificeSpec`-Vertrag; die STÄRKE des Vorrangs kommt
+    // aus dem gelernten Gewicht `spec:ready` (Kanal bounceRules), ist
+    // also nicht hartkodiert: ohne Profil bleibt die Reihenfolge exakt
+    // wie bisher, und der Trainer kann die Regel auch widerlegen.
+    const _specFirst = [];
+    if (deckProfile.specReadyPrior(engine, cpuIdx) > 0) {
+      for (let i = 0; i < ps.hand.length; i++) {
+        try {
+          if (deckProfile.sacrificeSpecReady(engine, cpuIdx, ps.hand[i])) _specFirst.push(i);
+        } catch { /* defensiv */ }
+      }
+      if (_specFirst.length) {
+        cpuLog(`  fireAdditionalActions: Opfer-Bedingung erfüllt → ${_specFirst.map(i => ps.hand[i]).join(', ')} vorgezogen`);
+        handOrder.push(..._specFirst);
+      }
     }
+    // ── Ausspiel-Reihenfolge: gelernte Priorität statt Handposition ──
+    // Als Ruling: die CPU soll lernen, WELCHE Karten jede Runde die
+    // höchste Ausspiel-Priorität haben. Bisher lief dieser Block in
+    // ROHER Handreihenfolge — welche der spielbaren Karten zuerst
+    // drankam, hing an ihrer zufälligen Position auf der Hand. Bei
+    // Gratis-Aktionen ist die Reihenfolge aber entscheidend, weil die
+    // ersten Plays die späteren erst ermöglichen (Grant-Geber, Tutor,
+    // Board-Material für Opfer-Beschwörungen).
+    //
+    // Sortiert wird nach gelerntem Kartenwert plus dem Tag-Kanal
+    // `playOrderRules` — beides aus dem Profil, nichts hartkodiert.
+    // Ohne Profil liefern beide 0/null → stabile Sortierung lässt die
+    // Handreihenfolge exakt wie bisher. `cpuDeferUntilLast` bleibt
+    // die harte Nachhut und wird von der Sortierung nicht angetastet.
+    const _orderScore = (i) => {
+      const nm = ps.hand[i];
+      let s = 0;
+      try {
+        const v = deckProfile.learnedCardValue(engine, cpuIdx, nm);
+        if (typeof v === 'number') s += v * 0.1;
+        s += deckProfile.playOrderPrior(engine, cpuIdx,
+          deckProfile.classifyPlayOrderTags(engine, cpuIdx, nm));
+      } catch { /* defensiv */ }
+      return s;
+    };
+    const _rank = (arr) => arr
+      .map((i, k) => ({ i, k, s: _orderScore(i) }))
+      .sort((a, b) => (b.s - a.s) || (a.k - b.k))   // stabil bei Gleichstand
+      .map(o => o.i);
+    // ── AUSSPIEL-VORFAHRT (31.7.) ─────────────────────────────────────
+    // Spiegel des vorhandenen `cpuDeferUntilLast`: Karten mit
+    // `cpuMeta.playOrderPriority` (Zahl, größer = früher) gehen VOR das
+    // gelernte Ranking. Grund: bei einem Enabler ist die Reihenfolge
+    // keine Wertfrage, sondern eine KAUSALE Bedingung — er muss vor den
+    // Karten liegen, die er bezahlt, sonst ist sein Grant im selben Zug
+    // nutzlos. Das kann der Wert-Term gar nicht ausdrücken: er geht mit
+    // Faktor 0.1 in den Score ein (Spanne 0.8-10), die gelernten
+    // Reihenfolge-Gewichte mit ±15. Selbst der Maximalwert 100 könnte
+    // einen negativen Tag nicht überstimmen.
+    // Gemessen im v111-Lauf: Werewolf 541 Plays über den Gratis-Pfad,
+    // Primordium 46 — der Enabler kam 12× seltener zum Zug als die
+    // Karte, die er finanziert.
+    // Ohne den Vertrag ändert sich nichts (Liste bleibt leer).
+    const _vanguard = [];
     for (let i = 0; i < ps.hand.length; i++) {
-      const s = loadCardEffect(ps.hand[i]);
-      if (s?.cpuMeta?.cpuDeferUntilLast) handOrder.push(i);
+      if (_specFirst.includes(i)) continue;
+      const pr = loadCardEffect(ps.hand[i])?.cpuMeta?.playOrderPriority;
+      if (typeof pr === 'number') _vanguard.push({ i, pr });
     }
+    // Gleichstand innerhalb der Vorhut entscheidet das GELERNTE Ranking,
+    // erst danach die Handposition: der Designer setzt die STUFE ("diese
+    // Karte muss vor die anderen"), die Reihenfolge INNERHALB der Stufe
+    // bleibt lernbar. Ohne Profil ist _orderScore für alle 0 → stabile
+    // Sortierung nach Handposition, also exakt das alte Verhalten.
+    _vanguard.sort((a, b) => (b.pr - a.pr)
+      || (_orderScore(b.i) - _orderScore(a.i))
+      || (a.i - b.i));
+    const _vanIdx = _vanguard.map(o => o.i);
+    const _mainIdx = [], _lastIdx = [];
+    for (let i = 0; i < ps.hand.length; i++) {
+      if (_specFirst.includes(i) || _vanIdx.includes(i)) continue;   // schon vorgezogen
+      const s = loadCardEffect(ps.hand[i]);
+      (s?.cpuMeta?.cpuDeferUntilLast ? _lastIdx : _mainIdx).push(i);
+    }
+    handOrder.push(..._vanIdx, ..._rank(_mainIdx), ..._rank(_lastIdx));
     for (const handIdx of handOrder) {
       const cardName = ps.hand[handIdx];
       const cd = cardDB[cardName];
@@ -2211,20 +2978,88 @@ async function fireAdditionalActions(engine, helpers) {
       // Don't waste Attacks/Spells when every enemy target is immune.
       if (!cardHasAnyViableEnemyTarget(engine, cpuIdx, cardName, cd)) continue;
 
-      const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
-      if (heroIdx < 0) continue;
-
-      const key = cardName + '|' + heroIdx;
-      if (tried.has(key)) continue;
-
-      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [ct]);
-      if (!v) continue;
-      if (!v.isMainPhase) continue;
-      if (!v.isInherentAction) {
-        const typeId = engine.findAdditionalActionForCard(cpuIdx, cardName, heroIdx);
-        if (!typeId) continue;
+      // ── Gedeckten Caster finden (Held-Mismatch-Fix) ──
+      // pickHeroForActionCard rankt nach Schul-Level/Atk-Heuristik und
+      // kennt weder Inherent-Bedingungen (Overheal Shock: SM≥2 auf dem
+      // CASTER) noch heldengebundene Additional-Action-Deckung
+      // (Friendship: heroRestricted, deckt nur Zauber SEINES Helden).
+      // Vorher wurde nur der Heuristik-Held geprüft — lag die Deckung
+      // auf einem anderen Helden, wurde die Karte komplett verworfen
+      // und z. B. Friendships Frei-Zauber verfiel jede Runde. Jetzt:
+      // Heuristik-Held zuerst (bester Caster gewinnt bei Deckung),
+      // danach alle übrigen legalen Helden auf Deckung prüfen.
+      const prefHero = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
+      if (prefHero < 0) continue;
+      const heroOrder = [prefHero];
+      for (const e of listEligibleHeroesForActionCard(engine, cpuIdx, cd)) {
+        if (e.hi !== prefHero) heroOrder.push(e.hi);
       }
-      pick = { cardName, handIdx, heroIdx, cardType: ct };
+      let heroIdx = -1;
+      let _presetSlot = -1;
+      for (const hi of heroOrder) {
+        if (tried.has(cardName + '|' + hi)) continue;
+        // ── Slot ZUERST, dann validieren (Messung 29.7. 14:01) ──────
+        // Der Server lehnte 3702 von 3778 Normal-Beschwörungen ab
+        // ("server-nein"), obwohl das Gate zugestimmt hatte. Ursache ist
+        // eine Asymmetrie in der Legalitätsprüfung: `inherentAction` ist
+        // bei den Deepseas eine FUNKTION, die `opts.zoneSlot` auswertet —
+        // ist der Slot LEER, liefert sie false (kein Zyklus-Zug, also
+        // keine inhärente Gratis-Aktion). Diese Prüfung lief hier bisher
+        // OHNE zoneSlot: die Funktion übersprang den Slot-Test und
+        // meldete true, sobald irgendeine bounce-bare Kreatur existierte.
+        // Anschließend wählte pickCreatureZoneSlot einen FREIEN Slot —
+        // und der Server, der MIT diesem Slot prüft, verwarf den Play
+        // (Main Phase erlaubt Kreaturen nur inhärent oder per Grant).
+        // Ergebnis: tausende Bewertungen für Plays, die nie zustande
+        // kommen konnten. Jetzt wird der Slot vor der Validierung
+        // bestimmt und mitgegeben — die CPU sieht dieselbe Legalität
+        // wie der Server.
+        const trySlot = (ct === 'Creature')
+          ? pickCreatureZoneSlot(engine, cpuIdx, hi, cardName) : -1;
+        if (ct === 'Creature' && trySlot < 0) continue;
+        const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, hi, [ct],
+          ct === 'Creature' ? { zoneSlot: trySlot } : undefined);
+        if (!v || !v.isMainPhase) continue;
+        // Dasselbe `canSummon`-Gate wie der Server (siehe cpuCanSummonHere).
+        if (ct === 'Creature' && !cpuCanSummonHere(engine, cpuIdx, cardName, hi)) {
+          swapDiag(engine, 'pick:cansummon-nein');
+          swapDiag(engine, `cansummon-nein:${cardName}`);
+          continue;
+        }
+        if (!v.isInherentAction) {
+          // ── Grant-Lebenszyklus, Station "Nachsehen" ────────────────
+          // Messung 29.7. 21:17: die CPU spielt Primordium 2.29×/Spiel,
+          // kommt aber nur auf 0.61 grant-finanzierte Beschwörungen —
+          // und Ablehnungen erklären das NICHT (server-nein 85,
+          // declined 16). Die Plays werden also gar nicht versucht: an
+          // dieser Stelle fällt die Karte still per `continue` heraus,
+          // wenn kein Grant vorliegt. Ohne Zähler war dieser häufigste
+          // Ausgang unsichtbar. Al erreicht 0.86 Grants je RUNDE, die
+          // CPU 0.09 je Zug — Faktor 10.
+          if (!engine.findAdditionalActionForCard(cpuIdx, cardName, hi)) {
+            swapDiag(engine, `grant:kein-grant-beim-check:mp${engine.gs?.currentPhase === 4 ? '2' : '1'}`);
+            continue;
+          }
+          swapDiag(engine, `grant:gefunden:mp${engine.gs?.currentPhase === 4 ? '2' : '1'}`);
+        }
+        _presetSlot = trySlot;
+        // Karten-Vertrag cpuPlayVeto — additional:true, weil dieser
+        // Pfad Frei-/Zusatz-Aktionen spielt (Friendships Draw-Rider
+        // greift hier, Heal für 0 + 3 Draws kann sich lohnen).
+        {
+          const _vsc = loadCardEffect(cardName);
+          if (typeof _vsc?.cpuPlayVeto === 'function') {
+            let _veto = false;
+            try { _veto = !!_vsc.cpuPlayVeto(engine, cpuIdx, hi, { additional: true }); }
+            catch { _veto = false; }
+            if (_veto) continue;
+          }
+        }
+        heroIdx = hi;
+        break;
+      }
+      if (heroIdx < 0) continue;
+      pick = { cardName, handIdx, heroIdx, cardType: ct, presetSlot: _presetSlot };
       break;
     }
     if (!pick) return;
@@ -2233,18 +3068,29 @@ async function fireAdditionalActions(engine, helpers) {
     cpuLog(`      → fire additional ${pick.cardType.toLowerCase()} "${pick.cardName}" hero=${pick.heroIdx}`);
     let zoneSlot = -1;
     if (pick.cardType === 'Creature') {
-      zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx);
+      // Den bereits VALIDIERTEN Slot übernehmen; ein zweiter Aufruf
+      // könnte einen anderen liefern (die Wahl enthält Zufall) und die
+      // gerade hergestellte Übereinstimmung mit dem Server wieder brechen.
+      zoneSlot = (pick.presetSlot >= 0)
+        ? pick.presetSlot
+        : pickCreatureZoneSlot(engine, cpuIdx, pick.heroIdx, pick.cardName);
       if (zoneSlot < 0) { tried.add(pick.cardName + '|' + pick.heroIdx); continue; }
     }
+    let _playReturn = null;
     const actionFn = async () => {
       if (pick.cardType === 'Creature') {
-        await helpers.doPlayCreature(helpers.room, cpuIdx, {
+        maybeSetCrossSideHint(engine, cpuIdx, pick.cardName);
+        // Rückgabewert festhalten: doPlayCreature meldet mit `false`,
+        // dass der Server den Play abgelehnt hat. Unterscheidet
+        // "Server sagt nein" von "Play lief, bewirkte aber nichts".
+        _playReturn = await helpers.doPlayCreature(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
           heroIdx: pick.heroIdx,
           zoneSlot,
         });
       } else {
+        noteDamageImpact(engine, cpuIdx, pick.cardName);
         await helpers.doPlaySpell(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
@@ -2264,12 +3110,200 @@ async function fireAdditionalActions(engine, helpers) {
     //    immediate state delta). Same flag used by activateFreeAbilities.
     const pickScript = loadCardEffect(pick.cardName);
     const pickAlwaysCommit = !!pickScript?.blockedByHandLock
-      || !!pickScript?.cpuMeta?.alwaysCommit;
+      || (typeof pickScript?.cpuMeta?.alwaysCommit === 'function'
+      ? (() => { try { return !!pickScript.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); } catch { return false; } })()
+      : !!pickScript?.cpuMeta?.alwaysCommit);
+    // Rafflesia-Chain: Ein per Chain-Grant geschenkter Folgezauber ist
+    // GRATIS — das Standard-Gate bewertet ihn aber wie einen normalen
+    // Play und lässt ihn bei marginal negativem Score verfallen.
+    // Threshold stark senken (nicht aufheben: aktiv schädliche Casts
+    // bleiben skippbar). Greift NUR, wenn der castende Held einen
+    // aktiven rafflesia_chain-Grant trägt → alte Decks unberührt.
+    let addlThreshold;
+    try {
+      const _grants = ps.heroes?.[pick.heroIdx]?.counters?.aaGrants || {};
+      if (pick.cardType === 'Spell'
+          && Object.keys(_grants).some(t => t.startsWith('rafflesia_chain_') && _grants[t] > 0)) {
+        addlThreshold = -60;
+      }
+    } catch {}
+    // ── Handneutrale Gratis-Plays: eigene, niedrigere Hürde ──
+    // Als Vergleichsanalyse (Deepsea-Batch 1292 Spiele vs 17 Pilot-Siege):
+    // Dieser ganze Pfad spielt AUSSCHLIESSLICH Gratis-Aktionen (inherent
+    // oder per Grant bezahlt) — bekam aber die Standard-Schwelle +3, die
+    // für Aktionen gedacht ist, die den Zug kosten. Besonders teuer beim
+    // Swap-Play (Kreatur auf besetzten Slot): der Insasse kehrt auf die
+    // Hand zurück, die Handgröße bleibt also GLEICH und das Board tauscht
+    // nur seine Zusammensetzung — die Sofortbewertung sieht ~0 Delta,
+    // während der reale Ertrag (Siphem-Counter, Teppes-Draw, erneuter
+    // On-Summon-Trigger, recyceltes Material als DDG-Tribut) erst später
+    // anfällt. Messbar: die CPU hatte im Median 3 swap-fähige Kreaturen
+    // auf der Hand und machte 0.75 Swaps/Runde, Al 2.4. Im Datensatz
+    // selbst ist der Zusammenhang der stärkste überhaupt — bei GLEICHER
+    // Spiellänge (12-16 HZ): 0-2 Bounces 0% WR, 12-14 Bounces 83% WR.
+    // Deshalb: kostet der Play nichts UND schrumpft die Hand nicht,
+    // genügt "nicht aktiv schädlich". Generisch über den vorhandenen
+    // Slot-Vertrag (canPlaceOnOccupiedSlot) — kein Deck-Wissen.
+    let _pickSlotOccupied = false, _slotBefore = null;
+    if (pick.cardType === 'Creature' && zoneSlot >= 0) {
+      try {
+        _slotBefore = ((ps.supportZones?.[pick.heroIdx] || [])[zoneSlot] || [])[0] || null;
+        _pickSlotOccupied = !!_slotBefore;
+      } catch {}
+    }
+    if (addlThreshold === undefined && pick.cardType === 'Creature' && zoneSlot >= 0) {
+      try {
+        const occupied = _pickSlotOccupied;
+        if (occupied && typeof loadCardEffect(pick.cardName)?.canPlaceOnOccupiedSlot === 'function') {
+          addlThreshold = FREE_SWAP_GATE_THRESHOLD;
+        } else if (!occupied) {
+          // Freie Normal-Beschwörung: ebenfalls eine Gratis-Aktion,
+          // also nicht die Hürde für zugkostende Aktionen anlegen.
+          addlThreshold = FREE_SUMMON_GATE_THRESHOLD;
+        }
+      } catch {}
+    }
+    // ── Ausspiel-Reihenfolge-Tags: HIER berechnen, nicht erst beim Log ──
+    // Die Push-Stelle weiter unten las `_pickTags` — deklariert ist die
+    // Variable aber in einer ANDEREN Funktion (Zeile ~1920). In diesem
+    // Gültigkeitsbereich existiert sie nicht, der Zugriff warf einen
+    // ReferenceError, und das umschließende `try/catch` schluckte ihn
+    // still. Folge: `engine._playOrderLog` blieb IMMER leer, in jedem
+    // Datensatz standen 0 playOrderDecisions und jedes Profil hatte
+    // `playOrderRules: {}`. Der ganze Ausspiel-Reihenfolge-Kanal hat
+    // seit seiner Einführung nie einen einzigen Datenpunkt erzeugt —
+    // und damit auch die Motor-Rollen-Tags aus v107
+    // (pord:grants-action, pord:copies-onsummon, pord:spec-strands)
+    // ins Leere laufen lassen.
+    let _orderTags = null;
+    try {
+      if (!engine._inMctsSim) {
+        _orderTags = deckProfile.classifyPlayOrderTags(engine, cpuIdx, pick.cardName);
+      }
+    } catch { /* Tags sind optional */ }
     const committed = await mctsGatedActivation(engine, helpers, `additional ${pick.cardType} ${pick.cardName}`, actionFn,
-      { alwaysCommit: pickAlwaysCommit });
+      {
+        alwaysCommit: pickAlwaysCommit,
+        overrideThreshold: addlThreshold,
+        // Delta-Diagnose: trennt Zyklus-Züge von Normal-Beschwörungen,
+        // damit die Verteilung je Fall lesbar ist.
+        diagKey: pick.cardType === 'Creature' && zoneSlot >= 0
+          ? (_pickSlotOccupied ? 'swap' : 'normal') : undefined,
+        // `cpuMeta.evaluateThroughTurnEnd` wurde hier bisher NICHT
+        // durchgereicht (nur in den Artefakt-, Equip- und Potion-Pfaden).
+        // Genau dieser Pfad spielt aber die inhärenten Zusatz-Aktions-
+        // Zauber, deren Nutzen erst im weiteren Zugverlauf entsteht —
+        // Torchure schenkt eine zweite Action in der Action Phase, was
+        // die Sofortbewertung nicht sehen kann. Mit dem Rest-des-Zuges-
+        // Rollout wird die Bonus-Action tatsächlich ausgespielt und der
+        // Gewinn sichtbar.
+        evaluateThroughTurnEnd: !!pickScript?.cpuMeta?.evaluateThroughTurnEnd,
+      });
     const shrank = ps.hand.length < handLenBefore;
-    cpuLog(`      ← additional "${pick.cardName}" ${committed && shrank ? 'OK' : 'SKIPPED/FAILED'}`);
-    if (!committed || !shrank) tried.add(pick.cardName + '|' + pick.heroIdx);
+    // ── Erfolgstest, der Zyklus-Züge nicht als Fehlschlag wertet ──────
+    // `shrank` allein ist für Swaps STRUKTURELL falsch: der Tausch legt
+    // eine Handkarte ab und nimmt die verdrängte Kreatur zurück auf die
+    // Hand — die Handlänge bleibt also GLEICH. Jeder geglückte Swap galt
+    // damit als Fehlschlag, landete in `tried` und war für den Rest des
+    // Zuges gesperrt; die Kette brach nach genau einem Tausch je Karte
+    // und Held ab. Genau deshalb bewegte sich die Swap-Rate trotz v83
+    // nicht: das Wert-Gate hatte längst zugestimmt (Delta-Messung:
+    // 1047 von 1530 Swaps über +3, Schwelle −12), der Fehlschlag entstand
+    // ERST danach. Der Bug ist älter als v83.
+    // Robuster Ersatz: hat der Zielslot seinen Inhalt gewechselt? Das
+    // trifft normale Beschwörung (leer → Karte) und Swap (alt → neu)
+    // gleichermaßen und bleibt bei echtem Fehlschlag falsch.
+    let _slotFilled = false;
+    if (pick.cardType === 'Creature' && zoneSlot >= 0) {
+      try {
+        const after = ((ps.supportZones?.[pick.heroIdx] || [])[zoneSlot] || [])[0] || null;
+        _slotFilled = !!after && after !== _slotBefore;
+        // Randfall: Tausch auf eine GLEICHNAMIGE Karte (bei 4 Kopien je
+        // Deepsea keine Seltenheit) — der Name allein verrät den Wechsel
+        // dann nicht. Die frisch platzierte Instanz trägt aber
+        // turnPlayed = aktueller Zug.
+        if (!_slotFilled && after) {
+          const inst = (engine.cardInstances || []).find(ci => ci
+            && ci.zone === 'support' && ci.heroIdx === pick.heroIdx
+            && ci.zoneSlot === zoneSlot && (ci.controller ?? ci.owner) === cpuIdx);
+          if (inst && inst.turnPlayed === engine.gs?.turn) _slotFilled = true;
+        }
+      } catch {}
+    }
+    const played = shrank || _slotFilled;
+    if (pick.cardType === 'Creature' && zoneSlot >= 0) {
+      const wasSwap = _pickSlotOccupied;
+      const kind = wasSwap ? 'swap' : 'normal';
+      // DREI Ausgänge statt zwei. Messung 29.7. 12:24: die Schwelle
+      // kommt an (thr:normal:-12, 3667×) UND die Deltas schlagen sie
+      // (3618 im Bucket −3..0) — trotzdem zählten nur 38 als Commit.
+      // Der alte Zweiwege-Zähler warf "Gate hat abgelehnt" und "Gate
+      // hat zugestimmt, aber der Play kam nicht zustande" in denselben
+      // Topf. Genau diese Unterscheidung entscheidet, wo weitergesucht
+      // wird — Bewertung oder Ausführung.
+      if (!committed) swapDiag(engine, `gate:${kind}-declined`);
+      else if (!played) {
+        swapDiag(engine, `gate:${kind}-failed`);
+        // (A) Warum? Server-Ablehnung vs. wirkungsloser Play.
+        swapDiag(engine, `fail:${kind}:${_playReturn === false ? 'server-nein'
+          : _playReturn === null ? 'nie-aufgerufen' : 'ohne-wirkung'}`);
+        // (C) Welche Karte? Fehlschläge konzentrieren sich erfahrungs-
+        // gemäß auf wenige Karten — das ist der schnellste Hinweis.
+        swapDiag(engine, `failcard:${pick.cardName}`);
+        // ── (F) WARUM GENAU? (30.7.) ─────────────────────────────────
+        // `server-nein` war bisher eine Sackgasse: 1641 Ablehnungen je
+        // Lauf ohne jeden Hinweis auf den Grund. Der Server hält ihn
+        // jetzt selbst in `engine._playRefusal` fest (11 unterschiedene
+        // Ausgänge in doPlayCreature). Bewusst NICHT hier nachgebaut —
+        // genau dieses Nachbauen hat die v103- und v108-Asymmetrien
+        // erzeugt.
+        try {
+          const rf = engine._playRefusal;
+          if (rf && rf.cardName === pick.cardName) {
+            swapDiag(engine, `refuse:${rf.label}`);
+            swapDiag(engine, `refusecard:${pick.cardName}:${rf.label}`);
+            if (rf.detail) swapDiag(engine, `refusewhy:${rf.label}:${rf.detail}`);
+          } else if (_playReturn === false) {
+            // Der Server hat abgelehnt, aber keinen Grund hinterlassen —
+            // dann fehlt eine Instrumentierungsstelle.
+            swapDiag(engine, 'refuse:unbekannt');
+          }
+        } catch { /* Telemetrie darf nie stören */ }
+      }
+      else swapDiag(engine, `gate:${kind}-commit`);
+      // ── DOPPELZÄHLUNG BEHOBEN (30.7.) ────────────────────────────────
+      // Diese Zeile sollte nur die ALTNAMEN weiterführen, stempelte im
+      // Erfolgsfall aber denselben Key `gate:KIND-commit` ein ZWEITES Mal
+      // (der `else`-Zweig darüber hat ihn schon gesetzt). Alle Commit-
+      // Zahlen seit v101 waren dadurch exakt doppelt so hoch: gemessen
+      // 2902 `gate:swap-commit` gegen 1453 echte Bounce-Place-Ereignisse
+      // in der Telemetrie. Gegenprobe, die den Befund festnagelt:
+      // `gate:swap-skip` 959 = declined 455 + failed 504 — der Skip-Pfad
+      // stimmt exakt, weil er nur EINMAL gestempelt wird.
+      // Der Altname wird jetzt nur noch im Skip-Fall gesetzt; für den
+      // Commit-Fall ist `gate:KIND-commit` bereits oben gefallen.
+      if (!(committed && played)) swapDiag(engine, `gate:${kind}-skip`);
+    }
+    cpuLog(`      ← additional "${pick.cardName}" ${committed && played ? 'OK' : 'SKIPPED/FAILED'}`);
+    // Ausspiel-Reihenfolge-Kanal: nur VOLLZOGENE Plays stempeln — die
+    // Tags beschreiben die Lage VOR dem Play (oben berechnet), das Label
+    // liefert später der Spielverlauf.
+    // `played` statt `shrank`: derselbe Grund wie beim Erfolgstest oben —
+    // ein Swap lässt die Handlänge unverändert und wäre sonst nie
+    // geloggt worden. v98 hat das an drei Stellen korrigiert, diese
+    // vierte wurde übersehen.
+    if (committed && played) {
+      try {
+        if (!engine._inMctsSim) {
+          if (!engine._playOrderLog) engine._playOrderLog = [];
+          engine._playOrderLog.push({
+            pi: cpuIdx, c: pick.cardName, t: engine.gs?.turn || 0,
+            tags: _orderTags || [],
+          });
+        }
+      } catch { /* nie stören */ }
+    }
+    if (!committed || !played) tried.add(pick.cardName + '|' + pick.heroIdx);
     await pauseAction(engine);
   }
 }
@@ -2279,16 +3313,106 @@ async function fireAdditionalActions(engine, helpers) {
 // Returns an array of { hi, freeZones? }. Empty array means no hero is
 // eligible. Used by the MCTS candidate expander to evaluate per-hero
 // variations AND by pickHeroForActionCard (the non-MCTS heuristic path).
+
+// ── Cross-Side-Placement-Vertrag (Chilly-Wizard-Klasse) ──
+// Skripte mit `cpuMeta.preferOpponentSupportZone` platzieren bevorzugt in
+// eine freie GEGNERISCHE Support-Zone (Status-Mirror-Lock). Der UI-Pfad
+// setzt dafür `gs._chillyWizardHint` beim Drag — die CPU setzte den Hint
+// nie, wodurch der Cross-Side-Play (und damit die Hero-Lock-Combo) für
+// Bots unspielbar war ("Future CPU bot reads this flag" im Kartenskript).
+// Ziel-Heuristik: lebender Opp-Held mit den meisten HP und freier Zone
+// (stärkster Held = wertvollster Lock). Muss vor JEDEM doPlayCreature-
+// Pfad laufen (Live UND Rollout-Executor), damit Gate-Bewertung und
+// echter Play identisch sind.
+function maybeSetCrossSideHint(engine, cpuIdx, cardName) {
+  try {
+    const script = loadCardEffect(cardName);
+    if (!script?.cpuMeta?.preferOpponentSupportZone) return;
+    const oppIdx = cpuIdx === 0 ? 1 : 0;
+    const oppPs = engine.gs.players[oppIdx];
+    let best = null;
+    for (let hi = 0; hi < (oppPs?.heroes || []).length; hi++) {
+      const h = oppPs.heroes[hi];
+      if (!h?.name || h.hp <= 0) continue;
+      const zones = oppPs.supportZones?.[hi] || [[], [], []];
+      for (let s = 0; s < 3; s++) {
+        if ((zones[s] || []).length === 0) {
+          if (!best || h.hp > best.hp) best = { heroIdx: hi, slotIdx: s, hp: h.hp };
+          break;
+        }
+      }
+    }
+    if (!best) return;
+    if (!engine.gs._chillyWizardHint) engine.gs._chillyWizardHint = {};
+    engine.gs._chillyWizardHint[cpuIdx] = { ownerIdx: oppIdx, heroIdx: best.heroIdx, slotIdx: best.slotIdx };
+  } catch { /* Hint ist optional — Placement fällt auf eigene Zone zurück */ }
+}
+
+/**
+ * Darf diese Karte an DIESEM Helden einen besetzten Slot einnehmen?
+ *
+ * ── ALS RULING (31.7.) ──────────────────────────────────────────────
+ * "Deepsea Swap-Effekte funktionieren EXPLIZIT auch für Creatures von
+ * toten Helden, sowie für Helden ohne die nötigen Abilities, oder
+ * Helden, die Frozen oder Stunned sind. Swaps sind KOMPLETT UNABHÄNGIG
+ * von Heroes."
+ * Die Engine setzt das bereits um (`_bypassDeadHeroFilter` in
+ * _deepsea-shared). Die CPU tat es NICHT: an drei Stellen wurden Helden
+ * vorab nach `hp <= 0`, `frozen`, `stunned` und `heroMeetsLevelReq`
+ * aussortiert, BEVOR die Bounce-Ausnahme überhaupt geprüft wurde.
+ *
+ * Gemessen: 78.5% aller Null-Züge hatten einen tauschbaren Körper, und
+ * 59.7% waren "Ziel vorhanden UND Held tot". `pick:no-motor` ist mit
+ * 1985 Treffern der drittgrößte Blocker in Null-Zügen.
+ *
+ * Antwort kommt aus dem Karten-Vertrag selbst — dieselbe Lehre wie bei
+ * den Legalitäts-Asymmetrien v103/v108: die Karte kennt ihre Regel,
+ * nicht der Pilot. Karten ohne den Vertrag liefern false, für sie
+ * ändert sich nichts.
+ */
+function cardCanBouncePlaceAtHero(engine, pi, heroIdx, cardName) {
+  try {
+    const sc = loadCardEffect(cardName);
+    if (!sc) return false;
+    // ── VERALLGEMEINERT (31.7., nach dem "place"-Sweep) ─────────────
+    // Erste Fassung fragte NUR `getBouncePlacementTargets` — den Vertrag
+    // der Deepsea-Linie. Der Sweep über alle 408 Kreaturen fand 60
+    // Selbst-Platzierer ("place this Creature into …"), davon tragen nur
+    // 16 diesen Vertrag. Die übrigen Mechaniken (Surprise-Platzierung in
+    // FREIE Zonen, Slippery-Zugbeginn-Bewegung, Effekt-Platzierung bei
+    // Defeat/Revive) laufen nicht über den Aktionspfad und bleiben
+    // unberührt — mit EINER Ausnahme: "500 Piranhas in a Monster Suit"
+    // ist ein Handkarten-Play ohne Aktionskosten, das sich selbst in eine
+    // BESETZTE gegnerische Zone platziert. Es trägt
+    // `canBypassFreeZoneRequirement`, aber kein
+    // `getBouncePlacementTargets`, und fiel deshalb durch.
+    if (typeof sc.getBouncePlacementTargets === 'function') {
+      const ts = sc.getBouncePlacementTargets(engine.gs, pi, engine) || [];
+      if (ts.some(t => t && t.heroIdx === heroIdx)) return true;
+    }
+    if (sc.canBypassFreeZoneRequirement || typeof sc.canPlaceOnOccupiedSlot === 'function') return true;
+    return false;
+  } catch { return false; }
+}
+
 function listEligibleHeroesForActionCard(engine, pi, cardData) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   const eligible = [];
   for (let hi = 0; hi < 3; hi++) {
     const hero = ps.heroes[hi];
-    if (!hero?.name || hero.hp <= 0) continue;
-    if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
-    if (hero.statuses?.negated && cardData.cardType === 'Spell') continue;
-    if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+    if (!hero?.name) continue;
+    // Swap-Ausnahme (Als Ruling): ein Tausch auf den Slot dieses Helden
+    // ist von seinem Zustand UNABHÄNGIG — tot, frozen, stunned oder ohne
+    // die nötige Ability spielt keine Rolle. Nur wenn die Karte hier gar
+    // nicht bounce-platzieren KANN, gelten die normalen Schranken.
+    const _swapOk = cardCanBouncePlaceAtHero(engine, pi, hi, cardData?.name);
+    if (!_swapOk) {
+      if (hero.hp <= 0) continue;
+      if (hero.statuses?.frozen || hero.statuses?.stunned) continue;
+      if (hero.statuses?.negated && cardData.cardType === 'Spell') continue;
+      if (!engine.heroMeetsLevelReq(pi, hi, cardData)) continue;
+    }
 
     if (cardData.cardType === 'Creature') {
       const zones = ps.supportZones?.[hi] || [[], [], []];
@@ -2296,36 +3420,102 @@ function listEligibleHeroesForActionCard(engine, pi, cardData) {
       for (let z = 0; z < 3; z++) {
         if ((zones[z] || []).length === 0) freeCount++;
       }
-      if (freeCount === 0) continue;
+      if (freeCount === 0) {
+        // Bounce-Place-Vertrag: Karten mit canBypassFreeZoneRequirement
+        // (Deepsea Bats, Horror Clown …) dürfen laut Engine auch bei
+        // VOLLEN Zonen gespielt werden (Swap: Occupant → Hand, Karte in
+        // dieselbe Zone). Die Brain-Enumeration ignorierte das bisher —
+        // der Mensch konnte swappen, die CPU sah die Karte nie. Genau
+        // in vollen Boards ist der Swap aber am wertvollsten
+        // (Teppes/Siphem-Bounce-Trigger).
+        let bypass = false;
+        const _bsc = loadCardEffect(cardData.name);
+        if (typeof _bsc?.canBypassFreeZoneRequirement === 'function') {
+          try { bypass = !!_bsc.canBypassFreeZoneRequirement(engine.gs, pi, hi, cardData, engine); } catch {}
+        }
+        if (!bypass) continue;
+      }
       eligible.push({ hi, freeZones: freeCount });
     } else {
       eligible.push({ hi });
     }
   }
 
-  // Destruction Spell routing: if the caster has a hero with the
-  // `forcesSingleTarget` flag (currently: Ida, the Adept of Destruction)
-  // AND that hero is eligible to cast this Destruction Spell, restrict
-  // the eligible list to those heroes only. Without this, the candidate
-  // enumerator emits one per eligible hero — MCTS then scores "cast via
-  // Ida" (single target) vs "cast via another Lv3 Destruction hero"
-  // (AoE) and naturally picks the AoE route for higher raw damage,
-  // silently bypassing Ida's signature restriction. Users expect Ida's
-  // passive to be respected while she's on the team, so we force the
-  // CPU to route Destruction Spells through her whenever she's a valid
-  // caster. If no flagged hero is eligible, the unrestricted list is
-  // returned unchanged.
-  if (cardData?.cardType === 'Spell' && eligible.length > 1) {
-    const s1 = cardData.spellSchool1;
-    const s2 = cardData.spellSchool2;
-    if (s1 === 'Destruction Magic' || s2 === 'Destruction Magic') {
-      const flags = gs.heroFlags || {};
-      const restricted = eligible.filter(e => !!flags[`${pi}-${e.hi}`]?.forcesSingleTarget);
-      if (restricted.length > 0) return restricted;
-    }
-  }
+  // KEIN Routing für forcesSingleTarget-Helden (Ida): Als Regel-Ruling
+  // (Juli 2026) — Idas Restriktion ist rein PER-CASTER: nur AoEs, die
+  // SIE castet, werden Single-Target. Sie schränkt weder das Team ein,
+  // noch ist sie Default- oder Zwangs-Caster für Destruction-Spells.
+  // Eine frühere Fassung filterte hier die Kandidatenliste hart auf
+  // Ida, sobald sie castbar war ("Signatur-Restriktion respektieren")
+  // — das ging auf eine Misskommunikation zurück und BLOCKIERTE exakt
+  // die Comeback-Linie "Ankh → Bartas wiederbeleben → Avalanche als
+  // echten AoE casten": der Bartas-Arm existierte für MCTS nie.
+  // Jetzt bleiben alle castbaren Helden Kandidaten; die Wahl treffen
+  // Caster-Deltas (gelernt), cpuCasterPriority und die echte
+  // Resolution in den Rollouts (die Idas Transformation korrekt sieht).
 
+  // ── Held-Vertrag: cpuCasterPriority ───────────────────────────────
+  // Sortiert die Kandidaten-Helden für diese Karte. Helden mit
+  // höherer Priorität stehen vorn — sie werden Default-Cast-Held und
+  // bekommen in der MCTS-Budget-Vorsortierung die Rollouts (Rafflesia
+  // will Decay/Support-Spells selbst casten, um ihren Chain-Grant zu
+  // triggern). Helden ohne Export → 0, alte Decks unberührt.
+  if (eligible.length > 1) {
+    try {
+      const prio = (e) => {
+        const hn = ps.heroes?.[e.hi]?.name;
+        if (!hn) return 0;
+        const hs = loadCardEffect(hn);
+        return typeof hs?.cpuCasterPriority === 'function'
+          ? (Number(hs.cpuCasterPriority(engine, pi, e.hi, cardData)) || 0) : 0;
+      };
+      eligible.sort((a, b) => prio(b) - prio(a));
+    } catch {}
+  }
   return eligible;
+}
+
+// ── Caster-Draw-Kontext (Deckout-Prävention, Als Kontext-Regel) ──────
+// "Setze die Spells weiter ein, aber achte darauf, WELCHER Held sie
+// nutzt": Abilities mit cpuMeta.castTriggersDraw (Friendship Lv2/3)
+// ziehen Karten, wenn ihr Held einen Spell der passenden Schule castet.
+// Bei gefährlich kleinem Deck (≤ gelernte deckoutDangerSize bzw.
+// Default) liefert dieser Helfer die erwarteten Draws eines Casts via
+// Held `hi` — pickHeroForActionCard bestraft solche Caster dann, sodass
+// Heal & Co. weiter gespielt, aber über draw-freie Helden geroutet
+// werden. Erkennung über slot[0] der Ability-Stacks (Performance-Kopien
+// AUF einem Friendship-Stack erhöhen slot.length und zählen damit als
+// Level mit; alleinstehende Kopie-Konstruktionen bewusst ausgelassen).
+function casterCastDrawCount(engine, pi, hi, cardData) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return 0;
+  let draws = 0;
+  for (const slot of (ps.abilityZones?.[hi] || [])) {
+    if (!slot || !slot.length) continue;
+    const meta = loadCardEffect(slot[0])?.cpuMeta?.castTriggersDraw;
+    if (!meta) continue;
+    if (meta.school && cardData.spellSchool1 !== meta.school && cardData.spellSchool2 !== meta.school) continue;
+    const lvl = Math.min(3, slot.length);
+    draws += meta.drawsAtLevel?.[lvl] || 0;
+  }
+  return draws;
+}
+
+// Hebt Always-Commit-Bypässe für zieh-lastige Aktivierungen auf, sobald
+// das eigene Deck gefährlich klein ist: baseCommit bleibt in sicheren
+// Lagen erhalten (die Bypässe existieren, weil die Eval reine Karten-
+// Trades historisch unterbewertete), aber am kleinen Deck entscheidet
+// wieder das reguläre MCTS-Gate — dessen Commit-Arm den Draw real
+// resolvet und über den Deck-Nähe-Term in evaluateState bepreist.
+function liftCommitBypassForDraws(engine, pi, baseCommit, drawish) {
+  return !!baseCommit && !(drawish && deckIsDangerouslySmall(engine, pi));
+}
+
+function deckIsDangerouslySmall(engine, pi) {
+  const dl = engine.gs?.players?.[pi]?.mainDeck?.length;
+  if (typeof dl !== 'number') return false;
+  const th = deckProfile.deckoutDangerSizeOf(engine, pi) ?? DECKOUT_EVAL_TH_DEFAULT;
+  return dl <= th;
 }
 
 function pickHeroForActionCard(engine, pi, cardData, cardName) {
@@ -2344,10 +3534,18 @@ function pickHeroForActionCard(engine, pi, cardData, cardName) {
   }
 
   if (cardData.cardType === 'Attack') {
-    let topAtk = -Infinity;
-    for (const e of eligible) topAtk = Math.max(topAtk, ps.heroes[e.hi].atk || 0);
-    const tied = eligible.filter(e => (ps.heroes[e.hi].atk || 0) === topAtk);
-    return tied[Math.floor(Math.random() * tied.length)].hi;
+    // Basis: höchster ATK; gelernter Caster-Delta als additiver Versatz
+    // (skaliert ~ATK-Punkte-Bereich hoch, damit ein satter gelernter
+    // Unterschied einen kleinen ATK-Vorsprung überstimmen kann).
+    let best = [], bestScore = -Infinity;
+    for (const e of eligible) {
+      const hn = ps.heroes[e.hi]?.name;
+      const score = (ps.heroes[e.hi].atk || 0)
+        + deckProfile.casterDelta(engine, pi, cardName, hn) * 5;
+      if (score > bestScore + 1e-9) { bestScore = score; best = [e]; }
+      else if (Math.abs(score - bestScore) <= 1e-9) best.push(e);
+    }
+    return best[Math.floor(Math.random() * best.length)].hi;
   }
 
   if (cardData.cardType === 'Spell' || cardData.cardType === 'Creature') {
@@ -2377,33 +3575,471 @@ function pickHeroForActionCard(engine, pi, cardData, cardName) {
     }
 
     if (cardData.cardType === 'Spell') {
-      // Highest matching Spell-School level preferred. Tie → random.
-      const topLvl = Math.max(...scored.map(s => s.schoolLvl));
-      const tied = scored.filter(s => s.schoolLvl === topLvl);
-      return tied[Math.floor(Math.random() * tied.length)].hi;
+      // Basis: höchstes passendes Schul-Level; gelernter Caster-Delta
+      // als additiver Versatz (×0.15 auf Level-Skala: ein voller ±20-
+      // Delta entspricht damit ±3 Leveln — genug, um z.B. Idas
+      // AoE→Single-Target-Malus gegen einen Level-Gleichstand oder
+      // -Vorsprung durchzusetzen). Caster-Draw-Kontext: Bei gefährlich
+      // kleinem Deck kostet jeder erwartete Draw des Casts (Friendship-
+      // Rider des Helden) 1.5 Level Präferenz — der Spell wird weiter
+      // gespielt, aber über den draw-freien Helden. Tie → random.
+      const deckDanger = deckIsDangerouslySmall(engine, pi);
+      let best = [], bestScore = -Infinity;
+      for (const s of scored) {
+        const hn = ps.heroes[s.hi]?.name;
+        let score = s.schoolLvl + deckProfile.casterDelta(engine, pi, cardName, hn) * 0.15;
+        if (deckDanger) score -= casterCastDrawCount(engine, pi, s.hi, cardData) * 1.5;
+        if (score > bestScore + 1e-9) { bestScore = score; best = [s]; }
+        else if (Math.abs(score - bestScore) <= 1e-9) best.push(s);
+      }
+      return best[Math.floor(Math.random() * best.length)].hi;
     }
 
-    // Creatures: lowest matching Spell-School level preferred.
-    // Tiebreak 1: most free Support Zones. Tiebreak 2: random.
-    const lowLvl = Math.min(...scored.map(s => s.schoolLvl));
-    const lowest = scored.filter(s => s.schoolLvl === lowLvl);
-    const maxFree = Math.max(...lowest.map(s => s.freeZones));
-    const mostFree = lowest.filter(s => s.freeZones === maxFree);
-    return mostFree[Math.floor(Math.random() * mostFree.length)].hi;
+    // Creatures — Placement-Lernkanal (Als Support-Zonen-Ökonomie):
+    // Basis-Score reproduziert die alte Heuristik EXAKT (lowest
+    // matching level ×100, dann most free zones), der gelernte
+    // placementPrior (per Deck, Tags plc:slack / plc:bigwait)
+    // verschiebt sie. Ohne Profil: prior=0 → Verhalten unverändert.
+    const _logPlacement = (choice, tags) => {
+      try {
+        if (engine._inMctsSim) return;
+        if (!engine._placementLog) engine._placementLog = [];
+        engine._placementLog.push({ pi, c: cardData.name, t: gs.turn || 0, tags: tags || [] });
+      } catch { /* nie stören */ }
+    };
+    // Trainings-Exploration: zufälliger eligible Held liefert die
+    // Kontrast-Arme, aus denen der Trainer die Slack-Regeln lernt.
+    const placeEps = parseFloat(process.env.PP_PLACE_EXPLORE || '0.25');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && scored.length > 1 && Math.random() < placeEps) {
+      const e = scored[Math.floor(Math.random() * scored.length)];
+      _logPlacement(e, deckProfile.classifyPlacementTags(engine, pi, cardData, e.schoolLvl));
+      return e.hi;
+    }
+    let bestPick = null, bestScore = -Infinity, bestTags = null;
+    for (const s of scored) {
+      const tags = deckProfile.classifyPlacementTags(engine, pi, cardData, s.schoolLvl);
+      const prior = deckProfile.placementPrior(engine, pi, tags);
+      const score = -(s.schoolLvl || 0) * 100 + (s.freeZones || 0) + prior * 10 + Math.random() * 0.5;
+      if (score > bestScore) { bestScore = score; bestPick = s; bestTags = tags; }
+    }
+    _logPlacement(bestPick, bestTags);
+    return bestPick.hi;
   }
 
   return eligible[Math.floor(Math.random() * eligible.length)].hi;
 }
 
-function pickCreatureZoneSlot(engine, pi, heroIdx) {
+/**
+ * H2 (Vergleichsanalyse): findet eine ausgabefähige Beschwörung für
+ * einen unverbrauchten Additional-Action-Grant (Primordiums
+ * 'summon_deepsea_primordium' und künftige Summon-Grants). Nur aktiv,
+ * wenn die reguläre Aktion verbraucht ist — solange der Planner noch
+ * frei wählt, wird nichts erzwungen. Liefert {cardName, handIndex,
+ * heroIdx, zoneSlot} oder null.
+ */
+function findSpendableSummonGrantPlay(engine, cpuIdx) {
+  const gs = engine.gs;
+  const ps = gs.players[cpuIdx];
+  if (!ps) return null;
+  // Reguläre Aktion muss weg sein, sonst würde doPlayCreature sie
+  // statt des Grants verbrauchen und wir kämen dem Planner zuvor.
+  if ((ps.heroesActedThisTurn || []).length === 0) return null;
+  if ((ps._bonusMainActions || 0) > 0) return null;
+  if ((ps.bonusActions?.remaining || 0) > 0) return null;
+  const cardDB = engine._getCardDB();
+  let best = null;
+  const seen = new Set();
+  for (let handIndex = 0; handIndex < (ps.hand || []).length; handIndex++) {
+    const cardName = ps.hand[handIndex];
+    if (seen.has(cardName)) continue;
+    seen.add(cardName);
+    const cd = cardDB[cardName];
+    if (!cd || cd.cardType !== 'Creature') continue;
+    for (let heroIdx = 0; heroIdx < (ps.heroes || []).length; heroIdx++) {
+      const hero = ps.heroes[heroIdx];
+      if (!hero || !hero.name) continue;
+      // Swap-Ausnahme wie oben: ein grant-finanzierter Tausch auf den
+      // Slot eines toten Helden ist legal und war hier ausgeschlossen.
+      if (hero.hp <= 0 && !cardCanBouncePlaceAtHero(engine, cpuIdx, heroIdx, cardName)) continue;
+      let typeId = null;
+      try { typeId = engine.findAdditionalActionForCard(cpuIdx, cardName, heroIdx); } catch { }
+      if (!typeId) continue;
+      // ── SLOT ZUERST, dann Legalität (Messung 30.7.) ──────────────────
+      // Hier stand ein STRIKTES `heroMeetsLevelReq` VOR der Slot-Wahl.
+      // Das ist derselbe Klassenfehler wie die in v103 behobene
+      // Legalitäts-Asymmetrie, nur an der anderen Stelle: Karten dürfen
+      // die Level-Hürde per Vertrag umgehen (`canBypassLevelReq`, bei der
+      // Deepsea-Linie `canBypassLevelReqIfBounceable` — der Tausch-Summon
+      // ist level-UNABHÄNGIG). Der strikte Check kannte diese Bypässe
+      // nicht und warf ausgerechnet die Lv2-Kerne (Werewolf, Witch,
+      // Monstrosity) ohne Summoning Magic 2 raus. Messbar: der Spender
+      // fand in 535 von 535 Versuchen NICHTS, während derselbe Grant in
+      // Main Phase 2 vom Gratis-Pfad (der über `validateActionPlay` mit
+      // Slot prüft) 138× gefunden wurde.
+      // Jetzt: Slot bestimmen, dann mit genau diesem Slot validieren —
+      // die CPU sieht dieselbe Legalität wie der Server. Der validierte
+      // Slot wandert mit, statt später neu gewürfelt zu werden (die Wahl
+      // enthält Zufall).
+      const zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx, cardName);
+      if (zoneSlot == null || zoneSlot < 0) continue;
+      if (!cpuCanSummonHere(engine, cpuIdx, cardName, heroIdx)) continue;
+      let legal = false;
+      try {
+        const v = engine.validateActionPlay(cpuIdx, cardName, handIndex, heroIdx,
+          ['Creature'], { zoneSlot });
+        legal = !!v;
+      } catch { legal = false; }
+      if (!legal) {
+        // Fallback auf den strikten Pfad, falls validateActionPlay in
+        // dieser Stellung gar nicht greift (Phasen-Randfälle).
+        let strict = false;
+        try { strict = !!engine.heroMeetsLevelReq(cpuIdx, heroIdx, cd); } catch { strict = false; }
+        if (!strict) continue;
+      }
+      let val = 0;
+      try { val = learnedCardValue(engine, cpuIdx, cardName, (cd.level || 0) * 10, 1); } catch { }
+      if (!best || val > best.val) best = { cardName, handIndex, heroIdx, zoneSlot, val };
+    }
+  }
+  return best ? { cardName: best.cardName, handIndex: best.handIndex, heroIdx: best.heroIdx, zoneSlot: best.zoneSlot } : null;
+}
+
+/**
+ * Swap-Diagnose (Als Auftrag nach dem ernüchternden 27.7.-Batch).
+ * Zählt, WARUM ein Zyklus-Zug zustande kam oder nicht — die Swap-Rate
+ * bewegte sich trotz der v83-Schwellensenkung nicht, und ohne diese
+ * Zähler lässt sich nicht unterscheiden, ob ein Swap am Wert-Gate
+ * scheiterte oder dort nie ankam. Reine Telemetrie, beeinflusst keine
+ * Entscheidung; in MCTS-Rollouts stumm, damit nur echte Züge zählen.
+ */
+/**
+ * Das `canSummon`-Gate der KARTE, so wie der Server es durchsetzt.
+ *
+ * Gemessen 30.7.: `isCreatureSummonable` kam in diesem Modul NULL Mal vor —
+ * die CPU führte damit eine Legalitätsprüfung nicht aus, die der Server in
+ * doPlayCreature unmittelbar nach `validateActionPlay` anwendet. Ergebnis
+ * ist dieselbe Klasse von Asymmetrie wie in v103, nur an einer anderen
+ * Station: die CPU committet einen Play, den der Server anschließend mit
+ * `false` verwirft ("server-nein").
+ *
+ * Sichtbarster Fall Dark Deepsea God — 353 Fehlschläge im v107-Lauf, Platz 2
+ * aller Karten. Sein Kartentext verlangt 2+ Kreaturen, die NICHT in dieser
+ * Runde beschworen wurden; das prüft er in seinem eigenen `canSummon`. Die
+ * CPU las stattdessen `getSacrificableCreatures`, das diesen Filter NICHT
+ * anlegt. Reproduziert:
+ *     Körper aus Vorrunden : CPU true  | Server true
+ *     Körper diese Runde   : CPU true  | Server FALSE   ← Asymmetrie
+ * Verschärft durch v107 selbst: ein Tausch stempelt die Kreatur auf die
+ * laufende Runde, der Motor verbrennt also genau das Material, das DDG als
+ * Tribut braucht — je besser die Kette läuft, desto öfter sieht DDG
+ * spielbar aus, ohne es zu sein.
+ *
+ * Deckneutral: Karten ohne `canSummon` liefern true, Verhalten unverändert.
+ */
+function cpuCanSummonHere(engine, pi, cardName, heroIdx) {
+  try {
+    if (typeof engine.isCreatureSummonable !== 'function') return true;
+    return !!engine.isCreatureSummonable(cardName, pi, heroIdx);
+  } catch { return true; }
+}
+
+/**
+ * Kanonische Zusage-Form für JEDEN confirm-Prompt.
+ *
+ * Es gibt im Projekt zwei Konsumenten-Formen:
+ *   • `ctx.promptConfirmEffect` (43 Karten) liest `result?.confirmed === true`
+ *   • schlichte Reaktions-/Trigger-Confirms lesen `if (result)`
+ * `{ confirmed: true }` erfüllt BEIDE — der blanke Boolean `true` nur die
+ * zweite. Eingefroren, damit ein Konsument das geteilte Objekt nicht
+ * versehentlich verändert.
+ */
+const CONFIRM_YES = Object.freeze({ confirmed: true });
+
+/** Beliebige Zusage-Rückgabe auf die duale Form bringen; Ablehnung bleibt null. */
+function normalizeConfirm(res) {
+  if (res === true) return CONFIRM_YES;
+  if (res && typeof res === 'object') {
+    // Bereits objektförmig: `confirmed` sicherstellen, Restfelder behalten
+    // (manche Karten reichen Zusatzdaten über den Confirm zurück).
+    if (res.confirmed === undefined) return { ...res, confirmed: true };
+    return res;
+  }
+  return res ? CONFIRM_YES : null;
+}
+
+/**
+ * Zähler für optionale "you may"-Bestätigungen (Als Auswertungs-Bedarf).
+ * Trennt "das Gehirn wollte den Effekt" von "der Effekt kam zustande" —
+ * genau die Lücke, in der der Rückgabeform-Bug jahrelang unsichtbar saß.
+ * Reine Telemetrie.
+ */
+function confirmDiag(engine, promptData, said) {
+  try {
+    const nm = promptData?._gerryOriginalTitle || promptData?.title;
+    if (!nm) return;
+    swapDiag(engine, `confirm:${said ? 'ja' : 'nein'}`);
+    swapDiag(engine, `confirmcard:${nm}:${said ? 'ja' : 'nein'}`);
+  } catch { /* Telemetrie darf nie stören */ }
+}
+
+function swapDiag(engine, key) {
+  try {
+    if (!engine || engine._inMctsSim) return;
+    // ── T1: ZUG-AUFLÖSUNG (31.7.) ───────────────────────────────────
+    // Alle bisherigen Zähler sind SPIEL-Summen. Der offene Befund ist
+    // aber ein Zug-Phänomen: die Null-Quote steigt von 0% im ersten
+    // eigenen Zug auf über 70% ab Zug 11, und in 96% dieser Züge liegen
+    // spielbare Kreaturen auf der Hand. Ohne Zug-Auflösung lässt sich
+    // nicht sagen, WAS im achten Zug anders ist als im dritten.
+    // Derselbe Schlüssel wandert deshalb zusätzlich in einen Topf, den
+    // der Recorder bei jedem Zugwechsel abholt und leert.
+    try {
+      const _pi = engine._cpuPlayerIdx;
+      if (_pi != null && _pi >= 0) {
+        const b = (engine._turnBlockers = engine._turnBlockers || {});
+        b[key] = (b[key] || 0) + 1;
+      }
+    } catch { /* nie stören */ }
+    // Getrennt nach Spieler: im Training steuert die CPU BEIDE Seiten,
+    // ein gemeinsamer Topf hätte die Zähler verdoppelt (im ersten Lauf
+    // lagen die "eigenen Züge" dadurch 2.5× über der Spiellänge). Der
+    // Recorder nimmt nur den Topf des beobachteten Spielers.
+    const pi = engine._cpuPlayerIdx;
+    if (typeof pi !== 'number') return;
+    if (!engine._swapDiag) engine._swapDiag = [Object.create(null), Object.create(null)];
+    const bucket = engine._swapDiag[pi] || (engine._swapDiag[pi] = Object.create(null));
+    bucket[key] = (bucket[key] || 0) + 1;
+  } catch { /* Telemetrie darf nie stören */ }
+}
+
+function pickCreatureZoneSlot(engine, pi, heroIdx, cardName) {
   const ps = engine.gs.players[pi];
   const zones = ps.supportZones?.[heroIdx] || [[], [], []];
   const free = [];
   for (let z = 0; z < 3; z++) {
     if ((zones[z] || []).length === 0) free.push(z);
   }
-  if (!free.length) return -1;
-  return free[Math.floor(Math.random() * free.length)];
+  // Als Befund (Deepsea-Fundamentaldiagnose): Die Tausch-Beschwörung
+  // funktioniert UNABHÄNGIG vom Level (canBypassLevelReqIfBounceable),
+  // der reguläre Summon auf einen freien Slot dagegen nicht. Die alte
+  // "freier Slot schlägt Bounce"-Regel wählte deshalb für Lv2-Deepseas
+  // ohne Summoning Magic 2 den einzigen ILLEGALEN Platzierungsweg —
+  // Witch/Werewolf blieben liegen (nur 23% der Lv2-Plays vor SM2, und
+  // die fast nur über volle Boards), das Board erreichte kaum je
+  // Summenlevel 4 und DDG kam nicht (Median-Cast Zug 20). Deshalb:
+  // Erfüllt der Held den NORMALEN Level-Pfad nicht, ist der Bounce der
+  // bevorzugte Slot, auch wenn Zonen frei sind. Bewusst nur der primäre
+  // Schul-Zähler ohne Reduktions-/Coverage-Pfade — falls eine Reduktion
+  // den Normal-Summon doch legal machte, ist der Bounce trotzdem legal
+  // und kostet nur den zurückgenommenen Insassen (der als Handkarte für
+  // den nächsten Swap wiederkommt und Siphem-Counter erzeugt).
+  const cdForLevel = engine._getCardDB()[cardName];
+  let normalLevelOk = true;
+  if (cdForLevel) {
+    const lvl = cdForLevel.level || 0;
+    const schools = [];
+    if (cdForLevel.spellSchool1) schools.push(cdForLevel.spellSchool1);
+    if (cdForLevel.spellSchool2 && cdForLevel.spellSchool2 !== cdForLevel.spellSchool1) schools.push(cdForLevel.spellSchool2);
+    if (schools.length > 0 && lvl > 0) {
+      let combined = 0;
+      try {
+        for (const sc of schools) combined += engine.countAbilitiesForSchool(sc, ps.abilityZones?.[heroIdx]) || 0;
+      } catch { combined = lvl; /* im Zweifel Altverhalten */ }
+      const hero = ps.heroes?.[heroIdx];
+      const heroBypass = hero?.bypassLevelReq && lvl <= hero.bypassLevelReq.maxLevel
+        && hero.bypassLevelReq.types?.includes(cdForLevel.cardType);
+      normalLevelOk = combined >= lvl || !!heroBypass;
+    }
+  }
+  if (!normalLevelOk) {
+    const viaBounce = pickBouncePlacementSlot(engine, pi, heroIdx, cardName);
+    if (viaBounce >= 0) { swapDiag(engine, 'pick:bounce-lvl'); return viaBounce; }
+    swapDiag(engine, 'pick:lvl-no-target');
+    // kein Bounce-Ziel → Altverhalten (freier Slot; Engine-Reduktionen
+    // können den Summon noch legalisieren)
+  }
+  // ── H1 (Vergleichsanalyse Demos 1-3): Swap als WERT-Aktion ──
+  // Die alte Regel "Freier Slot schlägt Bounce: der reguläre Summon
+  // liefert denselben on-play-Trigger, behält aber den Insassen" ist
+  // durch Als Pilot-Spiele widerlegt: Er swappt 2.17×/ZUG bei
+  // Board-Max Ø 4.7 — freie Slots waren fast immer da. Der Zyklus
+  // schlägt den Insassen, WENN der Motor läuft: jeder Bounce erzeugt
+  // Siphem-Counter + Teppes-Draw, und die zurückgenommene Karte ist
+  // ein weiterer on-play-Trigger für später. Der Motor-Check läuft
+  // generisch über den Hero-Vertrag `cpuValuesBounces` (exportiert von
+  // Siphem/Teppes), damit hier kein Deck-Wissen by-name steht.
+  //
+  // KORREKTUR (Messung 29.7.): hier stand zusätzlich `hand.length < 7`
+  // mit der Begründung, ein Bounce triebe die Karte am Zugende ins
+  // Discard-Cleanup. Diese Begründung war SACHLICH FALSCH — der Swap
+  // ist handneutral: `commitHandRemoval()` nimmt die gespielte Karte
+  // VOR `_runBeforeSummon` von der Hand, erst danach legt
+  // tryBouncePlace den Insassen zurück. Die Hand geht also 7 → 6 → 7
+  // und überschreitet das Limit nie.
+  // Die Bedingung war zugleich der mit Abstand größte Engpass:
+  // 10065 von 13206 Slot-Entscheidungen (76%) endeten deswegen auf
+  // einem freien Slot — und genau die dorthin umgeleiteten
+  // Normal-Plays lehnt das Gate zu 99.8% ab (Delta −12..0 gegen
+  // Schwelle +3), während Swaps zu 72% durchgehen. Der Block
+  // verhinderte also ausgerechnet bei voller Hand die einzige
+  // Aktion, die tatsächlich zustande kommt.
+  let bounceValued = false;
+  try {
+    for (const h of (ps.heroes || [])) {
+      // KEIN hp-Filter (Als Ruling, 31.7.): der Tausch erzeugt seinen
+      // On-Summon-Trigger unabhängig davon, ob der Held lebt. Vorher
+      // schaltete der Tod von Teppes/Siphem den gesamten Motor-Zweig ab
+      // — messbar als `pick:no-motor`, 1985 Treffer allein in Null-Zügen,
+      // und 59.7% aller Null-Züge waren "Bounce-Ziel da, Held tot".
+      // Der Vertrag beschreibt die DECK-Identität, nicht den Zustand
+      // eines einzelnen Helden.
+      if (!h || !h.name) continue;
+      if (loadCardEffect(h.name)?.cpuValuesBounces) { bounceValued = true; break; }
+    }
+  } catch { /* Vertrag ist optional */ }
+  if (bounceValued) {
+    // Volle Hand weiterhin ZÄHLEN (Diagnose), aber nicht mehr blocken.
+    if ((ps.hand || []).length >= 7) swapDiag(engine, 'pick:hand-full-allowed');
+    const viaBounce = pickBouncePlacementSlot(engine, pi, heroIdx, cardName);
+    if (viaBounce >= 0) { swapDiag(engine, 'pick:bounce-motor'); return viaBounce; }
+    swapDiag(engine, 'pick:motor-no-target');
+  } else {
+    swapDiag(engine, 'pick:no-motor');
+  }
+  // Ohne laufenden Motor gilt weiter: freier Slot schlägt Bounce (der
+  // reguläre Summon liefert denselben on-play-Trigger und behält den
+  // Insassen auf dem Board).
+  if (free.length) {
+    swapDiag(engine, 'pick:free-slot');
+    return free[Math.floor(Math.random() * free.length)];
+  }
+  const last = pickBouncePlacementSlot(engine, pi, heroIdx, cardName);
+  swapDiag(engine, last >= 0 ? 'pick:bounce-fallback' : 'pick:none');
+  return last;
+}
+
+// Bounce-Platzierung als eigene Funktion, damit die level-bewusste
+// Slot-Wahl oben sie auch bei FREIEN Zonen ansteuern kann.
+function pickBouncePlacementSlot(engine, pi, heroIdx, cardName) {
+  const ps = engine.gs?.players?.[pi];
+  // ── Bounce-Place-Vertrag (Deepsea-Linie, Als Befund zu Dark Deepsea
+  // God) ──
+  // listEligibleHeroesForActionCard lässt Karten mit
+  // `canBypassFreeZoneRequirement` auf VOLLEN Boards ausdrücklich zu
+  // ("Genau in vollen Boards ist der Swap am wertvollsten"), aber diese
+  // Slot-Wahl kannte nur freie Zonen und lieferte -1 — woraufhin die
+  // Aufrufer die Karte still verwarfen. Der menschliche Spielpfad
+  // (server.js) konsultiert an derselben Stelle `canPlaceOnOccupiedSlot`
+  // und setzt `_requestedBouncePlaceSlot` für den beforeSummon-Hook; die
+  // CPU sah die Option nie. Betrifft die gesamte Deepsea-Kreaturen-Linie
+  // (17 Karten): jede darf als inhärente Bonus-Aktion eine ältere
+  // Deepsea-Kreatur auf die Hand zurückbouncen und deren Slot einnehmen —
+  // der Motor des Decks, weil so jede Runde neue on-play-Trigger
+  // entstehen. Ohne diesen Zweig invertierte sich der Deckplan: je mehr
+  // Kreaturen gespammt wurden, desto voller die Zonen, desto seltener war
+  // überhaupt noch etwas spielbar.
+  if (!cardName) return -1;
+  let script = null;
+  try { script = loadCardEffect(cardName); } catch { return -1; }
+  if (!script) return -1;
+
+  // Gewährt die Karte den Bypass für volle Zonen überhaupt? Das ist
+  // dieselbe Prüfung, die listEligibleHeroesForActionCard fährt — hier
+  // wiederholt, damit die Slot-Wahl auch allein aufgerufen korrekt ist.
+  // Nötig, weil manche Karten die AGGREGAT-Regel nur hier tragen: Dark
+  // Deepsea Gods canPlaceOnOccupiedSlot bejaht jeden Slot mit einem
+  // Opfer-Kandidaten, die Bedingung "2+ Kreaturen, Summenlevel ≥ 4"
+  // steckt dagegen in canBypassFreeZoneRequirement.
+  const cardData = engine._getCardDB()[cardName];
+  if (typeof script.canBypassFreeZoneRequirement === 'function') {
+    try {
+      if (!script.canBypassFreeZoneRequirement(engine.gs, pi, heroIdx, cardData, engine)) return -1;
+    } catch { return -1; }
+  }
+
+  // Bevorzugt die vom Skript selbst gemeldeten Ziele (kennen die
+  // kartenspezifische Regel, z.B. "nicht in dieser Runde beschworen").
+  const cands = [];
+  if (typeof script.getBouncePlacementTargets === 'function') {
+    try {
+      for (const t of (script.getBouncePlacementTargets(engine.gs, pi, engine) || [])) {
+        if (!t || t.heroIdx !== heroIdx) continue;
+        const z = t.slotIdx;
+        if (z >= 0 && z < 3 && !cands.includes(z)) cands.push(z);
+      }
+    } catch { /* Ziel-Liste ist optional — Fallback unten */ }
+  }
+
+  // ── Opfer-Wahl: gelernter Kanal statt Münzwurf (Als Auftrag) ──────
+  // Bis v83 stand hier `Math.random()` — WELCHE Kreatur auf die Hand
+  // zurückgeht, war reiner Zufall, obwohl genau das die zentrale
+  // Ketten-Entscheidung ist. Als Ruling: die Karten mit der höchsten
+  // Ausspiel-Priorität sollen bevorzugt zurückgebounct werden (sie
+  // stehen dann bereit, um erneut zu feuern); Ausnahme sind
+  // Konstellationen, die gerade eine Opfer-Bedingung erfüllen. Beides
+  // wird NICHT hartkodiert: `classifyBounceTags` beschreibt die Lage,
+  // die Gewichte kommen aus dem gelernten Kanal `bounceRules`.
+  // Ohne Profil ist der Prior 0 → die Wahl fällt wieder zufällig aus
+  // (exakt das Altverhalten), das Deck lernt sie sich also selbst an.
+  const _victimAt = (z) => {
+    try {
+      const nm = ((ps.supportZones?.[heroIdx] || [])[z] || [])[0];
+      if (!nm) return null;
+      return (engine.cardInstances || []).find(ci => ci
+        && ci.zone === 'support' && ci.heroIdx === heroIdx
+        && ci.zoneSlot === z && (ci.controller ?? ci.owner) === pi) || { name: nm };
+    } catch { return null; }
+  };
+  const _logBounce = (tags) => {
+    try {
+      if (engine._inMctsSim) return;
+      // EIGENER Log-Name: `_bounceLog` gehört bereits der Bounce-
+      // Telemetrie im Recorder (Struktur {t, c:[Namen], by}) und wird
+      // ungefiltert als Feld `bounces` ausgeliefert. In v84 schrieb
+      // dieser Kanal versehentlich in dasselbe Array — die Telemetrie
+      // war dadurch mit Einträgen anderer Struktur durchsetzt (der
+      // Lernkanal blieb sauber, weil er auf `pi` filtert, das den
+      // Original-Einträgen fehlt).
+      if (!engine._bounceDecisionLog) engine._bounceDecisionLog = [];
+      engine._bounceDecisionLog.push({ pi, c: cardName, t: engine.gs?.turn || 0, tags: tags || [] });
+    } catch { /* nie stören */ }
+  };
+  const _chooseSlot = (slots) => {
+    if (!slots.length) return -1;
+    // Trainings-Exploration: erzeugt die Kontrast-Arme, aus denen der
+    // Trainer die Regeln überhaupt erst lernen kann (gleiches Muster
+    // wie PP_PLACE_EXPLORE beim Platzierungs-Kanal).
+    const eps = parseFloat(process.env.PP_BOUNCE_EXPLORE || '0.25');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && slots.length > 1 && Math.random() < eps) {
+      const z = slots[Math.floor(Math.random() * slots.length)];
+      _logBounce(deckProfile.classifyBounceTags(engine, pi, _victimAt(z)));
+      return z;
+    }
+    let best = -1, bestScore = -Infinity, bestTags = null;
+    for (const z of slots) {
+      const tags = deckProfile.classifyBounceTags(engine, pi, _victimAt(z));
+      const score = deckProfile.bouncePrior(engine, pi, tags) + Math.random() * 0.5;
+      if (score > bestScore) { bestScore = score; best = z; bestTags = tags; }
+    }
+    _logBounce(bestTags);
+    return best;
+  };
+
+  // `canPlaceOnOccupiedSlot` ist die Autorität (dieselbe Prüfung, die der
+  // Server fährt): gemeldete Ziele werden damit validiert, fehlen sie,
+  // dient sie als Scan über alle Slots.
+  if (typeof script.canPlaceOnOccupiedSlot === 'function') {
+    const pool = cands.length ? cands : [0, 1, 2];
+    const ok = [];
+    for (const z of pool) {
+      try {
+        if (script.canPlaceOnOccupiedSlot(engine.gs, pi, heroIdx, z, engine)) ok.push(z);
+      } catch { /* einzelner Slot unklar → überspringen */ }
+    }
+    return _chooseSlot(ok);
+  }
+
+  return _chooseSlot(cands);
 }
 
 // Heuristic detection of "this Equipment increases the equipped Hero's Attack."
@@ -2533,6 +4169,39 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
   if (!abZones) return 0;
   const cardDB = engine._getCardDB();
 
+  // ── JOKER-ABILITIES (1.8., Als Report "die CPU tat nichts") ───────
+  // Performance zählt für die Schule des Stapels, auf dem sie liegt
+  // (`isWildcardAbility`, siehe `countAbilitiesForSchool`). Die
+  // Bewertung unten fragt aber `cd.spellSchool1 === cardName` — und
+  // KEINE Karte nennt "Performance" als Schule. Für Joker war der
+  // Freischalt-Term deshalb immer 0, die CPU legte sie nie an.
+  //
+  // Belegt im Mitschnitt gegen "Join our Cult!": die CPU hielt ZWEI
+  // Performance und tat in zwei Zügen nichts, obwohl Klaus mit
+  // Summoning Magic 1 → 2 den Haressassin (Lv2) und mit Decay Magic
+  // 2 → 3 die Forbidden Zone (Lv3, gelernter Wert 93 — ihre stärkste
+  // Karte) freigeschaltet hätte.
+  //
+  // Für einen Joker wird deshalb der BESTE erreichbare Stapel bewertet:
+  // er hebt die Schule des Stapels, dem er beitritt, um eine Stufe.
+  // Gewertet wird die Variante mit dem größten Freischalt-Gewinn.
+  const _wildScript = (() => {
+    try { return require('./_loader').loadCardEffect(cardName); }
+    catch { return null; }
+  })();
+  if (_wildScript?.isWildcardAbility) {
+    let best = 0;
+    for (const slot of abZones) {
+      const base = (slot || [])[0];
+      if (!base || slot.length >= 3) continue;   // leerer Stapel bringt keine Schule, voller geht nicht
+      // Wert dieses Stapels = Bewertung, als hinge man die BASIS-Ability
+      // ein weiteres Mal an (gleiche Wirkung auf die Schulstufe).
+      const v = scoreAbilityPlacement(engine, pi, heroIdx, base);
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
   // Current level the hero has in this ability (max across zones).
   let currentLevel = 0;
   for (const slot of abZones) {
@@ -2653,12 +4322,60 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
     reducerUnlock = scoreSpellLevelReducerUnlock(engine, pi, heroIdx, cardName, script, abZones, ps, cardDB);
   }
 
+  // ── Learned placement prior ────────────────────────────────────────
+  // ML-trained (ability → hero) prior from the deck's profile: games
+  // where this ability ended up stacked on this hero correlated with
+  // winning (positive) or losing (negative). Additive on the same
+  // scale as the structural terms so a strong learned prior can break
+  // ties and redirect stacks, but a hard structural unlock (unlock*100)
+  // still dominates when it disagrees.
+  let learnedPrior = 0;
+  const heroName = ps?.heroes?.[heroIdx]?.name;
+  if (heroName) {
+    learnedPrior = deckProfile.abilityPlacementBonus(engine, pi, cardName, heroName)
+      + deckProfile.boardPairBonus(engine, pi, cardName, heroIdx);
+  }
+
   // Scaling cards add value proportional to the new level (each level
   // reached cranks Heal/Phoenix Tackle/etc. higher). Heuristically the
   // bonus is `scalingValue * newLevel`; combined with the unlock term
   // it lets a 3-Heal deck still want Support Magic Lv3 even when the
   // deck has nothing requiring Support Magic Lv2/Lv3 to cast.
-  return unlock * 100 + reducerUnlock * 100 + scalingValue * newLevel + currentLevel * 10 + attachmentBonus;
+  // ── Held-Vertrag: cpuAbilityAttachBonus ──────────────────────────
+  // Ein HELD kann Ability-Platzierungen auf sich anziehen/abstoßen
+  // (Rafflesia zieht Decay/Support Magic zu sich, damit ihr
+  // Doppelzauber-Kern castbar wird). Helden ohne Export → 0, alte
+  // Decks bleiben unberührt.
+  let heroContractBonus = 0;
+  if (heroName) {
+    try {
+      const heroScript = loadCardEffect(heroName);
+      if (typeof heroScript?.cpuAbilityAttachBonus === 'function') {
+        heroContractBonus = Number(heroScript.cpuAbilityAttachBonus(engine, pi, heroIdx, cardName)) || 0;
+      }
+    } catch {}
+  }
+
+  // ── Attach-Draw-Kontext (Deckout-Prävention, generischer Contract) ──
+  // Abilities mit cpuMeta.attachTriggersDraw (Creativity) ziehen Karten,
+  // wenn IHR Held eine weitere Ability angehängt bekommt. Bei gefährlich
+  // kleinem Deck bestraft jeder erwartete Draw das Anhängen an DIESEN
+  // Helden — die Ability wird weiter gespielt, nur beim draw-freien
+  // Helden. Kalibrierung ×25: Lv3-Creativity = −75, redirectet Stacks
+  // gegen Priors/Ties, überstimmt aber keinen strukturellen Unlock
+  // (unlock×100) — wer die Schule WIRKLICH braucht, kriegt sie trotzdem.
+  let attachDrawMalus = 0;
+  if (deckIsDangerouslySmall(engine, pi)) {
+    for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+      if (!slot || !slot.length) continue;
+      const meta = loadCardEffect(slot[0])?.cpuMeta?.attachTriggersDraw;
+      if (!meta) continue;
+      const lvl = Math.min(3, slot.length);
+      attachDrawMalus += (meta.drawsAtLevel?.[lvl] || 0) * 25;
+    }
+  }
+
+  return unlock * 100 + reducerUnlock * 100 + scalingValue * newLevel + currentLevel * 10 + attachmentBonus + learnedPrior + heroContractBonus - attachDrawMalus;
 }
 
 // Cheap helper: does ANY card in hand+deck require this school for its
@@ -2948,6 +4665,31 @@ function resolveAbilitySlot(engine, pi, hi, cardName) {
 // matches the prompt's kind and passes validation. On mismatch, the entry
 // stays in the queue and the prompt falls through to heuristics — this keeps
 // the plan resilient to unexpected extra prompts in the real play.
+/**
+ * Trägt eine der angebotenen Karten eine HARTE Vorfahrt für diese
+ * Entscheidung? Dann ist sie keine Suchfrage mehr und der MCTS-Plan darf
+ * sie nicht beantworten.
+ *
+ * Deckneutral über den vorhandenen Vertrag `gameStartPickPriority` — die
+ * einzige Stelle im Projekt, an der eine Karte eine Auswahl hart an sich
+ * zieht. Kommt ein zweiter solcher Vertrag dazu, gehört er hier ergänzt.
+ * Karten ohne den Vertrag ändern nichts: dann bleibt der Plan zuständig.
+ */
+function promptHasPinnedAnswer(promptData) {
+  try {
+    if (!promptData || promptData.type !== 'cardGallery') return false;
+    const cards = promptData.cards;
+    if (!Array.isArray(cards) || cards.length === 0) return false;
+    for (const c of cards) {
+      const nm = c?.name || c?.cardName;
+      if (!nm) continue;
+      const v = loadCardEffect(nm)?.gameStartPickPriority;
+      if (typeof v === 'number') return true;
+    }
+    return false;
+  } catch { return false; }
+}
+
 const MCTS_BRANCHABLE_GENERIC_TYPES = ['zonePick', 'cardGallery', 'cardGalleryMulti', 'playerPicker', 'optionPicker', 'confirm'];
 
 function mctsValidateTargetEntry(entry, validTargets) {
@@ -3031,6 +4773,84 @@ function cpuCheapestGalleryCombo(cards, need, costKey, maxBudget) {
   return out;
 }
 
+// Budget-bewusster Score-Greedy für exakte Mehrfach-Picks (Zi-Menüs):
+// nimmt Karten in Score-Reihenfolge, aber nur wenn nach dem Pick die
+// verbleibenden Slots noch mit den BILLIGSTEN Restkarten ins Budget
+// passen (Machbarkeits-Check) — im Gegensatz zum naiven Top-Loop kann
+// das Ergebnis nie unter `need` Karten fallen, solange eine legale
+// Auswahl existiert. scoreOf: Karte → Zahl (höher = lieber anbieten).
+function cpuBestGalleryCombo(cards, need, costKey, maxBudget, scoreOf) {
+  if (!need || need <= 0 || (cards || []).length < need) return null;
+  const pool = cards.map(c => ({
+    name: c.name,
+    cost: costKey ? (Number(c[costKey]) || 0) : 0,
+    score: scoreOf ? scoreOf(c) : 0,
+  }));
+  const byScore = pool.slice().sort((a, b) => b.score - a.score);
+  const picked = [];
+  let spent = 0;
+  const feasible = (candidate) => {
+    if (maxBudget == null) return true;
+    const remainNeed = need - picked.length - 1;
+    if (remainNeed <= 0) return spent + candidate.cost <= maxBudget;
+    const rest = pool
+      .filter(x => x !== candidate && !picked.includes(x))
+      .map(x => x.cost)
+      .sort((a, b) => a - b)
+      .slice(0, remainNeed);
+    if (rest.length < remainNeed) return false;
+    return spent + candidate.cost + rest.reduce((s, v) => s + v, 0) <= maxBudget;
+  };
+  for (const cand of byScore) {
+    if (picked.length >= need) break;
+    if (picked.includes(cand)) continue;
+    if (!feasible(cand)) continue;
+    picked.push(cand);
+    spent += cand.cost;
+  }
+  if (picked.length < need) return null;
+  return picked.map(x => x.name);
+}
+
+// Adversariale Menü-Komposition (Als Maximin-Auftrag): Der GEGNER wählt
+// aus unserem 3er-Menü — bei Zi das, was WIR casten (er nimmt unser
+// Minimum), bei Magic Lamp das, was ER bekommt (uns bleibt Summe−Max).
+// Score-Summen-Greedy baut daher genau die Falle "Bombe + 2 Filler"
+// (Iter1-Daten: Gathering Storm 0/65 durchgelassen, Chain Lightning
+// 0/266 — der Köder feuert nie). Exakte Enumeration aller 3er-Kombos
+// unterm Budget mit quellenspezifischer Zielfunktion; scoreOf liefert
+// den SITUATIVEN Wert (_galleryScore = learnedCardValue inkl. Cluster/
+// Standing/Timing + menuOfferRule inkl. Situations-Deltas). Nur für
+// kleine Galerien (C(22,3)=1540) — größere fallen auf Greedy zurück.
+function cpuAdversarialMenuCombo(cards, need, costKey, maxBudget, scoreOf, objective) {
+  if (!cards || need !== 3 || cards.length < 3 || cards.length > 22) return null;
+  const pool = cards.map(c => ({
+    n: c.name,
+    cost: costKey ? (Number(c[costKey]) || 0) : 0,
+    s: scoreOf ? scoreOf(c) : 0,
+  }));
+  let best = null, bestV = -Infinity;
+  for (let i = 0; i < pool.length; i++) {
+    for (let j = i + 1; j < pool.length; j++) {
+      for (let k = j + 1; k < pool.length; k++) {
+        const a = pool[i], b = pool[j], c = pool[k];
+        if (maxBudget != null && a.cost + b.cost + c.cost > maxBudget) continue;
+        const v = objective === 'sumMinusMax'
+          ? a.s + b.s + c.s - Math.max(a.s, b.s, c.s)
+          : Math.min(a.s, b.s, c.s);
+        if (v > bestV) { bestV = v; best = [a.n, b.n, c.n]; }
+      }
+    }
+  }
+  return best;
+}
+
+const MENU_OBJECTIVES = {
+  'Timeless King Zi': 'min',          // Gegner wählt, was wir casten → Minimum zählt
+  'Magic Lamp': 'sumMinusMax',        // Gegner nimmt den Pick → uns bleiben die 2 schwächsten
+  // Crestina bewusst NICHT: Pool = ganzes Spiel, Galerie zu groß (Als Scope-Entscheid)
+};
+
 // Enumerate alternative values for a branchable generic prompt. Returns an
 // array of { value, label } entries usable as plan values.
 function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
@@ -3059,6 +4879,43 @@ function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
     }));
   }
   if (type === 'cardGallery') {
+    // ── Tutor-Pick-Lernanschluss (Als Auftrag: "wann welche Karte
+    // suchen" ist fundamental) ── Die Galerie-Sortierung entscheidet,
+    // WELCHE Varianten der MCTS überhaupt als Arme probiert (Cap 6).
+    // Ohne gelernten Anteil fielen Profil-Lieblinge (Divine Gift of
+    // Fire!) aus den Top-6, bevor der MCTS sie je bewerten konnte.
+    // Der gelernte Kartenwert wird auf den Heuristik-Score addiert;
+    // ohne Profil: +0 → Verhalten unverändert.
+    try {
+      const _pi = engine._cpuPlayerIdx;
+      const _tpr = deckProfile.profileFor ? null : null; // (Regeln unten direkt via learnedTutorPick)
+      const _src = promptData.title || promptData.cardName || 'unknown';
+      const _rules = (function () {
+        try { return require('./_deck-profile').__getProfile?.(engine, _pi)?.tutorPickRules || null; } catch { return null; }
+      })();
+      for (const c of cards) {
+        if (c && c.name && c._galleryScore !== undefined) {
+          // Revive-Karten ohne (sinnvolles) Revive-Ziel bekommen KEINE
+          // Learned-Additive: der Heuristik-Score ist bereits hart
+          // gedeckelt (estimateHandCardValueFor), und ein kontextfrei
+          // gelernter cardValue bzw. eine tutorPickRule würde Golden
+          // Ankh bei vollem Team wieder in die Top-6-Arme heben.
+          const revSit = reviveCardSituation(engine, _pi, c.name);
+          if (revSit && (!revSit.hasDead || !revSit.useful)) continue;
+          const lv = deckProfile.learnedCardValue(engine, _pi, c.name, 0, 1) || 0;
+          c._galleryScore += lv * 0.5;
+          // Gelernte Quelle→Karte-Regel (tutorPickRules) direkt dazu.
+          if (_rules) c._galleryScore += (_rules[`${_src}→${c.name}`] || 0);
+          // Tutor-Cap gilt auch NACH den Learned-Additiven — sonst
+          // hebelt genau dieser (ungegatete) Pfad den min(12)-Deckel
+          // wieder aus ("Magnetic Potion sucht Magnetic Glove").
+          const tSc = loadCardEffect(c.name);
+          if (tSc?.blockedByHandLock && typeof tSc.resolve === 'function') {
+            c._galleryScore = Math.min(c._galleryScore, 12);
+          }
+        }
+      }
+    } catch { /* defensiv */ }
     // Sort by `_galleryScore` (stamped by `pickBestGalleryCard` during
     // the heuristic recon) descending so the first MCTS_MAX_ALTS_PER_BRANCH
     // variations actually explore the highest-impact cards. Without this,
@@ -3090,15 +4947,19 @@ function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
       if (cheap) {
         branches.push({ value: { selectedCards: cheap.slice() }, label: `cheapest${plan.need}` });
       }
-      const top = [];
-      let sum = 0;
-      for (const c of cards) {
-        if (top.length >= plan.need) break;
-        const cost = plan.costKey ? (Number(c[plan.costKey]) || 0) : 0;
-        if (plan.maxBudget != null && sum + cost > plan.maxBudget) continue;
-        top.push(c.name);
-        sum += cost;
-      }
+      // Budget-bewusster Score-Greedy statt des naiven Top-Loops (der
+      // konnte unter `need` bleiben und einen invaliden Branch liefern).
+      // Bei Menü-Quellen zusätzlich die adversariale Zielfunktion als
+      // eigener Branch — MCTS vergleicht dann "Summen-bestes Trio" vs
+      // "Maximin-Trio" per Rollout.
+      const menuObj = promptData.menuSource ? MENU_OBJECTIVES[promptData.menuSource] : null;
+      const adv3 = menuObj
+        ? cpuAdversarialMenuCombo(cards, plan.need, plan.costKey, plan.maxBudget,
+            c => (c._galleryScore || 0), menuObj)
+        : null;
+      if (adv3) branches.push({ value: { selectedCards: adv3.slice() }, label: `maximin${plan.need}` });
+      const top = cpuBestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget,
+        c => (c._galleryScore || 0)) || [];
       if (top.length === plan.need) {
         const tKey = top.slice().sort().join('|');
         const cKey = cheap ? cheap.slice().sort().join('|') : '';
@@ -3149,6 +5010,10 @@ function installCpuBrain(engine) {
   // guarded internally against MCTS re-entry by the caller (see
   // Magenta / Soul Shard Ren).
   engine._cpuEvaluateState = (cpuIdx) => evaluateState(engine, cpuIdx);
+  // Situativer Handwert für Karten-Skripte (Zi-Gegner-Pick u.ä.):
+  // voller learnedCardValue-Stack (Cluster/Standing/Timing/Caster-
+  // Deltas des bewerteten Spielers) statt Level-Proxys.
+  engine._cpuEstimateHandValue = (pi, cardName) => estimateHandCardValueFor(engine, pi, cardName);
 
   const origTarget = engine._getCpuTargetResponse.bind(engine);
   const origGeneric = engine._getCpuGenericResponse.bind(engine);
@@ -3162,9 +5027,78 @@ function installCpuBrain(engine) {
   // both during live play AND inside MCTS rollouts; rollout state lives
   // on the cloned snapshot, so the live hero objects never see rollout
   // mutations.
+  // ── Ability-Aktivierungs-Zähler (für abilityDependencyScore) ──
+  // Nicht-Spell-School-Abilities (Leadership, Alchemy, Necromancy …)
+  // tragen ihren Wert über AKTIVIERUNGEN statt als Cast-Voraussetzung.
+  // Die laufen als 'ability_activated' durch engine.log — hier je
+  // Spieler mitgezählt (rollout-sicher), damit der Removal-Score beide
+  // Dimensionen sieht.
+  {
+    const origLog = engine.log.bind(engine);
+    engine.log = function (type, data) {
+      try {
+        if (type === 'ability_activated' && !engine._inMctsSim && data?.card && data?.player) {
+          const pIdx = engine.gs?.players?.findIndex(p => p?.username === data.player);
+          if (pIdx === 0 || pIdx === 1) {
+            if (!engine._schoolUse) engine._schoolUse = [Object.create(null), Object.create(null)];
+            const u = engine._schoolUse[pIdx][data.card] || (engine._schoolUse[pIdx][data.card] = { casts: 0, levels: [], activations: 0 });
+            u.activations = (u.activations || 0) + 1;
+          }
+        }
+      } catch { /* Beobachter darf nie stören */ }
+      return origLog(type, data);
+    };
+  }
+
   const origRunHooks = engine.runHooks.bind(engine);
   engine.runHooks = async function (hookName, hookCtx = {}) {
     const result = await origRunHooks(hookName, hookCtx);
+    // ── Verhaltens-Fingerprint beider Spieler (Cluster-Feature) ──
+    // Zählt bis Zug 8: Attack-Casts, Spell-Casts, Kreaturen-Summons je
+    // Spieler. Lebt auf der ENGINE (nicht in gs), damit Rollout-
+    // Snapshots ihn nicht anfassen; der _inMctsSim-Guard hält
+    // Simulations-Lärm draußen. Konsumiert von _deck-profile.js:
+    // learnedCardValue schaltet ab Zug 5 cluster-konditionale
+    // Karten-Deltas dazu (clusterOfFingerprint ist die geteilte,
+    // trainer-identische Zuordnung).
+    try {
+      if (!engine._inMctsSim && (engine.gs?.turn || 99) <= 8) {
+        // Achsen identisch zum Recorder: dmg (Helden-Schadenseinheiten
+        // à 150), cre (Kreaturen-Summons), spl (Spell-/Attack-Casts).
+        if (!engine._behaviorFp) engine._behaviorFp = [{ dmg: 0, cre: 0, spl: 0, _raw: 0 }, { dmg: 0, cre: 0, spl: 0, _raw: 0 }];
+        if (hookName === 'afterSpellResolved' && typeof hookCtx.casterIdx === 'number' && engine._behaviorFp[hookCtx.casterIdx]) {
+          const nm = hookCtx.spellName || hookCtx.spellCardData?.name;
+          const cdb = nm ? engine._getCardDB()[nm] : null;
+          if (cdb && (cdb.cardType === 'Attack' || cdb.cardType === 'Spell')) engine._behaviorFp[hookCtx.casterIdx].spl++;
+          // Schul-Nutzung (fürs Ability-Removal-Scoring): Welche Schulen
+          // hat dieser Spieler nachweislich benutzt, auf welchem Level?
+          // Läuft OHNE Zug-Limit — je mehr Historie, desto besser.
+          if (cdb) {
+            if (!engine._schoolUse) engine._schoolUse = [Object.create(null), Object.create(null)];
+            for (const sk of [cdb.spellSchool1, cdb.spellSchool2]) {
+              if (!sk) continue;
+              const u = engine._schoolUse[hookCtx.casterIdx][sk] || (engine._schoolUse[hookCtx.casterIdx][sk] = { casts: 0, levels: [] });
+              u.casts++;
+              if (u.levels.length < 30) u.levels.push(cdb.level || 0);
+            }
+          }
+        } else if (hookName === 'afterDamage' && typeof hookCtx.amount === 'number' && hookCtx.amount > 0) {
+          const side = engine._findHeroOwner?.(hookCtx.target);
+          if (side === 0 || side === 1) {
+            const attacker = engine._behaviorFp[side === 0 ? 1 : 0];
+            attacker._raw += hookCtx.amount;
+            attacker.dmg = Math.round(attacker._raw / 150);
+          }
+        } else if (hookName === 'onCardEnterZone') {
+          const card = hookCtx.enteringCard;
+          if (card && hookCtx.toZone === 'support') {
+            const own = card.controller ?? card.owner;
+            const cd = engine._getCardDB()[card.name];
+            if (typeof own === 'number' && engine._behaviorFp[own] && cd?.cardType === 'Creature') engine._behaviorFp[own].cre++;
+          }
+        }
+      }
+    } catch { /* Beobachter darf nie stören */ }
     try {
       if (hookName === 'afterDamage') {
         // Damage to a single hero target. `hookCtx.amount` is the actual
@@ -3274,8 +5208,44 @@ function installCpuBrain(engine) {
       } else if (mctsValidateGenericEntry(head, promptData)) {
         engine._mctsTargetPlan.shift();
         scriptedValue = head.value;
+        // Tutor-Pick-Erhebung: Der LIVE-konsumierte Plan einer
+        // Galerie-Wahl ist die vollzogene Such-Entscheidung. Quelle =
+        // Prompt-Titel (Tutor-Karte/-Ability), Pick = gewählte Karte.
+        try {
+          if (!engine._inMctsSim && scriptedValue?.selectedCards?.length) {
+            if (!engine._tutorPickLog) engine._tutorPickLog = [];
+            engine._tutorPickLog.push({
+              pi: playerIdx,
+              src: promptData.title || promptData.cardName || 'unknown',
+              picked: scriptedValue.selectedCards.slice(0, 3),
+              t: engine.gs?.turn || 0,
+            });
+          }
+        } catch { /* nie stören */ }
       }
       // else: leave in queue for a future matching prompt.
+    }
+
+    // ── HARTE KARTEN-VORFAHRT SCHLÄGT DEN PLAN (30.7.) ────────────────
+    // Gemessen: Barkers Spielstart-Pick landete nur in 46 von 160
+    // Spielen auf Primordium — obwohl die Karte mit
+    // `gameStartPickPriority: 100` eine harte Vorfahrt exportiert und
+    // `gameStartPickDecision` sie in ALLEN drei Zweigen nach vorn
+    // sortiert. Der Grund liegt eine Ebene höher: `cardGallery` steht in
+    // MCTS_BRANCHABLE_GENERIC_TYPES, die Recon plant den Prompt also ein
+    // und die Zeile unten nimmt `scriptedValue`, bevor die Karten-
+    // Antwort überhaupt aufgerufen wird. In rund 71% der Spiele hat also
+    // die Suche entschieden statt der Vorfahrt.
+    // Als Ruling dazu steht wörtlich im Code von gameStartPickDecision:
+    // "Gilt bewusst AUCH im Training — Al will den Pick fest."
+    // Wirkung in den Daten: Spiele MIT dem Pick 52.2% WR und 3.53
+    // Trigger/Zug, Spiele OHNE 44.7% und 2.43.
+    // Der Plan-Eintrag wurde oben bereits konsumiert und bleibt es auch
+    // — sonst verschöbe sich die Zuordnung aller folgenden Einträge.
+    // Nur der WERT wird verworfen, damit die Karten-Antwort greift.
+    if (scriptedValue != null && promptHasPinnedAnswer(promptData)) {
+      scriptedValue = null;
+      swapDiag(engine, 'startpick:vorfahrt-vor-plan');
     }
 
     // During MCTS rollouts (fast mode), BOTH players' prompts auto-respond
@@ -3292,7 +5262,8 @@ function installCpuBrain(engine) {
       // ── MCTS recon recording ──
       // Only record branchable types — confirms/forceDiscards don't enumerate
       // alternatives we care to explore.
-      if (Array.isArray(engine._mctsTargetRecord) && MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)) {
+      if (Array.isArray(engine._mctsTargetRecord) && MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)
+        && !promptHasPinnedAnswer(promptData)) {
         engine._mctsTargetRecord.push({
           kind: `generic:${promptData.type}`,
           title: promptData.title,
@@ -3351,7 +5322,50 @@ function installCpuBrain(engine) {
       // Pass playerIdx through so the picker uses the CARD CONTROLLER's
       // own/enemy sides — critical for reactive cards fired on the
       // opponent's turn (Shield of Life, Cure, etc.).
-      const picked = scriptedPick || engine._getCpuTargetResponse(validTargets, config, playerIdx);
+      // ── Card cpuResponse contract beats the MCTS plan ──
+      // A card module's explicit cpuResponse is a deterministic domain
+      // contract (Shield of Life never heals the enemy, Fridge's move
+      // priority list). The MCTS variation enumeration explores ALL
+      // targets, so the scripted plan can carry a noisy rollout's pick
+      // (observed live: Shield of Life healing an ENEMY hero because a
+      // rollout's eval briefly preferred it). For prompts whose title
+      // resolves to a module with cpuResponse, ask the card FIRST and
+      // let its answer override the plan; the matched plan head was
+      // already consumed above, so the queue stays in sync.
+      let cardPick;
+      if (config.title) {
+        const _sc = loadCardEffect(config.source || config.title);
+        if (_sc?.cpuResponse) {
+          const _r = _sc.cpuResponse(engine, 'effectTarget', { validTargets, config, playerIdx });
+          if (_r !== undefined) cardPick = _r;
+        }
+      }
+      // ── Gelernter Target-Prior-Kanal ──
+      // Greift NUR, wenn weder Karten-Contract (cpuResponse) noch
+      // MCTS-Plan entschieden haben — er ersetzt also ausschließlich
+      // den deterministischen Default-Picker. Im Profil gelernte
+      // Zielklassen-Gewichte wählen bei klarem Signal; im Training
+      // sorgt gelegentliche Exploration für Daten auf allen Armen.
+      let priorPick = null;
+      if (cardPick === undefined && !scriptedPick && !engine._inMctsSim) {
+        const srcName = config.previewCardName || config.source || config.title;
+        priorPick = deckProfile.targetPickDecision(engine, playerIdx, srcName, validTargets, config);
+      }
+      const picked = (cardPick !== undefined) ? cardPick
+        : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
+      // Log-Stempel für den Recorder (record.targetPicks): die FINALE
+      // Wahl, egal welcher Pfad sie traf — klassifiziert als Tags.
+      try {
+        if (!engine._inMctsSim && Array.isArray(picked) && picked.length === 1) {
+          const tgt = validTargets.find(t => t && t.id === picked[0]);
+          const srcName = config.previewCardName || config.source || config.title || null;
+          if (tgt && srcName) {
+            if (!engine._targetLog) engine._targetLog = [];
+            engine._targetLog.push({ pi: playerIdx, c: srcName, t: engine.gs?.turn || 0,
+              tags: deckProfile.classifyTargetTags(engine, tgt, validTargets, playerIdx) });
+          }
+        }
+      } catch { /* Log darf nie stören */ }
       // ── MCTS recon recording ──
       // For damage Attacks/Spells with both own and enemy targets,
       // strip own-side targets out of the recorded `validTargets` so
@@ -3430,7 +5444,125 @@ function installCpuBrain(engine) {
 // Returns an array of selected target IDs (same contract as
 // _getCpuTargetResponse) or undefined to let the default handler run.
 
+/**
+ * Registry-basierter Schadens-Multiplikator eines Ziels (Als Audit-
+ * Auftrag "die CPU soll ALLE Block-/Reduktions-Effekte erkennen"):
+ * liest BUFF_EFFECTS aus _hooks.js — die zentrale Wahrheit, die auch
+ * die Engine-Pipeline speist. Produkt aller damageMultiplier-Buffs
+ * (Held: hero.buffs; Kreatur: inst.counters.buffs). 0 = Schaden
+ * sinnlos (medusa_petrified, damage_immune, künftige 0er-Einträge
+ * automatisch); 0.5 = Cloudy; 2 = disrupted.
+ */
+function targetDamageMultiplier(engine, target) {
+  try {
+    const { BUFF_EFFECTS } = require('./_hooks');
+    const buffs = target?.type === 'hero'
+      ? engine.gs?.players?.[target.owner]?.heroes?.[target.heroIdx]?.buffs
+      : target?.cardInstance?.counters?.buffs;
+    if (!buffs) return 1;
+    let m = 1;
+    for (const k of Object.keys(buffs)) {
+      const def = BUFF_EFFECTS[k];
+      if (def && typeof def.damageMultiplier === 'number') m *= def.damageMultiplier;
+    }
+    return m;
+  } catch { return 1; }
+}
+
 function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
+  // ── Damage-Gate (Als Registry-Audit) ──
+  // Dealt der Prompt Schaden (gleiche Inferenz wie die Engine:
+  // explizites dealsDamage:false schaltet ab, sonst baseDamage>0 oder
+  // konkreter damageType), fliegen Ziele mit Multiplikator 0 raus —
+  // plus der konditionale Anti-Magic-Block (magic_immune-Buff gegen
+  // Spell-Schaden, wenn Buff-Level ≥ Kartenlevel und die Karte nicht
+  // bypassesMagicImmune exportiert). Reduktionen (Cloudy 0.5) und
+  // Verstärkungen (disrupted 2) filtern NICHT — sie fließen als
+  // dmgred-/dmgamp-Tags in den Lernkanal (classifyTargetTags).
+  {
+    const dealsDamage = config?.dealsDamage === false ? false : (
+      (typeof config?.baseDamage === 'number' && config.baseDamage > 0)
+      || (!!config?.damageType && config.damageType !== 'status' && config.damageType !== 'none'));
+    if (dealsDamage && Array.isArray(validTargets) && validTargets.length > 1) {
+      const isSpell = /spell/.test(String(config?.damageType || ''));
+      let cardLevel = null, bypassesAM = false;
+      if (isSpell && config?.title) {
+        try {
+          cardLevel = engine._getCardDB()?.[config.title]?.level ?? null;
+          bypassesAM = !!require('./_loader').loadCardEffect(config.title)?.bypassesMagicImmune;
+        } catch { }
+      }
+      const blocked = (t) => {
+        if (targetDamageMultiplier(engine, t) === 0) return true;
+        if (isSpell && !bypassesAM) {
+          const buffs = t?.type === 'hero'
+            ? engine.gs?.players?.[t.owner]?.heroes?.[t.heroIdx]?.buffs
+            : t?.cardInstance?.counters?.buffs;
+          const am = buffs?.magic_immune;
+          if (am && (cardLevel == null || (am.level ?? 99) >= cardLevel)) return true;
+        }
+        return false;
+      };
+      const keep = validTargets.filter(t => !blocked(t));
+      if (keep.length > 0) validTargets = keep;
+    }
+  }
+  // ── Heil-Gate (Als Heal-Burn-Befund) ──
+  // Das Training lernte "gegnerische Helden heilen → gewinnen", weil
+  // die Ziele im Testing Overheal Shock trugen — der Kontext fehlte im
+  // Signal, und live heilte die CPU Gegner OHNE Umwandlung hoch.
+  // Korrektheits-Regel vor jedem Lernen/Scoren: Bei als Heilung
+  // markierten Prompts (config.isHealing) sind Gegner-Ziele nur
+  // zulässig, wenn ihre Heilung zu Schaden wird (statuses.healReversed
+  // — der Status, den Overheal Shock setzt). Leert das Gate die Liste
+  // nicht komplett, arbeitet alles Weitere (gelernte targetPriors,
+  // Default-Picker) auf der gefilterten Menge; sonst Altverhalten als
+  // Softlock-Schutz.
+  // ── Status-Gate (Als Demo-Befund, status_blocked reason
+  // 'negative_status_immune'): wendet der Prompt einen negativen
+  // Status an (config.appliesStatus), sind Ziele sinnlos, deren
+  // Immunität ihn blocken würde — Helden-Buff negative_status_immune,
+  // Kreaturen-Buff gleichen Namens, und der 'immune'-Status für die
+  // CC-Familie (frozen/stunned/negated/bound, wie CC_STATUSES der
+  // Engine). Filter nur, wenn danach Ziele übrig bleiben.
+  {
+    const st = typeof config?.appliesStatus === 'string' ? config.appliesStatus : null;
+    const NEG = ['frozen', 'stunned', 'negated', 'bound', 'poisoned', 'burning', 'cursed'];
+    const CC = ['frozen', 'stunned', 'negated', 'bound'];
+    if (st && NEG.includes(st) && Array.isArray(validTargets) && validTargets.length > 1) {
+      const blocked = (t) => {
+        if (!t) return false;
+        if (t.type === 'hero') {
+          const h = engine.gs?.players?.[t.owner]?.heroes?.[t.heroIdx];
+          if (!h) return false;
+          if (h.buffs?.negative_status_immune) return true;
+          if (h.statuses?.immune && CC.includes(st)) return true;
+          // Registry-Audit: Light-Ball-Schutz (Engine-Methode als eine
+          // Quelle der Wahrheit) und Johannas Schutzschirm (lebende
+          // "Johanna, Crusader of Light" auf der Zielseite schützt die
+          // ANDEREN Helden; sich selbst nicht).
+          try {
+            if (engine._lightBallProtects
+              && engine._lightBallProtects(t.owner, 'hero', t.heroIdx)) return true;
+          } catch { }
+          const heroes = engine.gs?.players?.[t.owner]?.heroes || [];
+          if (heroes.some(j => j && j !== h && j.name === 'Johanna, Crusader of Light' && j.hp > 0)) return true;
+          return false;
+        }
+        const inst = t.cardInstance;
+        return !!(inst?.counters?.buffs?.negative_status_immune);
+      };
+      const keep = validTargets.filter(t => !blocked(t));
+      if (keep.length > 0) validTargets = keep;
+    }
+  }
+  if (config?.isHealing && Array.isArray(validTargets) && validTargets.length > 1) {
+    const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
+    const healReversed = (t) => t?.type === 'hero'
+      && !!engine.gs?.players?.[t.owner]?.heroes?.[t.heroIdx]?.statuses?.healReversed;
+    const filtered = validTargets.filter(t => t && (t.owner === cpuIdx || healReversed(t)));
+    if (filtered.length > 0) validTargets = filtered;
+  }
   if (!Array.isArray(validTargets) || validTargets.length === 0) {
     return config.cancellable ? [] : undefined;
   }
@@ -3440,7 +5572,12 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // on the OPPONENT's turn (Shield of Life, Cure) flipped own/enemy and
   // caused the CPU to heal the enemy.
   const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
-  const cardName = config.title;
+  // `config.source` gewinnt vor dem Titel — Titel sind für Menschen
+  // geschrieben und oft keine reinen Kartennamen (z.B. "<Held> — Charme
+  // Lv1"). Der Schwester-Pfad weiter oben macht das längst so; hier
+  // fehlte es, wodurch Karten-Contracts an dieser Stelle unerreichbar
+  // blieben.
+  const cardName = config.source || config.title;
   const cd = cardName ? engine._getCardDB()[cardName] : null;
 
   // Per-card target override: cards can export `cpuResponse(engine, 'target',
@@ -3709,6 +5846,23 @@ function pickBuffTargetsMulti(engine, ownTargets, cardName, maxSelect) {
 
 // ─── Generic choice picker ─────────────────────────────────────────────
 
+// Tutor-/Galerie-Pick-Erhebung: Jede LIVE vollzogene Galerie-Wahl
+// (Tutor-Suche, Revive-Galerie, ...) wird mit Quelle+Pick geloggt —
+// Grundlage der Tutor-Pick-Regeln im Trainer ("wann welche Karte
+// suchen"). Sim-Antworten werden nicht gezählt.
+function _logGalleryPick(engine, promptData, who, names) {
+  try {
+    if (engine._inMctsSim || !names || !names.length) return;
+    if (!engine._tutorPickLog) engine._tutorPickLog = [];
+    engine._tutorPickLog.push({
+      pi: who,
+      src: promptData.title || promptData.cardName || 'unknown',
+      picked: names.slice(0, 3),
+      t: engine.gs?.turn || 0,
+    });
+  } catch { /* nie stören */ }
+}
+
 function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   const type = promptData.type;
   // Use the CARD CONTROLLER's pi (not the active player) so reactive
@@ -3754,10 +5908,68 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     if (script?.cpuResponse) {
       try {
         const override = script.cpuResponse(engine, 'generic', promptData);
-        if (override !== undefined) return override;
+        if (override !== undefined) {
+          // ── ZWEITER PFAD derselben Rückgabeform-Falle (Audit 30.7.) ──
+          // Die zentrale Normalisierung weiter unten wird hier
+          // ÜBERSPRUNGEN: ein karteneigenes cpuResponse geht direkt
+          // zurück an den Aufrufer. Karten, die auf ihr eigenes
+          // "you may"-Confirm mit blankem `true` antworten, liefen
+          // deshalb weiter ins Leere — im Audit blieb genau eine übrig
+          // (Soul Shard Shut, `return true` für den eigenen Confirm).
+          // An der Wurzel normalisiert statt auf der Karte, damit auch
+          // künftige cpuResponse-Implementierungen nicht in dieselbe
+          // Falle laufen: `{confirmed:true}` erfüllt beide
+          // Konsumenten-Formen, `null`/`false` bleiben Ablehnung.
+          if (promptData.type === 'confirm') return normalizeConfirm(override);
+          return override;
+        }
       } catch (err) {
         console.error(`[CPU] ${cardName} cpuResponse threw:`, err.message);
       }
+    }
+  }
+
+  // ── KOSTEN-CONFIRMS SIND KEINE OPT-INS (31.7.) ────────────────────
+  // Zwei nachfolgende Zweige bejahen automatisch: der Reaktions-Zweig
+  // über cpuReactionDecisions "fire reactions ASAP", und das
+  // Proaktiv-Cast-Gate über "wir haben uns für die Karte schon
+  // entschieden". Beide sind für Prompts der Form "darfst du diesen
+  // Vorteil mitnehmen?" gebaut. Ein Prompt, dessen JA eine RESSOURCE
+  // AUSGIBT (Aktion, Gold, Handkarte, HP), ist die Umkehrung davon —
+  // dort ist das automatische Ja der teuerste mögliche Fehler.
+  //
+  // BELEGT an Greatmaw Remora (Repro gegen die echte Engine): der
+  // Kartentext bietet die Beschwörung als GRATIS-Zusatzaktion an, der
+  // Prompt fragt "willst du stattdessen eine deiner Aktionen dafür
+  // ausgeben, um den Nicht-Greatmaw-Lock zu vermeiden?"
+  // (confirmLabel '✋ Spend an Action', cancelLabel '🦈 Free'). Weil der
+  // Prompt `showCard` trägt, fiel er in den Reaktions-Zweig →
+  // cpuReactionDecision → true → {confirmed:true} → spendAction →
+  // consumeRealActionFor → heroesActedThisTurn. Die CPU verbrannte bei
+  // JEDEM Remora die einzige Aktion des Zuges für eine Beschwörung, die
+  // sie ohnehin gratis bekam. Und selbst wenn dieser Zweig nicht
+  // gegriffen hätte, hätte das Proaktiv-Cast-Gate darunter dasselbe
+  // getan (Prompt-Titel === Name der gerade resolvenden Karte).
+  //
+  // Karten deklarieren das über `cpuMeta.confirmCostsResource`: `true`
+  // für "jeder Confirm dieser Karte kostet", oder ein Prädikat
+  // (engine, pi, promptData) → boolean für Karten mit mehreren Prompts.
+  // Die Antwort ist die konservative Ablehnung — dieselbe, die der
+  // generische cancellable-Confirm-Default ganz unten gibt ("opting
+  // into a follow-up without the CPU knowing how to execute it").
+  // Wer wirklich zahlen will, exportiert `cpuResponse`; das wird oben
+  // geprüft und gewinnt gegen diesen Zweig.
+  if (type === 'confirm' && promptData.cancellable && cardName) {
+    let costsResource = false;
+    try {
+      const c = loadCardEffect(cardName)?.cpuMeta?.confirmCostsResource;
+      costsResource = (typeof c === 'function')
+        ? c(engine, cpuIdx, promptData) === true
+        : c === true;
+    } catch { costsResource = false; }
+    if (costsResource) {
+      confirmDiag(engine, promptData, false);
+      return null;
     }
   }
 
@@ -3769,11 +5981,97 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // Shield's "🛡️ Defend!", etc. Any cancellable card-effect confirm
   // with `showCard` is a reaction opt-in; route through the smarter
   // decision-maker rather than the blanket-decline branch below.
+  // ── statusSelect (Coffee/Tea/Beer-Familie) ──
+  // Status-Auswahl-Galerie: Die CPU wählt ALLE angebotenen Status —
+  // bei Heilung/Übertragung strikt korrekt (mehr entfernen ist besser).
+  // Ohne diesen Zweig fiel der unbekannte cancellable Typ in den
+  // generischen Decline → Coffees resolve abortete → der
+  // Targeting-Resolver loopte über die Ziele bis zum Safety-Cap und
+  // die Karte wurde NIE erfolgreich gespielt (0/700 trotz Kanal).
+  if (type === 'statusSelect') {
+    const sel = (promptData.statuses || []).map(s => (s && s.key !== undefined) ? s.key : s).filter(Boolean);
+    return { selectedStatuses: sel };
+  }
   if (type === 'confirm'
       && promptData.cancellable
       && (promptData.showCard
           || (promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)))) {
-    return cpuReactionDecision(engine, promptData);
+    // ── Surprise-Fire-Lernkanal ──
+    // Nur für echte Surprises (script.isSurprise) — Reactions aus der
+    // Hand haben eine andere Ökonomie und bleiben bei der Heuristik.
+    // Hierarchie: gelernte Regel > Trainings-Exploration > Heuristik
+    // (cpuReactionDecision, bisher "fire ASAP"). Die finale
+    // Entscheidung wird für den Recorder gestempelt.
+    const rxName = promptData._gerryOriginalTitle || promptData.title;
+    const rxScript = rxName ? loadCardEffect(rxName) : null;
+    if (rxScript?.isSurprise) {
+      const d = deckProfile.surpriseFireDecision(engine, cpuIdx, rxName);
+      let fired;
+      if (d === 'fire') fired = true;
+      else if (d === 'hold') fired = false;
+      else fired = cpuReactionDecision(engine, promptData) === true;
+      try {
+        if (!engine._inMctsSim) {
+          if (!engine._surpriseLog) engine._surpriseLog = [];
+          engine._surpriseLog.push({ pi: cpuIdx, c: rxName, t: engine.gs?.turn || 0, fired });
+        }
+      } catch { /* Log darf nie stören */ }
+      return fired ? CONFIRM_YES : null;
+    }
+
+    // ── Reaktions-Fire-Lernkanal (Als Vorgabe) ──
+    // Bisher entschied hier allein die Heuristik "fire ASAP". Jetzt darf
+    // eine gelernte Regel ZURÜCKHALTEN — die Heuristik bleibt aber Veto,
+    // weil sie Korrektheit kodiert (Juice ohne reinigbares Ziel, eigene
+    // Chain). Gebucketed nach Schadenskontext, ersatzweise Zug-Phase.
+    //
+    // REVIEW-FIX (Deepsea-Batch 15.2% WR): Der Kanal gilt NUR für die
+    // markierten Hand-Reaktionsfenster der Engine. Ohne dieses Gate
+    // wanderten ALLE cardName-betitelten Confirms hindurch — auch die
+    // Bounce-Platzierungs-Bestätigungen der Deepsea-Linie. Folge im
+    // Training: ~40% der Platzierungen per 50/50-Exploration abgelehnt
+    // (Mummy 44/90, Witch 13/27), daraus NEGATIVE Regeln gelernt, die
+    // den Deck-Motor zur Laufzeit dauerhaft abwürgten (WR 17.6% in
+    // Iter1 → 11.8% ab Iter2, als die Holds griffen). Alles ohne Marker
+    // fällt jetzt auf die Heuristik zurück (Verhalten vor v24:
+    // fire ASAP → Platzierungen werden bestätigt).
+    if (promptData._handReactionWindow !== true) {
+      // ── RÜCKGABEFORM (gemessen 30.7., End-to-End gegen die echte
+      // Engine) ────────────────────────────────────────────────────────
+      // `cpuReactionDecision` liefert den BLANKEN Boolean `true`. Das ist
+      // die Form für "Plain reaction/trigger confirm: caller checks
+      // `if (result)`". Der KANONISCHE "you may"-Weg der Karten ist aber
+      // `ctx.promptConfirmEffect`, und der liest `result?.confirmed ===
+      // true` — `true.confirmed` ist `undefined`, also FALSE. Das Gehirn
+      // sagte ja, die Engine las nein: JEDER optionale On-Summon-Effekt
+      // einer CPU-gespielten Karte wurde still abgelehnt. Belegt am
+      // laufenden Spiel: Primordiums Grant, Witchs Tutor, Mummys Stun und
+      // Bats feuerten NIE (`aaGrants=null`, keine Effekt-Logs), während
+      // der Prompt `true` zurückgab. Erklärt die Trainingsdaten exakt —
+      // 410 Primordium-Plays, aber `grantsExpired = 0` und praktisch
+      // keine Grants: sie verfielen nicht, sie entstanden nie.
+      // Der Kommentar am Plain-Confirm-Zweig weiter unten benennt die
+      // Lösung bereits: "Returning `{ confirmed: true }` satisfies both."
+      // Betrifft ALLE 43 Karten mit `promptConfirmEffect`, nicht nur die
+      // Deepsea-Linie — deshalb hier zentral normalisiert statt je Karte.
+      const _dec = cpuReactionDecision(engine, promptData);
+      confirmDiag(engine, promptData, _dec === true || _dec?.confirmed === true);
+      return normalizeConfirm(_dec);
+    }
+    const heur = cpuReactionDecision(engine, promptData) === true;
+    if (!heur) return null;
+    const t = engine.gs?.turn || 1;
+    const rxBucket = engine._rxDamageCtx?.tag
+      || (t <= 4 ? 'early' : t <= 9 ? 'mid' : 'late');
+    const rxD = deckProfile.reactionFireDecision(engine, cpuIdx, rxName, rxBucket);
+    const rxFired = rxD !== 'hold';
+    try {
+      if (!engine._inMctsSim) {
+        if (!engine._reactionLog) engine._reactionLog = [];
+        engine._reactionLog.push({ pi: cpuIdx, c: rxName, t, b: rxBucket, fired: rxFired });
+      }
+    } catch { /* Log darf nie stören */ }
+    return rxFired ? CONFIRM_YES : null;
   }
 
   // ── Ability-attach prompts (Sacrifice to Divinity, Megu, Alex, …) ──
@@ -3917,6 +6215,7 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     const cards = promptData.cards || [];
     if (!cards.length) return null;
     const c = pickBestGalleryCard(engine, cpuIdx, cards);
+    _logGalleryPick(engine, promptData, cpuIdx, [c.name]);
     return { cardName: c.name, source: c.source };
   }
   if (type === 'cardGalleryMulti') {
@@ -3935,12 +6234,47 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     pickBestGalleryCard(engine, cpuIdx, cards); // stamps `_galleryScore` on each
     const plan = cpuGalleryMultiPlan(promptData);
     if (plan.hardCount) {
-      // EXACT-count prompt (Timeless King Zi). The greedy top-score
-      // loop below can grab high-score cards that blow the budget and
-      // then fail to reach `need`, yielding an invalid pick the
-      // consuming card rejects. The cheapest `need`-combo is the only
-      // thing guaranteed valid whenever a legal selection exists.
-      const combo = cpuCheapestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget);
+      // EXACT-count prompt (Timeless King Zi / Magic Lamp / Crestina).
+      // Früher: IMMER das billigste Trio — ein Legalitäts-Shim, keine
+      // Strategie (High-Level-Spells wurden dadurch NIE angeboten; Als
+      // Gathering-Storm-Befund). Jetzt: budget-bewusster Score-Greedy
+      // über _galleryScore + gelernte Angebotsregel der Menü-Quelle
+      // (menuOfferRules, misst Menü-Design inkl. Gegnerverhalten).
+      // Cheapest bleibt Fallback-Garantie. In Trainingsspielen ersetzt
+      // ε (PP_MENU_EXPLORE, default 0.15) einen Slot durch eine
+      // zufällige machbare Alternative — sonst entstünde nie Evidenz
+      // darüber, was Gegner mit ungewohnten Angeboten anfangen.
+      const menuSrc = promptData.menuSource || null;
+      const scoreOf = (c) => (c._galleryScore || 0)
+        + (menuSrc ? deckProfile.menuOfferRule(engine, cpuIdx, menuSrc, c.name) : 0);
+      const objective = menuSrc ? MENU_OBJECTIVES[menuSrc] : null;
+      let combo = (objective
+          ? cpuAdversarialMenuCombo(cards, plan.need, plan.costKey, plan.maxBudget, scoreOf, objective)
+          : null)
+        || cpuBestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget, scoreOf)
+        || cpuCheapestGalleryCombo(cards, plan.need, plan.costKey, plan.maxBudget);
+      if (combo && process.env.PP_TRAIN && !engine._inMctsSim && cards.length > plan.need) {
+        const eps = parseFloat(process.env.PP_MENU_EXPLORE || '0.15');
+        if (eps > 0 && Math.random() < eps) {
+          const outsiders = cards.filter(c => !combo.includes(c.name));
+          if (outsiders.length) {
+            const swapIn = outsiders[Math.floor(Math.random() * outsiders.length)];
+            const slot = Math.floor(Math.random() * combo.length);
+            const trial = combo.slice();
+            trial[slot] = swapIn.name;
+            // Budget-Prüfung des Tauschs (nur bei costKey nötig)
+            if (plan.maxBudget == null || !plan.costKey) combo = trial;
+            else {
+              const cost = trial.reduce((sum, n) => {
+                const card = cards.find(c => c.name === n);
+                return sum + (Number(card?.[plan.costKey]) || 0);
+              }, 0);
+              if (cost <= plan.maxBudget) combo = trial;
+            }
+          }
+        }
+      }
+      _logGalleryPick(engine, promptData, cpuIdx, (combo || []) || []);
       return { selectedCards: combo || [] };
     }
     // Typed multi-pick — "up to N of type X and up to M of type Y"
@@ -3971,6 +6305,7 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
         typeUsed[e.type] = (typeUsed[e.type] || 0) + 1;
         typedPicks.push(e.name);
       }
+      _logGalleryPick(engine, promptData, cpuIdx, (typedPicks) || []);
       return { selectedCards: typedPicks };
     }
     // Soft multi-pick ("pick up to N you can afford"): greedy top-score
@@ -3993,6 +6328,7 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       picks.push(c.name);
       budgetRemaining -= cost;
     }
+    _logGalleryPick(engine, promptData, cpuIdx, (picks) || []);
     return { selectedCards: picks };
   }
   // Card-name picker — the prompt Luck raises on activation. Engine default
@@ -4474,6 +6810,16 @@ function isTargetImmune(engine, target) {
     if (hero.statuses?.immune) return true;
     if (hero.statuses?.stunned?._baihuPetrify) return true;
     if (hero.charmedBy != null && hero.charmedBy !== target.owner) return true;
+    // Submerged (Als Demo-Befund, damage_blocked reason 'submerged'):
+    // die Engine blockt Schaden UND Status-Effekte auf getauchte
+    // Helden, SOLANGE der Besitzer noch einen anderen lebenden,
+    // nicht-getauchten Helden hat — exakt diese Bedingung hier
+    // gespiegelt, damit die CPU keine Effekte an submerged verschwendet.
+    if (hero.buffs?.submerged) {
+      const otherAlive = (gs.players[target.owner]?.heroes || [])
+        .some(h => h && h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged);
+      if (otherAlive) return true;
+    }
     return false;
   }
 
@@ -4488,10 +6834,25 @@ function isTargetImmune(engine, target) {
     if (inst.counters?.control_immune) return true;
     if (inst.counters?._cardinalImmune) return true;
     if (inst.counters?._baihuPetrify) return true;
+    // Registry-Audit (Als Auftrag): golden_wings setzt zusätzlich
+    // untargetable_by_opponent — für Ziele der GEGENSEITE immun (eigene
+    // Kreaturen mit dem Counter bleiben für den Besitzer wählbar).
+    if (inst.counters?.untargetable_by_opponent
+        && target.owner !== engine._cpuPlayerIdx) return true;
+    if (inst.counters?.untargetable_by_opponent_pi != null
+        && inst.counters.untargetable_by_opponent_pi === engine._cpuPlayerIdx) return true;
     return false;
   }
   return false;
 }
+
+// Helfer-Bündel, das an die per-Karte-Hooks in `cpuMeta` durchgereicht
+// wird (alwaysCommit, activationScoreBonus). So können Karten-Skripte die
+// Ziel-Hygiene der CPU mitbenutzen, statt die Immunitäts-Regeln zu
+// duplizieren — `isTargetImmune` deckt tot, immun, Baihu-Petrify,
+// gecharmt, submerged und den Erstzug-Schild ab. Bewusst ein Objekt:
+// weitere Helfer lassen sich ergänzen, ohne jede Signatur anzufassen.
+const CPU_META_HELPERS = { isTargetImmune };
 
 function pickEnemyTargets(engine, enemyTargets, damage, maxSelect) {
   const gs = engine.gs;
@@ -4678,8 +7039,8 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
         const scoreHero = (t) => {
           const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
           if (!h) return -Infinity;
-          const burn = h.statuses?.burn || 0;
-          const poison = h.statuses?.poison || 0;
+          const burn = statusStacks(h, 'burned');
+          const poison = statusStacks(h, 'poisoned');
           const tickDmg = STATUS_DMG_PER_STACK * (burn + poison);
           const lethal = tickDmg > 0 && tickDmg >= h.hp ? 10000 : 0;
           const ascended = targetIsAscendedOrAscendableHero(engine, t) ? 1000 : 0;
@@ -4755,7 +7116,19 @@ function scoreSelfStatusTarget(engine, target, statusName) {
   const hero = ps?.heroes?.[target.heroIdx];
   if (!hero?.name) return 0;
   let total = 0;
-  const ctx = { engine, owner: target.owner, heroIdx: target.heroIdx, hero };
+  // Ressourcen-Kontext für die Karten-Verträge: Gold-Bedarf vs. Bestand
+  // aus demselben Demand-Modell, das auch evaluateState nutzt. Damit
+  // können Karten wie Fiona ("+20 Gold pro Selbst-Status") ihren Wert
+  // situativ beziffern, statt konstant zu liefern — ein Selbst-Gift bei
+  // 200 Gold Vorrat ist kein Gewinn, sondern ein verschenkter Effekt
+  // (live beobachtet in Venom Swamp: Gift auf die eigene Fiona statt
+  // auf den Gegner, bei vollem Goldbeutel).
+  let goldSurplus = 0, goldDemand = 0;
+  try {
+    goldDemand = computeGoldDemand(engine, target.owner) || 0;
+    goldSurplus = Math.max(0, (ps?.gold || 0) - goldDemand);
+  } catch { /* Kontext optional */ }
+  const ctx = { engine, owner: target.owner, heroIdx: target.heroIdx, hero, goldDemand, goldSurplus };
   const applyScript = (script) => {
     if (typeof script?.cpuStatusSelfValue !== 'function') return;
     try {
@@ -5112,13 +7485,43 @@ function getRolloutBrain() { return _rolloutBrain; }
 // triples the per-rollout cost vs h=2). Most decisions still finish
 // well under this; the cap only matters on heavy-board, many-candidate
 // turns where the extra wall-clock buys a noticeably better pick.
-const MCTS_RANK_BUDGET_MS = 20000;
+//
+// PP_MCTS_BUDGET_MS / PP_MCTS_PULLS: env overrides for batch training
+// (PP_TRAIN mode), where per-game throughput matters more than squeezing
+// the last few points of decision quality out of each turn. Read once at
+// module load; live games simply don't set them.
+const MCTS_RANK_BUDGET_MS = parseInt(process.env.PP_MCTS_BUDGET_MS || '20000', 10);
 // UCB1 total-pull cap per decision. Hard ceiling on how many rollouts a
 // single decision can burn; typically cut short by the wall-clock budget.
-const MCTS_UCB1_TOTAL_PULLS = 80;
+const MCTS_UCB1_TOTAL_PULLS = parseInt(process.env.PP_MCTS_PULLS || '80', 10);
 // UCB1 exploration constant. √2 is the textbook default. Higher = more
 // exploration (visit undervisited arms), lower = more exploitation.
 const MCTS_UCB1_EXPLORE_C = 1.414;
+// Deck-Nähe-Eval (Deckout-Prävention): Default-Schwelle wenn kein
+// Profil eine gelernte deckoutDangerSize liefert, und die quadratische
+// Eskalation (Malus = (th−deck)² × K in Eval-Punkten; bei th=8 also
+// −8 bei Deck=7 … −512 bei Deck=0 — im Bereich echter Board-Swings).
+const DECKOUT_EVAL_TH_DEFAULT = 8;
+const DECKOUT_EVAL_K = parseFloat(process.env.PP_DECKPROX_K || '8');
+
+// ── Eigener Angriffswert (siehe evaluateState) ──────────────────────
+// HP-äquivalentes Gewicht je verfügbarem ATK-Umsetzer und Deckel auf die
+// Zahl der gezählten Umsetzer. Bewusst konservativ: bei 3 Umsetzern und
+// 250 ATK trägt der Term 262 Punkte, bleibt also unter dem ±500-KO-Term.
+// Abschalter für A/B-Läufe: PP_ATK_EVAL_K=0.
+const ATK_EVAL_PER_CONVERSION = parseFloat(process.env.PP_ATK_EVAL_K || '0.35');
+const ATK_EVAL_MAX_CONVERSIONS = 3;
+// ── PUCT-Prior-Einfluss ──
+// Profil-cardValues fließen als VERBLASSENDE Startgewichte in die
+// Kandidaten-Exploration: prior×SCALE/(1+visits). Bei visits=0 lenkt
+// das Profil, welche Arme zuerst gezogen werden (bei knappem Budget
+// entscheidet das, was überhaupt evaluiert wird); mit jedem Pull
+// übernimmt die gemessene Evidenz (Q-Term). Ein falsches Profil wird
+// so vom Suchbaum ÜBERSTIMMT statt blind befolgt — der strukturelle
+// Fix für die "toxische Priors"-Falle. Skala klein, weil die
+// Arm-Differenzen im Q-Term typischerweise nur wenige Punkte betragen
+// (vgl. MCTS_EXT_EPSILON_ABS = 3).
+const MCTS_PUCT_SCALE = parseFloat(process.env.PP_PUCT_SCALE || '0.15');
 // ─── Adaptive extension phase ──────────────────────────────────────────
 // When the regular UCB1 phase ends with the top arms still clustered
 // inside the noise band, spend up to MCTS_EXT_PULLS_MAX extra rollouts
@@ -5751,6 +8154,24 @@ function pickBestGalleryCard(engine, pi, cards) {
     c._galleryScore = score;
     if (score > best) best = score;
   }
+  // ── Trainings-ε für Galerie-Picks (PP_GALLERY_EXPLORE, default 0.1) ─
+  // Galerie-Picks hatten als einziger gelernter Kanal KEINE Exploration
+  // — negative tutorPickRules unterdrückten damit exakt die Picks, die
+  // Gegenevidenz erzeugen würden (selbstkonservierende Regeln, Als
+  // DM-Fetch-Befund). Mit Wahrscheinlichkeit ε wird ein uniform
+  // zufälliger Kandidat massiv geboostet: er gewinnt die Heuristik-
+  // Auswahl UND die MCTS-Prior-Sortierung (PUCT darf per Evidenz
+  // weiterhin überstimmen — "weiche" Exploration, die katastrophale
+  // Picks nicht erzwingt). Nur in LIVE-Trainingsspielen.
+  if (process.env.PP_TRAIN && !engine._inMctsSim && cards.length > 1) {
+    const galleryEps = parseFloat(process.env.PP_GALLERY_EXPLORE || '0.1');
+    if (galleryEps > 0 && Math.random() < galleryEps) {
+      const c = cards[Math.floor(Math.random() * cards.length)];
+      c._galleryScore += 1000;
+      if (c._galleryScore > best) best = c._galleryScore;
+      cpuLog(`  [explore] Galerie: Zufalls-Kandidat "${c.name}" geboostet (ε=${galleryEps})`);
+    }
+  }
   const top = cards.filter(c => c._galleryScore >= best - 0.01);
   const pick = top[Math.floor(Math.random() * top.length)] || cards[0];
   // Hard invariant: the returned pick MUST be one of the input cards
@@ -5785,6 +8206,180 @@ function kazenaDrawAvailable(engine, pi) {
     return true; // a usable Kazena whose effect hasn't fired this turn
   }
   return false;
+}
+
+// ── castGate-Revive-Awareness ────────────────────────────────────────
+// Könnte ein TOTER eigener Held diese Karte casten, wenn er wiederbelebt
+// würde — und liegt eine Revive-Quelle auf der Hand? Dann ist die Karte
+// keine 0.15-Brick, sondern (wie beim Enabler-in-Hand-Fall) nur EINE
+// Setup-Aktion entfernt: die Ankh-Linie "wiederbeleben → casten".
+// Revive-Quellen: cpuMeta.reviveCard (Ankh, Resuscitation Potion,
+// Divine Gifts) oder cpuMeta.canReviveDeadHero (Reincarnation — die
+// wegen ihres Creature-Zweitmodus bewusst keinen reviveCard-Malus
+// trägt). Elixir of Immortality zählt NICHT: es belebt nur ZUKÜNFTIGE
+// Tode wieder, holt einen bereits toten Helden also nicht zurück.
+// Eligibility-Probe im cpuShouldPlay-Muster: hp temporär positiv
+// setzen, listEligibleHeroesForActionCard fragen, in `finally`
+// restaurieren — side-effect-frei.
+function deadHeroCouldCastWithReviveInHand(engine, pi, cd) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps?.heroes) return false;
+  let hasRevive = false;
+  for (const cn of (ps.hand || [])) {
+    const meta = loadCardEffect(cn)?.cpuMeta;
+    if (meta?.reviveCard || meta?.canReviveDeadHero) { hasRevive = true; break; }
+  }
+  if (!hasRevive) return false;
+  for (let hi = 0; hi < ps.heroes.length; hi++) {
+    const hero = ps.heroes[hi];
+    if (!hero?.name || (hero.hp ?? 0) > 0) continue;
+    const savedHp = hero.hp;
+    hero.hp = 100;
+    let ok = false;
+    try {
+      ok = listEligibleHeroesForActionCard(engine, pi, cd).some(e => e.hi === hi);
+    } catch { /* defensiv */ } finally {
+      hero.hp = savedHp;
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+// ── Revive-Karten-Situationslage ─────────────────────────────────────
+// Für Karten mit `cpuMeta.reviveCard` (Golden Ankh, Resuscitation
+// Potion, Divine Gift of Equality/Death): Gibt es überhaupt einen
+// besiegten EIGENEN Helden — und bei temporären Revives
+// (`cpuMeta.reviveTemporary`, Golden Ankh): hätte der Wiederbelebte in
+// DIESER Runde etwas beizutragen? Letzteres fragt die side-effect-freie
+// `cpuShouldPlay`-Probe des Kartenskripts (castbare Handkarte, aktiver
+// Hero-Effekt, aktivierbare Ability/Creature — Als Spezifikation:
+// "nur wiederbeleben, wenn es diese Runde einen Nutzen gibt"; ein
+// Revive für eine Runde ohne Nutzen ist verbranntes Gold + Handkarte).
+// Rückgabe `null` für alle Karten ohne das Flag (Verhalten unverändert).
+// Reincarnation (Modal-Karte mit Creature-Zweitmodus) und Elixir of
+// Immortality (proaktives Permanent) tragen das Flag bewusst NICHT —
+// beide haben auch ohne toten Helden legitimen Wert.
+function reviveCardSituation(engine, pi, cardName) {
+  const script = loadCardEffect(cardName);
+  if (!script?.cpuMeta?.reviveCard) return null;
+  const heroes = engine.gs?.players?.[pi]?.heroes || [];
+  let hasDead = false;
+  for (const h of heroes) {
+    if (h?.name && (h.hp ?? 0) <= 0) { hasDead = true; break; }
+  }
+  if (!hasDead) return { hasDead: false, useful: false };
+  if (script.cpuMeta.reviveTemporary && typeof script.cpuShouldPlay === 'function') {
+    let useful = false;
+    // Fail-open: wirft die Probe, behandeln wir den Revive als nützlich —
+    // ein fälschlicher Malus wäre schlimmer als ein fälschlicher Fetch.
+    try { useful = !!script.cpuShouldPlay(engine, pi); } catch { useful = true; }
+    return { hasDead: true, useful };
+  }
+  return { hasDead: true, useful: true };
+}
+
+// ── Ability-Such-Dringlichkeit (Spell-School-Unlock) ─────────────────
+// Wie dringend braucht `pi` diese Ability GERADE, um Brick-Karten auf
+// der Hand überhaupt einsetzen zu können? Zählt Handkarten
+// (Spell/Attack/Creature), die diese Ability als spellSchool1/2 listen
+// und aktuell von KEINEM lebenden Helden castbar sind:
+//   +18 wenn EIN weiteres Level auf einem lebenden, nicht
+//       frozen/stunned Helden die Karte SOFORT freischalten würde
+//       (Simulation wie in scoreSpellLevelReducerUnlock: Zonen-Kopie,
+//       Stack <3 erhöhen oder leeren Slot füllen, dann die
+//       side-effect-freie Engine-Levelprüfung),
+//   +6  für bloßen Fortschritt (Level reicht danach noch nicht).
+// Cap 36, damit zwei Sofort-Unlocks eine Ability über generische
+// Playables (25) heben, aber Ascension-Floor (60) und Beasts (100)
+// weiter Vorrang behalten. Bewusst NUR Handkarten: die Dringlichkeit
+// "Brick liegt JETZT auf der Hand" ist der situative Teil — deckweite
+// Schul-Bedarfe deckt das statische Profil (cardValues/Timing) ab.
+function abilitySearchUnlockBonus(engine, pi, abilityName) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return 0;
+  const cardDB = engine._getCardDB();
+  let bonus = 0;
+  const seen = new Set();
+  // Simulation: Würde +1 Level dieser Ability Held `hi` für Karte `cd`
+  // freischalten? (Zonen-Kopie, Stack <3 erhöhen oder leeren Slot
+  // füllen, side-effect-freie Engine-Levelprüfung; Fallback simple
+  // Max-Level-Betrachtung.) Geteilt von Unlock- UND Upgrade-Zweig.
+  const plusOneUnlocks = (hi, cd) => {
+    const hero = ps.heroes?.[hi];
+    if (!hero?.name || hero.hp <= 0) return false;
+    if (hero.statuses?.frozen || hero.statuses?.stunned) return false;
+    if (typeof engine._testLevelReqForZones === 'function') {
+      const abZones = ps.abilityZones?.[hi] || [];
+      const simZones = abZones.map(slot => (slot ? slot.slice() : []));
+      let placed = false;
+      for (const slot of simZones) {
+        if (slot.length > 0 && slot[0] === abilityName && slot.length < 3) { slot.push(abilityName); placed = true; break; }
+      }
+      if (!placed) {
+        for (const slot of simZones) {
+          if (slot.length === 0) { slot.push(abilityName); placed = true; break; }
+        }
+      }
+      if (!placed) return false;
+      try { return !!engine._testLevelReqForZones(pi, hi, cd, hero, cd.level || 0, simZones); } catch { return false; }
+    }
+    // Fallback ohne Engine-Helfer (ignoriert Reducer/Zweitschulen).
+    let lvl = 0;
+    for (const slot of (ps.abilityZones?.[hi] || [])) {
+      if (slot && slot[0] === abilityName) lvl = Math.max(lvl, slot.length);
+    }
+    return lvl + 1 >= (cd.level || 0);
+  };
+  for (const cn of (ps.hand || [])) {
+    if (!cn || cn === abilityName || seen.has(cn)) continue;
+    seen.add(cn);
+    const cd = cardDB[cn];
+    if (!cd) continue;
+    const t = cd.cardType;
+    if (t !== 'Spell' && t !== 'Attack' && t !== 'Creature') continue;
+    if (cd.spellSchool1 !== abilityName && cd.spellSchool2 !== abilityName) continue;
+    const eligibleNow = listEligibleHeroesForActionCard(engine, pi, cd);
+    if (eligibleNow.length > 0) {
+      // ── Caster-UPGRADE-Zweig (Als Ida→Bartas-Befund) ───────────────
+      // Die Karte IST castbar — aber vielleicht nur SCHLECHT: der beste
+      // aktuell mögliche Caster kann einen stark negativen gelernten
+      // Caster-Delta tragen (Ida macht Avalanche zu Single-Target,
+      // gelernt −11.7), während ein Held, der durch +1 Level dieser
+      // Ability eligible WÜRDE, einen deutlich besseren Delta hat
+      // (Bartas +12.2). Der alte "castbar → keine Dringlichkeit"-
+      // Kurzschluss übersah genau das. Bonus = Delta-Differenz
+      // (bereits confidence-skaliert aus dem Profil), Rauschboden 4,
+      // Beitrag je Handkarte gedeckelt auf 20.
+      let bestCur = -Infinity;
+      for (const e of eligibleNow) {
+        const hn = ps.heroes?.[e.hi]?.name;
+        const d = hn ? deckProfile.casterDelta(engine, pi, cn, hn) : 0;
+        if (d > bestCur) bestCur = d;
+      }
+      let bestUp = -Infinity;
+      const eligSet = new Set(eligibleNow.map(e => e.hi));
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        if (eligSet.has(hi)) continue;
+        if (!plusOneUnlocks(hi, cd)) continue;
+        const hn = ps.heroes?.[hi]?.name;
+        const d = hn ? deckProfile.casterDelta(engine, pi, cn, hn) : 0;
+        if (d > bestUp) bestUp = d;
+      }
+      if (bestUp > -Infinity) {
+        const gain = bestUp - bestCur;
+        if (gain >= 4) bonus += Math.min(20, gain);
+      }
+      continue;
+    }
+    // ── Unlock-Zweig (unverändert): Karte ist gar nicht castbar ──────
+    let unlockNow = false;
+    for (let hi = 0; hi < 3 && !unlockNow; hi++) {
+      if (plusOneUnlocks(hi, cd)) unlockNow = true;
+    }
+    bonus += unlockNow ? 18 : 6;
+  }
+  return Math.min(36, bonus);
 }
 
 function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
@@ -5827,6 +8422,145 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
       const willMeet  = Math.max(0, Math.min(goldGain, demand - gold));
       const willSpill = goldGain - willMeet;
       base = willMeet * 2 + willSpill * 0.2;
+    }
+  }
+  // ── Learned deck-profile blend ─────────────────────────────────────
+  // When the piloted lineup has an ML-trained profile, blend the learned
+  // per-card value (timing-adjusted for the current turn) with the
+  // affordability heuristic. The blend weight is the profile's
+  // sample-size CONFIDENCE (see _deck-profile.confidence): a 100-game
+  // profile only nudges the heuristic, a 1000+-game profile mostly
+  // replaces it. On top, add the held-combo bonus: learned pair
+  // synergies raise a card's value while its partner is in hand — this
+  // is what makes tutors fetch the second half of a combo and discards
+  // spare it. Placed BEFORE the ascension / Cardinal Beast floors and
+  // the Kazena override so those explicit rules keep precedence over
+  // the statistics.
+  if (!typeLocked) {
+    // ── Castability-Gate für den Profil-Einfluss ─────────────────────
+    // Gelernte Werte stammen aus Spielen, in denen die Karte gespielt
+    // wurde — implizit also castbar war. Kann aktuell KEIN Held die
+    // Karte casten (Schule/Level fehlt), ist der gelernte Wert nicht
+    // anwendbar: Ohne Gate übertönte er die Heuristik und Tutoren
+    // fetchten hochbewertete Spells als tote Bricks (live beobachtet:
+    // 2 Züge Brick, bis die Ability nachkam). Stufen:
+    //   castbar jetzt                          → 1.0 (volles Gewicht)
+    //   Enabler-Ability liegt in der Hand      → 0.5 (eine Setup-Aktion
+    //                                            entfernt — Fetch okay,
+    //                                            wenn der Plan steht)
+    //   weder noch                             → 0.15 (Brick: Heuristik
+    //                                            dominiert)
+    // Nur für level-/schulgebundene Typen; Abilities, Artefakte und
+    // Potions haben keine Schul-Anforderung und bleiben ungegated.
+    let castGate = 1;
+    let presumptiveCasterName = null;
+    if (cd.cardType === 'Spell' || cd.cardType === 'Attack' || cd.cardType === 'Creature') {
+      const eligible = listEligibleHeroesForActionCard(engine, pi, cd);
+      if (eligible.length) {
+        // Präsumtiver Caster: der castbare Held mit dem besten gelernten
+        // Caster-Delta (Basis: cpuCasterPriority-Reihenfolge aus
+        // listEligibleHeroesForActionCard). Kein Ida-Routing mehr (Als
+        // Ruling: forcesSingleTarget ist rein per-Caster) — die Karte
+        // wird so bewertet, wie ihr BESTER verfügbarer Caster sie
+        // spielen würde; existiert nur ein schwacher Caster (nur Ida
+        // lebt), trägt der Handwert dessen negativen Versatz.
+        let bestHi = eligible[0].hi, bestD = -Infinity;
+        for (const e of eligible) {
+          const hn = ps?.heroes?.[e.hi]?.name;
+          const d = hn ? deckProfile.casterDelta(engine, pi, cardName, hn) : 0;
+          if (d > bestD) { bestD = d; bestHi = e.hi; }
+        }
+        presumptiveCasterName = ps?.heroes?.[bestHi]?.name || null;
+      } else {
+        const schools = [cd.spellSchool1, cd.spellSchool2].filter(Boolean);
+        const enablerInHand = schools.some(sc => (ps?.hand || []).includes(sc));
+        // Revive-Awareness: Kann ein TOTER eigener Held die Karte casten
+        // und liegt eine Revive-Quelle auf der Hand, ist die Karte
+        // ebenfalls nur eine Setup-Aktion entfernt (wiederbeleben →
+        // casten) — gleiche 0.5-Stufe wie der Enabler-Fall statt
+        // Brick-0.15. Kurzschluss: die teurere Probe läuft nur, wenn
+        // der billigere Enabler-Check nicht schon gegriffen hat.
+        const reviveLine = !enablerInHand && deadHeroCouldCastWithReviveInHand(engine, pi, cd);
+        castGate = (enablerInHand || reviveLine) ? 0.5 : 0.15;
+      }
+    }
+    const blended = deckProfile.learnedCardValue(engine, pi, cardName, base, castGate);
+    if (blended != null) base = blended;
+    const handArrForPairs = ps?.hand;
+    if (handArrForPairs && handArrForPairs.length > 1) {
+      base += deckProfile.heldPairBonus(engine, pi, cardName, handArrForPairs, castGate);
+    }
+    // ── Caster-Delta (Held × Karte) ──────────────────────────────────
+    // Der pauschale gelernte cardValue verschmiert über alle Caster —
+    // fatal, wenn ein Held die Wirkung transformiert (Ida: Destruction-
+    // AoE → Single-Target; ihr Avalanche-"AoE-Wert" stammt aus Spielen
+    // mit anderen Castern). presumptiveCasterName ist der castbare Held
+    // mit dem besten gelernten Delta — sein Versatz korrigiert Handwert,
+    // Eval, Discard UND die Tutor-Galerie, bevor MCTS-Budget und
+    // Rollout-Policy auf den inflationierten Prior hereinfallen. Nur
+    // Spell/Attack: der Trainings-Kanal speist sich aus
+    // afterSpellResolved.
+    if (presumptiveCasterName && (cd.cardType === 'Spell' || cd.cardType === 'Attack')) {
+      base += deckProfile.casterDelta(engine, pi, cardName, presumptiveCasterName);
+    }
+    // ── Deckout-Guard ────────────────────────────────────────────────
+    // Gelernter Malus für Karten (Draw-/Self-Mill-Engines), deren
+    // Plays im Danger-Bereich mit eigenen Deckout-Losses über-
+    // korrelierten. Greift NUR, wenn das eigene Restdeck ≤ der im
+    // Training gelernten Danger-Schwelle liegt — die CPU hört damit
+    // auf, sich bei kleinem Deck weiter leerzuziehen, statt per
+    // Deck-Out zu verlieren. Wirkt in Handwert, Eval, Discard UND
+    // Tutor-Galerie (auch in den Rollouts).
+    base += deckProfile.deckoutGuard(engine, pi, cardName);
+    // ── Tutor-Cap NACH dem Learned-Blend (Fix "Tutor sucht Tutor") ───
+    // Der min(12)-Cap weiter oben lief VOR dem Blend — ein hoher
+    // gelernter cardValue (Blend-Gewicht bis 0.75; das Castability-Gate
+    // greift bei Artefakten nicht) konnte ihn aushebeln und "Magnetic
+    // Potion sucht Magnetic Glove" wieder attraktiv machen. Finaler
+    // Clamp: Karten, deren einziger Play-Effekt "ziehe/suche eine
+    // andere Karte" ist, sind als SUCHZIEL nie mehr als 12 wert — die
+    // Wertschöpfung steckt in der Karte, die sie ihrerseits holen
+    // würden, und die würde sonst doppelt gezählt.
+    {
+      const tScript = loadCardEffect(cardName);
+      if (tScript?.blockedByHandLock && typeof tScript.resolve === 'function') {
+        base = Math.min(base, 12);
+      }
+    }
+    // ── Revive-Karten situativ statt statisch bewerten ───────────────
+    // Für Karten mit cpuMeta.reviveCard ersetzt die Situationslage den
+    // kontextfreien Lernwert-Pfad:
+    //   kein toter eigener Held        → harter Deckel 4 (die Suche/das
+    //     Halten lohnt schlicht nicht; neutralisiert den durch
+    //     Selektionsbias inflationierten statischen cardValue — Ankh
+    //     wurde im Training ja fast nur in GUTEN Spots gespielt)
+    //   toter Held, aber temporärer Revive (Golden Ankh) OHNE Nutzung
+    //   in dieser Runde (cpuShouldPlay-Probe)  → Deckel 8 (der Held
+    //     stirbt am Rundenende wieder, ohne etwas beigetragen zu haben)
+    //   sonst → gelernter situativer reviveBonus wie gehabt.
+    const revSit = reviveCardSituation(engine, pi, cardName);
+    if (revSit) {
+      if (!revSit.hasDead) base = Math.min(base, 4);
+      else if (!revSit.useful) base = Math.min(base, 8);
+      else base += deckProfile.reviveBonus(engine, pi, cardName);
+    } else {
+      // Situativer Revive-Bonus für alle übrigen Karten: greift NUR,
+      // wenn gerade ein eigener Held besiegt ist, und bewertet dessen
+      // gelernte Identität plus die aktuell castbaren Abilities (siehe
+      // _deck-profile.reviveBonus). Für nicht geflaggte Revive-Quellen
+      // (Reincarnation, Elixir) bleibt das Verhalten unverändert.
+      base += deckProfile.reviveBonus(engine, pi, cardName);
+    }
+    // ── Ability-Such-Dringlichkeit (Spell-School-Unlock) ─────────────
+    // Bisher hatte eine Ability als Suchziel nur Affordability +
+    // statischen Profilwert — "such Destruction Magic, weil Fireball
+    // als Brick auf der Hand liegt" gab es nicht (die Unlock-Logik lag
+    // ausschließlich in scoreAbilityPlacement, also der WOHIN-Frage).
+    // abilitySearchUnlockBonus liefert den situativen OB-Anteil:
+    // +18 je Handkarte, die EIN weiteres Level dieser Schule sofort
+    // freischalten würde, +6 für bloßen Fortschritt, Cap 36.
+    if (cd.cardType === 'Ability') {
+      base += abilitySearchUnlockBonus(engine, pi, cardName);
     }
   }
   // Ascension-critical floor — applies UNIVERSALLY to any card that
@@ -6250,6 +8984,26 @@ function recordEndOfTurnGold(engine) {
   ps._cpuGoldHistory.turnsTracked++;
 }
 
+/**
+ * Stack-Zähler für Tick-Status (Als Poison-Vial-Befund): Die Engine
+ * speichert Status als OBJEKT unter dem STATUS_EFFECTS-Schlüssel —
+ * `hero.statuses.poisoned = { stacks: 2, ... }`, analog `burned`.
+ * Die CPU las jahrelang `statuses.poison` / `statuses.burn` (falscher
+ * Schlüssel UND falsche Form: Zahl statt Objekt) und bekam damit
+ * IMMER 0 — der gesamte Status-Antizipations-Block der Eval war toter
+ * Code, Gift/Brand waren für MCTS unsichtbar. Symptom: Poison Vial
+ * (freie 2 Stacks) 2% Einsatzrate, weil der Gate-Delta ≈ 0 blieb.
+ * Robust gegen alle Formen: fehlt → 0, Objekt ohne stacks → 1
+ * (Engine-Default, vgl. cactus-creature.js), Zahl → Zahl.
+ */
+function statusStacks(entity, key) {
+  const s = entity?.statuses?.[key];
+  if (!s) return 0;
+  if (typeof s === 'number') return s;
+  const n = Number(s.stacks);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 function evaluateState(engine, cpuIdx) {
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -6264,6 +9018,34 @@ function evaluateState(engine, cpuIdx) {
   }
 
   let score = 0;
+
+  // ── Deck-Nähe (Deckout-Prävention) ──────────────────────────────────
+  // Bisher hatte die Eval KEINEN Deck-Größen-Term: Eine Linie, die bei
+  // Deck=6 per Kazena/Friendship/Wheels auf 0 zieht, evaluierte exakt
+  // wie bei Deck=30 — MCTS und Rollouts KONNTEN den nahenden Deck-Out
+  // nicht sehen und bestätigten Suizid-Linien (Als Heal-Burn-Befund:
+  // Iter4 50% Loss(deck_out), Konsum 3.0/Zug). Eskalierender Malus
+  // unterhalb der Danger-Schwelle (gelernt aus dem Profil, sonst
+  // Default): quadratisch, damit "noch eine Karte ziehen" bei Deck=8
+  // billig ist, bei Deck=2 aber richtig weh tut — eine Lethal-Linie
+  // darf die letzten Karten trotzdem ziehen, weil die Eval abwägt
+  // statt verbietet. Symmetrisch: das GEGNERISCHE Deck nahe 0 ist ein
+  // Bonus (Deckout ist eine Win-Condition — Suicide Bombers deckt
+  // Gegner aus). Reguliert damit JEDE Zieh-Entscheidung situativ:
+  // Kazena-Aktivierungs-Arme, Wheels, Tutor-Ketten, Caster-Wahl mit
+  // Friendship-Draw-Rider — überall, wo Rollouts real resolven.
+  {
+    const deckProx = (idx) => {
+      const dl = gs.players[idx]?.mainDeck?.length;
+      if (typeof dl !== 'number') return 0;
+      const th = deckProfile.deckoutDangerSizeOf(engine, idx) ?? DECKOUT_EVAL_TH_DEFAULT;
+      if (dl >= th) return 0;
+      const d = th - dl;
+      return d * d * DECKOUT_EVAL_K;
+    };
+    score -= deckProx(cpuIdx);
+    score += deckProx(oppIdx);
+  }
 
   // ── Doomed-hero projection ──────────────────────────────────────────
   // Heroes flagged with `_forceKillAtTurnEnd === gs.turn` (Golden Ankh,
@@ -7041,6 +9823,100 @@ function evaluateState(engine, cpuIdx) {
   // context-dependent decision: strong when demand > supply, weak when
   // already covered. Symmetric for the opponent — draining gold from a
   // spend-ready opp is powerful, from a hoarder is nearly worthless.
+  // ── Opfer-Fortschritts-Term (Als Auftrag, Deepsea-Diagnose) ──
+  // Handkarten mit Opfer-Spec (Skript exportiert minCount/minSumLevel,
+  // z.B. Dark Deepsea God: 2 Kreaturen, Summenlevel ≥ 4) sind für die
+  // Suche unsichtbare Pläne: Ein Lv1-Body ≈ Lv2-Body in kurzfristiger
+  // Bewertung, der Enabler-Wert liegt jenseits des Rollout-Horizonts —
+  // gemessen: nur 29% der DDG-Festhänger-Spiele erreichten je
+  // Summenlevel 4, aber 59.2% WR wenn DDG castet. Dieser Term belohnt
+  // Board-Zustände proportional zum Fortschritt Richtung Spec-Erfüllung,
+  // solange der Enabler auf der Hand liegt: 30 Punkte je opferbarem
+  // Summenlevel (gedeckelt am Ziel) + 40 bei voller Erfüllbarkeit.
+  // Generisch über den Spec-Vertrag, symmetrisch für den Gegner.
+  const sacrificeProgress = (side) => {
+    const sps = gs.players[side];
+    let bonus = 0;
+    const seenSpecs = new Set();
+    for (const hn of (sps?.hand || [])) {
+      if (seenSpecs.has(hn)) continue;
+      seenSpecs.add(hn);
+      let sc = null;
+      try { sc = loadCardEffect(hn); } catch { continue; }
+      const spec = sc?.sacrificeSpec
+        || ((sc?.minSumLevel > 0) ? { minCount: sc.minCount, minSumLevel: sc.minSumLevel } : null);
+      const msl = spec?.minSumLevel, mcnt = spec?.minCount || 0;
+      if (!(msl > 0)) continue;
+      let sacs = [];
+      try { sacs = engine.getSacrificableCreatures ? (engine.getSacrificableCreatures(side) || []) : []; } catch {}
+      const cnt = sacs.length;
+      const sum = sacs.reduce((a, c) => a + (c.level || 0), 0);
+      bonus += 30 * Math.min(sum, msl);
+      if (cnt >= mcnt && sum >= msl) bonus += 40;
+      // je Spec-Karte einmal — mehrere Kopien stapeln den Plan nicht
+    }
+    return bonus;
+  };
+  score += sacrificeProgress(cpuIdx) - sacrificeProgress(oppIdx);
+
+  // ── Recycelbare Körper = Motor-Treibstoff (Messung 30.7.) ───────────
+  // Die Zyklus-Decks (Deepsea-Linie und alles Künftige mit demselben
+  // Vertrag) haben eine STRUKTURELLE Obergrenze, die die Bewertung bisher
+  // nicht sah: Ein Tausch-Summon verbraucht eine Kreatur, die ÄLTER als
+  // dieser Zug ist, und produziert eine frische, die im selben Zug nicht
+  // mehr taugt. Die Zahl der Tausch-Züge je Runde ist damit exakt durch
+  // die Zahl der ALTEN Board-Kreaturen gedeckelt — nicht durch die
+  // Board-Größe. Gemessen im v106-Lauf: in 25% der eigenen Züge stand
+  // KEINE einzige alte Kreatur (Bounce-Rate 1.17/Zug gegen Als 2.50),
+  // und der stärkste Zusammenhang im ganzen Datensatz läuft über die
+  // Bounce-Zahl. Ein reiner Kreaturen-Zähler bepreist das nicht: er
+  // bewertet einen frisch getauschten Körper genauso wie einen, der
+  // nächste Runde wieder Treibstoff ist.
+  //
+  // Generisch über `getBouncePlacementTargets` / `canPlaceOnOccupiedSlot`
+  // — genau die Verträge, die die Tausch-Beschwörung überhaupt
+  // definieren. Decks ohne diese Verträge bekommen 0, also exakt
+  // Altverhalten. Bewusst degressiv (Wurzel): der Sprung von 0 auf 1
+  // recycelbaren Körper entscheidet über "Motor läuft überhaupt", der
+  // von 4 auf 5 ist Feinschliff. Symmetrisch für den Gegner.
+  const recyclableFuel = (side) => {
+    try {
+      const sps = gs.players[side];
+      if (!sps) return 0;
+      // Trägt überhaupt eine Handkarte den Tausch-Vertrag? Sonst ist
+      // der Treibstoff wertlos und der Term bleibt stumm.
+      let hasCycler = false;
+      const seen = new Set();
+      for (const hn of (sps.hand || [])) {
+        if (seen.has(hn)) continue;
+        seen.add(hn);
+        let sc = null;
+        try { sc = loadCardEffect(hn); } catch { continue; }
+        if (typeof sc?.canPlaceOnOccupiedSlot === 'function'
+          || typeof sc?.getBouncePlacementTargets === 'function') { hasCycler = true; break; }
+      }
+      if (!hasCycler) return 0;
+      // Alte eigene Kreaturen zählen — die Karten-Verträge kennen die
+      // genaue Regel ("nicht in dieser Runde beschworen", inkl.
+      // Ausnahmen wie Infected Squirrel), deshalb über sie statt über
+      // eine nachgebaute turnPlayed-Prüfung.
+      const slots = new Set();
+      for (const hn of seen) {
+        let sc = null;
+        try { sc = loadCardEffect(hn); } catch { continue; }
+        if (typeof sc?.getBouncePlacementTargets !== 'function') continue;
+        try {
+          for (const t of (sc.getBouncePlacementTargets(gs, side, engine) || [])) {
+            if (t && t.heroIdx != null && t.slotIdx != null) slots.add(`${t.heroIdx}:${t.slotIdx}`);
+          }
+        } catch { /* einzelne Karte unklar → überspringen */ }
+        if (slots.size) break;   // die Liste ist karten-unabhängig identisch
+      }
+      return 34 * Math.sqrt(slots.size);
+    } catch { return 0; }
+  };
+  score += recyclableFuel(cpuIdx) - recyclableFuel(oppIdx);
+
   const ownGoldDemand = computeGoldDemand(engine, cpuIdx);
   const oppGoldDemand = computeGoldDemand(engine, oppIdx);
   const goldValue = (gold, demand) => {
@@ -7069,8 +9945,8 @@ function evaluateState(engine, cpuIdx) {
   const STATUS_DMG_PER_STACK = 30; // baseline; matches Medea's 30-per-stack doubling
   for (const h of (ps.heroes || [])) {
     if (!h?.name || h.hp <= 0) continue;
-    const burn = h.statuses?.burn || 0;
-    const poison = h.statuses?.poison || 0;
+    const burn = statusStacks(h, 'burned');
+    const poison = statusStacks(h, 'poisoned');
     const totalDmg = STATUS_DMG_PER_STACK * (burn + poison);
     if (totalDmg >= h.hp) { score -= 400; continue; } // anticipated kill — crisis
     // Burn always drains (no "good burn" synergy exists in this game).
@@ -7080,7 +9956,7 @@ function evaluateState(engine, cpuIdx) {
   for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
     const h = opp.heroes[hi];
     if (!h?.name || h.hp <= 0) continue;
-    const stacks = (h.statuses?.burn || 0) + (h.statuses?.poison || 0);
+    const stacks = statusStacks(h, 'burned') + statusStacks(h, 'poisoned');
     if (stacks <= 0) continue;
     const dmg = STATUS_DMG_PER_STACK * stacks;
     if (dmg >= h.hp) score += 400; // anticipated kill
@@ -7088,6 +9964,85 @@ function evaluateState(engine, cpuIdx) {
       const threat = mctsEnemyHeroDynamicValue(engine, oppIdx, hi, oppTeamMaxSchoolLvl);
       score += 0.5 * dmg * threat;
     }
+  }
+
+  // ── Angriffswert: Helden-ATK × verfügbare Umsetzer (31.7.) ────────
+  // Die Eval bepreiste ATK bisher NUR beim GEGNER (Antizipations-Block
+  // direkt darunter) und die EIGENE gar nicht — `atk` kam in der ganzen
+  // Funktion genau einmal vor, als `oppMaxAtk`. Für jedes Deck, dessen
+  // Plan darin besteht, die ATK eines Helden zu steigern (Nero Zira:
+  // +30 permanent je Kreatur-Platzierung, bis 5×/Zug; ATK-Equipment;
+  // Buff-Kreaturen), war der gesamte Aufbau damit unsichtbar: eine
+  // Beschwörung, die "nur" ATK erzeugt, hat ein Eval-Delta von exakt 0,
+  // und jedes Wert-Gate lehnt sie folgerichtig ab. Dieselbe Bauart wie
+  // die Deepsea-Swap-Blindheit ("der Swap muss dem Evaluator seinen
+  // Gewinn zeigen"). Gemessen im Mawstruck-Datensatz (1268 Spiele):
+  // 0.50 Kreatur-Eintritte je eigenem Zug bei einem Cap von 5, 63% der
+  // eigenen Züge ganz ohne Eintritt, 5er-Cap in 0.1% der Züge erreicht.
+  //
+  // ATK wird in diesem Spiel NICHT automatisch zu Schaden — ein Held
+  // schlägt nur über Attack-Karten zu oder über Effekte, die seine ATK
+  // ausschütten. Der Term skaliert deshalb mit der Zahl der real
+  // vorhandenen UMSETZER, statt ATK flach zu bepreisen:
+  //   (a) Attack-Karten auf der Hand — generisch, deckunabhängig
+  //   (b) aktive Support-Zonen-Karten, die sich per
+  //       `cpuMeta.atkConversionsPerTurn` als ATK-Umsetzer deklarieren
+  //       (Infected Greatmaw, Sacrificial Dagger)
+  // Ohne Umsetzer bleibt der Term 0 — genau das richtige Signal für
+  // einen Helden mit hoher ATK, die er nie ausschütten kann.
+  //
+  // Gezählt wird die HÖCHSTE ATK unter den lebenden, nicht-CC'ten
+  // eigenen Helden: Umsetzer dieser Bauart wählen ihren Helden entweder
+  // frei ("deal damage equal to the Attack stat of one of your Heroes")
+  // oder hängen an einem festen, und in beiden Fällen würde der Pilot
+  // den stärksten nehmen. Spiegelt bewusst die `oppMaxAtk`-Logik.
+  //
+  // Symmetrisch, damit MCTS nicht die eigene ATK pumpt und die des
+  // Gegners ignoriert. Der Antizipations-Block darunter modelliert eine
+  // ANDERE Größe (die Kill-Schwelle im nächsten Zug, ±400); die
+  // Überlappung ist über das kleine Gewicht bewusst klein gehalten.
+  {
+    const atkCardDB = engine._getCardDB();
+    const atkSideValue = (idx) => {
+      const pl = gs.players[idx];
+      if (!pl) return 0;
+      let maxAtk = 0;
+      for (const h of (pl.heroes || [])) {
+        if (!isAliveForEval(h)) continue;
+        if (h.statuses?.frozen || h.statuses?.stunned || h.statuses?.negated) continue;
+        const a = h.atk || 0;
+        if (a > maxAtk) maxAtk = a;
+      }
+      if (maxAtk <= 0) return 0;
+      let conv = 0;
+      // (a) Attack-Karten auf der Hand — der generische Umsetzer.
+      // Bewusst auf EINEN Umsetzer gedeckelt, egal wie viele Attack-
+      // Karten liegen: eine Attack-Karte kostet die Aktion des Zuges,
+      // drei davon auf der Hand verdreifachen den Schaden also nicht.
+      // Die deklarierten Umsetzer unter (b) stapeln dagegen, weil sie
+      // Kreatur-/Equipment-Effekte sind und keine Aktion kosten.
+      for (const nm of (pl.hand || [])) {
+        const cd = atkCardDB[nm];
+        if (cd && cd.cardType === 'Attack') { conv = 1; break; }
+      }
+      // (b) Deklarierte Umsetzer auf dem Board. Statusgeprüft wie jede
+      // andere Kreatur-/Artefakt-Passive: eine negierte oder gefrorene
+      // Karte setzt nichts um.
+      for (const inst of (engine.cardInstances || [])) {
+        if (conv >= ATK_EVAL_MAX_CONVERSIONS) break;
+        if (!inst || inst.zone !== 'support') continue;
+        if ((inst.controller ?? inst.owner) !== idx) continue;
+        if (inst.faceDown) continue;
+        const c = inst.counters || {};
+        if (c.negated || c.nulled || c.frozen || c.stunned) continue;
+        let n = 0;
+        try { n = loadCardEffect(inst.name)?.cpuMeta?.atkConversionsPerTurn || 0; } catch { n = 0; }
+        if (n > 0) conv += n;
+      }
+      if (conv <= 0) return 0;
+      return Math.min(conv, ATK_EVAL_MAX_CONVERSIONS) * maxAtk * ATK_EVAL_PER_CONVERSION;
+    };
+    score += atkSideValue(cpuIdx) - atkSideValue(oppIdx);
   }
 
   // Opponent-turn attack anticipation. The opp's highest-atk living,
@@ -7266,13 +10221,15 @@ async function applyActionCandidate(engine, helpers, candidate) {
     const slotTaken = zoneSlot != null
       && (((ps2.supportZones?.[heroIdx] || [])[zoneSlot] || []).length > 0);
     if (zoneSlot == null || zoneSlot < 0 || slotTaken) {
-      zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx);
+      zoneSlot = pickCreatureZoneSlot(engine, cpuIdx, heroIdx, cardName);
     }
     if (zoneSlot < 0) return false;
-    await helpers.doPlayCreature(helpers.room, cpuIdx, {
+    maybeSetCrossSideHint(engine, cpuIdx, cardName);
+        await helpers.doPlayCreature(helpers.room, cpuIdx, {
       cardName, handIndex: handIdx, heroIdx, zoneSlot,
     });
   } else if (cardType === 'Spell' || cardType === 'Attack') {
+    noteDamageImpact(engine, cpuIdx, cardName);
     await helpers.doPlaySpell(helpers.room, cpuIdx, {
       cardName, handIndex: handIdx, heroIdx,
     });
@@ -7520,6 +10477,31 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
 // activations (Cool Fridge to a random hero, artifact-with-nothing-to-do)
 // get filtered out before firing.
 const MCTS_ACTIVATION_GATE_THRESHOLD = 3;
+// Schwelle für handneutrale GRATIS-Plays (Swap auf besetzten Slot).
+// Deutlich unter der Standard-Hürde, weil der Ertrag solcher Plays
+// strukturell erst nach der Sofortbewertung anfällt (siehe die
+// ausführliche Begründung an der Verwendungsstelle in
+// fireAdditionalActions). Bewusst NICHT so tief wie die Rafflesia-Chain
+// (−60): aktiv schädliche Swaps — etwa das Zurücknehmen einer Kreatur,
+// deren Board-Präsenz gerade gebraucht wird — sollen weiterhin skippbar
+// bleiben. Der Wert ist die Haupt-Stellschraube dieses Hebels und
+// gehört nach dem nächsten Trainingslauf gegen die Swap-Rate kalibriert.
+const FREE_SWAP_GATE_THRESHOLD = -12;
+// Schwelle für FREIE NORMAL-Beschwörungen im selben Pfad (Kreatur in
+// einen leeren Slot). Als Ziel: "jede Runde konsistent mindestens eine
+// neue Deepsea-Kreatur, besser 2+ dank Primordium."
+// Messung 29.7.: dieser Pfad brachte 0.33 neue Kreaturen je SPIEL — die
+// Deltas liegen zu 99% im Bucket −12..0, die Standardhürde +3 lehnt sie
+// also systematisch um wenige Punkte ab. Diese +3 sind für Aktionen
+// gedacht, die den ZUG kosten; hier ist jede Aktion gratis (inherent
+// oder per Grant bezahlt), die Karte kostet nur einen Handplatz.
+// Der Wert deckt sich mit der Swap-Schwelle, weil beide dieselbe
+// Blindstelle teilen: der Ertrag einer Kreatur auf dem Board (spätere
+// On-Summon-Trigger, Siphem-Material, DDG-Tribut UND — seit v99 der
+// gemessene Hauptengpass — künftige Bounce-Ziele) fällt erst nach der
+// Sofortbewertung an. Eigene Konstante statt Wiederverwendung, damit
+// beide Hebel getrennt kalibrierbar bleiben.
+const FREE_SUMMON_GATE_THRESHOLD = -12;
 
 // How many distinct branchable prompts to explore per recon. Each branchable
 // prompt contributes its own set of variations (one per alternative pick),
@@ -7896,13 +10878,118 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
     if (!m) m = /^additional (?:Spell|Attack|Creature) (.+)$/.exec(desc);
     return m ? loadCardEffect(m[1]) : null;
   })();
-  const overrideThreshold = cardScript?.cpuMeta?.activationGateThreshold;
-  const threshold = (typeof overrideThreshold === 'number')
+  // Schwellen-Override: Aufrufer-seitig (options.overrideThreshold, für
+  // situative Fälle wie die Rafflesia-Chain) VOR karten-seitig
+  // (cpuMeta.activationGateThreshold). Der Aufrufer-Wert wurde bislang
+  // zwar übergeben, aber nie gelesen — die Rafflesia-Absenkung auf −60
+  // war damit wirkungslos.
+  const overrideThreshold = (typeof options.overrideThreshold === 'number')
+    ? options.overrideThreshold
+    : cardScript?.cpuMeta?.activationGateThreshold;
+  // Gelernte Lock-Ordering-Strafe (siehe _deck-profile.lockOrderPenalty):
+  // Setzt diese Karte laut Trainingsdaten einen Lock und liegen noch
+  // viele Karten des gesperrten Typs in der Hand, steigt die Schwelle —
+  // das Gate committet Boomerang & Co. erst, wenn die anderen Optionen
+  // abgearbeitet sind. Zentral hier statt an den Callsites: greift so
+  // für JEDEN Gate-Typ (artifact, potion, equip-effect, …), dessen
+  // Karte gelernte Gewichte trägt; Karten ohne Gewichte kosten nur den
+  // Map-Lookup. Kartennamen liefert die desc-Extraktion oben.
+  let lockDelta = 0;
+  {
+    const m2 = /^(?:artifact|potion|spell|attack|free-ability|creature-effect|equip-effect|area|permanent) (.+)$/.exec(desc);
+    const gatePi = engine._cpuPlayerIdx ?? engine.gs?.activePlayer;
+    if (m2 && typeof gatePi === 'number' && !engine._inMctsSim) {
+      try { lockDelta = deckProfile.lockOrderPenalty(engine, gatePi, m2[1]); } catch { lockDelta = 0; }
+    }
+  }
+  // Gelernter Hero-Effekt-Timing-Prior (siehe _deck-profile.
+  // heroEffectTimingPrior): verschiebt die Gate-Schwelle nach dem
+  // aktuellen Handgrößen-Bucket. Kazena bei 4+ Handkarten → gelernt
+  // negativer Wert → Schwelle steigt → das Gate wartet, bis die Hand
+  // leer gespielt ist; bei 0-1 Karten sinkt die Schwelle. Nur ein
+  // Prior — ein starker Sofort-Nutzen (best.score) gewinnt weiterhin,
+  // Nischen-Timings ("erst fischen, dann spielen") bleiben möglich.
+  let heroFxDelta = 0;
+  {
+    const mh = /^hero-effect h(\d+)$/.exec(desc);
+    const gatePi = engine._cpuPlayerIdx ?? engine.gs?.activePlayer;
+    if (mh && typeof gatePi === 'number' && !engine._inMctsSim) {
+      const h = engine.gs?.players?.[gatePi]?.heroes?.[Number(mh[1])];
+      const hn = h?.baseName || h?.name;
+      if (hn) {
+        try { heroFxDelta = deckProfile.heroEffectTimingPrior(engine, gatePi, hn); }
+        catch { heroFxDelta = 0; }
+      }
+    }
+  }
+  // Per-Karte dynamischer Score-Bonus (`cpuMeta.activationScoreBonus`,
+  // Signatur (engine, cpuIdx, helpers) => Zahl). Für Karten, deren Wert
+  // die Sofortbewertung strukturell nicht sieht, aber MIT DER LAGE
+  // SKALIERT — Smoke Vial etwa: pro Gegner-Held, der wirklich neu
+  // geblendet wird. Anders als `alwaysCommit` (alles-oder-nichts)
+  // verschiebt der Bonus die Entscheidung nur graduell, das Gate darf
+  // also weiter ablehnen, wenn die Stellung dagegenspricht. Technisch
+  // als Senkung der Schwelle umgesetzt — entscheidungsgleich zu einem
+  // Aufschlag auf best.score, lässt aber den geloggten Recon-Score
+  // unverfälscht.
+  let scoreBonus = 0;
+  if (typeof cardScript?.cpuMeta?.activationScoreBonus === 'function') {
+    const gatePi = engine._cpuPlayerIdx ?? engine.gs?.activePlayer;
+    if (typeof gatePi === 'number') {
+      try {
+        const v = cardScript.cpuMeta.activationScoreBonus(engine, gatePi, CPU_META_HELPERS);
+        scoreBonus = Number.isFinite(v) ? v : 0;
+      } catch { scoreBonus = 0; }
+    }
+  }
+  const threshold = ((typeof overrideThreshold === 'number')
     ? overrideThreshold
-    : (evaluateThroughTurnEnd ? 30 : MCTS_ACTIVATION_GATE_THRESHOLD);
+    : (evaluateThroughTurnEnd ? 30 : MCTS_ACTIVATION_GATE_THRESHOLD)) + lockDelta - heroFxDelta - scoreBonus;
   const beats = best.score > skipScore + threshold;
-  const commit = beats || alwaysCommit;
-  cpuLog(`      [gate] ${desc}: skip=${skipScore.toFixed(1)} best=${best.score.toFixed(1)} threshold=${threshold} via ${best.label} → ${commit ? (beats ? 'COMMIT' : 'FORCE-COMMIT') : 'SKIP'}`);
+  // ε-Exploration: eine Aktivierung, die das Gate skippen würde,
+  // trotzdem committen — nur im Trainings-Self-Play (siehe exploreRoll).
+  // So bekommen Karten, deren Wert das Gate systematisch unterschätzt
+  // (Engine-/Setup-Karten ohne Sofort-Payoff), überhaupt erst
+  // Trainingsdaten.
+  const exploreForce = !beats && !alwaysCommit && exploreRoll(engine);
+  // Starke gelernte Lock-Strafe (≥10) setzt auch alwaysCommit aus:
+  // Draw-/Tutor-Artefakte committen sonst bedingungslos — genau die
+  // Kategorie, in der ein Lock-Fehlgriff (Boomerang vor der vollen
+  // Artefakt-Hand) am teuersten ist.
+  const lockVeto = lockDelta >= 10 && !beats;
+  const commit = beats || (alwaysCommit && !lockVeto) || exploreForce;
+  // ── Delta-Diagnose (Als Auftrag) ──────────────────────────────────
+  // Die v95-Zähler sagen nur "committet/abgelehnt". Offen blieb, ob die
+  // gesenkte Swap-Schwelle überhaupt ankommt und WIE WEIT das Delta sie
+  // verfehlt — ohne das hieße jede weitere Anpassung wieder raten.
+  // `options.diagKey` markiert die Aufrufer, die das wissen wollen.
+  if (options.diagKey) {
+    const delta = best.score - skipScore;
+    // Feinere Klassen rund um die Null: dort liegt die Masse, und nur
+    // mit dieser Auflösung lässt sich die Schwelle exakt kalibrieren
+    // statt sie zu raten.
+    const b = delta <= -200 ? '<=-200'
+      : delta <= -50 ? '-200..-50'
+      : delta <= -20 ? '-50..-20'
+      : delta <= -12 ? '-20..-12'
+      : delta <= -6 ? '-12..-6'
+      : delta <= -3 ? '-6..-3'
+      : delta <= 0 ? '-3..0'
+      : delta <= 3 ? '0..3'
+      : delta <= 20 ? '3..20' : '>20';
+    swapDiag(engine, `delta:${options.diagKey}:${b}`);
+    // Die TATSÄCHLICH benutzte Schwelle mitschreiben: bestätigt oder
+    // widerlegt, dass der Aufrufer-Override das Gate erreicht.
+    swapDiag(engine, `thr:${options.diagKey}:${Math.round(threshold)}`);
+    // (B) Welcher Plan gewann die Recon? Heißt er 'skip' oder liegt der
+    // Score exakt auf dem Skip-Wert, hatte das Gate gar keinen echten
+    // Plan zu committen — dann ist die Ursache die Planfindung, nicht
+    // die Bewertung.
+    swapDiag(engine, `plan:${options.diagKey}:${String(best.label || '?').slice(0, 24)}`);
+    if (Math.abs(delta) < 0.001) swapDiag(engine, `plan:${options.diagKey}:DELTA-EXAKT-NULL`);
+  }
+  if (lockVeto && alwaysCommit) cpuLog(`      [gate] ${desc}: alwaysCommit durch Lock-Strafe (+${lockDelta.toFixed(1)}) ausgesetzt`);
+  cpuLog(`      [gate] ${desc}: skip=${skipScore.toFixed(1)} best=${best.score.toFixed(1)} threshold=${Number(threshold.toFixed(2))}${scoreBonus ? ` (Bonus ${scoreBonus.toFixed(1)})` : ''} via ${best.label} → ${commit ? (beats ? 'COMMIT' : (exploreForce ? 'EXPLORE-COMMIT' : 'FORCE-COMMIT')) : 'SKIP'}`);
 
   if (!commit) return false;
 
@@ -8099,6 +11186,31 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     }
   }
 
+  // ── PUCT-Priors: cachen + Erstziehungs-Reihenfolge ──
+  // Ein learnedCardValue-Aufruf pro ARM (nicht pro Pull); die stabile
+  // Sortierung nach Prior bestimmt, welche unbesuchten Arme bei
+  // knappem Budget zuerst (bzw. überhaupt) gezogen werden. Ohne
+  // geladenes Profil ist prior überall 0 → Verhalten unverändert.
+  {
+    const priorCache = new Map();
+    const pi = engine._cpuPlayerIdx;
+    for (const arm of arms) {
+      const nm = arm.candidate?.cardName;
+      if (!nm) { arm.prior = 0; continue; }
+      if (!priorCache.has(nm)) {
+        let p = 0;
+        try { p = deckProfile.learnedCardValue(engine, pi, nm, 0, 1) || 0; } catch { p = 0; }
+        priorCache.set(nm, p);
+      }
+      arm.prior = priorCache.get(nm);
+    }
+    if ([...priorCache.values()].some(v => v !== 0)) {
+      arms.sort((a, b) => (a.visits > 0 ? 1 : 0) - (b.visits > 0 ? 1 : 0) || (b.prior || 0) - (a.prior || 0));
+      const top = arms.find(a => a.visits === 0);
+      if (top) cpuLog(`  [puct] ${arms.length} Arme prior-sortiert — Erstziehung: "${top.candidate?.cardName}" (prior ${Math.round(top.prior || 0)})`);
+    }
+  }
+
   // ── Ensure-min-pulls phase: pull each zero-visit arm once ──
   for (const arm of arms) {
     if (arm.visits > 0) continue;
@@ -8135,7 +11247,8 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     for (const arm of arms) {
       const ucb = arm.visits === 0
         ? Infinity
-        : (arm.scoreSum / arm.visits) + MCTS_UCB1_EXPLORE_C * Math.sqrt(lnN / arm.visits);
+        : (arm.scoreSum / arm.visits) + MCTS_UCB1_EXPLORE_C * Math.sqrt(lnN / arm.visits)
+          + (arm.prior || 0) * MCTS_PUCT_SCALE / (1 + arm.visits);
       if (ucb > bestUCB) { bestUCB = ucb; bestArm = arm; }
     }
     if (!bestArm) break;
@@ -8329,6 +11442,23 @@ async function runTurbo(engine, fn) {
  *   • Creature / Spell / Attack — at least one hero meets its level req
  * Mulligan when fewer than max(3, 40% of handSize) cards qualify.
  */
+/**
+ * T3: Mulligan-Telemetrie. Aus dem Profil: mullRate 26%, aber
+ * winAfterMull 52.8% gegen winAfterKeep 49.3% — Mulligan ist im Schnitt
+ * BESSER und wird trotzdem nur in einem Viertel der Spiele genutzt. Um
+ * die Schwelle begründet zu verschieben statt zu raten, braucht es die
+ * Entscheidung samt Hand und Bewertung.
+ */
+function _logMulligan(engine, pi, hand, decision, score) {
+  try {
+    if (engine._inMctsSim) return;
+    (engine._mulliganLog = engine._mulliganLog || []).push({
+      pi, hand: (hand || []).slice(), mull: !!decision,
+      score: typeof score === 'number' ? Math.round(score * 100) / 100 : null,
+    });
+  } catch { /* nie stören */ }
+}
+
 function shouldMulliganStartingHand(engine, pi) {
   const gs = engine.gs;
   const ps = gs?.players?.[pi];
@@ -8362,8 +11492,52 @@ function shouldMulliganStartingHand(engine, pi) {
     }
   }
   const threshold = Math.max(3, Math.ceil(ps.hand.length * 0.4));
-  const mull = playable < threshold;
-  cpuLog(`  [mulligan] hand=${ps.hand.length} playable=${playable} threshold=${threshold} → ${mull ? 'MULLIGAN' : 'KEEP'}`);
+  const genericMull = playable < threshold;
+
+  // ── Helden-Skript-Hook: cpuMulliganAdvice ──────────────────────────
+  // Deck-/Helden-spezifische Mulligan-Kriterien leben im jeweiligen
+  // Kartenmodul (Architektur-Regel: keine kartenspezifische Logik in
+  // Core-Dateien). Ein Skript kann 'mulligan' | 'keep' | null liefern.
+  // Präzedenz: 'mulligan' schlägt alles (eine für den Plan tote Hand
+  // ist auch dann tot, wenn sie "spielbar" aussieht — z. B. Beato ohne
+  // Schulen-Diversität), 'keep' schlägt den generischen Mulligan
+  // (plan-taugliche Hände nicht wegen der Spielbarkeits-Zählung
+  // wegwerfen), null → generische Regel.
+  let advice = null;
+  for (let hi = 0; hi < (ps.heroes?.length || 0); hi++) {
+    const heroName = ps.heroes[hi]?.baseName || ps.heroes[hi]?.name;
+    if (!heroName) continue;
+    let script = null;
+    try { script = loadCardEffect(heroName); } catch { continue; }
+    if (typeof script?.cpuMulliganAdvice !== 'function') continue;
+    let a = null;
+    try { a = script.cpuMulliganAdvice(engine, pi, ps.hand, hi); }
+    catch (err) { cpuLog(`  [mulligan] advice "${heroName}" threw: ${err.message}`); continue; }
+    if (a === 'mulligan') { advice = 'mulligan'; break; }
+    if (a === 'keep' && advice == null) advice = 'keep';
+  }
+
+  // ── Gelernter Kanal: Profil-Starthand-Score ────────────────────────
+  // Aus startHandValues des Deck-Profils (Winrate-Delta pro Karte in
+  // der finalen Starthand). Urteilt nur bei ausreichender Abdeckung
+  // (≥ 50 % der Handkarten mit gelerntem Wert). Konservative Schwellen:
+  // deutlich unterdurchschnittliche Hand (≤ −10) → Mulligan, deutlich
+  // überdurchschnittliche (≥ +8) → Keep; dazwischen entscheidet die
+  // generische Spielbarkeits-Regel. Helden-Advice behält Vorrang —
+  // eine plan-tote Hand bleibt tot, egal was die Statistik sagt.
+  let profMull = null;
+  let profScore = null;
+  const sh = deckProfile.startHandScore(engine, pi, ps.hand);
+  if (sh && sh.covered >= Math.ceil(ps.hand.length / 2)) {
+    profScore = Math.round(sh.score * 10) / 10;
+    if (sh.score <= -10) profMull = true;
+    else if (sh.score >= 8) profMull = false;
+  }
+
+  const mull = advice === 'mulligan' ? true : advice === 'keep' ? false
+    : profMull != null ? profMull : genericMull;
+  cpuLog(`  [mulligan] hand=${ps.hand.length} playable=${playable} threshold=${threshold} generic=${genericMull ? 'MULL' : 'KEEP'} profil=${profScore != null ? profScore : '—'} advice=${advice || '—'} → ${mull ? 'MULLIGAN' : 'KEEP'}`);
+  _logMulligan(engine, pi, engine.gs?.players?.[pi]?.hand, mull, null);
   return mull;
 }
 
@@ -8468,4 +11642,4 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   return best;
 }
 
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn };
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts };

@@ -37,8 +37,18 @@ module.exports = {
     const target = targets.find(t => t.id === selectedIds[0]);
     if (!target) return false;
 
-    const inst = target.cardInstance;
     const cardName = target.cardName;
+    // Robustheit: Zwischen Target-Pick und Resolve kann die Kreatur
+    // verschwinden (Reaction/Surprise des Gegners feuert auf den Play
+    // und tötet das Ziel). Ohne Guard splicete der Code den NAMEN
+    // trotzdem aus der Support-Zone (Geister-Instanz, korrupter
+    // Boardzustand mit Folgefehler-Flut) und crashte dann bei
+    // `inst.zone = …` ("Cannot set properties of undefined").
+    const inst = target.cardInstance || engine.cardInstances.find(c =>
+      c.zone === 'support' && (c.controller ?? c.owner) === target.owner
+      && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
+      && c.name === cardName);
+    if (!inst || inst.zone !== 'support') return false; // sauber abbrechen — VOR jeder Mutation
     const heroOwner = target.owner;
     const heroIdx = target.heroIdx;
     const slotIdx = target.slotIdx;

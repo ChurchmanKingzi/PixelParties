@@ -53,7 +53,7 @@ module.exports = {
         if (inst.owner !== oppIdx) continue;
         if (inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
-        const cd = cardDB[inst.name];
+        const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         if (inst.counters?._damagedOnTurn === currentTurn) continue;
         if (inst.counters?.stunned) continue;

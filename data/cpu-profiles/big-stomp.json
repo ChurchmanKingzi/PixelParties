@@ -1,0 +1,417 @@
+{
+  "deck": "Big Stomp!",
+  "heroes": [
+    "Güldefaber, the King of Dwarfs",
+    "Kit, the Shark Researcher",
+    "Alex, Trainer of Heroes"
+  ],
+  "games": 1359,
+  "trainWinRate": "26.3%",
+  "trainedAt": "2026-07-26T09:20:46.585Z",
+  "meanTurns": 20.6,
+  "cardValues": {
+    "Performance": 8,
+    "Fighting": 8,
+    "Training": 8,
+    "Alchemic Journal": 30,
+    "Summoning Magic": 36,
+    "Gigantisaur Stomp": 68.5,
+    "Cute Cheese": 8,
+    "Gigantisaur Chimera": 100,
+    "The Great Wall of Deri": 8,
+    "Elixir of Quickness": 12.9,
+    "Magic Lamp": 15.4
+  },
+  "timing": {
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.23
+    },
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.29
+    },
+    "Training": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.13
+    },
+    "Alchemic Journal": {
+      "early": 0.75,
+      "mid": 1.04,
+      "late": 1.23
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.15
+    },
+    "Cute Cheese": {
+      "early": 0.84,
+      "mid": 1,
+      "late": 1.16
+    },
+    "The Great Wall of Deri": {
+      "early": 0.8,
+      "mid": 1.17,
+      "late": 1.03
+    }
+  },
+  "pairBonuses": {
+    "Fighting|Juice": 9.8,
+    "Training|dc:Divine Gift of the Deepsea": 4.2,
+    "Elixir of Quickness|dc:Gigantisaur Pteranos": 7.1,
+    "Cute Cheese|Elixir of Quickness": 4.4,
+    "Magic Lamp|dc:Gigantisaur King Trex": 4.8,
+    "Gigantisaur Stomp|dc:Gigantisaur King Trex": 4.4,
+    "Gigantisaur Stomp|dc:Gigantisaur Triceras": 5.4,
+    "Cute Cheese|Gigantisaur Chimera": 13.8,
+    "Gigantisaur Chimera|dc:Gigantisaur Stomp": 5.4,
+    "Gigantisaur Chimera|dc:Gigantisaur Stegon": 5.6,
+    "Gigantisaur Chimera|The Great Wall of Deri": 13.6,
+    "Golden Ankh|Juice": 4.9,
+    "Juice|dc:Rocket Sneeze": 5.3,
+    "Juice|dc:Gigantisaur Pteranos": 5.9,
+    "Juice|dc:Gigantisaur King Trex": 5.8,
+    "Juice|dc:Gigantisaur Triceras": 6.3
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Gigantisaur Chimera": -10.1
+    },
+    "swarm": {
+      "Gigantisaur Chimera": 6.7
+    },
+    "spell": {
+      "Gigantisaur Stegon": 7.5
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Alchemic Journal": 7.8,
+      "Elixir of Quickness": 5.4,
+      "Summoning Magic": 10.5,
+      "Fighting": 4.5,
+      "Gigantisaur Stomp": 13.8,
+      "Cute Cheese": 6.1,
+      "Gigantisaur Chimera": 8.9,
+      "Magnetic Potion": 7.6,
+      "Gigantisaur Triceras": 8.6,
+      "Divine Gift of the Deepsea": 9.8
+    },
+    "ahead": {
+      "Gigantisaur Stomp": -16.3,
+      "Gigantisaur Chimera": 13.6
+    }
+  },
+  "standingEvalThreshold": 1501,
+  "menuOfferRules": {
+    "Magic Lamp→Divine Gift of the Deepsea": 4,
+    "Magic Lamp→Field Standard": 7.4,
+    "Magic Lamp→Fighting": 5.4,
+    "Magic Lamp→Gigantisaur Ankylos": -7.7,
+    "Magic Lamp→Gigantisaur Stomp": -5.3,
+    "Magic Lamp→Giga Steroids": -5.9,
+    "Magic Lamp→Gigantisaur King Trex": -3.3,
+    "Magic Lamp→Gigantisaur Pteranos": 5.1,
+    "Magic Lamp→Training": 4.4,
+    "Magic Lamp→Juice": 4.8,
+    "Magic Lamp→Gigantisaur Brachion": -17,
+    "Magic Lamp→Gigantisaur Spinor": -4.1,
+    "Magic Lamp→Rocket Sneeze": 18.9,
+    "Magic Lamp→Golden Ankh": -11.4,
+    "Magic Lamp→The Great Wall of Deri": -14
+  },
+  "menuOfferRulesByCluster": {
+    "spell": {
+      "Magic Lamp→Divine Gift of the Deepsea": 14.6,
+      "Magic Lamp→Field Standard": 15,
+      "Magic Lamp→Fighting": 15,
+      "Magic Lamp→Summoning Magic": 4.8,
+      "Magic Lamp→Gigantisaur Chimera": 7.4
+    },
+    "aggro": {
+      "Magic Lamp→Divine Gift of the Deepsea": -15,
+      "Magic Lamp→Field Standard": -15,
+      "Magic Lamp→Fighting": -13.8,
+      "Magic Lamp→Gigantisaur Ankylos": -15,
+      "Magic Lamp→Summoning Magic": -15,
+      "Magic Lamp→Gigantisaur Stomp": -15,
+      "Magic Lamp→Giga Steroids": 5.9,
+      "Magic Lamp→Gigantisaur Chimera": -15,
+      "Magic Lamp→Gigantisaur King Trex": -15,
+      "Magic Lamp→Juice": -15,
+      "Magic Lamp→Golden Ankh": -15
+    },
+    "swarm": {
+      "Magic Lamp→Divine Gift of the Deepsea": 15,
+      "Magic Lamp→Field Standard": 11.4,
+      "Magic Lamp→Fighting": 4.2,
+      "Magic Lamp→Gigantisaur Ankylos": 15,
+      "Magic Lamp→Summoning Magic": 15,
+      "Magic Lamp→Gigantisaur Stomp": 15,
+      "Magic Lamp→Giga Steroids": -10.5,
+      "Magic Lamp→Gigantisaur Chimera": 15,
+      "Magic Lamp→Juice": 13
+    },
+    "mixed": {
+      "Magic Lamp→Divine Gift of the Deepsea": 4.3,
+      "Magic Lamp→Gigantisaur Ankylos": 3.4,
+      "Magic Lamp→Summoning Magic": 15,
+      "Magic Lamp→Gigantisaur Stomp": 15,
+      "Magic Lamp→Giga Steroids": 3.4,
+      "Magic Lamp→Gigantisaur Chimera": 7.9,
+      "Magic Lamp→Juice": 15
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Field Standard": -8.1,
+      "Magic Lamp→Gigantisaur Ankylos": -9.3,
+      "Magic Lamp→Summoning Magic": -5.5,
+      "Magic Lamp→Gigantisaur Stomp": -8.7,
+      "Magic Lamp→Gigantisaur Chimera": -7.7,
+      "Magic Lamp→Rocket Sneeze": -15,
+      "Magic Lamp→Golden Ankh": -15
+    },
+    "ahead": {
+      "Magic Lamp→Gigantisaur Stomp": 15
+    }
+  },
+  "targetPriors": {
+    "Gigantisaur Stomp": {
+      "side:own": -11.3,
+      "kind:creature": 7.5
+    },
+    "Gigantisaur Ankylos": {
+      "kind:creature": 16
+    },
+    "Gigantisaur Chimera": {
+      "kind:creature": -20,
+      "side:own": -20
+    },
+    "Juice": {
+      "kind:creature": 19.5
+    },
+    "Gigantisaur Spinor": {
+      "hp:min": -7.6,
+      "side:own": -6.3
+    },
+    "Gathering Storm": {
+      "hp:max": -6.3
+    }
+  },
+  "reactionRules": {
+    "Rocket Sneeze": {
+      "mid": -4,
+      "early": 6.7,
+      "late": 2.2
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:1": -5.9,
+      "st:frozen-hero": -8.7,
+      "st:hero-caster": -5.1,
+      "st:poison2+": 11.7,
+      "st:stun-hero": -16.5
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 6.9,
+    "plc:slack:1": -5.2,
+    "plc:slack:2+": -9.8
+  },
+  "tutorPickRules": {
+    "Kit, the Shark Researcher→Gigantisaur King Trex": -2.1,
+    "Kit, the Shark Researcher→Gigantisaur Triceras": 5.6,
+    "Kit, the Shark Researcher→Gigantisaur Raptoren": 3.7,
+    "Training→Summoning Magic": -2.2,
+    "Training→Fighting": 5.2,
+    "Magic Lamp→Divine Gift of the Deepsea": 3,
+    "Magic Lamp→Field Standard": 7.9,
+    "Magic Lamp→Fighting": 8.3,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Summoning Magic": 3.3,
+    "Magic Lamp→Gigantisaur Stomp": -2.7,
+    "Magic Lamp→Giga Steroids": -4.3,
+    "Magic Lamp→Gigantisaur King Trex": -6.9,
+    "Magic Lamp→Gigantisaur Pteranos": -8.9,
+    "Magic Lamp→Training": 5.1,
+    "Magic Lamp→Cloudy Slime": -20,
+    "Magic Lamp→Juice": 7,
+    "Magic Lamp→Gigantisaur Brachion": -15.6,
+    "Magic Lamp→Gigantisaur Spinor": -3,
+    "Magic Lamp→Book of Doom": -20,
+    "Magic Lamp→Rocket Sneeze": 10.1,
+    "Magic Lamp→Decay Magic": -20,
+    "Magic Lamp→Chain Lightning": -20,
+    "Magic Lamp→Golden Ankh": -5.5,
+    "Magic Lamp→The Great Wall of Deri": -10.4,
+    "Magic Lamp→Gigantisaur Stegon": -16.7,
+    "Cute Cheese→Gigantisaur Chimera": -4.6,
+    "Cute Cheese→Gigantisaur Raptoren": 15.5,
+    "Cute Cheese→Gigantisaur Ankylos": -3.9,
+    "Cute Cheese→Gigantisaur Pteranos": 11.7,
+    "Cute Cheese→Gigantisaur Stegon": -12.1,
+    "Cute Cheese→Gigantisaur King Trex": -4,
+    "Cute Cheese→Gigantisaur Brachion": 5.7,
+    "Cute Cheese→Gigantisaur Spinor": -2.1,
+    "The Cosmic Depths→Gigantisaur Chimera": 20,
+    "Enigma, the Seller of Secrets→Gigantisaur Triceras": 7.9,
+    "Enigma, the Seller of Secrets→Alchemic Journal": 6.9,
+    "Enigma, the Seller of Secrets→Smuggler's Pier": 4.2,
+    "Enigma, the Seller of Secrets→Gigantisaur Spinor": 7.4,
+    "Enigma, the Seller of Secrets→Gigantisaur Chimera": 4.6,
+    "Enigma, the Seller of Secrets→Juice": -5.8,
+    "Enigma, the Seller of Secrets→Gigantisaur Stomp": 7.9,
+    "Enigma, the Seller of Secrets→Fighting": 20,
+    "Enigma, the Seller of Secrets→Divine Gift of the Deepsea": -11,
+    "Enigma, the Seller of Secrets→Field Standard": -3.7,
+    "Enigma, the Seller of Secrets→Cute Cheese": -11.1,
+    "Enigma, the Seller of Secrets→Golden Ankh": -6.5,
+    "Enigma, the Seller of Secrets→Summoning Magic": -2.3,
+    "Enigma, the Seller of Secrets→Giga Steroids": 2.7,
+    "Enigma, the Seller of Secrets→Gigantisaur King Trex": 2.4,
+    "Enigma, the Seller of Secrets→Gigantisaur Pteranos": -11.4,
+    "Enigma, the Seller of Secrets→The Great Wall of Deri": -3.6,
+    "Enigma, the Seller of Secrets→Rocket Sneeze": -4.5,
+    "Enigma, the Seller of Secrets→Gigantisaur Brachion": -3.1,
+    "Enigma, the Seller of Secrets→Training": -5.3,
+    "Enigma, the Seller of Secrets→Gigantisaur Stegon": -11.1,
+    "Enigma, the Seller of Secrets→Gigantisaur Raptoren": -2.9,
+    "Magnetic Potion→Summoning Magic": 13.3,
+    "Magnetic Potion→Gigantisaur Stomp": -6.3,
+    "Magnetic Potion→Gigantisaur Chimera": -15.3,
+    "Magnetic Potion→Golden Ankh": 9.6,
+    "Divine Gift of the Deepsea→Gigantisaur Pteranos": -20,
+    "Divine Gift of the Deepsea→Gigantisaur Chimera": 16.5,
+    "Divine Gift of the Deepsea→Gigantisaur King Trex": -13.9,
+    "Divine Gift of the Deepsea→Gigantisaur Ankylos": 12.3,
+    "Divine Gift of the Deepsea→Gigantisaur Raptoren": -20,
+    "Divine Gift of the Deepsea→Gigantisaur Triceras": 15.9,
+    "Magic Amethyst→Summoning Magic": -15,
+    "Magic Amethyst→Performance": 17.9,
+    "Magic Amethyst→Toughness": -9,
+    "Alchemic Journal — Choose a Potion→Elixir of Quickness": 11.4,
+    "Alchemic Journal — Choose a Potion→Magnetic Potion": -15.5,
+    "Alchemic Journal — Choose a Potion→Magic Lamp": 7.9
+  },
+  "abilityPriors": {
+    "Summoning Magic@Güldefaber, the King of Dwarfs": 150,
+    "Summoning Magic@Güldefaber, the King of Dwarfs≥2": 150,
+    "Summoning Magic@Güldefaber, the King of Dwarfs≥3": -35.8,
+    "Wealth@Güldefaber, the King of Dwarfs": -60,
+    "Wealth@Güldefaber, the King of Dwarfs≥2": -60,
+    "Training@Güldefaber, the King of Dwarfs": 28.7,
+    "Training@Güldefaber, the King of Dwarfs≥2": -60,
+    "Creativity@Kit, the Shark Researcher": -60,
+    "Creativity@Kit, the Shark Researcher≥2": -60,
+    "Summoning Magic@Kit, the Shark Researcher": 150,
+    "Fighting@Alex, Trainer of Heroes": 150,
+    "Fighting@Alex, Trainer of Heroes≥2": 150,
+    "Fighting@Alex, Trainer of Heroes≥3": -60,
+    "Training@Alex, Trainer of Heroes": -31.5,
+    "Training@Alex, Trainer of Heroes≥2": -60,
+    "Summoning Magic@Alex, Trainer of Heroes": -60,
+    "Toughness@Güldefaber, the King of Dwarfs": -60,
+    "Toughness@Güldefaber, the King of Dwarfs≥2": -60,
+    "Toughness@Güldefaber, the King of Dwarfs≥3": 36.1,
+    "Fighting@Güldefaber, the King of Dwarfs": 150,
+    "Summoning Magic@Kit, the Shark Researcher≥2": -60,
+    "Fighting@Kit, the Shark Researcher": 34.1,
+    "Training@Alex, Trainer of Heroes≥3": -60,
+    "Summoning Magic@Alex, Trainer of Heroes≥2": 150,
+    "Summoning Magic@Kit, the Shark Researcher≥3": 150,
+    "Training@Kit, the Shark Researcher": -60,
+    "Creativity@Kit, the Shark Researcher≥3": -60,
+    "Fighting@Kit, the Shark Researcher≥2": 150,
+    "Wealth@Güldefaber, the King of Dwarfs≥3": 28.1,
+    "Training@Kit, the Shark Researcher≥2": 150,
+    "Training@Kit, the Shark Researcher≥3": -60,
+    "Fighting@Güldefaber, the King of Dwarfs≥2": -60
+  },
+  "equipPriors": {
+    "The Great Wall of Deri@Güldefaber, the King of Dwarfs": 63,
+    "The Great Wall of Deri@Alex, Trainer of Heroes": -60
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Kit, the Shark Researcher": -6
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Creativity": 7.7,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Training": -15,
+    "Golden Ankh→Fighting": -15
+  },
+  "startHandValues": {
+    "Juice": -4.7,
+    "Smuggler's Pier": -2.1,
+    "Gigantisaur Stomp": -1.2,
+    "Training": 1.6,
+    "Gigantisaur Pteranos": -1.8,
+    "Golden Ankh": -2,
+    "Giga Steroids": -2.8,
+    "Gigantisaur King Trex": 6.7,
+    "Divine Gift of the Deepsea": 1.3,
+    "Gigantisaur Brachion": 4.1,
+    "Gigantisaur Chimera": 1.8,
+    "The Great Wall of Deri": -1.3,
+    "Gigantisaur Spinor": 7.5,
+    "Cute Cheese": -1.4,
+    "Gigantisaur Raptoren": 3.6,
+    "Gigantisaur Stegon": 1.2,
+    "Alchemic Journal": 5.6
+  },
+  "mulliganStats": {
+    "games": 1359,
+    "mullRate": "62%",
+    "winAfterMull": "27.1%",
+    "winAfterKeep": "25.1%"
+  },
+  "heroEffectTiming": {
+    "Güldefaber, the King of Dwarfs@hand:2-3": 6.2,
+    "Güldefaber, the King of Dwarfs@hand:0-1": 4.7
+  },
+  "boardPairs": {
+    "Summoning Magic|Wealth": 5.7,
+    "Summoning Magic|Training": 9.9,
+    "Fighting|Summoning Magic": 7.7,
+    "Fighting|Toughness": 5.9,
+    "Fighting|Wealth": 5.4,
+    "Summoning Magic|Toughness": 6.2,
+    "Creativity|Training": 5,
+    "Gigantisaur Spinor|Summoning Magic": 7.4,
+    "Creativity|Gigantisaur Chimera": 12.7,
+    "Gigantisaur Chimera|Summoning Magic": 15,
+    "Gigantisaur Brachion|Summoning Magic": 15,
+    "Creativity|Gigantisaur Stegon": -15,
+    "Gigantisaur Chimera|The Great Wall of Deri": -15,
+    "Gigantisaur King Trex|Toughness": 15,
+    "Gigantisaur King Trex|Wealth": 15,
+    "Gigantisaur Spinor|Training": -15,
+    "Fighting|Gigantisaur Brachion": 15,
+    "Gigantisaur Chimera|Toughness": -15
+  },
+  "protectionRules": {
+    "Gigantisaur Brachion": {
+      "ratioThreshold": 0.25
+    }
+  },
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.333,
+      "n": 153,
+      "values": {
+        "Deepsea Primordium": 0.049,
+        "Waitress": 0.267,
+        "Psychic Scout": -0.083,
+        "Elven Forager": -0.083,
+        "Elven Archer": -0.033
+      }
+    }
+  }
+}

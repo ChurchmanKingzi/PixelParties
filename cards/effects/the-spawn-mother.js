@@ -317,7 +317,7 @@ module.exports = {
     // into hand array, instance zone update. The destination hand
     // is `inst.owner`'s (matching the engine's standard support→hand
     // routing — see actionMoveCard's HAND case).
-    await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME });
+    await engine.actionMoveCard(inst, 'hand', -1, -1, { source: CARD_NAME, sourceOwner: ctrl });
     engine.log('spawn_mother_bounce', {
       owner: inst.owner, hero: engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx]?.name,
     });

@@ -60,10 +60,25 @@ function hasFreeZone(ps, heroIdx) {
  * rule are honored (placement here skips `beforeSummon`, so we want strict
  * mode — Trex can't land on a Gigantisaur-occupied Hero via the Bottle).
  */
+// cards.json wurde bei JEDEM getEligibleCreatures-Aufruf synchron von
+// Platte gelesen und komplett geparst — und canActivate ruft das in
+// jedem isPotionPlayable-Scan der Planungsschleifen. Laut V8-Profil
+// war das nach dem Loader-Fix der größte Einzelfresser im
+// Slip-'n'-Slide-Deck (19% der Ticks). Jetzt: engine-DB bevorzugen,
+// sonst einmalig lazy laden und modulweit cachen.
+let _cardDBCache = null;
+function _getCardDB(engine) {
+  if (engine && typeof engine._getCardDB === 'function') return engine._getCardDB();
+  if (!_cardDBCache) {
+    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
+    _cardDBCache = {};
+    allCards.forEach(c => { _cardDBCache[c.name] = c; });
+  }
+  return _cardDBCache;
+}
+
 function getEligibleCreatures(gs, pi, engine = null) {
-  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
-  const cardDB = {};
-  allCards.forEach(c => { cardDB[c.name] = c; });
+  const cardDB = _getCardDB(engine);
 
   const ps = gs.players[pi];
   const eligible = [];

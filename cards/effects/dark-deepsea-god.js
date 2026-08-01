@@ -69,6 +69,11 @@ const { hasCardType } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Dark Deepsea God';
+// Als Ruling: DDG macht 150 — die Konstante hier war IMMER richtig.
+// Falsch war der effect-TEXT in data/cards.json ("deal 250 damage"),
+// den der Client wörtlich auf der Karte anzeigt; er ist auf 150
+// korrigiert. (Kurzzeitig stand hier 250, weil der Datentext fälschlich
+// als Quelle der Wahrheit gelesen wurde — zurückgedreht.)
 const DAMAGE = 150;
 
 // Full manifest runs 2500ms. The card materializes at the 50% mark so
@@ -131,7 +136,7 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
     if ((inst.controller ?? inst.owner) !== oi) continue;
     if (inst.zone !== 'support') continue;
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     creatureEntries.push({
       inst, amount: DAMAGE, type: 'creature',
@@ -168,9 +173,38 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 }
 
 module.exports = {
+
+  // Als Ruling nach dem Batch-21-09-32-Befund: der Standing-Kanal
+  // lernte behind −13.5, real gewinnen behind-Spiele MIT DDG-Cast
+  // 20.0% gegen 7.3% ohne — die Wincon wurde genau dann gemieden, wenn
+  // das Comeback sie braucht. Floor 0: kein fehl-gelernter Malus im
+  // Rückstand; positive gelernte Werte bleiben unangetastet.
+  cpuStandingDeltaFloor: { behind: 0 },
+  // ── Gewicht in Als Hauptmetrik (On-Summon-Trigger je Runde) ─────────
+  // Als Vorgabe: "der Trigger von Dark Deepsea God ist DEUTLICH
+  // wertvoller als andere (und als einziger reduziert er die Breite des
+  // eigenen Boards; ein Balancing-Mechanismus für seinen EXTREM starken
+  // Effekt)". Der Recorder liest diesen Vertrag; ohne ihn zählt jeder
+  // On-Summon-Trigger 1. Die Zahl steht bewusst HIER und nicht im
+  // Mess-Kern, damit sie ohne Engine-Änderung justierbar bleibt.
+  // Referenz aus den Demo-Spielen: DDG steuert bei Al 1.34 der 4.49
+  // gewichteten Trigger je eigenem Zug bei — knapp ein Drittel.
+  // `cardValueFloor` aus demselben Grund wie bei Primordium (Als Ruling:
+  // die beiden wichtigsten Karten des Decks). DDG hatte sich zuletzt von
+  // 8 auf 31.6 erholt — der Boden verhindert den Rückfall in die
+  // Lernspirale, die schon einmal von 0.26 auf 0.14 Casts/Spiel führte.
+  // KEIN playOrderPriority: DDG läuft nicht über den Gratis-Pfad, dort
+  // wäre die Vorgabe wirkungslos; seine Vorfahrt regelt `spec:ready`.
+  cpuMeta: { onSummonTriggerWeight: 5, cardValueFloor: 60 },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   canBypassLevelReq: () => true,
+  // Opfer-Spec als GENERISCHER Vertrag exportiert (Als Auftrag "System,
+  // das gezielt auf DDG hinarbeitet"): der Opfer-Fortschritts-Term in
+  // evaluateState liest minCount/minSumLevel jeder Handkarte und belohnt
+  // Board-Zustände Richtung Erfüllung. Jede künftige Opfer-Karte, die
+  // ihre Spec so exportiert, wird automatisch mitgeplant.
+  sacrificeSpec: SACRIFICE_SPEC,
 
   // DDG's text is "tribute 2+ Creatures NOT summoned this turn (sum-
   // level ≥ 4)". The `canSatisfySacrifice` engine helper doesn't apply

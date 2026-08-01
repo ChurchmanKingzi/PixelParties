@@ -47,6 +47,25 @@ module.exports = {
   creatureEffect: true,
   requiresTarget: true,
 
+  cpuMeta: {
+    // ── ATK-Umsetzer ────────────────────────────────────────────────
+    // Verwandelt 1×/Zug je Instanz die ATK eines eigenen Helden in
+    // Schaden. Datengrundlage des Angriffswert-Terms in evaluateState:
+    // ohne mindestens einen deklarierten Umsetzer (oder eine
+    // Attack-Karte auf der Hand) ist ATK dort wertlos — genau richtig,
+    // weil ein Held ohne Ausschütter seine ATK nie zu Schaden macht.
+    atkConversionsPerTurn: 1,
+
+    // ── Wincondition-Boden (Designer-Vorgabe) ───────────────────────
+    // Der einzige wiederholbare Ausschütter des Decks. Gemessen
+    // (1268 Spiele) WR nach Aktivierungen: 0-2 → 12-13%, 3 → 28%,
+    // 4 → 48%, 5+ → 45%; Schnitt lag bei 2.23 Aktivierungen/Spiel.
+    // Gelernter Wert 57.9 — schon der höchste im Deck, aber nicht
+    // deutlich genug, um im Gratis-Pfad und in der Tutor-Wahl zu
+    // gewinnen. Wirkt nur nach oben.
+    cardValueFloor: 70,
+  },
+
   canActivateCreatureEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;

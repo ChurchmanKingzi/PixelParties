@@ -44,6 +44,13 @@
 const { placePollutionTokens, hasFreeZone, countFreeZones } = require('./_pollution-shared');
 
 module.exports = {
+  // Zählt als "Spell that places Pollution Tokens" (Als Golden-Wings-
+  // Ruling Juli 2026, gleiche Bauart): Der Token ist Einsatz-KOSTEN
+  // ("by placing 1 Pollution Token into your free Support Zone"), gilt
+  // aber trotzdem. Relevant für Mana Beacons Zusatz-Aktion; Mana Minings
+  // Reduktion ist bei Level 0 gegenstandslos.
+  placesPollutionTokens: true,
+
   // Dimmed in hand so the player can't drag it onto a hero — it's only ever
   // played via the post-land prompt.
   neverPlayable: true,

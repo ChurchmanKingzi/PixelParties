@@ -26,6 +26,14 @@ const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // Zählt als "Spell that places Pollution Tokens" (Als Ruling Juli 2026)
+  // — die Token-Platzierung ist Teil der laufenden Wirkung, auch wenn sie
+  // beim turn player als Alternative zum Karten-Löschen anfällt. Damit
+  // greifen Mana Minings Level-Reduktion und Mana Beacons Zusatz-Aktion.
+  // Ohne das Flag war Acid Rain in "Spell Industrialization" ein toter
+  // Slot (0/380 Spiele: Lv2 Decay Magic, das dem Deck ebenfalls fehlt).
+  placesPollutionTokens: true,
+
   // Active in 'hand' so the self-cast onPlay hook fires when the spell is
   // played from hand; active in 'area' so afterSpellResolved fires while
   // the card is sitting on the board reacting to other spells.

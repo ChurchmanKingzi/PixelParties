@@ -464,8 +464,22 @@ function resolveSourceCreature(engine, source) {
     || (source.zone === 'support' && source.id != null ? source : null);
   if (hint?.id != null) {
     const byId = engine.cardInstances.find(c => c.id === hint.id);
+    // Der zweite Zweig akzeptierte FRÜHER den übergebenen `hint` selbst,
+    // sobald er `zone === 'support'` trug — ohne zu prüfen, ob diese
+    // Instanz überhaupt noch lebt. Eine geopferte oder zerstörte Kreatur
+    // hinterlässt aber genau so einen Schnappschuss: `zone` steht noch
+    // auf 'support', und weil `counters.currentHp` fehlt, fiel
+    // `aliveSupport` auf die BASIS-HP der Karte zurück und hielt sie für
+    // lebendig. Das Rückstoß-Routing (Fireshield, Booby Trap) landete
+    // dann auf einer Karte, die gar nicht mehr auf dem Feld steht —
+    // genau das Gegenteil dessen, was der Kommentar oben verspricht
+    // ("re-resolved so a stale snapshot can't land the hit on a
+    // wrong/old target"). Der Schnappschuss zählt jetzt nur noch, wenn
+    // er IDENTISCH mit einer lebenden Instanz der Engine ist; sonst
+    // greift die Namensauflösung darunter, die ohnehin nur lebende
+    // Support-Karten durchlässt.
     const live = aliveSupport(byId)
-      || (hint.zone === 'support' ? aliveSupport(hint) : null);
+      || (engine.cardInstances.includes(hint) ? aliveSupport(hint) : null);
     if (live) return live;
   }
 

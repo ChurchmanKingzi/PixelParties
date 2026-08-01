@@ -46,7 +46,7 @@ function getOwnControlledCreatureInsts(engine, pi) {
     if (inst.zone !== 'support') continue;
     if (inst.owner !== pi) continue; // bounce returns to original owner — own only
     if (inst.faceDown) continue;
-    const cd = cardDB[inst.name];
+    const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
     if (!cd || !hasCardType(cd, 'Creature')) continue;
     out.push(inst);
   }

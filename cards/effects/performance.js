@@ -81,12 +81,34 @@ module.exports = {
       const ps = ctx.players[ctx.cardOwner];
       const zone = (ps.abilityZones[ctx.cardHeroIdx] || [])[ctx.card.zoneSlot] || [];
       if (zone.length < 2) return; // No ability below (shouldn't happen with customPlacement)
-      const baseAbilityName = zone[0]; // The ability Performance is copying
+      // ── Kopierziel auflösen: erste NICHT-Performance-Karte im Slot ──
+      // zone[0] kann selbst 'Performance' sein (z. B. wenn ein Effekt die
+      // Basis-Ability aus dem Slot entfernt hat und die Performances
+      // nachgerutscht sind). Naiv zone[0] zu laden hieße dann: Performance
+      // delegiert an ihr eigenes onPlay → Endlos-Rekursion mit 50 Schaden
+      // pro Ebene, bis der Damage-Cap der Engine zieht (live beobachtet,
+      // Stack: performance.js:89 → :89 → :89 …). Regelrichtig ist ohnehin:
+      // Performance kopiert die zugrundeliegende ECHTE Ability — eine
+      // andere Performance ist selbst nur Kopie.
+      const baseAbilityName = zone.find(n => n !== 'Performance');
+      if (!baseAbilityName) return; // Slot besteht nur aus Performances → nichts zu kopieren
       ctx.card.counters.copiedAbility = baseAbilityName; // Remember for onCardLeaveZone
 
-      const baseScript = loadCardEffect(baseAbilityName);
-      if (baseScript?.hooks?.onPlay) {
-        await baseScript.hooks.onPlay(ctx);
+      // ── Rekursionsguard (Sicherheitsnetz) ──
+      // Schützt zusätzlich gegen INDIREKTE Delegations-Zyklen (Ability A
+      // delegiert an B, B zurück an A) über den geteilten Hook-Kontext.
+      ctx._performanceDelegationDepth = (ctx._performanceDelegationDepth || 0) + 1;
+      try {
+        if (ctx._performanceDelegationDepth > 3) {
+          console.warn(`[Performance] Delegations-Tiefe > 3 (→ "${baseAbilityName}") — Rekursionsguard bricht ab`);
+          return;
+        }
+        const baseScript = loadCardEffect(baseAbilityName);
+        if (baseScript?.hooks?.onPlay) {
+          await baseScript.hooks.onPlay(ctx);
+        }
+      } finally {
+        ctx._performanceDelegationDepth--;
       }
     },
 
@@ -98,10 +120,22 @@ module.exports = {
       // stat bonuses (Fighting ATK, Toughness HP, etc.) are properly removed.
       const copiedAbility = ctx.card.counters.copiedAbility;
       if (!copiedAbility) return;
-
-      const baseScript = loadCardEffect(copiedAbility);
-      if (baseScript?.hooks?.onCardLeaveZone) {
-        await baseScript.hooks.onCardLeaveZone(ctx);
+      // Altbestände können 'Performance' als copiedAbility tragen (vor dem
+      // Auflösungs-Fix gespeichert) — Selbst-Delegation hier genauso
+      // rekursiv wie in onPlay, daher identischer Guard.
+      if (copiedAbility === 'Performance') return;
+      ctx._performanceDelegationDepth = (ctx._performanceDelegationDepth || 0) + 1;
+      try {
+        if (ctx._performanceDelegationDepth > 3) {
+          console.warn(`[Performance] Delegations-Tiefe > 3 (leaveZone → "${copiedAbility}") — Rekursionsguard bricht ab`);
+          return;
+        }
+        const baseScript = loadCardEffect(copiedAbility);
+        if (baseScript?.hooks?.onCardLeaveZone) {
+          await baseScript.hooks.onCardLeaveZone(ctx);
+        }
+      } finally {
+        ctx._performanceDelegationDepth--;
       }
     },
   },

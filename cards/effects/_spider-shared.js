@@ -146,11 +146,10 @@ async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName,
       ? engine.cardInstances.find(c => c.id === pick.instId)
       : null;
     if (!inst || inst.zone !== 'surprise') continue;
-    engine._broadcastEvent('play_pile_transfer', {
-      owner: inst.owner, cardName: inst.name,
-      from: 'surprise', to: 'discard',
-      fromHeroIdx: inst.heroIdx,
-    });
+    // KEIN eigener play_pile_transfer: `actionDestroyCard` sendet den
+    // zonenverankerten Flug selbst, und zwar erst nach allen
+    // Abbruchpfaden. Der Broadcast hier lief davor — Doppelflug im
+    // Normalfall, Geisterflug bei abgewehrter Zerstörung.
     await engine.actionDestroyCard(
       { name: sourceCardName, owner: playerIdx },
       inst,

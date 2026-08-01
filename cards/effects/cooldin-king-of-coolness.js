@@ -124,6 +124,19 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
 
   // Step C: Splice from hand + track a fresh in-hand instance so onPlay
   // sees it exactly the way the normal spell-play handler would.
+  //
+  // Play-Marker für den Trainings-Recorder (Als Befund: "The First
+  // Circle of Hell wird nur in 12.4% der Spiele gespielt"). Cooldin
+  // spielt die Area per direktem hand.splice, was den CARD_MOVED-Hook
+  // umgeht, auf dem die Zonen-Erfassung des Recorders sitzt — gemessen
+  // wurde die Area in 439 von 532 Spielen geholt (446 Picks durch
+  // Cooldin), aber nur in 66 als Play erfasst. `asPlay: 'sole'` zählt
+  // typunabhängig, hier nötig, weil Areas als Spell-Kartentyp geführt
+  // werden und die einfache Fenster-Regel Spells überspringt.
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName, from: 'hand', to: 'area',
+    asPlay: 'sole', fromHandIdx: handIndex,
+  });
   ps.hand.splice(handIndex, 1);
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
 
@@ -172,6 +185,12 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
+  // Zug-BEENDENDER Effekt ("Immediately end your turn afterwards"):
+  // Darf von der CPU NICHT in Main Phase 1 gefeuert werden — das
+  // verschenkt Action Phase + Main Phase 2 komplett (Als Fund). Der
+  // Hero-Effekt-Pass sperrt Effekte mit diesem Flag in MP1; in MP2
+  // ist das Zugende gratis (danach kommt nur noch tryAscend).
+  heroEffectEndsTurn: true,
 
   // CPU threat assessment: plays an extra Area per activation (≈1 card of
   // value). Doesn't cost a card from hand but ends the turn early — the
@@ -285,7 +304,23 @@ module.exports = {
 
     if (!gs.result) {
       const currentPhase = gs.currentPhase;
-      if (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) {
+      // Sicherheitsgurt gegen Zombie-Ausführung: Wenn dieser Effekt vom
+      // Hardcap verlassen wurde und erst JETZT (Züge später) hier
+      // ankommt, gehört das Zugende nicht mehr uns — advanceToPhase in
+      // einen fremden Zug kollabiert die Turn-Loop (no-result). Nur
+      // beenden, wenn wir noch im eigenen Zug sind UND keine Karten-
+      // Deadline abgelaufen ist (abgelaufene Deadline = wir sind der
+      // verlassene Kontext, siehe _runWithCardHardcap).
+      // Guard NUR im Live-Pfad: In Sims gibt es keinen Hardcap-Wrap und
+      // eine abgelaufene Karten-Deadline ist dort der reguläre
+      // Sim-Selbst-Cancel — den Effektausgang zu verändern würde die
+      // Rollout-Bewertung verfälschen. Feldname: gs.activePlayer.
+      const cardDl = engine._cpuCardDeadline;
+      const isZombie = !engine._inMctsSim && typeof cardDl === 'number' && Date.now() >= cardDl;
+      const stillOurTurn = gs.activePlayer == null || gs.activePlayer === pi;
+      if (isZombie || !stillOurTurn) {
+        console.warn(`[Cooldin] Zugende übersprungen — ${isZombie ? 'verlassener Hardcap-Kontext' : 'nicht mehr am Zug'} (Zug ${gs.turn}, activePlayer ${gs.activePlayer}, pi ${pi})`);
+      } else if (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) {
         await engine.advanceToPhase(pi, 5);
       }
     }

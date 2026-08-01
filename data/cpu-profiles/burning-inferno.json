@@ -1,0 +1,398 @@
+{
+  "deck": "Burning Inferno",
+  "heroes": [
+    "Alex, Trainer of Heroes",
+    "Luna Pele, the Flame Dancer",
+    "Barker, the Monster Tamer"
+  ],
+  "games": 1292,
+  "trainWinRate": "43.3%",
+  "trainedAt": "2026-07-20T03:21:14.014Z",
+  "meanTurns": 18.8,
+  "cardValues": {
+    "Candlestick Squire": 10.5,
+    "Summoning Magic": 8,
+    "Angry Cheese": 15.4,
+    "Waitress": 12.7,
+    "Destruction Magic": 8,
+    "Heart of the Mountain": 48.2,
+    "Mountain Tear River": 8,
+    "Fireshield": 8,
+    "Dance of the Flame Pillars": 71.4,
+    "Luna Kiai": 8,
+    "Treasure Chest": 17,
+    "Boiling Oil": 53,
+    "Grunge Harpyformer": 23,
+    "Dichotomy of Luna and Tempeste": 55.3,
+    "Heat Wave": 100
+  },
+  "timing": {
+    "Candlestick Squire": {
+      "early": 0.75,
+      "mid": 1.08,
+      "late": 1.3
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.09,
+      "late": 1.3
+    },
+    "Angry Cheese": {
+      "early": 0.75,
+      "mid": 1.11,
+      "late": 1.22
+    },
+    "Waitress": {
+      "early": 0.75,
+      "mid": 1.18,
+      "late": 1.23
+    },
+    "Destruction Magic": {
+      "early": 0.75,
+      "mid": 1.17,
+      "late": 1.3
+    },
+    "Heart of the Mountain": {
+      "early": 1,
+      "mid": 0.79,
+      "late": 1.21
+    },
+    "Mountain Tear River": {
+      "early": 1,
+      "mid": 0.95,
+      "late": 1.05
+    },
+    "Fireshield": {
+      "early": 1,
+      "mid": 0.85,
+      "late": 1.15
+    },
+    "Dance of the Flame Pillars": {
+      "early": 1,
+      "mid": 0.79,
+      "late": 1.21
+    },
+    "Luna Kiai": {
+      "early": 0.75,
+      "mid": 1.09,
+      "late": 1.3
+    },
+    "Treasure Chest": {
+      "early": 0.75,
+      "mid": 1.22,
+      "late": 1.24
+    },
+    "Boiling Oil": {
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
+    },
+    "Grunge Harpyformer": {
+      "early": 0.75,
+      "mid": 1.14,
+      "late": 1.3
+    },
+    "Heat Wave": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    }
+  },
+  "pairBonuses": {
+    "Dance of the Flame Pillars|dc:Luna Kiai": 4.2,
+    "Boiling Oil|Treasure Chest": 4.3,
+    "Coffee|dc:Summoning Magic": 4.5,
+    "Heat Wave|dc:Divine Gift of Fire": 4,
+    "Outbreak|dc:Divine Gift of Fire": 5,
+    "Outbreak|dc:Golden Ankh": 8.3,
+    "Outbreak|dc:Summoning Magic": 11
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Candlestick Squire": -11.8,
+      "Summoning Magic": -11.2,
+      "Angry Cheese": -12.8,
+      "Waitress": -12.5,
+      "Destruction Magic": -10.7,
+      "Dichotomy of Luna and Tempeste": -10.4,
+      "Heart of the Mountain": -12.8,
+      "Mountain Tear River": -11.3,
+      "Fireshield": -10.1,
+      "Goff, the Burnbringer": -14.6,
+      "Dance of the Flame Pillars": -9.3,
+      "Divine Gift of Fire": -12,
+      "Luna Kiai": -11.1,
+      "Treasure Chest": -11.1,
+      "Boiling Oil": -13.9,
+      "Grunge Harpyformer": -12.5,
+      "Coffee": -10.8,
+      "Heat Wave": -8.4,
+      "Outbreak": -9.3
+    },
+    "swarm": {
+      "Candlestick Squire": 9.4,
+      "Summoning Magic": 9.4,
+      "Angry Cheese": 12.1,
+      "Waitress": 9.4,
+      "Destruction Magic": 9.6,
+      "Dichotomy of Luna and Tempeste": 7.4,
+      "Heart of the Mountain": 7.2,
+      "Mountain Tear River": 7.5,
+      "Fireshield": 8.7,
+      "Goff, the Burnbringer": 11,
+      "Dance of the Flame Pillars": 9.7,
+      "Divine Gift of Fire": 10.8,
+      "Luna Kiai": 8.1,
+      "Treasure Chest": 9,
+      "Boiling Oil": 11.4,
+      "Grunge Harpyformer": 8.5,
+      "Coffee": 11.2,
+      "Heat Wave": 8.8,
+      "Outbreak": 11.1
+    },
+    "spell": {
+      "Dance of the Flame Pillars": -6.1,
+      "Coffee": -9.4,
+      "Heat Wave": -7.4
+    }
+  },
+  "casterDeltas": {
+    "Dance of the Flame Pillars": {
+      "Luna Pele, the Flame Dancer": -10.4,
+      "Barker, the Monster Tamer": 7.2,
+      "Alex, Trainer of Heroes": 7.8
+    },
+    "Divine Gift of Fire": {
+      "Luna Pele, the Flame Dancer": -8,
+      "Alex, Trainer of Heroes": 7.1
+    },
+    "Boiling Oil": {
+      "Luna Pele, the Flame Dancer": -7.2,
+      "Alex, Trainer of Heroes": 8.1
+    },
+    "Heat Wave": {
+      "Barker, the Monster Tamer": 10.4,
+      "Luna Pele, the Flame Dancer": -11.4,
+      "Alex, Trainer of Heroes": 7.2
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Mountain Tear River": -11.1,
+      "Candlestick Squire": 3.3,
+      "Dance of the Flame Pillars": -5.1,
+      "Divine Gift of Fire": 5,
+      "Treasure Chest": 4.3,
+      "Heat Wave": -14.4,
+      "Summoning Magic": 5
+    },
+    "ahead": {
+      "Mountain Tear River": 17.4,
+      "Goff, the Burnbringer": -20,
+      "Heat Wave": 15.2
+    }
+  },
+  "standingEvalThreshold": 1109,
+  "targetPriors": {
+    "Dance of the Flame Pillars": {
+      "kind:creature": -8.9
+    },
+    "Grunge Harpyformer": {
+      "hp:min": 7.9
+    },
+    "Mountain Tear River": {
+      "hp:max": -20,
+      "hp:min": -16.1
+    },
+    "Outbreak": {
+      "side:own": -10
+    },
+    "Aggressive Town Guard": {
+      "side:own": -8.9,
+      "hp:min": -6.6
+    },
+    "Dichotomy of Luna and Tempeste": {
+      "kind:hero": -11.6,
+      "side:opp": -7.6,
+      "side:own": 8.6
+    },
+    "Biomancy Token": {
+      "hp:min": 9
+    },
+    "Guardian Beast Hou": {
+      "kind:hero": 6.8,
+      "kind:creature": -9.1
+    }
+  },
+  "surpriseRules": {
+    "Mountain Tear River": {
+      "early": 8.2,
+      "mid": 16.5,
+      "late": 5
+    },
+    "Spike Trap": {
+      "early": 10,
+      "mid": 10,
+      "late": 20
+    }
+  },
+  "statusHealRules": {
+    "Coffee": {
+      "st:2": 9.5,
+      "st:hero-caster": 5.9,
+      "st:1": 11.3,
+      "st:3+": 2,
+      "st:poison2+": 11.2,
+      "st:stun-hero": -2.7,
+      "st:frozen-hero": -5.5
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -8.8,
+    "plc:slack:1": 7.2,
+    "plc:slack:2+": 9,
+    "plc:bigwait": 15
+  },
+  "tutorPickRules": {
+    "Angry Cheese→Dance of the Flame Pillars": -7.6,
+    "Angry Cheese→Divine Gift of Fire": 5.7,
+    "Angry Cheese→Dichotomy of Luna and Tempeste": 11.8,
+    "Angry Cheese→Boiling Oil": 4.8,
+    "Magic Lamp→Summoning Magic": 6.4,
+    "Magic Lamp→Alchemy": -6,
+    "Magic Lamp→Divine Gift of Sacrifice": 20,
+    "Magic Lamp→Chain Lightning": -11.1,
+    "Magic Lamp→Acid Vial": -9.3,
+    "Magic Lamp→Fighting": 13.7,
+    "Magic Lamp→Elixir of Immortality": -11.8,
+    "Magic Lamp→Fiery Slime": 6.2,
+    "Magic Lamp→Martyry": 20,
+    "Magic Lamp→Divine Gift of the Guardian": 6.4,
+    "Cute Dog→Dichotomy of Luna and Tempeste": -3,
+    "Cute Dog→Heat Wave": 3,
+    "The Cosmic Depths→Candlestick Squire": 4.9,
+    "The Cosmic Depths→Grunge Harpyformer": 3.7,
+    "The Cosmic Depths→Goff, the Burnbringer": -6.6,
+    "Enigma, the Seller of Secrets→Dichotomy of Luna and Tempeste": 8.4,
+    "Enigma, the Seller of Secrets→Luna Kiai": -12.3,
+    "Enigma, the Seller of Secrets→Golden Ankh": 13.1,
+    "Enigma, the Seller of Secrets→Dance of the Flame Pillars": 13.8,
+    "Enigma, the Seller of Secrets→Mountain Tear River": 3.2,
+    "Enigma, the Seller of Secrets→Heat Wave": 2.1,
+    "Enigma, the Seller of Secrets→Summoning Magic": -3.3,
+    "Enigma, the Seller of Secrets→Heart of the Mountain": 10.4,
+    "Enigma, the Seller of Secrets→Destruction Magic": -12.2,
+    "Enigma, the Seller of Secrets→Candlestick Squire": 3.8,
+    "Enigma, the Seller of Secrets→Treasure Chest": 4.8,
+    "Enigma, the Seller of Secrets→Coffee": -3,
+    "Enigma, the Seller of Secrets→Waitress": 8.7,
+    "Enigma, the Seller of Secrets→Gon, the Frostbringer": 12.5,
+    "Enigma, the Seller of Secrets→Angry Cheese": -8.7,
+    "Enigma, the Seller of Secrets→Goff, the Burnbringer": -11.2,
+    "Guardian Beast Hou→Treasure Chest": -17.3,
+    "Magic Amethyst→Training": 20
+  },
+  "abilityPriors": {
+    "Training@Alex, Trainer of Heroes": 46.6,
+    "Summoning Magic@Alex, Trainer of Heroes": 72.3,
+    "Destruction Magic@Luna Pele, the Flame Dancer": 58.3,
+    "Destruction Magic@Luna Pele, the Flame Dancer≥2": 65.1,
+    "Destruction Magic@Luna Pele, the Flame Dancer≥3": 150,
+    "Singing@Luna Pele, the Flame Dancer": 113.3,
+    "Summoning Magic@Luna Pele, the Flame Dancer": 150,
+    "Summoning Magic@Barker, the Monster Tamer": 150,
+    "Training@Barker, the Monster Tamer": 115.5,
+    "Destruction Magic@Barker, the Monster Tamer": 19.3,
+    "Destruction Magic@Barker, the Monster Tamer≥2": 150,
+    "Destruction Magic@Barker, the Monster Tamer≥3": 150,
+    "Summoning Magic@Alex, Trainer of Heroes≥2": -60,
+    "Summoning Magic@Barker, the Monster Tamer≥2": -60,
+    "Destruction Magic@Alex, Trainer of Heroes": 70.3,
+    "Destruction Magic@Alex, Trainer of Heroes≥2": 130.5,
+    "Summoning Magic@Luna Pele, the Flame Dancer≥2": -60,
+    "Destruction Magic@Alex, Trainer of Heroes≥3": -60,
+    "Summoning Magic@Barker, the Monster Tamer≥3": 104.7
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Alex, Trainer of Heroes": 30,
+    "Golden Ankh→Luna Pele, the Flame Dancer": -4.8
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Fighting": 30,
+    "Golden Ankh→Training": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Destruction Magic": 30,
+    "Golden Ankh→Singing": 22.2
+  },
+  "startHandValues": {
+    "Dichotomy of Luna and Tempeste": 2.2,
+    "Summoning Magic": -1.6,
+    "Candlestick Squire": -4,
+    "Golden Ankh": -2.6,
+    "Fireshield": -1,
+    "Outbreak": 3.9,
+    "Mountain Tear River": 2,
+    "Coffee": -2.1,
+    "Destruction Magic": 1.4,
+    "Heat Wave": 9.1,
+    "Luna Kiai": -1.3,
+    "Gon, the Frostbringer": -1.7,
+    "Angry Cheese": -1.9,
+    "Heart of the Mountain": -2,
+    "Dance of the Flame Pillars": -4.9,
+    "Boiling Oil": -1.1,
+    "Divine Gift of Fire": 20,
+    "Treasure Chest": -4.7,
+    "Goff, the Burnbringer": -1.3,
+    "Waitress": -5.8
+  },
+  "mulliganStats": {
+    "games": 1292,
+    "mullRate": "20.5%",
+    "winAfterMull": "45.3%",
+    "winAfterKeep": "42.8%"
+  },
+  "heroEffectTiming": {},
+  "boardPairs": {
+    "Fighting|Training": 15,
+    "Fighting|Summoning Magic": 7.3,
+    "Summoning Magic|Training": 15,
+    "Destruction Magic|Summoning Magic": 15,
+    "Singing|Summoning Magic": 15,
+    "Summoning Magic|Waitress": 9.2,
+    "Training|Waitress": -15,
+    "Destruction Magic|Waitress": 12.8,
+    "Destruction Magic|Training": 15,
+    "Luna Kiai|Summoning Magic": 3.7,
+    "Dichotomy of Luna and Tempeste|Summoning Magic": 9.3,
+    "Dichotomy of Luna and Tempeste|Training": -9.6,
+    "Destruction Magic|Dichotomy of Luna and Tempeste": 15,
+    "Dichotomy of Luna and Tempeste|Singing": 11.2,
+    "Singing|Waitress": 15,
+    "Destruction Magic|Grunge Harpyformer": 15,
+    "Destruction Magic|Luna Kiai": 15,
+    "Destruction Magic|Fighting": 5.9,
+    "Fighting|Grunge Harpyformer": 13.5,
+    "Luna Kiai|Singing": 10.2,
+    "Candlestick Squire|Summoning Magic": 6.2,
+    "Candlestick Squire|Training": -15,
+    "Candlestick Squire|Destruction Magic": 15,
+    "Candlestick Squire|Singing": 15,
+    "Dichotomy of Luna and Tempeste|Fighting": -12.9
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.432,
+      "n": 387,
+      "values": {
+        "Waitress": -0.209,
+        "Grunge Harpyformer": -0.051,
+        "Goff, the Burnbringer": 0.035,
+        "Ska Harpyformer": -0.32
+      }
+    }
+  }
+}

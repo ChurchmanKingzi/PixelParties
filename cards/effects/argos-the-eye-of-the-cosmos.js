@@ -100,6 +100,16 @@ module.exports = {
     if (kind !== 'generic') return undefined;
     if (promptData?.type !== 'optionPicker') return undefined;
     const optIds = (promptData.options || []).map(o => o?.id);
+    // Level-Picker (numerische Option-IDs = Counter-Anzahl): Der
+    // optionPicker-Default nimmt stur die ERSTE Option — die CPU
+    // beschwor damit immer nur Lv1, selbst mit vollen Countern.
+    // Argos' Counter verfallen am eigenen Zugstart (Passive 2),
+    // "use it or lose it": höchstes verfügbares Level wählen.
+    const numeric = optIds.filter(id => /^\d+$/.test(id || ''));
+    if (numeric.length === optIds.length && numeric.length > 0) {
+      const best = numeric.map(Number).sort((a, b) => b - a)[0];
+      return { optionId: String(best) };
+    }
     // Source picker has exactly { hand, deck } option ids.
     const isSourcePicker = optIds.length === 2
       && optIds.includes('hand') && optIds.includes('deck');

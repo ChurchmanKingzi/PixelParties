@@ -117,7 +117,7 @@ module.exports = {
           if (t.type !== 'equip' && t.type !== 'creature') return false;
           const inst = t.cardInstance;
           if (!inst) return false;
-          const cd = cardDB[inst.name];
+          const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
           if (!cd || !hasCardType(cd, 'Creature')) return false;
           if (restrictToLowLevel && (cd.level || 0) > 1) return false;
           return true;

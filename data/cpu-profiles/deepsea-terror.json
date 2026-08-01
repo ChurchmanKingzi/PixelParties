@@ -1,0 +1,344 @@
+{
+  "deck": "Deepsea Terror",
+  "heroes": [
+    "Teppes, the Deepsea Vampire",
+    "Siphem, the Deepsea Demon",
+    "Barker, the Monster Tamer"
+  ],
+  "games": 320,
+  "trainWinRate": "61.9%",
+  "trainedAt": "2026-07-31T20:01:29.704Z",
+  "meanTurns": 12.9,
+  "cardValues": {
+    "Deepsea Primordium": 95.8,
+    "Deepsea Mummy": 31.7,
+    "Summoning Magic": 12.3,
+    "Deepsea Werewolf": 70.5,
+    "Deepsea Jack O' Lantern": 10.7,
+    "Cute Cheese": 8.9,
+    "Deepsea Witch": 24.9,
+    "Dark Deepsea God": 99.4,
+    "Sandy Blob": 10.1,
+    "The Sacred Jewel": 8.2,
+    "Deepsea Monstrosity": 42.9,
+    "Deepsea Bats": 11.7,
+    "Divine Gift of the Guardian": 17,
+    "Golden Ankh": 22.1,
+    "Deepsea Pirate": 8.9,
+    "Coffee": 16.4
+  },
+  "timing": {
+    "Deepsea Primordium": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Deepsea Mummy": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.96
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.97
+    },
+    "Deepsea Werewolf": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.17
+    },
+    "Deepsea Jack O' Lantern": {
+      "early": 0.75,
+      "mid": 1.14,
+      "late": 1.12
+    },
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.19
+    },
+    "Deepsea Witch": {
+      "early": 0.76,
+      "mid": 1.2,
+      "late": 1.04
+    },
+    "Dark Deepsea God": {
+      "early": 0.75,
+      "mid": 1.26,
+      "late": 1.26
+    },
+    "Sandy Blob": {
+      "early": 0.82,
+      "mid": 1.08,
+      "late": 1.1
+    },
+    "The Sacred Jewel": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Deepsea Monstrosity": {
+      "early": 0.75,
+      "mid": 1.28,
+      "late": 1.03
+    },
+    "Deepsea Bats": {
+      "early": 0.94,
+      "mid": 0.99,
+      "late": 1.06
+    },
+    "Divine Gift of the Guardian": {
+      "early": 0.95,
+      "mid": 1.03,
+      "late": 1.01
+    },
+    "Golden Ankh": {
+      "early": 1,
+      "mid": 0.97,
+      "late": 1.03
+    },
+    "Deepsea Pirate": {
+      "early": 0.75,
+      "mid": 1.18,
+      "late": 1.19
+    },
+    "Coffee": {
+      "early": 1,
+      "mid": 0.95,
+      "late": 1.05
+    }
+  },
+  "pairBonuses": {
+    "Deepsea Primordium|Deepsea Werewolf": 6.5,
+    "Deepsea Primordium|dc:Cute Cheese": 7.3,
+    "Dark Deepsea God|Deepsea Primordium": 7.9,
+    "Deepsea Primordium|Sandy Blob": 4.6,
+    "Deepsea Primordium|dc:Deepsea Bats": 4.8,
+    "Deepsea Primordium|dc:Deepsea Pirate": 5.9,
+    "Deepsea Primordium|dc:Deepsea Witch": 5.9,
+    "Deepsea Monstrosity|Deepsea Primordium": 4.9,
+    "Deepsea Primordium|dc:Coffee": 6.4,
+    "Deepsea Primordium|dc:Deepsea Jack O' Lantern": 5.8,
+    "Deepsea Primordium|dc:Deepsea Mummy": 4.9,
+    "Deepsea Primordium|dc:The Sacred Jewel": 7.3,
+    "Deepsea Primordium|dc:Deepsea Werewolf": 4.7,
+    "Deepsea Primordium|dc:Dark Deepsea God": 4.9,
+    "Deepsea Primordium|dc:Golden Ankh": 6.2,
+    "Deepsea Primordium|dc:Sandy Blob": 5.4,
+    "Deepsea Primordium|dc:Divine Gift of the Guardian": 6.1,
+    "Deepsea Primordium|dc:Summoning Magic": 4.6,
+    "Deepsea Primordium|dc:Deepsea Monstrosity": 4.3,
+    "Deepsea Mummy|dc:Divine Gift of the Guardian": 4.8,
+    "Deepsea Werewolf|Summoning Magic": 5,
+    "Dark Deepsea God|Summoning Magic": 4.8,
+    "Deepsea Monstrosity|Summoning Magic": 4.6,
+    "Summoning Magic|dc:Deepsea Bats": 4.8,
+    "Summoning Magic|dc:Deepsea Pirate": 5.4,
+    "Summoning Magic|dc:Deepsea Jack O' Lantern": 4.4,
+    "Summoning Magic|dc:The Sacred Jewel": 4.6,
+    "Summoning Magic|dc:Coffee": 5.5,
+    "Summoning Magic|dc:Golden Ankh": 4.6,
+    "Summoning Magic|dc:Divine Gift of the Guardian": 5.3,
+    "Deepsea Werewolf|Deepsea Witch": 4.2,
+    "Cute Cheese|Deepsea Werewolf": 4.3,
+    "Deepsea Werewolf|The Sacred Jewel": 4.2,
+    "Deepsea Jack O' Lantern|dc:Divine Gift of the Guardian": 4.6,
+    "Cute Cheese|dc:Deepsea Pirate": 4.2,
+    "Cute Cheese|dc:Deepsea Witch": 4,
+    "Cute Cheese|dc:Divine Gift of the Guardian": 4.5,
+    "Deepsea Witch|dc:Divine Gift of the Guardian": 4.3,
+    "Dark Deepsea God|The Sacred Jewel": 4.7,
+    "Deepsea Pirate|Sandy Blob": 4,
+    "The Sacred Jewel|dc:Coffee": 4.9,
+    "The Sacred Jewel|dc:Cute Cheese": 4.1,
+    "The Sacred Jewel|dc:Deepsea Bats": 6.3,
+    "The Sacred Jewel|dc:Deepsea Pirate": 4.7,
+    "The Sacred Jewel|dc:Divine Gift of the Guardian": 4.4,
+    "Deepsea Bats|dc:Divine Gift of the Guardian": 4.5,
+    "Deepsea Bats|dc:Deepsea Monstrosity": 4.2
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Deepsea Primordium": -7.3,
+      "Deepsea Mummy": -6.3,
+      "Summoning Magic": -8.4,
+      "Cute Cheese": -7.8,
+      "The Sacred Jewel": -6.2,
+      "Deepsea Pirate": -6.4,
+      "Coffee": -7.7
+    },
+    "swarm": {
+      "Divine Gift of the Guardian": -11.1
+    },
+    "spell": {
+      "Coffee": 7.9
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Deepsea Werewolf": 16.8,
+      "Deepsea Jack O' Lantern": 14,
+      "Cute Cheese": 15.6,
+      "Deepsea Witch": 14.1,
+      "Dark Deepsea God": 20,
+      "Deepsea Monstrosity": 13.6
+    },
+    "ahead": {
+      "Deepsea Primordium": 13.4,
+      "Deepsea Werewolf": 8.1
+    }
+  },
+  "standingEvalThreshold": 928,
+  "targetPriors": {
+    "Deepsea Mummy": {
+      "kind:creature": -10.3
+    },
+    "Deepsea Werewolf": {
+      "hp:max": -10.6
+    },
+    "Siphem, the Deepsea Demon": {
+      "kind:creature": -8.7,
+      "side:own": -20
+    },
+    "Sandy Blob": {
+      "hp:max": -13.8,
+      "dmgred": -20
+    }
+  },
+  "statusHealRules": {
+    "Coffee": {
+      "st:2": -20,
+      "st:hero-caster": -17.4,
+      "st:3+": -11.8,
+      "st:1": 20,
+      "st:stun-hero": -4.7
+    }
+  },
+  "placementRules": {
+    "plc:bigwait": 2.4
+  },
+  "bounceRules": {
+    "bnc:val:mid": 4.6,
+    "bnc:lvl:0": 6.3,
+    "bnc:spec-help": -8.5,
+    "bnc:val:lo": -5.5,
+    "bnc:lvl:1": -5.8,
+    "bnc:val:hi": 3.5,
+    "bnc:dup": 5.6,
+    "bnc:spec-keep": 5.5,
+    "bnc:lvl:3+": 4.6,
+    "bnc:spec-break": 3,
+    "spec:ready": 15
+  },
+  "playOrderRules": {
+    "pord:first": 5.6,
+    "pord:swap": 11.5,
+    "pord:grants-action": 11.2,
+    "pord:spec-ready": 2
+  },
+  "tutorPickRules": {
+    "Cute Cheese→Deepsea Werewolf": -2.1,
+    "Cute Cheese→Dark Deepsea God": -14.9,
+    "Cute Cheese→Deepsea Primordium": 6.8,
+    "Cute Cheese→Deepsea Monstrosity": 20,
+    "Cute Cheese→Deepsea Jack O' Lantern": -13.5,
+    "Cute Cheese→Deepsea Mummy": 20,
+    "Cute Cheese→Deepsea Witch": 12.2,
+    "Cute Cheese→Sandy Blob": 15.6,
+    "Deepsea Witch→Dark Deepsea God": 2.7,
+    "Deepsea Witch→Deepsea Monstrosity": 3.6,
+    "Deepsea Witch→Deepsea Bats": 13.9,
+    "Deepsea Witch→Deepsea Werewolf": -4.6,
+    "Deepsea Witch→Deepsea Primordium": -2.3,
+    "Deepsea Witch→Deepsea Mummy": -2.1,
+    "Deepsea Witch→Deepsea Jack O' Lantern": 20,
+    "Necromancy→Deepsea Mummy": 9,
+    "Necromancy→Sandy Blob": 13.2,
+    "Necromancy→Deepsea Primordium": -20,
+    "Necromancy→Deepsea Werewolf": 20,
+    "Necromancy→Deepsea Jack O' Lantern": 20,
+    "Necromancy→Deepsea Pirate": 19.4,
+    "Necromancy→Deepsea Bats": 19.6,
+    "Necromancy→Deepsea Monstrosity": -16.1,
+    "Deepsea Bats→Deepsea Primordium": 14.9,
+    "Deepsea Bats→Deepsea Jack O' Lantern": 19,
+    "Deepsea Bats→Deepsea Mummy": -20,
+    "The Cosmic Depths→Deepsea Primordium": -4.3,
+    "The Cosmic Depths→Deepsea Mummy": 7.2,
+    "Enigma, the Seller of Secrets→Deepsea Werewolf": -15.5,
+    "Enigma, the Seller of Secrets→Deepsea Witch": 12.4,
+    "Enigma, the Seller of Secrets→The Sacred Jewel": 9.5
+  },
+  "abilityPriors": {
+    "Necromancy@Teppes, the Deepsea Vampire": -60,
+    "Necromancy@Teppes, the Deepsea Vampire≥2": -60,
+    "Leadership@Siphem, the Deepsea Demon": 130.5,
+    "Summoning Magic@Siphem, the Deepsea Demon": 150,
+    "Summoning Magic@Barker, the Monster Tamer": -60,
+    "Summoning Magic@Barker, the Monster Tamer≥2": -55.9,
+    "Summoning Magic@Barker, the Monster Tamer≥3": -60,
+    "Training@Barker, the Monster Tamer": -60,
+    "Summoning Magic@Teppes, the Deepsea Vampire": -60,
+    "Summoning Magic@Siphem, the Deepsea Demon≥2": 150,
+    "Summoning Magic@Siphem, the Deepsea Demon≥3": 150,
+    "Summoning Magic@Teppes, the Deepsea Vampire≥2": -59.1,
+    "Summoning Magic@Teppes, the Deepsea Vampire≥3": 16.7
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Teppes, the Deepsea Vampire": 30,
+    "Golden Ankh→Siphem, the Deepsea Demon": -15
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Necromancy": 30,
+    "Golden Ankh→Decay Magic": -15,
+    "Golden Ankh→Leadership": -13.2,
+    "Golden Ankh→Summoning Magic": -15
+  },
+  "startHandValues": {
+    "Golden Ankh": -1.6,
+    "Deepsea Mummy": 1.1,
+    "Deepsea Jack O' Lantern": 3.4,
+    "Deepsea Bats": 10.1,
+    "Coffee": -1.9,
+    "Summoning Magic": 1.9,
+    "Deepsea Witch": 13.8,
+    "Deepsea Werewolf": -3.5,
+    "Divine Gift of the Guardian": 4.8,
+    "Cute Cheese": -3.3,
+    "The Sacred Jewel": -7.2,
+    "Deepsea Pirate": -6.4,
+    "Sandy Blob": 6.2,
+    "Dark Deepsea God": 6.4
+  },
+  "mulliganStats": {
+    "games": 320,
+    "mullRate": "19.7%",
+    "winAfterMull": "61.9%",
+    "winAfterKeep": "61.9%"
+  },
+  "heroEffectTiming": {
+    "Siphem, the Deepsea Demon@hand:4+": 10,
+    "Siphem, the Deepsea Demon@hand:2-3": -15
+  },
+  "boardPairs": {
+    "Decay Magic|Summoning Magic": 15,
+    "Leadership|Summoning Magic": 15,
+    "Dark Deepsea God|Summoning Magic": -5.6,
+    "Dark Deepsea God|Training": -6.8,
+    "Necromancy|Summoning Magic": 14.2,
+    "Deepsea Monstrosity|Summoning Magic": -15,
+    "Necromancy|Sandy Blob": 15,
+    "Decay Magic|Deepsea Werewolf": 15,
+    "Deepsea Werewolf|Leadership": 15,
+    "Sandy Blob|Summoning Magic": -15,
+    "Decay Magic|Sandy Blob": 15,
+    "Leadership|Sandy Blob": 15,
+    "Sandy Blob|Training": -15,
+    "Dark Deepsea God|Necromancy": 7.6
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

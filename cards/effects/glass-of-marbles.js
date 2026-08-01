@@ -16,6 +16,12 @@
 const CARD_NAME = 'Glass of Marbles';
 
 module.exports = {
+  // Discard-Fodder: Der Wert liegt AUSSCHLIESSLICH im Hand-Discard-
+  // Trigger — ein proaktiver Play verliert ihn (Necklace: "no effect
+  // when you play it"). Play war strikt schädlich; die CPU behält die
+  // Karte als Discard-Futter (die wertbasierte Abwurf-Wahl wirft
+  // wertlose Play-Karten bevorzugt ab — perfekte Synergie).
+  cpuSkipProactive: true,
   // Active in hand so the hook fires while in hand,
   // and in discard/deleted so it still fires after
   // the zone update (engine sets zone before hook).
@@ -40,6 +46,9 @@ module.exports = {
       gs.hoptUsed[hoptKey] = gs.turn;
 
       engine.log('glass_of_marbles', { player: gs.players[pi]?.username });
+      // Zählbarer Einsatz-Beleg (Aktiveffekt-Statistik): Discard-Fodder
+      // "spielt" man nicht — der Trigger IST der Einsatz.
+      engine.log('discard_trigger_fired', { player: gs.players[pi]?.username, card: CARD_NAME });
       await engine.actionDrawCards(pi, 2);
       engine.sync();
     },
@@ -59,6 +68,9 @@ module.exports = {
       gs.hoptUsed[hoptKey] = gs.turn;
 
       engine.log('glass_of_marbles', { player: gs.players[pi]?.username });
+      // Zählbarer Einsatz-Beleg (Aktiveffekt-Statistik): Discard-Fodder
+      // "spielt" man nicht — der Trigger IST der Einsatz.
+      engine.log('discard_trigger_fired', { player: gs.players[pi]?.username, card: CARD_NAME });
       await engine.actionDrawCards(pi, 2);
       engine.sync();
     },

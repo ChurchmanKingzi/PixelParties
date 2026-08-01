@@ -34,8 +34,21 @@ module.exports = {
   // CPU self-status target score. Fiona gains 20 gold per negative-status
   // application, so the CPU should eagerly aim self-status cards
   // (Sickly Cheese, Zsos'Ssar cost, …) at her when she's on its side.
-  cpuStatusSelfValue(statusName) {
-    return STATUS_EFFECTS[statusName]?.negative ? 40 : 0;
+  cpuStatusSelfValue(statusName, ctx) {
+    if (!STATUS_EFFECTS[statusName]?.negative) return 0;
+    // Kontextabhängig statt konstant: +20 Gold sind nur dann ~40 Score
+    // wert, wenn das Deck Gold BRAUCHT. Bei wachsendem Überschuss
+    // (Bestand über dem Demand-Modell-Bedarf, siehe scoreSelfStatusTarget)
+    // fällt der Wert linear auf 0 — ab ~40 Gold Überschuss ist ein
+    // Selbst-Gift auf Fiona kein Gewinn mehr, und die Zielwahl gibt den
+    // Status dorthin, wo er hingehört: auf den Gegner. Zusätzlich kein
+    // Selbst-Status bei kritischen HP — der Status-Schaden ist dann
+    // teurer als 20 Gold.
+    const hero = ctx?.hero;
+    if (hero && typeof hero.hp === 'number' && hero.hp <= 80) return 0;
+    const surplus = ctx?.goldSurplus ?? 0;
+    const factor = Math.max(0, Math.min(1, 1 - surplus / 40));
+    return Math.round(40 * factor);
   },
 
   hooks: {

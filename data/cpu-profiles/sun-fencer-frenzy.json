@@ -1,0 +1,363 @@
+{
+  "deck": "Sun Fencer Frenzy",
+  "heroes": [
+    "Kazena, the Storming Rebel",
+    "Taio, the Sun Fencer",
+    "Bill, the Angry Auctioneer"
+  ],
+  "games": 1360,
+  "trainWinRate": "59.4%",
+  "trainedAt": "2026-07-25T09:44:28.823Z",
+  "meanTurns": 17.5,
+  "cardValues": {
+    "Wanted Poster": 8,
+    "The Sun Sword": 8,
+    "Destruction Magic": 18.1,
+    "Leadership": 9.8,
+    "Fighting": 15.6,
+    "Booby Trap": 8,
+    "Magnetic Glove": 33.4,
+    "Dark Gear": 31,
+    "Heavy Hit": 36.5,
+    "Critical Strike": 93.6,
+    "Whirlwind Strike": 57.5,
+    "Boiling Oil": 48.3,
+    "Taio, Absorber of the Mountain's Heart": 51.9
+  },
+  "timing": {
+    "Destruction Magic": {
+      "early": 0.81,
+      "mid": 1.06,
+      "late": 1.13
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.14,
+      "late": 1.23
+    },
+    "Fighting": {
+      "early": 0.75,
+      "mid": 1.13,
+      "late": 1.17
+    },
+    "Booby Trap": {
+      "early": 1.06,
+      "mid": 0.88,
+      "late": 1.06
+    },
+    "Magnetic Glove": {
+      "early": 0.8,
+      "mid": 1,
+      "late": 1.2
+    },
+    "Heavy Hit": {
+      "early": 0.83,
+      "mid": 1.03,
+      "late": 1.14
+    },
+    "Critical Strike": {
+      "early": 1,
+      "mid": 0.87,
+      "late": 1.13
+    },
+    "Whirlwind Strike": {
+      "early": 1,
+      "mid": 0.9,
+      "late": 1.1
+    },
+    "Boiling Oil": {
+      "early": 0.87,
+      "mid": 1.04,
+      "late": 1.08
+    }
+  },
+  "pairBonuses": {
+    "The Sun Sword|dc:Transdimensional Stab": 4.1,
+    "Escape|Heavy Hit": 12.7,
+    "Heavy Hit|dc:Golden Ankh": 4.7,
+    "Tea|dc:Whirlwind Strike": 4.3
+  },
+  "casterDeltas": {
+    "Booby Trap": {
+      "Taio, the Sun Fencer": -12.6,
+      "Bill, the Angry Auctioneer": -9.8,
+      "Taio, Absorber of the Mountain's Heart": 20
+    },
+    "Heavy Hit": {
+      "Taio, the Sun Fencer": -6.3,
+      "Taio, Absorber of the Mountain's Heart": 17.1
+    },
+    "Critical Strike": {
+      "Taio, the Sun Fencer": -15.1,
+      "Taio, Absorber of the Mountain's Heart": 18
+    },
+    "Whirlwind Strike": {
+      "Taio, the Sun Fencer": -8.4,
+      "Taio, Absorber of the Mountain's Heart": 13.4
+    },
+    "Boiling Oil": {
+      "Taio, the Sun Fencer": -14.1,
+      "Taio, Absorber of the Mountain's Heart": 20
+    },
+    "Magic Hammer": {
+      "Taio, the Sun Fencer": -20,
+      "Taio, Absorber of the Mountain's Heart": 20,
+      "Bill, the Angry Auctioneer": 20
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Fighting": 11.3,
+      "Booby Trap": -20,
+      "Magnetic Glove": -10,
+      "Dark Gear": 7.7,
+      "Critical Strike": 10.4,
+      "Taio, Absorber of the Mountain's Heart": 19.8,
+      "Tea": -18.1,
+      "Magic Hammer": 8.4,
+      "Golden Ankh": -12.9,
+      "Escape": -20
+    },
+    "ahead": {
+      "Critical Strike": 4.7
+    }
+  },
+  "standingEvalThreshold": 976,
+  "targetPriors": {
+    "Diplomacy": {
+      "hp:min": 8
+    },
+    "Biomancy Token": {
+      "hp:min": -13.9,
+      "side:own": 8.3
+    },
+    "Heavy Hit": {
+      "side:own": -12.7
+    },
+    "Critical Strike": {
+      "hp:min": -8.1,
+      "side:own": -20
+    },
+    "Whirlwind Strike": {
+      "hp:min": -8.7,
+      "hp:max": -6.1
+    },
+    "Tea — Inflict": {
+      "kind:creature": 15.8,
+      "side:own": 7.4
+    },
+    "Magic Hammer": {
+      "side:own": -20,
+      "hp:min": -8.6,
+      "kind:creature": -12.4
+    },
+    "Transdimensional Stab": {
+      "hp:max": -9.4
+    },
+    "Aggressive Town Guard": {
+      "hp:max": -11.1,
+      "hp:min": -9.3,
+      "kind:creature": 8.7
+    },
+    "Metal Harpyformer": {
+      "hp:max": -11.7,
+      "hp:min": -12.3
+    },
+    "Steam Dwarf Exterminator": {
+      "hp:min": -7.3,
+      "hp:max": 11.5
+    },
+    "Invader Token": {
+      "hp:min": -11.5
+    },
+    "Elven Archer": {
+      "hp:min": -7.5
+    },
+    "Cosmic Skeleton": {
+      "hp:min": -14.9,
+      "hp:max": 7.6
+    },
+    "Elven Leader": {
+      "hp:min": -20
+    }
+  },
+  "surpriseRules": {
+    "Booby Trap": {
+      "early": 2.4,
+      "mid": 7.7,
+      "late": 13.5
+    }
+  },
+  "reactionRules": {
+    "Escape": {
+      "lethal": 3.2
+    }
+  },
+  "statusHealRules": {
+    "Tea": {
+      "st:1": 14.2,
+      "st:2": 10.2,
+      "st:stun-hero": 20,
+      "st:3+": -6.8
+    }
+  },
+  "tutorPickRules": {
+    "Magnetic Glove→Heavy Hit": 3.7,
+    "Magnetic Glove→Fighting": -12.7,
+    "Magnetic Glove→Destruction Magic": -13.6,
+    "Magnetic Glove→Magic Hammer": -5.2,
+    "Magnetic Glove→Critical Strike": 11.5,
+    "Magnetic Glove→Jump in the River": 8.8,
+    "Magnetic Glove→Golden Ankh": -12,
+    "Magnetic Glove→Leadership": -17.9,
+    "Magnetic Glove→Escape": -2.4,
+    "Magnetic Glove→Taio, Absorber of the Mountain's Heart": -6.4,
+    "Magnetic Glove→Magnetic Glove": 7.3,
+    "Magnetic Glove→Tea": -2.7,
+    "Magnetic Glove→Booby Trap": -20,
+    "Magnetic Glove→Whirlwind Strike": 9.7,
+    "Magnetic Glove→The Yeeting": 12.3,
+    "Taio, Absorber of the Mountain's Heart→Booby Trap": -20,
+    "Taio, Absorber of the Mountain's Heart→Whirlwind Strike": 5,
+    "Taio, Absorber of the Mountain's Heart→Boiling Oil": 4.7,
+    "Taio, Absorber of the Mountain's Heart→Magic Hammer": 15.6,
+    "Taio, Absorber of the Mountain's Heart→Heavy Hit": 6.4,
+    "Taio, Absorber of the Mountain's Heart→Critical Strike": 4.4,
+    "Guardian Beast Ji→Deepsea Idol": -20,
+    "Guardian Beast Ji→Guardian Beast Zhu": -20,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Alchemy": 4.6,
+    "Enigma, the Seller of Secrets→Jump in the River": 12,
+    "Enigma, the Seller of Secrets→Fighting": -5.3,
+    "Enigma, the Seller of Secrets→Escape": -7.1,
+    "Enigma, the Seller of Secrets→Booby Trap": 12.3,
+    "Enigma, the Seller of Secrets→Magic Hammer": -20,
+    "Enigma, the Seller of Secrets→Critical Strike": 5.9,
+    "Enigma, the Seller of Secrets→Magnetic Glove": 8.9,
+    "Enigma, the Seller of Secrets→Boiling Oil": 2.7,
+    "Enigma, the Seller of Secrets→Golden Ankh": 5,
+    "Enigma, the Seller of Secrets→The Yeeting": 7.3,
+    "Enigma, the Seller of Secrets→Whirlwind Strike": -20,
+    "Enigma, the Seller of Secrets→Tea": -8.8,
+    "Enigma, the Seller of Secrets→Heavy Hit": 20,
+    "Magic Amethyst→Fighting": 18.5
+  },
+  "abilityPriors": {
+    "Adventurousness@Kazena, the Storming Rebel": 35.9,
+    "Support Magic@Kazena, the Storming Rebel": 14.7,
+    "Fighting@Taio, the Sun Fencer": -60,
+    "Fighting@Taio, the Sun Fencer≥2": -13.3,
+    "Fighting@Taio, the Sun Fencer≥3": 150,
+    "Thieving@Taio, the Sun Fencer": -60,
+    "Destruction Magic@Taio, the Sun Fencer": 28,
+    "Diplomacy@Bill, the Angry Auctioneer": 124,
+    "Trade@Bill, the Angry Auctioneer": -60,
+    "Leadership@Bill, the Angry Auctioneer": -60,
+    "Leadership@Bill, the Angry Auctioneer≥2": -60,
+    "Fighting@Kazena, the Storming Rebel": 73.8,
+    "Fighting@Kazena, the Storming Rebel≥2": 46.8,
+    "Leadership@Taio, the Sun Fencer": -40.9,
+    "Destruction Magic@Bill, the Angry Auctioneer": -46.1,
+    "Destruction Magic@Bill, the Angry Auctioneer≥2": -60,
+    "Destruction Magic@Kazena, the Storming Rebel": -60,
+    "Destruction Magic@Kazena, the Storming Rebel≥2": 102,
+    "Fighting@Taio, Absorber of the Mountain's Heart": 150,
+    "Fighting@Taio, Absorber of the Mountain's Heart≥2": 150,
+    "Fighting@Taio, Absorber of the Mountain's Heart≥3": 150,
+    "Thieving@Taio, Absorber of the Mountain's Heart": 150,
+    "Destruction Magic@Taio, Absorber of the Mountain's Heart": 89.9,
+    "Leadership@Bill, the Angry Auctioneer≥3": -60,
+    "Leadership@Kazena, the Storming Rebel": -39.5,
+    "Leadership@Kazena, the Storming Rebel≥2": 48.8,
+    "Destruction Magic@Taio, Absorber of the Mountain's Heart≥2": 145.2,
+    "Destruction Magic@Taio, Absorber of the Mountain's Heart≥3": 96,
+    "Fighting@Bill, the Angry Auctioneer": -29.3,
+    "Fighting@Bill, the Angry Auctioneer≥2": -60,
+    "Leadership@Taio, Absorber of the Mountain's Heart": 61.7,
+    "Leadership@Taio, Absorber of the Mountain's Heart≥2": 18.6,
+    "Leadership@Taio, the Sun Fencer≥2": 110.7,
+    "Leadership@Taio, the Sun Fencer≥3": 150,
+    "Fighting@Kazena, the Storming Rebel≥3": -27.1,
+    "Leadership@Kazena, the Storming Rebel≥3": -60,
+    "Fighting@Bill, the Angry Auctioneer≥3": -60,
+    "Leadership@Taio, Absorber of the Mountain's Heart≥3": -31.4
+  },
+  "equipPriors": {
+    "Wanted Poster@Taio, the Sun Fencer": -60,
+    "The Sun Sword@Kazena, the Storming Rebel": -60,
+    "The Sun Sword@Taio, the Sun Fencer": 150,
+    "Wanted Poster@Kazena, the Storming Rebel": 150
+  },
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Kazena, the Storming Rebel": 29.2
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Adventurousness": 30,
+    "Golden Ankh→Support Magic": 30,
+    "Golden Ankh→Fighting": -3.7,
+    "Golden Ankh→Leadership": 30
+  },
+  "startHandValues": {
+    "Booby Trap": -1.9,
+    "Destruction Magic": 3.3,
+    "Fighting": 1.5,
+    "Critical Strike": -2.2,
+    "Boiling Oil": 2.3,
+    "Magnetic Glove": -1.4,
+    "Jump in the River": -1.3,
+    "Whirlwind Strike": 4.9,
+    "The Sun Sword": 5.5,
+    "Tea": -6.1,
+    "Heavy Hit": -1.3,
+    "Taio, Absorber of the Mountain's Heart": -2.7
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "65.9%",
+    "winAfterMull": "61.2%",
+    "winAfterKeep": "56%"
+  },
+  "heroEffectTiming": {
+    "Kazena, the Storming Rebel@hand:2-3": 4.5
+  },
+  "boardPairs": {
+    "Destruction Magic|Fighting": 12,
+    "Destruction Magic|Thieving": 11.7,
+    "Diplomacy|Leadership": -5.2,
+    "Metal Harpyformer|Thieving": -15,
+    "Adventurousness|Wanted Poster": 14.7,
+    "Support Magic|Wanted Poster": 14.4,
+    "Destruction Magic|Wanted Poster": -6.6,
+    "Adventurousness|Destruction Magic": -10.1,
+    "Destruction Magic|Support Magic": -11,
+    "Fighting|The Sun Sword": 15,
+    "The Sun Sword|Thieving": 15,
+    "Destruction Magic|The Sun Sword": 5.7,
+    "Leadership|Wanted Poster": 5.3,
+    "Fighting|Wanted Poster": -7.4,
+    "Leadership|The Sun Sword": -8.3,
+    "Adventurousness|The Sun Sword": -15,
+    "Support Magic|The Sun Sword": -15,
+    "Thieving|Wanted Poster": -15,
+    "Adventurousness|Harpyformer Choir": 15,
+    "Harpyformer Choir|Support Magic": 15,
+    "Cute Dog|Thieving": 15,
+    "Leadership|Ska Harpyformer": -15,
+    "Diplomacy|Metal Harpyformer": 15,
+    "Metal Harpyformer|Trade": 15,
+    "Diplomacy|The Sun Sword": 8.4,
+    "The Sun Sword|Trade": 8.4,
+    "Harpyformer Choir|Wanted Poster": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.708,
+      "n": 65,
+      "values": {
+        "Deepsea Primordium": 0.054
+      }
+    }
+  }
+}

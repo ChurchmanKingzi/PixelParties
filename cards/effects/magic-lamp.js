@@ -42,6 +42,7 @@ module.exports = {
     // Step 1: Player picks exactly 3 different cards
     const result = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
+      menuSource: 'Magic Lamp',
       cards: galleryCards,
       selectCount: 3,
       title: 'Magic Lamp',
@@ -153,6 +154,12 @@ module.exports = {
     // The play handlers consume this tag via `_consumeHandCardOrigin`.
     const oppInst = engine._trackCard(oppChoice, oppIdx, 'hand');
     oppInst.originalOwner = pi;
+    // Menü-Kanal (Als Auftrag): Angebots-Trio + was der Gegner nahm.
+    engine.log('magic_lamp_result', {
+      player: ps.username,
+      offered: chosenNames.slice(),
+      oppTook: oppChoice,
+    });
     engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: 'Magic Lamp' });
     engine.sync();
     await engine._delay(600);

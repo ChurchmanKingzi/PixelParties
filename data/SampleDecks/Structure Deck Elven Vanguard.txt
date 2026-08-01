@@ -1,0 +1,33 @@
+=== PIXEL PARTIES DECK ===
+Name: Structure Deck: Elven Vanguard
+Cover: Elven Leader
+
+== HEROES ==
+Barker, the Monster Tamer
+Maya, the Nature Fairy
+Tharx, the Never-Losing General
+
+== MAIN DECK ==
+4x Aggressive Town Guard
+1x Beer
+2x Boots of Hermes
+2x Deepsea Idol
+4x Elven Archer
+4x Elven Druid
+4x Elven Forager
+4x Elven Leader
+3x Elven Rider
+3x Golden Ankh
+2x Juice
+3x Magnetic Glove
+6x Necromancy
+4x Performance
+3x Psychic Scout
+1x Snow Cannon
+4x Summoning Magic
+2x Toughness
+4x Wheels
+
+== POTION DECK ==
+
+== SIDE DECK ==

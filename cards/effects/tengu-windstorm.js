@@ -81,6 +81,8 @@
 //      symmetrically for that phase.
 // ═══════════════════════════════════════════
 
+const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
+
 const { payRebelliokaiCost } = require('./_rebelliokai-shared');
 
 const CARD_NAME = 'Tengu Windstorm';
@@ -320,10 +322,23 @@ function isFirstActionThisTurn(engine, playerIdx) {
   ]);
   const currentTurn = engine.gs.turn;
   const playerName = engine.gs.players[playerIdx]?.username;
-  for (const entry of engine.actionLog) {
+  // IN-FLIGHT-SCHUTZ (siehe _log-scan-shared.js): Bei LIVE-CPU-Plays
+  // feuert Tengus EIGENER spell_played-Eintrag via
+  // maybeFireCpuRevealEarly vor onPlay — der Scan sah sich selbst und
+  // der Action-Refund-Rider feuerte für die CPU nie. Rückwärts-Scan +
+  // Multiset: was noch auf dem Resolving-Spell-Stack liegt, zählt
+  // nicht als "hat diese Runde schon eine Aktion verbraucht".
+  const inFlight = inFlightSpellMultiset(engine);
+  const entries = engine.actionLog;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
     if (entry.turn !== currentTurn) continue;
     if (entry.player !== playerName) continue;
-    if (ALWAYS_ACTION_TYPES.has(entry.type)) return false;
+    if (ALWAYS_ACTION_TYPES.has(entry.type)) {
+      if ((entry.type === 'spell_played' || entry.type === 'immediate_action')
+          && inFlight[entry.card] > 0) { inFlight[entry.card]--; continue; }
+      return false;
+    }
     if (ACTION_COST_GATED_TYPES.has(entry.type) && entry.actionCost === true) return false;
   }
   return true;

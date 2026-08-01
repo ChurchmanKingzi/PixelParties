@@ -1,0 +1,249 @@
+{
+  "deck": "Cute Commando",
+  "heroes": [
+    "Visionary Genius Heinz",
+    "Cute Annoyance Mini",
+    "Cool Rescuer Monia"
+  ],
+  "games": 304,
+  "trainWinRate": "31.6%",
+  "trainedAt": "2026-07-17T16:36:12.326Z",
+  "meanTurns": 12.7,
+  "cardValues": {
+    "Fighting": 30.3,
+    "Harpyformer Choir": 18.8,
+    "Divine Gift of Balance": 9.3,
+    "Cute Dog": 26.8,
+    "Summoning Magic": 35.4,
+    "Cute Bunny": 36.6,
+    "Cute Phoenix": 100,
+    "Forceful Revival": 42.4,
+    "Grave Worm": 8,
+    "Cute Cat": 19.7,
+    "Gravedigger Slap": 32.8,
+    "Cute Bird": 8
+  },
+  "timing": {
+    "Fighting": {
+      "early": 1.3,
+      "mid": 1.1,
+      "late": 0.75
+    },
+    "Harpyformer Choir": {
+      "early": 1.3,
+      "mid": 0.75,
+      "late": 1
+    },
+    "Divine Gift of Balance": {
+      "early": 1.2,
+      "mid": 0.8,
+      "late": 1
+    },
+    "Cute Dog": {
+      "early": 1.19,
+      "mid": 1.02,
+      "late": 0.79
+    },
+    "Summoning Magic": {
+      "early": 1.3,
+      "mid": 0.76,
+      "late": 0.87
+    },
+    "Cute Bunny": {
+      "early": 0.97,
+      "mid": 1.03,
+      "late": 1
+    },
+    "Cute Phoenix": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Forceful Revival": {
+      "early": 0.75,
+      "mid": 1.27,
+      "late": 1
+    },
+    "Grave Worm": {
+      "early": 1.3,
+      "mid": 0.89,
+      "late": 0.75
+    },
+    "Gravedigger Slap": {
+      "early": 1,
+      "mid": 1.27,
+      "late": 0.75
+    }
+  },
+  "pairBonuses": {
+    "Cute Phoenix|Fighting": 16,
+    "Fighting|Grave Worm": 12.6,
+    "Harpyformer Choir|Populated Island Turtle": 9.6,
+    "Cute Phoenix|Harpyformer Choir": 11.8,
+    "Field Cannon|Harpyformer Choir": 11.9,
+    "Fighting|Harpyformer Choir": 15.8,
+    "Harpyformer Choir|Resuscitation Potion": 17.2,
+    "Cute Phoenix|Divine Gift of Balance": 13.4,
+    "Cute Dog|Cute Phoenix": 13.7,
+    "Cute Dog|Field Cannon": 9.7,
+    "Cute Dog|Magnetic Potion": 27.4,
+    "Cute Dog|Elixir of Quickness": 16.8,
+    "Cute Phoenix|Summoning Magic": 12.8,
+    "Field Cannon|Summoning Magic": 9.6,
+    "Cute Bunny|Cute Phoenix": 11.9,
+    "Cute Cat|Cute Phoenix": 20.4,
+    "Cute Phoenix|Forceful Revival": 28.9,
+    "Cute Phoenix|Frolake": 18.4,
+    "Field Cannon|Forceful Revival": 13,
+    "Cute Phoenix|Grave Worm": 28.1,
+    "Gigantisaur Triceras|Grave Worm": 14.3,
+    "Grave Worm|Populated Island Turtle": 11.1,
+    "Cute Cat|Fighting": 34.2,
+    "Cute Cat|Summoning Magic": 11.3,
+    "Cute Phoenix|Gravedigger Slap": 19.3,
+    "Gigantisaur Triceras|Gravedigger Slap": 16.8,
+    "Gravedigger Slap|Populated Island Turtle": 10.5,
+    "Fighting|Gravedigger Slap": 29.2,
+    "Cute Phoenix|Elixir of Quickness": 26,
+    "Elixir of Quickness|Field Cannon": 12.8,
+    "Elixir of Quickness|Summoning Magic": 9.8,
+    "Cute Phoenix|Magnetic Potion": 19.7,
+    "Fighting|Magnetic Potion": 9.5,
+    "Gigantisaur Triceras|Magnetic Potion": 13.5,
+    "Field Cannon|Magnetic Potion": 15.8,
+    "Forceful Revival|Magnetic Potion": 9.2,
+    "Cute Bird|Cute Phoenix": 22.8,
+    "Cute Bird|Forceful Revival": 10,
+    "Cute Bird|Field Cannon": 10.3,
+    "Cute Bird|Gravedigger Slap": 11.2,
+    "Cute Bird|Populated Island Turtle": 13,
+    "Field Cannon|Golden Ankh": 20.8,
+    "Cute Cat|Field Cannon": 16.1,
+    "Cute Dog|Divine Gift of Balance": 40,
+    "Fighting|Summoning Magic": 40,
+    "Harpyformer Choir|Summoning Magic": 27.1,
+    "Fighting|Forceful Revival": 40,
+    "Cute Bunny|Summoning Magic": 40,
+    "Cute Cat|Grave Worm": 40,
+    "Cute Bunny|Elixir of Quickness": 12.6,
+    "Forceful Revival|Grave Worm": 20.9,
+    "Elixir of Quickness|Harpyformer Choir": 40,
+    "Gravedigger Slap|Harpyformer Choir": 40,
+    "Magnetic Potion|Summoning Magic": 7,
+    "Cute Cat|Elixir of Quickness": 40,
+    "Elixir of Quickness|Gravedigger Slap": 40,
+    "Fighting|Golden Ankh": 7.9,
+    "Grave Worm|Harpyformer Choir": 10.7,
+    "Frolake|Harpyformer Choir": 40,
+    "Cute Bird|Divine Gift of Balance": 40,
+    "Resuscitation Potion|Summoning Magic": 7.1,
+    "Golden Ankh|Summoning Magic": 40,
+    "Cute Cat|Gravedigger Slap": 40,
+    "Cute Bunny|Cute Cat": 40,
+    "Field Cannon|Fighting": 40
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Harpyformer Choir": -7.2,
+      "Cute Dog": -7.1,
+      "Cute Phoenix": -9.9,
+      "Forceful Revival": -6.6,
+      "Cute Bird": -7.4,
+      "Resuscitation Potion": -6
+    },
+    "swarm": {
+      "Field Cannon": -7.3
+    },
+    "spell": {
+      "Fighting": 6.6,
+      "Cute Dog": 11.3,
+      "Summoning Magic": 7.7,
+      "Cute Bunny": 8.5,
+      "Forceful Revival": 9.4,
+      "Grave Worm": 11.3,
+      "Elixir of Quickness": -7.9
+    }
+  },
+  "targetPriors": {
+    "Cute Phoenix": {
+      "kind:creature": -20
+    },
+    "Gravedigger Slap": {
+      "kind:creature": -12.5
+    },
+    "Field Cannon": {
+      "kind:creature": -13.7,
+      "side:own": -18.9
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": 1.7,
+    "plc:bigwait": 8.6,
+    "plc:slack:1": -3.4,
+    "plc:slack:2+": 4.4
+  },
+  "abilityPriors": {
+    "Fighting@Visionary Genius Heinz": -12.3,
+    "Inventing@Visionary Genius Heinz": -60,
+    "Charme@Cute Annoyance Mini": 150,
+    "Summoning Magic@Cute Annoyance Mini": 150,
+    "Charme@Cool Rescuer Monia": 79.9,
+    "Fighting@Cool Rescuer Monia": 150,
+    "Summoning Magic@Visionary Genius Heinz": -60,
+    "Fighting@Cute Annoyance Mini": 48.5,
+    "Summoning Magic@Cool Rescuer Monia": 150
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Cute Annoyance Mini": 30,
+    "Resuscitation Potion→Cute Annoyance Mini": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Charme": -15,
+    "Golden Ankh→Summoning Magic": 30,
+    "Resuscitation Potion→Charme": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Resuscitation Potion→Fighting": -15
+  },
+  "startHandValues": {
+    "Cute Dog": -3,
+    "Harpyformer Choir": 2.1,
+    "Golden Ankh": 6.2,
+    "Fighting": 8.6,
+    "Gigantisaur Triceras": 6.9,
+    "Frolake": -7.7,
+    "Cute Bird": -6.1,
+    "Deepsea Idol": -5.8,
+    "Cute Cat": -9,
+    "Cute Phoenix": 1.8,
+    "Skull Necklace": -11.3,
+    "Summoning Magic": 5.5,
+    "Forceful Revival": -6,
+    "Field Cannon": 4.3,
+    "Divine Gift of Balance": 13.4,
+    "Populated Island Turtle": -5.3,
+    "Grave Worm": 8.4
+  },
+  "mulliganStats": {
+    "games": 304,
+    "mullRate": "10.2%",
+    "winAfterMull": "38.7%",
+    "winAfterKeep": "30.8%"
+  },
+  "heroEffectTiming": {
+    "Cute Annoyance Mini@hand:2-3": 6.3,
+    "Visionary Genius Heinz@hand:0-1": 6.4
+  },
+  "boardPairs": {
+    "Cute Bunny|Cute Dog": -15,
+    "Cute Bunny|Summoning Magic": -15,
+    "Charme|Cute Phoenix": 15,
+    "Harpyformer Choir|Summoning Magic": -15,
+    "Cute Dog|Fighting": -12.1,
+    "Charme|Field Cannon": 15,
+    "Field Cannon|Fighting": 15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

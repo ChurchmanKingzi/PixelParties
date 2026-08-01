@@ -25,6 +25,58 @@ module.exports = {
   // to keep Support Magic worth stacking even when no card in the deck
   // strictly requires it at the higher level.
   cpuMeta: { scalesWithSchool: 'Support Magic' },
+  // ── CPU: Nutzlos-Play-Veto (cpuPlayVeto-Vertrag) ──────────────────
+  // Heal für 0 ist ein verschwendeter Zauber. Der Play wird aus der
+  // CPU-Enumeration genommen, wenn ALLE folgenden Nutzenquellen fehlen:
+  //  (a) ein eigenes lebendes Ziel mit HP-Defizit (Held oder Kreatur),
+  //  (b) Nao als Caster (Overheal erlaubt → füttert afterHeal-Trigger
+  //      wie Lifeforce Howitzer, echter Effekt trotz voller HP),
+  //  (c) ein GEGNER-Held mit healReversed (Overheal Shock): Heilung
+  //      wird dort zu Schaden — Heal ist dann ein Damage-Spell,
+  //  (d) beim Additional-/Frei-Zauber-Pfad: Friendship ≥ 2 am Caster
+  //      (der Draw-Rider hängt am Additional-Action-Grant; reguläre
+  //      Action-Plays bekommen ihn NIE, dort zählt (d) nicht).
+  cpuPlayVeto(engine, pi, heroIdx, ctx2) {
+    const gs = engine.gs;
+    const ps = gs?.players?.[pi];
+    if (!ps) return false;
+    const caster = ps.heroes?.[heroIdx];
+    // (b) Nao-Overheal ist KEIN Freifahrtschein: Die Engine erlaubt
+    // Overheal nur auf Ziele mit hp <= maxHp (Helden) bzw.
+    // currentHp <= baseHp (Kreaturen) — ein bereits over-healtes Ziel
+    // (hp > maxHp) bekommt auch von Nao NICHTS. Deshalb kein
+    // Pauschal-Return, sondern ein laxeres Zielkriterium unten.
+    const naoCaster = (caster?.baseName || caster?.name || '').startsWith('Nao');
+    // (d) Friendship-Draw beim Additional-Pfad
+    if (ctx2?.additional) {
+      for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+        if (slot && slot[0] === 'Friendship' && slot.length >= 2) return false;
+      }
+    }
+    // (a) heilbares eigenes Ziel? Ohne Nao: echtes HP-Defizit nötig.
+    // Mit Nao: hp <= maxHp genügt (Overheal ab Voll-HP ist echter
+    // Effekt — HP-Puffer + afterHeal-Trigger wie Lifeforce Howitzer).
+    for (const hh of (ps.heroes || [])) {
+      if (!hh?.name || hh.hp <= 0) continue;
+      const max = hh.maxHp || hh.hp;
+      if (naoCaster ? hh.hp <= max : hh.hp < max) return false;
+    }
+    for (const inst of (engine.cardInstances || [])) {
+      if (inst.owner !== pi || inst.zone !== 'support') continue;
+      const cur = inst.counters?.currentHp;
+      const max = inst.counters?.maxHp;
+      const base = inst.counters?.baseHp ?? max;
+      if (typeof cur !== 'number' || typeof max !== 'number' || cur <= 0) continue;
+      if (naoCaster ? cur <= base : cur < max) return false;
+    }
+    // (c) healReversed-Gegner (Heilung = Schaden)
+    const oi = pi === 0 ? 1 : 0;
+    for (const hh of (gs.players?.[oi]?.heroes || [])) {
+      if (hh?.name && hh.hp > 0 && hh.statuses?.healReversed) return false;
+    }
+    return true; // keine Nutzenquelle → Play verwerfen
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -45,6 +97,11 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'support_spell',
+        // CPU-Vertrag (Als Heal-Burn-Befund): markiert den Prompt als
+        // HEILUNG, damit der Ziel-Picker Gegner ohne healReversed
+        // aussortieren kann — "Gegner heilen → gewinnen" wurde sonst
+        // ohne den Overheal-Shock-Kontext gelernt.
+        isHealing: true,
         title: 'Heal',
         description: `Heal a target for ${healAmount} HP. (Support Magic Lv${smLevel})`,
         confirmLabel: `💚 Heal! (${healAmount})`,

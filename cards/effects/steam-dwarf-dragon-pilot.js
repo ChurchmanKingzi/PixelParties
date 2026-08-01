@@ -74,7 +74,10 @@ module.exports = attachSteamEngine({
   // this the fireball never fires. Free damage is beneficial. (Title == card
   // name for this lookup.)
   cpuResponse(engine, kind, promptData) {
-    if (promptData?.type === 'confirm' && !promptData.showCard) return { confirmed: true };
+    // KEINE !showCard-Bedingung: promptConfirmEffect defaultet showCard
+    // inzwischen IMMER auf den Kartennamen — die alte Bedingung war nie
+    // erfüllt und der Confirm wurde still declined (Barker-Bugklasse).
+    if (promptData?.type === 'confirm') return { confirmed: true };
     return undefined;
   },
   requiresTarget: true,
@@ -215,9 +218,14 @@ module.exports = attachSteamEngine({
 
       // Only when this Creature is actively on the field
       if (!inst || inst.zone !== 'support') return;
-      if (inst.counters?.negated || inst.counters?.nulled) return;
-      const hero = ctx.attachedHero;
-      if (!hero?.name || hero.hp <= 0) return;
+      // Als Ruling (Kreaturen-Audit nach dem Sandy-Blob-Fund): der
+      // Kartentext nennt KEINE Hero-Abhängigkeit, also gated nur der
+      // Zustand der Kreatur SELBST — isCardEffectActive ist das
+      // kanonische Gate (faceDown/negated/nulled/frozen/stunned; der
+      // alte Inline-Check kannte frozen/stunned nicht). Das frühere
+      // attachedHero-Gate widersprach Rulebook + Engine-Doktrin
+      // (Kreaturen toter/gestunnter Heroes bleiben aktiv).
+      if (!engine.isCardEffectActive(inst)) return;
 
       // Track uses per turn on the instance itself
       if (!inst.counters) inst.counters = {};

@@ -1,0 +1,353 @@
+{
+  "deck": "Steam Dwarf Mines",
+  "heroes": [
+    "Cute Nerd Magenta",
+    "Layn, Defender of Deri",
+    "Alice, the Puppeteer Girl"
+  ],
+  "games": 1233,
+  "trainWinRate": "68.9%",
+  "trainedAt": "2026-07-20T02:39:46.309Z",
+  "meanTurns": 13.5,
+  "cardValues": {
+    "Cute Cheese": 16.8,
+    "Summoning Magic": 8,
+    "Steam Dwarf Engineer": 47.2,
+    "Aggressive Town Guard": 76.1,
+    "Steam Dwarf Exterminator": 50.9,
+    "Steam Dwarf Diver": 8,
+    "Ska Harpyformer": 59.1,
+    "Performance": 8,
+    "Juice": 32.3,
+    "Steam Dwarf Miner": 8.4,
+    "Leadership": 22.9,
+    "Divine Gift of Fire": 81.3,
+    "Steam Dwarf Brewer": 8,
+    "Golden Ankh": 23.2
+  },
+  "timing": {
+    "Cute Cheese": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Steam Dwarf Engineer": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Aggressive Town Guard": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.99
+    },
+    "Steam Dwarf Exterminator": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Steam Dwarf Diver": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.19
+    },
+    "Ska Harpyformer": {
+      "early": 1,
+      "mid": 1.26,
+      "late": 0.75
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Juice": {
+      "early": 1,
+      "mid": 0.75,
+      "late": 1.3
+    },
+    "Steam Dwarf Miner": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.3
+    },
+    "Divine Gift of Fire": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Steam Dwarf Brewer": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Summoning Magic|dc:Bottled Lightning": 4.5,
+    "Resuscitation Potion|Steam Dwarf Brewer": 4.8,
+    "Leadership|dc:Bottled Lightning": 4.3,
+    "Bottled Flame|Steam Dwarf Dragon Pilot": 5.6
+  },
+  "cardValueDeltasByCluster": {
+    "aggro": {
+      "Cute Cheese": -6.7,
+      "Summoning Magic": -7.1,
+      "Steam Dwarf Engineer": -6.5,
+      "Aggressive Town Guard": -6.1,
+      "Steam Dwarf Exterminator": -6.3,
+      "Steam Dwarf Diver": -6.6,
+      "Performance": -6.8,
+      "Steam Dwarf Brewer": -7.2,
+      "Divine Gift of Fire": -7.9,
+      "Steam Dwarf Miner": -7.5,
+      "Leadership": -7.7,
+      "Steam Dwarf Dragon Pilot": -7.4,
+      "Resuscitation Potion": -7.5
+    },
+    "spell": {
+      "Juice": 6.3,
+      "Bottled Flame": -7.2,
+      "Steam Dwarf Dragon Pilot": -7.7,
+      "Bottled Lightning": 7.3
+    }
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Aggressive Town Guard": -3.2,
+      "Steam Dwarf Exterminator": 4.4,
+      "Ska Harpyformer": -6.2,
+      "Steam Dwarf Brewer": 5.8,
+      "Juice": -6.4,
+      "Golden Ankh": -10.6,
+      "Steam Dwarf Dragon Pilot": -13.4
+    },
+    "ahead": {
+      "Summoning Magic": 6.4,
+      "Steam Dwarf Engineer": -10.8,
+      "Steam Dwarf Exterminator": -12.4,
+      "Steam Dwarf Diver": -14.1,
+      "Leadership": 6.9
+    }
+  },
+  "standingEvalThreshold": 867,
+  "targetPriors": {
+    "Aggressive Town Guard": {
+      "side:own": -6.5,
+      "hp:max": -8.2
+    },
+    "Steam Dwarf Exterminator": {
+      "kind:creature": -7.3
+    },
+    "Juice": {
+      "kind:creature": 7.1,
+      "side:own": -10.7,
+      "side:opp": 7.1,
+      "hp:max": -7.5,
+      "frozen": -20
+    },
+    "Steam Dwarf Dragon Pilot": {
+      "side:own": -14.7,
+      "hp:max": -11.5,
+      "kind:creature": -11.3
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:1": 5.1,
+      "st:stun-hero": -6.8,
+      "st:3+": -2.1,
+      "st:poison2+": 13.5,
+      "st:frozen-hero": -15
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -4.4,
+    "plc:slack:1": 3.5,
+    "plc:slack:2+": 9.3,
+    "plc:bigwait": 10.5
+  },
+  "tutorPickRules": {
+    "Cute Cheese→Steam Dwarf Brewer": -2.2,
+    "Cute Cheese→Steam Dwarf Diver": 5.8,
+    "Cute Cheese→Aggressive Town Guard": -4,
+    "Cute Cheese→Steam Dwarf Miner": 5.8,
+    "Cute Cheese→Steam Dwarf Dragon Pilot": -3.8,
+    "Cute Cheese→Ska Harpyformer": 3.1,
+    "Magic Lamp→Acid Vial": -10.4,
+    "Magic Lamp→Alchemy": -12.3,
+    "Magic Lamp→Chain Lightning": -6.1,
+    "Magic Lamp→Critical Strike": 10.6,
+    "Magic Lamp→Elixir of Immortality": 4.7,
+    "Steam Dwarf Diver→Steam Dwarf Diver": -5.7,
+    "Steam Dwarf Diver→Performance": 9.1,
+    "Steam Dwarf Diver→Summoning Magic": -5.7,
+    "Steam Dwarf Diver→Divine Gift of Fire": 2.9,
+    "Steam Dwarf Diver→Steam Dwarf Dragon Pilot": -9.5,
+    "Steam Dwarf Diver→Glass of Marbles": 5.6,
+    "Steam Dwarf Diver→Steam Dwarf Brewer": -5.9,
+    "Steam Dwarf Diver→Steam Dwarf Exterminator": -4.2,
+    "Steam Dwarf Diver→Mystery Box": 8.3,
+    "Steam Dwarf Diver→Steam Dwarf Engineer": 4.4,
+    "Steam Dwarf Diver→Steam Dwarf Miner": -4.7,
+    "Steam Dwarf Diver→Cute Cheese": 20,
+    "Ska Harpyformer→Performance": 12.7,
+    "Ska Harpyformer→Leadership": 2.8,
+    "Ska Harpyformer→Summoning Magic": -14.2,
+    "Steam Dwarf Engineer→Steam Dwarf Miner": -9.3,
+    "Steam Dwarf Engineer→Ska Harpyformer": -4.1,
+    "Steam Dwarf Engineer→Aggressive Town Guard": -20,
+    "Steam Dwarf Engineer→Steam Dwarf Exterminator": 12.7,
+    "Steam Dwarf Engineer→Steam Dwarf Brewer": 11.3,
+    "Steam Dwarf Engineer→Steam Dwarf Diver": -11.1,
+    "Steam Dwarf Engineer→Steam Dwarf Engineer": 20,
+    "Steam Dwarf Engineer→Steam Dwarf Dragon Pilot": 20,
+    "Necromancy→Steam Dwarf Diver": 14.8,
+    "Necromancy→Ska Harpyformer": -12.3,
+    "Necromancy→Aggressive Town Guard": 10.4,
+    "Necromancy→Steam Dwarf Dragon Pilot": 20,
+    "Necromancy→Steam Dwarf Engineer": -10.2,
+    "Necromancy→Steam Dwarf Exterminator": -20,
+    "Necromancy→Steam Dwarf Miner": -16.5,
+    "Enigma, the Seller of Secrets→Steam Dwarf Engineer": 8.4,
+    "Enigma, the Seller of Secrets→Steam Dwarf Dragon Pilot": 5.1,
+    "Enigma, the Seller of Secrets→Summoning Magic": -4.6,
+    "Enigma, the Seller of Secrets→Steam Dwarf Miner": -14.2,
+    "Enigma, the Seller of Secrets→Steam Dwarf Exterminator": -4,
+    "Enigma, the Seller of Secrets→Aggressive Town Guard": -18.1,
+    "Enigma, the Seller of Secrets→Steam Dwarf Diver": -4.5,
+    "Enigma, the Seller of Secrets→Glass of Marbles": 3.5,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": 10.1,
+    "Enigma, the Seller of Secrets→Leadership": 8,
+    "Enigma, the Seller of Secrets→Juice": -7.8,
+    "Enigma, the Seller of Secrets→Mystery Box": -8,
+    "Enigma, the Seller of Secrets→Cute Cheese": 17.2,
+    "Enigma, the Seller of Secrets→Golden Ankh": -2.4,
+    "Magic Amethyst→Summoning Magic": -20,
+    "Magic Amethyst→Destruction Magic": -6,
+    "Magic Amethyst→Leadership": 20,
+    "Training→Performance": 8.6,
+    "Training→Leadership": -18.3,
+    "Training→Summoning Magic": 11.5,
+    "Premonition→Steam Dwarf Dragon Pilot": 2.8,
+    "Premonition→Steam Dwarf Engineer": 2,
+    "Premonition→Aggressive Town Guard": 7.6,
+    "Premonition→Steam Dwarf Exterminator": -18.1,
+    "Premonition→Steam Dwarf Diver": -11.3,
+    "Premonition→Summoning Magic": -8.7,
+    "Premonition→Leadership": 18,
+    "Premonition→Ska Harpyformer": -8.3,
+    "Premonition→Divine Gift of Fire": 9
+  },
+  "abilityPriors": {
+    "Charme@Cute Nerd Magenta": 150,
+    "Charme@Cute Nerd Magenta≥2": -60,
+    "Creativity@Cute Nerd Magenta": 150,
+    "Summoning Magic@Cute Nerd Magenta": 150,
+    "Leadership@Layn, Defender of Deri": 150,
+    "Leadership@Layn, Defender of Deri≥2": -60,
+    "Leadership@Layn, Defender of Deri≥3": 150,
+    "Toughness@Layn, Defender of Deri": 150,
+    "Summoning Magic@Layn, Defender of Deri": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl≥2": 150,
+    "Leadership@Alice, the Puppeteer Girl": 150,
+    "Leadership@Cute Nerd Magenta": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl≥2": 150,
+    "Summoning Magic@Cute Nerd Magenta≥2": 150,
+    "Creativity@Cute Nerd Magenta≥2": 150,
+    "Toughness@Layn, Defender of Deri≥2": -60,
+    "Toughness@Layn, Defender of Deri≥3": -60,
+    "Charme@Cute Nerd Magenta≥3": -60,
+    "Summoning Magic@Layn, Defender of Deri≥2": -60,
+    "Leadership@Alice, the Puppeteer Girl≥2": -60,
+    "Leadership@Alice, the Puppeteer Girl≥3": -60,
+    "Summoning Magic@Cute Nerd Magenta≥3": -60,
+    "Leadership@Cute Nerd Magenta≥2": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl≥3": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl≥3": 16.3
+  },
+  "equipPriors": {},
+  "lockPenalties": {},
+  "reviveTargets": {
+    "Golden Ankh→Alice, the Puppeteer Girl": 30,
+    "Golden Ankh→Cute Nerd Magenta": 30,
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30
+  },
+  "reviveAbilities": {
+    "Golden Ankh→Destruction Magic": 30,
+    "Golden Ankh→Summoning Magic": 30,
+    "Golden Ankh→Creativity": 20.7,
+    "Resuscitation Potion→Destruction Magic": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Golden Ankh→Leadership": -15,
+    "Golden Ankh→Charme": 30
+  },
+  "startHandValues": {
+    "Summoning Magic": 2.1,
+    "Mystery Box": -2.9,
+    "Juice": -1.4,
+    "Steam Dwarf Engineer": 2,
+    "Leadership": 2.1,
+    "Aggressive Town Guard": 1.6,
+    "Steam Dwarf Dragon Pilot": -3.8,
+    "Steam Dwarf Diver": 2.3,
+    "Divine Gift of Fire": 1.6,
+    "Steam Dwarf Exterminator": 2.3,
+    "Steam Dwarf Brewer": -2.5
+  },
+  "mulliganStats": {
+    "games": 1233,
+    "mullRate": "0.1%",
+    "winAfterMull": "100%",
+    "winAfterKeep": "68.8%"
+  },
+  "heroEffectTiming": {
+    "Alice, the Puppeteer Girl@hand:4+": 4.6,
+    "Cute Nerd Magenta@hand:2-3": 7.2,
+    "Alice, the Puppeteer Girl@hand:2-3": 11.1,
+    "Alice, the Puppeteer Girl@hand:0-1": 4.5,
+    "Cute Nerd Magenta@hand:0-1": 5.3
+  },
+  "boardPairs": {
+    "Steam Dwarf Diver|Steam Dwarf Miner": -10,
+    "Charme|Steam Dwarf Diver": 7.2,
+    "Creativity|Steam Dwarf Diver": 8,
+    "Charme|Summoning Magic": 8,
+    "Creativity|Summoning Magic": 9.3,
+    "Leadership|Steam Dwarf Exterminator": -4.7,
+    "Steam Dwarf Exterminator|Toughness": -9.4,
+    "Steam Dwarf Exterminator|Summoning Magic": 6,
+    "Steam Dwarf Engineer|Toughness": -12.1,
+    "Leadership|Summoning Magic": 11.7,
+    "Destruction Magic|Leadership": 10.5,
+    "Leadership|Steam Dwarf Miner": -7.5,
+    "Steam Dwarf Miner|Toughness": -14.3,
+    "Ska Harpyformer|Toughness": -13.4,
+    "Destruction Magic|Steam Dwarf Exterminator": 11.8,
+    "Charme|Steam Dwarf Exterminator": 6.4,
+    "Creativity|Steam Dwarf Exterminator": 7.3,
+    "Charme|Ska Harpyformer": 11.2,
+    "Creativity|Ska Harpyformer": 10,
+    "Destruction Magic|Steam Dwarf Engineer": 12.1,
+    "Steam Dwarf Engineer|Steam Dwarf Miner": -13.3,
+    "Steam Dwarf Brewer|Toughness": -13.5,
+    "Destruction Magic|Steam Dwarf Brewer": 7.9,
+    "Steam Dwarf Dragon Pilot|Summoning Magic": 11.1,
+    "Destruction Magic|Ska Harpyformer": 8.8,
+    "Steam Dwarf Diver|Toughness": -12.8,
+    "Steam Dwarf Brewer|Steam Dwarf Exterminator": 13.2
+  },
+  "protectionRules": {},
+  "gameStartPicks": {}
+}

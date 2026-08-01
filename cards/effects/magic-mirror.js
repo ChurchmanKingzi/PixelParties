@@ -23,6 +23,18 @@ const { loadCardEffect } = require('./_loader');
 module.exports = {
   isSurprise: true,
 
+  // Magic Mirror platziert als Teil SEINER EIGENEN Wirkung Pollution
+  // Tokens ("equal to the negated Spell's level") — damit ist es ein
+  // "Spell that places Pollution Tokens" im Sinne von Mana Mining
+  // (Level-Reduktion) und Mana Beacon (Zusatz-Aktion). Das Flag fehlte,
+  // wodurch Mana Minings Reduktion NIE griff: Als Befund im Deck
+  // "Spell Industrialization" — Victorica trägt Mana Mining Lv3 (in
+  // 374/380 Spielen), das hätte Lv3 Magic Arts auf effektiv 0 gesenkt
+  // und die Karte für sie spielbar gemacht; ohne Flag blieb sie
+  // strukturell uncastbar (2/380 Spiele) und pickSurprisePlacement
+  // lehnte die Platzierung korrekt, aber auf falscher Grundlage ab.
+  placesPollutionTokens: true,
+
   // Magic Mirror's whole effect depends on a triggering Spell to reflect
   // (sourceInfo.cardName / level / etc.). Telekinesis supplies no such
   // source, so the card would be a silent no-op if it were selectable.

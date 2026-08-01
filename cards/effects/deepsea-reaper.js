@@ -45,7 +45,7 @@ module.exports = {
       for (const inst of engine.cardInstances) {
         if (inst.zone !== 'support') continue;
         if (inst.id === ctx.card.id) continue;
-        const cd = cardDB[inst.name];
+        const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         if (inst.faceDown) continue;
         creatures.push(inst);

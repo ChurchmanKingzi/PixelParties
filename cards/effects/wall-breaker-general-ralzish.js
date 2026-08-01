@@ -301,28 +301,14 @@ module.exports = {
           return true; // committed — claim the once-per-turn
         }
       }
-      // Zone-anchored board→discard flight. Without this, the
-      // client's diff-based fly-out detector resolves the source by
-      // CARD NAME and always animates from the LEFT-MOST same-named
-      // card on the board (wrong slot when duplicates exist). Emitting
-      // an explicit `play_pile_transfer` keyed to this instance's
-      // exact zone makes the flight start at the real card, and the
-      // frontend's pending-bucket suppresses the duplicate name-keyed
-      // diff animation. Fired BEFORE the destroy so the source slot is
-      // still rendered. Area has its own engine-level area→discard
-      // broadcast; Coolness-Stack tops fly via actionPopCoolnessStackTo;
-      // Permanents aren't name-captured by the diff detector — so this
-      // is scoped to support / ability / surprise zones only.
-      const tz = targetInst.zone;
-      if (tz === 'support' || tz === 'ability' || tz === 'surprise') {
-        engine._broadcastEvent('play_pile_transfer', {
-          owner: targetInst.owner,
-          cardName: targetInst.name,
-          from: tz, to: 'discard',
-          fromHeroIdx: targetInst.heroIdx,
-          fromSlotIdx: targetInst.zoneSlot,
-        });
-      }
+      // KEIN eigener play_pile_transfer mehr: `actionDestroyCard`
+      // sendet den zonenverankerten Flug selbst — und zwar erst NACH
+      // allen Abbruchpfaden (Immunität, Gate, Monias Schutz). Der
+      // frühere Broadcast HIER lief davor und erzeugte damit zwei
+      // Probleme zugleich: einen Doppelflug im Normalfall und eine
+      // Animation für eine Zerstörung, die anschließend abgewehrt
+      // wurde. Eigene Leichen-Animationen laufen über
+      // `{ skipPileTransfer: true }` (siehe Brackle).
       await engine.actionDestroyCard(source, targetInst);
     }
 

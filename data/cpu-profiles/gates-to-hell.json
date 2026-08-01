@@ -1,0 +1,426 @@
+{
+  "deck": "Gates to Hell",
+  "heroes": [
+    "Nicolas, the Hidden Alchemist",
+    "Silent Water Mizune",
+    "Treasure Huntress Semi"
+  ],
+  "games": 1360,
+  "trainWinRate": "42.8%",
+  "trainedAt": "2026-07-24T23:17:27.673Z",
+  "meanTurns": 15.1,
+  "cardValues": {
+    "Summoning Magic": 8,
+    "Elixir of Quickness": 27.9,
+    "Pure Advantage Camel": 8,
+    "Wheels": 18.5,
+    "Magic Lamp": 30.9,
+    "Performance": 10.2,
+    "Cute Cheese": 10.7,
+    "Demon's Gate": 100,
+    "Magnetic Potion": 31.2,
+    "Acid Vial": 35.9,
+    "Ska Harpyformer": 26.6,
+    "Pressed Skill": 11.4,
+    "Fire Bomb": 25.3,
+    "Defending the Gate": 54
+  },
+  "timing": {
+    "Summoning Magic": {
+      "early": 0.75,
+      "mid": 1.24,
+      "late": 1.3
+    },
+    "Elixir of Quickness": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Pure Advantage Camel": {
+      "early": 0.75,
+      "mid": 0.77,
+      "late": 1.3
+    },
+    "Wheels": {
+      "early": 0.75,
+      "mid": 1.25,
+      "late": 1
+    },
+    "Magic Lamp": {
+      "early": 0.76,
+      "mid": 1.24,
+      "late": 1
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.08
+    },
+    "Cute Cheese": {
+      "early": 0.77,
+      "mid": 1.23,
+      "late": 1
+    },
+    "Demon's Gate": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 0.86
+    },
+    "Magnetic Potion": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Acid Vial": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Ska Harpyformer": {
+      "early": 1,
+      "mid": 1.01,
+      "late": 0.99
+    },
+    "Pressed Skill": {
+      "early": 0.81,
+      "mid": 1.19,
+      "late": 1
+    }
+  },
+  "pairBonuses": {
+    "Defending the Gate|Demon's Gate": 6.2,
+    "Demon's Gate|Monster in a Bottle": 4.1,
+    "Acid Vial|Magnetic Potion": 4.9,
+    "Acid Vial|dc:Divine Gift of the Guardian": 4.4,
+    "Elixir of Immortality|dc:Divine Gift of the Guardian": 5,
+    "Elixir of Immortality|dc:Juice": 4.7,
+    "The Yeeting|dc:Divine Gift of the Guardian": 4.9
+  },
+  "cardValueDeltasByStanding": {
+    "behind": {
+      "Performance": -6.2,
+      "Demon's Gate": 15.6,
+      "Resuscitation Potion": -10,
+      "Ska Harpyformer": -5.9,
+      "Divine Gift of the Guardian": -10.6,
+      "Defending the Gate": 12.3
+    }
+  },
+  "standingEvalThreshold": 1023,
+  "menuOfferRules": {
+    "Magic Lamp→Demon's Gate": 6.9,
+    "Magic Lamp→Divine Gift of the Guardian": -5,
+    "Magic Lamp→Elixir of Immortality": -7.5,
+    "Magic Lamp→Dark Gear": 4.3,
+    "Magic Lamp→Chain Lightning": 5.1,
+    "Magic Lamp→Summoning Magic": -5.4,
+    "Magic Lamp→Ska Harpyformer": 2.7,
+    "Magic Lamp→Cute Cheese": 8.2,
+    "Magic Lamp→Pure Advantage Camel": 13.5,
+    "Magic Lamp→Flame Avalanche": 20,
+    "Magic Lamp→Phoenix Tackle": -11.5,
+    "Magic Lamp→The Yeeting": 11.4,
+    "Magic Lamp→Resuscitation Potion": -19.3
+  },
+  "menuOfferRulesByCluster": {
+    "spell": {
+      "Magic Lamp→Demon's Gate": 11.5,
+      "Magic Lamp→Divine Gift of the Guardian": 3.8,
+      "Magic Lamp→Elixir of Immortality": 15,
+      "Magic Lamp→Acid Vial": 8.5,
+      "Magic Lamp→Dark Gear": 15,
+      "Magic Lamp→Defending the Gate": 11.1,
+      "Magic Lamp→Ska Harpyformer": -15
+    },
+    "aggro": {
+      "Magic Lamp→Demon's Gate": -15,
+      "Magic Lamp→Divine Gift of the Guardian": -7.9,
+      "Magic Lamp→Elixir of Immortality": -13.6,
+      "Magic Lamp→Acid Vial": -15,
+      "Magic Lamp→Dark Gear": -15,
+      "Magic Lamp→Defending the Gate": -15,
+      "Magic Lamp→Chain Lightning": -15,
+      "Magic Lamp→Summoning Magic": -6.7,
+      "Magic Lamp→Monster in a Bottle": -9.1,
+      "Magic Lamp→Ska Harpyformer": -15,
+      "Magic Lamp→Fire Bomb": -15,
+      "Magic Lamp→Wheels": -15
+    },
+    "mixed": {
+      "Magic Lamp→Demon's Gate": 3.8,
+      "Magic Lamp→Acid Vial": 4.7,
+      "Magic Lamp→Dark Gear": 12.9,
+      "Magic Lamp→Defending the Gate": 3.6,
+      "Magic Lamp→Chain Lightning": 13.5,
+      "Magic Lamp→Ska Harpyformer": 15,
+      "Magic Lamp→Fire Bomb": 3.5,
+      "Magic Lamp→Resuscitation Potion": -14.5,
+      "Magic Lamp→Wheels": 14.1
+    },
+    "swarm": {
+      "Magic Lamp→Demon's Gate": 11,
+      "Magic Lamp→Divine Gift of the Guardian": 4.8,
+      "Magic Lamp→Elixir of Immortality": 9.7,
+      "Magic Lamp→Acid Vial": 15,
+      "Magic Lamp→Dark Gear": 8.8,
+      "Magic Lamp→Defending the Gate": 14.3,
+      "Magic Lamp→Chain Lightning": 9.8,
+      "Magic Lamp→Summoning Magic": 9.3,
+      "Magic Lamp→Monster in a Bottle": 12.7,
+      "Magic Lamp→Ska Harpyformer": 12.8,
+      "Magic Lamp→Fire Bomb": 15,
+      "Magic Lamp→The Yeeting": 15,
+      "Magic Lamp→Resuscitation Potion": -6.6,
+      "Magic Lamp→Wheels": 15
+    }
+  },
+  "menuOfferRulesByStanding": {
+    "behind": {
+      "Magic Lamp→Demon's Gate": -8.2,
+      "Magic Lamp→Divine Gift of the Guardian": -6.2,
+      "Magic Lamp→Elixir of Immortality": -9.8,
+      "Magic Lamp→Acid Vial": -5.8,
+      "Magic Lamp→Defending the Gate": -11.4,
+      "Magic Lamp→Chain Lightning": -8.1,
+      "Magic Lamp→Summoning Magic": -3,
+      "Magic Lamp→Monster in a Bottle": -3.5,
+      "Magic Lamp→Ska Harpyformer": -8.9,
+      "Magic Lamp→The Yeeting": -10.7,
+      "Magic Lamp→Resuscitation Potion": -15,
+      "Magic Lamp→Wheels": 6.7
+    },
+    "ahead": {
+      "Magic Lamp→Acid Vial": 15,
+      "Magic Lamp→Defending the Gate": 15,
+      "Magic Lamp→Chain Lightning": 15
+    }
+  },
+  "targetPriors": {
+    "Phoenix Tackle": {
+      "side:own": -13.5
+    },
+    "The Yeeting — Choose Target": {
+      "side:own": -6.4
+    },
+    "Juice": {
+      "kind:creature": -10.7,
+      "frozen": 15.2,
+      "hp:min": -8.5
+    },
+    "Steam Dwarf Exterminator": {
+      "kind:creature": -8.3,
+      "kind:hero": 8.3
+    },
+    "Infected Greatmaw": {
+      "hp:min": -15.6,
+      "hp:max": 17.1
+    }
+  },
+  "surpriseRules": {
+    "Pure Advantage Camel": {
+      "mid": -4.3,
+      "late": 6.9
+    },
+    "Defending the Gate": {
+      "mid": 9.2,
+      "late": -6
+    },
+    "Spike Trap": {
+      "early": -10.4,
+      "mid": -10.4,
+      "late": -10.4
+    }
+  },
+  "statusHealRules": {
+    "Juice": {
+      "st:hero-caster": -7.3,
+      "st:2": -2.9,
+      "st:1": -14.8,
+      "st:poison2+": -6.7,
+      "st:frozen-hero": -20
+    }
+  },
+  "placementRules": {
+    "plc:slack:0": -3.4,
+    "plc:bigwait": -5.9,
+    "plc:slack:2+": 3.7,
+    "plc:slack:1": 2.1
+  },
+  "tutorPickRules": {
+    "Magic Lamp→Demon's Gate": 3.6,
+    "Magic Lamp→Divine Gift of the Guardian": -4.2,
+    "Magic Lamp→Elixir of Immortality": -5.2,
+    "Magic Lamp→Dark Gear": 6.2,
+    "Magic Lamp→Chain Lightning": 9.7,
+    "Magic Lamp→Summoning Magic": -4.1,
+    "Magic Lamp→Loyal Hountriever": -16.2,
+    "Magic Lamp→Cute Cheese": 7.7,
+    "Magic Lamp→Juice": 5.8,
+    "Magic Lamp→Alchemy": 13.5,
+    "Magic Lamp→Pure Advantage Camel": 12.2,
+    "Magic Lamp→Flame Avalanche": 19.2,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Phoenix Tackle": -13.6,
+    "Magic Lamp→The Yeeting": 13,
+    "Magic Lamp→Resuscitation Potion": -17.6,
+    "Magic Lamp→Pressed Skill": -20,
+    "Cute Cheese→Ska Harpyformer": -5.4,
+    "Cute Cheese→Demon's Gate": 4,
+    "Magnetic Potion→Performance": -12.5,
+    "Magnetic Potion→Fire Bomb": -2.8,
+    "Magnetic Potion→Divine Gift of the Guardian": -11.8,
+    "Magnetic Potion→Juice": -10.2,
+    "Magnetic Potion→Summoning Magic": -6.1,
+    "Magnetic Potion→The Yeeting": -5.7,
+    "Magnetic Potion→Chain Lightning": 12.4,
+    "Magnetic Potion→Monster in a Bottle": -9.1,
+    "Magnetic Potion→Wheels": 5.7,
+    "Magnetic Potion→Demon's Gate": 11.9,
+    "Magnetic Potion→Resuscitation Potion": -20,
+    "Magnetic Potion→Pure Advantage Camel": 4.5,
+    "Magnetic Potion→Ska Harpyformer": -8.9,
+    "Monster in a Bottle→Pure Advantage Camel": 8.2,
+    "Monster in a Bottle→Ska Harpyformer": -18.6,
+    "Monster in a Bottle→Demon's Gate": 12,
+    "Pressed Skill→Summoning Magic": -6.5,
+    "Pressed Skill→Performance": 5.3,
+    "Elixir of Immortality→Ska Harpyformer": 11.6,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": -20,
+    "Elixir of Immortality→Silent Water Mizune": 9.7,
+    "The Cosmic Depths→Pure Advantage Camel": 4.8,
+    "The Cosmic Depths→Ska Harpyformer": -7,
+    "Enigma, the Seller of Secrets→The Yeeting": 2.3,
+    "Enigma, the Seller of Secrets→Performance": 18.1,
+    "Enigma, the Seller of Secrets→Pure Advantage Camel": -7.7,
+    "Enigma, the Seller of Secrets→Pressed Skill": -2.3,
+    "Enigma, the Seller of Secrets→Acid Vial": -11.2,
+    "Enigma, the Seller of Secrets→Juice": 10.8,
+    "Enigma, the Seller of Secrets→Flame Avalanche": 16,
+    "Enigma, the Seller of Secrets→Demon's Gate": -5.7,
+    "Enigma, the Seller of Secrets→Summoning Magic": -2.4,
+    "Enigma, the Seller of Secrets→Ska Harpyformer": 5.4,
+    "Enigma, the Seller of Secrets→Chain Lightning": -10.3,
+    "Enigma, the Seller of Secrets→Fire Bomb": 18.6,
+    "Enigma, the Seller of Secrets→Defending the Gate": -5,
+    "Enigma, the Seller of Secrets→Cute Cheese": -4.6,
+    "Enigma, the Seller of Secrets→Monster in a Bottle": -12,
+    "Enigma, the Seller of Secrets→Wheels": -13.4,
+    "Enigma, the Seller of Secrets→Phoenix Tackle": -9.7,
+    "Magic Amethyst→Summoning Magic": 2.9,
+    "Magic Amethyst→Performance": -3.8,
+    "Laser Volley→Nicolas, the Hidden Alchemist": 3.8
+  },
+  "abilityPriors": {
+    "Summoning Magic@Nicolas, the Hidden Alchemist": 60,
+    "Summoning Magic@Nicolas, the Hidden Alchemist≥2": 150,
+    "Summoning Magic@Nicolas, the Hidden Alchemist≥3": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist": 47.6,
+    "Alchemy@Nicolas, the Hidden Alchemist≥2": 150,
+    "Alchemy@Nicolas, the Hidden Alchemist≥3": 78.6,
+    "Magic Arts@Silent Water Mizune": 150,
+    "Magic Arts@Silent Water Mizune≥2": -60,
+    "Magic Arts@Silent Water Mizune≥3": -60,
+    "Summoning Magic@Silent Water Mizune": 115.6,
+    "Summoning Magic@Silent Water Mizune≥2": 150,
+    "Summoning Magic@Silent Water Mizune≥3": 150,
+    "Adventurousness@Treasure Huntress Semi": 150,
+    "Adventurousness@Treasure Huntress Semi≥2": 143.3,
+    "Adventurousness@Treasure Huntress Semi≥3": -60,
+    "Summoning Magic@Treasure Huntress Semi": 150,
+    "Summoning Magic@Treasure Huntress Semi≥2": -60,
+    "Summoning Magic@Treasure Huntress Semi≥3": -60
+  },
+  "equipPriors": {},
+  "lockPenalties": {
+    "Performance|potion@1": -25,
+    "Ska Harpyformer|potion@0": 10,
+    "Performance|potion@3+": -4.1,
+    "Summoning Magic|potion@3+": -25,
+    "Summoning Magic|potion@1": 10,
+    "Performance|potion@0": 5.4,
+    "Summoning Magic|potion@0": 10,
+    "Performance|potion@2": -25,
+    "Summoning Magic|potion@2": 10,
+    "Ska Harpyformer|potion@1": 10,
+    "Ska Harpyformer|potion@2": 10
+  },
+  "reviveTargets": {
+    "Resuscitation Potion→Treasure Huntress Semi": 30,
+    "Resuscitation Potion→Silent Water Mizune": 30,
+    "Elixir of Immortality→Nicolas, the Hidden Alchemist": 30,
+    "Elixir of Immortality→Silent Water Mizune": 30,
+    "Elixir of Immortality→Treasure Huntress Semi": 30,
+    "Resuscitation Potion→Nicolas, the Hidden Alchemist": 30
+  },
+  "reviveAbilities": {
+    "Resuscitation Potion→Adventurousness": 30,
+    "Resuscitation Potion→Magic Arts": 30,
+    "Resuscitation Potion→Summoning Magic": 30,
+    "Elixir of Immortality→Summoning Magic": 30,
+    "Elixir of Immortality→Alchemy": 30,
+    "Elixir of Immortality→Magic Arts": 30,
+    "Elixir of Immortality→Adventurousness": 30,
+    "Resuscitation Potion→Alchemy": 30
+  },
+  "startHandValues": {
+    "Pure Advantage Camel": 1.6,
+    "Summoning Magic": 1.9,
+    "Defending the Gate": 2,
+    "Acid Vial": -2.2,
+    "Monster in a Bottle": -4.5,
+    "Flame Avalanche": 5.7,
+    "Chain Lightning": -1.9,
+    "Resuscitation Potion": -2,
+    "Elixir of Immortality": 4,
+    "Ska Harpyformer": -1.6,
+    "Demon's Gate": 1.1,
+    "Cute Cheese": 4.9,
+    "Fire Bomb": -6.1,
+    "Divine Gift of the Guardian": -4.4,
+    "Pressed Skill": 2,
+    "Magic Lamp": -15.2,
+    "Wheels": -4.7,
+    "Juice": -2.9,
+    "The Yeeting": -5.5,
+    "Magnetic Potion": -13.4,
+    "Elixir of Quickness": 1.1
+  },
+  "mulliganStats": {
+    "games": 1360,
+    "mullRate": "22.2%",
+    "winAfterMull": "38.7%",
+    "winAfterKeep": "44%"
+  },
+  "heroEffectTiming": {
+    "Silent Water Mizune@hand:2-3": 5.2,
+    "Silent Water Mizune@hand:0-1": 7.2
+  },
+  "boardPairs": {
+    "Demon's Gate|Summoning Magic": 6,
+    "Alchemy|Demon's Gate": 7.4,
+    "Alchemy|Summoning Magic": 15,
+    "Magic Arts|Summoning Magic": 15,
+    "Demon's Gate|Magic Arts": 15,
+    "Ska Harpyformer|Summoning Magic": 15,
+    "Adventurousness|Pure Advantage Camel": 15,
+    "Adventurousness|Summoning Magic": 15,
+    "Metal Harpyformer|Summoning Magic": 15,
+    "Adventurousness|Metal Harpyformer": 15,
+    "Alchemy|Pure Advantage Camel": -13.5,
+    "Pure Advantage Camel|Ska Harpyformer": -15,
+    "Alchemy|Metal Harpyformer": -15
+  },
+  "protectionRules": {},
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.509,
+      "n": 110,
+      "values": {
+        "Deepsea Primordium": 0.314,
+        "Ska Harpyformer": -0.145,
+        "Hell Fox": -0.176,
+        "Candlestick Squire": 0.241
+      }
+    }
+  }
+}

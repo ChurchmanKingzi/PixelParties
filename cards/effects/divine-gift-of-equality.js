@@ -83,6 +83,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
+  // `reviveCard`: Braucht einen besiegten eigenen Helden (ohne Schul-
+  // Abilities) — ohne den ist die Karte als Suchziel/Handkarte wertlos;
+  // _cpu.js (reviveCardSituation) deckelt sie dann hart.
+  cpuMeta: { reviveCard: true },
 
   spellPlayCondition(gs, pi, engine) {
     if (getDeadOwnedTargetsNoSchool(gs, pi).length === 0) return false;

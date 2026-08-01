@@ -50,8 +50,14 @@ module.exports = {
     if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
     ps._oncePerGameUsed.add('divineGift');
 
-    // Rain animation (persists for rest of turn)
+    // Rain animation (persists for rest of turn). Als Bugreport: der
+    // Regen endete NIE (Overlay hängt am document.body, kein Stop-
+    // Event existierte — er überlebte sogar bis ins Menü). Der Stop
+    // läuft über den generischen queueTurnEndBroadcast-Vertrag: die
+    // Engine flusht ihn in switchTurn am Ende DIESES Zugs, egal wo
+    // diese Karte dann liegt.
     engine._broadcastEvent('divine_rain_start', { turn: gs.turn });
+    engine.queueTurnEndBroadcast('divine_rain_stop');
     await engine._delay(600);
 
     engine.log('divine_gift_of_rain', {
