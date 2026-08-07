@@ -247,6 +247,9 @@ function PuzzleCreator() {
       : [emptyPlayer(), emptyPlayer()]
   );
   const [areaZones, setAreaZones] = useState(saved?.areaZones || [[], []]);
+  // Doom Clock: Startzaehler je Seite (Als Vorgabe 5.8.). 0..19 —
+  // 20 waere sofortige Niederlage, das ergibt als AUFBAU keinen Sinn.
+  const [doomCounters, setDoomCounters] = useState(saved?.doomCounters || [0, 0]);
   const [hand, setHand] = useState(saved?.hand || []);
   const [oppHand, setOppHand] = useState(saved?.oppHand || []);
   const [puzzleName, setPuzzleName] = useState(saved?.puzzleName || '');
@@ -270,6 +273,14 @@ function PuzzleCreator() {
   // Collapse the filter sidebar to reclaim its width for a wider card
   // grid (3 → 5 columns), mirroring the deck builder's collapsible filters.
   const [puzzleFiltersCollapsed, setPuzzleFiltersCollapsed] = useState(false);
+  // Geometrie des Suchpanels, gespiegelt aus style.css:
+  //   .pz-search-panel   width: 580px
+  //   .pz-filter-sidebar width: 200px + 1px border-right
+  // Der Karten-Tooltip legt sich deckungsgleich ueber die Galerie, also
+  // ueber den Bereich RECHTS der Filterspalte.
+  const PZ_PANEL_W = 580;
+  const PZ_FILTER_W = 201;
+  const galleryLeft = puzzleFiltersCollapsed ? 0 : PZ_FILTER_W;
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editHp, setEditHp] = useState('');
@@ -511,10 +522,31 @@ function PuzzleCreator() {
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
-    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, hand, oppHand, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
-  }, [players, areaZones, hand, oppHand, puzzleName, meDebuffs, oppDebuffs]);
+    try { localStorage.setItem('pz-creator-state', JSON.stringify({ players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs })); } catch (_) {}
+  }, [players, areaZones, doomCounters, hand, oppHand, puzzleName, meDebuffs, oppDebuffs]);
 
   const puzzleIgnoreRef = useRef(false); // true after leaving — blocks inflight game_state updates
+
+  // ── Musik im Creator ──
+  // Editor: Erstellen-Thema. Testlauf: Probieren-Thema — ein
+  // Durchspielen bleibt ein Durchspielen, auch aus dem Creator heraus.
+  //
+  // ACHTUNG, Reihenfolge: hier stand vorher ein `if (!puzzleGameState)
+  // setBgmMode('puzzleCreate')` MIT `return () => setBgmMode('menu')`.
+  // React raeumt bei JEDER Dep-Aenderung erst auf und laesst dann den
+  // Rumpf laufen. Startete der Testlauf, feuerte also zuerst das
+  // Aufraeumen ('menu') und der Rumpf tat danach nichts, weil
+  // `puzzleGameState` gesetzt war — es blieb die Hauptmenue-Musik.
+  // Der Rumpf setzt den Modus jetzt IMMER, und das Aufraeumen laeuft
+  // nur noch beim tatsaechlichen Verlassen des Creators.
+  useEffect(() => {
+    if (!setBgmMode) return;
+    setBgmMode(puzzleGameState ? 'puzzleAttempt' : 'puzzleCreate');
+  }, [puzzleGameState, setBgmMode]);
+
+  const bgmRef = useRef(setBgmMode);
+  bgmRef.current = setBgmMode;
+  useEffect(() => () => { if (bgmRef.current) bgmRef.current('menu'); }, []);
 
   // ── Puzzle Battle: socket listeners ──
   useEffect(() => {
@@ -522,7 +554,7 @@ function PuzzleCreator() {
       if (!state.isPuzzle || puzzleIgnoreRef.current) return;
       puzzleRoomRef.current = state.roomId;
       setPuzzleGameState(state);
-      setBgmMode('puzzle');
+      // Musik steuert der Effekt oben aus `puzzleGameState`.
     };
     const onPuzzleError = (msg) => {
       notify('Puzzle error: ' + msg, 'error');
@@ -549,7 +581,8 @@ function PuzzleCreator() {
     // Return to creator
     setPuzzleGameState(null);
     puzzleRoomRef.current = null;
-    setBgmMode('menu');
+    // Musik: der Effekt oben schaltet beim Zuruecksetzen von
+    // `puzzleGameState` von selbst auf 'puzzleCreate'.
     if (result) {
       setValidated(success);
       notify(success ? '🧩 Puzzle validated! Export is now available.' : 'Puzzle not cleared — adjust and try again.', success ? 'success' : 'info');
@@ -559,6 +592,7 @@ function PuzzleCreator() {
   const handleReset = useCallback(() => {
     setPlayers([emptyPlayer(), emptyPlayer()]);
     setAreaZones([[], []]);
+    setDoomCounters([0, 0]);
     setHand([]);
     setOppHand([]);
     setMeDebuffs([]);
@@ -1391,6 +1425,11 @@ function PuzzleCreator() {
   // are puzzle-saved under `_creatureStatuses[hi-slot].changeCounter`).
   // Null when the open editor target isn't one of these cards.
   const [editChangeCounter, setEditChangeCounter] = useState(null);
+  // For the Waflav archetype: number of Evolution Counters the Hero starts
+  // the puzzle with. Lives on `hero._evolutionCounters` — same shape as
+  // Argos' Change Counters. Null when the open editor target isn't a
+  // Waflav form, so the section stays hidden.
+  const [editEvolutionCounter, setEditEvolutionCounter] = useState(null);
   // For Charm of Balance: number of Balance Counters this Equipment starts
   // the puzzle with. Saved under `_creatureStatuses[hi-slot].balance` and
   // applied server-side as `inst.counters.balance` (alongside headCounter
@@ -1417,6 +1456,14 @@ function PuzzleCreator() {
   // flag isn't reachable from the client; mirrors the convention used
   // for the Head-Counter / Sleeping-Beauty editors above.
   const COUNTER_CONSUMER_HEROES = new Set(['Argos, the Eye of the Cosmos']);
+  // Waflav base form + all five Ascended forms. Matched via the card
+  // database's `archetype` field rather than a hard-coded name list, so a
+  // future sixth form works without touching the editor.
+  const isWaflavHeroName = (name) => {
+    if (!name) return false;
+    const cd = getCard(name);
+    return !!cd && cd.archetype === 'Waflav';
+  };
   const COUNTER_CONSUMER_CREATURES = new Set([
     'Analyzer from the Cosmic Depths',
     'Gatherer from the Cosmic Depths',
@@ -1445,6 +1492,9 @@ function PuzzleCreator() {
       // heroes so the editor section stays hidden.
       setEditChangeCounter(COUNTER_CONSUMER_HEROES.has(h.name)
         ? (h._changeCounters || 0)
+        : null);
+      setEditEvolutionCounter(isWaflavHeroName(h.name)
+        ? (h._evolutionCounters || 0)
         : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
@@ -1548,6 +1598,14 @@ function PuzzleCreator() {
           p.heroes[hi]._changeCounters = editChangeCounter;
         } else {
           delete p.heroes[hi]._changeCounters;
+        }
+        // Waflav: Evolution Counters decide which Ascended forms are
+        // reachable, so authoring them is what makes a Waflav puzzle
+        // playable at all (4 counters = Deep-Drowned on turn 1).
+        if (editEvolutionCounter != null && editEvolutionCounter > 0) {
+          p.heroes[hi]._evolutionCounters = editEvolutionCounter;
+        } else {
+          delete p.heroes[hi]._evolutionCounters;
         }
       }
       return p;
@@ -1655,7 +1713,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editBalanceCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editBalanceCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1694,12 +1752,12 @@ function PuzzleCreator() {
     }
     // Send puzzle to server — starts a real battle against a CPU opponent
     puzzleIgnoreRef.current = false;
-    socket.emit('start_puzzle', { players, areaZones, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs] });
-  }, [players, areaZones, hand, oppHand, meDebuffs, oppDebuffs, notify]);
+    socket.emit('start_puzzle', { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs] });
+  }, [players, areaZones, doomCounters, hand, oppHand, meDebuffs, oppDebuffs, notify]);
 
   const handleExport = useCallback(() => {
     if (!validated) return;
-    const data = { players, areaZones, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
+    const data = { players, areaZones, doomCounters, hand, oppHand, playerDebuffs: [meDebuffs, oppDebuffs], version: 1 };
     socket.emit('export_puzzle', data);
   }, [validated, players, areaZones, hand, oppHand, meDebuffs, oppDebuffs]);
 
@@ -2244,6 +2302,25 @@ function PuzzleCreator() {
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
         <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
           placeholder="Puzzle name..." style={{ width: 180, padding: '4px 10px', fontSize: 11, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
+        {/* Doom Clock: Startzaehler je Seite. Erscheint nur, wenn
+            ueberhaupt eine Uhr in einer Area-Zone liegt (Als Vorgabe
+            5.8.). Max 19 — 20 waere sofortige Niederlage und als
+            AUFBAU sinnlos. */}
+        {[0, 1].map((si) => (
+          (areaZones[si] || []).includes('Doom Clock') ? (
+            <label key={'dcin' + si} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#ff8f8f' }}>
+              ☠️ {si === 0 ? 'Me' : 'Opp'}
+              <input className="input" type="number" min="0" max="19"
+                value={doomCounters[si] ?? 0}
+                onChange={(e) => {
+                  const v = Math.max(0, Math.min(19, parseInt(e.target.value, 10) || 0));
+                  setDoomCounters(prev => { const n = [...prev]; n[si] = v; return n; });
+                  setValidated(false);
+                }}
+                style={{ width: 54, padding: '4px 6px', fontSize: 11, borderColor: 'rgba(220,70,70,.5)', color: '#ff8f8f' }} />
+            </label>
+          ) : null
+        ))}
         <div style={{ flex: 1 }} />
         <button className="btn btn-danger" onClick={handleReset} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>↺ RESET</button>
         <button className="btn" onClick={handleVerify} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
@@ -2590,8 +2667,24 @@ function PuzzleCreator() {
       {/* ── Card Tooltip Panel ── */}
       {tooltipCard && (
         <div className="board-tooltip" style={tooltipSide === 'right'
-          ? { left: 580, right: 'auto', borderLeft: '1px solid var(--accent)', borderRight: 'none' }
-          : { left: 220, right: 'auto', borderRight: '1px solid var(--accent)', borderLeft: 'none', boxShadow: '4px 0 20px rgba(0,0,0,.8)' }
+          ? { left: PZ_PANEL_W, right: 'auto', borderLeft: '1px solid var(--accent)', borderRight: 'none' }
+          : {
+              // Deckungsgleich mit der Card Gallery statt "ungefaehr
+              // darueber": die Galerie beginnt exakt hinter der
+              // Filterspalte (200px + 1px Rahmen) und endet mit dem
+              // Suchpanel bei 580px. Fruehere Werte waren `left: 220` bei
+              // fester Breite 360 aus `.board-tooltip` — der rechte Rand
+              // sass damit richtig, der linke ~19px zu weit rechts, und
+              // ein Streifen Galerie schaute darunter hervor.
+              // Bei eingeklappten Filtern faengt die Galerie bei 0 an,
+              // dann waechst der Tooltip entsprechend mit.
+              left: galleryLeft,
+              width: PZ_PANEL_W - galleryLeft,
+              right: 'auto',
+              borderRight: '1px solid var(--accent)',
+              borderLeft: 'none',
+              boxShadow: '4px 0 20px rgba(0,0,0,.8)',
+            }
         }>
           <CardTooltipContent card={tooltipCard}>
             {tooltipCard.cardType === 'Ascended Hero' && ascensionMap[tooltipCard.name] &&
@@ -2806,6 +2899,43 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Number of cards Charm of Balance lets the player draw on activation.
+                </div>
+              </div>
+            )}
+            {/* Waflav Evolution Counter editor — visible for the base Hero
+                and all five Ascended forms. The counter is the archetype's
+                whole resource: it pays for every Ascension (1 for
+                Stormkissed up to 4 for Deep-Drowned) and Descending places
+                more back. Saved as `hero._evolutionCounters`, which the
+                shared Waflav helpers read directly. */}
+            {editEvolutionCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🧬 Evolution Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editEvolutionCounter || 0) <= 0}
+                    onClick={() => setEditEvolutionCounter(Math.max(0, (editEvolutionCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editEvolutionCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditEvolutionCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#8fffc4' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditEvolutionCounter((editEvolutionCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4
                 </div>
               </div>
             )}

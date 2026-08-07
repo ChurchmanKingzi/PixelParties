@@ -169,4 +169,12 @@ module.exports = {
     engine.sync();
     return true;
   },
+
+  cpuMeta: {
+    // Welche Statuszustaende legt diese Karte an? Deckneutraler
+    // Vertrag — Formen, die Zaehler aus einem Status ziehen
+    // (Flamebathed/Burn, Swampborne/Poison), fragen darueber ab,
+    // ob ein passender Applier zur Hand ist. Kartentext: "Choose a target your opponent controls and Burn it."
+    appliesStatuses: ['burned'],
+  },
 };

@@ -43,6 +43,10 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
     if (inst.heroIdx !== heroIdx) continue;
     // Artifacts attached on the hero column we currently control.
     if ((inst.controller ?? inst.owner) !== pi) continue;
+    // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY und
+    // duerfen Toras' Artefakt-Zaehlung deshalb nicht erhoehen
+    // (Als Ruling 5.8.).
+    if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
     names.add(inst.name);
@@ -133,6 +137,8 @@ module.exports = {
       const cd = ctx._engine.getEffectiveCardData(enteringCard)
         || ctx._engine._getCardDB()[enteringCard.name];
       if (!cd || !hasCardType(cd, 'Artifact')) return;
+      // Neuberechnung ist unkritisch: die Zaehlfunktion oben laesst
+      // als Ability zaehlende Karten bereits aus.
 
       applyAtkBonus(ctx);
     },
@@ -150,6 +156,8 @@ module.exports = {
       const cd = ctx._engine.getEffectiveCardData(leavingInst)
         || ctx._engine._getCardDB()[leavingInst?.name];
       if (!cd || !hasCardType(cd, 'Artifact')) return;
+      // Neuberechnung ist unkritisch: die Zaehlfunktion oben laesst
+      // als Ability zaehlende Karten bereits aus.
 
       applyAtkBonus(ctx, leavingInst?.id);
     },

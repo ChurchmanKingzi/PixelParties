@@ -111,6 +111,11 @@ function getStealableCreatures(engine, playerIdx) {
 }
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
+  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
+  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
+  takesControlOfTargets: true,
+
   isTargetingArtifact: true,
   // The card's cost in cards.json (5) is the BASE cost — text says "this
   // Artifact's Cost is multiplied by the Creature's original level". The

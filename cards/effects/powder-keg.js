@@ -136,56 +136,72 @@ module.exports = {
   },
 
   /**
-   * CPU sanity gate. Powder Keg's placement on its own is a net loss
-   * for the playing side — it costs gold + a hand card, fills an opp
-   * Support slot the opp could've used (mild positive), AND immediately
-   * feeds opp's on-creature-placed hooks (Ingo's gold, Maya's HP buff,
-   * Alice's buff, etc.) — all clearly negative deltas. The value comes
-   * later when the 1-HP body dies and AoEs the host hero's row. Refuse
-   * the play unless at least one opp hero has a free slot AND at least
-   * one Creature already sitting in their row that the AoE would hit.
+   * CPU-Legalitaets-Gate. NICHT mehr: Wert-Urteil.
+   *
+   * ── Was hier frueher stand und warum es weg ist (Als Ruling 5.8.) ──
+   * Die alte Fassung verlangte, dass in der Zielreihe SCHON eine
+   * Creature steht, sonst lohne der Todes-AoE nicht. Das ist fuer
+   * Powder Kegs urspruengliches Zuhause (Shadows over Blackport)
+   * richtig — und fuer "Morph and Kill!" genau verkehrt herum: dort ist
+   * Powder Keg ein ZIELSPENDER. Spielt der Gegner keine Creatures, hat
+   * Waflav nichts zum Toeten und bekommt keinen Evolution Counter; das
+   * 1-HP-Fass ist dann der einzige Weg, sich selbst ein weiches Ziel zu
+   * besorgen. Das alte Gate lehnte also ausgerechnet in der Lage ab,
+   * fuer die die Karte im Deck steckt (gemessen: 0.8% Einsatzquote,
+   * 273 Handlimit-Abwuerfe in 500 Spielen).
+   *
+   * Uebrig bleibt nur die Legalitaet — gibt es ueberhaupt einen Platz?
+   * Ob die Platzierung sich lohnt, entscheiden ab jetzt `alwaysCommit`
+   * (Sofortbewertung sieht den Ertrag strukturell nicht) und die
+   * gelernte Zielwahl unten.
    */
   cpuShouldPlay(engine, pi) {
-    const oppIdx = pi === 0 ? 1 : 0;
-    const oppPs = engine.gs.players[oppIdx];
-    if (!oppPs) return false;
-    const cardDB = engine._getCardDB();
-    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-      const hero = oppPs.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      const supZones = oppPs.supportZones?.[hi] || [];
-      const hasFreeSlot = supZones.slice(0, 3).some(s => (s || []).length === 0);
-      if (!hasFreeSlot) continue;
-      let creatures = 0;
-      for (let si = 0; si < 3; si++) {
-        for (const cn of (supZones[si] || [])) {
-          const cd = cardDB[cn];
-          if (cd && hasCardType(cd, 'Creature')) creatures++;
-        }
-      }
-      if (creatures >= 1) return true;
-    }
-    return false;
+    return getOppPlacementTargets(engine.gs, pi).length > 0;
   },
 
   /**
-   * CPU target picker for the opp-Hero prompt. Picks the Hero whose
-   * row would generate the highest AoE payoff — sum of (min(currentHp,
-   * 150)) over the row's living Creatures. Capping at 150 reflects
-   * that overkill doesn't matter (1-HP victims and 500-HP victims both
-   * count as one kill for damage-budget purposes). Tie-break on raw
-   * creature count, then on the smallest existing free-slot count
-   * (fewer free slots = more crowded row = more AoE coverage).
+   * CPU-Zielwahl: WELCHER gegnerische Held bekommt das Fass?
    *
-   * Falls through to the generic CPU brain on non-target prompts.
+   * Zuerst der gelernte Kanal (`targetPriors['Powder Keg']`), dann als
+   * Rueckfallebene die alte Heuristik. Al vermutet den Helden mit den
+   * meisten Creatures bzw. den, der ueber das Spiel die meisten
+   * beschworen hat — beides steht dem Lerner jetzt als Tag zur
+   * Verfuegung (`row:creatures:*`, `row:hosted:*` in
+   * classifyTargetTags), aber als HYPOTHESE, nicht als Verdrahtung:
+   * bestaetigen muss es die Messung, und sie kann es auch widerlegen.
+   * Ohne Profil (und im Training, wo Profile abgeschaltet sind) sorgt
+   * targetPickDecision ausserdem fuer die Exploration, aus der der
+   * Kontrast ueberhaupt erst entsteht.
+   *
+   * Der Picker bietet je Held einen `hero-`-Eintrag UND je freiem Slot
+   * einen `slot-`-Eintrag an. Gelernt und entschieden wird auf der
+   * HELDEN-Ebene — welcher Slot es innerhalb der Reihe wird, ist fuer
+   * den AoE gleichgueltig (er trifft die uebrigen Slots derselben
+   * Reihe) und wuerde den Tag-Raum nur verwaessern.
+   *
+   * Faellt bei Nicht-Ziel-Prompts auf das generische CPU-Hirn zurueck.
    */
   cpuResponse(engine, kind, payload) {
     if (kind !== 'target' && kind !== 'effectTarget') return undefined;
-    const { validTargets } = payload || {};
+    const { validTargets, config, playerIdx } = payload || {};
     if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
     const cardDB = engine._getCardDB();
     const DAMAGE_CAP = 150;
-    const scored = validTargets.map(t => {
+
+    // Nur die Helden-Eintraege; gibt es keine (theoretisch: nur
+    // Slot-Ziele), bleibt die volle Liste.
+    const heroTargets = validTargets.filter(t => t && t.type === 'hero');
+    const pool = heroTargets.length > 0 ? heroTargets : validTargets;
+
+    // ── Gelernter Kanal zuerst ──
+    try {
+      const pi = playerIdx != null ? playerIdx : engine._cpuPlayerIdx;
+      const dp = require('./_deck-profile');
+      const learned = dp.targetPickDecision(engine, pi, CARD_NAME, pool, config || {});
+      if (Array.isArray(learned) && learned.length > 0) return learned;
+    } catch { /* Profil fehlt oder ist stumm — Heuristik uebernimmt */ }
+
+    const scored = pool.map(t => {
       const ps = engine.gs.players[t.owner];
       const supZones = ps?.supportZones?.[t.heroIdx] || [];
       let payoff = 0;
@@ -266,9 +282,14 @@ module.exports = {
     // arrival) while skipping host-incapacitation gates — important
     // because Powder Keg's text explicitly allows placement onto dead
     // / Frozen / Stunned / Negated Heroes.
+    // `crossSidePlacement: true` ist der Opt-in fuer die zentrale Sperre
+    // in `summonCreatureWithHooks`: NUR diese Stelle darf eine
+    // `placesOnOpponentBoard`-Creature setzen, und sie setzt sie
+    // ausschliesslich auf die Gegnerseite (hostOwner stammt aus der
+    // Zielliste, die per Konstruktion nur gegnerische Eintraege enthaelt).
     const placed = await engine.summonCreatureWithHooks(
       CARD_NAME, hostOwner, hostHeroIdx, freeSlot,
-      { source: CARD_NAME, isPlacement: true },
+      { source: CARD_NAME, isPlacement: true, crossSidePlacement: true },
     );
     if (!placed?.inst) return { aborted: true };
 
@@ -328,6 +349,16 @@ module.exports = {
         if (inst.heroIdx !== hostHeroIdx) continue;
         if (inst.zoneSlot === ownSlot) continue;
         if (inst.faceDown) continue;
+        // Schon TOT? Nicht mehr treffen. Die Engine feuert die
+        // Todes-Hooks, waehrend die sterbende Instanz noch getrackt ist
+        // (sie soll ihren eigenen Leave-Hook noch bekommen) — von hier
+        // aus sieht ein Todes-AoE also auch Leichen. Der Riegel in
+        // `processCreatureDamageBatch` faengt das inzwischen ab; diese
+        // Zeile verhindert schon den sinnlosen Batch davor und trifft
+        // ausserdem den Kartentext genauer: eine zerstoerte Karte ist
+        // keine "Creature in the Support Zone" mehr.
+        if (inst._deathResolved) continue;
+        if ((inst.counters?.currentHp ?? 1) <= 0) continue;
         const cd = inst.counters?._cardDataOverride || cardDB[inst.name]; // token-override-aware (Biomancy Token — Als AoE-Report)
         if (!cd || !hasCardType(cd, 'Creature')) continue;
         victims.push(inst);
@@ -375,5 +406,24 @@ module.exports = {
       });
       engine.sync();
     },
+  },
+
+  cpuMeta: {
+    /**
+     * Als Vorgabe (5.8.): "stell Powder Keg direkt auf Always commit".
+     *
+     * Die Sofortbewertung kann diese Karte nicht bepreisen. Sie sieht
+     * −4 Gold, −1 Handkarte und einen GEGNERISCHEN Support-Slot, der
+     * sich fuellt — alles negativ, teils sogar doppelt (fremde
+     * On-Place-Hooks wie Ingos Gold feuern mit). Der gesamte Ertrag
+     * faellt spaeter an: der AoE beim Tod des Fasses, und in "Morph and
+     * Kill!" das blosse VORHANDENSEIN eines 1-HP-Ziels, an dem Waflav
+     * seinen Evolution Counter holt. Beides liegt jenseits des
+     * Bewertungshorizonts — dieselbe Klasse wie Perfect Disguise.
+     *
+     * `cpuShouldPlay` haelt die Legalitaet weiterhin fest, der Planer
+     * prueft die Goldkosten ohnehin.
+     */
+    alwaysCommit: true,
   },
 };

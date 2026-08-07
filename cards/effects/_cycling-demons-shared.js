@@ -156,7 +156,11 @@ async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
     }
   };
   addPile(pi);
-  addPile(oppIdx);
+  // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner einen
+  // wirksamen Boris, faellt SEINE Ablage als Quelle weg — die eigene
+  // bleibt nutzbar. Bleibt gar nichts uebrig, greift der
+  // "keine Eintraege"-Ausstieg direkt darunter.
+  if (!engine.borisHidesOpponentSide?.(pi)) addPile(oppIdx);
   if (entries.length === 0) return;
 
   const selected = await ctx.promptCardGallery(entries, {

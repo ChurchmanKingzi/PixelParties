@@ -30,9 +30,13 @@ module.exports = {
   },
 
   /** Compute all valid targets on the board. */
-  getValidTargets(gs, playerIdx) {
+  getValidTargets(gs, playerIdx, engineArg) {
     const targets = [];
     const cardDB = _getCardDB();
+    // `getValidTargets` bekommt die Engine nicht immer mit — Fallback
+    // ueber die Referenz am Spielzustand (gleiche Konvention wie
+    // Capture Net).
+    const engine = engineArg || gs._engineRef || null;
     for (let pi = 0; pi < 2; pi++) {
       const ps = gs.players[pi];
       // First-turn protection: cannot target opponent's abilities for removal (generic rule)
@@ -64,6 +68,13 @@ module.exports = {
             }
           }
         }
+        // Karten, die in einer SUPPORT-Zone liegen, dort aber als Ability
+        // zaehlen (Cloak of Edge) — zentral ueber den Sammler, damit
+        // kuenftige Sonderfaelle automatisch mitkommen (Als Ruling 5.8.).
+        for (const t of (engine?.getAbilityTargets?.(pi) || [])) {
+          if (t.zoneKind !== 'support') continue;
+          targets.push(t);
+        }
       }
       // Artifact-style support-zone targets. Includes standard equipment,
       // support-zone Heroes (Initiation Ritual), and the Artifact-Creature
@@ -77,6 +88,9 @@ module.exports = {
           for (const cardName of cards) {
             const script = loadCardEffect(cardName);
             const cd = cardDB[cardName];
+            // Zaehlt hier als Ability -> wurde oben schon als
+            // Ability-Ziel erfasst, nicht doppelt aufnehmen.
+            if (engine?.countsAsAbilityInZone?.(cardName, { zone: 'support' })) continue;
             const isEquip = script?.isEquip
               || (cd && (cd.subtype || '').toLowerCase() === 'equipment')
               || (cd && (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero'))

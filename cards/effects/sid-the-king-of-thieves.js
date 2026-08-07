@@ -47,6 +47,10 @@
 const CARD_NAME = 'Sid, the King of Thieves';
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 1): nimmt Karten aus dem GEGNERDECK auf die eigene Hand.
+  // Bei wirksamem Boris beim Gegner nicht aktivierbar.
+  stealsOpponentCards: true,
+
   // ── CPU: Steal-Auswahl ────────────────────────────────────────────
   // Sids Wert ist EXTREM matchup-abhängig — statt eines eigenen
   // Lernkanals konsumiert er das trainierte Profil des GEGNER-Decks:

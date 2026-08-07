@@ -28,7 +28,7 @@
 //  Creature. (TEST_IMMEDIATE below resolves it on play for testing.)
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Ladder to the Sky';
 
@@ -59,7 +59,7 @@ function buildLadderGallery(engine, pi, maxLevel) {
   for (const cn of (ps?.mainDeck || [])) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     // `pileSide: 'deck'` so "level in your hand" reducers (Ruin Mourner)
     // don't apply to a deck Creature.

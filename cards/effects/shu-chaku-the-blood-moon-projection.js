@@ -34,6 +34,8 @@ function _findOwnArtifactInstances(engine, pi) {
     if (inst.zone !== 'support') continue;
     if ((inst.controller ?? inst.owner) !== pi) continue;
     const cd = cardDB[inst.name];
+    // Zaehlt in der Support-Zone als Ability -> kein Artifact-Ziel.
+    if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
     out.push(inst);
   }

@@ -99,4 +99,12 @@ module.exports = {
     engine.log('poison_applied', { target: target.cardName, stacks: 2, by: 'Poison Vial' });
     engine.sync();
   },
+
+  cpuMeta: {
+    // Welche Statuszustaende legt diese Karte an? Deckneutraler
+    // Vertrag — Formen, die Zaehler aus einem Status ziehen
+    // (Flamebathed/Burn, Swampborne/Poison), fragen darueber ab,
+    // ob ein passender Applier zur Hand ist. Kartentext: "Choose a target and inflict 2 Stacks of Poison to it."
+    appliesStatuses: ['poisoned'],
+  },
 };

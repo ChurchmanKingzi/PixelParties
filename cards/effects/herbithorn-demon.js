@@ -9,4 +9,9 @@
 
 const { buildDemonHooks } = require('./_cycling-demons-shared');
 
-module.exports = buildDemonHooks('Herbithorn Demon');
+const _herbithorn = buildDemonHooks('Herbithorn Demon');
+// BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt aus der Ablage EINES BELIEBIGEN
+// Spielers auf die eigene Hand, also auch aus der des Gegners.
+// Nachtraeglich gesetzt, weil der Export aus einer Fabrik kommt.
+_herbithorn.stealsFromEitherSide = true;
+module.exports = _herbithorn;

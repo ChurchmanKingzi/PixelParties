@@ -204,6 +204,13 @@ module.exports = {
     // ── Step 7: mutate state ─────────────────────────────────────────────
     // Opp's gifted card carries `originalOwner = pi` so its eventual
     // discard / deleted disposition routes back to the activator.
+    // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
+    if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
+          { byPi: pi, count: 1, sourceName: 'Birthday Present' })) {
+      engine.log('birthday_present_negated', { player: gs.players[pi]?.username });
+      engine.sync();
+      return;
+    }
     oppPs.hand.push(oppChoice);
     const oppInst = engine._trackCard(oppChoice, oppIdx, 'hand');
     oppInst.originalOwner = pi;

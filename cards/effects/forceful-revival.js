@@ -29,7 +29,7 @@
 //      hit. If it kills the user, that is intended.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Forceful Revival';
 
@@ -46,7 +46,7 @@ function _eligibleCreatureNames(engine, ps, maxLevel, pi) {
   for (const cn of (ps.discardPile || [])) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     // Effective level — Whoolmoth-style `reduceCardLevel` rebates
     // / Phatnir's Cool-Stack discount push the printed level down,

@@ -170,7 +170,16 @@ function loadCardEffect(cardName) {
         // bedeutungsloses `isPassive: true` trug. Beim Aufräumen dieses Flags
         // (Vertrags-Sweep 1.8.) fiel Terror deshalb komplett aus der Ladung.
         // Jetzt trägt der ECHTE Vertrag das Skript.
-        || !!mod.forceEndTurnOnUniqueResolves;
+        || !!mod.forceEndTurnOnUniqueResolves
+        // Area-Aktiveffekte. `areaEffect` + `onAreaEffect` werden von
+        // `getActivatableAreas` / `activateAreaEffect` ausgewertet, standen
+        // aber in KEINER Erkennungsliste. Die bestehenden Area-Karten
+        // ueberlebten den Filter nur, weil sie NEBENBEI Hooks tragen — eine
+        // Area, deren ganzer Inhalt der aktivierbare Effekt ist, fiel
+        // komplett aus der Ladung und war im Spiel wirkungslos. Exakt die
+        // Klasse, die der Terror-Kommentar direkt darueber beschreibt.
+        || !!mod.areaEffect
+        || typeof mod.onAreaEffect === 'function';
       if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;

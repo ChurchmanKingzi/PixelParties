@@ -27,6 +27,12 @@
 const CARD_NAME = 'Sculpture Theft';
 
 module.exports = {
+  // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt eine beliebige gefrorene Creature auf die eigene Hand.
+  // Trifft jede gefrorene Creature, beide Seiten — deshalb NICHT sperren, sondern bei
+  // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange
+  // es eigene legale Ziele gibt, bleibt der Effekt nutzbar.
+  stealsFromEitherSide: true,
+
   isReaction: true,
   canActivate: () => false,
 
@@ -66,10 +72,15 @@ module.exports = {
 
   resolve: async (engine, pi, _selectedIds, _validTargets, _chain, _myIdx) => {
     const candidates = [];
+    // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner
+    // einen wirksamen Boris, faellt SEINE Seite als Quelle weg — die
+    // eigene bleibt waehlbar.
+    const nurEigene = engine.borisHidesOpponentSide?.(pi) === true;
     for (const inst of engine.cardInstances) {
       if (inst.zone !== 'support') continue;
       if (inst.faceDown) continue;
       if (!inst.counters?.frozen) continue;
+      if (nurEigene && inst.owner !== pi) continue;
       candidates.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
         type: 'equip',

@@ -70,6 +70,15 @@ function buildAbilityTargets(engine, pi) {
   const heroIdxs = permanentlyControlledHeroIndices(ps);
   const targets = [];
   for (const hi of heroIdxs) {
+    // Support-Zonen-Karten, die dort als Ability zaehlen (Cloak of Edge)
+    // — zentral ueber den Sammler (Als Ruling 5.8.).
+    for (const t of (engine.collectSupportZoneAbilities?.(pi, hi) || [])) {
+      targets.push({
+        id: `equip-${pi}-${hi}-${t.slotIdx}`, type: 'equip',
+        owner: pi, heroIdx: hi, slotIdx: t.slotIdx,
+        cardName: t.cardName, level: 1,
+      });
+    }
     const abZones = ps.abilityZones?.[hi] || [];
     for (let si = 0; si < abZones.length; si++) {
       const slot = abZones[si] || [];

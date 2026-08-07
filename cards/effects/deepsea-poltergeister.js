@@ -50,6 +50,9 @@ module.exports = {
         if (inst.zone !== 'support') continue;
         if (inst.faceDown) continue;
         const cd = cardDB[inst.name];
+        // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY,
+        // nicht mehr als Artifact (Als Ruling 5.8.).
+        if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
         if (!cd || !hasCardType(cd, 'Artifact')) continue;
         const ownerPi = inst.controller ?? inst.owner;
         targets.push({

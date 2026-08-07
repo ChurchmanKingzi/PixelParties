@@ -70,6 +70,30 @@ function _countBuddies(engine, pi) {
 }
 
 module.exports = {
+  /**
+   * CPU-Antwort auf die "Buddy beschwoeren?"-Abfrage.
+   *
+   * WARUM NOETIG (Als Befund 5.8.: "Inya beschwoert bei der CPU nicht"):
+   * Der heuristische Standard fuer ABBRECHBARE confirm-Abfragen ist
+   * ABLEHNEN (`_cpu.js`: "Confirm-cancellable default: decline"). Die
+   * MCTS-Kandidatenliste bietet zwar zusaetzlich "confirm" an — waehrend
+   * einer Reaktionskette und im Puzzle laeuft aber kein MCTS, also greift
+   * der Standard und Inya lehnte immer ab.
+   *
+   * Als Vorgabe: "Sie SOLLTE immer beschwoeren, wenn sie kann." Der
+   * Hook wird nur erreicht, wenn `onSpellDiscard` die Vorbedingungen
+   * schon geprueft hat (freie Support-Zone vorhanden), ein Ja ist hier
+   * also immer ausfuehrbar.
+   *
+   * Der GLOBALE Standard bleibt bewusst unangetastet — er ist fuer
+   * "may"-Abfragen richtig, deren Nutzen nicht feststeht.
+   */
+  cpuResponse(engine, promptType, promptData) {
+    if (promptType !== 'generic') return undefined;
+    if (promptData?.type !== 'confirm') return undefined;
+    return { confirmed: true };
+  },
+
   activeIn: ['hero'],
   // Damage shield is a passive — keep it active even when Inya is
   // frozen / stunned / negated.

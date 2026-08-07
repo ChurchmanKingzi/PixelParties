@@ -1035,7 +1035,13 @@ function PlayScreen() {
   // Sync battle music state. Puzzle / tutorial games use bgm_puzzle.
   useEffect(() => {
     if (!gameState) setBgmMode('menu');
-    else if (gameState.isPuzzle || gameState.isTutorial) setBgmMode('puzzle');
+    // Ergebnis zuerst: sobald es steht, laeuft das Sieg- bzw.
+    // Niederlage-Thema, egal welcher Spielmodus dahintersteckt.
+    else if (gameState.result && typeof gameState.result.winnerIdx === 'number') {
+      setBgmMode(gameState.result.winnerIdx === gameState.myIndex ? 'win' : 'defeat');
+    }
+    else if (gameState.isPuzzle) setBgmMode('puzzleAttempt');
+    else if (gameState.isTutorial) setBgmMode('tutorial');
     // Gegnerspezifisches Thema, wenn der Server eines gemeldet hat
     // (nur CPU-Kämpfe; PvP behält das generische Kampfthema).
     else {
@@ -1816,7 +1822,23 @@ const BGM_FILES = {
   login:  '/music/bgm_login.wav',
   menu:   '/music/bgm_menu.wav',
   battle: '/music/bgm_battle.mp3',
+  // `puzzle` ist seit 3.8. UNBENUTZT: Puzzles haben zwei eigene Stuecke
+  // (Editor / Durchspielen) und das Tutorial sein eigenes. Der Eintrag
+  // bleibt als Rueckfallebene stehen, falls irgendwo noch 'puzzle'
+  // gesetzt wird — dann klingt es wenigstens nach etwas.
   puzzle: '/music/bgm_puzzle.mp3',
+  tutorial: '/music/bgm_tutorial.ogg',
+  // Dunklere Fassung des Tutorial-Themes; laeuft, solange Antonia auf
+  // der Tutorial-Buehne steht.
+  tutorialAntonia: '/music/bgm_tutorial_antonia.ogg',
+  puzzleCreate:  '/music/bgm_puzzle_erstellen.ogg',
+  puzzleAttempt: '/music/bgm_puzzle_probieren.ogg',
+  // Ergebnis-Themen: laufen loopend im End-of-Battle-Screen, solange das
+  // Ergebnis steht. `win` dient bei Puzzle-/Tutorial-Siegen zugleich als
+  // Fanfare — dort ersetzt es den kurzen victory-SFX, statt zusaetzlich
+  // zu ihm zu spielen.
+  win:    '/music/bgm_win.ogg',
+  defeat: '/music/bgm_defeat.ogg',
   shop:   '/music/bgm_shop.ogg',
 };
 const _mkBgm = (url) => (typeof Audio !== 'undefined' ? new Audio(url) : null);
@@ -1824,9 +1846,19 @@ const _bgmLogin = _mkBgm(BGM_FILES.login);
 const _bgmMenu = _mkBgm(BGM_FILES.menu);
 const _bgmBattle = _mkBgm(BGM_FILES.battle);
 const _bgmPuzzle = _mkBgm(BGM_FILES.puzzle);
+const _bgmTutorial = _mkBgm(BGM_FILES.tutorial);
+const _bgmTutorialAntonia = _mkBgm(BGM_FILES.tutorialAntonia);
+const _bgmPuzzleCreate = _mkBgm(BGM_FILES.puzzleCreate);
+const _bgmPuzzleAttempt = _mkBgm(BGM_FILES.puzzleAttempt);
+const _bgmWin = _mkBgm(BGM_FILES.win);
+const _bgmDefeat = _mkBgm(BGM_FILES.defeat);
 const _bgmShop = _mkBgm(BGM_FILES.shop);
-const _bgmTracks = { login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, shop: _bgmShop };
-for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmShop]) {
+const _bgmTracks = {
+  login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, tutorial: _bgmTutorial, tutorialAntonia: _bgmTutorialAntonia,
+  puzzleCreate: _bgmPuzzleCreate, puzzleAttempt: _bgmPuzzleAttempt,
+  win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop,
+};
+for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmTutorial, _bgmTutorialAntonia, _bgmPuzzleCreate, _bgmPuzzleAttempt, _bgmWin, _bgmDefeat, _bgmShop]) {
   if (t) {
     t.loop = true;
     // Start from the player's persisted volume (0 if they muted last session)
@@ -2043,24 +2075,42 @@ function MusicManager({ bgmMode }) {
       currentTrack.current = target; // record intent so a later same-target call still no-ops cleanly
       return;
     }
-    // Fade out whichever track is currently playing.
-    const fadeOut = Object.entries(_bgmTracks)
-      .find(([, t]) => t && t !== fadeIn && !t.paused)?.[1] || null;
+    // Fade out EVERY other audible track, nicht nur den ersten Treffer.
+    //
+    // Hier stand `.find(...)` — also genau EIN Ausblenden pro Wechsel.
+    // Ein Ausblendvorgang laeuft 8 x 40 ms; wechselt der Modus in dieser
+    // Zeit erneut (und beim Puzzle-Test tun das gleich mehrere
+    // useEffects nacheinander), ist der vorige Track noch NICHT pausiert.
+    // Der naechste Wechsel greift sich dann irgendeinen davon und laesst
+    // die uebrigen dauerhaft weiterlaufen — so klangen bgm_puzzle und
+    // bgm_puzzle_probieren gleichzeitig.
+    const fadeOuts = Object.values(_bgmTracks).filter(t => t && t !== fadeIn && !t.paused);
 
     const targetVol = getTargetVol();
 
-    // Quick crossfade
-    if (fadeOut && !fadeOut.paused) {
-      const fo = fadeOut;
-      const origVol = fo.volume;
+    // Quick crossfade — je Element mit eigenem Timer-Riegel, damit zwei
+    // Ausblendungen desselben Tracks sich nicht gegenseitig die
+    // Lautstaerke verstellen.
+    for (const fo of fadeOuts) {
+      if (fo._ppFadeTimer) { clearInterval(fo._ppFadeTimer); fo._ppFadeTimer = null; }
+      const origVol = fo._ppBaseVol != null ? fo._ppBaseVol : fo.volume;
+      fo._ppBaseVol = origVol;
       let step = 0;
-      const fadeInterval = setInterval(() => {
+      fo._ppFadeTimer = setInterval(() => {
         step++;
         fo.volume = Math.max(0, origVol * (1 - step / 8));
-        if (step >= 8) { clearInterval(fadeInterval); fo.pause(); fo.volume = origVol; fo.currentTime = 0; }
+        if (step >= 8) {
+          clearInterval(fo._ppFadeTimer); fo._ppFadeTimer = null;
+          fo.pause(); fo.volume = origVol; fo.currentTime = 0;
+          delete fo._ppBaseVol;
+        }
       }, 40);
     }
 
+    // Der eintretende Track koennte selbst gerade ausblenden — Timer
+    // abraeumen, sonst dreht die alte Schleife ihn wieder herunter.
+    if (fadeIn._ppFadeTimer) { clearInterval(fadeIn._ppFadeTimer); fadeIn._ppFadeTimer = null; }
+    delete fadeIn._ppBaseVol;
     fadeIn.volume = 0;
     fadeIn.play().then(() => {
       let step = 0;

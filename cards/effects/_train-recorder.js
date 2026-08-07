@@ -26,6 +26,21 @@
 // gs.turn is the GLOBAL turn counter (increments once per player turn,
 // ~10 total in an average match). Buckets chosen so an average game
 // touches all three.
+/**
+ * Unter welchem Namen werden Ability-Platzierungen dieses Helden
+ * verbucht? Ohne Vertrag: der Kartenname. Mit
+ * `cpuMeta.abilityIdentity`: der gemeinsame Schluessel aller Formen —
+ * Abilities haengen am Heldenslot und ueberleben Auf-/Abstieg, es gibt
+ * also nur EINEN Empfaenger, egal wie er gerade heisst.
+ */
+function abilityIdentityOf(engine, heroName) {
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const id = loadCardEffect(heroName)?.cpuMeta?.abilityIdentity;
+    return (typeof id === 'string' && id) ? id : heroName;
+  } catch { return heroName; }
+}
+
 function turnBucket(turn) {
   if (turn <= 4) return 'early';
   if (turn <= 9) return 'mid';
@@ -652,7 +667,32 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
             const cdF = engine._getCardDB()[card.name];
             if (cdF && cdF.cardType === 'Creature') oppFingerprint.cre++;
           }
-          if (card && (card.controller ?? card.owner) === pinnedIdx) {
+          // ── WER HAT GESPIELT vs. AUF WESSEN BRETT (6.8.) ──────────
+          // Bisher wurde ein Zonen-Eintritts-Play ueber
+          // `(controller ?? owner)` zugeordnet — also ueber die
+          // BRETTSEITE. Fuer Karten, die man auf die GEGNERISCHE Seite
+          // legt, ist das falsch: Powder Keg landet in der gegnerischen
+          // Support Zone, die Instanz traegt dort owner/controller =
+          // Gegner, und der Play des Piloten wurde dem GEGNER
+          // zugeschrieben. Gemessen: der Planer waehlte Powder Keg 871×
+          // aus (`artifactPicks` zaehlt NACH gold/canActivate/
+          // cpuShouldPlay), in `plays` erschien sie in 27 von 738
+          // Spielen. Vierter Fall dieser Klasse nach Boots of Hermes,
+          // Cooldins Area und FCoH.
+          //
+          // `originalOwner` ist das kanonische "wessen Karte ist das"
+          // und beantwortet damit "wer hat sie gespielt". Fuer alles
+          // Normale ist es identisch mit owner — die Zuordnung aendert
+          // sich AUSSCHLIESSLICH bei Cross-Side-Platzierungen. Bewusst
+          // NICHT umgestellt: der Gegner-Fingerprint darueber, der will
+          // wirklich "was steht auf dessen Brett".
+          const playSide = card ? (card.originalOwner ?? (card.controller ?? card.owner)) : null;
+          // Wirts-Helden- und Equip-Lookups bleiben an der BRETTSEITE —
+          // bei einer Cross-Side-Platzierung steht der Wirts-Held auf
+          // der anderen Seite, und ein Lookup in players[pinnedIdx]
+          // haette dort stillschweigend den falschen Namen gestempelt.
+          const zoneSide = card ? (card.controller ?? card.owner) : null;
+          if (card && playSide === pinnedIdx) {
             const cd = engine._getCardDB()[card.name];
             // Support zone: Creatures + equipped Artifacts. Spell/Attack
             // attachments ALSO enter support zones but were already
@@ -679,7 +719,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
               // trägt bereits genau diese Bedeutung ("Ziel-Held einer
               // Platzierung") bei Abilities — hier gespiegelt.
               const hostName = (cd.cardType === 'Creature' && typeof hookCtx.toHeroIdx === 'number')
-                ? engine.gs?.players?.[pinnedIdx]?.heroes?.[hookCtx.toHeroIdx]?.name
+                ? engine.gs?.players?.[zoneSide]?.heroes?.[hookCtx.toHeroIdx]?.name
                 : null;
               recordPlay(card.name, undefined, hostName || undefined);
               // Equip-Platzierung: WELCHER Held das Equipment bekommt,
@@ -689,7 +729,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
               if (cd.cardType === 'Artifact'
                   && (cd.subtype || '').toLowerCase() === 'equipment'
                   && typeof hookCtx.toHeroIdx === 'number') {
-                const heroName = engine.gs?.players?.[pinnedIdx]?.heroes?.[hookCtx.toHeroIdx]?.name;
+                const heroName = engine.gs?.players?.[zoneSide]?.heroes?.[hookCtx.toHeroIdx]?.name;
                 if (heroName) {
                   const key = `${card.name}@${heroName}`;
                   equips[key] = (equips[key] || 0) + 1;
@@ -878,6 +918,31 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       const statusHealDecisions = (engine._statusHealLog || [])
         .filter(e => e.pi === pinnedIdx)
         .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      // Counter-Ausgabe-Kanal (Als Vorgabe 5.8.): "diesen Zähler jetzt
+      // ausgeben oder für den Aufstieg aufheben?" — fired/held je
+      // Entscheidung, Tags aus classifyCounterSpendTags.
+      const counterSpendDecisions = (engine._counterSpendLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      // Zugende-Form je eigenem Zug: asc = in Ascended Form geendet,
+      // evo = Zählerstand, ca = ein Aufstieg wäre bezahlbar gewesen.
+      // Der Trainer formt daraus die Belohnung für den Kanal darüber und
+      // die Report-Kennzahl "Züge, die in der Basisform endeten".
+      const formTurns = (engine._formTurnLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ t, asc, evo, ca, form, src, fit, desc, stack }) =>
+          ({ t, asc, evo, ca, form, src, fit, desc, stack }));
+      // Abstiege je Zug (Als Auftrag 6.8.). Eigenes Feld statt nur der
+      // Zahl im formTurns-Stempel: der Stempel faellt nur, wenn der Zug
+      // regulär bis zur End Phase läuft — Abstiege in abgebrochenen
+      // Zügen wären sonst unsichtbar.
+      const descends = (engine._descendLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ t, from, gain }) => ({ t, from, gain }));
+      // Descend-Lernkanal: "jetzt abbauen oder weiterstapeln?"
+      const descendDecisions = (engine._descendDecisionLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
       // Final ability placement snapshot: "Ability@HeroName" -> stack level.
       const abilities = Object.create(null);
       const ps = engine.gs?.players?.[pinnedIdx];
@@ -887,7 +952,12 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         if (!heroName) continue;
         for (const slot of (ps.abilityZones?.[hi] || [])) {
           if (!slot || slot.length === 0) continue;
-          const key = `${slot[0]}@${heroName}`;
+          // Formen eines morphenden Helden teilen sich einen Prior-Satz,
+          // wenn ihr Skript `cpuMeta.abilityIdentity` deklariert. Sonst
+          // stempelt dieser Block die ENDFORM des Spiels als Ort der
+          // Platzierung — und der Ability-Prior lernt in Wahrheit die
+          // Winrate der Endform statt den Wert der Ability.
+          const key = `${slot[0]}@${abilityIdentityOf(engine, heroName)}`;
           abilities[key] = Math.max(abilities[key] || 0, slot.length);
         }
       }
@@ -1017,6 +1087,10 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         // T3: Mulligan-Entscheidungen samt Hand
         mulliganLog: (engine._mulliganLog || []).filter(e => e.pi === pinnedIdx),
         statusHealDecisions,
+        counterSpendDecisions,
+        formTurns,
+        descends,
+        descendDecisions,
         placementDecisions,
         bounceDecisions,
         // Swap-Diagnose (Als Auftrag): Zählerkette Verfügbarkeit →

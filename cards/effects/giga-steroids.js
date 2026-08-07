@@ -143,9 +143,12 @@ function _recomputeOnSteroidsFlag(engine, pi) {
  * BOTH because:
  *   • `onActionUsed` fires for Spell / Attack / Creature plays and
  *     `actionCost: true` Ability activations.
- *   • `onAnyActionResolved` fires UNIVERSALLY — including Hero-effect
- *     activations (`heroEffectActionCost`) which DON'T fire
- *     `onActionUsed`.
+ *   • `onAnyActionResolved` fires for every action that CONSUMES the
+ *     Action resource — including Hero-effect activations
+ *     (`heroEffectActionCost`), which DON'T fire `onActionUsed`.
+ *     Kostenlose Helden-Effekte feuern ihn seit Als Ruling (4.8.)
+ *     NICHT mehr; fuer Champion & Co. aendert sich dadurch nichts,
+ *     die zahlen ja eine Aktion.
  * Without the `onAnyActionResolved` listener, activating Champion's
  * effect as Action 1 would never trigger the fizzle path, the
  * grant would stay alive, and `advanceToPhase`'s internal "any

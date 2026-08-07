@@ -37,12 +37,12 @@ module.exports = {
   // doll-grow animation we broadcast manually below is the whole show.
   animationType: 'none',
 
-  canActivate(gs, pi) {
-    return _enumerateControlledAbilities(gs, pi).length > 0;
+  canActivate(gs, pi, engine) {
+    return _enumerateControlledAbilities(gs, pi, engine).length > 0;
   },
 
-  getValidTargets(gs, pi) {
-    return _enumerateControlledAbilities(gs, pi).map(ab => ({
+  getValidTargets(gs, pi, engine) {
+    return _enumerateControlledAbilities(gs, pi, engine).map(ab => ({
       id: `ability-${ab.zoneOwner}-${ab.heroIdx}-${ab.slotIdx}`,
       type: 'ability',
       owner: ab.zoneOwner,
@@ -73,7 +73,7 @@ module.exports = {
 
     // Re-validate at resolve time — control / immunity could have
     // shifted between target selection and resolution.
-    const stillValid = _enumerateControlledAbilities(engine.gs, pi).some(ab =>
+    const stillValid = _enumerateControlledAbilities(engine.gs, pi, engine).some(ab =>
       ab.zoneOwner === target.owner &&
       ab.heroIdx   === target.heroIdx &&
       ab.slotIdx   === target.slotIdx
@@ -153,7 +153,7 @@ module.exports = {
  *
  * Returns: [{ zoneOwner, heroIdx, slotIdx, cardName, level }]
  */
-function _enumerateControlledAbilities(gs, pi) {
+function _enumerateControlledAbilities(gs, pi, engine) {
   const out = [];
   const oi  = pi === 0 ? 1 : 0;
 
@@ -164,7 +164,7 @@ function _enumerateControlledAbilities(gs, pi) {
       if (!h?.name) continue;
       // Own hero charmed away by the opponent — they currently control it.
       if (h.charmedBy != null && h.charmedBy !== pi) continue;
-      _pushHeroAbilities(myPs, hi, pi, out);
+      _pushHeroAbilities(myPs, hi, pi, out, engine);
     }
   }
 
@@ -179,14 +179,20 @@ function _enumerateControlledAbilities(gs, pi) {
       // generic immune flag.
       if (h.statuses?.charmed) continue;
       if (h.statuses?.immune)  continue;
-      _pushHeroAbilities(ops, hi, oi, out);
+      _pushHeroAbilities(ops, hi, oi, out, engine);
     }
   }
 
   return out;
 }
 
-function _pushHeroAbilities(playerState, heroIdx, zoneOwner, out) {
+function _pushHeroAbilities(playerState, heroIdx, zoneOwner, out, engine) {
+  // Karten, die in einer SUPPORT-Zone liegen, dort aber als Ability
+  // zaehlen (Cloak of Edge) — zentral ueber den Sammler, damit
+  // kuenftige Sonderfaelle automatisch mitkommen (Als Ruling 5.8.).
+  for (const t of (engine?.collectSupportZoneAbilities?.(zoneOwner, heroIdx) || [])) {
+    out.push({ zoneOwner, heroIdx, slotIdx: t.slotIdx, cardName: t.cardName, level: 1, fromSupport: true });
+  }
   const zones = playerState.abilityZones?.[heroIdx] || [];
   for (let zi = 0; zi < zones.length; zi++) {
     const slot = zones[zi] || [];

@@ -29,7 +29,7 @@
 //     effects don't double-fire.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Cute Phoenix';
 
@@ -46,7 +46,7 @@ function countCreaturesInDiscard(engine, ps) {
   for (const cn of ps.discardPile) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (cd && hasCardType(cd, 'Creature')) seen.add(cn);
+    if (cd && isOwnSideSummonableCreature(cd, cn)) seen.add(cn);
   }
   return seen.size;
 }

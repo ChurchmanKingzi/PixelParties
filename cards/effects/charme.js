@@ -17,6 +17,11 @@
 const { loadCardEffect } = require('./_loader');
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
+  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
+  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
+  stealsOpponentCards: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['ability'],
@@ -127,6 +132,18 @@ module.exports = {
     const isActionPhase = gs.currentPhase === 3;
     const isMainPhase = gs.currentPhase === 2 || gs.currentPhase === 4;
 
+    // Erst-Runden-Immunität (Als Regel): in Runde 1 sind ALLE Karten des
+    // Nicht-Zugspielers immun gegen alles, was der Zugspieler tun kann.
+    // Jede Charme-Stufe greift auf gegnerische Karten zu — Lv1 borgt eine
+    // gegnerische Ability, Lv2 nimmt eine Handkarte, Lv3 übernimmt einen
+    // Helden —, also ist die Fähigkeit dann komplett gesperrt. Vorher
+    // fizzelten Lv2/Lv3 erst MITTEN in der Resolution, wodurch der HOPT
+    // schon verbraucht war und die Aktivierung überhaupt angeboten wurde;
+    // Lv1 kannte die Regel gar nicht. Die Fizzles bleiben als zweite
+    // Absicherung stehen, falls eine Stufe über einen anderen Weg
+    // erreicht wird.
+    if (gs.firstTurnProtectedPlayer === oi) return false;
+
     if (level >= 3) {
       // Lv3: need opponent hero alive (Main Phase only)
       if (!isMainPhase) return false;
@@ -175,6 +192,28 @@ function _getOpponentActivatableAbilities(gs, pi, engine) {
   const oi = pi === 0 ? 1 : 0;
   const ops = gs.players[oi];
   const results = [];
+
+  // Karten, die in einer SUPPORT-Zone liegen, dort aber als Ability
+  // zaehlen (Cloak of Edge) — zentral ueber den Sammler. Als Ruling
+  // 5.8.: Cloak SOLL ausleihbar sein und erhoeht dann den Angriffswert
+  // des CHARME-Helden. Sie liefert ihren Effekt ueber `onEquipEffect`
+  // statt `onFreeActivate`, deshalb die eigene Schleife.
+  for (const st of (engine?.collectSupportZoneAbilities?.(oi) || [])) {
+    const h = ops.heroes?.[st.heroIdx];
+    if (!h?.name || h.hp <= 0) continue;
+    const script = loadCardEffect(st.cardName);
+    if (!script?.onEquipEffect) continue;
+    // HARTE Sperre pro NAME UND SPIELER (Als Reminder 5.8.): eine
+    // Nutzung graut ALLE Kopien aus. Beide Seiten pruefen, wie bei den
+    // uebrigen geborgten Abilities.
+    if (gs.hoptUsed?.[`free-ability:${st.cardName}:${oi}`] === gs.turn) continue;
+    if (gs.hoptUsed?.[`free-ability:${st.cardName}:${pi}`] === gs.turn) continue;
+    results.push({
+      abName: st.cardName, script, isFree: true, isAction: false,
+      ownerHeroIdx: st.heroIdx, zoneIdx: st.slotIdx, level: 1,
+      fromSupport: true, sourceInst: st.inst,
+    });
+  }
 
   for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
     const h = ops.heroes[hi];
@@ -265,8 +304,14 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   // free-activate rollback (HOPT released, no animation, no opponent
   // reveal).
   const targets = abilities.map(ab => ({
-    id: `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`,
-    type: 'ability',
+    id: ab.fromSupport
+      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
+      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`,
+    // `type` MUSS der ZONE folgen, nicht dem Regeltyp — der Client
+    // hebt Ability-Slots und Support-Slots ueber verschiedene Wege
+    // hervor. Mit `type: 'ability'` fand der Picker die Cloak in der
+    // Support-Zone nicht (Als Befund 5.8.).
+    type: ab.fromSupport ? 'equip' : 'ability',
     owner: oi,
     heroIdx: ab.ownerHeroIdx,
     slotIdx: ab.zoneIdx,
@@ -306,12 +351,16 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   if (!selectedIds || selectedIds.length === 0) return false;
   const targetId = selectedIds[0];
   const selectedAb = abilities.find(ab =>
-    `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}` === targetId
+    (ab.fromSupport
+      ? `equip-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`
+      : `ability-${oi}-${ab.ownerHeroIdx}-${ab.zoneIdx}`) === targetId
   );
   if (!selectedAb) return false;
 
   const script = selectedAb.script;
-  const activateFn = script.onFreeActivate || script.onActivate;
+  const activateFn = selectedAb.fromSupport
+    ? script.onEquipEffect
+    : (script.onFreeActivate || script.onActivate);
   if (!activateFn) return false;
 
   // Create a fake context as if the ability were on this Hero
@@ -362,11 +411,19 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   // OWN copy of the same ability the same turn (Adventurousness etc.).
   // Skipped on cancel (the borrow didn't actually commit).
   if (result !== false) {
+    if (!gs.hoptUsed) gs.hoptUsed = {};
+    // Einheitlich der namensbasierte Schluessel — auch fuer Karten aus
+    // der Support-Zone (Cloak of Edge). Sie sind hart einmal pro Runde
+    // pro Spieler, nicht pro Instanz. Zusaetzlich die Besitzerseite
+    // stempeln, damit der Gegner seine Cloak danach nicht mehr nutzen
+    // kann (Als Reminder 5.8.).
     const stampKey = selectedAb.isFree
       ? `free-ability:${selectedAb.abName}:${pi}`
       : `ability-action:${selectedAb.abName}:${pi}`;
-    if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[stampKey] = gs.turn;
+    if (selectedAb.fromSupport) {
+      gs.hoptUsed[`free-ability:${selectedAb.abName}:${oi}`] = gs.turn;
+    }
   }
   engine.sync();
   return result !== false;
@@ -411,6 +468,17 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
   }
 
   if (cardName && stealHandIdx >= 0) {
+    // Reaktionsfenster (Ambush the Scout), Kategorie 'steal' — VOR der
+    // Flug-Animation, sonst sieht der Gegner die Karte schon fliegen
+    // und sie kommt danach wieder zurueck. Charme baut den Griff in
+    // die fremde Hand selbst statt ueber actionStealFromHand, deshalb
+    // steht der Aufruf hier von Hand.
+    if (await engine.checkHandInteractionReaction(oi, 'steal',
+          { byPi: pi, count: 1, sourceName: 'Charme' })) {
+      engine.log('charme_steal_negated', { player: gs.players[pi]?.username, from: ops.username });
+      engine.sync();
+      return;
+    }
     // Broadcast the hand-rip flight FIRST so the client highlights
     // the source slot, hides it, and animates a face-up clone from
     // opp's hand into ours BEFORE the state sync arrives. Without

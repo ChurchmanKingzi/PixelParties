@@ -29,7 +29,7 @@
 //    Creature as fresh on its summon turn.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { CARDINAL_NAMES } = require('./_cardinal-shared');
 const { countFrozenTargets } = require('./_mischief-militia-shared');
@@ -70,7 +70,7 @@ function _getSummonableHandIndices(engine, pi) {
     const cn = ps.hand[i];
     const cd = cardDB[cn];
     if (!cd) continue;
-    if (!hasCardType(cd, 'Creature')) continue;
+    if (!isOwnSideSummonableCreature(cd, cn)) continue;
     // Effective level via the canonical helper — passes the specific
     // hand index so Rocky-Slime-style per-slot offsets count toward
     // the Lv≤1 gate.

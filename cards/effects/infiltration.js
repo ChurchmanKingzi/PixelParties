@@ -17,6 +17,10 @@
 const CARD_NAME = 'Infiltration';
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 1): nimmt die oberste Karte des Gegnerdecks auf die eigene Hand.
+  // Bei wirksamem Boris beim Gegner nicht aktivierbar.
+  stealsOpponentCards: true,
+
   activeIn: ['ability'],
   freeActivation: true,
 

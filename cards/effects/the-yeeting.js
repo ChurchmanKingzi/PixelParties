@@ -35,7 +35,11 @@ module.exports = {
   //     types use cost-scaled fallbacks. Cancellable prompt declines
   //     when no positive-value target exists.
   cpuResponse(engine, kind, payload) {
-    if (kind !== 'target') return undefined;
+    // Die Engine sendet für Ziel-Prompts ausschließlich 'effectTarget'
+    // (_engine.js `_getCpuTargetResponse`, _cpu.js Zeile ~5349) — 'target'
+    // wird NIRGENDS gesendet. Der frühere Guard `if (kind !== 'target')`
+    // hat die ganze Heuristik unten deshalb nie erreicht.
+    if (kind !== 'effectTarget' && kind !== 'target') return undefined;
     const { validTargets } = payload || {};
     if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
 
@@ -80,6 +84,27 @@ module.exports = {
     // than waste the 150 self-damage destroying a worthless card.
     if (pickedId == null || bestScore <= 0) return undefined;
     return [pickedId];
+  },
+
+  // ── CPU-Gate ──────────────────────────────────────────────────────
+  // `canActivate` darf NICHT enger werden: der Kartentext erlaubt auch
+  // das eigene Brett als Ziel, und Menschen nutzen das (eigenen
+  // Pollution-Permanent wegräumen o.Ä.). Die CPU dagegen zerstört
+  // ausschließlich GEGNERISCHE Karten — ohne solche würde sie die Karte
+  // anspielen, im Ziel-Prompt ablehnen und der Zug bräche mit
+  // `{ aborted: true }` ab (in Runde 1 unter Erst-Runden-Schutz war das
+  // garantiert der Fall). Das Gate stellt deshalb exakt dieselbe Frage,
+  // die `cpuResponse` gleich beantworten wird — dieselbe Bewertungs-
+  // funktion, damit Gate und Entscheidung nicht auseinanderlaufen
+  // können.
+  cpuShouldPlay(engine, pi) {
+    const targets = _collectBoardTargets(engine.gs, engine);
+    for (const t of targets) {
+      if (t.owner === pi) continue;
+      if (t._cardInstance?.counters?.immovable) continue;
+      if (_scoreEnemyCard(engine, t) > 0) return true;
+    }
+    return false;
   },
 
   canActivate(gs, pi) {
@@ -134,6 +159,12 @@ module.exports = {
 
     const cardPick = await engine.promptEffectTarget(pi, boardTargets, {
       title: 'The Yeeting — Choose Target',
+      // Der CPU-Dispatch in `_getCpuTargetResponse` schlägt `config.source
+      // || config.title` als Kartenname nach. Ohne `source` landete hier
+      // `loadCardEffect('The Yeeting — Choose Target')` → null, die
+      // `cpuResponse` unten war toter Code und die CPU fiel auf
+      // "cancellable → ablehnen" zurück. Dieselbe Falle wie in charme.js.
+      source: 'The Yeeting',
       description: `${hero.name} will yeet into it! Choose a card to destroy.`,
       confirmLabel: '💥 YEET!',
       confirmClass: 'btn-danger',
@@ -322,6 +353,9 @@ function _scoreEnemyCard(engine, target) {
 
   // Support-zone cards: Creatures vs. Equipment.
   if (target.type === 'equip' && inst.zone === 'support') {
+    // HINWEIS (Als Klarstellung 5.8.): The Yeeting zielt auf JEDE
+    // Nicht-Hero-Karte — die Unterscheidung Artifact/Ability ist hier
+    // gar nicht noetig, Cloak of Edge ist ohnehin waehlbar.
     const isCreature = cd.cardType === 'Creature'
       || (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'));
     if (isCreature) {
@@ -381,9 +415,24 @@ function _collectBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
 
+  // Erst-Runden-Schutz: Karten des geschützten Spielers kann
+  // `actionDestroyCard` gar nicht zerstören (es loggt `destroy_blocked`
+  // und kehrt zurück). Sie hier anzubieten hieße, ein Ziel zu zeigen,
+  // das die Bezahlung anschließend verweigert — der Spieler zahlt 150
+  // Selbstschaden für nichts. Der dafür vorgesehene Engine-Helfer heißt
+  // `isAbilityRemovalProtected` und ist ausdrücklich für getValidTargets
+  // gedacht.
+  const EngineClass = engine?.constructor;
+  const isProtected = (owner) => (
+    typeof EngineClass?.isAbilityRemovalProtected === 'function'
+      ? EngineClass.isAbilityRemovalProtected(gs, owner)
+      : gs.firstTurnProtectedPlayer === owner
+  );
+
   for (const inst of engine.cardInstances) {
     if (inst.zone === 'hand' || inst.zone === 'discard' || inst.zone === 'deleted' || inst.zone === 'hero' || inst.zone === 'deck') continue;
     if (inst.counters?.immovable) continue;
+    if (isProtected(inst.owner)) continue;
     if (seen.has(inst.id)) continue;
     seen.add(inst.id);
 

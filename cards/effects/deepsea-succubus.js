@@ -34,6 +34,11 @@ const {
 const CARD_NAME = 'Deepsea Succubus';
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
+  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
+  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
+  takesControlOfTargets: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   inherentAction: inherentActionIfBounceable,

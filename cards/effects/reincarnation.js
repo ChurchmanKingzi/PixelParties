@@ -32,7 +32,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 // Free-zone requirements per mode. Reincarnation always costs 2 Pollution
 // Tokens, but the Creature-restore path ALSO needs a zone for the creature
@@ -67,7 +67,7 @@ function getRestoreCandidates(ps, cardDB, engine, pi) {
   const counts = {};
   for (const name of (ps?.discardPile || [])) {
     const cd = cardDB[name];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
     // Effective level (Whoolmoth-style reducers etc. + Lethe's
     // per-pile +1 stamps via `pileSide: 'discard'`).
     const lvl = engine?.effectiveCardLevel

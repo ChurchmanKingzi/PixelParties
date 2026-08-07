@@ -31,6 +31,10 @@
 const CARD_NAME = 'Enigma, the Seller of Secrets';
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 1): nimmt eine Karte aus dem Gegnerdeck auf die eigene Hand.
+  // Bei wirksamem Boris beim Gegner nicht aktivierbar.
+  stealsOpponentCards: true,
+
   activeIn: ['hero'],
   heroEffect: true,
 

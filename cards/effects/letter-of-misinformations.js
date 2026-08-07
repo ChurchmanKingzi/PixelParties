@@ -105,6 +105,16 @@ module.exports = {
       // render). We track which entries we ADDED so they can be
       // cleared in the finally block below — preserving any
       // pre-existing reveals (Luna Kiai, etc.).
+      // Reaktionsfenster (Ambush the Scout), Kategorie 'reveal' — VOR
+      // dem Aufdecken, weil schon das Ansehen die Hand-Interaktion ist.
+      // Wird negiert, entfaellt Ansehen UND Wegnehmen.
+      if (await engine.checkHandInteractionReaction(oi, 'reveal',
+            { byPi: pi, count: (ops.hand || []).length, sourceName: 'Letter of Misinformations' })) {
+        engine.log('letter_of_misinformations_negated', { player: gs.players[pi]?.username });
+        engine.sync();
+        return;
+      }
+
       if (!ops._revealedHandIndices) ops._revealedHandIndices = {};
       const revealedKeysAdded = [];
       for (const idx of eligibleIndices) {

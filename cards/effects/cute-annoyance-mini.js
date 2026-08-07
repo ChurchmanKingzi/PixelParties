@@ -36,7 +36,7 @@
 //          point, NOT Mini's main Action.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Cute Annoyance Mini';
 const CUTE_ARCHETYPE = 'Cute';
@@ -56,7 +56,7 @@ function getCuteCreaturesInDeck(engine, ps) {
     const cd = cardDB[name];
     if (!cd) continue;
     if (cd.archetype !== CUTE_ARCHETYPE) continue;
-    if (!hasCardType(cd, 'Creature')) continue;
+    if (!isOwnSideSummonableCreature(cd, name)) continue;
     out.push({ name, count });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));

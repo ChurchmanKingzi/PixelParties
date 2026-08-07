@@ -28,6 +28,12 @@ const {
 const CARD_NAME = 'Sparkfly Worker';
 
 module.exports = {
+  // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt eine beliebige Nicht-Held-Karte vom Brett auf die eigene Hand.
+  // Trifft jede Nicht-Held-Karte auf dem GESAMTEN Brett — deshalb NICHT sperren, sondern bei
+  // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange
+  // es eigene legale Ziele gibt, bleibt der Effekt nutzbar.
+  stealsFromEitherSide: true,
+
   requiresTarget: true,
   activeIn: ['support'],
   blockedByHandLock: true,
@@ -54,7 +60,14 @@ module.exports = {
       const targets = collectNonHeroBoardTargets(gs, engine);
       // Don't offer the just-summoned Worker as a steal target — it would
       // self-bounce and silently break the summon-resolution flow.
-      const filteredTargets = targets.filter(t => t._cardInstance?.id !== ctx.card?.id);
+      // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner
+      // einen wirksamen Boris, faellt SEINE Brettseite weg — die eigene
+      // bleibt waehlbar. Bleibt nichts uebrig, greift der
+      // "keine Ziele"-Ausstieg direkt darunter.
+      const nurEigene = engine.borisHidesOpponentSide?.(pi) === true;
+      const filteredTargets = targets
+        .filter(t => t._cardInstance?.id !== ctx.card?.id)
+        .filter(t => !nurEigene || (t.owner ?? t._cardInstance?.owner) === pi);
       if (filteredTargets.length === 0) return;
 
       const picked = await engine.promptEffectTarget(pi, filteredTargets, {

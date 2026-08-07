@@ -152,6 +152,95 @@ brain edits required.
 
 ---
 
+## Turn-1 Immunity
+
+**Rule: during turn 1, every card belonging to the non-turn player is completely immune to anything the turn player can do.** `gs.firstTurnProtectedPlayer` holds that player's index (cleared when the starting player's turn ends).
+
+You normally do not need to handle this. Both target chokepoints strip protected-owned entries automatically:
+
+* `engine.promptEffectTarget()` — inner prompts built inside `resolve` / hooks
+* `normalizeValidTargets()` (server) — the `getValidTargets` + `targetingConfig` session
+
+The filter is skipped when the PROMPTED player is the protected one (they may always pick their own cards). Opt out with `ignoreFirstTurnProtection: true` in the prompt config.
+
+**What you DO have to handle: your play gate.** The filter runs at prompt time, not at gate time — so a `canActivate` / `canFreeActivate` / `inherentAction` that counts opponent cards will still report "playable", the card gets played, gold is spent and the picker then comes up empty. Gate on what the actor can actually touch:
+
+```js
+canActivate(gs, pi) {
+  const prot = gs.firstTurnProtectedPlayer;
+  for (let p = 0; p < 2; p++) {
+    if (prot != null && p === prot && pi !== prot) continue;  // unreachable this turn
+    …
+  }
+}
+```
+
+If EVERY mode of your card targets the opponent, gate the whole card off: `if (gs.firstTurnProtectedPlayer === oi) return false;` (Charme does this). Fizzling mid-resolution instead is worse — the activation was already offered and its once-per-turn slot already spent.
+
+`GameEngine.isAbilityRemovalProtected(gs, ownerIdx)` is the named predicate for one-off checks.
+
+## `onStatusApplied` — both field names
+
+The status name arrives under **both** `ctx.statusName` and `ctx.status`; they are always identical. Historically the six fire sites disagreed — `addHeroStatus` sent only `statusName`, `actionApplyStatus` only `status`, `applyCreatureStatus` both — so a listener reading one name was blind to half the engine. All sites now send both. Either name is safe; new cards should still read `ctx.statusName || ctx.status` so they keep working against older engine copies.
+
+**Hero targets vs Creature targets differ in STORAGE, not in the hook.** A Hero keeps statuses in `hero.statuses[name] = { duration, … }` and the duration always exists (default 1). A Creature keeps them in `inst.counters[name] = 1` with a companion `inst.counters[name + 'Duration']` that is only written when the duration exceeds 1. Reading `ctx.target.statuses?.<x>` therefore silently skips every Creature — check `ctx.target.counters` for the Creature branch (`ctx._onCreature` is set on the `applyCreatureStatus` path). Extending a plain one-turn Creature status means WRITING 2, not incrementing a missing field.
+
+If your card should only react to Hero targets, guard on identity (`ctx.target !== <your hero>`) rather than relying on the field name.
+
+## Ascension & Descend
+
+Default Ascension gates on the spell-school orb path (`hero.ascensionReady` + `hero.ascensionTarget`, both set by the BASE hero's script). Cards whose own text names a different price declare it themselves, on the ASCENDED card:
+
+| Export | Shape | Meaning |
+| --- | --- | --- |
+| `ascensionCondition` | `(gs, pi, heroIdx, engine) → bool` | Replaces the `ascensionReady` check. Evaluated BEFORE the hand splice, so a refusal never eats the card. |
+| `payAscensionCost` | `(engine, pi, heroIdx)` | Charged immediately after the splice; the condition guarantees affordability. |
+| `blockEndPhaseOnAscend` | `bool` | "Ascending this Hero does not end your turn." |
+| `formsAscensionStack` | `bool` | Push the previous form onto `hero._formStack` so a later Descend pops exactly one level. |
+| `evolutionAnimation` | `bool` | Fire `play_evolution_animation` and wait out its duration before resolving on. |
+| `onAscensionBonus` | `async (engine, pi, heroIdx)` | Card-specific bonus fired after the Ascension hook. |
+
+`engine.performDescend(pi, heroIdx)` is the mirror: it pops one level off `hero._formStack`, reverses the intrinsic HP delta (printed max HP of both forms, so mid-game max-HP buffs survive a round trip) with current HP FLOORED AT 1, re-points the hero instance, clears the cached script, re-runs the landed form's `onAscendSetup`, and returns the shed form to hand so cycling is repeatable.
+
+**Multiple Ascension targets.** `hero.ascensionTargets` (array) sits alongside the legacy scalar `hero.ascensionTarget`; the client accepts either. Set both when a Hero has more than one legal form.
+
+**Several once-per-turn effects on one Hero Effect.** The engine stamps a single shared `hero-effect:<name>:<pi>:<heroIdx>` HOPT after `onHeroEffect` returns anything but `false`. A card with independent once-per-turn options must therefore keep its OWN keys and `return false` — and drain the pending reveal itself, since the engine only drains it on the `!== false` path.
+
+**Teaching the CPU which form to pick.** Route the choice through a `cardGallery` prompt with a STABLE `title` / `source`. That is all the wiring needed: `_logGalleryPick` records every live gallery resolution as `{src, picked, t}`, the trainer turns those into `tutorPickRules['<src>→<card>']` with Advantage labels and recency weighting, and the gallery scorer adds the learned value back when ranking. Renaming the source string silently invalidates every trained profile.
+
+## CPU Prompt Overrides (`cpuResponse`)
+
+A card can answer its own prompts for the CPU instead of letting the generic brain decide:
+
+```js
+cpuResponse(engine, kind, payload) { ... }   // return undefined to fall through
+```
+
+**Two rules decide whether your handler is ever reached. Get either wrong and it is silently dead code — the CPU falls back to "cancellable → decline" and your card simply never works for the CPU.**
+
+**1. `kind` is `'generic'` or `'effectTarget'` — never `'target'`.** Those are the only two strings the engine sends (`_getCpuGenericResponse`, `_getCpuTargetResponse`) and the only one `_cpu.js` sends. A guard like `if (kind !== 'target') return undefined;` disables the whole handler.
+
+| Prompt call | `kind` | `payload` |
+| --- | --- | --- |
+| `promptGeneric` | `'generic'` | the prompt data object (`type`, `options`, …) |
+| `promptEffectTarget` | `'effectTarget'` | `{ validTargets, config, playerIdx }` |
+
+**2. The dispatch key is `config.source || config.title`, and it must be the exact card name.** The engine resolves it with `loadCardEffect()`, so a decorated title does not match:
+
+```js
+// BROKEN — loadCardEffect('The Yeeting — Choose Target') returns null
+await engine.promptEffectTarget(pi, targets, { title: `${CARD_NAME} — Choose Target`, … });
+
+// CORRECT — decorated title for the player, real name for the dispatch
+await engine.promptEffectTarget(pi, targets, {
+  title: `${CARD_NAME} — Choose Target`, source: CARD_NAME, …
+});
+```
+
+Any prompt whose `title` carries a dash, colon or interpolation needs an explicit `source`.
+
+**Keep the play-gate and the handler on the same logic.** If `cpuResponse` will only ever pick certain targets (e.g. opponent-owned ones), gate the play itself with `cpuShouldPlay(engine, pi) → bool` using the SAME predicate. Otherwise the CPU plays the card, declines its own prompt, and the resolve aborts — repeatedly, since `{ aborted: true }` re-opens the targeting session.
+
 ## Module Exports — Lifecycle Methods
 
 ### Abilities (actionCost / freeActivation)
@@ -861,6 +950,40 @@ module.exports = {
       // React to actions...
     },
   },
+};
+```
+
+### Ability- und Artifact-Ziele einsammeln
+
+**Immer ueber die zentralen Sammler gehen, nie selbst `ps.abilityZones`
+oder die Support-Zonen durchlaufen.** Sonst uebersieht der Effekt
+Sonderfaelle wie Cloak of Edge, die in einer SUPPORT-Zone liegt, dort
+aber als Ability zaehlt.
+
+```js
+// Alle Abilities, die der Spieler kontrolliert — aus Ability-Zonen UND
+// aus Support-Zonen (Karten mit `countsAsAbilityInZone`).
+const ziele = engine.getAbilityTargets(pi, {
+  heroIdx: 2,            // optional: nur dieser Held
+  livingHeroOnly: true,  // optional: nur bei lebendem Traeger
+  cardName: 'Fighting',  // optional: nur dieser Name
+});
+// -> [{ id, type, zoneKind, owner, heroIdx, slotIdx, cardName, level, cardInstance }]
+//    zoneKind: 'ability' (type 'ability') | 'support' (type 'equip')
+//    `type` folgt der ZONE, damit Ziel-Picker unveraendert funktionieren.
+
+// Gegenstueck: Artefakte in Support-Zonen, OHNE die dort als Ability
+// zaehlenden Karten.
+const artefakte = engine.getArtifactTargets(pi);
+```
+
+Eine neue Karte, die sich auf dem Brett als anderer Typ verhaelt, setzt
+dafuer nur ein Flag am Skript — die Sammler ziehen automatisch nach:
+
+```js
+module.exports = {
+  isEquip: true,
+  countsAsAbilityInZone: true,   // zaehlt in der Support-Zone als Ability
 };
 ```
 

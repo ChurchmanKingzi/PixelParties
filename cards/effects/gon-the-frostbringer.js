@@ -36,15 +36,26 @@ module.exports = {
      * `frozen.duration > 1` (multi-turn freezes tick down instead
      * of clearing), so all we need is to bump the field.
      *
-     * Limitations:
-     *   • Creature freezes are stored as `inst.counters.frozen = 1`
-     *     with no duration field, and they don't fire ON_STATUS_APPLIED
-     *     — so this listener only extends Hero freezes today. If/when
-     *     creature-freeze duration becomes a thing, the same shape can
-     *     extend it (just hook a creature-status-applied event).
+     * "one or more TARGETS" — Creatures count too (Als Ruling). The
+     * old comment here claimed creature freezes carry no duration and
+     * never fire ON_STATUS_APPLIED; both statements are stale.
+     * `applyCreatureStatus` fires the hook and stores a duration under
+     * `inst.counters.frozenDuration` whenever `opts.duration > 1`. What
+     * actually kept Gon Hero-only was the body: it read
+     * `target.statuses.frozen`, which a CardInstance simply does not
+     * have — Creatures keep their statuses in `counters`.
+     *
+     * Storage asymmetry to keep in mind: a Hero's duration always
+     * exists (`statuses.frozen.duration`, default 1), a Creature's only
+     * exists once it exceeds 1 — `applyCreatureStatus` skips the field
+     * for the plain one-turn case. Extending a plain creature freeze
+     * therefore means writing 2, not reading-then-incrementing.
      */
     onStatusApplied: async (ctx) => {
-      if (ctx.statusName !== 'frozen') return;
+      // Beide Feldnamen lesen — siehe _engine.js, die Feuerstellen
+      // sendeten historisch unterschiedliche Namen.
+      const applied = ctx.statusName || ctx.status;
+      if (applied !== 'frozen') return;
       const engine = ctx._engine;
       const gs = engine.gs;
       // "Your effects" — fire only when the side whose turn is
@@ -54,14 +65,27 @@ module.exports = {
       // fire while their owner is the active player.
       if (gs.activePlayer !== ctx.cardOwner) return;
 
-      const hero = ctx.target;
-      if (!hero || !hero.statuses?.frozen) return;
-      const cur = hero.statuses.frozen.duration ?? 1;
-      hero.statuses.frozen.duration = cur + 1;
-      engine.log('gon_freeze_extend', {
-        target: hero.name,
-        newDuration: hero.statuses.frozen.duration,
-      });
+      const target = ctx.target;
+      if (!target) return;
+
+      // ── Hero target ──
+      if (target.statuses?.frozen) {
+        const cur = target.statuses.frozen.duration ?? 1;
+        target.statuses.frozen.duration = cur + 1;
+        engine.log('gon_freeze_extend', {
+          target: target.name, newDuration: target.statuses.frozen.duration,
+        });
+        return;
+      }
+
+      // ── Creature target ──
+      if (target.counters?.frozen) {
+        const cur = target.counters.frozenDuration || 1;
+        target.counters.frozenDuration = cur + 1;
+        engine.log('gon_freeze_extend', {
+          target: target.name, newDuration: target.counters.frozenDuration,
+        });
+      }
     },
   },
 };

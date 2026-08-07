@@ -17,7 +17,7 @@
 // ═══════════════════════════════════════════
 
 const { attachSteamEngine } = require('./_steam-dwarf-shared');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Steam Dwarf Engineer';
 
@@ -50,7 +50,7 @@ module.exports = attachSteamEngine({
     for (const deckCard of ps.mainDeck) {
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
-      if (!hasCardType(dcd, 'Creature')) continue;
+      if (!isOwnSideSummonableCreature(dcd, dcd.name)) continue;
       const dMax = dcd.hp || 0;
       if (dMax > 0 && dMax <= curHp) return true;
     }
@@ -76,7 +76,7 @@ module.exports = attachSteamEngine({
     for (const deckCard of (ps.mainDeck || [])) {
       const dcd = cardDB[deckCard];
       if (!dcd) continue;
-      if (!hasCardType(dcd, 'Creature')) continue;
+      if (!isOwnSideSummonableCreature(dcd, dcd.name)) continue;
       const dMax = dcd.hp || 0;
       if (dMax <= 0 || dMax > curHp) continue;
       countMap[deckCard] = (countMap[deckCard] || 0) + 1;

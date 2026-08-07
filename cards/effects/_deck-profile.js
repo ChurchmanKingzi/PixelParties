@@ -354,7 +354,17 @@ function abilityPlacementBonus(engine, pi, abilityName, heroName) {
       }
     }
   }
-  const base = `${abilityName}@${heroName}`;
+  // Gleiche Identitaets-Aufloesung wie die Schreibseite im Recorder:
+  // Formen eines morphenden Helden teilen einen Prior-Satz, sobald ihr
+  // Skript `cpuMeta.abilityIdentity` deklariert. Ohne Vertrag bleibt es
+  // beim Kartennamen — kein bestehendes Deck aendert sein Verhalten.
+  let priorHero = heroName;
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const id = loadCardEffect(heroName)?.cpuMeta?.abilityIdentity;
+    if (typeof id === 'string' && id) priorHero = id;
+  } catch { /* Kartenname bleibt */ }
+  const base = `${abilityName}@${priorHero}`;
   const stepKey = targetLevel >= 2 ? `${base}≥${targetLevel}` : base;
   const v = priors[stepKey] ?? priors[base];
   const learned = (typeof v === 'number' && prof) ? v * confidence(prof) : 0;
@@ -1055,6 +1065,43 @@ function classifyTargetTags(engine, target, validTargets, pickerIdx) {
         if (myHp <= Math.min(...peers)) tags.push('hp:min');
       }
     }
+    // ── REIHEN-KONTEXT (5.8., Als Powder-Keg-Vorgabe) ────────────────
+    // Bisher beschrieb das Vokabular nur den Ziel-Helden SELBST (HP,
+    // Position, Status). Was in seiner Support-Reihe steht, war
+    // unsichtbar — und genau daran hängt jede Karte, deren Wirkung die
+    // REIHE trifft statt den Helden (Powder Kegs Todes-AoE) oder die
+    // dort einen Körper platzieren will.
+    //
+    // Als Hypothese zu Powder Keg: "der Held mit den meisten Creatures
+    // oder der, der im Laufe des Spiels die meisten beschworen hat."
+    // Beides bekommt hier ein Tag — als HYPOTHESE. Das Gewicht kommt
+    // wie bei jedem anderen Tag aus den Daten und darf sie widerlegen.
+    // Deckneutral: reine Brettfakten, kein Kartenwissen.
+    if (kind === 'hero' && typeof target.heroIdx === 'number') {
+      try {
+        const rowPs = engine.gs?.players?.[target.owner];
+        const zones = rowPs?.supportZones?.[target.heroIdx] || [];
+        const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+        let creatures = 0, free = 0;
+        for (let si = 0; si < 3; si++) {
+          const slot = zones[si] || [];
+          if (slot.length === 0) { free++; continue; }
+          for (const cn of slot) {
+            const cd = cardDB?.[cn];
+            if (cd && (cd.cardType === 'Creature' || cd.subtype === 'Creature')) creatures++;
+          }
+        }
+        tags.push(`row:creatures:${Math.min(creatures, 3)}`);
+        tags.push(`row:free:${Math.min(free, 3)}`);
+        // Wie viele Kreaturen hat DIESER Held über das ganze Spiel
+        // beherbergt? Der Zähler wird beim Beschwören gestempelt
+        // (engine._hostedSummons), zählt also auch die längst wieder
+        // gestorbenen — Als zweite Hypothese, die "wer beschwört am
+        // meisten nach" von "wer hat gerade viel stehen" trennt.
+        const hosted = (engine._hostedSummons?.[target.owner] || [])[target.heroIdx] || 0;
+        tags.push(`row:hosted:${hosted >= 5 ? '5+' : (hosted >= 3 ? '3-4' : (hosted >= 1 ? '1-2' : '0'))}`);
+      } catch { /* Tagging darf nie eine Zielwahl kippen */ }
+    }
     const frozen = target.type === 'hero'
       ? !!engine.gs?.players?.[target.owner]?.heroes?.[target.heroIdx]?.statuses?.frozen
       : !!target.cardInstance?.counters?.frozen;
@@ -1444,6 +1491,397 @@ function scriptCopiesOnSummon(cardName) {
   return !!s && /runHooks\s*\(\s*['"]onPlay['"]/.test(s);
 }
 
+// ─── Counter-Ausgabe-Kanal (5.8., Als Vorgabe) ────────────────────────
+//
+// Als Auftrag: "eine HOHE Belohnung dafuer, nicht in der Base-Form den
+// Zug zu beenden — der Base-Form-Effekt ist voellig legitim, aber sie
+// soll damit NICHT den letzten Counter verbrennen."
+//
+// Das ist eine Entscheidung, die der Sofortbewertung strukturell
+// entgeht: "Draw 3" liest sich als +3 Handkarten und damit klar
+// positiv, waehrend der verzichtete Aufstieg (HP/ATK-Sprung, freigesetzte
+// Bombs, der ganze Descend-Zyklus) erst spaeter und ueber mehrere Zuege
+// anfaellt. Gemessen kostete das den Archetyp 310 Zaehler in 500 Spielen
+// — rund 28% des gesamten Aufkommens, rechnerisch ~77 nicht gemachte
+// Deep-Drowned-Aufstiege.
+//
+// Deshalb ein eigener getaggter Kanal statt einer Verdrahtung: Das
+// Vokabular beschreibt die LAGE (wie viele Zaehler, blockiert die
+// Ausgabe einen bezahlbaren Aufstieg, steht der Held in der Basisform),
+// die Gewichte kommen aus den Daten. Der Trainer formt dabei das Label
+// mit einem starken Term dafuer, ob der Zug in einer Ascended Form
+// endete — das ist Als "hohe Belohnung", und sie wirkt gerichtet:
+// dieselbe Ausgabe bekommt in der Basisform mit blockiertem Aufstieg
+// ein anderes Vorzeichen als an einer aufgestiegenen Form.
+//
+// Getrieben vom Karten-Vertrag `cpuMeta.counterSpend` — kein
+// Archetyp-Wissen hier. Meldet die Karte Kosten 0 (die vier
+// Descend-Formen LEGEN Zaehler nach), bleibt der Kanal stumm.
+
+function counterSpendContext(engine, pi, heroIdx) {
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const gs = engine.gs;
+    const ps = gs?.players?.[pi];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return null;
+    const spend = loadCardEffect(hero.name)?.cpuMeta?.counterSpend;
+    if (!spend || typeof spend.cost !== 'function' || typeof spend.get !== 'function') return null;
+    const cost = spend.cost(engine, pi, heroIdx);
+    if (!(cost > 0)) return null;
+    const have = Number(spend.get(engine, pi, heroIdx)) || 0;
+    if (have < cost) return null;
+    return { spend, cost, have, hero };
+  } catch { return null; }
+}
+
+/**
+ * Waere nach der Ausgabe noch ein Aufstieg aus der HAND bezahlbar?
+ *
+ * Reversible Probe: Stand senken, jede Ascended-Hero-Karte der Hand
+ * ihre eigene `ascensionCondition` fragen, Stand zuruecksetzen. Damit
+ * braucht der Classifier weder die Preise der Formen noch ihre Namen —
+ * er fragt genau den Vertrag, den auch `tryAscend` fragt.
+ */
+function ascensionAffordableAt(engine, pi, heroIdx, ctx, level) {
+  const { loadCardEffect } = require('./_loader');
+  const gs = engine.gs;
+  const ps = gs?.players?.[pi];
+  const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+  const before = ctx.spend.get(engine, pi, heroIdx);
+  let ok = false;
+  try {
+    ctx.spend.set(engine, pi, heroIdx, level);
+    for (const cn of (ps?.hand || [])) {
+      if (cardDB?.[cn]?.cardType !== 'Ascended Hero') continue;
+      const sc = loadCardEffect(cn);
+      if (typeof sc?.ascensionCondition !== 'function') continue;
+      try {
+        if (sc.ascensionCondition(gs, pi, heroIdx, engine)) { ok = true; break; }
+      } catch { /* einzelne Form unklar */ }
+    }
+  } finally {
+    ctx.spend.set(engine, pi, heroIdx, before);
+  }
+  return ok;
+}
+
+function classifyCounterSpendTags(engine, pi, heroIdx) {
+  const tags = [];
+  try {
+    const ctx = counterSpendContext(engine, pi, heroIdx);
+    if (!ctx) return tags;
+    const left = Math.max(0, ctx.have - ctx.cost);
+    tags.push(`cs:have:${ctx.have >= 4 ? '4+' : String(ctx.have)}`);
+    tags.push(`cs:left:${left >= 3 ? '3+' : String(left)}`);
+
+    const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+    tags.push(cardDB?.[ctx.hero.name]?.cardType === 'Ascended Hero' ? 'cs:ascended' : 'cs:base');
+
+    const nowOk = ascensionAffordableAt(engine, pi, heroIdx, ctx, ctx.have);
+    if (!nowOk) {
+      // Kein Aufstieg auf der Hand bezahlbar — die Ausgabe kostet
+      // aktuell gar keine Gelegenheit. Wichtiger Kontrastarm: ohne ihn
+      // lernte der Kanal "ausgeben ist schlecht" auch dort, wo nichts
+      // zu verpassen war.
+      tags.push('cs:no-ascend-now');
+    } else if (ascensionAffordableAt(engine, pi, heroIdx, ctx, ctx.have - ctx.cost)) {
+      tags.push('cs:keeps-ascend');
+    } else {
+      tags.push('cs:blocks-ascend');
+    }
+    tags.push(engine.gs?.currentPhase === 4 ? 'cs:mp2' : 'cs:mp1');
+  } catch { /* Tagging ist Diagnose, nie Abbruchgrund */ }
+  return tags;
+}
+
+function counterSpendPrior(engine, pi, heroName, tags) {
+  try {
+    const rules = profileFor(engine, pi)?.counterSpendRules?.[heroName];
+    if (!rules) return 0;
+    const raw = (tags || []).reduce((s, g) => s + (rules[g] || 0), 0);
+    // Deckel auf der SUMME, nicht nur je Tag. Der Trainer filtert
+    // universelle Tags zwar heraus, aber mehrere echte Lage-Tags koennen
+    // sich weiterhin addieren; ohne Deckel waere die Schwelle von ±4
+    // schon bei drei mittelstarken Tags bedeutungslos und der Kanal
+    // liefe auf "immer skip" bzw. "immer play" hinaus.
+    return Math.max(-20, Math.min(20, raw));
+  } catch { return 0; }
+}
+
+/**
+ * 'play' | 'skip' | null (= keine Meinung, regulaeres Gate entscheidet).
+ *
+ * Ohne Profil IMMER null → exakt das bisherige Verhalten, das Deck
+ * lernt sich die Regel selbst an. Im Training sorgt Exploration fuer
+ * beide Arme; die ε-Rest-Exploration trotz vorhandener Regel folgt der
+ * Begruendung des Heil-Kanals (sonst erstickt eine negative Regel den
+ * fired-Arm und die naechste Iteration lernt nur noch aus Altbestand).
+ */
+function counterSpendDecision(engine, pi, heroName, tags) {
+  try {
+    if (!tags || tags.length === 0) return null;
+    const rules = profileFor(engine, pi)?.counterSpendRules?.[heroName];
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = counterSpendPrior(engine, pi, heroName, tags);
+      if (score >= 4) return 'play';
+      if (score <= -4) return 'skip';
+      return null;
+    }
+    const explore = parseFloat(process.env.PP_COUNTER_EXPLORE || '0.3');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) {
+      return Math.random() < 0.5 ? 'skip' : 'play';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/**
+ * Liegt in der Hand eine Karte, die diesen Status anlegen kann?
+ *
+ * Deckneutral ueber zwei Vertraege: `cpuMeta.appliesStatuses: [...]`
+ * und das schon vorhandene `targetingConfig.appliesStatus`. BEWUSST
+ * KEIN Textscan — "Burned"/"Poisoned" stehen auch in Karten, die nur
+ * AUF den Status reagieren (die Waflav-Formen selbst sagen "Whenever a
+ * target is Burned"), ein Scan wuerde also genau die Karte als Applier
+ * zaehlen, deren Passung er messen soll. Preis dieser Entscheidung:
+ * die Messung sieht nur DEKLARIERTE Applier und untertreibt, solange
+ * nicht mehr Karten den Vertrag tragen.
+ */
+function handHasStatusApplier(engine, pi, status) {
+  try {
+    if (!status) return false;
+    const { loadCardEffect } = require('./_loader');
+    for (const cn of (engine.gs?.players?.[pi]?.hand || [])) {
+      const sc = loadCardEffect(cn);
+      if (!sc) continue;
+      const list = sc.cpuMeta?.appliesStatuses;
+      if (Array.isArray(list) && list.includes(status)) return true;
+      const single = sc.targetingConfig?.appliesStatus;
+      if (typeof single === 'string' && single === status) return true;
+    }
+  } catch { /* Messung darf nie stoeren */ }
+  return false;
+}
+
+/**
+ * Kann dieser Held gerade zuschlagen — also einen Defeat-Trigger
+ * ueberhaupt ausloesen? Deckneutral: eine Attack-Karte auf der Hand,
+ * die dieser Held nach seinen Abilities auch nutzen darf.
+ */
+function heroCanAttackNow(engine, pi, heroIdx) {
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+    for (const cn of (engine.gs?.players?.[pi]?.hand || [])) {
+      const cd = cardDB?.[cn];
+      if (!cd || cd.cardType !== 'Attack') continue;
+      if (typeof engine.heroMeetsLevelReq === 'function') {
+        try {
+          if (!engine.heroMeetsLevelReq(pi, heroIdx, cd)) continue;
+        } catch { /* unklar → als nutzbar werten */ }
+      }
+      return true;
+    }
+  } catch { /* Messung darf nie stoeren */ }
+  return false;
+}
+
+/**
+ * Zugende-Stempel: wie steht der Counter-Held am Ende des eigenen Zuges?
+ *
+ * Als Auftrag 6.8. — zusaetzlich zur Basis/Ascended-Frage soll messbar
+ * werden, auf WELCHER Form die CPU landet und wie oft sie pro Zug
+ * descendet. Bewertbar wird die Formwahl erst durch den Kontext, denn
+ * die Formen ziehen ihre Zaehler aus verschiedenen Quellen:
+ *   defeat  (Basis, Thunderstruck) → braucht eine nutzbare Attack
+ *   status  (Flamebathed/Burn, Swampborne/Poison) → braucht einen Applier
+ *   none    (Stormkissed, Deep-Drowned) → hat gar keine laufende Quelle
+ * Deshalb wandert neben dem Formnamen auch `src` (die Quelle laut
+ * Karten-Vertrag `cpuMeta.counterSource`) und `fit` (ist der noetige
+ * Ausloeser ueberhaupt zur Hand?) in den Record. Damit laesst sich Als
+ * Rangfolge nachher PRUEFEN statt sie zu unterstellen.
+ *
+ * Nur Helden mit `counterConsumer`-Vertrag — fuer andere Decks bleibt
+ * das Feld leer und der Kanal komplett stumm.
+ */
+function classifyFormTurn(engine, pi) {
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const gs = engine.gs;
+    const ps = gs?.players?.[pi];
+    const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+    const turn = gs?.turn || 0;
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      const sc = loadCardEffect(hero.name);
+      if (!sc?.cpuMeta?.counterConsumer) continue;
+      const ascended = cardDB?.[hero.name]?.cardType === 'Ascended Hero' ? 1 : 0;
+      let evo = 0;
+      try { evo = Number(sc.cpuMeta.counterSpend?.get?.(engine, pi, hi)) || 0; } catch { evo = 0; }
+      let couldAscend = 0;
+      for (const cn of (ps.hand || [])) {
+        if (cardDB?.[cn]?.cardType !== 'Ascended Hero') continue;
+        const asc = loadCardEffect(cn);
+        if (typeof asc?.ascensionCondition !== 'function') continue;
+        try {
+          if (asc.ascensionCondition(gs, pi, hi, engine)) { couldAscend = 1; break; }
+        } catch { /* einzelne Form unklar */ }
+      }
+      // Counter-Quelle der Endform und ob ihr Ausloeser zur Hand ist
+      const cSrc = sc.cpuMeta.counterSource || null;
+      let src = 'unknown', fit = 0;
+      if (cSrc?.kind === 'defeat') {
+        src = 'defeat';
+        fit = heroCanAttackNow(engine, pi, hi) ? 1 : 0;
+      } else if (cSrc?.kind === 'status') {
+        src = cSrc.status || 'status';
+        fit = handHasStatusApplier(engine, pi, cSrc.status) ? 1 : 0;
+      } else if (cSrc?.kind === 'none') {
+        src = 'none';
+        fit = 0;   // per Definition kein Ausloeser — die Form sammelt nicht
+      }
+      // Wie viele Abstiege in DIESEM Zug?
+      let desc = 0;
+      try {
+        desc = (engine._descendLog || []).filter(d => d.pi === pi && d.t === turn).length;
+      } catch { /* egal */ }
+      // Wie viele VERSCHIEDENE Formen liegen unter der aktuellen? Das
+      // ist die Groesse des Stapels, den ein Rueckwaerts-Abbau spaeter
+      // in Zaehler verwandeln kann.
+      let stack = 0;
+      try { stack = new Set(hero._formStack || []).size; } catch { /* egal */ }
+      return { t: turn, asc: ascended, evo, ca: couldAscend,
+        form: hero.name, src, fit, desc, stack };
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+// ─── Descend-Kanal (Als Auftrag 6.8., "mach wie du für richtig hältst") ──
+//
+// Gemessen im Lauf nach v259: Ø Formstapel 1.05, und 70% aller Abstiege
+// gehen von Stormkissed aus. Die CPU nutzt den Descend also als
+// RUNDENPUMPE (hoch, sofort runter, +1 Zaehler, wieder hoch) statt als
+// Stapel. Als Plan verlangt das Gegenteil: erst moeglichst viele
+// VERSCHIEDENE Formen stapeln, dann in EINEM Zug rueckwaerts abbauen und
+// mit dem Vorrat Deep-Drowned bezahlen.
+//
+// Bewusst als getaggter Kanal und NICHT als harte Regel: der Lerner hat
+// in diesem Deck mehrfach von selbst in die richtige Richtung gezeigt,
+// sobald er den Kontrast sehen konnte (casterDeltas → Thunderstruck,
+// tutorPickRules → Deep-Drowned). Ihm fehlte nur das Vokabular fuer die
+// Frage "jetzt abbauen oder noch weiterstapeln?". Genau das steht hier.
+//
+// Deckneutral ueber `cpuMeta.counterSource` und `ascensionCondition` —
+// keine Formnamen.
+
+function classifyDescendTags(engine, pi, heroIdx) {
+  const tags = [];
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const gs = engine.gs;
+    const ps = gs?.players?.[pi];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name) return tags;
+    const cardDB = engine._getCardDB ? engine._getCardDB() : null;
+    const sc = loadCardEffect(hero.name);
+
+    // Wie tief ist der Stapel — wie viel gaebe es ueberhaupt abzubauen?
+    const stack = Array.isArray(hero._formStack) ? hero._formStack : [];
+    const distinct = new Set(stack).size;
+    tags.push(`ds:stack:${distinct >= 3 ? '3+' : String(distinct)}`);
+
+    // Zaehlerstand jetzt
+    let evo = 0;
+    try { evo = Number(sc?.cpuMeta?.counterSpend?.get?.(engine, pi, heroIdx)) || 0; } catch { evo = 0; }
+    tags.push(`ds:evo:${evo >= 3 ? '3+' : String(evo)}`);
+
+    // Wo landet der Abstieg?
+    const target = stack[stack.length - 1];
+    if (target) {
+      tags.push(cardDB?.[target]?.cardType === 'Ascended Hero' ? 'ds:ziel-ascended' : 'ds:ziel-basis');
+      // PUMPE: die Zielform ist dieselbe, in die gerade wieder
+      // aufgestiegen wuerde — der Kreisel, den die Messung gefunden hat.
+      if ((ps.hand || []).includes(hero.name)) tags.push('ds:pumpe');
+    }
+
+    // Bringt der Abstieg eine TEURE Form in Reichweite, die es jetzt
+    // nicht ist? Das ist die eigentliche Frage hinter Als Plan.
+    let reachNow = false, reachAfter = false;
+    const spend = sc?.cpuMeta?.counterSpend;
+    for (const cn of (ps.hand || [])) {
+      if (cardDB?.[cn]?.cardType !== 'Ascended Hero') continue;
+      const asc = loadCardEffect(cn);
+      if (typeof asc?.ascensionCondition !== 'function') continue;
+      try { if (asc.ascensionCondition(gs, pi, heroIdx, engine)) reachNow = true; } catch { /* egal */ }
+    }
+    if (spend && typeof spend.set === 'function') {
+      const before = spend.get(engine, pi, heroIdx);
+      try {
+        spend.set(engine, pi, heroIdx, before + 1);   // ein Abstieg = mind. 1 Zaehler
+        for (const cn of (ps.hand || [])) {
+          if (cardDB?.[cn]?.cardType !== 'Ascended Hero') continue;
+          const asc = loadCardEffect(cn);
+          if (typeof asc?.ascensionCondition !== 'function') continue;
+          try { if (asc.ascensionCondition(gs, pi, heroIdx, engine)) { reachAfter = true; break; } } catch { /* egal */ }
+        }
+      } finally { spend.set(engine, pi, heroIdx, before); }
+    }
+    if (!reachNow && reachAfter) tags.push('ds:schaltet-frei');
+    else if (reachNow) tags.push('ds:schon-erreichbar');
+    else tags.push('ds:nichts-in-reichweite');
+
+    tags.push(gs?.currentPhase === 4 ? 'ds:mp2' : 'ds:mp1');
+  } catch { /* Tagging ist Diagnose, nie Abbruchgrund */ }
+  return tags;
+}
+
+function descendPrior(engine, pi, heroName, tags) {
+  try {
+    const rules = profileFor(engine, pi)?.descendRules?.[heroName];
+    if (!rules) return 0;
+    const raw = (tags || []).reduce((s, g) => s + (rules[g] || 0), 0);
+    return Math.max(-20, Math.min(20, raw));
+  } catch { return 0; }
+}
+
+/** 'play' | 'skip' | null (= keine Meinung, der Karten-Vertrag entscheidet). */
+function descendDecision(engine, pi, heroName, tags) {
+  try {
+    if (!tags || tags.length === 0) return null;
+    const rules = profileFor(engine, pi)?.descendRules?.[heroName];
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = descendPrior(engine, pi, heroName, tags);
+      if (score >= 4) return 'play';
+      if (score <= -4) return 'skip';
+      return null;
+    }
+    const explore = parseFloat(process.env.PP_DESCEND_EXPLORE || '0.3');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) {
+      return Math.random() < 0.5 ? 'skip' : 'play';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/** Entscheidung festhalten — hoechstens eine je Held und Zug. */
+function noteDescend(engine, pi, heroName, tags, fired) {
+  try {
+    if (engine._inMctsSim) return;
+    if (!engine._descendDecisionLog) engine._descendDecisionLog = [];
+    const t = engine.gs?.turn || 0;
+    const prev = engine._descendDecisionLog.find(e => e.pi === pi && e.c === heroName && e.t === t);
+    if (prev) { if (fired) { prev.fired = 1; prev.tags = tags; } return; }
+    engine._descendDecisionLog.push({ pi, c: heroName, t, tags, fired: fired ? 1 : 0 });
+  } catch { /* nie stoeren */ }
+}
+
 function playOrderPrior(engine, pi, tags) {
   try {
     const rules = profileFor(engine, pi)?.playOrderRules;
@@ -1492,5 +1930,13 @@ module.exports = {
   specReadyPrior,
   classifyPlayOrderTags,
   playOrderPrior,
+  classifyCounterSpendTags,
+  counterSpendPrior,
+  counterSpendDecision,
+  classifyDescendTags,
+  descendPrior,
+  descendDecision,
+  noteDescend,
+  classifyFormTurn,
   __getProfile: profileFor,
 };

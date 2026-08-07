@@ -69,7 +69,7 @@
 //    accurate for "summoned this turn" reads).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Garius, the Great Reformer';
 
@@ -111,7 +111,7 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName) {
     if (seen.has(cn)) continue;
     if (excludeName && cn === excludeName) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;

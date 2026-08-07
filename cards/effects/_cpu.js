@@ -20,6 +20,23 @@ const deckProfile = require('./_deck-profile');
 // values make the CPU feel sluggish on complex decks.
 const PAUSE_BETWEEN_ACTIONS = 600;
 const PAUSE_BETWEEN_PHASES = 450;
+
+// Wie oft darf DIESELBE Aktivierung innerhalb eines Schleifendurchlaufs
+// wiederholt gefeuert werden? Das ist KEINE Regelgrenze — wie viele
+// Nutzungen eine Karte hat, entscheidet ausschließlich sie selbst über
+// ihr `canActivate…`-Gate. Diese Zahl ist nur der Riegel gegen eine
+// Karte, die dauerhaft "verfügbar" meldet und trotzdem jedes Mal
+// feuert; ohne ihn liefe die Schleife bis zur Zug-Deadline. Bewusst
+// deutlich über dem, was echte Karten brauchen (aktuell 3).
+const MAX_ACTIVATION_REPEATS = 8;
+// Wie viele Aufstiege darf ein Zug höchstens enthalten? Auch das ist
+// KEINE Regelgrenze — die Karten begrenzen sich über ihren Counter-Preis
+// selbst. Der Riegel fängt nur den Fall ab, dass eine Form netto Counter
+// zurückgibt (Stormkissed: −1 zahlen, +2 erhalten) und die Schleife
+// sich dadurch bis zur Zug-Deadline weiterdrehen könnte. Drei reicht für
+// jede Linie, die im Archetyp vorgesehen ist (Aufstieg → Descend →
+// Wiederaufstieg).
+const MAX_ASCENSIONS_PER_TURN = 3;
 // Delay for each CPU prompt decision during card resolution (targeting, picks,
 // confirms). Puzzle mode keeps the original 50ms via the original prompt path.
 const CPU_PROMPT_DELAY = 350;
@@ -627,16 +644,71 @@ async function runCpuTurn(engine, helpers) {
   cpuLog('← Main Phase 2 done');
 
   if (!stillCpuTurn(engine, cpuIdx)) return;
-  cpuLog('→ tryAscend');
-  const ascended = await tryAscend(engine, helpers);
-  cpuLog(`← tryAscend done (ascended=${ascended})`);
+  // ── Ascension-Zyklus (5.8., Als Morph-and-Kill-Befund) ─────────────
+  // Früher: EIN tryAscend, danach immer advancePhase → der Zug war
+  // vorbei. Für Formen mit `blockEndPhaseOnAscend` ("Ascending this
+  // Hero does not end your turn") war das nachweislich falsch — der
+  // ganze Zweck des Aufstiegs (Karten, die einen Ascended Hero
+  // VORAUSSETZEN, die Effekte der neuen Form, der Descend-Zyklus)
+  // fiel damit strukturell aus. `performAscension` liefert die
+  // Auskunft längst als `skipEndPhase`; server.js wertet sie aus,
+  // nur der Pilot warf sie weg.
+  //
+  // Jetzt: aufsteigen → wenn der Zug weiterläuft, Main Phase 2 erneut
+  // durchlaufen (die neu freigeschalteten Plays einsammeln) → erneut
+  // prüfen. Formen OHNE den Vertrag (Beato, Arthor, Layn) verhalten
+  // sich exakt wie bisher: erster Aufstieg, dann Zugende.
+  let ascendedAny = false;
+  let ascendEndedTurn = false;
+  for (let ascPass = 0; ascPass < MAX_ASCENSIONS_PER_TURN; ascPass++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (engine.gs.currentPhase !== PHASES.MAIN2) break;
+    cpuLog(`→ tryAscend (Durchgang ${ascPass + 1})`);
+    const asc = await tryAscend(engine, helpers, { firstOfTurn: ascPass === 0 });
+    cpuLog(`← tryAscend done (ascended=${asc.ascended}, endsTurn=${asc.endsTurn})`);
+    if (!asc.ascended) break;
+    ascendedAny = true;
+    if (asc.endsTurn) { ascendEndedTurn = true; break; }
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    // Der Zug läuft weiter — genau hier liegt der Gewinn: Karten mit
+    // "only while you control an Ascended Hero" / "can only be used by
+    // an Ascended Hero" sind ab jetzt spielbar, die neue Form hat ihren
+    // eigenen Helden-Effekt (Descend, Deep-Drowned-Overcharge), und der
+    // Descend legt Counter für den nächsten Aufstieg nach.
+    cpuLog('→ Main Phase 2 (nach Ascension, neu freigeschaltete Plays)');
+    await runMainPhase(engine, helpers);
+    cpuLog('← Main Phase 2 (nach Ascension) done');
+  }
   if (!stillCpuTurn(engine, cpuIdx)) return;
-  if (ascended) {
-    // performAscension returns { skipEndPhase: true } by default — the
-    // normal SP flow reads that and auto-advances to End Phase. Self-play
-    // has to do it itself. Without this, the turn chain exits with the
-    // ascender stuck in Main Phase 2, startGame resolves with no winner,
-    // and we get a no-result tie (the Butterflies tie cluster).
+  // ── Zugende-Stempel: in welcher Form endet der Zug? ────────────────
+  // Als Vorgabe: "eine HOHE Belohnung dafuer, nicht in der Base-Form den
+  // Zug zu beenden". Der Stempel liefert dem Trainer die Bezugsgroesse
+  // dafuer — Basisform ja/nein, Zaehlerstand, und ob ein Aufstieg in
+  // diesem Moment noch bezahlbar GEWESEN waere (ohne das waere "endete
+  // in der Basisform" nicht von "hatte nie die Wahl" zu unterscheiden).
+  // Steht VOR allen Rueckgabepfaden des Zugendes, damit auch der
+  // zug-beendende Aufstieg gestempelt wird.
+  try {
+    if (!engine._inMctsSim) {
+      const ft = deckProfile.classifyFormTurn(engine, cpuIdx);
+      if (ft) {
+        if (!engine._formTurnLog) engine._formTurnLog = [];
+        engine._formTurnLog.push({ pi: cpuIdx, ...ft });
+        swapDiag(engine, ft.asc ? 'form:zugende-ascended'
+          : (ft.ca ? 'form:zugende-basis-trotz-moeglich' : 'form:zugende-basis'));
+      }
+    }
+  } catch { /* Telemetrie */ }
+  if (ascendedAny && engine.gs.currentPhase !== PHASES.MAIN2) {
+    // Eine zug-beendende Form hat den Aufstieg gemacht und die Engine
+    // ist schon weiter — nichts mehr zu tun.
+    return;
+  }
+  if (ascendEndedTurn) {
+    // performAscension meldete skipEndPhase:true (Alt-Verhalten). Self-
+    // play muss die Phase selbst weiterschalten; ohne das hängt die
+    // Kette in Main Phase 2, startGame löst ohne Sieger auf und wir
+    // bekommen ein no-result (der Butterflies-Unentschieden-Cluster).
     if (engine.gs.currentPhase === PHASES.MAIN2 && !engine.gs.result) {
       await engine.advancePhase(cpuIdx);
       broadcast(helpers);
@@ -1140,10 +1212,22 @@ async function tryActionCostingAbility(engine, helpers) {
 }
 
 // ─── Ascension ─────────────────────────────────────────────────────────
-// Per user spec: "If a CPU can Ascend, it will do so as the LAST game action
-// of its turn." Random pick if multiple Heroes are ready.
+// Quelle-Name des Formwahl-Prompts. Muss STABIL bleiben: er ist der
+// Schlüssel der gelernten Regeln (`tutorPickRules['Waflav Evolution→…']`)
+// — eine Umbenennung entwertet jedes trainierte Profil.
+const ASCENSION_CHOICE_SRC = 'Waflav Evolution';
 
-async function tryAscend(engine, helpers) {
+// Als Ursprungsvorgabe: "If a CPU can Ascend, it will do so as the LAST
+// game action of its turn." Das galt, solange JEDER Aufstieg den Zug
+// beendete. Formen mit `blockEndPhaseOnAscend` ("Ascending this Hero
+// does not end your turn") sind davon ausgenommen — für sie ist der
+// Aufstieg ein Zug-MITTELPUNKT, nach dem noch gespielt wird.
+//
+// Rückgabe: { ascended, endsTurn }. `endsTurn` spiegelt exakt
+// `performAscension`s `skipEndPhase` wider — die Auskunft war immer da,
+// wurde vom Piloten aber verworfen.
+
+async function tryAscend(engine, helpers, opts = {}) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -1156,16 +1240,51 @@ async function tryAscend(engine, helpers) {
     const cardName = ps.hand[handIdx];
     const cd = cardDB[cardName];
     if (!cd || cd.cardType !== 'Ascended Hero') continue;
+    const aScript = loadCardEffect(cardName);
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      if (!hero.ascensionReady) continue;
+      // Cards with their own printed price (Waflav's Evolution Counters)
+      // declare `ascensionCondition`; asking it here keeps the CPU from
+      // burning its Ascension attempt on a form it cannot afford —
+      // `performAscension` would reject it and the turn would end with
+      // nothing done.
+      if (typeof aScript?.ascensionCondition === 'function') {
+        if (!aScript.ascensionCondition(gs, cpuIdx, hi, engine)) continue;
+      } else if (!hero.ascensionReady) {
+        continue;
+      }
       candidates.push({ cardName, handIdx, heroIdx: hi });
     }
   }
-  if (!candidates.length) return false;
+  if (!candidates.length) return { ascended: false, endsTurn: false };
 
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  // ── Form choice (multi-form archetypes) ──────────────────────────
+  // With several affordable forms for the same Hero the choice is a real
+  // decision, not a coin flip. Route it through a cardGallery prompt so
+  // it rides the existing tutor-pick learning channel end to end:
+  // `_logGalleryPick` records `src → picked` on every LIVE gallery
+  // resolution, the trainer turns those into `tutorPickRules` with
+  // Advantage labels and recency weighting, and the gallery scorer adds
+  // `tutorPickRules[src→card]` back when ranking. The CPU therefore
+  // learns which evolution pays off in which situation, per deck profile.
+  let pick;
+  const multi = candidates.filter(c => c.heroIdx === candidates[0].heroIdx);
+  const distinct = [...new Set(multi.map(c => c.cardName))];
+  if (distinct.length > 1) {
+    const choice = await engine.promptGeneric(cpuIdx, {
+      type: 'cardGallery',
+      title: ASCENSION_CHOICE_SRC,
+      source: ASCENSION_CHOICE_SRC,
+      description: 'Which form?',
+      cards: distinct.map(n => ({ name: n, source: 'hand' })),
+      cancellable: false,
+    });
+    const chosen = choice?.cardName;
+    pick = multi.find(c => c.cardName === chosen) || multi[0];
+  } else {
+    pick = candidates[Math.floor(Math.random() * candidates.length)];
+  }
   cpuLog(`  → ascend "${pick.cardName}" onto hero ${pick.heroIdx}`);
   await pauseAction(engine);
   // Ascension is an enormous, near-always-positive boon: HP/ATK upgrade,
@@ -1175,18 +1294,31 @@ async function tryAscend(engine, helpers) {
   // route the activation through the gate with `alwaysCommit: true` —
   // MCTS still gets to explore bonus-prompt variations to pick the best
   // one, but the gate will not refuse the ascension itself.
+  //
+  // NUR für den ERSTEN Aufstieg des Zuges. Seit dem Zyklus (mehrere
+  // Aufstiege je Zug möglich) wäre ein Dauer-Bypass gefährlich: eine
+  // Form, die netto Counter zurückgibt (Stormkissed: −1/+2), könnte
+  // sich sonst durch die ganze Hand schleifen, ohne dass die Bewertung
+  // je widersprechen darf. Folgeaufstiege gehen durchs normale Gate.
+  let ascResult = null;
   const actionFn = async () => {
-    await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, {});
+    ascResult = await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, {});
   };
   const committed = await mctsGatedActivation(engine, helpers, `ascend ${pick.cardName}`, actionFn,
-    { alwaysCommit: true });
+    { alwaysCommit: opts.firstOfTurn !== false });
   if (!committed) {
     cpuLog(`  ← ascension skipped by MCTS gate`);
-    return false;
+    return { ascended: false, endsTurn: false };
   }
-  cpuLog(`  ← ascension done`);
+  // `skipEndPhase === false` heißt: die Form trägt `blockEndPhaseOnAscend`,
+  // der Zug läuft weiter. Fehlt die Auskunft (Alt-Pfad, Gate-Recon ohne
+  // echten Lauf), gilt die konservative Annahme "Zug endet" — genau das
+  // bisherige Verhalten.
+  const endsTurn = ascResult ? ascResult.skipEndPhase !== false : true;
+  cpuLog(`  ← ascension done (endsTurn=${endsTurn})`);
   broadcast(helpers);
-  return true;
+  swapDiag(engine, endsTurn ? 'asc:endet-zug' : 'asc:zug-laeuft-weiter');
+  return { ascended: true, endsTurn };
 }
 
 async function runMainPhase(engine, helpers) {
@@ -1277,6 +1409,16 @@ async function runMainPhase(engine, helpers) {
     if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
     if (cpuPastDeadline(engine)) return;
 
+    // Hand-aktivierte Effekte NACH den discard-empfindlichen Kreaturen
+    // (ein Abwurf schließt deren Fenster) und VOR allem anderen — sie
+    // sind kostenlos und schalten oft erst frei, was danach kommt
+    // (Stormkisseds Counter ist die Eintrittskarte in den Aufstieg).
+    cpuLog('    → fireHandActivations');
+    await fireHandActivations(engine, helpers);
+    cpuLog('    ← fireHandActivations');
+    if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
+    if (cpuPastDeadline(engine)) return;
+
     cpuLog('    → playArtifacts');
     await playArtifacts(engine, helpers);
     cpuLog('    ← playArtifacts');
@@ -1329,6 +1471,88 @@ async function runMainPhase(engine, helpers) {
 // turn even if multiple Heroes stack the same Ability. The handler claims
 // HOPT on successful activation; we just need to skip if gs.hoptUsed says so.
 
+// ─── Hand-aktivierte Effekte ──────────────────────────────────────────
+//
+// `handActivatedEffect` ist ein Karten-Vertrag, den die Engine seit
+// jeher kennt (`getHandActivatableCards` / `doHandActivate`) — aber
+// AUSSCHLIESSLICH der Client löste ihn aus, über den Socket
+// `activate_hand_card`. Für den Piloten existierte der Pfad nicht: der
+// Effekt war für JEDE CPU jeder Karte dieser Bauart tot.
+//
+// Gemessen an Morph and Kill (500 Mitschnitte, 5.8.): Stormkisseds
+// "Discard → 1 Evolution Counter" feuerte 0×. Es ist die einzige
+// Counter-Quelle, die keinen Kill voraussetzt — ohne sie hängt der
+// ganze Archetyp daran, dass die Basisform erst einmal etwas tötet,
+// und in 76% der Spiele kam nie ein einziger Counter zustande.
+// Betroffen sind heute außerdem Luna Kiai und Mana-Absorbing Crystal.
+//
+// Zwei Verträge, beide optional und beide dem `cpuShouldPlay`-Muster
+// nachgebaut:
+//   • `cpuShouldHandActivate(engine, pi, handIndex)` → bool
+//     Soft-Gate der Karte, bevor überhaupt bewertet wird.
+//   • `cpuMeta.alwaysCommit` (bool | (engine, pi) => bool)
+//     Für Effekte, deren Ertrag die Sofortbewertung nicht sieht — ein
+//     Abwurf gegen einen Counter liest sich als reiner Kartenverlust
+//     (dieselbe Blindstelle wie bei Perfect Disguise).
+async function fireHandActivations(engine, helpers) {
+  const cpuIdx = engine._cpuPlayerIdx;
+  if (typeof engine.getHandActivatableCards !== 'function') return;
+  if (typeof engine.doHandActivate !== 'function') return;
+  const tried = new Set();
+  for (let safety = 0; safety < 6; safety++) {
+    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (cpuPastDeadline(engine)) return;
+    let list = [];
+    try { list = engine.getHandActivatableCards(cpuIdx) || []; }
+    catch { return; }
+    if (list.length === 0) {
+      if (safety === 0) swapDiag(engine, 'handact:keine-kandidaten');
+      return;
+    }
+    let pick = null;
+    for (const cand of list) {
+      if (!cand || tried.has(cand.cardName)) continue;
+      const script = loadCardEffect(cand.cardName);
+      if (typeof script?.cpuShouldHandActivate === 'function') {
+        let ok = true;
+        try { ok = !!script.cpuShouldHandActivate(engine, cpuIdx, cand.handIndex); }
+        catch (err) {
+          console.error(`[cpu] cpuShouldHandActivate ${cand.cardName} threw:`, err.message);
+        }
+        if (!ok) {
+          swapDiag(engine, `handact:soft-nein:${cand.cardName}`);
+          tried.add(cand.cardName);
+          continue;
+        }
+      }
+      pick = { ...cand, script };
+      break;
+    }
+    if (!pick) return;
+    tried.add(pick.cardName);
+    swapDiag(engine, `handact:kandidat:${pick.cardName}`);
+
+    const alwaysCommit = (typeof pick.script?.cpuMeta?.alwaysCommit === 'function'
+      ? (() => {
+          try { return !!pick.script.cpuMeta.alwaysCommit(engine, cpuIdx, CPU_META_HELPERS); }
+          catch { return false; }
+        })()
+      : !!pick.script?.cpuMeta?.alwaysCommit);
+
+    let fired = false;
+    const actionFn = async () => {
+      fired = !!(await engine.doHandActivate(cpuIdx, pick.cardName, pick.handIndex));
+    };
+    const committed = await mctsGatedActivation(engine, helpers,
+      `hand-activate ${pick.cardName}`, actionFn, { alwaysCommit });
+    swapDiag(engine, committed
+      ? (fired ? `handact:ok:${pick.cardName}` : `handact:gefeuert-nein:${pick.cardName}`)
+      : `handact:gate-nein:${pick.cardName}`);
+    if (committed && fired) broadcast(helpers);
+    await pauseAction(engine);
+  }
+}
+
 async function activateBoardEffects(engine, helpers) {
   await activateFreeAbilities(engine, helpers);
   if (!stillCpuTurn(engine, engine._cpuPlayerIdx)) return;
@@ -1344,25 +1568,79 @@ async function activateBoardEffects(engine, helpers) {
   await activatePermanents(engine, helpers);
 }
 
+// ─── Counter-Ausgabe-Kanal: Helfer ────────────────────────────────────
+
+/** Aktueller Zaehlerstand eines Helden ueber den Karten-Vertrag, oder null. */
+function readCounterStock(engine, pi, heroIdx) {
+  try {
+    if (!(heroIdx >= 0)) return null;
+    const hero = engine.gs?.players?.[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return null;
+    const spend = loadCardEffect(hero.name)?.cpuMeta?.counterSpend;
+    if (!spend || typeof spend.get !== 'function') return null;
+    const v = spend.get(engine, pi, heroIdx);
+    return Number.isFinite(v) ? v : null;
+  } catch { return null; }
+}
+
+/**
+ * Eine Ausgabe-Entscheidung festhalten — HOECHSTENS EINE je Held und Zug.
+ *
+ * Der Helden-Effekt ist once-per-turn, es gibt also pro Zug genau eine
+ * Entscheidung. Ein SKIP verbraucht die HOPT-Sperre aber nicht, also
+ * bewertet jeder weitere `activateHeroEffects`-Durchlauf dieselbe
+ * Gelegenheit erneut. Ohne Dedupe zaehlt der held-Arm Wiederholungen
+ * statt Entscheidungen — im ersten Lauf um Faktor ~7 aufgeblasen.
+ * Ein spaeteres `fired: 1` ueberschreibt ein frueheres `0` desselben
+ * Zuges: dass in einem Durchlauf abgelehnt und im naechsten doch
+ * ausgegeben wurde, ist EIN Vorgang, und sein Ausgang ist die Ausgabe.
+ */
+function noteCounterSpend(engine, pi, heroName, tags, fired) {
+  try {
+    if (engine._inMctsSim) return;
+    if (!engine._counterSpendLog) engine._counterSpendLog = [];
+    const t = engine.gs?.turn || 0;
+    const prev = engine._counterSpendLog.find(e =>
+      e.pi === pi && e.c === heroName && e.t === t);
+    if (prev) {
+      if (fired) { prev.fired = 1; prev.tags = tags; }
+      return;
+    }
+    engine._counterSpendLog.push({ pi, c: heroName, t, tags, fired: fired ? 1 : 0 });
+  } catch { /* nie stoeren */ }
+}
+
 async function activateHeroEffects(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
   if (!ps) return;
 
-  // Flashbang gate — Hero Effect activations now fire onAnyActionResolved
-  // (so they trigger Flashbang's turn-end). Skip in Main Phase 1 to
-  // preserve the one allowed Action for the Action Phase's wider
-  // card pool; allow in Main Phase 2 as a fallback. Same rationale
-  // as the gate in fireAdditionalActions above.
-  if (isCpuFlashbanged(engine) && gs.currentPhase === 2) {
-    cpuLog('  activateHeroEffects: skipping in MP1 (Flashbanged)');
-    return;
-  }
+  // Flashbang-Sperre: siehe Als Ruling (4.8.) — ein Helden-Effekt löst
+  // `onAnyActionResolved` nur noch aus, wenn er die Ressource Aktion
+  // VERBRAUCHT (`heroEffectActionCost`). Kostenlose Helden-Effekte sind
+  // unter Flashbang also gefahrlos und werden nicht mehr pauschal
+  // gesperrt; die Sperre unten filtert nur noch die aktionskostenden.
+  const flashbangedInMp1 = isCpuFlashbanged(engine) && gs.currentPhase === 2;
   const tried = new Set();
-  for (let safety = 0; safety < 6; safety++) {
+  // Livelock-Riegel, siehe MAX_ACTIVATION_REPEATS.
+  const repeatCount = new Map();
+  // Tags der Counter-Ausgabe-Entscheidung des GEWAEHLTEN Helden — sie
+  // entstehen in der Kandidatenschleife, gebraucht werden sie erst nach
+  // der Aktivierung (fired-Arm des Lernkanals).
+  let pickCsTags = null;
+  let pickCsHero = null;
+  let pickCsEvoBefore = null;
+  let pickCsHeroIdx = -1;
+  // Von 6 angehoben: mit Mehrfachnutzungen (Kassaran 3×) reichten die
+  // alten Durchläufe für drei Helden nicht mehr aus.
+  for (let safety = 0; safety < 16; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
     let pickIdx = -1;
+    pickCsTags = null;
+    pickCsHero = null;
+    pickCsEvoBefore = null;
+    pickCsHeroIdx = -1;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
@@ -1379,6 +1657,14 @@ async function activateHeroEffects(engine, helpers) {
       const script = loadCardEffect(hero.name);
       const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
       let available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      // Unter Flashbang in Main Phase 1: nur Effekte aufschieben, die
+      // wirklich eine Aktion kosten — die würden den Zug hier sofort
+      // beenden und die Action Phase mitsamt breiterem Kartenpool
+      // verschenken. In MP2 bietet derselbe Pass sie regulär an.
+      if (available && flashbangedInMp1 && script?.heroEffectActionCost) {
+        cpuLog(`      hero-effect "${hero.name}": Aktionskosten unter Flashbang — aufgeschoben auf Main Phase 2`);
+        available = false;
+      }
       // Zug-beendende Hero-Effekte (heroEffectEndsTurn, z. B. Cooldin)
       // sind in Main Phase 1 GESPERRT: Ein Feuern dort verschenkt die
       // Action Phase + MP2. In MP2 (Phase 4) bietet derselbe Pass sie
@@ -1400,6 +1686,34 @@ async function activateHeroEffects(engine, helpers) {
           console.error(`[cpu] cpuShouldUseHeroEffect ${hero.name} threw:`, err.message);
         }
         if (!available) cpuLog(`      hero-effect "${hero.name}": cpuShouldUseHeroEffect → skip`);
+      }
+      // ── Counter-Ausgabe-Kanal (Als Vorgabe 5.8.) ──────────────────
+      // Helden, die fuer ihren Effekt Zaehler VERBRAUCHEN, bekommen die
+      // Frage "jetzt ausgeben oder fuer den Aufstieg aufheben?" als
+      // eigene, gelernte Entscheidung. Ohne Profil liefert der Kanal
+      // null → exakt das bisherige Verhalten; die Regel lernt sich das
+      // Deck selbst an. Getrieben vom Vertrag `cpuMeta.counterSpend`,
+      // kein Archetyp-Wissen im Piloten.
+      let csTags = null;
+      if (available && script?.cpuMeta?.counterSpend) {
+        csTags = deckProfile.classifyCounterSpendTags(engine, cpuIdx, hi);
+        if (csTags && csTags.length > 0) {
+          const csDec = deckProfile.counterSpendDecision(engine, cpuIdx, hero.name, csTags);
+          if (csDec === 'skip') {
+            // Genau EIN Eintrag je Held und Zug. Der Helden-Effekt ist
+            // once-per-turn, es gibt also pro Zug genau EINE Ausgabe-
+            // Entscheidung — aber ein Skip verbraucht die HOPT-Sperre
+            // nicht, weshalb dieselbe Gelegenheit in jedem weiteren
+            // Durchlauf von `activateHeroEffects` erneut bewertet und
+            // erneut geloggt wurde. Im ersten Lauf blies das den
+            // held-Arm auf ~7× seiner wahren Groesse.
+            noteCounterSpend(engine, cpuIdx, hero.name, csTags, 0);
+            swapDiag(engine, 'cspend:aufgehoben');
+            cpuLog(`      hero-effect "${hero.name}": Counter aufgehoben (${csTags.join(',')})`);
+            available = false;
+            csTags = null;
+          }
+        }
       }
       if (available && script.canActivateHeroEffect) {
         try {
@@ -1429,19 +1743,95 @@ async function activateHeroEffects(engine, helpers) {
         }
         return true;
       });
-      if (available || hasEquippedEffect) { pickIdx = hi; break; }
+      if (available || hasEquippedEffect) {
+        pickIdx = hi;
+        if (available && csTags && csTags.length > 0) {
+          pickCsTags = csTags;
+          pickCsHero = hero.name;
+          // Zaehlerstand VOR der Aktivierung — der einzige verlaessliche
+          // Beleg dafuer, ob wirklich ausgegeben wurde (siehe unten).
+          pickCsEvoBefore = readCounterStock(engine, cpuIdx, hi);
+          pickCsHeroIdx = hi;
+        }
+        break;
+      }
     }
     if (pickIdx < 0) return;
     cpuLog(`      → activate hero effect hero=${pickIdx}`);
-    const handBefore = JSON.stringify(gs.hoptUsed || {});
+    // Formzustand VOR der Aktivierung — siehe Fortschritts-Riegel unten.
+    const formBefore = engine.gs?.players?.[cpuIdx]?.heroes?.[pickIdx]?.name || null;
     const committed = await mctsGatedActivation(engine, helpers, `hero-effect h${pickIdx}`,
       () => helpers.doActivateHeroEffect(helpers.room, cpuIdx, { heroIdx: pickIdx }));
-    const handAfter = JSON.stringify(gs.hoptUsed || {});
-    if (!committed || handBefore === handAfter) {
-      cpuLog(`      ← hero effect hero=${pickIdx} did NOT claim HOPT — marking as tried`);
+    // Vorher wurde `JSON.stringify(gs.hoptUsed)` vor/nach verglichen —
+    // ein Helden-Effekt mit MEHREREN Nutzungen pro Runde (Kassaran, 3×)
+    // lässt die Sperre offen und sah damit aus wie "nicht gefeuert".
+    // Der Server meldet das Ergebnis jetzt direkt.
+    const fired = engine.didActivationFire(`hero-effect:${cpuIdx}:${pickIdx}`);
+    // ── fired-Arm des Counter-Ausgabe-Kanals (6.8., korrigiert) ────
+    // ALT: `fired: (committed && fired) ? 1 : 0` mit `fired` aus
+    // `engine.didActivationFire(...)`. Zwei Fehler auf einmal:
+    //
+    // (a) `didActivationFire` wird nur wahr, wenn `onHeroEffect` NICHT
+    //     `false` zurueckgibt. Die Waflav-Familie nutzt
+    //     `finishSelfManagedHeroEffect`, das absichtlich `false`
+    //     liefert, damit die Engine ihren eigenen HOPT-Stempel nicht
+    //     setzt — der fired-Arm war also blind fuer genau die
+    //     Heldenfamilie, fuer die der Kanal existiert.
+    // (b) Gate-Ablehnungen (`committed === false`) landeten als
+    //     `fired: 0` im selben Topf. Eine Gate-Ablehnung ist aber gar
+    //     keine Ausgabe-Entscheidung, sondern ein Wert-Urteil — sie
+    //     gehoert in keinen der beiden Arme.
+    //
+    // Messergebnis des ersten Laufs: 8354 Entscheidungen, davon 8353
+    // "held" und 1 "fired". Keine Kontrastgruppe, also keine Regel.
+    //
+    // NEU: der Beleg ist der ZAEHLERSTAND. Ist er nach der Aktivierung
+    // niedriger als davor, wurde ausgegeben — unabhaengig davon, wie
+    // der Effekt sein Feuern meldet. Gate-Ablehnungen werden verworfen
+    // und separat gezaehlt.
+    try {
+      if (!engine._inMctsSim && pickCsTags && pickCsHero) {
+        if (!committed) {
+          swapDiag(engine, 'cspend:gate-nein');
+        } else {
+          const after = readCounterStock(engine, cpuIdx, pickCsHeroIdx);
+          const spent = (pickCsEvoBefore != null && after != null && after < pickCsEvoBefore);
+          noteCounterSpend(engine, cpuIdx, pickCsHero, pickCsTags, spent ? 1 : 0);
+          swapDiag(engine, spent ? 'cspend:ausgegeben' : 'cspend:aktiviert-ohne-ausgabe');
+        }
+      }
+    } catch { /* nie stoeren */ }
+    const repeats = (repeatCount.get(pickIdx) || 0) + 1;
+    repeatCount.set(pickIdx, repeats);
+    // ── FORTSCHRITTS-RIEGEL (Als Ruling 6.8.) ─────────────────────────
+    // `fired` kommt aus `didActivationFire` und ist bei Helden-Effekten,
+    // die ihre Sperre selbst verwalten, IMMER false — deren
+    // `onHeroEffect` liefert bewusst `false`, damit die Engine den
+    // gemeinsamen `hero-effect:<name>`-Stempel nicht setzt (sonst
+    // sperrten sich zwei Effekte derselben Karte gegenseitig aus).
+    // Ein ERFOLGREICHER Vorgang galt dadurch als "nicht gefeuert" und
+    // sperrte den Helden fuer den Rest dieses Durchlaufs.
+    //
+    // Gemessen an den Waflav-Formen: Stormkissed/Thunderstruck/
+    // Flamebathed/Swampborne liefern `true` und waren nie betroffen —
+    // Deep-Drowned liefert `false` und blockierte nach SEINEM Abstieg
+    // die Kette.
+    //
+    // Als Regel lautet: eine Descension je FORM je Runde, danach darf
+    // sofort weiter abgestiegen werden. Die Regelseite kann das laengst
+    // (die Sperre haengt am Formnamen, und `hoptKey` der CPU ebenso) —
+    // es fehlte nur das Fortschritts-Signal. Ein Wechsel des Formnamens
+    // IST unmissverstaendlicher Fortschritt: die naechste Aktivierung
+    // trifft eine andere Karte mit eigener Sperre. Deckneutral, greift
+    // fuer jeden Helden-Effekt, der den Helden umwandelt.
+    const formAfter = engine.gs?.players?.[cpuIdx]?.heroes?.[pickIdx]?.name || null;
+    const transformed = !!(committed && formBefore && formAfter && formBefore !== formAfter);
+    if (transformed) swapDiag(engine, 'heroeff:form-gewechselt');
+    if (!committed || (!fired && !transformed) || repeats >= MAX_ACTIVATION_REPEATS) {
+      cpuLog(`      ← hero effect hero=${pickIdx} nicht gefeuert — als versucht markiert`);
       tried.add(pickIdx);
     } else {
-      cpuLog(`      ← hero effect hero=${pickIdx} OK`);
+      cpuLog(`      ← hero effect hero=${pickIdx} OK (${repeats}.)`);
     }
     await pauseAction(engine);
   }
@@ -1580,7 +1970,9 @@ async function activateFreeAbilities(engine, helpers) {
   if (!ps) return;
 
   const tried = new Set();
-  for (let safety = 0; safety < 12; safety++) {
+  // Livelock-Riegel, siehe MAX_ACTIVATION_REPEATS.
+  const repeatCount = new Map();
+  for (let safety = 0; safety < 24; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
 
     let pick = null;
@@ -1685,7 +2077,6 @@ async function activateFreeAbilities(engine, helpers) {
     }
 
     const hoptKey = `free-ability:${pick.abilityName}:${cpuIdx}`;
-    const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      → activate free ability "${pick.abilityName}" hero=${pick.heroIdx} zone=${pick.zoneIdx}`);
     const pickAbilityScript = loadCardEffect(pick.abilityName);
     // Always-commit triggers: (a) cards flagged `blockedByHandLock`
@@ -1702,8 +2093,16 @@ async function activateFreeAbilities(engine, helpers) {
       () => helpers.doActivateFreeAbility(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneIdx: pick.zoneIdx }),
       { alwaysCommit: pickAbilityAlwaysCommit });
     const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
-    cpuLog(`      ← free ability "${pick.abilityName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
-    if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
+    // Karten, die den Engine-Schlüssel nach erfolgreicher Auflösung
+    // wieder freigeben, weil sie mehrere Nutzungen pro Runde haben
+    // (Lethes Necromancy, 3×), sahen über `nowClaimed` aus wie
+    // "nicht gefeuert". Der Server meldet es jetzt direkt; `nowClaimed`
+    // bleibt nur noch als Zusatzinfo im Log.
+    const fired = engine.didActivationFire(hoptKey);
+    const repeats = (repeatCount.get(pick.key) || 0) + 1;
+    repeatCount.set(pick.key, repeats);
+    cpuLog(`      ← free ability "${pick.abilityName}" ${committed && fired ? `OK (${repeats}.${nowClaimed ? '' : ' Sperre offen'})` : 'SKIPPED/FAILED'}`);
+    if (!committed || !fired || repeats >= MAX_ACTIVATION_REPEATS) tried.add(pick.key);
     await pauseAction(engine);
   }
 }
@@ -1752,7 +2151,12 @@ async function activateCreatureEffects(engine, helpers) {
   if (!ps) return;
 
   const tried = new Set();
-  for (let safety = 0; safety < 12; safety++) {
+  // Wie oft hat DIESE Instanz in diesem Durchlauf schon gefeuert?
+  // Nur Livelock-Riegel — die echte Grenze führt die Karte selbst.
+  const repeatCount = new Map();
+  // Obergrenze angehoben: mit Mehrfachnutzungen (3-Headed Giant 3×)
+  // reichten 12 Durchläufe für ein volles Brett nicht mehr aus.
+  for (let safety = 0; safety < 32; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return;
 
     let pick = null;
@@ -1768,12 +2172,18 @@ async function activateCreatureEffects(engine, helpers) {
         if (!inst) continue;
         if (inst.faceDown) continue; // face-down surprises aren't actives
         if (inst.turnPlayed === gs.turn && !inst.counters?._hasHaste) continue; // summoning sickness
-        const hoptKey = `creature-effect:${inst.id}`;
-        if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
 
         const effectName = inst.counters?._effectOverride || cardName;
         const script = loadCardEffect(effectName);
         if (!script?.creatureEffect || !script.onCreatureEffect) continue;
+
+        // Verfügbarkeit über die ZENTRALE Engine-Prüfung: Sperre UND
+        // Karten-Gate. Vorher stand hier nur die Sperre — Kreaturen,
+        // deren `canActivateCreatureEffect` gerade nein sagt, liefen
+        // dadurch ins Gate und wurden für den Rest der Phase auf
+        // `tried` gesetzt. Jetzt sieht die CPU exakt dasselbe wie der
+        // Client, also nie mehr und nie weniger als ein Mensch.
+        if (!engine.creatureEffectStillAvailable(inst)) continue;
 
         const key = `${cardName}|${hi}|${zi}|${inst.id}`;
         if (tried.has(key)) continue;
@@ -1805,7 +2215,6 @@ async function activateCreatureEffects(engine, helpers) {
     if (!pick) return;
 
     const hoptKey = `creature-effect:${pick.instId}`;
-    const wasClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
     cpuLog(`      → activate creature effect "${pick.cardName}" hero=${pick.heroIdx} zone=${pick.zoneSlot}`);
     const pickScript = loadCardEffect(pick.cardName);
     // alwaysCommit darf eine FUNKTION sein: (engine, cpuIdx) => bool.
@@ -1816,9 +2225,21 @@ async function activateCreatureEffects(engine, helpers) {
     const committed = await mctsGatedActivation(engine, helpers, `creature-effect ${pick.cardName}`,
       () => helpers.doActivateCreatureEffect(helpers.room, cpuIdx, { heroIdx: pick.heroIdx, zoneSlot: pick.zoneSlot }),
       { alwaysCommit: pickAlwaysCommit, evaluateThroughTurnEnd: pickEvalThroughTurnEnd });
-    const nowClaimed = gs.hoptUsed?.[hoptKey] === gs.turn;
-    cpuLog(`      ← creature effect "${pick.cardName}" ${committed && nowClaimed ? 'OK' : 'SKIPPED/FAILED'}`);
-    if (!committed || (!wasClaimed && !nowClaimed)) tried.add(pick.key);
+    // Hat sie GEFEUERT? Das meldet der Server jetzt direkt, statt dass
+    // wir es aus der Sperre ableiten. Karten mit mehreren Nutzungen pro
+    // Runde lassen die Sperre bewusst offen — die alte Ableitung las
+    // das als "nicht gefeuert" und verschenkte alle weiteren Nutzungen.
+    const fired = engine.didActivationFire(hoptKey);
+    const repeats = (repeatCount.get(pick.instId) || 0) + 1;
+    repeatCount.set(pick.instId, repeats);
+    cpuLog(`      ← creature effect "${pick.cardName}" ${committed && fired ? `OK (${repeats}.)` : 'SKIPPED/FAILED'}`);
+    // Nur weiter anbieten, wenn wirklich gefeuert wurde. Ob noch eine
+    // Nutzung übrig ist, entscheidet die Verfügbarkeitsprüfung oben im
+    // nächsten Durchlauf — die Karte ist dafür die einzige Instanz.
+    // Der Wiederholungs-Riegel ist reiner Livelock-Schutz, keine
+    // Regelgrenze: er greift erst weit jenseits dessen, was eine Karte
+    // legitim braucht.
+    if (!committed || !fired || repeats >= MAX_ACTIVATION_REPEATS) tried.add(pick.key);
     await pauseAction(engine);
   }
 }

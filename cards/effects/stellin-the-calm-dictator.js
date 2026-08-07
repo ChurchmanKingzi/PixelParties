@@ -36,7 +36,7 @@
 //  wrong inside the chained 3-card hand path).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME    = 'Stellin, the Calm Dictator';
 const ATTACHABLE   = 'Stellan, the Calm Cat';
@@ -109,7 +109,7 @@ function levelZeroCreatureNames(engine, playerIdx, source) {
   for (const cn of (source || [])) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
     const raw = cd.level || 0;
     if (raw === 0) { seen.add(cn); result.push(cn); continue; }
     const reduced = engine._applyCardLevelReductions(cd, raw, playerIdx);

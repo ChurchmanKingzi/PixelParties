@@ -63,6 +63,11 @@ module.exports = {
       // Check exactly 1 opponent target was hit
       const targets = ctx.damageTargets || [];
       if (targets.length !== 1) return;
+      // Karten, die ausdruecklich nie mehr als 1 Ziel treffen duerfen
+      // (Basketskull), sind von Bartas' Zweitziel ausgenommen
+      // (Als Hinweis 5.8.). Deklarativ ueber ein Flag am Skript, nicht
+      // ueber eine Namensliste.
+      if (loadCardEffect(ctx.spellName)?.neverMultiTarget) return;
 
       // Check spell level < Bartas's Destruction Magic level
       const spellLevel = spellData.level || 0;

@@ -672,7 +672,13 @@ const ZONE_ANIM_SFX = {
   // Dog bite (Loyal Terrier and any future fang-tribe cards)
   dog_bite:                { name: 'slash' },
   // Heavy impact
-  magic_hammer:            { name: 'heavy_impact', opts: { delay: 400 } },
+  // `hammerDrop` laeuft 1s und setzt den Hammer bei 34% auf, also nach
+  // 340ms (Aufprallblitz .33s, Squash und Funken 320-330ms). Der Delay
+  // ist der Aufprallzeitpunkt INNERHALB der Animation — den Vorlauf bis
+  // zum Animationsstart (ZONE_ANIM_MOUNT_DELAY_MS) rechnet
+  // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
+  // auseinanderlaufen koennen.
+  magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
   tiger_impact:            { name: 'heavy_impact' },
   ox_impact:               { name: 'heavy_impact' },
   snake_impact:            { name: 'heavy_impact' },
@@ -717,7 +723,27 @@ const ZONE_ANIM_SFX = {
 // should layer with another cue.
 const ZONE_ANIM_NONEFFECT = new Set([
   // Self-contained non-attack visuals that can layer with another cue.
+  //
+  // `magic_hammer` (Magic Hammer, Hammer Skeleton, Heavy Hit) ist der
+  // Sonderfall, fuer den es diese Liste gibt: der Aufprall-Thud ist
+  // NICHT der Cast-Klang, sondern ein zweiter, spaeterer Schlag ~440ms
+  // danach — der Moment, in dem der Hammerkopf aufsetzt. Ohne den
+  // Eintrag hier hat `spell_cast` (aus dem `spell_played`-Log, das
+  // beim Bestaetigen des Ziels feuert) den 'effect'-Slot schon
+  // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
+  // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
+  'magic_hammer',
 ]);
+
+// Vorlauf zwischen dem `play_zone_animation`-Ereignis und dem Start der
+// Animation: `onZoneAnim` mountet sie ueber ein setTimeout, damit das DOM
+// nach dem Zustands-Sync die richtigen Positionen liefert. Die Delays in
+// ZONE_ANIM_SFX sind animationsrelativ ("wann trifft der Hammer im
+// Keyframe"), also muss dieser Vorlauf hier draufgerechnet werden.
+// app-board.jsx liest dieselbe Konstante fuer sein setTimeout — sonst
+// laufen Bild und Ton wieder auseinander.
+const ZONE_ANIM_MOUNT_DELAY_MS = 100;
+window.ZONE_ANIM_MOUNT_DELAY_MS = ZONE_ANIM_MOUNT_DELAY_MS;
 
 function playSFXForZoneAnim(type) {
   if (!type) return;
@@ -728,6 +754,10 @@ function playSFXForZoneAnim(type) {
   if (opts.category === undefined && !ZONE_ANIM_NONEFFECT.has(type)) {
     opts.category = 'effect';
   }
+  // Nur animationsrelative Delays werden verschoben. Eintraege ohne
+  // `delay` sind Cast-Klaenge und sollen bewusst sofort mit dem
+  // Ereignis kommen, nicht erst mit dem Animationsstart.
+  if (opts.delay > 0) opts.delay += ZONE_ANIM_MOUNT_DELAY_MS;
   playSFX(entry.name, opts);
 }
 
@@ -764,6 +794,31 @@ if (typeof document !== 'undefined') {
     // explicit `dedupe` (most of the cancel-handler call sites).
     if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
     else playSFX('ui_click', { dedupe: 60 });
+  }, { capture: true });
+
+  // ── DROPDOWNS UND SCHALTER (Als Befund 5.8.) ──────────────────────
+  // Der Listener oben trifft nur `button` / `[role="button"]`. Ein
+  // `<select>` ist keins von beidem, deshalb waren die Dropdowns im
+  // Puzzle-Creator (und ueberall sonst) komplett stumm. Dasselbe gilt
+  // fuer Checkboxen und Radios.
+  //
+  // Zwei Momente bekommen einen Klang, weil sich beide wie ein Klick
+  // anfuehlen: das AUFKLAPPEN (mousedown) und das AUSWAEHLEN (change).
+  // Beim Aufklappen mit kurzem Dedupe, damit Aufklappen + sofortiges
+  // Auswaehlen nicht doppelt klackt.
+  const _uiControlSfx = (el, opts) => {
+    if (!el) return;
+    if (el.closest('.volume-control, .volume-slider-popup')) return;
+    if (el.dataset && el.dataset.sfx === 'none') return;
+    playSFX('ui_click', opts);
+  };
+  document.addEventListener('mousedown', (e) => {
+    const sel = e.target.closest('select');
+    if (sel && !sel.disabled) _uiControlSfx(sel, { dedupe: 200 });
+  }, { capture: true });
+  document.addEventListener('change', (e) => {
+    const el = e.target.closest('select, input[type="checkbox"], input[type="radio"]');
+    if (el && !el.disabled) _uiControlSfx(el, { dedupe: 60 });
   }, { capture: true });
 
   // Escape key → ui_cancel. Matches the auto-dedupe window so any
@@ -2427,6 +2482,114 @@ function showTextBox(opts) {
   if (_textBoxSetter) _textBoxSetter(opts || null);
 }
 
+
+// ── Antonia-Praesenz (Tutorial-Musik) ───────────────────────────────
+// Antonia betritt und verlaesst die Tutorial-Buehne ueber die
+// Textbox-Regie (`enterRight` / `exitRight`). Ihre Anwesenheit soll das
+// Tutorial-Thema umschalten, und zwar UEBER die einzelne Textbox HINAUS:
+// `rightVisible` wird bei jeder neuen Sequenz zurueckgesetzt, sie bleibt
+// aber szenisch anwesend, bis sie ausdruecklich abgeht. Deshalb ein
+// eigener, sequenzuebergreifender Zustand mit Mini-Abo, damit die
+// BGM-Effekte in app-screens darauf reagieren koennen.
+let _antoniaPresent = false;
+const _antoniaSubs = new Set();
+function setAntoniaPresent(v) {
+  const val = !!v;
+  if (_antoniaPresent === val) return;
+  _antoniaPresent = val;
+  for (const fn of _antoniaSubs) { try { fn(val); } catch {} }
+}
+function isAntoniaPresent() { return _antoniaPresent; }
+function useAntoniaPresent() {
+  const [present, setPresent] = useState(_antoniaPresent);
+  useEffect(() => {
+    _antoniaSubs.add(setPresent);
+    setPresent(_antoniaPresent);
+    return () => { _antoniaSubs.delete(setPresent); };
+  }, []);
+  return present;
+}
+/** Portraet-Pfad, an dem wir Antonia erkennen. */
+const ANTONIA_PORTRAIT = '/Antonia.png';
+
+/**
+ * Steht Antonia in diesem Tutorial von der ERSTEN Sekunde an auf der
+ * Buehne?
+ *
+ * Sie kommt in zwei Rollen vor, und ich hatte beim ersten Anlauf nur
+ * eine gesehen:
+ *   • RECHTE Rolle (Tutorial 3 und 5): tritt per `enterRight` auf und
+ *     geht per `exitRight` — `rightVisible` startet auf false.
+ *   • LINKE Rolle (Tutorial 6 und 7): `opts.speaker` ist ihr Portraet,
+ *     sie ist die einzige Sprecherin, dauerhaft und ohne Auftritt —
+ *     `leftVisible` startet auf true.
+ * Fuer die linke Rolle gibt es also gar kein Ereignis, an dem man den
+ * Musikwechsel aufhaengen koennte; die Praesenz muss beim Start des
+ * Tutorials aus dem Skript gelesen werden.
+ */
+function tutorialStartsWithAntonia(num) {
+  const script = TUTORIAL_SCRIPTS[num];
+  return !!script && script.opts?.speaker === ANTONIA_PORTRAIT;
+}
+
+
+/**
+ * Misst ein Highlight-Ziel so, dass es SPAETER exakt wie das Original
+ * projiziert werden kann.
+ *
+ * Das Problem: das Kampffeld liegt auf einer perspektivisch gekippten
+ * Ebene (`.board-plane` mit rotateX + scale, `perspective` auf
+ * `.board-plane-clip`). `getBoundingClientRect()` liefert dort die
+ * ACHSENPARALLELE HUELLE des projizierten Vierecks — also eine zu grosse
+ * Kiste, und der flach hineingestreckte Klon steht aufrecht, waehrend die
+ * echte Karte schraeg liegt. Genau das hat Al gesehen: Highlights liegen
+ * nicht auf den Karten und haben nicht ihre Form.
+ *
+ * Die Loesung misst das Ziel in EBENEN-LOKALEN Koordinaten (Transform
+ * kurz abgeschaltet, wie es der Board-Scaler mit seinen Flat-Fenstern
+ * ohnehin routinemaessig tut) und gibt zusaetzlich die Transform-Daten
+ * der Ebene zurueck. Der Renderer baut daraus dieselbe Projektionskette
+ * nach — das Highlight erbt Neigung, Skalierung und Fluchtpunkt.
+ *
+ * Ziele AUSSERHALB der Ebene (Handkarten, Buttons, Menues) haben keine
+ * Projektion; fuer sie bleibt es beim einfachen Bildschirm-Rechteck.
+ */
+const TB_FLAT_CLASS = 'tb-flat-probe';
+function measureHighlight(el) {
+  const plane = el.closest && (el.closest('.board-plane') || el.closest('.pz-board-plane'));
+  const clip = plane && plane.parentElement;
+  if (!plane || !clip) {
+    const r = el.getBoundingClientRect();
+    return { flat: true, rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
+  }
+  // Transform kurz aus -> beide Rects sind jetzt Layout-Koordinaten.
+  clip.classList.add(TB_FLAT_CLASS);
+  const cr = clip.getBoundingClientRect();
+  const pr = plane.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  clip.classList.remove(TB_FLAT_CLASS);
+
+  const cs = getComputedStyle(plane);
+  const clipCs = getComputedStyle(clip);
+  // Die Kette wird EXAKT nachgebaut: clip (perspective) > plane
+  // (transform) > Element. Entscheidend ist, dass das aeussere Fenster auf
+  // der CLIP-Box sitzt und nicht auf der Ebenen-Box: `perspective-origin`
+  // loest gegen die Clip-Box auf, und die Ebene sitzt darin um das
+  // Overhang-Padding eingerueckt. Auf die Ebenen-Box gelegt wandert der
+  // Fluchtpunkt um genau dieses Padding — das Highlight bekam dadurch eine
+  // andere Projektion als die Karte darunter.
+  return {
+    flat: false,
+    clip: { left: cr.left, top: cr.top, width: cr.width, height: cr.height },
+    plane: { left: pr.left - cr.left, top: pr.top - cr.top, width: pr.width, height: pr.height },
+    local: { left: er.left - pr.left, top: er.top - pr.top, width: er.width, height: er.height },
+    transform: cs.transform,
+    transformOrigin: cs.transformOrigin,
+    perspective: clipCs.perspective,
+    perspectiveOrigin: clipCs.perspectiveOrigin,
+  };
+}
+
 function TextBox() {
   const [opts, setOpts] = useState(null);
   const [pages, setPages] = useState([]);
@@ -2462,6 +2625,10 @@ function TextBox() {
 
   useLayoutEffect(() => {
     if (!opts) { setPages([]); setPageIdx(0); setCharCount(0); setDone(false); setHighlightRects([]); setRightVisible(false); setRightExiting(false); setLeftVisible(true); setLeftExiting(false); setFading(false); onShowFiredRef.current = new Set(); return; }
+
+    // Linke Dauer-Rolle: sie steht ab der ersten Seite da, es gibt kein
+    // `enterLeft`, an dem man haengen koennte.
+    if (opts.speaker === ANTONIA_PORTRAIT) setAntoniaPresent(true);
 
     if (opts.pages && Array.isArray(opts.pages)) {
       setPages(opts.pages);
@@ -2514,7 +2681,12 @@ function TextBox() {
     setDone(false);
 
     // Per-page events
-    if (page?.enterRight) setRightVisible(true);
+    if (page?.enterRight) {
+      setRightVisible(true);
+      // Nur wenn die rechte Rolle wirklich Antonia ist — die Mechanik
+      // selbst ist generisch und wird auch von anderen Sprechern genutzt.
+      if (opts?.rightSpeaker === ANTONIA_PORTRAIT) setAntoniaPresent(true);
+    }
     if (page?.enterLeft) setLeftVisible(true);
     if (page?.onShow && !onShowFiredRef.current.has(pageIdx)) {
       onShowFiredRef.current.add(pageIdx);
@@ -2544,8 +2716,9 @@ function TextBox() {
       const pulse = typeof h === 'object' && h.pulse;
       if (!sel) continue;
       document.querySelectorAll(sel).forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) rects.push({ rect: r, pulse, html: el.outerHTML });
+        const m = measureHighlight(el);
+        const box = m.flat ? m.rect : m.local;
+        if (box.width > 0 && box.height > 0) rects.push({ ...m, pulse, html: el.outerHTML });
       });
     }
     setHighlightRects(rects);
@@ -2560,13 +2733,44 @@ function TextBox() {
       setDone(true);
     } else if (pageIdx < pages.length - 1) {
       const currentPage = pages[pageIdx];
-      if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
-      if (currentPage?.exitLeft) { setLeftExiting(true); setTimeout(() => { setLeftVisible(false); setLeftExiting(false); }, 600); }
+      if (currentPage?.exitRight) {
+        setRightExiting(true);
+        const wasAntonia = opts?.rightSpeaker === ANTONIA_PORTRAIT;
+        setTimeout(() => {
+          setRightVisible(false); setRightExiting(false);
+          if (wasAntonia) setAntoniaPresent(false);
+        }, 600);
+      }
+      if (currentPage?.exitLeft) {
+        setLeftExiting(true);
+        const leftWasAntonia = opts?.speaker === ANTONIA_PORTRAIT;
+        setTimeout(() => {
+          setLeftVisible(false); setLeftExiting(false);
+          if (leftWasAntonia) setAntoniaPresent(false);
+        }, 600);
+      }
       setPageIdx(pageIdx + 1);
     } else {
       const currentPage = pages[pageIdx];
-      if (currentPage?.exitRight) { setRightExiting(true); setTimeout(() => { setRightVisible(false); setRightExiting(false); }, 600); }
-      if (currentPage?.exitLeft) { setLeftExiting(true); setTimeout(() => { setLeftVisible(false); setLeftExiting(false); }, 600); }
+      // LETZTE Seite: die Abgangs-Animation laeuft, aber die Sichtbarkeit
+      // wird NICHT umgeschaltet. Sonst faellt das Portrait nach 600 ms aus
+      // dem Layout, waehrend das Overlay noch bis 1200 ms steht — die
+      // Textbox reflowt in den frei gewordenen Platz und "expandiert" kurz
+      // vor dem Verschwinden. Die Animation hat `forwards`, das Portrait
+      // bleibt also unsichtbar und haelt nur seinen Platz; um 1200 ms
+      // verschwindet ohnehin alles zusammen.
+      if (currentPage?.exitRight) {
+        setRightExiting(true);
+        if (opts?.rightSpeaker === ANTONIA_PORTRAIT) {
+          setTimeout(() => setAntoniaPresent(false), 600);
+        }
+      }
+      if (currentPage?.exitLeft) {
+        setLeftExiting(true);
+        if (opts?.speaker === ANTONIA_PORTRAIT) {
+          setTimeout(() => setAntoniaPresent(false), 600);
+        }
+      }
       // Fade out then dismiss
       setFading(true);
       const cb = opts.onDismiss;
@@ -2636,16 +2840,40 @@ function TextBox() {
 
   return (
     <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
-      {highlightRects.map((h, i) => (
-        <div key={i} className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '')} style={{
-          position: 'fixed',
-          left: h.rect.left, top: h.rect.top,
-          width: h.rect.width, height: h.rect.height,
-          pointerEvents: 'none',
-        }}>
-          <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
-        </div>
-      ))}
+      {highlightRects.map((h, i) => {
+        const inner = (
+          <div className={'textbox-highlight' + (h.pulse ? ' textbox-highlight-pulse' : '')}
+            style={h.flat
+              ? { position: 'fixed', left: h.rect.left, top: h.rect.top,
+                  width: h.rect.width, height: h.rect.height, pointerEvents: 'none' }
+              : { position: 'absolute', left: h.local.left, top: h.local.top,
+                  width: h.local.width, height: h.local.height, pointerEvents: 'none' }}>
+            <div className="textbox-highlight-clone" dangerouslySetInnerHTML={{ __html: h.html }} />
+          </div>
+        );
+        if (h.flat) return <div key={i} style={{ display: 'contents' }}>{inner}</div>;
+        // Projektionskette der Ebene nachbauen: aeusseres Fenster sitzt auf
+        // der UNVERZERRTEN Ebenen-Box und traegt die perspective, das innere
+        // uebernimmt Transform und Ursprung. Damit erbt das Highlight
+        // Neigung, Zoom und Fluchtpunkt exakt.
+        return (
+          <div key={i} style={{
+            position: 'fixed',
+            left: h.clip.left, top: h.clip.top,
+            width: h.clip.width, height: h.clip.height,
+            perspective: h.perspective, perspectiveOrigin: h.perspectiveOrigin,
+            pointerEvents: 'none', zIndex: 90001,
+          }}>
+            <div style={{
+              position: 'absolute',
+              left: h.plane.left, top: h.plane.top,
+              width: h.plane.width, height: h.plane.height,
+              transform: h.transform, transformOrigin: h.transformOrigin,
+              transformStyle: 'preserve-3d',
+            }}>{inner}</div>
+          </div>
+        );
+      })}
       <div className="textbox">
         {opts.speaker && leftVisible && (
           <div className={'textbox-portrait' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
@@ -2756,8 +2984,12 @@ const TUTORIAL_SCRIPTS = {
       { text: 'I got da damages for ya!', side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
       { text: "Listen, kiddo! Da real **big** damages aren't done with Blah-Blah-Spells or Who-Cares-Creatures!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
       { text: "{red:**Attacks!**}\nDat's what it's all about, ya get me?!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Can't go wrong with da BONK for **big** damages, right?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
-      { text: "Dere - I've done ya a little somethin' of a favor, ya see?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
+      // Der Boost (Sound + Stat-Aenderung + Highlight) sitzt auf DIESER
+      // Seite, nicht mehr auf der "Dere"-Seite darunter: Al will Highlight
+      // und Update zeitgleich mit dem Sound sehen, also BEVOR Antonia den
+      // Gefallen ankuendigt. Vorher lief alles erst mit ihrer Ansage los,
+      // wodurch der Stat-Sprung dem Text hinterherhinkte.
+      { text: "Can't go wrong with da BONK for **big** damages, right?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
         onShow: () => {
           socket.emit('tutorial_modify', { type: 'tutorial3_boost' });
           const el = document.querySelector('[data-hero-owner="me"][data-hero-name*="Willy"]');
@@ -2766,6 +2998,10 @@ const TUTORIAL_SCRIPTS = {
         highlights: [
           { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
         ] },
+      // KEIN Highlight mehr: der Boost samt Hervorhebung ist auf der Seite
+      // davor passiert, hier waere es nur eine zweite pulsierende Schicht
+      // ueber derselben Karte.
+      { text: "Dere - I've done ya a little somethin' of a favor, ya see?", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true },
       { text: "Attacks do harder BONKs when your Heroes got higher BONK stats, so dis lil' boost'll help you hit real hard!", side: 'right', speakerName: 'Jetpack Raccoon', nameColor: '#ff4444', shakeText: true,
         highlights: [
           { selector: '[data-hero-owner="me"][data-hero-name*="Willy"]', pulse: true },
@@ -2958,3 +3194,7 @@ window.BuffColumn = BuffColumn;
 window.TextBox = TextBox;
 window.showTextBox = showTextBox;
 window.TUTORIAL_SCRIPTS = TUTORIAL_SCRIPTS;
+window.useAntoniaPresent = useAntoniaPresent;
+window.isAntoniaPresent = isAntoniaPresent;
+window.setAntoniaPresent = setAntoniaPresent;
+window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;

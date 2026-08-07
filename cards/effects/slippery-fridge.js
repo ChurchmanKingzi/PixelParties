@@ -103,7 +103,15 @@ module.exports = {
 
   canActivate(gs, pi) {
     // Check if any equip on the board can be moved
+    // Erst-Runden-Immunität (Als Regel): Fridge bleibt in Runde 1
+    // spielbar, aber NUR auf eigene Equips — die Karten des geschützten
+    // Spielers sind unantastbar. Ohne diese Zeile meldete das Gate
+    // "spielbar", weil es fremde Equips mitzählte, während der zentrale
+    // Ziel-Filter sie im Picker anschließend entfernt hätte: Karte
+    // gespielt, Gold weg, leerer Picker.
+    const ftProtected = gs.firstTurnProtectedPlayer;
     for (let pIdx = 0; pIdx < 2; pIdx++) {
+      if (ftProtected != null && pIdx === ftProtected && pi !== ftProtected) continue;
       const ps = gs.players[pIdx];
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];

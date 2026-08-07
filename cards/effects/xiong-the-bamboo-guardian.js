@@ -83,7 +83,11 @@ async function tryTutor(ctx) {
   if (resolving) exclude.add(resolving);
 
   const counts = new Map();
+  // BORIS-EINSCHRAENKUNG: hat der Gegner einen wirksamen Boris, faellt
+  // SEINE Ablage als Quelle weg — die eigene bleibt nutzbar.
+  const nurEigene = engine?.borisHidesOpponentSide?.(pi) === true;
   for (let owner = 0; owner < gs.players.length; owner++) {
+    if (nurEigene && owner !== pi) continue;
     const dp = gs.players[owner]?.discardPile || [];
     for (const name of dp) {
       if (exclude.has(name)) continue;
@@ -121,6 +125,12 @@ async function tryTutor(ctx) {
 }
 
 module.exports = {
+  // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt aus der Ablage BEIDER Spieler auf die eigene Hand.
+  // Trifft Ablage BEIDER Spieler — deshalb NICHT sperren, sondern bei
+  // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange
+  // es eigene legale Ziele gibt, bleibt der Effekt nutzbar.
+  stealsFromEitherSide: true,
+
   activeIn: ['hero'],
   // Source-attributed on-kill effect — the tutor needs to fire even
   // when Xiong himself died in the same damage exchange (e.g. a

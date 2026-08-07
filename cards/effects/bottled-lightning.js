@@ -22,6 +22,10 @@ module.exports = {
     const damages = [150, 100, 50];
 
     const takerIdx = await runDiscardChain(engine, pi, 'Bottled Lightning');
+    // null = die Abwurfkette wurde negiert (Ambush the Scout). Bei
+    // diesem Trank IST die Kette der Effekt, also ist die ganze Karte
+    // negiert — kein Schaden, kein Status (Als Ruling 5.8.).
+    if (takerIdx == null) return;
     const takerPs = gs.players[takerIdx];
 
     engine.log('bottled_take', { player: takerPs.username, potion: 'Bottled Lightning' });

@@ -69,6 +69,11 @@ function _eligibleHeroIdxs(engine, pi) {
 }
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
+  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
+  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
+  takesControlOfTargets: true,
+
   isReaction: true,
   // Reaction-only — never proactively playable.
   canActivate: () => false,

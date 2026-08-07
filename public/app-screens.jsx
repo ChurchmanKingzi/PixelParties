@@ -6,6 +6,7 @@ const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useC
 const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
+const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
 
 // Eye / eye-off glyphs for the password show/hide toggle.
 const EyeIcon = () => (
@@ -1376,13 +1377,65 @@ function MainMenu() {
     return () => window.removeEventListener('keydown', h, true);
   }, [tutorialBrowserOpen, tutorialAttemptState]);
 
-  // Play bgm_puzzle while a puzzle attempt or tutorial attempt is active.
+  // Puzzle-Versuche laufen auf `bgm_puzzle_probieren`, Tutorials weiter
+  // auf dem alten `bgm_puzzle` — Al hat die beiden neuen Stuecke
+  // ausdruecklich fuer Puzzles bestellt, nicht fuers Tutorial.
+  // Der Rumpf deckt alle Faelle ab; das Aufraeumen laeuft NUR beim
+  // Verlassen des Menues. Ein `return () => setBgmMode('menu')` an einem
+  // Effekt mit Deps feuert bei JEDEM Dep-Wechsel vor dem Rumpf — im
+  // Creator hat genau das die Probieren-Musik ueberschrieben.
+  // Antonias Auftritt/Abgang schaltet das Tutorial-Thema um. `antoniaHere`
+  // steht in den Deps, damit ein Wechsel MITTEN im Tutorial greift.
+  const antoniaHere = useAntoniaPresent();
   useEffect(() => {
     if (!setBgmMode) return;
-    if (puzzleAttemptState || tutorialAttemptState) setBgmMode('puzzle');
+    // Puzzle-Ergebnis: Sieg- bzw. Niederlage-Thema, solange der
+    // Ergebnis-Screen steht. Tutorials sind hier BEWUSST nicht dabei —
+    // bei ihnen laeuft das Tutorial-Thema noch durch den Outro-Dialog,
+    // und GameBoard schaltet erst mit der Fanfare um (v184).
+    const _pr = puzzleAttemptState?.result;
+    const _tr = tutorialAttemptState?.result;
+    if (_pr && typeof _pr.winnerIdx === 'number') {
+      setBgmMode(_pr.winnerIdx === puzzleAttemptState.myIndex ? 'win' : 'defeat');
+    }
+    else if (puzzleAttemptState) setBgmMode('puzzleAttempt');
+    // Tutorial-NIEDERLAGE: sofort aufs Niederlage-Thema.
+    //
+    // Warum nur die Niederlage: bei einem SIEG laeuft danach der
+    // Outro-Dialog, und v184 haelt dafuer bewusst das Tutorial-Thema —
+    // GameBoard schaltet dort erst mit der Fanfare auf `win`. Weil der
+    // Effekt in GameBoard (Kind) VOR diesem hier (Elternteil) laeuft,
+    // ueberschrieb dieser Effekt beim Ergebniswechsel das gerade
+    // gesetzte `defeat` wieder mit dem Tutorial-Thema. Beim Sieg fiel es
+    // nicht auf, weil die Fanfare dort erst SPAETER feuert (nach dem
+    // Outro) und dieser Effekt bis dahin nicht erneut laeuft.
+    else if (_tr && typeof _tr.winnerIdx === 'number'
+             && _tr.winnerIdx !== tutorialAttemptState.myIndex) setBgmMode('defeat');
+    // BEWUSST ohne `!result`: zwischen dem Sieg und der Fanfare laeuft
+    // noch der Outro-Dialog, und dabei soll das Tutorial-Thema WEITER
+    // spielen. Den Wechsel aufs Menue-Thema stoesst GameBoard an, wenn
+    // die Fanfare feuert — der Fanfaren-Duck haelt ihn zurueck und wendet
+    // ihn direkt danach an, also nahtlos.
+    else if (tutorialAttemptState) setBgmMode(antoniaHere ? 'tutorialAntonia' : 'tutorial');
     else setBgmMode('menu');
-    return () => { if (setBgmMode) setBgmMode('menu'); };
-  }, [puzzleAttemptState, tutorialAttemptState, setBgmMode]);
+  }, [puzzleAttemptState, tutorialAttemptState, antoniaHere, setBgmMode]);
+
+  // Startzustand je Tutorial-Durchgang aus dem SKRIPT lesen, nicht
+  // pauschal auf "abwesend" setzen: in Tutorial 6 und 7 ist Antonia die
+  // linke Dauer-Sprecherin und damit von der ersten Sekunde an da — noch
+  // bevor die erste Textbox aufgeht. Beim Ende wieder loeschen, damit
+  // ein neuer Lauf nichts erbt.
+  useEffect(() => {
+    if (!setAntoniaPresent) return;
+    if (!tutorialAttemptState) { setAntoniaPresent(false); return; }
+    if (tutorialStartsWithAntonia && tutorialStartsWithAntonia(window._currentTutorialNum)) {
+      setAntoniaPresent(true);
+    }
+  }, [tutorialAttemptState]);
+
+  const menuBgmRef = useRef(setBgmMode);
+  menuBgmRef.current = setBgmMode;
+  useEffect(() => () => { if (menuBgmRef.current) menuBgmRef.current('menu'); }, []);
 
   // Render GameBoard during tutorial attempt
   if (tutorialAttemptState) {
@@ -3762,6 +3815,8 @@ function GuestRegisterModal({ onClose, starterDeckId }) {
 }
 
 function SingleplayerScreen() {
+  // Antonia-Praesenz auch hier, fuer den Tutorial-Zweig weiter unten.
+  const antoniaHere2 = useAntoniaPresent();
   const { user, setUser, setScreen, notify, setBgmMode } = useContext(AppContext);
   const [opponents, setOpponents] = useState(null);          // null = loading
   const [personalDecks, setPersonalDecks] = useState([]);
@@ -3885,10 +3940,30 @@ function SingleplayerScreen() {
       }
       setBgmMode(mode);
     }
-    else if (tutorialAttemptState && !tutorialAttemptState.result) setBgmMode('puzzle');
+    // Ergebnis-Thema: solange der End-of-Battle-Screen eines CPU-Kampfes
+    // steht, laeuft `win` bzw. `defeat` in Schleife. Erst wenn der
+    // Zustand ganz verschwindet, geht es zurueck ins Menue-Thema.
+    else if (cpuBattleState?.result && typeof cpuBattleState.result.winnerIdx === 'number') {
+      setBgmMode(cpuBattleState.result.winnerIdx === cpuBattleState.myIndex ? 'win' : 'defeat');
+    }
+    // Tutorial-NIEDERLAGE: sofort aufs Niederlage-Thema.
+    //
+    // Warum nur die Niederlage: bei einem SIEG laeuft danach der
+    // Outro-Dialog, und v184 haelt dafuer bewusst das Tutorial-Thema —
+    // GameBoard schaltet dort erst mit der Fanfare auf `win`. Weil der
+    // Effekt in GameBoard (Kind) VOR diesem hier (Elternteil) laeuft,
+    // ueberschrieb dieser Effekt beim Ergebniswechsel das gerade
+    // gesetzte `defeat` wieder mit dem Tutorial-Thema. Beim Sieg fiel es
+    // nicht auf, weil die Fanfare dort erst SPAETER feuert (nach dem
+    // Outro) und dieser Effekt bis dahin nicht erneut laeuft.
+    else if (tutorialAttemptState?.result
+             && typeof tutorialAttemptState.result.winnerIdx === 'number'
+             && tutorialAttemptState.result.winnerIdx !== tutorialAttemptState.myIndex) setBgmMode('defeat');
+    // Laufendes Tutorial ODER Sieg mit noch laufendem Outro: Tutorial-Thema.
+    else if (tutorialAttemptState) setBgmMode(antoniaHere2 ? 'tutorialAntonia' : 'tutorial');
     else setBgmMode('menu');
     return () => { if (setBgmMode) setBgmMode('menu'); };
-  }, [cpuBattleState, tutorialAttemptState, setBgmMode]);
+  }, [cpuBattleState, tutorialAttemptState, antoniaHere2, setBgmMode]);
 
   // Esc → back to menu (battle's own Esc handling takes priority). Guests have
   // no menu, so Esc ends their session and returns to the login screen — same

@@ -147,6 +147,13 @@ module.exports = {
     // card the opponent ended up with.
     engine._broadcastEvent('card_reveal', { cardName: oppChoice });
     engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: oppIdx });
+    // Reaktionsfenster (Ambush the Scout), Kategorie 'insert'.
+    if (await engine.checkHandInteractionReaction(oppIdx, 'insert',
+          { byPi: pi, count: 1, sourceName: 'Magic Lamp' })) {
+      engine.log('magic_lamp_negated', { player: gs.players[pi]?.username });
+      engine.sync();
+      return;
+    }
     oppPs.hand.push(oppChoice);
     // Track the gifted card with a foreign-origin tag so when the
     // opponent plays it, the discard / deleted pile routes back to

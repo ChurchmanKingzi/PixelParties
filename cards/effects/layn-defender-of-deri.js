@@ -3,25 +3,26 @@
 //  Hero — 450 HP, 50 ATK
 //  Starting abilities: Leadership, Toughness
 //
-//  While Layn is alive and not incapacitated
-//  (not Frozen, Stunned or Negated), all ally
-//  Creatures on the board have +100 current
-//  and max HP.
+//  Kartentext: "Increase the current and max HP
+//  of any Creature you summon by 100."
 //
-//  The bonus is applied immediately whenever:
-//    • Layn enters play / game starts
-//    • An ally Creature is summoned
-//    • Layn recovers from CC or is revived
+//  EINMALIGER Bonus im Moment des Beschwoerens.
+//  Er wird NIE zurueckgenommen — weder bei Layns
+//  Tod noch bei Frozen / Stunned / Negated.
 //
-//  The bonus is removed immediately when:
-//    • Layn is KO'd
-//    • Layn becomes Frozen, Stunned or Negated
-//  On removal, currentHp is capped at the new
-//  max but not otherwise reduced.
+//  Tod und CC bewirken GENAU EINES (Als Ruling):
+//  Creatures, die WAEHREND dieser Zeit beschworen
+//  werden, bekommen den Bonus nicht. Kein Entzug,
+//  keine rueckwirkende Nachvergabe, wenn Layn sich
+//  erholt oder wiederbelebt wird.
 //
-//  bypassStatusFilter: true — Layn's hooks must
-//  fire even while she is CC'd (to catch the
-//  moment a status is applied TO her).
+//  Das erledigt die Engine von selbst: der zentrale
+//  Listener-Filter in `runHooks` laesst die Hooks
+//  eines toten oder CC'ten Helden gar nicht erst
+//  feuern (allgemeine Regel: passiver Effekt wirkt
+//  nicht waehrend stunned/frozen/negiert). Deshalb
+//  gibt es hier KEIN `bypassStatusFilter` — es wuerde
+//  genau diese Regel aushebeln.
 //
 //  Tracking: each buffed creature instance
 //  carries inst.counters._laynBonus = 100.
@@ -34,7 +35,15 @@ const BONUS     = 100;
 
 // ─── Helpers ──────────────────────────────
 
-/** True when Layn is alive and unaffected by CC. */
+/**
+ * True when Layn is alive and unaffected by CC — die Bedingung fuer
+ * eine NEUE Bonus-Vergabe.
+ *
+ * Doppelt gemoppelt und mit Absicht: der zentrale Listener-Filter in
+ * `runHooks` unterdrueckt Hooks eines toten oder CC'ten Helden bereits.
+ * Diese Pruefung ist der Guertel zum Hosentraeger — und sie dokumentiert
+ * die Regel an der Stelle, an der sie zaehlt.
+ */
 function laynIsActive(hero) {
   return !!(
     hero && hero.hp > 0 &&
@@ -54,52 +63,7 @@ function applyBonus(ctx, inst) {
   inst.counters._laynBonus = BONUS;
 }
 
-/**
- * Apply the bonus to every qualifying ally creature that doesn't yet have it.
- */
-function applyBonusToAll(ctx) {
-  const engine  = ctx._engine;
-  const pi      = ctx.cardOwner;
-  const cardDB  = engine._getCardDB();
 
-  for (const inst of engine.cardInstances) {
-    // Controller-aware filter — "Creatures you control". The old
-    // `owner OR controller === pi` form wrongly included cross-side-
-    // placed cards still owned by us but currently controlled by opp.
-    if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (inst.zone !== 'support') continue;
-    if (inst.counters._laynBonus) continue;
-    const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
-    applyBonus(ctx, inst);
-  }
-  engine.sync();
-}
-
-/**
- * Remove the bonus from every ally creature that has it.
- * currentHp is capped at the new max but not otherwise reduced.
- */
-function removeBonusFromAll(engine, pi) {
-  for (const inst of engine.cardInstances) {
-    // Controller-aware filter — "Creatures you control". The old
-    // `owner OR controller === pi` form wrongly included cross-side-
-    // placed cards still owned by us but currently controlled by opp.
-    if ((inst.controller ?? inst.owner) !== pi) continue;
-    if (inst.zone !== 'support') continue;
-    const bonus = inst.counters._laynBonus || 0;
-    if (!bonus) continue;
-
-    const oldMax    = inst.counters.maxHp || 0;
-    const currentHp = inst.counters.currentHp ?? oldMax; // unset = at full health
-    const newMax    = Math.max(0, oldMax - bonus);
-
-    inst.counters.maxHp     = newMax;
-    inst.counters.currentHp = Math.min(currentHp, newMax); // cap, but don't otherwise reduce
-    delete inst.counters._laynBonus;
-  }
-  engine.sync();
-}
 
 // ─── Card module ──────────────────────────
 
@@ -111,17 +75,13 @@ module.exports = {
   // Ascension condition cannot be bypassed via cheat mode
   cheatAscensionBlocked: true,
 
-  // Must fire even when Layn is CC'd (e.g. to react the moment she is frozen)
-  bypassStatusFilter: true,
-
-  // CPU self-status penalty. Frozen / Stunned / Negated knocks Layn
-  // out of "active" and strips her +100 HP aura from every ally creature
-  // — a much bigger hit than the status itself. Heavy negative so the
-  // CPU never picks Layn for self-CC over a neutral hero.
-  cpuStatusSelfValue(statusName) {
-    if (statusName === 'frozen' || statusName === 'stunned' || statusName === 'negated') return -80;
-    return 0;
-  },
+  // KEIN `bypassStatusFilter`: der zentrale Filter SOLL hier greifen —
+  // er ist genau das, was "waehrend CC / tot keine neuen Boni" umsetzt.
+  //
+  // KEIN `cpuStatusSelfValue` mehr: die frueheren -80 standen dafuer,
+  // dass CC Layn ihre ganze Aura entriss. Da nichts mehr entzogen wird,
+  // ist ein Freeze auf Layn nicht schlimmer als auf jeden anderen
+  // Helden mit Passive.
 
   // Vertrag für Träger-Schutz (Slippery Fridge & Co.).
   ascensionItems: [LAYN_ASCENSION_ITEM],
@@ -147,21 +107,13 @@ module.exports = {
   },
 
   hooks: {
-    // ── Apply bonus when Layn enters / game starts ────────────────────────
-
-    onGameStart: (ctx) => {
-      const hero = ctx.attachedHero;
-      if (!laynIsActive(hero)) return;
-      applyBonusToAll(ctx);
-    },
-
-    onPlay: (ctx) => {
-      const hero = ctx.attachedHero;
-      if (!laynIsActive(hero)) return;
-      applyBonusToAll(ctx);
-    },
-
-    // ── Apply bonus to each new ally Creature summoned ────────────────────
+    // ── Der EINZIGE Hook: Bonus beim Beschwoeren ──────────────────────────
+    // Frueher gab es hier zusaetzlich onGameStart / onPlay (Flaechen-
+    // Vergabe an alle bereits stehenden Creatures), onStatusApplied /
+    // onStatusRemoved (Entzug bei CC + Nachvergabe danach), onHeroKO
+    // (Entzug beim Tod) und onHeroRevive (Nachvergabe danach). Alle
+    // ersatzlos entfernt: der Bonus gilt "any Creature you SUMMON",
+    // wird nie entzogen und nie rueckwirkend nachgereicht.
 
     onCardEnterZone: (ctx) => {
       if (ctx.toZone !== 'support') return;
@@ -184,54 +136,23 @@ module.exports = {
       engine.sync();
     },
 
-    // ── Remove bonus when Layn is KO'd ────────────────────────────────────
-
-    onHeroKO: (ctx) => {
-      // Only react to THIS hero being KO'd
-      if (ctx.heroIdx !== ctx.cardHeroIdx) return;
-      if (ctx.deadHero !== ctx.attachedHero && ctx.deadHero?.name !== CARD_NAME) return;
-
-      removeBonusFromAll(ctx._engine, ctx.cardOwner);
-    },
-
-    // ── Remove bonus when Layn gains a CC status ──────────────────────────
-    // bypassStatusFilter ensures this fires even after the status is set.
-
-    onStatusApplied: (ctx) => {
-      // Only react to THIS hero receiving a CC status
-      if (ctx.heroOwner !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
-
-      const status = ctx.statusName;
-      if (status !== 'frozen' && status !== 'stunned' && status !== 'negated') return;
-
-      removeBonusFromAll(ctx._engine, ctx.cardOwner);
-    },
-
-    // ── Re-apply bonus when Layn's CC is cleared ─────────────────────────
-
-    onStatusRemoved: (ctx) => {
-      // Only react to THIS hero losing a CC status
-      if (ctx.heroOwner !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
-
-      const status = ctx.statusName;
-      if (status !== 'frozen' && status !== 'stunned' && status !== 'negated') return;
-
-      // Re-apply only if Layn is now fully active (no remaining CC)
-      const hero = ctx.attachedHero;
-      if (!laynIsActive(hero)) return;
-
-      applyBonusToAll(ctx);
-    },
-
-    // ── Re-apply bonus when Layn is revived ───────────────────────────────
-
-    onHeroRevive: (ctx) => {
-      if (ctx.heroIdx !== ctx.cardHeroIdx || ctx.playerIdx !== ctx.cardOwner) return;
-
-      const hero = ctx.attachedHero;
-      if (!laynIsActive(hero)) return;
-
-      applyBonusToAll(ctx);
-    },
+    // ── KEINE Ruecknahme-Hooks ────────────────────────────────────────────
+    // Hier standen frueher `onHeroKO` (Entzug beim Tod),
+    // `onStatusApplied` (Entzug bei CC), `onStatusRemoved` und
+    // `onHeroRevive` (jeweils Nachvergabe an alle). Alle ersatzlos
+    // entfernt.
+    //
+    // Als Ruling: der Bonus wird NIE zurueckgenommen. Tod und CC
+    // bewirken ausschliesslich, dass waehrenddessen beschworene
+    // Creatures ihn nicht bekommen — und dafuer braucht es hier gar
+    // nichts: der zentrale Listener-Filter in `runHooks` laesst
+    // `onCardEnterZone` bei totem oder CC'tem Helden nicht feuern.
+    //
+    // Historie als Warnung: das alte `onHeroKO` hat NIE gefeuert, weil
+    // seine Wache `ctx.heroIdx` / `ctx.deadHero` las, die Engine aber
+    // `{ hero, source, _bypassDeadHeroFilter }` sendet. Ich habe die
+    // Wache einmal "repariert" und damit den Entzug erst scharf
+    // gestellt — der tote Code hatte in Wahrheit recht.
+    // NICHT wieder einbauen.
   },
 };

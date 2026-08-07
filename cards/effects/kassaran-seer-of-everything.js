@@ -14,13 +14,19 @@
 //   • Multi-use vs. standard heroEffect — engine
 //     auto-stamps HOPT on truthy return from
 //     onHeroEffect, which would gate re-activation
-//     to once per turn. We always return false to
-//     skip that stamp, manage our own per-turn use
-//     count on the hero (`_kassaranUsesThisTurn`),
-//     and gate via `canActivateHeroEffect`. The
-//     pending reveal/log are fired manually before
-//     the false-return so opp still sees the
-//     activation on the second & third uses.
+//     to once per turn. Wir setzen deshalb
+//     `ctx._skipHeroEffectHopt = true` (Gegenstueck
+//     zu `_skipCreatureEffectHopt`), fuehren den
+//     Verbrauch selbst auf dem Helden
+//     (`_kassaranUsesThisTurn`) und gaten ueber
+//     `canActivateHeroEffect`. Der frueher genutzte
+//     Weg "immer false zurueckgeben" bedeutete fuer
+//     die Engine zugleich "abgebrochen" und hat
+//     `onAnyActionResolved` sowie die CPU-Erkennung
+//     mit ausgehebelt. Der pending reveal/log wird
+//     weiterhin manuell VOR dem Ende gefeuert, damit
+//     der Gegner die Aktivierung zum Zeitpunkt der
+//     Ansage sieht und nicht erst danach.
 //   • Mismatch lock-out — a wrong call sets
 //     `_kassaranNegatedThisTurn` on the hero; the
 //     activation gate refuses subsequent uses
@@ -185,11 +191,16 @@ module.exports = {
 
     engine.sync();
 
-    // Always return false so the engine doesn't stamp the standard
-    // hero-effect HOPT — we manage uses ourselves. The pending
-    // reveal/log were fired above, so the false-return only suppresses
-    // the HOPT stamp.
-    return false;
+    // Die Nutzung hat stattgefunden — das melden wir mit `true` und
+    // unterdrücken NUR den Sperr-Stempel über das dafür vorgesehene
+    // Flag. Früher stand hier `return false`; dieser Rückgabewert
+    // bedeutet für die Engine aber gleichzeitig "abgebrochen", und das
+    // hatte zwei Nebenwirkungen: `onAnyActionResolved` (Flashbang zählt
+    // Helden-Effekte als Aktion) feuerte für Kassaran nie, und die CPU
+    // konnte "gefeuert" nicht von "abgebrochen" unterscheiden und kam
+    // dadurch nur auf eine Nutzung je Main Phase statt auf drei.
+    ctx._skipHeroEffectHopt = true;
+    return true;
   },
 
   hooks: {

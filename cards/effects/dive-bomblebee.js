@@ -233,6 +233,10 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
 }
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 1): nimmt eine Karte von der GEGNERISCHEN Brettseite.
+  // Bei wirksamem Boris beim Gegner nicht aktivierbar.
+  stealsOpponentCards: true,
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

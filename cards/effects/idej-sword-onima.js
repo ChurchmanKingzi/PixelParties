@@ -56,6 +56,15 @@ module.exports = {
       // Collect every Ability copy attached to the struck Hero.
       const abz = oppPs.abilityZones?.[tHeroIdx] || [];
       const targets = [];
+      // Support-Zonen-Karten, die dort als Ability zaehlen (Cloak of
+      // Edge) — zentral ueber den Sammler (Als Ruling 5.8.).
+      for (const st of (engine.collectSupportZoneAbilities?.(oppIdx, tHeroIdx) || [])) {
+        targets.push({
+          id: `equip-${oppIdx}-${tHeroIdx}-${st.slotIdx}`, type: 'equip',
+          owner: oppIdx, heroIdx: tHeroIdx, slotIdx: st.slotIdx,
+          cardName: st.cardName,
+        });
+      }
       for (let zi = 0; zi < abz.length; zi++) {
         const slot = abz[zi] || [];
         for (let ci = 0; ci < slot.length; ci++) {

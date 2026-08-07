@@ -60,6 +60,17 @@ module.exports = {
       }
       const declared = result.cardName;
 
+      // Reaktionsfenster (Ambush the Scout), Kategorie 'reveal': das
+      // Aufdecken ist bereits die Hand-Interaktion und passiert VOR
+      // dem Abwurf — hier ist also der richtige Moment. Wird negiert,
+      // entfaellt der gesamte Hand-Teil, die Ansage bleibt bestehen.
+      if (await engine.checkHandInteractionReaction(oi, 'reveal',
+            { byPi: pi, count: (ops.hand || []).length, sourceName: CARD_NAME })) {
+        engine.log('accusation_negated', { player: ps.username, declared });
+        engine.sync();
+        return;
+      }
+
       // Reveal opp's full hand to the caster (private peek). Each
       // card in opp's hand emits a `card_reveal` to the caster's
       // socket only; this is the same pattern Krates / Sid use to
@@ -82,6 +93,9 @@ module.exports = {
         if (idx < 0) break;
         const ok = await engine.actionDiscardHandCard(oi, declared, idx, {
           source: CARD_NAME,
+          // Fenster hier NICHT erneut oeffnen — es lief schon beim
+          // Aufdecken oben, sonst kaeme es je abgeworfener Kopie neu.
+          _skipHandInteractionCheck: true,
         });
         if (!ok) break;
         discarded++;

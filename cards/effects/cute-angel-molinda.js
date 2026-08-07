@@ -79,6 +79,11 @@ function _molindaFreeZones(engine, ctx) {
 }
 
 module.exports = {
+  // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
+  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
+  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
+  takesControlOfTargets: true,
+
   // CPU: confirm this card's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (trigger hook),
   // which would otherwise make this control-steal a no-op for the CPU. (The

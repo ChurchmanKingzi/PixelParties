@@ -47,6 +47,20 @@ const HOOKS = {
   BEFORE_PLAY:      'beforePlay',
   ON_PLAY:          'onPlay',
   ON_DISCARD:       'onDiscard',
+  // Feuert UNMITTELBAR BEVOR ein Effekt die Hand eines Spielers anfasst,
+  // und ist ABBRECHBAR: eine Reaktion setzt `ctx.cancelled = true`, der
+  // ausloesende Effekt ueberspringt daraufhin GENAU DIESEN Teileffekt und
+  // laeuft sonst normal weiter (Als Ruling 4.8.: bei Strong Ox Headbutt
+  // faellt der Schaden trotzdem, nur der Abwurf entfaellt).
+  // Kontext: { targetPi, byPi, kind, count, sourceName, cancelled }
+  // kind ist einer aus HAND_INTERACTION_KINDS (_hand-interaction-registry.js).
+  // Feuert NUR, wenn ein FREMDER Effekt die Hand anfasst — eigene Kosten
+  // (byPi === targetPi) oeffnen kein Fenster.
+  ON_HAND_INTERACTION: 'onHandInteraction',
+  // Feuert, NACHDEM ein Doom Counter auf eine Doom Clock gelegt wurde.
+  // Kontext: { clock, byPi, count, sourceName }. Zuhoerer sind Archer
+  // of Teocuilatl (Schaden) und Swift Eagle Warrior (Karte ziehen).
+  ON_DOOM_COUNTER_PLACED: 'onDoomCounterPlaced',
   ON_MILL:          'onMill',       // Fires when cards are milled from deck to discard (NOT onDiscard)
   ON_DELETE:        'onDelete',
   ON_CARD_ENTER_ZONE: 'onCardEnterZone',
@@ -527,11 +541,43 @@ function isCreatureSource(engine, source) {
   return source.zone === 'support' || source.cardInstance?.zone === 'support';
 }
 
+
+/**
+ * Darf `cardName` durch einen GENERISCHEN „beschwöre / belebe eine
+ * Creature"-Effekt auf die EIGENE Bretthaelfte gelegt werden?
+ *
+ * Als Ruling: Creatures, die laut ihrem Text NUR in gegnerische Zonen
+ * gelegt werden koennen, duerfen auch ueber fremde Effekte nicht auf der
+ * eigenen Seite landen. Solche Karten deklarieren `placesOnOpponentBoard`.
+ *
+ * Warum es das ueberhaupt braucht: Powder Keg ist `cardType: 'Artifact'`
+ * mit `subtype: 'Creature'`. Der uebliche Pool-Filter `hasCardType(cd,
+ * 'Creature')` laesst ihn deshalb durch (der strikte `cardType ===
+ * 'Creature'` nicht), und jeder Wiederbelebungs-Effekt konnte ihn so auf
+ * die eigene Haelfte holen.
+ *
+ * Fuer Pool-Listen gedacht — die Brett-Erkennung (ist DIESES Ding auf dem
+ * Feld eine Creature?) bleibt bei `hasCardType`.
+ */
+function isOwnSideSummonableCreature(cd, cardName) {
+  if (!cd || !hasCardType(cd, 'Creature')) return false;
+  // Lazy require: _loader zieht _hooks nicht, ein Zyklus entsteht also
+  // nicht — der Aufruf steht trotzdem hier drin, damit die Modul-
+  // Ladereihenfolge egal bleibt.
+  try {
+    const { loadCardEffect } = require('./_loader');
+    const script = loadCardEffect(cardName || cd.name);
+    if (script?.placesOnOpponentBoard) return false;
+  } catch { /* ohne Loader lieber durchlassen als alles blockieren */ }
+  return true;
+}
+
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
+  isOwnSideSummonableCreature,
   resolveSourceCreature, isCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

@@ -1515,6 +1515,220 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       }
     }
   }
+  // ── Counter-Ausgabe-Kanal (Als Vorgabe 5.8.) ──
+  //
+  // "Füge ML eine HOHE Belohnung dafür hinzu, nicht in der Base-Form den
+  // Zug zu beenden — so soll sie lernen, dass der Base-Form-Effekt zwar
+  // völlig legitim ist, sie damit aber NICHT den letzten Counter
+  // verbrennen sollte."
+  //
+  // Umgesetzt als LABEL-FORMUNG, nicht als Regel: dieselbe One-vs-Rest-
+  // Mechanik wie beim Heil-Kanal, aber das Ziel-y jeder Entscheidung
+  // bekommt einen Aufschlag/Abschlag danach, wie der Zug ENDETE, in dem
+  // sie fiel. Das ist der entscheidende Unterschied zu einem globalen
+  // Bonus: dieselbe Ausgabe kann in der Basisform mit blockiertem
+  // Aufstieg bestraft und an einer aufgestiegenen Form belohnt werden —
+  // welches Vorzeichen wo gilt, entscheiden weiterhin die Daten.
+  //
+  // Drei Stufen, absichtlich asymmetrisch:
+  //   in Ascended Form geendet                        → +FORM_REWARD
+  //   in Basisform geendet, Aufstieg WÄRE möglich     → −FORM_REWARD
+  //   in Basisform geendet, Aufstieg unmöglich        →  0
+  // Die dritte Stufe ist der Grund, warum der Stempel `ca` mitführt:
+  // ohne sie würde jeder Zug ohne Aufstiegs-Option mitbestraft, und der
+  // Kanal lernte "nie ausgeben" statt "den letzten Zähler nicht".
+  const FORM_REWARD = 0.5;
+  const CS_T_MIN = 2.5;   // strenger als bei Caster-Deltas: das geformte
+                          // Label streut breiter, und eine falsche
+                          // Skip-Regel wuergt den fired-Arm der naechsten
+                          // Iteration komplett ab.
+  const counterSpendRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const decs = [];
+    let nShaped = 0;
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.counterSpendDecisions)) continue;
+      // Zug → wie endete er? (asc/ca aus dem formTurns-Stempel)
+      const byTurn = Object.create(null);
+      for (const f of (g.formTurns || [])) byTurn[f.t] = f;
+      for (const d of g.counterSpendDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        const base = ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome;
+        const ft = byTurn[d.t];
+        let shape = 0;
+        if (ft) {
+          if (ft.asc) shape = FORM_REWARD;
+          else if (ft.ca) shape = -FORM_REWARD;
+          nShaped++;
+        }
+        decs.push({ c: d.c, tags: d.tags || [], fired: !!d.fired,
+          y: Math.max(-1, Math.min(2, base + shape)) });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        const inT = ds.filter(d => d.tags.includes(g));
+        // ── PRÄVALENZ-FILTER ──────────────────────────────────────────
+        // Der Prior SUMMIERT die Tag-Gewichte. Ein Tag, das auf fast
+        // JEDER Entscheidung dieses Helden sitzt (`cs:base` in einem
+        // Deck mit nur einer counterConsumer-Form, `cs:mp2` wenn alle
+        // Aktivierungen in Main Phase 2 fallen), misst nicht die Lage,
+        // sondern den globalen fired-vs-held-Unterschied — und zählt ihn
+        // damit ein zweites Mal neben den Tags, die ihn tatsächlich
+        // erklären. Im Synthetik-Test kamen so fünf Tags à −20 zusammen:
+        // −100 gegen eine Entscheidungsschwelle von 4, also "nie
+        // ausgeben", ganz gleich in welcher Lage. Das ist exakt die
+        // Doppelzählung, an der v85 der Ausspiel-Reihenfolge-Kanal
+        // gescheitert ist. Tags, die weder ausreichend häufig noch
+        // ausreichend selten sind, tragen keine Unterscheidung — raus.
+        const prevalence = inT.length / ds.length;
+        if (prevalence > 0.95 || prevalence < 0.05) continue;
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const mean = a => a.reduce((s, d) => s + d.y, 0) / a.length;
+        const vari = (a, m) => a.reduce((s, d) => s + (d.y - m) ** 2, 0) / Math.max(1, a.length - 1);
+        const mF = mean(fired), mH = mean(held);
+        const delta = mF - mH;
+        // ── WELCH-t-GATE ──────────────────────────────────────────────
+        // Ohne Signifikanztest erzeugte der Kanal in der Negativkontrolle
+        // (Ausgabe und Zugende-Form absichtlich UNKORRELIERT, 640
+        // Entscheidungen) ein `cs:blocks-ascend` von −6.2 und damit eine
+        // Skip-Regel aus reinem Rauschen: die Skala ×120 ist gegenüber
+        // der Streuung des geformten Labels zu groß, eine 1.3-Sigma-
+        // Schwankung reicht schon über die Schwelle von 4. Derselbe
+        // Riegel wie bei Caster-Deltas und Uplift-Paaren.
+        const se = Math.sqrt(vari(fired, mF) / fired.length + vari(held, mH) / held.length) || 1e-9;
+        if (Math.abs(delta / se) < CS_T_MIN) continue;
+        // Stichproben-Schrumpfung auf den kleineren Arm, gleiche
+        // Begründung wie im Ausspiel-Reihenfolge-Kanal: dünne Arme sind
+        // am stärksten konfundiert.
+        const nArm = Math.min(fired.length, held.length);
+        const damp = nArm / (nArm + 60);
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120 * damp)) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) counterSpendRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      console.log(`Counter-Ausgabe: ${decs.length} Entscheidungen (${nShaped} mit Form-Belohnung ±${FORM_REWARD}), ${Object.keys(counterSpendRules).length} Helden mit Regeln`);
+      for (const [c, rs] of Object.entries(counterSpendRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+    // ── Report: Als eigentliche Zielgröße, direkt ausgewiesen ──
+    let tTurns = 0, tAsc = 0, tBaseMoeglich = 0, evoSum = 0, descSum = 0, stackSum = 0;
+    const endForm = Object.create(null);      // Form → [Züge, davon passend]
+    const bySrc = Object.create(null);        // Counter-Quelle → [Züge, davon passend]
+    let descTurns = 0, descGames = 0, descTotal = 0;
+    for (const g of trainGames) {
+      for (const f of (g.formTurns || [])) {
+        tTurns++;
+        if (f.asc) tAsc++;
+        else if (f.ca) tBaseMoeglich++;
+        evoSum += (f.evo || 0);
+        descSum += (f.desc || 0);
+        stackSum += (f.stack || 0);
+        if (f.desc > 0) descTurns++;
+        if (f.form) {
+          const e = endForm[f.form] || (endForm[f.form] = [0, 0]);
+          e[0]++; if (f.fit) e[1]++;
+        }
+        if (f.src) {
+          const e = bySrc[f.src] || (bySrc[f.src] = [0, 0]);
+          e[0]++; if (f.fit) e[1]++;
+        }
+      }
+      const d = (g.descends || []).length;
+      if (d > 0) { descGames++; descTotal += d; }
+    }
+    if (tTurns > 0) {
+      console.log(`Form am Zugende: ${tTurns} eigene Züge — ascended ${(tAsc / tTurns * 100).toFixed(1)}%, `
+        + `Basisform TROTZ bezahlbarem Aufstieg ${(tBaseMoeglich / tTurns * 100).toFixed(1)}%, `
+        + `Ø Zähler am Zugende ${(evoSum / tTurns).toFixed(2)}, Ø Formstapel ${(stackSum / tTurns).toFixed(2)}`);
+      if (tBaseMoeglich / tTurns > 0.05) {
+        console.log(`  ← ${tBaseMoeglich} Züge endeten in der Basisform, obwohl ein Aufstieg bezahlbar war`);
+      }
+      // Auf WELCHER Form endet die CPU — und passte die Form zu dem,
+      // was sie an Auslösern zur Hand hatte? (Als Auftrag 6.8.)
+      console.log('  Endform (Anteil der Züge | davon mit passendem Auslöser zur Hand):');
+      for (const [form, [cnt, fitCnt]] of Object.entries(endForm).sort((a, b) => b[1][0] - a[1][0])) {
+        console.log(`    ${form.padEnd(38)} ${(cnt / tTurns * 100).toFixed(1).padStart(5)}%  Passung ${(fitCnt / cnt * 100).toFixed(0)}%`);
+      }
+      console.log('  nach Counter-Quelle der Endform:');
+      for (const [src, [cnt, fitCnt]] of Object.entries(bySrc).sort((a, b) => b[1][0] - a[1][0])) {
+        console.log(`    ${src.padEnd(38)} ${(cnt / tTurns * 100).toFixed(1).padStart(5)}%  Passung ${(fitCnt / cnt * 100).toFixed(0)}%`);
+      }
+      console.log(`  Descend: Ø ${(descSum / tTurns).toFixed(2)}/Zug, in ${(descTurns / tTurns * 100).toFixed(1)}% der Züge`
+        + `, ${descGames} Spiele mit ≥1 Abstieg (${descTotal} gesamt)`);
+    }
+  }
+  // ── Descend-Kanal (Als Auftrag 6.8.) ──
+  //
+  // "Jetzt den Stapel abbauen oder noch weiterstapeln?" Gleiche Bauart
+  // wie counterSpendRules inklusive Prävalenzfilter, Welch-t-Gate und
+  // Schrumpfung — die beiden Riegel, ohne die ein solcher Kanal Regeln
+  // aus Rauschen erzeugt (in der Negativkontrolle nachgewiesen).
+  //
+  // KEINE Label-Formung hier: anders als beim Counter-Kanal gibt es
+  // keine Zielgröße, die Al vorgegeben hätte. Der Abbau soll sich über
+  // das normale Ergebnis-Label rechtfertigen — sonst würde ich dem
+  // Lerner meine eigene Vermutung als Belohnung unterschieben.
+  const descendRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const DS_T_MIN = 2.5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.descendDecisions)) continue;
+      for (const d of g.descendDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        const y = ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome;
+        decs.push({ c: d.c, tags: d.tags || [], fired: !!d.fired, y });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        const inT = ds.filter(d => d.tags.includes(g));
+        const prevalence = inT.length / ds.length;
+        if (prevalence > 0.95 || prevalence < 0.05) continue;
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const mean = a => a.reduce((s, d) => s + d.y, 0) / a.length;
+        const vari = (a, m) => a.reduce((s, d) => s + (d.y - m) ** 2, 0) / Math.max(1, a.length - 1);
+        const mF = mean(fired), mH = mean(held);
+        const delta = mF - mH;
+        const se = Math.sqrt(vari(fired, mF) / fired.length + vari(held, mH) / held.length) || 1e-9;
+        if (Math.abs(delta / se) < DS_T_MIN) continue;
+        const nArm = Math.min(fired.length, held.length);
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120 * (nArm / (nArm + 60)))) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) descendRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      console.log(`Descend-Kanal: ${decs.length} Entscheidungen, ${Object.keys(descendRules).length} Formen mit Regeln`);
+      for (const [c, rs] of Object.entries(descendRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+  }
   // ── Placement-Regeln (Support-Zonen-Ökonomie) ──
   // ── Ausspiel-Reihenfolge-Kanal (Als Auftrag, Schwester des Ketten-
   // Kanals): welche Karte gehört als nächstes gespielt? Gleiche
@@ -2010,7 +2224,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       for (const [k, v] of Object.entries(tutorPickRules).slice(0, 6)) console.log(`  ${v > 0 ? '+' : ''}${v}  ${k}`);
     }
   }
-  return { w, keep, support, uplifts, upliftStats, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  return { w, keep, support, uplifts, upliftStats, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
@@ -2595,6 +2809,10 @@ function main() {
     // Gelernte Status-Heilungs-Kontextregeln je Karte.
     statusHealRules: (advModel && advModel.statusHealRules && Object.keys(advModel.statusHealRules).length > 0)
       ? advModel.statusHealRules : undefined,
+    counterSpendRules: (advModel && advModel.counterSpendRules && Object.keys(advModel.counterSpendRules).length > 0)
+      ? advModel.counterSpendRules : undefined,
+    descendRules: (advModel && advModel.descendRules && Object.keys(advModel.descendRules).length > 0)
+      ? advModel.descendRules : undefined,
     // Gelernte Support-Zonen-Ökonomie (Placement-Kanal).
     placementRules: (advModel && advModel.placementRules && Object.keys(advModel.placementRules).length > 0)
       ? advModel.placementRules : undefined,

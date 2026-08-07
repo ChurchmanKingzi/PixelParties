@@ -51,7 +51,12 @@ function getCapturableCreatures(engine, pi) {
   const cardDB = engine._getCardDB();
   const oppShielded = engine._isSideNondamageShielded(oppIdx);
   const out = [];
-  for (const side of [pi, oppIdx]) {
+  // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner einen
+  // wirksamen Boris, faellt SEINE Brettseite als Ziel weg. Die eigene
+  // bleibt waehlbar — bleibt dort nichts uebrig, greift die normale
+  // "keine Ziele"-Behandlung und die Karte ist von selbst unspielbar.
+  const sides = engine.borisHidesOpponentSide?.(pi) ? [pi] : [pi, oppIdx];
+  for (const side of sides) {
     // The Great Wall of Deri: a side's Creatures can't be CHOSEN by the
     // opponent's non-damage effects. Capture Net is non-damage, so a
     // shielded opponent's Creatures are unreachable — your own are
@@ -78,6 +83,12 @@ function getCapturableCreatures(engine, pi) {
 }
 
 module.exports = {
+  // BORIS-EINSCHRAENKUNG (Klausel 1, Als Praezisierung 5.8.): nimmt eine BELIEBIGE Creature vom Brett auf die eigene Hand.
+  // Trifft beliebige Creature auf dem GESAMTEN Brett — deshalb NICHT sperren, sondern bei
+  // wirksamem Boris beim Gegner nur dessen Seite ausblenden. Solange
+  // es eigene legale Ziele gibt, bleibt der Effekt nutzbar.
+  stealsFromEitherSide: true,
+
   isTargetingArtifact: true,
   // cards.json cost (4) is the BASE — real cost is level × 4, so the
   // engine must not auto-deduct; resolve() deducts manually.

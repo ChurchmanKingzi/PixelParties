@@ -194,6 +194,9 @@ module.exports = {
 
       // ── Tier 2+: an Artifact equipped to a Hero → its controller
       //    (= you, the equipper) draws 1. Only when YOU equip. ──
+      // Cloak of Edge & Co. zaehlen in der Support-Zone als ABILITY
+      // (Als Ruling 5.8.) — sie loesen den Artefakt-Trigger nicht aus.
+      if (ctx._engine.countsAsAbilityInZone(entering.name, entering)) return;
       if (n >= 2
         && cd.cardType === 'Artifact'
         && (cd.subtype || '').toLowerCase() === 'equipment'

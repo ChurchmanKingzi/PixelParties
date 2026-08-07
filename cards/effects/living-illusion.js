@@ -33,7 +33,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones, getFreeZones } = require('./_pollution-shared');
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 /**
  * Return the free Support Zones belonging to a specific Hero only.
@@ -129,7 +129,7 @@ module.exports = {
       const effLevels = {};
       for (const name of deck) {
         const cd = cardDB[name];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
         const lvl = engine.effectiveCardLevel(cd, pi);
         if (lvl > 3) continue;
         if (!engine.isCreatureSummonable(name, pi, userHeroIdx)) continue;
