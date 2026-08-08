@@ -72,53 +72,11 @@ function verbraucheGoldSource(ctx) {
   if (ctx?._goldSource) ctx._goldSource.consumed = true;
 }
 
-/**
- * Darf dieser Held die Kreatur NORMAL beschwoeren? (Als Ruling 8.8.:
- * "summon as an additional Action" ist eine ganz normale Beschwoerung —
- * sie kostet nur keine Aktion und laeuft reaktiv. Ein tauglicher Caster
- * ist also weiterhin Pflicht.)
- *
- * Geprueft wird: lebendig, nicht Frozen / Stunned / Webbed / Bound /
- * Negated, und die Level- bzw. Schulanforderung der Karte
- * (`heroMeetsLevelReq` deckt Abilities, Ascension-Bypaesse und Wisdom mit ab).
- *
- * ANMERKUNG: `the-cosmic-depths.js` fuehrt dieselbe Pruefung als eigene
- * lokale Kopie (dort ohne `negated`/`webbed`). Zusammenlegen waere
- * sinnvoll, ist aber eine Aenderung an fremder Karte — Al gemeldet.
- */
-function canHeroSummon(engine, pi, heroIdx, cd) {
-  const hero = engine.gs?.players?.[pi]?.heroes?.[heroIdx];
-  if (!hero?.name || hero.hp <= 0) return false;
-  const st = hero.statuses || {};
-  if (st.frozen || st.stunned || st.webbed || st.bound || st.negated) return false;
-  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
-}
-
-/**
- * Alle Plaetze, auf die diese Kreatur regulaer beschworen werden
- * koennte — je EIN Eintrag pro freier Zone eines tauglichen Helden,
- * damit der Spieler wie bei einer normalen Beschwoerung waehlen kann
- * (Als Vorgabe 8.8.), nicht nur den ersten freien Slot bekommt.
- */
-function eligibleSummonZones(engine, pi, cardName) {
-  const ps = engine.gs?.players?.[pi];
-  const cd = engine._getCardDB()[cardName];
-  if (!ps || !cd) return [];
-  const out = [];
-  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!canHeroSummon(engine, pi, hi, cd)) continue;
-    const zones = ps.supportZones?.[hi] || [];
-    for (let zi = 0; zi < Math.min(zones.length, 3); zi++) {
-      if ((zones[zi] || []).length === 0) {
-        out.push({
-          heroIdx: hi, slotIdx: zi,
-          label: `${ps.heroes[hi].name} — Slot ${zi + 1}`,
-        });
-      }
-    }
-  }
-  return out;
-}
+// Caster-Eignung und waehlbare Plaetze liegen in `_summon-eligibility.js`
+// — dieselbe Auslegung nutzt auch green-dragoneer.js. Hier nur
+// weitergereicht, damit die Monkee-Karten eine einzige Bezugsquelle
+// haben.
+const { canHeroSummon, eligibleSummonZones } = require('./_summon-eligibility');
 
 /** Erster freier Support-Slot eines Helden, sonst -1. */
 function freeSlotOn(ps, heroIdx) {

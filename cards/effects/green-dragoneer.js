@@ -34,12 +34,12 @@
 //      einer vorher gesammelten Liste — ohne die
 //      Pruefung kaeme der Prompt auch dann, wenn die
 //      Karte laengst gespielt ist).
-//    · Landeplatz: bevorzugt der gerade frei gewordene
-//      Platz des gefallenen Drachen (thematisch nimmt
-//      der Dragoneer dessen Stelle ein). Ist der schon
-//      wieder belegt, sucht die Engine mit zoneSlot -1
-//      einen freien Platz bei demselben Helden; hat der
-//      keinen mehr, gehe ich die uebrigen Helden durch.
+//    · Landeplatz: AUSSCHLIESSLICH der Platz des
+//      gefallenen Drachen (Als Ruling 8.8. zum neuen
+//      Kartentext "into the Support Zone it occupied").
+//      Ist er wieder belegt, feuert der Effekt gar nicht.
+//      Damit steht auch der Caster fest — der Held dieser
+//      Zone muss die Beschwoerung regulaer leisten koennen.
 //    · Der Summon laeuft ueber
 //      `summonCreatureWithHooks`, kostet also weder
 //      Aktion noch Gold — genau das meint "as an
@@ -70,6 +70,7 @@
 // ═══════════════════════════════════════════
 
 const { isDragoDeath } = require('./_drago-shared');
+const { canHeroSummon } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Green Dragoneer';
 const DAMAGE = 100;
@@ -91,12 +92,6 @@ function makeSacrificeSpec(engine) {
   };
 }
 
-/** Erster freier Support-Platz bei diesem Helden, sonst -1. */
-function freeSlotOn(ps, heroIdx) {
-  const zones = ps.supportZones?.[heroIdx] || [];
-  for (let z = 0; z < 3; z++) if ((zones[z] || []).length === 0) return z;
-  return -1;
-}
 
 module.exports = {
   requiresTarget: true,
@@ -200,31 +195,34 @@ module.exports = {
       // Frische Handpruefung — siehe Kopfkommentar.
       if (!ps.hand.includes(CARD_NAME)) return;
 
-      // Irgendwo Platz? Sonst gar nicht erst fragen.
-      const heroes = ps.heroes || [];
-      let heroIdx = death.heroIdx;
-      let slot = -1;
-      const deadSlotFree = ((ps.supportZones?.[heroIdx]?.[death.zoneSlot]) || []).length === 0;
-      if (deadSlotFree) {
-        slot = death.zoneSlot;
-      } else if (freeSlotOn(ps, heroIdx) >= 0) {
-        slot = -1;                                   // Engine sucht bei diesem Helden
-      } else {
-        heroIdx = -1;
-        for (let hi = 0; hi < heroes.length; hi++) {
-          if (!heroes[hi]?.name) continue;
-          if (freeSlotOn(ps, hi) >= 0) { heroIdx = hi; slot = -1; break; }
-        }
-        if (heroIdx < 0) {
-          engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'no_free_zone' });
-          return;
-        }
+      // ── EIN Platz, kein Ausweichen (Als Ruling 8.8.) ─────────────────
+      // Kartentext: "into the Support Zone it occupied". Der Effekt darf
+      // NUR feuern, wenn genau diese Zone frei ist, und der Dragoneer
+      // kann NUR dorthin. Frueher fiel die Karte dreistufig zurueck
+      // (andere Zone desselben Helden, dann anderer Held) — das
+      // widerspricht dem Wortlaut und ist raus.
+      const heroIdx = death.heroIdx;
+      const slot = death.zoneSlot;
+      if (((ps.supportZones?.[heroIdx]?.[slot]) || []).length !== 0) {
+        engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'zone_taken' });
+        return;
+      }
+
+      // ── Tauglicher Caster (Als Ruling 8.8., spielweit) ───────────────
+      // "as an additional Action" ist eine ganz normale Beschwoerung, sie
+      // kostet nur keine Aktion. Weil der Platz feststeht, steht auch der
+      // Caster fest: der Held dieser Zone. Ist er tot, gesperrt oder
+      // erfuellt er die Levelanforderung nicht, findet nichts statt.
+      const cd = engine._getCardDB()[CARD_NAME];
+      if (!canHeroSummon(engine, pi, heroIdx, cd)) {
+        engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
+        return;
       }
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `A "Drago" Creature you control (${death.name}) was defeated. Summon ${CARD_NAME} from your hand as an additional Action?`,
+        message: `A "Drago" Creature you control (${death.name}) was defeated. Summon ${CARD_NAME} from your hand into its Support Zone as an additional Action?`,
         showCard: CARD_NAME,
         confirmLabel: '🐉 Summon!',
         cancelLabel: 'No',

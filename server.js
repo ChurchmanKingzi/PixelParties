@@ -450,8 +450,10 @@ async function initDatabase() {
   // Tracks which sample deck (starter or structure) the user has pinned as
   // their default. Null when the default is a custom deck from `decks`.
   try { await db.execute("ALTER TABLE users ADD COLUMN default_sample_deck_id TEXT DEFAULT NULL"); } catch {}
-  // Guest accounts: ephemeral, starter-decks-vs-CPU only, never unlock new
-  // opponents, and purged on logout / server start (see purgeGuest).
+  // Guest accounts: ephemeral, starter-decks-vs-CPU only, and purged on
+  // logout / server start (see purgeGuest). Sie schalten seit 8.8. sehr
+  // wohl neue Gegner frei — aber nur fuer die laufende Sitzung, weil das
+  // Konto samt seiner unlock-Zeilen mit purgeGuest verschwindet.
   try { await db.execute("ALTER TABLE users ADD COLUMN is_guest INTEGER DEFAULT 0"); } catch {}
   // Daily Challenge — 3 random Heroes the player must win with for SC bonuses.
   // Resets every 12:00 Europe/Berlin (CET/CEST) globally, or 24h after the
@@ -1180,7 +1182,8 @@ async function purgeAllGuests() {
 
 // Create a throwaway guest account: starter decks vs CPU only, seeded with
 // just the starter-deck opponents and pinned to a random starter. Guests
-// never unlock new opponents (see endCpuBattle) and are purged on logout.
+// schalten Gegner nur sitzungsweit frei (siehe endCpuBattle + unlock-rules.js)
+// und werden beim Abmelden weggeraeumt.
 app.post('/api/auth/guest', async (req, res) => {
   try {
     const id = uuidv4();
@@ -2515,11 +2518,13 @@ function getCpuMessages(deckId) {
 //  More unlock as the player hits win milestones (endCpuBattle):
 //    • the first win vs each of the initial opponents → +1 random unlock
 //    • reaching THREE_WIN_MILESTONE wins vs ANY opponent → +1 random unlock
+//  Gaeste haben eine eigene, grosszuegigere Regel (jeder erste Sieg gegen
+//  eine CPU) — alles in `unlock-rules.js`.
 //  The gallery and the structure-deck shop are both filtered to a user's
 //  unlocked set. Preexisting accounts are re-gated to this same starting
 //  point by a one-time migration (see initDatabase).
 // ═══════════════════════════════════════════════════════════════════
-const THREE_WIN_MILESTONE = 3;
+const { THREE_WIN_MILESTONE, cpuUnlockCount } = require('./unlock-rules');
 
 // Seed an account with its initial opponent roster — the starter-deck
 // (non-structure) opponents — flagged is_initial=1, and mark the account
@@ -4957,20 +4962,24 @@ function endCpuBattle(room, winnerIdx, reason) {
             losses = losses + excluded.losses
         `, [humanUserId, opponentDeckId, humanWon, humanLost]);
 
-        // Opponent-unlock milestones — only on a win, and never for guests
-        // (they're permanently locked to the starter-deck opponents).
+        // Freischaltungen — nur bei einem Sieg. Die Regel selbst steht in
+        // `unlock-rules.js`; hier wird nur der Zustand zusammengetragen.
+        // GAESTE schalten seit 8.8. ebenfalls frei: jeder erste Sieg gegen
+        // eine CPU bringt eine zufaellige neue — fuer die laufende Sitzung.
         const guestRow = await db.get('SELECT is_guest FROM users WHERE id = ?', [humanUserId]);
-        if (humanWon && !guestRow?.is_guest) {
-          const initRow = await db.get(
-            'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
-            [humanUserId, opponentDeckId]
-          );
-          const isInitial = !!(initRow && initRow.is_initial);
-          let unlockCount = 0;
-          // First-ever win against one of the starting opponents.
-          if (isInitial && preWins === 0) unlockCount++;
-          // Crossing the "beat the same opponent N times" threshold.
-          if (preWins === THREE_WIN_MILESTONE - 1) unlockCount++;
+        if (humanWon) {
+          const isGuest = !!guestRow?.is_guest;
+          // Das Startaufgebot interessiert nur registrierte Konten; die
+          // Abfrage entfaellt fuer Gaeste.
+          let isInitial = false;
+          if (!isGuest) {
+            const initRow = await db.get(
+              'SELECT is_initial FROM unlocked_opponents WHERE user_id = ? AND opponent_deck_id = ?',
+              [humanUserId, opponentDeckId]
+            );
+            isInitial = !!(initRow && initRow.is_initial);
+          }
+          const unlockCount = cpuUnlockCount({ isGuest, isInitial, preWins });
 
           const newlyUnlocked = [];
           for (let k = 0; k < unlockCount; k++) {
