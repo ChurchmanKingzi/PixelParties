@@ -1097,6 +1097,16 @@ function MainMenu() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') { cheatBufRef.current = ''; return; }
       if (!/^[0-9]$/.test(e.key)) { cheatBufRef.current = ''; return; }
       cheatBufRef.current = (cheatBufRef.current + e.key).slice(-5);
+      // ── Kampagne (Story-Modus): dreimal die 1 ──
+      // Noch nicht oeffentlich, deshalb wie der Freischalt-Cheat ueber
+      // denselben Ziffernpuffer. Wird VOR dem 5er-Code geprueft, sonst
+      // schluckt '11111' beide.
+      if (cheatBufRef.current.slice(-3) === '111') {
+        cheatBufRef.current = '';
+        if (window.playSFX) window.playSFX('ui_click');
+        setScreen('campaign');
+        return;
+      }
       if (cheatBufRef.current !== '12345') return;
       cheatBufRef.current = '';
       try {

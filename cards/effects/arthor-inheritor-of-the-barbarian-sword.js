@@ -32,6 +32,9 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
+  // Rein schaedlich: 300 Schaden auf ein beliebiges Ziel, gilt als Attack.
+  // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
+  heroEffectHarmfulOnly: true,
 
   async onAscensionBonus(engine, pi, heroIdx) {
     await engine.performAscensionBonus(pi, heroIdx, ['Fighting', 'Summoning Magic']);

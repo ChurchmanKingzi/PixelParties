@@ -18,6 +18,13 @@ module.exports = {
   // heroEffect replaces it via server.js doActivateHeroEffect).
   mummifiesHost: true,
   heroEffect: 'Place a Mummy Token into the free Support Zone of a Hero your opponent controls that has no Mummy Tokens in its Support Zones yet.',
+  // Rein schaedlich: platziert einen Mummy Token in der Zone des GEGNERS.
+  // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
+  // Von Al ausdruecklich bestaetigt (8.8.): das Platzieren soll in Zug 1
+  // geblockt sein. Vorher lief der Effekt DURCH den Schutz hindurch — er
+  // ist weder Schaden noch Status noch Discard/Mill und wurde deshalb von
+  // keiner der bestehenden Sperren erfasst.
+  heroEffectHarmfulOnly: true,
 
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;

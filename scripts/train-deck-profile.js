@@ -1729,6 +1729,91 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       }
     }
   }
+  // ── Beschwörungs-Diagnose (Als Auftrag 7.8.) ──
+  //
+  // Befund: 19.7% der Spiele enden mit NULL eigenen Kreaturen auf dem
+  // Brett, und die verlieren fast alle (WR 10.2% gegen 33.0% gesamt).
+  // Weil das nur jedes fünfte Spiel trifft, ist es von Hand nicht
+  // zuverlässig zu reproduzieren — dieser Block wertet es deshalb bei
+  // JEDEM Lauf automatisch aus.
+  //
+  // `summon:vollzogen` kommt aus der zentralen Beschwörung in der
+  // Engine (alle drei Wege aufs eigene Brett, ohne Cross-Side), die
+  // `summon:*`-Ablehnungszähler aus dem Filterpfad des Piloten. Erst
+  // beides zusammen sagt, WORAN es lag.
+  {
+    // Rückwärtskompatibilität: `summon:vollzogen` gibt es erst ab v262.
+    // Ohne diesen Riegel läse der Block Altdaten als "100% der Spiele
+    // ohne Beschwörung" — ein Fehlalarm, der genau die Zahl entwertet,
+    // um die es hier geht. Fehlt der Zähler im ganzen Datensatz, ist der
+    // Lauf schlicht zu alt und der Block schweigt.
+    const instrumented = trainGames.some(g =>
+      hasData(g) && Object.prototype.hasOwnProperty.call(g.swapDiag || {}, 'summon:vollzogen'));
+    const zero = [], nonzero = [];
+    for (const g of instrumented ? trainGames : []) {
+      if (!hasData(g)) continue;
+      const sd = g.swapDiag || {};
+      ((sd['summon:vollzogen'] || 0) === 0 ? zero : nonzero).push(g);
+    }
+    const tot = zero.length + nonzero.length;
+    if (tot > 0) {
+      const wr = a => (a.length ? a.reduce((s, g) => s + (g.outcome === 1 ? 1 : 0), 0) / a.length * 100 : 0);
+      const turns = a => (a.length ? a.reduce((s, g) => s + (g.turns || 0), 0) / a.length : 0);
+      console.log(`Beschwörungen: ${zero.length} von ${tot} Spielen (${(zero.length / tot * 100).toFixed(1)}%) mit KEINER eigenen Kreatur`
+        + ` — WR dort ${wr(zero).toFixed(1)}% gegen ${wr(nonzero).toFixed(1)}%`
+        + `, Ø ${turns(zero).toFixed(1)} gegen ${turns(nonzero).toFixed(1)} Züge`);
+      if (zero.length > 0) {
+        // Ablehnungsgründe JE ZUG normieren — die Null-Spiele sind
+        // kürzer, absolute Summen wären allein dadurch niedriger und
+        // der Vergleich wertlos.
+        const perTurn = (games, pred) => {
+          let sum = 0, t = 0;
+          for (const g of games) {
+            t += (g.turns || 0) / 2;   // eigene Züge ≈ halbe Spiellänge
+            for (const [k, v] of Object.entries(g.swapDiag || {})) if (pred(k)) sum += v;
+          }
+          return t > 0 ? sum / t : 0;
+        };
+        const reasons = new Set();
+        for (const g of zero) {
+          for (const k of Object.keys(g.swapDiag || {})) {
+            if (k.startsWith('summon:') && !k.startsWith('summon:vollzogen')) reasons.add(k.split(':').slice(0, 2).join(':'));
+          }
+        }
+        const rows = [...reasons].map(r => ({
+          r, z: perTurn(zero, k => k === r || k.startsWith(r + ':')),
+          n: perTurn(nonzero, k => k === r || k.startsWith(r + ':')),
+        })).sort((a, b) => b.z - a.z);
+        console.log('  Ablehnungsgründe je eigenem Zug (Null-Spiele | Rest):');
+        for (const { r, z, n } of rows) {
+          if (z < 0.01 && n < 0.01) continue;
+          console.log(`    ${r.padEnd(30)} ${z.toFixed(2).padStart(6)} | ${n.toFixed(2).padStart(6)}`);
+        }
+        // Welche Kreatur scheitert woran? Nur die Null-Spiele.
+        const byCard = Object.create(null);
+        for (const g of zero) {
+          for (const [k, v] of Object.entries(g.swapDiag || {})) {
+            if (!k.startsWith('summon:') || k.startsWith('summon:vollzogen')) continue;
+            const parts = k.split(':');
+            if (parts.length < 3) continue;
+            const card = parts.slice(2).join(':');
+            (byCard[card] = byCard[card] || Object.create(null));
+            byCard[card][parts[1]] = (byCard[card][parts[1]] || 0) + v;
+          }
+        }
+        const cards = Object.entries(byCard).sort((a, b) =>
+          Object.values(b[1]).reduce((s, v) => s + v, 0) - Object.values(a[1]).reduce((s, v) => s + v, 0));
+        if (cards.length > 0) {
+          console.log('  je Karte in den Null-Spielen (häufigster Grund zuerst):');
+          for (const [card, m] of cards.slice(0, 8)) {
+            const top = Object.entries(m).sort((a, b) => b[1] - a[1])
+              .map(([g, v]) => `${g} ${v}`).join(', ');
+            console.log(`    ${card.padEnd(32)} ${top}`);
+          }
+        }
+      }
+    }
+  }
   // ── Placement-Regeln (Support-Zonen-Ökonomie) ──
   // ── Ausspiel-Reihenfolge-Kanal (Als Auftrag, Schwester des Ketten-
   // Kanals): welche Karte gehört als nächstes gespielt? Gleiche

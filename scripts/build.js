@@ -42,6 +42,7 @@ const ENTRIES = [
   'app-puzzle',
   'app-deckbuilder',
   'app-board',
+  'app-campaign',
   'app-main',
 ];
 

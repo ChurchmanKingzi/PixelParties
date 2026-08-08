@@ -37,6 +37,16 @@ const MAX_ACTIVATION_REPEATS = 8;
 // jede Linie, die im Archetyp vorgesehen ist (Aufstieg → Descend →
 // Wiederaufstieg).
 const MAX_ASCENSIONS_PER_TURN = 3;
+// Wie viele Beschwoerungen darf der Gratis-Bypass je Zug durchwinken?
+//
+// Reiner Livelock-Riegel gegen koerper-erzeugende Beschwoerungen, KEINE
+// Wertaussage. Meine Rate-Hypothese aus v265 war falsch, und Al hat sie
+// widerlegt: Morph and Kill fuehrt selbst zwoelf Karten mit inhaerenter
+// Aktion (4× Aggressive Town Guard, 4× Ska Harpyformer, 4× Disgruntled
+// Forest Warden), die Dichte allein unterscheidet die Decks also nicht.
+// Der Unterschied war Steam Dwarf Dragon Pilot — eine OPFER-Beschwoerung,
+// siehe `summonCostsMoreThanTheCard`.
+const MAX_FREE_SUMMONS_PER_TURN = 3;
 // Delay for each CPU prompt decision during card resolution (targeting, picks,
 // confirms). Puzzle mode keeps the original 50ms via the original prompt path.
 const CPU_PROMPT_DELAY = 350;
@@ -1657,6 +1667,17 @@ async function activateHeroEffects(engine, helpers) {
       const script = loadCardEffect(hero.name);
       const hoptKey = `hero-effect:${hero.name}:${cpuIdx}:${hi}`;
       let available = (script?.heroEffect && script?.onHeroEffect && gs.hoptUsed?.[hoptKey] !== gs.turn);
+      // ── Spielstart-Schutz (Als Ruling 8.8.) ──────────────────────────
+      // Rein schaedliche Helden-Effekte sind nicht nutzbar, solange die
+      // GEGENSEITE unter dem Schutz steht. Dieselbe Pruefung laeuft in
+      // getActiveHeroEffects (Anzeige) und doActivateHeroEffect
+      // (autoritativ) — hier steht sie, damit der Pilot die Gelegenheit
+      // gar nicht erst bewertet: sonst faehrt er je Main-Phase-Durchlauf
+      // eine Gate-Recon fuer einen Effekt, der nichts ausrichten kann.
+      if (available && engine.isHeroEffectBlockedByGraceShield(script, cpuIdx)) {
+        cpuLog(`      hero-effect "${hero.name}": Spielstart-Schutz — rein schaedlich, gesperrt`);
+        available = false;
+      }
       // Unter Flashbang in Main Phase 1: nur Effekte aufschieben, die
       // wirklich eine Aktion kosten — die würden den Zug hier sofort
       // beenden und die Action Phase mitsamt breiterem Kartenpool
@@ -1734,6 +1755,7 @@ async function activateHeroEffects(engine, helpers) {
         if (!eq?.heroEffect || !eq?.onHeroEffect) return false;
         const hk = `hero-effect:${ci.name}:${cpuIdx}:${hi}`;
         if (gs.hoptUsed?.[hk] === gs.turn) return false;
+        if (engine.isHeroEffectBlockedByGraceShield(eq, cpuIdx)) return false;
         // Same canActivate pre-check for equipped providers.
         if (eq.canActivateHeroEffect) {
           try {
@@ -3255,6 +3277,32 @@ function isFirstTurnSafe(engine, cpuIdx, cardName, cardData) {
 //   • Attacks   → highest atk
 // Targeting is left to the engine's default CPU auto-responder until 2i.
 
+/**
+ * Kostet diese Beschwoerung mehr als die Handkarte?
+ *
+ * Der Gratis-Bypass darf NUR greifen, wenn "inhaerente Aktion" wirklich
+ * "umsonst" heisst. Bei Opfer-Beschwoerungen ist das Gegenteil der Fall:
+ * Steam Dwarf Dragon Pilots `inherentAction` liefert
+ * `engine.canSatisfySacrifice(...)` — die Gratis-Aktion wird gewaehrt,
+ * WEIL zwei eigene Kreaturen bezahlt werden. Ein Bypass liest das als
+ * "kostenlos" und heisst in Wahrheit "opfere immer". Genau diese Karte
+ * steckt 4× in Steam Dwarf Mines, dem Matchup, in dem Als Training zwei
+ * Mal stehenblieb.
+ *
+ * Erkannt an den STRUKTURELLEN Vertraegen der Opfer-/Bounce-Familie,
+ * nicht an Kartennamen: wer auf besetzte Slots legen darf oder die
+ * Freie-Zone-Pflicht umgehen darf, raeumt sich den Platz mit etwas frei,
+ * das schon dasteht. Dazu ein ausdrueckliches Opt-out fuer Sonderfaelle.
+ */
+function summonCostsMoreThanTheCard(script) {
+  if (!script) return false;
+  if (script.cpuMeta?.freeSummonBypass === false) return true;
+  return !!(script.sacrificeSpec
+    || script.canBypassFreeZoneRequirement
+    || script.canPlaceOnOccupiedSlot
+    || script.getBouncePlacementTargets);
+}
+
 async function fireAdditionalActions(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
@@ -3270,6 +3318,7 @@ async function fireAdditionalActions(engine, helpers) {
   // (otherwise the turn ends with the trigger wasted on nothing).
   if (isCpuFlashbanged(engine) && gs.currentPhase === 2) {
     cpuLog('  fireAdditionalActions: skipping in MP1 (Flashbanged — saving sole Action for Action Phase)');
+    swapDiag(engine, 'summon:aus-flashbang-mp1');
     return;
   }
 
@@ -3420,13 +3469,14 @@ async function fireAdditionalActions(engine, helpers) {
       // Heuristik-Held zuerst (bester Caster gewinnt bei Deckung),
       // danach alle übrigen legalen Helden auf Deckung prüfen.
       const prefHero = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
-      if (prefHero < 0) continue;
+      if (prefHero < 0) { swapDiag(engine, `summon:kein-held:${cardName}`); continue; }
       const heroOrder = [prefHero];
       for (const e of listEligibleHeroesForActionCard(engine, cpuIdx, cd)) {
         if (e.hi !== prefHero) heroOrder.push(e.hi);
       }
       let heroIdx = -1;
       let _presetSlot = -1;
+      let _presetInherent = false;
       for (const hi of heroOrder) {
         if (tried.has(cardName + '|' + hi)) continue;
         // ── Slot ZUERST, dann validieren (Messung 29.7. 14:01) ──────
@@ -3447,10 +3497,11 @@ async function fireAdditionalActions(engine, helpers) {
         // wie der Server.
         const trySlot = (ct === 'Creature')
           ? pickCreatureZoneSlot(engine, cpuIdx, hi, cardName) : -1;
-        if (ct === 'Creature' && trySlot < 0) continue;
+        if (ct === 'Creature' && trySlot < 0) { swapDiag(engine, `summon:kein-slot:${cardName}`); continue; }
         const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, hi, [ct],
           ct === 'Creature' ? { zoneSlot: trySlot } : undefined);
-        if (!v || !v.isMainPhase) continue;
+        if (!v) { swapDiag(engine, `summon:illegal:${cardName}`); continue; }
+        if (!v.isMainPhase) { swapDiag(engine, `summon:falsche-phase:${cardName}`); continue; }
         // Dasselbe `canSummon`-Gate wie der Server (siehe cpuCanSummonHere).
         if (ct === 'Creature' && !cpuCanSummonHere(engine, cpuIdx, cardName, hi)) {
           swapDiag(engine, 'pick:cansummon-nein');
@@ -3469,11 +3520,17 @@ async function fireAdditionalActions(engine, helpers) {
           // CPU 0.09 je Zug — Faktor 10.
           if (!engine.findAdditionalActionForCard(cpuIdx, cardName, hi)) {
             swapDiag(engine, `grant:kein-grant-beim-check:mp${engine.gs?.currentPhase === 4 ? '2' : '1'}`);
+            // Zusaetzlich unter dem `summon:`-Praefix, damit dieser Grund
+            // in der Beschwoerungs-Diagnose des Trainers auftaucht — und
+            // zwar MIT Kartennamen. Der alte Schluessel bleibt unveraendert
+            // stehen, damit bestehende Auswertungen weiterlaufen.
+            if (ct === 'Creature') swapDiag(engine, `summon:kein-grant:${cardName}`);
             continue;
           }
           swapDiag(engine, `grant:gefunden:mp${engine.gs?.currentPhase === 4 ? '2' : '1'}`);
         }
         _presetSlot = trySlot;
+        _presetInherent = !!v.isInherentAction;
         // Karten-Vertrag cpuPlayVeto — additional:true, weil dieser
         // Pfad Frei-/Zusatz-Aktionen spielt (Friendships Draw-Rider
         // greift hier, Heal für 0 + 3 Draws kann sich lohnen).
@@ -3483,17 +3540,22 @@ async function fireAdditionalActions(engine, helpers) {
             let _veto = false;
             try { _veto = !!_vsc.cpuPlayVeto(engine, cpuIdx, hi, { additional: true }); }
             catch { _veto = false; }
-            if (_veto) continue;
+            if (_veto) { swapDiag(engine, `summon:karten-veto:${cardName}`); continue; }
           }
         }
         heroIdx = hi;
         break;
       }
-      if (heroIdx < 0) continue;
-      pick = { cardName, handIdx, heroIdx, cardType: ct, presetSlot: _presetSlot };
+      if (heroIdx < 0) { swapDiag(engine, `summon:kein-held-uebrig:${cardName}`); continue; }
+      pick = { cardName, handIdx, heroIdx, cardType: ct, presetSlot: _presetSlot, inherent: _presetInherent };
       break;
     }
-    if (!pick) return;
+    if (!pick) {
+      // Kein einziger Kandidat hat den ganzen Filterpfad ueberstanden.
+      // Zusammen mit den Zaehlern oben ergibt sich daraus, WORAN es lag.
+      if (safety === 0) swapDiag(engine, 'summon:kein-kandidat');
+      return;
+    }
 
     const handLenBefore = ps.hand.length;
     cpuLog(`      → fire additional ${pick.cardType.toLowerCase()} "${pick.cardName}" hero=${pick.heroIdx}`);
@@ -3612,14 +3674,69 @@ async function fireAdditionalActions(engine, helpers) {
         _orderTags = deckProfile.classifyPlayOrderTags(engine, cpuIdx, pick.cardName);
       }
     } catch { /* Tags sind optional */ }
+    // ── FREIE BESCHWÖRUNGEN COMMITTEN IMMER (Als Ruling 7.8.) ────────
+    // "Die inherent action Creatures sollten IMMER worth playing sein,
+    // wenn man sie for free rausbekommen kann. Das sollte nie passieren!"
+    //
+    // Gemessen im Lauf 14-30: in 42 von 164 Spielen (25.6%) beschwört
+    // die CPU die ganze Partie über nichts, und zwar ausschließlich, weil
+    // das Wert-Gate ablehnt — kein einziges `fail:*` oder `refuse:*`, die
+    // Plays sind alle legal. In diesen Spielen kommt KEINE Bewertung über
+    // die Schwelle −12; die Masse liegt bei −50..−20 und −200..−50. Die
+    // Rechnung stützt das nicht: ein Support-Slot ist +30 wert
+    // (`SLOT_BASE`), eine Handkarte grob 25 — eine kostenlose Beschwörung
+    // müsste netto leicht POSITIV sein. Woher die −50 wirklich kommen,
+    // ist noch offen (dafür der Karten-Delta-Zähler unten).
+    //
+    // Der Bypass greift NUR bei `isInherentAction`, also wenn die Karte
+    // ihre Aktion selbst mitbringt: dann kostet der Play keine Aktion,
+    // kein Gold und keine Gelegenheit — nur die Handkarte. Deckneutral,
+    // weil er am Engine-Flag hängt und nicht an Kartennamen.
+    //
+    // BEWUSST NICHT einbezogen: grant-finanzierte Beschwörungen. Ein
+    // Grant ist eine knappe Ressource, deren Verbrauch eine echte
+    // Wertfrage ist — dort entscheidet das Gate weiter.
+    // ── Deckel je Zug ────────────────────────────────────────────────
+    // Ohne ihn kann ein Deck, dessen Beschwoerungen NEUE beschwoerbare
+    // Koerper erzeugen (Token-Generatoren), die aeussere Fortschritts-
+    // Schleife von `runMainPhase` endlos weiterdrehen: jede freie
+    // Beschwoerung committet jetzt garantiert, gilt also als Fortschritt.
+    // Drei reicht fuer jede vorgesehene Linie und beendet den Fall.
+    const freeTurnKey = `${cpuIdx}:${gs.turn || 0}`;
+    if (engine._freeSummonTurnKey !== freeTurnKey) {
+      engine._freeSummonTurnKey = freeTurnKey;
+      engine._freeSummonCount = 0;
+    }
+    const costlySummon = summonCostsMoreThanTheCard(pickScript);
+    if (pick.cardType === 'Creature' && pick.inherent === true && costlySummon) {
+      swapDiag(engine, `summon:frei-kostenpflichtig:${pick.cardName}`);
+    }
+    const freeSummon = (pick.cardType === 'Creature' && pick.inherent === true
+      && !costlySummon
+      && (engine._freeSummonCount || 0) < MAX_FREE_SUMMONS_PER_TURN);
+    if (freeSummon) {
+      engine._freeSummonCount = (engine._freeSummonCount || 0) + 1;
+      swapDiag(engine, `summon:frei-bypass:${pick.cardName}`);
+    } else if (pick.cardType === 'Creature' && pick.inherent === true && !costlySummon) {
+      swapDiag(engine, 'summon:frei-deckel');
+    }
     const committed = await mctsGatedActivation(engine, helpers, `additional ${pick.cardType} ${pick.cardName}`, actionFn,
       {
-        alwaysCommit: pickAlwaysCommit,
+        alwaysCommit: pickAlwaysCommit || freeSummon,
+        // Eine freie Beschwoerung hat nichts zu bewerten: der Slot steht
+        // schon fest (`presetSlot`), die Entscheidung ist getroffen. Also
+        // gar nicht erst suchen — das ist strikt WENIGER Arbeit als vor
+        // v263, nicht mehr.
+        commitWithoutRecon: freeSummon && !pickAlwaysCommit,
         overrideThreshold: addlThreshold,
         // Delta-Diagnose: trennt Zyklus-Züge von Normal-Beschwörungen,
         // damit die Verteilung je Fall lesbar ist.
         diagKey: pick.cardType === 'Creature' && zoneSlot >= 0
           ? (_pickSlotOccupied ? 'swap' : 'normal') : undefined,
+        // Zusätzlich JE KARTE — ohne das ließ sich aus `delta:normal:*`
+        // nicht ablesen, WELCHE Beschwörung mit −50 bepreist wird, und
+        // genau daran hing die Ursachensuche.
+        diagCard: pick.cardType === 'Creature' ? pick.cardName : undefined,
         // `cpuMeta.evaluateThroughTurnEnd` wurde hier bisher NICHT
         // durchgereicht (nur in den Artefakt-, Equip- und Potion-Pfaden).
         // Genau dieser Pfad spielt aber die inhärenten Zusatz-Aktions-
@@ -11132,7 +11249,16 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   // `_mctsKilledThisTurn` is set: an earlier rollout this turn tripped
   // the heap/snapshot caps, so committing without re-rolling-out is the
   // right policy (mirrors the inMctsSim bypass).
-  if (engine._inMctsSim
+  // `commitWithoutRecon`: die Entscheidung steht bereits fest UND es gibt
+  // keinen Zielplan zu optimieren. Dann ist die Recon reine Verschwendung
+  // — sie kostet einen vollen Suchbaum, dessen Ergebnis anschliessend
+  // verworfen wird. Genau das hat v263 vervielfacht: jede freie
+  // Beschwoerung lief mit `alwaysCommit` durch die volle Suche, und weil
+  // sie danach IMMER committet, ging die Schleife zur naechsten freien
+  // Kreatur weiter — statt wie vorher nach der ersten Ablehnung zu
+  // stoppen. Ergebnis waren viele Suchbaeume je Zug statt einem.
+  if (options.commitWithoutRecon
+      || engine._inMctsSim
       || engine._mctsKilledThisTurn
       || cpuPastDeadline(engine)
       || (engine.gs?.turn || 0) >= MCTS_LATE_GAME_TURN_THRESHOLD) {
@@ -11409,6 +11535,12 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       : delta <= 3 ? '0..3'
       : delta <= 20 ? '3..20' : '>20';
     swapDiag(engine, `delta:${options.diagKey}:${b}`);
+    // Dieselbe Klasse zusaetzlich JE KARTE, wenn der Aufrufer den Namen
+    // mitgibt. `delta:<kind>:*` sagt nur, DASS Beschwoerungen mit −50
+    // bepreist werden; erst der Kartenname sagt, WELCHE — und ob es an
+    // der Karte selbst haengt (Harpyformers Selbstschaden) oder an der
+    // Lage.
+    if (options.diagCard) swapDiag(engine, `deltacard:${options.diagCard}:${b}`);
     // Die TATSÄCHLICH benutzte Schwelle mitschreiben: bestätigt oder
     // widerlegt, dass der Aufrufer-Override das Gate erreicht.
     swapDiag(engine, `thr:${options.diagKey}:${Math.round(threshold)}`);

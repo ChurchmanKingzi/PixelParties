@@ -3193,6 +3193,12 @@ window.StatusBadges = StatusBadges;
 window.BuffColumn = BuffColumn;
 window.TextBox = TextBox;
 window.showTextBox = showTextBox;
+// Die Kampagnen-Dialogbox (app-campaign.jsx) baut auf DENSELBEN
+// Textbausteinen auf wie die Tutorial-Textbox — gleiche Auszeichnung
+// (**fett**, *kursiv*, {purple:…}), gleicher Schreibmaschineneffekt.
+window.parseInlineMarkdown = parseInlineMarkdown;
+window.renderMarkdownSlice = renderMarkdownSlice;
+window.applyShake = applyShake;
 window.TUTORIAL_SCRIPTS = TUTORIAL_SCRIPTS;
 window.useAntoniaPresent = useAntoniaPresent;
 window.isAntoniaPresent = isAntoniaPresent;

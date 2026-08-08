@@ -126,6 +126,24 @@ function collectTargets(engine, controllerIdx) {
   return targets;
 }
 
+/**
+ * Teilmenge von `collectTargets`, an der eine Zerstoerung auch wirklich
+ * ankommt — `actionDestroyCard` prallt bei Karten des Spielers unter
+ * `gs.firstTurnProtectedPlayer` mit `destroy_blocked` ab.
+ *
+ * ALS RULING (8.8.), ausdruecklich: der MENSCH bekommt weiterhin die
+ * VOLLSTAENDIGE Zielliste. Er darf ein unzerstoerbares Ziel waehlen und
+ * damit schlicht einen Fehler machen — das ist Spielerentscheidung, nicht
+ * Aufgabe der Engine. Diese Einschraenkung dient allein dem Piloten, der
+ * sonst den Effekt anfaengt, um im Ziel-Picker abzubrechen.
+ */
+function destroyableTargets(engine, controllerIdx) {
+  const shieldedPi = engine.gs?.firstTurnProtectedPlayer;
+  const all = collectTargets(engine, controllerIdx);
+  if (shieldedPi == null) return all;
+  return all.filter(t => t.owner !== shieldedPi);
+}
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -176,6 +194,32 @@ module.exports = {
         default: return 0;     // 0, or 4+ (badly overshot)
       }
     },
+  },
+
+  /**
+   * CPU-Gate (Als Vorgabe 8.8.: „die CPU soll WISSEN, dass nur eigene
+   * Ziele legal waeren, und den Effekt nicht anfangen, um dann
+   * abzubrechen").
+   *
+   * `canActivateHeroEffect` fragt nur, ob ueberhaupt ein Ziel existiert —
+   * und eigene Karten sind immer waehlbar. Unter dem Spielstart-Schutz
+   * (oder bei leerem Gegnerbrett) blieben fuer die CPU also nur Ziele
+   * uebrig, die entweder ihr selbst gehoeren oder an denen die
+   * Zerstoerung abprallt; der Pilot lief an, um im Ziel-Picker
+   * abzubrechen. Ralzish soll fuer die CPU eine Abriss-Birne gegen den
+   * GEGNER sein; das eigene Brett einzureissen bewertet niemand.
+   *
+   * Bewusst NUR CPU-seitig, an zwei Stellen zugleich: der Mensch behaelt
+   * die vollstaendige Zielliste (auch unzerstoerbare Ziele — er darf
+   * einen Fehler machen) UND darf sein eigenes Brett gezielt abraeumen.
+   * Wird in `activateHeroEffects` VOR Gate und Kartenreveal ausgewertet
+   * — es entsteht also gar kein Anlauf.
+   */
+  cpuShouldUseHeroEffect(engine, pi) {
+    try {
+      const opp = pi === 0 ? 1 : 0;
+      return destroyableTargets(engine, pi).some(t => t.owner === opp);
+    } catch { return true; }
   },
 
   /**

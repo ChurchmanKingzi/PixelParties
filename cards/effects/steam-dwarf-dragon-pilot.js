@@ -42,31 +42,98 @@ const CARD_NAME = 'Steam Dwarf Dragon Pilot';
 const DISCHARGE_DAMAGE = 100;
 const DISCHARGES_PER_TURN = 3;
 
+// ── "not summoned this turn" (Korrektur 8.8.) ──
+// Die Klausel steht seit jeher im Kartentext, wurde aber nie geprueft:
+// `getSacrificableCreatures` laesst frisch beschworene Kreaturen
+// ABSICHTLICH zu (Opfern ist gewollte Selbstentfernung, kein Zug der
+// Kreatur — siehe Kommentar dort), und weder dieser Spec noch
+// `_steam-dwarf-shared.js` filterten sie heraus. Man konnte also im
+// selben Zug beschwoeren und sofort als Tribut verheizen.
+//
+// Weil der Filter den AKTUELLEN Zug braucht, sind die Specs jetzt
+// Fabriken statt Modulkonstanten — ein Objekt auf Modulebene koennte
+// `gs.turn` nicht sehen.
+const notSummonedThisTurn = (engine) => {
+  const turn = engine?.gs?.turn || 0;
+  return (c) => c?.inst?.turnPlayed !== turn;
+};
+
 // Normal sacrifice spec — any Creature that was not summoned this turn
 // qualifies. Used on the paid Action-Phase path where Dragon Pilot
 // consumes the main action slot and the "all Lv1" bonus does not apply.
-const SACRIFICE_SPEC = {
-  minCount: 2,
-  minMaxHp: 300,
-  title: CARD_NAME,
-  description: 'Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP ≥ 300.',
-  confirmLabel: '🐉 Sacrifice!',
-  confirmClass: 'btn-danger',
-  cancellable: true,
-};
+//
+// `showFilteredAsIneligible` zeigt die in diesem Zug beschworenen
+// Kreaturen weiterhin an, nur ausgegraut — sonst verschwaenden sie
+// kommentarlos aus der Auswahl.
+function makeSacrificeSpec(engine) {
+  return {
+    minCount: 2,
+    minMaxHp: 300,
+    filter: notSummonedThisTurn(engine),
+    showFilteredAsIneligible: true,
+    title: CARD_NAME,
+    description: 'Sacrifice 2 or more of your Creatures (not summoned this turn) with combined max HP ≥ 300.',
+    confirmLabel: '🐉 Sacrifice!',
+    confirmClass: 'btn-danger',
+    cancellable: true,
+  };
+}
 
 // Lv1-only variant — only ≤Lv1 tributes are selectable. Used when Dragon
 // Pilot is taking its "additional Action" (inherent) path so the zero-
 // action-cost summon cannot be resolved against higher-level tributes.
-// `showFilteredAsIneligible` keeps the filtered-out Lv2+ Creatures
-// visible in the prompt but greyed out so the player can see at a
-// glance which of their Creatures don't qualify.
-const LV1_SACRIFICE_SPEC = {
-  ...SACRIFICE_SPEC,
-  filter: (c) => (c.level || 0) <= 1,
-  showFilteredAsIneligible: true,
-  description: 'Sacrifice 2 or more Level 1 or lower Creatures (not summoned this turn) with combined max HP ≥ 300.',
-};
+// Beide Filter greifen hier zusammen: nicht frisch UND hoechstens Lv1.
+function makeLv1SacrificeSpec(engine) {
+  const notFresh = notSummonedThisTurn(engine);
+  return {
+    ...makeSacrificeSpec(engine),
+    filter: (c) => notFresh(c) && (c.level || 0) <= 1,
+    description: 'Sacrifice 2 or more Level 1 or lower Creatures (not summoned this turn) with combined max HP ≥ 300.',
+  };
+}
+
+/** Kann dieser Held Dragon Pilot ueberhaupt beschwoeren (lebt, erfuellt
+ *  die Stufenanforderung)? */
+function heroCanSummonHere(engine, pi, heroIdx) {
+  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0) return false;
+  const cd = engine._getCardDB()[CARD_NAME];
+  return engine.heroMeetsLevelReq(pi, heroIdx, cd);
+}
+
+/**
+ * Belegte Support-Plaetze, auf die Dragon Pilot geworfen werden darf.
+ *
+ * Nur bei Helden, deren Zonen KOMPLETT voll sind — nur dort schafft das
+ * Opfern ueberhaupt erst den Platz, in den Dragon Pilot dann faellt.
+ * Geprueft wird mit GENAU dem Spec, den `beforeSummon` anschliessend
+ * benutzt (inklusive `mustIncludeFromHeroIdx`), damit Hervorhebung und
+ * spaetere Bezahlung nie auseinanderlaufen.
+ *
+ * Welcher Spec das ist, haengt am Beschwoerungsweg: sobald ein reines
+ * Lv1-Opfer moeglich ist, meldet `inherentAction` "zusaetzliche Aktion",
+ * und dann gilt der strengere Lv1-Spec.
+ *
+ * EINE Quelle fuer drei Verbraucher: `getBouncePlacementTargets`
+ * (Hervorhebung im Client), `canPlaceOnOccupiedSlot` (Annahme auf dem
+ * Server) und `canBypassFreeZoneRequirement` (Handkarten-Eignung).
+ */
+function occupiedDropSlots(gs, pi, engine) {
+  const ps = gs.players[pi];
+  if (!ps) return [];
+  const lv1 = makeLv1SacrificeSpec(engine);
+  const spec = engine.canSatisfySacrifice(pi, lv1) ? lv1 : makeSacrificeSpec(engine);
+  const out = [];
+  for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    const zones = ps.supportZones?.[hi] || [];
+    const slots = [0, 1, 2];
+    if (slots.some(z => (zones[z] || []).length === 0)) continue;   // hat noch Platz
+    if (!heroCanSummonHere(engine, pi, hi)) continue;
+    if (!engine.canSatisfySacrifice(pi, { ...spec, mustIncludeFromHeroIdx: hi })) continue;
+    for (const z of slots) if ((zones[z] || []).length > 0) out.push({ heroIdx: hi, slotIdx: z });
+  }
+  return out;
+}
 
 module.exports = attachSteamEngine({
   // CPU: confirm the "unleash fireball?" prompt — the default brain declines
@@ -86,7 +153,7 @@ module.exports = attachSteamEngine({
   // Used by the engine for hand-play gating (`getSummonBlocked`) AND by
   // summon effects (Living Illusion etc.) via `engine.isCreatureSummonable`.
   canSummon(ctx) {
-    return ctx._engine.canSatisfySacrifice(ctx.cardOwner, SACRIFICE_SPEC);
+    return ctx._engine.canSatisfySacrifice(ctx.cardOwner, makeSacrificeSpec(ctx._engine));
   },
 
   // Inherent additional Action when an all-Lv1 sacrifice subset is
@@ -95,7 +162,7 @@ module.exports = attachSteamEngine({
   // restricts the tribute picker to ≤Lv1 creatures so the player cannot
   // claim the free summon while paying with higher-level tributes.
   inherentAction(gs, pi, heroIdx, engine) {
-    return engine.canSatisfySacrifice(pi, LV1_SACRIFICE_SPEC);
+    return engine.canSatisfySacrifice(pi, makeLv1SacrificeSpec(engine));
   },
 
   // Free-zone bypass: Dragon Pilot can be summoned onto a Hero with no
@@ -103,12 +170,8 @@ module.exports = attachSteamEngine({
   // of their OWN (sacrificing one of this Hero's Creatures is what
   // frees the slot Dragon Pilot lands in), AND the overall sacrifice
   // spec remains satisfiable.
-  canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) => {
-    const heroHasOwnSac = engine.getSacrificableCreatures(pi)
-      .some(c => c.inst.heroIdx === heroIdx);
-    if (!heroHasOwnSac) return false;
-    return engine.canSatisfySacrifice(pi, SACRIFICE_SPEC);
-  },
+  canBypassFreeZoneRequirement: (gs, pi, heroIdx, cardData, engine) =>
+    occupiedDropSlots(gs, pi, engine).some(sl => sl.heroIdx === heroIdx),
 
   // Drop-on-occupied: only relevant for the all-full-slots case. When
   // the summoning Hero's Support Zones are all occupied but the player
@@ -119,24 +182,25 @@ module.exports = attachSteamEngine({
   // constraint is that ≥1 must come from THIS Hero's zones, enforced in
   // beforeSummon via mustIncludeFromHeroIdx.
   //
-  // Intentionally does NOT export getBouncePlacementTargets — that
-  // would put Dragon Pilot into the client-side "bounce mode" (used by
-  // Deepsea creatures), which forces drops onto specific occupied
-  // bp-slots ONLY and makes click-on-hand enter the pick-a-swap-target
-  // flow. Dragon Pilot wants the standard drop model (Hero / free zone)
-  // for the normal case; the all-full case falls back to a raw drop on
-  // any occupied slot which the server accepts via this hook.
-  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) => {
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    const supZones = ps.supportZones[heroIdx] || [];
-    const hasFree = [0, 1, 2].some(z => (supZones[z] || []).length === 0);
-    if (hasFree) return false; // prefer normal free-slot drops
-    const heroHasOwnSac = engine.getSacrificableCreatures(pi)
-      .some(c => c.inst.heroIdx === heroIdx);
-    if (!heroHasOwnSac) return false;
-    return engine.canSatisfySacrifice(pi, SACRIFICE_SPEC);
-  },
+  // Damit der Client die belegten Plaetze auch ANZEIGT und den Wurf
+  // zulaesst (Korrektur 8.8.). Der fruehere Kommentar hier sagte, ein
+  // Export von `getBouncePlacementTargets` wuerde Dragon Pilot in den
+  // Deepsea-"bounce mode" zwingen und den normalen Wurf auf freie Zonen
+  // verdraengen. Das stimmt nicht (mehr): der Client mischt beide Modi
+  // ausdruecklich — belegte bp-Plaetze UND freie Plaetze
+  // beschwoerungsfaehiger Helden leuchten gemeinsam auf, und der Klick
+  // auf die Handkarte bietet ebenfalls beides an (app-board.jsx
+  // ~Z. 19181 ff.). Ohne diesen Export leuchten bei Kreatur-Zuegen NUR
+  // leere Plaetze — ein Held mit komplett vollen Zonen war damit gar
+  // nicht anwaehlbar, obwohl Server und Kartenlogik den Wurf laengst
+  // akzeptiert haetten.
+  getBouncePlacementTargets: (gs, pi, engine) => occupiedDropSlots(gs, pi, engine),
+
+  // Serverseitige Annahme des Wurfs — muss exakt dieselbe Liste
+  // benutzen wie die Hervorhebung.
+  canPlaceOnOccupiedSlot: (gs, pi, heroIdx, slotIdx, engine) =>
+    occupiedDropSlots(gs, pi, engine)
+      .some(sl => sl.heroIdx === heroIdx && sl.slotIdx === slotIdx),
 
   // Pre-placement resolution: prompt for sacrifices, destroy them.
   // Returning false aborts the summon (engine's summonCreatureWithHooks
@@ -172,7 +236,7 @@ module.exports = attachSteamEngine({
     const allFullDrop = !!ps?._requestedBouncePlaceSlot;
     if (ps?._requestedBouncePlaceSlot) delete ps._requestedBouncePlaceSlot;
 
-    const baseSpec = ctx.isInherentAction ? LV1_SACRIFICE_SPEC : SACRIFICE_SPEC;
+    const baseSpec = ctx.isInherentAction ? makeLv1SacrificeSpec(engine) : makeSacrificeSpec(engine);
     const spec = allFullDrop
       ? {
           ...baseSpec,

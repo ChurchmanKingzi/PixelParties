@@ -3012,6 +3012,195 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
 //   4. Lichtung      — warmer Lichtteppich um die Huette
 //   5. Huette        — mit flackerndem Fensterlicht
 //   6. Gluehwuermchen + einzelne fallende Blaetter
+// ── Thebinxan War Counselor ─────────────────────────────────────────
+//  Der GEGNER sagt einen Kartentyp an; der Spieler sieht diese Abfrage
+//  nicht und braucht die Ansage deshalb gross in der Bildmitte, in der
+//  Farbe des angesagten Typs. Faehrt heran, haelt kurz, blendet aus.
+const TypeDeclarationOverlay = React.memo(function TypeDeclarationOverlay({ decl, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2100);
+    return () => clearTimeout(t);
+  }, [decl.id, onDone]);
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, pointerEvents: 'none',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 21000,
+    }}>
+      <div style={{
+        textAlign: 'center',
+        animation: 'tdEnter 2100ms cubic-bezier(.2,1.3,.4,1) forwards',
+      }}>
+        <div style={{
+          fontSize: 15, letterSpacing: '3px', textTransform: 'uppercase',
+          color: '#d8d8e4', textShadow: '0 2px 6px rgba(0,0,0,.9)', marginBottom: 6,
+        }}>
+          {decl.declaredBy} declares
+        </div>
+        <div style={{
+          fontFamily: '"Orbitron", "Rajdhani", sans-serif',
+          fontSize: 54, fontWeight: 900, letterSpacing: '2px',
+          color: decl.color,
+          textShadow: `0 0 18px ${decl.color}, 0 0 42px ${decl.color}88,`
+            + ' 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000',
+          padding: '10px 34px',
+          border: `3px solid ${decl.color}`,
+          borderRadius: 10,
+          background: 'rgba(8,8,16,.82)',
+          boxShadow: `0 0 30px ${decl.color}66, inset 0 0 24px ${decl.color}22`,
+        }}>
+          {decl.label}
+        </div>
+      </div>
+      <style>{`
+        @keyframes tdEnter {
+          0%   { opacity: 0; transform: scale(.55); }
+          14%  { opacity: 1; transform: scale(1.06); }
+          22%  { transform: scale(1); }
+          80%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.12); }
+        }
+      `}</style>
+    </div>
+  );
+});
+
+// ── War Council Gathering Place ──────────────────────────────────────
+//  Ein altgriechischer Tempel als Spielfeldhintergrund. Sechs Schichten,
+//  bewusst flankenlastig, damit die Brettmitte lesbar bleibt (dasselbe
+//  Prinzip wie beim Cottage-Overlay):
+//    1. Grundton     — Mittelmeerhimmel oben, warmer Marmorboden unten
+//    2. Sonne        — warmer Schein von oben links
+//    3. Ferne        — Huegelband und ein schmaler Meerstreifen
+//    4. Gebaelk      — Architrav und Giebeldreieck ueber der Szene
+//    5. Saeulen      — je drei dorische Saeulen an den Flanken, kanneliert
+//    6. Staub        — langsam treibende Partikel im Sonnenlicht
+const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
+  // Saeulen: aussen groesser und undurchsichtiger, nach innen kleiner —
+  // ergibt Tiefe, ohne die Mitte zuzustellen.
+  const columns = useMemo(() => {
+    const out = [];
+    for (let side = 0; side < 2; side++) {
+      for (let i = 0; i < 3; i++) {
+        const depth = i / 2;                       // 0 = aussen, 1 = innen
+        const off = 1.5 + i * 7.5;                 // Abstand vom Bildrand
+        out.push({
+          left: side === 0 ? off : 100 - off - (9 - depth * 3),
+          width: 9 - depth * 3,
+          top: 12 + depth * 7,
+          height: 78 - depth * 16,
+          opacity: 0.30 - depth * 0.13,
+        });
+      }
+    }
+    return out;
+  }, []);
+
+  const motes = useMemo(() => Array.from({ length: 30 }, () => ({
+    left: 4 + Math.random() * 92,
+    top: 12 + Math.random() * 80,
+    size: 2 + Math.random() * 3.5,
+    dur: 9 + Math.random() * 9,
+    delay: Math.random() * 10,
+    drift: (Math.random() * 30 - 15).toFixed(1),
+  })), []);
+
+  return (
+    <div className="warcouncil-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      zIndex: -1, overflow: 'hidden',
+      background:
+        'linear-gradient(180deg, rgba(120,168,206,0.26) 0%, rgba(176,200,214,0.20) 30%,'
+        + ' rgba(214,200,168,0.18) 62%, rgba(196,174,140,0.26) 100%)',
+    }}>
+      {/* Sonnenlicht von oben links */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 70% 55% at 22% 8%,'
+          + ' rgba(255,238,190,0.24) 0%, rgba(255,222,150,0.10) 45%, rgba(0,0,0,0) 78%)',
+      }} />
+
+      {/* Ferne Huegel und ein Streifen Meer */}
+      <div style={{
+        position: 'absolute', left: '-4%', right: '-4%', top: '26%', height: '13%',
+        background: 'linear-gradient(180deg, rgba(96,132,150,0.22) 0%, rgba(70,110,132,0.16) 100%)',
+        borderRadius: '50% 50% 0 0 / 100% 100% 0 0',
+      }} />
+      <div style={{
+        position: 'absolute', left: 0, right: 0, top: '38%', height: '3%',
+        background: 'linear-gradient(180deg, rgba(74,132,158,0.26) 0%, rgba(58,110,140,0.14) 100%)',
+      }} />
+
+      {/* Gebaelk: Architrav ... */}
+      <div style={{
+        position: 'absolute', left: '-2%', right: '-2%', top: '9%', height: '4.5%',
+        background: 'linear-gradient(180deg, rgba(240,232,212,0.34) 0%, rgba(206,194,170,0.30) 55%,'
+          + ' rgba(160,148,126,0.26) 100%)',
+        boxShadow: '0 3px 10px rgba(60,50,36,0.22)',
+      }} />
+      {/* ... und Giebeldreieck darueber */}
+      <div style={{
+        position: 'absolute', left: '50%', top: '0%',
+        width: '54%', height: '10%', transform: 'translateX(-50%)',
+        background: 'linear-gradient(180deg, rgba(246,240,224,0.32) 0%, rgba(210,198,172,0.26) 100%)',
+        clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
+      }} />
+
+      {/* Dorische Saeulen an beiden Flanken */}
+      {columns.map((c, i) => (
+        <div key={'wc' + i} style={{
+          position: 'absolute',
+          left: c.left + '%', top: c.top + '%',
+          width: c.width + '%', height: c.height + '%',
+          opacity: c.opacity,
+        }}>
+          {/* Kapitell */}
+          <div style={{
+            position: 'absolute', left: '-14%', top: 0, width: '128%', height: '5%',
+            background: 'linear-gradient(180deg, rgba(248,244,232,1) 0%, rgba(198,186,162,1) 100%)',
+            borderRadius: '2px',
+          }} />
+          {/* Schaft mit Kannelierung */}
+          <div style={{
+            position: 'absolute', left: 0, top: '5%', width: '100%', height: '91%',
+            background: 'repeating-linear-gradient(90deg,'
+              + ' rgba(250,246,236,1) 0px, rgba(250,246,236,1) 3px,'
+              + ' rgba(196,184,160,1) 5px, rgba(232,226,210,1) 8px)',
+            boxShadow: 'inset -6px 0 10px rgba(90,78,58,0.35)',
+          }} />
+          {/* Basis */}
+          <div style={{
+            position: 'absolute', left: '-10%', bottom: 0, width: '120%', height: '4%',
+            background: 'linear-gradient(180deg, rgba(228,220,200,1) 0%, rgba(176,164,140,1) 100%)',
+            borderRadius: '2px',
+          }} />
+        </div>
+      ))}
+
+      {/* Staub im Sonnenlicht */}
+      {motes.map((m, i) => (
+        <span key={'wcm' + i} style={{
+          position: 'absolute', left: m.left + '%', top: m.top + '%',
+          width: m.size, height: m.size, borderRadius: '50%',
+          background: 'rgba(255,244,206,0.85)',
+          boxShadow: '0 0 6px rgba(255,232,170,0.7)',
+          animation: `wcMote ${m.dur}s ease-in-out ${m.delay}s infinite`,
+          '--wcDrift': m.drift + 'px',
+        }} />
+      ))}
+
+      <style>{`
+        @keyframes wcMote {
+          0%, 100% { transform: translate(0, 0); opacity: 0; }
+          20%      { opacity: .55; }
+          50%      { transform: translate(var(--wcDrift), -22px); opacity: .8; }
+          80%      { opacity: .4; }
+        }
+      `}</style>
+    </div>
+  );
+});
+
 const CottageOverlay = React.memo(function CottageOverlay() {
   // Ferner Saum: schmales Band oben, klein und blass -> Tiefe.
   const farTrees = useMemo(() => Array.from({ length: 34 }, (_, i) => ({
@@ -7296,8 +7485,13 @@ const ANIM_REGISTRY = {
   // with a bright white glint at the intersection, a gold-red
   // "CRITICAL!" text pulse, shockwave ring, and scattering sparks.
   // Everything front-loads so the hit feels instantaneous and heavy.
+  // `noLabel` blendet die "CRITICAL!"-Schrift aus — fuer Karten, die
+  // nur den Schnitt wollen (Sorbereus spiegelt den Angriff zurueck,
+  // das ist kein kritischer Treffer). Extras aus dem
+  // `play_zone_animation`-Payload landen dank GameAnimationRenderer
+  // direkt als Props hier.
   critical_slash: (() => {
-    return function CriticalSlashEffect({ x, y, w, h }) {
+    return function CriticalSlashEffect({ x, y, w, h, noLabel }) {
       const ww = Math.max(w || 80, 80);
       const hh = Math.max(h || 110, 110);
       const len = Math.hypot(ww, hh) * 2.1;
@@ -7352,7 +7546,7 @@ const ANIM_REGISTRY = {
             opacity: 0,
           }} />
           {/* "CRITICAL!" text pulse — punchy gold-red */}
-          <div style={{
+          {!noLabel && <div style={{
             position: 'absolute', left: -90, top: -56, width: 180,
             textAlign: 'center',
             fontFamily: '"Orbitron", "Rajdhani", sans-serif',
@@ -7363,7 +7557,7 @@ const ANIM_REGISTRY = {
             opacity: 0,
             transform: 'scale(0.3)',
             pointerEvents: 'none',
-          }}>CRITICAL!</div>
+          }}>CRITICAL!</div>}
           {/* Spark fan radiating out of the impact */}
           {sparks.map((s, i) => (
             <div key={'cs'+i} style={{
@@ -12132,6 +12326,380 @@ const ANIM_REGISTRY = {
               15%  { opacity: 1; }
               85%  { opacity: 1; }
               100% { opacity: 0; transform: translateY(var(--ccSnowEndY)) rotate(180deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Harpthenean War Counselor ────────────────────────────
+  //  Goldene Federn statt Bluttropfen: sie ist eine Harpyie.
+  //  Ein Schlagflügel-Aufblitzen, dann 18 Federn, die sich
+  //  drehend und trudelnd vom Ziel weg verteilen.
+  golden_feathers: (() => {
+    return function GoldenFeathersEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const feathers = useMemo(() => Array.from({ length: 18 }, (_, i) => {
+        const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.5;
+        const dist = 45 + Math.random() * 95;
+        return {
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist * 0.75 - 20,   // leicht nach oben
+          size: 13 + Math.random() * 13,
+          spin: (Math.random() * 900 - 450).toFixed(0),
+          delay: Math.random() * 240,
+          dur: 620 + Math.random() * 520,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Flügelschlag: warmer Blitz */}
+          <div style={{
+            position: 'absolute', left: -cw * 0.9, top: -cw * 0.9,
+            width: cw * 1.8, height: cw * 1.8, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,240,180,.85) 0%, rgba(255,206,90,.45) 40%,'
+              + ' rgba(198,150,40,.18) 68%, transparent 82%)',
+            boxShadow: '0 0 40px rgba(255,214,110,.85)',
+            animation: 'gfFlash 460ms ease-out forwards',
+          }} />
+          {feathers.map((f, i) => (
+            <span key={'gf' + i} style={{
+              position: 'absolute', left: -f.size / 2, top: -f.size / 2,
+              width: f.size, height: f.size * 0.42,
+              borderRadius: '60% 8% 60% 8%',
+              background: 'linear-gradient(120deg, #fff3c4 0%, #ffd766 42%, #c8951f 100%)',
+              boxShadow: '0 0 8px rgba(255,214,110,.9)',
+              opacity: 0,
+              '--gfX': f.dx + 'px',
+              '--gfY': f.dy + 'px',
+              '--gfSpin': f.spin + 'deg',
+              animation: `gfDrift ${f.dur}ms cubic-bezier(.2,.7,.4,1) ${f.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes gfFlash {
+              0%   { opacity: 0; transform: scale(.35); }
+              35%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.25); }
+            }
+            @keyframes gfDrift {
+              0%   { opacity: 0; transform: translate(0,0) rotate(0deg) scale(.5); }
+              18%  { opacity: 1; }
+              70%  { opacity: .9; }
+              100% { opacity: 0;
+                     transform: translate(var(--gfX), var(--gfY)) rotate(var(--gfSpin)) scale(1); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Minocrete War Counselor ──────────────────────────────
+  //  Grosse doppelseitige Streitaxt: sie faehrt von oben rechts
+  //  herein, schlaegt durch das Ziel und laesst eine Schnittspur
+  //  plus Funken zurueck.
+  battle_axe_cleave: (() => {
+    return function BattleAxeCleaveEffect({ x, y, w, h }) {
+      // Gesamthoehe der Axt; 84 % davon liegen auf der Zielmitte.
+      const AX_H = Math.max(h || 120, 120) * 1.6;
+      const sparks = useMemo(() => Array.from({ length: 16 }, () => ({
+        angle: -20 + Math.random() * 220,
+        dist: 40 + Math.random() * 90,
+        size: 3 + Math.random() * 5,
+        delay: 240 + Math.random() * 140,
+        dur: 380 + Math.random() * 260,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
+          {/*  Die Axt: Griff OBEN am Drehpunkt, Kopf UNTEN am Ziel.
+               Erste Fassung war verkehrt herum — die Klingen sassen am
+               Drehpunkt und der Stielrest schwang durchs Ziel. Geometrie:
+               der Kasten ist H hoch und haengt so, dass 84 % seiner Hoehe
+               genau auf der Zielmitte liegen; dort sitzt der Kopf. Der
+               Drehpunkt (die Haende) liegt bei 6 % und damit weit
+               darueber, der Stiel spannt dazwischen. */}
+          <div style={{
+            position: 'absolute', left: -22, top: -AX_H * 0.84,
+            width: 44, height: AX_H,
+            transformOrigin: '50% 6%',
+            animation: 'axSwing 520ms cubic-bezier(.5,.05,.35,1) forwards',
+          }}>
+            {/* Stiel — vom Griff bis zum Kopf */}
+            <div style={{
+              position: 'absolute', left: '45%', top: '4%', width: '10%', height: '80%',
+              background: 'linear-gradient(90deg, #5c3d1c 0%, #a97c40 45%, #6b4a24 100%)',
+              borderRadius: 3,
+            }} />
+            {/* Knauf am Griffende */}
+            <div style={{
+              position: 'absolute', left: '38%', top: '2%', width: '24%', height: '4%',
+              background: 'linear-gradient(180deg, #c9a763 0%, #7a5a24 100%)',
+              borderRadius: 3,
+            }} />
+            {/* Kopf: zwei Klingen links und rechts, am UNTEREN Ende */}
+            <div style={{
+              position: 'absolute', left: '-52%', top: '70%', width: '102%', height: '26%',
+              background: 'linear-gradient(180deg, #f2f6fa 0%, #b9c6d4 55%, #7b8998 100%)',
+              borderRadius: '90% 6% 90% 6% / 90% 6% 90% 6%',
+              boxShadow: '0 0 16px rgba(220,240,255,.9)',
+            }} />
+            <div style={{
+              position: 'absolute', left: '50%', top: '70%', width: '102%', height: '26%',
+              background: 'linear-gradient(180deg, #f2f6fa 0%, #b9c6d4 55%, #7b8998 100%)',
+              borderRadius: '6% 90% 6% 90% / 6% 90% 6% 90%',
+              boxShadow: '0 0 16px rgba(220,240,255,.9)',
+            }} />
+            {/* Zwinge, wo Kopf und Stiel sitzen */}
+            <div style={{
+              position: 'absolute', left: '36%', top: '72%', width: '28%', height: '20%',
+              background: 'linear-gradient(180deg, #8f9aa6 0%, #58636e 100%)',
+              borderRadius: 3,
+            }} />
+          </div>
+          {/* Schnittspur durch das Ziel */}
+          <div style={{
+            position: 'absolute', left: -90, top: -4,
+            width: 180, height: 8, borderRadius: 4,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,.95) 20%,'
+              + ' rgba(255,230,190,.9) 50%, rgba(255,255,255,.95) 80%, transparent 100%)',
+            boxShadow: '0 0 22px rgba(255,240,220,.95)',
+            opacity: 0,
+            animation: 'axCut 420ms ease-out 250ms forwards',
+          }} />
+          {sparks.map((sp, i) => (
+            <span key={'ax' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: sp.size, height: sp.size, borderRadius: '50%',
+              background: '#ffe9b0',
+              boxShadow: `0 0 ${sp.size * 2}px rgba(255,220,150,.9)`,
+              opacity: 0,
+              '--axAngle': sp.angle + 'deg',
+              '--axDist': sp.dist + 'px',
+              animation: `axSpark ${sp.dur}ms ease-out ${sp.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes axSwing {
+              0%   { transform: rotate(-78deg) translateY(-30px); opacity: 0; }
+              25%  { opacity: 1; }
+              62%  { transform: rotate(6deg) translateY(0); }
+              80%  { transform: rotate(0deg); opacity: 1; }
+              100% { transform: rotate(-8deg) translateY(-14px); opacity: 0; }
+            }
+            @keyframes axCut {
+              0%   { opacity: 0; transform: scaleX(.2); }
+              30%  { opacity: 1; transform: scaleX(1); }
+              100% { opacity: 0; transform: scaleX(1.15); }
+            }
+            @keyframes axSpark {
+              0%   { opacity: 0; transform: rotate(var(--axAngle)) translateX(0) scale(1); }
+              15%  { opacity: 1; }
+              100% { opacity: 0; transform: rotate(var(--axAngle)) translateX(var(--axDist)) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Dragolfin ─────────────────────────────────────────────
+  //  Eine Wasserwelle rollt von links ueber das Ziel: erst ein
+  //  tiefer Wasserberg mit weisser Schaumkrone, dann Gischt,
+  //  die nach oben davonspritzt, ein Aufschlagring und zwei
+  //  auslaufende Wellenringe. ~900 ms; die Karte wartet 450 ms,
+  //  damit der Schaden auf dem Wellenkamm liegt.
+  water_wave: (() => {
+    return function WaterWaveEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const drops = useMemo(() => Array.from({ length: 22 }, () => ({
+        dx: -cw * 0.9 + Math.random() * cw * 2.2,
+        dy: -ch * (0.5 + Math.random() * 0.9),
+        size: 4 + Math.random() * 9,
+        delay: 180 + Math.random() * 320,
+        dur: 460 + Math.random() * 380,
+      })), [cw, ch]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Wasserberg — rollt von links herein und wieder hinaus */}
+          <div style={{
+            position: 'absolute', left: -cw * 1.5, top: -ch * 0.75,
+            width: cw * 2.2, height: ch * 1.5,
+            borderRadius: '46% 54% 40% 60% / 60% 45% 55% 40%',
+            background: 'linear-gradient(115deg, rgba(10,60,120,.92) 0%, rgba(30,120,200,.9) 38%, rgba(90,200,240,.85) 68%, rgba(235,252,255,.95) 92%)',
+            boxShadow: '0 0 40px rgba(60,160,230,.75), inset 0 -14px 26px rgba(255,255,255,.5)',
+            filter: 'blur(0.6px)',
+            opacity: 0,
+            animation: 'dgWave 900ms cubic-bezier(.3,.7,.35,1) forwards',
+          }} />
+          {/* Schaumkrone, laeuft der Welle voraus */}
+          <div style={{
+            position: 'absolute', left: -cw * 1.5, top: -ch * 0.8,
+            width: cw * 2.2, height: ch * 0.5,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse at 60% 60%, rgba(255,255,255,.95) 0%, rgba(210,245,255,.7) 45%, transparent 75%)',
+            filter: 'blur(3px)',
+            opacity: 0,
+            animation: 'dgFoam 900ms cubic-bezier(.3,.7,.35,1) 40ms forwards',
+          }} />
+          {/* Aufschlagring */}
+          <div style={{
+            position: 'absolute', left: -cw * 0.85, top: -ch * 0.6,
+            width: cw * 1.7, height: ch * 1.2, borderRadius: '50%',
+            border: '3px solid rgba(200,245,255,.9)',
+            boxShadow: '0 0 26px rgba(120,210,255,.8) inset, 0 0 20px rgba(120,210,255,.7)',
+            opacity: 0,
+            animation: 'dgSplash 520ms ease-out 330ms forwards',
+          }} />
+          {/* Gischt */}
+          {drops.map((d, i) => (
+            <div key={'dg' + i} style={{
+              position: 'absolute', left: -d.size / 2, top: -d.size / 2,
+              width: d.size, height: d.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(150,225,255,.9) 50%, transparent 78%)',
+              opacity: 0,
+              '--dgX': d.dx + 'px',
+              '--dgY': d.dy + 'px',
+              animation: `dgDrop ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes dgWave {
+              0%   { opacity: 0; transform: translateX(-70%) scaleY(.7); }
+              20%  { opacity: 1; }
+              55%  { opacity: 1; transform: translateX(0%) scaleY(1); }
+              100% { opacity: 0; transform: translateX(65%) scaleY(.75); }
+            }
+            @keyframes dgFoam {
+              0%   { opacity: 0; transform: translateX(-60%) scaleX(.8); }
+              25%  { opacity: 1; }
+              60%  { opacity: .9; transform: translateX(6%) scaleX(1.1); }
+              100% { opacity: 0; transform: translateX(70%) scaleX(1.2); }
+            }
+            @keyframes dgSplash {
+              0%   { opacity: .95; transform: scale(.35); }
+              100% { opacity: 0; transform: scale(1.35); }
+            }
+            @keyframes dgDrop {
+              0%   { opacity: 0; transform: translate(0px, 0px) scale(.5); }
+              20%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--dgX), var(--dgY)) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── Blue-Ice Dragon ───────────────────────────────────────
+  //  Der Splitter-Treffer auf ein bereits eingefrorenes Ziel:
+  //  zwölf blaue Flammenzungen schießen aus ALLEN Richtungen
+  //  nach innen, schlagen in der Mitte zusammen (weißblauer
+  //  Kern), eine kalte Druckwelle läuft nach außen und
+  //  Glutfunken steigen auf. Gesamtlaufzeit ~950 ms; die Karte
+  //  wartet 780 ms, damit der Schaden auf dem Einschlag liegt.
+  blue_ice_flames: (() => {
+    return function BlueIceFlamesEffect({ x, y, w, h }) {
+      const cw = w || 100;
+      const ch = h || 140;
+      const reach = Math.max(cw, ch);
+      // Zwölf Zungen gleichmäßig auf dem Kreis, leicht versetzt,
+      // damit die Anordnung nicht mechanisch wirkt.
+      const jets = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+        const angle = (Math.PI * 2 * i) / 12 + (i % 2 ? 0.12 : -0.12);
+        const dist = reach * 2.0;
+        return {
+          key: i,
+          sx: Math.cos(angle) * dist,
+          sy: Math.sin(angle) * dist,
+          len: reach * (1.05 + (i % 3) * 0.2),
+          thick: Math.max(9, cw * (0.19 + (i % 4) * 0.04)),
+          rot: (angle * 180) / Math.PI,
+          delay: 18 * i,
+        };
+      }), [cw, ch, reach]);
+      const embers = useMemo(() => Array.from({ length: 18 }, () => {
+        const a = Math.random() * Math.PI * 2;
+        const d = 30 + Math.random() * reach * 0.9;
+        return {
+          dx: Math.cos(a) * d,
+          dy: Math.sin(a) * d - 40,
+          size: 5 + Math.random() * 9,
+          delay: 420 + Math.random() * 260,
+          dur: 520 + Math.random() * 420,
+        };
+      }), [reach]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Flammenzungen aus allen Richtungen */}
+          {jets.map(j => (
+            <div key={j.key} style={{
+              position: 'absolute',
+              left: -j.len / 2, top: -j.thick / 2,
+              width: j.len, height: j.thick,
+              borderRadius: j.thick,
+              background: 'linear-gradient(90deg, rgba(40,120,255,0) 0%, rgba(60,150,255,0.55) 22%, rgba(120,215,255,0.95) 62%, rgba(240,252,255,1) 88%, rgba(255,255,255,0) 100%)',
+              filter: 'blur(1.5px) drop-shadow(0 0 10px rgba(90,190,255,0.95))',
+              mixBlendMode: 'screen',
+              opacity: 0,
+              transformOrigin: '50% 50%',
+              '--bidX': j.sx + 'px',
+              '--bidY': j.sy + 'px',
+              '--bidRot': j.rot + 'deg',
+              animation: `bidJet 620ms cubic-bezier(.25,.7,.25,1) ${j.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Weißblauer Kern im Moment des Zusammenschlagens */}
+          <div style={{
+            position: 'absolute', left: -cw * 0.9, top: -ch * 0.9,
+            width: cw * 1.8, height: ch * 1.8, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(190,240,255,0.95) 25%, rgba(80,170,255,0.6) 55%, transparent 78%)',
+            mixBlendMode: 'screen', opacity: 0,
+            animation: 'bidCore 620ms ease-out 300ms forwards',
+          }} />
+          {/* Kalte Druckwelle nach außen */}
+          <div style={{
+            position: 'absolute', left: -cw * 1.5, top: -ch * 1.5,
+            width: cw * 3, height: ch * 3, borderRadius: '50%',
+            border: '3px solid rgba(150,220,255,0.85)',
+            boxShadow: '0 0 26px rgba(110,190,255,0.7) inset, 0 0 20px rgba(110,190,255,0.6)',
+            opacity: 0,
+            animation: 'bidShock 520ms ease-out 380ms forwards',
+          }} />
+          {/* Aufsteigende Glutfunken */}
+          {embers.map((e, i) => (
+            <div key={'e' + i} style={{
+              position: 'absolute', left: -e.size / 2, top: -e.size / 2,
+              width: e.size, height: e.size, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(140,215,255,0.9) 45%, transparent 75%)',
+              mixBlendMode: 'screen', opacity: 0,
+              '--bidEX': e.dx + 'px',
+              '--bidEY': e.dy + 'px',
+              animation: `bidEmber ${e.dur}ms ease-out ${e.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes bidJet {
+              0%   { opacity: 0; transform: translate(var(--bidX), var(--bidY)) rotate(var(--bidRot)) scaleX(0.35); }
+              18%  { opacity: 1; }
+              72%  { opacity: 1; transform: translate(0px, 0px) rotate(var(--bidRot)) scaleX(1); }
+              100% { opacity: 0; transform: translate(0px, 0px) rotate(var(--bidRot)) scaleX(1.3); }
+            }
+            @keyframes bidCore {
+              0%   { opacity: 0; transform: scale(0.25); }
+              35%  { opacity: 1; transform: scale(1.12); }
+              100% { opacity: 0; transform: scale(1.75); }
+            }
+            @keyframes bidShock {
+              0%   { opacity: 0.95; transform: scale(0.25); }
+              100% { opacity: 0; transform: scale(1.15); }
+            }
+            @keyframes bidEmber {
+              0%   { opacity: 0; transform: translate(0px, 0px) scale(0.5); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--bidEX), var(--bidEY)) scale(0.2); }
             }
           `}</style>
         </div>
@@ -19591,6 +20159,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, []);
   const [explosions, setExplosions] = useState([]); // Target IDs currently showing explosion
   const [cardReveals, setCardReveals] = useState([]); // [{id, cardName}] — stacked reveals
+  const [typeDeclaration, setTypeDeclaration] = useState(null); // Thebinxan-Ansage
   const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
   const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
@@ -19640,6 +20209,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   // Listen for opponent card reveal
   useEffect(() => {
+    const onTypeDeclaration = ({ label, color, declaredBy }) => {
+      if (window.playSFX) window.playSFX('reveal');
+      setTypeDeclaration({ id: Date.now() + Math.random(), label, color, declaredBy });
+    };
     const onReveal = ({ cardName }) => { if (window.playSFX) window.playSFX('reveal'); setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx }) => {
       // If the OPPONENT searched, prepare face-up draw animation
@@ -20060,6 +20633,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     socket.on('effect_source_glow', onEffectGlow);
     socket.on('card_reveal', onReveal);
+    socket.on('play_type_declaration', onTypeDeclaration);
     socket.on('deck_search_add', onDeckSearchAdd);
     socket.on('reaction_chain_update', onChainUpdate);
     socket.on('reaction_chain_resolving_start', onChainResolvingStart);
@@ -25088,7 +25662,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deck_to_deleted', onDeckToDeleted);
     return () => {
-      socket.off('effect_source_glow', onEffectGlow); socket.off('card_reveal', onReveal); socket.off('deck_search_add', onDeckSearchAdd);
+      socket.off('effect_source_glow', onEffectGlow); socket.off('card_reveal', onReveal); socket.off('play_type_declaration', onTypeDeclaration); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('hand_to_board_fly', onHandToBoard);
       socket.off('attach_hero_fly', onAttachHeroFly);
       socket.off('reaction_chain_update', onChainUpdate); socket.off('reaction_chain_resolving_start', onChainResolvingStart);
@@ -25577,13 +26151,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!showGameOver) return;
     const handleKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); result?.isPuzzle ? handleResultLeave() : handleLeave(); }
-      if ((e.key === 'Enter' || e.key === ' ') && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent && !result?.isPuzzle) {
+      // Kampagnen-Duell: KEINE Revanche ueber die Tastatur. Sonst
+      // startet ein Leertasten-Druck — im Story-Modus die Taste zum
+      // Weiterblaettern — aus Versehen das ganze Duell neu. Verlassen
+      // geht ueber Escape und den CONTINUE-Knopf.
+      if ((e.key === 'Enter' || e.key === ' ') && !gameState.isCampaign && !isSpectator && !oppLeft && !oppDisconnected && !myRematchSent && !result?.isPuzzle) {
         e.preventDefault(); handleRematch();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [showGameOver, isSpectator, oppLeft, oppDisconnected, myRematchSent]);
+  }, [showGameOver, isSpectator, oppLeft, oppDisconnected, myRematchSent, gameState.isCampaign]);
 
   // Escape closes surrender dialog, deck viewer, cancels potion targeting, cancels effect prompts, declines mulligan — or opens surrender dialog
   useEffect(() => {
@@ -26113,12 +26691,75 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // "activation sent to the chain" and "HOPT counter incremented on return"
   // — the Alchemy-during-Cure-chain race.
   const isEffectLocked = !!(isTargeting || gameState.effectPrompt || gameState.surprisePending || gameState.mulliganPending || gameState.heroEffectPending || spellHeroPick || abilityAttachPick || summonOrRevealPick || pendingAdditionalPlay || pendingAbilityActivation || showSurrender || showEndTurnConfirm || reactionChain || (gameState._spellResolutionDepth || 0) > 0);
+  // ── "Mindestens ein Opfer von DIESEM Helden" ──
+  // Tribut-Beschwoerung auf einen vollen Helden: das Opfern schafft erst
+  // den Platz, in dem die Kreatur landet — mindestens eine der Auswahlen
+  // MUSS deshalb aus seinen Zonen kommen. Statt die Auswahl hinterher
+  // abzulehnen und den Waehler wortlos neu zu oeffnen, sperren wir die
+  // uebrigen Kreaturen genau dann, wenn sich die Bedingung sonst nicht
+  // mehr erfuellen laesst: naemlich sobald nach diesem Klick kein Platz
+  // fuer den Pflichttribut mehr frei waere. Bei "genau 2 Opfer" heisst
+  // das konkret — erstes Opfer frei waehlbar, und wenn es nicht beim
+  // Beschwoerer stand, bleibt fuer das zweite nur noch er uebrig.
+  // Bereits Gewaehltes bleibt immer anklickbar (zum Abwaehlen).
+  //
+  // Zweiter Fall: die Auswahl ist VOLL. Ist `maxTotal` erreicht, laesst
+  // `togglePotionTarget` weitere Klicks wortlos ins Leere laufen — die
+  // Karten sehen aber weiter waehlbar aus. Auch das wird jetzt
+  // ausgegraut, bis der Spieler ein Opfer wieder abwaehlt. Ausnahme:
+  // bei `maxTotal === 1` TAUSCHT ein Klick die Auswahl aus, ist also
+  // sehr wohl wirksam — dort bleibt alles anklickbar. Dieselbe Logik
+  // gilt fuer die Sonderobergrenze `maxNonOwnSupport` (Pollution).
+  //
+  // Gemeinsame Regel: gesperrt wird genau das, wo ein Klick NICHTS
+  // bewirken wuerde. Bereits Gewaehltes ist davon nie betroffen.
+  const blockedTargetIds = (() => {
+    if (!isTargeting) return new Set();
+    const all = pt.validTargets || [];
+    const cfg = pt.config || {};
+    const sel = new Set(potionSelection);
+    const blocked = new Set();
+    const selectable = all.filter(t => !t.ineligible && !sel.has(t.id));
+
+    // (a) Pflichttribut aus den Zonen eines bestimmten Helden.
+    const heroIdxReq = cfg.mustIncludeFromHeroIdx;
+    if (heroIdxReq != null) {
+      const fromHero = (t) => t.type === 'equip' && t.heroIdx === heroIdxReq;
+      const alreadySatisfied = all.some(t => sel.has(t.id) && fromHero(t));
+      if (!alreadySatisfied) {
+        const maxTotal = cfg.maxTotal ?? Infinity;
+        const roomLeft = maxTotal - potionSelection.length;
+        const heroStillAvailable = selectable.some(fromHero);
+        if (roomLeft <= 1 || !heroStillAvailable) {
+          for (const t of selectable) if (!fromHero(t)) blocked.add(t.id);
+        }
+      }
+    }
+
+    // (b) Auswahl voll.
+    const maxTotal = cfg.maxTotal;
+    if (maxTotal != null && maxTotal > 1 && potionSelection.length >= maxTotal) {
+      for (const t of selectable) blocked.add(t.id);
+    }
+
+    // (c) Obergrenze fuer Ziele ausserhalb der eigenen Support-Zonen.
+    const maxNonOwn = cfg.maxNonOwnSupport;
+    if (maxNonOwn !== undefined) {
+      const usedNonOwn = all.filter(t => sel.has(t.id) && !t.ownSupport).length;
+      if (usedNonOwn >= maxNonOwn) {
+        for (const t of selectable) if (!t.ownSupport) blocked.add(t.id);
+      }
+    }
+
+    return blocked;
+  })();
+
   // Valid targets can be clicked/selected; ineligible targets are only
   // shown visually (dimmed) so the player can see which board Creatures
   // WOULD qualify for the effect but don't meet its filter (e.g. Dragon
   // Pilot's ≤Lv1 requirement on the inherent path).
-  const validTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => !t.ineligible).map(t => t.id)) : new Set();
-  const ineligibleTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => t.ineligible).map(t => t.id)) : new Set();
+  const validTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => !t.ineligible && !blockedTargetIds.has(t.id)).map(t => t.id)) : new Set();
+  const ineligibleTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => t.ineligible || blockedTargetIds.has(t.id)).map(t => t.id)) : new Set();
   const selectedSet = new Set(potionSelection);
 
   const togglePotionTarget = (targetId) => {
@@ -26206,6 +26847,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const selectedTargets = (pt?.validTargets || []).filter(t => potionSelection.includes(t.id));
       const total = selectedTargets.reduce((sum, t) => sum + (t?._meta?.level || 0), 0);
       if (total < minSumLvl) return false;
+    }
+    // Pflichttribut aus den Zonen eines bestimmten Helden (siehe
+    // blockedTargetIds weiter oben): der Knopf bleibt gesperrt,
+    // solange keine der Auswahlen von dort kommt.
+    const mustHeroIdx = pt?.config?.mustIncludeFromHeroIdx;
+    if (mustHeroIdx != null) {
+      const selectedTargets = (pt?.validTargets || []).filter(t => potionSelection.includes(t.id));
+      if (!selectedTargets.some(t => t.type === 'equip' && t.heroIdx === mustHeroIdx)) return false;
     }
     return true;
   })();
@@ -26569,6 +27218,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const playerByName = (n) => getPlayer(n);
     const t = entry.type;
+    // ── Diagnose-Einträge des Zugablaufs (8.8.) ──
+    if (t === 'hook_timeout') {
+      return <span style={{ color: '#ff9944' }}>⏱ Effect of {cName(entry.card)} timed out ({entry.hook})</span>;
+    }
+    if (t === 'stale_end_phase_dropped') {
+      return <span style={{ color: '#ff9944' }}>⏱ Late End Phase from turn {entry.enteredOnTurn} discarded</span>;
+    }
+    if (t === 'switch_turn_reentry_blocked') {
+      return <span style={{ color: '#ff9944' }}>⏱ Duplicate turn change blocked</span>;
+    }
+    if (t === 'turn_start_irregular') {
+      return <span style={{ color: '#ff5555' }}>⚠ Turn started out of {entry.fromPhase} — previous turn did not end normally</span>;
+    }
+    if (t === 'thebinxan_declared') {
+      return <>{pName(getPlayer(entry.player).name, getPlayer(entry.player).color)} declares <b>{entry.declaration}</b></>;
+    }
+    if (t === 'thebinxan_reveal') {
+      return <>{pName(getPlayer(entry.player).name, getPlayer(entry.player).color)} reveals {cName(entry.card)} — {entry.correct ? 'declaration was correct' : 'wrong declaration!'}</>;
+    }
     const statusColor = (s) => {
       const sl = (s||'').toLowerCase();
       if (sl === 'burned' || sl === 'burn') return '#ff8833';
@@ -28848,6 +29516,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Blood Rock')) || ((gameState.areaZones?.[1] || []).includes('Blood Rock'))) && <BloodRockOverlay />}
+            {(((gameState.areaZones?.[0] || []).includes('War Council Gathering Place')) || ((gameState.areaZones?.[1] || []).includes('War Council Gathering Place'))) && <WarCouncilOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Dark Ocean')) || ((gameState.areaZones?.[1] || []).includes('Dark Ocean'))) && <DarkOceanOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Doom Clock')) || ((gameState.areaZones?.[1] || []).includes('Doom Clock'))) && <DoomClockOverlay />}
             {(((gameState.areaZones?.[0] || []).includes('Temple of Sacrifice')) || ((gameState.areaZones?.[1] || []).includes('Temple of Sacrifice'))) && <TempleOfSacrificeOverlay />}
@@ -29907,6 +30576,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* Opponent card reveal */}
+      {typeDeclaration && (
+        <TypeDeclarationOverlay decl={typeDeclaration} onDone={() => setTypeDeclaration(null)} />
+      )}
       {cardReveals.length > 0 && (
         <CardRevealOverlay reveals={cardReveals} onRemove={(id) => setCardReveals(prev => prev.filter(r => r.id !== id))} />
       )}
@@ -31577,6 +32249,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : gameState.isCampaign ? (
+                // KAMPAGNEN-DUELL: der Ausgang gehoert der STORY. Kein
+                // Deckwechsel, keine Revanche — wer verliert, lebt mit
+                // dem Ergebnis (oder landet bei einem Pflichtduell ueber
+                // den Ruecksetzpunkt ohnehin wieder am Szenenanfang).
+                // Ein Wiederholungsknopf waere hier ein Ausweichknopf.
+                <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>→ CONTINUE</button>
               ) : gameState.isCpuBattle ? (
                 <>
                   <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>
@@ -31732,6 +32411,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {isSpectator ? (
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
+              ) : gameState.isCampaign ? (
+                // KAMPAGNEN-DUELL: der Ausgang gehoert der STORY. Kein
+                // Deckwechsel, keine Revanche — wer verliert, lebt mit
+                // dem Ergebnis (oder landet bei einem Pflichtduell ueber
+                // den Ruecksetzpunkt ohnehin wieder am Szenenanfang).
+                // Ein Wiederholungsknopf waere hier ein Ausweichknopf.
+                <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>→ CONTINUE</button>
               ) : gameState.isCpuBattle ? (
                 <>
                   <button className="btn btn-success" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleRematch}>

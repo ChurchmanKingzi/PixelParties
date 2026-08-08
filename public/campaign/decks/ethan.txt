@@ -1,0 +1,36 @@
+=== PIXEL PARTIES DECK ===
+Name: Ethans Deck
+Cover: Wowhalla, the Hall of the Cool
+
+== HEROES ==
+Cooldin, King of Coolness
+Thorad, Strength of Coolness
+Freshya, Beauty of Coolness
+
+== MAIN DECK ==
+4x Alchemy
+4x Booby Trap
+4x Burning Finger
+4x Coolness Overcharge
+1x Divine Gift of Coolness
+8x Fighting
+2x Fireshield
+4x Golden Ankh
+2x Hammer Throw
+4x Heavy Hit
+4x Juice
+4x Prophecy of Coolness
+4x Quick Attack
+2x Ragnarock
+2x Swellpnir, Mount of Coolness
+2x Thieving Strike
+3x Toughness
+2x Wowhalla, the Hall of the Cool
+
+== POTION DECK ==
+1x Elixir of Immortality
+2x Elixir of Quickness
+1x Magnetic Potion
+1x Resuscitation Potion
+
+== SIDE DECK ==

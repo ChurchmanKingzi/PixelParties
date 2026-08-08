@@ -1,0 +1,42 @@
+=== PIXEL PARTIES DECK ===
+Name: Crums Deck
+Cover: Slippery Whoolmoth
+
+== HEROES ==
+Cooldin, King of Coolness
+Hel, the Bound Specter
+Ingo, Investor of Evil
+
+== MAIN DECK ==
+4x Alchemic Journal
+2x Coffee
+2x Cute Cheese
+2x Deepsea Idol
+3x Defending the Gate
+1x Divine Gift of Balance
+2x Golden Ankh
+5x Leadership
+1x Magic Amethyst
+2x Magnetic Glove
+2x Slippery Ice
+2x Slippery Narw
+4x Slippery Pengu
+3x Slippery Polar
+4x Slippery Skates
+4x Slippery Snobbit
+2x Slippery Snowman
+4x Slippery Spikeblock
+3x Slippery Whoolmoth
+4x Summoning Magic
+4x Wheels
+
+== POTION DECK ==
+2x Acid Vial
+2x Elixir of Quickness
+2x Fire Bomb
+1x Magic Lamp
+2x Magnetic Potion
+2x Monster in a Bottle
+1x Resuscitation Potion
+
+== SIDE DECK ==

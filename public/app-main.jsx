@@ -1840,6 +1840,12 @@ const BGM_FILES = {
   win:    '/music/bgm_win.ogg',
   defeat: '/music/bgm_defeat.ogg',
   shop:   '/music/bgm_shop.ogg',
+  // Kampagne: eigenes Element, dessen `src` die Story umschaltet
+  // (Ziel-Bezeichner `campaign:<slug>` -> /music/bgm_<slug>.ogg).
+  // Es MUSS hier stehen und nicht spaeter erzeugt werden, damit der
+  // Entsperr-Durchlauf beim ersten Klick es mit erfasst — sonst lehnt
+  // Chromium die Wiedergabe ab.
+  campaign: '/music/bgm_menu.wav',
 };
 const _mkBgm = (url) => (typeof Audio !== 'undefined' ? new Audio(url) : null);
 const _bgmLogin = _mkBgm(BGM_FILES.login);
@@ -1853,12 +1859,13 @@ const _bgmPuzzleAttempt = _mkBgm(BGM_FILES.puzzleAttempt);
 const _bgmWin = _mkBgm(BGM_FILES.win);
 const _bgmDefeat = _mkBgm(BGM_FILES.defeat);
 const _bgmShop = _mkBgm(BGM_FILES.shop);
+const _bgmCampaign = _mkBgm(BGM_FILES.campaign);
 const _bgmTracks = {
   login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, tutorial: _bgmTutorial, tutorialAntonia: _bgmTutorialAntonia,
   puzzleCreate: _bgmPuzzleCreate, puzzleAttempt: _bgmPuzzleAttempt,
-  win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop,
+  win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop, campaign: _bgmCampaign,
 };
-for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmTutorial, _bgmTutorialAntonia, _bgmPuzzleCreate, _bgmPuzzleAttempt, _bgmWin, _bgmDefeat, _bgmShop]) {
+for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmTutorial, _bgmTutorialAntonia, _bgmPuzzleCreate, _bgmPuzzleAttempt, _bgmWin, _bgmDefeat, _bgmShop, _bgmCampaign]) {
   if (t) {
     t.loop = true;
     // Start from the player's persisted volume (0 if they muted last session)
@@ -1985,6 +1992,25 @@ function _bgmBattleSrc(url) {
 function _bgmResolveTrack(target) {
   if (target === 'battle') return _bgmBattleSrc(BGM_BATTLE_DEFAULT);
   if (_bgmTracks[target]) return _bgmTracks[target];
+  // Kampagnenmusik: wie beim Kampf wird die `src` des BESTEHENDEN
+  // Elements umgeschaltet (entsperrt bleibt entsperrt). Fehlt die
+  // Datei, faellt es auf das Menuethema zurueck.
+  const c = /^campaign:([a-z0-9_-]+)$/i.exec(String(target || ''));
+  if (c) {
+    const el = _bgmTracks.campaign;
+    if (!el) return null;
+    const url = '/music/bgm_' + c[1] + '.ogg';
+    if (!el.src || !el.src.endsWith(url)) {
+      el.onerror = () => {
+        el.onerror = null;
+        el.src = BGM_FILES.menu;
+        try { el.load(); el.play().catch(() => {}); } catch {}
+      };
+      el.src = url;
+      try { el.load(); } catch {}
+    }
+    return el;
+  }
   const m = /^battle:([a-z0-9]+)$/.exec(String(target || ''));
   if (!m) return null;
   return _bgmBattleSrc('/music/bgm_' + m[1] + '.ogg');
@@ -2543,7 +2569,10 @@ function App() {
   // Escape key → return to main menu from any sub-screen (except play — handled by PlayScreen/GameBoard)
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === 'Escape' && !e.defaultPrevented && user && screen !== 'menu' && screen !== 'play' && screen !== 'deckbuilder') {
+      // Die Kampagne faengt Escape selbst ab (Menue / Untermenues
+      // schliessen). Ohne diese Ausnahme wuerde ein Escape mitten in
+      // einer Szene den ganzen Story-Modus verlassen.
+      if (e.key === 'Escape' && !e.defaultPrevented && user && screen !== 'menu' && screen !== 'play' && screen !== 'deckbuilder' && screen !== 'campaign') {
         setScreen('menu');
       }
     };
@@ -2600,6 +2629,7 @@ function App() {
           screen === 'profile' ? <ProfileScreen /> :
           screen === 'rules' ? <RulesScreen /> :
           screen === 'puzzle-create' ? <PuzzleCreator /> :
+          screen === 'campaign' ? <CampaignScreen /> :
           <MainMenu />}
       </GameErrorBoundary>
     </AppContext.Provider>

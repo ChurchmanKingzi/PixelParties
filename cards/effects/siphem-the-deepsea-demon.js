@@ -43,6 +43,11 @@ module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
 
+  // Rein schaedlicher Helden-Effekt: die einzige Wirkung ist Schaden.
+  // Unter dem Spielstart-Schutz der Gegenseite damit nicht nutzbar
+  // (Als Ruling 8.8.) — siehe isHeroEffectBlockedByGraceShield in
+  // _engine.js. Ersetzt das Siphem-Sondergate aus v270.
+  heroEffectHarmfulOnly: true,
   /**
    * Counter-Wahl der CPU (Als Auftrag "schau genau auf Siphem"): Der
    * generische Options-Default nimmt die ERSTE Option — bei aufsteigender

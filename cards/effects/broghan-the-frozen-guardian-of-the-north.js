@@ -30,6 +30,9 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
+  // Rein schaedlich: 500 Schaden (deckabhaengig reduziert) auf ein Ziel.
+  // Unter dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.).
+  heroEffectHarmfulOnly: true,
 
   // CPU heuristic — late-game ranged damage that grows as the deck thins.
   supportYield(ctx) {

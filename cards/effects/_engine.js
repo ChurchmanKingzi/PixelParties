@@ -40,6 +40,54 @@ const _envMB = (name) => { const v = parseInt(process.env[name] || '', 10); retu
 const HEAP_CHECK_RSS_MB = _envMB('PP_HEAP_RSS_MB') || Math.round(_HEAP_LIMIT_MB * 0.80);
 const HEAP_CHECK_TOTAL_MB = _envMB('PP_HEAP_TOTAL_MB') || Math.round(_HEAP_LIMIT_MB * 0.72);
 const HEAP_CHECK_USED_MB = _envMB('PP_HEAP_USED_MB') || Math.round(_HEAP_LIMIT_MB * 0.60);
+
+// ── RSS-GRUNDLAST (8.8., Invader-Token-Befund) ───────────────────────────
+// Die RSS-Schwelle wurde aus dem HEAP-Limit abgeleitet. Das ist ein
+// Kategorienfehler: `rss` enthaelt neben dem JS-Heap auch Programmcode,
+// native Module (libsql, socket.io), Puffer und Allokator-Arenen. Auf der
+// Trainingsmaschine (Limit 4-8 GB) verschwindet diese Grundlast im
+// Rauschen; in einem kleinen Produktions-Container liegt 0.80 x Limit
+// UNTERHALB der normalen Grundlast — der Waechter feuert dann dauerhaft,
+// auf einem voellig gesunden Prozess. Gemessen auf dem Live-Server:
+// rss 215-221 MB bei heapUsed 72-82 MB und flacher Kurve ueber 20 Minuten.
+//
+// Deshalb wird nur noch der HEAP-ZURECHENBARE Anteil von rss geprueft:
+// Schwelle = 0.80 x Limit PLUS gemessene Grundlast. Die Grundlast wird
+// ausschliesslich in RUHIGEN Momenten nachgezogen (Heap unter der Haelfte
+// der Used-Schwelle), damit ein echter Runaway sie nicht mit anhebt und
+// sich so selbst unsichtbar macht.
+let _rssNonHeapMB = 0;
+let _heapGuardAnnounced = false;
+/**
+ * Gemeinsamer Pruefpunkt aller vier Heap-Waechter (runHooks, snapshot,
+ * actionDealDamage, Creature-Damage-Batch).
+ * @returns {string|null} Klartext-Grund bei Ueberschreitung, sonst null.
+ */
+function heapGuardExceeded(mu) {
+  const rssM = Math.round(mu.rss / 1024 / 1024);
+  const totM = Math.round(mu.heapTotal / 1024 / 1024);
+  const usedM = Math.round(mu.heapUsed / 1024 / 1024);
+  if (usedM * 2 < HEAP_CHECK_USED_MB) {
+    const gap = Math.max(0, rssM - totM);
+    if (gap > _rssNonHeapMB) _rssNonHeapMB = gap;
+  }
+  if (!_heapGuardAnnounced) {
+    _heapGuardAnnounced = true;
+    // EINMAL beim ersten Pruefpunkt in die Konsole. Ohne diese Zeile sind
+    // die Schwellen unsichtbar und ein dauerfeuernder Waechter faellt
+    // niemandem auf — genau das war der Fall.
+    console.log(`[heap-guard] V8-Limit ${_HEAP_LIMIT_MB} MB → Schwellen: `
+      + `heapUsed>${HEAP_CHECK_USED_MB} MB, heapTotal>${HEAP_CHECK_TOTAL_MB} MB, `
+      + `rss>${HEAP_CHECK_RSS_MB}+${_rssNonHeapMB} MB (inkl. Grundlast) | `
+      + `jetzt rss=${rssM} heapTotal=${totM} heapUsed=${usedM}`);
+  }
+  if (usedM > HEAP_CHECK_USED_MB) return `heapUsed ${usedM} > ${HEAP_CHECK_USED_MB} MB`;
+  if (totM > HEAP_CHECK_TOTAL_MB) return `heapTotal ${totM} > ${HEAP_CHECK_TOTAL_MB} MB`;
+  if (rssM > HEAP_CHECK_RSS_MB + _rssNonHeapMB) {
+    return `rss ${rssM} > ${HEAP_CHECK_RSS_MB} + ${_rssNonHeapMB} MB Grundlast`;
+  }
+  return null;
+}
 // Per-turn cap on OUTER snapshots — see snapshot()'s comment for what
 // "outer" means (snapshots taken at the LIVE-turn level, not nested
 // inside an already-committed rollout). With the outer-only counter,
@@ -1016,12 +1064,13 @@ class GameEngine {
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+      const _reason = heapGuardExceeded(mu);
+      if (_reason) {
         this._mctsKilledThisTurn = true;
         this._tryForceGcOnTrip();
         this._dumpOverloadDiagnostics('snapshot-heap');
         const d = this._describeHeapTripDiagnostics();
-        const err = new Error(`MCTS_OVERLOAD: heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${turn} phase ${this.gs?.currentPhase} (snapshots=${d.snapshots} thisTurn=${this._snapshotsThisTurn} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        const err = new Error(`MCTS_OVERLOAD: heap check tripped (${_reason}): rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${turn} phase ${this.gs?.currentPhase} (snapshots=${d.snapshots} thisTurn=${this._snapshotsThisTurn} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;
         throw err;
       }
@@ -1386,6 +1435,9 @@ class GameEngine {
    * @returns {*} The response value (same shape the client would send)
    */
   _getCpuGenericResponse(promptData, promptedPlayerIdx) {
+    // Aufgedeckte Handkarten ins Gedaechtnis holen, bevor eine
+    // CPU-Heuristik daraus schliesst.
+    try { this.sweepRevealedHands(); } catch { /* Gedaechtnis ist Beiwerk */ }
     // The prompt is FOR `promptedPlayerIdx` — which is not necessarily the
     // active CPU. In self-play either player may receive a forceDiscard
     // (Pollution) or other mandatory prompt during the opposite side's
@@ -2154,7 +2206,19 @@ class GameEngine {
     // subsequent runHooks calls this turn no-op. Prevents each rollout
     // from re-tripping the cap and paying 10000 hooks of allocation
     // before short-circuiting again.
-    if (this._turnHooksKilled) return;
+    if (this._turnHooksKilled) {
+      // Einmal je Zug melden, wenn das echte Spiel betroffen ist. Vorher
+      // war dieser Zustand voellig stumm: Karten hoerten mitten im Zug
+      // auf zu wirken, ohne dass irgendwo etwas stand. Genau daran ist
+      // der Invader-Token-Fall so lange unentdeckt geblieben.
+      if (!this._inMctsSim && !this._fastMode && this._hooksKilledWarnTurn !== this.gs?.turn) {
+        this._hooksKilledWarnTurn = this.gs?.turn;
+        console.warn(`[Engine] ⚠️  Karteneffekte in Zug ${this.gs?.turn} stillgelegt `
+          + `(erster unterdrueckter Hook: ${hookName}, bereits ${this._hooksFiredThisTurn} Hooks gefeuert). `
+          + `Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus.`);
+      }
+      return;
+    }
 
     // Central sacrifice bookkeeping. EVERY path that fires
     // ON_CREATURE_SACRIFICED — `resolveSacrificeCost`, `treatAsSacrificed`,
@@ -2194,14 +2258,37 @@ class GameEngine {
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
-        this._turnHooksKilled = true;
-        this._hookCapTrippedThisTurn = true;
+      const reason = heapGuardExceeded(mu);
+      if (reason) {
+        // ── LIVE-SPIEL vs. SIMULATION (8.8.) ──────────────────────────
+        // Der Waechter wurde fuer die MCTS-Suche gebaut: dort ist ein
+        // abgebrochener Rollout gratis, die Suche faellt auf die
+        // Heuristik zurueck. Im LIVE-Spiel bedeutet `_turnHooksKilled`
+        // dagegen, dass ab dem 20. Hook des Zuges KEIN Karteneffekt mehr
+        // ausloest — Rundenende-Effekte, Reaktionen, Trigger, alles.
+        // Das ist kein Schutz, das ist ein stiller Regelbruch (belegt am
+        // Invader Token, der ab einem gewissen Punkt nicht mehr feuerte).
+        // Gegen echte Endlosschleifen im Live-Spiel greifen weiterhin
+        // MAX_HOOKS_PER_TURN, MAX_DAMAGE_CALLS_PER_TURN und
+        // MAX_ACTION_RECURSION; die grosse Allokationsquelle — die
+        // Suche — wird hier ohnehin abgeschaltet.
         this._mctsKilledThisTurn = true;
         this._tryForceGcOnTrip();
-        this._dumpOverloadDiagnostics('inline-hook-heap');
-        const d = this._describeHeapTripDiagnostics();
-        throw new Error(`Inline heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks (snapshots=${d.snapshots} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. Hooks disabled rest-of-turn. Likely runaway allocation.`);
+        if (this._inMctsSim || this._fastMode) {
+          this._turnHooksKilled = true;
+          this._hookCapTrippedThisTurn = true;
+          this._dumpOverloadDiagnostics('inline-hook-heap');
+          const d = this._describeHeapTripDiagnostics();
+          throw new Error(`Inline heap check tripped (${reason}): rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._hooksFiredThisTurn} hooks (snapshots=${d.snapshots} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. Hooks disabled rest-of-turn. Likely runaway allocation.`);
+        }
+        // Live: einmal je Zug melden, Karteneffekte laufen weiter.
+        if (this._liveHeapWarnTurn !== this.gs?.turn) {
+          this._liveHeapWarnTurn = this.gs?.turn;
+          this._dumpOverloadDiagnostics('inline-hook-heap-live');
+          console.warn(`[Engine] ⚠️  Heap-Waechter im LIVE-Spiel getrippt (${reason}) `
+            + `— MCTS fuer Zug ${this.gs?.turn} abgeschaltet, Karteneffekte laufen weiter. `
+            + `rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB nach ${this._hooksFiredThisTurn} Hooks.`);
+        }
       }
     }
     // Within-snapshot cap short-circuit: once the cap trips in this
@@ -2511,6 +2598,17 @@ class GameEngine {
                   lastTick = this._hookProgressTick;
                   setTimeout(check, EFFECT_TIMEOUT_MS);
                 } else {
+                  // Der Treffer gehoert ins Spielprotokoll, nicht nur in
+                  // die Serverkonsole: in der Aufnahme vom 8.8. war der
+                  // Timeout die Ursache eines abgebrochenen Zuges, aber im
+                  // Mitschnitt nicht zu sehen — die Fehlersuche musste
+                  // ueber die Render-Logs laufen.
+                  try {
+                    this._hookTimeouts = (this._hookTimeouts || 0) + 1;
+                    this.log('hook_timeout', {
+                      hook: hookName, card: c?.name || null, turn: this.gs.turn,
+                    });
+                  } catch { /* Protokoll ist Beiwerk */ }
                   rej(new Error('Hook timeout'));
                 }
               };
@@ -5075,12 +5173,13 @@ class GameEngine {
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+      const _reason = heapGuardExceeded(mu);
+      if (_reason) {
         this._mctsKilledThisTurn = true;
         this._tryForceGcOnTrip();
         this._dumpOverloadDiagnostics('damage-heap');
         const d = this._describeHeapTripDiagnostics();
-        const err = new Error(`MCTS_OVERLOAD: damage-call heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        const err = new Error(`MCTS_OVERLOAD: damage-call heap check tripped (${_reason}): rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;
         throw err;
       }
@@ -5618,7 +5717,7 @@ class GameEngine {
       // target last took >0 damage. Used by cards like Medusa's Curse
       // ("affect only targets that have not taken damage yet this turn").
       // Not card-specific — any future "damaged this turn" lookup uses this.
-      if (actualAmount > 0) target._damagedOnTurn = this.gs.turn;
+      if (actualAmount > 0) this._noteDamageTaken(target, actualAmount);
     }
     // "Real" dealt: HP-drop, capped at the target's pre-hit HP so
     // overkill doesn't count. Consumers (Golden Arrow's gold ratio, any
@@ -5829,7 +5928,7 @@ class GameEngine {
       const hpBefore = target.hp;
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
-      if (dealt > 0) target._damagedOnTurn = this.gs.turn;
+      if (dealt > 0) this._noteDamageTaken(target, dealt);
 
       this.log('damage', {
         source: source?.name, target: this._heroLabel(target),
@@ -6577,6 +6676,10 @@ class GameEngine {
 
     for (const cardName of cardNames) {
       this._broadcastEvent('deck_search_add', { cardName, playerIdx });
+      // Der Gegner sieht diese Karte AUS DEM DECK auf die Hand wandern —
+      // beides ist damit oeffentlich bekannt (siehe Kartengedaechtnis).
+      this.noteKnownCard(oppIdx, cardName, 'deck');
+      this.noteKnownCard(oppIdx, cardName, 'hand');
       this.log('deck_search', { player: searcherName, card: cardName, by: title });
       this.sync();
       await this._delay(500);
@@ -7048,6 +7151,139 @@ class GameEngine {
     ps.hand.push(cardName);
     this.log('card_added_to_hand', { player: ps.username, card: cardName, by: source || null });
     this.sync();
+  }
+
+  /**
+   * ══ Kartengedaechtnis (Ergaenzung 8.8.) ══
+   *
+   * Was WEISS ein Spieler ueber die Karten des anderen? Die Engine kennt
+   * natuerlich alles — eine CPU darf davon aber nur benutzen, was sie
+   * auch legitim gesehen hat. Deshalb dieses eigene Gedaechtnis: es
+   * sammelt ausschliesslich OEFFENTLICHE Beobachtungen und ist die
+   * einzige Quelle, aus der CPU-Heuristiken raten duerfen.
+   *
+   * Gefuehrt wird je Beobachter zweierlei:
+   *   · `hand` — Karten, die er in der gegnerischen HAND gesehen hat
+   *     (aufgedeckte Handkarten, offen gesuchte Karten).
+   *   · `deck` — Karten, von denen er weiss, dass sie aus dem
+   *     gegnerischen DECK kamen. Das ist der Beleg fuer "ich habe
+   *     gesehen, dass so etwas im Deck ist".
+   *
+   * Erste Nutzerin ist Thebinxan War Counselor, deren Ansage der Gegner
+   * treffen muss.
+   *
+   * GRENZEN, bewusst in Kauf genommen:
+   *   · Beobachtet wird an zwei Stellen — offen aus dem Deck auf die
+   *     Hand geholte Karten (`revealSearchedCards` /
+   *     `actionAddCardFromDeckToHand`) und aufgedeckte Handkarten beim
+   *     Sweep. Eine Aufdeckung, die zwischen zwei Sweeps kommt UND
+   *     wieder verschwindet, entgeht dem Gedaechtnis.
+   *   · Vergessen wird nicht kartengenau. Stattdessen deckelt der
+   *     Lesezugriff die Gesamtzahl auf die HANDGROESSE des Gegners —
+   *     die ist oeffentlich, verraet also nichts, und verhindert, dass
+   *     das Gedaechtnis unbegrenzt veraltet.
+   */
+  _cardKnowledge(observerIdx) {
+    if (!this.gs._cardKnowledge) this.gs._cardKnowledge = {};
+    if (!this.gs._cardKnowledge[observerIdx]) {
+      this.gs._cardKnowledge[observerIdx] = { hand: {}, deck: {} };
+    }
+    return this.gs._cardKnowledge[observerIdx];
+  }
+
+  /** Beobachtung eintragen. `where` ist 'hand' oder 'deck'. */
+  noteKnownCard(observerIdx, cardName, where = 'hand') {
+    if (observerIdx == null || observerIdx < 0 || !cardName) return;
+    const bag = this._cardKnowledge(observerIdx);
+    const shelf = where === 'deck' ? bag.deck : bag.hand;
+    shelf[cardName] = (shelf[cardName] || 0) + 1;
+  }
+
+  /** Eine bekannte Handkarte wieder streichen (sie hat die Hand verlassen). */
+  forgetKnownHandCard(observerIdx, cardName) {
+    const bag = this.gs._cardKnowledge?.[observerIdx];
+    if (!bag?.hand?.[cardName]) return;
+    bag.hand[cardName] -= 1;
+    if (bag.hand[cardName] <= 0) delete bag.hand[cardName];
+  }
+
+  /** Aktuell aufgedeckte Handkarten in das Gedaechtnis der Gegenseite holen. */
+  sweepRevealedHands() {
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
+      const ps = this.gs.players[pi];
+      const revealed = ps?._revealedHandIndices;
+      if (!revealed) continue;
+      const observer = pi === 0 ? 1 : 0;
+      for (const key of Object.keys(revealed)) {
+        if (!revealed[key]) continue;
+        const name = (ps.hand || [])[Number(key)];
+        if (!name) continue;
+        // Nicht doppelt zaehlen, solange dieselbe Karte aufgedeckt liegt.
+        const bag = this._cardKnowledge(observer);
+        const seenKey = `${pi}:${key}:${name}`;
+        if (!bag._seen) bag._seen = {};
+        if (bag._seen[seenKey]) continue;
+        bag._seen[seenKey] = true;
+        this.noteKnownCard(observer, name, 'hand');
+      }
+    }
+  }
+
+  /**
+   * Was `observerIdx` ueber die Karten des Gegners weiss. Die
+   * Hand-Zaehlungen sind auf die tatsaechliche (oeffentliche)
+   * Handgroesse gedeckelt, damit veraltete Eintraege nicht ueberwiegen.
+   */
+  knownOpponentCards(observerIdx) {
+    const bag = this.gs._cardKnowledge?.[observerIdx] || { hand: {}, deck: {} };
+    const oppIdx = observerIdx === 0 ? 1 : 0;
+    const handSize = (this.gs.players?.[oppIdx]?.hand || []).length;
+    const hand = {};
+    let used = 0;
+    for (const [name, n] of Object.entries(bag.hand || {})) {
+      if (used >= handSize) break;
+      const take = Math.min(n, handSize - used);
+      if (take > 0) { hand[name] = take; used += take; }
+    }
+    return { hand, deck: { ...(bag.deck || {}) } };
+  }
+
+  /**
+   * Generischer Zaehler "wie viel Schaden hat dieses Ziel in DIESEM Zug
+   * schon genommen?" (Ergaenzung 8.8., gebraucht von Minocrete War
+   * Counselor: "deal damage to it equal to the amount of damage it
+   * already took this turn").
+   *
+   * Bisher merkte sich die Engine nur den ZUG des letzten Treffers
+   * (`_damagedOnTurn`, gelesen z.B. von Medusa's Curse), nicht die
+   * SUMME. Dieser Helfer fuehrt beides an einer Stelle und wird von
+   * allen drei Schadenspfaden aufgerufen (Helden zweimal, Kreaturen im
+   * Stapel) — damit zaehlt auch Schaden mit, der VOR dem Erscheinen der
+   * lesenden Karte gefallen ist.
+   *
+   * `bag` ist der Traeger der Marker: beim Helden das Heldenobjekt
+   * selbst, bei der Kreatur ihr `counters`-Objekt. Beim ersten Treffer
+   * eines Zuges wird die Summe zurueckgesetzt.
+   *
+   * @param {object} bag    Heldenobjekt ODER inst.counters
+   * @param {number} amount Tatsaechlich gefallener Schaden (>0)
+   */
+  _noteDamageTaken(bag, amount) {
+    if (!bag || !(amount > 0)) return;
+    const turn = this.gs.turn || 0;
+    if (bag._damageTakenTurn !== turn) {
+      bag._damageTakenTurn = turn;
+      bag._damageTakenAmount = 0;
+    }
+    bag._damageTakenAmount = (bag._damageTakenAmount || 0) + amount;
+    bag._damagedOnTurn = turn;
+  }
+
+  /** Wie viel Schaden hat dieses Ziel in diesem Zug schon genommen? */
+  damageTakenThisTurn(bag) {
+    if (!bag) return 0;
+    if (bag._damageTakenTurn !== (this.gs.turn || 0)) return 0;
+    return bag._damageTakenAmount || 0;
   }
 
   /**
@@ -8263,6 +8499,30 @@ class GameEngine {
     // driftfrei und ueber alle Rollouts konsistent. Gleiche Bauart wie
     // die uebrigen Telemetriekanaele (swapDiag, _targetLog), die
     // ebenfalls in Simulationen stumm bleiben.
+    // ── Vollzugs-Zaehler fuer die Beschwoerungs-Diagnose (7.8.) ──────
+    // Gegenstueck zu den `summon:*`-Ablehnungszaehlern im Piloten: erst
+    // beides zusammen beantwortet "warum stand die ganze Partie nichts
+    // auf dem Brett". Bewusst HIER und nicht im Piloten, weil Kreaturen
+    // ueber DREI Wege auf das eigene Brett kommen (Zusatzaktion, Grant,
+    // discard-empfindlicher Sonderpfad) — ein Zaehler an der zentralen
+    // Beschwoerung erfasst alle, ohne dass ich einen davon uebersehe.
+    // `playerIdx === _cpuPlayerIdx` schliesst Cross-Side-Platzierungen
+    // wie Powder Keg aus: die landen auf dem GEGNERISCHEN Brett und sind
+    // keine Antwort auf "hat die CPU selbst etwas beschworen".
+    // Die swapDiag-Mechanik ist hier eingesetzt statt importiert — der
+    // Pilot ist ein Konsument der Engine, nicht umgekehrt.
+    try {
+      const _pi = this._cpuPlayerIdx;
+      if (!this._inMctsSim && typeof _pi === 'number' && playerIdx === _pi) {
+        if (!this._swapDiag) this._swapDiag = [Object.create(null), Object.create(null)];
+        const b = this._swapDiag[_pi] || (this._swapDiag[_pi] = Object.create(null));
+        b['summon:vollzogen'] = (b['summon:vollzogen'] || 0) + 1;
+        b[`summon:vollzogen:${cardName}`] = (b[`summon:vollzogen:${cardName}`] || 0) + 1;
+        const t = (this._turnBlockers = this._turnBlockers || {});
+        t['summon:vollzogen'] = (t['summon:vollzogen'] || 0) + 1;
+      }
+    } catch { /* Telemetrie darf nie eine Beschwoerung kippen */ }
+
     try {
       if (!this._inMctsSim) {
         if (!this._hostedSummons) this._hostedSummons = [[], []];
@@ -12471,6 +12731,25 @@ class GameEngine {
    * Begin a new turn for the active player.
    */
   async startTurn() {
+    // ── Diagnose: wurde der vorige Zug regulär beendet? (8.8.) ──
+    // Ein Zug endet normalerweise über die END-Phase, die zuerst ihr
+    // eigenes `phase_start` protokolliert und danach switchTurn ruft.
+    // In einer Aufnahme vom 8.8. sprang eine Partie mitten aus MAIN1 in
+    // den nächsten Zug — OHNE END-Phase, also an switchTurn vorbei. Aus
+    // dem Protokoll liess sich danach nur noch ablesen DASS es passiert
+    // ist, nicht WOHER. Diese Zeile schliesst die Lücke: sie hält fest,
+    // aus welcher Phase heraus der neue Zug beginnt. Alles ausser END
+    // (5) ist ein Befund und gehoert untersucht.
+    const cameFrom = this._lastPhaseBeforeTurnStart;
+    if (cameFrom != null && cameFrom !== PHASES.END) {
+      this.log('turn_start_irregular', {
+        fromPhase: PHASE_NAMES[cameFrom] || String(cameFrom),
+        previousPlayer: this.gs.players[this.gs.activePlayer]?.username || null,
+        turn: this.gs.turn,
+      });
+    }
+    this._lastPhaseBeforeTurnStart = null;
+
     this.gs.currentPhase = PHASES.START;
 
     // ── Clear stale `_preventPhaseAdvance` flag ──
@@ -12805,7 +13084,10 @@ class GameEngine {
         break;
       }
 
-      case PHASES.END:
+      case PHASES.END: {
+        // Fuer die Veraltet-Pruefung unten: welchen Zug beenden wir?
+        const endPhaseTurn = this.gs.turn;
+        const endPhasePlayer = this.gs.activePlayer;
         // Wait for any in-flight target picker, generic prompt, hero
         // effect, or mid-resolution card to settle BEFORE running End
         // Phase work. Without this gate, a Terror-forced advance (or
@@ -12827,8 +13109,26 @@ class GameEngine {
         // Area-Bypass gilt hier ausdrücklich NICHT (nur der Pollution-
         // Sofort-Abwurf wird von ihr ausgesetzt).
         await this.enforceHandLimit(this.gs.activePlayer, { context: 'endOfTurn' });
+        // ── Veraltete END-Phase abweisen (8.8.) ──
+        // `Promise.race` kann einen haengenden Hook nur ABHAENGEN, nicht
+        // abbrechen — die Zeitsperre lehnt ab, der Hook selbst laeuft
+        // weiter. Loest er sich spaeter auf, setzt sein Ablauf hier fort
+        // und wuerde den Zug wechseln, obwohl das Spiel laengst
+        // weitergelaufen ist. Genau so verlor ein Tester am 8.8. seinen
+        // Zug mitten in MAIN1: die END-Phase des VORIGEN Zuges kam
+        // verspaetet zurueck und startete den naechsten Zug ueber ihm.
+        // Wir merken uns deshalb beim Betreten, WELCHEN Zug wir beenden,
+        // und steigen aus, wenn das nicht mehr stimmt.
+        if (this.gs.turn !== endPhaseTurn || this.gs.activePlayer !== endPhasePlayer) {
+          this.log('stale_end_phase_dropped', {
+            enteredOnTurn: endPhaseTurn, nowTurn: this.gs.turn,
+            enteredForPlayer: this.gs.players[endPhasePlayer]?.username || null,
+          });
+          break;
+        }
         await this.switchTurn();
         break;
+      }
     }
   }
 
@@ -13053,7 +13353,65 @@ class GameEngine {
   /**
    * Switch to the other player's turn.
    */
+  /**
+   * ── Kein zweiter Zugwechsel, solange einer laeuft (8.8.) ──
+   * Im Fehlerfall vom 8.8. liefen zwei Zugablaeufe gleichzeitig; die
+   * Serverkonsole zeigte zwei "TURN END" direkt hintereinander (79 s und
+   * 184 s), waehrend fuer drei CPU-Zuege gar keines kam. Ein zweiter
+   * Wechsel mitten im ersten bringt Zugzaehler, aktiven Spieler und
+   * Rundenstart-Hooks durcheinander — genau so verlor ein Tester seinen
+   * Zug mitten in MAIN1.
+   *
+   * Der Riegel sitzt bewusst in einem duennen Mantel und nicht im Rumpf:
+   * `_switchTurnInner` hat ZEHN return-Ausstiege, ein Flag ohne `finally`
+   * bliebe beim ersten davon haengen und das Spiel stuende fuer immer.
+   * Die Eigenrekursion (Guardian Beast Zhu) ruft direkt den Rumpf und
+   * laeuft deshalb nicht gegen den eigenen Riegel.
+   */
   async switchTurn() {
+    // ── RIEGEL JE ZUG STATT GLOBAL (8.8.) ─────────────────────────────
+    // Ein globales „läuft gerade" sperrte auch die LEGITIME
+    // verschachtelte Übergabe. Der CPU-Treiber läuft INNERHALB von
+    // `_switchTurnInner`:
+    //   Mensch beendet Zug → switchTurn → startTurn → _cpuDriver
+    //   → CPU spielt → advancePhase Main2→End → runPhase(END)
+    //   → switchTurn  ← genau hier
+    // Diese innere Übergabe beendet einen ANDEREN Zug und muss durch.
+    // Mit dem globalen Riegel wurde sie als „Duplicate turn change"
+    // abgewiesen: der CPU-Zug endete nie, der Mensch kam nicht mehr an
+    // die Reihe, die Partie stand nach dem ersten CPU-Zug still.
+    //
+    // Gesperrt wird deshalb nur noch die ECHTE Wiederholung — derselbe
+    // Zug desselben Spielers wird bereits gewechselt. Das ist der Fall,
+    // gegen den der Riegel gebaut wurde (verspätet zurückkehrende
+    // END-Phase); die Zug-Kennung trifft ihn genauso, ohne die
+    // Verschachtelung mitzunehmen. Die veraltete END-Phase wird davor
+    // ohnehin schon von `stale_end_phase_dropped` in runPhase abgewiesen.
+    const inFlightKey = `${this.gs?.turn}:${this.gs?.activePlayer}`;
+    if (this._switchTurnInFlightKey === inFlightKey) {
+      this.log('switch_turn_reentry_blocked', {
+        turn: this.gs.turn,
+        activePlayer: this.gs.players[this.gs.activePlayer]?.username || null,
+      });
+      return;
+    }
+    const prevInFlightKey = this._switchTurnInFlightKey;
+    this._switchTurnInFlightKey = inFlightKey;
+    // Für Fremdleser/Diagnose weiterhin gepflegt.
+    this._switchTurnInFlight = true;
+    try {
+      return await this._switchTurnInner();
+    } finally {
+      this._switchTurnInFlightKey = prevInFlightKey;
+      this._switchTurnInFlight = prevInFlightKey != null;
+    }
+  }
+
+  async _switchTurnInner() {
+    // Für die Unregelmässigkeits-Diagnose in startTurn: aus welcher
+    // Phase heraus wechseln wir? Regulär ist das END.
+    this._lastPhaseBeforeTurnStart = this.gs.currentPhase;
+
     // If game already ended (e.g. all heroes dead during End Phase), don't continue
     if (this.gs.result) return;
     // Heap snapshot at turn boundary — lets us see growth across the
@@ -13074,7 +13432,37 @@ class GameEngine {
     // duration tickers, etc.) are a legitimate part of the human's turn
     // and may even produce a winning board state, so they must resolve
     // before we evaluate puzzle success/failure.
-    await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+    // ── ZUGUEBERGABE IST UNVERHANDELBAR (8.8.) ────────────────────────
+    // Diese beiden Aufrufe sind die ERSTEN Anweisungen der Uebergabe. Warf
+    // einer von ihnen (Heap-Waechter, Hook-Obergrenze, CPU-Deadline, ein
+    // Kartenfehler), brach `_switchTurnInner` VOR dem Spielerwechsel ab:
+    // `runCpuTurn` flog bis in den Treiber-catch in server.js, dort wurde
+    // die Meldung geloggt — und danach passierte nichts mehr. Der aktive
+    // Spieler blieb die CPU, die Phase blieb END, das Spiel stand still.
+    // Genau dieses Bild hatte der Tester ("die CPU reagiert nicht mehr").
+    // Ein Ueberlast-Abbruch darf Effekte kosten, niemals aber den Zug.
+    //
+    // `_turnEndHooksDoneForTurn` macht den Abschnitt zusaetzlich
+    // idempotent: ein spaeterer Rettungs-Aufruf der Uebergabe wiederholt
+    // die Rundenende-Effekte NICHT (sonst schluege z.B. der Invader Token
+    // zweimal zu).
+    // NUR im echten Spiel merken: Rollouts durchlaufen dieselben
+    // Zugnummern in der Simulation und wuerden den Merker sonst fuer den
+    // LIVE-Zug setzen — die echten Rundenende-Effekte fielen dann aus.
+    const _liveTurnEnd = !(this._inMctsSim || this._fastMode);
+    if (!_liveTurnEnd || this._turnEndHooksDoneForTurn !== this.gs.turn) {
+      if (_liveTurnEnd) this._turnEndHooksDoneForTurn = this.gs.turn;
+      try {
+        await this.runHooks(HOOKS.ON_TURN_END, { turn: this.gs.turn, activePlayer: this.gs.activePlayer });
+      } catch (err) {
+        console.error('[Engine] ⚠️  ON_TURN_END abgebrochen — Zugübergabe läuft trotzdem weiter:', err.message);
+        this.log('turn_end_hooks_aborted', {
+          turn: this.gs.turn,
+          player: this.gs.players[this.gs.activePlayer]?.username || null,
+          reason: String(err.message || '').slice(0, 240),
+        });
+      }
+    }
     if (this.gs.result) return; // ON_TURN_END resolution itself produced a result
 
     // End-of-turn Surprise window (Spider Silk Bridge). Fires AFTER
@@ -13085,7 +13473,13 @@ class GameEngine {
     // helper; on negation we short-circuit (no current Surprise needs
     // to abort the end-of-turn pipeline, but the contract is preserved
     // for future Surprises).
-    await this._checkSurpriseOnTurnEnd(this.gs.activePlayer);
+    try {
+      await this._checkSurpriseOnTurnEnd(this.gs.activePlayer);
+    } catch (err) {
+      // Gleiche Begruendung wie oben: das Fenster darf ausfallen, die
+      // Uebergabe nicht.
+      console.error('[Engine] ⚠️  Rundenende-Surprise abgebrochen — Zugübergabe läuft weiter:', err.message);
+    }
     if (this.gs.result) return;
 
     // Turn-rollover cleanup for additional-action grants whose TYPE
@@ -13228,7 +13622,7 @@ class GameEngine {
         // the OTHER player on the recursive call.
         if (!this.gs.result) {
           this.gs.currentPhase = 5; // End phase
-          await this.switchTurn();
+          await this._switchTurnInner();   // Rumpf: laeuft im selben Riegel
           return;
         }
       }
@@ -14586,6 +14980,11 @@ class GameEngine {
         minRequired: spec.minCount,
         minSumMaxHp: spec.minMaxHp || undefined,
         minSumLevel: spec.minSumLevel || undefined,
+        // "Mindestens ein Opfer von DIESEM Helden" — bis 8.8. wurde die
+        // Bedingung erst NACH dem Bestaetigen geprueft, und die Schleife
+        // unten oeffnete den Waehler kommentarlos erneut. Jetzt kennt der
+        // Client sie und sperrt die falschen Kreaturen schon vorher.
+        mustIncludeFromHeroIdx: spec.mustIncludeFromHeroIdx,
         // Sacrifice-flavor red highlight on every eligible target. All
         // engine-driven sacrifice prompts route through this helper, so
         // setting it here covers the whole codebase: Sacrifice to
@@ -15158,6 +15557,13 @@ class GameEngine {
           // Parallel rule for combined-level thresholds (Dark Deepsea
           // God's tribute: 2+ creatures with combined levels ≥ 4).
           minSumLevel: config.minSumLevel,
+          // Sacrifice-summon rule: at least one pick must come from THIS
+          // Hero's Support Zones (tribute-summon onto a full Hero — the
+          // sacrifice is what frees the landing slot). The client greys
+          // out the remaining Creatures as soon as no further pick could
+          // still satisfy it, instead of letting the player confirm and
+          // silently re-opening the picker.
+          mustIncludeFromHeroIdx: config.mustIncludeFromHeroIdx,
           // Optional small card preview image rendered inside the
           // targeting panel — set this to the name of the card the
           // prompt is "about" (the equip Bill is offering, the creature
@@ -15327,7 +15733,13 @@ class GameEngine {
       }
     }
 
-    if (sourceName && count >= threshold && !this.gs._terrorForceEndTurn) {
+    // `== null` statt Wahrheitsprüfung: Spielerindex 0 ist FALSY. Mit
+    // `!this.gs._terrorForceEndTurn` blieb der Riegel für Spieler 0
+    // offen, der Block konnte also mehrfach laufen und Auftritt plus
+    // Protokollzeile doppelt auslösen, solange der Server die Marke noch
+    // nicht abgeräumt hatte. Der Verbraucher in server.js (~Z. 3448)
+    // prüft bereits richtig mit `!= null`.
+    if (sourceName && count >= threshold && this.gs._terrorForceEndTurn == null) {
       // Hero-script opt-outs (e.g. Blackstache's immuneToTerror) can
       // block the force-end on the affected side. Pass the actual
       // ability name as the source so opt-out flags can match it.
@@ -22741,8 +23153,38 @@ class GameEngine {
    * Must be during Main Phase.
    * Returns array of { heroIdx, heroName }
    */
-  getActiveHeroEffects(playerIdx) {
-    const ps = this.gs.players[playerIdx];
+  /**
+   * Spielstart-Schutz-Sperre für rein schädliche Helden-Effekte
+   * (Als Ruling 8.8.).
+   *
+   * `gs.firstTurnProtectedPlayer` blockt beim geschützten Spieler ALLES —
+   * Schaden, Status, Discard, Mill, Zerstörung. Er ist aber bewusst KEIN
+   * Ziel-Filter (siehe Kommentar in `promptDamageTarget`): geschützte
+   * Helden bleiben wählbar, der Schaden wird erst in der Schadens-
+   * Pipeline verworfen. Ein Helden-Effekt, dessen einzige Wirkung Schaden
+   * oder Entfernung ist, konnte deshalb angeboten und angefangen werden,
+   * obwohl er nichts ausrichten kann — beim Menschen als Fehlklick, bei
+   * der CPU als wiederholter Anlauf samt Kartenreveal.
+   *
+   * Karten melden sich über `heroEffectHarmfulOnly: true` an. Solange die
+   * GEGENSEITE unter dem Schutz steht, ist der Effekt schlicht nicht
+   * nutzbar: kein Knopf, kein Glühen, keine Aktivierung, kein CPU-Anlauf.
+   * Steht der Schutz auf der EIGENEN Seite (man ist selbst der
+   * Geschützte), ändert sich nichts — der Gegner bleibt angreifbar.
+   *
+   * Konsumiert an DREI Stellen, damit kein Weg offen bleibt:
+   * `getActiveHeroEffects` (Anzeige), `doActivateHeroEffect` in server.js
+   * (autoritativ, auch gegen einen manipulierten Client) und
+   * `activateHeroEffects` in _cpu.js (der Pilot bewertet gar nicht erst).
+   */
+  isHeroEffectBlockedByGraceShield(script, playerIdx) {
+    if (!script?.heroEffectHarmfulOnly) return false;
+    if (playerIdx == null || playerIdx < 0) return false;
+    const opp = playerIdx === 0 ? 1 : 0;
+    return this.gs?.firstTurnProtectedPlayer === opp;
+  }
+
+  getActiveHeroEffects(playerIdx) {    const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     if (this.gs.activePlayer !== playerIdx) return [];
     const result = [];
@@ -22795,6 +23237,11 @@ class GameEngine {
       // target. The hero stays alive and can still take normal Actions
       // — only the targeted activation is hidden (no glow, no button).
       if (hero.statuses?.blinded && script.requiresTarget === true) continue;
+
+      // Rein schaedliche Helden-Effekte sind unter dem Spielstart-Schutz
+      // gesperrt (Als Ruling 8.8.) — gleiches Muster wie Blinded darueber:
+      // der Held bleibt handlungsfaehig, nur diese Aktivierung verschwindet.
+      if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
       // Distracting Crystal in hand blocks Hero Effects whose script
       // declares `shufflesIntoDeck: true` (e.g. Elana, the Rocky
@@ -22890,6 +23337,7 @@ class GameEngine {
         const script = loadCardEffect(hero.name);
         if (!script?.heroEffect) continue;
         if (hero.statuses?.blinded && script.requiresTarget === true) continue;
+        if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
         const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -22925,6 +23373,7 @@ class GameEngine {
         const script = loadCardEffect(hero.name);
         if (!script?.heroEffect) continue;
         if (hero.statuses?.blinded && script.requiresTarget === true) continue;
+        if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
         const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
@@ -25654,12 +26103,13 @@ class GameEngine {
       const rssM = Math.round(mu.rss / 1024 / 1024);
       const totM = Math.round(mu.heapTotal / 1024 / 1024);
       const usedM = Math.round(mu.heapUsed / 1024 / 1024);
-      if (rssM > HEAP_CHECK_RSS_MB || totM > HEAP_CHECK_TOTAL_MB || usedM > HEAP_CHECK_USED_MB) {
+      const _reason = heapGuardExceeded(mu);
+      if (_reason) {
         this._mctsKilledThisTurn = true;
         this._tryForceGcOnTrip();
         this._dumpOverloadDiagnostics('creature-heap');
         const d = this._describeHeapTripDiagnostics();
-        const err = new Error(`MCTS_OVERLOAD: creature-damage-batch heap check tripped: rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
+        const err = new Error(`MCTS_OVERLOAD: creature-damage-batch heap check tripped (${_reason}): rss=${rssM}MB heapTotal=${totM}MB heapUsed=${usedM}MB at turn ${this.gs?.turn} phase ${this.gs?.currentPhase} after ${this._damageCallsTotal} damage calls (snapshots=${d.snapshots} hooks=${d.hooksFired} instances=${d.instances}). Top hooks: ${d.topHooks}. Top instances: ${d.topNames}. Top firing cards: ${d.topFiringCards}. Heap by candidate: ${d.candidateAlloc}. Recent trail: ${d.trail}. MCTS aborted for this turn.`);
         err._mctsOverload = true;
         throw err;
       }
@@ -26171,7 +26621,7 @@ class GameEngine {
       const creatureHpBefore = e.inst.counters.currentHp;
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
-      e.inst.counters._damagedOnTurn = this.gs.turn;
+      this._noteDamageTaken(e.inst.counters, actualAmount);
       this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, damageType: e.type, owner: e.inst.owner });
 
       // Stamp the actual HP delta onto the entry — capped at pre-hit HP

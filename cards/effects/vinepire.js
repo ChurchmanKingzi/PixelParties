@@ -69,16 +69,48 @@ function _isOpponentCreature(inst, vinepireInst) {
   return (inst.controller ?? inst.owner) !== vinepireInst.owner;
 }
 
+// Sitzungs-Marken fuer die Spell-Damage-Logs. Siehe _resetIfNewSpell.
+let _spellSessionSeq = 0;
+const _spellSessionIds = new WeakMap();
+function _spellSessionId(log) {
+  let id = _spellSessionIds.get(log);
+  if (id === undefined) {
+    id = ++_spellSessionSeq;
+    _spellSessionIds.set(log, id);
+  }
+  return id;
+}
+
 function _resetIfNewSpell(vinepireInst, gs) {
-  // Use the array reference identity as a per-spell session token. The
-  // engine sets `gs._spellDamageLog = []` at the start of each Spell/
-  // Attack cast (server.js doPlaySpell) — a fresh array means a fresh
-  // spell, even if the previous one was negated and never fired
-  // afterSpellResolved.
+  // Pro Zauber eine Sitzungsmarke. Die Engine setzt `gs._spellDamageLog
+  // = []` zu Beginn jedes Spell-/Attack-Casts (server.js doPlaySpell) —
+  // ein frisches Array heisst frischer Zauber, auch wenn der vorige
+  // negiert wurde und nie `afterSpellResolved` gefeuert hat.
+  //
+  // ── WARUM EINE ZAHL UND NICHT DAS ARRAY (7.8.) ────────────────────
+  // Frueher lag das Array SELBST in `counters._vinepireSpellRef`. Das
+  // sprengte den Snapshot: `_clone` serialisiert die counters mit
+  // JSON.stringify, und die Log-Eintraege tragen `cardInstance` —
+  // lebende CardInstance-Objekte. Enthaelt das Log die Vinepire-Instanz
+  // selbst, schliesst sich der Kreis ueber ihre eigenen counters:
+  //   counters._vinepireSpellRef → [ … ] → entry.cardInstance
+  //     → CardInstance.counters → _vinepireSpellRef → …
+  // Ergebnis war ein "Converting circular structure to JSON" mitten im
+  // MCTS-Snapshot, das den ganzen CPU-Zug abbrach.
+  //
+  // Gebraucht wird ohnehin nur die IDENTITAET des Arrays, nie sein
+  // Inhalt. Eine WeakMap vergibt je Array eine Zahl; die ist klonbar,
+  // zyklenfrei und haelt das Array nicht am Leben. Verhalten identisch,
+  // auch ueber Snapshot/Restore: dort entsteht ein neues Array und damit
+  // eine neue Marke — genau wie vorher der Referenzvergleich fehlschlug.
+  //
+  // ALLGEMEIN: in `inst.counters` gehoeren nur primitive Werte. Alles
+  // dort wird bei jedem Snapshot JSON-serialisiert.
   const log = gs._spellDamageLog;
   if (!log) return false;
-  if (vinepireInst.counters._vinepireSpellRef !== log) {
-    vinepireInst.counters._vinepireSpellRef = log;
+  const sid = _spellSessionId(log);
+  if (vinepireInst.counters._vinepireSpellRef !== sid) {
+    vinepireInst.counters._vinepireSpellRef = sid;
     vinepireInst.counters._vinepirePendingHeal = 0;
   }
   return true;

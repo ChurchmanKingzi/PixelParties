@@ -36,6 +36,10 @@ module.exports = {
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
+  // Rein schaedlich: 50 Schaden je nicht-frisch beschworener Kreatur auf
+  // ein Ziel, das der GEGNER kontrolliert. Unter dem Spielstart-Schutz
+  // nicht nutzbar (Als Ruling 8.8.).
+  heroEffectHarmfulOnly: true,
 
   // CPU threat assessment (damage supporter). 50 damage per non-fresh
   // Creature the owner controls, once per turn.

@@ -654,6 +654,17 @@ async function initDatabase() {
     PRIMARY KEY (user_id, puzzle_id)
   )`);
 
+  // ── KAMPAGNE (Story-Modus) ──
+  // Ein Speicherstand je Spieler. Der Inhalt ist bewusst ein JSON-Blob:
+  // die Kampagne wächst noch, und jedes neue Feld (Flags, Gegenstände,
+  // Variablen) hier als Spalte nachzuziehen wäre reine Reibung. Der
+  // Server prüft beim Schreiben nur Größe und Grundform.
+  await db.execute(`CREATE TABLE IF NOT EXISTS campaign_progress (
+    user_id TEXT PRIMARY KEY,
+    state TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
   console.log('[DB] Tables initialized');
 }
 
@@ -1706,6 +1717,233 @@ app.get('/api/cards/available', async (req, res) => {
     res.json({ available });
   } catch {
     res.json({ available: {} });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  KAMPAGNE (Story-Modus)
+// ═══════════════════════════════════════════════════════════════════
+// Sämtliche Inhalte der Kampagne liegen UNVERSCHLÜSSELT unter
+// public/campaign/ und werden statisch ausgeliefert:
+//   backgrounds/  16:9-Pixelart-Hintergründe (320x180)
+//   sprites/      Ganzkörperfiguren
+//   avatars/      Portraits für die Dialogbox
+//   scenes/       Szenen- und Weltdateien (.js, vom Client ausgewertet)
+//   decks/        Kampagnen-Decks im normalen Deck-Textformat
+// Der Server steuert nur drei Dinge bei: das Verzeichnis-Verzeichnis
+// (damit neue Dateien ohne Codeänderung auftauchen), den Speicherstand
+// und die Kampagnen-Duelle (die dürfen NICHT vom Client kommen, sonst
+// wäre das Deck frei wählbar).
+
+const CAMPAIGN_DIR = path.join(__dirname, 'public', 'campaign');
+
+// ── TESTSCHALTER (7.8., von Al ausdrücklich als vorläufig markiert) ──
+// Solange hier eine Zahl steht, starten ALLE Helden des Kampagnen-
+// Gegners mit dieser HP — Duelle sind damit in Sekunden durchgespielt,
+// was das Prüfen von Story-Verzweigungen enorm beschleunigt.
+// Auf `null` setzen, sobald die Kampagne echt gespielt werden soll.
+const CAMPAIGN_TEST_ENEMY_HP = 1;
+const CAMPAIGN_STATE_MAX = 512 * 1024;   // Schutz gegen aufgeblähte Speicherstände
+
+function campaignList(sub, exts) {
+  try {
+    const dir = path.join(CAMPAIGN_DIR, sub);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(f => exts.has(path.extname(f).toLowerCase()))
+      .sort();
+  } catch { return []; }
+}
+
+/** Deck-Textformat -> Deck-Objekt. Bewusst eigenständig statt in
+ *  loadSampleDecks() eingehängt: dieselbe Grammatik, aber ohne die
+ *  Shop-/Freischalt-Logik der Beispiel-Decks, und ohne Risiko für den
+ *  bestehenden Pfad. */
+function parseCampaignDeckText(text, fallbackName) {
+  const cardsByName = getCardDB();
+  const lines = String(text).split(/\r?\n/);
+  let deckName = fallbackName, coverCard = '', section = null;
+  const heroNames = [], mainCards = [], potionCards = [], sideCards = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('===')) continue;
+    if (line.startsWith('Name:'))  { deckName = line.slice(5).trim(); continue; }
+    if (line.startsWith('Cover:')) { coverCard = line.slice(6).trim(); continue; }
+    if (line === '== HEROES ==')      { section = 'heroes'; continue; }
+    if (line === '== MAIN DECK ==')   { section = 'main';   continue; }
+    if (line === '== POTION DECK ==') { section = 'potion'; continue; }
+    if (line === '== SIDE DECK ==')   { section = 'side';   continue; }
+    if (section === 'heroes') { heroNames.push(line === '(empty)' ? null : line); continue; }
+    if (!section) continue;
+    const m = line.match(/^(\d+)x\s+(.+)$/);
+    if (!m) continue;
+    const arr = section === 'main' ? mainCards : section === 'potion' ? potionCards : sideCards;
+    for (let j = 0; j < parseInt(m[1], 10); j++) arr.push(m[2].trim());
+  }
+  const heroes = [0, 1, 2].map(i => {
+    const name = heroNames[i] || null;
+    if (!name) return { hero: null, ability1: null, ability2: null };
+    const card = cardsByName[name];
+    return { hero: name, ability1: card?.startingAbility1 || null, ability2: card?.startingAbility2 || null };
+  });
+  return { name: deckName, coverCard, heroes, mainDeck: mainCards, potionDeck: potionCards, sideDeck: sideCards };
+}
+
+/** Lädt public/campaign/decks/<slug>.txt. Der Slug wird hart gefiltert,
+ *  damit kein '../' aus dem Kampagnenordner herausführt. */
+function loadCampaignDeck(slug) {
+  const clean = String(slug || '').replace(/[^A-Za-z0-9 _-]/g, '');
+  if (!clean) return null;
+  const file = path.join(CAMPAIGN_DIR, 'decks', clean + '.txt');
+  if (!file.startsWith(path.join(CAMPAIGN_DIR, 'decks'))) return null;
+  if (!fs.existsSync(file)) return null;
+  try { return parseCampaignDeckText(fs.readFileSync(file, 'utf-8'), clean); }
+  catch (err) { console.error('[Campaign] Deck', clean, 'unlesbar:', err.message); return null; }
+}
+
+function campaignDeckLegal(deck) {
+  if (!deck) return false;
+  if ((deck.mainDeck || []).length !== 60) return false;
+  if ((deck.heroes || []).filter(h => h && h.hero).length !== 3) return false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ANTE (Kartensatz)
+// ═══════════════════════════════════════════════════════════════════
+// Ein Ante-Duell wird VOR dem Spiel vereinbart (die Szene handelt das
+// aus). Danach nimmt sich der Sieger eine Karte aus dem Bestand des
+// Verlierers — dauerhaft.
+//
+// Wählbar ist, was am Ende der Partie SICHTBAR war: alles auf dem
+// Feld (Support-, Fähigkeits-, Überraschungs-, Flächenzonen,
+// Permanents, Coolness-Stapel) plus Ablage und gelöschte Karten.
+// NICHT die Hand und nicht das Restdeck — sonst wählte man blind.
+// Ausnahme: wäre die Auswahl dadurch leer (sehr kurze Partie), steht
+// das GESAMTE Deck zur Wahl, damit ein Ante nie ins Leere läuft.
+//
+// Immun sind die drei Starthelden und ihre Start-Fähigkeitskarten:
+// ohne sie wäre das Deck nicht mehr spielbar, und der Verlust wäre
+// kein Rückschlag, sondern ein Abbruch.
+
+/** Sammelt Kartennamen aus beliebig verschachtelten Zonen. Die Zonen
+ *  führen teils Namen (Strings), teils Objekte ({name, id}). */
+function campaignCollectNames(value, out) {
+  if (!value) return out;
+  if (Array.isArray(value)) { for (const v of value) campaignCollectNames(v, out); return out; }
+  if (typeof value === 'string') { if (value.trim()) out.add(value); return out; }
+  if (typeof value === 'object' && (value.name || value.card)) out.add(value.name || value.card);
+  return out;
+}
+
+function campaignAntePool(gs, loserIdx, deck) {
+  const ps = (gs.players || [])[loserIdx] || {};
+  const immune = new Set();
+  for (const h of (deck.heroes || [])) {
+    if (!h) continue;
+    if (h.hero) immune.add(h.hero);
+    if (h.ability1) immune.add(h.ability1);
+    if (h.ability2) immune.add(h.ability2);
+  }
+
+  const seen = new Set();
+  campaignCollectNames(ps.supportZones, seen);
+  campaignCollectNames(ps.abilityZones, seen);
+  campaignCollectNames(ps.surpriseZones, seen);
+  campaignCollectNames(ps.permanents, seen);
+  campaignCollectNames(ps.coolnessStack, seen);
+  campaignCollectNames((gs.areaZones || [])[loserIdx], seen);
+  campaignCollectNames(ps.discardPile, seen);
+  campaignCollectNames(ps.deletedPile, seen);
+
+  let pool = [...seen].filter(n => n && !immune.has(n));
+  let fromDeck = false;
+  if (!pool.length) {
+    // Nichts sichtbar gewesen -> das komplette Deck wird wählbar.
+    const all = new Set();
+    campaignCollectNames(deck.mainDeck, all);
+    campaignCollectNames(deck.potionDeck, all);
+    pool = [...all].filter(n => n && !immune.has(n));
+    fromDeck = true;
+  }
+  // Kopien zählen im Ante nur einmal.
+  return { pool: pool.sort((a, b) => a.localeCompare(b)), immune: [...immune], fromDeck };
+}
+
+/** Wahl des Gegners. Fähigkeiten sind mit Abstand die häufigsten Karten
+ *  im Pool (jede Heldenzone trägt welche bei) — ohne diese Regel nähme
+ *  der Gegner fast immer eine Fähigkeit, was sich beliebig anfühlt.
+ *  Deshalb: Fähigkeiten NUR, wenn es nichts anderes gibt. */
+function campaignAnteCpuPick(pool) {
+  if (!pool.length) return null;
+  const db = getCardDB();
+  const nonAbility = pool.filter(n => (db[n] && db[n].cardType) !== 'Ability');
+  const from = nonAbility.length ? nonAbility : pool;
+  return from[Math.floor(Math.random() * from.length)];
+}
+
+// GET /api/campaign/manifest — was liegt im Kampagnenordner?
+// Der Client lädt daraufhin jede Szenendatei einzeln. Dadurch reicht es,
+// eine neue Datei in den Ordner zu legen — kein Registrieren nötig.
+app.get('/api/campaign/manifest', authMiddleware, (req, res) => {
+  const IMG = new Set(['.png', '.gif', '.webp', '.jpg', '.jpeg']);
+  res.json({
+    scenes:      campaignList('scenes', new Set(['.js'])),
+    backgrounds: campaignList('backgrounds', IMG),
+    sprites:     campaignList('sprites', IMG),
+    avatars:     campaignList('avatars', IMG),
+    decks:       campaignList('decks', new Set(['.txt'])).map(f => f.replace(/\.txt$/, '')),
+  });
+});
+
+// GET /api/campaign/deck/:slug — Kampagnen-Deck als Objekt (für den
+// Deck-Editor: das Startdeck des Spielers kommt aus derselben Quelle).
+app.get('/api/campaign/deck/:slug', authMiddleware, (req, res) => {
+  const deck = loadCampaignDeck(req.params.slug);
+  if (!deck) return res.status(404).json({ error: 'Campaign deck not found' });
+  res.json({ deck });
+});
+
+// GET /api/campaign/state — Speicherstand (oder null für "neu").
+app.get('/api/campaign/state', authMiddleware, async (req, res) => {
+  try {
+    const row = await db.get('SELECT state FROM campaign_progress WHERE user_id = ?', [req.user.userId]);
+    if (!row) return res.json({ state: null });
+    let parsed = null;
+    try { parsed = JSON.parse(row.state); } catch { parsed = null; }
+    res.json({ state: parsed });
+  } catch (err) {
+    console.error('[Campaign] state read error:', err.message);
+    res.status(500).json({ error: 'Failed to read campaign state' });
+  }
+});
+
+// PUT /api/campaign/state — Speicherstand schreiben (Autosave).
+app.put('/api/campaign/state', authMiddleware, async (req, res) => {
+  const state = req.body && req.body.state;
+  if (!state || typeof state !== 'object') return res.status(400).json({ error: 'No state' });
+  const json = JSON.stringify(state);
+  if (json.length > CAMPAIGN_STATE_MAX) return res.status(413).json({ error: 'Campaign state too large' });
+  try {
+    await db.run(`INSERT INTO campaign_progress (user_id, state, updated_at)
+                  VALUES (?, ?, datetime('now'))
+                  ON CONFLICT(user_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`,
+                 [req.user.userId, json]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Campaign] state write error:', err.message);
+    res.status(500).json({ error: 'Failed to save campaign state' });
+  }
+});
+
+// POST /api/campaign/reset — Speicherstand löschen (Neustart der Story).
+app.post('/api/campaign/reset', authMiddleware, async (req, res) => {
+  try {
+    await db.run('DELETE FROM campaign_progress WHERE user_id = ?', [req.user.userId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Campaign] reset error:', err.message);
+    res.status(500).json({ error: 'Failed to reset campaign' });
   }
 });
 
@@ -3598,6 +3836,12 @@ function sendGameState(room, playerIdx, extra) {
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
     isTutorial: gs.isTutorial || false,
+    // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
+    // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört
+    // der Story, nicht dem Spieler).
+    isCampaign: gs.isCampaign || false,
+    campaignRetry: gs.campaignRetry !== false,
+    campaignAnte: gs.isAnte || false,
     isCpuBattle: room.type === 'singleplayer',
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
@@ -4225,6 +4469,12 @@ function sendSpectatorGameState(room) {
     result: gs.result || null, rematchRequests: gs.rematchRequests || [],
     isPuzzle: gs.isPuzzle || false,
     isTutorial: gs.isTutorial || false,
+    // Kampagnen-Duell: das Kampffeld blendet damit Deck-Auswahl und
+    // Revanche aus und zeigt stattdessen "Weiter" (der Ausgang gehört
+    // der Story, nicht dem Spieler).
+    isCampaign: gs.isCampaign || false,
+    campaignRetry: gs.campaignRetry !== false,
+    campaignAnte: gs.isAnte || false,
     isCpuBattle: room.type === 'singleplayer',
     // Gegnerspezifisches Battle-Theme (Slug ohne 'bgm_'-Präfix und
     // Endung). null → der Client nimmt das generische Kampfthema.
@@ -4915,6 +5165,25 @@ function makeCpuDriver(room) {
         stack: err.stack,
       });
       console.error('[CPU] turn error:', err.message, err.stack);
+      // ── RETTUNG (8.8.) ──────────────────────────────────────────────
+      // Bricht runCpuTurn mit einer Ausnahme ab, hat NICHTS die Kontrolle
+      // zurueckgegeben: `activePlayer` ist weiterhin die CPU, die Phase
+      // steht, der Mensch kann nicht handeln — die Partie friert ein.
+      // Genau so endete das gemeldete Spiel (Heap-Waechter warf in
+      // switchTurn, direkt am ON_TURN_END des Invader Tokens).
+      // Die Rundenende-Effekte sind in der Engine ueber
+      // `_turnEndHooksDoneForTurn` gegen doppelte Ausloesung gesichert,
+      // die Uebergabe laesst sich hier also gefahrlos nachholen.
+      try {
+        const gs = engine.gs;
+        if (gs && !gs.result && !engine._fastMode && !engine._inMctsSim
+            && gs.activePlayer === engine._cpuPlayerIdx) {
+          console.warn(`[CPU] Zug ${gs.turn} haengt nach Fehler — erzwinge Zugübergabe.`);
+          await engine.switchTurn();
+        }
+      } catch (err2) {
+        console.error('[CPU] Rettungs-Zugübergabe fehlgeschlagen:', err2.message);
+      }
     }
   };
 }
@@ -7591,7 +7860,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     );
     const hoptKey = `hero-effect:MummyToken:${pi}:${heroIdx}`;
     if (gs.hoptUsed?.[hoptKey] !== gs.turn && mummyInst) {
-      let ok = true;
+      // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
+      let ok = !room.engine.isHeroEffectBlockedByGraceShield(mummyScript, pi);
       if (mummyScript.canActivateHeroEffect) {
         const ctx = room.engine._createContext(mummyInst, { event: 'canHeroEffectCheck' });
         ok = mummyScript.canActivateHeroEffect(ctx);
@@ -7602,7 +7872,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
       const inst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
-      let ok = !!inst;
+      // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
+      let ok = !!inst && !room.engine.isHeroEffectBlockedByGraceShield(ownScript, pi);
       if (ok && ownScript.canActivateHeroEffect) {
         const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
         ok = ownScript.canActivateHeroEffect(ctx);
@@ -7618,7 +7889,8 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     if (!eqScript?.heroEffect || !eqScript?.onHeroEffect) continue;
     const hoptKey = `hero-effect:${ci.name}:${pi}:${heroIdx}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
-    let ok = true;
+    // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
+    let ok = !room.engine.isHeroEffectBlockedByGraceShield(eqScript, pi);
     if (eqScript.canActivateHeroEffect) {
       try {
         const ctx = room.engine._createContext(ci, { event: 'canHeroEffectCheck' });
@@ -12584,7 +12856,15 @@ io.on('connection', (socket) => {
   });
 
   // ── Singleplayer CPU battle ──
-  async function createCpuBattle({ playerDeckId, cpuDeckId }) {
+  // `campaign` (optional) schaltet auf ein KAMPAGNEN-Duell um:
+  //   { duelId, opponent, opponentName, retry, bgm }
+  // Der Unterschied zum normalen CPU-Kampf ist bewusst klein — dieselbe
+  // Raumeinrichtung, dieselbe Mulligan-Choreografie, dasselbe Gehirn.
+  // Abweichend sind nur: die Deck-Herkunft (Spielerdeck aus dem
+  // Speicherstand, Gegnerdeck aus public/campaign/decks) und der
+  // Abschluss (keine SC-Belohnung, keine npc_stats, keine
+  // Gegner-Freischaltung — die Story wertet selbst aus).
+  async function createCpuBattle({ playerDeckId, cpuDeckId, campaign }) {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game'); return; }
 
@@ -12625,17 +12905,41 @@ io.on('connection', (socket) => {
       return parseDeck(row);
     };
 
-    console.log(`[createCpuBattle] playerDeckId='${playerDeckId}' cpuDeckId='${cpuDeckId}' user=${currentUser.username}`);
-    const playerDeck = await fetchDeck(playerDeckId, { label: 'player' });
-    const cpuDeck = await fetchDeck(cpuDeckId, { allowUnownedStructure: true, label: 'cpu' });
-    if (!playerDeck) { socket.emit('cpu_battle_error', 'Your deck is not available'); return; }
-    if (!cpuDeck) { socket.emit('cpu_battle_error', 'CPU deck is not available'); return; }
+    let playerDeck, cpuDeck;
+    if (campaign) {
+      // Spielerdeck kommt aus dem SPEICHERSTAND, nicht vom Client — sonst
+      // könnte man im Story-Modus ein beliebiges Deck einschmuggeln.
+      let saved = null;
+      try {
+        const row = await db.get('SELECT state FROM campaign_progress WHERE user_id = ?', [currentUser.userId]);
+        saved = row ? JSON.parse(row.state) : null;
+      } catch { saved = null; }
+      playerDeck = saved && saved.deck ? saved.deck : null;
+      if (!campaignDeckLegal(playerDeck)) {
+        socket.emit('cpu_battle_error', 'Your campaign deck is incomplete (3 Heroes, 60 cards).');
+        return;
+      }
+      cpuDeck = loadCampaignDeck(campaign.opponent);
+      if (!campaignDeckLegal(cpuDeck)) {
+        socket.emit('cpu_battle_error', 'Campaign deck "' + campaign.opponent + '" is missing or incomplete.');
+        return;
+      }
+      playerDeckId = 'campaign-player';
+      cpuDeckId = 'campaign-' + campaign.opponent;
+      console.log(`[Campaign] Duell '${campaign.duelId}' gegen '${campaign.opponent}' für ${currentUser.username}`);
+    } else {
+      console.log(`[createCpuBattle] playerDeckId='${playerDeckId}' cpuDeckId='${cpuDeckId}' user=${currentUser.username}`);
+      playerDeck = await fetchDeck(playerDeckId, { label: 'player' });
+      cpuDeck = await fetchDeck(cpuDeckId, { allowUnownedStructure: true, label: 'cpu' });
+      if (!playerDeck) { socket.emit('cpu_battle_error', 'Your deck is not available'); return; }
+      if (!cpuDeck) { socket.emit('cpu_battle_error', 'CPU deck is not available'); return; }
 
-    // Opponents are unlock-gated. The gallery only surfaces unlocked ones,
-    // but guard the socket path against crafted requests / stale clients.
-    if (typeof cpuDeckId === 'string' && cpuDeckId.startsWith('sample-')) {
-      const unlocked = await getUnlockedOpponentIds(currentUser.userId);
-      if (!unlocked.has(cpuDeckId)) { socket.emit('cpu_battle_error', 'Opponent not unlocked yet'); return; }
+      // Opponents are unlock-gated. The gallery only surfaces unlocked ones,
+      // but guard the socket path against crafted requests / stale clients.
+      if (typeof cpuDeckId === 'string' && cpuDeckId.startsWith('sample-')) {
+        const unlocked = await getUnlockedOpponentIds(currentUser.userId);
+        if (!unlocked.has(cpuDeckId)) { socket.emit('cpu_battle_error', 'Opponent not unlocked yet'); return; }
+      }
     }
 
     const snapshotDeck = (d) => JSON.parse(JSON.stringify({
@@ -12658,15 +12962,48 @@ io.on('connection', (socket) => {
       // Pre-populate _currentDecks so setupGameState uses our fetched decks
       // directly instead of re-querying per-player (which would fail for the CPU user).
       _currentDecks: [snapshotDeck(playerDeck), snapshotDeck(cpuDeck)],
+      // Merker für die Revanche-Behandlung und den Abschluss.
+      _campaign: campaign || null,
     };
     rooms.set(roomId, room);
     socket.join('room:' + roomId);
 
     await setupGameState(room);
+    if (campaign) {
+      room.gameState.isCampaign = true;
+      room.gameState.campaignRetry = campaign.retry !== false;
+      room.gameState._campaignDuelId = campaign.duelId || null;
+      room.gameState.isAnte = !!campaign.ante;
+      // Testschalter (siehe CAMPAIGN_TEST_ENEMY_HP): greift NACH
+      // setupGameState und VOR startGameEngine, damit die Engine die
+      // gesenkten Werte als Ausgangslage übernimmt.
+      if (CAMPAIGN_TEST_ENEMY_HP != null) {
+        for (const h of (room.gameState.players?.[1]?.heroes || [])) {
+          if (!h || !h.name) continue;
+          h.hp = CAMPAIGN_TEST_ENEMY_HP;
+          h.maxHp = CAMPAIGN_TEST_ENEMY_HP;
+        }
+        console.log('[Campaign] TEST: Gegner-Helden auf ' + CAMPAIGN_TEST_ENEMY_HP + ' HP gesetzt.');
+      }
+      // Name UND Avatar des Gegners stehen in der Story, nicht im Deck.
+      // Ohne den Avatar zeigte das Kampffeld den Zuschnitt des mittleren
+      // Helden — im Story-Modus sitzt dort aber eine FIGUR, kein Deck.
+      // `game-hand-avatar` greift, sobald players[1].avatar gesetzt ist.
+      if (room.gameState.players?.[1]) {
+        if (campaign.opponentName) room.gameState.players[1].username = campaign.opponentName;
+        // Nur Pfade aus dem Kampagnen-Portraitordner zulassen.
+        const av = String(campaign.opponentAvatar || '');
+        if (/^\/campaign\/avatars\/[^./][^/]*$/.test(av)) {
+          room.gameState.players[1].avatar = av;
+        }
+      }
+    }
     const firstPlayer = Math.random() < 0.5 ? 0 : 1;
     console.log(`[SP trace] firstPlayer=${firstPlayer} (0=human, 1=CPU)`);
     await startGameEngine(room, roomId, firstPlayer, (engine) => {
-      engine.onGameOver = (r, winnerIdx, reason) => endCpuBattle(r, winnerIdx, reason);
+      engine.onGameOver = (r, winnerIdx, reason) => (campaign
+        ? endCampaignBattle(r, winnerIdx, reason)
+        : endCpuBattle(r, winnerIdx, reason));
       engine._cpuPlayerIdx = 1;
       installCpuBrain(engine);
       // Demo-Recorder (Als Pilot-Spiele): zeichnet menschlich gespielte
@@ -12782,6 +13119,116 @@ io.on('connection', (socket) => {
       for (let i = 0; i < 2; i++) sendGameState(room, i);
     }
   }
+
+  // Abschluss eines KAMPAGNEN-Duells. Bewusst mager: kein SC, keine
+  // W/L-Statistik, keine Gegner-Freischaltung. Belohnungen und Folgen
+  // bestimmt die Szene (onWin/onLose), der Server meldet nur, wie es
+  // ausging.
+  function endCampaignBattle(room, winnerIdx, reason) {
+    const gs = room.gameState;
+    if (!gs || gs.result) return;
+    const loserIdx = winnerIdx === 0 ? 1 : 0;
+    gs.result = {
+      winnerIdx, reason,
+      winnerName: gs.players[winnerIdx]?.username || '?',
+      loserName: gs.players[loserIdx]?.username || '?',
+      isRanked: false, eloChanges: null,
+      setScore: [0, 0], setOver: true, format: 1,
+      isCpuBattle: true, isCampaign: true,
+      campaignDuelId: gs._campaignDuelId || null,
+      scAwarded: 0,
+    };
+    gs.rematchRequests = [];
+    // Wie bei endCpuBattle: MCTS-Rollouts teilen sich den echten
+    // Zustand — ohne diesen Riegel meldet jede Simulation ein
+    // Duellergebnis an den Client.
+    if (room.engine?._fastMode) return;
+    room.status = 'finished';
+    const sid = room.players?.[0]?.socketId;
+    if (sid) io.to(sid).emit('campaign_duel_result', {
+      duelId: gs._campaignDuelId || null,
+      won: winnerIdx === 0,
+      reason,
+    });
+
+    // ── ANTE ──
+    // Der Sieger nimmt eine Karte aus dem Bestand des Verlierers.
+    // Gewinnt der Mensch, bekommt er die Auswahl geschickt; verliert
+    // er, wählt der Gegner sofort und das Ergebnis geht direkt raus.
+    if (room._campaign && room._campaign.ante && sid) {
+      try {
+        const deck = (room._currentDecks || [])[loserIdx] || {};
+        const { pool, fromDeck } = campaignAntePool(gs, loserIdx, deck);
+        gs._ante = { pool, taken: null, youWon: winnerIdx === 0 };
+        if (!pool.length) {
+          console.warn('[Campaign] Ante: leerer Pool, übersprungen.');
+        } else if (winnerIdx === 0) {
+          io.to(sid).emit('campaign_ante_prompt', {
+            duelId: gs._campaignDuelId || null, pool, fromDeck,
+          });
+        } else {
+          const pick = campaignAnteCpuPick(pool);
+          gs._ante.taken = pick;
+          console.log(`[Campaign] Ante: Gegner nimmt "${pick}" (Pool ${pool.length}${fromDeck ? ', aus dem Deck' : ''}).`);
+          io.to(sid).emit('campaign_ante_result', {
+            duelId: gs._campaignDuelId || null, youWon: false, card: pick,
+          });
+        }
+      } catch (err) {
+        console.error('[Campaign] Ante fehlgeschlagen:', err.message, err.stack);
+      }
+    }
+
+    for (let i = 0; i < 2; i++) sendGameState(room, i);
+  }
+
+  // Der Mensch hat gewonnen und eine Karte aus dem Pool gewählt.
+  socket.on('campaign_ante_pick', ({ roomId, cardName }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._campaign || !room._campaign.ante) return;
+    if (!room.players?.some(p => p.userId === currentUser.userId)) return;
+    const gs = room.gameState;
+    if (!gs || !gs._ante || gs._ante.taken) return;      // nur EINMAL
+    if (!gs._ante.youWon) return;                        // Verlierer wählt nicht
+    if (!gs._ante.pool.includes(cardName)) return;       // nur aus dem Pool
+    gs._ante.taken = cardName;
+    console.log(`[Campaign] Ante: Spieler nimmt "${cardName}".`);
+    socket.emit('campaign_ante_result', {
+      duelId: gs._campaignDuelId || null, youWon: true, card: cardName,
+    });
+  });
+
+  // Start eines Kampagnen-Duells. Der Client übergibt NUR die Kennung
+  // des Gegnerdecks und die Duell-Id aus der Szene.
+  // `opponentAvatar` MUSS hier mit ausgepackt werden — beim ersten
+  // Anlauf stand es zwar im Client-Aufruf und wurde weiter unten in
+  // createCpuBattle auch ausgewertet, fiel aber genau hier unter den
+  // Tisch. Ergebnis: das Kampffeld fiel weiter auf den Zuschnitt des
+  // mittleren Helden zurück.
+  socket.on('start_campaign_duel', ({ duelId, opponent, opponentName, opponentAvatar, ante }) => {
+    if (!currentUser) return;
+    createCpuBattle({ campaign: { duelId, opponent, opponentName, opponentAvatar, ante: !!ante } })
+      .catch(err => {
+        console.error('[Campaign] Duell-Start fehlgeschlagen:', err.message, err.stack);
+        socket.emit('cpu_battle_error', 'Could not start duel: ' + (err.message || 'unknown'));
+      });
+  });
+
+  // ── TESTTASTEN IM KAMPAGNEN-DUELL (7.8.) ──
+  // Im Story-Modus beendet "1" das Duell als Sieg und "0" als
+  // Niederlage — damit lassen sich Verzweigungen prüfen, ohne jedes
+  // Mal ein ganzes Spiel zu spielen. Greift AUSSCHLIESSLICH in Räumen
+  // mit `_campaign`; reguläre CPU- und PvP-Kämpfe kennen den Weg nicht.
+  socket.on('campaign_debug_end', ({ roomId, win }) => {
+    if (!currentUser) return;
+    const room = rooms.get(roomId);
+    if (!room || !room._campaign) return;
+    if (!room.players?.some(p => p.userId === currentUser.userId)) return;
+    if (!room.gameState || room.gameState.result) return;
+    console.log(`[Campaign] Testtaste: Duell '${room.gameState._campaignDuelId}' als ${win ? 'SIEG' : 'NIEDERLAGE'} beendet.`);
+    endCampaignBattle(room, win ? 0 : 1, 'debug_key');
+  });
 
   // Debug: snapshot → mutate heavily → restore → compare. Verifies the
   // engine's snapshot/restore methods produce byte-identical state after
@@ -14299,6 +14746,18 @@ io.on('connection', (socket) => {
     if (room.type !== 'singleplayer') { console.warn('[CPU rematch] wrong room type:', room.type); return; }
     const playerEntry = room.players?.find(p => p.userId === currentUser.userId);
     if (!playerEntry) { console.warn('[CPU rematch] playerEntry not found in room', roomId); return; }
+    // Kampagnen-Duell: erneut antreten heißt hier "nochmal versuchen" —
+    // gleicher Gegner, Deck wieder aus dem Speicherstand.
+    if (room._campaign) {
+      const camp = room._campaign;
+      socket.leave('room:' + roomId);
+      cleanupRoom(roomId);
+      createCpuBattle({ campaign: camp }).catch(err => {
+        console.error('[Campaign] Wiederholung fehlgeschlagen:', err.message);
+        socket.emit('cpu_battle_error', 'Retry failed: ' + (err.message || 'unknown'));
+      });
+      return;
+    }
     const playerDeckId = playerEntry.deckId;
     // CPU is always player index 1 in singleplayer rooms (set by
     // createCpuBattle at line ~5617). Fall back to the prior CPU deck

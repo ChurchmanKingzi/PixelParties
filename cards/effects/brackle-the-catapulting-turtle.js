@@ -122,6 +122,10 @@ function _eligibleSacrificeCandidates(engine, pi) {
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
+  // Rein schaedlich: eigene Kreatur opfern, um Schaden auszuteilen. Unter
+  // dem Spielstart-Schutz nicht nutzbar (Als Ruling 8.8.) — sonst waere
+  // das Opfer bezahlt und der Schaden verpufft.
+  heroEffectHarmfulOnly: true,
 
   /**
    * Pre-gate. Engine's standard checks (Hero alive / not frozen /

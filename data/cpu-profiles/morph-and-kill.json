@@ -5,383 +5,363 @@
     "Waflav, the Metamorphing Monstrosity",
     "Cooldin, King of Coolness"
   ],
-  "games": 1389,
-  "trainWinRate": "33.1%",
-  "trainedAt": "2026-08-07T07:41:43.047Z",
-  "meanTurns": 20.1,
+  "games": 654,
+  "trainWinRate": "30.1%",
+  "trainedAt": "2026-08-07T19:03:25.796Z",
+  "meanTurns": 17.4,
   "cardValues": {
-    "Aggressive Town Guard": 94.3,
-    "Cottage at the Forest's Edge": 8,
-    "Poison Vial": 13.8,
-    "Leadership": 9.8,
-    "Ska Harpyformer": 46,
-    "Performance": 8.7,
-    "Elixir of Quickness": 33.9,
-    "Alchemy": 8.7,
-    "Fighting": 10.1,
-    "Magnetic Potion": 14.7,
-    "Heavy Hit": 83.7,
-    "Quick Attack": 45.7,
-    "Arcane Lamp": 14,
-    "Stormkissed Waflav": 81.9,
-    "Flamebathed Waflav": 48.2,
-    "Juice": 8.3,
-    "Disgruntled Forest Warden": 50.5,
-    "Voice in your Head": 35.1,
-    "Thunderstruck Waflav": 14.7,
-    "Swampborne Waflav": 23.6,
-    "Powder Keg": 19
+    "Alchemy": 9.5,
+    "Elixir of Quickness": 39.7,
+    "Fighting": 12.1,
+    "Ska Harpyformer": 47.6,
+    "Performance": 8.3,
+    "Quick Attack": 47.6,
+    "Cottage at the Forest's Edge": 8.1,
+    "Magnetic Potion": 19.2,
+    "Heavy Hit": 61.2,
+    "Juice": 8.2,
+    "Aggressive Town Guard": 100,
+    "Poison Vial": 25.4,
+    "Leadership": 10.5,
+    "Stormkissed Waflav": 91.1,
+    "Voice in your Head": 31,
+    "Disgruntled Forest Warden": 53,
+    "Flamebathed Waflav": 12.5,
+    "Arcane Lamp": 12.7,
+    "Thunderstruck Waflav": 28.4,
+    "Swampborne Waflav": 26.8,
+    "Powder Keg": 13
   },
   "timing": {
-    "Aggressive Town Guard": {
-      "early": 0.88,
-      "mid": 1.03,
-      "late": 1.09
-    },
-    "Cottage at the Forest's Edge": {
-      "early": 0.75,
-      "mid": 1.22,
-      "late": 1.29
-    },
-    "Poison Vial": {
-      "early": 0.77,
-      "mid": 0.99,
-      "late": 1.24
-    },
-    "Leadership": {
-      "early": 0.75,
-      "mid": 1.17,
-      "late": 1.17
-    },
-    "Ska Harpyformer": {
-      "early": 0.8,
-      "mid": 1.01,
-      "late": 1.19
-    },
-    "Performance": {
-      "early": 0.75,
-      "mid": 1.25,
-      "late": 1.3
+    "Alchemy": {
+      "early": 0.83,
+      "mid": 0.91,
+      "late": 1.26
     },
     "Elixir of Quickness": {
       "early": 0.75,
-      "mid": 1.18,
-      "late": 1.12
-    },
-    "Alchemy": {
-      "early": 0.75,
-      "mid": 1.19,
-      "late": 1.3
+      "mid": 1.3,
+      "late": 0.84
     },
     "Fighting": {
       "early": 0.75,
       "mid": 1.3,
-      "late": 1.19
-    },
-    "Magnetic Potion": {
-      "early": 0.8,
-      "mid": 0.98,
       "late": 1.22
     },
-    "Heavy Hit": {
+    "Ska Harpyformer": {
       "early": 0.75,
-      "mid": 0.91,
+      "mid": 1.14,
+      "late": 1.23
+    },
+    "Performance": {
+      "early": 0.75,
+      "mid": 1.29,
       "late": 1.3
     },
     "Quick Attack": {
       "early": 0.75,
-      "mid": 1.14,
-      "late": 1.28
+      "mid": 1.3,
+      "late": 1.05
     },
-    "Arcane Lamp": {
-      "early": 1.1,
-      "mid": 0.94,
-      "late": 0.97
+    "Cottage at the Forest's Edge": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1
+    },
+    "Magnetic Potion": {
+      "early": 0.83,
+      "mid": 1.1,
+      "late": 1.07
+    },
+    "Heavy Hit": {
+      "early": 0.75,
+      "mid": 1.14,
+      "late": 1.3
+    },
+    "Juice": {
+      "early": 1.15,
+      "mid": 0.75,
+      "late": 1.15
+    },
+    "Aggressive Town Guard": {
+      "early": 0.99,
+      "mid": 1.12,
+      "late": 0.89
+    },
+    "Poison Vial": {
+      "early": 0.83,
+      "mid": 1.03,
+      "late": 1.13
+    },
+    "Leadership": {
+      "early": 0.75,
+      "mid": 1.21,
+      "late": 1.07
     },
     "Stormkissed Waflav": {
       "early": 0.75,
-      "mid": 1.11,
-      "late": 1.3
-    },
-    "Flamebathed Waflav": {
-      "early": 0.86,
-      "mid": 0.97,
-      "late": 1.17
-    },
-    "Juice": {
-      "early": 0.99,
-      "mid": 0.84,
-      "late": 1.17
-    },
-    "Disgruntled Forest Warden": {
-      "early": 0.87,
-      "mid": 1.01,
-      "late": 1.13
+      "mid": 1.3,
+      "late": 0.86
     },
     "Voice in your Head": {
-      "early": 0.95,
-      "mid": 1.02,
-      "late": 1.03
+      "early": 0.99,
+      "mid": 1.08,
+      "late": 0.92
+    },
+    "Disgruntled Forest Warden": {
+      "early": 0.92,
+      "mid": 1.19,
+      "late": 0.9
+    },
+    "Flamebathed Waflav": {
+      "early": 1.07,
+      "mid": 1.1,
+      "late": 0.83
+    },
+    "Arcane Lamp": {
+      "early": 1.1,
+      "mid": 0.99,
+      "late": 0.91
     },
     "Thunderstruck Waflav": {
-      "early": 1,
-      "mid": 1.01,
-      "late": 0.99
+      "early": 0.99,
+      "mid": 1.04,
+      "late": 0.97
     },
     "Swampborne Waflav": {
-      "early": 1.02,
-      "mid": 1,
-      "late": 0.98
+      "early": 1.01,
+      "mid": 0.97,
+      "late": 1.03
     },
     "Powder Keg": {
-      "early": 1.01,
-      "mid": 0.99,
-      "late": 1.01
+      "early": 1.07,
+      "mid": 0.88,
+      "late": 1.06
     }
   },
   "pairBonuses": {
-    "Aggressive Town Guard|dc:Flamebathed Waflav": 6.3,
-    "Cottage at the Forest's Edge|Ska Harpyformer": 5,
-    "Leadership|dc:Poison Vial": 16.7,
-    "Performance|dc:Deep-Drowned Waflav": 4.6,
-    "Stormkissed Waflav|dc:Swampborne Waflav": 4.7,
-    "Flamebathed Waflav|dc:Juice": 4.8,
-    "Juice|dc:Powder Keg": 4.7,
-    "Juice|dc:Voice in your Head": 5.3,
-    "Juice|dc:Swampborne Waflav": 9.3,
-    "Juice|dc:Alchemy": 12.7,
-    "Disgruntled Forest Warden|dc:Juice": 6.1,
-    "Voice in your Head|dc:Fighting": 14.1
+    "Elixir of Quickness|Thunderstruck Waflav": 5.3,
+    "Fighting|dc:Voice in your Head": 4.3,
+    "Fighting|dc:Heavy Hit": 5,
+    "Fighting|dc:Quick Attack": 4,
+    "Performance|Ska Harpyformer": 4,
+    "Ska Harpyformer|dc:Arcane Lamp": 4.3,
+    "Ska Harpyformer|dc:Voice in your Head": 4.2,
+    "Ska Harpyformer|dc:Thunderstruck Waflav": 7.6,
+    "Performance|dc:Quick Attack": 5.3,
+    "Performance|dc:Voice in your Head": 4.5,
+    "Heavy Hit|Powder Keg": 18.3,
+    "Aggressive Town Guard|Leadership": 4.5,
+    "Aggressive Town Guard|dc:Thunderstruck Waflav": 6.4,
+    "Aggressive Town Guard|dc:Swampborne Waflav": 8.1,
+    "Disgruntled Forest Warden|Stormkissed Waflav": 6.4,
+    "Elixir of Quickness|Poison Vial": 40
   },
   "casterDeltas": {
     "Heavy Hit": {
-      "Flamebathed Waflav": 7.6,
-      "Thunderstruck Waflav": 10.5,
-      "Waflav, the Metamorphing Monstrosity": -10,
-      "Swampborne Waflav": 20
-    },
-    "Quick Attack": {
-      "Cooldin, King of Coolness": 8.6,
-      "Waflav, the Metamorphing Monstrosity": -5.9,
-      "Flamebathed Waflav": 8.6
+      "Flamebathed Waflav": 12
     }
   },
   "cardValueDeltasByStanding": {
     "behind": {
-      "Poison Vial": 4.6,
-      "Leadership": 11.1,
-      "Aggressive Town Guard": 5.8,
-      "Elixir of Quickness": 9,
-      "Alchemy": 5.2,
-      "Fighting": 6.8,
-      "Heavy Hit": 10.9,
-      "Quick Attack": 8.8,
-      "Stormkissed Waflav": 13,
-      "Flamebathed Waflav": 16.1,
-      "Disgruntled Forest Warden": 10.8,
-      "Voice in your Head": 9.7,
-      "Thunderstruck Waflav": 9.3
+      "Quick Attack": 8,
+      "Heavy Hit": 8.6,
+      "Performance": -7.7,
+      "Aggressive Town Guard": 7.1,
+      "Poison Vial": 8.5,
+      "Stormkissed Waflav": 9.2,
+      "Disgruntled Forest Warden": 9.6,
+      "Thunderstruck Waflav": 8
+    },
+    "ahead": {
+      "Juice": -19.1
     }
   },
-  "standingEvalThreshold": 1099,
+  "standingEvalThreshold": 1096,
   "targetPriors": {
-    "Aggressive Town Guard": {
-      "side:own": -9,
-      "hp:max": -6.8,
-      "row:creatures:3": 8.9,
-      "row:hosted:3-4": 8.2,
-      "row:hosted:5+": 15.9
-    },
-    "Alice, the Puppeteer Girl": {
-      "row:creatures:2": 6.3,
-      "row:hosted:3-4": 6.2,
-      "row:hosted:5+": 13.6,
-      "threat:priority_target": -8
+    "Quick Attack": {
+      "row:creatures:2": 10.5,
+      "row:free:1": 9.2,
+      "row:free:3": -8,
+      "row:hosted:0": -8.6,
+      "row:hosted:3-4": 8.4,
+      "row:hosted:5+": 10.6
     },
     "Heavy Hit": {
-      "row:hosted:5+": 20,
-      "threat:priority_target": -20
-    },
-    "Quick Attack": {
-      "row:creatures:3": 6.2,
-      "row:hosted:5+": 8,
-      "threat:priority_target": -20
-    },
-    "Stormkissed Waflav": {
-      "row:hosted:1-2": 11.5,
-      "row:creatures:1": 18.6,
-      "row:free:2": 18.2,
-      "row:free:1": 20,
-      "row:creatures:2": 20
-    },
-    "Flamebathed Waflav": {
-      "hp:max": -6.2,
-      "row:hosted:5+": 14.4
+      "row:free:1": 9.5,
+      "row:creatures:2": 12.7,
+      "row:creatures:0": -7.9,
+      "row:free:3": -7.8,
+      "row:hosted:0": -8.2,
+      "side:own": -8.4,
+      "row:hosted:3-4": 8.5,
+      "row:hosted:5+": 20
     },
     "Juice": {
-      "row:free:0": 7.5,
-      "row:hosted:3-4": 11,
-      "row:creatures:2": 8.6,
-      "row:free:1": 8.2,
-      "side:own": -10.3,
-      "hp:min": -6.2,
-      "row:hosted:5+": 17.6,
-      "kind:creature": -20,
-      "frozen": -16.1
+      "row:creatures:1": 11.4,
+      "row:hosted:1-2": 6,
+      "pos:0": -7.3,
+      "row:hosted:0": -7.7,
+      "side:own": -6.1,
+      "hp:max": -6.9,
+      "hp:min": -17.1,
+      "row:free:0": 6.5,
+      "row:creatures:3": 8.3,
+      "row:creatures:2": -7.9
+    },
+    "Aggressive Town Guard": {
+      "hp:min": -6.9,
+      "row:creatures:2": 7.1,
+      "side:own": -20,
+      "row:hosted:3-4": 7.2,
+      "row:hosted:5+": 20,
+      "threat:priority_target": 20
+    },
+    "Alice, the Puppeteer Girl": {
+      "kind:creature": -10.4,
+      "row:free:0": 9.8,
+      "row:creatures:3": 9,
+      "row:hosted:3-4": 11.4
+    },
+    "Stormkissed Waflav": {
+      "row:creatures:1": 6.4,
+      "row:free:2": 6.4,
+      "row:hosted:1-2": 8.5,
+      "row:creatures:2": 20,
+      "row:free:1": 20
     },
     "Disgruntled Forest Warden": {
-      "row:creatures:1": -6.4,
-      "side:own": -14.3,
-      "kind:creature": -16.1,
-      "row:creatures:3": 6.7
+      "kind:creature": -20,
+      "side:own": -11.7,
+      "row:hosted:3-4": 10.6,
+      "row:creatures:3": 8.2
+    },
+    "Flamebathed Waflav": {
+      "row:free:3": -8.9,
+      "row:hosted:5+": 9.6,
+      "row:free:2": 9.1
     },
     "Thunderstruck Waflav": {
-      "hp:max": -9.3,
-      "row:hosted:3-4": 6.2,
-      "row:hosted:5+": 11.4,
-      "kind:creature": 20
-    },
-    "Swampborne Waflav": {
-      "hp:max": -7.7,
-      "row:free:1": -7.5,
-      "row:creatures:3": 11.8,
-      "row:free:0": 11.6,
-      "row:hosted:5+": 11.9,
-      "row:creatures:1": -6.6,
-      "row:hosted:3-4": 7.5
+      "hp:min": -7.9,
+      "row:creatures:2": 8.8,
+      "row:hosted:3-4": 11.6,
+      "row:creatures:3": 7.7,
+      "row:free:0": 6.6,
+      "row:creatures:0": -8,
+      "row:hosted:0": -9.8,
+      "row:hosted:5+": 20
     },
     "Cottage at the Forest's Edge": {
-      "row:creatures:2": -8.6,
-      "row:free:1": -8.6,
-      "row:hosted:3-4": -8.8
+      "row:creatures:1": 20,
+      "row:free:2": 15.7,
+      "row:creatures:0": -12.1,
+      "row:free:3": -11.4,
+      "row:hosted:0": -9.5,
+      "row:creatures:2": 20,
+      "row:free:1": 20,
+      "row:hosted:3-4": 20
+    },
+    "Swampborne Waflav": {
+      "row:hosted:0": -6.4,
+      "hp:max": -7.6,
+      "row:creatures:2": 13.6,
+      "row:hosted:3-4": 11.1,
+      "hp:min": -6.5,
+      "row:free:1": 8.8
     },
     "Deep-Drowned Waflav": {
-      "row:creatures:0": 6.7,
-      "row:hosted:0": 7.5
+      "hp:min": -20,
+      "row:hosted:0": -20,
+      "row:hosted:1-2": 20
     }
   },
   "statusHealRules": {
     "Juice": {
-      "st:1": 4.2,
-      "st:stun-hero": 6.4,
-      "st:hero-caster": 3.6,
-      "st:poison2+": 5.6,
-      "st:2": 9.9,
-      "st:frozen-hero": 13.6,
-      "st:3+": -8.7
+      "st:3+": -6.1,
+      "st:hero-caster": 3.4,
+      "st:stun-hero": 7.7,
+      "st:frozen-hero": -9.3,
+      "st:2": 18.7
     }
   },
   "counterSpendRules": {
     "Waflav, the Metamorphing Monstrosity": {
-      "cs:have:1": -4.6,
-      "cs:left:0": -4.6,
       "cs:mp1": 20,
-      "cs:blocks-ascend": -15.1,
-      "cs:mp2": 9
-    }
-  },
-  "descendRules": {
-    "Swampborne Waflav": {
-      "ds:evo:1": 8.2,
-      "ds:ziel-ascended": 7.2,
-      "ds:mp2": 8
+      "cs:blocks-ascend": -9.9
     }
   },
   "placementRules": {
-    "plc:slack:1": -1.6
+    "plc:slack:0": -1.8,
+    "plc:slack:2+": 10.3,
+    "plc:bigwait": -15
   },
   "playOrderRules": {
-    "pord:first": -5.6
+    "pord:first": -3.9
   },
   "tutorPickRules": {
-    "Magnetic Potion→Ska Harpyformer": 20,
-    "Magnetic Potion→Stormkissed Waflav": -4.2,
-    "Magnetic Potion→Fighting": 3.2,
-    "Magnetic Potion→Swampborne Waflav": 7.5,
-    "Magnetic Potion→Voice in your Head": -6.8,
-    "Magnetic Potion→Flamebathed Waflav": 10,
-    "Magnetic Potion→Disgruntled Forest Warden": 5.5,
-    "Magnetic Potion→Aggressive Town Guard": -7.8,
-    "Magnetic Potion→Deep-Drowned Waflav": 12.8,
-    "Magnetic Potion→Heavy Hit": 7.8,
-    "Magnetic Potion→Leadership": -13.2,
-    "Magnetic Potion→Juice": 5.3,
-    "Magnetic Potion→Quick Attack": 2.7,
-    "Magnetic Potion→Arcane Lamp": -20,
-    "Stormkissed Waflav→Thunderstruck Waflav": 4.1,
-    "Stormkissed Waflav→Deep-Drowned Waflav": 8.8,
-    "Stormkissed Waflav→Stormkissed Waflav": -6.1,
-    "Stormkissed Waflav→Flamebathed Waflav": 2,
-    "Stormkissed Waflav→Swampborne Waflav": 3.6,
-    "Waflav Evolution→Flamebathed Waflav": 2.4,
-    "Waflav Evolution→Thunderstruck Waflav": -6.3,
-    "Waflav Evolution→Swampborne Waflav": 7.1,
-    "Waflav Evolution→Stormkissed Waflav": -2.3,
-    "Waflav Evolution→Deep-Drowned Waflav": 8.9,
-    "Waflav, the Metamorphing Monstrosity→Fighting": 7.6,
-    "Waflav, the Metamorphing Monstrosity→Performance": -4.2,
-    "Waflav, the Metamorphing Monstrosity→Leadership": -11.6,
-    "Waflav, the Metamorphing Monstrosity→Alchemy": -10.9,
-    "Deep-Drowned Waflav→Stormkissed Waflav": 4.9,
-    "Deep-Drowned Waflav→Flamebathed Waflav": -18.2,
-    "The Cosmic Depths→Ska Harpyformer": 3.4,
-    "The Cosmic Depths→Disgruntled Forest Warden": 3.8,
-    "The Cosmic Depths→Aggressive Town Guard": -6.8,
-    "Enigma, the Seller of Secrets→Voice in your Head": 9,
-    "Enigma, the Seller of Secrets→Thunderstruck Waflav": 9,
+    "Magnetic Potion→Heavy Hit": 9.8,
+    "Magnetic Potion→Aggressive Town Guard": 9.9,
+    "Magnetic Potion→Fighting": 12.7,
+    "Magnetic Potion→Arcane Lamp": -4.3,
+    "Magnetic Potion→Stormkissed Waflav": -15.7,
+    "Magnetic Potion→Ska Harpyformer": 14.6,
+    "Stormkissed Waflav→Stormkissed Waflav": -6.8,
+    "Stormkissed Waflav→Flamebathed Waflav": 2.5,
+    "Stormkissed Waflav→Swampborne Waflav": 13.6,
+    "Stormkissed Waflav→Deep-Drowned Waflav": 7.6,
+    "Waflav, the Metamorphing Monstrosity→Fighting": 16.4,
+    "Waflav, the Metamorphing Monstrosity→Alchemy": -20,
+    "Waflav Evolution→Stormkissed Waflav": -3.8,
+    "Waflav Evolution→Deep-Drowned Waflav": 8.8,
+    "Waflav Evolution→Swampborne Waflav": 13.2,
+    "Ska Harpyformer→Fighting": 10.6,
+    "Ska Harpyformer→Leadership": 8.7,
+    "The Cosmic Depths→Aggressive Town Guard": -20,
+    "The Cosmic Depths→Disgruntled Forest Warden": 20,
+    "Enigma, the Seller of Secrets→Swampborne Waflav": -12.7,
+    "Enigma, the Seller of Secrets→Quick Attack": 7,
+    "Enigma, the Seller of Secrets→Alchemy": 6.9,
+    "Enigma, the Seller of Secrets→Heavy Hit": -5.1,
+    "Enigma, the Seller of Secrets→Fighting": 9.1,
+    "Enigma, the Seller of Secrets→Voice in your Head": -6.4,
     "Enigma, the Seller of Secrets→Ska Harpyformer": -3.2,
-    "Enigma, the Seller of Secrets→Juice": 8.6,
-    "Enigma, the Seller of Secrets→Aggressive Town Guard": -16.9,
-    "Enigma, the Seller of Secrets→Swampborne Waflav": 9.7,
-    "Enigma, the Seller of Secrets→Disgruntled Forest Warden": -20,
-    "Enigma, the Seller of Secrets→Powder Keg": -10.2,
-    "Enigma, the Seller of Secrets→Deep-Drowned Waflav": -8.1,
-    "Enigma, the Seller of Secrets→Quick Attack": 5.2,
-    "Enigma, the Seller of Secrets→Alchemy": 12.2,
-    "Enigma, the Seller of Secrets→Leadership": -9.9,
-    "Enigma, the Seller of Secrets→Arcane Lamp": -6.7,
-    "Enigma, the Seller of Secrets→Stormkissed Waflav": 3.3,
-    "Enigma, the Seller of Secrets→Fighting": 20,
-    "Magic Lamp→Acid Vial": -20,
-    "Magic Lamp→Chain Lightning": -20,
-    "Magic Lamp→Defending the Gate": -15.9,
-    "Magic Lamp→Decay Magic": 20,
-    "Magic Lamp→The Warlord's Bite": -5.8,
-    "Magic Amethyst→Destruction Magic": -5.2,
-    "Ska Harpyformer→Fighting": 8.4,
-    "Ska Harpyformer→Leadership": -15.2
+    "Enigma, the Seller of Secrets→Juice": 19.4,
+    "Enigma, the Seller of Secrets→Powder Keg": 10,
+    "Magic Amethyst→Summoning Magic": 4.4
   },
   "abilityPriors": {
     "Destruction Magic@Alice, the Puppeteer Girl": 150,
-    "Summoning Magic@Alice, the Puppeteer Girl": 83.5,
-    "Summoning Magic@Alice, the Puppeteer Girl≥2": -60,
-    "Cannibalism@Waflav": -60,
-    "Alchemy@Cooldin, King of Coolness": 150,
-    "Alchemy@Cooldin, King of Coolness≥2": 150,
+    "Summoning Magic@Alice, the Puppeteer Girl": -60,
+    "Cannibalism@Waflav": 11,
+    "Toughness@Waflav": -60,
+    "Fighting@Waflav": 150,
+    "Alchemy@Cooldin, King of Coolness": 11.6,
+    "Alchemy@Cooldin, King of Coolness≥2": -60,
     "Alchemy@Cooldin, King of Coolness≥3": 150,
     "Leadership@Cooldin, King of Coolness": -60,
-    "Leadership@Cooldin, King of Coolness≥2": 150,
-    "Fighting@Cooldin, King of Coolness": 31.4,
-    "Fighting@Waflav": 150,
-    "Fighting@Alice, the Puppeteer Girl": 150,
-    "Leadership@Cooldin, King of Coolness≥3": 150,
-    "Destruction Magic@Alice, the Puppeteer Girl≥2": 150,
+    "Leadership@Cooldin, King of Coolness≥2": -17.1,
+    "Summoning Magic@Alice, the Puppeteer Girl≥2": -60,
     "Alchemy@Alice, the Puppeteer Girl": -60,
-    "Fighting@Waflav≥2": -60,
-    "Leadership@Alice, the Puppeteer Girl": 150,
-    "Fighting@Cooldin, King of Coolness≥2": -60,
     "Cannibalism@Waflav≥2": -60,
-    "Alchemy@Alice, the Puppeteer Girl≥2": -60,
-    "Alchemy@Waflav": -60,
+    "Cannibalism@Waflav≥3": 150,
+    "Fighting@Waflav≥2": 150,
+    "Leadership@Cooldin, King of Coolness≥3": 150,
+    "Fighting@Cooldin, King of Coolness": 150,
     "Toughness@Waflav≥2": -60,
-    "Leadership@Waflav": -60,
-    "Toughness@Waflav≥3": 150,
-    "Fighting@Waflav≥3": -60
+    "Toughness@Waflav≥3": -60,
+    "Destruction Magic@Alice, the Puppeteer Girl≥2": -60,
+    "Leadership@Alice, the Puppeteer Girl": 150,
+    "Fighting@Waflav≥3": -60,
+    "Fighting@Alice, the Puppeteer Girl": -60,
+    "Alchemy@Waflav": -38.7,
+    "Alchemy@Alice, the Puppeteer Girl≥2": 150,
+    "Fighting@Cooldin, King of Coolness≥2": -60,
+    "Leadership@Waflav": -60
   },
   "equipPriors": {},
   "lockPenalties": {},
   "reviveTargets": {
-    "Cottage at the Forest's Edge→Flamebathed Waflav": 30
+    "Cottage at the Forest's Edge→Stormkissed Waflav": 30
   },
   "reviveAbilities": {
     "Cottage at the Forest's Edge→Cannibalism": -15,
@@ -389,75 +369,63 @@
     "Cottage at the Forest's Edge→Fighting": -15
   },
   "startHandValues": {
-    "Voice in your Head": 2.3,
-    "Deep-Drowned Waflav": -3.7,
-    "Cottage at the Forest's Edge": -3.8,
-    "Flamebathed Waflav": -1.4,
-    "Disgruntled Forest Warden": -1.3,
-    "Powder Keg": -2,
-    "Aggressive Town Guard": 3.2,
-    "Juice": -1.3,
-    "Ska Harpyformer": 2.7,
-    "Alchemy": 1.2,
-    "Thunderstruck Waflav": -2,
-    "Stormkissed Waflav": 2.5,
-    "Arcane Lamp": -4.9,
-    "Swampborne Waflav": -4.5
+    "Heavy Hit": -5,
+    "Powder Keg": -2.9,
+    "Arcane Lamp": -4.3,
+    "Juice": -3.7,
+    "Quick Attack": 2.3,
+    "Alchemy": 4.5,
+    "Cottage at the Forest's Edge": 6,
+    "Aggressive Town Guard": 4.5,
+    "Ska Harpyformer": 1.6,
+    "Stormkissed Waflav": 4.6,
+    "Voice in your Head": -3.4,
+    "Swampborne Waflav": 4,
+    "Leadership": -3.5,
+    "Disgruntled Forest Warden": 1.4,
+    "Thunderstruck Waflav": -3.8,
+    "Flamebathed Waflav": -1.2
   },
   "mulliganStats": {
-    "games": 1389,
-    "mullRate": "33.2%",
-    "winAfterMull": "31.5%",
-    "winAfterKeep": "33.9%"
+    "games": 654,
+    "mullRate": "32.1%",
+    "winAfterMull": "32.9%",
+    "winAfterKeep": "28.8%"
   },
   "heroEffectTiming": {
     "Alice, the Puppeteer Girl@hand:4+": 15,
-    "Alice, the Puppeteer Girl@hand:2-3": 15,
-    "Waflav, the Metamorphing Monstrosity@hand:4+": 13.2,
     "Stormkissed Waflav@hand:4+": 15,
-    "Alice, the Puppeteer Girl@hand:0-1": 15,
-    "Stormkissed Waflav@hand:2-3": 15,
+    "Waflav, the Metamorphing Monstrosity@hand:4+": 12.9,
+    "Alice, the Puppeteer Girl@hand:0-1": 11.1,
+    "Stormkissed Waflav@hand:2-3": 11.5,
+    "Waflav, the Metamorphing Monstrosity@hand:2-3": 12.5,
+    "Alice, the Puppeteer Girl@hand:2-3": 15,
+    "Thunderstruck Waflav@hand:4+": 15,
     "Swampborne Waflav@hand:4+": 15,
-    "Flamebathed Waflav@hand:4+": 15,
-    "Thunderstruck Waflav@hand:4+": 10.1,
-    "Swampborne Waflav@hand:2-3": 15,
-    "Flamebathed Waflav@hand:2-3": 15,
-    "Waflav, the Metamorphing Monstrosity@hand:0-1": 11.9,
-    "Waflav, the Metamorphing Monstrosity@hand:2-3": 13.1
+    "Swampborne Waflav@hand:2-3": 15
   },
   "boardPairs": {
-    "Aggressive Town Guard|Alchemy": 9,
-    "Aggressive Town Guard|Leadership": 10.8,
     "Aggressive Town Guard|Fighting": 15,
-    "Alchemy|Fighting": 12.9,
-    "Fighting|Leadership": 14,
+    "Fighting|Ska Harpyformer": 14.7,
+    "Cannibalism|Fighting": 15,
+    "Fighting|Toughness": 15,
+    "Aggressive Town Guard|Alchemy": 11.5,
+    "Aggressive Town Guard|Leadership": 12.7,
+    "Leadership|Ska Harpyformer": 10.6,
+    "Alchemy|Destruction Magic": 9.6,
+    "Alchemy|Summoning Magic": 10.6,
+    "Alchemy|Fighting": 15,
+    "Fighting|Leadership": 15,
     "Destruction Magic|Disgruntled Forest Warden": 15,
     "Disgruntled Forest Warden|Summoning Magic": 15,
-    "Destruction Magic|Fighting": 5.4,
-    "Fighting|Summoning Magic": 6.8,
-    "Aggressive Town Guard|Cannibalism": 12.3,
-    "Aggressive Town Guard|Toughness": 12.7,
-    "Alchemy|Ska Harpyformer": 8.6,
-    "Leadership|Ska Harpyformer": 8.3,
-    "Alchemy|Destruction Magic": 6.5,
-    "Alchemy|Summoning Magic": 6.1,
-    "Destruction Magic|Leadership": 10.1,
-    "Leadership|Summoning Magic": 9.1,
-    "Aggressive Town Guard|Destruction Magic": 14.1,
-    "Aggressive Town Guard|Summoning Magic": 11.9,
-    "Aggressive Town Guard|Disgruntled Forest Warden": 12.1,
-    "Disgruntled Forest Warden|Leadership": 14.3
+    "Aggressive Town Guard|Destruction Magic": 15,
+    "Aggressive Town Guard|Summoning Magic": 15,
+    "Cannibalism|Leadership": -15,
+    "Leadership|Toughness": -15,
+    "Alchemy|Cannibalism": -11,
+    "Disgruntled Forest Warden|Leadership": -15,
+    "Ska Harpyformer|Summoning Magic": 10.3
   },
   "protectionRules": {},
-  "gameStartPicks": {
-    "Barker, the Monster Tamer": {
-      "baseline": 0.276,
-      "n": 105,
-      "values": {
-        "Ska Harpyformer": 0.077,
-        "Deepsea Primordium": -0.181,
-        "Aggressive Town Guard": -0.276
-      }
-    }
-  }
+  "gameStartPicks": {}
 }
