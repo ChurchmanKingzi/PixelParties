@@ -132,8 +132,14 @@ module.exports = {
         pile.splice(idx, 1);
         if (chosen.source === 'deck') engine.shuffleDeck(pi);
 
+        // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling
+        // 8.8.) — `hookExtras._tributePaid` meldet das an Trigger wie
+        // Rubin, the Dragoneer Champion. Der Stempel aus
+        // `_runBeforeSummon` greift hier nicht: das Opfer lief in
+        // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
         const summon = await engine.summonCreatureWithHooks(
-          chosen.name, pi, calaHi, slot, { source: CARD_NAME },
+          chosen.name, pi, calaHi, slot,
+          { source: CARD_NAME, hookExtras: { _tributePaid: true } },
         );
         if (!summon?.inst) {
           // Placement fizzled — refund the fetched card.

@@ -174,6 +174,24 @@ module.exports = {
       const death = ctx.creature;
       if (!isDragoDeath(engine, death, pi)) return;
 
+      // ── RESERVIERTE ZONE (Als Ruling 8.8.) ───────────────────────────
+      // Eine Opfer-Beschwoerung raeumt sich ihren eigenen Landeplatz frei:
+      // die Kosten werden in `beforeSummon` bezahlt, die beschworene Karte
+      // (Blue-Ice Dragon) landet erst danach. Genau in diesem Fenster
+      // feuert unser Todes-Trigger — und setzte sich in die Zone, die
+      // eigentlich schon vergeben ist. Al: der Effekt darf dann NICHT
+      // feuern.
+      //
+      // Gesperrt wird nur der EINE reservierte Platz. Faellt bei einer
+      // Mehrfach-Opferung eine zweite Kreatur in einer anderen Zone, ist
+      // deren Platz frei und der Trigger dort weiterhin erlaubt.
+      if (engine.isSlotReservedForSummon(pi, death.heroIdx, death.zoneSlot)) {
+        engine.log('green_dragoneer_fizzle', {
+          player: ps.username, reason: 'zone_reserved_for_summon',
+        });
+        return;
+      }
+
       // Ein Prompt je Todesfall.
       gs._greenDragoneerTriggered = gs._greenDragoneerTriggered || {};
       const evtKey = `${pi}:${death.heroIdx}:${death.zoneSlot}:${death.name}:${gs.turn}`;

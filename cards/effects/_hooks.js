@@ -84,6 +84,12 @@ const HOOKS = {
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
   ON_RESOURCE_SPEND: 'onResourceSpend',
+  // NACH der Buchung: der Kontostand steht dann schon auf dem neuen
+  // Wert und die Anzeige ist synchronisiert. Fuer Effekte, die das
+  // gerade gewonnene bzw. gezahlte Gold sofort weiterverwenden
+  // (Monkee-Archetyp: gain 4+ ... you may immediately pay that Gold).
+  AFTER_RESOURCE_GAIN:  'afterResourceGain',
+  AFTER_RESOURCE_SPEND: 'afterResourceSpend',
 
   // ── Level ──
   BEFORE_LEVEL_CHANGE: 'beforeLevelChange',

@@ -2062,6 +2062,11 @@ class GameEngine {
       'onDiscard', 'onCardEnterZone', 'onCardLeaveZone',
       'onDelete', 'onCreatureDeath', 'onMill',
       'onTurnStart', 'onTurnEnd',
+      // Ressourcen-Ereignisse: Resilient Monkee liegt im ABLAGESTAPEL und
+      // reagiert von dort auf Goldgewinne. Ohne Eintrag hier bekommt er
+      // gar keinen getrackten Listener und feuert nie (Als Befund 8.8.:
+      // Nimble auf der Hand loeste aus, Resilient im Stapel nicht).
+      'afterResourceGain', 'afterResourceSpend',
     ]);
     if (!PILE_RELEVANT_HOOKS.has(hookName)) return;
 
@@ -2246,6 +2251,20 @@ class GameEngine {
         ?? hookCtx.creature?.controller ?? hookCtx.creature?.owner;
       const sacPs = (sacrificer != null) ? this.gs.players[sacrificer] : null;
       if (sacPs) sacPs._creaturesSacrificedThisTurn = (sacPs._creaturesSacrificedThisTurn || 0) + 1;
+      // Fortlaufende Nummer JEDES echten Opfers. `_runBeforeSummon`
+      // vergleicht sie vorher/nachher und erkennt daran, ob eine
+      // Beschwoerung ihre Kosten mit einem Tribut bezahlt hat (Vertrag
+      // `_tributePaid`, siehe summonCreatureWithHooks). Bewusst an DIESEN
+      // Hook gehaengt: Karten, die ihre "Opfer" nur zurueck auf die Hand
+      // bouncen (Dark Deepsea God), feuern ihn gar nicht und zaehlen damit
+      // von selbst NICHT als Tribut-Beschwoerung — Als Ruling 8.8.
+      this._sacrificeSeq = (this._sacrificeSeq || 0) + 1;
+      // Laeuft gerade die Kostenzahlung einer Beschwoerung? Dann ist DIESE
+      // Beschwoerung tributbezahlt — sofort stempeln. Frueher stand der
+      // Stempel erst NACH `beforeSummon`, und Karten, die sich dort selbst
+      // platzieren, hatten ihre Eintritts-Hooks da laengst gefeuert.
+      const _bsf = this._beforeSummonInFlight;
+      if (_bsf) this._pendingTributeSummon = { ..._bsf };
     }
     // Inline heap check every 50 hook invocations (was 500 — tightened
     // after overnight OOMs kept slipping through). setInterval-based
@@ -8589,7 +8608,7 @@ class GameEngine {
     // that explicitly own the cost (e.g. Steam Dwarf Engineer's "its own
     // life is the cost") opt out via `skipBeforeSummon: true`.
     if (!opts.skipBeforeSummon) {
-      const ok = await this._runBeforeSummon(cardName, playerIdx, heroIdx, opts.hookExtras);
+      const ok = await this._runBeforeSummon(cardName, playerIdx, heroIdx, opts.hookExtras, zoneSlot);
       if (!ok) return null;
     }
 
@@ -8632,6 +8651,7 @@ class GameEngine {
       const hostHero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
       const onDeadHero = !hostHero?.name || hostHero.hp <= 0;
       const isPlacement = !!opts.isPlacement;
+      const _tribExtra = this.takeTributeSummonExtras(cardName, playerIdx, opts.hookExtras);
       const hookCtx = {
         _onlyCard: inst, playedCard: inst, cardName,
         zone: 'support', heroIdx, zoneSlot: actualSlot,
@@ -8639,6 +8659,7 @@ class GameEngine {
         _bypassDeadHeroFilter: onDeadHero || isPlacement,
         _isPlacement: isPlacement,
         ...(opts.hookExtras || {}),
+        ..._tribExtra,
       };
       await this.runHooks('onPlay', hookCtx);
       // `hookExtras` is propagated to onCardEnterZone too — listeners
@@ -8652,6 +8673,7 @@ class GameEngine {
         _bypassDeadHeroFilter: onDeadHero || isPlacement,
         _isPlacement: isPlacement,
         ...(opts.hookExtras || {}),
+        ..._tribExtra,
       });
     }
 
@@ -8668,17 +8690,131 @@ class GameEngine {
    * are logged and treated as a false return (safer to fizzle than to
    * summon without resolving a cost we promised to resolve).
    */
-  async _runBeforeSummon(cardName, playerIdx, heroIdx, hookExtras = {}) {
+  /**
+   * Vertrag `_tributePaid` (8.8.) — "diese Beschwoerung wurde mit dem
+   * Opfer von 1+ ANDEREN Creatures bezahlt". Verbraucht den Stempel, den
+   * `_runBeforeSummon` setzt, und liefert die Hook-Erweiterung.
+   *
+   * ZWINGEND an JEDER Stelle aufrufen, die nach einer Beschwoerung
+   * `onPlay` / `onCardEnterZone` selbst feuert — nicht nur in
+   * `summonCreatureWithHooks`. Der Hauptweg des Spiels laeuft NICHT
+   * dort entlang: `doPlayCreature` in server.js ruft `_runBeforeSummon`
+   * und `summonCreature` getrennt und feuert die beiden Hooks selbst.
+   * Genau das hat den Vertrag in v274 auf dem wichtigsten Pfad stumm
+   * gelassen (Rubin feuerte nie).
+   *
+   * @param hookExtras optionale Extras des Aufrufers; ein dort gesetztes
+   *   `_tributePaid` gilt zusaetzlich (Calamitusk, Garius: erst opfern,
+   *   dann separat beschwoeren).
+   */
+  takeTributeSummonExtras(cardName, playerIdx, hookExtras = null) {
+    const pend = this._pendingTributeSummon;
+    // Immer verbrauchen, damit der Stempel nicht auf eine spaetere,
+    // unbeteiligte Beschwoerung durchschlaegt.
+    if (pend) delete this._pendingTributeSummon;
+    const paid = !!(hookExtras && hookExtras._tributePaid)
+      || !!(pend && pend.cardName === cardName
+            && pend.playerIdx === playerIdx && pend.turn === this.gs?.turn);
+    return paid ? { _tributePaid: true } : {};
+  }
+
+  /**
+   * Ist dieser Support-Slot gerade fuer eine laufende Beschwoerung
+   * reserviert? (Als Ruling 8.8., Green-Dragoneer-Fall.)
+   *
+   * Eine Opfer-Beschwoerung raeumt ihren eigenen Landeplatz frei: die
+   * Kosten werden in `beforeSummon` bezahlt, die Karte landet erst
+   * danach. In diesem Fenster ist der Platz LEER — und ein Trigger, der
+   * auf den Tod reagiert und sich in die frei gewordene Zone setzt
+   * (Green Dragoneer), konnte ihn wegschnappen. Die beschworene Karte
+   * fand ihren Platz dann besetzt.
+   *
+   * Reserviert wird nur ein KONKRET angeforderter Slot. Wer ohne
+   * Zielplatz beschwoert (`zoneSlot < 0`), sucht sich ohnehin einen
+   * freien und hat nichts zu verlieren.
+   */
+  isSlotReservedForSummon(playerIdx, heroIdx, zoneSlot) {
+    const r = this._reservedSummonSlot;
+    if (!r) return false;
+    if (r.playerIdx !== playerIdx || r.heroIdx !== heroIdx || r.zoneSlot !== zoneSlot) return false;
+    // ALS PRAEZISIERUNG (8.8.): die Reservierung ist kein Selbstzweck —
+    // sie soll nur verhindern, dass die laufende Beschwoerung heimatlos
+    // wird. Bleibt bei DEMSELBEN Helden ein anderer Platz uebrig (etwa
+    // weil ein zweites Tribut von dort kam), darf der Trigger den
+    // reservierten Platz nehmen; die Beschwoerung weicht dann dorthin aus.
+    return !this._hasAlternativeSupportSlot(playerIdx, heroIdx, zoneSlot);
+  }
+
+  /**
+   * Gibt es bei diesem Helden ausser `exceptSlot` noch einen Platz, den
+   * die laufende Beschwoerung nehmen koennte? Zaehlt sowohl JETZT leere
+   * Slots als auch die, die durch die gerade laufende Kostenzahlung
+   * gleich frei werden (`_sacrificeInProgress`) — die Tribute fallen
+   * nacheinander, beim ersten Tod steht der zweite noch da.
+   */
+  _hasAlternativeSupportSlot(playerIdx, heroIdx, exceptSlot) {
+    const zones = this.gs?.players?.[playerIdx]?.supportZones?.[heroIdx];
+    if (!Array.isArray(zones)) return false;
+    const sac = this._sacrificeInProgress;
+    const vacating = (sac && sac.playerIdx === playerIdx)
+      ? sac.slots.filter(x => x.heroIdx === heroIdx).map(x => x.zoneSlot)
+      : [];
+    // Nur die BASISZONEN 0-2: genau dort — und nur dort — sucht
+    // `safePlaceInSupport` einen Ersatzplatz, wenn der Wunschplatz besetzt
+    // ist. Eine vierte Zone aus einem erweiterten Layout wuerde die
+    // Beschwoerung also gar nicht retten und darf hier nicht mitzaehlen.
+    const max = Math.min(zones.length, 3);
+    for (let si = 0; si < max; si++) {
+      if (si === exceptSlot) continue;
+      const belegt = (zones[si] || []).length > 0;
+      if (!belegt || vacating.includes(si)) return true;
+    }
+    return false;
+  }
+
+  async _runBeforeSummon(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
     const script = loadCardEffect(cardName);
     if (!script?.beforeSummon) return true;
+    // Zielplatz fuer die Dauer der Kostenzahlung reservieren (s.o.).
+    // Vorgaenger sichern, damit verschachtelte Beschwoerungen sich nicht
+    // gegenseitig die Reservierung loeschen.
+    const _prevReservation = this._reservedSummonSlot;
+    if (reservedSlot >= 0) {
+      this._reservedSummonSlot = { playerIdx, heroIdx, zoneSlot: reservedSlot };
+    }
+    // ── Welche Beschwoerung zahlt hier gerade ihre Kosten? ────────────
+    // Gebraucht fuer den `_tributePaid`-Stempel: der muss SOFORT beim
+    // Opfer gesetzt werden, nicht erst nach `beforeSummon`. Manche Karten
+    // (Blue-Ice Dragon beim Drop auf einen belegten Platz) platzieren
+    // sich naemlich INNERHALB ihres `beforeSummon` selbst und feuern die
+    // Eintritts-Hooks von dort — also lange bevor diese Funktion
+    // zurueckkehrt. Belegt durch Als Log vom 8.8.: die
+    // `onCardEnterZone`-Zeile kam VOR der `beforeSummon`-Zeile.
+    const _prevBeforeSummon = this._beforeSummonInFlight;
+    this._beforeSummonInFlight = { cardName, playerIdx, turn: this.gs?.turn };
     try {
       const dummy = new CardInstance(cardName, playerIdx, 'hand', heroIdx);
       const ctx = this._createContext(dummy, { ...hookExtras });
+      // Tribut-Erkennung: hat die Kostenzahlung dieser Beschwoerung ein
+      // echtes Opfer gefeuert? Der Stempel wird von
+      // `summonCreatureWithHooks` eingeloest — auch dann, wenn der Server
+      // `_runBeforeSummon` selbst aufruft und danach mit
+      // `skipBeforeSummon` beschwoert (Handkarten-Pfad).
       const res = await script.beforeSummon(ctx);
+      // Der Stempel wird beim OPFER gesetzt (siehe runHooks); wurde die
+      // Beschwoerung anschliessend doch abgeblasen, gehoert er weg.
+      if (res === false && this._pendingTributeSummon
+          && this._pendingTributeSummon.cardName === cardName
+          && this._pendingTributeSummon.playerIdx === playerIdx) {
+        delete this._pendingTributeSummon;
+      }
       return res !== false;
     } catch (err) {
       console.error(`[beforeSummon] ${cardName} threw:`, err.message);
       return false;
+    } finally {
+      this._reservedSummonSlot = _prevReservation;
+      this._beforeSummonInFlight = _prevBeforeSummon;
     }
   }
 
@@ -13034,8 +13170,10 @@ class GameEngine {
         delete this.gs._skipResourceDraw;
         delete this.gs._resourcePhaseLocked;
         await this._delay(150);
-        // Gain 4 Gold
-        await this.actionGainGold(activeP, 4);
+        // Gain 4 Gold — als AUTOMATISCHES Einkommen markiert, damit
+        // Effekte, die auf "Gold durch einen Effekt" reagieren, es
+        // ueberspringen koennen (Monkee-Archetyp).
+        await this.actionGainGold(activeP, 4, { _isResourceGain: true });
         // Auto-advance after hooks
         await this.runHooks(HOOKS.ON_PHASE_END, { phase: phaseName, phaseIndex: phase });
         await this._delay(200);
@@ -13904,7 +14042,7 @@ class GameEngine {
     return blocked;
   }
 
-  async actionGainGold(playerIdx, amount) {
+  async actionGainGold(playerIdx, amount, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
     // Gold-lock (Golden Arrow): cannot gain any gold for the rest of the
@@ -13914,7 +14052,12 @@ class GameEngine {
       this.log('gold_gain_blocked', { player: ps.username, amount, reason: 'goldLocked' });
       return;
     }
-    const hookCtx = { playerIdx, amount, cancelled: false };
+    // `_isResourceGain` markiert das AUTOMATISCHE Rundeneinkommen der
+    // Resource Phase. Als Ruling 8.8.: "through an effect" schliesst es
+    // ausdruecklich aus — sonst wuerde der Monkee-Archetyp bei jedem
+    // Zugbeginn von allein feuern (das Einkommen betraegt exakt 4 Gold).
+    // Gleiches Muster wie `_isResourceDraw` beim Standard-Nachziehen.
+    const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
     // Opponent's Surprise window — Gold Trap (and any future
@@ -13932,7 +14075,26 @@ class GameEngine {
       this.gs._scTracking[playerIdx].totalGoldEarned += gained;
     }
     this.log('gold_gain', { player: ps.username, amount: gained, total: ps.gold });
+    // ERST synchronisieren, DANN den Nach-Buchungs-Hook feuern (Als
+    // Vorgabe 8.8.): oeffnet ein Effekt daraufhin eine Abfrage ("pay that
+    // Gold"), soll die Goldanzeige den neuen Stand bereits zeigen. Und
+    // das Gold ist wirklich da, kann also sofort wieder ausgegeben werden.
     this.sync();
+    if (gained > 0) {
+      // `_goldSource` ist BEWUSST ein Objekt und kein Flag: `runHooks`
+      // reicht den Hook-Kontext per Spread an jeden Listener weiter, die
+      // REFERENZ bleibt dabei dieselbe. Ein Listener, der die Quelle
+      // verbraucht, setzt `consumed = true`, und alle nachfolgenden
+      // Listener desselben Ereignisses sehen das (Als Ruling 8.8.:
+      // „wird eine Goldquelle einmal konsumiert, muessen alle weiteren
+      // Monkees aus der Reaktionskette entfernt werden"). Jedes
+      // Gewinn-Ereignis bekommt sein eigenes Objekt — verschachtelte
+      // Gewinne aus einer laufenden Kette sind eigene Quellen.
+      await this.runHooks(HOOKS.AFTER_RESOURCE_GAIN, {
+        playerIdx, amount: gained, _isResourceGain: !!opts._isResourceGain,
+        _goldSource: { playerIdx, amount: gained, consumed: false },
+      });
+    }
   }
 
   async actionSpendGold(playerIdx, amount) {
@@ -13948,8 +14110,15 @@ class GameEngine {
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_SPEND, hookCtx);
     if (hookCtx.cancelled) return false;
-    ps.gold -= hookCtx.amount;
-    this.log('gold_spend', { player: ps.username, amount: hookCtx.amount, total: ps.gold });
+    const spent = hookCtx.amount;
+    ps.gold -= spent;
+    this.log('gold_spend', { player: ps.username, amount: spent, total: ps.gold });
+    // Gegenstueck zu AFTER_RESOURCE_GAIN, gleiche Reihenfolge. Criminal
+    // Monkee haengt daran ("when you pay exactly 4 Gold").
+    this.sync();
+    if (spent > 0) {
+      await this.runHooks(HOOKS.AFTER_RESOURCE_SPEND, { playerIdx, amount: spent });
+    }
     return true;
   }
 
@@ -14655,6 +14824,10 @@ class GameEngine {
       // Frozen / Stunned / negated host statuses are ignored by the
       // runHooks filter for support-zone listeners already, so no
       // extra flag is needed for those.
+      // Dritter Weg, der die Eintritts-Hooks selbst feuert — auch er muss
+      // den Tribut-Stempel einloesen (Blue-Ice Dragon platziert sich aus
+      // seinem eigenen `beforeSummon` ueber diesen Aufruf).
+      const _tribExtra = this.takeTributeSummonExtras(cardName, playerIdx);
       await this.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst, cardName,
         zone: ZONES.SUPPORT, heroIdx, zoneSlot: slotIdx,
@@ -14662,6 +14835,7 @@ class GameEngine {
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
         ...discardSummonExtras,
+        ..._tribExtra,
       });
       await this.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: ZONES.SUPPORT, toHeroIdx: heroIdx,
@@ -14669,6 +14843,7 @@ class GameEngine {
         _bypassDeadHeroFilter: true,
         _isPlacement: true,
         ...discardSummonExtras,
+        ..._tribExtra,
       });
     } else if (opts.fireHooks !== false && opts.negateEffects) {
       await this.runHooks('onCardEnterZone', {
@@ -15037,6 +15212,26 @@ class GameEngine {
       catch (err) { console.error(`[${ctx.cardName}] sacrifice onTributesChosen rider failed:`, err.message); }
     }
 
+    // ── Welche Plaetze werden durch DIESE Kostenzahlung gleich frei? ──
+    // Die Tribute fallen NACHEINANDER: beim Tod des ersten steht der
+    // zweite noch auf dem Brett. Ein Trigger, der in diesem Moment fragt
+    // „gibt es noch einen Ausweichplatz?" (Green Dragoneer ueber
+    // `isSlotReservedForSummon`) wuerde ihn deshalb uebersehen. Der
+    // Merker nennt alle Slots der gewaehlten Tribute im Voraus; sie
+    // gelten fuer die Dauer der Zahlung als „gleich frei".
+    const _prevSacInProgress = this._sacrificeInProgress;
+    this._sacrificeInProgress = {
+      playerIdx: pi,
+      slots: picked
+        .map(t => t.cardInstance)
+        .filter(i => i && i.zone === 'support' && i.heroIdx >= 0 && i.zoneSlot >= 0)
+        .map(i => ({ heroIdx: i.heroIdx, zoneSlot: i.zoneSlot })),
+    };
+    // Rumpf bewusst NICHT neu eingerueckt — die Klammer ist nur da, um den
+    // Merker oben im `finally` sicher zurueckzusetzen; so bleibt der Diff
+    // auf die tatsaechliche Aenderung beschraenkt.
+    try {
+
     // Per-sacrifice victim animation. Defaults to the knife-plunge
     // visual but the caller can override (e.g. Trex chomps tributes
     // with a `dino_bite` instead). `sacrificeAnimationExtras` are
@@ -15161,6 +15356,9 @@ class GameEngine {
       playerIdx: pi, creatureCount: picked.length, _skipReactionCheck: true,
     });
     return true;
+    } finally {
+      this._sacrificeInProgress = _prevSacInProgress;
+    }
   }
 
   /** Place an Area card from a casting spell onto its owner's area zone. */
@@ -21064,6 +21262,8 @@ class GameEngine {
     afterDamage: 'Damage was just dealt',
     onHeroKO: 'A hero was knocked out',
     onResourceGain: 'Resources were gained',
+    afterResourceGain: 'Gold was just gained',
+    afterResourceSpend: 'Gold was just spent',
     onStatusApplied: 'A status effect was applied',
     onStatusRemoved: 'A status effect was removed',
     afterLevelChange: 'A level was changed',

@@ -337,9 +337,14 @@ module.exports = {
       // (3) Place into the freshly emptied slot. `isPlacement: true`
       //     fires onPlay + onCardEnterZone in placement mode (skips
       //     host-incapacitation gates).
+      // Diese Beschwoerung wurde mit einem Opfer bezahlt (Als Ruling
+      // 8.8.) — `hookExtras._tributePaid` meldet das an Trigger wie
+      // Rubin, the Dragoneer Champion. Der Stempel aus
+      // `_runBeforeSummon` greift hier nicht: das Opfer lief in
+      // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
       const summonRes = await engine.summonCreatureWithHooks(
         repName, pi, sacHeroIdx, sacZoneSlot,
-        { source: CARD_NAME, isPlacement: true },
+        { source: CARD_NAME, isPlacement: true, hookExtras: { _tributePaid: true } },
       );
       if (!summonRes?.inst) {
         // Placement fizzled (beforeSummon refused etc.). Refund the

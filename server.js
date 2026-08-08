@@ -7298,7 +7298,10 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       return true;
     }
 
-    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction, viaDragDrop: !!viaDragDrop });
+    // `zoneSlot` mitgeben: waehrend der Kostenzahlung ist dieser Platz
+    // reserviert, damit ein Todes-Trigger (Green Dragoneer) sich nicht in
+    // die gerade freigeopferte Zone setzt (Als Ruling 8.8.).
+    const beforeSummonOk = await room.engine._runBeforeSummon(cardName, pi, heroIdx, { isInherentAction, viaDragDrop: !!viaDragDrop }, zoneSlot);
     const placementConsumed = ps._placementConsumedByCard === cardName;
     if (placementConsumed) delete ps._placementConsumedByCard;
     if (!beforeSummonOk && !placementConsumed) {
@@ -7447,8 +7450,14 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // …) where no hero-level gating happens. Listeners like
       // Orthos's "if THIS Hero summons a Loyal" use the flag to
       // skip non-summon placements.
-      await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot, _isNormalSummon: true });
-      await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true });
+      // `_tributePaid`: wurde diese Beschwoerung mit einem Opfer bezahlt?
+      // Dieser Pfad feuert die beiden Hooks SELBST (statt ueber
+      // summonCreatureWithHooks), muss den Stempel aus `_runBeforeSummon`
+      // also selbst einloesen — sonst bliebe der Vertrag auf dem
+      // Hauptweg des Spiels stumm.
+      const _tribExtra = room.engine.takeTributeSummonExtras(cardName, pi);
+      await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot, _isNormalSummon: true, ..._tribExtra });
+      await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true, ..._tribExtra });
     }
     if (!isReactionSubtype) {
       await room.engine.runHooks('onActionUsed', {
