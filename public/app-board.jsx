@@ -8541,6 +8541,63 @@ const ANIM_REGISTRY = {
   diamond_sparkle: DiamondSparkleEffect,
   spider_summon: SpiderSummonEffect,
   beer_bubbles: BeerBubblesEffect,
+  monkee_shield: (() => {
+    // Resilient Monkee (v347): ein goldener Schutzring pulst auf und
+    // verblasst, dazu ein Schild-Zeichen.
+    return function MonkeeShieldEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -46, top: -46, width: 92, height: 92,
+            borderRadius: '50%', border: '3px solid #ffd76f',
+            boxShadow: '0 0 22px rgba(255,215,110,.9), inset 0 0 18px rgba(255,215,110,.55)',
+            animation: 'pp-monkee-shield 900ms ease-out forwards',
+          }} />
+          <div style={{
+            position: 'absolute', left: -14, top: -18, fontSize: 30,
+            filter: 'drop-shadow(0 0 8px rgba(255,215,110,.95))',
+            animation: 'pp-monkee-shield-icon 900ms ease-out forwards',
+          }}>🛡️</div>
+        </div>
+      );
+    };
+  })(),
+  golden_banana_rain: (() => {
+    // Logan, the Investment Monkee: ein Regen goldener Bananen prasselt
+    // auf das Ziel. Bananen fallen von oberhalb der Karte herab, jede
+    // mit eigener Verzoegerung, Drehung und seitlichem Versatz, und
+    // zerplatzen unten in einem goldenen Aufschlag.
+    // `count` (v347): Cheeky Monkee benutzt dieselbe Animation mit
+    // weniger Bananen. Fehlt der Wert, bleibt es bei Logans 14.
+    return function GoldenBananaRainEffect({ x, y, count }) {
+      const anzahl = Math.max(3, Math.min(24, count || 14));
+      const bananas = useMemo(() => Array.from({ length: anzahl }, () => ({
+        xOff: -46 + Math.random() * 92,
+        size: 16 + Math.random() * 12,
+        delay: Math.random() * 420,
+        dur: 520 + Math.random() * 320,
+        spin: -220 + Math.random() * 440,
+        tilt: -35 + Math.random() * 70,
+      })), [anzahl]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(255,215,60,.75) 0%, rgba(220,170,20,.28) 42%, transparent 72%)' }} />
+          {bananas.map((b, i) => (
+            <div key={i}
+              style={{
+                position: 'absolute', left: b.xOff, top: -70,
+                fontSize: b.size,
+                filter: 'drop-shadow(0 0 6px rgba(255,210,60,.95))',
+                animation: `pp-banana-fall ${b.dur}ms cubic-bezier(.45,.05,.55,.95) ${b.delay}ms both`,
+                ['--pp-banana-spin']: `${b.spin}deg`,
+                ['--pp-banana-tilt']: `${b.tilt}px`,
+              }}
+            >🍌</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   juice_bubbles: (() => {
     // Orange juice bubbles — same as beer but orange palette
     return function JuiceBubblesEffect({ x, y }) {
@@ -15275,6 +15332,58 @@ const CARD_NAME_TYPE_COLORS = { Hero:'#aa44ff', 'Ascended Hero':'#7722cc', Abili
 // Dropdown variant of the generic Option Picker prompt. Used when a prompt
 // has many scalar choices (Siphem spending 1..N counters) and the usual
 // stack of wide buttons would eat too much vertical space.
+/**
+ * Betragsauswahl per Schieberegler + Zahlenfeld.
+ *
+ * `ep.sliderMin` / `ep.sliderMax` / `ep.sliderDefault` kommen vom
+ * Karteneffekt. Getippte Werte werden beim Bestaetigen in den erlaubten
+ * Bereich geklemmt, damit eine leere oder unsinnige Eingabe nie eine
+ * ungueltige Antwort schickt.
+ */
+function OptionPickerSlider({ ep, respondToPrompt }) {
+  const min = Number.isFinite(ep.sliderMin) ? ep.sliderMin : 1;
+  const max = Number.isFinite(ep.sliderMax) ? ep.sliderMax : Math.max(min, 1);
+  const [wert, setWert] = useState(
+    Number.isFinite(ep.sliderDefault) ? Math.min(max, Math.max(min, ep.sliderDefault)) : max
+  );
+  const klemmen = (n) => Math.min(max, Math.max(min, Math.floor(Number(n) || min)));
+  const einheit = ep.sliderUnit || '';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="range" min={min} max={max} step={1} value={wert}
+          onChange={e => setWert(klemmen(e.target.value))}
+          style={{ flex: 1, accentColor: 'var(--accent)' }}
+        />
+        <input
+          type="number" min={min} max={max} step={1} value={wert}
+          onChange={e => setWert(e.target.value === '' ? min : klemmen(e.target.value))}
+          onBlur={e => setWert(klemmen(e.target.value))}
+          style={{
+            width: 78, padding: '6px 8px', fontSize: 13, textAlign: 'right',
+            background: 'var(--bg2)', color: 'var(--accent)',
+            border: '1px solid var(--accent)', borderRadius: 6,
+          }}
+        />
+        {einheit && <span style={{ fontSize: 12, color: 'var(--text2)' }}>{einheit}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" style={{ flex: 1, padding: '10px 18px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)' }}
+          onClick={() => respondToPrompt({ optionId: String(klemmen(wert)) })}>
+          {ep.confirmLabel || 'Confirm'}
+        </button>
+        {ep.cancellable && (
+          <button className="btn" style={{ padding: '10px 14px', fontSize: 12, opacity: .8 }}
+            onClick={() => respondToPrompt({ cancelled: true })}>
+            {ep.cancelLabel || 'Cancel'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OptionPickerDropdown({ ep, respondToPrompt }) {
   const options = ep.options || [];
   const [selectedId, setSelectedId] = useState(options[0]?.id || '');
@@ -20660,6 +20769,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!d?.cardName) return;
       const dur = Math.max(400, Math.min(6000, d.durationMs || 2000));
       setCardShowcase({ cardName: d.cardName, dur, key: Date.now() });
+      // v348: optionaler Klang zum Auftritt. Aktivierungen (siehe
+      // engine.announceActiveEffect) schicken `sfx` mit, Terrors
+      // Auftritt nicht — dessen Verhalten bleibt unveraendert.
+      if (d.sfx && window.playSFX) window.playSFX(d.sfx, { dedupe: 120, category: 'effect' });
       window.setTimeout(() => {
         setCardShowcase(cur => (cur && cur.cardName === d.cardName ? null : cur));
       }, dur + 60);
@@ -25656,6 +25769,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const anim of newAnims) {
         setTimeout(() => {
           setDiscardAnims(prev => [...prev, anim]);
+          // v337 (Als Befund): der Flug in den Deleted Pile war stumm —
+          // Trade schickte fuenf Karten lautlos weg. Derselbe Klang wie
+          // beim Abwurf, je Karte und im Takt ihres Fluges; ein eigener
+          // Delete-Klang existiert nicht. Gilt fuer JEDEN Sender von
+          // `deck_to_deleted`, also auch Nerdy Cheese.
+          if (window.playSFX) window.playSFX('discard', { dedupe: 40 });
           setTimeout(() => setDiscardAnims(prev => prev.filter(a => a.id !== anim.id)), 500);
         }, anim.delay);
       }
@@ -28041,6 +28160,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     🧬{hero._evolutionCounters}
                   </div>
                 )}
+                {/* ── Invest Counters (Logan, the Investment Monkee) ── */}
+                {hero?.name && hero._investCounters > 0 && (
+                  <div
+                    onMouseEnter={e => showGameTooltip(e, `Invest Counters: ${hero._investCounters}. At the end of your turn Logan can cash them in for ${hero._investCounters} Gold or ${hero._investCounters * 5} damage. Drop to 0 Gold and they are all lost.`)}
+                    onMouseLeave={hideGameTooltip}
+                    style={{
+                      // Obere rechte Ecke (Als Vorgabe v344 — mittig sah
+                      // nicht gut aus). Kollidiert nicht mit den Evolution-
+                      // und Change-Counters, die dort ebenfalls sitzen:
+                      // die haengen an Waflav bzw. Argos, Logan ist keiner
+                      // von beiden.
+                      position: 'absolute', right: '6%', top: '6%',
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      padding: '2px 5px', borderRadius: 8,
+                      background: 'rgba(60,50,10,0.85)',
+                      border: '1px solid #ffd76f', color: '#fff3c4',
+                      fontSize: '0.72em', fontWeight: 'bold',
+                      pointerEvents: 'auto', zIndex: 6,
+                      textShadow: '0 0 4px #d9a520',
+                    }}
+                  >
+                    🪙{hero._investCounters}
+                  </div>
+                )}
                 {/* ── Change Counters (Cosmic Depths) ── */}
                 {hero?.name && hero._changeCounters > 0 && (
                   <div
@@ -29083,6 +29226,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       >
                         <span className="head-counter-icon">⚖️</span>
                         <span className="head-counter-num">×{cc.balance}</span>
+                      </div>
+                    ) : null}
+                    {/* Resilient Monkees Schutzschild (v347). Der Zaehler
+                        traegt seine Verfallsrunde; `gs.turn` steht im
+                        Zustand, also kann der Client selbst entscheiden,
+                        ob das Abzeichen noch gilt — kein Aufraeumen noetig. */}
+                    {cc?._monkeeShieldUntilTurn > (gameState.turn || 0) ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, 'Shielded: any damage this Creature would take is negated until the start of its controller\u2019s next turn. Damage that cannot be negated still gets through.')}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #ffe08f, #b8860b)', borderColor: '#6b4c00', color: '#3a2a00' }}
+                      >
+                        <span className="head-counter-icon">🛡️</span>
+                      </div>
+                    ) : null}
+                    {cc?.bunnyBombCounter > 0 ? (
+                      <div className="head-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bunnyBombCounter}. Bunny Bombs deals ${cc.bunnyBombCounter * 20} damage to every target on the board when it is defeated.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #ff8a4c, #a32b00)', borderColor: '#5c1800', color: '#fff3e0' }}
+                      >
+                        <span className="head-counter-icon">🧨</span>
+                        <span className="head-counter-num">×{cc.bunnyBombCounter}</span>
                       </div>
                     ) : null}
                     {(() => { return cc?.additionalActionAvail ? <div className="additional-action-icon"
@@ -31144,9 +31310,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Confirm Dialog ── */}
       {isMyEffectPrompt && ep.type === 'confirm' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          {/* `showCardLeft`: zweites Kartenbild LINKS neben dem Text. Fuer
+              Abfragen, in denen zwei Karten eine Rolle spielen — Bubbles
+              zeigt links die betroffene Kreatur, rechts sich selbst. */}
+          {ep.showCardLeft && CARDS_BY_NAME[ep.showCardLeft] && (() => {
+            const leftData = CARDS_BY_NAME[ep.showCardLeft];
+            const leftImg = cardImageUrl(ep.showCardLeft);
+            return (
+              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, alignSelf: 'center', borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+                onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(leftData); }}
+                onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+                {leftImg ? (
+                  <img src={leftImg} alt={ep.showCardLeft} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{ep.showCardLeft}</div>
+                )}
+              </div>
+            );
+          })()}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Confirm'}</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>{ep.message}</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: ep.warning ? 6 : 16 }}>{ep.message}</div>
+            {/* `warning`: Zusatzzeile in Warnfarbe unter der Nachricht —
+                fuer Folgen, die der Spieler nicht uebersehen soll. */}
+            {ep.warning && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 16 }}>{ep.warning}</div>
+            )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-success" style={{ padding: '10px 24px', fontSize: 13 }}
                 onClick={() => respondToPrompt({ confirmed: true })}>
@@ -31168,7 +31357,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const showCardData = CARDS_BY_NAME[ep.showCard];
             const showCardImg = cardImageUrl(ep.showCard);
             return (
-              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, alignSelf: 'center', borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
                 onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(showCardData); }}
                 onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
                 {showCardImg ? (
@@ -31216,7 +31405,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
-          {ep.renderAs === 'dropdown' ? (
+          {ep.renderAs === 'slider' ? (
+            // Slider-Variante fuer freie Betraege (Logan's Invest
+            // Counters). Eine Dropdown-Liste mit 40 Eintraegen ist zum
+            // Auswaehlen einer ZAHL das falsche Werkzeug — Regler plus
+            // Zahlenfeld ist beides: schnell grob und exakt fein.
+            // Antwortform bleibt `{ optionId: '<n>' }`, der Server
+            // braucht also nichts zu wissen.
+            <OptionPickerSlider ep={ep} respondToPrompt={respondToPrompt} />
+          ) : ep.renderAs === 'dropdown' ? (
             // Dropdown variant for prompts with many scalar choices (e.g. Siphem's
             // "spend N counters" list). Keeps the panel compact and prevents a
             // tall button stack. `selectedOptionId` is stored in a ref so we

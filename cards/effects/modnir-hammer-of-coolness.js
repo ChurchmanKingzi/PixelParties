@@ -1,3 +1,4 @@
+const { heroCanBeEquipped } = require('./_hooks');
 // ═══════════════════════════════════════════
 //  EQUIPMENT: "Modnir, Hammer of Coolness"
 //  Has no effect from your hand.
@@ -48,7 +49,10 @@ module.exports = {
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+      // v341: kanonische Ausruest-Regel (tot / eingefroren / bezaubert)
+      // aus `_hooks.js` statt einer eigenen Teilpruefung. Die
+      // Frozen-Sperre stand hier schon, `charmed` fehlte.
+      if (!heroCanBeEquipped(hero)) continue;
       // Frozen Heroes cannot be equipped (they can't accept new gear
       // while frozen). Stunned + Negated are also disqualified for the
       // same reason — the Hero is incapacitated.

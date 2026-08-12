@@ -402,6 +402,23 @@ function playSFXForLog(entry) {
     // going through engine.discardFromHand(). The discardPile-grew watcher
     // catches most of these, but mapping them here guarantees the cue
     // regardless of sync ordering or batching.
+    // Loeschungen (Deleted Pile). Ein eigener Klang existiert nicht;
+    // semantisch ist es derselbe Vorgang wie ein Abwurf — Karte
+    // verlaesst ihren Ort und landet auf einem Stapel. Der Flug in den
+    // Deleted Pile klingt in app-board.jsx bereits je Karte, die
+    // Dedupe-Zeit unterdrueckt die Doppelung.
+    // Resilient Monkee (v347): Schutzschild — derselbe Klang wie andere
+    // Schutz-/Buff-Effekte.
+    case 'resilient_monkee_shield':
+      playSFX('buff', { dedupe: 60 });
+      return;
+    case 'card_deleted':
+    case 'rebelliokai_discard_delete':
+    case 'cybug_fuel_delete':
+    case 'vacarn_delete_redirect':
+    case 'timeless_king_zi_delete':
+    case 'skeleton_priest_delete':
+    case 'shard_delete':
     case 'magenta_discard':
     case 'arthor_discard':
     case 'ballad_discard':
@@ -497,6 +514,11 @@ function playSFXForLog(entry) {
     // ── Resources ─────────────────────────────
     case 'gold_gain':
     case 'gold_steal':
+    // Logan, the Investment Monkee: Einzahlen und die Gold-Auszahlung
+    // benutzen denselben Muenzklang. Der Schaden-Zweig laeuft ueber die
+    // normalen Schaden-Ereignisse und braucht hier nichts.
+    case 'logan_invest':
+    case 'logan_payout_gold':
       playSFX('gold_gain', { dedupe: 30 });
       return;
 

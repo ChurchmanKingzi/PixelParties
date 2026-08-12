@@ -54,6 +54,14 @@ const CARD_NAME = 'Grand Inquisitor Karian';
 const SUSPENDED_KEY = '_karianSuspendedParalysis';
 
 /**
+ * Phasen, in denen der Spieler mit dem Helden handelt: beide MAIN-Phasen
+ * (Abilities, Helden-Effekte, Karten spielen) und die ACTION-Phase
+ * (Angriffe). START, RESOURCE und END bleiben aussen vor — dort gibt es
+ * nichts zu tun, und END muss die Status-Dauer herunterzaehlen.
+ */
+const HANDLUNGSPHASEN = new Set([PHASES.MAIN1, PHASES.ACTION, PHASES.MAIN2]);
+
+/**
  * Resolve Karian's hero object from a hook ctx. Uses
  * `cardOriginalOwner` (immune to charm-redirected ctx fields) and the
  * card-instance's `heroIdx`. Returns null if Karian's slot is empty.
@@ -164,23 +172,43 @@ module.exports = {
     },
 
     // ─── Bucket 2 — paralysisLike: act despite + bonus Action ───
+    // v339 (Als Befund): die Aussetzung lief NUR in der Action Phase —
+    // Abilities und Helden-Effekte aktiviert man aber in den MAIN-Phasen.
+    // Dort sah Karian eingefroren aus UND war es auch: der Server sperrt
+    // in `doActivateFreeAbility` / `doActivateHeroEffect` auf
+    // `statuses.frozen/stunned/webbed`, der Client graut nach denselben
+    // Feldern aus. Das war also kein Anzeigefehler.
+    //
+    // Der Kartentext trennt zwei Dinge: die zweite Aktion gilt
+    // ausdruecklich „during your Action Phase", das „otherwise not
+    // affected by those effects" dagegen ALLGEMEIN. Deshalb wird jetzt
+    // in JEDER Handlungsphase ausgesetzt, der Bonus aber weiterhin nur
+    // in der Action Phase gewaehrt.
+    //
+    // Bewusst je Phase aussetzen UND am Phasenende wieder einsetzen,
+    // statt ueber den ganzen Zug: `processStatusExpiry('END')` laeuft am
+    // Anfang der END-Phase und muss die Dauer noch herunterzaehlen
+    // koennen. Waeren die Status dann weggeraeumt, liefe das Einfrieren
+    // nie ab.
     onPhaseStart: async (ctx) => {
-      if (ctx.phaseIndex !== PHASES.ACTION) return;
+      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
-      // Only the active player gets the bonus Action — the rule says
-      // "during your Action Phase".
+      // Nur der aktive Spieler — der Held handelt in seinem eigenen Zug.
       if (engine.gs.activePlayer !== ctx.cardOriginalOwner) return;
       const hero = _karianHero(ctx);
       if (!hero?.name || hero.hp <= 0) return;
       const wasAfflicted = _suspendParalysis(hero);
       if (!wasAfflicted) return;
-      _grantBonusAction(engine, ctx.cardOriginalOwner, ctx.cardHeroIdx);
-      engine.log('karian_shake_off', { hero: hero.name });
+      // Die zweite Aktion bleibt der Action Phase vorbehalten.
+      if (ctx.phaseIndex === PHASES.ACTION) {
+        _grantBonusAction(engine, ctx.cardOriginalOwner, ctx.cardHeroIdx);
+      }
+      engine.log('karian_shake_off', { hero: hero.name, phase: ctx.phaseIndex });
       engine.sync();
     },
 
     onPhaseEnd: async (ctx) => {
-      if (ctx.phaseIndex !== PHASES.ACTION) return;
+      if (!HANDLUNGSPHASEN.has(ctx.phaseIndex)) return;
       const engine = ctx._engine;
       if (engine.gs.activePlayer !== ctx.cardOriginalOwner) return;
       const hero = _karianHero(ctx);

@@ -97,7 +97,24 @@ function heapGuardExceeded(mu) {
 // outer rollouts in a single turn (the original Heal-Burn / Steam-Dwarf
 // crashes were ~1000-1500). Cap at 1500 to catch those while leaving
 // 5x headroom over honest decisions.
-const MAX_SNAPSHOTS_PER_TURN = 1500;
+// Ab v323 über PP_MAX_SNAPSHOTS_PER_TURN einstellbar. Zweck ist NICHT,
+// die Schwelle im Betrieb zu senken, sondern den Diagnose-Dump auf
+// Knopfdruck zu erzwingen: `_dumpOverloadDiagnostics` schreibt die
+// mcts-overload-*.trail.json nur, wenn eine Kappe reisst. Ein
+// Absturzlauf ist stochastisch — mit einem kleinen Wert (z.B. 300)
+// reisst sie im Verdachts-Matchup zuverlaessig, und zusammen mit
+// MCTS_HOOK_HEAP_PROFILE=1 steht die Hook-Zuordnung sofort in der Datei.
+// Default unveraendert 1500.
+const MAX_SNAPSHOTS_PER_TURN = (() => {
+  const v = parseInt(process.env.PP_MAX_SNAPSHOTS_PER_TURN || '', 10);
+  if (Number.isFinite(v) && v > 0) {
+    // Einmalig melden — eine still nicht angekommene Umgebungsvariable
+    // hat in diesem Projekt schon zweimal einen Messlauf gekostet.
+    console.log(`[mcts] Snapshot-Kappe je Zug auf ${v} gesetzt (Default 1500) — Diagnose-Modus.`);
+    return v;
+  }
+  return 1500;
+})();
 // Per-CALL heap check for damage events. The snapshot-level and
 // runHooks-level heap checks both run at boundary points (snapshot
 // taken / hook fired) — but a single MCTS rollout that fires many
@@ -5409,6 +5426,32 @@ class GameEngine {
     }
 
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
+
+    // ── `amountIsFinal` (9.8.) ───────────────────────────────────────
+    // Fuer UMGELEITETEN Schaden: der Betrag wurde an seinem
+    // urspruenglichen Ziel bereits vollstaendig berechnet, die
+    // quellenseitigen Modifikatoren sind also schon drin. Laeuft er
+    // hier erneut durch die `beforeDamage`-Hooks, wenden dieselben
+    // Karten ihre Korrektur ein ZWEITES Mal an.
+    //
+    // Als Befund 9.8.: Ghuanjuns Hook zieht bei `usesHeroAtk` die
+    // Differenz zwischen aktuellem und Basis-Angriff ab. Bei einem
+    // 20er-Treffer mit Differenz 20 kam nach der Umleitung 0 an —
+    // Bubbles „wehrte ab" und nahm nichts.
+    //
+    // Die Hooks laufen weiterhin (sie setzen Flags wie
+    // `capAtHPMinus1` und haben Nebenwirkungen); nur ihre
+    // BETRAGSAENDERUNG wird zurueckgenommen. Alles, was DANACH kommt —
+    // Buff-Multiplikatoren, Immunitaeten, Deckel — greift normal, denn
+    // das sind Eigenschaften des NEUEN Ziels.
+    if (opts?.amountIsFinal && !hookCtx.cancelled && hookCtx.amount !== amount) {
+      this.log('damage_amount_restored', {
+        target: this._heroLabel(target), from: hookCtx.amount, to: amount,
+        reason: 'redirected_amount_is_final',
+      });
+      hookCtx.amount = amount;
+    }
+
     // ── Piercing override ──
     // `cannotBeNegated` says "damage cannot be reduced or negated"
     // (Ida's Destruction Spells, future piercing effects). Any
@@ -7019,6 +7062,71 @@ class GameEngine {
    * einmal — Effekte, die je Karte einzeln discarden (Schleifen über
    * actionDiscardHandCard), pulsen sonst pro Karte neu.
    */
+/**
+   * Auftritt einer Karte am LINKEN Bildschirmrand (v347, Als GENERELLE
+   * REGEL): „wenn ein aktiver Effekt triggert, soll die zugehoerige
+   * Karte auf der linken Seite des Battlefields erscheinen und
+   * ausfaden."
+   *
+   * Bewusst hier und nicht je Karte: gerufen wird das an den fuenf
+   * Aktivierungswegen im Server (Kreatur-Effekt, Ability, freie
+   * Ability, Helden-Effekt, Artefakt). Damit bekommt JEDER aktive
+   * Effekt den Auftritt, auch kuenftige, ohne dass eine Kartendatei
+   * etwas davon wissen muss.
+   *
+   * Rein visuell und sim-sicher: im MCTS-Rollout gibt es keinen
+   * Client, `_broadcastEvent` ist dort ohnehin wirkungslos.
+   */
+/**
+   * Karten-Auftritt eines aktiven Effekts (v347, Timing korrigiert v349).
+   *
+   * ZWEISTUFIG, weil der Auftritt NACH der Zielwahl kommen soll (Als
+   * Vorgabe; Muster: Book of Doom, das mit `animationType: 'none'` die
+   * automatische Vorab-Animation abschaltet und selbst im `resolve`
+   * ausloest):
+   *
+   *   1. `armEffectAnnounce(name, owner)` — der Server meldet VOR dem
+   *      Handler an, WELCHE Karte gerade aktiviert wird. Noch keine
+   *      Anzeige.
+   *   2. `announceActiveEffect()` — loest den Auftritt aus. Karten mit
+   *      eigener Zielwahl rufen das SELBST, direkt nachdem das Ziel
+   *      bestaetigt ist. Karten ohne Zielwahl muessen nichts tun: der
+   *      Server loest nach dem Handler aus, falls noch angemeldet.
+   *   3. `clearEffectAnnounce()` — Abbruch, kein Auftritt.
+   *
+   * Mit Argumenten gerufen wirkt `announceActiveEffect(name, owner)`
+   * weiterhin sofort — das braucht der Trank-Weg, dessen `resolve` erst
+   * nach der Zielwahl laeuft.
+   */
+  armEffectAnnounce(cardName, ownerIdx) {
+    this._pendingEffectAnnounce = cardName ? { cardName, owner: ownerIdx ?? null } : null;
+  }
+
+  clearEffectAnnounce() {
+    this._pendingEffectAnnounce = null;
+  }
+
+  announceActiveEffect(cardName, ownerIdx) {
+    let name = cardName, owner = ownerIdx;
+    if (name == null) {
+      const p = this._pendingEffectAnnounce;
+      if (!p) return;                       // schon ausgeloest oder abgebrochen
+      name = p.cardName; owner = p.owner;
+    }
+    this._pendingEffectAnnounce = null;
+    if (!name) return;
+    if (this._inMctsSim || this._fastMode) return;
+    try {
+      // Benutzt die VORHANDENE Auftritt-Architektur (`play_card_showcase`,
+      // seit 1.8. fuer Terror da). `sfx` ist optional und neu — Terrors
+      // Auftritt schickt es nicht und bleibt damit unveraendert.
+      this._broadcastEvent('play_card_showcase', {
+        cardName: name, owner: owner ?? null, durationMs: 1400,
+        sfx: 'ability_activate',
+      });
+    } catch { /* Kosmetik darf nie stoeren */ }
+  }
+
   async effectSourceGlow(ownerIdx, sourceName) {
     if (!sourceName || this._inMctsSim) return;
     const now = Date.now();
@@ -7029,6 +7137,51 @@ class GameEngine {
       this._broadcastEvent('effect_source_glow', { playerIdx: ownerIdx, cardName: sourceName });
     } catch { /* rein kosmetisch */ }
     await this._delay(EFFECT_GLOW_LEAD_MS);
+  }
+
+  /**
+   * Wem gehoert der Effekt, der diesen Abwurf ausloest? (v329, Als Ruling)
+   *
+   * Regel: "200 nur, wenn der Abwurf vom GEGNER des Kartenbesitzers
+   * ausgeht." Entscheidend ist der Besitzer der VERURSACHENDEN Karte —
+   * nicht der aktive Spieler und nicht der Abwerfende.
+   *
+   * Bewusst HIER abgeleitet statt an ~19 Aufrufstellen nachgetragen:
+   * ein Vertrag, den jede Aufrufstelle einzeln bedienen muss, wird
+   * vergessen — in diesem Projekt mehrfach belegt. Kuenftige Karten
+   * erben die Ableitung, ohne etwas davon zu wissen.
+   *
+   * Stufen, von sicher nach heuristisch:
+   *   1. `opts.sourceOwner` — explizit angegeben, gewinnt immer.
+   *   2. `opts.selfInflicted` — die Karte erklaert es zu eigenen Kosten.
+   *   3. Namensaufloesung: traegt genau EIN Spieler eine Karte oder
+   *      einen Helden dieses Namens, ist er der Verursacher. Haben
+   *      BEIDE sie, bleibt es unbestimmt — dann lieber `null` als
+   *      geraten.
+   *
+   * @returns {number|null} Spielerindex des Verursachers, sonst null
+   */
+  _deriveEffectOwner(opts = {}, playerIdx) {
+    if (opts.sourceOwner === 0 || opts.sourceOwner === 1) return opts.sourceOwner;
+    if (opts.selfInflicted) return playerIdx;
+    const name = typeof opts.source === 'string' ? opts.source : opts.source?.name;
+    if (!name) return null;
+    const besitzer = new Set();
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs?.players?.[pi];
+      if (!ps) continue;
+      if ((ps.heroes || []).some(h => h?.name === name)) { besitzer.add(pi); continue; }
+      for (const zone of (ps.abilityZones || [])) {
+        if ((zone || []).some(slot => (slot || []).includes(name))) { besitzer.add(pi); break; }
+      }
+    }
+    for (const inst of (this.cardInstances || [])) {
+      if (inst?.name !== name) continue;
+      if (inst.zone === ZONES.DISCARD || inst.zone === ZONES.DELETED) continue;
+      const o = inst.controller ?? inst.owner;
+      if (o === 0 || o === 1) besitzer.add(o);
+    }
+    return besitzer.size === 1 ? [...besitzer][0] : null;
   }
 
   async actionDiscardCardsAnimated(playerIdx, count, opts = {}) {
@@ -7064,6 +7217,9 @@ class GameEngine {
         await this.runHooks(HOOKS.ON_DISCARD, {
           playerIdx, card: inst, cardName, discardedCardName: cardName,
           discardedInstId: inst.id,
+          source: opts.source || null,
+          sourceOwner: this._deriveEffectOwner(opts, playerIdx),
+          selfInflicted: !!opts.selfInflicted,
           _fromHand: true,
         });
       }
@@ -7998,6 +8154,8 @@ class GameEngine {
       // not other copies that were already in discard") compare
       // `ctx.discardedInstId === ctx.card.id`.
       discardedInstId: inst?.id ?? null,
+      sourceOwner: this._deriveEffectOwner(opts, playerIdx),
+      selfInflicted: !!opts.selfInflicted,
       _fromHand: true,
       _skipReactionCheck: opts.skipReactionCheck !== false,
     };
@@ -9710,6 +9868,14 @@ class GameEngine {
               // Crestmas, Spreading Rumor, etc.) so listeners can key
               // off who triggered the discard.
               source: opts.source || null,
+              // v327: `selfInflicted` markiert einen Abwurf, den eine
+              // EIGENE Karte ihrem Besitzer als Kosten auferlegt (Monia,
+              // Inventing, …). Der Marker existierte schon, wurde aber
+              // nicht in den Hook gereicht — Zuhörer wie Skull Necklace
+              // mussten deshalb über `gs.activePlayer` raten und lagen
+              // im Gegnerzug systematisch falsch.
+              selfInflicted: !!opts.selfInflicted,
+              sourceOwner: this._deriveEffectOwner(opts, playerIdx),
               _fromHand: true, _skipReactionCheck: true,
             },
           });
@@ -9746,6 +9912,14 @@ class GameEngine {
    * @param {string} [opts.title] - Prompt title (default 'Hand Limit')
    */
   async enforceHandLimit(playerIdx, opts = {}) {
+    // v331: Eine abgeraeumte Partie erzwingt kein Handlimit mehr. Diese
+    // Stelle beendete BEIDE Abbruch-Bloecke in Als Logs vom 11.8. — sie
+    // laeuft in `runPhase` eines Zuges, der beim `abort()` schon
+    // unterwegs war, und die Wachen aus v330 sitzen an den EINTRITTEN
+    // der Schleifen, greifen fuer einen laufenden Zug also nicht mehr.
+    // Ein Zwangsabwurf in einer beendeten Partie hat ohnehin keine
+    // Wirkung; der Wurf darunter waere reines Rauschen.
+    if (this._aborted) return;
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
 
@@ -13552,6 +13726,21 @@ class GameEngine {
 
     // If game already ended (e.g. all heroes dead during End Phase), don't continue
     if (this.gs.result) return;
+
+    // ── Sicherheitsnetz fuer aufgeschobene Surprises (9.8.) ──────────
+    // Jumpscare & Co. stellen sich beim Ausloesen in `_deferredSurprises`
+    // und werden von der jeweiligen Aktion eingeloest. Vergisst ein Pfad
+    // das (der Helden-Effekt tat es bis 9.8.), blieb der Eintrag liegen
+    // und feuerte irgendwann im ZUG DES GEGNERS — dann prompte die
+    // falsche Seite und stunte sich selbst. Hier wird er spaetestens am
+    // Zugende eingeloest, also noch in der Runde, in der er entstand.
+    if (!this._inMctsSim && this.gs._deferredSurprises?.length) {
+      try {
+        await this._executeDeferredSurprises();
+      } catch (err) {
+        console.error('[switchTurn] deferred surprise drain failed:', err?.message || err);
+      }
+    }
     // Heap snapshot at turn boundary — lets us see growth across the
     // game without waiting for the heap-trip threshold to fire. If
     // rss climbs steadily turn-over-turn, there's a structural leak;
@@ -16193,6 +16382,22 @@ class GameEngine {
     // and so source-type gates (Anti-Magnet's "Equipment-Artifact-cast"
     // filter) see a Creature source, not a Spell.
     sourceCard = this._rewriteSourceForCreatureCaster(sourceCard);
+
+    // ── Quell-Merkmal `cannotBeRedirected` (8.8.) ────────────────────
+    // Karten, deren Text "this damage cannot be ... redirected" sagt
+    // (Acid Vial), tragen das Flag auf ihrem Skript. Bisher kannte nur
+    // die Targeting-Konfiguration ein `config.cannotBeRedirected`, das
+    // der jeweilige Aufrufer setzen musste — ein Kartenmerkmal galt
+    // damit nur dort, wo jemand daran gedacht hat. Hier greift es an
+    // der EINEN Stelle, durch die jede Ziel-Umleitung laeuft.
+    if (sourceCard?.name) {
+      const srcScript = loadCardEffect(sourceCard.name);
+      if (srcScript?.cannotBeRedirected) {
+        this.log('redirect_blocked', { source: sourceCard.name, reason: 'cannotBeRedirected' });
+        return null;
+      }
+    }
+
     const redirected = await this._checkTargetRedirectOnce(
       targetOwnerIdx, selected, validTargets, config, sourceCard
     );
@@ -26334,6 +26539,18 @@ class GameEngine {
         // are removed. Distinct from `_cardinalImmune` so the Cardinal
         // Beast name fallback and identity stay clean.
         e._immuneCreature = true;
+      } else if (inst?.counters?._monkeeShieldUntilTurn != null
+                 && this.gs.turn < inst.counters._monkeeShieldUntilTurn
+                 && e.canBeNegated !== false) {
+        // Resilient Monkee (v343): Schadensschild bis zum Beginn des
+        // naechsten eigenen Zuges. SELBST ABLAUFEND — der Marker traegt
+        // seine Verfallsrunde, es braucht keinen Aufraeum-Hook, und der
+        // Schutz haelt auch, wenn Resilient das Brett verlaesst.
+        //
+        // `canBeNegated !== false` ist Als Ruling: NUR Schaden wird
+        // abgewehrt, und Schaden, der Negation durchbricht (Idas Zauber
+        // und Verwandte), kommt durch und toetet trotzdem.
+        e._immuneCreature = true;
       } else if (inst?.counters?._guardianImmune && e.canBeNegated !== false) {
         e._immuneCreature = true;
       } else if (inst?.counters?._stealImmortal) {
@@ -27820,19 +28037,62 @@ class GameEngine {
    */
   async checkAllHeroesDead() {
     if (this.gs.result) return; // Game already over
+
+    // ── Simultanschaden (8.8.) ───────────────────────────────────────
+    // Trifft eine Karte das GANZE Brett auf einmal, darf nicht der erste
+    // toedliche Treffer das Spiel entscheiden — sonst haengt der Ausgang
+    // an der Reihenfolge, in der die Ziele abgearbeitet werden. Wer
+    // solchen Schaden austeilt, hebt `_deferGameOverCheck` an und stoesst
+    // die Auswertung danach EINMAL selbst an (Bunny Bombs).
+    if (this.gs._deferGameOverCheck > 0) {
+      this.gs._gameOverCheckPending = true;
+      return;
+    }
+    this.gs._gameOverCheckPending = false;
+
+    // Beide Seiten ERST bewerten, dann entscheiden.
+    const wiped = [false, false];
     for (let pi = 0; pi < 2; pi++) {
       const ps = this.gs.players[pi];
       const heroes = ps?.heroes || [];
       const allDead = heroes.length > 0 && heroes.every(h => !h.name || h.hp <= 0);
-      if (allDead) {
-        // Any permanent opted into `preventsAllHeroesDeadLoss: true`
-        // suspends the loss on this side (Elixir of Immortality and
-        // any future "I'll handle the revive myself" effect).
-        const hasLossSuspender = (ps.permanents || []).some(p => {
-          const script = loadCardEffect(p.name);
-          return script?.preventsAllHeroesDeadLoss;
-        });
-        if (hasLossSuspender) continue;
+      if (!allDead) continue;
+      // Any permanent opted into `preventsAllHeroesDeadLoss: true`
+      // suspends the loss on this side (Elixir of Immortality and
+      // any future "I'll handle the revive myself" effect).
+      const hasLossSuspender = (ps.permanents || []).some(p => {
+        const script = loadCardEffect(p.name);
+        return script?.preventsAllHeroesDeadLoss;
+      });
+      wiped[pi] = !hasLossSuspender;
+    }
+
+    // ── Unentschieden ────────────────────────────────────────────────
+    // Beide Seiten ausgeloescht. Bisher entschied stillschweigend die
+    // Schleifenreihenfolge (Spieler 0 verlor). Eine Karte kann den
+    // Verlierer jetzt ausdruecklich bestimmen — Bunny Bombs: "When this
+    // would result in a draw, you lose the game." Ohne Angabe bleibt es
+    // beim alten Verhalten.
+    if (wiped[0] && wiped[1]) {
+      const hint = this.gs._drawLoserIdx;
+      const loserIdx = (hint === 0 || hint === 1) ? hint : 0;
+      const winnerIdx = loserIdx === 0 ? 1 : 0;
+      this.log('draw_resolved', {
+        loser: this.gs.players[loserIdx]?.username,
+        winner: this.gs.players[winnerIdx]?.username,
+        decidedBy: (hint === 0 || hint === 1) ? 'card_effect' : 'default',
+      });
+      if (this._inMctsSim) {
+        if (!this.gs.result) this.gs.result = { winnerIdx, reason: 'draw_resolved' };
+      } else if (this.onGameOver) {
+        this.onGameOver(this.room, winnerIdx, 'draw_resolved');
+      }
+      return;
+    }
+
+    for (let pi = 0; pi < 2; pi++) {
+      const ps = this.gs.players[pi];
+      if (wiped[pi]) {
         const winnerIdx = pi === 0 ? 1 : 0;
         this.log('all_heroes_dead', { loser: ps.username, winner: this.gs.players[winnerIdx].username });
         if (this._inMctsSim) {

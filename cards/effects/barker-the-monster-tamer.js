@@ -168,9 +168,9 @@ module.exports = {
       const heroIdx = ctx.cardHeroIdx;
 
       // Load card database for creature data
-      const allCards = require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8');
-      const cardDB = {};
-      JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
+      // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
+      // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
+      const cardDB = require('./_card-db').getCardDB();
 
       // Find all Lv <=1 Creatures in hand and deck. Per-Creature
       // `canSummon` filter (`_bypassBeforeSummon: true`) is applied

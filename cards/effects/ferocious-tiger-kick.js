@@ -41,6 +41,12 @@ module.exports = {
         damageType: 'attack',
         baseDamage: baseAtk,
         title: 'Ferocious Tiger Kick',
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'stunned',
         description: desc,
         confirmLabel: `🐯 Tiger Kick! (${baseAtk})`,
         confirmClass: 'btn-danger',

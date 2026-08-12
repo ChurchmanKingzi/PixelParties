@@ -49,6 +49,10 @@ module.exports = {
       side: 'my',
       types: ['hero', 'creature'],
       title: CARD_NAME,
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet
+        // (Als Auftrag 9.8.). Ohne die Angabe lief das Gate nicht, und
+        // die CPU verbrannte Status an Zielen, die Johanna schuetzt.
+        appliesStatus: 'stunned',
       description: 'Choose a target you control to Stun for 1 turn.',
       confirmLabel: '💫 Stun!',
       confirmClass: 'btn-warning',

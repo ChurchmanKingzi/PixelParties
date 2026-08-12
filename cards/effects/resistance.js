@@ -98,6 +98,22 @@ module.exports = {
       const statusName = ctx.statusName;
       if (!statusName) return;
 
+      // ── SCHUTZ-STATUS DER ENGINE NIE ABFANGEN (v328, Als Report) ────
+      // `shielded` ist der Anfangsschutz aus der Turn-1-Regel: die Engine
+      // haengt ihn beim Spielstart an JEDEN Helden des nicht beginnenden
+      // Spielers (_engine.js ~12880). Resistance sah ihn als "Status auf
+      // meinem Helden" und entfernte ihn — womit der Held seinen
+      // kompletten Turn-1-Schutz gegen Statuseffekte verlor, denn genau
+      // `hero.statuses.shielded` ist das Gate, das alle anderen Status
+      // abweist (_engine.js ~25688).
+      //
+      // `immune` ist derselbe Fall: die Engine vergibt ihn nach dem
+      // Abklingen einer Kontrollwirkung. Beides sind Regel-Gaben an den
+      // EIGENEN Helden, keine gegnerischen Effekte — Resistance hat dort
+      // nichts abzufangen, und eine Ladung dafuer zu verbrauchen waere
+      // ohnehin verkehrt.
+      if (statusName === 'shielded' || statusName === 'immune') return;
+
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;
 

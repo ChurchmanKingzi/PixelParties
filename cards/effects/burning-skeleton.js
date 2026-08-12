@@ -45,6 +45,12 @@ module.exports = {
       types: ['hero', 'creature'],
       damageType: 'status',
       title: CARD_NAME,
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'burned',
       description: 'Burn an opponent\'s Hero or Creature for the rest of the game.',
       confirmLabel: '🔥 Burn!',
       confirmClass: 'btn-danger',

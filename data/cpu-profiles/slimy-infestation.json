@@ -5,353 +5,502 @@
     "Stellan, the Calm Cat",
     "Barker, the Monster Tamer"
   ],
-  "games": 160,
-  "trainWinRate": "43.1%",
-  "trainedAt": "2026-07-31T14:17:19.016Z",
-  "meanTurns": 15,
+  "games": 1393,
+  "trainWinRate": "44.1%",
+  "trainedAt": "2026-08-12T07:23:59.931Z",
+  "meanTurns": 15.2,
   "cardValues": {
-    "Fiery Slime": 49.9,
-    "Cloudy Slime": 56.5,
-    "Alchemy": 8.2,
-    "Shadowy Slime": 33.2,
-    "Elixir of Quickness": 13,
-    "Performance": 18,
+    "Sparky Slime": 30.2,
     "Rain of Arrows": 100,
-    "Shiny Slime": 8.3,
-    "Magic Lamp": 8.4,
-    "Cute Camera": 12.3,
-    "Cute Cheese": 24.8,
-    "Slime Rancher": 65.9,
-    "Splashy Slime": 26.5,
-    "Magnetic Glove": 11.6,
-    "Magnetic Potion": 25.1,
-    "Sparky Slime": 39.7,
-    "Wheels": 24.7,
-    "Icy Slime": 33.9,
-    "Martyry": 8.1,
-    "Cuteness Sensor": 30.5,
-    "Resuscitation Potion": 36
+    "Martyry": 8.2,
+    "Splashy Slime": 18.3,
+    "Performance": 8.5,
+    "Wheels": 11.6,
+    "Cuteness Sensor": 12.7,
+    "Shadowy Slime": 18.2,
+    "Magnetic Glove": 11.8,
+    "Cute Camera": 13.8,
+    "Fiery Slime": 66.9,
+    "Icy Slime": 21.6,
+    "Cloudy Slime": 30.8,
+    "Shiny Slime": 8.6,
+    "Cute Cheese": 27.7,
+    "Alchemy": 11,
+    "Slime Rancher": 85.2,
+    "Magnetic Potion": 21.1,
+    "Magic Lamp": 19,
+    "Resuscitation Potion": 37.4,
+    "Elixir of Quickness": 19.1
   },
   "timing": {
-    "Fiery Slime": {
-      "early": 1.3,
-      "mid": 0.75,
-      "late": 0.75
-    },
-    "Cloudy Slime": {
-      "early": 1.13,
-      "mid": 1.07,
-      "late": 0.8
-    },
-    "Alchemy": {
-      "early": 1.17,
-      "mid": 0.86,
-      "late": 0.97
-    },
-    "Shadowy Slime": {
-      "early": 1.14,
-      "mid": 1,
-      "late": 0.86
-    },
-    "Elixir of Quickness": {
-      "early": 1.12,
-      "mid": 1.21,
-      "late": 0.75
-    },
-    "Performance": {
-      "early": 1.28,
-      "mid": 0.75,
-      "late": 1.11
+    "Sparky Slime": {
+      "early": 1.2,
+      "mid": 1.02,
+      "late": 0.78
     },
     "Rain of Arrows": {
       "early": 0.75,
       "mid": 1.3,
-      "late": 0.81
+      "late": 0.76
     },
-    "Shiny Slime": {
-      "early": 1.3,
-      "mid": 0.75,
-      "late": 1.19
-    },
-    "Magic Lamp": {
-      "early": 1.3,
-      "mid": 0.88,
-      "late": 0.78
-    },
-    "Cute Camera": {
-      "early": 1.07,
-      "mid": 1.02,
-      "late": 0.91
-    },
-    "Cute Cheese": {
-      "early": 1.24,
-      "mid": 1.25,
-      "late": 0.75
-    },
-    "Slime Rancher": {
-      "early": 1.07,
-      "mid": 1.02,
-      "late": 0.91
+    "Martyry": {
+      "early": 1.05,
+      "mid": 0.91,
+      "late": 1.04
     },
     "Splashy Slime": {
-      "early": 1.29,
-      "mid": 0.82,
-      "late": 0.89
+      "early": 1.17,
+      "mid": 0.8,
+      "late": 1.03
     },
-    "Magnetic Glove": {
-      "early": 1.2,
-      "mid": 1.11,
-      "late": 0.75
-    },
-    "Magnetic Potion": {
-      "early": 0.97,
-      "mid": 1.12,
-      "late": 0.91
-    },
-    "Sparky Slime": {
-      "early": 1.26,
-      "mid": 0.99,
+    "Performance": {
+      "early": 1.16,
+      "mid": 1.09,
       "late": 0.75
     },
     "Wheels": {
-      "early": 1.05,
-      "mid": 1.09,
-      "late": 0.86
-    },
-    "Icy Slime": {
-      "early": 0.75,
-      "mid": 1.26,
-      "late": 1.06
-    },
-    "Martyry": {
-      "early": 1.19,
-      "mid": 0.75,
-      "late": 1.15
+      "early": 1.15,
+      "mid": 1.11,
+      "late": 0.75
     },
     "Cuteness Sensor": {
-      "early": 1.13,
-      "mid": 1.12,
+      "early": 1.05,
+      "mid": 1.06,
+      "late": 0.89
+    },
+    "Shadowy Slime": {
+      "early": 1.05,
+      "mid": 1.01,
+      "late": 0.94
+    },
+    "Magnetic Glove": {
+      "early": 1.15,
+      "mid": 1.24,
+      "late": 0.75
+    },
+    "Cute Camera": {
+      "early": 1.04,
+      "mid": 1.04,
+      "late": 0.93
+    },
+    "Fiery Slime": {
+      "early": 1.25,
+      "mid": 0.77,
+      "late": 0.98
+    },
+    "Icy Slime": {
+      "early": 1.08,
+      "mid": 0.99,
+      "late": 0.93
+    },
+    "Cloudy Slime": {
+      "early": 1.3,
+      "mid": 0.78,
+      "late": 0.76
+    },
+    "Shiny Slime": {
+      "early": 1.26,
+      "mid": 0.95,
+      "late": 0.79
+    },
+    "Cute Cheese": {
+      "early": 1.3,
+      "mid": 1.14,
+      "late": 0.75
+    },
+    "Alchemy": {
+      "early": 1.06,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Slime Rancher": {
+      "early": 1.17,
+      "mid": 1.3,
+      "late": 0.75
+    },
+    "Magnetic Potion": {
+      "early": 1.03,
+      "mid": 1.18,
+      "late": 0.79
+    },
+    "Magic Lamp": {
+      "early": 1.09,
+      "mid": 1.25,
       "late": 0.75
     },
     "Resuscitation Potion": {
       "early": 1,
-      "mid": 1.06,
-      "late": 0.94
+      "mid": 0.89,
+      "late": 1.11
+    },
+    "Elixir of Quickness": {
+      "early": 1.05,
+      "mid": 1.22,
+      "late": 0.75
     }
   },
   "pairBonuses": {
-    "Fiery Slime|Slime Rancher": 10.4,
-    "Shadowy Slime|Slime Rancher": 13.5,
-    "Slime Rancher|dc:Cute Cheese": 13.9,
-    "Slime Rancher|dc:Rain of Arrows": 20.4,
-    "Icy Slime|Sparky Slime": 12.1,
-    "Alchemy|Resuscitation Potion": 40,
-    "Cute Cheese|Magnetic Potion": 40
-  },
-  "cardValueDeltasByCluster": {
-    "aggro": {
-      "Elixir of Quickness": -6.3,
-      "Wheels": -6.8
-    },
-    "swarm": {
-      "Martyry": 8.9
-    },
-    "spell": {
-      "Rain of Arrows": -6,
-      "Magic Lamp": -7.2
-    }
+    "Slime Rancher|Sparky Slime": 6.3,
+    "Fiery Slime|Rain of Arrows": 6.6,
+    "Rain of Arrows|Slime Rancher": 4.8,
+    "Magnetic Glove|Rain of Arrows": 7.2,
+    "Magnetic Glove|Performance": 4.8,
+    "Cute Camera|Cuteness Sensor": 6,
+    "Cloudy Slime|Shadowy Slime": 4.8,
+    "Fiery Slime|Slime Rancher": 4.6,
+    "Icy Slime|Slime Rancher": 6.2,
+    "Icy Slime|Resuscitation Potion": 11.5,
+    "Alchemy|Elixir of Quickness": 12.4,
+    "Slime Rancher|dc:Rain of Arrows": 5.9,
+    "Elixir of Quickness|Resuscitation Potion": 13.8
   },
   "cardValueDeltasByStanding": {
     "behind": {
-      "Rain of Arrows": 20,
-      "Shiny Slime": -19,
-      "Magic Lamp": -18.4
+      "Sparky Slime": -7.1,
+      "Rain of Arrows": 14,
+      "Splashy Slime": -6.8,
+      "Performance": -12.4,
+      "Wheels": -11.6,
+      "Cuteness Sensor": -6.8,
+      "Shadowy Slime": -6,
+      "Magnetic Glove": -9.7,
+      "Fiery Slime": -9.1,
+      "Icy Slime": -6.2,
+      "Cloudy Slime": -7.2,
+      "Alchemy": -7.2,
+      "Slime Rancher": -5.2,
+      "Shiny Slime": -13.3,
+      "Elixir of Quickness": -5.7
+    },
+    "ahead": {
+      "Sparky Slime": -7,
+      "Martyry": -19.8,
+      "Performance": 6.4
     }
   },
-  "standingEvalThreshold": 1105,
+  "standingEvalThreshold": 1017,
   "menuOfferRules": {
-    "Magic Lamp→Rain of Arrows": 12,
-    "Magic Lamp→Alchemy": 10.7,
-    "Magic Lamp→Cute Camera": -20,
-    "Magic Lamp→Martyry": -20,
-    "Magic Lamp→Wheels": 4.8,
-    "Magic Lamp→Fiery Slime": 13.2,
-    "Magic Lamp→Performance": 17.6,
-    "Magic Lamp→Icy Slime": -7.8
+    "Magic Lamp→Martyry": -3.6,
+    "Magic Lamp→Performance": 4.7,
+    "Magic Lamp→Rain of Arrows": 2.8,
+    "Magic Lamp→Shiny Slime": -15.7,
+    "Magic Lamp→Sparky Slime": 8.3,
+    "Magic Lamp→Splashy Slime": -15.9,
+    "Magic Lamp→Cuteness Sensor": -13,
+    "Magic Lamp→Slime Rancher": -2.6
   },
   "menuOfferRulesByCluster": {
-    "spell": {
-      "Magic Lamp→Rain of Arrows": -15,
-      "Magic Lamp→Alchemy": -15,
-      "Magic Lamp→Wheels": -15
+    "mixed": {
+      "Magic Lamp→Alchemy": 4.8,
+      "Magic Lamp→Icy Slime": 5.7,
+      "Magic Lamp→Fiery Slime": 4.3,
+      "Magic Lamp→Rain of Arrows": 15,
+      "Magic Lamp→Sparky Slime": 7.4,
+      "Magic Lamp→Shadowy Slime": 15,
+      "Magic Lamp→Slime Rancher": 15
     },
-    "aggro": {
-      "Magic Lamp→Rain of Arrows": -15,
-      "Magic Lamp→Alchemy": -15,
-      "Magic Lamp→Cute Camera": -3.4,
-      "Magic Lamp→Wheels": -15
+    "spell": {
+      "Magic Lamp→Alchemy": -5.2,
+      "Magic Lamp→Icy Slime": -15,
+      "Magic Lamp→Martyry": -15,
+      "Magic Lamp→Fiery Slime": -8.4,
+      "Magic Lamp→Cute Camera": -6.9,
+      "Magic Lamp→Performance": -15,
+      "Magic Lamp→Rain of Arrows": -14.7,
+      "Magic Lamp→Sparky Slime": -4.3,
+      "Magic Lamp→Shadowy Slime": -15,
+      "Magic Lamp→Slime Rancher": -5.5
     },
     "swarm": {
-      "Magic Lamp→Rain of Arrows": 15,
-      "Magic Lamp→Alchemy": 15,
-      "Magic Lamp→Wheels": 15,
-      "Magic Lamp→Fiery Slime": 15
+      "Magic Lamp→Alchemy": 8.4,
+      "Magic Lamp→Icy Slime": 5.2,
+      "Magic Lamp→Martyry": 15,
+      "Magic Lamp→Cloudy Slime": 10.8,
+      "Magic Lamp→Fiery Slime": 14.6,
+      "Magic Lamp→Cute Camera": 7.3,
+      "Magic Lamp→Rain of Arrows": 9.2,
+      "Magic Lamp→Sparky Slime": 15,
+      "Magic Lamp→Shadowy Slime": 7.9,
+      "Magic Lamp→Splashy Slime": 14.9,
+      "Magic Lamp→Slime Rancher": 15
     },
-    "mixed": {
-      "Magic Lamp→Alchemy": 7.8
+    "aggro": {
+      "Magic Lamp→Alchemy": -10.4,
+      "Magic Lamp→Cloudy Slime": -12.4,
+      "Magic Lamp→Fiery Slime": -15,
+      "Magic Lamp→Performance": 15,
+      "Magic Lamp→Rain of Arrows": -15,
+      "Magic Lamp→Shiny Slime": 12.7,
+      "Magic Lamp→Sparky Slime": -15,
+      "Magic Lamp→Shadowy Slime": -7.9,
+      "Magic Lamp→Splashy Slime": -15,
+      "Magic Lamp→Slime Rancher": -15
     }
   },
   "menuOfferRulesByStanding": {
     "behind": {
+      "Magic Lamp→Alchemy": -13.1,
+      "Magic Lamp→Icy Slime": -15,
+      "Magic Lamp→Martyry": -15,
+      "Magic Lamp→Cloudy Slime": -15,
+      "Magic Lamp→Fiery Slime": -15,
+      "Magic Lamp→Cute Camera": -11.9,
+      "Magic Lamp→Performance": 9.6,
       "Magic Lamp→Rain of Arrows": -15,
-      "Magic Lamp→Alchemy": -15,
-      "Magic Lamp→Wheels": -15,
-      "Magic Lamp→Fiery Slime": -15
+      "Magic Lamp→Shiny Slime": 12.1,
+      "Magic Lamp→Sparky Slime": -15,
+      "Magic Lamp→Shadowy Slime": -15,
+      "Magic Lamp→Splashy Slime": -15,
+      "Magic Lamp→Slime Rancher": -15
     },
     "ahead": {
-      "Magic Lamp→Rain of Arrows": 15,
-      "Magic Lamp→Alchemy": 15
+      "Magic Lamp→Alchemy": 15,
+      "Magic Lamp→Icy Slime": 15,
+      "Magic Lamp→Cloudy Slime": 15,
+      "Magic Lamp→Fiery Slime": 15,
+      "Magic Lamp→Rain of Arrows": 15
     }
   },
   "targetPriors": {
-    "Fiery Slime": {
-      "frozen": 13.9
+    "Sparky Slime": {
+      "row:hosted:3-4": -7,
+      "row:hosted:5+": -6.3,
+      "frozen": 8.1
     },
     "Alice, the Puppeteer Girl": {
-      "pos:1": -8.7,
-      "pos:2": 6.6,
-      "hp:min": -7.9,
-      "frozen": 16.1
+      "row:free:0": 6.3,
+      "row:creatures:2": 6,
+      "row:hosted:3-4": 9.8,
+      "row:creatures:3": 6.7,
+      "dmgred": -20,
+      "row:hosted:5+": 15.6,
+      "threat:priority_target": -20,
+      "frozen": 7.2
     },
-    "Sparky Slime": {
-      "frozen": 9.8
+    "Fiery Slime": {
+      "dmgred": -14.4,
+      "stat:blocked": -13.7,
+      "threat:priority_target": -20
+    },
+    "Icy Slime": {
+      "dmgred": -19.9
     }
   },
   "impactWeights": {
-    "dmg100": 0.002,
-    "heroKill": 0.13,
-    "creatureKill": 0.056,
-    "loCut": 0.009,
-    "hiCut": 0.176
+    "dmg100": 0.024,
+    "heroKill": 0.132,
+    "creatureKill": 0.014,
+    "loCut": 0.086,
+    "hiCut": 0.194
   },
   "impactRules": {
     "Rain of Arrows": {
-      "low": -25,
-      "mid": 6.8,
-      "high": 20.1
+      "low": -17,
+      "high": 15.9
     }
   },
   "placementRules": {
-    "plc:slack:2+": -1.9
+    "plc:slack:0": -2.2,
+    "plc:slack:1": 3.8,
+    "plc:slack:2+": -7.2,
+    "plc:bigwait": 8.1
   },
   "tutorPickRules": {
-    "Cloudy Slime→Fiery Slime": -17,
-    "Cloudy Slime→Splashy Slime": 20,
-    "Cloudy Slime→Shadowy Slime": 8.8,
-    "Cloudy Slime→Shiny Slime": -16.8,
-    "Magic Lamp→Rain of Arrows": 4.1,
-    "Magic Lamp→Alchemy": 3.8,
-    "Magic Lamp→Cute Camera": -20,
-    "Magic Lamp→Martyry": -20,
-    "Magic Lamp→Wheels": 4.8,
-    "Magic Lamp→Fiery Slime": 12.7,
-    "Magic Lamp→Shadowy Slime": -5.2,
-    "Magic Lamp→Performance": 16.9,
-    "Magic Lamp→Icy Slime": 2.1,
-    "Magic Lamp→Sparky Slime": -20,
-    "Stellan, the Calm Cat→Shadowy Slime": 5.3,
-    "Stellan, the Calm Cat→Fiery Slime": 6.6,
-    "Stellan, the Calm Cat→Icy Slime": -2.8,
-    "Stellan, the Calm Cat→Sparky Slime": 9.3,
-    "Stellan, the Calm Cat→Splashy Slime": -4.7,
-    "Stellan, the Calm Cat→Shiny Slime": -15.6,
-    "Shadowy Slime→Icy Slime": -16.8,
-    "Shadowy Slime→Fiery Slime": 20,
-    "Cute Cheese→Icy Slime": 4.1,
-    "Cute Cheese→Shadowy Slime": -7.4,
+    "Stellan, the Calm Cat→Sparky Slime": -4.1,
+    "Stellan, the Calm Cat→Splashy Slime": -3,
+    "Stellan, the Calm Cat→Shadowy Slime": -4.7,
+    "Stellan, the Calm Cat→Cloudy Slime": -2.4,
+    "Stellan, the Calm Cat→Fiery Slime": 4.5,
+    "Stellan, the Calm Cat→Shiny Slime": 7.2,
+    "Cuteness Sensor→Cuteness Sensor": 14.4,
+    "Cloudy Slime→Shadowy Slime": 5.7,
+    "Cloudy Slime→Icy Slime": -5.1,
+    "Cloudy Slime→Splashy Slime": -7.6,
+    "Cloudy Slime→Sparky Slime": 4.5,
+    "Cloudy Slime→Fiery Slime": 4.2,
+    "Cloudy Slime→Cloudy Slime": -9.9,
+    "Cute Cheese→Splashy Slime": 5.9,
+    "Cute Cheese→Shiny Slime": 2.4,
+    "Cute Cheese→Shadowy Slime": -4.3,
+    "Cute Cheese→Cloudy Slime": -5.7,
+    "Cute Cheese→Sparky Slime": 3,
+    "Cute Cheese→Icy Slime": 5.9,
+    "Shadowy Slime→Cloudy Slime": 2.7,
+    "Shadowy Slime→Sparky Slime": 5.1,
+    "Shadowy Slime→Splashy Slime": 8.7,
+    "Shadowy Slime→Fiery Slime": -4.1,
+    "Shadowy Slime→Icy Slime": 15,
+    "Shadowy Slime→Shiny Slime": -15.1,
+    "Shadowy Slime→Shadowy Slime": -8.4,
+    "Magic Lamp→Alchemy": 3.2,
+    "Magic Lamp→Martyry": -7.7,
+    "Magic Lamp→Performance": 7.3,
+    "Magic Lamp→Rain of Arrows": 2.5,
+    "Magic Lamp→Shiny Slime": -12.8,
+    "Magic Lamp→Defending the Gate": 20,
+    "Magic Lamp→Sparky Slime": 10.8,
+    "Magic Lamp→Magnetic Glove": 4.4,
+    "Magic Lamp→Splashy Slime": -12,
+    "Magic Lamp→Acid Vial": -20,
+    "Magic Lamp→Cuteness Sensor": -9,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Poisoned Well": -20,
+    "Magnetic Glove→Sparky Slime": -20,
+    "Magnetic Glove→Cloudy Slime": -16.7,
+    "Magnetic Glove→Icy Slime": -12.5,
+    "Magnetic Glove→Splashy Slime": 9.3,
+    "Magnetic Glove→Slime Rancher": -3.6,
+    "Magnetic Glove→Rain of Arrows": 20,
+    "Magnetic Glove→Alchemy": -3.2,
+    "Magnetic Glove→Shiny Slime": -6.1,
+    "Magnetic Glove→Wheels": 9.7,
+    "Magnetic Glove→Martyry": 20,
+    "Magnetic Glove→Fiery Slime": -12.9,
+    "Magnetic Glove→Shadowy Slime": 7.1,
+    "Magnetic Glove→Cute Camera": -20,
+    "Magnetic Glove→Cute Cheese": -20,
+    "Training→Alchemy": -2.8,
+    "Training→Performance": 2.8,
+    "Magnetic Potion→Alchemy": -16.7,
+    "Magnetic Potion→Shiny Slime": 7.6,
+    "Magnetic Potion→Splashy Slime": 3.1,
+    "Magnetic Potion→Slime Rancher": -8.5,
+    "Magnetic Potion→Performance": -12.7,
+    "Magnetic Potion→Icy Slime": -20,
     "Magnetic Potion→Rain of Arrows": 20,
-    "Magnetic Potion→Alchemy": -9.9,
-    "Cuteness Sensor→Cute Camera": 3,
-    "Cuteness Sensor→Cute Cheese": -3,
-    "Enigma, the Seller of Secrets→Splashy Slime": -5.1
+    "Magnetic Potion→Shadowy Slime": -20,
+    "Magnetic Potion→Fiery Slime": -3.1,
+    "Magnetic Potion→Cute Camera": -20,
+    "Magnetic Potion→Sparky Slime": -20,
+    "Magnetic Potion→Cloudy Slime": 4,
+    "Magnetic Potion→Wheels": -20,
+    "Magnetic Potion→Martyry": -19.3,
+    "Enigma, the Seller of Secrets→Alchemy": -10.8,
+    "Enigma, the Seller of Secrets→Slime Rancher": 6.6,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -10.5,
+    "Enigma, the Seller of Secrets→Cuteness Sensor": 3.1,
+    "Enigma, the Seller of Secrets→Cute Cheese": -13.9,
+    "Enigma, the Seller of Secrets→Martyry": -8.5,
+    "Enigma, the Seller of Secrets→Fiery Slime": -8.5,
+    "Enigma, the Seller of Secrets→Sparky Slime": -9.7,
+    "Enigma, the Seller of Secrets→Shadowy Slime": 5.7,
+    "Enigma, the Seller of Secrets→Rain of Arrows": -4.7,
+    "Enigma, the Seller of Secrets→Performance": -18.8,
+    "Enigma, the Seller of Secrets→Icy Slime": 7.7,
+    "Enigma, the Seller of Secrets→Wheels": 13,
+    "Enigma, the Seller of Secrets→Splashy Slime": 12.4,
+    "Enigma, the Seller of Secrets→Cute Camera": 20,
+    "Magic Amethyst→Destruction Magic": 11,
+    "Magic Amethyst→Performance": -5.2,
+    "Magic Amethyst→Summoning Magic": 5.1
   },
   "abilityPriors": {
     "Destruction Magic@Alice, the Puppeteer Girl": 150,
     "Summoning Magic@Alice, the Puppeteer Girl": 150,
-    "Alchemy@Alice, the Puppeteer Girl": -60,
-    "Alchemy@Alice, the Puppeteer Girl≥2": -60,
     "Leadership@Stellan, the Calm Cat": 150,
-    "Leadership@Stellan, the Calm Cat≥2": -34,
     "Support Magic@Stellan, the Calm Cat": 150,
     "Summoning Magic@Barker, the Monster Tamer": 150,
+    "Summoning Magic@Barker, the Monster Tamer≥2": -60,
     "Training@Barker, the Monster Tamer": 150,
-    "Alchemy@Barker, the Monster Tamer": -60,
-    "Training@Barker, the Monster Tamer≥2": 150,
-    "Alchemy@Barker, the Monster Tamer≥2": -60,
-    "Alchemy@Barker, the Monster Tamer≥3": 150,
-    "Destruction Magic@Alice, the Puppeteer Girl≥2": -60,
-    "Support Magic@Stellan, the Calm Cat≥2": -60,
-    "Summoning Magic@Alice, the Puppeteer Girl≥2": -60,
-    "Alchemy@Alice, the Puppeteer Girl≥3": 150,
-    "Summoning Magic@Barker, the Monster Tamer≥2": 150,
+    "Leadership@Stellan, the Calm Cat≥2": -60,
     "Alchemy@Stellan, the Calm Cat": -60,
-    "Alchemy@Stellan, the Calm Cat≥2": -60
+    "Alchemy@Alice, the Puppeteer Girl": 150,
+    "Alchemy@Alice, the Puppeteer Girl≥2": 150,
+    "Support Magic@Stellan, the Calm Cat≥2": 150,
+    "Training@Barker, the Monster Tamer≥2": -60,
+    "Alchemy@Barker, the Monster Tamer": -60,
+    "Alchemy@Barker, the Monster Tamer≥2": -60,
+    "Summoning Magic@Alice, the Puppeteer Girl≥2": -60,
+    "Alchemy@Stellan, the Calm Cat≥2": 150,
+    "Alchemy@Barker, the Monster Tamer≥3": -60,
+    "Alchemy@Alice, the Puppeteer Girl≥3": 50.1,
+    "Leadership@Stellan, the Calm Cat≥3": -60,
+    "Training@Barker, the Monster Tamer≥3": 150,
+    "Destruction Magic@Alice, the Puppeteer Girl≥2": 150
   },
   "equipPriors": {},
   "lockPenalties": {},
   "reviveTargets": {
-    "Resuscitation Potion→Stellan, the Calm Cat": -15,
-    "Resuscitation Potion→Alice, the Puppeteer Girl": 30
+    "Resuscitation Potion→Alice, the Puppeteer Girl": 30,
+    "Resuscitation Potion→Stellan, the Calm Cat": 30
   },
   "reviveAbilities": {
-    "Resuscitation Potion→Leadership": -15,
-    "Resuscitation Potion→Support Magic": -15,
     "Resuscitation Potion→Destruction Magic": 30,
     "Resuscitation Potion→Summoning Magic": 30,
-    "Resuscitation Potion→Alchemy": -15
+    "Resuscitation Potion→Alchemy": 30,
+    "Resuscitation Potion→Leadership": 30,
+    "Resuscitation Potion→Support Magic": 30
   },
   "startHandValues": {
-    "Shiny Slime": -8.1,
-    "Fiery Slime": 1.8,
-    "Shadowy Slime": -5.9,
-    "Alchemy": -4.2,
-    "Cloudy Slime": 6.9,
-    "Magnetic Glove": 6.9,
-    "Sparky Slime": -3.7,
-    "Wheels": -1.1,
-    "Cute Cheese": -3.1,
-    "Rain of Arrows": 7.9,
-    "Cute Camera": -3.1,
-    "Cuteness Sensor": 1.3,
-    "Icy Slime": -7.2,
-    "Slime Rancher": 6.9
+    "Shiny Slime": -3.4,
+    "Wheels": -4.5,
+    "Rain of Arrows": 2.9,
+    "Cute Cheese": 3.1,
+    "Martyry": 5.3,
+    "Sparky Slime": 1.9,
+    "Alchemy": -1.3,
+    "Slime Rancher": -2.8,
+    "Cute Camera": -5.3,
+    "Performance": -5.6,
+    "Splashy Slime": 3.6
   },
   "mulliganStats": {
-    "games": 160,
-    "mullRate": "2.5%",
-    "winAfterMull": "50%",
-    "winAfterKeep": "42.9%"
+    "games": 1393,
+    "mullRate": "4.9%",
+    "winAfterMull": "33.8%",
+    "winAfterKeep": "44.7%"
   },
   "heroEffectTiming": {
-    "Alice, the Puppeteer Girl@hand:4+": 6.1,
-    "Alice, the Puppeteer Girl@hand:2-3": 6.9
+    "Alice, the Puppeteer Girl@hand:4+": 3.9,
+    "Alice, the Puppeteer Girl@hand:2-3": 4.9
   },
   "boardPairs": {
-    "Slime Rancher|Summoning Magic": 15,
-    "Fiery Slime|Training": -15,
+    "Destruction Magic|Shadowy Slime": 15,
     "Destruction Magic|Fiery Slime": 15,
+    "Destruction Magic|Summoning Magic": 15,
+    "Sparky Slime|Summoning Magic": 6.9,
+    "Sparky Slime|Training": -7.6,
+    "Fiery Slime|Leadership": 8,
+    "Fiery Slime|Support Magic": 7,
+    "Leadership|Shiny Slime": -9.6,
+    "Alchemy|Shiny Slime": -15,
+    "Slime Rancher|Summoning Magic": 8.8,
+    "Slime Rancher|Training": -15,
+    "Cloudy Slime|Training": -14.8,
+    "Destruction Magic|Sparky Slime": 15,
+    "Alchemy|Destruction Magic": 6.3,
+    "Cloudy Slime|Shadowy Slime": -12.9,
+    "Leadership|Shadowy Slime": 10,
+    "Shadowy Slime|Support Magic": 8.7,
+    "Shadowy Slime|Slime Rancher": -12.2,
+    "Shadowy Slime|Training": -15,
     "Destruction Magic|Icy Slime": 15,
-    "Alchemy|Leadership": -15,
-    "Alchemy|Support Magic": -15,
-    "Fiery Slime|Shiny Slime": -15
+    "Fiery Slime|Training": -10.1,
+    "Destruction Magic|Splashy Slime": 14.9,
+    "Cloudy Slime|Destruction Magic": 15,
+    "Shiny Slime|Sparky Slime": -12.3,
+    "Alchemy|Training": -8.5,
+    "Destruction Magic|Slime Rancher": 15,
+    "Cloudy Slime|Shiny Slime": -14.1,
+    "Shadowy Slime|Shiny Slime": -15,
+    "Shiny Slime|Summoning Magic": 10.3,
+    "Icy Slime|Shiny Slime": -15,
+    "Slime Rancher|Sparky Slime": -12.4,
+    "Shiny Slime|Splashy Slime": -15
   },
   "protectionRules": {},
   "gameStartPicks": {
     "Barker, the Monster Tamer": {
-      "baseline": 0.383,
-      "n": 47,
+      "baseline": 0.451,
+      "n": 426,
       "values": {
-        "Slime Rancher": -0.067
+        "Cloudy Slime": -0.058,
+        "Fiery Slime": -0.165,
+        "Elven Forager": 0.049,
+        "Shadowy Slime": -0.058,
+        "Deepsea Primordium": -0.076,
+        "Slime Rancher": 0.034,
+        "Candlestick Squire": 0.174
       }
     }
   }

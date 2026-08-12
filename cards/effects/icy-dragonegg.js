@@ -82,6 +82,10 @@ module.exports = {
         side: 'any',
         max: 1,
         title: CARD_NAME,
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet
+        // (Als Auftrag 9.8.). Ohne die Angabe lief das Gate nicht, und
+        // die CPU verbrannte Status an Zielen, die Johanna schuetzt.
+        appliesStatus: 'frozen',
         description: `Select a target to Freeze for ${FREEZE_TURNS} turn.`,
         confirmLabel: '❄️ Freeze!',
         confirmClass: 'btn-info',

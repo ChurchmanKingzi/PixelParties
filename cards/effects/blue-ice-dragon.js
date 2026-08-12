@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Blue-Ice Dragon"
-//  Creature (Summoning Magic Lv2, Normal) —
+//  Creature (Destruction Magic + Summoning Magic, Lv3, Normal) —
 //  250 HP, kein ATK.
 //
 //  EFFECT (per cards.json):
@@ -285,6 +285,12 @@ module.exports = {
       damageType: 'creature',
       baseDamage: FROZEN_DAMAGE,
       title: CARD_NAME,
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'frozen',
       description: `Choose a target. If it is Frozen, deal ${FROZEN_DAMAGE} damage — otherwise Freeze it for ${FREEZE_TURNS} turns.`,
       confirmLabel: '❄️ Choose!',
       confirmClass: 'btn-info',

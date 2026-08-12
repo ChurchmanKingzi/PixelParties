@@ -990,13 +990,70 @@ function reactionFireDecision(engine, pi, cardName, bucket) {
 //   side:opp/side:own (relativ zum Wähler), kind:hero/kind:creature,
 //   hp:max/hp:min (innerhalb gleicher Seite+Art der ANGEBOTENEN Ziele),
 //   frozen. Nur ableitbare Tags werden vergeben (defensiv).
-function classifyTargetTags(engine, target, validTargets, pickerIdx) {
+// ── Haftet ein negativer Status an diesem Ziel? ──────────────────────
+// EINE Definition fuer beide Verbraucher: das Ziel-Gate in `_cpu.js`
+// (welche Ziele sind fuer eine REINE Status-Abfrage sinnvoll) und das
+// Lern-Tag unten (bei Karten, die Schaden UND Status tragen, soll der
+// Kanal lernen, wie stark das Haften die Schadens-Prioritaet
+// verschiebt — Als Vorgabe 9.8.).
+//
+// Gespiegelt aus `actionAddStatus`: Spielstart-Schutz, negative_status_
+// immune, `immune` gegen die CC-Familie, Light Ball und Johannas Schirm
+// (die nur wirkt, solange sie selbst handlungsfaehig ist).
+const CC_STATUSES = ['frozen', 'stunned', 'negated', 'bound'];
+const NEGATIVE_STATUSES = ['frozen', 'stunned', 'negated', 'bound',
+  'poisoned', 'burning', 'burned', 'cursed', 'webbed', 'silenced'];
+
+function statusWouldStick(engine, target, statusName) {
+  try {
+    if (!target || !statusName) return true;
+    if (!NEGATIVE_STATUSES.includes(statusName)) return true;
+    const gs = engine?.gs;
+    if (!gs) return true;
+
+    if (target.type === 'hero') {
+      if (gs.firstTurnProtectedPlayer === target.owner) return false;
+      const h = gs.players?.[target.owner]?.heroes?.[target.heroIdx];
+      if (!h) return true;
+      if (h.buffs?.negative_status_immune) return false;
+      if (h.statuses?.immune && CC_STATUSES.includes(statusName)) return false;
+      if (h.statuses?.charmed) return false;
+      try {
+        if (engine._lightBallProtects
+          && engine._lightBallProtects(target.owner, 'hero', target.heroIdx)) return false;
+      } catch { /* defensiv */ }
+      const heroes = gs.players?.[target.owner]?.heroes || [];
+      const johanna = heroes.some(j => j && j !== h
+        && j.name === 'Johanna, Crusader of Light' && j.hp > 0
+        && !j.statuses?.frozen && !j.statuses?.stunned
+        && !j.statuses?.webbed && !j.statuses?.negated);
+      if (johanna) return false;
+      return true;
+    }
+
+    const inst = target.cardInstance;
+    if (inst?.counters?.buffs?.negative_status_immune) return false;
+    if (gs.firstTurnProtectedPlayer != null
+      && (inst?.controller ?? inst?.owner) === gs.firstTurnProtectedPlayer) return false;
+    return true;
+  } catch { return true; }
+}
+
+function classifyTargetTags(engine, target, validTargets, pickerIdx, config) {
   const tags = [];
   try {
     if (!target) return tags;
     const kind = target.type === 'hero' ? 'hero' : 'creature';
     tags.push(`kind:${kind}`);
     if (typeof target.owner === 'number') tags.push(target.owner === pickerIdx ? 'side:own' : 'side:opp');
+    // ── Haftet der angehaengte Status? (Als Vorgabe 9.8.) ────────────
+    // Bei Karten, die Schaden UND Status tragen, ist KEIN Ziel wertlos,
+    // nur weil der Status abprallt — der Schaden landet ja. Ob er
+    // haftet, kann die Rangfolge aber verschieben. Genau diese Frage
+    // gehoert in den Lernkanal statt in ein Gate: der Tag-Raum ist
+    // offen, `targetPriors` lernt das Gewicht je Karte aus Ergebnissen.
+    const st = typeof config?.appliesStatus === 'string' ? config.appliesStatus : null;
+    if (st) tags.push(statusWouldStick(engine, target, st) ? 'stat:sticks' : 'stat:blocked');
     // ── Identität statt nur Situation (Als Einwand) ──────────────────
     // Das übrige Vokabular ist rein situativ (HP-Extreme, Status,
     // Schadensmultiplikator) — damit ließ sich "schütze IMMER den
@@ -1151,10 +1208,22 @@ function targetPickDecision(engine, pi, cardName, validTargets, config = {}) {
     if (config.count && config.count > 1) return null; // nur Single-Picks
     const prof = profileFor(engine, pi);
     const priors = prof?.targetPriors?.[cardName];
-    if (priors) {
+    // ── ε-Exploration TROTZ Regel (9.8.) ─────────────────────────────
+    // Vorher hoerte die Exploration auf, sobald eine Karte IRGENDEIN
+    // Gewicht hatte: der `if (priors)`-Zweig kehrte immer zurueck, der
+    // 35%-Zufallsgriff darunter war fuer sie unerreichbar. Damit friert
+    // das Profil ein — Arme, die bis dahin nie gewaehlt wurden (etwa
+    // `side:own`), bekommen NIE Daten, und der Trainer verlangt fuer ein
+    // Gewicht MIN_ARM=6 Entscheidungen in BEIDEN Armen. Genau deshalb
+    // steht in den Profilen kein einziges `side:*`-Gewicht.
+    // Dasselbe Mittel wie im Heil- und Counter-Kanal: mit p=ruleEps die
+    // Regel bewusst ignorieren und zufaellig ziehen.
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (priors && !epsRoll) {
       let best = null, bestScore = -Infinity, second = -Infinity;
       for (const t of validTargets) {
-        const tags = classifyTargetTags(engine, t, validTargets, pi);
+        const tags = classifyTargetTags(engine, t, validTargets, pi, config);
         const s = tags.reduce((sum, g) => sum + (priors[g] || 0), 0);
         if (s > bestScore) { second = bestScore; bestScore = s; best = t; }
         else if (s > second) { second = s; }
@@ -1914,6 +1983,7 @@ module.exports = {
   reloadProfiles,
   clusterOfFingerprint,
   classifyTargetTags,
+  statusWouldStick,
   targetPickDecision,
   surpriseFireDecision,
   reactionFireDecision,

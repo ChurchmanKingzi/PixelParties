@@ -28,9 +28,9 @@ module.exports = {
       if (ctx.isSummonLocked()) return;
 
       // Load card database
-      const allCards = require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8');
-      const cardDB = {};
-      JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
+      // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
+      // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
+      const cardDB = require('./_card-db').getCardDB();
 
       // Find lv 0 Creatures in hand (excluding the just-summoned Cloudy Slime itself)
       const eligibleCards = [];
@@ -80,12 +80,30 @@ module.exports = {
       if (!confirmed) return;
 
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
+      //
+      // v326: ZWEI RIEGEL. Beide Rueckwege dieser Schleife konnten sonst
+      // ohne Fortschritt kreisen — belegt am 11.8.: die CPU beantwortete
+      // GENAU DIESE Galerie 50 001 Mal in einem einzigen MCTS-Rollout,
+      // bis der Heap voll war. Ursache: waehlt die CPU eine Karte, fuer
+      // die es keine freie Zone gibt, fuehrt `continue` zur unveraenderten
+      // Liste — und ihr Waehler trifft deterministisch dieselbe Wahl.
+      //   (a) `ohneZone` merkt sich Karten ohne legale Zone und nimmt sie
+      //       aus der Auswahl. Gilt fuer Mensch wie CPU: fuer diese Karte
+      //       existiert kein Platz, ein erneutes Anbieten waere sinnlos.
+      //   (b) `runden` deckelt die Rueckwaerts-Navigation (Escape aus der
+      //       Zonenwahl), die fuer Menschen erwuenscht ist und deshalb
+      //       nicht ausgeschlossen, sondern nur begrenzt wird.
+      const ohneZone = new Set();
+      let runden = 0;
+      const MAX_RUNDEN = 24;
       while (true) {
+        if (++runden > MAX_RUNDEN) return;
         // Recompute eligible cards (hand may have changed if multiple effects)
         const currentEligible = [];
         const currentSeen = new Set();
         for (const name of (ps.hand || [])) {
           if (currentSeen.has(name)) continue;
+          if (ohneZone.has(name)) continue;
           const c = cardDB[name];
           if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
             currentSeen.add(name);
@@ -104,7 +122,7 @@ module.exports = {
         // Step 3: Pick a zone — filter by the selected Creature's
         // per-Hero `canSummon` rule.
         const freeZones = getFreeZones(selected.cardName);
-        if (freeZones.length === 0) continue;
+        if (freeZones.length === 0) { ohneZone.add(selected.cardName); continue; }
 
         const zone = await ctx.promptZonePick(freeZones, {
           title: 'Cloudy Slime',

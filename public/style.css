@@ -5875,6 +5875,17 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 
 /* Gold sparkle flash */
+/* Logan, the Investment Monkee — goldener Bananenregen.
+   Faellt von oberhalb der Karte herab, dreht sich dabei und driftet
+   seitlich; die Werte kommen als CSS-Variablen aus der Komponente,
+   damit jede Banane eine eigene Bahn hat. */
+@keyframes pp-banana-fall {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  12%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(var(--pp-banana-tilt, 0px), 132px) rotate(var(--pp-banana-spin, 180deg)); opacity: 0; }
+}
+
 .anim-gold-flash {
   position: absolute;
   width: 40px;

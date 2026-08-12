@@ -215,6 +215,54 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose })
   );
 }
 
+// ── Counter-Abzeichen im Editor ──────────────────────────────────────
+// Das Spielbrett zeigt gesetzte Zaehler als Abzeichen an; der Editor tat
+// das bisher fuer KEINEN von ihnen (Als Befund 8.8.). Ohne Anzeige ist
+// nicht erkennbar, ob ein Wert wirklich gespeichert wurde.
+//
+// Gerendert wird eine Spalte statt einzelner absolut positionierter
+// Abzeichen: `.head-counter-badge` sitzt fest unten links, mehrere
+// Zaehler auf derselben Karte laegen sonst uebereinander.
+const PUZZLE_COUNTER_BADGES = [
+  { key: 'headCounter',       icon: '🐲', label: 'Head Counters' },
+  { key: 'changeCounter',     icon: '🌌', label: 'Change Counters' },
+  { key: 'balance',           icon: '⚖️', label: 'Balance Counters' },
+  { key: 'bunnyBombCounter',  icon: '🧨', label: 'Bomb Counters' },
+];
+const PUZZLE_HERO_COUNTER_BADGES = [
+  { key: '_changeCounters',    icon: '🌌', label: 'Change Counters' },
+  { key: '_evolutionCounters', icon: '🧬', label: 'Evolution Counters' },
+  // Logan, the Investment Monkee (v336). Als Vorgabe: ALLE Zaehler
+  // muessen im Editor setzbar sein — ohne Eintrag hier gibt es weder
+  // Abzeichen noch Eingabefeld.
+  { key: '_investCounters',    icon: '🪙', label: 'Invest Counters' },
+];
+
+function CounterBadges({ source, defs }) {
+  if (!source) return null;
+  const shown = defs.filter(d => (source[d.key] || 0) > 0);
+  if (shown.length === 0) return null;
+  return (
+    <div style={{
+      // OBEN statt unten: bei Kreaturen sitzt dort die HP-Leiste, die
+      // Abzeichen haben sie verdeckt (Als Befund 8.8.). Rechts
+      // ausgerichtet, weil die Statusreihe links mittig haengt.
+      position: 'absolute', right: 1, top: 2, zIndex: 6,
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
+      pointerEvents: 'none',
+    }}>
+      {shown.map(d => (
+        <div key={d.key} className="head-counter-badge"
+          title={`${d.label}: ${source[d.key]}`}
+          style={{ position: 'static' }}>
+          <span className="head-counter-icon">{d.icon}</span>
+          <span className="head-counter-num">×{source[d.key]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PuzzleCreator() {
   const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
 
@@ -1430,12 +1478,22 @@ function PuzzleCreator() {
   // Argos' Change Counters. Null when the open editor target isn't a
   // Waflav form, so the section stays hidden.
   const [editEvolutionCounter, setEditEvolutionCounter] = useState(null);
+  // Logan, the Investment Monkee: Invest Counters, die der Held beim
+  // Puzzle-Start traegt. Liegen als `hero._investCounters` — gleiche
+  // Form wie Evolution/Change Counters. Null fuer andere Helden, damit
+  // der Abschnitt verborgen bleibt.
+  const [editInvestCounter, setEditInvestCounter] = useState(null);
   // For Charm of Balance: number of Balance Counters this Equipment starts
   // the puzzle with. Saved under `_creatureStatuses[hi-slot].balance` and
   // applied server-side as `inst.counters.balance` (alongside headCounter
   // and changeCounter). Null for non-Charm targets so the editor section
   // stays hidden.
   const [editBalanceCounter, setEditBalanceCounter] = useState(null);
+  // Fuer Bunny Bombs: Anzahl Bomb Counter, mit denen die Kreatur ins
+  // Puzzle startet. Gespeichert unter `_creatureStatuses[hi-slot].bunnyBombCounter`,
+  // serverseitig als `inst.counters.bunnyBombCounter` angewendet. Null fuer
+  // andere Karten, damit der Abschnitt verborgen bleibt.
+  const [editBunnyBombCounter, setEditBunnyBombCounter] = useState(null);
   // For Sparkfly Queen: which sacrifice gifts (Architect / Attendant /
   // Worker) the Queen carries. Gifts are normally granted by Hive's Crown
   // when sacrificing a Sparkfly Creature; in puzzle mode the author can
@@ -1496,6 +1554,9 @@ function PuzzleCreator() {
       setEditEvolutionCounter(isWaflavHeroName(h.name)
         ? (h._evolutionCounters || 0)
         : null);
+      setEditInvestCounter(h.name === 'Logan, the Investment Monkee'
+        ? (h._investCounters || 0)
+        : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
       const c = getCard(cards[0]);
@@ -1544,6 +1605,10 @@ function PuzzleCreator() {
       // Null for non-Charm targets so the editor section stays hidden.
       setEditBalanceCounter(c?.name === 'Charm of Balance'
         ? (cs.balance || 0)
+        : null);
+      // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
+      setEditBunnyBombCounter(c?.name === 'Bunny Bombs'
+        ? (cs.bunnyBombCounter || 0)
         : null);
       // Sparkfly Queen: hydrate the gift checklist from the saved
       // `_sparkflyGiftFlags`. Null for other Creatures so the editor
@@ -1606,6 +1671,13 @@ function PuzzleCreator() {
           p.heroes[hi]._evolutionCounters = editEvolutionCounter;
         } else {
           delete p.heroes[hi]._evolutionCounters;
+        }
+        // Logan: Invest Counters. Gleiche Speicherform, damit Server
+        // und Client sie ohne Sonderfall durchreichen.
+        if (editInvestCounter != null && editInvestCounter > 0) {
+          p.heroes[hi]._investCounters = editInvestCounter;
+        } else {
+          delete p.heroes[hi]._investCounters;
         }
       }
       return p;
@@ -1689,6 +1761,12 @@ function PuzzleCreator() {
       if (editBalanceCounter != null && editBalanceCounter > 0) {
         merged.balance = editBalanceCounter;
       }
+      // Bunny Bombs: Bomb Counter sichern. Server legt sie auf
+      // `inst.counters.bunnyBombCounter`.
+      delete merged.bunnyBombCounter;
+      if (editBunnyBombCounter != null && editBunnyBombCounter > 0) {
+        merged.bunnyBombCounter = editBunnyBombCounter;
+      }
       // Sparkfly Queen: persist the gift checklist. Server reads
       // `_sparkflyGiftFlags` and runs the same `grantInheritedAbility`
       // path Hive's Crown uses, so the buffs / inherited-effect text /
@@ -1713,7 +1791,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editBalanceCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editBalanceCounter, editBunnyBombCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -2027,6 +2105,7 @@ function PuzzleCreator() {
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                  <CounterBadges source={hero} defs={PUZZLE_HERO_COUNTER_BADGES} />
                   {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
                     <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
@@ -2214,6 +2293,7 @@ function PuzzleCreator() {
                         {(cs.frozen || cs.stunned || cs.burned || cs.poisoned || cs.negated || cs._extraLife) &&
                           <StatusBadges statuses={cs} isHero={false} />}
                         {cs.buffs && <BuffColumn buffs={cs.buffs} />}
+                        <CounterBadges source={cs} defs={PUZZLE_COUNTER_BADGES} />
                       </>;
                     })() : <div className="board-zone-empty">{item.isIsland ? 'Island' : 'Support'}</div>}
                   </div>
@@ -2902,6 +2982,43 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {/* Bunny Bombs Bomb Counter editor — nur sichtbar, wenn das
+                Bearbeitungsziel eine Bunny Bombs ist. Schreibt `bunnyBombCounter`
+                in `_creatureStatuses[hi-slot]`; der Puzzle-Loader des
+                Servers legt das auf `inst.counters.bunnyBombCounter`, wovon
+                sowohl das Abzeichen auf dem Brett als auch der Schaden
+                beim Tod (20 je Zaehler) ausgehen. */}
+            {editBunnyBombCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  💣 Bomb Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editBunnyBombCounter || 0) <= 0}
+                    onClick={() => setEditBunnyBombCounter(Math.max(0, (editBunnyBombCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editBunnyBombCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditBunnyBombCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ff8a4c' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditBunnyBombCounter((editBunnyBombCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Explodes for {(editBunnyBombCounter || 0) * 20} damage to every target on the board when defeated.
+                </div>
+              </div>
+            )}
             {/* Waflav Evolution Counter editor — visible for the base Hero
                 and all five Ascended forms. The counter is the archetype's
                 whole resource: it pays for every Ascension (1 for
@@ -2936,6 +3053,41 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Ascension costs: Stormkissed 1 · Flamebathed / Swampborne / Thunderstruck 2 · Deep-Drowned 4
+                </div>
+              </div>
+            )}
+            {/* Logan's Invest Counters — the Hero pays Gold for them and
+                cashes them in at end of turn (Gold, or 5 damage each).
+                Authoring them lets a puzzle start mid-investment. Saved
+                as `hero._investCounters`. */}
+            {editInvestCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🪙 Invest Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editInvestCounter || 0) <= 0}
+                    onClick={() => setEditInvestCounter(Math.max(0, (editInvestCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editInvestCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditInvestCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ffe08f' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditInvestCounter((editInvestCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Cashes in at end of turn for {(editInvestCounter || 0)} Gold or {(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.
                 </div>
               </div>
             )}

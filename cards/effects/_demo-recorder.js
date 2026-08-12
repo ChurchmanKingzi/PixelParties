@@ -61,6 +61,54 @@ function safeClone(x) {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════
+// CPU GEGEN CPU WIRD NIE AUFGEZEICHNET (10.8., Als Vorgabe)
+//
+// Der Recorder existiert, um MENSCHLICH pilotierte Partien zu
+// dokumentieren — Als Entscheidungen samt Optionen und Hand. Eine
+// Partie ohne Menschen am Steuer enthält davon nichts, kostet aber
+// je Spiel: safeClone auf jedes Log-Ereignis, alle 1,5 s die ganze
+// Datei neu als JSON auf die Platte, am Ende gzip + Datenbankzeile.
+// Im Headless-Training lief das bis hierher bei JEDEM Spiel mit
+// (belegt: 10 031 der 10 046 Zeilen in `demo_games` tragen eine
+// `train-…`-roomId).
+//
+// Die Sperre sitzt bewusst HIER und nicht in server.js: `startGameEngine`
+// ist zwar der einzige heutige Aufrufer, aber eine Regel, die nur an der
+// Aufrufstelle steht, kann ein künftiger Pfad vergessen. Im Modul kann
+// sie niemand umgehen.
+//
+// Zwei unabhängige Kennzeichen, beide präzise (kein Menschen-Spiel
+// trägt sie):
+//   • engine._isSelfPlay — gesetzt von ALLEN drei CPU-gegen-CPU-Pfaden
+//     (Headless-Training, Self-Play-Batch, cpu_vs_cpu-Zuschauermodus)
+//   • process.env.PP_TRAIN — Headless-Sammellauf, hat nie einen Menschen
+//
+// Ausdrücklich einschaltbar bleibt es mit PP_DEMO_RECORD_CPU=1 — etwa
+// um das Verhalten der CPU in einer Partie nachzuvollziehen. Bewusst
+// eine EIGENE Variable und nicht PP_DEMO_RECORD, damit ein für den
+// Webserver gesetztes Flag nicht versehentlich das Training wieder
+// mitschreiben lässt.
+// ═══════════════════════════════════════════════════════════════════
+
+/** Läuft diese Partie CPU gegen CPU (Training, Self-Play, Zuschauermodus)? */
+function isCpuVsCpuGame(engine) {
+  if (engine && engine._isSelfPlay) return true;
+  if (process.env.PP_TRAIN) return true;
+  return false;
+}
+
+/** Darf diese Partie aufgezeichnet werden? */
+function demoRecordingAllowed(engine) {
+  if (!isCpuVsCpuGame(engine)) return true;
+  return process.env.PP_DEMO_RECORD_CPU === '1';
+}
+
+// Einmal je Prozess melden, dass nicht aufgezeichnet wird — sonst ist
+// "keine Demo-Datei" nicht unterscheidbar von "Recorder kaputt". Je
+// Spiel zu melden wäre im Training nur Rauschen.
+let _cpuSkipGemeldet = false;
+
 /**
  * Hält den Aufnahme-Ordner beschränkt. **Nur nötig im Live-Betrieb:**
  * seit die Aufnahme standardmäßig läuft, schreibt JEDE Partie eine
@@ -152,6 +200,18 @@ function _pruneOldRecordings(dir) {
 
 function attachDemoRecorder(engine, opts = {}) {
   if (engine._demoRecorder) return engine._demoRecorder;
+  // CPU gegen CPU: nichts anhängen. Kein Ereignisstrom, keine Datei,
+  // keine Datenbankzeile, kein Nachzügler-Intervall — und vor allem
+  // kein Überschreiben von `engine._crashTrailSink`, den der
+  // Trainings-Runner für seine Heap-Sonde vorher gesetzt hat.
+  if (!demoRecordingAllowed(engine)) {
+    if (!_cpuSkipGemeldet) {
+      _cpuSkipGemeldet = true;
+      console.log('[demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet '
+        + '(PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).');
+    }
+    return null;
+  }
   const pilotIdx = opts.pilotIdx != null ? opts.pilotIdx : 0;
   const outDir = opts.outDir || path.join(__dirname, '..', '..', 'data', 'demo-games');
 
@@ -454,4 +514,7 @@ function attachDemoRecorder(engine, opts = {}) {
   return api;
 }
 
-module.exports = { attachDemoRecorder };
+// `demoRecordingAllowed` wird mitexportiert, damit ein Aufrufer die
+// Entscheidung schon VOR dem Anhängen abfragen kann (z. B. um sich das
+// Laden zu sparen) — die Wahrheit steht aber weiterhin nur hier.
+module.exports = { attachDemoRecorder, demoRecordingAllowed, isCpuVsCpuGame };

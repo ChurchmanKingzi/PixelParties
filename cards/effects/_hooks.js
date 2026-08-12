@@ -578,11 +578,35 @@ function isOwnSideSummonableCreature(cd, cardName) {
   return true;
 }
 
+/**
+ * Darf dieser Held GERADE ausgeruestet werden? (v341, Als Ruling)
+ *
+ * Die Regel „an einen toten Helden kann nichts ausgeruestet werden"
+ * kommt nie allein: der normale Artefakt-Weg (server.js
+ * `doPlayArtifact`) sperrt bei TOT, EINGEFROREN und BEZAUBERT.
+ * Karten, die per `safePlaceInSupport` direkt ausruesten, umgehen
+ * diesen Weg und muessen dieselbe Pruefung selbst mitbringen — und
+ * genau dabei ist schon zweimal ein Teil vergessen worden.
+ *
+ * Deshalb steht die Regel ab v341 HIER, an einer Stelle, und alle
+ * Wege lesen sie: der Server, Criminal Monkee, Modnir, Swellpnir.
+ * Reine Lesefunktion ohne Engine-Bezug, damit auch Kartendateien
+ * sie ohne Engine-Referenz benutzen koennen.
+ */
+function heroCanBeEquipped(hero) {
+  if (!hero || !hero.name) return false;
+  if (hero.hp <= 0) return false;                 // tot
+  if (hero.statuses && hero.statuses.frozen) return false;   // eingefroren
+  if (hero.statuses && hero.statuses.charmed) return false;  // bezaubert
+  return true;
+}
+
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
+  heroCanBeEquipped,
   isOwnSideSummonableCreature,
   resolveSourceCreature, isCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,

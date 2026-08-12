@@ -421,6 +421,7 @@ function broadcast(helpers) {
  * still requires two calls (Main1→Action, then Action→Main2).
  */
 async function runCpuTurn(engine, helpers) {
+  if (istAbgebrochen(engine)) return;
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -803,6 +804,7 @@ function hasSpendableSecondActionGrant(engine, pi) {
 }
 
 async function runActionPhase(engine, helpers) {
+  if (istAbgebrochen(engine)) return;
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -1332,6 +1334,7 @@ async function tryAscend(engine, helpers, opts = {}) {
 }
 
 async function runMainPhase(engine, helpers) {
+  if (istAbgebrochen(engine)) return;
   // Swap-Diagnose, Verfügbarkeits-Ebene: EINMAL je eigenem Zug die
   // Ausgangslage festhalten — wie viele Handkarten könnten überhaupt
   // einen Zyklus-Zug machen, und existiert ein bounce-bares Ziel?
@@ -4711,7 +4714,13 @@ function scoreSpellLevelReducerUnlock(engine, pi, heroIdx, cardName, script, abZ
   return unlock;
 }
 
-function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
+function scoreAbilityPlacement(engine, pi, heroIdx, cardName, _tiefe = 0) {
+  // v325: Rekursionsdeckel. Der Joker-Zweig unten bewertet fremde Stapel
+  // erneut; legitim ist dabei GENAU eine Ebene. Alles darueber ist ein
+  // Zyklus — ohne Deckel endete er in `RangeError: Maximum call stack
+  // size exceeded` und riss den ganzen CPU-Zug mit (Als Report 11.8.:
+  // Spiel als TIE/no-result verbucht).
+  if (_tiefe > 2) return 0;
   const ps = engine.gs.players[pi];
   const abZones = ps?.abilityZones?.[heroIdx];
   if (!abZones) return 0;
@@ -4742,9 +4751,19 @@ function scoreAbilityPlacement(engine, pi, heroIdx, cardName) {
     for (const slot of abZones) {
       const base = (slot || [])[0];
       if (!base || slot.length >= 3) continue;   // leerer Stapel bringt keine Schule, voller geht nicht
+      // v325: Ein Stapel, dessen BASIS selbst ein Joker ist, hat GAR KEINE
+      // Schule — `countAbilitiesForSchool` zaehlt einen Joker als Schule
+      // der Basis, und keine Karte nennt "Performance" als Schule. So ein
+      // Stapel ist also wie ein leerer zu behandeln. Ohne diese Zeile ruft
+      // sich die Funktion mit DEMSELBEN Namen erneut auf: Endlosrekursion,
+      // sobald die CPU eine Performance auf einen leeren Platz gelegt hat.
+      if (base === cardName) continue;
+      let _basisScript = null;
+      try { _basisScript = require('./_loader').loadCardEffect(base); } catch { _basisScript = null; }
+      if (_basisScript?.isWildcardAbility) continue;
       // Wert dieses Stapels = Bewertung, als hinge man die BASIS-Ability
       // ein weiteres Mal an (gleiche Wirkung auf die Schulstufe).
-      const v = scoreAbilityPlacement(engine, pi, heroIdx, base);
+      const v = scoreAbilityPlacement(engine, pi, heroIdx, base, _tiefe + 1);
       if (v > best) best = v;
     }
     return best;
@@ -5239,6 +5258,230 @@ function promptHasPinnedAnswer(promptData) {
 }
 
 const MCTS_BRANCHABLE_GENERIC_TYPES = ['zonePick', 'cardGallery', 'cardGalleryMulti', 'playerPicker', 'optionPicker', 'confirm'];
+
+// ═══════════════════════════════════════════════════════════════════
+// NOTBREMSE FÜR DIE MCTS-AUFZEICHNUNG (10.8., aus dem Heap-Snapshot)
+//
+// Der OOM-Snapshot des abgestürzten Trainingslaufs bestand zu 95 % aus
+// GENAU den Einträgen, die unten gepusht werden: 2,72 Mio. Datensätze
+// mit `title`/`cancellable`/`kind`/`picked`/`wasScripted`/`alternatives`,
+// je 3 Alternativen aus `{ value, label }` — zusammen 1,5 GB.
+//
+// Ein Rollout sammelt normalerweise eine Handvoll davon. Millionen
+// heißt: irgendein Aufrufer fragt DENSELBEN Prompt in einer Schleife
+// endlos ab. Diese Schleife feuert dabei weder Hooks noch Snapshots —
+// deshalb hat die synchrone Heap-Sonde (die genau an diesen beiden
+// Stellen sitzt) nie etwas gemeldet und jeder Wächter blieb stumm.
+//
+// Die Bremse tut zwei Dinge:
+//   1. sie BENENNT den Prompt (Titel, Typ, Spieler, Zug, Phase) — genau
+//      die Angabe, die bisher gefehlt hat;
+//   2. sie wirft, statt den Prozess volllaufen zu lassen. Der Wurf
+//      landet im vorhandenen Rollout-catch, der Zug geht ohne diesen
+//      Kandidaten weiter — aus einem toten Lauf wird ein verlorener
+//      Rollout.
+//
+// Schwelle über PP_MCTS_RECORD_CAP (Default 50000; ein gesunder Rollout
+// liegt bei einer zweistelligen Zahl, echte Ausreißer bei einigen
+// hundert — 50 000 kann kein legitimer Zug erreichen).
+// ═══════════════════════════════════════════════════════════════════
+const MCTS_RECORD_CAP = (() => {
+  const v = parseInt(process.env.PP_MCTS_RECORD_CAP || '', 10);
+  return Number.isFinite(v) && v > 0 ? v : 5000;
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// ABGEBROCHENE PARTIE = SOFORT AUSSTEIGEN (11.8., aus Als Konsolenlog)
+//
+// `engine.abort()` setzt nur eine Fahne, die an fünf Stellen geprüft
+// wird — die Zugschleife und der MCTS gehören NICHT dazu. Läuft eine
+// Partie in den Trainings-Watchdog (im Log: `TIE … (2t, timeout)`),
+// dann räumt der Trainer sie ab und startet die nächste, WÄHREND die
+// alte Engine im Hintergrund weiterrechnet: sie beantwortet weiter
+// Prompts, füllt weiter ihren `_mctsTargetRecord` und bekommt nie ein
+// Spielende. Deshalb sieht die Heap-Spur der VORDERGRUND-Partie
+// kerngesund aus, während der Prozess am Speicher stirbt — gemessen
+// wird das falsche Spiel.
+//
+// Die Engine gibt bei `_aborted` in `promptGeneric`/`promptEffectTarget`
+// `null` zurück. Für einen Aufrufer, der bis zu einer gültigen Wahl
+// schleift, ist `null` aber kein Abbruch, sondern ein Grund, es noch
+// einmal zu versuchen — endlos. Nur ein Wurf bricht so eine Schleife.
+//
+// Der Wurf landet im vorhandenen `startGamePromise.catch(() => {})`
+// des Trainers; im Live-Spiel wird `abort()` nur beim Abräumen des
+// Raums gerufen, dort ist danach ohnehin niemand mehr am Zug.
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// WIEDERHOLUNGSSPERRE (v326) — der allgemeine Riegel gegen
+// nicht-fortschreitende Prompt-Schleifen
+//
+// Belegt am 11.8.: `cloudy-slime.js` fragte in EINEM Rollout 50 001 Mal
+// dieselbe Galerie ab. Muster: `while (true)` → CPU waehlt Karte X →
+// fuer X gibt es keine freie Zone → `continue` → dieselbe Liste →
+// dieselbe Wahl. Elf Karten tragen dieses Schleifenmuster.
+//
+// Diese Sperre erkennt es unabhaengig von der Karte: WENN dieselbe Frage
+// (Typ + Titel + Anzahl Optionen) hintereinander dieselbe Antwort
+// bekommt, macht niemand Fortschritt. Alles, was sich aendert — andere
+// Frage, andere Antwort — setzt den Zaehler zurueck. Eine gesunde
+// Entscheidung wiederholt sich nie hundertfach identisch.
+//
+// Der Wurf laeuft in den vorhandenen Rollout-catch: der Kandidat faellt
+// weg, die Partie laeuft weiter. Schwelle ueber PP_PROMPT_REPEAT_CAP.
+// ═══════════════════════════════════════════════════════════════════
+const PROMPT_REPEAT_CAP = (() => {
+  const v = parseInt(process.env.PP_PROMPT_REPEAT_CAP || '', 10);
+  return Number.isFinite(v) && v > 0 ? v : 200;
+})();
+
+function noteRepeat(engine, art, titel, optionen, antwort, playerIdx) {
+  const sig = `${art}|${titel}|${optionen}`;
+  let kurz;
+  try { kurz = JSON.stringify(antwort); } catch { kurz = String(antwort); }
+  if (kurz && kurz.length > 200) kurz = kurz.slice(0, 200);
+  if (engine._promptRepeatSig === sig && engine._promptRepeatAnswer === kurz) {
+    engine._promptRepeatCount = (engine._promptRepeatCount || 1) + 1;
+    if (engine._promptRepeatCount > PROMPT_REPEAT_CAP) {
+      const ort = {
+        grund: 'prompt-repeat',
+        anzahl: engine._promptRepeatCount,
+        prompt: String(titel || '(ohne Titel)'),
+        typ: String(art || '?'),
+        spieler: playerIdx,
+        zug: engine.gs?.turn ?? null,
+        phase: engine.gs?.currentPhase ?? null,
+      };
+      if (!engine._promptRepeatGemeldet) {
+        engine._promptRepeatGemeldet = true;
+        console.error('[Prompt-Schleife] ' + JSON.stringify(ort));
+        console.error('  → Dieselbe Frage bekam ' + ort.anzahl
+          + ' Mal hintereinander dieselbe Antwort. Der Aufrufer macht keinen Fortschritt.');
+        try { engine._crashTrailSink?.(ort); } catch { /* Forensik darf nie stoeren */ }
+      }
+      // NICHT zuruecksetzen: solange dieselbe Frage dieselbe Antwort
+      // bekommt, wirft jeder weitere Aufruf. Sonst bekaeme ein Aufrufer,
+      // der den Wurf verschluckt, alle PROMPT_REPEAT_CAP Runden erneut
+      // freie Fahrt — die Schleife waere wieder unbegrenzt.
+      const err = new Error(`Prompt-Schleife: "${ort.prompt}" (typ=${ort.typ}) `
+        + `${ort.anzahl}x identisch beantwortet, Zug ${ort.zug} Phase ${ort.phase}`);
+      err._promptRepeat = true;
+      throw err;
+    }
+  } else {
+    engine._promptRepeatSig = sig;
+    engine._promptRepeatAnswer = kurz;
+    engine._promptRepeatCount = 1;
+  }
+}
+
+// ── STILLER AUSSTIEG STATT HUNDERTER WUERFE (v330) ─────────────────
+// v321 laesst jeden Prompt nach `abort()` werfen. Das bricht zwar jede
+// einzelne Schleife auf, stoppt aber nicht die KASKADE darueber: der
+// Rollout faengt den Wurf, nimmt den naechsten Kandidaten, der fragt
+// wieder — hunderte Zeilen je abgeraeumter Partie (Als Konsolenlog
+// 11.8., Spiele 53/62/94).
+//
+// Deshalb steigen die CPU-Schleifen selbst aus, sobald `_aborted` steht.
+// Der Wurf bleibt als Notbremse fuer alles, was diese Pruefung nicht
+// passiert — er kommt dann aber hoechstens noch einmal vor.
+function istAbgebrochen(engine) {
+  if (!engine?._aborted) return false;
+  if (!engine._abbruchGemeldet) {
+    engine._abbruchGemeldet = true;
+    console.log('[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.');
+  }
+  return true;
+}
+
+function throwIfAborted(engine, wo) {
+  if (!engine._aborted) return;
+  const err = new Error(`Partie abgebrochen — ${wo} nach abort() aufgerufen`);
+  err._gameAborted = true;
+  throw err;
+}
+
+// ── KUMULATIVE ZAEHLUNG (v322) ──────────────────────────────────────
+// Der Deckel oben prueft EINEN Puffer. Der Heap-Snapshot zeigte aber
+// 2,72 Mio. Datensaetze, OHNE dass der Deckel je ausloeste — dann
+// verteilen sie sich auf viele kleine Puffer, die nach dem Rollout
+// weggeworfen, aber von irgendetwas festgehalten werden. Diese Form
+// kann ein Pro-Puffer-Deckel prinzipiell nicht sehen.
+//
+// Deshalb zusaetzlich zwei Zaehler je Engine, die NICHT zurueckgesetzt
+// werden: `_mctsRecordTotal` (alle je gepushten Datensaetze) und
+// `_mctsRecordMax` (laengster je erreichter Puffer). Alle
+// PP_MCTS_RECORD_TICK Datensaetze geht ein Messpunkt an den
+// Crash-Trail — der landet als `heapProbes` in der inflight-/crash-
+// Datei, ganz ohne Konsole.
+//
+// LESART der beiden Zahlen im naechsten Absturz:
+//   gesamt gross + max klein  → viele festgehaltene Kleinpuffer
+//   gesamt gross + max gross  → ein durchlaufender Puffer (Deckel greift)
+//   gesamt klein              → die Datensaetze sind NICHT der Heapfresser
+const MCTS_RECORD_TICK = (() => {
+  const v = parseInt(process.env.PP_MCTS_RECORD_TICK || '', 10);
+  return Number.isFinite(v) && v > 0 ? v : 250000;
+})();
+
+function mctsRecordTick(engine, promptTitel, promptTyp, playerIdx, bufLen) {
+  const punkt = {
+    grund: 'mcts-record-tick',
+    gesamt: engine._mctsRecordTotal,
+    max: engine._mctsRecordMax,
+    prompt: String(promptTitel || '(ohne Titel)'),
+    typ: String(promptTyp || '?'),
+    spieler: playerIdx,
+    puffer: bufLen,
+    zug: engine.gs?.turn ?? null,
+    phase: engine.gs?.currentPhase ?? null,
+  };
+  console.error('[MCTS-Aufzeichnung] ' + JSON.stringify(punkt));
+  try { engine._crashTrailSink?.(punkt); } catch { /* Forensik darf nie stoeren */ }
+}
+
+function mctsRecordPush(engine, eintrag, promptTitel, promptTyp, playerIdx) {
+  const buf = engine._mctsTargetRecord;
+  if (!Array.isArray(buf)) return;
+  if (engine._mctsRecordOverflowed) throw mctsRecordOverflowError(engine, promptTitel, promptTyp, playerIdx, buf.length);
+  buf.push(eintrag);
+
+  const gesamt = (engine._mctsRecordTotal = (engine._mctsRecordTotal || 0) + 1);
+  if (buf.length > (engine._mctsRecordMax || 0)) engine._mctsRecordMax = buf.length;
+  if (gesamt % MCTS_RECORD_TICK === 0) mctsRecordTick(engine, promptTitel, promptTyp, playerIdx, buf.length);
+
+  if (buf.length <= MCTS_RECORD_CAP) return;
+  engine._mctsRecordOverflowed = true;
+  const anzahl = buf.length;
+  buf.length = 0;                       // Speicher sofort wieder freigeben
+  throw mctsRecordOverflowError(engine, promptTitel, promptTyp, playerIdx, anzahl);
+}
+
+function mctsRecordOverflowError(engine, promptTitel, promptTyp, playerIdx, anzahl) {
+  const ort = {
+    grund: 'mcts-record-overflow',
+    anzahl,
+    prompt: String(promptTitel || '(ohne Titel)'),
+    typ: String(promptTyp || '?'),
+    spieler: playerIdx,
+    zug: engine.gs?.turn ?? null,
+    phase: engine.gs?.currentPhase ?? null,
+  };
+  // Bewusst console.error und nicht cpuLog: cpuLog ist während eines
+  // Rollouts stummgeschaltet, und genau dort passiert es.
+  if (!engine._mctsRecordOverflowGemeldet) {
+    engine._mctsRecordOverflowGemeldet = true;
+    console.error('[MCTS-Aufzeichnung ÜBERGELAUFEN] ' + JSON.stringify(ort));
+    console.error('  → Dieser Prompt wurde in EINEM Rollout ' + anzahl
+      + ' Mal beantwortet. Das ist die Endlosschleife, die den Heap füllt.');
+    try { engine._crashTrailSink?.(ort); } catch { /* Forensik darf nie stören */ }
+  }
+  const err = new Error(`MCTS-Aufzeichnung übergelaufen (${anzahl}) bei Prompt "${ort.prompt}" `
+    + `(typ=${ort.typ}, Spieler ${playerIdx}, Zug ${ort.zug}, Phase ${ort.phase})`);
+  err._mctsRecordOverflow = true;
+  return err;
+}
+
 
 function mctsValidateTargetEntry(entry, validTargets) {
   if (!entry || entry.kind !== 'target') return false;
@@ -5747,6 +5990,8 @@ function installCpuBrain(engine) {
       promptData = _gerryRedirect.rewrittenData;
     }
 
+    throwIfAborted(engine, 'promptGeneric');
+
     // ── MCTS scripted plan (peek, consume only on match) ──
     let scriptedValue = null;
     if (engine.isCpuPlayer(playerIdx) && Array.isArray(engine._mctsTargetPlan) && engine._mctsTargetPlan.length > 0) {
@@ -5810,16 +6055,18 @@ function installCpuBrain(engine) {
       // ── MCTS recon recording ──
       // Only record branchable types — confirms/forceDiscards don't enumerate
       // alternatives we care to explore.
+      noteRepeat(engine, promptData.type, promptData.title,
+        (promptData.cards || promptData.options || []).length, picked, playerIdx);
       if (Array.isArray(engine._mctsTargetRecord) && MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)
         && !promptHasPinnedAnswer(promptData)) {
-        engine._mctsTargetRecord.push({
+        mctsRecordPush(engine, {
           kind: `generic:${promptData.type}`,
           title: promptData.title,
           cancellable: !!promptData.cancellable,
           alternatives: mctsEnumerateGenericAlternatives(promptData, playerIdx),
           picked,
           wasScripted: scriptedValue != null,
-        });
+        }, promptData.title, promptData.type, playerIdx);
       }
       return picked;
     }
@@ -5829,6 +6076,7 @@ function installCpuBrain(engine) {
   const origPromptEffectTarget = engine.promptEffectTarget.bind(engine);
   engine.promptEffectTarget = async function (playerIdx, validTargets, config = {}) {
     if (!validTargets || validTargets.length === 0) return [];
+    throwIfAborted(engine, 'promptEffectTarget');
 
     // ── MCTS scripted plan (peek, consume only on match) ──
     let scriptedPick = null;
@@ -5910,7 +6158,7 @@ function installCpuBrain(engine) {
           if (tgt && srcName) {
             if (!engine._targetLog) engine._targetLog = [];
             engine._targetLog.push({ pi: playerIdx, c: srcName, t: engine.gs?.turn || 0,
-              tags: deckProfile.classifyTargetTags(engine, tgt, validTargets, playerIdx) });
+              tags: deckProfile.classifyTargetTags(engine, tgt, validTargets, playerIdx, config) });
           }
         }
       } catch { /* Log darf nie stören */ }
@@ -5923,6 +6171,7 @@ function installCpuBrain(engine) {
       // each own target and a noisy rollout could pick one that
       // freezes our own Hero for the post-CC `immune` payoff — far
       // less valuable than a Spell + 120 HP.
+      noteRepeat(engine, 'target', config.title, (validTargets || []).length, picked, playerIdx);
       if (Array.isArray(engine._mctsTargetRecord)) {
         const maxSel = Math.max(1, config.maxTotal || config.maxSelect || 1);
         const recCardName = config.title;
@@ -5947,7 +6196,7 @@ function installCpuBrain(engine) {
             hp: t.hp,
             type: t.type,
           }));
-        engine._mctsTargetRecord.push({
+        mctsRecordPush(engine, {
           kind: 'target',
           title: config.title,
           cancellable: !!config.cancellable,
@@ -5955,7 +6204,7 @@ function installCpuBrain(engine) {
           validTargets: recordedTargets,
           picked,
           wasScripted: !!scriptedPick,
-        });
+        }, config.title, 'target', playerIdx);
       }
       return picked;
     }
@@ -6075,33 +6324,33 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // Engine). Filter nur, wenn danach Ziele übrig bleiben.
   {
     const st = typeof config?.appliesStatus === 'string' ? config.appliesStatus : null;
-    const NEG = ['frozen', 'stunned', 'negated', 'bound', 'poisoned', 'burning', 'cursed'];
-    const CC = ['frozen', 'stunned', 'negated', 'bound'];
-    if (st && NEG.includes(st) && Array.isArray(validTargets) && validTargets.length > 1) {
-      const blocked = (t) => {
-        if (!t) return false;
-        if (t.type === 'hero') {
-          const h = engine.gs?.players?.[t.owner]?.heroes?.[t.heroIdx];
-          if (!h) return false;
-          if (h.buffs?.negative_status_immune) return true;
-          if (h.statuses?.immune && CC.includes(st)) return true;
-          // Registry-Audit: Light-Ball-Schutz (Engine-Methode als eine
-          // Quelle der Wahrheit) und Johannas Schutzschirm (lebende
-          // "Johanna, Crusader of Light" auf der Zielseite schützt die
-          // ANDEREN Helden; sich selbst nicht).
-          try {
-            if (engine._lightBallProtects
-              && engine._lightBallProtects(t.owner, 'hero', t.heroIdx)) return true;
-          } catch { }
-          const heroes = engine.gs?.players?.[t.owner]?.heroes || [];
-          if (heroes.some(j => j && j !== h && j.name === 'Johanna, Crusader of Light' && j.hp > 0)) return true;
-          return false;
-        }
-        const inst = t.cardInstance;
-        return !!(inst?.counters?.buffs?.negative_status_immune);
-      };
-      const keep = validTargets.filter(t => !blocked(t));
-      if (keep.length > 0) validTargets = keep;
+    // Nur REINE Status-Abfragen steuern. Traegt der Prompt auch Schaden,
+    // ist der Status blosses Beiwerk — dann darf das Gate nicht filtern,
+    // sonst meidet die CPU ein lohnendes Schadensziel, nur weil der
+    // angehaengte Status dort nicht haftet. Fuer genau diese Karten
+    // liefert `classifyTargetTags` stattdessen das Tag `stat:sticks` /
+    // `stat:blocked` in den Lernkanal.
+    const _statusPromptDealsDamage = (typeof config?.baseDamage === 'number' && config.baseDamage > 0)
+      || (!!config?.damageType && config.damageType !== 'status' && config.damageType !== 'none');
+    if (st && !_statusPromptDealsDamage
+        && Array.isArray(validTargets) && validTargets.length > 1) {
+      // ── KEIN Urteil mehr an dieser Stelle (Als Vorgabe 9.8.) ───────
+      // Welche Seite und welches Ziel das beste ist, entscheidet der
+      // LERNKANAL. Zwei harte Regeln standen hier und sind beide raus:
+      //
+      //  • „nie die eigene Seite" (v307) — absolut formuliert falsch, es
+      //    gibt Helden, bei denen ein eigenes Ziel die beste Wahl ist
+      //    (Fiona-Muster).
+      //  • „nur Ziele, an denen der Status haftet" — das erzwang bei
+      //    einer lebenden Johanna auf der Gegnerseite sogar das
+      //    GEGENTEIL: die geschuetzten Gegner fielen raus, uebrig blieben
+      //    die eigenen Helden, und die CPU traf sich selbst.
+      //
+      // Beide Fragen sind jetzt im Tag-Raum ausdrueckbar (`side:own` /
+      // `side:opp` und `stat:sticks` / `stat:blocked`) und werden ueber
+      // `targetPriors` je Karte gelernt. Ein Gate, das hier filtert,
+      // wuerde genau die Arme leer halten, die der Trainer braucht.
+      void st;
     }
   }
   if (config?.isHealing && Array.isArray(validTargets) && validTargets.length > 1) {
@@ -6241,7 +6490,20 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
   // Runs BEFORE the heal/buff heuristics because those would otherwise
   // win ties by shuffling randomly and wash out the signal.
   const appliesStatus = typeof config.appliesStatus === 'string' ? config.appliesStatus : null;
-  if (appliesStatus && ownTargets.length > 0) {
+  // ── NUR fuer echte SELBST-Status-Karten (9.8.) ────────────────────
+  // Dieser Zweig war fuer Karten gedacht, deren Status per Design auf
+  // die eigene Seite geht (Sickly Cheese, Zsos'Ssar-Kosten). Er feuerte
+  // aber bei JEDER Abfrage mit `appliesStatus`, sobald eigene Ziele
+  // dabei waren — also auch bei Icy Slime & Co., die beide Seiten
+  // treffen koennen. Ergebnis: die CPU fror ihren eigenen Helden ein.
+  //
+  // Abgrenzung ohne Urteil: greift nur, wenn die Abfrage GAR KEINE
+  // gegnerischen Ziele hat oder ausdruecklich `side: 'own'` verlangt.
+  // Steht beides offen, entscheidet die normale Absichts-Logik und
+  // darueber der Lernkanal (`side:own` / `side:opp`, `stat:*`) — genau
+  // dort gehoert die Fiona-Frage hin.
+  const _selfStatusPrompt = enemyTargets.length === 0 || config.side === 'own';
+  if (appliesStatus && _selfStatusPrompt && ownTargets.length > 0) {
     const picked = pickSelfStatusTarget(engine, ownTargets, appliesStatus);
     if (picked) return [picked.id];
   }
@@ -7075,6 +7337,28 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
     const ps = engine.gs.players[cpuIdx];
     if (!ps?.hand?.length) return null;
+
+    // ── UNGEWINNBARES ABWURF-DUELL (v327, Als Report) ────────────────
+    // Bottled Flame / Lightning laufen als WECHSELSEITIGE Kette. Hat der
+    // Gegner einen wirksamen Boris, wirft er nie etwas ab — die Kette
+    // kommt also endlos zurück, bis die CPU keine Handkarten mehr hat
+    // und den Effekt DOCH nimmt. Weiter abzuwerfen kostet die ganze Hand
+    // und ändert am Ausgang nichts. Also sofort annehmen.
+    // Haben BEIDE einen Boris, darf keiner verzichten (Sicherung in
+    // _bottled-shared.js) — dann ist es ein normales Duell.
+    if (type === 'forceDiscardCancellable' && promptData.alternatingChain) {
+      try {
+        const boris = require('./_loader').loadCardEffect('Boris, the Guardian of Blackport');
+        const gegner = cpuIdx === 0 ? 1 : 0;
+        if (boris?.borisActive
+            && boris.borisActive(engine, gegner)
+            && !boris.borisActive(engine, cpuIdx)) {
+          cpuLog(`  [Abwurf-Duell] Gegner hat einen wirksamen Boris — die Kette ist nicht zu gewinnen. `
+            + `Effekt sofort annehmen statt ${ps.hand.length} Handkarten zu verschenken.`);
+          return null; // "Take it!"
+        }
+      } catch { /* Boris nicht ladbar → normal weiterrechnen */ }
+    }
     let eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
     // Defensive resolving-card exclusion. When a script prompts for a
     // forced discard / delete during its own resolve and forgets to
@@ -8622,7 +8906,7 @@ function mctsEnemyCreatureValue(engine, inst) {
   }
   // On-death fuel — discount.
   const script = loadCardEffect(inst.name);
-  const onDeath = script?.cpuMeta?.onDeathBenefit || 0;
+  const onDeath = readOnDeathBenefit(script, engine, inst);
   if (onDeath > 0) value -= Math.min(0.7, onDeath / 30);
   // Chain sources should be killed eagerly when armed (denying their
   // window) — slight bump.
@@ -9718,11 +10002,19 @@ function evaluateState(engine, cpuIdx) {
       // Support-zone Creatures (Loyal Terrier, Ruin Mourner, …) AND Area
       // cards (Temple of Sacrifice) can be chain sources — anything that
       // profits when an ally Creature dies / is sacrificed.
-      if (inst.zone !== 'support' && inst.zone !== 'area') continue;
-      if (inst.faceDown) continue;
+      // v333 zusaetzlich: HANDkarten, die sich ausdruecklich als
+      // Handquelle deklarieren (Green Dragoneer). Sichtpruefung siehe
+      // `chainSourceIsVisible` — die CPU rechnet nur mit Handkarten, die
+      // sie kennen DARF.
+      if (inst.zone !== 'support' && inst.zone !== 'area' && inst.zone !== 'hand') continue;
+      if (inst.zone === 'support' && inst.faceDown) continue;
       const script = loadCardEffect(inst.name);
       const chain = script?.cpuMeta?.chainSource;
       if (!chain) continue;
+      if (inst.zone === 'hand') {
+        if (!chain.fromHand) continue;
+        if (!chainSourceIsVisible(inst, cpuIdx)) continue;
+      }
       try {
         if (chain.isArmed && !chain.isArmed(engine, inst)) continue;
       } catch { continue; }
@@ -9743,9 +10035,16 @@ function evaluateState(engine, cpuIdx) {
     if (!inst) return 0;
     const script = loadCardEffect(inst.name);
     const meta = script?.cpuMeta;
-    let value = meta?.onDeathBenefit || 0;
+    let value = readOnDeathBenefit(script, engine, inst);
     if (meta?.chainSource) return value; // chain sources skip chain bonuses
-    const sources = ownerIdx === cpuIdx ? ownChainSources : oppChainSources;
+    const eigene = ownerIdx === cpuIdx ? ownChainSources : oppChainSources;
+    const fremde = ownerIdx === cpuIdx ? oppChainSources : ownChainSources;
+    // v333: Quellen der eigenen Seite zaehlen wie bisher; zusaetzlich
+    // Quellen der GEGENSEITE, die ausdruecklich auf Tode hier reagieren.
+    const sources = [
+      ...eigene.filter(q => (q.chain.side || 'own') === 'own'),
+      ...fremde.filter(q => q.chain.side === 'opponent'),
+    ];
     for (const { inst: srcInst, chain } of sources) {
       if (srcInst.id === inst.id) continue; // can't trigger off self
       try {
@@ -10737,6 +11036,7 @@ function evaluateState(engine, cpuIdx) {
 // Dispatches an Action-Phase candidate to the right helper. Returns true
 // if the play actually shrank the CPU's hand (a real play occurred).
 async function applyActionCandidate(engine, helpers, candidate) {
+  if (istAbgebrochen(engine)) return false;
   const cpuIdx = engine._cpuPlayerIdx;
   const handBefore = engine.gs.players[cpuIdx].hand.length;
   const { cardName, cardType, handIdx, heroIdx } = candidate;
@@ -10793,6 +11093,7 @@ async function applyActionCandidate(engine, helpers, candidate) {
 // before those fire systematically overvalues self-buffs that clean up
 // at end-of-turn. Stops before switchTurn: the human's turn is not modeled.
 async function rolloutRestOfTurn(engine, helpers) {
+  if (istAbgebrochen(engine)) return;
   const cpuIdx = engine._cpuPlayerIdx;
   // If phase is still Action (combo mechanics held it open), advance once.
   if (engine.gs.currentPhase === 3) {
@@ -10864,6 +11165,7 @@ async function rolloutRestOfTurn(engine, helpers) {
 // One rollout of a candidate with an optional scripted target plan. Returns
 // { score, record, completed }. Record is only populated when requested.
 async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, record = false } = {}) {
+  if (istAbgebrochen(engine)) return { score: -Infinity, record: [], completed: false };
   const cpuIdx = engine._cpuPlayerIdx;
   const candidateName = candidate?.cardName || candidate?.abilityName || '?';
   // Trail the rollout BEFORE snapshotting — the snapshot itself can
@@ -10932,7 +11234,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
   engine.enterFastMode();
   engine._mctsTargetPlan = plan ? [...plan] : null;
   const recordBuf = record ? [] : null;
-  if (recordBuf) engine._mctsTargetRecord = recordBuf;
+  if (recordBuf) { engine._mctsTargetRecord = recordBuf; engine._mctsRecordOverflowed = false; }
   // Save+restore _cpuLogSilent rather than blindly setting it to false at
   // the end — nested rollouts (e.g. a Main-Phase gate fired inside an
   // outer Action-Phase rollout) would otherwise unsilence the outer scope
@@ -11068,15 +11370,82 @@ const MCTS_MAX_ALTS_PER_BRANCH = 6;
 // future card that opts into the same shape gets the same treatment.
 // See loyal-terrier.js for the prototype.
 
-function _mctsCollectArmedChainSources(engine, ownerIdx) {
+/**
+ * Liest `cpuMeta.onDeathBenefit` (v332).
+ *
+ * Bisher nur eine Zahl. Manche Todes-Effekte haengen aber am ZUSTAND der
+ * Instanz — Bunny Bombs zuendet `Zaehler x 20` Flaechenschaden, ohne
+ * Zaehler ist die Karte harmlos. Eine feste Zahl waere entweder zu
+ * aengstlich (frueh) oder zu mutig (spaet). Deshalb darf die Deklaration
+ * jetzt auch eine Funktion `(engine, inst) => number` sein; Zahlen
+ * funktionieren unveraendert weiter.
+ *
+ * Massstab (siehe evaluateState): ein Support-Slot ist 30 wert, der
+ * Boden liegt bei 5 — ab 25 ist das Toeten also praktisch wertlos.
+ */
+function readOnDeathBenefit(script, engine, inst) {
+  const roh = script?.cpuMeta?.onDeathBenefit;
+  if (typeof roh === 'function') {
+    try {
+      const v = roh(engine, inst);
+      return Number.isFinite(v) ? v : 0;
+    } catch { return 0; }
+  }
+  return roh || 0;
+}
+
+/**
+ * Darf der CPU-Pilot diese Karte ueberhaupt in seine Rechnung nehmen? (v333)
+ *
+ * Eigene Karten immer. Karten des GEGNERS nur, wenn sie offenliegen —
+ * eine Karte auf der Gegnerhand kennt die CPU erst, wenn sie ihr gezeigt
+ * wurde (`inst.knownToOpponent`, gesetzt von der Engine beim Aufdecken;
+ * das Flag bedeutet "die Gegenseite des Besitzers hat sie gesehen", aus
+ * Sicht der CPU also genau das Richtige).
+ *
+ * ALS VORGABE, woertlich: die CPU soll NICHT allwissend sein und nicht
+ * anders spielen, sobald der Gegner einen Green Dragoneer zieht.
+ *
+ * Karten im Support liegen offen und brauchen die Pruefung nicht.
+ */
+const ZONE_HAND = 'hand';
+
+function chainSourceIsVisible(inst, cpuIdx) {
+  if (!inst) return false;
+  if ((inst.controller ?? inst.owner) === cpuIdx) return true;
+  if (inst.zone !== ZONE_HAND) return true;         // offenes Brett
+  return inst.knownToOpponent === true;             // Gegnerhand: nur wenn gezeigt
+}
+
+/**
+ * Sammelt scharfe Chain-Quellen eines Spielers.
+ *
+ * v333, zwei Erweiterungen ueber das urspruengliche Support-only-Modell:
+ *   • `chainSource.fromHand: true` — die Quelle wirkt aus der HAND
+ *     (Green Dragoneer beschwoert sich selbst, wenn ein anderer Drago
+ *     stirbt). Nur mit Sichtpruefung, siehe `chainSourceIsVisible`.
+ *   • `chainSource.side: 'opponent'` — die Quelle reagiert nicht auf
+ *     Tode der EIGENEN Seite, sondern auf die des Gegners (Bomblebee
+ *     schiesst, wenn ein gegnerisches Ziel stirbt). Verrechnet wird sie
+ *     deshalb gegen die Slots der Gegenseite; siehe die Aufrufstellen.
+ *
+ * @param {number} [cpuIdx] Sichtpunkt fuer die Handpruefung. Fehlt er,
+ *                          werden Handquellen konservativ ausgelassen.
+ */
+function _mctsCollectArmedChainSources(engine, ownerIdx, cpuIdx) {
   const sources = [];
   for (const inst of engine.cardInstances) {
     if (inst.owner !== ownerIdx) continue;
-    if (inst.zone !== 'support') continue;
-    if (inst.faceDown) continue;
+    if (inst.zone !== 'support' && inst.zone !== ZONE_HAND) continue;
+    if (inst.zone === 'support' && inst.faceDown) continue;
     const script = loadCardEffect(inst.name);
     const chain = script?.cpuMeta?.chainSource;
     if (!chain) continue;
+    if (inst.zone === ZONE_HAND) {
+      if (!chain.fromHand) continue;                       // Karte will das gar nicht
+      if (cpuIdx == null) continue;                        // ohne Sichtpunkt lieber nicht
+      if (!chainSourceIsVisible(inst, cpuIdx)) continue;   // Gegnerhand, ungesehen
+    }
     try {
       if (chain.isArmed && !chain.isArmed(engine, inst)) continue;
     } catch { continue; }
@@ -11085,16 +11454,23 @@ function _mctsCollectArmedChainSources(engine, ownerIdx) {
   return sources;
 }
 
-function _mctsEffectiveOnDeathValue(engine, inst, sources) {
+function _mctsEffectiveOnDeathValue(engine, inst, sources, gegenQuellen = []) {
   if (!inst) return 0;
   const script = loadCardEffect(inst.name);
   const meta = script?.cpuMeta;
-  let value = meta?.onDeathBenefit || 0;
+  let value = readOnDeathBenefit(script, engine, inst);
   // Chain sources themselves don't compound chain bonuses on their own
   // death — killing the Terrier ends the window, killing the Shepherd
   // ends the revive. Mirror evaluateState's logic exactly.
   if (meta?.chainSource) return value;
-  for (const { inst: srcInst, chain } of sources) {
+  const alle = [
+    ...sources.filter(q => (q.chain.side || 'own') === 'own'),
+    // v333 Gegenrichtung: Quellen der ANDEREN Seite, die auf Tode HIER
+    // reagieren (Bomblebee). Ihr Ertrag macht diese Kreatur fuer ihren
+    // Besitzer weniger wert — das Toeten also attraktiver.
+    ...gegenQuellen.filter(q => q.chain.side === 'opponent'),
+  ];
+  for (const { inst: srcInst, chain } of alle) {
     if (srcInst.id === inst.id) continue;
     try {
       if (chain.triggersOn && !chain.triggersOn(engine, inst, srcInst)) continue;
@@ -11174,7 +11550,7 @@ function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES
       const ownChainFuelEligible = engine && r.maxSelect > 1 && Array.isArray(r.validTargets);
       if (ownChainFuelEligible) {
         const cpuIdx = engine._cpuPlayerIdx;
-        const ownChainSources = _mctsCollectArmedChainSources(engine, cpuIdx);
+        const ownChainSources = _mctsCollectArmedChainSources(engine, cpuIdx, cpuIdx);
         if (ownChainSources.length > 0) {
           const ownChainFuel = [];
           for (const t of r.validTargets) {
@@ -11216,6 +11592,7 @@ function mctsBuildVariationsFromRecord(record, { maxBranches = MCTS_MAX_BRANCHES
 }
 
 async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}) {
+  if (istAbgebrochen(engine)) return false;
   // `alwaysCommit` — run the recon + variations to pick the best target plan,
   // but commit regardless of whether the score beats skip. Intended for
   // pure-draw / tutor activations: the evaluator's gold-vs-hand-value model
@@ -11338,6 +11715,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   engine._mctsRolloutStartT = Date.now();
   engine.enterFastMode();
   engine._mctsTargetRecord = [];
+  engine._mctsRecordOverflowed = false;
   // Save+restore the silence flag so a nested gate (this one being called
   // FROM inside an outer rollout's runMainPhase) doesn't unsilence the
   // outer scope. See mctsRunOneRollout for the same pattern.
@@ -11647,6 +12025,7 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
 //   5. Return candidates sorted by best variation score, each decorated with
 //      a scriptedTargetPlan that the real play should follow.
 async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_ROLLOUTS_PER_CANDIDATE) {
+  if (istAbgebrochen(engine)) return candidates;
   // Auto-clear the kill-flag on LIVE turn change only. Without the
   // `!_inMctsSim` gate, a nested mctsRankCandidates call inside a
   // rollout (where gs.turn is the simulated turn, not the live turn)

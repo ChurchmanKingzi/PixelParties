@@ -13,7 +13,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
-const { BUFF_EFFECTS } = require('./cards/effects/_hooks');
+const { BUFF_EFFECTS, heroCanBeEquipped } = require('./cards/effects/_hooks');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 
 // ── Minimal .env loader (no dependency) ──────────────────────────
@@ -5530,9 +5530,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const isArtifactCreature = subLower.split('/').some(t => t.trim() === 'creature');
 
   if (isEquip) {
-    if (hero.hp <= 0) return false;
-    if (hero.statuses?.frozen) return false;
-    if (hero.statuses?.charmed) return false;
+    // v341: die drei Zustandssperren stehen jetzt in `_hooks.js`, damit
+    // Karten, die per `safePlaceInSupport` direkt ausruesten, dieselbe
+    // Regel lesen statt sie nachzubauen (und dabei Teile zu vergessen).
+    if (!heroCanBeEquipped(hero)) return false;
 
     const equipScript = loadCardEffect(cardName);
     if (equipScript?.canEquipToHero && !equipScript.canEquipToHero(gs, pi, heroIdx, room.engine)) return false;
@@ -6703,10 +6704,17 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     room.engine._currentEffectSource = {
       cardName: inst.name, owner: pi, cardType: 'CreatureEffect',
     };
+    // v347: Karten-Auftritt links — generelle Regel fuer JEDEN aktiven
+    // Effekt (siehe engine.announceActiveEffect).
+    room.engine.armEffectAnnounce(inst.name, pi);
     let resolved;
     try {
       resolved = await script.onCreatureEffect(ctx);
+      // Karten mit eigener Zielwahl haben den Auftritt schon selbst
+      // ausgeloest; alle anderen bekommen ihn hier, nach dem Effekt.
+      if (resolved !== false) room.engine.announceActiveEffect();
     } finally {
+      room.engine.clearEffectAnnounce();
       room.engine._promptCardStack.pop();
       room.engine._currentEffectSource = prevSrc;
     }
@@ -6964,10 +6972,13 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   room.engine._lastPromptGerryDeclined = false;
 
   try {
+    room.engine.armEffectAnnounce(abilityName, pi);   // v349
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
     });
+    room.engine.announceActiveEffect();
+    room.engine.clearEffectAnnounce();
 
     if (chainResult.negated) {
       // Negation keeps HOPT consumed — the ability fired (and was countered).
@@ -8117,8 +8128,18 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(chosen.inst, {});
+    room.engine.armEffectAnnounce(chosen.name, pi);   // v349
     const resolved = await chosen.script.onHeroEffect(ctx);
+    if (resolved !== false) room.engine.announceActiveEffect();
+    room.engine.clearEffectAnnounce();
     await room.engine._flushSurpriseDrawChecks();
+    // Aufgeschobene Surprises abarbeiten (Jumpscare: "After the Attack,
+    // Spell or effect resolves"). Fehlte hier — ein Helden-Effekt, der
+    // einen gegnerischen Helden anvisiert, stellte den Eintrag in die
+    // Warteschlange, und niemand loeste sie ein. Er blieb dort liegen,
+    // bis IRGENDWANN ein Zauber gespielt wurde, und feuerte dann im
+    // falschen Zug (Als Demo vom 9.8.: Zug 3 ausgeloest, Zug 4 aufgeloest).
+    await room.engine._executeDeferredSurprises();
 
     if (charmedOwner != null) {
       chosen.inst.controller = origController;
@@ -8458,6 +8479,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
       resolve: script.resolve ? async () => {
         if (broadcastPotionAnim) broadcastPotionAnim();
+        room.engine.announceActiveEffect(potionName, pi);   // v347
         return await script.resolve(room.engine, pi, selectedIds, validTargets);
       } : null,
     });
@@ -9054,7 +9076,16 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     try {
       chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
-        resolve: async () => await script.resolve(room.engine, pi, [], []),
+        resolve: async () => {
+          room.engine.armEffectAnnounce(cardName, pi);   // v349
+          try {
+            const r = await script.resolve(room.engine, pi, [], []);
+            if (r !== false) room.engine.announceActiveEffect();
+            return r;
+          } finally {
+            room.engine.clearEffectAnnounce();
+          }
+        },
       });
     } catch (err) {
       console.error('[Engine] Artifact resolve error:', err.stack || err.message); // Stack statt nur Message — ohne ihn war der Täter (Ushabti) nicht auffindbar
@@ -12221,6 +12252,12 @@ io.on('connection', (socket) => {
         if (typeof h._evolutionCounters === 'number' && h._evolutionCounters > 0) {
           out._evolutionCounters = h._evolutionCounters;
         }
+        // Invest Counters (Logan, the Investment Monkee) — gleiche
+        // Bauart wie oben: der Held traegt den Rohwert, die Projektion
+        // fuer den Client filtert sonst alles Unbekannte weg.
+        if (typeof h._investCounters === 'number' && h._investCounters > 0) {
+          out._investCounters = h._investCounters;
+        }
         return out;
       });
       while (heroes.length < 3) heroes.push({ name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} });
@@ -12481,6 +12518,13 @@ io.on('connection', (socket) => {
             // as the draw count.
             if (typeof cs.balance === 'number' && cs.balance > 0) {
               inst.counters.balance = cs.balance;
+            }
+            // Bunny Bombs — im Puzzle-Editor gesetzte Bomb Counter.
+            // Landen auf `inst.counters.bunnyBombCounter`; das Kartenskript
+            // rechnet daraus beim Tod 20 Schaden je Zaehler, und das
+            // Brett zeigt sie als Abzeichen.
+            if (typeof cs.bunnyBombCounter === 'number' && cs.bunnyBombCounter > 0) {
+              inst.counters.bunnyBombCounter = cs.bunnyBombCounter;
             }
             // Sleeping Beauty's linked-hero slot — authored in the puzzle
             // editor. The link is per-SLOT (matches in-game behavior:

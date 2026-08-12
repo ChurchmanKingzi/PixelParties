@@ -19,6 +19,10 @@ module.exports = {
         side: 'any',
         max: 1,
         title: 'Sparky Slime',
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet
+        // (Als Auftrag 9.8.). Ohne die Angabe lief das Gate nicht, und
+        // die CPU verbrannte Status an Zielen, die Johanna schuetzt.
+        appliesStatus: 'negated',
         description: 'Select a target to Negate.',
         confirmLabel: 'Negate!',
         confirmClass: 'btn-warning',

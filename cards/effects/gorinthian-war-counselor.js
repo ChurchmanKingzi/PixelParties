@@ -90,6 +90,12 @@ module.exports = {
       damageType: 'status',
       dealsDamage: false,     // reiner Stun — keine Schadensreaktionen wecken
       title: CARD_NAME,
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'stunned',
       description: `Stun a target for ${STUN_TURNS} turns. While Stunned by this effect, any damage it would take becomes 0.`,
       confirmLabel: '🌀 Stun!',
       confirmClass: 'btn-info',

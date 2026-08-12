@@ -101,11 +101,35 @@ async function fireSkullDamage(ctx, deleted) {
   const ps = gs.players[ownerIdx];
   if (!ps) return;
 
-  // Whose-effect heuristic. The active player is the side currently
-  // executing cards / abilities; opponent reactive triggers fired on
-  // the off-turn are the corner case the engine can't disambiguate
-  // here.
-  const byOpponent = (gs.activePlayer ?? ownerIdx) !== ownerIdx;
+  // ── WESSEN EFFEKT? (v327, Als Report + Mitschnitt belegt) ─────────
+  // Der 200er-Schlag gilt laut Kartentext NUR, wenn der Abwurf vom
+  // GEGNER des Necklace-Besitzers ausgeht.
+  //
+  // Bisher entschied das allein `gs.activePlayer`. Im Mitschnitt vom
+  // 11.8. warf die CPU im EIGENEN Zug per "Cool Rescuer Monia" ab —
+  // eine eigene Karte, eigene Kosten. Weil der Abwurf im Zug des
+  // Gegners lag, meldete die Heuristik trotzdem "vom Gegner".
+  //
+  // `selfInflicted` trägt die Engine seit jeher an genau diesen
+  // Stellen (Monia setzt es explizit); ab v327 reicht sie es auch in
+  // den Hook. Ist es gesetzt, sind es eigene Kosten — Punkt. Nur wenn
+  // dieser eindeutige Marker fehlt, bleibt die alte Näherung.
+  // v329 (Als Ruling): Massgeblich ist, WEM DIE VERURSACHENDE KARTE
+  // GEHOERT. Draw als gegnerische Karte → 200, als eigene → 50. Die
+  // Engine leitet den Besitzer an einer Stelle ab (`_deriveEffectOwner`)
+  // und reicht ihn als `ctx.sourceOwner` durch — die ~19 Kartendateien
+  // mit eigenen Abwurfkosten (Inventing/Magenta, Frolake, Archer, …)
+  // muessen dafuer nichts wissen und nichts setzen.
+  //
+  // Nur wenn die Ableitung nichts findet (`null` — etwa weil BEIDE
+  // Spieler eine Karte dieses Namens fuehren), bleibt die alte
+  // Naeherung ueber `gs.activePlayer` als letzter Rueckfall stehen.
+  const verursacher = (ctx.sourceOwner === 0 || ctx.sourceOwner === 1)
+    ? ctx.sourceOwner
+    : (ctx.selfInflicted ? ownerIdx : null);
+  const byOpponent = verursacher != null
+    ? verursacher !== ownerIdx
+    : (gs.activePlayer ?? ownerIdx) !== ownerIdx;
   const damage = byOpponent ? OPP_DAMAGE : SELF_DAMAGE;
 
   // No confirm step — the target picker IS the opt-in. "You may"

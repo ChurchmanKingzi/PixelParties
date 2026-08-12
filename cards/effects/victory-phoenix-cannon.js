@@ -101,9 +101,9 @@ module.exports = {
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
       // Find eligible spells in hand: Normal Destruction Magic, level ≤ 1
-      const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
-      const cardDB = {};
-      allCards.forEach(c => { cardDB[c.name] = c; });
+      // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
+      // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
+      const cardDB = require('./_card-db').getCardDB();
 
       const eligibleSpells = [];
       const seen = new Set();

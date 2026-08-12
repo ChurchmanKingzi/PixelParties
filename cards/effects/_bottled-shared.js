@@ -62,6 +62,13 @@ async function runDiscardChain(engine, potionOwner, potionName) {
       cancellable: true,
       showOpponentWaiting: true,
       opponentTitle: `🍾 ${potionName} — Opponent is deciding...`,
+      // v327: Kennzeichen für den CPU-Piloten. NUR bei einer WECHSEL-
+      // SEITIGEN Kette ist ein gegnerischer Boris relevant — dort wirft
+      // er nie etwas ab, die Kette kommt also immer zurück und lässt
+      // sich nicht gewinnen. Ein gewöhnlicher Zwangsabwurf trifft nur
+      // einen Spieler; dort sagt ein fremder Boris gar nichts.
+      alternatingChain: true,
+      chainOwner: potionOwner,
     });
 
     if (!result || result.cancelled) {

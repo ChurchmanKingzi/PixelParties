@@ -77,6 +77,12 @@ module.exports = {
         damageType: 'status',
         dealsDamage: false,
         title: "The Warlord's Bite",
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'poisoned',
         description: `Inflict ${stacks} Poison Stack${stacks > 1 ? 's' : ''} to an unpoisoned target.`,
         confirmLabel: `🐍 Bite! (${stacks} stack${stacks > 1 ? 's' : ''})`,
         confirmClass: 'btn-danger',

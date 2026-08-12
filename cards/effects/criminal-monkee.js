@@ -31,17 +31,51 @@
 //  entfallen, die 4 Gold des Effekts sind die Kosten.
 // ═══════════════════════════════════════════
 
-const { freeSlotOn, eligibleSummonZones } = require('./_monkee-shared');
+const { freeSlotOn, eligibleSummonZones,
+  investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
+} = require('./_monkee-shared');
 
 const CARD_NAME = 'Criminal Monkee';
+const { heroCanBeEquipped } = require('./_hooks');
+
 const NFM = 'Non-Fungible Monkee';
-const PRICE = 4;
+const PRICE = 4;          // Gold — nur fuer den Beschwoerungs-Trigger
+const INVEST_COST = 4;    // Invest Counter — Kosten der 2. Faehigkeit (v343)
 const HOPT_KEY = (pi) => `monkee-summon:${CARD_NAME}:${pi}`;
 const RESOLVING = '_criminalMonkeeResolving';
 
 /** Liegt ein "Non-Fungible Monkee" im Deck? */
 function nfmImDeck(ps) {
   return (ps?.mainDeck || []).includes(NFM);
+}
+
+/**
+ * Darf an den corresponding Hero ausgeruestet werden?
+ * (v338, praezisiert v340/v341 nach Als Rulings)
+ *
+ * „Corresponding Hero" ist der Held, in dessen Support Zone die Karte
+ * liegt (Spielvokabular).
+ *
+ * DIE REGEL DAHINTER ist nicht „Kreaturen brauchen einen lebenden
+ * Wirt" — Kreatur-Effekte funktionieren bei totem Wirt ausdruecklich
+ * weiter („Creatures are independent of their slot's Hero", server.js).
+ * Massgeblich ist vielmehr: **an einen toten Helden kann nichts
+ * ausgeruestet werden.** Der normale Artefakt-Weg setzt das laengst
+ * durch (server.js `doPlayArtifact`: `if (isEquip) { if (hero.hp <= 0)
+ * return false; … }`, direkt neben den Frozen- und Charmed-Sperren).
+ *
+ * Criminal Monkee ist die AUSNAHME, die diesen Weg umgeht: sie holt
+ * „Non-Fungible Monkee" aus dem Deck und setzt es per
+ * `safePlaceInSupport` direkt, also an der Pruefung vorbei. Deshalb
+ * muss die Karte sie selbst nachziehen.
+ *
+ * v341: Und zwar VOLLSTAENDIG. Meine erste Fassung prueft nur auf tot —
+ * Al: „Frozen Heroes duerfen ja nicht equipped werden." Richtig, und
+ * bezaubert ebenfalls nicht. Deshalb liegt die Regel jetzt in
+ * `_hooks.heroCanBeEquipped` und wird hier nur noch gelesen.
+ */
+function wirtKannAusgeruestetWerden(ps, heroIdx) {
+  return heroCanBeEquipped(ps?.heroes?.[heroIdx]);
 }
 
 module.exports = {
@@ -58,7 +92,13 @@ module.exports = {
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     if (ctx.card?.zone !== 'support') return false;
-    if ((ps.gold || 0) < PRICE) return false;
+    // Toter corresponding Hero → kein Effekt: an einen toten Helden
+    // kann nichts ausgeruestet werden (siehe `istWirtAmLeben`).
+    if (!wirtKannAusgeruestetWerden(ps, ctx.cardHeroIdx)) return false;
+    // v343 (Als Auftrag): die zweite Faehigkeit kostet 4 INVEST COUNTER
+    // statt 4 Gold. Der Beschwoerungs-Trigger unten bleibt bei Gold.
+    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
     return freeSlotOn(ps, ctx.cardHeroIdx) >= 0;
   },
@@ -71,16 +111,21 @@ module.exports = {
     const heroIdx = ctx.cardHeroIdx;                 // der corresponding Hero
     if (!ps) return false;
 
-    if ((ps.gold || 0) < PRICE) return false;
+    // Zweite Sperre am Ausfuehrungsweg: `canActivateCreatureEffect` ist
+    // nur das Angebot, ein manipulierter Client koennte die Aktivierung
+    // trotzdem schicken.
+    if (!wirtKannAusgeruestetWerden(ps, heroIdx)) return false;
+    if (investHoptUsed(gs, ctx.card)) return false;
+    if (heroesWithInvest(ps, INVEST_COST).length === 0) return false;
     if (!nfmImDeck(ps)) return false;
     if (freeSlotOn(ps, heroIdx) < 0) return false;
 
     const bestaetigt = await engine.promptGeneric(pi, {
       type: 'confirm',
       title: CARD_NAME,
-      message: `Pay ${PRICE} Gold to equip "${NFM}" from your deck to ${ps.heroes?.[heroIdx]?.name || 'this Hero'} for free?`,
+      message: `Remove ${INVEST_COST} Invest Counters from a Hero you control to equip "${NFM}" from your deck to ${ps.heroes?.[heroIdx]?.name || 'this Hero'} for free?`,
       showCard: CARD_NAME,
-      confirmLabel: `🐒 Pay ${PRICE} Gold!`,
+      confirmLabel: `🐒 Remove ${INVEST_COST} Invest Counters!`,
       cancelLabel: 'No',
       cancellable: true,
       gerrymanderEligible: true,
@@ -88,7 +133,8 @@ module.exports = {
     // Abbruch laesst die Einmal-pro-Zug-Sperre ungestempelt.
     if (!bestaetigt || bestaetigt.cancelled) return false;
 
-    const bezahlt = await engine.actionSpendGold(pi, PRICE);
+    const bezahlt = await payInvestCounters(engine, pi, INVEST_COST, CARD_NAME);
+    if (bezahlt) markInvestHopt(gs, ctx.card);
     if (!bezahlt) return false;
 
     // Zustand nach der Zahlung neu pruefen — `afterResourceSpend` kann
@@ -127,7 +173,7 @@ module.exports = {
 
     engine.log('criminal_monkee_equip', {
       player: ps.username, card: NFM,
-      hero: ps.heroes?.[heroIdx]?.name, slot: platz.actualSlot, goldPaid: PRICE,
+      hero: ps.heroes?.[heroIdx]?.name, slot: platz.actualSlot, investPaid: INVEST_COST,
     });
     engine.sync();
     return true;

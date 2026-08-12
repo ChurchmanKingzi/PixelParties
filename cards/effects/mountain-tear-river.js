@@ -177,6 +177,10 @@ module.exports = {
         min: 0,
         max: EXTRA_BURNS,
         title: CARD_NAME,
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet
+        // (Als Auftrag 9.8.). Ohne die Angabe lief das Gate nicht, und
+        // die CPU verbrannte Status an Zielen, die Johanna schuetzt.
+        appliesStatus: 'burned',
         description: `Choose up to ${EXTRA_BURNS} additional targets to Burn.`,
         confirmLabel: '🔥 Burn!',
         confirmClass: 'btn-danger',

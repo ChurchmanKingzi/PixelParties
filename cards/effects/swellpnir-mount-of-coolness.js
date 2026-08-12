@@ -1,3 +1,4 @@
+const { heroCanBeEquipped } = require('./_hooks');
 // ═══════════════════════════════════════════
 //  EQUIPMENT: "Swellpnir, Mount of Coolness"
 //  Has no effect from your hand.
@@ -94,7 +95,10 @@ module.exports = {
     const targets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
+      // v341: kanonische Ausruest-Regel (tot / eingefroren / bezaubert)
+      // aus `_hooks.js` statt einer eigenen Teilpruefung. Die
+      // Frozen-Sperre stand hier schon, `charmed` fehlte.
+      if (!heroCanBeEquipped(hero)) continue;
       // Frozen Heroes can't accept new equipment.
       if (hero.statuses?.frozen) continue;
       const slots = ps.supportZones?.[hi] || [];

@@ -163,6 +163,10 @@ async function triggerBomblebeeAsIfDeath(engine, inst, opts = {}) {
 
 module.exports = {
   BOMBLEBEE_NAMES,
+  // v333: der CPU-Bewertungshinweis der Bomblebees braucht die
+  // HOPT-Auskunft, um eine bereits gezuendete Biene nicht als scharf zu
+  // zaehlen. Reine Lesefunktion, keine Nebenwirkung.
+  bomblebeeHoptUsed,
   isOpponentTargetDeath,
   findOwnBomblebees,
   triggerBomblebeeAsIfDeath,

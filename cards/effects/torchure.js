@@ -59,6 +59,12 @@ module.exports = {
         damageType: 'status',
         dealsDamage: false, // Poison only — no damage; don't wake damage-mitigation Reactions (Spectral Armor)
         title: 'Torchure',
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'poisoned',
         description: 'Choose one of your Heroes to Poison (2 stacks, permanent).',
         confirmLabel: '\u2620\uFE0F Torchure!',
         confirmClass: 'btn-danger',

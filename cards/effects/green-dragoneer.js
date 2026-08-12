@@ -94,6 +94,44 @@ function makeSacrificeSpec(engine) {
 
 
 module.exports = {
+
+  // ── CPU-Bewertungshinweis (v333) ──────────────────────────────────
+  // HANDQUELLE: Green Dragoneer reagiert aus der HAND — stirbt ein
+  // anderer Drago, beschwoert er sich selbst. Der Tod eines eigenen
+  // Dragos ist damit weniger schlimm, als der Bewerter bisher annahm
+  // (er sammelte nur Quellen im Support).
+  //
+  // `fromHand: true` meldet das an; die SICHTPRUEFUNG steckt im Sammler:
+  // eine Karte auf der GEGNERhand zaehlt nur, wenn sie der CPU gezeigt
+  // wurde. Al ausdruecklich: die CPU soll nicht allwissend werden und
+  // ihre Zielwahl nicht aendern, bloss weil der Gegner die Karte gezogen
+  // hat.
+  //
+  // Ertrag: eine Lv-hohe Kreatur landet gratis auf dem Brett — auf der
+  // Slot-Skala (Basis 30) ein grosser Posten, aber kein voller Slot,
+  // weil ein Landeplatz frei sein muss: 12.
+  cpuMeta: {
+    chainSource: {
+      fromHand: true,
+      isArmed(engine, inst) {
+        return !!inst && inst.zone === 'hand';
+      },
+      triggersOn(engine, tributeInst, sourceInst) {
+        if (!tributeInst || !sourceInst) return false;
+        if (tributeInst.id === sourceInst.id) return false;
+        // Nur eigene Dragos zaehlen — der Dragoneer reagiert auf den Tod
+        // eines Dragos SEINER Seite.
+        if ((tributeInst.controller ?? tributeInst.owner)
+            !== (sourceInst.controller ?? sourceInst.owner)) return false;
+        try {
+          const db = engine?._getCardDB ? engine._getCardDB() : {};
+          const cd = db[tributeInst.name];
+          return !!cd && /Drago/i.test(cd.archetype || '');
+        } catch { return false; }
+      },
+      valuePerTrigger: 12,
+    },
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,

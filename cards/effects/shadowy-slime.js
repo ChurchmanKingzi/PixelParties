@@ -30,9 +30,9 @@ module.exports = {
       if (ctx.isSummonLocked()) return;
 
       // Load card database
-      const allCards = require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8');
-      const cardDB = {};
-      JSON.parse(allCards).forEach(c => { cardDB[c.name] = c; });
+      // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
+      // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
+      const cardDB = require('./_card-db').getCardDB();
 
       // Find lv 0 Creatures in discard pile. Per-Creature `canSummon`
       // filter (`_bypassBeforeSummon: true`) is applied against THIS

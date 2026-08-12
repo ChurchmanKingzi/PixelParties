@@ -12,6 +12,14 @@
 module.exports = {
   isPotion: true,
 
+  // Der Kartentext sagt "This damage cannot be reduced, REDIRECTED or
+  // negated" — bisher stand die Nicht-Umleitbarkeit nur im Kommentar.
+  // Als Ruling 8.8.: sie ist ein echtes Merkmal. Umleitende Effekte
+  // (Bubbles) fragen dieses Flag auf dem Quell-Skript ab und lassen den
+  // Schaden durchgehen. Rockfall trägt es NICHT: sein Text nennt nur
+  // "reduced or negated", er bleibt also umleitbar.
+  cannotBeRedirected: true,
+
   canActivate(gs, playerIdx) {
     // Hard once per turn
     const hoptKey = `acid-vial:${playerIdx}`;

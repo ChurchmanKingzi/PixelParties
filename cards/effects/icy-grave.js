@@ -61,6 +61,12 @@ module.exports = {
         types: ['hero', 'creature'],
         damageType: 'status',
         title: CARD_NAME,
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'frozen',
         description: `Choose any target — Freeze it for ${FREEZE_DURATION} turns.`,
         confirmLabel: '❄ Freeze!',
         confirmClass: 'btn-info',

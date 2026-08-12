@@ -5,6 +5,27 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
+/**
+ * Wie viele Ticks braucht "until the end of your next turn"?
+ *
+ * GEMESSEN (9.8., `processStatusExpiry('END')`): die Frost-Dauer laeuft
+ * AUSSCHLIESSLICH am Zugende des KONTROLLEURS des eingefrorenen Ziels
+ * herunter — die Schleife geht nur ueber `gs.players[activePlayer]` und
+ * ueber dessen Kreaturen. Damit bedeutet derselbe Kartentext je nach
+ * Seite eine andere Zahl:
+ *
+ *  • EIGENES Ziel: der erste Tick faellt noch in diesen Zug, der zweite
+ *    ans Ende des eigenen naechsten — also **2**. Die frueheren 3 liefen
+ *    bis zum Ende des UEBERNAECHSTEN eigenen Zuges (Als Befund: die CPU
+ *    fror ihren eigenen Helden ein und blieb drei Runden stehen).
+ *  • GEGNERISCHES Ziel: dort tickt es an SEINEN Zugenden. Mit **1** ist
+ *    er genau seinen naechsten Zug lang eingefroren; 2 wuerde ihn zwei
+ *    volle Zuege lahmlegen und den Text deutlich ueberschiessen.
+ */
+function frostDauer(casterIdx, targetOwnerIdx) {
+  return targetOwnerIdx === casterIdx ? 2 : 1;
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -18,6 +39,10 @@ module.exports = {
         max: 1,
         title: 'Icy Slime',
         description: 'Select a target to Freeze.',
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet.
+        // Ohne die Angabe lief das Gate gar nicht, und die CPU verbrannte
+        // ihre Freezes an Helden, die Johanna schuetzt (Als Demo 9.8.).
+        appliesStatus: 'frozen',
         confirmLabel: 'Freeze!',
         confirmClass: 'btn-info',
         cancellable: false,
@@ -38,12 +63,8 @@ module.exports = {
 
       if (target.type === 'hero') {
         await engine.addHeroStatus(target.owner, target.heroIdx, 'frozen', {
-          // Kartentext: "until the end of your next turn" — bei End-of-
-          // Turn-Ticks und Cast im eigenen Zug = 3 Ticks (Rest eigener
-          // Zug → Gegnerzug → eigener Folgezug). Vorher fehlte die
-          // duration komplett → 1-Zug-Default, der VOR dem eigenen
-          // nächsten Zug ablief und damit nie ein Payoff-Fenster bot.
-          duration: 3,
+          // Dauer siehe `frostDauer` — sie haengt an der SEITE des Ziels.
+          duration: frostDauer(ctx.cardOwner, target.owner),
           appliedBy: ctx.cardOwner, animationType: 'ice_encase' });
       } else if (target.type === 'equip') {
         const inst = target.cardInstance || engine.cardInstances.find(c => c.owner === target.owner && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx);
@@ -54,8 +75,9 @@ module.exports = {
           await engine.applyCreatureStatus(inst, 'frozen', {
             sourceOwner: ctx.cardOwner,
             source: 'Icy Slime',
-            // Kartentext: "until the end of your next turn" (s. Hero-Zweig)
-            frozenDuration: 3,
+            // Dieselbe Rechnung wie beim Helden — der Kreatur-Zaehler
+            // laeuft ebenfalls nur am Zugende des Kontrolleurs herunter.
+            frozenDuration: frostDauer(ctx.cardOwner, target.owner),
           });
         }
       }

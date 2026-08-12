@@ -319,8 +319,9 @@ async function reviveCreature(engine, pi, chosen) {
   if (!ps.supportZones[targetHi]) ps.supportZones[targetHi] = [[], [], []];
   ps.supportZones[targetHi][targetSi] = [chosen.name];
 
-  const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
-  const cd = allCards.find(c => c.name === chosen.name);
+  // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
+  // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.
+  const cd = require('./_card-db').getCardDB(engine)[chosen.name];
   const maxHp = cd?.hp || 100;
   const reviveHp = Math.ceil(maxHp / 2);
 

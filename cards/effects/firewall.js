@@ -66,6 +66,12 @@ module.exports = {
         damageType: 'destruction_spell',
         baseDamage: DAMAGE,
         title: CARD_NAME,
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'burned',
         description: `Deal ${DAMAGE} damage to any target and Burn it.`,
         confirmLabel: `🔥 ${DAMAGE} + Burn!`,
         confirmClass: 'btn-danger',

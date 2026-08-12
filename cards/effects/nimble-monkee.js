@@ -22,14 +22,24 @@
 //  gebucht und nichts zurueckgegeben.
 // ═══════════════════════════════════════════
 
-const { monkeeGoldTrigger, eligibleSummonZones, goldSourceVerbraucht, verbraucheGoldSource } = require('./_monkee-shared');
+const { monkeeGoldTrigger, eligibleSummonZones, goldSourceVerbraucht, verbraucheGoldSource,
+  investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
+} = require('./_monkee-shared');
 
 const CARD_NAME = 'Nimble Monkee';
 const HOPT_KEY = (pi) => `monkee-summon:${CARD_NAME}:${pi}`;
 const RESOLVING = '_nimbleMonkeeResolving';
 
 module.exports = {
-  activeIn: ['hand'],
+  activeIn: ['hand', 'support'],
+
+  // v345: OHNE dieses Flag bietet die Engine den Effekt gar nicht an —
+  // `creatureEffectScriptAllows` steigt bei `!script.creatureEffect`
+  // sofort aus, und `getActivatableCreatures` schickt die Karte dann nie
+  // als aktivierbar an den Client. Criminal Monkee hatte es schon, die
+  // anderen drei nicht: die Zweitfaehigkeiten aus v343 waren deshalb
+  // unausloesbar.
+  creatureEffect: true,
 
   hooks: {
     afterResourceGain: async (ctx) => {
@@ -127,5 +137,34 @@ module.exports = {
         gs[RESOLVING][pi] = false;
       }
     },
+  },
+
+  // ══ ZWEITE FAEHIGKEIT (v343): Invest Counter als Kosten ══
+  // 8 Invest Counter von einem eigenen Helden → 2 Karten ziehen.
+  // Die Zaehler kommen von Logan, the Investment Monkee — das ist die
+  // Klammer, die ihn in den Archetyp einbindet. Alles Gemeinsame
+  // (Kandidatensuche, Auswahl, Abbuchen, Einmal-pro-Zug je Instanz)
+  // steht in `_monkee-shared.js`.
+  canActivateCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    if (ctx.card?.zone !== 'support') return false;
+    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 8).length === 0) return false;
+    return true;
+  },
+
+  async onCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    if (ctx.card?.zone !== 'support') return false;
+    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (!await payInvestCounters(engine, pi, 8, CARD_NAME)) return false;
+    markInvestHopt(engine.gs, ctx.card);
+    await engine.actionDrawCards(pi, 2, { source: CARD_NAME });
+    engine.log('nimble_monkee_invest_draw', {
+      player: engine.gs.players[pi]?.username, cards: 2,
+    });
+    engine.sync();
+    return true;
   },
 };

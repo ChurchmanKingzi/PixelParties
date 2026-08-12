@@ -166,6 +166,19 @@ for (let it = 1; it <= iterations; it++) {
     // handhabbar und den Absturz schneller.
     const heapMax = process.env.PP_TRAIN_HEAP_MAX || '4096';
     const nodeArgs = [`--max-old-space-size=${heapMax}`, '--expose-gc'];
+    // PP_TRAIN_INSPECT=1 → Debugger-Port. Das einzige Werkzeug, das bei
+    // einem SYNCHRON blockierten Haupt-Thread noch etwas sagt: der
+    // Inspector laeuft in einem eigenen Thread. Beim Haenger in
+    // chrome://inspect verbinden und auf Pause druecken — der Call Stack
+    // zeigt die laufende Schleife. Funktioniert auch unter Windows, wo
+    // es kein SIGUSR2 fuer Diagnoseberichte gibt.
+    if (process.env.PP_TRAIN_INSPECT === '1') {
+      nodeArgs.unshift(`--inspect=${process.env.PP_TRAIN_INSPECT_PORT || '9229'}`);
+      if (attempt === 1) {
+        console.log('  [inspect] Debugger-Port offen — beim Haenger chrome://inspect oeffnen,');
+        console.log('            "inspect" klicken und im Sources-Tab auf Pause druecken.');
+      }
+    }
     if (process.env.PP_TRAIN_HEAPSNAP === '1') {
       nodeArgs.push('--heapsnapshot-near-heap-limit=1');
       if (attempt === 1) console.log(`  [heapsnap] V8 schreibt beim OOM einen Heap-Snapshot (Heap-Limit ${heapMax} MB).`);

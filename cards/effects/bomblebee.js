@@ -144,6 +144,39 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
 }
 
 module.exports = {
+
+  // ── CPU-Bewertungshinweis (v333) ──────────────────────────────────
+  // GEGENRICHTUNG: die uebrigen Chain-Quellen (Loyal Terrier, Cute
+  // Phoenix) profitieren, wenn eine Kreatur der EIGENEN Seite stirbt.
+  // Bomblebee ist der Spiegelfall — sie feuert, wenn ein GEGNERISCHES
+  // Ziel faellt, und macht das Toeten damit wertvoller statt teurer.
+  // `side: 'opponent'` sagt dem Bewerter genau das; er verrechnet die
+  // Quelle dann gegen die Slots der Gegenseite.
+  //
+  // 150 Schaden auf ein frei gewaehltes Ziel — auf der Slot-Skala
+  // (Basis 30, Boden 5) ist das ein spuerbarer, aber kein alles
+  // ueberragender Ertrag: 10.
+  cpuMeta: {
+    chainSource: {
+      side: 'opponent',
+      isArmed(engine, inst) {
+        if (!inst || inst.zone !== 'support' || inst.faceDown) return false;
+        try {
+          const { bomblebeeHoptUsed } = require('./_bomblebee-shared');
+          if (bomblebeeHoptUsed && bomblebeeHoptUsed(engine?.gs, inst)) return false;
+        } catch { /* ohne Auskunft lieber scharf annehmen */ }
+        return true;
+      },
+      triggersOn(engine, tributeInst, sourceInst) {
+        if (!tributeInst || !sourceInst) return false;
+        // Der Bewerter fragt nur fuer Kreaturen der Gegenseite; jeder
+        // solche Tod zaehlt.
+        return (tributeInst.controller ?? tributeInst.owner)
+          !== (sourceInst.controller ?? sourceInst.owner);
+      },
+      valuePerTrigger: 10,
+    },
+  },
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

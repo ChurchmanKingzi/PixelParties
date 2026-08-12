@@ -97,10 +97,106 @@ function anyFreeZone(ps) {
   return null;
 }
 
+/**
+ * ══ INVEST COUNTER ALS KOSTEN (v342) ══
+ *
+ * Alle vier Monkee-Kreaturen haben ab v342 eine zweite Faehigkeit der
+ * gleichen Bauart: „You may once per turn remove N Invest Counters from
+ * a Hero you control to …". Die Zaehler kommen von Logan, the
+ * Investment Monkee (`hero._investCounters`) — das ist die Klammer, die
+ * ihn in den Archetyp einbindet.
+ *
+ * Alles Gemeinsame steht deshalb hier: welcher Held zahlen kann, die
+ * Auswahl bei mehreren Kandidaten, das Abbuchen und die
+ * Einmal-pro-Zug-Sperre. Die Karten bringen nur noch ihren Preis und
+ * ihre Wirkung mit.
+ */
+const INVEST_KEY = '_investCounters';
+
+function investCountersOn(hero) {
+  return (hero && typeof hero[INVEST_KEY] === 'number') ? hero[INVEST_KEY] : 0;
+}
+
+/**
+ * Eigene Helden, die mindestens `n` Invest Counter tragen.
+ *
+ * „A Hero you control" schliesst BEZAUBERTE Helden aus — die werden
+ * technisch vom Gegner kontrolliert und sind daher keine legalen Ziele
+ * fuer Effekte, die nur eigene Ziele waehlen duerfen (Als Ruling 11.8.).
+ */
+function heroesWithInvest(ps, n) {
+  const out = [];
+  const heroes = ps?.heroes || [];
+  for (let hi = 0; hi < heroes.length; hi++) {
+    const hero = heroes[hi];
+    if (!hero?.name || hero.hp <= 0) continue;
+    if (hero.statuses?.charmed) continue;
+    if (investCountersOn(hero) < n) continue;
+    out.push({ hero, heroIdx: hi, counters: investCountersOn(hero) });
+  }
+  return out;
+}
+
+/** Einmal-pro-Zug-Schluessel der Invest-Faehigkeit — pro INSTANZ. */
+function investHoptKey(inst) {
+  return `monkee-invest:${inst?.id}`;
+}
+
+function investHoptUsed(gs, inst) {
+  return gs?.hoptUsed?.[investHoptKey(inst)] === gs?.turn;
+}
+
+function markInvestHopt(gs, inst) {
+  if (!gs.hoptUsed) gs.hoptUsed = {};
+  gs.hoptUsed[investHoptKey(inst)] = gs.turn;
+}
+
+/**
+ * Die Kosten bezahlen: `n` Invest Counter von EINEM eigenen Helden
+ * entfernen. Gibt es mehrere Kandidaten, waehlt der Spieler; bei genau
+ * einem wird ohne Rueckfrage abgebucht.
+ *
+ * @returns {Promise<boolean>} true, wenn bezahlt wurde
+ */
+async function payInvestCounters(engine, pi, n, cardName) {
+  const ps = engine.gs.players[pi];
+  const kandidaten = heroesWithInvest(ps, n);
+  if (kandidaten.length === 0) return false;
+
+  let gewaehlt = kandidaten[0];
+  if (kandidaten.length > 1) {
+    const wahl = await engine.promptGeneric(pi, {
+      type: 'optionPicker',
+      title: cardName,
+      description: `Remove ${n} Invest Counters from which Hero?`,
+      cancellable: true,
+      options: kandidaten.map(k => ({
+        id: String(k.heroIdx),
+        label: k.hero.name,
+        description: `${k.counters} Invest Counter${k.counters === 1 ? '' : 's'} → ${k.counters - n} left`,
+      })),
+    });
+    if (!wahl?.optionId) return false;
+    gewaehlt = kandidaten.find(k => String(k.heroIdx) === String(wahl.optionId));
+    if (!gewaehlt) return false;
+  }
+
+  const rest = investCountersOn(gewaehlt.hero) - n;
+  if (rest <= 0) delete gewaehlt.hero[INVEST_KEY];
+  else gewaehlt.hero[INVEST_KEY] = rest;
+  engine.log('monkee_invest_spent', {
+    player: ps.username, card: cardName,
+    hero: gewaehlt.hero.name, removed: n, left: Math.max(0, rest),
+  });
+  return true;
+}
+
 module.exports = {
   MONKEE, MIN_GOLD,
   isMonkeeName, isMonkeeCreature, monkeeGoldTrigger,
   goldSourceVerbraucht, verbraucheGoldSource,
   canHeroSummon, eligibleSummonZones,
   freeSlotOn, anyFreeZone,
+  INVEST_KEY, investCountersOn, heroesWithInvest,
+  investHoptUsed, markInvestHopt, payInvestCounters,
 };

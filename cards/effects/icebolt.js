@@ -24,6 +24,12 @@ module.exports = {
         damageType: 'destruction_spell',
         baseDamage: 120,
         title: 'Icebolt',
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'frozen',
         description: 'Choose a target to deal 120 damage and Freeze.',
         confirmLabel: '❄️ Icebolt! (120)',
         confirmClass: 'btn-info',

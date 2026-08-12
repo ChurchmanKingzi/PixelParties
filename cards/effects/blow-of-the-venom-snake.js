@@ -35,6 +35,12 @@ module.exports = {
         damageType: 'attack',
         baseDamage: baseAtk,
         title: 'Blow of the Venom Snake',
+        // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
+        // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
+        // `classifyTargetTags` stempelt stattdessen `stat:sticks` bzw.
+        // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
+        // das Haften die Schadens-Rangfolge verschiebt.
+        appliesStatus: 'poisoned',
         description: desc,
         confirmLabel: `🐍 Strike! (${baseAtk})`,
         confirmClass: 'btn-danger',

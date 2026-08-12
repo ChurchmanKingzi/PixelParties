@@ -28,15 +28,50 @@
 //  Kreatur (Als Ruling 4.8.).
 // ═══════════════════════════════════════════
 
-const { monkeeGoldTrigger, goldSourceVerbraucht, verbraucheGoldSource } = require('./_monkee-shared');
+const { monkeeGoldTrigger, goldSourceVerbraucht, verbraucheGoldSource,
+  investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
+} = require('./_monkee-shared');
 
 const CARD_NAME = 'Cheeky Monkee';
 const DAMAGE = 80;
+
+/** Jedes Ziel auf dem Brett: Helden und Kreaturen beider Seiten. */
+function alleBrettZiele(engine) {
+  const { hasCardType } = require('./_hooks');
+  const ziele = [];
+  for (let pi = 0; pi < 2; pi++) {
+    const heroes = engine.gs.players[pi]?.heroes || [];
+    for (let hi = 0; hi < heroes.length; hi++) {
+      const hero = heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      ziele.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: hero.name });
+    }
+  }
+  const db = engine._getCardDB ? engine._getCardDB() : {};
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if (!hasCardType(db[inst.name], 'Creature')) continue;
+    ziele.push({
+      id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`, type: 'equip',
+      owner: inst.owner, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+      cardName: inst.name, cardInstance: inst,
+    });
+  }
+  return ziele;
+}
 
 module.exports = {
   requiresTarget: true,
   // ^ Blinded-Gating, siehe cards/effects/_hooks.js.
   activeIn: ['support'],
+
+  // v345: OHNE dieses Flag bietet die Engine den Effekt gar nicht an —
+  // `creatureEffectScriptAllows` steigt bei `!script.creatureEffect`
+  // sofort aus, und `getActivatableCreatures` schickt die Karte dann nie
+  // als aktivierbar an den Client. Criminal Monkee hatte es schon, die
+  // anderen drei nicht: die Zweitfaehigkeiten aus v343 waren deshalb
+  // unausloesbar.
+  creatureEffect: true,
 
   hooks: {
     afterResourceGain: async (ctx) => {
@@ -118,5 +153,74 @@ module.exports = {
       });
       engine.sync();
     },
+  },
+
+  // ══ ZWEITE FAEHIGKEIT (v343): Invest Counter als Kosten ══
+  // 4 Invest Counter → 80 Schaden auf ein beliebiges Ziel auf dem Brett.
+  // Die Zaehler kommen von Logan, the Investment Monkee — das ist die
+  // Klammer, die ihn in den Archetyp einbindet. Alles Gemeinsame
+  // (Kandidatensuche, Auswahl, Abbuchen, Einmal-pro-Zug je Instanz)
+  // steht in `_monkee-shared.js`.
+  canActivateCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    if (ctx.card?.zone !== 'support') return false;
+    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    if (heroesWithInvest(engine.gs.players[ctx.cardOwner], 4).length === 0) return false;
+    return true;
+  },
+
+  async onCreatureEffect(ctx) {
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    if (ctx.card?.zone !== 'support') return false;
+    if (investHoptUsed(engine.gs, ctx.card)) return false;
+    // v346: Zielwahl VOR der Zahlung und abbrechbar — wie bei Resilient
+    // Monkee. Wer abbricht, hat nichts ausgegeben und seine
+    // Einmal-pro-Zug-Nutzung noch.
+    const ziele = alleBrettZiele(engine);
+    if (ziele.length === 0) return false;
+    const wahl = await engine.promptEffectTarget(pi, ziele, {
+      title: CARD_NAME,
+      description: 'Choose a target for 80 damage.',
+      confirmLabel: '💥 80 Damage!',
+      cancellable: true,
+      selectCount: 1,
+      minSelect: 1,
+    });
+    const id = Array.isArray(wahl) ? wahl[0] : wahl;
+    if (!id) return false;                            // abgebrochen
+    const ziel = ziele.find(t => t.id === id);
+    if (!ziel) return false;
+
+    if (!await payInvestCounters(engine, pi, 4, CARD_NAME)) return false;
+    markInvestHopt(engine.gs, ctx.card);
+    // v349 (Als Vorgabe, Muster Book of Doom): der Karten-Auftritt kommt
+    // ERST jetzt — Ziel steht, Kosten sind bezahlt. Der Server hat ihn
+    // nur angemeldet; wir loesen ihn aus, bevor die Bananen fallen.
+    engine.announceActiveEffect();
+    const quelle = ctx.card;
+    // v347: kleiner Bananenregen — dieselbe Animation wie bei Logan,
+    // nur mit weniger Bananen (`count`). Vor dem Schaden, damit erst
+    // die Bananen fallen und dann die Zahl erscheint.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'golden_banana_rain',
+      count: 6,
+      owner: ziel.owner,
+      heroIdx: ziel.heroIdx,
+      zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
+    });
+    await engine._delay(380);
+    if (ziel.type === 'hero') {
+      const held = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+      if (held && held.hp > 0) await engine.actionDealDamage(quelle, held, 80, 'creature');
+    } else if (ziel.cardInstance) {
+      await engine.actionDealCreatureDamage(quelle, ziel.cardInstance, 80, 'creature',
+        { sourceOwner: pi, canBeNegated: true });
+    }
+    engine.log('cheeky_monkee_invest_damage', {
+      player: engine.gs.players[pi]?.username, target: ziel.cardName, damage: 80,
+    });
+    engine.sync();
+    return true;
   },
 };

@@ -49,6 +49,10 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         title: 'Toxic Trap',
+        // Sagt dem CPU-Ziel-Gate, WELCHEN Status diese Abfrage anwendet
+        // (Als Auftrag 9.8.). Ohne die Angabe lief das Gate nicht, und
+        // die CPU verbrannte Status an Zielen, die Johanna schuetzt.
+        appliesStatus: 'poisoned',
         description: 'Choose a target to Poison (1 stack).',
         confirmLabel: '☠️ Poison!',
         confirmClass: 'btn-danger',
