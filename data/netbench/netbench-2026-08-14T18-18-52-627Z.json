@@ -1,0 +1,1001 @@
+{
+  "erzeugt": "2026-08-14T18:18:52.629Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "To Attain Divinity",
+      "deckB": "Gates to Hell",
+      "turns": 13,
+      "ms": 40845,
+      "nachrichten": 1561,
+      "raw": 6095870,
+      "wire": 110051,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 44172,
+      "snapshots": 6814,
+      "hookTimeouts": 0,
+      "gateChecks": 4,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 2,
+      "deckA": "Gather That Storm!",
+      "deckB": "Gates to Hell",
+      "turns": 2,
+      "ms": 43,
+      "nachrichten": 49,
+      "raw": 163464,
+      "wire": 6734,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 32,
+      "snapshots": 3,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 3,
+      "deckA": "Pew-Pew!",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 394,
+      "nachrichten": 170,
+      "raw": 558515,
+      "wire": 14069,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 672,
+      "snapshots": 44,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 4,
+      "deckA": "Dance of the Butterflies",
+      "deckB": "Gates to Hell",
+      "turns": 4,
+      "ms": 11418,
+      "nachrichten": 695,
+      "raw": 2583844,
+      "wire": 48709,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 12782,
+      "snapshots": 933,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug4p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 4,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug4p1ph3",
+          "noops": 0,
+          "reentry": 1
+        },
+        {
+          "zug": 4,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug4p1ph3",
+          "noops": 1,
+          "reentry": 1
+        }
+      ],
+      "switchTurnBlocks": [
+        {
+          "schluessel": "4:1",
+          "blockPhase": 3,
+          "blockRufer": "GameEngine.switchTurn@_engine.js:14027 ← GameEngine.runPhase@_engine.js:13747 ← async@_engine.js:13876 ← async@_cpu.js:790",
+          "halterZug": 3,
+          "halterAktiv": 0,
+          "halterPhase": 5,
+          "halterRufer": "GameEngine.switchTurn@_engine.js:14043 ← GameEngine.runPhase@_engine.js:13747 ← async@_engine.js:13876 ← async@_cpu.js:790"
+        }
+      ],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 5,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 4689,
+      "nachrichten": 458,
+      "raw": 1544764,
+      "wire": 32824,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 5125,
+      "snapshots": 1074,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug3p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 3,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug3p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 6,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "turns": 9,
+      "ms": 27958,
+      "nachrichten": 1269,
+      "raw": 4714136,
+      "wire": 90730,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 28470,
+      "snapshots": 2981,
+      "hookTimeouts": 0,
+      "gateChecks": 1,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 7,
+      "deckA": "Mawstruck",
+      "deckB": "Gates to Hell",
+      "turns": 2,
+      "ms": 4442,
+      "nachrichten": 310,
+      "raw": 1051175,
+      "wire": 24637,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 4922,
+      "snapshots": 669,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug2p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 2,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug2p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 8,
+      "deckA": "Burning Inferno",
+      "deckB": "Gates to Hell",
+      "turns": 4,
+      "ms": 13442,
+      "nachrichten": 721,
+      "raw": 2537808,
+      "wire": 51347,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 14687,
+      "snapshots": 2348,
+      "hookTimeouts": 0,
+      "gateChecks": 2,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 9,
+      "deckA": "Pew-Pew!",
+      "deckB": "Gates to Hell",
+      "turns": 1,
+      "ms": 39,
+      "nachrichten": 63,
+      "raw": 223165,
+      "wire": 7697,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 47,
+      "snapshots": 3,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug1p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 1,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug1p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 10,
+      "deckA": "Bloody King Zi",
+      "deckB": "Gates to Hell",
+      "turns": 7,
+      "ms": 23674,
+      "nachrichten": 1163,
+      "raw": 4371536,
+      "wire": 78227,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 25109,
+      "snapshots": 3070,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 1166,
+      "raw": 10285796,
+      "wire": 135352
+    },
+    {
+      "name": "action_log",
+      "count": 1048,
+      "raw": 138424,
+      "wire": 34804
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 124,
+      "raw": 10952,
+      "wire": 4220
+    },
+    {
+      "name": "card_reveal",
+      "count": 117,
+      "raw": 6518,
+      "wire": 2887
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 56,
+      "raw": 6428,
+      "wire": 2427
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 35,
+      "raw": 4360,
+      "wire": 1892
+    },
+    {
+      "name": "ability_activated",
+      "count": 48,
+      "raw": 3586,
+      "wire": 1349
+    },
+    {
+      "name": "potion_resolved",
+      "count": 18,
+      "raw": 1496,
+      "wire": 980
+    },
+    {
+      "name": "deck_search_add",
+      "count": 32,
+      "raw": 2068,
+      "wire": 896
+    },
+    {
+      "name": "gold_change",
+      "count": 20,
+      "raw": 824,
+      "wire": 490
+    },
+    {
+      "name": "game_started",
+      "count": 2,
+      "raw": 552,
+      "wire": 387
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 8,
+      "raw": 1000,
+      "wire": 363
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 10,
+      "raw": 600,
+      "wire": 353
+    },
+    {
+      "name": "summon_effect",
+      "count": 10,
+      "raw": 826,
+      "wire": 336
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 6,
+      "raw": 1032,
+      "wire": 334
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 4,
+      "raw": 692,
+      "wire": 301
+    },
+    {
+      "name": "play_projectile_animation",
+      "count": 4,
+      "raw": 780,
+      "wire": 273
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 4,
+      "raw": 488,
+      "wire": 172
+    },
+    {
+      "name": "birthday_present_reveal_start",
+      "count": 2,
+      "raw": 224,
+      "wire": 129
+    },
+    {
+      "name": "timeless_king_reveal_clear",
+      "count": 2,
+      "raw": 216,
+      "wire": 88
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 2,
+      "raw": 228,
+      "wire": 82
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 2,
+      "raw": 142,
+      "wire": 76
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 2,
+      "raw": 66,
+      "wire": 47
+    },
+    {
+      "name": "area_descend",
+      "count": 2,
+      "raw": 108,
+      "wire": 40
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-38cc2ed4",
+      "count": 790,
+      "raw": 3028036,
+      "wire": 55027
+    },
+    {
+      "sid": "sid-b-netbench-38cc2ed4",
+      "count": 770,
+      "raw": 3067558,
+      "wire": 54830
+    },
+    {
+      "sid": "sid-a-netbench-43acb3ed",
+      "count": 578,
+      "raw": 2196146,
+      "wire": 39523
+    },
+    {
+      "sid": "sid-b-netbench-43acb3ed",
+      "count": 584,
+      "raw": 2175114,
+      "wire": 38511
+    },
+    {
+      "sid": "room:netbench-38cc2ed4",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-43acb3ed",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 2724,
+    "raw": 10467406,
+    "wire": 188278
+  },
+  "groesste_nachricht": {
+    "bytes": 12584,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 2,
+    "raw": 550
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 2,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1200hp, deck 54, hand 6) | p1(heroes 3/3 alive, 1050hp, deck 53, hand 4) | turn 2 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 3,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Bow Sniper Darge\" → Theme \"darge\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1000hp, deck 50, hand 7) | p1(heroes 3/3 alive, 1150hp, deck 50, hand 5) | turn 3 phase 1 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Beato, the Butterfly Witch\" → Theme \"beato\" (48 Themes im Ordner)",
+        "[warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→3 — ok:zugende@zug4p1ph3",
+        "[warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→3 — ok:zugende@zug4p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 950hp, deck 42, hand 7) | p1(heroes 3/3 alive, 1200hp, deck 36, hand 7) | turn 4 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 5,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)",
+        "[warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1150hp, deck 47, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 5) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 6,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 450hp, deck 35, hand 6) | p1(heroes 3/3 alive, 650hp, deck 29, hand 8) | turn 9 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 7,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Nero Zira, the Mastermind\" → Theme \"nerozira\" (48 Themes im Ordner)",
+        "[warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→3 — ok:zugende@zug2p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1250hp, deck 52, hand 3) | p1(heroes 3/3 alive, 1200hp, deck 51, hand 5) | turn 2 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 8,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Luna Pele, the Flame Dancer\" → Theme \"lunapele\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1350hp, deck 43, hand 5) | p1(heroes 3/3 alive, 660hp, deck 36, hand 6) | turn 4 phase 5 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 9,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)",
+        "[warn] [CPU] STILLER HALT: Zug 1 p1 Phase 2→3 — ok:zugende@zug1p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1150hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 54, hand 4) | turn 1 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "gate_statistik": [
+    {
+      "nr": 1,
+      "deckA": "To Attain Divinity",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 4,
+      "schilde": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Gather That Storm!",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Pew-Pew!",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Dance of the Butterflies",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 1,
+      "schilde": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Mawstruck",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Burning Inferno",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 2,
+      "schilde": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Pew-Pew!",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Bloody King Zi",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    }
+  ],
+  "uebergabe_statistik": [
+    {
+      "nr": 1,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 2,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 3,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 4,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 1,
+      "noops": 1,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 5,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 6,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 7,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 8,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 9,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    },
+    {
+      "nr": 10,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": []
+    }
+  ],
+  "kandidaten_heap": {
+    "Adventurousness": {
+      "rollouts": 1099,
+      "mbGesamt": 538.57,
+      "mbProRollout": 0.4901,
+      "ueberSchwelle": 86
+    },
+    "Magic Hammer": {
+      "rollouts": 67,
+      "mbGesamt": 5.5,
+      "mbProRollout": 0.0821,
+      "ueberSchwelle": 0
+    },
+    "Ska Harpyformer": {
+      "rollouts": 148,
+      "mbGesamt": -0.2,
+      "mbProRollout": -0.0013,
+      "ueberSchwelle": 60
+    },
+    "Flame Avalanche": {
+      "rollouts": 11,
+      "mbGesamt": 30.37,
+      "mbProRollout": 2.7613,
+      "ueberSchwelle": 0
+    },
+    "Compulsory Body Swap": {
+      "rollouts": 256,
+      "mbGesamt": -3.08,
+      "mbProRollout": -0.012,
+      "ueberSchwelle": 0
+    },
+    "Demon's Gate": {
+      "rollouts": 548,
+      "mbGesamt": 316.48,
+      "mbProRollout": 0.5775,
+      "ueberSchwelle": 68
+    },
+    "Hell Fox": {
+      "rollouts": 24,
+      "mbGesamt": 53.77,
+      "mbProRollout": 2.2404,
+      "ueberSchwelle": 0
+    },
+    "Prophecy of Tempeste": {
+      "rollouts": 8,
+      "mbGesamt": 9.47,
+      "mbProRollout": 1.1833,
+      "ueberSchwelle": 0
+    },
+    "Chain Lightning": {
+      "rollouts": 3,
+      "mbGesamt": -2.4,
+      "mbProRollout": -0.799,
+      "ueberSchwelle": 0
+    },
+    "Brilliant Idea": {
+      "rollouts": 220,
+      "mbGesamt": 34.37,
+      "mbProRollout": 0.1562,
+      "ueberSchwelle": 0
+    },
+    "Infected Greatmaw": {
+      "rollouts": 80,
+      "mbGesamt": 16.58,
+      "mbProRollout": 0.2072,
+      "ueberSchwelle": 30
+    },
+    "Luna Kiai": {
+      "rollouts": 82,
+      "mbGesamt": 27.73,
+      "mbProRollout": 0.3381,
+      "ueberSchwelle": 1
+    },
+    "Dance of the Flame Pillars": {
+      "rollouts": 78,
+      "mbGesamt": 5.13,
+      "mbProRollout": 0.0657,
+      "ueberSchwelle": 37
+    },
+    "Pyroblast": {
+      "rollouts": 157,
+      "mbGesamt": 55.52,
+      "mbProRollout": 0.3536,
+      "ueberSchwelle": 13
+    },
+    "Timeless King Zi": {
+      "rollouts": 27,
+      "mbGesamt": 28.38,
+      "mbProRollout": 1.0511,
+      "ueberSchwelle": 0
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 63,
+  "cpu_ms_gesamt": 136018,
+  "hook_feuer_je_karte": {
+    "Giga Steroids": 111,
+    "Treasure Huntress Semi": 98,
+    "Elixir of Immortality": 74,
+    "Performance": 44,
+    "Archibald, the Archmage": 28,
+    "Luck": 25,
+    "Willy, the Valiant Leprechaun": 23,
+    "Alex, Trainer of Heroes": 19,
+    "Barker, the Monster Tamer": 17,
+    "Beato, the Butterfly Witch": 16,
+    "Blood Rock": 15,
+    "Nicolas, the Hidden Alchemist": 13,
+    "Ska Harpyformer": 11,
+    "Fighting": 10,
+    "Wealth": 10,
+    "Luna Pele, the Flame Dancer": 9,
+    "Goff, the Burnbringer": 9,
+    "Cardinal Beast Qinglong": 7,
+    "Cardinal Beast Zhuque": 7,
+    "Ingo, Investor of Evil": 7,
+    "Nero Zira, the Mastermind": 7,
+    "Dichotomy of Luna and Tempeste": 7,
+    "Prophecy of Tempeste": 4,
+    "Cool Rescuer Monia": 3,
+    "Pollution Token": 3,
+    "Compulsory Body Swap": 2,
+    "Tarleinn the Traveler": 2,
+    "Archer": 2,
+    "Bow Sniper Darge": 2,
+    "Graveyard Gathering": 2,
+    "Brilliant Idea": 2,
+    "Cardinal Beast Xuanwu": 2,
+    "Luna Kiai": 2,
+    "Sacrifice to Divinity": 1,
+    "Magic Hammer": 1,
+    "Flame Avalanche": 1,
+    "Chain Lightning": 1,
+    "Divine Gift of Sacrifice": 1,
+    "Controlled Attack": 1,
+    "Divine Gift of Fire": 1,
+    "Dance of the Flame Pillars": 1,
+    "Fireball": 1,
+    "Pyroblast": 1,
+    "Divine Gift of the Guardian": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 86,
+    "Demon's Gate": 68,
+    "Ska Harpyformer": 60,
+    "Dance of the Flame Pillars": 37,
+    "Infected Greatmaw": 30,
+    "Pyroblast": 13,
+    "Luna Kiai": 1
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Ska Harpyformer [rule]": 1,
+    "Barker, the Monster Tamer → Goff, the Burnbringer [rule]": 1
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [],
+  "heil_zielwahl": {},
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "To Attain Divinity",
+      "cpuMs": 22086,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 22086
+    },
+    {
+      "name": "Bloody King Zi",
+      "cpuMs": 12554.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 12554.5
+    },
+    {
+      "name": "Burning Inferno",
+      "cpuMs": 7343.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 7343.5
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 84806.5,
+      "partien": 12,
+      "abbrueche": 10,
+      "proPartie": 7067.208333333333
+    },
+    {
+      "name": "Dance of the Butterflies",
+      "cpuMs": 6391,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 6391
+    },
+    {
+      "name": "Mawstruck",
+      "cpuMs": 2461,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 2461
+    },
+    {
+      "name": "Pew-Pew!",
+      "cpuMs": 359.5,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 179.75
+    },
+    {
+      "name": "Gather That Storm!",
+      "cpuMs": 16,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 16
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 94139,
+    "roh_je_partie": 5233703,
+    "wire_je_verbindung": 47069.5,
+    "wire_je_halbzug": 9413.9,
+    "kompressionsfaktor": 55.59548115021405
+  }
+}

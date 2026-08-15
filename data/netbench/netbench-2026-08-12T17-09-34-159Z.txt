@@ -1,0 +1,172 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 20 | Zuschauer je Partie: 3 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler + 3 Zuschauer je Partie.
+
+  Partie   1/20   74 Halbzuege    8640 Nachrichten    35.78 MB roh  →    0.533 MB Leitung    36 s    40 s CPU  Bamboo Warrior vs Cool Gang
+  Partie   2/20    3 Halbzuege     341 Nachrichten     1.00 MB roh  →    0.026 MB Leitung   600 s   565 s CPU  ⚠ zeitlimit@zug3  Sacrificial Demons vs Man's Best Friends
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Calamitusk, the Chaorc War Chief" → Theme "calamitusk" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   3/20   51 Halbzuege    9351 Nachrichten    35.40 MB roh  →    0.573 MB Leitung    25 s    29 s CPU  Grand Rebellion! vs Shadows over Blackport
+  Partie   4/20   40 Halbzuege    7056 Nachrichten    23.77 MB roh  →    0.424 MB Leitung   600 s   573 s CPU  ⚠ zeitlimit@zug40  Great Weapon Master vs Big Stomp!
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Toras, Master of all Weapons" → Theme "toras" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [error] [overload] trail dump → C:\Pixel Parties WEB\PixelPartiesWeb\mcts-overload-1786549539467-t40-cpu-deadline.trail.json
+       [warn] [Engine] ⚠️  Karteneffekte in Zug 38 stillgelegt (erster unterdrueckter Hook: onResourceGain, bereits 33 Hooks gefeuert). Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus.
+  Partie   5/20   35 Halbzuege    6616 Nachrichten    20.68 MB roh  →    0.339 MB Leitung    24 s    25 s CPU  Pew-Pew! vs Flying Sparks
+  Partie   6/20   66 Halbzuege   12854 Nachrichten    43.90 MB roh  →    0.778 MB Leitung    81 s    78 s CPU  Man's Best Friends vs Poison Torture
+  Partie   7/20   16 Halbzuege    1748 Nachrichten     6.50 MB roh  →    0.115 MB Leitung   600 s   572 s CPU  ⚠ zeitlimit@zug16  Dance of the Butterflies vs Steam Dwarf Mines
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Beato, the Butterfly Witch" → Theme "beato" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   8/20    1 Halbzuege      56 Nachrichten     0.15 MB roh  →    0.011 MB Leitung   600 s   567 s CPU  ⚠ zeitlimit@zug1  Burning Inferno vs Elven Vanguard
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   9/20    1 Halbzuege      41 Nachrichten     0.12 MB roh  →    0.010 MB Leitung   600 s   568 s CPU  ⚠ zeitlimit@zug1  Elven Vanguard vs Join our Cult!
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  10/20   94 Halbzuege   18505 Nachrichten    65.02 MB roh  →    1.133 MB Leitung    33 s    35 s CPU  Parts of the Soul vs Great Weapon Master
+  Partie  11/20    9 Halbzuege    2260 Nachrichten     6.21 MB roh  →    0.133 MB Leitung     5 s     6 s CPU  Great Weapon Master vs Gather That Storm!
+  Partie  12/20   21 Halbzuege    5672 Nachrichten    16.83 MB roh  →    0.291 MB Leitung    20 s    21 s CPU  Bloody King Zi vs Gather That Storm!
+  Partie  13/20   21 Halbzuege    3056 Nachrichten     9.13 MB roh  →    0.169 MB Leitung    20 s    22 s CPU  Flying Sparks vs Cute Commando
+  Partie  14/20    1 Halbzuege      86 Nachrichten     0.21 MB roh  →    0.012 MB Leitung   600 s   593 s CPU  ⚠ zeitlimit@zug1  Elven Vanguard vs Shadows over Blackport
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  15/20   16 Halbzuege    2997 Nachrichten     8.80 MB roh  →    0.160 MB Leitung   600 s   594 s CPU  ⚠ zeitlimit@zug16  Join our Cult! vs Steam Dwarf Mines
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Klaus, the Cult Leader" → Theme "klaus" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  16/20    1 Halbzuege      71 Nachrichten     0.24 MB roh  →    0.012 MB Leitung   600 s   592 s CPU  ⚠ zeitlimit@zug1  Idej Illusions vs Elven Vanguard
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  17/20   10 Halbzuege    1094 Nachrichten     3.80 MB roh  →    0.080 MB Leitung   600 s   592 s CPU  ⚠ zeitlimit@zug10  Steam Dwarf Mines vs Venom Swamp
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  18/20   49 Halbzuege    9167 Nachrichten    30.46 MB roh  →    0.492 MB Leitung    37 s    40 s CPU  Creepy Crawlies vs Bloody King Zi
+  Partie  19/20   26 Halbzuege    6365 Nachrichten    22.05 MB roh  →    0.389 MB Leitung    12 s    14 s CPU  Idej Illusions vs Great Weapon Master
+  Partie  20/20    2 Halbzuege     179 Nachrichten     0.49 MB roh  →    0.017 MB Leitung   600 s   590 s CPU  ⚠ zeitlimit@zug2  Depths of the Cosmos vs Elven Vanguard
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Argos, the Eye of the Cosmos" → Theme "argos" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+
+[netbench] 44 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 10 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   74.2%      367.0 KB    28763.4 KB       3983    7.22 KB       98.7%  game_state
+   19.8%       98.1 KB      396.1 KB       3224    0.12 KB       75.2%  action_log
+    1.8%        8.8 KB       24.3 KB        502    0.05 KB       63.7%  card_reveal
+    1.2%        6.1 KB       12.8 KB        110    0.12 KB       52.7%  hand_to_board_fly
+    0.8%        4.2 KB        9.7 KB        134    0.07 KB       56.8%  ability_activated
+    0.4%        1.8 KB        4.2 KB         50    0.08 KB       57.6%  play_zone_animation
+    0.3%        1.5 KB        4.1 KB         36    0.12 KB       64.4%  play_pile_transfer
+    0.2%        1.2 KB        2.4 KB         40    0.06 KB       49.5%  fighting_atk_change
+    0.2%        1.0 KB        2.1 KB         32    0.06 KB       49.7%  deck_search_add
+    0.2%        1.0 KB        2.7 KB         32    0.08 KB       64.2%  summon_effect
+    0.2%        0.9 KB        1.6 KB         12    0.13 KB       43.3%  play_hand_steal
+    0.2%        0.9 KB        1.3 KB         18    0.07 KB       33.4%  potion_resolved
+    0.1%        0.4 KB        0.9 KB          8    0.11 KB       58.2%  deck_to_deleted
+    0.1%        0.4 KB        0.6 KB         16    0.04 KB       41.5%  gold_change
+    0.1%        0.3 KB        0.9 KB          8    0.12 KB       66.3%  qinglong_lightning
+  … und 12 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler        125.1 KB Leitung je Verbindung und Partie  (7692.5 KB roh)
+  Zuschauer       81.4 KB Leitung je Verbindung und Partie  (4615.0 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            28.55 MB roh  →  0.483 MB auf der Leitung
+  Ø je Verbindung:        98.9 KB
+  Ø je Halbzug (alle):    11.09 KB
+  Singleplayer (1 Client): ~98.9 KB je Partie
+  PvP (2 Clients):         ~197.8 KB je Partie
+  je zusätzlichem Zuschauer: ~98.9 KB je Partie
+  In 5 GB passen:          ~53.000 Singleplayer-Partien
+                           ~26.500 PvP-Partien
+  OHNE Kompression wären es 896 bzw. 448 — Faktor 59.1
+  Größte Einzelnachricht:  12.9 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 20 Partien: 101.9 min CPU
+    594 s  bei  16 Halbzuegen (37.1 s/Halbzug)   ⚠ Join our Cult! vs Steam Dwarf Mines
+    593 s  bei   1 Halbzuegen (593.1 s/Halbzug)   ⚠ Elven Vanguard vs Shadows over Blackport
+    592 s  bei  10 Halbzuegen (59.2 s/Halbzug)   ⚠ Steam Dwarf Mines vs Venom Swamp
+    592 s  bei   1 Halbzuegen (591.7 s/Halbzug)   ⚠ Idej Illusions vs Elven Vanguard
+    590 s  bei   2 Halbzuegen (295.1 s/Halbzug)   ⚠ Depths of the Cosmos vs Elven Vanguard
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+        296        1          1  Venom Swamp
+        295        1          1  Depths of the Cosmos
+        293        3          3  Steam Dwarf Mines
+        291        5          5  Elven Vanguard
+        291        2          2  Join our Cult!
+        287        1          1  Big Stomp!
+        286        1          1  Dance of the Butterflies
+        283        1          1  Burning Inferno
+        282        1          1  Sacrificial Demons
+        161        2          1  Man's Best Friends
+  → Abbrueche haeufen sich bei: Venom Swamp (1), Depths of the Cosmos (1), Steam Dwarf Mines (3), Elven Vanguard (5), Join our Cult! (2), Big Stomp! (1), Dance of the Butterflies (1), Burning Inferno (1), Sacrificial Demons (1), Man's Best Friends (1), Shadows over Blackport (1), Idej Illusions (1), Great Weapon Master (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+     1289   14.5%  Elixir of Immortality
+     1141   12.9%  Wealth
+      961   10.8%  Giga Steroids
+      547    6.2%  Glass of Marbles
+      434    4.9%  Reiza, the Chief Tormentor
+      277    3.1%  Rebelliokai Backup Bakus
+      233    2.6%  Creativity
+      222    2.5%  Arthor, the King of Blackport
+      199    2.2%  Loyal Hountriever
+      169    1.9%  Hammer Throw   ⚠ 71 leckende Rollouts
+      166    1.9%  Quick Attack
+      135    1.5%  Skull Necklace
+      134    1.5%  Heavy Hit   ⚠ 20 leckende Rollouts
+      133    1.5%  Thieving Strike   ⚠ 11 leckende Rollouts
+      108    1.2%  Shield of Death
+
+═══ ⚠ LECKENDE ROLLOUTS ═══
+  Rollouts, die nach dem Zuruecksetzen ueber 0,5 MB nicht freigegeben haben.
+  Die Engine nennt das selbst den Anfang einer „death spiral" — solche Karten
+  treiben die Suchkosten hoch, ohne dass am Brett etwas passiert.
+    149x  Adventurousness
+    105x  Chain Lightning
+     71x  Hammer Throw
+     60x  Icy Grave
+     58x  Burning Finger
+     45x  Kappa Sword Slash
+     38x  Steam Dwarf Exterminator
+     30x  Gravedigger Slap
+     27x  Forceful Revival
+     20x  Heavy Hit
+  Broadcasts an ALLE:      10 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         74         8640      35.78        0.533    36     40        ja  deck_out           Bamboo Warrior vs Cool Gang
+   2          3          341       1.00        0.026   600    565      NEIN  zeitlimit@zug3     Sacrificial Demons vs Man's Best Friends
+   3         51         9351      35.40        0.573    25     29        ja  deck_out           Grand Rebellion! vs Shadows over Blackport
+   4         40         7056      23.77        0.424   600    573      NEIN  zeitlimit@zug40    Great Weapon Master vs Big Stomp!
+   5         35         6616      20.68        0.339    24     25        ja  deck_out           Pew-Pew! vs Flying Sparks
+   6         66        12854      43.90        0.778    81     78        ja  deck_out           Man's Best Friends vs Poison Torture
+   7         16         1748       6.50        0.115   600    572      NEIN  zeitlimit@zug16    Dance of the Butterflies vs Steam Dwarf Mines
+   8          1           56       0.15        0.011   600    567      NEIN  zeitlimit@zug1     Burning Inferno vs Elven Vanguard
+   9          1           41       0.12        0.010   600    568      NEIN  zeitlimit@zug1     Elven Vanguard vs Join our Cult!
+  10         94        18505      65.02        1.133    33     35        ja  deck_out           Parts of the Soul vs Great Weapon Master
+  11          9         2260       6.21        0.133     5      6        ja  all_heroes_dead    Great Weapon Master vs Gather That Storm!
+  12         21         5672      16.83        0.291    20     21        ja  deck_out           Bloody King Zi vs Gather That Storm!
+  13         21         3056       9.13        0.169    20     22        ja  deck_out           Flying Sparks vs Cute Commando
+  14          1           86       0.21        0.012   600    593      NEIN  zeitlimit@zug1     Elven Vanguard vs Shadows over Blackport
+  15         16         2997       8.80        0.160   600    594      NEIN  zeitlimit@zug16    Join our Cult! vs Steam Dwarf Mines
+  16          1           71       0.24        0.012   600    592      NEIN  zeitlimit@zug1     Idej Illusions vs Elven Vanguard
+  17         10         1094       3.80        0.080   600    592      NEIN  zeitlimit@zug10    Steam Dwarf Mines vs Venom Swamp
+  18         49         9167      30.46        0.492    37     40        ja  deck_out           Creepy Crawlies vs Bloody King Zi
+  19         26         6365      22.05        0.389    12     14        ja  all_heroes_dead    Idej Illusions vs Great Weapon Master
+  20          2          179       0.49        0.017   600    590      NEIN  zeitlimit@zug2     Depths of the Cosmos vs Elven Vanguard

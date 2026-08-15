@@ -1,0 +1,174 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 20 | Zuschauer je Partie: 3 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler + 3 Zuschauer je Partie.
+
+  Partie   1/20   86 Halbzuege   25876 Nachrichten    86.28 MB roh  →    1.466 MB Leitung    61 s    68 s CPU  Slip 'n Slide vs Great Weapon Master
+  Partie   2/20   64 Halbzuege   15066 Nachrichten    51.29 MB roh  →    0.826 MB Leitung    34 s    35 s CPU  ⚠ ohne-spielende  Depths of the Cosmos vs Bone Rush
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+  Partie   3/20   68 Halbzuege   12352 Nachrichten    40.94 MB roh  →    0.629 MB Leitung    30 s    31 s CPU  Pew-Pew! vs Shadows over Blackport
+  Partie   4/20   24 Halbzuege    6008 Nachrichten    17.88 MB roh  →    0.308 MB Leitung    24 s    26 s CPU  Gather That Storm! vs Bloody King Zi
+  Partie   5/20    5 Halbzuege     778 Nachrichten     1.93 MB roh  →    0.048 MB Leitung   600 s   562 s CPU  ⚠ zeitlimit@zug5  Steam Dwarf Mines vs Flying Sparks
+     ↳ 29 abgebrochene(r) Hook(s): 
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Layn, Defender of Deri" → Theme "layn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   6/20   53 Halbzuege    4331 Nachrichten    15.51 MB roh  →    0.256 MB Leitung    34 s    35 s CPU  Mawstruck vs Creepy Crawlies
+  Partie   7/20   93 Halbzuege   23097 Nachrichten    69.89 MB roh  →    1.105 MB Leitung    54 s    52 s CPU  Pew-Pew! vs Mawstruck
+  Partie   8/20   73 Halbzuege    8092 Nachrichten    32.53 MB roh  →    0.527 MB Leitung    13 s    13 s CPU  Shadows over Blackport vs Morph and Kill!
+  Partie   9/20   82 Halbzuege   22514 Nachrichten    79.60 MB roh  →    1.237 MB Leitung   112 s   107 s CPU  Creepy Crawlies vs Slip 'n Slide
+  Partie  10/20   30 Halbzuege    6796 Nachrichten    22.56 MB roh  →    0.367 MB Leitung    16 s    17 s CPU  Gather That Storm! vs Dance of the Butterflies
+  Partie  11/20   47 Halbzuege    8206 Nachrichten    29.32 MB roh  →    0.467 MB Leitung    71 s    69 s CPU  Big Stomp! vs Morph and Kill!
+  Partie  12/20   57 Halbzuege   10876 Nachrichten    37.73 MB roh  →    0.620 MB Leitung    19 s    18 s CPU  Cool Gang vs Shadows over Blackport
+  Partie  13/20    2 Halbzuege     303 Nachrichten     0.85 MB roh  →    0.023 MB Leitung   600 s   551 s CPU  ⚠ zeitlimit@zug2  Pew-Pew! vs Slimy Infestation
+     ↳ 8 abgebrochene(r) Hook(s): 
+     ↳ letzte 6 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Bow Sniper Darge" → Theme "darge" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [error] [overload] trail dump → C:\Pixel Parties WEB\PixelPartiesWeb\mcts-overload-1786565480629-t1-cpu-deadline.trail.json
+       [error] [CPU] turn error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseStart). Top hooks: onPhaseStart:6 onPhaseEnd:5 beforeDraw:4 onDraw:4 onResourceGain:2 afterResourceGain:2 onPlay:2 onCardEnterZone:2. Top instances: Adventurousness×4, Support Magic×2, Fighting×2, Summoning Magic×2, Leadership×2. Top firing cards: Stellan, the Calm Cat×4, Fighting×2, Treasure Huntress Semi×2, Barker, the Monster Tamer×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach "Leadership" → t1/ph2/p0 attach "Fighting" → t1/ph3/p0 rollout "Adventurousness". Force-ending in-flight chain. Error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseStart). Top hooks: onPhaseStart:6 onPhaseEnd:5 beforeDraw:4 onDraw:4 onResourceGain:2 afterResourceGain:2 onPlay:2 onCardEnterZone:2. Top instances: Adventurousness×4, Support Magic×2, Fighting×2, Summoning Magic×2, Leadership×2. Top firing cards: Stellan, the Calm Cat×4, Fighting×2, Treasure Huntress Semi×2, Barker, the Monster Tamer×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach "Leadership" → t1/ph2/p0 attach "Fighting" → t1/ph3/p0 rollout "Adventurousness". Force-ending in-flight chain.
+    at GameEngine.runHooks (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:2466:19)
+    at GameEngine.runPhase (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13477:16)
+    at GameEngine.advancePhase (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13730:16)
+    at async runCpuTurn (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_cpu.js:772:3)
+    at async GameEngine.cpuTurn [as _cpuDriver] (C:\Pixel Parties WEB\PixelPartiesWeb\server.js:5376:7)
+    at async GameEngine.startGame (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13195:13)
+       [warn] [CPU] Zug 1 haengt nach Fehler — erzwinge Zugübergabe.
+       [warn] [Engine] ⚠️  Karteneffekte in Zug 1 stillgelegt (erster unterdrueckter Hook: onTurnEnd, bereits 32 Hooks gefeuert). Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus.
+  Partie  14/20   16 Halbzuege    2270 Nachrichten     7.99 MB roh  →    0.139 MB Leitung    12 s    14 s CPU  Idej Illusions vs Morph and Kill!
+  Partie  15/20    7 Halbzuege     696 Nachrichten     2.28 MB roh  →    0.049 MB Leitung   600 s   550 s CPU  ⚠ zeitlimit@zug7  Dance of the Butterflies vs Steam Dwarf Mines
+     ↳ 107 abgebrochene(r) Hook(s): 
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Layn, Defender of Deri" → Theme "layn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  16/20   54 Halbzuege   12511 Nachrichten    42.39 MB roh  →    0.682 MB Leitung    60 s    57 s CPU  Man's Best Friends vs Sun Fencer Frenzy
+  Partie  17/20   52 Halbzuege   10796 Nachrichten    37.40 MB roh  →    0.603 MB Leitung    84 s    79 s CPU  Shadows over Blackport vs Deepsea Terror
+  Partie  18/20   41 Halbzuege   12470 Nachrichten    42.95 MB roh  →    0.672 MB Leitung    42 s    43 s CPU  Slip 'n Slide vs One-Two-Punch!
+  Partie  19/20   72 Halbzuege   18250 Nachrichten    63.59 MB roh  →    0.971 MB Leitung    92 s    88 s CPU  Boom Boom Kaboom! vs Dance of the Butterflies
+  Partie  20/20    2 Halbzuege     139 Nachrichten     0.42 MB roh  →    0.015 MB Leitung   600 s   547 s CPU  ⚠ zeitlimit@zug2  Sacrificial Demons vs Parts of the Soul
+     ↳ 3 abgebrochene(r) Hook(s): 
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Thep, the Court Scribe" → Theme "thep" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+
+[netbench] 88 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 15 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.1%      487.6 KB    42068.6 KB       5774    7.29 KB       98.8%  game_state
+   20.6%      141.1 KB      563.2 KB       4522    0.12 KB       74.9%  action_log
+    2.2%       14.8 KB       39.3 KB        846    0.05 KB       62.4%  card_reveal
+    1.4%        9.7 KB       19.6 KB        176    0.11 KB       50.8%  hand_to_board_fly
+    1.0%        6.9 KB       22.5 KB        120    0.19 KB       69.5%  play_card_transfer
+    1.0%        6.8 KB       18.3 KB        282    0.06 KB       62.9%  ability_activated
+    0.4%        3.0 KB        7.0 KB        118    0.06 KB       57.2%  creature_zone_move
+    0.4%        2.8 KB        6.9 KB         83    0.08 KB       59.1%  play_zone_animation
+    0.4%        2.6 KB        6.6 KB         51    0.13 KB       60.7%  play_pile_transfer
+    0.3%        1.8 KB        3.0 KB         22    0.14 KB       40.3%  play_hand_steal
+    0.3%        1.7 KB        2.6 KB         80    0.03 KB       33.3%  play_gold_coins
+    0.2%        1.4 KB        4.1 KB         49    0.08 KB       65.3%  summon_effect
+    0.2%        1.4 KB        2.9 KB         49    0.06 KB       50.6%  fighting_atk_change
+    0.2%        1.2 KB        2.4 KB         36    0.06 KB       50.3%  deck_search_add
+    0.1%        0.8 KB        1.3 KB         18    0.07 KB       34.8%  potion_resolved
+  … und 18 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler        164.6 KB Leitung je Verbindung und Partie  (10485.0 KB roh)
+  Zuschauer      118.9 KB Leitung je Verbindung und Partie  (7268.0 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            41.77 MB roh  →  0.670 MB auf der Leitung
+  Ø je Verbindung:        137.2 KB
+  Ø je Halbzug (alle):    12.13 KB
+  Singleplayer (1 Client): ~137.2 KB je Partie
+  PvP (2 Clients):         ~274.4 KB je Partie
+  je zusätzlichem Zuschauer: ~137.2 KB je Partie
+  In 5 GB passen:          ~38.212 Singleplayer-Partien
+                           ~19.106 PvP-Partien
+  OHNE Kompression wären es 612 bzw. 306 — Faktor 62.4
+  Größte Einzelnachricht:  13.1 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 20 Partien: 49.4 min CPU
+    562 s  bei   5 Halbzuegen (112.4 s/Halbzug)   ⚠ Steam Dwarf Mines vs Flying Sparks
+    551 s  bei   2 Halbzuegen (275.4 s/Halbzug)   ⚠ Pew-Pew! vs Slimy Infestation
+    550 s  bei   7 Halbzuegen (78.5 s/Halbzug)   ⚠ Dance of the Butterflies vs Steam Dwarf Mines
+    547 s  bei   2 Halbzuegen (273.4 s/Halbzug)   ⚠ Sacrificial Demons vs Parts of the Soul
+    107 s  bei  82 Halbzuegen (1.3 s/Halbzug)     Creepy Crawlies vs Slip 'n Slide
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+        281        1          1  Flying Sparks
+        278        2          2  Steam Dwarf Mines
+        275        1          1  Slimy Infestation
+        273        1          1  Sacrificial Demons
+        273        1          1  Parts of the Soul
+        109        3          1  Dance of the Butterflies
+        106        3          1  Pew-Pew!
+         44        1          0  Boom Boom Kaboom!
+         39        1          0  Deepsea Terror
+         36        3          0  Slip 'n Slide
+  → Abbrueche haeufen sich bei: Flying Sparks (1), Steam Dwarf Mines (2), Slimy Infestation (1), Sacrificial Demons (1), Parts of the Soul (1), Dance of the Butterflies (1), Pew-Pew! (1), Depths of the Cosmos (1), Bone Rush (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+     1744   13.0%  Wealth
+      737    5.5%  Slippery Whoolmoth
+      642    4.8%  Willy, the Valiant Leprechaun
+      585    4.4%  Ingo, Investor of Evil
+      518    3.9%  Giga Steroids
+      454    3.4%  Legendary Sword of a Barbarian King
+      404    3.0%  Slippery Narw
+      401    3.0%  Elixir of Immortality
+      349    2.6%  Treasure Huntress Semi
+      318    2.4%  Creativity
+      307    2.3%  Ancient Tech Infinite Energy Core
+      299    2.2%  Slippery Pengu   ⚠ 34 leckende Rollouts
+      277    2.1%  Slippery Polar   ⚠ 55 leckende Rollouts
+      276    2.1%  Divine Gift of Balance
+      276    2.1%  Box Spider
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+  594764x  Barker, the Monster Tamer → Deepsea Primordium [priority]
+
+═══ ⚠ LECKENDE ROLLOUTS ═══
+  Rollouts, die nach dem Zuruecksetzen ueber 0,5 MB nicht freigegeben haben.
+  Die Engine nennt das selbst den Anfang einer „death spiral" — solche Karten
+  treiben die Suchkosten hoch, ohne dass am Brett etwas passiert.
+    111x  Heavy Hit
+     90x  Adventurousness
+     67x  Gathering Storm
+     55x  Slippery Polar
+     53x  Rocket Fist
+     42x  Sandy Blob
+     36x  Chain Lightning
+     34x  Slippery Pengu
+     23x  Aggressive Town Guard
+     21x  Forceful Revival
+  Broadcasts an ALLE:      15 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         86        25876      86.28        1.466    61     68        ja  deck_out           Slip 'n Slide vs Great Weapon Master
+   2         64        15066      51.29        0.826    34     35      NEIN  ohne-spielende     Depths of the Cosmos vs Bone Rush
+   3         68        12352      40.94        0.629    30     31        ja  deck_out           Pew-Pew! vs Shadows over Blackport
+   4         24         6008      17.88        0.308    24     26        ja  all_heroes_dead    Gather That Storm! vs Bloody King Zi
+   5          5          778       1.93        0.048   600    562      NEIN  zeitlimit@zug5     Steam Dwarf Mines vs Flying Sparks
+   6         53         4331      15.51        0.256    34     35        ja  all_heroes_dead    Mawstruck vs Creepy Crawlies
+   7         93        23097      69.89        1.105    54     52        ja  deck_out           Pew-Pew! vs Mawstruck
+   8         73         8092      32.53        0.527    13     13        ja  deck_out           Shadows over Blackport vs Morph and Kill!
+   9         82        22514      79.60        1.237   112    107        ja  deck_out           Creepy Crawlies vs Slip 'n Slide
+  10         30         6796      22.56        0.367    16     17        ja  all_heroes_dead    Gather That Storm! vs Dance of the Butterflies
+  11         47         8206      29.32        0.467    71     69        ja  deck_out           Big Stomp! vs Morph and Kill!
+  12         57        10876      37.73        0.620    19     18        ja  deck_out           Cool Gang vs Shadows over Blackport
+  13          2          303       0.85        0.023   600    551      NEIN  zeitlimit@zug2     Pew-Pew! vs Slimy Infestation
+  14         16         2270       7.99        0.139    12     14        ja  all_heroes_dead    Idej Illusions vs Morph and Kill!
+  15          7          696       2.28        0.049   600    550      NEIN  zeitlimit@zug7     Dance of the Butterflies vs Steam Dwarf Mines
+  16         54        12511      42.39        0.682    60     57        ja  deck_out           Man's Best Friends vs Sun Fencer Frenzy
+  17         52        10796      37.40        0.603    84     79        ja  deck_out           Shadows over Blackport vs Deepsea Terror
+  18         41        12470      42.95        0.672    42     43        ja  deck_out           Slip 'n Slide vs One-Two-Punch!
+  19         72        18250      63.59        0.971    92     88        ja  deck_out           Boom Boom Kaboom! vs Dance of the Butterflies
+  20          2          139       0.42        0.015   600    547      NEIN  zeitlimit@zug2     Sacrificial Demons vs Parts of the Soul

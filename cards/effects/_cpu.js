@@ -420,8 +420,26 @@ function broadcast(helpers) {
  * advancePhase transitions one phase at a time, so skipping the Action Phase
  * still requires two calls (Main1→Action, then Action→Main2).
  */
+// ═══════════════════════════════════════════════════════════════════
+// BROTKRUME FUER DEN STILLEN ZUG-ABBRUCH (v386, 14.8.)
+//
+// Der CPU-Pilot hat dutzende Ausstiege der Form
+//   if (!stillCpuTurn(engine, cpuIdx)) return;
+// Jeder davon kehrt STILL zurueck. Passiert das in `runCpuTurn`, ohne
+// dass der Zug beendet wurde, endet im Self-Play die ganze Kette:
+// `startGame` loest ohne Ergebnis auf, der Messstand meldet
+// `ohne-spielende` — und bisher stand nirgends, WELCHER Ausstieg es war.
+//
+// Die Marke kostet eine String-Zuweisung auf dem Ausstiegspfad und wird
+// nur LIVE gesetzt (Rollouts betreten dieselben Funktionen und wuerden
+// sie sonst ueberschreiben). `makeCpuDriver` liest sie nach der
+// Rueckkehr aus, wenn der Zug noch offen steht.
+function marke(engine, was) {
+  if (engine && !engine._inMctsSim) engine._cpuTurnMark = was;
+}
+
 async function runCpuTurn(engine, helpers) {
-  if (istAbgebrochen(engine)) return;
+  if (istAbgebrochen(engine)) return marke(engine, `aus:runCpuTurn#1:abbruch@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -471,7 +489,7 @@ async function runCpuTurn(engine, helpers) {
     };
     helpers.__bodyCountWrapped = true;
   }
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#2:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   if (typeof engine._trailWrite === 'function') {
     // Log the full hand contents (not just the size) so post-mortem
     // analysis can diff hand_at_turn_N vs hand_at_turn_M and see
@@ -573,13 +591,13 @@ async function runCpuTurn(engine, helpers) {
   await runMainPhase(engine, helpers);
   cpuLog('← Main Phase 1 done');
 
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#3:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   await pausePhase(engine);
   cpuLog(`advancePhase Main1→Action`);
   await engine.advancePhase(cpuIdx);
   broadcast(helpers);
 
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#4:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   cpuLog(`→ Action Phase (currentPhase=${gs.currentPhase})`);
   await runActionPhase(engine, helpers);
 
@@ -639,7 +657,7 @@ async function runCpuTurn(engine, helpers) {
   }
 
   cpuLog(`← Action Phase done (currentPhase=${engine.gs.currentPhase})`);
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#5:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   // Force-advance if still in Action Phase (no play, or combo ended with the
   // gate held open for a fraction of a frame).
   if (engine.gs.currentPhase === 3) {
@@ -649,12 +667,12 @@ async function runCpuTurn(engine, helpers) {
     broadcast(helpers);
   }
 
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#6:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   cpuLog(`→ Main Phase 2 (currentPhase=${gs.currentPhase})`);
   await runMainPhase(engine, helpers);
   cpuLog('← Main Phase 2 done');
 
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#7:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   // ── Ascension-Zyklus (5.8., Als Morph-and-Kill-Befund) ─────────────
   // Früher: EIN tryAscend, danach immer advancePhase → der Zug war
   // vorbei. Für Formen mit `blockEndPhaseOnAscend` ("Ascending this
@@ -672,7 +690,7 @@ async function runCpuTurn(engine, helpers) {
   let ascendedAny = false;
   let ascendEndedTurn = false;
   for (let ascPass = 0; ascPass < MAX_ASCENSIONS_PER_TURN; ascPass++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#8:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     if (engine.gs.currentPhase !== PHASES.MAIN2) break;
     cpuLog(`→ tryAscend (Durchgang ${ascPass + 1})`);
     const asc = await tryAscend(engine, helpers, { firstOfTurn: ascPass === 0 });
@@ -680,7 +698,7 @@ async function runCpuTurn(engine, helpers) {
     if (!asc.ascended) break;
     ascendedAny = true;
     if (asc.endsTurn) { ascendEndedTurn = true; break; }
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#9:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     // Der Zug läuft weiter — genau hier liegt der Gewinn: Karten mit
     // "only while you control an Ascended Hero" / "can only be used by
     // an Ascended Hero" sind ab jetzt spielbar, die neue Form hat ihren
@@ -690,7 +708,7 @@ async function runCpuTurn(engine, helpers) {
     await runMainPhase(engine, helpers);
     cpuLog('← Main Phase 2 (nach Ascension) done');
   }
-  if (!stillCpuTurn(engine, cpuIdx)) return;
+  if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:runCpuTurn#10:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   // ── Zugende-Stempel: in welcher Form endet der Zug? ────────────────
   // Als Vorgabe: "eine HOHE Belohnung dafuer, nicht in der Base-Form den
   // Zug zu beenden". Der Stempel liefert dem Trainer die Bezugsgroesse
@@ -713,7 +731,7 @@ async function runCpuTurn(engine, helpers) {
   if (ascendedAny && engine.gs.currentPhase !== PHASES.MAIN2) {
     // Eine zug-beendende Form hat den Aufstieg gemacht und die Engine
     // ist schon weiter — nichts mehr zu tun.
-    return;
+    return marke(engine, `ok:aufstieg-beendete-zug@ph${engine.gs.currentPhase}`);
   }
   if (ascendEndedTurn) {
     // performAscension meldete skipEndPhase:true (Alt-Verhalten). Self-
@@ -724,7 +742,7 @@ async function runCpuTurn(engine, helpers) {
       await engine.advancePhase(cpuIdx);
       broadcast(helpers);
     }
-    return;
+    return marke(engine, `ok:aufstieg-skipEndPhase@ph${engine.gs.currentPhase}`);
   }
 
   await pausePhase(engine);
@@ -771,6 +789,7 @@ async function runCpuTurn(engine, helpers) {
   cpuLog(`advancePhase Main2→End`);
   await engine.advancePhase(cpuIdx);
   broadcast(helpers);
+  marke(engine, `ok:zugende@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   cpuLog(`===== TURN END (${Date.now() - turnStartT}ms) =====`);
 }
 
@@ -804,7 +823,7 @@ function hasSpendableSecondActionGrant(engine, pi) {
 }
 
 async function runActionPhase(engine, helpers) {
-  if (istAbgebrochen(engine)) return;
+  if (istAbgebrochen(engine)) return marke(engine, `aus:runActionPhase#1:abbruch@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
@@ -1189,8 +1208,53 @@ async function runActionPhase(engine, helpers) {
       && hoptBefore !== gs.turn;
     cpuLog(`    ← Action Phase result: shrank=${shrank} phaseChanged=${phaseChanged}${hoptClaimed ? ' hoptClaimed=true' : ''} newPhase=${engine.gs.currentPhase}`);
     if (shrank || phaseChanged || hoptClaimed) return true;
+    // ── Warum ist NICHTS passiert? ────────────────────────────────────
+    // Ein Versuch ohne jede Wirkung ist bisher stumm: die Kandidatenliste
+    // haelt die Karte fuer spielbar, `doPlaySpell` steigt still mit
+    // `return false` aus (rund ein Dutzend Stellen) oder bricht die
+    // Aufloesung ab, und im Log steht nur `shrank=false`. Genau so ist
+    // Overheal Shock in Als Lauf zweimal hintereinander verpufft.
+    // Der Grund wird jetzt benannt — Kartenname inklusive, damit die
+    // Zeile im Bericht auffindbar ist.
+    cpuLog(`    ⚠ "${pick.cardName}" blieb wirkungslos — Grund: ${diagnoseFailedPlay(engine, cpuIdx, pick)}`);
   }
   return false;
+}
+
+/**
+ * Nachschau nach einem Play-Versuch, der weder die Hand verkleinert
+ * noch die Phase bewegt noch ein HOPT gestempelt hat.
+ *
+ * Prueft in der Reihenfolge, in der die echte Kette prueft, und meldet
+ * die ERSTE Stelle, die jetzt nein sagt. Bewusst rein lesend — die
+ * Funktion darf den Spielzustand unter keinen Umstaenden anfassen.
+ *
+ * `gs._cpuPlayFailReason` wird von `doPlaySpell` / `doSummonCreature`
+ * gestempelt (server.js) und hat Vorrang: das ist die Auskunft der
+ * Stelle, die tatsaechlich ausgestiegen ist.
+ */
+function diagnoseFailedPlay(engine, cpuIdx, pick) {
+  try {
+    const gs = engine.gs;
+    const ps = gs.players[cpuIdx];
+    const stamped = gs._cpuPlayFailReason;
+    if (stamped) return stamped;
+    if (pick.handIdx != null && ps?.hand?.[pick.handIdx] !== pick.cardName) {
+      return `Hand-Index ${pick.handIdx} zeigt auf "${ps?.hand?.[pick.handIdx] ?? '—'}" statt auf die Karte`;
+    }
+    const script = loadCardEffect(pick.cardName);
+    if (script?.spellPlayCondition && !script.spellPlayCondition(gs, cpuIdx, engine)) {
+      return 'spellPlayCondition sagt nein';
+    }
+    if (pick.cardType === 'Spell' || pick.cardType === 'Attack') {
+      const v = engine.validateActionPlay(cpuIdx, pick.cardName, pick.handIdx, pick.heroIdx,
+        ['Spell', 'Attack'], {});
+      if (!v) return 'validateActionPlay sagt nein (Level/Schule, Sperre oder Aktionsrecht)';
+    }
+    return 'unbekannt — Aufloesung lief an und brach ohne Wirkung ab';
+  } catch (err) {
+    return `Diagnose selbst fehlgeschlagen (${err.message})`;
+  }
 }
 
 // ─── Action-costing Ability fallback ───────────────────────────────────
@@ -1334,7 +1398,7 @@ async function tryAscend(engine, helpers, opts = {}) {
 }
 
 async function runMainPhase(engine, helpers) {
-  if (istAbgebrochen(engine)) return;
+  if (istAbgebrochen(engine)) return marke(engine, `aus:runMainPhase#1:abbruch@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   // Swap-Diagnose, Verfügbarkeits-Ebene: EINMAL je eigenem Zug die
   // Ausgangslage festhalten — wie viele Handkarten könnten überhaupt
   // einen Zyklus-Zug machen, und existiert ein bounce-bares Ziel?
@@ -1513,7 +1577,7 @@ async function fireHandActivations(engine, helpers) {
   if (typeof engine.doHandActivate !== 'function') return;
   const tried = new Set();
   for (let safety = 0; safety < 6; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:fireHandActivations#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     if (cpuPastDeadline(engine)) return;
     let list = [];
     try { list = engine.getHandActivatableCards(cpuIdx) || []; }
@@ -1648,7 +1712,7 @@ async function activateHeroEffects(engine, helpers) {
   // Von 6 angehoben: mit Mehrfachnutzungen (Kassaran 3×) reichten die
   // alten Durchläufe für drei Helden nicht mehr aus.
   for (let safety = 0; safety < 16; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateHeroEffects#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     let pickIdx = -1;
     pickCsTags = null;
     pickCsHero = null;
@@ -1867,7 +1931,7 @@ async function activateEquipEffects(engine, helpers) {
   const gs = engine.gs;
   const tried = new Set();
   for (let safety = 0; safety < 12; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateEquipEffects#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     let pick = null;
     for (const inst of engine.cardInstances) {
       if (inst.owner !== cpuIdx || inst.zone !== 'support') continue;
@@ -1923,7 +1987,7 @@ async function activateAreaEffects(engine, helpers) {
   const gs = engine.gs;
   const tried = new Set();
   for (let safety = 0; safety < 6; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateAreaEffects#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     let pick = null;
     // Areas belong to a specific player but both players can activate each
     // (the rules allow Area activations from either player). Scan both sides.
@@ -1960,7 +2024,7 @@ async function activatePermanents(engine, helpers) {
   const gs = engine.gs;
   const tried = new Set();
   for (let safety = 0; safety < 10; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activatePermanents#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     let pick = null;
     // Permanents can belong to either player (stored in ps.permanents).
     // canActivatePermanent gates whether the CPU (pi=cpuIdx) can act.
@@ -1998,7 +2062,7 @@ async function activateFreeAbilities(engine, helpers) {
   // Livelock-Riegel, siehe MAX_ACTIVATION_REPEATS.
   const repeatCount = new Map();
   for (let safety = 0; safety < 24; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateFreeAbilities#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -2145,7 +2209,7 @@ async function activateAreaEffects(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const tried = new Set();
   for (let safety = 0; safety < 6; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateAreaEffects#2:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     const areas = (engine.getActivatableAreas(cpuIdx) || [])
       .filter(a => a.canActivate && !tried.has(`${a.areaName}|${a.areaOwner}`));
     const pick = areas[0];
@@ -2182,7 +2246,7 @@ async function activateCreatureEffects(engine, helpers) {
   // Obergrenze angehoben: mit Mehrfachnutzungen (3-Headed Giant 3×)
   // reichten 12 Durchläufe für ein volles Brett nicht mehr aus.
   for (let safety = 0; safety < 32; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:activateCreatureEffects#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
     for (let hi = 0; hi < (ps.supportZones || []).length; hi++) {
@@ -2352,7 +2416,7 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
   const tried = new Set();
 
   for (let safety = 0; safety < 12; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:playDiscardSensitiveCreatures#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     if (cpuPastDeadline(engine)) return;
 
     let pick = null;
@@ -2455,7 +2519,7 @@ async function playArtifacts(engine, helpers) {
   const tried = new Set(); // card names that look playable but failed to actually play
 
   for (let safety = 0; safety < 20; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:playArtifacts#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
     for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
@@ -2836,7 +2900,7 @@ async function playPotions(engine, helpers) {
   const tried = new Set();
 
   for (let safety = 0; safety < 20; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:playPotions#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
     if (ps.potionLocked) return;
 
     let pick = null;
@@ -2926,7 +2990,7 @@ async function placeSurprises(engine, helpers) {
   const tried = new Set();
 
   for (let safety = 0; safety < 20; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:placeSurprises#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
     for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
@@ -3332,7 +3396,7 @@ async function fireAdditionalActions(engine, helpers) {
   const tried = new Set();
 
   for (let safety = 0; safety < 20; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:fireAdditionalActions#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
     // Hand iteration order: non-deferred cards first, then any cards
@@ -4309,6 +4373,33 @@ const CONFIRM_YES = Object.freeze({ confirmed: true });
 /** Beliebige Zusage-Rückgabe auf die duale Form bringen; Ablehnung bleibt null. */
 function normalizeConfirm(res) {
   if (res === true) return CONFIRM_YES;
+  // ── v394: EIN PROMISE IST AUCH EIN OBJEKT ─────────────────────────
+  // Der Zweig darunter hat jedes Objekt ohne `confirmed` ausgespreizt
+  // und als `{...res, confirmed: true}` zurueckgegeben. Bei einem
+  // Promise ist `{...promise}` aber `{}` — die Antwort wurde also zu
+  // einem blanken `{confirmed: true}`, und **das Promise selbst
+  // verschwand**. Niemand hat es je abgewartet.
+  //
+  // Genau eine Karte antwortet asynchron: `ska-harpyformer.js`. Ihr
+  // `cpuResponse` setzt `_inMctsSim = true`, ruft `enterFastMode()`,
+  // macht `snapshot()` + Rollout und raeumt im `finally` mit
+  // `restore(snap)` wieder auf. Verworfen lief diese IIFE LOSGELOEST
+  // weiter: die Fahnen standen, waehrend das echte Spiel weiterlief,
+  // und ihr spaetes `restore()` warf den Live-Zustand zurueck.
+  //
+  // Im Messstand sah das so aus: `startGame` loeste auf, waehrend
+  // `fastModeTiefe=1` und `_inMctsSim=true` standen — bei
+  // `rolloutTiefe=0` und leerem Simulations-Register, weil dieser
+  // Pfad in einem KARTENSKRIPT sitzt und keins der fuenf
+  // instrumentierten Tore benutzt. Danach sprang der Stand rueckwaerts
+  // (Zug 8 → 7, Phase 5 → 2). Ska Harpyformer steckt in acht Decks,
+  // darunter Gates to Hell (4x) — dem Deck, an dem sich die Abbrueche
+  // gesammelt haben.
+  //
+  // Thenables werden deshalb DURCHGEREICHT und erst nach dem Aufloesen
+  // normalisiert. Der Aufrufer (`promptGeneric`) ist async und wartet
+  // sie dann korrekt ab.
+  if (res && typeof res.then === 'function') return res.then(normalizeConfirm);
   if (res && typeof res === 'object') {
     // Bereits objektförmig: `confirmed` sicherstellen, Restfelder behalten
     // (manche Karten reichen Zusatzdaten über den Confirm zurück).
@@ -5030,7 +5121,7 @@ async function attachAbilities(engine, helpers) {
   // Each hero only gets one attach per turn, so the loop naturally terminates
   // once every hero is filled or no tiered candidate remains.
   for (let safety = 0; safety < 6; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return;
+    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:attachAbilities#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     // ── Per-pass placement biases (recomputed each pass since the
     // ability board state changes between attaches). Each Ability
@@ -5335,11 +5426,123 @@ const PROMPT_REPEAT_CAP = (() => {
   return Number.isFinite(v) && v > 0 ? v : 200;
 })();
 
+// ═══════════════════════════════════════════════════════════════════
+// MEHRSCHRITT-ZYKLEN (v384) — die Luecke, durch die Barker gefallen ist
+//
+// Der Riegel oben vergleicht nur mit der UNMITTELBAR vorigen Frage. Er
+// faengt damit einstufige Schleifen (v326, cloudy-slime) und war fuer
+// die auch gebaut. Barkers Schleife ist ZWEISTUFIG:
+//
+//   cardGallery "Barker" → {Ska Harpyformer}   (Fortschritt? nein)
+//   zonePick    "Barker" → null                (Fortschritt? nein)
+//   ... und wieder von vorn
+//
+// Weil sich Typ und Antwort bei JEDER Umdrehung aendern, setzt der
+// einstufige Zaehler jedes Mal zurueck — im Repro lief die Schleife
+// ueber 256 Umdrehungen, ohne dass er ansprach. Deshalb zusaetzlich
+// eine Periodenerkennung ueber einen Ringpuffer der letzten Frage-
+// Antwort-Paare: bilden die letzten 2p Eintraege zwei identische
+// Haelften, wiederholt sich ein Muster der Laenge p.
+//
+// Bewusst ab p = 2 (p = 1 deckt der Riegel oben schon ab, sonst gaebe
+// es zwei Meldungen fuer denselben Fall). Obergrenze 8 — laengere
+// Zyklen sind denkbar, aber der Puffer soll klein und die Pruefung
+// billig bleiben (max. 8 Vergleiche je Prompt).
+//
+// FALSCHALARM-BETRACHTUNG: eine gesunde Mehrfach-Platzierung (Layn's
+// Rally u.ae.) fragt zwar wiederholt dieselbe Zonen-Frage, bekommt
+// aber ANDERE Antworten und eine schrumpfende Optionszahl — die
+// Signatur aendert sich, das Muster bricht, der Zaehler faellt auf 0.
+// Ausgeloest wird erst nach PROMPT_REPEAT_CAP aufeinanderfolgenden
+// Prompts INNERHALB eines unveraenderten Musters — bei p = 2 also nach
+// rund 100 Umdrehungen. Jeder Rollout leert den Puffer zusaetzlich
+// (siehe resetPromptCycle), Muster koennen sich also nicht ueber
+// Simulationsgrenzen hinweg addieren.
+// ═══════════════════════════════════════════════════════════════════
+const PROMPT_CYCLE_MAX_PERIOD = 8;
+
+function noteCycle(engine, art, titel, optionen, kurz, playerIdx) {
+  const fp = `${art}|${titel}|${optionen}=>${kurz}`;
+  const ring = engine._promptRing || (engine._promptRing = []);
+  ring.push(fp);
+  if (ring.length > PROMPT_CYCLE_MAX_PERIOD * 2) ring.shift();
+
+  let periode = 0;
+  for (let p = 2; p <= PROMPT_CYCLE_MAX_PERIOD; p++) {
+    if (ring.length < p * 2) break;
+    let gleich = true;
+    for (let i = 0; i < p; i++) {
+      if (ring[ring.length - 1 - i] !== ring[ring.length - 1 - i - p]) { gleich = false; break; }
+    }
+    if (gleich) { periode = p; break; }
+  }
+
+  if (!periode) {
+    engine._promptCyclePeriod = 0;
+    engine._promptCycleCount = 0;
+    return;
+  }
+  if (engine._promptCyclePeriod === periode) {
+    engine._promptCycleCount = (engine._promptCycleCount || 1) + 1;
+  } else {
+    engine._promptCyclePeriod = periode;
+    engine._promptCycleCount = 1;
+  }
+  if (engine._promptCycleCount <= PROMPT_REPEAT_CAP) return;
+
+  const muster = ring.slice(ring.length - periode).map(x => x.slice(0, 120));
+  const ort = {
+    grund: 'prompt-cycle',
+    periode,
+    anzahl: engine._promptCycleCount,
+    prompt: String(titel || '(ohne Titel)'),
+    typ: String(art || '?'),
+    spieler: playerIdx,
+    zug: engine.gs?.turn ?? null,
+    phase: engine.gs?.currentPhase ?? null,
+    muster,
+  };
+  if (!engine._promptCycleGemeldet) {
+    engine._promptCycleGemeldet = true;
+    console.error('[Prompt-Zyklus] ' + JSON.stringify(ort));
+    console.error('  → Ein Muster aus ' + periode + ' Fragen wiederholt sich '
+      + ort.anzahl + ' Mal unveraendert. Der Aufrufer macht keinen Fortschritt.');
+    for (const m of muster) console.error('     • ' + m);
+    try { engine._crashTrailSink?.(ort); } catch { /* Forensik darf nie stoeren */ }
+  }
+  // Wie beim einstufigen Riegel NICHT zuruecksetzen — wer den Wurf
+  // verschluckt, bekommt ihn beim naechsten Prompt erneut.
+  const err = new Error(`Prompt-Zyklus: Muster aus ${periode} Fragen um "${ort.prompt}" `
+    + `${ort.anzahl}x unveraendert wiederholt, Zug ${ort.zug} Phase ${ort.phase}`);
+  err._promptRepeat = true;
+  err._promptCycle = true;
+  throw err;
+}
+
+// Ringpuffer an JEDER Simulationsgrenze leeren. Ohne das koennten sich
+// Muster ueber viele Rollouts hinweg addieren: eine Karte mit genau zwei
+// Prompts, die in 200 Rollouts identisch beantwortet wird, saehe fuer den
+// Detektor aus wie eine Schleife — ist aber voellig gesund. Ein echter
+// Haenger dreht IMMER innerhalb EINER Ausfuehrung; er braucht die
+// Rollout-Grenze nicht.
+function resetPromptCycle(engine) {
+  if (!engine) return;
+  if (engine._promptRing) engine._promptRing.length = 0;
+  engine._promptCyclePeriod = 0;
+  engine._promptCycleCount = 0;
+  engine._promptRepeatSig = null;
+  engine._promptRepeatAnswer = null;
+  engine._promptRepeatCount = 0;
+}
+
 function noteRepeat(engine, art, titel, optionen, antwort, playerIdx) {
   const sig = `${art}|${titel}|${optionen}`;
   let kurz;
   try { kurz = JSON.stringify(antwort); } catch { kurz = String(antwort); }
   if (kurz && kurz.length > 200) kurz = kurz.slice(0, 200);
+  // Mehrschritt-Zyklen zuerst pruefen: der einstufige Zweig unten kann
+  // werfen, und dann fehlte dem Ringpuffer ein Eintrag.
+  noteCycle(engine, art, titel, optionen, kurz, playerIdx);
   if (engine._promptRepeatSig === sig && engine._promptRepeatAnswer === kurz) {
     engine._promptRepeatCount = (engine._promptRepeatCount || 1) + 1;
     if (engine._promptRepeatCount > PROMPT_REPEAT_CAP) {
@@ -6146,6 +6349,29 @@ function installCpuBrain(engine) {
       if (cardPick === undefined && !scriptedPick && !engine._inMctsSim) {
         const srcName = config.previewCardName || config.source || config.title;
         priorPick = deckProfile.targetPickDecision(engine, playerIdx, srcName, validTargets, config);
+        // ── HEIL-SICHERUNG UEBER DEM PRIOR (13.8.) ───────────────────
+        // Der gelernte Prior sitzt VOR `cpuPickTargets` — und damit vor
+        // beiden bestehenden Schutzmechanismen: dem `isHealing`-Gate am
+        // Kopf des Pickers und dem Heil-Zweig, der ausdruecklich nie
+        // einen Gegner ohne healReversed heilt. Konkreter Fall aus dem
+        // Heal-Burn-Profil: "Divine Gift of The Light" hat
+        // `side:opp +6.4` und `pos:2 +8.6` gelernt, `side:own −12.3`.
+        // Ein Gegnerheld auf Position 2 gewinnt damit mit 15.0 gegen
+        // −12.3 — die CPU haette dem Gegner 100 HP GESCHENKT, und zwar
+        // an einem Prompt, den sie nicht abbrechen kann. Gelernt wurde
+        // das aus Spielen, in denen die Ziele Overheal Shock trugen
+        // (siehe das `healrev`-Tag, das genau dafuer eingefuehrt wurde).
+        // Der Prior darf also gern Gegner waehlen — aber nur solche,
+        // bei denen Heilung zu Schaden wird. Sonst faellt die Wahl auf
+        // den Picker durch, der die Reihenfolge bereits kennt.
+        if (priorPick && config.isHealing) {
+          const verschenkt = priorPick.some(id => {
+            const t = validTargets.find(x => x && x.id === id);
+            if (!t || t.owner === playerIdx) return false;
+            return !heroHealReversed(engine, t);
+          });
+          if (verschenkt) priorPick = null;
+        }
       }
       const picked = (cardPick !== undefined) ? cardPick
         : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
@@ -8763,6 +8989,30 @@ function mctsRoleRedundancyDiscount(engine, oppIdx, hi) {
  *   - up to 1.0 from same-role redundancy with living teammates
  *   - up to 0.6 if another teammate already covers their highest school
  */
+
+/**
+ * Feindliches Anhaengsel? — generischer Karten-Vertrag
+ * `cpuMeta.hostileAttachment: true`.
+ *
+ * Bedeutung: Die Karte liegt in der Support Zone eines Helden, gehoert
+ * aber der GEGENSEITE und arbeitet gegen den Wirt (Overheal Shock:
+ * Heilung wird zu Schaden). Fuer die Bewertung heisst das zweierlei:
+ *
+ *   • sie ist keine Ausruestung des Wirts (mctsEnemyHeroDynamicValue),
+ *   • sie ist kein Brett-Besitz des Wirts (Slot-Term in evaluateState).
+ *
+ * Der EIGENE Wert der Karte gehoert nicht hierher — den meldet das
+ * Kartenskript ueber `cpuMeta.cpuInstBonus`. Saubere Trennung: dieser
+ * Schalter raeumt nur die falschen Vorzeichen weg, er vergibt keine
+ * Punkte.
+ */
+function isHostileAttachment(cardName) {
+  if (!cardName) return false;
+  try {
+    return !!loadCardEffect(cardName)?.cpuMeta?.hostileAttachment;
+  } catch { return false; }
+}
+
 function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
   const gs = engine.gs;
   const ps = gs.players[oppIdx];
@@ -8799,7 +9049,8 @@ function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
   // equipped hero with even one weapon is a notably bigger threat
   // than the same hero with nothing on them. Equipment-Creatures
   // (Pollution Spewer-style hybrids) and pure Creatures don't count
-  // here — they're tracked separately as board presence.
+  // here — they're tracked separately as board presence. Feindliche
+  // Anhaengsel (`cpuMeta.hostileAttachment`) sind ausgenommen.
   const supportZones = ps.supportZones?.[hi] || [];
   let equipCount = 0;
   if (supportZones.length > 0) {
@@ -8812,6 +9063,17 @@ function mctsEnemyHeroDynamicValue(engine, oppIdx, hi, teamMaxSchoolLvl) {
         // contribute via creature valuation, not equipment.
         if (cd.cardType === 'Creature') continue;
         if (cd.cardType === 'Artifact' && (cd.subtype || '').toLowerCase() === 'creature') continue;
+        // ── Feindliche Anhaengsel zaehlen NICHT als Ausruestung ────────
+        // Gemessen an Overheal Shock: die Karte liegt zwar in der
+        // Support Zone des Wirts, gehoert aber dem ANGREIFER und
+        // schadet dem Wirt. Sie hier mitzuzaehlen hob die Bedrohung des
+        // Wirts um 0.4 — bei 450 HP entsprach das 180 Eval-Punkten
+        // GEGEN den Angreifer. Die Karte anzuhaengen kostete dadurch
+        // 215 Punkte, sie abzuwerfen nur 25: die CPU warf sie
+        // folgerichtig lieber ab. Generischer Vertrag statt by-name:
+        // `cpuMeta.hostileAttachment` (siehe auch die Slot-Bewertung in
+        // evaluateState, die dieselbe Kennzeichnung liest).
+        if (isHostileAttachment(cardName)) continue;
         equipCount++;
       }
     }
@@ -10054,11 +10316,21 @@ function evaluateState(engine, cpuIdx) {
     }
     return value;
   };
+  // ── Feindliche Anhaengsel belegen zwar einen Slot, sind aber kein
+  // Brett-Besitz ihres Wirts (Overheal Shock & Co., Vertrag
+  // `cpuMeta.hostileAttachment`). Ein Slot, in dem AUSSCHLIESSLICH
+  // solche Karten liegen, zaehlt fuer KEINE Seite: dem Wirt gehoert er
+  // nicht, und der Angreifer bekommt hier bewusst auch nichts —
+  // sein Gewinn ist der EFFEKT der Karte, den das Kartenskript ueber
+  // `cpuMeta.cpuInstBonus` selbst bepreist. Sonst zaehlte derselbe
+  // Vorteil zweimal.
+  const slotCountsForOwner = (slot) =>
+    (slot || []).some(cn => !isHostileAttachment(cn));
   let ownSupVal = 0, oppSupVal = 0;
   for (let hi = 0; hi < 3; hi++) {
     for (let z = 0; z < 3; z++) {
-      const ownSlot = ps.supportZones?.[hi]?.[z] || [];
-      const oppSlot = opp.supportZones?.[hi]?.[z] || [];
+      const ownSlot = slotCountsForOwner(ps.supportZones?.[hi]?.[z]) ? (ps.supportZones[hi][z] || []) : [];
+      const oppSlot = slotCountsForOwner(opp.supportZones?.[hi]?.[z]) ? (opp.supportZones[hi][z] || []) : [];
       if (ownSlot.length > 0) {
         const inst = engine.cardInstances.find(c =>
           c.owner === cpuIdx && c.zone === 'support'
@@ -11093,7 +11365,7 @@ async function applyActionCandidate(engine, helpers, candidate) {
 // before those fire systematically overvalues self-buffs that clean up
 // at end-of-turn. Stops before switchTurn: the human's turn is not modeled.
 async function rolloutRestOfTurn(engine, helpers) {
-  if (istAbgebrochen(engine)) return;
+  if (istAbgebrochen(engine)) return marke(engine, `aus:rolloutRestOfTurn#1:abbruch@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
   const cpuIdx = engine._cpuPlayerIdx;
   // If phase is still Action (combo mechanics held it open), advance once.
   if (engine.gs.currentPhase === 3) {
@@ -11263,6 +11535,7 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     const histAfter = { ...engine._hookHistogramThisTurn };
     const firesAfter = { ...engine._hookFiresByCard };
     engine.restore(snap);
+    resetPromptCycle(engine);
     engine._inMctsSim = prevInSim;
     engine._mctsRolloutStartT = prevRolloutStartT;
     _cpuLogSilent = prevSilent;
@@ -11278,6 +11551,19 @@ async function mctsRunOneRollout(engine, helpers, candidate, { plan = null, reco
     cur.calls += 1;
     cur.totalMb += deltaMb;
     engine._candidateHeapDelta[candidateName] = cur;
+    // ── v385: ZWEITER, NICHT ZURUECKGESETZTER TOPF ────────────────
+    // `_candidateHeapDelta` wird in `snapshot()` bei JEDEM LIVE-Zug-
+    // wechsel genullt — es ist ein Pro-Zug-Zaehler fuer die
+    // Ueberlast-Diagnose. Wer am Partieende ausliest, sieht deshalb nur
+    // den letzten Zug (im Absturz-Trail vom 14.8.: ein einziger
+    // Eintrag). Fuer die Frage "welcher Kandidat kostet ueber die ganze
+    // Partie wie viel, und WIE OFT wird er bewertet" braucht es einen
+    // Topf, den niemand leert.
+    if (!engine._candidateHeapTotal) engine._candidateHeapTotal = Object.create(null);
+    const ges = engine._candidateHeapTotal[candidateName] || { calls: 0, totalMb: 0 };
+    ges.calls += 1;
+    ges.totalMb += deltaMb;
+    engine._candidateHeapTotal[candidateName] = ges;
     // Leaky-rollout detector: when a rollout's net heap delta exceeds
     // the threshold, dump the per-rollout hook + per-card fire breakdown
     // as a trail entry. This is independent of which CANDIDATE the
@@ -11699,6 +11985,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       _cpuLogSilent = prevSilentSkip;
       engine.exitFastMode();
       engine.restore(snapSkip);
+      resetPromptCycle(engine);
       engine._inMctsSim = prevInSimSkip;
       engine._mctsRolloutStartT = prevRolloutStartTSkip;
     }
@@ -11738,6 +12025,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
   _cpuLogSilent = prevSilent;
   engine.exitFastMode();
   engine.restore(snap);
+  resetPromptCycle(engine);
   engine._inMctsSim = prevInSim;
   engine._mctsRolloutStartT = prevRolloutStartT;
 
@@ -11780,6 +12068,7 @@ async function mctsGatedActivation(engine, helpers, desc, actionFn, options = {}
       _cpuLogSilent = prevSilent2;
       engine.exitFastMode();
       engine.restore(snap2);
+      resetPromptCycle(engine);
       engine._inMctsSim = prevInSim2;
       engine._mctsRolloutStartT = prevRolloutStartT2;
     }
@@ -11996,6 +12285,7 @@ async function rankCandidatesEvalGreedy(engine, helpers, candidates) {
       // Throwing candidates are scored -Infinity → sorted last.
     } finally {
       engine.restore(snap);
+      resetPromptCycle(engine);
     }
     scored.push({ cand, score });
   }
@@ -12170,12 +12460,50 @@ async function mctsRankCandidates(engine, helpers, candidates, rollouts = MCTS_R
     }
   }
 
+  // ── EIN EINZIGER ARM: nichts zu vergleichen (12.8., Als Befund) ──────
+  // Diese Funktion liefert ausschliesslich eine REIHENFOLGE (plus den
+  // gewaehlten Zielplan je Kandidat) — der Aufrufer probiert die Liste
+  // von oben nach unten durch. Es gibt keine Score-Schwelle und keinen
+  // Vergleich gegen „nichts tun"; `out` enthaelt den Score gar nicht.
+  // Bei genau EINEM Arm steht die Reihenfolge also fest, bevor der
+  // erste Pull laeuft, und jeder weitere Rollout erzeugt exakt null
+  // entscheidungsrelevante Information.
+  //
+  // Bis hierher hat der Arm bereits seinen Score: die Recon-Phase macht
+  // einen Rollout je Kandidat, und die Mindest-Pull-Phase darueber holt
+  // einen nach, falls die Recon nicht durchlief. Der Score bleibt damit
+  // ROLLOUT-skaliert — es wird nichts durch eine billigere Bewertung
+  // ersetzt, es entfaellt nur die Wiederholung.
+  //
+  // Praktischer Anlass: Zuege, in denen die Action Phase genau einen
+  // Kandidaten hat (Als Log: `Action Phase candidates: 1` →
+  // Adventurousness). Bisher liefen dort bis zu MCTS_UCB1_TOTAL_PULLS
+  // (80) Rollouts bzw. das volle MCTS_RANK_BUDGET_MS (20 s) — reine
+  // Wartezeit fuer den Menschen am anderen Ende.
+  //
+  // Die Erweiterungsphase weiter unten braucht keinen eigenen Riegel:
+  // sie steigt bei `visited.length < 2` bzw. `cluster.length < 2` schon
+  // von selbst aus.
+  const ucb1Lohnt = arms.length > 1;
+  if (!ucb1Lohnt && arms.length === 1) {
+    // MIT ZEITANGABE (12.8., Als Steam-Dwarf-Lauf). Ohne sie las sich
+    // die Zeile wie eine Ersparnis — im Log stand „1 Rollout statt bis
+    // zu 80" neben einem einzelnen Rollout, der 582 SEKUNDEN gebraucht
+    // hatte. Nicht die Zahl der Rollouts ist dort das Problem, sondern
+    // die Dauer des einen. Die Zeit gehoert also danebengeschrieben.
+    const msBisher = Date.now() - t0;
+    cpuLog(`  [MCTS/UCB1] nur 1 Arm ("${arms[0].candidate?.cardName}") — `
+      + `Vergleichsphase uebersprungen (${totalRollouts} Rollout${totalRollouts === 1 ? '' : 's'} `
+      + `statt bis zu ${MCTS_UCB1_TOTAL_PULLS}, bisher ${msBisher} ms`
+      + `${msBisher > 10000 ? ' ⚠ EIN Rollout dauert hier ungewoehnlich lange' : ''})`);
+  }
+
   // ── UCB1 phase: pull the highest-UCB arm, repeat until budget ──
   // UCB1(arm) = avg(arm) + C * sqrt(ln(N) / visits(arm))
   // where N is the sum of visits across all arms. Unvisited arms get
   // infinite UCB (they'd have been pulled in the min-pulls phase — this
   // is defensive).
-  while (!budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
+  while (ucb1Lohnt && !budgetExceeded && totalRollouts < MCTS_UCB1_TOTAL_PULLS) {
     if ((Date.now() - t0) >= MCTS_RANK_BUDGET_MS || cpuPastDeadline(engine)) {
       budgetExceeded = true;
       break;
@@ -12532,6 +12860,23 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   const horizonOverride = Number.isInteger(opts.horizon) ? Math.max(0, opts.horizon) : null;
   if (horizonOverride !== null) _rolloutHorizon = horizonOverride;
   const prevRolloutStartT = engine._mctsRolloutStartT;
+  // ── VORIGEN WERT SICHERN (12.8., Als Messlauf) ────────────────────
+  // Diese Funktion war die EINZIGE von neun Stellen in dieser Datei,
+  // die `_inMctsSim` am Ende hart auf `false` gesetzt hat statt den
+  // vorherigen Wert wiederherzustellen (mctsRunOneRollout, die beiden
+  // Skip-Bewerter und mctsEvaluate machen es alle mit `prevInSim`).
+  //
+  // Das Flag ist der Hauptschalter fuer „wir simulieren nur": rund 50
+  // Stellen in _engine.js haengen daran — Protokollierung, Lernkanaele,
+  // Trainings-Zaehler, Statistik. Steht es faelschlich auf `false`,
+  // waehrend eine Simulation weiterlaeuft, halten all diese Stellen
+  // simulierte Zuege fuer echte.
+  //
+  // Sichtbar wurde es am Startgriff-Kanal: `gameStartPickDecision`
+  // protokolliert nur `if (!engine._inMctsSim)` — und im Messlauf vom
+  // 12.8. standen dort **594.764 Eintraege fuer 20 Partien**, obwohl
+  // Barkers Griff genau EINMAL je Partie faellt.
+  const prevInSim = engine._inMctsSim;
   engine._inMctsSim = true;
   engine.enterFastMode();
   _cpuLogSilent = true;
@@ -12571,11 +12916,11 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
           score = evaluateState(engine, cpuIdx);
         }
       } catch { /* score stays -Infinity */ }
-      finally { engine.restore(snap); }
+      finally { engine.restore(snap); resetPromptCycle(engine); }
       if (score > bestScore) { bestScore = score; best = opt; }
     }
   } finally {
-    engine._inMctsSim = false;
+    engine._inMctsSim = prevInSim;
     engine._mctsRolloutStartT = prevRolloutStartT;
     engine.exitFastMode();
     _cpuLogSilent = prevSilent;

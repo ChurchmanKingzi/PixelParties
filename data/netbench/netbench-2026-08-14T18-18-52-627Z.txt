@@ -1,0 +1,205 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10   13 Halbzuege    1561 Nachrichten     5.81 MB roh  →    0.105 MB Leitung    41 s    44 s CPU  To Attain Divinity vs Gates to Hell
+  Partie   2/10    2 Halbzuege      49 Nachrichten     0.16 MB roh  →    0.006 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Gather That Storm! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 54, hand 6) | p1(heroes 3/3 alive, 1050hp, deck 53, hand 4) | turn 2 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   3/10    3 Halbzuege     170 Nachrichten     0.53 MB roh  →    0.013 MB Leitung     0 s     1 s CPU  ⚠ ohne-spielende  Pew-Pew! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1000hp, deck 50, hand 7) | p1(heroes 3/3 alive, 1150hp, deck 50, hand 5) | turn 3 phase 1 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Bow Sniper Darge" → Theme "darge" (48 Themes im Ordner)
+  Partie   4/10    4 Halbzuege     695 Nachrichten     2.46 MB roh  →    0.046 MB Leitung    11 s    13 s CPU  ⚠ ohne-spielende  Dance of the Butterflies vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 950hp, deck 42, hand 7) | p1(heroes 3/3 alive, 1200hp, deck 36, hand 7) | turn 4 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 4 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug4p1ph3
+     ↳ STILLER HALT: Zug 4 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug4p1ph3
+        switchTurn ohne Wechsel: 1x | Wiedereintritt geblockt: 1x
+     ↳ switchTurn kehrte ohne Wechsel zurueck: Zug 4 p1 Phase 5→3
+     ↳ WIEDEREINTRITT geblockt (Schluessel 4:1, Phase 3)
+        Halter:  Zug 3 p0 Phase 5 — GameEngine.switchTurn@_engine.js:14043 ← GameEngine.runPhase@_engine.js:13747 ← async@_engine.js:13876 ← async@_cpu.js:790
+        Blocker: GameEngine.switchTurn@_engine.js:14027 ← GameEngine.runPhase@_engine.js:13747 ← async@_engine.js:13876 ← async@_cpu.js:790
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Beato, the Butterfly Witch" → Theme "beato" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→3 — ok:zugende@zug4p1ph3
+       [warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→3 — ok:zugende@zug4p1ph3
+  Partie   5/10    3 Halbzuege     458 Nachrichten     1.47 MB roh  →    0.031 MB Leitung     5 s     5 s CPU  ⚠ ohne-spielende  Gates to Hell vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1150hp, deck 47, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 5) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 3 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug3p1ph3
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3
+  Partie   6/10    9 Halbzuege    1269 Nachrichten     4.50 MB roh  →    0.087 MB Leitung    28 s    28 s CPU  ⚠ ohne-spielende  Gates to Hell vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 450hp, deck 35, hand 6) | p1(heroes 3/3 alive, 650hp, deck 29, hand 8) | turn 9 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   7/10    2 Halbzuege     310 Nachrichten     1.00 MB roh  →    0.023 MB Leitung     4 s     5 s CPU  ⚠ ohne-spielende  Mawstruck vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 52, hand 3) | p1(heroes 3/3 alive, 1200hp, deck 51, hand 5) | turn 2 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug2p1ph3
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Nero Zira, the Mastermind" → Theme "nerozira" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→3 — ok:zugende@zug2p1ph3
+  Partie   8/10    4 Halbzuege     721 Nachrichten     2.42 MB roh  →    0.049 MB Leitung    13 s    15 s CPU  ⚠ ohne-spielende  Burning Inferno vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1350hp, deck 43, hand 5) | p1(heroes 3/3 alive, 660hp, deck 36, hand 6) | turn 4 phase 5 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Luna Pele, the Flame Dancer" → Theme "lunapele" (48 Themes im Ordner)
+  Partie   9/10    1 Halbzuege      63 Nachrichten     0.21 MB roh  →    0.007 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Pew-Pew! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1150hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 54, hand 4) | turn 1 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 1 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug1p1ph3
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 1 p1 Phase 2→3 — ok:zugende@zug1p1ph3
+  Partie  10/10    7 Halbzuege    1163 Nachrichten     4.17 MB roh  →    0.075 MB Leitung    24 s    25 s CPU  Bloody King Zi vs Gates to Hell
+
+[netbench] 63 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 2 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.9%       66.1 KB     5022.4 KB        583    8.61 KB       98.7%  game_state
+   18.5%       17.0 KB       67.6 KB        524    0.13 KB       74.9%  action_log
+    2.2%        2.1 KB        5.3 KB         62    0.09 KB       61.5%  play_zone_animation
+    1.5%        1.4 KB        3.2 KB         59    0.05 KB       55.7%  card_reveal
+    1.3%        1.2 KB        3.1 KB         28    0.11 KB       62.2%  play_pile_transfer
+    1.0%        0.9 KB        2.1 KB         18    0.12 KB       56.6%  hand_to_board_fly
+    0.7%        0.7 KB        1.8 KB         24    0.07 KB       62.4%  ability_activated
+    0.5%        0.5 KB        0.7 KB          9    0.08 KB       34.5%  potion_resolved
+    0.5%        0.4 KB        1.0 KB         16    0.06 KB       56.7%  deck_search_add
+    0.3%        0.2 KB        0.4 KB         10    0.04 KB       40.5%  gold_change
+    0.2%        0.2 KB        0.3 KB          1    0.27 KB       29.9%  game_started
+    0.2%        0.2 KB        0.5 KB          4    0.12 KB       63.7%  qinglong_lightning
+    0.2%        0.2 KB        0.3 KB          5    0.06 KB       41.2%  effect_source_glow
+    0.2%        0.2 KB        0.4 KB          5    0.08 KB       59.3%  summon_effect
+    0.2%        0.2 KB        0.5 KB          3    0.17 KB       67.6%  play_ram_animation
+  … und 9 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         46.0 KB Leitung je Verbindung und Partie  (2555.5 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            4.99 MB roh  →  0.090 MB auf der Leitung
+  Ø je Verbindung:        46.0 KB
+  Ø je Halbzug (alle):    9.19 KB
+  Singleplayer (1 Client): ~46.0 KB je Partie
+  PvP (2 Clients):         ~91.9 KB je Partie
+  je zusätzlichem Zuschauer: ~46.0 KB je Partie
+  In 5 GB passen:          ~114.059 Singleplayer-Partien
+                           ~57.029 PvP-Partien
+  OHNE Kompression wären es 2.051 bzw. 1.025 — Faktor 55.6
+  Größte Einzelnachricht:  12.3 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 2.3 min CPU
+     44 s  bei  13 Halbzuegen (3.4 s/Halbzug)     To Attain Divinity vs Gates to Hell
+     28 s  bei   9 Halbzuegen (3.2 s/Halbzug)   ⚠ Gates to Hell vs Gates to Hell
+     25 s  bei   7 Halbzuegen (3.6 s/Halbzug)     Bloody King Zi vs Gates to Hell
+     15 s  bei   4 Halbzuegen (3.7 s/Halbzug)   ⚠ Burning Inferno vs Gates to Hell
+     13 s  bei   4 Halbzuegen (3.2 s/Halbzug)   ⚠ Dance of the Butterflies vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         22        1          0  To Attain Divinity
+         13        1          0  Bloody King Zi
+          7        1          1  Burning Inferno
+          7       12         10  Gates to Hell
+          6        1          1  Dance of the Butterflies
+          2        1          1  Mawstruck
+          0        2          2  Pew-Pew!
+          0        1          1  Gather That Storm!
+  → Abbrueche haeufen sich bei: Burning Inferno (1), Gates to Hell (10), Dance of the Butterflies (1), Mawstruck (1), Pew-Pew! (2), Gather That Storm! (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      111   18.4%  Giga Steroids
+       98   16.2%  Treasure Huntress Semi
+       74   12.3%  Elixir of Immortality
+       44    7.3%  Performance
+       28    4.6%  Archibald, the Archmage
+       25    4.1%  Luck
+       23    3.8%  Willy, the Valiant Leprechaun
+       19    3.1%  Alex, Trainer of Heroes
+       17    2.8%  Barker, the Monster Tamer
+       16    2.6%  Beato, the Butterfly Witch
+       15    2.5%  Blood Rock
+       13    2.2%  Nicolas, the Hidden Alchemist
+       11    1.8%  Ska Harpyformer   ⚠ 60 leckende Rollouts
+       10    1.7%  Fighting
+       10    1.7%  Wealth
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Ska Harpyformer [rule]
+     1x  Barker, the Monster Tamer → Goff, the Burnbringer [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+     86x  Adventurousness
+     68x  Demon's Gate
+     60x  Ska Harpyformer
+     37x  Dance of the Flame Pillars
+     30x  Infected Greatmaw
+     13x  Pyroblast
+      1x  Luna Kiai
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      1099      538.6        0.490            86  Adventurousness
+       548      316.5        0.578            68  Demon's Gate
+       157       55.5        0.354            13  Pyroblast
+        24       53.8        2.240             0  Hell Fox
+       220       34.4        0.156             0  Brilliant Idea
+        11       30.4        2.761             0  Flame Avalanche
+        27       28.4        1.051             0  Timeless King Zi
+        82       27.7        0.338             1  Luna Kiai
+        80       16.6        0.207            30  Infected Greatmaw
+         8        9.5        1.183             0  Prophecy of Tempeste
+        67        5.5        0.082             0  Magic Hammer
+        78        5.1        0.066            37  Dance of the Flame Pillars
+       148       -0.2       -0.001            60  Ska Harpyformer
+         3       -2.4       -0.799             0  Chain Lightning
+       256       -3.1       -0.012             0  Compulsory Body Swap
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (8 Partien):    Ø 0.4 Pruefungen, Ø 0.0 Schilde
+  durchgespielt (2 Partien):  Ø 2.0 Pruefungen, Ø 0.0 Schilde
+  je Partie (nur mit Pruefungen):
+      Partie  1     4 Pruefungen,   0 Schilde  all_heroes_dead
+    ⚠ Partie  6     1 Pruefungen,   0 Schilde  ohne-spielende
+    ⚠ Partie  8     2 Pruefungen,   0 Schilde  ohne-spielende
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Ausgang
+  ⚠    4             1             1            0                      0  ohne-spielende
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry          1/8  vs  0/2
+    noops            1/8  vs  0/2
+    doppelstart      0/8  vs  0/2
+    treiberSkips     0/8  vs  0/2
+  Broadcasts an ALLE:      2 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         13         1561       5.81        0.105    41     44        ja  all_heroes_dead    To Attain Divinity vs Gates to Hell
+   2          2           49       0.16        0.006     0      0      NEIN  ohne-spielende     Gather That Storm! vs Gates to Hell
+   3          3          170       0.53        0.013     0      1      NEIN  ohne-spielende     Pew-Pew! vs Gates to Hell
+   4          4          695       2.46        0.046    11     13      NEIN  ohne-spielende     Dance of the Butterflies vs Gates to Hell
+   5          3          458       1.47        0.031     5      5      NEIN  ohne-spielende     Gates to Hell vs Gates to Hell
+   6          9         1269       4.50        0.087    28     28      NEIN  ohne-spielende     Gates to Hell vs Gates to Hell
+   7          2          310       1.00        0.023     4      5      NEIN  ohne-spielende     Mawstruck vs Gates to Hell
+   8          4          721       2.42        0.049    13     15      NEIN  ohne-spielende     Burning Inferno vs Gates to Hell
+   9          1           63       0.21        0.007     0      0      NEIN  ohne-spielende     Pew-Pew! vs Gates to Hell
+  10          7         1163       4.17        0.075    24     25        ja  all_heroes_dead    Bloody King Zi vs Gates to Hell

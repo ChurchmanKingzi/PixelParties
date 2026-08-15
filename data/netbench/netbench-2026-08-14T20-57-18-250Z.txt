@@ -1,0 +1,190 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    8 Halbzuege    1358 Nachrichten     4.54 MB roh  →    0.086 MB Leitung    20 s    24 s CPU  Cool Gang vs Gates to Hell
+  Partie   2/10    8 Halbzuege    1265 Nachrichten     4.74 MB roh  →    0.087 MB Leitung    16 s    19 s CPU  Bone Rush vs Gates to Hell
+  Partie   3/10   11 Halbzuege    1647 Nachrichten     6.15 MB roh  →    0.113 MB Leitung    12 s    14 s CPU  Morph and Kill! vs Gates to Hell
+  Partie   4/10   77 Halbzuege    4867 Nachrichten    24.25 MB roh  →    0.345 MB Leitung    20 s    21 s CPU  Creepy Crawlies vs Gates to Hell
+  Partie   5/10   26 Halbzuege    2462 Nachrichten     9.64 MB roh  →    0.161 MB Leitung    73 s    73 s CPU  Big Stomp! vs Gates to Hell
+  Partie   6/10   17 Halbzuege    2097 Nachrichten     8.20 MB roh  →    0.143 MB Leitung    55 s    55 s CPU  Parts of the Soul vs Gates to Hell
+  Partie   7/10   10 Halbzuege    1288 Nachrichten     4.90 MB roh  →    0.087 MB Leitung    35 s    36 s CPU  Slimy Infestation vs Gates to Hell
+  Partie   8/10   11 Halbzuege    1421 Nachrichten     5.44 MB roh  →    0.096 MB Leitung    84 s    83 s CPU  Slimy Infestation vs Gates to Hell
+  Partie   9/10   12 Halbzuege    1792 Nachrichten     6.43 MB roh  →    0.117 MB Leitung    23 s    24 s CPU  Cool Gang vs Gates to Hell
+  Partie  10/10   38 Halbzuege    3805 Nachrichten    16.59 MB roh  →    0.262 MB Leitung    49 s    52 s CPU  One-Two-Punch! vs Gates to Hell
+
+[netbench] 124 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 10 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   73.8%      113.3 KB     9167.6 KB        985    9.31 KB       98.8%  game_state
+   18.2%       27.9 KB      108.6 KB        869    0.13 KB       74.3%  action_log
+    1.3%        2.0 KB        4.6 KB         83    0.05 KB       55.5%  card_reveal
+    1.3%        1.9 KB        4.9 KB         58    0.08 KB       60.5%  play_zone_animation
+    0.9%        1.3 KB        2.9 KB         23    0.13 KB       53.3%  hand_to_board_fly
+    0.9%        1.3 KB        3.2 KB         26    0.12 KB       57.8%  play_pile_transfer
+    0.6%        0.9 KB        2.3 KB         34    0.07 KB       62.7%  ability_activated
+    0.4%        0.6 KB        1.5 KB         24    0.06 KB       56.9%  deck_search_add
+    0.4%        0.6 KB        1.6 KB         19    0.08 KB       63.6%  summon_effect
+    0.3%        0.5 KB        0.9 KB         11    0.08 KB       37.1%  potion_resolved
+    0.2%        0.4 KB        0.9 KB          6    0.16 KB       60.9%  play_ram_animation
+    0.2%        0.3 KB        0.7 KB          5    0.15 KB       47.8%  play_beam_animation
+    0.1%        0.2 KB        0.6 KB          5    0.11 KB       63.8%  burn_tick
+    0.1%        0.2 KB        0.3 KB          1    0.27 KB       29.8%  game_started
+    0.1%        0.2 KB        0.3 KB          6    0.06 KB       46.7%  fighting_atk_change
+  … und 29 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         76.7 KB Leitung je Verbindung und Partie  (4652.6 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            9.09 MB roh  →  0.150 MB auf der Leitung
+  Ø je Verbindung:        76.7 KB
+  Ø je Halbzug (alle):    7.04 KB
+  Singleplayer (1 Client): ~76.7 KB je Partie
+  PvP (2 Clients):         ~153.4 KB je Partie
+  je zusätzlichem Zuschauer: ~76.7 KB je Partie
+  In 5 GB passen:          ~68.347 Singleplayer-Partien
+                           ~34.173 PvP-Partien
+  OHNE Kompression wären es 1.126 bzw. 563 — Faktor 60.7
+  Größte Einzelnachricht:  17.6 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 6.7 min CPU
+     83 s  bei  11 Halbzuegen (7.5 s/Halbzug)     Slimy Infestation vs Gates to Hell
+     73 s  bei  26 Halbzuegen (2.8 s/Halbzug)     Big Stomp! vs Gates to Hell
+     55 s  bei  17 Halbzuegen (3.2 s/Halbzug)     Parts of the Soul vs Gates to Hell
+     52 s  bei  38 Halbzuegen (1.4 s/Halbzug)     One-Two-Punch! vs Gates to Hell
+     36 s  bei  10 Halbzuegen (3.6 s/Halbzug)     Slimy Infestation vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         36        1          0  Big Stomp!
+         30        2          0  Slimy Infestation
+         27        1          0  Parts of the Soul
+         26        1          0  One-Two-Punch!
+         20       10          0  Gates to Hell
+         12        2          0  Cool Gang
+         11        1          0  Creepy Crawlies
+          9        1          0  Bone Rush
+          7        1          0  Morph and Kill!
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      194   12.6%  Treasure Huntress Semi
+      158   10.3%  Elixir of Immortality
+      140    9.1%  Creativity
+      108    7.0%  Performance
+       92    6.0%  Ghuanjun, the Undead Martial Artist
+       83    5.4%  Stellan, the Calm Cat
+       73    4.7%  Fighting
+       60    3.9%  Wowhalla, the Hall of the Cool
+       55    3.6%  Fiery Slime   ⚠ 40 leckende Rollouts
+       45    2.9%  Sacred Hammer of the Volcano
+       38    2.5%  Güldefaber, the King of Dwarfs
+       38    2.5%  Alex, Trainer of Heroes
+       37    2.4%  Kit, the Shark Researcher
+       36    2.3%  Cool Repair
+       33    2.1%  Toughness
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Fiery Slime [rule]
+     1x  Barker, the Monster Tamer → Slime Rancher [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    228x  Adventurousness
+     71x  Demon's Gate
+     62x  Thieving Strike
+     54x  Heavy Hit
+     40x  Fiery Slime
+      8x  Slime Rancher
+      4x  Phoenix Tackle
+      3x  Cloudy Slime
+      1x  Shadowy Slime
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      5817     1828.7        0.314           228  Adventurousness
+      1363      447.4        0.328            71  Demon's Gate
+       702      181.2        0.258             0  Güldefaber, the King of Dwarfs
+       393      168.8        0.429            40  Fiery Slime
+       602      163.7        0.272            54  Heavy Hit
+       319      162.0        0.508             0  Ferocious Tiger Kick
+       201      149.5        0.744             0  Icy Slime
+       159      137.6        0.866             8  Slime Rancher
+       355      102.6        0.289             0  Blow of the Venom Snake
+       497       87.2        0.175             0  Strong Ox Headbutt
+       351       79.7        0.227             0  Stranglehold
+       301       74.4        0.247             0  Burning Finger
+       249       72.9        0.293             0  Rain of Arrows
+       105       71.0        0.676             0  Splashy Slime
+        27       62.8        2.326             0  Soul Shard Ren
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (0 Partien):    Ø — Pruefungen, Ø — Schilde
+  durchgespielt (10 Partien):  Ø 4.1 Pruefungen, Ø 0.0 Schilde
+  je Partie (nur mit Pruefungen):
+      Partie  1     5 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  2     2 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  3     1 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  4     7 Pruefungen,   0 Schilde  deck_out
+      Partie  5     2 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  6     8 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  8     4 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie  9     4 Pruefungen,   0 Schilde  all_heroes_dead
+      Partie 10     8 Pruefungen,   0 Schilde  deck_out
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Fahnen-Lecks  Tiefe@Ende  Phasen-Blocks  spellDepth@Ende  Ausgang
+       1             0             0            0                      4             4           0              0                1  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       2             0             0            0                      2             2           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       3             0             0            0                      1             1           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       4             0             0            0                      3             3           0              0                0  deck_out
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       5             0             0            0                      3             3           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       6             0             0            0                      2             2           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       8             0             0            0                      2             2           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       9             0             0            0                      4             4           0              0                1  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+      10             0             0            0                      2             2           0              0                0  deck_out
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry            —  vs  0/10
+    noops              —  vs  0/10
+    doppelstart        —  vs  0/10
+    treiberSkips       —  vs  9/10
+    fahnenLecks        —  vs  9/10
+    tiefeEnde          —  vs  0/10
+    phasenBlocks       —  vs  0/10
+    spellTiefe         —  vs  2/10
+  Broadcasts an ALLE:      10 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          8         1358       4.54        0.086    20     24        ja  all_heroes_dead    Cool Gang vs Gates to Hell
+   2          8         1265       4.74        0.087    16     19        ja  all_heroes_dead    Bone Rush vs Gates to Hell
+   3         11         1647       6.15        0.113    12     14        ja  all_heroes_dead    Morph and Kill! vs Gates to Hell
+   4         77         4867      24.25        0.345    20     21        ja  deck_out           Creepy Crawlies vs Gates to Hell
+   5         26         2462       9.64        0.161    73     73        ja  all_heroes_dead    Big Stomp! vs Gates to Hell
+   6         17         2097       8.20        0.143    55     55        ja  all_heroes_dead    Parts of the Soul vs Gates to Hell
+   7         10         1288       4.90        0.087    35     36        ja  all_heroes_dead    Slimy Infestation vs Gates to Hell
+   8         11         1421       5.44        0.096    84     83        ja  all_heroes_dead    Slimy Infestation vs Gates to Hell
+   9         12         1792       6.43        0.117    23     24        ja  all_heroes_dead    Cool Gang vs Gates to Hell
+  10         38         3805      16.59        0.262    49     52        ja  deck_out           One-Two-Punch! vs Gates to Hell

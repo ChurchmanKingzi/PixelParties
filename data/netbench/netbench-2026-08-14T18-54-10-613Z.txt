@@ -1,0 +1,356 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    8 Halbzuege    1302 Nachrichten     4.82 MB roh  →    0.086 MB Leitung    14 s    18 s CPU  Steam Dwarf Mines vs Gates to Hell
+  Partie   2/10    3 Halbzuege     331 Nachrichten     1.15 MB roh  →    0.025 MB Leitung     5 s     6 s CPU  ⚠ ohne-spielende  Sacrificial Demons vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1100hp, deck 52, hand 7) | p1(heroes 3/3 alive, 1100hp, deck 52, hand 2) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 3 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug3p1ph3
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3
+  Partie   3/10    5 Halbzuege     693 Nachrichten     2.29 MB roh  →    0.046 MB Leitung     4 s     5 s CPU  ⚠ ohne-spielende  Venom Swamp vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1040hp, deck 45, hand 5) | p1(heroes 3/3 alive, 580hp, deck 42, hand 6) | turn 5 phase 0 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 5 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+  Partie   4/10    3 Halbzuege     325 Nachrichten     1.06 MB roh  →    0.023 MB Leitung     3 s     4 s CPU  ⚠ ohne-spielende  Gather That Storm! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 50, hand 7) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 4) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 3 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug3p1ph3
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 5 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 5 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3
+  Partie   5/10   12 Halbzuege    2037 Nachrichten     7.72 MB roh  →    0.135 MB Leitung    14 s    16 s CPU  Steam Dwarf Mines vs Gates to Hell
+  Partie   6/10   20 Halbzuege     458 Nachrichten     1.39 MB roh  →    0.029 MB Leitung    34 s    36 s CPU  To Attain Divinity vs Gates to Hell
+  Partie   7/10   12 Halbzuege     374 Nachrichten     1.15 MB roh  →    0.025 MB Leitung    18 s    19 s CPU  Spell Industrialization vs Gates to Hell
+  Partie   8/10    4 Halbzuege     403 Nachrichten     1.28 MB roh  →    0.027 MB Leitung     5 s     5 s CPU  ⚠ ohne-spielende  Spell Industrialization vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1000hp, deck 52, hand 3) | p1(heroes 3/3 alive, 570hp, deck 42, hand 6) | turn 4 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Partie   9/10    3 Halbzuege     154 Nachrichten     0.53 MB roh  →    0.013 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Join our Cult! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 52, hand 5) | p1(heroes 3/3 alive, 900hp, deck 42, hand 7) | turn 3 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Klaus, the Cult Leader" → Theme "klaus" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Partie  10/10    1 Halbzuege     107 Nachrichten     0.34 MB roh  →    0.010 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Venom Swamp vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 50, hand 7) | turn 1 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 1 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug1p1ph3
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 1 p1 Phase 2→3 — ok:zugende@zug1p1ph3
+
+[netbench] 714 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 4 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   70.7%       49.8 KB     3789.9 KB        416    9.12 KB       98.7%  game_state
+   19.0%       13.4 KB       53.8 KB        410    0.13 KB       75.1%  action_log
+    2.2%        1.5 KB        3.9 KB         46    0.09 KB       60.9%  play_zone_animation
+    1.7%        1.2 KB        2.8 KB         50    0.06 KB       57.6%  card_reveal
+    1.5%        1.0 KB        2.4 KB         19    0.13 KB       56.8%  hand_to_board_fly
+    0.8%        0.6 KB        1.4 KB         12    0.11 KB       57.4%  play_pile_transfer
+    0.8%        0.5 KB        1.6 KB         23    0.07 KB       66.0%  ability_activated
+    0.5%        0.4 KB        1.0 KB         15    0.06 KB       61.2%  deck_search_add
+    0.5%        0.4 KB        1.0 KB         12    0.09 KB       64.4%  summon_effect
+    0.3%        0.2 KB        0.4 KB          9    0.04 KB       41.3%  gold_change
+    0.3%        0.2 KB        0.4 KB          3    0.15 KB       47.2%  play_beam_animation
+    0.3%        0.2 KB        0.3 KB          1    0.27 KB       29.9%  game_started
+    0.3%        0.2 KB        0.3 KB          4    0.08 KB       32.5%  potion_resolved
+    0.2%        0.2 KB        0.5 KB          5    0.12 KB       71.1%  qinglong_lightning
+    0.2%        0.1 KB        0.2 KB          4    0.05 KB       50.6%  punch_impact
+  … und 17 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         35.3 KB Leitung je Verbindung und Partie  (1930.6 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            3.77 MB roh  →  0.069 MB auf der Leitung
+  Ø je Verbindung:        35.3 KB
+  Ø je Halbzug (alle):    5.42 KB
+  Singleplayer (1 Client): ~35.3 KB je Partie
+  PvP (2 Clients):         ~70.5 KB je Partie
+  je zusätzlichem Zuschauer: ~35.3 KB je Partie
+  In 5 GB passen:          ~148.714 Singleplayer-Partien
+                           ~74.357 PvP-Partien
+  OHNE Kompression wären es 2.715 bzw. 1.357 — Faktor 54.8
+  Größte Einzelnachricht:  14.8 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 1.8 min CPU
+     36 s  bei  20 Halbzuegen (1.8 s/Halbzug)     To Attain Divinity vs Gates to Hell
+     19 s  bei  12 Halbzuegen (1.6 s/Halbzug)     Spell Industrialization vs Gates to Hell
+     18 s  bei   8 Halbzuegen (2.2 s/Halbzug)     Steam Dwarf Mines vs Gates to Hell
+     16 s  bei  12 Halbzuegen (1.3 s/Halbzug)     Steam Dwarf Mines vs Gates to Hell
+      6 s  bei   3 Halbzuegen (1.9 s/Halbzug)   ⚠ Sacrificial Demons vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         18        1          0  To Attain Divinity
+          8        2          0  Steam Dwarf Mines
+          6        2          1  Spell Industrialization
+          5       10          6  Gates to Hell
+          3        1          1  Sacrificial Demons
+          2        1          1  Gather That Storm!
+          1        2          2  Venom Swamp
+          0        1          1  Join our Cult!
+  → Abbrueche haeufen sich bei: Spell Industrialization (1), Gates to Hell (6), Sacrificial Demons (1), Gather That Storm! (1), Venom Swamp (2), Join our Cult! (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      106   14.1%  Treasure Huntress Semi
+       72    9.5%  Elixir of Immortality
+       58    7.7%  Creativity
+       57    7.6%  Ingo, Investor of Evil
+       50    6.6%  Layn, Defender of Deri
+       49    6.5%  Wealth
+       48    6.4%  Steam Dwarf Miner
+       48    6.4%  Performance
+       35    4.6%  Archibald, the Archmage
+       24    3.2%  Prophecy of Tempeste
+       21    2.8%  Ska Harpyformer
+       20    2.7%  Barker, the Monster Tamer
+       18    2.4%  The Great Clock Tower "Big Gwen"
+       12    1.6%  Steam Dwarf Exterminator
+       12    1.6%  Fiona, the Princess of Blackport
+
+═══ STEAM-DWARF-ZAEHLWERK ═══
+  Abwurf-Reaktion: 9.360 Aufrufe → 1.856 mal gefeuert (19.8 %)
+    davon abgewiesen: HOPT 3.727 | nicht im Support 0 | fremder Abwurf 3.777 | inaktiv 0
+    Wartezeit allein aus den 150-ms-Pausen im Hook: 278.4 s (live; im Rollout uebersprungen)
+    hoechste erreichte max HP: 350
+  Miner-Zugende: 1.376 Ausloesungen, 2.769 Karten insgesamt
+    groesster Einzelzug: 3 Karten bei 350 max HP
+    (`count = floor(maxHp / 100)` ist UNGEDECKELT — steigt die HP, steigt die Kette)
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Ska Harpyformer [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+     74x  Adventurousness
+     61x  Eraser Beam
+     59x  Chain Lightning
+     40x  The Warlord's Bite
+     37x  Chosen Sacrifice
+     31x  Pyroblast
+     21x  Demon's Gate
+     11x  Phoenix Tackle
+      4x  Poison Pollen
+      2x  Steam Dwarf Diver
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      2059      827.1        0.402            74  Adventurousness
+       611      241.7        0.396            21  Demon's Gate
+       256       81.1        0.317             0  Steam Dwarf Miner
+       204       73.0        0.358             0  Prophecy of Tempeste
+       326       72.5        0.222            59  Chain Lightning
+       300       57.4        0.191            31  Pyroblast
+       128       47.8        0.373             2  Steam Dwarf Diver
+        80       47.8        0.597             0  Steam Dwarf Exterminator
+       239       31.7        0.132            61  Eraser Beam
+        66       25.3        0.384            40  The Warlord's Bite
+         9       24.9        2.767             4  Poison Pollen
+         5        5.1        1.029             1  Stinky Stables
+        80        4.3        0.054            37  Chosen Sacrifice
+       151        2.1        0.014             0  Guardian Angel
+        60       -0.6       -0.009             0  Ska Harpyformer
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (6 Partien):    Ø 0.3 Pruefungen, Ø 0.0 Schilde
+  durchgespielt (4 Partien):  Ø 2.3 Pruefungen, Ø 0.3 Schilde
+  je Partie (nur mit Pruefungen):
+      Partie  1     4 Pruefungen,   0 Schilde  all_heroes_dead
+    ⚠ Partie  2     2 Pruefungen,   0 Schilde  ohne-spielende
+      Partie  5     5 Pruefungen,   1 Schilde  all_heroes_dead
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Fahnen-Lecks  Tiefe@Ende  Ausgang
+       1             0             0            0                      1             2           0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    2             0             0            0                      5             5           0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    3             0             0            0                      5             5           0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    4             0             0            0                      5             5           0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       5             0             0            0                      5             5           0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       6             0             0            0                      5             5           0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       7             0             0            0                      5             5           0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    8             0             0            0                      5             5           0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    9             0             0            0                      1             1           0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry          0/6  vs  0/4
+    noops            0/6  vs  0/4
+    doppelstart      0/6  vs  0/4
+    treiberSkips     5/6  vs  4/4
+    fahnenLecks      5/6  vs  4/4
+    tiefeEnde        0/6  vs  0/4
+  Broadcasts an ALLE:      4 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          8         1302       4.82        0.086    14     18        ja  all_heroes_dead    Steam Dwarf Mines vs Gates to Hell
+   2          3          331       1.15        0.025     5      6      NEIN  ohne-spielende     Sacrificial Demons vs Gates to Hell
+   3          5          693       2.29        0.046     4      5      NEIN  ohne-spielende     Venom Swamp vs Gates to Hell
+   4          3          325       1.06        0.023     3      4      NEIN  ohne-spielende     Gather That Storm! vs Gates to Hell
+   5         12         2037       7.72        0.135    14     16        ja  all_heroes_dead    Steam Dwarf Mines vs Gates to Hell
+   6         20          458       1.39        0.029    34     36        ja  all_heroes_dead    To Attain Divinity vs Gates to Hell
+   7         12          374       1.15        0.025    18     19        ja  all_heroes_dead    Spell Industrialization vs Gates to Hell
+   8          4          403       1.28        0.027     5      5      NEIN  ohne-spielende     Spell Industrialization vs Gates to Hell
+   9          3          154       0.53        0.013     0      0      NEIN  ohne-spielende     Join our Cult! vs Gates to Hell
+  10          1          107       0.34        0.010     0      0      NEIN  ohne-spielende     Venom Swamp vs Gates to Hell

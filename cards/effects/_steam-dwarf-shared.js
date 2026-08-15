@@ -38,28 +38,56 @@ const ARCHETYPE = 'Steam Dwarfs';
  * times, but only the first pass mutates HP. Subsequent passes see
  * the turn-stamp and exit.
  */
+/**
+ * Zaehlwerk fuer die Diagnose (12.8., Als Auftrag nach dem
+ * 582-Sekunden-Rollout). Bewusst am ENGINE-Objekt und nicht ueber
+ * `engine.log()`: das steigt im Fast-Mode in Zeile 1 aus, und genau die
+ * Rollouts wollen wir ja zaehlen. Reine Integer-Additionen, kein
+ * Speicherwachstum, kein Einfluss aufs Spiel. Wird NICHT gesnapshottet
+ * — die Zahl soll die GESAMTE Arbeit erfassen, auch die verworfene.
+ */
+function steamZaehl(engine, feld, wert = 1) {
+  try {
+    const d = engine._steamDiag || (engine._steamDiag = Object.create(null));
+    d[feld] = (d[feld] || 0) + wert;
+  } catch { /* Diagnose darf nie stoeren */ }
+}
+function steamMax(engine, feld, wert) {
+  try {
+    const d = engine._steamDiag || (engine._steamDiag = Object.create(null));
+    if (!(d[feld] >= wert)) d[feld] = wert;
+  } catch { /* Diagnose darf nie stoeren */ }
+}
+
 async function fireSteamEngine(ctx) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const inst = ctx.card;
 
-  if (!inst || inst.zone !== 'support') return;
-  if (ctx.playerIdx !== ctx.cardOwner) return;        // only my discards
+  // Jeder Aufruf wird gezaehlt — auch die, die gleich wieder aussteigen.
+  // Erst der Vergleich „aufgerufen" gegen „gefeuert" zeigt, ob die Kette
+  // lang ist oder ob nur oft vergeblich gefragt wird.
+  steamZaehl(engine, 'aufgerufen');
+
+  if (!inst || inst.zone !== 'support') { steamZaehl(engine, 'raus_zone'); return; }
+  if (ctx.playerIdx !== ctx.cardOwner) { steamZaehl(engine, 'raus_fremd'); return; }        // only my discards
   // Als Ruling (Kreaturen-Audit): kein Hero-Bezug im Steam-Engine-Text
   // → nur der Zustand der Kreatur selbst gated (kanonisch via
   // isCardEffectActive statt des alten attachedHero-Gates; deckt jetzt
   // auch frozen/stunned/faceDown der Kreatur).
-  if (!engine.isCardEffectActive(inst)) return;
+  if (!engine.isCardEffectActive(inst)) { steamZaehl(engine, 'raus_inaktiv'); return; }
 
   // Hard once-per-turn per creature instance
   if (!inst.counters) inst.counters = {};
   const turn = gs.turn || 0;
-  if (inst.counters._steamEngineTurn === turn) return;
+  if (inst.counters._steamEngineTurn === turn) { steamZaehl(engine, 'raus_hopt'); return; }
   inst.counters._steamEngineTurn = turn;
+  steamZaehl(engine, 'gefeuert');
 
   // Apply the engine — engine.increaseMaxHp handles the creature path
   // (bumps both counters.maxHp and counters.currentHp by the amount).
   engine.increaseMaxHp(inst, STEAM_ENGINE_GAIN);
+  steamMax(engine, 'maxHp_hoechster', inst.counters?.maxHp || 0);
 
   // Steam puff animation on the creature's zone
   engine._broadcastEvent('play_zone_animation', {
@@ -77,6 +105,10 @@ async function fireSteamEngine(ctx) {
   });
 
   engine.sync();
+  // Diese 150 ms liegen INNERHALB eines Hooks und fallen je Steam Dwarf
+  // auf dem Brett einmal an. Mitgezaehlt, damit im Bericht steht, wie
+  // viel Wartezeit die Abwurfketten allein hier erzeugen.
+  steamZaehl(engine, 'delay_ms', 150);
   await engine._delay(150);
 }
 
@@ -177,6 +209,8 @@ function isSteamDwarf(cardName, engine) {
 }
 
 module.exports = {
+  steamZaehl,
+  steamMax,
   STEAM_ENGINE_GAIN,
   ARCHETYPE,
   attachSteamEngine,

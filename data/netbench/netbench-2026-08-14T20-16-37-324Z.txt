@@ -1,0 +1,275 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10   19 Halbzuege     493 Nachrichten     1.61 MB roh  →    0.032 MB Leitung    75 s    79 s CPU  Heal Burn vs Gates to Hell
+  Partie   2/10   10 Halbzuege     341 Nachrichten     1.13 MB roh  →    0.024 MB Leitung    15 s    17 s CPU  Lightning Caller vs Gates to Hell
+  Partie   3/10   46 Halbzuege    4093 Nachrichten    19.69 MB roh  →    0.297 MB Leitung    36 s    40 s CPU  Slip 'n Slide vs Gates to Hell
+  Partie   4/10    1 Halbzuege     111 Nachrichten     0.35 MB roh  →    0.011 MB Leitung     3 s     0 s CPU  ⚠ ohne-spielende  Steam Dwarf Mines vs Gates to Hell
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null offeneSims=0
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null offeneSims=0
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 52, hand 4) | p1(heroes 3/3 alive, 1200hp, deck 55, hand 5) | turn 1 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 1 p0 Phase 2→3
+        Brotkrume: ok:zugende@zug1p0ph3
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Layn, Defender of Deri" → Theme "layn" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [CPU] STILLER HALT: Zug 1 p0 Phase 2→3 — ok:zugende@zug1p0ph3
+  Partie   5/10    1 Halbzuege      90 Nachrichten     0.27 MB roh  →    0.008 MB Leitung     0 s     0 s CPU  ⚠ startgame-zu-frueh  Gates to Hell vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:0:2 → 1:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null offeneSims=0
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null offeneSims=0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 50, hand 4) | turn 1 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 2 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+     ↳ letzte 7 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 2 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:0:2 → 1:1:2
+  Partie   6/10   15 Halbzuege    1048 Nachrichten     3.88 MB roh  →    0.072 MB Leitung    57 s    59 s CPU  Bamboo Warrior vs Gates to Hell
+  Partie   7/10   10 Halbzuege    1224 Nachrichten     4.37 MB roh  →    0.081 MB Leitung    59 s    59 s CPU  Boom Boom Kaboom! vs Gates to Hell
+  Partie   8/10   15 Halbzuege     201 Nachrichten     0.69 MB roh  →    0.016 MB Leitung    37 s    40 s CPU  Deepsea Terror vs Gates to Hell
+  Partie   9/10    7 Halbzuege     915 Nachrichten     3.23 MB roh  →    0.062 MB Leitung    12 s    13 s CPU  ⚠ startgame-zu-frueh  Slip 'n Slide vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 8:0:3 → 7:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null offeneSims=0
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=6:0 offeneSims=0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1050hp, deck 49, hand 4) | p1(heroes 3/3 alive, 1000hp, deck 40, hand 7) | turn 7 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 8 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 8 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 8 Phase 3 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+     ↳ letzte 7 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 8 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 8 Phase 3 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 8 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 8:0:3 → 7:1:2
+  Partie  10/10    2 Halbzuege     144 Nachrichten     0.44 MB roh  →    0.012 MB Leitung     0 s     0 s CPU  ⚠ startgame-zu-frueh  Idej Illusions vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:1:5 → 2:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null offeneSims=0
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=1:0 offeneSims=0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1000hp, deck 51, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 51, hand 8) | turn 2 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Idej Lord Daiyo" → Theme "daiyo" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:1:5 → 2:1:2
+
+[netbench] 92 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 6 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   74.0%       66.0 KB     5279.6 KB        561    9.41 KB       98.8%  game_state
+   17.7%       15.8 KB       58.8 KB        479    0.12 KB       73.2%  action_log
+    1.6%        1.4 KB        3.4 KB         18    0.19 KB       59.0%  play_card_transfer
+    1.0%        0.9 KB        2.1 KB         39    0.05 KB       55.4%  card_reveal
+    1.0%        0.9 KB        2.0 KB         23    0.09 KB       53.6%  play_zone_animation
+    0.9%        0.8 KB        1.8 KB         15    0.12 KB       56.1%  hand_to_board_fly
+    0.6%        0.6 KB        1.1 KB         18    0.06 KB       46.4%  creature_zone_move
+    0.6%        0.6 KB        1.5 KB         20    0.08 KB       62.4%  ability_activated
+    0.4%        0.4 KB        0.9 KB          8    0.11 KB       55.5%  play_pile_transfer
+    0.3%        0.3 KB        0.4 KB         12    0.03 KB       29.4%  play_gold_coins
+    0.3%        0.3 KB        0.6 KB          9    0.06 KB       55.5%  deck_search_add
+    0.3%        0.2 KB        0.4 KB          5    0.08 KB       35.8%  potion_resolved
+    0.3%        0.2 KB        0.6 KB          7    0.08 KB       61.4%  summon_effect
+    0.2%        0.2 KB        0.3 KB          1    0.27 KB       29.7%  game_started
+    0.1%        0.1 KB        0.2 KB          3    0.06 KB       43.6%  fighting_atk_change
+  … und 16 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         44.6 KB Leitung je Verbindung und Partie  (2677.3 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            5.23 MB roh  →  0.087 MB auf der Leitung
+  Ø je Verbindung:        44.6 KB
+  Ø je Halbzug (alle):    4.65 KB
+  Singleplayer (1 Client): ~44.6 KB je Partie
+  PvP (2 Clients):         ~89.2 KB je Partie
+  je zusätzlichem Zuschauer: ~44.6 KB je Partie
+  In 5 GB passen:          ~117.612 Singleplayer-Partien
+                           ~58.806 PvP-Partien
+  OHNE Kompression wären es 1.958 bzw. 979 — Faktor 60.1
+  Größte Einzelnachricht:  11.7 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 5.1 min CPU
+     79 s  bei  19 Halbzuegen (4.1 s/Halbzug)     Heal Burn vs Gates to Hell
+     59 s  bei  15 Halbzuegen (3.9 s/Halbzug)     Bamboo Warrior vs Gates to Hell
+     59 s  bei  10 Halbzuegen (5.9 s/Halbzug)     Boom Boom Kaboom! vs Gates to Hell
+     40 s  bei  46 Halbzuegen (0.9 s/Halbzug)     Slip 'n Slide vs Gates to Hell
+     40 s  bei  15 Halbzuegen (2.7 s/Halbzug)     Deepsea Terror vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         39        1          0  Heal Burn
+         29        1          0  Bamboo Warrior
+         29        1          0  Boom Boom Kaboom!
+         20        1          0  Deepsea Terror
+         14       11          5  Gates to Hell
+         13        2          1  Slip 'n Slide
+          9        1          0  Lightning Caller
+          0        1          1  Steam Dwarf Mines
+          0        1          1  Idej Illusions
+  → Abbrueche haeufen sich bei: Gates to Hell (5), Slip 'n Slide (1), Steam Dwarf Mines (1), Idej Illusions (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      507   20.5%  Elixir of Immortality
+      300   12.1%  Slippery Whoolmoth
+      244    9.9%  Treasure Huntress Semi
+      212    8.6%  Slippery Pengu
+      160    6.5%  Wealth
+      137    5.5%  Slippery Snobbit
+      103    4.2%  Slippery Snowman
+       97    3.9%  Ingo, Investor of Evil
+       73    2.9%  Performance
+       71    2.9%  Slippery Spikeblock   ⚠ 42 leckende Rollouts
+       68    2.7%  Lifeforce Howitzer
+       62    2.5%  Hel, the Bound Specter
+       37    1.5%  Friendship
+       35    1.4%  Xiong, the Bamboo Guardian
+       34    1.4%  Divine Gift of Balance
+
+═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══
+  Modus: `frei` = inhaerente Zusatz-Aktion (Support Magic 2 oder Decay Magic 1
+  beim Caster), `zusatz` = ueber einen Geber (Friendship & Co.), `main` = hat
+  die Aktion der Runde gekostet. „doppelt" = Ziel trug den Zustand schon —
+  jeder solche Einsatz ist verschenkt (der Zustand ist ein Boolean).
+
+  Partie  Zug  Modus   Caster                      → Ziel (HP)
+       1    3  frei    Nao, the Barrier Priestess  → Nicolas, the Hidden Alchemist (400)
+       1    3  frei    Nao, the Barrier Priestess  → Silent Water Mizune (400)
+          └─   0 Umwandlungen,     0 Schaden · 19 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+
+  SUMME ueber 1 Partie(n) mit Beteiligung:
+    Einsaetze: 2  (frei 2 | ueber Geber 0 | Main-Aktion 0)
+    Umwandlungen: 0, daraus 0 Schaden (0 je Einsatz)
+    Siege der spielenden Seite: 1/1 gewertete Partien mit mindestens einem Einsatz (100 %)
+
+    ⚠ GELEGT, ABER NIE EINGELOEST. Die Karte liegt richtig, es folgt nur
+      keine Heilung auf das Ziel. Die Zielwahl-Tabelle unten sagt, wohin
+      die Heilungen stattdessen gehen.
+
+  ZIELWAHL ALLER HEILUNGEN (Versuche, live, je Quelle):
+        3x     450 HP  Healing Melody → eigen
+        1x     200 HP  Healing Potion → eigen
+    → eigene Seite 4 | geschockter Gegner 0 | Gegner OHNE Umkehr 0
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Deepsea Primordium [priority]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    117x  Adventurousness
+     57x  Thieving Strike
+     45x  Demon's Gate
+     42x  Slippery Spikeblock
+     28x  Muscle Training
+     15x  Strong Ox Headbutt
+      3x  Heavy Hit
+      1x  Chain Lightning
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      2925     2160.5        0.739           117  Adventurousness
+       931      366.0        0.393            45  Demon's Gate
+       388      233.4        0.602             3  Heavy Hit
+       193      150.8        0.781            15  Strong Ox Headbutt
+       143      107.2        0.750             0  Slippery Pengu
+        77       94.6        1.228             0  Slippery Snowman
+       130       82.2        0.633             0  Sandy Blob
+       159       73.5        0.462            57  Thieving Strike
+        73       49.2        0.675             0  Attack
+        80       49.2        0.614            42  Slippery Spikeblock
+        48       46.8        0.976             0  Deepsea Pirate
+        30       45.9        1.529             0  Critical Strike
+        81       38.9        0.481             1  Chain Lightning
+        74       33.5        0.452             0  Slippery Polar
+        16       33.2        2.077             0  Deepsea Bats
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (4 Partien):    Ø 0.3 Pruefungen, Ø 0.0 Schilde
+  durchgespielt (6 Partien):  Ø 0.3 Pruefungen, Ø 0.0 Schilde
+  je Partie (nur mit Pruefungen):
+      Partie  3     1 Pruefungen,   0 Schilde  deck_out
+      Partie  7     1 Pruefungen,   0 Schilde  all_heroes_dead
+    ⚠ Partie  9     1 Pruefungen,   0 Schilde  startgame-zu-frueh
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Fahnen-Lecks  Tiefe@Ende  Phasen-Blocks  spellDepth@Ende  Ausgang
+       1             0             0            0                      1             1           0              0                1  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       2             0             0            0                      1             1           0              0                1  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       3             0             0            0                      1             1           0              0                0  deck_out
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    4             0             0            0                      1             1           0              0                0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    5             0             0            0                      2             2           0              1                0  startgame-zu-frueh
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       6             0             0            0                      0             0           0              1                0  all_heroes_dead
+         Block-Gruende: spellResolutionDepth
+       7             0             0            0                      0             0           0              0                1  all_heroes_dead
+  ⚠    9             0             0            0                      2             2           0              1                0  startgame-zu-frueh
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠   10             0             0            0                      1             1           0              0                0  startgame-zu-frueh
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry          0/4  vs  0/6
+    noops            0/4  vs  0/6
+    doppelstart      0/4  vs  0/6
+    treiberSkips     4/4  vs  3/6
+    fahnenLecks      4/4  vs  3/6
+    tiefeEnde        0/4  vs  0/6
+    phasenBlocks     2/4  vs  1/6
+    spellTiefe       0/4  vs  3/6
+  Broadcasts an ALLE:      6 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         19          493       1.61        0.032    75     79        ja  all_heroes_dead    Heal Burn vs Gates to Hell
+   2         10          341       1.13        0.024    15     17        ja  all_heroes_dead    Lightning Caller vs Gates to Hell
+   3         46         4093      19.69        0.297    36     40        ja  deck_out           Slip 'n Slide vs Gates to Hell
+   4          1          111       0.35        0.011     3      0      NEIN  ohne-spielende     Steam Dwarf Mines vs Gates to Hell
+   5          1           90       0.27        0.008     0      0      NEIN  startgame-zu-frueh  Gates to Hell vs Gates to Hell
+   6         15         1048       3.88        0.072    57     59        ja  all_heroes_dead    Bamboo Warrior vs Gates to Hell
+   7         10         1224       4.37        0.081    59     59        ja  all_heroes_dead    Boom Boom Kaboom! vs Gates to Hell
+   8         15          201       0.69        0.016    37     40        ja  all_heroes_dead    Deepsea Terror vs Gates to Hell
+   9          7          915       3.23        0.062    12     13      NEIN  startgame-zu-frueh  Slip 'n Slide vs Gates to Hell
+  10          2          144       0.44        0.012     0      0      NEIN  startgame-zu-frueh  Idej Illusions vs Gates to Hell

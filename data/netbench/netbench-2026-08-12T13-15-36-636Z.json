@@ -1,0 +1,1162 @@
+{
+  "erzeugt": "2026-08-12T13:15:36.638Z",
+  "konfiguration": {
+    "games": 20,
+    "spectators": 3,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 300000,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Bone Rush",
+      "deckB": "Join our Cult!",
+      "turns": 52,
+      "ms": 65566,
+      "nachrichten": 10045,
+      "raw": 34653404,
+      "wire": 569104,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 2,
+      "deckA": "Venom Swamp",
+      "deckB": "Deepsea Terror",
+      "turns": 21,
+      "ms": 30005,
+      "nachrichten": 5408,
+      "raw": 17775018,
+      "wire": 323961,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 3,
+      "deckA": "Gather That Storm!",
+      "deckB": "Big Stomp!",
+      "turns": 21,
+      "ms": 26297,
+      "nachrichten": 5413,
+      "raw": 15363049,
+      "wire": 272891,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 4,
+      "deckA": "Join our Cult!",
+      "deckB": "Heal Burn",
+      "turns": 46,
+      "ms": 72473,
+      "nachrichten": 9665,
+      "raw": 31789580,
+      "wire": 537287,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 5,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Join our Cult!",
+      "turns": 42,
+      "ms": 26056,
+      "nachrichten": 3775,
+      "raw": 16156299,
+      "wire": 264052,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 6,
+      "deckA": "Depths of the Cosmos",
+      "deckB": "Spell Industrialization",
+      "turns": 86,
+      "ms": 9354,
+      "nachrichten": 20614,
+      "raw": 74965984,
+      "wire": 1269348,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 7,
+      "deckA": "Man's Best Friends",
+      "deckB": "Join our Cult!",
+      "turns": 41,
+      "ms": 30732,
+      "nachrichten": 9072,
+      "raw": 31732948,
+      "wire": 524065,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 8,
+      "deckA": "Slimy Infestation",
+      "deckB": "Depths of the Cosmos",
+      "turns": 2,
+      "ms": 92012,
+      "nachrichten": 193,
+      "raw": 548096,
+      "wire": 18162,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 9,
+      "deckA": "Depths of the Cosmos",
+      "deckB": "Lightning Caller",
+      "turns": 13,
+      "ms": 6417,
+      "nachrichten": 3042,
+      "raw": 9003311,
+      "wire": 170224,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 10,
+      "deckA": "Grand Rebellion!",
+      "deckB": "Depths of the Cosmos",
+      "turns": 52,
+      "ms": 25840,
+      "nachrichten": 10917,
+      "raw": 35061389,
+      "wire": 596453,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 11,
+      "deckA": "Shifting Sandlands",
+      "deckB": "Gates to Hell",
+      "turns": 51,
+      "ms": 91520,
+      "nachrichten": 4084,
+      "raw": 14826384,
+      "wire": 252424,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 12,
+      "deckA": "Cute Commando",
+      "deckB": "Mawstruck",
+      "turns": 58,
+      "ms": 29736,
+      "nachrichten": 5075,
+      "raw": 19221576,
+      "wire": 315238,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 13,
+      "deckA": "Depths of the Cosmos",
+      "deckB": "Shifting Sandlands",
+      "turns": 50,
+      "ms": 140958,
+      "nachrichten": 9325,
+      "raw": 28167971,
+      "wire": 509881,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 14,
+      "deckA": "One-Two-Punch!",
+      "deckB": "Steam Dwarf Mines",
+      "turns": 6,
+      "ms": 94010,
+      "nachrichten": 1197,
+      "raw": 3872383,
+      "wire": 75803,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 15,
+      "deckA": "Grand Rebellion!",
+      "deckB": "Steam Dwarf Mines",
+      "turns": 7,
+      "ms": 96021,
+      "nachrichten": 574,
+      "raw": 1780280,
+      "wire": 39555,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 16,
+      "deckA": "Burning Inferno",
+      "deckB": "Gather That Storm!",
+      "turns": 4,
+      "ms": 5048,
+      "nachrichten": 125,
+      "raw": 383958,
+      "wire": 15118,
+      "grund": "ende",
+      "gewertet": true
+    },
+    {
+      "nr": 17,
+      "deckA": "Grand Rebellion!",
+      "deckB": "Dance of the Butterflies",
+      "turns": 52,
+      "ms": 32937,
+      "nachrichten": 11113,
+      "raw": 42701988,
+      "wire": 643980,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 18,
+      "deckA": "Join our Cult!",
+      "deckB": "Bone Rush",
+      "turns": 37,
+      "ms": 78591,
+      "nachrichten": 7890,
+      "raw": 25387264,
+      "wire": 442610,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 19,
+      "deckA": "Heal Burn",
+      "deckB": "Crystal Gifts",
+      "turns": 23,
+      "ms": 13248,
+      "nachrichten": 6092,
+      "raw": 17908098,
+      "wire": 324476,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 20,
+      "deckA": "Suicide Bombers",
+      "deckB": "Bloody King Zi",
+      "turns": 53,
+      "ms": 152067,
+      "nachrichten": 11712,
+      "raw": 41100190,
+      "wire": 644634,
+      "grund": "deck_out",
+      "gewertet": true
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 60674,
+      "raw": 448046990,
+      "wire": 5414617
+    },
+    {
+      "name": "action_log",
+      "count": 53529,
+      "raw": 6727507,
+      "wire": 1664260
+    },
+    {
+      "name": "card_reveal",
+      "count": 6825,
+      "raw": 329610,
+      "wire": 129545
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 3539,
+      "raw": 314976,
+      "wire": 125764
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 2102,
+      "raw": 255157,
+      "wire": 121786
+    },
+    {
+      "name": "ability_activated",
+      "count": 2315,
+      "raw": 158191,
+      "wire": 62888
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 820,
+      "raw": 110231,
+      "wire": 37615
+    },
+    {
+      "name": "summon_effect",
+      "count": 815,
+      "raw": 71856,
+      "wire": 24337
+    },
+    {
+      "name": "deck_search_add",
+      "count": 648,
+      "raw": 40884,
+      "wire": 20948
+    },
+    {
+      "name": "potion_resolved",
+      "count": 400,
+      "raw": 28800,
+      "wire": 18783
+    },
+    {
+      "name": "gold_change",
+      "count": 412,
+      "raw": 16892,
+      "wire": 9698
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 254,
+      "raw": 8382,
+      "wire": 5971
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 66,
+      "raw": 8929,
+      "wire": 5422
+    },
+    {
+      "name": "nomu_draw",
+      "count": 171,
+      "raw": 10404,
+      "wire": 4765
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 125,
+      "raw": 8375,
+      "wire": 4377
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 126,
+      "raw": 7692,
+      "wire": 3764
+    },
+    {
+      "name": "game_started",
+      "count": 17,
+      "raw": 5389,
+      "wire": 3560
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 75,
+      "raw": 9375,
+      "wire": 2830
+    },
+    {
+      "name": "forbidden_zone_overlay",
+      "count": 42,
+      "raw": 2478,
+      "wire": 2111
+    },
+    {
+      "name": "gathering_storm_strike",
+      "count": 145,
+      "raw": 9545,
+      "wire": 1818
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 29,
+      "raw": 3277,
+      "wire": 1316
+    },
+    {
+      "name": "butterfly_cloud_animation",
+      "count": 15,
+      "raw": 2980,
+      "wire": 1217
+    },
+    {
+      "name": "burn_tick",
+      "count": 20,
+      "raw": 3700,
+      "wire": 1051
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 35,
+      "raw": 2170,
+      "wire": 991
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 12,
+      "raw": 2231,
+      "wire": 925
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 15,
+      "raw": 1710,
+      "wire": 804
+    },
+    {
+      "name": "area_descend",
+      "count": 30,
+      "raw": 1900,
+      "wire": 740
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 10,
+      "raw": 1490,
+      "wire": 580
+    },
+    {
+      "name": "discard_to_deleted_animation",
+      "count": 10,
+      "raw": 1120,
+      "wire": 501
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 5,
+      "raw": 995,
+      "wire": 431
+    },
+    {
+      "name": "mill_center_reveal",
+      "count": 9,
+      "raw": 1133,
+      "wire": 400
+    },
+    {
+      "name": "chaos_magic_reveal",
+      "count": 15,
+      "raw": 925,
+      "wire": 321
+    },
+    {
+      "name": "flashbang_screen",
+      "count": 10,
+      "raw": 350,
+      "wire": 298
+    },
+    {
+      "name": "creature_damage_floater",
+      "count": 10,
+      "raw": 770,
+      "wire": 259
+    },
+    {
+      "name": "slow_dark_magic",
+      "count": 15,
+      "raw": 540,
+      "wire": 237
+    },
+    {
+      "name": "big_gwen_clock_activation",
+      "count": 5,
+      "raw": 215,
+      "wire": 162
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 5,
+      "raw": 305,
+      "wire": 149
+    },
+    {
+      "name": "willy_leprechaun",
+      "count": 5,
+      "raw": 230,
+      "wire": 132
+    },
+    {
+      "name": "play_chaos_screen",
+      "count": 5,
+      "raw": 130,
+      "wire": 130
+    },
+    {
+      "name": "tears_of_creation_animation",
+      "count": 2,
+      "raw": 342,
+      "wire": 124
+    },
+    {
+      "name": "card_effect_flash",
+      "count": 5,
+      "raw": 235,
+      "wire": 119
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-33b1c83a",
+      "count": 4133,
+      "raw": 16673625,
+      "wire": 276781
+    },
+    {
+      "sid": "sid-b-netbench-33b1c83a",
+      "count": 3868,
+      "raw": 16268201,
+      "wire": 270496
+    },
+    {
+      "sid": "sid-spec-0-netbench-33b1c83a",
+      "count": 4204,
+      "raw": 14007947,
+      "wire": 240621
+    },
+    {
+      "sid": "sid-spec-1-netbench-33b1c83a",
+      "count": 4204,
+      "raw": 14007947,
+      "wire": 240621
+    },
+    {
+      "sid": "sid-spec-2-netbench-33b1c83a",
+      "count": 4204,
+      "raw": 14007947,
+      "wire": 240621
+    },
+    {
+      "sid": "sid-a-netbench-9b0be832",
+      "count": 2197,
+      "raw": 9785165,
+      "wire": 148252
+    },
+    {
+      "sid": "sid-b-netbench-9b0be832",
+      "count": 2111,
+      "raw": 9603377,
+      "wire": 144722
+    },
+    {
+      "sid": "sid-b-netbench-eff57977",
+      "count": 2212,
+      "raw": 8992290,
+      "wire": 141921
+    },
+    {
+      "sid": "sid-a-netbench-82ea7bde",
+      "count": 2295,
+      "raw": 9203244,
+      "wire": 139312
+    },
+    {
+      "sid": "sid-a-netbench-39d3460a",
+      "count": 2120,
+      "raw": 8091674,
+      "wire": 138841
+    },
+    {
+      "sid": "sid-b-netbench-82ea7bde",
+      "count": 2288,
+      "raw": 9000047,
+      "wire": 138303
+    },
+    {
+      "sid": "sid-a-netbench-eff57977",
+      "count": 2214,
+      "raw": 8641888,
+      "wire": 136661
+    },
+    {
+      "sid": "sid-b-netbench-39d3460a",
+      "count": 2181,
+      "raw": 7945717,
+      "wire": 133381
+    },
+    {
+      "sid": "sid-a-netbench-f60595a7",
+      "count": 1982,
+      "raw": 8120127,
+      "wire": 132772
+    },
+    {
+      "sid": "sid-a-netbench-88dea9a6",
+      "count": 1795,
+      "raw": 7934510,
+      "wire": 126243
+    },
+    {
+      "sid": "sid-b-netbench-88dea9a6",
+      "count": 1793,
+      "raw": 7800464,
+      "wire": 123374
+    },
+    {
+      "sid": "sid-spec-0-netbench-82ea7bde",
+      "count": 2376,
+      "raw": 7632194,
+      "wire": 122270
+    },
+    {
+      "sid": "sid-spec-1-netbench-82ea7bde",
+      "count": 2376,
+      "raw": 7632194,
+      "wire": 122270
+    },
+    {
+      "sid": "sid-spec-2-netbench-82ea7bde",
+      "count": 2376,
+      "raw": 7632194,
+      "wire": 122270
+    },
+    {
+      "sid": "sid-b-netbench-f60595a7",
+      "count": 1957,
+      "raw": 7566273,
+      "wire": 121383
+    },
+    {
+      "sid": "sid-a-netbench-edfff123",
+      "count": 1906,
+      "raw": 7015169,
+      "wire": 118966
+    },
+    {
+      "sid": "sid-a-netbench-57247875",
+      "count": 1868,
+      "raw": 7175778,
+      "wire": 118155
+    },
+    {
+      "sid": "sid-spec-0-netbench-9b0be832",
+      "count": 2268,
+      "raw": 7771043,
+      "wire": 116932
+    },
+    {
+      "sid": "sid-spec-1-netbench-9b0be832",
+      "count": 2268,
+      "raw": 7771043,
+      "wire": 116932
+    },
+    {
+      "sid": "sid-spec-2-netbench-9b0be832",
+      "count": 2268,
+      "raw": 7771043,
+      "wire": 116932
+    },
+    {
+      "sid": "sid-b-netbench-274f49a3",
+      "count": 1786,
+      "raw": 7065090,
+      "wire": 116710
+    },
+    {
+      "sid": "sid-b-netbench-1ddb4c79",
+      "count": 1849,
+      "raw": 6518067,
+      "wire": 115432
+    },
+    {
+      "sid": "sid-b-netbench-edfff123",
+      "count": 1884,
+      "raw": 7269601,
+      "wire": 114389
+    },
+    {
+      "sid": "sid-a-netbench-1ddb4c79",
+      "count": 1847,
+      "raw": 6449907,
+      "wire": 113635
+    },
+    {
+      "sid": "sid-b-netbench-57247875",
+      "count": 1855,
+      "raw": 6838201,
+      "wire": 111949
+    },
+    {
+      "sid": "sid-a-netbench-274f49a3",
+      "count": 1795,
+      "raw": 7098827,
+      "wire": 111919
+    },
+    {
+      "sid": "sid-spec-0-netbench-39d3460a",
+      "count": 2205,
+      "raw": 6341227,
+      "wire": 108007
+    },
+    {
+      "sid": "sid-spec-1-netbench-39d3460a",
+      "count": 2205,
+      "raw": 6341227,
+      "wire": 108007
+    },
+    {
+      "sid": "sid-spec-2-netbench-39d3460a",
+      "count": 2205,
+      "raw": 6341227,
+      "wire": 108007
+    },
+    {
+      "sid": "sid-spec-0-netbench-f60595a7",
+      "count": 2035,
+      "raw": 6322229,
+      "wire": 104913
+    },
+    {
+      "sid": "sid-spec-1-netbench-f60595a7",
+      "count": 2035,
+      "raw": 6322229,
+      "wire": 104913
+    },
+    {
+      "sid": "sid-spec-2-netbench-f60595a7",
+      "count": 2035,
+      "raw": 6322229,
+      "wire": 104913
+    },
+    {
+      "sid": "sid-b-netbench-d62f200b",
+      "count": 1566,
+      "raw": 5999446,
+      "wire": 102370
+    },
+    {
+      "sid": "sid-spec-0-netbench-edfff123",
+      "count": 1958,
+      "raw": 5834831,
+      "wire": 101241
+    },
+    {
+      "sid": "sid-spec-1-netbench-edfff123",
+      "count": 1958,
+      "raw": 5834831,
+      "wire": 101241
+    },
+    {
+      "sid": "sid-spec-2-netbench-edfff123",
+      "count": 1958,
+      "raw": 5834831,
+      "wire": 101241
+    },
+    {
+      "sid": "sid-spec-0-netbench-274f49a3",
+      "count": 1830,
+      "raw": 5856238,
+      "wire": 98409
+    },
+    {
+      "sid": "sid-spec-1-netbench-274f49a3",
+      "count": 1830,
+      "raw": 5856238,
+      "wire": 98409
+    },
+    {
+      "sid": "sid-spec-2-netbench-274f49a3",
+      "count": 1830,
+      "raw": 5856238,
+      "wire": 98409
+    },
+    {
+      "sid": "sid-a-netbench-d62f200b",
+      "count": 1544,
+      "raw": 5586877,
+      "wire": 93629
+    },
+    {
+      "sid": "sid-spec-0-netbench-1ddb4c79",
+      "count": 1876,
+      "raw": 5066560,
+      "wire": 93535
+    },
+    {
+      "sid": "sid-spec-1-netbench-1ddb4c79",
+      "count": 1876,
+      "raw": 5066560,
+      "wire": 93535
+    },
+    {
+      "sid": "sid-spec-2-netbench-1ddb4c79",
+      "count": 1876,
+      "raw": 5066560,
+      "wire": 93535
+    },
+    {
+      "sid": "sid-spec-0-netbench-d62f200b",
+      "count": 1593,
+      "raw": 4600208,
+      "wire": 82134
+    },
+    {
+      "sid": "sid-spec-1-netbench-d62f200b",
+      "count": 1593,
+      "raw": 4600208,
+      "wire": 82134
+    },
+    {
+      "sid": "sid-spec-2-netbench-d62f200b",
+      "count": 1593,
+      "raw": 4600208,
+      "wire": 82134
+    },
+    {
+      "sid": "sid-b-netbench-3a106b37",
+      "count": 1061,
+      "raw": 4274101,
+      "wire": 73182
+    },
+    {
+      "sid": "sid-b-netbench-d57c069a",
+      "count": 1216,
+      "raw": 4150672,
+      "wire": 71351
+    },
+    {
+      "sid": "sid-a-netbench-3a106b37",
+      "count": 1061,
+      "raw": 3954180,
+      "wire": 69631
+    },
+    {
+      "sid": "sid-a-netbench-d57c069a",
+      "count": 1185,
+      "raw": 4044426,
+      "wire": 68157
+    },
+    {
+      "sid": "sid-spec-0-netbench-d57c069a",
+      "count": 1230,
+      "raw": 3237561,
+      "wire": 61586
+    },
+    {
+      "sid": "sid-spec-1-netbench-d57c069a",
+      "count": 1230,
+      "raw": 3237561,
+      "wire": 61586
+    },
+    {
+      "sid": "sid-spec-2-netbench-d57c069a",
+      "count": 1230,
+      "raw": 3237561,
+      "wire": 61586
+    },
+    {
+      "sid": "sid-spec-0-netbench-3a106b37",
+      "count": 1095,
+      "raw": 3182140,
+      "wire": 60313
+    },
+    {
+      "sid": "sid-spec-1-netbench-3a106b37",
+      "count": 1095,
+      "raw": 3182140,
+      "wire": 60313
+    },
+    {
+      "sid": "sid-spec-2-netbench-3a106b37",
+      "count": 1095,
+      "raw": 3182140,
+      "wire": 60313
+    },
+    {
+      "sid": "sid-b-netbench-04217d70",
+      "count": 1087,
+      "raw": 3535220,
+      "wire": 59153
+    },
+    {
+      "sid": "sid-a-netbench-04217d70",
+      "count": 1031,
+      "raw": 3469515,
+      "wire": 57615
+    },
+    {
+      "sid": "sid-spec-0-netbench-04217d70",
+      "count": 1098,
+      "raw": 2785999,
+      "wire": 51971
+    },
+    {
+      "sid": "sid-spec-1-netbench-04217d70",
+      "count": 1098,
+      "raw": 2785999,
+      "wire": 51971
+    },
+    {
+      "sid": "sid-spec-2-netbench-04217d70",
+      "count": 1098,
+      "raw": 2785999,
+      "wire": 51971
+    },
+    {
+      "sid": "sid-a-netbench-f293c353",
+      "count": 602,
+      "raw": 2127921,
+      "wire": 37500
+    },
+    {
+      "sid": "sid-b-netbench-f293c353",
+      "count": 600,
+      "raw": 2028369,
+      "wire": 36637
+    },
+    {
+      "sid": "sid-spec-0-netbench-f293c353",
+      "count": 613,
+      "raw": 1615568,
+      "wire": 31959
+    },
+    {
+      "sid": "sid-spec-1-netbench-f293c353",
+      "count": 613,
+      "raw": 1615568,
+      "wire": 31959
+    },
+    {
+      "sid": "sid-spec-2-netbench-f293c353",
+      "count": 613,
+      "raw": 1615568,
+      "wire": 31959
+    },
+    {
+      "sid": "sid-spec-0-netbench-eff57977",
+      "count": 216,
+      "raw": 529027,
+      "wire": 12149
+    },
+    {
+      "sid": "sid-spec-1-netbench-eff57977",
+      "count": 216,
+      "raw": 529027,
+      "wire": 12149
+    },
+    {
+      "sid": "sid-spec-2-netbench-eff57977",
+      "count": 216,
+      "raw": 529027,
+      "wire": 12149
+    },
+    {
+      "sid": "sid-spec-0-netbench-57247875",
+      "count": 120,
+      "raw": 270696,
+      "wire": 7370
+    },
+    {
+      "sid": "sid-spec-1-netbench-57247875",
+      "count": 120,
+      "raw": 270696,
+      "wire": 7370
+    },
+    {
+      "sid": "sid-spec-2-netbench-57247875",
+      "count": 120,
+      "raw": 270696,
+      "wire": 7370
+    },
+    {
+      "sid": "sid-spec-0-netbench-88dea9a6",
+      "count": 62,
+      "raw": 140336,
+      "wire": 4742
+    },
+    {
+      "sid": "sid-spec-1-netbench-88dea9a6",
+      "count": 62,
+      "raw": 140336,
+      "wire": 4742
+    },
+    {
+      "sid": "sid-spec-2-netbench-88dea9a6",
+      "count": 62,
+      "raw": 140336,
+      "wire": 4742
+    },
+    {
+      "sid": "sid-a-netbench-f9e82956",
+      "count": 24,
+      "raw": 93369,
+      "wire": 3387
+    },
+    {
+      "sid": "sid-b-netbench-f9e82956",
+      "count": 25,
+      "raw": 86635,
+      "wire": 3307
+    },
+    {
+      "sid": "sid-spec-0-netbench-f9e82956",
+      "count": 25,
+      "raw": 67879,
+      "wire": 2738
+    },
+    {
+      "sid": "sid-spec-1-netbench-f9e82956",
+      "count": 25,
+      "raw": 67879,
+      "wire": 2738
+    },
+    {
+      "sid": "sid-spec-2-netbench-f9e82956",
+      "count": 25,
+      "raw": 67879,
+      "wire": 2738
+    },
+    {
+      "sid": "room:netbench-f60595a7",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-04217d70",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-f293c353",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-39d3460a",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-57247875",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-f9e82956",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-9b0be832",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-d57c069a",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-3a106b37",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-edfff123",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-88dea9a6",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-274f49a3",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-eff57977",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-1ddb4c79",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-d62f200b",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-82ea7bde",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-33b1c83a",
+      "count": 1,
+      "raw": 317,
+      "wire": 208
+    }
+  ],
+  "summe": {
+    "count": 133367,
+    "raw": 456198411,
+    "wire": 7675746
+  },
+  "groesste_nachricht": {
+    "bytes": 13398,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 17,
+    "raw": 4675
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 8,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Argos, the Eye of the Cosmos\" → Theme \"argos\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 14,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Ghuanjun, the Undead Martial Artist\" → Theme \"ghuanjun\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 15,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Layn, Defender of Deri\" → Theme \"layn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    }
+  ],
+  "unterdrueckte_ausgabezeilen": 43,
+  "hochrechnung": {
+    "wire_je_partie": 451514.4705882353,
+    "roh_je_partie": 26835200.647058822,
+    "wire_je_verbindung": 90302.89411764705,
+    "wire_je_halbzug": 10934.111111111111,
+    "kompressionsfaktor": 59.43375549425424
+  }
+}

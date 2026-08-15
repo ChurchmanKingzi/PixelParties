@@ -1,0 +1,62 @@
+[Unit]
+Description=Pixel Parties TCG — Spielserver
+Documentation=https://pixelpartiestcg.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pixelparties
+Group=pixelparties
+WorkingDirectory=/opt/pixelparties
+Slice=pixelparties.slice
+
+# ── Umgebung ───────────────────────────────────────────────────
+# Diese Werte gewinnen bewusst gegen die .env: der Loader in
+# server.js setzt eine Variable nur, wenn sie noch nicht existiert.
+# Was hier steht, ist also nicht versehentlich überschreibbar.
+Environment=NODE_ENV=production
+Environment=PP_NO_WATCH=1
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Environment=TRUST_PROXY=1
+Environment=COOKIE_SECURE=1
+# Heap-Grenze unter MemoryHigh der Slice halten. Läuft V8 in sein
+# eigenes Limit, bekommst du einen sauberen JS-Fehler mit Stacktrace;
+# läuft der Container in MemoryMax, killt der Kernel wortlos.
+Environment=NODE_OPTIONS=--max-old-space-size=2560
+
+ExecStart=/usr/bin/node server.js
+
+Restart=always
+RestartSec=5
+# Fünf Fehlstarts in einer Minute heißt: es liegt am Code, nicht am
+# Zufall. Dann soll die Unit stehenbleiben statt endlos zu kreiseln.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# ── Härtung ────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Alles außerhalb dieser Pfade ist für den Prozess schreibgeschützt.
+# data/ = SQLite und Spielaufzeichnungen, public/dist = der Build, den
+# server.js beim Hochfahren selbst erzeugt, uploads/ = Avatare.
+ReadWritePaths=/opt/pixelparties/data
+ReadWritePaths=/opt/pixelparties/public/dist
+ReadWritePaths=/opt/pixelparties/uploads
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pixelparties
+
+[Install]
+WantedBy=multi-user.target

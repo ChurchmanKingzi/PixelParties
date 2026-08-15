@@ -226,6 +226,38 @@ module.exports = {
       });
       if (!confirmed) return;
 
+      // ── FORTSCHRITTS-SICHERUNG DER PICKER-SCHLEIFE (v384) ──────────
+      // Die Rückwärtsnavigation unten (`zone == null` → zurück zur
+      // Galerie) ist eine reine MENSCHEN-Bequemlichkeit: Escape auf dem
+      // Zonenwähler soll eine Stufe zurückführen. Für einen AUTOMATEN
+      // ist sie strukturell falsch — der antwortet auf dieselbe Galerie
+      // wieder dasselbe, bekommt wieder `null` und dreht endlos.
+      //
+      // Belegt am echten Engine-Repro (14.8.): ohne installiertes
+      // CPU-Gehirn beantwortet der Engine-Default JEDEN cancellable
+      // Prompt mit `null`, also auch `zonePick`. Im Messstand (alle
+      // Pausen ausgehängt) waren das 569.718 Umdrehungen in 5 Sekunden;
+      // im Lauf vom 14.8. standen 1.308.102 Spielstart-Griffe für EINE
+      // Partie im Bericht, dazu 51 abgebrochene Hooks und 300 s CPU bei
+      // 9 Halbzügen. Der Hook-Timeout stoppt so eine Schleife NICHT
+      // (`Promise.race` lässt die Verliererseite weiterlaufen).
+      //
+      // Als Ruling: Barker soll nie „gar nichts" beschwören, solange es
+      // mögliche Ziele gibt. Deshalb: kam die Antwort von einem
+      // Automaten, wird die ERSTE FREIE ZONE genommen statt
+      // zurückzuspringen. Die Bedingung ist exakt die, mit der die
+      // Engine in `promptGeneric` selbst entscheidet, ob sie den
+      // Client fragt oder selbst antwortet — damit gibt es keinen
+      // dritten Fall, den diese Prüfung übersieht.
+      const automatAntwortet = () =>
+        engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode;
+      // Letzte Verteidigungslinie für jeden künftigen Pfad, der weder
+      // Mensch noch bekannter Automat ist: nach so vielen Rücksprüngen
+      // wird ebenfalls platziert. Ein Mensch erreicht die Zahl im
+      // Normalbetrieb nicht (jeder Rücksprung ist zwei Klicks).
+      const MAX_RUECKSPRUENGE = 20;
+      let rueckspruenge = 0;
+
       // Step 2 + 3: Pick creature → pick zone (with back navigation)
       while (true) {
         // Step 2: Pick a creature
@@ -246,7 +278,17 @@ module.exports = {
           description: `Place ${selected.cardName} into a Support Zone.`,
           cancellable: true,
         });
-        if (!zone) continue; // Escape = back to creature picker
+        // Escape = back to creature picker — aber nur für einen echten
+        // Menschen (siehe Kommentar über der Schleife).
+        let zielZone = zone;
+        if (!zielZone) {
+          rueckspruenge++;
+          if (automatAntwortet() || rueckspruenge > MAX_RUECKSPRUENGE) {
+            zielZone = freeZones[0];
+          } else {
+            continue;
+          }
+        }
 
         // Execute: remove from source, place into support zone
         const cardName = selected.cardName;
@@ -260,10 +302,10 @@ module.exports = {
 
         // Place into support zone
         if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-        ps.supportZones[heroIdx][zone.slotIdx] = [cardName];
+        ps.supportZones[heroIdx][zielZone.slotIdx] = [cardName];
 
         // Track card instance in engine with placement flag
-        const inst = engine._trackCard(cardName, pi, 'support', heroIdx, zone.slotIdx);
+        const inst = engine._trackCard(cardName, pi, 'support', heroIdx, zielZone.slotIdx);
         inst.counters.isPlacement = 1;
 
         // Counts as a creature summon for this turn — gates like
@@ -273,11 +315,11 @@ module.exports = {
         // Action Phase.
         ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
-        engine.log('placement', { card: cardName, by: 'Barker, the Monster Tamer', from: selected.source, heroIdx, zoneSlot: zone.slotIdx });
+        engine.log('placement', { card: cardName, by: 'Barker, the Monster Tamer', from: selected.source, heroIdx, zoneSlot: zielZone.slotIdx });
 
-        engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: zone.slotIdx, cardName });
+        engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: zielZone.slotIdx, cardName });
 
-        await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zone.slotIdx });
+        await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zielZone.slotIdx });
         await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
 
         engine.sync();

@@ -5,369 +5,477 @@
     "Nao, the Barrier Priestess",
     "Treasure Huntress Semi"
   ],
-  "games": 160,
-  "trainWinRate": "46.3%",
-  "trainedAt": "2026-07-31T14:54:21.217Z",
-  "meanTurns": 25.5,
+  "games": 1392,
+  "trainWinRate": "58.1%",
+  "trainedAt": "2026-08-14T07:35:52.338Z",
+  "meanTurns": 22.2,
   "cardValues": {
-    "Lifeforce Howitzer": 13.6,
-    "Friendship": 11.3,
-    "Performance": 10.2,
-    "Shield of Death": 21,
-    "The Yeeting": 12.4,
-    "Martyry": 8.5,
-    "Heal": 62.5,
-    "Wheels": 71.6,
-    "Support Magic": 14.3,
+    "Lifeforce Howitzer": 34.1,
+    "Performance": 9.5,
+    "Martyry": 8.2,
+    "Heal": 67.2,
+    "Dark Gear": 21.7,
+    "Shield of Death": 17.6,
+    "Shard of Chaos": 29.3,
+    "Support Magic": 9.5,
+    "Friendship": 9.9,
+    "Overheal Shock": 37.8,
+    "Magnetic Glove": 45.2,
+    "The Yeeting": 22,
     "Healing Melody": 100,
-    "Magnetic Glove": 22,
-    "Brilliant Idea": 8.2,
-    "Shard of Chaos": 34.1,
-    "Guardian Angel": 24.8,
-    "Shield of Life": 13.5,
-    "Dark Gear": 17.5,
-    "Cure": 29.1,
-    "Overheal Shock": 34.5,
-    "Divine Gift of The Light": 17,
-    "Golden Ankh": 11
+    "Wheels": 47.7,
+    "Cure": 10.1,
+    "Shield of Life": 12.3,
+    "Brilliant Idea": 8.6,
+    "Golden Ankh": 15.1,
+    "Guardian Angel": 33.1,
+    "Divine Gift of The Light": 20.7
   },
   "timing": {
     "Lifeforce Howitzer": {
-      "early": 0.75,
-      "mid": 1.3,
+      "early": 0.87,
+      "mid": 1.27,
       "late": 0.86
-    },
-    "Friendship": {
-      "early": 1,
-      "mid": 0.98,
-      "late": 1.01
     },
     "Performance": {
       "early": 0.75,
       "mid": 1.3,
-      "late": 1.1
-    },
-    "Shield of Death": {
-      "early": 0.94,
-      "mid": 0.79,
-      "late": 1.26
-    },
-    "The Yeeting": {
-      "early": 0.78,
-      "mid": 1.07,
-      "late": 1.14
+      "late": 1.21
     },
     "Martyry": {
-      "early": 0.92,
-      "mid": 1.03,
-      "late": 1.05
+      "early": 0.75,
+      "mid": 0.94,
+      "late": 1.3
     },
     "Heal": {
       "early": 0.75,
-      "mid": 1.22,
+      "mid": 1.07,
+      "late": 1.3
+    },
+    "Dark Gear": {
+      "early": 0.93,
+      "mid": 1.02,
+      "late": 1.05
+    },
+    "Shield of Death": {
+      "early": 0.84,
+      "mid": 1.12,
+      "late": 1.04
+    },
+    "Shard of Chaos": {
+      "early": 0.87,
+      "mid": 1.14,
+      "late": 0.99
+    },
+    "Support Magic": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.01
+    },
+    "Friendship": {
+      "early": 0.75,
+      "mid": 1.3,
+      "late": 1.08
+    },
+    "Overheal Shock": {
+      "early": 0.79,
+      "mid": 1.16,
+      "late": 1.05
+    },
+    "Magnetic Glove": {
+      "early": 0.75,
+      "mid": 1.09,
+      "late": 1.3
+    },
+    "The Yeeting": {
+      "early": 0.97,
+      "mid": 1.02,
+      "late": 1.01
+    },
+    "Healing Melody": {
+      "early": 0.75,
+      "mid": 1.3,
       "late": 1.3
     },
     "Wheels": {
       "early": 0.75,
-      "mid": 0.75,
-      "late": 1.3
-    },
-    "Support Magic": {
-      "early": 0.75,
-      "mid": 0.95,
-      "late": 1.3
-    },
-    "Healing Melody": {
-      "early": 0.75,
-      "mid": 1.22,
-      "late": 1.3
-    },
-    "Magnetic Glove": {
-      "early": 0.96,
-      "mid": 0.78,
-      "late": 1.26
-    },
-    "Brilliant Idea": {
-      "early": 1.2,
-      "mid": 1.21,
-      "late": 0.75
-    },
-    "Shard of Chaos": {
-      "early": 0.83,
-      "mid": 0.91,
+      "mid": 1.25,
       "late": 1.25
     },
-    "Guardian Angel": {
-      "early": 1,
-      "mid": 0.94,
-      "late": 1.06
-    },
-    "Shield of Life": {
-      "early": 0.8,
-      "mid": 1.06,
-      "late": 1.15
-    },
-    "Dark Gear": {
-      "early": 0.91,
-      "mid": 1.03,
-      "late": 1.05
-    },
     "Cure": {
-      "early": 0.84,
-      "mid": 0.77,
+      "early": 0.75,
+      "mid": 1.06,
       "late": 1.3
     },
-    "Overheal Shock": {
+    "Shield of Life": {
       "early": 0.75,
-      "mid": 1.08,
-      "late": 1.22
+      "mid": 1.22,
+      "late": 1.16
     },
-    "Divine Gift of The Light": {
-      "early": 0.99,
-      "mid": 1,
-      "late": 1
+    "Brilliant Idea": {
+      "early": 0.98,
+      "mid": 1.26,
+      "late": 0.77
     },
     "Golden Ankh": {
-      "early": 1,
-      "mid": 1.04,
-      "late": 0.96
+      "early": 1.05,
+      "mid": 1,
+      "late": 0.95
+    },
+    "Guardian Angel": {
+      "early": 0.92,
+      "mid": 1,
+      "late": 1.08
+    },
+    "Divine Gift of The Light": {
+      "early": 0.87,
+      "mid": 1.09,
+      "late": 1.03
     }
   },
   "pairBonuses": {
-    "Lifeforce Howitzer|The Yeeting": 4.3,
-    "Dark Gear|Lifeforce Howitzer": 6.7,
-    "Healing Melody|Lifeforce Howitzer": 6.2,
-    "Lifeforce Howitzer|Overheal Shock": 9.7,
-    "Lifeforce Howitzer|dc:Martyry": 4.1,
-    "Lifeforce Howitzer|Wheels": 4.1,
-    "Lifeforce Howitzer|Support Magic": 4.9,
-    "Performance|dc:Martyry": 6.9,
-    "Guardian Angel|Performance": 5.9,
-    "Performance|dc:Magnetic Glove": 4.1,
-    "Cure|Shield of Death": 4.6,
-    "Shield of Death|The Yeeting": 4.3,
-    "Shield of Death|dc:Performance": 16.6,
-    "Golden Ankh|The Yeeting": 4.1,
-    "Shield of Life|The Yeeting": 4.1,
-    "The Yeeting|dc:Friendship": 4.5,
-    "The Yeeting|dc:Golden Ankh": 4.2,
-    "Heal|Martyry": 6.6,
-    "Martyry|dc:Heal": 6,
-    "Wheels|dc:Heal": 4.3,
-    "Wheels|dc:Martyry": 4.5,
-    "Wheels|dc:The Yeeting": 5,
-    "Wheels|dc:Magnetic Glove": 4.9,
-    "Guardian Angel|Wheels": 5,
-    "Wheels|dc:Lifeforce Howitzer": 6.6,
-    "Wheels|dc:Shield of Death": 5.3,
-    "Support Magic|dc:Heal": 5.1,
-    "Support Magic|dc:Martyry": 5.2,
-    "Support Magic|dc:Wheels": 4,
-    "Support Magic|dc:Magnetic Glove": 5.5,
-    "Guardian Angel|Support Magic": 4.7,
-    "Support Magic|dc:Lifeforce Howitzer": 7.9,
-    "Support Magic|dc:Golden Ankh": 5.8,
-    "Support Magic|dc:Shield of Death": 6.7,
-    "Healing Melody|dc:Heal": 4.8,
-    "Healing Melody|dc:Martyry": 4.8,
-    "Healing Melody|dc:Wheels": 5.6,
-    "Healing Melody|dc:Magnetic Glove": 5.3,
-    "Healing Melody|Shield of Life": 4.3,
-    "Magnetic Glove|dc:Shield of Death": 5.7,
-    "Shard of Chaos|Shield of Life": 7.9,
-    "Guardian Angel|dc:Magnetic Glove": 6.3,
-    "Cure|Guardian Angel": 4.6,
-    "Shield of Life|dc:Friendship": 13.6,
-    "Dark Gear|Overheal Shock": 13.5,
-    "Cure|dc:The Yeeting": 6.9,
-    "Cure|dc:Brilliant Idea": 6.1,
-    "Cure|dc:Golden Ankh": 4.9,
-    "Cure|dc:Heal": 5.4,
-    "Cure|dc:Magnetic Glove": 8.8,
-    "Cure|dc:Performance": 5.9,
-    "Cure|dc:Shield of Life": 9.9,
-    "Cure|dc:Shard of Chaos": 6.8,
-    "Overheal Shock|dc:Heal": 4.4,
-    "Overheal Shock|dc:The Yeeting": 5.3,
-    "Overheal Shock|dc:Magnetic Glove": 6.4,
-    "Overheal Shock|dc:Martyry": 10.2,
-    "Golden Ankh|dc:Magnetic Glove": 6
-  },
-  "cardValueDeltasByCluster": {
-    "spell": {
-      "Friendship": 6,
-      "Shield of Death": 7.5,
-      "Support Magic": 6.2,
-      "Cure": 9.8
-    }
+    "The Yeeting|dc:Shield of Life": 4.5
   },
   "casterDeltas": {
     "Heal": {
-      "Nao, the Barrier Priestess": -9.5,
-      "Kazena, the Storming Rebel": 10.2
+      "Nao, the Barrier Priestess": -11.5,
+      "Treasure Huntress Semi": 15.9,
+      "Kazena, the Storming Rebel": 9.2
     },
     "Healing Melody": {
-      "Nao, the Barrier Priestess": -12.6,
-      "Kazena, the Storming Rebel": 12.1
+      "Kazena, the Storming Rebel": 4.3,
+      "Nao, the Barrier Priestess": -5.3,
+      "Treasure Huntress Semi": 12.3
     },
     "Cure": {
-      "Nao, the Barrier Priestess": -20,
-      "Kazena, the Storming Rebel": 16.1
+      "Nao, the Barrier Priestess": -15,
+      "Treasure Huntress Semi": 11,
+      "Kazena, the Storming Rebel": 14
     }
   },
   "cardValueDeltasByStanding": {
     "behind": {
-      "Friendship": -19.8,
-      "Martyry": -16.8,
-      "Magnetic Glove": -18.4,
-      "Brilliant Idea": -17.1,
-      "Golden Ankh": -20
+      "Martyry": -10.7,
+      "Shield of Death": -6.4,
+      "Magnetic Glove": -7.4,
+      "The Yeeting": -6.9,
+      "Shield of Life": -7.8,
+      "Brilliant Idea": -9.6,
+      "Golden Ankh": -18.4
     },
     "ahead": {
-      "Brilliant Idea": -20
+      "Performance": -6.5,
+      "Shield of Death": -13.6,
+      "Shard of Chaos": -12.9,
+      "Support Magic": -7.6,
+      "Friendship": -7.6,
+      "Brilliant Idea": -14.7,
+      "Golden Ankh": -20,
+      "Guardian Angel": -7.2
     }
   },
-  "standingEvalThreshold": 958,
+  "standingEvalThreshold": 1025,
+  "deckoutGuard": {
+    "Support Magic": -16.5,
+    "Brilliant Idea": -5.4,
+    "Friendship": -6.8,
+    "Shield of Life": -12.6,
+    "Lifeforce Howitzer": -13,
+    "Shard of Chaos": -10.7,
+    "The Yeeting": -15.5
+  },
+  "deckoutDangerSize": 6,
   "targetPriors": {
     "Heal": {
-      "healrev": 8,
-      "kind:creature": -7.1
+      "row:free:3": -15.5,
+      "healrev": 12.2,
+      "row:creatures:1": 6,
+      "row:creatures:3": -18.5,
+      "row:hosted:3-4": 6.4,
+      "dmgred": 9.7,
+      "row:hosted:5+": 13.6,
+      "frozen": 7.7
     },
     "Lifeforce Howitzer": {
-      "kind:creature": -9.8,
-      "hp:max": -16.7,
-      "healrev": 8.7,
-      "pos:2": 7.9
-    },
-    "Shield of Death": {
-      "hp:min": -8.8,
-      "kind:creature": -20,
-      "pos:2": 18.9,
-      "healrev": 8.8
-    },
-    "Guardian Angel": {
-      "pos:1": -16.5,
-      "hp:max": -9.5,
-      "pos:0": 9.2
-    },
-    "Cure": {
-      "hp:min": 6.6
-    },
-    "Shield of Life": {
-      "pos:2": -7.7
+      "kind:creature": -16.4,
+      "healrev": 6.6,
+      "hp:max": -6.6,
+      "row:hosted:5+": 10.4,
+      "threat:priority_target": -13.9
     },
     "Overheal Shock": {
-      "kind:creature": -9.6,
-      "kind:hero": 9,
-      "hp:min": 9.5,
-      "pos:2": 18.3
+      "row:hosted:3-4": 11.9,
+      "dmgred": 10.9,
+      "row:hosted:5+": 8.4
+    },
+    "Shield of Death": {
+      "kind:creature": -20,
+      "hp:max": -6.2,
+      "pos:2": 10.6,
+      "row:hosted:3-4": 6.5,
+      "row:creatures:3": 6.7,
+      "row:hosted:5+": 10.7,
+      "dmgred": -12.6,
+      "threat:priority_target": -18.5
+    },
+    "Cure": {
+      "frozen": -15.3,
+      "row:creatures:2": 20,
+      "row:free:0": 11.1,
+      "row:hosted:1-2": 11.6,
+      "healrev": 10.8,
+      "row:free:3": -16.5,
+      "hp:max": 6.1,
+      "kind:creature": -14.2,
+      "row:hosted:3-4": 11.8
+    },
+    "Guardian Angel": {
+      "row:free:3": -14,
+      "row:hosted:1-2": -20,
+      "healrev": -15.6
+    },
+    "Shield of Life": {
+      "row:free:3": -17,
+      "row:free:0": 9.1,
+      "hp:max": 8.1,
+      "pos:2": -9.5,
+      "row:free:2": -7.3,
+      "row:hosted:1-2": 20
     },
     "Divine Gift of The Light": {
-      "side:opp": 6.4,
-      "pos:2": 8.6,
-      "healrev": 10.2,
-      "side:own": -12.3,
-      "kind:creature": -20
+      "side:own": -6.4,
+      "row:creatures:2": 8.8,
+      "row:hosted:3-4": 19.3,
+      "row:free:3": -10.1,
+      "row:hosted:5+": 8.6,
+      "dmgred": 7.7,
+      "threat:priority_target": 8.6,
+      "kind:creature": -9.4
     },
     "Martyry": {
-      "hp:max": -8.3,
-      "pos:0": -12
+      "row:free:2": -8.9,
+      "row:free:3": -11.2,
+      "row:free:0": 15.8
+    },
+    "Gathering Storm": {
+      "pos:1": 12.9,
+      "hp:min": 10.3,
+      "row:free:2": 6.6,
+      "pos:0": -18.8,
+      "pos:2": -14.8,
+      "hp:max": 8.6,
+      "row:free:0": -16.6
+    },
+    "Cosmic Skeleton": {
+      "pos:1": -9.2,
+      "hp:min": -8.6,
+      "row:creatures:3": 7.6,
+      "row:free:0": 9.5,
+      "row:hosted:0": -8.5,
+      "row:creatures:0": -20,
+      "row:free:2": -10.9,
+      "pos:2": 15.1,
+      "hp:max": -12.2
+    },
+    "Aggressive Town Guard": {
+      "side:own": -19.9,
+      "hp:max": -17.6,
+      "row:free:1": -7.2,
+      "row:hosted:0": -14.4,
+      "row:creatures:2": 6.2,
+      "row:hosted:1-2": 7.5,
+      "pos:2": -7.9
+    },
+    "Pollution Piranha": {
+      "pos:1": -10.1,
+      "hp:min": -16.2,
+      "healrev": 15.1,
+      "pos:2": 19.3
     }
   },
+  "playOrderRules": {
+    "pord:first": -2.9
+  },
   "tutorPickRules": {
-    "Shard of Chaos — Retrieve Attack/Spell/Creature→Heal": -8,
-    "Shard of Chaos — Retrieve Attack/Spell/Creature→Brilliant Idea": -20,
-    "Shard of Chaos — Retrieve Attack/Spell/Creature→Healing Melody": 11.1,
-    "Magnetic Glove→Wheels": -13.5,
-    "Magnetic Glove→Healing Melody": 20,
-    "Magnetic Glove→Heal": -7.7,
-    "Brilliant Idea→Wheels": -8.9,
-    "Brilliant Idea→Healing Melody": 9.5,
-    "Brilliant Idea→Heal": 9.4,
-    "Brilliant Idea→Overheal Shock": -3,
-    "Brilliant Idea→Brilliant Idea": 2.7,
-    "Shard of Chaos — Retrieve Artifact→Wheels": 3,
-    "Shard of Chaos — Retrieve Artifact→Magnetic Glove": -7.4,
-    "Shard of Chaos — Retrieve Artifact→The Yeeting": 8.1,
-    "Enigma, the Seller of Secrets→Golden Ankh": -3.9,
-    "Enigma, the Seller of Secrets→Performance": -5.8
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Healing Melody": 2.4,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Brilliant Idea": -2.7,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Overheal Shock": 15.8,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Cure": -5.4,
+    "Shard of Chaos — Retrieve Attack/Spell/Creature→Martyry": -2.6,
+    "Magnetic Glove→The Yeeting": -20,
+    "Magnetic Glove→Dark Gear": 6.8,
+    "Magnetic Glove→Performance": -5.8,
+    "Magnetic Glove→Support Magic": -11.4,
+    "Magnetic Glove→Divine Gift of The Light": 12.1,
+    "Magnetic Glove→Shield of Life": -20,
+    "Magnetic Glove→Golden Ankh": -5.2,
+    "Magnetic Glove→Healing Melody": 9.3,
+    "Magnetic Glove→Brilliant Idea": -7.8,
+    "Magnetic Glove→Shield of Death": -8.1,
+    "Magnetic Glove→Lifeforce Howitzer": -4.1,
+    "Magnetic Glove→Friendship": -15.3,
+    "Magnetic Glove→Cure": -13,
+    "Magnetic Glove→Shard of Chaos": -8.4,
+    "Magnetic Glove→Guardian Angel": 6.6,
+    "Magnetic Glove→Overheal Shock": -4.1,
+    "Brilliant Idea→Divine Gift of The Light": -20,
+    "Brilliant Idea→Overheal Shock": -9.3,
+    "Brilliant Idea→Support Magic": 3.5,
+    "Brilliant Idea→Brilliant Idea": -6.8,
+    "Brilliant Idea→Shard of Chaos": -6.7,
+    "Brilliant Idea→Shield of Life": -5.9,
+    "Brilliant Idea→Cure": 7.4,
+    "Brilliant Idea→The Yeeting": 4.6,
+    "Brilliant Idea→Healing Melody": 6.5,
+    "Brilliant Idea→Shield of Death": -6.7,
+    "Brilliant Idea→Magnetic Glove": -12.5,
+    "Brilliant Idea→Martyry": -20,
+    "Brilliant Idea→Golden Ankh": -11.9,
+    "Brilliant Idea→Performance": 4.9,
+    "Brilliant Idea→Lifeforce Howitzer": -19.3,
+    "Brilliant Idea→Guardian Angel": -8.2,
+    "Brilliant Idea→Heal": 2,
+    "Magic Lamp→Field Standard": -18,
+    "Magic Lamp→Chain Lightning": -20,
+    "Magic Lamp→Decay Magic": -9.7,
+    "Magic Lamp→Fighting": -20,
+    "Magic Lamp→Acid Vial": 4.8,
+    "Magic Lamp→Defending the Gate": 15.9,
+    "Magic Lamp→Bamboo Staff": -20,
+    "Shard of Chaos — Retrieve Artifact→Shard of Chaos": -20,
+    "Shard of Chaos — Retrieve Artifact→Magnetic Glove": 5,
+    "Shard of Chaos — Retrieve Artifact→The Yeeting": 4.6,
+    "Shard of Chaos — Retrieve Artifact→Golden Ankh": -4.7,
+    "Shard of Chaos — Retrieve Artifact→Lifeforce Howitzer": -11.1,
+    "Shard of Chaos — Retrieve Artifact→Shield of Life": 12.8,
+    "Laser Volley→Nao, the Barrier Priestess": 18.1,
+    "Laser Volley→Kazena, the Storming Rebel": -14.4,
+    "Laser Volley→Treasure Huntress Semi": -3.5,
+    "Enigma, the Seller of Secrets→Shard of Chaos": 8.6,
+    "Enigma, the Seller of Secrets→Healing Melody": 4.9,
+    "Enigma, the Seller of Secrets→Overheal Shock": 8,
+    "Enigma, the Seller of Secrets→Martyry": -13.6,
+    "Enigma, the Seller of Secrets→Friendship": -18.3,
+    "Enigma, the Seller of Secrets→Support Magic": 20,
+    "Enigma, the Seller of Secrets→The Yeeting": 9.7,
+    "Enigma, the Seller of Secrets→Cure": 15.4,
+    "Enigma, the Seller of Secrets→Performance": -20,
+    "Enigma, the Seller of Secrets→Magnetic Glove": -16,
+    "Enigma, the Seller of Secrets→Shield of Death": -5.6,
+    "Enigma, the Seller of Secrets→Brilliant Idea": 4,
+    "Enigma, the Seller of Secrets→Lifeforce Howitzer": 6.9,
+    "Enigma, the Seller of Secrets→Shield of Life": 20,
+    "Enigma, the Seller of Secrets→Wheels": -11.5,
+    "Shard of Chaos — Retrieve Ability→Support Magic": -15.3,
+    "Shard of Chaos — Retrieve Ability→Performance": 6,
+    "Shard of Chaos — Retrieve Ability→Adventurousness": 20,
+    "Magic Amethyst→Adventurousness": -4.1,
+    "Magic Amethyst→Performance": 16.7
   },
   "abilityPriors": {
     "Adventurousness@Kazena, the Storming Rebel": -60,
-    "Adventurousness@Kazena, the Storming Rebel≥2": 150,
-    "Support Magic@Kazena, the Storming Rebel": 62.1,
-    "Support Magic@Kazena, the Storming Rebel≥2": -60,
-    "Friendship@Nao, the Barrier Priestess": -60,
-    "Friendship@Nao, the Barrier Priestess≥2": 72.6,
-    "Friendship@Nao, the Barrier Priestess≥3": 150,
-    "Support Magic@Nao, the Barrier Priestess": -60,
-    "Support Magic@Nao, the Barrier Priestess≥2": -60,
-    "Support Magic@Nao, the Barrier Priestess≥3": 103,
-    "Friendship@Treasure Huntress Semi": -60,
+    "Adventurousness@Kazena, the Storming Rebel≥2": -60,
+    "Support Magic@Kazena, the Storming Rebel": 150,
+    "Support Magic@Kazena, the Storming Rebel≥2": 150,
+    "Friendship@Nao, the Barrier Priestess": 150,
+    "Friendship@Nao, the Barrier Priestess≥2": -60,
+    "Friendship@Nao, the Barrier Priestess≥3": -60,
+    "Support Magic@Nao, the Barrier Priestess": 150,
+    "Support Magic@Nao, the Barrier Priestess≥2": 150,
+    "Support Magic@Nao, the Barrier Priestess≥3": 150,
+    "Friendship@Treasure Huntress Semi": 11.4,
     "Friendship@Treasure Huntress Semi≥2": -60,
-    "Adventurousness@Treasure Huntress Semi": 69.8,
-    "Adventurousness@Treasure Huntress Semi≥2": 112.3,
-    "Adventurousness@Treasure Huntress Semi≥3": 146.7,
-    "Support Magic@Kazena, the Storming Rebel≥3": 150,
+    "Adventurousness@Treasure Huntress Semi": 150,
+    "Adventurousness@Treasure Huntress Semi≥2": -60,
     "Support Magic@Treasure Huntress Semi": -60,
-    "Friendship@Kazena, the Storming Rebel": 150,
-    "Friendship@Treasure Huntress Semi≥3": -60,
-    "Adventurousness@Kazena, the Storming Rebel≥3": 150,
-    "Support Magic@Treasure Huntress Semi≥2": 150
+    "Adventurousness@Kazena, the Storming Rebel≥3": -60,
+    "Friendship@Kazena, the Storming Rebel": -30.8,
+    "Support Magic@Treasure Huntress Semi≥2": 150,
+    "Support Magic@Treasure Huntress Semi≥3": 150,
+    "Adventurousness@Treasure Huntress Semi≥3": -60,
+    "Support Magic@Kazena, the Storming Rebel≥3": 150,
+    "Friendship@Kazena, the Storming Rebel≥2": -60,
+    "Friendship@Kazena, the Storming Rebel≥3": 150,
+    "Friendship@Treasure Huntress Semi≥3": -60
   },
   "equipPriors": {
-    "Lifeforce Howitzer@Kazena, the Storming Rebel": -60,
-    "Shield of Death@Kazena, the Storming Rebel": -60,
+    "Lifeforce Howitzer@Kazena, the Storming Rebel": 150,
     "Lifeforce Howitzer@Nao, the Barrier Priestess": 150,
-    "Lifeforce Howitzer@Treasure Huntress Semi": -60,
-    "Shield of Life@Treasure Huntress Semi": 150,
-    "Shield of Life@Nao, the Barrier Priestess": -60,
-    "Shield of Death@Nao, the Barrier Priestess": 150,
+    "Shield of Death@Treasure Huntress Semi": -60,
+    "Lifeforce Howitzer@Treasure Huntress Semi": 136.5,
+    "Shield of Life@Nao, the Barrier Priestess": 101.3,
+    "Shield of Death@Kazena, the Storming Rebel": 113,
     "Shield of Life@Kazena, the Storming Rebel": 150,
-    "Shield of Death@Treasure Huntress Semi": -40.6
+    "Shield of Life@Treasure Huntress Semi": -60,
+    "Shield of Death@Nao, the Barrier Priestess": 150
   },
   "lockPenalties": {},
   "reviveTargets": {
-    "Golden Ankh→Kazena, the Storming Rebel": -15,
-    "Golden Ankh→Nao, the Barrier Priestess": 30,
-    "Golden Ankh→Treasure Huntress Semi": 30
+    "Golden Ankh→Kazena, the Storming Rebel": 30,
+    "Golden Ankh→Treasure Huntress Semi": 30,
+    "Golden Ankh→Nao, the Barrier Priestess": 30
   },
   "reviveAbilities": {
     "Golden Ankh→Adventurousness": 30,
-    "Golden Ankh→Support Magic": -15,
+    "Golden Ankh→Support Magic": 30,
     "Golden Ankh→Friendship": 30
   },
   "startHandValues": {
-    "Friendship": 3.7,
-    "The Yeeting": 12.6,
-    "Lifeforce Howitzer": 6,
-    "Magnetic Glove": -2.8,
-    "Support Magic": 3.7,
-    "Shield of Life": 5.1,
-    "Healing Melody": -2.5,
-    "Cure": -7.1,
-    "Shard of Chaos": 2.6,
-    "Shield of Death": -1.8,
-    "Wheels": -11.9,
-    "Heal": 4.9,
-    "Martyry": -14.4,
-    "Golden Ankh": -8.2,
-    "Dark Gear": -17.7
+    "Heal": -1.4,
+    "Lifeforce Howitzer": 7.4,
+    "Friendship": -1.3,
+    "Golden Ankh": -7.1,
+    "Shield of Life": 1.5,
+    "Shield of Death": 4.9,
+    "Cure": -3.7,
+    "Healing Melody": -3.1,
+    "The Yeeting": -3.6,
+    "Shard of Chaos": -1.4,
+    "Magnetic Glove": 5.1,
+    "Dark Gear": 1.9
   },
   "mulliganStats": {
-    "games": 160,
-    "mullRate": "24.4%",
-    "winAfterMull": "43.6%",
-    "winAfterKeep": "47.1%"
+    "games": 1392,
+    "mullRate": "27.4%",
+    "winAfterMull": "58.1%",
+    "winAfterKeep": "58.1%"
   },
-  "heroEffectTiming": {},
+  "heroEffectTiming": {
+    "Kazena, the Storming Rebel@hand:2-3": 2.9,
+    "Kazena, the Storming Rebel@hand:0-1": -2
+  },
   "boardPairs": {
-    "Lifeforce Howitzer|Shield of Death": 13.2,
-    "Shield of Death|Support Magic": 12.2,
-    "Guardian Angel|Lifeforce Howitzer": 8.8,
-    "Guardian Angel|Support Magic": 7.5,
-    "Friendship|Shield of Life": -15
+    "Friendship|Lifeforce Howitzer": -8.7,
+    "Shield of Life|Support Magic": -7.3,
+    "Friendship|Support Magic": 15,
+    "Adventurousness|Shield of Death": -10.7,
+    "Shield of Death|Shield of Life": 6.8,
+    "Adventurousness|Shield of Life": -7.1,
+    "Guardian Angel|Lifeforce Howitzer": 15,
+    "Friendship|Guardian Angel": -8.4,
+    "Guardian Angel|Support Magic": -15,
+    "Aggressive Town Guard|Friendship": -15
   },
   "protectionRules": {},
-  "gameStartPicks": {}
+  "gameStartPicks": {
+    "Barker, the Monster Tamer": {
+      "baseline": 0.622,
+      "n": 119,
+      "values": {
+        "Deepsea Primordium": 0.105,
+        "Ska Harpyformer": 0.156
+      }
+    },
+    "Bill, the Angry Auctioneer": {
+      "baseline": 0.754,
+      "n": 61,
+      "values": {
+        "The Sun Sword": 0.127,
+        "Sacred Hammer of the Volcano": 0.163,
+        "Summoning Circle": -0.28,
+        "Legendary Sword of a Barbarian King": -0.28,
+        "Wanted Poster": 0.079
+      }
+    }
+  }
 }

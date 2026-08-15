@@ -1,0 +1,202 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 20 | Zuschauer je Partie: 3 | Pausen: uebersprungen
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler + 3 Zuschauer je Partie.
+
+  Partie   1/20   85 Halbzuege   19486 Nachrichten    73.04 MB roh  →    1.858 MB Leitung    15 s  Great Weapon Master vs Morph and Kill!
+  Partie   2/20   16 Halbzuege   24635 Nachrichten    15.55 MB roh  →    1.367 MB Leitung    15 s  Flying Sparks vs Sun Fencer Frenzy
+  Partie   3/20   45 Halbzuege   41811 Nachrichten    29.26 MB roh  →    2.295 MB Leitung    27 s  Gather That Storm! vs Idej Illusions
+  Partie   4/20   12 Halbzuege   11577 Nachrichten     9.39 MB roh  →    0.685 MB Leitung     6 s  Gather That Storm! vs Morph and Kill!
+  Partie   5/20   48 Halbzuege   18622 Nachrichten    35.29 MB roh  →    1.348 MB Leitung    25 s  Slip 'n Slide vs Bone Rush
+  Partie   6/20   16 Halbzuege    7557 Nachrichten    10.52 MB roh  →    0.495 MB Leitung     7 s  Bone Rush vs Venom Swamp
+  Partie   7/20    2 Halbzuege     205 Nachrichten     0.55 MB roh  →    0.026 MB Leitung    48 s  ⚠ stillstand  Burning Inferno vs Heal Burn
+     ↳ letzte 16 Engine-Zeilen vor dem Abbruch:
+       [demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).
+       [bgm] CPU-Gegner "Waflav, the Metamorphing Monstrosity" → Theme "waflav" (48 Themes im Ordner)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Lilly, the Charming Infiltrator" → Theme "lilly" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   8/20   54 Halbzuege   31152 Nachrichten    30.81 MB roh  →    1.848 MB Leitung    89 s  Parts of the Soul vs Cute Commando
+  Partie   9/20   35 Halbzuege   31554 Nachrichten    31.58 MB roh  →    1.868 MB Leitung    96 s  One-Two-Punch! vs Gates to Hell
+  Partie  10/20    2 Halbzuege     178 Nachrichten     0.48 MB roh  →    0.023 MB Leitung    48 s  ⚠ stillstand  Cute Commando vs Elven Vanguard
+     ↳ letzte 22 Engine-Zeilen vor dem Abbruch:
+       [demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).
+       [bgm] CPU-Gegner "Waflav, the Metamorphing Monstrosity" → Theme "waflav" (48 Themes im Ordner)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Lilly, the Charming Infiltrator" → Theme "lilly" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Thep, the Court Scribe" → Theme "thep" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Ghuanjun, the Undead Martial Artist" → Theme "ghuanjun" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Cute Annoyance Mini" → Theme "mini" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  11/20    1 Halbzuege      41 Nachrichten     0.12 MB roh  →    0.012 MB Leitung    48 s  ⚠ stillstand  Elven Vanguard vs Bone Rush
+     ↳ letzte 24 Engine-Zeilen vor dem Abbruch:
+       [demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).
+       [bgm] CPU-Gegner "Waflav, the Metamorphing Monstrosity" → Theme "waflav" (48 Themes im Ordner)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Lilly, the Charming Infiltrator" → Theme "lilly" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Thep, the Court Scribe" → Theme "thep" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Ghuanjun, the Undead Martial Artist" → Theme "ghuanjun" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Cute Annoyance Mini" → Theme "mini" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  12/20   18 Halbzuege   45320 Nachrichten    13.28 MB roh  →    2.386 MB Leitung    42 s  Big Stomp! vs Gather That Storm!
+  Partie  13/20   65 Halbzuege   23849 Nachrichten    56.39 MB roh  →    2.068 MB Leitung    60 s  Bamboo Warrior vs Guardians of the Treasure Cave
+  Partie  14/20    2 Halbzuege     189 Nachrichten     0.51 MB roh  →    0.025 MB Leitung    48 s  ⚠ stillstand  Elven Vanguard vs Grand Rebellion!
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Thep, the Court Scribe" → Theme "thep" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Ghuanjun, the Undead Martial Artist" → Theme "ghuanjun" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Cute Annoyance Mini" → Theme "mini" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Mao, the Vengeful Guardian" → Theme "mao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Champion, the Stormbringer" → Theme "champion" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  15/20   24 Halbzuege   10848 Nachrichten    18.53 MB roh  →    0.797 MB Leitung    20 s  Morph and Kill! vs Venom Swamp
+  Partie  16/20    1 Halbzuege      91 Nachrichten     0.21 MB roh  →    0.016 MB Leitung    48 s  ⚠ stillstand  Elven Vanguard vs Grand Rebellion!
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Vacarn, the Dark Goblin Necromancer" → Theme "vacarn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Thep, the Court Scribe" → Theme "thep" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Ghuanjun, the Undead Martial Artist" → Theme "ghuanjun" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Cute Annoyance Mini" → Theme "mini" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Mao, the Vengeful Guardian" → Theme "mao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Champion, the Stormbringer" → Theme "champion" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [bgm] CPU-Gegner "Maya, the Nature Fairy" → Theme "maya" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  17/20   71 Halbzuege   57179 Nachrichten    54.10 MB roh  →    3.646 MB Leitung    64 s  Man's Best Friends vs Big Stomp!
+  Partie  18/20   66 Halbzuege   72276 Nachrichten    56.87 MB roh  →    4.045 MB Leitung   188 s  Suicide Bombers vs Sun Fencer Frenzy
+  Partie  19/20   52 Halbzuege   24485 Nachrichten    29.80 MB roh  →    1.515 MB Leitung    34 s  Guardians of the Treasure Cave vs Shifting Sandlands
+  Partie  20/20   64 Halbzuege   16959 Nachrichten    55.66 MB roh  →    1.559 MB Leitung    25 s  Shadows over Blackport vs Bamboo Warrior
+
+[netbench] 42 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 15 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   49.9%      946.5 KB      946.5 KB      19919    0.05 KB        0.0%  card_reveal
+   25.2%      478.8 KB      478.8 KB       3847    0.12 KB        0.0%  action_log
+   21.3%      404.0 KB    34009.8 KB       4658    7.30 KB       98.8%  game_state
+    0.8%       15.6 KB       15.6 KB        134    0.12 KB        0.0%  hand_to_board_fly
+    0.5%        9.7 KB        9.7 KB        141    0.07 KB        0.0%  ability_activated
+    0.4%        8.0 KB        8.0 KB         96    0.08 KB        0.0%  play_zone_animation
+    0.3%        5.0 KB        5.0 KB         41    0.12 KB        0.0%  play_pile_transfer
+    0.2%        3.8 KB        3.8 KB         20    0.19 KB        0.0%  play_card_transfer
+    0.2%        3.6 KB        3.6 KB         42    0.08 KB        0.0%  summon_effect
+    0.2%        3.5 KB        3.5 KB         12    0.30 KB        0.0%  discard_to_deleted_animation
+    0.1%        2.8 KB        2.8 KB          6    0.45 KB        0.0%  deleted_to_discard_animation
+    0.1%        2.5 KB        2.5 KB         40    0.06 KB        0.0%  deck_search_add
+    0.1%        1.9 KB        1.9 KB         33    0.06 KB        0.0%  fighting_atk_change
+    0.1%        1.3 KB        1.3 KB         18    0.07 KB        0.0%  potion_resolved
+    0.1%        1.2 KB        1.2 KB         19    0.06 KB        0.0%  gathering_storm_strike
+  … und 22 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Zuschauer      495.8 KB Leitung je Verbindung und Partie  (6659.6 KB roh)
+  Spieler        204.5 KB Leitung je Verbindung und Partie  (7761.8 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            34.67 MB roh  →  1.852 MB auf der Leitung
+  Ø je Verbindung:        379.3 KB
+  Ø je Halbzug (alle):    42.39 KB
+  Singleplayer (1 Client): ~379.3 KB je Partie
+  PvP (2 Clients):         ~758.6 KB je Partie
+  je zusätzlichem Zuschauer: ~379.3 KB je Partie
+  In 5 GB passen:          ~13.822 Singleplayer-Partien
+                           ~6.911 PvP-Partien
+  OHNE Kompression wären es 738 bzw. 369 — Faktor 18.7
+  Größte Einzelnachricht:  15.4 KB (game_state)
+  Broadcasts an ALLE:      15 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  gewertet  Grund              Decks
+   1         85        19486      73.04        1.858    15        ja  deck_out           Great Weapon Master vs Morph and Kill!
+   2         16        24635      15.55        1.367    15        ja  deck_out           Flying Sparks vs Sun Fencer Frenzy
+   3         45        41811      29.26        2.295    27        ja  all_heroes_dead    Gather That Storm! vs Idej Illusions
+   4         12        11577       9.39        0.685     6        ja  all_heroes_dead    Gather That Storm! vs Morph and Kill!
+   5         48        18622      35.29        1.348    25        ja  all_heroes_dead    Slip 'n Slide vs Bone Rush
+   6         16         7557      10.52        0.495     7        ja  all_heroes_dead    Bone Rush vs Venom Swamp
+   7          2          205       0.55        0.026    48      NEIN  stillstand         Burning Inferno vs Heal Burn
+   8         54        31152      30.81        1.848    89        ja  deck_out           Parts of the Soul vs Cute Commando
+   9         35        31554      31.58        1.868    96        ja  deck_out           One-Two-Punch! vs Gates to Hell
+  10          2          178       0.48        0.023    48      NEIN  stillstand         Cute Commando vs Elven Vanguard
+  11          1           41       0.12        0.012    48      NEIN  stillstand         Elven Vanguard vs Bone Rush
+  12         18        45320      13.28        2.386    42        ja  all_heroes_dead    Big Stomp! vs Gather That Storm!
+  13         65        23849      56.39        2.068    60        ja  all_heroes_dead    Bamboo Warrior vs Guardians of the Treasure Cave
+  14          2          189       0.51        0.025    48      NEIN  stillstand         Elven Vanguard vs Grand Rebellion!
+  15         24        10848      18.53        0.797    20        ja  all_heroes_dead    Morph and Kill! vs Venom Swamp
+  16          1           91       0.21        0.016    48      NEIN  stillstand         Elven Vanguard vs Grand Rebellion!
+  17         71        57179      54.10        3.646    64        ja  deck_out           Man's Best Friends vs Big Stomp!
+  18         66        72276      56.87        4.045   188        ja  deck_out           Suicide Bombers vs Sun Fencer Frenzy
+  19         52        24485      29.80        1.515    34        ja  deck_out           Guardians of the Treasure Cave vs Shifting Sandlands
+  20         64        16959      55.66        1.559    25        ja  deck_out           Shadows over Blackport vs Bamboo Warrior

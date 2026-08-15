@@ -1,0 +1,150 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10   14 Halbzuege    1627 Nachrichten     5.72 MB roh  →    0.102 MB Leitung     6 s     9 s CPU  Crystal Gifts vs Man's Best Friends
+  Partie   2/10   16 Halbzuege    2348 Nachrichten     9.90 MB roh  →    0.163 MB Leitung    26 s    30 s CPU  One-Two-Punch! vs Man's Best Friends
+  Partie   3/10   25 Halbzuege    2892 Nachrichten    11.09 MB roh  →    0.190 MB Leitung    29 s    32 s CPU  Boom Boom Kaboom! vs Man's Best Friends
+  Partie   4/10   13 Halbzuege    1919 Nachrichten     6.60 MB roh  →    0.119 MB Leitung    24 s    25 s CPU  Flying Sparks vs Man's Best Friends
+  Partie   5/10   21 Halbzuege    2631 Nachrichten     9.96 MB roh  →    0.173 MB Leitung    59 s    62 s CPU  Boom Boom Kaboom! vs Man's Best Friends
+  Partie   6/10   13 Halbzuege    1979 Nachrichten     7.53 MB roh  →    0.137 MB Leitung    15 s    17 s CPU  Deepsea Terror vs Man's Best Friends
+  Partie   7/10   52 Halbzuege    4097 Nachrichten    19.44 MB roh  →    0.290 MB Leitung    24 s    26 s CPU  Big Stomp! vs Man's Best Friends
+  Partie   8/10   12 Halbzuege    2519 Nachrichten    10.15 MB roh  →    0.179 MB Leitung    25 s    28 s CPU  Slip 'n Slide vs Man's Best Friends
+  Partie   9/10   10 Halbzuege    1212 Nachrichten     4.29 MB roh  →    0.079 MB Leitung    40 s    40 s CPU  Boom Boom Kaboom! vs Man's Best Friends
+  Partie  10/10    9 Halbzuege    1082 Nachrichten     3.97 MB roh  →    0.074 MB Leitung    29 s    29 s CPU  ⚠ ohne-spielende  Morph and Kill! vs Man's Best Friends
+     ↳ Diagnose: p0(heroes 3/3 alive, 650hp, deck 39, hand 7) | p1(heroes 3/3 alive, 980hp, deck 30, hand 8) | turn 9 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Orthos, the Loyal Guard Dog" → Theme "orthos" (48 Themes im Ordner)
+
+[netbench] 64 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 9 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.9%      117.1 KB     9481.3 KB        997    9.51 KB       98.8%  game_state
+   18.9%       30.8 KB      118.8 KB        934    0.13 KB       74.0%  action_log
+    1.8%        2.9 KB        7.6 KB         91    0.08 KB       61.7%  play_zone_animation
+    1.2%        2.0 KB        4.5 KB         81    0.06 KB       56.3%  card_reveal
+    1.0%        1.6 KB        4.3 KB         34    0.13 KB       62.8%  play_pile_transfer
+    0.8%        1.3 KB        2.6 KB         21    0.12 KB       50.0%  hand_to_board_fly
+    0.5%        0.8 KB        1.9 KB         10    0.19 KB       58.1%  play_card_transfer
+    0.4%        0.7 KB        2.1 KB         33    0.07 KB       66.6%  ability_activated
+    0.4%        0.7 KB        1.4 KB         23    0.06 KB       51.5%  deck_search_add
+    0.4%        0.7 KB        1.8 KB         22    0.08 KB       63.8%  summon_effect
+    0.4%        0.6 KB        1.0 KB         13    0.07 KB       34.6%  potion_resolved
+    0.3%        0.5 KB        1.0 KB          7    0.15 KB       47.0%  play_beam_animation
+    0.3%        0.5 KB        0.7 KB         23    0.03 KB       34.8%  play_gold_coins
+    0.3%        0.4 KB        1.3 KB          8    0.16 KB       64.5%  play_ram_animation
+    0.2%        0.3 KB        0.7 KB         11    0.06 KB       48.6%  fighting_atk_change
+  … und 23 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         81.4 KB Leitung je Verbindung und Partie  (4817.6 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            9.41 MB roh  →  0.159 MB auf der Leitung
+  Ø je Verbindung:        81.4 KB
+  Ø je Halbzug (alle):    8.33 KB
+  Singleplayer (1 Client): ~81.4 KB je Partie
+  PvP (2 Clients):         ~162.8 KB je Partie
+  je zusätzlichem Zuschauer: ~81.4 KB je Partie
+  In 5 GB passen:          ~64.396 Singleplayer-Partien
+                           ~32.198 PvP-Partien
+  OHNE Kompression wären es 1.088 bzw. 544 — Faktor 59.2
+  Größte Einzelnachricht:  16.5 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 5.0 min CPU
+     62 s  bei  21 Halbzuegen (2.9 s/Halbzug)     Boom Boom Kaboom! vs Man's Best Friends
+     40 s  bei  10 Halbzuegen (4.0 s/Halbzug)     Boom Boom Kaboom! vs Man's Best Friends
+     32 s  bei  25 Halbzuegen (1.3 s/Halbzug)     Boom Boom Kaboom! vs Man's Best Friends
+     30 s  bei  16 Halbzuegen (1.8 s/Halbzug)     One-Two-Punch! vs Man's Best Friends
+     29 s  bei   9 Halbzuegen (3.3 s/Halbzug)   ⚠ Morph and Kill! vs Man's Best Friends
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         22        3          0  Boom Boom Kaboom!
+         15       10          1  Man's Best Friends
+         15        1          0  One-Two-Punch!
+         15        1          1  Morph and Kill!
+         14        1          0  Slip 'n Slide
+         13        1          0  Big Stomp!
+         13        1          0  Flying Sparks
+          9        1          0  Deepsea Terror
+          4        1          0  Crystal Gifts
+  → Abbrueche haeufen sich bei: Man's Best Friends (1), Morph and Kill! (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      567   15.9%  Giga Steroids
+      542   15.2%  Loyal Hountriever   ⚠ 55 leckende Rollouts
+      480   13.4%  Wealth
+      310    8.7%  Ingo, Investor of Evil
+      296    8.3%  Orthos, the Loyal Guard Dog
+      123    3.4%  Ghuanjun, the Undead Martial Artist
+      123    3.4%  Alex, Trainer of Heroes
+      119    3.3%  Sacred Hammer of the Volcano
+       99    2.8%  Creativity
+       64    1.8%  The Sun Sword
+       59    1.7%  Ancient Tech Infinite Energy Core
+       57    1.6%  Resistance
+       55    1.5%  Fighting
+       55    1.5%  Slippery Polar
+       51    1.4%  Performance
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Deepsea Primordium [priority]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+     58x  Loyal Shepherd
+     55x  Loyal Hountriever
+     51x  Heavy Hit
+     49x  Loyal Labradoodle
+     48x  Adventurousness
+     39x  Loyal Rottweiler
+     26x  Strong Ox Headbutt
+     16x  Blow of the Venom Snake
+     16x  Deepsea Bats
+     15x  Stranglehold
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      1188      515.3        0.434            55  Loyal Hountriever
+       977      412.7        0.422            51  Heavy Hit
+       651      309.3        0.475            48  Adventurousness
+       762      275.7        0.362             0  Güldefaber, the King of Dwarfs
+       786      219.1        0.279             2  Attack
+       968      191.4        0.198            39  Loyal Rottweiler
+       776      165.1        0.213            49  Loyal Labradoodle
+       208      149.4        0.718             0  Ferocious Tiger Kick
+       931      130.5        0.140             0  Loyal Pinpom
+       349      129.4        0.371            10  Deepsea Primordium
+       158      127.1        0.804             6  Whirlwind Strike
+       115      102.2        0.889            16  Blow of the Venom Snake
+       523       86.8        0.166            26  Strong Ox Headbutt
+       261       76.6        0.294            58  Loyal Shepherd
+       135       64.7        0.479             0  Slippery Spikeblock
+  Broadcasts an ALLE:      9 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         14         1627       5.72        0.102     6      9        ja  all_heroes_dead    Crystal Gifts vs Man's Best Friends
+   2         16         2348       9.90        0.163    26     30        ja  all_heroes_dead    One-Two-Punch! vs Man's Best Friends
+   3         25         2892      11.09        0.190    29     32        ja  all_heroes_dead    Boom Boom Kaboom! vs Man's Best Friends
+   4         13         1919       6.60        0.119    24     25        ja  all_heroes_dead    Flying Sparks vs Man's Best Friends
+   5         21         2631       9.96        0.173    59     62        ja  all_heroes_dead    Boom Boom Kaboom! vs Man's Best Friends
+   6         13         1979       7.53        0.137    15     17        ja  all_heroes_dead    Deepsea Terror vs Man's Best Friends
+   7         52         4097      19.44        0.290    24     26        ja  all_heroes_dead    Big Stomp! vs Man's Best Friends
+   8         12         2519      10.15        0.179    25     28        ja  all_heroes_dead    Slip 'n Slide vs Man's Best Friends
+   9         10         1212       4.29        0.079    40     40        ja  all_heroes_dead    Boom Boom Kaboom! vs Man's Best Friends
+  10          9         1082       3.97        0.074    29     29      NEIN  ohne-spielende     Morph and Kill! vs Man's Best Friends

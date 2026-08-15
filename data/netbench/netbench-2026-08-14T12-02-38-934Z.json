@@ -1,0 +1,1122 @@
+{
+  "erzeugt": "2026-08-14T12:02:38.935Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 300000,
+    "cpuTurnMs": 20000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Heal Burn",
+      "deckB": "Shifting Sandlands",
+      "turns": 35,
+      "ms": 53541,
+      "nachrichten": 3807,
+      "raw": 16247145,
+      "wire": 258826,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 59671,
+      "snapshots": 11539,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Heal Burn",
+      "deckB": "Depths of the Cosmos",
+      "turns": 24,
+      "ms": 19739,
+      "nachrichten": 2636,
+      "raw": 9865810,
+      "wire": 174011,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 22422,
+      "snapshots": 2619,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Heal Burn",
+      "deckB": "Flying Sparks",
+      "turns": 2,
+      "ms": 65,
+      "nachrichten": 64,
+      "raw": 212571,
+      "wire": 8239,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 62,
+      "snapshots": 25,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Heal Burn",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 2285,
+      "nachrichten": 305,
+      "raw": 1026869,
+      "wire": 22892,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 2938,
+      "snapshots": 1028,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Heal Burn",
+      "deckB": "Great Weapon Master",
+      "turns": 17,
+      "ms": 18601,
+      "nachrichten": 2168,
+      "raw": 8048036,
+      "wire": 141113,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 20422,
+      "snapshots": 3740,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Heal Burn",
+      "deckB": "Gates to Hell",
+      "turns": 17,
+      "ms": 106565,
+      "nachrichten": 2231,
+      "raw": 8890284,
+      "wire": 152754,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 107953,
+      "snapshots": 11865,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Heal Burn",
+      "deckB": "Cute Commando",
+      "turns": 14,
+      "ms": 78187,
+      "nachrichten": 1866,
+      "raw": 6997694,
+      "wire": 123302,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 79828,
+      "snapshots": 4920,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Heal Burn",
+      "deckB": "Steam Dwarf Mines",
+      "turns": 11,
+      "ms": 17373,
+      "nachrichten": 1824,
+      "raw": 6552166,
+      "wire": 123479,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 19000,
+      "snapshots": 3575,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Heal Burn",
+      "deckB": "Crystal Gifts",
+      "turns": 13,
+      "ms": 12115,
+      "nachrichten": 2201,
+      "raw": 7986397,
+      "wire": 140617,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 13172,
+      "snapshots": 1871,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Heal Burn",
+      "deckB": "Bloody King Zi",
+      "turns": 8,
+      "ms": 18241,
+      "nachrichten": 1167,
+      "raw": 4353017,
+      "wire": 79295,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 19640,
+      "snapshots": 4091,
+      "hookTimeouts": 0
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 6226,
+      "raw": 58933422,
+      "wire": 729228
+    },
+    {
+      "name": "action_log",
+      "count": 6334,
+      "raw": 844128,
+      "wire": 206173
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 974,
+      "raw": 84966,
+      "wire": 29541
+    },
+    {
+      "name": "card_reveal",
+      "count": 619,
+      "raw": 34707,
+      "wire": 14383
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 193,
+      "raw": 24178,
+      "wire": 10700
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 184,
+      "raw": 21256,
+      "wire": 8943
+    },
+    {
+      "name": "ability_activated",
+      "count": 240,
+      "raw": 18650,
+      "wire": 7269
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 82,
+      "raw": 12674,
+      "wire": 4532
+    },
+    {
+      "name": "potion_resolved",
+      "count": 60,
+      "raw": 4646,
+      "wire": 3125
+    },
+    {
+      "name": "deck_search_add",
+      "count": 94,
+      "raw": 6162,
+      "wire": 3072
+    },
+    {
+      "name": "play_heal_beam",
+      "count": 64,
+      "raw": 8064,
+      "wire": 2485
+    },
+    {
+      "name": "reaction_chain_update",
+      "count": 28,
+      "raw": 9778,
+      "wire": 2264
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 62,
+      "raw": 4120,
+      "wire": 1924
+    },
+    {
+      "name": "summon_effect",
+      "count": 60,
+      "raw": 5250,
+      "wire": 1793
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 22,
+      "raw": 3014,
+      "wire": 1721
+    },
+    {
+      "name": "game_started",
+      "count": 7,
+      "raw": 1932,
+      "wire": 1355
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 18,
+      "raw": 2800,
+      "wire": 971
+    },
+    {
+      "name": "surprise_flip",
+      "count": 20,
+      "raw": 2258,
+      "wire": 946
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 36,
+      "raw": 2886,
+      "wire": 812
+    },
+    {
+      "name": "play_heal_zero",
+      "count": 50,
+      "raw": 2896,
+      "wire": 805
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 28,
+      "raw": 1708,
+      "wire": 792
+    },
+    {
+      "name": "burn_tick",
+      "count": 18,
+      "raw": 2330,
+      "wire": 792
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 26,
+      "raw": 728,
+      "wire": 728
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 26,
+      "raw": 3300,
+      "wire": 580
+    },
+    {
+      "name": "reaction_chain_link_resolved",
+      "count": 28,
+      "raw": 2314,
+      "wire": 527
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 12,
+      "raw": 1358,
+      "wire": 524
+    },
+    {
+      "name": "nomu_draw",
+      "count": 24,
+      "raw": 1478,
+      "wire": 522
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 22,
+      "raw": 1342,
+      "wire": 466
+    },
+    {
+      "name": "play_card_showcase",
+      "count": 10,
+      "raw": 740,
+      "wire": 442
+    },
+    {
+      "name": "gold_change",
+      "count": 18,
+      "raw": 738,
+      "wire": 439
+    },
+    {
+      "name": "deck_to_discard_animation",
+      "count": 6,
+      "raw": 658,
+      "wire": 336
+    },
+    {
+      "name": "surprise_reset",
+      "count": 12,
+      "raw": 1152,
+      "wire": 321
+    },
+    {
+      "name": "play_chaos_screen",
+      "count": 12,
+      "raw": 312,
+      "wire": 312
+    },
+    {
+      "name": "mill_center_reveal",
+      "count": 6,
+      "raw": 774,
+      "wire": 299
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 6,
+      "raw": 750,
+      "wire": 213
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 6,
+      "raw": 444,
+      "wire": 212
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 4,
+      "raw": 500,
+      "wire": 181
+    },
+    {
+      "name": "card_effect_flash",
+      "count": 6,
+      "raw": 282,
+      "wire": 156
+    },
+    {
+      "name": "play_guardian_angel",
+      "count": 6,
+      "raw": 294,
+      "wire": 142
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 2,
+      "raw": 370,
+      "wire": 141
+    },
+    {
+      "name": "punch_impact",
+      "count": 4,
+      "raw": 224,
+      "wire": 134
+    },
+    {
+      "name": "area_descend",
+      "count": 6,
+      "raw": 342,
+      "wire": 120
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 4,
+      "raw": 132,
+      "wire": 104
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 2,
+      "raw": 124,
+      "wire": 64
+    },
+    {
+      "name": "dark_control",
+      "count": 2,
+      "raw": 84,
+      "wire": 54
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-b-netbench-dc278686",
+      "count": 1903,
+      "raw": 8181929,
+      "wire": 131826
+    },
+    {
+      "sid": "sid-a-netbench-dc278686",
+      "count": 1903,
+      "raw": 8064940,
+      "wire": 126807
+    },
+    {
+      "sid": "sid-b-netbench-10990659",
+      "count": 1322,
+      "raw": 5026731,
+      "wire": 89502
+    },
+    {
+      "sid": "sid-a-netbench-10990659",
+      "count": 1313,
+      "raw": 4838803,
+      "wire": 84315
+    },
+    {
+      "sid": "sid-b-netbench-164f4b74",
+      "count": 1117,
+      "raw": 4056844,
+      "wire": 71122
+    },
+    {
+      "sid": "sid-a-netbench-b773e9cb",
+      "count": 1065,
+      "raw": 4003035,
+      "wire": 70578
+    },
+    {
+      "sid": "sid-b-netbench-b773e9cb",
+      "count": 1102,
+      "raw": 4044725,
+      "wire": 70342
+    },
+    {
+      "sid": "sid-a-netbench-164f4b74",
+      "count": 1083,
+      "raw": 3929277,
+      "wire": 69301
+    },
+    {
+      "sid": "sid-b-netbench-67d6bb4b",
+      "count": 927,
+      "raw": 3374731,
+      "wire": 63094
+    },
+    {
+      "sid": "sid-b-netbench-4614033c",
+      "count": 943,
+      "raw": 3541637,
+      "wire": 63020
+    },
+    {
+      "sid": "sid-a-netbench-67d6bb4b",
+      "count": 896,
+      "raw": 3177159,
+      "wire": 60191
+    },
+    {
+      "sid": "sid-a-netbench-4614033c",
+      "count": 922,
+      "raw": 3455781,
+      "wire": 60089
+    },
+    {
+      "sid": "sid-b-netbench-13b0bcac",
+      "count": 580,
+      "raw": 2192479,
+      "wire": 39864
+    },
+    {
+      "sid": "sid-a-netbench-13b0bcac",
+      "count": 586,
+      "raw": 2160262,
+      "wire": 39237
+    },
+    {
+      "sid": "room:netbench-10990659",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-67d6bb4b",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-164f4b74",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-13b0bcac",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-dc278686",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-b773e9cb",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-4614033c",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 15669,
+    "raw": 60050265,
+    "wire": 1040643
+  },
+  "groesste_nachricht": {
+    "bytes": 13063,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 7,
+    "raw": 1925
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 3,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Lilly, the Charming Infiltrator\" → Theme \"lilly\" (48 Themes im Ordner)"
+      ]
+    },
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ]
+    },
+    {
+      "partie": 6,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ]
+    }
+  ],
+  "unterdrueckte_ausgabezeilen": 63,
+  "cpu_ms_gesamt": 345108,
+  "hook_feuer_je_karte": {
+    "Friendship": 496,
+    "Shield of Life": 296,
+    "Lifeforce Howitzer": 238,
+    "Treasure Huntress Semi": 214,
+    "Shield of Death": 207,
+    "Elixir of Immortality": 121,
+    "Skull Necklace": 105,
+    "Performance": 67,
+    "Overheal Shock": 65,
+    "Cute Dog": 58,
+    "Wealth": 57,
+    "Invader Token": 52,
+    "Giga Steroids": 52,
+    "The Sun Sword": 48,
+    "Divine Gift of The Light": 44,
+    "Arthor, the King of Blackport": 42,
+    "Glass of Marbles": 40,
+    "Guardian Angel": 37,
+    "Mary Crestmas": 34,
+    "Toras, Master of all Weapons": 33,
+    "Cute Cat": 32,
+    "Cool Rescuer Monia": 28,
+    "Analyzer from the Cosmic Depths": 26,
+    "Healing Melody": 24,
+    "Argos, the Eye of the Cosmos": 24,
+    "Intrude": 24,
+    "Cute Bunny": 22,
+    "Layn, Defender of Deri": 22,
+    "Heal": 19,
+    "Gatherer from the Cosmic Depths": 19,
+    "Sacred Hammer of the Volcano": 19,
+    "Creativity": 19,
+    "Blood Rock": 17,
+    "Harpyformer Choir": 14,
+    "Earth-Shattering Hammer, Relic of Deri": 13,
+    "Nao, the Barrier Priestess": 10,
+    "Bakhm, the Desert Digger": 9,
+    "Frolake": 8,
+    "Fighting": 7,
+    "Steam Dwarf Exterminator": 7,
+    "Brilliant Idea": 6,
+    "Ska Harpyformer": 6,
+    "Pollution Token": 6,
+    "Mystery Box": 5,
+    "Rain of Arrows": 4,
+    "Fiona, the Princess of Blackport": 4,
+    "Telekinesis": 2,
+    "Nicolas, the Hidden Alchemist": 2,
+    "Quick Attack": 2,
+    "Divine Gift of the Guardian": 2,
+    "Pyroblast": 2,
+    "The Cosmic Depths": 1,
+    "Invader from the Cosmic Depths": 1,
+    "Thieving Strike": 1,
+    "Controlled Attack": 1,
+    "Metal Harpyformer": 1,
+    "Critical Strike": 1,
+    "Forceful Revival": 1,
+    "Divine Gift of Balance": 1,
+    "Gravedigger Slap": 1,
+    "Toughness": 1,
+    "Divine Gift of Fire": 1,
+    "Crystal Well": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 119,
+    "Rain of Arrows": 59,
+    "Heal": 50,
+    "Gravedigger Slap": 45,
+    "Guardian Angel": 31,
+    "Timeless King Zi": 24,
+    "Healing Melody": 18,
+    "Gatherer from the Cosmic Depths": 12,
+    "Overheal Shock": 8,
+    "Demon's Gate": 2
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {},
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {
+    "aufgerufen": 985,
+    "gefeuert": 702,
+    "maxHp_hoechster": 300,
+    "delay_ms": 105300,
+    "raus_fremd": 283,
+    "miner_zugenden": 17,
+    "miner_karten_gesamt": 17,
+    "miner_groesster_zug": 1,
+    "miner_hoechste_hp": 150
+  },
+  "overheal_shock": [
+    {
+      "nr": 1,
+      "decks": [
+        "Heal Burn",
+        "Shifting Sandlands"
+      ],
+      "turns": 35,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 2,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Nomu, Wanderer of Worlds",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 4,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Bakhm, the Desert Digger",
+          "zielIdx": 1,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 1,
+        "schaden": 200,
+        "jeSeite": [
+          200,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 2,
+      "decks": [
+        "Heal Burn",
+        "Depths of the Cosmos"
+      ],
+      "turns": 24,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 10,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Cooldin, King of Coolness",
+          "zielIdx": 2,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 1,
+        "schaden": 300,
+        "jeSeite": [
+          300,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 5,
+      "decks": [
+        "Heal Burn",
+        "Great Weapon Master"
+      ],
+      "turns": 17,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 7,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Fiona, the Princess of Blackport",
+          "zielIdx": 2,
+          "zielHp": 420,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 9,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Arthor, the King of Blackport",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 3,
+        "schaden": 700,
+        "jeSeite": [
+          700,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 6,
+      "decks": [
+        "Heal Burn",
+        "Gates to Hell"
+      ],
+      "turns": 17,
+      "sieger": null,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "einsaetze": [
+        {
+          "zug": 4,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Nicolas, the Hidden Alchemist",
+          "zielIdx": 0,
+          "zielHp": 350,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 1,
+        "schaden": 200,
+        "jeSeite": [
+          200,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 7,
+      "decks": [
+        "Heal Burn",
+        "Cute Commando"
+      ],
+      "turns": 14,
+      "sieger": 0,
+      "grund": "deck_out",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Visionary Genius Heinz",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Cool Rescuer Monia",
+          "zielIdx": 2,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 5,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Cute Annoyance Mini",
+          "zielIdx": 1,
+          "zielHp": 50,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 1,
+        "schaden": 300,
+        "jeSeite": [
+          300,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 8,
+      "decks": [
+        "Heal Burn",
+        "Steam Dwarf Mines"
+      ],
+      "turns": 11,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "zusatz",
+          "ziel": "Layn, Defender of Deri",
+          "zielIdx": 1,
+          "zielHp": 650,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "main",
+          "ziel": "Alice, the Puppeteer Girl",
+          "zielIdx": 2,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 5,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Cute Nerd Magenta",
+          "zielIdx": 0,
+          "zielHp": 240,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 4,
+        "schaden": 650,
+        "jeSeite": [
+          650,
+          0
+        ]
+      }
+    },
+    {
+      "nr": 9,
+      "decks": [
+        "Heal Burn",
+        "Crystal Gifts"
+      ],
+      "turns": 13,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 11,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Cooldin, King of Coolness",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 11,
+          "spieler": 0,
+          "caster": "Treasure Huntress Semi",
+          "casterIdx": 2,
+          "modus": "main",
+          "ziel": "Mary Crestmas",
+          "zielIdx": 1,
+          "zielHp": 50,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": {
+        "treffer": 1,
+        "schaden": 150,
+        "jeSeite": [
+          150,
+          0
+        ]
+      }
+    }
+  ],
+  "heil_zielwahl": {
+    "Shield of Life → eigen": {
+      "n": 17,
+      "hp": 1700
+    },
+    "Heal → eigen": {
+      "n": 8,
+      "hp": 1650
+    },
+    "Heal → gegner-geschockt": {
+      "n": 10,
+      "hp": 2300
+    },
+    "Healing Melody → eigen": {
+      "n": 69,
+      "hp": 11550
+    },
+    "Guardian Angel → eigen": {
+      "n": 3,
+      "hp": 1197
+    },
+    "Heal → gegner-offen": {
+      "n": 1,
+      "hp": 150
+    },
+    "Cure → gegner-geschockt": {
+      "n": 1,
+      "hp": 100
+    },
+    "Cure → eigen": {
+      "n": 4,
+      "hp": 400
+    },
+    "Cure → gegner-offen": {
+      "n": 2,
+      "hp": 200
+    },
+    "Divine Gift of The Light → gegner-geschockt": {
+      "n": 1,
+      "hp": 100
+    }
+  },
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "Cute Commando",
+      "cpuMs": 39914,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 39914
+    },
+    {
+      "name": "Shifting Sandlands",
+      "cpuMs": 29835.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 29835.5
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 55445.5,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 27722.75
+    },
+    {
+      "name": "Heal Burn",
+      "cpuMs": 172554,
+      "partien": 10,
+      "abbrueche": 3,
+      "proPartie": 17255.4
+    },
+    {
+      "name": "Depths of the Cosmos",
+      "cpuMs": 11211,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 11211
+    },
+    {
+      "name": "Great Weapon Master",
+      "cpuMs": 10211,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 10211
+    },
+    {
+      "name": "Bloody King Zi",
+      "cpuMs": 9820,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 9820
+    },
+    {
+      "name": "Steam Dwarf Mines",
+      "cpuMs": 9500,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 9500
+    },
+    {
+      "name": "Crystal Gifts",
+      "cpuMs": 6586,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 6586
+    },
+    {
+      "name": "Flying Sparks",
+      "cpuMs": 31,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 31
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 148663.2857142857,
+    "roh_je_partie": 8578609.285714285,
+    "wire_je_verbindung": 74331.64285714286,
+    "wire_je_halbzug": 8529.860655737704,
+    "kompressionsfaktor": 57.704962220473305
+  }
+}

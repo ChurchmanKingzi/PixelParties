@@ -17,6 +17,88 @@
 
 const { loadCardEffect } = require('./_loader');
 
+// ═══════════════════════════════════════════
+//  CPU-BEWERTUNG (gemessen am 13.8.)
+//
+//  Ausgangslage, mit derselben Methode wie bei Overheal Shock
+//  nachgemessen (Engine offline, echte Heal-Burn-Aufstellung):
+//
+//      spielen  Δ = −22.2      abwerfen Δ = −22.2
+//
+//  Identisch — das Permanent ist in der Bewertung EXAKT NULL wert.
+//  Deckungsgleich mit Als erstem Messlog, wo das Gate
+//  `skip=−1251.7 best=−1273.8 → SKIP` meldete (Differenz 22.1).
+//  Die CPU lehnte die Karte also aktiv ab, weil Spielen 22 Punkte
+//  schlechter war als Nichtstun. Gleiche Bauart wie Flashbang,
+//  Torchure und Smoke Vial: die Auszahlung liegt in KUENFTIGEN Zuegen,
+//  die Sofortbewertung sieht nur die fehlende Handkarte.
+//
+//  REFERENZWERTE fuer die Groessenordnung (gemessen):
+//      100 Schaden an einem Gegnerhelden  = +115
+//      100 Heilung  an einem eigenen Held = +100
+//  EIN einziger Ausloeser ist also rund 100 Punkte wert. Die
+//  Obergrenze unten liegt bewusst DARUNTER — das ganze Permanent ist
+//  billiger bepreist als ein einzelner seiner Ausloeser.
+// ═══════════════════════════════════════════
+
+// ── STELLSCHRAUBEN (Als Zahlen, aenderbar) ───────────────────────────
+const DGOTL_PRO_QUELLE   = 20;   // je noch spielbarem Ausloeser
+const DGOTL_MAX_QUELLEN  = 4;    // Deckel → 80 Grundwert
+const DGOTL_SCHARF_BONUS = 0.5;  // +50 %, wenn der Ping SOFORT Schaden waere
+
+/**
+ * Wie viele Ausloeser kann diese Seite noch legen?
+ *
+ * Ausloeser = Support-Magic-SPELL, der NICHT heilt (`includesHealing`)
+ * und nicht die Karte selbst. Gezaehlt werden Hand und Nachziehstapel.
+ * Im Heal-Burn-Deck sind das 11 Kopien: 4x Brilliant Idea, 1x Guardian
+ * Angel, 2x Martyry — und 4x Overheal Shock. Die Shock ist selbst ein
+ * Ausloeser: sie anzuhaengen bringt im selben Zug den 100er-Ping mit,
+ * der dann direkt in das gerade geschockte Ziel gehen kann.
+ */
+function countTriggerSources(engine, pi) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return 0;
+  const cardDB = engine._getCardDB();
+  let n = 0;
+  const scan = (list) => {
+    for (const name of (list || [])) {
+      if (name === 'Divine Gift of The Light') continue;
+      const cd = cardDB[name];
+      if (!cd || cd.cardType !== 'Spell' || cd.spellSchool1 !== 'Support Magic') continue;
+      let heilt = false;
+      try { heilt = !!loadCardEffect(name)?.includesHealing; } catch { heilt = false; }
+      if (heilt) continue;
+      n++;
+      if (n >= DGOTL_MAX_QUELLEN) return true;
+    }
+    return false;
+  };
+  if (scan(ps.hand)) return n;
+  scan(ps.mainDeck);
+  return n;
+}
+
+/**
+ * Ist der 100er-Ping GERADE scharf, also sofort Schaden statt Heilung?
+ * Zwei Wege: ein Gegnerheld mit `healReversed` (Overheal Shock) oder
+ * ein eigenes Ziel mit noch unverbrauchtem Lifeforce Howitzer, der
+ * geheilte HP in Schaden am Gegner uebersetzt.
+ */
+function pingIstScharf(engine, pi) {
+  const gs = engine.gs;
+  const oi = pi === 0 ? 1 : 0;
+  for (const h of (gs.players?.[oi]?.heroes || [])) {
+    if (h?.name && h.hp > 0 && h.statuses?.healReversed) return true;
+  }
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.owner !== pi || inst.zone !== 'support') continue;
+    if (inst.name !== 'Lifeforce Howitzer') continue;
+    if (!inst.counters?.usedThisTurn) return true;
+  }
+  return false;
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -24,6 +106,46 @@ module.exports = {
   oncePerGameKey: 'divineGift',
   inherentAction: true,
   activeIn: ['hand', 'permanent'],
+
+  cpuMeta: {
+    /**
+     * Wert des liegenden Permanents fuer seinen Besitzer.
+     *
+     * Vertrag `cpuInstBonus(engine, inst, ownerIdx)`: der Rueckgabewert
+     * wird der Seite gutgeschrieben, die die Instanz kontrolliert. Die
+     * Schleife in `evaluateState` laeuft ueber ALLE `cardInstances`,
+     * also auch ueber Zone `permanent` — dieselbe Mechanik, die
+     * Overheal Shock nutzt, nur mit umgekehrtem Vorzeichen (hier hilft
+     * die Karte ihrem Besitzer).
+     *
+     * Wert ist 0, solange die Seite keinen Ausloeser mehr legen kann —
+     * dann liegt das Permanent tot da und soll auch nichts wert sein.
+     */
+    cpuInstBonus(engine, inst, ownerIdx) {
+      try {
+        if (!inst || inst.zone !== 'permanent') return 0;
+        if (inst.name !== 'Divine Gift of The Light') return 0;
+
+        // Nur die ERSTE Kopie zaehlt. Praktisch kann es dank
+        // `oncePerGame` nur eine geben — der Riegel steht trotzdem,
+        // weil dieselbe Falle bei Overheal Shock und The Great Wall of
+        // Deri schon einmal zugeschlagen haette.
+        const erste = (engine.cardInstances || []).find(c =>
+          c.name === 'Divine Gift of The Light'
+          && c.zone === 'permanent'
+          && (c.controller ?? c.owner) === ownerIdx);
+        if (erste && erste.id !== inst.id) return 0;
+
+        const quellen = countTriggerSources(engine, ownerIdx);
+        if (quellen <= 0) return 0;
+
+        const grund = DGOTL_PRO_QUELLE * Math.min(quellen, DGOTL_MAX_QUELLEN);
+        return pingIstScharf(engine, ownerIdx)
+          ? grund * (1 + DGOTL_SCHARF_BONUS)
+          : grund;
+      } catch { return 0; }
+    },
+  },
 
   hooks: {
     /**
@@ -129,6 +251,15 @@ module.exports = {
         confirmLabel: '✨ Bless! (100 HP)',
         confirmClass: 'btn-success',
         cancellable: false,
+        // CPU-Vertrag (13.8.): markiert den Prompt als HEILUNG. Ohne
+        // die Marke griff weder das Heil-Gate am Kopf von
+        // `cpuPickTargets` noch die neue Sicherung ueber dem gelernten
+        // Prior — und das Profil hat fuer diese Karte ausgerechnet
+        // `side:opp +6.4` gelernt. Der Prompt ist NICHT abbrechbar, ein
+        // falsches Ziel waere also ein garantiertes Geschenk von 100 HP
+        // an den Gegner. `heal.js` war bislang die einzige Karte im
+        // Pool, die diese Marke setzt.
+        isHealing: true,
         greenSelect: true,
         exclusiveTypes: true,
         maxPerType: { hero: 1, equip: 1 },

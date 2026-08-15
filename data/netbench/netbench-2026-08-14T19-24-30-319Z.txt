@@ -1,0 +1,212 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    7 Halbzuege    1174 Nachrichten     4.25 MB roh  →    0.078 MB Leitung    11 s    14 s CPU  Bone Rush vs Gates to Hell
+  Partie   2/10    8 Halbzuege    1159 Nachrichten     4.39 MB roh  →    0.083 MB Leitung    14 s    17 s CPU  ⚠ ohne-spielende  Bamboo Warrior vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1000hp, deck 25, hand 7) | p1(heroes 1/3 alive, 10hp, deck 41, hand 5) | turn 8 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ PHASENWECHSEL VERWEIGERT (advancePhase/spellResolutionDepth): Zug 8 Phase 4 aktiv=p0 rufer=p0 spellDepth=1 zauber=[]
+     ↳ _spellResolutionDepth am Partieende: 1 (sollte 0 sein) — jeder Phasenwechsel danach war ein No-op
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advancePhase/spellResolutionDepth): Zug 8 Phase 4 aktiv=p0 rufer=p0 spellDepth=1 zauber=[]
+  Partie   3/10    3 Halbzuege     279 Nachrichten     0.83 MB roh  →    0.019 MB Leitung     2 s     2 s CPU  ⚠ ohne-spielende  Heal Burn vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1400hp, deck 50, hand 7) | p1(heroes 3/3 alive, 1050hp, deck 40, hand 6) | turn 3 phase 0 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+  Partie   4/10    8 Halbzuege    1126 Nachrichten     3.79 MB roh  →    0.072 MB Leitung     9 s    12 s CPU  Shifting Sandlands vs Gates to Hell
+  Partie   5/10    1 Halbzuege     104 Nachrichten     0.30 MB roh  →    0.009 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Big Stomp! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1550hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1050hp, deck 46, hand 4) | turn 1 phase 4 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   6/10    4 Halbzuege     305 Nachrichten     0.99 MB roh  →    0.022 MB Leitung     1 s     2 s CPU  ⚠ ohne-spielende  Morph and Kill! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 800hp, deck 47, hand 4) | p1(heroes 3/3 alive, 1150hp, deck 52, hand 5) | turn 4 phase 1 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 4 Phase 1 aktiv=p1 rufer=p0 spellDepth=0 zauber=[]
+     ↳ letzte 6 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Waflav, the Metamorphing Monstrosity" → Theme "waflav" (48 Themes im Ordner)
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 10 p1 Phase 2 — _cpuDriver fehlt
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 4 Phase 1 aktiv=p1 rufer=p0 spellDepth=0 zauber=[]
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+  Partie   7/10    4 Halbzuege     518 Nachrichten     1.67 MB roh  →    0.035 MB Leitung     2 s     3 s CPU  ⚠ ohne-spielende  Depths of the Cosmos vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1050hp, deck 48, hand 4) | p1(heroes 3/3 alive, 1200hp, deck 47, hand 7) | turn 4 phase 1 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte Piloten-Marke: aus:runCpuTurn#7:still@zug4p1ph1
+     ↳ PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 4 Phase 0 aktiv=p1 rufer=p0 spellDepth=0 zauber=[]
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Argos, the Eye of the Cosmos" → Theme "argos" (48 Themes im Ordner)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 4 Phase 0 aktiv=p1 rufer=p0 spellDepth=0 zauber=[]
+  Partie   8/10    9 Halbzuege    1410 Nachrichten     5.41 MB roh  →    0.097 MB Leitung    11 s    13 s CPU  ⚠ ohne-spielende  Sun Fencer Frenzy vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 600hp, deck 28, hand 6) | p1(heroes 2/3 alive, 250hp, deck 31, hand 4) | turn 9 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte Piloten-Marke: ok:zugende@zug9p1ph2
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   9/10   18 Halbzuege    2003 Nachrichten     7.53 MB roh  →    0.131 MB Leitung    19 s    20 s CPU  Cool Gang vs Gates to Hell
+  Partie  10/10   10 Halbzuege    1293 Nachrichten     4.61 MB roh  →    0.087 MB Leitung    27 s    28 s CPU  Venom Swamp vs Gates to Hell
+
+[netbench] 75 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 4 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.2%       66.8 KB     5073.3 KB        575    8.82 KB       98.7%  game_state
+   18.7%       17.6 KB       70.8 KB        548    0.13 KB       75.2%  action_log
+    1.7%        1.6 KB        4.1 KB         48    0.09 KB       60.7%  play_zone_animation
+    1.7%        1.6 KB        3.5 KB         66    0.05 KB       55.9%  card_reveal
+    1.1%        1.1 KB        2.5 KB         20    0.13 KB       57.5%  hand_to_board_fly
+    0.9%        0.8 KB        1.8 KB         16    0.11 KB       54.2%  play_pile_transfer
+    0.7%        0.6 KB        1.7 KB         26    0.07 KB       63.1%  ability_activated
+    0.5%        0.5 KB        0.7 KB         10    0.08 KB       37.0%  potion_resolved
+    0.5%        0.4 KB        0.9 KB         15    0.06 KB       52.4%  deck_search_add
+    0.4%        0.3 KB        1.0 KB         12    0.08 KB       64.1%  summon_effect
+    0.3%        0.3 KB        0.7 KB          8    0.09 KB       59.1%  coolness_stack_change
+    0.3%        0.3 KB        0.7 KB          5    0.16 KB       62.4%  play_beam_animation
+    0.3%        0.3 KB        0.5 KB          4    0.13 KB       43.3%  play_hand_steal
+    0.2%        0.2 KB        0.5 KB          3    0.15 KB       57.0%  play_ram_animation
+    0.2%        0.2 KB        0.3 KB          1    0.27 KB       29.9%  game_started
+  … und 24 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         47.0 KB Leitung je Verbindung und Partie  (2583.2 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            5.05 MB roh  →  0.092 MB auf der Leitung
+  Ø je Verbindung:        47.0 KB
+  Ø je Halbzug (alle):    8.74 KB
+  Singleplayer (1 Client): ~47.0 KB je Partie
+  PvP (2 Clients):         ~93.9 KB je Partie
+  je zusätzlichem Zuschauer: ~47.0 KB je Partie
+  In 5 GB passen:          ~111.658 Singleplayer-Partien
+                           ~55.829 PvP-Partien
+  OHNE Kompression wären es 2.029 bzw. 1.014 — Faktor 55.0
+  Größte Einzelnachricht:  14.2 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 1.8 min CPU
+     28 s  bei  10 Halbzuegen (2.8 s/Halbzug)     Venom Swamp vs Gates to Hell
+     20 s  bei  18 Halbzuegen (1.1 s/Halbzug)     Cool Gang vs Gates to Hell
+     17 s  bei   8 Halbzuegen (2.1 s/Halbzug)   ⚠ Bamboo Warrior vs Gates to Hell
+     14 s  bei   7 Halbzuegen (2.0 s/Halbzug)     Bone Rush vs Gates to Hell
+     13 s  bei   9 Halbzuegen (1.4 s/Halbzug)   ⚠ Sun Fencer Frenzy vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         14        1          0  Venom Swamp
+         10        1          0  Cool Gang
+          8        1          1  Bamboo Warrior
+          7        1          0  Bone Rush
+          6        1          1  Sun Fencer Frenzy
+          6        1          0  Shifting Sandlands
+          6       10          6  Gates to Hell
+          1        1          1  Depths of the Cosmos
+          1        1          1  Heal Burn
+          1        1          1  Morph and Kill!
+  → Abbrueche haeufen sich bei: Bamboo Warrior (1), Sun Fencer Frenzy (1), Gates to Hell (6), Depths of the Cosmos (1), Heal Burn (1), Morph and Kill! (1), Big Stomp! (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      182   22.3%  Elixir of Immortality
+      103   12.6%  Treasure Huntress Semi
+       65    8.0%  Wowhalla, the Hall of the Cool
+       48    5.9%  Creativity
+       43    5.3%  The Sun Sword
+       40    4.9%  Fighting
+       36    4.4%  Performance
+       31    3.8%  Taio, the Sun Fencer
+       24    2.9%  Fiona, the Princess of Blackport
+       23    2.8%  Xiong, the Bamboo Guardian
+       20    2.5%  Wealth
+       17    2.1%  Zsos'Ssar, the Serpent Warlord
+       12    1.5%  Mystery Box
+       12    1.5%  Biomancy
+       11    1.3%  Nicolas, the Hidden Alchemist
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    231x  Adventurousness
+     59x  Gatherer from the Cosmic Depths
+     32x  Rain of Arrows
+     21x  Heavy Hit
+     21x  The Warlord's Bite
+     21x  Poison Pollen
+     14x  Stinky Stables
+      9x  Hammer Throw
+      4x  Poisoned Well
+      3x  Burning Finger
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      1617      554.3        0.343           231  Adventurousness
+       282      220.9        0.783            21  The Warlord's Bite
+       613      219.5        0.358             0  Demon's Gate
+       245      158.9        0.649            21  Heavy Hit
+       182      124.6        0.685             0  Cosmic Skeleton
+        58      105.9        1.825             3  Burning Finger
+        67       89.8        1.340             0  Venom Infusion
+       203       76.3        0.376            32  Rain of Arrows
+        75       63.1        0.841             0  Skeleton Necromancer
+       146       48.8        0.334             0  Critical Strike
+       151       45.1        0.299            21  Poison Pollen
+        46       40.3        0.876             0  Skeleton Bard
+        25       38.2        1.528             0  Hammer Skeleton
+        50       32.4        0.649             0  Magic Hammer
+        81       22.6        0.279            59  Gatherer from the Cosmic Depths
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (6 Partien):    Ø 0.5 Pruefungen, Ø 0.2 Schilde
+  durchgespielt (4 Partien):  Ø 1.5 Pruefungen, Ø 0.0 Schilde
+  je Partie (nur mit Pruefungen):
+    ⚠ Partie  2     1 Pruefungen,   0 Schilde  ohne-spielende
+    ⚠ Partie  6     1 Pruefungen,   0 Schilde  ohne-spielende
+    ⚠ Partie  8     1 Pruefungen,   1 Schilde  ohne-spielende
+      Partie 10     6 Pruefungen,   0 Schilde  all_heroes_dead
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Fahnen-Lecks  Tiefe@Ende  Phasen-Blocks  spellDepth@Ende  Ausgang
+       1             0             0            0                      0             1           0              1                0  all_heroes_dead
+         Block-Gruende: falscher-spieler
+  ⚠    2             0             0            0                      0             0           0              1                1  ohne-spielende
+         Block-Gruende: spellResolutionDepth
+  ⚠    3             0             0            0                      0             1           0              0                0  ohne-spielende
+  ⚠    6             0             0            0                      1             2           0              1                0  ohne-spielende
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    7             0             0            0                      0             0           0              1                0  ohne-spielende
+         Block-Gruende: falscher-spieler
+       9             0             0            0                      0             0           0              0                1  all_heroes_dead
+      10             0             0            0                      1             2           0              0                0  all_heroes_dead
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry          0/6  vs  0/4
+    noops            0/6  vs  0/4
+    doppelstart      0/6  vs  0/4
+    treiberSkips     1/6  vs  1/4
+    fahnenLecks      2/6  vs  2/4
+    tiefeEnde        0/6  vs  0/4
+    phasenBlocks     3/6  vs  1/4
+    spellTiefe       1/6  vs  1/4
+  Broadcasts an ALLE:      4 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          7         1174       4.25        0.078    11     14        ja  all_heroes_dead    Bone Rush vs Gates to Hell
+   2          8         1159       4.39        0.083    14     17      NEIN  ohne-spielende     Bamboo Warrior vs Gates to Hell
+   3          3          279       0.83        0.019     2      2      NEIN  ohne-spielende     Heal Burn vs Gates to Hell
+   4          8         1126       3.79        0.072     9     12        ja  all_heroes_dead    Shifting Sandlands vs Gates to Hell
+   5          1          104       0.30        0.009     0      0      NEIN  ohne-spielende     Big Stomp! vs Gates to Hell
+   6          4          305       0.99        0.022     1      2      NEIN  ohne-spielende     Morph and Kill! vs Gates to Hell
+   7          4          518       1.67        0.035     2      3      NEIN  ohne-spielende     Depths of the Cosmos vs Gates to Hell
+   8          9         1410       5.41        0.097    11     13      NEIN  ohne-spielende     Sun Fencer Frenzy vs Gates to Hell
+   9         18         2003       7.53        0.131    19     20        ja  all_heroes_dead    Cool Gang vs Gates to Hell
+  10         10         1293       4.61        0.087    27     28        ja  all_heroes_dead    Venom Swamp vs Gates to Hell

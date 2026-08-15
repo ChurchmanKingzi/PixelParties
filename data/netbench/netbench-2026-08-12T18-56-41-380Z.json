@@ -1,0 +1,1410 @@
+{
+  "erzeugt": "2026-08-12T18:56:41.382Z",
+  "konfiguration": {
+    "games": 20,
+    "spectators": 3,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Depths of the Cosmos",
+      "deckB": "Slip 'n Slide",
+      "turns": 83,
+      "ms": 34538,
+      "nachrichten": 18438,
+      "raw": 70180409,
+      "wire": 1097108,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 40328,
+      "snapshots": 10612
+    },
+    {
+      "nr": 2,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Suicide Bombers",
+      "turns": 73,
+      "ms": 42017,
+      "nachrichten": 11508,
+      "raw": 44646684,
+      "wire": 704373,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 44954,
+      "snapshots": 15155
+    },
+    {
+      "nr": 3,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Shifting Sandlands",
+      "turns": 53,
+      "ms": 64958,
+      "nachrichten": 10834,
+      "raw": 34082317,
+      "wire": 578696,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 67437,
+      "snapshots": 19831
+    },
+    {
+      "nr": 4,
+      "deckA": "To Attain Divinity",
+      "deckB": "Depths of the Cosmos",
+      "turns": 1,
+      "ms": 35073,
+      "nachrichten": 125,
+      "raw": 322150,
+      "wire": 14962,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 33734,
+      "snapshots": 16426
+    },
+    {
+      "nr": 5,
+      "deckA": "Gates to Hell",
+      "deckB": "Join our Cult!",
+      "turns": 44,
+      "ms": 99580,
+      "nachrichten": 3828,
+      "raw": 15176211,
+      "wire": 251002,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 97360,
+      "snapshots": 14241
+    },
+    {
+      "nr": 6,
+      "deckA": "Join our Cult!",
+      "deckB": "One-Two-Punch!",
+      "turns": 44,
+      "ms": 62306,
+      "nachrichten": 11355,
+      "raw": 43515327,
+      "wire": 667251,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 61422,
+      "snapshots": 9127
+    },
+    {
+      "nr": 7,
+      "deckA": "Idej Illusions",
+      "deckB": "Boom Boom Kaboom!",
+      "turns": 62,
+      "ms": 48066,
+      "nachrichten": 6761,
+      "raw": 26746544,
+      "wire": 423489,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 47313,
+      "snapshots": 10240
+    },
+    {
+      "nr": 8,
+      "deckA": "Bloody King Zi",
+      "deckB": "To Attain Divinity",
+      "turns": 2,
+      "ms": 600007,
+      "nachrichten": 257,
+      "raw": 736174,
+      "wire": 21859,
+      "grund": "zeitlimit@zug2",
+      "gewertet": false,
+      "cpuMs": 566062,
+      "snapshots": 5
+    },
+    {
+      "nr": 9,
+      "deckA": "Gather That Storm!",
+      "deckB": "Crystal Gifts",
+      "turns": 9,
+      "ms": 6311,
+      "nachrichten": 2339,
+      "raw": 6508997,
+      "wire": 126883,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 8000,
+      "snapshots": 1277
+    },
+    {
+      "nr": 10,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Big Stomp!",
+      "turns": 8,
+      "ms": 599995,
+      "nachrichten": 1025,
+      "raw": 3198537,
+      "wire": 62793,
+      "grund": "zeitlimit@zug8",
+      "gewertet": false,
+      "cpuMs": 559438,
+      "snapshots": 4912
+    },
+    {
+      "nr": 11,
+      "deckA": "Burning Inferno",
+      "deckB": "Crystal Gifts",
+      "turns": 2,
+      "ms": 5285,
+      "nachrichten": 320,
+      "raw": 931956,
+      "wire": 25117,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 5156,
+      "snapshots": 31
+    },
+    {
+      "nr": 12,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Pew-Pew!",
+      "turns": 96,
+      "ms": 69609,
+      "nachrichten": 22444,
+      "raw": 75684333,
+      "wire": 1191468,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 68485,
+      "snapshots": 11841
+    },
+    {
+      "nr": 13,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Shifting Sandlands",
+      "turns": 51,
+      "ms": 177722,
+      "nachrichten": 11695,
+      "raw": 36819533,
+      "wire": 599951,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 170641,
+      "snapshots": 31079
+    },
+    {
+      "nr": 14,
+      "deckA": "Suicide Bombers",
+      "deckB": "Dance of the Butterflies",
+      "turns": 75,
+      "ms": 56592,
+      "nachrichten": 19098,
+      "raw": 70228024,
+      "wire": 1073020,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 56031,
+      "snapshots": 8835
+    },
+    {
+      "nr": 15,
+      "deckA": "Parts of the Soul",
+      "deckB": "Bamboo Warrior",
+      "turns": 76,
+      "ms": 131830,
+      "nachrichten": 9385,
+      "raw": 41018258,
+      "wire": 645075,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 126251,
+      "snapshots": 23590
+    },
+    {
+      "nr": 16,
+      "deckA": "Cool Gang",
+      "deckB": "Spell Industrialization",
+      "turns": 91,
+      "ms": 21330,
+      "nachrichten": 20787,
+      "raw": 69459073,
+      "wire": 1071629,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 20922,
+      "snapshots": 3645
+    },
+    {
+      "nr": 17,
+      "deckA": "Grand Rebellion!",
+      "deckB": "Burning Inferno",
+      "turns": 2,
+      "ms": 5081,
+      "nachrichten": 286,
+      "raw": 857702,
+      "wire": 22493,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 4922,
+      "snapshots": 4
+    },
+    {
+      "nr": 18,
+      "deckA": "Shifting Sandlands",
+      "deckB": "Gates to Hell",
+      "turns": 51,
+      "ms": 199266,
+      "nachrichten": 4665,
+      "raw": 16513479,
+      "wire": 278508,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 191000,
+      "snapshots": 28535
+    },
+    {
+      "nr": 19,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Lightning Caller",
+      "turns": 18,
+      "ms": 600007,
+      "nachrichten": 2641,
+      "raw": 8645710,
+      "wire": 159123,
+      "grund": "zeitlimit@zug18",
+      "gewertet": false,
+      "cpuMs": 561141,
+      "snapshots": 3095
+    },
+    {
+      "nr": 20,
+      "deckA": "Parts of the Soul",
+      "deckB": "Great Weapon Master",
+      "turns": 96,
+      "ms": 92900,
+      "nachrichten": 19677,
+      "raw": 67461950,
+      "wire": 1106898,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 88798,
+      "snapshots": 19783
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 81351,
+      "raw": 607912396,
+      "wire": 7098107
+    },
+    {
+      "name": "action_log",
+      "count": 66682,
+      "raw": 8529959,
+      "wire": 2060557
+    },
+    {
+      "name": "card_reveal",
+      "count": 12986,
+      "raw": 608215,
+      "wire": 222913
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 2161,
+      "raw": 250485,
+      "wire": 122651
+    },
+    {
+      "name": "ability_activated",
+      "count": 3978,
+      "raw": 282344,
+      "wire": 115366
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 1268,
+      "raw": 112431,
+      "wire": 40251
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 355,
+      "raw": 69200,
+      "wire": 21046
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 687,
+      "raw": 41986,
+      "wire": 20098
+    },
+    {
+      "name": "deck_search_add",
+      "count": 526,
+      "raw": 33307,
+      "wire": 17323
+    },
+    {
+      "name": "potion_resolved",
+      "count": 321,
+      "raw": 23378,
+      "wire": 15591
+    },
+    {
+      "name": "summon_effect",
+      "count": 408,
+      "raw": 35232,
+      "wire": 12813
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 150,
+      "raw": 20520,
+      "wire": 12385
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 220,
+      "raw": 28265,
+      "wire": 11398
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 497,
+      "raw": 16401,
+      "wire": 9572
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 355,
+      "raw": 21655,
+      "wire": 8883
+    },
+    {
+      "name": "nomu_draw",
+      "count": 307,
+      "raw": 18498,
+      "wire": 8589
+    },
+    {
+      "name": "gold_change",
+      "count": 325,
+      "raw": 13325,
+      "wire": 7688
+    },
+    {
+      "name": "game_started",
+      "count": 14,
+      "raw": 4438,
+      "wire": 2925
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 55,
+      "raw": 3425,
+      "wire": 1206
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 19,
+      "raw": 2147,
+      "wire": 878
+    },
+    {
+      "name": "forbidden_zone_overlay",
+      "count": 14,
+      "raw": 826,
+      "wire": 659
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 10,
+      "raw": 1295,
+      "wire": 657
+    },
+    {
+      "name": "tears_of_creation_animation",
+      "count": 9,
+      "raw": 2575,
+      "wire": 624
+    },
+    {
+      "name": "gathering_storm_strike",
+      "count": 40,
+      "raw": 2640,
+      "wire": 593
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 15,
+      "raw": 1875,
+      "wire": 550
+    },
+    {
+      "name": "area_descend",
+      "count": 20,
+      "raw": 1255,
+      "wire": 475
+    },
+    {
+      "name": "eraser_beam",
+      "count": 7,
+      "raw": 749,
+      "wire": 388
+    },
+    {
+      "name": "burn_tick",
+      "count": 5,
+      "raw": 1070,
+      "wire": 295
+    },
+    {
+      "name": "play_chaos_screen",
+      "count": 10,
+      "raw": 260,
+      "wire": 260
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 7,
+      "raw": 420,
+      "wire": 256
+    },
+    {
+      "name": "big_gwen_clock_activation",
+      "count": 5,
+      "raw": 215,
+      "wire": 165
+    },
+    {
+      "name": "willy_leprechaun",
+      "count": 5,
+      "raw": 230,
+      "wire": 136
+    },
+    {
+      "name": "ability_block_flash",
+      "count": 2,
+      "raw": 122,
+      "wire": 53
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-ebb58860",
+      "count": 4097,
+      "raw": 17302173,
+      "wire": 272993
+    },
+    {
+      "sid": "sid-a-netbench-1810701b",
+      "count": 4352,
+      "raw": 17147367,
+      "wire": 262268
+    },
+    {
+      "sid": "sid-b-netbench-ebb58860",
+      "count": 4005,
+      "raw": 17113681,
+      "wire": 259322
+    },
+    {
+      "sid": "sid-b-netbench-1810701b",
+      "count": 4429,
+      "raw": 16739797,
+      "wire": 255718
+    },
+    {
+      "sid": "sid-b-netbench-8a611598",
+      "count": 3288,
+      "raw": 15965061,
+      "wire": 254176
+    },
+    {
+      "sid": "sid-a-netbench-d9b4ce1b",
+      "count": 3676,
+      "raw": 15715643,
+      "wire": 245166
+    },
+    {
+      "sid": "sid-b-netbench-d9b4ce1b",
+      "count": 3547,
+      "raw": 15835453,
+      "wire": 242453
+    },
+    {
+      "sid": "sid-b-netbench-aa286644",
+      "count": 3711,
+      "raw": 15694002,
+      "wire": 239710
+    },
+    {
+      "sid": "sid-a-netbench-8a611598",
+      "count": 3384,
+      "raw": 15531342,
+      "wire": 239601
+    },
+    {
+      "sid": "sid-b-netbench-89068e5d",
+      "count": 3743,
+      "raw": 15015132,
+      "wire": 238018
+    },
+    {
+      "sid": "sid-a-netbench-89068e5d",
+      "count": 3843,
+      "raw": 15017760,
+      "wire": 236195
+    },
+    {
+      "sid": "sid-a-netbench-a63dcd5a",
+      "count": 3919,
+      "raw": 15687600,
+      "wire": 233367
+    },
+    {
+      "sid": "sid-b-netbench-a63dcd5a",
+      "count": 4135,
+      "raw": 14911634,
+      "wire": 225594
+    },
+    {
+      "sid": "sid-a-netbench-aa286644",
+      "count": 3599,
+      "raw": 15329054,
+      "wire": 225505
+    },
+    {
+      "sid": "sid-spec-0-netbench-1810701b",
+      "count": 4554,
+      "raw": 13932284,
+      "wire": 224424
+    },
+    {
+      "sid": "sid-spec-1-netbench-1810701b",
+      "count": 4554,
+      "raw": 13932284,
+      "wire": 224424
+    },
+    {
+      "sid": "sid-spec-2-netbench-1810701b",
+      "count": 4554,
+      "raw": 13932284,
+      "wire": 224424
+    },
+    {
+      "sid": "sid-spec-0-netbench-89068e5d",
+      "count": 4030,
+      "raw": 12476247,
+      "wire": 210825
+    },
+    {
+      "sid": "sid-spec-1-netbench-89068e5d",
+      "count": 4030,
+      "raw": 12476247,
+      "wire": 210825
+    },
+    {
+      "sid": "sid-spec-2-netbench-89068e5d",
+      "count": 4030,
+      "raw": 12476247,
+      "wire": 210825
+    },
+    {
+      "sid": "sid-a-netbench-d3b92f3a",
+      "count": 3290,
+      "raw": 13070062,
+      "wire": 207574
+    },
+    {
+      "sid": "sid-spec-0-netbench-a63dcd5a",
+      "count": 4244,
+      "raw": 12953174,
+      "wire": 204153
+    },
+    {
+      "sid": "sid-spec-1-netbench-a63dcd5a",
+      "count": 4244,
+      "raw": 12953174,
+      "wire": 204153
+    },
+    {
+      "sid": "sid-spec-2-netbench-a63dcd5a",
+      "count": 4244,
+      "raw": 12953174,
+      "wire": 204153
+    },
+    {
+      "sid": "sid-spec-0-netbench-d9b4ce1b",
+      "count": 3738,
+      "raw": 12876332,
+      "wire": 203093
+    },
+    {
+      "sid": "sid-spec-1-netbench-d9b4ce1b",
+      "count": 3738,
+      "raw": 12876332,
+      "wire": 203093
+    },
+    {
+      "sid": "sid-spec-2-netbench-d9b4ce1b",
+      "count": 3738,
+      "raw": 12876332,
+      "wire": 203093
+    },
+    {
+      "sid": "sid-spec-0-netbench-aa286644",
+      "count": 3929,
+      "raw": 13068217,
+      "wire": 202532
+    },
+    {
+      "sid": "sid-spec-1-netbench-aa286644",
+      "count": 3929,
+      "raw": 13068217,
+      "wire": 202532
+    },
+    {
+      "sid": "sid-spec-2-netbench-aa286644",
+      "count": 3929,
+      "raw": 13068217,
+      "wire": 202532
+    },
+    {
+      "sid": "sid-b-netbench-d3b92f3a",
+      "count": 3077,
+      "raw": 12774674,
+      "wire": 192900
+    },
+    {
+      "sid": "sid-a-netbench-65b6ec81",
+      "count": 2261,
+      "raw": 9595684,
+      "wire": 150590
+    },
+    {
+      "sid": "sid-b-netbench-65b6ec81",
+      "count": 2169,
+      "raw": 9583029,
+      "wire": 145129
+    },
+    {
+      "sid": "sid-b-netbench-8b0bbe57",
+      "count": 2330,
+      "raw": 8666961,
+      "wire": 137896
+    },
+    {
+      "sid": "sid-b-netbench-17678b3d",
+      "count": 2142,
+      "raw": 8076033,
+      "wire": 131648
+    },
+    {
+      "sid": "sid-a-netbench-8b0bbe57",
+      "count": 2221,
+      "raw": 8129952,
+      "wire": 126092
+    },
+    {
+      "sid": "sid-spec-0-netbench-65b6ec81",
+      "count": 2308,
+      "raw": 8112099,
+      "wire": 123775
+    },
+    {
+      "sid": "sid-spec-1-netbench-65b6ec81",
+      "count": 2308,
+      "raw": 8112099,
+      "wire": 123775
+    },
+    {
+      "sid": "sid-spec-2-netbench-65b6ec81",
+      "count": 2308,
+      "raw": 8112099,
+      "wire": 123775
+    },
+    {
+      "sid": "sid-a-netbench-17678b3d",
+      "count": 2100,
+      "raw": 7454882,
+      "wire": 121960
+    },
+    {
+      "sid": "sid-b-netbench-256c01ed",
+      "count": 1873,
+      "raw": 7427420,
+      "wire": 121298
+    },
+    {
+      "sid": "sid-a-netbench-256c01ed",
+      "count": 1870,
+      "raw": 7543604,
+      "wire": 120972
+    },
+    {
+      "sid": "sid-a-netbench-8b6ee223",
+      "count": 1926,
+      "raw": 7505078,
+      "wire": 120737
+    },
+    {
+      "sid": "sid-b-netbench-8b6ee223",
+      "count": 1961,
+      "raw": 7131452,
+      "wire": 116240
+    },
+    {
+      "sid": "sid-spec-0-netbench-8b0bbe57",
+      "count": 2381,
+      "raw": 6674101,
+      "wire": 111918
+    },
+    {
+      "sid": "sid-spec-1-netbench-8b0bbe57",
+      "count": 2381,
+      "raw": 6674101,
+      "wire": 111918
+    },
+    {
+      "sid": "sid-spec-2-netbench-8b0bbe57",
+      "count": 2381,
+      "raw": 6674101,
+      "wire": 111918
+    },
+    {
+      "sid": "sid-spec-0-netbench-17678b3d",
+      "count": 2197,
+      "raw": 6183695,
+      "wire": 108293
+    },
+    {
+      "sid": "sid-spec-1-netbench-17678b3d",
+      "count": 2197,
+      "raw": 6183695,
+      "wire": 108293
+    },
+    {
+      "sid": "sid-spec-2-netbench-17678b3d",
+      "count": 2197,
+      "raw": 6183695,
+      "wire": 108293
+    },
+    {
+      "sid": "sid-spec-0-netbench-ebb58860",
+      "count": 1135,
+      "raw": 3410171,
+      "wire": 57283
+    },
+    {
+      "sid": "sid-spec-1-netbench-ebb58860",
+      "count": 1135,
+      "raw": 3410171,
+      "wire": 57283
+    },
+    {
+      "sid": "sid-spec-2-netbench-ebb58860",
+      "count": 1135,
+      "raw": 3410171,
+      "wire": 57283
+    },
+    {
+      "sid": "sid-spec-0-netbench-8a611598",
+      "count": 904,
+      "raw": 3173846,
+      "wire": 50363
+    },
+    {
+      "sid": "sid-spec-1-netbench-8a611598",
+      "count": 904,
+      "raw": 3173846,
+      "wire": 50363
+    },
+    {
+      "sid": "sid-spec-2-netbench-8a611598",
+      "count": 904,
+      "raw": 3173846,
+      "wire": 50363
+    },
+    {
+      "sid": "sid-b-netbench-4a04c8c6",
+      "count": 463,
+      "raw": 1507786,
+      "wire": 27535
+    },
+    {
+      "sid": "sid-a-netbench-4a04c8c6",
+      "count": 459,
+      "raw": 1470923,
+      "wire": 27039
+    },
+    {
+      "sid": "sid-spec-0-netbench-4a04c8c6",
+      "count": 472,
+      "raw": 1176657,
+      "wire": 24033
+    },
+    {
+      "sid": "sid-spec-1-netbench-4a04c8c6",
+      "count": 472,
+      "raw": 1176657,
+      "wire": 24033
+    },
+    {
+      "sid": "sid-spec-2-netbench-4a04c8c6",
+      "count": 472,
+      "raw": 1176657,
+      "wire": 24033
+    },
+    {
+      "sid": "sid-spec-0-netbench-8b6ee223",
+      "count": 259,
+      "raw": 625544,
+      "wire": 13774
+    },
+    {
+      "sid": "sid-spec-1-netbench-8b6ee223",
+      "count": 259,
+      "raw": 625544,
+      "wire": 13774
+    },
+    {
+      "sid": "sid-spec-2-netbench-8b6ee223",
+      "count": 259,
+      "raw": 625544,
+      "wire": 13774
+    },
+    {
+      "sid": "sid-spec-0-netbench-d3b92f3a",
+      "count": 131,
+      "raw": 300497,
+      "wire": 7602
+    },
+    {
+      "sid": "sid-spec-1-netbench-d3b92f3a",
+      "count": 131,
+      "raw": 300497,
+      "wire": 7602
+    },
+    {
+      "sid": "sid-spec-2-netbench-d3b92f3a",
+      "count": 131,
+      "raw": 300497,
+      "wire": 7602
+    },
+    {
+      "sid": "sid-spec-0-netbench-256c01ed",
+      "count": 28,
+      "raw": 68290,
+      "wire": 2842
+    },
+    {
+      "sid": "sid-spec-1-netbench-256c01ed",
+      "count": 28,
+      "raw": 68290,
+      "wire": 2842
+    },
+    {
+      "sid": "sid-spec-2-netbench-256c01ed",
+      "count": 28,
+      "raw": 68290,
+      "wire": 2842
+    },
+    {
+      "sid": "room:netbench-d9b4ce1b",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-4a04c8c6",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-1810701b",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-89068e5d",
+      "count": 1,
+      "raw": 317,
+      "wire": 210
+    },
+    {
+      "sid": "room:netbench-ebb58860",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-17678b3d",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-d3b92f3a",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-8b0bbe57",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-aa286644",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-8a611598",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-a63dcd5a",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-8b6ee223",
+      "count": 1,
+      "raw": 317,
+      "wire": 209
+    },
+    {
+      "sid": "room:netbench-65b6ec81",
+      "count": 1,
+      "raw": 317,
+      "wire": 207
+    },
+    {
+      "sid": "room:netbench-256c01ed",
+      "count": 1,
+      "raw": 317,
+      "wire": 206
+    }
+  ],
+  "summe": {
+    "count": 172814,
+    "raw": 618041139,
+    "wire": 9815351
+  },
+  "groesste_nachricht": {
+    "bytes": 17698,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 14,
+    "raw": 3850
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Archibald, the Archmage\" → Theme \"archibald\" (48 Themes im Ordner)",
+        "[error] [Engine] Hook \"onTurnStart\" on card \"Barker, the Monster Tamer\" (17ec72b0-50c) failed: Hook timeout"
+      ]
+    },
+    {
+      "partie": 8,
+      "grund": "zeitlimit@zug2",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Timeless King Zi\" → Theme \"zi\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[error] [overload] trail dump → C:\\Pixel Parties WEB\\PixelPartiesWeb\\mcts-overload-1786559027168-t1-cpu-deadline.trail.json",
+        "[error] [CPU] turn error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseStart). Top hooks: onPhaseStart:6 onPhaseEnd:5 beforeDraw:3 onDraw:3 onResourceGain:3 afterResourceGain:3 onPlay:2 onCardEnterZone:2. Top instances: Leadership×3, Kazena, the Storming Rebel×2, Adventurousness×2, Support Magic×2, Wisdom×2. Top firing cards: Barker, the Monster Tamer×1, Archibald, the Archmage×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach \"Leadership\" → t1/ph3/p0 rollout \"Adventurousness\". Force-ending in-flight chain. Error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseStart). Top hooks: onPhaseStart:6 onPhaseEnd:5 beforeDraw:3 onDraw:3 onResourceGain:3 afterResourceGain:3 onPlay:2 onCardEnterZone:2. Top instances: Leadership×3, Kazena, the Storming Rebel×2, Adventurousness×2, Support Magic×2, Wisdom×2. Top firing cards: Barker, the Monster Tamer×1, Archibald, the Archmage×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach \"Leadership\" → t1/ph3/p0 rollout \"Adventurousness\". Force-ending in-flight chain.\n    at GameEngine.runHooks (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_engine.js:2466:19)\n    at GameEngine.runPhase (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_engine.js:13477:16)\n    at GameEngine.advancePhase (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_engine.js:13730:16)\n    at async runCpuTurn (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_cpu.js:772:3)\n    at async GameEngine.cpuTurn [as _cpuDriver] (C:\\Pixel Parties WEB\\PixelPartiesWeb\\server.js:5376:7)\n    at async GameEngine.startGame (C:\\Pixel Parties WEB\\PixelPartiesWeb\\cards\\effects\\_engine.js:13195:13)",
+        "[warn] [CPU] Zug 1 haengt nach Fehler — erzwinge Zugübergabe.",
+        "[warn] [Engine] ⚠️  Karteneffekte in Zug 1 stillgelegt (erster unterdrueckter Hook: onTurnEnd, bereits 32 Hooks gefeuert). Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus."
+      ]
+    },
+    {
+      "partie": 10,
+      "grund": "zeitlimit@zug8",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Kit, the Shark Researcher\" → Theme \"kit\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 11,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Mary Crestmas\" → Theme \"marycrestmas\" (48 Themes im Ordner)",
+        "[error] [Engine] Hook \"onTurnStart\" on card \"Barker, the Monster Tamer\" (943dbd67-772) failed: Hook timeout"
+      ]
+    },
+    {
+      "partie": 17,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Champion, the Stormbringer\" → Theme \"champion\" (48 Themes im Ordner)",
+        "[error] [Engine] Hook \"onTurnStart\" on card \"Barker, the Monster Tamer\" (733e128d-f81) failed: Hook timeout"
+      ]
+    },
+    {
+      "partie": 19,
+      "grund": "zeitlimit@zug18",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Sol Rym, the Thunder Djinn\" → Theme \"solrym\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    }
+  ],
+  "unterdrueckte_ausgabezeilen": 46,
+  "cpu_ms_gesamt": 2819395,
+  "hook_feuer_je_karte": {
+    "Elixir of Immortality": 1976,
+    "Wealth": 1195,
+    "Slippery Pengu": 662,
+    "Glass of Marbles": 588,
+    "Treasure Huntress Semi": 571,
+    "Ancient Tech Infinite Energy Core": 522,
+    "Willy, the Valiant Leprechaun": 446,
+    "Slippery Polar": 371,
+    "Slippery Spikeblock": 345,
+    "Creativity": 325,
+    "Quick Attack": 322,
+    "Divine Gift of Balance": 299,
+    "Slippery Whoolmoth": 280,
+    "Heavy Hit": 266,
+    "Ingo, Investor of Evil": 261,
+    "Resistance": 242,
+    "Hel, the Bound Specter": 192,
+    "Attack": 179,
+    "Hammer Throw": 174,
+    "Ida, the Adept of Destruction": 164,
+    "Icebolt": 153,
+    "Slippery Snobbit": 146,
+    "Critical Strike": 134,
+    "Ghuanjun, the Undead Martial Artist": 123,
+    "Divine Gift of Fire": 114,
+    "Luck": 113,
+    "Phoenix Tackle": 112,
+    "Victory Phoenix Cannon": 109,
+    "Lizbeth, the Reaper of the Light": 108,
+    "Pyroblast": 106,
+    "Strong Ox Headbutt": 97,
+    "Fighting": 91,
+    "Sandy Blob": 89,
+    "Telekinesis": 88,
+    "Alex, Trainer of Heroes": 83,
+    "Arthor, the King of Blackport": 81,
+    "Fire Bolts": 74,
+    "Thieving Strike": 73,
+    "Shield of Life": 72,
+    "Bamboo Staff": 71,
+    "Sacred Hammer of the Volcano": 69,
+    "The Sun Sword": 53,
+    "Ferocious Tiger Kick": 52,
+    "Burning Finger": 49,
+    "Giga Steroids": 42,
+    "Performance": 39,
+    "Whirlwind Strike": 35,
+    "Gatherer from the Cosmic Depths": 34,
+    "Icy Grave": 33,
+    "Beato, the Butterfly Witch": 31,
+    "Stranglehold": 30,
+    "Toras, Master of all Weapons": 30,
+    "Analyzer from the Cosmic Depths": 29,
+    "Steam Dwarf Miner": 27,
+    "Cloud in a Bottle": 26,
+    "Layn, Defender of Deri": 26,
+    "Magic Hammer": 25,
+    "Bamboo Shield": 25,
+    "Brilliant Idea": 25,
+    "Pollution Spewer": 25,
+    "Toughness": 24,
+    "Wowhalla, the Hall of the Cool": 24,
+    "Muscle Training": 22,
+    "Cardinal Beast Zhuque": 22,
+    "Xiong, the Bamboo Guardian": 21,
+    "Ska Harpyformer": 20,
+    "The Great Clock Tower \"Big Gwen\"": 19,
+    "Andras, the Human Weapon": 18,
+    "Güldefaber, the King of Dwarfs": 17,
+    "Biomancy": 16,
+    "Rain of Arrows": 14,
+    "Eraser Beam": 14,
+    "Cardinal Beast Baihu": 14,
+    "Pollution Token": 13,
+    "Divine Gift of Coolness": 13,
+    "Gathering Storm": 13,
+    "Tarleinn the Traveler": 12,
+    "Divine Gift of Creation": 11,
+    "Metal Harpyformer": 10,
+    "Blow of the Venom Snake": 10,
+    "Argos, the Eye of the Cosmos": 9,
+    "Thorad, Strength of Coolness": 9,
+    "Cardinal Beast Xuanwu": 8,
+    "Barker, the Monster Tamer": 7,
+    "Klaus, the Cult Leader": 7,
+    "Intrude": 7,
+    "Kit, the Shark Researcher": 7,
+    "Steam Dwarf Diver": 7,
+    "Steam Dwarf Engineer": 7,
+    "Nicolas, the Hidden Alchemist": 6,
+    "Cool Repair": 6,
+    "Luna Pele, the Flame Dancer": 6,
+    "Cardinal Beast Qinglong": 6,
+    "Fiona, the Princess of Blackport": 6,
+    "Mary Crestmas": 5,
+    "Pollution Piranha": 5,
+    "Steam Dwarf Brewer": 5,
+    "Bomb Berserker Bartas": 4,
+    "Forbidden Zone": 4,
+    "Flame Avalanche": 3,
+    "Jump in the River": 3,
+    "Johanna, Crusader of Light": 3,
+    "Life-Searcher from the Cosmic Depths": 2,
+    "Slippery Ice": 2,
+    "Archibald, the Archmage": 2,
+    "Divine Gift of the Guardian": 2,
+    "Graveyard Gathering": 2,
+    "Soul Shard Shut": 2,
+    "Soul Shard Ka": 2,
+    "Chain Lightning": 2,
+    "Blade of the Swamp Witch": 2,
+    "Soul Shard Sekhem": 2,
+    "Blade of the Frostbringer": 2,
+    "Earth-Shattering Hammer, Relic of Deri": 2,
+    "The Cosmic Depths": 1,
+    "Compulsory Body Swap": 1,
+    "Divine Gift of Forgetting": 1,
+    "Bill, the Angry Auctioneer": 1,
+    "Idej Lord Daiyo": 1,
+    "Phalanx Pike": 1,
+    "Cataclysm": 1,
+    "Boiling Oil": 1,
+    "Bow Sniper Darge": 1,
+    "Soul Shard Ib": 1,
+    "Rain of Death": 1,
+    "Reincarnation": 1,
+    "Sol Rym, the Thunder Djinn": 1,
+    "Butterfly Cloud": 1,
+    "The Master's Sword": 1,
+    "Soul Shard Ren": 1,
+    "Soul Shard Khet": 1,
+    "Divine Gift of Sacrifice": 1,
+    "Learning": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 211,
+    "Heavy Hit": 84,
+    "Steam Dwarf Brewer": 41,
+    "Ferocious Tiger Kick": 37,
+    "Güldefaber, the King of Dwarfs": 30,
+    "Cataclysm": 23,
+    "Flame Avalanche": 23,
+    "Stranglehold": 17,
+    "Hammer Throw": 17,
+    "Icebolt": 16,
+    "Telekinesis": 16,
+    "Phoenix Tackle": 11,
+    "Burning Finger": 9,
+    "Gatherer from the Cosmic Depths": 8,
+    "Victory Phoenix Cannon": 8,
+    "Steam Dwarf Diver": 3,
+    "Strong Ox Headbutt": 2,
+    "Attack": 2,
+    "Muscle Training": 1
+  },
+  "deck_kosten": [
+    {
+      "name": "Bloody King Zi",
+      "cpuMs": 283031,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 283031
+    },
+    {
+      "name": "Lightning Caller",
+      "cpuMs": 280570.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 280570.5
+    },
+    {
+      "name": "Steam Dwarf Mines",
+      "cpuMs": 560289.5,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 280144.75
+    },
+    {
+      "name": "Big Stomp!",
+      "cpuMs": 279719,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 279719
+    },
+    {
+      "name": "To Attain Divinity",
+      "cpuMs": 299898,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 149949
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 144180,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 72090
+    },
+    {
+      "name": "Shifting Sandlands",
+      "cpuMs": 214539,
+      "partien": 3,
+      "abbrueche": 0,
+      "proPartie": 71513
+    },
+    {
+      "name": "Parts of the Soul",
+      "cpuMs": 107524.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 53762.25
+    },
+    {
+      "name": "Boom Boom Kaboom!",
+      "cpuMs": 142695.5,
+      "partien": 3,
+      "abbrueche": 0,
+      "proPartie": 47565.166666666664
+    },
+    {
+      "name": "Great Weapon Master",
+      "cpuMs": 44399,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 44399
+    },
+    {
+      "name": "Bamboo Warrior",
+      "cpuMs": 85602.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 42801.25
+    },
+    {
+      "name": "Join our Cult!",
+      "cpuMs": 79391,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 39695.5
+    },
+    {
+      "name": "Pew-Pew!",
+      "cpuMs": 34242.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 34242.5
+    },
+    {
+      "name": "One-Two-Punch!",
+      "cpuMs": 30711,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 30711
+    },
+    {
+      "name": "Dance of the Butterflies",
+      "cpuMs": 28015.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 28015.5
+    },
+    {
+      "name": "Slip 'n Slide",
+      "cpuMs": 54406.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 27203.25
+    },
+    {
+      "name": "Suicide Bombers",
+      "cpuMs": 50492.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 25246.25
+    },
+    {
+      "name": "Idej Illusions",
+      "cpuMs": 23656.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 23656.5
+    },
+    {
+      "name": "Depths of the Cosmos",
+      "cpuMs": 37031,
+      "partien": 2,
+      "abbrueche": 1,
+      "proPartie": 18515.5
+    },
+    {
+      "name": "Cool Gang",
+      "cpuMs": 10461,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 10461
+    },
+    {
+      "name": "Spell Industrialization",
+      "cpuMs": 10461,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 10461
+    },
+    {
+      "name": "Gather That Storm!",
+      "cpuMs": 4000,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 4000
+    },
+    {
+      "name": "Crystal Gifts",
+      "cpuMs": 6578,
+      "partien": 2,
+      "abbrueche": 1,
+      "proPartie": 3289
+    },
+    {
+      "name": "Burning Inferno",
+      "cpuMs": 5039,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 2519.5
+    },
+    {
+      "name": "Grand Rebellion!",
+      "cpuMs": 2461,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 2461
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 701096.5,
+    "roh_je_partie": 44145795.64285714,
+    "wire_je_verbindung": 140219.3,
+    "wire_je_halbzug": 10857.689159292035,
+    "kompressionsfaktor": 62.96678936902002
+  }
+}

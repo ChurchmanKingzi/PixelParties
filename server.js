@@ -73,6 +73,15 @@ function enrichPuzzleBuffs(buffs) {
 
 // ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
+// ───────────────────────────────────────────────────────────────
+//  BINDEADRESSE (15.8., netcup-Umzug)
+//  Hinter Caddy lauscht der Node-Prozess NUR auf dem Loopback. Sonst
+//  haengt Port 3000 zusaetzlich offen im Netz und ist unter der nackten
+//  IP direkt erreichbar — an TLS, an den Zugriffsprotokollen und an der
+//  Firewall vorbei. Ohne gesetztes HOST bleibt es beim bisherigen
+//  Verhalten (alle Schnittstellen), damit Tests im LAN weiter gehen.
+// ───────────────────────────────────────────────────────────────
+const HOST = process.env.HOST || '0.0.0.0';
 const PROFILE_SECRET = process.env.PROFILE_SECRET || 'pxlParties_s3cret_k3y_2025!';
 const PUZZLE_SECRET = process.env.PUZZLE_SECRET || 'pxlParties_puzzl3_k3y_2025!';
 const profileImportUsed = new Set();
@@ -256,9 +265,183 @@ function flushSelfPlayTrail(reason) {
   _activeSelfPlayTrailFd = null;
 }
 
+// ───────────────────────────────────────────────────────────────
+//  DEBUG-WERKZEUGE: LIVE AUS (12.8., Als Vorgabe)
+//
+//  Fuenf Socket-Ereignisse sind reine Entwicklerwerkzeuge, die man
+//  ueber die Browser-Konsole ausloest — es gibt KEINE Oberflaeche
+//  dafuer (im gesamten public/ kein einziger Emitter):
+//
+//    debug_self_play_run      Selbstspiel-Stapel (bis zu hunderte Partien)
+//    debug_self_play_ab       A/B-Vergleich zweier Konfigurationen
+//    debug_self_play_config   setzt Rollout-Horizont/Brain global um
+//    debug_cpu_vs_cpu         CPU gegen CPU in einem eigenen Raum
+//    debug_cpu_snapshot_test  Snapshot/Restore-Selbsttest der Engine
+//
+//  Sie hingen bisher NUR an `if (!currentUser)` — jeder angemeldete
+//  Nutzer (auch ein Gast) konnte damit Trainingslaeufe auf der
+//  Live-Instanz starten. Auf einer freien Render-Instanz frisst das
+//  Rechenzeit, Speicher UND Bandbreite.
+//
+//  DAS LOKALE ML-TRAINING IST NICHT BETROFFEN: es laeuft ueber
+//  `PP_TRAIN=1 node server.js` → `runTrainingBatch()` auf Modulebene,
+//  ganz OHNE Socket-Server (`server.listen` wird dort nie gerufen).
+//  scripts/train-iterative.js startet genau diesen Weg. Die Handler
+//  hier werden davon nicht angefasst.
+//
+//  Standard ist AUS. Lokal einschalten mit `PP_DEBUG_TOOLS=1`.
+//  Bewusst NICHT-REGISTRIEREN statt Pruefung im Handler: was nicht
+//  angemeldet ist, kann auch von einem praeparierten Client nicht
+//  erreicht werden — socket.io verwirft unbekannte Ereignisse still.
+// ───────────────────────────────────────────────────────────────
+const DEBUG_TOOLS_ENABLED = process.env.PP_DEBUG_TOOLS === '1';
+
 const app = express();
+
+// ───────────────────────────────────────────────────────────────
+//  BETRIEB HINTER EINEM REVERSE PROXY (15.8., netcup-Umzug)
+//
+//  Auf dem eigenen Server terminiert Caddy TLS und reicht die Anfrage
+//  per einfachem HTTP an 127.0.0.1 weiter. Ohne `trust proxy` sieht
+//  Express dann bei JEDER Anfrage die Proxy-IP statt der echten und
+//  haelt jede Verbindung fuer unverschluesselt (`req.secure` === false).
+//
+//  BEWUSST NUR PER UMGEBUNGSVARIABLE: Steht der Server nackt im Netz
+//  (lokale Entwicklung), darf X-Forwarded-For NICHT geglaubt werden —
+//  sonst kann sich jeder Client eine beliebige Herkunfts-IP andichten.
+//  TRUST_PROXY wird deshalb ausschliesslich in der systemd-Unit
+//  gesetzt, wo tatsaechlich ein Proxy davorsteht.
+// ───────────────────────────────────────────────────────────────
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+}
+
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+
+// ───────────────────────────────────────────────────────────────
+//  WEBSOCKET-KOMPRESSION (12.8.)
+//
+//  Socket.IO v4 liefert `perMessageDeflate` AUSGESCHALTET aus (in v2
+//  war es noch an). Jedes `game_state` ging damit als roher JSON-Text
+//  ueber die Leitung — und `game_state` ist der mit Abstand groesste
+//  und haeufigste Verkehr, den dieser Server erzeugt.
+//
+//  GEMESSEN an einer echten Partie (Mid-Game-Brett aus einer
+//  Demo-Aufnahme, 200 aufeinanderfolgende Zustaende):
+//    roh                                   501 KB
+//    je Nachricht einzeln komprimiert       214 KB  (−57 %)
+//    permessage-deflate, geteiltes Fenster   61 KB  (−88 %)
+//
+//  Der grosse Unterschied kommt vom „context takeover": deflate
+//  behaelt sein Woerterbuch ueber Nachrichten hinweg. Aufeinander-
+//  folgende Spielzustaende sind fast identisch, also schrumpfen sie
+//  auf den DIFF zusammen. Genau deshalb wird `serverNoContextTakeover`
+//  hier bewusst NICHT gesetzt — das waere der haeufig kopierte
+//  „speicherschonende" Vorschlag und wuerde den Gewinn halbieren.
+//
+//  Kosten: je Verbindung haelt zlib ein Fenster plus Hash-Tabellen,
+//  rund 250-300 KB. Bei den Spielerzahlen dieses Servers sind das
+//  wenige MB. `threshold` laesst Kleinkram (Pings, kurze Ereignisse)
+//  unkomprimiert — die wuerden durch den deflate-Rahmen sonst sogar
+//  groesser.
+//
+//  FUNKTIONAL AENDERT SICH NICHTS: permessage-deflate ist Teil des
+//  WebSocket-Standards (RFC 7692) und wird beim Handshake ausgehandelt.
+//  Browser, die es nicht koennen, bekommen weiter unkomprimierte
+//  Frames; der Client braucht keine Zeile Aenderung.
+// ───────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+//  ERLAUBTE HERKUENFTE (15.8.)
+//  Hier stand `origin: '*'` — jede fremde Seite durfte eine
+//  Socket-Verbindung zu diesem Server aufbauen und im Namen eines
+//  eingeloggten Besuchers mitspielen. Auf Render war das folgenlos,
+//  weil dort nur eine einzige Domain existierte. Mit eigener Domain
+//  plus Testsubdomain wird daraus eine Liste.
+//
+//  Ohne PP_ALLOWED_ORIGINS bleibt es bei '*' — an der lokalen
+//  Entwicklung aendert sich also nichts.
+// ───────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = (process.env.PP_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const io = new Server(server, {
+  cors: { origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*' },
+  perMessageDeflate: {
+    // SCHWELLE 32, NICHT 1024 (12.8., am Messlauf nachgerechnet).
+    // Mit der ws-Vorgabe 1024 blieb alles ausser `game_state`
+    // ungepackt — und das waren 79 % der Leitungsbytes: `card_reveal`
+    // (Ø 49 Byte, 68 % aller Nachrichten) und `action_log` (Ø 127
+    // Byte) gingen zu 100 % roh raus. Gerade diese Kleinnachrichten
+    // wiederholen sich staendig, das geteilte Woerterbuch frisst sie
+    // also besonders gut: nachgerechnet **70 % Ersparnis** auf genau
+    // diesem Verkehr. Bei 64 waeren `card_reveal`-Rahmen weiter
+    // ungepackt (sie sind kuerzer), deshalb 32.
+    // Darunter bleiben nur noch die engine.io-Protokollrahmen
+    // (Ping/Pong, 1-2 Byte) — die wuerde Kompression nur aufblaehen.
+    threshold: 32,
+    zlibDeflateOptions: { level: 6, memLevel: 8 },
+    zlibInflateOptions: { chunkSize: 16 * 1024 },
+    concurrencyLimit: 10,
+  },
+});
+
+// ───────────────────────────────────────────────────────────────
+//  AUSGANGS-VOLUMEN MESSEN (12.8., standardmaessig AUS)
+//
+//  Mit `PP_NET_STATS=1` zaehlt der Server, wie viele Bytes je
+//  Socket-Ereignis tatsaechlich rausgehen, und schreibt alle 60 s die
+//  groessten Posten ins Log. Gehaengt wird am engine.io-Socket, also
+//  hinter ALLEN Sendewegen (`socket.emit`, `io.to(...).emit`,
+//  `_broadcastEvent`) — die Zahlen sind echte Frame-Groessen, keine
+//  Schaetzung.
+//
+//  Zweck: die Bandbreiten-Spitzen im Render-Report lassen sich damit
+//  einem Ereignis zuordnen, statt sie zu erraten. Ohne die Variable
+//  passiert hier gar nichts.
+// ───────────────────────────────────────────────────────────────
+if (process.env.PP_NET_STATS === '1') {
+  const netBytes = new Map();   // Ereignisname -> { bytes, count }
+  const zaehle = (name, n) => {
+    const e = netBytes.get(name) || { bytes: 0, count: 0 };
+    e.bytes += n; e.count++;
+    netBytes.set(name, e);
+  };
+  try {
+    io.engine.on('connection', (raw) => {
+      const _write = raw.write?.bind(raw);
+      if (!_write) return;
+      raw.write = function (data, opts, cb) {
+        try {
+          const laenge = typeof data === 'string'
+            ? Buffer.byteLength(data)
+            : (data?.length || 0);
+          // Socket.IO-Rahmen: `42["ereignis",…]` bzw. `42/ns,["…"]`.
+          let name = 'sonstiges';
+          if (typeof data === 'string') {
+            const m = data.match(/^\d+(?:\/[^,]*,)?\["([^"]{1,64})"/);
+            if (m) name = m[1];
+            else if (/^\d+$/.test(data.slice(0, 2))) name = 'protokoll';
+          }
+          zaehle(name, laenge);
+        } catch { /* Messung darf nie stoeren */ }
+        return _write(data, opts, cb);
+      };
+    });
+    setInterval(() => {
+      if (netBytes.size === 0) return;
+      const top = [...netBytes.entries()].sort((a, b) => b[1].bytes - a[1].bytes).slice(0, 10);
+      const gesamt = [...netBytes.values()].reduce((s, e) => s + e.bytes, 0);
+      console.log(`[netstats] ${(gesamt / 1048576).toFixed(2)} MB seit Start — Top:`);
+      for (const [name, e] of top) {
+        console.log(`  ${(e.bytes / 1048576).toFixed(2).padStart(8)} MB  ${String(e.count).padStart(7)}x  ${name}`);
+      }
+    }, 60000).unref?.();
+  } catch (e) {
+    console.error('[netstats] konnte nicht angehaengt werden:', e.message);
+  }
+}
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
@@ -298,6 +481,66 @@ const GZIP_MIME = {
   '.map': 'application/json; charset=UTF-8',
 };
 const _gzCache = new Map(); // absPath -> { mtimeMs, buf }
+
+// ───────────────────────────────────────────────────────────────
+//  gzip fuer DYNAMISCHE JSON-Antworten (12.8.)
+//
+//  Die Schicht darunter komprimiert nur Dateien auf der Platte. Die
+//  58 `/api/...`-Endpunkte gehen an ihr vorbei und antworten roh —
+//  Kartenlisten, Decks, Sammlung, Shop-Katalog, Bestenliste. JSON
+//  komprimiert um 85-90 %.
+//
+//  Bewusst NUR `res.json` umhuellt, nicht `res.send`/`res.sendFile`:
+//  bei `res.json` ist der Inhaltstyp eindeutig und der Koerper
+//  vollstaendig, es gibt also keinen Stream, keinen Bereichsabruf und
+//  keine Datei-ETags, die man kaputtmachen koennte. Alles andere
+//  laeuft unveraendert weiter.
+//
+//  Sicherheitsnetze: nur mit `Accept-Encoding: gzip`, nur ab 1 KB
+//  (darunter waere gzip groesser), nie wenn schon eine Codierung
+//  gesetzt ist, nie bei HEAD/204/304 — und bei JEDEM Fehler faellt
+//  der Aufruf auf das originale `res.json` zurueck.
+// ───────────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  if (!/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return next();
+  const _json = res.json.bind(res);
+  res.json = function (obj) {
+    try {
+      if (req.method === 'HEAD') return _json(obj);
+      if (res.statusCode === 204 || res.statusCode === 304) return _json(obj);
+      if (res.getHeader('Content-Encoding')) return _json(obj);
+      const roh = Buffer.from(JSON.stringify(obj), 'utf8');
+      if (roh.length < 1024) return _json(obj);
+      const gz = zlib.gzipSync(roh, { level: 6 });
+      if (gz.length >= roh.length) return _json(obj);   // nie vergroessern
+      // ETag selbst rechnen und bedingte Anfragen bedienen. Express
+      // vergibt fuer `res.json` normalerweise einen ETag; wuerde man
+      // ihn hier ersatzlos fallen lassen, verloeren die gepollten
+      // Endpunkte ihre 304-Antworten und schickten jedes Mal den
+      // vollen Koerper — die Kompression haette an dieser Stelle
+      // Bandbreite gekostet statt gespart. SCHWACHER ETag, weil sich
+      // die Darstellung je nach Codierung unterscheidet.
+      const etag = 'W/"' + roh.length.toString(16) + '-'
+        + crypto.createHash('sha1').update(roh).digest('base64').slice(0, 27) + '"';
+      res.setHeader('ETag', etag);
+      res.setHeader('Vary', 'Accept-Encoding');
+      const inm = req.headers['if-none-match'];
+      if (inm && inm.split(',').some(v => v.trim() === etag)) {
+        res.statusCode = 304;
+        res.removeHeader('Content-Length');
+        return res.end();
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Length', gz.length);
+      return res.end(gz);
+    } catch {
+      return _json(obj);
+    }
+  };
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
   const ext = path.extname(req.path).toLowerCase();
@@ -369,6 +612,18 @@ function serveIndexHtml(req, res) {
     html = html.split('__GOOGLE_CLIENT_ID__').join(process.env.GOOGLE_CLIENT_ID || '');
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
     res.setHeader('Cache-Control', 'no-cache');
+    // 12.8.: index.html ging als einzige Seite ungepackt raus (die
+    // gzip-Schicht greift nur fuer .js/.json/.css/.svg/.map). Sie wird
+    // bei JEDEM Aufruf UND von jeder SPA-Route ausgeliefert.
+    if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+      try {
+        const gz = zlib.gzipSync(Buffer.from(html, 'utf8'), { level: 6 });
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Length', gz.length);
+        return res.end(gz);
+      } catch { /* faellt unten auf den ungepackten Weg zurueck */ }
+    }
     return res.send(html);
   } catch (e) {
     return res.sendFile(INDEX_HTML_PATH);
@@ -376,7 +631,27 @@ function serveIndexHtml(req, res) {
 }
 app.get(['/', '/index.html'], serveIndexHtml);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// ── AUSGEHENDE BANDBREITE / AKTUALITAET (v350, angepasst v351) ──────
+// Gemessen am 11.8.: `public/` ist 114 MB und der Sound-Vorlader holte
+// ALLE 52 Effektklaenge (damals 16 MB WAV) bei jedem Seitenaufruf. Den
+// Loewenanteil erledigt inzwischen die Umstellung auf OGG (0,73 MB).
+//
+// ALS VORGABE (bindend): geht ein Update live, soll es SOFORT fuer alle
+// Spieler gelten — niemand darf stundenlang auf altem Stand sitzen.
+// Deshalb ueberall `maxAge: 0`.
+//
+// Das ist billiger als es klingt: `max-age=0` heisst NICHT „jedes Mal
+// neu laden", sondern „jedes Mal nachfragen". Express liefert ETag und
+// Last-Modified, der Browser schickt eine bedingte Anfrage und bekommt
+// bei unveraenderter Datei ein 304 ohne Inhalt — ein paar hundert Byte
+// statt Megabyte. Geaendert wird nur, was sich wirklich geaendert hat,
+// und zwar sofort.
+//
+// `/cards` behaelt bewusst seine 7 Tage: ~730 Kartenbilder, die sich so
+// gut wie nie aendern, und dort waeren 730 bedingte Anfragen je
+// Seitenaufruf der teurere Weg. Wer Kartenkunst tauscht, muss also bis
+// zu 7 Tage einplanen — oder den Dateinamen aendern.
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }));
 app.use('/data', express.static(path.join(__dirname, 'data')));
 // Card art (~730 immutable-ish PNGs). A long cache lifetime means a full
 // reload / re-login serves them straight from disk instead of re-fetching
@@ -819,10 +1094,33 @@ async function consumeEmailCode({ email, purpose, code }) {
   return { ok: true, row };
 }
 
+// ───────────────────────────────────────────────────────────────
+//  COOKIE-ATTRIBUTE (15.8.)
+//  `secure` haengt an COOKIE_SECURE und NICHT an einer Auto-Erkennung
+//  ueber req.secure: die schlaegt bei falsch gesetztem `trust proxy`
+//  still ins Gegenteil um, und der Fehlerfall waere "niemand kann sich
+//  mehr anmelden", ohne dass irgendwo etwas im Log steht. In der
+//  systemd-Unit steht COOKIE_SECURE=1; lokal ueber http bleibt es aus,
+//  weil der Browser ein secure-Cookie ueber http kommentarlos verwirft.
+//
+//  sameSite: 'lax' ist die richtige Stufe — 'strict' wuerde bedeuten,
+//  dass ein Klick auf einen geteilten Duell-Link von Discord aus als
+//  abgemeldet ankommt.
+//
+//  WICHTIG: clearCookie unten MUSS dieselben Attribute mitgeben, sonst
+//  findet der Browser das Cookie nicht wieder und Abmelden tut nichts.
+// ───────────────────────────────────────────────────────────────
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.COOKIE_SECURE === '1',
+  path: '/',
+};
+
 function startSession(res, user) {
   const token = uuidv4();
   sessions.set(token, { userId: user.id, username: user.username });
-  res.cookie('pp_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie('pp_token', token, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
   return token;
 }
 
@@ -1153,7 +1451,7 @@ app.post('/api/auth/logout', async (req, res) => {
     try { await purgeGuest(sess.userId); } catch (err) { console.error('[logout] purgeGuest failed:', err.message); }
   }
   if (token) sessions.delete(token);
-  res.clearCookie('pp_token');
+  res.clearCookie('pp_token', COOKIE_OPTS);
   res.json({ ok: true });
 });
 
@@ -5141,6 +5439,19 @@ function cpuBgmForRoom(room) {
 function makeCpuDriver(room) {
 
   return async function cpuTurn(engine) {
+    // ── v386: STILLER HALT WIRD BENANNT ──────────────────────────────
+    // `runCpuTurn` kehrt an dutzenden Stellen still zurueck. Steht der
+    // CPU-Zug danach UNVERAENDERT (gleiche Zugnummer, gleicher aktiver
+    // Spieler, kein Ergebnis), hat niemand die Uebergabe gemacht — im
+    // Self-Play endet damit die ganze Kette, `startGame` loest ohne
+    // Sieger auf und der Messstand meldet `ohne-spielende`. Genau
+    // dieser Fall wird hier festgehalten, samt der Brotkrume, die der
+    // Pilot auf dem Ausstiegspfad hinterlassen hat.
+    const _vorher = engine._inMctsSim ? null : {
+      zug: engine.gs?.turn, aktiv: engine.gs?.activePlayer,
+      phase: engine.gs?.currentPhase,
+    };
+    if (_vorher) engine._cpuTurnMark = null;
     try {
       await runCpuTurn(engine, {
         room,
@@ -5162,6 +5473,21 @@ function makeCpuDriver(room) {
         sendGameState,
         sendSpectatorGameState,
       });
+      if (_vorher && !engine._inMctsSim && !engine.gs?.result
+          && engine.gs?.turn === _vorher.zug
+          && engine.gs?.activePlayer === _vorher.aktiv) {
+        const eintrag = {
+          zug: _vorher.zug, aktiv: _vorher.aktiv,
+          phaseVorher: _vorher.phase, phaseNachher: engine.gs?.currentPhase,
+          marke: engine._cpuTurnMark || '(keine Marke — Ausstieg nicht instrumentiert)',
+          noops: (engine._switchTurnNoops || []).length,
+          reentry: engine._switchTurnReentryBlocked || 0,
+        };
+        if (!engine._silentTurnExits) engine._silentTurnExits = [];
+        engine._silentTurnExits.push(eintrag);
+        console.warn(`[CPU] STILLER HALT: Zug ${eintrag.zug} p${eintrag.aktiv} `
+          + `Phase ${eintrag.phaseVorher}→${eintrag.phaseNachher} — ${eintrag.marke}`);
+      }
     } catch (err) {
       // Record the error so the no-result diagnosis (self-play) can report
       // that the CPU driver crashed instead of resolving cleanly.
@@ -5761,9 +6087,20 @@ function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, engine) 
 async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, viaCreatureInstId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
+  // ── Warum ist der Play gescheitert? (Diagnose, 13.8.) ──────────────
+  // `doPlaySpell` steigt an rund einem Dutzend Stellen mit einem
+  // stummen `return false` aus, und die Aufloesung kann zusaetzlich
+  // abgebrochen werden. Im CPU-Log stand davon bisher nur
+  // `shrank=false` — genau so ist Overheal Shock in Als Lauf zweimal
+  // hintereinander verpufft, ohne dass irgendwo ein Grund auftauchte.
+  // Der Stempel wird bei JEDEM Aufruf zurueckgesetzt und von
+  // `diagnoseFailedPlay` (_cpu.js) ausgelesen. Reine Diagnose: kein
+  // Zweig liest ihn, das Spielverhalten bleibt unveraendert.
+  delete gs._cpuPlayFailReason;
+  const _bail = (grund) => { gs._cpuPlayFailReason = grund; return false; };
 
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner });
-  if (!v) return false;
+  if (!v) return _bail('validateActionPlay: nein (Level/Schule, Sperre, Handindex oder spellPlayCondition)');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, wasBerserkGranted } = v;
   // `isInherentAction` is mutable post-onPlay: Curse (and any future
   // card with the same dual-mode shape) sets `gs._spellForcesActionConsume`
@@ -5771,7 +6108,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // back to "consumes a main Action". The flag is consumed and the
   // local re-bound just before the action-economy hooks fire below.
   let isInherentAction = v.isInherentAction;
-  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return false;
+  if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, room.engine)) return _bail('Distracting Crystal sperrt das Zurueckmischen');
 
   // Wolflesia-style Creature spell-cast routing: the client sends
   // `viaCreatureInstId` when the player picked a Creature as the
@@ -5865,7 +6202,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // Clean up the spell-caster override we set above before bailing,
       // otherwise the next spell cast in this turn could pick it up.
       if (_viaCreature) delete gs._spellCasterOverride;
-      return false;
+      return _bail('braucht eine Zusatz-Aktion, aber kein Geber passt zur Karte');
     }
     consumedInst = room.engine.consumeAdditionalAction(pi, typeId);
     additionalConsumed = true;
@@ -5925,7 +6262,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
     if (_viaCreature) delete gs._spellCasterOverride;
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
-    return false;
+    return _bail('Helden-Aktionskosten wurden nicht bezahlt (payHeroActionCost sagt nein)');
   }
   // From here on the hero cost is in 'pending' state — the try/finally
   // below must call commit (on success) or refund (on cancel/negate)
@@ -6109,6 +6446,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // the intent clear and matches the post-resolution release below).
       _releaseSpellDepth();
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+      // Diagnose: die Karte bleibt in der Hand, obwohl `true`
+      // zurueckgeht — fuer die CPU sieht das aus wie ein wirkungsloser
+      // Play. Der haeufigste Grund ist ein Ziel-Prompt, der leer
+      // beantwortet wurde (`_spellCancelled` aus dem Kartenskript).
+      gs._cpuPlayFailReason = 'Aufloesung abgebrochen (_spellCancelled) — Ziel-Prompt leer oder keine gueltigen Ziele';
       return true;
     }
     delete gs._spellCancelled;
@@ -6706,7 +7048,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     };
     // v347: Karten-Auftritt links — generelle Regel fuer JEDEN aktiven
     // Effekt (siehe engine.announceActiveEffect).
-    room.engine.armEffectAnnounce(inst.name, pi);
+    room.engine.armEffectAnnounce(inst.name, pi, 'board');
     let resolved;
     try {
       resolved = await script.onCreatureEffect(ctx);
@@ -6972,15 +7314,19 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
   room.engine._lastPromptGerryDeclined = false;
 
   try {
-    room.engine.armEffectAnnounce(abilityName, pi);   // v349
+    // v353: `'board'` — eine Ability liegt im Ability-Slot am Brett,
+    // beide Seiten sehen den Auftritt.
+    room.engine.armEffectAnnounce(abilityName, pi, 'board');   // v349
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0,
       resolve: null, fromBoard: true,
     });
-    room.engine.announceActiveEffect();
-    room.engine.clearEffectAnnounce();
 
     if (chainResult.negated) {
+      // Gefeuert und gekontert — der Auftritt gehoert trotzdem dazu,
+      // sonst sieht der Gegner nie, WAS seine Negation getroffen hat.
+      room.engine.announceActiveEffect();
+      room.engine.clearEffectAnnounce();
       // Negation keeps HOPT consumed — the ability fired (and was countered).
       hoptReserved = false;
       for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
@@ -7019,6 +7365,17 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
 
     const ctx = room.engine._createContext(inst, {});
     const resolved = await script.onFreeActivate(ctx, level);
+    // ── AUFTRITT ERST HIER (12.8., Als Befund an "Trade") ────────────
+    // Vorher stand der Auftritt direkt hinter dem Chain-Fenster, also
+    // VOR `onFreeActivate` und damit vor jeder Abfrage der Karte. Bei
+    // Trade erschien die Karte deshalb, BEVOR der Bestaetigen-Dialog
+    // kam — Ablehnen und neu klicken erzeugte beliebig viele Auftritte.
+    // Jetzt gilt hier dieselbe Regel wie an allen anderen Wegen: der
+    // Auftritt kommt NACH dem Handler und nur, wenn er nicht abgebrochen
+    // wurde. Karten mit eigener Zielwahl haben ihn ggf. schon selbst
+    // ausgeloest; die Anmeldung ist dann verfallen und das hier ein No-op.
+    if (resolved !== false) room.engine.announceActiveEffect();
+    room.engine.clearEffectAnnounce();
     await room.engine._flushSurpriseDrawChecks();
 
     if (charmedOwner != null) {
@@ -7086,6 +7443,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
     // Unexpected error mid-activation — release the reservation so the
     // player isn't silently robbed of their HOPT by a crash.
     releaseHopt();
+    room.engine.clearEffectAnnounce();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -7685,12 +8043,19 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     );
     if (!inst) return false;
 
+    // v353: Auftritt auch fuer Abilities MIT Aktionskosten. Bisher hatte
+    // nur `doActivateFreeAbility` einen — dass eine Trade-Aktivierung die
+    // Karte zeigt und eine Leadership-Aktivierung nicht, war eine
+    // Luecke, keine Absicht. `'board'`: beide Seiten sehen sie.
+    room.engine.armEffectAnnounce(abilityName, pi, 'board');
     const chainResult = await room.engine.executeCardWithChain({
       cardName: abilityName, owner: pi, heroIdx, cardType: 'Ability', goldCost: 0, resolve: null,
       fromBoard: true,
     });
 
     if (chainResult.negated) {
+      room.engine.announceActiveEffect();   // gefeuert und gekontert
+      room.engine.clearEffectAnnounce();
       // Negated — refund the Hero pre-action cost (Saint Nicolas
       // keeps the marked Potion).
       await room.engine.refundHeroActionCost(heroOwner, heroIdx);
@@ -7729,6 +8094,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
     const result = await script.onActivate(ctx, level);
+    // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
+    // abgebrochene Aktivierung darf keine Karte einblenden.
+    if (result !== false) room.engine.announceActiveEffect();
+    room.engine.clearEffectAnnounce();
 
     if (result === false) {
       delete gs._pendingCardReveal;
@@ -7833,6 +8202,7 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   } catch (err) {
     console.error('[doActivateAbility]', err.message);
   } finally {
+    room.engine.clearEffectAnnounce();
     // Safety net for the Hero pre-action cost — see doPlaySpell.
     if (!_heroCostFinalized) {
       try { await room.engine.refundHeroActionCost(heroOwner, heroIdx); } catch {}
@@ -8128,7 +8498,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(chosen.inst, {});
-    room.engine.armEffectAnnounce(chosen.name, pi);   // v349
+    room.engine.armEffectAnnounce(chosen.name, pi, 'board');   // v349
     const resolved = await chosen.script.onHeroEffect(ctx);
     if (resolved !== false) room.engine.announceActiveEffect();
     room.engine.clearEffectAnnounce();
@@ -8272,9 +8642,14 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
     if (oppSid) io.to(oppSid).emit('card_reveal', { cardName: perm.name });
     sendToSpectators(room, 'card_reveal', { cardName: perm.name });
     room.engine.log('permanent_activated', { card: perm.name, player: gs.players[pi].username });
-    await script.onActivatePermanent(room.engine, pi, permOwner, perm);
+    // v353: Auftritt — ein Permanent liegt am Brett, also `'board'`.
+    room.engine.armEffectAnnounce(perm.name, pi, 'board');
+    const _ret = await script.onActivatePermanent(room.engine, pi, permOwner, perm);
+    if (_ret !== false) room.engine.announceActiveEffect();
   } catch (err) {
     console.error('[doActivatePermanent]', err.message);
+  } finally {
+    room.engine.clearEffectAnnounce();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -8343,7 +8718,13 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
+    // v353: Auftritt — das Artefakt liegt ausgeruestet am Brett
+    // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
+    // ausgeloest erst danach.
+    room.engine.armEffectAnnounce(cardName, pi, 'board');
     const resolved = await script.onEquipEffect(ctx);
+    if (resolved !== false) room.engine.announceActiveEffect();
+    room.engine.clearEffectAnnounce();
     if (resolved !== false) {
       hoptReserved = false; // reservation becomes the final consumption
       if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
@@ -8369,6 +8750,7 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // Crash mid-activation — release the reservation so a real error
     // doesn't silently brick the player's once-per-turn slot.
     releaseHopt();
+    room.engine.clearEffectAnnounce();
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -8479,7 +8861,9 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       cardName: potionName, owner: pi, cardType, goldCost: goldCost || 0,
       resolve: script.resolve ? async () => {
         if (broadcastPotionAnim) broadcastPotionAnim();
-        room.engine.announceActiveEffect(potionName, pi);   // v347
+        // v353: `'hand'` — der Spieler setzt die Karte gerade selbst aus
+        // der Hand ein (Book of Doom & Co). Nur der GEGNER sieht sie.
+        room.engine.announceActiveEffect(potionName, pi, 'hand');   // v347
         return await script.resolve(room.engine, pi, selectedIds, validTargets);
       } : null,
     });
@@ -8852,10 +9236,19 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
 
     let chainResult;
     try {
+      // v353: Auftritt fuer Traenke OHNE Zielwahl. Die Variante MIT
+      // Zielwahl laeuft ueber `doConfirmPotion` und hatte ihn schon —
+      // hier fehlte er. `'hand'`: nur der Gegner sieht die Karte.
+      room.engine.armEffectAnnounce(cardName, pi, 'hand');
       chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Potion', goldCost: 0,
-        resolve: script.resolve ? async () => await script.resolve(room.engine, pi, [], []) : null,
+        resolve: script.resolve ? async () => {
+          const r = await script.resolve(room.engine, pi, [], []);
+          if (r !== false) room.engine.announceActiveEffect();
+          return r;
+        } : null,
       });
+      room.engine.clearEffectAnnounce();
     } catch (err) {
       console.error('[Engine] Potion chain error:', err.message);
       chainResult = { negated: false, chainFormed: false };
@@ -9077,7 +9470,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
         resolve: async () => {
-          room.engine.armEffectAnnounce(cardName, pi);   // v349
+          room.engine.armEffectAnnounce(cardName, pi, 'hand');   // v349
           try {
             const r = await script.resolve(room.engine, pi, [], []);
             if (r !== false) room.engine.announceActiveEffect();
@@ -10557,9 +10950,86 @@ async function startGameEngine(room, roomId, activePlayer, afterInit) {
   io.emit('rooms', getRoomList());
 }
 
+// ── v385: von der Verbindungs-Closure auf MODULEBENE gehoben ──────
+// Die Funktion ist rein (nur room/winnerIdx/reason) und war bisher in
+// `io.on('connection')` eingesperrt — der Messstand konnte sie nicht
+// rufen und meldete `ohne-spielende` ohne jede Begruendung. Jetzt
+// nutzen Selbstspiel UND netbench dieselbe Diagnose.
+/**
+ * Snapshot engine state for tie/result diagnosis. Called from `finish()`
+ * to capture WHY a game ended the way it did — crucial for explaining
+ * `no-result` ties, where the turn chain exited cleanly without setting
+ * gs.result. Returns a short human-readable string.
+ */
+function buildGameDiagnosis(room, winnerIdx, reason) {
+  const gs = room?.gameState;
+  const engine = room?.engine;
+  if (!gs) return 'no-gamestate';
+
+  const summarizeSide = (pi) => {
+    const ps = gs.players?.[pi];
+    if (!ps) return `p${pi}=?`;
+    const heroes = (ps.heroes || []).filter(h => h && h.name);
+    const alive = heroes.filter(h => (h.hp || 0) > 0).length;
+    const totalHp = heroes.reduce((s, h) => s + Math.max(0, h.hp || 0), 0);
+    const deck = (ps.mainDeck || []).length;
+    const hand = (ps.hand || []).length;
+    return `p${pi}(heroes ${alive}/${heroes.length} alive, ${totalHp}hp, deck ${deck}, hand ${hand})`;
+  };
+
+  const parts = [summarizeSide(0), summarizeSide(1)];
+  parts.push(`turn ${gs.turn} phase ${gs.currentPhase} active p${gs.activePlayer}`);
+
+  // Hypothesize ONLY for unexplained finishes. Named reasons already
+  // carry their own meaning.
+  if (reason === 'no-result' || !reason) {
+    const p0Alive = (gs.players?.[0]?.heroes || []).some(h => h?.name && (h.hp || 0) > 0);
+    const p1Alive = (gs.players?.[1]?.heroes || []).some(h => h?.name && (h.hp || 0) > 0);
+    const p0Deck = (gs.players?.[0]?.mainDeck || []).length;
+    const p1Deck = (gs.players?.[1]?.mainDeck || []).length;
+    const pendingPrompt = !!(engine?._pendingPrompt || engine?._pendingGenericPrompt);
+    const driverErrors = engine?._driverErrors || [];
+
+    const hypotheses = [];
+    if (!p0Alive && !p1Alive) hypotheses.push('both sides wiped (all-heroes-dead never fired?)');
+    else if (!p0Alive) hypotheses.push('p0 wiped, win-check skipped');
+    else if (!p1Alive) hypotheses.push('p1 wiped, win-check skipped');
+    if (p0Deck === 0 && p1Deck === 0) hypotheses.push('both decks empty');
+    else if (p0Deck === 0) hypotheses.push('p0 deck empty, deck-out never fired');
+    else if (p1Deck === 0) hypotheses.push('p1 deck empty, deck-out never fired');
+    if (pendingPrompt) hypotheses.push('pending prompt unresolved');
+    if (driverErrors.length) {
+      const last = driverErrors.at(-1);
+      // Extract the first in-project frame from the stack so the tie log
+      // points straight at the thrower (usually a card script).
+      const pickFrame = (stack) => {
+        if (!stack) return '';
+        const lines = stack.split('\n').slice(1);
+        const frame = lines.find(l => /cards[\\/]/.test(l) && !/_engine\.js/.test(l))
+                   || lines.find(l => /cards[\\/]/.test(l))
+                   || lines[0] || '';
+        return frame.trim();
+      };
+      const frame = pickFrame(last.stack);
+      hypotheses.push(`CPU driver threw ${driverErrors.length}× (last: t${last.turn} p${last.player}: ${last.message}${frame ? ` @ ${frame}` : ''})`);
+    }
+    if (!hypotheses.length) hypotheses.push('turn chain exited with both sides alive and decks non-empty');
+    parts.push('cause: ' + hypotheses.join('; '));
+  }
+
+  return parts.join(' | ');
+}
+
 io.on('connection', (socket) => {
   let currentUser = null;
   const socketIP = getSocketIP(socket);
+
+  // Entwicklerwerkzeuge nur anmelden, wenn PP_DEBUG_TOOLS=1 gesetzt ist
+  // (siehe Block bei DEBUG_TOOLS_ENABLED). Ohne den Schalter existiert
+  // der Zuhoerer gar nicht.
+  const onDebug = (ereignis, handler) => {
+    if (DEBUG_TOOLS_ENABLED) socket.on(ereignis, handler);
+  };
 
   socket.on('auth', (token) => {
     const session = sessions.get(token);
@@ -13297,7 +13767,7 @@ io.on('connection', (socket) => {
   // a round-trip. Client can trigger via:
   //   window.socket.emit('debug_cpu_snapshot_test', { roomId: <current room id> })
   // Results print on the server console AND echo back to the client.
-  socket.on('debug_cpu_snapshot_test', ({ roomId }) => {
+  onDebug('debug_cpu_snapshot_test', ({ roomId }) => {
     if (!currentUser) return;
     const room = rooms.get(roomId);
     if (!room?.engine) {
@@ -13419,71 +13889,6 @@ io.on('connection', (socket) => {
   // a heal-heavy deck. Win-rate for Heal Burn is tracked via the normal
   // deck table; if synergy-specific debugging is needed again, reinstate
   // from git history.
-
-  /**
-   * Snapshot engine state for tie/result diagnosis. Called from `finish()`
-   * to capture WHY a game ended the way it did — crucial for explaining
-   * `no-result` ties, where the turn chain exited cleanly without setting
-   * gs.result. Returns a short human-readable string.
-   */
-  function buildGameDiagnosis(room, winnerIdx, reason) {
-    const gs = room?.gameState;
-    const engine = room?.engine;
-    if (!gs) return 'no-gamestate';
-
-    const summarizeSide = (pi) => {
-      const ps = gs.players?.[pi];
-      if (!ps) return `p${pi}=?`;
-      const heroes = (ps.heroes || []).filter(h => h && h.name);
-      const alive = heroes.filter(h => (h.hp || 0) > 0).length;
-      const totalHp = heroes.reduce((s, h) => s + Math.max(0, h.hp || 0), 0);
-      const deck = (ps.mainDeck || []).length;
-      const hand = (ps.hand || []).length;
-      return `p${pi}(heroes ${alive}/${heroes.length} alive, ${totalHp}hp, deck ${deck}, hand ${hand})`;
-    };
-
-    const parts = [summarizeSide(0), summarizeSide(1)];
-    parts.push(`turn ${gs.turn} phase ${gs.currentPhase} active p${gs.activePlayer}`);
-
-    // Hypothesize ONLY for unexplained finishes. Named reasons already
-    // carry their own meaning.
-    if (reason === 'no-result' || !reason) {
-      const p0Alive = (gs.players?.[0]?.heroes || []).some(h => h?.name && (h.hp || 0) > 0);
-      const p1Alive = (gs.players?.[1]?.heroes || []).some(h => h?.name && (h.hp || 0) > 0);
-      const p0Deck = (gs.players?.[0]?.mainDeck || []).length;
-      const p1Deck = (gs.players?.[1]?.mainDeck || []).length;
-      const pendingPrompt = !!(engine?._pendingPrompt || engine?._pendingGenericPrompt);
-      const driverErrors = engine?._driverErrors || [];
-
-      const hypotheses = [];
-      if (!p0Alive && !p1Alive) hypotheses.push('both sides wiped (all-heroes-dead never fired?)');
-      else if (!p0Alive) hypotheses.push('p0 wiped, win-check skipped');
-      else if (!p1Alive) hypotheses.push('p1 wiped, win-check skipped');
-      if (p0Deck === 0 && p1Deck === 0) hypotheses.push('both decks empty');
-      else if (p0Deck === 0) hypotheses.push('p0 deck empty, deck-out never fired');
-      else if (p1Deck === 0) hypotheses.push('p1 deck empty, deck-out never fired');
-      if (pendingPrompt) hypotheses.push('pending prompt unresolved');
-      if (driverErrors.length) {
-        const last = driverErrors.at(-1);
-        // Extract the first in-project frame from the stack so the tie log
-        // points straight at the thrower (usually a card script).
-        const pickFrame = (stack) => {
-          if (!stack) return '';
-          const lines = stack.split('\n').slice(1);
-          const frame = lines.find(l => /cards[\\/]/.test(l) && !/_engine\.js/.test(l))
-                     || lines.find(l => /cards[\\/]/.test(l))
-                     || lines[0] || '';
-          return frame.trim();
-        };
-        const frame = pickFrame(last.stack);
-        hypotheses.push(`CPU driver threw ${driverErrors.length}× (last: t${last.turn} p${last.player}: ${last.message}${frame ? ` @ ${frame}` : ''})`);
-      }
-      if (!hypotheses.length) hypotheses.push('turn chain exited with both sides alive and decks non-empty');
-      parts.push('cause: ' + hypotheses.join('; '));
-    }
-
-    return parts.join(' | ');
-  }
 
   async function runOneSelfPlayGame(deckA, deckB, opts = {}) {
     // `cpuSkipCardNames` lives in the caller's destructured options
@@ -13772,7 +14177,7 @@ io.on('connection', (socket) => {
   //   rolloutBrain: 'heuristic' | 'evalGreedy' (default 'evalGreedy')
   // Emit BEFORE launching a run to change settings. Persists until
   // changed again or process restarts.
-  socket.on('debug_self_play_config', ({ rolloutHorizon, rolloutBrain } = {}) => {
+  onDebug('debug_self_play_config', ({ rolloutHorizon, rolloutBrain } = {}) => {
     if (rolloutHorizon != null) setRolloutHorizon(rolloutHorizon);
     if (rolloutBrain != null) setRolloutBrain(rolloutBrain);
     const cfg = { rolloutHorizon: getRolloutHorizon(), rolloutBrain: getRolloutBrain() };
@@ -13780,7 +14185,7 @@ io.on('connection', (socket) => {
     socket.emit('debug_self_play_config_result', { ok: true, ...cfg });
   });
 
-  socket.on('debug_self_play_run', ({
+  onDebug('debug_self_play_run', ({
     count = 5, deckIdA, deckIdB, random, silent = true,
     minMatchupGames = 5, excludeDeckNames = [],
     pinDeckName, pinDeckNames, samplesOnly = false,
@@ -14498,7 +14903,7 @@ io.on('connection', (socket) => {
   //    socket.on('debug_self_play_ab_result', console.log);
   //  Optional: { deckNameA, deckNameB, horizons: [0,1,2], brains: ['heuristic','evalGreedy'] }
   // ═══════════════════════════════════════════
-  socket.on('debug_self_play_ab', ({
+  onDebug('debug_self_play_ab', ({
     count = 50,
     deckNameA = 'Heal Burn',
     deckNameB = 'Spell Industrialization',
@@ -14652,7 +15057,7 @@ io.on('connection', (socket) => {
   //    socket.emit('debug_cpu_vs_cpu', { deckNameA: 'Dance of the Butterflies', deckNameB: 'Heal Burn' });
   //    socket.on('cpu_battle_error', console.log);
   // ═══════════════════════════════════════════
-  socket.on('debug_cpu_vs_cpu', async ({ deckNameA, deckNameB } = {}) => {
+  onDebug('debug_cpu_vs_cpu', async ({ deckNameA, deckNameB } = {}) => {
     if (!currentUser) { socket.emit('cpu_battle_error', 'Not authenticated'); return; }
     if (activeGames.has(currentUser.userId)) { socket.emit('cpu_battle_error', 'Already in a game — leave first'); return; }
 
@@ -15830,6 +16235,1502 @@ async function runTrainingBatch() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  BANDBREITEN-MESSSTAND (PP_NETTEST=1)
+//
+//  Beantwortet die Frage „was kosten mich diese Partien LIVE an
+//  ausgehender Bandbreite?", ohne dass ein Spieler, ein Browser oder
+//  eine Render-Instanz beteiligt sein muss.
+//
+//    PP_NETTEST=1 node server.js
+//    Bequemer: node scripts/netbench.js --games 10 --spectators 2
+//
+//  WIE DAS GEHT — drei Beobachtungen aus dem Code:
+//
+//   1. `sendGameState` steigt bei `!p.socketId` aus. Im Trainingslauf
+//      sind beide socketIds `null`, deshalb wird dort NIE eine Nutzlast
+//      gebaut. Hier bekommen die Spieler ERFUNDENE socketIds, damit der
+//      komplette Sendeweg laeuft — inklusive aller teuren Rechnungen,
+//      die `sendGameState` je Aufruf anstellt.
+//
+//   2. Jeder Weg, der eine ECHTE Socket-Antwort braucht (Ketten-Abfrage,
+//      target/option/confirm-Prompt), holt sich vorher `_getSocket(sid)`
+//      und faellt bei `!socket` sofort auf einen Vorgabewert zurueck
+//      (`pass`, erste Option, `false`). Unsere Socket-Registry ist leer,
+//      also blockiert nichts — gemessen wird trotzdem, was rausgegangen
+//      waere.
+//
+//   3. Der CPU-Treiber ruft `enterFastMode()` SELBST um seine
+//      MCTS-Rollouts herum (sechs Stellen in _cpu.js). Die Partie
+//      draussen darf also normal laufen: die Rollouts bleiben stumm,
+//      nur die echten Spielzuege senden. Genau das misst man.
+//
+//  WAS GEMESSEN WIRD: jede Nachricht, die der Server an einen Client
+//  schicken WUERDE — als socket.io-Rahmen (`42["ereignis",…]`), also
+//  Byte fuer Byte das, was Render als „WebSocket Responses" zaehlt.
+//  Zusaetzlich wird jede Nachricht durch einen permessage-deflate-Strom
+//  je Verbindung geschickt, mit exakt der Konfiguration des Servers
+//  (Schwelle 1024, Stufe 6, geteiltes Woerterbuch) — die Zahlen sind
+//  damit die TATSAECHLICHEN Leitungsbytes, nicht die rohen.
+//
+//  Schalter (alle optional):
+//    PP_NETTEST_GAMES=10        Partien (Vorgabe 5)
+//    PP_NETTEST_DECK_A / _B     Decknamen (Teiltreffer); sonst zufaellig
+//    PP_NETTEST_SPECTATORS=0    zusaetzliche Zuschauer je Partie
+//    PP_NETTEST_REALTIME=1      Animationspausen NICHT ueberspringen
+//    PP_NETTEST_OUT=<pfad>      JSON-Bericht (Vorgabe data/netbench/…)
+//    PP_NETTEST_LOW=1           eigene Prozesspriorität senken
+// ═══════════════════════════════════════════════════════════════════
+
+/** Umgebungswert robust lesen — `set X=1 && …` schleppt in cmd ein
+ *  Leerzeichen in den Wert. Das hat hier schon zweimal Zeit gekostet. */
+function _nbEnv(name, vorgabe) {
+  const v = process.env[name];
+  return (v == null || String(v).trim() === '') ? vorgabe : String(v).trim();
+}
+
+// ── KONSOLEN-SCHLEUSE ────────────────────────────────────────────────
+// Eine Partie OHNE Fast-Mode redet: `_cpuVerbose` steht in _cpu.js auf
+// `true` (Vorgabe fuer den Entwicklerbetrieb), und der Trainingslauf
+// schaltet es nur deshalb ab, weil er `setCpuVerbose(PP_TRAIN_VERBOSE)`
+// ruft. Dazu kommen verstreute Meldungen aus Engine und Karten.
+//
+// Zwei Massnahmen, damit der Messlauf sich verhaelt wie das Training:
+// `setCpuVerbose(false)` (die saubere Abschaltung an der Quelle) UND
+// diese Schleuse, die alles Uebrige aus stdout heraushaelt, ohne es
+// wegzuwerfen: die letzten Zeilen bleiben in einem Ringpuffer und
+// werden gezeigt, wenn eine Partie haengt oder abstuerzt. Genau dann
+// will man sie sehen — und sonst nie.
+const _nbEcht = {
+  log: console.log.bind(console), warn: console.warn.bind(console),
+  info: console.info.bind(console), debug: console.debug.bind(console),
+  error: console.error.bind(console),
+};
+/** Meine eigene Ausgabe — geht IMMER durch, auch bei geschlossener Schleuse. */
+function _nbSchreib(...a) { _nbEcht.log(...a); }
+
+function _nbSchleuse(ringGroesse = 400) {
+  const ring = [];
+  let verschluckt = 0;
+  const schlucke = (praefix) => (...a) => {
+    verschluckt++;
+    try {
+      ring.push(praefix + a.map(x => (typeof x === 'string' ? x : require('util').inspect(x, { depth: 1 }))).join(' '));
+      if (ring.length > ringGroesse) ring.shift();
+    } catch { /* Protokollieren darf nie stoeren */ }
+  };
+  return {
+    zu() {
+      console.log = schlucke(''); console.info = schlucke('');
+      console.debug = schlucke(''); console.warn = schlucke('[warn] ');
+      // console.error bleibt SICHTBAR: echte Fehler will man sofort
+      // sehen, nicht erst im Nachhinein im Ringpuffer.
+      console.error = (...a) => { schlucke('[error] ')(...a); _nbEcht.error(...a); };
+    },
+    auf() {
+      console.log = _nbEcht.log; console.warn = _nbEcht.warn;
+      console.info = _nbEcht.info; console.debug = _nbEcht.debug;
+      console.error = _nbEcht.error;
+    },
+    letzte(n = 30) { return ring.slice(-n); },
+    /** Ringpuffer leeren — je Partie einmal, damit die Diagnose bei
+     *  einer auffaelligen Partie DEREN Zeilen zeigt und nicht die der
+     *  sechs davor (Als Log 12.8.: zu sehen waren nur Startmeldungen
+     *  und Abbruch-Quittungen frueherer Partien). */
+    leeren() { ring.length = 0; },
+    anzahl() { return verschluckt; },
+  };
+}
+
+/** Ein Messstand fuer genau eine Partie. */
+function _makeNetProbe() {
+  // Ereignis -> { count, raw, wire }
+  const jeEreignis = new Map();
+  // Empfaenger -> { count, raw, wire }
+  const jeEmpfaenger = new Map();
+  // Rahmen in Sendereihenfolge, je Empfaenger (fuer den deflate-Strom)
+  const rahmenJeEmpfaenger = new Map();
+  let groesster = { bytes: 0, event: null };
+  let broadcastRaw = 0, broadcastCount = 0;
+  let laufend = 0, laufendRoh = 0;   // billige Live-Zaehler fuer den Fortschritt
+
+  const buche = (map, key, roh) => {
+    const e = map.get(key) || { count: 0, raw: 0, wire: 0 };
+    e.count++; e.raw += roh;
+    map.set(key, e);
+    return e;
+  };
+
+  const erfasse = (sid, ereignis, daten) => {
+    let rahmen;
+    try {
+      // socket.io v4, Standard-Namensraum: `42["ereignis",nutzlast]`
+      rahmen = '42' + JSON.stringify([ereignis, daten === undefined ? null : daten]);
+    } catch {
+      rahmen = '42["' + ereignis + '",null]';   // zyklisch o.ae. — nicht messbar
+    }
+    const roh = Buffer.byteLength(rahmen, 'utf8');
+    laufend++; laufendRoh += roh;
+    buche(jeEreignis, ereignis, roh);
+    buche(jeEmpfaenger, sid, roh);
+    if (roh > groesster.bytes) groesster = { bytes: roh, event: ereignis };
+    let liste = rahmenJeEmpfaenger.get(sid);
+    if (!liste) { liste = []; rahmenJeEmpfaenger.set(sid, liste); }
+    liste.push({ ereignis, buf: Buffer.from(rahmen, 'utf8') });
+  };
+
+  return {
+    erfasse,
+    /** Ohne Sortieren/Rechnen — fuer die Fortschrittszeile. */
+    stand() { return { nachrichten: laufend, roh: laufendRoh }; },
+    erfasseBroadcast(ereignis, daten) {
+      try { broadcastRaw += Buffer.byteLength('42' + JSON.stringify([ereignis, daten ?? null]), 'utf8'); }
+      catch { /* egal */ }
+      broadcastCount++;
+    },
+    /**
+     * Leitungsbytes bestimmen: je Empfaenger EIN deflate-Strom, wie ihn
+     * `ws` fuer permessage-deflate mit context takeover fuehrt. Rahmen
+     * unter der Schwelle gehen ungepackt raus (Server-Einstellung
+     * `threshold: 1024`) und fuettern das Woerterbuch NICHT.
+     */
+    async wireAuswerten(schwelle = 32) {   // MUSS die Serverschwelle spiegeln
+      for (const [sid, liste] of rahmenJeEmpfaenger) {
+        const co = zlib.createDeflateRaw({ level: 6, memLevel: 8, windowBits: 15 });
+        for (const { ereignis, buf } of liste) {
+          let wire;
+          if (buf.length < schwelle) {
+            wire = buf.length;                       // ungepackt gesendet
+          } else {
+            const teile = [];
+            const auf = (c) => teile.push(c);
+            co.on('data', auf);
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((res) => co.write(buf, () => co.flush(zlib.constants.Z_SYNC_FLUSH, res)));
+            co.removeListener('data', auf);
+            wire = teile.reduce((n, c) => n + c.length, 0);
+          }
+          jeEreignis.get(ereignis).wire += wire;
+          jeEmpfaenger.get(sid).wire += wire;
+        }
+        co.end();
+      }
+      rahmenJeEmpfaenger.clear();   // Speicher je Partie wieder freigeben
+    },
+    bericht() {
+      const ereignisse = [...jeEreignis.entries()]
+        .map(([name, e]) => ({ name, ...e }))
+        .sort((a, b) => b.wire - a.wire);
+      const empfaenger = [...jeEmpfaenger.entries()]
+        .map(([sid, e]) => ({ sid, ...e }))
+        .sort((a, b) => b.wire - a.wire);
+      return {
+        ereignisse, empfaenger, groesster,
+        broadcast: { count: broadcastCount, raw: broadcastRaw },
+        summe: {
+          count: ereignisse.reduce((n, e) => n + e.count, 0),
+          raw: ereignisse.reduce((n, e) => n + e.raw, 0),
+          wire: ereignisse.reduce((n, e) => n + e.wire, 0),
+        },
+      };
+    },
+  };
+}
+
+/** Eine Messpartie: zwei CPU-Decks, erfundene Sockets, volle Sendewege. */
+async function runNetBenchmarkGame(deckA, deckB, cfg, haken = {}) {
+  const snapshotDeck = (d) => JSON.parse(JSON.stringify({
+    mainDeck: d.mainDeck || [], heroes: d.heroes || [],
+    potionDeck: d.potionDeck || [], sideDeck: d.sideDeck || [], skins: d.skins || {},
+  }));
+  const roomId = 'netbench-' + uuidv4().substring(0, 8);
+  const zuschauer = [];
+  for (let i = 0; i < cfg.spectators; i++) {
+    zuschauer.push({ username: 'Zuschauer ' + (i + 1), userId: 'nb-spec-' + i + '-' + roomId,
+      socketId: 'sid-spec-' + i + '-' + roomId, color: '#888', avatar: null });
+  }
+  const room = {
+    id: roomId, host: 'netbench', hostId: 'netbench',
+    // GENAU die Raumform des Trainingslaufs (`runHeadlessTrainingGame`),
+    // weil die sich taeglich bewaehrt. Zur Nutzlast: es wird fuer BEIDE
+    // Seiten ein voller, eigener Zustand gebaut — das ist der PvP-Fall
+    // mit zwei Clients. Der Unterschied zu einem echten PvP-Raum sind
+    // zwei Felder (`isCpuBattle`, `cpuBgm`), also ein paar Byte.
+    // `DEBUG_REVEAL_NPC_HAND` ist `false`, hier wird also nichts
+    // zusaetzlich aufgedeckt und damit auch nichts ueberschaetzt.
+    type: 'singleplayer', format: 1, winsNeeded: 1, setScore: [0, 0],
+    playerPw: null, specPw: null,
+    players: [
+      { username: 'Spieler A', userId: 'nb-a-' + roomId, socketId: 'sid-a-' + roomId, deckId: 'nb-a' },
+      { username: 'Spieler B', userId: 'nb-b-' + roomId, socketId: 'sid-b-' + roomId, deckId: 'nb-b' },
+    ],
+    spectators: zuschauer, status: 'waiting', created: Date.now(),
+    gameState: null, chatHistory: [], privateChatHistory: {},
+    _currentDecks: [snapshotDeck(deckA), snapshotDeck(deckB)],
+    _deckNames: [deckA.name || '?', deckB.name || '?'],
+  };
+  rooms.set(roomId, room);
+  await setupGameState(room);
+  const firstPlayer = Math.random() < 0.5 ? 0 : 1;
+  const t0 = Date.now();
+
+  return new Promise((resolve) => {
+    let done = false;
+    let startPromise = null;
+    let hardTimeout = null;
+    let wachhund = null;
+    let sieger = null;   // Gewinner-Index, fuer den Karten-Bericht
+    // Rechenzeit und Kartenprofil DIESER Partie einsammeln, bevor
+    // aufgeraeumt wird. Beides steht schon in der Engine — es hat nur
+    // nie jemand ausgelesen (12.8., nach Als „verdaechtig langem Lauf").
+    const cpuT0 = process.cpuUsage();
+    let ernte = null;
+    const einsammeln = () => {
+      if (ernte) return;
+      const u = process.cpuUsage(cpuT0);
+      const eng = room.engine;
+      const leaks = {};
+      for (const e of (eng?._actionTrail || [])) {
+        if (e.kind === 'leakyRollout' && e.cardName) leaks[e.cardName] = (leaks[e.cardName] || 0) + 1;
+      }
+      // ── HOOK-TIMEOUTS (12.8., Barker-Befund) ─────────────────────
+      // Die Engine bricht einen Hook ab, wenn er EFFECT_TIMEOUT_MS
+      // (5 s) lang keinen Fortschritt zeigt — `_hookProgressTick`
+      // bewegt sich nicht UND keine Abfrage steht offen. Sie zaehlt das
+      // in `_hookTimeouts` und schreibt je Treffer einen
+      // `hook_timeout`-Eintrag mit Hook- und KARTENNAME ins Protokoll.
+      // Bisher stand das nur in der Serverkonsole; hier wird es
+      // ausgewertet, damit der naechste Lauf die Frage „welche Karte
+      // haengt" von selbst beantwortet.
+      // Primaerquelle ist der engine-eigene Zaehler `_hookTimeoutsByCard`
+      // — er zaehlt AUCH im Fast-Mode, wo `log()` aussteigt und der
+      // Protokollweg deshalb leer bleibt (Messlauf 12.8.: 29/107/8
+      // Abbrueche gezaehlt, Kartenliste leer). Das Protokoll dient nur
+      // noch als Rueckfall fuer aeltere Engines.
+      const timeouts = { ...(eng?._hookTimeoutsByCard || {}) };
+      if (!Object.keys(timeouts).length) {
+        for (const e of (eng?.actionLog || [])) {
+          if (e?.type === 'hook_timeout') {
+            const key = `${e.card || '?'} (${e.hook || '?'})`;
+            timeouts[key] = (timeouts[key] || 0) + 1;
+          }
+        }
+      }
+      // ── SPIELSTART-GRIFFE (12.8., Als Barker-Frage) ──────────────
+      // `gameStartPickDecision` protokolliert jeden beantworteten Griff
+      // in `engine._gameStartLog` mit der QUELLE: `priority` (harte
+      // Skript-Vorfahrt via `gameStartPickPriority`), `rule` (gelernte
+      // Profilwerte), `explore` (Training) oder Kombinationen. Wer hier
+      // NICHT auftaucht, wurde vom Kanal mit `null` beantwortet — und
+      // faellt damit auf die teure MCTS-Suche durch.
+      //
+      // Damit ist nach jedem Lauf belegbar statt argumentierbar, ob
+      // Barkers Griff die Suche noch anfasst.
+      const starts = {};
+      for (const g of (eng?._gameStartLog || [])) {
+        const key = `${g.card} → ${(g.picks || []).join(', ')} [${g.src}]`;
+        starts[key] = (starts[key] || 0) + 1;
+      }
+      ernte = {
+        gameStartPicks: starts,
+        cpuMs: (u.user + u.system) / 1000,
+        hookFiresByCard: { ...(eng?._hookFiresByCard || {}) },
+        leakyRollouts: leaks,
+        snapshots: eng?._snapshotsTaken || 0,
+        hookTimeouts: eng?._hookTimeouts || 0,
+        hookTimeoutsByCard: timeouts,
+        overloadTrips: { ...(eng?._overloadTrips || {}) },
+        steamDiag: { ...(eng?._steamDiag || {}) },
+        // ── Overheal Shock / Heilungs-Umkehr (13.8.) ────────────────
+        // Beides nur aus LIVE-Zuegen: die Karte stempelt ihren Einsatz
+        // selbst (`_shockLog`), die Engine zaehlt am Umkehr-Gate mit
+        // (`_healReversedDiag`). Rollouts sind in beiden ausgeschlossen.
+        shockLog: [...(eng?._shockLog || [])],
+        healReversed: eng?._healReversedDiag
+          ? { ...eng._healReversedDiag, jeSeite: [...eng._healReversedDiag.jeSeite] }
+          : null,
+        healRouting: { ...(eng?._healRouting || {}) },
+        shockEntfernt: eng?._shockEntfernt || 0,
+        shockEntferntLebend: eng?._shockEntferntLebend || 0,
+        // ── v385: KANDIDATEN-HEAP JE ROLLOUT ────────────────────────
+        // Die Liste "Rollouts mit hohem Speicherumsatz" zaehlt nur
+        // TREFFER ueber 0,5 MB. Damit sehen "teuer je Rollout" und
+        // "sehr oft bewertet" identisch aus — im Lauf 14.8. 12:02 stand
+        // Adventurousness mit 119 an der Spitze, ohne dass sich sagen
+        // liess, welches von beidem gemeint ist. `_candidateHeapDelta`
+        // fuehrt {calls, totalMb} je Kandidat und lag bisher ungenutzt
+        // auf der Engine.
+        candidateHeapDelta: { ...(eng?._candidateHeapTotal || {}) },
+        // ── v385: WARUM ENDETE DIE PARTIE OHNE ERGEBNIS? ────────────
+        // `ohne-spielende` heisst: die Zugkette lief aus, ohne dass
+        // `gs.result` gesetzt wurde. Bisher stand im Bericht nur der
+        // Name. `buildGameDiagnosis` (Modulebene seit v385) beschreibt
+        // Heldenstand, Deckgroessen, Zug/Phase und — der wichtigste
+        // Teil — die vom CPU-Treiber gefangenen Ausnahmen samt erstem
+        // Karten-Frame aus dem Stack.
+        diagnose: (!room.gameState?.result)
+          ? buildGameDiagnosis(room, -1, 'no-result') : null,
+        treiberFehler: (eng?._driverErrors || []).slice(-5).map(e => ({
+          zug: e.turn, spieler: e.player, phase: e.phase, meldung: e.message,
+        })),
+        // ── v386: Brotkrumen ────────────────────────────────────────
+        stilleHalte: (eng?._silentTurnExits || []).slice(-5),
+        letzteMarke: eng?._cpuTurnMark || null,
+        switchTurnNoops: (eng?._switchTurnNoops || []).slice(-5),
+        switchTurnReentry: eng?._switchTurnReentryBlocked || 0,
+        nachlauf: nachlaufBefund,                                // v391
+      };
+    };
+
+    let nachlaufBefund = null;                 // v391
+    const finish = (grund) => {
+      if (done) return;
+      done = true;
+      einsammeln();                       // VOR dem abort/Abbau
+      // ── SOFORT ABBRECHEN (12.8., Als Rueckfrage „unendliche Spiele
+      //    sollten unmoeglich sein") ─────────────────────────────────
+      // Sie SIND unmoeglich — das Deck-Out beendet jede Partie. Genau
+      // das war hier auch passiert: die Engine meldete Deck-Out, rief
+      // `onGameOver`, und diese Funktion lief an. Nur hat sie die
+      // Engine nicht angehalten. Abgeraeumt wird erst unten in
+      // `drain.then(...)` via `destroyRoom` → `engine.abort()`, und
+      // `drain` haengt an `startPromise` (loest nie auf, die Partie
+      // laeuft ja) ODER an einem 2-Sekunden-TIMER — der im
+      // Mikrotask-Stau nie drankam. Ergebnis: eine laengst entschiedene
+      // Partie drehte endlos weiter.
+      //
+      // Deshalb hier, als ERSTES und ohne jeden Timer: anhalten. Die
+      // CPU-Schleifen in _cpu.js steigen auf `_aborted` selbst aus.
+      try { room.engine?.abort?.(); } catch { /* Abbau darf nie werfen */ }
+      if (hardTimeout) { clearTimeout(hardTimeout); hardTimeout = null; }
+      if (wachhund) { clearInterval(wachhund); wachhund = null; }
+      for (const p of room.players) activeGames.delete(p.userId);
+      const turns = room.gameState?.turn || 0;
+      const drain = startPromise
+        ? Promise.race([startPromise.catch(() => {}), new Promise(r => setTimeout(r, 2000))])
+        : Promise.resolve();
+      drain.then(() => {
+        const eng = room.engine;
+        if (eng) { eng.onGameOver = null; eng._cpuDriver = null; }
+        room._currentDecks = null;
+        destroyRoom(roomId);
+        resolve({ turns, ms: Date.now() - t0, grund, sieger, ...ernte });
+      });
+    };
+
+    startGameEngine(room, roomId, firstPlayer, (engine) => {
+      engine._isSelfPlay = true;          // beide Seiten CPU-pilotiert
+      engine._cpuPlayerIdx = firstPlayer;
+      // ── DAS GEHIRN FEHLTE (v384, 14.8.) ────────────────────────────
+      // Alle vier anderen CPU-Pfade rufen `installCpuBrain` in genau
+      // diesem Rueckruf auf (Singleplayer, Self-Play, cpu-vs-cpu,
+      // Training); der Messstand als einziger nicht. Ohne das Gehirn
+      // bleibt `_getCpuGenericResponse` der Engine-Default — und der
+      // beantwortet JEDEN cancellable Prompt mit `null`.
+      //
+      // Zwei Folgen, beide belegt: (1) Barkers `onTurnStart` bekam auf
+      // seinen Zonenwaehler `null` und sprang endlos zur Galerie
+      // zurueck — 1.308.102 Spielstart-Griffe in EINER Partie, 300 s
+      // CPU bei 9 Halbzuegen, 51 abgebrochene Hooks. (2) Der ganze
+      // Messstand hat eine CPU OHNE Ziel- und Wahl-Gehirn vermessen;
+      // alle Zahlen aus Laeufen vor v384 stehen unter diesem Vorbehalt
+      // und sind mit spaeteren nicht vergleichbar.
+      //
+      // Muss VOR `onBeforeHandDraw` stehen (siehe startGameEngine) —
+      // deshalb hier ganz oben und nicht weiter unten im Rueckruf.
+      installCpuBrain(engine);
+
+      // ── PAUSEN, REISSLEINE UND EIN ECHTER YIELD (12.8.) ────────────
+      //
+      // Animationspausen werden uebersprungen; die Zahl der Sendungen
+      // aendert sich dadurch nicht, nur die Wanduhr. Wer den echten
+      // Takt sehen will, setzt PP_NETTEST_REALTIME=1.
+      //
+      // ABER: `() => Promise.resolve()` allein war ein FEHLER, und zwar
+      // ein lehrreicher. Damit besteht der komplette Partieverlauf nur
+      // noch aus MIKROtasks. Node leert die Mikrotask-Warteschlange
+      // vollstaendig, BEVOR ein Timer drankommt — eine unendliche Kette
+      // aufgeloester Promises haengt also `setTimeout` und
+      // `setInterval` komplett aus. Genau deshalb hat bei Als
+      // Endlos-Partie WEDER der Wachhund NOCH das 5-Minuten-Zeitlimit
+      // gefeuert: beide sind Timer, und Timer kamen nie dran.
+      //
+      // Zwei Konsequenzen, beide hier:
+      //   (a) alle ~10 ms EIN echter Makrotask (`setImmediate`) — damit
+      //       laeuft der Event-Loop weiter und Timer feuern wieder;
+      //   (b) eine SYNCHRONE Reissleine, die gar nicht erst auf Timer
+      //       angewiesen ist. Sie prueft Halbzug-Obergrenze und
+      //       Wandzeit bei jedem Pausenaufruf und bricht per
+      //       `engine.abort()` ab — die CPU-Schleifen in _cpu.js
+      //       steigen darauf von selbst aus (`istAbgebrochen`).
+      // ── DENKZEIT JE ZUG KAPPEN (12.8., Als Zeitlimit-Abbruch) ─────
+      // `runCpuTurn` setzt zu Beginn jedes LIVE-Zugs
+      // `engine._cpuTurnDeadline = Date.now() + MAX_CPU_TURN_MS` (90 s)
+      // und fragt den Wert danach ueber `cpuPastDeadline` selbst ab.
+      // Es ist also eine simple Zahl — ich kappe sie beim SCHREIBEN,
+      // statt irgendwo in die Suche einzugreifen. Die CPU beendet ihren
+      // Zug dann ueber ihren eigenen, erprobten Weg (Heuristik-
+      // Reihenfolge, Sicherheitsschleifen, Force-Advance zur End Phase).
+      //
+      // `_inMctsSim` ist dabei egal: die Engine setzt die Frist ohnehin
+      // nur fuer Live-Zuege, und `null` (Ruecksetzen) reicht die
+      // Klammer unveraendert durch.
+      if (cfg.cpuTurnMs > 0) {
+        let _frist = null;
+        Object.defineProperty(engine, '_cpuTurnDeadline', {
+          configurable: true,
+          // ── LAZY SEEDEN, NICHT NUR KAPPEN (12.8., Elven Vanguard) ──
+          // Kappen allein reicht nicht: die Frist wird NUR in
+          // `runCpuTurn` gesetzt. Entscheidungen, die VORHER laufen,
+          // sehen `null` — und `cpuPastDeadline` gibt dann `false`
+          // zurueck, dauerhaft. Genau das passiert bei Barkers
+          // `onTurnStart`-Griff: `startTurn` feuert ON_TURN_START
+          // (der Engine-Kommentar nennt Barker dort namentlich),
+          // BEVOR der CPU-Treiber laeuft. Die Optionsschleife in
+          // `mctsPickFromOptions` prueft zwar `cpuPastDeadline` vor
+          // jeder Option — nur ist da nichts zu pruefen.
+          //
+          // Deshalb: beim ERSTEN Lesen die Uhr starten. Gelesen wird
+          // ausschliesslich aus `cpuPastDeadline`, also genau dann,
+          // wenn das CPU-Gehirn arbeitet — die Uhr startet damit nicht
+          // zu frueh. `runCpuTurn` ueberschreibt sie danach je Zug
+          // (gekappt), und ein Ruecksetzen auf `null` startet beim
+          // naechsten Lesen ein frisches Fenster.
+          get: () => {
+            if (_frist == null) _frist = Date.now() + cfg.cpuTurnMs;
+            return _frist;
+          },
+          set: (v) => {
+            _frist = (typeof v === 'number')
+              ? Math.min(v, Date.now() + cfg.cpuTurnMs)
+              : v;
+          },
+        });
+      }
+
+      const echterDelay = engine._delay.bind(engine);
+      let letzterYield = Date.now();
+      engine._delay = (ms) => {
+        if (!done) {
+          const turn = room.gameState?.turn || 0;
+          if (turn >= cfg.maxTurns) {
+            engine.abort();
+            finish(`endlosschleife@zug${turn}`);
+          } else if (Date.now() - t0 > cfg.gameTimeoutMs) {
+            engine.abort();
+            // Halbzug mitgeben: „zeitlimit bei Halbzug 4" heisst
+            // langsame Zuege, „bei Halbzug 300" heisst lange Partie.
+            finish(`zeitlimit@zug${room.gameState?.turn || 0}`);
+          }
+        } else if (!engine._aborted) {
+          // Die Partie ist fuer uns durch, die Engine laeuft aber noch —
+          // genau der Zustand, der die Endlos-Drehung erzeugt hat.
+          engine.abort();
+        }
+        if (cfg.realtime) return echterDelay(ms);
+        // ── v390: LIVE IMMER EIN MAKROTASK ──────────────────────────
+        // Bis v389 lieferte diese Huelle im Normalfall `Promise.resolve()`
+        // — einen MIKROtask. Die Engine selbst nimmt live ein echtes
+        // `setTimeout`, also einen MAKROtask. Der Unterschied ist nicht
+        // kosmetisch: ein Makrotask laesst ALLE wartenden Fortsetzungen
+        // zuerst durchlaufen, ein Mikrotask setzt die eigene Funktion
+        // sofort fort. Zwei verschraenkte async-Ketten bekommen im
+        // Messstand damit eine andere Reihenfolge als ueberall sonst.
+        //
+        // Genau das ist der einzige Unterschied, den der Messstand
+        // gegenueber Live-Spiel, cpu-vs-cpu, Self-Play und Training hat
+        // (`engine._delay` wird projektweit NUR hier ueberschrieben) —
+        // und die `ohne-spielende`-Abbrueche sehen wie ein
+        // Reihenfolge-Fehler aus (Zustand springt rueckwaerts: Zug 16
+        // → 15, Phase 5 → 3). Al hat zu Recht darauf hingewiesen, dass
+        // ihm das Bild live und im Training NIE begegnet ist.
+        //
+        // Neu also: dieselbe Task-Klasse wie in Produktion, nur ohne
+        // Wartezeit. Der Rollout-Pfad bleibt bewusst auf dem Mikrotask
+        // — dort tut die Engine selbst nichts anderes (`_fastMode` →
+        // `Promise.resolve()`), und ein Makrotask je Rollout-Pause
+        // waere millionenfach.
+        // ── v392: v390 ZURUECKGEDREHT ────────────────────────────
+        // v390 gab live IMMER einen Makrotask zurueck, um zu pruefen, ob
+        // die Task-Klasse die `ohne-spielende`-Abbrueche erklaert. Der
+        // Lauf vom 19:24 hat das widerlegt (Quote unveraendert 6/10) und
+        // die Rechenzeit dabei VERVIELFACHT: 142 s / 58 s / 55 s je
+        // Partie gegen vorher 20-30 s. Also zurueck zur Drossel — der
+        // Yield alle 10 ms haelt den Event-Loop atmend, ohne je Pause
+        // einen Makrotask zu kosten.
+        const jetzt = Date.now();
+        if (jetzt - letzterYield >= 10) {
+          letzterYield = jetzt;
+          return new Promise((r) => setImmediate(r));
+        }
+        return Promise.resolve();
+      };
+      engine.onGameOver = (_r, _w, grund) => {
+        // Sieger festhalten — der Karten-Bericht braucht Sieg/Niederlage
+        // je Partie, und `finish` bekommt nur den Grund gereicht.
+        if (_w === 0 || _w === 1) sieger = _w;
+        if (!done) finish(grund || 'ende');
+      };
+      room.engine._cpuDriver = makeCpuDriver(room);
+      if (room.gameState?.mulliganPending) {
+        room.gameState.mulliganPending = false;
+        delete room.gameState.mulliganDecisions;
+      }
+      hardTimeout = setTimeout(() => {
+        room.engine?.abort?.();
+        finish(`zeitlimit@zug${room.gameState?.turn || 0}`);
+      }, cfg.gameTimeoutMs);
+
+      // ── WACHHUND (12.8., nach Als Verdacht „koennte das loopen?") ──
+      // Zwei verschiedene Krankheiten, zwei verschiedene Diagnosen:
+      //   • STILLSTAND — weder Halbzug noch Nachrichten bewegen sich.
+      //     Die Partie haengt (Prompt ohne Antwort, Deadlock).
+      //   • DREHZAHL — Nachrichten laufen weiter, der Halbzug nicht.
+      //     Das IST die Endlosschleife, die Al befuerchtet — und sie
+      //     waere zugleich ein handfester Bandbreiten-Befund.
+      // Beides beendet die Partie mit klarem Grund, statt fuenf Minuten
+      // stumm ins Timeout zu laufen.
+      // ── DRITTES LEBENSZEICHEN: ENGINE-TICKS (12.8., Als Absturz) ──
+      // Erster Anlauf pruefte nur Halbzug und Nachrichtenzahl. Beides
+      // steht STILL, waehrend die CPU rechnet: MCTS-Rollouts laufen im
+      // Fast-Mode, senden also nichts, und der Halbzug bleibt derselbe.
+      // Eine lange Entscheidung sah damit aus wie ein Haenger — Als
+      // Partie 7 wurde nach 48 s bei Halbzug 2 als „stillstand"
+      // abgeschossen, obwohl die CPU nur nachdachte.
+      //
+      // `engine._hookProgressTick` ist das richtige Signal: `sync()`
+      // erhoeht es AUSDRUECKLICH auch im Fast-Mode („MCTS rollouts that
+      // call sync() should count as progress too"). Bewegt es sich,
+      // arbeitet die Engine — egal ob nach aussen etwas sichtbar wird.
+      const STILLSTAND_MS = cfg.stallMs;
+      const DREHZAHL_MS = Math.max(120000, cfg.stallMs * 2);
+      let letzterTurn = -1, letzteZahl = -1, letzteTicks = -1;
+      let letzterTurnFuerZaehler = -1, letzteZahlBeiTurnwechsel = 0;
+      let turnSeit = Date.now(), bewegungSeit = Date.now();
+
+      // ── VIERTES LEBENSZEICHEN: VERBRAUCHTE CPU-ZEIT (12.8.) ────────
+      // Nach dem Messlauf blieben drei Partien uebrig, die nach genau
+      // 92/94/96 s abgeschossen wurden — Halbzug, Nachrichten UND Ticks
+      // standen alle still. Damit ist die entscheidende Frage: RECHNET
+      // der Prozess (dann arbeitet die CPU nur lange) oder schlaeft er
+      // (dann haengt wirklich etwas)? Das beantwortet nur die
+      // verbrauchte Prozessorzeit.
+      //
+      // Wichtig ist die Arbeitsteilung: „rechnet" gilt fuer den
+      // STILLSTAND-Wachhund als Fortschritt — eine lange Suche wird
+      // also nicht mehr abgeschossen. Eine ENDLOSE Rechnung faengt
+      // dafuer weiterhin das harte Zeitlimit je Partie (`--game-ms`,
+      // Vorgabe 300 s). Zwei Grenzen fuer zwei verschiedene Fragen.
+      const cpuMs = () => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
+      let letzteCpu = cpuMs();
+      let rechnetSeit = 0;              // aufsummierte Rechenzeit im Stillstandsfenster
+      let diagnose = null;
+      wachhund = setInterval(() => {
+        if (done) return;
+        const turn = room.gameState?.turn ?? 0;
+        const stand = haken.stand ? haken.stand() : { nachrichten: 0, roh: 0 };
+        const ticks = room.engine?._hookProgressTick || 0;
+        const jetzt = Date.now();
+        const cpuJetzt = cpuMs();
+        const cpuZuwachs = cpuJetzt - letzteCpu;
+        letzteCpu = cpuJetzt;
+        // Ueber 50 % eines Kerns im 2-Sekunden-Fenster = der Prozess
+        // arbeitet. Darunter tut er nichts Nennenswertes.
+        const rechnet = cpuZuwachs > 1000;
+
+        if (turn !== letzterTurn) { letzterTurn = turn; turnSeit = jetzt; }
+        if (stand.nachrichten !== letzteZahl || ticks !== letzteTicks || rechnet) {
+          letzteZahl = stand.nachrichten; letzteTicks = ticks;
+          bewegungSeit = jetzt; rechnetSeit = 0;
+        } else {
+          rechnetSeit += cpuZuwachs;
+        }
+        diagnose = { turn, nachrichten: stand.nachrichten, ticks,
+          stillSeit: Math.round((jetzt - bewegungSeit) / 1000),
+          cpuImFenster: Math.round(rechnetSeit) };
+        if (haken.fortschritt) haken.fortschritt({ turn, ms: jetzt - t0, ticks, rechnet, ...stand });
+        // Dritte Krankheit, die Al gefunden hat: die Partie zaehlt
+        // munter Halbzuege, aber keine Seite kommt je durch. Weder
+        // „Stillstand" noch „Drehzahl" greift dann — es bewegt sich ja
+        // alles. Nur die Obergrenze faengt das.
+        if (turn >= cfg.maxTurns) { room.engine?.abort?.(); return finish(`endlosschleife@zug${turn}`); }
+        if (jetzt - bewegungSeit > STILLSTAND_MS) {
+          room.engine?.abort?.();
+          // Der Grund sagt jetzt, WORAN es lag: „untaetig" heisst, der
+          // Prozess hat in der ganzen Zeit praktisch keine Rechenzeit
+          // verbraucht — das ist ein echter Haenger, kein langes Denken.
+          const art = diagnose && diagnose.cpuImFenster > cfg.stallMs * 0.2 ? 'rechnend' : 'untaetig';
+          return finish(`stillstand(${art}, Halbzug ${turn}, ${diagnose?.cpuImFenster || 0} ms CPU)`);
+        }
+        // „Drehzahl" heisst: es GEHT etwas raus, aber der Halbzug bleibt
+        // stehen. Reines Nachdenken (Ticks ohne Nachrichten) faellt
+        // ausdruecklich NICHT darunter.
+        if (jetzt - turnSeit > DREHZAHL_MS && stand.nachrichten > letzteZahlBeiTurnwechsel) {
+          room.engine?.abort?.(); return finish('drehzahl');
+        }
+        if (turn !== letzterTurnFuerZaehler) { letzterTurnFuerZaehler = turn; letzteZahlBeiTurnwechsel = stand.nachrichten; }
+      }, 2000);
+      // KEIN enterFastMode hier — genau das ist der Unterschied zum
+      // Trainingslauf: die Partie soll senden.
+      startPromise = room.engine.startGame()
+        // `startGame` ist durch, ohne dass `onGameOver` gefeuert hat —
+        // die Partie hatte also kein regulaeres Ende. Im Messlauf vom
+        // 12.8. traf das eine Partie nach 4 Halbzuegen und 5 Sekunden.
+        // Eigener Grund, damit so etwas nicht stillschweigend in den
+        // Schnitt wandert.
+        // ── v391: NACHLAUF STATT SOFORTIGEM URTEIL ────────────────
+        // Bisher galt: `startGame` ist durch → Partie ist tot →
+        // `abort()` und Abbau. Diese Annahme wurde NIE geprueft, und
+        // sie traegt die ganze `ohne-spielende`-Jagd seit v386.
+        //
+        // Die Kette ist eine einzige verschachtelte await-Folge
+        // (startTurn → Treiber → switchTurn → Treiber → …). Fehlt
+        // IRGENDWO ein `await`, loest `startGame` auf, waehrend die
+        // Partie im Hintergrund weiterlaeuft — und der Messstand
+        // erschlaegt sie dann selbst mit `engine.abort()`.
+        //
+        // Deshalb jetzt: nicht sofort urteilen, sondern nachsehen. Bis
+        // zu 3 s in 100-ms-Schritten pruefen, ob sich Zug, Phase oder
+        // Ergebnis noch bewegen. Bewegt sich etwas, war die Partie
+        // LEBENDIG und der Befund ein Messfehler — das steht dann als
+        // eigener Grund im Bericht und wandert nicht in denselben Topf.
+        .then(async () => {
+          if (done) return;
+          const fertig = room.gameState?.result?.reason;
+          if (fertig) return finish(fertig);
+          const stand = () => `${room.gameState?.turn}:${room.gameState?.activePlayer}`
+            + `:${room.gameState?.currentPhase}`;
+          // ── v392: FAHNENSTAND IM MOMENT DES AUFLOESENS ────────────
+          // Der 19:47-Lauf hat gezeigt, dass 6 von 7 Abbruechen gar
+          // keine sind: die Partie lebte, und ihr Zustand wanderte
+          // danach RUECKWAERTS (Zug 4 → 3, Phase 5 → 2). Es laeuft also
+          // eine Simulation, waehrend die await-Kette von `startGame`
+          // schon zurueckkehrt — irgendwo fehlt ein `await`.
+          //
+          // Welcher Pfad das ist, sagt der Zaehlerstand GENAU JETZT,
+          // vor dem Nachlauf. `_fastModeDepth` ist dabei der schaerfste:
+          // `enterFastMode`/`exitFastMode` fuehren ihn paarweise, eine
+          // Unwucht benennt die Simulation, die noch offen ist. Nach dem
+          // Nachlauf wird derselbe Stand erneut genommen — raeumt sich
+          // die Unwucht in den 3 s auf, war die Simulation nur spaet;
+          // bleibt sie stehen, ist sie haengen geblieben.
+          // v395: auf das Noetige gekuerzt — die Jagd ist vorbei, diese
+          // Zeile bleibt nur als Regressionsnetz fuer den Ska-Fall.
+          const fahnen = () => ({
+            inMctsSim: !!engine._inMctsSim,
+            fastMode: !!engine._fastMode,
+            fastModeTiefe: engine._fastModeDepth || 0,
+          });
+          const fahnenVorher = fahnen();
+          const vorher = stand();
+          const bis = Date.now() + 3000;
+          let bewegt = false;
+          let nachher = vorher;
+          while (Date.now() < bis && !done) {
+            await new Promise((r) => setTimeout(r, 100));
+            if (room.gameState?.result?.reason) {
+              if (!done) finish(`${room.gameState.result.reason}@nachlauf`);
+              return;
+            }
+            nachher = stand();
+            if (nachher !== vorher) { bewegt = true; break; }
+          }
+          if (done) return;
+          if (bewegt) {
+            // Weiterhin abbrechen (sonst laufen zehn Partien parallel
+            // weiter), aber unter EIGENEM Namen — dieser Fall ist
+            // etwas voellig anderes als eine stehende Partie.
+            nachlaufBefund = { vorher, nachher, fahnenVorher, fahnenNachher: fahnen() };
+            console.warn(`[netbench] PARTIE LEBTE WEITER: startGame war durch, `
+              + `Stand wanderte ${vorher} → ${nachher}`);
+            return finish('startgame-zu-frueh');
+          }
+          nachlaufBefund = { vorher, nachher: vorher, fahnenVorher, fahnenNachher: fahnen() };
+          return finish('ohne-spielende');
+        })
+        .catch((err) => { console.error('[netbench] startGame:', err.message); if (!done) finish('fehler'); });
+    }).catch((err) => {
+      console.error('[netbench] setup:', err.message);
+      if (!done) finish('setup-fehler');
+    });
+  });
+}
+
+async function runNetBenchmark() {
+  if (_nbEnv('PP_NETTEST_LOW', '') === '1') {
+    try { require('os').setPriority(0, require('os').constants.priority.PRIORITY_LOW); }
+    catch (e) { console.warn('[netbench] Priorität konnte nicht gesenkt werden:', e.message); }
+  }
+  // ── PROFILE BLEIBEN AN (12.8., Als Befund zu Barker) ──────────────
+  // Hier stand `PP_DISABLE_PROFILES = '1'` — uebernommen aus dem
+  // Trainingslauf, wo es RICHTIG ist (dort sollen die Daten unbeein-
+  // flusst vom Gelernten entstehen). Fuer eine MESSUNG ist es falsch:
+  // `PP_DISABLE_PROFILES=1` macht `_deck-profile.js` komplett zum
+  // No-op — `profileFor` gibt `null` zurueck, und damit liefert
+  // `gameStartPickDecision` ebenfalls `null`.
+  //
+  // Genau dieser Kanal beantwortet Barkers Start-Griff normalerweise
+  // OHNE jeden Rollout: er wird in Barkers Prompt-Responder ALS ERSTES
+  // versucht und steigt bei einem Treffer sofort aus, lange bevor
+  // `mctsPick(..., { horizon: 6 })` drankommt. Vier der fuenf
+  // Barker-Decks haben den Griff laengst gelernt (burning-inferno,
+  // elven-vanguard, slimy-infestation, to-attain-divinity), insgesamt
+  // 24 von 42 Profilen haben `gameStartPicks`.
+  //
+  // Mein Schalter hat den Kanal also abgeschaltet und die Suche dahinter
+  // freigelegt — die teuren Barker-Partien waren zum Teil ein
+  // MESSARTEFAKT. Live laufen die Profile mit, also misst der Messstand
+  // ab jetzt auch damit. Wer den nackten Zustand sehen will, setzt
+  // `--no-profiles`.
+  if (_nbEnv('PP_NETTEST_NO_PROFILES', '') === '1') {
+    process.env.PP_DISABLE_PROFILES = '1';
+  }
+  setRolloutHorizon(parseInt(_nbEnv('PP_NETTEST_HORIZON', '2'), 10));
+  // Die eigentliche Ursache der Textwand: `_cpuVerbose` steht in
+  // _cpu.js auf `true`. Der Trainingslauf ist nur deshalb still, weil
+  // er hier `setCpuVerbose(...)` ruft — der Messlauf tat es nicht.
+  const laut = _nbEnv('PP_NETTEST_VERBOSE', '') === '1';
+  setCpuVerbose(laut);
+
+
+  const cfg = {
+    games: Math.max(1, parseInt(_nbEnv('PP_NETTEST_GAMES', '5'), 10) || 5),
+    spectators: Math.max(0, parseInt(_nbEnv('PP_NETTEST_SPECTATORS', '0'), 10) || 0),
+    realtime: _nbEnv('PP_NETTEST_REALTIME', '') === '1',
+    // Harte Obergrenze an HALBZUEGEN. Derselbe Wert und dieselbe
+    // Begruendung wie im Selbstspiel-Wachhund (server.js ~13992):
+    // „normal games end well under 50" — 400 faengt die Partien ab, die
+    // Zuege zaehlen, ohne dass je eine Seite toedlich wird.
+    maxTurns: Math.max(20, parseInt(_nbEnv('PP_NETTEST_MAX_TURNS', '400'), 10) || 400),
+    gameTimeoutMs: Math.max(10000, parseInt(_nbEnv('PP_NETTEST_GAME_MS', '600000'), 10) || 600000),
+    // Denkzeit je LIVE-Zug. Die Engine erlaubt 90 s (`MAX_CPU_TURN_MS`),
+    // aber ihr eigener Kommentar sagt: „a healthy turn finishes in under
+    // 10s; this cap exists solely to break out of pathological …
+    // scenarios". Fuer eine BANDBREITEN-Messung ist Spielstaerke egal —
+    // gemessen werden Bytes, nicht Zugqualitaet. 30 s laesst jeden
+    // gesunden Zug in Ruhe und kappt nur die pathologischen, statt sie
+    // 90 s lang laufen zu lassen und am Ende die halbe Partie
+    // wegzuwerfen. 0 = Engine-Vorgabe behalten.
+    cpuTurnMs: Math.max(0, parseInt(_nbEnv('PP_NETTEST_CPU_TURN_MS', '30000'), 10) || 0),
+    brain: _nbEnv('PP_NETTEST_BRAIN', '') === 'heuristic' ? 'heuristic' : null,
+    // Ab wann gilt eine Partie als haengend? Grosszuegig, weil eine
+    // einzelne MCTS-Entscheidung auf einer nebenher trainierenden
+    // Maschine durchaus eine Minute brauchen darf. Gemessen wird
+    // ohnehin nicht mehr nur „nichts gesendet", sondern zusaetzlich der
+    // Engine-Tick (siehe Wachhund).
+    stallMs: Math.max(15000, parseInt(_nbEnv('PP_NETTEST_STALL_MS', '90000'), 10) || 90000),
+  };
+  // `heuristic` denkt deutlich schneller als `evalGreedy`. Aendert die
+  // gespielten Zuege und damit die Zahlen leicht — deshalb NICHT
+  // Vorgabe, sondern ein bewusster Schalter fuer lange Laeufe.
+  if (cfg.brain === 'heuristic') setRolloutBrain('heuristic');
+  // Widerspruechliche Grenzen melden statt sie stillschweigend zu
+  // ertragen: ein Partie-Zeitlimit unter dem Vierfachen der Denkzeit
+  // je Zug wirft praktisch garantiert Partien aus der Wertung.
+  if (cfg.cpuTurnMs > 0 && cfg.gameTimeoutMs < cfg.cpuTurnMs * 4) {
+    _nbSchreib(`[netbench] WARNUNG: --game-ms (${cfg.gameTimeoutMs} ms) ist knapp gegenueber `
+      + `--cpu-turn-ms (${cfg.cpuTurnMs} ms). Partien mit mehreren langsamen Zuegen `
+      + `laufen ins Zeitlimit und fallen aus der Wertung.`);
+  }
+  const samples = loadSampleDecks().filter(d =>
+    d && Array.isArray(d.heroes) && d.heroes.length > 0
+    && Array.isArray(d.mainDeck) && d.mainDeck.length > 0);
+  if (samples.length < 2) { console.error('[netbench] zu wenige Beispieldecks gefunden'); process.exit(2); }
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const finde = (n) => n ? samples.find(d => norm(d.name).includes(norm(n))) : null;
+  const wunschA = finde(_nbEnv('PP_NETTEST_DECK_A', ''));
+  const wunschB = finde(_nbEnv('PP_NETTEST_DECK_B', ''));
+
+  const zeilen = [];                      // sammelt den Textbericht
+  const sag = (t = '') => { _nbSchreib(t); zeilen.push(t); };
+  const nur = (t) => { zeilen.push(t); };  // nur in die Datei
+
+  sag('═══ BANDBREITEN-MESSSTAND ═══');
+  sag(`Partien: ${cfg.games} | Zuschauer je Partie: ${cfg.spectators} | `
+    + `Pausen: ${cfg.realtime ? 'echt' : 'uebersprungen'}`
+    + (laut ? ' | Engine-Ausgabe: LAUT' : ''));
+  sag(`Grenzen: Denkzeit/Zug ${cfg.cpuTurnMs ? cfg.cpuTurnMs / 1000 + ' s' : 'Engine-Vorgabe (90 s)'}`
+    + ` | Zeitlimit/Partie ${cfg.gameTimeoutMs / 1000} s`
+    + ` | Stillstand ab ${cfg.stallMs / 1000} s`
+    + ` | Halbzuege max ${cfg.maxTurns}`
+    + ` | Rollout-Brain ${cfg.brain || 'evalGreedy'}`
+    + ` | Deck-Profile ${process.env.PP_DISABLE_PROFILES === '1' ? 'AUS' : 'AN'}`);
+  sag('Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler'
+    + (cfg.spectators ? ` + ${cfg.spectators} Zuschauer` : '') + ' je Partie.');
+  sag('');
+
+  // Sammler ueber alle GEWERTETEN Partien. Bewusst kein zweiter
+  // Messstand: eine abgebrochene Endlos-Partie mit Zehntausenden
+  // Nachrichten wuerde jeden Schnitt unbrauchbar machen. Eingerechnet
+  // wird deshalb erst NACH dem Ende — und nur, wenn die Partie sauber
+  // war.
+  const sammler = {
+    ereignisse: new Map(), empfaenger: new Map(),
+    groesster: { bytes: 0, event: null }, broadcast: { count: 0, raw: 0 },
+  };
+  const einrechnen = (b) => {
+    const zu = (map, key, e) => {
+      const x = map.get(key) || { count: 0, raw: 0, wire: 0 };
+      x.count += e.count; x.raw += e.raw; x.wire += e.wire;
+      map.set(key, x);
+    };
+    for (const e of b.ereignisse) zu(sammler.ereignisse, e.name, e);
+    for (const e of b.empfaenger) zu(sammler.empfaenger, e.sid, e);
+    if (b.groesster.bytes > sammler.groesster.bytes) sammler.groesster = b.groesster;
+    sammler.broadcast.count += b.broadcast.count;
+    sammler.broadcast.raw += b.broadcast.raw;
+  };
+  const proPartie = [];
+  // Kostenprofil: WELCHE Karten und WELCHE Decks fressen Rechenzeit?
+  // Bewusst ueber ALLE Partien gefuehrt, auch die abgebrochenen — gerade
+  // die teuren sind ja die interessanten.
+  const kartenFires = new Map();     // Karte -> Hook-Feuer
+  const kartenLeaks = new Map();     // Karte -> Zahl leckender Rollouts
+  const kandHeap = new Map();        // Kandidat -> { calls, totalMb } (v385)
+  const deckBilanz = new Map();      // Deck -> Siege/Partien/Laenge/CPU (v395)
+  const paarung = new Map();         // "A vs B" -> {n, siegeA} (v395)
+  const hookTimeouts = new Map();    // "Karte (Hook)" -> Zahl abgebrochener Hooks
+  const startGriffe = new Map();     // "Karte → Wahl [Quelle]" -> Haeufigkeit
+  const overloads = new Map();       // Grund -> Zahl der Notbrems-Ausloesungen
+  const steam = new Map();           // Steam-Dwarf-Zaehlwerk
+  const shockPartien = [];           // Overheal Shock: eine Zeile je Partie
+  const healRouting = new Map();     // "Quelle → Zielart" -> {n, hp}
+  let shockEntfernt = 0, shockEntferntLebend = 0;
+  const deckKosten = new Map();      // Deck -> { cpuMs, partien, abbrueche }
+  const buchen = (deck, cpuMs, abbruch) => {
+    const x = deckKosten.get(deck) || { cpuMs: 0, partien: 0, abbrueche: 0 };
+    x.cpuMs += cpuMs; x.partien++; if (abbruch) x.abbrueche++;
+    deckKosten.set(deck, x);
+  };
+
+  // Sendewege abfangen. In diesem Prozess laeuft nichts anderes ueber
+  // `io`, die Umleitung ist also vollstaendig.
+  const _ioTo = io.to.bind(io);
+  const _ioEmit = io.emit.bind(io);
+  let aktiveSonde = null;
+  io.to = (sid) => ({ emit: (ereignis, daten) => { if (aktiveSonde) aktiveSonde.erfasse(sid, ereignis, daten); } });
+  io.emit = (ereignis, daten) => { if (aktiveSonde) aktiveSonde.erfasseBroadcast(ereignis, daten); };
+  // Leere Registry: `_getSocket` liefert `undefined`, jeder
+  // antwortabhaengige Weg nimmt seinen Vorgabewert. Nichts blockiert.
+  io.sockets = { sockets: new Map() };
+
+  const schleuse = _nbSchleuse();
+  const tty = !!process.stdout.isTTY;
+  let letzteHeartbeat = 0;
+  const auffaellig = [];
+
+  try {
+    for (let g = 0; g < cfg.games; g++) {
+      const a = wunschA || samples[Math.floor(Math.random() * samples.length)];
+      let b = wunschB || samples[Math.floor(Math.random() * samples.length)];
+      if (b === a && samples.length > 1 && !wunschB) b = samples[(samples.indexOf(a) + 1) % samples.length];
+      const sonde = _makeNetProbe();
+      aktiveSonde = sonde;
+
+      // Lebenszeichen: alle paar Sekunden EINE Zeile (im Terminal an
+      // Ort und Stelle ueberschrieben). Damit ist auf einen Blick zu
+      // sehen, dass sich etwas bewegt — und woran es haengt, falls nicht.
+      let vorigeNachrichten = -1;
+      const fortschritt = ({ turn, ms, nachrichten, rechnet }) => {
+        const jetzt = Date.now();
+        if (!tty && jetzt - letzteHeartbeat < 30000) return;
+        letzteHeartbeat = jetzt;
+        // „rechnet" kommt jetzt aus der gemessenen Prozessorzeit statt
+        // aus „es ging nichts raus" — das ist der Zustand, den ich beim
+        // ersten Anlauf faelschlich fuer einen Haenger gehalten habe.
+        const denkt = rechnet === true || nachrichten === vorigeNachrichten;
+        vorigeNachrichten = nachrichten;
+        const t = `  … Partie ${g + 1}/${cfg.games} · Halbzug ${turn} · `
+          + `${(ms / 1000).toFixed(0)} s · ${nachrichten.toLocaleString('de-DE')} Nachrichten`
+          + (denkt ? ' · CPU rechnet' : '');
+        if (tty) process.stdout.write('\r' + t.padEnd(78));
+        else _nbSchreib(t);
+      };
+
+      if (!laut) { schleuse.leeren(); schleuse.zu(); }
+      let r;
+      try {
+        r = await runNetBenchmarkGame(a, b, cfg, { stand: () => sonde.stand(), fortschritt });
+      } finally {
+        if (!laut) schleuse.auf();
+        if (tty) process.stdout.write('\r' + ' '.repeat(78) + '\r');
+      }
+      aktiveSonde = null;
+      await sonde.wireAuswerten();
+      const s = sonde.bericht();
+      const seltsam = /^(stillstand|drehzahl|zeitlimit|timeout|fehler|setup-fehler|endlosschleife|ohne-spielende|startgame-zu-frueh)/.test(r.grund || '');
+      if (!seltsam) einrechnen(s);
+      for (const [k, v] of Object.entries(r.hookFiresByCard || {})) {
+        kartenFires.set(k, (kartenFires.get(k) || 0) + v);
+      }
+      for (const [k, v] of Object.entries(r.leakyRollouts || {})) {
+        kartenLeaks.set(k, (kartenLeaks.get(k) || 0) + v);
+      }
+      for (const [k, v] of Object.entries(r.candidateHeapDelta || {})) {
+        const e = kandHeap.get(k) || { calls: 0, totalMb: 0 };
+        e.calls += (v.calls || 0); e.totalMb += (v.totalMb || 0);
+        kandHeap.set(k, e);
+      }
+      for (const [k, v] of Object.entries(r.hookTimeoutsByCard || {})) {
+        hookTimeouts.set(k, (hookTimeouts.get(k) || 0) + v);
+      }
+      for (const [k, v] of Object.entries(r.gameStartPicks || {})) {
+        startGriffe.set(k, (startGriffe.get(k) || 0) + v);
+      }
+      for (const [k, v] of Object.entries(r.overloadTrips || {})) {
+        overloads.set(k, (overloads.get(k) || 0) + v);
+      }
+      for (const [k, v] of Object.entries(r.steamDiag || {})) {
+        // Hoechstwerte werden gemaxt, Zaehler summiert.
+        if (k.includes('hoechst') || k.includes('groesst')) {
+          if (!(steam.get(k) >= v)) steam.set(k, v);
+        } else steam.set(k, (steam.get(k) || 0) + v);
+      }
+      buchen(a.name, (r.cpuMs || 0) / 2, seltsam);
+      buchen(b.name, (r.cpuMs || 0) / 2, seltsam);
+      // ── Overheal Shock / Heilungs-Umkehr je Partie (13.8.) ──────
+      // Nur Partien mit tatsaechlichem Einsatz ODER tatsaechlicher
+      // Umwandlung landen hier; ein Lauf ohne die Karte druckt den
+      // Abschnitt gar nicht erst.
+      if ((r.shockLog || []).length || (r.healReversed?.treffer || 0) > 0) {
+        shockPartien.push({
+          nr: g + 1, decks: [a.name, b.name], turns: r.turns,
+          sieger: r.sieger, grund: r.grund, gewertet: !seltsam,
+          einsaetze: r.shockLog || [], hr: r.healReversed || null,
+        });
+      }
+      for (const [k, v] of Object.entries(r.healRouting || {})) {
+        const e = healRouting.get(k) || { n: 0, hp: 0 };
+        e.n += v.n; e.hp += v.hp; healRouting.set(k, e);
+      }
+      shockEntfernt += (r.shockEntfernt || 0);
+      shockEntferntLebend += (r.shockEntferntLebend || 0);
+      // ── v395: SIEGBILANZ JE DECK UND PAARUNG ────────────────────
+      // Bei 100 zufaelligen Paarungen ist das die eigentliche Ausbeute
+      // des Laufs: welches Deck gewinnt wie oft, wie lang sind seine
+      // Partien, was kostet es. Nur GEWERTETE Partien zaehlen — eine
+      // abgebrochene sagt ueber Staerke nichts.
+      if (!seltsam && (r.sieger === 0 || r.sieger === 1)) {
+        const seiten = [a.name, b.name];
+        for (let si = 0; si < 2; si++) {
+          const e = deckBilanz.get(seiten[si])
+            || { partien: 0, siege: 0, halbzuege: 0, cpuMs: 0 };
+          e.partien += 1;
+          if (r.sieger === si) e.siege += 1;
+          e.halbzuege += (r.turns || 0);
+          e.cpuMs += (r.cpuMs || 0) / 2;
+          deckBilanz.set(seiten[si], e);
+        }
+        const [x, y] = [a.name, b.name].slice().sort();
+        const key = `${x} vs ${y}`;
+        const pe = paarung.get(key) || { n: 0, siegeX: 0 };
+        pe.n += 1;
+        if (seiten[r.sieger] === x) pe.siegeX += 1;
+        paarung.set(key, pe);
+      }
+      proPartie.push({ nr: g + 1, deckA: a.name, deckB: b.name, turns: r.turns, ms: r.ms,
+        nachrichten: s.summe.count, raw: s.summe.raw, wire: s.summe.wire,
+        grund: r.grund, gewertet: !seltsam, sieger: r.sieger ?? null,
+        cpuMs: Math.round(r.cpuMs || 0), snapshots: r.snapshots || 0,
+        hookTimeouts: r.hookTimeouts || 0,
+        letzteMarke: r.letzteMarke || null,
+        stilleHalte: r.stilleHalte || [],
+        stilleHalte: r.stilleHalte || [] });
+      sag(`  Partie ${String(g + 1).padStart(3)}/${cfg.games}  ${String(r.turns).padStart(3)} Halbzuege  `
+        + `${String(s.summe.count).padStart(6)} Nachrichten  `
+        + `${(s.summe.raw / 1048576).toFixed(2).padStart(7)} MB roh  →  `
+        + `${(s.summe.wire / 1048576).toFixed(3).padStart(7)} MB Leitung  `
+        + `${(r.ms / 1000).toFixed(0).padStart(4)} s  `
+        + `${((r.cpuMs || 0) / 1000).toFixed(0).padStart(4)} s CPU  `
+        + `${seltsam ? '⚠ ' + r.grund + '  ' : ''}${a.name} vs ${b.name}`);
+
+      // Nur im Problemfall wird die verschluckte Engine-Ausgabe gezeigt —
+      // dann aber sofort, und dieselben Zeilen wandern in den Bericht.
+      if (seltsam) {
+        const letzte = schleuse.letzte(25);
+        auffaellig.push({ partie: g + 1, grund: r.grund, letzteZeilen: letzte,
+          diagnose: r.diagnose || null, treiberFehler: r.treiberFehler || [] });
+        if (r.hookTimeouts) {
+          sag(`     ↳ ${r.hookTimeouts} abgebrochene(r) Hook(s): `
+            + Object.entries(r.hookTimeoutsByCard || {}).map(([k, v]) => `${k} ×${v}`).join(', '));
+        }
+        // ── v385: WARUM kam kein Ergebnis zustande? ─────────────
+        // Bisher stand hier nur der Name des Abbruchgrunds. Die
+        // Diagnose nennt Heldenstand, Deckgroessen, Zug/Phase und —
+        // entscheidend — die vom CPU-Treiber gefangenen Ausnahmen mit
+        // dem ersten Karten-Frame aus dem Stack.
+        if (r.nachlauf) {
+          if (r.nachlauf.vorher !== r.nachlauf.nachher) {
+            sag(`     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte `
+              + `${r.nachlauf.vorher} → ${r.nachlauf.nachher} (Zug:Spieler:Phase)`);
+            sag(`        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,`);
+            sag(`        sondern die await-Kette von startGame endete zu frueh.`);
+          }
+          const f = (x) => x ? `inMctsSim=${x.inMctsSim} fastMode=${x.fastMode} `
+            + `fastModeTiefe=${x.fastModeTiefe}` : '—';
+          sag(`     ↳ Fahnen beim Aufloesen: ${f(r.nachlauf.fahnenVorher)}`);
+          sag(`     ↳ Fahnen nach Nachlauf:  ${f(r.nachlauf.fahnenNachher)}`);
+        }
+        if (r.diagnose) sag(`     ↳ Diagnose: ${r.diagnose}`);
+        for (const h of (r.stilleHalte || [])) {
+          sag(`     ↳ STILLER HALT: Zug ${h.zug} p${h.aktiv} Phase ${h.phaseVorher}→${h.phaseNachher}`);
+          sag(`        Brotkrume: ${h.marke}`);
+          if (h.noops) sag(`        switchTurn ohne Wechsel: ${h.noops}x | Wiedereintritt geblockt: ${h.reentry}x`);
+        }
+        if (!(r.stilleHalte || []).length && r.letzteMarke) {
+          sag(`     ↳ letzte Piloten-Marke: ${r.letzteMarke}`);
+        }
+        for (const nn of (r.switchTurnNoops || [])) {
+          sag(`     ↳ switchTurn kehrte ohne Wechsel zurueck: Zug ${nn.zug} p${nn.aktiv} Phase ${nn.phaseVorher}→${nn.phaseNachher}`);
+        }
+        sag(`     ↳ letzte ${letzte.length} Engine-Zeilen vor dem Abbruch:`);
+        for (const z of letzte) sag('       ' + z);
+      }
+    }
+  } finally {
+    schleuse.auf();
+    io.to = _ioTo; io.emit = _ioEmit;
+  }
+  if (!laut && schleuse.anzahl() > 0) {
+    sag(`\n[netbench] ${schleuse.anzahl().toLocaleString('de-DE')} Engine-Ausgabezeilen unterdrueckt `
+      + `(mit --verbose sichtbar).`);
+  }
+
+  const gewertet = proPartie.filter(p2 => p2.gewertet).length;
+  if (gewertet === 0) {
+    sag('');
+    sag('⚠ KEINE einzige Partie ist sauber zu Ende gekommen — Bandbreite laesst sich');
+    sag('  daraus nicht rechnen. Die DIAGNOSE steht trotzdem unten: sie stammt aus');
+    sag('  allen Partien, auch den abgebrochenen — und genau dann braucht man sie.');
+    // ── FEHLER VON MIR, 12.8. ─────────────────────────────────────
+    // Hier stand ein `return`. Damit fielen ausgerechnet in dem Fall,
+    // fuer den die Zaehlwerke gebaut wurden — keine Partie kommt durch —
+    // alle Diagnose-Abschnitte unter den Tisch. Die Zahlen WAREN
+    // erhoben, sie wurden nur nie gedruckt.
+    diagnoseDrucken();
+    sag('');
+    sag('  Fuer Bandbreitenzahlen mit anderen Decks erneut versuchen (--deck-a/--deck-b).');
+    _nbSchreib('');
+    return;
+  }
+  const B = {
+    ereignisse: [...sammler.ereignisse.entries()].map(([name, e]) => ({ name, ...e }))
+      .sort((x, y) => y.wire - x.wire),
+    empfaenger: [...sammler.empfaenger.entries()].map(([sid, e]) => ({ sid, ...e }))
+      .sort((x, y) => y.wire - x.wire),
+    groesster: sammler.groesster,
+    broadcast: sammler.broadcast,
+    summe: {
+      count: [...sammler.ereignisse.values()].reduce((t, e) => t + e.count, 0),
+      raw: [...sammler.ereignisse.values()].reduce((t, e) => t + e.raw, 0),
+      wire: [...sammler.ereignisse.values()].reduce((t, e) => t + e.wire, 0),
+    },
+  };
+  const n = gewertet;
+  const mb = (x) => (x / 1048576);
+  const kb = (x) => (x / 1024);
+  const teilnehmer = 2 + cfg.spectators;
+  const turnsGesamt = proPartie.filter(p => p.gewertet).reduce((s, p) => s + p.turns, 0) || 1;
+
+  const endlos = proPartie.filter(p2 => /^endlosschleife/.test(p2.grund || ''));
+  if (endlos.length) {
+    sag('');
+    sag('═══ ⚠ PARTIEN AN DER OBERGRENZE ═══');
+    sag(`  ${endlos.length} von ${cfg.games} Partien liefen bis zur Obergrenze von ${cfg.maxTurns} Halbzuegen.`);
+    sag('  Normale Partien enden weit darunter, und das Deck-Out beendet sie');
+    sag('  spaetestens von selbst — wer die Grenze reisst, hat also entweder eine');
+    sag('  Paarung, in der niemand durchkommt, oder einen Effekt, der das Ziehen');
+    sag('  dauerhaft unterdrueckt. Betroffen:');
+    for (const p2 of endlos) sag(`    • ${p2.deckA} vs ${p2.deckB} (${p2.grund})`);
+    sag('  Fuer die Bandbreiten-Zahlen sind diese Partien ausgeklammert — sie wuerden');
+    sag('  den Schnitt sonst mit Zehntausenden Nachrichten verfaelschen.');
+  }
+  sag(''); sag(`═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: ${n} gewertete Partien) ═══`);
+  sag('  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis');
+  for (const e of B.ereignisse.slice(0, 15)) {
+    const anteil = 100 * e.wire / (B.summe.wire || 1);
+    sag(
+      `  ${anteil.toFixed(1).padStart(5)}%  ${kb(e.wire / n).toFixed(1).padStart(9)} KB  `
+      + `${kb(e.raw / n).toFixed(1).padStart(9)} KB  ${String(Math.round(e.count / n)).padStart(9)}  `
+      + `${(e.raw / e.count / 1024).toFixed(2).padStart(6)} KB  `
+      + `${(100 - 100 * e.wire / e.raw).toFixed(1).padStart(9)}%  ${e.name}`);
+  }
+  if (B.ereignisse.length > 15) sag(`  … und ${B.ereignisse.length - 15} weitere Ereignisarten`);
+
+  sag(''); sag('═══ JE EMPFÄNGER ═══');
+  const proEmpf = new Map();
+  for (const e of B.empfaenger) {
+    const art = e.sid.includes('-spec-') ? 'Zuschauer' : 'Spieler';
+    const x = proEmpf.get(art) || { count: 0, raw: 0, wire: 0, n: 0 };
+    x.count += e.count; x.raw += e.raw; x.wire += e.wire; x.n++;
+    proEmpf.set(art, x);
+  }
+  for (const [art, x] of proEmpf) {
+    const anzahl = art === 'Spieler' ? 2 : cfg.spectators;
+    sag(`  ${art.padEnd(10)} ${kb(x.wire / n / (anzahl || 1)).toFixed(1).padStart(9)} KB Leitung je Verbindung und Partie  `
+      + `(${kb(x.raw / n / (anzahl || 1)).toFixed(1)} KB roh)`);
+  }
+
+  sag(''); sag('═══ HOCHRECHNUNG ═══');
+  const wirePartie = B.summe.wire / n;
+  const rawPartie = B.summe.raw / n;
+  const wireProSpieler = wirePartie / teilnehmer;
+  sag(`  Ø je Partie:            ${mb(rawPartie).toFixed(2)} MB roh  →  ${mb(wirePartie).toFixed(3)} MB auf der Leitung`);
+  sag(`  Ø je Verbindung:        ${kb(wireProSpieler).toFixed(1)} KB`);
+  sag(`  Ø je Halbzug (alle):    ${kb(B.summe.wire / turnsGesamt).toFixed(2)} KB`);
+  sag(`  Singleplayer (1 Client): ~${kb(wireProSpieler).toFixed(1)} KB je Partie`);
+  sag(`  PvP (2 Clients):         ~${kb(wireProSpieler * 2).toFixed(1)} KB je Partie`);
+  sag(`  je zusätzlichem Zuschauer: ~${kb(wireProSpieler).toFixed(1)} KB je Partie`);
+  const budget = 5 * 1024 * 1024 * 1024;
+  sag(`  In 5 GB passen:          ~${Math.floor(budget / (wireProSpieler || 1)).toLocaleString('de-DE')} Singleplayer-Partien`);
+  sag(`                           ~${Math.floor(budget / (wireProSpieler * 2 || 1)).toLocaleString('de-DE')} PvP-Partien`);
+  sag(`  OHNE Kompression wären es ${Math.floor(budget / ((rawPartie / teilnehmer) || 1)).toLocaleString('de-DE')} bzw. `
+    + `${Math.floor(budget / ((rawPartie / teilnehmer) * 2 || 1)).toLocaleString('de-DE')} — Faktor `
+    + `${(B.summe.raw / (B.summe.wire || 1)).toFixed(1)}`);
+  sag(`  Größte Einzelnachricht:  ${kb(B.groesster.bytes).toFixed(1)} KB (${B.groesster.event})`);
+
+  // ── SCOPE-REGRESSION AUS v378, gefunden am 13.8. ──────────────────
+  // Als der Diagnoseblock in `diagnoseDrucken()` gewandert ist, sind
+  // SECHS `const`-Deklarationen mitgewandert, die der JSON-Schreiber
+  // weiter unten braucht. Jeder Lauf mit mindestens einer gewerteten
+  // Partie ist seitdem beim Schreiben gestorben:
+  //   [netbench] Bericht konnte nicht geschrieben werden: cpuAlle is not defined
+  // Aufgefallen ist es erst jetzt, weil der Lauf davor KEINE gewertete
+  // Partie hatte und in den Null-Zweig lief, der frueher zurueckkehrt.
+  // Der Textbericht war ebenfalls weg — beide Dateien entstehen in
+  // derselben Anweisungsfolge. Deshalb: hier deklariert, drinnen nur
+  // noch zugewiesen.
+  let cpuAlle = 0;
+  let deckListe = [];
+  let fires = [];
+  let leaks = [];
+  let timeouts = [];
+  let griffe = [];
+  let notbremsen = [];
+
+  // Als HOISTETE Funktion deklariert (nicht `const`), damit sie auch
+  // oben im Null-Partien-Zweig aufgerufen werden kann.
+  function diagnoseDrucken() {
+  // ── RECHENZEIT: der zweite knappe Posten neben der Bandbreite ──────
+  // Auf einer freien Render-Instanz ist CPU genauso begrenzt wie
+  // Traffic — und eine Partie, die die CPU minutenlang beschaeftigt,
+  // blockiert dort alles andere. Deshalb steht sie hier mit im Bericht.
+  cpuAlle = proPartie.reduce((n, p2) => n + (p2.cpuMs || 0), 0);
+  sag('');
+  sag('═══ RECHENZEIT ═══');
+  sag(`  Gesamt ueber alle ${proPartie.length} Partien: ${(cpuAlle / 60000).toFixed(1)} min CPU`);
+  const teuerste = [...proPartie].sort((x, y) => (y.cpuMs || 0) - (x.cpuMs || 0)).slice(0, 5);
+  for (const p2 of teuerste) {
+    sag(`  ${((p2.cpuMs || 0) / 1000).toFixed(0).padStart(5)} s  bei ${String(p2.turns).padStart(3)} Halbzuegen`
+      + ` (${((p2.cpuMs || 0) / Math.max(p2.turns, 1) / 1000).toFixed(1)} s/Halbzug)`
+      + `  ${p2.gewertet ? '   ' : ' ⚠ '}${p2.deckA} vs ${p2.deckB}`);
+  }
+
+  deckListe = [...deckKosten.entries()]
+    .map(([name, x]) => ({ name, ...x, proPartie: x.cpuMs / x.partien }))
+    .sort((x, y) => y.proPartie - x.proPartie);
+  if (deckListe.length) {
+    sag('');
+    sag('═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══');
+    sag('   s/Partie  Partien  Abbrueche  Deck');
+    for (const d of deckListe.slice(0, 10)) {
+      sag(`  ${(d.proPartie / 1000).toFixed(0).padStart(9)}  ${String(d.partien).padStart(7)}  `
+        + `${String(d.abbrueche).padStart(9)}  ${d.name}`);
+    }
+    const auffaellig = deckListe.filter(d => d.abbrueche > 0);
+    if (auffaellig.length) {
+      sag(`  → Abbrueche haeufen sich bei: ${auffaellig.map(d => `${d.name} (${d.abbrueche})`).join(', ')}`);
+    }
+  }
+
+  // ── WELCHE KARTEN FEUERN DIE MEISTEN HOOKS ────────────────────────
+  // `_hookFiresByCard` fuehrt die Engine ohnehin mit; bisher tauchte sie
+  // nur in Overload-Dumps auf, also ausgerechnet dann, wenn es schon zu
+  // spaet war. Hier steht sie nach JEDEM Lauf.
+  fires = [...kartenFires.entries()].sort((x, y) => y[1] - x[1]);
+  if (fires.length) {
+    sag('');
+    sag('═══ HOOK-FEUER JE KARTE (Top 15) ═══');
+    const summe = fires.reduce((n, [, v]) => n + v, 0);
+    for (const [name, v] of fires.slice(0, 15)) {
+      const leck = kartenLeaks.get(name);
+      sag(`  ${String(v).padStart(7)}  ${(100 * v / summe).toFixed(1).padStart(5)}%  ${name}`
+        + (leck ? `   ⚠ ${leck} leckende Rollouts` : ''));
+    }
+  }
+  if (steam.size) {
+    const z = (k) => steam.get(k) || 0;
+    sag('');
+    sag('═══ STEAM-DWARF-ZAEHLWERK ═══');
+    const auf = z('aufgerufen'), gef = z('gefeuert');
+    sag(`  Abwurf-Reaktion: ${auf.toLocaleString('de-DE')} Aufrufe → ${gef.toLocaleString('de-DE')} mal gefeuert`
+      + `${auf ? ` (${(100 * gef / auf).toFixed(1)} %)` : ''}`);
+    sag(`    davon abgewiesen: HOPT ${z('raus_hopt').toLocaleString('de-DE')}`
+      + ` | nicht im Support ${z('raus_zone').toLocaleString('de-DE')}`
+      + ` | fremder Abwurf ${z('raus_fremd').toLocaleString('de-DE')}`
+      + ` | inaktiv ${z('raus_inaktiv').toLocaleString('de-DE')}`);
+    sag(`    Wartezeit allein aus den 150-ms-Pausen im Hook: `
+      + `${(z('delay_ms') / 1000).toFixed(1)} s (live; im Rollout uebersprungen)`);
+    sag(`    hoechste erreichte max HP: ${z('maxHp_hoechster').toLocaleString('de-DE')}`);
+    if (z('miner_zugenden')) {
+      sag(`  Miner-Zugende: ${z('miner_zugenden').toLocaleString('de-DE')} Ausloesungen, `
+        + `${z('miner_karten_gesamt').toLocaleString('de-DE')} Karten insgesamt`);
+      sag(`    groesster Einzelzug: ${z('miner_groesster_zug').toLocaleString('de-DE')} Karten`
+        + ` bei ${z('miner_hoechste_hp').toLocaleString('de-DE')} max HP`);
+      sag('    (`count = floor(maxHp / 100)` ist UNGEDECKELT — steigt die HP, steigt die Kette)');
+    }
+  }
+  // ═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══════════════════════════
+  // Karten-Einsatzbericht fuer die Umkehr-Mechanik. Beantwortet in
+  // einer Tabelle: wie oft eingesetzt, hat es eine Aktion gekostet,
+  // welcher Held war das Ziel, was hat die Umkehr an Schaden gebracht,
+  // und wie ist die Partie ausgegangen. Alles aus LIVE-Zuegen — die
+  // beiden Quellen (`_shockLog` in der Karte, `_healReversedDiag` in
+  // der Engine) schliessen Rollouts ausdruecklich aus.
+  if (shockPartien.length) {
+    sag('');
+    sag('═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══');
+    sag('  Modus: `frei` = inhaerente Zusatz-Aktion (Support Magic 2 oder Decay Magic 1');
+    sag('  beim Caster), `zusatz` = ueber einen Geber (Friendship & Co.), `main` = hat');
+    sag('  die Aktion der Runde gekostet. „doppelt" = Ziel trug den Zustand schon —');
+    sag('  jeder solche Einsatz ist verschenkt (der Zustand ist ein Boolean).');
+    sag('');
+    sag('  Partie  Zug  Modus   Caster                      → Ziel (HP)');
+    let nEins = 0, nFrei = 0, nZusatz = 0, nMain = 0, nDoppelt = 0;
+    let nTreffer = 0, nSchaden = 0;
+    let nMitEinsatz = 0, nSiegeMitEinsatz = 0;
+    for (const p2 of shockPartien) {
+      for (const e of p2.einsaetze) {
+        nEins++;
+        if (e.modus === 'frei') nFrei++; else if (e.modus === 'zusatz') nZusatz++; else nMain++;
+        if (e.zielHatteSchon) nDoppelt++;
+        sag(`  ${String(p2.nr).padStart(6)}  ${String(e.zug).padStart(3)}  `
+          + `${String(e.modus).padEnd(6)}  ${String(e.caster).slice(0, 26).padEnd(26)}  → `
+          + `${e.ziel} (${e.zielHp})${e.zielHatteSchon ? '   ⚠ doppelt' : ''}`);
+      }
+      const t = p2.hr?.treffer || 0, d = p2.hr?.schaden || 0;
+      nTreffer += t; nSchaden += d;
+      const wer = (p2.sieger === 0 || p2.sieger === 1) ? p2.decks[p2.sieger] : null;
+      // Die Karte steckt im Deck der Seite, die sie gespielt hat.
+      const seite = p2.einsaetze.length ? p2.einsaetze[0].spieler : null;
+      const gewonnen = (seite != null && p2.sieger === seite);
+      // Gewertet wird nur, was die Frage beantwortet: Partien, in denen
+      // die Karte tatsaechlich gespielt wurde und die sauber endeten.
+      if (p2.gewertet && p2.einsaetze.length) {
+        nMitEinsatz++;
+        if (gewonnen) nSiegeMitEinsatz++;
+      }
+      sag(`          └─ ${String(t).padStart(3)} Umwandlungen, ${String(d).padStart(5)} Schaden`
+        + ` · ${p2.turns} Halbzuege · ${wer ? 'Sieger: ' + wer : 'kein Sieger'}`
+        + ` (${p2.grund})${p2.gewertet ? '' : '  ⚠ nicht gewertet'}`);
+    }
+    sag('');
+    sag(`  SUMME ueber ${shockPartien.length} Partie(n) mit Beteiligung:`);
+    sag(`    Einsaetze: ${nEins}  (frei ${nFrei} | ueber Geber ${nZusatz} | Main-Aktion ${nMain}`
+      + `${nDoppelt ? ` | ⚠ ${nDoppelt} auf ein bereits geschocktes Ziel` : ''})`);
+    sag(`    Umwandlungen: ${nTreffer}, daraus ${nSchaden} Schaden`
+      + `${nEins ? ` (${(nSchaden / nEins).toFixed(0)} je Einsatz)` : ''}`);
+    if (nMitEinsatz) {
+      sag(`    Siege der spielenden Seite: ${nSiegeMitEinsatz}/${nMitEinsatz} gewertete Partien`
+        + ` mit mindestens einem Einsatz (${(100 * nSiegeMitEinsatz / nMitEinsatz).toFixed(0)} %)`);
+    }
+    if (!nEins) {
+      sag('    ⚠ KEIN einziger Einsatz — die Umwandlungen stammen aus einer aelteren');
+      sag('      Anhaftung oder einer anderen Quelle des healReversed-Zustands.');
+    }
+    if (shockEntfernt) {
+      sag(`    Vom Brett entfernt, bevor eingeloest: ${shockEntfernt}`
+        + ` (davon ${shockEntferntLebend} bei noch lebendem Wirt)`);
+    }
+    if (nEins && !nTreffer) {
+      sag('');
+      sag('    ⚠ GELEGT, ABER NIE EINGELOEST. Die Karte liegt richtig, es folgt nur');
+      sag('      keine Heilung auf das Ziel. Die Zielwahl-Tabelle unten sagt, wohin');
+      sag('      die Heilungen stattdessen gehen.');
+    }
+    const wege = [...healRouting.entries()].sort((x, y) => y[1].n - x[1].n);
+    if (wege.length) {
+      sag('');
+      sag('  ZIELWAHL ALLER HEILUNGEN (Versuche, live, je Quelle):');
+      let gGesch = 0, gOffen = 0, gEigen = 0;
+      for (const [k, v] of wege) {
+        if (k.endsWith('gegner-geschockt')) gGesch += v.n;
+        else if (k.endsWith('gegner-offen')) gOffen += v.n;
+        else gEigen += v.n;
+        sag(`    ${String(v.n).padStart(5)}x  ${String(v.hp).padStart(6)} HP  ${k}`);
+      }
+      sag(`    → eigene Seite ${gEigen} | geschockter Gegner ${gGesch}`
+        + ` | Gegner OHNE Umkehr ${gOffen}${gOffen ? '  ⚠ reines Geschenk' : ''}`);
+    }
+  }
+  notbremsen = [...overloads.entries()].sort((x, y) => y[1] - x[1]);
+  if (notbremsen.length) {
+    sag('');
+    sag('═══ ⚠ NOTBREMSEN DER ENGINE ═══');
+    sag('  `_dumpOverloadDiagnostics` hat angeschlagen. `cpu-deadline` heisst: ein');
+    sag('  LIVE-Zug hat sein Zeitbudget gerissen — der Trail-Dump daneben sagt, wobei.');
+    for (const [grund, v] of notbremsen) sag(`  ${String(v).padStart(5)}x  ${grund}`);
+  }
+  griffe = [...startGriffe.entries()].sort((x, y) => y[1] - x[1]);
+  if (griffe.length) {
+    sag('');
+    sag('═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══');
+    sag('  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,');
+    sag('  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche');
+    sag('  GAR NICHT erreicht hat.');
+    for (const [name, v] of griffe.slice(0, 12)) sag(`  ${String(v).padStart(4)}x  ${name}`);
+  }
+  timeouts = [...hookTimeouts.entries()].sort((x, y) => y[1] - x[1]);
+  if (timeouts.length) {
+    sag('');
+    sag('═══ ⚠ ABGEBROCHENE HOOKS ═══');
+    sag('  Die Engine bricht einen Hook ab, wenn er 5 s lang keinen Fortschritt zeigt');
+    sag('  (`_hookProgressTick` steht UND keine Abfrage offen). Rollouts bewegen den');
+    sag('  Tick — wer hier auftaucht, haengt also NICHT in der MCTS-Suche, sondern');
+    sag('  irgendwo davor oder danach. Ein abgebrochener onTurnStart kann den ganzen');
+    sag('  Zug kosten; die Partie endet dann als „ohne-spielende".');
+    for (const [name, v] of timeouts.slice(0, 10)) sag(`  ${String(v).padStart(5)}x  ${name}`);
+  }
+  leaks = [...kartenLeaks.entries()].sort((x, y) => y[1] - x[1]);
+  if (leaks.length) {
+    sag('');
+    sag('═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══');
+    sag('  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.');
+    sag('  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.');
+    sag('  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —');
+    sag('  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.');
+    sag('  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.');
+    for (const [name, v] of leaks.slice(0, 10)) sag(`  ${String(v).padStart(5)}x  ${name}`);
+  }
+  // ── v385: KOSTEN JE KANDIDAT, nicht nur Trefferzahl ───────────────
+  // Die Liste darueber zaehlt nur Rollouts ueber 0,5 MB. Damit sehen
+  // "teuer je Rollout" und "sehr oft bewertet" identisch aus — genau die
+  // Frage, die bei Adventurousness (119 Treffer, Lauf 14.8. 12:02) offen
+  // blieb. Diese Tabelle trennt es: `Rollouts` ist die Haeufigkeit,
+  // `MB/Rollout` die Kosten. Eine Karte, die oft und billig bewertet
+  // wird, steht mit vielen Rollouts und kleinem Schnitt da; ein echter
+  // Fresser mit wenigen Rollouts und grossem Schnitt.
+  const kand = [...kandHeap.entries()]
+    .filter(([, v]) => v.calls > 0)
+    .sort((x, y) => y[1].totalMb - x[1].totalMb);
+  if (kand.length) {
+    sag('');
+    sag('═══ KOSTEN JE MCTS-KANDIDAT ═══');
+    sag('  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe');
+    sag('  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass');
+    sag('  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.');
+    sag('   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat');
+    for (const [name, v] of kand.slice(0, 15)) {
+      const proRollout = v.totalMb / v.calls;
+      sag(`  ${String(v.calls).padStart(8)}  ${v.totalMb.toFixed(1).padStart(9)}  `
+        + `${proRollout.toFixed(3).padStart(11)}  ${String(kartenLeaks.get(name) || 0).padStart(12)}  ${name}`);
+    }
+  }
+  // ── v395: SIEGE JE DECK ───────────────────────────────────────────
+  if (deckBilanz.size) {
+    const zeilen = [...deckBilanz.entries()]
+      .filter(([, v]) => v.partien > 0)
+      .sort((p, q) => (q[1].siege / q[1].partien) - (p[1].siege / p[1].partien));
+    sag('');
+    sag('═══ SIEGE JE DECK (nur gewertete Partien) ═══');
+    sag('  Quote  Siege/Partien  Ø Halbzuege  Ø s CPU (halbiert)  Deck');
+    for (const [name, v] of zeilen) {
+      const q = (100 * v.siege / v.partien).toFixed(0) + '%';
+      sag(`  ${q.padStart(5)}  ${String(v.siege + '/' + v.partien).padStart(13)}  `
+        + `${(v.halbzuege / v.partien).toFixed(1).padStart(11)}  `
+        + `${(v.cpuMs / v.partien / 1000).toFixed(1).padStart(18)}  ${name}`);
+    }
+    const wenig = zeilen.filter(([, v]) => v.partien < 5).length;
+    if (wenig) {
+      sag(`  Hinweis: ${wenig} Deck(s) mit weniger als 5 Partien — Quote dort nicht belastbar.`);
+    }
+  }
+  if (paarung.size) {
+    const mehrfach = [...paarung.entries()].filter(([, v]) => v.n >= 3)
+      .sort((p, q) => q[1].n - p[1].n).slice(0, 15);
+    if (mehrfach.length) {
+      sag('');
+      sag('═══ PAARUNGEN MIT MINDESTENS 3 PARTIEN ═══');
+      for (const [k, v] of mehrfach) {
+        const erst = k.split(' vs ')[0];
+        sag(`  ${String(v.n).padStart(3)}x  ${erst} gewinnt ${v.siegeX}/${v.n}  (${k})`);
+      }
+    }
+  }
+  }   // ← Ende diagnoseDrucken
+  diagnoseDrucken();
+  if (B.broadcast.count) {
+    sag(`  Broadcasts an ALLE:      ${B.broadcast.count} Stück, ${kb(B.broadcast.raw / n).toFixed(1)} KB/Partie roh `
+      + `— live × Anzahl verbundener Clients`);
+  }
+
+  // ── Vollbericht auf Platte ──
+  const stempel = new Date().toISOString().replace(/[:.]/g, '-');
+  const out = _nbEnv('PP_NETTEST_OUT',
+    path.join(__dirname, 'data', 'netbench', `netbench-${stempel}.json`));
+  const txt = out.replace(/\.json$/i, '') + '.txt';
+  try {
+    fs.mkdirSync(path.dirname(txt), { recursive: true });
+    // Der Textbericht enthaelt WORTGLEICH das, was oben in der Konsole
+    // stand — plus die Einzelpartien-Tabelle, die dort nur als Zeilen
+    // vorbeilief. Zum Nachlesen ohne JSON-Betrachter.
+    const tabelle = ['', '═══ EINZELPARTIEN ═══',
+      '  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks'];
+    for (const p2 of proPartie) {
+      tabelle.push(`  ${String(p2.nr).padStart(2)}  ${String(p2.turns).padStart(9)}  `
+        + `${String(p2.nachrichten).padStart(11)}  ${(p2.raw / 1048576).toFixed(2).padStart(9)}  `
+        + `${(p2.wire / 1048576).toFixed(3).padStart(11)}  ${(p2.ms / 1000).toFixed(0).padStart(4)}  `
+        + `${((p2.cpuMs || 0) / 1000).toFixed(0).padStart(5)}  `
+        + `${(p2.gewertet ? 'ja' : 'NEIN').padStart(8)}  `
+        + `${String(p2.grund || '').padEnd(17)}  ${p2.deckA} vs ${p2.deckB}`);
+    }
+    fs.writeFileSync(txt, zeilen.concat(tabelle, ['']).join('\n'), { encoding: 'utf-8' });
+    fs.writeFileSync(out, JSON.stringify({
+      erzeugt: new Date().toISOString(),
+      konfiguration: cfg,
+      partien: proPartie,
+      ereignisse: B.ereignisse,
+      empfaenger: B.empfaenger,
+      summe: B.summe,
+      groesste_nachricht: B.groesster,
+      broadcasts: B.broadcast,
+      auffaellige_partien: auffaellig,
+      deck_bilanz: Object.fromEntries([...deckBilanz.entries()].map(([k, v]) => [k, {
+        partien: v.partien, siege: v.siege,
+        quote: +(v.siege / v.partien).toFixed(3),
+        halbzuegeSchnitt: +(v.halbzuege / v.partien).toFixed(1),
+        cpuSekSchnitt: +(v.cpuMs / v.partien / 1000).toFixed(1) }])),
+      paarungen: Object.fromEntries([...paarung.entries()]),
+      kandidaten_heap: Object.fromEntries([...kandHeap.entries()]
+        .map(([k, v]) => [k, { rollouts: v.calls, mbGesamt: +v.totalMb.toFixed(2),
+          mbProRollout: +(v.totalMb / Math.max(1, v.calls)).toFixed(4),
+          ueberSchwelle: kartenLeaks.get(k) || 0 }])),
+      unterdrueckte_ausgabezeilen: schleuse.anzahl(),
+      cpu_ms_gesamt: cpuAlle,
+      hook_feuer_je_karte: Object.fromEntries(fires),
+      leckende_rollouts: Object.fromEntries(leaks),
+      abgebrochene_hooks: Object.fromEntries(timeouts),
+      spielstart_griffe: Object.fromEntries(griffe),
+      notbremsen: Object.fromEntries(notbremsen),
+      steam_dwarf_zaehlwerk: Object.fromEntries(steam),
+      overheal_shock: shockPartien,
+      heil_zielwahl: Object.fromEntries(healRouting),
+      shock_entfernt: { gesamt: shockEntfernt, wirtLebte: shockEntferntLebend },
+      deck_kosten: deckListe,
+      hochrechnung: {
+        wire_je_partie: wirePartie, roh_je_partie: rawPartie,
+        wire_je_verbindung: wireProSpieler,
+        wire_je_halbzug: B.summe.wire / turnsGesamt,
+        kompressionsfaktor: B.summe.raw / (B.summe.wire || 1),
+      },
+    }, null, 2), { encoding: 'utf-8' });
+    _nbSchreib(`\n[netbench] Bericht (Text): ${txt}`);
+    _nbSchreib(`[netbench] Bericht (JSON): ${out}`);
+  } catch (e) {
+    console.error('[netbench] Bericht konnte nicht geschrieben werden:', e.message);
+  }
+}
+
 // ===== CATCH-ALL (SPA) =====
 app.get('*', serveIndexHtml);
 
@@ -15841,10 +17742,16 @@ if (process.env.PP_TRAIN) {
   runTrainingBatch()
     .then(() => process.exit(0))
     .catch(err => { console.error('[train] batch failed:', err); process.exit(1); });
+} else if (_nbEnv('PP_NETTEST', '') === '1') {
+  // Bandbreiten-Messstand — wie der Trainingslauf ohne Datenbank und
+  // ohne Socket-Server. Siehe den Block bei runNetBenchmark().
+  runNetBenchmark()
+    .then(() => process.exit(0))
+    .catch(err => { console.error('[netbench] fehlgeschlagen:', err); process.exit(1); });
 } else
 initDatabase().then(async () => {
   await purgeAllGuests(); // clear orphaned guest accounts from previous runs
-  server.listen(PORT, () => {
+  server.listen(PORT, HOST, () => {
     // ── DIAGNOSE-SCHALTER BEIM START ANZEIGEN ─────────────────────
     // Zum ZWEITEN Mal ist eine Umgebungsvariable still nicht
     // angekommen (erst PP_DEMO_RECORD, jetzt PP_CHAIN_DEBUG /
@@ -15876,6 +17783,20 @@ initDatabase().then(async () => {
         } else {
           console.log('[diagnose] keine Diagnose-Schalter aktiv.')
         }
+      }
+      // Zustand der Entwicklerwerkzeuge unuebersehbar melden. Beim
+      // Bandbreiten-Problem war „laeuft da was, das nicht laufen soll?"
+      // genau die Frage, die man nicht raten will — also sagt der
+      // Server sie beim Hochfahren an.
+      if (DEBUG_TOOLS_ENABLED) {
+        console.warn('[debug-tools] AN (PP_DEBUG_TOOLS=1) — Selbstspiel, A/B, CPU-vs-CPU und '
+          + 'Snapshot-Test sind ueber Socket-Ereignisse ausloesbar. Auf einer LIVE-Instanz ausschalten.');
+      } else {
+        console.log('[debug-tools] AUS — Selbstspiel-/Debug-Ereignisse sind nicht angemeldet.');
+      }
+      if (process.env.PP_DEBUG_TOOLS != null && process.env.PP_DEBUG_TOOLS !== '1') {
+        console.warn('[debug-tools] PP_DEBUG_TOOLS ist gesetzt, aber nicht auf "1": '
+          + JSON.stringify(process.env.PP_DEBUG_TOOLS) + ' — bleibt AUS.');
       }
     }
 

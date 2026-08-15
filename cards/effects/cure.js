@@ -175,6 +175,12 @@ module.exports = {
         description: 'Choose a target to cleanse all negative status effects and heal.',
         confirmLabel: '💚 Cure!',
         confirmClass: 'btn-success',
+        // v385: Cure heilt UND reinigt — beides ist auf einem Gegner ohne
+        // `healReversed` ein Geschenk. Das Flag schaltet die Heil-Gates in
+        // `cpuPickTargets` scharf (eigene Seite oder geschockter Gegner);
+        // ohne es entschied allein der gelernte Prior, und im Messlauf
+        // 14.8. 12:02 gingen so 2 Cures an offene Gegner.
+        isHealing: true,
         cancellable: true,
         greenSelect: true,
         exclusiveTypes: true,
@@ -212,6 +218,7 @@ module.exports = {
       description: 'Choose a target to cleanse all negative status effects and heal.',
       confirmLabel: '💚 Cure!',
       confirmClass: 'btn-success',
+      isHealing: true,   // v385, Begruendung im onPlay-Zweig
       cancellable: false,
       greenSelect: true,
       exclusiveTypes: true,

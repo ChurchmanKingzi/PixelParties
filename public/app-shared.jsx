@@ -64,7 +64,7 @@ window.getPointerXY = getPointerXY;
 
 // ═══════════════════════════════════════════
 //  SOUND EFFECT MANAGER
-//  Preloads all /sounds/*.wav (or *.mp3 — see SFX_EXT_OVERRIDES) once via
+//  Preloads all /sounds/*.ogg (see SFX_EXT_OVERRIDES) once via
 //  Web Audio API, then plays overlapping copies on demand. Volume is read
 //  from window._ppGetVolume at play time so the slider takes effect
 //  immediately. `decodeAudioData` handles both wav and mp3 transparently
@@ -73,12 +73,16 @@ window.getPointerXY = getPointerXY;
 // ═══════════════════════════════════════════
 
 // Per-name file-extension overrides. Anything not listed here is loaded
-// from /sounds/{name}.wav. Listed names use their explicit extension —
+// from /sounds/{name}.ogg. Listed names use their explicit extension —
 // the decode path doesn't care, browsers auto-detect format.
-const SFX_EXT_OVERRIDES = {
-  victory: 'mp3',
-  defeat:  'mp3',
-};
+// v350: Standard ist jetzt OGG Vorbis statt WAV. Die 52 Effektklaenge
+// lagen unkomprimiert vor (16 MB) und werden ALLE bei jedem
+// Seitenaufruf vorgeladen — das war der groesste Einzelposten der
+// ausgehenden Bandbreite. Als OGG q4 sind es 0,73 MB, also ein
+// Zwanzigstel, bei fuer kurze Effekte nicht hoerbarem Unterschied.
+// `decodeAudioData` schnueffelt ohnehin am Bytestrom, die Endung
+// betrifft nur die Abruf-URL.
+const SFX_EXT_OVERRIDES = {};
 
 const SFX_NAMES = [
   'ability_activate', 'ascension', 'attack_ram', 'buff', 'burn',
@@ -116,7 +120,7 @@ function _getSfxCtx() {
 // allowed to start" warning on page load.
 function _fetchSfxBytes(name) {
   if (_sfxBytes[name] || _sfxMissing[name]) return;
-  const ext = SFX_EXT_OVERRIDES[name] || 'wav';
+  const ext = SFX_EXT_OVERRIDES[name] || 'ogg';   // v350: war 'wav'
   fetch(`/sounds/${name}.${ext}`)
     .then(r => { if (!r.ok) throw new Error('404'); return r.arrayBuffer(); })
     .then(buf => {

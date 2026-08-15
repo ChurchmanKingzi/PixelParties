@@ -1,0 +1,879 @@
+{
+  "erzeugt": "2026-08-14T13:57:34.664Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Gates to Hell",
+      "turns": 7,
+      "ms": 15495,
+      "nachrichten": 1114,
+      "raw": 4297823,
+      "wire": 79130,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 18281,
+      "snapshots": 4116,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Creepy Crawlies",
+      "deckB": "Gates to Hell",
+      "turns": 13,
+      "ms": 12126,
+      "nachrichten": 2149,
+      "raw": 8749334,
+      "wire": 149640,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 15890,
+      "snapshots": 3248,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Idej Illusions",
+      "deckB": "Gates to Hell",
+      "turns": 1,
+      "ms": 39,
+      "nachrichten": 91,
+      "raw": 317111,
+      "wire": 9944,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 77,
+      "snapshots": 5,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Cute Commando",
+      "deckB": "Gates to Hell",
+      "turns": 11,
+      "ms": 34998,
+      "nachrichten": 1892,
+      "raw": 7423972,
+      "wire": 131229,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 37922,
+      "snapshots": 4643,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Grand Rebellion!",
+      "deckB": "Gates to Hell",
+      "turns": 19,
+      "ms": 58721,
+      "nachrichten": 1462,
+      "raw": 6244072,
+      "wire": 105259,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 59610,
+      "snapshots": 7772,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Deepsea Terror",
+      "deckB": "Gates to Hell",
+      "turns": 6,
+      "ms": 17350,
+      "nachrichten": 809,
+      "raw": 3210738,
+      "wire": 61285,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 18530,
+      "snapshots": 2401,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Gates to Hell",
+      "turns": 2,
+      "ms": 8096,
+      "nachrichten": 293,
+      "raw": 897827,
+      "wire": 20995,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 8203,
+      "snapshots": 1100,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Shifting Sandlands",
+      "deckB": "Gates to Hell",
+      "turns": 2,
+      "ms": 199,
+      "nachrichten": 137,
+      "raw": 414726,
+      "wire": 12042,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 157,
+      "snapshots": 26,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Slimy Infestation",
+      "deckB": "Gates to Hell",
+      "turns": 5,
+      "ms": 20657,
+      "nachrichten": 619,
+      "raw": 2287272,
+      "wire": 43223,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 20859,
+      "snapshots": 4126,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Depths of the Cosmos",
+      "deckB": "Gates to Hell",
+      "turns": 53,
+      "ms": 25483,
+      "nachrichten": 4224,
+      "raw": 18225953,
+      "wire": 299770,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 25750,
+      "snapshots": 1712,
+      "hookTimeouts": 0
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 3472,
+      "raw": 33847057,
+      "wire": 415767
+    },
+    {
+      "name": "action_log",
+      "count": 3418,
+      "raw": 437876,
+      "wire": 114400
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 332,
+      "raw": 29946,
+      "wire": 13477
+    },
+    {
+      "name": "card_reveal",
+      "count": 312,
+      "raw": 17424,
+      "wire": 7663
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 112,
+      "raw": 13170,
+      "wire": 5949
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 84,
+      "raw": 10952,
+      "wire": 5027
+    },
+    {
+      "name": "ability_activated",
+      "count": 146,
+      "raw": 10790,
+      "wire": 4063
+    },
+    {
+      "name": "summon_effect",
+      "count": 78,
+      "raw": 6570,
+      "wire": 2348
+    },
+    {
+      "name": "deck_search_add",
+      "count": 80,
+      "raw": 5278,
+      "wire": 2341
+    },
+    {
+      "name": "potion_resolved",
+      "count": 28,
+      "raw": 2256,
+      "wire": 1302
+    },
+    {
+      "name": "surprise_flip",
+      "count": 24,
+      "raw": 2696,
+      "wire": 1261
+    },
+    {
+      "name": "gold_change",
+      "count": 44,
+      "raw": 1804,
+      "wire": 1061
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 12,
+      "raw": 2084,
+      "wire": 986
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 30,
+      "raw": 2038,
+      "wire": 967
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 18,
+      "raw": 2248,
+      "wire": 777
+    },
+    {
+      "name": "game_started",
+      "count": 3,
+      "raw": 828,
+      "wire": 581
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 6,
+      "raw": 894,
+      "wire": 487
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 6,
+      "raw": 972,
+      "wire": 347
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 8,
+      "raw": 488,
+      "wire": 293
+    },
+    {
+      "name": "mill_center_reveal",
+      "count": 6,
+      "raw": 778,
+      "wire": 274
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 8,
+      "raw": 488,
+      "wire": 184
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 4,
+      "raw": 300,
+      "wire": 146
+    },
+    {
+      "name": "surprise_reset",
+      "count": 6,
+      "raw": 468,
+      "wire": 131
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 4,
+      "raw": 320,
+      "wire": 126
+    },
+    {
+      "name": "alleria_spider_redirect",
+      "count": 2,
+      "raw": 246,
+      "wire": 124
+    },
+    {
+      "name": "play_card_showcase",
+      "count": 4,
+      "raw": 296,
+      "wire": 116
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 4,
+      "raw": 112,
+      "wire": 112
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 4,
+      "raw": 156,
+      "wire": 108
+    },
+    {
+      "name": "area_descend",
+      "count": 4,
+      "raw": 232,
+      "wire": 80
+    },
+    {
+      "name": "burn_tick",
+      "count": 2,
+      "raw": 176,
+      "wire": 77
+    },
+    {
+      "name": "reaction_chain_link_resolved",
+      "count": 4,
+      "raw": 316,
+      "wire": 64
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-452f37fb",
+      "count": 2116,
+      "raw": 9253370,
+      "wire": 150821
+    },
+    {
+      "sid": "sid-b-netbench-452f37fb",
+      "count": 2107,
+      "raw": 8972307,
+      "wire": 148755
+    },
+    {
+      "sid": "sid-a-netbench-3b91b213",
+      "count": 1069,
+      "raw": 4462230,
+      "wire": 76037
+    },
+    {
+      "sid": "sid-b-netbench-3b91b213",
+      "count": 1079,
+      "raw": 4286828,
+      "wire": 73409
+    },
+    {
+      "sid": "sid-a-netbench-e0046d05",
+      "count": 951,
+      "raw": 3758182,
+      "wire": 66966
+    },
+    {
+      "sid": "sid-b-netbench-e0046d05",
+      "count": 940,
+      "raw": 3665514,
+      "wire": 64070
+    },
+    {
+      "sid": "room:netbench-3b91b213",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-452f37fb",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-e0046d05",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 8265,
+    "raw": 34399259,
+    "wire": 580639
+  },
+  "groesste_nachricht": {
+    "bytes": 14881,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 3,
+    "raw": 825
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 1,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[deck-profile] loaded \"Great Weapon Master\" (great-weapon-master.json): 18 card values, 18 pairs, 10 ability priors, trained on 1360 games (win-rate 46.6%)",
+        "[deck-profile] loaded \"Guardians of the Treasure Cave\" (guardians-of-the-treasure-cave.json): 19 card values, 19 pairs, 20 ability priors, trained on 1292 games (win-rate 49.4%)",
+        "[deck-profile] loaded \"Heal Burn\" (heal-burn.json): 20 card values, 1 pairs, 24 ability priors, trained on 1392 games (win-rate 58.1%)",
+        "[deck-profile] loaded \"Idej Illusions\" (idej-illusions.json): 11 card values, 29 pairs, 22 ability priors, trained on 1360 games (win-rate 31%)",
+        "[deck-profile] loaded \"Join our Cult!\" (join-our-cult.json): 17 card values, 16 pairs, 33 ability priors, trained on 1360 games (win-rate 62.2%)",
+        "[deck-profile] loaded \"Lightning Caller\" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)",
+        "[deck-profile] loaded \"Man's Best Friends\" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)",
+        "[deck-profile] loaded \"Mawstruck\" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)",
+        "[deck-profile] loaded \"Morph and Kill!\" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)",
+        "[deck-profile] loaded \"One-Two-Punch!\" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)",
+        "[deck-profile] loaded \"Parts of the Soul\" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)",
+        "[deck-profile] loaded \"Pew-Pew!\" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)",
+        "[deck-profile] loaded \"Poison Torture\" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)",
+        "[deck-profile] loaded \"Sacrificial Demons\" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)",
+        "[deck-profile] loaded \"Shadows over Blackport\" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)",
+        "[deck-profile] loaded \"Shifting Sandlands\" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)",
+        "[deck-profile] loaded \"Slimy Infestation\" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)",
+        "[deck-profile] loaded \"Slip 'n Slide\" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)",
+        "[deck-profile] loaded \"Spell Industrialization\" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)",
+        "[deck-profile] loaded \"Steam Dwarf Mines\" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)",
+        "[deck-profile] loaded \"Suicide Bombers\" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)",
+        "[deck-profile] loaded \"Sun Fencer Frenzy\" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)",
+        "[deck-profile] loaded \"To Attain Divinity\" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)",
+        "[deck-profile] loaded \"Venom Swamp\" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)",
+        "[heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+25 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=65 heapUsed=40"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 950hp, deck 33, hand 8) | p1(heroes 3/3 alive, 460hp, deck 36, hand 10) | turn 7 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 3,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1000hp, deck 52, hand 5) | p1(heroes 3/3 alive, 1050hp, deck 50, hand 3) | turn 1 phase 4 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 5,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 2/3 alive, 425hp, deck 31, hand 6) | p1(heroes 3/3 alive, 900hp, deck 26, hand 7) | turn 19 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 6,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Siphem, the Deepsea Demon\" → Theme \"siphem\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1250hp, deck 48, hand 3) | p1(heroes 3/3 alive, 1100hp, deck 37, hand 9) | turn 6 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 7,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Andras, the Human Weapon\" → Theme \"andras\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1300hp, deck 49, hand 6) | p1(heroes 3/3 alive, 1100hp, deck 49, hand 5) | turn 2 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 8,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1200hp, deck 53, hand 7) | p1(heroes 3/3 alive, 1000hp, deck 49, hand 3) | turn 2 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 9,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1200hp, deck 52, hand 4) | p1(heroes 3/3 alive, 1050hp, deck 41, hand 10) | turn 5 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "kandidaten_heap": {
+    "Adventurousness": {
+      "rollouts": 1206,
+      "mbGesamt": 372.3,
+      "mbProRollout": 0.3087,
+      "ueberSchwelle": 117
+    },
+    "Critical Strike": {
+      "rollouts": 176,
+      "mbGesamt": 160.37,
+      "mbProRollout": 0.9112,
+      "ueberSchwelle": 55
+    },
+    "Heavy Hit": {
+      "rollouts": 44,
+      "mbGesamt": 16.46,
+      "mbProRollout": 0.3741,
+      "ueberSchwelle": 0
+    },
+    "Rain of Arrows": {
+      "rollouts": 219,
+      "mbGesamt": 43,
+      "mbProRollout": 0.1964,
+      "ueberSchwelle": 0
+    },
+    "Demon's Gate": {
+      "rollouts": 883,
+      "mbGesamt": 475.7,
+      "mbProRollout": 0.5387,
+      "ueberSchwelle": 54
+    },
+    "Crimson Skull Spider": {
+      "rollouts": 4,
+      "mbGesamt": 5.79,
+      "mbProRollout": 1.448,
+      "ueberSchwelle": 0
+    },
+    "Gravedigger Slap": {
+      "rollouts": 6,
+      "mbGesamt": 10.06,
+      "mbProRollout": 1.6772,
+      "ueberSchwelle": 0
+    },
+    "Harpyformer Choir": {
+      "rollouts": 20,
+      "mbGesamt": -0.88,
+      "mbProRollout": -0.0442,
+      "ueberSchwelle": 0
+    },
+    "Cute Dog": {
+      "rollouts": 132,
+      "mbGesamt": 56.21,
+      "mbProRollout": 0.4259,
+      "ueberSchwelle": 0
+    },
+    "Forceful Revival": {
+      "rollouts": 67,
+      "mbGesamt": 92.87,
+      "mbProRollout": 1.3862,
+      "ueberSchwelle": 0
+    },
+    "Cute Cat": {
+      "rollouts": 16,
+      "mbGesamt": 2.44,
+      "mbProRollout": 0.1526,
+      "ueberSchwelle": 0
+    },
+    "Cute Bunny": {
+      "rollouts": 28,
+      "mbGesamt": 19.05,
+      "mbProRollout": 0.6805,
+      "ueberSchwelle": 0
+    },
+    "Frolake": {
+      "rollouts": 1,
+      "mbGesamt": 2,
+      "mbProRollout": 2.0042,
+      "ueberSchwelle": 0
+    },
+    "Grave Worm": {
+      "rollouts": 1,
+      "mbGesamt": 1.99,
+      "mbProRollout": 1.99,
+      "ueberSchwelle": 0
+    },
+    "Ska Harpyformer": {
+      "rollouts": 7,
+      "mbGesamt": -3.64,
+      "mbProRollout": -0.5197,
+      "ueberSchwelle": 0
+    },
+    "Cute Bird": {
+      "rollouts": 49,
+      "mbGesamt": 28.87,
+      "mbProRollout": 0.5893,
+      "ueberSchwelle": 0
+    },
+    "Rebelliokai Oblivious Oni": {
+      "rollouts": 3,
+      "mbGesamt": -13.66,
+      "mbProRollout": -4.5528,
+      "ueberSchwelle": 0
+    },
+    "Champion, the Stormbringer": {
+      "rollouts": 78,
+      "mbGesamt": 88.04,
+      "mbProRollout": 1.1287,
+      "ueberSchwelle": 0
+    },
+    "Kirin Firebreath": {
+      "rollouts": 27,
+      "mbGesamt": 20.15,
+      "mbProRollout": 0.7464,
+      "ueberSchwelle": 0
+    },
+    "Kappa Sword Slash": {
+      "rollouts": 30,
+      "mbGesamt": 32.16,
+      "mbProRollout": 1.072,
+      "ueberSchwelle": 0
+    },
+    "Rebelliokai Terror Tengu": {
+      "rollouts": 66,
+      "mbGesamt": 145.57,
+      "mbProRollout": 2.2056,
+      "ueberSchwelle": 0
+    },
+    "Tanuki Escape": {
+      "rollouts": 8,
+      "mbGesamt": 15.49,
+      "mbProRollout": 1.9362,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Pirate": {
+      "rollouts": 119,
+      "mbGesamt": 85.37,
+      "mbProRollout": 0.7174,
+      "ueberSchwelle": 23
+    },
+    "Dark Deepsea God": {
+      "rollouts": 142,
+      "mbGesamt": -4.27,
+      "mbProRollout": -0.0301,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Primordium": {
+      "rollouts": 39,
+      "mbGesamt": -17.08,
+      "mbProRollout": -0.4379,
+      "ueberSchwelle": 21
+    },
+    "Shadowy Slime": {
+      "rollouts": 44,
+      "mbGesamt": 5.31,
+      "mbProRollout": 0.1207,
+      "ueberSchwelle": 12
+    },
+    "Icy Slime": {
+      "rollouts": 73,
+      "mbGesamt": 70.76,
+      "mbProRollout": 0.9693,
+      "ueberSchwelle": 21
+    },
+    "Slime Rancher": {
+      "rollouts": 44,
+      "mbGesamt": 3.56,
+      "mbProRollout": 0.0809,
+      "ueberSchwelle": 11
+    },
+    "Gerrymander": {
+      "rollouts": 118,
+      "mbGesamt": 45.76,
+      "mbProRollout": 0.3878,
+      "ueberSchwelle": 7
+    },
+    "The Cosmic Depths": {
+      "rollouts": 9,
+      "mbGesamt": 2.59,
+      "mbProRollout": 0.2876,
+      "ueberSchwelle": 0
+    },
+    "Analyzer from the Cosmic Depths": {
+      "rollouts": 93,
+      "mbGesamt": 99.2,
+      "mbProRollout": 1.0667,
+      "ueberSchwelle": 0
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 57,
+  "cpu_ms_gesamt": 205279,
+  "hook_feuer_je_karte": {
+    "Treasure Huntress Semi": 165,
+    "Glass of Marbles": 120,
+    "Giga Steroids": 118,
+    "Cute Cat": 107,
+    "Cute Dog": 70,
+    "Creativity": 63,
+    "Argos, the Eye of the Cosmos": 53,
+    "Skull Necklace": 52,
+    "Invader Token": 48,
+    "Fighting": 39,
+    "Elixir of Immortality": 32,
+    "Rebelliokai Backup Bakus": 27,
+    "Performance": 25,
+    "Harpyformer Choir": 24,
+    "Lizbeth, the Reaper of the Light": 17,
+    "Divine Gift of Balance": 16,
+    "Ska Harpyformer": 15,
+    "Cool Rescuer Monia": 15,
+    "Johanna, Crusader of Light": 14,
+    "Stellan, the Calm Cat": 14,
+    "Nicolas, the Hidden Alchemist": 11,
+    "Biomancy": 11,
+    "Xiong, the Bamboo Guardian": 11,
+    "Barker, the Monster Tamer": 11,
+    "Mystery Box": 9,
+    "Alleria, the Queen of Spiders": 9,
+    "Resistance": 9,
+    "Idej Projection": 9,
+    "Analyzer from the Cosmic Depths": 9,
+    "Cute Bunny": 8,
+    "Alex, Trainer of Heroes": 7,
+    "Divine Gift of the Guardian": 7,
+    "Jumper Spider": 6,
+    "Bamboo Shield": 5,
+    "Cybug CENTIPEDE": 5,
+    "Cybug BEE": 4,
+    "Sparky Slime": 4,
+    "Icy Slime": 4,
+    "Rain of Arrows": 3,
+    "Toughness": 3,
+    "Rebelliokai Terror Tengu": 3,
+    "Sacred Hammer of the Volcano": 3,
+    "Slime Rancher": 3,
+    "Rebelliokai Timid Tanuki": 2,
+    "Deepsea Pirate": 2,
+    "Wealth": 2,
+    "Quick Attack": 1,
+    "Metal Harpyformer": 1,
+    "Heavy Hit": 1,
+    "Critical Strike": 1,
+    "Spider Hive": 1,
+    "Divine Gift of Fire": 1,
+    "Idej Lord Daiyo": 1,
+    "Forceful Revival": 1,
+    "Kirin Firebreath": 1,
+    "Deepsea Primordium": 1,
+    "Deepsea Bats": 1,
+    "Teppes, the Deepsea Vampire": 1,
+    "Siphem, the Deepsea Demon": 1,
+    "Deepsea Witch": 1,
+    "The Cosmic Depths": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 117,
+    "Critical Strike": 55,
+    "Demon's Gate": 54,
+    "Deepsea Pirate": 23,
+    "Deepsea Primordium": 21,
+    "Icy Slime": 21,
+    "Shadowy Slime": 12,
+    "Slime Rancher": 11,
+    "Gerrymander": 7
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Deepsea Primordium [priority]": 1,
+    "Barker, the Monster Tamer → Sparky Slime [rule]": 1
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [],
+  "heil_zielwahl": {
+    "Healing Potion → eigen": {
+      "n": 1,
+      "hp": 200
+    }
+  },
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "Grand Rebellion!",
+      "cpuMs": 29805,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 29805
+    },
+    {
+      "name": "Cute Commando",
+      "cpuMs": 18961,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 18961
+    },
+    {
+      "name": "Depths of the Cosmos",
+      "cpuMs": 12875,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 12875
+    },
+    {
+      "name": "Slimy Infestation",
+      "cpuMs": 10429.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 10429.5
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 102639.5,
+      "partien": 10,
+      "abbrueche": 7,
+      "proPartie": 10263.95
+    },
+    {
+      "name": "Deepsea Terror",
+      "cpuMs": 9265,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 9265
+    },
+    {
+      "name": "Bamboo Warrior",
+      "cpuMs": 9140.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 9140.5
+    },
+    {
+      "name": "Creepy Crawlies",
+      "cpuMs": 7945,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 7945
+    },
+    {
+      "name": "Boom Boom Kaboom!",
+      "cpuMs": 4101.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 4101.5
+    },
+    {
+      "name": "Shifting Sandlands",
+      "cpuMs": 78.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 78.5
+    },
+    {
+      "name": "Idej Illusions",
+      "cpuMs": 38.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 38.5
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 193546.33333333334,
+    "roh_je_partie": 11466419.666666666,
+    "wire_je_verbindung": 96773.16666666667,
+    "wire_je_halbzug": 7540.766233766234,
+    "kompressionsfaktor": 59.24379692028954
+  }
+}

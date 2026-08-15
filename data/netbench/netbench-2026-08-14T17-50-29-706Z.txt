@@ -1,0 +1,217 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    3 Halbzuege     206 Nachrichten     0.63 MB roh  →    0.015 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Cute Commando vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1150hp, deck 49, hand 5) | p1(heroes 3/3 alive, 1000hp, deck 47, hand 5) | turn 3 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [deck-profile] loaded "Great Weapon Master" (great-weapon-master.json): 18 card values, 18 pairs, 10 ability priors, trained on 1360 games (win-rate 46.6%)
+       [deck-profile] loaded "Guardians of the Treasure Cave" (guardians-of-the-treasure-cave.json): 19 card values, 19 pairs, 20 ability priors, trained on 1292 games (win-rate 49.4%)
+       [deck-profile] loaded "Heal Burn" (heal-burn.json): 20 card values, 1 pairs, 24 ability priors, trained on 1392 games (win-rate 58.1%)
+       [deck-profile] loaded "Idej Illusions" (idej-illusions.json): 11 card values, 29 pairs, 22 ability priors, trained on 1360 games (win-rate 31%)
+       [deck-profile] loaded "Join our Cult!" (join-our-cult.json): 17 card values, 16 pairs, 33 ability priors, trained on 1360 games (win-rate 62.2%)
+       [deck-profile] loaded "Lightning Caller" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)
+       [deck-profile] loaded "Man's Best Friends" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)
+       [deck-profile] loaded "Mawstruck" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)
+       [deck-profile] loaded "Morph and Kill!" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)
+       [deck-profile] loaded "One-Two-Punch!" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)
+       [deck-profile] loaded "Parts of the Soul" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)
+       [deck-profile] loaded "Pew-Pew!" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)
+       [deck-profile] loaded "Poison Torture" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)
+       [deck-profile] loaded "Sacrificial Demons" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)
+       [deck-profile] loaded "Shadows over Blackport" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)
+       [deck-profile] loaded "Shifting Sandlands" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)
+       [deck-profile] loaded "Slimy Infestation" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)
+       [deck-profile] loaded "Slip 'n Slide" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)
+       [deck-profile] loaded "Spell Industrialization" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)
+       [deck-profile] loaded "Steam Dwarf Mines" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)
+       [deck-profile] loaded "Suicide Bombers" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)
+       [deck-profile] loaded "Sun Fencer Frenzy" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)
+       [deck-profile] loaded "To Attain Divinity" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)
+       [deck-profile] loaded "Venom Swamp" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+32 MB (inkl. Grundlast) | jetzt rss=100 heapTotal=68 heapUsed=39
+  Partie   2/10    3 Halbzuege     159 Nachrichten     0.49 MB roh  →    0.013 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Creepy Crawlies vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1050hp, deck 53, hand 5) | p1(heroes 3/3 alive, 1050hp, deck 52, hand 3) | turn 3 phase 0 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Alleria, the Queen of Spiders" → Theme "alleria" (48 Themes im Ordner)
+  Partie   3/10    2 Halbzuege     329 Nachrichten     1.06 MB roh  →    0.023 MB Leitung     2 s     3 s CPU  ⚠ ohne-spielende  Gather That Storm! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 50, hand 8) | p1(heroes 3/3 alive, 1150hp, deck 47, hand 7) | turn 2 phase 5 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug2p1ph5
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug2p1ph5
+        switchTurn ohne Wechsel: 1x | Wiedereintritt geblockt: 1x
+     ↳ switchTurn kehrte ohne Wechsel zurueck: Zug 2 p1 Phase 5→5
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Tarleinn the Traveler" → Theme "tarleinn" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→5 — ok:zugende@zug2p1ph5
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→5 — ok:zugende@zug2p1ph5
+  Partie   4/10    2 Halbzuege     474 Nachrichten     1.72 MB roh  →    0.034 MB Leitung     2 s     3 s CPU  ⚠ ohne-spielende  Dance of the Butterflies vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 950hp, deck 40, hand 14) | p1(heroes 3/3 alive, 1150hp, deck 46, hand 6) | turn 2 phase 5 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug2p1ph5
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug2p1ph5
+        switchTurn ohne Wechsel: 1x | Wiedereintritt geblockt: 1x
+     ↳ switchTurn kehrte ohne Wechsel zurueck: Zug 2 p1 Phase 5→5
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Beato, the Butterfly Witch" → Theme "beato" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→5 — ok:zugende@zug2p1ph5
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→5 — ok:zugende@zug2p1ph5
+  Partie   5/10   10 Halbzuege    1126 Nachrichten     3.98 MB roh  →    0.072 MB Leitung    10 s    13 s CPU  Bamboo Warrior vs Gates to Hell
+  Partie   6/10   11 Halbzuege    1209 Nachrichten     4.48 MB roh  →    0.081 MB Leitung    33 s    35 s CPU  ⚠ ohne-spielende  Big Stomp! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1400hp, deck 37, hand 5) | p1(heroes 3/3 alive, 700hp, deck 28, hand 7) | turn 11 phase 0 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Kit, the Shark Researcher" → Theme "kit" (48 Themes im Ordner)
+  Partie   7/10    4 Halbzuege     623 Nachrichten     1.99 MB roh  →    0.041 MB Leitung    26 s    27 s CPU  ⚠ ohne-spielende  Flying Sparks vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 900hp, deck 29, hand 11) | p1(heroes 3/3 alive, 670hp, deck 35, hand 8) | turn 4 phase 4 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   8/10    4 Halbzuege     779 Nachrichten     2.72 MB roh  →    0.052 MB Leitung    14 s    15 s CPU  ⚠ ohne-spielende  Venom Swamp vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 47, hand 4) | p1(heroes 2/3 alive, 440hp, deck 39, hand 7) | turn 4 phase 5 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 4 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug4p1ph5
+     ↳ STILLER HALT: Zug 4 p1 Phase 2→5
+        Brotkrume: ok:zugende@zug4p1ph5
+        switchTurn ohne Wechsel: 1x | Wiedereintritt geblockt: 1x
+     ↳ switchTurn kehrte ohne Wechsel zurueck: Zug 4 p1 Phase 5→5
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Zsos'Ssar, the Serpent Warlord" → Theme "zsosssar" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→5 — ok:zugende@zug4p1ph5
+       [warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→5 — ok:zugende@zug4p1ph5
+  Partie   9/10    3 Halbzuege     275 Nachrichten     0.87 MB roh  →    0.019 MB Leitung     9 s    10 s CPU  ⚠ ohne-spielende  Cute Commando vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1150hp, deck 39, hand 10) | p1(heroes 3/3 alive, 950hp, deck 45, hand 6) | turn 3 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Cute Annoyance Mini" → Theme "mini" (48 Themes im Ordner)
+  Partie  10/10    9 Halbzuege    1770 Nachrichten     6.16 MB roh  →    0.114 MB Leitung    26 s    29 s CPU  Cute Commando vs Gates to Hell
+
+[netbench] 65 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 2 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   68.9%       65.7 KB     5087.2 KB        546    9.32 KB       98.7%  game_state
+   20.0%       19.1 KB       79.0 KB        591    0.13 KB       75.8%  action_log
+    1.9%        1.8 KB        4.1 KB         78    0.05 KB       56.6%  card_reveal
+    1.7%        1.6 KB        3.6 KB         42    0.08 KB       55.1%  play_zone_animation
+    1.3%        1.2 KB        2.8 KB         23    0.12 KB       55.5%  hand_to_board_fly
+    1.3%        1.2 KB        3.0 KB         27    0.11 KB       59.7%  play_pile_transfer
+    0.9%        0.9 KB        2.1 KB         34    0.06 KB       58.8%  deck_search_add
+    0.6%        0.6 KB        1.6 KB         24    0.07 KB       61.4%  ability_activated
+    0.6%        0.6 KB        1.3 KB         19    0.07 KB       53.2%  effect_source_glow
+    0.6%        0.5 KB        1.5 KB         19    0.08 KB       65.0%  summon_effect
+    0.4%        0.4 KB        1.7 KB         10    0.17 KB       76.5%  play_ram_animation
+    0.3%        0.3 KB        0.5 KB          9    0.06 KB       41.2%  fighting_atk_change
+    0.2%        0.2 KB        0.3 KB          1    0.27 KB       29.9%  game_started
+    0.2%        0.2 KB        0.3 KB          3    0.11 KB       46.7%  deck_to_discard_animation
+    0.2%        0.2 KB        0.3 KB          7    0.04 KB       41.1%  gold_change
+  … und 10 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         47.7 KB Leitung je Verbindung und Partie  (2595.6 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            5.07 MB roh  →  0.093 MB auf der Leitung
+  Ø je Verbindung:        47.7 KB
+  Ø je Halbzug (alle):    10.04 KB
+  Singleplayer (1 Client): ~47.7 KB je Partie
+  PvP (2 Clients):         ~95.3 KB je Partie
+  je zusätzlichem Zuschauer: ~47.7 KB je Partie
+  In 5 GB passen:          ~109.984 Singleplayer-Partien
+                           ~54.992 PvP-Partien
+  OHNE Kompression wären es 2.019 bzw. 1.009 — Faktor 54.5
+  Größte Einzelnachricht:  18.4 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 2.2 min CPU
+     35 s  bei  11 Halbzuegen (3.1 s/Halbzug)   ⚠ Big Stomp! vs Gates to Hell
+     29 s  bei   9 Halbzuegen (3.2 s/Halbzug)     Cute Commando vs Gates to Hell
+     27 s  bei   4 Halbzuegen (6.7 s/Halbzug)   ⚠ Flying Sparks vs Gates to Hell
+     15 s  bei   4 Halbzuegen (3.8 s/Halbzug)   ⚠ Venom Swamp vs Gates to Hell
+     13 s  bei  10 Halbzuegen (1.3 s/Halbzug)     Bamboo Warrior vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         17        1          1  Big Stomp!
+         13        1          1  Flying Sparks
+          8        1          1  Venom Swamp
+          7       10          8  Gates to Hell
+          6        1          0  Bamboo Warrior
+          6        3          2  Cute Commando
+          1        1          1  Gather That Storm!
+          1        1          1  Dance of the Butterflies
+          0        1          1  Creepy Crawlies
+  → Abbrueche haeufen sich bei: Big Stomp! (1), Flying Sparks (1), Venom Swamp (1), Gates to Hell (8), Cute Commando (2), Gather That Storm! (1), Dance of the Butterflies (1), Creepy Crawlies (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+       95    8.3%  Glass of Marbles
+       95    8.3%  Cute Cat
+       83    7.3%  Skull Necklace
+       82    7.2%  Treasure Huntress Semi
+       76    6.6%  Elixir of Immortality
+       72    6.3%  Giga Steroids
+       57    5.0%  Creativity
+       44    3.8%  Fighting
+       44    3.8%  Bamboo Staff
+       44    3.8%  Cute Dog
+       39    3.4%  Performance
+       36    3.1%  Wealth
+       26    2.3%  Xiong, the Bamboo Guardian
+       26    2.3%  Kit, the Shark Researcher
+       26    2.3%  Alex, Trainer of Heroes
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    235x  Adventurousness
+     51x  Demon's Gate
+     37x  Ska Harpyformer
+     26x  Gigantisaur Spinor
+      5x  The Warlord's Bite
+      4x  Güldefaber, the King of Dwarfs
+      1x  Aggressive Town Guard
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      1539      459.1        0.298           235  Adventurousness
+       217      114.3        0.527            51  Demon's Gate
+       148      100.4        0.678             0  Cute Bunny
+        74       89.8        1.213             0  Gravedigger Slap
+       287       88.7        0.309             4  Güldefaber, the King of Dwarfs
+       166       65.6        0.395             0  Quick Attack
+        56       34.8        0.622             0  Forceful Revival
+       140       33.2        0.237             0  Brilliant Idea
+        81       32.8        0.405             0  Pet Snake
+        24       22.0        0.916             0  Cute Cat
+        56       20.8        0.371             1  Aggressive Town Guard
+        51       19.7        0.386             0  Hammer Throw
+        14       19.6        1.401             0  Cute Dog
+        40       14.9        0.373             0  Gigantisaur Raptoren
+       229       11.8        0.052            37  Ska Harpyformer
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (8 Partien):    Ø 0.3 Pruefungen, Ø 0.0 Schilde
+  durchgespielt (2 Partien):  Ø 1.5 Pruefungen, Ø 0.5 Schilde
+  je Partie (nur mit Pruefungen):
+    ⚠ Partie  6     2 Pruefungen,   0 Schilde  ohne-spielende
+      Partie 10     3 Pruefungen,   1 Schilde  all_heroes_dead
+  Broadcasts an ALLE:      2 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          3          206       0.63        0.015     0      0      NEIN  ohne-spielende     Cute Commando vs Gates to Hell
+   2          3          159       0.49        0.013     0      0      NEIN  ohne-spielende     Creepy Crawlies vs Gates to Hell
+   3          2          329       1.06        0.023     2      3      NEIN  ohne-spielende     Gather That Storm! vs Gates to Hell
+   4          2          474       1.72        0.034     2      3      NEIN  ohne-spielende     Dance of the Butterflies vs Gates to Hell
+   5         10         1126       3.98        0.072    10     13        ja  all_heroes_dead    Bamboo Warrior vs Gates to Hell
+   6         11         1209       4.48        0.081    33     35      NEIN  ohne-spielende     Big Stomp! vs Gates to Hell
+   7          4          623       1.99        0.041    26     27      NEIN  ohne-spielende     Flying Sparks vs Gates to Hell
+   8          4          779       2.72        0.052    14     15      NEIN  ohne-spielende     Venom Swamp vs Gates to Hell
+   9          3          275       0.87        0.019     9     10      NEIN  ohne-spielende     Cute Commando vs Gates to Hell
+  10          9         1770       6.16        0.114    26     29        ja  all_heroes_dead    Cute Commando vs Gates to Hell

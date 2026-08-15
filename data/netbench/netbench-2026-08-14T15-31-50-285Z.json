@@ -1,0 +1,791 @@
+{
+  "erzeugt": "2026-08-14T15:31:50.289Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Mawstruck",
+      "deckB": "Shifting Sandlands",
+      "turns": 2,
+      "ms": 128,
+      "nachrichten": 68,
+      "raw": 209005,
+      "wire": 7947,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 141,
+      "snapshots": 4,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Lightning Caller",
+      "deckB": "Shifting Sandlands",
+      "turns": 11,
+      "ms": 23701,
+      "nachrichten": 1577,
+      "raw": 6032159,
+      "wire": 111666,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 27796,
+      "snapshots": 2598,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Parts of the Soul",
+      "deckB": "Shifting Sandlands",
+      "turns": 8,
+      "ms": 26623,
+      "nachrichten": 1447,
+      "raw": 4879479,
+      "wire": 91916,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 28421,
+      "snapshots": 4279,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Shifting Sandlands",
+      "turns": 4,
+      "ms": 13933,
+      "nachrichten": 773,
+      "raw": 2645424,
+      "wire": 54350,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 15313,
+      "snapshots": 1373,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Idej Illusions",
+      "deckB": "Shifting Sandlands",
+      "turns": 11,
+      "ms": 25175,
+      "nachrichten": 1758,
+      "raw": 6599941,
+      "wire": 118575,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 26547,
+      "snapshots": 2887,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Great Weapon Master",
+      "deckB": "Shifting Sandlands",
+      "turns": 9,
+      "ms": 19064,
+      "nachrichten": 1433,
+      "raw": 5144232,
+      "wire": 92746,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 19703,
+      "snapshots": 1472,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Big Stomp!",
+      "deckB": "Shifting Sandlands",
+      "turns": 9,
+      "ms": 38043,
+      "nachrichten": 1132,
+      "raw": 4082957,
+      "wire": 75122,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 38172,
+      "snapshots": 5013,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Big Stomp!",
+      "deckB": "Shifting Sandlands",
+      "turns": 8,
+      "ms": 17300,
+      "nachrichten": 1213,
+      "raw": 4260000,
+      "wire": 79276,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 17751,
+      "snapshots": 2194,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Lightning Caller",
+      "deckB": "Shifting Sandlands",
+      "turns": 9,
+      "ms": 19603,
+      "nachrichten": 1470,
+      "raw": 5430666,
+      "wire": 100909,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 19922,
+      "snapshots": 2314,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Lightning Caller",
+      "deckB": "Shifting Sandlands",
+      "turns": 26,
+      "ms": 39461,
+      "nachrichten": 3025,
+      "raw": 12717259,
+      "wire": 209824,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 39796,
+      "snapshots": 3218,
+      "hookTimeouts": 0
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 4756,
+      "raw": 44073707,
+      "wire": 569743
+    },
+    {
+      "name": "action_log",
+      "count": 4398,
+      "raw": 584472,
+      "wire": 140569
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 660,
+      "raw": 56928,
+      "wire": 19649
+    },
+    {
+      "name": "card_reveal",
+      "count": 498,
+      "raw": 27991,
+      "wire": 11406
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 183,
+      "raw": 24245,
+      "wire": 10292
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 172,
+      "raw": 20986,
+      "wire": 9147
+    },
+    {
+      "name": "nomu_draw",
+      "count": 210,
+      "raw": 12528,
+      "wire": 4990
+    },
+    {
+      "name": "potion_resolved",
+      "count": 92,
+      "raw": 7002,
+      "wire": 4679
+    },
+    {
+      "name": "summon_effect",
+      "count": 158,
+      "raw": 13578,
+      "wire": 4563
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 68,
+      "raw": 11424,
+      "wire": 4189
+    },
+    {
+      "name": "surprise_flip",
+      "count": 86,
+      "raw": 9642,
+      "wire": 4011
+    },
+    {
+      "name": "deck_search_add",
+      "count": 92,
+      "raw": 5994,
+      "wire": 3051
+    },
+    {
+      "name": "ability_activated",
+      "count": 120,
+      "raw": 8198,
+      "wire": 2774
+    },
+    {
+      "name": "surprise_reset",
+      "count": 70,
+      "raw": 7166,
+      "wire": 1802
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 92,
+      "raw": 5612,
+      "wire": 1739
+    },
+    {
+      "name": "game_started",
+      "count": 7,
+      "raw": 1932,
+      "wire": 1354
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 26,
+      "raw": 3248,
+      "wire": 1070
+    },
+    {
+      "name": "play_card_showcase",
+      "count": 22,
+      "raw": 1628,
+      "wire": 1000
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 30,
+      "raw": 1832,
+      "wire": 975
+    },
+    {
+      "name": "gold_change",
+      "count": 32,
+      "raw": 1310,
+      "wire": 763
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 8,
+      "raw": 1420,
+      "wire": 586
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 14,
+      "raw": 916,
+      "wire": 461
+    },
+    {
+      "name": "deck_to_discard_animation",
+      "count": 6,
+      "raw": 672,
+      "wire": 335
+    },
+    {
+      "name": "reaction_chain_update",
+      "count": 2,
+      "raw": 730,
+      "wire": 267
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 10,
+      "raw": 330,
+      "wire": 255
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 4,
+      "raw": 588,
+      "wire": 228
+    },
+    {
+      "name": "punch_box_animation",
+      "count": 6,
+      "raw": 486,
+      "wire": 190
+    },
+    {
+      "name": "butterfly_cloud_animation",
+      "count": 2,
+      "raw": 716,
+      "wire": 181
+    },
+    {
+      "name": "smug_coin_save",
+      "count": 4,
+      "raw": 176,
+      "wire": 82
+    },
+    {
+      "name": "discard_to_deck_animation",
+      "count": 2,
+      "raw": 138,
+      "wire": 72
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 2,
+      "raw": 124,
+      "wire": 63
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 2,
+      "raw": 664,
+      "wire": 60
+    },
+    {
+      "name": "divine_rain_start",
+      "count": 2,
+      "raw": 68,
+      "wire": 57
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 2,
+      "raw": 56,
+      "wire": 56
+    },
+    {
+      "name": "divine_rain_stop",
+      "count": 2,
+      "raw": 50,
+      "wire": 50
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 2,
+      "raw": 136,
+      "wire": 49
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-b-netbench-c06ababd",
+      "count": 1502,
+      "raw": 6373754,
+      "wire": 105018
+    },
+    {
+      "sid": "sid-a-netbench-c06ababd",
+      "count": 1522,
+      "raw": 6343229,
+      "wire": 104613
+    },
+    {
+      "sid": "sid-a-netbench-f7ee2b45",
+      "count": 890,
+      "raw": 3292291,
+      "wire": 59594
+    },
+    {
+      "sid": "sid-b-netbench-f7ee2b45",
+      "count": 867,
+      "raw": 3307374,
+      "wire": 58788
+    },
+    {
+      "sid": "sid-b-netbench-54f9eecd",
+      "count": 781,
+      "raw": 3049825,
+      "wire": 56594
+    },
+    {
+      "sid": "sid-a-netbench-54f9eecd",
+      "count": 795,
+      "raw": 2982058,
+      "wire": 54879
+    },
+    {
+      "sid": "sid-a-netbench-7a086760",
+      "count": 733,
+      "raw": 2710002,
+      "wire": 50360
+    },
+    {
+      "sid": "sid-b-netbench-7a086760",
+      "count": 736,
+      "raw": 2720388,
+      "wire": 50355
+    },
+    {
+      "sid": "sid-b-netbench-450dbb9e",
+      "count": 705,
+      "raw": 2601154,
+      "wire": 47115
+    },
+    {
+      "sid": "sid-a-netbench-48604cbe",
+      "count": 736,
+      "raw": 2416836,
+      "wire": 45863
+    },
+    {
+      "sid": "sid-b-netbench-48604cbe",
+      "count": 710,
+      "raw": 2462367,
+      "wire": 45860
+    },
+    {
+      "sid": "sid-a-netbench-450dbb9e",
+      "count": 727,
+      "raw": 2542802,
+      "wire": 45437
+    },
+    {
+      "sid": "sid-b-netbench-2fc932fe",
+      "count": 555,
+      "raw": 2038721,
+      "wire": 37670
+    },
+    {
+      "sid": "sid-a-netbench-2fc932fe",
+      "count": 576,
+      "raw": 2043960,
+      "wire": 37258
+    },
+    {
+      "sid": "room:netbench-450dbb9e",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-2fc932fe",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-7a086760",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-54f9eecd",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-48604cbe",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-f7ee2b45",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-c06ababd",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 11842,
+    "raw": 44886693,
+    "wire": 800758
+  },
+  "groesste_nachricht": {
+    "bytes": 14923,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 7,
+    "raw": 1925
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 1,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[deck-profile] loaded \"Great Weapon Master\" (great-weapon-master.json): 18 card values, 18 pairs, 10 ability priors, trained on 1360 games (win-rate 46.6%)",
+        "[deck-profile] loaded \"Guardians of the Treasure Cave\" (guardians-of-the-treasure-cave.json): 19 card values, 19 pairs, 20 ability priors, trained on 1292 games (win-rate 49.4%)",
+        "[deck-profile] loaded \"Heal Burn\" (heal-burn.json): 20 card values, 1 pairs, 24 ability priors, trained on 1392 games (win-rate 58.1%)",
+        "[deck-profile] loaded \"Idej Illusions\" (idej-illusions.json): 11 card values, 29 pairs, 22 ability priors, trained on 1360 games (win-rate 31%)",
+        "[deck-profile] loaded \"Join our Cult!\" (join-our-cult.json): 17 card values, 16 pairs, 33 ability priors, trained on 1360 games (win-rate 62.2%)",
+        "[deck-profile] loaded \"Lightning Caller\" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)",
+        "[deck-profile] loaded \"Man's Best Friends\" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)",
+        "[deck-profile] loaded \"Mawstruck\" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)",
+        "[deck-profile] loaded \"Morph and Kill!\" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)",
+        "[deck-profile] loaded \"One-Two-Punch!\" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)",
+        "[deck-profile] loaded \"Parts of the Soul\" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)",
+        "[deck-profile] loaded \"Pew-Pew!\" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)",
+        "[deck-profile] loaded \"Poison Torture\" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)",
+        "[deck-profile] loaded \"Sacrificial Demons\" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)",
+        "[deck-profile] loaded \"Shadows over Blackport\" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)",
+        "[deck-profile] loaded \"Shifting Sandlands\" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)",
+        "[deck-profile] loaded \"Slimy Infestation\" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)",
+        "[deck-profile] loaded \"Slip 'n Slide\" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)",
+        "[deck-profile] loaded \"Spell Industrialization\" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)",
+        "[deck-profile] loaded \"Steam Dwarf Mines\" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)",
+        "[deck-profile] loaded \"Suicide Bombers\" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)",
+        "[deck-profile] loaded \"Sun Fencer Frenzy\" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)",
+        "[deck-profile] loaded \"To Attain Divinity\" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)",
+        "[deck-profile] loaded \"Venom Swamp\" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)",
+        "[heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+27 MB (inkl. Grundlast) | jetzt rss=92 heapTotal=65 heapUsed=43"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1100hp, deck 52, hand 4) | p1(heroes 3/3 alive, 1200hp, deck 53, hand 7) | turn 2 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Bakhm, the Desert Digger\" → Theme \"bakhm\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 750hp, deck 39, hand 7) | p1(heroes 3/3 alive, 890hp, deck 38, hand 8) | turn 4 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 8,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Bakhm, the Desert Digger\" → Theme \"bakhm\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 2/3 alive, 740hp, deck 38, hand 9) | p1(heroes 3/3 alive, 950hp, deck 25, hand 11) | turn 8 phase 5 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "kandidaten_heap": {
+    "Cosmic Skeleton": {
+      "rollouts": 1528,
+      "mbGesamt": 694.43,
+      "mbProRollout": 0.4545,
+      "ueberSchwelle": 113
+    },
+    "Adventurousness": {
+      "rollouts": 855,
+      "mbGesamt": 222.13,
+      "mbProRollout": 0.2598,
+      "ueberSchwelle": 137
+    },
+    "Chain Lightning": {
+      "rollouts": 520,
+      "mbGesamt": 250.1,
+      "mbProRollout": 0.481,
+      "ueberSchwelle": 61
+    },
+    "Butterfly Cloud": {
+      "rollouts": 80,
+      "mbGesamt": -1.15,
+      "mbProRollout": -0.0144,
+      "ueberSchwelle": 0
+    },
+    "Sandy Blob": {
+      "rollouts": 35,
+      "mbGesamt": -9.48,
+      "mbProRollout": -0.2709,
+      "ueberSchwelle": 0
+    },
+    "Soul Shard Shut": {
+      "rollouts": 65,
+      "mbGesamt": 63.13,
+      "mbProRollout": 0.9712,
+      "ueberSchwelle": 0
+    },
+    "Soul Shard Khet": {
+      "rollouts": 49,
+      "mbGesamt": 30.99,
+      "mbProRollout": 0.6325,
+      "ueberSchwelle": 0
+    },
+    "Rain of Arrows": {
+      "rollouts": 969,
+      "mbGesamt": 376.48,
+      "mbProRollout": 0.3885,
+      "ueberSchwelle": 130
+    },
+    "Hammer Throw": {
+      "rollouts": 80,
+      "mbGesamt": 19.24,
+      "mbProRollout": 0.2404,
+      "ueberSchwelle": 0
+    },
+    "Critical Strike": {
+      "rollouts": 80,
+      "mbGesamt": 48.54,
+      "mbProRollout": 0.6067,
+      "ueberSchwelle": 0
+    },
+    "Telekinesis": {
+      "rollouts": 8,
+      "mbGesamt": 10.1,
+      "mbProRollout": 1.2626,
+      "ueberSchwelle": 0
+    },
+    "Güldefaber, the King of Dwarfs": {
+      "rollouts": 401,
+      "mbGesamt": 120.3,
+      "mbProRollout": 0.3,
+      "ueberSchwelle": 0
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 62,
+  "cpu_ms_gesamt": 233562,
+  "hook_feuer_je_karte": {
+    "Creativity": 195,
+    "Wealth": 147,
+    "Elixir of Immortality": 83,
+    "Lizbeth, the Reaper of the Light": 79,
+    "Alex, Trainer of Heroes": 53,
+    "Bakhm, the Desert Digger": 50,
+    "Kit, the Shark Researcher": 46,
+    "Fighting": 44,
+    "Cloud in a Bottle": 42,
+    "Giga Steroids": 31,
+    "Toras, Master of all Weapons": 29,
+    "Fiona, the Princess of Blackport": 26,
+    "Güldefaber, the King of Dwarfs": 24,
+    "Performance": 17,
+    "Resistance": 16,
+    "Xiong, the Bamboo Guardian": 13,
+    "Arthor, the King of Blackport": 13,
+    "Telekinesis": 11,
+    "The Master's Sword": 11,
+    "Sandy Blob": 9,
+    "Shield of Life": 9,
+    "Rain of Arrows": 8,
+    "Toughness": 8,
+    "Idej Projection": 7,
+    "Mystery Box": 6,
+    "Chain Lightning": 5,
+    "Nicolas, the Hidden Alchemist": 4,
+    "Glass of Marbles": 4,
+    "The Sun Sword": 4,
+    "Cool Rescuer Monia": 3,
+    "Ingo, Investor of Evil": 3,
+    "Nero Zira, the Mastermind": 3,
+    "Sol Rym, the Thunder Djinn": 3,
+    "Quick Attack": 3,
+    "Biomancy": 3,
+    "Metal Harpyformer": 3,
+    "Ska Harpyformer": 2,
+    "Eraser Beam": 2,
+    "Butterfly Cloud": 1,
+    "Learning": 1,
+    "Soul Shard Khet": 1,
+    "Soul Shard Ka": 1,
+    "Hammer Throw": 1,
+    "Idej Lord Daiyo": 1,
+    "Critical Strike": 1,
+    "The Great Wall of Deri": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 137,
+    "Rain of Arrows": 130,
+    "Cosmic Skeleton": 113,
+    "Chain Lightning": 61
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {},
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [],
+  "heil_zielwahl": {
+    "Healing Potion → eigen": {
+      "n": 2,
+      "hp": 400
+    },
+    "Shield of Life → eigen": {
+      "n": 1,
+      "hp": 100
+    }
+  },
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "Lightning Caller",
+      "cpuMs": 43757,
+      "partien": 3,
+      "abbrueche": 0,
+      "proPartie": 14585.666666666666
+    },
+    {
+      "name": "Parts of the Soul",
+      "cpuMs": 14210.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 14210.5
+    },
+    {
+      "name": "Big Stomp!",
+      "cpuMs": 27961.5,
+      "partien": 2,
+      "abbrueche": 1,
+      "proPartie": 13980.75
+    },
+    {
+      "name": "Idej Illusions",
+      "cpuMs": 13273.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 13273.5
+    },
+    {
+      "name": "Shifting Sandlands",
+      "cpuMs": 116781,
+      "partien": 10,
+      "abbrueche": 3,
+      "proPartie": 11678.1
+    },
+    {
+      "name": "Great Weapon Master",
+      "cpuMs": 9851.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 9851.5
+    },
+    {
+      "name": "Bamboo Warrior",
+      "cpuMs": 7656.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 7656.5
+    },
+    {
+      "name": "Mawstruck",
+      "cpuMs": 70.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 70.5
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 114394,
+    "roh_je_partie": 6412384.714285715,
+    "wire_je_verbindung": 57197,
+    "wire_je_halbzug": 9647.686746987953,
+    "kompressionsfaktor": 56.055253896932655
+  }
+}

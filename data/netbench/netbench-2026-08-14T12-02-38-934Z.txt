@@ -1,0 +1,183 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 20 s | Zeitlimit/Partie 300 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10   35 Halbzuege    3807 Nachrichten    15.49 MB roh  →    0.247 MB Leitung    54 s    60 s CPU  Heal Burn vs Shifting Sandlands
+  Partie   2/10   24 Halbzuege    2636 Nachrichten     9.41 MB roh  →    0.166 MB Leitung    20 s    22 s CPU  Heal Burn vs Depths of the Cosmos
+  Partie   3/10    2 Halbzuege      64 Nachrichten     0.20 MB roh  →    0.008 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Heal Burn vs Flying Sparks
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Lilly, the Charming Infiltrator" → Theme "lilly" (48 Themes im Ordner)
+  Partie   4/10    3 Halbzuege     305 Nachrichten     0.98 MB roh  →    0.022 MB Leitung     2 s     3 s CPU  ⚠ ohne-spielende  Heal Burn vs Gates to Hell
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   5/10   17 Halbzuege    2168 Nachrichten     7.68 MB roh  →    0.135 MB Leitung    19 s    20 s CPU  Heal Burn vs Great Weapon Master
+  Partie   6/10   17 Halbzuege    2231 Nachrichten     8.48 MB roh  →    0.146 MB Leitung   107 s   108 s CPU  ⚠ ohne-spielende  Heal Burn vs Gates to Hell
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   7/10   14 Halbzuege    1866 Nachrichten     6.67 MB roh  →    0.118 MB Leitung    78 s    80 s CPU  Heal Burn vs Cute Commando
+  Partie   8/10   11 Halbzuege    1824 Nachrichten     6.25 MB roh  →    0.118 MB Leitung    17 s    19 s CPU  Heal Burn vs Steam Dwarf Mines
+  Partie   9/10   13 Halbzuege    2201 Nachrichten     7.62 MB roh  →    0.134 MB Leitung    12 s    13 s CPU  Heal Burn vs Crystal Gifts
+  Partie  10/10    8 Halbzuege    1167 Nachrichten     4.15 MB roh  →    0.076 MB Leitung    18 s    20 s CPU  Heal Burn vs Bloody King Zi
+
+[netbench] 63 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 7 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   70.1%      101.7 KB     8221.7 KB        889    9.24 KB       98.8%  game_state
+   19.8%       28.8 KB      117.8 KB        905    0.13 KB       75.6%  action_log
+    2.8%        4.1 KB       11.9 KB        139    0.09 KB       65.2%  play_zone_animation
+    1.4%        2.0 KB        4.8 KB         88    0.05 KB       58.6%  card_reveal
+    1.0%        1.5 KB        3.4 KB         28    0.12 KB       55.7%  hand_to_board_fly
+    0.9%        1.2 KB        3.0 KB         26    0.11 KB       57.9%  play_pile_transfer
+    0.7%        1.0 KB        2.6 KB         34    0.08 KB       61.0%  ability_activated
+    0.4%        0.6 KB        1.8 KB         12    0.15 KB       64.2%  play_beam_animation
+    0.3%        0.4 KB        0.6 KB          9    0.08 KB       32.7%  potion_resolved
+    0.3%        0.4 KB        0.9 KB         13    0.06 KB       50.1%  deck_search_add
+    0.2%        0.3 KB        1.1 KB          9    0.12 KB       69.2%  play_heal_beam
+    0.2%        0.3 KB        1.4 KB          4    0.34 KB       76.8%  reaction_chain_update
+    0.2%        0.3 KB        0.6 KB          9    0.06 KB       53.3%  effect_source_glow
+    0.2%        0.3 KB        0.7 KB          9    0.09 KB       65.8%  summon_effect
+    0.2%        0.2 KB        0.4 KB          3    0.13 KB       42.9%  play_hand_steal
+  … und 30 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         72.6 KB Leitung je Verbindung und Partie  (4188.8 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            8.18 MB roh  →  0.142 MB auf der Leitung
+  Ø je Verbindung:        72.6 KB
+  Ø je Halbzug (alle):    8.33 KB
+  Singleplayer (1 Client): ~72.6 KB je Partie
+  PvP (2 Clients):         ~145.2 KB je Partie
+  je zusätzlichem Zuschauer: ~72.6 KB je Partie
+  In 5 GB passen:          ~72.226 Singleplayer-Partien
+                           ~36.113 PvP-Partien
+  OHNE Kompression wären es 1.251 bzw. 625 — Faktor 57.7
+  Größte Einzelnachricht:  12.8 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 5.8 min CPU
+    108 s  bei  17 Halbzuegen (6.4 s/Halbzug)   ⚠ Heal Burn vs Gates to Hell
+     80 s  bei  14 Halbzuegen (5.7 s/Halbzug)     Heal Burn vs Cute Commando
+     60 s  bei  35 Halbzuegen (1.7 s/Halbzug)     Heal Burn vs Shifting Sandlands
+     22 s  bei  24 Halbzuegen (0.9 s/Halbzug)     Heal Burn vs Depths of the Cosmos
+     20 s  bei  17 Halbzuegen (1.2 s/Halbzug)     Heal Burn vs Great Weapon Master
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         40        1          0  Cute Commando
+         30        1          0  Shifting Sandlands
+         28        2          2  Gates to Hell
+         17       10          3  Heal Burn
+         11        1          0  Depths of the Cosmos
+         10        1          0  Great Weapon Master
+         10        1          0  Bloody King Zi
+         10        1          0  Steam Dwarf Mines
+          7        1          0  Crystal Gifts
+          0        1          1  Flying Sparks
+  → Abbrueche haeufen sich bei: Gates to Hell (2), Heal Burn (3), Flying Sparks (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      496   18.2%  Friendship
+      296   10.9%  Shield of Life
+      238    8.7%  Lifeforce Howitzer
+      214    7.9%  Treasure Huntress Semi
+      207    7.6%  Shield of Death
+      121    4.4%  Elixir of Immortality
+      105    3.9%  Skull Necklace
+       67    2.5%  Performance
+       65    2.4%  Overheal Shock   ⚠ 8 leckende Rollouts
+       58    2.1%  Cute Dog
+       57    2.1%  Wealth
+       52    1.9%  Invader Token
+       52    1.9%  Giga Steroids
+       48    1.8%  The Sun Sword
+       44    1.6%  Divine Gift of The Light
+
+═══ STEAM-DWARF-ZAEHLWERK ═══
+  Abwurf-Reaktion: 985 Aufrufe → 702 mal gefeuert (71.3 %)
+    davon abgewiesen: HOPT 0 | nicht im Support 0 | fremder Abwurf 283 | inaktiv 0
+    Wartezeit allein aus den 150-ms-Pausen im Hook: 105.3 s (live; im Rollout uebersprungen)
+    hoechste erreichte max HP: 300
+  Miner-Zugende: 17 Ausloesungen, 17 Karten insgesamt
+    groesster Einzelzug: 1 Karten bei 150 max HP
+    (`count = floor(maxHp / 100)` ist UNGEDECKELT — steigt die HP, steigt die Kette)
+
+═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══
+  Modus: `frei` = inhaerente Zusatz-Aktion (Support Magic 2 oder Decay Magic 1
+  beim Caster), `zusatz` = ueber einen Geber (Friendship & Co.), `main` = hat
+  die Aktion der Runde gekostet. „doppelt" = Ziel trug den Zustand schon —
+  jeder solche Einsatz ist verschenkt (der Zustand ist ein Boolean).
+
+  Partie  Zug  Modus   Caster                      → Ziel (HP)
+       1    2  frei    Kazena, the Storming Rebel  → Nomu, Wanderer of Worlds (400)
+       1    4  frei    Kazena, the Storming Rebel  → Bakhm, the Desert Digger (400)
+          └─   1 Umwandlungen,   200 Schaden · 35 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+       2   10  frei    Nao, the Barrier Priestess  → Cooldin, King of Coolness (400)
+          └─   1 Umwandlungen,   300 Schaden · 24 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+       5    7  frei    Nao, the Barrier Priestess  → Fiona, the Princess of Blackport (420)
+       5    9  frei    Nao, the Barrier Priestess  → Arthor, the King of Blackport (400)
+          └─   3 Umwandlungen,   700 Schaden · 17 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+       6    4  frei    Kazena, the Storming Rebel  → Nicolas, the Hidden Alchemist (350)
+          └─   1 Umwandlungen,   200 Schaden · 17 Halbzuege · kein Sieger (ohne-spielende)  ⚠ nicht gewertet
+       7    3  frei    Kazena, the Storming Rebel  → Visionary Genius Heinz (400)
+       7    3  frei    Kazena, the Storming Rebel  → Cool Rescuer Monia (400)
+       7    5  frei    Kazena, the Storming Rebel  → Cute Annoyance Mini (50)
+          └─   1 Umwandlungen,   300 Schaden · 14 Halbzuege · Sieger: Heal Burn (deck_out)
+       8    3  zusatz  Nao, the Barrier Priestess  → Layn, Defender of Deri (650)
+       8    3  main    Kazena, the Storming Rebel  → Alice, the Puppeteer Girl (400)
+       8    5  frei    Nao, the Barrier Priestess  → Cute Nerd Magenta (240)
+          └─   4 Umwandlungen,   650 Schaden · 11 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+       9   11  frei    Kazena, the Storming Rebel  → Cooldin, King of Coolness (400)
+       9   11  main    Treasure Huntress Semi      → Mary Crestmas (50)
+          └─   1 Umwandlungen,   150 Schaden · 13 Halbzuege · Sieger: Heal Burn (all_heroes_dead)
+
+  SUMME ueber 7 Partie(n) mit Beteiligung:
+    Einsaetze: 14  (frei 11 | ueber Geber 1 | Main-Aktion 2)
+    Umwandlungen: 12, daraus 2500 Schaden (179 je Einsatz)
+    Siege der spielenden Seite: 6/6 gewertete Partien mit mindestens einem Einsatz (100 %)
+
+  ZIELWAHL ALLER HEILUNGEN (Versuche, live, je Quelle):
+       69x   11550 HP  Healing Melody → eigen
+       17x    1700 HP  Shield of Life → eigen
+       10x    2300 HP  Heal → gegner-geschockt
+        8x    1650 HP  Heal → eigen
+        4x     400 HP  Cure → eigen
+        3x    1197 HP  Guardian Angel → eigen
+        2x     200 HP  Cure → gegner-offen
+        1x     150 HP  Heal → gegner-offen
+        1x     100 HP  Cure → gegner-geschockt
+        1x     100 HP  Divine Gift of The Light → gegner-geschockt
+    → eigene Seite 101 | geschockter Gegner 12 | Gegner OHNE Umkehr 3  ⚠ reines Geschenk
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    119x  Adventurousness
+     59x  Rain of Arrows
+     50x  Heal
+     45x  Gravedigger Slap
+     31x  Guardian Angel
+     24x  Timeless King Zi
+     18x  Healing Melody
+     12x  Gatherer from the Cosmic Depths
+      8x  Overheal Shock
+      2x  Demon's Gate
+  Broadcasts an ALLE:      7 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         35         3807      15.49        0.247    54     60        ja  all_heroes_dead    Heal Burn vs Shifting Sandlands
+   2         24         2636       9.41        0.166    20     22        ja  all_heroes_dead    Heal Burn vs Depths of the Cosmos
+   3          2           64       0.20        0.008     0      0      NEIN  ohne-spielende     Heal Burn vs Flying Sparks
+   4          3          305       0.98        0.022     2      3      NEIN  ohne-spielende     Heal Burn vs Gates to Hell
+   5         17         2168       7.68        0.135    19     20        ja  all_heroes_dead    Heal Burn vs Great Weapon Master
+   6         17         2231       8.48        0.146   107    108      NEIN  ohne-spielende     Heal Burn vs Gates to Hell
+   7         14         1866       6.67        0.118    78     80        ja  deck_out           Heal Burn vs Cute Commando
+   8         11         1824       6.25        0.118    17     19        ja  all_heroes_dead    Heal Burn vs Steam Dwarf Mines
+   9         13         2201       7.62        0.134    12     13        ja  all_heroes_dead    Heal Burn vs Crystal Gifts
+  10          8         1167       4.15        0.076    18     20        ja  all_heroes_dead    Heal Burn vs Bloody King Zi

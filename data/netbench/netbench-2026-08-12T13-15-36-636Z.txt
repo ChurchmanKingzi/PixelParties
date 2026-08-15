@@ -1,0 +1,94 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 20 | Zuschauer je Partie: 3 | Pausen: uebersprungen
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler + 3 Zuschauer je Partie.
+
+  Partie   1/20   52 Halbzuege   10045 Nachrichten    33.05 MB roh  →    0.543 MB Leitung    66 s  Bone Rush vs Join our Cult!
+  Partie   2/20   21 Halbzuege    5408 Nachrichten    16.95 MB roh  →    0.309 MB Leitung    30 s  Venom Swamp vs Deepsea Terror
+  Partie   3/20   21 Halbzuege    5413 Nachrichten    14.65 MB roh  →    0.260 MB Leitung    26 s  Gather That Storm! vs Big Stomp!
+  Partie   4/20   46 Halbzuege    9665 Nachrichten    30.32 MB roh  →    0.512 MB Leitung    72 s  Join our Cult! vs Heal Burn
+  Partie   5/20   42 Halbzuege    3775 Nachrichten    15.41 MB roh  →    0.252 MB Leitung    26 s  Bamboo Warrior vs Join our Cult!
+  Partie   6/20   86 Halbzuege   20614 Nachrichten    71.49 MB roh  →    1.211 MB Leitung     9 s  Depths of the Cosmos vs Spell Industrialization
+  Partie   7/20   41 Halbzuege    9072 Nachrichten    30.26 MB roh  →    0.500 MB Leitung    31 s  Man's Best Friends vs Join our Cult!
+  Partie   8/20    2 Halbzuege     193 Nachrichten     0.52 MB roh  →    0.017 MB Leitung    92 s  ⚠ stillstand  Slimy Infestation vs Depths of the Cosmos
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Argos, the Eye of the Cosmos" → Theme "argos" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   9/20   13 Halbzuege    3042 Nachrichten     8.59 MB roh  →    0.162 MB Leitung     6 s  Depths of the Cosmos vs Lightning Caller
+  Partie  10/20   52 Halbzuege   10917 Nachrichten    33.44 MB roh  →    0.569 MB Leitung    26 s  Grand Rebellion! vs Depths of the Cosmos
+  Partie  11/20   51 Halbzuege    4084 Nachrichten    14.14 MB roh  →    0.241 MB Leitung    92 s  Shifting Sandlands vs Gates to Hell
+  Partie  12/20   58 Halbzuege    5075 Nachrichten    18.33 MB roh  →    0.301 MB Leitung    30 s  Cute Commando vs Mawstruck
+  Partie  13/20   50 Halbzuege    9325 Nachrichten    26.86 MB roh  →    0.486 MB Leitung   141 s  Depths of the Cosmos vs Shifting Sandlands
+  Partie  14/20    6 Halbzuege    1197 Nachrichten     3.69 MB roh  →    0.072 MB Leitung    94 s  ⚠ stillstand  One-Two-Punch! vs Steam Dwarf Mines
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Ghuanjun, the Undead Martial Artist" → Theme "ghuanjun" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  15/20    7 Halbzuege     574 Nachrichten     1.70 MB roh  →    0.038 MB Leitung    96 s  ⚠ stillstand  Grand Rebellion! vs Steam Dwarf Mines
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Layn, Defender of Deri" → Theme "layn" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie  16/20    4 Halbzuege     125 Nachrichten     0.37 MB roh  →    0.014 MB Leitung     5 s  Burning Inferno vs Gather That Storm!
+  Partie  17/20   52 Halbzuege   11113 Nachrichten    40.72 MB roh  →    0.614 MB Leitung    33 s  Grand Rebellion! vs Dance of the Butterflies
+  Partie  18/20   37 Halbzuege    7890 Nachrichten    24.21 MB roh  →    0.422 MB Leitung    79 s  Join our Cult! vs Bone Rush
+  Partie  19/20   23 Halbzuege    6092 Nachrichten    17.08 MB roh  →    0.309 MB Leitung    13 s  Heal Burn vs Crystal Gifts
+  Partie  20/20   53 Halbzuege   11712 Nachrichten    39.20 MB roh  →    0.615 MB Leitung   152 s  Suicide Bombers vs Bloody King Zi
+
+[netbench] 43 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 17 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   70.5%      311.0 KB    25738.0 KB       3569    7.21 KB       98.8%  game_state
+   21.7%       95.6 KB      386.5 KB       3149    0.12 KB       75.3%  action_log
+    1.7%        7.4 KB       18.9 KB        401    0.05 KB       60.7%  card_reveal
+    1.6%        7.2 KB       18.1 KB        208    0.09 KB       60.1%  play_zone_animation
+    1.6%        7.0 KB       14.7 KB        124    0.12 KB       52.3%  hand_to_board_fly
+    0.8%        3.6 KB        9.1 KB        136    0.07 KB       60.2%  ability_activated
+    0.5%        2.2 KB        6.3 KB         48    0.13 KB       65.9%  play_pile_transfer
+    0.3%        1.4 KB        4.1 KB         48    0.09 KB       66.1%  summon_effect
+    0.3%        1.2 KB        2.3 KB         38    0.06 KB       48.8%  deck_search_add
+    0.2%        1.1 KB        1.7 KB         24    0.07 KB       34.8%  potion_resolved
+    0.1%        0.6 KB        1.0 KB         24    0.04 KB       42.6%  gold_change
+    0.1%        0.3 KB        0.5 KB         15    0.03 KB       28.8%  play_gold_coins
+    0.1%        0.3 KB        0.5 KB          4    0.13 KB       39.3%  play_hand_steal
+    0.1%        0.3 KB        0.6 KB         10    0.06 KB       54.2%  nomu_draw
+    0.1%        0.3 KB        0.5 KB          7    0.07 KB       47.7%  effect_source_glow
+  … und 26 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler        108.4 KB Leitung je Verbindung und Partie  (6618.0 KB roh)
+  Zuschauer       74.7 KB Leitung je Verbindung und Partie  (4323.4 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            25.59 MB roh  →  0.431 MB auf der Leitung
+  Ø je Verbindung:        88.2 KB
+  Ø je Halbzug (alle):    10.68 KB
+  Singleplayer (1 Client): ~88.2 KB je Partie
+  PvP (2 Clients):         ~176.4 KB je Partie
+  je zusätzlichem Zuschauer: ~88.2 KB je Partie
+  In 5 GB passen:          ~59.452 Singleplayer-Partien
+                           ~29.726 PvP-Partien
+  OHNE Kompression wären es 1.000 bzw. 500 — Faktor 59.4
+  Größte Einzelnachricht:  13.1 KB (game_state)
+  Broadcasts an ALLE:      17 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  gewertet  Grund              Decks
+   1         52        10045      33.05        0.543    66        ja  deck_out           Bone Rush vs Join our Cult!
+   2         21         5408      16.95        0.309    30        ja  all_heroes_dead    Venom Swamp vs Deepsea Terror
+   3         21         5413      14.65        0.260    26        ja  all_heroes_dead    Gather That Storm! vs Big Stomp!
+   4         46         9665      30.32        0.512    72        ja  deck_out           Join our Cult! vs Heal Burn
+   5         42         3775      15.41        0.252    26        ja  deck_out           Bamboo Warrior vs Join our Cult!
+   6         86        20614      71.49        1.211     9        ja  deck_out           Depths of the Cosmos vs Spell Industrialization
+   7         41         9072      30.26        0.500    31        ja  deck_out           Man's Best Friends vs Join our Cult!
+   8          2          193       0.52        0.017    92      NEIN  stillstand         Slimy Infestation vs Depths of the Cosmos
+   9         13         3042       8.59        0.162     6        ja  all_heroes_dead    Depths of the Cosmos vs Lightning Caller
+  10         52        10917      33.44        0.569    26        ja  deck_out           Grand Rebellion! vs Depths of the Cosmos
+  11         51         4084      14.14        0.241    92        ja  deck_out           Shifting Sandlands vs Gates to Hell
+  12         58         5075      18.33        0.301    30        ja  deck_out           Cute Commando vs Mawstruck
+  13         50         9325      26.86        0.486   141        ja  deck_out           Depths of the Cosmos vs Shifting Sandlands
+  14          6         1197       3.69        0.072    94      NEIN  stillstand         One-Two-Punch! vs Steam Dwarf Mines
+  15          7          574       1.70        0.038    96      NEIN  stillstand         Grand Rebellion! vs Steam Dwarf Mines
+  16          4          125       0.37        0.014     5        ja  ende               Burning Inferno vs Gather That Storm!
+  17         52        11113      40.72        0.614    33        ja  deck_out           Grand Rebellion! vs Dance of the Butterflies
+  18         37         7890      24.21        0.422    79        ja  all_heroes_dead    Join our Cult! vs Bone Rush
+  19         23         6092      17.08        0.309    13        ja  all_heroes_dead    Heal Burn vs Crystal Gifts
+  20         53        11712      39.20        0.615   152        ja  deck_out           Suicide Bombers vs Bloody King Zi

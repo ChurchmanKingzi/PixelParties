@@ -1,0 +1,1183 @@
+{
+  "erzeugt": "2026-08-12T12:48:29.373Z",
+  "konfiguration": {
+    "games": 20,
+    "spectators": 3,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 300000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Great Weapon Master",
+      "deckB": "Morph and Kill!",
+      "turns": 85,
+      "ms": 15228,
+      "nachrichten": 19486,
+      "raw": 76591620,
+      "wire": 1947797,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 2,
+      "deckA": "Flying Sparks",
+      "deckB": "Sun Fencer Frenzy",
+      "turns": 16,
+      "ms": 14664,
+      "nachrichten": 24635,
+      "raw": 16300542,
+      "wire": 1433199,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 3,
+      "deckA": "Gather That Storm!",
+      "deckB": "Idej Illusions",
+      "turns": 45,
+      "ms": 27029,
+      "nachrichten": 41811,
+      "raw": 30676468,
+      "wire": 2406622,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 4,
+      "deckA": "Gather That Storm!",
+      "deckB": "Morph and Kill!",
+      "turns": 12,
+      "ms": 6375,
+      "nachrichten": 11577,
+      "raw": 9846035,
+      "wire": 718026,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 5,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Bone Rush",
+      "turns": 48,
+      "ms": 24525,
+      "nachrichten": 18622,
+      "raw": 37003485,
+      "wire": 1412986,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 6,
+      "deckA": "Bone Rush",
+      "deckB": "Venom Swamp",
+      "turns": 16,
+      "ms": 7313,
+      "nachrichten": 7557,
+      "raw": 11025861,
+      "wire": 519056,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 7,
+      "deckA": "Burning Inferno",
+      "deckB": "Heal Burn",
+      "turns": 2,
+      "ms": 48025,
+      "nachrichten": 205,
+      "raw": 576877,
+      "wire": 27295,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 8,
+      "deckA": "Parts of the Soul",
+      "deckB": "Cute Commando",
+      "turns": 54,
+      "ms": 89428,
+      "nachrichten": 31152,
+      "raw": 32309342,
+      "wire": 1937958,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 9,
+      "deckA": "One-Two-Punch!",
+      "deckB": "Gates to Hell",
+      "turns": 35,
+      "ms": 96009,
+      "nachrichten": 31554,
+      "raw": 33116622,
+      "wire": 1959184,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 10,
+      "deckA": "Cute Commando",
+      "deckB": "Elven Vanguard",
+      "turns": 2,
+      "ms": 48036,
+      "nachrichten": 178,
+      "raw": 505298,
+      "wire": 24059,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 11,
+      "deckA": "Elven Vanguard",
+      "deckB": "Bone Rush",
+      "turns": 1,
+      "ms": 48080,
+      "nachrichten": 41,
+      "raw": 127921,
+      "wire": 12647,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 12,
+      "deckA": "Big Stomp!",
+      "deckB": "Gather That Storm!",
+      "turns": 18,
+      "ms": 42240,
+      "nachrichten": 45320,
+      "raw": 13926286,
+      "wire": 2502216,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 13,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Guardians of the Treasure Cave",
+      "turns": 65,
+      "ms": 59940,
+      "nachrichten": 23849,
+      "raw": 59126321,
+      "wire": 2168503,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 14,
+      "deckA": "Elven Vanguard",
+      "deckB": "Grand Rebellion!",
+      "turns": 2,
+      "ms": 48027,
+      "nachrichten": 189,
+      "raw": 539309,
+      "wire": 25955,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 15,
+      "deckA": "Morph and Kill!",
+      "deckB": "Venom Swamp",
+      "turns": 24,
+      "ms": 19971,
+      "nachrichten": 10848,
+      "raw": 19426410,
+      "wire": 836090,
+      "grund": "all_heroes_dead",
+      "gewertet": true
+    },
+    {
+      "nr": 16,
+      "deckA": "Elven Vanguard",
+      "deckB": "Grand Rebellion!",
+      "turns": 1,
+      "ms": 48078,
+      "nachrichten": 91,
+      "raw": 223404,
+      "wire": 17100,
+      "grund": "stillstand",
+      "gewertet": false
+    },
+    {
+      "nr": 17,
+      "deckA": "Man's Best Friends",
+      "deckB": "Big Stomp!",
+      "turns": 71,
+      "ms": 64079,
+      "nachrichten": 57179,
+      "raw": 56725327,
+      "wire": 3823413,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 18,
+      "deckA": "Suicide Bombers",
+      "deckB": "Sun Fencer Frenzy",
+      "turns": 66,
+      "ms": 187943,
+      "nachrichten": 72276,
+      "raw": 59631580,
+      "wire": 4241291,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 19,
+      "deckA": "Guardians of the Treasure Cave",
+      "deckB": "Shifting Sandlands",
+      "turns": 52,
+      "ms": 34087,
+      "nachrichten": 24485,
+      "raw": 31244298,
+      "wire": 1588936,
+      "grund": "deck_out",
+      "gewertet": true
+    },
+    {
+      "nr": 20,
+      "deckA": "Shadows over Blackport",
+      "deckB": "Bamboo Warrior",
+      "turns": 64,
+      "ms": 25372,
+      "nachrichten": 16959,
+      "raw": 58364301,
+      "wire": 1634246,
+      "grund": "deck_out",
+      "gewertet": true
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "card_reveal",
+      "count": 298778,
+      "raw": 14538082,
+      "wire": 14538082
+    },
+    {
+      "name": "action_log",
+      "count": 57705,
+      "raw": 7354490,
+      "wire": 7354490
+    },
+    {
+      "name": "game_state",
+      "count": 69865,
+      "raw": 522390400,
+      "wire": 6205425
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 2012,
+      "raw": 239496,
+      "wire": 239496
+    },
+    {
+      "name": "ability_activated",
+      "count": 2110,
+      "raw": 149675,
+      "wire": 149675
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 1445,
+      "raw": 123640,
+      "wire": 123640
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 610,
+      "raw": 76895,
+      "wire": 76895
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 300,
+      "raw": 58635,
+      "wire": 58635
+    },
+    {
+      "name": "summon_effect",
+      "count": 635,
+      "raw": 54780,
+      "wire": 54780
+    },
+    {
+      "name": "discard_to_deleted_animation",
+      "count": 175,
+      "raw": 53060,
+      "wire": 53060
+    },
+    {
+      "name": "deleted_to_discard_animation",
+      "count": 95,
+      "raw": 43485,
+      "wire": 43485
+    },
+    {
+      "name": "deck_search_add",
+      "count": 595,
+      "raw": 37910,
+      "wire": 37910
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 490,
+      "raw": 29900,
+      "wire": 29900
+    },
+    {
+      "name": "potion_resolved",
+      "count": 275,
+      "raw": 19955,
+      "wire": 19955
+    },
+    {
+      "name": "gathering_storm_strike",
+      "count": 290,
+      "raw": 19080,
+      "wire": 19080
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 290,
+      "raw": 17690,
+      "wire": 17690
+    },
+    {
+      "name": "gold_change",
+      "count": 375,
+      "raw": 15375,
+      "wire": 15375
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 405,
+      "raw": 13365,
+      "wire": 13365
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 95,
+      "raw": 11200,
+      "wire": 11200
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 120,
+      "raw": 8710,
+      "wire": 8710
+    },
+    {
+      "name": "nomu_draw",
+      "count": 125,
+      "raw": 7455,
+      "wire": 7455
+    },
+    {
+      "name": "burn_tick",
+      "count": 75,
+      "raw": 7230,
+      "wire": 7230
+    },
+    {
+      "name": "tears_of_creation_animation",
+      "count": 15,
+      "raw": 5340,
+      "wire": 5340
+    },
+    {
+      "name": "game_started",
+      "count": 15,
+      "raw": 4755,
+      "wire": 4755
+    },
+    {
+      "name": "play_evolution_animation",
+      "count": 30,
+      "raw": 4690,
+      "wire": 4690
+    },
+    {
+      "name": "card_effect_flash",
+      "count": 95,
+      "raw": 4465,
+      "wire": 4465
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 35,
+      "raw": 4375,
+      "wire": 4375
+    },
+    {
+      "name": "hero_ascension",
+      "count": 35,
+      "raw": 3975,
+      "wire": 3975
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 60,
+      "raw": 3725,
+      "wire": 3725
+    },
+    {
+      "name": "gold_steal_burst",
+      "count": 45,
+      "raw": 2835,
+      "wire": 2835
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 15,
+      "raw": 2815,
+      "wire": 2815
+    },
+    {
+      "name": "mill_center_reveal",
+      "count": 20,
+      "raw": 2590,
+      "wire": 2590
+    },
+    {
+      "name": "flashbang_screen",
+      "count": 45,
+      "raw": 1575,
+      "wire": 1575
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 10,
+      "raw": 1130,
+      "wire": 1130
+    },
+    {
+      "name": "area_descend",
+      "count": 15,
+      "raw": 925,
+      "wire": 925
+    },
+    {
+      "name": "deck_to_ability_animation",
+      "count": 5,
+      "raw": 575,
+      "wire": 575
+    },
+    {
+      "name": "smug_coin_save",
+      "count": 5,
+      "raw": 220,
+      "wire": 220
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-spec-0-netbench-3aab26f3",
+      "count": 21953,
+      "raw": 11520338,
+      "wire": 1184237
+    },
+    {
+      "sid": "sid-spec-1-netbench-3aab26f3",
+      "count": 21953,
+      "raw": 11520338,
+      "wire": 1184237
+    },
+    {
+      "sid": "sid-spec-2-netbench-3aab26f3",
+      "count": 21953,
+      "raw": 11520338,
+      "wire": 1184237
+    },
+    {
+      "sid": "sid-spec-0-netbench-4e37a426",
+      "count": 17191,
+      "raw": 10876812,
+      "wire": 1070971
+    },
+    {
+      "sid": "sid-spec-1-netbench-4e37a426",
+      "count": 17191,
+      "raw": 10876812,
+      "wire": 1070971
+    },
+    {
+      "sid": "sid-spec-2-netbench-4e37a426",
+      "count": 17191,
+      "raw": 10876812,
+      "wire": 1070971
+    },
+    {
+      "sid": "sid-spec-0-netbench-b3bde222",
+      "count": 14605,
+      "raw": 2863530,
+      "wire": 778589
+    },
+    {
+      "sid": "sid-spec-1-netbench-b3bde222",
+      "count": 14605,
+      "raw": 2863530,
+      "wire": 778589
+    },
+    {
+      "sid": "sid-spec-2-netbench-b3bde222",
+      "count": 14605,
+      "raw": 2863530,
+      "wire": 778589
+    },
+    {
+      "sid": "sid-spec-0-netbench-e76d8e97",
+      "count": 12818,
+      "raw": 5832192,
+      "wire": 686199
+    },
+    {
+      "sid": "sid-spec-1-netbench-e76d8e97",
+      "count": 12818,
+      "raw": 5832192,
+      "wire": 686199
+    },
+    {
+      "sid": "sid-spec-2-netbench-e76d8e97",
+      "count": 12818,
+      "raw": 5832192,
+      "wire": 686199
+    },
+    {
+      "sid": "sid-spec-0-netbench-b850c076",
+      "count": 9405,
+      "raw": 6301685,
+      "wire": 534869
+    },
+    {
+      "sid": "sid-spec-1-netbench-b850c076",
+      "count": 9405,
+      "raw": 6301685,
+      "wire": 534869
+    },
+    {
+      "sid": "sid-spec-2-netbench-b850c076",
+      "count": 9405,
+      "raw": 6301685,
+      "wire": 534869
+    },
+    {
+      "sid": "sid-spec-0-netbench-f84d721f",
+      "count": 9164,
+      "raw": 6043331,
+      "wire": 524639
+    },
+    {
+      "sid": "sid-spec-1-netbench-f84d721f",
+      "count": 9164,
+      "raw": 6043331,
+      "wire": 524639
+    },
+    {
+      "sid": "sid-spec-2-netbench-f84d721f",
+      "count": 9164,
+      "raw": 6043331,
+      "wire": 524639
+    },
+    {
+      "sid": "sid-spec-0-netbench-d7e455cf",
+      "count": 5788,
+      "raw": 10814372,
+      "wire": 465110
+    },
+    {
+      "sid": "sid-spec-1-netbench-d7e455cf",
+      "count": 5788,
+      "raw": 10814372,
+      "wire": 465110
+    },
+    {
+      "sid": "sid-spec-2-netbench-d7e455cf",
+      "count": 5788,
+      "raw": 10814372,
+      "wire": 465110
+    },
+    {
+      "sid": "sid-b-netbench-b0e65429",
+      "count": 3589,
+      "raw": 17601376,
+      "wire": 412570
+    },
+    {
+      "sid": "sid-spec-0-netbench-e2a021f7",
+      "count": 7025,
+      "raw": 5699059,
+      "wire": 409086
+    },
+    {
+      "sid": "sid-spec-1-netbench-e2a021f7",
+      "count": 7025,
+      "raw": 5699059,
+      "wire": 409086
+    },
+    {
+      "sid": "sid-spec-2-netbench-e2a021f7",
+      "count": 7025,
+      "raw": 5699059,
+      "wire": 409086
+    },
+    {
+      "sid": "sid-spec-0-netbench-3beec495",
+      "count": 7556,
+      "raw": 3129572,
+      "wire": 404311
+    },
+    {
+      "sid": "sid-spec-1-netbench-3beec495",
+      "count": 7556,
+      "raw": 3129572,
+      "wire": 404311
+    },
+    {
+      "sid": "sid-spec-2-netbench-3beec495",
+      "count": 7556,
+      "raw": 3129572,
+      "wire": 404311
+    },
+    {
+      "sid": "sid-b-netbench-d7e455cf",
+      "count": 3308,
+      "raw": 13915333,
+      "wire": 396606
+    },
+    {
+      "sid": "sid-a-netbench-b0e65429",
+      "count": 3797,
+      "raw": 16601286,
+      "wire": 391616
+    },
+    {
+      "sid": "sid-spec-0-netbench-b0e65429",
+      "count": 4033,
+      "raw": 14129547,
+      "wire": 381098
+    },
+    {
+      "sid": "sid-spec-1-netbench-b0e65429",
+      "count": 4033,
+      "raw": 14129547,
+      "wire": 381098
+    },
+    {
+      "sid": "sid-spec-2-netbench-b0e65429",
+      "count": 4033,
+      "raw": 14129547,
+      "wire": 381098
+    },
+    {
+      "sid": "sid-a-netbench-d7e455cf",
+      "count": 3176,
+      "raw": 12767555,
+      "wire": 376250
+    },
+    {
+      "sid": "sid-b-netbench-3aab26f3",
+      "count": 3266,
+      "raw": 12415146,
+      "wire": 346396
+    },
+    {
+      "sid": "sid-a-netbench-3aab26f3",
+      "count": 3150,
+      "raw": 12655103,
+      "wire": 341867
+    },
+    {
+      "sid": "sid-spec-0-netbench-aad5b998",
+      "count": 3862,
+      "raw": 10871992,
+      "wire": 337503
+    },
+    {
+      "sid": "sid-spec-1-netbench-aad5b998",
+      "count": 3862,
+      "raw": 10871992,
+      "wire": 337503
+    },
+    {
+      "sid": "sid-spec-2-netbench-aad5b998",
+      "count": 3862,
+      "raw": 10871992,
+      "wire": 337503
+    },
+    {
+      "sid": "sid-spec-0-netbench-1fefc066",
+      "count": 4779,
+      "raw": 6778341,
+      "wire": 325954
+    },
+    {
+      "sid": "sid-spec-1-netbench-1fefc066",
+      "count": 4779,
+      "raw": 6778341,
+      "wire": 325954
+    },
+    {
+      "sid": "sid-spec-2-netbench-1fefc066",
+      "count": 4779,
+      "raw": 6778341,
+      "wire": 325954
+    },
+    {
+      "sid": "sid-b-netbench-aad5b998",
+      "count": 2618,
+      "raw": 12968315,
+      "wire": 313906
+    },
+    {
+      "sid": "sid-a-netbench-aad5b998",
+      "count": 2754,
+      "raw": 12779693,
+      "wire": 307514
+    },
+    {
+      "sid": "sid-a-netbench-4e37a426",
+      "count": 2798,
+      "raw": 11983332,
+      "wire": 306625
+    },
+    {
+      "sid": "sid-b-netbench-4e37a426",
+      "count": 2807,
+      "raw": 12111242,
+      "wire": 303558
+    },
+    {
+      "sid": "sid-b-netbench-1fefc066",
+      "count": 2147,
+      "raw": 8458264,
+      "wire": 222281
+    },
+    {
+      "sid": "sid-a-netbench-1fefc066",
+      "count": 2137,
+      "raw": 8209881,
+      "wire": 212526
+    },
+    {
+      "sid": "sid-spec-0-netbench-67781d4a",
+      "count": 2872,
+      "raw": 3581794,
+      "wire": 196889
+    },
+    {
+      "sid": "sid-spec-1-netbench-67781d4a",
+      "count": 2872,
+      "raw": 3581794,
+      "wire": 196889
+    },
+    {
+      "sid": "sid-spec-2-netbench-67781d4a",
+      "count": 2872,
+      "raw": 3581794,
+      "wire": 196889
+    },
+    {
+      "sid": "sid-spec-0-netbench-7c905f74",
+      "count": 3409,
+      "raw": 1828591,
+      "wire": 190708
+    },
+    {
+      "sid": "sid-spec-1-netbench-7c905f74",
+      "count": 3409,
+      "raw": 1828591,
+      "wire": 190708
+    },
+    {
+      "sid": "sid-spec-2-netbench-7c905f74",
+      "count": 3409,
+      "raw": 1828591,
+      "wire": 190708
+    },
+    {
+      "sid": "sid-b-netbench-f84d721f",
+      "count": 1829,
+      "raw": 7049693,
+      "wire": 183871
+    },
+    {
+      "sid": "sid-a-netbench-e2a021f7",
+      "count": 1708,
+      "raw": 7233424,
+      "wire": 182407
+    },
+    {
+      "sid": "sid-a-netbench-f84d721f",
+      "count": 1830,
+      "raw": 7129339,
+      "wire": 179853
+    },
+    {
+      "sid": "sid-b-netbench-b850c076",
+      "count": 1709,
+      "raw": 7169078,
+      "wire": 179113
+    },
+    {
+      "sid": "sid-b-netbench-e2a021f7",
+      "count": 1701,
+      "raw": 6913380,
+      "wire": 178954
+    },
+    {
+      "sid": "sid-b-netbench-e76d8e97",
+      "count": 1686,
+      "raw": 6728518,
+      "wire": 177833
+    },
+    {
+      "sid": "sid-a-netbench-b850c076",
+      "count": 1629,
+      "raw": 7042172,
+      "wire": 175147
+    },
+    {
+      "sid": "sid-a-netbench-e76d8e97",
+      "count": 1670,
+      "raw": 6451057,
+      "wire": 169875
+    },
+    {
+      "sid": "sid-spec-0-netbench-908c131c",
+      "count": 2084,
+      "raw": 2019593,
+      "wire": 126074
+    },
+    {
+      "sid": "sid-spec-1-netbench-908c131c",
+      "count": 2084,
+      "raw": 2019593,
+      "wire": 126074
+    },
+    {
+      "sid": "sid-spec-2-netbench-908c131c",
+      "count": 2084,
+      "raw": 2019593,
+      "wire": 126074
+    },
+    {
+      "sid": "sid-a-netbench-67781d4a",
+      "count": 1122,
+      "raw": 4353732,
+      "wire": 123427
+    },
+    {
+      "sid": "sid-b-netbench-67781d4a",
+      "count": 1109,
+      "raw": 4326979,
+      "wire": 121679
+    },
+    {
+      "sid": "sid-a-netbench-3beec495",
+      "count": 979,
+      "raw": 3608143,
+      "wire": 112262
+    },
+    {
+      "sid": "sid-b-netbench-3beec495",
+      "count": 987,
+      "raw": 3303366,
+      "wire": 107687
+    },
+    {
+      "sid": "sid-a-netbench-b3bde222",
+      "count": 756,
+      "raw": 2692793,
+      "wire": 83385
+    },
+    {
+      "sid": "sid-b-netbench-b3bde222",
+      "count": 748,
+      "raw": 2642586,
+      "wire": 82747
+    },
+    {
+      "sid": "sid-b-netbench-7c905f74",
+      "count": 694,
+      "raw": 2212729,
+      "wire": 74100
+    },
+    {
+      "sid": "sid-a-netbench-7c905f74",
+      "count": 655,
+      "raw": 2147216,
+      "wire": 71485
+    },
+    {
+      "sid": "sid-a-netbench-908c131c",
+      "count": 656,
+      "raw": 2511587,
+      "wire": 71028
+    },
+    {
+      "sid": "sid-b-netbench-908c131c",
+      "count": 648,
+      "raw": 2455178,
+      "wire": 69489
+    },
+    {
+      "sid": "room:netbench-b0e65429",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-3beec495",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-e76d8e97",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-7c905f74",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-1fefc066",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-908c131c",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-f84d721f",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-b850c076",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-b3bde222",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-d7e455cf",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-67781d4a",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-4e37a426",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-3aab26f3",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-e2a021f7",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    },
+    {
+      "sid": "room:netbench-aad5b998",
+      "count": 1,
+      "raw": 317,
+      "wire": 317
+    }
+  ],
+  "summe": {
+    "count": 437310,
+    "raw": 545314498,
+    "wire": 29129523
+  },
+  "groesste_nachricht": {
+    "bytes": 15722,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 15,
+    "raw": 4125
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 7,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).",
+        "[bgm] CPU-Gegner \"Waflav, the Metamorphing Monstrosity\" → Theme \"waflav\" (48 Themes im Ordner)",
+        "[heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Lilly, the Charming Infiltrator\" → Theme \"lilly\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Vacarn, the Dark Goblin Necromancer\" → Theme \"vacarn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Nao, the Barrier Priestess\" → Theme \"nao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 10,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).",
+        "[bgm] CPU-Gegner \"Waflav, the Metamorphing Monstrosity\" → Theme \"waflav\" (48 Themes im Ordner)",
+        "[heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Lilly, the Charming Infiltrator\" → Theme \"lilly\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Vacarn, the Dark Goblin Necromancer\" → Theme \"vacarn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Nao, the Barrier Priestess\" → Theme \"nao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Thep, the Court Scribe\" → Theme \"thep\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Ghuanjun, the Undead Martial Artist\" → Theme \"ghuanjun\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Cute Annoyance Mini\" → Theme \"mini\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 11,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[demo-recorder] CPU-gegen-CPU-Partien werden nicht aufgezeichnet (PP_DEMO_RECORD_CPU=1 erzwingt die Aufnahme).",
+        "[bgm] CPU-Gegner \"Waflav, the Metamorphing Monstrosity\" → Theme \"waflav\" (48 Themes im Ordner)",
+        "[heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+26 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=64 heapUsed=40",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Lilly, the Charming Infiltrator\" → Theme \"lilly\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Vacarn, the Dark Goblin Necromancer\" → Theme \"vacarn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Nao, the Barrier Priestess\" → Theme \"nao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Thep, the Court Scribe\" → Theme \"thep\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Ghuanjun, the Undead Martial Artist\" → Theme \"ghuanjun\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Cute Annoyance Mini\" → Theme \"mini\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Maya, the Nature Fairy\" → Theme \"maya\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 14,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Vacarn, the Dark Goblin Necromancer\" → Theme \"vacarn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Nao, the Barrier Priestess\" → Theme \"nao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Thep, the Court Scribe\" → Theme \"thep\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Ghuanjun, the Undead Martial Artist\" → Theme \"ghuanjun\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Cute Annoyance Mini\" → Theme \"mini\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Maya, the Nature Fairy\" → Theme \"maya\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Mao, the Vengeful Guardian\" → Theme \"mao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Champion, the Stormbringer\" → Theme \"champion\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    },
+    {
+      "partie": 16,
+      "grund": "stillstand",
+      "letzteZeilen": [
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Vacarn, the Dark Goblin Necromancer\" → Theme \"vacarn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Nao, the Barrier Priestess\" → Theme \"nao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Thep, the Court Scribe\" → Theme \"thep\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Ghuanjun, the Undead Martial Artist\" → Theme \"ghuanjun\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Cute Annoyance Mini\" → Theme \"mini\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Maya, the Nature Fairy\" → Theme \"maya\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Tarleinn the Traveler\" → Theme \"tarleinn\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Mao, the Vengeful Guardian\" → Theme \"mao\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Champion, the Stormbringer\" → Theme \"champion\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Zsos'Ssar, the Serpent Warlord\" → Theme \"zsosssar\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.",
+        "[bgm] CPU-Gegner \"Maya, the Nature Fairy\" → Theme \"maya\" (48 Themes im Ordner)",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    }
+  ],
+  "unterdrueckte_ausgabezeilen": 42,
+  "hochrechnung": {
+    "wire_je_partie": 1941968.2,
+    "roh_je_partie": 36354299.86666667,
+    "wire_je_verbindung": 388393.64,
+    "wire_je_halbzug": 43412.105812220565,
+    "kompressionsfaktor": 18.72033737044029
+  }
+}

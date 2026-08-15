@@ -1,0 +1,164 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 20 s | Zeitlimit/Partie 300 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10   71 Halbzuege    6978 Nachrichten    28.25 MB roh  →    0.441 MB Leitung    23 s    26 s CPU  Heal Burn vs Dance of the Butterflies
+  Partie   2/10    9 Halbzuege     519 Nachrichten     1.64 MB roh  →    0.030 MB Leitung   300 s   300 s CPU  ⚠ zeitlimit@zug9  Heal Burn vs To Attain Divinity
+     ↳ 51 abgebrochene(r) Hook(s): 
+     ↳ letzte 3 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Archibald, the Archmage" → Theme "archibald" (48 Themes im Ordner)
+       [error] [Engine] Hook "onTurnStart" on card "Barker, the Monster Tamer" (7e543b9a-eaf) failed: Hook timeout
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   3/10   67 Halbzuege    6433 Nachrichten    23.08 MB roh  →    0.359 MB Leitung    72 s    75 s CPU  Heal Burn vs Man's Best Friends
+  Partie   4/10   71 Halbzuege    6944 Nachrichten    25.50 MB roh  →    0.393 MB Leitung    44 s    46 s CPU  Heal Burn vs Shadows over Blackport
+  Partie   5/10   69 Halbzuege    6538 Nachrichten    23.54 MB roh  →    0.387 MB Leitung    92 s    93 s CPU  Heal Burn vs Mawstruck
+  Partie   6/10   21 Halbzuege    2080 Nachrichten     7.28 MB roh  →    0.126 MB Leitung    28 s    29 s CPU  Heal Burn vs Venom Swamp
+  Partie   7/10   14 Halbzuege    1647 Nachrichten     5.20 MB roh  →    0.090 MB Leitung    16 s    17 s CPU  Heal Burn vs Crystal Gifts
+  Partie   8/10   70 Halbzuege    6701 Nachrichten    24.45 MB roh  →    0.398 MB Leitung    72 s    72 s CPU  Heal Burn vs Man's Best Friends
+  Partie   9/10   49 Halbzuege    3774 Nachrichten    14.64 MB roh  →    0.225 MB Leitung   112 s   111 s CPU  Heal Burn vs Elven Vanguard
+  Partie  10/10   17 Halbzuege    1717 Nachrichten     5.92 MB roh  →    0.102 MB Leitung    14 s    14 s CPU  Heal Burn vs Venom Swamp
+
+[netbench] 66 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 9 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   72.8%      208.8 KB    17660.2 KB       2184    8.09 KB       98.8%  game_state
+   21.7%       62.4 KB      262.2 KB       2001    0.13 KB       76.2%  action_log
+    2.0%        5.6 KB       15.1 KB        315    0.05 KB       62.8%  card_reveal
+    1.1%        3.1 KB        6.7 KB         61    0.11 KB       54.0%  hand_to_board_fly
+    0.8%        2.3 KB        5.9 KB         77    0.08 KB       61.8%  ability_activated
+    0.5%        1.4 KB        3.1 KB         37    0.08 KB       56.0%  play_zone_animation
+    0.2%        0.6 KB        0.8 KB         12    0.07 KB       33.2%  potion_resolved
+    0.2%        0.5 KB        1.3 KB         11    0.12 KB       61.4%  play_pile_transfer
+    0.2%        0.5 KB        0.9 KB         15    0.06 KB       48.5%  deck_search_add
+    0.1%        0.3 KB        0.7 KB          4    0.19 KB       58.6%  play_ram_animation
+    0.1%        0.3 KB        0.5 KB          4    0.13 KB       43.4%  play_hand_steal
+    0.1%        0.3 KB        0.7 KB          9    0.08 KB       64.9%  summon_effect
+    0.1%        0.2 KB        0.3 KB          1    0.27 KB       29.8%  game_started
+    0.1%        0.2 KB        0.3 KB          7    0.04 KB       41.5%  gold_change
+    0.0%        0.1 KB        0.3 KB          2    0.19 KB       58.1%  play_card_transfer
+  … und 15 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler        143.5 KB Leitung je Verbindung und Partie  (8980.2 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            17.54 MB roh  →  0.280 MB auf der Leitung
+  Ø je Verbindung:        143.5 KB
+  Ø je Halbzug (alle):    5.75 KB
+  Singleplayer (1 Client): ~143.5 KB je Partie
+  PvP (2 Clients):         ~287.0 KB je Partie
+  je zusätzlichem Zuschauer: ~143.5 KB je Partie
+  In 5 GB passen:          ~36.536 Singleplayer-Partien
+                           ~18.268 PvP-Partien
+  OHNE Kompression wären es 583 bzw. 291 — Faktor 62.6
+  Größte Einzelnachricht:  13.0 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 13.1 min CPU
+    300 s  bei   9 Halbzuegen (33.4 s/Halbzug)   ⚠ Heal Burn vs To Attain Divinity
+    111 s  bei  49 Halbzuegen (2.3 s/Halbzug)     Heal Burn vs Elven Vanguard
+     93 s  bei  69 Halbzuegen (1.4 s/Halbzug)     Heal Burn vs Mawstruck
+     75 s  bei  67 Halbzuegen (1.1 s/Halbzug)     Heal Burn vs Man's Best Friends
+     72 s  bei  70 Halbzuegen (1.0 s/Halbzug)     Heal Burn vs Man's Best Friends
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+        150        1          1  To Attain Divinity
+         55        1          0  Elven Vanguard
+         47        1          0  Mawstruck
+         39       10          1  Heal Burn
+         37        2          0  Man's Best Friends
+         23        1          0  Shadows over Blackport
+         13        1          0  Dance of the Butterflies
+         11        2          0  Venom Swamp
+          9        1          0  Crystal Gifts
+  → Abbrueche haeufen sich bei: To Attain Divinity (1), Heal Burn (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+     1582   19.1%  Friendship
+      759    9.1%  Lifeforce Howitzer
+      698    8.4%  Treasure Huntress Semi
+      647    7.8%  Wealth
+      635    7.6%  Brilliant Idea   ⚠ 85 leckende Rollouts
+      483    5.8%  Shield of Death
+      422    5.1%  Willy, the Valiant Leprechaun
+      395    4.8%  Loyal Hountriever
+      363    4.4%  Shield of Life
+      342    4.1%  Heal   ⚠ 111 leckende Rollouts
+      236    2.8%  Healing Melody   ⚠ 39 leckende Rollouts
+      177    2.1%  Legendary Sword of a Barbarian King
+      119    1.4%  Ingo, Investor of Evil
+      115    1.4%  Luck
+      103    1.2%  Performance
+
+═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══
+  Modus: `frei` = inhaerente Zusatz-Aktion (Support Magic 2 oder Decay Magic 1
+  beim Caster), `zusatz` = ueber einen Geber (Friendship & Co.), `main` = hat
+  die Aktion der Runde gekostet. „doppelt" = Ziel trug den Zustand schon —
+  jeder solche Einsatz ist verschenkt (der Zustand ist ein Boolean).
+
+  Partie  Zug  Modus   Caster                      → Ziel (HP)
+       1    2  frei    Kazena, the Storming Rebel  → Alleria, the Queen of Spiders (400)
+       1   54  frei    Nao, the Barrier Priestess  → Beato, the Butterfly Witch (300)
+          └─   0 Umwandlungen,     0 Schaden · 71 Halbzuege · Sieger: Heal Burn (deck_out)
+       4    2  zusatz  Nao, the Barrier Priestess  → Bill, the Angry Auctioneer (400)
+       4    6  zusatz  Nao, the Barrier Priestess  → Arthor, the King of Blackport (400)
+       4   34  frei    Nao, the Barrier Priestess  → Jenny, the Class Fairy (300)
+          └─   0 Umwandlungen,     0 Schaden · 71 Halbzuege · Sieger: Heal Burn (deck_out)
+       5   15  frei    Nao, the Barrier Priestess  → Nero Zira, the Mastermind (450)
+          └─   0 Umwandlungen,     0 Schaden · 69 Halbzuege · Sieger: Mawstruck (deck_out)
+       6    5  main    Kazena, the Storming Rebel  → Fiona, the Princess of Blackport (450)
+       6    5  zusatz  Nao, the Barrier Priestess  → Medea, the Swamp Witch (400)
+       6   17  main    Kazena, the Storming Rebel  → Zsos'Ssar, the Serpent Warlord (400)
+          └─   0 Umwandlungen,     0 Schaden · 21 Halbzuege · Sieger: Venom Swamp (all_heroes_dead)
+       8   23  zusatz  Nao, the Barrier Priestess  → Alice, the Puppeteer Girl (300)
+          └─   0 Umwandlungen,     0 Schaden · 70 Halbzuege · Sieger: Heal Burn (deck_out)
+
+  SUMME ueber 5 Partie(n) mit Beteiligung:
+    Einsaetze: 10  (frei 4 | ueber Geber 4 | Main-Aktion 2)
+    Umwandlungen: 0, daraus 0 Schaden (0 je Einsatz)
+    Siege der spielenden Seite: 3/5 gewertete Partien mit mindestens einem Einsatz (60 %)
+
+    ⚠ GELEGT, ABER NIE EINGELOEST. Die Karte liegt richtig, es folgt nur
+      keine Heilung auf das Ziel. Die Zielwahl-Tabelle unten sagt, wohin
+      die Heilungen stattdessen gehen.
+
+  ZIELWAHL ALLER HEILUNGEN (Versuche, live, je Quelle):
+        2x     200 HP  Divine Gift of The Light → eigen
+    → eigene Seite 2 | geschockter Gegner 0 | Gegner OHNE Umkehr 0
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+  1308102x  Barker, the Monster Tamer → Ska Harpyformer [rule]
+  405801x  Barker, the Monster Tamer → Psychic Scout [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    111x  Heal
+     96x  Adventurousness
+     85x  Brilliant Idea
+     80x  The Warlord's Bite
+     41x  Venom Infusion
+     39x  Healing Melody
+  Broadcasts an ALLE:      9 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1         71         6978      28.25        0.441    23     26        ja  deck_out           Heal Burn vs Dance of the Butterflies
+   2          9          519       1.64        0.030   300    300      NEIN  zeitlimit@zug9     Heal Burn vs To Attain Divinity
+   3         67         6433      23.08        0.359    72     75        ja  deck_out           Heal Burn vs Man's Best Friends
+   4         71         6944      25.50        0.393    44     46        ja  deck_out           Heal Burn vs Shadows over Blackport
+   5         69         6538      23.54        0.387    92     93        ja  deck_out           Heal Burn vs Mawstruck
+   6         21         2080       7.28        0.126    28     29        ja  all_heroes_dead    Heal Burn vs Venom Swamp
+   7         14         1647       5.20        0.090    16     17        ja  all_heroes_dead    Heal Burn vs Crystal Gifts
+   8         70         6701      24.45        0.398    72     72        ja  deck_out           Heal Burn vs Man's Best Friends
+   9         49         3774      14.64        0.225   112    111        ja  deck_out           Heal Burn vs Elven Vanguard
+  10         17         1717       5.92        0.102    14     14        ja  all_heroes_dead    Heal Burn vs Venom Swamp

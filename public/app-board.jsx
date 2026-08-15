@@ -20322,7 +20322,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (window.playSFX) window.playSFX('reveal');
       setTypeDeclaration({ id: Date.now() + Math.random(), label, color, declaredBy });
     };
-    const onReveal = ({ cardName }) => { if (window.playSFX) window.playSFX('reveal'); setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]); };
+    // `sfx` ist optional (12.8.): Aktivierungen eigener Brett-Karten
+    // schicken ihren eigenen Klang mit, weil Kreatur-, Helden-, Area-
+    // und Equip-Effekte sonst voellig stumm waeren. Alle uebrigen
+    // Reveals kommen ohne das Feld und klingen unveraendert.
+    const onReveal = ({ cardName, sfx }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx) {
@@ -27409,6 +27413,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
       if (t === 'hero_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} activated their effect!</span>; }
       if (t === 'creature_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
+      // Areas und Equip-Effekte hatten als einzige der Aktivierungs-
+      // Familie keinen Renderer — die Engine protokollierte sie, der
+      // Client verwarf sie still (unbekannte Typen fallen ans Ketten-
+      // ende auf `return null`). Al fiel es an Smuggler's Pier auf.
+      if (t === 'area_effect_activated') { const p = playerByName(entry.player || entry.activator); return <span>{pName(p.name, p.color)} activated {cName(entry.area)}!</span>; }
+      if (t === 'equip_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
       if (t === 'surprise_set') { const p = playerByName(entry.player); return <span>🎭 {pName(p.name, p.color)} set a Surprise on {entry.hero}.</span>; }
       if (t === 'surprise_activated') { const p = playerByName(entry.player); return <span>💥 {pName(p.name, p.color)} activated {cName(entry.card)} on {entry.hero}!</span>; }
       if (t === 'surprise_reset') { const p = playerByName(entry.player); return <span>🎭 {cName(entry.card)} returned to Surprise position.</span>; }
@@ -27426,7 +27436,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'hero_ko') { return <span className="log-hero-defeated">💀 {entry.hero} was defeated!</span>; }
       if (t === 'heal') { return <span className="log-heal">{entry.target} healed <span className="log-amount">{entry.amount}</span> HP!</span>; }
       if (t === 'heal_creature') { return <span className="log-heal">{cName(entry.target)} healed <span className="log-amount">{entry.amount}</span> HP!</span>; }
-      if (t === 'draw_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew {entry.count} card{entry.count>1?'s':''}.</span>; }
+      if (t === 'draw_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew {entry.count} card{entry.count>1?'s':''}{entry.source ? <> through {cName(entry.source)}</> : null}.</span>; }
       if (t === 'potion_draw') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew a card from Potion Deck!</span>; }
       if (t === 'status_add') {
         const s = entry.status || '';
@@ -27578,7 +27588,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const entry = actionLog[i];
       if (entry.type === 'draw') {
         let count = 1;
-        while (i + 1 < actionLog.length && actionLog[i + 1].type === 'draw' && actionLog[i + 1].player === entry.player) { count++; i++; }
+        // Nur Ziehungen DESSELBEN Verursachers buendeln (12.8.) — sonst
+        // verschmelzen zwei Effekte, die hintereinander ziehen lassen,
+        // zu einer Zeile mit der Quelle des ersten.
+        while (i + 1 < actionLog.length && actionLog[i + 1].type === 'draw'
+               && actionLog[i + 1].player === entry.player
+               && (actionLog[i + 1].source || null) === (entry.source || null)) { count++; i++; }
         result.push({ ...entry, type: 'draw_batch', count, id: entry.id });
       } else if (entry.type === 'discard' || entry.type === 'forced_discard') {
         let count = 1;

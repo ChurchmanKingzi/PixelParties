@@ -865,6 +865,10 @@ class GameEngine {
         actionRecursionTrace: [...((this._actionRecursionTrace) || [])],
       };
       fs.writeFileSync(fn, JSON.stringify(payload, null, 2));
+      // Ausloesungen zaehlen (12.8.), damit der Messstand sie ausweisen
+      // kann statt dass sie nur in der Serverkonsole stehen.
+      this._overloadTrips = this._overloadTrips || Object.create(null);
+      this._overloadTrips[reason] = (this._overloadTrips[reason] || 0) + 1;
       console.error(`[overload] trail dump → ${fn}`);
     } catch (err) {
       console.error('[overload] trail dump failed:', err.message);
@@ -1214,7 +1218,26 @@ class GameEngine {
       chainDepth: this.chainDepth,
       pendingTriggers: _clone(this.pendingTriggers),
       isResolving: this.isResolving,
-      actionLog: _clone(this.actionLog),
+      // ── PROTOKOLL NICHT KLONEN (12.8., gemessen) ─────────────────
+      // `_clone` ist hier `structuredClone` ueber das GESAMTE
+      // Aktionsprotokoll — und das waechst ueber die Partie. Gemessen:
+      // 1.000 Eintraege = 1,4 ms je Snapshot, 3.200 = 4,0 ms, 8.000 =
+      // 8,7 ms. Bei einigen hundert Rollouts je Zug sind das SEKUNDEN
+      // reine Kopierzeit, und zwar wachsend mit der Spieldauer.
+      //
+      // Es ist auch vollstaendig ueberfluessig: `log()` steigt bei
+      // `_fastMode` sofort aus, und jeder Rollout laeuft im Fast-Mode
+      // (mctsRunOneRollout ruft `enterFastMode()`). Waehrend eines
+      // Rollouts KANN sich das Protokoll also gar nicht aendern.
+      // Ausserdem ist `push` die einzige Mutation im ganzen Projekt —
+      // Eintraege werden nie geaendert oder entfernt.
+      //
+      // Deshalb: Laenge merken statt Inhalt kopieren. `restore` kuerzt
+      // wieder auf diese Laenge. Fuer den reinen Anhaenge-Fall ist das
+      // exakt gleichwertig; falls doch jemand ausserhalb des Fast-Mode
+      // snapshottet und anhaengt, wird es korrekt zurueckgerollt.
+      // Das ALTE Verhalten bleibt fuer alles andere unangetastet.
+      actionLogLen: this.actionLog.length,
       _inReactionCheck: this._inReactionCheck,
       _inNomuResolution: this._inNomuResolution || false,
       _inSurpriseResolution: this._inSurpriseResolution || false,
@@ -1242,6 +1265,26 @@ class GameEngine {
       // on what looks like a real overload but is actually leaked
       // counter state from previous rollouts.
       _damageCallsThisTurn: this._damageCallsThisTurn,
+      // ── v388: ZUGUEBERGABE-BUCHHALTUNG GEHOERT IN DEN SCHNAPPSCHUSS ──
+      // `_switchTurnInFlightKey` haengt an der ENGINE, nicht an `gs` —
+      // `restore()` hat es deshalb nie zurueckgesetzt. Simuliert ein
+      // Rollout den Zugwechsel DERSELBEN Runde (rolloutRestOfTurn bis
+      // zum Zugende), setzt es genau den Schluessel `<zug>:<spieler>`,
+      // den die LIVE-Uebergabe kurz darauf braucht — und die wird als
+      // Duplikat abgewiesen, die Zugkette endet still.
+      //
+      // Belegt im Lauf 14.8. 18:18, Partie 4: blockiert wurde Schluessel
+      // `4:1`, der Halter-Eintrag lautete aber `3:0`. Der Halter wird
+      // nur LIVE geschrieben, der Schluessel bedingungslos — wer `4:1`
+      // gesetzt hat, lief also in einer Simulation.
+      //
+      // Dieselbe Fehlerklasse wie der Prompt-Zyklus-Ringpuffer in v384:
+      // Engine-Zustand, der eine Simulation ueberlebt. Hier im
+      // Schnappschuss statt an den sechs Aufrufstellen, damit auch jede
+      // kuenftige snapshot/restore-Stelle automatisch mitgeschuetzt ist.
+      _switchTurnInFlightKey: this._switchTurnInFlightKey ?? null,
+      _switchTurnInFlightInfo: this._switchTurnInFlightInfo ?? null,
+      _switchTurnInFlight: this._switchTurnInFlight || false,
     };
     // Periodic snapshot-size sample for diagnostics. Once every 200
     // snapshots, JSON-serialize the snap and trail-write its size.
@@ -1360,7 +1403,15 @@ class GameEngine {
     this.chainDepth = snap.chainDepth;
     this.pendingTriggers = _clone(snap.pendingTriggers);
     this.isResolving = snap.isResolving;
-    this.actionLog = _clone(snap.actionLog);
+    // Siehe Kommentar in snapshot(): Laenge zuruecksetzen statt Klon
+    // einspielen. `snap.actionLog` gibt es in neuen Snapshots nicht
+    // mehr; der Zweig bleibt fuer etwaige alte Snapshots stehen.
+    if (Array.isArray(snap.actionLog)) {
+      this.actionLog = _clone(snap.actionLog);
+    } else if (typeof snap.actionLogLen === 'number'
+               && this.actionLog.length > snap.actionLogLen) {
+      this.actionLog.length = snap.actionLogLen;
+    }
     this._inReactionCheck = snap._inReactionCheck;
     this._inNomuResolution = snap._inNomuResolution;
     this._inSurpriseResolution = snap._inSurpriseResolution;
@@ -1384,6 +1435,13 @@ class GameEngine {
     // Default to 0 if the snapshot pre-dates this field (matches the
     // backwards-compat shape of the sibling safety counters above).
     this._damageCallsThisTurn = snap._damageCallsThisTurn || 0;
+    // v388: Zuguebergabe-Buchhaltung mit zuruecknehmen (Begruendung im
+    // snapshot()-Block). Ohne das ueberlebt ein simulierter Zugwechsel
+    // die Simulation und blockiert den echten als vermeintliches
+    // Duplikat.
+    this._switchTurnInFlightKey = snap._switchTurnInFlightKey ?? null;
+    this._switchTurnInFlightInfo = snap._switchTurnInFlightInfo ?? null;
+    this._switchTurnInFlight = snap._switchTurnInFlight || false;
     // External refs (room, io, sendGameState, onGameOver, _cpuDriver,
     // _additionalActionTypes) are intentionally preserved — they're the
     // plumbing to the real game, not part of the game's mutable state.
@@ -1410,6 +1468,31 @@ class GameEngine {
     // short-circuits on the `if (sid)` guard.
     this._savedSocketIds = this.gs.players.map(ps => ps?.socketId ?? null);
     for (const ps of this.gs.players) if (ps) ps.socketId = null;
+    // ── ZUSCHAUER EBENFALLS STILLLEGEN (12.8., gemessen) ─────────────
+    // Genau dieselbe Begruendung wie oben — nur waren die Zuschauer nie
+    // dabei. Folge: JEDER Sendeweg, der die Zuschauerliste DIREKT
+    // durchlaeuft statt ueber `_broadcastEvent` zu gehen, hat waehrend
+    // der MCTS-Rollouts weiter gefunkt. Das sind fuenf Stellen
+    // (`_firePendingCardReveal`, `_checkTargetRedirectOnce` zweimal,
+    // `_activateSurprise`, `_broadcastChainState`) — nur
+    // `_broadcastEvent` prueft `_fastMode` selbst.
+    //
+    // GEMESSEN am Bandbreiten-Lauf vom 12.8.: ein Zuschauer bekam
+    // **4,4x so viele Nachrichten wie ein Spieler**, und `card_reveal`
+    // allein stellte 68 % aller Nachrichten. Das war nicht nur
+    // Bandbreite: der Zuschauer sah Karten aufgedeckt, die die CPU nur
+    // SIMULIERT hat — also verdeckte Information aus Rollouts.
+    //
+    // Hier stillzulegen statt an fuenf Stellen `_fastMode` zu pruefen,
+    // deckt auch jeden kuenftigen Sendeweg ab. Gesichert wird per
+    // Objektbezug, damit ein Beitritt oder Abgang waehrend eines
+    // Rollouts nichts durcheinanderbringt.
+    this._savedSpectatorIds = [];
+    for (const spec of (this.room?.spectators || [])) {
+      if (!spec) continue;
+      this._savedSpectatorIds.push([spec, spec.socketId ?? null]);
+      spec.socketId = null;
+    }
   }
 
   /** Leave simulation mode and restore socket routing. Only the exit
@@ -1425,6 +1508,10 @@ class GameEngine {
       }
     }
     this._savedSocketIds = null;
+    if (this._savedSpectatorIds) {
+      for (const [spec, sid] of this._savedSpectatorIds) { if (spec) spec.socketId = sid; }
+      this._savedSpectatorIds = null;
+    }
     this._fastMode = false;
   }
 
@@ -2641,6 +2728,17 @@ class GameEngine {
                   // ueber die Render-Logs laufen.
                   try {
                     this._hookTimeouts = (this._hookTimeouts || 0) + 1;
+                    // Auch im Fast-Mode zaehlbar machen (12.8.):
+                    // `log()` steigt dort in Zeile 1 aus, deshalb kam
+                    // die Zahl der Abbrueche im Messstand ohne
+                    // KARTENNAMEN an (29/107/8 Treffer, Liste leer).
+                    // Der Zaehler hier lebt am Engine-Objekt und ist
+                    // vom Protokoll unabhaengig.
+                    try {
+                      const k = `${c?.name || '?'} (${hookName})`;
+                      this._hookTimeoutsByCard = this._hookTimeoutsByCard || Object.create(null);
+                      this._hookTimeoutsByCard[k] = (this._hookTimeoutsByCard[k] || 0) + 1;
+                    } catch { /* Diagnose darf nie stoeren */ }
                     this.log('hook_timeout', {
                       hook: hookName, card: c?.name || null, turn: this.gs.turn,
                     });
@@ -2940,13 +3038,23 @@ class GameEngine {
         return engine.decreaseMaxHp(target, amount);
       },
       async drawCards(playerIdx, count, opts) {
-        return engine.actionDrawCards(playerIdx, count, opts);
+        // Der Kontext kennt seine eigene Karte — Ziehungen tragen damit
+        // ihren Verursacher, auch wenn der ambiente Merker mal nicht
+        // greift. Ueberschreibbar via opts, gleiches Muster wie
+        // ctx.moveCard und ctx.discardCards.
+        return engine.actionDrawCards(playerIdx, count, {
+          source: cardInstance || undefined,
+          ...(opts || {}),
+        });
       },
       /** Animated multi-draw — see `engine.actionDrawCardsAnimated`.
        *  Prefer this from card scripts whose draw is followed by
        *  another visual (Spell-to-discard, hand-to-deleted-pile, etc.). */
       async drawCardsAnimated(playerIdx, count, opts) {
-        return engine.actionDrawCardsAnimated(playerIdx, count, opts);
+        return engine.actionDrawCardsAnimated(playerIdx, count, {
+          source: cardInstance || undefined,
+          ...(opts || {}),
+        });
       },
       async destroyCard(targetCard) {
         return engine.actionDestroyCard(cardInstance, targetCard);
@@ -4008,6 +4116,20 @@ class GameEngine {
           damageType: config.damageType,
           isBuff: config.isBuff,
           isHeal: config.isHeal,
+          // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
+          // Diese Liste ist eine WEISSE LISTE — was nicht draufsteht,
+          // erreicht `cpuPickTargets` nie. `isHealing` fehlte, und damit
+          // waren BEIDE Heil-Sicherungen des Piloten fuer jede Karte
+          // tot, die ueber diese Huelle prompted: das Gate am Kopf von
+          // `cpuPickTargets` (nur eigene Seite oder `healReversed`) und
+          // die Prior-Sicherung darueber. Betroffen war `heal.js`, das
+          // das Flag korrekt setzt — es wurde hier still verschluckt.
+          // Im Messlauf 14.8. 12:02 die Folge: `1x Heal → gegner-offen`,
+          // also 150 HP an einen Gegner ohne Umkehr verschenkt.
+          // ACHTUNG, zwei aehnliche Namen: `isHeal` (darueber) speist
+          // `looksLikeHeal` fuer die Bewertung, `isHealing` ist das
+          // Ziel-GATE. Sie sind NICHT austauschbar.
+          isHealing: config.isHealing,
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
@@ -4452,6 +4574,20 @@ class GameEngine {
           damageType: config.damageType,
           isBuff: config.isBuff,
           isHeal: config.isHeal,
+          // ── v385: `isHealing` gehoert MIT weitergereicht ────────────
+          // Diese Liste ist eine WEISSE LISTE — was nicht draufsteht,
+          // erreicht `cpuPickTargets` nie. `isHealing` fehlte, und damit
+          // waren BEIDE Heil-Sicherungen des Piloten fuer jede Karte
+          // tot, die ueber diese Huelle prompted: das Gate am Kopf von
+          // `cpuPickTargets` (nur eigene Seite oder `healReversed`) und
+          // die Prior-Sicherung darueber. Betroffen war `heal.js`, das
+          // das Flag korrekt setzt — es wurde hier still verschluckt.
+          // Im Messlauf 14.8. 12:02 die Folge: `1x Heal → gegner-offen`,
+          // also 150 HP an einen Gegner ohne Umkehr verschenkt.
+          // ACHTUNG, zwei aehnliche Namen: `isHeal` (darueber) speist
+          // `looksLikeHeal` fuer die Bewertung, `isHealing` ist das
+          // Ziel-GATE. Sie sind NICHT austauschbar.
+          isHealing: config.isHealing,
           appliesStatus: config.appliesStatus,
           allowOwnSide: config.allowOwnSide,
           selfDamage: config.selfDamage,
@@ -6289,11 +6425,49 @@ class GameEngine {
       }
       if (targetPi >= 0) break;
     }
+
+    // ── WOHIN ZIELT DIE HEILUNG? (13.8.) ──────────────────────────────
+    // Nach dem ersten Messlauf stand da: 14 Overheal Shocks gelegt, NULL
+    // Umwandlungen. Die Karte liegt also richtig — nur trifft danach nie
+    // eine Heilung. Um „heilt die CPU ueberhaupt Gegner?" von „heilt sie
+    // die FALSCHEN Gegner?" zu trennen, wird hier jeder Heil-VERSUCH
+    // nach Quelle und Zielart gebucht (Versuch, nicht Wirkung — genau
+    // das beantwortet die Zielwahl-Frage). Nur live.
+    if (targetPi >= 0 && !this._inMctsSim && !this._fastMode) {
+      try {
+        if (!this._healRouting) this._healRouting = {};
+        const heiler = (source && typeof source === 'object' && source.owner != null)
+          ? source.owner : this.gs.activePlayer;
+        const art = (targetPi === heiler) ? 'eigen'
+          : (target?.statuses?.healReversed ? 'gegner-geschockt' : 'gegner-offen');
+        const key = `${(source && source.name) || '?'} → ${art}`;
+        const e = this._healRouting[key] || (this._healRouting[key] = { n: 0, hp: 0 });
+        e.n++; e.hp += (amount || 0);
+      } catch { /* Messung darf nie stoeren */ }
+    }
     if (target?.statuses?.healReversed) {
       this.log('heal_reversed', {
         source: source?.name, target: this._heroLabel(target), amount,
         by: target.statuses.healReversed.source || 'healReversed',
       });
+      // ── ZAEHLWERK (13.8.) ──────────────────────────────────────────
+      // Was die Umkehr ueber eine Partie tatsaechlich einbringt. Am
+      // Objekt gefuehrt, weil `log()` im Fast-Mode schweigt — und
+      // umgekehrt sollen Rollouts hier gerade NICHT mitzaehlen, sonst
+      // meldet der Bericht simulierten statt echtem Schaden.
+      if (!this._inMctsSim && !this._fastMode) {
+        try {
+          if (!this._healReversedDiag) {
+            this._healReversedDiag = { treffer: 0, schaden: 0, jeSeite: [0, 0] };
+          }
+          const d = this._healReversedDiag;
+          d.treffer++;
+          d.schaden += (amount || 0);
+          // Gutgeschrieben wird der Seite, die den Zustand gesetzt hat.
+          const by = target.statuses.healReversed.appliedBy;
+          if (by === 0 || by === 1) d.jeSeite[by] += (amount || 0);
+        } catch { /* Messung darf nie stoeren */ }
+      }
       await this.actionDealDamage(source, target, amount, 'other');
       return;
     }
@@ -6881,6 +7055,20 @@ class GameEngine {
       }
     }
 
+    // ── VERURSACHER DER ZIEHUNG (12.8., Als Vorgabe) ─────────────────
+    // „Bei der Draw-Zeile immer automatisch die Source mit anzeigen."
+    // Einmal hier aufgeloest statt an 128 Aufrufstellen nachgetragen —
+    // ein Vertrag, den jede Karte einzeln bedienen muesste, wird
+    // zwangslaeufig irgendwo vergessen (und meldet sich dann nicht).
+    // Rangfolge: ausdrueckliche Angabe > ambiente Quelle.
+    // Das Rundeneinkommen der Resource Phase hat KEINEN Verursacher —
+    // `_isResourceDraw` haelt die Zeile dort unveraendert.
+    const drawSource = opts._isResourceDraw
+      ? null
+      : (typeof opts.source === 'string' ? opts.source
+        : (opts.source?.name || this._effectSourceName() || null));
+    const quelle = drawSource ? { source: drawSource } : {};
+
     const drawn = [];
     const drawDelay = count > 1 ? (opts.drawDelay ?? 300) : 0;
     for (let i = 0; i < count; i++) {
@@ -6919,7 +7107,7 @@ class GameEngine {
       this._autoRevealOnEnterHand(playerIdx, ps.hand.length - 1, cardName);
       drawn.push(inst);
 
-      this.log('draw', { player: ps.username, card: cardName });
+      this.log('draw', { player: ps.username, card: cardName, ...quelle });
       // Propagate opts._isResourceDraw to listeners so cards that gate
       // on "via an effect" (Cosmic Depths Analyzer / Gatherer) can
       // distinguish the standard resource-phase auto-draw from effect-
@@ -6950,7 +7138,7 @@ class GameEngine {
         const extraInst = this._trackCard(extraCard, playerIdx, ZONES.HAND);
         this._autoRevealOnEnterHand(playerIdx, ps.hand.length - 1, extraCard);
         drawn.push(extraInst);
-        this.log('draw', { player: ps.username, card: extraCard });
+        this.log('draw', { player: ps.username, card: extraCard, ...quelle });
         this._broadcastEvent('nomu_draw', { playerIdx, cardName: extraCard });
         await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: extraInst, cardName: extraCard });
 
@@ -7097,33 +7285,113 @@ class GameEngine {
    * Mit Argumenten gerufen wirkt `announceActiveEffect(name, owner)`
    * weiterhin sofort — das braucht der Trank-Weg, dessen `resolve` erst
    * nach der Zielwahl laeuft.
+   *
+   * DRITTES ARGUMENT `origin` (12.8., Als Regel): `'board'` (Vorgabe)
+   * fuer Karten, die schon im Spiel liegen — Areas, Helden, Kreaturen,
+   * Abilities, ausgeruestete Artefakte. `'hand'` fuer Karten, die der
+   * Spieler gerade selbst aus der Hand einsetzt (Book of Doom & Co).
+   * Karten, die `announceActiveEffect()` ohne Argumente rufen, erben
+   * den Wert aus dem `armEffectAnnounce` ihres Aktivierungswegs — eine
+   * Kartendatei muss davon also nichts wissen.
+   *
+   * TRANSPORT SEIT 12.8. (Als Entscheidung): NICHT mehr die mittige
+   * Einblendung `play_card_showcase`, sondern der vorhandene
+   * `card_reveal` links neben dem Feld — deutlich weniger stoerend.
+   * Der GEGNER bekommt diesen Reveal an allen Wegen ohnehin schon
+   * (`_pendingCardReveal` / `_firePendingCardReveal`, seit jeher
+   * gegnerseitig); hier wird deshalb nur noch die fehlende Haelfte
+   * nachgereicht — der Reveal fuer den AKTIVIERENDEN SELBST, und zwar
+   * ausschliesslich bei Brett-Quellen. Bei `'hand'` passiert gar
+   * nichts mehr: dort deckt der vorhandene Gegner-Reveal alles ab, und
+   * der Spieler weiss selbst, was er gerade gespielt hat.
+   *
+   * `play_card_showcase` bleibt als Mechanismus bestehen und wird
+   * weiter direkt genutzt (Terrors Zug-Ende, Warrior of Teocuilatl) —
+   * nur die AKTIVIERUNGEN laufen nicht mehr darueber.
    */
-  armEffectAnnounce(cardName, ownerIdx) {
-    this._pendingEffectAnnounce = cardName ? { cardName, owner: ownerIdx ?? null } : null;
+  armEffectAnnounce(cardName, ownerIdx, origin) {
+    this._pendingEffectAnnounce = cardName
+      ? { cardName, owner: ownerIdx ?? null, origin: origin === 'hand' ? 'hand' : 'board' }
+      : null;
+    // ── ZWEITE AUFGABE (12.8.): der AMBIENTE Aktivierungs-Merker ──────
+    // Anders als `_pendingEffectAnnounce` (das beim Ausloesen des
+    // Auftritts verfaellt) lebt dieser Merker ueber die GANZE
+    // Aktivierung — er beantwortet die Frage „welche Karte laesst
+    // hier gerade etwas geschehen?", die z.B. die Zieh-Protokollzeile
+    // stellt. Bewusst hier angehaengt statt als elftes Paar
+    // Push/Pop-Aufrufe: `armEffectAnnounce`/`clearEffectAnnounce`
+    // stehen bereits an JEDEM Aktivierungsweg und genau mit der
+    // richtigen Lebensdauer (vor dem Handler an, danach aus).
+    //
+    // `turn` begrenzt einen etwaigen Ausreisser: verlaesst ein Weg die
+    // Funktion ueber ein fruehes `return`, ohne zu raeumen, ist der
+    // Merker spaetestens mit dem naechsten Halbzug wieder wertlos —
+    // und bis dahin ueberschreibt ihn die naechste Aktivierung.
+    this._activationSource = cardName
+      ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn }
+      : null;
   }
 
   clearEffectAnnounce() {
     this._pendingEffectAnnounce = null;
+    this._activationSource = null;
   }
 
-  announceActiveEffect(cardName, ownerIdx) {
-    let name = cardName, owner = ownerIdx;
+  /**
+   * „Welche Karte laesst hier gerade etwas geschehen?" (12.8.)
+   *
+   * Reihenfolge, von speziell nach allgemein:
+   *   1. `_currentEffectSource` — gesetzt von `runHooks` (die Karte,
+   *      deren Hook laeuft) und von `executeCardWithChain` (waehrend
+   *      des `resolve`). Das ist der INNERSTE Verursacher: zieht ein
+   *      Hook-Listener waehrend einer fremden Aktivierung, gehoert die
+   *      Zeile dem Listener, nicht der Aktivierung.
+   *   2. `_activationSource` — die laufende Aktivierung. Deckt die
+   *      Wege ab, deren Handler AUSSERHALB von `executeCardWithChain`
+   *      laeuft (freie Ability, Ability, Helden-, Area-, Equip-Effekt).
+   *
+   * Gibt `null` zurueck, wenn nichts von beidem greift — dann war es
+   * kein Effekt, sondern der normale Spielablauf.
+   */
+  _effectSourceName() {
+    const hook = this._currentEffectSource?.cardName;
+    if (hook) return hook;
+    const act = this._activationSource;
+    if (act?.cardName && (act.turn == null || act.turn === this.gs?.turn)) return act.cardName;
+    return null;
+  }
+
+  announceActiveEffect(cardName, ownerIdx, origin) {
+    let name = cardName, owner = ownerIdx, from = origin;
     if (name == null) {
       const p = this._pendingEffectAnnounce;
       if (!p) return;                       // schon ausgeloest oder abgebrochen
-      name = p.cardName; owner = p.owner;
+      name = p.cardName; owner = p.owner; from = p.origin;
     }
     this._pendingEffectAnnounce = null;
     if (!name) return;
     if (this._inMctsSim || this._fastMode) return;
+    // WER SIEHT DEN AUFTRITT (Als Regel 12.8.)
+    // Der GEGNER immer — fuer ihn ist der Auftritt die Information,
+    // was gerade passiert. Der BESITZER nur bei Brett-Quellen
+    // (`origin: 'board'`): eine Karte, die er selbst gerade aus der
+    // Hand gespielt hat, muss ihm niemand zeigen.
+    // Handkarten: nichts zu tun. Der Gegner sieht sie ueber den
+    // vorhandenen `card_reveal`, der Spieler braucht keine Anzeige
+    // fuer eine Karte, die er selbst gerade gespielt hat.
+    if (from === 'hand') return;
+    if (owner !== 0 && owner !== 1) return;
     try {
-      // Benutzt die VORHANDENE Auftritt-Architektur (`play_card_showcase`,
-      // seit 1.8. fuer Terror da). `sfx` ist optional und neu — Terrors
-      // Auftritt schickt es nicht und bleibt damit unveraendert.
-      this._broadcastEvent('play_card_showcase', {
-        cardName: name, owner: owner ?? null, durationMs: 1400,
-        sfx: 'ability_activate',
-      });
+      // Nur an den Aktivierenden. Der Gegner hat seinen Reveal schon
+      // (`_firePendingCardReveal`), und die Zuschauer bekommen ihn ueber
+      // dieselbe Stelle — beide werden hier bewusst ausgespart, sonst
+      // saehen sie die Karte doppelt.
+      // `sfx` ueberschreibt clientseitig den Standardklang `reveal`:
+      // Kreatur-, Helden-, Area- und Equip-Aktivierungen haben sonst
+      // GAR keinen Klang (Als Nimble-Wunsch aus v347 haengt daran).
+      this._broadcastEvent('card_reveal', {
+        cardName: name, sfx: 'ability_activate',
+      }, { toPlayers: [owner], toSpectators: false });
     } catch { /* Kosmetik darf nie stoeren */ }
   }
 
@@ -13700,22 +13968,80 @@ class GameEngine {
     // Verschachtelung mitzunehmen. Die veraltete END-Phase wird davor
     // ohnehin schon von `stale_end_phase_dropped` in runPhase abgewiesen.
     const inFlightKey = `${this.gs?.turn}:${this.gs?.activePlayer}`;
-    if (this._switchTurnInFlightKey === inFlightKey) {
+    // v388: In der Simulation nie blockieren — der Schluessel dort
+    // stammt zwangslaeufig aus dem LIVE-Spiel (Simulationen schreiben
+    // seit v388 nicht mehr), und ein Rollout, der den laufenden Zug
+    // nachspielt, traegt genau dessen Schluessel.
+    if (!this._inMctsSim && this._switchTurnInFlightKey === inFlightKey) {
       this.log('switch_turn_reentry_blocked', {
         turn: this.gs.turn,
         activePlayer: this.gs.players[this.gs.activePlayer]?.username || null,
       });
+      // v386: auch diesen Weg zaehlen — er kehrt zurueck, ohne zu wechseln.
+      // v387: und festhalten, WER den Schluessel haelt. Ohne das steht im
+      // Bericht nur "Wiedereintritt geblockt: 1x", ohne jeden Hinweis
+      // darauf, welche Uebergabe noch offen ist und wer sie angestossen
+      // hat. Der Halter-Eintrag wird beim Setzen des Schluessels
+      // gefuellt (siehe unten), hier nur ausgelesen.
+      if (!this._inMctsSim && !this._fastMode) {
+        this._switchTurnReentryBlocked = (this._switchTurnReentryBlocked || 0) + 1;
+        this._cpuTurnMark = `aus:switchTurn-reentry@zug${this.gs.turn}p${this.gs.activePlayer}`;
+      }
       return;
     }
     const prevInFlightKey = this._switchTurnInFlightKey;
-    this._switchTurnInFlightKey = inFlightKey;
+    const prevInFlightInfo = this._switchTurnInFlightInfo;
+    // ── v388: IN EINER SIMULATION GAR NICHT ERST SCHREIBEN ───────────
+    // Zweite, unabhaengige Verteidigung neben dem Schnappschuss: der
+    // Riegel ist gegen eine VERSPAETET zurueckkehrende echte END-Phase
+    // gebaut. Ein simulierter Zugwechsel braucht ihn nicht — im Rollout
+    // feuert der Treiber ohnehin nicht (`!_inMctsSim` am Treiberblock),
+    // eine Endlos-Verschachtelung kann also gar nicht entstehen.
+    // Bewusst nur ueber `_inMctsSim` und NICHT ueber `_fastMode`:
+    // Self-Play im Training laeuft LIVE mit `_fastMode`, dort muss der
+    // Riegel weiter greifen.
+    const _simUebergabe = !!this._inMctsSim;
+    if (!_simUebergabe) {
+      this._switchTurnInFlightKey = inFlightKey;
+      this._switchTurnInFlightInfo = {
+        zug: this.gs?.turn, aktiv: this.gs?.activePlayer,
+        phase: this.gs?.currentPhase,
+      };
+    }
     // Für Fremdleser/Diagnose weiterhin gepflegt.
-    this._switchTurnInFlight = true;
+    if (!_simUebergabe) this._switchTurnInFlight = true;   // v388
+    // ── BROTKRUME (v386) ──────────────────────────────────────────────
+    // `_switchTurnInner` hat zehn Ausstiege. Kehrt einer davon zurueck,
+    // OHNE dass Zugnummer oder aktiver Spieler sich bewegt haben und
+    // ohne dass ein Ergebnis feststeht, ist die Zugkette genau hier
+    // versandet — der Messlauf vom 14.8. 15:31 hatte eine Partie, die
+    // in Phase 5 (End) stehen blieb, also NACH dem Betreten dieser
+    // Uebergabe. Statt zehn Einzelmarken wird hier das Ergebnis
+    // geprueft: das faengt jeden der zehn Wege ab.
+    const _stVorher = {
+      turn: this.gs?.turn, aktiv: this.gs?.activePlayer,
+      phase: this.gs?.currentPhase,
+    };
     try {
       return await this._switchTurnInner();
     } finally {
-      this._switchTurnInFlightKey = prevInFlightKey;
-      this._switchTurnInFlight = prevInFlightKey != null;
+      if (!_simUebergabe) {                              // v388
+        this._switchTurnInFlightKey = prevInFlightKey;
+        this._switchTurnInFlightInfo = prevInFlightInfo;
+        this._switchTurnInFlight = prevInFlightKey != null;
+      }
+      if (!this._inMctsSim && !this._fastMode && !this.gs?.result
+          && this.gs?.turn === _stVorher.turn
+          && this.gs?.activePlayer === _stVorher.aktiv) {
+        const eintrag = {
+          zug: _stVorher.turn, aktiv: _stVorher.aktiv,
+          phaseVorher: _stVorher.phase, phaseNachher: this.gs?.currentPhase,
+        };
+        (this._switchTurnNoops = this._switchTurnNoops || []).push(eintrag);
+        if (this._switchTurnNoops.length > 20) this._switchTurnNoops.shift();
+        this._cpuTurnMark = `aus:switchTurn-ohne-wechsel@zug${eintrag.zug}`
+          + `p${eintrag.aktiv}ph${eintrag.phaseVorher}→${eintrag.phaseNachher}`;
+      }
     }
   }
 
@@ -17300,6 +17626,13 @@ class GameEngine {
    * Call this from async contexts before opponent effects modify support zones.
    */
   async _triggerGateCheck(targetOwnerIdx, sourceName = null) {
+    // ── v386: Zaehler fuer das Gate-Korrelat ────────────────────────
+    // Die Abbruchrate folgte in den A/B-Laeufen der Zahl der
+    // `Defending the Gate`-Kopien im Deck (4x → 7/10, 2x → 3/10,
+    // 0x → 1/10), mit Gegenbeispielen. Statt das weiter aus Decklisten
+    // zu schaetzen, wird hier gezaehlt, wie oft der Pfad LIVE wirklich
+    // laeuft — dann laesst sich die Rate direkt gegen abgebrochene und
+    // durchgespielte Partien halten.
     // Already shielded this resolution
     if (this.gs._gateShieldActive === targetOwnerIdx) return true;
 
@@ -24106,14 +24439,36 @@ class GameEngine {
 
     const ctx = this._createContext(inst, { _activator: activatorPi });
     let resolved = true;
+    // Karten-Anzeige (12.8.). Areas waren der EINZIGE Aktivierungsweg
+    // ohne jede Anzeige — der Gegner sah gar nicht, welche Area gerade
+    // gefeuert hat. Deshalb hier BEIDE Haelften:
+    //   • `_pendingCardReveal` = der gegnerseitige Reveal, genau wie ihn
+    //     die uebrigen Wege im Server setzen;
+    //   • `armEffectAnnounce` = der Reveal fuer den Aktivierenden selbst.
+    // Beide feuern erst NACH dem Handler und nur, wenn nicht abgebrochen
+    // wurde — eine zurueckgenommene Zielwahl zeigt niemandem etwas.
+    this.gs._pendingCardReveal = { cardName: areaName, ownerIdx: activatorPi };
+    this.armEffectAnnounce(areaName, activatorPi, 'board');
     try {
       const ret = await script.onAreaEffect(ctx);
       if (ret === false) resolved = false;
+      if (resolved) {
+        this._firePendingCardReveal();
+        this.announceActiveEffect();
+      }
+      // `player` ist der Hausname fuer den Handelnden und das Feld, das
+      // Log-Renderer und Recorder zuerst lesen; `activator` bleibt fuer
+      // den Bestand daneben stehen (12.8.).
       this.log('area_effect_activated', {
-        area: areaName, activator: gs.players[activatorPi]?.username,
+        area: areaName,
+        player: gs.players[activatorPi]?.username,
+        activator: gs.players[activatorPi]?.username,
       });
     } catch (err) {
       console.error(`[onAreaEffect] ${areaName}:`, err.message);
+    } finally {
+      this.clearEffectAnnounce();
+      delete this.gs._pendingCardReveal;
     }
     // If the activation cancelled (user backed out of a prompt), release
     // the HOPT — they didn't commit. EXCEPTION: a Gerrymander veto
@@ -28373,7 +28728,7 @@ class GameEngine {
     }
   }
 
-  _broadcastEvent(event, data) {
+  _broadcastEvent(event, data, opts) {
     if (this._aborted) return;
     if (this._fastMode) return; // Silent during MCTS simulations.
     // Animation broadcasts count as progress for the runHooks timeout
@@ -28432,11 +28787,24 @@ class GameEngine {
         outData = { ...outData, zoneSlot: override.zoneSlot };
       }
     }
+    // Optionale Empfaengerauswahl (12.8.). `opts.toPlayers` ist eine
+    // Liste von Spielerindizes; ohne sie geht das Ereignis wie bisher an
+    // BEIDE Spieler. Gebraucht vom Karten-Auftritt: eine von der Hand
+    // gespielte Karte bekommt nur der GEGNER zu sehen — der Spieler
+    // weiss ja, was er gerade selbst eingesetzt hat.
+    // Zuschauer bekommen weiterhin alles: sie sind unbeteiligt und
+    // sollen das Spiel vollstaendig sehen.
+    const onlyPlayers = Array.isArray(opts?.toPlayers) ? opts.toPlayers : null;
     for (let i = 0; i < 2; i++) {
+      if (onlyPlayers && !onlyPlayers.includes(i)) continue;
       const sid = this.gs.players[i]?.socketId;
       if (sid) this.io.to(sid).emit(event, outData);
     }
-    if (this.room?.spectators) {
+    // `opts.toSpectators: false` fuer Ereignisse, die den Zuschauern auf
+    // einem ANDEREN Weg schon zugestellt werden — sonst saehen sie sie
+    // doppelt (Beispiel: der eigene card_reveal des Aktivierenden;
+    // die Gegner-Seite schickt denselben Reveal bereits an sie mit).
+    if (opts?.toSpectators !== false && this.room?.spectators) {
       for (const spec of this.room.spectators) {
         if (spec.socketId) this.io.to(spec.socketId).emit(event, outData);
       }

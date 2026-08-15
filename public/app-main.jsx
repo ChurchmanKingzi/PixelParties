@@ -1818,9 +1818,14 @@ function PlayScreen() {
 // im Ordner; Menü- und Shop-Musik liefen also seit jeher still ins
 // Leere (404). Jetzt zeigen sie auf die tatsächlich vorhandenen
 // Dateien.
+//
+// HINWEIS (11.8.): `bgm_login` und `bgm_menu` lagen als UNKOMPRIMIERTE
+// WAVs vor (8,1 und 7,5 MB) — ausgerechnet die beiden Stücke, die jeder
+// Besucher als Erstes lädt. Als OGG sind es 1,0 und 1,1 MB. Der Rest
+// des Soundtracks war längst OGG.
 const BGM_FILES = {
-  login:  '/music/bgm_login.wav',
-  menu:   '/music/bgm_menu.wav',
+  login:  '/music/bgm_login.ogg',
+  menu:   '/music/bgm_menu.ogg',
   battle: '/music/bgm_battle.mp3',
   // `puzzle` ist seit 3.8. UNBENUTZT: Puzzles haben zwei eigene Stuecke
   // (Editor / Durchspielen) und das Tutorial sein eigenes. Der Eintrag
@@ -1845,7 +1850,7 @@ const BGM_FILES = {
   // Es MUSS hier stehen und nicht spaeter erzeugt werden, damit der
   // Entsperr-Durchlauf beim ersten Klick es mit erfasst — sonst lehnt
   // Chromium die Wiedergabe ab.
-  campaign: '/music/bgm_menu.wav',
+  campaign: '/music/bgm_menu.ogg',
 };
 const _mkBgm = (url) => (typeof Audio !== 'undefined' ? new Audio(url) : null);
 const _bgmLogin = _mkBgm(BGM_FILES.login);

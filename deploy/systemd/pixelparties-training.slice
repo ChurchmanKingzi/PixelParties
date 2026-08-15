@@ -1,0 +1,18 @@
+# Ressourcengruppe für Trainingsläufe (netbench, Sammelläufe).
+#
+# Nachrangig gegenüber pixelparties.slice. Wichtig ist vor allem die
+# CPUQuota: Sie hält einen der vier Kerne frei, damit der Spielserver
+# und die SSH-Sitzung auch dann noch antworten, wenn ein Sammellauf
+# alles gibt, was er kriegen kann.
+
+[Unit]
+Description=Pixel Parties — Trainingsläufe (nachrangig)
+Before=slices.target
+
+[Slice]
+MemoryHigh=3G
+MemoryMax=3500M
+# 300% = drei von vier Kernen. Der vierte bleibt dem Spiel.
+CPUQuota=300%
+CPUWeight=100
+IOWeight=100

@@ -1,0 +1,336 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    2 Halbzuege     284 Nachrichten     0.95 MB roh  →    0.021 MB Leitung     0 s     0 s CPU  ⚠ startgame-zu-frueh  Dance of the Butterflies vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 3:0:2 → 2:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=1:0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1100hp, deck 48, hand 9) | p1(heroes 3/3 alive, 1100hp, deck 49, hand 4) | turn 2 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 3 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [deck-profile] loaded "Join our Cult!" (join-our-cult.json): 17 card values, 16 pairs, 33 ability priors, trained on 1360 games (win-rate 62.2%)
+       [deck-profile] loaded "Lightning Caller" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)
+       [deck-profile] loaded "Man's Best Friends" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)
+       [deck-profile] loaded "Mawstruck" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)
+       [deck-profile] loaded "Morph and Kill!" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)
+       [deck-profile] loaded "One-Two-Punch!" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)
+       [deck-profile] loaded "Parts of the Soul" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)
+       [deck-profile] loaded "Pew-Pew!" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)
+       [deck-profile] loaded "Poison Torture" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)
+       [deck-profile] loaded "Sacrificial Demons" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)
+       [deck-profile] loaded "Shadows over Blackport" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)
+       [deck-profile] loaded "Shifting Sandlands" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)
+       [deck-profile] loaded "Slimy Infestation" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)
+       [deck-profile] loaded "Slip 'n Slide" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)
+       [deck-profile] loaded "Spell Industrialization" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)
+       [deck-profile] loaded "Steam Dwarf Mines" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)
+       [deck-profile] loaded "Suicide Bombers" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)
+       [deck-profile] loaded "Sun Fencer Frenzy" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)
+       [deck-profile] loaded "To Attain Divinity" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)
+       [deck-profile] loaded "Venom Swamp" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+31 MB (inkl. Grundlast) | jetzt rss=99 heapTotal=68 heapUsed=37
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 3 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 3:0:2 → 2:1:2
+  Partie   2/10   10 Halbzuege    1413 Nachrichten     4.89 MB roh  →    0.091 MB Leitung    17 s    21 s CPU  ⚠ startgame-zu-frueh  Cool Gang vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 11:0:3 → 10:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=9:0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1400hp, deck 18, hand 7) | p1(heroes 2/3 alive, 280hp, deck 42, hand 2) | turn 10 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 11 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 11 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Thorad, Strength of Coolness" → Theme "thorad" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 11 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 11 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 11:0:3 → 10:1:2
+  Partie   3/10    3 Halbzuege     344 Nachrichten     1.18 MB roh  →    0.027 MB Leitung     4 s     5 s CPU  ⚠ startgame-zu-frueh  Steam Dwarf Mines vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 4:1:2 → 3:0:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=2:1
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1150hp, deck 49, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 7) | turn 3 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 4 p1 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Layn, Defender of Deri" → Theme "layn" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 4:1:2 → 3:0:2
+  Partie   4/10    7 Halbzuege    1214 Nachrichten     4.36 MB roh  →    0.081 MB Leitung    18 s    21 s CPU  ⚠ startgame-zu-frueh  Sun Fencer Frenzy vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 8:0:2 → 7:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=6:0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 600hp, deck 35, hand 5) | p1(heroes 3/3 alive, 630hp, deck 33, hand 5) | turn 7 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 8 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 8 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 8:0:2 → 7:1:2
+  Partie   5/10   10 Halbzuege    1701 Nachrichten     6.18 MB roh  →    0.109 MB Leitung    71 s    71 s CPU  ⚠ ohne-spielende  Grand Rebellion! vs Gates to Hell
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Diagnose: p0(heroes 1/3 alive, 50hp, deck 20, hand 7) | p1(heroes 3/3 alive, 650hp, deck 22, hand 7) | turn 10 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte Piloten-Marke: ok:zugende@zug10p1ph2
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Champion, the Stormbringer" → Theme "champion" (48 Themes im Ordner)
+  Partie   6/10    1 Halbzuege     125 Nachrichten     0.37 MB roh  →    0.011 MB Leitung     0 s     0 s CPU  ⚠ startgame-zu-frueh  Deepsea Terror vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:0:2 → 1:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1150hp, deck 49, hand 6) | turn 1 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 2 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 2 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+     ↳ letzte 5 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 2 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:0:2 → 1:1:2
+  Partie   7/10    4 Halbzuege     480 Nachrichten     1.62 MB roh  →    0.034 MB Leitung    10 s     7 s CPU  ⚠ ohne-spielende  Man's Best Friends vs Gates to Hell
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Diagnose: p0(heroes 3/3 alive, 1100hp, deck 52, hand 3) | p1(heroes 3/3 alive, 850hp, deck 45, hand 5) | turn 4 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 4 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug4p1ph3
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 5 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ letzte 4 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Orthos, the Loyal Guard Dog" → Theme "orthos" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [CPU] STILLER HALT: Zug 4 p1 Phase 2→3 — ok:zugende@zug4p1ph3
+  Partie   8/10    4 Halbzuege     613 Nachrichten     1.85 MB roh  →    0.039 MB Leitung     4 s     4 s CPU  ⚠ startgame-zu-frueh  Big Stomp! vs Gates to Hell
+     ↳ PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 5:0:2 → 4:1:2 (Zug:Spieler:Phase)
+        Der Abbruch ist dann ein MESSFEHLER — nicht die Partie haengt,
+        sondern die await-Kette von startGame endete zu frueh.
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=true fastMode=true fastModeTiefe=1 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=3:0
+        → beim Aufloesen lief noch eine Simulation (fastModeTiefe 1 → 0, rolloutTiefe 0 → 0). Das ist der fehlende await.
+     ↳ Diagnose: p0(heroes 3/3 alive, 1300hp, deck 42, hand 7) | p1(heroes 3/3 alive, 1100hp, deck 39, hand 6) | turn 4 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 3 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ ROLLOUT-FAHNE GELECKT (startTurn): Zug 5 p0 fastMode=true — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+     ↳ PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 5 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+     ↳ letzte 7 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Kit, the Shark Researcher" → Theme "kit" (48 Themes im Ordner)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797
+       [warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       [warn] [Engine] PHASENWECHSEL VERWEIGERT (advancePhase/falscher-spieler): Zug 5 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]
+       [warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 5:0:2 → 4:1:2
+  Partie   9/10    8 Halbzuege    1192 Nachrichten     4.17 MB roh  →    0.081 MB Leitung    15 s    16 s CPU  Gather That Storm! vs Gates to Hell
+  Partie  10/10    2 Halbzuege     258 Nachrichten     0.83 MB roh  →    0.018 MB Leitung     5 s     3 s CPU  ⚠ ohne-spielende  To Attain Divinity vs Gates to Hell
+     ↳ Fahnen beim Aufloesen: rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Fahnen nach Nachlauf:  rolloutTiefe=0 inMctsSim=false fastMode=false fastModeTiefe=0 spellTiefe=0 uebergabe=null
+     ↳ Diagnose: p0(heroes 3/3 alive, 1100hp, deck 50, hand 6) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 7) | turn 2 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ STILLER HALT: Zug 2 p1 Phase 2→3
+        Brotkrume: ok:zugende@zug2p1ph3
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Archibald, the Archmage" → Theme "archibald" (48 Themes im Ordner)
+       [warn] [CPU] STILLER HALT: Zug 2 p1 Phase 2→3 — ok:zugende@zug2p1ph3
+
+[netbench] 85 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 1 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.8%       59.2 KB     4196.5 KB        500    8.39 KB       98.6%  game_state
+   18.2%       15.0 KB       59.2 KB        458    0.13 KB       74.6%  action_log
+    1.8%        1.5 KB        3.3 KB         38    0.09 KB       55.0%  play_zone_animation
+    1.6%        1.3 KB        3.0 KB         59    0.05 KB       56.0%  card_reveal
+    1.4%        1.1 KB        2.6 KB         22    0.12 KB       57.5%  play_pile_transfer
+    1.0%        0.8 KB        1.2 KB         16    0.08 KB       33.0%  potion_resolved
+    1.0%        0.8 KB        1.8 KB         14    0.13 KB       55.2%  hand_to_board_fly
+    0.8%        0.7 KB        1.5 KB         24    0.06 KB       55.5%  deck_search_add
+    0.7%        0.6 KB        1.5 KB         22    0.07 KB       60.8%  ability_activated
+    0.5%        0.4 KB        1.2 KB         10    0.12 KB       67.0%  qinglong_lightning
+    0.2%        0.2 KB        0.5 KB          6    0.08 KB       61.1%  summon_effect
+    0.2%        0.2 KB        0.3 KB          1    0.27 KB       29.7%  game_started
+    0.2%        0.2 KB        0.3 KB          8    0.04 KB       48.2%  gold_change
+    0.2%        0.1 KB        0.4 KB          2    0.18 KB       58.8%  play_card_transfer
+    0.1%        0.1 KB        0.2 KB          2    0.10 KB       51.9%  surprise_flip
+  … und 5 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         41.3 KB Leitung je Verbindung und Partie  (2137.1 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            4.17 MB roh  →  0.081 MB auf der Leitung
+  Ø je Verbindung:        41.3 KB
+  Ø je Halbzug (alle):    10.32 KB
+  Singleplayer (1 Client): ~41.3 KB je Partie
+  PvP (2 Clients):         ~82.5 KB je Partie
+  je zusätzlichem Zuschauer: ~41.3 KB je Partie
+  In 5 GB passen:          ~127.056 Singleplayer-Partien
+                           ~63.528 PvP-Partien
+  OHNE Kompression wären es 2.453 bzw. 1.226 — Faktor 51.8
+  Größte Einzelnachricht:  10.7 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 2.5 min CPU
+     71 s  bei  10 Halbzuegen (7.1 s/Halbzug)   ⚠ Grand Rebellion! vs Gates to Hell
+     21 s  bei  10 Halbzuegen (2.1 s/Halbzug)   ⚠ Cool Gang vs Gates to Hell
+     21 s  bei   7 Halbzuegen (3.0 s/Halbzug)   ⚠ Sun Fencer Frenzy vs Gates to Hell
+     16 s  bei   8 Halbzuegen (2.0 s/Halbzug)     Gather That Storm! vs Gates to Hell
+      7 s  bei   4 Halbzuegen (1.7 s/Halbzug)   ⚠ Man's Best Friends vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         36        1          1  Grand Rebellion!
+         10        1          1  Cool Gang
+         10        1          1  Sun Fencer Frenzy
+          8        1          0  Gather That Storm!
+          7       10          9  Gates to Hell
+          3        1          1  Man's Best Friends
+          3        1          1  Steam Dwarf Mines
+          2        1          1  Big Stomp!
+          1        1          1  To Attain Divinity
+          0        1          1  Dance of the Butterflies
+  → Abbrueche haeufen sich bei: Grand Rebellion! (1), Cool Gang (1), Sun Fencer Frenzy (1), Gates to Hell (9), Man's Best Friends (1), Steam Dwarf Mines (1), Big Stomp! (1), To Attain Divinity (1), Dance of the Butterflies (1), Deepsea Terror (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      151   17.5%  Elixir of Immortality
+       83    9.6%  Treasure Huntress Semi
+       74    8.6%  Rebelliokai Backup Bakus
+       39    4.5%  Performance
+       38    4.4%  The Sun Sword
+       37    4.3%  Creativity
+       34    3.9%  Fighting
+       31    3.6%  Wowhalla, the Hall of the Cool
+       31    3.6%  Rebelliokai Kind Kitsune
+       27    3.1%  Giga Steroids
+       26    3.0%  Glass of Marbles
+       26    3.0%  Taio, the Sun Fencer
+       24    2.8%  Toughness
+       17    2.0%  Loyal Hountriever   ⚠ 49 leckende Rollouts
+       16    1.9%  Wealth
+
+═══ STEAM-DWARF-ZAEHLWERK ═══
+  Abwurf-Reaktion: 224 Aufrufe → 159 mal gefeuert (71.0 %)
+    davon abgewiesen: HOPT 4 | nicht im Support 0 | fremder Abwurf 61 | inaktiv 0
+    Wartezeit allein aus den 150-ms-Pausen im Hook: 23.9 s (live; im Rollout uebersprungen)
+    hoechste erreichte max HP: 250
+  Miner-Zugende: 69 Ausloesungen, 69 Karten insgesamt
+    groesster Einzelzug: 1 Karten bei 150 max HP
+    (`count = floor(maxHp / 100)` ist UNGEDECKELT — steigt die HP, steigt die Kette)
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Ska Harpyformer [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+     57x  Adventurousness
+     49x  Loyal Hountriever
+     34x  Kappa Sword Slash
+     28x  Güldefaber, the King of Dwarfs
+     20x  Hammer Throw
+     20x  Whirlwind Strike
+     19x  Heavy Hit
+     18x  Guardian Angel
+     14x  Gathering Storm
+     13x  Tengu Windstorm
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+      1330      627.2        0.472            57  Adventurousness
+       150      177.0        1.180            34  Kappa Sword Slash
+        52      116.8        2.246             0  Rebelliokai Backup Bakus
+       436      101.8        0.234             1  Demon's Gate
+       113       90.0        0.797             0  Burning Finger
+       143       89.5        0.626            49  Loyal Hountriever
+        75       87.7        1.170             0  Rebelliokai Terror Tengu
+       127       86.7        0.683            19  Heavy Hit
+        67       46.0        0.687            20  Whirlwind Strike
+        56       31.8        0.567             5  Steam Dwarf Exterminator
+        74       30.6        0.414             0  Champion, the Stormbringer
+        27       28.9        1.071            18  Guardian Angel
+        75       27.4        0.365            11  Kirin Firebreath
+       106       26.8        0.253            11  Chain Lightning
+       160       24.5        0.153            28  Güldefaber, the King of Dwarfs
+
+═══ GATE-CHECKS (Defending the Gate) GEGEN DEN AUSGANG ═══
+  abgebrochen (9 Partien):    Ø 1.1 Pruefungen, Ø 0.1 Schilde
+  durchgespielt (1 Partien):  Ø 2.0 Pruefungen, Ø 0.0 Schilde
+  je Partie (nur mit Pruefungen):
+    ⚠ Partie  4     2 Pruefungen,   0 Schilde  startgame-zu-frueh
+    ⚠ Partie  5     7 Pruefungen,   1 Schilde  ohne-spielende
+    ⚠ Partie  8     1 Pruefungen,   0 Schilde  startgame-zu-frueh
+      Partie  9     2 Pruefungen,   0 Schilde  all_heroes_dead
+
+═══ UEBERGABE-STOERUNGEN (v387) ═══
+  Partie  Wiedereintr.  ohne Wechsel  Doppelstart  Treiber uebersprungen  Fahnen-Lecks  Tiefe@Ende  Phasen-Blocks  spellDepth@Ende  Ausgang
+  ⚠    1             0             0            0                      1             1           0              1                0  startgame-zu-frueh
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    2             0             0            0                      1             1           0              0                0  startgame-zu-frueh
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    3             0             0            0                      1             1           0              0                0  startgame-zu-frueh
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    4             0             0            0                      1             1           0              0                0  startgame-zu-frueh
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    6             0             0            0                      1             1           0              1                0  startgame-zu-frueh
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    7             0             0            0                      1             1           0              0                0  ohne-spielende
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+  ⚠    8             0             0            0                      2             2           0              1                0  startgame-zu-frueh
+         Block-Gruende: falscher-spieler
+         Gruende: _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)
+       9             0             0            0                      0             1           0              0                1  all_heroes_dead
+  Anteil betroffener Partien (abgebrochen vs durchgespielt):
+    reentry          0/9  vs  0/1
+    noops            0/9  vs  0/1
+    doppelstart      0/9  vs  0/1
+    treiberSkips     7/9  vs  0/1
+    fahnenLecks      7/9  vs  1/1
+    tiefeEnde        0/9  vs  0/1
+    phasenBlocks     3/9  vs  0/1
+    spellTiefe       0/9  vs  1/1
+  Broadcasts an ALLE:      1 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          2          284       0.95        0.021     0      0      NEIN  startgame-zu-frueh  Dance of the Butterflies vs Gates to Hell
+   2         10         1413       4.89        0.091    17     21      NEIN  startgame-zu-frueh  Cool Gang vs Gates to Hell
+   3          3          344       1.18        0.027     4      5      NEIN  startgame-zu-frueh  Steam Dwarf Mines vs Gates to Hell
+   4          7         1214       4.36        0.081    18     21      NEIN  startgame-zu-frueh  Sun Fencer Frenzy vs Gates to Hell
+   5         10         1701       6.18        0.109    71     71      NEIN  ohne-spielende     Grand Rebellion! vs Gates to Hell
+   6          1          125       0.37        0.011     0      0      NEIN  startgame-zu-frueh  Deepsea Terror vs Gates to Hell
+   7          4          480       1.62        0.034    10      7      NEIN  ohne-spielende     Man's Best Friends vs Gates to Hell
+   8          4          613       1.85        0.039     4      4      NEIN  startgame-zu-frueh  Big Stomp! vs Gates to Hell
+   9          8         1192       4.17        0.081    15     16        ja  all_heroes_dead    Gather That Storm! vs Gates to Hell
+  10          2          258       0.83        0.018     5      3      NEIN  ohne-spielende     To Attain Divinity vs Gates to Hell

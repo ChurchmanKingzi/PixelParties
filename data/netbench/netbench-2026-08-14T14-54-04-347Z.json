@@ -1,0 +1,975 @@
+{
+  "erzeugt": "2026-08-14T14:54:04.349Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Crystal Gifts",
+      "deckB": "Man's Best Friends",
+      "turns": 14,
+      "ms": 6023,
+      "nachrichten": 1627,
+      "raw": 5995440,
+      "wire": 106474,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 8953,
+      "snapshots": 1162,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "One-Two-Punch!",
+      "deckB": "Man's Best Friends",
+      "turns": 16,
+      "ms": 25749,
+      "nachrichten": 2348,
+      "raw": 10380588,
+      "wire": 170883,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 29563,
+      "snapshots": 10572,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Man's Best Friends",
+      "turns": 25,
+      "ms": 29083,
+      "nachrichten": 2892,
+      "raw": 11624335,
+      "wire": 199024,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 31827,
+      "snapshots": 8850,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Flying Sparks",
+      "deckB": "Man's Best Friends",
+      "turns": 13,
+      "ms": 23680,
+      "nachrichten": 1919,
+      "raw": 6918984,
+      "wire": 124996,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 25453,
+      "snapshots": 4615,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Man's Best Friends",
+      "turns": 21,
+      "ms": 58894,
+      "nachrichten": 2631,
+      "raw": 10445231,
+      "wire": 181545,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 61579,
+      "snapshots": 18439,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Deepsea Terror",
+      "deckB": "Man's Best Friends",
+      "turns": 13,
+      "ms": 14933,
+      "nachrichten": 1979,
+      "raw": 7901013,
+      "wire": 143739,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 17313,
+      "snapshots": 4886,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Big Stomp!",
+      "deckB": "Man's Best Friends",
+      "turns": 52,
+      "ms": 24312,
+      "nachrichten": 4097,
+      "raw": 20387199,
+      "wire": 304284,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 26219,
+      "snapshots": 8646,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Man's Best Friends",
+      "turns": 12,
+      "ms": 24607,
+      "nachrichten": 2519,
+      "raw": 10647152,
+      "wire": 187207,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 27891,
+      "snapshots": 4510,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Man's Best Friends",
+      "turns": 10,
+      "ms": 39556,
+      "nachrichten": 1212,
+      "raw": 4498670,
+      "wire": 82496,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 40093,
+      "snapshots": 7627,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Morph and Kill!",
+      "deckB": "Man's Best Friends",
+      "turns": 9,
+      "ms": 29262,
+      "nachrichten": 1082,
+      "raw": 4158846,
+      "wire": 77284,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 29454,
+      "snapshots": 4159,
+      "hookTimeouts": 0
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 8976,
+      "raw": 87379776,
+      "wire": 1079443
+    },
+    {
+      "name": "action_log",
+      "count": 8402,
+      "raw": 1095018,
+      "wire": 284245
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 818,
+      "raw": 69960,
+      "wire": 26761
+    },
+    {
+      "name": "card_reveal",
+      "count": 730,
+      "raw": 41222,
+      "wire": 18010
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 304,
+      "raw": 39836,
+      "wire": 14806
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 193,
+      "raw": 23878,
+      "wire": 11931
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 90,
+      "raw": 17102,
+      "wire": 7173
+    },
+    {
+      "name": "ability_activated",
+      "count": 296,
+      "raw": 19798,
+      "wire": 6615
+    },
+    {
+      "name": "deck_search_add",
+      "count": 208,
+      "raw": 13148,
+      "wire": 6374
+    },
+    {
+      "name": "summon_effect",
+      "count": 194,
+      "raw": 16688,
+      "wire": 6043
+    },
+    {
+      "name": "potion_resolved",
+      "count": 116,
+      "raw": 8844,
+      "wire": 5782
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 64,
+      "raw": 9534,
+      "wire": 5051
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 206,
+      "raw": 6798,
+      "wire": 4431
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 72,
+      "raw": 11574,
+      "wire": 4111
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 102,
+      "raw": 6222,
+      "wire": 3198
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 72,
+      "raw": 4392,
+      "wire": 2450
+    },
+    {
+      "name": "gold_change",
+      "count": 94,
+      "raw": 3862,
+      "wire": 2301
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 68,
+      "raw": 4632,
+      "wire": 2146
+    },
+    {
+      "name": "game_started",
+      "count": 9,
+      "raw": 2484,
+      "wire": 1743
+    },
+    {
+      "name": "burn_tick",
+      "count": 32,
+      "raw": 5406,
+      "wire": 1572
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 18,
+      "raw": 2450,
+      "wire": 1398
+    },
+    {
+      "name": "play_projectile_animation",
+      "count": 24,
+      "raw": 5736,
+      "wire": 1343
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 38,
+      "raw": 2358,
+      "wire": 1076
+    },
+    {
+      "name": "card_effect_flash",
+      "count": 40,
+      "raw": 1880,
+      "wire": 613
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 12,
+      "raw": 1524,
+      "wire": 488
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 8,
+      "raw": 1000,
+      "wire": 356
+    },
+    {
+      "name": "reaction_chain_update",
+      "count": 4,
+      "raw": 1372,
+      "wire": 265
+    },
+    {
+      "name": "creature_damage_floater",
+      "count": 6,
+      "raw": 462,
+      "wire": 205
+    },
+    {
+      "name": "ability_block_flash",
+      "count": 4,
+      "raw": 244,
+      "wire": 115
+    },
+    {
+      "name": "area_descend",
+      "count": 4,
+      "raw": 224,
+      "wire": 89
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 4,
+      "raw": 320,
+      "wire": 79
+    },
+    {
+      "name": "hero_announcement",
+      "count": 2,
+      "raw": 120,
+      "wire": 79
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 2,
+      "raw": 146,
+      "wire": 75
+    },
+    {
+      "name": "dark_deepsea_god_manifest",
+      "count": 2,
+      "raw": 86,
+      "wire": 69
+    },
+    {
+      "name": "reaction_chain_link_resolved",
+      "count": 4,
+      "raw": 316,
+      "wire": 58
+    },
+    {
+      "name": "rain_of_spores_activated",
+      "count": 2,
+      "raw": 66,
+      "wire": 56
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 2,
+      "raw": 56,
+      "wire": 56
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 2,
+      "raw": 78,
+      "wire": 42
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-fa39cbdd",
+      "count": 2053,
+      "raw": 10155638,
+      "wire": 154363
+    },
+    {
+      "sid": "sid-b-netbench-fa39cbdd",
+      "count": 2043,
+      "raw": 10231285,
+      "wire": 149727
+    },
+    {
+      "sid": "sid-a-netbench-ee7b0014",
+      "count": 1444,
+      "raw": 5810965,
+      "wire": 99702
+    },
+    {
+      "sid": "sid-b-netbench-ee7b0014",
+      "count": 1447,
+      "raw": 5813094,
+      "wire": 99129
+    },
+    {
+      "sid": "sid-a-netbench-ce3d7365",
+      "count": 1263,
+      "raw": 5383670,
+      "wire": 94223
+    },
+    {
+      "sid": "sid-b-netbench-ce3d7365",
+      "count": 1255,
+      "raw": 5263206,
+      "wire": 92790
+    },
+    {
+      "sid": "sid-a-netbench-17920397",
+      "count": 1310,
+      "raw": 5226350,
+      "wire": 90901
+    },
+    {
+      "sid": "sid-b-netbench-17920397",
+      "count": 1320,
+      "raw": 5218605,
+      "wire": 90450
+    },
+    {
+      "sid": "sid-a-netbench-05ae1e2d",
+      "count": 1169,
+      "raw": 5172558,
+      "wire": 85622
+    },
+    {
+      "sid": "sid-b-netbench-05ae1e2d",
+      "count": 1178,
+      "raw": 5207754,
+      "wire": 85068
+    },
+    {
+      "sid": "sid-a-netbench-df9845a2",
+      "count": 986,
+      "raw": 4095618,
+      "wire": 74443
+    },
+    {
+      "sid": "sid-b-netbench-df9845a2",
+      "count": 992,
+      "raw": 3805119,
+      "wire": 69102
+    },
+    {
+      "sid": "sid-a-netbench-f6984088",
+      "count": 957,
+      "raw": 3548920,
+      "wire": 64200
+    },
+    {
+      "sid": "sid-b-netbench-f6984088",
+      "count": 961,
+      "raw": 3369788,
+      "wire": 60602
+    },
+    {
+      "sid": "sid-a-netbench-0c67e11b",
+      "count": 809,
+      "raw": 3060261,
+      "wire": 54174
+    },
+    {
+      "sid": "sid-b-netbench-0c67e11b",
+      "count": 817,
+      "raw": 2934903,
+      "wire": 52107
+    },
+    {
+      "sid": "sid-a-netbench-3f54fd5e",
+      "count": 597,
+      "raw": 2235259,
+      "wire": 41350
+    },
+    {
+      "sid": "sid-b-netbench-3f54fd5e",
+      "count": 614,
+      "raw": 2263135,
+      "wire": 40952
+    },
+    {
+      "sid": "room:netbench-f6984088",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-17920397",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-df9845a2",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-fa39cbdd",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-ce3d7365",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-3f54fd5e",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-0c67e11b",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-05ae1e2d",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-ee7b0014",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 21224,
+    "raw": 88798612,
+    "wire": 1500648
+  },
+  "groesste_nachricht": {
+    "bytes": 16931,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 9,
+    "raw": 2475
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 10,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Orthos, the Loyal Guard Dog\" → Theme \"orthos\" (48 Themes im Ordner)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 650hp, deck 39, hand 7) | p1(heroes 3/3 alive, 980hp, deck 30, hand 8) | turn 9 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "kandidaten_heap": {
+    "Loyal Hountriever": {
+      "rollouts": 1188,
+      "mbGesamt": 515.35,
+      "mbProRollout": 0.4338,
+      "ueberSchwelle": 55
+    },
+    "Accusation": {
+      "rollouts": 82,
+      "mbGesamt": 16.56,
+      "mbProRollout": 0.2019,
+      "ueberSchwelle": 0
+    },
+    "Loyal Pinpom": {
+      "rollouts": 931,
+      "mbGesamt": 130.49,
+      "mbProRollout": 0.1402,
+      "ueberSchwelle": 0
+    },
+    "Slow": {
+      "rollouts": 1,
+      "mbGesamt": -4.83,
+      "mbProRollout": -4.8263,
+      "ueberSchwelle": 0
+    },
+    "Rain of Spores": {
+      "rollouts": 80,
+      "mbGesamt": -3.79,
+      "mbProRollout": -0.0474,
+      "ueberSchwelle": 0
+    },
+    "Loyal Rottweiler": {
+      "rollouts": 968,
+      "mbGesamt": 191.36,
+      "mbProRollout": 0.1977,
+      "ueberSchwelle": 39
+    },
+    "Loyal Labradoodle": {
+      "rollouts": 776,
+      "mbGesamt": 165.12,
+      "mbProRollout": 0.2128,
+      "ueberSchwelle": 49
+    },
+    "Loyal Terrier": {
+      "rollouts": 531,
+      "mbGesamt": 23.2,
+      "mbProRollout": 0.0437,
+      "ueberSchwelle": 3
+    },
+    "Heavy Hit": {
+      "rollouts": 977,
+      "mbGesamt": 412.66,
+      "mbProRollout": 0.4224,
+      "ueberSchwelle": 51
+    },
+    "Ferocious Tiger Kick": {
+      "rollouts": 208,
+      "mbGesamt": 149.35,
+      "mbProRollout": 0.718,
+      "ueberSchwelle": 0
+    },
+    "Stranglehold": {
+      "rollouts": 60,
+      "mbGesamt": 24.43,
+      "mbProRollout": 0.4072,
+      "ueberSchwelle": 15
+    },
+    "Whirlwind Strike": {
+      "rollouts": 158,
+      "mbGesamt": 127.09,
+      "mbProRollout": 0.8044,
+      "ueberSchwelle": 6
+    },
+    "Strong Ox Headbutt": {
+      "rollouts": 523,
+      "mbGesamt": 86.78,
+      "mbProRollout": 0.1659,
+      "ueberSchwelle": 26
+    },
+    "Blow of the Venom Snake": {
+      "rollouts": 115,
+      "mbGesamt": 102.2,
+      "mbProRollout": 0.8887,
+      "ueberSchwelle": 16
+    },
+    "Attack": {
+      "rollouts": 786,
+      "mbGesamt": 219.12,
+      "mbProRollout": 0.2788,
+      "ueberSchwelle": 2
+    },
+    "Adventurousness": {
+      "rollouts": 651,
+      "mbGesamt": 309.32,
+      "mbProRollout": 0.4751,
+      "ueberSchwelle": 48
+    },
+    "Quick Attack": {
+      "rollouts": 54,
+      "mbGesamt": -34.89,
+      "mbProRollout": -0.6461,
+      "ueberSchwelle": 4
+    },
+    "Sparkfly Worker": {
+      "rollouts": 107,
+      "mbGesamt": 42.24,
+      "mbProRollout": 0.3947,
+      "ueberSchwelle": 0
+    },
+    "Loyal Shepherd": {
+      "rollouts": 261,
+      "mbGesamt": 76.62,
+      "mbProRollout": 0.2936,
+      "ueberSchwelle": 58
+    },
+    "Muscle Training": {
+      "rollouts": 20,
+      "mbGesamt": -9,
+      "mbProRollout": -0.45,
+      "ueberSchwelle": 0
+    },
+    "Dark Deepsea God": {
+      "rollouts": 381,
+      "mbGesamt": -40.63,
+      "mbProRollout": -0.1066,
+      "ueberSchwelle": 3
+    },
+    "Deepsea Primordium": {
+      "rollouts": 349,
+      "mbGesamt": 129.39,
+      "mbProRollout": 0.3707,
+      "ueberSchwelle": 10
+    },
+    "Deepsea Bats": {
+      "rollouts": 42,
+      "mbGesamt": 46.35,
+      "mbProRollout": 1.1036,
+      "ueberSchwelle": 16
+    },
+    "Deepsea Mummy": {
+      "rollouts": 14,
+      "mbGesamt": 3.34,
+      "mbProRollout": 0.2388,
+      "ueberSchwelle": 6
+    },
+    "Güldefaber, the King of Dwarfs": {
+      "rollouts": 762,
+      "mbGesamt": 275.7,
+      "mbProRollout": 0.3618,
+      "ueberSchwelle": 0
+    },
+    "Gigantisaur Pteranos": {
+      "rollouts": 46,
+      "mbGesamt": 16.83,
+      "mbProRollout": 0.3658,
+      "ueberSchwelle": 0
+    },
+    "Gigantisaur Triceras": {
+      "rollouts": 69,
+      "mbGesamt": 16.81,
+      "mbProRollout": 0.2437,
+      "ueberSchwelle": 0
+    },
+    "Gigantisaur Spinor": {
+      "rollouts": 87,
+      "mbGesamt": 64.7,
+      "mbProRollout": 0.7437,
+      "ueberSchwelle": 0
+    },
+    "Gigantisaur Brachion": {
+      "rollouts": 74,
+      "mbGesamt": -17.36,
+      "mbProRollout": -0.2345,
+      "ueberSchwelle": 0
+    },
+    "Gigantisaur Raptoren": {
+      "rollouts": 127,
+      "mbGesamt": -6.04,
+      "mbProRollout": -0.0476,
+      "ueberSchwelle": 0
+    },
+    "Slippery Polar": {
+      "rollouts": 48,
+      "mbGesamt": 3.79,
+      "mbProRollout": 0.0789,
+      "ueberSchwelle": 0
+    },
+    "Slippery Ice": {
+      "rollouts": 20,
+      "mbGesamt": 7.18,
+      "mbProRollout": 0.3592,
+      "ueberSchwelle": 0
+    },
+    "Slippery Narw": {
+      "rollouts": 102,
+      "mbGesamt": 10.48,
+      "mbProRollout": 0.1028,
+      "ueberSchwelle": 0
+    },
+    "Slippery Spikeblock": {
+      "rollouts": 135,
+      "mbGesamt": 64.72,
+      "mbProRollout": 0.4794,
+      "ueberSchwelle": 0
+    },
+    "Slippery Snowman": {
+      "rollouts": 10,
+      "mbGesamt": 5.07,
+      "mbProRollout": 0.5072,
+      "ueberSchwelle": 0
+    },
+    "Slippery Snobbit": {
+      "rollouts": 5,
+      "mbGesamt": 3.12,
+      "mbProRollout": 0.6232,
+      "ueberSchwelle": 0
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 64,
+  "cpu_ms_gesamt": 298345,
+  "hook_feuer_je_karte": {
+    "Giga Steroids": 567,
+    "Loyal Hountriever": 542,
+    "Wealth": 480,
+    "Ingo, Investor of Evil": 310,
+    "Orthos, the Loyal Guard Dog": 296,
+    "Ghuanjun, the Undead Martial Artist": 123,
+    "Alex, Trainer of Heroes": 123,
+    "Sacred Hammer of the Volcano": 119,
+    "Creativity": 99,
+    "The Sun Sword": 64,
+    "Ancient Tech Infinite Energy Core": 59,
+    "Resistance": 57,
+    "Fighting": 55,
+    "Slippery Polar": 55,
+    "Performance": 51,
+    "Toughness": 49,
+    "Güldefaber, the King of Dwarfs": 46,
+    "Gigantisaur King Trex": 45,
+    "Mary Crestmas": 42,
+    "Slippery Spikeblock": 37,
+    "Hel, the Bound Specter": 31,
+    "Kit, the Shark Researcher": 29,
+    "Andras, the Human Weapon": 26,
+    "Arthor, the King of Blackport": 21,
+    "Lilly, the Charming Infiltrator": 19,
+    "Heavy Hit": 15,
+    "Loyal Pinpom": 14,
+    "Teppes, the Deepsea Vampire": 14,
+    "Siphem, the Deepsea Demon": 14,
+    "Loyal Terrier": 13,
+    "Quick Attack": 13,
+    "Barker, the Monster Tamer": 13,
+    "Waflav, the Metamorphing Monstrosity": 13,
+    "Strong Ox Headbutt": 12,
+    "Loyal Labradoodle": 12,
+    "Attack": 11,
+    "Deepsea Primordium": 8,
+    "Phalanx Pike": 6,
+    "Loyal Shepherd": 6,
+    "Divine Gift of the Guardian": 5,
+    "Muscle Training": 4,
+    "Ferocious Tiger Kick": 4,
+    "Cool Repair": 4,
+    "Ska Harpyformer": 4,
+    "Deepsea Monstrosity": 4,
+    "Deepsea Werewolf": 4,
+    "The Great Wall of Deri": 4,
+    "Whirlwind Strike": 3,
+    "Deepsea Mummy": 3,
+    "Spreading Rumor": 2,
+    "Accusation": 2,
+    "Blow of the Venom Snake": 2,
+    "Deepsea Witch": 2,
+    "Crystal Well": 1,
+    "Slow": 1,
+    "Rain of Spores": 1,
+    "Letter of Misinformations": 1,
+    "Intrude": 1,
+    "Bill, the Angry Auctioneer": 1,
+    "Jump in the River": 1,
+    "Stranglehold": 1,
+    "Sparkfly Worker": 1,
+    "Divine Gift of Fire": 1,
+    "Deepsea Bats": 1,
+    "Slippery Ice": 1,
+    "Cannibalism": 1,
+    "Cottage at the Forest's Edge": 1
+  },
+  "leckende_rollouts": {
+    "Loyal Shepherd": 58,
+    "Loyal Hountriever": 55,
+    "Heavy Hit": 51,
+    "Loyal Labradoodle": 49,
+    "Adventurousness": 48,
+    "Loyal Rottweiler": 39,
+    "Strong Ox Headbutt": 26,
+    "Blow of the Venom Snake": 16,
+    "Deepsea Bats": 16,
+    "Stranglehold": 15,
+    "Deepsea Primordium": 10,
+    "Whirlwind Strike": 6,
+    "Deepsea Mummy": 6,
+    "Quick Attack": 4,
+    "Dark Deepsea God": 3,
+    "Loyal Terrier": 3,
+    "Attack": 2
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Deepsea Primordium [priority]": 1
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [],
+  "heil_zielwahl": {},
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "Boom Boom Kaboom!",
+      "cpuMs": 66749.5,
+      "partien": 3,
+      "abbrueche": 0,
+      "proPartie": 22249.833333333332
+    },
+    {
+      "name": "Man's Best Friends",
+      "cpuMs": 149172.5,
+      "partien": 10,
+      "abbrueche": 1,
+      "proPartie": 14917.25
+    },
+    {
+      "name": "One-Two-Punch!",
+      "cpuMs": 14781.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 14781.5
+    },
+    {
+      "name": "Morph and Kill!",
+      "cpuMs": 14727,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 14727
+    },
+    {
+      "name": "Slip 'n Slide",
+      "cpuMs": 13945.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 13945.5
+    },
+    {
+      "name": "Big Stomp!",
+      "cpuMs": 13109.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 13109.5
+    },
+    {
+      "name": "Flying Sparks",
+      "cpuMs": 12726.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 12726.5
+    },
+    {
+      "name": "Deepsea Terror",
+      "cpuMs": 8656.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 8656.5
+    },
+    {
+      "name": "Crystal Gifts",
+      "cpuMs": 4476.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 4476.5
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 166738.66666666666,
+    "roh_je_partie": 9866512.444444444,
+    "wire_je_verbindung": 83369.33333333333,
+    "wire_je_halbzug": 8526.40909090909,
+    "kompressionsfaktor": 59.173511709608114
+  }
+}

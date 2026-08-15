@@ -1,0 +1,1321 @@
+{
+  "erzeugt": "2026-08-14T20:16:37.326Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Heal Burn",
+      "deckB": "Gates to Hell",
+      "turns": 19,
+      "ms": 75486,
+      "nachrichten": 493,
+      "raw": 1689434,
+      "wire": 33768,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 78797,
+      "snapshots": 6855,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 5,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 2,
+      "deckA": "Lightning Caller",
+      "deckB": "Gates to Hell",
+      "turns": 10,
+      "ms": 14788,
+      "nachrichten": 341,
+      "raw": 1181008,
+      "wire": 25015,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 17047,
+      "snapshots": 2178,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 3,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Gates to Hell",
+      "turns": 46,
+      "ms": 35668,
+      "nachrichten": 4093,
+      "raw": 20647748,
+      "wire": 311834,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 39952,
+      "snapshots": 2410,
+      "hookTimeouts": 0,
+      "gateChecks": 1,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 6,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 4,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "turns": 1,
+      "ms": 3185,
+      "nachrichten": 111,
+      "raw": 367859,
+      "wire": 11182,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 172,
+      "snapshots": 18,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug1p0ph3",
+      "stilleHalte": [
+        {
+          "zug": 1,
+          "aktiv": 0,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug1p0ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 2,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 5,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "turns": 1,
+      "ms": 199,
+      "nachrichten": 90,
+      "raw": 288211,
+      "wire": 8909,
+      "grund": "startgame-zu-frueh",
+      "gewertet": false,
+      "cpuMs": 157,
+      "snapshots": 11,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 2,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 2,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 6,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Gates to Hell",
+      "turns": 15,
+      "ms": 56974,
+      "nachrichten": 1048,
+      "raw": 4072648,
+      "wire": 75551,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 58969,
+      "snapshots": 4330,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 7,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Gates to Hell",
+      "turns": 10,
+      "ms": 58732,
+      "nachrichten": 1224,
+      "raw": 4585191,
+      "wire": 84541,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 58859,
+      "snapshots": 11651,
+      "hookTimeouts": 0,
+      "gateChecks": 1,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 8,
+      "deckA": "Deepsea Terror",
+      "deckB": "Gates to Hell",
+      "turns": 15,
+      "ms": 37300,
+      "nachrichten": 201,
+      "raw": 723201,
+      "wire": 17061,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 39859,
+      "snapshots": 10741,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    },
+    {
+      "nr": 9,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Gates to Hell",
+      "turns": 7,
+      "ms": 12127,
+      "nachrichten": 915,
+      "raw": 3382395,
+      "wire": 64773,
+      "grund": "startgame-zu-frueh",
+      "gewertet": false,
+      "cpuMs": 12625,
+      "snapshots": 3872,
+      "hookTimeouts": 0,
+      "gateChecks": 1,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 8,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 8,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 10,
+      "deckA": "Idej Illusions",
+      "deckB": "Gates to Hell",
+      "turns": 2,
+      "ms": 139,
+      "nachrichten": 144,
+      "raw": 456665,
+      "wire": 12763,
+      "grund": "startgame-zu-frueh",
+      "gewertet": false,
+      "cpuMs": 31,
+      "snapshots": 5,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 3368,
+      "raw": 32437639,
+      "wire": 405414
+    },
+    {
+      "name": "action_log",
+      "count": 2876,
+      "raw": 361130,
+      "wire": 96916
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 108,
+      "raw": 20848,
+      "wire": 8553
+    },
+    {
+      "name": "card_reveal",
+      "count": 234,
+      "raw": 12827,
+      "wire": 5719
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 140,
+      "raw": 12208,
+      "wire": 5670
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 88,
+      "raw": 11258,
+      "wire": 4938
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 108,
+      "raw": 6588,
+      "wire": 3532
+    },
+    {
+      "name": "ability_activated",
+      "count": 118,
+      "raw": 9208,
+      "wire": 3466
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 48,
+      "raw": 5368,
+      "wire": 2389
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 70,
+      "raw": 2310,
+      "wire": 1630
+    },
+    {
+      "name": "deck_search_add",
+      "count": 54,
+      "raw": 3500,
+      "wire": 1556
+    },
+    {
+      "name": "potion_resolved",
+      "count": 28,
+      "raw": 2290,
+      "wire": 1470
+    },
+    {
+      "name": "summon_effect",
+      "count": 42,
+      "raw": 3594,
+      "wire": 1386
+    },
+    {
+      "name": "game_started",
+      "count": 6,
+      "raw": 1656,
+      "wire": 1164
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 18,
+      "raw": 1098,
+      "wire": 619
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 12,
+      "raw": 1802,
+      "wire": 592
+    },
+    {
+      "name": "gold_change",
+      "count": 20,
+      "raw": 820,
+      "wire": 472
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 14,
+      "raw": 908,
+      "wire": 438
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 10,
+      "raw": 1250,
+      "wire": 404
+    },
+    {
+      "name": "play_projectile_animation",
+      "count": 2,
+      "raw": 414,
+      "wire": 276
+    },
+    {
+      "name": "deck_to_discard_animation",
+      "count": 4,
+      "raw": 440,
+      "wire": 236
+    },
+    {
+      "name": "discard_to_deck_animation",
+      "count": 4,
+      "raw": 274,
+      "wire": 147
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 4,
+      "raw": 320,
+      "wire": 126
+    },
+    {
+      "name": "surprise_flip",
+      "count": 2,
+      "raw": 232,
+      "wire": 117
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 4,
+      "raw": 112,
+      "wire": 112
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 4,
+      "raw": 250,
+      "wire": 112
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 4,
+      "raw": 156,
+      "wire": 100
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 2,
+      "raw": 146,
+      "wire": 69
+    },
+    {
+      "name": "reaction_chain_link_resolved",
+      "count": 4,
+      "raw": 316,
+      "wire": 63
+    },
+    {
+      "name": "surprise_reset",
+      "count": 2,
+      "raw": 156,
+      "wire": 44
+    },
+    {
+      "name": "area_descend",
+      "count": 2,
+      "raw": 112,
+      "wire": 40
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-a9318140",
+      "count": 2047,
+      "raw": 10405691,
+      "wire": 156533
+    },
+    {
+      "sid": "sid-b-netbench-a9318140",
+      "count": 2045,
+      "raw": 10241781,
+      "wire": 155107
+    },
+    {
+      "sid": "sid-a-netbench-53129679",
+      "count": 611,
+      "raw": 2284808,
+      "wire": 42373
+    },
+    {
+      "sid": "sid-b-netbench-53129679",
+      "count": 612,
+      "raw": 2300107,
+      "wire": 41974
+    },
+    {
+      "sid": "sid-a-netbench-944a7da7",
+      "count": 524,
+      "raw": 2047115,
+      "wire": 38402
+    },
+    {
+      "sid": "sid-b-netbench-944a7da7",
+      "count": 523,
+      "raw": 2025257,
+      "wire": 36956
+    },
+    {
+      "sid": "sid-b-netbench-78754046",
+      "count": 251,
+      "raw": 853139,
+      "wire": 16912
+    },
+    {
+      "sid": "sid-a-netbench-78754046",
+      "count": 241,
+      "raw": 836019,
+      "wire": 16661
+    },
+    {
+      "sid": "sid-a-netbench-f3f9b00b",
+      "count": 169,
+      "raw": 587665,
+      "wire": 12416
+    },
+    {
+      "sid": "sid-b-netbench-f3f9b00b",
+      "count": 171,
+      "raw": 593067,
+      "wire": 12405
+    },
+    {
+      "sid": "sid-b-netbench-df1589d7",
+      "count": 101,
+      "raw": 360304,
+      "wire": 8509
+    },
+    {
+      "sid": "sid-a-netbench-df1589d7",
+      "count": 99,
+      "raw": 362621,
+      "wire": 8358
+    },
+    {
+      "sid": "room:netbench-78754046",
+      "count": 1,
+      "raw": 276,
+      "wire": 195
+    },
+    {
+      "sid": "room:netbench-f3f9b00b",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-a9318140",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-53129679",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-df1589d7",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-944a7da7",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 7400,
+    "raw": 32899230,
+    "wire": 547770
+  },
+  "groesste_nachricht": {
+    "bytes": 11962,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 6,
+    "raw": 1650
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Layn, Defender of Deri\" → Theme \"layn\" (48 Themes im Ordner)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [CPU] STILLER HALT: Zug 1 p0 Phase 2→3 — ok:zugende@zug1p0ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1250hp, deck 52, hand 4) | p1(heroes 3/3 alive, 1200hp, deck 55, hand 5) | turn 1 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 5,
+      "grund": "startgame-zu-frueh",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 2 Phase 2 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:0:2 → 1:1:2"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1200hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 50, hand 4) | turn 1 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 9,
+      "grund": "startgame-zu-frueh",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 8 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] PHASENWECHSEL VERWEIGERT (advanceToPhase/falscher-spieler): Zug 8 Phase 3 aktiv=p0 rufer=p1 spellDepth=0 zauber=[]",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 8 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 8 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 8:0:3 → 7:1:2"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1050hp, deck 49, hand 4) | p1(heroes 3/3 alive, 1000hp, deck 40, hand 7) | turn 7 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 10,
+      "grund": "startgame-zu-frueh",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Idej Lord Daiyo\" → Theme \"daiyo\" (48 Themes im Ordner)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14433 ← async@_engine.js:14175 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [netbench] PARTIE LEBTE WEITER: startGame war durch, Stand wanderte 2:1:5 → 2:1:2"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1000hp, deck 51, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 51, hand 8) | turn 2 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "gate_statistik": [
+    {
+      "nr": 1,
+      "deckA": "Heal Burn",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Lightning Caller",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "deck_out",
+      "checks": 1,
+      "schilde": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Gates to Hell",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Bamboo Warrior",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Boom Boom Kaboom!",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 1,
+      "schilde": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Deepsea Terror",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Slip 'n Slide",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "checks": 1,
+      "schilde": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Idej Illusions",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "checks": 0,
+      "schilde": 0
+    }
+  ],
+  "uebergabe_statistik": [
+    {
+      "nr": 1,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 1,
+      "blockGruende": []
+    },
+    {
+      "nr": 2,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 1,
+      "blockGruende": []
+    },
+    {
+      "nr": 3,
+      "gewertet": true,
+      "grund": "deck_out",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 0,
+      "blockGruende": []
+    },
+    {
+      "nr": 4,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 0,
+      "blockGruende": []
+    },
+    {
+      "nr": 5,
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 2,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 2,
+      "tiefeEnde": 0,
+      "phasenBlocks": 1,
+      "spellTiefe": 0,
+      "blockGruende": [
+        "falscher-spieler"
+      ]
+    },
+    {
+      "nr": 6,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": [],
+      "fahnenLecks": 0,
+      "tiefeEnde": 0,
+      "phasenBlocks": 1,
+      "spellTiefe": 0,
+      "blockGruende": [
+        "spellResolutionDepth"
+      ]
+    },
+    {
+      "nr": 7,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": [],
+      "fahnenLecks": 0,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 1,
+      "blockGruende": []
+    },
+    {
+      "nr": 8,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": [],
+      "fahnenLecks": 0,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 0,
+      "blockGruende": []
+    },
+    {
+      "nr": 9,
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 2,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 2,
+      "tiefeEnde": 0,
+      "phasenBlocks": 1,
+      "spellTiefe": 0,
+      "blockGruende": [
+        "falscher-spieler"
+      ]
+    },
+    {
+      "nr": 10,
+      "gewertet": false,
+      "grund": "startgame-zu-frueh",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0,
+      "phasenBlocks": 0,
+      "spellTiefe": 0,
+      "blockGruende": []
+    }
+  ],
+  "kandidaten_heap": {
+    "Adventurousness": {
+      "rollouts": 2925,
+      "mbGesamt": 2160.52,
+      "mbProRollout": 0.7386,
+      "ueberSchwelle": 117
+    },
+    "Demon's Gate": {
+      "rollouts": 931,
+      "mbGesamt": 365.95,
+      "mbProRollout": 0.3931,
+      "ueberSchwelle": 45
+    },
+    "Chain Lightning": {
+      "rollouts": 81,
+      "mbGesamt": 38.94,
+      "mbProRollout": 0.4808,
+      "ueberSchwelle": 1
+    },
+    "Butterfly Cloud": {
+      "rollouts": 80,
+      "mbGesamt": 15.74,
+      "mbProRollout": 0.1967,
+      "ueberSchwelle": 0
+    },
+    "Slippery Pengu": {
+      "rollouts": 143,
+      "mbGesamt": 107.21,
+      "mbProRollout": 0.7497,
+      "ueberSchwelle": 0
+    },
+    "Slippery Snobbit": {
+      "rollouts": 21,
+      "mbGesamt": 12.05,
+      "mbProRollout": 0.5738,
+      "ueberSchwelle": 0
+    },
+    "Slippery Snowman": {
+      "rollouts": 77,
+      "mbGesamt": 94.58,
+      "mbProRollout": 1.2283,
+      "ueberSchwelle": 0
+    },
+    "Thieving Strike": {
+      "rollouts": 159,
+      "mbGesamt": 73.53,
+      "mbProRollout": 0.4624,
+      "ueberSchwelle": 57
+    },
+    "Heavy Hit": {
+      "rollouts": 388,
+      "mbGesamt": 233.43,
+      "mbProRollout": 0.6016,
+      "ueberSchwelle": 3
+    },
+    "Hammer Throw": {
+      "rollouts": 77,
+      "mbGesamt": 14.8,
+      "mbProRollout": 0.1923,
+      "ueberSchwelle": 0
+    },
+    "Critical Strike": {
+      "rollouts": 30,
+      "mbGesamt": 45.87,
+      "mbProRollout": 1.529,
+      "ueberSchwelle": 0
+    },
+    "Strong Ox Headbutt": {
+      "rollouts": 193,
+      "mbGesamt": 150.76,
+      "mbProRollout": 0.7811,
+      "ueberSchwelle": 15
+    },
+    "Attack": {
+      "rollouts": 73,
+      "mbGesamt": 49.25,
+      "mbProRollout": 0.6746,
+      "ueberSchwelle": 0
+    },
+    "Muscle Training": {
+      "rollouts": 66,
+      "mbGesamt": 15.13,
+      "mbProRollout": 0.2292,
+      "ueberSchwelle": 28
+    },
+    "Quick Attack": {
+      "rollouts": 12,
+      "mbGesamt": -15.33,
+      "mbProRollout": -1.2777,
+      "ueberSchwelle": 0
+    },
+    "Dark Deepsea God": {
+      "rollouts": 289,
+      "mbGesamt": -64.1,
+      "mbProRollout": -0.2218,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Primordium": {
+      "rollouts": 160,
+      "mbGesamt": 19.51,
+      "mbProRollout": 0.1219,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Bats": {
+      "rollouts": 16,
+      "mbGesamt": 33.24,
+      "mbProRollout": 2.0774,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Werewolf": {
+      "rollouts": 135,
+      "mbGesamt": -13.88,
+      "mbProRollout": -0.1028,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Monstrosity": {
+      "rollouts": 8,
+      "mbGesamt": 14.23,
+      "mbProRollout": 1.7786,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Witch": {
+      "rollouts": 82,
+      "mbGesamt": -6.39,
+      "mbProRollout": -0.0779,
+      "ueberSchwelle": 0
+    },
+    "Deepsea Pirate": {
+      "rollouts": 48,
+      "mbGesamt": 46.85,
+      "mbProRollout": 0.976,
+      "ueberSchwelle": 0
+    },
+    "Sandy Blob": {
+      "rollouts": 130,
+      "mbGesamt": 82.24,
+      "mbProRollout": 0.6326,
+      "ueberSchwelle": 0
+    },
+    "Slippery Polar": {
+      "rollouts": 74,
+      "mbGesamt": 33.48,
+      "mbProRollout": 0.4524,
+      "ueberSchwelle": 0
+    },
+    "Slippery Ice": {
+      "rollouts": 6,
+      "mbGesamt": 10.59,
+      "mbProRollout": 1.7655,
+      "ueberSchwelle": 0
+    },
+    "Slippery Spikeblock": {
+      "rollouts": 80,
+      "mbGesamt": 49.16,
+      "mbProRollout": 0.6145,
+      "ueberSchwelle": 42
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 92,
+  "cpu_ms_gesamt": 306468,
+  "hook_feuer_je_karte": {
+    "Elixir of Immortality": 507,
+    "Slippery Whoolmoth": 300,
+    "Treasure Huntress Semi": 244,
+    "Slippery Pengu": 212,
+    "Wealth": 160,
+    "Slippery Snobbit": 137,
+    "Slippery Snowman": 103,
+    "Ingo, Investor of Evil": 97,
+    "Performance": 73,
+    "Slippery Spikeblock": 71,
+    "Lifeforce Howitzer": 68,
+    "Hel, the Bound Specter": 62,
+    "Friendship": 37,
+    "Xiong, the Bamboo Guardian": 35,
+    "Divine Gift of Balance": 34,
+    "Fighting": 32,
+    "Resistance": 25,
+    "Biomancy": 21,
+    "Creativity": 20,
+    "Overheal Shock": 19,
+    "Ska Harpyformer": 19,
+    "Alex, Trainer of Heroes": 19,
+    "Barker, the Monster Tamer": 15,
+    "Teppes, the Deepsea Vampire": 15,
+    "Nicolas, the Hidden Alchemist": 13,
+    "Glass of Marbles": 10,
+    "Siphem, the Deepsea Demon": 10,
+    "Deepsea Primordium": 9,
+    "Lizbeth, the Reaper of the Light": 9,
+    "Mystery Box": 8,
+    "Divine Gift of the Guardian": 7,
+    "Andras, the Human Weapon": 7,
+    "Sacred Hammer of the Volcano": 7,
+    "Deepsea Werewolf": 6,
+    "Fiona, the Princess of Blackport": 5,
+    "Heavy Hit": 5,
+    "Healing Melody": 4,
+    "Cloud in a Bottle": 4,
+    "Toughness": 4,
+    "Quick Attack": 4,
+    "Deepsea Witch": 4,
+    "Sandy Blob": 4,
+    "Slippery Polar": 3,
+    "Heal": 2,
+    "Chain Lightning": 2,
+    "Slippery Ice": 2,
+    "Layn, Defender of Deri": 2,
+    "Hammer Throw": 2,
+    "Strong Ox Headbutt": 2,
+    "Attack": 2,
+    "Deepsea Bats": 2,
+    "Deepsea Monstrosity": 2,
+    "Nao, the Barrier Priestess": 1,
+    "Sol Rym, the Thunder Djinn": 1,
+    "Butterfly Cloud": 1,
+    "Metal Harpyformer": 1,
+    "Critical Strike": 1,
+    "Thieving Strike": 1,
+    "Divine Gift of Coolness": 1,
+    "Phalanx Pike": 1,
+    "Deepsea Mummy": 1,
+    "Deepsea Pirate": 1,
+    "Idej Lord Daiyo": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 117,
+    "Thieving Strike": 57,
+    "Demon's Gate": 45,
+    "Slippery Spikeblock": 42,
+    "Muscle Training": 28,
+    "Strong Ox Headbutt": 15,
+    "Heavy Hit": 3,
+    "Chain Lightning": 1
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Deepsea Primordium [priority]": 1
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [
+    {
+      "nr": 1,
+      "decks": [
+        "Heal Burn",
+        "Gates to Hell"
+      ],
+      "turns": 19,
+      "sieger": 0,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Nicolas, the Hidden Alchemist",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 3,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Silent Water Mizune",
+          "zielIdx": 1,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    }
+  ],
+  "heil_zielwahl": {
+    "Healing Melody → eigen": {
+      "n": 3,
+      "hp": 450
+    },
+    "Healing Potion → eigen": {
+      "n": 1,
+      "hp": 200
+    }
+  },
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "Heal Burn",
+      "cpuMs": 39398.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 39398.5
+    },
+    {
+      "name": "Bamboo Warrior",
+      "cpuMs": 29484.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 29484.5
+    },
+    {
+      "name": "Boom Boom Kaboom!",
+      "cpuMs": 29429.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 29429.5
+    },
+    {
+      "name": "Deepsea Terror",
+      "cpuMs": 19929.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 19929.5
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 153312.5,
+      "partien": 11,
+      "abbrueche": 5,
+      "proPartie": 13937.5
+    },
+    {
+      "name": "Slip 'n Slide",
+      "cpuMs": 26288.5,
+      "partien": 2,
+      "abbrueche": 1,
+      "proPartie": 13144.25
+    },
+    {
+      "name": "Lightning Caller",
+      "cpuMs": 8523.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 8523.5
+    },
+    {
+      "name": "Steam Dwarf Mines",
+      "cpuMs": 86,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 86
+    },
+    {
+      "name": "Idej Illusions",
+      "cpuMs": 15.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 15.5
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 91295,
+    "roh_je_partie": 5483205,
+    "wire_je_verbindung": 45647.5,
+    "wire_je_halbzug": 4763.217391304348,
+    "kompressionsfaktor": 60.06029903061504
+  }
+}

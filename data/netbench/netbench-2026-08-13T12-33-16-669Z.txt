@@ -1,0 +1,193 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 20 s | Zeitlimit/Partie 300 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    2 Halbzuege      90 Nachrichten     0.29 MB roh  →    0.009 MB Leitung   300 s   296 s CPU  ⚠ zeitlimit@zug2  Heal Burn vs To Attain Divinity
+     ↳ 7 abgebrochene(r) Hook(s): 
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [deck-profile] loaded "Lightning Caller" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)
+       [deck-profile] loaded "Man's Best Friends" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)
+       [deck-profile] loaded "Mawstruck" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)
+       [deck-profile] loaded "Morph and Kill!" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)
+       [deck-profile] loaded "One-Two-Punch!" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)
+       [deck-profile] loaded "Parts of the Soul" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)
+       [deck-profile] loaded "Pew-Pew!" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)
+       [deck-profile] loaded "Poison Torture" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)
+       [deck-profile] loaded "Sacrificial Demons" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)
+       [deck-profile] loaded "Shadows over Blackport" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)
+       [deck-profile] loaded "Shifting Sandlands" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)
+       [deck-profile] loaded "Slimy Infestation" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)
+       [deck-profile] loaded "Slip 'n Slide" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)
+       [deck-profile] loaded "Spell Industrialization" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)
+       [deck-profile] loaded "Steam Dwarf Mines" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)
+       [deck-profile] loaded "Suicide Bombers" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)
+       [deck-profile] loaded "Sun Fencer Frenzy" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)
+       [deck-profile] loaded "To Attain Divinity" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)
+       [deck-profile] loaded "Venom Swamp" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+35 MB (inkl. Grundlast) | jetzt rss=100 heapTotal=65 heapUsed=45
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+       [error] [overload] trail dump → C:\Pixel Parties WEB\PixelPartiesWeb\mcts-overload-1786623898999-t1-cpu-deadline.trail.json
+       [error] [CPU] turn error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseEnd). Top hooks: onPhaseStart:6 onPhaseEnd:6 beforeDraw:3 onDraw:3 onPlay:3 onResourceGain:2 afterResourceGain:2 onCardEnterZone:2. Top instances: Adventurousness×4, Support Magic×3, Friendship×3, Kazena, the Storming Rebel×2, Wisdom×2. Top firing cards: Friendship×2, Treasure Huntress Semi×2, Nao, the Barrier Priestess×1, Barker, the Monster Tamer×1, Archibald, the Archmage×1, Brilliant Idea×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach "Friendship" → t1/ph3/p0 rollout "Adventurousness" → t1/ph3/p0 leakyRollout "Adventurousness". Force-ending in-flight chain. Error: CPU live-turn deadline exceeded inside hook chain at turn 1 phase 5 active p0 after 32 hooks (curHook=onPhaseEnd). Top hooks: onPhaseStart:6 onPhaseEnd:6 beforeDraw:3 onDraw:3 onPlay:3 onResourceGain:2 afterResourceGain:2 onCardEnterZone:2. Top instances: Adventurousness×4, Support Magic×3, Friendship×3, Kazena, the Storming Rebel×2, Wisdom×2. Top firing cards: Friendship×2, Treasure Huntress Semi×2, Nao, the Barrier Priestess×1, Barker, the Monster Tamer×1, Archibald, the Archmage×1, Brilliant Idea×1. Recent trail: t1/ph2/p0 cpuTurnStart → t1/ph2/p0 attach "Friendship" → t1/ph3/p0 rollout "Adventurousness" → t1/ph3/p0 leakyRollout "Adventurousness". Force-ending in-flight chain.
+    at GameEngine.runHooks (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:2470:19)
+    at GameEngine.runPhase (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13608:20)
+    at async GameEngine.advancePhase (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13763:5)
+    at async runCpuTurn (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_cpu.js:772:3)
+    at async GameEngine.cpuTurn [as _cpuDriver] (C:\Pixel Parties WEB\PixelPartiesWeb\server.js:5376:7)
+    at async GameEngine.startGame (C:\Pixel Parties WEB\PixelPartiesWeb\cards\effects\_engine.js:13228:13)
+       [warn] [CPU] Zug 1 haengt nach Fehler — erzwinge Zugübergabe.
+       [warn] [Engine] ⚠️  Karteneffekte in Zug 1 stillgelegt (erster unterdrueckter Hook: onTurnEnd, bereits 32 Hooks gefeuert). Ab hier loest in diesem Zug KEIN Kartentrigger mehr aus.
+  Partie   2/10   84 Halbzuege    8638 Nachrichten    30.63 MB roh  →    0.505 MB Leitung    18 s    23 s CPU  Heal Burn vs Shadows over Blackport
+  Partie   3/10   74 Halbzuege    7229 Nachrichten    29.40 MB roh  →    0.448 MB Leitung    18 s    20 s CPU  Heal Burn vs Dance of the Butterflies
+  Partie   4/10   65 Halbzuege    6848 Nachrichten    27.26 MB roh  →    0.420 MB Leitung    25 s    27 s CPU  Heal Burn vs Bamboo Warrior
+  Partie   5/10   21 Halbzuege    2209 Nachrichten     7.37 MB roh  →    0.124 MB Leitung    11 s    12 s CPU  Heal Burn vs Bone Rush
+  Partie   6/10   91 Halbzuege    8825 Nachrichten    31.42 MB roh  →    0.502 MB Leitung    27 s    29 s CPU  Heal Burn vs Spell Industrialization
+  Partie   7/10   75 Halbzuege    8453 Nachrichten    34.04 MB roh  →    0.522 MB Leitung    41 s    43 s CPU  Heal Burn vs Bamboo Warrior
+  Partie   8/10   40 Halbzuege    3273 Nachrichten    11.09 MB roh  →    0.176 MB Leitung   300 s   300 s CPU  ⚠ zeitlimit@zug40  Heal Burn vs Big Stomp!
+     ↳ 1004 abgebrochene(r) Hook(s): 
+     ↳ letzte 2 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Nao, the Barrier Priestess" → Theme "nao" (48 Themes im Ordner)
+       [CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt.
+  Partie   9/10   69 Halbzuege    6743 Nachrichten    23.66 MB roh  →    0.377 MB Leitung    16 s    18 s CPU  Heal Burn vs Mawstruck
+  Partie  10/10   40 Halbzuege    5025 Nachrichten    19.06 MB roh  →    0.282 MB Leitung    39 s    41 s CPU  Heal Burn vs One-Two-Punch!
+
+[netbench] 68 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 8 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   73.7%      299.9 KB    25530.5 KB       3067    8.32 KB       98.8%  game_state
+   21.0%       85.4 KB      381.4 KB       2829    0.13 KB       77.6%  action_log
+    2.1%        8.7 KB       24.5 KB        526    0.05 KB       64.5%  card_reveal
+    1.0%        4.0 KB        8.0 KB         74    0.11 KB       49.7%  hand_to_board_fly
+    0.8%        3.3 KB        8.8 KB        118    0.08 KB       62.6%  ability_activated
+    0.3%        1.4 KB        3.3 KB         38    0.09 KB       58.8%  play_zone_animation
+    0.1%        0.5 KB        0.9 KB          7    0.13 KB       41.6%  play_hand_steal
+    0.1%        0.5 KB        1.2 KB         11    0.11 KB       55.4%  play_pile_transfer
+    0.1%        0.5 KB        0.7 KB         10    0.07 KB       33.8%  potion_resolved
+    0.1%        0.5 KB        0.9 KB         15    0.06 KB       50.5%  deck_search_add
+    0.1%        0.4 KB        0.7 KB         12    0.06 KB       48.8%  fighting_atk_change
+    0.1%        0.4 KB        0.9 KB          5    0.19 KB       59.8%  play_card_transfer
+    0.1%        0.3 KB        0.8 KB         10    0.08 KB       64.9%  summon_effect
+    0.1%        0.3 KB        0.7 KB          4    0.19 KB       59.0%  play_ram_animation
+    0.0%        0.2 KB        0.3 KB          1    0.27 KB       29.8%  game_started
+  … und 14 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler        203.4 KB Leitung je Verbindung und Partie  (12982.6 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            25.36 MB roh  →  0.397 MB auf der Leitung
+  Ø je Verbindung:        203.4 KB
+  Ø je Halbzug (alle):    6.27 KB
+  Singleplayer (1 Client): ~203.4 KB je Partie
+  PvP (2 Clients):         ~406.9 KB je Partie
+  je zusätzlichem Zuschauer: ~203.4 KB je Partie
+  In 5 GB passen:          ~25.772 Singleplayer-Partien
+                           ~12.886 PvP-Partien
+  OHNE Kompression wären es 403 bzw. 201 — Faktor 63.8
+  Größte Einzelnachricht:  14.2 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 13.5 min CPU
+    300 s  bei  40 Halbzuegen (7.5 s/Halbzug)   ⚠ Heal Burn vs Big Stomp!
+    296 s  bei   2 Halbzuegen (147.9 s/Halbzug)   ⚠ Heal Burn vs To Attain Divinity
+     43 s  bei  75 Halbzuegen (0.6 s/Halbzug)     Heal Burn vs Bamboo Warrior
+     41 s  bei  40 Halbzuegen (1.0 s/Halbzug)     Heal Burn vs One-Two-Punch!
+     29 s  bei  91 Halbzuegen (0.3 s/Halbzug)     Heal Burn vs Spell Industrialization
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+        150        1          1  Big Stomp!
+        148        1          1  To Attain Divinity
+         40       10          2  Heal Burn
+         21        1          0  One-Two-Punch!
+         17        2          0  Bamboo Warrior
+         14        1          0  Spell Industrialization
+         11        1          0  Shadows over Blackport
+         10        1          0  Dance of the Butterflies
+          9        1          0  Mawstruck
+          6        1          0  Bone Rush
+  → Abbrueche haeufen sich bei: Big Stomp! (1), To Attain Divinity (1), Heal Burn (2)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+     1500   12.8%  Friendship
+      938    8.0%  Elixir of Immortality
+      926    7.9%  Lifeforce Howitzer
+      879    7.5%  Brilliant Idea   ⚠ 99 leckende Rollouts
+      871    7.4%  Treasure Huntress Semi
+      723    6.2%  Shield of Life
+      566    4.8%  Wealth
+      490    4.2%  Heal   ⚠ 40 leckende Rollouts
+      443    3.8%  Giga Steroids
+      440    3.8%  Willy, the Valiant Leprechaun
+      434    3.7%  Healing Melody   ⚠ 17 leckende Rollouts
+      386    3.3%  Shield of Death
+      192    1.6%  Creativity
+      168    1.4%  Glass of Marbles
+      152    1.3%  Heavy Hit
+
+═══ OVERHEAL SHOCK / HEILUNGS-UMKEHR ═══
+  Modus: `frei` = inhaerente Zusatz-Aktion (Support Magic 2 oder Decay Magic 1
+  beim Caster), `zusatz` = ueber einen Geber (Friendship & Co.), `main` = hat
+  die Aktion der Runde gekostet. „doppelt" = Ziel trug den Zustand schon —
+  jeder solche Einsatz ist verschenkt (der Zustand ist ein Boolean).
+
+  Partie  Zug  Modus   Caster                      → Ziel (HP)
+       2    7  zusatz  Nao, the Barrier Priestess  → Bill, the Angry Auctioneer (400)
+       2   51  frei    Kazena, the Storming Rebel  → Arthor, the King of Blackport (400)
+       2   73  frei    Kazena, the Storming Rebel  → Jenny, the Class Fairy (300)
+          └─   0 Umwandlungen,     0 Schaden · 84 Halbzuege · Sieger: Heal Burn (deck_out)
+       3   13  zusatz  Nao, the Barrier Priestess  → Alleria, the Queen of Spiders (400)
+       3   17  zusatz  Nao, the Barrier Priestess  → Willy, the Valiant Leprechaun (400)
+       3   25  zusatz  Nao, the Barrier Priestess  → Beato, the Butterfly Witch (300)
+          └─   0 Umwandlungen,     0 Schaden · 74 Halbzuege · Sieger: Heal Burn (deck_out)
+       5    6  frei    Nao, the Barrier Priestess  → Alice, the Puppeteer Girl (400)
+          └─   0 Umwandlungen,     0 Schaden · 21 Halbzuege · Sieger: Bone Rush (all_heroes_dead)
+       6    6  zusatz  Nao, the Barrier Priestess  → Cooldin, King of Coolness (400)
+       6   42  frei    Nao, the Barrier Priestess  → Ingo, Investor of Evil (400)
+       6   52  frei    Nao, the Barrier Priestess  → Victorica, the Eternal Empress (160)
+          └─   0 Umwandlungen,     0 Schaden · 91 Halbzuege · Sieger: Heal Burn (deck_out)
+       7   16  zusatz  Nao, the Barrier Priestess  → Nicolas, the Hidden Alchemist (400)
+          └─   0 Umwandlungen,     0 Schaden · 75 Halbzuege · Sieger: Heal Burn (deck_out)
+       8    3  zusatz  Nao, the Barrier Priestess  → Güldefaber, the King of Dwarfs (700)
+          └─   0 Umwandlungen,     0 Schaden · 40 Halbzuege · kein Sieger (zeitlimit@zug40)  ⚠ nicht gewertet
+       9   29  frei    Nao, the Barrier Priestess  → Cool Rescuer Monia (300)
+          └─   0 Umwandlungen,     0 Schaden · 69 Halbzuege · Sieger: Mawstruck (deck_out)
+      10   13  frei    Kazena, the Storming Rebel  → Bill, the Angry Auctioneer (400)
+          └─   0 Umwandlungen,     0 Schaden · 40 Halbzuege · Sieger: Heal Burn (deck_out)
+
+  SUMME ueber 8 Partie(n) mit Beteiligung:
+    Einsaetze: 14  (frei 7 | ueber Geber 7 | Main-Aktion 0)
+    Umwandlungen: 0, daraus 0 Schaden (0 je Einsatz)
+    Siege der spielenden Seite: 5/7 gewertete Partien mit mindestens einem Einsatz (71 %)
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+     99x  Brilliant Idea
+     69x  Adventurousness
+     40x  Heal
+     40x  Rocket Fist
+     34x  Guardian Angel
+     20x  Whirlwind Strike
+     19x  Hammer Throw
+     17x  Healing Melody
+     12x  Burning Finger
+      3x  Critical Strike
+  Broadcasts an ALLE:      8 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          2           90       0.29        0.009   300    296      NEIN  zeitlimit@zug2     Heal Burn vs To Attain Divinity
+   2         84         8638      30.63        0.505    18     23        ja  deck_out           Heal Burn vs Shadows over Blackport
+   3         74         7229      29.40        0.448    18     20        ja  deck_out           Heal Burn vs Dance of the Butterflies
+   4         65         6848      27.26        0.420    25     27        ja  deck_out           Heal Burn vs Bamboo Warrior
+   5         21         2209       7.37        0.124    11     12        ja  all_heroes_dead    Heal Burn vs Bone Rush
+   6         91         8825      31.42        0.502    27     29        ja  deck_out           Heal Burn vs Spell Industrialization
+   7         75         8453      34.04        0.522    41     43        ja  deck_out           Heal Burn vs Bamboo Warrior
+   8         40         3273      11.09        0.176   300    300      NEIN  zeitlimit@zug40    Heal Burn vs Big Stomp!
+   9         69         6743      23.66        0.377    16     18        ja  deck_out           Heal Burn vs Mawstruck
+  10         40         5025      19.06        0.282    39     41        ja  deck_out           Heal Burn vs One-Two-Punch!

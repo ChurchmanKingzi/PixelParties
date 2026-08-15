@@ -1,0 +1,881 @@
+{
+  "erzeugt": "2026-08-14T08:52:30.476Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 300000,
+    "cpuTurnMs": 20000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Heal Burn",
+      "deckB": "Dance of the Butterflies",
+      "turns": 71,
+      "ms": 23293,
+      "nachrichten": 6978,
+      "raw": 29618473,
+      "wire": 462720,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 26203,
+      "snapshots": 9519,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Heal Burn",
+      "deckB": "To Attain Divinity",
+      "turns": 9,
+      "ms": 300237,
+      "nachrichten": 519,
+      "raw": 1717876,
+      "wire": 31819,
+      "grund": "zeitlimit@zug9",
+      "gewertet": false,
+      "cpuMs": 300375,
+      "snapshots": 383,
+      "hookTimeouts": 51
+    },
+    {
+      "nr": 3,
+      "deckA": "Heal Burn",
+      "deckB": "Man's Best Friends",
+      "turns": 67,
+      "ms": 72265,
+      "nachrichten": 6433,
+      "raw": 24199527,
+      "wire": 376812,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 74875,
+      "snapshots": 18804,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Heal Burn",
+      "deckB": "Shadows over Blackport",
+      "turns": 71,
+      "ms": 44001,
+      "nachrichten": 6944,
+      "raw": 26740225,
+      "wire": 411674,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 45859,
+      "snapshots": 7252,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Heal Burn",
+      "deckB": "Mawstruck",
+      "turns": 69,
+      "ms": 91636,
+      "nachrichten": 6538,
+      "raw": 24681674,
+      "wire": 406206,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 93376,
+      "snapshots": 15983,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 6,
+      "deckA": "Heal Burn",
+      "deckB": "Venom Swamp",
+      "turns": 21,
+      "ms": 27679,
+      "nachrichten": 2080,
+      "raw": 7633480,
+      "wire": 132288,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 28828,
+      "snapshots": 5572,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Heal Burn",
+      "deckB": "Crystal Gifts",
+      "turns": 14,
+      "ms": 16304,
+      "nachrichten": 1647,
+      "raw": 5457187,
+      "wire": 94877,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 17298,
+      "snapshots": 3190,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Heal Burn",
+      "deckB": "Man's Best Friends",
+      "turns": 70,
+      "ms": 72275,
+      "nachrichten": 6701,
+      "raw": 25635985,
+      "wire": 417238,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 72155,
+      "snapshots": 17892,
+      "hookTimeouts": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Heal Burn",
+      "deckB": "Elven Vanguard",
+      "turns": 49,
+      "ms": 112157,
+      "nachrichten": 3774,
+      "raw": 15348658,
+      "wire": 235744,
+      "grund": "deck_out",
+      "gewertet": true,
+      "cpuMs": 110688,
+      "snapshots": 13889,
+      "hookTimeouts": 1
+    },
+    {
+      "nr": 10,
+      "deckA": "Heal Burn",
+      "deckB": "Venom Swamp",
+      "turns": 17,
+      "ms": 13927,
+      "nachrichten": 1717,
+      "raw": 6207648,
+      "wire": 107371,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 14047,
+      "snapshots": 2819,
+      "hookTimeouts": 0
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 19654,
+      "raw": 162756009,
+      "wire": 1924434
+    },
+    {
+      "name": "action_log",
+      "count": 18006,
+      "raw": 2416312,
+      "wire": 574911
+    },
+    {
+      "name": "card_reveal",
+      "count": 2831,
+      "raw": 138905,
+      "wire": 51704
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 552,
+      "raw": 61811,
+      "wire": 28434
+    },
+    {
+      "name": "ability_activated",
+      "count": 690,
+      "raw": 54814,
+      "wire": 20951
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 332,
+      "raw": 28722,
+      "wire": 12633
+    },
+    {
+      "name": "potion_resolved",
+      "count": 108,
+      "raw": 7790,
+      "wire": 5200
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 98,
+      "raw": 11802,
+      "wire": 4553
+    },
+    {
+      "name": "deck_search_add",
+      "count": 132,
+      "raw": 8630,
+      "wire": 4445
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 34,
+      "raw": 6574,
+      "wire": 2723
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 32,
+      "raw": 4320,
+      "wire": 2447
+    },
+    {
+      "name": "summon_effect",
+      "count": 78,
+      "raw": 6666,
+      "wire": 2343
+    },
+    {
+      "name": "game_started",
+      "count": 9,
+      "raw": 2484,
+      "wire": 1744
+    },
+    {
+      "name": "gold_change",
+      "count": 60,
+      "raw": 2460,
+      "wire": 1440
+    },
+    {
+      "name": "play_card_transfer",
+      "count": 14,
+      "raw": 2754,
+      "wire": 1153
+    },
+    {
+      "name": "play_gold_coins",
+      "count": 46,
+      "raw": 1518,
+      "wire": 1077
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 20,
+      "raw": 2264,
+      "wire": 940
+    },
+    {
+      "name": "fighting_atk_change",
+      "count": 28,
+      "raw": 1710,
+      "wire": 930
+    },
+    {
+      "name": "burn_tick",
+      "count": 10,
+      "raw": 2160,
+      "wire": 562
+    },
+    {
+      "name": "play_chaos_screen",
+      "count": 16,
+      "raw": 416,
+      "wire": 416
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 10,
+      "raw": 694,
+      "wire": 318
+    },
+    {
+      "name": "deck_to_deleted",
+      "count": 6,
+      "raw": 756,
+      "wire": 279
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 4,
+      "raw": 596,
+      "wire": 252
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 8,
+      "raw": 496,
+      "wire": 246
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 8,
+      "raw": 1000,
+      "wire": 245
+    },
+    {
+      "name": "slow_dark_magic",
+      "count": 12,
+      "raw": 432,
+      "wire": 194
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 6,
+      "raw": 366,
+      "wire": 158
+    },
+    {
+      "name": "card_effect_flash",
+      "count": 4,
+      "raw": 188,
+      "wire": 100
+    },
+    {
+      "name": "area_descend",
+      "count": 2,
+      "raw": 116,
+      "wire": 51
+    },
+    {
+      "name": "willy_leprechaun",
+      "count": 2,
+      "raw": 92,
+      "wire": 47
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-b-netbench-667d5f73",
+      "count": 3485,
+      "raw": 14803670,
+      "wire": 237762
+    },
+    {
+      "sid": "sid-a-netbench-667d5f73",
+      "count": 3492,
+      "raw": 14814527,
+      "wire": 224764
+    },
+    {
+      "sid": "sid-b-netbench-24983d40",
+      "count": 3336,
+      "raw": 12403440,
+      "wire": 209147
+    },
+    {
+      "sid": "sid-b-netbench-d3390bd9",
+      "count": 3434,
+      "raw": 12607671,
+      "wire": 209131
+    },
+    {
+      "sid": "sid-a-netbench-d3390bd9",
+      "count": 3266,
+      "raw": 13028038,
+      "wire": 207912
+    },
+    {
+      "sid": "sid-b-netbench-b4be8f61",
+      "count": 3653,
+      "raw": 13143241,
+      "wire": 207819
+    },
+    {
+      "sid": "sid-a-netbench-b4be8f61",
+      "count": 3290,
+      "raw": 13596708,
+      "wire": 203662
+    },
+    {
+      "sid": "sid-a-netbench-24983d40",
+      "count": 3201,
+      "raw": 12277958,
+      "wire": 196865
+    },
+    {
+      "sid": "sid-b-netbench-8f6ca5a7",
+      "count": 3282,
+      "raw": 11872155,
+      "wire": 190368
+    },
+    {
+      "sid": "sid-a-netbench-8f6ca5a7",
+      "count": 3150,
+      "raw": 12327096,
+      "wire": 186251
+    },
+    {
+      "sid": "sid-b-netbench-1d8842e5",
+      "count": 1935,
+      "raw": 7906276,
+      "wire": 124620
+    },
+    {
+      "sid": "sid-a-netbench-1d8842e5",
+      "count": 1838,
+      "raw": 7442106,
+      "wire": 110930
+    },
+    {
+      "sid": "sid-a-netbench-3b1926fe",
+      "count": 1029,
+      "raw": 3862239,
+      "wire": 66311
+    },
+    {
+      "sid": "sid-b-netbench-3b1926fe",
+      "count": 1050,
+      "raw": 3770965,
+      "wire": 65783
+    },
+    {
+      "sid": "sid-a-netbench-cc45b27e",
+      "count": 851,
+      "raw": 3163363,
+      "wire": 53841
+    },
+    {
+      "sid": "sid-b-netbench-cc45b27e",
+      "count": 865,
+      "raw": 3044009,
+      "wire": 53336
+    },
+    {
+      "sid": "sid-b-netbench-8363626a",
+      "count": 837,
+      "raw": 2741758,
+      "wire": 48248
+    },
+    {
+      "sid": "sid-a-netbench-8363626a",
+      "count": 809,
+      "raw": 2715153,
+      "wire": 46436
+    },
+    {
+      "sid": "room:netbench-d3390bd9",
+      "count": 1,
+      "raw": 276,
+      "wire": 195
+    },
+    {
+      "sid": "room:netbench-667d5f73",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-24983d40",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-3b1926fe",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-1d8842e5",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-cc45b27e",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-8f6ca5a7",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-b4be8f61",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-8363626a",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 42812,
+    "raw": 165522857,
+    "wire": 2644930
+  },
+  "groesste_nachricht": {
+    "bytes": 13320,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 9,
+    "raw": 2475
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 2,
+      "grund": "zeitlimit@zug9",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Archibald, the Archmage\" → Theme \"archibald\" (48 Themes im Ordner)",
+        "[error] [Engine] Hook \"onTurnStart\" on card \"Barker, the Monster Tamer\" (7e543b9a-eaf) failed: Hook timeout",
+        "[CPU] Partie abgebrochen — laufende Kaskade wird abgeraeumt."
+      ]
+    }
+  ],
+  "unterdrueckte_ausgabezeilen": 66,
+  "cpu_ms_gesamt": 783704,
+  "hook_feuer_je_karte": {
+    "Friendship": 1582,
+    "Lifeforce Howitzer": 759,
+    "Treasure Huntress Semi": 698,
+    "Wealth": 647,
+    "Brilliant Idea": 635,
+    "Shield of Death": 483,
+    "Willy, the Valiant Leprechaun": 422,
+    "Loyal Hountriever": 395,
+    "Shield of Life": 363,
+    "Heal": 342,
+    "Healing Melody": 236,
+    "Legendary Sword of a Barbarian King": 177,
+    "Ingo, Investor of Evil": 119,
+    "Luck": 115,
+    "Performance": 103,
+    "Arthor, the King of Blackport": 99,
+    "Guardian Angel": 93,
+    "Psychic Scout": 80,
+    "Orthos, the Loyal Guard Dog": 79,
+    "Overheal Shock": 72,
+    "Cool Rescuer Monia": 72,
+    "Barker, the Monster Tamer": 58,
+    "Zsos'Ssar, the Serpent Warlord": 52,
+    "Controlled Attack": 50,
+    "Beato, the Butterfly Witch": 41,
+    "Nero Zira, the Mastermind": 40,
+    "Medea, the Swamp Witch": 40,
+    "Summoning Circle": 39,
+    "Mary Crestmas": 35,
+    "Rocket Fist": 34,
+    "Maya, the Nature Fairy": 33,
+    "Divine Gift of The Light": 30,
+    "Fiona, the Princess of Blackport": 30,
+    "Cardinal Beast Xuanwu": 24,
+    "Burning Finger": 22,
+    "Cardinal Beast Baihu": 20,
+    "Divine Gift of Creation": 19,
+    "Intrude": 19,
+    "Vinepire": 18,
+    "Fighting": 17,
+    "Archibald, the Archmage": 15,
+    "Cardinal Beast Qinglong": 14,
+    "The Warlord's Bite": 14,
+    "Toughness": 11,
+    "Nao, the Barrier Priestess": 10,
+    "Greatmaw Remora": 7,
+    "Venom Infusion": 6,
+    "Graveyard Gathering": 5,
+    "Cardinal Beast Zhuque": 5,
+    "Ska Harpyformer": 3,
+    "Loyal Pinpom": 3,
+    "Poisoned Well": 3,
+    "Trial of Coolness": 2,
+    "Poison Pollen": 2,
+    "Slow": 2,
+    "Accusation": 2,
+    "Compulsory Body Swap": 1,
+    "Sacrifice to Divinity": 1,
+    "Bill, the Angry Auctioneer": 1,
+    "Divine Gift of Sacrifice": 1,
+    "Jump in the River": 1,
+    "Stinky Stables": 1,
+    "Rap Harpyformer": 1
+  },
+  "leckende_rollouts": {
+    "Heal": 111,
+    "Adventurousness": 96,
+    "Brilliant Idea": 85,
+    "The Warlord's Bite": 80,
+    "Venom Infusion": 41,
+    "Healing Melody": 39
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Ska Harpyformer [rule]": 1308102,
+    "Barker, the Monster Tamer → Psychic Scout [rule]": 405801
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {},
+  "overheal_shock": [
+    {
+      "nr": 1,
+      "decks": [
+        "Heal Burn",
+        "Dance of the Butterflies"
+      ],
+      "turns": 71,
+      "sieger": 0,
+      "grund": "deck_out",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 2,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "frei",
+          "ziel": "Alleria, the Queen of Spiders",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 54,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Beato, the Butterfly Witch",
+          "zielIdx": 1,
+          "zielHp": 300,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    },
+    {
+      "nr": 4,
+      "decks": [
+        "Heal Burn",
+        "Shadows over Blackport"
+      ],
+      "turns": 71,
+      "sieger": 0,
+      "grund": "deck_out",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 2,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "zusatz",
+          "ziel": "Bill, the Angry Auctioneer",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 6,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "zusatz",
+          "ziel": "Arthor, the King of Blackport",
+          "zielIdx": 1,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 34,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Jenny, the Class Fairy",
+          "zielIdx": 2,
+          "zielHp": 300,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    },
+    {
+      "nr": 5,
+      "decks": [
+        "Heal Burn",
+        "Mawstruck"
+      ],
+      "turns": 69,
+      "sieger": 1,
+      "grund": "deck_out",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 15,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "frei",
+          "ziel": "Nero Zira, the Mastermind",
+          "zielIdx": 1,
+          "zielHp": 450,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    },
+    {
+      "nr": 6,
+      "decks": [
+        "Heal Burn",
+        "Venom Swamp"
+      ],
+      "turns": 21,
+      "sieger": 1,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 5,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "main",
+          "ziel": "Fiona, the Princess of Blackport",
+          "zielIdx": 2,
+          "zielHp": 450,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 5,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "zusatz",
+          "ziel": "Medea, the Swamp Witch",
+          "zielIdx": 0,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        },
+        {
+          "zug": 17,
+          "spieler": 0,
+          "caster": "Kazena, the Storming Rebel",
+          "casterIdx": 0,
+          "modus": "main",
+          "ziel": "Zsos'Ssar, the Serpent Warlord",
+          "zielIdx": 1,
+          "zielHp": 400,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    },
+    {
+      "nr": 8,
+      "decks": [
+        "Heal Burn",
+        "Man's Best Friends"
+      ],
+      "turns": 70,
+      "sieger": 0,
+      "grund": "deck_out",
+      "gewertet": true,
+      "einsaetze": [
+        {
+          "zug": 23,
+          "spieler": 0,
+          "caster": "Nao, the Barrier Priestess",
+          "casterIdx": 1,
+          "modus": "zusatz",
+          "ziel": "Alice, the Puppeteer Girl",
+          "zielIdx": 2,
+          "zielHp": 300,
+          "zielHatteSchon": false
+        }
+      ],
+      "hr": null
+    }
+  ],
+  "heil_zielwahl": {
+    "Divine Gift of The Light → eigen": {
+      "n": 2,
+      "hp": 200
+    }
+  },
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "To Attain Divinity",
+      "cpuMs": 150187.5,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 150187.5
+    },
+    {
+      "name": "Elven Vanguard",
+      "cpuMs": 55344,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 55344
+    },
+    {
+      "name": "Mawstruck",
+      "cpuMs": 46688,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 46688
+    },
+    {
+      "name": "Heal Burn",
+      "cpuMs": 391852,
+      "partien": 10,
+      "abbrueche": 1,
+      "proPartie": 39185.2
+    },
+    {
+      "name": "Man's Best Friends",
+      "cpuMs": 73515,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 36757.5
+    },
+    {
+      "name": "Shadows over Blackport",
+      "cpuMs": 22929.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 22929.5
+    },
+    {
+      "name": "Dance of the Butterflies",
+      "cpuMs": 13101.5,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 13101.5
+    },
+    {
+      "name": "Venom Swamp",
+      "cpuMs": 21437.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 10718.75
+    },
+    {
+      "name": "Crystal Gifts",
+      "cpuMs": 8649,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 8649
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 293881.1111111111,
+    "roh_je_partie": 18391428.555555556,
+    "wire_je_verbindung": 146940.55555555556,
+    "wire_je_halbzug": 5890.712694877506,
+    "kompressionsfaktor": 62.581186269579916
+  }
+}

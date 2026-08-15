@@ -1,0 +1,1455 @@
+{
+  "erzeugt": "2026-08-14T18:54:10.615Z",
+  "konfiguration": {
+    "games": 10,
+    "spectators": 0,
+    "realtime": false,
+    "maxTurns": 400,
+    "gameTimeoutMs": 600000,
+    "cpuTurnMs": 30000,
+    "brain": null,
+    "stallMs": 90000
+  },
+  "partien": [
+    {
+      "nr": 1,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "turns": 8,
+      "ms": 14054,
+      "nachrichten": 1302,
+      "raw": 5055174,
+      "wire": 90552,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 17859,
+      "snapshots": 2576,
+      "hookTimeouts": 0,
+      "gateChecks": 4,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 6,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 2,
+      "deckA": "Sacrificial Demons",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 4557,
+      "nachrichten": 331,
+      "raw": 1205416,
+      "wire": 26061,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 5564,
+      "snapshots": 1901,
+      "hookTimeouts": 0,
+      "gateChecks": 2,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug3p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 3,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug3p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 2,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 2,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 3,
+      "deckA": "Venom Swamp",
+      "deckB": "Gates to Hell",
+      "turns": 5,
+      "ms": 4000,
+      "nachrichten": 693,
+      "raw": 2399807,
+      "wire": 48197,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 4594,
+      "snapshots": 1382,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 4,
+      "deckA": "Gather That Storm!",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 3344,
+      "nachrichten": 325,
+      "raw": 1114214,
+      "wire": 23601,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 3922,
+      "snapshots": 1553,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug3p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 3,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug3p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 5,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 5,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 5,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "turns": 12,
+      "ms": 13888,
+      "nachrichten": 2037,
+      "raw": 8095744,
+      "wire": 141431,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 15624,
+      "snapshots": 2528,
+      "hookTimeouts": 0,
+      "gateChecks": 5,
+      "gateSchilde": 1,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 10,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 10,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 10,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 6,
+      "deckA": "To Attain Divinity",
+      "deckB": "Gates to Hell",
+      "turns": 20,
+      "ms": 34325,
+      "nachrichten": 458,
+      "raw": 1458712,
+      "wire": 30858,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 35640,
+      "snapshots": 8428,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 7,
+      "deckA": "Spell Industrialization",
+      "deckB": "Gates to Hell",
+      "turns": 12,
+      "ms": 17702,
+      "nachrichten": 374,
+      "raw": 1206222,
+      "wire": 25965,
+      "grund": "all_heroes_dead",
+      "gewertet": true,
+      "cpuMs": 19499,
+      "snapshots": 3195,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 11,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 12,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 8,
+      "deckA": "Spell Industrialization",
+      "deckB": "Gates to Hell",
+      "turns": 4,
+      "ms": 4677,
+      "nachrichten": 403,
+      "raw": 1338130,
+      "wire": 28685,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 5000,
+      "snapshots": 735,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 1,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        },
+        {
+          "wo": "switchTurn",
+          "zug": 4,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 9,
+      "deckA": "Join our Cult!",
+      "deckB": "Gates to Hell",
+      "turns": 3,
+      "ms": 61,
+      "nachrichten": 154,
+      "raw": 550709,
+      "wire": 13512,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 94,
+      "snapshots": 6,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": null,
+      "stilleHalte": [],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": [
+        {
+          "wo": "switchTurn",
+          "zug": 3,
+          "aktiv": 0,
+          "phase": 2,
+          "grund": "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+        }
+      ]
+    },
+    {
+      "nr": 10,
+      "deckA": "Venom Swamp",
+      "deckB": "Gates to Hell",
+      "turns": 1,
+      "ms": 26,
+      "nachrichten": 107,
+      "raw": 353394,
+      "wire": 10669,
+      "grund": "ohne-spielende",
+      "gewertet": false,
+      "cpuMs": 47,
+      "snapshots": 7,
+      "hookTimeouts": 0,
+      "gateChecks": 0,
+      "gateSchilde": 0,
+      "letzteMarke": "ok:zugende@zug1p1ph3",
+      "stilleHalte": [
+        {
+          "zug": 1,
+          "aktiv": 1,
+          "phaseVorher": 2,
+          "phaseNachher": 3,
+          "marke": "ok:zugende@zug1p1ph3",
+          "noops": 0,
+          "reentry": 0
+        }
+      ],
+      "switchTurnBlocks": [],
+      "startTurnWiederholungen": 0,
+      "startTurnWdhLog": [],
+      "treiberUebersprungen": []
+    }
+  ],
+  "ereignisse": [
+    {
+      "name": "game_state",
+      "count": 1662,
+      "raw": 15523268,
+      "wire": 204114
+    },
+    {
+      "name": "action_log",
+      "count": 1638,
+      "raw": 220426,
+      "wire": 54838
+    },
+    {
+      "name": "play_zone_animation",
+      "count": 182,
+      "raw": 16048,
+      "wire": 6269
+    },
+    {
+      "name": "card_reveal",
+      "count": 199,
+      "raw": 11275,
+      "wire": 4784
+    },
+    {
+      "name": "hand_to_board_fly",
+      "count": 74,
+      "raw": 9827,
+      "wire": 4248
+    },
+    {
+      "name": "play_pile_transfer",
+      "count": 48,
+      "raw": 5586,
+      "wire": 2382
+    },
+    {
+      "name": "ability_activated",
+      "count": 92,
+      "raw": 6388,
+      "wire": 2174
+    },
+    {
+      "name": "deck_search_add",
+      "count": 60,
+      "raw": 3978,
+      "wire": 1543
+    },
+    {
+      "name": "summon_effect",
+      "count": 48,
+      "raw": 4180,
+      "wire": 1489
+    },
+    {
+      "name": "gold_change",
+      "count": 36,
+      "raw": 1476,
+      "wire": 867
+    },
+    {
+      "name": "play_beam_animation",
+      "count": 10,
+      "raw": 1488,
+      "wire": 785
+    },
+    {
+      "name": "game_started",
+      "count": 4,
+      "raw": 1104,
+      "wire": 774
+    },
+    {
+      "name": "potion_resolved",
+      "count": 14,
+      "raw": 1088,
+      "wire": 734
+    },
+    {
+      "name": "qinglong_lightning",
+      "count": 18,
+      "raw": 2250,
+      "wire": 650
+    },
+    {
+      "name": "punch_impact",
+      "count": 16,
+      "raw": 896,
+      "wire": 443
+    },
+    {
+      "name": "burn_tick",
+      "count": 8,
+      "raw": 1442,
+      "wire": 427
+    },
+    {
+      "name": "deck_to_discard_animation",
+      "count": 6,
+      "raw": 660,
+      "wire": 335
+    },
+    {
+      "name": "surprise_flip",
+      "count": 6,
+      "raw": 692,
+      "wire": 326
+    },
+    {
+      "name": "play_hand_steal",
+      "count": 4,
+      "raw": 558,
+      "wire": 303
+    },
+    {
+      "name": "creature_zone_move",
+      "count": 6,
+      "raw": 366,
+      "wire": 136
+    },
+    {
+      "name": "toughness_hp_change",
+      "count": 4,
+      "raw": 248,
+      "wire": 128
+    },
+    {
+      "name": "reaction_chain_link_resolving",
+      "count": 4,
+      "raw": 320,
+      "wire": 126
+    },
+    {
+      "name": "effect_source_glow",
+      "count": 4,
+      "raw": 240,
+      "wire": 125
+    },
+    {
+      "name": "surprise_reset",
+      "count": 6,
+      "raw": 468,
+      "wire": 121
+    },
+    {
+      "name": "play_ram_animation",
+      "count": 2,
+      "raw": 336,
+      "wire": 119
+    },
+    {
+      "name": "reaction_chain_done",
+      "count": 4,
+      "raw": 112,
+      "wire": 112
+    },
+    {
+      "name": "cooldin_terraform",
+      "count": 2,
+      "raw": 190,
+      "wire": 101
+    },
+    {
+      "name": "reaction_chain_resolving_start",
+      "count": 4,
+      "raw": 156,
+      "wire": 100
+    },
+    {
+      "name": "play_permanent_animation",
+      "count": 2,
+      "raw": 228,
+      "wire": 84
+    },
+    {
+      "name": "big_gwen_clock_activation",
+      "count": 2,
+      "raw": 86,
+      "wire": 65
+    },
+    {
+      "name": "reaction_chain_link_resolved",
+      "count": 4,
+      "raw": 316,
+      "wire": 64
+    },
+    {
+      "name": "area_descend",
+      "count": 2,
+      "raw": 156,
+      "wire": 40
+    }
+  ],
+  "empfaenger": [
+    {
+      "sid": "sid-a-netbench-deefe400",
+      "count": 1021,
+      "raw": 4145126,
+      "wire": 71991
+    },
+    {
+      "sid": "sid-b-netbench-deefe400",
+      "count": 1015,
+      "raw": 3950342,
+      "wire": 69247
+    },
+    {
+      "sid": "sid-a-netbench-7e6e4204",
+      "count": 654,
+      "raw": 2586883,
+      "wire": 46009
+    },
+    {
+      "sid": "sid-b-netbench-7e6e4204",
+      "count": 647,
+      "raw": 2468015,
+      "wire": 44349
+    },
+    {
+      "sid": "sid-a-netbench-caaf619e",
+      "count": 233,
+      "raw": 728774,
+      "wire": 15431
+    },
+    {
+      "sid": "sid-b-netbench-caaf619e",
+      "count": 224,
+      "raw": 729662,
+      "wire": 15234
+    },
+    {
+      "sid": "sid-a-netbench-48eb25e5",
+      "count": 190,
+      "raw": 604229,
+      "wire": 13003
+    },
+    {
+      "sid": "sid-b-netbench-48eb25e5",
+      "count": 183,
+      "raw": 601717,
+      "wire": 12768
+    },
+    {
+      "sid": "room:netbench-7e6e4204",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-48eb25e5",
+      "count": 1,
+      "raw": 276,
+      "wire": 194
+    },
+    {
+      "sid": "room:netbench-deefe400",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    },
+    {
+      "sid": "room:netbench-caaf619e",
+      "count": 1,
+      "raw": 276,
+      "wire": 193
+    }
+  ],
+  "summe": {
+    "count": 4171,
+    "raw": 15815852,
+    "wire": 288806
+  },
+  "groesste_nachricht": {
+    "bytes": 15170,
+    "event": "game_state"
+  },
+  "broadcasts": {
+    "count": 4,
+    "raw": 1100
+  },
+  "auffaellige_partien": [
+    {
+      "partie": 2,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 2 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 2 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1100hp, deck 52, hand 7) | p1(heroes 3/3 alive, 1100hp, deck 52, hand 2) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 3,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1040hp, deck 45, hand 5) | p1(heroes 3/3 alive, 580hp, deck 42, hand 6) | turn 5 phase 0 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 4,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 5 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 5 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [CPU] STILLER HALT: Zug 3 p1 Phase 2→3 — ok:zugende@zug3p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1200hp, deck 50, hand 7) | p1(heroes 3/3 alive, 1200hp, deck 49, hand 4) | turn 3 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 8,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p1, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p1 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 4 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 4 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1000hp, deck 52, hand 3) | p1(heroes 3/3 alive, 570hp, deck 42, hand 6) | turn 4 phase 3 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 9,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Klaus, the Cult Leader\" → Theme \"klaus\" (48 Themes im Ordner)",
+        "[warn] [Engine] ROLLOUT-FAHNE GELECKT: _inMctsSim steht bei Rollout-Tiefe 0 (Zug 3 p0, fastMode=true) — GameEngine.startTurn@_engine.js:13396 ← GameEngine._switchTurnInner@_engine.js:14384 ← async@_engine.js:14126 ← async@_engine.js:13797",
+        "[warn] [Engine] TREIBER UEBERSPRUNGEN (switchTurn): Zug 3 p0 Phase 2 — _inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1250hp, deck 52, hand 5) | p1(heroes 3/3 alive, 900hp, deck 42, hand 7) | turn 3 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    },
+    {
+      "partie": 10,
+      "grund": "ohne-spielende",
+      "letzteZeilen": [
+        "[bgm] CPU-Gegner \"Silent Water Mizune\" → Theme \"mizune\" (48 Themes im Ordner)",
+        "[warn] [CPU] STILLER HALT: Zug 1 p1 Phase 2→3 — ok:zugende@zug1p1ph3"
+      ],
+      "diagnose": "p0(heroes 3/3 alive, 1250hp, deck 55, hand 5) | p1(heroes 3/3 alive, 1200hp, deck 50, hand 7) | turn 1 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty",
+      "treiberFehler": []
+    }
+  ],
+  "gate_statistik": [
+    {
+      "nr": 1,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 4,
+      "schilde": 0
+    },
+    {
+      "nr": 2,
+      "deckA": "Sacrificial Demons",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 2,
+      "schilde": 0
+    },
+    {
+      "nr": 3,
+      "deckA": "Venom Swamp",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 4,
+      "deckA": "Gather That Storm!",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 5,
+      "deckA": "Steam Dwarf Mines",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 5,
+      "schilde": 1
+    },
+    {
+      "nr": 6,
+      "deckA": "To Attain Divinity",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 7,
+      "deckA": "Spell Industrialization",
+      "deckB": "Gates to Hell",
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 8,
+      "deckA": "Spell Industrialization",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 9,
+      "deckA": "Join our Cult!",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    },
+    {
+      "nr": 10,
+      "deckA": "Venom Swamp",
+      "deckB": "Gates to Hell",
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "checks": 0,
+      "schilde": 0
+    }
+  ],
+  "uebergabe_statistik": [
+    {
+      "nr": 1,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 2,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 2,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 3,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 4,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 5,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 6,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 7,
+      "gewertet": true,
+      "grund": "all_heroes_dead",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 8,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 5,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 5,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 9,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 1,
+      "skipGruende": [
+        "_inMctsSim stand noch (Rollout-Fahne geleckt, fastMode=true rolloutDepth=0)"
+      ],
+      "fahnenLecks": 1,
+      "tiefeEnde": 0
+    },
+    {
+      "nr": 10,
+      "gewertet": false,
+      "grund": "ohne-spielende",
+      "reentry": 0,
+      "noops": 0,
+      "doppelstart": 0,
+      "treiberSkips": 0,
+      "skipGruende": [],
+      "fahnenLecks": 0,
+      "tiefeEnde": 0
+    }
+  ],
+  "kandidaten_heap": {
+    "Adventurousness": {
+      "rollouts": 2059,
+      "mbGesamt": 827.07,
+      "mbProRollout": 0.4017,
+      "ueberSchwelle": 74
+    },
+    "Steam Dwarf Miner": {
+      "rollouts": 256,
+      "mbGesamt": 81.09,
+      "mbProRollout": 0.3167,
+      "ueberSchwelle": 0
+    },
+    "Demon's Gate": {
+      "rollouts": 611,
+      "mbGesamt": 241.74,
+      "mbProRollout": 0.3957,
+      "ueberSchwelle": 21
+    },
+    "Steam Dwarf Exterminator": {
+      "rollouts": 80,
+      "mbGesamt": 47.79,
+      "mbProRollout": 0.5973,
+      "ueberSchwelle": 0
+    },
+    "Ska Harpyformer": {
+      "rollouts": 60,
+      "mbGesamt": -0.57,
+      "mbProRollout": -0.0095,
+      "ueberSchwelle": 0
+    },
+    "Chosen Sacrifice": {
+      "rollouts": 80,
+      "mbGesamt": 4.32,
+      "mbProRollout": 0.054,
+      "ueberSchwelle": 37
+    },
+    "Poison Pollen": {
+      "rollouts": 9,
+      "mbGesamt": 24.91,
+      "mbProRollout": 2.7674,
+      "ueberSchwelle": 4
+    },
+    "Stinky Stables": {
+      "rollouts": 5,
+      "mbGesamt": 5.15,
+      "mbProRollout": 1.0292,
+      "ueberSchwelle": 1
+    },
+    "The Warlord's Bite": {
+      "rollouts": 66,
+      "mbGesamt": 25.32,
+      "mbProRollout": 0.3837,
+      "ueberSchwelle": 40
+    },
+    "Steam Dwarf Diver": {
+      "rollouts": 128,
+      "mbGesamt": 47.8,
+      "mbProRollout": 0.3734,
+      "ueberSchwelle": 2
+    },
+    "Phoenix Tackle": {
+      "rollouts": 30,
+      "mbGesamt": -9.29,
+      "mbProRollout": -0.3098,
+      "ueberSchwelle": 11
+    },
+    "Chain Lightning": {
+      "rollouts": 326,
+      "mbGesamt": 72.48,
+      "mbProRollout": 0.2223,
+      "ueberSchwelle": 59
+    },
+    "Prophecy of Tempeste": {
+      "rollouts": 204,
+      "mbGesamt": 72.99,
+      "mbProRollout": 0.3578,
+      "ueberSchwelle": 0
+    },
+    "Guardian Angel": {
+      "rollouts": 151,
+      "mbGesamt": 2.14,
+      "mbProRollout": 0.0141,
+      "ueberSchwelle": 0
+    },
+    "Eraser Beam": {
+      "rollouts": 239,
+      "mbGesamt": 31.66,
+      "mbProRollout": 0.1325,
+      "ueberSchwelle": 61
+    },
+    "Pyroblast": {
+      "rollouts": 300,
+      "mbGesamt": 57.45,
+      "mbProRollout": 0.1915,
+      "ueberSchwelle": 31
+    }
+  },
+  "unterdrueckte_ausgabezeilen": 714,
+  "cpu_ms_gesamt": 107843,
+  "hook_feuer_je_karte": {
+    "Treasure Huntress Semi": 106,
+    "Elixir of Immortality": 72,
+    "Creativity": 58,
+    "Ingo, Investor of Evil": 57,
+    "Layn, Defender of Deri": 50,
+    "Wealth": 49,
+    "Steam Dwarf Miner": 48,
+    "Performance": 48,
+    "Archibald, the Archmage": 35,
+    "Prophecy of Tempeste": 24,
+    "Ska Harpyformer": 21,
+    "Barker, the Monster Tamer": 20,
+    "The Great Clock Tower \"Big Gwen\"": 18,
+    "Steam Dwarf Exterminator": 12,
+    "Fiona, the Princess of Blackport": 12,
+    "Pollution Token": 12,
+    "Nicolas, the Hidden Alchemist": 11,
+    "Toughness": 10,
+    "Zsos'Ssar, the Serpent Warlord": 10,
+    "Steam Dwarf Diver": 10,
+    "Guardian Angel": 10,
+    "Glass of Marbles": 8,
+    "Eraser Beam": 8,
+    "Mystery Box": 5,
+    "Pollution Spewer": 5,
+    "Divine Gift of Fire": 4,
+    "Medea, the Swamp Witch": 4,
+    "Pollution Piranha": 4,
+    "Tarleinn the Traveler": 3,
+    "Chain Lightning": 3,
+    "Pyroblast": 3,
+    "Chosen Sacrifice": 2,
+    "Chaorc Corpse Cannibal": 2,
+    "Chaorc Rider Warg": 2,
+    "Sacrifice to Divinity": 2,
+    "Chaorc Ruin Mourner": 1,
+    "Temple of Sacrifice": 1,
+    "Cannibalism": 1,
+    "The Warlord's Bite": 1,
+    "Rap Harpyformer": 1,
+    "Divine Gift of the Guardian": 1
+  },
+  "leckende_rollouts": {
+    "Adventurousness": 74,
+    "Eraser Beam": 61,
+    "Chain Lightning": 59,
+    "The Warlord's Bite": 40,
+    "Chosen Sacrifice": 37,
+    "Pyroblast": 31,
+    "Demon's Gate": 21,
+    "Phoenix Tackle": 11,
+    "Poison Pollen": 4,
+    "Steam Dwarf Diver": 2,
+    "Stinky Stables": 1
+  },
+  "abgebrochene_hooks": {},
+  "spielstart_griffe": {
+    "Barker, the Monster Tamer → Ska Harpyformer [rule]": 1
+  },
+  "notbremsen": {},
+  "steam_dwarf_zaehlwerk": {
+    "aufgerufen": 9360,
+    "raus_fremd": 3777,
+    "miner_zugenden": 1376,
+    "miner_karten_gesamt": 2769,
+    "miner_groesster_zug": 3,
+    "miner_hoechste_hp": 350,
+    "gefeuert": 1856,
+    "maxHp_hoechster": 350,
+    "delay_ms": 278400,
+    "raus_hopt": 3727
+  },
+  "overheal_shock": [],
+  "heil_zielwahl": {},
+  "shock_entfernt": {
+    "gesamt": 0,
+    "wirtLebte": 0
+  },
+  "deck_kosten": [
+    {
+      "name": "To Attain Divinity",
+      "cpuMs": 17820,
+      "partien": 1,
+      "abbrueche": 0,
+      "proPartie": 17820
+    },
+    {
+      "name": "Steam Dwarf Mines",
+      "cpuMs": 16741.5,
+      "partien": 2,
+      "abbrueche": 0,
+      "proPartie": 8370.75
+    },
+    {
+      "name": "Spell Industrialization",
+      "cpuMs": 12249.5,
+      "partien": 2,
+      "abbrueche": 1,
+      "proPartie": 6124.75
+    },
+    {
+      "name": "Gates to Hell",
+      "cpuMs": 53921.5,
+      "partien": 10,
+      "abbrueche": 6,
+      "proPartie": 5392.15
+    },
+    {
+      "name": "Sacrificial Demons",
+      "cpuMs": 2782,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 2782
+    },
+    {
+      "name": "Gather That Storm!",
+      "cpuMs": 1961,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 1961
+    },
+    {
+      "name": "Venom Swamp",
+      "cpuMs": 2320.5,
+      "partien": 2,
+      "abbrueche": 2,
+      "proPartie": 1160.25
+    },
+    {
+      "name": "Join our Cult!",
+      "cpuMs": 47,
+      "partien": 1,
+      "abbrueche": 1,
+      "proPartie": 47
+    }
+  ],
+  "hochrechnung": {
+    "wire_je_partie": 72201.5,
+    "roh_je_partie": 3953963,
+    "wire_je_verbindung": 36100.75,
+    "wire_je_halbzug": 5553.961538461538,
+    "kompressionsfaktor": 54.762892737685505
+  }
+}

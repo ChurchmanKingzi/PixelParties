@@ -1,0 +1,22 @@
+# Ressourcengruppe für den Spielbetrieb.
+#
+# Der Sinn der beiden Slices: Ein entgleister Trainingslauf darf den
+# Spielserver nicht mitreißen. Der Kernel entscheidet bei Knappheit
+# anhand von CPUWeight, wer Rechenzeit bekommt — 800 gegen 100 heißt,
+# dass der Spielbetrieb rund das Achtfache zugeteilt bekommt.
+#
+# Zahlen für RS 1000 G12 (4 Kerne, 8 GB). Bei einem größeren Tarif
+# beide Slices anheben.
+
+[Unit]
+Description=Pixel Parties — Spielbetrieb
+Before=slices.target
+
+[Slice]
+# MemoryHigh drosselt (der Kernel fängt an zu recyceln), MemoryMax
+# tötet. Der Abstand dazwischen ist der Puffer, in dem ein Speicherleck
+# auffällt, bevor es den Prozess umbringt.
+MemoryHigh=3G
+MemoryMax=4G
+CPUWeight=800
+IOWeight=800

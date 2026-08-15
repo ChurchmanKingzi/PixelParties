@@ -1,0 +1,193 @@
+═══ BANDBREITEN-MESSSTAND ═══
+Partien: 10 | Zuschauer je Partie: 0 | Pausen: uebersprungen
+Grenzen: Denkzeit/Zug 30 s | Zeitlimit/Partie 600 s | Stillstand ab 90 s | Halbzuege max 400 | Rollout-Brain evalGreedy | Deck-Profile AN
+Gemessen wird der AUSGEHENDE Verkehr an 2 Spieler je Partie.
+
+  Partie   1/10    7 Halbzuege    1114 Nachrichten     4.10 MB roh  →    0.075 MB Leitung    15 s    18 s CPU  ⚠ ohne-spielende  Bamboo Warrior vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 950hp, deck 33, hand 8) | p1(heroes 3/3 alive, 460hp, deck 36, hand 10) | turn 7 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 25 Engine-Zeilen vor dem Abbruch:
+       [deck-profile] loaded "Great Weapon Master" (great-weapon-master.json): 18 card values, 18 pairs, 10 ability priors, trained on 1360 games (win-rate 46.6%)
+       [deck-profile] loaded "Guardians of the Treasure Cave" (guardians-of-the-treasure-cave.json): 19 card values, 19 pairs, 20 ability priors, trained on 1292 games (win-rate 49.4%)
+       [deck-profile] loaded "Heal Burn" (heal-burn.json): 20 card values, 1 pairs, 24 ability priors, trained on 1392 games (win-rate 58.1%)
+       [deck-profile] loaded "Idej Illusions" (idej-illusions.json): 11 card values, 29 pairs, 22 ability priors, trained on 1360 games (win-rate 31%)
+       [deck-profile] loaded "Join our Cult!" (join-our-cult.json): 17 card values, 16 pairs, 33 ability priors, trained on 1360 games (win-rate 62.2%)
+       [deck-profile] loaded "Lightning Caller" (lightning-caller.json): 13 card values, 11 pairs, 14 ability priors, trained on 1360 games (win-rate 74.3%)
+       [deck-profile] loaded "Man's Best Friends" (man-s-best-friends.json): 17 card values, 3 pairs, 25 ability priors, trained on 1360 games (win-rate 45.4%)
+       [deck-profile] loaded "Mawstruck" (mawstruck.json): 21 card values, 8 pairs, 24 ability priors, trained on 1268 games (win-rate 22.9%)
+       [deck-profile] loaded "Morph and Kill!" (morph-and-kill.json): 21 card values, 16 pairs, 27 ability priors, trained on 654 games (win-rate 30.1%)
+       [deck-profile] loaded "One-Two-Punch!" (one-two-punch.json): 13 card values, 1 pairs, 22 ability priors, trained on 1360 games (win-rate 51.5%)
+       [deck-profile] loaded "Parts of the Soul" (parts-of-the-soul.json): 13 card values, 9 pairs, 27 ability priors, trained on 1360 games (win-rate 35.4%)
+       [deck-profile] loaded "Pew-Pew!" (pew-pew.json): 16 card values, 2 pairs, 16 ability priors, trained on 1292 games (win-rate 59%)
+       [deck-profile] loaded "Poison Torture" (poison-torture.json): 17 card values, 5 pairs, 26 ability priors, trained on 1292 games (win-rate 71.7%)
+       [deck-profile] loaded "Sacrificial Demons" (sacrificial-demons.json): 17 card values, 0 pairs, 17 ability priors, trained on 1148 games (win-rate 38.9%)
+       [deck-profile] loaded "Shadows over Blackport" (shadows-over-blackport.json): 20 card values, 9 pairs, 32 ability priors, trained on 394 games (win-rate 27.7%)
+       [deck-profile] loaded "Shifting Sandlands" (shifting-sandlands.json): 17 card values, 0 pairs, 21 ability priors, trained on 1292 games (win-rate 68.4%)
+       [deck-profile] loaded "Slimy Infestation" (slimy-infestation.json): 21 card values, 13 pairs, 22 ability priors, trained on 1393 games (win-rate 44.1%)
+       [deck-profile] loaded "Slip 'n Slide" (slip-n-slide.json): 13 card values, 176 pairs, 9 ability priors, trained on 1291 games (win-rate 33.3%)
+       [deck-profile] loaded "Spell Industrialization" (spell-industrialization.json): 14 card values, 28 pairs, 26 ability priors, trained on 1292 games (win-rate 49.1%)
+       [deck-profile] loaded "Steam Dwarf Mines" (steam-dwarf-mines.json): 14 card values, 4 pairs, 27 ability priors, trained on 1233 games (win-rate 68.9%)
+       [deck-profile] loaded "Suicide Bombers" (suicide-bombers.json): 17 card values, 6 pairs, 8 ability priors, trained on 1292 games (win-rate 65%)
+       [deck-profile] loaded "Sun Fencer Frenzy" (sun-fencer-frenzy.json): 13 card values, 4 pairs, 38 ability priors, trained on 1360 games (win-rate 59.4%)
+       [deck-profile] loaded "To Attain Divinity" (to-attain-divinity.json): 10 card values, 13 pairs, 22 ability priors, trained on 1292 games (win-rate 51.8%)
+       [deck-profile] loaded "Venom Swamp" (venom-swamp.json): 21 card values, 13 pairs, 10 ability priors, trained on 1292 games (win-rate 70%)
+       [heap-guard] V8-Limit 4144 MB → Schwellen: heapUsed>2486 MB, heapTotal>2984 MB, rss>3315+25 MB (inkl. Grundlast) | jetzt rss=90 heapTotal=65 heapUsed=40
+  Partie   2/10   13 Halbzuege    2149 Nachrichten     8.34 MB roh  →    0.143 MB Leitung    12 s    16 s CPU  Creepy Crawlies vs Gates to Hell
+  Partie   3/10    1 Halbzuege      91 Nachrichten     0.30 MB roh  →    0.009 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Idej Illusions vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1000hp, deck 52, hand 5) | p1(heroes 3/3 alive, 1050hp, deck 50, hand 3) | turn 1 phase 4 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   4/10   11 Halbzuege    1892 Nachrichten     7.08 MB roh  →    0.125 MB Leitung    35 s    38 s CPU  Cute Commando vs Gates to Hell
+  Partie   5/10   19 Halbzuege    1462 Nachrichten     5.95 MB roh  →    0.100 MB Leitung    59 s    60 s CPU  ⚠ ohne-spielende  Grand Rebellion! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 2/3 alive, 425hp, deck 31, hand 6) | p1(heroes 3/3 alive, 900hp, deck 26, hand 7) | turn 19 phase 2 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   6/10    6 Halbzuege     809 Nachrichten     3.06 MB roh  →    0.058 MB Leitung    17 s    19 s CPU  ⚠ ohne-spielende  Deepsea Terror vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1250hp, deck 48, hand 3) | p1(heroes 3/3 alive, 1100hp, deck 37, hand 9) | turn 6 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Siphem, the Deepsea Demon" → Theme "siphem" (48 Themes im Ordner)
+  Partie   7/10    2 Halbzuege     293 Nachrichten     0.86 MB roh  →    0.020 MB Leitung     8 s     8 s CPU  ⚠ ohne-spielende  Boom Boom Kaboom! vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1300hp, deck 49, hand 6) | p1(heroes 3/3 alive, 1100hp, deck 49, hand 5) | turn 2 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Andras, the Human Weapon" → Theme "andras" (48 Themes im Ordner)
+  Partie   8/10    2 Halbzuege     137 Nachrichten     0.40 MB roh  →    0.011 MB Leitung     0 s     0 s CPU  ⚠ ohne-spielende  Shifting Sandlands vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 53, hand 7) | p1(heroes 3/3 alive, 1000hp, deck 49, hand 3) | turn 2 phase 2 active p0 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie   9/10    5 Halbzuege     619 Nachrichten     2.18 MB roh  →    0.041 MB Leitung    21 s    21 s CPU  ⚠ ohne-spielende  Slimy Infestation vs Gates to Hell
+     ↳ Diagnose: p0(heroes 3/3 alive, 1200hp, deck 52, hand 4) | p1(heroes 3/3 alive, 1050hp, deck 41, hand 10) | turn 5 phase 3 active p1 | cause: turn chain exited with both sides alive and decks non-empty
+     ↳ letzte 1 Engine-Zeilen vor dem Abbruch:
+       [bgm] CPU-Gegner "Silent Water Mizune" → Theme "mizune" (48 Themes im Ordner)
+  Partie  10/10   53 Halbzuege    4224 Nachrichten    17.38 MB roh  →    0.286 MB Leitung    25 s    26 s CPU  Depths of the Cosmos vs Gates to Hell
+
+[netbench] 57 Engine-Ausgabezeilen unterdrueckt (mit --verbose sichtbar).
+
+═══ GRÖSSTE BANDBREITEN-FRESSER (nach Leitungsbytes; Basis: 3 gewertete Partien) ═══
+  Anteil  Leitung/Partie   roh/Partie   Nachrichten  Ø roh   Kompression  Ereignis
+   71.6%      135.3 KB    11017.9 KB       1157    9.52 KB       98.8%  game_state
+   19.7%       37.2 KB      142.5 KB       1139    0.13 KB       73.9%  action_log
+    2.3%        4.4 KB        9.7 KB        111    0.09 KB       55.0%  play_zone_animation
+    1.3%        2.5 KB        5.7 KB        104    0.05 KB       56.0%  card_reveal
+    1.0%        1.9 KB        4.3 KB         37    0.11 KB       54.8%  play_pile_transfer
+    0.9%        1.6 KB        3.6 KB         28    0.13 KB       54.1%  hand_to_board_fly
+    0.7%        1.3 KB        3.5 KB         49    0.07 KB       62.3%  ability_activated
+    0.4%        0.8 KB        2.1 KB         26    0.08 KB       64.3%  summon_effect
+    0.4%        0.8 KB        1.7 KB         27    0.06 KB       55.6%  deck_search_add
+    0.2%        0.4 KB        0.7 KB          9    0.08 KB       42.3%  potion_resolved
+    0.2%        0.4 KB        0.9 KB          8    0.11 KB       53.2%  surprise_flip
+    0.2%        0.3 KB        0.6 KB         15    0.04 KB       41.2%  gold_change
+    0.2%        0.3 KB        0.7 KB          4    0.17 KB       52.7%  play_card_transfer
+    0.2%        0.3 KB        0.7 KB         10    0.07 KB       52.6%  effect_source_glow
+    0.1%        0.3 KB        0.7 KB          6    0.12 KB       65.4%  qinglong_lightning
+  … und 16 weitere Ereignisarten
+
+═══ JE EMPFÄNGER ═══
+  Spieler         94.5 KB Leitung je Verbindung und Partie  (5598.8 KB roh)
+
+═══ HOCHRECHNUNG ═══
+  Ø je Partie:            10.94 MB roh  →  0.185 MB auf der Leitung
+  Ø je Verbindung:        94.5 KB
+  Ø je Halbzug (alle):    7.36 KB
+  Singleplayer (1 Client): ~94.5 KB je Partie
+  PvP (2 Clients):         ~189.0 KB je Partie
+  je zusätzlichem Zuschauer: ~94.5 KB je Partie
+  In 5 GB passen:          ~55.477 Singleplayer-Partien
+                           ~27.738 PvP-Partien
+  OHNE Kompression wären es 936 bzw. 468 — Faktor 59.2
+  Größte Einzelnachricht:  14.5 KB (game_state)
+
+═══ RECHENZEIT ═══
+  Gesamt ueber alle 10 Partien: 3.4 min CPU
+     60 s  bei  19 Halbzuegen (3.1 s/Halbzug)   ⚠ Grand Rebellion! vs Gates to Hell
+     38 s  bei  11 Halbzuegen (3.4 s/Halbzug)     Cute Commando vs Gates to Hell
+     26 s  bei  53 Halbzuegen (0.5 s/Halbzug)     Depths of the Cosmos vs Gates to Hell
+     21 s  bei   5 Halbzuegen (4.2 s/Halbzug)   ⚠ Slimy Infestation vs Gates to Hell
+     19 s  bei   6 Halbzuegen (3.1 s/Halbzug)   ⚠ Deepsea Terror vs Gates to Hell
+
+═══ TEUERSTE DECKS (Rechenzeit je Partie, halbiert auf beide Seiten) ═══
+   s/Partie  Partien  Abbrueche  Deck
+         30        1          1  Grand Rebellion!
+         19        1          0  Cute Commando
+         13        1          0  Depths of the Cosmos
+         10        1          1  Slimy Infestation
+         10       10          7  Gates to Hell
+          9        1          1  Deepsea Terror
+          9        1          1  Bamboo Warrior
+          8        1          0  Creepy Crawlies
+          4        1          1  Boom Boom Kaboom!
+          0        1          1  Shifting Sandlands
+  → Abbrueche haeufen sich bei: Grand Rebellion! (1), Slimy Infestation (1), Gates to Hell (7), Deepsea Terror (1), Bamboo Warrior (1), Boom Boom Kaboom! (1), Shifting Sandlands (1), Idej Illusions (1)
+
+═══ HOOK-FEUER JE KARTE (Top 15) ═══
+      165   13.6%  Treasure Huntress Semi
+      120    9.9%  Glass of Marbles
+      118    9.8%  Giga Steroids
+      107    8.9%  Cute Cat
+       70    5.8%  Cute Dog
+       63    5.2%  Creativity
+       53    4.4%  Argos, the Eye of the Cosmos
+       52    4.3%  Skull Necklace
+       48    4.0%  Invader Token
+       39    3.2%  Fighting
+       32    2.6%  Elixir of Immortality
+       27    2.2%  Rebelliokai Backup Bakus
+       25    2.1%  Performance
+       24    2.0%  Harpyformer Choir
+       17    1.4%  Lizbeth, the Reaper of the Light
+
+═══ SPIELSTART-GRIFFE (vom Lernkanal beantwortet) ═══
+  Quelle `priority` = harte Skript-Vorfahrt, `rule` = gelernte Profilwerte,
+  `explore` = Training. Jeder Eintrag hier ist ein Griff, der die MCTS-Suche
+  GAR NICHT erreicht hat.
+     1x  Barker, the Monster Tamer → Deepsea Primordium [priority]
+     1x  Barker, the Monster Tamer → Sparky Slime [rule]
+
+═══ ROLLOUTS MIT HOHEM SPEICHERUMSATZ ═══
+  Gemessen wird der heapUsed-Unterschied um Snapshot/Restore, ab 0,5 MB.
+  ACHTUNG BEI DER DEUTUNG: darin steckt auch noch nicht eingesammelter Muell.
+  Bleibt der Speicher ueber die Partie flach, ist es GC-DRUCK, kein Leck —
+  teuer ist es trotzdem, weil jeder Rollout diesen Umsatz erneut erzeugt.
+  Ein echtes Leck erkennt man daran, dass rss/heapUsed mitwaechst.
+    117x  Adventurousness
+     55x  Critical Strike
+     54x  Demon's Gate
+     23x  Deepsea Pirate
+     21x  Deepsea Primordium
+     21x  Icy Slime
+     12x  Shadowy Slime
+     11x  Slime Rancher
+      7x  Gerrymander
+
+═══ KOSTEN JE MCTS-KANDIDAT ═══
+  Heap-Umsatz um Snapshot/Restore, aufsummiert je Kandidat. Dieselbe
+  Messgroesse wie oben — hier aber MIT der Zahl der Rollouts, sodass
+  Haeufigkeit und Stueckkosten auseinanderzuhalten sind.
+   Rollouts     MB ges   MB/Rollout   ueber 0,5 MB  Kandidat
+       883      475.7        0.539            54  Demon's Gate
+      1206      372.3        0.309           117  Adventurousness
+       176      160.4        0.911            55  Critical Strike
+        66      145.6        2.206             0  Rebelliokai Terror Tengu
+        93       99.2        1.067             0  Analyzer from the Cosmic Depths
+        67       92.9        1.386             0  Forceful Revival
+        78       88.0        1.129             0  Champion, the Stormbringer
+       119       85.4        0.717            23  Deepsea Pirate
+        73       70.8        0.969            21  Icy Slime
+       132       56.2        0.426             0  Cute Dog
+       118       45.8        0.388             7  Gerrymander
+       219       43.0        0.196             0  Rain of Arrows
+        30       32.2        1.072             0  Kappa Sword Slash
+        49       28.9        0.589             0  Cute Bird
+        27       20.2        0.746             0  Kirin Firebreath
+  Broadcasts an ALLE:      3 Stück, 0.3 KB/Partie roh — live × Anzahl verbundener Clients
+
+═══ EINZELPARTIEN ═══
+  Nr  Halbzuege  Nachrichten     roh MB   Leitung MB     s  s CPU  gewertet  Grund              Decks
+   1          7         1114       4.10        0.075    15     18      NEIN  ohne-spielende     Bamboo Warrior vs Gates to Hell
+   2         13         2149       8.34        0.143    12     16        ja  all_heroes_dead    Creepy Crawlies vs Gates to Hell
+   3          1           91       0.30        0.009     0      0      NEIN  ohne-spielende     Idej Illusions vs Gates to Hell
+   4         11         1892       7.08        0.125    35     38        ja  all_heroes_dead    Cute Commando vs Gates to Hell
+   5         19         1462       5.95        0.100    59     60      NEIN  ohne-spielende     Grand Rebellion! vs Gates to Hell
+   6          6          809       3.06        0.058    17     19      NEIN  ohne-spielende     Deepsea Terror vs Gates to Hell
+   7          2          293       0.86        0.020     8      8      NEIN  ohne-spielende     Boom Boom Kaboom! vs Gates to Hell
+   8          2          137       0.40        0.011     0      0      NEIN  ohne-spielende     Shifting Sandlands vs Gates to Hell
+   9          5          619       2.18        0.041    21     21      NEIN  ohne-spielende     Slimy Infestation vs Gates to Hell
+  10         53         4224      17.38        0.286    25     26        ja  all_heroes_dead    Depths of the Cosmos vs Gates to Hell
