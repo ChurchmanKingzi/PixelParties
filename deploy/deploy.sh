@@ -61,7 +61,20 @@ as_svc npm run build
 # alle angemeldeten Spieler ab. Das war auf Render genauso — aber
 # es ist ein Grund, nicht mitten am Abend auszurollen.
 log "Dienst neu starten"
+# Die Unit-Dateien liegen als Symlink im Repo und koennen sich mit jedem
+# Ausrollen aendern; ohne daemon-reload benutzt systemd die alte Fassung
+# aus dem Speicher weiter und warnt nur beilaeufig.
+systemctl daemon-reload
 systemctl restart "$SERVICE"
+
+# Gleiches gilt fuer das Caddyfile: auch versioniert, auch nicht von
+# selbst neu eingelesen.
+if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+	systemctl reload caddy || warn "Caddy-Reload fehlgeschlagen — bitte pruefen."
+else
+	warn "Caddyfile ist fehlerhaft — Caddy wurde NICHT neu geladen."
+	warn "Pruefen mit: caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile"
+fi
 
 # ── 4. Gesundheitsprüfung ─────────────────────────────────────
 log "Warten, bis der Server antwortet"

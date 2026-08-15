@@ -167,6 +167,22 @@ else
 	printf '\033[1;33m  dieses Skript erneut laufen lassen.\033[0m\n'
 fi
 
+# ── 11. fail2ban — ZULETZT ────────────────────────────────────
+# Es wurde oben mit installiert und dabei von apt automatisch gestartet.
+# Waehrend der Einrichtung ist das falsch herum: Der Waechter sperrt IPs
+# nach fehlgeschlagenen Anmeldungen aus — und fehlgeschlagene Anmeldungen
+# sind genau das, womit in dieser Phase zu rechnen ist. Er laeuft deshalb
+# erst, wenn der Schluessel-Login nachweislich funktioniert.
+if [ -s "$ADMIN_KEYS" ]; then
+	log "fail2ban aktivieren"
+	systemctl enable --now fail2ban >/dev/null 2>&1 || true
+else
+	log "fail2ban vorerst stilllegen (kein funktionierender Login vorhanden)"
+	systemctl stop fail2ban >/dev/null 2>&1 || true
+	printf '\033[1;33m! fail2ban laeuft NICHT. Es wird beim naechsten Lauf dieses\033[0m\n'
+	printf '\033[1;33m  Skripts gestartet, sobald der SSH-Schluessel hinterlegt ist.\033[0m\n'
+fi
+
 log "Grundeinrichtung fertig."
 cat <<EOF
 

@@ -10,8 +10,11 @@ Description=Pixel Parties — Trainingsläufe (nachrangig)
 Before=slices.target
 
 [Slice]
-MemoryHigh=3G
-MemoryMax=3500M
+# Muss über PP_TRAIN_HEAP_MAX (3072) plus Node-Grundlast liegen, sonst
+# killt der Kernel den Kindprozess, bevor V8 sein eigenes Limit meldet —
+# wortloser Abbruch statt Stacktrace.
+MemoryHigh=3500M
+MemoryMax=4G
 # 300% = drei von vier Kernen. Der vierte bleibt dem Spiel.
 CPUQuota=300%
 CPUWeight=100

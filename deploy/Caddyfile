@@ -13,7 +13,7 @@
 
 {
 	# Adresse für Ablaufwarnungen von Let's Encrypt. MUSS gesetzt werden.
-	email alexander.schiffke@t-online.de
+	email DEINE-MAILADRESSE
 }
 
 (pixelparties) {
@@ -34,14 +34,17 @@
 	}
 }
 
-pixelpartiestcg.com {
-	import pixelparties
-}
-
-www.pixelpartiestcg.com {
-	redir https://pixelpartiestcg.com{uri} permanent
-}
-
+# ── STUFE 1+2: Testbetrieb parallel zu Render ─────────────────
 neu.pixelpartiestcg.com {
 	import pixelparties
 }
+
+# ── STUFE 3: Umschaltung ──────────────────────────────────────
+# Erst einkommentieren, wenn der A-Record von pixelpartiestcg.com
+# tatsächlich auf diesen Server zeigt. Vorher scheitert die
+# Zertifikatsausstellung — Let's Encrypt prüft über genau diesen
+# Namen — und Caddy läuft in eine Wiederholungsschleife.
+#
+# pixelpartiestcg.com, www.pixelpartiestcg.com {
+# 	import pixelparties
+# }

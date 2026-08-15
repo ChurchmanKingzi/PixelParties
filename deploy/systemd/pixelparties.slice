@@ -5,8 +5,10 @@
 # anhand von CPUWeight, wer Rechenzeit bekommt — 800 gegen 100 heißt,
 # dass der Spielbetrieb rund das Achtfache zugeteilt bekommt.
 #
-# Zahlen für RS 1000 G12 (4 Kerne, 8 GB). Bei einem größeren Tarif
-# beide Slices anheben.
+# Zahlen für RS 1000 G12 (4 Kerne, 8 GB). Der Spielserver ist per
+# NODE_OPTIONS ohnehin auf 2560 MB Heap gedeckelt und braucht im Alltag
+# weit weniger; die Grenzen hier sind bewusst niedriger als früher,
+# damit für die Trainingsläufe echter Platz bleibt.
 
 [Unit]
 Description=Pixel Parties — Spielbetrieb
@@ -16,7 +18,7 @@ Before=slices.target
 # MemoryHigh drosselt (der Kernel fängt an zu recyceln), MemoryMax
 # tötet. Der Abstand dazwischen ist der Puffer, in dem ein Speicherleck
 # auffällt, bevor es den Prozess umbringt.
-MemoryHigh=3G
-MemoryMax=4G
+MemoryHigh=1500M
+MemoryMax=3G
 CPUWeight=800
 IOWeight=800
