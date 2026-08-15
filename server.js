@@ -1,3 +1,42 @@
+// ── Minimal .env loader (no dependency) ──────────────────────────
+//  MUSS VOR ALLEN LOKALEN require() STEHEN. (15.8., netcup-Umzug)
+//
+//  Dieser Block stand bis v387 UNTER `const db = require('./db')`.
+//  Das war ein latenter Fehler: db.js entscheidet BEIM LADEN, in seinem
+//  Modulrumpf, ob es sich mit Turso oder mit einer lokalen SQLite-Datei
+//  verbindet —
+//      const isRemote = !!(TURSO_DATABASE_URL && TURSO_AUTH_TOKEN)
+//  — und zu diesem Zeitpunkt war die .env noch nicht eingelesen. Der
+//  Server startete dann kommentarlos gegen eine leere lokale Datenbank.
+//
+//  Auf Render ist das nie aufgefallen, weil die Zugangsdaten dort echte
+//  Umgebungsvariablen der Plattform waren und schon vor dem Node-Start
+//  existierten. Erst mit dem Umzug auf eine .env-Datei kam es heraus.
+//
+//  Gleiches gilt fuer cards/effects/_engine.js, das auf Modulebene
+//  PP_DMG_CAP liest. Der Loader gehoert deshalb VOR JEDEN require.
+//
+//  Liest KEY=VALUE aus der .env im Projektwurzelverzeichnis, ohne
+//  bereits gesetzte echte Umgebungsvariablen zu ueberschreiben — was in
+//  der systemd-Unit steht, gewinnt also weiterhin.
+(function loadDotEnv() {
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i.exec(line);
+      if (!m || line.trim().startsWith('#')) continue;
+      let val = m[2];
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[m[1]] === undefined) process.env[m[1]] = val;
+    }
+  } catch (e) { console.error('[env] .env load failed:', e.message); }
+})();
+
 const express = require('express');
 const http = require('http');
 const https = require('https');
@@ -16,25 +55,6 @@ const { loadCardEffect } = require('./cards/effects/_loader');
 const { BUFF_EFFECTS, heroCanBeEquipped } = require('./cards/effects/_hooks');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 
-// ── Minimal .env loader (no dependency) ──────────────────────────
-// Loads KEY=VALUE pairs from a project-root .env into process.env
-// (without overriding vars already set in the real environment).
-// Used for SMTP credentials; see mailer.js.
-(function loadDotEnv() {
-  try {
-    const envPath = path.join(__dirname, '.env');
-    if (!fs.existsSync(envPath)) return;
-    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i.exec(line);
-      if (!m || line.trim().startsWith('#')) continue;
-      let val = m[2];
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      if (process.env[m[1]] === undefined) process.env[m[1]] = val;
-    }
-  } catch (e) { console.error('[env] .env load failed:', e.message); }
-})();
 
 const { sendMail } = require('./mailer');
 
