@@ -33,9 +33,17 @@ module.exports = {
     return [...ownHeroes, ...ownCreatures, ...oppHeroes, ...oppCreatures];
   },
 
-  targetingConfig(gs, pi, cost) {
+  targetingConfig(gs, pi, cost, engine) {
     const ps = gs.players[pi];
-    const maxTargets = cost > 0 ? Math.floor((ps.gold || 0) / cost) : 99;
+    // Budget statt rohem Kontostand (Als Report 16.8.): mit Kent
+    // stehen 20 Gold mehr zur Verfuegung, und der Ziel-Waehler muss das
+    // wissen — sonst bietet er zu wenige Ziele an. `engine` liegt hier
+    // als 5. Parameter an; aeltere Aufrufer ohne ihn fallen sauber auf
+    // den Kontostand zurueck.
+    const budget = engine?.goldBudget ? engine.goldBudget(pi, CARD_NAME) : (ps.gold || 0);
+    const maxTargets = cost > 0
+      ? (budget === Infinity ? 99 : Math.floor(budget / cost))
+      : 99;
     return {
       description: `Select up to ${maxTargets} target${maxTargets !== 1 ? 's' : ''} to deal ${DAMAGE_PER_TARGET} damage each.`,
       confirmLabel: '📖 Unleash!',
@@ -66,14 +74,15 @@ module.exports = {
     const totalCost = baseCost * selectedIds.length;
     const ps = engine.gs.players[pi];
 
-    // Gold check
-    if ((ps.gold || 0) < totalCost) return;
+    // Bezahlbarkeit inkl. Kreditrahmen — sonst blockiert diese Zeile
+    // genau den Zug, den der Ziel-Waehler oben schon erlaubt hat.
+    if (!engine.canAffordGold(pi, totalCost, CARD_NAME)) return;
 
     // Claim HOPT
     if (!engine.claimHOPT('book-of-doom', pi)) return;
 
     // Deduct gold
-    ps.gold -= totalCost;
+    await engine._payCardCost(pi, totalCost);
     engine.log('gold_spend', { player: ps.username, amount: totalCost, total: ps.gold });
 
     // Map selected IDs to targets

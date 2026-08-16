@@ -76,19 +76,17 @@ module.exports = {
     // Collect the top 5 cards
     const cards = ps.mainDeck.splice(0, 5);
 
-    // Broadcast deck-to-deleted animation with card names (face-up)
-    engine._broadcastEvent('deck_to_deleted', { owner: pi, cards });
-
-    // Move cards to deleted pile
-    for (const cardName of cards) {
-      ps.deletedPile.push(cardName);
-    }
-
     engine.log('trade', { player: ps.username, cards, goldGain, level });
-    engine.sync();
 
-    // Wait for flying card animations to finish (5 cards × 150ms stagger + 500ms flight)
-    await engine._delay(1300);
+    // Flug UND getaktete Landung liegen seit 16.8. in der Engine
+    // (`actionDeleteFromDeckAnimated`). Frueher wurden hier alle fuenf
+    // Karten sofort in den Stapel gelegt und einmal synchronisiert —
+    // die LETZTE lag damit schon obenauf, waehrend die erste noch flog
+    // (Als Report). Jetzt landet jede Karte, wenn ihr Flug ankommt.
+    // Die Wartezeit steckt in der Primitive; `settle` deckt den
+    // Nachlauf der letzten Flugkarte ab, damit der Goldgewinn danach
+    // nicht in die noch laufende Animation faellt.
+    await engine.actionDeleteFromDeckAnimated(pi, cards, { settle: 200 });
 
     // Gain gold (actionGainGold fires hooks + auto-syncs + frontend auto-detects the gain)
     await engine.actionGainGold(pi, goldGain);

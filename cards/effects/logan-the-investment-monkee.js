@@ -25,11 +25,14 @@
 //      wie Siphems "spend N counters"-Liste, damit auch 40 Gold keine
 //      Knopfwand erzeugen.
 //
-//   2. PLEITE RAEUMT AUF — `afterResourceSpend` / `afterResourceGain`.
-//      "If you EVER have 0 Gold" ist ein Dauerzustand, kein Zeitpunkt:
-//      geprueft wird nach jeder Goldbewegung, nicht nur im eigenen Zug.
-//      Bewusst BEIDE Hooks: Gold kann auch durch fremde Effekte auf 0
-//      fallen, und ein Gewinn von 0 ist ebenfalls eine Bewegung.
+//   2. PLEITE RAEUMT AUF — der Zustandsvertrag `goldStateRule`.
+//      "If you EVER have 0 Gold" ist ein Dauerzustand, kein Zeitpunkt.
+//      Geprueft wird auf EXAKT 0 — negatives Gold (Debt-O-Tron)
+//      raeumt NICHT ab, das ist ausdruecklich gewollt.
+//      Die Engine ruft den Vertrag nach JEDER Goldaenderung dieses
+//      Spielers: Gewinn, Zahlung, Wipe (Market Crash) UND das rohe
+//      Abziehen von Kartenkosten. Ein Traeger statt drei Hooks — die
+//      drei liessen die Kostenzahlung durchrutschen (Als Report 16.8.).
 //
 //   3. AUSZAHLEN — `onTurnEnd` mit einer Wahl aus zwei Effekten.
 //      "You may" heisst: Ablehnen muss moeglich sein, also ist der
@@ -84,15 +87,48 @@ function ownLogans(engine, pi) {
 function pruefePleite(engine, pi) {
   const ps = engine?.gs?.players?.[pi];
   if (!ps) return;
-  if ((ps.gold || 0) > 0) return;
+  // WAEHREND der eigenen Einzahlung stillhalten (Als Report 16.8.).
+  // Der Ablauf war „bezahlen → Regel greift → Counter setzen → Regel
+  // greift nochmal": bei 10 vorhandenen Countern und 50 eingezahltem
+  // Gold gab das ZWEI Verfalls-Meldungen (10, dann 50). Die Zahlung und
+  // das Setzen der Counter sind aber EIN Vorgang; geprueft wird erst,
+  // wenn er fertig ist. Ergebnis unveraendert (wer alles investiert,
+  // steht auf 0 Gold und verliert alles) — aber als EIN Ereignis ueber
+  // den vollen Bestand.
+  if (engine._loganInvestInFlight > 0) return;
+  // EXAKT 0, nicht „<= 0" (Als Ruling 16.8. zum Debt-O-Tron-Archetyp:
+  // „Logans Counter verfallen explizit nur bei exakt 0"). Vor v407 gab
+  // es kein negatives Gold, `> 0` und `!== 0` waren also dasselbe —
+  // seit Kent nicht mehr: bei −5 haette die alte Pruefung die Counter
+  // abgeraeumt und ein Debt-O-Tron-Logan-Deck unmoeglich gemacht.
+  if ((ps.gold || 0) !== 0) return;
+  let etwasVerfallen = false;
   for (const { hero, heroIdx } of ownLogans(engine, pi)) {
     const hatte = getInvest(hero);
     if (hatte <= 0) continue;
     setInvest(hero, 0);
+    etwasVerfallen = true;
     engine.log('logan_invest_wiped', {
       player: ps.username, hero: CARD_NAME, heroIdx, lost: hatte,
     });
+    // Muenzen fallen vom Zaehler-Abzeichen weg und entfaerben sich
+    // (16.8., Als Vorgabe). Gegenstueck zum goldenen Bananenregen der
+    // Auszahlung: dort faellt Gold AUF ein Ziel, hier faellt es weg.
+    // `count` skaliert die Muenzzahl mit dem Verlust; die Animation
+    // deckelt selbst. Je Logan eine eigene — mehrere Kopien verlieren
+    // ihre Counter gleichzeitig, also sollen auch beide bluten.
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'invest_counters_lost',
+      owner: pi, heroIdx, zoneSlot: -1,
+      count: hatte,
+    });
   }
+  // OHNE dieses sync blieb das Abzeichen stehen, bis irgendwer sonst
+  // synchronisiert hat: alle drei Traeger-Hooks laufen NACH dem sync
+  // ihrer Gold-Primitive (actionGainGold/actionSpendGold/actionSetGold
+  // synchronisieren VOR dem Nach-Buchungs-Hook). Der Zustand war also
+  // richtig, nur unsichtbar — dieselbe Klasse wie die v401-Faelle.
+  if (etwasVerfallen) engine.sync();
 }
 
 /** Alle Ziele auf dem Brett — Helden und Kreaturen, beide Seiten. */
@@ -173,36 +209,55 @@ module.exports = {
     if (!wahl?.optionId) return;
 
     const betrag = Math.min(gold, Math.max(1, parseInt(wahl.optionId, 10) || 0));
-    const bezahlt = await engine.actionSpendGold(pi, betrag);
+
+    // Zahlung UND Zaehlersetzung sind ein Vorgang: waehrenddessen ruht
+    // die Pleite-Regel (siehe pruefePleite). Zaehler statt Flag, damit
+    // verschachtelte Faelle sauber bleiben; Freigabe im finally.
+    engine._loganInvestInFlight = (engine._loganInvestInFlight || 0) + 1;
+    let bezahlt = false;
+    try {
+      bezahlt = await engine.actionSpendGold(pi, betrag);
+      if (bezahlt) {
+        setInvest(hero, getInvest(hero) + betrag);
+        engine.log('logan_invest', {
+          player: ps.username, hero: CARD_NAME, heroIdx,
+          paid: betrag, counters: getInvest(hero),
+        });
+      }
+    } finally {
+      engine._loganInvestInFlight = Math.max(0, (engine._loganInvestInFlight || 1) - 1);
+    }
     if (!bezahlt) return;
 
-    setInvest(hero, getInvest(hero) + betrag);
-    engine.log('logan_invest', {
-      player: ps.username, hero: CARD_NAME, heroIdx,
-      paid: betrag, counters: getInvest(hero),
-    });
-
-    // Bezahlen kann das Gold auf 0 gebracht haben — dann greift die
-    // Pleite-Regel SOFORT und die Einzahlung ist verpufft. Das ist die
-    // woertliche Lesart des Kartentexts; wer alles investiert, verliert
-    // alles.
+    // JETZT einmal pruefen. Hat die Zahlung das Gold auf 0 gebracht,
+    // verfaellt der GESAMTE Bestand in einem Ereignis — die woertliche
+    // Lesart des Kartentexts, aber ohne die doppelte Meldung.
     pruefePleite(engine, pi);
     engine.sync();
   },
 
-  hooks: {
-    // ── 2) PLEITE RAEUMT AUF ──────────────────────────────────────
-    afterResourceSpend: (ctx) => {
-      const pi = ctx.playerIdx != null ? ctx.playerIdx : ctx.cardOwner;
-      if (pi == null) return;
-      pruefePleite(ctx._engine, pi);
-    },
-    afterResourceGain: (ctx) => {
-      const pi = ctx.playerIdx != null ? ctx.playerIdx : ctx.cardOwner;
-      if (pi == null) return;
-      pruefePleite(ctx._engine, pi);
-    },
+  // ── 2) PLEITE RAEUMT AUF — EIN Vertrag statt drei Hooks ─────────
+  //
+  //  "If you EVER have 0 Gold" ist ein DAUERZUSTAND, kein Ereignis.
+  //  Bis v403 hing die Regel an drei Bewegungs-Hooks
+  //  (`afterResourceGain` / `afterResourceSpend` / `afterGoldSet`) —
+  //  und lief damit an allem vorbei, was Gold roh abzieht. Genau das
+  //  hat Al am 16.8. gemeldet: sein letztes Gold fuer Wheels
+  //  ausgegeben, sichtbar auf 0, Counter blieben liegen. Kartenkosten
+  //  laufen naemlich ueber rund zwanzig eigene Abzugsstellen.
+  //
+  //  Statt eines VIERTEN Hooks jetzt der Zustandsvertrag
+  //  `goldStateRule`: die Engine ruft ihn nach JEDER Goldaenderung des
+  //  Spielers, egal ueber welchen Weg (siehe `_checkGoldStateRules`
+  //  und `_payCardCost` in _engine.js). Ein Traeger, keine Luecke.
+  //
+  //  SYNCHRON — der Vertrag darf nichts awaiten. `pruefePleite`
+  //  braucht das auch nicht: setzen, loggen, broadcasten, syncen.
+  goldStateRule(engine, playerIdx) {
+    pruefePleite(engine, playerIdx);
+  },
 
+  hooks: {
     // ── 3) AUSZAHLEN ──────────────────────────────────────────────
     onTurnEnd: async (ctx) => {
       if (!ctx.isMyTurn) return;

@@ -45,8 +45,13 @@
 
 const CARD_NAME = 'Luna Pele, the Flame Dancer';
 const BURN_DRAW_CAP = 4;
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'lunaBurnDraw';
 
 module.exports = {
+  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
+  chargesPerTurn: BURN_DRAW_CAP,
+  chargeKey: USE_KEY,
   activeIn: ['hero'],
 
   hooks: {
@@ -103,17 +108,12 @@ module.exports = {
 
       // ── Effect 2: a target was Burned → draw 1 (cap 4 per turn) ──
       if (statusName === 'burned') {
-        const turn = gs.turn || 0;
-        if (luna._lunaBurnDrawTurn !== turn) {
-          luna._lunaBurnDrawTurn  = turn;
-          luna._lunaBurnDrawCount = 0;
-        }
-        if (luna._lunaBurnDrawCount >= BURN_DRAW_CAP) return;
-        luna._lunaBurnDrawCount++;
+        // Rundenstempel und Kappe im gemeinsamen Zaehler (v421).
+        if (!spendUse(luna, gs, { key: USE_KEY, max: BURN_DRAW_CAP })) return;
         await engine.actionDrawCards(pi, 1);
         engine.log('luna_pele_draw', {
           player: gs.players[pi]?.username,
-          drawnThisTurn: luna._lunaBurnDrawCount,
+          drawnThisTurn: BURN_DRAW_CAP - usesLeft(luna, gs, { key: USE_KEY, max: BURN_DRAW_CAP }),
         });
       }
     },

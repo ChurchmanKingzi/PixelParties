@@ -95,7 +95,7 @@ module.exports = {
     // Pay gold
     if (goldCost > 0) {
       if ((ps.gold || 0) < goldCost) return false; // Safety
-      ps.gold -= goldCost;
+      await engine._payCardCost(pi, goldCost);
       engine.log('gold_spent', { player: ps.username, amount: goldCost, reason: 'Alchemy' });
       engine._broadcastEvent('gold_change', { owner: pi, amount: -goldCost });
     }

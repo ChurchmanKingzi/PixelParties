@@ -40,30 +40,28 @@ const CARD_NAME = '3-Headed Giant';
 const MAX_USES  = 3;
 const DAMAGE     = 80;
 
-const TURN_KEY = '_threeHeadedGiantTurn';
-const USES_KEY = '_threeHeadedGiantUses';
 
 /** Bereits verbrauchte Nutzungen in der LAUFENDEN Runde. */
+// Seit v417 ueber den gemeinsamen Rundenzaehler. Die beiden lokalen
+// Helfer bleiben als schmale Huelle stehen, damit die zwoelf
+// Aufrufstellen unveraendert lesbar bleiben.
 function usesThisTurn(gs, inst) {
-  const c = inst?.counters;
-  if (!c) return 0;
-  if (c[TURN_KEY] !== (gs?.turn || 0)) return 0;   // andere Runde → 0
-  return c[USES_KEY] || 0;
+  return MAX_USES - usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES });
 }
 
 /** Eine Nutzung verbuchen; gibt den neuen Stand zurück. */
 function spendUse(gs, inst) {
-  if (!inst.counters) inst.counters = {};
-  const turn = gs?.turn || 0;
-  if (inst.counters[TURN_KEY] !== turn) {
-    inst.counters[TURN_KEY] = turn;
-    inst.counters[USES_KEY] = 0;
-  }
-  inst.counters[USES_KEY] = (inst.counters[USES_KEY] || 0) + 1;
-  return inst.counters[USES_KEY];
+  spendUseShared(inst, gs, { key: USE_KEY, max: MAX_USES });
+  return usesThisTurn(gs, inst);
 }
 
+const { usesLeft, spendUse: spendUseShared } = require('./_charges');
+const USE_KEY = 'threeHeadedGiant';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 3,
+  chargeKey: USE_KEY,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],

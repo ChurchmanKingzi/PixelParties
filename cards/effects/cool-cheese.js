@@ -106,7 +106,7 @@ module.exports = {
         gerrymanderEligible: true, // True "you may" — pay extra to skip lock.
       });
       if (confirmed && !confirmed.cancelled) {
-        ps.gold = Math.max(0, (ps.gold || 0) - EXTRA_COST);
+        await engine._payCardCost(pi, EXTRA_COST);
         paidExtra = true;
         engine.log('cool_cheese_pay', { player: ps.username, card: result.cardName, amount: EXTRA_COST });
       }

@@ -821,6 +821,152 @@ function statusHealDecision(engine, pi, cardName, tags) {
   return null;
 }
 
+// ── MARKET-CRASH-KANAL (Als Auftrag 16.8.) ───────────────────────────
+//
+//  "Both players' Gold becomes 0" ist die seltene Sorte Karte, deren
+//  Wert fast vollstaendig am ZEITPUNKT haengt und fast gar nicht am
+//  Brett. Als vier Teilfragen waren:
+//    (a) braucht die CPU ihr eigenes Gold noch?
+//    (b) wann im Zug geht die Karte idealerweise noch frei durch
+//        (moeglichst viel selbst ausgegeben, aber gerade noch mehr als
+//        der Gegner)?
+//    (c) wann lohnt es sich, eine Action dafuer auszugeben?
+//    (d) lohnt es sich ueberhaupt — braucht das Gegnerdeck sein Gold,
+//        wieviel hat es, wieviel braucht es?
+//
+//  WAS HIER BEWUSST NICHT GELERNT WIRD. (a), (d) und der Kartenwert
+//  selbst sind BERECHENBAR und schon gebaut — dieselbe Linie wie beim
+//  Ability-Dependency-Score darunter:
+//    · `computeGoldDemand(engine, pi)` (_cpu.js) = was ein Spieler
+//      JETZT produktiv ausgeben koennte (Artefakte in der Hand plus
+//      Aktivierungen mit `cpuGoldCostForActivation`).
+//    · `mctsOpponentGoldEconomy(engine, oppIdx)` = 0,3 (Hamsterer, Gold
+//      ist ihm egal) bis 1,8 (ausgehungert, jedes Gold zaehlt), aus
+//      Vorrat/Bedarf plus der Zugende-Historie `_cpuGoldHistory`.
+//    · Und `evaluateState` bewertet Gold bereits als
+//      `min(gold,demand)*2 + Ueberschuss*0,2` — der Tauschwert des Wipes
+//      ist fuer MCTS also ohne jede Aenderung sichtbar.
+//  Diese Groessen werden hier zu TAGS verdichtet, nicht nachgebaut.
+//
+//  GELERNT wird nur der Rest, der aus ihnen nicht folgt: ob sich der
+//  Tausch in dieser Lage, in dieser Phase, in diesem Modus gelohnt hat.
+//  Der Trainer bildet je Tag das uebliche Delta mean(gespielt) −
+//  mean(gehalten); die Laufzeit summiert die Tags der aktuellen Lage.
+//
+//  Die Tags kommen absichtlich in wenigen, groben Familien (Modus,
+//  Phase, Vorsprung, Eigenopfer, Gegner-Hunger, Beute) — sechs Tags je
+//  Entscheidung. Feiner geschnitten erreicht kein einzelner Tag mehr die
+//  MIN_ARM-Schwelle des Trainers.
+
+/** Gold-Kennzahlen beider Seiten. Lazy require gegen den Modulzyklus:
+ *  `_cpu.js` laedt `_deck-profile.js` beim Start, andersherum darf das
+ *  also erst zur Laufzeit passieren — dann sind beide fertig geladen. */
+function goldSnapshot(engine, pi) {
+  const oi = pi === 0 ? 1 : 0;
+  const ps = engine?.gs?.players?.[pi];
+  const ops = engine?.gs?.players?.[oi];
+  if (!ps || !ops) return null;
+  let demandOwn = 0, demandOpp = 0, oppEconomy = 1.0;
+  try {
+    const cpu = require('./_cpu');
+    if (typeof cpu.computeGoldDemand === 'function') {
+      demandOwn = cpu.computeGoldDemand(engine, pi) || 0;
+      demandOpp = cpu.computeGoldDemand(engine, oi) || 0;
+    }
+    if (typeof cpu.mctsOpponentGoldEconomy === 'function') {
+      oppEconomy = cpu.mctsOpponentGoldEconomy(engine, oi);
+    }
+  } catch { /* Kanal darf nie das Spiel stoeren */ }
+  return {
+    own: ps.gold || 0, opp: ops.gold || 0,
+    demandOwn, demandOpp, oppEconomy,
+  };
+}
+
+/**
+ * Tags fuer den Market-Crash-Kanal.
+ * @param {object} opts { additional } — true, wenn gerade der Frei-/
+ *        Zusatzaktions-Pfad geprueft wird (Vorsprung besteht), false beim
+ *        regulaeren Action-Play.
+ */
+function classifyMarketCrashTags(engine, pi, opts = {}) {
+  const tags = [];
+  try {
+    const g = goldSnapshot(engine, pi);
+    if (!g) return tags;
+
+    // (1) MODUS — kostet der Play eine Action? Das ist der teuerste
+    // Unterschied und deshalb ein eigener Tag, nicht nur eine Kovariate.
+    tags.push(opts.additional ? 'mc:frei' : 'mc:action');
+
+    // (2) PHASE — "wann im Zug". MP1 heisst: es koennte noch gekauft
+    // werden. MP2 heisst: der Zug ist praktisch durch, was jetzt noch
+    // liegt, verfaellt ohnehin bis zum naechsten Einkommen.
+    const ph = engine.gs?.currentPhase;
+    tags.push(ph === 4 ? 'mc:mp2' : ph === 3 ? 'mc:ap' : 'mc:mp1');
+
+    // (3) VORSPRUNG — Als "gerade noch mehr als der Gegner". Ein knapper
+    // Vorsprung ist der Idealfall: er traegt den Frei-Modus, ohne dass
+    // viel eigenes Gold mitverbrennt.
+    const lead = g.own - g.opp;
+    if (lead <= 0) tags.push('mc:vorsprung-keiner');
+    else if (lead <= 3) tags.push('mc:vorsprung-knapp');
+    else if (lead <= 9) tags.push('mc:vorsprung-mittel');
+    else tags.push('mc:vorsprung-gross');
+
+    // (4) EIGENOPFER — nicht das eigene Gold zaehlt, sondern der Teil
+    // davon, den die CPU JETZT noch in etwas verwandeln koennte. 20 Gold
+    // ohne einen einzigen Kauf in der Hand sind kein Verlust.
+    const opfer = Math.min(g.own, g.demandOwn);
+    if (opfer <= 0) tags.push('mc:eigenopfer-0');
+    else if (opfer <= 7) tags.push('mc:eigenopfer-klein');
+    else tags.push('mc:eigenopfer-gross');
+
+    // (5) GEGNER-HUNGER — braucht das Gegnerdeck sein Gold ueberhaupt?
+    if (g.oppEconomy >= 1.3) tags.push('mc:opp-hungrig');
+    else if (g.oppEconomy >= 0.7) tags.push('mc:opp-normal');
+    else tags.push('mc:opp-satt');
+
+    // (6) BEUTE — der absolute Betrag, den es dem Gegner wegnimmt.
+    if (g.opp >= 18) tags.push('mc:beute-gross');
+    else if (g.opp >= 8) tags.push('mc:beute-mittel');
+    else tags.push('mc:beute-klein');
+  } catch { /* defensiv */ }
+  return tags;
+}
+
+/**
+ * → 'play' | 'skip' | null. Gleiche Bauform wie `statusHealDecision`:
+ * Tag-Punkte aus dem Profil summieren, Schwelle ±4, darunter entscheidet
+ * MCTS weiter. Der Aufrufer protokolliert die Tags, damit der Trainer
+ * gespielt/gehalten je Kontext vergleichen kann.
+ */
+function marketCrashDecision(engine, pi, cardName, tags) {
+  try {
+    const prof = profileFor(engine, pi);
+    const rules = prof?.marketCrashRules?.[cardName];
+    // ε-Rest-Exploration trotz Regel — gleiche Begruendung wie im
+    // Surprise- und Status-Heil-Kanal: eine ueberwiegend negative
+    // Iteration wuerde die Karte sonst komplett ersticken, es kaemen
+    // keine frischen "gespielt"-Arme nach und die Regeln lernten nur
+    // noch aus altem Bestand.
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = (tags || []).reduce((s, g) => s + (rules[g] || 0), 0);
+      if (score >= 4) return 'play';
+      if (score <= -4) return 'skip';
+      return null;
+    }
+    // Ohne Regeln: in Trainingslaeufen bewusst durchlassen, damit beide
+    // Arme entstehen. PP_CRASH_EXPLORE=1 erzwingt jeden Play — der
+    // deterministische End-zu-End-Test.
+    const explore = parseFloat(process.env.PP_CRASH_EXPLORE || '0.4');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) return 'play';
+  } catch { /* defensiv */ }
+  return null;
+}
+
 // ── Ability-Removal-Dependency-Score ─────────────────────────────────
 // "Was kann der Gegner ohne diese Ability alles NICHT MEHR?" ist aus
 // öffentlicher Information BERECHENBAR statt lernbar: Seine Casts sind
@@ -1983,6 +2129,8 @@ module.exports = {
   reloadProfiles,
   clusterOfFingerprint,
   classifyTargetTags,
+  classifyMarketCrashTags,
+  marketCrashDecision,
   statusWouldStick,
   targetPickDecision,
   surpriseFireDecision,

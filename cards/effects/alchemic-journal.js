@@ -62,7 +62,7 @@ module.exports = {
 
     if (mode === 'choose') {
       // Deduct extra 5 gold
-      ps.gold -= 5;
+      await engine._payCardCost(pi, 5);
 
       // Build gallery of unique potions in deck
       const seen = new Set();

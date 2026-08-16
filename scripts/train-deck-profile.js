@@ -1515,6 +1515,51 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       }
     }
   }
+  // ── Market-Crash-Kanal (Als Auftrag 16.8.) ──
+  // Pro Karte x Kontext-Tag (mc:frei/action, mc:mp1/mp2/ap,
+  // mc:vorsprung-*, mc:eigenopfer-*, mc:opp-*, mc:beute-*):
+  // Delta = meanLabel(gespielt) - meanLabel(gehalten) im gleichen
+  // Kontext. Identische Bauform zu den Status-Heil-Regeln darueber —
+  // die Laufzeit summiert die Tag-Deltas der aktuellen Lage.
+  const marketCrashRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.marketCrashDecisions)) continue;
+      for (const d of g.marketCrashDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        decs.push({ c: d.c, tags: d.tags || [], fired: !!d.fired,
+          y: ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        const inT = ds.filter(d => d.tags.includes(g));
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const delta = fired.reduce((s, d) => s + d.y, 0) / fired.length
+          - held.reduce((s, d) => s + d.y, 0) / held.length;
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120)) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) marketCrashRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      console.log(`Market Crash: ${decs.length} Entscheidungen, ${Object.keys(marketCrashRules).length} Karten mit Kontext-Regeln`);
+      for (const [c, rs] of Object.entries(marketCrashRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+  }
   // ── Counter-Ausgabe-Kanal (Als Vorgabe 5.8.) ──
   //
   // "Füge ML eine HOHE Belohnung dafür hinzu, nicht in der Base-Form den
@@ -2309,7 +2354,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       for (const [k, v] of Object.entries(tutorPickRules).slice(0, 6)) console.log(`  ${v > 0 ? '+' : ''}${v}  ${k}`);
     }
   }
-  return { w, keep, support, uplifts, upliftStats, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  return { w, keep, support, uplifts, upliftStats, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
@@ -2894,6 +2939,8 @@ function main() {
     // Gelernte Status-Heilungs-Kontextregeln je Karte.
     statusHealRules: (advModel && advModel.statusHealRules && Object.keys(advModel.statusHealRules).length > 0)
       ? advModel.statusHealRules : undefined,
+    marketCrashRules: (advModel && advModel.marketCrashRules && Object.keys(advModel.marketCrashRules).length > 0)
+      ? advModel.marketCrashRules : undefined,
     counterSpendRules: (advModel && advModel.counterSpendRules && Object.keys(advModel.counterSpendRules).length > 0)
       ? advModel.counterSpendRules : undefined,
     descendRules: (advModel && advModel.descendRules && Object.keys(advModel.descendRules).length > 0)

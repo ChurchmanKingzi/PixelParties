@@ -1032,6 +1032,193 @@ module.exports = {
 };
 ```
 
+### Gold: gain, spend — and *set* (`actionSetGold`)
+
+Three primitives, three different meanings. Picking the wrong one is a
+rules bug, not a style choice:
+
+| Primitive | Meaning | Fires | Blocked by `goldLocked` |
+|---|---|---|---|
+| `actionGainGold(pi, n, opts)` | the player **gains** gold | `onResourceGain` → `afterResourceGain` | yes |
+| `actionSpendGold(pi, n)` | the player **pays** gold | `onResourceSpend` → `afterResourceSpend` | yes |
+| `actionSetGold(pi, n, opts)` | gold **becomes** n | `afterGoldSet` only | **no** |
+
+`actionSetGold` exists because a wipe or a forced value is **neither a
+gain nor a payment** (Al's ruling 16.8. on *Market Crash*: "Both
+players' Gold becomes 0"). Consequences, all deliberate:
+
+- Cards that trigger on a **payment** (*Criminal Monkee* — "when you
+  pay exactly 4 Gold") must NOT fire on a wipe. They don't, because
+  `afterResourceSpend` is not raised.
+- *Golden Arrow*'s lock ("cannot gain or spend Gold") does NOT stop a
+  set, for the same reason.
+- **State-based** gold rules still have to work. *Logan, the Investment
+  Monkee* — "If you ever have 0 Gold, remove all Invest Counters" —
+  describes a standing condition, not a moment. That is what
+  `afterGoldSet` is for; Logan listens to all three carriers.
+
+`afterGoldSet` fires **even when the value did not change**: it reports
+a state, not a movement, and "if you ever have X" is exactly the rule
+shape that a change-only check would miss. It is deliberately **not**
+in `HOOK_DESCRIPTIONS`, so it opens no reaction window.
+
+Negative gold is not representable today (every deduction clamps at 0)
+and `actionSetGold` clamps too. If the *Debt-O-Tron* archetype ("while
+you have less than 0 Gold") is ever built, that clamp is the single
+place to change.
+
+---
+
+### State-based Gold rules — use `goldStateRule`, not the movement hooks
+
+> **The trap:** a rule phrased *"if you **ever** have 0 Gold …"* is a
+> standing condition, not an event. Hanging it on
+> `afterResourceGain` / `afterResourceSpend` / `afterGoldSet` misses
+> every path that changes Gold some other way — most importantly
+> **paying a card's Cost**, which is deducted raw at ~20 sites and
+> fires none of those hooks.
+
+Export a synchronous function from the **Hero's** module:
+
+```js
+// Called after EVERY change to this player's Gold, whatever caused it.
+goldStateRule(engine, playerIdx) {
+  const ps = engine.gs.players[playerIdx];
+  if ((ps.gold || 0) > 0) return;
+  // … enforce the standing condition …
+}
+```
+
+The engine walks it from `_checkGoldStateRules(playerIdx)`, which every
+Gold path calls: `actionGainGold`, `actionSpendGold`, `actionSetGold`,
+`actionStealGold` (for the victim) and `_payCardCost`.
+
+**It must be synchronous.** Cost deductions sit inside resolution paths
+that are partly synchronous; an un-awaited promise there is exactly the
+class of bug that cost the v386–v394 hunt. Mutating state, logging,
+broadcasting and `sync()` are all fine — awaiting is not. The walker is
+re-entrancy guarded, so a rule may call `sync()` itself.
+
+**Paying a Cost: always `await engine._payCardCost(playerIdx, cost)`**,
+never `ps.gold -= cost`. What it fires, and why:
+
+| Hook | Fired? | Why |
+|---|---|---|
+| `AFTER_RESOURCE_SPEND` | **yes** | Al's ruling 16.8.: a Card Cost *is* a payment, so "when you pay exactly N Gold" cards (Criminal Monkee) must see it. |
+| `ON_RESOURCE_SPEND` | **no** | The pre-hook is *cancellable*. A listener could block the Cost of a card that is already resolving — played, but never paid for. Costs are not negotiable at that point. |
+| `goldStateRule` | **yes, last** | Same order as `actionSpendGold`: the standing condition gets the last word, after every reaction to the payment has settled. |
+
+It reports the amount **actually** deducted, not the amount asked
+for — if the player could not cover it, they did not pay N, and
+"exactly N" must not fire.
+
+It is `async` because of the hook; every call site awaits it.
+`goldStateRule` stays synchronous regardless.
+
+**NEVER write `ps.gold` directly** — not `-=`, not `+=`, not `=`. Any
+raw write is invisible to *both* rule families at once, and the card
+doing it still works, so nothing looks broken:
+
+| What you are doing | Use |
+|---|---|
+| Paying a card's Cost (incl. variable / `manualGoldCost` costs) | `await engine._payCardCost(pi, amount)` |
+| Gaining Gold from an effect | `await engine.actionGainGold(pi, amount)` |
+| Spending Gold outside a Cost | `await engine.actionSpendGold(pi, amount)` |
+| Setting Gold to a fixed value (a wipe) | `await engine.actionSetGold(pi, amount)` |
+| Taking Gold from the opponent | `await engine.actionStealGold(pi, amount)` |
+
+This one keeps coming back: on 16.8. the same mistake surfaced three
+times in a row — 19 raw Cost deductions in the engine, then those same
+sites firing no payment hook, then **18 more inside card scripts**
+(cards with `manualGoldCost` compute their own Cost, so they were
+never covered by the engine-side fix). Al found the last batch on
+*Book of Doom*: exactly 4 Gold for one target, down to 0, and neither
+Logan nor Criminal Monkee reacted.
+
+So it now reports itself: **`_gold-audit.js` scans every card script
+at server start** and warns about raw `.gold` writes. If your card is
+a real exception — Swagdri briefly inflates Gold purely to suppress a
+display artefact, Tool Freezer refunds a Cost that was never paid —
+add it to that file's `ALLOWLIST` **with a reason**.
+
+Logan, the Investment Monkee is the first and so far only consumer.
+
+---
+
+### Negative Gold (Debt-O-Tron) — three contracts
+
+Gold could not go below zero until v407; every deduction clamped and
+every affordability gate compared against the balance. The Debt-O-Tron
+archetype opens that up, but only under conditions, and only through
+these contracts. **With none of them present the credit line is 0 and
+everything behaves exactly as before.**
+
+| Contract | Lives on | Shape | What it does |
+|---|---|---|---|
+| `goldOverdraft(engine, pi)` | a **Hero** | → number | How much *new debt* a single payment may take on. Kent returns 20, regardless of the current balance. |
+| `selfGoldOverdraft` | any **card** | `true` / number / fn | Credit that applies **only when that card is the one being paid for**. `Debt-O-Tron Damage Fees` uses `true` (unlimited). Never bleeds onto other payments. |
+| `blocksActions(engine, pi)` | a **Hero** | → bool | Player-wide Action lock, as a *standing* condition. Synchronous, like `goldStateRule`. |
+
+The engine asks via `goldOverdraftLimit(pi, cardName)`,
+`canAffordGold(pi, cost, cardName)` and `areActionsBlocked(pi)`.
+
+**The measure is always "new debt", never an absolute floor.** A
+payment may be at most `max(0, gold) + limit`, so from −10 with a limit
+of 20 you may still pay 20 and land at −30. The same formula drives the
+"for every 10 Gold you spent in excess of your current Gold" cards:
+`amount − max(0, goldBefore)`.
+
+**`areActionsBlocked` is checked wherever `hero._actionLockedTurn` is**,
+which gives it the right scope for free: normal *and* additional
+Actions, plus Hero effects and Abilities **only when those cost an
+Action**. Free Hero effects stay usable.
+
+Two traps worth naming:
+
+- **Any `gold > 0` test in existing code is now suspect.** Before v407
+  it was interchangeable with `!== 0`; it no longer is. Logan's "if you
+  ever have 0 Gold" wiped his counters at −5 until this was caught.
+- **Artifacts do not go through `validateActionPlay`.** `doPlayArtifact`
+  now consults `canPlayWithHero` itself (v408) — before that, a
+  card-side gate on an Artifact was display-only and a direct call went
+  straight through.
+
+---
+
+### Conditional inherent additional Actions
+
+`inherentAction` may be a **function** `(gs, pi, heroIdx, engine) → bool`.
+Returning `true` means "this play does not consume an Action".
+
+Read the card text carefully: a clause like *"You may use this Spell as
+an additional Action while &lt;condition&gt;"* gates only the **action
+economy**, not the card. Such a card stays playable without the
+condition — it just costs the Action. That is `inherentAction` alone;
+adding a `spellPlayCondition` would be wrong and would also grey the
+card out for the human player. Models: *Quick Attack* (first Attack of
+the turn), *Overheal Shock* (caster's school levels), *Market Crash*
+(more Gold than the opponent). *Gate to the Armory* is the opposite
+shape — there the free mode has a **cost** (it ends your turn), so its
+`inherentAction` returns `false` whenever a real Action slot is free.
+
+Two engine stamps set by `doPlaySpell` **before** `onPlay` let a card
+see which route it took:
+
+```js
+const modus = gs._spellWasInherent      ? 'frei'     // inherent grant
+            : gs._spellConsumedMainAction ? 'main'   // burned the Action
+            :                               'zusatz'; // external grant
+```
+
+Note the CPU consequence: the enumerator **skips** inherent-action
+cards in the Action Phase and defers them to `fireAdditionalActions` in
+Main Phase. A card whose `inherentAction` is currently `true` is
+therefore only ever considered on the free path — and `cpuPlayVeto`
+receives `{ additional: true }` there and `{ additional: false }` on the
+regular path, which is the clean place to hang a per-mode CPU decision.
+
+---
+
 ### Areas — respect "Diver Helmet" (MANDATORY for every Area)
 
 > **Diver Helmet** (Artifact / Equipment): *"The equipped Hero and all
@@ -1460,6 +1647,91 @@ a protected target visibly sees the heart hit before the block reads.
 
 ---
 
+### Instance card-data overrides — always read them via `getEffectiveCardData` (MANDATORY)
+
+> **The pattern:** a few cards put a card on the board under one name
+> while it *is*, for game-rules purposes, something else. A **Biomancy
+> Token** is the canonical case: the Potion itself is placed in the
+> Support Zone and only `inst.counters._cardDataOverride` turns it into
+> a `Creature/Token`.
+
+Any code that asks *"what kind of card is this instance?"* must go
+through the engine helper, never the raw database:
+
+```js
+const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];  // ✅
+const cd = cardDB[inst.name];                                       // ❌
+```
+
+`getEffectiveCardData` returns the plain DB entry when no override
+exists, so the swap is free for every ordinary card. Reading raw is a
+silent bug: the instance answers with the *underlying* card's type, HP
+and level, and rules code quietly excludes it. Two real ones, both
+fixed after Al reported them: the AoE target collectors (hence the
+`token-override-aware` comments scattered through `_engine.js` and the
+shared modules) and `getSacrificableCreatures`, where Biomancy Tokens
+were not sacrificable at all until v399.
+
+**The one deliberate exception** is a card that asks about the
+*underlying* card on purpose. Kyli, the Deceptive Sapling reads *"when
+you sacrifice a Creature that is **not a Potion**"* — her anti-loop
+clause exists precisely because a Biomancy Token is a Potion. That
+check uses the raw DB via `_biomancy-shared.isPotionCardName`, and it
+says so in a comment. If you write such a check, say why.
+
+**Creating a Biomancy Token:** don't rebuild the counter block. Call
+`placeBiomancyToken(engine, pi, heroIdx, potionName, level, opts)` from
+`_biomancy-shared.js` — the single interpretation site, shared by
+`biomancy.js`, `kyli-the-deceptive-sapling.js` and the puzzle loader in
+`server.js`. Need only the counters (no placement)? Use
+`biomancyTokenCounters(potionData, level)`.
+
+---
+
+### Puzzle Mode — every card must work there, and every Counter must be authorable (MANDATORY)
+
+> **Al's rule (16.8.):** every new card is play-tested through **Puzzle
+> Mode**. It must work there. And **if a card uses Counters, those
+> Counters must be settable in the Puzzle Editor** — otherwise the one
+> state that matters most for the card can't be reproduced in a test.
+
+Puzzle Mode is not a reduced engine — it runs the same `GameEngine`, so
+a card that works in a normal game usually works there too. The two
+things that differ, and that you have to think about:
+
+1. **No MCTS.** Reaction chains and puzzles run the heuristic CPU path
+   (`cpuReactionDecision`, `_getCpuGenericResponse`), not the search.
+   A card whose CPU behaviour lives only in `evaluateState` will look
+   inert in a puzzle. If the CPU must do something specific, give the
+   card a `cpuResponse` — that is the path a puzzle actually takes.
+2. **Starting state is authored, not played into.** Anything the card
+   needs in order to be interesting has to be reachable from the
+   editor: HP, ATK, statuses, buffs, gold (`pz.gold`, per player),
+   Areas, Surprises, hand contents — **and Counters.**
+
+**Wiring a new Counter into the editor.** There is no generic registry;
+each Counter type is declared in two places that must agree. Follow the
+existing pairs (Head Counter / Change Counter / Evolution Counter /
+Invest Counter / Balance / Bunny Bomb / Anti Magic level):
+
+- **Client — `public/app-puzzle.jsx`:** one `useState` for the value
+  (`editXCounter`), hydrated in `openStatEditor` and gated so the
+  section stays hidden for unrelated cards. Gate by card name, by an
+  explicit `Set`, or by `archetype` from the card DB — prefer the
+  archetype/`Set` route so a later sibling card works without touching
+  the editor (`isWaflavHeroName` is the model). Hero Counters are saved
+  on the hero as `hero._xCounters`; card Counters go under
+  `_creatureStatuses[<heroIdx>-<slot>].x`.
+- **Server — the puzzle loader in `server.js` (`createPuzzleGame` →
+  `buildPlayerState`):** one block that copies the authored value onto
+  the live object — `hero._xCounters` for Heroes,
+  `inst.counters.x` for support-zone cards.
+
+If a Counter exists in the engine but in neither of those places, the
+card is untestable by Al's workflow and counts as unfinished.
+
+---
+
 ### Deferred side-effects — NEVER use `setTimeout` / `setImmediate` for animation bursts (MANDATORY)
 
 > **Rule:** any code path that calls `engine._broadcastEvent(...)` (or
@@ -1528,3 +1800,67 @@ setImmediate(() => { /* live-state recheck */ });
 Otherwise the simulated trigger fires a deferred callback that runs
 against the post-restore live state, which usually no-ops but can
 surface unexpected prompts in edge cases.
+
+## „Up to X times per turn" — EIN Verfahren (ab v417)
+
+**Als Regel (16.8., verbindlich):** X-mal in MEINER Runde, dann
+FRISCHE X-mal in der Gegnerrunde. `gs.turn` zählt jeden Spielerzug
+hoch, der Rundenstempel im gemeinsamen Zähler setzt das automatisch um.
+
+```js
+const { usesLeft, spendUse, refundUse } = require('./_charges');
+const USE_KEY = 'meineKarte';   // frei wählbar, pro Karte eindeutig
+
+module.exports = {
+  chargesPerTurn: 3,        // Anzeige oben rechts (nur bei X > 1!)
+  chargeKey: USE_KEY,       // mehr braucht die Anzeige nicht
+
+  hooks: {
+    irgendeinTrigger: async (ctx) => {
+      const gs = ctx._engine?.gs;
+      // prüft UND verbucht in einem — false heißt „nichts mehr frei"
+      if (!spendUse(ctx.card, gs, { key: USE_KEY, max: 3 })) return;
+      …
+    },
+  },
+};
+```
+
+| Funktion | Zweck |
+|---|---|
+| `usesLeft(inst, gs, {key, max})` | Nur lesen — z.B. für Prompt-Texte |
+| `spendUse(inst, gs, {key, max})` | Prüfen + verbuchen, `false` wenn leer |
+| `refundUse(inst, gs, {key})` | Reservierung zurückgeben (Abbruch) |
+
+### Verbuchen erst NACH der Zusage
+
+**Al-Regel (16.8.):** Bricht der Spieler ab, darf ihn das KEINE Ladung
+kosten. Also `spendUse` erst rufen, wenn die Wahl steht:
+
+```js
+const frei = usesLeft(ctx.card, gs, { key: USE_KEY, max: 3 });
+if (frei <= 0) return;                       // Gate: nur prüfen
+
+const target = await ctx.promptDamageTarget({ … });
+if (!target) return;                          // Abbruch — nichts verbucht
+
+spendUse(ctx.card, gs, { key: USE_KEY, max: 3 });   // erst JETZT
+```
+
+Braucht die Karte einen Schutz gegen ihre eigene Wiedereintritts-
+schleife (Antonia iteriert über eine Schadensrunde), darf sie
+stattdessen vorab reservieren — muss dann aber auf JEDEM Abbruchpfad
+`refundUse` rufen.
+
+**KEIN `onTurnStart` zum Zurücksetzen schreiben.** Der Stempel erledigt
+das. Genau diese vergessbare Rücksetzung war der Bug bei Archer und
+Golden Vermin: ihre Hooks liefen nur beim EIGENEN Rundenbeginn, damit
+galt ein Kontingent für beide Züge zusammen.
+
+**Bei genau EINER Ladung wird nichts angezeigt** — solche Karten sind
+Schalter. `chargesPerTurn: 1` ist erlaubt, die Engine filtert es raus.
+
+Hängt die Anzeige an einer Bedingung, statt `chargeKey` eine Funktion
+`remainingCharges(inst, gs)` liefern, die `null` zurückgibt, wenn
+nichts angezeigt werden soll (Vorbild: Smug Mastermind Antonia zeigt
+nur, solange „Cool Rescuer Monia" unter ihr liegt).

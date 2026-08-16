@@ -5,6 +5,12 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useContext } = React;
 const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipContent, useCardTooltip, StatusBadges, BuffColumn, GameTooltip, socket } = window;
+
+// Groesse des Galerie-Sichtfensters und der Nachlade-Schwelle. 120 deckt
+// bei 3 bzw. 5 Spalten mehrere Bildschirmhoehen ab, ist also nie sichtbar
+// als „Liste hoert auf".
+const GALLERY_PAGE = 120;
+const GALLERY_GROW_MARGIN = 600;
 const { FrozenOverlay, NegatedOverlay, BurnedOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
 
 // ── Ambient pixel motes for the Puzzle Creator ─────────────────────────
@@ -378,6 +384,40 @@ function PuzzleCreator() {
     return result;
   }, [puzzleFilters]);
 
+  // ── Sichtfenster der Galerie (Fix 16.8., Als Bericht) ──────────────
+  //
+  //  Der Deck-Builder blaettert (20-40 Karten je Seite) und ist deshalb
+  //  fluessig; diese Galerie hat frueher IMMER die volle Trefferliste
+  //  gerendert. Ohne Filter sind das rund 1400 Zellen mit je einem
+  //  <img> — daher die lange Ladezeit beim Betreten. Und weil beim
+  //  Tippen die ganze Liste neu aufgebaut wird, war jeder Tastendruck
+  //  ein Massen-Mount: „KYLI" ruecktwaerts zu loeschen laesst die Liste
+  //  von einer Handvoll auf Hunderte wachsen — genau ab dem Y, wie Al
+  //  beobachtet hat.
+  //
+  //  Statt Blaetterei (das waere ein UX-Bruch — die Galerie ist bewusst
+  //  eine durchgehende Scrollflaeche) waechst das Fenster beim Scrollen
+  //  nach. Es wird zurueckgesetzt, sobald sich die Filter aendern.
+  const [shownCount, setShownCount] = useState(GALLERY_PAGE);
+  useEffect(() => {
+    setShownCount(GALLERY_PAGE);
+    // Beim Filterwechsel nach oben — sonst haengt man im Nichts, wenn
+    // die neue Trefferliste kuerzer ist als die Scrollposition.
+    if (searchResultsRef.current) searchResultsRef.current.scrollTop = 0;
+  }, [puzzleFilters]);
+  const visibleResults = useMemo(
+    () => (shownCount >= searchResults.length ? searchResults : searchResults.slice(0, shownCount)),
+    [searchResults, shownCount],
+  );
+  /** Naehert sich das Ende, das Fenster vergroessern. */
+  const growGalleryIfNeeded = useCallback(() => {
+    const el = searchResultsRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - GALLERY_GROW_MARGIN) {
+      setShownCount(prev => (prev >= searchResults.length ? prev : prev + GALLERY_PAGE));
+    }
+  }, [searchResults.length]);
+
   // ── Custom scrollbar for mobile (CSS scrollbars aren't touch-interactive) ──
   const updateScrollThumb = useCallback(() => {
     const el = searchResultsRef.current;
@@ -397,12 +437,13 @@ function PuzzleCreator() {
   useEffect(() => {
     const el = searchResultsRef.current;
     if (!el) return;
-    el.addEventListener('scroll', updateScrollThumb, { passive: true });
-    const ro = new ResizeObserver(updateScrollThumb);
+    const onScroll = () => { updateScrollThumb(); growGalleryIfNeeded(); };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(onScroll);
     ro.observe(el);
-    updateScrollThumb();
-    return () => { el.removeEventListener('scroll', updateScrollThumb); ro.disconnect(); };
-  }, [updateScrollThumb, searchResults]);
+    onScroll();   // fuellt nach, wenn das Fenster hoeher ist als die erste Ladung
+    return () => { el.removeEventListener('scroll', onScroll); ro.disconnect(); };
+  }, [updateScrollThumb, growGalleryIfNeeded, searchResults]);
 
   const scrollTrackTouch = useCallback((e) => {
     e.stopPropagation();
@@ -1428,12 +1469,27 @@ function PuzzleCreator() {
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand]);
 
   // ── Pile zone helpers ──
+  /** Stapel oeffnen — mit Klang. Der Klick war bisher stumm, obwohl
+   *  das Schliessen laengst `ui_cancel` spielt (Als Report 16.8.). */
+  const oeffneStapel = useCallback((ziel) => {
+    if (window.playSFX) window.playSFX('ui_click', { volume: 0.5 });
+    setViewPile(ziel);
+  }, []);
+
   const handlePileDrop = useCallback((e, si, key) => {
     e.preventDefault(); setDragOverZone(null);
     if (dragCardName == null) return;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); }
     updatePlayer(si, pp => { pp[key].push(dragCardName); return pp; });
+    // Klangliche Rueckmeldung beim Ablegen (Als Vorgabe 16.8.): der
+    // Editor war beim Ziehen komplett stumm. `placement` ist der
+    // vorhandene „Karte liegt jetzt da"-Klang des Spiels; fuer die
+    // Ablage-Stapel passt der Abwurf-Klang besser.
+    if (window.playSFX) {
+      const abwurf = key === 'discardPile' || key === 'deletedPile';
+      window.playSFX(abwurf ? 'discard' : 'placement', { dedupe: 40 });
+    }
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null;
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, removeFromOppHand, updatePlayer]);
 
@@ -2139,7 +2195,7 @@ function PuzzleCreator() {
               {hi === 2 && (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') && (
                 <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))' }}>
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'coolness-' + si ? { boxShadow: '0 0 14px rgba(120,210,255,.7)' } : {}) }}
-                    onClick={() => (p.coolnessStack || []).length > 0 && setViewPile({ si, key: 'coolnessStack' })}
+                    onClick={() => (p.coolnessStack || []).length > 0 && oeffneStapel({ si, key: 'coolnessStack' })}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('coolness-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => handlePileDrop(e, si, 'coolnessStack')}>
@@ -2198,7 +2254,7 @@ function PuzzleCreator() {
               {/* Deleted pile — inside first group, positioned to its left */}
               {hi === 0 && (
                 <div className="board-zone board-zone-deleted" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('delete'), cursor: p.deletedPile.length ? 'pointer' : undefined, ...(dragOverZone === 'deleted-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.deletedPile.length > 0 && setViewPile({ si, key: 'deletedPile' })}
+                  onClick={() => p.deletedPile.length > 0 && oeffneStapel({ si, key: 'deletedPile' })}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('deleted-' + si); }}
                   onDragLeave={() => setDragOverZone(null)}
                   onDrop={(e) => handlePileDrop(e, si, 'deletedPile')}>
@@ -2211,7 +2267,7 @@ function PuzzleCreator() {
               {/* Potion Deck — inside last group, positioned to its right */}
               {hi === 2 && (
                 <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))', ...zs('potion'), cursor: p.potionDeck.length ? 'pointer' : undefined, ...(dragOverZone === 'potion-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.potionDeck.length > 0 && setViewPile({ si, key: 'potionDeck' })}
+                  onClick={() => p.potionDeck.length > 0 && oeffneStapel({ si, key: 'potionDeck' })}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('potion-' + si); }}
                   onDragLeave={() => setDragOverZone(null)}
                   onDrop={(e) => handlePileDrop(e, si, 'potionDeck')}>
@@ -2302,7 +2358,7 @@ function PuzzleCreator() {
               {/* Discard pile — inside first group, positioned to its left */}
               {hi === 0 && (
                 <div className="board-zone" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('discard'), cursor: p.discardPile.length ? 'pointer' : undefined, ...(dragOverZone === 'discard-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.discardPile.length > 0 && setViewPile({ si, key: 'discardPile' })}
+                  onClick={() => p.discardPile.length > 0 && oeffneStapel({ si, key: 'discardPile' })}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('discard-' + si); }}
                   onDragLeave={() => setDragOverZone(null)}
                   onDrop={(e) => handlePileDrop(e, si, 'discardPile')}>
@@ -2315,7 +2371,7 @@ function PuzzleCreator() {
               {/* Deck — inside last group, positioned to its right */}
               {hi === 2 && (
                 <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))', ...zs('deck'), cursor: p.mainDeck.length ? 'pointer' : undefined, ...(dragOverZone === 'deck-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.mainDeck.length > 0 && setViewPile({ si, key: 'mainDeck' })}
+                  onClick={() => p.mainDeck.length > 0 && oeffneStapel({ si, key: 'mainDeck' })}
                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('deck-' + si); }}
                   onDragLeave={() => setDragOverZone(null)}
                   onDrop={(e) => handlePileDrop(e, si, 'mainDeck')}>
@@ -2524,18 +2580,26 @@ function PuzzleCreator() {
               gridTemplateColumns: `repeat(${puzzleFiltersCollapsed ? 5 : 3}, 1fr)`,
               ...(isTouchDevice ? { scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } : {}),
             }}>
-            {searchResults.map((c, i) => {
+            {visibleResults.map((c) => {
               const img = cardImageUrl(c.name);
               return (
-                <div key={c.name + i} className="pz-search-card"
+                // Schluessel ist NUR der Kartenname (in AVAILABLE_CARDS
+                // eindeutig). Mit dem frueheren `c.name + i` verschob
+                // jeder Tastendruck die Indizes, praktisch jede Zelle
+                // bekam einen neuen Schluessel und React warf DOM-Knoten
+                // samt <img> weg und baute sie neu auf. Stabile
+                // Schluessel heisst: gefilterte Karten verschwinden,
+                // bleibende behalten ihr Bild.
+                <div key={c.name} className="pz-search-card"
                   onClick={!isTouchDevice ? () => { addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } : undefined}
                   onTouchStart={(e) => touchDragStart(c.name, null, null, null, e)}
                   onTouchMove={touchDragMove}
                   onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } }}
                   draggable={!isTouchDevice} onDragStart={(e) => { setDragGhost(e, c.name); onDragStart(e, c.name, null, null); }} onDragEnd={onDragEnd}
                   onMouseEnter={() => showTooltip(c, 'right')} onMouseLeave={hideTooltip}
-                  title={c.name + ' (' + c.cardType + (c.subtype ? ' / ' + c.subtype : '') + ')'}>
-                  {img ? <img src={img} className="pz-search-card-img" draggable={false} /> : (
+                  >
+                  {img ? <img src={img} className="pz-search-card-img" draggable={false}
+                    loading="lazy" decoding="async" /> : (
                     <div className="pz-search-card-text">
                       <span style={{ fontSize: 10, fontWeight: 700 }}>{c.name}</span>
                       <span style={{ fontSize: 8, color: 'var(--text2)' }}>{c.cardType}</span>
@@ -2597,7 +2661,7 @@ function PuzzleCreator() {
                     onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); if (window.playSFX) window.playSFX('discard'); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
-                    title={cardName}>
+                    >
                     {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                       <div className="pz-hand-card-text"><span>{cardName}</span></div>
                     )}
@@ -2608,8 +2672,14 @@ function PuzzleCreator() {
             </div>
             <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
               <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
-              <input className="input" type="number" min="0" max="999" value={players[1].gold ?? 0}
-                onChange={(e) => { const v = Math.min(999, Math.max(0, parseInt(e.target.value) || 0)); updatePlayer(1, p => { p.gold = v; return p; }); }}
+              {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
+                  gueltiger Zustand und muss auch im Puzzle einstellbar
+                  sein (Als Vorgabe 16.8.). Untergrenze −999, und die
+                  Zahl wird rot, sobald sie unter 0 faellt — dieselbe
+                  Lesart wie im Spiel. */}
+              <input className="input" type="number" min="-999" max="999" value={players[1].gold ?? 0}
+                style={{ color: (players[1].gold ?? 0) < 0 ? '#ff5c5c' : undefined }}
+                onChange={(e) => { const v = Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)); updatePlayer(1, p => { p.gold = v; return p; }); }}
                 style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
               {/* Right spacer mirrors the bag icon's width so the field sits centered */}
               <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
@@ -2715,7 +2785,7 @@ function PuzzleCreator() {
                 onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); if (window.playSFX) window.playSFX('discard'); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
-                title={cardName}>
+                >
                 {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                   <div className="pz-hand-card-text"><span>{cardName}</span></div>
                 )}
@@ -2726,8 +2796,14 @@ function PuzzleCreator() {
         </div>
         <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
           <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
-          <input className="input" type="number" min="0" max="999" value={players[0].gold ?? 0}
-            onChange={(e) => { const v = Math.min(999, Math.max(0, parseInt(e.target.value) || 0)); updatePlayer(0, p => { p.gold = v; return p; }); }}
+          {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
+              gueltiger Zustand und muss auch im Puzzle einstellbar
+              sein (Als Vorgabe 16.8.). Untergrenze −999, und die
+              Zahl wird rot, sobald sie unter 0 faellt — dieselbe
+              Lesart wie im Spiel. */}
+          <input className="input" type="number" min="-999" max="999" value={players[0].gold ?? 0}
+            style={{ color: (players[0].gold ?? 0) < 0 ? '#ff5c5c' : undefined }}
+            onChange={(e) => { const v = Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)); updatePlayer(0, p => { p.gold = v; return p; }); }}
             style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
           {/* Right spacer mirrors the bag icon's width so the field sits centered */}
           <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
@@ -2805,7 +2881,7 @@ function PuzzleCreator() {
                       onContextMenu={(e) => { e.preventDefault(); removePileCard(viewPile.si, viewPile.key, idx); }}
                       onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                       onMouseLeave={hideTooltip}
-                      title={cardName + ' (right-click to remove)'}>
+                      >
                       {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 2 }} draggable={false} /> : (
                         <div className="pz-hand-card-text"><span>{cardName}</span></div>
                       )}

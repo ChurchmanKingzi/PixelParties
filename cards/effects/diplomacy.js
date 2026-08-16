@@ -214,7 +214,7 @@ module.exports = {
     await engine._delay(500);
 
     // Pay gold
-    ps.gold -= cost;
+    await engine._payCardCost(pi, cost);
     engine.log('gold_spent', { player: ps.username, amount: cost, reason: 'Diplomacy' });
     engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
 

@@ -191,7 +191,10 @@ module.exports = {
     const totalCost = level * BASE_COST;
 
     // Final gold check (may have changed since canActivate)
-    if ((ps.gold || 0) < totalCost) {
+    // Bezahlbarkeit inkl. Kreditrahmen (16.8.): ohne den blockiert
+    // diese Zeile genau die Zahlung, die der Ziel-Waehler oben
+    // bereits erlaubt hat — Als Book-of-Doom-Report.
+    if (!engine.canAffordGold(pi, totalCost, 'Dark Gear')) {
       engine.log('dark_gear_fizzle', { player: ps.username, reason: 'insufficient_gold', cost: totalCost, gold: ps.gold });
       return { aborted: true };
     }
@@ -218,7 +221,7 @@ module.exports = {
     }
 
     // ── Pay gold ──
-    ps.gold -= totalCost;
+    await engine._payCardCost(pi, totalCost);
     engine.log('gold_spent', { player: ps.username, amount: totalCost, reason: 'Dark Gear' });
     engine._broadcastEvent('gold_change', { owner: pi, amount: -totalCost });
 

@@ -12929,4 +12929,9 @@ async function mctsPickFromOptions(engine, options, applyFn, opts = {}) {
   return best;
 }
 
-module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts };
+// `computeGoldDemand` und `mctsOpponentGoldEconomy` sind ab 16.8.
+// mit exportiert: der Market-Crash-Lernkanal in `_deck-profile.js`
+// verdichtet beide zu Tags und soll sie NICHT nachbauen — eine
+// Gold-Bedarfsrechnung, die an zwei Stellen gepflegt wird, laeuft
+// garantiert auseinander. Rein additiv, kein Aufrufer geaendert.
+module.exports = { runCpuTurn, installCpuBrain, runTurbo, shouldMulliganStartingHand, setCpuVerbose, getCpuVerbose, setCpuTranscribeFn, setRolloutHorizon, getRolloutHorizon, setRolloutBrain, getRolloutBrain, mctsValueGoldVsDraw, mctsPickFromOptions, rolloutRestOfTurn, seedExploreAttempts, computeGoldDemand, mctsOpponentGoldEconomy };

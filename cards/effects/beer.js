@@ -94,7 +94,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
 
     // Check gold
-    if ((ps.gold || 0) < totalCost) return;
+    if (!engine.canAffordGold(pi, totalCost, CARD_NAME)) return;
 
     // Map selected IDs to targets
     const targets = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
@@ -141,7 +141,7 @@ module.exports = {
     if (cleanseActions.length !== targets.length) return; // Aborted
 
     // Execute: deduct gold
-    ps.gold -= totalCost;
+    await engine._payCardCost(pi, totalCost);
     engine.log('beer_used', { player: ps.username, targets: targets.length, totalCost });
 
     // Remove selected statuses and play animations

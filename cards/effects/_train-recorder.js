@@ -918,6 +918,14 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       const statusHealDecisions = (engine._statusHealLog || [])
         .filter(e => e.pi === pinnedIdx)
         .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      // Market-Crash-Kanal (Als Auftrag 16.8.): "Gold beider Seiten auf
+      // 0" ist fast reine Zeitpunkt-Entscheidung. Gleiche Form wie der
+      // Status-Heil-Kanal — gespielt/gehalten je Kontext, Tags aus
+      // classifyMarketCrashTags (Modus, Phase, Vorsprung, Eigenopfer,
+      // Gegner-Hunger, Beute).
+      const marketCrashDecisions = (engine._marketCrashLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
       // Counter-Ausgabe-Kanal (Als Vorgabe 5.8.): "diesen Zähler jetzt
       // ausgeben oder für den Aufstieg aufheben?" — fired/held je
       // Entscheidung, Tags aus classifyCounterSpendTags.
@@ -1087,6 +1095,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         // T3: Mulligan-Entscheidungen samt Hand
         mulliganLog: (engine._mulliganLog || []).filter(e => e.pi === pinnedIdx),
         statusHealDecisions,
+        marketCrashDecisions,
         counterSpendDecisions,
         formTurns,
         descends,

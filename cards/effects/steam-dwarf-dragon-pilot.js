@@ -135,7 +135,13 @@ function occupiedDropSlots(gs, pi, engine) {
   return out;
 }
 
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'dragonPilot';
 module.exports = attachSteamEngine({
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 3,
+  chargeKey: USE_KEY,
   // CPU: confirm the "unleash fireball?" prompt — the default brain declines
   // cancellable confirms outside a card-cast (onDiscard trigger), so without
   // this the fireball never fires. Free damage is beneficial. (Title == card
@@ -269,7 +275,7 @@ module.exports = attachSteamEngine({
      * Up to 3 uses per turn per instance (tracked on inst.counters).
      * Does NOT conflict with the shared STEAM ENGINE passive: that
      * one has its own HOPT key (_steamEngineTurn), while this one
-     * uses _dragonPilotDischarge for counting uses.
+     * nutzt den gemeinsamen Rundenzaehler (Schluessel `dragonPilot`).
      */
     onDiscard: async (ctx) => {
       const engine = ctx._engine;
@@ -291,20 +297,15 @@ module.exports = attachSteamEngine({
       // (Kreaturen toter/gestunnter Heroes bleiben aktiv).
       if (!engine.isCardEffectActive(inst)) return;
 
-      // Track uses per turn on the instance itself
-      if (!inst.counters) inst.counters = {};
-      const turn = gs.turn || 0;
-      if (inst.counters._dragonPilotDischargeTurn !== turn) {
-        inst.counters._dragonPilotDischargeTurn = turn;
-        inst.counters._dragonPilotDischargeUsed = 0;
-      }
-      if (inst.counters._dragonPilotDischargeUsed >= DISCHARGES_PER_TURN) return;
+      // Rundenstempel und Kappe im gemeinsamen Zaehler (v417).
+      const freiDP = usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN });
+      if (freiDP <= 0) return;
 
       // Offer activation — this is optional, so player can decline.
       const confirm = await engine.promptGeneric(pi, {
         type: 'confirm',
         title: CARD_NAME,
-        message: `A card was discarded. Unleash a fireball for ${DISCHARGE_DAMAGE} damage? (${DISCHARGES_PER_TURN - inst.counters._dragonPilotDischargeUsed} use(s) left this turn)`,
+        message: `A card was discarded. Unleash a fireball for ${DISCHARGE_DAMAGE} damage? (${freiDP} use(s) left this turn)`,
         confirmLabel: '🔥 Fireball!',
         cancelLabel: 'No',
         cancellable: true,
@@ -326,8 +327,7 @@ module.exports = attachSteamEngine({
       if (!target) return;
 
       // Commit the use counter only once the player is locked in
-      inst.counters._dragonPilotDischargeUsed =
-        (inst.counters._dragonPilotDischargeUsed || 0) + 1;
+      spendUse(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN });
 
       const tgtOwner = target.owner;
       const tgtHeroIdx = target.heroIdx;
@@ -357,7 +357,7 @@ module.exports = attachSteamEngine({
         player: gs.players[pi]?.username,
         target: target.cardName,
         damage: DISCHARGE_DAMAGE,
-        usesRemaining: DISCHARGES_PER_TURN - inst.counters._dragonPilotDischargeUsed,
+        usesRemaining: usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN }),
       });
       engine.sync();
     },

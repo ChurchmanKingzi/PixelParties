@@ -167,7 +167,7 @@ module.exports = {
     }
 
     // Deduct gold
-    ps.gold = Math.max(0, (ps.gold || 0) - goldCost);
+    await engine._payCardCost(pi, goldCost);
 
     // Place in support zone
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];

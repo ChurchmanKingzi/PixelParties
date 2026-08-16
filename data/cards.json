@@ -25262,13 +25262,31 @@
     "atk": 30,
     "cost": null,
     "effect": "You may once per turn pay any amount of Gold to place that many Invest Counters on this Hero. If you ever have 0 Gold, remove all Invest Counters from this Hero. At the end of your turn, you may activate one of these effects:\n- Gain Gold equal to the number of Invest Counters on this Hero.\n- Deal damage equal to five times the number of Invest Counters on this Hero to any target on the board.",
-    "archetype": "Monkee",
+    "archetype": "Monkees",
     "setID": "PP MBS1",
     "banned": "",
     "startingAbility1": "Trade",
     "startingAbility2": "Wealth",
     "spellSchool1": "",
     "spellSchool2": "",
+    "foil": null
+  },
+  {
+    "name": "Market Crash",
+    "cardType": "Spell",
+    "subtype": "Normal",
+    "level": 0,
+    "hp": null,
+    "atk": null,
+    "cost": null,
+    "effect": "You may use this Spell as an additional Action while you have more Gold than your opponent. Both players' Gold becomes 0.",
+    "archetype": "",
+    "setID": "PP MSCH",
+    "banned": "",
+    "spellSchool1": "Magic Arts",
+    "spellSchool2": "",
+    "startingAbility1": "",
+    "startingAbility2": "",
     "foil": null
   }
 ]

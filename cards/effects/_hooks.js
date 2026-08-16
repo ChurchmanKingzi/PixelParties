@@ -90,6 +90,20 @@ const HOOKS = {
   // (Monkee-Archetyp: gain 4+ ... you may immediately pay that Gold).
   AFTER_RESOURCE_GAIN:  'afterResourceGain',
   AFTER_RESOURCE_SPEND: 'afterResourceSpend',
+  // Feuert, NACHDEM das Gold eines Spielers auf einen festen Betrag
+  // GESETZT wurde (`engine.actionSetGold`) — das ist WEDER ein Gewinn
+  // NOCH eine Zahlung (Als Ruling 16.8. zu "Market Crash": ein Wipe ist
+  // kein "spend", also feuert AFTER_RESOURCE_SPEND dabei ausdruecklich
+  // NICHT und Golden Arrows Gold-Sperre blockt ihn nicht).
+  // Genau deshalb braucht es diesen dritten Traeger: zustandsbasierte
+  // Gold-Regeln vom Zuschnitt "if you ever have 0 Gold" (Logan, the
+  // Investment Monkee) beschreiben einen DAUERZUSTAND und muessen auch
+  // nach einem Wipe greifen. Kontext: { playerIdx, before, amount,
+  // delta, sourceName }.
+  // BEWUSST NICHT in HOOK_DESCRIPTIONS eingetragen: das ist eine
+  // Zustandsmeldung, kein Aktivierungsereignis — es soll kein
+  // Reaktionsfenster oeffnen.
+  AFTER_GOLD_SET:       'afterGoldSet',
 
   // ── Level ──
   BEFORE_LEVEL_CHANGE: 'beforeLevelChange',

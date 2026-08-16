@@ -11,6 +11,21 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
+  //
+  // SONDERFALL: Nomus Zaehler gehoert der ENGINE, nicht der Karte —
+  // `actionDrawCards` fuehrt ihn unter `gs._nomuDrawCount` je Spieler
+  // (die Karte selbst ist rein passiv, sie hat gar keinen Hook). Der
+  // Zaehler wird beim Rundenbeginn fuer BEIDE Seiten genullt, ist also
+  // schon nach Als Regel gebaut; er bleibt deshalb, wo er ist, und die
+  // Anzeige liest ihn nur.
+  chargesPerTurn: 3,
+  remainingCharges: (inst, gs) => {
+    const pi = inst?.controller ?? inst?.owner;
+    if (pi == null) return null;
+    const benutzt = gs?._nomuDrawCount?.[`nomu_draws:${pi}`] || 0;
+    return { remaining: Math.max(0, 3 - benutzt), max: 3 };
+  },
   activeIn: ['hero'],
   isNomuHero: true,
   bypassHandLimit: true,

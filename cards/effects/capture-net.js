@@ -148,7 +148,10 @@ module.exports = {
     const totalCost = level * BASE_COST;
 
     // Final gold check (state may have shifted since targeting).
-    if ((ps.gold || 0) < totalCost) {
+    // Bezahlbarkeit inkl. Kreditrahmen (16.8.): ohne den blockiert
+    // diese Zeile genau die Zahlung, die der Ziel-Waehler oben
+    // bereits erlaubt hat — Als Book-of-Doom-Report.
+    if (!engine.canAffordGold(pi, totalCost, CARD_NAME)) {
       engine.log('capture_net_fizzle', {
         player: ps.username, reason: 'insufficient_gold', cost: totalCost,
       });
@@ -158,7 +161,7 @@ module.exports = {
     // ── Commit ──
     engine.claimHOPT(HOPT_KEY, pi);
     if (totalCost > 0) {
-      ps.gold -= totalCost;
+      await engine._payCardCost(pi, totalCost);
       engine.log('gold_spent', { player: ps.username, amount: totalCost, reason: CARD_NAME });
       engine._broadcastEvent('gold_change', { owner: pi, amount: -totalCost });
     }

@@ -16,9 +16,9 @@
 //  Animation: sickly jungle flowers overgrowing.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
-
-const LEVEL_STATS = { 1: 40, 2: 60, 3: 80 };
+const {
+  tokenStatsForLevel, freeSupportSlots, placeBiomancyToken,
+} = require('./_biomancy-shared');
 
 module.exports = {
   activeIn: ['ability'],
@@ -68,8 +68,7 @@ module.exports = {
         if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
 
         // Must have a free support zone
-        const supZones = ps.supportZones[hi] || [[], [], []];
-        if (![0, 1, 2].some(z => (supZones[z] || []).length === 0)) continue;
+        if (freeSupportSlots(engine, pi, hi).length === 0) continue;
 
         // Soft HOPT: check if this hero's Biomancy was already used this turn
         const hoptKey = `biomancy:${pi}:${hi}`;
@@ -92,7 +91,7 @@ module.exports = {
       for (const entry of eligible) {
         if (ctx.placed) break;
 
-        const stats = LEVEL_STATS[Math.min(entry.level, 3)];
+        const stats = tokenStatsForLevel(entry.level).hp;
 
         const result = await engine.promptGeneric(pi, {
           // Title must stay the bare card name so the CPU brain's
@@ -119,53 +118,15 @@ module.exports = {
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[`biomancy:${pi}:${entry.heroIdx}`] = gs.turn;
 
-        // Place the Potion itself as a Creature/Token in the support zone
-        const potionName = ctx.potionName;
-        const cardDB = engine._getCardDB();
-        const potionData = cardDB[potionName];
-        const placeResult = engine.safePlaceInSupport(potionName, pi, entry.heroIdx, -1);
-        if (!placeResult) continue;
-
-        const { inst, actualSlot } = placeResult;
-
-        // Override card data so the engine treats this Potion as a Creature/Token.
-        // The token's level scales with Biomancy's level (Lv1→0 / Lv2→1 /
-        // Lv3→2) — exposed via `_cardDataOverride.level` so any system
-        // that reads effective card data (Dark Gear's level-scaled cost
-        // gate, the on-board level badge, hover tooltip) sees a numeric
-        // level instead of `null`.
-        const tokenLevel = Math.max(0, entry.level - 1);
-        inst.counters._cardDataOverride = {
-          ...(potionData || {}),
-          cardType: 'Creature/Token',
-          hp: stats,
-          level: tokenLevel,
-          effect: `Once per turn: Deal ${stats} damage to any target on the board.`,
-        };
-        // Load the Biomancy Token's creature effect script instead of the potion's
-        inst.counters._effectOverride = 'Biomancy Token';
-        inst.counters.currentHp = stats;
-        inst.counters.maxHp = stats;
-        inst.counters.biomancyDamage = stats;
-        inst.counters.biomancyLevel = entry.level;
-
-        // Play flower overgrowth animation
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'biomancy_bloom',
-          owner: pi, heroIdx: entry.heroIdx, zoneSlot: actualSlot,
-        });
-        await engine._delay(600);
-
-        engine.log('biomancy_token_created', {
-          player: ps.username, hero: entry.hero.name,
-          potion: ctx.potionName, level: entry.level, hp: stats, damage: stats,
-        });
-
-        // Fire onCardEnterZone to trigger Pes'zet etc.
-        await engine.runHooks('onCardEnterZone', {
-          enteringCard: inst, toZone: 'support', toHeroIdx: entry.heroIdx,
-          _skipReactionCheck: true,
-        });
+        // Platzierung, Override, Animation, Log und onCardEnterZone
+        // liegen seit dem 16.8. in `_biomancy-shared.js` — dieselbe
+        // Stelle, aus der auch Kyli ihre Tokens erzeugt. Verhalten
+        // unveraendert, nur nicht mehr doppelt gepflegt.
+        const placed = await placeBiomancyToken(
+          engine, pi, entry.heroIdx, ctx.potionName, entry.level,
+          { sourceName: 'Biomancy' },
+        );
+        if (!placed) continue;
 
         ctx.setFlag('placed', true);
         engine.sync();

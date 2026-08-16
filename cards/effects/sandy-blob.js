@@ -35,7 +35,13 @@ const CARD_NAME = 'Sandy Blob';
 const DISCHARGE_DAMAGE = 50;
 const DISCHARGES_PER_TURN = 3;
 
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'sandyBlob';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 3,
+  chargeKey: USE_KEY,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -152,18 +158,11 @@ module.exports = {
       if (!inst || inst.zone !== 'support') return;
       if (!engine.isCardEffectActive(inst)) return;
 
-      // Per-turn use tracking on the instance (matches Dragon Pilot
-      // discharge accounting).
-      if (!inst.counters) inst.counters = {};
-      const turn = gs.turn || 0;
-      if (inst.counters._sandyBlobDischargeTurn !== turn) {
-        inst.counters._sandyBlobDischargeTurn = turn;
-        inst.counters._sandyBlobDischargeUsed = 0;
-      }
-      if (inst.counters._sandyBlobDischargeUsed >= DISCHARGES_PER_TURN) return;
+      // Rundenstempel und Kappe im gemeinsamen Zaehler (v417).
+      if (usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN }) <= 0) return;
 
       const pi = selfController;
-      const remaining = DISCHARGES_PER_TURN - inst.counters._sandyBlobDischargeUsed;
+      const remaining = usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN });
 
       // Single-step activation: go straight to the target picker. The
       // player either clicks an opponent target (activates) or cancels
@@ -184,8 +183,7 @@ module.exports = {
       });
       if (!target) return;
 
-      inst.counters._sandyBlobDischargeUsed =
-        (inst.counters._sandyBlobDischargeUsed || 0) + 1;
+      spendUse(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN });
 
       const tgtOwner = target.owner;
       const tgtHeroIdx = target.heroIdx;
@@ -215,7 +213,7 @@ module.exports = {
         trigger: entering.name,
         target: target.cardName,
         damage: DISCHARGE_DAMAGE,
-        usesRemaining: DISCHARGES_PER_TURN - inst.counters._sandyBlobDischargeUsed,
+        usesRemaining: usesLeft(inst, engine.gs, { key: USE_KEY, max: DISCHARGES_PER_TURN }),
       });
       engine.sync();
     },

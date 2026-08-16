@@ -2282,6 +2282,20 @@ select optgroup {
   animation: abilityBoltBounce 0.5s ease-in-out infinite alternate;
   z-index: 10;
 }
+/* ── ARTEFAKT-KREATUREN: WEISSES ABZEICHEN ─────────────────────────
+   Das goldene Schwert-Abzeichen sass auf einer goldenen Artefaktkarte
+   und war schlicht nicht zu sehen — Al hat das Highlight erst gefunden,
+   nachdem wir gemeinsam danach gesucht haben (16.8.). Fuer
+   Artefakt-Kreaturen deshalb weiss mit kaltem Schein, damit es sich
+   vom goldenen Kartenrahmen abhebt. Der Glimmrand der Zone bleibt
+   golden — der steht auf dem dunklen Hintergrund und ist gut sichtbar.
+   Nur der Vollstaendigkeit halber: normale Kreaturen behalten Gold. */
+.zone-creature-activatable.zone-artifact-creature::after {
+  color: #ffffff;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,1))
+          drop-shadow(0 0 14px rgba(180,220,255,.9))
+          drop-shadow(0 0 3px rgba(40,40,60,.9));
+}
 @keyframes creatureEffectPulse {
   0%, 100% { box-shadow: 0 0 22px rgba(255,190,80,1), 0 0 44px rgba(255,140,30,.75), 0 0 70px rgba(255,140,30,.35), inset 0 0 18px rgba(255,190,80,.45); border-color: rgba(255,190,80,1); }
   50%      { box-shadow: 0 0 36px rgba(255,220,130,1), 0 0 72px rgba(255,170,40,.95), 0 0 110px rgba(255,170,40,.55), inset 0 0 28px rgba(255,220,130,.75); border-color: rgba(255,240,180,1); }
@@ -3806,6 +3820,55 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   text-shadow: 0 0 10px rgba(255,215,0,.5);
 }
 
+/* Gold-Crash ("Market Crash"): beide Goldzahlen werden gleichzeitig rot
+   und ticken auf 0 herunter. Der Farbwechsel selbst laeuft ueber eine
+   kurze Transition, damit das Umschlagen nicht hart springt; das
+   Herunterzaehlen treibt React (siehe `goldCrash` in app-board.jsx).
+   Bewusst nur Farbe + Puls, KEIN Layout-Wechsel: die Zahl sitzt in einer
+   Flex-Zeile neben dem Muenz-Icon, ein Groessensprung wuerde die ganze
+   Leiste zappeln lassen. */
+.game-gold-value {
+  transition: color 220ms ease-out, text-shadow 220ms ease-out;
+}
+/* Negatives Gold (Debt-O-Tron). Als Vorgabe: „rot und mit einem -
+   vor dem Betrag". Das Minus setzt die Komponente (formatGold), hier
+   steht nur die Farbe. Bewusst ein anderer Rotton als der Crash-Puls
+   darunter — Schulden sind ein DAUERZUSTAND, kein Ereignis, also
+   ruhig statt pulsierend. */
+.game-gold-value.gold-negative {
+  color: #ff5c5c;
+  text-shadow: 0 0 10px rgba(255,60,60,.6);
+}
+/* Beides gleichzeitig (ein Crash auf einen verschuldeten Spieler):
+   der Crash-Puls gewinnt, sonst blinkt die Zahl zwischen zwei Rots. */
+.game-gold-value.gold-crashing.gold-negative {
+  color: #ff3b30;
+}
+.game-gold-value.gold-crashing {
+  color: #ff3b30;
+  text-shadow: 0 0 12px rgba(255,59,48,.75);
+  animation: goldCrashPulse 600ms ease-in-out infinite;
+}
+@keyframes goldCrashPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+
+/* Gegenstueck zum Absturz: Loan Shredder tilgt die Schulden, der Zaehler
+   laeuft von −X auf 0 hinauf. GRUEN statt rot (Als Vorgabe 16.8.) — und
+   die Gruen-Regel muss die `.gold-negative`-Rotfaerbung ueberschreiben,
+   solange die Animation laeuft, sonst blieben die Minuswerte rot. */
+.game-gold-value.gold-recovering,
+.game-gold-value.gold-recovering.gold-negative {
+  color: #3ddc84;
+  text-shadow: 0 0 12px rgba(61,220,132,.75);
+  animation: goldRecoverPulse 600ms ease-in-out infinite;
+}
+@keyframes goldRecoverPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .8; transform: scale(1.06); }
+}
+
 /* Hand action buttons (Sort / Shuffle) — fixed position, left of gold */
 .hand-actions {
   position: absolute;
@@ -4515,6 +4578,36 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    creature). Sits bottom-left on the support card so it doesn't clash
    with summoning-sickness (top-left), additional-action (top-right),
    creature-level (right-middle), or mummified (bottom-right). */
+/* ── LADUNGSANZEIGE OBEN RECHTS ────────────────────────────────────
+   Fuer Permanents mit „up to X times per turn" (Al 16.8.). Weiss,
+   solange Ladungen uebrig sind, rot bei 0. Oben RECHTS, damit sie dem
+   Zaehler-Abzeichen (unten links) nicht ins Gehege kommt; das
+   Aktivierbar-Abzeichen sitzt ausserhalb der Karte (top/right -10px)
+   und ueberdeckt sie deshalb nicht. */
+.zone-charge-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: calc(11px * var(--board-scale));
+  padding: 1px 3px;
+  font-family: 'Pixel Intv', 'Press Start 2P', monospace;
+  font-size: calc(9px * var(--board-scale));
+  line-height: 1.1;
+  text-align: center;
+  color: #ffffff;
+  background: rgba(10, 15, 30, 0.82);
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 3px;
+  text-shadow: 0 0 3px #000, 1px 1px 0 #000;
+  pointer-events: none;
+  z-index: 9;
+}
+.zone-charge-badge.zone-charge-empty {
+  color: #ff5c5c;
+  border-color: rgba(255,92,92,.9);
+  background: rgba(40, 6, 6, 0.85);
+}
+
 .head-counter-badge {
   position: absolute;
   left: 1px;
@@ -5884,6 +5977,42 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   12%  { opacity: 1; }
   80%  { opacity: 1; }
   100% { transform: translate(var(--pp-banana-tilt, 0px), 132px) rotate(var(--pp-banana-spin, 180deg)); opacity: 0; }
+}
+
+/* Logan — verfallene Invest Counter (16.8., Als Vorgabe „kleine
+   Animation, wenn er durch seinen eigenen Effekt auf 0 faellt").
+   Gegenstueck zum Bananenregen darueber: die Muenzen fallen VOM
+   Zaehler-Abzeichen weg statt auf ein Ziel, kippen dabei zur Seite und
+   ENTFAERBEN sich (`grayscale` + `saturate`) — das Gold wird zu Asche.
+   Kurzer Aufwaerts-Impuls am Anfang, damit es wie „abspringen" aussieht
+   und nicht wie ein simples Durchfallen. */
+/* Kent — Verschuldung. Rote Muenzen fallen NACH OBEN aus der Karte
+   heraus: das Gold ist nicht verloren wie bei Logan, es ist ins Minus
+   abgeflossen. Gleiche Grammatik, umgekehrte Richtung. */
+@keyframes pp-debt-coin-rise {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(.8); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translate(var(--pp-debt-drift, 0px), -66px) rotate(var(--pp-debt-spin, 180deg)) scale(1.05);
+         opacity: 0; }
+}
+
+/* Flammen von Missing Parts: aufsteigend, kurz groesser werdend, dann
+   ausduennend. Gegenstueck zu `pp-invest-coin-drop` (fallend/entfaerbend). */
+@keyframes pp-debt-flame-rise {
+  0%   { transform: translate(0, 6px) scale(.55); opacity: 0; }
+  18%  { transform: translate(calc(var(--pp-flame-drift, 0px) * .25), -4px) scale(1.12); opacity: 1; }
+  60%  { transform: translate(calc(var(--pp-flame-drift, 0px) * .7), calc(var(--pp-flame-rise, -60px) * .62)) scale(1); opacity: .9; }
+  100% { transform: translate(var(--pp-flame-drift, 0px), var(--pp-flame-rise, -60px)) scale(.5); opacity: 0; }
+}
+
+@keyframes pp-invest-coin-drop {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1);
+         opacity: 0; filter: none; }
+  10%  { transform: translate(0, -9px) rotate(calc(var(--pp-invest-spin, 180deg) * .12)) scale(1.05);
+         opacity: 1; }
+  55%  { opacity: .85; filter: grayscale(.55) saturate(.7); }
+  100% { transform: translate(var(--pp-invest-drift, 0px), 74px) rotate(var(--pp-invest-spin, 180deg)) scale(.72);
+         opacity: 0; filter: grayscale(1) saturate(.3); }
 }
 
 .anim-gold-flash {
@@ -10203,6 +10332,14 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   cursor: pointer;
   transition: border-color .15s, transform .1s;
   position: relative;
+  /* Zellen ausserhalb des Sichtbereichs ueberspringen Layout und Paint
+     (Fix 16.8. zur Ladezeit des Puzzle-Creators). `aspect-ratio` oben
+     gibt der Zelle ihre Hoehe auch dann, wenn der Inhalt uebersprungen
+     wird — das Raster bleibt also stabil und die Scrollleiste springt
+     nicht. `contain-intrinsic-size` ist der Rueckfall fuer Browser, die
+     die Hoehe nicht aus dem Seitenverhaeltnis ableiten. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
 }
 .pz-search-card:hover {
   border-color: var(--accent);

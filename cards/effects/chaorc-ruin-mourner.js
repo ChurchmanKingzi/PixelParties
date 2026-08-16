@@ -29,7 +29,13 @@ const { isOwnSacrifice } = require('./_chaorcs-shared');
 const CARD_NAME = 'Chaorc Ruin Mourner';
 const MAX_BURNS = 4;
 
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'ruinBurn';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 4,
+  chargeKey: USE_KEY,
   activeIn: ['hand', 'support'],
 
   /**
@@ -69,10 +75,10 @@ module.exports = {
       // allowing a separate copy's sacrifice to trigger the burn.
       if (!isOwnSacrifice(ctx, pi)) return;
 
-      // Per-turn 4-use cap, scoped per Ruin Mourner instance.
-      const c = ctx.card.counters || (ctx.card.counters = {});
-      if (c._ruinBurnTurn !== gs.turn) { c._ruinBurnTurn = gs.turn; c._ruinBurnCount = 0; }
-      if ((c._ruinBurnCount || 0) >= MAX_BURNS) return;
+      // Kappe von 4 Nutzungen je Ruin-Mourner-Instanz. Rundenstempel
+      // und Kappe stecken seit v417 im gemeinsamen Zaehler.
+      const freiRB = usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
+      if (freiRB <= 0) return;
 
       const heroIdx = ctx.cardHeroIdx;
       // The tribute that triggered this burn is already marked for death —
@@ -87,7 +93,7 @@ module.exports = {
         damageType: 'creature',
         baseDamage: 80,
         title: CARD_NAME,
-        description: `You may deal 80 damage to a target. (${MAX_BURNS - (c._ruinBurnCount || 0)} use${MAX_BURNS - (c._ruinBurnCount || 0) !== 1 ? 's' : ''} left this turn.)`,
+        description: `You may deal 80 damage to a target. (${freiRB} use${freiRB !== 1 ? 's' : ''} left this turn.)`,
         confirmLabel: '💀 80 Damage!',
         confirmClass: 'btn-danger',
         cancellable: true,
@@ -95,7 +101,7 @@ module.exports = {
       });
       if (!target) return; // declined — use not spent
 
-      c._ruinBurnCount = (c._ruinBurnCount || 0) + 1;
+      spendUse(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS });
 
       const slot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {
@@ -114,7 +120,7 @@ module.exports = {
         }
       }
       engine.log('ruin_mourner_burn', {
-        player: gs.players[pi]?.username, used: c._ruinBurnCount, target: target.cardName || target.type,
+        player: gs.players[pi]?.username, used: MAX_BURNS - usesLeft(ctx.card, gs, { key: USE_KEY, max: MAX_BURNS }), target: target.cardName || target.type,
       });
       engine.sync();
     },
@@ -125,9 +131,8 @@ module.exports = {
     // ally deaths as fuel for its on-sacrifice burn.
     chainSource: {
       isArmed: (engine, inst) => {
-        const c = inst.counters || {};
-        const used = c._ruinBurnTurn === engine.gs.turn ? (c._ruinBurnCount || 0) : 0;
-        return inst.zone === 'support' && used < MAX_BURNS;
+        return inst.zone === 'support'
+          && usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_BURNS }) > 0;
       },
       triggersOn: (engine, tributeInst, sourceInst) =>
         (tributeInst.controller ?? tributeInst.owner) === (sourceInst.controller ?? sourceInst.owner),

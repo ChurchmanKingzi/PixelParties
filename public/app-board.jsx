@@ -5,7 +5,8 @@
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
 const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands,
-        cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB } = window;
+        cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB,
+        useStickyHoverFlag } = window;
 
 // ═══════════════════════════════════════════
 //  TYPEWRITER TEXT (win/loss speech bubbles)
@@ -471,6 +472,21 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
       {label}
     </div>
   );
+}
+
+// ── Gold-Darstellung, inkl. NEGATIVEM Gold (Debt-O-Tron) ──────────
+// Der Archetyp laesst den Kontostand unter 0 fallen; Als Vorgabe:
+// „rot und mit einem - vor dem Betrag". `Math.abs` + eigenes Vorzeichen
+// statt einfach der Zahl, damit das Minus garantiert direkt am Betrag
+// klebt und nicht von einer Locale-Formatierung verschoben wird.
+function goldIsNegative(v) { return (Number(v) || 0) < 0; }
+/** Finanziert sich diese Karte selbst? Namensliste kommt vom Server. */
+function goldSelfFinanced(ps, cardName) {
+  return !!cardName && (ps?.goldSelfOverdraftCards || []).includes(cardName);
+}
+function formatGold(v) {
+  const n = Number(v) || 0;
+  return n < 0 ? '-' + Math.abs(n) : String(n);
 }
 
 // Floating gold gain number
@@ -8598,6 +8614,159 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  debt_incurred: (() => {
+    // Kent, the Indebted Apprentice: der Spieler ist ins Minus
+    // gerutscht. Gegenstueck zu Logans `invest_counters_lost` — dort
+    // fallen Muenzen WEG und entfaerben sich, hier steigen sie ROT aus
+    // der Karte auf: das Gold ist nicht verloren, es ist Schuld
+    // geworden. `count` skaliert grob mit der Hoehe der Schulden.
+    return function DebtIncurredEffect({ x, y, count }) {
+      const anzahl = Math.max(3, Math.min(12, count || 5));
+      const muenzen = useMemo(() => Array.from({ length: anzahl }, () => ({
+        xOff: -22 + Math.random() * 44,
+        size: 13 + Math.random() * 8,
+        delay: Math.random() * 260,
+        dur: 620 + Math.random() * 280,
+        spin: -140 + Math.random() * 280,
+        drift: -20 + Math.random() * 40,
+      })), [anzahl]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{
+            background: 'radial-gradient(circle, rgba(255,80,80,.6) 0%, rgba(180,40,40,.25) 45%, transparent 72%)',
+          }} />
+          {muenzen.map((m, i) => (
+            <div key={i}
+              style={{
+                position: 'absolute',
+                left: m.xOff - m.size / 2, top: -m.size / 2,
+                fontSize: m.size,
+                filter: 'drop-shadow(0 0 6px rgba(255,90,90,.85)) hue-rotate(-35deg) saturate(1.6)',
+                animation: `pp-debt-coin-rise ${m.dur}ms cubic-bezier(.3,.5,.4,1) ${m.delay}ms both`,
+                ['--pp-debt-spin']: `${m.spin}deg`,
+                ['--pp-debt-drift']: `${m.drift}px`,
+              }}
+            >🪙</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  debt_flames: (() => {
+    // Debt-O-Tron Model Missing Parts: „10× deine Schulden" als Schaden.
+    // Al wollte ausdruecklich FLAMMEN, deren ANZAHL UND GROESSE mit dem
+    // angerichteten Schaden skalieren (Vorgabe 16.8.).
+    //
+    // Gegenstueck zu Logans fallenden Muenzen: dort faellt etwas weg und
+    // entfaerbt sich, hier steigt etwas auf und wird heisser. Nach der
+    // Hausregel bedeutet AUFWAERTS „etwas passiert JETZT".
+    //
+    // Skalierung bewusst logarithmisch statt linear: zwischen 30 und 300
+    // Schaden liegt Faktor 10, aber 10x so viele Flammen waeren eine
+    // Wand. `stufe` laeuft von 0 (wenig) bis 1 (sehr viel) und steuert
+    // Anzahl (5→16) und Groesse (16→40px) gemeinsam.
+    return function DebtFlamesEffect({ x, y, damage }) {
+      const schaden = Math.max(1, Number(damage) || 10);
+      const stufe = Math.min(1, Math.log10(schaden / 10 + 1) / Math.log10(31));
+      const anzahl = Math.round(5 + stufe * 11);
+      const basis = 16 + stufe * 24;
+      const flammen = useMemo(() => Array.from({ length: anzahl }, (_, i) => ({
+        // Breiter gestreut, je mehr Schaden — kleine Treffer bleiben ein
+        // Zuengeln in der Kartenmitte, grosse ein Flaechenbrand.
+        xOff: (-18 - stufe * 26) + Math.random() * (36 + stufe * 52),
+        size: basis * (0.62 + Math.random() * 0.62),
+        delay: Math.random() * 220,
+        dur: 520 + Math.random() * 340,
+        drift: -14 + Math.random() * 28,
+        hoehe: 42 + stufe * 46 + Math.random() * 26,
+      })), [anzahl, basis, stufe]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Hitzeblitz am Boden — waechst mit der Stufe mit. Wie beim
+              Muenz-Blitz KEIN left/top: `.anim-gold-flash` zentriert
+              sich selbst ueber den Ankerpunkt. */}
+          <div className="anim-gold-flash" style={{
+            transform: `scale(${1 + stufe * 1.5})`,
+            background: 'radial-gradient(circle, rgba(255,180,60,.6) 0%, rgba(255,90,20,.28) 45%, transparent 72%)',
+          }} />
+          {flammen.map((f, i) => (
+            <div key={i}
+              style={{
+                position: 'absolute',
+                left: f.xOff - f.size / 2,
+                top: -f.size / 2,
+                fontSize: f.size,
+                filter: `drop-shadow(0 0 ${4 + stufe * 8}px rgba(255,140,40,.85))`,
+                animation: `pp-debt-flame-rise ${f.dur}ms cubic-bezier(.25,.6,.4,1) ${f.delay}ms both`,
+                ['--pp-flame-drift']: `${f.drift}px`,
+                ['--pp-flame-rise']: `${-f.hoehe}px`,
+              }}
+            >🔥</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+
+  invest_counters_lost: (() => {
+    // Logan, the Investment Monkee: seine Invest Counter sind verfallen
+    // („If you ever have 0 Gold, remove all Invest Counters").
+    //
+    // Bewusst das GEGENSTUECK zum goldenen Bananenregen derselben Karte:
+    // dort faellt Gold AUF ein Ziel und blitzt golden, hier faellt es
+    // VOM Helden weg und die Muenzen entfaerben sich im Fallen. Nach der
+    // Hausregel fuer Effekte bedeutet ABWAERTS „etwas ist weg".
+    //
+    // Die Muenzen starten MITTIG auf der Heldenkarte und fallen von dort
+    // weg. Erster Wurf haengte sie ans Zaehler-Abzeichen oben rechts —
+    // das sass im Spiel auf der rechten Kante statt auf der Karte (Als
+    // Korrektur 16.8.).
+    // `count` ist die Zahl der verlorenen Counter; gedeckelt, damit ein
+    // 40-Counter-Logan keine Muenzlawine ausloest.
+    return function InvestCountersLostEffect({ x, y, count }) {
+      const anzahl = Math.max(3, Math.min(12, count || 5));
+      const muenzen = useMemo(() => Array.from({ length: anzahl }, () => ({
+        xOff: -22 + Math.random() * 44,
+        size: 13 + Math.random() * 9,
+        delay: Math.random() * 260,
+        dur: 620 + Math.random() * 300,
+        spin: -160 + Math.random() * 320,
+        drift: -26 + Math.random() * 52,
+      })), [anzahl]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Kurzer aschgrauer Blitz statt des goldenen. KEIN left/top
+              hier — `.anim-gold-flash` zentriert sich selbst ueber den
+              Ankerpunkt (left/top -20 bei 40x40). Ein Ueberschreiben
+              haette den Blitz an seiner oberen linken Ecke aufgehaengt. */}
+          <div className="anim-gold-flash" style={{
+            background: 'radial-gradient(circle, rgba(190,180,150,.55) 0%, rgba(120,110,90,.22) 45%, transparent 72%)',
+          }} />
+          {muenzen.map((m, i) => (
+            <div key={i}
+              style={{
+                position: 'absolute',
+                // Mittig auf der Karte (16.8., Als Korrektur). Der erste
+                // Wurf setzte den Ursprung ans Zaehler-Abzeichen oben
+                // rechts — im Spiel sass die Animation damit auf der
+                // rechten KANTE statt auf der Karte. Anker ist jetzt der
+                // Mittelpunkt der Heldenzone, den `playAnimation` als
+                // x/y liefert; `-size/2` zentriert das Glyph darauf,
+                // sonst haenge es an seiner oberen linken Ecke.
+                left: m.xOff - m.size / 2,
+                top: -m.size / 2,
+                fontSize: m.size,
+                filter: 'drop-shadow(0 0 5px rgba(190,170,110,.7))',
+                animation: `pp-invest-coin-drop ${m.dur}ms cubic-bezier(.35,.02,.6,1) ${m.delay}ms both`,
+                ['--pp-invest-spin']: `${m.spin}deg`,
+                ['--pp-invest-drift']: `${m.drift}px`,
+              }}
+            >🪙</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   juice_bubbles: (() => {
     // Orange juice bubbles — same as beer but orange palette
     return function JuiceBubblesEffect({ x, y }) {
@@ -15267,7 +15436,14 @@ function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
 // When not hovered, shows the Creature's own art with the appropriate
 // corner badge.
 function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...boardCardProps }) {
-  const [hovered, setHovered] = useState(false);
+  // `useStickyHoverFlag` statt eines nackten useState: der Hover TAUSCHT
+  // hier das Kartenbild, der Knoten unter dem Zeiger wird also mitten in
+  // der Bewegung ersetzt — genau die Lage, in der ein mouseleave
+  // verlorengeht und die Karte auf dem Overlay haengenbleibt (Als
+  // Biomancy-Token-Report 16.8.). Der Hook prueft nach, ob der Zeiger
+  // wirklich noch drueber ist.
+  const wrapRef = useRef(null);
+  const [hovered, hoverProps] = useStickyHoverFlag(wrapRef);
   const overlay = attachedHero || mimicCreature;
   const showName = hovered ? overlay : creatureName;
   const isMimic = !attachedHero && !!mimicCreature;
@@ -15276,10 +15452,9 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...
   const badgeShortName = (overlay || '').split(',')[0] || (isMimic ? 'Mimic' : 'Hero');
   const badgeTitle = isMimic ? `Mimicking: ${overlay}` : `Attached: ${overlay}`;
   return (
-    <div className="attachable-creature-wrap"
+    <div className="attachable-creature-wrap" ref={wrapRef}
       style={{ position: 'relative', width: '100%', height: '100%' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}>
+      {...hoverProps}>
       <BoardCard {...boardCardProps} cardName={showName} />
       {!hovered && overlay && (
         <div className="attached-hero-badge"
@@ -15299,15 +15474,17 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...
 
 // Renders an ability zone stack — handles Performance visual transformation
 function AbilityStack({ cards }) {
-  const [hovered, setHovered] = useState(false);
+  // Gleiche Bauform wie AttachableCreatureCard oben — der Hover tauscht
+  // das Bild der obersten Performance-Karte, also dieselbe Falle.
+  const stackRef = useRef(null);
+  const [hovered, hoverProps] = useStickyHoverFlag(stackRef);
   // Check if top card is Performance — if so, display the ability below it
   const topCard = cards[cards.length - 1];
   const isTopPerformance = topCard === 'Performance';
   const displayName = isTopPerformance && cards.length > 1 ? cards[cards.length - 2] : topCard;
 
   return (
-    <div className="board-ability-stack"
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    <div className="board-ability-stack" ref={stackRef} {...hoverProps}>
       {cards.map((c, ci) => {
         // When top is Performance: show the underlying ability image for Performance cards,
         // but on hover, show the actual Performance card
@@ -16071,6 +16248,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const oppIdx = myIdx === 0 ? 1 : 0;
   // Großer Karten-Auftritt (Terror). null = nichts zu zeigen.
   const [cardShowcase, setCardShowcase] = useState(null);
+  // Gold-Crash-Anzeige ("Market Crash"). null = normal, sonst ein Array
+  // [wertP0, wertP1] mit den ANZUZEIGENDEN Zwischenständen. Der Server
+  // hat das Gold längst auf 0 gesetzt und synchronisiert; diese Werte
+  // überschreiben die Anzeige rein kosmetisch, bis der Countdown durch
+  // ist. Deshalb React-State und nicht textContent: ein sync() mitten im
+  // Countdown würde eine DOM-Manipulation sofort überschreiben.
+  const [goldCrash, setGoldCrash] = useState(null);
+  const goldCrashRaf = useRef(null);
+  // 'crash' (rot) oder 'recover' (gruen) — steuert die Zaehler-Klasse.
+  const [goldCrashTone, setGoldCrashTone] = useState('crash');
   const me = gameState.players[myIdx];
   const opp = gameState.players[oppIdx];
   const gameSkins = useMemo(() => ({ ...(me.deckSkins || {}), ...(opp.deckSkins || {}) }), [me.deckSkins, opp.deckSkins]);
@@ -17805,6 +17992,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
+    // Karteneigenes Gate (`canPlayWithHero`), vom Server ausgewertet.
+    // Ohne das prueft der Client nur die KOSTEN — Debt-O-Trons sahen
+    // dadurch spielbar aus, obwohl ihre „nur bei negativem Gold"- und
+    // „nur einmal pro Zug"-Bedingungen nicht erfuellt waren.
+    if ((me.cardGateBlockedCards || []).includes(cardName)) return true;
 
     // Divine Gift of Creation lock: dim cards with locked names
     if ((me.creationLockedNames || []).includes(cardName)) return true;
@@ -17873,7 +18065,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // (mirrors `applyRustingCrystalCostMultiplier` server-side).
           const baseAfterCrystal = applyCrystalCostMods(me, cardName, card.cost || 0);
           const effCost = Math.max(0, baseAfterCrystal - handReduction);
-          if ((me.gold || 0) < effCost) return true;
+          if (!goldSelfFinanced(me, card.name)
+              && (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) < effCost) return true;
         }
         // Once-per-game artifacts (Smug Coin, etc.)
         if ((me.oncePerGameUsed || []).includes(cardName)) return true;
@@ -18793,7 +18986,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const isEquipPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card && card.cardType === 'Artifact'
       && (['equipment','creature'].includes((card.subtype || '').toLowerCase().trim())
           || (card.subtype || '').toLowerCase().split('/').some(t => t.trim() === 'creature'))
-      && (me.gold || 0) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0));
+      // Bezahlbarkeit MIT Kreditrahmen. Beides kommt vom Server:
+      //  · `goldOverdraft` — kartenunabhaengiger Rahmen (Kent: 20 je
+      //    Zahlung, 0 ohne den Archetyp). Basis ist `max(0, gold)`, nicht
+      //    `gold` — der Rahmen begrenzt NEUE Schuld, ist also auch aus
+      //    dem Minus heraus voll verfuegbar (Als Korrektur 16.8.).
+      //  · `goldSelfOverdraftCards` — Karten, die sich SELBST finanzieren
+      //    („Debt-O-Tron Damage Fees"). Der Client kennt keine
+      //    Kartenskripte, deshalb schickt der Server die Namen.
+      // Ohne beides graut die Oberflaeche Karten aus, die der Server
+      // laengst erlaubt.
+      && (goldSelfFinanced(me, card.name)
+          || (Math.max(0, me.gold || 0) + (me.goldOverdraft || 0)) >= Math.max(0, applyCrystalCostMods(me, card.name, card.cost || 0) - ((me.handCostReductions || {})[idx] || 0)));
     // "Artifact-activatable" is click-to-use (potions / Wheels-style). It
     // excludes Equipment AND Artifact-Creatures — both of those are drag-
     // to-hero plays instead. Reaction-subtype Artifacts (Invisibility
@@ -20493,13 +20697,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }, 400);
     };
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneType, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim }) => {
       if (window.playSFX) window.playSFX('laser', { dedupe: 60, category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
-      const srcEl = sourceZoneSlot != null && sourceZoneSlot >= 0
-        ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
-        : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      // `sourceZoneType: 'ability'` laesst den Strahl an einer ABILITY-Zone
+      // beginnen statt an einer Support Zone (16.8., Als Occultism-Report:
+      // der Strahl startete an der geopferten Kreatur statt an der
+      // Occultism, die gefeuert hat). Ohne die Angabe bleibt alles wie
+      // vorher — Support-Slot, sonst die Heldenzone.
+      const srcEl = (sourceZoneType === 'ability' && sourceHeroIdx >= 0 && sourceZoneSlot >= 0)
+        ? document.querySelector(`[data-ability-zone][data-ability-owner="${srcLabel}"][data-ability-hero="${sourceHeroIdx}"][data-ability-slot="${sourceZoneSlot}"]`)
+        : (sourceZoneSlot != null && sourceZoneSlot >= 0
+          ? document.querySelector(`[data-support-zone][data-support-owner="${srcLabel}"][data-support-hero="${sourceHeroIdx}"][data-support-slot="${sourceZoneSlot}"]`)
+          : document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`));
       let tgtEl;
       if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
@@ -25753,6 +25964,85 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_gold_coins', onGoldCoins);
+    // ── GOLD-CRASH ("Market Crash") ────────────────────────────────
+    // Beide Goldzahlen werden gleichzeitig rot und ticken in
+    // `durationMs` gleichmäßig auf 0 herunter. EIN rAF-Lauf treibt
+    // beide Seiten, damit sie wirklich synchron laufen — zwei separate
+    // Schleifen driften auseinander.
+    //
+    // Die Tickzahl ergibt sich von selbst aus dem Startbetrag: bei
+    // linearer Interpolation über eine feste Dauer wechselt die Zahl
+    // genau so oft, wie Gold da war (obere Grenze ist die Bildrate).
+    // 30 Gold ticken also sichtbar schneller als 4 — Als Vorgabe.
+    //
+    // `Math.ceil` statt `Math.round`: so bleibt der Startwert im ersten
+    // Frame stehen und die 0 fällt exakt am Ende, nicht kurz davor.
+    const onGoldCrash = ({ amounts, durationMs, to, tone }) => {
+      if (!Array.isArray(amounts)) return;
+      const start = [Number(amounts[0]) || 0, Number(amounts[1]) || 0];
+      // `to` (optional): Zielwert je Spieler. Ohne Angabe zaehlt beides
+      // auf 0 herunter — das ist Market Crash. Loan Shredder setzt NUR
+      // den eigenen Stand auf 0 und haelt den Gegner auf seinem Wert
+      // fest, sonst wuerde die Animation dem Gegner faelschlich einen
+      // Absturz vorspielen (Als Vorgabe 16.8.).
+      const ziel = Array.isArray(to)
+        ? [Number(to[0]) || 0, Number(to[1]) || 0]
+        : [0, 0];
+      // `tone`: 'crash' (rot/absteigend, Standard) oder 'recover'
+      // (gruen/aufsteigend). Steuert Klangrichtung und CSS-Klasse.
+      const heilend = tone === 'recover';
+      setGoldCrashTone(heilend ? 'recover' : 'crash');
+      const dur = Math.max(1, Number(durationMs) || 3000);
+      if (goldCrashRaf.current) cancelAnimationFrame(goldCrashRaf.current);
+      setGoldCrash(start.slice());
+      // ── KLANG: absteigende Muenz-Kaskade ─────────────────────────
+      // Bewusst der VORHANDENE `gold_gain`-Klang, nur mit fallender
+      // Tonhoehe abgespielt — nach der Hausregel für Effekte bedeutet
+      // eine ABWAERTS-Richtung "etwas ist weg". Sechs Anschlaege über
+      // die Dauer verteilt, Rate 1.0 → 0.5 und leiser werdend, damit es
+      // wie ein versiegender Muenzstrom klingt statt wie ein Maschinen-
+      // gewehr. Die Anschlaege werden mit `delay` sample-genau im
+      // AudioContext eingeplant, laufen also nicht ueber setTimeout und
+      // driften nicht gegen die Zahlen.
+      // `dedupe: 0` ist noetig: alle sechs Aufrufe passieren im selben
+      // Tick, ein Dedupe-Fenster wuerde fuenf davon schlucken.
+      // Bewegte Gesamtstrecke — nicht die blosse Summe: bei `recover`
+      // startet sie negativ, `gesamt > 0` haette den Klang verschluckt.
+      const strecke = Math.abs(start[0] - ziel[0]) + Math.abs(start[1] - ziel[1]);
+      if (strecke > 0 && window.playSFX) {
+        const N = 6;
+        for (let i = 0; i < N; i++) {
+          const t = (N - 1) === 0 ? 0 : i / (N - 1);
+          window.playSFX('gold_gain', {
+            delay: (dur / N) * i,
+            // AUFSTEIGEND beim Tilgen, ABSTEIGEND beim Absturz —
+            // dieselbe Hausregel wie bei den Muenzen/Flammen.
+            rate: heilend ? 0.7 + 0.5 * t : 1 - 0.5 * t,
+            volume: heilend ? 0.6 + 0.3 * t : 0.9 - 0.45 * t,
+            dedupe: 0,
+          });
+        }
+      }
+      const t0 = performance.now();
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / dur);
+        if (p >= 1) {
+          goldCrashRaf.current = null;
+          setGoldCrash(null);   // ab hier wieder der echte Serverwert
+          return;
+        }
+        // Von `start` nach `ziel` statt fest gegen 0. `Math.round`
+        // statt `Math.ceil`, damit die Zahl aus dem Minus heraus
+        // gleichmaessig laeuft (ceil sprang bei negativen Werten).
+        setGoldCrash([
+          Math.round(start[0] + (ziel[0] - start[0]) * p),
+          Math.round(start[1] + (ziel[1] - start[1]) * p),
+        ]);
+        goldCrashRaf.current = requestAnimationFrame(step);
+      };
+      goldCrashRaf.current = requestAnimationFrame(step);
+    };
+    socket.on('play_gold_crash', onGoldCrash);
     const onDeckToDeleted = ({ owner, cards }) => {
       const prefix = owner === myIdx ? 'my' : 'opp';
       const deckEl = document.querySelector(`[data-${prefix}-deck]`);
@@ -25881,6 +26171,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('yolomungandr_manifest', onYolomungandrManifest);
       socket.off('play_chaos_screen', onChaosScreen);
       socket.off('play_gold_coins', onGoldCoins);
+      socket.off('play_gold_crash', onGoldCrash);
+      if (goldCrashRaf.current) { cancelAnimationFrame(goldCrashRaf.current); goldCrashRaf.current = null; }
       socket.off('deck_to_deleted', onDeckToDeleted);
     };
   }, []);
@@ -27572,7 +27864,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'zsos_ssar_cost') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} inflicted Poison on {entry.target} (Serpent's Cost).</span>; }
       if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
       if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }
-      if (t === 'biomancy_token_created') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} converted {cName(entry.potion)} into a Biomancy Token ({entry.hp} HP)!</span>; }
+      if (t === 'logan_invest') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} invested <span className="log-amount" style={{color:'#ffcc44'}}>{entry.paid}</span> Gold — now at <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''}.</span>; }
+      if (t === 'logan_payout_gold') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} for <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold!</span>; }
+      if (t === 'logan_payout_damage') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} — <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
+            if (t === 'kent_overdraft') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} went into debt — Gold is now <span className="log-amount">{entry.gold}</span>. No more Actions this turn.</span>; }
+      if (t === 'debt_o_tron_fees') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} played {cName('Debt-O-Tron Damage Fees')} on credit — <span className="log-amount">{entry.cost}</span> Gold charged, leaving <span className="log-amount">{entry.gold}</span>.</span>; }
+            if (t === 'logan_invest_wiped') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} dropped to 0 Gold — {cName(entry.hero)} lost <span className="log-amount">{entry.lost}</span> Invest Counter{entry.lost !== 1 ? 's' : ''}!</span>; }
+            if (t === 'biomancy_token_created') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} converted {cName(entry.potion)} into a Biomancy Token ({entry.hp} HP)!</span>; }
       if (t === 'biomancy_token_attack') { const p = playerByName(entry.player); return <span className="log-damage">Biomancy Token dealt <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
       if (t === 'intrude_placed') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} attached {cName('Intrude')} to {entry.hero}.</span>; }
       if (t === 'intrude_negate') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Intrude negated {entry.target}'s draw of {entry.blocked} card{entry.blocked!==1?'s':''}!</span>; }
@@ -28028,6 +28326,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 ) : (
                   <div className="board-zone-empty">{'Hero ' + (i+1)}</div>
                 )}
+                {/* Ladungen eines Helden mit „up to X times per turn"
+                    (Kassaran, Luna Pele, Nero Zira, Nomu, Teppes).
+                    Nur die eigene Seite — der Gegner soll nicht
+                    mitlesen, wie oft der Held noch feuern kann. */}
+                {(() => {
+                  if (isOpp || !hero?.name) return null;
+                  const lad = (gameState.zoneCharges || []).find(c =>
+                    c.zone === 'hero' && c.heroIdx === i);
+                  if (!lad) return null;
+                  return (
+                    <div className={'zone-charge-badge' + (lad.remaining === 0 ? ' zone-charge-empty' : '')}
+                      onMouseEnter={e => showGameTooltip(e, `Noch ${lad.remaining} von ${lad.max} Einsätzen in dieser Runde.`)}
+                      onMouseLeave={hideGameTooltip}
+                    >{lad.remaining}</div>
+                  );
+                })()}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
                 {hero?.name && isFrozen && <FrozenOverlay />}
                 {hero?.name && isStunned && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
@@ -28607,6 +28921,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cards.length > 0 ? (
                       <>
                         <AbilityStack cards={cards} />
+                        {/* Ladungen einer „up to X times per turn"-Ability.
+                            Al will den Zaehler ausdruecklich AN DER ABILITY
+                            sehen, nicht am Helden (16.8.) — Lethes
+                            Necromancy ist der erste Fall. */}
+                        {(() => {
+                          if (isOpp) return null;
+                          const lad = (gameState.zoneCharges || []).find(c =>
+                            c.zone === 'ability' && c.heroIdx === i && c.zoneSlot === z);
+                          if (!lad) return null;
+                          return (
+                            <div className={'zone-charge-badge' + (lad.remaining === 0 ? ' zone-charge-empty' : '')}
+                              onMouseEnter={e => showGameTooltip(e, lad.max != null
+                                ? `Noch ${lad.remaining} von ${lad.max} Einsätzen in dieser Runde.`
+                                : `Noch ${lad.remaining} Einsätze in dieser Runde.`)}
+                              onMouseLeave={hideGameTooltip}
+                            >{lad.remaining}</div>
+                          );
+                        })()}
                         {cards[0] === 'Terror' && gameState.terrorThreshold != null && (() => {
                           const count = gameState.terrorCount || 0;
                           const threshold = gameState.terrorThreshold;
@@ -28832,6 +29164,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              // Artefakt-Kreatur? Bestimmt nur die FARBE des Abzeichens
+              // (weiss statt gold, weil Gold auf Gold verschwand). Die
+              // Pruefung ist dieselbe wie beim Rendern weiter unten:
+              // cardType Artifact UND subtype Creature.
+              // Ladungen von „up to X times per turn"-Permanents. Der
+              // Server schickt sie nur fuer die eigene Seite.
+              const ladung = cards.length > 0 && !isOpp
+                ? (gameState.zoneCharges || []).find(c => (c.zone || 'support') === 'support'
+                    && c.heroIdx === i && c.zoneSlot === z)
+                : null;
+              const istArtefaktKreatur = (() => {
+                if (!isCreatureActivatable || cards.length === 0) return false;
+                const cd = CARDS_BY_NAME[cards[cards.length - 1]];
+                if (!cd) return false;
+                const typ = (cd.cardType || '').split('/').some(t => t.trim() === 'Artifact');
+                const sub = (cd.subtype || '').split('/').some(t => t.trim() === 'Creature');
+                return typ && sub;
+              })();
               const equipEffectEntry = cards.length > 0 && !isCreatureActivatable && (gameState.activatableEquips || []).find(c =>
                 c.heroIdx === i && c.zoneSlot === z && !isOpp
               );
@@ -28908,7 +29258,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
@@ -29060,6 +29410,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       : undefined; return !isCreature ? (
                       <>
                         <BoardCard cardName={cards[cards.length-1]} skins={gameSkins} />
+                        {ladung ? (
+                          <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
+                            onMouseEnter={e => showGameTooltip(e, ladung.max != null
+                              ? `Noch ${ladung.remaining} von ${ladung.max} Einsätzen in dieser Runde.`
+                              : `Noch ${ladung.remaining} Einsätze in dieser Runde.`)}
+                            onMouseLeave={hideGameTooltip}
+                          >{ladung.remaining}</div>
+                        ) : null}
                         {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                         {cc?.balance > 0 ? (
                           <div className="head-counter-badge"
@@ -29298,6 +29656,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
                     {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?.magic_silenced || cc?._baihuStunned || cc?.sirenLinked || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
+                    {ladung ? (
+                      <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
+                        onMouseEnter={e => showGameTooltip(e, ladung.max != null
+                          ? `Noch ${ladung.remaining} von ${ladung.max} Einsätzen in dieser Runde.`
+                          : `Noch ${ladung.remaining} Einsätze in dieser Runde.`)}
+                        onMouseLeave={hideGameTooltip}
+                      >{ladung.remaining}</div>
+                    ) : null}
                     {cc?._guardianImmune ? <div className="board-card-guardian-shield" /> : null}
                     </>
                     ); })()
@@ -29511,7 +29877,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
-            <span className="game-gold-value orbit-font" data-gold-player={oppIdx}>{opp.gold || 0}</span>
+            <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
           </div>
         </div>
         {/* Board */}
@@ -29809,7 +30175,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'me' }}
                     badge={(gameState.areaZones?.[myIdx] || []).includes('Doom Clock')
                       ? `☠️${gameState.doomCounters?.[myIdx] || 0}/20` : null}
-                    onClick={onMyAreaClick} />
+                    onClick={onMyAreaClick}>
+                    {/* Ladungen einer „up to X times per turn"-Area
+                        (The Bonegrinder). Eigenes Abzeichen statt des
+                        `badge`-Props, damit es sich mit der Doom-Clock-
+                        Anzeige nicht in die Quere kommt. */}
+                    {(() => {
+                      const lad = (gameState.zoneCharges || []).find(c => c.zone === 'area');
+                      if (!lad) return null;
+                      return (
+                        <div className={'zone-charge-badge' + (lad.remaining === 0 ? ' zone-charge-empty' : '')}
+                          onMouseEnter={e => showGameTooltip(e, `Noch ${lad.remaining} von ${lad.max} Einsätzen in dieser Runde.`)}
+                          onMouseLeave={hideGameTooltip}
+                        >{lad.remaining}</div>
+                      );
+                    })()}
+                  </BoardZone>
                   <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area"
                     style={{...oppBoardZone('area'), left: areaPositions[1], cursor: (isOppAreaValid || oppAreaActivatable) ? 'pointer' : undefined, ...hiddenStyle}}
                     className={(oppAreaCls + ' area-zone-opp').trim()}
@@ -30349,7 +30730,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           )}
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
-            <span className="game-gold-value orbit-font" data-gold-player={myIdx}>{me.gold || 0}</span>
+            <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
           </div>
         </div>
 

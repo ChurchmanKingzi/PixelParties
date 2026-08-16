@@ -7,6 +7,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { charges: ladungenLesen } = require('./_charges');
 
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // Safety caps to terminate runaway trigger fan-out / infinite summons
@@ -206,6 +207,15 @@ const EFFECT_GLOW_LEAD_MS = 500;
 // Deck → Bildschirmmitte (Flip face-up, kurzer Hold) → Discard-Pile.
 // Gleiches Prozedere wie Chaos Magic (dort 2000 ms), nur schneller.
 const MILL_CENTER_REVEAL_MS = 1100;
+// Takt der Deck→Loeschstapel-Fluege. MUSS zum Client passen: der
+// `deck_to_deleted`-Handler in app-board.jsx staffelt die Fluege mit
+// `i * 150` und raeumt jede fliegende Karte nach 500 ms ab. Eine Karte
+// LANDET also bei `i * 150 + 500`. `actionDeleteFromDeckAnimated` unten
+// bucht sie genau dann in den Stapel — vorher stand die letzte Karte
+// sofort obenauf, waehrend die Fluege noch liefen (Als Trade-Report
+// 16.8.).
+const DECK_TO_DELETED_PACE_MS = 150;
+const DECK_TO_DELETED_FLIGHT_MS = 500;
 
 // ═══════════════════════════════════════════
 //  GENERIC TARGETING FILTER:
@@ -7117,9 +7127,24 @@ class GameEngine {
         _isResourceDraw: !!opts._isResourceDraw,
       });
 
-      // Visual pacing: sync + delay between draws so cards appear one by one
+      // Visual pacing: sync + delay between draws so cards appear one by one.
+      //
+      // ── FIX 16.8. (Als Wheels-Report) ────────────────────────────
+      // Der Sync stand frueher HINTER `i < count - 1`, lief also nach der
+      // LETZTEN Karte nicht. Folge, mit Wheels („Draw 3/4") beobachtet:
+      //   · sichtbar wurden nur count-1 Karten,
+      //   · Klaenge kamen trotzdem count-mal (jedes `log('draw')` spielt
+      //     seinen Cue, unabhaengig vom Sync),
+      //   · und die letzte Karte erschien erst beim naechsten Sync des
+      //     AUFRUFERS — bei Wheels rund eine Sekunde spaeter, wo der
+      //     diff-basierte Zieh-Animator des Clients dann seinen EIGENEN
+      //     Cue feuerte. Macht count+1 Klaenge fuer count Karten.
+      // Jetzt wird nach JEDER gezogenen Karte synchronisiert; gewartet
+      // wird weiterhin nur ZWISCHEN den Karten, der Ablauf wird also
+      // nicht laenger. `sync()` steigt im Fast-Mode frueh aus, Rollouts
+      // kostet der zusaetzliche Aufruf nichts.
+      this.sync();
       if (drawDelay > 0 && i < count - 1) {
-        this.sync();
         await this._delay(drawDelay);
       }
     }
@@ -11675,6 +11700,9 @@ class GameEngine {
     // One-turn action lock (Treasure Hunter's Backpack, etc.) — stamp matches the
     // current turn while live, becomes stale on turn rollover.
     if (hero._actionLockedTurn === this.gs.turn) return [];
+    // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+    // Geltungsbereich wie der Rundenstempel darueber.
+    if (this.areActionsBlocked(playerIdx)) return [];
     const cardDB = this._getCardDB();
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     const eligible = [];
@@ -11823,6 +11851,9 @@ class GameEngine {
       if (ps.comboLockHeroIdx != null && ps.comboLockHeroIdx !== hi) { own[hi] = playable; continue; }
       if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) { own[hi] = playable; continue; }
       if (hero._actionLockedTurn === this.gs.turn) { own[hi] = playable; continue; }
+      // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+      // Geltungsbereich wie der Rundenstempel darueber.
+      if (this.areActionsBlocked(playerIdx)) { own[hi] = playable; continue; }
       // Divine Gift of Skill lock — clears once the hero has Magic Arts
       // ≥ 1, so the hero stays highlight-eligible the moment they're
       // unblocked. Mirror in `validateActionPlay` (the authoritative
@@ -12084,6 +12115,9 @@ class GameEngine {
         // Combo lock does NOT apply to charmed heroes
         if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+        // Geltungsbereich wie der Rundenstempel darueber.
+        if (this.areActionsBlocked(playerIdx)) continue;
         // Skill lock — applies regardless of borrow side.
         if (this.isHeroSkillLocked(oppIdx, hi)) continue;
 
@@ -12542,6 +12576,9 @@ class GameEngine {
     if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return null;
     // One-turn action lock (Treasure Hunter's Backpack, etc.)
     if (hero._actionLockedTurn === this.gs.turn) return null;
+    // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+    // Geltungsbereich wie der Rundenstempel darueber.
+    if (this.areActionsBlocked(pi)) return null;
 
     // Spell school / level requirements — centralized check (handles levelOverrideCards, bypassLevelReq, negation).
     // Wolflesia-style Creature spell-cast: bypasses the host hero's
@@ -13402,19 +13439,11 @@ class GameEngine {
       console.error('[deepseaPerTurnReset]', err.message);
     }
 
-    // ── Reset Teppes's per-turn return-draw counter ──
-    // Teppes draws up to 5× per turn when cards return to hand; the
-    // counter lives on hero. We reset it at turn start (for both
-    // players' heroes, so either side's Teppes resets).
-    for (const ps of this.gs.players) {
-      if (!ps) continue;
-      for (const hero of (ps.heroes || [])) {
-        if (!hero) continue;
-        if (hero._teppesReturnDrawsThisTurn != null) {
-          hero._teppesReturnDrawsThisTurn = 0;
-        }
-      }
-    }
+    // (Teppes' Zieh-Zaehler setzt sich seit v421 per Rundenstempel
+    // selbst zurueck — die Schleife hier ist entfallen. Eine
+    // Ruecksetzung an einer anderen Stelle als die Zaehlung war genau
+    // die Bauart, die bei Archer, Golden Vermin, Lethe und Kassaran
+    // schiefgegangen ist.)
 
     // Reset per-turn flags
     const activePs = this.gs.players[this.gs.activePlayer];
@@ -14610,9 +14639,11 @@ class GameEngine {
         _goldSource: { playerIdx, amount: gained, consumed: false },
       });
     }
+    // Zustandsregeln (Logan) — siehe _checkGoldStateRules.
+    this._checkGoldStateRules(playerIdx);
   }
 
-  async actionSpendGold(playerIdx, amount) {
+  async actionSpendGold(playerIdx, amount, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
     // Gold-lock (Golden Arrow): cannot spend gold either — the card text
@@ -14621,11 +14652,15 @@ class GameEngine {
       this.log('gold_spend_blocked', { player: ps.username, amount, reason: 'goldLocked' });
       return false;
     }
-    if ((ps.gold || 0) < amount) return false;
+    // Kreditrahmen (Debt-O-Tron). Ohne den Archetyp ist er 0 und die
+    // Pruefung exakt die alte.
+    if (!this.canAffordGold(playerIdx, amount, opts.cardName)) return false;
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_SPEND, hookCtx);
     if (hookCtx.cancelled) return false;
     const spent = hookCtx.amount;
+    // KEINE Klemme: der Kreditrahmen oben hat die Zahlung erlaubt,
+    // also darf sie unter 0 gehen (Debt-O-Tron).
     ps.gold -= spent;
     this.log('gold_spend', { player: ps.username, amount: spent, total: ps.gold });
     // Gegenstueck zu AFTER_RESOURCE_GAIN, gleiche Reihenfolge. Criminal
@@ -14634,7 +14669,379 @@ class GameEngine {
     if (spent > 0) {
       await this.runHooks(HOOKS.AFTER_RESOURCE_SPEND, { playerIdx, amount: spent });
     }
+    // Zustandsregeln (Logan) — siehe _checkGoldStateRules.
+    this._checkGoldStateRules(playerIdx);
     return true;
+  }
+
+  /**
+   * Gold auf einen festen Betrag SETZEN — weder Gewinn noch Zahlung.
+   *
+   * Als Ruling 16.8. (Anlass "Market Crash": "Both players' Gold becomes
+   * 0."): ein Wipe ist KEIN "spend". Daraus folgt zweierlei, und beides
+   * ist hier absichtlich so gebaut:
+   *   • `AFTER_RESOURCE_SPEND` feuert NICHT. Karten, die an einer
+   *     ZAHLUNG haengen (Criminal Monkee: "when you pay exactly 4
+   *     Gold"), duerfen von einem Wipe nicht ausgeloest werden.
+   *   • `ps.goldLocked` (Golden Arrow: "cannot gain or spend Gold")
+   *     blockt NICHT. Gesperrt sind Gewinn und Zahlung, nicht das
+   *     Setzen.
+   *
+   * Stattdessen feuert `AFTER_GOLD_SET`. Den braucht es, weil es
+   * ZUSTANDSbasierte Gold-Regeln gibt: Logans "If you ever have 0 Gold,
+   * remove all Invest Counters" beschreibt einen Dauerzustand, keinen
+   * Zeitpunkt — die Regel muss also auch nach einem Wipe greifen,
+   * obwohl niemand etwas ausgegeben hat. Ohne diesen dritten Traeger
+   * haette ein Wipe Logans Zaehler stehengelassen, waehrend sein Besitzer
+   * sichtbar auf 0 Gold steht.
+   *
+   * Der Hook feuert AUCH, wenn sich der Betrag nicht geaendert hat
+   * (before === next). Er meldet einen Zustand, keine Bewegung — und ein
+   * Zustandspruefer, der nur bei Aenderung laeuft, ist genau der Fall,
+   * den "if you ever" ausschliesst.
+   *
+   * Negatives Gold ist derzeit engineweit nicht darstellbar (alle
+   * Abzuege klemmen auf 0); der Betrag wird deshalb bei 0 geklemmt.
+   * Sollte der Debt-O-Tron-Archetyp ("while you have less than 0 Gold")
+   * einmal implementiert werden, ist DIESE Stelle die eine, an der die
+   * Klemme faellt.
+   *
+   * @param {number} playerIdx
+   * @param {number} amount      Zielbetrag (wird bei 0 geklemmt)
+   * @param {object} [opts]      { sourceName } fuer Log und Hook-Kontext
+   * @returns {Promise<boolean>} true, wenn gesetzt wurde
+   */
+  async actionSetGold(playerIdx, amount, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return false;
+    const before = ps.gold || 0;
+    const next = Math.max(0, Math.floor(Number(amount) || 0));
+    ps.gold = next;
+    this.log('gold_set', {
+      player: ps.username, before, total: next,
+      by: opts.sourceName || 'Gold Set',
+    });
+    // ERST synchronisieren, DANN den Hook — gleiche Reihenfolge wie in
+    // actionGainGold/actionSpendGold, damit eine daraus geoeffnete
+    // Abfrage schon den neuen Stand anzeigt.
+    this.sync();
+    await this.runHooks(HOOKS.AFTER_GOLD_SET, {
+      playerIdx, before, amount: next, delta: next - before,
+      sourceName: opts.sourceName || null,
+    });
+    // Zustandsregeln (Logan) — siehe _checkGoldStateRules.
+    this._checkGoldStateRules(playerIdx);
+    return true;
+  }
+
+  /**
+   * KREDITRAHMEN: wie weit darf dieser Spieler bei DIESER Zahlung unter
+   * 0 gehen?
+   *
+   * 0 heisst „gar nicht" — das ist der Normalfall im ganzen Spiel.
+   * Negatives Gold gibt es nur ueber den Debt-O-Tron-Archetyp, und die
+   * Bedingungen dafuer stehen in `_debt-o-tron-shared.js`.
+   *
+   * Zwei Quellen, es gewinnt die groessere:
+   *   · HELDENVERTRAG `goldOverdraft(engine, playerIdx)` — Kent gibt 20,
+   *     aber nur solange das Gold noch >= 0 ist.
+   *   · KARTENVERTRAG `selfGoldOverdraft` auf der zahlenden Karte —
+   *     „Debt-O-Tron Damage Fees" darf sich selbst immer bezahlen,
+   *     auch aus dem Minus heraus (`Infinity`).
+   *
+   * @param {number} playerIdx
+   * @param {string} [cardName] die Karte, die gerade bezahlt wird
+   * @returns {number} zusaetzlich verfuegbarer Betrag (>= 0)
+   */
+  goldOverdraftLimit(playerIdx, cardName) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return 0;
+    let limit = 0;
+    for (const hero of (ps.heroes || [])) {
+      if (!hero?.name || hero.hp <= 0) continue;
+      let script = null;
+      try { script = loadCardEffect(hero.name); } catch { continue; }
+      if (typeof script?.goldOverdraft !== 'function') continue;
+      try { limit = Math.max(limit, script.goldOverdraft(this, playerIdx) || 0); }
+      catch { /* eine kaputte Karte darf keinen Kredit erzwingen */ }
+    }
+    if (cardName) {
+      let script = null;
+      try { script = loadCardEffect(cardName); } catch { script = null; }
+      const self = script?.selfGoldOverdraft;
+      if (self === true || self === Infinity) return Infinity;
+      if (typeof self === 'number' && self > limit) limit = self;
+      if (typeof self === 'function') {
+        try { limit = Math.max(limit, self(this, playerIdx) || 0); } catch { /* ignorieren */ }
+      }
+    }
+    return limit;
+  }
+
+  /**
+   * Kann dieser Spieler `cost` bezahlen — Kreditrahmen eingerechnet?
+   *
+   * Ersetzt engineweit das alte `(ps.gold || 0) >= cost`. Ohne
+   * Debt-O-Tron auf dem Brett ist der Rahmen 0 und die Antwort exakt
+   * dieselbe wie vorher.
+   */
+  canAffordGold(playerIdx, cost, cardName) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return false;
+    const betrag = Number(cost) || 0;
+    if (betrag <= 0) return true;
+    const gold = ps.gold || 0;
+    if (gold >= betrag) return true;
+    // BASIS ist `max(0, gold)`, nicht `gold` (Als Korrektur 16.8.).
+    // Der Rahmen ist ein Betrag an NEUER Schuld, den eine einzelne
+    // Zahlung aufnehmen darf — nicht eine absolute Untergrenze. Wer
+    // schon bei −10 steht, darf mit Kent trotzdem noch 20 aufnehmen und
+    // landet bei −30. Es ist damit exakt dasselbe Mass wie in
+    // `_debt-o-tron-shared.excessSpent`: Betrag − max(0, GoldVorher).
+    return (Math.max(0, gold) + this.goldOverdraftLimit(playerIdx, cardName)) >= betrag;
+  }
+
+  /**
+   * BUDGET: wie viel darf dieser Spieler bei EINER Zahlung hoechstens
+   * ausgeben?
+   *
+   * Das Gegenstueck zu `canAffordGold` fuer Karten mit VARIABLEN Kosten
+   * („X-Kosten"): die rechnen sich aus dem Budget aus, wie viele Ziele
+   * sie anbieten duerfen, und dafuer reicht ein Ja/Nein nicht.
+   *
+   * Anlass (Als Report 16.8.): „Book of Doom funktioniert nicht mit
+   * Kent — ich kann es aktivieren und den Target-Picker starten, der
+   * versteht aber nicht, dass ich 20 extra Gold zur Verfuegung habe."
+   * Die Zielzahl kam aus `Math.floor(ps.gold / cost)`, also aus dem
+   * rohen Kontostand ohne Kreditrahmen.
+   *
+   * Basis ist `max(0, gold)` — dieselbe Rechnung wie in
+   * `canAffordGold`: der Rahmen begrenzt NEUE Schuld, nicht den
+   * Kontostand. Ohne Debt-O-Tron ist er 0 und das Budget schlicht das
+   * vorhandene Gold.
+   *
+   * @param {number} playerIdx
+   * @param {string} [cardName] die zahlende Karte (fuer `selfGoldOverdraft`)
+   * @returns {number} hoechstmoegliche Zahlung; `Infinity` ist moeglich
+   */
+  goldBudget(playerIdx, cardName) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return 0;
+    const limit = this.goldOverdraftLimit(playerIdx, cardName);
+    if (limit === Infinity) return Infinity;
+    return Math.max(0, ps.gold || 0) + limit;
+  }
+
+  /**
+   * AKTIONSSPERRE auf Spielerebene.
+   *
+   * `hero._actionLockedTurn` gibt es laengst, ist aber PRO HELD und ein
+   * Rundenstempel. Kent braucht beides anders: spielerweit und als
+   * DAUERZUSTAND („While your Gold is negative, you cannot perform
+   * Actions"). Deshalb derselbe Vertragsansatz wie bei `goldStateRule`:
+   * eine synchrone Frage an die Helden des Spielers.
+   *
+   * GELTUNGSBEREICH (Als Ruling 16.8.): normale Aktionen UND
+   * Zusatz-Aktionen; Helden-Effekte und Abilities aber nur, wenn sie
+   * ausdruecklich eine Aktion KOSTEN (`heroEffectActionCost` /
+   * `actionCost`) — freie Effekte bleiben erlaubt. Der Aufruf steht
+   * deshalb genau dort, wo auch `_actionLockedTurn` geprueft wird.
+   *
+   * @param {number} playerIdx
+   * @returns {boolean}
+   */
+  areActionsBlocked(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return false;
+    // ── NACHWIRKENDE Sperre (Als Vorgabe 16.8.) ────────────────────
+    // Das spielerweite Gegenstueck zu `hero._actionLockedTurn`: ein
+    // Rundenstempel am SPIELER. Kent setzt ihn, wenn er sich
+    // verschuldet („you cannot perform an Action for the rest of the
+    // turn afterwards") — und der muss halten, „selbst wenn Kent nach
+    // dessen Ausloesung eingefroren oder gar besiegt wird". Genau
+    // deshalb steht er hier VOR dem Heldenlauf: der findet nur lebende
+    // Helden, ein toter Kent haette die Sperre sonst aufgehoben.
+    if (ps._playerActionLockedTurn === (this.gs?.turn || 0)) return true;
+    for (const hero of (ps.heroes || [])) {
+      if (!hero?.name || hero.hp <= 0) continue;
+      let script = null;
+      try { script = loadCardEffect(hero.name); } catch { continue; }
+      if (typeof script?.blocksActions !== 'function') continue;
+      try { if (script.blocksActions(this, playerIdx)) return true; }
+      catch { /* defensiv: eine kaputte Karte sperrt nichts */ }
+    }
+    return false;
+  }
+
+  /**
+   * ZUSTANDSREGELN AUF DEN GOLDSTAND pruefen.
+   *
+   * Anlass (Als Report 16.8.): Logans „If you ever have 0 Gold, remove
+   * all Invest Counters" haing an den Bewegungs-Hooks
+   * `afterResourceGain` / `afterResourceSpend` / `afterGoldSet`. Das
+   * KOSTEN-Bezahlen einer Karte laeuft aber an allen dreien vorbei — es
+   * zieht das Gold roh ab (`ps.gold = Math.max(0, ps.gold - cost)`, gut
+   * zwanzig Stellen in `_engine.js` und `server.js`). Wer sein letztes
+   * Gold fuer ein Artefakt ausgibt, steht sichtbar auf 0, und Logan
+   * merkte nichts.
+   *
+   * Ein VIERTER Hook waere die falsche Antwort gewesen: die Regel ist
+   * kein Ereignis, sondern ein Dauerzustand („if you EVER have"). Sie
+   * gehoert an EINE Stelle, die nach JEDER Goldbewegung laeuft — egal
+   * welcher Weg sie ausgeloest hat.
+   *
+   * SYNCHRON, mit Absicht. Ein `async` Hook waere hier gefaehrlich: die
+   * Kosten-Abzuege stehen mitten in Aufloesungspfaden, teils
+   * synchronen. Ein nicht abgewartetes Promise ist genau der Fehler,
+   * der die Ska-Harpyformer-Jagd (v386-v394) gekostet hat. Der Vertrag
+   * ist deshalb eine reine Funktion, Vorbild `bypassHandLimit`.
+   *
+   * KARTENVERTRAG: `goldStateRule(engine, playerIdx)` auf dem Modul
+   * eines HELDEN. Wird nach jeder Goldaenderung dieses Spielers
+   * aufgerufen und darf den Zustand veraendern, broadcasten und
+   * `sync()` rufen — aber nichts awaiten.
+   *
+   * @param {number} playerIdx
+   */
+  _checkGoldStateRules(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return;
+    // Wiedereintritts-Riegel: eine Regel darf beim Aufraeumen selbst
+    // `sync()` rufen, und `sync()` soll die Regeln nicht erneut anwerfen.
+    if (this._inGoldStateRules) return;
+    this._inGoldStateRules = true;
+    try {
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name) continue;
+        let script = null;
+        try { script = loadCardEffect(hero.name); } catch { continue; }
+        if (typeof script?.goldStateRule !== 'function') continue;
+        try { script.goldStateRule(this, playerIdx); }
+        catch (err) {
+          console.error(`[Engine] goldStateRule "${hero.name}" warf:`, err?.message || err);
+        }
+      }
+    } finally {
+      this._inGoldStateRules = false;
+    }
+  }
+
+  /**
+   * Die KOSTEN einer Karte bezahlen.
+   *
+   * Der eine Weg fuer „Cost vom Gold abziehen" — vorher lag derselbe
+   * Rohabzug an 19 Stellen verstreut, und keine davon meldete
+   * irgendetwas.
+   *
+   * WAS GEFEUERT WIRD (Als Ruling 16.8.):
+   *   · `AFTER_RESOURCE_SPEND` — JA. „Criminal Monkee soll ausdruecklich
+   *     auch bei Artefakt-Kosten von exakt 4 Gold feuern." Kartenkosten
+   *     sind eine Zahlung wie jede andere, also sehen „when you pay
+   *     exactly N Gold"-Karten sie jetzt auch.
+   *   · `ON_RESOURCE_SPEND` — NEIN, bewusst nicht. Der Vor-Hook ist
+   *     ABBRECHBAR; ein Listener koennte damit die Kostenzahlung einer
+   *     Karte verhindern, die bereits aufloest — die Karte waere gespielt
+   *     und trotzdem bezahlt-frei. Kosten sind an dieser Stelle nicht
+   *     mehr verhandelbar.
+   *   · `_checkGoldStateRules` — JA, zuletzt, wie in `actionSpendGold`:
+   *     der Dauerzustand ist das letzte Wort, nachdem alle Reaktionen
+   *     auf die Zahlung durch sind.
+   *
+   * Gemeldet wird der TATSAECHLICH abgezogene Betrag, nicht der
+   * geforderte. Reichte das Gold nicht, wurde eben weniger gezahlt —
+   * „exactly 4" darf dann nicht anspringen.
+   *
+   * ASYNC: alle 19 Aufrufstellen liegen in async-Funktionen und warten
+   * ab. Ein nicht abgewarteter Hook waere hier genau der Fehler aus der
+   * Ska-Harpyformer-Jagd; `goldStateRule` bleibt davon unberuehrt
+   * synchron.
+   *
+   * NEGATIVES GOLD (v407): die Buchung klemmt nur noch dort, wo kein
+   * Kreditrahmen greift. `opts.cardName` gibt der Rahmenrechnung die
+   * zahlende Karte mit — „Debt-O-Tron Damage Fees" darf sich selbst
+   * immer bezahlen, Kent gibt 20 solange das Gold noch >= 0 ist.
+   *
+   * @param {number} playerIdx
+   * @param {number} cost   Betrag; <= 0 ist ein No-op
+   * @param {object} [opts] { cardName } fuer den Kreditrahmen
+   * @returns {Promise<number>} was wirklich abgezogen wurde
+   */
+  async _payCardCost(playerIdx, cost, opts = {}) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return 0;
+    const betrag = Number(cost) || 0;
+    if (betrag <= 0) return 0;
+    const vorher = ps.gold || 0;
+    // Klemme nur so weit, wie KEIN Kreditrahmen greift (Debt-O-Tron).
+    // Ohne den Archetyp ist `limit` 0 und `boden` 0 — exakt das alte
+    // `Math.max(0, …)`. Mit Kredit darf die Buchung unter 0 gehen, aber
+    // hoechstens bis an den Rahmen.
+    const limit = this.goldOverdraftLimit(playerIdx, opts.cardName);
+    // Der Boden folgt derselben Rechnung wie `canAffordGold`: eine
+    // Zahlung darf hoechstens `max(0, gold) + limit` gross sein, das
+    // Ergebnis also nicht unter `min(0, gold) − limit` fallen. Bei
+    // Start >= 0 ist das schlicht −limit; aus dem Minus heraus wandert
+    // der Boden mit (−10 mit Rahmen 20 → Boden −30).
+    const boden = limit === Infinity ? -Infinity : (Math.min(0, vorher) - limit);
+    ps.gold = Math.max(boden, vorher - betrag);
+    const gezahlt = vorher - ps.gold;
+    if (gezahlt <= 0) return 0;
+    // ERST synchronisieren, DANN der Nach-Buchungs-Hook — gleiche
+    // Reihenfolge wie in actionGainGold/actionSpendGold, damit eine
+    // daraus geoeffnete Abfrage (Criminal Monkees „nochmal 4 zahlen?")
+    // den neuen Goldstand schon anzeigt.
+    this.sync();
+    // Der Hook laeuft in try/catch, und zwar aus einem Grund, den der
+    // rohe Abzug vorher nicht hatte: eine Kostenzahlung darf NICHT
+    // scheitern koennen. Das Gold ist an dieser Stelle schon weg; wirft
+    // ein Listener, wuerde die Ausnahme mitten in der Kartenaufloesung
+    // hochschlagen und die Zustandsregeln darunter ueberspringen — die
+    // Karte waere bezahlt, aber halb aufgeloest, und Logans Counter
+    // blieben trotz 0 Gold liegen. Der Fehler wird gemeldet, der Ablauf
+    // laeuft weiter.
+    try {
+      await this.runHooks(HOOKS.AFTER_RESOURCE_SPEND, { playerIdx, amount: gezahlt });
+    } catch (err) {
+      console.error('[Engine] afterResourceSpend nach Kostenzahlung warf:', err?.message || err);
+    }
+    this._checkGoldStateRules(playerIdx);
+    return gezahlt;
+  }
+
+  /**
+   * Karten vom DECK in den Loeschstapel schicken — mit Flug UND
+   * getakteter Landung.
+   *
+   * Die Karten muessen VOR dem Aufruf aus `mainDeck` entfernt sein
+   * (der Aufrufer entscheidet, WELCHE es sind: oberste N, eine
+   * gesuchte, …). Diese Methode uebernimmt nur den sichtbaren Teil:
+   * einen `deck_to_deleted`-Broadcast fuer die ganze Gruppe, und
+   * danach je Karte ein `push` + `sync()` genau in dem Moment, in dem
+   * ihr Flug ankommt.
+   *
+   * WARUM getaktet: der Client staffelt die Fluege selbst. Wer alle
+   * Karten sofort in den Stapel legt und einmal synchronisiert, zeigt
+   * die LETZTE Karte schon oben auf dem Stapel, waehrend die erste noch
+   * unterwegs ist — genau der Fehler, den Al am 16.8. an Trade gemeldet
+   * hat.
+   *
+   * @param {number} playerIdx  Besitzer von Deck und Loeschstapel
+   * @param {string[]} cards    bereits aus dem Deck entnommene Namen
+   * @param {object} [opts]     { settle } zusaetzliche Nachlaufzeit
+   * @returns {Promise<void>}
+   */
+  async actionDeleteFromDeckAnimated(playerIdx, cards, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || !Array.isArray(cards) || cards.length === 0) return;
+    this._broadcastEvent('deck_to_deleted', { owner: playerIdx, cards });
+    for (let i = 0; i < cards.length; i++) {
+      // Erste Karte: volle Flugzeit. Jede weitere: der Staffelabstand.
+      await this._delay(i === 0 ? DECK_TO_DELETED_FLIGHT_MS : DECK_TO_DELETED_PACE_MS);
+      ps.deletedPile.push(cards[i]);
+      this.sync();
+    }
+    if (opts.settle) await this._delay(opts.settle);
   }
 
   // ─── GENERIC EFFECT PRIMITIVES ──────────────
@@ -14675,6 +15082,7 @@ class GameEngine {
     this._broadcastEvent('gold_steal_burst', { fromPlayer: oi, toPlayer: pi, amount: clamped });
 
     ops.gold = Math.max(0, (ops.gold || 0) - clamped);
+    this._checkGoldStateRules(oi);   // der BESTOHLENE kann auf 0 gefallen sein
     await this.actionGainGold(pi, clamped);
 
     this.log('gold_steal', {
@@ -15438,7 +15846,22 @@ class GameEngine {
       // Baihu is a Baihu regardless of how it landed on the board.
       if (inst.counters?._cardinalImmune) continue;
       if (CARDINAL_NAMES.includes(inst.name)) continue;
-      const cd = cardDB[inst.name];
+      // EFFEKTIVE Kartendaten, nicht die rohe Datenbank (Fix 16.8., Als
+      // Bugreport zu Kyli). Ein Biomancy-Token wird unter dem Namen der
+      // zugrundeliegenden POTION getrackt und erst ueber
+      // `counters._cardDataOverride` zur `Creature/Token`. Mit `cardDB[
+      // inst.name]` las diese Stelle die Potion und warf den Token aus
+      // den Opferkandidaten — er war im ganzen Spiel nicht opferbar,
+      // obwohl er auf dem Brett eine Kreatur ist. Dieselbe Umstellung
+      // hatte Al schon fuer die AoE-Pfade gemeldet (siehe die
+      // „token-override-aware"-Kommentare in _engine.js und den
+      // shared-Modulen); die Opfer-Stelle war der letzte Ausreisser.
+      // Nebenwirkung, ausdruecklich gewollt: `maxHp` und `level` kommen
+      // damit ebenfalls vom Token (80 HP / Lv2 statt Potion-null) — genau
+      // die Werte, mit denen ein Token als Tribut zaehlen muss.
+      // Fuer alles OHNE Override liefert getEffectiveCardData exakt den
+      // DB-Eintrag zurueck, der Rest bleibt also unveraendert.
+      const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
       if (!cd) continue;
       const isCreature = cd.cardType === 'Creature'
         || (cd.cardType || '').split('/').includes('Creature')
@@ -16258,8 +16681,23 @@ class GameEngine {
           cancelLabel: config.cancelLabel,
           exclusiveTypes: config.exclusiveTypes || false,
           maxPerType: config.maxPerType || {},
-          maxTotal: config.maxTotal || undefined,
-          minRequired: config.minRequired || 0,
+          // ── `selectCount` / `minSelect` ALS ALIAS (Als Report 16.8.) ──
+          // Es gibt zwei Prompt-Familien mit UNTERSCHIEDLICHEN Feldnamen:
+          // die Karten-Galerie liest `selectCount`/`minSelect`, die
+          // Ziel-Auswahl hier liest `maxTotal`/`minRequired`. Karten
+          // haben reihenweise die Galerie-Namen an die Ziel-Auswahl
+          // gegeben — die fielen dann still auf „unbegrenzt" zurueck.
+          // Folge: man konnte MEHRERE Ziele anklicken, der Effekt nahm
+          // aber nur das erste. Al hat es an Scrap Plow und Cheeky
+          // Monkee gesehen und richtig als etwas Allgemeines im
+          // Auswahlprozess vermutet.
+          //
+          // Mit gesetztem `maxTotal: 1` greift die laengst vorhandene
+          // Client-Regel „bei maxTotal === 1 TAUSCHT ein Klick die
+          // Auswahl aus" (togglePotionTarget) — genau das gewuenschte
+          // Verhalten. Ausdrueckliches `maxTotal` gewinnt weiterhin.
+          maxTotal: config.maxTotal ?? config.selectCount ?? undefined,
+          minRequired: config.minRequired ?? config.minSelect ?? 0,
           // Pollution-cap rule: caps non-own-support selections while leaving
           // own-support targets exempt. Consumed by togglePotionTarget.
           maxNonOwnSupport: config.maxNonOwnSupport,
@@ -18286,7 +18724,7 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, targetOwner, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       // Once-per-game gate (mirrors after-damage handler).
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -18380,7 +18818,7 @@ class GameEngine {
       } else {
         ps.discardPile.push(cardName);
       }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -18490,7 +18928,7 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -18549,7 +18987,7 @@ class GameEngine {
       } else {
         ps.discardPile.push(cardName);
       }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -18645,7 +19083,7 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, ownerIdx, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -18696,7 +19134,7 @@ class GameEngine {
       } else {
         ps.discardPile.push(cardName);
       }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -18785,7 +19223,7 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -18835,7 +19273,7 @@ class GameEngine {
       } else {
         ps.discardPile.push(cardName);
       }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -18928,7 +19366,7 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
         const opgKey = script.oncePerGameKey || cardName;
@@ -18955,7 +19393,7 @@ class GameEngine {
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -19055,7 +19493,7 @@ class GameEngine {
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
         this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         // Check condition
         if (script.afterDamageCondition &&
@@ -19107,7 +19545,7 @@ class GameEngine {
         } else {
           ps.discardPile.push(cardName);
         }
-        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        await this._payCardCost(pi, cost);
         if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
 
         // Push state NOW so the hand and pile both re-render in one
@@ -19248,7 +19686,7 @@ class GameEngine {
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
         this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         if (script.oncePerGame || script.oncePerGameKey) {
           const opgKey = script.oncePerGameKey || cardName;
@@ -19287,7 +19725,7 @@ class GameEngine {
         ps.hand.splice(actualIdx, 1);
         if (destPile === 'deleted') ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
-        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        await this._payCardCost(pi, cost);
         if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
         if (script.oncePerGame || script.oncePerGameKey) {
@@ -19406,7 +19844,7 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.resourcePhaseCondition &&
           !script.resourcePhaseCondition(this.gs, playerIdx, this)) continue;
@@ -19450,7 +19888,7 @@ class GameEngine {
       } else {
         ps.discardPile.push(cardName);
       }
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && playerIdx >= 0 && playerIdx < 2) {
         this.gs._scTracking[playerIdx].cardsPlayedFromHand++;
       }
@@ -19522,7 +19960,7 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.postSummonReactionCondition &&
           !script.postSummonReactionCondition(this.gs, summoningPi, this, summonedInst, summonHookCtx)) continue;
@@ -19556,7 +19994,7 @@ class GameEngine {
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && summoningPi >= 0 && summoningPi < 2) {
         this.gs._scTracking[summoningPi].cardsPlayedFromHand++;
       }
@@ -19702,7 +20140,7 @@ class GameEngine {
 
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
-        if (cost > 0 && (ps.gold || 0) < cost) { if (_bwOut) _bwOut.goldMiss++; continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { if (_bwOut) _bwOut.goldMiss++; continue; }
 
         if (script.creatureDamageBatchCondition &&
             !script.creatureDamageBatchCondition(this.gs, pi, this, entries)) { if (_bwOut) _bwOut.condMiss++; continue; }
@@ -19734,7 +20172,7 @@ class GameEngine {
         const actualIdx = ps.hand.indexOf(cardName);
         if (actualIdx < 0) continue;
         ps.hand.splice(actualIdx, 1);
-        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        await this._payCardCost(pi, cost);
         if (this.gs._scTracking && pi >= 0 && pi < 2) {
           this.gs._scTracking[pi].cardsPlayedFromHand++;
         }
@@ -19825,7 +20263,7 @@ class GameEngine {
       const cardData = cardDB[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.cdMovementReactionCondition &&
           !script.cdMovementReactionCondition(this.gs, victimOwner, this, victim, source, effectType)) continue;
@@ -19857,7 +20295,7 @@ class GameEngine {
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && victimOwner >= 0 && victimOwner < 2) {
         this.gs._scTracking[victimOwner].cardsPlayedFromHand++;
       }
@@ -19966,7 +20404,7 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oppActionPhaseReactionCondition &&
           !script.oppActionPhaseReactionCondition(this.gs, reactorIdx, this)) continue;
@@ -20001,7 +20439,7 @@ class GameEngine {
       const actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) {
         this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
       }
@@ -20816,7 +21254,7 @@ class GameEngine {
           ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
           : baseCost;
         this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         // Once-per-game check
         if (script.oncePerGame || script.oncePerGameKey) {
@@ -20941,7 +21379,7 @@ class GameEngine {
         } else {
           ps.discardPile.push(cardName);
         }
-        if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+        await this._payCardCost(pi, cost);
         if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
         // Push state to the client NOW so the hand re-renders without
@@ -21060,7 +21498,7 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
-        if (cost > 0 && (ps.gold || 0) < cost) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
+        if (cost > 0 && !this.canAffordGold(pi, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       // Card-specific condition (HOPT gate etc.)
       if (script.ascensionReactionCondition &&
@@ -21096,7 +21534,7 @@ class GameEngine {
 
       // Consume from hand + pay gold
       ps.hand.splice(hi, 1);
-      if (cost > 0) ps.gold = Math.max(0, (ps.gold || 0) - cost);
+      await this._payCardCost(pi, cost);
       if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
       // Reveal the card to the opponent + spectators
@@ -22085,7 +22523,7 @@ class GameEngine {
         const cost = script.dynamicCost
           ? script.dynamicCost(this.gs, pi, this, chainCtx)
           : baseCost;
-        if ((ps.gold || 0) < cost) continue;
+        if (!this.canAffordGold(pi, cost, cardName)) continue;
 
         if (script.reactionCondition && !script.reactionCondition(this.gs, pi, this, chainCtx)) continue;
 
@@ -22335,7 +22773,7 @@ class GameEngine {
         wisdomCost = this.getWisdomDiscardCost(pi, reactionCasterHeroIdx, cardData);
       }
 
-      if (cost > 0) ps.gold -= cost;
+      await this._payCardCost(pi, cost);
 
       // KEIN Eintrag und KEIN Flug an dieser Stelle.
       // v202 hat hier den Flug abgeschickt, v204 zusaetzlich den
@@ -23655,6 +24093,9 @@ class GameEngine {
       if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
       if (hero.statuses?.frozen && !chillyDogOwnSide) continue;
       if (hero._actionLockedTurn === this.gs.turn) continue;
+      // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+      // Geltungsbereich wie der Rundenstempel darueber.
+      if (this.areActionsBlocked(playerIdx)) continue;
       // Divine Gift of Skill lock — action-cost ability activations
       // are Actions, so the lock applies. Mirror in the charmed/
       // controlled branches below (they consume the same Action slot).
@@ -23706,6 +24147,9 @@ class GameEngine {
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogOwnSide) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+        // Geltungsbereich wie der Rundenstempel darueber.
+        if (this.areActionsBlocked(playerIdx)) continue;
         // Skill lock applies to the hero regardless of who's borrowing
         // it — `oi` is the side the hero lives on, so its ability zones
         // (and the Magic Arts threshold) read from there.
@@ -23746,6 +24190,9 @@ class GameEngine {
         if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
         if (hero.statuses?.frozen && !chillyDogOwnSide) continue;
         if (hero._actionLockedTurn === this.gs.turn) continue;
+        // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+        // Geltungsbereich wie der Rundenstempel darueber.
+        if (this.areActionsBlocked(playerIdx)) continue;
         if (this.isHeroSkillLocked(oi, hi)) continue;
 
         for (let zi = 0; zi < (ops.abilityZones[hi] || []).length; zi++) {
@@ -24141,6 +24588,152 @@ class GameEngine {
    * Also scans charmed opponent heroes' creatures.
    * Returns array of { owner, heroIdx, zoneSlot, cardName, canActivate, instId }
    */
+  /**
+   * Ladungsanzeige fuer Permanents mit „up to X times per turn".
+   *
+   * Vertrag: ein Kartenskript liefert `remainingCharges(inst, gs)` und
+   * bekommt dafuer eine Zahl oben rechts auf der Karte — weiss, solange
+   * Ladungen uebrig sind, rot bei 0 (Als Vorgabe 16.8.). Absichtlich
+   * generisch gehalten: die Engine weiss nichts ueber die Zaehlweise,
+   * jede Karte fuehrt ihren Zaehler selbst.
+   *
+   * Nur eigene Support-Zonen — der Gegner soll nicht mitlesen, wie oft
+   * eine Karte noch feuern kann.
+   */
+  getZoneCharges(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return [];
+    const out = [];
+    // Support- UND Ability-Zonen (v420). Lethes Necromancy sitzt in der
+    // Ability-Zone, und Al will den Zaehler ausdruecklich AN DER
+    // ABILITY sehen, nicht an der Heldin. `zone` sagt dem Client, wo
+    // das Abzeichen hingehoert.
+    // ── HELDEN (v421) ────────────────────────────────────────────────
+    // Fuenf Helden aus Als Liste zaehlen „up to X times per turn"
+    // (Kassaran, Luna Pele, Nero Zira, Nomu, Teppes). Ihre Zaehler
+    // liegen FLACH am Heldenobjekt, nicht in einer `counters`-Tasche —
+    // der gemeinsame Zaehler kommt damit klar. Das Abzeichen sitzt am
+    // Heldenportrait.
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const held = ps.heroes[hi];
+      if (!held?.name) continue;
+      let hs = null;
+      try { hs = loadCardEffect(held.name); } catch { continue; }
+      const eigene = typeof hs?.remainingCharges === 'function';
+      const deklarativ = typeof hs?.chargesPerTurn === 'number'
+        && typeof hs?.chargeKey === 'string';
+      if (!eigene && !deklarativ) continue;
+      let w = null;
+      try {
+        // Der Held ist hier selbst der Traeger. `remainingCharges`
+        // bekommt zusaetzlich `controller`/`heroIdx` angeheftet, damit
+        // Sonderfaelle wie Nomu (Zaehler in der Engine, je Spieler)
+        // wissen, um wen es geht.
+        const traeger = eigene
+          ? Object.assign(Object.create(held), { controller: playerIdx, owner: playerIdx, heroIdx: hi })
+          : held;
+        w = eigene ? hs.remainingCharges(traeger, this.gs)
+          : ladungenLesen(held, this.gs, { key: hs.chargeKey, max: hs.chargesPerTurn });
+      } catch { continue; }
+      if (!w || typeof w.remaining !== 'number' || !(w.max > 1)) continue;
+      out.push({ zone: 'hero', heroIdx: hi, zoneSlot: -1,
+        remaining: Math.max(0, w.remaining), max: w.max });
+    }
+
+    // ── AREA-ZONE (v421) ─────────────────────────────────────────────
+    // `gs.areaZones[pi]` ist eine flache Namensliste. The Bonegrinder
+    // ist der erste Fall mit Ladungen.
+    for (const areaName of (this.gs.areaZones?.[playerIdx] || [])) {
+      let as = null;
+      try { as = loadCardEffect(areaName); } catch { continue; }
+      const eigene = typeof as?.remainingCharges === 'function';
+      const deklarativ = typeof as?.chargesPerTurn === 'number'
+        && typeof as?.chargeKey === 'string';
+      if (!eigene && !deklarativ) continue;
+      const inst = (this.cardInstances || []).find(c => c && c.name === areaName
+        && c.zone === 'area' && (c.controller ?? c.owner) === playerIdx);
+      if (!inst) continue;
+      let w = null;
+      try {
+        w = eigene ? as.remainingCharges(inst, this.gs)
+          : ladungenLesen(inst, this.gs, { key: as.chargeKey, max: as.chargesPerTurn });
+      } catch { continue; }
+      if (!w || typeof w.remaining !== 'number' || !(w.max > 1)) continue;
+      out.push({ zone: 'area', heroIdx: -1, zoneSlot: -1,
+        remaining: Math.max(0, w.remaining), max: w.max });
+    }
+
+    const quellen = [
+      { zone: 'support', zonen: ps.supportZones },
+      { zone: 'ability', zonen: ps.abilityZones },
+    ];
+    for (const { zone, zonen } of quellen) {
+      for (let hi = 0; hi < (zonen || []).length; hi++) {
+        const reihe = zonen[hi] || [];
+        for (let z = 0; z < reihe.length; z++) {
+          const slot = reihe[z] || [];
+          if (slot.length === 0) continue;
+          // Ability-Stapel: die OBERSTE Karte zaehlt (Lv2/Lv3 liegen
+          // darueber). Support: dieselbe Auflage wie bisher.
+          const name = slot[slot.length - 1];
+          let script = null;
+          try { script = loadCardEffect(name); } catch { continue; }
+          // Dritter Weg, nur fuer Ability-Zonen: der HELD liefert die
+          // Ladungen seiner Ability. Lethes „Necromancy up to 3 times
+          // per turn" ist eine Regel DER HELDIN — `necromancy.js` ist
+          // eine allgemeine Karte, die viele Helden tragen, und soll
+          // von Lethe nichts wissen muessen. Der Zaehler gehoert
+          // trotzdem aufs Ability-Abzeichen (Als Vorgabe 16.8.).
+          let heldSkript = null;
+          if (zone === 'ability') {
+            const heldName = ps.heroes?.[hi]?.name;
+            if (heldName) { try { heldSkript = loadCardEffect(heldName); } catch { /* egal */ } }
+          }
+          const hatHeld = typeof heldSkript?.abilityCharges === 'function';
+          const hatEigene = typeof script?.remainingCharges === 'function';
+          const hatDeklarativ = typeof script?.chargesPerTurn === 'number'
+            && typeof script?.chargeKey === 'string';
+          if (!hatEigene && !hatDeklarativ && !hatHeld) continue;
+          const inst = (this.cardInstances || []).find(c => c && c.name === name
+            && c.zone === zone && c.heroIdx === hi && c.zoneSlot === z
+            && (c.controller ?? c.owner) === playerIdx);
+          if (!inst) continue;
+          let werte = null;
+          // Ein kaputter Zaehler darf nie den Spielzustand kippen — im
+          // Zweifel wird einfach nichts angezeigt.
+          try {
+            if (hatEigene) werte = script.remainingCharges(inst, this.gs);
+            else if (hatDeklarativ) {
+              werte = ladungenLesen(inst, this.gs,
+                { key: script.chargeKey, max: script.chargesPerTurn });
+            }
+            // Der Held darf ergaenzen ODER ueberschreiben — er kennt
+            // seine eigene Ausnahme besser als die Ability.
+            if (hatHeld) {
+              const vomHelden = heldSkript.abilityCharges(name, inst, this.gs);
+              if (vomHelden) werte = vomHelden;
+            }
+          } catch { continue; }
+          if (!werte || typeof werte.remaining !== 'number') continue;
+          // ── EINMAL-PRO-RUNDE ZEIGT NICHTS AN (Als Vorgabe 16.8.) ────
+          // Bei genau einer Ladung ist die Karte ein Schalter: einmal
+          // ausgeloest, fertig. Da gibt es nichts zu merken, und ein
+          // „1" auf jeder zweiten Karte waere nur Rauschen. Bewusst
+          // HIER geprueft und nicht im Client: so kann keine Karte das
+          // versehentlich umgehen.
+          if (!(werte.max > 1)) continue;
+          out.push({
+            zone, heroIdx: hi, zoneSlot: z,
+            remaining: Math.max(0, werte.remaining),
+            max: typeof werte.max === 'number' ? werte.max : undefined,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+
   getActivatableCreatures(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];

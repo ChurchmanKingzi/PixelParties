@@ -30,7 +30,8 @@
 //  Listens on `onNecromancyResolved` (fired by necromancy.js). When
 //  the activator is THIS Lethe instance (matched by heroIdx) on her
 //  own controller's side:
-//    • Per-turn counter `ps._letheNecromancyUsesThisTurn` increments.
+//    • Der gemeinsame Rundenzaehler auf der Necromancy-Instanz
+//      (Schluessel `letheNecromancy`) zaehlt hoch.
 //      If it stays below 3, the engine's HOPT slot for Necromancy is
 //      released so the SAME Lethe can activate again. necromancy.js's
 //      generic `_necromancyLockedToHero` lock (set on every
@@ -44,8 +45,23 @@
 //  rest of the turn (HOPT remains claimed too).
 // ═══════════════════════════════════════════
 
+const { usesLeft, spendUse, charges } = require('./_charges');
+
 const CARD_NAME = 'Lethe, the Forgetful Fixer';
 const MAX_NECROMANCY_USES = 3;
+// Schluessel des gemeinsamen Rundenzaehlers. Er sitzt auf der
+// NECROMANCY-INSTANZ, nicht auf Lethe: die Regel gehoert zu „this
+// Hero's Necromancy", das Abzeichen zeigt Al auf der Ability, und mit
+// dem Rundenstempel setzt sich der Zaehler von selbst zurueck.
+const NECRO_KEY = 'letheNecromancy';
+
+/** Die Necromancy-Instanz in der Ability-Zone dieses Lethe-Helden. */
+function necromancyInstanz(engine, controller, heroIdx) {
+  return (engine?.cardInstances || []).find(c => c
+    && c.name === 'Necromancy' && c.zone === 'ability'
+    && c.heroIdx === heroIdx
+    && (c.controller ?? c.owner) === controller) || null;
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 
@@ -75,6 +91,39 @@ function lockLethe(ps, gs) {
 }
 
 module.exports = {
+  /**
+   * Ladungen fuer die Necromancy an DIESER Heldin (Als Vorgabe 16.8.:
+   * Zaehler oben in der Ecke der Ability, nicht bei Lethe).
+   * `necromancy.js` bleibt allgemein und weiss nichts von Lethe — die
+   * Ausnahme steht hier, wo auch der Effekttext steht.
+   */
+  abilityCharges: (abilityName, inst, gs) => {
+    if (abilityName !== 'Necromancy') return null;
+    const pi = inst?.controller ?? inst?.owner;
+    const ps = gs?.players?.[pi];
+    const leer = { remaining: 0, max: MAX_NECROMANCY_USES };
+
+    // ── FREMDSPERRE ZEIGT SOFORT 0 (Als Report 16.8.) ────────────────
+    // Aktive Abilities sind hart einmal pro Runde: pro Spieler darf nur
+    // EINE Necromancy-Instanz feuern. Lethes Ausnahme hebt das nur fuer
+    // SIE auf. Nutzt also ein anderer Held Necromancy, ist Lethes fuer
+    // die Runde tot — ihr Zaehler stand aber weiter auf 3, weil sie
+    // selbst nichts verbraucht hatte. Die Regel selbst greift laengst
+    // (necromancy.js pinnt ueber `_necromancyLockedToHero`, und der
+    // HOPT-Riegel bleibt gesetzt); nur die Anzeige log.
+    //
+    // Beide Riegel werden geprueft, obwohl im Normalfall beide zugleich
+    // greifen — die Pinnung ist die inhaltlich richtige Aussage, der
+    // HOPT die technische.
+    const lock = ps?._necromancyLockedToHero;
+    if (lock && lock.turn === gs?.turn && lock.heroName && lock.heroName !== CARD_NAME) {
+      return leer;
+    }
+    if (gs?.hoptUsed?.[`free-ability:Necromancy:${pi}`] === gs?.turn) return leer;
+
+    return charges(inst, gs, { key: NECRO_KEY, max: MAX_NECROMANCY_USES });
+  },
+
   activeIn: ['hero'],
   // Keep the bookkeeping hooks (defeat tracking + lock refresh + the
   // Necromancy-extension hook) firing even while Lethe is Frozen /
@@ -97,7 +146,7 @@ module.exports = {
       if (ctx.activePlayer !== controller) return;
       const ps = gs.players[controller];
       if (!ps) return;
-      delete ps._letheNecromancyUsesThisTurn;
+      // (Necromancy-Zaehler setzt sich per Rundenstempel selbst zurueck.)
       if (!ps._letheTargetDefeated) return;
       lockLethe(ps, gs);
       engine.sync();
@@ -114,7 +163,6 @@ module.exports = {
       const ps = ctx._engine.gs.players[controller];
       if (!ps) return;
       delete ps._letheTargetDefeated;
-      delete ps._letheNecromancyUsesThisTurn;
     },
 
     /** A Creature the controller controls was defeated. */
@@ -173,8 +221,16 @@ module.exports = {
       // `onFreeActivate` ran; if Lethe still has uses left, clear it
       // so the next `doActivateFreeAbility` passes the HOPT gate.
       // After the 3rd use, we LEAVE the HOPT claimed — that's the cap.
-      const uses = (ps._letheNecromancyUsesThisTurn || 0) + 1;
-      ps._letheNecromancyUsesThisTurn = uses;
+      // Gemeinsamer Rundenzaehler auf der Necromancy-Instanz (v420).
+      // Vorher lag er als `ps._letheNecromancyUsesThisTurn` am
+      // Spielerzustand und wurde per `onTurnStart`/`onTurnEnd`
+      // geloescht — dieselbe vergessbare Ruecksetzung, die bei Archer
+      // und Golden Vermin schiefging. Der Stempel erledigt das jetzt.
+      const abInst = necromancyInstanz(engine, controller, ctx.hostHeroIdx);
+      if (abInst) spendUse(abInst, gs, { key: NECRO_KEY, max: MAX_NECROMANCY_USES });
+      const uses = abInst
+        ? MAX_NECROMANCY_USES - usesLeft(abInst, gs, { key: NECRO_KEY, max: MAX_NECROMANCY_USES })
+        : MAX_NECROMANCY_USES;
       if (uses < MAX_NECROMANCY_USES) {
         const hoptKey = `free-ability:Necromancy:${controller}`;
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];

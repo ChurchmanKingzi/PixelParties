@@ -23,8 +23,13 @@ const { hasCardType } = require('./_hooks');
 const CARD_NAME = 'Nero Zira, the Mastermind';
 const ATK_BOOST = 30;
 const USES_PER_TURN = 5;
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'neroZiraAtk';
 
 module.exports = {
+  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
+  chargesPerTurn: USES_PER_TURN,
+  chargeKey: USE_KEY,
   activeIn: ['hero'],
 
   // CPU threat assessment. Each friendly Creature summon into pi's support
@@ -63,13 +68,8 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
 
       // Per-turn use cap, keyed by gs.turn (matches Sandy Blob).
-      const turn = gs.turn || 0;
-      if (hero._neroZiraAtkBoostTurn !== turn) {
-        hero._neroZiraAtkBoostTurn = turn;
-        hero._neroZiraAtkBoostUsed = 0;
-      }
-      if (hero._neroZiraAtkBoostUsed >= USES_PER_TURN) return;
-      hero._neroZiraAtkBoostUsed++;
+      // Rundenstempel und Kappe im gemeinsamen Zaehler (v421).
+      if (!spendUse(hero, gs, { key: USE_KEY, max: USES_PER_TURN })) return;
 
       // Permanent ATK gain. Routed through `_applyHeroAtkDelta` so
       // the Curse suppression accumulator catches it when the host
@@ -83,7 +83,7 @@ module.exports = {
         player: gs.players[pi].username,
         creature: entering.name,
         amount: ATK_BOOST,
-        usesRemaining: USES_PER_TURN - hero._neroZiraAtkBoostUsed,
+        usesRemaining: usesLeft(hero, gs, { key: USE_KEY, max: USES_PER_TURN }),
       });
       engine.sync();
     },

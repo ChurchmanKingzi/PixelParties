@@ -184,7 +184,7 @@ module.exports = {
     if ((ps.gold || 0) < cost) return false;
     if ((ps.mainDeck || []).length < cards) return false;
 
-    ps.gold -= cost;
+    await engine._payCardCost(pi, cost);
     await engine.actionDrawCards(pi, cards);
 
     // Lock further hand-additions for the rest of the turn. This is
@@ -284,7 +284,7 @@ module.exports.cpuResponse = function cpuResponse(engine, kind, promptData) {
     if ((ps.gold || 0) < cost) return false;
     const deck = ps.mainDeck || [];
     if (deck.length < cards) return false;
-    ps.gold -= cost;
+    await engine._payCardCost(pi, cost);
     for (let i = 0; i < cards; i++) ps.hand.push(deck.shift());
     ps.handLocked = true;
     return true;

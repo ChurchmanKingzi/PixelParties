@@ -183,7 +183,7 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
     cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
     resolve: async () => {
       if (cost > 0) {
-        ps.gold -= cost;
+        await engine._payCardCost(pi, cost);
         engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
       }
       const result = engine.safePlaceInSupport(cardName, pi, destHeroIdx, destSlot);
@@ -242,7 +242,7 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
   }
 
   if (cost > 0 && !chainResult.negated) {
-    ps.gold -= cost;
+    await engine._payCardCost(pi, cost);
     engine._broadcastEvent('gold_change', { owner: pi, amount: -cost });
   }
 

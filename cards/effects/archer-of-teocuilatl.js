@@ -80,8 +80,13 @@ module.exports = {
       if (ctx._isMove) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
-      engine.gs.players[pi].gold = (engine.gs.players[pi].gold || 0) + GOLD_GAIN;
-      engine._broadcastEvent('gold_change', { owner: pi, amount: GOLD_GAIN });
+      // Ueber `actionGainGold` statt roh (Fix 16.8., vom Gold-Prueflauf
+      // gefunden). „gain 4 Gold" ist ein GEWINN, und genau 4 ist die
+      // Schwelle der Monkee-Ausloeser („When you gain 4 or more Gold
+      // through an effect" — Nimble/Resilient Monkee). Der rohe Zuschlag
+      // war fuer die unsichtbar, ebenso fuer Golden Arrows Gold-Sperre
+      // und das Gold-Trap-Ueberraschungsfenster.
+      await engine.actionGainGold(pi, GOLD_GAIN);
       engine.log('archer_teocuilatl_gold', {
         player: engine.gs.players[pi]?.username, amount: GOLD_GAIN,
       });

@@ -72,7 +72,7 @@ module.exports = {
     const oppPs = gs.players[oppIdx];
     const goldCost = targetLink.goldCost || 0;
     if (goldCost > 0 && oppPs) {
-      oppPs.gold = Math.max(0, (oppPs.gold || 0) - goldCost);
+      await engine._payCardCost(oppIdx, goldCost);
       engine.log('rusty_touch_gold', {
         player: oppPs.username, card: targetLink.cardName, gold: goldCost,
       });

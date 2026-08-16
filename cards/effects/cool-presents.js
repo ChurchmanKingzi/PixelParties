@@ -125,13 +125,16 @@ module.exports = {
     }
 
     const totalCost = baseCost * targets.length;
-    if ((ps.gold || 0) < totalCost) {
+    // Bezahlbarkeit inkl. Kreditrahmen (16.8.): ohne den blockiert
+    // diese Zeile genau die Zahlung, die der Ziel-Waehler oben
+    // bereits erlaubt hat — Als Book-of-Doom-Report.
+    if (!engine.canAffordGold(pi, totalCost, CARD_NAME)) {
       // Affordability is auto-capped server-side via manualGoldCost,
       // so this is defense-in-depth — bail without committing.
       return;
     }
 
-    ps.gold -= totalCost;
+    await engine._payCardCost(pi, totalCost);
     engine._broadcastEvent('gold_change', { owner: pi, amount: -totalCost });
 
     // Process in DESCENDING handIndex order so the splice from each

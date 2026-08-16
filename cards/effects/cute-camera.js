@@ -56,7 +56,7 @@ module.exports = {
       });
 
       if (confirmed) {
-        ps.gold -= 3;
+        await engine._payCardCost(pi, 3);
         myLink.chainClosed = true;
         engine.log('chain_closed', { card: 'Cute Camera', player: ps.username, extraCost: 3 });
         engine.sync();

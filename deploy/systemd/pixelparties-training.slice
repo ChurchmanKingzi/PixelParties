@@ -10,11 +10,17 @@ Description=Pixel Parties — Trainingsläufe (nachrangig)
 Before=slices.target
 
 [Slice]
-# Muss über PP_TRAIN_HEAP_MAX (3072) plus Node-Grundlast liegen, sonst
+# Muss über PP_TRAIN_HEAP_MAX (4096) plus Node-Grundlast liegen, sonst
 # killt der Kernel den Kindprozess, bevor V8 sein eigenes Limit meldet —
 # wortloser Abbruch statt Stacktrace.
-MemoryHigh=3500M
-MemoryMax=4G
+#
+# Warum 4096 und nicht weniger: _engine.js leitet die Schwellen seines
+# Heap-Wächters aus dem V8-Limit ab und bricht MCTS ab, wenn sie reißen.
+# Ein kleineres Limit macht den Piloten schwächer und die Läufe
+# unvergleichbar mit lokalen. Das Limit ist damit ein QUALITÄTSparameter,
+# nicht nur eine Speichergrenze.
+MemoryHigh=4G
+MemoryMax=4800M
 # 300% = drei von vier Kernen. Der vierte bleibt dem Spiel.
 CPUQuota=300%
 CPUWeight=100

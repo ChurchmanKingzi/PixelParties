@@ -53,6 +53,7 @@ const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
 const { BUFF_EFFECTS, heroCanBeEquipped } = require('./cards/effects/_hooks');
+const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 
 
@@ -3726,18 +3727,18 @@ function checkPotionLock(ps, gs, pi) {
  * Find the current hand index of a resolving card tracked by nth-occurrence.
  * Returns -1 if the card was removed from hand (self-discarded).
  */
-function getResolvingHandIndex(ps) {
-  if (!ps._resolvingCard) return -1;
-  const { name, nth } = ps._resolvingCard;
-  let count = 0;
-  for (let i = 0; i < (ps.hand || []).length; i++) {
-    if (ps.hand[i] === name) {
-      count++;
-      if (count === nth) return i;
-    }
-  }
-  return -1; // Card was removed from hand during resolution
-}
+// Aufgeschobene Handentnahme — liegt seit v414 in einem eigenen Modul,
+// weil server.js beim Laden einen Server startet und die Logik dort
+// nicht testbar war. Verhalten unveraendert; `getResolvingHandIndex`
+// bleibt als lokaler Name erhalten, damit alle Aufrufstellen gleich
+// bleiben.
+const {
+  beginHandResolve,
+  getResolvingHandIndex,
+  commitHandResolve,
+  abortHandResolve,
+  eligibleIndicesWithoutResolving,
+} = require('./cards/effects/_hand-resolve.js');
 
 function sendGameState(room, playerIdx, extra) {
   if (room.engine?._fastMode) return; // Silent during MCTS simulations.
@@ -4073,6 +4074,32 @@ function sendGameState(room, playerIdx, extra) {
         return [...blocked];
       })() : [],
       neverPlayableCards: pi === playerIdx ? ps.hand.filter(cn => loadCardEffect(cn)?.neverPlayable) : [],
+      // Karten, deren EIGENES Gate (`canPlayWithHero`) sie gerade
+      // sperrt — Debt-O-Tron: „only while you have less than 0 Gold",
+      // „only summon 1 per turn", und die Handkarte, die als Kosten
+      // geloescht werden muss. Der Client kennt keine Kartenskripte und
+      // hat bis 16.8. NUR die Kosten geprueft; die Debt-O-Trons sahen
+      // deshalb spielbar aus, obwohl der Server sie ablehnt (Als
+      // Report). Geprueft gegen ALLE eigenen Helden: gesperrt ist eine
+      // Karte nur, wenn sie bei KEINEM spielbar waere.
+      cardGateBlockedCards: pi === playerIdx ? (() => {
+        const raus = new Set();
+        for (const cn of new Set(ps.hand || [])) {
+          let sc = null;
+          try { sc = loadCardEffect(cn); } catch { continue; }
+          if (typeof sc?.canPlayWithHero !== 'function') continue;
+          const cd = getCardDB()[cn];
+          let irgendwoSpielbar = false;
+          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+            if (!ps.heroes[hi]?.name) continue;
+            try {
+              if (sc.canPlayWithHero(gs, pi, hi, cd, room.engine)) { irgendwoSpielbar = true; break; }
+            } catch { irgendwoSpielbar = true; break; }   // kaputtes Gate sperrt nicht
+          }
+          if (!irgendwoSpielbar) raus.add(cn);
+        }
+        return [...raus];
+      })() : [],
       // Per-instance hand-card level offsets (Rocky Slime, persistent
       // — carries onto the summoned support instance). Owner-only:
       // the opponent shouldn't see which copies are reduced. Maps
@@ -4130,6 +4157,20 @@ function sendGameState(room, playerIdx, extra) {
       supportSpellLocked: ps.supportSpellLocked || false,
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
+      // Kreditrahmen (Debt-O-Tron/Kent). Der Client rechnet ihn beim
+      // Ausgrauen der Handkarten mit — sonst sperrt die Oberflaeche
+      // Karten, die der Server laengst erlaubt. Ohne den Archetyp 0.
+      goldOverdraft: room.engine.goldOverdraftLimit(pi),
+      // Karten, die sich SELBST finanzieren („Debt-O-Tron Damage Fees":
+      // spielbar auch bei negativem Gold). Der Rahmen darueber gilt
+      // kartenunabhaengig und wuerde diese Karten faelschlich ausgrauen;
+      // der Client behandelt Namen aus dieser Liste als immer bezahlbar.
+      // Nur die eigene Hand, und nur Namen — kein Kartenskript im Client.
+      goldSelfOverdraftCards: pi === playerIdx
+        ? [...new Set((ps.hand || []).filter(n => {
+            try { return !!loadCardEffect(n)?.selfGoldOverdraft; } catch { return false; }
+          }))]
+        : [],
       permanents: ps.permanents || [],
       coolnessStack: ps.coolnessStack || [],
       // Whether the top of THIS player's Stack is playable from the
@@ -4415,6 +4456,10 @@ function sendGameState(room, playerIdx, extra) {
     freeActivatableAbilities: room.engine ? room.engine.getFreeActivatableAbilities(playerIdx) : [],
     activeHeroEffects: room.engine ? room.engine.getActiveHeroEffects(playerIdx) : [],
     activatableCreatures: room.engine ? room.engine.getActivatableCreatures(playerIdx) : [],
+    // Ladungen von Permanents mit „up to X times per turn" (Als
+    // Vorgabe 16.8.). Nur fuer die eigene Seite — der Gegner soll
+    // nicht mitlesen, wie oft eine Karte noch feuern kann.
+    zoneCharges: room.engine ? room.engine.getZoneCharges(playerIdx) : [],
     // Creatures that can act as Spell casters via Wolflesia-style
     // `bypassesCasterRequirement` additional actions. Each entry has
     // `{ creatureInstId, cardName, heroIdx, zoneSlot, eligibleHandCards }`.
@@ -4773,6 +4818,7 @@ function sendSpectatorGameState(room) {
       creationLockedNames: [],
       handLockBlockedCards: [],
       neverPlayableCards: [],
+      cardGateBlockedCards: [],
       handLevelOffsets: {},
       handLevelOffsetsTransient: {},
       handLevelOffsetHeroFilter: {},
@@ -4780,6 +4826,13 @@ function sendSpectatorGameState(room) {
       handCostReductions: {},
       comboLockHeroIdx: ps.comboLockHeroIdx ?? null,
       heroesActedThisTurn: ps.heroesActedThisTurn || [],
+      // Kreditrahmen (Debt-O-Tron/Kent). Der Client rechnet ihn beim
+      // Ausgrauen der Handkarten mit — sonst sperrt die Oberflaeche
+      // Karten, die der Server laengst erlaubt. Ohne den Archetyp 0.
+      goldOverdraft: room.engine.goldOverdraftLimit(pi),
+      // Zuschauer sehen keine Haende — die Liste der sich selbst
+      // finanzierenden Karten bleibt hier deshalb leer.
+      goldSelfOverdraftCards: [],
     })),
     areaZones: gs.areaZones,
     // Doom Counter leben auf der Karten-INSTANZ, die nicht mit
@@ -4878,6 +4931,7 @@ function sendSpectatorGameState(room) {
     freeActivatableAbilities: [],
     activeHeroEffects: [],
     activatableCreatures: [],
+    zoneCharges: [],
     activatableEquips: [],
     activatablePermanents: [],
     activatableAreas: [],
@@ -5770,6 +5824,23 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const cardData = getCardDB()[cardName];
   if (!cardData || cardData.cardType !== 'Artifact') return false;
 
+  // ── KARTENEIGENES SPIELBARKEITS-GATE (16.8.) ───────────────────────
+  // `canPlayWithHero` ist der Vertrag, mit dem eine KARTE sagt „ich darf
+  // hier gerade nicht gespielt werden". Die Engine fragt ihn beim
+  // Auflisten der spielbaren Handkarten (getHeroPlayableCards) — aber
+  // ARTEFAKTE laufen nicht ueber `validateActionPlay`, und dieser Pfad
+  // hat den Vertrag bisher gar nicht gekannt. Das Gate war damit reine
+  // Anzeige: der Client graute die Karte aus, ein direkter Aufruf kam
+  // trotzdem durch. Aufgefallen beim Debt-O-Tron-Archetyp — dessen fuenf
+  // „Model"-Karten sind nur bei negativem Gold spielbar und „Damage
+  // Fees" ist hart einmal pro Zug; beides waere umgehbar gewesen.
+  // Gilt ab jetzt fuer JEDES Artefakt mit dem Vertrag.
+  {
+    const _gate = loadCardEffect(cardName);
+    if (_gate?.canPlayWithHero
+        && !_gate.canPlayWithHero(gs, pi, heroIdx, cardData, room.engine)) return false;
+  }
+
   // ── HAND-SPERRE DURCHSETZEN (1.8.) ─────────────────────────────────
   // `neverPlayable` markiert Karten, die aus der HAND wirkungslos sind
   // und nur über einen anderen Weg ins Spiel kommen (Coolness-Stapel,
@@ -5842,7 +5913,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   }
   const costReduction = playerReduction + handReduction + heroEquipReduction;
   const cost = Math.max(0, rawCost - costReduction);
-  if ((ps.gold || 0) < cost) return false;
+  if (!room.engine.canAffordGold(pi, cost, cardName)) return false;
 
   // For cross-side artifacts (Powder Keg etc.), the client's `heroIdx`
   // targets the OPPONENT's hero column. Dereference the host hero
@@ -5927,7 +5998,9 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       const chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
         resolve: async () => {
-          if (cost > 0) ps.gold -= cost;
+          // `cardName` mit: nur so greift `selfGoldOverdraft` (Debt-O-Tron
+          // Damage Fees darf sich selbst auch aus dem Minus bezahlen).
+          await room.engine._payCardCost(pi, cost, { cardName });
           if (costReduction > 0) {
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
@@ -5978,39 +6051,130 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     if (finalSlot < 0 || finalSlot >= 3) return false;
     if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
 
-    ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    // ── ENTNAHME AUFGESCHOBEN (Als Report 16.8., v414) ──────────────
+    // Vorher wurde die Karte HIER aus der Hand genommen — also VOR dem
+    // Kettenfenster. Waehrend des Fensters lag sie damit nirgends, und
+    // Al sah sie „kurz in die Hand zurueckspringen, gehighlightet
+    // werden und dann wieder in die Zone springen".
+    //
+    // Jetzt bleibt sie — ausgegraut, wie bei `doPlayCreature` — bis zur
+    // Aufloesung in der Hand liegen und wandert in EINEM Zug in die
+    // Zone. Genau Als Vorgabe: „sollte sofort dort landen, wie eine
+    // Creature."
+    //
+    // Der AUSRUESTUNGS-Zweig weiter oben bleibt bewusst unberuehrt:
+    // dort meldet niemand ein Problem, und er haengt an ganz anderen
+    // Pfaden (Cross-Side-Equip, Powder Keg, freie Gegner-Helden).
+    beginHandResolve(ps, cardName, handIndex);
+    let handEntnommen = false;
+    /** Nimmt die Karte JETZT aus der Hand. Mehrfachaufruf folgenlos. */
+    const entnimmHandkarte = () => {
+      const idx = commitHandResolve(ps, {
+        onRemoved: () => {
+          if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        },
+      });
+      if (idx >= 0) handEntnommen = true;
+      return idx;
+    };
+
     room.engine.log('artifact_creature_placed', { player: ps.username, card: cardName, hero: hero.name, cost });
     room.engine._trackTerrorResolvedEffect(pi, cardName);
-    // Hand-to-board fly animation. Anchor to the destination's player
-    // index — for cross-side placement the fly lands on opp's row,
-    // not the playing player's, so the client renders the trajectory
-    // correctly.
-    broadcastHandToBoard(room, pi, {
-      cardName, handIndex, zoneType: 'support',
-      heroIdx, slotIdx: finalSlot,
-      destOwner: placementOwner,
-    });
 
     try {
-      const oi = pi === 0 ? 1 : 0;
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid) io.to(oppSid).emit('card_reveal', { cardName });
-      sendToSpectators(room, 'card_reveal', { cardName });
-      await room.engine._delay(100);
+      // ── KEIN VORAB-REVEAL, KEINE 100-ms-PAUSE (Als Report 16.8.) ──
+      // DAS war die eigentliche Ursache des Zurueckspringens — nicht
+      // die Entnahme (die v414 bereits aufgeschoben hat).
+      //
+      // Der Ablauf war: Karte fallenlassen → Drag-Geist verschwindet →
+      // der Client zeigt wieder seinen letzten Serverstand, in dem die
+      // Karte noch in der Hand liegt → 100 ms Pause → erst dann laeuft
+      // die Kette durch und die Karte landet. Diese 100 ms sind lang
+      // genug, um die Karte sichtbar in die Hand zurueckspringen und
+      // dort (als aufzuloesende Karte) aufleuchten zu lassen.
+      //
+      // `doPlayCreature` macht beides NICHT: kein Vorab-Reveal, keine
+      // Pause. Ohne Gegner-Reaktion loest `executeCardWithChain` sofort
+      // auf („No reactions — resolve normally"), die Karte landet im
+      // selben Tick, und genau deshalb sieht Aggressive Town Guard
+      // richtig aus. Artefakt-Kreaturen machen es jetzt genauso.
+      //
+      // Der Gegner verliert nichts: er sieht die Karte weiterhin per
+      // `hand_to_board_fly` in die Zone fliegen (dieselbe Information,
+      // die ihm eine normale Kreatur gibt), und gibt es tatsaechlich
+      // eine Reaktion, oeffnet das Reaktionsfenster ohnehin seine
+      // eigene Anzeige.
+      //
+      // Der AUSRUESTUNGS-Zweig behaelt Reveal und Pause: dort landet
+      // die Karte an einem Helden statt in einer Zone, niemand meldet
+      // ein Problem, und ich fasse ihn ohne Anlass nicht an.
 
+      // Item Lock laeuft VOR dem Kettenfenster — und seit die Karte
+      // dort noch in der Hand liegt, koennte der Spieler ausgerechnet
+      // sie selbst loeschen. `eligibleIndicesWithoutResolving` nimmt
+      // ihren Slot aus der Auswahl; als FUNKTION uebergeben, weil die
+      // Indizes nach jedem Abwurf rutschen (Muster von Wheels).
+      // Bleibt danach nichts Loeschbares uebrig, entfaellt die Abgabe.
       if (ps.itemLocked && (ps.hand || []).length > 0) {
-        await room.engine.actionPromptForceDiscard(pi, 1, {
-          title: 'Item Lock Cost',
-          description: 'You must delete 1 card from your hand to use an Artifact.',
-          source: 'Item Lock', deleteMode: true, selfInflicted: true,
-        });
+        const waehlbar = eligibleIndicesWithoutResolving(ps);
+        if (waehlbar().length > 0) {
+          await room.engine.actionPromptForceDiscard(pi, 1, {
+            title: 'Item Lock Cost',
+            description: 'You must delete 1 card from your hand to use an Artifact.',
+            source: 'Item Lock', deleteMode: true, selfInflicted: true,
+            eligibleIndices: waehlbar,
+          });
+        }
       }
 
       const chainResult = await room.engine.executeCardWithChain({
         cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
         resolve: async () => {
-          if (cost > 0) ps.gold -= cost;
+          // `cardName` mit: nur so greift `selfGoldOverdraft` (Debt-O-Tron
+          // Damage Fees darf sich selbst auch aus dem Minus bezahlen).
+          // ── ENTNAHME VOR DER ZAHLUNG (Als Report 16.8., v419) ────────
+          // DAS war der letzte Rest des Zurueckspringens. `_payCardCost`
+          // ruft mitten drin `this.sync()` (damit eine daraus geoeffnete
+          // Abfrage den neuen Goldstand zeigt) — und in genau diesem
+          // Zustandsversand lag die Karte noch in der Hand, markiert als
+          // „loest gerade auf". Der Client zeichnete sie also einen
+          // Moment lang aufleuchtend in der Hand, bevor sie in die Zone
+          // wanderte. Danach laufen auch noch AFTER_RESOURCE_SPEND-Hooks,
+          // die ihrerseits Abfragen oeffnen duerfen (Money Printer) —
+          // dieser Moment konnte also beliebig lang werden.
+          //
+          // `doPlayCreature` hat das Problem nicht, weil Kreaturen gar
+          // kein Gold kosten: dort gibt es zwischen Ablegen und Setzen
+          // ueberhaupt keinen Zustandsversand.
+          //
+          // Die Karte verlaesst die Hand deshalb VOR der Zahlung. Sie
+          // liegt damit fuer die Dauer der Zahlung nirgends — das ist
+          // unsichtbar, weil der Client in dieser Zeit keinen Anlass
+          // hat, die Handkarte zu zeichnen, waehrend eine Rueckkehr in
+          // die Hand sehr wohl auffaellt.
+          //
+          // Bewusst NICHT auch das Setzen vorgezogen: dann koennte ein
+          // frisch gespieltes Debt-O-Tron-Modell auf seine EIGENE
+          // Kostenzahlung triggern (die Modelle verlangen
+          // `zone === 'support'`). Das waere eine Regelaenderung, die
+          // Al nicht bestellt hat.
+          // Reihenfolge: FLUG → ENTNAHME → ZAHLUNG → SETZEN.
+          // Der Flug zuerst, weil sein Client-Handler den Quell-Slot per
+          // `data-hand-idx` im DOM sucht und still abbricht, wenn er ihn
+          // nicht findet (`if (!sourceEl || !destEl) return;`). Nach der
+          // Entnahme ist die Hand einen Slot kuerzer — beim letzten
+          // Handplatz gaebe es das Element nicht mehr und der Gegner
+          // saehe gar keine Flugbahn.
+          const handIdxJetzt = getResolvingHandIndex(ps);
+          broadcastHandToBoard(room, pi, {
+            cardName,
+            handIndex: handIdxJetzt >= 0 ? handIdxJetzt : handIndex,
+            zoneType: 'support',
+            heroIdx, slotIdx: finalSlot,
+            destOwner: placementOwner,
+          }, !!clickPlaced);
+          entnimmHandkarte();
+          await room.engine._payCardCost(pi, cost, { cardName });
           if (costReduction > 0) {
             delete ps._nextArtifactCostReduction;
             delete ps._nextArtifactCostReductionTurn;
@@ -6044,9 +6208,23 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         },
       });
 
-      if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
+      if (chainResult.negated) {
+        // Negiert: `resolve` lief nie, die Karte liegt also noch in der
+        // Hand. Erst entnehmen, dann routen — sonst laege sie doppelt
+        // (Hand UND Ablage).
+        entnimmHandkarte();
+        await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
+      }
     } catch (err) {
       console.error('[Engine] doPlayArtifact (creature) error:', err.message);
+    } finally {
+      // Sicherheitsnetz. Ist die Karte hier noch nicht entnommen, ging
+      // etwas schief, BEVOR bezahlt oder gesetzt wurde — dann bleibt
+      // sie in der Hand liegen, nur der Merker faellt weg (sonst waere
+      // sie fuer immer ausgegraut). Das ist strikt besser als frueher:
+      // dort war die Karte nach einem Fehler verloren, weil die
+      // Entnahme laengst passiert war.
+      if (!handEntnommen) abortHandResolve(ps);
     }
     for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
     return true;
@@ -7933,6 +8111,9 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
   if (charmedOwner == null && borrowedFromOwner == null && gs.players[pi].comboLockHeroIdx != null && gs.players[pi].comboLockHeroIdx !== heroIdx) return false;
   // One-turn action lock (Treasure Hunter's Backpack, etc.)
   if (hero._actionLockedTurn === gs.turn) return false;
+  // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
+  // Geltungsbereich wie der Rundenstempel darueber.
+  if (room.engine.areActionsBlocked(pi)) return false;
   // Divine Gift of Skill lock — chosen hero can't act unless they have
   // Magic Arts >= 1. Action-cost ability activations are Actions.
   if (room.engine.isHeroSkillLocked(heroOwner, heroIdx)) return false;
@@ -8384,6 +8565,12 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     // aren't "Actions"); action-cost activations DO consume an Action,
     // so the lock applies.
     if (isActionCost && hero._actionLockedTurn === gs.turn) return false;
+    // Spielerweite Sperre (Kent bei negativem Gold). Gleiche Scoping-
+    // Regel wie die Zeile darueber: FREIE Helden-Effekte bleiben
+    // erlaubt, nur solche mit Aktionskosten sind gesperrt (Als Ruling
+    // 16.8. — „NUR fuer Heldeneffekte, wenn diese explizit eine Action
+    // kosten, z.B. Champion").
+    if (isActionCost && room.engine.areActionsBlocked(pi)) return false;
     // Divine Gift of Skill lock — action-cost hero effects are Actions.
     if (isActionCost && room.engine.isHeroSkillLocked(heroOwner, heroIdx)) return false;
     let consumedAdditionalHeroInst = null;
@@ -8800,7 +8987,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
 
   const ps = gs.players[pi];
   if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost) {
-    if ((ps.gold || 0) < goldCost) return false;
+    if (!room.engine.canAffordGold(pi, goldCost, potionName)) return false;
   }
 
   gs.potionTargeting = null;
@@ -8893,7 +9080,8 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   }
 
   if (cardType === 'Artifact' && goldCost > 0 && !script.manualGoldCost && !chainResult.negated) {
-    ps.gold -= goldCost;
+    // `cardName` mit — siehe oben (selfGoldOverdraft).
+    await room.engine._payCardCost(pi, goldCost, { cardName: potionName });
   }
 
   if (chainResult.resolveResult?.aborted) {
@@ -8913,11 +9101,23 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     delete gs._pendingCardReveal;
     delete gs._pendingPlayLog;
     const freshTargets = script.getValidTargets ? script.getValidTargets(gs, pi, room.engine, handIndex) : validTargets;
+    // `room.engine` als 4. Parameter (16.8.): Karten mit VARIABLEN
+    // Kosten rechnen sich aus dem Budget aus, wie viele Ziele sie
+    // anbieten duerfen — und dafuer brauchen sie den Kreditrahmen
+    // (Kent gibt 20 dazu). Rueckwaertskompatibel: wer den Parameter
+    // nicht liest, verhaelt sich unveraendert.
     const config = typeof script.targetingConfig === 'function'
-      ? script.targetingConfig(gs, pi, goldCost)
+      ? script.targetingConfig(gs, pi, goldCost, room.engine)
       : { ...script.targetingConfig };
     if (script.manualGoldCost && !config.maxTotal) {
-      config.maxTotal = goldCost > 0 ? Math.floor((ps.gold || 0) / goldCost) : 99;
+      // Auch der Standard-Deckel rechnet mit Budget statt Kontostand —
+      // er greift fuer alle X-Kosten-Karten ohne eigenes `maxTotal`
+      // (Beer, Cool Presents). Ohne das blieb Als Report an genau
+      // diesen Karten bestehen, nur unsichtbarer als bei Book of Doom.
+      const budget = room.engine.goldBudget(pi, potionName);
+      config.maxTotal = goldCost > 0
+        ? (budget === Infinity ? 99 : Math.floor(budget / goldCost))
+        : 99;
     }
     gs.potionTargeting = {
       potionName, handIndex, ownerIdx: pi, cardType, goldCost,
@@ -9422,7 +9622,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // even when they're short on gold; the script's own `canActivate`
   // and `getValidTargets` filter targets by what they can actually
   // afford. Standard Artifacts still gate on the base cost.
-  if (!script.manualGoldCost && (ps.gold || 0) < cost) return false;
+  if (!script.manualGoldCost && !room.engine.canAffordGold(pi, cost, cardName)) return false;
   if ((cardData.subtype || '').toLowerCase() === 'reaction' && !script.proactivePlay) return false;
   if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
@@ -9439,11 +9639,19 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     // only stamped after the player confirms (doConfirmPotion), so
     // scripts that need self-exclusion at the targeting-build stage
     // rely on this explicit argument.
+    // `room.engine` als 4. Parameter und Budget statt Kontostand — DIE
+    // Stelle, an der Book of Doom seine Ziele zaehlt (16.8., Als
+    // zweiter Report). Die gleiche Rechnung steht in `doConfirmPotion`;
+    // v409 hatte nur DIESE hier uebersehen, weshalb der Ziel-Waehler
+    // bei <= 0 Gold weiter nichts anbot.
     const config = typeof script.targetingConfig === 'function'
-      ? script.targetingConfig(gs, pi, cost)
+      ? script.targetingConfig(gs, pi, cost, room.engine)
       : { ...script.targetingConfig };
     if (script.manualGoldCost && !config.maxTotal) {
-      config.maxTotal = cost > 0 ? Math.floor((ps.gold || 0) / cost) : 99;
+      const budget = room.engine.goldBudget(pi, cardName);
+      config.maxTotal = cost > 0
+        ? (budget === Infinity ? 99 : Math.floor(budget / cost))
+        : 99;
     }
     const validTargets = normalizeValidTargets(
       script.getValidTargets(gs, pi, room.engine, handIndex), pi, room.engine, config,
@@ -9517,7 +9725,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     else room.engine._firePendingPlayLog();
 
-    if (cost > 0 && !script.manualGoldCost && !chainResult.negated) ps.gold -= cost;
+    if (cost > 0 && !script.manualGoldCost && !chainResult.negated) await room.engine._payCardCost(pi, cost, { cardName });
     if (!chainResult.negated && costReduction > 0) {
       delete ps._nextArtifactCostReduction;
       delete ps._nextArtifactCostReductionTurn;
@@ -12965,20 +13173,19 @@ io.on('connection', (socket) => {
             // damage effect) is identical whether the token was created
             // during play or authored into a puzzle.
             if (cs.biomancyLevel) {
-              const level = Math.max(1, Math.min(3, cs.biomancyLevel));
-              const stats = { 1: 40, 2: 60, 3: 80 }[level];
-              const potionData = cardsByName[inst.name];
-              inst.counters._cardDataOverride = {
-                ...(potionData || {}),
-                cardType: 'Creature/Token',
-                hp: stats,
-                effect: `Once per turn: Deal ${stats} damage to any target on the board.`,
-              };
-              inst.counters._effectOverride = 'Biomancy Token';
-              inst.counters.currentHp = stats;
-              inst.counters.maxHp = stats;
-              inst.counters.biomancyDamage = stats;
-              inst.counters.biomancyLevel = level;
+              // Seit 16.8. ueber `_biomancy-shared.js` — dieselbe Stelle,
+              // aus der `biomancy.js` und Kyli ihre Tokens bauen. Die
+              // frueher hier inline gepflegte Kopie hatte das Feld
+              // `level` im Override NICHT gesetzt: ein im Editor
+              // gesetzter Token las damit die `null` der Potion, ein im
+              // Spiel entstandener eine echte Zahl. Das fiel an jeder
+              // Stelle auseinander, die effektive Kartendaten auswertet
+              // (Dark Gears stufenabhaengiges Kostengatter, das
+              // Stufen-Abzeichen, der Tooltip). Jetzt sind beide gleich.
+              Object.assign(
+                inst.counters,
+                biomancyTokenCounters(cardsByName[inst.name], cs.biomancyLevel),
+              );
             }
             // Cute Hydra Head Counter — authored in the puzzle editor,
             // mirrors what the live `onPlay` handler stamps after the
@@ -17839,6 +18046,26 @@ initDatabase().then(async () => {
       }
     } catch (e) {
       console.warn('[hand-interaction] Prüflauf fehlgeschlagen:', e.message);
+    }
+
+    // Gold-Prüflauf: meldet Kartenskripte, die roh auf `.gold` schreiben
+    // und damit an Logans Zustandsregel UND Criminal Monkees Zahlungs-
+    // Trigger vorbeilaufen. Derselbe Fehler ist am 16.8. dreimal
+    // hintereinander aufgetreten (v404/v405/v406) — ab jetzt meldet er
+    // sich selbst, statt beim Playtest aufzufallen.
+    try {
+      const { reportGoldAudit } = require('./cards/effects/_gold-audit');
+      const { warnings: goldWarn, checked: goldChecked } = reportGoldAudit();
+      if (goldWarn.length) {
+        console.warn('╔══════════════════════════════════════════════════════╗');
+        console.warn(`║  ${String(goldWarn.length).padEnd(2)} KARTE(N) MIT ROHEM GOLD-ZUGRIFF                 ║`);
+        console.warn('║  Details siehe die Zeilen darüber                    ║');
+        console.warn('╚══════════════════════════════════════════════════════╝');
+      } else {
+        console.log(`[gold-audit] ${goldChecked} Kartenskripte geprüft, kein roher Gold-Zugriff`);
+      }
+    } catch (e) {
+      console.warn('[gold-audit] Prüflauf fehlgeschlagen:', e.message);
     }
     // Demo-Aufnahme-Banner (Als Pilot-Spiele): beim Start unübersehbar
     // machen, ob PP_DEMO_RECORD wirkt — der erste Versuch scheiterte

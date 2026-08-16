@@ -86,18 +86,14 @@ module.exports = {
 
     // ── Step 1: Delete one copy from deck to the deleted pile ──
     ps.mainDeck.splice(deleteIdx, 1);
-    ps.deletedPile.push(result.cardName);
-    // Visual cue — the client's `deck_to_deleted` handler (app-board.jsx
-    // onDeckToDeleted) expects `{ owner, cards: string[] }` and animates
-    // each named card flying from the owner's deck to their deleted pile.
-    engine._broadcastEvent('deck_to_deleted', {
-      owner: pi, cards: [result.cardName],
-    });
     engine.log('nerdy_cheese_delete', {
       player: ps.username, card: result.cardName,
     });
-    engine.sync();
-    await engine._delay(500);
+    // Gleiche Primitive wie Trade (16.8.): Flug + Landung genau dann,
+    // wenn die Karte ankommt. Bei einer einzelnen Karte ist der
+    // sichtbare Unterschied klein, aber es gibt jetzt nur noch EINE
+    // Stelle, die den Takt kennt.
+    await engine.actionDeleteFromDeckAnimated(pi, [result.cardName]);
 
     // ── Step 2: If another copy still sits in the deck, tutor it to hand ──
     const tutorIdx = ps.mainDeck.indexOf(result.cardName);

@@ -7,6 +7,7 @@ uploads/cardbacks/*
 !uploads/cardbacks/.gitkeep
 !cards/.gitkeep
 .env
+PPKeys
 electron/desktop-secrets.json
 
 # ML-Trainingsdaten (groß, wachsend, maschinenspezifisch, reproduzierbar)

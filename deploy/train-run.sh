@@ -15,12 +15,16 @@
 #  · Er läuft unter systemd statt in deiner Shell. Verbindung trennen ist
 #    gefahrlos, und der Lauf bleibt überwach- und abbrechbar.
 #
-#  ZUR HEAP-GRENZE: train-iterative.js startet seine Kindprozesse mit
-#  PP_TRAIN_HEAP_MAX, Vorgabe im Skript 4096 MB. Das liegt ÜBER der
-#  Speichergrenze der Slice — der Kernel würde das Kind töten, bevor V8
-#  sein eigenes Limit erreicht, und du bekämst einen wortlosen Abbruch
-#  statt eines JS-Fehlers mit Stacktrace. Deshalb setzt dieses Skript
-#  3072, sofern du nichts anderes angibst.
+#  ZUR HEAP-GRENZE — 4096 IST KEIN ZUFALLSWERT:
+#  In v389 stand hier 3072, um unter die Slice-Grenze zu passen. Das war
+#  ein Fehler mit Folgen für die Ergebnisse: _engine.js leitet die
+#  Schwellen seines Heap-Wächters aus dem TATSÄCHLICHEN V8-Limit ab
+#  (0.60/0.72/0.80 x Limit). Reißt eine davon, wird MCTS für diesen Zug
+#  ABGEBROCHEN — die CPU spielt den Zug ohne Suche. Ein kleineres Limit
+#  heißt also: früher abbrechen, schwächer pilotieren, schlechtere
+#  Trainingsdaten. Läufe auf verschiedenen Heap-Größen sind NICHT
+#  vergleichbar. 4096 entspricht der Vorgabe in train-iterative.js und
+#  damit dem lokalen Lauf; die Slice ist entsprechend angehoben.
 # ══════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -46,7 +50,7 @@ if [ ${#ENV_ARGS[@]} -gt 0 ]; then
 		case "$_e" in --setenv=PP_TRAIN_HEAP_MAX=*) _has_heap=1 ;; esac
 	done
 fi
-[ "$_has_heap" -eq 1 ] || ENV_ARGS+=(--setenv=PP_TRAIN_HEAP_MAX=3072)
+[ "$_has_heap" -eq 1 ] || ENV_ARGS+=(--setenv=PP_TRAIN_HEAP_MAX=4096)
 
 # systemd-run braucht einen absoluten Pfad zum Programm.
 CMD="$(command -v "$1")" || { echo "Nicht gefunden: $1" >&2; exit 1; }

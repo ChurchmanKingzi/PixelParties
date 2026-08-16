@@ -25,8 +25,13 @@ const { isSkeletonCreature, findSkeletonsInDiscard } = require('./_skeleton-shar
 
 const CARD_NAME = 'The Bonegrinder';
 const MAX_DRAWS_PER_TURN = 5;
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'bonegrinder';
 
 module.exports = {
+  // Ladungsanzeige in der Area-Zone (Als Vorgabe 16.8.).
+  chargesPerTurn: MAX_DRAWS_PER_TURN,
+  chargeKey: USE_KEY,
   activeIn: ['hand', 'area'],
 
   /**
@@ -217,12 +222,10 @@ module.exports = {
 
       // Per-turn cap on this Bonegrinder instance.
       const inst = ctx.card;
-      const turn = engine.gs.turn || 0;
-      if (!inst.counters._bonegrinderDrawsTurn || inst.counters._bonegrinderDrawsTurn !== turn) {
-        inst.counters._bonegrinderDrawsTurn = turn;
-        inst.counters._bonegrinderDrawsCount = 0;
-      }
-      if ((inst.counters._bonegrinderDrawsCount || 0) >= MAX_DRAWS_PER_TURN) return;
+      // Rundenstempel und Kappe im gemeinsamen Zaehler (v421). NUR
+      // pruefen — verbucht wird erst nach der Zusage (Abbruch darf
+      // keine Ladung kosten, Als Regel 16.8.).
+      if (usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }) <= 0) return;
 
       // Hand-lock makes the draw worthless — silently skip rather
       // than waste the prompt.
@@ -240,7 +243,7 @@ module.exports = {
       });
       if (!confirmed) return;
 
-      inst.counters._bonegrinderDrawsCount = (inst.counters._bonegrinderDrawsCount || 0) + 1;
+      spendUse(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN });
       // Redirect to deleted via the engine's generic flag.
       leaving._redirectToDeleted = true;
       // Draw 1.
@@ -248,7 +251,7 @@ module.exports = {
       engine.log('bonegrinder_draw', {
         player: ps.username,
         deletedSkeleton: leaving.name,
-        usedThisTurn: inst.counters._bonegrinderDrawsCount,
+        usedThisTurn: MAX_DRAWS_PER_TURN - usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }),
       });
     },
 
@@ -303,12 +306,10 @@ module.exports = {
 
       // Per-turn cap on this Bonegrinder instance.
       const inst = ctx.card;
-      const turn = engine.gs.turn || 0;
-      if (!inst.counters._bonegrinderDrawsTurn || inst.counters._bonegrinderDrawsTurn !== turn) {
-        inst.counters._bonegrinderDrawsTurn = turn;
-        inst.counters._bonegrinderDrawsCount = 0;
-      }
-      if ((inst.counters._bonegrinderDrawsCount || 0) >= MAX_DRAWS_PER_TURN) return;
+      // Rundenstempel und Kappe im gemeinsamen Zaehler (v421). NUR
+      // pruefen — verbucht wird erst nach der Zusage (Abbruch darf
+      // keine Ladung kosten, Als Regel 16.8.).
+      if (usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }) <= 0) return;
 
       // Hand-lock makes the draw worthless — silently skip.
       if (ps.handLocked) return;
@@ -336,12 +337,12 @@ module.exports = {
         owner: myController, cardName, from: 'discard', to: 'deleted',
       });
 
-      inst.counters._bonegrinderDrawsCount = (inst.counters._bonegrinderDrawsCount || 0) + 1;
+      spendUse(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN });
       await engine.actionDrawCards(myController, 1, { source: CARD_NAME });
       engine.log('bonegrinder_draw', {
         player: ps.username,
         deletedSkeleton: cardName,
-        usedThisTurn: inst.counters._bonegrinderDrawsCount,
+        usedThisTurn: MAX_DRAWS_PER_TURN - usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }),
       });
       engine.sync();
     },
@@ -369,17 +370,13 @@ module.exports = {
       if (milled.length === 0) return;
 
       const inst = ctx.card;
-      const turn = engine.gs.turn || 0;
-      if (!inst.counters._bonegrinderDrawsTurn || inst.counters._bonegrinderDrawsTurn !== turn) {
-        inst.counters._bonegrinderDrawsTurn = turn;
-        inst.counters._bonegrinderDrawsCount = 0;
-      }
+      // Kappe wird in der Schleife unten je Karte geprueft (v421).
 
       const ps = engine.gs.players[myController];
       if (!ps) return;
 
       for (const cardName of milled) {
-        if ((inst.counters._bonegrinderDrawsCount || 0) >= MAX_DRAWS_PER_TURN) break;
+        if (usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }) <= 0) break;
         if (!isSkeletonCreature(cardName, engine)) continue;
         // Card might have been pulled out of discard already by a
         // chained mill effect (e.g., self-delete redirect runs
@@ -410,24 +407,20 @@ module.exports = {
           owner: myController, cardName, from: 'discard', to: 'deleted',
         });
 
-        inst.counters._bonegrinderDrawsCount = (inst.counters._bonegrinderDrawsCount || 0) + 1;
+        spendUse(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN });
         await engine.actionDrawCards(myController, 1, { source: CARD_NAME });
         engine.log('bonegrinder_draw', {
           player: ps.username,
           deletedSkeleton: cardName,
-          usedThisTurn: inst.counters._bonegrinderDrawsCount,
+          usedThisTurn: MAX_DRAWS_PER_TURN - usesLeft(inst, engine.gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }),
         });
         engine.sync();
       }
     },
 
-    /** Reset per-turn counters at start of own turn. */
-    onTurnStart: (ctx) => {
-      const inst = ctx.card;
-      if (inst.counters?._bonegrinderDrawsCount) {
-        inst.counters._bonegrinderDrawsCount = 0;
-        inst.counters._bonegrinderDrawsTurn = ctx._engine.gs.turn || 0;
-      }
-    },
+    // Ruecksetzung entfaellt (v421) — der gemeinsame Zaehler stempelt
+    // die Runde mit. Der Hook hieß „at start of own turn", setzte aber
+    // bei JEDEM Rundenbeginn zurueck; Hook UND Stempel nebeneinander
+    // waren ohnehin eine Doppelbuchhaltung.
   },
 };

@@ -26,21 +26,23 @@
 // ═══════════════════════════════════════════
 
 const ATTACHABLE = 'Cool Rescuer Monia';
-const HOPT_KEY   = '_antoniaTriggersThisTurn';
 const MAX_TRIGGERS = 2;
 
-function triggersUsed(card) {
-  return (card?.counters && card.counters[HOPT_KEY]) || 0;
+// Die drei Helfer laufen seit v417 ueber den gemeinsamen
+// Rundenzaehler. Sie brauchen dafuer `gs` — der Rundenstempel steckt
+// im Zaehler, damit die Ladungen in JEDEM Spielerzug frisch sind
+// (Als Regel 16.8.). Das Reservieren-und-Zurueckgeben bleibt
+// unveraendert: Antonia bucht vor dem Prompt und gibt bei Abbruch
+// zurueck, damit eine wieder eintretende Schadensrunde ihr den Platz
+// nicht wegschnappt.
+function triggersUsed(card, gs) {
+  return MAX_TRIGGERS - usesLeft(card, gs, { key: USE_KEY, max: MAX_TRIGGERS });
 }
-function reserveTrigger(card) {
-  if (!card.counters) card.counters = {};
-  card.counters[HOPT_KEY] = triggersUsed(card) + 1;
+function reserveTrigger(card, gs) {
+  spendUse(card, gs, { key: USE_KEY, max: MAX_TRIGGERS });
 }
-function refundTrigger(card) {
-  if (!card?.counters) return;
-  const n = triggersUsed(card);
-  if (n <= 1) delete card.counters[HOPT_KEY];
-  else card.counters[HOPT_KEY] = n - 1;
+function refundTrigger(card, gs) {
+  refundUse(card, gs, { key: USE_KEY });
 }
 
 /**
@@ -167,7 +169,17 @@ async function runAntoniaEffect(ctx) {
   return true;
 }
 
+const { usesLeft, spendUse, refundUse, charges } = require('./_charges');
+const USE_KEY = 'antonia';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.). SONDERFALL: den
+  // Effekt gibt es ueberhaupt erst, wenn „Cool Rescuer Monia" unter
+  // ihr liegt. Ohne Monia also KEINE Anzeige — sonst stuende dort eine
+  // 2 fuer einen Effekt, den die Karte gar nicht hat.
+  chargesPerTurn: MAX_TRIGGERS,
+  remainingCharges: (inst, gs) => (inst?.counters?.attachedHero
+    ? charges(inst, gs, { key: USE_KEY, max: MAX_TRIGGERS })
+    : null),
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -199,11 +211,10 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
 
   hooks: {
-    onTurnStart: (ctx) => {
-      if (ctx.card?.counters && ctx.card.counters[HOPT_KEY] != null) {
-        delete ctx.card.counters[HOPT_KEY];
-      }
-    },
+    // Ruecksetzung entfaellt (v417) — der gemeinsame Zaehler stempelt
+    // die Runde mit. Der alte Hook loeschte bei JEDEM Rundenbeginn und
+    // traf damit zufaellig schon die richtige Regel; jetzt steht sie
+    // ausdruecklich im Zaehler statt in einem Hook.
 
     /**
      * "Up to 2 per turn, when a Creature you control takes damage". Each
@@ -220,7 +231,8 @@ module.exports = {
       // mark Antonia at 0 HP without untracking yet under unusual orderings.
       if ((ctx.card.counters?.currentHp || 0) <= 0) return;
 
-      if (triggersUsed(ctx.card) >= MAX_TRIGGERS) return;
+      const gsA = ctx._engine?.gs;
+      if (triggersUsed(ctx.card, gsA) >= MAX_TRIGGERS) return;
 
       const entries = ctx.entries || [];
       const myController = ctx.cardOwner;
@@ -238,14 +250,14 @@ module.exports = {
       // refunds on cancel — meaning the player can stop early by
       // cancelling the second prompt and the unused trigger goes back
       // into the per-turn budget.
-      const fires = Math.min(damagedCount, MAX_TRIGGERS - triggersUsed(ctx.card));
+      const fires = Math.min(damagedCount, MAX_TRIGGERS - triggersUsed(ctx.card, gsA));
       for (let i = 0; i < fires; i++) {
         // Re-check survival between iterations — Antonia might die to
         // an interleaved effect launched from her own destroy.
         if ((ctx.card.counters?.currentHp || 0) <= 0) break;
-        if (triggersUsed(ctx.card) >= MAX_TRIGGERS) break;
+        if (triggersUsed(ctx.card, gsA) >= MAX_TRIGGERS) break;
 
-        reserveTrigger(ctx.card);
+        reserveTrigger(ctx.card, gsA);
         let fired = false;
         try {
           fired = await runAntoniaEffect(ctx);
@@ -253,7 +265,7 @@ module.exports = {
           console.error('[Antonia] effect threw:', err.message);
         }
         if (!fired) {
-          refundTrigger(ctx.card);
+          refundTrigger(ctx.card, gsA);
           // Cancel propagates — stop offering further triggers from
           // this batch (the player explicitly declined).
           break;

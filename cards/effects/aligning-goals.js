@@ -124,7 +124,7 @@ module.exports = {
       // post-steal failure path (rare) leaves the gold spent — that
       // matches the card text "Spend 5 Gold" reading as paid on cast,
       // not on success.
-      ps.gold -= GOLD_COST;
+      await engine._payCardCost(pi, GOLD_COST);
       engine.log('gold_spent', {
         player: ps.username, amount: GOLD_COST, reason: CARD_NAME,
       });

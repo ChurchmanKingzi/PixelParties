@@ -417,6 +417,12 @@ function playSFXForLog(entry) {
       playSFX('buff', { dedupe: 60 });
       return;
     case 'card_deleted':
+    // Erzwungenes LOESCHEN war stumm, obwohl das erzwungene
+    // ABWERFEN (`forced_discard`) laengst klingt — derselbe
+    // Vorgang, nur mit anderem Zielstapel. Aufgefallen an den
+    // Debt-O-Tron-Kosten (Als Report 16.8.), betrifft aber jeden
+    // `actionPromptForceDiscard(..., deleteMode: true)`.
+    case 'forced_delete':
     case 'rebelliokai_discard_delete':
     case 'cybug_fuel_delete':
     case 'vacarn_delete_redirect':
@@ -610,6 +616,17 @@ window.playSFXForStatus = playSFXForStatus;
 // the right sound, so we only map the ones that are animation-only or need
 // a distinctive layer (e.g. orbital laser pitched down).
 const ZONE_ANIM_SFX = {
+  // Logan — verfallene Invest Counter. `debuff` ist der vorhandene
+  // „etwas wurde weggenommen"-Klang; einen eigenen Muenzverfall-Klang
+  // gibt es nicht, und `gold_gain` waere hier genau verkehrt herum.
+  invest_counters_lost:    { name: 'debuff' },
+  // Kent: ins Minus gerutscht. Derselbe „weggenommen"-Klang, tiefer
+  // abgespielt — Schulden sind die schwerere Variante desselben Vorgangs.
+  debt_incurred:           { name: 'debuff', opts: { rate: 0.75 } },
+  // Missing Parts: Flammen. `burn` ist der vorhandene Brand-Klang;
+  // etwas tiefer abgespielt, damit ein 10x-Schulden-Treffer wuchtiger
+  // klingt als ein normaler Brandschaden.
+  debt_flames:             { name: 'burn', opts: { rate: 0.85 } },
   // Signature
   orbital_laser_red:       { name: 'orbital_laser', opts: { rate: 0.6 } },
   blood_moon_pulse:        { name: 'elem_dark' },
@@ -2343,6 +2360,69 @@ function CardTooltipContent({ card, children, imageUrl }) {
  *
  * Returns: { tooltipCard, tooltipSide, showTooltip, hideTooltip, setTooltipCard, setTooltipSide }
  */
+// ═══════════════════════════════════════════════════════════════
+//  useStickyHoverFlag — Hover-Zustand, der nicht haengenbleibt
+//
+//  Das naive Muster
+//      const [hovered, setHovered] = useState(false);
+//      <div onMouseEnter={() => setHovered(true)}
+//           onMouseLeave={() => setHovered(false)}>
+//  ist auf dem Spielbrett NICHT sicher. React setzt mouseenter/leave
+//  ueber delegierte mouseover/mouseout um, und bei schnellen Maus-
+//  bewegungen ueber viele kleine Karten geht ein mouseout verloren —
+//  besonders, wenn der Hover selbst das Kind neu rendert (Karte
+//  tauscht ihr Bild) und der Knoten unter dem Zeiger dabei ersetzt
+//  wird. Der Zustand steht dann auf true, obwohl die Maus laengst weg
+//  ist, und bleibt es bis zum naechsten Hover.
+//
+//  Al hat das am 16.8. an Biomancy-Tokens gemeldet („bleibt permanent,
+//  bis man noch mal drueberhovert").
+//
+//  Gegenmittel ist dieselbe Bauform, die `useCardTooltip` schon
+//  benutzt: ein billiger Nachkontroll-Takt. Solange der Zustand true
+//  ist, wird alle HOVER_RECHECK_MS geprueft, ob das Element WIRKLICH
+//  noch `:hover` traegt — die CSS-Pseudoklasse kommt vom Browser und
+//  luegt nicht. Ist es das nicht mehr, faellt der Zustand zurueck.
+//  Der Takt laeuft NUR, solange gehovert wird, kostet im Ruhezustand
+//  also nichts.
+//
+//  Verwendung:
+//      const ref = useRef(null);
+//      const [hovered, hoverProps] = useStickyHoverFlag(ref);
+//      <div ref={ref} {...hoverProps}> …
+// ═══════════════════════════════════════════════════════════════
+
+const HOVER_RECHECK_MS = 250;
+
+function useStickyHoverFlag(ref) {
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!hovered) return;
+    const check = () => {
+      const el = ref?.current;
+      // Kein Element mehr im DOM (Karte hat das Brett verlassen) ODER
+      // der Zeiger ist woanders → Zustand aufloesen.
+      if (!el || !el.isConnected) { setHovered(false); return; }
+      let stillOver = false;
+      try { stillOver = el.matches(':hover'); } catch { stillOver = true; }
+      if (!stillOver) setHovered(false);
+    };
+    const id = setInterval(check, HOVER_RECHECK_MS);
+    return () => clearInterval(id);
+  }, [hovered, ref]);
+
+  const hoverProps = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    // Beim Ziehen gibt es kein zuverlaessiges mouseleave — der Zeiger
+    // haengt an der Drag-Vorschau. Explizit mitnehmen.
+    onDragStart: () => setHovered(false),
+  };
+
+  return [hovered, hoverProps, setHovered];
+}
+
 function useCardTooltip(opts) {
   const defaultSide = (opts && opts.defaultSide) || 'right';
   // Include .status-badge:hover and .buff-icon:hover so the 300ms safety-
@@ -3211,6 +3291,7 @@ window.useFoilBands = useFoilBands;
 window.VolumeControl = VolumeControl;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;
+window.useStickyHoverFlag = useStickyHoverFlag;
 window.showGameTooltip = showGameTooltip;
 window.showCursorTooltip = showCursorTooltip;
 window.hideGameTooltip = hideGameTooltip;

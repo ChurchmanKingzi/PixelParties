@@ -53,7 +53,14 @@ function getArrowIndicesInHand(ps) {
   return out;
 }
 
+const { usesLeft, spendUse } = require('./_charges');
+// Schluessel des einheitlichen Rundenzaehlers (v417).
+const USE_KEY = 'archerShot';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 3,
+  chargeKey: USE_KEY,
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -117,18 +124,13 @@ module.exports = {
   },
 
   hooks: {
-    /**
-     * Reset the per-turn counter at the start of THIS Archer's
-     * controller's turn. Per-instance counter so multiple Archers
-     * each get their own 3 uses.
-     */
-    onTurnStart: (ctx) => {
-      if (ctx.activePlayer !== ctx.cardOwner) return;
-      const inst = ctx.card;
-      if (inst?.counters && inst.counters._archerUsesThisTurn) {
-        delete inst.counters._archerUsesThisTurn;
-      }
-    },
+    // ── KEINE eigene Ruecksetzung mehr (v417) ────────────────────
+    // Hier stand ein `onTurnStart`, das den Zaehler NUR beim eigenen
+    // Rundenbeginn loeschte. Damit galten die 3 Schuesse fuer den
+    // eigenen UND den Gegnerzug zusammen — Als Regel sagt aber: 3-mal
+    // in meiner Runde, dann FRISCHE 3-mal in der Gegnerrunde. Der
+    // gemeinsame Zaehler stempelt die Runde mit und setzt sich von
+    // selbst zurueck; ein Hook, den man vergessen kann, entfaellt.
 
     /**
      * Per-Arrow trigger. The engine fires `onReactionActivated` once
@@ -156,8 +158,10 @@ module.exports = {
 
       const inst = ctx.card;
       if (!inst) return;
-      const used = inst.counters?._archerUsesThisTurn || 0;
-      if (used >= MAX_USES) return;
+      const gs = ctx._engine?.gs;
+      const frei = usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES });
+      if (frei <= 0) return;
+      const used = MAX_USES - frei;
 
       const engine = ctx._engine;
       const target = await ctx.promptDamageTarget({
@@ -173,9 +177,8 @@ module.exports = {
       });
       if (!target) return;
 
-      // Spend the use (only after the player commits to a target).
-      if (!inst.counters) inst.counters = {};
-      inst.counters._archerUsesThisTurn = used + 1;
+      // Erst verbuchen, wenn der Spieler ein Ziel bestaetigt hat.
+      spendUse(inst, gs, { key: USE_KEY, max: MAX_USES });
 
       const targetSlot = target.type === 'equip' ? target.slotIdx : -1;
       engine._broadcastEvent('play_zone_animation', {
@@ -204,7 +207,7 @@ module.exports = {
         arrow: reactionName,
         target: target.cardName,
         damage: SHOT_DAMAGE,
-        usesThisTurn: inst.counters._archerUsesThisTurn,
+        usesThisTurn: MAX_USES - usesLeft(inst, gs, { key: USE_KEY, max: MAX_USES }),
       });
       engine.sync();
     },

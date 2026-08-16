@@ -18,7 +18,7 @@
 //     `ctx._skipHeroEffectHopt = true` (Gegenstueck
 //     zu `_skipCreatureEffectHopt`), fuehren den
 //     Verbrauch selbst auf dem Helden
-//     (`_kassaranUsesThisTurn`) und gaten ueber
+//     (gemeinsamer Rundenzaehler, Schluessel `kassaran`) und gaten ueber
 //     `canActivateHeroEffect`. Der frueher genutzte
 //     Weg "immer false zurueckgeben" bedeutete fuer
 //     die Engine zugleich "abgebrochen" und hat
@@ -57,9 +57,14 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Kassaran, Seer of Everything';
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'kassaran';
 const MAX_USES_PER_TURN = 3;
 
 module.exports = {
+  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
+  chargesPerTurn: MAX_USES_PER_TURN,
+  chargeKey: USE_KEY,
   activeIn: ['hero'],
   heroEffect: true,
 
@@ -79,7 +84,7 @@ module.exports = {
     const hero = ctx.attachedHero;
     if (!hero) return false;
     if (hero._kassaranNegatedThisTurn) return false;
-    if ((hero._kassaranUsesThisTurn || 0) >= MAX_USES_PER_TURN) return false;
+    if (usesLeft(hero, engine?.gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return false;
     // Hand-locked is NOT a gate here — Kassaran's text "ignores any
     // effects that would prevent you from drawing cards" means he
     // activates regardless. The match-path bypass (below) is what
@@ -96,7 +101,7 @@ module.exports = {
     if (!ps || !hero) return false;
     if ((ps.mainDeck || []).length === 0) return false;
     if (hero._kassaranNegatedThisTurn) return false;
-    if ((hero._kassaranUsesThisTurn || 0) >= MAX_USES_PER_TURN) return false;
+    if (usesLeft(hero, engine?.gs, { key: USE_KEY, max: MAX_USES_PER_TURN }) <= 0) return false;
 
     // ── Step 1: declare a card name (Luck's cardNamePicker UI) ─────
     // Filter to main-deck-eligible card types — only Spell / Attack /
@@ -130,14 +135,14 @@ module.exports = {
     engine._firePendingCardReveal();
 
     // Spend the use.
-    hero._kassaranUsesThisTurn = (hero._kassaranUsesThisTurn || 0) + 1;
+    spendUse(hero, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
 
     const topCard = ps.mainDeck[0];
     const matched = (topCard === declared);
 
     engine.log('kassaran_declare', {
       player: ps.username, declared, revealed: topCard, matched,
-      use: hero._kassaranUsesThisTurn,
+      use: MAX_USES_PER_TURN - usesLeft(hero, gs, { key: USE_KEY, max: MAX_USES_PER_TURN }),
     });
 
     // Broadcast the flip animation to both clients BEFORE mutating
@@ -213,7 +218,14 @@ module.exports = {
       if (ctx.activePlayer !== ctx.cardOriginalOwner) return;
       const hero = ctx.attachedHero;
       if (!hero) return;
-      if (hero._kassaranUsesThisTurn) delete hero._kassaranUsesThisTurn;
+      // ── KEINE Ruecksetzung der Nutzungen mehr (v421) ────────────
+      // Hier stand `delete hero._kassaranUsesThisTurn` — und der Hook
+      // steigt zwei Zeilen darueber aus, wenn NICHT der Besitzer am Zug
+      // ist. Damit galten die 3 Nutzungen fuer den eigenen UND den
+      // Gegnerzug zusammen. Als Regel: X-mal je Spielerzug. Der
+      // gemeinsame Rundenzaehler stempelt die Runde mit und setzt sich
+      // selbst zurueck. (Vierter Fall dieser Art nach Archer, Golden
+      // Vermin und Lethe.)
       if (hero._kassaranNegatedThisTurn) delete hero._kassaranNegatedThisTurn;
     },
   },

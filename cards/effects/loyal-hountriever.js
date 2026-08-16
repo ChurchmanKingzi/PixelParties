@@ -7,7 +7,8 @@
 //  "Loyal" Creature, except "Loyal Hountriever",
 //  draw 1 card.
 //
-//  Per-instance counter (`hountrieverFiresThisTurn`)
+//  Per-instance counter (gemeinsamer Rundenzaehler, Schluessel
+//  `hountriever`) — frisch in JEDEM Spielerzug (Als Regel 16.8.)
 //  caps the trigger at 3 per turn per Hountriever
 //  — so two Hountrievers in play can each draw up
 //  to 3 cards per turn (six total). Counter resets
@@ -21,7 +22,13 @@ const { isLoyalCreature } = require('./_loyal-shared');
 const CARD_NAME    = 'Loyal Hountriever';
 const MAX_PER_TURN = 3;
 
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'hountriever';
 module.exports = {
+  // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
+  // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
+  chargesPerTurn: 3,
+  chargeKey: USE_KEY,
   activeIn: ['support'],
 
   hooks: {
@@ -44,10 +51,12 @@ module.exports = {
       // Loyal-only.
       if (!isLoyalCreature(entering.name, ctx._engine)) return;
 
-      // Per-instance triple HOPT.
-      const fired = ctx.card.counters.hountrieverFiresThisTurn || 0;
-      if (fired >= MAX_PER_TURN) return;
-      ctx.card.counters.hountrieverFiresThisTurn = fired + 1;
+      // Dreifach-HOPT je Instanz ueber den gemeinsamen Rundenzaehler
+      // (v417). `spendUse` prueft und verbucht in einem — faellt es
+      // aus, war nichts mehr frei.
+      const gsH = ctx._engine?.gs;
+      const fired = MAX_PER_TURN - usesLeft(ctx.card, gsH, { key: USE_KEY, max: MAX_PER_TURN });
+      if (!spendUse(ctx.card, gsH, { key: USE_KEY, max: MAX_PER_TURN })) return;
 
       const engine = ctx._engine;
       const ps     = engine.gs.players[ctx.cardOriginalOwner];
@@ -70,11 +79,7 @@ module.exports = {
       engine.sync();
     },
 
-    /** Reset the per-turn fire counter at the start of each of the controller's turns. */
-    onTurnStart: async (ctx) => {
-      if (ctx.card.counters.hountrieverFiresThisTurn) {
-        ctx.card.counters.hountrieverFiresThisTurn = 0;
-      }
-    },
+    // Ruecksetzung entfaellt (v417): der gemeinsame Zaehler stempelt
+    // die Runde mit und ist damit in jedem Spielerzug wieder voll.
   },
 };

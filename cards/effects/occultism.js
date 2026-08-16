@@ -21,6 +21,8 @@
 //    2. Pick a damage target (cancellable).
 //    3. Resolve in order: sacrifice animation → ON_CREATURE_SACRIFICED
 //       → actionDestroyCard → beam to target → deal damage.
+//       Der Strahl startet an DIESER Occultism-Ability — nicht am
+//       Tribut und nicht an der ersten Occultism der Seite.
 //
 //  Both prompts are cancellable; the cost is paid only after BOTH
 //  selections are confirmed, so a half-committed activation never
@@ -233,14 +235,27 @@ module.exports = {
       );
     }
 
-    // ── Damage: beam from the sacrifice site to the target. ──
-    // A hand substitute has no board slot — the beam then starts at the
-    // Hero whose Occultism fired.
+    // ── Damage: beam from the ACTIVATED OCCULTISM to the target. ──
+    //
+    // 16.8., Als Report: der Strahl startete frueher an der geopferten
+    // Kreatur. Der Schaden kommt aber von der Ability, nicht vom Tribut
+    // — und zwar von GENAU DIESER Occultism, nicht der ersten auf der
+    // Seite. `ctx.card` ist die aktivierte Ability-Instanz, ihr
+    // `zoneSlot` also der richtige Ability-Slot. `sourceZoneType:
+    // 'ability'` sagt dem Client, in welcher Zonenart er suchen soll.
+    //
+    // Faellt der Slot wider Erwarten aus (Ability mitten in der
+    // Aufloesung entfernt), bleibt `sourceZoneSlot: -1` — der Client
+    // faellt dann auf die Heldenzone zurueck, also immer noch auf den
+    // richtigen Helden statt auf den Tribut. Der Hand-Substitut-Fall
+    // braucht dadurch keine Sonderbehandlung mehr.
+    const abilitySlot = Number.isInteger(ctx.card?.zoneSlot) ? ctx.card.zoneSlot : -1;
     const targetZoneSlot = damageTarget.type === 'hero' ? -1 : damageTarget.slotIdx;
     engine._broadcastEvent('play_beam_animation', {
-      sourceOwner: isHandSub ? pi : sacOwner,
-      sourceHeroIdx: isHandSub ? heroIdx : sacHeroIdx,
-      sourceZoneSlot: isHandSub ? -1 : sacZoneSlot,
+      sourceOwner: pi,
+      sourceHeroIdx: heroIdx,
+      sourceZoneSlot: abilitySlot,
+      sourceZoneType: 'ability',
       targetOwner: damageTarget.owner,
       targetHeroIdx: damageTarget.heroIdx,
       targetZoneSlot,

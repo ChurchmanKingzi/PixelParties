@@ -17,8 +17,13 @@
 
 const CARD_NAME = 'Teppes, the Deepsea Vampire';
 const MAX_DRAWS_PER_TURN = 5;
+const { usesLeft, spendUse } = require('./_charges');
+const USE_KEY = 'teppesDraw';
 
 module.exports = {
+  // Ladungsanzeige am Heldenportrait (Als Vorgabe 16.8.).
+  chargesPerTurn: MAX_DRAWS_PER_TURN,
+  chargeKey: USE_KEY,
   // H1-Vertrag (Vergleichsanalyse): solange dieser Held lebt, sind
   // Bounce-Platzierungen Wert-Aktionen — Teppes zieht bei Deepsea-Returns nach.
   // Konsumiert von pickCreatureZoneSlot (_cpu.js).
@@ -56,10 +61,12 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return;
       if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return;
 
-      // Up-to-5 per turn.
-      const count = hero._teppesReturnDrawsThisTurn || 0;
-      if (count >= MAX_DRAWS_PER_TURN) return;
-      hero._teppesReturnDrawsThisTurn = count + 1;
+      // Bis zu 5 je Zug — gemeinsamer Rundenzaehler (v421). Vorher
+      // lag der Zaehler flach am Helden und wurde in `_engine.js`
+      // beim Rundenbeginn fuer BEIDE Seiten genullt; das war zwar
+      // richtig, aber eine Ruecksetzung an einer ganz anderen Stelle
+      // als die Zaehlung. Der Stempel erledigt es jetzt hier.
+      if (!spendUse(hero, gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN })) return;
 
       await engine.actionDrawCards(pi, 1);
       engine._broadcastEvent('play_zone_animation', {
@@ -67,7 +74,7 @@ module.exports = {
       });
       engine.log('teppes_draw', {
         player: gs.players[pi]?.username,
-        drawsThisTurn: hero._teppesReturnDrawsThisTurn,
+        drawsThisTurn: MAX_DRAWS_PER_TURN - usesLeft(hero, gs, { key: USE_KEY, max: MAX_DRAWS_PER_TURN }),
       });
       engine.sync();
     },

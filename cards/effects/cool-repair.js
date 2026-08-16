@@ -225,7 +225,10 @@ module.exports = {
     const equipCost = cd.cost || 0;
     const repairCost = Math.ceil(equipCost / 2);
 
-    if ((ps.gold || 0) < repairCost) {
+    // Bezahlbarkeit inkl. Kreditrahmen (16.8.): ohne den blockiert
+    // diese Zeile genau die Zahlung, die der Ziel-Waehler oben
+    // bereits erlaubt hat — Als Book-of-Doom-Report.
+    if (!engine.canAffordGold(pi, repairCost, 'Cool Repair')) {
       engine.log('cool_repair_no_gold', { player: ps.username, needed: repairCost, have: ps.gold || 0 });
       return { aborted: true };
     }
@@ -302,7 +305,7 @@ module.exports = {
 
     // ── Step 4: Deduct dynamic gold cost ──
     if (repairCost > 0) {
-      ps.gold -= repairCost;
+      await engine._payCardCost(pi, repairCost);
       engine.log('gold_spend', { player: ps.username, amount: repairCost, total: ps.gold, for: 'Cool Repair' });
     }
 
