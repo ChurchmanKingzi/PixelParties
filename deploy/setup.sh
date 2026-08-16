@@ -138,15 +138,17 @@ systemctl daemon-reload
 systemctl enable pixelparties.service >/dev/null
 
 # ── 9. Caddy-Konfiguration ────────────────────────────────────
-log "Caddyfile verlinken"
-if [ -e /etc/caddy/Caddyfile ] && [ ! -L /etc/caddy/Caddyfile ]; then
-	mv /etc/caddy/Caddyfile /etc/caddy/Caddyfile.original
+log "Caddyfile bereitstellen"
+if [ ! -e /etc/caddy/Caddyfile ]; then
+  cp "$APP_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
+  chown root:root /etc/caddy/Caddyfile
+  chmod 644 /etc/caddy/Caddyfile
+  log "Vorlage nach /etc/caddy/Caddyfile kopiert — dort Domain und E-Mail eintragen."
+else
+  log "/etc/caddy/Caddyfile existiert bereits — unveraendert gelassen."
 fi
-ln -sf "$APP_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
-if grep -q 'DEINE-MAILADRESSE' "$APP_DIR/deploy/Caddyfile"; then
-	printf '\n\033[1;33m! deploy/Caddyfile: E-Mail-Adresse ist noch der Platzhalter.\033[0m\n'
-	printf '\033[1;33m  Erst eintragen, dann "systemctl reload caddy".\033[0m\n'
-fi
+
+if grep -q 'DEINE-MAILADRESSE' /etc/caddy/Caddyfile; then
 
 # ── 10. SSH absichern — zuletzt und nur mit Netz ──────────────
 if [ -s "$ADMIN_KEYS" ]; then
@@ -188,7 +190,7 @@ cat <<EOF
 
 Nächste Schritte:
   1. $APP_DIR/.env anlegen (Vorlage: .env.example, Abschnitt PRODUKTION)
-  2. deploy/Caddyfile: E-Mail-Adresse eintragen
+  2. /etc/caddy/Caddyfile: E-Mail-Adresse eintragen: E-Mail-Adresse eintragen
   3. A-Record für neu.pixelpartiestcg.com auf diesen Server zeigen lassen
   4. sudo bash deploy/deploy.sh
 
