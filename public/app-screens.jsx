@@ -397,6 +397,7 @@ function AuthScreen() {
   const [cooldown, setCooldown] = useState(0); // resend throttle (seconds)
   const googleBtnRef = useRef(null);   // container Google renders its button into
   const googleInited = useRef(false);  // GIS initialize() is one-shot per page
+  const googleRenderedIn = useRef(null); // in welchen Knoten schon gezeichnet wurde
   // Inside the Electron desktop shell the GIS popup can't postMessage its
   // credential back (the popup is ejected to the system browser), so the
   // desktop build uses a native OAuth flow exposed by the preload bridge.
@@ -540,9 +541,32 @@ function AuthScreen() {
   });
 
   // Load Google Identity Services and render its button (login/signup tabs only).
-  // The GIS script is added once; renderButton re-runs on tab switch so the
-  // button text matches ("Sign in"/"Sign up with Google"). Skipped in the
-  // desktop shell, which uses submitGoogleDesktop and its own button instead.
+  // ── GOOGLE-KNOPF: FESTE SPRACHE, FESTE BESCHRIFTUNG, KEIN NEUBAU ──
+  // Al 17.8., zwei Befunde in einem:
+  //
+  //  1) „Einer hat das Label ‚Ueber Google anmelden', der andere ‚Mit
+  //     Google anmelden'. Beide sollen Englisch sein."
+  //     Den Text zeichnet GOOGLE selbst und uebersetzt ihn nach der
+  //     Browsersprache — daher Deutsch, und zwei Varianten, weil wir je
+  //     nach Reiter `signup_with` oder `signin_with` anforderten.
+  //     Jetzt `locale: 'en'` (feste Sprache) und in BEIDEN Reitern
+  //     `signin_with`. ANMERKUNG: Google gibt die Formulierung vor;
+  //     „Sign in with Google" ist die englische Fassung, ein woertliches
+  //     „Log in with Google" bietet die Schnittstelle nicht an.
+  //
+  //  2) „Wenn ich zwischen Login und Signup hin und her springe,
+  //     verzerrt sich die Hoehe der kompletten Menue-Box."
+  //     Genau richtig beobachtet: der Effekt lief bei JEDEM Reiterwechsel,
+  //     leerte den Container (`innerHTML = ''`) und liess Google neu
+  //     zeichnen. Fuer einen Moment war die Stelle nur `minHeight: 44`
+  //     hoch, danach wieder so hoch wie der personalisierte Knopf mit
+  //     Als Konto — das ist der Sprung.
+  //     Da der Text jetzt in beiden Reitern gleich ist, gibt es keinen
+  //     Grund mehr, neu zu zeichnen. Neu gezeichnet wird nur noch, wenn
+  //     der Container wirklich ein anderer ist (nach 'forgot' o.ae. kommt
+  //     ein frischer Knoten aus dem Wiederaufbau).
+  //
+  // Im Desktop-Gehaeuse uebersprungen: dort steht der eigene Knopf.
   useEffect(() => {
     if (isDesktop) return;
     if (!window.GOOGLE_CLIENT_ID) return;
@@ -558,11 +582,17 @@ function AuthScreen() {
         });
         googleInited.current = true;
       }
+      // Schon in DIESEM Knoten gezeichnet? Dann stehen lassen — jedes
+      // Neuzeichnen kostet einen Hoehensprung.
+      if (googleRenderedIn.current === googleBtnRef.current
+        && googleBtnRef.current.childElementCount > 0) return;
       googleBtnRef.current.innerHTML = '';
       gid.renderButton(googleBtnRef.current, {
         theme: 'filled_black', size: 'large', shape: 'pill', width: 280,
-        text: mode === 'signup' ? 'signup_with' : 'signin_with',
+        locale: 'en',
+        text: 'signin_with',
       });
+      googleRenderedIn.current = googleBtnRef.current;
     };
     if (window.google && window.google.accounts && window.google.accounts.id) { render(); return () => { cancelled = true; }; }
     let s = document.getElementById('gis-script');
@@ -680,7 +710,10 @@ function AuthScreen() {
                       <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z"/>
                       <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
                     </svg>
-                    {mode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
+                    {/* Wortgleich mit dem Knopf, den Google zeichnet — sonst
+                        stehen im Desktop-Gehaeuse und im Browser zwei
+                        verschiedene Beschriftungen. */}
+                    Sign in with Google
                   </button>
                 </div>
               ) : (
