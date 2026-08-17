@@ -10,10 +10,9 @@
 //  Deleted after use (standard Potion behavior).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
-const fs = require('fs');
-const path = require('path');
+const { getCardDB: _getCardDB } = require('./_card-db');
 
 /**
  * Check if a specific hero can summon a specific creature.
@@ -60,23 +59,6 @@ function hasFreeZone(ps, heroIdx) {
  * rule are honored (placement here skips `beforeSummon`, so we want strict
  * mode — Trex can't land on a Gigantisaur-occupied Hero via the Bottle).
  */
-// cards.json wurde bei JEDEM getEligibleCreatures-Aufruf synchron von
-// Platte gelesen und komplett geparst — und canActivate ruft das in
-// jedem isPotionPlayable-Scan der Planungsschleifen. Laut V8-Profil
-// war das nach dem Loader-Fix der größte Einzelfresser im
-// Slip-'n'-Slide-Deck (19% der Ticks). Jetzt: engine-DB bevorzugen,
-// sonst einmalig lazy laden und modulweit cachen.
-let _cardDBCache = null;
-function _getCardDB(engine) {
-  if (engine && typeof engine._getCardDB === 'function') return engine._getCardDB();
-  if (!_cardDBCache) {
-    const allCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
-    _cardDBCache = {};
-    allCards.forEach(c => { _cardDBCache[c.name] = c; });
-  }
-  return _cardDBCache;
-}
-
 function getEligibleCreatures(gs, pi, engine = null) {
   const cardDB = _getCardDB(engine);
 
@@ -101,7 +83,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
     for (const name of list) {
       if (seen.has(name + ':' + source)) continue;
       const cd = cardDB[name];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
+      if (!cd || !isPileCreature(cd)) continue;
       if (effLvl(cd, source) > 3) continue;
       if (summonBlocked.includes(name)) continue;
       // Check if ANY living hero with free zones can summon this
@@ -148,7 +130,7 @@ module.exports = {
     // Build eligible creatures
     // v323: NICHT je Auslösung von der Platte lesen — 0,83 MB Datei,
     // mehrere MB Müll je Hook-Auslösung, dazu synchrone E/A im Event-Loop.
-    const cardDB = require('./_card-db').getCardDB();
+    const cardDB = _getCardDB();
 
     while (true) {
       // Recompute eligible each loop iteration (state may change)
@@ -166,7 +148,7 @@ module.exports = {
         for (const name of list) {
           if (seen.has(name + ':' + source)) continue;
           const cd = cardDB[name];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          if (!cd || !isPileCreature(cd)) continue;
           if (effLvl(cd, source) > 3) continue;
           if (summonBlocked.includes(name)) continue;
           let canSummon = false;

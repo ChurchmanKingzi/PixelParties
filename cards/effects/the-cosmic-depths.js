@@ -34,7 +34,7 @@
 //  represented on their side.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'The Cosmic Depths';
 
@@ -107,7 +107,7 @@ function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
   for (const cn of (ps?.mainDeck || [])) {
     if (excludeName && cn === excludeName) continue;
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     if (ownedLevels.has(cd.level ?? 0)) continue;
     // Must be summonable by at least one of the activator's living,
     // unfrozen / unstunned / unbound Heroes with the level + spell
@@ -136,6 +136,12 @@ function getEligibleDeckCreatures(engine, pi, ownedLevels, excludeName) {
 }
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Hand
+
   activeIn: ['hand', 'area'],
   areaEffect: true,
 

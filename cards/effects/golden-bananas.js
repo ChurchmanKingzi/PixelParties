@@ -15,12 +15,22 @@
 //  `treasure-chest.js`.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"), analog zum Zieh-Riegel:
+// ist der Gold-Gewinn der EINZIGE Nutzen, wird die Karte gesperrt
+// statt wirkungslos zu feuern. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 const CARD_NAME = 'Golden Bananas';
 const PORTION = 4;
 const PORTIONEN = 3;
 
 module.exports = {
   hooks: {},
+
+  // Der Gewinn (3× 4 Gold) IST die ganze Karte — ohne ihn bleibt nichts.
+  canActivate(gs, pi, engine) {
+    return !goldGainWouldBeBlocked(engine, pi);
+  },
 
   // CPU-Hinweis wie bei Treasure Chest: der Wert der Karte IST das Gold.
   // Ohne `handValueAsGoldGain` bewertet `estimateHandCardValueFor` sie als

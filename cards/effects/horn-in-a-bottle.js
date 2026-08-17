@@ -8,6 +8,12 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Hand
+
   isPotion: true,
   deferBroadcast: true,
 
@@ -27,7 +33,10 @@ module.exports = {
     }
 
     // Build eligible indices (all hand cards except the resolving potion)
-    const eligibleIndices = ps.hand.map((_, i) => i).filter(i => i !== resolvingIdx);
+    const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+    const eligibleIndices = ps.hand
+      .map((_, i) => i)
+      .filter(i => i !== resolvingIdx && waehlbar.has(ps.hand[i]));
 
     // If no cards to pick from (hand is just the potion), skip picking and draw 1
     if (eligibleIndices.length === 0) {
@@ -59,6 +68,9 @@ module.exports = {
 
     const selectedCards = result.selectedCards || [];
     const count = selectedCards.length;
+    // Ausserhalb des Blocks, weil das Protokoll unten beides zeigt:
+    // die AUSWAHL (`count`) und das, was wirklich zurueckging.
+    let totalReturned = 0;
 
     if (count > 0) {
       // Sort indices descending so splicing doesn't shift later indices
@@ -66,13 +78,20 @@ module.exports = {
       const cardNamesToReturn = sortedByIdx.map(s => s.cardName);
 
       // Mulligan cards back to deck (handles animation, opponent routing, shuffling)
-      const { potionCount } = await engine.actionMulliganCards(pi, cardNamesToReturn);
+      const mulligan = await engine.actionMulliganCards(pi, cardNamesToReturn);
+      const potionCount = mulligan.potionCount || 0;
+      totalReturned = mulligan.totalReturned || 0;
 
       engine.sync();
       await engine._delay(400);
 
       // Draw replacement cards: non-potions from main deck, potions from potion deck, +1 bonus from main
-      const mainToDraw = count - potionCount + 1;
+      // ★ Als Regel (17.8.): "the same number" meint ALLE
+      // zurueckgemischten Karten — auch gestohlene, die ins
+      // GEGNER-Deck gingen. `totalReturned` zaehlt beide Decks;
+      // die frueher benutzte Auswahlmenge haette bei einem
+      // fehlgeschlagenen Rueckweg zu viel gezogen.
+      const mainToDraw = totalReturned - potionCount + 1;
       await engine.actionDrawCards(pi, mainToDraw);
       for (let i = 0; i < potionCount; i++) {
         if ((ps.potionDeck || []).length === 0) break;
@@ -88,7 +107,7 @@ module.exports = {
 
     engine.log('horn_in_a_bottle', {
       player: ps.username,
-      shuffled: count,
+      shuffled: count, returned: totalReturned,
       drawn: count + 1,
     });
 

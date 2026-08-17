@@ -8,7 +8,7 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 module.exports = {
   activeIn: ['support'],
@@ -46,7 +46,7 @@ module.exports = {
       for (const name of (ps.discardPile || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+        if (c && isPileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
           seen.add(name);
           eligibleCards.push({ name, source: 'discard' });
         }
@@ -92,7 +92,7 @@ module.exports = {
         for (const name of (ps.discardPile || [])) {
           if (currentSeen.has(name)) continue;
           const c = cardDB[name];
-          if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0 && canPlaceOnHere(name)) {
+          if (c && isPileCreature(c) && (c.level || 0) === 0 && canPlaceOnHere(name)) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'discard' });
           }

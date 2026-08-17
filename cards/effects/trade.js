@@ -11,6 +11,11 @@
 //  Cannot activate with <5 cards in deck.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"), analog zum Zieh-Riegel:
+// ist der Gold-Gewinn der EINZIGE Nutzen, wird die Karte gesperrt
+// statt wirkungslos zu feuern. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 const GOLD_BY_LEVEL = [5, 10, 20]; // index 0 = Lv1, etc.
 
 module.exports = {
@@ -48,6 +53,10 @@ module.exports = {
    * Can activate if the player has at least 5 cards in their deck.
    */
   canFreeActivate(ctx, level) {
+    // "delete the top 5 cards of your deck to gain X Gold" — ohne das
+    // Gold bliebe reiner Verlust. Gesperrt, und das Once-per-turn
+    // bleibt unverbraucht.
+    if (goldGainWouldBeBlocked(ctx._engine, ctx.cardOwner)) return false;
     const ps = ctx.players[ctx.cardOwner];
     return (ps.mainDeck || []).length >= 5;
   },

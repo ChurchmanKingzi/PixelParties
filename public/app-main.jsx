@@ -2143,31 +2143,55 @@ function MusicManager({ bgmMode }) {
     if (fadeIn._ppFadeTimer) { clearInterval(fadeIn._ppFadeTimer); fadeIn._ppFadeTimer = null; }
     delete fadeIn._ppBaseVol;
     fadeIn.volume = 0;
-    fadeIn.play().then(() => {
+
+    // ── EINBLENDUNG MIT DEMSELBEN RIEGEL WIE DIE AUSBLENDUNG ──────────
+    // ★ Als Befund 17.8.: „Try as Guest → sofort per Escape wieder raus →
+    // der Sound ruckelt und rauscht ekelhaft. Aber NUR, wenn man sofort
+    // bei Screen-Transition wieder escaped."
+    //
+    // Ursache: der EINblend-Timer lag in einer lokalen Variablen und war
+    // von aussen nicht erreichbar. Wechselt der Modus innerhalb der
+    // Blendzeit (8 × 40 ms = 320 ms) erneut, landet der Track in
+    // `fadeOuts` und bekommt einen AUSblend-Timer — waehrend sein alter
+    // EINblend-Timer weiterlaeuft und ihn gegenlaeufig wieder hochdreht.
+    // Zwei Timer im 40-ms-Takt gegeneinander auf derselben
+    // `volume`-Eigenschaft: das ist das Rauschen.
+    //
+    // Die Ausblendung hatte diesen Riegel laengst (`fo._ppFadeTimer`),
+    // die Einblendung nie. Jetzt teilen sich beide Richtungen DENSELBEN
+    // Platz — ein Element blendet immer nur in eine Richtung, und jeder
+    // neue Wechsel raeumt den alten Timer ab, egal woher er stammt.
+    const starteEinblendung = () => {
+      // Ein neuerer Wechsel hat uns ueberholt, waehrend `play()` lief:
+      // dann gehoert dieser Track nicht mehr auf die Buehne. Ohne diese
+      // Pruefung bliebe er hoerbar, obwohl ihn niemand mehr ausblendet
+      // (beim Aufsammeln von `fadeOuts` war er noch pausiert).
+      if (currentTrack.current !== target) {
+        fadeIn.pause(); fadeIn.currentTime = 0; fadeIn.volume = targetVol;
+        return;
+      }
+      if (fadeIn._ppFadeTimer) { clearInterval(fadeIn._ppFadeTimer); fadeIn._ppFadeTimer = null; }
       let step = 0;
-      const fadeInterval = setInterval(() => {
+      fadeIn._ppFadeTimer = setInterval(() => {
         step++;
         fadeIn.volume = Math.min(targetVol, targetVol * (step / 8));
-        if (step >= 8) clearInterval(fadeInterval);
+        if (step >= 8) { clearInterval(fadeIn._ppFadeTimer); fadeIn._ppFadeTimer = null; }
       }, 40);
-    }).catch(() => {
+    };
+
+    // VOR dem Abspielen setzen: `starteEinblendung` vergleicht dagegen,
+    // und `play()` kann bereits im selben Tick aufloesen.
+    currentTrack.current = target;
+
+    fadeIn.play().then(starteEinblendung).catch(() => {
       // Autoplay still blocked — retry on next user interaction
       const retry = () => {
         fadeIn.volume = 0;
-        fadeIn.play().then(() => {
-          let step = 0;
-          const fadeInterval = setInterval(() => {
-            step++;
-            fadeIn.volume = Math.min(targetVol, targetVol * (step / 8));
-            if (step >= 8) clearInterval(fadeInterval);
-          }, 40);
-        }).catch(() => {});
+        fadeIn.play().then(starteEinblendung).catch(() => {});
         window.removeEventListener('click', retry);
       };
       window.addEventListener('click', retry, { once: true });
     });
-
-    currentTrack.current = target;
   }, [getTargetVol]);
 
   // Unlock audio on first user interaction

@@ -23,6 +23,12 @@ const CARD_NAME = 'Lunatic Cycle - Crescent Moon';
 const PREREQ = 'Lunatic Cycle - New Moon';
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Hand
+
   isEquip: true,
   activeIn: ['support'],
 
@@ -53,7 +59,11 @@ module.exports = {
         // In-hand multi-select — the player clicks the cards in their
         // OWN hand to choose what to shuffle back (the `handPick`
         // prompt; same UX as Leadership), NOT a modal gallery.
-        const eligibleIndices = ps.hand.map((_, i) => i);
+        const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+        const eligibleIndices = ps.hand
+          .map((_, i) => i)
+          .filter(i => waehlbar.has(ps.hand[i]));
+        if (eligibleIndices.length === 0) return;
         const result = await engine.promptGeneric(pi, {
           type: 'handPick',
           title: CARD_NAME,
@@ -74,14 +84,19 @@ module.exports = {
 
         // actionMulliganCards handles shuffle-back animation, opponent
         // routing, deck shuffle, and reports how many were potions.
-        const { potionCount } = await engine.actionMulliganCards(pi, namesToReturn);
-        engine.log('lunatic_crescent_cycle', { player: ps.username, count });
+        const { potionCount, totalReturned } = await engine.actionMulliganCards(pi, namesToReturn);
+        engine.log('lunatic_crescent_cycle', { player: ps.username, count, returned: totalReturned });
         engine.sync();
         await engine._delay(400);
 
         // Draw the same number back: non-potions from main deck, any
         // potion slots from the potion deck (mirrors Leadership).
-        await engine.actionDrawCards(pi, count - potionCount);
+        // ★ Als Regel (17.8.): "the same number" meint ALLE
+        // zurueckgemischten Karten — auch gestohlene, die ins
+        // GEGNER-Deck gingen. `totalReturned` zaehlt beide Decks;
+        // die frueher benutzte Auswahlmenge haette bei einem
+        // fehlgeschlagenen Rueckweg zu viel gezogen.
+        await engine.actionDrawCards(pi, totalReturned - potionCount);
         for (let i = 0; i < potionCount; i++) {
           if ((ps.potionDeck || []).length === 0) break;
           ps.hand.push(ps.potionDeck.shift());

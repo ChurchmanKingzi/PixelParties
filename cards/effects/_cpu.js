@@ -9,7 +9,13 @@
 // active effects, Ascension, and the targeting engine.
 
 const { loadCardEffect } = require('./_loader');
-const { PHASES, getCleansableStatuses } = require('./_hooks');
+const { PHASES, getCleansableStatuses, hasCardType } = require('./_hooks');
+// `hasCardType(cd, 'Creature')` statt `cd.cardType === 'Creature'` ueberall dort,
+// wo es um Karten AUF DEM FELD geht: eine Artifact Creature (Powder Keg,
+// Pollution Spewer, die Debt-O-Trons) ist in einer Support Zone eine Creature
+// und muss in Brettbewertung und Fingerabdruck mitzaehlen. Fuer HANDkarten
+// bleibt der strenge Vergleich richtig — dort ist sie ein Artifact (Als Ruling
+// 17.8., Auslegung in `isPileCreature`).
 // Learned per-deck profiles (ML-trained via scripts/train-deck-profile.js).
 // No-ops when no profile matches the piloted lineup or when
 // PP_DISABLE_PROFILES=1 (training data collection).
@@ -466,7 +472,7 @@ async function runCpuTurn(engine, helpers) {
             const nm = ((_p.supportZones?.[hi] || [])[z] || [])[0];
             if (!nm) continue;
             const cd = _db[nm];
-            if (cd && cd.cardType === 'Creature') k++;
+            if (cd && hasCardType(cd, 'Creature')) k++;
           }
         }
       } catch { /* Telemetrie */ }
@@ -1441,7 +1447,7 @@ async function runMainPhase(engine, helpers) {
           const nm = ((dps.supportZones?.[hi] || [])[z] || [])[0];
           if (!nm) continue;
           const cd2 = cardDB[nm];
-          if (!cd2 || cd2.cardType !== 'Creature') continue;
+          if (!cd2 || !hasCardType(cd2, 'Creature')) continue;
           boardCreatures++;
           const inst = (engine.cardInstances || []).find(ci => ci
             && ci.zone === 'support' && ci.heroIdx === hi && ci.zoneSlot === z
@@ -2901,7 +2907,7 @@ async function playPotions(engine, helpers) {
 
   for (let safety = 0; safety < 20; safety++) {
     if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:playPotions#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
-    if (ps.potionLocked) return;
+    if (engine.arePotionsLockedFor(cpuIdx)) return;
 
     let pick = null;
     for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
@@ -2959,7 +2965,7 @@ async function playPotions(engine, helpers) {
 function isPotionPlayable(engine, pi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
-  if (ps.potionLocked) return false;
+  if (engine.arePotionsLockedFor(pi)) return false;
   if (ps._creationLockedNames?.has(cardName)) return false;
 
   const script = loadCardEffect(cardName);
@@ -4311,8 +4317,17 @@ function findSpendableSummonGrantPlay(engine, cpuIdx) {
         try { strict = !!engine.heroMeetsLevelReq(cpuIdx, heroIdx, cd); } catch { strict = false; }
         if (!strict) continue;
       }
+      // ★ Stand bis v426 ohne `deckProfile.` — freier Bezeichner, also
+      // ReferenceError, vom leeren `catch` verschluckt. `val` blieb
+      // damit IMMER 0, und `val > best.val` war nie wahr: der Spender
+      // nahm stets den ERSTEN legalen Kandidaten statt des besten.
+      // Der Fallback `(cd.level||0)*10` griff ebenfalls nie.
       let val = 0;
-      try { val = learnedCardValue(engine, cpuIdx, cardName, (cd.level || 0) * 10, 1); } catch { }
+      try {
+        val = deckProfile.learnedCardValue(engine, cpuIdx, cardName, (cd.level || 0) * 10, 1) || 0;
+      } catch (err) {
+        if (process.env.PP_CPU_DEBUG) console.warn('[cpu] Grant-Spender ohne Lernwert:', err.message);
+      }
       if (!best || val > best.val) best = { cardName, handIndex, heroIdx, zoneSlot, val };
     }
   }
@@ -5847,7 +5862,10 @@ const MENU_OBJECTIVES = {
 
 // Enumerate alternative values for a branchable generic prompt. Returns an
 // array of { value, label } entries usable as plan values.
-function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
+// `engine` ist NEU (v426). Der Tutor-Pick-Lernanschluss weiter unten hat es
+// immer schon benutzt — nur gab es die Variable in dieser Funktion nie, und
+// ihr `catch { /* defensiv */ }` hat den ReferenceError seit jeher verschluckt.
+function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
   const type = promptData.type;
   if (type === 'zonePick') {
     let zones = (promptData.zones || []).slice();
@@ -5873,43 +5891,6 @@ function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
     }));
   }
   if (type === 'cardGallery') {
-    // ── Tutor-Pick-Lernanschluss (Als Auftrag: "wann welche Karte
-    // suchen" ist fundamental) ── Die Galerie-Sortierung entscheidet,
-    // WELCHE Varianten der MCTS überhaupt als Arme probiert (Cap 6).
-    // Ohne gelernten Anteil fielen Profil-Lieblinge (Divine Gift of
-    // Fire!) aus den Top-6, bevor der MCTS sie je bewerten konnte.
-    // Der gelernte Kartenwert wird auf den Heuristik-Score addiert;
-    // ohne Profil: +0 → Verhalten unverändert.
-    try {
-      const _pi = engine._cpuPlayerIdx;
-      const _tpr = deckProfile.profileFor ? null : null; // (Regeln unten direkt via learnedTutorPick)
-      const _src = promptData.title || promptData.cardName || 'unknown';
-      const _rules = (function () {
-        try { return require('./_deck-profile').__getProfile?.(engine, _pi)?.tutorPickRules || null; } catch { return null; }
-      })();
-      for (const c of cards) {
-        if (c && c.name && c._galleryScore !== undefined) {
-          // Revive-Karten ohne (sinnvolles) Revive-Ziel bekommen KEINE
-          // Learned-Additive: der Heuristik-Score ist bereits hart
-          // gedeckelt (estimateHandCardValueFor), und ein kontextfrei
-          // gelernter cardValue bzw. eine tutorPickRule würde Golden
-          // Ankh bei vollem Team wieder in die Top-6-Arme heben.
-          const revSit = reviveCardSituation(engine, _pi, c.name);
-          if (revSit && (!revSit.hasDead || !revSit.useful)) continue;
-          const lv = deckProfile.learnedCardValue(engine, _pi, c.name, 0, 1) || 0;
-          c._galleryScore += lv * 0.5;
-          // Gelernte Quelle→Karte-Regel (tutorPickRules) direkt dazu.
-          if (_rules) c._galleryScore += (_rules[`${_src}→${c.name}`] || 0);
-          // Tutor-Cap gilt auch NACH den Learned-Additiven — sonst
-          // hebelt genau dieser (ungegatete) Pfad den min(12)-Deckel
-          // wieder aus ("Magnetic Potion sucht Magnetic Glove").
-          const tSc = loadCardEffect(c.name);
-          if (tSc?.blockedByHandLock && typeof tSc.resolve === 'function') {
-            c._galleryScore = Math.min(c._galleryScore, 12);
-          }
-        }
-      }
-    } catch { /* defensiv */ }
     // Sort by `_galleryScore` (stamped by `pickBestGalleryCard` during
     // the heuristic recon) descending so the first MCTS_MAX_ALTS_PER_BRANCH
     // variations actually explore the highest-impact cards. Without this,
@@ -5919,6 +5900,54 @@ function mctsEnumerateGenericAlternatives(promptData, cpuIdxForBias) {
     // pieces and high-impact spells got dropped because they sit later
     // alphabetically). Cards without a stamped score fall to the back.
     const cards = (promptData.cards || []).slice();
+
+    // ── Tutor-Pick-Lernanschluss (Als Auftrag: „wann welche Karte
+    // suchen" ist fundamental) ── Die Galerie-Sortierung entscheidet,
+    // WELCHE Varianten der MCTS ueberhaupt als Arme probiert (Cap 6).
+    // Ohne gelernten Anteil fielen Profil-Lieblinge (Divine Gift of
+    // Fire!) aus den Top-6, bevor der MCTS sie je bewerten konnte.
+    // Der gelernte Kartenwert wird auf den Heuristik-Score addiert;
+    // ohne Profil: +0 → Verhalten unveraendert.
+    //
+    // ★ DIESER BLOCK WAR TOT (bis v426). Er stand VOR `const cards`
+    // (Zugriff in der temporalen Todeszone) und las ein `engine`, das
+    // es in dieser Funktion nicht gab — beides ReferenceError, beides
+    // vom `catch` unten verschluckt. Ergebnis: 3384 gelernte
+    // Tutor-Regeln ueber 40 Profile kamen an der Galerie nie an, die
+    // Arme wurden rein heuristisch gewaehlt. Jetzt steht der Block
+    // hinter der Deklaration und `engine` ist ein Parameter.
+    try {
+      const _pi = engine._cpuPlayerIdx;
+      const _src = promptData.title || promptData.cardName || 'unknown';
+      const _rules = deckProfile.__getProfile?.(engine, _pi)?.tutorPickRules || null;
+      for (const c of cards) {
+        if (c && c.name && c._galleryScore !== undefined) {
+          // Revive-Karten ohne (sinnvolles) Revive-Ziel bekommen KEINE
+          // Learned-Additive: der Heuristik-Score ist bereits hart
+          // gedeckelt (estimateHandCardValueFor), und ein kontextfrei
+          // gelernter cardValue bzw. eine tutorPickRule wuerde Golden
+          // Ankh bei vollem Team wieder in die Top-6-Arme heben.
+          const revSit = reviveCardSituation(engine, _pi, c.name);
+          if (revSit && (!revSit.hasDead || !revSit.useful)) continue;
+          const lv = deckProfile.learnedCardValue(engine, _pi, c.name, 0, 1) || 0;
+          c._galleryScore += lv * 0.5;
+          // Gelernte Quelle→Karte-Regel (tutorPickRules) direkt dazu.
+          if (_rules) c._galleryScore += (_rules[`${_src}→${c.name}`] || 0);
+          // Tutor-Cap gilt auch NACH den Learned-Additiven — sonst
+          // hebelt genau dieser (ungegatete) Pfad den min(12)-Deckel
+          // wieder aus („Magnetic Potion sucht Magnetic Glove").
+          const tSc = loadCardEffect(c.name);
+          if (tSc?.blockedByHandLock && typeof tSc.resolve === 'function') {
+            c._galleryScore = Math.min(c._galleryScore, 12);
+          }
+        }
+      }
+    } catch (err) {
+      // Diagnose statt Stille: genau dieses stumme `catch` hat den
+      // Defekt oben ueber Monate verdeckt. PP_CPU_DEBUG=1 zeigt ihn.
+      if (process.env.PP_CPU_DEBUG) console.warn('[cpu] Tutor-Lernanschluss uebersprungen:', err.message);
+    }
+
     cards.sort((a, b) => (b._galleryScore || -Infinity) - (a._galleryScore || -Infinity));
     return cards.map(c => ({
       value: { cardName: c.name, source: c.source },
@@ -6088,7 +6117,7 @@ function installCpuBrain(engine) {
           if (card && hookCtx.toZone === 'support') {
             const own = card.controller ?? card.owner;
             const cd = engine._getCardDB()[card.name];
-            if (typeof own === 'number' && engine._behaviorFp[own] && cd?.cardType === 'Creature') engine._behaviorFp[own].cre++;
+            if (typeof own === 'number' && engine._behaviorFp[own] && hasCardType(cd, 'Creature')) engine._behaviorFp[own].cre++;
           }
         }
       }
@@ -6131,7 +6160,7 @@ function installCpuBrain(engine) {
         const toZone = hookCtx.toZone;
         if (enteringCard && toZone === 'support') {
           const cd = engine._getCardDB()[enteringCard.name];
-          if (cd && cd.cardType === 'Creature') {
+          if (cd && hasCardType(cd, 'Creature')) {
             const owner = enteringCard.controller ?? enteringCard.owner;
             const hi = enteringCard.heroIdx;
             const hero = (owner != null && hi != null && hi >= 0)
@@ -6266,7 +6295,7 @@ function installCpuBrain(engine) {
           kind: `generic:${promptData.type}`,
           title: promptData.title,
           cancellable: !!promptData.cancellable,
-          alternatives: mctsEnumerateGenericAlternatives(promptData, playerIdx),
+          alternatives: mctsEnumerateGenericAlternatives(engine, promptData, playerIdx),
           picked,
           wasScripted: scriptedValue != null,
         }, promptData.title, promptData.type, playerIdx);
@@ -9484,9 +9513,15 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
   const gold = ps?.gold || 0;
   const cost = cd.cost || 0;
   const typeLocked =
-    (cd.cardType === 'Potion' && ps?.potionLocked) ||
+    (cd.cardType === 'Potion' && engine.arePotionsLockedFor(pi)) ||
     (cd.cardType === 'Artifact' && ps?.itemLocked) ||
-    (cd.cardType === 'Creature' && ps?.creatureLocked);
+    // Beschwoerungssperre: gilt laut Als Ruling 17.8. auch fuer Artifact
+    // Creatures — ab dem Moment, wo sie beschworen wuerden, waeren sie
+    // Creatures. Deshalb `hasCardType` statt des strengen Vergleichs.
+    // (`ps.creatureLocked` setzt derzeit NICHTS im ganzen Projekt — der
+    //  Zweig ist tot; er bleibt nur konsistent stehen. Al gemeldet.)
+    (hasCardType(cd, 'Creature') && ps?.summonLocked) ||
+    (hasCardType(cd, 'Creature') && ps?.creatureLocked);
   let base;
   if (typeLocked) base = 10;
   else if (cost <= gold) base = 25;

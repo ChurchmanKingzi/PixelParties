@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType, ZONES } = require('./_hooks');
+const { getCardDB } = require('./_card-db');
 
 module.exports = {
   requiresTarget: true,
@@ -104,16 +105,12 @@ module.exports = {
 function _getEligibleCreatures(gs, engine) {
   const targets = [];
   let cardDB;
-  try {
-    cardDB = engine ? engine._getCardDB() : (() => {
-      const allCards = JSON.parse(
-        require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8')
-      );
-      const db = {};
-      allCards.forEach(c => { db[c.name] = c; });
-      return db;
-    })();
-  } catch { return []; }
+  // `getCardDB` nimmt die Engine-DB, wenn eine Engine da ist, und faellt
+  // sonst auf den modulweiten Cache zurueck. Vorher stand hier ein
+  // Inline-Parser OHNE Cache: jeder engine-lose Aufruf las die 0,83-MB-Datei
+  // neu von Platte. Aktuell reichen alle Live-Aufrufer eine Engine durch,
+  // die Falle war also kalt — jetzt ist sie ganz weg.
+  try { cardDB = getCardDB(engine); } catch { return []; }
 
   for (let pi = 0; pi < 2; pi++) {
     const ps = gs.players[pi];

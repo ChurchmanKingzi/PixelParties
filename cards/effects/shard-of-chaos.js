@@ -11,20 +11,12 @@
 //  are separate types.
 // ═══════════════════════════════════════════
 
+const { getCardDB } = require('./_card-db');
+
 const ACTION_TYPES = new Set(['Attack', 'Spell', 'Creature']);
 
 function normalizeType(cardType) {
   return ACTION_TYPES.has(cardType) ? 'Action' : cardType;
-}
-
-let _cardDB = null;
-function getCardDB() {
-  if (!_cardDB) {
-    const cards = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'data', 'cards.json'), 'utf-8'));
-    _cardDB = {};
-    cards.forEach(c => { _cardDB[c.name] = c; });
-  }
-  return _cardDB;
 }
 
 module.exports = {

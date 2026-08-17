@@ -5,6 +5,11 @@
 //  You may once per turn draw 2 cards and discard 1 card afterwards.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Skeleton Mage';
 
 module.exports = {
@@ -13,6 +18,10 @@ module.exports = {
   blockedByHandLock: true,
 
   canActivateCreatureEffect(ctx) {
+    // Ohne den 2er-Zug blieben nur der Abwurf von 1 Karte uebrig — Als Ruling:
+    // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
+    // Once-per-turn nicht.
+    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
     const ps = ctx._engine.gs.players[ctx.cardOwner];
     if (!ps) return false;
     // Hand-lock kills the draw side of this effect — gating here

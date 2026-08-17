@@ -32,6 +32,10 @@
 //  ueber `return false` die Rundennutzung frei.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
+// solange der Gewinn gesperrt ist. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 const {
   WC,
   countWarCounselors,
@@ -75,12 +79,14 @@ module.exports = {
       description: 'Choose which counsel to follow.',
       showCard: CARD_NAME,
       options: [
-        {
+        // Gold-Option nur, wenn der Gewinn nicht gesperrt ist
+        // (Als Ruling 17.8., "Tuscan Aristocrat").
+        ...(goldGainWouldBeBlocked(engine, pi) ? [] : [{
           id: 'gold',
           label: `💰 Gain ${goldGain} Gold`,
           description: `${GOLD_PER_COUNSELLOR} × ${counselors} "${WC}" Creature${counselors !== 1 ? 's' : ''} you control.`,
           color: '#ffd700',
-        },
+        }]),
         {
           id: 'damage',
           label: `🔥 Deal ${damage} damage`,

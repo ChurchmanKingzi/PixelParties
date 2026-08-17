@@ -491,8 +491,11 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
             menus.push({ s: 'Chaos Magic', t: engine.gs?.turn || 0, o: null, c: null });
           }
         }
+        // Aus dem `if`-Block herausgezogen: die GRANT_EXPIRE-Pruefung
+        // direkt darunter liest `pinnedUser` ebenfalls und warf sonst
+        // einen ReferenceError (Blockbindung).
+        const pinnedUser = engine.gs?.players?.[pinnedIdx]?.username;
         if (!engine._inMctsSim && data && type === 'gem_kept_in_hand') {
-          const pinnedUser = engine.gs?.players?.[pinnedIdx]?.username;
           if (data.card && data.player && pinnedUser && data.player === pinnedUser) recordPlay(data.card);
         }
         if (!engine._inMctsSim && type === GRANT_EXPIRE_EVENT && data

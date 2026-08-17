@@ -199,7 +199,7 @@ async function sacrificeSelf(engine, inst, pi) {
   await engine.runHooks('onCreatureSacrificed', {
     creature: inst, cardName: inst.name, owner: inst.owner,
     heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-    source: { name: CARD_NAME_ARG, owner: pi, heroIdx: inst.heroIdx ?? -1 },
+    source: { name: inst.name, owner: pi, heroIdx: inst.heroIdx ?? -1 },
     _skipReactionCheck: true,
   });
   if (inst.zone === 'hand') {
@@ -214,7 +214,7 @@ async function sacrificeSelf(engine, inst, pi) {
     engine._untrackCard(inst.id);
   } else {
     await engine.actionDestroyCard(
-      { name: CARD_NAME_ARG, owner: pi, heroIdx: inst.heroIdx }, inst,
+      { name: inst.name, owner: pi, heroIdx: inst.heroIdx }, inst,
     );
   }
 }
@@ -226,4 +226,7 @@ module.exports = {
   findOccupant,
   sacrificeableSlots,
   sacrificeSummonIntoSlot,
+  // War NIE exportiert — Guardian of Teocuilatl rief sie als freien
+  // Bezeichner auf und lief dort in einen ReferenceError.
+  sacrificeSelf,
 };

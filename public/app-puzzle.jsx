@@ -346,6 +346,11 @@ function PuzzleCreator() {
   const [dragSource, setDragSource] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [viewPile, setViewPile] = useState(null);
+  // Suchtext der Stapel-Ansicht (Als Vorgabe 17.8.: die Deck-Ansicht im
+  // Puzzle-Mode hatte keine Suchleiste). Wird beim Oeffnen/Schliessen
+  // zurueckgesetzt, damit ein alter Filter nicht die naechste Ansicht
+  // leer aussehen laesst.
+  const [pileSuche, setPileSuche] = useState('');
   const boardWrapRef = useRef(null);
   const dragEntityData = useRef(null);
   const searchResultsRef = useRef(null);
@@ -1539,6 +1544,12 @@ function PuzzleCreator() {
   // Form wie Evolution/Change Counters. Null fuer andere Helden, damit
   // der Abschnitt verborgen bleibt.
   const [editInvestCounter, setEditInvestCounter] = useState(null);
+  // Cecilia, the Harrowing Crusader: „has been defeated at least once
+  // this game" ist die Aufstiegsbedingung ihrer Ascension. Ohne
+  // Setzmoeglichkeit liesse sich „Rescued Damsel Cecilia" im Puzzle
+  // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
+  // Evolution Counters. Null fuer alle anderen Helden.
+  const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
   // For Charm of Balance: number of Balance Counters this Equipment starts
   // the puzzle with. Saved under `_creatureStatuses[hi-slot].balance` and
   // applied server-side as `inst.counters.balance` (alongside headCounter
@@ -1584,6 +1595,31 @@ function PuzzleCreator() {
   ]);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
+    // ── ALLE OPTIONALEN ABSCHNITTE ZUERST ZURUECKSETZEN (Als Befund 17.8.) ──
+    // Al: „man kann Charm of Balance im Puzzle-Editor Invest Counters
+    // zuweisen" — die gibt es nur bei Logan. Ursache war kein falsches
+    // Gate, sondern ALTZUSTAND: der Helden-Zweig setzt
+    // `editInvestCounter`, der Support-Zweig setzte ihn nie zurueck.
+    // Wer erst Logan und dann eine Support-Karte anklickte, sah dessen
+    // Abschnitt weiter stehen.
+    //
+    // Jede Sichtbarkeit haengt an „!== null". Deshalb hier EINMAL alles
+    // auf null, danach hydriert jeder Zweig nur, was zu seinem Ziel
+    // gehoert. So kann kein kuenftiger Zaehler mehr durchsickern —
+    // vorher haette ihn jeder Zweig einzeln abraeumen muessen, und genau
+    // das wurde vergessen.
+    setEditBiomancyLevel(null);
+    setEditAttachedHero(null);
+    setEditHeadCounter(null);
+    setEditLinkedHeroSlot(null);
+    setEditChangeCounter(null);
+    setEditEvolutionCounter(null);
+    setEditInvestCounter(null);
+    setEditCeciliaDefeated(null);
+    setEditBalanceCounter(null);
+    setEditBunnyBombCounter(null);
+    setEditSparkflyGifts(null);
+    setEditAntiMagicLevel(null);
     if (zt === 'hero') {
       const h = p.heroes[hi]; if (!h) return;
       setEditTarget({ si, zt, hi, slot });
@@ -1612,6 +1648,9 @@ function PuzzleCreator() {
         : null);
       setEditInvestCounter(h.name === 'Logan, the Investment Monkee'
         ? (h._investCounters || 0)
+        : null);
+      setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
+        ? !!h._ceciliaDefeatedOnce
         : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
@@ -1730,6 +1769,11 @@ function PuzzleCreator() {
         }
         // Logan: Invest Counters. Gleiche Speicherform, damit Server
         // und Client sie ohne Sonderfall durchreichen.
+        if (editCeciliaDefeated != null && editCeciliaDefeated) {
+          p.heroes[hi]._ceciliaDefeatedOnce = true;
+        } else if (editCeciliaDefeated != null) {
+          delete p.heroes[hi]._ceciliaDefeatedOnce;
+        }
         if (editInvestCounter != null && editInvestCounter > 0) {
           p.heroes[hi]._investCounters = editInvestCounter;
         } else {
@@ -1847,7 +1891,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editBalanceCounter, editBunnyBombCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBalanceCounter, editBunnyBombCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -1920,7 +1964,7 @@ function PuzzleCreator() {
       // Pop-ups close one level at a time so a "viewing a deck pile"
       // Escape doesn't boot the whole creator. Order matters: most
       // transient overlay first, navigation away last.
-      if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setViewPile(null);            return; }
+      if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setViewPile(null); setPileSuche(''); return; }
       if (debuffMenuOpen)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDebuffMenuOpen(null);      return; }
       if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setRemovePopupPos(null);      return; }
       if (mobileSelected)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setMobileSelected(null);      return; }
@@ -2859,11 +2903,32 @@ function PuzzleCreator() {
           <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewPile(null); }}>
             <div className="modal" style={{ maxWidth: 600, padding: 20, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>{sideLabel} — {labels[viewPile.key] || viewPile.key} ({pile.length})</h3>
-                <button className="btn" style={{ padding: '4px 10px', fontSize: 10 }} onClick={() => setViewPile(null)}>✕ CLOSE</button>
+                <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>{sideLabel} — {labels[viewPile.key] || viewPile.key} ({(() => {
+                  const q = pileSuche.trim().toLowerCase();
+                  if (!q) return pile.length;
+                  const n = pile.filter(c => c.toLowerCase().includes(q)).length;
+                  return `${n}/${pile.length}`;
+                })()})</h3>
+                <button className="btn" style={{ padding: '4px 10px', fontSize: 10 }} onClick={() => { setViewPile(null); setPileSuche(''); }}>✕ CLOSE</button>
               </div>
+              {/* Suchleiste (Als Vorgabe 17.8.). Gefiltert wird nur die
+                  ANZEIGE — Ziehen, Umsortieren und Entfernen arbeiten
+                  weiter auf dem echten Stapelindex, deshalb wandert
+                  `idx` aus dem Original mit und wird nicht neu vergeben. */}
+              <input
+                className="db-filter-input"
+                placeholder="Search name..."
+                value={pileSuche}
+                autoFocus
+                onChange={(e) => setPileSuche(e.target.value)}
+                style={{ marginBottom: 10, width: '100%' }}
+              />
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 'calc(6px * var(--board-scale))', padding: 4, alignContent: 'flex-start' }}>
-                {pile.map((cardName, idx) => {
+                {pile
+                  .map((cardName, idx) => ({ cardName, idx }))
+                  .filter(({ cardName }) => !pileSuche.trim()
+                    || cardName.toLowerCase().includes(pileSuche.trim().toLowerCase()))
+                  .map(({ cardName, idx }) => {
                   const img = cardImageUrl(cardName);
                   return (
                     <div key={idx} className="pz-hand-card" draggable
@@ -3101,6 +3166,21 @@ function PuzzleCreator() {
                 Stormkissed up to 4 for Deep-Drowned) and Descending places
                 more back. Saved as `hero._evolutionCounters`, which the
                 shared Waflav helpers read directly. */}
+            {editCeciliaDefeated != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⚔️ Ascension
+                </span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!editCeciliaDefeated}
+                    onChange={(e) => setEditCeciliaDefeated(e.target.checked)} />
+                  Has been defeated at least once this game
+                </label>
+                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+                  Required for "Rescued Damsel Cecilia".
+                </div>
+              </div>
+            )}
             {editEvolutionCounter != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>

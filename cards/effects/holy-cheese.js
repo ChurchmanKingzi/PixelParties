@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
   isTargetingArtifact: true,
@@ -141,15 +142,3 @@ module.exports = {
     engine.sync();
   },
 };
-
-// Module-level card DB loader (cached) for canActivate (no engine context)
-let _cardDBCache = null;
-function _getCardDB() {
-  if (_cardDBCache) return _cardDBCache;
-  try {
-    const allCards = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8'));
-    _cardDBCache = {};
-    allCards.forEach(c => { _cardDBCache[c.name] = c; });
-    return _cardDBCache;
-  } catch { return {}; }
-}

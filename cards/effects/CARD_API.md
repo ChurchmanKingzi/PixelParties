@@ -29,6 +29,28 @@ That's it — the engine handles registration, caching, and lifecycle automatica
 
 ---
 
+## ★ `banned` ist KEIN Grund, eine Karte nicht zu implementieren (Als Regel 17.8.)
+
+> „`banned` in cards.json hat keine Auswirkung darauf, ob eine Karte
+> implementiert werden sollte und kann bis auf weiteres ignoriert werden."
+
+Das Feld `banned` in `data/cards.json` ist eine Balance-Notiz, kein
+Bauauftrag. Eine gebannte Karte wird **genauso vollstaendig gebaut und
+getestet** wie jede andere — sie muss im Puzzle Mode und in Testaufbauten
+funktionieren, und ein Bann kann jederzeit zurueckgenommen werden.
+
+Auch nicht tun: den Bann im Kartenkopf als Sonderfall kommentieren oder
+ihn in Tests zusichern. Eine Zusicherung auf `banned` misst eine
+Balance-Entscheidung und wird rot, sobald Al sie aendert.
+
+**Stand der Technik (17.8. gemessen, damit niemand ein Gate vermutet, das
+es nicht gibt):** `banned` wird im ganzen Projekt an **genau einer** Stelle
+gelesen — `getDailyHeroPool` in server.js schliesst gebannte Helden aus der
+Tagesauswahl aus. Der Deck-Editor prueft es **nicht**; eine gebannte Karte
+ist derzeit also deckbaulich voll zugelassen.
+
+---
+
 ## Module Exports — Card Type Flags
 
 At least one of these must be present, or the loader will ignore the file.
@@ -275,7 +297,25 @@ Any prompt whose `title` carries a dash, colon or interpolation needs an explici
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `heroEffect` | `bool` | Flag indicating this hero has an activatable effect. |
-| `onHeroEffect` | `async (ctx) → void` | Called when the hero effect is activated. |
+| `onHeroEffect` | `async (ctx) → false \| any` | Called when the hero effect is activated. **Return `false` on every abort path** — see below. |
+
+**★ RUECKGABEVERTRAG von `onHeroEffect` (Als Befund 17.8.):** die Engine
+stempelt das Einmal-pro-Zug NUR, wenn der Rueckgabewert `!== false` ist
+(`doActivateHeroEffect` in server.js) — und meldet den Effekt sonst als
+gefeuert (`announceActiveEffect`, `noteActivationOutcome`). Ein blosses
+`return;` liefert `undefined` und gilt damit als ERFOLG: der Zug ist
+verbraucht, obwohl nichts geschehen ist. Genau so fiel Cecilia auf —
+Abbruch der Kartenauswahl kostete die Aktivierung.
+
+Also: **jeder** Pfad, der nichts bewirkt, gibt `false` zurueck — abgebrochene
+Abfrage, fehlgeschlagene Zahlung, Ziel zwischenzeitlich verschwunden, Gate
+nachtraeglich nicht mehr erfuellt. Der Erfolgspfad gibt `true` zurueck (oder
+irgendetwas ausser `false`).
+
+Sonderfall MEHRFACHNUTZUNG pro Runde (Kassaran, 3x): dort fuehrt die Karte
+ihren Verbrauch selbst und setzt `ctx._skipHeroEffectHopt = true`, statt
+`false` zurueckzugeben — `false` hiesse zusaetzlich "abgebrochen" und wuerde
+`onAnyActionResolved` und die CPU-Erkennung mit aushebeln.
 | `canActivateHeroEffect` | `(ctx) → bool` | Extra activation condition (beyond alive/not-frozen/HOPT). |
 
 ### Creatures
@@ -1416,6 +1456,55 @@ damage pipeline, not this rule.
 
 Reference: `_isGateShielded` / `_triggerGateCheck` in `_engine.js`;
 `fire-bomb.js`; `capture-net.js` (via `stealBoardCardToHand`).
+
+---
+
+### Spell-school filters — read BOTH fields, never `spellSchool1` alone (MANDATORY)
+
+> **Al's ruling (16.8.):** a card that is *partly* a given school **counts as
+> that school**. Friendship locks a Spell that is only half Support Magic;
+> Holy Cheese finds it; Angry Cheese finds a half-Destruction Spell, and so on.
+> A dual-school card belongs to **both** of its schools, everywhere.
+
+Use the shared helper — never compare a field directly:
+
+```js
+const { hasSpellSchool } = require('./_hooks');
+
+if (hasSpellSchool(cd, 'Support Magic')) { /* … */ }        // ✅
+if (cd.spellSchool1 === 'Support Magic') { /* … */ }        // ❌ misses half of them
+if (cd.spellSchool1 === 'X' || cd.spellSchool2 === 'X') {}  // works, but don't add new ones
+```
+
+**Why a one-sided read is not a 50/50 gamble but a systematic miss:** since the
+dual-school ordering rule (Al, 11.8.) the two fields are **alphabetically
+sorted**, not "main school first". So a school always lands in the same slot
+relative to its partner:
+
+| School            | Sorts | Can appear in `spellSchool2`?          |
+|-------------------|-------|----------------------------------------|
+| Decay Magic       | 1st   | never (always field 1)                 |
+| Destruction Magic | 2nd   | only paired with Decay                 |
+| Fighting          | 3rd   | —                                      |
+| Magic Arts        | 4th   | paired with Decay / Destruction        |
+| Summoning Magic   | 5th   | paired with any of the above           |
+| Support Magic     | 6th   | **always** — it sorts behind all others |
+
+`spellSchool1 === 'Support Magic'` therefore misses **every** dual-school
+Support Spell there is. That was a live bug in ten places until v425
+(Friendship, Lizbeth, Divine Gift of The Light, Thalia, the playability gate,
+the hand grey-out and the "support spell used this turn" flag). The six cards
+it silently exempted: Dangerous Knowledge, Energy Drain, Holy Selection,
+Sacrifice to Divinity, The Light Brigade Marches, Spectral Armor.
+
+**The one exception** is the de-duplication idiom when *collecting* a card's
+schools — that one is about field identity, not membership, and stays:
+
+```js
+const schools = [];
+if (cd.spellSchool1) schools.push(cd.spellSchool1);
+if (cd.spellSchool2 && cd.spellSchool2 !== cd.spellSchool1) schools.push(cd.spellSchool2);
+```
 
 ---
 

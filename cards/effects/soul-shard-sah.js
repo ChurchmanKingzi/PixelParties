@@ -56,7 +56,7 @@ const {
   soulShardEffectActivates_FromNecromancy,
   markSoulShardEffectFired,
 } = require('./_soul-shards-shared');
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Soul Shard Sah';
@@ -102,7 +102,7 @@ module.exports = {
       for (const name of ps.discardPile) {
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isPileCreature(cd)) continue;
         if (!_hasOnSummonEffect(name)) continue;
         counts[name] = (counts[name] || 0) + 1;
       }

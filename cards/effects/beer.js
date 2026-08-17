@@ -8,6 +8,11 @@
 
 const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
+// Diagnose-Name fuer die Gold-Schranke. Fehlte ganz — `canAffordGold(pi,
+// totalCost, CARD_NAME)` warf deshalb einen ReferenceError, noch bevor
+// Beer irgendetwas tun konnte.
+const CARD_NAME = 'Beer';
+
 function getTargetStatuses(target, engine) {
   // Hero statuses
   if (target.type === 'hero') {

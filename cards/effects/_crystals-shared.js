@@ -112,7 +112,7 @@ function refreshWeakeningCrystalNegation(engine) {
 
 /**
  * Distracting Crystal hand-passive: while a copy sits in `pi`'s hand,
- * any of their cards/abilities whose script declares `shufflesIntoDeck:
+ * any of their cards/abilities whose script declares `shufflesFromHandOrDiscardIntoDeck:
  * true` (Leadership, Elana the Rocky Rebel, …) cannot be activated.
  * Consulted by the activatable-ability and hero-effect gates, and by
  * the server-side play handler. Big Gwen Guard's suppression turns

@@ -21,7 +21,7 @@
 //     via the standard `actionDealDamage` path.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Gravedigger Slap';
 const PER_CREATURE_DAMAGE = 40;
@@ -39,7 +39,7 @@ function countCreaturesInOwnDiscard(engine, ps) {
   for (const cn of ps.discardPile) {
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
-    if (cd && hasCardType(cd, 'Creature')) seen.add(cn);
+    if (cd && isPileCreature(cd)) seen.add(cn);
   }
   return seen.size;
 }

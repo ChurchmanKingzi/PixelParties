@@ -40,7 +40,7 @@
 //  hits.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const ATTACHABLE = 'Cute Princess Mary';
 const CARD_NAME  = 'Unsettling Opportunist Vullary';
@@ -63,7 +63,7 @@ function levelMaxNCreatureNames(engine, pi, hand, maxLevel) {
     if (seen.has(cn)) continue;
     seen.add(cn);
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     // Effective level (handIdx forwarded so per-slot offsets count).
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
     if (lvl > maxLevel) continue;

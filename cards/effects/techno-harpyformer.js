@@ -10,6 +10,11 @@
 //    from hand to draw 2 cards.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME    = 'Techno Harpyformer';
@@ -42,6 +47,10 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Ohne den 2er-Zug blieben nur die Abwurf-Kosten uebrig — Als Ruling:
+    // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
+    // Once-per-turn nicht.
+    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).includes(ABILITY_NAME);
   },

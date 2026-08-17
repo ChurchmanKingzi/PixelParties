@@ -22,6 +22,11 @@
 //  gebucht und nichts zurueckgegeben.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const { monkeeGoldTrigger, eligibleSummonZones, goldSourceVerbraucht, verbraucheGoldSource,
   investHoptUsed, markInvestHopt, payInvestCounters, heroesWithInvest,
 } = require('./_monkee-shared');
@@ -146,6 +151,10 @@ module.exports = {
   // (Kandidatensuche, Auswahl, Abbuchen, Einmal-pro-Zug je Instanz)
   // steht in `_monkee-shared.js`.
   canActivateCreatureEffect(ctx) {
+    // Ohne den 2er-Zug blieben nur der Verlust von 8 Invest Countern uebrig — Als Ruling:
+    // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
+    // Once-per-turn nicht.
+    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 2)) return false;
     const engine = ctx._engine;
     if (ctx.card?.zone !== 'support') return false;
     if (investHoptUsed(engine.gs, ctx.card)) return false;

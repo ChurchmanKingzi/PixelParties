@@ -46,7 +46,7 @@
 //      (cost is already paid).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME      = 'Cute Dog';
 const MIN_TUTOR_LEVEL = 3;
@@ -64,7 +64,7 @@ function isTutorEligible(cd) {
   if (!cd) return false;
   if ((cd.level || 0) < MIN_TUTOR_LEVEL) return false;
   if (hasCardType(cd, 'Token')) return false;
-  return hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature');
+  return hasCardType(cd, 'Spell') || isPileCreature(cd);
 }
 
 function distinctTutorNames(engine, ps) {

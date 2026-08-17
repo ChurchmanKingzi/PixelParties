@@ -5,8 +5,25 @@
 //  Support Magic level. Cards drawn one by one.
 // ═══════════════════════════════════════════
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 module.exports = {
   cpuMeta: { scalesWithSchool: 'Support Magic' },
+
+  // ── Tuscan Artist (Als Ruling 16.8.) ──
+  // Haste zieht 2/3/4 je nach Support-Magic-Level des CASTERS. Der Zug
+  // ist ihr einziger Nutzen, also ist sie gesperrt, wenn genau dieser
+  // Held 2 oder 3 zoege — bei Level 3+ (4 Karten) bleibt sie spielbar.
+  // Deshalb `canPlayWithHero` und nicht `neverPlayable`: der Server
+  // graut ueber `cardGateBlockedCards` erst aus, wenn KEIN eigener Held
+  // sie mehr spielen kann.
+  canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
+    const ps = gs.players[pi];
+    const abZones = ps?.abilityZones?.[heroIdx] || [[], [], []];
+    const smLevel = engine.countAbilitiesForSchool('Support Magic', abZones);
+    const drawCount = smLevel >= 3 ? 4 : smLevel >= 2 ? 3 : 2;
+    return !drawWouldBeBlocked(engine, pi, drawCount);
+  },
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

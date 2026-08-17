@@ -80,7 +80,7 @@ module.exports = {
   isPostSummonHandReaction: true, // Custom flag, see _checkPostSummonHandReactions.
   // Shuffles hand cards back into deck — flagged for "No Retreat!"
   // detection.
-  shufflesIntoDeck: true,
+  shufflesFromHandOrDiscardIntoDeck: true,
 
   cpuMeta: {
     // Hand-value synergy hint — Cosmic Manipulation REACTS to direct-
@@ -144,7 +144,12 @@ module.exports = {
         ps.mainDeck.push(name);
         shuffled++;
       }
-      if (shuffled > 0) engine.shuffleDeck(pi, 'main');
+      if (shuffled > 0) {
+        engine.shuffleDeck(pi, 'main');
+        // Hatusbals Bonus: laeuft nicht ueber `actionMulliganCards`,
+        // meldet deshalb selbst — EINMAL mit der Gesamtzahl.
+        await engine.noteShuffledBack(pi, shuffled, CARD_NAME);
+      }
     }
 
     // ── Step 3: Place 1 Change Counter per shuffled card on a self-

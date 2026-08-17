@@ -20,7 +20,7 @@
 //  discard zone (activeIn includes 'discard').
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME  = 'Staff of Illusions';
 const COST_PER_LEVEL = 10;
@@ -35,14 +35,14 @@ function buildCreatureGallery(ps, cardDB, engine, pi) {
 
   for (const cn of (ps.mainDeck || [])) {
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     const lvl = effLvl(cd);
     if (lvl > MAX_LEVEL) continue;
     if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'deck', level: lvl });
   }
   for (const cn of (ps.hand || [])) {
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     const lvl = effLvl(cd);
     if (lvl > MAX_LEVEL) continue;
     if (!entries.has(cn)) entries.set(cn, { name: cn, source: 'hand', level: lvl });
@@ -250,6 +250,26 @@ module.exports = {
           continue;
         }
 
+        // ── Zurueckmisch-Sperre (v430, Hatusbal) ──────────────────
+        // Kontrolliert der Gegner Hatusbal, the Leader of Tusca, darf
+        // hier nichts ins eigene Deck zurueck. Der Eintrag bleibt in
+        // `remaining`, die geliehene Creature bleibt also auf dem Brett
+        // und wird PERMANENT.
+        //
+        // ★ DAS IST ALS GEWOLLTE FOLGE (Ruling 16.8.), kein Bug —
+        // nicht "reparieren". Und es ist NICHT der Distracting-Crystal-
+        // Fall: der sperrt nur Hand und Ablage, eine Brettquelle laeuft
+        // an ihm vorbei. Deshalb hier OHNE `fromHandOrDiscard`.
+        if (!entry.oppTurnPending && ctx.activePlayer === entry.opponent
+            && engine.shuffleBackIntoOwnDeckBlocked(entry.owner)) {
+          engine.log('staff_illusion_return_blocked', {
+            player: gs.players[entry.owner]?.username,
+            creature: entry.creatureName,
+          });
+          remaining.push(entry);
+          continue;
+        }
+
         // Return condition: it's the end of the opponent's (non-pending) turn
         if (!entry.oppTurnPending && ctx.activePlayer === entry.opponent) {
           // Find the creature instance
@@ -276,6 +296,9 @@ module.exports = {
             // Return to deck and shuffle
             ps.mainDeck.push(entry.creatureName);
             engine.shuffleDeck(entry.owner);
+            // Eine einzelne Karte — loest Hatusbals 2er-Schwelle nie
+            // aus, wird aber der Vollstaendigkeit halber gemeldet.
+            await engine.noteShuffledBack(entry.owner, 1, CARD_NAME);
             engine._untrackCard(inst.id);
 
             engine.log('staff_illusion_return', {

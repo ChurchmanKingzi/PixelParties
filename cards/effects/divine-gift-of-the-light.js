@@ -15,6 +15,10 @@
 //  (matters for Nao's overheal passive).
 // ═══════════════════════════════════════════
 
+// Doppelschul-Karten gehoeren BEIDEN Schulen an (Als Ruling 16.8.).
+// Nie `spellSchool1 === …` vergleichen — siehe Helferkommentar.
+const { hasSpellSchool } = require('./_hooks');
+
 const { loadCardEffect } = require('./_loader');
 
 // ═══════════════════════════════════════════
@@ -65,7 +69,7 @@ function countTriggerSources(engine, pi) {
     for (const name of (list || [])) {
       if (name === 'Divine Gift of The Light') continue;
       const cd = cardDB[name];
-      if (!cd || cd.cardType !== 'Spell' || cd.spellSchool1 !== 'Support Magic') continue;
+      if (!cd || cd.cardType !== 'Spell' || !hasSpellSchool(cd, 'Support Magic')) continue;
       let heilt = false;
       try { heilt = !!loadCardEffect(name)?.includesHealing; } catch { heilt = false; }
       if (heilt) continue;
@@ -201,7 +205,7 @@ module.exports = {
       if (spellData.name === 'Divine Gift of The Light' || ctx.spellName === 'Divine Gift of The Light') return;
 
       // Only Support Magic Spells
-      if (spellData.spellSchool1 !== 'Support Magic') return;
+      if (!hasSpellSchool(spellData, 'Support Magic')) return;
 
       // Skip healing spells
       const script = loadCardEffect(spellData.name || ctx.spellName);

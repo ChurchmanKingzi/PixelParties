@@ -69,7 +69,7 @@
 //    accurate for "summoned this turn" reads).
 // ═══════════════════════════════════════════
 
-const { hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { isPileCreature, hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
 
 const CARD_NAME = 'Garius, the Great Reformer';
 
@@ -279,7 +279,7 @@ module.exports = {
       const repName = repPick.cardName;
       if (repName === sacName) continue;
       const repCd = cardDB[repName];
-      if (!repCd || !hasCardType(repCd, 'Creature')
+      if (!repCd || !isPileCreature(repCd)
           || engine.effectiveCardLevel(repCd, pi) > sacLevel) continue;
       if ((ps.mainDeck || []).indexOf(repName) < 0) continue;
       // Defensive canSummon re-check — gallery filter ran at picker

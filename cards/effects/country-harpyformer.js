@@ -11,6 +11,11 @@
 //    Ability from hand to gain 6 Gold.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"), analog zum Zieh-Riegel:
+// ist der Gold-Gewinn der EINZIGE Nutzen, wird die Karte gesperrt
+// statt wirkungslos zu feuern. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 const { harpyformerInherentAction, harpyformerDiscardCost } = require('./_harpyformer-shared');
 
 const CARD_NAME  = 'Country Harpyformer';
@@ -43,6 +48,11 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Nur der AKTIVE Teileffekt ist reines Gold ("discard an
+    // Adventurousness Ability to gain 6 Gold"). Die Karte selbst
+    // bleibt spielbar — Beschwoerungs-Effekt und Zusatzaktion haengen
+    // nicht am Gold.
+    if (goldGainWouldBeBlocked(ctx._engine, ctx.cardOwner)) return false;
     const ps = ctx.players[ctx.cardOwner];
     return (ps?.hand || []).includes(ABILITY_NAME);
   },

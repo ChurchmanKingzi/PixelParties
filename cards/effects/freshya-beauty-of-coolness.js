@@ -7,6 +7,11 @@
 //  play there's nothing to push onto.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Freshya, Beauty of Coolness';
 
 module.exports = {
@@ -16,6 +21,9 @@ module.exports = {
   canActivateHeroEffect(ctx) {
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
+    // Ohne den 3er-Zug bliebe nur der Verlust einer Handkarte an den
+    // Coolness Stack — Als Ruling: dann nicht aktivierbar.
+    if (drawWouldBeBlocked(engine, pi, 3)) return false;
     if (!engine.hasCoolnessStack(pi)) return false;
     const ps = engine.gs.players[pi];
     return Array.isArray(ps?.hand) && ps.hand.length > 0;

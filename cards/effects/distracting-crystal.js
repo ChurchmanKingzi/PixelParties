@@ -17,7 +17,7 @@
 //     `doActivate*` / `doConfirmPotion` /
 //     `doUseArtifactEffect` handler and rejects
 //     a play whose script declares
-//     `shufflesIntoDeck: true` while the
+//     `shufflesFromHandOrDiscardIntoDeck: true` while the
 //     activator's hand still contains a copy.
 //     Same set of cards "No Retreat!" can negate.
 // ═══════════════════════════════════════════

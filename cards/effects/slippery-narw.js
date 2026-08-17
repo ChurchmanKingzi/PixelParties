@@ -19,7 +19,7 @@
 //  pick. "May" wording on both clauses.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 const { onSlipperyTurnStart, slipperyOnMoveGate } = require('./_slippery-shared');
 
 const CARD_NAME = 'Slippery Narw';
@@ -36,7 +36,7 @@ function buildTutorGallery(engine, pi) {
       const key = name + ':' + source;
       if (seen.has(key)) continue;
       const cd = cardDB[name];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
+      if (!cd || !isPileCreature(cd)) continue;
       seen.add(key);
       out.push({ name, source });
     }

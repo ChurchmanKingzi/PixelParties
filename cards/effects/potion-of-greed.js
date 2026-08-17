@@ -12,6 +12,11 @@
 //  immediately, forfeiting the Action slot.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Potion of Greed';
 
 module.exports = {
@@ -24,7 +29,11 @@ module.exports = {
   // Action slot was already used or never going to fire) or a
   // confusing retroactive lock — the card text reads "Skip your
   // Action Phase", which presupposes the phase hasn't started yet.
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
+    // Ohne den Zug bliebe nur der Nachteil ("Skip your Action Phase") —
+    // Als Ruling: dann ist die Karte gesperrt. Der Zug geht aus dem
+    // POTION-Deck, zaehlt aber genauso.
+    if (drawWouldBeBlocked(engine, pi, 2)) return false;
     const ps = gs.players[pi];
     if (!ps) return false;
     if (ps.handLocked) return false;

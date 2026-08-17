@@ -48,7 +48,7 @@
 //    matches Alex / Training / Kassaran.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Kit, the Shark Researcher';
 const HOPT_A = 'kit-mode-A';
@@ -103,7 +103,7 @@ function _collectDeckCreatures(engine, pi) {
   const counts = {};
   for (const cn of ps.mainDeck) {
     const cd = cardDB[cn];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     counts[cn] = (counts[cn] || 0) + 1;
   }
   return Object.entries(counts)

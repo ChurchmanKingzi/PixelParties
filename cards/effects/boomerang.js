@@ -40,25 +40,9 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { getCardDB } = require('./_card-db');
 
 const CARD_NAME = 'Boomerang';
-
-// Module-cached card-DB lookup so canActivate (which only gets gs / pi)
-// can still read cardType info. Same pattern Shard of Chaos uses.
-let _cardDB = null;
-function getCardDB() {
-  if (!_cardDB) {
-    const cards = JSON.parse(
-      require('fs').readFileSync(
-        require('path').join(__dirname, '..', '..', 'data', 'cards.json'),
-        'utf-8',
-      ),
-    );
-    _cardDB = {};
-    for (const c of cards) _cardDB[c.name] = c;
-  }
-  return _cardDB;
-}
 
 /** Does this player's discard pile contain at least one Artifact? */
 function hasArtifactInDiscard(ps) {

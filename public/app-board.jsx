@@ -17884,6 +17884,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const activePlayerData = gameState.players[activePlayer];
   const phaseColor = activePlayerData?.color || 'var(--accent)';
 
+  // ── AUSRUEST-WIRTSREGEL, Spiegel von `heroCanBeEquipped` ────────────
+  // Kanonisch steht die Regel in `cards/effects/_hooks.js` (v341, Als
+  // Ruling): tot, eingefroren oder bezaubert → kein Ausruesten. Der
+  // Client kann das Modul nicht laden, also EIN Spiegel hier statt
+  // handgeschriebener Teilpruefungen an jeder Stelle — genau daran ist
+  // die Regel serverseitig schon zweimal auseinandergelaufen.
+  //
+  // Wer sie aendert, aendert sie in `_hooks.js` MIT.
+  const canHeroHostEquip = (hero) => {
+    if (!hero || !hero.name) return false;
+    if (hero.hp <= 0) return false;                 // tot
+    if (hero.statuses?.frozen) return false;        // eingefroren
+    if (hero.statuses?.charmed) return false;       // bezaubert
+    return true;
+  };
+
   // Card graying logic based on phase
   const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
 
@@ -18002,6 +18018,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if ((me.creationLockedNames || []).includes(cardName)) return true;
 
     const isActionType = ACTION_TYPES.includes(card.cardType);
+    // Artifact Creature (cardType 'Artifact' + subtype 'Creature'):
+    // Al-Ruling 17.8. — in der Hand ist sie ein Artifact, aber ab dem
+    // Moment, wo sie beschworen wuerde, waere sie eine Creature. Fuer
+    // die BESCHWOERUNGSSPERREN zaehlt sie deshalb wie eine Creature und
+    // wird genauso ausgegraut. Der Server setzt dieselbe Regel in
+    // `doPlayArtifact` durch.
+    const countsAsSummon = card.cardType === 'Creature'
+      || (card.cardType === 'Artifact'
+          && (card.subtype || '').split('/').some(t => t.trim() === 'Creature'));
+    // Der isActionType-Zweig unten erreicht sie NICHT — ACTION_TYPES kennt
+    // nur Attack/Spell/Creature, eine Artifact Creature ist cardType
+    // 'Artifact'. Gespielt wird sie aber in der Main Phase, die Sperr-
+    // pruefung muss also hier stehen. Fuer normale Creatures bleibt sie
+    // dort, wo sie war.
+    if (countsAsSummon && card.cardType !== 'Creature') {
+      if (me.summonLocked) return true;
+      if ((gameState.summonBlocked || []).includes(cardName)) return true;
+    }
+
     const isSurprise = (card.subtype || '').toLowerCase() === 'surprise';
     if (currentPhase === 2 || currentPhase === 4) {
       // Surprise cards: playable if any hero has an empty surprise zone
@@ -19737,6 +19772,44 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
           if (card.cardType === 'Potion') {
             socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
+          } else if (isEquipPlayable && (gameState.ownSideSummonArtifacts || []).includes(cardName)) {
+            // Klick-zu-Beschwoeren fuer Artifact Creatures (Als Vorgabe
+            // 17.8.): „genau wie bei einer Lv-0-Creature auch." Bis dahin
+            // fielen sie in den `use_artifact_effect`-Zweig darunter und
+            // taten beim Klick nichts — spielbar waren sie nur per
+            // Drag&Drop.
+            //
+            // `isEquipPlayable` ist hier die richtige Vorbedingung: es
+            // deckt Artifact Creatures ausdruecklich mit ab und rechnet
+            // Gold inklusive Rusting Crystal, Handrabatten, Kreditrahmen
+            // und Selbstfinanzierung durch — genau Als „mit genug Gold".
+            // Welche Artifact Creatures auf der EIGENEN Seite landen,
+            // sagt der Server (`ownSideSummonArtifacts`); Powder Keg
+            // behaelt so seine eigene Ziel-Oberflaeche.
+            const acEligible = [];
+            for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+              const h = me.heroes[hi];
+              if (!h?.name || h.hp <= 0) continue;
+              const slot = findFreeSupportSlot(me, hi);
+              if (slot < 0) continue;
+              acEligible.push({ idx: hi, name: h.name, zoneSlot: slot });
+            }
+            if (acEligible.length === 1) {
+              socket.emit('play_artifact', {
+                roomId: gameState.roomId, cardName,
+                handIndex: idx, heroIdx: acEligible[0].idx,
+                zoneSlot: acEligible[0].zoneSlot,
+                clickPlaced: true,
+              });
+            } else if (acEligible.length > 1) {
+              // `isCreature: true` nur fuer Ueberschrift und Text des
+              // Panels („🐾 Summon …"); versendet wird ueber den eigenen
+              // `isArtifactCreature`-Zweig, der VOR `isCreature` steht.
+              setSpellHeroPick({
+                cardName, handIndex: idx, card,
+                eligible: acEligible, isCreature: true, isArtifactCreature: true,
+              });
+            }
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
             socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
           } else if (isEquipPlayable && card.cardType === 'Artifact') {
@@ -20902,7 +20975,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           el.classList.remove('effect-source-glow');
           void el.offsetWidth;
           el.classList.add('effect-source-glow');
-          setTimeout(() => { try { el.classList.remove('effect-source-glow'); } catch { } }, 1100);
+          // ── GLANZ AN DER KARTE, NICHT AM PLATZ (Als Report 17.8.) ────
+          // Al: beschwoert man eine Artifact Creature, leuchtet die
+          // Karte auf, die JETZT an ihrem alten Handindex liegt.
+          //
+          // Ursache: dieser Glanz wird IMPERATIV gesetzt, der Handplatz
+          // ist aber ein React-Knoten mit `key={'h-' + origIdx}` — also
+          // nach INDEX wiederverwendet. Verlaesst die Karte die Hand,
+          // ruecken die folgenden auf, React patcht am selben Knoten nur
+          // `data-card-name` und das Bild. Die von Hand gesetzte Klasse
+          // ueberlebt das und schmueckt danach eine fremde Karte.
+          // (Sie verschwindet nur zufaellig dann, wenn sich auch der
+          // `className` des Platzes aendert — deshalb Als Beobachtung,
+          // dass es „nur bei Artefakten" auftritt: zwei spielbare Karten
+          // hintereinander ergeben denselben Klassenstring.)
+          //
+          // Gegenmittel: den Glanz an die KARTE binden. Ein Beobachter
+          // auf dem Namensattribut raeumt ihn ab, sobald der Platz eine
+          // andere Karte zeigt. Der Zeitgeber bleibt als zweiter Weg.
+          const attr = el.getAttribute('data-card-name') === cardName
+            ? 'data-card-name' : 'data-hero-name';
+          let beobachter = null;
+          const glanzAus = () => {
+            try { el.classList.remove('effect-source-glow'); } catch { }
+            if (beobachter) { try { beobachter.disconnect(); } catch { } beobachter = null; }
+          };
+          try {
+            beobachter = new MutationObserver(() => {
+              if (el.getAttribute(attr) !== cardName) glanzAus();
+            });
+            beobachter.observe(el, { attributes: true, attributeFilter: [attr] });
+          } catch { /* ohne Beobachter bleibt es beim Zeitgeber */ }
+          setTimeout(glanzAus, 1100);
         });
       } catch { /* rein kosmetisch */ }
     };
@@ -28050,8 +28154,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })();
           const equipIneligible = (!isOpp || playDrag?.isFreeSideEquip) && playDrag && playDrag.isEquip && (() => {
             const hero = heroes[i];
-            if (!hero || !hero.name || hero.hp <= 0) return true;
-            if (hero.statuses?.frozen) return true; // Can't equip to frozen heroes
+            // Wirtsregel zentral (tot / eingefroren / bezaubert). Vorher
+            // stand hier eine Teilpruefung ohne `charmed` — ein bezauberter
+            // Held sah damit als Ziel gueltig aus, und der Server lehnte ab.
+            if (!canHeroHostEquip(hero)) return true;
+            // KARTENEIGENE Ausruestbeschraenkung (Crusader's: nur Cecilia).
+            // Der Server veroeffentlicht sie je Handkarte, weil der Client
+            // die Kartenskripte nicht kennt. Nur Karten MIT Beschraenkung
+            // stehen in der Liste — fuer alle anderen aendert sich nichts.
+            if (!isOpp) {
+              const erlaubt = (gameState.equipEligibleHeroes || {})[playDrag.cardName];
+              if (Array.isArray(erlaubt) && !erlaubt.includes(i)) return true;
+            }
             const supZ = supZones[i] || [];
             for (let z = 0; z < 3; z++) { if ((supZ[z] || []).length === 0) return false; }
             return true;
@@ -29153,7 +29267,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
               const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid;
-              const isDragInvalidZone = (isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget;
+              // Zonen-Ausgrauen beim Ausruestungs-Drag (Als Vorgaben 17.8.).
+              // Bisher dimmte ein Equip-Drag ueberhaupt KEINE Zone — die
+              // Bedingung unten kennt nur Creature- und Attachment-Draege.
+              // Zwei Gruende, beide auf der EIGENEN Seite:
+              //   1. der Wirt kann gar nicht ausgeruestet werden (tot,
+              //      eingefroren, bezaubert) — dieselbe Regel, die die
+              //      Heldenkachel schon graut;
+              //   2. die Karte selbst laesst diesen Helden nicht zu
+              //      (Crusader's: nur Cecilia).
+              // Die GEGNERseite bleibt aussen vor: dort gelten eigene
+              // Pfade, und Cross-Side-Equip (Powder Keg) darf laut
+              // Kartentext ausdruecklich auf tote/eingefrorene Wirte.
+              const isEquipZoneDim = !isOpp && !!playDrag?.isEquip && (() => {
+                if (!canHeroHostEquip((p.heroes || [])[i])) return true;
+                const erlaubt = (gameState.equipEligibleHeroes || {})[playDrag.cardName];
+                return Array.isArray(erlaubt) && !erlaubt.includes(i);
+              })();
+              const isDragInvalidZone = ((isDraggingCreature || isDraggingAttachment || _isCrossSideCreatureDrag) && !isDragValidZoneAny && !isBouncePlaceTarget)
+                || isEquipZoneDim;
               // heroAction: dim zones for non-Coffee heroes
               const isHeroActionZoneDimmed = heroActionActive && !isDraggingCreature && !isDraggingAttachment && i !== heroActionHeroIdx;
               // Additional Action provider selection highlight
@@ -32364,6 +32496,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     socket.emit('effect_prompt_response', {
                       roomId: gameState.roomId,
                       response,
+                    });
+                  } else if (pick.isArtifactCreature) {
+                    // Artifact Creature: derselbe Picker, aber der Weg
+                    // aufs Feld ist `play_artifact` (doPlayArtifact hat
+                    // den isArtifactCreature-Zweig), nicht play_creature.
+                    // MUSS vor `pick.isCreature` stehen — die Ueberschrift
+                    // kommt ueber genau diese Fahne.
+                    socket.emit('play_artifact', {
+                      roomId: gameState.roomId, cardName: pick.cardName,
+                      handIndex: pick.handIndex, heroIdx: h.idx,
+                      zoneSlot: h.zoneSlot,
+                      clickPlaced: true,
                     });
                   } else if (pick.isCreature) {
                     socket.emit('play_creature', {

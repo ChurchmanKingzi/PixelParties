@@ -37,6 +37,10 @@
 //  normal silenced-while-disabled rules).
 // ═══════════════════════════════════════════
 
+// Doppelschul-Karten gehoeren BEIDEN Schulen an (Als Ruling 16.8.).
+// Nie `spellSchool1 === …` vergleichen — siehe Helferkommentar.
+const { hasSpellSchool } = require('./_hooks');
+
 const CARD_NAME = 'Thalia, the Fun Fairy';
 
 /**
@@ -103,7 +107,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx) {
     if (!cardData) return 0;
     if (cardData.cardType !== 'Spell') return 0;
-    if (cardData.spellSchool1 !== 'Support Magic') return 0;
+    if (!hasSpellSchool(cardData, 'Support Magic')) return 0;
     return getThaliaFriendshipLevel(engine, ownerIdx);
   },
 

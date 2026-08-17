@@ -36,6 +36,11 @@
 //  Creature"). Mandatory choice: draw 1 OR gain 4 Gold.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
+// solange der Gewinn gesperrt ist — statt eine Wahl anzubieten, die
+// nichts bringt. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 const CARD_NAME = 'Chosen Sacrifice';
 
 module.exports = {
@@ -60,7 +65,9 @@ module.exports = {
         description: 'You sacrificed Chosen Sacrifice — choose your reward:',
         options: [
           { id: 'draw', label: '🃏 Draw 1 card' },
-          { id: 'gold', label: '💰 Gain 4 Gold' },
+          // Gold-Option nur, wenn der Gewinn nicht gesperrt ist.
+          ...(goldGainWouldBeBlocked(engine, pi)
+            ? [] : [{ id: 'gold', label: '💰 Gain 4 Gold' }]),
         ],
         cancellable: false,
         gerrymanderEligible: true,

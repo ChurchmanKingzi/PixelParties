@@ -20,7 +20,7 @@
 //  (_illusionSummon) as Staff of Illusions.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Create Illusion';
 
@@ -70,7 +70,7 @@ module.exports = {
       for (const cn of (ps.mainDeck || [])) {
         if (seen.has(cn)) continue;
         const cd = cardDB[cn];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isPileCreature(cd)) continue;
         if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         seen.add(cn);
         galleryCards.push({ name: cn, source: 'deck' });

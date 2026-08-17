@@ -5,8 +5,18 @@
 //  counter.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"), analog zum Zieh-Riegel:
+// ist der Gold-Gewinn der EINZIGE Nutzen, wird die Karte gesperrt
+// statt wirkungslos zu feuern. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 module.exports = {
   hooks: {},
+
+  // Der Gewinn (10 Gold) IST die ganze Karte — ohne ihn bleibt nichts.
+  canActivate(gs, pi, engine) {
+    return !goldGainWouldBeBlocked(engine, pi);
+  },
 
   // CPU brain hint — the entire on-play value of this card is the +10 Gold
   // it grants. Without this, `estimateHandCardValueFor` rates Treasure Chest

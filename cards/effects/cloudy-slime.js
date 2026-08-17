@@ -7,7 +7,7 @@
 //  At the start of owner's turn, gain 1 level.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 module.exports = {
   activeIn: ['support'],
@@ -38,7 +38,7 @@ module.exports = {
       for (const name of (ps.hand || [])) {
         if (seen.has(name)) continue;
         const c = cardDB[name];
-        if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
+        if (c && isPileCreature(c) && (c.level || 0) === 0) {
           seen.add(name);
           eligibleCards.push({ name, source: 'hand' });
         }
@@ -105,7 +105,7 @@ module.exports = {
           if (currentSeen.has(name)) continue;
           if (ohneZone.has(name)) continue;
           const c = cardDB[name];
-          if (c && hasCardType(c, 'Creature') && (c.level || 0) === 0) {
+          if (c && isPileCreature(c) && (c.level || 0) === 0) {
             currentSeen.add(name);
             currentEligible.push({ name, source: 'hand' });
           }

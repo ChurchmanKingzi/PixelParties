@@ -103,8 +103,76 @@ body {
   font-size: 13px;
 }
 .btn:hover { background: rgba(0,240,255,.18); box-shadow: 0 0 15px rgba(0,240,255,.25); }
-.btn:active { transform: scale(.97); }
+.btn:active { transform: scale(.97) translateY(1px); }
 .btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── VOLUMEN UND GLANZ FUER ALLE KNOEPFE ──────────────────────────────
+   Al: „einfarbige Kaesten … mache sie schoener" (v469).
+
+   ── Die Ruckel-Episode, damit sie nicht wiederkommt (v470-v472) ──
+   Nach v469 fuehlte sich die Seite ruckelig an, bis in die
+   Tastatureingabe. Ursache war NICHT diese Gestaltung, sondern eine
+   abgeschaltete Grafikbeschleunigung in Als Opera (`opera://gpu` meldete
+   „Software only" fuer Compositing UND Rasterization) — in Firefox war
+   dieselbe Seite fluessig. Alles wurde auf der CPU gezeichnet.
+
+   Zurueck ist deshalb: der Verlauf (statisch) und der Glanz als
+   OPACITY-Blende (uebernimmt der Compositor).
+   NICHT zurueck ist der wandernde Streifen aus v469 — der lief ueber
+   eine Transition auf `background-position`, und die zeichnet auf JEDEM
+   Knopf jeden Frame neu. Das war unabhaengig von Als Browser einfach
+   teuer und wird nicht wiederhergestellt.
+
+   Aus Pseudoelementen, weil die Farbvarianten (`.btn-danger`, `-gold`,
+   … plus Dutzende inline gesetzte Hintergruende) `background` als
+   KURZFORM ueberschreiben: ein Verlauf direkt auf `.btn` waere bei jeder
+   einzelnen sofort weg.
+
+   Groesse, Innenabstand, Schrift, Rahmen und Ecken bleiben unangetastet —
+   `.btn` steckt auch im Spielbrett, Deckbau und Puzzle-Editor. */
+.btn { position: relative; }
+
+/* Verlauf: Lichtkante oben, Schattenfuss unten. Statisch, also einmal je
+   Neuzeichnen und nicht je Frame. */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.17) 0%,
+    rgba(255,255,255,.05) 45%,
+    rgba(0,0,0,.10) 55%,
+    rgba(0,0,0,.26) 100%);
+}
+
+/* Glanz beim Ueberfahren — als Blende, nicht als Wanderung. Ausserhalb
+   des Hovers voellig durchsichtig und damit gar nicht erst gezeichnet. */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg,
+    transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%);
+  transition: opacity .22s ease;
+}
+.btn:hover::after { opacity: 1; }
+
+/* Gedrueckt: die Lichtkante kippt, der Knopf wirkt eingedrueckt. */
+.btn:active::before {
+  background: linear-gradient(180deg, rgba(0,0,0,.22) 0%, rgba(255,255,255,.10) 100%);
+}
+
+/* Deaktiviert bleibt flach — ein plastischer Knopf sieht anklickbar aus. */
+.btn:disabled::before,
+.btn:disabled::after { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn::after { transition: none; }
+}
+}
 .btn-danger { border-color: var(--danger); color: var(--danger); background: rgba(255,51,102,.08); }
 .btn-danger:hover { background: rgba(255,51,102,.18); box-shadow: 0 0 15px rgba(255,51,102,.25); }
 .btn-success { border-color: var(--success); color: var(--success); background: rgba(51,255,136,.08); }
@@ -924,6 +992,33 @@ select optgroup {
 .google-btn:hover:not(:disabled) { background: #1f2023; border-color: #8a8f93; }
 .google-btn:disabled { opacity: .6; cursor: default; }
 .google-btn svg { flex: 0 0 auto; }
+
+/* Auffaelligere Variante fuer den Login-Screen (Als Vorgabe 17.8.:
+   „der Sign-in-Button muss offensichtlicher sein"). Die Google-Marke
+   schreibt Farbe und Form des Knopfes vor — deshalb bleibt die
+   Flaeche wie sie ist, und die Aufmerksamkeit kommt ueber Groesse,
+   einen Akzentrahmen und ein ruhiges Pulsieren. Nur diese Variante,
+   damit der Knopf anderswo unveraendert bleibt. */
+.google-btn--prominent {
+  width: 320px; height: 52px; font-size: 15px; font-weight: 600;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent),
+              0 6px 18px rgba(0, 0, 0, .45);
+  animation: googleBtnPulse 2.4s ease-in-out infinite;
+}
+.google-btn--prominent:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+@keyframes googleBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 18px rgba(0,0,0,.45); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent), 0 6px 22px rgba(0,0,0,.5); }
+}
+/* Bewegungsempfindliche Nutzer: Groesse und Rahmen bleiben, das
+   Pulsieren faellt weg. */
+@media (prefers-reduced-motion: reduce) {
+  .google-btn--prominent { animation: none; }
+}
 .auth-step-title {
   font-family: var(--font-display), sans-serif; font-weight: 700; font-size: 15px;
   color: var(--text); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
@@ -12492,6 +12587,77 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .badge { border-radius: 0; border: 3px solid currentColor; }
 
 /* 8 ── Auth/login panel: drop the frosted glass for a flat pixel window */
+/* ── REITER „LOG IN" / „SIGN UP" (Als Vorgabe 17.8.) ─────────────────
+   „Sollten deutlicher sichtbar und mittig statt linksbuendig sein."
+
+   Bewusst NUR im Login-Bildschirm (`.auth-screen` davor): `.tab` ist
+   eine allgemeine Klasse, und die Grundfassung — klein, gedaempft,
+   linksbuendig — ist ueberall sonst genau richtig.
+
+   „Deutlicher" kommt aus drei Richtungen zusammen, nicht aus einer
+   einzigen grellen: groessere Schrift mit mehr Laufweite, ein hoeherer
+   Kontrast auch im INAKTIVEN Zustand (vorher `--text2`, das las sich
+   wie ausgegraut), und ein kraeftigerer Unterstrich beim aktiven Reiter.
+   Beide gleich breit, damit das Paar symmetrisch in der Mitte sitzt. */
+.auth-screen .tab-bar {
+  justify-content: center;
+}
+.auth-screen .tab {
+  flex: 0 0 auto;
+  min-width: 118px;
+  text-align: center;
+  padding: 10px 22px;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  color: var(--text);
+  opacity: .62;                 /* gedaempft, aber nicht ausgegraut */
+  border-bottom-width: 3px;
+  margin-bottom: -3px;
+}
+.auth-screen .tab:hover { opacity: .85; }
+.auth-screen .tab.active {
+  opacity: 1;
+  color: var(--accent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* ── STANDARD-ZOOM DES LOGIN-FENSTERS (Als Vorgabe 17.8.) ────────────
+   „Erhoehe den Standard-Zoom fuer das Main-Login-Interface um 2 Stufen."
+   Zwei Stufen der ueblichen Zoom-Leiter sind 1.1 × 1.1 = 1.21.
+
+   `zoom` statt `transform: scale()`, weil zoom die Groesse WIRKLICH
+   veraendert: der Kasten belegt entsprechend mehr Platz und bleibt
+   sauber zentriert. `scale()` haette ihn nur optisch gedehnt und ueber
+   den Bildschirmrand laufen lassen, ohne dass das Layout es merkt.
+
+   Als Variable, damit eine weitere Stufe eine Zahl ist: 1.331 waere
+   drei, 1.1 eine. */
+/* ★ NACHBESSERUNG (v471): der Zoom sitzt jetzt auf dem INHALT, nicht
+   auf dem Kasten. In v466 lag er auf `.panel` — und damit auch auf der
+   `.auth-panel-explosion`, die viewport-gross ist UND dauernd animiert.
+   Sie musste per Gegen-Zoom zurueckgerechnet werden, und eine
+   fortlaufend animierte, viewport-grosse Ebene in einem gezoomten
+   Teilbaum schaltet die Schnellpfade des Browsers ab: jeder
+   Animationsframe zeichnet den halben Bildschirm neu, inklusive
+   Formular. Das passt zu Als Bild „Eingaben kommen mit Verzoegerung".
+
+   Jetzt zoomt nur `.auth-panel-content` (das Formular). Die
+   Explosionsebene liegt daneben und bleibt voellig unberuehrt — kein
+   Gegen-Zoom noetig. Die Breite des Kastens ist dafuer im JSX von 380
+   auf 460 gesetzt (380 × 1.21), damit der Inhalt hineinpasst. */
+.auth-screen .auth-panel-content {
+  --auth-zoom: 1.21;
+  zoom: var(--auth-zoom);
+}
+
+/* Auf schmalen Schirmen zurueck auf Normalgroesse: 460px sprengen ein
+   Telefon. Die Kastenbreite deckelt dort das `max-width` unten mit. */
+@media (max-width: 560px) {
+  .auth-screen .auth-panel-content { --auth-zoom: 1; }
+  .auth-screen .panel { max-width: calc(100vw - 24px); }
+}
+
 .auth-screen .panel {
   border-radius: 0;
   -webkit-backdrop-filter: none;

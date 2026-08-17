@@ -289,7 +289,11 @@ module.exports = {
     // Zielliste, die per Konstruktion nur gegnerische Eintraege enthaelt).
     const placed = await engine.summonCreatureWithHooks(
       CARD_NAME, hostOwner, hostHeroIdx, freeSlot,
-      { source: CARD_NAME, isPlacement: true, crossSidePlacement: true },
+      // `selfPlacement: true` ist der Opt-in fuer den Artifact-Creature-Riegel
+      // in `summonCreatureWithHooks` (Als Ruling 17.8.): eine Artifact Creature
+      // darf nur von sich selbst platziert werden, nie von einem fremden Effekt
+      // als Creature beschworen. Powder Keg IST diese eine Stelle.
+      { source: CARD_NAME, isPlacement: true, crossSidePlacement: true, selfPlacement: true },
     );
     if (!placed?.inst) return { aborted: true };
 

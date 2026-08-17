@@ -83,6 +83,9 @@ const HOOKS = {
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
+  // Ein Effekt hat Karten ins eigene Deck zurueckgemischt. `count` ist
+  // die Zahl DIESES Effekts, nicht der Rundensumme (Hatusbal).
+  ON_SHUFFLED_BACK_TO_DECK: 'onShuffledBackToDeck',
   ON_RESOURCE_SPEND: 'onResourceSpend',
   // NACH der Buchung: der Kontostand steht dann schon auf dem neuen
   // Wert und die Anzeige ist synchronisiert. Fuer Effekte, die das
@@ -386,6 +389,37 @@ function hasCardType(cd, type) {
 }
 
 /**
+ * Gehoert die Karte dieser Zauberschule an?
+ *
+ * ALS RULING (16.8., verbindlich): eine Karte, die "zum Teil"
+ * Support Magic ist, ZAEHLT als Support Magic — Friendship sperrt sie.
+ * Allgemein: eine Doppelschul-Karte gehoert BEIDEN Schulen an, so wie
+ * es die Level-Deckung (`schools.push(s1); schools.push(s2)`) und rund
+ * zwanzig Kartenskripte (Holy Cheese, Angry Cheese, Taio, Demon's
+ * Gate …) seit jeher handhaben.
+ *
+ * WARUM ES EINEN HELFER BRAUCHT: seit der Regel "Doppelschulen stehen
+ * ALPHABETISCH" (Als Regel 11.8.) ist die Reihenfolge kein Design mehr,
+ * sondern Sortierung. "Support Magic" sortiert hinter alle anderen
+ * fuenf Schulen — es landet also bei JEDER Doppelschul-Karte in
+ * `spellSchool2`. Ein `cd.spellSchool1 === 'Support Magic'` uebersieht
+ * damit systematisch alle sechs solchen Spells (Dangerous Knowledge,
+ * Energy Drain, Holy Selection, Sacrifice to Divinity, The Light
+ * Brigade Marches, Spectral Armor). Genau so war es an zehn Stellen.
+ *
+ * Fuer JEDE kuenftige Schulabfrage diesen Helfer nehmen, nie ein
+ * Feld einzeln vergleichen.
+ *
+ * @param {object} cd     Kartendaten aus cards.json
+ * @param {string} school z.B. 'Support Magic'
+ * @returns {boolean}
+ */
+function hasSpellSchool(cd, school) {
+  if (!cd || !school) return false;
+  return cd.spellSchool1 === school || cd.spellSchool2 === school;
+}
+
+/**
  * "Artifact-Creature" hybrid: a card whose cardType is `Artifact` AND whose
  * subtype contains `Creature` (Pollution Spewer is the reference implementation).
  * Plays like an Artifact — pays gold, goes to a Support Zone during Main
@@ -401,6 +435,44 @@ function hasCardType(cd, type) {
 function isArtifactCreature(cd) {
   if (!cd) return false;
   return cd.cardType === 'Artifact' && hasCardType(cd, 'Creature');
+}
+
+/**
+ * ALS RULING (17.8., spielweit): **eine Artifact Creature ist NUR auf dem
+ * Spielfeld eine Creature.** Ausserhalb — Hand, Deck, Ablagestapel,
+ * Loeschstapel, Side Deck — zaehlt sie ausschliesslich als Artifact.
+ *
+ * Das ist keine neue Erfindung, sondern die Verallgemeinerung des
+ * gedruckten Textes: Powder Keg sagt woertlich "**While this card is
+ * placed into a Support Zone**, it is treated as a Creature", und
+ * Pollution Spewer "Place this into the free Support Zone of a Hero you
+ * control **as a Creature**". Die Kartenwerdung haengt also an der
+ * Support Zone. Ab jetzt gilt derselbe Satz fuer alle sieben
+ * Artifact-Creatures und fuer jede kuenftige.
+ *
+ * DIE GRENZE IST DIE SUPPORT ZONE, nicht "das Brett": in der Surprise
+ * Zone liegt die Karte verdeckt und ist noch in keiner Support Zone.
+ *
+ * WANN DIESEN HELFER NEHMEN: immer dann, wenn ein Effekt einen STAPEL
+ * nach Creatures durchsucht, zaehlt oder daraus beschwoert/belebt —
+ * Tutor-Suchen, Wiederbelebungen aus der Ablage, "je Creature in deinem
+ * Ablagestapel". Fuer Karten, die bereits IN einer Support Zone liegen
+ * (Instanz-Scans ueber `cardInstances`, `supportZones`, Todesereignisse),
+ * bleibt `hasCardType(cd, 'Creature')` richtig — dort IST sie eine
+ * Creature.
+ *
+ * Merkhilfe fuer den Unterschied: `hasCardType` fragt "was steht auf der
+ * Karte?", `isPileCreature` fragt "was ist sie DORT, wo sie liegt?".
+ *
+ * Karten mit `cardType === 'Creature'` sind nicht betroffen — der Fall
+ * entsteht ausschliesslich ueber den `subtype`-Zweig in `hasCardType`.
+ * Creature-TOKEN behalten ihre Creature-Eigenschaft ueberall: sie sind
+ * keine Artifacts.
+ */
+function isPileCreature(cd) {
+  if (!cd) return false;
+  if (isArtifactCreature(cd)) return false;
+  return hasCardType(cd, 'Creature');
 }
 
 /**
@@ -619,7 +691,7 @@ module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
-  hasCardType, isArtifactCreature, hasNumericCreatureLevel, isCreatureNegated,
+  hasCardType, hasSpellSchool, isArtifactCreature, isPileCreature, hasNumericCreatureLevel, isCreatureNegated,
   heroCanBeEquipped,
   isOwnSideSummonableCreature,
   resolveSourceCreature, isCreatureSource,

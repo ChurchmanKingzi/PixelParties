@@ -7,7 +7,8 @@
 //  (see Magnetic Glove) with a type filter.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
+const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
   blockedByHandLock: true,
@@ -19,7 +20,7 @@ module.exports = {
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
     // Must have at least one Creature in deck
     const cardDB = _getCardDB();
-    return (gs.players[pi]?.mainDeck || []).some(name => hasCardType(cardDB[name], 'Creature'));
+    return (gs.players[pi]?.mainDeck || []).some(name => isPileCreature(cardDB[name]));
   },
 
   // No board targets — self-targeting effect
@@ -48,7 +49,7 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const countMap = {};
     for (const cardName of (ps.mainDeck || [])) {
-      if (!hasCardType(cardDB[cardName], 'Creature')) continue;
+      if (!isPileCreature(cardDB[cardName])) continue;
       countMap[cardName] = (countMap[cardName] || 0) + 1;
     }
 
@@ -71,7 +72,7 @@ module.exports = {
 
     // Verify the card is actually in the deck and is a Creature
     if (ps.mainDeck.indexOf(result.cardName) < 0) return;
-    if (!hasCardType(cardDB[result.cardName], 'Creature')) return;
+    if (!isPileCreature(cardDB[result.cardName])) return;
 
     // Route through the canonical helper so on-card-added-to-hand
     // fires — Cosmic Depths Analyzer / Gatherer key off this hook
@@ -85,15 +86,3 @@ module.exports = {
     });
   },
 };
-
-// Module-level card DB loader (cached) for canActivate (no engine context)
-let _cardDBCache = null;
-function _getCardDB() {
-  if (_cardDBCache) return _cardDBCache;
-  try {
-    const allCards = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../../data/cards.json'), 'utf-8'));
-    _cardDBCache = {};
-    allCards.forEach(c => { _cardDBCache[c.name] = c; });
-    return _cardDBCache;
-  } catch { return {}; }
-}

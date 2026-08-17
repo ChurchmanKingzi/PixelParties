@@ -22,7 +22,7 @@
 //      calling context about the redirect
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Deepsea Encounter';
@@ -77,7 +77,7 @@ module.exports = {
         if (name === bouncedName) continue;
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isPileCreature(cd)) continue;
         // Effective level honours hand-active reducers (Whoolmoth, …).
         if (engine.effectiveCardLevel(cd, pi) > maxLevel) continue;
         return true;
@@ -116,7 +116,7 @@ module.exports = {
       if (n === bouncedName) continue;
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];
-      if (!cd || !hasCardType(cd, 'Creature')) continue;
+      if (!cd || !isPileCreature(cd)) continue;
       const lvl = engine.effectiveCardLevel(cd, pi);
       if (lvl > maxLevel) continue;
       seen.add(n);

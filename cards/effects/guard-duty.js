@@ -22,7 +22,7 @@ module.exports = {
   inherentAction: true, // Free additional Action — no main-action cost.
   // Shuffles discard pile back into deck — flagged for "No Retreat!"
   // detection.
-  shufflesIntoDeck: true,
+  shufflesFromHandOrDiscardIntoDeck: true,
 
   spellPlayCondition(gs, pi) {
     return !gs[ONCE_PER_GAME_KEY]?.[pi];
@@ -52,6 +52,10 @@ module.exports = {
         ps.discardPile = [];
         engine.shuffleDeck(pi, 'main');
         engine.log('guard_duty_shuffle_self', { player: ps.username, moved });
+        // Hatusbals Bonus: diese Karte geht an `actionRecycleCards`
+        // vorbei (sie schiebt die GANZE Ablage in einem Rutsch), meldet
+        // ihren Effekt also selbst.
+        await engine.noteShuffledBack(pi, moved, CARD_NAME);
       }
 
       // Step 2: prompt opponent (yes/no). Fizzle silently if opp's

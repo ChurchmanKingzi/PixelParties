@@ -5,6 +5,11 @@
 //  No hand size limit during your first turn.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
+// solange der Gewinn gesperrt ist — statt eine Wahl anzubieten, die
+// nichts bringt. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -82,7 +87,9 @@ module.exports = {
         description: "Willy's Luck! Choose your reward:",
         options: [
           { id: 'draw', label: '🃏 Draw 5 Cards', description: 'Draw 5 cards from your deck.', color: '#4488ff' },
-          { id: 'gold', label: '💰 Gain 30 Gold', description: 'Add 30 Gold to your treasury.', color: '#ffcc00' },
+          // Gold-Option nur, wenn der Gewinn nicht gesperrt ist.
+          ...(goldGainWouldBeBlocked(engine, pi)
+            ? [] : [{ id: 'gold', label: '💰 Gain 30 Gold', description: 'Add 30 Gold to your treasury.', color: '#ffcc00' }]),
         ],
         cancellable: false,
         gerrymanderEligible: true, // 5 cards vs 30 gold are distinct mechanical effects.

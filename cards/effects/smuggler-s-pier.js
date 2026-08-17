@@ -284,7 +284,11 @@ module.exports.cpuResponse = function cpuResponse(engine, kind, promptData) {
     if ((ps.gold || 0) < cost) return false;
     const deck = ps.mainDeck || [];
     if (deck.length < cards) return false;
-    await engine._payCardCost(pi, cost);
+    // `eng` ist im Rollout die SIMULIERTE Engine, `cpuIdx` der Spieler
+    // dieses Aufrufs. Vorher stand hier `engine._payCardCost(pi, …)`:
+    // `pi` gibt es in diesem Bereich gar nicht (ReferenceError), und
+    // `engine` haette waehrend jedes Rollouts die ECHTE Partie belastet.
+    await eng._payCardCost(cpuIdx, cost);
     for (let i = 0; i < cards; i++) ps.hand.push(deck.shift());
     ps.handLocked = true;
     return true;

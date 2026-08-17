@@ -338,6 +338,11 @@ function AnimatedTitleBackdrop() {
 // stacking context). Same independent floats + screen-shake as the main scene
 // — in sync because both mount together. pointer-events:none so clicks still
 // reach the form beneath.
+// Wie weit `cat_mid` nach links rueckt, damit sie den Login-Kasten
+// freigibt. 8vw sind bei 1900px Breite gut 150px — der Kasten ist mit
+// dem v466-Zoom rund 460px breit und beginnt damit bei etwa 38 %.
+const KATZE_LINKS = '8vw';
+
 function AnimatedTitleCatsOverlay() {
   const layer = (file, extra) => ({
     position: 'absolute', inset: 0, willChange: 'transform',
@@ -348,7 +353,22 @@ function AnimatedTitleCatsOverlay() {
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
         <div style={layer('cat_top.png', { transformOrigin: '23% 5%', '--mx': '0.729vw', '--my': '-0.833vh', '--mr': '3deg', animation: 'ab-floaty 3.4s ease-in-out -0.5s infinite' })} />
-        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' })} />
+        {/* cat_mid sass mit ihrem Bildmittelpunkt bei 37 % genau auf der
+            linken Kante des Login-Kastens und lag als Vordergrundebene
+            darueber — seit dem groesseren Zoom (v466) zu dominant.
+            Al: „muss weiter links platziert werden."
+
+            Verschoben ueber `inset` statt ueber `transform`: die Ebene
+            traegt eine laufende `ab-floaty`-Animation, und die
+            ueberschreibt jedes inline gesetzte `transform`. `inset` ist
+            davon unberuehrt. Links und rechts um denselben Betrag
+            versetzt, damit die Ebene GENAUSO BREIT bleibt — sonst
+            zieht das `100% 100%`-Hintergrundbild die Katze in die
+            Laenge.
+
+            KATZE_LINKS ist die einzige Stellschraube: groesser =
+            weiter weg vom Kasten. */}
+        <div style={layer('cat_mid.png', { inset: `0 ${KATZE_LINKS} 0 -${KATZE_LINKS}`, transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' })} />
         <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
       </div>
     </div>
@@ -404,6 +424,57 @@ function AuthScreen() {
     if (isNew) window._isNewAccount = true;
     setUser(data.user);
   };
+
+  // ── SCHNELLANMELDUNG UEBER DIE MERK-MARKE ─────────────────────────
+  // Al: „wenn ich mich danach ausloge, soll der Button mich trotzdem
+  //  sofort wieder in das alte Profil reinladen."
+  //
+  // Genau daran sind die Anlaeufe v459-v462 gescheitert, und zwar nicht
+  // an Technik, sondern an meiner Annahme: ich hatte „Sitzung" und
+  // „gemerktes Geraet" gleichgesetzt. Das Abmelden beendet eine
+  // Sitzung — es soll aber nicht das Geraet vergessen. Deshalb gibt es
+  // jetzt ZWEI Marken: `pp_token` (Sitzung, faellt beim Abmelden) und
+  // `pp_remember` (Geraet, bleibt). Der Knopf tauscht die zweite gegen
+  // eine frische Sitzung.
+  const [merkKonto, setMerkKonto] = useState(null);    // username | null
+  const [merkGeprueft, setMerkGeprueft] = useState(false);
+
+  useEffect(() => {
+    let abgebrochen = false;
+    (async () => {
+      const vorher = window.AUTH_TOKEN;
+      window.AUTH_TOKEN = null;             // das Cookie soll antworten
+      try {
+        const data = await api('/auth/remember');
+        if (!abgebrochen && data?.username) setMerkKonto(data.username);
+      } catch (_) {
+        /* Kein gemerktes Geraet — Normalfall beim ersten Besuch. */
+      } finally {
+        window.AUTH_TOKEN = vorher;
+        if (!abgebrochen) setMerkGeprueft(true);
+      }
+    })();
+    return () => { abgebrochen = true; };
+  }, []);
+
+  const schnellAnmelden = () => run(async () => {
+    if (!merkKonto) return;
+    const vorher = window.AUTH_TOKEN;
+    window.AUTH_TOKEN = null;
+    try {
+      const data = await api('/auth/remember', { method: 'POST' });
+      finishAuth(data, false);
+    } catch (err) {
+      window.AUTH_TOKEN = vorher;
+      setMerkKonto(null);
+      setError(`Quick sign-in failed: ${err?.message || 'unknown error'}`);
+    }
+  });
+
+  const geraetVergessen = () => run(async () => {
+    try { await api('/auth/remember', { method: 'DELETE' }); } catch (_) {}
+    setMerkKonto(null);
+  });
 
   const submitLogin = () => run(async () => {
     if (!identifier.trim() || !password) { setError('Fill in all fields'); return; }
@@ -545,8 +616,24 @@ function AuthScreen() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {mode === 'login' ? (
-            <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
-              onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
+            <>
+              <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
+                onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
+              {/* PLATZHALTER statt fester Pixelhoehe (Als Befund 17.8.:
+                  „wechselt man zwischen den Reitern, wechselt die Hoehe des
+                  kompletten Menue-Interfaces"). Anmelden hat eine Eingabe
+                  weniger als Registrieren — hier steht deshalb eine echte,
+                  unsichtbare Eingabe. Sie ist exakt so hoch wie die fehlende
+                  Zeile, ohne dass irgendwo eine Zahl hinterlegt werden muss:
+                  `.input` hat keine feste Hoehe, sie ergibt sich aus
+                  Schriftgroesse und Innenabstand. Ein hartkodierter Wert waere
+                  bei jeder Schrift- oder Zoomaenderung wieder falsch.
+                  `aria-hidden` + `tabIndex={-1}`: unsichtbar heisst hier auch
+                  fuer Tastatur und Screenreader nicht vorhanden. */}
+              <div aria-hidden="true" style={{ visibility: 'hidden', pointerEvents: 'none' }}>
+                <input className="input" tabIndex={-1} readOnly value="" onChange={() => {}} />
+              </div>
+            </>
           ) : (
             <>
               <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
@@ -562,14 +649,20 @@ function AuthScreen() {
           <button className="btn btn-big" onClick={mode === 'login' ? submitLogin : submitSignup} disabled={loading}>
             {loading ? '...' : mode === 'login' ? 'LOG IN' : 'SIGN UP'}
           </button>
-          {mode === 'login' && (
-            <div className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
-              Forgot your password?
-            </div>
-          )}
-          {mode === 'signup' && (
-            <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
-          )}
+          {/* Beide Fusszeilen teilen sich EIN Fach fester Mindesthoehe.
+              Sonst bliebe ein Resthuepfer: der Hinweis beim Registrieren
+              kann zweizeilig umbrechen, der Passwort-Link ist immer
+              einzeilig. 34px entsprechen zwei Zeilen à 11.5px bei
+              Zeilenhoehe 1.5. */}
+          <div style={{ minHeight: 34, display: 'flex', alignItems: 'flex-start' }}>
+            {mode === 'login' ? (
+              <div className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
+                Forgot your password?
+              </div>
+            ) : (
+              <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
+            )}
+          </div>
           {window.GOOGLE_CLIENT_ID && (
             <>
               <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
@@ -577,7 +670,7 @@ function AuthScreen() {
                 <div style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }}>
                   <button
                     type="button"
-                    className="google-btn"
+                    className="google-btn google-btn--prominent"
                     onClick={submitGoogleDesktop}
                     disabled={loading}
                   >
@@ -658,12 +751,39 @@ function AuthScreen() {
   return (
     <div className="screen-center auth-screen">
       <AnimatedTitleBackdrop />
-      <DiscordButton label="DISCORD" size={40} className="discord-btn--lg" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10 }} />
+      {/* ── ABLAGE OBEN RECHTS, nach dem Vorbild des Hauptmenues ──────
+          Gleiche Bauform wie dort: eine Spalte, `alignItems: stretch`,
+          gleicher Abstand, Discord ganz unten. Reihenfolge nach Als
+          Vorgabe (17.8.): Login, darunter Lautstaerke, darunter
+          Discord. Vorher stand der Regler allein oben links — falsch
+          platziert, weil das Hauptmenue alles rechts sammelt. */}
+      <div style={{ position: 'fixed', top: 14, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 20, zIndex: 10 }}>
+        {/* EINE ZEILE aus Knopf + Regler — exakt die Zeile, die im
+            Hauptmenue LOGOUT und den Regler traegt (gleiche Flex-Werte,
+            gleicher Abstand, gleiche Knopfmasse). Darunter Discord als
+            `block`, wie dort. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <button
+            className="btn menu-logout-btn"
+            style={{ padding: '7px 22px', fontSize: 13, opacity: merkKonto ? 1 : 0.45 }}
+            onClick={schnellAnmelden}
+            disabled={!merkKonto || !merkGeprueft || loading}
+            title={merkKonto
+              ? `Sign back in as ${merkKonto} (right-click to forget this device)`
+              : 'No remembered account on this device'}
+            onContextMenu={(e) => { e.preventDefault(); if (merkKonto) geraetVergessen(); }}
+          >
+            {merkKonto ? `LOGIN · ${merkKonto}` : 'LOGIN'}
+          </button>
+          <VolumeControl />
+        </div>
+        <DiscordButton block />
+      </div>
       {/* Shake wrapper: jolts the panel in sync with the backdrop's ab-shake
           (same 10s clock). Kept separate from the panel so its .animate-in
           entrance transform isn't clobbered by the shake transform. */}
       <div className="auth-panel-shake" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="panel animate-in" style={{ width: 380, textAlign: 'center' }}>
+        <div className="panel animate-in" style={{ width: 460, textAlign: 'center' }}>
           {/* Explosion — a full-viewport, scene-aligned layer that renders ABOVE
               the box's dithered surface but BELOW the form controls. It stays a
               child of the panel (overflow:visible) so it rides the same
@@ -1288,6 +1408,27 @@ function MainMenu() {
     setUser(null);
   };
 
+  // ── ESCAPE IM HAUPTMENUE FRAGT NACH DEM AUSLOGGEN (Als Vorgabe 17.8.) ─
+  // „Im Hauptmenue Escape zu druecken, sollte das ‚Really log out?'-
+  //  Submenue aufrufen, als haette man Logout geklickt."
+  //
+  // Nur, wenn sonst NICHTS offen ist: sonst wuerde Escape gleichzeitig
+  // das Tagesfenster schliessen UND die Abmeldefrage aufmachen. Die
+  // anderen Fenster registrieren ihre eigenen Escape-Behandlungen in der
+  // Capture-Phase und rufen `stopImmediatePropagation()` — dieser
+  // Listener haengt deshalb bewusst in der BUBBLE-Phase und kommt gar
+  // nicht erst dran, solange eines von ihnen offen ist.
+  useEffect(() => {
+    if (logoutConfirm) return;
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.repeat) return;
+      if (e.target?.closest?.('input, textarea, [contenteditable="true"]')) return;
+      setLogoutConfirm(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [logoutConfirm]);
+
   // Close the logout confirmation on Escape or an outside click.
   useEffect(() => {
     if (!logoutConfirm) return;
@@ -1540,11 +1681,16 @@ function MainMenu() {
           <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
             <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
             {logoutConfirm && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: 'var(--bg2)', border: '1px solid var(--danger)', borderRadius: 6, padding: '10px 12px', boxShadow: '0 4px 16px rgba(0,0,0,.5)', whiteSpace: 'nowrap', zIndex: 20 }}>
-                <div style={{ fontSize: 12, color: 'var(--text1)', marginBottom: 8, textAlign: 'center' }}>Really log out?</div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                  <button className="btn btn-danger" style={{ padding: '4px 16px', fontSize: 11 }} onClick={logout}>YES</button>
-                  <button className="btn" style={{ padding: '4px 16px', fontSize: 11 }} onClick={() => setLogoutConfirm(false)}>NO</button>
+              /* Eine Nummer groesser (Als Vorgabe 17.8.): Rahmen 2px,
+                 mehr Innenabstand, Text 15 statt 12, Knoepfe 13 statt 11.
+                 Die Position bleibt — das Feld haengt weiterhin unter dem
+                 LOGOUT-Knopf und rechtsbuendig, sonst wanderte es aus der
+                 Ablage heraus. */
+              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, background: 'var(--bg2)', border: '2px solid var(--danger)', borderRadius: 8, padding: '16px 20px', boxShadow: '0 6px 22px rgba(0,0,0,.6)', whiteSpace: 'nowrap', zIndex: 20 }}>
+                <div style={{ fontSize: 15, color: 'var(--text1)', marginBottom: 12, textAlign: 'center' }}>Really log out?</div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  <button className="btn btn-danger" style={{ padding: '7px 24px', fontSize: 13 }} onClick={logout}>YES</button>
+                  <button className="btn" style={{ padding: '7px 24px', fontSize: 13 }} onClick={() => setLogoutConfirm(false)}>NO</button>
                 </div>
               </div>
             )}
@@ -4108,7 +4254,15 @@ function SingleplayerScreen() {
           onViewRules={() => { setTutorialBrowserOpen(false); setShowRules(true); }}
         />
       )}
-      <div className="top-bar">
+      {/* Kopfzeile ANGEPINNT (Als Vorgabe 17.8.): Deckauswahl, Gegnersuche
+          und Titel bleiben beim Scrollen stehen. Inline statt in `.top-bar`,
+          weil die Klasse von jedem Screen benutzt wird — hier scrollt der
+          Inhalt im `screen-full`-Container, anderswo nicht.
+          `position: relative` steht in der Klasse und ankert den zentrierten
+          Titel; `sticky` uebernimmt diese Ankerrolle mit, der Titel bleibt
+          also mittig. Der eigene Hintergrund (`--bg2`) ist schon gesetzt,
+          sodass Inhalt sauber darunter durchlaeuft. */}
+      <div className="top-bar" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
         <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onBack}>← BACK</button>
         {user?.isGuest && (
           <button className="btn" style={{ padding: '5px 16px', fontSize: 13 }} onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>

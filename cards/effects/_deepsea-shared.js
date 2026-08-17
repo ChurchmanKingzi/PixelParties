@@ -45,6 +45,7 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+const { isPileCreature } = require('./_hooks');
 
 const DEEPSEA_ARCHETYPE = 'Deepsea';
 
@@ -854,7 +855,7 @@ function eligibleSwapReplacements(engine, pi, excludeName, maxLevel) {
     if (seen.has(n)) continue;
     if (n === excludeName) continue;
     const cd = cardDB[n];
-    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if (!cd || !isPileCreature(cd)) continue;
     // Effective level — per-slot offsets + active `reduceCardLevel`
     // hooks (Whoolmoth, etc.) flow through here.
     const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });

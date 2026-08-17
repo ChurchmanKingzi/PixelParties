@@ -24,6 +24,11 @@
 //     would just burn a card for nothing.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const { gigantisaursCanSummon } = require('./_gigantisaurs-shared');
 
 const CARD_NAME = 'Gigantisaur Triceras';
@@ -39,6 +44,10 @@ module.exports = {
   creatureEffect: true,
 
   canActivateCreatureEffect(ctx) {
+    // Ohne den 3er-Zug blieben nur die Abwurf-Kosten uebrig — Als Ruling:
+    // dann ist der Effekt nicht aktivierbar und verbraucht auch sein
+    // Once-per-turn nicht.
+    if (drawWouldBeBlocked(ctx._engine, ctx.cardOwner, 3)) return false;
     const engine = ctx._engine;
     const ps = engine.gs.players[ctx.cardOwner];
     if (!ps) return false;

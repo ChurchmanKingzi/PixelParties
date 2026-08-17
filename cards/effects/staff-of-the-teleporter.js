@@ -123,16 +123,23 @@ module.exports = {
       .map(s => s.cardName);
 
     let potionCount = 0;
+    let totalReturned = 0;
     if (cardNamesToReturn.length > 0) {
       const mulliganResult = await engine.actionMulliganCards(pi, cardNamesToReturn);
       potionCount = mulliganResult.potionCount || 0;
+      totalReturned = mulliganResult.totalReturned || 0;
     }
 
     // Bonus +1 always lands on the main-deck pool (same as Leadership
     // Lv3's bonus draw — there's no rules basis for routing it
     // specifically to the potion deck).
     const bonusDraw = isAllHand ? 1 : 0;
-    const mainToDraw = (count - potionCount) + bonusDraw;
+    // ★ Als Regel (17.8.): "the same number" meint ALLE
+    // zurueckgemischten Karten — auch gestohlene, die ins
+    // GEGNER-Deck gingen. `totalReturned` zaehlt beide Decks;
+    // die frueher benutzte Auswahlmenge haette bei einem
+    // fehlgeschlagenen Rueckweg zu viel gezogen.
+    const mainToDraw = (totalReturned - potionCount) + bonusDraw;
 
     if (mainToDraw > 0) {
       await engine.actionDrawCards(pi, mainToDraw, { source: CARD_NAME });

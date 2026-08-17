@@ -52,7 +52,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
-const { BUFF_EFFECTS, heroCanBeEquipped } = require('./cards/effects/_hooks');
+const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool } = require('./cards/effects/_hooks');
 const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 
@@ -482,12 +482,59 @@ try {
 }
 
 // ───────────────────────────────────────────────────────────────
+//  QUELLTEXT-RIEGEL fuer /cards/effects (17.8.)
+//
+//  `/cards` ist als Ordner statisch eingehaengt, damit die ~730
+//  Kartenbilder ausgeliefert werden. Darin liegt aber auch
+//  `cards/effects/` — 858 Dateien Spiellogik. Ueber /cards/effects/
+//  war damit der komplette Quelltext oeffentlich abrufbar, inklusive
+//  `_engine.js` (1,4 MB) und `_cpu.js` (0,65 MB), und wegen
+//  `maxAge: '7d'` auch noch mit langer Cache-Zusage. Bei einem
+//  Bandbreitenkontingent ist das doppelt unschoen.
+//
+//  ZWEI Schichten liefern dort aus, und BEIDE sitzen weiter unten:
+//  die gzip-Schicht (GZIP_ROOTS enthaelt '/cards/', GZIP_MIME
+//  enthaelt '.js') und danach express.static. Der Riegel steht
+//  deshalb HIER, vor beiden.
+//
+//  Geprueft wird der AUFGELOESTE Pfad, nicht das Praefix: die
+//  gzip-Schicht normalisiert `..` selbst und laesst
+//  `/cards/x/../effects/_engine.js` durch ihre Traversal-Pruefung
+//  (das Ergebnis liegt ja unter cards/). Ein reiner
+//  startsWith-Test waere damit umgehbar gewesen.
+//
+//  Kartenkunst ist NICHT betroffen: `/api/cards/available` listet
+//  nur Bilddateien der obersten Ebene, `effects` ist ein Ordner und
+//  faellt durch den Extension-Filter. `/cards/skins/` bleibt frei.
+// ───────────────────────────────────────────────────────────────
+const CARDS_DIR = path.join(__dirname, 'cards');
+const CARD_EFFECTS_DIR = path.join(CARDS_DIR, 'effects');
+
+function zeigtAufKarteneffekte(reqPath) {
+  if (!reqPath.startsWith('/cards/')) return false;
+  let rel;
+  try { rel = decodeURIComponent(reqPath.slice('/cards/'.length)); }
+  catch { return true; } // kaputte Prozentkodierung — im Zweifel sperren
+  const abs = path.resolve(CARDS_DIR, rel).toLowerCase();
+  const eff = CARD_EFFECTS_DIR.toLowerCase();
+  // Segmentgrenze beachten: ein kuenftiges cards/effectsfoo/ waere frei.
+  return abs === eff || abs.startsWith(eff + path.sep);
+}
+
+app.use((req, res, next) => {
+  if (!zeigtAufKarteneffekte(req.path)) return next();
+  // 404 statt 403 — die Existenz muss nicht bestaetigt werden.
+  res.status(404).type('text/plain').send('Not Found');
+});
+
+// ───────────────────────────────────────────────────────────────
 //  On-the-fly gzip for compressible static assets (zero-dep).
 //  Compresses .js/.json/.css/.svg/.map from public, /data and
 //  /cards. Results are cached in memory keyed by file mtime, so
 //  editing cards.json (etc.) is picked up on the next request.
 //  Conditional requests (If-Modified-Since) still yield 304s, so
 //  repeat visits are not regressed vs express.static.
+//  `/cards/effects/` ist durch den Riegel darueber ausgenommen.
 // ───────────────────────────────────────────────────────────────
 const GZIP_ROOTS = [
   ['/data/', path.join(__dirname, 'data')],
@@ -780,6 +827,40 @@ async function initDatabase() {
   // Holds a not-yet-verified registration. No `users` row exists until the
   // emailed code is confirmed, so unverified attempts never squat a
   // username and never leave orphan decks.
+  // ── SITZUNGEN UEBERLEBEN EINEN NEUSTART (Als Befund 17.8.) ────────
+  // `sessions` war eine reine In-Memory-Map. Der `pp_token`-Cookie hat
+  // sieben Tage Laufzeit, die Gegenstelle im Server war aber nach jedem
+  // Neustart weg — jeder Cookie und jede gemerkte Marke also sofort
+  // ungueltig. Genau daran scheiterte der neue LOGIN-Knopf: Al startet
+  // den Server bei jedem Paket neu.
+  //
+  // Die Zeilen werden beim Start EINMAL in die Map geladen, damit
+  // `authMiddleware` synchron bleiben kann (sie wird an vielen Stellen
+  // ohne await benutzt).
+  await db.execute(`CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    username TEXT,
+    created_at INTEGER NOT NULL
+  )`);
+
+  // ── „ANGEMELDET BLEIBEN" UEBERLEBT DAS ABMELDEN (Als Vorgabe 17.8.) ─
+  // Getrennt von `sessions`, und das ist der ganze Punkt: eine Sitzung
+  // endet beim Abmelden, diese Marke NICHT. Al: „wenn ich mich danach
+  // ausloge, soll der Button mich trotzdem sofort wieder in das alte
+  // Profil reinladen."
+  //
+  // `user_id` ist TEXT — die IDs sind UUIDs (`1cd5b9c7-…`), keine
+  // Zahlen. Die aeltere `sessions`-Tabelle deklariert INTEGER; dank
+  // SQLite-Affinitaet liegt der Text trotzdem heil drin, aber richtig
+  // ist es nicht, deshalb hier von vornherein TEXT.
+  await db.execute(`CREATE TABLE IF NOT EXISTS remember_tokens (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    username TEXT,
+    created_at INTEGER NOT NULL
+  )`);
+
   await db.execute(`CREATE TABLE IF NOT EXISTS pending_signups (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -1138,11 +1219,73 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
-function startSession(res, user) {
+async function startSession(res, user) {
   const token = uuidv4();
   sessions.set(token, { userId: user.id, username: user.username });
+  // ── SCHREIBEN MIT AWAIT UND LAUTEM FEHLER (17.8.) ─────────────────
+  // Erster Wurf: `.catch(() => {})` ohne await. Das war doppelt falsch.
+  // Al meldete `[auth] 0 Sitzung(en) wiederhergestellt` — die Tabelle
+  // blieb leer, und WARUM war nicht zu sehen, weil ich den Fehler selbst
+  // verschluckt hatte. Ein stiller `catch` an einer gerade erst neu
+  // gebauten Stelle kostet genau die Information, die man braucht.
+  //
+  // Jetzt: await (die Zeile steht, BEVOR die Antwort rausgeht) und der
+  // echte Fehlertext in der Konsole. Die Anmeldung scheitert trotzdem
+  // nicht daran — sie laeuft ueber die Map weiter.
+  try {
+    await db.run(
+      'INSERT OR REPLACE INTO sessions (token, user_id, username, created_at) VALUES (?, ?, ?, ?)',
+      [token, user.id, user.username ?? null, Date.now()],
+    );
+    console.log(`[auth] Sitzung gespeichert (${user.username || 'ohne Namen'}, id ${user.id})`);
+  } catch (err) {
+    console.error('[auth] ★ Sitzung konnte NICHT gespeichert werden:', err?.message || err);
+    console.error('[auth]   → Schnellanmeldung nach einem Neustart wird nicht funktionieren.');
+  }
   res.cookie('pp_token', token, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+  // Merk-Marke fuer die Schnellanmeldung. Eigenes Cookie mit langer
+  // Laufzeit, das das Abmelden BEWUSST stehen laesst — sonst waere der
+  // Knopf nach jedem Logout wieder tot (genau der gemeldete Fall).
+  // Gaeste bekommen keine: ihr Konto wird beim Abmelden geloescht.
+  if (!user.is_guest) {
+    try {
+      const merk = uuidv4();
+      await db.run(
+        'INSERT OR REPLACE INTO remember_tokens (token, user_id, username, created_at) VALUES (?, ?, ?, ?)',
+        [merk, user.id, user.username ?? null, Date.now()],
+      );
+      res.cookie('pp_remember', merk, { ...COOKIE_OPTS, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      console.log(`[auth] Merk-Marke gesetzt (${user.username || 'ohne Namen'})`);
+    } catch (err) {
+      console.error('[auth] ★ Merk-Marke konnte nicht gespeichert werden:', err?.message || err);
+    }
+  }
   return token;
+}
+
+/** Sitzungen aus der Datenbank in die Map holen; abgelaufene wegwerfen. */
+async function restoreSessions() {
+  const maxAlter = Date.now() - 7 * 24 * 60 * 60 * 1000;   // wie der Cookie
+  try {
+    const roh = await db.get('SELECT COUNT(*) AS n FROM sessions');
+    const abgelaufen = await db.run('DELETE FROM sessions WHERE created_at < ?', [maxAlter]);
+    // Waisen (geloeschte Konten, geraeumte Gaeste) fallen hier heraus
+    // UND aus der Tabelle — sonst antwortet /auth/me mit „User not found".
+    await db.run('DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)');
+    const zeilen = await db.all(
+      'SELECT s.token AS token, s.user_id AS user_id, s.username AS username '
+      + 'FROM sessions s JOIN users u ON u.id = s.user_id');
+    for (const z of (zeilen || [])) {
+      sessions.set(z.token, { userId: z.user_id, username: z.username });
+    }
+    // Rohbestand mitmelden: „0 wiederhergestellt" allein sagt nicht, ob
+    // nie etwas geschrieben wurde oder ob die Bereinigung alles wegnahm.
+    console.log(`[auth] ${(zeilen || []).length} Sitzung(en) wiederhergestellt `
+      + `(Tabelle enthielt ${roh?.n ?? '?'}, davon ${abgelaufen?.rowsAffected ?? 0} abgelaufen)`);
+  } catch (err) {
+    console.error('[auth] Sitzungen konnten nicht geladen werden:', err.message);
+  }
 }
 
 // Finish setting up a freshly-created `users` row: give them a first deck, pin
@@ -1307,7 +1450,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
   await db.run('DELETE FROM pending_signups WHERE id = ?', [pending.id]);
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-  const token = startSession(res, user);
+  const token = await startSession(res, user);
   res.json({ token, user: sanitizeUser(user), isNewAccount: true });
 });
 
@@ -1364,6 +1507,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 10), user.id]);
   // Invalidate any live sessions for this account after a reset.
   for (const [tok, sess] of sessions) if (sess.userId === user.id) sessions.delete(tok);
+  try { db.run('DELETE FROM sessions WHERE user_id = ?', [user.id]).catch(() => {}); } catch (_) {}
   res.json({ ok: true });
 });
 
@@ -1382,7 +1526,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid username/email or password' });
   }
 
-  const token = startSession(res, user);
+  const token = await startSession(res, user);
   // Assign a random default avatar if the user doesn't have one
   if (!user.avatar) {
     const defaultAvatar = getRandomDefaultAvatar();
@@ -1460,7 +1604,7 @@ app.post('/api/auth/google', async (req, res) => {
     }
   }
 
-  const token = startSession(res, user);
+  const token = await startSession(res, user);
   res.json({ token, user: sanitizeUser(user), isNewAccount: isNew });
 });
 
@@ -1472,7 +1616,59 @@ app.post('/api/auth/logout', async (req, res) => {
     try { await purgeGuest(sess.userId); } catch (err) { console.error('[logout] purgeGuest failed:', err.message); }
   }
   if (token) sessions.delete(token);
+  if (token) { try { db.run('DELETE FROM sessions WHERE token = ?', [token]).catch(() => {}); } catch (_) {} }
   res.clearCookie('pp_token', COOKIE_OPTS);
+  // `pp_remember` bleibt ABSICHTLICH stehen — das ist der Unterschied
+  // zwischen „abgemeldet" und „dieses Geraet vergisst mich". Wer das
+  // Zweite will, nimmt „Forget this device" im Login-Bildschirm.
+  res.json({ ok: true });
+});
+
+// Wer steckt hinter der Merk-Marke? Nur der Name, ohne Anmeldung —
+// der Login-Bildschirm entscheidet damit, ob der Knopf aktiv ist.
+app.get('/api/auth/remember', async (req, res) => {
+  const merk = req.cookies?.pp_remember;
+  if (!merk) return res.status(401).json({ error: 'no remembered device' });
+  try {
+    const row = await db.get(
+      'SELECT r.user_id AS user_id, u.username AS username FROM remember_tokens r '
+      + 'JOIN users u ON u.id = r.user_id WHERE r.token = ?', [merk]);
+    if (!row) return res.status(401).json({ error: 'unknown token' });
+    res.json({ username: row.username });
+  } catch (err) {
+    console.error('[auth/remember] Lesen fehlgeschlagen:', err.message);
+    res.status(500).json({ error: 'lookup failed' });
+  }
+});
+
+// Marke gegen eine frische Sitzung tauschen — das ist der Knopfdruck.
+app.post('/api/auth/remember', async (req, res) => {
+  const merk = req.cookies?.pp_remember;
+  if (!merk) return res.status(401).json({ error: 'no remembered device' });
+  try {
+    const row = await db.get('SELECT user_id FROM remember_tokens WHERE token = ?', [merk]);
+    if (!row) return res.status(401).json({ error: 'unknown token' });
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [row.user_id]);
+    if (!user) {
+      await db.run('DELETE FROM remember_tokens WHERE token = ?', [merk]);
+      res.clearCookie('pp_remember', COOKIE_OPTS);
+      return res.status(401).json({ error: 'account gone' });
+    }
+    const token = await startSession(res, user);
+    res.json({ token, user: sanitizeUser(user) });
+  } catch (err) {
+    console.error('[auth/remember] Anmeldung fehlgeschlagen:', err.message);
+    res.status(500).json({ error: 'sign-in failed' });
+  }
+});
+
+// „Dieses Geraet vergessen" — die Marke aktiv wegwerfen.
+app.delete('/api/auth/remember', async (req, res) => {
+  const merk = req.cookies?.pp_remember;
+  if (merk) {
+    try { await db.run('DELETE FROM remember_tokens WHERE token = ?', [merk]); } catch (_) {}
+  }
+  res.clearCookie('pp_remember', COOKIE_OPTS);
   res.json({ ok: true });
 });
 
@@ -1525,7 +1721,7 @@ app.post('/api/auth/guest', async (req, res) => {
     } catch (err) { console.error('[guest] starter pin failed:', err.message); }
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-    const token = startSession(res, user);
+    const token = await startSession(res, user);
     res.json({ token, user: sanitizeUser(user), isGuest: true });
   } catch (err) {
     console.error('[guest] creation failed:', err.message);
@@ -3780,16 +3976,46 @@ function sendGameState(room, playerIdx, extra) {
     const midEffect = heroEffectActive || cardResolving || promptOpen || chainOpen;
     // Only force during playable phases (Main1, Action, Main2)
     if (phase >= 2 && phase <= 4 && !midEffect) {
-      gs._terrorProcessing = true;
       const terrorPi = gs._terrorForceEndTurn;
-      delete gs._terrorForceEndTurn;
-      setTimeout(() => {
-        gs._terrorProcessing = false;
-        room.engine.runPhase(5).then(() => { // PHASES.END = 5
-          for (let i = 0; i < 2; i++) sendGameState(room, i);
-          sendSpectatorGameState(room);
-        }).catch(err => console.error('[Terror] force end error:', err.message));
-      }, 500);
+      const terrorSrc = gs._terrorForceEndSource || { owner: terrorPi };
+
+      // ── ZUG-ENDE-RIEGEL (v436) ────────────────────────────────────
+      // Dieser Pfad laeuft NICHT ueber `advanceToPhase` — er ruft
+      // `runPhase(5)` direkt. Der Riegel dort greift hier also nicht,
+      // und deshalb muss er hier eigens stehen.
+      //
+      // Als Befund 17.8.: Tuscan Prisoner hielt Doom Prophecy nicht auf.
+      // Grund war meine falsche Annahme in v429, Terror werde immer
+      // schon an der Schwelle (`_checkTerrorThreshold`) abgefangen. Das
+      // stimmt fuer Terror selbst — aber **Doom Prophecy setzt
+      // `_terrorForceEndTurn` direkt aus dem Kartenskript** und laeuft
+      // an der Schwelle vorbei. Der Verbraucher hier ist der einzige
+      // gemeinsame Engpass beider Setzer und damit die richtige Stelle.
+      if (room.engine._blackstacheBlocksTurnEnd(terrorPi, terrorSrc)) {
+        // NUR die Marken raeumen und weiterlaufen lassen. KEIN `return`
+        // und kein eigener Zustandsversand: dieser Block sitzt MITTEN IN
+        // `sendGameState`, das direkt darunter den Zustand aufbaut und
+        // verschickt. Ein Abbruch hier haette genau diesen Versand
+        // verschluckt, ein eigener Versand wuerde sich rekursiv aufrufen.
+        delete gs._terrorForceEndTurn;
+        delete gs._terrorForceEndSource;
+        room.engine.log('turn_end_blocked', {
+          player: gs.players[terrorPi]?.username,
+          source: terrorSrc.name || null,
+          via: 'terrorForceEndTurn',
+        });
+      } else {
+        gs._terrorProcessing = true;
+        delete gs._terrorForceEndTurn;
+        delete gs._terrorForceEndSource;
+        setTimeout(() => {
+          gs._terrorProcessing = false;
+          room.engine.runPhase(5).then(() => { // PHASES.END = 5
+            for (let i = 0; i < 2; i++) sendGameState(room, i);
+            sendSpectatorGameState(room);
+          }).catch(err => console.error('[Terror] force end error:', err.message));
+        }, 500);
+      }
     }
   }
   const state = {
@@ -4026,7 +4252,7 @@ function sendGameState(room, playerIdx, extra) {
       // number rolls over (the underlying flag holds the lock-turn).
       artifactLocked: (ps._artifactLockTurn === gs.turn) || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
-      potionLocked: ps.potionLocked || false,
+      potionLocked: room.engine ? room.engine.arePotionsLockedFor(pi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
       drawLocked: ps.drawLocked || false,
@@ -4626,6 +4852,15 @@ function sendGameState(room, playerIdx, extra) {
     // — equippable to EITHER side's eligible Hero. The client uses this
     // to also light up OPPONENT Hero/Support zones as drag/click equip
     // targets; `doPlayArtifact` honors the chosen `targetOwner`.
+    // Artifact Creatures, die auf der EIGENEN Seite beschworen werden.
+    // Der Client oeffnet darauf den Helden-Picker beim Klick (Als Vorgabe
+    // 17.8.) — Gold und freie Zonen prueft er selbst, hier steht nur, was
+    // er nicht wissen kann: die Kartenskript-Fahnen.
+    ownSideSummonArtifacts: room.engine ? room.engine.getOwnSideSummonArtifacts(playerIdx) : [],
+    // Kartenname → erlaubte eigene Helden, fuer Ausruestung mit EIGENER
+    // Beschraenkung (Crusader's: nur Cecilia). Der Client graut damit
+    // Heldenkacheln und Support-Zonen beim Drag korrekt aus.
+    equipEligibleHeroes: room.engine ? room.engine.getEquipEligibleHeroes(playerIdx) : {},
     freeSideEquipArtifacts: room.engine ? room.engine.getFreeSideEquipArtifacts(playerIdx) : [],
     bouncePlacementTargets: room.engine ? room.engine.getBouncePlacementTargets(playerIdx) : {},
     bakhmSurpriseSlots: room.engine ? (() => {
@@ -4779,7 +5014,7 @@ function sendSpectatorGameState(room) {
       // for the rationale.
       artifactLocked: (ps._artifactLockTurn === gs.turn) || false,
       dealtDamageToOpponent: ps.dealtDamageToOpponent || false,
-      potionLocked: ps.potionLocked || false,
+      potionLocked: room.engine ? room.engine.arePotionsLockedFor(spi) : (ps.potionLocked || false),
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
       drawLocked: ps.drawLocked || false,
@@ -4829,7 +5064,7 @@ function sendSpectatorGameState(room) {
       // Kreditrahmen (Debt-O-Tron/Kent). Der Client rechnet ihn beim
       // Ausgrauen der Handkarten mit — sonst sperrt die Oberflaeche
       // Karten, die der Server laengst erlaubt. Ohne den Archetyp 0.
-      goldOverdraft: room.engine.goldOverdraftLimit(pi),
+      goldOverdraft: room.engine.goldOverdraftLimit(spi),
       // Zuschauer sehen keine Haende — die Liste der sich selbst
       // finanzierenden Karten bleibt hier deshalb leer.
       goldSelfOverdraftCards: [],
@@ -4939,6 +5174,8 @@ function sendSpectatorGameState(room) {
     heroStrictLevelCards: {},
     crossSidePlayableCards: [],
     crossSidePlayableArtifacts: [],
+    ownSideSummonArtifacts: [],
+    equipEligibleHeroes: {},
     freeSideEquipArtifacts: [],
     bouncePlacementTargets: {},
     bakhmSurpriseSlots: [],
@@ -6039,6 +6276,32 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   }
 
   if (isArtifactCreature) {
+    // ── BESCHWOERUNGSSPERREN (Als Ruling 17.8.) ──────────────────────
+    // „Ab dem Moment, wo sie beschworen wuerden, waeren sie Creatures.
+    //  Das heisst, sie checken vor dem Ausspielen ganz normal wie andere
+    //  Creatures auch, ob Sperren existieren."
+    //
+    // Das war bis hierher NICHT so: die Sperren stehen in
+    // `doPlayCreature` (server.js ~Z7753), und eine Artifact Creature
+    // laeuft nie dort durch, sondern hier. `getSummonBlocked` hat sie
+    // zwar schon ausgegraut — der Server haette den Zug aber trotzdem
+    // angenommen. Grauton ohne Durchsetzung.
+    //
+    // Geprueft wird gegen den SPIELENDEN Spieler `pi`, nicht gegen den
+    // Platzierungs-Besitzer: die Sperre haengt am Beschwoerer. Powder Keg
+    // legt auf die Gegnerseite, prueft aber die eigene Sperre.
+    if (ps.summonLocked) return false;
+    try {
+      if (room.engine.getSummonBlocked(pi).includes(cardName)) return false;
+    } catch (err) {
+      console.error('[Engine] getSummonBlocked (artifact creature) error:', err.message);
+    }
+    // Der per-Held-Teil (`isCreatureSummonable`: Gigantisaurs-Belegung,
+    // Chimera & Co.) nur fuer die EIGENE Seite. Bei Cross-Side-Platzierung
+    // waere der Zielheld der des Gegners — dort dieselbe Pruefung zu
+    // fahren waere eine eigene Regelfrage, die Al nicht beantwortet hat.
+    if (placementOwner === pi && !room.engine.isCreatureSummonable(cardName, pi, heroIdx)) return false;
+
     // For cross-side placement, use opp's supportZones; otherwise own.
     if (!placementPs.supportZones[heroIdx]) placementPs.supportZones[heroIdx] = [[], [], []];
     let finalSlot = zoneSlot;
@@ -6185,11 +6448,32 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // true` runs onPlay + onCardEnterZone while skipping host-
           // incapacitation gates (Powder Keg's text explicitly allows
           // dead / Frozen / Stunned hosts).
+          // `selfPlacement: true` — DIES IST DER EIGENE SPIELWEG der Karte
+          // aus der Hand, nicht ein Fremdeffekt. Ohne die Fahne greift der
+          // Artifact-Creature-Riegel in `summonCreatureWithHooks` (v438)
+          // und `placed` wird null; der Block darunter legt die Karte dann
+          // in den Ablagestapel. Genau so sah Als Regressionsbericht aus:
+          // „drag/droppe ich eine in eine Support Zone, geht sie in den
+          // Discard, statt beschworen zu werden."
+          //
+          // Mein v438-Denkfehler: ich hatte behauptet, der Handweg der
+          // sieben laufe nicht durch `summonCreatureWithHooks`. Geprueft
+          // hatte ich nur die KARTENSKRIPTE (Powder Keg) — nicht diesen
+          // Zweig hier, der genau das tut. Dritte Auflage derselben Lehre.
           const placed = await room.engine.summonCreatureWithHooks(
             cardName, placementOwner, heroIdx, finalSlot,
             {
               source: 'Artifact-Creature play',
               isPlacement: _isCrossSideArtifact,
+              selfPlacement: true,
+              // Zustand SOFORT nach dem Setzen versenden, VOR Glanz und
+              // Hooks (Als Report 17.8. zum Drag&Drop). Ohne das zeigt der
+              // Client waehrend der ganzen Beschwoerung noch seinen alten
+              // Stand — Karte in der Hand, Zone leer — und die Karte
+              // „springt zurueck", bis der Versand am Ende sie umsetzt.
+              // Die Entnahme ist an dieser Stelle laengst passiert, der
+              // eine Versand zeigt also Hand UND Zone in einem Zug.
+              syncOnPlacement: true,
             },
           );
           if (!placed) {
@@ -6239,7 +6523,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
  * Distracting Crystal in `pi`'s hand blocks any effect they activate
  * that would shuffle cards from hand / discard / board back into the
  * deck. The card-author tags matching effects with
- * `script.shufflesIntoDeck: true`; this helper consults the tag and
+ * `script.shufflesFromHandOrDiscardIntoDeck: true`; this helper consults the tag and
  * the `pi`-side hand contents. Used as a top-of-handler gate in every
  * `doActivate*` / `doPlay*` / `doUseArtifactEffect` / `doConfirmPotion`
  * path so the play is silently rejected before any state mutation.
@@ -6279,7 +6563,7 @@ function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, engine) 
     if (selfRevealEffectsSuppressed(engine, pi)) return false;
   }
   const sc = loadCardEffect(cardName);
-  return !!sc?.shufflesIntoDeck;
+  return !!sc?.shufflesFromHandOrDiscardIntoDeck;
 }
 
 async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwner, attachmentZoneSlot, viaCreatureInstId }) {
@@ -6782,7 +7066,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       });
     }
 
-    if (cardData.cardType === 'Spell' && cardData.spellSchool1 === 'Support Magic') {
+    if (cardData.cardType === 'Spell' && hasSpellSchool(cardData, 'Support Magic')) {
       ps.supportSpellUsedThisTurn = true;
       if (additionalConsumed && consumedInst?.counters?._aaLastConsumed?.startsWith('friendship_support')) {
         // Read ability zones from the HERO OWNER's side — for charmed
@@ -9168,6 +9452,19 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     room.engine.log('gem_kept_in_hand', { player: ps.username, card: potionName });
   }
   if (hi >= 0 && !keepInHand) {
+    // ── FLUG VOR ENTNAHME (Als Regel 17.8.) ─────────────────────────
+    // „Die Hand soll sich immer ERST verkleinern, wenn die entsprechende
+    //  Handkarte visuell beginnt, von der Hand woanders hin zu fliegen."
+    // Der Flug wird deshalb HIER ausgeloest, unmittelbar vor dem Splice
+    // und damit im selben Zustandsversand — nicht dem Diff-Erkenner des
+    // Clients ueberlassen, der die Quelle nur ueber den Kartennamen
+    // sucht und bei gleichnamigen Karten den falschen Platz erwischt.
+    // Dieselbe Reihenfolge wie im Artefakt-Kreatur-Weg (v419).
+    room.engine._broadcastEvent('play_pile_transfer', {
+      owner: pi, cardName: potionName,
+      from: 'hand', to: (cardType === 'Potion' || script.deleteOnUse) ? 'deleted' : 'discard',
+      fromHandIdx: hi,
+    });
     ps.hand.splice(hi, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     // Foreign-origin cards (Magic Lamp gifts etc.) discard / delete
@@ -9405,7 +9702,9 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
 
   const ps = gs.players[pi];
   if (!ps) return false;
-  if (ps.potionLocked) return false;
+  // Sperre kann auch von einer gegnerischen Karte kommen (Tuscan
+  // Mystic) — `arePotionsLockedFor` fasst beide Quellen zusammen.
+  if (room.engine.arePotionsLockedFor(pi)) return false;
   if (ps._creationLockedNames?.has(cardName)) return false;
   if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return false;
   if (ps._resolvingCard && handIndex === getResolvingHandIndex(ps)) return false;
@@ -9765,6 +10064,17 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
         // (schloss die Amethyst-Unterzählung: 3/700 trotz realer Plays).
         room.engine.log('gem_kept_in_hand', { player: ps.username, card: cardName });
       } else {
+        // Flug vor Entnahme — siehe Regel im Potion-Pfad (doConfirmPotion).
+        // Bei einem Artefakt, das sich selbst aufs Brett legt
+        // (`_spellPlacedOnBoard`), waere ein Stapelflug falsch: die Karte
+        // geht ja nicht in die Ablage. Dort schweigt der Broadcast.
+        if (!gs._spellPlacedOnBoard) {
+          room.engine._broadcastEvent('play_pile_transfer', {
+            owner: pi, cardName,
+            from: 'hand', to: script.deleteOnUse ? 'deleted' : 'discard',
+            fromHandIdx: currentIdx,
+          });
+        }
         ps.hand.splice(currentIdx, 1);
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
         if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
@@ -12781,7 +13091,10 @@ io.on('connection', (socket) => {
       if (!result.success) return;
       // Skip to End Phase if required
       if (result.skipEndPhase) {
-        await room.engine.advanceToPhase(pi, 5); // PHASES.END = 5
+        // GRUNDMECHANIK, kein Karteneffekt (Als Ruling 16.8.): der
+        // Aufstieg beendet den Zug von Regels wegen. Zug-Ende-Immunitaet
+        // (Tuscan Prisoner) greift hier ausdruecklich NICHT.
+        await room.engine.advanceToPhase(pi, 5, { baseMechanic: true }); // PHASES.END = 5
       }
     } catch (err) {
       console.error('[Engine] ascend_hero error:', err.message, err.stack);
@@ -12955,6 +13268,14 @@ io.on('connection', (socket) => {
         // fuer den Client filtert sonst alles Unbekannte weg.
         if (typeof h._investCounters === 'number' && h._investCounters > 0) {
           out._investCounters = h._investCounters;
+        }
+        // Cecilia „has been defeated at least once this game" — die
+        // Aufstiegsbedingung ihrer Ascension, im Puzzle-Editor als
+        // `h._ceciliaDefeatedOnce` gesetzt. Ohne diese Zeile faellt der
+        // Merker aus der Projektion und die Ascension liesse sich im
+        // Puzzle nicht testen.
+        if (h._ceciliaDefeatedOnce) {
+          out._ceciliaDefeatedOnce = true;
         }
         return out;
       });
@@ -17978,6 +18299,11 @@ if (process.env.PP_TRAIN) {
 } else
 initDatabase().then(async () => {
   await purgeAllGuests(); // clear orphaned guest accounts from previous runs
+  // Sitzungen zurueckholen, BEVOR der Server Anfragen annimmt — sonst
+  // laufen die ersten Aufrufe nach einem Neustart in „Not authenticated".
+  // NACH dem Gaeste-Raeumen, damit Sitzungen geloeschter Gastkonten
+  // gar nicht erst in die Map kommen.
+  await restoreSessions();
   server.listen(PORT, HOST, () => {
     // ── DIAGNOSE-SCHALTER BEIM START ANZEIGEN ─────────────────────
     // Zum ZWEITEN Mal ist eine Umgebungsvariable still nicht

@@ -211,11 +211,13 @@ module.exports = {
       });
 
       if (totalRemoved >= DRAW_THRESHOLD) {
-        for (let d = 0; d < DRAW_COUNT; d++) {
-          await engine.actionDrawCards(pi, 1);
-          engine.sync();
-          if (d < DRAW_COUNT - 1) await engine._delay(150);
-        }
+        // ── LOGISCHE Zugmenge, nicht Einzelkarten (Als Ruling 16.8.) ──
+        // Der Text sagt "draw 2 cards" — EIN Zug von 2. Die alte
+        // 1er-Schleife war reine Animation und haette Tuscan Artist
+        // immer nur "1" gezeigt, den Riegel also umgangen.
+        // `actionDrawCards` staffelt intern bereits.
+        await engine.actionDrawCards(pi, DRAW_COUNT);
+        engine.sync();
       }
 
       engine.sync();

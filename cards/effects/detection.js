@@ -225,11 +225,17 @@ module.exports = {
         return;
       }
 
-      const drawTotal = DRAW_PER_REMOVED * removedCount;
-      for (let d = 0; d < drawTotal; d++) {
-        await engine.actionDrawCards(pi, 1);
+      // ── LOGISCHE Zugmenge, nicht Einzelkarten (Als Ruling 16.8.) ──
+      // Der Kartentext sagt "draw 2 cards for every Surprise removed".
+      // Al liest das als EINZELNE Instanzen von "ziehe 2", die Tuscan
+      // Artist jede fuer sich blockt. Die alte 1er-Schleife (nur fuer
+      // die Animation) haette dem Riegel immer nur "1" gezeigt und ihn
+      // damit versehentlich umgangen. `actionDrawCards` staffelt intern
+      // bereits — ein eigener 1er-Loop war nie noetig.
+      for (let s = 0; s < removedCount; s++) {
+        await engine.actionDrawCards(pi, DRAW_PER_REMOVED);
         engine.sync();
-        if (d < drawTotal - 1) await engine._delay(150);
+        if (s < removedCount - 1) await engine._delay(150);
       }
 
       engine.sync();

@@ -24,7 +24,7 @@ module.exports = {
   heroEffect: true,
   // Shuffles hand back into deck — flagged for "No Retreat!"
   // detection.
-  shufflesIntoDeck: true,
+  shufflesFromHandOrDiscardIntoDeck: true,
 
   // CPU threat assessment: net +1 draw per activation (refills hand + 1).
   supportYield() {
@@ -70,16 +70,49 @@ module.exports = {
     await engine._delay(400);
 
     // Return all hand cards to deck
-    const cardNamesToReturn = [...ps.hand];
-    await engine.actionMulliganCards(pi, cardNamesToReturn);
+    // ── Zurueckmisch-Sperre (Hatusbal) ──
+    // Elana mischt die GANZE Hand, hat also keine Auswahl-Abfrage zum
+    // Vorfiltern. Sperrt Hatusbal, bleiben nur die GESTOHLENEN Karten
+    // uebrig. Ihr Text sagt "draw the SAME NUMBER of cards +1" — die
+    // Zahl haengt also an dem, was TATSAECHLICH zurueckging, nicht an
+    // der urspruenglichen Handgroesse. `drawCount` wird deshalb unten
+    // neu berechnet.
+    const cardNamesToReturn = engine.shuffleBackEligibleHandCards(pi);
+    const { ownDeckCount, potionCount, totalReturned } =
+      await engine.actionMulliganCards(pi, cardNamesToReturn);
+
+    // "the same number of cards +1" — gemessen an dem, was wirklich
+    // zurueckging, ★ ueber BEIDE Decks (Als Regel 17.8.): eine
+    // gestohlene Karte wandert ins Gegner-Deck und zaehlt trotzdem mit.
+    // `ownDeckCount` ist bewusst NICHT die Zahl hier — die gehoert
+    // Hatusbals Bonus-Schwelle.
+    const tatsaechlichGezogen = totalReturned + 1;
 
     await engine._delay(400);
 
-    engine.log('elana_shuffle', { player: ps.username, returned: cardNamesToReturn.length, drawing: drawCount });
+    engine.log('elana_shuffle', {
+      player: ps.username, returned: totalReturned, ownDeck: ownDeckCount,
+      drawing: tatsaechlichGezogen, fromPotionDeck: potionCount,
+    });
 
     await engine._delay(300);
 
-    await engine.actionDrawCards(pi, drawCount);
+    // ★ AUFTEILUNG NACH DECK (Als Ruling 17.8., war ein Bug):
+    // Karten, die ins POTION DECK zurueckgemischt wurden, muessen auch
+    // VON DORT nachgezogen werden. Elana zog vorher alles aus dem
+    // Hauptdeck — bei Potions in der Hand haetten sich die Deckgroessen
+    // dauerhaft verschoben. Leadership, Horn in a Bottle, Crescent Moon
+    // und Staff of the Teleporter machen es seit jeher so; Elana war die
+    // einzige Ausnahme. Der +1-Bonus kommt wie dort aus dem Hauptdeck.
+    const mainToDraw = tatsaechlichGezogen - potionCount;
+    await engine.actionDrawCards(pi, mainToDraw);
+    for (let i = 0; i < potionCount; i++) {
+      if ((ps.potionDeck || []).length === 0) break;
+      const potionCard = ps.potionDeck.shift();
+      ps.hand.push(potionCard);
+      engine.sync();
+      await engine._delay(200);
+    }
 
     engine.sync();
     return true;

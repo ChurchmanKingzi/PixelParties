@@ -149,13 +149,20 @@ function _initSoundManager() {
 // fallback BEFORE <VolumeControl> mounts and registers window._ppGetVolume —
 // so a player who muted last session stays muted from the very first frame
 // (login / auth screen) instead of hearing audio until the menu loads.
+// Standard-Lautstaerke fuer alle, die noch nichts eingestellt haben.
+// Al 17.8.: „viel zu laut; halbiere den Default" — 0.4 → 0.2. EINE
+// Konstante, weil der Wert vorher an drei Stellen stand (Vorlade-Helfer,
+// Regler-Zustand, Rueckfall im catch) und beim naechsten Dreh sonst
+// wieder auseinanderlaufen wuerde.
+const DEFAULT_VOLUME = 0.2;
+
 function _ppPersistedVolume() {
   try {
     if (localStorage.getItem('pp_muted') === '1') return 0;
     const v = parseFloat(localStorage.getItem('pp_volume'));
-    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.4;
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_VOLUME;
   } catch {
-    return 0.4;
+    return DEFAULT_VOLUME;
   }
 }
 window._ppPersistedVolume = _ppPersistedVolume;
@@ -817,7 +824,11 @@ if (typeof document !== 'undefined') {
   // the tree, so any onClick higher up that calls e.stopPropagation()
   // (modal wrappers, etc.) can't block this cue from firing.
   document.addEventListener('click', (e) => {
-    const btn = e.target.closest('button, [role="button"]');
+    // `.tab` mit aufgenommen (Als Befund 17.8.: „Zwischen Log In und Sign
+    // Up hin und her zu klicken, macht noch kein Geraeusch"). Reiter sind
+    // `<div>`s ohne Rolle und fielen deshalb durch — dasselbe gilt fuer
+    // jeden kuenftigen Reiter, nicht nur fuer die beiden im Login.
+    const btn = e.target.closest('button, [role="button"], .tab');
     if (!btn) return;
     if (btn.closest('.volume-control, .volume-slider-popup')) return;
     // Don't double-fire on buttons that have data-sfx="none".
@@ -837,6 +848,61 @@ if (typeof document !== 'undefined') {
     // explicit `dedupe` (most of the cancel-handler call sites).
     if (isCancel) playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
     else playSFX('ui_click', { dedupe: 60 });
+  }, { capture: true });
+
+  // ── ESCAPE KLINGT IMMER (Als Regel 17.8.) ─────────────────────────
+  // „Ein Menue/Submenue per Escape zu schliessen, sollte IMMER ein
+  //  Geraeusch machen!"
+  //
+  // Bewusst ZENTRAL statt an den einzelnen Stellen: es gibt 23
+  // Escape-Behandlungen in vier Dateien, und die meisten rufen
+  // `stopImmediatePropagation()`. Ein Listener weiter hinten in der
+  // Kette bekaeme davon gar nichts mehr mit — deshalb hier in der
+  // CAPTURE-Phase und vor allen anderen registriert (app-shared laedt
+  // als erstes). Damit klingt auch jedes Menue, das es heute noch
+  // nicht gibt.
+  //
+  // Der Preis: Escape klingt auch dann, wenn gerade nichts offen ist.
+  // Ob ein Handler wirklich etwas geschlossen hat, laesst sich von hier
+  // aus nicht sehen — und Als Regel sagt ausdruecklich „immer".
+  //
+  // `dedupe` faengt die Stellen ab, die ihr `ui_cancel` schon selbst
+  // spielen (Puzzle-Stapelansicht u.a.): derselbe Klang innerhalb des
+  // Fensters wird verschluckt, es bleibt bei einem.
+  //
+  // ★★ AN `window`, NICHT AN `document` (Als Befund 17.8.: Gast-Menue,
+  // Daily, Puzzles und How-to-Play blieben trotz allem stumm).
+  // Capture laeuft von aussen nach innen: window → document → … → Ziel.
+  // Die 39 bestehenden Behandlungen haengen an `window` und rufen
+  // `stopImmediatePropagation()` — ein Listener an `document` ist damit
+  // eine Ebene ZU TIEF und kommt nie dran. „Capture-Phase" allein
+  // genuegt also nicht; es zaehlt, an welchem KNOTEN man haengt.
+  // Unter mehreren Listenern am selben Knoten entscheidet dann die
+  // Reihenfolge der Registrierung — und `app-shared` laedt als erstes.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.repeat) return;
+    playSFX('ui_cancel', { dedupe: 250, volume: 0.4 });
+  }, true);
+
+  // ── TIPPEN KLINGT (Als Vorgabe 17.8.) ─────────────────────────────
+  // „Etwas in ein Textfeld einzugeben (Username, Password, Searchbars
+  //  jeder Art usw.), sollte ein kleines Geraeusch machen."
+  //
+  // Am `keydown` des Feldes statt am `input`-Ereignis: so klingt auch
+  // die Ruecktaste, und Einfuegen per Maus loest nicht einen einzigen
+  // lauten Schlag fuer den ganzen Text aus.
+  //
+  // Nur Zeichen und Ruecktaste. Steuer- und Navigationstasten bleiben
+  // still — Escape hat oben schon seinen eigenen Klang, und Tab oder
+  // Pfeiltasten sind kein Tippen. Leise und kurz gedeckelt, sonst wird
+  // schnelles Schreiben zum Maschinengewehr.
+  document.addEventListener('keydown', (e) => {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches('input, textarea, [contenteditable="true"]')) return;
+    if (el.type === 'range' || el.type === 'checkbox' || el.type === 'radio') return;
+    const tippt = e.key === 'Backspace' || (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey);
+    if (!tippt) return;
+    playSFX('ui_click', { dedupe: 35, volume: 0.22 });
   }, { capture: true });
 
   // ── DROPDOWNS UND SCHALTER (Als Befund 5.8.) ──────────────────────
@@ -1375,6 +1441,22 @@ function hasSacredJewelArtifactBonus(deck) {
   return countInDeck(deck, SACRED_JEWEL) >= 4;
 }
 
+// "Cecilia, the Harrowing Crusader": *"When you play this Hero, you may
+// play up to 5 copies of any Attacks, Spells and Artifacts in your
+// deck."* Bei einem HELDEN heisst "when you play this Hero" — wie bei
+// Nicolas — dass er im Team steht; die Klausel ist eine Deckbauregel.
+// Hebt die Kopiengrenze dieser drei Typen von 4 auf 5.
+//
+// Trifft sie mit der Sacred-Jewel-Klausel zusammen, gilt der HOEHERE
+// Wert: beides sind Erlaubnisse, keine Beschraenkungen. Bei Artifacts
+// sagen beide 5, das faellt also zusammen; Cecilias eigener Beitrag
+// sind Attacks und Spells.
+const CECILIA_CRUSADER = 'Cecilia, the Harrowing Crusader';
+const CECILIA_TYPES = new Set(['Attack', 'Spell', 'Artifact']);
+function hasCeciliaCopyBonus(deck) {
+  return (deck?.heroes || []).some(h => h?.hero === CECILIA_CRUSADER);
+}
+
 // Heroes whose card text explicitly allows multiple copies in the team
 // slot ("You may play any number of copies of this Hero as part of your
 // Starting Heroes"). They also get an unlimited global cap, with the
@@ -1399,8 +1481,12 @@ function getCardMax(deck, cardName) {
   if (ct === 'Hero') return MULTI_TEAM_HEROES.has(cardName) ? Infinity : 5;
   if (ct === 'Potion') return 2;
   if (ct === 'Ability') return Infinity;
-  if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) return 5;
-  return 4;
+  // Erst die Sonderklauseln sammeln, dann die grosszuegigste nehmen —
+  // so schliessen zwei Erlaubnisse einander nicht aus.
+  let max = 4;
+  if (ct === 'Artifact' && hasSacredJewelArtifactBonus(deck)) max = Math.max(max, 5);
+  if (CECILIA_TYPES.has(ct) && hasCeciliaCopyBonus(deck)) max = Math.max(max, 5);
+  return max;
 }
 
 function canAddCard(deck, cardName, section) {
@@ -1855,7 +1941,7 @@ function VolumeControl() {
   const [open, setOpen] = useState(false);
   const [volume, setVolume] = useState(() => {
     const saved = localStorage.getItem('pp_volume');
-    return saved != null ? parseFloat(saved) : 0.4;
+    return saved != null ? parseFloat(saved) : DEFAULT_VOLUME;
   });
   const [muted, setMuted] = useState(() => localStorage.getItem('pp_muted') === '1');
   const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);

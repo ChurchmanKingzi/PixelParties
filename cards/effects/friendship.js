@@ -16,6 +16,10 @@
 //  LEVEL 3: Same as Lv2 but draw 3 cards.
 // ═══════════════════════════════════════════
 
+// Doppelschul-Karten gehoeren BEIDEN Schulen an (Als Ruling 16.8.).
+// Nie `spellSchool1 === …` vergleichen — siehe Helferkommentar.
+const { hasSpellSchool } = require('./_hooks');
+
 const { loadCardEffect } = require('./_loader');
 
 const ADDITIONAL_TYPE_PREFIX = 'friendship_support';
@@ -46,7 +50,7 @@ function getFriendshipLevel(ps, heroIdx) {
  */
 function buildFilter(engine, pi, heroIdx) {
   return (cardData) => {
-    if (!cardData || cardData.cardType !== 'Spell' || cardData.spellSchool1 !== 'Support Magic') return false;
+    if (!cardData || cardData.cardType !== 'Spell' || !hasSpellSchool(cardData, 'Support Magic')) return false;
 
     const ps = engine.gs.players[pi];
     if (!ps) return false;
@@ -187,7 +191,7 @@ module.exports = {
       // but defensive: a future change to the filter shouldn't silently
       // start drawing on Trick / Destruction Magic.
       const spellData = ctx.spellCardData;
-      if (!spellData || spellData.spellSchool1 !== 'Support Magic') return;
+      if (!spellData || !hasSpellSchool(spellData, 'Support Magic')) return;
 
       const level = getFriendshipLevel(ps, heroIdx);
       if (level < 2) return; // Lv1 grants the action but no draw

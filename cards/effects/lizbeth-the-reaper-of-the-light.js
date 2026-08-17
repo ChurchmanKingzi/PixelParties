@@ -69,6 +69,10 @@
 //  turn per spec.
 // ═══════════════════════════════════════════
 
+// Doppelschul-Karten gehoeren BEIDEN Schulen an (Als Ruling 16.8.).
+// Nie `spellSchool1 === …` vergleichen — siehe Helferkommentar.
+const { hasSpellSchool } = require('./_hooks');
+
 const CARD_NAME = 'Lizbeth, the Reaper of the Light';
 const FIGHTING_DELTA_KEY = 'lizbethBorrowedFightingDelta';
 const RESISTANCE_BLOCKS_KEY = 'lizbethBorrowedResistanceBlocks';
@@ -344,7 +348,7 @@ function setupBorrowedFriendship(ctx) {
     allowedCategories: ['spell'],
     heroRestricted: true,
     filter: (cardData) => {
-      if (!cardData || cardData.cardType !== 'Spell' || cardData.spellSchool1 !== 'Support Magic') return false;
+      if (!cardData || cardData.cardType !== 'Spell' || !hasSpellSchool(cardData, 'Support Magic')) return false;
       const ps = engine.gs.players[pi];
       if (!ps) return false;
       const lvl = maxOpponentAbilityLevel(engine, pi, 'Friendship');
@@ -376,7 +380,7 @@ async function handleFriendshipDrawMirror(ctx) {
   // Only fires when Lizbeth herself cast a Support Magic Spell.
   if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
   const spellData = ctx.spellCardData;
-  if (!spellData || spellData.spellSchool1 !== 'Support Magic') return;
+  if (!spellData || !hasSpellSchool(spellData, 'Support Magic')) return;
 
   const level = maxOpponentAbilityLevel(engine, pi, 'Friendship');
   if (level < 2) return;

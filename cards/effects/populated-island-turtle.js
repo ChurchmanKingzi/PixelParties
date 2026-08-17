@@ -31,12 +31,22 @@
 //     `onCardLeaveZone` clears the sentinels so
 //     the host Hero's slots free up cleanly.
 //
-//  Caveat: this is a banned card by design, so
-//  the sentinel approach favours simplicity over
-//  full engine integration. Effects that read
-//  raw `supportZones[hi][si][0]` without a
-//  cardDB lookup (rare) would see the sentinel
-//  string — none in the current codebase.
+//  Caveat: der Platzhalter-Ansatz zieht Einfachheit
+//  der vollen Engine-Anbindung vor. Effekte, die
+//  `supportZones[hi][si][0]` ROH lesen, ohne
+//  cardDB-Nachschlag (selten), saehen die
+//  Platzhalter-Zeichenkette — im aktuellen Stand
+//  gibt es keinen solchen Leser.
+//
+//  ★ 17.8.: die urspruengliche Begruendung lautete
+//  „this is a banned card by design". Die traegt
+//  nicht mehr — nach Als Regel vom 17.8. sagt
+//  `banned` nichts darueber, wie sorgfaeltig eine
+//  Karte gebaut wird (siehe CARD_API.md). Die
+//  Abkuerzung bleibt vorerst stehen, weil sie
+//  nachweislich mit nichts kollidiert; sie ist
+//  aber jetzt eine offene Schuld, keine
+//  gerechtfertigte Vereinfachung. Al gemeldet.
 // ═══════════════════════════════════════════
 
 const ZONE_BLOCKED_SENTINEL = '_ZoneBlocked';

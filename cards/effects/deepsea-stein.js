@@ -25,6 +25,12 @@ const CARD_NAME = 'Deepsea Stein';
 const MAX_PICKS = 3;
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Ablage
+
   inherentAction: inherentActionIfBounceable,
   canBypassLevelReq: canBypassLevelReqIfBounceable,
   canBypassFreeZoneRequirement: canBypassFreeZoneIfBounceable,

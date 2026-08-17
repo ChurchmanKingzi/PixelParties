@@ -10,7 +10,7 @@
 //
 //  Detection: every card whose effect literally
 //  recycles cards back into the deck declares
-//  `shufflesIntoDeck: true` on its script. The
+//  `shufflesFromHandOrDiscardIntoDeck: true` on its script. The
 //  initial chain link is the activator (Spell /
 //  Attack / Hero Effect / Ability), so we check
 //  its script's flag. A new "shuffles back"
@@ -34,7 +34,7 @@ module.exports = {
     // "When your opponent activates ..." — only opp-initiated effects.
     if (initial.owner === pi) return false;
     const script = loadCardEffect(initial.cardName);
-    return !!script?.shufflesIntoDeck;
+    return !!script?.shufflesFromHandOrDiscardIntoDeck;
   },
 
   resolve: async (engine, pi, _selectedIds, _validTargets, chain) => {

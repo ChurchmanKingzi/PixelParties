@@ -152,7 +152,7 @@ module.exports = {
       // Re-check it hasn't been protected during the prompt.
       if (ctx.cancelled) return;
 
-      await sacrificeSelf(engine, ctx.card, pi);
+      await T.sacrificeSelf(engine, ctx.card, pi);
       ctx.cancel(); // negate the effect on the Area
       engine.log('teocuilatl_protect', {
         player: engine.gs.players[pi]?.username, area: ctx.areaName, from: ctx.source,

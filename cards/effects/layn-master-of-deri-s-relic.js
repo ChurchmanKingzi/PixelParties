@@ -66,7 +66,7 @@
 //    spent).
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME      = 'Layn, Master of Deri\'s Relic';
 const TARGET_LEVEL   = 1;
@@ -76,7 +76,7 @@ const MAX_PLACEMENTS = 3;
 function hasEligibleCreature(ps, cardDB) {
   return (ps.discardPile || []).some(cn => {
     const cd = cardDB[cn];
-    return cd && hasCardType(cd, 'Creature') && (cd.level ?? 0) === TARGET_LEVEL;
+    return cd && isPileCreature(cd) && (cd.level ?? 0) === TARGET_LEVEL;
   });
 }
 
@@ -139,7 +139,7 @@ module.exports = {
     const counts = {};
     for (const cn of (ps.discardPile || [])) {
       const cd = cardDB[cn];
-      if (!cd || !hasCardType(cd, 'Creature') || (cd.level ?? 0) !== TARGET_LEVEL) continue;
+      if (!cd || !isPileCreature(cd) || (cd.level ?? 0) !== TARGET_LEVEL) continue;
       counts[cn] = (counts[cn] || 0) + 1;
     }
     const galleryCards = Object.entries(counts)

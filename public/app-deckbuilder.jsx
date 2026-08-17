@@ -473,7 +473,15 @@ function DeckBuilder() {
       }
       updateSections({ heroes, main: cleanedMain, potion: potionDeck });
     } else {
-      updateSections({ heroes });
+      // Wird ein Held ERSETZT, kann damit auch eine Deckbauklausel
+      // wegfallen (Cecilia). Gleiche Aufraeumung wie beim Entfernen.
+      const getrimmt = isCubeDeck(currentDeck)
+        ? currentDeck
+        : trimOverLimitCopies({ ...currentDeck, heroes });
+      updateSections({
+        heroes,
+        main: getrimmt.mainDeck, potion: getrimmt.potionDeck, side: getrimmt.sideDeck,
+      });
     }
     if (window.playSFX) window.playSFX('draw');
     return true;
@@ -488,10 +496,17 @@ function DeckBuilder() {
     // Artifact a 5-copy allowance. When that happens, any Artifact
     // currently at 5 copies must be auto-trimmed back to 4. We assemble
     // the prospective post-remove deck, then run trimOverLimitCopies.
-    const maybeAutoTrim = (draftDeck) => {
-      if (cardName !== 'The Sacred Jewel') return draftDeck;
-      return trimOverLimitCopies(draftDeck);
-    };
+    // Frueher stand hier ein Namensvergleich auf "The Sacred Jewel".
+    // Seit Cecilia (Attacks/Spells/Artifacts auf 5, solange sie im Team
+    // steht) gibt es eine zweite solche Klausel — und es werden weitere
+    // kommen. `trimOverLimitCopies` ist bei einem regelkonformen Deck
+    // ohnehin wirkungslos, der Aufruf kann also bedingungslos laufen und
+    // deckt jede kuenftige Klausel automatisch ab. Cube-Decks bleiben
+    // aussen vor: dort gilt keine Kopiengrenze, ein Trim wuerde die
+    // Liste zusammenstreichen.
+    const maybeAutoTrim = (draftDeck) => (
+      isCubeDeck(draftDeck) ? draftDeck : trimOverLimitCopies(draftDeck)
+    );
     if (section === 'main') {
       const next = maybeAutoTrim({ ...currentDeck, mainDeck: removeOne(currentDeck.mainDeck || [], index) });
       updateSections({ main: next.mainDeck, potion: next.potionDeck, side: next.sideDeck });
@@ -527,7 +542,15 @@ function DeckBuilder() {
         }
         updateSections({ heroes, main: cleanedMain, potion: potionDeck });
       } else {
-        updateSections({ heroes });
+        // Verlaesst Cecilia das Team, faellt die 6-Kopien-Erlaubnis weg —
+        // dieselbe Aufraeumung wie beim Sacred Jewel, nur ueber den
+        // Heldenplatz. `maybeAutoTrim` entscheidet selbst, ob es etwas
+        // zu tun gibt.
+        const getrimmt = maybeAutoTrim({ ...currentDeck, heroes });
+        updateSections({
+          heroes,
+          main: getrimmt.mainDeck, potion: getrimmt.potionDeck, side: getrimmt.sideDeck,
+        });
       }
     }
   }, [currentDeck, unsaved, decks, activeIdx]);
@@ -813,12 +836,32 @@ function DeckBuilder() {
       }
     }
 
+    // Verlaesst ein Held per Drag den Team-Slot, kann damit eine
+    // Deckbauklausel wegfallen (Cecilia: Attacks/Spells/Artifacts auf 5).
+    // Derselbe Abgleich wie in `removeFrom`; bei einem regelkonformen
+    // Deck ist er wirkungslos, deshalb bedingungslos — nur Cube bleibt
+    // aussen vor (dort gilt keine Kopiengrenze).
+    const heldVerlaesstTeam = fromSection === 'hero' && targetSection !== 'hero';
+    let kappung = null;
+    if (heldVerlaesstTeam && !isCubeDeck(tempDeck)) {
+      const getrimmt = trimOverLimitCopies(tempDeck);
+      const veraendert = getrimmt.mainDeck.length !== tempDeck.mainDeck.length
+        || getrimmt.potionDeck.length !== tempDeck.potionDeck.length
+        || getrimmt.sideDeck.length !== tempDeck.sideDeck.length;
+      if (veraendert) {
+        kappung = getrimmt;
+        tempDeck.mainDeck = getrimmt.mainDeck;
+        tempDeck.potionDeck = getrimmt.potionDeck;
+        tempDeck.sideDeck = getrimmt.sideDeck;
+      }
+    }
+
     const changes = {};
     const nicolasCleanup = fromSection === 'hero' && targetSection !== 'hero' && cardName === 'Nicolas, the Hidden Alchemist';
-    if (fromSection === 'main' || targetSection === 'main' || nicolasCleanup) changes.main = tempDeck.mainDeck;
+    if (fromSection === 'main' || targetSection === 'main' || nicolasCleanup || kappung) changes.main = tempDeck.mainDeck;
     if (fromSection === 'heroes' || targetSection === 'heroes' || fromSection === 'hero' || targetSection === 'hero') changes.heroes = tempDeck.heroes;
-    if (fromSection === 'potion' || targetSection === 'potion' || nicolasCleanup) changes.potion = tempDeck.potionDeck;
-    if (fromSection === 'side' || targetSection === 'side') changes.side = tempDeck.sideDeck;
+    if (fromSection === 'potion' || targetSection === 'potion' || nicolasCleanup || kappung) changes.potion = tempDeck.potionDeck;
+    if (fromSection === 'side' || targetSection === 'side' || kappung) changes.side = tempDeck.sideDeck;
     updateSections(changes);
   }, [currentDeck, addCardTo, addCardAt, updateSections]);
 

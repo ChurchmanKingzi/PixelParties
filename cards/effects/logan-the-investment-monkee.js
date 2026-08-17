@@ -48,6 +48,11 @@
 //     wie bei den meisten Helden-Effekten.
 // ═══════════════════════════════════════════
 
+// Als Ruling 17.8. ("Tuscan Aristocrat"): eine Gold-OPTION faellt weg,
+// solange der Gewinn gesperrt ist — statt eine Wahl anzubieten, die
+// nichts bringt. Auslegung in `_gold-block-shared.js`.
+const { goldGainWouldBeBlocked } = require('./_gold-block-shared');
+
 'use strict';
 
 const CARD_NAME = 'Logan, the Investment Monkee';
@@ -178,10 +183,13 @@ module.exports = {
     const ps = engine.gs.players[pi];
     const heroIdx = ctx.card?.heroIdx;
     const hero = ps?.heroes?.[heroIdx];
-    if (!hero || hero.name !== CARD_NAME) return;
+    // `false` statt blossem `return` an JEDEM Abbruchpfad: sonst
+    // stempelt die Engine das Einmal-pro-Zug, obwohl nichts geschah
+    // (Als Befund 17.8. an Cecilia — gleiche Bauart hier).
+    if (!hero || hero.name !== CARD_NAME) return false;
 
     const gold = ps.gold || 0;
-    if (gold <= 0) return;
+    if (gold <= 0) return false;
 
     // Betrag frei waehlbar von 1 bis Gold. `renderAs: 'slider'` gibt dem
     // Client einen Schieberegler mit Zahlenfeld (Als Vorgabe) — die
@@ -206,7 +214,7 @@ module.exports = {
       cancellable: true,
       options,
     });
-    if (!wahl?.optionId) return;
+    if (!wahl?.optionId) return false;   // Abbruch — Zug bleibt unverbraucht
 
     const betrag = Math.min(gold, Math.max(1, parseInt(wahl.optionId, 10) || 0));
 
@@ -227,13 +235,14 @@ module.exports = {
     } finally {
       engine._loganInvestInFlight = Math.max(0, (engine._loganInvestInFlight || 1) - 1);
     }
-    if (!bezahlt) return;
+    if (!bezahlt) return false;
 
     // JETZT einmal pruefen. Hat die Zahlung das Gold auf 0 gebracht,
     // verfaellt der GESAMTE Bestand in einem Ereignis — die woertliche
     // Lesart des Kartentexts, aber ohne die doppelte Meldung.
     pruefePleite(engine, pi);
     engine.sync();
+    return true;
   },
 
   // ── 2) PLEITE RAEUMT AUF — EIN Vertrag statt drei Hooks ─────────
@@ -278,7 +287,9 @@ module.exports = {
         description: `${zaehler} Invest Counter${zaehler === 1 ? '' : 's'} — choose an effect to activate.`,
         cancellable: true,
         options: [
-          { id: 'gold',   label: `💰 Gain ${zaehler} Gold` },
+          // Gold-Option nur, wenn der Gewinn nicht gesperrt ist.
+          ...(goldGainWouldBeBlocked(engine, pi)
+            ? [] : [{ id: 'gold', label: `💰 Gain ${zaehler} Gold` }]),
           { id: 'damage', label: `💥 Deal ${schaden} damage`, description: 'to any target on the board' },
         ],
       });

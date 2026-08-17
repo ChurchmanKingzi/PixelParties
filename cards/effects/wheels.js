@@ -16,6 +16,23 @@
 //  function (indices shift after each splice).
 // ═══════════════════════════════════════════
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
+/**
+ * Die waehlbaren Fahrten. Faellt eine Option der Zieh-Sperre zum Opfer,
+ * wird sie gar nicht erst angeboten. Beide Optionen gesperrt kann es
+ * nicht geben — 4 liegt ausserhalb der Sperre (genau 2 oder 3).
+ */
+function wheelsOptionen(engine, pi) {
+  const alle = [
+    { id: 'draw3', label: 'Draw 3, Discard 1', description: 'Draw 3 cards, then discard 1 from your hand.', color: '#44cc88', menge: 3 },
+    { id: 'draw4', label: 'Draw 4, Delete 2', description: 'Draw 4 cards, then delete 2 from your hand.', color: '#ff8844', menge: 4 },
+  ];
+  return alle
+    .filter(o => !drawWouldBeBlocked(engine, pi, o.menge))
+    .map(({ menge, ...rest }) => rest);
+}
+
 module.exports = {
   isTargetingArtifact: true,
 
@@ -44,10 +61,12 @@ module.exports = {
       type: 'optionPicker',
       title: 'Wheels',
       description: 'Choose your ride:',
-      options: [
-        { id: 'draw3', label: 'Draw 3, Discard 1', description: 'Draw 3 cards, then discard 1 from your hand.', color: '#44cc88' },
-        { id: 'draw4', label: 'Draw 4, Delete 2', description: 'Draw 4 cards, then delete 2 from your hand.', color: '#ff8844' },
-      ],
+      // ── Tuscan Artist (Als Ruling 16.8.) ──
+      // Der 3er-Zug ist gesperrt, der 4er nicht. Dann verschwindet die
+      // Option ganz, statt eine Wahl anzubieten, die nichts zieht — Al
+      // ausdruecklich: "bei Wheels gibt es dann KEINE Auswahl mehr".
+      // Der 4er-Zweig bleibt und wird unten automatisch gewaehlt.
+      options: wheelsOptionen(engine, pi),
       cancellable: true,
       gerrymanderEligible: true, // 2 distinct effects (Draw3+Discard1 vs Draw4+Delete2).
     });

@@ -43,7 +43,7 @@
 //  Necromancy re-summons can't re-fire.
 // ═══════════════════════════════════════════
 
-const { hasCardType, hasNumericCreatureLevel } = require('./_hooks');
+const { isPileCreature, hasCardType, hasNumericCreatureLevel } = require('./_hooks');
 
 module.exports = {
   requiresTarget: true,
@@ -74,7 +74,7 @@ module.exports = {
       for (let i = 0; i < (ps.hand || []).length; i++) {
         const cn = ps.hand[i];
         const cd = cardDB[cn];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isPileCreature(cd)) continue;
         if (!hasNumericCreatureLevel(cd)) continue;
         const effLevel = (cd.level || 0) + (handOffsets[i] || 0);
         if (effLevel <= 0) continue;

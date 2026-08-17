@@ -85,6 +85,11 @@ module.exports = {
       // Zug sofort beenden — Terror-Mechanik: der Server wartet, bis
       // Prompts, Effekte und eine laufende Kette durch sind.
       gs._terrorForceEndTurn = pi;
+      // Quelle fuer den Zug-Ende-Riegel (v436). Doom Prophecy beendet
+      // den EIGENEN Zug — Blackstache greift hier also nicht, Tuscan
+      // Prisoner schon ("unaffected by ALL effects that would end
+      // your turn", Als Ruling 16.8.).
+      gs._terrorForceEndSource = { name: CARD_NAME, owner: pi };
       engine.log('doom_prophecy_end_turn', { player: ps.username });
       engine.sync();
     },

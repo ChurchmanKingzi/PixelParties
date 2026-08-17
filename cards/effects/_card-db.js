@@ -38,7 +38,20 @@ function getCardDB(engine) {
     try { return engine._getCardDB(); } catch { /* Rückfall auf den eigenen Cache */ }
   }
   if (_cache) return _cache;
-  const roh = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
+  // Lesefehler geben eine LEERE Map zurück statt zu werfen. Das war das
+  // Verhalten der 13 lokalen Kopien, die am 17.8. auf dieses Modul
+  // umgestellt wurden, und es ist im Live-Spiel das gutmütigere: eine
+  // unlesbare cards.json lässt einzelne Karten wirkungslos bleiben,
+  // statt einen Hook mitten in der Auflösung zu sprengen. Der Fehler
+  // wird laut protokolliert und NICHT gecacht — ein vorübergehender
+  // Fehler heilt beim nächsten Aufruf von selbst.
+  let roh;
+  try {
+    roh = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/cards.json'), 'utf-8'));
+  } catch (e) {
+    console.error('[_card-db] cards.json nicht lesbar:', e.message);
+    return {};
+  }
   const db = {};
   roh.forEach(c => { db[c.name] = c; });
   _cache = db;

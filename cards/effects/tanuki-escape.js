@@ -82,6 +82,12 @@ const COST_NAME    = 'Rebelliokai Timid Tanuki';
 const MAX_BOUNCE   = 3;
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Hand
+
   spellPlayCondition(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
@@ -147,7 +153,10 @@ module.exports = {
       let shuffledNames = [];
       if (budget > 0 && (ps.hand || []).length > 0) {
         const cap = Math.min(budget, ps.hand.length);
-        const eligibleIndices = ps.hand.map((_, i) => i);
+        const waehlbar = new Set(engine.shuffleBackEligibleHandCards(pi));
+        const eligibleIndices = ps.hand
+          .map((_, i) => i)
+          .filter(i => waehlbar.has(ps.hand[i]));
         const handPick = await engine.promptGeneric(pi, {
           type:           'handPick',
           title:          CARD_NAME,
@@ -169,8 +178,10 @@ module.exports = {
         }
       }
 
+      let zurueckgegangen = 0;
       if (shuffledNames.length > 0) {
-        await engine.actionMulliganCards(pi, shuffledNames);
+        const r = await engine.actionMulliganCards(pi, shuffledNames);
+        zurueckgegangen = r.totalReturned || 0;
         await engine._delay(280);
       }
 
@@ -178,7 +189,11 @@ module.exports = {
       // The rule ties this count to "that many" — i.e. the count actually
       // shuffled back, NOT the original `budget`. If the player chose 0
       // shuffles, they tutor 0 cards (Spell still resolves, cost paid).
-      const tutorBudget = shuffledNames.length;
+      // ★ Als Regel (17.8.): "that many" haengt an dem, was TATSAECHLICH
+      // zurueckging — ueber BEIDE Decks, gestohlene Karten also inklusive.
+      // Vorher stand hier die AUSWAHL-Menge; sperrt Hatusbal einen Teil,
+      // haette sie zu viel getutort.
+      const tutorBudget = zurueckgegangen;
       if (tutorBudget > 0) {
         const cardDB = engine._getCardDB();
         const shuffledSet = new Set(shuffledNames);

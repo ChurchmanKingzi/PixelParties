@@ -134,6 +134,12 @@ function isFirstMagicArtsSpellThisTurn(engine, playerIdx) {
 }
 
 module.exports = {
+  // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
+  // Distracting Crystal gesperrt und von Hatusbal, the Leader of
+  // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR
+  // Hand und Ablage ab — Brett/Loeschstapel ausdruecklich nicht.
+  shufflesFromHandOrDiscardIntoDeck: true,   // Herkunft: Ablage
+
   /**
    * Dynamic `inherentAction` — Main Phase plays self-provide as an
    * additional Action when this is the player's first Magic Arts

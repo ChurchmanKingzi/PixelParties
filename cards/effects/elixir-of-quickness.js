@@ -4,10 +4,20 @@
 //  No restrictions, no discard requirement.
 // ═══════════════════════════════════════════
 
+// Als Ruling 16.8. ("Tuscan Artist"): ist der 2er-/3er-Zug der EINZIGE
+// Nutzen dieser Karte, wird sie gesperrt statt wirkungslos zu feuern.
+// Die Auslegung steht in `_draw-block-shared.js`.
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 const CARD_NAME = 'Elixir of Quickness';
 
 module.exports = {
   isPotion: true,
+
+  // Der Zug IST die ganze Karte — ohne ihn bleibt nichts uebrig.
+  canActivate(gs, pi, engine) {
+    return !drawWouldBeBlocked(engine, pi, 3);
+  },
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;

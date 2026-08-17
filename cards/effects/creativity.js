@@ -10,6 +10,8 @@
 //  copies stacked on top).
 // ═══════════════════════════════════════════
 
+const { drawWouldBeBlocked } = require('./_draw-block-shared');
+
 module.exports = {
   // Deckout-Prävention (generischer Contract): Diese Ability zieht
   // Karten, wenn ihrem Helden eine weitere Ability angehängt wird —
@@ -69,6 +71,14 @@ module.exports = {
 
       // No draws at level 0 or below
       if (creativityLevel <= 0) return;
+
+      // ── Tuscan Artist (Als Ruling 16.8.) ──
+      // Auf Lv2/Lv3 zieht Creativity 2 bzw. 3 Karten, und der Zug ist
+      // ihr ganzer Effekt. Sperrt der Gegner ihn, feuert sie GAR NICHT
+      // — und verbraucht dann auch ihr Once-per-turn nicht (Al
+      // ausdruecklich). Deshalb steht die Pruefung VOR dem SOPT-Stempel.
+      // Lv1 zieht 1 und laeuft normal durch.
+      if (drawWouldBeBlocked(engine, pi, creativityLevel)) return;
 
       // Claim SOPT and draw
       engine.gs.hoptUsed[soptKey] = engine.gs.turn;

@@ -26,7 +26,7 @@
 //  the placement helper.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Klaus, the Cult Leader';
 
@@ -99,7 +99,7 @@ module.exports = {
         if (seen.has(cn)) continue;
         seen.add(cn);
         const cd = cardDB[cn];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !isPileCreature(cd)) continue;
         // Effective level (Whoolmoth-style reducers, per-slot offsets).
         const lvl = engine.effectiveCardLevel(cd, pi, { handIdx: i });
         if (lvl >= spellLevel) continue;
