@@ -44,9 +44,13 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+// v481: Schluessel und Rundenriegel kommen aus dem gemeinsamen Modul.
+// `The Final Trial` liest dieselbe Liste — zwei Kopien waeren eine
+// Driftfalle. Verhalten unveraendert, nur die Quelle der Wahrheit.
+const { TRIAL_KEYS, trialTurnIsClean, stampTrialLock } = require('./_trials-shared');
 
 const CARD_NAME = 'Trial of Dominance';
-const ONCE_PER_GAME_KEY = 'trialOfDominance';
+const ONCE_PER_GAME_KEY = TRIAL_KEYS[CARD_NAME];
 const HEART_MS = 950;
 
 /** Live, non-face-down Creatures the opponent controls. */
@@ -71,11 +75,7 @@ module.exports = {
   // Symmetric Attack/Spell lock (mirrors Trial of Coolness): the turn
   // must be Trial-or-nothing — refuse if an Attack/Spell already ran.
   spellPlayCondition(gs, pi) {
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    if ((ps.attacksPlayedThisTurn || 0) > 0) return false;
-    if ((ps.spellsPlayedThisTurn || 0) > 0) return false;
-    return true;
+    return trialTurnIsClean(gs, pi);
   },
 
   hooks: {
@@ -89,7 +89,7 @@ module.exports = {
 
       // Lock out further Attacks/Spells this turn — stamped regardless
       // of whether the wipe hits anything (the Trial was still played).
-      ps._attackSpellLockedTurn = gs.turn;
+      stampTrialLock(gs, pi);
 
       const creatures = collectOpponentCreatures(engine, oppIdx);
 

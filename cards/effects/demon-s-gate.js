@@ -127,6 +127,12 @@ module.exports = {
       maxSelect: 1,
       cancellable: true,
       confirmLabel: '🔥 Cast!',
+      // Einsatz-Pick, kein Mulligan (18.8.). Ohne diesen Marker wies
+      // der generische CPU-Handler dem Gate die SCHLECHTESTE Karte zu
+      // — er ist fuer Abwurf gebaut und sortiert aufsteigend. Mit ihm
+      // laeuft die Wahl ueber `tutorPickRules['Demon’s Gate→<Spell>']`
+      // und MCTS. Betrifft nur die CPU; menschliche Zuege unveraendert.
+      pickIntent: 'use',
     });
     if (!result || result.cancelled
         || !Array.isArray(result.selectedCards)

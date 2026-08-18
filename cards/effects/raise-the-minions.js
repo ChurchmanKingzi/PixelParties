@@ -32,11 +32,18 @@ function getFreeSupportZonesForHero(ps, heroIdx) {
   const zones = [];
   if (!ps) return zones;
   const hero = ps.heroes?.[heroIdx];
-  if (!hero?.name || hero.hp <= 0) return zones;
+  // ★ ALS REGEL (18.8.): der Kartentext sagt „PLACE them into free
+  // Support Zones of the user" — bei „place" ist der Zustand des
+  // Helden komplett egal. Die frühere Zeile schloss einen GEFALLENEN
+  // Nutzer aus und liess den Spruch dann ins Leere laufen.
+  // Der Namens-Check bleibt: „of the user" verlangt, dass in der
+  // Spalte ueberhaupt ein Held steht. Siehe CARD_API,
+  // „place ignores the host Hero entirely".
+  if (!hero?.name) return zones;
   const slots = ps.supportZones?.[heroIdx] || [];
   for (let si = 0; si < 3; si++) {
     if ((slots[si] || []).length === 0) {
-      zones.push({ heroIdx, slotIdx: si, label: `${hero.name} — Slot ${si + 1}` });
+      zones.push({ heroIdx, slotIdx: si, label: `${hero.name}${hero.hp <= 0 ? ' (KO)' : ''} — Slot ${si + 1}` });
     }
   }
   return zones;

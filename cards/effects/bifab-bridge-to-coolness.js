@@ -1,5 +1,15 @@
 // ═══════════════════════════════════════════
-//  SPELL: "Bifab, Bridge of Coolness"
+//  SPELL: "Bifab, Bridge to Coolness"
+//
+//  ★ NAME: "Bridge TO Coolness" ist ABSICHT (Als Ruling 17.8.) —
+//    kein Tippfehler, auch wenn die uebrigen Karten der Familie
+//    "… of Coolness" heissen (Modnir, Hammer of Coolness; Swellpnir,
+//    Mount of Coolness; Thrysh, Robber of Coolness). Bis v477 stand
+//    in cards.json faelschlich "of", waehrend die Kartenkunst schon
+//    "to" hiess — die Zuordnung Bild↔Karte lief ueber den
+//    entschaerften Namen ins Leere und die Karte war im Deckbuilder
+//    UNSICHTBAR. Nicht "zurueckreparieren".
+//
 //  Has no effect from your hand.
 //
 //  When it is the top of your Coolness Stack, you
@@ -7,12 +17,19 @@
 //  for any card and add it to your hand. This
 //  counts as an additional Action. 1/turn.
 //
-//  The 'noDefaultPlay' flag below makes the card
-//  fizzle if cast normally from hand — only the
-//  Stack-play path resolves the effect.
+//  ★ WORTLAUT: der Kartentext sagt seit v478 „You can only play 1
+//    … per turn" — nach Als Regel (v249) ist das die HARTE Variante,
+//    pro SPIELER, nicht pro Instanz. Genau das leistet
+//    `ctx.hardOncePerTurn` (→ `claimHOPT(key, controller)`).
+//    Bei blossem „Once per turn" waere es weich und pro Instanz.
+//
+//  Das `neverPlayable`-Flag weiter unten graut die
+//  Karte in der Hand aus — nur der Stack-Weg loest
+//  den Effekt aus. (Der Kopf nannte hier frueher ein
+//  Flag `noDefaultPlay`, das es im Projekt nie gab.)
 // ═══════════════════════════════════════════
 
-const CARD_NAME = 'Bifab, Bridge of Coolness';
+const CARD_NAME = 'Bifab, Bridge to Coolness';
 const HOPT_KEY  = 'bifabUsedThisTurn';
 
 module.exports = {

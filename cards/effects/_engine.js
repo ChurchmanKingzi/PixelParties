@@ -6324,10 +6324,63 @@ class GameEngine {
     return false;
   }
 
+  /**
+   * ★ ALS RULING 18.8.: „die Extraleben sollten stacken, sie kann dann
+   * mehrere haben!" (Anlass: Damsel-Cecilias eingebautes Extraleben
+   * machte sie zu einem illegalen Ziel fuer Trial of Coolness.)
+   *
+   * Die Marke ist deshalb kein einzelnes Objekt mehr, sondern kann
+   * einen Stapel tragen: `_extraLifeStack` ist eine Liste von Quellen.
+   * `_extraLife` bleibt als Feld bestehen — daran haengen etliche
+   * Lesestellen, und es zeigt immer die OBERSTE Marke. Verbraucht wird
+   * von oben; ist der Stapel leer, verschwindet auch `_extraLife`.
+   */
+  addExtraLife(target, lifeMark) {
+    if (!target) return 0;
+    const stack = Array.isArray(target._extraLifeStack) ? target._extraLifeStack : [];
+    // Eine schon vorhandene Einzelmarke (Cecilia, aeltere Spielstaende)
+    // in den Stapel uebernehmen, damit nichts verloren geht.
+    if (stack.length === 0 && target._extraLife) stack.push(target._extraLife);
+    stack.push(lifeMark || { by: 'Extra Life' });
+    target._extraLifeStack = stack;
+    target._extraLife = stack[stack.length - 1];
+    return stack.length;
+  }
+
+  /** Wie viele Extraleben traegt dieses Ziel gerade? */
+  countExtraLives(target) {
+    if (!target) return 0;
+    if (Array.isArray(target._extraLifeStack)) return target._extraLifeStack.length;
+    return target._extraLife ? 1 : 0;
+  }
+
+  /**
+   * Nimmt EIN Extraleben vom Traeger und gibt dessen Marke zurueck.
+   * Traeger ist ein Held (`hero`) oder die Counter einer Kreatur —
+   * beide fuehren dieselben zwei Felder.
+   */
+  _popExtraLife(traeger) {
+    if (!traeger) return null;
+    const stack = Array.isArray(traeger._extraLifeStack) ? traeger._extraLifeStack : null;
+    let lifeMark;
+    if (stack && stack.length > 0) {
+      lifeMark = stack.pop();
+      if (stack.length > 0) {
+        traeger._extraLife = stack[stack.length - 1];   // die naechste rueckt nach
+      } else {
+        delete traeger._extraLifeStack;
+        delete traeger._extraLife;
+      }
+    } else {
+      lifeMark = traeger._extraLife;
+      delete traeger._extraLife;
+    }
+    return lifeMark;
+  }
+
   _consumeExtraLife(target, knownOwnerIdx) {
     if (!target || target.hp > 0 || !target._extraLife) return false;
-    const lifeMark = target._extraLife;
-    delete target._extraLife;
+    const lifeMark = this._popExtraLife(target);
     target.hp = target.maxHp || 400;
     const ownerIdx = (knownOwnerIdx != null && knownOwnerIdx >= 0)
       ? knownOwnerIdx
@@ -7989,20 +8042,32 @@ class GameEngine {
         || fromZone === ZONES.ABILITY
         || fromZone === ZONES.SURPRISE
         || fromZone === ZONES.PERMANENT;
+      // ★ ALS BEFUND 18.8. (Trial of Dominance), in zwei Runden gelernt:
+      //  1. Erst flog die Karte ZWEIMAL — dieser Vorab-Flug ging immer
+      //     nach `discard`, obwohl `_redirectToDeleted` sie in den
+      //     Deleted Pile schickt; der Diff-Animator zeichnete dann noch
+      //     den richtigen Weg.
+      //  2. Mein erster Versuch (Vorab-Flug beim Umleiten WEGLASSEN)
+      //     war falsch: Al sah die Kreatur „komplett unsichtbar", bevor
+      //     ihre Bewegung anfing. Der Vorab-Flug ist naemlich genau das,
+      //     was die Karte in dem Moment zeigt, in dem sie vom Brett
+      //     verschwindet.
+      // Richtig ist Als Vorgabe woertlich: dasselbe Verfahren wie bei
+      // „durch Schaden getoetet → Discard", nur mit dem Deleted Pile
+      // als Ziel. Also Vorab-Flug BEHALTEN und nur sein ZIEL anpassen.
+      // Der Doppelflug bleibt trotzdem weg: der Client meldet einen
+      // ausdruecklichen `play_pile_transfer` in seinem
+      // `handToPilePending`-Eimer an (nach ZIEL getrennt) und
+      // unterdrueckt damit den Flug des Diff-Animators — was beim
+      // falschen Ziel `discard` eben NICHT griff, weil der Deleted Pile
+      // wuchs und nicht der Discard.
+      const _zielPile = targetCard._redirectToDeleted ? 'deleted' : 'discard';
       if (isBoardZone) {
         const payload = {
           owner: targetCard.owner,
           cardName: targetCard.name,
           from: fromZone,
-          // Cards opted into the discard→deleted redirect via
-          // `_redirectToDeleted` haven't flipped the flag yet (it
-          // fires inside onCardLeaveZone, which is called by
-          // actionMoveCard further down). For the common case the
-          // destination IS discard; the edge case where a redirect
-          // fires only loses the broadcast flight (the diff
-          // animator's deleted-pile branch still triggers) — caller
-          // can pre-emit a `to: 'deleted'` transfer if needed.
-          to: 'discard',
+          to: _zielPile,
           fromHeroIdx: targetCard.heroIdx,
         };
         if (fromZone === ZONES.PERMANENT) {
@@ -8838,6 +8903,15 @@ class GameEngine {
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
 
     let actualSlot = zoneSlot;
+    // ── Geteilte Zonen (Alice, the Transfer Student) ─────────────────
+    // ★ 18.8., Als Testbefund: die NORMALE Beschwoerung von der Hand
+    // laeuft nicht ueber `actionPlaceCreature`, sondern hier durch.
+    // Deshalb griff Alices Wirkung nur bei Sonderplatzierungen (dem
+    // Slime), waehrend ein regulaer beschworener 3-Headed Giant auf
+    // einen besetzten Platz nicht durfte. Der Riegel ist jetzt an
+    // beiden Stellen derselbe.
+    const { canShareInto } = require('./_alice-shared');
+    const mayShare = (z) => canShareInto(this, playerIdx, heroIdx, z, cardName);
 
     // Auto-find first free slot when no specific slot requested
     if (actualSlot < 0) {
@@ -8847,6 +8921,14 @@ class GameEngine {
           break;
         }
       }
+      // Kein freier Platz — mit Alice darf die Karte trotzdem zu einer
+      // Namensgleichen dazu. Erst NACH dem Freien suchen: ein leerer
+      // Platz bleibt die natuerlichere Wahl.
+      if (actualSlot < 0) {
+        for (let z = 0; z < 3; z++) {
+          if (mayShare(z)) { actualSlot = z; break; }
+        }
+      }
       if (actualSlot < 0) {
         this.log('support_zone_full', { card: cardName, heroIdx, reason: 'no_free_zone' });
         return null;
@@ -8854,7 +8936,14 @@ class GameEngine {
     }
 
     // Check if desired slot is occupied
+    let shareHere = false;
     if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0) {
+      if (mayShare(actualSlot)) {
+        // Gewuenschter Platz ist besetzt, aber von einer Namensgleichen
+        // — die Karte stoesst dazu, statt woandershin verschoben zu
+        // werden. Genau das ist Alices Wirkung.
+        shareHere = true;
+      } else {
       // Find another free base zone (0–2) on the same hero
       actualSlot = -1;
       for (let z = 0; z < 3; z++) {
@@ -8864,15 +8953,22 @@ class GameEngine {
         }
       }
       if (actualSlot < 0) {
+        for (let z = 0; z < 3; z++) {
+          if (z !== zoneSlot && mayShare(z)) { actualSlot = z; shareHere = true; break; }
+        }
+      }
+      if (actualSlot < 0) {
         this.log('support_zone_full', { card: cardName, heroIdx, reason: 'no_free_zone' });
         return null; // No free zones — caller handles fizzle
       }
       this.log('support_zone_relocated', { card: cardName, heroIdx, from: zoneSlot, to: actualSlot });
+      }
     }
 
     // Place the card
     if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
-    ps.supportZones[heroIdx][actualSlot] = [cardName];
+    if (shareHere) ps.supportZones[heroIdx][actualSlot].push(cardName);
+    else ps.supportZones[heroIdx][actualSlot] = [cardName];
     const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
     // Drain pending hand-indexed-field captures for this cardName. The
     // splice interceptor stamped these onto `ps._handIndexedFieldPending`
@@ -12214,6 +12310,17 @@ class GameEngine {
           const supZones = ps.supportZones[hi] || [];
           let hasFree = false;
           for (let z = 0; z < 3; z++) { if ((supZones[z] || []).length === 0) { hasFree = true; break; } }
+          // ★ 18.8.: mit „Alice, the Transfer Student" zaehlt auch ein
+          // BESETZTER Platz als Ziel, sofern dort schon eine Kreatur
+          // GLEICHEN Namens liegt. Ohne diese Zeile waere die Karte bei
+          // vollem Brett gar nicht erst spielbar — und damit auch im
+          // Client nirgends anklickbar.
+          if (!hasFree) {
+            const { canShareInto: _shareOk } = require('./_alice-shared');
+            for (let z = 0; z < 3; z++) {
+              if (_shareOk(this, playerIdx, hi, z, cd.name)) { hasFree = true; break; }
+            }
+          }
           // Free-zone bypass — the card can opt out of the "Hero must
           // have a free slot" requirement by exporting canBypassFree
           // ZoneRequirement(gs, pi, heroIdx, cd, engine). Used by the
@@ -16103,7 +16210,22 @@ class GameEngine {
       : 0;
 
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-    ps.supportZones[heroIdx][slotIdx] = [cardName];
+    // ── Geteilte Zone (Alice, the Transfer Student) ──────────────────
+    // Liegt dort schon mindestens eine Kreatur GLEICHEN Namens und
+    // teilt dieser Spieler seine Zonen, wird die neue Kopie DAZUGELEGT
+    // statt den Platz zu ueberschreiben. Der Platz fuehrt dann mehrere
+    // Nennungen desselben Namens; jede hat ihre eigene Instanz mit
+    // eigener HP, eigenen Countern und eigenem Status.
+    // Ohne Alice bleibt es beim bisherigen Ueberschreiben — die
+    // Bedingung ist ohne ihren Schalter immer falsch.
+    {
+      const { canShareInto } = require('./_alice-shared');
+      if (canShareInto(this, playerIdx, heroIdx, slotIdx, cardName)) {
+        ps.supportZones[heroIdx][slotIdx].push(cardName);
+      } else {
+        ps.supportZones[heroIdx][slotIdx] = [cardName];
+      }
+    }
 
     const inst = this._trackCard(cardName, playerIdx, ZONES.SUPPORT, heroIdx, slotIdx);
     inst.counters = inst.counters || {};
@@ -16246,6 +16368,18 @@ class GameEngine {
             : `Column ${hi + 1}`;
           zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
         }
+      }
+    }
+    // ── Geteilte Zonen (Alice, the Transfer Student) ─────────────────
+    // Wer `opts.shareableFor: '<Kartenname>'` mitgibt, bekommt zu den
+    // freien Plaetzen auch die dazu, auf denen bereits eine Kreatur
+    // GLEICHEN Namens liegt. Opt-in, damit Aufrufer, die wirklich
+    // einen leeren Platz brauchen (Umzug, Ausruestung), unveraendert
+    // bleiben. Ohne Alice liefert der Zusatz immer eine leere Liste.
+    if (opts.shareableFor) {
+      const { shareableSupportZones } = require('./_alice-shared');
+      for (const z of shareableSupportZones(this, playerIdx, opts.shareableFor, { livingHeroesOnly: livingOnly })) {
+        zones.push(z);
       }
     }
     return zones;
@@ -17074,7 +17208,8 @@ class GameEngine {
     // Mirrors the matching gate in `promptGeneric`.
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50);
-      return this._getCpuTargetResponse(validTargets, config, playerIdx);
+      const cpuPicked = await this._getCpuTargetResponse(validTargets, config, playerIdx);
+      return this._disambiguateStackedTargets(playerIdx, validTargets, cpuPicked);
     }
     // Rewrite equip-target IDs to use the creature's PHYSICAL side
     // before handing them to the client — see `normalizeValidTargets`
@@ -17092,7 +17227,7 @@ class GameEngine {
       t.owner = physSide;
       t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
     }
-    return new Promise((resolve) => {
+    const picked = await new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
         potionName: config.title || 'Effect',
@@ -17173,6 +17308,60 @@ class GameEngine {
       };
       this.sync();
     });
+    return this._disambiguateStackedTargets(playerIdx, validTargets, picked);
+  }
+
+  /**
+   * WELCHE Kopie ist gemeint? — Instanz-Rueckfrage bei geteilten Zonen
+   * („Alice, the Transfer Student", Als Vorgabe 18.8.).
+   *
+   * Ein geteilter Platz erscheint auf dem Brett als EINE Karte; die
+   * Zielauswahl liefert deshalb auch nur EINE Ziel-ID je Platz. Steckt
+   * dahinter aber ein Stapel, muss der Spieler sagen koennen, welche
+   * der Kopien er meint — sie haben eigene HP, eigene Counter, eigenen
+   * Status.
+   *
+   * ★ Genau EINE Stelle, weil `promptEffectTarget` der gemeinsame
+   * Flaschenhals aller Karten-Zielabfragen ist. Kein Kartenskript muss
+   * etwas davon wissen: wir schreiben die `cardInstance` des gewaehlten
+   * Ziels auf die ausgesuchte Kopie um, und weil die Aufrufer genau
+   * dieses Objekt weiterverwenden (`targets.find(t => t.id === …)`),
+   * wirkt die Wahl ueberall.
+   *
+   * Ohne Alice ist das ein No-op: `isStacked` ist dann nie wahr.
+   */
+  async _disambiguateStackedTargets(playerIdx, validTargets, pickedIds) {
+    if (!Array.isArray(pickedIds) || pickedIds.length === 0) return pickedIds;
+    const alice = require('./_alice-shared');
+    for (const id of pickedIds) {
+      const t = (validTargets || []).find(v => v && v.id === id);
+      if (!t || t.type !== 'equip') continue;
+      const side = t.cardInstance
+        ? (t.cardInstance.controller ?? t.cardInstance.owner)
+        : t.owner;
+      const heroIdx = t.heroIdx;
+      const slotIdx = t.slotIdx ?? t.cardInstance?.zoneSlot;
+      if (side == null || heroIdx == null || slotIdx == null) continue;
+      const stack = alice.stackAt(this, side, heroIdx, slotIdx);
+      if (stack.length <= 1) continue;
+
+      const choice = await this.promptGeneric(playerIdx, {
+        type: 'instancePick',
+        title: t.cardName || stack[0].name,
+        description: 'This zone is shared — choose which copy you mean.',
+        instances: stack.map(i => alice.describeInstance(this, i)),
+        cancellable: false,
+      });
+      const wanted = choice && choice.instId
+        ? stack.find(i => i.id === choice.instId)
+        : null;
+      // Keine (oder unbrauchbare) Antwort → beim obersten Stapeleintrag
+      // bleiben. Das ist das bisherige Verhalten und nie schlechter als
+      // ein abgebrochener Effekt.
+      t.cardInstance = wanted || stack[stack.length - 1];
+      t.cardName = t.cardInstance.name;
+    }
+    return pickedIds;
   }
 
   /**
@@ -25361,10 +25550,18 @@ class GameEngine {
           const slot = (scanPs.supportZones[hi] || [])[zi] || [];
           if (slot.length === 0) continue;
           const creatureName = slot[0];
-          const inst = this.cardInstances.find(c =>
+          // ★ 18.8. (geteilte Zonen, „Alice, the Transfer Student"):
+          // ALLE Instanzen dieses Platzes durchgehen, nicht nur die
+          // erste. Vorher stand hier ein `find(...)` — in einem Stapel
+          // war damit nur die unterste Kopie ueberhaupt aktivierbar,
+          // und der Client konnte die anderen gar nicht anbieten.
+          // Fuer einen gewoehnlichen Platz mit genau einer Kreatur ist
+          // die Schleife wortgleich zum alten Verhalten.
+          const slotInsts = this.cardInstances.filter(c =>
             (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === zi
           );
-          if (!inst) continue;
+          if (slotInsts.length === 0) continue;
+          for (const inst of slotInsts) {
           if (inst.faceDown) continue;
           // CC-locked creatures cannot fire their own effects — mirrors the
           // engine's hook filter at runHooks (frozen/stunned/negated/nulled
@@ -25450,6 +25647,7 @@ class GameEngine {
             actionCost: isActionCost,
             charmedOwner: charmedOwner != null ? pi : undefined,
           });
+          } // ← Ende der Instanz-Schleife (geteilte Zonen)
         }
       }
     };
@@ -28543,8 +28741,10 @@ class GameEngine {
         // the player to spend a card when Extra Life is already saving
         // this creature). Marker is consumed at this point.
         if (e.inst.counters._extraLife && !e.inst._reviveAfterDeath) {
-          const lifeMark = e.inst.counters._extraLife;
-          delete e.inst.counters._extraLife;
+          // ★ Stapelbar seit Als Ruling 18.8. — es wird EINE Marke
+          // verbraucht, die naechste rueckt nach. `_popExtraLife`
+          // kapselt beide Faelle (Stapel und alte Einzelmarke).
+          const lifeMark = this._popExtraLife(e.inst.counters);
           e.inst._reviveAfterDeath = {
             name: e.inst.name,
             owner: e.inst.owner,

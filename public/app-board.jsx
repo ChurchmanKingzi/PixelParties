@@ -9587,6 +9587,141 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Trial of Annoyance ───────────────────────────────────────────
+  // Als Vorgabe (18.8.): „Neun geflügelte Katzen (animiert!), die in
+  // Dreiergruppen um jede der drei Hero Zones des Gegners schwirren wie
+  // lästige Fliegen."
+  // Eine Ausloesung je gegnerischem Helden zeichnet DREI Katzen — drei
+  // Ausloesungen ergeben die neun. Jede Katze fliegt eine eigene
+  // Lissajous-Schleife (zwei Sinus mit ungleichen Frequenzen), damit die
+  // Bahnen sich nicht decken und das Ganze wirklich nach nervigem
+  // Umherschwirren aussieht statt nach Kreisverkehr.
+  // Bewegt wird ausschliesslich per `transform` — Projektregel, und der
+  // Compositor uebernimmt es ohne Layout-Arbeit.
+  annoying_cats: (() => {
+    const KATZEN = ['🐈', '🐱', '🐈‍⬛'];
+    return function AnnoyingCatsEffect({ x, y }) {
+      const katzen = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
+        char:  KATZEN[i % KATZEN.length],
+        // Ungleiche Radien und Frequenzen je Katze → keine zwei Bahnen
+        // gleichen sich, und keine schwirrt im selben Takt.
+        rx:    26 + i * 9 + Math.random() * 8,
+        ry:    16 + i * 5 + Math.random() * 6,
+        dauer: 900 + i * 160 + Math.random() * 200,
+        delay: i * 120 + Math.random() * 90,
+        dreh:  (i / 3) * 360,
+        size:  15 + Math.random() * 6,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {katzen.map((k, i) => (
+            <div key={'ac' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              animation: `annoyCatOrbit${i % 3} ${k.dauer}ms linear ${k.delay}ms 3`,
+              opacity: 0,
+            }}>
+              <div style={{
+                fontSize: k.size,
+                transform: `rotate(${k.dreh}deg)`,
+                filter: 'drop-shadow(0 0 3px rgba(120,220,255,.75))',
+              }}>
+                {/* Fluegel als eigenes Zeichen daneben — flattert schneller
+                    als die Bahn, damit es lebendig wirkt. */}
+                <span style={{
+                  display: 'inline-block',
+                  animation: `annoyCatFlap ${180 + i * 40}ms ease-in-out infinite alternate`,
+                }}>🪽</span>
+                <span>{k.char}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Trial of Loyalty ─────────────────────────────────────────────
+  // Als Vorgabe (18.8.): „für jede vom Deck auf die Hand fliegende Karte
+  // kleine weiße Vögelchen und Herzchen." Wird je geholter Karte einmal
+  // ausgeloest (siehe `trial-of-loyalty.js`), begleitet also jeden
+  // einzelnen Flug statt einmal fuer alle.
+  loyalty_birds: (() => {
+    const VOEGEL = ['🕊️', '🐦'];
+    return function LoyaltyBirdsEffect({ x, y }) {
+      const teile = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+        const istVogel = i % 3 !== 2;   // zwei Voegel je Herzchen
+        return {
+          char: istVogel
+            ? VOEGEL[Math.floor(Math.random() * VOEGEL.length)]
+            : '🤍',
+          xOff:  -60 + Math.random() * 120,
+          delay: Math.random() * 320,
+          dur:   620 + Math.random() * 520,
+          size:  istVogel ? 13 + Math.random() * 9 : 10 + Math.random() * 8,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{
+            background: 'radial-gradient(circle, rgba(255,255,255,.55) 0%, rgba(220,235,255,.22) 45%, transparent 72%)',
+          }} />
+          {teile.map((t, i) => (
+            <div key={'lb' + i} style={{
+              position: 'absolute', left: t.xOff, top: 8,
+              fontSize: t.size,
+              filter: 'drop-shadow(0 0 4px rgba(255,255,255,.85))',
+              animation: `holySparkleRise ${t.dur}ms ease-out ${t.delay}ms forwards`,
+              opacity: 0,
+            }}>{t.char}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Trial of Knowledge ───────────────────────────────────────────
+  // Als Vorgabe (18.8.): „Blaue Herzchen und Particles auf allen
+  // 'Trial of'-Karten auf der Hand." Eine Ausloesung je betroffener
+  // Handkarte, verankert an genau dieser Karte (`handIdx`).
+  knowledge_sparkle: (() => {
+    return function KnowledgeSparkleEffect({ x, y }) {
+      const teile = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+        const istHerz = i % 4 === 0;
+        const ang = (i / 16) * Math.PI * 2 + (Math.random() * 0.5 - 0.25);
+        const rad = 18 + Math.random() * 22;
+        return {
+          istHerz,
+          dx: Math.cos(ang) * rad,
+          dy: Math.sin(ang) * rad,
+          size: istHerz ? 12 + Math.random() * 8 : 3 + Math.random() * 4,
+          delay: Math.random() * 260,
+          dur: 640 + Math.random() * 380,
+          ton: ['#7fd4ff', '#4aa8ff', '#a8e4ff', '#2f8fe0'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-gold-flash" style={{
+            background: 'radial-gradient(circle, rgba(90,180,255,.55) 0%, rgba(40,120,220,.25) 45%, transparent 72%)',
+          }} />
+          {teile.map((t, i) => (
+            <div key={'ks' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              // Zwei Groessen im selben Ausbruch: Herzchen als Zeichen,
+              // Partikel als winzige leuchtende Punkte.
+              ...(t.istHerz
+                ? { fontSize: t.size, color: t.ton,
+                    textShadow: `0 0 6px ${t.ton}` }
+                : { width: t.size, height: t.size, borderRadius: '50%',
+                    background: t.ton, boxShadow: `0 0 8px ${t.ton}` }),
+              animation: `knowledgeDrift ${t.dur}ms ease-out ${t.delay}ms forwards`,
+              opacity: 0,
+              '--kdx': `${t.dx}px`,
+              '--kdy': `${t.dy}px`,
+            }}>{t.istHerz ? '♥' : null}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   // Trial of Dominance — a ring of blood-red hearts blooms around the
   // doomed Creature, then fades as it's deleted. Uses the ♥ text glyph
   // (U+2665) so the colour is fully controllable (emoji hearts can't
@@ -15517,6 +15652,117 @@ const CARD_NAME_TYPE_COLORS = { Hero:'#aa44ff', 'Ascended Hero':'#7722cc', Abili
  * Bereich geklemmt, damit eine leere oder unsinnige Eingabe nie eine
  * ungueltige Antwort schickt.
  */
+/**
+ * ═══ GETEILTE SUPPORT-ZONEN: die Instanz-Liste ═══
+ * „Alice, the Transfer Student" laesst mehrere Kreaturen GLEICHEN
+ * Namens einen Platz teilen. Das Brett zeigt dafuer EINE Karte mit
+ * einer Stueckzahl; wer wissen will, was genau dort liegt — oder
+ * welche Kopie ihren Effekt zuenden soll —, bekommt diese Liste.
+ *
+ * EIN Baustein fuer ZWEI Verwendungen, damit beide dasselbe zeigen:
+ *   • Nachschlagen und Aktivieren: Klick auf die gestapelte Karte
+ *   • Auswaehlen: die `instancePick`-Abfrage der Engine
+ *
+ * ★ 18.8., nach Als Test — die Zustaende werden mit **denselben
+ * Bausteinen wie das Brett** gezeichnet: `StatusBadges` und
+ * `BuffColumn` aus app-shared.jsx. Vorher hat diese Liste die rohen
+ * Counter selbst als Chips ausgegeben, mit zwei haesslichen Folgen:
+ * interne Buchhaltung wie `isPlacement` stand als Zustand da, und
+ * `buffs` (ein OBJEKT) wurde als Zahl gerendert — „×[object Object]".
+ * Die geteilten Bausteine kennen zu jedem Status und jedem Buff ein
+ * Symbol und einen ausformulierten Satz, zeigen Buchhaltung gar nicht
+ * erst an und wachsen automatisch mit, wenn eine neue Karte einen
+ * neuen Zustand einfuehrt.
+ *
+ * `canActivateFor(inst)` entscheidet je Zeile, ob sie ihren Effekt
+ * zuenden kann; `onActivate` bekommt dann genau diese Instanz.
+ */
+function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate }) {
+  const list = instances || [];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {list.map((inst, i) => {
+        const hp = inst.hp != null ? inst.hp : 0;
+        const maxHp = inst.maxHp != null && inst.maxHp > 0 ? inst.maxHp : Math.max(hp, 1);
+        const pct = Math.max(0, Math.min(100, Math.round((hp / maxHp) * 100)));
+        // Rot, sobald es knapp wird — dieselbe Ampel wie auf dem Brett.
+        const barColor = pct <= 25 ? '#e05252' : pct <= 60 ? '#e0b152' : '#52c471';
+        const activatable = typeof canActivateFor === 'function' && canActivateFor(inst);
+        const clickable = !!onPick || activatable;
+        const handleClick = () => {
+          if (window.playSFX) window.playSFX('ui_click');
+          if (onPick) return onPick(inst);
+          if (activatable && onActivate) return onActivate(inst);
+        };
+        return (
+          <div key={inst.instId || i}
+            onClick={clickable ? handleClick : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 6,
+              border: '1px solid ' + (activatable ? 'var(--accent, #ffd166)' : 'var(--border, rgba(255,255,255,.18))'),
+              background: activatable ? 'rgba(255,209,102,.10)' : 'rgba(255,255,255,.04)',
+              cursor: clickable ? 'pointer' : 'default',
+            }}>
+            <div style={{
+              minWidth: 26, textAlign: 'center', fontWeight: 700,
+              fontSize: 12, color: 'var(--text2)',
+            }}>#{i + 1}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                alignItems: 'baseline', gap: 8, marginBottom: 4,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{inst.name}</span>
+                <span style={{ fontSize: 11, color: 'var(--text2)' }}>{hp} / {maxHp} HP</span>
+              </div>
+              {/* Nur `transform` animieren — Projektregel fuer alles Bewegte. */}
+              <div style={{
+                height: 5, borderRadius: 3, overflow: 'hidden',
+                background: 'rgba(0,0,0,.45)',
+              }}>
+                <div style={{
+                  height: '100%', width: '100%', background: barColor,
+                  transform: `scaleX(${pct / 100})`, transformOrigin: 'left center',
+                  transition: 'transform .25s',
+                }} />
+              </div>
+              {/* Zustaende in der Sprache des Bretts. Der Wrapper hebt die
+                  absolute Positionierung auf, mit der beide Bausteine
+                  sonst an einer Karte kleben (siehe .stack-inst-badges). */}
+              <div className="stack-inst-badges" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 5 }}>
+                <StatusBadges
+                  statuses={inst.statuses}
+                  counters={inst.counters}
+                  buffs={inst.counters?.buffs}
+                  cardName={inst.name}
+                />
+                {inst.counters?.buffs
+                  ? <BuffColumn buffs={inst.counters.buffs} cardName={inst.name} />
+                  : null}
+                {inst.summonedThisTurn && (
+                  <span style={{
+                    fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                    background: 'rgba(255,255,255,.10)',
+                    border: '1px solid rgba(255,255,255,.28)',
+                  }}>summoned this turn</span>
+                )}
+                {activatable && (
+                  <span style={{
+                    fontSize: 10, padding: '1px 6px', borderRadius: 8, fontWeight: 700,
+                    background: 'rgba(255,209,102,.22)',
+                    border: '1px solid var(--accent, #ffd166)',
+                  }}>⚡ Click to use effect</span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function OptionPickerSlider({ ep, respondToPrompt }) {
   const min = Number.isFinite(ep.sliderMin) ? ep.sliderMin : 1;
   const max = Number.isFinite(ep.sliderMax) ? ep.sliderMax : Math.max(min, 1);
@@ -17160,7 +17406,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // same pile in ONE diff detection, they cascade one-by-one like a
   // mass-discard instead of all moving at once. A single card gets
   // delay 0 (unchanged behaviour).
-  const PILE_FLIGHT_STAGGER_MS = 130;
+  // ★ 18.8. von 130 auf 190 ms (Al: „der Delay zwischen den einzelnen
+  // Creatures ist minimal zu kurz").
+  const PILE_FLIGHT_STAGGER_MS = 190;
 
   // Helper: create anims from board rects for unmatched pile entries
   const animsFromBoard = (entries, boardRects, dest, destSelector, side) => {
@@ -17269,6 +17517,73 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // `count`        — wie viele Flüge dieser Aufruf einbringt (Batch: alle).
   // `extraSpanMs`  — Eigen-Dauer des Aufrufers (bei Batches die interne
   //                  Staffelung), auf die der geteilte Abstand folgt.
+  // ═══ ANKER EINER HANDKARTEN-ANIMATION ═══════════════════════════
+  // Als Befund 18.8., dreimal gemeldet: die Voegel von Trial of Loyalty
+  // sassen nicht auf der frisch gezogenen Karte.
+  //
+  // Zwei Regeln, die dabei herauskamen:
+  //  1. **Der Handindex ist der eindeutige Anker, nicht der Name.**
+  //     Liegt schon eine gleichnamige Karte auf der Hand, trifft eine
+  //     Namenssuche die falsche. Karten werden hinten angehaengt, der
+  //     Index steht beim Senden also fest.
+  //  2. **Der Name darf NICHT einspringen, solange der Index noch
+  //     kommen kann.** Genau daran ist der vorige Versuch gescheitert:
+  //     der Slot war noch nicht gezeichnet, der Namensrueckfall griff
+  //     sofort — und landete auf der ALTEN Kopie. Der Name ist deshalb
+  //     der allerletzte Versuch, erst nach Ablauf der Frist.
+  //
+  // Warum ueberhaupt eine Frist: auf einem langsam zeichnenden Client
+  // (Als Opera laeuft bewusst ohne Grafikbeschleunigung) ist der neue
+  // Slot nach 100 ms noch nicht im DOM. Ein einziger Versuch reicht da
+  // nicht.
+  //
+  // `doc` und `zeichnen` sind Parameter, damit der Repro die Funktion
+  // gegen eine DOM-Attrappe fahren kann.
+  const resolveHandAnchor = (rest, type, zeichnen, doc, fristMs = 800) => {
+    const d = doc || document;
+    const wert = rest.handCardName
+      ? String(rest.handCardName).replace(/(["\\])/g, '\\$1')
+      : null;
+    const perIndex = () => (rest.handIdx != null
+      ? d.querySelector(`.game-hand-me .hand-slot[data-hand-idx="${rest.handIdx}"]`)
+      : null);
+    const perName = () => {
+      if (!wert) return null;
+      // LETZTER Treffer = neueste (rechteste) Kopie.
+      const alle = d.querySelectorAll(`.game-hand-me .hand-slot[data-card-name="${wert}"]`);
+      return alle.length ? alle[alle.length - 1] : null;
+    };
+    const start = Date.now();
+    const versuch = () => {
+      const ziel = perIndex() || (rest.handIdx == null ? perName() : null);
+      if (ziel) { zeichnen(type, ziel); return; }
+      if (Date.now() - start <= fristMs) { setTimeout(versuch, 60); return; }
+      // Frist abgelaufen — jetzt erst der Namensrueckfall.
+      const spaet = perName();
+      if (spaet) zeichnen(type, spaet);
+    };
+    setTimeout(versuch, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
+  };
+
+  // Eigener, kurzer Takt fuer Fluege VOM BRETT (Als Vorgabe 18.8.).
+  // Anders als `takePileFlightLane` wartet der ERSTE Flug einer Salve
+  // NICHT — die Karte verschwindet ja in genau diesem Moment vom Brett.
+  // Jeder weitere derselben Salve ruecht um `PILE_FLIGHT_STAGGER_MS`
+  // nach, gedeckelt wie ueberall ueber `pileFlightPace`, damit ein
+  // grosses Massaker nicht minutenlang traeufelt.
+  const boardFlightBurstRef = useRef({ until: 0, count: 0 });
+  const takeBoardFlightStagger = () => {
+    const now = Date.now();
+    const burst = boardFlightBurstRef.current;
+    if (now > (burst.until || 0)) burst.count = 0;      // neue Salve
+    const delay = pileFlightPace(burst.count + 1, PILE_FLIGHT_STAGGER_MS) * burst.count;
+    burst.count += 1;
+    // Solange innerhalb von 400 ms weitere Fluege kommen, zaehlt es als
+    // dieselbe Salve.
+    burst.until = now + delay + 400;
+    return Math.round(delay);
+  };
+
   const takePileFlightLane = (count = 1, extraSpanMs = 0) => {
     const now = Date.now();
     const lane = pileFlightLaneRef.current;
@@ -18372,6 +18687,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Play-mode drag state (Action Phase — dragging to board)
   const [playDrag, setPlayDrag] = useState(null);
 
+  // Nachschlage-Fenster fuer eine geteilte Support-Zone (Alice, the
+  // Transfer Student). Haelt die Instanz-Zeilen des angeklickten
+  // Stapels; `null` = geschlossen. Reines Ansehen — die Auswahl bei
+  // einem Effekt laeuft ueber die `instancePick`-Abfrage der Engine.
+  const [stackInspect, setStackInspect] = useState(null); // { title, instances }
+
   // Ability drag state (Main Phases — dragging ability to hero/zone)
   const [abilityDrag, setAbilityDrag] = useState(null); // { idx, cardName, card, mouseX, mouseY, targetHero, targetZone }
 
@@ -18549,6 +18870,42 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // hero's own identity rather than a conditional placement mode, so Mary's
   // free slots light up under a Cute Phoenix drag. Card-side bypasses still
   // don't.
+  // ── Geteilte Support-Zonen („Alice, the Transfer Student") ────────
+  // Darf `cardName` zu diesem BESETZTEN Platz dazu? Nur wenn der
+  // Spieler seine Zonen teilt und dort ausschliesslich Kreaturen
+  // GLEICHEN Namens liegen. Spiegelt `canShareInto` aus
+  // `cards/effects/_alice-shared.js` — der Server validiert ohnehin
+  // erneut, hier geht es nur darum, den Platz ueberhaupt als Ziel
+  // anzubieten.
+  //
+  // Anhaengsel (Equipment, Attachment-Spells) liegen im selben
+  // Slot-Array hinter der Kreatur; sie werden ueber ihren Kartentyp
+  // herausgefiltert, sonst waere ein ausgeruesteter Stapel nie
+  // teilbar.
+  const canShareSupportSlot = (playerData, heroIdx, slotIdx, cardName) => {
+    if (!playerData?.sharesSupportZones || !cardName) return false;
+    const slot = (playerData.supportZones?.[heroIdx] || [])[slotIdx] || [];
+    if (slot.length === 0) return false;
+    const isCreatureName = (n) => {
+      const cd = CARDS_BY_NAME[n];
+      if (!cd) return false;
+      const t = String(cd.cardType || ''), st = String(cd.subtype || '');
+      return t.split('/').some(x => x.trim() === 'Creature')
+        || st.split('/').some(x => x.trim() === 'Creature');
+    };
+    const creatures = slot.filter(isCreatureName);
+    if (creatures.length === 0) return false;
+    return creatures.every(n => n === cardName);
+  };
+
+  /** Erster Platz dieses Helden, auf den `cardName` dazustossen darf. */
+  const findShareableSupportSlot = (playerData, heroIdx, cardName) => {
+    for (let z = 0; z < 3; z++) {
+      if (canShareSupportSlot(playerData, heroIdx, z, cardName)) return z;
+    }
+    return -1;
+  };
+
   const canHeroNormalSummon = (playerData, heroIdx, card) => {
     if (!card || card.cardType !== 'Creature') return false;
     // Inherit the server's full eligibility pipeline (level/school,
@@ -19312,6 +19669,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Deepsea Creature even if a bounceable exists elsewhere.
               if (isOccupied) {
                 if (hasBounceTargets && isBounceSlot) { targetHero = hi; targetSlot = si; }
+                // ── Geteilte Zone (Alice, the Transfer Student) ──────
+                // ★ 18.8., Als Testbefund: ein besetzter Platz war beim
+                // normalen Beschwoeren gar kein Drop-Ziel, also liess
+                // sich Alices Wirkung mit der Maus nie erreichen.
+                // Traegt der Platz bereits eine GLEICHNAMIGE Kreatur,
+                // ist er jetzt ein gueltiges Ziel. Dieselbe Huerde wie
+                // beim leeren Platz (`canHeroNormalSummon`), damit sich
+                // ueber das Teilen keine Stufengrenze umgehen laesst.
+                else if (card.cardType === 'Creature'
+                         && canShareSupportSlot(me, hi, si, card.name)) {
+                  const canPlayHere = isHeroAction
+                    || (crossSidePlayable && me.heroes?.[hi]?.hp > 0)
+                    || canHeroNormalSummon(me, hi, card);
+                  if (canPlayHere && si < ((me.supportZones[hi] || []).length || 3)) {
+                    targetHero = hi; targetSlot = si;
+                  }
+                }
               } else if (card.cardType === 'Creature') {
                 // Cross-side-playable cards (Chilly Wizard) accept any
                 // alive own Hero's empty Support Zone — the host Hero
@@ -20041,10 +20415,44 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 bounceTargets: [...bpTargets, ...normalTargets],
               });
             } else {
+              // ── Geteilte Zonen („Alice, the Transfer Student") ─────
+              // ★ 18.8., Als Testbefund: der Klickweg sucht sich mit
+              // `findFreeSupportSlot` selbst einen LEEREN Platz — ein
+              // besetzter Platz mit einer Namensgleichen war damit per
+              // Klick nie erreichbar.
+              // Loesung ohne neues Bauteil: sobald irgendwo geteilt
+              // werden kann, denselben SLOT-Picker oeffnen, den der
+              // Deepsea-Tausch schon nutzt (`pendingBouncePick`). Der
+              // hebt die in Frage kommenden Plaetze hervor, und der
+              // Server leitet nach dem angeklickten Platz weiter.
+              // Kann NICHT geteilt werden, bleibt alles wie bisher.
+              const shareTargets = [];
+              for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                if (!canHeroNormalSummon(me, hi, card)) continue;
+                const sz = findShareableSupportSlot(me, hi, cardName);
+                if (sz >= 0) shareTargets.push({ heroIdx: hi, slotIdx: sz });
+              }
+              if (shareTargets.length > 0) {
+                const freeTargets = [];
+                for (let hi = 0; hi < (me.heroes || []).length; hi++) {
+                  if (!canHeroNormalSummon(me, hi, card)) continue;
+                  const fz = findFreeSupportSlot(me, hi);
+                  if (fz >= 0) freeTargets.push({ heroIdx: hi, slotIdx: fz });
+                }
+                setPendingBouncePick({
+                  cardName, handIndex: idx, card,
+                  bounceTargets: [...shareTargets, ...freeTargets],
+                });
+                setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+                return;
+              }
               const eligible = [];
               for (let hi = 0; hi < (me.heroes || []).length; hi++) {
                 if (!canHeroPlayCard(me, hi, card)) continue;
-                const slot = findFreeSupportSlot(me, hi);
+                // Kein freier Platz, aber ein teilbarer? Dann diesen
+                // nehmen — sonst faellt der Held hier ganz heraus.
+                let slot = findFreeSupportSlot(me, hi);
+                if (slot < 0) slot = findShareableSupportSlot(me, hi, cardName);
                 if (slot < 0) continue;
                 eligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
               }
@@ -20727,6 +21135,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // `data-my-coolness` / `data-opp-coolness` (not the `me` / `opp`
         // label flavor used by other zones).
         sel = owner === myIdx ? '[data-my-coolness]' : '[data-opp-coolness]';
+      } else if (rest.handCardName || rest.handIdx != null || zoneType === 'hand') {
+        // ★ 18.8.: Animationen an der HAND. Bisher kannte der Verteiler
+        // nur Brett-Zonen — eine Wirkung, die die Hand betrifft, konnte
+        // gar nicht verankert werden (und `heroIdx: -1` traf ins Leere,
+        // weil `data-hero-idx="-1"` kein Element ist).
+        // Nur die EIGENE Hand: die gegnerische ist verdeckt.
+        //
+        // ★ Bevorzugt ueber den KARTENNAMEN, nicht ueber den Index:
+        // loest eine Karte die Animation aus, waehrend sie selbst die
+        // Hand verlaesst, rutschen alle Indizes — der Name bleibt.
+        if (owner !== myIdx) return;
+        if (rest.handCardName || rest.handIdx != null) {
+          resolveHandAnchor(rest, type,
+            (typ, ziel) => playAnimation(typ, ziel, { duration: 1000, ...rest }));
+          return;
+        }
+        sel = '.game-hand-me';
       } else if (zoneSlot >= 0) {
         sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
       } else {
@@ -24596,16 +25021,73 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Diff-Detektors starten (Als Fund: letzter Wheels-Delete +
       // Wheels' eigener Hand→Discard-Flug). Flüge zu Hand/Support/Deck
       // bleiben ungetaktet — dort gibt es keine Kollision.
-      const usesPileLane = (to === 'discard' || to === 'deleted');
+      //
+      // ★ ALS BEFUND 18.8. (Trial of Dominance, dritte Runde): „werden
+      // auch weiterhin *sofort* vom Board entfernt und nicht erst, wenn
+      // ihre Movement-Animation anfängt."
+      // Ursache ist genau diese Spur. Eine Karte vom BRETT verschwindet
+      // in dem Moment, in dem der Spielstand ankommt — wird ihr Flug
+      // dahinter eingereiht (bis zu 5 × 350 ms), klafft dazwischen ein
+      // Loch, in dem die Kreatur schlicht weg ist.
+      // Deshalb fliegen BRETT-Quellen sofort. Die Spur bleibt fuer
+      // Hand-Quellen, wo sie herkommt: die Handkarte ist ohnehin schon
+      // aus der Hand heraus animiert, dort stoert eine Wartezeit nicht.
+      // Gestaffelt wird bei Dominance ohnehin schon serverseitig (ein
+      // `await actionDestroyCard` je Kreatur).
+      const _vomBrett = (from === 'support' || from === 'ability'
+        || from === 'surprise' || from === 'permanent');
+      const usesPileLane = (to === 'discard' || to === 'deleted') && !_vomBrett;
+      // ★ ALS BEFUND 18.8. (dritte Runde): „Jetzt bewegt Trial of
+      // Dominance alle Creatures *gleichzeitig* zum Deleted Pile. Es
+      // sollte zwischen den Creatures jeweils ein kleiner Delay sein,
+      // wie wenn z.B. Book of Doom mehrere Creatures gleichzeitig
+      // tötet."
+      // Die grosse Spur war richtig zu verlassen (die liess die Karte
+      // bis zu 1,75 s lang verschwunden am Brett stehen), aber ganz
+      // ohne Takt starten alle im selben Bild. Book of Doom bekommt
+      // seinen Takt vom Diff-Animator, der einen BATCH intern mit
+      // `PILE_FLIGHT_STAGGER_MS` staffelt — ausdrueckliche Broadcasts
+      // kommen einzeln an und haben den nicht.
+      // Deshalb hier ein eigener, KURZER Takt: der erste Flug startet
+      // sofort (kein Loch am Brett), jeder weitere derselben Salve
+      // ruecht 130 ms nach. Die Salve endet, sobald 400 ms lang nichts
+      // mehr kommt.
+      const boardDelay = _vomBrett && (to === 'discard' || to === 'deleted')
+        ? takeBoardFlightStagger()
+        : 0;
       const laneDelay = usesPileLane
         ? takePileFlightLane(1)
-        : 0;
+        : boardDelay;
+      // ★★ ALS BEFUND 18.8. (vierte Runde): „Creatures jenseits der
+      // ersten flashen unsichtbar, bis sie sich bewegen."
+      // Ursache: bei einer Wartezeit wurde der Knoten erst NACH ihr ins
+      // Dokument gehaengt. Die Kreatur war also in genau dem Fenster
+      // zwischen „vom Brett verschwunden" und „Flug beginnt" nirgends.
+      //
+      // Fuer BRETT-Quellen ist die Loesung, den Knoten SOFORT
+      // einzuhaengen und nur den Animationsstart per `animation-delay`
+      // zu verschieben: die Karte sitzt dann sichtbar auf ihrem alten
+      // Platz und fliegt, wenn sie dran ist — „die Kreatur steht noch
+      // da, dann hebt sie ab".
+      //
+      // Fuer HAND-Quellen bleibt es beim spaeten Einhaengen. Dort ist
+      // die Hand laengst nachgerueckt, und eine Karte, die bis zu 1,75 s
+      // auf ihrer alten Handposition ruht, war genau Als frueherer
+      // Befund „hovert kurz auf der Stelle". Zwei Quellen, zwei
+      // richtige Antworten.
       const spawnFlight = () => {
         document.body.appendChild(card);
         setTimeout(() => card.remove(), durationMs + 100);
       };
-      if (laneDelay > 0) setTimeout(spawnFlight, laneDelay);
-      else spawnFlight();
+      if (laneDelay > 0) {
+        if (_vomBrett) {
+          card.style.animationDelay = laneDelay + 'ms';
+          document.body.appendChild(card);
+          setTimeout(() => card.remove(), laneDelay + durationMs + 100);
+        } else {
+          setTimeout(spawnFlight, laneDelay);
+        }
+      } else spawnFlight();
     };
     socket.on('play_pile_transfer', onPileTransfer);
 
@@ -28466,7 +28948,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && isBerserked && <BerserkedOverlay />}
                 {hero?.name && hasLightBall && <LightBallAura />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isBerserked || isCursed || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isBerserked || isCursed || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
@@ -29266,7 +29748,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && cards.length === 0 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragValidZoneAny = isDragValidZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid;
+              // ── Geteilte Zone („Alice, the Transfer Student") ─────────
+              // ★ 18.8., zweiter Anlauf: v487 hat nur die DROP-AUFLOESUNG
+              // erweitert, nicht die OPTIK. `isDragValidZone` verlangt
+              // `cards.length === 0`, also blieb ein besetzter Platz auch
+              // dann ausgegraut und unerreichbar, wenn dort eine
+              // Namensgleiche lag — die Zone wurde von `isDragInvalidZone`
+              // sogar aktiv gedimmt. Hervorhebung und Trefferpruefung
+              // muessen dieselbe Bedingung benutzen, sonst zeigt das Brett
+              // etwas anderes an, als der Klick tut.
+              const isShareDragZone = isDraggingCreature && !!playDrag?.card
+                && cards.length > 0
+                && canShareSupportSlot(me, i, z, playDrag.card.name)
+                && emptyCanPlayHere
+                && z < ((me.supportZones[i] || []).length || 3)
+                && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
+              const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid;
               // Zonen-Ausgrauen beim Ausruestungs-Drag (Als Vorgaben 17.8.).
               // Bisher dimmte ein Equip-Drag ueberhaupt KEINE Zone — die
               // Bedingung unten kennt nur Creature- und Attachment-Draege.
@@ -29296,6 +29793,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 c.heroIdx === i && c.zoneSlot === z && ((!isOpp && !c.charmedOwner) || (isOpp && c.charmedOwner === pi))
               );
               const isCreatureActivatable = creatureEffectEntry?.canActivate === true;
+              // Geteilte Zone? Der Server schickt die Kopien einzeln in
+              // `supportStacks`, Schluessel wie bei `creatureCounters`.
+              const stackHere = (gameState.supportStacks || {})[`${pi}-${i}-${z}`];
               // Artefakt-Kreatur? Bestimmt nur die FARBE des Abzeichens
               // (weiss statt gold, weil Gold auf Gold verschwand). Die
               // Pruefung ist dieselbe wie beim Rendern weiter unten:
@@ -29446,6 +29946,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (slipperySelected == null) return;
                     respondToPrompt({ instId: slipperySelected, destHeroIdx: i, destSlot: z });
                     setSlipperySelected(null);
+                  } : (stackHere && stackHere.length >= 2) ? () => {
+                    // ── Geteilte Zone: ein Klick IRGENDWO auf der Karte
+                    // oeffnet die Instanz-Liste (Als Vorgabe 18.8.).
+                    // Steht bewusst NACH allen abfragegetriebenen Zweigen
+                    // — laeuft gerade eine Zielwahl, bleibt der Klick eine
+                    // Zielwahl. Und VOR der direkten Effekt-Aktivierung,
+                    // weil bei einem Stapel offen ist, WELCHE Kopie
+                    // zuenden soll; das entscheidet die Liste.
+                    if (window.playSFX) window.playSFX('ui_click');
+                    setStackInspect({
+                      title: stackHere[0]?.name || 'Shared Zone',
+                      instances: stackHere,
+                      heroIdx: i, zoneSlot: z, isOpp,
+                      charmedOwner: creatureEffectEntry?.charmedOwner,
+                    });
                   } : (isCreatureActivatable && !isEffectLocked) ? () => {
                     socket.emit('activate_creature_effect', { roomId: gameState.roomId, heroIdx: i, zoneSlot: z, charmedOwner: creatureEffectEntry?.charmedOwner });
                   } : (isEquipActivatable && !isEffectLocked) ? () => {
@@ -29659,6 +30174,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         {(() => { const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[cards.length-1]]?.hp; return <BoardCard cardName={cards[cards.length-1]} hp={curHp} maxHp={mHp} hpPosition="creature" label={cards.length+''} skins={gameSkins} />; })()}
                       </div>
                     )}
+                    {/* ── Geteilte Zone: Stueckzahl + Nachschlagen ──
+                        Der Server schickt die Kopien einzeln in
+                        `supportStacks` (nur bei mehr als einer). Das
+                        Brett zeigt weiter EINE Karte; das Abzeichen
+                        nennt die Zahl und oeffnet per Klick die Liste
+                        mit HP, Countern und Status je Kopie.
+                        `stopPropagation`, damit der Klick nicht als
+                        Zielwahl oder Aktivierung durchschlaegt. */}
+                    {(() => {
+                      const stack = (gameState.supportStacks || {})[cKey];
+                      if (!stack || stack.length < 2) return null;
+                      return (
+                        <div className="head-counter-badge"
+                          onMouseEnter={e => showGameTooltip(e, `${stack.length} Creatures share this Support Zone. Click the card to see each copy with its own HP, counters and statuses — and to use its effect.`)}
+                          onMouseLeave={hideGameTooltip}
+                          style={{
+                            // Kein eigener Klick mehr: seit Als Test (18.8.)
+                            // oeffnet ein Klick IRGENDWO auf der Karte die
+                            // Liste. Das Abzeichen ist nur noch Anzeige, sonst
+                            // waere es ein zweiter, unnoetiger Trefferbereich.
+                            pointerEvents: 'none',
+                            background: 'linear-gradient(135deg, #8fd0ff, #2a6ea8)',
+                            borderColor: '#1b4a72', color: '#06243a',
+                          }}
+                        >
+                          <span className="head-counter-icon">🧬</span>
+                          <span className="head-counter-num">×{stack.length}</span>
+                        </div>
+                      );
+                    })()}
                     {(() => {
                       // `cc.level` is the DELTA from base (engine's
                       // `actionChangeLevel` accumulates here). Show the
@@ -32000,6 +32545,69 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Card Name Picker (Luck, etc.) ── */}
       {isMyEffectPrompt && ep.type === 'cardNamePicker' && (
         <CardNamePickerPrompt ep={ep} onRespond={respondToPrompt} />
+      )}
+
+      {/* ── Nachschlagen: was liegt in dieser geteilten Zone? ──
+          Reines Ansehen, jederzeit schliessbar. Geoeffnet vom
+          Stueckzahl-Abzeichen auf der Brettkarte. */}
+      {stackInspect && (
+        <div className="modal-overlay" onClick={() => setStackInspect(null)}>
+          <DraggablePanel className="modal animate-in" style={{ maxWidth: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>
+                {stackInspect.title}
+              </span>
+              <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }}
+                onClick={() => setStackInspect(null)}>✕ CLOSE</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+              {(stackInspect.instances || []).length} Creatures share this Support Zone.
+              {stackInspect.isOpp ? '' : ' Click a copy to use its effect.'}
+            </div>
+            <SharedZoneInstanceList
+              instances={stackInspect.instances}
+              /* Aktivierbarkeit kommt aus derselben Quelle wie beim
+                 normalen Brettklick — `activatableCreatures`. Seit dem
+                 Engine-Fix vom 18.8. steht dort ein Eintrag JE INSTANZ,
+                 vorher nur einer je Platz. Fremde Seite: nur ansehen. */
+              canActivateFor={stackInspect.isOpp ? null : (inst) =>
+                (gameState.activatableCreatures || []).some(c =>
+                  c.instId === inst.instId && c.canActivate === true)}
+              onActivate={(inst) => {
+                socket.emit('activate_creature_effect', {
+                  roomId: gameState.roomId,
+                  heroIdx: stackInspect.heroIdx,
+                  zoneSlot: stackInspect.zoneSlot,
+                  charmedOwner: stackInspect.charmedOwner,
+                  instId: inst.instId,
+                });
+                setStackInspect(null);
+              }}
+            />
+          </DraggablePanel>
+        </div>
+      )}
+
+      {/* ── Effect Prompt: welche Kopie aus einer geteilten Zone? ── */}
+      {/* Engine-seitig aus `_disambiguateStackedTargets`. Bewusst NICHT
+          abbrechbar: die Zielwahl ist zu diesem Zeitpunkt schon
+          getroffen, offen ist nur noch WELCHE der gleichnamigen
+          Kopien gemeint war. */}
+      {isMyEffectPrompt && ep.type === 'instancePick' && (
+        <div className="modal-overlay">
+          <DraggablePanel className="modal animate-in" style={{ maxWidth: 420 }}>
+            <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>
+              {ep.title || 'Choose a copy'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>
+              {ep.description || 'This zone is shared — choose which copy you mean.'}
+            </div>
+            <SharedZoneInstanceList
+              instances={ep.instances}
+              onPick={(inst) => respondToPrompt({ instId: inst.instId })}
+            />
+          </DraggablePanel>
+        </div>
       )}
 
       {/* ── Effect Prompt: Card Gallery Picker ── */}

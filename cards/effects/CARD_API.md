@@ -1404,6 +1404,42 @@ redirect cards `anti-magnet.js` (`isTargetRedirect`) and
 
 ---
 
+### "place" ignores the host Hero entirely (MANDATORY)
+
+Als Ruling (18.8.), verbindlich fuer JEDE Karte:
+
+> **Sagt der Kartentext "place", ist der Zustand des zugehoerigen
+> Helden komplett egal.**
+
+Tot, eingefroren, betaeubt, gebunden, negiert, bezaubert — oder gar
+kein Held in der Spalte: die Support-Zone bleibt ein gueltiges Ziel.
+Eine Platzierung braucht keinen handlungsfaehigen Wirt, weil niemand
+"beschwoert"; die Karte wird schlicht hingelegt.
+
+**"summon" ist das Gegenteil.** Dort MUSS der Held handlungsfaehig
+sein — er ist der Beschwoerer, und Frozen/Stunned/tot verhindern die
+Beschwoerung. Wer eine Karte baut, liest also zuerst das Verb im
+Kartentext und waehlt danach die Zonen.
+
+Praktisch heisst das:
+
+* `engine.getFreeSupportZones(pi, opts)` **ohne** `livingHeroesOnly`
+  aufrufen. Die Option existiert fuer Beschwoerungswege; auf einem
+  place-Pfad ist sie ein Fehler. (`namedHeroesOnly` ebenso: nur setzen,
+  wenn der Kartentext ausdruecklich einen Helden verlangt.)
+* Sammelt eine Karte ihre Zielzonen selbst, darf der Filter **nicht**
+  `hero.hp <= 0` oder einen Status abfragen.
+* `engine.actionPlaceCreature` prueft von sich aus KEINEN Heldenzustand
+  — das ist Absicht und darf nicht "nachgebessert" werden.
+
+Der Fehler, der zu dieser Regel gefuehrt hat: `Infinitely Reproducing
+Slime` ("place it into the Support Zone of any Hero you control") rief
+`getFreeSupportZones` mit `livingHeroesOnly: true` und konnte deshalb
+nicht zu einem gefallenen Helden nachlegen.
+
+Reference implementations: `infinitely-reproducing-slime.js`
+(`placementZones`), `actionPlaceCreature` in `_engine.js`.
+
 ### Support-Zone effects — respect "Defending the Gate" (MANDATORY)
 
 > **Defending the Gate** (Artifact / Surprise): a face-down Surprise

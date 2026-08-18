@@ -151,6 +151,43 @@ function getCardArray() {
   return _cachedCardArray;
 }
 
+// ── Geteilte Support-Zonen: die Stapel fuer den Client ───────────────
+// „Alice, the Transfer Student" laesst mehrere Kreaturen GLEICHEN
+// Namens einen Platz teilen. `creatureCounters` ist je Platz nur EIN
+// Eintrag (die Schleife ueberschreibt, die letzte Instanz gewinnt) —
+// fuer die Stueckzahl und die Instanz-Galerie braucht der Client die
+// Kopien EINZELN. Genau dieselbe Form wie die `instancePick`-Abfrage
+// der Engine, damit Brett und Abfrage dieselben Zeilen zeichnen.
+// Nur Plaetze mit MEHR als einer Kreatur landen hier; ohne Alice ist
+// die Karte leer und kostet nichts.
+function buildSupportStacks(room) {
+  if (!room?.engine) return {};
+  const alice = require('./cards/effects/_alice-shared');
+  const engine = room.engine;
+  const byKey = {};
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    const physicalSide = (inst.stolenBy != null)
+      ? inst.owner
+      : (inst.controller ?? inst.owner);
+    const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
+    if (byKey[key]) continue; // Platz schon abgearbeitet
+    const stack = alice.stackAt(engine, physicalSide, inst.heroIdx, inst.zoneSlot);
+    if (stack.length <= 1) { byKey[key] = null; continue; }
+    byKey[key] = stack.map(i => alice.describeInstance(engine, i));
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(byKey)) if (v) out[k] = v;
+  return out;
+}
+
+// Karten, deren Text die Kopienzahl im Deck freigibt („Your deck may
+// contain any number of …"). SPIEGEL von `UNLIMITED_COPY_CARDS` in
+// public/app-shared.jsx — laufen die beiden Listen auseinander, baut
+// der serverseitige Deckgenerator Decks, die der Deckbuilder nicht
+// zulaesst (oder umgekehrt).
+const UNLIMITED_COPY_CARDS = new Set(['Infinitely Reproducing Slime']);
+
 // ===== DAILY CHALLENGE =====
 // The most recent 12:00 Europe/Berlin (CET/CEST), as Unix-seconds ≤ nowSec.
 function mostRecentNoonCETSec(nowSec = Math.floor(Date.now() / 1000)) {
@@ -698,6 +735,63 @@ function serveIndexHtml(req, res) {
   }
 }
 app.get(['/', '/index.html'], serveIndexHtml);
+
+// ───────────────────────────────────────────────────────────────
+//  SUCHMASCHINEN: robots.txt + sitemap.xml
+//
+//  Beide fehlten bis v485 — und weil der SPA-Auffangpfad ganz unten
+//  (`app.get('*')`) JEDEN Pfad mit der index.html beantwortet, kam
+//  auf `/robots.txt` bisher HTML mit Status 200 zurueck statt einer
+//  Robots-Datei. Googles Crawler behandelt Unlesbares zwar als
+//  „alles erlaubt", aber eine HTML-Seite unter /robots.txt ist ein
+//  Fehlsignal, und /sitemap.xml war gar nicht erst zu finden.
+//
+//  Beide Routen stehen VOR `express.static`, damit sie auch dann
+//  gewinnen, wenn spaeter einmal eine gleichnamige Datei in
+//  `public/` landet — und sie bauen ihre URLs aus `resolveOrigin`,
+//  genau wie die Share-Vorschau. Damit stimmt der Host automatisch,
+//  egal ob die Seite unter der eigenen Domain oder unter der
+//  Render-Adresse ausgeliefert wird.
+//
+//  Die Sitemap fuehrt heute genau EINEN Eintrag, weil die App genau
+//  eine URL hat („/"). Das ist kein Versehen: Client-Routen gibt es
+//  nicht (kein pushState im ganzen Frontend). Kommen oeffentliche
+//  Seiten dazu (Kartenliste, Regeln), gehoeren sie hier hinein.
+// ───────────────────────────────────────────────────────────────
+app.get('/robots.txt', (req, res) => {
+  const origin = resolveOrigin(req);
+  res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    // Nichts von Wert fuer den Index, aber viel Crawl-Budget:
+    // Kartenkunst und Klaenge sind ~800 Dateien.
+    'Disallow: /api/',
+    'Disallow: /sounds/',
+    'Disallow: /music/',
+    '',
+    `Sitemap: ${origin}/sitemap.xml`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const origin = resolveOrigin(req);
+  res.setHeader('Content-Type', 'application/xml; charset=UTF-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send([
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    '  <url>',
+    `    <loc>${origin}/</loc>`,
+    '    <changefreq>weekly</changefreq>',
+    '    <priority>1.0</priority>',
+    '  </url>',
+    '</urlset>',
+    '',
+  ].join('\n'));
+});
 
 // ── AUSGEHENDE BANDBREITE / AKTUALITAET (v350, angepasst v351) ──────
 // Gemessen am 11.8.: `public/` ist 114 MB und der Sound-Vorlader holte
@@ -4023,6 +4117,16 @@ function sendGameState(room, playerIdx, extra) {
     players: gs.players.map((ps, pi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
+      // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
+      // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
+      // `heroes` und `supportZones` — der Client liest ihn als
+      // `me.sharesSupportZones`. Beim ersten Versuch (v487) stand er auf
+      // der TOP-Ebene des Spielstands; `me` ist aber
+      // `gameState.players[myIdx]`, also war er dort immer undefined und
+      // die ganze Drop-/Klick-Logik lief ins Leere.
+      // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
+      // Alices Tod.
+      sharesSupportZones: !!ps._aliceShareActive,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: pi === playerIdx ? ps.surpriseZones : ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         // Puzzle mode: reveal opponent (CPU) surprises so the player can
@@ -4609,6 +4713,7 @@ function sendGameState(room, playerIdx, extra) {
       }
       return cc;
     })() : {},
+    supportStacks: buildSupportStacks(room),
     additionalActions: room.engine ? room.engine.getAdditionalActions(playerIdx) : [],
     // Per-card level reductions contributed by board-wide `reduceCardLevel`
     // hooks (Elven Forager, …). Map of cardName → non-negative reduction.
@@ -4954,6 +5059,16 @@ function sendSpectatorGameState(room) {
     players: gs.players.map((ps, spi) => ({
       username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
+      // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
+      // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
+      // `heroes` und `supportZones` — der Client liest ihn als
+      // `me.sharesSupportZones`. Beim ersten Versuch (v487) stand er auf
+      // der TOP-Ebene des Spielstands; `me` ist aber
+      // `gameState.players[myIdx]`, also war er dort immer undefined und
+      // die ganze Drop-/Klick-Logik lief ins Leere.
+      // Aus dem Spielerzustand, nicht vom Brett — die Wirkung ueberlebt
+      // Alices Tod.
+      sharesSupportZones: !!ps._aliceShareActive,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
@@ -5157,6 +5272,7 @@ function sendSpectatorGameState(room) {
       }
       return cc;
     })() : {},
+    supportStacks: buildSupportStacks(room),
     additionalActions: [],
     inherentActionCards: [],
     inherentActionHeroes: {},
@@ -7294,7 +7410,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   return true;
 }
 
-async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOwner }) {
+async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOwner, instId }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
@@ -7315,9 +7431,17 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   if (slot.length === 0) return false;
   const creatureName = slot[0];
 
-  const inst = room.engine.cardInstances.find(c =>
+  // ★ 18.8. (geteilte Zonen, „Alice, the Transfer Student"): teilen sich
+  // mehrere Kreaturen diesen Platz, sagt `instId`, WELCHE gemeint ist —
+  // ohne die Angabe traefe das `find(...)` immer nur die unterste Kopie.
+  // Die ID wird gegen den Platz geprueft, damit ein manipulierter Aufruf
+  // nicht irgendeine fremde Instanz aktiviert.
+  const slotInsts = room.engine.cardInstances.filter(c =>
     (c.owner === heroOwner || c.controller === heroOwner) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
+  const inst = instId != null
+    ? slotInsts.find(c => c.id === instId)
+    : slotInsts[0];
   if (!inst) return false;
   // CC-locked creatures cannot fire their own effects — mirrors the
   // engine-side filter in getActivatableCreatures and the hook gate in
@@ -8014,9 +8138,34 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         console.error('[canPlaceOnOccupiedSlot]', cardName, err.message);
       }
     }
-    if (!allowOccupied) return _no('slot-besetzt');
-    delete ps._requestedNormalSummonSlot;
-    ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
+    // ── Geteilte Zone (Alice, the Transfer Student) ─────────────────
+    // ★ 18.8., Als Testbefund: eine normal beschworene Kreatur durfte
+    // nicht auf einen Platz, der bereits eine Namensgleiche traegt —
+    // der Server lehnte mit „slot-besetzt" ab, noch bevor die Engine
+    // ueberhaupt gefragt wurde.
+    // Reihenfolge mit Bedacht: `canPlaceOnOccupiedSlot` wird ZUERST
+    // gefragt, damit jede bestehende Karte (Deepsea-Tausch) sich
+    // exakt wie bisher verhaelt. Alices Teilen ist der Rueckfall.
+    let shareOccupied = false;
+    if (!allowOccupied) {
+      try {
+        const { canShareInto } = require('./cards/effects/_alice-shared');
+        shareOccupied = canShareInto(room.engine, pi, heroIdx, zoneSlot, cardName);
+      } catch (err) {
+        console.error('[canShareInto]', cardName, err.message);
+      }
+    }
+    if (!allowOccupied && !shareOccupied) return _no('slot-besetzt');
+    if (shareOccupied) {
+      // Das ist eine NORMALE Beschwoerung, die sich einen Platz teilt —
+      // kein Tausch. Deshalb dasselbe Absichts-Flag wie beim leeren
+      // Platz setzen, sonst kaeme `tryBouncePlace` dazwischen.
+      delete ps._requestedBouncePlaceSlot;
+      ps._requestedNormalSummonSlot = { heroIdx, slotIdx: zoneSlot };
+    } else {
+      delete ps._requestedNormalSummonSlot;
+      ps._requestedBouncePlaceSlot = { heroIdx, slotIdx: zoneSlot };
+    }
   } else {
     // Player picked an EMPTY slot — they want a regular summon into this
     // zone, not a bounce-place swap. Set an intent flag so beforeSummon
@@ -11189,7 +11338,12 @@ function cubeAutoBuildDeck(pool, cardDB, deckName) {
     if (cd.cardType === 'Potion' && !hasNicolas) continue; // no Nicolas → no main-deck Potions
     // Effective copy limit (mirrors getCardMax in app-shared.jsx, simplified).
     let limit;
-    if (cd.maxCopies != null) limit = cd.maxCopies;
+    // Kartentext schlaegt jede Typregel — Gegenstueck zu
+    // UNLIMITED_COPY_CARDS in app-shared.jsx. Beide Listen muessen
+    // zusammenpassen, sonst baut der Generator andere Decks als der
+    // Deckbuilder erlaubt.
+    if (UNLIMITED_COPY_CARDS.has(name)) limit = Infinity;
+    else if (cd.maxCopies != null) limit = cd.maxCopies;
     else if (cd.cardType === 'Hero') limit = 4;
     else if (cd.cardType === 'Potion') limit = 2;
     else if (cd.cardType === 'Ability') limit = Infinity;
@@ -18280,7 +18434,31 @@ async function runNetBenchmark() {
 }
 
 // ===== CATCH-ALL (SPA) =====
-app.get('*', serveIndexHtml);
+// ★ v485: fehlende DATEIEN bekommen jetzt eine echte 404 statt der
+// index.html. Vorher beantwortete diese Zeile ausnahmslos jeden Pfad
+// mit Status 200 und HTML — auch `/gibtsnicht.png` oder
+// `/beliebig.js`. Fuer Suchmaschinen sind das „Soft 404s": unendlich
+// viele URLs, die alle dieselbe Seite mit demselben Titel liefern.
+// Google drosselt daraufhin die Indexierung der gesamten Domain.
+//
+// Der Riegel ist bewusst eng: er greift NUR, wenn das letzte
+// Pfadsegment eine Dateiendung traegt (und nicht .html ist). Alles
+// andere — `/play`, `/deck/123` — laeuft weiter in die SPA, damit
+// kuenftige Client-Routen nicht brechen. Heute gibt es keine: das
+// Frontend kennt kein pushState, die App lebt vollstaendig unter „/".
+app.get('*', (req, res, next) => {
+  const last = req.path.split('/').pop() || '';
+  const dot = last.lastIndexOf('.');
+  if (dot > 0) {
+    const ext = last.slice(dot).toLowerCase();
+    if (ext !== '.html' && ext !== '.htm') {
+      res.status(404);
+      res.setHeader('Content-Type', 'text/plain; charset=UTF-8');
+      return res.send('Not found');
+    }
+  }
+  return next();
+}, serveIndexHtml);
 
 // ===== START =====
 // Headless training mode — no DB, no socket server. Sample decks come

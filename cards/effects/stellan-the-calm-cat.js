@@ -254,10 +254,25 @@ async function runStellanEffect(ctx) {
  * hero-damage afterDamage hook returns, so any new live instances on
  * Stellan's side get picked up.
  */
-function tryFire(ctx) {
+function tryFire(ctx, opts = {}) {
   if (alreadyTriggered(ctx.card)) return;
   const hero = ctx.attachedHero;
-  if (!hero?.name || hero.hp <= 0) return;
+  if (!hero?.name) return;
+  // ★ ALS RULING (18.8.): „Stellan sollte auch noch auslösen, wenn er
+  // durch den auslösenden Schaden stirbt, aber NICHT, wenn er im
+  // Vorfeld eingefroren, negiert etc. war."
+  //   • Frozen / Stunned / Negiert → sein Effekt ist ueberhaupt
+  //     blockiert, es findet nie ein Placing statt. Darum kuemmert
+  //     sich die Engine bereits: `runHooks` filtert Helden-Hooks
+  //     dieser Zustaende heraus, und dieses Skript setzt bewusst KEIN
+  //     `bypassStatusFilter`. Hier ist also nichts zu tun
+  //   • Toedlicher Schaden → „zuerst 'when he takes damage, immediately
+  //     place', DANN stirbt er". Der Tod darf den Ausloeser also nicht
+  //     mehr verschlucken. Der Schadenspfad ruft deshalb mit
+  //     `allowDead`, der Status-Pfad nicht: ein bereits gefallener
+  //     Stellan soll nicht durch einen nachtraeglichen Status neu
+  //     ausloesen (Statuseffekte toeten ihn ja nicht)
+  if (!opts.allowDead && hero.hp <= 0) return;
 
   markTriggered(ctx.card);
   const card = ctx.card;
@@ -266,7 +281,12 @@ function tryFire(ctx) {
     // flush boundary. A dead Stellan refunds the slot — the once-per-
     // turn shouldn't burn against a hero who never got to react.
     const heroNow = ctx.attachedHero;
-    if (!heroNow?.name || heroNow.hp <= 0) {
+    // Nur noch die vollstaendige Entfernung bricht ab. Der TOD tut es
+    // nicht mehr: nach Als Ruling gehoert die Platzierung noch zum
+    // Schadensereignis, das ihn getoetet hat. Frueher stand hier
+    // `|| heroNow.hp <= 0` — damit verfiel genau der Fall, den die
+    // Karte interessant macht.
+    if (!heroNow?.name) {
       refundTrigger(card);
       return;
     }
@@ -282,6 +302,15 @@ function tryFire(ctx) {
 
 module.exports = {
   activeIn: ['hero'],
+
+  // ★ ALS RULING (18.8.): der toedliche Schaden darf den Ausloeser
+  // nicht mehr verschlucken. `runHooks` verwirft Helden-Hooks, sobald
+  // `hero.hp <= 0` — und genau dieser Fall ist hier gewollt. Deshalb
+  // die Ausnahme.
+  // BEWUSST NICHT `bypassStatusFilter`: Frozen / Stunned / Negiert
+  // sollen ihn weiterhin stumm schalten, denn dann ist sein Effekt
+  // blockiert und es findet nie ein Placing statt.
+  bypassDeadHeroFilter: true,
 
   // Gerrymander redirect — pick `deck` (single search) over `hand`
   // (potentially multiple). Limits opp's volume payoff.
@@ -317,7 +346,12 @@ module.exports = {
       if (expectedHero !== target) return;
       // Damage of any source / any type counts — no filter. The
       // placement itself is deferred (see `tryFire`).
-      tryFire(ctx);
+      // `realDealt <= 0` heisst: es kam gar kein Schaden an (z.B. voll
+      // absorbiert). Dann gibt es auch kein „when he takes damage".
+      // Das ist zugleich der Riegel gegen einen bereits GEFALLENEN
+      // Stellan: an dem landet kein Schaden mehr.
+      if (ctx.realDealt != null && ctx.realDealt <= 0) return;
+      tryFire(ctx, { allowDead: true });
     },
 
     onStatusApplied: async (ctx) => {

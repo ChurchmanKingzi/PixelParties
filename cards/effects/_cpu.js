@@ -5726,6 +5726,19 @@ function mctsValidateGenericEntry(entry, promptData) {
     const names = new Set((promptData.cards || []).map(c => c.name));
     return v.selectedCards.every(n => names.has(n));
   }
+  if (type === 'handPick') {
+    // Einsatz-Pick: genau eine Handkarte, die im Kandidatensatz steht
+    // und deren Name noch an diesem Platz liegt. Der Handstand kann
+    // sich zwischen Recon und Ausfuehrung verschoben haben — dann ist
+    // der Plan ungueltig und die Heuristik uebernimmt.
+    if (!isUseIntentHandPick(promptData)) return false;
+    if (!Array.isArray(v.selectedCards) || v.selectedCards.length !== 1) return false;
+    const sel = v.selectedCards[0];
+    if (!sel || typeof sel.handIndex !== 'number' || !sel.cardName) return false;
+    const elig = promptData.eligibleIndices;
+    if (Array.isArray(elig) && !elig.includes(sel.handIndex)) return false;
+    return true;
+  }
   if (type === 'playerPicker') {
     return v.playerIdx === 0 || v.playerIdx === 1;
   }
@@ -5865,6 +5878,89 @@ const MENU_OBJECTIVES = {
 // `engine` ist NEU (v426). Der Tutor-Pick-Lernanschluss weiter unten hat es
 // immer schon benutzt — nur gab es die Variable in dieser Funktion nie, und
 // ihr `catch { /* defensiv */ }` hat den ReferenceError seit jeher verschluckt.
+// ═══════════════════════════════════════════════════════════════════
+// „WELCHE HANDKARTE EINSETZEN?" — gelernter Kanal statt Heuristik
+//
+// ALS VORGABE (18.8.): „In welcher Situation welcher Spell gewirkt
+// wird, soll per ML gelernt werden. Magic Arts Spells sind sehr
+// vielseitig und nicht klar ‚stark' oder ‚schwach'."
+//
+// AUSGANGSLAGE: `handPick` kannte nur EINE Semantik — Mulligan/Abwurf.
+// Der Handler unten sortiert AUFSTEIGEND nach Wert und gibt die
+// SCHLECHTESTEN Karten zurueck. Fuer „welchen Spell wirken?" ist das
+// genau verkehrt herum. Betroffen waren Skeleton Wizard UND Demon's
+// Gate, seit es das Gate gibt.
+//
+// LOESUNG OHNE NEUEN LERNKANAL: Prompts mit `pickIntent: 'use'`
+// werden wie eine Galerie behandelt und haengen sich an den
+// BESTEHENDEN Tutor-Pick-Kanal (`tutorPickRules['<Quelle>→<Karte>']`).
+// Der Kanal ist genau dafuer gebaut — „wann welche Karte" — und
+// bringt Recency-Gewichtung, MIN_ARM, Signifikanzschwelle und
+// Trainer-Report schon mit. Kein neues Recorder-Feld, keine
+// Trainer-Aenderung, kein zweites Tag-Vokabular.
+//
+// BEWUSST NICHT `estimateHandCardValueFor` wie bei der Galerie: das
+// misst „wie wertvoll waere die Karte AUF DER HAND", was beim Wirken
+// die falsche Frage ist — und es haette genau den Stark/Schwach-Prior
+// eingebacken, den Als Vorgabe verneint. Die Heuristik traegt hier nur
+// einen schwachen Kartenwert bei; die eigentliche Entscheidung faellt
+// ueber die gelernte Quelle→Karte-Regel und die MCTS-Rollouts.
+//
+// Rueckgabe: absteigend sortierte Kandidaten [{ name, handIndex, score }].
+// ═══════════════════════════════════════════════════════════════════
+function cpuRankUsePickCandidates(engine, promptData, pi) {
+  const ps = engine.gs?.players?.[pi];
+  if (!ps || !Array.isArray(ps.hand)) return [];
+  const eligible = Array.isArray(promptData.eligibleIndices)
+    ? promptData.eligibleIndices
+    : ps.hand.map((_, i) => i);
+  const src = promptData.title || promptData.cardName || 'unknown';
+  let rules = null;
+  try { rules = deckProfile.__getProfile?.(engine, pi)?.tutorPickRules || null; } catch { /* ohne Profil: 0 */ }
+  const out = [];
+  for (const idx of eligible) {
+    const name = ps.hand[idx];
+    if (!name) continue;
+    let score = 0;
+    try { score += (deckProfile.learnedCardValue(engine, pi, name, 0, 1) || 0) * 0.5; } catch { /* 0 */ }
+    if (rules) score += (rules[`${src}→${name}`] || 0);
+    out.push({ name, handIndex: idx, score });
+  }
+  // Trainings-ε — dieselbe Begruendung wie bei der Galerie: ohne
+  // Exploration unterdrueckt eine negative Regel genau die Picks, die
+  // Gegenevidenz erzeugen wuerden. Nur in LIVE-Trainingsspielen.
+  if (process.env.PP_TRAIN && !engine._inMctsSim && out.length > 1) {
+    const eps = parseFloat(process.env.PP_GALLERY_EXPLORE || '0.1');
+    if (eps > 0 && Math.random() < eps) {
+      const c = out[Math.floor(Math.random() * out.length)];
+      c.score += 1000;
+      cpuLog(`  [explore] Einsatz-Pick: Zufalls-Kandidat "${c.name}" geboostet (ε=${eps})`);
+    }
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out;
+}
+
+/** Ist dieser Prompt ein „welche Handkarte einsetzen?"-Pick? */
+function isUseIntentHandPick(promptData) {
+  return promptData?.type === 'handPick'
+    && promptData.pickIntent === 'use'
+    && (promptData.maxSelect || 1) === 1;
+}
+
+/**
+ * Darf MCTS diesen generischen Prompt verzweigen? Die Typliste plus
+ * die Einsatz-Picks — gewoehnliche `handPick`-Prompts (Mulligan,
+ * Abwurf) bleiben AUSSEN VOR, damit die Aufzeichnung nicht mit
+ * Eintraegen volllaeuft, fuer die es gar keine Alternativen gibt
+ * (siehe die OOM-Notbremse oben).
+ */
+function mctsIsBranchableGeneric(promptData) {
+  if (!promptData) return false;
+  if (MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)) return true;
+  return isUseIntentHandPick(promptData);
+}
+
 function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
   const type = promptData.type;
   if (type === 'zonePick') {
@@ -6004,6 +6100,17 @@ function mctsEnumerateGenericAlternatives(engine, promptData, cpuIdxForBias) {
       { value: { playerIdx: 0 }, label: 'player=0' },
       { value: { playerIdx: 1 }, label: 'player=1' },
     ];
+  }
+  if (type === 'handPick') {
+    // Nur Einsatz-Picks verzweigen. Mulligan-/Abwurf-Prompts geben
+    // bewusst KEINE Alternativen zurueck — sie werden weiter unten
+    // heuristisch beantwortet (und stehen deshalb auch nicht in
+    // `mctsIsBranchableGeneric`).
+    if (!isUseIntentHandPick(promptData)) return [];
+    return cpuRankUsePickCandidates(engine, promptData, cpuIdxForBias).map(c => ({
+      value: { selectedCards: [{ cardName: c.name, handIndex: c.handIndex }] },
+      label: `use=${c.name}`,
+    }));
   }
   if (type === 'optionPicker') {
     return (promptData.options || []).map(opt => ({
@@ -6239,12 +6346,23 @@ function installCpuBrain(engine) {
         try {
           if (!engine._inMctsSim && scriptedValue?.selectedCards?.length) {
             if (!engine._tutorPickLog) engine._tutorPickLog = [];
-            engine._tutorPickLog.push({
-              pi: playerIdx,
-              src: promptData.title || promptData.cardName || 'unknown',
-              picked: scriptedValue.selectedCards.slice(0, 3),
-              t: engine.gs?.turn || 0,
-            });
+            // `selectedCards` traegt je nach Prompt-Typ NAMEN
+            // (cardGalleryMulti) oder OBJEKTE {cardName, handIndex}
+            // (handPick-Einsatz-Pick). Der Trainer schluesselt auf
+            // `<Quelle>→<Karte>` — ohne diese Normalisierung landete
+            // dort "[object Object]" und der Kanal waere vergiftet.
+            const names = scriptedValue.selectedCards
+              .slice(0, 3)
+              .map(s => (typeof s === 'string' ? s : s?.cardName))
+              .filter(Boolean);
+            if (names.length) {
+              engine._tutorPickLog.push({
+                pi: playerIdx,
+                src: promptData.title || promptData.cardName || 'unknown',
+                picked: names,
+                t: engine.gs?.turn || 0,
+              });
+            }
           }
         } catch { /* nie stören */ }
       }
@@ -6289,7 +6407,7 @@ function installCpuBrain(engine) {
       // alternatives we care to explore.
       noteRepeat(engine, promptData.type, promptData.title,
         (promptData.cards || promptData.options || []).length, picked, playerIdx);
-      if (Array.isArray(engine._mctsTargetRecord) && MCTS_BRANCHABLE_GENERIC_TYPES.includes(promptData.type)
+      if (Array.isArray(engine._mctsTargetRecord) && mctsIsBranchableGeneric(promptData)
         && !promptHasPinnedAnswer(promptData)) {
         mctsRecordPush(engine, {
           kind: `generic:${promptData.type}`,
@@ -7534,9 +7652,39 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // low-value filler gets mulliganed. With minSelect=0 (Horn in a Bottle)
   // we may return zero cards for a pure +1 draw; with minSelect≥1
   // (Leadership) we always return at least that many of the worst cards.
+  // ── Geteilte Zone: welche Kopie? (Alice, the Transfer Student) ──
+  // Reine Ueberlebensantwort, damit Training und Rollouts nicht am
+  // Prompt haengen bleiben. Gewaehlt wird die Kopie mit den WENIGSTEN
+  // aktuellen HP: als Angreifer ist das der sicherste Abschuss, als
+  // Verteidiger die Kopie, die am wenigsten verliert. Eine gelernte
+  // Politik waere hier moeglich (eigener Kanal), lohnt aber erst,
+  // wenn die Karte ueberhaupt im Spiel ist.
+  if (type === 'instancePick') {
+    const list = promptData.instances || [];
+    if (!list.length) return null;
+    let best = list[0];
+    for (const e of list) {
+      const a = e.hp == null ? Infinity : e.hp;
+      const b = best.hp == null ? Infinity : best.hp;
+      if (a < b) best = e;
+    }
+    return { instId: best.instId };
+  }
   if (type === 'handPick') {
     const ps = engine.gs.players[cpuIdx];
     if (!ps?.hand?.length) return null;
+    // ── Einsatz-Pick („welchen Spell wirken?") ──
+    // MUSS vor der Mulligan-Bewertung stehen: die sortiert aufsteigend
+    // und gaebe hier die SCHLECHTESTE Karte zurueck. Hier gewinnt der
+    // hoechste gelernte Wert; der Pick wird in denselben Tutor-Kanal
+    // geloggt, aus dem er gelernt wird.
+    if (isUseIntentHandPick(promptData)) {
+      const ranked = cpuRankUsePickCandidates(engine, promptData, cpuIdx);
+      if (!ranked.length) return null;
+      const top = ranked[0];
+      _logGalleryPick(engine, promptData, cpuIdx, [top.name]);
+      return { selectedCards: [{ cardName: top.name, handIndex: top.handIndex }] };
+    }
     const eligible = promptData.eligibleIndices || ps.hand.map((_, i) => i);
     if (!eligible.length) return null;
     const maxSelect = promptData.maxSelect || 1;

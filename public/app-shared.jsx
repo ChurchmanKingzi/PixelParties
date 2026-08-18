@@ -1464,12 +1464,63 @@ function hasCeciliaCopyBonus(deck) {
 // the actual limiting.
 const MULTI_TEAM_HEROES = new Set(['Peter Röll, the Protagonist']);
 
+// Karten, deren Text die Kopienzahl im Deck ausdruecklich freigibt
+// („Your deck may contain any number of …"). Gleiche Bauart wie
+// MULTI_TEAM_HEROES: die Obergrenze faellt hier, die tatsaechliche
+// Schranke bleibt die Deckgroesse (60 Hauptdeck / 15 Nebendeck).
+// Bewusst NICHT ueber `maxCopies` in cards.json geloest — JSON kennt
+// kein Infinity, eine grosse Zahl waere geraten und die Anzeige zeigte
+// „n/999" statt „n/∞".
+const UNLIMITED_COPY_CARDS = new Set(['Infinitely Reproducing Slime']);
+
+// ── Helden mit gleichem Vornamen schliessen einander im Team aus ──
+// Als Regel (18.8.): „Heroes mit denselben Namen (Alice) aber
+// verschiedenen Titeln sollten mutually exclusive im Hero-Lineup
+// sein." Vorname = alles vor dem ERSTEN Komma.
+//
+// Betrifft heute nur zwei echte Paare, weil die Team-Sektion ohnehin
+// nur `cardType === 'Hero'` annimmt: alle Basis/Ascended-Paare
+// (Beato, Taio, Layn, Champion …) sind damit automatisch aussen vor —
+// Ascended Heroes liegen im Hauptdeck.
+//   • Alice, the Puppeteer Girl / Alice, the Transfer Student → gilt
+//   • Gabby, the Boarding Broad / Gabby, the Pirate Zombie → gilt,
+//     wirkt aber nicht: der Pirate Zombie sagt selbst „This cannot be
+//     one of your starting Heroes"
+//   • Kasperov, the King of Kings [B] / [W] → gilt ebenfalls
+//
+// Bei IDENTISCHEM Namensteil gilt die Regel ohne Ausnahme — auch
+// Kasperov, the King of Kings [B] und [W] schliessen einander aus
+// (Als Ruling 18.8.: „bei identischen Namen sollte das klar sein").
+function heroFirstName(cardName) {
+  return String(cardName || '').split(',')[0].trim();
+}
+
+/**
+ * Steht im Team schon ein Held mit demselben Vornamen, aber anderem
+ * vollen Namen? `ignoreIdx` laesst einen Platz aus (fuer Pruefungen
+ * beim Austauschen eines Slots).
+ */
+function teamHasNameClash(deck, cardName, ignoreIdx) {
+  const first = heroFirstName(cardName);
+  if (!first) return false;
+  return (deck?.heroes || []).some((h, i) => {
+    if (i === ignoreIdx) return false;
+    const other = h?.hero;
+    if (!other || other === cardName) return false;
+    return heroFirstName(other) === first;
+  });
+}
+
 // Effective per-card max across sections. Centralizes the default-4
 // logic and the Sacred Jewel exception so callers (canAddCard, auto-trim
 // on Sacred Jewel removal, etc.) all agree.
 function getCardMax(deck, cardName) {
   const card = window.CARDS_BY_NAME[cardName];
   if (!card) return 0;
+  // Kartentext schlaegt jede Typregel: „Your deck may contain any
+  // number of …". Steht VOR `maxCopies`, damit ein spaeter gesetztes
+  // Feld die Freigabe nicht versehentlich wieder deckelt.
+  if (UNLIMITED_COPY_CARDS.has(cardName)) return Infinity;
   if (card.maxCopies != null) return card.maxCopies;
   const ct = card.cardType;
   // Heroes: 1 copy in the team slot + up to 4 copies in main / side
@@ -1531,7 +1582,7 @@ function canAddCard(deck, cardName, section) {
       return true;
     }
     if ((deck.mainDeck || []).length >= 60) return false;
-    if (ct === 'Ability' && effMax === Infinity) return true;
+    if (effMax === Infinity) return true;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
@@ -1560,12 +1611,15 @@ function canAddCard(deck, cardName, section) {
       const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
       if (inTeam >= 1) return false;
     }
+    // Gleicher Vorname, anderer Titel → schliesst einander aus
+    // (Als Regel 18.8., siehe teamHasNameClash).
+    if (teamHasNameClash(deck, cardName)) return false;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
   if (section === 'side') {
     if ((deck.sideDeck || []).length >= 15) return false;
-    if (ct === 'Ability' && effMax === Infinity) return true;
+    if (effMax === Infinity) return true;
     if (ct === 'Hero') {
       const inSide = (deck.sideDeck || []).filter(n => n === cardName).length;
       if (inSide >= 4) return false;
@@ -2055,8 +2109,13 @@ function canCardTypeEnterSection(deck, cardName, section) {
 // ═══════════════════════════════════════════
 
 function showGameTooltip(e, text) {
-  const r = e.currentTarget.getBoundingClientRect();
-  window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2 };
+  // `e.currentTarget` JETZT festhalten: React recycelt seine Ereignisse,
+  // nach dem Handler ist das Feld null. Die DOM-Referenz selbst bleibt
+  // gueltig — der Waechter unten braucht sie, um zu merken, wenn das
+  // Element verschwindet.
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  window._gameTooltip = { text, x: r.right + 6, y: r.top + r.height / 2, el };
   window.dispatchEvent(new Event('gameTooltip'));
 }
 /**
@@ -2069,20 +2128,73 @@ function showGameTooltip(e, text) {
  */
 function showCursorTooltip(e, text) {
   if (!e || typeof e.clientX !== 'number') return;
-  window._gameTooltip = { text, x: e.clientX + 14, y: e.clientY + 14, atCursor: true };
+  window._gameTooltip = {
+    text, x: e.clientX + 14, y: e.clientY + 14, atCursor: true,
+    el: e.currentTarget || null,
+  };
   window.dispatchEvent(new Event('gameTooltip'));
 }
 function hideGameTooltip() {
   window._gameTooltip = null;
   window.dispatchEvent(new Event('gameTooltip'));
 }
+/**
+ * ═══ WAECHTER GEGEN HAENGENDE TOOLTIPS ═══
+ * Als Befund (18.8.): „Wenn ich im Puzzle-Creator per Escape das
+ * Edit-Menü eines Heroes schließe, während ein Tooltip angezeigt wird,
+ * wird der Tooltip permanent angezeigt, auch wenn ich den Cursor
+ * entferne!"
+ *
+ * Ursache ist allgemein, nicht auf den Puzzle-Editor beschraenkt: der
+ * Tooltip geht bei `mouseenter` auf und bei `mouseleave` wieder zu.
+ * Verschwindet das Element, waehrend der Zeiger darauf steht — Modal
+ * geschlossen, Knopf ausgeblendet, Zone geleert —, dann feuert
+ * **kein** `mouseleave`. Niemand raeumt auf, der Tooltip bleibt stehen.
+ *
+ * Zwei Netze, beide zentral statt an jeder Aufrufstelle:
+ *  1. Ist das Anker-Element nicht mehr im Dokument, wird der Tooltip
+ *     weggeraeumt. Deckt JEDE Ausbau-Ursache ab, nicht nur Escape.
+ *  2. Escape raeumt ihn zusaetzlich sofort weg — in der CAPTURE-Phase,
+ *     weil bestehende Escape-Handler (z.B. app-puzzle) mit
+ *     `stopImmediatePropagation` arbeiten und einen normalen
+ *     Bubble-Listener nie erreichen wuerden.
+ *
+ * Bewusst NICHT ueber `:hover` geprueft: waehrend Ein-/Ausblendungen
+ * ist das kurzzeitig falsch, und ein zu frueh weggenommener Tooltip
+ * waere schlimmer als der seltene haengende.
+ */
+function startTooltipWatchdog(getEl, hide, doc) {
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  const pruefen = () => {
+    const el = getEl();
+    if (el && d?.body && !d.body.contains(el)) hide();
+  };
+  const id = setInterval(pruefen, 150);
+  // Einmal sofort: ein Element kann schon zwischen Render und Effekt
+  // verschwunden sein.
+  pruefen();
+  return () => clearInterval(id);
+}
+
 function GameTooltip() {
   const [tip, setTip] = useState(null);
   useEffect(() => {
     const handler = () => setTip(window._gameTooltip ? { ...window._gameTooltip } : null);
     window.addEventListener('gameTooltip', handler);
-    return () => window.removeEventListener('gameTooltip', handler);
+    // Escape raeumt immer auf — capture, damit
+    // `stopImmediatePropagation` anderer Handler nicht dazwischenkommt.
+    const onEsc = (e) => { if (e.key === 'Escape') hideGameTooltip(); };
+    window.addEventListener('keydown', onEsc, true);
+    return () => {
+      window.removeEventListener('gameTooltip', handler);
+      window.removeEventListener('keydown', onEsc, true);
+    };
   }, []);
+  // Waechter nur, solange ueberhaupt ein Tooltip mit Anker steht.
+  useEffect(() => {
+    if (!tip?.el) return undefined;
+    return startTooltipWatchdog(() => tip.el, hideGameTooltip);
+  }, [tip]);
   if (!tip) return null;
   // Element-anchored tips center vertically on the source's right
   // edge; cursor-anchored tips drop straight at the offset point so
@@ -2208,9 +2320,24 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   if (s._extraLife || c._extraLife) {
     const mark = s._extraLife || c._extraLife;
     const by   = (mark && typeof mark === 'object' && mark.by) || 'an effect';
+    // ★ ALS VORGABE 18.8.: „Wenn Extra-Leben gestapelt sind, sollte ein
+    // Counter die Gesamtzahl der Extra-Leben anzeigen."
+    // Der Stapel liegt neben der obersten Marke (`_extraLifeStack`,
+    // Engine `addExtraLife`). Bei genau EINEM Leben bleibt die Anzeige
+    // wie bisher — eine „1" an jedem einzelnen Abzeichen waere nur
+    // Rauschen. Dieselbe `duration`-Ecke, die auch Frozen fuer seine
+    // Restrunden nutzt.
+    const stack = s._extraLifeStack || c._extraLifeStack;
+    const anzahl = Array.isArray(stack) ? stack.length : 1;
+    const quellen = Array.isArray(stack)
+      ? [...new Set(stack.map(m => (m && typeof m === 'object' && m.by) || 'an effect'))]
+      : [by];
     badges.push({
       key: 'extraLife', icon: '💖',
-      tooltip: `Extra Life: The next time this is defeated, it is fully revived. (Granted by ${by}.)`,
+      duration: anzahl > 1 ? anzahl : null,
+      tooltip: anzahl > 1
+        ? `Extra Lives ×${anzahl}: Each time this is defeated, one is spent and it is fully revived. (Granted by ${quellen.join(', ')}.)`
+        : `Extra Life: The next time this is defeated, it is fully revived. (Granted by ${by}.)`,
     });
   }
   if (s.charmed) badges.push({ key: 'charmed', icon: '💘', tooltip: 'Charmed: Under opponent control and immune to all effects.' });

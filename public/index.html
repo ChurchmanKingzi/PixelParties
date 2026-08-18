@@ -43,6 +43,34 @@
        until focused. -->
   <link rel="preload" href="/data/Pixel%20Intv.otf" as="font" type="font/otf" crossorigin>
 
+  <!-- Strukturierte Daten. Sagt Google, WAS diese Seite ist, statt es
+       aus einem Ladebildschirm erraten zu lassen. Die Basis-URL wird
+       serverseitig auf den ausliefernden Host umgeschrieben (siehe
+       serveIndexHtml), deshalb steht hier dieselbe Vorgabe wie bei den
+       og:-Feldern daruber. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "name": "Pixel Parties TCG",
+    "alternateName": "Pixel Parties",
+    "url": "https://pixelparties.onrender.com/",
+    "image": "https://pixelparties.onrender.com/title.png",
+    "description": "Pixel Parties is a free online trading card game simulator. Build decks from over 1400 cards, duel live opponents in your browser, and climb the ranks.",
+    "genre": ["Trading Card Game", "Strategy"],
+    "gamePlatform": "Web browser",
+    "playMode": ["MultiPlayer", "SinglePlayer"],
+    "applicationCategory": "Game",
+    "operatingSystem": "Any (web browser)",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR",
+      "availability": "https://schema.org/InStock"
+    }
+  }
+  </script>
+
   <link rel="stylesheet" href="/style.css">
 
   <!-- Instant branded splash, shown until React mounts. Styles are

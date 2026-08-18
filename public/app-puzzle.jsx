@@ -1595,6 +1595,17 @@ function PuzzleCreator() {
   ]);
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
+    // ── Klang beim Oeffnen (Als Vorgabe 18.8.) ────────────────────────
+    // Das Schliessen klang schon (`ui_cancel`, Escape-Zweig), das
+    // Oeffnen war stumm. Gegenstueck ist `ui_prompt_open` — derselbe
+    // Klang, den das Brett fuer aufgehende Abfragen nutzt.
+    // Bewusst NICHT hier oben abspielen, sondern erst, wenn wirklich
+    // ein Editor aufgeht: beide Zweige unten steigen vorher aus, wenn
+    // an der Stelle gar keine Karte liegt. Ein Klang fuer „nichts
+    // passiert" waere schlimmer als gar keiner.
+    const klangBeimOeffnen = () => {
+      if (window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.5 });
+    };
     // ── ALLE OPTIONALEN ABSCHNITTE ZUERST ZURUECKSETZEN (Als Befund 17.8.) ──
     // Al: „man kann Charm of Balance im Puzzle-Editor Invest Counters
     // zuweisen" — die gibt es nur bei Logan. Ursache war kein falsches
@@ -1622,6 +1633,7 @@ function PuzzleCreator() {
     setEditAntiMagicLevel(null);
     if (zt === 'hero') {
       const h = p.heroes[hi]; if (!h) return;
+      klangBeimOeffnen();
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(h.hp)); setEditMaxHp(String(h.maxHp)); setEditAtk(String(h.atk));
       // Hydrate statuses, collapsing Death Knight's Bound-with-source
@@ -1655,6 +1667,7 @@ function PuzzleCreator() {
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
       const c = getCard(cards[0]);
+      klangBeimOeffnen();
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : '')); setEditMaxHp(''); setEditAtk('');
       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
@@ -2998,7 +3011,14 @@ function PuzzleCreator() {
               const h = players[editTarget.si].heroes[editTarget.hi];
               const isDead = h && h.hp <= 0;
               return (
-                <button className={'btn ' + (isDead ? 'btn-success' : 'btn-danger')}
+                // ★ 18.8., Als Vorgabe „der Defeat-Button sollte rot
+                // sein": die Klasse war schon `btn-danger`, aber im
+                // Modal faerbt `.modal .btn-danger` nur die Fuellung mit
+                // 12% Rot ein — der Knopf sah damit aus wie jeder
+                // andere. Der Abriss-Knopf bekommt jetzt eine VOLLE rote
+                // Fuellung (`btn-danger-solid`), die Wiederbelebung
+                // bleibt gruen.
+                <button className={'btn ' + (isDead ? 'btn-success' : 'btn-danger btn-danger-solid')}
                   style={{ width: '100%', padding: '6px 0', fontSize: 11, marginBottom: 12 }}
                   onClick={toggleHeroDead}>
                   {isDead ? '❤️ REVIVE (set HP to Max)' : '💀 DEFEAT (set HP to 0)'}
