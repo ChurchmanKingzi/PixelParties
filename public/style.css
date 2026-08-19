@@ -13682,3 +13682,44 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   15%  { opacity: 1; transform: translate(calc(var(--kdx) * .3), calc(var(--kdy) * .3)) scale(1); }
   100% { opacity: 0; transform: translate(var(--kdx), calc(var(--kdy) - 14px)) scale(.75); }
 }
+
+/* ── Erdriss (Cybug RHINOCEROS, Als Vorgabe 19.8.) ────────────────────
+   Nur `transform` und `opacity` animiert — Als CSS-Regel. */
+.anim-earth-dust {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(150,116,74,.75) 0%, rgba(110,84,52,.45) 45%, rgba(90,70,44,0) 75%);
+  animation: earthDust 700ms ease-out forwards;
+}
+@keyframes earthDust {
+  0%   { transform: scale(.25); opacity: 0; }
+  25%  { transform: scale(1);   opacity: .95; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.anim-earth-crack {
+  position: absolute;
+  width: 5px;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0) 0%, rgba(24,16,8,.95) 18%, rgba(58,38,18,.95) 55%, rgba(0,0,0,0) 100%);
+  box-shadow: 0 0 8px rgba(255,168,64,.55);
+  transform-origin: 50% 50%;
+  animation: earthCrack 700ms ease-out forwards;
+}
+@keyframes earthCrack {
+  0%   { transform: scaleY(0) rotate(-4deg); opacity: 0; }
+  30%  { transform: scaleY(1) rotate(-4deg); opacity: 1; }
+  100% { transform: scaleY(1) rotate(-4deg); opacity: 0; }
+}
+.anim-earth-chunk {
+  position: absolute;
+  border-radius: 2px;
+  background: linear-gradient(140deg, #a9835a 0%, #6b5133 100%);
+  box-shadow: 0 0 4px rgba(0,0,0,.5);
+  animation: earthChunk 680ms cubic-bezier(.2,.7,.4,1) forwards;
+}
+@keyframes earthChunk {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translate(0, -38px) rotate(220deg); opacity: 0; }
+}

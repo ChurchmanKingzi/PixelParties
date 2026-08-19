@@ -7928,7 +7928,16 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, charmedOwner,
       resolve: null, fromBoard: true,
     });
 
-    if (chainResult.negated) {
+    // Surprise-Fenster auf die AKTIVIERUNG — Zwilling der Stelle in
+    // `doPlayAbility`. Auch eine FREIE Aktivierung ist „activating the
+    // active effect of an Ability\", sie muss also dasselbe Fenster
+    // oeffnen; sonst haette Cybug LADYBUG eine Luecke, durch die jede
+    // freie Ability schluepft.
+    const abilitySurprise = chainResult.negated
+      ? null
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName);
+
+    if (chainResult.negated || abilitySurprise?.negateEffect) {
       // Gefeuert und gekontert — der Auftritt gehoert trotzdem dazu,
       // sonst sieht der Gegner nie, WAS seine Negation getroffen hat.
       room.engine.announceActiveEffect();
@@ -8687,7 +8696,16 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, charmedOwner, bor
       fromBoard: true,
     });
 
-    if (chainResult.negated) {
+    // Surprise-Fenster auf die AKTIVIERUNG (Cybug LADYBUG). Reihenfolge
+    // wie beim Helden-Effekt: erst die Kette, dann die Surprises — und
+    // nur, wenn die Kette die Aktivierung nicht ohnehin schon
+    // abgeraeumt hat. Eine Negation von hier laeuft durch denselben
+    // Ausgang wie eine Negation aus der Kette.
+    const abilitySurprise = chainResult.negated
+      ? null
+      : await room.engine._checkSurpriseOnAbilityActivation(pi, heroIdx, zoneIdx, abilityName);
+
+    if (chainResult.negated || abilitySurprise?.negateEffect) {
       room.engine.announceActiveEffect();   // gefeuert und gekontert
       room.engine.clearEffectAnnounce();
       // Negated — refund the Hero pre-action cost (Saint Nicolas

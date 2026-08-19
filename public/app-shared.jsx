@@ -764,6 +764,9 @@ const ZONE_ANIM_SFX = {
   coffee_steam:            null,
   pollution_evaporate:     null,
   laser_burst:             { name: 'laser' },
+  // Erdriss (Cybug RHINOCEROS) — schwerer Einschlag, leicht tiefer,
+  // damit er nach aufbrechendem Boden klingt statt nach Aufprall.
+  earth_rift:              { name: 'heavy_impact', opts: { rate: 0.85, delay: 60 } },
 };
 
 // Zone-animation sounds represent "the signature of the spell/attack/

@@ -8,6 +8,30 @@ available on the `ctx` object inside hooks.
 
 ---
 
+## ★ JEDE ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
+
+> „JEDE Animation soll grundsätzlich auch Sounds haben."
+
+Verbindlich für jede neue Animation. Es gibt dafür eine zentrale
+Zuordnung — kein Karten-Code ruft `playSFX` selbst auf:
+
+* **Zonen-Animationen** (`play_zone_animation`): Eintrag in
+  `ZONE_ANIM_SFX` in `public/app-shared.jsx`. Form:
+  `typ: { name: 'sfx_name', opts: { rate, delay, volume, category } }`.
+  Der Verteiler (`playSFXForZoneAnim`) hängt animationsrelative Delays
+  automatisch an den Einbau-Versatz an. Bewusst still? Dann
+  `typ: null` eintragen — ein FEHLENDER Eintrag ist ein Versehen, ein
+  `null`-Eintrag eine Entscheidung.
+* **Klänge liegen in `public/sounds/*.ogg`** (52 Stück). Erst dort
+  nachsehen, ob etwas passt, bevor ein neuer gebaut wird; über `rate`
+  lässt sich ein vorhandener Klang umfärben (schwerer, leichter).
+  Beispiel: `earth_rift` nutzt `heavy_impact` mit `rate: 0.85`.
+* **Prüfliste beim Bau einer neuen Animation:** Komponente in
+  `ANIM_REGISTRY` (app-board.jsx) · CSS-Keyframes (nur `transform`
+  und `opacity`) · **Eintrag in `ZONE_ANIM_SFX`** · Repro-Zusicherung
+  auf das gesendete `play_zone_animation`.
+
+
 ## Quick Start
 
 ```js

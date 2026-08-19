@@ -12,7 +12,7 @@
 //
 //  The milled card is revealed face-up for
 //  ~2 seconds as it flies to the discard pile
-//  (holdDuration: 2000 on actionMillCards).
+//  (holdDuration: 900 on actionMillCards).
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -146,37 +146,42 @@ module.exports = {
 
     // ── Step 1: discard a card from hand (cancellable) ───────────────────
 
-    const discardResult = await engine.promptGeneric(pi, {
-      type:        'forceDiscardCancellable',
-      title:       CARD_NAME,
+    // ★ Kanonischer Abwurf statt rohem Hand-Splice (Als Befund 19.8.:
+    // erst ein Abwurf-Klang ohne sichtbare Wirkung, dann ein extrem
+    // schneller, unvollstaendig aussehender Abwurf mit zweitem Klang).
+    // Ursache war genau dieser Handgriff: der eigene `forceDiscard`-
+    // Prompt spielte den Klang, danach entfernte ein roher Splice die
+    // Karte — ohne Hand→Ablage-Flug, ohne Quellen-Glow, ohne die
+    // ON_DISCARD-Hooks. Den Rest erledigte der Diff-Erkenner des
+    // Clients, daher das abgehackte Bild und der zweite Klang.
+    // `actionPromptForceDiscard` macht all das an EINER Stelle; der
+    // Helfer kann seit v507 auch abbrechen und liefert die Namen.
+    const abgeworfen = await engine.actionPromptForceDiscard(pi, 1, {
+      source: CARD_NAME,
+      selfInflicted: true,           // freiwillige Kosten, kein Zwang
+      // ★ NICHT abbrechbar (Als Vorgabe 19.8.): „Der Effekt sollte,
+      // sobald man im Forced-Discard-Handler angekommen ist, schlicht
+      // nicht cancellable sein." Das „may" der Karte entscheidet sich
+      // davor — beim Aktivieren des Heldeneffekts. Ist man einmal im
+      // Abwurf, wird abgeworfen.
+      cancellable: false,
+      // ★ Kein Quellen-Glow (Als Vorgabe 19.8.): er kostet 500 ms
+      // zwischen „Held angeklickt" und „Abwurf-Dialog da". Bei einem
+      // selbst ausgeloesten Effekt weiss der Spieler ohnehin, was er
+      // angeklickt hat.
+      skipSourceGlow: true,
+      title: CARD_NAME,
       description: 'Discard a card from your hand to choose a card from your deck to send to the discard pile.',
-      cancellable: true,
     });
-
-    if (!discardResult || discardResult.cancelled) return false;
-
-    const { cardName: discardName, handIndex } = discardResult;
-    if (discardName === undefined || handIndex === undefined) return false;
-
-    if (ps.hand[handIndex] === discardName) {
-      ps.hand.splice(handIndex, 1);
-    } else {
-      const fi = ps.hand.indexOf(discardName);
-      if (fi < 0) return false;
-      ps.hand.splice(fi, 1);
-    }
-    ps.discardPile.push(discardName);
-    // Don't fire onDiscard yet — Glass of Marbles (and similar) should draw
-    // AFTER the full effect resolves, not before the mill target is chosen.
+    if (!abgeworfen || abgeworfen.length === 0) return false;
+    const discardName = abgeworfen[0];
     engine.log('magenta_discard', { player: ps.username, discarded: discardName });
     engine.sync();
 
     if ((ps.mainDeck || []).length === 0) {
-      // Deck empty — fire onDiscard now and exit
-      await engine.runHooks('onDiscard', {
-        playerIdx: pi, cardName: discardName, discardedCardName: discardName,
-        _fromHand: true, _skipReactionCheck: true,
-      });
+      // Deck leer — fertig. Die ON_DISCARD-Hooks hat der Helfer bereits
+      // gefeuert; sie hier ein zweites Mal zu feuern haette Glass of
+      // Marbles & Co. doppelt ausgeloest.
       return true;
     }
 
@@ -209,22 +214,31 @@ module.exports = {
     const targetName = picked.cardName;
     if (!ps.mainDeck.includes(targetName)) return true;
 
-    // Fire onDiscard for the hand cost NOW — targetCardName ensures the chosen
-    // card is removed from the deck before anything is drawn, so Glass of
-    // Marbles cannot draw back the card about to be milled. The draw overlaps
-    // the animation.
-    await engine.runHooks('onDiscard', {
-      playerIdx: pi, cardName: discardName, discardedCardName: discardName,
-      _fromHand: true, _skipReactionCheck: true,
-    });
+    // ★ Das frühere Nachfeuern von `onDiscard` ist ENTFALLEN: seit dem
+    // Umbau auf `actionPromptForceDiscard` feuert der Helfer die Hooks
+    // selbst, direkt beim Abwurf. Es hier zu wiederholen hätte Glass
+    // of Marbles & Co. ein zweites Mal ausgelöst.
+    // Die alte Reihenfolge („erst die Deck-Karte festlegen, dann
+    // onDiscard") diente genau einem Zweck: Glass of Marbles sollte
+    // die gleich gemillte Karte nicht zurückziehen können. Das ist
+    // weiterhin gewahrt — `actionMillCards` zieht sie unten mit
+    // `targetCardName` gezielt aus dem Deck, und der Helfer hat den
+    // Abwurf schon abgeschlossen, bevor hier überhaupt gewählt wurde.
 
     // ── Step 3: mill via the standard function so ALL mill synergies fire ─
     // targetCardName pulls the specific card from anywhere in the deck.
-    // holdDuration shows the card face-up for 2 s (same as before).
+    // ★ KEINE blockierende Haltezeit mehr (Als Befund 19.8., zweiter
+    // Anlauf: „Der Delay am Ende ihres Effekts ist auch immer noch
+    // da"). Der erste Anlauf senkte `holdDuration` von 2000 auf 900 —
+    // gewartet wurde aber `travel + hold + fade + Puffer`, also
+    // 700+900+300+100 = 2000 ms, praktisch unveraendert.
+    // Mit `holdDuration: 0` entfaellt der Warteblock ganz; die
+    // Deck→Ablage-Animation laeuft weiter, nur haelt sie den Zug nicht
+    // mehr an. Wer wieder eine Lesepause will, dreht diese eine Zahl.
     // selfInflicted bypasses first-turn protection (player's own voluntary effect).
     await engine.actionMillCards(pi, 1, {
       targetCardName: targetName,
-      holdDuration:   2000,
+      holdDuration:   0,
       source:         CARD_NAME,
       selfInflicted:  true,
     });

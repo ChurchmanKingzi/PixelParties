@@ -70,13 +70,47 @@ module.exports = {
     },
 
     /**
-     * Engine fires `onCardActivation` (and similar) BEFORE an effect
-     * resolves — but the Area-protection window is the cleaner gate
-     * because it's narrow (only Area-destroying paths) and gives us
-     * the targeted Area inst directly. Implemented at module level
-     * (see `onAreaTargetedByOpponent` below).
+     * ★ Der Stack wird auch dann angelegt, wenn Wowhalla NICHT von der
+     * Hand kommt (Als Befund 19.8.).
+     *
+     * `onPlay` oben ist auf `cardZone === 'hand'` verriegelt. Eine
+     * Wowhalla, die der PUZZLE-CREATOR direkt in die Area-Zone setzt —
+     * oder die ein Effekt dorthin bringt — hatte deshalb nie einen
+     * Coolness Stack. Folge: `hasCoolnessStack` ist falsch, die
+     * Selbstverteidigung bietet sich gar nicht erst an, und das
+     * Loeschen des Stacks beim Verlassen sieht aus, als funktioniere
+     * es (es ist nur nichts da). Genau dieses Bild hat Al gemeldet.
+     *
+     * Der Kartentext sagt „When this card comes into play" — eine
+     * Puzzle-Platzierung IST das. Doppelbefuellung ist ausgeschlossen:
+     * `onPlay` legt den Stack an, bevor dieser Hook laeuft, und wir
+     * fuellen nur einen LEEREN Stack.
      */
-    _placeholder: undefined,
+    onCardEnterZone: async (ctx) => {
+      if (ctx.toZone !== 'area') return;
+      if (ctx.enteringCard?.id !== ctx.card.id) return;
+      const engine = ctx._engine;
+      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
+    },
+
+    /**
+     * ★ ...und beim SPIELSTART (Als Befund 19.8., zweiter Anlauf).
+     *
+     * Der Hook darueber reicht NICHT: ein Puzzle baut sein Brett
+     * direkt in den Spielzustand — `gs.areaZones` wird gesetzt, ohne
+     * dass je ein Zonenwechsel stattfindet, also feuert auch kein
+     * `onCardEnterZone`. `onGameStart` dagegen laeuft im Puzzle
+     * ausdruecklich (server.js ~13985), genau fuer solche Faelle.
+     * Damit hat eine vorbereitete Wowhalla ihren Stack, und ihre
+     * Selbstverteidigung steht ueberhaupt zur Verfuegung.
+     */
+    onGameStart: async (ctx) => {
+      if (ctx.cardZone !== 'area') return;
+      const engine = ctx._engine;
+      if (engine.hasCoolnessStack(ctx.cardOwner)) return;
+      await ctx.pushDeckTopToCoolnessStack(ctx.cardOwner, { source: CARD_NAME });
+    },
 
     /**
      * When Wowhalla leaves the Area zone (destroyed, removed, etc.),

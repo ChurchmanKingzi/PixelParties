@@ -32,7 +32,7 @@ function countCopies(arr, cardName) {
 }
 
 /** Build a deduplicated gallery of eligible equips in the player's deck. */
-function buildEligibleGallery(gs, pi) {
+function buildEligibleGallery(gs, pi, engine) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const seen = new Set();
@@ -43,6 +43,13 @@ function buildEligibleGallery(gs, pi) {
     const cd = _getCardDB()[cardName];
     const cost = cd.cost || 0;
     if (cost > MAX_EQUIP_COST) continue;
+    // ★ Als Regel 19.8.: eine Ausruestung ohne legalen Traeger ist
+    // keine legale Wahl. Gibt es dadurch gar keine, ist die Karte
+    // insgesamt nicht aktivierbar (siehe `canActivate` unten).
+    // Ohne Engine (aeltere Aufrufer) bleibt es bei der alten,
+    // ungefilterten Liste statt faelschlich alles zu sperren.
+    if (engine?.hasLegalEquipHero
+        && !engine.hasLegalEquipHero(cardName, pi, { requireFreeZone: true })) continue;
     seen.add(cardName);
     out.push({
       name: cardName, source: 'deck', cost,
@@ -68,11 +75,11 @@ module.exports = {
   isTargetingArtifact: true,
   activeIn: ['hand'],
 
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!ps) return false;
     if (!hasHeroWithFreeZone(ps)) return false;
-    return buildEligibleGallery(gs, pi).length > 0;
+    return buildEligibleGallery(gs, pi, engine).length > 0;
   },
 
   // Self-targeting — gallery picker handles selection
@@ -96,7 +103,7 @@ module.exports = {
     if (!ps) return { aborted: true };
 
     // ── Step 1: pick equip from deck ──
-    const gallery = buildEligibleGallery(gs, pi);
+    const gallery = buildEligibleGallery(gs, pi, engine);
     if (gallery.length === 0) return { aborted: true };
 
     const picked = await engine.promptGeneric(pi, {
@@ -114,11 +121,15 @@ module.exports = {
     if (deckIdx < 0) return { aborted: true };
 
     // ── Step 2: pick destination Hero / Support Zone ──
+    // ★ Ausruest-Beschraenkungen gelten auch hier (Al 19.8.): ein
+    // „Crusader's"-Artefakt darf nur an eine Cecilia, und nur eins je
+    // Held. Zentral ueber `engine.canEquipCardToHero`.
     const destTargets = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen) continue;
+      if (!engine.canEquipCardToHero(equipName, pi, hi)) continue;
       let hasFree = false;
       for (let si = 0; si < 3; si++) {
         if (((ps.supportZones[hi] || [])[si] || []).length === 0) {

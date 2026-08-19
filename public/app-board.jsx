@@ -825,6 +825,133 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay }) 
 }
 
 // ═══════════════════════════════════════════
+//  NEIGUNG FLIEGENDER KARTEN
+// ═══════════════════════════════════════════
+// Eine fliegende Karte haengt als `position: fixed` an <body> und liegt
+// damit AUSSERHALB der geneigten Brettebene (`.board-plane`,
+// `rotateX(var(--board-tilt))`). Ohne Zutun klappt eine Kreatur, die
+// gerade noch angewinkelt in ihrer Support Zone lag, im ersten Bild
+// ihres Fluges flach um — Als Befund 19.8. zu Trial of Dominance.
+// Dieselbe Lesart hat der Diff-Flug (`cardDiscardFly`) schon: angewinkelt
+// starten, auf dem Weg aufrichten, weil die Ablagestapel flache
+// Bedienoberflaeche sind.
+//
+// Zonen, die AUF der geneigten Ebene liegen. Fliegt eine Karte von hier
+// los, startet ihr Flug angewinkelt; landet sie hier, bleibt sie es.
+const FLIGHT_PLANE_ZONES = new Set(['support', 'ability', 'surprise', 'permanent', 'area', 'hero']);
+
+// Perspektive der Flugkarte. Bewusst derselbe Wert wie `--board-persp`
+// der Brettebene, damit die Verkuerzung gleich stark ausfaellt.
+const FLIGHT_TILT_PERSPECTIVE_PX = 900;
+
+// Die Neigung wird NICHT geraten, sondern aus der tatsaechlich
+// gerenderten Transformationsmatrix der Ebene gelesen. Das deckt ohne
+// Zusatzwissen mit ab: den Mobil- und Engpass-Rueckfall (Ebene flach →
+// 0deg, also gar keine Neigung), das Flach-Messfenster des
+// Scroll-Detektors, den Puzzle-Creator mit eigenem `--pz-tilt` und jede
+// kuenftige Aenderung von `--board-tilt`. Faellt irgendetwas davon aus,
+// ist das Ergebnis 0 — also genau das Verhalten von vorher.
+//
+// `doc` ist Parameter, damit ein Repro die Funktion gegen eine
+// DOM-Attrappe fahren kann.
+function readBoardTiltDeg(doc) {
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  if (!d || typeof d.querySelector !== 'function') return 0;
+  // ★ `.pz-plane` GIBT ES NICHT — die Puzzle-Ebene heisst
+  // `.pz-board-plane` (`.pz-plane-clip` ist nur ihr Wrapper). Der
+  // Rueckfall aus v497 traf deshalb NIE, und im Puzzle-Modus lieferte
+  // die Messung 0 → gar keine Neigung. Genau das hat Al am 19.8. als
+  // „Trial of Dominance ist immer noch flach" gemeldet: er testet im
+  // Puzzle-Modus. Nachgemessen: `.pz-plane` kommt in style.css und
+  // app-puzzle.jsx null mal vor.
+  const plane = d.querySelector('.board-plane') || d.querySelector('.pz-board-plane');
+  if (!plane) return 0;
+  const view = d.defaultView || (typeof window !== 'undefined' ? window : null);
+  if (!view || typeof view.getComputedStyle !== 'function') return 0;
+  const t = view.getComputedStyle(plane).transform;
+  // `none` oder eine 2D-`matrix(...)` heissen: die Ebene liegt flach.
+  if (!t || t.indexOf('matrix3d(') !== 0) return 0;
+  const v = t.slice(9, -1).split(',').map(s => parseFloat(s));
+  if (v.length !== 16 || v.some(n => !Number.isFinite(n))) return 0;
+  // Spalte 2 der Matrix ist das Bild der y-Achse. Bei
+  // `rotateX(θ) scale(s)` steht dort (0, s·cos θ, s·sin θ, 0) — der
+  // Massstab kuerzt sich im atan2 also heraus.
+  const deg = Math.atan2(v[6], v[5]) * 180 / Math.PI;
+  if (!Number.isFinite(deg)) return 0;
+  // Riegel gegen Unsinn aus fremden 3D-Transformationen.
+  return Math.max(0, Math.min(80, deg));
+}
+
+// Entscheidet, mit welcher Neigung ein Flug startet und endet.
+// Eigene Funktion, damit ein Repro die Entscheidungstabelle AUSFUEHREN
+// kann statt sie nachzubauen (Testlehre 2 aus v496).
+//
+// Nur QUELLEN auf der Brettebene werden angewinkelt — eine Handkarte
+// liegt flach und soll das bleiben, ihr Flug ist damit bildgleich zu
+// vorher. Landet die Karte wieder auf der Ebene (Support-/Area-Zone),
+// behaelt sie die Neigung; geht sie auf einen Stapel, ins Deck oder auf
+// die Hand, richtet sie sich auf dem Weg auf, weil das flache
+// Bedienoberflaeche ist.
+function flightTiltFor(from, to, planeTiltDeg) {
+  const tilt = Number(planeTiltDeg);
+  const grad = Number.isFinite(tilt) ? tilt : 0;
+  const vonEbene = FLIGHT_PLANE_ZONES.has(from);
+  const zuEbene = FLIGHT_PLANE_ZONES.has(to);
+  return {
+    startDeg: vonEbene ? grad : 0,
+    endDeg: (vonEbene && zuEbene) ? grad : 0,
+  };
+}
+
+// Legt den Karteninhalt in eine eigene Neigungs-Ebene und animiert dort
+// NUR die Neigung. Bewusst getrennt von der Flugbahn: `pileTransfer` &
+// Co. bleiben unangetastet, die Bahn ist also bildgleich zu vorher — die
+// Karte ist auf ihr nur nicht mehr flach.
+//
+// `perspective` gehoert dabei auf den ELTERN des gedrehten Elements, nie
+// auf das Element selbst — die Eigenschaft wirkt ausschliesslich auf
+// direkte Kinder. Genau daran ist die Brettebene selbst schon einmal
+// gescheitert (v11-Regression: rotateX ohne Perspektive = flache
+// affine Stauchung).
+//
+// Rueckgabe: das Element, in das der Karteninhalt gehoert — ohne Neigung
+// die Flugkarte selbst, dann entsteht auch kein zusaetzlicher Knoten.
+function makeFlightTiltLayer(card, opts, doc) {
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  const o = opts || {};
+  const startDeg = Number.isFinite(Number(o.startDeg)) ? Number(o.startDeg) : 0;
+  const endDeg = Number.isFinite(Number(o.endDeg)) ? Number(o.endDeg) : 0;
+  if (!d || typeof d.createElement !== 'function') return card;
+  if (Math.abs(startDeg) < 0.5 && Math.abs(endDeg) < 0.5) return card;
+  const durationMs = Number(o.durationMs) > 0 ? Number(o.durationMs) : 700;
+  const delayMs = Number(o.delayMs) > 0 ? Number(o.delayMs) : 0;
+  const easing = o.easing || 'ease-in-out';
+  card.style.perspective = FLIGHT_TILT_PERSPECTIVE_PX + 'px';
+  // Die Rundung wandert mit nach innen: `overflow: hidden` auf der
+  // Flugkarte wuerde die nahe Kante der geneigten Ebene abschneiden.
+  card.style.overflow = 'visible';
+  // Das Leuchten gehoert zum Kartenkoerper, muss also mitkippen —
+  // bliebe es auf der Flugkarte, umrahmte ein flaches Rechteck eine
+  // geneigte Karte.
+  const glow = card.style.boxShadow;
+  card.style.boxShadow = 'none';
+  const layer = d.createElement('div');
+  layer.className = 'card-flight-tilt';
+  layer.style.cssText = [
+    'width:100%', 'height:100%',
+    'border-radius:4px', 'overflow:hidden',
+    glow ? `box-shadow:${glow}` : '',
+    `--ftFrom:${startDeg}deg`, `--ftTo:${endDeg}deg`,
+    // `both`: waehrend einer Wartezeit (Brett-Takt) haelt die
+    // Rueckwaerts-Fuellung die Startneigung — die Kreatur steht also
+    // angewinkelt auf ihrem Platz, bis sie dran ist.
+    `animation:cardFlightTilt ${durationMs}ms ${easing} ${delayMs}ms both`,
+  ].join(';');
+  card.appendChild(layer);
+  return layer;
+}
+
+// ═══════════════════════════════════════════
 //  MODULAR GAME ANIMATION SYSTEM
 //  Add new animation types by adding to ANIM_REGISTRY.
 //  Usage: playAnimation('explosion', '#target-selector', { duration: 800 })
@@ -5208,6 +5335,44 @@ function CannibalismChompEffect({ x, y }) {
 }
 
 const ANIM_REGISTRY = {
+  // Erdriss — Cybug RHINOCEROS pflügt die Karte weg, bevor sie das
+  // Feld verlässt (Als Vorgabe 19.8.). Aufbau bewusst schlicht und im
+  // Stil der übrigen Einträge: ein Staubstoß, drei aufreißende Spalten
+  // und ein paar hochgeschleuderte Brocken.
+  earth_rift: (function () {
+    return function EarthRiftEffect({ x, y, w }) {
+      const base = Math.max(w || 72, 60);
+      const spalten = useMemo(() => [-18, 0, 18], []);
+      const brocken = useMemo(() => (
+        [0, 1, 2, 3, 4].map(i => ({
+          dx: (i - 2) * (base * 0.22),
+          delay: i * 45,
+          sz: 6 + (i % 3) * 3,
+        }))
+      ), [base]);
+      const dustSz = base * 1.8;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10130 }}>
+          <div className="anim-earth-dust" style={{
+            width: dustSz, height: dustSz * 0.55,
+            left: -dustSz / 2, top: -dustSz * 0.18,
+          }} />
+          {spalten.map((off, i) => (
+            <div key={i} className="anim-earth-crack" style={{
+              height: base * 1.25, left: off, top: -base * 0.6,
+              animationDelay: (i * 70) + 'ms',
+            }} />
+          ))}
+          {brocken.map((b, i) => (
+            <div key={'b' + i} className="anim-earth-chunk" style={{
+              width: b.sz, height: b.sz, left: b.dx, top: 0,
+              animationDelay: b.delay + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   // Idej Projection — green holographic damage-absorb burst. The
   // Projection "ate" the hit in the Hero's place: a green hologram
   // dome flares over its slot (flash + scanlined dome + expanding
@@ -17827,7 +17992,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // suppresses the duplicate. This catches cards pushed to discard
     // without a log — Artifacts that resolve and drop (Cute Cheese, etc.).
     if (discardGrew && window.playSFX) {
-      const addedCount = newDiscardLen - prevDiscardLen;
+      let addedCount = newDiscardLen - prevDiscardLen;
+      // Karten mit ausdruecklichem Flug haben ihren Klang schon vom
+      // Aktionslog bekommen — siehe `pileSoundSuppressRef`.
+      const vorgemerkt = Math.min(addedCount, pileSoundSuppressRef.current.discard || 0);
+      pileSoundSuppressRef.current.discard -= vorgemerkt;
+      addedCount -= vorgemerkt;
       for (let k = 0; k < addedCount; k++) {
         setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
       }
@@ -20908,6 +21078,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // (siehe takePileFlightLane).
   const pileFlightLaneRef = useRef({ until: 0, queued: 0 });
   const handToPilePendingOppRef = useRef({ discard: [], deleted: [] });
+  // Klang-Gegenstueck zu den Eimern darueber: zaehlt Karten, fuer die
+  // ein ausdruecklicher Flug lief und deren Abwurf-Klang der
+  // Aktionslog bereits gespielt hat.
+  const pileSoundSuppressRef = useRef({ discard: 0, deleted: 0 });
   const stealExpectedOppCountRef = useRef(-1); // opp hand count when stealHiddenOpp was set
   const stealExpectedMeCountRef = useRef(-1); // my hand count when stealHiddenMe was set
   const [stealHighlightMe, setStealHighlightMe] = useState(new Set()); // hand indices highlighted by opponent's blind pick selection
@@ -24748,6 +24922,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const idx = bucket.indexOf(entry);
           if (idx >= 0) bucket.splice(idx, 1);
         }, 700);
+        // ★ KLANG-DOPPLER unterdruecken (Als Befund 19.8. zu Magenta).
+        // Zwei Quellen feuern denselben Abwurf-Klang: der Aktionslog
+        // (sofort, wenn die Engine `discard` loggt) und der
+        // Stapelwachstums-Erkenner — der aber erst ausloest, wenn der
+        // neue Zustand ankommt, also NACH dem Flug. Die dortige
+        // 80-ms-Entprellung kann diese Luecke nicht ueberbruecken;
+        // man hoert denselben Abwurf zweimal.
+        // Ein ausdruecklicher Flug heisst: die Engine hat geloggt, der
+        // Klang lief schon. Der Zaehler ist das Klang-Gegenstueck zum
+        // Animations-Eimer darueber.
+        if (srcIsMe) {
+          const _sk = to;
+          pileSoundSuppressRef.current[_sk] = (pileSoundSuppressRef.current[_sk] || 0) + 1;
+          setTimeout(() => {
+            pileSoundSuppressRef.current[_sk] = Math.max(0, (pileSoundSuppressRef.current[_sk] || 1) - 1);
+          }, 1500);
+        }
       }
       // Resolve `pile` + locator extras to a DOM element on the side
       // requested by `isMe`. Tries the most specific selector first and
@@ -24761,6 +24952,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pile === 'deck')    return document.querySelector(isMe ? '[data-my-deck]'    : '[data-opp-deck]');
         if (pile === 'potionDeck') return document.querySelector(isMe ? '[data-my-potion-deck]' : '[data-opp-potion-deck]');
         if (pile === 'area')    return document.querySelector(`[data-area-zone][data-area-owner="${ownerLabel}"]`);
+        // ★ Coolness Stack als FLUGQUELLE (Als Vorgabe 19.8.: die
+        // Stack-Karten sollen einzeln in den Deleted Pile fliegen).
+        // Der Stapel ist nur besitzerbezogen — sein Datenattribut folgt
+        // der `data-my-…` / `data-opp-…`-Form, nicht dem `me`/`opp`-Label
+        // der uebrigen Zonen (dieselbe Sonderform wie im Zonen-Animations-
+        // Verteiler weiter oben).
+        if (pile === 'coolnessStack') return document.querySelector(isMe ? '[data-my-coolness]' : '[data-opp-coolness]');
         // Helden-Zone als Flug-Quelle: Waflavs abgelegte Form fliegt von
         // SEINER Zone auf den Ablagestapel. Ohne diesen Fall fiel der
         // Flug auf die namensbasierte Diff-Heuristik zurueck und startete
@@ -24912,9 +25110,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // this, the guard would short-circuit on the old element and
       // `pileTransferWindstorm` would never be defined — the card
       // would just snap to opacity:0 with no motion.
-      if (!document.getElementById('pile-transfer-keyframes-v2')) {
+      // `-v3`: dieselbe Ueberlegung fuer `cardFlightTilt`.
+      if (!document.getElementById('pile-transfer-keyframes-v3')) {
         const style = document.createElement('style');
-        style.id = 'pile-transfer-keyframes-v2';
+        style.id = 'pile-transfer-keyframes-v3';
         style.textContent = `
           @keyframes pileTransfer {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
@@ -24948,9 +25147,61 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             90%  { transform: translate(calc(var(--ptDx) * 0.92 - 18px), calc(var(--ptDy) * 0.92 + 14px)) rotate(180deg) scale(0.7); opacity: 0.85; }
             100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(720deg) scale(0.45); opacity: 0; }
           }
+          /* Neigung der Flugkarte — laeuft auf einer EIGENEN Ebene
+             INNERHALB der Flugkarte, damit die Flugbahn oben
+             unangetastet bleibt (Als Befund 19.8.: Kreaturen von
+             Trial of Dominance verlieren beim Abheben ihre
+             Perspektive). Werte kommen je Flug als --ftFrom/--ftTo. */
+          @keyframes cardFlightTilt {
+            from { transform: rotateX(var(--ftFrom, 0deg)); }
+            to   { transform: rotateX(var(--ftTo, 0deg)); }
+          }
         `;
         document.head.appendChild(style);
       }
+
+      // Pile-Flüge (→ Discard/Deleted) reihen sich in die gemeinsame
+      // Spur ein, damit sie nicht zeitgleich mit einem Flug des
+      // Diff-Detektors starten (Als Fund: letzter Wheels-Delete +
+      // Wheels' eigener Hand→Discard-Flug). Flüge zu Hand/Support/Deck
+      // bleiben ungetaktet — dort gibt es keine Kollision.
+      //
+      // ★ ALS BEFUND 18.8. (Trial of Dominance, dritte Runde): „werden
+      // auch weiterhin *sofort* vom Board entfernt und nicht erst, wenn
+      // ihre Movement-Animation anfängt."
+      // Ursache ist genau diese Spur. Eine Karte vom BRETT verschwindet
+      // in dem Moment, in dem der Spielstand ankommt — wird ihr Flug
+      // dahinter eingereiht (bis zu 5 × 350 ms), klafft dazwischen ein
+      // Loch, in dem die Kreatur schlicht weg ist.
+      // Deshalb fliegen BRETT-Quellen sofort. Die Spur bleibt fuer
+      // Hand-Quellen, wo sie herkommt: die Handkarte ist ohnehin schon
+      // aus der Hand heraus animiert, dort stoert eine Wartezeit nicht.
+      // Gestaffelt wird bei Dominance ohnehin schon serverseitig (ein
+      // `await actionDestroyCard` je Kreatur).
+      const _vomBrett = (from === 'support' || from === 'ability'
+        || from === 'surprise' || from === 'permanent');
+      const usesPileLane = (to === 'discard' || to === 'deleted') && !_vomBrett;
+      // ★ ALS BEFUND 18.8. (dritte Runde): „Jetzt bewegt Trial of
+      // Dominance alle Creatures *gleichzeitig* zum Deleted Pile. Es
+      // sollte zwischen den Creatures jeweils ein kleiner Delay sein,
+      // wie wenn z.B. Book of Doom mehrere Creatures gleichzeitig
+      // tötet."
+      // Die grosse Spur war richtig zu verlassen (die liess die Karte
+      // bis zu 1,75 s lang verschwunden am Brett stehen), aber ganz
+      // ohne Takt starten alle im selben Bild. Book of Doom bekommt
+      // seinen Takt vom Diff-Animator, der einen BATCH intern mit
+      // `PILE_FLIGHT_STAGGER_MS` staffelt — ausdrueckliche Broadcasts
+      // kommen einzeln an und haben den nicht.
+      // Deshalb hier ein eigener, KURZER Takt: der erste Flug startet
+      // sofort (kein Loch am Brett), jeder weitere derselben Salve
+      // ruecht 130 ms nach. Die Salve endet, sobald 400 ms lang nichts
+      // mehr kommt.
+      const boardDelay = _vomBrett && (to === 'discard' || to === 'deleted')
+        ? takeBoardFlightStagger()
+        : 0;
+      const laneDelay = usesPileLane
+        ? takePileFlightLane(1)
+        : boardDelay;
 
       const card = document.createElement('div');
       // `card-flight` opts the element out of the no-animations CSS
@@ -24994,6 +25245,46 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
       const durationMs = isWindstorm ? 1200 : 700;
       const easing = isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out';
+
+      // ── ★ KEINE Quellmaske fuer den Coolness Stack ──
+      // Ein Versuch mit Maske fuehrte zu DOPPELTER Buchhaltung: der
+      // Client zog die fliegende Karte ab UND die Engine nahm sie aus
+      // dem Stapel. Nachgerechnet ergab das genau Als Bild — die
+      // Anzeige sprang eine Karte zu weit („die zweite Karte steht ganz
+      // oben"), und bei nur einer Karte war der ganze Stapel unsichtbar
+      // (`hidden >= stackLen`).
+      // Jetzt fuehrt allein der Zustand die Quelle: die Engine nimmt
+      // die Karte beim START ihres Fluges aus dem Stapel, und weil die
+      // Fluege sich nicht mehr ueberlappen, zeigt der Stapel zu jedem
+      // Zeitpunkt genau die Karten, die noch drin sind. Nur das ZIEL
+      // wird bis zur Landung verdeckt (gleich darunter).
+
+      // ── ★ ZIELSTAPEL WAECHST ERST AM ENDE DER BEWEGUNG ──
+      // Als allgemeine Regel (19.8.). Der DIFF-Flugpfad macht das
+      // laengst (`scheduleAnims` zaehlt `…Hidden` hoch und erst nach
+      // der Landung herunter); der AUSDRUECKLICHE Flug tat es nicht —
+      // der Spielzustand mit der gewachsenen Ablage kommt sofort, die
+      // Karte lag also schon oben auf, waehrend ihr Flug noch lief.
+      // Weil Cute Nerd Magenta in v507 vom Diff- auf diesen Pfad
+      // wechselte, fiel es dort zuerst auf; betroffen ist JEDE
+      // ausdruecklich fliegende Karte.
+      // Die Haltezeit haengt an der ECHTEN Flugdauer plus dem
+      // Startversatz (Brett-Takt) — eine pauschale Zahl war 700 ms zu
+      // lang und liess die Karte spuerbar spaeter erscheinen.
+      if ((to === 'discard' || to === 'deleted') && cardName) {
+        const setHidden = to === 'discard'
+          ? (tgtIsMe ? setMyDiscardHidden : setOppDiscardHidden)
+          : (tgtIsMe ? setMyDeletedHidden : setOppDeletedHidden);
+        setHidden(prev => prev + 1);
+        // ★ Die Karte LANDET bei 80 % der Flugdauer — die letzten 20 %
+        // sind das Ausblenden (siehe die `pileTransfer`-Keyframes:
+        // 80 % voll sichtbar am Ziel, 100 % `opacity: 0`). Dieselbe
+        // Rechnung benutzt die Engine fuer `landAtMs` beim
+        // Selbstloesch-Transit. Mit `durationMs + 120` erschien die
+        // Karte spuerbar zu spaet (Als Befund 19.8.).
+        setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
+          (laneDelay || 0) + Math.round(durationMs * 0.8));
+      }
       card.style.cssText = [
         'position:fixed',
         `left:${srcX - 32}px`, `top:${srcY - 44}px`,
@@ -25004,60 +25295,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
+      // ── Neigung (Als Befund 19.8.) ───────────────────────────────
+      // „Wenn Trial of Dominance Creatures vom Board zum Deleted Pile
+      // schickt, werden diese komplett flach, sie verlieren ihre
+      // Perspektive."
+      // Entscheidungstabelle in `flightTiltFor`, Neigung der Ebene
+      // gemessen statt geraten in `readBoardTiltDeg`.
+      const flightTilt = flightTiltFor(from, to, readBoardTiltDeg(document));
+      // Dieselbe Wartezeit wie die Flugbahn: bei Brett-Quellen haengt
+      // der Knoten sofort im Dokument und nur der Start ist verschoben,
+      // sonst wird der Knoten selbst spaeter eingehaengt (siehe unten).
+      const flightDelayMs = (laneDelay > 0 && _vomBrett) ? laneDelay : 0;
+      const inhalt = makeFlightTiltLayer(card, {
+        startDeg: flightTilt.startDeg,
+        endDeg: flightTilt.endDeg,
+        durationMs, easing, delayMs: flightDelayMs,
+      }, document);
       if (imgUrl) {
         const img = document.createElement('img');
         img.src = imgUrl;
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
         img.draggable = false;
-        card.appendChild(img);
+        inhalt.appendChild(img);
         card.style.opacity = '1';
       } else {
-        card.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
+        inhalt.style.background = 'linear-gradient(135deg,#2a1a4a,#1a0a3a)';
         card.style.opacity = '1';
-        card.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
+        inhalt.innerHTML = `<div style="color:#c8a;font-size:8px;padding:4px;text-align:center;word-break:break-word;">${cardName}</div>`;
       }
-      // Pile-Flüge (→ Discard/Deleted) reihen sich in die gemeinsame
-      // Spur ein, damit sie nicht zeitgleich mit einem Flug des
-      // Diff-Detektors starten (Als Fund: letzter Wheels-Delete +
-      // Wheels' eigener Hand→Discard-Flug). Flüge zu Hand/Support/Deck
-      // bleiben ungetaktet — dort gibt es keine Kollision.
-      //
-      // ★ ALS BEFUND 18.8. (Trial of Dominance, dritte Runde): „werden
-      // auch weiterhin *sofort* vom Board entfernt und nicht erst, wenn
-      // ihre Movement-Animation anfängt."
-      // Ursache ist genau diese Spur. Eine Karte vom BRETT verschwindet
-      // in dem Moment, in dem der Spielstand ankommt — wird ihr Flug
-      // dahinter eingereiht (bis zu 5 × 350 ms), klafft dazwischen ein
-      // Loch, in dem die Kreatur schlicht weg ist.
-      // Deshalb fliegen BRETT-Quellen sofort. Die Spur bleibt fuer
-      // Hand-Quellen, wo sie herkommt: die Handkarte ist ohnehin schon
-      // aus der Hand heraus animiert, dort stoert eine Wartezeit nicht.
-      // Gestaffelt wird bei Dominance ohnehin schon serverseitig (ein
-      // `await actionDestroyCard` je Kreatur).
-      const _vomBrett = (from === 'support' || from === 'ability'
-        || from === 'surprise' || from === 'permanent');
-      const usesPileLane = (to === 'discard' || to === 'deleted') && !_vomBrett;
-      // ★ ALS BEFUND 18.8. (dritte Runde): „Jetzt bewegt Trial of
-      // Dominance alle Creatures *gleichzeitig* zum Deleted Pile. Es
-      // sollte zwischen den Creatures jeweils ein kleiner Delay sein,
-      // wie wenn z.B. Book of Doom mehrere Creatures gleichzeitig
-      // tötet."
-      // Die grosse Spur war richtig zu verlassen (die liess die Karte
-      // bis zu 1,75 s lang verschwunden am Brett stehen), aber ganz
-      // ohne Takt starten alle im selben Bild. Book of Doom bekommt
-      // seinen Takt vom Diff-Animator, der einen BATCH intern mit
-      // `PILE_FLIGHT_STAGGER_MS` staffelt — ausdrueckliche Broadcasts
-      // kommen einzeln an und haben den nicht.
-      // Deshalb hier ein eigener, KURZER Takt: der erste Flug startet
-      // sofort (kein Loch am Brett), jeder weitere derselben Salve
-      // ruecht 130 ms nach. Die Salve endet, sobald 400 ms lang nichts
-      // mehr kommt.
-      const boardDelay = _vomBrett && (to === 'discard' || to === 'deleted')
-        ? takeBoardFlightStagger()
-        : 0;
-      const laneDelay = usesPileLane
-        ? takePileFlightLane(1)
-        : boardDelay;
       // ★★ ALS BEFUND 18.8. (vierte Runde): „Creatures jenseits der
       // ersten flashen unsichtbar, bis sie sich bewegen."
       // Ursache: bei einer Wartezeit wurde der Knoten erst NACH ihr ins
@@ -25080,13 +25345,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => card.remove(), durationMs + 100);
       };
       if (laneDelay > 0) {
-        if (_vomBrett) {
-          card.style.animationDelay = laneDelay + 'ms';
-          document.body.appendChild(card);
-          setTimeout(() => card.remove(), laneDelay + durationMs + 100);
-        } else {
-          setTimeout(spawnFlight, laneDelay);
-        }
+        // ★ IMMER sofort einhaengen und nur die ANIMATION verzoegern
+        // (Als Befund 19.8.): frueher wurde bei Nicht-Brett-Quellen der
+        // ganze Flug per `setTimeout` verschoben. Der Zustand kommt
+        // aber sofort — die Karte war also schon aus ihrer Quelle
+        // verschwunden, waehrend die Kopie noch gar nicht existierte.
+        // Genau das hat Al am Coolness Stack gesehen: „Karte A
+        // verschwindet, B ist oben, und erst einen Augenblick spaeter
+        // beginnt die Bewegung von A."
+        // Mit `animationDelay` liegt die Kopie waehrend der Wartezeit
+        // sichtbar auf ihrer Quellposition — die Karte ist also nie
+        // nirgends. Brett-Quellen machten das laengst so; jetzt alle.
+        card.style.animationDelay = laneDelay + 'ms';
+        document.body.appendChild(card);
+        setTimeout(() => card.remove(), laneDelay + durationMs + 100);
       } else spawnFlight();
     };
     socket.on('play_pile_transfer', onPileTransfer);
@@ -25741,6 +26013,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const discardSel  = isMe
         ? (deleteMode ? '[data-my-deleted]'  : '[data-my-discard]')
         : (deleteMode ? '[data-opp-deleted]' : '[data-opp-discard]');
+      // ── ★ ZIELSTAPEL WAECHST ERST AM ENDE (Als Regel 19.8.) ──
+      // Zwillingsstelle zum ausdruecklichen Flug. Auch der Mill-Weg
+      // Deck→Ablage liess die Karten sofort am Ziel erscheinen (Als
+      // Befund: „Karten, die vom Deck direkt zum Discard gehen, z.B.
+      // via Magentas Effekt, erscheinen dort noch sofort").
+      // Die Haltezeit folgt derselben Rechnung wie unten beim Aufraeumen
+      // der Flugkarten: Versatz + Reisezeit + Haltephase + Ausblenden.
+      if (Array.isArray(cardNames) && cardNames.length > 0) {
+        const setHidden = deleteMode
+          ? (isMe ? setMyDeletedHidden : setOppDeletedHidden)
+          : (isMe ? setMyDiscardHidden : setOppDiscardHidden);
+        // ★ Landung bei 80 % der Reisezeit (560 von 700 ms) — dieselbe
+        // Rechnung wie beim ausdruecklichen Flug. Liegt eine Haltephase
+        // an, sitzt die Karte waehrenddessen sichtbar auf dem Stapel;
+        // dann darf er erst nach Halt und Ausblenden wachsen.
+        const _hold = holdDuration || 0;
+        const _gesamt = _hold > 0 ? (700 + _hold + 300) : 560;
+        cardNames.forEach((_n, i) => {
+          setHidden(prev => prev + 1);
+          setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
+            i * 200 + _gesamt);
+        });
+      }
       const srcEl = document.querySelector(deckSel);
       const tgtEl = document.querySelector(discardSel);
       if (!srcEl || !tgtEl || !cardNames || cardNames.length === 0) return;
@@ -27485,7 +27780,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const newHealNums = [];
       for (const [key, cur] of Object.entries(currentHp)) {
         const prev = prevHpRef.current[key];
-        if (prev && cur.hp > prev.hp && prev.hp > 0) {
+        // ★ `prev.hp > 0` schloss WIEDERBELEBUNGEN aus (0 → 100): Als
+        // Befund 19.8., die Revival-Animation zeigte keine gruene Zahl.
+        // Der Riegel soll nur verhindern, dass ein LEERER oder von einem
+        // ANDEREN Helden belegter Slot als Heilung gelesen wird —
+        // deshalb jetzt: HP-Anstieg von 0 zaehlt, solange derselbe Held
+        // im Slot steht.
+        if (prev && cur.hp > prev.hp && (prev.hp > 0 || prev.name === cur.name)) {
           // Same suppression as the damage branch — see comment above.
           if (manualHpSuppressRef.current[key]) continue;
           const healed = cur.hp - prev.hp;
