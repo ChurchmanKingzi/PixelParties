@@ -17,6 +17,8 @@
 //    node scripts/ab-all.js --only "Deepsea,Mawstruck"
 //    node scripts/ab-all.js --skip "Big Stomp"
 //    node scripts/ab-all.js --fast 0            → volles Suchbudget (3-4× langsamer)
+//    node scripts/ab-all.js --watch             → Zwischenstand live mitlesen
+//    node scripts/ab-all.js --watch --interval 15
 //    node scripts/ab-all.js --report            → nur Bericht, nichts spielen
 //    node scripts/ab-all.js --list              → nur auflisten, was anstünde
 //
@@ -75,6 +77,12 @@ const ONLY = getArg('--only', '').split(',').map(s => s.trim()).filter(Boolean);
 const SKIP = getArg('--skip', '').split(',').map(s => s.trim()).filter(Boolean);
 const REPORT_ONLY = hasFlag('--report');
 const LIST_ONLY = hasFlag('--list');
+// --watch: reiner Beobachter neben einem laufenden Lauf. Spielt nichts,
+// startet nichts, schreibt KEINE Berichtsdateien — liest nur die
+// Ergebnisdateien und zeichnet die Tabelle neu. Genau dafuer taugt das
+// jsonl-Format: jedes fertige Spiel wird sofort angehaengt.
+const WATCH = hasFlag('--watch');
+const INTERVAL = Math.max(5, parseInt(getArg('--interval', '30'), 10));
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -153,6 +161,18 @@ function urteil(W, L, ziel) {
   return { text: 'kein Nachweis (CI schließt 50 % ein)', kurz: '0' };
 }
 
+/** Eine Zeile Gesamtstand über ALLE Decks — die Nordstern-Zahl im Werden. */
+function zwischenstand(jobs) {
+  let spiele = 0, mitDaten = 0, summe = 0;
+  for (const j of jobs) {
+    const { W, L, T } = bilanz(j.out);
+    spiele += W + L + T;
+    if (W + L >= 20) { mitDaten++; summe += W / (W + L); }
+  }
+  const mittel = mitDaten > 0 ? `${(100 * summe / mitDaten).toFixed(1)} % über ${mitDaten} Decks` : 'noch keine belastbaren Decks';
+  return `gesamt ${spiele}/${jobs.length * GAMES} Spiele · Spiegel-Winrate im Mittel: ${mittel}`;
+}
+
 // ── Ein Deck fahren (mit Wiederanlauf, resumiert über die Zeilenzahl) ─
 function fahre(job) {
   return new Promise((resolve) => {
@@ -203,7 +223,9 @@ function fahre(job) {
 }
 
 // ── Bericht ──────────────────────────────────────────────────────────
-function bericht(jobs, dauerMs) {
+function bericht(jobs, dauerMs, opt = {}) {
+  const schreiben = opt.schreiben !== false;
+  const kompakt = !!opt.kompakt;
   const zeilen = [];
   const daten = [];
   for (const job of jobs) {
@@ -227,11 +249,16 @@ function bericht(jobs, dauerMs) {
   zeilen.push('═══════════════════════════════════════════════════════════════════════════');
   zeilen.push(`${b('Deck', 34)}${b('W-L-T', 14)}${b('Winrate', 18)}Urteil`);
   zeilen.push('───────────────────────────────────────────────────────────────────────────');
+  let unberuehrt = 0;
   for (const d of daten) {
+    // Im Beobachter-Modus die noch gar nicht begonnenen Decks zu EINER
+    // Zeile buendeln — sonst scrollt die interessante Haelfte weg.
+    if (kompakt && d.spiele === 0) { unberuehrt++; continue; }
     const wr = d.winrate == null ? '—'
       : `${(100 * d.winrate).toFixed(1)}% ±${(100 * d.ci).toFixed(1)}`;
     zeilen.push(`${b(d.deck.slice(0, 33), 34)}${b(`${d.wins}-${d.losses}-${d.ties}`, 14)}${b(wr, 18)}${d.urteil}`);
   }
+  if (unberuehrt > 0) zeilen.push(`${b('… ' + unberuehrt + ' Decks noch nicht begonnen', 34)}`);
   zeilen.push('───────────────────────────────────────────────────────────────────────────');
   const hilft = daten.filter(d => d.urteil.startsWith('HILFT')).length;
   const schaedlich = daten.filter(d => d.urteil.startsWith('SCHÄDLICH')).length;
@@ -250,6 +277,7 @@ function bericht(jobs, dauerMs) {
 
   const text = zeilen.join('\n');
   console.log('\n' + text + '\n');
+  if (!schreiben) return;
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   fs.writeFileSync(path.join(OUT_DIR, `REPORT-${stamp}.txt`), text, { encoding: 'utf-8' });
@@ -264,6 +292,18 @@ function bericht(jobs, dauerMs) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const jobs = buildJobs();
   if (jobs.length === 0) { console.error('[ab-all] Keine Profile zu messen.'); process.exit(1); }
+
+  if (WATCH) {
+    const zeichne = () => {
+      if (process.stdout.isTTY) console.clear();
+      console.log(`[ab-all] BEOBACHTER · ${new Date().toLocaleTimeString('de-DE')} · alle ${INTERVAL} s · Strg-C beendet nur die Anzeige`);
+      console.log(`[ab-all] ${zwischenstand(jobs)}`);
+      bericht(jobs, null, { schreiben: false, kompakt: true });
+    };
+    zeichne();
+    setInterval(zeichne, INTERVAL * 1000);
+    return;
+  }
 
   if (REPORT_ONLY) { bericht(jobs, null); return; }
 
@@ -297,9 +337,17 @@ function bericht(jobs, dauerMs) {
   const laufend = new Map();
 
   const fortschritt = setInterval(() => {
-    const zeilen = [...laufend.values()].map(j => `${j.deck.slice(0, 22)} ${bilanz(j.out).zeilen}/${GAMES}`);
+    // Nicht nur „wie viele Spiele", sondern der Zwischenstand — sonst
+    // sieht man 16 Stunden lang Zahlen, aber kein Ergebnis.
+    const zeilen = [...laufend.values()].map(j => {
+      const { W, L, T } = bilanz(j.out);
+      const { n, p } = wald(W, L);
+      const stand = n > 0 ? ` (${(100 * p).toFixed(0)}%)` : '';
+      return `${j.deck.slice(0, 22)} ${W + L + T}/${GAMES}${stand}`;
+    });
     const min = ((Date.now() - t0) / 60000).toFixed(0);
     console.log(`[ab-all] ${min} min · fertig ${fertigGezaehlt}/${offen.length} · läuft: ${zeilen.join(' | ') || '—'}`);
+    console.log(`[ab-all]    ${zwischenstand(jobs)}`);
   }, 60000);
   fortschritt.unref?.();
 
