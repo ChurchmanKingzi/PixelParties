@@ -187,10 +187,10 @@ module.exports = {
     const dmgSource = { name: CARD_NAME, owner: pi, heroIdx };
     if (target.type === 'hero') {
       const h = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-      if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, damage, 'other');
+      if (h && h.hp > 0) await engine.actionDealDamage(dmgSource, h, damage, 'creature');
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
-        dmgSource, target.cardInstance, damage, 'other',
+        dmgSource, target.cardInstance, damage, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

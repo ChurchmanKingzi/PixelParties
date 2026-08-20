@@ -139,11 +139,11 @@ module.exports = {
       if (target.type === 'hero') {
         const h = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (h && h.hp > 0) {
-          await engine.actionDealDamage(source, h, HIT_DAMAGE, 'other');
+          await engine.actionDealDamage(source, h, HIT_DAMAGE, 'creature');
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          source, target.cardInstance, HIT_DAMAGE, 'other',
+          source, target.cardInstance, HIT_DAMAGE, 'creature',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

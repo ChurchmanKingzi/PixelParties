@@ -91,12 +91,12 @@ module.exports = {
     if (target.type === 'hero') {
       const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
       if (tgtHero && tgtHero.hp > 0) {
-        await ctx.dealDamage(tgtHero, 50, 'other');
+        await ctx.dealDamage(tgtHero, 50, 'creature');
       }
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
         { name: CARD_NAME, owner: pi, heroIdx },
-        target.cardInstance, 50, 'other',
+        target.cardInstance, 50, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

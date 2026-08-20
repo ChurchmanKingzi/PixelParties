@@ -112,7 +112,7 @@ module.exports = {
     if (target.type === 'hero') {
       const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (hero && hero.hp > 0) {
-        await ctx.dealDamage(hero, 150, 'other');
+        await ctx.dealDamage(hero, 150, 'creature');
       }
     } else if (target.type === 'equip') {
       const inst = target.cardInstance || engine.cardInstances.find(c =>
@@ -122,7 +122,7 @@ module.exports = {
       if (inst) {
         await engine.actionDealCreatureDamage(
           { name: 'Cosmic Skeleton', owner: pi, heroIdx },
-          inst, 150, 'other',
+          inst, 150, 'creature',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

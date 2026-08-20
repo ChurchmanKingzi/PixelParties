@@ -21,9 +21,23 @@ const HOPT_KEY = 'stegon-recoil';
 // Damage-type allow-list for the trigger. Matches Fireshield's
 // "Attack/Spell/Creature effect" carve-out: rejects status ticks,
 // burn/poison residuals, artifact triggers, and 'other' generic.
+/**
+ * Ausloeser laut Kartentext: „takes damage from an Attack, Spell or
+ * Creature effect".
+ *
+ * ★ v520: `'creature'` FEHLTE. Die Menge fuehrte `'creature_effect'` —
+ * einen Namen, den KEINE Karte je als Schadenstyp schickt (er steht
+ * nur in Engine-Kommentaren). Die dritte Haelfte des Kartentexts war
+ * damit tot: Kreatureffekte loesten Stegons Rueckstoss nie aus.
+ * Aufgefallen bei der Typ-Bereinigung (Als Befund 20.8.).
+ *
+ * `'spell'`, `'support_spell'` und `'creature_effect'` bleiben als
+ * geduldete Aliasse stehen — sie kosten nichts und decken Quellen ab,
+ * die eines Tages so taggen.
+ */
 const TRIGGER_TYPES = new Set([
-  'attack', 'spell', 'destruction_spell', 'support_spell',
-  'creature_effect',
+  'attack', 'destruction_spell', 'creature',
+  'spell', 'support_spell', 'creature_effect',
 ]);
 
 module.exports = {
@@ -132,15 +146,28 @@ module.exports = {
         gs.hoptUsed[hoptKey] = gs.turn;
 
         // Apply the recoil.
+        //
+        // SCHADENSTYP `recoil` (Als Vorgabe 20.8.). Das Wort stand
+        // schon im Vokabular der Engine — `SURPRISE_SKIP_TYPES` und
+        // Zsos Ssars Filter fuehren es beide auf —, nur hat es bis
+        // hierher keine Karte je BENUTZT. Stegon ist der erste
+        // Traeger.
+        //
+        // Heute verhaelt es sich genau wie das vorherige `other`:
+        // kein Standard-Surprise-Fenster, Dark Ocean blockt es,
+        // Angler Angel erhoeht es (es ist Effektschaden). Der Wert
+        // liegt in der Unterscheidbarkeit — eine kuenftige Karte
+        // („wenn eine Kreatur Rueckstoss-Schaden nimmt …") kann jetzt
+        // darauf zeigen, ohne alles andere unter `other` mitzunehmen.
         const recoilSource = { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx };
         if (attackerKind === 'hero') {
           await engine.actionDealDamage(
-            recoilSource, attackerHero, recoilAmount, 'other',
+            recoilSource, attackerHero, recoilAmount, 'recoil',
             { _skipReactionCheck: true },
           );
         } else if (attackerInst) {
           await engine.actionDealCreatureDamage(
-            recoilSource, attackerInst, recoilAmount, 'other',
+            recoilSource, attackerInst, recoilAmount, 'recoil',
             { sourceOwner: pi, canBeNegated: true },
           );
         }

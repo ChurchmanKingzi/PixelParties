@@ -146,7 +146,7 @@ module.exports = {
         // by construction. "instead of damaging it" — to the letter.
         await engine.actionDefeatHero(source, hero, { reason: CARD_NAME });
       } else {
-        await ctx.dealDamage(hero, dmg, 'other');
+        await ctx.dealDamage(hero, dmg, 'creature');
       }
     } else {
       const cInst = target.cardInstance || engine.cardInstances.find(c =>
@@ -156,7 +156,7 @@ module.exports = {
       if (lethal) {
         await engine.actionDestroyCard(source, cInst);
       } else {
-        await engine.actionDealCreatureDamage(source, cInst, dmg, 'other',
+        await engine.actionDealCreatureDamage(source, cInst, dmg, 'creature',
           { sourceOwner: pi, canBeNegated: true });
       }
     }

@@ -8,12 +8,19 @@ available on the `ctx` object inside hooks.
 
 ---
 
-## ★ JEDE ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
+## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
-> „JEDE Animation soll grundsätzlich auch Sounds haben."
+> „Jede NEUE Animation soll einen Sound haben. Bestehende lasse ich
+> nur ändern, wenn sie mir negativ auffallen."
 
-Verbindlich für jede neue Animation. Es gibt dafür eine zentrale
-Zuordnung — kein Karten-Code ruft `playSFX` selbst auf:
+Verbindlich für jede **neu gebaute** Animation. BESTEHENDE stumme
+Animationen werden NICHT auf Vorrat nachgerüstet — nur auf Zuruf.
+Wer eine vorhandene Animation für eine neue Karte wiederverwenden
+will und ihr einen Klang geben möchte, legt dafür einen EIGENEN Typ
+an (`ZONE_ANIM_SFX` hängt am Typ, ein Eintrag klingt sonst überall
+mit) — Vorbild `trex_chomp`, das `dino_bite` unverändert weiterzeichnet.
+
+Die Zuordnung ist zentral — kein Karten-Code ruft `playSFX` selbst auf:
 
 * **Zonen-Animationen** (`play_zone_animation`): Eintrag in
   `ZONE_ANIM_SFX` in `public/app-shared.jsx`. Form:
@@ -31,6 +38,67 @@ Zuordnung — kein Karten-Code ruft `playSFX` selbst auf:
   und `opacity`) · **Eintrag in `ZONE_ANIM_SFX`** · Repro-Zusicherung
   auf das gesendete `play_zone_animation`.
 
+
+## ★ SCHADENSTYPEN — DAS VOLLSTÄNDIGE VOKABULAR
+
+Der `type`-Parameter jedes Schadensaufrufs. **Es gibt keine
+Registrierung und keine Validierung** — ein Tippfehler fällt nirgends
+auf, er ändert nur stillschweigend das Verhalten. Deshalb hier die
+verbindliche Liste:
+
+| Typ | Wofür |
+|---|---|
+| `'creature'` | **Der Normalfall für Kreatureffekte.** Alles, was eine Creature mit ihrem Effekt an Schaden austeilt. |
+| `'attack'` | Ein Angriff eines HELDEN. Auch dann, wenn eine Creature ihn auslöst und der Text sagt „treated as that Hero hitting the target" (Infected Greatmaw) — die Quelle ist dann der Held. |
+| `'destruction_spell'` | Schaden eines Zaubers. NICHT für Kreatureffekte, die zufällig groß sind. |
+| `'artifact'` | Schaden eines Artefakts. |
+| `'recoil'` | **Rückstoß** — Schaden, der auf einen Treffer hin zurückschlägt (Gigantisaur Stegon). Seit v520 in Gebrauch. |
+| `'status'` / `'poison'` / `'fire'` | Status-Ticks. Die Engine setzt sie selbst; Karten schreiben sie praktisch nie. |
+| `'other'` | Alles, was in keine Schublade passt — z.B. eine Selbstverletzung als Kosten (Ska Harpyformer). Bewusste Entscheidung, kein Auffangbecken. |
+
+**`'normal'` ist KEIN gültiger Typ** und war nie einer. Bis v519 stand
+er in vier Kreaturmodulen und hat sich wie ein unbekannter Wert
+verhalten.
+
+**Wer liest den Typ überhaupt?** Genau vier Stellen, und deshalb ist
+eine Fehlzuweisung ein echter Regelfehler, kein Schönheitsfleck:
+
+* **Dark Ocean** (`_engine.js`, Kreaturenstapel): „Creatures take no
+  damage, except from Attacks and Spells" — durch kommen NUR `attack`
+  und `destruction_spell`.
+* **Angler Angel**: erhöht Effektschaden von Kreaturen; ausgenommen
+  sind `attack` und die Status-Typen.
+* **Surprise-Fenster** (`SURPRISE_SKIP_TYPES`): `status`, `burn`,
+  `poison`, `recoil` und `other` öffnen das Standardfenster nicht.
+* **Zsos Ssar** benutzt dieselbe Ausnahmeliste.
+
+Faustregel beim Bau einer Creature: **`'creature'`, außer der
+Kartentext sagt ausdrücklich etwas anderes.**
+
+## ★ JEDE EINGESETZTE KARTE GEHÖRT INS LOG (Als Regel 20.8.)
+
+> „Jede Karte, die eingesetzt wird, sollte einen Logeintrag haben!"
+
+Zwei Hälften, und BEIDE müssen stimmen:
+
+1. **Engine-seitig** eine Zeile schreiben (`engine.log(typ, {...})`).
+   Für die normalen Spielwege macht das der Server schon
+   (`_setPendingPlayLog` → `spell_played`, `creature_effect_activated`,
+   `ability_activated`, `card_played`, …), für Reaktionsfenster die
+   Engine selbst.
+2. **Client-seitig** einen Fall in `formatLogEntry` (app-board.jsx).
+   **Ohne den ist die Zeile unsichtbar** — `formatLogEntry` gibt für
+   unbekannte Typen `null` zurück und der Eintrag wird verworfen.
+
+Genau daran hing der Befund vom 20.8.: alle 16 Hand-Reaktionsfenster
+loggten korrekt, hatten aber keinen Client-Fall — die 25 Karten, die
+über diese Fenster laufen (Troop Annihilation & Co.), erschienen nie im
+Log. Behoben über die Tabelle `REAKTIONS_ANLAESSE` in app-board.jsx: ein
+neues Fenster trägt sich dort mit einer Zeile ein.
+
+Kartenspezifische Zusatzzeilen (`blue_ice_shatter`, `angler_boost`, …)
+sind davon unberührt — die sind Beiwerk. Pflicht ist die Zeile
+„Spieler setzt Karte X ein".
 
 ## Quick Start
 
@@ -606,7 +674,7 @@ card scripts have to the game engine.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `ctx.dealDamage(target, amount, type)` | `Promise` | Deal damage to a hero. `type`: `'destruction_spell'`, `'attack'`, `'creature'`, `'status'`, `'artifact'`, `'other'` |
+| `ctx.dealDamage(target, amount, type)` | `Promise` | Deal damage to a hero. `type`: siehe **Schadenstypen** unten — `'creature'` ist der Normalfall für Kreatureffekte. |
 | `ctx.dealTrueDamage(target, amount, type, opts)` | `Promise<{dealt}>` | **"Cannot be reduced or negated"** damage. Works on both heroes and creatures. Bypasses buff multipliers (Cloudy, medusa_petrified), Charmed/Submerged immunity, Immortal/HP-1 caps, Smug Coin, Gate Shield, Guardian. Still respects first-turn protection and absolute creature immunities (Cardinal Beast, Baihu Petrify). Sets the `_damagedOnTurn` tracker so "took damage this turn" effects (Medusa's Curse) see it. Use this for Acid Vial / Rockfall / future true-damage cards. |
 | `ctx.healHero(target, amount)` | `Promise` | Heal a hero |
 | `ctx.reviveHero(playerIdx, heroIdx, hp, opts)` | `Promise` | Revive a KO'd hero |

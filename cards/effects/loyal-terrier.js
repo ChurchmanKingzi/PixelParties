@@ -157,11 +157,11 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
-          await engine.actionDealDamage(dmgSource, tgtHero, FOLLOW_DMG, 'normal');
+          await engine.actionDealDamage(dmgSource, tgtHero, FOLLOW_DMG, 'creature');
         }
       } else if (target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          dmgSource, target.cardInstance, FOLLOW_DMG, 'normal',
+          dmgSource, target.cardInstance, FOLLOW_DMG, 'creature',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

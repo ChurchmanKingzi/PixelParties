@@ -53,12 +53,12 @@ module.exports = {
     if (target.type === 'hero') {
       const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
       if (tgtHero && tgtHero.hp > 0) {
-        await ctx.dealDamage(tgtHero, 50, 'normal');
+        await ctx.dealDamage(tgtHero, 50, 'creature');
       }
     } else if (target.cardInstance) {
       await engine.actionDealCreatureDamage(
         { name: 'Aggressive Town Guard', owner: pi, heroIdx },
-        target.cardInstance, 50, 'normal',
+        target.cardInstance, 50, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

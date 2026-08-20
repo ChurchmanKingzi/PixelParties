@@ -7230,13 +7230,17 @@ class GameEngine {
       count = Math.max(0, batchCtx.amount);
       if (count === 0) return [];
 
-      // Pre-draw Surprise window (Cybug CENTIPEDE: "you draw that
-      // number of cards instead"). Offers any of opp's face-down
+      // Pre-draw Surprise window. Offers any of opp's face-down
       // Surprises exporting `surpriseBeforeOppDrawTrigger` for
       // activation BEFORE the draws happen. A returned
       // `{ drawRedirected: true }` cancels this call entirely —
-      // opp draws nothing; the Surprise's own onSurpriseActivate
-      // already handled re-routing the draws to its controller.
+      // opp draws nothing.
+      //
+      // STAND v517: KEINE Karte benutzt den Abbruchweg mehr. Cybug
+      // CENTIPEDE hat ihn bis v516 benutzt („you draw that number of
+      // cards instead"); seit der Balance-Aenderung zieht sie nur noch
+      // parallel mit und gibt `null` zurueck. Der Weg bleibt hier
+      // stehen, weil er der einzige Anker fuer „Ziehung abfangen" ist.
       const preDrawResult = await this._checkSurpriseBeforeOppDraw(playerIdx, count);
       if (preDrawResult?.drawRedirected) return [];
     }
@@ -19723,12 +19727,13 @@ class GameEngine {
 
   /**
    * Pre-draw Surprise window — fires INSIDE `actionDrawCards`
-   * BEFORE any cards are actually drawn, so a Surprise can redirect
-   * or steal the draw entirely (Cybug CENTIPEDE: "you draw that
-   * number of cards instead"). The Surprise script returns
-   * `{ drawRedirected: true }` from `onSurpriseActivate` to signal
-   * the caller — `actionDrawCards` then zeroes its draw count and
-   * exits without dispensing any cards.
+   * BEFORE any cards are actually drawn, so a Surprise can react to
+   * the draw (Cybug CENTIPEDE: "you draw the same number of cards")
+   * oder sie ganz abfangen. Fuers Abfangen gibt das Skript
+   * `{ drawRedirected: true }` aus `onSurpriseActivate` zurueck —
+   * `actionDrawCards` bricht dann ohne Ausgabe von Karten ab. Gibt
+   * es etwas anderes (oder `null`) zurueck, zieht der Gegner ganz
+   * normal weiter, und das Fenster prueft die restlichen Surprises.
    *
    * Skipped when already inside surprise resolution to prevent
    * recursive activation chains (a Surprise's own draws can't
@@ -19742,7 +19747,7 @@ class GameEngine {
     // need to faithfully model to make a reasonable move. Skip the
     // pre-draw window entirely in MCTS / fast-mode simulations — the
     // worst case is the brain undervalues a future Cybug-CENTIPEDE
-    // redirect, which is preferable to the brain hanging.
+    // Mitzieher, which is preferable to the brain hanging.
     if (this._inMctsSim || this._fastMode) return null;
     const opponentIdx = drawingPlayerIdx === 0 ? 1 : 0;
     const drawerName = this.gs.players[drawingPlayerIdx]?.username || 'Opponent';

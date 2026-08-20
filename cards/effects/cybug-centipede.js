@@ -4,19 +4,31 @@
 //
 //  "Activate this Surprise when your opponent would draw cards
 //   through an effect by deleting 1 "Wheels" from your hand or
-//   deck. You draw that number of cards instead. Then, place this
+//   deck. You draw the same number of cards. Then, place this
 //   Creature into one of the user's free Support Zones. When this
 //   Creature is defeated, add a "Wheels" from your discard pile to
 //   your hand."
 //
+//  ── BALANCE-AENDERUNG v517 (Als Vorgabe 19.8.) ──────────────────
+//  Bis v516 hiess der Text „You draw that number of cards INSTEAD":
+//  die Ziehung des Gegners wurde abgefangen und umgeleitet. Das war
+//  zu stark. Jetzt zieht der Gegner ganz normal, und der Beherrscher
+//  zieht dieselbe Anzahl ZUSAETZLICH.
+//
+//  Technisch ist das genau eine Zeile: `onSurpriseActivate` gibt
+//  KEIN `{ drawRedirected: true }` mehr zurueck. Der Rueckgabewert
+//  ist der einzige Weg, auf dem `actionDrawCards` die Ziehung des
+//  Gegners abbricht (`_engine.js` ~7241) — ohne ihn laeuft sie nach
+//  dem Fenster ganz normal weiter.
+//
 //  Mechanics
 //  ─────────
-//   • Pre-draw interrupt: hooks the engine's pre-draw Surprise
-//     window (`surpriseBeforeOppDrawTrigger`). Fires INSIDE
-//     `actionDrawCards` BEFORE any cards are dispensed. Returning
-//     `{ drawRedirected: true }` from `onSurpriseActivate` cancels
-//     opp's draw entirely; the controller's own follow-up draw
-//     happens here too.
+//   • Pre-draw window: hooks the engine's pre-draw Surprise window
+//     (`surpriseBeforeOppDrawTrigger`). Fires INSIDE
+//     `actionDrawCards` BEFORE any cards are dispensed. Der
+//     Beherrscher zieht also VOR dem Gegner — dieselbe Stelle wie
+//     bisher, nur ohne Abbruch. Zwei getrennte Decks, die
+//     Reihenfolge hat keine Nebenwirkung.
 //   • Activation cost: delete 1 "Wheels" from controller's hand
 //     (preferred) or deck. The trigger gate refuses to even prompt
 //     when no Wheels is available (`hasCybugFuel`).
@@ -58,17 +70,20 @@ module.exports = {
   surpriseBeforeOppDrawTrigger(gs, ownerIdx, heroIdx, drawInfo, engine) {
     if (!drawInfo || drawInfo.drawingPlayer === ownerIdx) return false;
     if (!drawInfo.count || drawInfo.count <= 0) return false;
-    // Hand-locked controllers can't fulfil "you draw that number of
-    // cards instead" — refuse to even prompt so the cost isn't
-    // wasted on a redirect that can't pay out.
+    // Hand-locked controllers can't draw at all (`actionDrawCards`
+    // steigt bei `handLocked` sofort aus) — refuse to even prompt,
+    // sonst kostet die Aktivierung ein Wheels und bringt nur noch
+    // den 10-HP-Koerper. Bewusst beibehalten aus v516; wenn Al den
+    // Koerper auch ohne Ziehung haben will, faellt genau diese
+    // Zeile weg.
     if (gs.players[ownerIdx]?.handLocked) return false;
     return hasCybugFuel(gs, ownerIdx, FUEL_CARD);
   },
 
   /**
-   * Pay the Wheels cost → draw that many cards for the controller.
-   * Returning `{ drawRedirected: true }` aborts the opp's
-   * `actionDrawCards` call so they draw nothing.
+   * Pay the Wheels cost → der Beherrscher zieht dieselbe Anzahl.
+   * KEIN Rueckgabewert mit `drawRedirected`: der Gegner zieht nach
+   * dem Fenster ganz normal weiter (Balance-Aenderung v517).
    */
   async onSurpriseActivate(ctx, sourceInfo) {
     const engine = ctx._engine;
@@ -92,24 +107,29 @@ module.exports = {
 
     const count = sourceInfo?.count || 0;
     if (count > 0) {
-      // Controller draws the redirected count. Pass `_skipBatchHook`
-      // so this internal draw doesn't re-trigger another Cybug
-      // CENTIPEDE on its own draw (and to skip the
-      // `BEFORE_DRAW_BATCH` reactors that already fired for the
-      // original opp draw — those have already had their say).
+      // Der Beherrscher zieht dieselbe Anzahl. `_skipBatchHook`
+      // bleibt gesetzt: diese Ziehung ist die FOLGE der gegnerischen,
+      // kein eigener Effekt-Draw. Ohne den Riegel liefe sie erneut
+      // durch `BEFORE_DRAW_BATCH` (Intrude & Co. wuerden die Kopie
+      // kopieren) und oeffnete ein weiteres Vor-Zieh-Fenster —
+      // Centipede koennte sich selbst hochschaukeln.
       await engine.actionDrawCards(pi, count, {
         source: CARD_NAME,
         _skipBatchHook: true,
       });
     }
 
-    engine.log('cybug_centipede_redirect', {
+    engine.log('cybug_centipede_draw', {
       player: ps.username,
-      count, original: sourceInfo?.drawingPlayer,
+      count, drawer: sourceInfo?.drawingPlayer,
     });
     engine.sync();
 
-    return { drawRedirected: true };
+    // Bewusst `null`: nur `{ drawRedirected: true }` wuerde die
+    // Ziehung des Gegners abbrechen. Das Fenster laeuft danach
+    // weiter durch die restlichen Surprises — richtig so, eine
+    // zweite Centipede darf auf dieselbe Ziehung reagieren.
+    return null;
   },
 
   hooks: {

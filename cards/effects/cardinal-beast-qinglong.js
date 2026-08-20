@@ -88,13 +88,13 @@ module.exports = {
         if (hero && hero.hp > 0) {
           await engine.actionDealDamage(
             { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
-            hero, dmg, 'normal'
+            hero, dmg, 'creature'
           );
         }
       } else if (tgt.cardInstance) {
         await engine.actionDealCreatureDamage(
           { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
-          tgt.cardInstance, dmg, 'normal',
+          tgt.cardInstance, dmg, 'creature',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

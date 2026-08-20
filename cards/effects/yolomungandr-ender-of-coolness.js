@@ -123,11 +123,14 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
     await engine._delay(450);
   }
 
+  // SCHADENSTYP `creature` seit v520 (vorher `destruction_spell`) —
+  // dieselbe Fehlzuweisung wie bei Phatnir, samt derselben Folge:
+  // Dark Ocean blockt den Schaden jetzt. Von Al so entschieden.
   if (target === 'heroes') {
     for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
       const h = oppPs.heroes[hi];
       if (h?.name && h.hp > 0) {
-        await ctx.dealDamage(h, damage, 'destruction_spell');
+        await ctx.dealDamage(h, damage, 'creature');
       }
     }
   } else {
@@ -136,7 +139,7 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
       if (inst.owner === oppIdx && inst.zone === 'support') {
         const cd = engine._getCardDB()[inst.name];
         if (cd && hasCardType(cd, 'Creature')) {
-          entries.push({ inst, amount: damage, source: ctx.card, type: 'destruction_spell' });
+          entries.push({ inst, amount: damage, source: ctx.card, type: 'creature' });
         }
       }
     }

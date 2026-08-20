@@ -78,15 +78,20 @@ module.exports = {
     });
     await engine._delay(550);
 
+    // SCHADENSTYP `creature` seit v520 (vorher `destruction_spell`).
+    // Der Kartentext nennt keinen Zauber — das war eine
+    // Fehlzuweisung. FOLGE: Dark Ocean („Creatures take no damage,
+    // except from Attacks and Spells") blockt diesen Schaden jetzt,
+    // vorher kam er durch. Von Al am 20.8. so entschieden.
     if (target.type === 'hero') {
       const h = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-      if (h && h.hp > 0) await ctx.dealDamage(h, ZAP_DAMAGE, 'destruction_spell');
+      if (h && h.hp > 0) await ctx.dealDamage(h, ZAP_DAMAGE, 'creature');
     } else if (target.cardInstance) {
       // Use `actionDealCreatureDamage` — the canonical creature damage
       // helper. The previous call to `engine.dealCreatureDamage` was
       // a non-existent method, so the damage silently dropped.
       await engine.actionDealCreatureDamage(
-        ctx.card, target.cardInstance, ZAP_DAMAGE, 'destruction_spell',
+        ctx.card, target.cardInstance, ZAP_DAMAGE, 'creature',
         { sourceOwner: pi, canBeNegated: true }
       );
     }

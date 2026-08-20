@@ -5334,7 +5334,124 @@ function CannibalismChompEffect({ x, y }) {
   );
 }
 
+// ── Hand-Reaktionsfenster → Logtext (Als Regel 20.8.) ────────────────
+// „Jede Karte, die eingesetzt wird, sollte einen Logeintrag haben."
+//
+// Die Engine schreibt fuer JEDES ihrer Reaktionsfenster eine Zeile mit
+// derselben Nutzlast `{ card, player, … }` — nur hatte `formatLogEntry`
+// fuer KEINE davon einen Fall, und unbekannte Typen wirft es still weg.
+// Ergebnis: die 25 Karten, die ueber diese Fenster gespielt werden,
+// tauchten im Aktionslog nie auf (Als Befund an Troop Annihilation).
+//
+// Eine Tabelle statt 16 Einzelfaellen: ein kuenftiges Fenster braucht
+// hier nur eine Zeile und faellt nicht wieder stumm durch.
+const REAKTIONS_ANLAESSE = {
+  pre_damage_reaction:            'damage was about to hit',
+  opp_pre_damage_reaction:        'damage was about to hit',
+  creature_pre_damage_reaction:   'a Creature was about to be hit',
+  opp_creature_pre_damage_reaction: 'a Creature was about to be hit',
+  creature_pre_defeat_reaction:   'a Creature was about to be defeated',
+  creature_defeated_reaction:     'a Creature was defeated',
+  after_damage_reaction:          'damage had landed',
+  after_creature_damage_reaction: 'a Creature had taken damage',
+  creature_damage_batch_reaction: 'Creatures had taken damage',
+  batch_reaction_fired:           'damage had landed',
+  resource_phase_reaction:        'the Resource Phase began',
+  post_summon_reaction:           'a Creature was summoned',
+  post_target_reaction:           'a target was chosen',
+  ascension_reaction:             'a Hero ascended',
+  cd_movement_reaction:           'a Creature moved',
+  opp_action_phase_reaction:      "the opponent's Action Phase",
+};
+
 const ANIM_REGISTRY = {
+  // ── Schusssalve (Gangster Angel — v518) ───────────────────────────
+  // Kein Gewehr-/Schuss-Motiv im Bestand (182 Typen geprueft), also
+  // eine neue, bewusst kleine Zeichnung: drei Muendungsblitze am
+  // linken Rand, sechs Leuchtspuren, die quer durchs Ziel ziehen, und
+  // ein paar Einschlagfunken. Nur `transform` und `opacity` animiert.
+  //
+  // 10 Schaden sind wenig — die Salve bleibt entsprechend knapp
+  // (520 ms) und leise, sonst ueberzeichnet sie ihren Effekt.
+  gunshot_barrage: (function () {
+    return function GunshotBarrageEffect({ x, y, w }) {
+      const basis = Math.max(w || 72, 60);
+      const spuren = useMemo(() => (
+        [0, 1, 2, 3, 4, 5].map(i => ({
+          yOff: -basis * 0.34 + (i * basis * 0.14),
+          delay: i * 55,
+          laenge: basis * (0.9 + (i % 3) * 0.22),
+          dicke: i % 2 === 0 ? 3 : 2,
+        }))
+      ), [basis]);
+      const blitze = useMemo(() => (
+        [0, 1, 2].map(i => ({ yOff: -basis * 0.2 + i * basis * 0.2, delay: i * 90 }))
+      ), [basis]);
+      const funken = useMemo(() => (
+        [0, 1, 2, 3, 4, 5, 6].map(i => {
+          const winkel = (i / 7) * Math.PI * 2;
+          return {
+            dx: Math.cos(winkel) * basis * 0.42,
+            dy: Math.sin(winkel) * basis * 0.42,
+            delay: 150 + i * 30,
+            gr: 3 + (i % 3),
+          };
+        })
+      ), [basis]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
+          {blitze.map((b, i) => (
+            <div key={'mz' + i} className="anim-gunshot-muzzle" style={{
+              width: basis * 0.3, height: basis * 0.16,
+              left: -basis * 0.95, top: b.yOff,
+              animationDelay: b.delay + 'ms',
+            }} />
+          ))}
+          {spuren.map((t, i) => (
+            <div key={'tr' + i} className="anim-gunshot-tracer" style={{
+              width: t.laenge, height: t.dicke,
+              left: -basis * 0.8, top: t.yOff,
+              animationDelay: t.delay + 'ms',
+              '--gsDist': (basis * 1.5) + 'px',
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <div key={'sp' + i} className="anim-gunshot-spark" style={{
+              width: f.gr, height: f.gr, left: 0, top: 0,
+              animationDelay: f.delay + 'ms',
+              '--gsdx': f.dx + 'px', '--gsdy': f.dy + 'px',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── T-Rex-Biss (Foresta, the Guard — Als Vorgabe 19.8.) ───────────
+  // Al wollte „einen grossen Biss eines T-Rex-Gebisses". GENAU DAS
+  // zeichnet `dino_bite` bereits (Gigantisaurs) — inklusive Ober-/
+  // Unterkiefer, Zahnreihe, Einschlagblitz und Blutspritzern. Statt
+  // einer zweiten, fast gleichen Zeichnung faehrt dieser Typ denselben
+  // Renderer auf voller Stufe.
+  //
+  // WARUM trotzdem ein EIGENER Typ und nicht schlicht `dino_bite`:
+  // die Klangzuordnung `ZONE_ANIM_SFX` haengt am TYP. Bekaeme
+  // `dino_bite` den neuen Klang, wuerde jeder Gigantisaur-Biss
+  // mitklingen — also eine Aenderung an einer BESTEHENDEN Animation,
+  // und die will Al ausdruecklich nur auf Zuruf. Eigener Typ = eigener
+  // Klang, die Gigantisaurs bleiben unberuehrt.
+  //
+  // Voreinstellung: `damage: 500` (Forestas Wert, faehrt die
+  // Intensitaetskurve ans Maximum) und `gore: true` (groesseres
+  // Gebiss, mehr Zaehne, dunklere Kiefer, Bluttropfen). Beides bleibt
+  // ueberschreibbar, falls eine kuenftige Karte denselben Biss
+  // kleiner braucht.
+  trex_chomp: (function () {
+    return function TrexChompEffect(props) {
+      const Biss = ANIM_REGISTRY.dino_bite;
+      if (!Biss) return null;
+      return <Biss {...props} damage={props.damage ?? 500} gore={props.gore ?? true} />;
+    };
+  })(),
   // Erdriss — Cybug RHINOCEROS pflügt die Karte weg, bevor sie das
   // Feld verlässt (Als Vorgabe 19.8.). Aufbau bewusst schlicht und im
   // Stil der übrigen Einträge: ein Staubstoß, drei aufreißende Spalten
@@ -28748,6 +28865,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'tharx_draw') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Tharx drew {entry.drawn} card{entry.drawn!==1?'s':''} ({entry.creatures} creature{entry.creatures!==1?'s':''})!</span>; }
       if (t === 'venom_infusion') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target}{entry.unhealable ? ' with Unhealable Poison' : ''}!</span>; }
       if (t === 'poisoned_well') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.targets} target{entry.targets !== 1 ? 's' : ''} with Poisoned Well!</span>; }
+      // Foresta, the Guard — der zweite Kostenteil ihrer Beschwoerung.
+      // Ohne eigenen Fall bliebe die Zeile UNSICHTBAR: formatLogEntry
+      // gibt fuer unbekannte Typen null zurueck.
+      if (t === 'foresta_hp_cost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} paid the summoning cost — HP halved from <span className="log-amount">{entry.from}</span> to <span className="log-amount">{entry.to}</span>.</span>; }
+      // Angler Angel: sichtbar machen, WARUM ein Treffer haerter war.
+      if (t === 'angler_boost') { return <span className="log-damage">{cName('Angler Angel')} increased {cName(entry.source)}'s damage by <span className="log-amount">+{entry.bonus}</span> to <span className="log-amount">{entry.newAmount}</span>.</span>; }
+      // Hand-Reaktionen: EIN Fall fuer die ganze Familie, siehe
+      // REAKTIONS_ANLAESSE oben.
+      if (REAKTIONS_ANLAESSE[t]) {
+        const p = playerByName(entry.player);
+        const bezug = entry.target || entry.trigger || entry.hero;
+        return <span className="log-status">⚡ {pName(p.name, p.color)} played {cName(entry.card)} in reaction — {REAKTIONS_ANLAESSE[t]}{bezug ? ` (${bezug})` : ''}.</span>;
+      }
       if (t === 'zsos_ssar_cost') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} inflicted Poison on {entry.target} (Serpent's Cost).</span>; }
       if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
       if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }

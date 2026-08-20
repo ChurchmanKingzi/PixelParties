@@ -191,13 +191,13 @@ module.exports = {
       if (target.type === 'hero') {
         const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (hero && hero.hp > 0) {
-          await engine.actionDealDamage(source, hero, SHOT_DAMAGE, 'other', {
+          await engine.actionDealDamage(source, hero, SHOT_DAMAGE, 'creature', {
             _skipReactionCheck: true,
           });
         }
       } else if (target.type === 'equip' && target.cardInstance) {
         await engine.actionDealCreatureDamage(
-          source, target.cardInstance, SHOT_DAMAGE, 'other',
+          source, target.cardInstance, SHOT_DAMAGE, 'creature',
           { sourceOwner: ctx.cardOwner, _skipReactionCheck: true }
         );
       }

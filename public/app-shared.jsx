@@ -639,6 +639,20 @@ const ZONE_ANIM_SFX = {
   blood_moon_pulse:        { name: 'elem_dark' },
   sunglasses_drop:         { name: 'sunglasses_drop' },
   critical_slash:          { name: 'critical_strike' },
+  // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
+  // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
+  // trockener Schuss statt eines fliegenden Pfeils. Leise gehalten:
+  // 10 Schaden je Ziel, und die Salve laeuft auf ALLEN Zielen
+  // gleichzeitig — bei fuenf Zielen sonst fuenf Schuesse uebereinander.
+  gunshot_barrage:         { name: 'projectile', opts: { rate: 1.35, volume: 0.5, dedupe: 200 } },
+  // Foresta, the Guard — der zuschnappende T-Rex-Kiefer (`trex_chomp`).
+  // `attack_ram` ist der wuchtigste Nahkampfklang im Katalog; tiefer
+  // abgespielt wird daraus ein schweres Gebiss statt eines Rempelns.
+  // Der Versatz trifft den SCHNAPP-Punkt: die Kiefer schliessen bei
+  // 38 % der 1600 ms Animationsdauer (~610 ms), und
+  // `playSFXForZoneAnim` legt den Einbau-Versatz von 100 ms selbst
+  // dazu — 500 + 100 = 600 ms.
+  trex_chomp:              { name: 'attack_ram', opts: { rate: 0.7, delay: 500 } },
   // Fire
   fireball:                { name: 'elem_fire' },
   flame_avalanche:         { name: 'elem_fire' },

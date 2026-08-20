@@ -48,7 +48,7 @@ module.exports = {
       await engine._delay(380);
 
       const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.card.heroIdx };
-      await engine.actionDealDamage(source, oppHero, HIT_DAMAGE, 'other');
+      await engine.actionDealDamage(source, oppHero, HIT_DAMAGE, 'creature');
 
       const ps = engine.gs.players[pi];
       engine.log('slippery_spikeblock_hit', {

@@ -13685,6 +13685,47 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 
 /* ── Erdriss (Cybug RHINOCEROS, Als Vorgabe 19.8.) ────────────────────
    Nur `transform` und `opacity` animiert — Als CSS-Regel. */
+/* ── Schusssalve (Gangster Angel, v518) ───────────────────────────────
+   Nur `transform` und `opacity` animiert — Als CSS-Regel. */
+.anim-gunshot-muzzle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(255,247,200,.95) 0%, rgba(255,190,70,.7) 45%, rgba(255,140,40,0) 78%);
+  opacity: 0;
+  animation: gunshotMuzzle 200ms ease-out forwards;
+}
+@keyframes gunshotMuzzle {
+  0%   { opacity: 0; transform: scale(.3, .6); }
+  35%  { opacity: 1; transform: scale(1.15, 1); }
+  100% { opacity: 0; transform: scale(.7, .8); }
+}
+.anim-gunshot-tracer {
+  position: absolute;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    rgba(255,238,170,0) 0%, rgba(255,226,140,.95) 35%, rgba(255,255,255,.95) 75%, rgba(255,255,255,0) 100%);
+  box-shadow: 0 0 6px rgba(255,200,90,.75);
+  opacity: 0;
+  animation: gunshotTracer 260ms linear forwards;
+}
+@keyframes gunshotTracer {
+  0%   { opacity: 0; transform: translateX(0) scaleX(.4); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(var(--gsDist)) scaleX(1); }
+}
+.anim-gunshot-spark {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8d0 0%, #ffb545 60%, rgba(255,140,40,0) 100%);
+  opacity: 0;
+  animation: gunshotSpark 360ms ease-out forwards;
+}
+@keyframes gunshotSpark {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+  25%  { opacity: 1; transform: translate(calc(var(--gsdx) * .4), calc(var(--gsdy) * .4)) scale(1.1); }
+  100% { opacity: 0; transform: translate(var(--gsdx), var(--gsdy)) scale(.5); }
+}
 .anim-earth-dust {
   position: absolute;
   border-radius: 50%;

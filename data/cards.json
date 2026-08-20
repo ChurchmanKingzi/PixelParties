@@ -4939,7 +4939,7 @@
     "hp": 10,
     "atk": null,
     "cost": null,
-    "effect": "Activate this Surprise when your opponent would draw cards through an effect by deleting 1 \"Wheels\" from your hand or deck. You draw that number of cards instead. Then, place this Creature into one of the user's free Support Zones. When this Creature is defeated, add a \"Wheels\" from your discard pile to your hand.",
+    "effect": "Activate this Surprise when your opponent would draw cards through an effect by deleting 1 \"Wheels\" from your hand or deck. You draw the same number of cards. Then, place this Creature into one of the user's free Support Zones. When this Creature is defeated, add a \"Wheels\" from your discard pile to your hand.",
     "archetype": "Cybug",
     "setID": "PP MSEG",
     "banned": "",

@@ -195,6 +195,12 @@ module.exports = {
         type: 'explosion', owner: pi, heroIdx, zoneSlot: -1,
       });
       await engine._delay(400);
+      // BLEIBT `other` (Als Ruling 20.8.: „eine besondere
+      // Schadensart"). Beim Typ-Grossreinemachen an 15 Kreaturen ist
+      // diese Stelle bewusst AUSGENOMMEN — es ist kein Angriff auf ein
+      // Ziel, sondern eine Selbstverletzung des eigenen Helden als
+      // Suchkosten. Waere sie `creature`, wuerde Angler Angel die
+      // eigenen Kosten um 50 verteuern. Nicht „korrigieren"!
       await ctx.dealDamage(hero, 50, 'other');
 
       // Only search if the hero survived
