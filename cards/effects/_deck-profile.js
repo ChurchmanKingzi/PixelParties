@@ -58,6 +58,7 @@ function heroKeyOf(heroNames) {
  * damit ein Tippfehler nicht als „Kanal wirkungslos" durchgeht.
  */
 let _ablationWarned = false;
+let _ablationTreffer = 0;   // wie oft wurde tatsächlich etwas abgeklemmt
 function stripDisabledChannels(p, datei) {
   const roh = process.env.PP_PROFILE_OFF;
   if (!roh) return;
@@ -70,6 +71,7 @@ function stripDisabledChannels(p, datei) {
     entfernt.push(n);
   }
   if (entfernt.length) {
+    _ablationTreffer++;
     console.log(`[deck-profile] ABLATION "${p.deck}" (${datei}): ${entfernt.join(', ')} abgeklemmt`);
   }
   // Die Warnung nur EINMAL je Lauf — sonst 42 identische Zeilen.
@@ -110,6 +112,22 @@ function loadAllProfiles() {
     } catch (err) {
       console.error(`[deck-profile] failed to load ${f}:`, err.message);
     }
+  }
+  // ── EICHZEILE (v574) ───────────────────────────────────────────────
+  // Läuft IMMER, auch ohne Stellschraube. Sie ist die Nullprobe: ohne
+  // sie ist „keine ABLATION-Zeile im Log" nicht von „Log unvollständig"
+  // zu unterscheiden. Genau daran ist der Lauf vom 21.8. still
+  // gescheitert — 12 Decks × 400 Spiele lang wurde das volle Profil
+  // gemessen, weil PP_PROFILE_OFF nie im Prozess ankam.
+  console.log(`[deck-profile] Konfiguration: ${_profiles.size} Profile geladen`
+    + ` · Ablation: ${process.env.PP_PROFILE_OFF || 'keine'}`
+    + ` · conf-cap: ${CONF_CAP}`
+    + (process.env.PP_FORCE_PROFILES === '1' ? ' · Quarantäne übersteuert' : ''));
+  if (process.env.PP_PROFILE_OFF && _ablationTreffer === 0) {
+    console.error('[deck-profile] ⛔ ABLATION ANGEFORDERT, ABER NICHTS ABGEKLEMMT.');
+    console.error(`[deck-profile]    Angefordert: ${process.env.PP_PROFILE_OFF}`);
+    console.error('[deck-profile]    Kein einziges Profil trug einen dieser Kanäle — der Lauf misst');
+    console.error('[deck-profile]    das VOLLE Profil und wäre als Ablation wertlos. Kanalnamen prüfen.');
   }
   return _profiles;
 }

@@ -17,8 +17,10 @@
 //    node scripts/ab-all.js --only "Deepsea,Mawstruck"
 //    node scripts/ab-all.js --skip "Big Stomp"
 //    node scripts/ab-all.js --fast 0            → volles Suchbudget (3-4× langsamer)
-//    PP_PROFILE_OFF=tutorPickRules node scripts/ab-all.js --tag ohne-tutor \
+//    node scripts/ab-all.js --ablate tutorPickRules --tag ohne-tutor
 //                                               → Ablation: Kanal abklemmen und messen
+//    node scripts/ab-all.js --conf-cap 0.4 --tag cap040
+//                                               → Profil-Gewicht deckeln und messen
 //    node scripts/ab-all.js --watch             → Zwischenstand live mitlesen
 //    node scripts/ab-all.js --watch --interval 15
 //    node scripts/ab-all.js --report            → nur Bericht, nichts spielen
@@ -81,6 +83,33 @@ const SKIP = getArg('--skip', '').split(',').map(s => s.trim()).filter(Boolean);
 // Ablations-Laeufe (PP_PROFILE_OFF=…), damit sie nicht in denselben
 // Topf laufen wie die Grundmessung.
 const TAG = getArg('--tag', '').trim().replace(/[^A-Za-z0-9_-]/g, '');
+
+// ── VARIANTEN-ERKENNUNG (v574) ───────────────────────────────────────
+// Der Lauf vom 21.8. hat 12 Decks à 400 Spiele lang gemessen, OHNE dass
+// PP_PROFILE_OFF im Kindprozess ankam — in keinem der 12 Logs steht eine
+// einzige „ABLATION"-Zeile, obwohl 40 von 42 Profilen tutorPickRules
+// tragen. Gemessen wurde also erneut das VOLLE Profil, und das Ergebnis
+// landete zu allem Ueberfluss als `abResult` im Profil-JSON und damit im
+// Deployment-Gate. Drei Riegel dagegen:
+//
+//   1. Kanaele werden mit `--ablate` gesetzt, nicht ueber die Shell.
+//      `VAR=wert befehl` gibt es unter Windows nicht — genau die Falle.
+//      Ein geerbtes PP_PROFILE_OFF wird weiter akzeptiert und gemeldet.
+//   2. Jede Abweichung von der Grundkonfiguration ist eine VARIANTE.
+//      Ohne `--tag` bricht der Lauf ab (exit 2) — auch bei --list,
+//      --report und --watch, denn sonst laese man die Dateien der
+//      Grundmessung unter der Ueberschrift der Variante.
+//   3. Varianten schreiben KEIN abResult (PP_AB_NO_PROFILE_WRITE=1 an
+//      die Kindprozesse; server.js prueft zusaetzlich selbst).
+const ABLATE = (getArg('--ablate', '') || process.env.PP_PROFILE_OFF || '')
+  .split(',').map(s => s.trim()).filter(Boolean).join(',');
+const CONF_CAP = (getArg('--conf-cap', '') || process.env.PP_PROFILE_CONF_CAP || '').trim();
+const VARIANTEN = [];
+if (ABLATE) VARIANTEN.push(`Ablation=${ABLATE}`);
+if (CONF_CAP) VARIANTEN.push(`conf-cap=${CONF_CAP}`);
+if (!FAST) VARIANTEN.push('volles Suchbudget (--fast 0)');
+if (HEAP !== 4096) VARIANTEN.push(`Heap=${HEAP}`);
+const IST_VARIANTE = VARIANTEN.length > 0;
 const REPORT_ONLY = hasFlag('--report');
 const LIST_ONLY = hasFlag('--list');
 // --watch: reiner Beobachter neben einem laufenden Lauf. Spielt nichts,
@@ -89,6 +118,30 @@ const LIST_ONLY = hasFlag('--list');
 // jsonl-Format: jedes fertige Spiel wird sofort angehaengt.
 const WATCH = hasFlag('--watch');
 const INTERVAL = Math.max(5, parseInt(getArg('--interval', '30'), 10));
+
+// ── EICHZEILE + RIEGEL (v574) ────────────────────────────────────────
+// Die Zeile laeuft IMMER, auch ohne Variante. Ohne diese Nullprobe ist
+// „keine ABLATION-Meldung im Log" nicht von „Log unvollstaendig" zu
+// unterscheiden — daran ist der 21.8.-Lauf still gescheitert.
+console.log(`[ab-all] Konfiguration: ${IST_VARIANTE ? VARIANTEN.join(' · ') : 'GRUNDMESSUNG (keine Variante)'}`
+  + ` · Tag: ${TAG || '—'} · abResult-Schreiben: ${IST_VARIANTE ? 'AUS' : 'AN'}`);
+if (IST_VARIANTE && !TAG) {
+  const vorschlag = ABLATE ? 'ohne-' + slugTag(ABLATE.split(',')[0])
+    : CONF_CAP ? 'cap' + CONF_CAP.replace(/[^0-9]/g, '')
+    : !FAST ? 'vollbudget' : 'variante';
+  console.error('[ab-all] ABBRUCH: Variantenlauf ohne --tag.');
+  console.error(`[ab-all]   Variante: ${VARIANTEN.join(' · ')}`);
+  console.error('[ab-all]   Ohne Kuerzel liefen die Ergebnisse in dieselben Dateien wie die');
+  console.error('[ab-all]   Grundmessung und waeren nicht mehr auseinanderzuhalten.');
+  console.error(`[ab-all]   → denselben Befehl noch einmal mit  --tag ${vorschlag}`);
+  process.exit(2);
+}
+if (TAG && !IST_VARIANTE) {
+  console.warn(`[ab-all] ⚠️  --tag ${TAG} gesetzt, aber KEINE Variante aktiv — dieser Lauf misst`);
+  console.warn('[ab-all]    dieselbe Konfiguration wie die Grundmessung, nur in eigene Dateien.');
+  console.warn('[ab-all]    Ablation gewollt? Dann --ablate <kanal> mitgeben (nicht ueber die Shell setzen).');
+}
+function slugTag(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 12); }
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -201,6 +254,13 @@ function fahre(job) {
         // quarantänisiertes Profil Baseline gegen Baseline.
         PP_FORCE_PROFILES: '1',
       };
+      // Variante EXPLIZIT an das Kind reichen statt sich auf die Shell
+      // zu verlassen (v574). Delete statt undefined: ein geerbtes
+      // PP_PROFILE_OFF aus einer frueheren Sitzung darf nicht still
+      // mitlaufen, wenn dieser Lauf keine Ablation ist.
+      if (ABLATE) env.PP_PROFILE_OFF = ABLATE; else delete env.PP_PROFILE_OFF;
+      if (CONF_CAP) env.PP_PROFILE_CONF_CAP = CONF_CAP; else delete env.PP_PROFILE_CONF_CAP;
+      if (IST_VARIANTE) env.PP_AB_NO_PROFILE_WRITE = '1'; else delete env.PP_AB_NO_PROFILE_WRITE;
       if (FAST) { env.PP_MCTS_BUDGET_MS = '4000'; env.PP_MCTS_PULLS = '24'; }
       // Exploration hat im Messlauf nichts verloren (server.js ignoriert
       // sie in A/B ohnehin — hier zusätzlich entfernt, damit die Absicht
@@ -209,6 +269,8 @@ function fahre(job) {
 
       const logStream = fs.createWriteStream(job.log, { flags: 'a' });
       logStream.write(`\n═══ Versuch ${attempts} — ${new Date().toISOString()} ═══\n`);
+      logStream.write(`Konfiguration: ${IST_VARIANTE ? VARIANTEN.join(' · ') : 'GRUNDMESSUNG'}`
+        + ` · Tag: ${TAG || '—'} · abResult: ${IST_VARIANTE ? 'wird NICHT geschrieben' : 'wird geschrieben'}\n`);
       const kind = spawn(process.execPath,
         [`--max-old-space-size=${HEAP}`, '--expose-gc', path.join(ROOT, 'server.js')],
         { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -252,7 +314,8 @@ function bericht(jobs, dauerMs, opt = {}) {
   zeilen.push(`  A/B-SPIEGEL — ALLE PROFILE GEGEN IHRE UNTRAINIERTE FORM`);
   zeilen.push(`  ${new Date().toISOString()} · Ziel ${GAMES} Spiele/Deck · ${FAST ? 'reduziertes' : 'volles'} Suchbudget`);
   if (TAG) zeilen.push(`  Lauf-Kuerzel: ${TAG}`);
-  if (process.env.PP_PROFILE_OFF) zeilen.push(`  ABLATION — abgeklemmt: ${process.env.PP_PROFILE_OFF}`);
+  zeilen.push(`  Konfiguration: ${IST_VARIANTE ? VARIANTEN.join(' · ') : 'GRUNDMESSUNG (keine Variante)'}`);
+  if (IST_VARIANTE) zeilen.push('  → Variantenlauf: KEIN abResult in die Profile geschrieben.');
   if (dauerMs != null) zeilen.push(`  Laufzeit: ${(dauerMs / 3600000).toFixed(1)} h`);
   zeilen.push('═══════════════════════════════════════════════════════════════════════════');
   zeilen.push(`${b('Deck', 34)}${b('W-L-T', 14)}${b('Winrate', 18)}Urteil`);

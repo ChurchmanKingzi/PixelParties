@@ -17094,6 +17094,24 @@ async function runTrainingBatch() {
       // Der Profil-Loader quarantänisiert Profile mit nachgewiesen
       // schädlichem Spiegel-Ergebnis (<48 % bei n≥50) — ein Profil, das
       // seinen eigenen Akzeptanztest verliert, deployt sich nicht mehr.
+      // ── VARIANTEN-RIEGEL (v574) ──────────────────────────────────
+      // Das Deployment-Gate darf AUSSCHLIESSLICH die Grundkonfiguration
+      // messen. Am 21.8. hat ein als Ablation gedachter Lauf (der in
+      // Wahrheit gar nicht abliert hat) seine 400-Spiele-Zahl in neun
+      // Profile geschrieben und die Grundmessung dort ueberschrieben.
+      // Waere die Ablation angekommen und ein Deck unter 48 % gefallen,
+      // haette sie ein gesundes Profil quarantaenisiert. Der Riegel
+      // sitzt bewusst HIER und nicht nur in ab-all.js — server.js kennt
+      // seine eigene Umgebung, ein vergessenes Flag im Aufrufer kann ihn
+      // also nicht umgehen.
+      const _abVariante = [];
+      if (process.env.PP_PROFILE_OFF) _abVariante.push(`Ablation ${process.env.PP_PROFILE_OFF}`);
+      if (process.env.PP_PROFILE_CONF_CAP) _abVariante.push(`conf-cap ${process.env.PP_PROFILE_CONF_CAP}`);
+      if (process.env.PP_AB_NO_PROFILE_WRITE === '1') _abVariante.push('vom Aufrufer gesperrt');
+      if (_abVariante.length > 0) {
+        console.log(`[train] abResult NICHT ins Profil geschrieben — Variantenlauf (${_abVariante.join(', ')}).`);
+        console.log('[train] Das Deployment-Gate misst nur die Grundkonfiguration; das Ergebnis steht in der jsonl/Log-Datei.');
+      } else {
       try {
         const slug = pinned.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         const profPath = path.join(__dirname, 'data', 'cpu-profiles', `${slug}.json`);
@@ -17107,6 +17125,7 @@ async function runTrainingBatch() {
           console.log(`[train] A/B-Ergebnis in ${slug}.json geschrieben${p < 0.48 && n >= 50 ? ' — Profil wird ab jetzt QUARANTÄNISIERT' : ''}`);
         }
       } catch (err) { console.error('[train] Konnte A/B-Ergebnis nicht ins Profil schreiben:', err.message); }
+      }
     } catch (err) { console.error('[train] A/B-Summary fehlgeschlagen:', err.message); }
   } else {
     console.log(`[train] next: node scripts/train-deck-profile.js "${outPath}"`);
