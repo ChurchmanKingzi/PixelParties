@@ -393,6 +393,10 @@ module.exports = {
 async function _selfDiscard(ctx, reason) {
   const engine = ctx._engine;
   if (!ctx.card || ctx.card.zone !== 'support') return;
+  // Auftritt links am Feld (Als Regel 21.8.: „Invisibility, wenn sie
+  // sich selbst mit ihrem Effekt entfernt"). In der gemeinsamen
+  // Abwurffunktion, damit ALLE vier Ausloeser ihn bekommen.
+  await engine.announceHookActivation(CARD_NAME, ctx.cardOwner);
   engine.log('invisibility_self_discard', {
     player: engine.gs.players[ctx.cardOwner]?.username,
     reason,

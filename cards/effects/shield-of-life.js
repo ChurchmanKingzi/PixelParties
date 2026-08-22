@@ -126,6 +126,10 @@ module.exports = {
       engine.sync();
 
       // Equip-Karte aufleuchten lassen (grün = Heilung)
+      // Auftritt links am Feld (Als Regel 21.8.: beim Ausloesen).
+      await engine.announceHookActivation('Shield of Life',
+        ctx.cardController ?? ctx.cardOwner, { source: ctx.source });
+
       engine._broadcastEvent('play_zone_animation', {
         type: 'equip_flash', color: '#4ade80',
         owner: ctx.cardController ?? ctx.cardOwner,

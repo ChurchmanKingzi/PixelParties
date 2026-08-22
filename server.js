@@ -4330,6 +4330,15 @@ function sendGameState(room, playerIdx, extra) {
       })(),
       potionDeckCards: pi === playerIdx ? ps.potionDeck : [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
+      // Ablage-Eintraege, die gerade eine FREMDE IDENTITAET tragen
+      // (Future Tech Copy Device). `{ echterName: aktuelleIdentitaet }`.
+      // Der Client zeigt sie beim Ueberfahren an — dieselbe Auskunft,
+      // die eine als Equip liegende Kopie ueber ihr Kartenbild gibt
+      // (Als Vorgabe 22.8.). Kein verstecktes Wissen: Ablagen sind
+      // ohnehin fuer beide Seiten einsehbar.
+      discardIdentities: require('./cards/effects/_future-tech-shared')
+        .ablageIdentitaeten(gs, pi),
+      discardEntries: room.engine ? room.engine.getDiscardEntries(pi) : [],
       // Lethe per-pile +1 stamps — `{ [cardName]: [stampCount, ...] }`
       // sized to combined discard+deleted occurrences. Forwarded to the
       // client so pile-viewer / cardGallery / BoardCard renderings can
@@ -4482,6 +4491,23 @@ function sendGameState(room, playerIdx, extra) {
         const merged = { ...(ps._handCostReductions || {}) };
         const perm = ps._handCostReductionsPermanent || {};
         for (const k of Object.keys(perm)) merged[k] = (merged[k] || 0) + (perm[k] || 0);
+        // Namensweiter Nullpreis (Misfire): fuer die ANZEIGE auf jeden
+        // Handindex dieses Namens uebersetzt — der Spieler soll auf
+        // JEDER Kopie sehen, dass sie gerade nichts kostet. Verbraucht
+        // wird trotzdem nur einmal, beim tatsaechlichen Spielen.
+        const frei = ps._freeArtifactNames || {};
+        const db = room.engine._getCardDB();
+        (ps.hand || []).forEach((n, i) => {
+          if (frei[n]) merged[i] = Math.max(merged[i] || 0, db[n]?.cost || 0);
+          // Selbstrabatt der Karte (Laser Cannon) fuer die ANZEIGE
+          // mitrechnen — sonst zeigt die Hand 60 an, der Server nimmt
+          // aber 20, und die Oberflaeche graut die Karte faelschlich aus.
+          const sk = loadCardEffect(n);
+          if (typeof sk?.selfCostReduction === 'function') {
+            const r = sk.selfCostReduction(gs, pi, db[n], room.engine) || 0;
+            if (r > 0) merged[i] = (merged[i] || 0) + r;
+          }
+        });
         return merged;
       })() : {},
       supportSpellLocked: ps.supportSpellLocked || false,
@@ -4921,6 +4947,14 @@ function sendGameState(room, playerIdx, extra) {
       ? [room.engine._isChillyDogActiveFor(0), room.engine._isChillyDogActiveFor(1)]
       : [false, false],
     activatableEquips: room.engine ? room.engine.getActivatableEquips(playerIdx) : [],
+    // Karten in der eigenen ABLAGE, die gerade benutzt werden koennen
+    // (Future Tech Prototypes). Der Client hebt sie im Ablage-Dialog
+    // hervor und macht sie anklickbar.
+    activatableDiscard: room.engine ? room.engine.getActivatableDiscardCards(playerIdx) : [],
+    // ★ Ein Eintrag JE STAPELPLATZ (v585): Instanz, aktuelle Identitaet
+    // und Benutzbarkeit. Ersetzt das Abhaken nach Namen im Client, das
+    // bei mehreren gleichen Karten geraten hat.
+    discardEntries: room.engine ? room.engine.getDiscardEntries(playerIdx) : [],
     activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
     activatableAreas: room.engine ? room.engine.getActivatableAreas(playerIdx) : [],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
@@ -5111,6 +5145,12 @@ function sendSpectatorGameState(room) {
       })(),
       potionDeckCards: [], potionDeckCount: ps.potionDeck.length,
       discardPile: ps.discardPile, deletedPile: ps.deletedPile,
+      // Siehe die Zwillingsstelle in der Spieler-Projektion. Die
+      // Laufvariable heisst hier `spi` — `check-scope` hat meinen
+      // kopierten `pi` sofort gefangen.
+      discardIdentities: require('./cards/effects/_future-tech-shared')
+        .ablageIdentitaeten(gs, spi),
+      discardEntries: room.engine ? room.engine.getDiscardEntries(spi) : [],
       letheStamps: ps._letheStamps || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
@@ -5284,6 +5324,8 @@ function sendSpectatorGameState(room) {
     activatableCreatures: [],
     zoneCharges: [],
     activatableEquips: [],
+    activatableDiscard: [],
+    discardEntries: [],
     activatablePermanents: [],
     activatableAreas: [],
     heroPlayableCards: { own: {}, charmed: {} },
@@ -6069,7 +6111,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot 
 
   ps.abilityZones[heroIdx] = abZones;
   ps.hand.splice(handIndex, 1);
-  if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+  room.engine.notePlayedFromHand(pi);
   // Consume the standard slot first; if it's already used, spend a bonus
   // attachment from Divine Gift of Skill instead. Track which slot was
   // consumed so a negation refund can return it cleanly.
@@ -6250,7 +6292,19 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // discounts (Play Money) both stack, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
   const handReduction = (ps._handCostReductions?.[handIndex] || 0)
-    + (ps._handCostReductionsPermanent?.[handIndex] || 0);
+    + (ps._handCostReductionsPermanent?.[handIndex] || 0)
+    // ★ Namensweiter Nullpreis (Misfire, Als Ruling 21.8.): „das
+    // NAECHSTE Artefakt mit diesem Namen diese Runde" — egal welche
+    // Kopie, also NICHT ueber den Handindex. Der Eintrag wird beim
+    // tatsaechlichen Spielen verbraucht und beim Zugbeginn geloescht.
+    + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
+    // ★ `selfCostReduction(gs, pi, cardData, engine)` — eine Karte
+    // verbilligt SICH SELBST (Future Tech Laser Cannon: −20 je Kopie in
+    // der Ablage). Bewusst ein eigener Vertrag und nicht `dynamicCost`:
+    // den liest der Server NUR bei Reaktionen. Additiv und
+    // rueckwaertskompatibel — kein Artefakt exportiert ihn per Default.
+    + (typeof _script?.selfCostReduction === 'function'
+      ? (_script.selfCostReduction(gs, pi, cardData, room.engine) || 0) : 0);
   // Target-Hero equip discount: a Hero script may export
   // `equipCostReduction(gs, pi, heroIdx, cardData, engine)` to discount
   // Artifacts equipped ONTO it (Tsu'Ki: Lunatic Cycle cards −10).
@@ -6327,7 +6381,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
 
     ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.notePlayedFromHand(pi);
 
     room.engine.log('artifact_equipped', { player: ps.username, card: cardName, hero: hero.name, cost });
     room.engine._trackTerrorResolvedEffect(pi, cardName);
@@ -6353,6 +6407,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         resolve: async () => {
           // `cardName` mit: nur so greift `selfGoldOverdraft` (Debt-O-Tron
           // Damage Fees darf sich selbst auch aus dem Minus bezahlen).
+          // Namensweiten Nullpreis verbrauchen — er gilt nur EINMAL.
+          if (ps._freeArtifactNames && ps._freeArtifactNames[cardName]) {
+            delete ps._freeArtifactNames[cardName];
+          }
           await room.engine._payCardCost(pi, cost, { cardName });
           if (costReduction > 0) {
             delete ps._nextArtifactCostReduction;
@@ -6450,7 +6508,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     const entnimmHandkarte = () => {
       const idx = commitHandResolve(ps, {
         onRemoved: () => {
-          if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+          room.engine.notePlayedFromHand(pi);
         },
       });
       if (idx >= 0) handEntnommen = true;
@@ -6553,6 +6611,10 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
             destOwner: placementOwner,
           }, !!clickPlaced);
           entnimmHandkarte();
+          // Namensweiten Nullpreis verbrauchen — er gilt nur EINMAL.
+          if (ps._freeArtifactNames && ps._freeArtifactNames[cardName]) {
+            delete ps._freeArtifactNames[cardName];
+          }
           await room.engine._payCardCost(pi, cost, { cardName });
           if (costReduction > 0) {
             delete ps._nextArtifactCostReduction;
@@ -6655,16 +6717,14 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
  *
  * Returns the (possibly-doubled) base cost.
  */
+// ★ Die Verdopplung selbst lebt seit v573 in `_crystals-shared.js` —
+// dort, wo auch ihre Ausnahme (`selfRevealEffectsSuppressed`) steht und
+// wo eine KARTE sie erreichen kann (Future Tech Copy Device bezahlt die
+// Kosten der Karte, deren Identität sie annimmt). Hier bleibt nur die
+// Durchreiche, damit die beiden Aufrufstellen unten unverändert lesen.
 function applyRustingCrystalCostMultiplier(gs, pi, cardName, baseCost, engine) {
-  if (!cardName || cardName === 'Rusting Crystal') return baseCost;
-  const ps = gs.players?.[pi];
-  if (!ps) return baseCost;
-  if (!(ps.hand || []).includes('Rusting Crystal')) return baseCost;
-  if (engine) {
-    const { selfRevealEffectsSuppressed } = require('./cards/effects/_crystals-shared');
-    if (selfRevealEffectsSuppressed(engine, pi)) return baseCost;
-  }
-  return baseCost * 2;
+  const { applyRustingCrystalCostMultiplier: helfer } = require('./cards/effects/_crystals-shared');
+  return helfer(gs, pi, cardName, baseCost, engine);
 }
 
 function isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, cardName, engine) {
@@ -6935,7 +6995,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       _heroCostFinalized = true;
       const hi = getResolvingHandIndex(ps);
       ps._resolvingCard = null;
-      if (hi >= 0) { ps.hand.splice(hi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
+      if (hi >= 0) { ps.hand.splice(hi, 1); room.engine.notePlayedFromHand(pi); }
       // Foreign-origin cards (Magic Lamp gifts etc.) route to the
       // ORIGINAL owner's discard pile, not the caster's. Falls back
       // to `pi` when the card has no foreign-origin tag.
@@ -7141,7 +7201,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     const resolveHi = getResolvingHandIndex(ps);
     ps._resolvingCard = null;
-    if (resolveHi >= 0) { ps.hand.splice(resolveHi, 1); if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++; }
+    if (resolveHi >= 0) { ps.hand.splice(resolveHi, 1); room.engine.notePlayedFromHand(pi); }
     if (gs._spellPlacedOnBoard) {
       delete gs._spellPlacedOnBoard;
     } else if (gs._spellReturnToHand) {
@@ -8240,7 +8300,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     ps._resolvingCard = null;
     if (idx >= 0) {
       ps.hand.splice(idx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      room.engine.notePlayedFromHand(pi);
     }
     return idx;
   };
@@ -8397,9 +8457,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
           // refund is the correct outcome; the action-economy rollback
           // below already un-spends the Action.
           ps.hand.push(cardName);
-          if (gs._scTracking && pi >= 0 && pi < 2) {
-            gs._scTracking[pi].cardsPlayedFromHand = Math.max(0, (gs._scTracking[pi].cardsPlayedFromHand || 0) - 1);
-          }
+          room.engine.notePlayedFromHand(pi, -1);
         } else {
           // Foreign-origin Creatures (Magic Lamp gifts etc.) still route
           // their fizzle discard back to the original owner's pile.
@@ -9313,6 +9371,46 @@ async function doActivatePermanent(room, pi, { permId, ownerIdx }) {
   return true;
 }
 
+/**
+ * Eine Karte AUS DER ABLAGE benutzen (Future Tech Prototypes, v582).
+ *
+ * Gegenstueck zu `doActivateEquipEffect`. Die Gates stehen bewusst
+ * hier und nicht nur im Sammler: der Sammler treibt die ANZEIGE, diese
+ * Funktion die WIRKUNG — ein manipulierter Client darf nicht daran
+ * vorbei (dieselbe Begruendung wie bei `neverPlayable`).
+ */
+async function doActivateDiscardEffect(room, pi, { instId }) {
+  if (!room?.engine || !room.gameState) return false;
+  const gs = room.gameState;
+  if (pi !== gs.activePlayer) return false;
+  if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return false;
+  if (gs.potionTargeting) return false;
+  if (gs._chainResolvingLock) return false;
+  if (gs._forceDiscardLock === pi) return false;
+
+  // Nur, was der Sammler auch anbietet — EINE Auslegungsstelle fuer
+  // „darf das gerade benutzt werden?".
+  const angebot = room.engine.getActivatableDiscardCards(pi);
+  const eintrag = angebot.find(e => e.instId === instId);
+  if (!eintrag) return false;
+
+  const inst = room.engine.cardInstances.find(c => c.id === instId);
+  if (!inst || inst.zone !== 'discard') return false;
+  const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+  if (typeof script?.onDiscardEffect !== 'function') return false;
+
+  room.engine.log('discard_effect_activated', {
+    player: gs.players[pi]?.username, card: eintrag.displayName,
+  });
+  try {
+    await script.onDiscardEffect(room.engine, pi, inst);
+  } catch (err) {
+    console.error('[doActivateDiscardEffect]', err.stack || err.message);
+  }
+  for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
+  return true;
+}
+
 async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   if (!room?.engine || !room.gameState) return false;
   const gs = room.gameState;
@@ -9320,7 +9418,23 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   if (gs.currentPhase !== 2 && gs.currentPhase !== 4) return false;
   if (gs.potionTargeting) return false;
 
-  const ps = gs.players[pi];
+  // ★ Cross-Side (v565): eine eigene Ausruestung kann auf der
+  // GEGNERSEITE liegen (Future Tech Control Device). Dann sind Held und
+  // Zone die des Gegners — die Instanz gehoert trotzdem `pi`.
+  const oi = pi === 0 ? 1 : 0;
+  // ★ Eine Cross-Side-Karte liegt PER DEFINITION auf der Gegenseite
+  // ihres Besitzers. Der Besitzer ergibt sich also aus der SEITE, in
+  // deren Zone sie steht — `originalOwner` ist nur die Bestaetigung und
+  // fehlt bei Karten, die ein PUZZLE vorbelegt hat (Als Befund 21.8.:
+  // „ist es bereits zu Beginn equipped, hat es nicht mal das
+  // Highlight").
+  const _crossInst = room.engine.cardInstances.find(c =>
+    c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+    && (gs.players[oi]?.supportZones?.[heroIdx]?.[zoneSlot] || []).includes(c.name)
+    // Auch hier ueber das Override: eine Copy Device, die zu einem
+    // Control Device geworden ist, liegt cross-side, heisst aber nicht so.
+    && loadCardEffect(c.counters?._effectOverride || c.name)?.placesOnOpponentBoard);
+  const ps = _crossInst ? gs.players[oi] : gs.players[pi];
   const hero = ps.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   // Bound blocks "Actions" only — equip-effect activations are an
@@ -9333,12 +9447,22 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   if (slot.length === 0) return false;
   const cardName = slot[0];
 
-  const inst = room.engine.cardInstances.find(c =>
+  // ★ Bei Cross-Side gehoert die Instanz der GEGENSEITE der Zone, in
+  // der sie liegt — `c.owner === pi` trifft dort nie zu. Ohne diesen
+  // Zweig fand der Server die Karte nicht und der Klick verpuffte
+  // (Als Befund 21.8.: „wird gehighlightet, Klick tut nichts").
+  const inst = _crossInst || room.engine.cardInstances.find(c =>
     (c.owner === pi || c.controller === pi) && c.zone === 'support' && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
   );
   if (!inst) return false;
 
-  const script = loadCardEffect(cardName);
+  // ★ Geliehene Identitaet (Future Tech Copy Device): die Karte heisst
+  // weiter Copy Device, IST aber die kopierte Ausruestung. Das Skript
+  // kommt deshalb aus dem Override — dieselbe Aufloesung, die
+  // `CardInstance.getHook` und der Aktivierungs-Sammler benutzen. Ohne
+  // diese Zeile war die Karte hervorgehoben und der Klick wirkungslos
+  // (der Fehler aus v567, hier vorweggenommen).
+  const script = loadCardEffect(inst.counters?._effectOverride || cardName);
   if (!script?.equipEffect || !script?.onEquipEffect) return false;
   if (!script.bypassHostStatusFilter) {
     if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
@@ -9633,7 +9757,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
       fromHandIdx: hi,
     });
     ps.hand.splice(hi, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.notePlayedFromHand(pi);
     // Foreign-origin cards (Magic Lamp gifts etc.) discard / delete
     // to the ORIGINAL owner's pile. `_consumeHandCardOrigin` returns
     // `pi` for normally-owned cards.
@@ -9678,7 +9802,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   } else if (hi >= 0 && keepInHand) {
     // Card stays in hand — still counts as a played-from-hand card
     // so per-turn play counters track it.
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.notePlayedFromHand(pi);
   } else {
     if (!chainResult.negated && cardType === 'Potion') checkPotionLock(ps, gs, pi);
   }
@@ -9731,7 +9855,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
 
     ps.supportZones[heroIdx][bakhmSlot] = [cardName];
     ps.hand.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.notePlayedFromHand(pi);
 
     const inst = room.engine._trackCard(cardName, pi, 'support', heroIdx, bakhmSlot);
     inst.faceDown = true;
@@ -9759,7 +9883,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   if (!ps.surpriseZones[heroIdx]) ps.surpriseZones[heroIdx] = [];
   ps.surpriseZones[heroIdx] = [cardName];
   ps.hand.splice(handIndex, 1);
-  if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+  room.engine.notePlayedFromHand(pi);
 
   const inst = room.engine._trackCard(cardName, pi, 'surprise', heroIdx, 0);
   inst.faceDown = true;
@@ -9953,7 +10077,7 @@ async function doUsePotion(room, pi, { cardName, handIndex }) {
     ps._resolvingCard = null;
     if (currentIdx >= 0) {
       ps.hand.splice(currentIdx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      room.engine.notePlayedFromHand(pi);
       // Foreign-origin Potions (Magic Lamp gifts etc.) route to the
       // ORIGINAL owner's pile. Resolves to `pi` for normally-owned
       // Potions, so the local-pile case is unchanged.
@@ -10073,7 +10197,27 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
   // reduction + Play Money's per-hand-index reduction, capped at 0.
   const playerReduction = ps._nextArtifactCostReduction || 0;
   const handReduction = (ps._handCostReductions?.[handIndex] || 0)
-    + (ps._handCostReductionsPermanent?.[handIndex] || 0);
+    + (ps._handCostReductionsPermanent?.[handIndex] || 0)
+    // ★ Namensweiter Nullpreis (Misfire, Als Ruling 21.8.): „das
+    // NAECHSTE Artefakt mit diesem Namen diese Runde" — egal welche
+    // Kopie, also NICHT ueber den Handindex. Der Eintrag wird beim
+    // tatsaechlichen Spielen verbraucht und beim Zugbeginn geloescht.
+    + ((ps._freeArtifactNames && ps._freeArtifactNames[cardName]) ? rawCost : 0)
+    // ★ `selfCostReduction(gs, pi, cardData, engine)` — eine Karte
+    // verbilligt SICH SELBST (Future Tech Laser Cannon: −20 je Kopie in
+    // der Ablage). Bewusst ein eigener Vertrag und nicht `dynamicCost`:
+    // den liest der Server NUR bei Reaktionen. Additiv und
+    // rueckwaertskompatibel — kein Artefakt exportiert ihn per Default.
+    // ★ EIGENE Nachladung statt der Konstante `script` weiter unten:
+    // die wird ERST NACH dieser Rechnung deklariert, ein Zugriff hier
+    // wirft `Cannot access 'script' before initialization` und legt
+    // JEDE Artefakt-Aktivierung lahm (Als Fehlerbericht 21.8.).
+    // `loadCardEffect` ist gecached, der zweite Aufruf kostet nichts.
+    + (() => {
+      const sk = loadCardEffect(cardName);
+      return typeof sk?.selfCostReduction === 'function'
+        ? (sk.selfCostReduction(gs, pi, cardData, room.engine) || 0) : 0;
+    })();
   const costReduction = playerReduction + handReduction;
   const cost = Math.max(0, rawCost - costReduction);
 
@@ -10191,6 +10335,9 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
     if (gs._pendingCardReveal) room.engine._firePendingCardReveal();
     else room.engine._firePendingPlayLog();
 
+    if (ps._freeArtifactNames && ps._freeArtifactNames[cardName] && !chainResult.negated) {
+      delete ps._freeArtifactNames[cardName];
+    }
     if (cost > 0 && !script.manualGoldCost && !chainResult.negated) await room.engine._payCardCost(pi, cost, { cardName });
     if (!chainResult.negated && costReduction > 0) {
       delete ps._nextArtifactCostReduction;
@@ -10225,7 +10372,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
       // it). Negated cards always go to discard regardless.
       const keepInHand = !chainResult.negated && chainResult.resolveResult?.keepInHand === true;
       if (keepInHand) {
-        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        room.engine.notePlayedFromHand(pi);
         // keepInHand-Gems erzeugen keinen ZoneEnter für die Karte selbst —
         // dieses Event ist die Play-Quelle für Recorder/Einsatz-Report
         // (schloss die Amethyst-Unterzählung: 3/700 trotz realer Plays).
@@ -10243,7 +10390,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex }) {
           });
         }
         ps.hand.splice(currentIdx, 1);
-        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        room.engine.notePlayedFromHand(pi);
         if (chainResult.negated) await room.engine.routeNegatedInitialCard(pi, cardName, chainResult);
         else if (gs._spellPlacedOnBoard) {
           // Area Artifacts (Smuggler's Pier, etc.) and any future
@@ -12558,7 +12705,7 @@ io.on('connection', (socket) => {
     delete inst.ushabtiTurn;
     inst.turnPlayed = currentTurn;
 
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    room.engine.notePlayedFromHand(pi);
     room.engine.log('creature_summoned', { player: ps.username, card: cardName, hero: hero.name });
     ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
     room.engine._trackTerrorResolvedEffect(pi, cardName);
@@ -12667,6 +12814,17 @@ io.on('connection', (socket) => {
   });
 
   // Activate an equipped card's active effect (Slippery Skates, etc.)
+  socket.on('activate_discard_effect', (params) => {
+    if (!currentUser) return;
+    const room = rooms.get(params?.roomId);
+    if (!room?.gameState) return;
+    const pi = room.gameState.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    doActivateDiscardEffect(room, pi, params)
+      .catch(err => console.error('[activate_discard_effect]', err.message))
+      .finally(() => room.engine?._runPostChainActions?.());
+  });
+
   socket.on('activate_equip_effect', (params) => {
     if (!currentUser) return;
     const room = rooms.get(params?.roomId);

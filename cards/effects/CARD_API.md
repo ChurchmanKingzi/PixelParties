@@ -391,6 +391,40 @@ Any prompt whose `title` carries a dash, colon or interpolation needs an explici
 | `heroEffect` | `bool` | Flag indicating this hero has an activatable effect. |
 | `onHeroEffect` | `async (ctx) → false \| any` | Called when the hero effect is activated. **Return `false` on every abort path** — see below. |
 
+### ★ AUFTRITT BEI PASSIVEN EFFEKTEN, DIE SICH AKTIVIEREN (Als Regel 21.8.)
+
+> „Jeder passive Effekt, der sich *aktiviert*, statt einfach (wie z.B.
+> Angler Angel) permanent passiv zu laufen, sollte on-activation so
+> einen Reveal haben."
+
+Gemeint ist die Kartenanzeige **links neben dem Feld ueber den
+Zugphasen** — dieselbe, die Future Tech Drone beim Aktivieren zeigt.
+
+**Wer ihn geschenkt bekommt:** alles, was ueber einen der
+Aktivierungswege laeuft. Die rufen `armEffectAnnounce(cardName, owner,
+origin)`, und `announceActiveEffect()` loest den Auftritt aus.
+
+**Wer ihn selbst senden muss:** ein Effekt, der aus einem HOOK heraus
+feuert (Future Tech Gear an `onDraw`, Future Tech Weathercock an seinem
+Reaktionsfenster). Dort gibt es keinen Aktivierungsweg — und
+`announceActiveEffect` allein reicht NICHT, weil es den Reveal
+absichtlich nur an den Besitzer schickt (`{ toPlayers: [owner] }`); der
+Gegner bekommt ihn sonst aus `_firePendingCardReveal`, was bei einem
+passiven Ausloeser nie passiert. Also:
+
+```js
+engine._broadcastEvent('card_reveal', {
+  cardName: CARD_NAME, playerIdx: owner, sfx: 'ability_activate',
+});
+await engine._delay(450);
+```
+
+**Wer ihn NICHT bekommt:** dauerhaft laufende Passiva, die nur einen
+Wert nachrechnen — Angler Angel, Future Tech Gun, Laser Cannon. Sie
+„aktivieren" sich nicht, sie sind einfach da. Und: kein Auftritt, wenn
+der Effekt im konkreten Fall nichts bewirkt (Gear mit 0 Kopien in der
+Ablage) — die Anzeige kuendigt etwas an, sie meldet keinen Leerlauf.
+
 **★ RUECKGABEVERTRAG von `onHeroEffect` (Als Befund 17.8.):** die Engine
 stempelt das Einmal-pro-Zug NUR, wenn der Rueckgabewert `!== false` ist
 (`doActivateHeroEffect` in server.js) — und meldet den Effekt sonst als
@@ -1902,6 +1936,165 @@ says so in a comment. If you write such a check, say why.
 `biomancy.js`, `kyli-the-deceptive-sapling.js` and the puzzle loader in
 `server.js`. Need only the counters (no placement)? Use
 `biomancyTokenCounters(potionData, level)`.
+
+---
+
+### Borrowed identity — a card that *is* another card for one turn (v573)
+
+> **The pattern:** Future Tech Copy Device takes on another Artifact's
+> name, Cost and effect for the rest of the turn — including becoming
+> an Equipment if it copied one.
+
+Nothing is renamed. The instance keeps its own name and carries three
+counters that already existed, each with its own job:
+
+| Counter | Does | Precedent |
+|---|---|---|
+| `_effectOverride` | hooks + `activeIn` come from the copied card | Soul Shard Sah |
+| `_cardDataOverride` | name, Cost, type, effect text via `getEffectiveCardData` | Biomancy Token |
+| `treatAsEquip` | `isEquipInZone` says yes | Initiation Ritual |
+
+Renaming would have meant finding the right entry again at turn end —
+piles are name lists, so several identical entries are indistinguishable.
+The overlay just falls off.
+
+**Every lookup that resolves a script from a NAME must go through the
+override**, or the card is highlighted and the click does nothing:
+
+```js
+const script = loadCardEffect(inst.counters?._effectOverride || cardName);  // ✅
+```
+
+Current sites: `CardInstance.getHook`, `CardInstance.isActiveIn`,
+`getActivatableEquips`, `getActivatableEquipsCrossSide`,
+`doActivateEquipEffect` and its cross-side instance lookup. For
+anything resolved out of a **Support Zone** there is now one helper —
+use it instead of `loadCardEffect(cardName)`:
+
+```js
+const script = engine.supportCardScript(owner, heroIdx, cardName);   // ✅
+```
+
+It backs `heroBlocksTargeting` (Jetpack), the equipped post-target
+reaction pass (Weathercock) and the `lethalProtection` scan. **A new
+name-keyed lookup needs the same treatment.**
+
+#### A card must not look for ITSELF by name
+
+The mirror of the same rule, on the card side. A borrowed identity
+sits in the zone under the CARRIER's name, so this finds nothing:
+
+```js
+for (const slot of ps.supportZones[hi]) if (slot.includes(CARD_NAME)) return hi;  // ❌
+```
+
+Prefer the instance: `ctx.card` in hooks and equip effects, and — for
+the equipped post-target reaction — `opts.inst` / `opts.heroIdx`, which
+the reaction pass now hands in. Where a contract genuinely has no
+instance (`canEquipToHero`), count instances by EFFECTIVE identity
+(`inst.counters._effectOverride || inst.name`) rather than scanning
+zone names; Future Tech Gear's "only 1 equipped" is the worked example.
+Both bugs were live until v575 and neither showed up in normal play —
+they only appear once a copy is involved.
+
+#### `onIdentityExpire(ctx)` — the expiry that cannot be shadowed
+
+A borrowed identity ends at turn end. That expiry **must not** live in
+the card's own `onTurnEnd`: `getHook` reads hooks off the *copied* card
+while an override is set, so copying anything that has its own
+`onTurnEnd` (Future Tech Control Device does) would shadow the
+rollback and the identity would stick forever.
+
+The engine therefore sweeps it in `switchTurn`, right beside
+`_expireTurnEndAdditionalActions` and for the same reason — *an expiry
+the expiring thing can switch off is not an expiry*:
+
+```js
+// The card marks itself:
+inst.counters._identityExpiresTurn = engine.gs.turn;
+
+// The engine calls the OWN script (never the override) at turn end:
+async onIdentityExpire(ctx) { /* drop an equipped copy, clear aliases … */ }
+```
+
+`_expireBorrowedIdentities()` clears `_effectOverride`,
+`_cardDataOverride`, `_identityExpiresTurn` and `treatAsEquip`
+afterwards in every case — even when the card exports no contract or
+its cleanup threw. A stuck identity is the worse state. The contract is
+listed in `_loader.js` so a card whose whole content is this hook still
+loads.
+
+---
+
+### Activating a card FROM THE DISCARD PILE (v582)
+
+> Future Tech Prototypes is the first card that does something while
+> sitting in the discard: *"While this card is in your discard pile,
+> you may once per turn change its name…"*. Every other activation
+> path runs through hand, board, ability or area zones.
+
+The contract mirrors `equipEffect` on purpose:
+
+```js
+module.exports = {
+  activeIn: ['discard'],        // stay tracked there
+  discardEffect: true,
+  canActivateDiscardEffect(gs, pi, engine, inst) { … },
+  async onDiscardEffect(engine, pi, inst) { … },
+};
+```
+
+**The pile is a NAME LIST, not an instance list.** A card that acts
+from there needs an instance for its counters and its per-turn lock, so
+`getActivatableDiscardCards` pairs each pile entry with one tracked
+`zone: 'discard'` instance and offers nothing when there is none — most
+cards reach the discard as a bare name. If your card must be usable
+there, re-zone its instance yourself when it arrives (the Ladder to the
+Sky pattern).
+
+**The whole chain, five links** — a missing one shows up as "the card
+is highlighted and clicking does nothing":
+
+1. the card (above)
+2. `engine.getActivatableDiscardCards(pi)` — the collector
+3. `activatableDiscard` in **both** state projections (server.js)
+4. `doActivateDiscardEffect` + the `activate_discard_effect` socket route
+5. the pile dialog renders `.pile-card-activatable` and emits the click
+
+The server re-checks everything the collector checked — active player,
+phase, and membership in the collector's own offer. The collector drives
+the *display*; the handler drives the *effect*, and a manipulated client
+must not slip past it (same reasoning as `neverPlayable`).
+
+---
+
+### `cannotBeIncreased` — "this damage cannot be increased" (v579)
+
+> Future Tech Doomsday Bomb is the first card with this clause. It is
+> **not** the same as true damage: `actionDealTrueDamage` also strips
+> reductions, immunities and lethal saves, which the text does not say.
+
+Pass it as an option on either damage path; the engine clamps the
+amount back down if a `beforeDamage` / `beforeCreatureDamageBatch`
+listener raised it:
+
+```js
+await engine.actionDealDamage(src, hero, n, 'artifact', { cannotBeIncreased: true });
+await engine.actionDealCreatureDamage(src, inst, n, 'artifact',
+  { sourceOwner: pi, cannotBeIncreased: true });
+```
+
+**One-sided on purpose.** Listeners still run (they set flags and have
+side effects), and REDUCTIONS still apply — shields, Cloudy and the
+rest keep working. Only an increase is taken back, and the engine logs
+`damage_increase_blocked` when it does. The symmetric sibling is
+`amountIsFinal`, used for redirected damage.
+
+**Both halves are needed.** Boosters live on two hooks — Angler Angel
+raises hero damage in `beforeDamage` and creature damage in
+`beforeCreatureDamageBatch`. Wiring only the hero side leaves the rule
+half-implemented, and no test that merely checks "the creature died"
+will notice.
 
 ---
 

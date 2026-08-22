@@ -71,6 +71,11 @@ module.exports = {
 
       // One damage prompt per matching return — sequential, so the
       // player can pick different targets across a multi-return batch.
+      // Auftritt links am Feld (Als Regel 21.8.: beim Ausloesen). VOR
+      // der Schleife, damit mehrere Treffer aus EINEM Ausloeser die
+      // Karte nur einmal zeigen.
+      await engine.announceHookActivation(CARD_NAME, selfInst.owner);
+
       for (let m = 0; m < matches; m++) {
         const target = await ctx.promptDamageTarget({
           side: 'any', types: ['hero', 'creature'],

@@ -623,6 +623,13 @@ window.playSFXForStatus = playSFXForStatus;
 // the right sound, so we only map the ones that are animation-only or need
 // a distinctive layer (e.g. orbital laser pitched down).
 const ZONE_ANIM_SFX = {
+  // Kernschlag (Doomsday Bomb, v580). Einen eigenen Explosionsklang
+  // gibt es im 52er-Katalog nicht — `heavy_impact` ist der einzige
+  // Kandidat und wird hier TIEFER und lauter gefahren als bei der
+  // normalen `explosion` (rate 0.75), damit der Unterschied zwischen
+  // einem Treffer und dem Kernschlag hoerbar ist. Der Verzug trifft
+  // den Moment, in dem der Feuerball steht.
+  nuke_blast:              { name: 'heavy_impact', opts: { rate: 0.45, volume: 1, delay: 120 } },
   // Logan — verfallene Invest Counter. `debuff` ist der vorhandene
   // „etwas wurde weggenommen"-Klang; einen eigenen Muenzverfall-Klang
   // gibt es nicht, und `gold_gain` waere hier genau verkehrt herum.
@@ -639,6 +646,15 @@ const ZONE_ANIM_SFX = {
   blood_moon_pulse:        { name: 'elem_dark' },
   sunglasses_drop:         { name: 'sunglasses_drop' },
   critical_slash:          { name: 'critical_strike' },
+  // Future Tech Doping — die Spritze (`syringe_stab`). `heavy_impact`
+  // tiefer und leiser ist der Einstich; der Versatz trifft den Moment,
+  // in dem die Nadel steht (240 ms + 100 ms Einbau-Versatz).
+  syringe_stab:            { name: 'heavy_impact', opts: { rate: 1.4, volume: 0.55, delay: 140 } },
+  // Future Tech Battery / Magic Modifier (v538) — beide sitzen auf
+  // einer Handkarte und sollen leise bleiben, sie begleiten nur eine
+  // Zahlenaenderung.
+  battery_charge:          { name: 'elem_lightning', opts: { rate: 1.5, volume: 0.45 } },
+  modifier_sparkle:        { name: 'buff', opts: { rate: 1.25, volume: 0.5 } },
   // Gangster Angel — Schusssalve (`gunshot_barrage`). `projectile` ist
   // der vorhandene Geschossklang; schneller abgespielt wird daraus ein
   // trockener Schuss statt eines fliegenden Pfeils. Leise gehalten:
@@ -724,6 +740,20 @@ const ZONE_ANIM_SFX = {
   necromancy_summon:       { name: 'elem_dark' },
   soul_shard_dark_grant:   { name: 'elem_dark' },
   soul_shard_inferno:      { name: 'elem_fire' },
+  // ★ `explosion` war STUMM (Als Klangregel verletzt). Die Animation
+  // wird laengst benutzt — Explosivo's Sword, Beam-Einschlaege, Future
+  // Tech Bazooka —, hatte hier aber nie einen Eintrag; deshalb bin ich
+  // ihr bisher ausgewichen. Einen eigenen Explosionsklang gibt es in
+  // `public/sounds/` nicht, also der naechstliegende: `heavy_impact`
+  // tiefer und lauter, mit `elem_fire` als Nachhall darueber gaebe es
+  // keinen zweiten Kanal — bleibt beim Einzelklang.
+  explosion:               { name: 'heavy_impact', opts: { rate: 0.75, volume: 0.9 } },
+  // `electric_strike` war ebenfalls STUMM — dieselbe Luecke wie bei
+  // `explosion` (v559). Genutzt u.a. von Misfire und der Uebernahme des
+  // Future Tech Control Device. `elem_lightning` ist der passende
+  // Haus-Klang, leiser gestellt, weil die Karte ihn mehrfach schnell
+  // hintereinander feuert.
+  electric_strike:         { name: 'elem_lightning', opts: { volume: 0.55, dedupe: 70 } },
   // Slash / bite
   claw_maul:               { name: 'slash' },
   scythe_cut:              { name: 'slash' },

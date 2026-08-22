@@ -62,6 +62,11 @@ module.exports = {
         for (let thi = 0; thi < (tps.heroes || []).length; thi++) {
           if (tps.heroes[thi] !== target) continue;
           if (target.hp <= 0) return;
+          // Auftritt links am Feld (Als Regel 21.8.: beim Status-Zufuegen).
+          // `ctx.source` als Schluessel — eine AoE-Attacke reicht dasselbe
+          // Quellobjekt an jeden Treffer weiter, also EIN Auftritt.
+          await engine.announceHookActivation('Blade of the Swamp Witch',
+            ctx.cardOwner, { source: ctx.source });
           await engine.addHeroStatus(tpi, thi, 'poisoned', {
             addStacks: 1,
             appliedBy: pi,

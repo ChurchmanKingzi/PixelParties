@@ -34,6 +34,17 @@ const REWARD = 4;
 
 /** Gold gutschreiben und protokollieren. */
 async function zahleAus(engine, ownerIdx, anlass, monkee) {
+  // Auftritt links am Feld (Als Regel 21.8.): die Karte AKTIVIERT sich
+  // hier an einem sichtbaren Spielereignis — anders als ein dauerhaft
+  // laufendes Passivum, das nur einen Wert nachrechnet. Steht in der
+  // gemeinsamen Auszahlung, damit BEIDE Ausloeser ihn bekommen und
+  // keiner der beiden Wege ihn vergessen kann.
+  // Siehe CARD_API.md, Abschnitt „Auftritt bei passiven Effekten".
+  engine._broadcastEvent('card_reveal', {
+    cardName: CARD_NAME, playerIdx: ownerIdx, sfx: 'ability_activate',
+  });
+  await engine._delay(420);
+
   engine._broadcastEvent('play_gold_coins', { owner: ownerIdx });
   await engine.actionGainGold(ownerIdx, REWARD);
   engine.log('non_fungible_monkee', {

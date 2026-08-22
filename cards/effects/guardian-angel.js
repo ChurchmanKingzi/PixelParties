@@ -243,6 +243,9 @@ module.exports = {
       });
       await engine._delay(1200);
 
+      // Auftritt links am Feld (Als Regel 21.8.: beim Revive).
+      await engine.announceHookActivation('Guardian Angel', heroPi);
+
       // ── Golden light explosion on hero ──
       engine._broadcastEvent('play_zone_animation', {
         type: 'holy_revival', owner: heroPi, heroIdx: heroHi, zoneSlot: -1,

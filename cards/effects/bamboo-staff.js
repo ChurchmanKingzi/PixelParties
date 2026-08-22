@@ -65,6 +65,18 @@ function anyValidTarget(gs) {
   return false;
 }
 
+
+/**
+ * Auftritt links am Feld beim AUSLOESEN (Als Regel 21.8.).
+ * Siehe CARD_API.md, Abschnitt „Auftritt bei passiven Effekten".
+ */
+async function zeigeAuftritt(engine, ownerIdx) {
+  engine._broadcastEvent('card_reveal', {
+    cardName: CARD_NAME, playerIdx: ownerIdx, sfx: 'ability_activate',
+  });
+  await engine._delay(420);
+}
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -154,6 +166,12 @@ module.exports = {
       // isn't registered in the client's ANIM_REGISTRY (it's only
       // handled by the dedicated socket listener), so the animation
       // silently dropped.
+      // Auftritt ZUERST — er kuendigt den Schlag an, statt ihn zu
+      // kommentieren. Erst hier, nicht oben im Hook: bis zu dieser
+      // Stelle kann der Ablauf noch abbrechen (kein Ziel, Held tot),
+      // und ein Auftritt ohne Wirkung waere falsch.
+      await zeigeAuftritt(engine, pi);
+
       engine._broadcastEvent('punch_impact', {
         owner: target.owner,
         heroIdx: target.heroIdx,

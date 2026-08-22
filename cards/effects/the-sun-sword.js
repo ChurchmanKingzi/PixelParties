@@ -218,6 +218,9 @@ module.exports = {
           const tps = engine.gs.players[tpi];
           for (let thi = 0; thi < (tps.heroes || []).length; thi++) {
             if (tps.heroes[thi] === target && target.hp > 0) {
+              // Auftritt links am Feld (Als Regel 21.8.: beim Burn).
+              await engine.announceHookActivation('The Sun Sword',
+                ctx.cardOwner, { source: ctx.source });
               await engine.addHeroStatus(tpi, thi, 'burned', {
                 appliedBy: pi,
                 animationType: 'flame_strike',
@@ -260,6 +263,9 @@ module.exports = {
           type: 'flame_strike', owner: inst.owner,
           heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
         });
+        // Auftritt links am Feld (Als Regel 21.8.: beim Burn).
+        await engine.announceHookActivation('The Sun Sword',
+          ctx.cardOwner, { source: ctx.source });
         const applied = await engine.applyCreatureStatus(inst, 'burned', {
           sourceOwner: pi,
           source: 'The Sun Sword',

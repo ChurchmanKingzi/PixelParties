@@ -179,7 +179,32 @@ function loadCardEffect(cardName) {
         // komplett aus der Ladung und war im Spiel wirkungslos. Exakt die
         // Klasse, die der Terror-Kommentar direkt darueber beschreibt.
         || !!mod.areaEffect
-        || typeof mod.onAreaEffect === 'function';
+        || typeof mod.onAreaEffect === 'function'
+        // Zielschutz aus der Support Zone (v563). Dieselbe Klasse wie
+        // die Area-Aktiveffekte darueber: eine Karte, deren GANZER
+        // Inhalt der Vertrag ist, trug sonst nichts, was der Filter
+        // kennt — sie fiel komplett aus der Ladung und war im Spiel
+        // wirkungslos (Future Tech Jetpack, sofort beim ersten Laden
+        // aufgefallen).
+        || typeof mod.blocksTargeting === 'function'
+        // Und der Selbstrabatt aus v541, aus demselben Grund.
+        || typeof mod.selfCostReduction === 'function'
+        // Aktivierung AUS DER ABLAGE (v582). Dieselbe Klasse wie die
+        // Area-Aktiveffekte und `blocksTargeting`: eine Karte, deren
+        // ganzer Inhalt dieser Vertrag ist, traegt sonst nichts, was
+        // der Filter kennt. Future Tech Prototypes ueberlebte den
+        // Filter bisher nur ZUFAELLIG ueber ihr `onIdentityExpire` —
+        // eine kuenftige Ablage-Karte ohne Ablaufstempel waere still
+        // aus der Ladung gefallen. (In der Gegenprobe aufgefallen.)
+        || !!mod.discardEffect
+        || typeof mod.onDiscardEffect === 'function'
+        // Ruecknahme einer geliehenen Identitaet (v573). Wird vom
+        // Zugende-Sweep `_expireBorrowedIdentities` gerufen, nicht ueber
+        // die Hook-Kette — also wieder dieselbe Klasse: eine Karte,
+        // deren ganzer Inhalt dieser Vertrag ist, faellt sonst aus der
+        // Ladung. (Copy Device traegt zwar auch `resolve`, aber die
+        // Liste soll den Vertrag trotzdem kennen.)
+        || typeof mod.onIdentityExpire === 'function';
       if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;

@@ -406,5 +406,13 @@
         "Hell Fox": -0.405
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.543,
+    "wins": 217,
+    "losses": 183,
+    "ties": 0,
+    "games": 400,
+    "date": "2026-08-21"
   }
 }

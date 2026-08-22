@@ -116,6 +116,10 @@ module.exports = {
       }
 
       // Equip-Karte aufleuchten lassen (rot = Vergeltung)
+      // Auftritt links am Feld (Als Regel 21.8.: beim Ausloesen).
+      await engine.announceHookActivation('Shield of Death',
+        ctx.cardController ?? ctx.cardOwner, { source: ctx.source });
+
       engine._broadcastEvent('play_zone_animation', {
         type: 'equip_flash', color: '#ef4444',
         owner: ctx.cardController ?? ctx.cardOwner,

@@ -59,7 +59,19 @@ module.exports = {
       && (hasCardType(srcData, 'Attack') || hasCardType(srcData, 'Spell'));
     const dmgType = opts?.damageType;
     const dmgTypeMatches = dmgType === 'attack' || /_spell$/.test(dmgType || '');
-    if (srcData && !isAttackOrSpell && !dmgTypeMatches) return false;
+    // ★ Kartentyp-Filter (Als Vorgabe 21.8.: „nur Attacks und Spells,
+    //   so steht es im Kartentext").
+    //   Der Riegel hing bisher an `srcData &&` — eine Quelle OHNE
+    //   Katalogeintrag rutschte also komplett durch. Solange nur
+    //   `promptDamageTarget` das Fenster oeffnete, fiel das nicht auf;
+    //   seit auch `promptEffectTarget` es oeffnet (v546), erreichen
+    //   deutlich mehr Quellarten diese Stelle. Ohne Eintrag gibt es
+    //   keinen Kartentyp — also keine Reaktion.
+    //   `dmgTypeMatches` bleibt fuer Heldeneffekte, die ausdruecklich
+    //   „als Attack gelten" (Infected Greatmaw): dort ist `srcData` die
+    //   HELDENkarte, der Typ passt nicht, der Schadenstyp schon.
+    if (!srcData) return false;
+    if (!isAttackOrSpell && !dmgTypeMatches) return false;
 
     // Exactly 1 target, belonging to the IC owner
     if (targetedHeroes.length !== 1) return false;

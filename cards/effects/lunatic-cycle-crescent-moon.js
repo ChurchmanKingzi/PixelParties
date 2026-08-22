@@ -56,6 +56,9 @@ module.exports = {
 
       inst.counters._crescentBusy = true;
       try {
+        // Auftritt links am Feld (Als Regel 21.8.: beim Ausloesen).
+        await engine.announceHookActivation(CARD_NAME, pi);
+
         // In-hand multi-select — the player clicks the cards in their
         // OWN hand to choose what to shuffle back (the `handPick`
         // prompt; same UX as Leadership), NOT a modal gallery.

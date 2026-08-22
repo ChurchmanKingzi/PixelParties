@@ -87,6 +87,11 @@ module.exports = {
       });
       if (!target) return; // declined — HOPT untouched
 
+      // Auftritt links am Feld (Als Regel 21.8.: beim Opfern). Erst
+      // hier, nach der verbindlichen Zusage — ein abgelehntes „may"
+      // soll nichts anzeigen.
+      await engine.announceHookActivation('Sacrificial Dagger', pi);
+
       // Committed — claim the once-per-turn.
       engine.claimHOPT(hoptKey, pi);
 

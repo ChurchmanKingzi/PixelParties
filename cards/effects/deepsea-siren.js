@@ -140,7 +140,9 @@ module.exports = {
         c._sirenLinkOwner = target.owner;
         c._sirenLinkHeroIdx = target.heroIdx;
         const heroObj = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (heroObj) {
+        // ★ Effekt-Immunitaet respektieren (Als Vorgabe 21.8.) —
+        // `sirenLinked` ist kein Katalogstatus, der Riegel steht hier.
+        if (heroObj && !engine.hasEffectImmunity?.(target.owner, target.heroIdx, null)) {
           heroObj.statuses = heroObj.statuses || {};
           heroObj.statuses.sirenLinked = { partnerName: CARD_NAME };
         }

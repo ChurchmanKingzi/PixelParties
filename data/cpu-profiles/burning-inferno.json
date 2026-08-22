@@ -394,5 +394,13 @@
         "Ska Harpyformer": -0.32
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.495,
+    "wins": 198,
+    "losses": 202,
+    "ties": 0,
+    "games": 400,
+    "date": "2026-08-21"
   }
 }

@@ -145,6 +145,10 @@ module.exports = {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (tgtHero && tgtHero.hp > 0) {
+          // Auftritt links am Feld (Als Regel 21.8.: beim Schiessen).
+          // `dmgSource` als Schluessel — mehrere Treffer aus EINEM Schuss
+          // zeigen die Karte trotzdem nur einmal.
+          await engine.announceHookActivation('Lifeforce Howitzer', ctx.cardOwner, { source: dmgSource });
           await engine.actionDealDamage(dmgSource, tgtHero, damage, 'artifact');
         }
       } else if (target.type === 'equip') {

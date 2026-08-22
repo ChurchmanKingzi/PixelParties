@@ -679,6 +679,11 @@ function PuzzleCreator() {
     // `puzzleGameState` von selbst auf 'puzzleCreate'.
     if (result) {
       setValidated(success);
+      // Fanfare auch auf dem Editor-Pfad: das Board spielt sie beim
+      // Ergebnis-Screen, aber im Create-Modus springt man von dort oft
+      // sofort zurueck. `dedupe` verhindert, dass beide Wege
+      // uebereinander klingen (Als Rueckmeldung 21.8.).
+      if (success && window.playSFX) window.playSFX('victory', { dedupe: 3000 });
       notify(success ? '🧩 Puzzle validated! Export is now available.' : 'Puzzle not cleared — adjust and try again.', success ? 'success' : 'info');
     }
   }, [puzzleGameState, notify, setBgmMode]);
@@ -1499,6 +1504,11 @@ function PuzzleCreator() {
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, removeFromOppHand, updatePlayer]);
 
   const removePileCard = useCallback((si, key, idx) => {
+    // Klang beim Entfernen per Rechtsklick (Als Befund 21.8.: in der
+    // Ablage kam nichts). Hand und Gegnerhand hatten ihn schon direkt
+    // am `onContextMenu`; hier sitzt er in der Funktion selbst, damit
+    // JEDER Pile ihn bekommt — Ablage, Deck, Trankdeck, Geloeschtes.
+    if (window.playSFX) window.playSFX('discard', { dedupe: 60 });
     updatePlayer(si, pp => { pp[key].splice(idx, 1); return pp; });
     // Auto-close if empty
     if (viewPile && viewPile.si === si && viewPile.key === key && players[si][key].length <= 1) setViewPile(null);
@@ -2269,7 +2279,7 @@ function PuzzleCreator() {
               {hi === 2 && (
                 <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: ((areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') ? 'calc((50px + 16px) * var(--board-scale))' : 'calc(8px * var(--board-scale))'), display: 'flex', flexDirection: 'column', gap: 'calc(3px * var(--board-scale))' }}>
                   {p.permanents.map((pm, i) => (
-                    <div key={pm.id} title={pm.name} onContextMenu={(e) => { e.preventDefault(); removeCard(si, 'permanent', 0, i); }}>
+                    <div key={pm.id} title={pm.name} onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
                       <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,215,0,.5)', background: 'rgba(255,215,0,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>

@@ -43,6 +43,9 @@
 
 const { placePollutionTokens, hasFreeZone, countFreeZones } = require('./_pollution-shared');
 
+/** Flugdauer Hand → Ablage, bevor die Karte umgebucht wird. */
+const AME_FLUG_MS = 480;
+
 module.exports = {
   // Zählt als "Spell that places Pollution Tokens" (Als Golden-Wings-
   // Ruling Juli 2026, gleiche Bauart): Der Token ist Einsatz-KOSTEN
@@ -122,6 +125,9 @@ module.exports = {
       engine.sync();
       await engine._delay(200);
 
+      // Auftritt links am Feld (Als Regel 21.8.).
+      await engine.announceHookActivation('Anti Magic Enchantment', pi);
+
       // Prompt the holder
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -138,6 +144,24 @@ module.exports = {
       // the counter + buff icon, and move AME's instance to discard.
       const handIdx = ps.hand.indexOf('Anti Magic Enchantment');
       if (handIdx < 0) return; // Raced with another consumer — bail.
+
+      // ★ SICHTBARER WEG HAND → ABLAGE (Als Befund 21.8.: „kein
+      // visueller Weg von der Hand zum Discard"). Die Karte buchte sich
+      // still um (`splice` + `push`) — auf dem Bildschirm verschwand sie
+      // aus der Hand und tauchte in der Ablage auf, ohne Flug.
+      // VOR dem `splice` senden, damit der Client den Handplatz noch
+      // findet, von dem der Flug startet.
+      //
+      // Bewusst nur die ANIMATION, nicht `actionDiscardHandCard`: der
+      // Helfer wuerde zusaetzlich `ON_DISCARD` ausloesen und fremde
+      // Karten mitfeuern lassen — das waere eine Regelaenderung, keine
+      // Kosmetik.
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName: 'Anti Magic Enchantment',
+        from: 'hand', to: 'discard', fromHandIdx: handIdx,
+      });
+      await engine._delay(AME_FLUG_MS);
+
       ps.hand.splice(handIdx, 1);
 
       const promptCtxShim = {

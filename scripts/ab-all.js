@@ -17,6 +17,8 @@
 //    node scripts/ab-all.js --only "Deepsea,Mawstruck"
 //    node scripts/ab-all.js --skip "Big Stomp"
 //    node scripts/ab-all.js --fast 0            → volles Suchbudget (3-4× langsamer)
+//    PP_PROFILE_OFF=tutorPickRules node scripts/ab-all.js --tag ohne-tutor \
+//                                               → Ablation: Kanal abklemmen und messen
 //    node scripts/ab-all.js --watch             → Zwischenstand live mitlesen
 //    node scripts/ab-all.js --watch --interval 15
 //    node scripts/ab-all.js --report            → nur Bericht, nichts spielen
@@ -75,6 +77,10 @@ const FAST = getArg('--fast', '1') !== '0';
 const MAX_ATTEMPTS = parseInt(getArg('--attempts', '10'), 10);
 const ONLY = getArg('--only', '').split(',').map(s => s.trim()).filter(Boolean);
 const SKIP = getArg('--skip', '').split(',').map(s => s.trim()).filter(Boolean);
+// --tag: haengt ein Kuerzel an die Ergebnisdateien. Noetig fuer
+// Ablations-Laeufe (PP_PROFILE_OFF=…), damit sie nicht in denselben
+// Topf laufen wie die Grundmessung.
+const TAG = getArg('--tag', '').trim().replace(/[^A-Za-z0-9_-]/g, '');
 const REPORT_ONLY = hasFlag('--report');
 const LIST_ONLY = hasFlag('--list');
 // --watch: reiner Beobachter neben einem laufenden Lauf. Spielt nichts,
@@ -115,8 +121,8 @@ function buildJobs() {
       deck: name,
       profil: f,
       slug: slug(name),
-      out: path.join(OUT_DIR, `${slug(name)}.jsonl`),
-      log: path.join(OUT_DIR, `${slug(name)}.log`),
+      out: path.join(OUT_DIR, `${slug(name)}${TAG ? '.' + TAG : ''}.jsonl`),
+      log: path.join(OUT_DIR, `${slug(name)}${TAG ? '.' + TAG : ''}.log`),
       // Vorheriges Urteil, damit der Bericht Veränderungen zeigen kann
       vorher: prof.abResult || null,
     });
@@ -245,6 +251,8 @@ function bericht(jobs, dauerMs, opt = {}) {
   zeilen.push('═══════════════════════════════════════════════════════════════════════════');
   zeilen.push(`  A/B-SPIEGEL — ALLE PROFILE GEGEN IHRE UNTRAINIERTE FORM`);
   zeilen.push(`  ${new Date().toISOString()} · Ziel ${GAMES} Spiele/Deck · ${FAST ? 'reduziertes' : 'volles'} Suchbudget`);
+  if (TAG) zeilen.push(`  Lauf-Kuerzel: ${TAG}`);
+  if (process.env.PP_PROFILE_OFF) zeilen.push(`  ABLATION — abgeklemmt: ${process.env.PP_PROFILE_OFF}`);
   if (dauerMs != null) zeilen.push(`  Laufzeit: ${(dauerMs / 3600000).toFixed(1)} h`);
   zeilen.push('═══════════════════════════════════════════════════════════════════════════');
   zeilen.push(`${b('Deck', 34)}${b('W-L-T', 14)}${b('Winrate', 18)}Urteil`);
@@ -279,7 +287,7 @@ function bericht(jobs, dauerMs, opt = {}) {
   console.log('\n' + text + '\n');
   if (!schreiben) return;
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = (TAG ? TAG + '-' : '') + new Date().toISOString().replace(/[:.]/g, '-');
   fs.writeFileSync(path.join(OUT_DIR, `REPORT-${stamp}.txt`), text, { encoding: 'utf-8' });
   fs.writeFileSync(path.join(OUT_DIR, `REPORT-${stamp}.json`),
     JSON.stringify({ erstellt: new Date().toISOString(), ziel: GAMES, fast: FAST, decks: daten }, null, 2),

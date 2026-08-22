@@ -30,6 +30,7 @@ const BIG_GWEN_GUARD = 'Big Gwen Guard';
 const WEAKENING_CRYSTAL = 'Weakening Crystal';
 const DISTRACTING_CRYSTAL = 'Distracting Crystal';
 const TREACHEROUS_CRYSTAL = 'Treacherous Crystal';
+const RUSTING_CRYSTAL = 'Rusting Crystal';
 const MANA_ABSORBING_CRYSTAL = 'Mana Absorbing Crystal';
 
 /**
@@ -127,6 +128,38 @@ function shuffleIntoDeckBlocked(engine, pi) {
 }
 
 /**
+ * Rusting Crystal hand-passive: while a copy sits in `pi`'s hand, the
+ * Cost of every OTHER card they play is doubled — applied BEFORE any
+ * reductions, so discounts bite on the already-doubled price.
+ * Idempotent: several Rusting Crystals still yield a single ×2
+ * ("does not stack with itself").
+ *
+ * ★ Diese Funktion stand bis v573 in `server.js` und war damit von
+ * einer KARTE aus nicht erreichbar. Future Tech Copy Device bezahlt
+ * die Kosten der Karte, deren Identität sie annimmt — ohne diesen
+ * Helfer hätte sie die Verdopplung entweder ignoriert oder
+ * nachgebaut, und ein zweiter Ort für dieselbe Regel ist genau das,
+ * was hier sonst überall vermieden wird. Jetzt lesen alle drei
+ * Aufrufer (beide Kostenrechnungen des Servers und Copy Device)
+ * dieselbe Fassung.
+ *
+ * @param {object} gs        Spielzustand
+ * @param {number} pi        Spieler, der zahlt
+ * @param {string} cardName  Karte, deren Preis gefragt ist
+ * @param {number} baseCost  Grundpreis vor Rabatten
+ * @param {object} [engine]  Für die Big-Gwen-Guard-Unterdrückung
+ * @returns {number}
+ */
+function applyRustingCrystalCostMultiplier(gs, pi, cardName, baseCost, engine) {
+  if (!cardName || cardName === RUSTING_CRYSTAL) return baseCost;
+  const ps = gs?.players?.[pi];
+  if (!ps) return baseCost;
+  if (!(ps.hand || []).includes(RUSTING_CRYSTAL)) return baseCost;
+  if (engine && selfRevealEffectsSuppressed(engine, pi)) return baseCost;
+  return baseCost * 2;
+}
+
+/**
  * Treacherous Crystal eligibility gate. True iff `victimPi` currently
  * holds a Treacherous Crystal in hand AND Big Gwen Guard isn't
  * suppressing self-reveal Crystal effects on the victim's side. Used
@@ -164,10 +197,12 @@ module.exports = {
   DISTRACTING_CRYSTAL,
   TREACHEROUS_CRYSTAL,
   MANA_ABSORBING_CRYSTAL,
+  RUSTING_CRYSTAL,
   controlsBigGwenGuard,
   selfRevealEffectsSuppressed,
   refreshWeakeningCrystalNegation,
   shuffleIntoDeckBlocked,
+  applyRustingCrystalCostMultiplier,
   isTreacherousLent,
   manaAbsorbingHandSpellLevelOffset,
 };

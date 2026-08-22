@@ -346,6 +346,10 @@ module.exports = {
         if (t.type === 'hero') {
           const tgtHero = gs.players[t.owner]?.heroes?.[t.heroIdx];
           if (tgtHero && tgtHero.hp > 0) {
+            // Auftritt links am Feld (Als Regel 21.8.: beim Schadenzufuegen).
+            // `source` als Schluessel: ein Flaechenschlag reicht dasselbe
+            // Objekt an jeden Treffer weiter → EIN Auftritt, nicht je Ziel.
+            await engine.announceHookActivation(CARD_NAME, ownerIdx, { source });
             await engine.actionDealDamage(source, tgtHero, dmg, 'destruction_spell');
           }
         } else {

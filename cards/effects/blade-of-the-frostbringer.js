@@ -79,6 +79,11 @@ module.exports = {
         });
         await engine._delay(300);
 
+        // Auftritt links am Feld (Als Regel 21.8.: beim Status-Zufuegen).
+        // Der Hook nimmt ohnehin nur das ERSTE Ziel, also kann es je
+        // Aufloesung nur einen Auftritt geben; das Zeitfenster des
+        // Helfers faengt Doppelungen aus schnellen Ketten ab.
+        await engine.announceHookActivation(CARD_NAME, pi);
         await engine.addHeroStatus(tgt.owner, tgt.heroIdx, 'frozen', {
           appliedBy: pi,
         });

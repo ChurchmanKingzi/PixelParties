@@ -29,6 +29,8 @@
 //     ist Sache von ANTS. Diese Karte weiß davon nichts.
 // ═══════════════════════════════════════════
 
+const { zaehleInAblage } = require('./_future-tech-shared');
+
 const CARD_NAME = 'Future Tech Gun';
 const BONUS_PER_COPY = 40;
 
@@ -47,7 +49,10 @@ function zuschlagNachrechnen(ctx) {
   if (!hero?.name) return;
 
   const ps = engine.gs.players[owner];
-  const kopien = (ps?.discardPile || []).filter(n => n === CARD_NAME).length;
+  // Ueber das gemeinsame Zaehlwerk statt per eigenem `filter` (v536):
+  // nur so sieht die Karte kuenftige Namens-Aliasse (Prototypes,
+  // Copy Device). Verhalten heute identisch.
+  const kopien = zaehleInAblage(engine.gs, owner, CARD_NAME);
   const neuerZuschlag = kopien * BONUS_PER_COPY;
 
   if (!inst.counters) inst.counters = {};

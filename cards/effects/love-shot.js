@@ -202,6 +202,15 @@ module.exports = {
       // already charmed-by-us via Charme Lv3) so the `finally`
       // restores it instead of stripping it. delete-via-undefined
       // is significant: a real `{...}` value must come back.
+      // ★ Effekt-Immunitaet respektieren (Als Vorgabe 21.8.) — wie bei
+      // Charme steht der Riegel hier von Hand, weil `charmed` kein
+      // Katalogstatus ist und nicht ueber `addHeroStatus` laeuft.
+      if (engine.hasEffectImmunity?.(oi, sel.heroIdx, null)) {
+        engine.log('effect_immunity', { hero: targetHero.name, status: 'charmed' });
+        engine.sync();
+        return;
+      }
+
       const prev = {
         charmedBy: targetHero.charmedBy,
         charmedFromOwner: targetHero.charmedFromOwner,

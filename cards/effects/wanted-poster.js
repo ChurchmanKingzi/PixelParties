@@ -46,6 +46,22 @@ function _isHeroSource(ctx) {
   return true;
 }
 
+
+/**
+ * Auftritt links am Feld beim AUSLOESEN (Als Regel 21.8.).
+ * Passive Effekte, die sich AKTIVIEREN, zeigen ihre Karte — anders als
+ * dauerhaft laufende Passiva. Aus einem Hook heraus gibt es keinen
+ * Aktivierungsweg, der das erledigt, und `announceActiveEffect` schickt
+ * den Reveal nur an den Besitzer; deshalb an den ganzen Raum.
+ * Siehe CARD_API.md, Abschnitt „Auftritt bei passiven Effekten".
+ */
+async function zeigeAuftritt(engine, ownerIdx) {
+  engine._broadcastEvent('card_reveal', {
+    cardName: CARD_NAME, playerIdx: ownerIdx, sfx: 'ability_activate',
+  });
+  await engine._delay(420);
+}
+
 module.exports = {
   activeIn: ['support'],
 
@@ -74,6 +90,7 @@ module.exports = {
       if (!_isHeroSource(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      await zeigeAuftritt(engine, pi);
       await engine.actionDrawCards(pi, DRAW_COUNT, { source: CARD_NAME });
       engine.log('wanted_poster_draw', {
         player: engine.gs.players[pi]?.username,
@@ -91,6 +108,7 @@ module.exports = {
       if (!_isHeroSource(ctx)) return;
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
+      await zeigeAuftritt(engine, pi);
       await engine.actionDrawCards(pi, DRAW_COUNT, { source: CARD_NAME });
       engine.log('wanted_poster_draw', {
         player: engine.gs.players[pi]?.username,

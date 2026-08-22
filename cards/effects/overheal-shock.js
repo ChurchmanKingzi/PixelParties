@@ -413,6 +413,14 @@ module.exports = {
       if (!targetHero.statuses) targetHero.statuses = {};
       // Fuer die Messung: trug der Held den Zustand schon? (Boolean —
       // dann war dieser Einsatz eine Fehlinvestition.)
+      // ★ Effekt-Immunitaet respektieren (Als Vorgabe 21.8.): `healReversed`
+      // ist kein Katalogstatus und laeuft nicht ueber `addHeroStatus`,
+      // der Riegel steht deshalb hier von Hand.
+      if (engine.hasEffectImmunity?.(oi, targetHeroIdx, null)) {
+        engine.log('effect_immunity', { hero: targetHero.name, status: 'healReversed' });
+        engine.sync();
+        return;
+      }
       const zielTrugSchon = !!targetHero.statuses.healReversed;
       targetHero.statuses.healReversed = { source: 'Overheal Shock', appliedBy: pi };
 

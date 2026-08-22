@@ -39,6 +39,46 @@ function heroKeyOf(heroNames) {
   return (heroNames || []).filter(Boolean).slice().sort().join('||');
 }
 
+/**
+ * ABLATION: einzelne Lernkanäle beim Laden abklemmen.
+ *
+ *   PP_PROFILE_OFF=tutorPickRules,boardPairs node server.js …
+ *
+ * Zweck: die Bestandsaufnahme vom 20.8. hat gezeigt, dass die Profile
+ * IM MITTEL klar helfen (Spiegel 60.9 % über 42 Decks), aber KEIN
+ * Merkmal des Profils sagt vorher, ob ein einzelnes hilft — weder
+ * Kanalgrößen noch die Trainings-Winrate (r = −0.06) noch der Anteil
+ * geklammerter Gewichte (r = −0.03). Welcher Kanal seinen Beitrag
+ * leistet, lässt sich also nicht ansehen, sondern nur MESSEN: Kanal
+ * abklemmen, denselben Spiegel-A/B fahren, Differenz ablesen.
+ *
+ * Ohne die Variable passiert nichts — kein Zweig, keine Kosten.
+ * Namen sind die Profil-Felder selbst (`tutorPickRules`,
+ * `abilityPriors`, `boardPairs`, …); unbekannte Namen werden gemeldet,
+ * damit ein Tippfehler nicht als „Kanal wirkungslos" durchgeht.
+ */
+let _ablationWarned = false;
+function stripDisabledChannels(p, datei) {
+  const roh = process.env.PP_PROFILE_OFF;
+  if (!roh) return;
+  const namen = roh.split(',').map(s => s.trim()).filter(Boolean);
+  const entfernt = [];
+  const unbekannt = [];
+  for (const n of namen) {
+    if (!(n in p)) { unbekannt.push(n); continue; }
+    delete p[n];
+    entfernt.push(n);
+  }
+  if (entfernt.length) {
+    console.log(`[deck-profile] ABLATION "${p.deck}" (${datei}): ${entfernt.join(', ')} abgeklemmt`);
+  }
+  // Die Warnung nur EINMAL je Lauf — sonst 42 identische Zeilen.
+  if (unbekannt.length && !_ablationWarned) {
+    _ablationWarned = true;
+    console.warn(`[deck-profile] ⚠️  ABLATION: ${unbekannt.join(', ')} steckt nicht in "${p.deck}" (Tippfehler? Oder der Kanal ist für dieses Deck ohnehin leer — dann misst die Ablation NICHTS)`);
+  }
+}
+
 function loadAllProfiles() {
   if (_profiles) return _profiles;
   _profiles = new Map();
@@ -64,6 +104,7 @@ function loadAllProfiles() {
         continue;
       }
       if (!Array.isArray(p.heroes) || p.heroes.length === 0) continue;
+      stripDisabledChannels(p, f);
       _profiles.set(heroKeyOf(p.heroes), p);
       console.log(`[deck-profile] loaded "${p.deck}" (${f}): ${Object.keys(p.cardValues || {}).length} card values, ${Object.keys(p.pairBonuses || {}).length} pairs, ${Object.keys(p.abilityPriors || {}).length} ability priors, trained on ${p.games} games (win-rate ${p.trainWinRate})`);
     } catch (err) {

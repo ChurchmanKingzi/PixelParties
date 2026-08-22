@@ -43,62 +43,11 @@
 //  exakt wie im zielwahlfreien Serverzweig.
 // ═══════════════════════════════════════════
 
-const { loadCardEffect } = require('./_loader');
+
+const { loesePotionAus } = require('./_potion-shared');
 
 const CARD_NAME = 'Tuscan Mystic';
 const AUFDECKEN = 2;
-
-/** Kann die gewaehlte Potion ueberhaupt aufloesen — und wenn ja, wie? */
-async function loesePotionAus(engine, pi, potionName) {
-  const script = loadCardEffect(potionName);
-  if (!script || typeof script.resolve !== 'function') return false;
-
-  // Sicherheitsnetz zur Sperre oben: kommt der Effekt doch bis hierher,
-  // fizzelt die Potion, statt eine gesperrte Aktivierung durchzulassen.
-  // (Fizzeln ist ein zulaessiger Ausgang — beide Karten werden trotzdem
-  // geloescht, Als Ruling 16.8.)
-  if (engine.arePotionsLockedFor(pi)) return false;
-
-  const gs = engine.gs;
-
-  // Eigenes Gate der Potion (z.B. "nur wenn ein Held verletzt ist").
-  if (typeof script.canActivate === 'function'
-      && !script.canActivate(gs, pi, engine)) return false;
-
-  // Zielwahlfreie Potion — direkt aufloesen, wie im Serverzweig.
-  if (!script.getValidTargets || !script.targetingConfig) {
-    await script.resolve(engine, pi, [], []);
-    return true;
-  }
-
-  // Mit Zielwahl: Ziele holen. Keine legalen Ziele ⇒ fizzelt (Als
-  // Ruling, Beispiel Elixir of Recovery bei vollen Helden).
-  let ziele = [];
-  try { ziele = script.getValidTargets(gs, pi, engine) || []; } catch { ziele = []; }
-  if (!ziele.length) return false;
-
-  const cfg = typeof script.targetingConfig === 'function'
-    ? script.targetingConfig(gs, pi)
-    : (script.targetingConfig || {});
-
-  const gewaehlt = await engine.promptEffectTarget(pi, ziele, {
-    title: potionName,
-    description: cfg.description || `Choose a target for ${potionName}.`,
-    confirmLabel: cfg.confirmLabel || '✨ Resolve!',
-    confirmClass: cfg.confirmClass || 'btn-info',
-    // NICHT abbrechbar: die Karte sagt "immediately resolve one of
-    // them". Die Wahlfreiheit lag in der Abfrage davor.
-    cancellable: false,
-    maxTotal: cfg.maxPerType ? undefined : 1,
-  });
-  if (!gewaehlt || !gewaehlt.length) return false;
-
-  if (typeof script.validateSelection === 'function'
-      && !script.validateSelection(gewaehlt, ziele)) return false;
-
-  await script.resolve(engine, pi, gewaehlt, ziele);
-  return true;
-}
 
 module.exports = {
   activeIn: ['support'],

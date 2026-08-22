@@ -2430,6 +2430,50 @@ select optgroup {
   position: relative;
   z-index: 1;
 }
+/* ── Eigene Ausrüstung auf der GEGNERSEITE (v569) ────────────────────
+   Al: „die Karte liegt ja auf der gegnerischen Seite, also wird der
+   Spieler da intuitiv nicht immer hinsehen." Deshalb deutlich lauter
+   als die normale Aktivierbar-Markierung: warmes Gelb statt Cyan (hebt
+   sich vom übrigen Brett ab), schnellerer Puls, ein umlaufender
+   Leuchtrahmen und ein Blitz-Zeichen statt des Zahnrads. */
+.zone-equip-crossside {
+  border-color: rgba(255,214,80,1) !important;
+  box-shadow: 0 0 26px rgba(255,214,80,1), 0 0 56px rgba(255,170,30,.85),
+              0 0 90px rgba(255,140,20,.45), inset 0 0 22px rgba(255,214,80,.5) !important;
+  animation: crossSidePulse 0.55s ease-in-out infinite !important;
+}
+@keyframes crossSidePulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.35); }
+}
+.zone-equip-crossside::after {
+  content: '⚡' !important;
+  color: #ffd650 !important;
+  font-size: 26px !important;
+  filter: drop-shadow(0 0 10px rgba(255,214,80,1)) drop-shadow(0 0 18px rgba(255,150,20,.9)) !important;
+  animation: crossSideBolt 0.55s ease-in-out infinite !important;
+}
+@keyframes crossSideBolt {
+  0%, 100% { transform: scale(1) rotate(-8deg); }
+  50%      { transform: scale(1.25) rotate(8deg); }
+}
+/* Umlaufender Rahmen — zieht das Auge auch dann an, wenn der Blick
+   gerade auf der eigenen Seite liegt. */
+.zone-equip-crossside::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 8px;
+  border: 2px dashed rgba(255,214,80,.9);
+  animation: crossSideRing 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes crossSideRing {
+  0%   { transform: rotate(0deg) scale(1); opacity: .85; }
+  50%  { opacity: .35; }
+  100% { transform: rotate(360deg) scale(1); opacity: .85; }
+}
+
 .zone-equip-activatable::after {
   content: '⚙';
   position: absolute;
@@ -6650,12 +6694,20 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 }
 
 /* HP display on board cards */
+/* ── HP dunkelgrün, ATK rot, beide schwarz umrandet (Als Vorgabe
+   21.8.) ──────────────────────────────────────────────────────────
+   Vorher standen beide Werte in Weiß mit weichem Schatten und waren
+   auf hellen Kartenbildern kaum auseinanderzuhalten. Die Umrandung
+   ist ein vierfacher 1px-Schatten (oben/unten/links/rechts) statt
+   `-webkit-text-stroke` — der Stroke frisst bei der Pixelschrift die
+   dünnen Striche auf. Ein weicher schwarzer Schein bleibt zusätzlich
+   drin, damit die Zahl auch über hellen Flächen sitzt. */
 .board-card-hp {
   position: absolute;
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: calc(10px * var(--board-scale));
-  color: #fff;
-  text-shadow: 0 0 4px #000, 0 0 2px #000, 1px 1px 0 #000;
+  color: #1f8b3a;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
   z-index: 4;
   pointer-events: none;
   line-height: 1;
@@ -6675,8 +6727,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   position: absolute;
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: calc(10px * var(--board-scale));
-  color: #fff;
-  text-shadow: 0 0 4px #000, 0 0 2px #000, 1px 1px 0 #000;
+  color: #d42323;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
   z-index: 4;
   pointer-events: none;
   line-height: 1;
@@ -6714,12 +6766,15 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   justify-content: space-between;
   font-family: 'Pixel Intv', 'Press Start 2P', monospace;
   font-size: calc(10px * var(--board-scale));
-  color: #fff;
-  text-shadow: 0 0 4px #000, 0 0 2px #000, 1px 1px 0 #000;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
   z-index: 4;
   pointer-events: none;
   line-height: 1;
 }
+/* Die beiden Zahlen im Hero-Streifen tragen ihre Farbe selbst —
+   dunkelgrün für HP, rot für ATK (Als Vorgabe 21.8.). */
+.board-card-stats-hero .board-card-hp-num { color: #1f8b3a; }
+.board-card-stats-hero .board-card-atk-num { color: #d42323; }
 
 /* Compact layout for narrow cards (low resolution / small board scale).
    Threshold of 55px is below the default card width (64px @ scale 1.0)
@@ -13685,6 +13740,145 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 
 /* ── Erdriss (Cybug RHINOCEROS, Als Vorgabe 19.8.) ────────────────────
    Nur `transform` und `opacity` animiert — Als CSS-Regel. */
+/* ── Stromstoß und Funkeln auf Handkarten (v538) ─────────────────────
+   Beide skalieren über die PARTIKELZAHL, nicht über die Größe — die
+   Karte bleibt lesbar, und ein großer Effekt liest sich als „mehr",
+   nicht als „lauter". Nur `transform` und `opacity`. */
+/* Die Drehung kommt als `--sprot` von der Komponente und wird in JEDEM
+   Keyframe mitgeführt. Vorher stand sie als inline `transform` auf dem
+   Element — und wurde von der Animation überschrieben, sodass alle
+   Funken waagerecht übereinander lagen und man nichts sah (Als Befund
+   21.8.). Merksatz: ein Element, dessen `transform` animiert wird, darf
+   seine Ausrichtung NICHT inline setzen. */
+.anim-battery-spark {
+  position: absolute;
+  border-radius: 2px;
+  transform-origin: 0% 50%;
+  background: linear-gradient(90deg, rgba(180,235,255,0) 0%, #bfe9ff 35%, #ffffff 65%, rgba(255,255,255,0) 100%);
+  box-shadow: 0 0 8px rgba(150,220,255,.95);
+  opacity: 0;
+  animation: batterySpark 520ms ease-out forwards;
+}
+@keyframes batterySpark {
+  0%   { opacity: 0; transform: rotate(var(--sprot, 0deg)) scaleX(.15); }
+  30%  { opacity: 1; transform: rotate(var(--sprot, 0deg)) scaleX(1); }
+  70%  { opacity: 1; transform: rotate(var(--sprot, 0deg)) scaleX(1.25); }
+  100% { opacity: 0; transform: rotate(var(--sprot, 0deg)) scaleX(1.6); }
+}
+.anim-battery-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(190,240,255,.95);
+  box-shadow: 0 0 14px rgba(140,215,255,.8), inset 0 0 10px rgba(140,215,255,.5);
+  opacity: 0;
+  animation: batteryRing 520ms ease-out forwards;
+}
+@keyframes batteryRing {
+  0%   { opacity: 0; transform: scale(.35); }
+  35%  { opacity: .95; transform: scale(.9); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+.anim-modifier-sparkle {
+  position: absolute;
+  background: radial-gradient(circle, #ffffff 0%, #cfa8ff 45%, rgba(150,90,255,0) 100%);
+  border-radius: 50%;
+  opacity: 0;
+  animation: modifierSparkle 560ms ease-in-out forwards;
+}
+@keyframes modifierSparkle {
+  0%   { opacity: 0; transform: scale(.3) rotate(0deg); }
+  40%  { opacity: 1; transform: scale(1.15) rotate(90deg); }
+  100% { opacity: 0; transform: scale(.4) rotate(180deg) translateY(-10px); }
+}
+
+/* ── Mischen: Blätter fächern aus dem Stapel (v534) ──────────────────
+   Drei Kartenrücken schwingen kurz heraus und schnappen zurück. Als
+   OVERLAY über dem Stapel gezeichnet, nicht als Klasse auf ihm — das
+   Stapel-Element gehört React und wird beim nächsten Spielzustand neu
+   gerendert, was eine direkt gesetzte Klasse sofort wieder entfernt
+   hätte (erster Anlauf 21.8., von Al gemeldet). Nur `transform` und
+   `opacity`. */
+.anim-deck-shuffle-card {
+  position: absolute;
+  border-radius: 3px;
+  /* Der Farbverlauf ist nur der Rückfall: sobald der Aufrufer einen
+     Kartenrücken mitgibt, setzt er `background-image` inline darüber
+     (Als Wunsch 21.8. — es soll der WIRKLICH gewählte Rücken sein).
+     `background-size: cover` hält das Bild formatfüllend, egal welche
+     Kantenlängen der Stapel gerade hat. */
+  background: linear-gradient(135deg, #3a4a6b 0%, #24304a 55%, #1a2336 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(140,170,220,.55);
+  box-shadow: 0 0 6px rgba(60,90,140,.5);
+  opacity: 0;
+  animation: deckShuffleCard 420ms ease-in-out forwards;
+}
+@keyframes deckShuffleCard {
+  0%   { opacity: 0; transform: translateX(0) rotate(0deg); }
+  25%  { opacity: .95; }
+  55%  { opacity: .95; transform: translateX(var(--shdx)) rotate(var(--shrot)); }
+  100% { opacity: 0; transform: translateX(0) rotate(0deg); }
+}
+
+/* ── Spritze (Future Tech Doping, v530) ──────────────────────────────
+   Nur `transform` und `opacity` animiert. */
+.anim-syringe-body {
+  position: absolute;
+  opacity: 0;
+  transform-origin: 50% 100%;
+  animation: syringeStab 520ms cubic-bezier(.2,.9,.35,1) forwards;
+}
+@keyframes syringeStab {
+  0%   { opacity: 0; transform: translate(38px, -54px) rotate(28deg) scale(1.15); }
+  22%  { opacity: 1; }
+  45%  { opacity: 1; transform: translate(0, 0) rotate(14deg) scale(1); }
+  55%  { transform: translate(-2px, 3px) rotate(14deg) scale(1); }
+  100% { opacity: 0; transform: translate(0, -6px) rotate(14deg) scale(.96); }
+}
+.anim-syringe-barrel {
+  position: absolute; left: 0; top: 0; width: 100%; height: 68%;
+  border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(100deg, rgba(255,252,235,.95) 0%, rgba(240,225,180,.9) 55%, rgba(205,185,130,.95) 100%);
+  box-shadow: 0 0 7px rgba(255,225,120,.65);
+}
+.anim-syringe-fluid {
+  /* Gelb (Als Vorgabe 21.8.) — vorher grün wie eine Heiltinktur; das
+     Doping soll aber nach Chemie aussehen, nicht nach Kräutersaft. */
+  position: absolute; left: 18%; top: 14%; width: 64%; height: 50%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255,240,140,.97), rgba(235,190,20,.97));
+}
+.anim-syringe-plunger {
+  position: absolute; left: 28%; top: -14%; width: 44%; height: 20%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #dfe9f2, #9fb3c4);
+  animation: syringePlunge 520ms ease-in forwards;
+}
+@keyframes syringePlunge {
+  0%, 45% { transform: translateY(0); }
+  70%     { transform: translateY(38%); }
+  100%    { transform: translateY(42%); }
+}
+.anim-syringe-needle {
+  position: absolute; left: 46%; top: 68%; width: 8%; height: 34%;
+  background: linear-gradient(180deg, rgba(220,235,250,.95), rgba(255,255,255,.9));
+  box-shadow: 0 0 4px rgba(255,255,255,.8);
+}
+.anim-syringe-drop {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6bf 0%, #f0c419 65%, rgba(235,190,20,0) 100%);
+  opacity: 0;
+  animation: syringeDrop 380ms ease-out forwards;
+}
+@keyframes syringeDrop {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+  30%  { opacity: 1; transform: translate(calc(var(--sydx) * .5), calc(var(--sydy) * .5)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--sydx), var(--sydy)) scale(.4); }
+}
+
 /* ── Schusssalve (Gangster Angel, v518) ───────────────────────────────
    Nur `transform` und `opacity` animiert — Als CSS-Regel. */
 .anim-gunshot-muzzle {
@@ -13763,4 +13957,163 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
   20%  { opacity: 1; }
   100% { transform: translate(0, -38px) rotate(220deg); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   KERNSCHLAG — Future Tech Doomsday Bomb (v580)
+
+   Eine Animation, die NICHT an einer Zone haengt, sondern die ganze
+   Kampfflaeche bespielt. Alle Groessen kommen als Inline-Werte aus der
+   Komponente (sie rechnet sie aus der Brettmasse aus); hier stehen nur
+   Farbe, Ablauf und Ursprung.
+
+   ★ Die Keyframes setzen `transform` — die Komponente darf ihre
+   Ausrichtung deshalb NICHT inline mitgeben (Lehre aus den Funken von
+   Future Tech Battery, 21.8.). Sie tut es auch nicht: Position laeuft
+   ueber `left`/`top`.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.anim-nuke { position: fixed; }
+.anim-nuke > * { position: absolute; pointer-events: none; }
+
+/* Weissblitz — kurz und hart, dann ausbleichen */
+.anim-nuke-flash {
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(255,255,255,.98) 0%,
+    rgba(255,238,170,.75) 28%,
+    rgba(255,150,40,.35) 52%,
+    rgba(255,80,0,0) 78%);
+  animation: nukeFlash 900ms ease-out forwards;
+}
+@keyframes nukeFlash {
+  0%   { opacity: 0; transform: scale(.15); }
+  8%   { opacity: 1; transform: scale(.55); }
+  30%  { opacity: .85; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+/* Druckwelle — flacher Ring, laeuft nach aussen */
+/* ★ Position kommt INLINE aus `nukeLayout` (Breite, Hoehe, links,
+   oben) — sie muss am Zuendpunkt sitzen, nicht in der Brettmitte. Hier
+   steht deshalb nur noch das Aussehen. Ein `top` an dieser Stelle
+   wuerde vom Inline-Wert ohnehin ueberschrieben und waere eine stille
+   Falle. */
+.anim-nuke-shock {
+  border: 3px solid rgba(255, 226, 150, .85);
+  border-radius: 50%;
+  box-shadow: 0 0 26px rgba(255,170,60,.65), inset 0 0 22px rgba(255,200,90,.4);
+  animation: nukeShock 1100ms cubic-bezier(.16,.8,.3,1) forwards;
+}
+.anim-nuke-shock-2 { animation-delay: 220ms; opacity: .6; }
+@keyframes nukeShock {
+  0%   { opacity: 0; transform: scale(.05); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
+/* Stiel — waechst von unten nach oben */
+.anim-nuke-stem {
+  border-radius: 42% 42% 26% 26%;
+  background: linear-gradient(to top,
+    rgba(255,140,30,.15) 0%,
+    rgba(255,170,60,.62) 30%,
+    rgba(255,215,130,.85) 100%);
+  filter: blur(2px);
+  transform-origin: 50% 100%;
+  animation: nukeStem 1500ms cubic-bezier(.22,.9,.3,1) forwards;
+}
+@keyframes nukeStem {
+  0%   { opacity: 0; transform: scaleY(.05) scaleX(.5); }
+  18%  { opacity: 1; }
+  55%  { transform: scaleY(1) scaleX(1); }
+  100% { opacity: 0; transform: scaleY(1.12) scaleX(1.15); }
+}
+
+/* Kappe — quillt auf und rollt sich am Rand ein */
+.anim-nuke-cap {
+  border-radius: 50% 50% 44% 44%;
+  background: radial-gradient(ellipse at 50% 68%,
+    rgba(255,248,214,.95) 0%,
+    rgba(255,196,90,.9) 32%,
+    rgba(238,110,30,.82) 62%,
+    rgba(120,44,10,.55) 88%,
+    rgba(80,30,10,0) 100%);
+  box-shadow: 0 0 60px rgba(255,150,50,.7);
+  filter: blur(1px);
+  transform-origin: 50% 90%;
+  animation: nukeCap 1700ms cubic-bezier(.18,.85,.28,1) forwards;
+}
+@keyframes nukeCap {
+  0%   { opacity: 0; transform: scale(.08) translateY(30%); }
+  22%  { opacity: 1; transform: scale(.55) translateY(6%); }
+  60%  { transform: scale(1) translateY(-6%); }
+  100% { opacity: 0; transform: scale(1.22) translateY(-16%); }
+}
+
+/* Feuerball am Boden */
+.anim-nuke-core {
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    #fffbe8 0%, #ffd257 26%, #ff8a1f 52%, rgba(190,60,10,.5) 78%, rgba(120,30,0,0) 100%);
+  animation: nukeCore 1200ms ease-out forwards;
+}
+@keyframes nukeCore {
+  0%   { opacity: 0; transform: scale(.1); }
+  10%  { opacity: 1; transform: scale(.9); }
+  55%  { opacity: .8; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+/* Glut — fliegt nach aussen und faellt aus */
+.anim-nuke-ember {
+  width: var(--size); height: var(--size);
+  left: calc(var(--size) / -2);
+  /* `top` setzt die Komponente inline auf den Zuendpunkt — die
+     Zentrierung laeuft deshalb ueber `margin-top`, sonst wuerde sie
+     ueberschrieben. */
+  margin-top: calc(var(--size) / -2);
+  border-radius: 50%;
+  background: var(--color);
+  box-shadow: 0 0 12px var(--color);
+  animation-name: nukeEmber;
+  animation-timing-function: cubic-bezier(.2,.7,.35,1);
+  animation-fill-mode: forwards;
+}
+@keyframes nukeEmber {
+  0%   { opacity: 0; transform: translate(0,0) scale(.3); }
+  12%  { opacity: 1; transform: translate(calc(var(--dx) * .22), calc(var(--dy) * .3)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 34px)) scale(.25); }
+}
+
+/* ═══ Aus der Ablage benutzbare Karte (Future Tech Prototypes, v582) ═══
+   Gegenstueck zur Aktivierbar-Markierung auf dem Brett, nur im
+   Ablage-Dialog. Der Rahmen sagt „hier ist etwas moeglich", das
+   Abzeichen sagt was. */
+.pile-card-activatable {
+  outline: 2px solid var(--accent, #00f0ff);
+  outline-offset: -2px;
+  border-radius: 6px;
+  animation: pileUsablePulse 1.4s ease-in-out infinite;
+}
+@keyframes pileUsablePulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(0, 240, 255, .45); }
+  50%      { box-shadow: 0 0 16px rgba(0, 240, 255, .85); }
+}
+.pile-card-activatable-badge {
+  position: absolute; bottom: 2px; right: 2px;
+  background: rgba(0, 0, 0, .78);
+  color: var(--accent, #00f0ff);
+  font-size: 9px; letter-spacing: .5px;
+  padding: 1px 4px; border-radius: 3px;
+  pointer-events: none; z-index: 6;
+}
+
+/* Ablage mit benutzbarem Inhalt (Future Tech Prototypes, v583).
+   Derselbe Cyan-Puls wie bei aktivierbarer Ausruestung — der Spieler
+   soll den Stapel aufklappen, ohne es jede Runde blind zu versuchen. */
+.zone-discard-usable {
+  outline: 2px solid var(--accent, #00f0ff);
+  outline-offset: -2px;
+  animation: pileUsablePulse 1.4s ease-in-out infinite;
 }

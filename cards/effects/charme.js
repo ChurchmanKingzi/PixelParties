@@ -596,6 +596,17 @@ async function _activateLv3(engine, gs, pi, heroIdx, hero, oi, ops) {
     return true; // HOPT consumed but blocked
   }
 
+  // ★ Effekt-Immunitaet respektieren (Als Vorgabe 21.8.: ALLE Effekte
+  // sollen an einem geschuetzten Helden abprallen — Escape Device,
+  // Invisibility Cloak). `charmed` laeuft bewusst NICHT ueber
+  // `addHeroStatus` (kein Katalogstatus), also steht der Riegel hier
+  // von Hand. `oi`/`sel.heroIdx` ist der betroffene Held.
+  if (engine.hasEffectImmunity?.(oi, sel.heroIdx, null)) {
+    engine.log('effect_immunity', { hero: targetHero.name, status: 'charmed' });
+    engine.sync();
+    return true;
+  }
+
   // ── Take control ──
   targetHero.charmedBy = pi;
   targetHero.charmedFromOwner = oi;
