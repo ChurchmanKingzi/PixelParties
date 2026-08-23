@@ -417,5 +417,13 @@
     "Pollution Piranha|Wisdom": 15
   },
   "protectionRules": {},
-  "gameStartPicks": {}
+  "gameStartPicks": {},
+  "abResult": {
+    "winrate": 0.67,
+    "wins": 134,
+    "losses": 66,
+    "ties": 0,
+    "games": 200,
+    "date": "2026-08-20"
+  }
 }

@@ -382,5 +382,13 @@
     "Slippery Snowman|Slippery Spikeblock": 12.8
   },
   "protectionRules": {},
-  "gameStartPicks": {}
+  "gameStartPicks": {},
+  "abResult": {
+    "winrate": 0.69,
+    "wins": 138,
+    "losses": 62,
+    "ties": 0,
+    "games": 200,
+    "date": "2026-08-20"
+  }
 }

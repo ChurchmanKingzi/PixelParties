@@ -354,5 +354,13 @@
         "Summoning Circle": 0.335
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.566,
+    "wins": 453,
+    "losses": 347,
+    "ties": 0,
+    "games": 800,
+    "date": "2026-08-21"
   }
 }

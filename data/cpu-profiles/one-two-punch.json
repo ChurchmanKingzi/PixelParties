@@ -322,5 +322,13 @@
         "Deepsea Primordium": 0.035
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.528,
+    "wins": 422,
+    "losses": 378,
+    "ties": 0,
+    "games": 800,
+    "date": "2026-08-22"
   }
 }

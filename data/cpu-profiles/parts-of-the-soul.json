@@ -323,5 +323,13 @@
         "Candlestick Squire": 0.518
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.74,
+    "wins": 148,
+    "losses": 52,
+    "ties": 0,
+    "games": 200,
+    "date": "2026-08-20"
   }
 }

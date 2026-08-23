@@ -298,5 +298,13 @@
     "Fighting|Support Magic": 15
   },
   "protectionRules": {},
-  "gameStartPicks": {}
+  "gameStartPicks": {},
+  "abResult": {
+    "winrate": 0.66,
+    "wins": 132,
+    "losses": 68,
+    "ties": 0,
+    "games": 200,
+    "date": "2026-08-20"
+  }
 }

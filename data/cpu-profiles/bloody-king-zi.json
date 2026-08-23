@@ -398,11 +398,11 @@
   "protectionRules": {},
   "gameStartPicks": {},
   "abResult": {
-    "winrate": 0.55,
-    "wins": 220,
-    "losses": 180,
+    "winrate": 0.519,
+    "wins": 415,
+    "losses": 385,
     "ties": 0,
-    "games": 400,
+    "games": 800,
     "date": "2026-08-21"
   }
 }

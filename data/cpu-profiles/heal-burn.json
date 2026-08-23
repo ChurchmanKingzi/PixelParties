@@ -477,5 +477,13 @@
         "Wanted Poster": 0.079
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.58,
+    "wins": 116,
+    "losses": 84,
+    "ties": 0,
+    "games": 200,
+    "date": "2026-08-20"
   }
 }

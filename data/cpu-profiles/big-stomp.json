@@ -416,10 +416,10 @@
   },
   "abResult": {
     "winrate": 0.49,
-    "wins": 196,
-    "losses": 204,
+    "wins": 392,
+    "losses": 408,
     "ties": 0,
-    "games": 400,
+    "games": 800,
     "date": "2026-08-21"
   }
 }

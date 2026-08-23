@@ -407,5 +407,13 @@
         "Grunge Harpyformer": 0.221
       }
     }
+  },
+  "abResult": {
+    "winrate": 0.604,
+    "wins": 483,
+    "losses": 317,
+    "ties": 0,
+    "games": 800,
+    "date": "2026-08-22"
   }
 }
