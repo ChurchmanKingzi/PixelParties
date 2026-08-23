@@ -24,6 +24,8 @@
 //    node scripts/ab-all.js --watch             → Zwischenstand live mitlesen
 //    node scripts/ab-all.js --watch --interval 15
 //    node scripts/ab-all.js --report            → nur Bericht, nichts spielen
+//    node scripts/ab-all.js --write-gates       → Vorschau: abResult aus den Rohdaten
+//    node scripts/ab-all.js --write-gates --apply   → und schreiben
 //    node scripts/ab-all.js --list              → nur auflisten, was anstünde
 //
 //  ── WARUM PARALLEL DIE RAM-FRAGE IST, NICHT DIE KERN-FRAGE ────────
@@ -118,6 +120,10 @@ const LIST_ONLY = hasFlag('--list');
 // jsonl-Format: jedes fertige Spiel wird sofort angehaengt.
 const WATCH = hasFlag('--watch');
 const INTERVAL = Math.max(5, parseInt(getArg('--interval', '30'), 10));
+// --write-gates: `abResult` in allen Profilen aus den Rohdaten der
+// Grundmessung neu berechnen. Ohne --apply nur Vorschau.
+const WRITE_GATES = hasFlag('--write-gates');
+const APPLY = hasFlag('--apply');
 
 // ── EICHZEILE + RIEGEL (v574) ────────────────────────────────────────
 // Die Zeile laeuft IMMER, auch ohne Variante. Ohne diese Nullprobe ist
@@ -315,6 +321,11 @@ function bericht(jobs, dauerMs, opt = {}) {
   zeilen.push(`  ${new Date().toISOString()} · Ziel ${GAMES} Spiele/Deck · ${FAST ? 'reduziertes' : 'volles'} Suchbudget`);
   if (TAG) zeilen.push(`  Lauf-Kuerzel: ${TAG}`);
   zeilen.push(`  Konfiguration: ${IST_VARIANTE ? VARIANTEN.join(' · ') : 'GRUNDMESSUNG (keine Variante)'}`);
+  // Woher die Zahlen kommen. Ohne diese Zeile sieht ein Bericht über den
+  // laufenden Variantenlauf genauso aus wie einer über die Grundmessung —
+  // der Kopf nennt zwar die Flags, aber nicht die Dateien, die sie
+  // auswählen. Genau daran ist eine Runde verlorengegangen.
+  zeilen.push(`  Gelesen aus: data/training/ab/<deck>${TAG ? '.' + TAG : ''}.jsonl`);
   if (IST_VARIANTE) zeilen.push('  → Variantenlauf: KEIN abResult in die Profile geschrieben.');
   if (dauerMs != null) zeilen.push(`  Laufzeit: ${(dauerMs / 3600000).toFixed(1)} h`);
   zeilen.push('═══════════════════════════════════════════════════════════════════════════');
@@ -358,6 +369,75 @@ function bericht(jobs, dauerMs, opt = {}) {
   console.log(`Bericht → data/training/ab/REPORT-${stamp}.txt (+ .json)`);
 }
 
+// ── GATES AUS DEN ROHDATEN ZURÜCKSCHREIBEN (v587) ────────────────────
+//  Das `abResult` im Profil ist ABGELEITETE Größe: es lässt sich jederzeit
+//  aus data/training/ab/<deck>.jsonl neu berechnen. Genau das rettet die
+//  Lage nach einem `deploy.sh`, das data/cpu-profiles/ hart zurücksetzt —
+//  data/training/ steht in der .gitignore und überlebt, die Gates nicht.
+//  Deshalb ist dieser Befehl nach JEDEM Ausrollen der richtige Reflex,
+//  nicht nur einmalig zur Reparatur.
+//
+//  Zwei Sicherungen: er läuft NUR auf der Grundmessung (kein Tag, keine
+//  Variante — ein Variantenergebnis darf nie ins Deployment-Gate), und er
+//  zeigt ohne `--apply` nur, was er täte.
+const GATE_MIN_N = 50;   // dieselbe Schwelle, ab der der Loader das Gate beachtet
+function schreibeGates(jobs) {
+  if (IST_VARIANTE || TAG) {
+    console.error('[ab-all] ABBRUCH: --write-gates arbeitet ausschließlich auf der Grundmessung.');
+    console.error(`[ab-all]   Aktiv: ${[...VARIANTEN, TAG ? `Tag=${TAG}` : ''].filter(Boolean).join(' · ')}`);
+    console.error('[ab-all]   Ein Variantenergebnis darf nie das Deployment-Gate setzen.');
+    process.exit(2);
+  }
+  const b = (s, n) => String(s).padEnd(n);
+  console.log(APPLY ? '[ab-all] GATES SCHREIBEN' : '[ab-all] GATES — VORSCHAU (nichts wird geschrieben; --apply führt aus)');
+  console.log(`${b('Deck', 32)}${b('bisher', 16)}${b('aus Rohdaten', 20)}Wirkung im Loader`);
+  console.log('─'.repeat(88));
+  let geschrieben = 0, uebersprungen = 0, unveraendert = 0, quarantaene = 0;
+  for (const job of jobs) {
+    const { W, L, T } = bilanz(job.out);
+    const n = W + L;
+    const alt = job.vorher ? `${(100 * job.vorher.winrate).toFixed(1)}% n=${job.vorher.games}` : '—';
+    if (n < GATE_MIN_N) {
+      uebersprungen++;
+      console.log(`${b(job.deck.slice(0, 31), 32)}${b(alt, 16)}${b(`nur ${n} Spiele`, 20)}übersprungen (< ${GATE_MIN_N})`);
+      continue;
+    }
+    const p = W / n;
+    // Datum aus der Datei, nicht von heute — der Stempel soll sagen, WANN
+    // gemessen wurde, nicht wann nachgetragen wurde.
+    let datum = new Date().toISOString().slice(0, 10);
+    try { datum = fs.statSync(job.out).mtime.toISOString().slice(0, 10); } catch { /* Fallback heute */ }
+    const neu = { winrate: Math.round(p * 1000) / 1000, wins: W, losses: L, ties: T, games: n, date: datum };
+    const sperrt = neu.winrate < 0.48;
+    if (sperrt) quarantaene++;
+    const wirkung = sperrt ? 'QUARANTÄNE (Heuristik übernimmt)' : 'lädt normal';
+    const gleich = job.vorher && job.vorher.winrate === neu.winrate && job.vorher.games === neu.games;
+    if (gleich) unveraendert++;
+    console.log(`${b(job.deck.slice(0, 31), 32)}${b(alt, 16)}${b(`${(100 * p).toFixed(1)}% n=${n}`, 20)}${wirkung}${gleich ? '  (unverändert)' : ''}`);
+    if (!APPLY || gleich) continue;
+    try {
+      const profPath = path.join(PROFILE_DIR, job.profil);
+      const prof = JSON.parse(fs.readFileSync(profPath, { encoding: 'utf-8' }));
+      prof.abResult = neu;
+      fs.writeFileSync(profPath, JSON.stringify(prof, null, 2), { encoding: 'utf-8' });
+      geschrieben++;
+    } catch (err) {
+      console.error(`[ab-all]   ⚠️  ${job.profil}: ${err.message}`);
+    }
+  }
+  console.log('─'.repeat(88));
+  console.log(`[ab-all] ${jobs.length} Decks · ${quarantaene} davon unter 48 % → Quarantäne`
+    + ` · ${uebersprungen} ohne ausreichende Rohdaten · ${unveraendert} bereits aktuell`);
+  if (APPLY) {
+    console.log(`[ab-all] ${geschrieben} Profil(e) geschrieben.`);
+    console.log('[ab-all] HINWEIS: data/cpu-profiles/ ist getrackt — ein deploy.sh mit `git reset --hard`');
+    console.log('[ab-all]   wirft das wieder weg. Entweder einchecken, oder diesen Befehl nach jedem');
+    console.log('[ab-all]   Ausrollen erneut fahren (die Rohdaten in data/training/ überleben).');
+  } else {
+    console.log('[ab-all] Nichts geschrieben. Ausführen mit:  node scripts/ab-all.js --write-gates --apply');
+  }
+}
+
 // ── Hauptlauf ────────────────────────────────────────────────────────
 (async () => {
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -375,6 +455,8 @@ function bericht(jobs, dauerMs, opt = {}) {
     setInterval(zeichne, INTERVAL * 1000);
     return;
   }
+
+  if (WRITE_GATES) { schreibeGates(jobs); return; }
 
   if (REPORT_ONLY) { bericht(jobs, null); return; }
 
