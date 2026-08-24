@@ -19193,6 +19193,44 @@ class GameEngine {
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50); // Minimal delay to let event loop breathe
       const response = this._getCpuGenericResponse(promptData, playerIdx);
+      // ── Entscheidungs-Protokoll (v589) ──────────────────────────
+      // Der gemeinsame Flaschenhals ALLER 476 promptGeneric-Aufrufe
+      // und der Trichter, die hierher delegieren (promptZonePick,
+      // promptConfirmEffect, promptCardGallery). Eine Zeile hier
+      // erfasst, was 912 Kartenskripte sonst einzeln melden müssten.
+      //
+      // ACHTUNG, der entscheidende Ausschluss: `_inMctsSim` ist WAHR
+      // während der Rollouts der Suche. Das sind hypothetische Züge in
+      // Planungskopien, keine gespielten Entscheidungen. Würden sie
+      // mitgeschrieben, ersäufte das Protokoll in Simulationen — bei
+      // 24 bis 80 Pulls je Zug um Größenordnungen mehr Zeilen als echte
+      // Entscheidungen, und der Lerner lernte die Suche statt das Spiel.
+      // Genau die Sorte stiller Datenfehler, die erst nach 20 000
+      // gesammelten Spielen auffällt und dann alles davon wertlos macht.
+      if (!this._inMctsSim) {
+        try {
+          const _dl = require('./_decision-log.js');
+          const _typ = (promptData && promptData.type) || 'generic';
+          const _art = _typ === 'confirm' ? 'optIn'
+            : _typ === 'optionPicker' ? 'mode'
+            : _typ === 'cardGallery' ? 'gallery'
+            : _typ === 'forceDiscard' ? 'discard'
+            : _typ === 'zonePick' ? 'zone'
+            : 'generic:' + _typ;
+          const _sc = promptData && promptData.showCard;
+          _dl.notiere(this, playerIdx, {
+            art: _art,
+            karte: (_sc && (_sc.name || _sc.cardName)) || (typeof _sc === 'string' ? _sc : null),
+            optionen: (promptData && (promptData.options || promptData.cards)) || null,
+            // null = abgelehnt. Bei cancellable Confirms ist das der
+            // Normalfall und genau die Information, die bisher fehlte.
+            gewaehlt: (response == null) ? null
+              : (typeof response === 'object'
+                ? (response.name || response.label || response.id || JSON.stringify(response).slice(0, 60))
+                : response),
+          });
+        } catch { /* Aufzeichnung darf nie eine Partie stören */ }
+      }
       return response;
     }
     return new Promise((resolve) => {

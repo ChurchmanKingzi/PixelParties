@@ -53,6 +53,11 @@ function turnBucket(turn) {
  * game is over to obtain the JSON-serialisable game record.
  */
 function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, firstPlayer, allowedNames = null }) {
+  // ── Entscheidungs-Protokoll scharfschalten (v589) ──────────────────
+  // Legt engine._decisionLog an. OHNE diesen Aufruf sind saemtliche
+  // Hooks in _engine.js ein No-op — im Live-Betrieb kostet das Modul
+  // also nichts, weil dort kein Recorder angehaengt wird.
+  try { require('./_decision-log.js').armLog(engine, pinnedIdx); } catch { /* egal */ }
   const plays = Object.create(null);   // name -> { early, mid, late }
   const pairs = Object.create(null);   // "A|B" (sorted) -> count
   const revives = Object.create(null); // "Card→Hero" -> count | "Card→ability:X" -> max level
@@ -1034,9 +1039,16 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
           if (boardPairsSame[k]) delete boardPairsSplit[k];
         }
       }
+      // Generisches Entscheidungs-Protokoll (v589). Die alten
+      // Spezialkanaele (menus, targetPicks, …) bleiben vorerst
+      // parallel bestehen, damit die vorhandenen Trainer weiterlaufen
+      // und beide Quellen gegeneinander geprueft werden koennen.
+      let _decisions = [];
+      try { _decisions = require('./_decision-log.js').ernte(engine); } catch { /* egal */ }
       return {
         deck: pinnedName,
         opponent: opponentName,
+        decisions: _decisions,
         startHand: shInfo ? shInfo.hand : null,
         mulliganed: shInfo ? (shInfo.mulliganed ? 1 : 0) : null,
         heroEffects,
