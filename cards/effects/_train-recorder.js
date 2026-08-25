@@ -53,10 +53,20 @@ function turnBucket(turn) {
  * game is over to obtain the JSON-serialisable game record.
  */
 function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, firstPlayer, allowedNames = null }) {
-  // ── Entscheidungs-Protokoll scharfschalten (v589) ──────────────────
-  // Legt engine._decisionLog an. OHNE diesen Aufruf sind saemtliche
-  // Hooks in _engine.js ein No-op — im Live-Betrieb kostet das Modul
-  // also nichts, weil dort kein Recorder angehaengt wird.
+  // ── Entscheidungs-Protokoll scharfschalten (v589, repariert v590) ──
+  // Legt engine._decisionLog an UND huellt die zwei Prompt-Trichter
+  // ein (promptGeneric, promptEffectTarget). Ohne diesen Aufruf
+  // passiert gar nichts — im Live-Betrieb kostet das Modul also
+  // nichts, weil dort kein Recorder angehaengt wird.
+  //
+  // ★ REIHENFOLGE IST TRAGEND: dieser Aufruf muss NACH
+  // `installCpuBrain(engine)` laufen, weil das Gehirn beide Methoden
+  // auf der Instanz ERSETZT. server.js haelt das ein (erst
+  // `installCpuBrain`, direkt danach `attachTrainingRecorder`).
+  // Kaeme jemand spaeter noch einmal mit einer eigenen Huelle, meldet
+  // `diagnose()` das im Spielsatz als `wrapper: 'ueberschrieben'` —
+  // genau die Konstellation, die in v589 zwanzig Spiele mit leerem
+  // `decisions`-Feld gekostet hat.
   try { require('./_decision-log.js').armLog(engine, pinnedIdx); } catch { /* egal */ }
   const plays = Object.create(null);   // name -> { early, mid, late }
   const pairs = Object.create(null);   // "A|B" (sorted) -> count
@@ -852,6 +862,15 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       // Phasengrenzen feuert dagegen nie eine halbe Resolution, und
       // Fremd-Locks aus dem Gegnerzug wandern spätestens beim eigenen
       // Zugbeginn in die Baseline.
+      // ── Verzoegerte Bewertung faellig stellen ────────────────────
+      // Beginnt der gepinnte Spieler seinen naechsten Zug, ist das
+      // Fenster aller offenen Entscheidungen abgelaufen (》until the
+      // start of your next turn《). `faellig()` traegt die Differenz des
+      // Stellungswerts nach; ausserhalb von Rollouts, sonst rechnete
+      // jede Simulation die echten Zeilen mit ab.
+      if (!engine._inMctsSim && hookName === 'onTurnStart') {
+        try { require('./_decision-log.js').faellig(engine); } catch { /* egal */ }
+      }
       if (!engine._inMctsSim && (hookName === 'onPhaseStart' || hookName === 'onTurnStart' || hookName === 'onPhaseEnd')) {
         try { prevLocks = readLocks(); } catch { /* nie das Spiel brechen */ }
       }
@@ -1044,11 +1063,22 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       // parallel bestehen, damit die vorhandenen Trainer weiterlaufen
       // und beide Quellen gegeneinander geprueft werden koennen.
       let _decisions = [];
-      try { _decisions = require('./_decision-log.js').ernte(engine); } catch { /* egal */ }
+      let _decisionDiag = null;
+      try {
+        const _dlm = require('./_decision-log.js');
+        _decisions = _dlm.ernte(engine);
+        // Selbstdiagnose MITLIEFERN. Ein leeres `decisions` ist sonst
+        // stumm: es kann heissen "die Trichter wurden nie durchlaufen",
+        // "der Filter hat alles verworfen" oder "die Huelle wurde
+        // ueberschrieben" — drei voellig verschiedene Ursachen. Der
+        // Rauchtest liest das Feld und weiss es sofort.
+        _decisionDiag = _dlm.diagnose(engine);
+      } catch { /* egal */ }
       return {
         deck: pinnedName,
         opponent: opponentName,
         decisions: _decisions,
+        decisionDiag: _decisionDiag,
         startHand: shInfo ? shInfo.hand : null,
         mulliganed: shInfo ? (shInfo.mulliganed ? 1 : 0) : null,
         heroEffects,

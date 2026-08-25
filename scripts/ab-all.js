@@ -20,6 +20,10 @@
 //    node scripts/ab-all.js --ablate tutorPickRules --tag ohne-tutor
 //                                               → Ablation: Kanal abklemmen und messen
 //    node scripts/ab-all.js --conf-cap 0.4 --tag cap040
+//    node scripts/ab-all.js --vs data/cpu-profiles-alt --tag neu-gegen-alt
+//                                               → GEPAART: neues Profil
+//                                                 gegen altes, im selben
+//                                                 Spiel, selber Code
 //                                               → Profil-Gewicht deckeln und messen
 //    node scripts/ab-all.js --watch             → Zwischenstand live mitlesen
 //    node scripts/ab-all.js --watch --interval 15
@@ -106,9 +110,23 @@ const TAG = getArg('--tag', '').trim().replace(/[^A-Za-z0-9_-]/g, '');
 const ABLATE = (getArg('--ablate', '') || process.env.PP_PROFILE_OFF || '')
   .split(',').map(s => s.trim()).filter(Boolean).join(',');
 const CONF_CAP = (getArg('--conf-cap', '') || process.env.PP_PROFILE_CONF_CAP || '').trim();
+// ── GEPAARTES MESSEN ─────────────────────────────────────────────────
+//   --vs <verzeichnis>        Vergleichs-Profilsatz (Seite B)
+//   --profile-dir <verz.>     eigener Satz (Seite A, Default
+//                             data/cpu-profiles)
+// Beide Saetze spielen im SELBEN Spiel gegeneinander, auf demselben
+// Code. Damit ist der Vergleich gegen Engine-Drift immun — anders als
+// eine Messung gegen eine historische Zahl, die einen Codestand
+// beschreibt, den es nicht mehr gibt.
+const VS_DIR = (getArg('--vs', '') || '').trim();
+const PROFILE_DIR_ARG = (getArg('--profile-dir', '') || '').trim();
 const VARIANTEN = [];
 if (ABLATE) VARIANTEN.push(`Ablation=${ABLATE}`);
 if (CONF_CAP) VARIANTEN.push(`conf-cap=${CONF_CAP}`);
+// Ein --vs-Lauf misst nicht 》Profil gegen Baseline《 und darf deshalb
+// NIEMALS ein abResult schreiben — sonst wandert eine Zahl aus einem
+// ganz anderen Vergleich in das Quarantaene-Gate.
+if (VS_DIR) VARIANTEN.push(`gepaart gegen ${VS_DIR}`);
 if (!FAST) VARIANTEN.push('volles Suchbudget (--fast 0)');
 if (HEAP !== 4096) VARIANTEN.push(`Heap=${HEAP}`);
 const IST_VARIANTE = VARIANTEN.length > 0;
@@ -264,6 +282,16 @@ function fahre(job) {
       // zu verlassen (v574). Delete statt undefined: ein geerbtes
       // PP_PROFILE_OFF aus einer frueheren Sitzung darf nicht still
       // mitlaufen, wenn dieser Lauf keine Ablation ist.
+      // ── GEPAARTES MESSEN: --vs <verzeichnis> ──────────────────────
+      // Statt 》Profil gegen Baseline《 laeuft dann 》neues Profil gegen
+      // altes Profil《 — beide im selben Spiel, auf demselben Code.
+      // Das ist die Antwort auf 》A/B ueber verschiedene Codestaende sind
+      // nicht vergleichbar《: gegen Engine-Drift immun, weil sie beide
+      // Arme gleich trifft.
+      if (VS_DIR) {
+        env.PP_PROFILE_DIR_A = PROFILE_DIR_ARG || 'data/cpu-profiles';
+        env.PP_PROFILE_DIR_B = VS_DIR;
+      } else { delete env.PP_PROFILE_DIR_A; delete env.PP_PROFILE_DIR_B; }
       if (ABLATE) env.PP_PROFILE_OFF = ABLATE; else delete env.PP_PROFILE_OFF;
       if (CONF_CAP) env.PP_PROFILE_CONF_CAP = CONF_CAP; else delete env.PP_PROFILE_CONF_CAP;
       if (IST_VARIANTE) env.PP_AB_NO_PROFILE_WRITE = '1'; else delete env.PP_AB_NO_PROFILE_WRITE;

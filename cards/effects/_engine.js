@@ -19193,44 +19193,23 @@ class GameEngine {
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50); // Minimal delay to let event loop breathe
       const response = this._getCpuGenericResponse(promptData, playerIdx);
-      // ── Entscheidungs-Protokoll (v589) ──────────────────────────
-      // Der gemeinsame Flaschenhals ALLER 476 promptGeneric-Aufrufe
-      // und der Trichter, die hierher delegieren (promptZonePick,
-      // promptConfirmEffect, promptCardGallery). Eine Zeile hier
-      // erfasst, was 912 Kartenskripte sonst einzeln melden müssten.
+      // ── Entscheidungs-Protokoll ─────────────────────────────────
+      // HIER stand in v589 der Aufzeichnungs-Hook. Er war TOT und
+      // wurde in v590 entfernt: `installCpuBrain` (_cpu.js ~6319)
+      // ERSETZT `engine.promptGeneric` auf der Instanz und beantwortet
+      // CPU-Prompts selbst — diese Methode wird also nur noch auf dem
+      // Menschen-Pfad erreicht, und in einem Headless-Trainingsspiel
+      // gibt es keinen Menschen. Ergebnis: 20 aufgezeichnete Spiele,
+      // null Zeilen.
       //
-      // ACHTUNG, der entscheidende Ausschluss: `_inMctsSim` ist WAHR
-      // während der Rollouts der Suche. Das sind hypothetische Züge in
-      // Planungskopien, keine gespielten Entscheidungen. Würden sie
-      // mitgeschrieben, ersäufte das Protokoll in Simulationen — bei
-      // 24 bis 80 Pulls je Zug um Größenordnungen mehr Zeilen als echte
-      // Entscheidungen, und der Lerner lernte die Suche statt das Spiel.
-      // Genau die Sorte stiller Datenfehler, die erst nach 20 000
-      // gesammelten Spielen auffällt und dann alles davon wertlos macht.
-      if (!this._inMctsSim) {
-        try {
-          const _dl = require('./_decision-log.js');
-          const _typ = (promptData && promptData.type) || 'generic';
-          const _art = _typ === 'confirm' ? 'optIn'
-            : _typ === 'optionPicker' ? 'mode'
-            : _typ === 'cardGallery' ? 'gallery'
-            : _typ === 'forceDiscard' ? 'discard'
-            : _typ === 'zonePick' ? 'zone'
-            : 'generic:' + _typ;
-          const _sc = promptData && promptData.showCard;
-          _dl.notiere(this, playerIdx, {
-            art: _art,
-            karte: (_sc && (_sc.name || _sc.cardName)) || (typeof _sc === 'string' ? _sc : null),
-            optionen: (promptData && (promptData.options || promptData.cards)) || null,
-            // null = abgelehnt. Bei cancellable Confirms ist das der
-            // Normalfall und genau die Information, die bisher fehlte.
-            gewaehlt: (response == null) ? null
-              : (typeof response === 'object'
-                ? (response.name || response.label || response.id || JSON.stringify(response).slice(0, 60))
-                : response),
-          });
-        } catch { /* Aufzeichnung darf nie eine Partie stören */ }
-      }
+      // Die Aufzeichnung sitzt jetzt dort, wo sie hingehört: als
+      // äußerste Hülle über beiden Trichtern, installiert von
+      // `_decision-log.js` (`instrumentiere`), angestoßen vom
+      // Trainings-Recorder NACH `installCpuBrain`. Damit ist sie von
+      // dieser Methode unabhängig.
+      //
+      // NICHTS hier wieder anhängen — eine Aufzeichnung gehört nicht
+      // in eine Methode, die andere Module überschreiben dürfen.
       return response;
     }
     return new Promise((resolve) => {
@@ -19304,6 +19283,24 @@ class GameEngine {
     if (mode === 'may') {
       const flagKey = `gerry-may-redirected:${oppIdx}`;
       if (this.gs.gerryUsed?.[flagKey] === this.gs.turn) return null;
+      // ── HAUSHALTS-TOR (Als Vorgabe): das Negate NICHT verschwenden ──
+      // Der Riegel unten verbraucht die Einmal-je-Zug-Umleitung am
+      // ERSTEN in Frage kommenden 》may《 des Halbzugs — ganz gleich, ob
+      // es um eine Kleinigkeit oder um die Karte geht, die der Gegner
+      // wirklich braucht. Fuer einen CPU-Besitzer fragt die Engine
+      // deshalb erst die Politik des Gehirns (`_gerryMayGate`, gesetzt
+      // von `installCpuBrain`): lohnt sich DIESES Angebot, oder warten
+      // wir auf ein besseres?
+      //
+      // Bewusst nur fuer CPU-Besitzer. Ein menschlicher Gerrymander-
+      // Besitzer entscheidet selbst und bekommt weiterhin jedes erste
+      // 》may《 des Halbzugs vorgelegt — die Spielregel bleibt unberuehrt.
+      if (this.isCpuPlayer(oppIdx) && typeof this._gerryMayGate === 'function') {
+        let ausgeben = true;
+        try { ausgeben = this._gerryMayGate(promptData, oppIdx, promptedPi) !== false; }
+        catch { ausgeben = true; }   // Politik darf nie eine Partie blockieren
+        if (!ausgeben) return null;
+      }
       if (!this.gs.gerryUsed) this.gs.gerryUsed = {};
       this.gs.gerryUsed[flagKey] = this.gs.turn;
     }
@@ -19312,6 +19309,13 @@ class GameEngine {
     // marker below short-circuits any nested call (e.g., a Gerrymander
     // owner who ALSO has a Gerrymander on the opposite side somehow).
     if (promptData._gerryRewritten) return null;
+
+    // Zurechnungs-Marke fuer den Aufzeichnungs-Vertrag: die Umleitung
+    // passiert innerhalb des CPU-Gehirns, die aeussere Huelle des
+    // Recorders sieht nur das ORIGINAL. Ohne diese Marke schriebe sie
+    // die Entscheidung dem gefragten statt dem entscheidenden Spieler
+    // zu. Rein informativ, keine Regelwirkung.
+    promptData._gerryRedirectedTo = oppIdx;
 
     const oppName = this.gs.players[promptedPi]?.username || 'your opponent';
     const rewrittenData = {

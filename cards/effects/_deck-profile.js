@@ -31,9 +31,29 @@
 
 const fs = require('fs');
 const path = require('path');
-const PROFILE_DIR = path.join(__dirname, '..', '..', 'data', 'cpu-profiles');
+// ── PROFIL-VERZEICHNIS, UMLENKBAR ─────────────────────────────────
+// `PP_PROFILE_DIR` zeigt die Laufzeit auf ein ANDERES Profil-Set.
+// Zweck: GEPAARTES Messen. Die 42er-Grundmessung altert mit der Engine
+// — mindestens ein Deck hat sich allein durch Engine-Aenderungen um
+// 8.7 Punkte bewegt, der Nordstern 61.4 % ist ein historischer Wert.
+// A/B-Ergebnisse ueber verschiedene Codestaende sind deshalb NICHT
+// vergleichbar, und eine vollstaendige Neumessung kostet rund 61 h.
+//
+// Die Loesung ist, das Messwerkzeug zu aendern statt die Messung zu
+// wiederholen: NEUES Profil gegen ALTES Profil, beide auf DEMSELBEN
+// Code, im selben Lauf. Damit ist der Vergleich gegen Engine-Drift
+// immun, weil die Drift auf beide Arme gleich wirkt.
+//
+// Relativ zum Projekt-Root aufgeloest, damit `--vs data/profile-alt`
+// aus jedem Arbeitsverzeichnis funktioniert.
+const PROFILE_ROOT = path.join(__dirname, '..', '..');
+const PROFILE_DIR = process.env.PP_PROFILE_DIR
+  ? path.resolve(PROFILE_ROOT, process.env.PP_PROFILE_DIR)
+  : path.join(PROFILE_ROOT, 'data', 'cpu-profiles');
 
-let _profiles = null; // heroKey -> profile
+// Ein Satz je Verzeichnis. Fuer das gepaarte Messen (`--vs`) muessen
+// ZWEI Saetze gleichzeitig im Speicher liegen — einer je Spielseite.
+const _profilesByDir = new Map();   // dir -> Map<heroKey, profile>
 
 function heroKeyOf(heroNames) {
   return (heroNames || []).filter(Boolean).slice().sort().join('||');
@@ -81,16 +101,18 @@ function stripDisabledChannels(p, datei) {
   }
 }
 
-function loadAllProfiles() {
-  if (_profiles) return _profiles;
-  _profiles = new Map();
+function loadAllProfiles(dir = PROFILE_DIR) {
+  const zwischen = _profilesByDir.get(dir);
+  if (zwischen) return zwischen;
+  const _profiles = new Map();
+  _profilesByDir.set(dir, _profiles);
   if (process.env.PP_DISABLE_PROFILES === '1') return _profiles;
   let files = [];
-  try { files = fs.readdirSync(PROFILE_DIR).filter(f => f.endsWith('.json')); }
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.json')); }
   catch { return _profiles; } // no profile dir → no profiles, fine
   for (const f of files) {
     try {
-      const raw = fs.readFileSync(path.join(PROFILE_DIR, f), { encoding: 'utf-8' });
+      const raw = fs.readFileSync(path.join(dir, f), { encoding: 'utf-8' });
       const p = JSON.parse(raw);
       // Quarantäne (A/B-gated Deployment): Hat dieses Profil seinen
       // Spiegeltest gegen die eigene Baseline klar verloren, richtet es
@@ -158,7 +180,15 @@ function profileFor(engine, pi) {
     // FIRST query of the game (turn 1 hand valuation), long before any
     // Ascension, so current names are reliable in practice.
     const names = heroes.map(h => h?.baseName || h?.name).filter(Boolean);
-    prof = loadAllProfiles().get(heroKeyOf(names)) || null;
+    // Gepaartes Messen: jede Seite darf aus einem EIGENEN Verzeichnis
+    // laden (`engine._profileDirBySide`, gesetzt von server.js aus
+    // PP_PROFILE_DIR_A/_B). Damit laufen neues und altes Profil im
+    // SELBEN Spiel gegeneinander — dieselbe Engine, dieselbe Startlage,
+    // dieselbe Zufallsfolge. Engine-Drift wirkt auf beide Arme gleich
+    // und faellt aus dem Vergleich heraus.
+    const roh = engine._profileDirBySide?.[pi];
+    const dir = roh ? path.resolve(PROFILE_ROOT, roh) : PROFILE_DIR;
+    prof = loadAllProfiles(dir).get(heroKeyOf(names)) || null;
   } catch { prof = null; }
   engine._deckProfileCache[pi] = prof;
   return prof;
@@ -608,7 +638,7 @@ function boardPairBonus(engine, pi, cardName, heroIdx) {
 }
 
 /** Test hook / hot-reload after retraining without a server restart. */
-function reloadProfiles() { _profiles = null; loadAllProfiles(); }
+function reloadProfiles() { _profilesByDir.clear(); loadAllProfiles(); }
 
 
 /**
@@ -1425,11 +1455,16 @@ function targetPickDecision(engine, pi, cardName, validTargets, config = {}) {
     // Regel bewusst ignorieren und zufaellig ziehen.
     const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
     const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
-    if (priors && !epsRoll) {
+    // FORM 2: der Absichts-Kanal traegt auch OHNE kartenspezifische
+    // Prioren — 》Heilung geht auf niedrige HP《 gilt kartenuebergreifend.
+    // Deshalb reicht EINE der beiden Quellen, damit gewaehlt wird.
+    const hatAbsicht = !!profileFor(engine, pi)?.targetIntentRules;
+    if ((priors || hatAbsicht) && !epsRoll) {
       let best = null, bestScore = -Infinity, second = -Infinity;
       for (const t of validTargets) {
         const tags = classifyTargetTags(engine, t, validTargets, pi, config);
-        const s = tags.reduce((sum, g) => sum + (priors[g] || 0), 0);
+        const s = tags.reduce((sum, g) => sum + ((priors && priors[g]) || 0), 0)
+          + targetIntentBonus(engine, pi, cardName, t, config);
         if (s > bestScore) { second = bestScore; bestScore = s; best = t; }
         else if (s > second) { second = s; }
       }
@@ -1670,6 +1705,94 @@ function classifyPlayOrderTags(engine, pi, cardName) {
     }
     if (sacrificeSpecReady(engine, pi, cardName)) tags.push('pord:spec-ready');
     if (!(ps.heroesActedThisTurn || []).length) tags.push('pord:first');
+
+    // ── DECKNEUTRALE LAGE-TAGS (Messbefund 24.8.) ────────────────────
+    // GEMESSEN an heal-burn (5440 Entscheidungen aus 1360 Partien):
+    // im gesamten Datensatz kam GENAU EIN Tag vor — `pord:first`, und
+    // das auf 94 % aller Zeilen. Alle anderen Tags oben haengen an
+    // DECKSPEZIFISCHEN Vertraegen (`canPlaceOnOccupiedSlot`,
+    // `sacrificeSpec`, Grant-Geber, On-Summon-Kopierer); ein Deck ohne
+    // diese Vertraege hat gar keinen Tag-Raum. Genau deshalb haben nur
+    // 3 von 42 Profilen `playOrderRules` — und zwei davon nur die
+    // 94-%-Muenze.
+    //
+    // Ein Tag auf 94 % misst nicht die LAGE, sondern den Deckmittelwert,
+    // und der Prior SUMMIERT ihn neben allem, was ihn erklaert. Der
+    // Kanal braucht also Merkmale, die in JEDEM Deck feuern und echten
+    // Kontrast erzeugen. Alles hier ist aus dem Zustand abgeleitet, kein
+    // Kartenwissen, keine Namen.
+    //
+    // NICHT NACHHOLBAR: was hier fehlt, fehlt allen je gesammelten
+    // Spielen. Deshalb lieber grosszuegig — der Praevalenzfilter und das
+    // t-Gate im Trainer werfen raus, was nichts traegt.
+    const stufe = (v, grenzen, namen) => {
+      for (let i = 0; i < grenzen.length; i++) if (v <= grenzen[i]) return namen[i];
+      return namen[namen.length - 1];
+    };
+
+    // (1) DIE EIGENTLICHE REIHENFOLGE: der wievielte freie Play dieses
+    //     Zuges ist das? Genau die Information, um die es im Kanal geht —
+    //     und sie fehlte bisher vollstaendig. Aus dem Log ablesbar, ohne
+    //     neuen Zustand.
+    let seq = 0;
+    try {
+      for (const e of (engine._playOrderLog || [])) {
+        if (e.pi === pi && e.t === (gs.turn || 0)) seq++;
+      }
+    } catch { /* egal */ }
+    tags.push('pord:seq:' + stufe(seq, [0, 1, 2], ['1', '2', '3', '4+']));
+
+    // (2) Karten-Steckbrief: Typ und Level.
+    let cd = null;
+    try { cd = engine._getCardDB ? engine._getCardDB()[cardName] : null; } catch { cd = null; }
+    if (cd) {
+      if (cd.cardType) tags.push('pord:type:' + String(cd.cardType).toLowerCase());
+      if (typeof cd.level === 'number') tags.push('pord:lvl:' + stufe(cd.level, [0, 1, 2], ['0', '1', '2', '3+']));
+    }
+
+    // (3) Phase — MP1, Action Phase und MP2 sind voellig verschiedene
+    //     Gelegenheiten.
+    if (gs.currentPhase != null) tags.push('pord:ph:' + gs.currentPhase);
+
+    // (4) Ressourcenlage: Hand, Gold, Restdeck.
+    const hand = (ps.hand || []).length;
+    tags.push('pord:hand:' + stufe(hand, [2, 4, 6], ['0-2', '3-4', '5-6', '7+']));
+    if (typeof ps.gold === 'number') {
+      tags.push('pord:gold:' + stufe(ps.gold, [0, 3, 7], ['0', '1-3', '4-7', '8+']));
+    }
+
+    // (5) Brettfuellung: wie viele eigene Support-Slots sind belegt?
+    let belegt = 0, slots = 0;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const held = ps.heroes[hi];
+      if (!held || !held.name || held.hp <= 0) continue;
+      for (let z = 0; z < 3; z++) {
+        slots++;
+        if (((ps.supportZones?.[hi] || [])[z] || []).length) belegt++;
+      }
+    }
+    if (slots > 0) {
+      const anteil = belegt / slots;
+      tags.push('pord:board:' + (anteil === 0 ? 'leer' : anteil < 0.5 ? 'teil' : anteil < 1 ? 'voll' : 'dicht'));
+    }
+
+    // (6) STANDING an lebenden Helden (Als ausdrueckliche Vorgabe:
+    //     》'behind' gemessen an der Anzahl lebender Heroes《). Fein
+    //     abgestuft statt binaer — 》einer hinten《 und 》zwei hinten《 sind
+    //     verschiedene Spiele.
+    const oi = pi === 0 ? 1 : 0;
+    const lebend = (q) => ((gs.players?.[q]?.heroes) || []).filter(h => h && (h.hp || 0) > 0).length;
+    const hd = lebend(pi) - lebend(oi);
+    tags.push('pord:hd:' + (hd <= -2 ? '-2' : hd === -1 ? '-1' : hd === 0 ? '0' : hd === 1 ? '+1' : '+2'));
+
+    // (7) HP-Verhaeltnis — Helden koennen alle stehen und trotzdem am
+    //     Rand sein.
+    const hpSum = (q) => ((gs.players?.[q]?.heroes) || []).reduce((a, h) => a + Math.max(0, (h && h.hp) || 0), 0);
+    const eigen = hpSum(pi), fremd = hpSum(oi);
+    if (eigen + fremd > 0) {
+      const q = eigen / (eigen + fremd);
+      tags.push('pord:hp:' + (q < 0.35 ? 'lo' : q < 0.5 ? 'unter' : q < 0.65 ? 'ueber' : 'hi'));
+    }
 
     // ── MOTOR-ROLLE der Karte (Messung 30.7.) ────────────────────────
     // Das bisherige Vokabular beschrieb nur WERT und LAGE, nie die
@@ -2164,7 +2287,227 @@ function playOrderPrior(engine, pi, tags) {
   } catch { return 0; }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  LAUFZEIT DER SECHS ENTSCHEIDUNGSFORMEN
+//
+//  Gegenstueck zu scripts/decision-channels.js. Ohne diesen Teil wuerden
+//  die neuen Regelsaetze gelernt und nie benutzt.
+//
+//  DIE TAG-ABLEITUNG MUSS HIER UND IM TRAINER IDENTISCH SEIN — dieselbe
+//  Regel wie bei `clusterOfFingerprint`. Weil der Trainer die Tags aus
+//  dem ROHEN Zustand ableitet (und nicht der Recorder sie stempelt),
+//  gibt es hier eine zweite Ableitung aus dem LIVE-Zustand. Beide
+//  Stufungen stehen deshalb in EINER Konstante, damit sie nicht
+//  auseinanderlaufen koennen.
+// ═══════════════════════════════════════════════════════════════════
+
+const D_STUFEN = {
+  t:    { grenzen: [4, 9],        namen: ['early', 'mid', 'late'] },
+  hand: { grenzen: [2, 4, 6],     namen: ['0-2', '3-4', '5-6', '7+'] },
+  gold: { grenzen: [0, 3, 7],     namen: ['0', '1-3', '4-7', '8+'] },
+  deck: { grenzen: [3, 8, 15],    namen: ['0-3', '4-8', '9-15', '16+'] },
+};
+function dStufe(v, art) {
+  const { grenzen, namen } = D_STUFEN[art];
+  for (let i = 0; i < grenzen.length; i++) if (v <= grenzen[i]) return namen[i];
+  return namen[namen.length - 1];
+}
+
+/**
+ * Zustands-Tags aus dem LIVE-Zustand — spiegelbildlich zu
+ * `zustandsTags()` im Trainer, der sie aus dem aufgezeichneten `z`
+ * ableitet. Laufen die beiden auseinander, schlaegt kein Test an und
+ * das Profil wirkt nur nicht; deshalb dieselben Stufen aus D_STUFEN.
+ */
+function decisionStateTags(engine, pi) {
+  const tags = [];
+  try {
+    const gs = engine.gs;
+    if (!gs) return tags;
+    const oi = pi === 0 ? 1 : 0;
+    const ps = gs.players?.[pi], os = gs.players?.[oi];
+    tags.push('st:t:' + dStufe(gs.turn || 0, 't'));
+    if (gs.currentPhase != null) tags.push('st:ph:' + gs.currentPhase);
+    const lebend = (q) => ((q && q.heroes) || []).filter(h => h && (h.hp || 0) > 0).length;
+    const hd = lebend(ps) - lebend(os);
+    tags.push('st:hd:' + (hd <= -2 ? '-2' : hd === -1 ? '-1' : hd === 0 ? '0' : hd === 1 ? '+1' : '+2'));
+    const hpS = (q) => ((q && q.heroes) || []).reduce((a, h) => a + Math.max(0, (h && h.hp) || 0), 0);
+    const eigen = hpS(ps), fremd = hpS(os);
+    if (eigen + fremd > 0) {
+      const q = eigen / (eigen + fremd);
+      tags.push('st:hp:' + (q < 0.35 ? 'lo' : q < 0.5 ? 'unter' : q < 0.65 ? 'ueber' : 'hi'));
+    }
+    if (Array.isArray(ps?.hand)) tags.push('st:hand:' + dStufe(ps.hand.length, 'hand'));
+    if (typeof ps?.gold === 'number') tags.push('st:gold:' + dStufe(ps.gold, 'gold'));
+    if (Array.isArray(ps?.mainDeck)) tags.push('st:deck:' + dStufe(ps.mainDeck.length, 'deck'));
+  } catch { /* defensiv */ }
+  return tags;
+}
+
+/**
+ * FORM 1 — 》you may《, PRO KARTE.
+ * Liefert 'play' | 'skip' | null (null = kein Urteil, Altverhalten).
+ *
+ * Grundrate plus additive Deltas. Bewusst KEIN deckweiter Rueckfall:
+ * verschiedene optionale Trigger desselben Decks haben gegenlaeufige
+ * Regeln, ein gemittelter Wert waere schaedlicher als gar keiner.
+ */
+function optInDecision(engine, pi, cardName) {
+  try {
+    if (!cardName) return null;
+    const regel = profileFor(engine, pi)?.optInRules?.[cardName];
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (regel && !epsRoll) {
+      let score = regel.b || 0;
+      if (regel.d) {
+        for (const g of decisionStateTags(engine, pi)) score += (regel.d[g] || 0);
+      }
+      score *= confidence(profileFor(engine, pi));
+      if (score >= 3) return 'play';
+      if (score <= -3) return 'skip';
+      return null;
+    }
+    // Ohne Regel: im Training beide Arme bedienen, sonst gaebe es nie
+    // eine Kontrastgruppe. Live bleibt alles beim Alten.
+    const explore = parseFloat(process.env.PP_OPTIN_EXPLORE || '0.25');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) {
+      return Math.random() < 0.5 ? 'skip' : 'play';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/**
+ * FORM 2 — Zielwahl ueber die ABSICHT. Liefert einen Zusatzscore je
+ * Ziel, den `targetPickDecision` auf die kartenspezifischen
+ * `targetPriors` addiert.
+ *
+ * Die Absicht kommt aus der Prompt-Konfiguration — genau die Felder,
+ * die der Recorder roh mitschreibt.
+ */
+function targetIntentBonus(engine, pi, cardName, ziel, config = {}) {
+  try {
+    const prof = profileFor(engine, pi);
+    if (!prof || !prof.targetIntentRules) return 0;
+    const absicht = (config.isHealing || config.isHeal) ? 'heal'
+      : ((config.baseDamage || 0) > 0) ? 'dmg'
+      : config.appliesStatus ? 'status'
+      : config.isBuff ? 'buff' : 'other';
+    const basis = prof.targetIntentRules[absicht];
+    if (!basis) return 0;
+    const abw = prof.targetCardDeltas?.[cardName] || null;
+    const tags = [];
+    if (ziel) {
+      tags.push('tg:side:' + (ziel.owner === pi ? 'own' : 'opp'));
+      if (ziel.type) tags.push('tg:kind:' + ziel.type);
+      if (ziel.heroIdx != null) tags.push('tg:pos:' + ziel.heroIdx);
+      if (ziel.zoneSlot != null) tags.push('tg:slot:' + ziel.zoneSlot);
+    }
+    let s = 0;
+    for (const g of tags) s += (basis[g] || 0) + (abw ? (abw[g] || 0) : 0);
+    return s * confidence(prof);
+  } catch { return 0; }
+}
+
+/**
+ * FORM 3 — ORDINAL (》wie viel《). Liefert den Index der Option, die der
+ * gelernten Zielstufe am naechsten kommt, oder null.
+ *
+ * Die Optionen muessen eine Zahlenreihe sein; sonst ist die Wahl
+ * kategorisch und dieser Kanal schweigt.
+ */
+function ordinalPick(engine, pi, cardName, options) {
+  try {
+    if (!cardName || !Array.isArray(options) || options.length < 3) return null;
+    const regel = profileFor(engine, pi)?.ordinalRules?.[cardName];
+    if (!regel || typeof regel.ziel !== 'number') return null;
+    const zahlen = options.map(o => {
+      const m = /(-?\d+)/.exec(String((o && (o.label || o.id || o.name)) ?? o));
+      return m ? parseInt(m[1], 10) : null;
+    });
+    if (zahlen.some(x => x === null)) return null;
+    const lo = Math.min(...zahlen), hi = Math.max(...zahlen);
+    if (hi <= lo) return null;
+    // Gleichstand bewusst zugunsten der HOEHEREN Option (》<=《 statt
+    // 》<《): liegt die gelernte Zielstufe genau zwischen zwei Optionen,
+    // bleibt das Verhalten damit auf der Seite des bisherigen Defaults
+    // (》letzte Option《 = 》all in《) statt willkuerlich nach unten zu
+    // kippen. Ohne explizite Regel haengt die Wahl an der Reihenfolge
+    // der Optionen — das waere stiller Zufall.
+    let best = -1, bestAbstand = Infinity;
+    zahlen.forEach((v, i) => {
+      const a = Math.abs((v - lo) / (hi - lo) - regel.ziel);
+      if (a <= bestAbstand) { bestAbstand = a; best = i; }
+    });
+    return best >= 0 ? best : null;
+  } catch { return null; }
+}
+
+/**
+ * FORM 4 — ADVERSARIELLE MENGENWAHL: Angebotswert einer Karte.
+ * Generischer Nachfolger von `menuOfferRule`, das nur die drei
+ * hartkodierten Quellen kannte. Faellt auf die alte Regel zurueck,
+ * damit vorhandene Profile weiterlaufen.
+ */
+function setOfferValue(engine, pi, quelle, karte) {
+  try {
+    const prof = profileFor(engine, pi);
+    if (!prof) return 0;
+    const key = `${quelle}→${karte}`;
+    let v = prof.setOfferRules?.[key];
+    if (typeof v !== 'number') v = prof.menuOfferRules?.[key];
+    if (typeof v !== 'number') return 0;
+    return v * confidence(prof);
+  } catch { return 0; }
+}
+
+/**
+ * FORM 5 — OFFENE POOLWAHL ueber KARTENMERKMALE.
+ * Bei 1405 Kandidaten ist Identitaet nicht lernbar; gelernt wurde ueber
+ * Typ, Level, Kosten, Schule, HP und Angriff. Der Lage-Zuschlag traegt
+ * Omikrons Ueberlebenswette: Koerper bei bedrohtem Brett, Effekt bei
+ * sicherem.
+ */
+function poolFeatureValue(engine, pi, quelle, karte) {
+  try {
+    const prof = profileFor(engine, pi);
+    const regel = prof?.poolFeatureRules?.[quelle];
+    if (!regel || !karte) return 0;
+    const cd = engine._getCardDB ? engine._getCardDB()[karte] : null;
+    if (!cd) return 0;
+    const stufe2 = (v, grenzen, namen) => {
+      for (let i = 0; i < grenzen.length; i++) if (v <= grenzen[i]) return namen[i];
+      return namen[namen.length - 1];
+    };
+    const merkmale = [];
+    if (cd.cardType) merkmale.push('ft:type:' + String(cd.cardType).toLowerCase().replace(/\s+/g, '-'));
+    if (typeof cd.level === 'number') merkmale.push('ft:lvl:' + stufe2(cd.level, [0, 1, 2], ['0', '1', '2', '3+']));
+    if (typeof cd.cost === 'number') merkmale.push('ft:cost:' + stufe2(cd.cost, [0, 2, 5], ['0', '1-2', '3-5', '6+']));
+    if (cd.spellSchool1) merkmale.push('ft:school:' + String(cd.spellSchool1).toLowerCase().replace(/\s+/g, '-'));
+    if (typeof cd.hp === 'number' && cd.hp > 0) merkmale.push('ft:hp:' + stufe2(cd.hp, [100, 300], ['lo', 'mid', 'hi']));
+    if (typeof cd.atk === 'number' && cd.atk > 0) merkmale.push('ft:atk:' + stufe2(cd.atk, [30, 80], ['lo', 'mid', 'hi']));
+    let s = 0;
+    for (const f of merkmale) s += (regel.f?.[f] || 0);
+    if (regel.lage) {
+      const lagen = decisionStateTags(engine, pi);
+      for (const l of lagen) {
+        const z = regel.lage[l];
+        if (!z) continue;
+        for (const f of merkmale) s += (z[f] || 0);
+      }
+    }
+    return s * confidence(prof);
+  } catch { return 0; }
+}
+
 module.exports = {
+  decisionStateTags,
+  optInDecision,
+  targetIntentBonus,
+  ordinalPick,
+  setOfferValue,
+  poolFeatureValue,
   protectionDecision,
   isCollecting,
   heroKeyOf,

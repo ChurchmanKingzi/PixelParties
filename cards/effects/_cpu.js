@@ -6599,6 +6599,13 @@ function installCpuBrain(engine) {
     return origTarget(validTargets, config, promptedPlayerIdx);
   };
 
+  // Gerrymander-Haushalt (Als Vorgabe): die Engine fragt vor dem
+  // Verbrauch der Einmal-je-Halbzug-Umleitung hier nach. Ohne
+  // installiertes Gehirn (Mensch, Puzzle) bleibt das Feld leer und die
+  // Engine verhaelt sich exakt wie bisher.
+  engine._gerryMayGate = (promptData, besitzerPi, opferPi) =>
+    gerryMayGate(engine, promptData, besitzerPi, opferPi);
+
   engine._getCpuGenericResponse = function (promptData, promptedPlayerIdx) {
     try {
       const res = cpuGenericChoice(engine, promptData, promptedPlayerIdx);
@@ -7046,6 +7053,176 @@ function _logGalleryPick(engine, promptData, who, names) {
   } catch { /* nie stören */ }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  GERRYMANDER-POLITIK (Als Vorgabe 24.8.)
+//
+//  Woertlich: 》Analysiere, welche Wahl schlechter fuer den Gegner ist
+//  und triff die《 sowie 》Analysiere, welchen You-may-Effekt der Gegner
+//  am meisten braucht und negiere den, verschwende das Negate nicht
+//  woanders《.
+//
+//  Beides war vorher nicht da:
+//    • Effekt 1 nahm bei fehlendem `cpuGerrymanderResponse` einfach
+//      OPTION 1 — bei 50 Karten mit `gerrymanderEligible` und nur 13
+//      mit eigenem Vertrag also 37 Karten Muenzwurf.
+//    • Effekt 2 verbrauchte die Einmal-je-Halbzug-Umleitung am ERSTEN
+//      in Frage kommenden 》may《. Der Riegel wird in
+//      `_tryGerrymanderRedirect` gesetzt, BEVOR ueberhaupt jemand
+//      antwortet — das Negate war also weg, sobald der Gegner
+//      irgendeine Kleinigkeit angeboten bekam.
+// ═══════════════════════════════════════════════════════════════════
+
+// Grundhuerde fuer das Ausgeben der Umleitung. Bewusst als erklaerte
+// Stellschraube (wie FREE_SWAP_GATE_THRESHOLD): nach dem ersten
+// Sammellauf gegen die tatsaechliche Verteilung der `gerryNegate`-Werte
+// zu eichen, statt sie jetzt zu raten.
+const GERRY_NEGATE_BASE = 40;
+// Je uebergangenem Angebot faellt die Huerde. Ohne das Abklingen
+// verfaellt die Umleitung regelmaessig ungenutzt — 》nichts negiert《 ist
+// strikt schlechter als 》etwas Mittelmaessiges negiert《, weil der
+// Riegel am Halbzugende ohnehin zurueckgesetzt wird.
+const GERRY_NEGATE_DECAY = 0.55;
+
+/**
+ * Wie sehr braucht der Gegner DIESES Angebot?
+ *
+ * Generisch aus vorhandenen Vertraegen, kein Kartenwissen:
+ *   • Der Kartenname steht per Definition auf dem Prompt — die
+ *     Eligibilitaet von Effekt 2 verlangt einen EXPLIZITEN `showCard`
+ *     (der Reaktions-Marker) oder `gerrymanderEligible`.
+ *   • `estimateHandCardValueFor` liefert den gelernten Wert dieser
+ *     Karte AUS SICHT DES GEGNERS — inklusive seines Deckprofils,
+ *     Cluster- und Standing-Deltas. Genau die Frage 》was braucht er《.
+ *   • Lage-Aufschlag: steht der Gegner mit dem Ruecken zur Wand, ist
+ *     eine Rettung mehr wert als dieselbe Karte im ruhigen Spiel —
+ *     und genau dann tut das Negieren am meisten weh.
+ */
+function gerryNegateWert(engine, promptData, opferPi) {
+  let wert = 0;
+  try {
+    const name = (typeof promptData.showCard === 'string' && promptData.showCard)
+      || promptData._gerryOriginalTitle || promptData.title || promptData.source || null;
+    if (name) {
+      try {
+        // Ueber die VEROEFFENTLICHTE Schnittstelle (`_cpuEstimateHandValue`,
+        // von installCpuBrain gesetzt) statt direkt ueber die lokale
+        // Funktion: das ist die Stelle, die Karten-Skripte ohnehin
+        // benutzen, und sie bleibt austauschbar/pruefbar.
+        const schaetzer = typeof engine._cpuEstimateHandValue === 'function'
+          ? engine._cpuEstimateHandValue
+          : ((pi, n) => estimateHandCardValueFor(engine, pi, n));
+        const v = schaetzer(opferPi, name);
+        if (Number.isFinite(v)) wert = Math.max(0, v);
+      } catch { /* Schaetzer ist Beiwerk */ }
+    }
+    // Lage des Opfers: eigene lebende Helden minus unsere. Je tiefer er
+    // steht, desto dringender braucht er, was er gerade anbietet
+    // bekommt — bis zu +50 %.
+    const gs = engine.gs;
+    const mein = opferPi === 0 ? 1 : 0;
+    const lebend = (pi) => ((gs.players[pi] && gs.players[pi].heroes) || [])
+      .filter(h => h && (h.hp || 0) > 0).length;
+    const rueckstand = lebend(mein) - lebend(opferPi);   // >0 = Opfer liegt hinten
+    if (rueckstand > 0) wert *= (1 + Math.min(0.5, 0.25 * rueckstand));
+  } catch { /* nie stoeren */ }
+  return wert;
+}
+
+/**
+ * Tor fuer Effekt 2: geben wir die Einmal-je-Halbzug-Umleitung JETZT
+ * aus? Wird von `_tryGerrymanderRedirect` gefragt, BEVOR der Riegel
+ * gesetzt wird — ein `false` laesst den Gegner selbst antworten und
+ * haelt das Negate fuer spaeter frei.
+ *
+ * Das ist ein Sekretaerinnen-Problem: wir kennen die spaeteren
+ * Angebote des Halbzugs nicht. Deshalb eine ABKLINGENDE Huerde — beim
+ * ersten Angebot streng, nach zwei uebergangenen Angeboten faktisch
+ * offen. Der Zaehler haengt an `gs` und wird darum von `restore()`
+ * korrekt zurueckgedreht; ein Rollout verbraucht das echte Budget nicht.
+ */
+function gerryMayGate(engine, promptData, besitzerPi, opferPi) {
+  try {
+    const gs = engine.gs;
+    const schluessel = `gerry-passed:${besitzerPi}`;
+    if (!gs.gerryPassed) gs.gerryPassed = {};
+    const stand = gs.gerryPassed[schluessel];
+    const uebergangen = (stand && stand.t === gs.turn) ? (stand.n || 0) : 0;
+
+    const wert = gerryNegateWert(engine, promptData, opferPi);
+    const schwelle = GERRY_NEGATE_BASE * Math.pow(GERRY_NEGATE_DECAY, uebergangen);
+    let ausgeben = wert >= schwelle;
+
+    // Exploration im Training: ohne Gegenarm lernt der Trainer die
+    // Huerde nie: er saehe nur Halbzuege, in denen wir ausgegeben haben.
+    // Gleiche Begruendung wie PP_PLACE_EXPLORE / PP_COUNTER_EXPLORE.
+    const eps = parseFloat(process.env.PP_GERRY_EXPLORE || '0') || 0;
+    let explored = false;
+    if (eps > 0 && !engine._inMctsSim && Math.random() < eps) { ausgeben = !ausgeben; explored = true; }
+
+    if (!ausgeben) gs.gerryPassed[schluessel] = { t: gs.turn, n: uebergangen + 1 };
+
+    // Aufzeichnen — der Trainer soll die Huerde spaeter selbst lernen.
+    // NUR ausserhalb der Rollouts, sonst ersaeuft das Protokoll.
+    if (!engine._inMctsSim) {
+      try {
+        require('./_decision-log.js').notiere(engine, besitzerPi, {
+          art: 'gerryNegate',
+          karte: (typeof promptData.showCard === 'string' && promptData.showCard)
+            || promptData.title || null,
+          gewaehlt: ausgeben ? 'negate' : null,
+          zusatz: { gv: Math.round(wert), gs_: Math.round(schwelle), gp: uebergangen,
+                    gerry: opferPi, ...(explored ? { gx: 1 } : {}) },
+        });
+      } catch { /* nie stoeren */ }
+    }
+    return ausgeben;
+  } catch { return true; }   // im Zweifel wie bisher: umleiten
+}
+
+/**
+ * Effekt 1: welche Option ist die SCHLECHTERE fuer den Gegner?
+ *
+ * Ohne Simulation nicht direkt bestimmbar — der Prompt haengt mitten in
+ * der Aufloesung einer fremden Karte, ein snapshot/restore wuerde die
+ * laufende Fortsetzung zerreissen (die Lehre aus Ska Harpyformer).
+ *
+ * Also ueber den Umweg, der im Projekt ohnehin die meiste Intelligenz
+ * traegt: WIR FRAGEN DAS OPFER. `cpuGenericChoice` mit dem Opfer als
+ * Perspektive liefert genau die Option, die es selbst waehlen wuerde —
+ * inklusive des kartenEIGENEN `cpuResponse`, wo eines existiert. Diese
+ * Option nehmen wir ihm weg. Bei zwei Optionen (der Normalfall) ist das
+ * exakt 》die schlechtere fuer ihn《; bei mehr als zweien immerhin die
+ * Verweigerung seiner besten.
+ *
+ * Der Reiz: jedes kuenftige Kartenskript mit `cpuResponse` verbessert
+ * Gerrymander automatisch mit, ohne dass hier eine Zeile dazukommt.
+ */
+function gerryOptionGegenwahl(engine, promptData, besitzerPi) {
+  const optionen = promptData.options || [];
+  if (!optionen.length) return null;
+  let opferWahl = null;
+  try {
+    const opferPi = promptData._gerryOriginalPromptedPi != null
+      ? promptData._gerryOriginalPromptedPi
+      : (besitzerPi === 0 ? 1 : 0);
+    // Sauberer Prompt aus Sicht des Opfers: OHNE die Umleitungs-Marken,
+    // sonst liefe die Abfrage in genau diesen Zweig zurueck.
+    const sauber = { ...promptData, title: promptData._gerryOriginalTitle || promptData.title };
+    delete sauber._gerryRewritten;
+    delete sauber._gerryOriginalTitle;
+    delete sauber._gerryOriginalPromptedPi;
+    delete sauber._gerryRedirectedTo;
+    const wahl = cpuGenericChoice(engine, sauber, opferPi);
+    if (wahl && wahl.optionId != null) opferWahl = wahl.optionId;
+  } catch { /* Gegenwahl ist Kuer — Fallback unten */ }
+  if (opferWahl != null) {
+    const gegen = optionen.find(o => o && o.id !== opferWahl);
+    if (gegen) return { optionId: gegen.id, _gegen: opferWahl };
+  }
+  // Konnte das Opfer nicht befragt werden: wie bisher die erste Option.
+  return { optionId: optionen[0].id };
+}
+
 function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   const type = promptData.type;
   // Use the CARD CONTROLLER's pi (not the active player) so reactive
@@ -7073,11 +7250,28 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // Confirm-cancellable default: decline. Most "may" prompts give
     // the prompted player a beneficial option; declining hurts them.
     if (type === 'confirm' && promptData.cancellable) return null;
-    // optionPicker default: pick the first option. Safer than picking
-    // the last (which the standard heuristic does — usually "all-in").
+    // optionPicker: die Option nehmen, die das Opfer selbst NICHT
+    // gewaehlt haette (siehe gerryOptionGegenwahl). Ersetzt den alten
+    // Default 》Option 1《, der bei 37 der 50 in Frage kommenden Karten
+    // ein Muenzwurf war.
     if (type === 'optionPicker') {
       const options = promptData.options || [];
-      if (options.length > 0) return { optionId: options[0].id };
+      if (options.length > 0) {
+        const wahl = gerryOptionGegenwahl(engine, promptData, cpuIdx);
+        if (!engine._inMctsSim && wahl) {
+          try {
+            require('./_decision-log.js').notiere(engine, cpuIdx, {
+              art: 'gerryMode',
+              karte: promptData._gerryOriginalTitle || promptData.title || null,
+              optionen: options,
+              gewaehlt: wahl.optionId,
+              zusatz: { gerry: promptData._gerryOriginalPromptedPi,
+                        ...(wahl._gegen != null ? { gg: wahl._gegen } : {}) },
+            });
+          } catch { /* nie stoeren */ }
+        }
+        if (wahl) return { optionId: wahl.optionId };
+      }
     }
     // Fall through to standard handling for other prompt types.
   }
@@ -7179,6 +7373,20 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       && promptData.cancellable
       && (promptData.showCard
           || (promptData.confirmLabel && /activate/i.test(promptData.confirmLabel)))) {
+    // ── FORM 1: 》you may《 PRO KARTE (Entscheidungs-Kanal) ───────────
+    // Sitzt VOR Surprise- und Reaktions-Kanal, uebersteuert sie aber
+    // NICHT: nur wo eine kartenspezifische Regel existiert, entscheidet
+    // sie; sonst faellt alles unveraendert durch. Der Reaktions-Kanal
+    // bleibt fuer die Hand-Reaktionsfenster zustaendig, denn dort ist
+    // die Oekonomie eine andere (Gold, Kette) — deshalb greift Form 1
+    // dort nicht.
+    if (promptData._handReactionWindow !== true && !promptData._gerryRewritten) {
+      const optName = promptData._gerryOriginalTitle || promptData.title
+        || (typeof promptData.showCard === 'string' ? promptData.showCard : null);
+      const optD = optName ? deckProfile.optInDecision(engine, cpuIdx, optName) : null;
+      if (optD === 'play') return CONFIRM_YES;
+      if (optD === 'skip') return null;
+    }
     // ── Surprise-Fire-Lernkanal ──
     // Nur für echte Surprises (script.isSurprise) — Reactions aus der
     // Hand haben eine andere Ökonomie und bleiben bei der Heuristik.
@@ -7353,6 +7561,16 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
       const pick = mctsValueGoldVsDraw(engine, cpuIdx);
       return { optionId: pick };
     }
+    // ── FORM 3: ORDINAL (》wie viel《) ───────────────────────────────
+    // Ist das Angebot eine Zahlenreihe, ist die Wahl geordnet und der
+    // Default 》letzte Option《 (= 》all in《) eine reine Vermutung. Der
+    // gelernte Kanal kennt die Zielstufe; ohne Regel bleibt es beim
+    // Default, also bit-identisch zum Altverhalten.
+    {
+      const ordName = promptData._gerryOriginalTitle || promptData.title || promptData.source;
+      const idx = deckProfile.ordinalPick(engine, cpuIdx, ordName, options);
+      if (idx != null && options[idx]) return { optionId: options[idx].id };
+    }
     return { optionId: options[options.length - 1].id };
   }
 
@@ -7397,7 +7615,8 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   if (type === 'cardGallery') {
     const cards = promptData.cards || [];
     if (!cards.length) return null;
-    const c = pickBestGalleryCard(engine, cpuIdx, cards);
+    const c = pickBestGalleryCard(engine, cpuIdx, cards,
+      promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null);
     _logGalleryPick(engine, promptData, cpuIdx, [c.name]);
     return { cardName: c.name, source: c.source };
   }
@@ -7414,7 +7633,10 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // `pickBestGalleryCard` first so MCTS's
     // `mctsBuildVariationsFromRecord` gets the same `_galleryScore`
     // order it relies on for variation exploration.
-    pickBestGalleryCard(engine, cpuIdx, cards); // stamps `_galleryScore` on each
+    // Quelle mitgeben: DAS ist der Pfad der Mengenwahl (Zi, Magic Lamp,
+    // Crestina) und der offenen Poolwahl — genau die Formen 4 und 5.
+    pickBestGalleryCard(engine, cpuIdx, cards,
+      promptData.menuSource || promptData._gerryOriginalTitle || promptData.title || null); // stamps `_galleryScore`
     const plan = cpuGalleryMultiPlan(promptData);
     if (plan.hardCount) {
       // EXACT-count prompt (Timeless King Zi / Magic Lamp / Crestina).
@@ -9411,17 +9633,32 @@ function canTeamSummonCardinalBeasts(engine, pi) {
  * half-value. Ties resolved randomly so the CPU isn't perfectly
  * predictable on equal-value gallery picks.
  */
-function pickBestGalleryCard(engine, pi, cards) {
+function pickBestGalleryCard(engine, pi, cards, quelle = null) {
   if (!Array.isArray(cards) || cards.length === 0) return null;
   const ps = engine.gs.players[pi];
   const handCounts = {};
   if (ps?.hand) {
     for (const name of ps.hand) handCounts[name] = (handCounts[name] || 0) + 1;
   }
+  // ── FORM 4 + 5: Angebotswert und Merkmalswert ────────────────────
+  // FORM 4 (Mengenwahl): der gelernte Quelle→Karte-Wert, generischer
+  // Nachfolger der drei hartkodierten Menü-Quellen.
+  // FORM 5 (offene Poolwahl): bei sehr grossen Angeboten ist Identitaet
+  // nicht lernbar — dann traegt der MERKMALS-Wert (Typ, Level, Kosten,
+  // Schule, HP, Angriff), zusaetzlich nach Lage aufgeschluesselt.
+  // Beide sind ADDITIV zur bestehenden Handwert-Schaetzung: ohne Profil
+  // sind sie 0 und die Auswahl ist bit-identisch zu vorher.
+  const grosserPool = cards.length >= 40;
   let best = -Infinity;
   for (const c of cards) {
     const seen = handCounts[c.name] || 0;
-    const score = estimateHandCardValueFor(engine, pi, c.name, seen);
+    let score = estimateHandCardValueFor(engine, pi, c.name, seen);
+    if (quelle) {
+      try {
+        score += deckProfile.setOfferValue(engine, pi, quelle, c.name);
+        if (grosserPool) score += deckProfile.poolFeatureValue(engine, pi, quelle, c.name);
+      } catch { /* Profil ist Kuer */ }
+    }
     c._galleryScore = score;
     if (score > best) best = score;
   }

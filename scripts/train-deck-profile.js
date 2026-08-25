@@ -72,17 +72,63 @@ const PAIR_SCALE = 45, PAIR_MAX = 40;    // positive-only export
 // der PAIR_MAX-Clamp die Ausnahme bleibt (typische Δ nach Dämpfung
 // 0.01-0.07 → 4-28 Punkte).
 const PAIR_UPLIFT_SCALE = 400;
-const ABILITY_SCALE = 120, ABILITY_MIN = -60, ABILITY_MAX = 150;
+// ── SYMMETRISCHER CLAMP (Export-Fix) ──────────────────────────────
+// ABILITY_MIN/-60 war die eingebaute Verzerrung: bei zentrierten
+// z-Werten ist ein Fenster von −60 bis +150 keine Leitplanke mehr,
+// sondern ein Formgeber, der jede negative Regel bei einem Viertel der
+// Amplitude abschneidet. Mit t-Gate und Schrumpfung liegen die Werte
+// ohnehin weit innerhalb — der Clamp faengt nur noch Ausreisser.
+// ABILITY_MIN bleibt als Name erhalten (fuer Alt-Aufrufer), wird aber
+// nicht mehr benutzt.
+// SKALA neu geeicht: mit familien-zentrierten z-Werten liegt |z| fast
+// immer unter 3. Bei SCALE 120 klemmte schon z=1.25 am Clamp — der
+// Clamp war damit der Formgeber und stapelte alles Starke auf denselben
+// Wert, wodurch die RANGFOLGE (in der laut Messung der ganze Wert
+// steckt) unter den Spitzenreitern verlorenging. SCALE 50 bildet z=3
+// auf den Clamp ab, z=1 auf 50 — die Leitplanke fasst nur noch echte
+// Ausreisser.
+const ABILITY_SCALE = 50, ABILITY_MIN = -60, ABILITY_MAX = 150;
 // Revive context — Handwert-Dimension, daher kleinere Skala als die
 // Platzierungs-Prioren (fließt additiv in estimateHandCardValueFor).
-const REVIVE_SCALE = 30, REVIVE_MIN = -15, REVIVE_MAX = 30;
+const REVIVE_SCALE = 10, REVIVE_MIN = -15, REVIVE_MAX = 30;   // z=3 → Clamp
 // Lock-Ordering: fließt als GATE-SCHWELLEN-Delta ein (Gate-Thresholds
 // sind klein, 3-30) — deutlich kleinere Skala als die Eval-Prioren.
-const LOCK_SCALE = 20, LOCK_MIN = -25, LOCK_MAX = 10;
+const LOCK_SCALE = 8, LOCK_MIN = -25, LOCK_MAX = 10;          // z=3 → Clamp
+// Lock-Strafen waren mit −25/+10 am staerksten asymmetrisch. Der
+// symmetrische Ersatz nimmt den GROESSEREN der beiden Betraege, damit
+// keine Information verloren geht.
+const LOCK_LIMIT = 25;
+
+// Karten-Datenbank — bisher brauchte der Trainer sie nicht; Form 5
+// (offene Poolwahl) lernt ueber KARTENMERKMALE statt Identitaet und
+// braucht sie deshalb. Einmal geladen, dann gemerkt.
+let argOutDir = null;   // via --out-dir; siehe main()
+let _cardDB = null;
+function loadCardDB() {
+  if (_cardDB) return _cardDB;
+  _cardDB = Object.create(null);
+  try {
+    const roh = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'cards.json'), 'utf-8'));
+    for (const c of (Array.isArray(roh) ? roh : Object.values(roh))) {
+      if (c && c.name) _cardDB[c.name] = c;
+    }
+  } catch { /* ohne DB laeuft Form 5 eben nicht */ }
+  return _cardDB;
+}
 
 function loadGames(files) {
   const games = [];
-  for (const f of files) {
+  // ── HERKUNFTSMARKE JE DAgger-ITERATION ────────────────────────────
+  // Der Aufruf ist `train-deck-profile.js <deck>-iter1.jsonl
+  // <deck>-iter2.jsonl …` — der argv-Index IST die Iteration, sie kostet
+  // also nichts. Ohne sie werden alle Iterationen in einen Topf geworfen,
+  // und die Iteration ist ein UNBEOBACHTETER STOERFAKTOR: jede Iteration
+  // hat eine andere Politik UND eine andere Winrate. Aendert sich die
+  // Einsatzquote einer Karte zwischen den Iterationen mit, misst das
+  // gepoolte winlift den Unterschied ZWISCHEN den Iterationen statt die
+  // Wirkung der Karte INNERHALB einer.
+  for (let fi = 0; fi < files.length; fi++) {
+    const f = files[fi];
     const raw = fs.readFileSync(f, { encoding: 'utf-8' });
     for (const line of raw.split('\n')) {
       const t = line.trim();
@@ -90,16 +136,23 @@ function loadGames(files) {
       try {
         const g = JSON.parse(t);
         if (g.abMode) continue; // A/B-Messläufe sind NIE Trainingsdaten
-        if (g.outcome === 0 || g.outcome === 1) games.push(g); // skip ties
+        if (g.outcome === 0 || g.outcome === 1) { g._iter = fi; games.push(g); } // skip ties
       } catch { /* corrupt line → skip */ }
     }
   }
   return games;
 }
 
-function featurize(g, meanTurns, lenCuts) {
+function featurize(g, meanTurns, lenCuts, nIter = 1) {
   const x = Object.create(null);
   x['bias'] = 1;
+  // Iterations-Dummy: faengt die Winraten- und Politikunterschiede
+  // zwischen den DAgger-Iterationen ab, damit sie nicht auf die
+  // Karten-Merkmale laden. Iteration 0 ist die Referenzkategorie
+  // (sonst waere der Satz kollinear mit dem Bias). Bei nur EINER
+  // Eingabedatei entfaellt der Dummy ganz. `iter:`-Merkmale werden
+  // nirgends exportiert — sie sind reine Stoerfaktor-Kontrolle.
+  if (nIter > 1 && (g._iter || 0) > 0) x[`iter:${g._iter}`] = 1;
   x['first'] = g.wentFirst ? 1 : 0;
   x['turns_n'] = ((g.turns || meanTurns) - meanTurns) / Math.max(1, meanTurns);
   // Nichtlineare Spiellängen-Kovariaten (Als Nao-Befund): turns_n ist
@@ -211,6 +264,51 @@ function fitSoftLogistic(rows, labels, keep, opts = {}) {
     }
   }
   return w;
+}
+
+/**
+ * Standardfehler der Gewichte aus der DIAGONALE der Fisher-Information.
+ *
+ * Fuer die logistische Regression ist die beobachtete Information
+ *     I_kk = Σ_i x_ik² · p_i(1−p_i)   (+ n·λ aus dem L2-Term,
+ *                                       der ein Gauss-Prior ist)
+ * und damit se_k ≈ 1/√I_kk. Der t-Wert w_k/se_k sagt, ob ein Gewicht
+ * ueberhaupt von Null unterscheidbar ist.
+ *
+ * WARUM DAS FEHLTE UND WAS ES KOSTET: der Export skalierte bisher
+ * `w[k]/sd` OHNE jeden Signifikanztest — jedes Gewicht wurde exportiert,
+ * ob es auf 3000 oder auf 9 Beobachtungen beruhte. Gemessen an
+ * heal-burn: 87 % aller Prioren klebten am Clamp und 56 % der
+ * Basis/≥2-Paare wechselten das Vorzeichen. Ein Vorzeichenwechsel
+ * zwischen 》Ability auf Held X《 und 》dieselbe Ability ab Stufe 2 auf
+ * demselben Helden《 ist inhaltlich kaum je plausibel — das ist die
+ * Signatur von Rauschen, das mit voller Amplitude exportiert wird.
+ *
+ * EHRLICHE GRENZE: die Diagonale ignoriert die Korrelation zwischen
+ * Merkmalen und ueberschaetzt die Praezision daher. Sie ist eine
+ * Untergrenze fuer den Standardfehler, kein exakter Wert — als GATE
+ * (》ist das ueberhaupt von Null zu unterscheiden《) trotzdem um
+ * Groessenordnungen besser als gar kein Test.
+ */
+function fisherStdErrors(rows, labels, w, keep, opts = {}) {
+  const l2 = opts.l2 ?? L2_LAMBDA;
+  const sigmoid = z => 1 / (1 + Math.exp(-z));
+  const info = Object.create(null);
+  for (const k of keep) info[k] = 0;
+  const n = rows.length;
+  for (let i = 0; i < n; i++) {
+    let z = 0;
+    for (const [k, v] of Object.entries(rows[i])) if (keep.has(k)) z += w[k] * v;
+    const p = sigmoid(z);
+    const varI = p * (1 - p);
+    for (const [k, v] of Object.entries(rows[i])) if (keep.has(k)) info[k] += v * v * varI;
+  }
+  const se = Object.create(null);
+  for (const k of keep) {
+    const I = info[k] + (k === 'bias' ? 0 : n * l2);
+    se[k] = I > 0 ? 1 / Math.sqrt(I) : Infinity;
+  }
+  return se;
 }
 
 function evalLogLoss(rows, labels, w, keep) {
@@ -444,26 +542,74 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       return m;
     };
     if (wins.length >= MIN_WINS && losses.length > 0) {
+      // ── STRATIFIZIERT NACH DAgger-ITERATION ───────────────────────
+      // Das gepoolte Lift vergleicht Siege aus ALLEN Iterationen mit
+      // Niederlagen aus allen. Da jede Iteration ihre eigene Winrate UND
+      // ihre eigene Politik hat, faengt eine Karte, deren Einsatzquote
+      // mit den Iterationen steigt, automatisch das Lift der spaeteren,
+      // besseren Iterationen ein — obwohl sie nichts dazu beigetragen
+      // hat. Klassische Stoerfaktor-Verzerrung, und sie ist gratis zu
+      // beheben: der argv-Index markiert die Iteration.
+      //
+      // Statt zu poolen wird das Lift JE ITERATION berechnet und
+      // gewichtet gemittelt (Gewicht = min(Siege, Niederlagen) der
+      // Iteration — eine Iteration ohne Kontrastgruppe traegt nichts
+      // bei). Eine Schicht ohne ausreichende Belege faellt heraus;
+      // bleibt keine uebrig, greift der gepoolte Weg als Rueckfall.
+      const schichten = new Map();
+      for (const g of trainGames) {
+        if (!hasData(g)) continue;
+        const it = g._iter || 0;
+        if (!schichten.has(it)) schichten.set(it, { w: [], l: [] });
+        (g.outcome === 1 ? schichten.get(it).w : schichten.get(it).l).push(g);
+      }
+      const brauchbar = [...schichten.entries()]
+        .filter(([, v]) => v.w.length >= 5 && v.l.length >= 5);
       const inW = presence(wins), inL = presence(losses);
       const cW = USE_INTENSITY ? totals(wins) : null;
       const cL = USE_INTENSITY ? totals(losses) : null;
       const keys = new Set([...Object.keys(inW), ...Object.keys(inL)]);
       const table = Object.create(null);
-      let intensified = 0;
+      let intensified = 0, stratifiziert = 0;
+      // Vorberechnete Zaehler je Schicht — sonst waere das O(Schichten x Zellen).
+      const proSchicht = brauchbar.map(([it, v]) => ({
+        it, nW: v.w.length, nL: v.l.length,
+        pW: presence(v.w), pL: presence(v.l),
+        tW: USE_INTENSITY ? totals(v.w) : null, tL: USE_INTENSITY ? totals(v.l) : null,
+        gew: Math.min(v.w.length, v.l.length),
+      }));
       for (const k of keys) {
         const w = inW[k] || 0, l = inL[k] || 0;
         if (w + l < MIN_CELL) continue;
-        let lift = (w / wins.length) - (l / losses.length);   // −1..1
+        const liftAus = (nW, nL, pW, pL, tW, tL) => {
+          let lift = ((pW[k] || 0) / nW) - ((pL[k] || 0) / nL);
+          if (USE_INTENSITY) {
+            const mw = (tW[k] || 0) / nW;
+            const ml = (tL[k] || 0) / nL;
+            lift = Math.max(-1, Math.min(1, (mw - ml) / INTENSITY_SCALE));
+          }
+          return lift;
+        };
+        const gepoolt = liftAus(wins.length, losses.length, inW, inL, cW, cL);
+        let lift = gepoolt;
+        if (proSchicht.length >= 2) {
+          let sz = 0, sg = 0;
+          for (const sch of proSchicht) {
+            if (((sch.pW[k] || 0) + (sch.pL[k] || 0)) < 3) continue;   // Schicht ohne Belege
+            sz += liftAus(sch.nW, sch.nL, sch.pW, sch.pL, sch.tW, sch.tL) * sch.gew;
+            sg += sch.gew;
+          }
+          if (sg > 0) { lift = sz / sg; stratifiziert++; }
+        }
         if (USE_INTENSITY) {
-          // Mittlere Anzahl je Spiel; identisch zum Anwesenheits-Lift,
-          // solange die Karte höchstens 1× pro Spiel und Phase fällt.
-          const mw = (cW[k] || 0) / wins.length;
-          const ml = (cL[k] || 0) / losses.length;
-          const intense = Math.max(-1, Math.min(1, (mw - ml) / INTENSITY_SCALE));
-          if (Math.abs(intense - lift) > 0.02) intensified++;
-          lift = intense;
+          const anwesenheit = (w / wins.length) - (l / losses.length);
+          if (Math.abs(lift - anwesenheit) > 0.02) intensified++;
         }
         table[k] = 0.5 + lift / 2;                              // 0..1
+      }
+      if (proSchicht.length >= 2) {
+        console.log(`Lernsignal: nach DAgger-Iteration stratifiziert — ${proSchicht.length} Schichten `
+          + `(${proSchicht.map(x => `it${x.it}:${x.nW}S/${x.nL}N`).join(' ')}), ${stratifiziert} Zellen geschichtet`);
       }
       liftPart = (name, turn) => table[`${name}|${bucketOf(turn)}`] ?? 0.5;
       console.log(`Lernsignal: winlift${USE_INTENSITY ? '+intensity' : ''} — ${Object.keys(table).length} Karte×Phase-Zellen mit Lift `
@@ -563,6 +709,8 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
   }
 
   const w = fitSoftLogistic(rows, labels, keep, { epochs: 1500, lr: 0.15 });
+  // Standardfehler zum selben Fit — Grundlage des t-Gates im Export.
+  const wSe = fisherStdErrors(rows, labels, w, keep);
 
   const hRows = holdEvs.map(rowOf);
   const hLabels = holdEvs.map(label);
@@ -1870,6 +2018,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
   const playOrderRules = Object.create(null);
   {
     const MIN_ARM = 8;
+    const PORD_T_MIN = 2.0;   // erklaerte Stellschraube, wie CASTER_T_MIN
     const decs = [];
     for (const g of trainGames) {
       if (!hasData(g) || !Array.isArray(g.playOrderDecisions)) continue;
@@ -1882,12 +2031,39 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
     const tags = new Set();
     for (const d of decs) for (const g of d.tags) tags.add(g);
+    let verworfenPraevalenz = 0, verworfenT = 0;
     for (const g of tags) {
       const withT = decs.filter(d => d.tags.includes(g));
       const without = decs.filter(d => !d.tags.includes(g));
       if (withT.length < MIN_ARM || without.length < MIN_ARM) continue;
+      // ── PRAEVALENZFILTER (Lehre aus dem counterSpend-Kanal) ────────
+      // Ein Tag, das auf fast jeder Entscheidung sitzt, misst nicht die
+      // LAGE, sondern den globalen Mittelwert — und der Prior SUMMIERT,
+      // zaehlt ihn also neben den Tags, die ihn erklaeren, ein zweites
+      // Mal. GEMESSEN an heal-burn (5440 Entscheidungen, 4360 mit
+      // Advantage): `pord:first` sass auf 94 % aller Zeilen und war das
+      // EINZIGE Tag im ganzen Datensatz. Die exportierte Regel (−2.9)
+      // beschrieb damit nichts Situatives, sondern den Deckmittelwert.
+      // Band 10..90 % statt 5..95 %: mit dem erweiterten Tag-Raum
+      // erklaeren mehrere Tags dieselbe Lage, ein Nahezu-Konstant-Tag
+      // ist dann reiner Achsenabschnitt — und der hat in einem Prior,
+      // der SUMMIERT, nichts verloren. `pord:first` lag bei 94 % und
+      // waere durch das alte Band gerutscht.
+      const prev = withT.length / decs.length;
+      if (prev > 0.90 || prev < 0.10) { verworfenPraevalenz++; continue; }
       const delta = withT.reduce((s, d) => s + d.y, 0) / withT.length
         - without.reduce((s, d) => s + d.y, 0) / without.length;
+      // ── WELCH-t (Lehre aus der Negativkontrolle des counterSpend-
+      // Kanals): ohne Signifikanztest erzeugt ein getaggter Kanal Regeln
+      // aus reinem Rauschen — die Skala x120 ist gegenueber der Streuung
+      // des geformten Labels gross genug, dass eine 1.3-Sigma-Schwankung
+      // ueber die Meldeschwelle reicht.
+      const varOf = (arr, m) => arr.reduce((a, d) => a + (d.y - m) ** 2, 0) / Math.max(1, arr.length - 1);
+      const mW = withT.reduce((a, d) => a + d.y, 0) / withT.length;
+      const mO = without.reduce((a, d) => a + d.y, 0) / without.length;
+      const tStat = Math.abs(delta) / Math.sqrt(
+        varOf(withT, mW) / withT.length + varOf(without, mO) / without.length) || 0;
+      if (!Number.isFinite(tStat) || tStat < PORD_T_MIN) { verworfenT++; continue; }
       // ── STICHPROBEN-SCHRUMPFUNG (31.7.) ──────────────────────────
       // MIN_ARM 8 ließ ein Tag mit 41 Belegen dasselbe Gewicht ziehen
       // wie eines mit 1477. Genau das ist passiert: `pord:grants-action`
@@ -1908,7 +2084,9 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       playOrderRules[g] = pts;
     }
     if (decs.length > 0) {
-      console.log(`Ausspiel-Reihenfolge: ${decs.length} Entscheidungen, ${Object.keys(playOrderRules).length} Tag-Regeln`
+      console.log(`Ausspiel-Reihenfolge: ${decs.length} Entscheidungen, ${tags.size} Tags`
+        + ` (${verworfenPraevalenz} an der Praevalenz, ${verworfenT} am t-Gate verworfen)`);
+      console.log(`Ausspiel-Reihenfolge: ${Object.keys(playOrderRules).length} Tag-Regeln`
         + (Object.keys(playOrderRules).length ? ' — ' + Object.entries(playOrderRules).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(', ') : ''));
     }
   }
@@ -2354,11 +2532,58 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
       for (const [k, v] of Object.entries(tutorPickRules).slice(0, 6)) console.log(`  ${v > 0 ? '+' : ''}${v}  ${k}`);
     }
   }
-  return { w, keep, support, uplifts, upliftStats, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  // ── DIE SECHS ENTSCHEIDUNGSFORMEN (generischer decisions-Kanal) ──
+  // Label je Entscheidung: das VERZOEGERTE Ergebnis hat Vorrang, denn es
+  // misst genau das Fenster dieser Entscheidung (172 Karten sagen
+  // woertlich 》until the start of your next turn《). Fehlt es, faellt der
+  // Kanal auf das Sofort-Delta der Eval-Kurve zurueck.
+  let decisionChannels = null;
+  {
+    const dEvals = [];
+    for (const g of trainGames) {
+      for (const d of (g.decisions || [])) {
+        if (d.r && Number.isFinite(d.r.dEval)) dEvals.push(d.r.dEval);
+      }
+    }
+    // Eigene z-Normierung: `dEval` lebt auf einer anderen Skala als die
+    // Play-Advantages (anderes Fenster, anderer Bezugspunkt). aMean/aSd
+    // darauf anzuwenden waere derselbe Fehler wie die fremde
+    // Familien-Streuung im Prior-Export.
+    const dMean = dEvals.length ? dEvals.reduce((a, b) => a + b, 0) / dEvals.length : 0;
+    const dSd = dEvals.length > 1
+      ? Math.sqrt(dEvals.reduce((a, b) => a + (b - dMean) ** 2, 0) / dEvals.length) || 1 : 1;
+    const label = (d, g) => {
+      let z;
+      if (d.r && Number.isFinite(d.r.dEval)) z = (d.r.dEval - dMean) / dSd;
+      else {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), (d.z && d.z.t) || 0);
+        if (adv === null) return null;
+        z = (adv - aMean) / aSd;
+      }
+      return ADV_BLEND * sigmoid(z) + (1 - ADV_BLEND) * g.outcome;
+    };
+    try {
+      const { buildDecisionChannels } = require('./decision-channels.js');
+      decisionChannels = buildDecisionChannels(trainGames, {
+        label, cardDB: loadCardDB(), log: (m) => console.log(m),
+      });
+    } catch (err) {
+      console.log(`Entscheidungs-Kanaele: uebersprungen (${err.message})`);
+    }
+  }
+
+  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
-  const files = process.argv.slice(2);
+  // `--out-dir <pfad>` aus der Dateiliste herausloesen.
+  const argv = process.argv.slice(2);
+  const oi = argv.indexOf('--out-dir');
+  if (oi >= 0) {
+    argOutDir = argv[oi + 1] || null;
+    argv.splice(oi, argOutDir ? 2 : 1);
+  }
+  const files = argv;
   if (files.length === 0) {
     console.error('Usage: node scripts/train-deck-profile.js <training-log.jsonl> [...]');
     process.exit(1);
@@ -2474,7 +2699,8 @@ function main() {
   const turnsSorted = trainGames.map(g => g.turns || meanTurns).sort((a, b) => a - b);
   const lq = p => turnsSorted[Math.floor(p * (turnsSorted.length - 1))];
   const lenCuts = turnsSorted.length >= 40 ? [lq(0.25), lq(0.5), lq(0.75)] : null;
-  const rows = trainGames.map(g => featurize(g, meanTurns, lenCuts)); // Fit nur auf Train-Split — Holdout liefert die ehrliche Güte
+  const nIter = 1 + Math.max(0, ...games.map(g => g._iter || 0));
+  const rows = trainGames.map(g => featurize(g, meanTurns, lenCuts, nIter)); // Fit nur auf Train-Split — Holdout liefert die ehrliche Güte
   const support = Object.create(null);
   for (const x of rows) for (const k of Object.keys(x)) support[k] = (support[k] || 0) + 1;
   const minSupport = Math.max(MIN_SUPPORT_ABS, Math.ceil(MIN_SUPPORT_FRAC * trainGames.length));
@@ -2517,7 +2743,7 @@ function main() {
   }
   console.log(`In-sample accuracy: ${(100 * correct / n).toFixed(1)}%`);
   {
-    const hRows = holdGames.map(g => featurize(g, meanTurns, lenCuts));
+    const hRows = holdGames.map(g => featurize(g, meanTurns, lenCuts, nIter));
     const hY = holdGames.map(g => g.outcome);
     const m = evalLogLoss(hRows, hY, w, keep);
     console.log(`HOLDOUT (Spiel-Modell): accuracy ${(100 * m.acc).toFixed(1)}%, logloss ${m.logLoss.toFixed(3)} über ${holdGames.length} Spiele`);
@@ -2531,6 +2757,87 @@ function main() {
   const srcW = advModel ? advModel.w : w;
   const srcKeep = advModel ? advModel.keep : keep;
   const srcSupport = advModel ? advModel.support : support;
+  // ★ WICHTIG: die vier Prior-Familien (ab:, eqp:, lk:, rev:) stammen aus
+  // dem SPIEL-Modell (`w`/`keep`/`support`), NICHT aus dem
+  // Advantage-Modell — nur die play:-Zellen kommen von dort. Mein erster
+  // Anlauf hat die Standardfehler des Advantage-Modells angelegt; dessen
+  // Merkmalsraum kennt gar kein `ab:`, also war jede Familienstatistik
+  // leer und der Export lieferte NULL Prioren. Genau die Sorte
+  // Verwechslung, die ein Gate stumm macht statt es krachen zu lassen.
+  const priorSe = fisherStdErrors(rows, y, w, keep);
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  EXPORT DER REGRESSIONS-PRIOREN — NEU GEFASST
+  //
+  //  Der alte Weg war `clamp(SCALE * (w[k] / sd), MIN, MAX)` mit vier
+  //  Fehlern auf einmal:
+  //
+  //   (1) `sd` war die Streuung der KARTEN-Gewichte — eine FREMDE
+  //       Merkmalsfamilie. Ability-, Equip-, Lock- und Revive-Gewichte
+  //       leben auf ganz anderen Skalen; sie durch die Streuung einer
+  //       anderen Familie zu teilen ist bedeutungslos.
+  //   (2) KEIN Mittelwertabzug. Die Kartenwerte werden korrekt
+  //       z-standardisiert ((x−μ)/σ), die Prioren nicht — eine Familie,
+  //       in der alles leicht positiv ist, wurde damit komplett nach
+  //       oben verschoben, statt ihre RANGFOLGE abzubilden.
+  //   (3) KEIN Signifikanztest. Ein Gewicht aus 9 Beobachtungen wurde
+  //       mit derselben Amplitude exportiert wie eines aus 3000.
+  //   (4) ASYMMETRISCHER Clamp (−60/+150). Bei zentrierten Werten ist
+  //       das eine eingebaute Verzerrung nach oben.
+  //
+  //  Gemessen an heal-burn: 87 % aller Prioren klebten am Clamp, 56 %
+  //  der Basis/≥2-Paare wechselten das Vorzeichen. Beides sind
+  //  Rausch-Signaturen, keine gelernten Regeln.
+  //
+  //  NEU, in dieser Reihenfolge:
+  //    z      = (w[k] − μ_Familie) / σ_Familie      ← eigene Familie
+  //    t-Gate = |w[k]/se[k]| ≥ PRIOR_T_MIN          ← Fisher-Diagonale
+  //    shrink = n/(n+PRIOR_SHRINK_K) auf dem Support
+  //    Clamp  = SYMMETRISCH ±MAX
+  //
+  //  Mit t-Gate und Schrumpfung wird der Clamp zur Leitplanke statt zum
+  //  Formgeber — genau das ist der pruefbare Anspruch: der Anteil am
+  //  Clamp muss einbrechen.
+  // ═══════════════════════════════════════════════════════════════════
+  const PRIOR_T_MIN = 2.0;      // wie CASTER_T_MIN; erklaerte Stellschraube
+  const PRIOR_SHRINK_K = 60;    // wie die Schrumpfung im Caster-Kanal
+
+  /** Mittelwert und Streuung EINER Merkmalsfamilie (Praefix). */
+  function familienStat(praefix) {
+    const vals = [];
+    for (const k of keep) if (k.startsWith(praefix)) vals.push(w[k]);
+    if (vals.length < 2) return null;
+    const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sg = Math.sqrt(vals.reduce((a, b) => a + (b - mu) ** 2, 0) / vals.length);
+    return { mu, sd: sg || 1, n: vals.length };
+  }
+
+  /**
+   * Ein Prior-Gewicht exportfertig machen. Liefert null, wenn es das
+   * t-Gate nicht besteht oder nach Schrumpfung unter die Meldeschwelle
+   * faellt. `stat` ist die Familienstatistik, `lim` der SYMMETRISCHE
+   * Clamp.
+   */
+  const priorGateStats = { gesamt: 0, tGate: 0, minAbs: 0, exportiert: 0, amClamp: 0 };
+  function priorWert(k, stat, scale, lim, minAbs) {
+    if (!stat) return null;
+    priorGateStats.gesamt++;
+    const se = priorSe ? priorSe[k] : null;
+    // Ohne Standardfehler (Spiel-Level-Fallback ohne Advantage-Modell)
+    // bleibt der alte Weg — dann aber ohne Signifikanzanspruch.
+    if (se != null && Number.isFinite(se)) {
+      const t = w[k] / se;
+      if (!Number.isFinite(t) || Math.abs(t) < PRIOR_T_MIN) { priorGateStats.tGate++; return null; }
+    }
+    const sup = support[k] || 0;
+    const shrink = sup / (sup + PRIOR_SHRINK_K);
+    const z = (w[k] - stat.mu) / stat.sd;
+    const v = clamp(scale * z * shrink, -lim, lim);
+    if (Math.abs(v) < minAbs) { priorGateStats.minAbs++; return null; }
+    priorGateStats.exportiert++;
+    if (Math.abs(Math.abs(v) - lim) < 0.05) priorGateStats.amClamp++;
+    return Math.round(v * 10) / 10;
+  }
   if (advModel) console.log('cardValues/Timing werden aus dem Advantage-Modell exportiert (Spiel-Modell liefert weiterhin ab:/eqp:/rev:/lk:/pair:).');
   const cardAgg = Object.create(null); // name -> { sumW, sumSup, buckets: {b: w} }
   for (const k of srcKeep) {
@@ -2626,11 +2933,12 @@ function main() {
   // Ability placement priors: signed (a placement that correlates with
   // LOSING should genuinely be avoided).
   const abilityPriors = Object.create(null);
+  const statAb = familienStat('ab:');
   for (const k of keep) {
     const m = /^ab:(.+)$/.exec(k);
     if (!m) continue;
-    const v = clamp(ABILITY_SCALE * (w[k] / sd), ABILITY_MIN, ABILITY_MAX);
-    if (Math.abs(v) >= 8) abilityPriors[m[1]] = Math.round(v * 10) / 10;
+    const v = priorWert(k, statAb, ABILITY_SCALE, ABILITY_MAX, 8);
+    if (v !== null) abilityPriors[m[1]] = v;
   }
 
   // Revive context: "Card→Hero" (identity) und "Card→ability:X"
@@ -2641,34 +2949,44 @@ function main() {
   // identisch zu den abilityPriors — signiert, damit nachweislich
   // schlechte Platzierungen aktiv gemieden werden.
   const equipPriors = Object.create(null);
+  const statEqp = familienStat('eqp:');
   for (const k of keep) {
     const m = /^eqp:(.+)$/.exec(k);
     if (!m) continue;
-    const v = clamp(ABILITY_SCALE * (w[k] / sd), ABILITY_MIN, ABILITY_MAX);
-    if (Math.abs(v) >= 8) equipPriors[m[1]] = Math.round(v * 10) / 10;
+    const v = priorWert(k, statEqp, ABILITY_SCALE, ABILITY_MAX, 8);
+    if (v !== null) equipPriors[m[1]] = v;
   }
 
   // Lock-Ordering-Gewichte: "Karte|lockTyp@heldBucket". Negativ =
   // Ausspielen in diesem Kontext korreliert mit Niederlagen (Boomerang
   // mit 3+ Artefakten auf der Hand) → Laufzeit erhöht die Gate-Schwelle.
   const lockPenalties = Object.create(null);
+  const statLk = familienStat('lk:');
   for (const k of keep) {
     const m = /^lk:(.+)$/.exec(k);
     if (!m) continue;
-    const v = clamp(LOCK_SCALE * (w[k] / sd), LOCK_MIN, LOCK_MAX);
-    if (Math.abs(v) >= 3) lockPenalties[m[1]] = Math.round(v * 10) / 10;
+    const v = priorWert(k, statLk, LOCK_SCALE, LOCK_LIMIT, 3);
+    if (v !== null) lockPenalties[m[1]] = v;
   }
 
   const reviveTargets = Object.create(null);
   const reviveAbilities = Object.create(null);
+  const statRev = familienStat('rev:');
   for (const k of keep) {
     const m = /^rev:(.+)$/.exec(k);
     if (!m) continue;
-    const v = clamp(REVIVE_SCALE * (w[k] / sd), REVIVE_MIN, REVIVE_MAX);
-    if (Math.abs(v) < 3) continue;
+    const v = priorWert(k, statRev, REVIVE_SCALE, REVIVE_MAX, 3);
+    if (v === null) continue;
     const key = m[1];
     if (key.includes('→ability:')) reviveAbilities[key.replace('→ability:', '→')] = Math.round(v * 10) / 10;
     else reviveTargets[key] = Math.round(v * 10) / 10;
+  }
+
+  if (priorGateStats.gesamt > 0) {
+    const g = priorGateStats;
+    console.log(`Prior-Export (ab/eqp/lk/rev): ${g.gesamt} Kandidaten → ${g.tGate} am t-Gate (|t|<${PRIOR_T_MIN}), `
+      + `${g.minAbs} unter Meldeschwelle, ${g.exportiert} exportiert, davon ${g.amClamp} am Clamp `
+      + `(${g.exportiert ? (100 * g.amClamp / g.exportiert).toFixed(0) : 0}%)`);
   }
 
   // Hero trio for runtime matching — taken from the ability keys' hero
@@ -2953,6 +3271,17 @@ function main() {
       ? advModel.bounceRules : undefined,
     playOrderRules: (advModel && advModel.playOrderRules && Object.keys(advModel.playOrderRules).length > 0)
       ? advModel.playOrderRules : undefined,
+    // ── Die sechs Entscheidungsformen ──────────────────────────────
+    // Undefined-Felder fallen beim JSON-Schreiben weg; ein Profil ohne
+    // decisions-Daten sieht also exakt aus wie bisher.
+    ...(advModel && advModel.decisionChannels ? {
+      optInRules: advModel.decisionChannels.optInRules,
+      targetIntentRules: advModel.decisionChannels.targetIntentRules,
+      targetCardDeltas: advModel.decisionChannels.targetCardDeltas,
+      ordinalRules: advModel.decisionChannels.ordinalRules,
+      setOfferRules: advModel.decisionChannels.setOfferRules,
+      poolFeatureRules: advModel.decisionChannels.poolFeatureRules,
+    } : {}),
     // Gelernte Tutor-/Such-Präferenzen (Quelle→Karte).
     tutorPickRules: (advModel && advModel.tutorPickRules && Object.keys(advModel.tutorPickRules).length > 0)
       ? advModel.tutorPickRules : undefined,
@@ -2970,7 +3299,15 @@ function main() {
   };
 
   const slug = deckName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const outDir = path.join(__dirname, '..', 'data', 'cpu-profiles');
+  // ── AUSGABEVERZEICHNIS, UMLENKBAR ────────────────────────────────
+  // `--out-dir <pfad>` bzw. `PP_PROFILE_OUT_DIR` schreibt das Profil
+  // woandershin. Gegenstueck zu `PP_PROFILE_DIR` in der Laufzeit: erst
+  // ein neues Set in ein eigenes Verzeichnis trainieren, dann beide
+  // Saetze auf DEMSELBEN Code gegeneinander messen. Ohne die Umlenkung
+  // ueberschreibt jedes Nachtraining den Vergleichsmassstab, gegen den
+  // man messen wollte.
+  const outDir = path.resolve(path.join(__dirname, '..'),
+    argOutDir || process.env.PP_PROFILE_OUT_DIR || path.join('data', 'cpu-profiles'));
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, `${slug}.json`);
   // Atomares Schreiben (tmp + rename): Bei PARALLELEN Trainings-Batches

@@ -16715,6 +16715,25 @@ async function runHeadlessTrainingGame(pinnedDeck, oppDeck, pinnedIdx, gameOpts 
       if (gameOpts.profileAllowedSide != null) {
         engine._profileAllowedSide = gameOpts.profileAllowedSide;
       }
+      // ── GEPAARTES MESSEN (PP_PROFILE_DIR_A / _B) ──────────────────
+      // Beide Seiten laden Profile, aber aus VERSCHIEDENEN
+      // Verzeichnissen: Seite A das neue Set, Seite B das alte. Damit
+      // laufen die beiden Profil-Generationen im SELBEN Spiel
+      // gegeneinander, auf demselben Code. Der Vergleich ist gegen
+      // Engine-Drift immun — die Drift wirkt auf beide Arme gleich.
+      //
+      // Hintergrund: A/B-Ergebnisse ueber verschiedene Codestaende sind
+      // NICHT vergleichbar (gemessen: ein Deck bewegte sich allein
+      // durch Engine-Aenderungen um 8.7 Punkte), und eine vollstaendige
+      // Neumessung der 42 Profile kostet rund 61 Stunden.
+      if (process.env.PP_PROFILE_DIR_A || process.env.PP_PROFILE_DIR_B) {
+        const a = process.env.PP_PROFILE_DIR_A || process.env.PP_PROFILE_DIR_B;
+        const b = process.env.PP_PROFILE_DIR_B || process.env.PP_PROFILE_DIR_A;
+        engine._profileDirBySide = pinnedIdx === 0 ? [a, b] : [b, a];
+        // Die Seiten-Maske wuerde die Gegenseite stumm schalten — genau
+        // das Gegenteil dessen, was hier gemessen werden soll.
+        engine._profileAllowedSide = null;
+      }
       installCpuBrain(engine);
       recorder = attachTrainingRecorder(engine, {
         pinnedIdx,
