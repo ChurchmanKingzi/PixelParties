@@ -385,9 +385,17 @@ function absicht(config) {
 // Abgeleitet aus der Zaehlung der tatsaechlich vorkommenden Prompt-Typen
 // in cards/effects/*.js — nicht geraten. Rein mechanisch: der Typ sagt,
 // welche GESTALT die Entscheidung hat, nicht was sie wert ist.
-function artAusTyp(typ) {
+function artAusTyp(typ, promptData) {
   switch (typ) {
-    case 'confirm': return 'optIn';          // 116x — das "you may"-Tor
+    // NUR ABBRECHBARE Confirms sind ein echtes Angebot. Ein Confirm
+    // ohne `cancellable` ist eine BESTAETIGUNG, keine Entscheidung --
+    // der Spieler kann nur zustimmen. Beides in denselben Topf zu
+    // werfen verwaessert die Grundrate (im Rauchtest 96 % Ja, weil die
+    // Pflicht-Bestaetigungen mitzaehlten) und laesst den Lerner fuer
+    // Karten, deren Confirm gar nicht optional ist, eine Regel ohne
+    // Gegenstand lernen.
+    case 'confirm':
+      return (promptData && promptData.cancellable) ? 'optIn' : 'ack';          // 116x — das "you may"-Tor
     case 'optionPicker': return 'mode';      //  56x — welcher von N Effekten
     case 'cardGallery':                      // 112x
     case 'deckSearchReveal': return 'gallery'; //  31x — eine Karte aus einem Pool
@@ -497,7 +505,7 @@ function instrumentiere(engine) {
       karte = (promptData && promptData.menuSource)
         || (sc && (sc.name || sc.cardName)) || (typeof sc === 'string' ? sc : null)
         || (promptData && (promptData.title || promptData.source)) || null;
-      art = artAusTyp(promptData && promptData.type);
+      art = artAusTyp(promptData && promptData.type, promptData);
       const roh = promptData && (promptData.options || promptData.cards || promptData.zones);
       if (Array.isArray(roh)) { gesamt = roh.length; angebot = roh.slice(0, MAX_OPTIONEN); }
     } catch { /* egal */ }
