@@ -164,8 +164,25 @@ console.log(`  Spiele gesamt ........ ${GESAMT.toLocaleString('de-DE')}`);
 console.log(`  Suchbudget ........... ${FAST ? 'reduziert (4000 ms / 24 Pulls)' : 'VOLL (--fast 0)'}`);
 console.log(`  Parallele Auftraege .. ${JOBS}`);
 console.log(`  Gegner-Profile ....... ${OPP_PROFILES ? 'AN (anderes Regime!)' : 'aus (wie gehabt)'}`);
-console.log(`  Geschaetzte Laufzeit . ${stunden(GESAMT * sekJeSpiel / JOBS)}`
-  + `  (${sekJeSpiel} s/Spiel, ${JOBS} parallel)`);
+// Gemessener Rauchtest: ~51 Entscheidungszeilen je Spiel. Ein
+// Spielsatz mit Entscheidungen wiegt damit grob 40 KB.
+const GB = GESAMT * 40 * 1024 / 1024 / 1024 / 1024;
+const sammelSek = GESAMT * sekJeSpiel / JOBS;
+// Trainingsphase: 294 Trainerlaeufe (42 Decks x 7 Wellen) auf wachsender
+// Datenmenge. Grobe Eichung ~8 min je Lauf im Mittel, parallelisiert.
+const trainSek = DECKS.length * WAVES * 8 * 60 / JOBS;
+console.log(`  Sammeln .............. ${stunden(sammelSek)}  (${sekJeSpiel} s/Spiel, ${JOBS} parallel)`);
+console.log(`  Trainieren ........... ${stunden(trainSek)}  (${DECKS.length * WAVES} Laeufe, ${JOBS} parallel)`);
+console.log(`  GESAMT ............... ${stunden(sammelSek + trainSek)}`);
+console.log(`  Platzbedarf .......... ~${GB.toFixed(1)} GB Trainingsdaten`);
+try {
+  const st = fs.statfsSync ? fs.statfsSync(ROOT) : null;
+  if (st) {
+    const freiGB = st.bavail * st.bsize / 1024 / 1024 / 1024;
+    console.log(`  Freier Platz ......... ${freiGB.toFixed(1)} GB`
+      + (freiGB < GB * 1.5 ? '   ⚠️  KNAPP — vor dem Start aufraeumen!' : ''));
+  }
+} catch { /* statfs nicht ueberall vorhanden */ }
 console.log('═'.repeat(72));
 
 if (PLAN_ONLY) {
@@ -252,6 +269,14 @@ function sammle(deck, welle) {
         PP_TRAIN_HORIZON: process.env.PP_TRAIN_HORIZON || '2',
         PP_GAME_TIMEOUT_MS: process.env.PP_GAME_TIMEOUT_MS || '600000',
       };
+      // ── GEGENARME DER NEUEN KANAELE ───────────────────────────────
+      // Ohne Exploration sieht der Trainer in JEDER Zeile dieselbe Wahl
+      // und kann nichts lernen — und Aufzeichnen ist nicht nachholbar.
+      // Die vorhandenen Kanaele (Menue 0.15, Galerie 0.1, Platzierung,
+      // Bounce, Counter) haben ihre Defaults schon; hier die neuen.
+      env.PP_OPTIN_EXPLORE = process.env.PP_OPTIN_EXPLORE || '0.25';
+      env.PP_OPTION_EXPLORE = process.env.PP_OPTION_EXPLORE || '0.2';
+      env.PP_GERRY_EXPLORE = process.env.PP_GERRY_EXPLORE || '0.25';
       if (FAST) { env.PP_MCTS_BUDGET_MS = '4000'; env.PP_MCTS_PULLS = '24'; }
       else { delete env.PP_MCTS_BUDGET_MS; delete env.PP_MCTS_PULLS; }
       // Ab Welle 2: MIT Profil sammeln (DAgger). Genau das ist der Sinn
@@ -304,21 +329,32 @@ async function parallel(aufgaben, n) {
     const kaputt = res.filter(r => r && !r.ok);
     for (const r of kaputt) console.warn(`[retrain] ⚠️  ${r.deck} Welle ${welle}: unvollstaendig (${r.grund || 'zu viele Neustarts'})`);
 
-    console.log(`\n  WELLE ${welle}/${WAVES} — Training (kumulativ ueber Welle 1..${welle})`);
-    for (const deck of DECKS) {
+    console.log(`\n  WELLE ${welle}/${WAVES} — Training (kumulativ ueber Welle 1..${welle}, ${JOBS} parallel)`);
+    // ★ PARALLEL, nicht nacheinander. Bei 42 Decks und wachsender
+    // Datenmenge (Welle 7 sieht 7 x 410 Spiele je Deck) ist die
+    // Trainingsphase kein Nebenposten mehr, sondern Stunden je Welle —
+    // sequentiell waere das ein zweistelliger Prozentanteil der
+    // Gesamtlaufzeit, in dem alle Kerne bis auf einen stillstehen.
+    // Unbedenklich: jedes Deck schreibt seine eigene Datei, und
+    // train-deck-profile.js schreibt atomar (tmp + rename).
+    const trainAufgaben = DECKS.map(deck => () => {
       // Kumulativ: der Trainer sieht ALLE bisherigen Wellen dieses Decks.
       // Die Herkunftsmarke je Datei (argv-Index) macht die Welle im
       // Modell zu einem beobachteten Faktor statt zu einem Stoerfaktor.
       const files = [];
       for (let w = 1; w <= welle; w++) { const f = datei(deck, w); if (zeilen(f) > 0) files.push(f); }
-      if (!files.length) { console.warn(`[retrain] ${deck}: keine Daten — kein Training.`); continue; }
+      if (!files.length) { console.warn(`[retrain] ${deck}: keine Daten — kein Training.`); return null; }
       const log = path.join(LAUF, `${slugOf(deck)}-train-w${welle}.log`);
       const r = spawnSync(process.execPath, [path.join(__dirname, 'train-deck-profile.js'), ...files],
         { cwd: ROOT, encoding: 'utf-8' });
       try { fs.writeFileSync(log, (r.stdout || '') + (r.stderr || ''), { encoding: 'utf-8' }); } catch { /* egal */ }
       const zeile = (r.stdout || '').split('\n').find(l => l.includes('HOLDOUT (Spiel-Modell)')) || '';
       console.log(`   ${r.status === 0 ? '✓' : '✗'} ${deck.padEnd(38)} ${zeile.trim().slice(0, 60)}`);
-    }
+      return r.status;
+    });
+    const tTrain = Date.now();
+    await parallel(trainAufgaben, JOBS);
+    console.log(`   Trainingsphase: ${stunden((Date.now() - tTrain) / 1000)}`);
     zustand.fertig[`welle${welle}`] = new Date().toISOString();
     speichereZustand(zustand);
     const verstrichen = (Date.now() - t0) / 1000;

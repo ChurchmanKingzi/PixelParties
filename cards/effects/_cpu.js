@@ -7155,7 +7155,13 @@ function gerryMayGate(engine, promptData, besitzerPi, opferPi) {
     // Exploration im Training: ohne Gegenarm lernt der Trainer die
     // Huerde nie: er saehe nur Halbzuege, in denen wir ausgegeben haben.
     // Gleiche Begruendung wie PP_PLACE_EXPLORE / PP_COUNTER_EXPLORE.
-    const eps = parseFloat(process.env.PP_GERRY_EXPLORE || '0') || 0;
+    // ★ Im TRAINING per Vorgabe explorieren. Ohne Gegenarm sieht der
+    // Trainer nur die Halbzuege, in denen die Heuristik ausgegeben hat —
+    // die Huerde GERRY_NEGATE_BASE waere dann nicht lernbar, sondern auf
+    // ewig geraten. Live bleibt es bei 0, dort wird nicht experimentiert.
+    const eps = process.env.PP_TRAIN
+      ? (parseFloat(process.env.PP_GERRY_EXPLORE || '0.25') || 0)
+      : (parseFloat(process.env.PP_GERRY_EXPLORE || '0') || 0);
     let explored = false;
     if (eps > 0 && !engine._inMctsSim && Math.random() < eps) { ausgeben = !ausgeben; explored = true; }
 
@@ -7560,6 +7566,18 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     if (hasGold && hasDraw && options.length === 2) {
       const pick = mctsValueGoldVsDraw(engine, cpuIdx);
       return { optionId: pick };
+    }
+    // ── Trainings-ε fuer die Optionswahl ───────────────────────────
+    // Der Default 》letzte Option《 ist deterministisch: ohne Exploration
+    // steht in JEDER aufgezeichneten Zeile dieselbe Wahl, es gaebe keine
+    // Kontrastgruppe und der ordinale Kanal bliebe fuer immer leer.
+    // Gleiche Begruendung und gleiche Groessenordnung wie
+    // PP_MENU_EXPLORE / PP_GALLERY_EXPLORE.
+    if (process.env.PP_TRAIN && !engine._inMctsSim) {
+      const oeps = parseFloat(process.env.PP_OPTION_EXPLORE || '0.2');
+      if (oeps > 0 && Math.random() < oeps) {
+        return { optionId: options[Math.floor(Math.random() * options.length)].id };
+      }
     }
     // ── FORM 3: ORDINAL (》wie viel《) ───────────────────────────────
     // Ist das Angebot eine Zahlenreihe, ist die Wahl geordnet und der
