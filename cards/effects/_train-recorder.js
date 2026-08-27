@@ -184,6 +184,13 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
     discard: 'di',
   };
   const menus = [];
+  // Zustandsvektoren je eigenem Zug. HIER deklariert, nicht weiter
+  // unten: der folgende anonyme Block { ... } ist eine eigene
+  // Block-Bindung, und was darin mit `const` entsteht, ist am
+  // Verwendungsort im Hook-Wrapper NICHT sichtbar. `check-scope` hat
+  // genau das gemeldet.
+  const stateCurve = [];
+  let _stateSnapshot = null;
   {
     // ── Hand-Reaktions-Plays (Als Idol-of-Crestina-Befund) ───────────
     // Die 8 Hand-Reaktionsfenster der Engine (_checkResourcePhaseReactions,
@@ -197,7 +204,118 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
     // Report — kein cardValue, kein Timing, kein Paar, kein Label.
     // Die Fenster markieren ihren Transfer jetzt mit `asPlay: true`
     // (unfreiwillige Hand-Discards/Deletes tragen den Marker NICHT).
-    const _econSnapshot = () => {
+    // ═════════════════════════════════════════════════════════════════
+  //  ZUSTANDSVEKTOR JE EIGENEM ZUG — Grundlage einer GELERNTEN
+  //  BLATTBEWERTUNG
+  //
+  //  WOZU: `evaluateState` ist handgeschrieben und nachweislich blind
+  //  fuer den Zug, der Deepsea gewinnt — beim Swap kehrt die Karte auf
+  //  die Hand zurueck, das Brett tauscht nur die Zusammensetzung, Delta
+  //  ~ 0, uebersprungen. MCTS entscheidet aber ALLES an diesem Massstab;
+  //  gelernte Prioren sortieren nur INNERHALB dessen, was der Bewerter
+  //  ueberhaupt in Betracht zieht. Ist der Massstab blind, verschiebt
+  //  Lernen bloss die Reihenfolge der Blinden. Gemessen: das fuenffache
+  //  Suchbudget aendert bei starken Decks nichts (84.3 -> 84.0) — nicht
+  //  die Suche ist der Engpass, sondern der Massstab.
+  //
+  //  WARUM `evalCurve` DAFUER NICHT REICHT: dort steht das ERGEBNIS des
+  //  handgeschriebenen Bewerters. Ein Modell darauf klont die Blindheit,
+  //  statt sie zu beheben. Und die vorhandenen Merkmale (`z` der
+  //  Entscheidungen, `pl/cr/ds` der playEvents) sind unter einem Swap
+  //  INVARIANT — Handgroesse gleich, Boardgroesse gleich, Kreaturenzahl
+  //  gleich. Genau der blinde Fleck.
+  //
+  //  WAS HIER ANDERS IST: die Zusammensetzung des Bretts, und vor allem
+  //  die RESSOURCEN, die die Gewinnlinie verbraucht. `old` (Kreaturen
+  //  aus Vorrunden) ist bounce-bares Material; `sw` sind Handkarten, die
+  //  einen besetzten Slot einnehmen koennen. Der staerkste Zusammenhang
+  //  im ganzen Datensatz haengt daran: 0-2 Bounces -> 0 % Winrate,
+  //  12-14 -> 83 %, bei konstanter Spiellaenge. Diese beiden Zahlen
+  //  unterscheiden sich vor und nach einem Swap — die alten nicht.
+  //
+  //  NICHT NACHHOLBAR. Was hier nicht gestempelt wird, fehlt allen je
+  //  gesammelten Spielen. Kosten: ~30 Zahlen je eigenem Zug, also rund
+  //  ein Promille des Spielsatzes.
+  //
+  //  Das Label steht bereits im Satz: `outcome`. Damit ist
+  //  Zustand -> Ausgang ein gewoehnliches Regressionsproblem, dieselbe
+  //  Maschinerie wie ueberall sonst (Holdout, Fisher, t-Gate).
+  // ═════════════════════════════════════════════════════════════════
+  _stateSnapshot = () => {
+    try {
+      const gs = engine.gs;
+      if (!gs) return null;
+      const oi = pinnedIdx === 0 ? 1 : 0;
+      const ps = gs.players?.[pinnedIdx], os = gs.players?.[oi];
+      if (!ps || !os) return null;
+      const f = { t: gs.turn || 0 };
+
+      const heldSeite = (p, pre) => {
+        const hs = (p.heroes || []).filter(h => h && h.name);
+        const leben = hs.filter(h => (h.hp || 0) > 0);
+        f[pre + 'hl'] = leben.length;
+        f[pre + 'hp'] = leben.reduce((a, h) => a + (h.hp || 0), 0);
+        f[pre + 'hmax'] = leben.reduce((a, h) => Math.max(a, h.hp || 0), 0);
+        f[pre + 'hand'] = (p.hand || []).length;
+        f[pre + 'deck'] = (p.mainDeck || []).length;
+        f[pre + 'disc'] = (p.discardPile || []).length;
+        f[pre + 'gold'] = p.gold || 0;
+        // Faehigkeiten sind der Schulen-Fortschritt und damit die
+        // eigentliche Uhr des Spiels.
+        let ab = 0;
+        for (const z of (p.abilityZones || [])) ab += (z || []).length;
+        f[pre + 'abil'] = ab;
+      };
+      heldSeite(ps, ''); heldSeite(os, 'o');
+
+      // ── Brett-Zusammensetzung ueber die Instanzen. Nur hier steht,
+      // WAS auf dem Brett liegt — Zonen-Arrays tragen bloss Namen.
+      const cardDB = engine._getCardDB ? engine._getCardDB() : {};
+      const zaehle = (pi2, pre) => {
+        let n = 0, lvl = 0, hp = 0, atk = 0, alt = 0, eq = 0, ctr = 0;
+        for (const inst of (engine.cardInstances || [])) {
+          if (!inst || inst.controller !== pi2) continue;
+          if (inst.zone !== 'support' && inst.zone !== 'SUPPORT') continue;
+          const cd = cardDB[inst.name];
+          if (!cd) continue;
+          if (String(cd.cardType || '').includes('Creature')) {
+            n++;
+            lvl += cd.level || 0;
+            hp += (inst.hp != null ? inst.hp : (cd.hp || 0));
+            atk += cd.atk || 0;
+            // ★ Bounce-Material: nur Kreaturen aus VORRUNDEN sind
+            // bounce-bar (Als Regel). Diese Zahl aendert sich beim Swap,
+            // die Kreaturenzahl nicht.
+            if ((inst.turnPlayed || 0) < (gs.turn || 0)) alt++;
+          } else if (cd.cardType === 'Artifact' || cd.cardType === 'Equipment') eq++;
+          for (const v of Object.values(inst.counters || {})) ctr += (typeof v === 'number' ? v : 0);
+        }
+        f[pre + 'cr'] = n; f[pre + 'crlvl'] = lvl; f[pre + 'crhp'] = hp;
+        f[pre + 'cratk'] = atk; f[pre + 'eq'] = eq; f[pre + 'ctr'] = ctr;
+        if (!pre) f.old = alt;
+      };
+      zaehle(pinnedIdx, ''); zaehle(oi, 'o');
+
+      // ── Handpotenzial: wie viele Handkarten koennen einen BESETZTEN
+      // Slot einnehmen? Der zweite Wert, der sich beim Swap bewegt.
+      let sw = 0;
+      try {
+        const { loadCardEffect } = require('./_loader');
+        for (const name of (ps.hand || [])) {
+          const sc = loadCardEffect(name);
+          if (sc && (typeof sc.canPlaceOnOccupiedSlot === 'function'
+            || typeof sc.getBouncePlacementTargets === 'function')) sw++;
+        }
+      } catch { /* Loader-Ausfall darf nichts kosten */ }
+      f.sw = sw;
+
+      const oek = _econSnapshot();
+      if (oek) { f.play = oek.pl; f.hcr = oek.cr; f.hds = oek.ds; }
+      return f;
+    } catch { return null; }
+  };
+
+  const _econSnapshot = () => {
       try {
         const ps = engine.gs?.players?.[pinnedIdx];
         if (!ps) return null;
@@ -870,6 +988,15 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       // jede Simulation die echten Zeilen mit ab.
       if (!engine._inMctsSim && hookName === 'onTurnStart') {
         try { require('./_decision-log.js').faellig(engine); } catch { /* egal */ }
+        // Zustandsvektor EINMAL je eigenem Zug. Am Zugbeginn, weil dort
+        // die Lage feststeht, bevor eigene Zuege sie veraendern.
+        try {
+          if (typeof _stateSnapshot === 'function'
+            && engine.gs?.activePlayer === pinnedIdx && stateCurve.length < 200) {
+            const f = _stateSnapshot();
+            if (f) stateCurve.push(f);
+          }
+        } catch { /* egal */ }
       }
       if (!engine._inMctsSim && (hookName === 'onPhaseStart' || hookName === 'onTurnStart' || hookName === 'onPhaseEnd')) {
         try { prevLocks = readLocks(); } catch { /* nie das Spiel brechen */ }
@@ -1079,6 +1206,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         opponent: opponentName,
         decisions: _decisions,
         decisionDiag: _decisionDiag,
+        stateCurve,
         startHand: shInfo ? shInfo.hand : null,
         mulliganed: shInfo ? (shInfo.mulliganed ? 1 : 0) : null,
         heroEffects,
