@@ -14173,6 +14173,34 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .auth-logo { display: block; margin: 0 auto 10px; transform: scale(1.06); transform-origin: center bottom; }
 .auth-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
 
+/* ═══ AUFBAU DES LOGIN-FORMULARS (v835) ═══════════════════════════════
+   Die Layout-Masse, die bis v834 als Inline-Styles im JSX standen (Kasten
+   460px, Ecke oben rechts, Spaltenabstand 12, Untertitel-Abstand 24 …),
+   stehen jetzt hier. Grund: Inline-Styles sind fuer Media Queries
+   unerreichbar — das Telefon-Layout weiter unten (`TELEFON QUER`) muss
+   genau diese Werte umstellen koennen. Auf dem Desktop ist alles hier
+   pixelgleich mit dem alten Inline-Stand. */
+.auth-screen .auth-panel { width: 460px; text-align: center; }
+.auth-screen .auth-subtitle { font-size: 13px; color: #3d3d54; margin-bottom: 24px; letter-spacing: 2px; }
+/* Formular und seine beiden Spalten: auf dem Desktop schlicht EINE Spalte
+   (Hauptteil, darunter die Alternativen), Abstand 12 wie zuvor. */
+.auth-form, .auth-form-main, .auth-form-alt { display: flex; flex-direction: column; gap: 12px; }
+/* Reiterbalken: 8 + Spaltenabstand 12 = die frueheren 20 darunter. */
+.auth-form .auth-tabs { margin-bottom: 8px; }
+/* Beide Fusszeilen teilen sich EIN Fach fester Mindesthoehe (Anmelden:
+   Passwort-Link, Registrieren: zweizeiliger Hinweis) — sonst huepft der
+   Kasten beim Reiterwechsel. 34px = zwei Zeilen à 11.5px bei 1.5. */
+.auth-footer { min-height: 34px; display: flex; align-items: flex-start; }
+.auth-or { text-align: center; color: var(--text2); font-size: 11px; margin: 2px 0; }
+/* Ablage oben rechts: Login-Knopf + Regler in einer Zeile, darunter
+   Discord als Block — dieselbe Bauform wie im Hauptmenue (Als Vorgabe
+   17.8.). */
+.auth-corner {
+  position: fixed; top: 14px; right: 12px; z-index: 10;
+  display: flex; flex-direction: column; align-items: stretch; gap: 20px;
+}
+.auth-corner-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+
 /* Explosion overlay. The wrapper is a viewport-sized box centred on the panel
    — and .screen-center centres the panel in the viewport, so it lines up flush
    with the backdrop scene. The inner core reproduces the backdrop's explosion
@@ -14198,6 +14226,84 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   transform-origin: 52% 42%;
   animation: ab-coreTether 4.8s ease-in-out infinite;
   image-rendering: pixelated;
+}
+
+/* ═══ TELEFON QUER — Login-Bildschirm (v835) ═══════════════════════════
+   Al, 8.9.: „auf dem Login-Screen sehe ich nur die Eingabefelder fuer
+   Username und Passwort, alles ab ‚Forgot your Password?' ist
+   abgeschnitten." Das Spiel ist auf Querformat gesperrt; ein Telefon
+   liefert quer also 360-430 CSS-Pixel HOEHE bei 800-930 Breite.
+
+   Warum es abgeschnitten war — drei Dinge stapelten sich:
+     1. Der Kasten ist ~800px hoch (Logo, Reiter, drei Eingaben, zwei
+        grosse Knoepfe, Google, zwei Trennzeilen, Kleingedrucktes) und
+        traegt zusaetzlich den Standard-Zoom 1.21 (Als Vorgabe 17.8.).
+     2. `--ui-scale` hat einen Boden von 0.70 (app-main.jsx); ein Telefon
+        laege rechnerisch bei ~0.43. Es bleibt also bei 0.70 → der
+        Kasten ist ~560 echte Pixel hoch auf einem 390 Pixel hohen Schirm.
+     3. `.auth-screen { overflow: hidden }` (wegen der viewport-grossen
+        Explosionsebene) — und `safe center` setzt den Kasten bei Ueberlauf
+        an den oberen Rand: die untere Haelfte ist schlicht weg, nicht
+        einmal erreichbar.
+
+   Loesung nach gaengiger Praxis fuer flache Querformate: NICHT weiter
+   verkleinern (Schrift und Tippflaechen sind bei 0.70 ohnehin an der
+   unteren Grenze), sondern die ungenutzte BREITE verwenden — das
+   Formular wird zweispaltig (links Reiter/Eingaben/Hauptknopf, rechts
+   Google/Gast), Leerraeume werden gestrafft, und der Bildschirm darf zur
+   Sicherheit scrollen (Fehlermeldungen, sehr kleine Geraete, eingeblendete
+   Tastatur).
+
+   Schwelle 600px Fensterhoehe: darunter passt der Desktop-Kasten selbst
+   bei Massstab 0.70 nicht mehr (0.70 × ~800 + Rand). Rein hoehenbasiert,
+   damit auch ein sehr flaches Desktop-Fenster profitiert; Hochformat
+   auf Telefonen ist ohnehin durch die Dreh-Aufforderung gesperrt. */
+@media (max-height: 600px) {
+  /* Sicherheitsnetz: scrollbar statt abgeschnitten. Bei Massstab ≤ 1
+     erzeugt die viewport-grosse Explosionsebene keinen Scrollbereich
+     ueber den Bildschirm hinaus (sie ist dann hoechstens so gross wie
+     der Bildschirm), das Desktop-Argument fuer `hidden` gilt hier nicht. */
+  .auth-screen { overflow-y: auto; overflow-x: hidden; }
+  /* Zoom des Inhalts: 1.15 statt 1.21 — mit Massstab 0.70 sind die
+     Eingaben damit ~32 echte Pixel hoch und die Schrift ~11px; die
+     ganze Hoehe des Kastens bleibt unter 300 echten Pixeln. */
+  .auth-screen .auth-panel-content { --auth-zoom: 1.15; }
+  /* Kasten: Breite aus dem Inhalt, gedeckelt so, dass links und rechts
+     je Platz fuer die Ablage oben rechts bleibt (sie ist einzeilig
+     ~200px breit, siehe unten). */
+  .auth-screen .auth-panel {
+    width: min(760px, calc(100 * var(--vw) - 2 * 215px));
+    padding: 12px 16px;
+  }
+  /* Logo kleiner (gedeckelte Breite → Hoehe folgt), Untertitel enger. */
+  .auth-header .auth-logo { max-width: 300px; margin-bottom: 6px; }
+  .auth-screen .auth-subtitle { margin-bottom: 10px; }
+  /* Zwei Spalten, gleich breit, durch eine Linie getrennt; die
+     Alternativen-Spalte mittig zur Hauptspalte. */
+  .auth-form { flex-direction: row; align-items: stretch; gap: 0; }
+  .auth-form-main, .auth-form-alt { flex: 1 1 0; min-width: 0; gap: 8px; }
+  .auth-form-main { padding-right: 18px; }
+  .auth-form-alt {
+    justify-content: center;
+    padding-left: 18px;
+    border-left: 2px solid var(--bg4);
+  }
+  /* Die Trennlinie sagt schon „oder" — die erste Trennzeile der rechten
+     Spalte ist damit doppelt und faellt weg; die zwischen Google und Gast
+     bleibt. */
+  .auth-form-alt > .auth-or:first-child { display: none; }
+  /* Einspaltige Schritte (Code, Passwort vergessen): schmal in der Mitte. */
+  .auth-form--single { max-width: 380px; margin: 0 auto; width: 100%; }
+  /* Reiter und Knoepfe flacher. */
+  .auth-screen .tab { padding: 7px 16px; min-width: 100px; font-size: 13px; }
+  .auth-form .auth-tabs { margin-bottom: 4px; }
+  .auth-screen .btn-big { padding: 11px 20px; }
+  .auth-footer { min-height: 0; }
+  /* Ablage oben rechts: EINE Zeile statt Spalte, Discord als Pille statt
+     Banner — sonst haengt sie 120 Pixel tief in den Kasten hinein. */
+  .auth-corner { flex-direction: row; align-items: center; gap: 10px; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
+  .auth-corner .discord-btn--block { width: auto; padding: 7px 12px; }
+  .auth-corner .discord-btn--block svg { width: 22px; }
 }
 
 /* 9 ── Main-menu chrome: square the frames/plaques, drop the blur */

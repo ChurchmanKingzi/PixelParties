@@ -587,8 +587,12 @@ function AuthScreen() {
       if (googleRenderedIn.current === googleBtnRef.current
         && googleBtnRef.current.childElementCount > 0) return;
       googleBtnRef.current.innerHTML = '';
+      // Breite des Google-Knopfs: 280 auf dem Desktop; im Telefon-Layout
+      // (zweispaltig, siehe `TELEFON QUER` in style.css) ist die rechte
+      // Spalte schmaler, dort 250. Dieselbe Schwelle wie die Media Query.
+      const kompakt = !!(window.matchMedia && window.matchMedia('(max-height: 600px)').matches);
       gid.renderButton(googleBtnRef.current, {
-        theme: 'filled_black', size: 'large', shape: 'pill', width: 280,
+        theme: 'filled_black', size: 'large', shape: 'pill', width: kompakt ? 250 : 280,
         locale: 'en',
         text: 'signin_with',
       });
@@ -606,8 +610,19 @@ function AuthScreen() {
     return () => { cancelled = true; s.removeEventListener('load', render); };
   }, [mode]);
 
+  // ── AUFBAU DES FORMULARS (v835, Mobile-Layout) ──────────────────────
+  // Alles Sichtbare traegt jetzt eine Klasse und KEINE Layout-Inline-Styles
+  // mehr: `auth-header` (Logo + Untertitel), `auth-form` mit den beiden
+  // Spalten `auth-form-main` (Reiter, Eingaben, Hauptknopf) und
+  // `auth-form-alt` (Google, Gast). Auf dem Desktop legt style.css beides
+  // untereinander — pixelgleich mit vorher. Auf flachen Bildschirmen
+  // (Telefon quer, `@media (max-height: 600px)`) stellt style.css die
+  // beiden Spalten NEBENEINANDER; das ist der ganze Trick, damit das
+  // Formular ohne Scrollen in 360-390 Pixel Hoehe passt. Layout gehoert
+  // in die CSS-Datei, nicht hierher — sonst ist es per Media Query nicht
+  // erreichbar.
   const Header = (
-    <>
+    <div className="auth-header">
       {/* Same wordmark logo as the main menu (data/logo.png), tinted + haloed
           with drifting particles. Scoped .auth-logo just fits it to the panel
           width (the menu sizes it for a full-width header). */}
@@ -616,10 +631,10 @@ function AuthScreen() {
         <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
         <div className="pp-logo-tint" aria-hidden="true"></div>
       </div>
-      <div className="orbit-font auth-subtitle" style={{ fontSize: 13, color: '#3d3d54', marginBottom: 24, letterSpacing: 2 }}>
+      <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
       </div>
-    </>
+    </div>
   );
 
   const Msgs = (
@@ -639,12 +654,15 @@ function AuthScreen() {
   let body;
   if (mode === 'login' || mode === 'signup') {
     body = (
-      <>
-        <div className="tab-bar" style={{ marginBottom: 20 }}>
-          <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => setMode('login')}>LOG IN</div>
-          <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => setMode('signup')}>SIGN UP</div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="auth-form">
+        <div className="auth-form-main">
+          {/* Reiter jetzt INNERHALB der Hauptspalte (vorher davor, mit
+              marginBottom 20). Die Spalte hat gap 12, der Reiterbalken
+              bekommt in style.css 8px darunter — zusammen dieselben 20. */}
+          <div className="tab-bar auth-tabs">
+            <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => setMode('login')}>LOG IN</div>
+            <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => setMode('signup')}>SIGN UP</div>
+          </div>
           {mode === 'login' ? (
             <>
               <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
@@ -684,7 +702,7 @@ function AuthScreen() {
               kann zweizeilig umbrechen, der Passwort-Link ist immer
               einzeilig. 34px entsprechen zwei Zeilen à 11.5px bei
               Zeilenhoehe 1.5. */}
-          <div style={{ minHeight: 34, display: 'flex', alignItems: 'flex-start' }}>
+          <div className="auth-footer">
             {mode === 'login' ? (
               <div className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
                 Forgot your password?
@@ -693,9 +711,11 @@ function AuthScreen() {
               <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
             )}
           </div>
+        </div>
+        <div className="auth-form-alt">
           {window.GOOGLE_CLIENT_ID && (
             <>
-              <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
+              <div className="auth-or">— or —</div>
               {isDesktop ? (
                 <div style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }}>
                   <button
@@ -721,17 +741,17 @@ function AuthScreen() {
               )}
             </>
           )}
-          <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 11, margin: '2px 0' }}>— or —</div>
+          <div className="auth-or">— or —</div>
           <button className="btn btn-big" onClick={submitGuest} disabled={loading}>
             ▶ TRY AS GUEST · vs CPU
           </button>
           <div className="auth-fine" style={{ textAlign: 'center' }}>Jump into a match with a Starter Deck — no account needed.</div>
         </div>
-      </>
+      </div>
     );
   } else if (mode === 'verify') {
     body = (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="auth-form auth-form--single">
         <div className="auth-step-title">Check your email</div>
         <div className="auth-fine">We sent a 6-digit code to <b>{pendingEmail}</b>. Enter it below to finish creating your account.</div>
         {codeField}
@@ -748,7 +768,7 @@ function AuthScreen() {
     );
   } else if (mode === 'forgot') {
     body = (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="auth-form auth-form--single">
         <div className="auth-step-title">Reset your password</div>
         <div className="auth-fine">Enter your account email and we'll send you a reset code.</div>
         <input className="input" type="email" placeholder="Email" value={email} autoFocus autoComplete="email"
@@ -762,7 +782,7 @@ function AuthScreen() {
     );
   } else if (mode === 'reset') {
     body = (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="auth-form auth-form--single">
         <div className="auth-step-title">Enter your reset code</div>
         <div className="auth-fine">If <b>{pendingEmail}</b> is registered, a code is on its way. Enter it with your new password.</div>
         {codeField}
@@ -790,12 +810,13 @@ function AuthScreen() {
           Vorgabe (17.8.): Login, darunter Lautstaerke, darunter
           Discord. Vorher stand der Regler allein oben links — falsch
           platziert, weil das Hauptmenue alles rechts sammelt. */}
-      <div style={{ position: 'fixed', top: 14, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 20, zIndex: 10 }}>
+      <div className="auth-corner">
         {/* EINE ZEILE aus Knopf + Regler — exakt die Zeile, die im
             Hauptmenue LOGOUT und den Regler traegt (gleiche Flex-Werte,
             gleicher Abstand, gleiche Knopfmasse). Darunter Discord als
-            `block`, wie dort. */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+            `block`, wie dort. Die Masse stehen seit v835 in style.css
+            (`.auth-corner`), damit das Telefon-Layout sie umstellen kann. */}
+        <div className="auth-corner-row">
           <button
             className="btn menu-logout-btn"
             style={{ padding: '7px 22px', fontSize: 13, opacity: merkKonto ? 1 : 0.45 }}
@@ -816,7 +837,7 @@ function AuthScreen() {
           (same 10s clock). Kept separate from the panel so its .animate-in
           entrance transform isn't clobbered by the shake transform. */}
       <div className="auth-panel-shake" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="panel animate-in" style={{ width: 460, textAlign: 'center' }}>
+        <div className="panel animate-in auth-panel">
           {/* Explosion — a full-viewport, scene-aligned layer that renders ABOVE
               the box's dithered surface but BELOW the form controls. It stays a
               child of the panel (overflow:visible) so it rides the same
