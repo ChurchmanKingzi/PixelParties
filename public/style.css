@@ -1180,10 +1180,15 @@ select optgroup {
   line-height: 0;
   /* Contain the multiply blend to this stack (image only), not the menu bg. */
   isolation: isolate;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,.7));
+  /* Der `drop-shadow`-Filter sass bis v835 HIER — auf dem Stapel, in dem
+     150 Partikel dauerhaft animieren. Ein Filter wird bei jeder Aenderung
+     seines Inhalts neu gerechnet, also 60-mal pro Sekunde ueber die
+     ganze Logoflaeche, auf der CPU. Jetzt liegt er auf dem BILD allein
+     (unten): gleicher Schatten unter den Buchstaben, kein Neurechnen. */
 }
 .pp-logo-img {
   display: block;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,.7));
   height: 92px;
   width: auto;
   /* Shrink to fit short windows; width re-derives to keep the aspect ratio. */
@@ -13011,8 +13016,14 @@ body:has(.textbox-overlay) .tooltip {
   color: var(--accent); white-space: nowrap;
 }
 
-/* Hide the flanking panels when there isn't room beside the menu. */
-@media (max-width: 1180px) {
+/* Hide the flanking panels when there isn't room beside the menu.
+   ★ v836: Schwelle 830 statt 1180. Media Queries messen das ECHTE
+   Fenster, das Layout aber laeuft im Massstab `--ui-scale` (Boden 0.70):
+   ein 900px breites Fenster ist innen 1286 Layout-Pixel breit, und dort
+   passen die Kaesten. Erst unter 830 echten Pixeln (1186 innen) wird es
+   eng — und Telefone darunter bekommen ohnehin das Telefon-Layout, das
+   die Kaesten schmaler macht und wieder einblendet. */
+@media (max-width: 830px) {
   .menu-side { display: none; }
 }
 
@@ -13031,6 +13042,29 @@ body:has(.textbox-overlay) .tooltip {
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
+/* ── Layout-Klassen des Hauptmenues (v836) ─────────────────────────────
+   Bis v835 Inline-Styles im JSX; hier, damit das Telefon-Layout sie
+   umstellen kann. Desktop pixelgleich. */
+.menu-topleft { display: contents; }
+.menu-stats {
+  position: absolute; top: 14px; left: 16px; z-index: 5;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+}
+.menu-stats-row { display: flex; align-items: center; gap: 12px; }
+.menu-stat-badge {
+  display: flex; align-items: center; gap: 8px;
+  line-height: 26px; font-size: 20px; padding: 10px 20px;
+}
+.menu-stat-coin { width: 26px; height: 26px; image-rendering: pixelated; }
+.menu-player-name { font-weight: 800; font-size: 22px; white-space: nowrap; }
+.menu-profile-avatar-fallback { font-size: 56px; opacity: .5; }
+.menu-corner {
+  position: absolute; top: 14px; right: 12px; z-index: 5;
+  display: flex; flex-direction: column; align-items: stretch; gap: 20px;
+}
+.menu-corner-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.menu-buttons { display: flex; flex-direction: column; gap: 12px; width: 340px; }
+
 /* Title + subtitle get their own backdrop plaque (they sit above the
    menu-body panel in the layout). */
 .menu-title,
@@ -13103,18 +13137,77 @@ body:has(.textbox-overlay) .tooltip {
 .menu-daily-btn:hover { transform: scale(1.04); filter: brightness(1.15); }
 .menu-daily-btn.is-available { animation: daily-glow 1.6s ease-in-out infinite; }
 
-@media (max-height: 500px) {
-  /* Landscape mobile — reorganize menu to horizontal */
-  .main-menu-screen { flex-direction: row !important; gap: 0 !important; padding: 10px 24px !important; justify-content: center !important; }
-  .menu-title { font-size: 16px !important; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); }
-  .menu-subtitle { font-size: 9px !important; position: absolute; top: 32px; left: 50%; transform: translateX(-50%); }
-  .menu-body { flex-direction: row; gap: 40px; margin-top: 20px; }
-  .menu-buttons { width: 200px !important; gap: 8px !important; }
-  .menu-buttons .btn-big { font-size: 12px !important; padding: 6px 12px !important; height: auto !important; }
-  .menu-user-info { align-items: flex-start; gap: 8px; }
-  .menu-user-info .orbit-font { font-size: 16px !important; }
-  .menu-user-info .badge { font-size: 13px !important; padding: 5px 10px !important; }
-  .menu-logout-btn { display: block; }
+/* ═══ TELEFON QUER — Hauptmenue (v836) ═════════════════════════════════
+   Ersetzt den Block von vor v803 (`max-height: 500px`), der noch
+   `.menu-title`/`.menu-subtitle` kannte und die Knoepfe auf 12px
+   Schrift drueckte — mit dem 0.70-Massstab darunter waren das 8 echte
+   Pixel. Grundsatz wie beim Login: nicht schrumpfen, sondern die Breite
+   nutzen. Innen ist ein Telefon quer ~1140-1300 Layout-Pixel breit und
+   nur ~515-590 hoch.
+
+   Aufbau:
+     • Kopfzeile oben: links Avatar · Name · ELO · SC in EINER Zeile
+       (die Rinne neben dem Bestenlisten-Kasten entfaellt — dort war
+       der Avatar halb aus dem Bild), rechts LOGOUT · Regler · Discord-
+       Pille. Das Logo dazwischen, 48px hoch.
+     • Der Knopfstreifen beginnt fest bei 84px (`!important` schlaegt
+       die per JS gemessene `padding-top`; die Messung liest danach
+       einfach 84 ab) und traegt die Knoepfe in ZWEI Spalten: 5 Zeilen à
+       48px statt 8 à 66 — der Puzzle-Doppelknopf und HOW TO PLAY gehen
+       ueber beide Spalten.
+     • Die Seitenkaesten (Top Players / Your Record) sind wieder da,
+       schmaler, und reichen von der Streifenoberkante bis fast zum
+       unteren Rand statt exakt so hoch wie der Streifen zu sein. */
+@media (max-height: 600px) {
+  .main-menu-screen { justify-content: flex-start !important; padding-top: 84px !important; gap: 0 !important; }
+  .main-menu-screen .pp-logo-img { height: 48px; }
+  /* Kopfzeile links */
+  .menu-topleft {
+    display: flex; align-items: center; gap: 12px;
+    position: absolute; top: 10px; left: 14px; z-index: 5;
+  }
+  .menu-topleft .menu-stats,
+  .menu-topleft .menu-profile-gutter { position: static; width: auto; }
+  .menu-profile-gutter { order: -1; flex-direction: row; gap: 10px; }
+  .menu-profile-gutter .menu-player-name { order: 1; }   /* Avatar vor dem Namen */
+  .menu-profile-avatar { width: 40px; border-width: 3px; }
+  .menu-profile-avatar-fallback { font-size: 22px; }
+  .menu-player-name { font-size: 18px; }
+  .menu-stats-row { gap: 8px; }
+  .menu-stat-badge { font-size: 14px; padding: 6px 12px; line-height: 20px; gap: 6px; }
+  .menu-stat-coin { width: 18px; height: 18px; }
+  /* Kopfzeile rechts: eine Zeile, Discord als Pille */
+  .menu-corner { flex-direction: row; align-items: center; gap: 10px; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
+  .menu-corner .discord-btn--block { width: auto; padding: 7px 12px; }
+  .menu-corner .discord-btn--block svg { width: 22px; }
+  /* Knopfstreifen: zwei Spalten */
+  /* Der Streifen reicht wie die Seitenkaesten bis 12px vor den unteren
+     Rand (84 oben + 12 unten), die Knoepfe sitzen darin mittig. */
+  .menu-body {
+    padding: 14px 18px; gap: 0; border-radius: 12px;
+    min-height: calc(100 * var(--vh) - 96px); justify-content: center;
+  }
+  .menu-buttons {
+    display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: dense;
+    gap: 12px; width: 420px;
+  }
+  .menu-buttons > .menu-nav-row,
+  .menu-buttons > .btn-big:last-child { grid-column: span 2; }
+  .menu-buttons .btn-big { height: 56px; font-size: 16px !important; }
+  .menu-buttons .btn-big.menu-nav-btn--half { font-size: 14px !important; }
+  /* Seitenkaesten: eingeblendet, schmal genug fuer 667px breite Geraete,
+     Hoehe von der Streifenoberkante bis zum unteren Rand */
+  .menu-side {
+    display: flex !important;
+    width: min(300px, calc(50 * var(--vw) - 268px));
+    height: auto !important; bottom: 12px; max-height: none;
+  }
+  .menu-side-panel { padding: 12px 14px 14px; border-radius: 10px; }
+  .menu-side-title { font-size: 14px; padding-bottom: 6px; }
+  .menu-lb-row { padding: 6px 8px; font-size: 14px; }
+  .menu-record-cell { padding: 9px 4px; }
+  .menu-record-cell b { font-size: 22px; }
+  .menu-deck-card { padding: 7px 9px; gap: 9px; }
 }
 
 /* ═══ Create Game modal compact ═══ */
@@ -14185,8 +14278,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* Formular und seine beiden Spalten: auf dem Desktop schlicht EINE Spalte
    (Hauptteil, darunter die Alternativen), Abstand 12 wie zuvor. */
 .auth-form, .auth-form-main, .auth-form-alt { display: flex; flex-direction: column; gap: 12px; }
-/* Reiterbalken: 8 + Spaltenabstand 12 = die frueheren 20 darunter. */
-.auth-form .auth-tabs { margin-bottom: 8px; }
+/* Reiterbalken (steht VOR dem Formular, volle Kastenbreite): 20 darunter
+   wie im alten Inline-Stand. */
+.auth-tabs { margin-bottom: 20px; }
 /* Beide Fusszeilen teilen sich EIN Fach fester Mindesthoehe (Anmelden:
    Passwort-Link, Registrieren: zweizeiliger Hinweis) — sonst huepft der
    Kasten beim Reiterwechsel. 34px = zwei Zeilen à 11.5px bei 1.5. */
@@ -14296,7 +14390,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .auth-form--single { max-width: 380px; margin: 0 auto; width: 100%; }
   /* Reiter und Knoepfe flacher. */
   .auth-screen .tab { padding: 7px 16px; min-width: 100px; font-size: 13px; }
-  .auth-form .auth-tabs { margin-bottom: 4px; }
+  .auth-tabs { margin-bottom: 10px; }
   .auth-screen .btn-big { padding: 11px 20px; }
   .auth-footer { min-height: 0; }
   /* Ablage oben rechts: EINE Zeile statt Spalte, Discord als Pille statt
@@ -15839,4 +15933,36 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   28%  { transform: scale(1.35); opacity: 1; }
   70%  { transform: scale(1.65); opacity: .5; }
   100% { transform: scale(1.9);  opacity: 0; }
+}
+
+/* ═══ LITE-MODUS — Sparbetrieb fuer Telefone (v836) ═══════════════════
+   Al, 8.9.: „das Spiel laggt auf meinem Handy". Auf einem Telefon-GPU
+   sind vier Dinge der Menue-Oberflaeche teuer, die auf dem Desktop
+   nicht auffallen:
+     1. `backdrop-filter: blur` — jeder gebluerte Kasten wird bei JEDEM
+        Frame neu gefiltert, sobald sich dahinter etwas bewegt (die
+        Kartenwand bewegt sich immer). 44 Stellen in dieser Datei.
+     2. 310 Partikel (150 Logo + 160 Hintergrund) mit je zwei animierten
+        Leuchtschatten (`box-shadow`).
+     3. Die Titelkulisse: bildschirmfuellende Ebenen mit `mix-blend-mode:
+        screen` (Blitz, Bloom, Flash) und 46 Glut-Funken.
+     4. Dauer-Animationen auf `box-shadow` (DAILY-Glimmen): box-shadow
+        kann der Compositor nicht, jeder Frame ist ein Neuzeichnen.
+   Alles hier ist Kosmetik; die Optik bleibt erkennbar, nur duenner.
+   Dieselbe Schwelle wie die Telefon-Layouts; `pointer: coarse` haelt
+   Desktop-Fenster in Briefkastenform aussen vor. */
+@media (pointer: coarse) and (max-height: 600px) {
+  * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  /* Partikel: ohne Leuchtschatten, und nur die ersten 60 je Schicht */
+  .pp-logo-particle, .pp-bg-particle { box-shadow: none; }
+  .pp-logo-particle:nth-child(n+61), .pp-bg-particle:nth-child(n+61) { display: none; }
+  /* Titelkulisse: Blitz/Bloom/Flash-Ebenen (Screen-Blending) aus,
+     Glut-Funken auf 15 gedeckelt, Bolt-Filter aus */
+  .anim-bloom, .anim-flash, .anim-lightning { display: none; }
+  .anim-embers > span:nth-child(n+16) { display: none; }
+  .anim-vignette { animation: none; }
+  /* DAILY-Glimmen: statisch statt animiert */
+  .menu-daily-btn.is-available { animation: none; box-shadow: 0 0 10px rgba(255,215,0,.6); border-color: #ffd700; }
+  /* Knopf-Glimmen im Hauptmenue nicht pulsieren lassen */
+  .menu-buttons .btn { transition: none; }
 }

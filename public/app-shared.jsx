@@ -8,20 +8,58 @@ window._isTouchDevice = false;
 window.addEventListener('touchstart', function onFirstTouch() {
   window._isTouchDevice = true;
   window.removeEventListener('touchstart', onFirstTouch);
-  // Auto-request fullscreen on mobile landscape
-  if (window.innerWidth > window.innerHeight && document.documentElement.requestFullscreen) {
-    try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch {}
-  }
 }, { passive: true });
+
+// ═══ VOLLBILD AUF DEM TELEFON (v836) ═══════════════════════════════════
+// Al, 8.9.: „auf dem Handy sehe ich konstant eine Kopfzeile mit X, dem
+// Namen des Tabs und Share". Das ist die Leiste des Browsers (Chrome
+// Custom Tab bzw. In-App-Browser) — eine Seite kann sie nicht
+// ausblenden, sie kann nur in den Vollbildmodus wechseln. Genau das
+// versuchte der alte Code seit jeher bei der ersten Beruehrung … in
+// einem `touchstart`-Listener. `touchstart` ZAEHLT NICHT ALS
+// NUTZERAKTIVIERUNG (die Liste: keydown, mousedown, pointerdown mit
+// Maus, pointerup, touchend), `requestFullscreen` wurde also jedes Mal
+// still abgelehnt — der Vollbildwechsel hat auf Telefonen nie
+// funktioniert. Jetzt haengt er an `touchend`.
+//
+// Ablauf: erste Beruehrung im Querformat → Vollbild + Querformat-Sperre
+// (`screen.orientation.lock`, nur im Vollbild erlaubt; auf iOS gibt es
+// weder das eine noch das andere — dort bleibt nur „Zum Home-Bildschirm",
+// siehe manifest.json). Verlaesst der Spieler das Vollbild (Zurueck-
+// Geste), scharft sich der Griff nach 1,5 s wieder: die naechste
+// Beruehrung holt es zurueck. Das ist das uebliche Verhalten von
+// Browserspielen im Querformat.
+function _ppRequestFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement || !el.requestFullscreen) return;
+  if (window.innerWidth <= window.innerHeight) return;
+  try {
+    const p = el.requestFullscreen({ navigationUI: 'hide' });
+    if (p && p.then) p.then(() => {
+      try {
+        const o = screen.orientation;
+        if (o && o.lock) o.lock('landscape').catch(() => {});
+      } catch {}
+    }).catch(() => {});
+  } catch {}
+}
+window._ppRequestFullscreen = _ppRequestFullscreen;
+function _ppArmFullscreenOnTouch() {
+  window.addEventListener('touchend', function onTouch() {
+    window._isTouchDevice = true;
+    window.removeEventListener('touchend', onTouch);
+    _ppRequestFullscreen();
+  }, { passive: true });
+}
+_ppArmFullscreenOnTouch();
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && window._isTouchDevice) setTimeout(_ppArmFullscreenOnTouch, 1500);
+});
 
 // Re-request fullscreen when rotating to landscape (if previously granted)
 window.addEventListener('orientationchange', () => {
   if (!window._isTouchDevice) return;
-  setTimeout(() => {
-    if (window.innerWidth > window.innerHeight && !document.fullscreenElement && document.documentElement.requestFullscreen) {
-      try { document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {}); } catch {}
-    }
-  }, 300);
+  setTimeout(_ppRequestFullscreen, 300);
 });
 
 // ===== MOBILE LONG-PRESS TOOLTIP SYSTEM =====
@@ -1485,7 +1523,16 @@ function _warmImageUrls(urls, onDone) {
 // never feels it.
 function _preloadDeferOnSlowConn() {
   const conn = navigator.connection;
-  return !!(conn && (conn.saveData || /(^|[^0-9])2g$/.test(conn.effectiveType || '')));
+  if (conn && (conn.saveData || /(^|[^0-9])2g$/.test(conn.effectiveType || ''))) return true;
+  // v836: auf Telefonen (grober Zeiger, flaches Querformat) ebenfalls
+  // nicht — ~730 Vollbilder plus Shop-Grafiken im Hintergrund zu laden
+  // und zu dekodieren kostet auf einem Handy Bildrate und Datenvolumen,
+  // waehrend der Spieler gerade das Menue benutzt. Dieselbe Schwelle wie
+  // das Telefon-Layout in style.css.
+  try {
+    if (window.matchMedia && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches) return true;
+  } catch {}
+  return false;
 }
 
 let _cardArtPreloadStarted = false;

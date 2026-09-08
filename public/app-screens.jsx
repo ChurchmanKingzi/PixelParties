@@ -317,7 +317,7 @@ function AnimatedTitleBackdrop() {
           </svg>
         </div>
         {/* 13 — embers */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        <div className="anim-embers" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {embers.map((e, i) => (
             <span key={i} style={{
               position: 'absolute', bottom: '-1.296vh', left: e.left.toFixed(2) + '%',
@@ -654,15 +654,17 @@ function AuthScreen() {
   let body;
   if (mode === 'login' || mode === 'signup') {
     body = (
+      <>
+        {/* Reiterbalken VOR dem Formular ueber die volle Kastenbreite
+            (v836, Als Rueckmeldung: im Telefon-Layout sass er in der linken
+            Spalte und damit nicht mehr mittig unter dem Logo). marginBottom
+            20 wie urspruenglich, in style.css. */}
+        <div className="tab-bar auth-tabs">
+          <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => setMode('login')}>LOG IN</div>
+          <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => setMode('signup')}>SIGN UP</div>
+        </div>
       <div className="auth-form">
         <div className="auth-form-main">
-          {/* Reiter jetzt INNERHALB der Hauptspalte (vorher davor, mit
-              marginBottom 20). Die Spalte hat gap 12, der Reiterbalken
-              bekommt in style.css 8px darunter — zusammen dieselben 20. */}
-          <div className="tab-bar auth-tabs">
-            <div className={'tab' + (mode === 'login' ? ' active' : '')} onClick={() => setMode('login')}>LOG IN</div>
-            <div className={'tab' + (mode === 'signup' ? ' active' : '')} onClick={() => setMode('signup')}>SIGN UP</div>
-          </div>
           {mode === 'login' ? (
             <>
               <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
@@ -748,6 +750,7 @@ function AuthScreen() {
           <div className="auth-fine" style={{ textAlign: 'center' }}>Jump into a match with a Starter Deck — no account needed.</div>
         </div>
       </div>
+      </>
     );
   } else if (mode === 'verify') {
     body = (
@@ -1365,8 +1368,11 @@ function MainMenu() {
     // logout/volume tray that floats over the corner. That child is
     // the menu's natural visual top (the title <h1>).
     const firstFlowChild = Array.from(screenEl.children).find(c => {
-      const pos = getComputedStyle(c).position;
-      return pos !== 'absolute' && pos !== 'fixed';
+      const cs = getComputedStyle(c);
+      // `display: contents` (die Huelle `.menu-topleft`, v836) hat keinen
+      // eigenen Kasten — ihr Rect waere 0/0 und der Anker saesse falsch.
+      if (cs.display === 'contents') return false;
+      return cs.position !== 'absolute' && cs.position !== 'fixed';
     });
     if (!firstFlowChild) return;
     const screenRect = screenEl.getBoundingClientRect();
@@ -1761,12 +1767,23 @@ function MainMenu() {
           <div className="pp-logo-tint" aria-hidden="true"></div>
         </div>
       </div>
-      <div style={{ position: 'absolute', top: 14, left: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, zIndex: 5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* ── OBEN LINKS (v836): Statistik-Plaketten und Name/Avatar in EINER
+          Huelle. Auf dem Desktop ist die Huelle `display: contents` — die
+          beiden Bloecke liegen genau wie vorher (Plaketten oben links,
+          Name+Avatar in der Rinne neben dem Bestenlisten-Kasten). Im
+          Telefon-Layout wird die Huelle zu einer Zeile oben links:
+          Avatar, Name, ELO, SC nebeneinander — die Rinne gibt es dort nicht
+          mehr (Als Befund 8.9.: „Avatar und Spielername zu weit links und
+          halb aus dem Bild"). Alle Layout-Masse stehen in style.css unter
+          `.menu-stats` / `.menu-profile-gutter` / `.menu-corner`; Inline
+          bleibt nur, was vom Spieler abhaengt (Farbe, Bild, Messwerte). */}
+      <div className="menu-topleft">
+      <div className="menu-stats">
+        <div className="menu-stats-row">
           {/* ELO + SC stats (the name now lives above the avatar below). */}
-          <span className="badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)', display: 'flex', alignItems: 'center', lineHeight: '26px', fontSize: 20, padding: '10px 20px' }}>ELO {user.elo}</span>
-          <span className="badge" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, padding: '10px 20px' }}>
-            <img src="/data/sc.png" style={{ width: 26, height: 26, imageRendering: 'pixelated' }} /> {user.sc || 0}
+          <span className="badge menu-stat-badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)' }}>ELO {user.elo}</span>
+          <span className="badge menu-stat-badge menu-stat-badge--sc" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700' }}>
+            <img src="/data/sc.png" className="menu-stat-coin" /> {user.sc || 0}
           </span>
         </div>
       </div>
@@ -1775,7 +1792,7 @@ function MainMenu() {
           panel (equal gaps on both sides). Clicking either opens the profile. */}
       <div className="menu-profile-gutter" style={panelTop != null ? { top: panelTop } : undefined}>
         <span className="orbit-font menu-player-name" onClick={() => setScreen('profile')} title="View Profile"
-          style={{ color: user.color || 'var(--accent)', fontWeight: 800, fontSize: 22, whiteSpace: 'nowrap' }}>{user.username}</span>
+          style={{ color: user.color || 'var(--accent)' }}>{user.username}</span>
         <div className="menu-profile-avatar" onClick={() => setScreen('profile')} title="View Profile"
           style={{
             color: user.color || 'var(--accent)',
@@ -1784,11 +1801,12 @@ function MainMenu() {
           }}>
           {user.avatar
             ? <img src={user.avatar} style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'pixelated' }} />
-            : <span style={{ fontSize: 56, opacity: 0.5 }}>👤</span>}
+            : <span className="menu-profile-avatar-fallback">👤</span>}
         </div>
       </div>
-      <div style={{ position: 'absolute', top: 14, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 20, zIndex: 5 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+      </div>
+      <div className="menu-corner">
+        <div className="menu-corner-row">
           <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
             <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
             {logoutConfirm && (
@@ -1811,7 +1829,7 @@ function MainMenu() {
         <DiscordButton block />
       </div>
       <div ref={menuBodyRef} className="menu-body ornate-frame" style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 340 }} className="animate-in menu-buttons">
+        <div className="animate-in menu-buttons">
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('play')}>
             <span className="menu-nav-label">PLAY ONLINE</span></button>
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
