@@ -80,6 +80,16 @@ const HOOKS = {
   // that need to distinguish "you chose to lose this Creature" from
   // any other death.
   ON_CREATURE_SACRIFICED: 'onCreatureSacrificed',
+  // v679b: Feuert im STERBEZWEIG, BEVOR der Kadaver auf einen Stapel
+  // gelegt und der Flug dorthin gesendet wird — und bevor
+  // ON_CREATURE_DEATH laeuft. Genau ein Zweck: Karten, die den
+  // Kadaver fuer sich beanspruchen wollen („statt ihn abzulegen …"),
+  // muessen VOR der Ablage fragen, sonst sieht der Spieler die Karte
+  // erst zum Ablagestapel fliegen und wird danach gefragt (Als Befund
+  // 31.8.). Wer hier beansprucht, stempelt `_deathClaim` auf die
+  // sterbende Instanz; der Tod selbst laeuft danach voellig normal
+  // weiter, inklusive aller on-death-Effekte.
+  ON_CREATURE_DEATH_CLAIM: 'onCreatureDeathClaim',
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
@@ -191,6 +201,32 @@ const ZONES = {
   // Cards on the Stack can be searched, played from the top, or moved
   // back to hand by dedicated "Cool" effects.
   COOLNESS_STACK: 'coolnessStack',
+  // ★ 28.8.: Crestinas Vorrat — offen liegende Karten NEBEN dem
+  // Spieler ("True Fairy Crestina, the Primordial Goddess"). Sie
+  // sind spielbar wie Handkarten, gelten aber ausdruecklich NICHT
+  // als solche: kein Handlimit, kein Ziel fuer Abwurf- oder
+  // Handzugriffs-Effekte (Als Rulings 28.8.). Deshalb eine eigene
+  // Zone statt einer Erweiterung von `hand` — die rund 500 Stellen,
+  // die `.hand` lesen, behalten so ihre Bedeutung.
+  CREATION: 'creationZone',
+  // ★ 5.9.: VERDECKTE Karte unter einer anderen („Monster Nest").
+  // Als Ruling: eine Kreatur, auf die eine andere gelegt wurde, ist
+  // KOMPLETT vom Brett verschwunden — nicht zielbar, zaehlt nicht als
+  // kontrollierte Kreatur, taucht in keiner Zaehlung auf.
+  //
+  // Dieselbe Ueberlegung wie bei CREATION oben: die rund 270 Stellen in
+  // Engine, Server und Kartenskripten, die `zone === 'support'` lesen,
+  // behalten so ihre Bedeutung, statt jede einzeln einen
+  // Verdeckt-Filter zu brauchen. Nachgemessen (5.9.): JEDE
+  // Slot→Instanz-Suche im Projekt filtert vorher auf die Zone, es gibt
+  // also keine Stelle, die eine verdeckte Instanz doch noch findet.
+  //
+  // Die INSTANZ bleibt dieselbe — HP, Counter, Status und Instanz-ID
+  // ueberleben das Verdecken unveraendert; `heroIdx`/`zoneSlot` merken
+  // sich den Platz, auf den sie zurueckkehrt. Ein Skript, das waehrend
+  // des Verdecktseins weiterlaufen soll (Aufraeumen am Zugende), traegt
+  // `activeIn: ['support', 'nested']`.
+  NESTED: 'nested',
 };
 
 // ═══════════════════════════════════════════
@@ -219,6 +255,14 @@ const STATUS_EFFECTS = {
   negated: { negative: true, cleansable: false, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
   burned:  { negative: true, cleansable: true,  label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune', dealsTickDamage: true, damageSourceName: 'Burn' },
   poisoned:{ negative: true, cleansable: true,  label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune', dealsTickDamage: true, damageSourceName: 'Poison' },
+  // `bleeding` (v712, Als Regel 3./4.9.): boolescher Status wie Burn, „for the
+  // rest of the game". KEIN Tick — der Traeger nimmt 50 Schaden NACH jeder
+  // eigenen Handlung: Action (Attack/Spell/Creature, Ability oder
+  // Heldeneffekt mit Action-Kosten, auch Zusatzaktionen), aktiver
+  // Heldeneffekt OHNE Action-Kosten, aktiver Creature-Effekt. NICHT bei
+  // Equipment, `place`, Surprises, Potions, Ascension, passiven Triggern.
+  // Engine: `_processBleedAfterAction` / `_processBleedAfterCreatureEffect`.
+  bleeding:{ negative: true, cleansable: true,  label: 'Bleeding', icon: '🩸', immuneKey: 'bleed_immune', damageSourceName: 'Bleed' },
   // `nulled` is used by permanent silence effects (Null Zone, Shadow etc).
   // Same rationale as `negated` — shouldn't be cleanseable.
   nulled:  { negative: true, cleansable: false, label: 'Nulled',  icon: '🔇', immuneKey: 'null_immune' },
@@ -280,6 +324,8 @@ const STATUS_EFFECTS = {
   cursed:    { negative: true, cleansable: true, label: 'Cursed',    icon: '🧿', immuneKey: 'curse_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
+  // Storm Piano (v628): verhindert jeden normalen Schaden bis zum Ende des naechsten eigenen Zuges.
+  damage_proof: { negative: false, label: 'Damage-proof', icon: '🛡️' },
 };
 
 function getNegativeStatuses() {
@@ -635,6 +681,38 @@ function isCreatureSource(engine, source) {
 
 
 /**
+ * v666 (Als Sweep 30.8.): Ist die Quelle eines Zielwahl-/Treffer-
+ * Fensters ein Attack, ein Spell oder ein Kreatureneffekt?
+ *
+ * Das Surprise-Fenster der Engine (`_checkSurpriseWindow`) oeffnet fuer
+ * JEDE Zielwahl — auch Heldeneffekte (Molindas Uebernahme), Artefakt-
+ * Effekte, Traenke. Surprises, deren Text „by an Attack, Spell or
+ * Creature effect" sagt, pruefen das hier, statt es jede fuer sich
+ * nachzubauen. Zulaessig:
+ *   • `damageType` 'attack', 'creature' oder '*_spell' (Alice-Klasse:
+ *     Heldeneffekt, der „als Spell" gilt; Arthors 300er als Attack);
+ *   • die Quellkarte ist eine Attack- oder Spell-Karte;
+ *   • die Quelle ist eine Kreatur auf dem Brett (`isCreatureSource`).
+ * Ein Held, ein Artefakt oder ein Trank als Quelle ohne solchen Typ
+ * loest NICHT aus. `opts.kinds` schraenkt weiter ein, z.B.
+ * `['attack','spell']` fuer „chosen by an Attack or Spell".
+ */
+function isAttackSpellOrCreatureSource(engine, sourceInfo, opts = {}) {
+  if (!sourceInfo || !engine) return false;
+  const kinds = new Set(opts.kinds || ['attack', 'spell', 'creature']);
+  const dt = String(sourceInfo.damageType || '');
+  const srcInst = sourceInfo.cardInstance;
+  const name = sourceInfo.cardName || srcInst?.name;
+  const cd = srcInst
+    ? (engine.getEffectiveCardData?.(srcInst) || engine._getCardDB()[srcInst.name] || (name ? engine._getCardDB()[name] : null))
+    : (name ? engine._getCardDB()[name] : null);
+  if (kinds.has('attack') && (dt === 'attack' || hasCardType(cd, 'Attack'))) return true;
+  if (kinds.has('spell') && (/_spell$/.test(dt) || hasCardType(cd, 'Spell'))) return true;
+  if (kinds.has('creature') && (dt === 'creature' || isCreatureSource(engine, sourceInfo))) return true;
+  return false;
+}
+
+/**
  * Darf `cardName` durch einen GENERISCHEN „beschwöre / belebe eine
  * Creature"-Effekt auf die EIGENE Bretthaelfte gelegt werden?
  *
@@ -687,13 +765,70 @@ function heroCanBeEquipped(hero) {
   return true;
 }
 
+/**
+ * ★ ALLGEMEINE SKALIERUNGSREGEL (Als Vorgabe 5.9.)
+ *
+ * „1/2/3", „100/200/300" und alles in dieser Form: der Wert wird an
+ * einer Stufe abgelesen. Was ausserhalb der aufgezaehlten Stufen liegt,
+ * wird GEKLEMMT — nicht ignoriert, nicht auf null gesetzt:
+ *
+ *   Stufe 0 (oder fehlend)        → der KLEINSTE angegebene Wert
+ *   Stufe groesser als die Liste  → der GROESSTE angegebene Wert
+ *
+ * Beispiel Land Sharks („up to 1/2/3 targets, depending on the Hero's
+ * Summoning Magic level"): ohne Summoning Magic bleibt 1 Ziel, bei
+ * Stufe 4+ bleiben es 3.
+ *
+ * @param {number} level   abgelesene Stufe (0 = nicht vorhanden)
+ * @param {Array} values   Werte in Stufenreihenfolge, [Stufe1, Stufe2, …]
+ */
+function scaledByLevel(level, values) {
+  if (!Array.isArray(values) || values.length === 0) return undefined;
+  const n = Number(level);
+  if (!Number.isFinite(n) || n <= 1) return values[0];
+  return values[Math.min(Math.floor(n), values.length) - 1];
+}
+
+/**
+ * Stufe einer Ability an einem Helden — die hoechste ueber alle
+ * Kandidaten-Zonensaetze (ein Held kann mehrere haben, etwa waehrend
+ * eines Formwechsels).
+ *
+ * ★ Stand hier statt in einem Kartenmodul (v778): gebaut wurde die
+ * Funktion fuer Doctor Fester und lebte deshalb in `_bleed-shared.js`
+ * — mit Bleed hat sie aber nichts zu tun. „Wie hoch ist Ability X an
+ * diesem Helden" ist eine allgemeine Frage; Gobbo braucht sie fuer
+ * Fighting, ohne das Blut-Modul anzufassen. `_bleed-shared` reicht
+ * `heroFightingLevel` unveraendert weiter, bestehende Aufrufer bleiben
+ * also gueltig.
+ *
+ * @param {object} engine
+ * @param {number} pi        Spielerindex
+ * @param {number} heroIdx   Heldenindex
+ * @param {string} ability   Name der Ability, z.B. 'Fighting'
+ * @returns {number} Stufe (0 = nicht vorhanden)
+ */
+function heroAbilityLevel(engine, pi, heroIdx, ability) {
+  let best = 0;
+  for (const abZones of engine._getCandidateAbilityZoneSets(pi, heroIdx)) {
+    best = Math.max(best, engine.countAbilitiesForSchool(ability, abZones));
+  }
+  return best;
+}
+
+/** Fighting-Stufe eines Helden. Kuerzel fuer `heroAbilityLevel(..., 'Fighting')`. */
+function heroFightingLevel(engine, pi, heroIdx) {
+  return heroAbilityLevel(engine, pi, heroIdx, 'Fighting');
+}
+
 module.exports = {
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
+  heroAbilityLevel, heroFightingLevel, scaledByLevel,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
   hasCardType, hasSpellSchool, isArtifactCreature, isPileCreature, hasNumericCreatureLevel, isCreatureNegated,
   heroCanBeEquipped,
   isOwnSideSummonableCreature,
-  resolveSourceCreature, isCreatureSource,
+  resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,
   POISON_BASE_DAMAGE, BURN_BASE_DAMAGE,
 };

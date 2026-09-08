@@ -276,7 +276,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   let attached = 0;
   for (let n = 0; n < 3; n++) {
     if (!engine.canAttachAbilityToHero(pi, DIVINITY, targetHeroIdx, { allowRestricted: true })) break;
-    const pulledFrom = pullDivinityFromAnySource(ps);
+    const pulledFrom = pullDivinityFromAnySource(ps, engine);
     if (!pulledFrom) break;
 
     const abZones = ps.abilityZones[targetHeroIdx];
@@ -316,7 +316,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
   engine.sync();
 }
 
-function pullDivinityFromAnySource(ps) {
+function pullDivinityFromAnySource(ps, engine) {
   // Order matches the card text "from your deck, hand or discard
   // pile" — but deck-first would force a shuffle reveal even when
   // a free hand copy is available, so prefer hand → deck → discard
@@ -324,10 +324,14 @@ function pullDivinityFromAnySource(ps) {
   // user wants strict left-to-right text ordering.
   const fromHand = ps.hand.indexOf(DIVINITY);
   if (fromHand >= 0) { ps.hand.splice(fromHand, 1); return 'hand'; }
-  const fromDeck = (ps.mainDeck || []).indexOf(DIVINITY);
-  if (fromDeck >= 0) { ps.mainDeck.splice(fromDeck, 1); return 'deck'; }
-  const fromDisc = (ps.discardPile || []).indexOf(DIVINITY);
-  if (fromDisc >= 0) { ps.discardPile.splice(fromDisc, 1); return 'discard'; }
+  const _taken_fromDeck = engine.takeFromPileSync(ps, 'deck', DIVINITY, { source: CARD_NAME });   // v820: Stapel-Schicht
+  if (_taken_fromDeck) {
+    return 'deck';
+  }
+  const _taken_fromDisc = engine.takeFromPileSync(ps, 'discard', DIVINITY, { source: CARD_NAME });   // v820: Stapel-Schicht
+  if (_taken_fromDisc) {
+    return 'discard';
+  }
   return null;
 }
 

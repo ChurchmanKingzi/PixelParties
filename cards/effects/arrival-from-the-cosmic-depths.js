@@ -291,9 +291,8 @@ module.exports = {
 
       // Splice the chosen copy out of the deck. Match by exact name —
       // any copy is equivalent for placement purposes.
-      const firstDeckIdx = ps.mainDeck.indexOf(firstName);
-      if (firstDeckIdx < 0) return; // Shouldn't happen post-prompt
-      ps.mainDeck.splice(firstDeckIdx, 1);
+      const _taken_firstDeckIdx = await engine.takeFromPile(ps, 'deck', firstName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_firstDeckIdx) return; // Shouldn't happen post-prompt
 
       engine._broadcastEvent('play_zone_animation', {
         type: ANIM_PORTAL,
@@ -395,7 +394,7 @@ module.exports = {
       });
       if (!ownPick) return;
 
-      ps.mainDeck.splice(secondDeckIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', secondDeckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
 
       engine._broadcastEvent('play_zone_animation', {
         type: ANIM_PORTAL,

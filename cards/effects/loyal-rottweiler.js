@@ -122,7 +122,11 @@ module.exports = {
       engine.sync();
       return true;
     }
-    ps.mainDeck.splice(stillDeckIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', stillDeckIdx, { source: 'Loyal Rottweiler' }))) {   // v820: Stapel-Schicht
+      // Deck locked — fizzle.
+      engine.sync();
+      return true;
+    }
 
     if (!ps.supportZones[ownHeroIdx]) ps.supportZones[ownHeroIdx] = [[], [], []];
     // The slot SHOULD be empty now (sacrifice cleared it) — if some
@@ -133,7 +137,7 @@ module.exports = {
     if (!placeResult) {
       // No free zone left at all — return the card to deck top so it
       // isn't silently lost.
-      ps.mainDeck.splice(stillDeckIdx, 0, loyalName);
+      engine.returnToPile(ps, 'deck', loyalName, stillDeckIdx);   // v820: Stapel-Schicht
       engine.sync();
       return true;
     }

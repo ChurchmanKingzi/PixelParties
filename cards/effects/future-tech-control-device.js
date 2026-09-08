@@ -141,13 +141,12 @@ module.exports = {
 
       if (zaehleInAblage(gs, pi, CARD_NAME) > 0) {
         // Eine Kopie aus der eigenen Ablage loeschen — der Preis.
-        const idx = ps.discardPile.lastIndexOf(CARD_NAME);
-        if (idx >= 0) {
+        const _taken_idx = await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+        if (_taken_idx) {
           engine._broadcastEvent('play_pile_transfer', {
             owner: pi, cardName: CARD_NAME, from: 'discard', to: 'deleted',
           });
           await engine._delay(420);
-          ps.discardPile.splice(idx, 1);
           if (!ps.deletedPile) ps.deletedPile = [];
           ps.deletedPile.push(CARD_NAME);
           // ★ Klang zum Loeschen (Als Hinweis 21.8.): der Flug allein

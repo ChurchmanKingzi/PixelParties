@@ -50,6 +50,8 @@ const UEBERSPRINGEN = new Set(['node_modules', 'vendor', 'dist', '.git', 'data',
 // Laufzeit-Globals. Alles, was hier NICHT steht und nirgends
 // deklariert ist, gilt als Fund.
 const GLOBALS = new Set([
+  // v800: fehlten, seit auch die Client-Dateien geprueft werden.
+  'CSS', 'MouseEvent',
   'require', 'module', 'exports', '__dirname', '__filename', 'process', 'console',
   'Buffer', 'global', 'globalThis', 'queueMicrotask', 'structuredClone', 'arguments',
   'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval', 'clearImmediate',
@@ -91,7 +93,49 @@ function zusatzGlobals(dateipfad) {
   for (const eintrag of GEREICHTE_NAMEN) {
     if (rel.startsWith(eintrag.pfad)) return new Set(eintrag.namen);
   }
+  // Die Client-Dateien unter `public/` liegen in getrennten Bundles und
+  // reichen sich Bausteine AUSDRUECKLICH ueber `window` weiter:
+  // `window.MainMenu = MainMenu` in der einen Datei macht den Namen in
+  // allen anderen benutzbar. Genau diese Zuweisungen — und NUR sie —
+  // gelten hier als gebunden.
+  //
+  // ★ v809: vorher galt die Vereinigung ALLER obersten Namen dieser
+  // Dateien. Das war zu grosszuegig und hat einen echten Fehler
+  // verdeckt: eine neue Komponente, die in einer Datei definiert und in
+  // einer anderen benutzt, aber nie an `window` gehaengt wurde, sah
+  // gebunden aus und war zur Laufzeit undefiniert. Die Liste der
+  // `window.X =`-Zuweisungen ist das, was zur Laufzeit tatsaechlich
+  // zaehlt.
+  if (rel.startsWith('public' + path.sep)) return client_fenster_namen();
   return null;
+}
+
+let _clientNamen = null;
+function client_fenster_namen() {
+  if (_clientNamen) return _clientNamen;
+  _clientNamen = new Set();
+  const dir = path.join(WURZEL, 'public');
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith('.jsx')) continue;
+    let ast;
+    try {
+      ast = parser.parse(fs.readFileSync(path.join(dir, name), 'utf8'), {
+        sourceType: 'script', allowReturnOutsideFunction: true, plugins: ['jsx'],
+      });
+    } catch { continue; }
+    // Nur `window.X = …` zaehlt — das ist der Weg, ueber den die Bundles
+    // sich gegenseitig sichtbar machen.
+    for (const knoten of ast.program.body) {
+      if (knoten.type !== 'ExpressionStatement') continue;
+      const a = knoten.expression;
+      if (!a || a.type !== 'AssignmentExpression' || a.operator !== '=') continue;
+      const ziel = a.left;
+      if (ziel.type !== 'MemberExpression' || ziel.computed) continue;
+      if (ziel.object.type !== 'Identifier' || ziel.object.name !== 'window') continue;
+      if (ziel.property.type === 'Identifier') _clientNamen.add(ziel.property.name);
+    }
+  }
+  return _clientNamen;
 }
 
 function jsDateien(verzeichnis, treffer = []) {
@@ -101,7 +145,14 @@ function jsDateien(verzeichnis, treffer = []) {
     if (eintrag.isDirectory()) {
       if (UEBERSPRINGEN.has(eintrag.name)) continue;
       jsDateien(p, treffer);
-    } else if (eintrag.name.endsWith('.js')) {
+    } else if (eintrag.name.endsWith('.js') || eintrag.name.endsWith('.jsx')) {
+      // ★ .jsx seit v800 dabei (Al-Absturz „azc is not defined", 5.9.).
+      // Die Client-Dateien lagen ausserhalb der Pruefung, und `dist/`
+      // wird uebersprungen — ein Bezeichner, der beim Umbauen einer
+      // Funktion ohne seine Bindung zurueckblieb, kam damit ungebremst
+      // bis ins laufende Spiel. Genau dieser Fall ist hier der Regelfall,
+      // nicht die Ausnahme: `public/app-board.jsx` hat ueber 38.000
+      // Zeilen.
       treffer.push(p);
     }
   }
@@ -113,7 +164,13 @@ function pruefeDatei(dateipfad) {
   const quelltext = fs.readFileSync(dateipfad, 'utf8');
   let ast;
   try {
-    ast = parser.parse(quelltext, { sourceType: 'script', allowReturnOutsideFunction: true });
+    ast = parser.parse(quelltext, {
+      sourceType: 'script',
+      allowReturnOutsideFunction: true,
+      // JSX nur fuer .jsx einschalten — in reinen .js-Dateien soll ein
+      // versehentliches `<` weiterhin ein Syntaxfehler sein.
+      plugins: dateipfad.endsWith('.jsx') ? ['jsx'] : [],
+    });
   } catch (err) {
     return [{ name: `(nicht lesbar: ${err.message})`, zeilen: [] }];
   }

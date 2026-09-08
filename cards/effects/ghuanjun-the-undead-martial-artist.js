@@ -221,7 +221,7 @@ module.exports = {
         if (e.source?.usesHeroAtk && hero) {
           const diff = (hero.atk || 0) - (hero.baseAtk || 0);
           if (diff !== 0) {
-            e.amount = Math.max(0, e.amount - diff);
+            e.modifyAmount(-Math.min(diff, e.amount));   // flat (Punkt vor Strich)
           }
         }
       }

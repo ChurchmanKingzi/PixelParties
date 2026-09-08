@@ -161,9 +161,8 @@ module.exports = {
       // `living-illusion.js` es tut, und melden die Decksuche an den
       // Client.
       if (source === 'deck') {
-        const deckIdx = ps.mainDeck.indexOf(CARD_NAME);
-        if (deckIdx < 0) return;
-        ps.mainDeck.splice(deckIdx, 1);
+        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_deckIdx) return;
         engine._broadcastEvent('deck_search_add', { cardName: CARD_NAME, playerIdx: pi });
       }
 

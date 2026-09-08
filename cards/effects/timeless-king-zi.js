@@ -262,8 +262,7 @@ module.exports = {
 
     // ── Step 2: remove one copy of each chosen Spell from the deck ──
     for (const name of chosen) {
-      const idx = ps.mainDeck.indexOf(name);
-      if (idx >= 0) ps.mainDeck.splice(idx, 1);
+      await engine.takeFromPile(ps, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
     }
     engine.sync();
 

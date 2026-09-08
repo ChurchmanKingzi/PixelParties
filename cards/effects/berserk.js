@@ -60,166 +60,38 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
   return n;
 }
 
+const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
   // Need at least one Hero (any side) with a free Support slot.
-  spellPlayCondition(gs) {
-    for (let p = 0; p < 2; p++) {
-      const ps = gs.players[p];
-      for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        const zones = ps.supportZones?.[hi] || [];
-        for (let si = 0; si < 3; si++) {
-          if (((zones[si] || []).length === 0)) return true;
-        }
-      }
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
-      // Self-cast gate: only fire when this card's own onPlay invocation
-      // is for THIS instance in hand.
       if (ctx.cardZone !== 'hand') return;
       if (ctx.playedCard?.id !== ctx.card.id) return;
-
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
-      const casterHeroIdx = ctx.cardHeroIdx;
-
-      // ── Build target list: any living Hero on either side with a
-      //    free Support slot. Both `hero` and per-zone `equip` entries
-      //    are added so the prompt accepts either click; matches the
-      //    Anti Magic pattern so the UI feels identical between
-      //    attachment Spells.
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        const tps = gs.players[p];
-        for (let hi = 0; hi < (tps?.heroes || []).length; hi++) {
-          const hero = tps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          const zones = tps.supportZones?.[hi] || [];
-          let hasFreeZone = false;
-          for (let si = 0; si < 3; si++) {
-            if (((zones[si] || []).length === 0)) {
-              hasFreeZone = true;
-              targets.push({
-                id: `equip-${p}-${hi}-${si}`,
-                type: 'equip',
-                owner: p, heroIdx: hi, slotIdx: si,
-                cardName: '',
-              });
-            }
-          }
-          if (hasFreeZone) {
-            targets.push({
-              id: `hero-${p}-${hi}`,
-              type: 'hero',
-              owner: p, heroIdx: hi,
-              cardName: hero.name,
-            });
-          }
-        }
-      }
-      if (targets.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // ── Pick target ──
-      let targetOwner, targetHeroIdx, targetSlot;
-      const heroTargets = targets.filter(t => t.type === 'hero');
-      const zoneTargets = targets.filter(t => t.type === 'equip');
-      if (heroTargets.length === 1 && zoneTargets.length === 1) {
-        targetOwner = heroTargets[0].owner;
-        targetHeroIdx = heroTargets[0].heroIdx;
-        targetSlot = zoneTargets[0].slotIdx;
-      } else {
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: CARD_NAME,
-          description: 'Attach Berserk to any Hero. That Hero can only Attack (max 2/turn) but gets one free additional Attack per turn.',
-          confirmLabel: '😡 Attach!',
-          confirmClass: 'btn-danger',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-          greenSelect: true,
-        });
-        if (!picked || picked.length === 0) { gs._spellCancelled = true; return; }
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-        targetOwner = target.owner;
-        if (target.type === 'equip') {
-          targetHeroIdx = target.heroIdx;
-          targetSlot = target.slotIdx;
-        } else {
-          targetHeroIdx = target.heroIdx;
-          const tps = gs.players[targetOwner];
-          for (let si = 0; si < 3; si++) {
-            if (((tps.supportZones[targetHeroIdx] || [])[si] || []).length === 0) {
-              targetSlot = si;
-              break;
-            }
-          }
-        }
-      }
-      if (targetSlot === undefined) return;
-
+      // v650: Anlegen ueber den geteilten Vorgang — beide Seiten, Anti-
+      // Magic-Schutz des Wirts inklusive (blockiert → Karte in den
+      // Discard des Casters, wie bisher).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        sides: [pi, pi === 0 ? 1 : 0],
+        description: 'Attach Berserk to any Hero. That Hero can only Attack (max 2/turn) but gets one free additional Attack per turn.',
+        confirmLabel: '😡 Attach!', confirmClass: 'btn-danger', skipEnterHook: true,
+      });
+      if (!res) return;
+      const { host, inst } = res;
+      const targetOwner = host.owner, targetHeroIdx = host.heroIdx;
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
-      if (!targetHero?.name || targetHero.hp <= 0) return;
-
-      // ── Anti Magic gate ──
-      // If the target Hero is Anti-Magic-immune at Berserk's level
-      // (Lv 2 Spell → magic_immune.level >= 2 covers it), the card
-      // must NOT attach. Per the user spec for Anti-Magic-blocked
-      // Attachments: route straight to the original owner's discard
-      // pile and leave the Support Zone slot free. Achieved by
-      // bailing BEFORE the support-zone push + the
-      // `gs._spellPlacedOnBoard = true` flag — server.js's
-      // post-resolve path then runs the standard discard routing
-      // (hand splice → originalOwner's discardPile push) for free.
-      if (engine._isHeroSpellProtected(targetHero, CARD_NAME)) {
-        engine.log('berserk_blocked', { target: targetHero.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(targetHero);
-        engine.sync();
-        return;
-      }
-
-      // ── Place Berserk in target's Support Zone ──
-      if (!tps.supportZones[targetHeroIdx]) tps.supportZones[targetHeroIdx] = [[], [], []];
-      if (!tps.supportZones[targetHeroIdx][targetSlot]) tps.supportZones[targetHeroIdx][targetSlot] = [];
-      tps.supportZones[targetHeroIdx][targetSlot].push(CARD_NAME);
-
-      // Re-track the live inst in the target's support zone; untrack
-      // the hand copy.
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-      const inst = engine._trackCard(CARD_NAME, targetOwner, 'support', targetHeroIdx, targetSlot);
-      // Discard routing override — the user spec says "all copies of
-      // Berserk on it automatically go to their ORIGINAL OWNER's
-      // discard pile". `_addCardToState` for ZONES.DISCARD reads
-      // `inst.originalOwner`, which `_trackCard` defaults to `owner`
-      // (the host of the support zone — wrong here). Re-bind it to
-      // the caster (`pi`) so when the cleanse path destroys this
-      // copy, it routes to the caster's pile, not the host's.
-      inst.originalOwner = pi;
-
-      // Tell the server not to discard — the card lives on the board.
-      gs._spellPlacedOnBoard = true;
-
-      // ── Apply the boolean berserked status ──
-      // If the target already has `berserked` (a prior Berserk Attachment),
-      // this second copy still occupies a Support slot but contributes
-      // nothing extra: same status, same single per-turn charge. Per
-      // the card text: "multiple copies on the same Hero do nothing".
       if (!targetHero.statuses?.berserked) {
         await engine.addHeroStatus(targetOwner, targetHeroIdx, STATUS_NAME, {
           appliedBy: pi,

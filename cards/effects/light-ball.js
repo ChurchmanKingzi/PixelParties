@@ -60,6 +60,7 @@
 
 const { getCleansableStatuses } = require('./_hooks');
 
+const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const CARD_NAME = 'Light Ball';
 
 /** First free Support Zone slot on `heroIdx` of `ps`, or -1. */
@@ -80,16 +81,10 @@ module.exports = {
    * Playable iff at least one own living Hero has a free Support
    * Zone slot to host the Attachment.
    */
-  spellPlayCondition(gs, pi) {
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (findFreeSlot(ps, hi) >= 0) return true;
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return attachmentHostsFor(gs, pi, engine).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
 
   hooks: {
     onPlay: async (ctx) => {
@@ -110,106 +105,15 @@ module.exports = {
       // auto-attaches to that Hero's leftmost free slot
       // (`_autoSlot`); clicking a specific empty slot attaches there
       // directly. Same shape Modnir / Bill / Curse / Berserk all use.
-      const targets = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        const slots = ps.supportZones?.[hi] || [];
-        let leftmostFree = -1;
-        for (let si = 0; si < 3; si++) {
-          if (!slots[si] || slots[si].length === 0) {
-            if (leftmostFree < 0) leftmostFree = si;
-            targets.push({
-              id: `equip-${pi}-${hi}-${si}`,
-              type: 'equip',
-              owner: pi, heroIdx: hi, slotIdx: si,
-              cardName: '',
-            });
-          }
-        }
-        if (leftmostFree >= 0) {
-          targets.push({
-            id: `hero-${pi}-${hi}`,
-            type: 'hero',
-            owner: pi, heroIdx: hi,
-            cardName: hero.name,
-            _autoSlot: leftmostFree,
-          });
-        }
-      }
-      if (targets.length === 0) { gs._spellCancelled = true; return; }
-
-      let destHero;
-      let destSlot;
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
-        const si = gs._attachmentZoneSlot;
-        const slot = (ps.supportZones[casterHeroIdx] || [])[si] || [];
-        if (slot.length === 0) { destHero = casterHeroIdx; destSlot = si; }
-      }
-      if (destHero == null) {
-        let picked;
-        const heroOnlyTargets = targets.filter(t => t.type === 'hero');
-        const zoneOnlyTargets = targets.filter(t => t.type === 'equip');
-        // Auto-resolve when there's exactly one Hero with one free
-        // slot (single legal placement on either click). The picker
-        // would otherwise show one Hero + one slot redundantly.
-        if (heroOnlyTargets.length === 1 && zoneOnlyTargets.length === 1) {
-          picked = heroOnlyTargets[0];
-        } else {
-          // `engine.promptEffectTarget` is the correct call —
-          // `ctx.promptEffectTarget` doesn't exist (the ctx wrapper
-          // only exposes `promptTarget` / `promptDamageTarget` /
-          // `promptMultiTarget`). Curse / Gathering Storm / Divine
-          // Zeal all use the engine path.
-          const result = await engine.promptEffectTarget(pi, targets, {
-            title: CARD_NAME,
-            description: 'Choose one of your Heroes (auto-leftmost-free slot) or click a specific empty Support Zone.',
-            confirmLabel: '✨ Attach!',
-            confirmClass: 'btn-success',
-            cancellable: true,
-            exclusiveTypes: true,
-            maxPerType: { hero: 1, equip: 1 },
-            maxTotal: 1,
-            greenSelect: true,
-          });
-          if (!result || result.length === 0) { gs._spellCancelled = true; return; }
-          picked = targets.find(t => t.id === result[0]);
-          if (!picked) { gs._spellCancelled = true; return; }
-        }
-        destHero = picked.heroIdx;
-        destSlot = picked.type === 'hero' ? picked._autoSlot : picked.slotIdx;
-        if (destSlot == null || destSlot < 0) { gs._spellCancelled = true; return; }
-      }
-
-      // ── Anti Magic gate ──
-      // Lv 2 Spell — Anti Magic Lv 2+ on the host covers it. Bail
-      // BEFORE the support-zone push so the server's standard
-      // post-resolve path routes the card to the caster's discard.
+      // v650: Anlegen ueber den geteilten Vorgang (eigene Helden).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        preferCaster: true,
+        description: 'Choose a Hero you control (leftmost free Support Zone) or a specific empty Support Zone to attach Light Ball to.',
+        confirmLabel: '💡 Attach!', skipEnterHook: true,
+      });
+      if (!res) return;
+      const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
       const destHeroObj = ps.heroes?.[destHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
-        engine.log('equip_blocked', {
-          card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune',
-        });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // ── Attach into the chosen Support Zone ──
-      if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
-      if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];
-      ps.supportZones[destHero][destSlot].push(CARD_NAME);
-
-      // Re-track from hand → support. `originalOwner` stamping routes
-      // a future discard back to the caster regardless of any control
-      // flip.
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand' && c.id === ctx.card.id,
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-      const inst = engine._trackCard(CARD_NAME, pi, 'support', destHero, destSlot);
-      inst.originalOwner = pi;
-
-      gs._spellPlacedOnBoard = true;
 
       // Attach burst — warm gold sparkles on the host Hero.
       engine._broadcastEvent('play_zone_animation', {

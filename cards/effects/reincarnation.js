@@ -263,8 +263,7 @@ module.exports = {
       }
 
       // Remove one copy of the chosen creature from the discard pile.
-      const discardIdx = ps.discardPile.indexOf(creatureName);
-      if (discardIdx >= 0) ps.discardPile.splice(discardIdx, 1);
+      await engine.takeFromPile(ps, 'discard', creatureName, { source: 'reincarnation' });   // v820: Stapel-Schicht
       const _letheBonus = engine.consumeLetheStamp(pi, creatureName);
 
       // Revival animation on the placement site.

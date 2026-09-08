@@ -135,13 +135,7 @@ module.exports = {
       const offset = available.indexOf(pickedName);
       if (offset < 0) break;
       const fullIdx = picksTaken + offset;
-      ps.mainDeck.splice(fullIdx, 1);
-
-      // Place face-down on top — the chosen card becomes mainDeck[0].
-      // Successive picks keep unshifting, so the LAST picked card ends
-      // up at the very top (drawn next), matching pick-order = stack-
-      // build-order from the spec.
-      ps.mainDeck.unshift(pickedName);
+      engine.moveWithinDeck(ps, fullIdx, 0);   // v820: deck-innere Umsortierung, keine Bewegung (Als Ruling 7.9.)
       if (!ps.deckTopVisible) ps.deckTopVisible = [];
       ps.deckTopVisible.unshift(pickedName);
 

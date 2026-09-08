@@ -20,6 +20,11 @@
 
 const CARD_NAME = 'Resistance';
 
+/** Der Status, wie er gerade auf dem Helden liegt (oder undefined). */
+function hero0Status(gs, pi, heroIdx, statusName) {
+  return gs.players[pi]?.heroes?.[heroIdx]?.statuses?.[statusName];
+}
+
 module.exports = {
   activeIn: ['ability'],
   bypassStatusFilter: true, // Must fire even after the status is set on the hero
@@ -113,6 +118,14 @@ module.exports = {
       // nichts abzufangen, und eine Ladung dafuer zu verbrauchen waere
       // ohnehin verkehrt.
       if (statusName === 'shielded' || statusName === 'immune') return;
+
+      // ── ZUSTANDSGEBUNDENE STATUS (v718, Als Ruling 4.9.) ───────────
+      // Ein Status, den eine Karte auf dem Brett dauerhaft AUFRECHT
+      // haelt (Paraseeds Gift), laesst sich nicht wegfangen: er wuerde
+      // im selben Atemzug neu aufliegen. Resistance dafuer eine Ladung
+      // zu verbrennen waere reine Verschwendung. Solche Status tragen
+      // `noAbsorb` und werden hier uebergangen.
+      if (hero0Status(gs, pi, heroIdx, statusName)?.noAbsorb) return;
 
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) return;

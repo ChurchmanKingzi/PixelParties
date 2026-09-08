@@ -78,6 +78,8 @@ module.exports = {
     // deck-search animation + log + hook + opp reveal.
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Cuteness Sensor',
+      // v734: „a \"Cute\" card" — Namensbezug als Teilstring (Als Regel 8.8.).
+      searchSpec: { label: '\"Cute\" card', filter: (cd, n) => (n || cd.name || '').includes('Cute') },
       reveal: true,
     });
   },

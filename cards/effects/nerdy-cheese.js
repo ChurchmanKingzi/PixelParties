@@ -86,7 +86,7 @@ module.exports = {
     if (cd.spellSchool1 !== 'Magic Arts' && cd.spellSchool2 !== 'Magic Arts') return;
 
     // ── Step 1: Delete one copy from deck to the deleted pile ──
-    ps.mainDeck.splice(deleteIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', deleteIdx, { source: 'Nerdy Cheese' }))) return;   // v820: Stapel-Schicht
     engine.log('nerdy_cheese_delete', {
       player: ps.username, card: result.cardName,
     });
@@ -106,7 +106,7 @@ module.exports = {
       return;
     }
 
-    ps.mainDeck.splice(tutorIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', tutorIdx, { source: 'Nerdy Cheese' }))) return;   // v820: Stapel-Schicht
     ps.hand.push(result.cardName);
     const tutorInst = engine._trackCard(result.cardName, pi, 'hand');
     engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
@@ -117,6 +117,12 @@ module.exports = {
     // canonical firing.
     await engine.runHooks('onCardAddedToHand', {
       playerIdx: pi, card: tutorInst, cardName: result.cardName,
+    });
+    // v734: Strichliste nachtragen (die Karte bucht von Hand). „a Spell
+    // with the SAME NAME" ist namensgebunden — ein Verdoppler findet
+    // damit nichts, was zugleich anders heisst. Genau so gemeint.
+    engine.noteDeckTutor(pi, result.cardName, 'Nerdy Cheese', {
+      label: `copy of ${result.cardName}`, filter: (cd, n) => n === result.cardName,
     });
     engine.sync();
 

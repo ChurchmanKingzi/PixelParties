@@ -174,9 +174,8 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
 
   // Splice from deck right before the placement so a chain negate
   // routes the card to discard from a deck-pulled state.
-  const deckIdx = ps.mainDeck.indexOf(cardName);
-  if (deckIdx < 0) return false;
-  ps.mainDeck.splice(deckIdx, 1);
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+  if (!_taken_deckIdx) return false;
 
   let placedInst = null;
   const chainResult = await engine.executeCardWithChain({
@@ -257,12 +256,48 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
   return true;
 }
 
+const ASCENDED_FORM = 'Dajan, Conqueror of the Treasure Cave';
+const ASCEND_GOLD   = 60;
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hero'],
   heroEffect: true,
   heroEffectActionCost: true,
+
+  /**
+   * v656 — Aufstieg zu „Dajan, Conqueror of the Treasure Cave" „while
+   * you have 60 or more Gold". Die Bedingung haengt an KEINER
+   * Zonenbewegung, sondern am Goldstand, der sich an Dutzenden Stellen
+   * aendert — deshalb der sync-getriebene Vertrag
+   * `refreshAscensionReadiness` (Engine v656) statt Zonen-Hooks. Die
+   * Bedingung selbst steht beim Conqueror (`ascensionCondition`); hier
+   * werden nur die Anzeige-Flags nachgefuehrt (Throne-Robber-Lehre).
+   */
+  refreshAscensionReadiness(engine, pi, heroIdx) {
+    const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.name !== CARD_NAME) return;
+    const conqueror = loadCardEffect(ASCENDED_FORM);
+    const bereit = hero.hp > 0 && typeof conqueror?.ascensionCondition === 'function'
+      && conqueror.ascensionCondition(engine.gs, pi, heroIdx, engine);
+    if (bereit) {
+      if (hero.ascensionReady && hero.ascensionTarget === ASCENDED_FORM) return;
+      hero.ascensionReady   = true;
+      hero.ascensionTarget  = ASCENDED_FORM;
+      hero.ascensionTargets = [ASCENDED_FORM];
+    } else if (hero.ascensionReady) {
+      delete hero.ascensionReady;
+      delete hero.ascensionTarget;
+      delete hero.ascensionTargets;
+    }
+  },
+
+  // CPU-Aufstiegsplanung: Fortschritt = Goldstand gegen die Schwelle.
+  ascensionProgress(engine, pi) {
+    const gold = engine.gs.players[pi]?.gold || 0;
+    return Math.max(0, Math.min(1, gold / ASCEND_GOLD));
+  },
 
   // Rough CPU yield — at most one play per turn, average value of a
   // discounted ~20-cost artifact ≈ a single mid-cost Action.
@@ -348,9 +383,9 @@ module.exports = {
 
       // Splice from deck before resolution — same ordering as
       // _playEquip, so a chain-negate routes from a deck-pulled state.
-      const deckIdx = ps.mainDeck.indexOf(chosenName);
-      if (deckIdx < 0) return false;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return false;
+      const deckIdx = _taken_deckIdx.idx;
 
       const result = await _runArtifactResolve(engine, pi, chosenName, cost,
         async () => script.resolve(engine, pi, selectedIds, validTargets));
@@ -371,9 +406,8 @@ module.exports = {
       // expose a `resolve` (they're all-hooks cards) — skip those, the
       // pull-from-deck would fizzle silently.
       if (typeof script?.resolve !== 'function') return false;
-      const deckIdx = ps.mainDeck.indexOf(chosenName);
-      if (deckIdx < 0) return false;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return false;
 
       const result = await _runArtifactResolve(engine, pi, chosenName, cost,
         async () => script.resolve(engine, pi, [], []));

@@ -42,7 +42,7 @@ const { zaehleInAblage } = require('./_future-tech-shared');
 const CARD_NAME = 'Future Tech Gear';
 const JE_KOPIE = 2;
 /** Wie lange der Auftritt steht, bevor gemahlen wird. */
-const AUFTRITT_MS = 450;
+const AUFTRITT_MS = 900;
 
 /**
  * Ist diese Instanz — nach ihrer WIRKSAMEN Identität — eine Gear?
@@ -132,10 +132,11 @@ async function ausloesen(ctx) {
       //   normalen Wegen schon aus `_firePendingCardReveal` hat. Ein
       //   passiver Ausloeser erzeugt den aber nie. Deshalb derselbe
       //   Reveal, nur an den ganzen Raum.
-      engine._broadcastEvent('card_reveal', {
-        cardName: CARD_NAME, playerIdx: owner, sfx: 'ability_activate',
-      });
-      await engine._delay(AUFTRITT_MS);
+      // v611: ueber den Standard-Helfer fuer passive Ausloeser (v554),
+      // laengere Vorlaufzeit — Al hat den Auftritt im Livespiel neben
+      // dem Salute-Mill nicht wahrgenommen; jetzt steht die Karte fast
+      // eine Sekunde, BEVOR die ersten Blaetter das Deck verlassen.
+      await engine.announceHookActivation(CARD_NAME, owner, { holdMs: AUFTRITT_MS });
 
       const ops = gs.players[oi];
       const vorher = (ops?.discardPile || []).length;

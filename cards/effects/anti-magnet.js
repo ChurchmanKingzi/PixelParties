@@ -89,7 +89,12 @@ module.exports = {
    * @param {object} config
    * @param {object} engine
    */
-  canRedirect(gs, pi, selected, validTargets, config, engine) {
+  canRedirect(gs, pi, selected, validTargets, config, engine, sourceCard) {
+    // v670 (Sweep): „chosen by an Attack, Spell or Creature effect" —
+    // Helden-, Artefakt-, Trank- und Ability-Effekte als Quelle loesen
+    // NICHT aus (Alleria-Muster).
+    const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
+    if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
     // Must be a target the Anti-Magnet player controls.
     if (selected.owner !== pi) return false;
 

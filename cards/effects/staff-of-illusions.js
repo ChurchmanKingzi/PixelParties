@@ -157,10 +157,8 @@ module.exports = {
     // ── Step 3: remove from source, deduct gold, place ──────────────────
 
     // Remove from deck or hand
-    const deckIdx = ps.mainDeck.indexOf(chosenName);
-    if (deckIdx >= 0) {
-      ps.mainDeck.splice(deckIdx, 1);
-      engine.shuffleDeck(pi);
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+    if (_taken_deckIdx) {
     } else {
       const handIdx = ps.hand.indexOf(chosenName);
       if (handIdx >= 0) ps.hand.splice(handIdx, 1);

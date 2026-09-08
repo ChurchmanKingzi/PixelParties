@@ -145,9 +145,8 @@ module.exports = {
       const apply = async (eng, opt) => {
         const psp = eng.gs.players[cpuIdx];
         // Splice the ability out of the deck (mirrors Alex's real placement).
-        const dIdx = (psp.mainDeck || []).indexOf(opt.cardName);
-        if (dIdx < 0) return false;
-        psp.mainDeck.splice(dIdx, 1);
+        const _taken_dIdx = await eng.takeFromPile(psp, 'deck', opt.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_dIdx) return false;
         // Resolve the destination zone (stack onto existing, then first free).
         const abZones = psp.abilityZones[opt.heroIdx] || [[], [], []];
         psp.abilityZones[opt.heroIdx] = abZones;
@@ -301,9 +300,8 @@ module.exports = {
       // hand. Mirrors the Training-tutor flow end-for-end, with the one
       // difference that we deliberately do NOT flip `abilityGivenThisTurn`
       // — this is explicitly an "additional attachment" per card text.
-      const deckIdx = ps.mainDeck.indexOf(chosenAbility);
-      if (deckIdx < 0) return;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return;
 
       const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
       ps.abilityZones[targetHeroIdx] = abZones;

@@ -63,7 +63,7 @@ module.exports = {
         if (e.canBeNegated === false) continue;
 
         const before = e.amount || 0;
-        e.amount = Math.max(0, before - reduction);
+        e.modifyAmount(-Math.min(reduction, before));   // flat (Punkt vor Strich)
         e._labradoodleReduced = true;
         appliedSomewhere = true;
         if (before > e.amount) {

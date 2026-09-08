@@ -112,7 +112,7 @@ module.exports = {
     for (const idx of indices) {
       const name = ops.deletedPile[idx];
       if (name == null) continue;
-      ops.deletedPile.splice(idx, 1);
+      if (!(await engine.takeFromPile(ops, 'deleted', idx, { source: CARD_NAME }))) continue;   // v820: Stapel-Schicht
       ops.discardPile.push(name);
       returned.push(name);
     }

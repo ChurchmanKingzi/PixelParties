@@ -242,9 +242,8 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
     if (idx < 0) return;                   // raced — bail
     ps.hand.splice(idx, 1);
   } else {
-    const idx = ps.mainDeck.indexOf(cardName);
-    if (idx < 0) return;
-    ps.mainDeck.splice(idx, 1);
+    const _taken_idx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (!_taken_idx) return;
     engine._broadcastEvent('deck_search_add', { cardName, playerIdx: pi });
     engine.shuffleDeck(pi, 'main');
     // Reveal to opp — standard etiquette for deck-search casts.

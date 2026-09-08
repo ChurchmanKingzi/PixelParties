@@ -182,11 +182,8 @@ module.exports = {
 
     // Final validation: slot still free + deck still contains the equip
     if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
-    const stillIdx = ps.mainDeck.indexOf(equipName);
-    if (stillIdx < 0) return { aborted: true };
-
-    // ── Step 3: pull from deck, place in support zone ──
-    ps.mainDeck.splice(stillIdx, 1);
+    const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (!_taken_stillIdx) return { aborted: true };
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
     if (!ps.supportZones[destHeroIdx][destSlot]) ps.supportZones[destHeroIdx][destSlot] = [];
     ps.supportZones[destHeroIdx][destSlot].push(equipName);

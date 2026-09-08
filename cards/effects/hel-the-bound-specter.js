@@ -276,8 +276,7 @@ module.exports = {
         // empty response so the effect always resolves.
         const chosenName = (res && res.cardName) || eligible[0].name;
 
-        const di = (ps.mainDeck || []).indexOf(chosenName);
-        if (di >= 0) ps.mainDeck.splice(di, 1);
+        await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
 
         helHero._helEffectArtifactName = chosenName;
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });

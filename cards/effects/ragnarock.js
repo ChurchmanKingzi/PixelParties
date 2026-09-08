@@ -70,21 +70,14 @@ module.exports = {
     const abilityName = initialLink.cardName;
     if (oppPi != null && oppPi >= 0 && heroIdx != null && heroIdx >= 0 && abilityName) {
       const oppPs = engine.gs.players[oppPi];
-      const slots = oppPs?.abilityZones?.[heroIdx] || [];
-      for (let zi = 0; zi < slots.length; zi++) {
-        const slot = slots[zi];
-        if (!slot?.length) continue;
-        if (slot[slot.length - 1] === abilityName) {
-          slot.pop();
-          oppPs.discardPile.push(abilityName);
-          engine._broadcastEvent('ability_zone_to_discard', {
-            owner: oppPi, heroIdx, zoneSlot: zi, cardName: abilityName,
-          });
-          engine.log('ragnarock_discard_ability', {
-            player: oppPs.username, ability: abilityName,
-          });
-          break;
-        }
+      // v800: ueber die Engine-Primitive (Instanz wandert mit, Fighting
+      // nimmt seinen ATK-Bonus zurueck) statt der alten Namens-Schleife.
+      const eintrag = engine.getAbilityTargets(oppPi, { heroIdx, cardName: abilityName })
+        .find(z => z.zoneKind === 'ability');
+      if (eintrag && await engine.discardAbilityTopCopy(eintrag, { source: 'Ragnarock', sourceOwner: pi })) {
+        engine.log('ragnarock_discard_ability', {
+          player: oppPs.username, ability: abilityName,
+        });
       }
     }
     engine.sync();

@@ -11,7 +11,11 @@
 //  heal converts to damage and kills the hero.
 // ═══════════════════════════════════════════
 
+const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const CARD_NAME = 'Guardian Angel';
+
 module.exports = {
+  activeIn: ['hand', 'support'],
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   oncePerGame: true,
@@ -38,144 +42,28 @@ module.exports = {
     return [sorted[0].id];
   },
 
-  spellPlayCondition(gs, pi) {
-    // Need at least 1 alive hero (either side) with a free support zone
-    for (let p = 0; p < 2; p++) {
-      const ps = gs.players[p];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        for (let si = 0; si < 3; si++) {
-          if (((ps.supportZones[hi] || [])[si] || []).length === 0) return true;
-        }
-      }
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
-
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
   hooks: {
     onPlay: async (ctx) => {
+      if (ctx.cardZone !== 'hand' || ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
-
-      // Build targets: ALL heroes (both sides) with free support zones
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        const tps = gs.players[p];
-        for (let hi = 0; hi < (tps.heroes || []).length; hi++) {
-          const hero = tps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          let hasFreeZone = false;
-          for (let si = 0; si < 3; si++) {
-            const slot = (tps.supportZones[hi] || [])[si] || [];
-            if (slot.length === 0) {
-              hasFreeZone = true;
-              targets.push({
-                id: `equip-${p}-${hi}-${si}`,
-                type: 'equip',
-                owner: p,
-                heroIdx: hi,
-                slotIdx: si,
-                cardName: '',
-              });
-            }
-          }
-          if (hasFreeZone) {
-            targets.push({
-              id: `hero-${p}-${hi}`,
-              type: 'hero',
-              owner: p,
-              heroIdx: hi,
-              cardName: hero.name,
-            });
-          }
-        }
-      }
-
-      if (targets.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // Select target
-      let targetOwner, targetHeroIdx, targetSlot;
-      const heroTargets = targets.filter(t => t.type === 'hero');
-      const zoneTargets = targets.filter(t => t.type === 'equip');
-
-      if (heroTargets.length === 1 && zoneTargets.length === 1) {
-        targetOwner = heroTargets[0].owner;
-        targetHeroIdx = heroTargets[0].heroIdx;
-        targetSlot = zoneTargets[0].slotIdx;
-      } else {
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: 'Guardian Angel',
-          description: 'Choose a Hero to protect with a Guardian Angel.',
-          confirmLabel: '👼 Bless!',
-          confirmClass: 'btn-success',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-          greenSelect: true,
-        });
-
-        if (!picked || picked.length === 0) {
-          gs._spellCancelled = true;
-          return;
-        }
-
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-
-        if (target.type === 'equip') {
-          targetOwner = target.owner;
-          targetHeroIdx = target.heroIdx;
-          targetSlot = target.slotIdx;
-        } else {
-          targetOwner = target.owner;
-          targetHeroIdx = target.heroIdx;
-          const tps = gs.players[targetOwner];
-          for (let si = 0; si < 3; si++) {
-            if (((tps.supportZones[targetHeroIdx] || [])[si] || []).length === 0) {
-              targetSlot = si;
-              break;
-            }
-          }
-        }
-      }
-
-      if (targetSlot === undefined) return;
+      // v650: Anlegen ueber den geteilten Vorgang (beide Seiten, Anti-Magic).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        sides: [pi, pi === 0 ? 1 : 0],
+        description: 'Choose a Hero to protect with a Guardian Angel.',
+        confirmLabel: '👼 Bless!', skipEnterHook: true,
+      });
+      if (!res) return;
+      const { host, inst } = res;
+      const targetOwner = host.owner, targetHeroIdx = host.heroIdx;
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
-      if (!targetHero?.name) return;
-
-      // ── Anti Magic gate ──
-      // Guardian Angel is a Lv 3 Spell. A target Hero with
-      // `magic_immune.level >= 3` (Anti Magic Lv 3 attached) is immune
-      // to its effect — the attachment must NOT land. Bail BEFORE the
-      // support-zone push + `_spellPlacedOnBoard` flag so the server
-      // routes the card to the caster's discard normally.
-      if (engine._isHeroSpellProtected(targetHero, 'Guardian Angel')) {
-        engine.log('equip_blocked', { card: 'Guardian Angel', target: targetHero.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(targetHero);
-        return;
-      }
-
-      // Place card in support zone
-      if (!tps.supportZones[targetHeroIdx]) tps.supportZones[targetHeroIdx] = [[], [], []];
-      if (!tps.supportZones[targetHeroIdx][targetSlot]) tps.supportZones[targetHeroIdx][targetSlot] = [];
-      tps.supportZones[targetHeroIdx][targetSlot].push('Guardian Angel');
-
-      // Re-track card instance
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === 'Guardian Angel' && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard('Guardian Angel', targetOwner, 'support', targetHeroIdx, targetSlot);
-      gs._spellPlacedOnBoard = true;
-
       engine.sync();
 
       // Play golden sparkle animation

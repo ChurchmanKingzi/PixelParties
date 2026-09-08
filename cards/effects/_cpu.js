@@ -449,6 +449,9 @@ async function runCpuTurn(engine, helpers) {
   const cpuIdx = engine._cpuPlayerIdx;
   const gs = engine.gs;
   const ps = gs.players[cpuIdx];
+  // Synergie-Kanal (v818): Hand-Kreaturen + Partner auf dem Brett am
+  // Zugbeginn festhalten; ausgewertet am Zugende (siehe unten).
+  try { deckProfile.noteSynergyTurnStart(engine, cpuIdx); } catch { /* Telemetrie */ }
   // ── Board-Erweiterung JE BESCHWÖRUNG (Als Definition) ─────────────
   // Al: "Ein Check nach jeder einzelnen Beschwörung. Sind nach der
   // Beschwörung mehr Kreaturen on board als vorher? Dann zählt diese
@@ -723,6 +726,7 @@ async function runCpuTurn(engine, helpers) {
   // in der Basisform" nicht von "hatte nie die Wahl" zu unterscheiden).
   // Steht VOR allen Rueckgabepfaden des Zugendes, damit auch der
   // zug-beendende Aufstieg gestempelt wird.
+  try { deckProfile.noteSynergyTurnEnd(engine, cpuIdx); } catch { /* Telemetrie */ }
   try {
     if (!engine._inMctsSim) {
       const ft = deckProfile.classifyFormTurn(engine, cpuIdx);
@@ -842,8 +846,21 @@ async function runActionPhase(engine, helpers) {
   // back for the subsequent try-in-order loop.
   let candidates = [];
   const typePriority = { Creature: 3, Spell: 2, Attack: 1 };
-  for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-    const cardName = ps.hand[handIdx];
+  // ★ 28.8.: Crestinas Vorrat mit erzeugen. Die Karten dort sind
+  // „playable as if they were part of your hand“ — also gehoeren sie
+  // in dieselbe Kandidatenliste.
+  //
+  // ZWEI Durchgaenge statt einer zusammengehaengten Liste, weil der
+  // INDEX je Quelle zaehlt. Eine gemeinsame Liste haette
+  // Vorrats-Indizes erzeugt, die auf Handkarten zeigen — genau der
+  // Fehler, der die Gratiskopie verursacht hat.
+  const _quellen = [
+    { liste: ps.hand || [], ausVorrat: false },
+    { liste: engine.isCreationZoneUsable(cpuIdx) ? (ps.creationZone || []) : [], ausVorrat: true },
+  ];
+  for (const { liste: _liste, ausVorrat } of _quellen) {
+  for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+    const cardName = _liste[handIdx];
     const cd = cardDB[cardName];
     if (!cd || typePriority[cd.cardType] == null) continue;
     // Surprise cards (regardless of cardType) must be SET face-down in
@@ -897,7 +914,7 @@ async function runActionPhase(engine, helpers) {
 
     for (const e of heroPool) {
       const heroIdx = e.hi;
-      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType]);
+      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType], { fromCreation: ausVorrat });
       if (!v) continue;
       if (!v.isActionPhase) continue;
       // Inherent additional Action cards (Divine Gift of Sacrifice, etc.)
@@ -941,7 +958,7 @@ async function runActionPhase(engine, helpers) {
         for (let z = 0; z < zones.length; z++) {
           if ((zones[z] || []).length !== 0) continue;
           candidates.push({
-            cardName, handIdx, heroIdx, zoneSlot: z,
+            cardName, handIdx, heroIdx, zoneSlot: z, fromCreation: ausVorrat,
             cardType: cd.cardType,
             level: cd.level || 0,
             typeScore: typePriority[cd.cardType],
@@ -950,7 +967,7 @@ async function runActionPhase(engine, helpers) {
         }
       } else {
         candidates.push({
-          cardName, handIdx, heroIdx,
+          cardName, handIdx, heroIdx, fromCreation: ausVorrat,
           cardType: cd.cardType,
           level: cd.level || 0,
           typeScore: typePriority[cd.cardType],
@@ -959,6 +976,7 @@ async function runActionPhase(engine, helpers) {
       }
     }
   }
+  }   // Ende des zweiten Quellen-Durchgangs (Hand + Vorrat)
 
   // ── Action-costing Ability activations as first-class candidates ──
   // Adventurousness, and any other Ability with `actionCost: true +
@@ -1178,6 +1196,10 @@ async function runActionPhase(engine, helpers) {
         await helpers.doPlayCreature(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
           heroIdx: pick.heroIdx,
           zoneSlot,
         });
@@ -1186,6 +1208,10 @@ async function runActionPhase(engine, helpers) {
         await helpers.doPlaySpell(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
           heroIdx: pick.heroIdx,
         });
       }
@@ -1318,8 +1344,9 @@ async function tryAscend(engine, helpers, opts = {}) {
   // Find ascension candidates: (handIdx, heroIdx) where handIdx holds an
   // Ascended Hero card and heroIdx points to a Hero that's ascensionReady.
   const candidates = [];
-  for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-    const cardName = ps.hand[handIdx];
+  for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+  for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+    const cardName = _liste[handIdx];
     const cd = cardDB[cardName];
     if (!cd || cd.cardType !== 'Ascended Hero') continue;
     const aScript = loadCardEffect(cardName);
@@ -1336,7 +1363,7 @@ async function tryAscend(engine, helpers, opts = {}) {
       } else if (!hero.ascensionReady) {
         continue;
       }
-      candidates.push({ cardName, handIdx, heroIdx: hi });
+      candidates.push({ cardName, handIdx, fromCreation: ausVorrat, heroIdx: hi });
     }
   }
   if (!candidates.length) return { ascended: false, endsTurn: false };
@@ -1384,7 +1411,7 @@ async function tryAscend(engine, helpers, opts = {}) {
   // je widersprechen darf. Folgeaufstiege gehen durchs normale Gate.
   let ascResult = null;
   const actionFn = async () => {
-    ascResult = await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, {});
+    ascResult = await engine.performAscension(cpuIdx, pick.heroIdx, pick.cardName, pick.handIdx, { fromCreation: pick.fromCreation });
   };
   const committed = await mctsGatedActivation(engine, helpers, `ascend ${pick.cardName}`, actionFn,
     { alwaysCommit: opts.firstOfTurn !== false });
@@ -1402,6 +1429,7 @@ async function tryAscend(engine, helpers, opts = {}) {
   swapDiag(engine, endsTurn ? 'asc:endet-zug' : 'asc:zug-laeuft-weiter');
   return { ascended: true, endsTurn };
 }
+}   // Ende des zweiten Quellen-Durchgangs
 
 async function runMainPhase(engine, helpers) {
   if (istAbgebrochen(engine)) return marke(engine, `aus:runMainPhase#1:abbruch@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
@@ -2426,8 +2454,9 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
     if (cpuPastDeadline(engine)) return;
 
     let pick = null;
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-      const cardName = ps.hand[handIdx];
+    for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+    for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+      const cardName = _liste[handIdx];
       const cd = cardDB[cardName];
       if (!cd || cd.cardType !== 'Creature') continue;
       if ((cd.subtype || '').toLowerCase() === 'surprise') continue;
@@ -2444,7 +2473,7 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
 
       const heroIdx = pickHeroForActionCard(engine, cpuIdx, cd, cardName);
       if (heroIdx < 0) continue;
-      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType]);
+      const v = engine.validateActionPlay(cpuIdx, cardName, handIdx, heroIdx, [cd.cardType], { fromCreation: ausVorrat });
       if (!v) continue;
       if (!v.isMainPhase) continue;
       // Either the summon is itself an inherent additional Action (free
@@ -2477,6 +2506,7 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
         await helpers.doPlayCreature(helpers.room, cpuIdx, {
         cardName: pick.cardName,
         handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
         heroIdx: pick.heroIdx,
         zoneSlot: pick.zoneSlot,
       });
@@ -2509,6 +2539,7 @@ async function playDiscardSensitiveCreatures(engine, helpers) {
     if (!committed || !placed) tried.add(pick.cardName + '|' + pick.handIdx);
     await pauseAction(engine);
   }
+  }   // Ende des zweiten Quellen-Durchgangs
 }
 
 // ─── Artifacts ──────────────────────────────────────────────────────────
@@ -2523,20 +2554,77 @@ async function playArtifacts(engine, helpers) {
   const ps = gs.players[cpuIdx];
   const cardDB = engine._getCardDB();
   const tried = new Set(); // card names that look playable but failed to actually play
+  // v657: Ein von DIESEM Lauf scharfgestellter Gratis-Kauf (Dajan,
+  // Conqueror) darf die Routine nie scharf verlassen — sonst sperrt er
+  // der CPU bis Zugende alle Nicht-Artefakt-Zuege. Jeder Ausgang
+  // entschaerft; nur ein eingeloester Kauf loest den Riegel selbst.
+  const _entschaerfen = () => {
+    if (engine.freeArtifactArmed?.(cpuIdx)) {
+      engine.disarmFreeArtifact(cpuIdx);
+      cpuLog('      ↩ free-artifact disarmed (not used)');
+    }
+  };
 
   for (let safety = 0; safety < 20; safety++) {
-    if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:playArtifacts#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
+    if (!stillCpuTurn(engine, cpuIdx)) { _entschaerfen(); return marke(engine, `aus:playArtifacts#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`); }
+
+    // ── v657: Gratis-Kauf scharf stellen, unmittelbar vor dem Kauf ──
+    // Nur wenn ein lebender Held das Scharfstellen anbietet
+    // (`cpuFreeArtifactPilot`), sein HOPT frei ist und es ein Artefakt
+    // mit festem Preis > 0 gibt, das die CPU MIT Nullpreis spielen
+    // wuerde. Das teuerste gewinnt; die Planung darunter sieht dann
+    // Kosten 0. Scheitert der Kauf, entschaerft der Ausgang.
+    if (!engine.freeArtifactArmed?.(cpuIdx) && typeof engine.armFreeArtifact === 'function') {
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) continue;
+        const hs = loadCardEffect(hero.name);
+        if (!hs?.cpuFreeArtifactPilot) continue;
+        if (gs.hoptUsed?.[`hero-effect:${hero.name}:${cpuIdx}:${hi}`] === gs.turn) continue;
+        if (hs.canActivateHeroEffect) {
+          try {
+            const inst = engine.cardInstances.find(c => c.owner === cpuIdx && c.zone === 'hero' && c.heroIdx === hi);
+            if (!inst || !hs.canActivateHeroEffect(engine._createContext(inst, { event: 'canHeroEffectCheck' }))) continue;
+          } catch { continue; }
+        }
+        // Probe: scharf stellen, planen, ggf. wieder zuruecknehmen.
+        engine.armFreeArtifact(cpuIdx, hi, hero.name);
+        let best = null;
+        for (let handIdx = 0; handIdx < (ps.hand || []).length; handIdx++) {
+          const cardName = ps.hand[handIdx];
+          if (tried.has(cardName)) continue;
+          const cd = cardDB[cardName];
+          if (!cd || cd.cardType !== 'Artifact' || (cd.cost || 0) <= 0) continue;
+          if (loadCardEffect(cardName)?.manualGoldCost) continue;
+          const plan = planArtifactPlay(engine, cpuIdx, cardName, handIdx, cd);
+          if (plan && (!best || (cd.cost || 0) > best.cost)) best = { plan, cost: cd.cost || 0 };
+        }
+        if (!best) { engine.disarmFreeArtifact(cpuIdx); continue; }
+        cpuLog(`      ⚡ free-artifact armed via ${hero.name} for "${best.plan.cardName}" (cost ${best.cost})`);
+        engine.log('free_artifact_armed', { player: ps.username, hero: hero.name });
+        engine.sync();
+        break;
+      }
+    }
 
     let pick = null;
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-      const cardName = ps.hand[handIdx];
+    for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+    // v657: bei scharfem Gratis-Kauf das TEUERSTE planbare Artefakt
+    // zuerst (Handreihenfolge sonst wie gehabt).
+    const _reihenfolge = [..._liste.keys()];
+    if (engine.freeArtifactArmed?.(cpuIdx)) {
+      _reihenfolge.sort((a, b) => ((cardDB[_liste[b]]?.cost || 0) - (cardDB[_liste[a]]?.cost || 0)) || (a - b));
+    }
+    for (const handIdx of _reihenfolge) {
+      const cardName = _liste[handIdx];
       if (tried.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || cd.cardType !== 'Artifact') continue;
       const plan = planArtifactPlay(engine, cpuIdx, cardName, handIdx, cd);
       if (plan) { pick = plan; break; }
     }
-    if (!pick) return;
+    if (!pick) { _entschaerfen(); return; }
 
     const handLenBefore = ps.hand.length;
     // Count copies of the SPECIFIC artifact name in hand. Hand-size-only
@@ -2551,6 +2639,10 @@ async function playArtifacts(engine, helpers) {
         await helpers.doPlayArtifact(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
           heroIdx: pick.heroIdx,
           zoneSlot: -1,
         });
@@ -2558,6 +2650,10 @@ async function playArtifacts(engine, helpers) {
         await helpers.doUseArtifactEffect(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
         });
         if (engine.gs.potionTargeting?.potionName === pick.cardName && engine.gs.potionTargeting.ownerIdx === cpuIdx) {
           await resolveTargetingPrompt(engine, helpers);
@@ -2636,9 +2732,11 @@ async function playArtifacts(engine, helpers) {
         }
       } catch { /* nie stören */ }
     }
-    if (!committed || !consumed) tried.add(pick.cardName);
+    if (!committed || !consumed) { tried.add(pick.cardName); _entschaerfen(); }
     await pauseAction(engine);
   }
+  }   // Ende des zweiten Quellen-Durchgangs
+  _entschaerfen();
 }
 
 function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
@@ -2650,7 +2748,14 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
 
   const rawCost = cardData.cost || 0;
   const costReduction = ps._nextArtifactCostReduction || 0;
-  const cost = Math.max(0, rawCost - costReduction);
+  // v657: scharfgestellter Gratis-Kauf (Dajan, Conqueror) — Artefakte
+  // mit festem Preis kosten 0; die mit selbstgerechnetem Preis
+  // (manualGoldCost) sind waehrenddessen gar nicht spielbar (Server
+  // lehnt ab), also hier ebenfalls draussen.
+  const _freiScharf = !!engine.freeArtifactArmed?.(pi);
+  const _manualCost = !!loadCardEffect(cardName)?.manualGoldCost;
+  if (_freiScharf && _manualCost) return null;
+  const cost = _freiScharf ? 0 : Math.max(0, rawCost - costReduction);
   if ((ps.gold || 0) < cost) return null;
 
   const subLower = (cardData.subtype || '').toLowerCase();
@@ -2910,8 +3015,9 @@ async function playPotions(engine, helpers) {
     if (engine.arePotionsLockedFor(cpuIdx)) return;
 
     let pick = null;
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-      const cardName = ps.hand[handIdx];
+    for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+    for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+      const cardName = _liste[handIdx];
       if (tried.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || cd.cardType !== 'Potion') continue;
@@ -2929,6 +3035,7 @@ async function playPotions(engine, helpers) {
       await helpers.doUsePotion(helpers.room, cpuIdx, {
         cardName: pick.cardName,
         handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
       });
       if (engine.gs.potionTargeting?.potionName === pick.cardName && engine.gs.potionTargeting.ownerIdx === cpuIdx) {
         await resolveTargetingPrompt(engine, helpers);
@@ -2960,6 +3067,7 @@ async function playPotions(engine, helpers) {
     if (!committed || !consumed) tried.add(pick.cardName);
     await pauseAction(engine);
   }
+  }   // Ende des zweiten Quellen-Durchgangs
 }
 
 function isPotionPlayable(engine, pi, cardName) {
@@ -2999,8 +3107,9 @@ async function placeSurprises(engine, helpers) {
     if (!stillCpuTurn(engine, cpuIdx)) return marke(engine, `aus:placeSurprises#1:still@zug${engine.gs.turn}p${engine.gs.activePlayer}ph${engine.gs.currentPhase}`);
 
     let pick = null;
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-      const cardName = ps.hand[handIdx];
+    for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+    for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+      const cardName = _liste[handIdx];
       if (tried.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || (cd.subtype || '').toLowerCase() !== 'surprise') continue;
@@ -3018,6 +3127,7 @@ async function placeSurprises(engine, helpers) {
     await helpers.doPlaySurprise(helpers.room, cpuIdx, {
       cardName: pick.cardName,
       handIndex: pick.handIdx,
+      fromCreation: pick.fromCreation || undefined,
       heroIdx: pick.heroIdx,
       bakhmSlot: pick.bakhmSlot,
     });
@@ -3026,6 +3136,7 @@ async function placeSurprises(engine, helpers) {
     if (!shrank) tried.add(pick.cardName);
     await pauseAction(engine);
   }
+  }   // Ende des zweiten Quellen-Durchgangs
 }
 
 // Returns { heroIdx, bakhmSlot } describing where to place the Surprise, or
@@ -3652,6 +3763,10 @@ async function fireAdditionalActions(engine, helpers) {
         _playReturn = await helpers.doPlayCreature(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
           heroIdx: pick.heroIdx,
           zoneSlot,
         });
@@ -3660,6 +3775,10 @@ async function fireAdditionalActions(engine, helpers) {
         await helpers.doPlaySpell(helpers.room, cpuIdx, {
           cardName: pick.cardName,
           handIndex: pick.handIdx,
+        fromCreation: pick.fromCreation || undefined,
+          // ★ Herkunft mitgeben, sonst loest der Server den Index in
+          // der Hand auf (Gratiskopie-Fehlerklasse).
+          fromCreation: pick.fromCreation || undefined,
           heroIdx: pick.heroIdx,
         });
       }
@@ -5170,8 +5289,9 @@ async function attachAbilities(engine, helpers) {
     };
 
     const tier1 = [], tier2 = [], tier3 = [];
-    for (let handIdx = 0; handIdx < ps.hand.length; handIdx++) {
-      const cardName = ps.hand[handIdx];
+    for (const { liste: _liste, ausVorrat } of cpuQuellen(engine, ps, cpuIdx)) {
+    for (let handIdx = 0; handIdx < _liste.length; handIdx++) {
+      const cardName = _liste[handIdx];
       const cd = cardDB[cardName];
       if (!cd || cd.cardType !== 'Ability') continue;
 
@@ -5215,7 +5335,7 @@ async function attachAbilities(engine, helpers) {
           slot = bias.slotByHero.get(hi);
         }
 
-        const entry = { handIdx, cardName, heroIdx: hi, zoneSlot: slot };
+        const entry = { handIdx, cardName, fromCreation: ausVorrat, heroIdx: hi, zoneSlot: slot };
         const thisHeroHasIt = heroHasAbility(ps, hi, cardName);
         if (thisHeroHasIt) {
           // Tier 1 (stack): always allowed — stacking improves an existing
@@ -5267,12 +5387,14 @@ async function attachAbilities(engine, helpers) {
     await helpers.doPlayAbility(helpers.room, cpuIdx, {
       cardName: pick.cardName,
       handIndex: pick.handIdx,
+      fromCreation: pick.fromCreation || undefined,
       heroIdx: pick.heroIdx,
       zoneSlot: pick.zoneSlot,
     });
     cpuLog(`      ← ability "${pick.cardName}" done`);
     await pauseAction(engine);
   }
+  }   // Ende des zweiten Quellen-Durchgangs
 }
 
 /**
@@ -6479,12 +6601,31 @@ function installCpuBrain(engine) {
       // let its answer override the plan; the matched plan head was
       // already consumed above, so the queue stays in sync.
       let cardPick;
-      if (config.title) {
+      // ── Ability-Kosten-Kanal (v801) VOR der Karten-Heuristik ──────
+      // Der Prompt traegt `config._abilityCost` → Regel/Exploration aus
+      // dem Profil; ohne Meinung entscheidet die Karte (unten) und der
+      // Schritt wird fuer den Trainer nachgetragen. Sitzt HIER, weil
+      // dieser Wrapper die Karten-Antwort direkt holt und
+      // `_getCpuTargetResponse` dann nie mehr erreicht.
+      let _acHandled = false;
+      if (config._abilityCost) {
+        try {
+          const _r = deckProfile.abilityCostPick(engine, validTargets, config, playerIdx);
+          if (_r !== undefined) { cardPick = _r; _acHandled = true; }
+        } catch (err) {
+          console.error('[CPU brain] abilityCostPick threw:', err.message);
+        }
+      }
+      if (cardPick === undefined && config.title) {
         const _sc = loadCardEffect(config.source || config.title);
         if (_sc?.cpuResponse) {
           const _r = _sc.cpuResponse(engine, 'effectTarget', { validTargets, config, playerIdx });
           if (_r !== undefined) cardPick = _r;
         }
+      }
+      if (config._abilityCost && !_acHandled && cardPick !== undefined) {
+        deckProfile.noteAbilityCostChoice(engine, validTargets, config, playerIdx,
+          Array.isArray(cardPick) && cardPick.length > 0 ? cardPick[0] : null);
       }
       // ── Gelernter Target-Prior-Kanal ──
       // Greift NUR, wenn weder Karten-Contract (cpuResponse) noch
@@ -6590,6 +6731,26 @@ function installCpuBrain(engine) {
   // (same class of bug as promptEffectTarget above).
 
   engine._getCpuTargetResponse = function (validTargets, config = {}, promptedPlayerIdx) {
+    // ── Ability-Kosten-Kanal (v801): Karten, die mit Abilities bezahlen,
+    // legen `config._abilityCost` an ihren Schleifen-Prompt. Regel oder
+    // Exploration entscheiden; ohne Meinung entscheidet die Karten-
+    // Heuristik (origTarget → script.cpuResponse) und wird NACHGETRAGEN,
+    // damit der Trainer auch diese Schritte sieht.
+    if (config && config._abilityCost) {
+      try {
+        const r = deckProfile.abilityCostPick(engine, validTargets, config, promptedPlayerIdx);
+        if (r !== undefined) return r;
+      } catch (err) {
+        console.error('[CPU brain] abilityCostPick threw:', err.message);
+      }
+      const fb = origTarget(validTargets, config, promptedPlayerIdx);
+      const note = (res) => {
+        deckProfile.noteAbilityCostChoice(engine, validTargets, config, promptedPlayerIdx,
+          Array.isArray(res) && res.length > 0 ? res[0] : null);
+        return res;
+      };
+      return (fb && typeof fb.then === 'function') ? fb.then(note) : note(fb);
+    }
     try {
       const picked = cpuPickTargets(engine, validTargets, config, promptedPlayerIdx);
       if (picked !== undefined) return picked;
@@ -7229,6 +7390,31 @@ function gerryOptionGegenwahl(engine, promptData, besitzerPi) {
   return { optionId: optionen[0].id };
 }
 
+/**
+ * ★ 28.8. (Als Auftrag): Crestinas Vorrat fuer ALLE Spielwege der CPU.
+ *
+ * Sechs Wege iterierten je fuer sich ueber `ps.hand` — Aufstieg,
+ * abwurfempfindliche Kreaturen, Artefakte, Potions, Surprises,
+ * Abilities. Statt das Muster sechsmal zu wiederholen, liefert dieser
+ * Helfer die Quellen und ihre Indizes.
+ *
+ * ZWEI Durchgaenge, nie eine zusammengehaengte Liste: der Index zaehlt
+ * je Quelle. Eine gemeinsame Liste erzeugt Vorrats-Indizes, die auf
+ * Handkarten zeigen — genau die Fehlerklasse, die die Gratiskopie
+ * verursacht hat.
+ *
+ * @returns {Array<{liste: string[], ausVorrat: boolean}>}
+ */
+function cpuQuellen(engine, ps, cpuIdx) {
+  return [
+    { liste: ps.hand || [], ausVorrat: false },
+    {
+      liste: engine.isCreationZoneUsable(cpuIdx) ? (ps.creationZone || []) : [],
+      ausVorrat: true,
+    },
+  ];
+}
+
 function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   const type = promptData.type;
   // Use the CARD CONTROLLER's pi (not the active player) so reactive
@@ -7281,6 +7467,11 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     }
     // Fall through to standard handling for other prompt types.
   }
+
+  // v670: Prompts, die sich selbst als reiner Vorteil deklarieren
+  // (`_cpuAutoConfirm` — Aufstiegsbonus „Add X to Hero?"), nimmt die
+  // CPU immer — VOR allen Karten-Overrides und Kosten-Heuristiken.
+  if (type === 'confirm' && promptData._cpuAutoConfirm) return { confirmed: true };
 
   // Per-card override wins over the generic brain. Card authors export
   // `cpuResponse(engine, promptKind, promptData)` to customize how the CPU
@@ -7360,7 +7551,7 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // `showCard` (the "this is THE card you're being asked to activate"
   // signal). Covers reaction confirmLabels beyond the original
   // "Activate" prefix — Cosmic Malfunction's "🌌 Negate!", Deepsea
-  // Idol's "🌊 Negate!", Bamboo Staff's "🕸️ Redirect!", Bamboo
+  // Idol's "🌊 Negate!", Bamboo Staff's "↪️ Redirect!", Bamboo
   // Shield's "🛡️ Defend!", etc. Any cancellable card-effect confirm
   // with `showCard` is a reaction opt-in; route through the smarter
   // decision-maker rather than the blanket-decline branch below.
@@ -7977,6 +8168,22 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // preserved over plentiful copies), and (c) card type — Ascended Hero
   // cards are irreplaceable plan pieces and almost always worth keeping.
   // Avoids hard-coded per-card rules; the evaluator handles the logic.
+  // ★ 28.8.: Abwurf aus Crestinas Vorrat. Eigene Prompt-Art, also auch
+  // hier eintragen — sonst faellt der Schutzeffekt aus (Als Befund).
+  // Bewusst SCHLICHT: die erste freigegebene Karte. Eine Bewertung,
+  // welche Vorratskarte am wenigsten wehtut, waere eine eigene
+  // Aufgabe; unbeantwortet zu lassen ist auf jeden Fall schlechter,
+  // denn dann verpufft der Schaden-Schutz ganz.
+  if (type === 'creationDiscard') {
+    const ps = engine.gs.players[cpuIdx];
+    const zone = ps?.creationZone || [];
+    if (zone.length === 0) return null;
+    const erlaubt = promptData?.eligibleIndices;
+    const idx = Array.isArray(erlaubt) && erlaubt.length > 0 ? erlaubt[0] : 0;
+    if (!zone[idx]) return null;
+    return { creationIndex: idx, cardName: zone[idx] };
+  }
+
   if (type === 'forceDiscard' || type === 'forceDiscardCancellable') {
     const ps = engine.gs.players[cpuIdx];
     if (!ps?.hand?.length) return null;
@@ -8103,6 +8310,18 @@ function cpuReactionDecision(engine, promptData) {
   }
 
   // Default: fire reactions ASAP.
+  // ── Karten-Heuristik als Vorstufe (v801) ────────────────────────
+  // `cpuMeta.reactionHeuristic(engine, promptData) → true|false` laesst
+  // eine Karte ihre eigene Vorentscheidung liefern, OHNE den Lernkanal
+  // (reactionFireDecision + _reactionLog) zu umgehen — anders als ein
+  // `cpuResponse`, das vor dem Gehirn greift und nichts loggt. Weapon
+  // Absorption: nur feuern, wenn der Treffer toedlich waere und die
+  // Heilung rettet; die Regel darf das spaeter uebersteuern.
+  try {
+    const rxScript = reactionName ? loadCardEffect(reactionName) : null;
+    const heur = rxScript?.cpuMeta?.reactionHeuristic;
+    if (typeof heur === 'function') return heur(engine, promptData) ? true : null;
+  } catch { /* Heuristik ist Beiwerk */ }
   return true;
 }
 
@@ -8316,6 +8535,9 @@ function isTargetImmune(engine, target) {
         && target.owner !== engine._cpuPlayerIdx) return true;
     if (inst.counters?.untargetable_by_opponent_pi != null
         && inst.counters.untargetable_by_opponent_pi === engine._cpuPlayerIdx) return true;
+    // v818: Board of Kings — gedeckte Kreaturen sind fuer den Gegner unwaehlbar.
+    if (typeof engine._boardGuardsCreatureChoice === 'function'
+        && engine._boardGuardsCreatureChoice(inst, engine._cpuPlayerIdx)) return true;
     return false;
   }
   return false;
@@ -10021,6 +10243,11 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
     const handArrForPairs = ps?.hand;
     if (handArrForPairs && handArrForPairs.length > 1) {
       base += deckProfile.heldPairBonus(engine, pi, cardName, handArrForPairs, castGate);
+    }
+    // Synergie-Kanal (v818): Partner liegt schon auf dem Brett →
+    // gelernter Aufschlag je Karte (Queen zaehlt als alle Aliasse).
+    if (cd.cardType === 'Creature' || (cd.cardType || '').split('/').includes('Creature')) {
+      base += deckProfile.synergyPrior(engine, pi, cardName) * Math.max(0, Math.min(1, castGate));
     }
     // ── Caster-Delta (Held × Karte) ──────────────────────────────────
     // Der pauschale gelernte cardValue verschmiert über alle Caster —

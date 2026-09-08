@@ -99,7 +99,8 @@ module.exports = {
     if ((ps.mainDeck?.length || 0) < REVEAL_COUNT) return { cancelled: true };
 
     // ── Step 1: take the top 3 cards off the deck ────────────────────────
-    const revealed = ps.mainDeck.splice(0, REVEAL_COUNT);
+    const revealed = await engine.takeTop(pi, REVEAL_COUNT, { source: 'Birthday Present' });   // v820: Stapel-Schicht
+    if (revealed.length < REVEAL_COUNT) { for (const n of revealed.reverse()) engine.returnToPile(pi, 'deck', n, 0); return { cancelled: true }; }
     engine.sync();
 
     // ── Step 2: reveal the Birthday Present artifact itself to opp ───────

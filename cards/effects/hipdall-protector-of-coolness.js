@@ -83,11 +83,9 @@ module.exports = {
       // Pull the card back out of the destination pile/hand if it landed.
       let recovered = false;
       if (toZone === 'discard') {
-        const i = ps.discardPile.lastIndexOf(cardName);
-        if (i >= 0) { ps.discardPile.splice(i, 1); recovered = true; }
+        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
-        const i = ps.deletedPile.lastIndexOf(cardName);
-        if (i >= 0) { ps.deletedPile.splice(i, 1); recovered = true; }
+        if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'hand') {
         // Already in hand — no-op.
         recovered = true;

@@ -150,8 +150,10 @@ module.exports = {
       return true;
     }
 
-    ps.mainDeck.splice(deckIdx, 1);
-    engine.shuffleDeck(pi);
+    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
+      engine.log('criminal_monkee_fizzle', { player: ps.username, reason: 'deck_locked' });
+      return true;
+    }
     engine._broadcastEvent('card_reveal', { cardName: NFM });
     await engine._delay(250);
 

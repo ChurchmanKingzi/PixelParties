@@ -83,6 +83,9 @@ module.exports = {
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Cute Cheese',
       reveal: true,
+      // v734: Was durfte gesucht werden? Koperniko haengt seine
+      // Zusatzsuche an dieselbe Einschraenkung („same specifications").
+      searchSpec: { label: 'Creature', filter: (cd) => isPileCreature(cd) },
     });
   },
 };

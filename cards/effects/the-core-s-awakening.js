@@ -59,6 +59,9 @@ function wirkenderHeld(gs, pi, engine) {
 }
 
 module.exports = {
+  // v834: NUR Stapel-Bewegung (Deck zur Ablage ueber `schickeVonDeckInAblage`);
+  // der Helfer ist fuer die Auto-Erkennung des Loaders unsichtbar.
+  blockedByPileLock: true,
   isReaction: true,
   canActivate: () => false,
 

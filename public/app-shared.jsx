@@ -209,6 +209,20 @@ const _AUTO_DEDUPE_SFX = { ui_cancel: 250, ui_click: 60 };
 
 function playSFX(name, opts = {}) {
   if (!name) return;
+  // ── Verzoegerte Klaenge werden VERZOEGERT beurteilt (v702) ────────
+  // Die Dedupe-Pruefungen unten (gleicher Name, Kategorie „effect")
+  // liefen bisher zur AUFRUFZEIT — ein Klang mit `delay: 800` wurde
+  // also von einem Effekt-Klang verschluckt, der 200 ms VOR dem Aufruf
+  // gespielt hatte, obwohl er selbst erst eine Sekunde spaeter kommen
+  // sollte (Als Befund: Rolling Boulder blieb komplett stumm — die
+  // Surprise-Aufdeckung hatte die Kategorie gerade belegt). Deshalb
+  // wandert der ganze Aufruf hinter den Delay; die Pruefung findet dann
+  // im Moment des tatsaechlichen Abspielens statt.
+  if (opts.delay && opts.delay > 0) {
+    const rest = { ...opts, delay: 0 };
+    setTimeout(() => playSFX(name, rest), opts.delay);
+    return;
+  }
   const now = performance.now();
   // Apply an auto-dedupe default for known UI sounds when the caller
   // didn't pass an explicit `dedupe`. Explicit `dedupe: 0` from a
@@ -623,6 +637,24 @@ window.playSFXForStatus = playSFXForStatus;
 // the right sound, so we only map the ones that are animation-only or need
 // a distinctive layer (e.g. orbital laser pitched down).
 const ZONE_ANIM_SFX = {
+  // Land Sharks (v785): das Zuschnappen des Gebisses. Einen eigenen
+  // Biss-Klang gibt es im 52er-Katalog nicht; `slash` ist der einzige
+  // schneidende Anschlag und wird hier TIEFER gefahren, damit er nach
+  // Kiefer statt nach Klinge klingt. Der Verzug trifft den Moment, in
+  // dem die Zahnreihen aufeinandertreffen (~310 ms im Keyframe).
+  //
+  // Bei mehreren Zielen feuern alle Bisse in einem Rahmen — die
+  // 'effect'-Sammelkategorie laesst genau EINEN Klang durch, statt drei
+  // uebereinanderliegende. Genau so soll es sein (Bauregel 7 der
+  // SFX-Familie: gleichzeitige Effekte duerfen nicht matschen).
+  shark_bite:              { name: 'slash', opts: { rate: 0.72, volume: 1, delay: 290 } },
+  // Shattered Trident (v660): rosa Glas zerspringt auf dem Ziel. Ein
+  // eigener Glas-Klang fehlt im 52er-Katalog — `elem_ice` (kristallin)
+  // hoeher gefahren ist das naechstliegende; der Verzug trifft den
+  // Moment, in dem die Scheibe bricht (~220 ms nach Mount).
+  pink_glass_shatter:      { name: 'elem_ice', opts: { rate: 1.35, volume: 0.95, delay: 220 } },
+  // Glass Sword (v810): tuerkise Scherben, etwas heller als der Trident.
+  glass_shatter:           { name: 'elem_ice', opts: { rate: 1.55, volume: 0.9, delay: 220 } },
   // Kernschlag (Doomsday Bomb, v580). Einen eigenen Explosionsklang
   // gibt es im 52er-Katalog nicht — `heavy_impact` ist der einzige
   // Kandidat und wird hier TIEFER und lauter gefahren als bei der
@@ -644,6 +676,29 @@ const ZONE_ANIM_SFX = {
   // Signature
   orbital_laser_red:       { name: 'orbital_laser', opts: { rate: 0.6 } },
   blood_moon_pulse:        { name: 'elem_dark' },
+  // Feuersaeule (Horned Demon, v602): `elem_fire` tiefer und etwas
+  // spaeter, damit es nach einem Aufbrausen von unten klingt statt
+  // nach einem geworfenen Feuerball; der Versatz trifft den Moment,
+  // in dem die Saeule steht (~140 ms Vorlauf + ~100 ms Hochschiessen).
+  // (v604: rate 0.8 klang fuer Al nach „Dark" — jetzt ungestimmt, damit
+  // es eindeutig Feuer ist.)
+  demon_fire_pillar:       { name: 'elem_fire', opts: { delay: 200 } },
+  // Kavallerie-Sturm (Cavalry, v604) — Rammstoss, wenn die Reiter die
+  // Karte erreichen (Reiter starten gestaffelt, Mitte bei ~300 ms).
+  // `dedupe`: Held- und Zonenreihen-Instanz feuern gleichzeitig —
+  // ein Rammstoss, nicht zwei.
+  cavalry_charge:          { name: 'attack_ram', opts: { delay: 250, dedupe: 400 } },
+  // Giftschaedel (Poisoned Meat, v615)
+  poison_skulls:           { name: 'poison', opts: { rate: 0.9 } },
+  // Meteor (Meteor Crash, v623) — schwerer Einschlag, wenn der Brocken landet.
+  // Meteor (Meteor Crash, v625): KEIN Eintrag — der Knall kommt komplett
+  // aus der Komponente (drei Klangebenen), weil die 'effect'-Kategorie
+  // hier den Einschlag nach dem Spell-Cast-Cue verschluckt hat.
+  // Nebelschleier (Chasing the Legend, v618)
+  mist_veil:               { name: 'elem_wind', opts: { rate: 0.6, volume: 0.6 } },
+  // Blitzregen (Piercer of Heavens, v617): KEIN Eintrag — jeder der
+  // acht Blitze spielt seinen eigenen `elem_lightning` aus der
+  // Komponente heraus (Als Wunsch: je Einschlag ein Impact-Sound).
   sunglasses_drop:         { name: 'sunglasses_drop' },
   critical_slash:          { name: 'critical_strike' },
   // Future Tech Doping — die Spritze (`syringe_stab`). `heavy_impact`
@@ -669,6 +724,14 @@ const ZONE_ANIM_SFX = {
   // `playSFXForZoneAnim` legt den Einbau-Versatz von 100 ms selbst
   // dazu — 500 + 100 = 600 ms.
   trex_chomp:              { name: 'attack_ram', opts: { rate: 0.7, delay: 500 } },
+  // Weapon Absorption (v800) — Sog-Ringe der Idej-Projektion, aber mit
+  // Heil-Klang statt Schild: der Held frisst Ausruestung fuer HP.
+  weapon_absorption:       { name: 'heal', opts: { rate: 0.9, delay: 250 } },
+  // Emergency Spell Armor (v803) — Notruestung: heller Schutzklang.
+  emergency_spell_armor:   { name: 'elem_holy', opts: { rate: 1.15, delay: 100 } },
+  weapon_storm:            { name: 'slash', opts: { rate: 0.85, delay: 80 } },
+  barrier_of_faith:        { name: 'elem_holy', opts: { rate: 1.0, delay: 120 } },
+  weapon_unleashing:       { name: 'buff', opts: { rate: 1.1, delay: 200 } },
   // Fire
   fireball:                { name: 'elem_fire' },
   flame_avalanche:         { name: 'elem_fire' },
@@ -708,6 +771,35 @@ const ZONE_ANIM_SFX = {
   // Biomancy
   biomancy_bloom:          { name: 'elem_biomancy' },
   biomancy_vines:          { name: 'elem_biomancy' },
+  // v738 (Blind Destruction): hohe Stichflamme — `elem_fire` tiefer
+  // und mit vollem Pegel, damit die Saeule Gewicht bekommt.
+  flame_jet:               { name: 'elem_fire', opts: { rate: 0.85, volume: 1 } },
+  // v746 (Spirit of the Barbarian Sword): brennender Hieb — Klinge
+  // zuerst, Feuer knapp darunter.
+  flaming_slash:           [
+    { name: 'slash', opts: { rate: 0.95, volume: 1 } },
+    { name: 'elem_fire', opts: { rate: 1.1, volume: 0.75, delay: 60 } },
+  ],
+  // v732 (Refreshing Night): die Karte heilt UND betaeubt — beides
+  // soll hoerbar sein. `heal` sofort, `debuff` tief und leise
+  // hinterher, wenn die Zzz aufsteigen.
+  sleep_zzz:               [
+    { name: 'heal', opts: { rate: 0.9, volume: 0.9 } },
+    { name: 'debuff', opts: { rate: 0.75, volume: 0.7, delay: 260 } },
+  ],
+  // v726: der einschlagende Dolch war stumm (Knife Throw, Opfer-Karten).
+  // `slash` auf den Moment des Aufpralls (~380 ms nach Mount).
+  knife_sacrifice:         { name: 'slash', opts: { rate: 1.1, volume: 0.95, delay: 360 } },
+  // v727: der geworfene Dolch (Knife Throw) — Sequenz aus Abflug und
+  // Einschlag. Der Flug dauert 180 ms, deshalb liegt `slash` genau
+  // dort; `projectile` kommt sofort mit dem Ereignis.
+  knife_throw_fly:         [
+    { name: 'projectile', opts: { rate: 1.25, volume: 0.9 } },
+    { name: 'slash', opts: { rate: 1.05, volume: 1, delay: 180 } },
+  ],
+  // v724 (Thicket): dasselbe Pflanzen-Timbre, etwas tiefer und laenger
+  // gefahren — das Dickicht ist dichter als der Rankenkranz.
+  thicket_cover:           { name: 'elem_biomancy', opts: { rate: 0.85, volume: 1, delay: 120 } },
   druid_leaf_storm:        { name: 'elem_biomancy' },
   // Water / deepsea
   deepsea_spores_rain:     { name: 'elem_water' },
@@ -715,6 +807,42 @@ const ZONE_ANIM_SFX = {
   deep_sea_bubbles:        { name: 'elem_water' },
   water_splash:            { name: 'elem_water' },
   whirlpool:               { name: 'elem_water' },
+  // Aquatic Spear (v698): der herabstuerzende Wasserspeer. `projectile`
+  // tiefer gefahren = schwere Lanze statt Pfeil; der Verzug trifft den
+  // Einschlag (280 ms Sturz − 100 ms Einbau-Versatz von
+  // playSFXForZoneAnim). Das Wasser klingt aus dem parallel laufenden
+  // whirlpool derselben Karte.
+  aquatic_spear_strike:    { name: 'projectile', opts: { rate: 0.75, delay: 180 } },
+  // Aquatic Arrows (v700): Wasserpfeil-Salve — derselbe Geschossklang
+  // wie arrow_rain, leicht hoeher (leichtere, nasse Pfeile) und leise
+  // mit dedupe, weil die Salve auf MEHREREN Creatures gleichzeitig
+  // laeuft (ein Regen, nicht drei uebereinander).
+  aquatic_arrow_rain:      { name: 'projectile', opts: { rate: 1.15, volume: 0.6, dedupe: 350 } },
+  // Schild-Block (v700): gedaempfter, hoeher gefahrener Aufprall —
+  // ein Treffer, der auf etwas Hartem LANDET statt durchzugehen.
+  // dedupe: der Discard-Rider von Aquatic Shield segnet viele Ziele
+  // in einem Rutsch.
+  shield_block:            { name: 'heavy_impact', opts: { rate: 1.25, volume: 0.55, delay: 60, dedupe: 300 } },
+  // Rolling Boulder (v702): POLTERN ueber die ganze Bahn — eine
+  // unregelmaessige Folge tiefer, leiser heavy_impact-Schlaege (Fels
+  // stoesst beim Rollen an), dazu der volle Aufprall exakt beim
+  // Ueberrollen (~550 ms der 1300-ms-Bahn, minus 100 ms
+  // Einbau-Versatz). Bewusst Bestandsklang, kein neues SFX.
+  // `category: null` + `dedupe: 0`: die Folge ist EIN Effekt und
+  // verwaltet ihre Dichte selbst — sonst schluckt die 400-ms-
+  // Kategoriesperre bzw. die Namens-Sperre fuer heavy_impact jeden
+  // zweiten Schlag.
+  rolling_boulder: [
+    { name: 'heavy_impact', opts: { rate: 0.5,  volume: 0.35, delay: 10,   category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 0.4,  delay: 120,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.48, volume: 0.45, delay: 210,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6,  volume: 1.0,  delay: 280,  category: null, dedupe: 0 } },   // Aufprall (380 ms − 100 Einbau)
+    { name: 'heavy_impact', opts: { rate: 0.52, volume: 0.45, delay: 430,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.47, volume: 0.4,  delay: 560,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.55, volume: 0.3,  delay: 690,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.5,  volume: 0.2,  delay: 830,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.52, volume: 0.15, delay: 980,  category: null, dedupe: 0 } },
+  ],
   dark_wave_engulf:        { name: 'elem_water' },
   // Wind
   whirlwind_spin:          { name: 'elem_wind' },
@@ -727,6 +855,30 @@ const ZONE_ANIM_SFX = {
   golden_wings:            { name: 'elem_holy' },
   victorica_holy_cleanse:  { name: 'elem_holy' },
   holy_revival:            { name: 'revive' },
+  // Konzert (Hymn of Rebirth, v631): Revive-Klang; der Auftakt (`ability_activate`) kommt aus der Komponente.
+  concert_revival:         { name: 'revive', opts: { delay: 350 } },
+  // Divine Awakening — oeffnet einen Aufstieg, klingt deshalb wie
+  // einer. Nachgemessen: `holy_revival` war NICHT stumm, aber
+  // „wiederbeleben" ist die falsche Aussage fuer diese Karte.
+  divine_awakening:        { name: 'ascension' },
+  // ── Gestaltwandel („???, the Shapeshifter", 28.8.) ───────────────
+  // Die Klangregel gilt auch fuer kleine Animationen: eine stumme
+  // Animation ist ein Fehler, kein Sparen (Lehre aus den 78 stummen
+  // Faellen). ★ Und sie verlangt einen Namen aus `SFX_NAMES` — ein
+  // erfundener laeuft in `_sfxMissing` und wird STILL uebersprungen,
+  // was genau denselben Zustand herstellt, den die Regel verhindern
+  // soll. Beide Eintraege nutzen deshalb vorhandene Klaenge:
+  //
+  //  • Verwandeln → `ascension`. Ein Held wird zu einer anderen
+  //    Heldenkarte — dasselbe Ereignis wie ein Aufstieg, und die
+  //    Karte folgt sogar demselben Umbenennungsmuster.
+  //  • Zurueckverwandeln → `status_remove`, etwas laeuft ab. Leiser,
+  //    weil es von selbst am Zugende passiert und nicht die aktive
+  //    Wahl des Spielers ist. Die Lautstaerke gehoert in `opts`, wie
+  //    bei `rate` daneben — ein blankes `volume` liest die Tabelle
+  //    nicht.
+  shapeshift_into:         { name: 'ascension' },
+  shapeshift_back:         { name: 'status_remove', opts: { volume: 0.7 } },
   angel_revival:           { name: 'revive' },
   golden_ankh_revival:     { name: 'revive' },
   // Dark
@@ -773,6 +925,8 @@ const ZONE_ANIM_SFX = {
   // `playSFXForZoneAnim` selbst dazu, damit die beiden Zahlen nicht
   // auseinanderlaufen koennen.
   magic_hammer:            { name: 'heavy_impact', opts: { delay: 340 } },
+  // Shattering Strike (v814): kleinerer Hammer, dumpferer Einschlag mit Erde.
+  shattering_strike:       { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.85, delay: 300 } },
   tiger_impact:            { name: 'heavy_impact' },
   ox_impact:               { name: 'heavy_impact' },
   snake_impact:            { name: 'heavy_impact' },
@@ -811,6 +965,76 @@ const ZONE_ANIM_SFX = {
   // Erdriss (Cybug RHINOCEROS) — schwerer Einschlag, leicht tiefer,
   // damit er nach aufbrechendem Boden klingt statt nach Aufprall.
   earth_rift:              { name: 'heavy_impact', opts: { rate: 0.85, delay: 60 } },
+
+  // ── Klang-Audit v603 (Als Auftrag 29.8.) ───────────────────────────
+  // 35 Animationen, denen KEIN Log-Klang folgt (Schaden, Status, …) und
+  // die deshalb bisher stumm liefen. Zuordnung direkt vergeben; Al
+  // korrigiert einzelne spaeter, wenn sie nicht passen.
+  //
+  // Zaehler / Aufladung — leise, kurz, keine Schadensverwechslung
+  bomblebee_tick:          { name: 'ping', opts: { rate: 1.6, volume: 0.35, dedupe: 200 } },
+  bomblebee_detonate:      { name: 'heavy_impact', opts: { rate: 0.7, delay: 120 } },
+  cosmic_counter_add:      { name: 'ping', opts: { rate: 1.3, volume: 0.4, dedupe: 150 } },
+  cosmic_counter_remove:   { name: 'debuff', opts: { rate: 1.3, volume: 0.4, dedupe: 150 } },
+  niu_powerup:             { name: 'buff', opts: { rate: 0.85 } },
+  // Spell-Effekte ohne Schadensfolge
+  capture_net:             { name: 'projectile', opts: { rate: 0.7, delay: 80 } },
+  corpse_explosion:        { name: 'creature_destroyed', opts: { rate: 0.8, delay: 100 } },
+  spider_avalanche:        { name: 'heavy_impact', opts: { rate: 0.6, delay: 150 } },
+  venom_fog:               { name: 'poison', opts: { rate: 0.8 } },
+  flooding:                { name: 'elem_water', opts: { rate: 0.75 } },
+  toxic_fumes_gas:         { name: 'elem_acid', opts: { rate: 0.8 } },
+  smoke_vial:              { name: 'elem_wind', opts: { rate: 0.7, volume: 0.7 } },
+  love_burst:              { name: 'buff', opts: { rate: 1.2 } },
+  pressed_skill_rain:      { name: 'elem_holy', opts: { rate: 1.1, volume: 0.7 } },
+  lunar_eclipse_pulse:     { name: 'elem_dark', opts: { rate: 0.8 } },
+  silence_cut:             { name: 'negate' },
+  deepsea_idol_negate:     { name: 'negate', opts: { rate: 0.8 } },
+  // Beschwoerungs- / Verwandlungsauftritte
+  coolness_summon:         { name: 'summon', opts: { rate: 1.1 } },
+  shadow_summon:           { name: 'elem_dark', opts: { rate: 1.1, volume: 0.7 } },
+  spider_summon:           { name: 'summon', opts: { rate: 0.85 } },
+  bomblebee_blast:         { name: 'elem_fire', opts: { rate: 1.2, delay: 80 } },
+  bomblebee_dive:          { name: 'elem_wind', opts: { rate: 1.3 } },
+  bomblebee_cluster:       { name: 'summon', opts: { rate: 1.3, volume: 0.7 } },
+  wind:                    { name: 'elem_wind' },
+  escape_dodge:            { name: 'elem_wind', opts: { rate: 1.5, volume: 0.6 } },
+  monkee_shield:           { name: 'buff', opts: { rate: 0.7 } },
+  club_bash:               { name: 'heavy_impact', opts: { rate: 1.1, delay: 100 } },
+  // Dekoration — bewusst leise
+  mini_hearts:             { name: 'heal', opts: { rate: 1.4, volume: 0.4 } },
+  beer_bubbles:            { name: 'elem_water', opts: { rate: 1.5, volume: 0.35 } },
+  unwanted_audience_zzz:   { name: 'debuff', opts: { rate: 0.6, volume: 0.45 } },
+  johanna_cleanse:         { name: 'status_remove' },
+  idej_projection_absorb:  { name: 'elem_holy', opts: { rate: 0.8, volume: 0.6 } },
+  annoying_cats:           { name: 'ui_error', opts: { rate: 0.9, volume: 0.5 } },
+  loyalty_birds:           { name: 'reveal', opts: { rate: 1.2, volume: 0.6 } },
+  knowledge_sparkle:       { name: 'reveal', opts: { rate: 1.4, volume: 0.6 } },
+  // ── Puppets (v706, Als Befund: Tausch-Klaenge zu leise/subtil) ──
+  // Jedes Token bekommt beim Tausch (Tri Fecta ↔ Tri Ad) seinen EIGENEN
+  // Klang, alle mit voller Lautstaerke; das Bild ist die Alias-Animation
+  // aus ANIM_REGISTRY (app-board). Ohne Kategorie, damit die sechs
+  // Klaenge in 520-ms-Folge nicht vom Effekt-Dedupe verschluckt werden.
+  puppet_swap_shishi:      { name: 'elem_fire',   opts: { rate: 0.95, volume: 1,   category: null } },
+  puppet_swap_brammi:      { name: 'buff',        opts: { rate: 1.1,  volume: 1,   category: null } },
+  puppet_swap_vinny:       { name: 'elem_holy',   opts: { rate: 1.0,  volume: 1,   category: null } },
+  puppet_swap_pavi:        { name: 'heal',        opts: { rate: 1.25, volume: 1,   category: null } },
+  puppet_swap_saras:       { name: 'reveal',      opts: { rate: 1.15, volume: 1,   category: null } },
+  puppet_swap_laki:        { name: 'gold_gain',   opts: { rate: 1.1,  volume: 1,   category: null } },
+  // Auftakt des Formwechsels auf dem Helden.
+  puppet_form_change:      { name: 'ascension',   opts: { rate: 1.0,  volume: 1,   category: null } },
+  // Bleed (v712): Schaden-Puls / Status-Erhalt.
+  // v715 (Al): der Bleed-Schaden war zu leise — heavy_impact (dumpfer,
+  // lauter Aufschlag) statt des allgemeinen Trefferklangs, ohne
+  // Kategorie-Dedupe, damit er nicht vom Angriffs-Klang verschluckt wird.
+  bleed_tick:              { name: 'heavy_impact',    opts: { rate: 0.85, volume: 1,   category: null } },
+  bleed_apply:             { name: 'damage',          opts: { rate: 0.7,  volume: 1,   category: null } },
+  blood_splatter:          { name: 'damage',          opts: { rate: 0.7,  volume: 1,   category: null } },
+  bloody_cut:              { name: 'slash',           opts: { rate: 0.7,  volume: 1 } },
+  // Laki legt Luck Counter (Al: lauter, klarer als der stumme gold_sparkle).
+  puppet_luck:             { name: 'gold_gain',   opts: { rate: 1.2,  volume: 1 } },
+  // Vinny legt Preserve Counter.
+  puppet_preserve:         { name: 'elem_holy',   opts: { rate: 1.1,  volume: 0.9 } },
 };
 
 // Zone-animation sounds represent "the signature of the spell/attack/
@@ -847,15 +1071,23 @@ function playSFXForZoneAnim(type) {
   if (!(type in ZONE_ANIM_SFX)) return;
   const entry = ZONE_ANIM_SFX[type];
   if (!entry) return;
-  const opts = { ...(entry.opts || {}) };
-  if (opts.category === undefined && !ZONE_ANIM_NONEFFECT.has(type)) {
-    opts.category = 'effect';
+  // v702: ein Eintrag darf auch eine SEQUENZ sein (Array von
+  // {name, opts}) — fuer Animationen, die ueber ihre Laufzeit mehrere
+  // Klaenge brauchen (Rolling Boulder: Poltern + Aufprall). Jeder
+  // Teil folgt denselben Regeln wie ein Einzeleintrag.
+  const teile = Array.isArray(entry) ? entry : [entry];
+  for (const teil of teile) {
+    if (!teil?.name) continue;
+    const opts = { ...(teil.opts || {}) };
+    if (opts.category === undefined && !ZONE_ANIM_NONEFFECT.has(type)) {
+      opts.category = 'effect';
+    }
+    // Nur animationsrelative Delays werden verschoben. Eintraege ohne
+    // `delay` sind Cast-Klaenge und sollen bewusst sofort mit dem
+    // Ereignis kommen, nicht erst mit dem Animationsstart.
+    if (opts.delay > 0) opts.delay += ZONE_ANIM_MOUNT_DELAY_MS;
+    playSFX(teil.name, opts);
   }
-  // Nur animationsrelative Delays werden verschoben. Eintraege ohne
-  // `delay` sind Cast-Klaenge und sollen bewusst sofort mit dem
-  // Ereignis kommen, nicht erst mit dem Animationsstart.
-  if (opts.delay > 0) opts.delay += ZONE_ANIM_MOUNT_DELAY_MS;
-  playSFX(entry.name, opts);
 }
 
 window.playSFXForZoneAnim = playSFXForZoneAnim;
@@ -1462,13 +1694,29 @@ function isDeckLegal(deck) {
   return { legal: reasons.length === 0, reasons };
 }
 
+// ── Kopienfamilie (v818, Al 6.9.) ──────────────────────────────────
+// „Queen of Kings [B]" und „Queen of Kings [W]" sind DIESELBE Karte mit
+// verschiedenen Effekten — `[B]`/`[W]` ist nur ein Datenbank-Hinweis.
+// Fuer alle Kopienlimits zaehlt der Namensstamm: max. 1 Kasperov im
+// Team (egal welche Farbe), 4 Queens beliebig gemischt, 8 Pawns ueber
+// beide Farben ZUSAMMEN. Hier steht die eine Auslegung, die
+// `countInDeck` und die Abschnittszaehler in `canAddCard` nutzen.
+const COPY_FAMILY_RE = /\s*\[(B|W)\]$/;
+function copyFamilyKey(cardName) {
+  return String(cardName || '').replace(COPY_FAMILY_RE, '');
+}
+function sameCopyFamily(a, b) {
+  return a === b || copyFamilyKey(a) === copyFamilyKey(b);
+}
+window.copyFamilyKey = copyFamilyKey;
+
 function countInDeck(deck, cardName, excludeSection) {
   let count = 0;
-  if (excludeSection !== 'main') count += (deck.mainDeck || []).filter(n => n === cardName).length;
-  if (excludeSection !== 'potion') count += (deck.potionDeck || []).filter(n => n === cardName).length;
-  if (excludeSection !== 'side') count += (deck.sideDeck || []).filter(n => n === cardName).length;
+  if (excludeSection !== 'main') count += (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
+  if (excludeSection !== 'potion') count += (deck.potionDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
+  if (excludeSection !== 'side') count += (deck.sideDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
   if (excludeSection !== 'heroes') {
-    (deck.heroes || []).forEach(h => { if (h && h.hero === cardName) count++; });
+    (deck.heroes || []).forEach(h => { if (h && sameCopyFamily(h.hero, cardName)) count++; });
   }
   return count;
 }
@@ -1538,6 +1786,18 @@ const UNLIMITED_COPY_CARDS = new Set(['Infinitely Reproducing Slime']);
 // Bei IDENTISCHEM Namensteil gilt die Regel ohne Ausnahme — auch
 // Kasperov, the King of Kings [B] und [W] schliessen einander aus
 // (Als Ruling 18.8.: „bei identischen Namen sollte das klar sein").
+// ★ v704 (Als Auftrag 3.9.): „This cannot be one of your Starting
+// Heroes." wird jetzt ERZWUNGEN — bisher stand der Satz nur im
+// Kartentext (Gabby, the Pirate Zombie, Tri Ad, the Puppet Mistress,
+// …). Ausgelegt aus dem Kartentext, damit kuenftige Karten mit dem
+// Satz automatisch mitgehen; der Server nutzt dieselbe Regel fuer
+// den Daily-Hero-Pool (`isNonStartingHero` in server.js).
+const NON_STARTING_HERO_RE = /cannot be one of your starting heroes/i;
+function isNonStartingHero(cardName) {
+  const card = window.CARDS_BY_NAME?.[cardName];
+  return !!card && card.cardType === 'Hero' && NON_STARTING_HERO_RE.test(String(card.effect || ''));
+}
+
 function heroFirstName(cardName) {
   return String(cardName || '').split(',')[0].trim();
 }
@@ -1612,7 +1872,7 @@ function canAddCard(deck, cardName, section) {
     // branch below), so global cap stays at 5 (1 team + 4 main).
     if (ct === 'Hero') {
       if ((deck.mainDeck || []).length >= 60) return false;
-      const inMain = (deck.mainDeck || []).filter(n => n === cardName).length;
+      const inMain = (deck.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
       if (inMain >= 4) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
@@ -1649,13 +1909,14 @@ function canAddCard(deck, cardName, section) {
   }
   if (section === 'hero') {
     if (ct !== 'Hero') return false;
+    if (isNonStartingHero(cardName)) return false; // v704: „cannot be one of your Starting Heroes"
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
     // Team slot: only ONE copy of each Hero may be in the team — except
     // for Heroes whose text allows multiple copies (Peter Röll). Those
     // are still gated by the 3 available team slots (the .some check
     // above) but skip the per-name uniqueness check.
     if (!MULTI_TEAM_HEROES.has(cardName)) {
-      const inTeam = (deck.heroes || []).filter(h => h?.hero === cardName).length;
+      const inTeam = (deck.heroes || []).filter(h => sameCopyFamily(h?.hero, cardName)).length;
       if (inTeam >= 1) return false;
     }
     // Gleicher Vorname, anderer Titel → schliesst einander aus
@@ -1668,7 +1929,7 @@ function canAddCard(deck, cardName, section) {
     if ((deck.sideDeck || []).length >= 15) return false;
     if (effMax === Infinity) return true;
     if (ct === 'Hero') {
-      const inSide = (deck.sideDeck || []).filter(n => n === cardName).length;
+      const inSide = (deck.sideDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
       if (inSide >= 4) return false;
     }
     if (countInDeck(deck, cardName) >= effMax) return false;
@@ -1951,7 +2212,8 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onClick={handleClick}
         onTouchStart={handleTouchStart}
         onContextMenu={(e) => { e.preventDefault(); onRightClick && onRightClick(); }}
-        onMouseEnter={show} onMouseLeave={hide}>
+        onMouseEnter={show} onMouseLeave={hide}
+        data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
         {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
         {imgUrl ? (
           <img src={imgUrl} alt={card.name}
@@ -2115,6 +2377,7 @@ window.isDeckLegal = isDeckLegal;
 window.countInDeck = countInDeck;
 window.hasNicolasHero = hasNicolasHero;
 window.canAddCard = canAddCard;
+window.isNonStartingHero = isNonStartingHero;
 window.getCardMax = getCardMax;
 window.trimOverLimitCopies = trimOverLimitCopies;
 window.hasSacredJewelArtifactBonus = hasSacredJewelArtifactBonus;
@@ -2141,7 +2404,7 @@ function canCardTypeEnterSection(deck, cardName, section) {
     return ct === 'Potion';
   }
   if (section === 'hero') {
-    return ct === 'Hero';
+    return ct === 'Hero' && !isNonStartingHero(cardName); // v704
   }
   if (section === 'side') {
     return true; // Any non-token card can be in side deck
@@ -2292,6 +2555,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   }
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
+  if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
   if (s.poisoned || c.poisoned) {
     const stacks = s.poisoned?.stacks || c.poisonStacks || c.poisoned || 1;
     const perStack = player?.poisonDamagePerStack || 30;
@@ -2309,7 +2573,20 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
         tooltip: 'Silenced: Has its effects negated.' + dur(c.negated),
       });
     } else {
-      badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+      // v731: quellgebundene Negation — sie endet nicht zum Zugende,
+      // sondern mit der Karte, die sie aufrecht haelt (Water Golem).
+      // Der Standardsatz „Wears off at the end of its owner's turn"
+      // waere hier schlicht falsch.
+      const quelle = s.negated?.sourceBound ? s.negated.source : c.negatedSourceBound;
+      if (quelle) {
+        badges.push({
+          key: 'negated', icon: '🚫',
+          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+            + ` Lasts while ${quelle} remains on the board.`,
+        });
+      } else {
+        badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+      }
     }
   }
   if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
@@ -2358,12 +2635,32 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
+  // v724 (Thicket): harte Unwaehlbarkeit fuer BEIDE Seiten — im
+  // Gegensatz zum weichen `untargetable` darueber gibt es hier kein
+  // „ausser es ist das einzige Ziel"-Ventil.
+  if (c.untargetable_all) badges.push({ key: 'hidden', icon: '🌿', tooltip: 'Hidden: Cannot be chosen by any card or effect — not even by its own controller — until its controller\'s next turn.' });
   if (s.invisible) badges.push({ key: 'invisible', icon: '👻', tooltip: 'Invisible: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen. (Shares pool with Untargetable.)' });
   if (s.healReversed) badges.push({ key: 'healReversed', icon: '💀', tooltip: 'Overheal Shock: Takes any healing as damage.' });
   // Extra Life — visual-only marker (Trial of Coolness, etc.). The mark
   // is stored OUTSIDE statuses (`hero._extraLife` / `inst.counters._extraLife`)
   // so engine status checks never trip on it; the badge simply mirrors
   // whichever side the props deliver.
+  // ── Einmal-Schadensschild (v698, Aquatic Shield) ────────────────
+  // Liste liegt beim Helden direkt (`hero._oneShotDmgShields`, per
+  // Spread hereingereicht) bzw. bei Creatures in den Countern. Mehrere
+  // Ladungen wirken KUMULATIV auf das naechste Schadensereignis —
+  // der Badge zeigt die Summe.
+  {
+    const schilde = s._oneShotDmgShields || c._oneShotDmgShields;
+    if (Array.isArray(schilde) && schilde.length > 0) {
+      const summe = schilde.reduce((a, e) => a + (e?.amount || 0), 0);
+      badges.push({
+        key: 'oneShotShield', icon: '🌊',
+        tooltip: `Shielded: The next damage this ${isHero ? 'Hero' : 'Creature'} would take is reduced by ${summe}. All charges are spent on that damage. Wears off at the start of its owner's turn.`,
+        duration: schilde.length > 1 ? schilde.length : null,
+      });
+    }
+  }
   if (s._extraLife || c._extraLife) {
     const mark = s._extraLife || c._extraLife;
     const by   = (mark && typeof mark === 'object' && mark.by) || 'an effect';
@@ -3571,3 +3868,8 @@ window.useAntoniaPresent = useAntoniaPresent;
 window.isAntoniaPresent = isAntoniaPresent;
 window.setAntoniaPresent = setAntoniaPresent;
 window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;
+// v809: bisher nur ueber die zufaellige Sichtbarkeit oberster
+// Deklarationen zwischen den Bundles erreichbar. Ausdruecklich
+// weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.
+window.SPARKLE_POSITIONS = SPARKLE_POSITIONS;
+window.setTapTooltip = setTapTooltip;

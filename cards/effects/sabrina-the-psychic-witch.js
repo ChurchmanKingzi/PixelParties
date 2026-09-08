@@ -230,10 +230,8 @@ module.exports = {
     };
 
     // ── 5. Pull the Surprise from the deck and activate it ──
-    const deckIdx = (ps.mainDeck || []).indexOf(surpriseName);
-    if (deckIdx < 0) return false;
-    ps.mainDeck.splice(deckIdx, 1);
-    engine.shuffleDeck(pi, 'main');
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', surpriseName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+    if (!_taken_deckIdx) return false;
 
     // Reveal the chosen Surprise to both players. `_activateSurprise`
     // emits its own opp-side card_reveal inside, but broadcasting

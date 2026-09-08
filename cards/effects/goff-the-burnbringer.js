@@ -103,10 +103,10 @@ module.exports = {
       // value (numbers don't share references through the spread in
       // _createContext), so a direct assignment doesn't propagate
       // back to the engine. setAmount writes to hookCtx.amount.
-      const doubled = (ctx.amount || 0) * 2;
-      ctx.setAmount(doubled);
+      // Punkt vor Strich (Al 1.9.): Verdopplung als MULTIPLIKATOR.
+      ctx.multiplyAmount(2);
       engine.log('goff_burn_doubled', {
-        target: target.name, newAmount: doubled,
+        target: target.name, newAmount: ctx.amount,
       });
     },
 
@@ -129,7 +129,7 @@ module.exports = {
         // side and now controlled by opp) don't get doubled. Controller-
         // aware comparison.
         if ((e.inst.controller ?? e.inst.owner) === ctx.cardOwner) continue;
-        e.amount = (e.amount || 0) * 2;
+        e.multiplyAmount(2);   // Punkt vor Strich
         ctx._engine.log('goff_burn_doubled', {
           target: e.inst.name, newAmount: e.amount,
         });

@@ -921,6 +921,36 @@ function DeckBuilder() {
   const pageSize = filtersCollapsed ? 40 : 20;
   const pageCount = Math.ceil(filteredCards.length / pageSize);
   const pageCards = filteredCards.slice(cardPage * pageSize, (cardPage + 1) * pageSize);
+  // ★ 4.9. (Als Befund): aendert sich die Galerie unter dem ruhenden Cursor
+  // (Suche/Filter/Seite), soll der Tooltip der Karte gelten, die JETZT
+  // dort liegt — oder verschwinden, wenn dort keine mehr ist. CardMini
+  // haelt seinen Hover selbst; wir reichen dem Element unter dem Cursor
+  // ein synthetisches mouseover (React-onMouseEnter) und dem vorherigen
+  // ein mouseout.
+  const lastMouseRef = useRef({ x: -1, y: -1 });
+  const lastHoverElRef = useRef(null);
+  useEffect(() => {
+    const onMove = (e) => { lastMouseRef.current = { x: e.clientX, y: e.clientY }; };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+  useEffect(() => {
+    const { x, y } = lastMouseRef.current;
+    if (x < 0) return;
+    const raf = requestAnimationFrame(() => {
+      const under = document.elementFromPoint(x, y);
+      const el = under ? under.closest('[data-card-mini][data-in-gallery]') : null;
+      const prev = lastHoverElRef.current;
+      if (prev && prev !== el && prev.isConnected) {
+        prev.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      }
+      if (el && el !== prev) {
+        el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }));
+      }
+      lastHoverElRef.current = el;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pageCards.map(c => c.name).join('|')]);
   useEffect(() => setCardPage(0), [filters, filtersCollapsed]);
 
   const validation = currentDeck ? isDeckLegal(currentDeck) : { legal: false, reasons: [] };

@@ -149,6 +149,17 @@ module.exports = {
     engine.sync();
     await engine._delay(200);
 
+    // ── „Vom Brett per Effekt in die Ablage" (v697, Aquatic-Serie) ──
+    // Mizunes Opfer laeuft an actionMoveCard vorbei (manueller Splice +
+    // Push), muss das Fenster also selbst oeffnen — genau dieser Weg
+    // soll Aquatic-Surprises ausloesen koennen.
+    await engine._fireBoardSentToDiscard({
+      cardName, ownerIdx: heroOwner,
+      fromZone: target.zoneType, fromHeroIdx: heroIdx,
+      zoneSlot: target.zoneSlot ?? -1,
+      source: 'Silent Water Mizune', sourceOwner: pi,
+    });
+
     // Draw 1 card (always)
     let drawCount = 1;
 

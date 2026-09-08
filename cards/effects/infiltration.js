@@ -96,6 +96,7 @@ async function _activateLv1(engine, gs, pi, oi, ps, ops) {
   // Now apply the state mutation.
   ops.mainDeck.shift();
   ps.hand.push(cardName);
+  engine._tagHandCardOrigin(pi, cardName, oi);   // v693: kehrt zum Besitzer zurueck
   engine.log('infiltration_take', { player: ps.username, card: cardName, level: 1 });
 
   // Reveal the taken card to OUR side only — the opp didn't see
@@ -165,7 +166,7 @@ async function _activateLv2or3(engine, gs, pi, oi, ps, ops, level) {
   // text says "any order" — preserving deck order is the natural
   // default; an explicit ordering prompt would be added if a
   // future card actually needs control here.
-  ops.mainDeck.splice(0, peekCount);
+  if ((await engine.takeTop(ops, peekCount, { source: CARD_NAME })).length !== peekCount) return;   // v820: Stapel-Schicht
   for (let i = 0; i < peeked.length; i++) {
     if (i === pickedIdx) continue;
     ops.mainDeck.push(peeked[i]);
@@ -173,6 +174,7 @@ async function _activateLv2or3(engine, gs, pi, oi, ps, ops, level) {
 
   // Add the picked card to our hand.
   ps.hand.push(pickedName);
+  engine._tagHandCardOrigin(pi, pickedName, oi);   // v693: kehrt zum Besitzer zurueck
   engine.log('infiltration_take', { player: ps.username, card: pickedName, level });
 
   // Reveal to OUR side only — same rationale as Lv1.

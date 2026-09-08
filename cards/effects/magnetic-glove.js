@@ -81,6 +81,9 @@ module.exports = {
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Magnetic Glove',
       reveal: true,
+      // v734: keine Einschraenkung — „Choose A CARD from your deck".
+      // Koperniko darf danach ebenfalls irgendetwas suchen.
+      searchSpec: { label: 'card', filter: null },
     });
   },
 };

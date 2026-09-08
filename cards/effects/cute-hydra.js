@@ -343,9 +343,8 @@ module.exports = {
       const ownerPs = engine.gs.players[death.originalOwner ?? death.owner];
       if (!ownerPs) return;
 
-      const dIdx = (ownerPs.discardPile || []).lastIndexOf(CARD_NAME);
-      if (dIdx < 0) return; // Already routed elsewhere.
-      ownerPs.discardPile.splice(dIdx, 1);
+      const _taken_dIdx = await engine.takeFromPile(ownerPs, 'discard', CARD_NAME, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+      if (!_taken_dIdx) return; // Already routed elsewhere.
       ownerPs.deletedPile.push(CARD_NAME);
 
       engine.log('cute_hydra_self_delete', {

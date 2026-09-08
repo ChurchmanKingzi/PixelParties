@@ -107,6 +107,11 @@ function getEligibleCreatures(gs, pi, engine = null) {
 }
 
 module.exports = {
+  // v834: NUR Beschwoerung (aus Hand ODER Ablage): unter `ps.summonLocked` nicht aktivierbar.
+  blockedBySummonLock: true,
+  // v826: NICHT "nur Stapel-Bewegung" (auch aus der HAND spielbar); die Auto-Erkennung
+  // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
+  blockedByPileLock: false,
   isPotion: true,
   deferBroadcast: true, // Broadcast after creature+zone selected, not before
 
@@ -225,9 +230,8 @@ module.exports = {
         if (idx < 0) return { cancelled: true };
         ps.hand.splice(idx, 1);
       } else {
-        const idx = ps.discardPile.indexOf(creatureName);
-        if (idx < 0) return { cancelled: true };
-        ps.discardPile.splice(idx, 1);
+        const _taken_idx = await engine.takeFromPile(ps, 'discard', creatureName, { source: 'monster-in-a-bottle' });   // v820: Stapel-Schicht
+        if (!_taken_idx) return { cancelled: true };
         _letheBonus = engine.consumeLetheStamp(pi, creatureName);
       }
 

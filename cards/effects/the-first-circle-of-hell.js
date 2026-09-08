@@ -45,6 +45,14 @@ const CARD_NAME = 'The First Circle of Hell';
 async function massDeleteDiscardPile(engine, pi) {
   const ps = engine.gs.players[pi];
   if (!ps?.discardPile?.length) return [];
+  // v626: Discard-out-Sperre (Staebe / The Eye of Ren). Diese Loeschung
+  // ist PFLICHT — beim Eye zahlt der Spieler den Freikauf mit allem
+  // Gold, das er hat (auch 0), und es wird geloescht; bei den Staeben
+  // bleibt die Sperre hart und nichts wird geloescht.
+  if (!(await engine._discardOutAllowed(pi, { mandatory: true }))) {
+    engine.log('first_circle_blocked', { player: ps.username, reason: 'discard_locked' });
+    return [];
+  }
   const moved = [];
   for (let idx = ps.discardPile.length - 1; idx >= 0; idx--) {
     const name = ps.discardPile[idx];
@@ -52,7 +60,7 @@ async function massDeleteDiscardPile(engine, pi) {
       fromZone: 'discard', fromInstance: null, source: CARD_NAME,
     });
     if (rescued) continue;
-    ps.discardPile.splice(idx, 1);
+    if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) break;   // v820: Stapel-Schicht
     ps.deletedPile = ps.deletedPile || [];
     ps.deletedPile.push(name);
     engine.log('card_deleted', {

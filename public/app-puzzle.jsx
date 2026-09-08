@@ -11,7 +11,7 @@ const { AppContext, cardImageUrl, VolumeControl, CARDS_BY_NAME, CardTooltipConte
 // als „Liste hoert auf".
 const GALLERY_PAGE = 120;
 const GALLERY_GROW_MARGIN = 600;
-const { FrozenOverlay, NegatedOverlay, BurnedOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
+const { FrozenOverlay, NegatedOverlay, BurnedOverlay, BleedingOverlay, PoisonedOverlay, HealReversedOverlay, ImmuneIcon } = window;
 
 // ── Ambient pixel motes for the Puzzle Creator ─────────────────────────
 // Same visual language as the battle board (reuses the global
@@ -77,6 +77,7 @@ const emptyPlayer = () => ({
   // the editor accordingly; the array is dropped to [] when Wowhalla
   // leaves the Area in the editor.
   coolnessStack: [],
+  creationZone: [],
 });
 
 // Dream-Landers attach pairs. Each Creature listed here can hold the
@@ -113,6 +114,7 @@ const ATTACHABLE_HERO_PAIRS = {
 const PLAYER_DEBUFF_REGISTRY = [
   { key: 'flashbanged',       label: '⚪ Flashbanged (turn ends after first action)', flagKey: '_flashbangedDebuff' },
   { key: 'summonLocked',      label: '🚫 Summon-locked',                              flagKey: 'summonLocked'        },
+  { key: 'actionLocked',      label: '🚫 Action-locked (no Actions, placing still works)', flagKey: 'actionLocked'  },
   { key: 'damageLocked',      label: '🛡️ Damage-locked',                              flagKey: 'damageLocked'        },
   { key: 'oppHandLocked',     label: '🫲 Opp-hand-locked',                            flagKey: 'oppHandLocked'       },
   { key: 'itemLocked',        label: '🔨 Item-locked (must delete to play artifact)', flagKey: 'itemLocked'          },
@@ -234,7 +236,29 @@ const PUZZLE_COUNTER_BADGES = [
   { key: 'changeCounter',     icon: '🌌', label: 'Change Counters' },
   { key: 'balance',           icon: '⚖️', label: 'Balance Counters' },
   { key: 'bunnyBombCounter',  icon: '🧨', label: 'Bomb Counters' },
+  // Demon Counter (v601) — Horned Demon, Baaliel; spaeter Great Vanguard Demon.
+  { key: 'demonCounter',      icon: '😈', label: 'Demon Counters' },
+  // Puppets (v707): Luck (Lucky Puppet Laki) / Preserve (Preserving Puppet Vinny).
+  { key: 'luck',              icon: '🍀', label: 'Luck Counters', row: 'puppet' },
+  { key: 'preserve',          icon: '🔒', label: 'Preserve Counters', row: 'puppet' },
 ];
+
+// Gate der Puppet-Counter-Editoren (Als Vorgabe 3.9.): Luck (Helden,
+// Creatures, Tokens) und Preserve (Creatures, Tokens) sind einstellbar,
+// solange der JEWEILIGE Spieler (Besitzer des Ziels) Tri Fecta ODER Tri
+// Ad kontrolliert — im Spiel verschwinden die Counter, sobald er keinen
+// der beiden mehr hat.
+const PUPPET_HERO_NAMES = new Set(['Tri Fecta, the Puppet Master', 'Tri Ad, the Puppet Mistress']);
+function puppetsInPlay(players) {
+  return (players || []).some(p => (p?.heroes || []).some(h => h?.name && PUPPET_HERO_NAMES.has(h.name)));
+}
+
+// Gate des Demon-Counter-Editors: jede Karte, deren Text Demon Counter
+// nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
+// spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
+function cardUsesDemonCounters(card) {
+  return !!card && typeof card.effect === 'string' && card.effect.includes('Demon Counter');
+}
 const PUZZLE_HERO_COUNTER_BADGES = [
   { key: '_changeCounters',    icon: '🌌', label: 'Change Counters' },
   { key: '_evolutionCounters', icon: '🧬', label: 'Evolution Counters' },
@@ -242,6 +266,8 @@ const PUZZLE_HERO_COUNTER_BADGES = [
   // muessen im Editor setzbar sein — ohne Eintrag hier gibt es weder
   // Abzeichen noch Eingabefeld.
   { key: '_investCounters',    icon: '🪙', label: 'Invest Counters' },
+  // Puppets (v707): Luck Counter auf dem Helden (Lucky Puppet Laki).
+  { key: '_luckCounter',       icon: '🍀', label: 'Luck Counters', row: 'puppet' },
 ];
 
 function CounterBadges({ source, defs }) {
@@ -257,14 +283,26 @@ function CounterBadges({ source, defs }) {
       display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
       pointerEvents: 'none',
     }}>
-      {shown.map(d => (
+      {shown.filter(d => !d.row).map(d => (
         <div key={d.key} className="head-counter-badge"
           title={`${d.label}: ${source[d.key]}`}
           style={{ position: 'static' }}>
           <span className="head-counter-icon">{d.icon}</span>
-          <span className="head-counter-num">×{source[d.key]}</span>
+          {!d.boolean && <span className="head-counter-num">×{source[d.key]}</span>}
         </div>
       ))}
+      {/* v708 (Puppets): Luck/Preserve nebeneinander in EINER Zeile. */}
+      {shown.some(d => d.row === 'puppet') && (
+        <div className="head-counter-badge" style={{ position: 'static', display: 'flex', gap: 4 }}
+          title={shown.filter(d => d.row === 'puppet').map(d => `${d.label}: ${source[d.key]}`).join(' · ')}>
+          {shown.filter(d => d.row === 'puppet').map(d => (
+            <span key={d.key} style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <span className="head-counter-icon">{d.icon}</span>
+              <span className="head-counter-num">×{source[d.key]}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -293,6 +331,7 @@ function PuzzleCreator() {
       ...base, ...raw,
       sideDeck: Array.isArray(raw.sideDeck) ? raw.sideDeck : [],
       coolnessStack: Array.isArray(raw.coolnessStack) ? raw.coolnessStack : [],
+      creationZone: Array.isArray(raw.creationZone) ? raw.creationZone : [],
     };
   };
   const [players, setPlayers] = useState(
@@ -342,6 +381,37 @@ function PuzzleCreator() {
   const [editAtk, setEditAtk] = useState('');
   const [dragCardName, setDragCardName] = useState(null);
   const [dragHandIdx, setDragHandIdx] = useState(null);
+  /**
+   * ★ 28.8. (Als Vorgabe): Umsortieren per Drag/Drop im Editor.
+   *
+   * Der Editor kannte bisher nur „Karte irgendwo ablegen" —
+   * `handleHandDrop` haengte sie hinten an, und ein Zug innerhalb der
+   * eigenen Hand war ausdruecklich ein No-op. Fuer das Umsortieren
+   * braucht es dieselben drei Dinge wie im Spiel: eine Zielposition,
+   * eine sichtbare Luecke und das Verstecken des Originals.
+   *
+   * `{ zone: 'hand'|'creation', idx }` — die Luecke gehoert immer zu
+   * genau einer Haelfte, und ein Wechsel zwischen beiden ist
+   * ausgeschlossen (Als Regel 28.8.).
+   */
+  const [dropGap, setDropGap] = useState(null);
+  /**
+   * ★ 28.8., Als Fehlerbericht: „jetzt kann ich Karten gar nicht mehr
+   * draggen".
+   *
+   * Ursache: das Verstecken der gezogenen Karte lief im SELBEN Tick
+   * wie `dragstart`. Bei HTML5-Drag nimmt der Browser sein Ziehbild
+   * unmittelbar nach dem Ereignis vom Quellelement — kollabiert das
+   * vorher auf Breite 0, bricht er den Zug ab. Im Spiel faellt das
+   * nicht auf, weil dort ein eigener Maus-Zug laeuft und gar kein
+   * HTML5-Drag.
+   *
+   * Deshalb ein eigener Merker, der erst im naechsten Tick gesetzt
+   * wird: `dragstart` ist dann durch, das Ziehbild steht, und das
+   * Original darf verschwinden.
+   */
+  const [ziehLaeuft, setZiehLaeuft] = useState(false);
+
   const [dragHandSource, setDragHandSource] = useState(null); // 'hand' or 'oppHand'
   const [dragSource, setDragSource] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
@@ -414,6 +484,30 @@ function PuzzleCreator() {
     () => (shownCount >= searchResults.length ? searchResults : searchResults.slice(0, shownCount)),
     [searchResults, shownCount],
   );
+  // ★ 4.9. (Als Befund): Galerie aendert sich unter dem ruhenden Cursor →
+  // Tooltip der Karte zeigen, die JETZT dort liegt, sonst ausblenden.
+  const lastMouseRef = useRef({ x: -1, y: -1 });
+  useEffect(() => {
+    const onMove = (e) => { lastMouseRef.current = { x: e.clientX, y: e.clientY }; };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+  useEffect(() => {
+    if (isTouchDevice) return;
+    const { x, y } = lastMouseRef.current;
+    if (x < 0) return;
+    const raf = requestAnimationFrame(() => {
+      const under = document.elementFromPoint(x, y);
+      const el = under ? under.closest('.pz-search-card[data-card-name]') : null;
+      if (el) {
+        const c = getCard(el.dataset.cardName);
+        if (c) showTooltip(c, 'right'); else hideTooltip();
+      } else {
+        hideTooltip();
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [visibleResults.map(c => c.name).join('|')]);
   /** Naehert sich das Ende, das Fenster vergroessern. */
   const growGalleryIfNeeded = useCallback(() => {
     const el = searchResultsRef.current;
@@ -1076,8 +1170,25 @@ function PuzzleCreator() {
     if (!handMountedRef.current) { handMountedRef.current = true; return; }
     invalidate();
   }, [hand, oppHand]);
+  // Puppets (v711, Als Befund 4.9.): verliert eine Seite ihren letzten
+  // Tri Fecta / Tri Ad, verschwinden alle Luck- und Preserve-Counter
+  // dieser Seite — wie im Spiel (`purgePuppetCountersIfOrphaned`).
+  // Laeuft nach JEDER Spieleraenderung (Held entfernt, ersetzt, geladen).
+  const stripOrphanedPuppetCounters = (p) => {
+    if (!p || puppetsInPlay([p])) return p;
+    for (const h of (p.heroes || [])) if (h && h._luckCounter) delete h._luckCounter;
+    if (p._creatureStatuses) {
+      for (const key of Object.keys(p._creatureStatuses)) {
+        const cs = p._creatureStatuses[key];
+        if (!cs) continue;
+        delete cs.luck; delete cs.preserve;
+        if (Object.keys(cs).length === 0) delete p._creatureStatuses[key];
+      }
+    }
+    return p;
+  };
   const updatePlayer = useCallback((idx, fn) => {
-    setPlayers(prev => { const next = [...prev]; next[idx] = fn(JSON.parse(JSON.stringify(prev[idx]))); return next; });
+    setPlayers(prev => { const next = [...prev]; next[idx] = stripOrphanedPuppetCounters(fn(JSON.parse(JSON.stringify(prev[idx])))); return next; });
     invalidate();
   }, [invalidate]);
   const updateArea = useCallback((idx, fn) => {
@@ -1185,6 +1296,15 @@ function PuzzleCreator() {
   const placeSupport = useCallback((cardName, si, hi, slot) => {
     if (window.playSFX) window.playSFX('placement');
     const zone = players[si].supportZones[hi][slot];
+    // v768: Abilities in einer Support Zone (Xal) STAPELN wie in einer
+    // echten Ability-Zone — gleicher Name, hoechstens 3. Ohne diesen
+    // Zweig wuerde der Editor den Stapel bei jedem Ablegen ersetzen und
+    // Level 2/3 waeren nicht baubar.
+    if (getCard(cardName)?.cardType === 'Ability'
+        && zone.length > 0 && zone[0] === cardName && zone.length < 3) {
+      updatePlayer(si, (p) => { p.supportZones[hi][slot].push(cardName); return p; });
+      return;
+    }
     if (zone.length > 0) {
       // Replacing a Flying Island — drop exactly 2 island zones (the
       // rightmost pair). Multiple stacked Flying Islands each keep their
@@ -1296,6 +1416,27 @@ function PuzzleCreator() {
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
   }, [updatePlayer, updateArea]);
 
+  /**
+   * Nimmt dieser Held Abilities in seine Support Zones? (v768)
+   *
+   * Spiegelt `engine.heroAcceptsAbilitiesInSupport`: das Flag
+   * `abilitiesInSupportZones` steht am HELDEN (Xal) oder an einem an
+   * ihm ausgeruesteten Artefakt (Xalibur). Der Editor kennt keine
+   * Kartenskripte, deshalb die Namensliste — sie ist kurz und wird
+   * hier gefuehrt, damit klar ist, wo sie zu ergaenzen waere.
+   */
+  const ABILITY_SUPPORT_KARTEN = ['Xal, the Animated Armor', 'Xalibur'];
+  const akzeptiertAbilities = useCallback((p, hi) => {
+    const held = p?.heroes?.[hi];
+    if (!held) return false;
+    // Helden liegen im Editor als OBJEKT vor (`{ name, hp, … }`), nicht
+    // als blosser Name — das war der Grund, warum der Editor die Ablage
+    // weiter verweigert hat (Als Befund 5.9.).
+    if (ABILITY_SUPPORT_KARTEN.includes(held.name || held)) return true;
+    const zonen = p.supportZones?.[hi] || [];
+    return zonen.some(slot => (slot || []).some(n => ABILITY_SUPPORT_KARTEN.includes(n)));
+  }, []);
+
   const canDrop = useCallback((cardName, zt, si, hi, slot) => {
     const c = getCard(cardName); if (!c) return false;
     const p = players[si];
@@ -1319,17 +1460,25 @@ function PuzzleCreator() {
       // Allow them on both base and Island zones (they're Creature-like).
       if (c.cardType === 'Potion') return true;
       if (isIsland) return isCreatureLike;
+      // v768: Abilities duerfen in die Support Zones eines Helden, der
+      // das kann (Xal, the Animated Armor; ein Held mit Xalibur). Der
+      // Editor prueft dieselbe Bedingung wie die Engine — Flag am
+      // Helden ODER an einem seiner Support-Karten-Artefakte.
+      if (c.cardType === 'Ability' && akzeptiertAbilities(p, hi)) return true;
       return isCreatureLike || c.subtype === 'Equipment' || c.subtype === 'Attachment';
     }
     if (zt === 'surprise') return !!p.heroes[hi] && c.subtype === 'Surprise';
     if (zt === 'area') return c.subtype === 'Area';
     if (zt === 'permanent') return true;
     return false;
-  }, [getCard, players]);
+  }, [getCard, players, akzeptiertAbilities]);
 
   // ── Drag ──
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
     setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
+    // Erst im naechsten Tick verstecken — siehe `ziehLaeuft`.
+    setZiehLaeuft(false);
+    setTimeout(() => setZiehLaeuft(true), 0);
     hideTooltip(); // dismiss tooltip during drag
     e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '');
   }, []);
@@ -1368,7 +1517,7 @@ function PuzzleCreator() {
     e.dataTransfer.setDragImage(ghost, 30, 42);
     setTimeout(() => { try { document.body.removeChild(ghost); } catch {} }, 0);
   }, []);
-  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null; }, []);
+  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null; }, []);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -1448,11 +1597,123 @@ function PuzzleCreator() {
   }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, updatePlayer]);
 
   // Drop onto player hand zone
+  /**
+   * ★ Als Vorgabe 28.8.: die zweigeteilte Hand erscheint im Editor,
+   * „solange Ascended Crestina auf meiner Seite ist".
+   *
+   * Im SPIEL haengt der Kasten dagegen daran, ob Karten drin liegen —
+   * dort waere ein leerer Kasten nur verlorene Handbreite. Im Editor
+   * ist es umgekehrt: ohne leeren Kasten gaebe es keine Stelle, an der
+   * die erste Karte abgelegt werden koennte.
+   */
+  const CRESTINA_ASC = 'True Fairy Crestina, the Primordial Goddess';
+  // ★ Helden sind auch im Editor OBJEKTE:
+  //   `p.heroes[hi] = { name, hp, maxHp, atk, baseAtk, statuses }`
+  // Ich hatte das aus der LEERVORLAGE `heroes: [null, null, null]`
+  // falsch geschlossen und auf einen Namensvergleich umgestellt —
+  // damit war die Bedingung immer falsch und der Kasten nie zu sehen
+  // (Als Befund 28.8.). Eine Vorlage sagt, was drinsteht, wenn NICHTS
+  // da ist; die Form steht an der ZUWEISUNG.
+  const zeigeVorrat = (players[0]?.heroes || []).some(h => h?.name === CRESTINA_ASC);
+  // ★ 28.8. (Als Befund): dasselbe fuer die GEGNERSEITE. Der Editor
+  // stellt beide Seiten auf, also braucht auch der Gegner seinen
+  // Vorrat — sonst laesst sich der Fall „Gegner spielt Crestina" gar
+  // nicht aufsetzen.
+  const zeigeVorratOpp = (players[1]?.heroes || []).some(h => h?.name === CRESTINA_ASC);
+
+  /**
+   * Zielposition aus der Zeigerlage — dieselbe Rechnung wie im Spiel
+   * (`calcDropIdx`): links der Mitte eines Platzes einfuegen, sonst
+   * dahinter.
+   */
+  /**
+   * ★ 28.8., Als Befund: „die Luecke erscheint bei der Hand immer ganz
+   * links". Ursache war der Selektor `.pz-hand > .pz-hand-cards` —
+   * `querySelector` liefert den ERSTEN Treffer im Dokument, und das
+   * ist die GEGNERhand, die weiter oben gerendert wird. Gemessen
+   * wurden also fremde Kartenpositionen.
+   *
+   * Jetzt ueber die eindeutigen Datenanker `data-pz-hand`, die es
+   * ohnehin schon gibt. Strukturpfade wie `A > B` sind hier
+   * gefaehrlich, weil dieselbe Struktur dreimal vorkommt.
+   */
+  const tropfIndex = useCallback((mouseX, sel) => {
+    // ★ 28.8.: LIVE gemessen, exakt wie `calcDropIdx` im Spiel — und
+    // ohne Notbehelf. Hier stand ein Einfrieren der Positionen gegen
+    // das Flackern; das war Symptombehandlung. Die Ursache lag im
+    // Styling (starre Plaetze + `overflow-x: auto`), und seit die
+    // Plaetze wie im Spiel schrumpfen, verschiebt die Luecke nichts
+    // mehr. Eine Rueckkopplung kann so gar nicht erst entstehen.
+    const kasten = document.querySelector(sel);
+    if (!kasten) return 0;
+    const plaetze = kasten.querySelectorAll('.pz-hand-card:not(.pz-hand-card-dragging)');
+    for (let i = 0; i < plaetze.length; i++) {
+      const r = plaetze[i].getBoundingClientRect();
+      if (mouseX < r.left + r.width / 2) return i;
+    }
+    return plaetze.length;
+  }, []);
+
+  /**
+   * Umsortieren innerhalb EINER Haelfte.
+   *
+   * ★ 28.8., Als Befund: „ganz nach rechts geht nicht". Ursache waren
+   * ZWEI Index-Raeume, die ich vermischt hatte. `tropfIndex` zaehlt
+   * OHNE die gezogene Karte (der Selektor schliesst sie aus), liefert
+   * also 0..n-1. Meine Umsortierung rechnete zusaetzlich `-1` ab dem
+   * Ursprung — damit war die letzte Position unerreichbar.
+   *
+   * Das Spiel macht es genau umgekehrt und richtig: hier KEINE
+   * Anpassung (die Karte ist ja schon herausgenommen, das Array steht
+   * bereits im selben Raum), dafuer `+1` in der ANZEIGE, wo sie noch
+   * drinsteht.
+   */
+  const sortiereUm = useCallback((zone, vonIdx, nachIdx) => {
+    if (vonIdx == null || nachIdx == null) return;
+    const misch = (arr) => {
+      const neu = [...arr];
+      const [k] = neu.splice(vonIdx, 1);
+      neu.splice(nachIdx, 0, k);
+      return neu;
+    };
+    // Vier Haelften: eigene Hand/Vorrat und dieselben beim Gegner.
+    if (zone === 'hand') setHand(prev => misch(prev));
+    else if (zone === 'oppHand') setOppHand(prev => misch(prev));
+    else if (zone === 'oppCreation') updatePlayer(1, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
+    else updatePlayer(0, pp => { pp.creationZone = misch(pp.creationZone || []); return pp; });
+    invalidate();
+  }, [updatePlayer, invalidate]);
+
   const handleHandDrop = useCallback((e) => {
     e.preventDefault();
     if (dragCardName == null) return;
-    // Own hand → own hand is a no-op; don't emit SFX in that case.
-    const noop = dragHandSource === 'hand' && dragHandIdx != null;
+    // ★ 28.8. (Als Vorgabe, Nachtrag): Vorrat → Hand. Im EDITOR
+    // duerfen Karten die Haelfte wechseln; im Spiel bleibt die
+    // Trennung eine Regel. Der Editor stellt einen Zustand her, er
+    // spielt ihn nicht.
+    if (dragHandSource === 'creation' && dragHandIdx != null) {
+      const name = dragCardName;
+      removeFromCreation(dragHandIdx);
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="hand"]');
+      setHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      if (window.playSFX) window.playSFX('draw');
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    // ★ 28.8.: Zug aus der eigenen Hand ist kein No-op mehr, sondern
+    // ein Umsortieren an die Zeigerposition (Als Vorgabe).
+    if (dragHandSource === 'hand' && dragHandIdx != null) {
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="hand"]');
+      sortiereUm('hand', dragHandIdx, ziel);
+      if (window.playSFX) window.playSFX('ui_click', { dedupe: 80 });
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    const noop = false;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     // From oppHand → remove from there and add here
     if (dragHandSource === 'oppHand' && dragHandIdx != null) { removeFromOppHand(dragHandIdx); setHand(prev => [...prev, dragCardName]); }
@@ -1461,13 +1722,137 @@ function PuzzleCreator() {
     // From own hand → no-op (reorder not needed)
     if (!noop && window.playSFX) window.playSFX('draw');
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromOppHand]);
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromOppHand, tropfIndex, sortiereUm]);
+
+  /**
+   * Ablegen im Vorrat („Creation Zone", True Fairy Crestina).
+   *
+   * Gleiche Bauform wie `handleHandDrop`, nur mit anderem Ziel — und
+   * bewusst OHNE Weg zwischen Hand und Vorrat: Als Regel 28.8. sagt
+   * „nicht zwischen beiden Piles wechseln". Eine Karte aus der Hand
+   * landet hier also NICHT; sie muss aus der Galerie oder vom Brett
+   * kommen.
+   */
+  const handleCreationDrop = useCallback((e) => {
+    e.preventDefault();
+    if (dragCardName == null) return;
+    // Zug aus dem eigenen Vorrat: umsortieren (Als Vorgabe 28.8.).
+    if (dragHandSource === 'creation' && dragHandIdx != null) {
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="creationZone"]');
+      sortiereUm('creation', dragHandIdx, ziel);
+      if (window.playSFX) window.playSFX('ui_click', { dedupe: 80 });
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    if (dragHandSource === 'hand' && dragHandIdx != null) {
+      // ★ 28.8. (Als Vorgabe, Nachtrag): Hand → Vorrat ist im EDITOR
+      // erlaubt. Im Spiel bleibt die Trennung eine Regel; der Editor
+      // stellt aber nur einen Zustand her, er spielt ihn nicht.
+      const name = dragCardName;
+      removeFromHand(dragHandIdx);
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="creationZone"]');
+      updatePlayer(0, pp => {
+        const n = [...(pp.creationZone || [])];
+        n.splice(ziel, 0, name);
+        pp.creationZone = n;
+        return pp;
+      });
+      if (window.playSFX) window.playSFX('draw');
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
+    if (dragHandSource === 'oppHand' && dragHandIdx != null) removeFromOppHand(dragHandIdx);
+    updatePlayer(0, pp => { pp.creationZone = [...(pp.creationZone || []), dragCardName]; return pp; });
+    if (window.playSFX) window.playSFX('draw');
+    setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+    setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromOppHand, updatePlayer, tropfIndex, sortiereUm]);
+
+  /**
+   * Ablegen im Vorrat des GEGNERS — gespiegelt zu `handleCreationDrop`
+   * (Als Befund 28.8.: „das sollte gemirrored sein").
+   */
+  const handleOppCreationDrop = useCallback((e) => {
+    e.preventDefault();
+    if (dragCardName == null) return;
+    const name = dragCardName;
+    const fertig = (ziel) => {
+      updatePlayer(1, pp => {
+        const n = [...(pp.creationZone || [])];
+        n.splice(ziel, 0, name);
+        pp.creationZone = n;
+        return pp;
+      });
+      if (window.playSFX) window.playSFX('draw');
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+    };
+    const ziel = tropfIndex(e.clientX, '[data-pz-hand="oppCreationZone"]');
+    if (dragHandSource === 'oppCreation' && dragHandIdx != null) {
+      updatePlayer(1, pp => {
+        pp.creationZone = (pp.creationZone || []).filter((_, i) => i !== dragHandIdx);
+        return pp;
+      });
+      return fertig(ziel > dragHandIdx ? ziel - 1 : ziel);
+    }
+    if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
+    if (dragHandSource === 'oppHand' && dragHandIdx != null) removeFromOppHand(dragHandIdx);
+    else if (dragHandSource === 'hand' && dragHandIdx != null) removeFromHand(dragHandIdx);
+    else if (dragHandSource === 'creation' && dragHandIdx != null) removeFromCreation(dragHandIdx);
+    fertig(ziel);
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone,
+      removeFromOppHand, removeFromHand, updatePlayer, tropfIndex]);
+
+  const removeFromOppCreation = useCallback((idx) => {
+    updatePlayer(1, pp => {
+      pp.creationZone = (pp.creationZone || []).filter((_, i) => i !== idx);
+      return pp;
+    });
+  }, [updatePlayer]);
+
+  const removeFromCreation = useCallback((idx) => {
+    updatePlayer(0, pp => {
+      pp.creationZone = (pp.creationZone || []).filter((_, i) => i !== idx);
+      return pp;
+    });
+  }, [updatePlayer]);
 
   // Drop onto opponent hand zone
   const handleOppHandDrop = useCallback((e) => {
     e.preventDefault();
     if (dragCardName == null) return;
-    const noop = dragHandSource === 'oppHand' && dragHandIdx != null;
+    // ★ 28.8.: gespiegelt zur eigenen Seite — Umsortieren und Wechsel
+    // zwischen Gegnerhand und Gegner-Vorrat.
+    if (dragHandSource === 'oppHand' && dragHandIdx != null) {
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="oppHand"]');
+      sortiereUm('oppHand', dragHandIdx, ziel);
+      if (window.playSFX) window.playSFX('ui_click', { dedupe: 80 });
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    if (dragHandSource === 'oppCreation' && dragHandIdx != null) {
+      const name = dragCardName;
+      updatePlayer(1, pp => {
+        pp.creationZone = (pp.creationZone || []).filter((_, i) => i !== dragHandIdx);
+        return pp;
+      });
+      const ziel = tropfIndex(e.clientX, '[data-pz-hand="oppHand"]');
+      setOppHand(prev => { const n = [...prev]; n.splice(ziel, 0, name); return n; });
+      if (window.playSFX) window.playSFX('draw');
+      setDragCardName(null); setDragHandIdx(null); setDragSource(null);
+      setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
+      dragEntityData.current = null;
+      return;
+    }
+    const noop = false;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
     // From player hand → remove from there and add here
     if (dragHandSource === 'hand' && dragHandIdx != null) { removeFromHand(dragHandIdx); setOppHand(prev => [...prev, dragCardName]); }
@@ -1476,7 +1861,7 @@ function PuzzleCreator() {
     // From own oppHand → no-op (reorder not needed)
     if (!noop && window.playSFX) window.playSFX('draw');
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand]);
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, tropfIndex, sortiereUm, updatePlayer]);
 
   // ── Pile zone helpers ──
   /** Stapel oeffnen — mit Klang. Der Klick war bisher stumm, obwohl
@@ -1571,6 +1956,11 @@ function PuzzleCreator() {
   // serverseitig als `inst.counters.bunnyBombCounter` angewendet. Null fuer
   // andere Karten, damit der Abschnitt verborgen bleibt.
   const [editBunnyBombCounter, setEditBunnyBombCounter] = useState(null);
+  // Demon Counter (v601): null = Abschnitt verborgen (keine Demon-Counter-Karte).
+  const [editDemonCounter, setEditDemonCounter] = useState(null);
+  // Puppets (v707): null = Editor ausgeblendet, sonst true/false.
+  const [editLuckCounter, setEditLuckCounter] = useState(null);
+  const [editPreserveCounter, setEditPreserveCounter] = useState(null);
   // For Sparkfly Queen: which sacrifice gifts (Architect / Attendant /
   // Worker) the Queen carries. Gifts are normally granted by Hive's Crown
   // when sacrificing a Sparkfly Creature; in puzzle mode the author can
@@ -1639,6 +2029,7 @@ function PuzzleCreator() {
     setEditCeciliaDefeated(null);
     setEditBalanceCounter(null);
     setEditBunnyBombCounter(null);
+    setEditDemonCounter(null);
     setEditSparkflyGifts(null);
     setEditAntiMagicLevel(null);
     if (zt === 'hero') {
@@ -1671,12 +2062,19 @@ function PuzzleCreator() {
       setEditInvestCounter(h.name === 'Logan, the Investment Monkee'
         ? (h._investCounters || 0)
         : null);
+      setEditLuckCounter(puppetsInPlay([p]) ? (h._luckCounter || 0) : null);
+      setEditPreserveCounter(null);
       setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
         ? !!h._ceciliaDefeatedOnce
         : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
       const c = getCard(cards[0]);
+      // v771: Eine ABILITY in einer Support Zone (Xal, Xalibur) hat gar
+      // nichts zu bearbeiten — kein HP, keine Status, keine Buffs. Der
+      // Klick soll deshalb NICHTS oeffnen statt einen leeren Dialog
+      // (Als Befund 5.9.).
+      if (c?.cardType === 'Ability') return;
       klangBeimOeffnen();
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : '')); setEditMaxHp(''); setEditAtk('');
@@ -1725,6 +2123,14 @@ function PuzzleCreator() {
         ? (cs.balance || 0)
         : null);
       // Bunny Bombs: Bomb Counter aus dem gespeicherten Zustand holen.
+      setEditDemonCounter(cardUsesDemonCounters(c) ? (cs.demonCounter || 0) : null);
+      // Puppets (v707): Luck/Preserve auf Creatures und Tokens.
+      {
+        const isCrOrToken = !!c && (String(c.cardType || '').includes('Creature') || c.cardType === 'Token');
+        const ownerHasPuppets = puppetsInPlay([p]);
+        setEditLuckCounter(ownerHasPuppets && isCrOrToken ? (cs.luck || 0) : null);
+        setEditPreserveCounter(ownerHasPuppets && isCrOrToken ? (cs.preserve || 0) : null);
+      }
       setEditBunnyBombCounter(c?.name === 'Bunny Bombs'
         ? (cs.bunnyBombCounter || 0)
         : null);
@@ -1802,6 +2208,10 @@ function PuzzleCreator() {
         } else {
           delete p.heroes[hi]._investCounters;
         }
+        // Puppets (v707): Luck Counter auf dem Helden — der Loader reicht
+        // `_luckCounter` durch, Laki liest es direkt vom Heldenobjekt.
+        if (editLuckCounter != null && editLuckCounter > 0) p.heroes[hi]._luckCounter = editLuckCounter;
+        else delete p.heroes[hi]._luckCounter;
       }
       return p;
     });
@@ -1890,6 +2300,15 @@ function PuzzleCreator() {
       if (editBunnyBombCounter != null && editBunnyBombCounter > 0) {
         merged.bunnyBombCounter = editBunnyBombCounter;
       }
+      // Demon Counter (v601): Server legt sie auf `inst.counters.demonCounter`.
+      delete merged.demonCounter;
+      if (editDemonCounter != null && editDemonCounter > 0) {
+        merged.demonCounter = editDemonCounter;
+      }
+      // Puppets (v707): Luck / Preserve Counter → `inst.counters.luck/preserve`.
+      delete merged.luck; delete merged.preserve;
+      if (editLuckCounter != null && editLuckCounter > 0) merged.luck = editLuckCounter;
+      if (editPreserveCounter != null && editPreserveCounter > 0) merged.preserve = editPreserveCounter;
       // Sparkfly Queen: persist the gift checklist. Server reads
       // `_sparkflyGiftFlags` and runs the same `grantInheritedAbility`
       // path Hive's Crown uses, so the buffs / inherited-effect text /
@@ -1914,7 +2333,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBalanceCounter, editBunnyBombCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -2048,6 +2467,8 @@ function PuzzleCreator() {
       tooltip: 'Stunned: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
     { key: 'burned', label: '🔥 Burned', color: '#ff6633',
       tooltip: 'Burned: takes 60 damage at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
+    { key: 'bleeding', label: '🩸 Bleeding', color: '#e0324c',
+      tooltip: 'Bleeding: takes 50 damage after each of its own actions (Attack, Spell, Creature, action-costing Ability or Hero effect, additional Actions), active Hero effects without action cost, and active Creature effects. Permanent until cleansed.' },
     { key: 'poisoned', label: '☠️ Poisoned', color: '#aa44ff', stacks: true,
       tooltip: 'Poisoned: takes 30 damage per stack at the start of each of its owner\'s turns. Permanent until cleansed or healed.' },
     { key: 'negated', label: '🚫 Negated', color: '#888',
@@ -2072,6 +2493,13 @@ function PuzzleCreator() {
       tooltip: 'Heal Reversed: any healing this target would receive deals damage instead.' },
     { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc',
       tooltip: 'Untargetable: cannot be chosen as a target by Attacks, Spells, or Creature effects.' },
+    // v723: kein echter Status, sondern eine Herkunftsangabe — die
+    // Kreatur gehoert urspruenglich der Gegenseite (`originalOwner`),
+    // so wie nach einem Dark Gear. Bewusst OHNE Badge, im Spiel ist
+    // davon nichts zu sehen; sie dient dem Testen von Karten, die
+    // dauerhafte Kontrolle lesen oder brechen (Liberation).
+    { key: 'stolen', label: '🔄 Stolen', color: '#ff9944', scope: 'creature',
+      tooltip: 'Stolen: this Creature is originally owned by the OTHER player (as if taken with Dark Gear). No badge — it only sets the original owner at puzzle start.' },
   ];
   const BUFF_LIST = [
     { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd',
@@ -2224,12 +2652,13 @@ function PuzzleCreator() {
                   {(hero.statuses?.stunned || hero.statuses?.webbed) && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
                   {hero.statuses?.negated && <NegatedOverlay />}
                   {hero.statuses?.burned && <BurnedOverlay />}
+                  {hero.statuses?.bleeding && <BleedingOverlay />}
                   {hero.statuses?.poisoned && <PoisonedOverlay stacks={hero.statuses.poisoned.stacks || 1} />}
                   {hero.statuses?.healReversed && <HealReversedOverlay />}
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                   <CounterBadges source={hero} defs={PUZZLE_HERO_COUNTER_BADGES} />
-                  {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
+                  {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.bleeding || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
                     <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                 </> : <div className="board-zone-empty">Hero</div>}
@@ -2270,6 +2699,27 @@ function PuzzleCreator() {
                       <BoardCard cardName={p.coolnessStack[p.coolnessStack.length - 1]} />
                       <div className="board-card-label">{p.coolnessStack.length}</div>
                     </> : <div className="board-zone-empty" style={{ color: 'rgba(120,210,255,.8)', fontSize: 'calc(8px * var(--board-scale))' }}>Coolness</div>}
+                  </div>
+                </div>
+              )}
+              {/* ── Crestinas Vorrat ──────────────────────────────── */}
+              {/* Anders als der Coolness Stack haengt er an KEINER Area,  */}
+              {/* sondern an „True Fairy Crestina" auf der Heldenreihe.    */}
+              {/* Der Kasten wird trotzdem immer angeboten, sobald ein     */}
+              {/* Held steht: ein Puzzle darf einen Vorrat auch OHNE       */}
+              {/* Crestina aufsetzen, um genau den Fall zu testen, in dem  */}
+              {/* sie das Feld verlassen hat (Als Ruling 4).               */}
+              {hi === 2 && (
+                <div style={{ position: 'absolute', left: '100%', top: 'calc(78px * var(--board-scale))', marginLeft: 'calc(8px * var(--board-scale))' }}>
+                  <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'creation-' + si ? { boxShadow: '0 0 14px rgba(230,190,90,.7)' } : {}) }}
+                    onClick={() => (p.creationZone || []).length > 0 && oeffneStapel({ si, key: 'creationZone' })}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('creation-' + si); }}
+                    onDragLeave={() => setDragOverZone(null)}
+                    onDrop={(e) => handlePileDrop(e, si, 'creationZone')}>
+                    {(p.creationZone || []).length > 0 ? <>
+                      <BoardCard cardName={p.creationZone[p.creationZone.length - 1]} />
+                      <div className="board-card-label">{p.creationZone.length}</div>
+                    </> : <div className="board-zone-empty" style={{ color: 'rgba(230,190,90,.85)', fontSize: 'calc(8px * var(--board-scale))' }}>Creation</div>}
                   </div>
                 </div>
               )}
@@ -2383,6 +2833,21 @@ function PuzzleCreator() {
                     data-support-zone="1" data-support-owner={isOpp ? 'opp' : 'me'}
                     {...zh('support', si, hi, slot)}>
                     {cards.length > 0 ? (() => {
+                      // v772: Ability-Stapel in einer Support Zone (Xal,
+                      // Xalibur) wie in einer Ability-Zone zeichnen —
+                      // versetzt und mit Stufenzahl.
+                      if (c?.cardType === 'Ability') {
+                        return (
+                          <div className="board-ability-stack">
+                            {cards.map((cn, ci) => (
+                              <div key={ci} className="board-ability-stack-card" style={{ top: ci * 5 }}>
+                                <BoardCard cardName={cn} />
+                              </div>
+                            ))}
+                            {cards.length > 1 && <div className="board-card-label">{cards.length}</div>}
+                          </div>
+                        );
+                      }
                       const cs = p._creatureStatuses?.[hi + '-' + slot] || {};
                       // Biomancy Tokens render their HP bar from the stored
                       // level (40/60/80) even though the underlying Potion
@@ -2411,9 +2876,10 @@ function PuzzleCreator() {
                         )}
                         {cs.frozen && <FrozenOverlay />}
                         {cs.burned && <BurnedOverlay />}
+                        {cs.bleeding && <BleedingOverlay />}
                         {cs.negated && <NegatedOverlay />}
                         {cs.poisoned && <PoisonedOverlay stacks={cs.poisoned.stacks || 1} />}
-                        {(cs.frozen || cs.stunned || cs.burned || cs.poisoned || cs.negated || cs._extraLife) &&
+                        {(cs.frozen || cs.stunned || cs.burned || cs.bleeding || cs.poisoned || cs.negated || cs._extraLife) &&
                           <StatusBadges statuses={cs} isHero={false} />}
                         {cs.buffs && <BuffColumn buffs={cs.buffs} />}
                         <CounterBadges source={cs} defs={PUZZLE_COUNTER_BADGES} />
@@ -2657,7 +3123,7 @@ function PuzzleCreator() {
                 // samt <img> weg und baute sie neu auf. Stabile
                 // Schluessel heisst: gefilterte Karten verschwinden,
                 // bleibende behalten ihr Bild.
-                <div key={c.name} className="pz-search-card"
+                <div key={c.name} className="pz-search-card" data-card-name={c.name}
                   onClick={!isTouchDevice ? () => { addToHand(c); if (window.playSFX) window.playSFX('draw'); setMobileSelected(null); } : undefined}
                   onTouchStart={(e) => touchDragStart(c.name, null, null, null, e)}
                   onTouchMove={touchDragMove}
@@ -2705,16 +3171,33 @@ function PuzzleCreator() {
         <div className="pz-board-wrap" ref={boardWrapRef}>
           {/* ── Opponent Hand (always revealed, behind tooltips) ── */}
           <div className="pz-hand pz-hand-opp" style={{ position: 'relative', zIndex: 1, marginBottom: 'calc(4px * var(--board-scale))' }}
-            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppHand'); }}
-            onDragLeave={() => setDragOverZone(null)}
+            onDragOver={(e) => {
+              e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppHand');
+              if (dragHandSource === 'oppHand' && dragHandIdx != null) {
+                setDropGap({ zone: 'oppHand', idx: tropfIndex(e.clientX, '[data-pz-hand="oppHand"]') });
+              }
+            }}
+            onDragLeave={(e) => {
+              // Kindwechsel ist kein Verlassen — siehe eigene Hand.
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              setDragOverZone(null); setDropGap(null);
+            }}
             onDrop={handleOppHandDrop}>
             <PzAmbiance variant="hand" />
             <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
             <div className="pz-hand-cards" data-pz-hand="oppHand" style={dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
               {oppHand.map((cardName, i) => {
                 const img = cardImageUrl(cardName);
+                // Gespiegelt zur eigenen Hand (Als Befund 28.8.).
+                const gapPosOh = dropGap?.zone === 'oppHand'
+                  ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+                  : null;
+                const lueckeOh = gapPosOh === i
+                  ? <div key={'ohgap' + i} className="pz-hand-gap" /> : null;
+                const gezogenOh = ziehLaeuft && dragHandSource === 'oppHand' && dragHandIdx === i;
                 return (
-                  <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+                  <React.Fragment key={'oh' + i}>{lueckeOh}
+                  <div className={'pz-hand-card' + (gezogenOh ? ' pz-hand-card-dragging' : '') + (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
                     
                     draggable={!isTouchDevice}
                     onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppHand')} onDragEnd={onDragEnd}
@@ -2733,10 +3216,68 @@ function PuzzleCreator() {
                       <div className="pz-hand-card-text"><span>{cardName}</span></div>
                     )}
                   </div>
+                  </React.Fragment>
                 );
               })}
+              {dropGap?.zone === 'oppHand'
+                && (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx) >= oppHand.length
+                && <div className="pz-hand-gap" />}
               {oppHand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>Drag cards here for the opponent's hand.</span>}
             </div>
+            {/* ── Vorrat des GEGNERS ────────────────────────────────
+                Spiegelbild der eigenen Haelfte; erscheint, solange der
+                GEGNER eine Ascended Crestina auf der Heldenreihe hat. */}
+            {zeigeVorratOpp && (
+              <div className="pz-hand-creation"
+                onDragOver={(e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  e.dataTransfer.dropEffect = 'move'; setDragOverZone('oppCreation');
+                  if (dragHandSource === 'oppCreation' && dragHandIdx != null) {
+                    setDropGap({ zone: 'oppCreation', idx: tropfIndex(e.clientX, '[data-pz-hand="oppCreationZone"]') });
+                  }
+                }}
+                onDragLeave={(e) => {
+                  e.stopPropagation();
+                  if (e.currentTarget.contains(e.relatedTarget)) return;
+                  setDragOverZone(null); setDropGap(null);
+                }}
+                onDrop={(e) => { e.stopPropagation(); handleOppCreationDrop(e); }}>
+                <span className="pz-hand-label orbit-font">CREATION ({(players[1].creationZone || []).length})</span>
+                <div className="pz-hand-cards" data-pz-hand="oppCreationZone"
+                  style={dragOverZone === 'oppCreation' ? { boxShadow: '0 0 14px rgba(230,190,90,.45) inset' } : undefined}>
+                  {(players[1].creationZone || []).map((cardName, i) => {
+                    const img = cardImageUrl(cardName);
+                    const gapPos = dropGap?.zone === 'oppCreation'
+                      ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+                      : null;
+                    const luecke = gapPos === i
+                      ? <div key={'ocgap' + i} className="pz-hand-gap" /> : null;
+                    const gezogen = ziehLaeuft && dragHandSource === 'oppCreation' && dragHandIdx === i;
+                    return (
+                      <React.Fragment key={'oc' + i}>{luecke}
+                      <div className={'pz-hand-card pz-creation-card' + (gezogen ? ' pz-hand-card-dragging' : '')}
+                        draggable={!isTouchDevice}
+                        onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppCreation')} onDragEnd={onDragEnd}
+                        onContextMenu={(e) => { e.preventDefault(); removeFromOppCreation(i); if (window.playSFX) window.playSFX('discard'); }}
+                        onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'right'); }}
+                        onMouseLeave={hideTooltip}>
+                        {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                          <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                        )}
+                      </div>
+                      </React.Fragment>
+                    );
+                  })}
+                  {dropGap?.zone === 'oppCreation'
+                    && (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+                       >= (players[1].creationZone || []).length
+                    && <div className="pz-hand-gap" />}
+                  {(players[1].creationZone || []).length === 0 && (
+                    <span style={{ color: 'var(--text2)', fontSize: 11 }}>Drag cards here — face-up.</span>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
               <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
               {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
@@ -2829,16 +3370,55 @@ function PuzzleCreator() {
                instead of the full screen — this frees the area beneath the
                gallery, which now fills the full height. ── */}
           <div className="pz-hand" style={{ position: 'relative', zIndex: 10000 }}
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('hand'); }}
-        onDragLeave={() => setDragOverZone(null)}
+        onDragOver={(e) => {
+          e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('hand');
+          // Zieh-Luecke nur beim UMSORTIEREN innerhalb der Hand — beim
+          // Hereinziehen von aussen waere sie irrefuehrend, die Karte
+          // haengt sich dort hinten an.
+          if (dragHandSource === 'hand' && dragHandIdx != null) {
+            setDropGap({ zone: 'hand', idx: tropfIndex(e.clientX, '[data-pz-hand="hand"]') });
+          }
+        }}
+        onDragLeave={(e) => {
+          // ★ 28.8., DIE Ursache des Flackerns (Als Verdacht bestaetigt:
+          // „ist der Container fundamental anders?").
+          //
+          // `dragleave` feuert am Container AUCH DANN, wenn der Zeiger
+          // nur auf ein KINDelement wechselt — also bei jeder Karte,
+          // ueber die man zieht. Damit lief: Luecke weg → Reihe
+          // aendert sich → `dragover` → Luecke wieder da → naechste
+          // Karte → Luecke weg … im Takt der Mausbewegung.
+          //
+          // Das Spiel kennt das Problem nicht, weil es GAR KEIN
+          // dragleave hat: dort laeuft ein eigener Maus-Zug ueber
+          // mousemove. Das ist der fundamentale Unterschied — nicht
+          // das Styling, an dem ich zweimal vergeblich gedreht habe.
+          //
+          // Nur raeumen, wenn der Zeiger den Container WIRKLICH
+          // verlassen hat.
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          setDragOverZone(null); setDropGap(null);
+        }}
         onDrop={handleHandDrop}>
         <PzAmbiance variant="hand" />
         <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
         <div className="pz-hand-cards" data-pz-hand="hand" style={dragOverZone === 'hand' || dragOverZone === 'hand:hand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
           {hand.map((cardName, i) => {
             const img = cardImageUrl(cardName);
+            // Zieh-Luecke VOR diesem Platz, wenn der Zeiger hier steht.
+            // ★ Der Index kommt OHNE die gezogene Karte; hier steht sie
+            // aber noch drin. Deshalb `+1` ab dem Ursprung — dieselbe
+            // Umrechnung wie `displayHand` im Spiel. Ohne sie war die
+            // letzte Position unerreichbar (Als Befund 28.8.).
+            const gapPos = dropGap?.zone === 'hand'
+              ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+              : null;
+            const luecke = gapPos === i
+              ? <div key={'gap' + i} className="pz-hand-gap" /> : null;
+            const gezogen = ziehLaeuft && dragHandSource === 'hand' && dragHandIdx === i;
             return (
-              <div key={i} className={'pz-hand-card' + (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
+              <React.Fragment key={i}>{luecke}
+              <div className={'pz-hand-card' + (gezogen ? ' pz-hand-card-dragging' : '') + (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
                 
                 draggable={!isTouchDevice}
                 onDragStart={(e) => onDragStart(e, cardName, i, null, 'hand')} onDragEnd={onDragEnd}
@@ -2857,10 +3437,86 @@ function PuzzleCreator() {
                   <div className="pz-hand-card-text"><span>{cardName}</span></div>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
+          {dropGap?.zone === 'hand'
+            && (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx) >= hand.length
+            && <div className="pz-hand-gap" />}
           {hand.length === 0 && <span style={{ color: 'var(--text2)', fontSize: 11 }}>{isTouchDevice ? 'Search → tap to add. Tap card, then tap zone to place.' : 'Search → click to add or drag directly onto the board. Right-click to remove.'}</span>}
         </div>
+        {/* ── Crestinas Vorrat, zweite Haelfte der Handzone ──────────
+            Erscheint, solange „True Fairy Crestina" auf der eigenen
+            Heldenreihe steht (Als Vorgabe 28.8.). Die Aufteilung ist
+            dieselbe wie im Spiel: 66 % Hand, 33 % Vorrat — hier ueber
+            `flex` an den beiden Kaesten, weil die Editor-Handzone
+            eigene Klassen hat.
+            Karten koennen NICHT zwischen Hand und Vorrat wechseln
+            (Als Regel 28.8.); `handleCreationDrop` weist einen Zug aus
+            der Hand still ab. */}
+        {zeigeVorrat && (
+          <div className="pz-hand-creation"
+            // ★ 28.8., Als Befund: „beim Drag in die Creation-Zone wird
+            // noch die normale Hand gehighlightet". Der Kasten liegt
+            // INNERHALB von `.pz-hand`, und dessen `onDragOver` feuert
+            // beim Hochblubbern NACH diesem hier — es setzte die
+            // Markierung also gleich wieder auf 'hand' zurueck.
+            // `stopPropagation` an allen drei Ereignissen, sonst
+            // gewinnt der Elternhandler auch beim Ablegen und die
+            // Karte landete in der Hand statt im Vorrat.
+            onDragOver={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              e.dataTransfer.dropEffect = 'move'; setDragOverZone('creation');
+              if (dragHandSource === 'creation' && dragHandIdx != null) {
+                setDropGap({ zone: 'creation', idx: tropfIndex(e.clientX, '[data-pz-hand="creationZone"]') });
+              }
+            }}
+            onDragLeave={(e) => {
+              e.stopPropagation();
+              // Siehe Hand: nur bei echtem Verlassen raeumen.
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              setDragOverZone(null); setDropGap(null);
+            }}
+            onDrop={(e) => { e.stopPropagation(); handleCreationDrop(e); }}>
+            <span className="pz-hand-label orbit-font">CREATION ({(players[0].creationZone || []).length})</span>
+            <div className="pz-hand-cards" data-pz-hand="creationZone"
+              style={dragOverZone === 'creation' ? { boxShadow: '0 0 14px rgba(230,190,90,.45) inset' } : undefined}>
+              {(players[0].creationZone || []).map((cardName, i) => {
+                const img = cardImageUrl(cardName);
+                // Siehe Hand: Umrechnung zwischen den beiden Index-Raeumen.
+                const gapPosCz = dropGap?.zone === 'creation'
+                  ? (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+                  : null;
+                const luecke = gapPosCz === i
+                  ? <div key={'czgap' + i} className="pz-hand-gap" /> : null;
+                const gezogen = ziehLaeuft && dragHandSource === 'creation' && dragHandIdx === i;
+                return (
+                  <React.Fragment key={'cz' + i}>{luecke}
+                  <div className={'pz-hand-card pz-creation-card' + (gezogen ? ' pz-hand-card-dragging' : '')}
+                    draggable={!isTouchDevice}
+                    onDragStart={(e) => onDragStart(e, cardName, i, null, 'creation')} onDragEnd={onDragEnd}
+                    onContextMenu={(e) => { e.preventDefault(); removeFromCreation(i); if (window.playSFX) window.playSFX('discard'); }}
+                    onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
+                    onMouseLeave={hideTooltip}>
+                    {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                      <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                    )}
+                  </div>
+                  </React.Fragment>
+                );
+              })}
+              {dropGap?.zone === 'creation'
+                && (dragHandIdx != null && dropGap.idx >= dragHandIdx ? dropGap.idx + 1 : dropGap.idx)
+                   >= (players[0].creationZone || []).length
+                && <div className="pz-hand-gap" />}
+              {(players[0].creationZone || []).length === 0 && (
+                <span style={{ color: 'var(--text2)', fontSize: 11 }}>
+                  Drag cards here — playable like hand cards, face-up.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
           <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
           {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
@@ -2919,7 +3575,7 @@ function PuzzleCreator() {
       {/* ── Pile Viewer Modal ── */}
       {viewPile && (() => {
         const pile = players[viewPile.si][viewPile.key] || [];
-        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck', sideDeck: 'Side Deck', coolnessStack: 'Coolness Stack' };
+        const labels = { discardPile: 'Discard Pile', deletedPile: 'Deleted Pile', mainDeck: 'Deck', potionDeck: 'Potion Deck', sideDeck: 'Side Deck', coolnessStack: 'Coolness Stack', creationZone: 'Creation Zone' };
         const sideLabel = viewPile.si === 0 ? 'You' : 'Opponent';
         if (pile.length === 0) { setViewPile(null); return null; }
         return (
@@ -3190,6 +3846,41 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
+            {/* Demon Counter editor (v601) — sichtbar fuer jede Karte, deren
+                Text Demon Counter nennt (Horned Demon; spaeter Great Vanguard
+                Demon). Schreibt `demonCounter` in `_creatureStatuses[hi-slot]`;
+                der Puzzle-Loader legt das auf `inst.counters.demonCounter`. */}
+            {editDemonCounter != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  😈 Demon Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    disabled={(editDemonCounter || 0) <= 0}
+                    onClick={() => setEditDemonCounter(Math.max(0, (editDemonCounter || 0) - 1))}>
+                    −
+                  </button>
+                  <input className="input" type="number" min={0}
+                    value={editDemonCounter ?? 0}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10);
+                      setEditDemonCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#d98cff' }} />
+                  <button className="btn"
+                    style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                    onClick={() => setEditDemonCounter((editDemonCounter || 0) + 1)}>
+                    +
+                  </button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Horned Demon's strike deals {(editDemonCounter || 0) * 50} damage (50 per Demon Counter).
+                </div>
+              </div>
+            )}
             {/* Waflav Evolution Counter editor — visible for the base Hero
                 and all five Ascended forms. The counter is the archetype's
                 whole resource: it pays for every Ascension (1 for
@@ -3274,6 +3965,74 @@ function PuzzleCreator() {
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
                   Cashes in at end of turn for {(editInvestCounter || 0)} Gold or {(editInvestCounter || 0) * 5} damage. Lost entirely at 0 Gold.
+                </div>
+              </div>
+            )}
+            {/* Puppets (v709): Luck Counters (Laki) — Helden, Creatures, Tokens;
+                Preserve Counters (Vinny) — Creatures, Tokens. Zahleneingabe wie
+                bei Demon/Invest Counters, beide in EINER Zeile. Sichtbar, sobald
+                der Besitzer des Ziels Tri Fecta oder Tri Ad kontrolliert. */}
+            {(editLuckCounter != null || editPreserveCounter != null) && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🎭 Puppet Counters
+                </span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 6, flexWrap: 'nowrap' }}>
+                  {editLuckCounter != null && (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4 }}>🍀 Luck Counters</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button className="btn"
+                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
+                          disabled={(editLuckCounter || 0) <= 0}
+                          onClick={() => setEditLuckCounter(Math.max(0, (editLuckCounter || 0) - 1))}>
+                          −
+                        </button>
+                        <input className="input" type="number" min={0}
+                          value={editLuckCounter ?? 0}
+                          onChange={(e) => {
+                            const n = parseInt(e.target.value, 10);
+                            setEditLuckCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                          style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#7fdc7f' }} />
+                        <button className="btn"
+                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
+                          onClick={() => setEditLuckCounter((editLuckCounter || 0) + 1)}>
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {editPreserveCounter != null && (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4 }}>🔒 Preserve Counters</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button className="btn"
+                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
+                          disabled={(editPreserveCounter || 0) <= 0}
+                          onClick={() => setEditPreserveCounter(Math.max(0, (editPreserveCounter || 0) - 1))}>
+                          −
+                        </button>
+                        <input className="input" type="number" min={0}
+                          value={editPreserveCounter ?? 0}
+                          onChange={(e) => {
+                            const n = parseInt(e.target.value, 10);
+                            setEditPreserveCounter(Number.isFinite(n) && n >= 0 ? n : 0);
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && saveStats()}
+                          style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#8fc8ff' }} />
+                        <button className="btn"
+                          style={{ padding: '6px 10px', fontSize: 12, minWidth: 32 }}
+                          onClick={() => setEditPreserveCounter((editPreserveCounter || 0) + 1)}>
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                  Luck: Lucky Puppet Laki may remove ALL Luck Counters to redirect an opponent's card or effect chosen on a lucky target. Preserve: Preserving Puppet Vinny may remove ALL Preserve Counters to negate an opponent's card or effect on preserved Creatures.
                 </div>
               </div>
             )}
@@ -3410,7 +4169,12 @@ function PuzzleCreator() {
               const isEquipEdit = editTarget.zt === 'support'
                 && _editCard?.cardType === 'Artifact'
                 && sub === 'equipment';
+              // v770: Eine Ability in einer Support Zone (Xal) hat keine
+              // HP — das Feld gehoert dort nicht hin.
+              const isAbilityEdit = editTarget.zt === 'support'
+                && _editCard?.cardType === 'Ability';
               const hideHp = isBiomancyTokenEdit
+                || isAbilityEdit
                 || ((isAttachmentEdit || isEquipEdit) && !subtypeIsCreature);
               if (hideHp) return null;
               return (
@@ -3451,12 +4215,26 @@ function PuzzleCreator() {
               const sub = (c.subtype || '').toLowerCase();
               const isEquip = c.cardType === 'Artifact' && sub === 'equipment';
               const isAttachment = c.cardType === 'Spell' && sub === 'attachment';
-              return isEquip || isAttachment;
+              // v770: Eine ABILITY in einer Support Zone (Xal) ist eine
+              // Ability, keine Creature — sie traegt weder Statuseffekte
+              // noch Buffs (Als Befund 5.9.).
+              const isAbility = c.cardType === 'Ability';
+              return isEquip || isAttachment || isAbility;
             })()) && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Status Effects</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                {STATUS_LIST.map(st => {
+                {STATUS_LIST.filter(st => {
+                  // `scope: 'creature'` — nur bei einer echten Creature
+                  // in einer Support Zone anbieten (Helden, Equipment,
+                  // Attachments und Tokens gehen leer aus).
+                  if (st.scope !== 'creature') return true;
+                  if (editTarget.zt !== 'support') return false;
+                  const p = players[editTarget.si];
+                  const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
+                  const c = cards.length ? getCard(cards[0]) : null;
+                  return !!c && (c.cardType === 'Creature' || c.cardType === 'Creature/Token');
+                }).map(st => {
                   const active = !!editStatuses[st.key];
                   // Cursor-anchored hover tooltip — describes what the
                   // status does in-game so the puzzle author doesn't
@@ -3501,6 +4279,9 @@ function PuzzleCreator() {
               const p = players[editTarget.si];
               const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
               const c = cards.length ? getCard(cards[0]) : null;
+              // v770: Abilities in Support Zones (Xal) tragen ebenfalls
+              // keine Buffs.
+              if (c && c.cardType === 'Ability') return true;
               return c && c.cardType === 'Spell' && (c.subtype || '').toLowerCase() === 'attachment';
             })()) && (
             <div style={{ marginBottom: 14 }}>

@@ -10,7 +10,7 @@
 //  Does NOT negate the triggering effect.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 module.exports = {
   isSurprise: true,
@@ -42,6 +42,8 @@ module.exports = {
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
     // Only triggers against OPPONENT effects
     if (sourceInfo.owner === ownerIdx) return false;
+    // v666 (Sweep): „opponent's Attack, Spell or Creature effect“.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
     return true;
   },
 

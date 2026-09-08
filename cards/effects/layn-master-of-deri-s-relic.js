@@ -27,7 +27,7 @@
 //  ──────────────
 //  • Gallery picker (`cardGallery`) shows the
 //    DISTINCT Lv1 Creature names in discard with
-//    a count badge. The player picks ONE name;
+//    a count badge. The player picks ONE name
 //    the system then places `min(in_discard, 3,
 //    free_zones)` copies one zone at a time.
 //
@@ -195,9 +195,8 @@ module.exports = {
       const destHeroIdx = zonePick.heroIdx;
       const destSlot    = zonePick.slotIdx;
 
-      const discardIdx = ps.discardPile.indexOf(chosenName);
-      if (discardIdx < 0) break;
-      ps.discardPile.splice(discardIdx, 1);
+      const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_discardIdx) break;
 
       if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
       ps.supportZones[destHeroIdx][destSlot] = [chosenName];

@@ -54,12 +54,6 @@ const CARD_NAME = 'Minocrete War Counselor';
  * Verdopplung nicht darueber (Als Ruling 8.8.: Harpthenean bleibt selbst
  * verdoppelt bei hoechstens 300).
  */
-function doubledWithCap(engine, source, amount) {
-  const doubled = amount * 2;
-  const cap = loadCardEffect(source?.name)?.damageCap;
-  return (typeof cap === 'number') ? Math.min(doubled, cap) : doubled;
-}
-
 /** Stammt dieser Schaden von einem ANDEREN Ratgeber unter meiner Kontrolle? */
 function fromOtherCounselor(engine, source, pi) {
   if (!source?.name) return false;
@@ -169,10 +163,13 @@ module.exports = {
       // denselben Schaden nicht noch einmal.
       if (ctx._minocreteDoubled) return;
       ctx._minocreteDoubled = true;
-      const doubled = doubledWithCap(ctx._engine, ctx.source, ctx.amount);
-      ctx.setAmount(doubled);
+      // Punkt vor Strich (Al 1.9.): Verdopplung als MULTIPLIKATOR, der
+      // Deckel der Quelle bleibt absolut (setAmount) obendrauf.
+      ctx.multiplyAmount(2);
+      const cap = loadCardEffect(ctx.source?.name)?.damageCap;
+      if (typeof cap === 'number' && ctx.amount > cap) ctx.setAmount(cap);
       ctx._engine.log('minocrete_doubled', {
-        source: ctx.source?.name, target: ctx.target?.name, newAmount: doubled,
+        source: ctx.source?.name, target: ctx.target?.name, newAmount: ctx.amount,
       });
     },
 
@@ -186,7 +183,8 @@ module.exports = {
         if (!fromOtherCounselor(ctx._engine, e.source, ctx.cardOwner)) continue;
         if (e._minocreteDoubled) continue;          // nicht stapeln
         e._minocreteDoubled = true;
-        e.amount = doubledWithCap(ctx._engine, e.source, e.amount);
+        e.multiplyAmount(2);   // Punkt vor Strich; Deckel absolut obendrauf
+        { const cap = loadCardEffect(e.source?.name)?.damageCap; if (typeof cap === 'number' && e.amount > cap) e.amount = cap; }
         ctx._engine.log('minocrete_doubled', {
           source: e.source?.name, target: e.inst?.name, newAmount: e.amount,
         });

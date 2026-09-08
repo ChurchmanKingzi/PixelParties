@@ -14,6 +14,9 @@ const CARD_NAME = 'Magic Emerald';
 const MILL_AMOUNT = 3;
 
 module.exports = {
+  // v826: NICHT "nur Stapel-Bewegung" (Gegner-Deck: eigene Bewegung des Wirkenden, nicht gesperrt); die Auto-Erkennung
+  // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
+  blockedByPileLock: false,
   activeIn: ['hand'],
 
   canActivate(gs, pi) {

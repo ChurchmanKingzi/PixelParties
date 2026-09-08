@@ -59,6 +59,14 @@ module.exports = {
   // Engine flag — surfaces Escape in the pre-damage hand-reaction
   // window. Spectral Armor's pattern.
   isPreDamageReaction: true,
+  // v718: Der Text sagt „would be DEFEATED" — die Karte greift damit
+  // auch gegen Insta-Kills ohne Schaden (Eraser Beam, Hand of Death).
+  // Reine Schadensminderer tragen dieses Flag NICHT.
+  firesOnDefeat: true,
+  // v800: der Caster ist der GETROFFENE Held ("a Hero you control that
+  // can use this Attack") — das Fenster prueft ihn jetzt zentral und
+  // zieht seine Wisdom-Kosten ein (`_rxCastPlan`).
+  casterIsTarget: true,
 
   /**
    * Eligibility gate for the pre-damage reaction prompt.

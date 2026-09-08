@@ -311,9 +311,8 @@ async function runStellinEffect(ctx) {
   if (!dest) return false;
   const { heroIdx, slotIdx: slot } = dest;
 
-  const deckIdx = ps.mainDeck.indexOf(chosenName);
-  if (deckIdx < 0) return false;
-  ps.mainDeck.splice(deckIdx, 1);
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+  if (!_taken_deckIdx) return false;
 
   // Race: slot could have been filled between prompt and now (engine
   // has been doing other work during the prompt's network round-trip).

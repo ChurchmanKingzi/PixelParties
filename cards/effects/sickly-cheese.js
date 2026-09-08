@@ -133,6 +133,9 @@ module.exports = {
     // ON_CARD_ADDED_TO_HAND hook, and the opponent reveal prompt.
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Sickly Cheese',
+      // v734: „a Decay Magic Spell".
+      searchSpec: { label: 'Decay Magic Spell', filter: (cd) => hasCardType(cd, 'Spell')
+        && (cd.spellSchool1 === 'Decay Magic' || cd.spellSchool2 === 'Decay Magic') },
       reveal: true,
     });
   },

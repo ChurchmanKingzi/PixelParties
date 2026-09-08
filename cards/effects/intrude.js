@@ -15,6 +15,9 @@
 //    - Cancel (do nothing)
 // ═══════════════════════════════════════════
 
+const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const CARD_NAME = 'Intrude';
+
 module.exports = {
   activeIn: ['hand', 'support'],
 
@@ -53,77 +56,23 @@ module.exports = {
   hooks: {
     // ── Placement: auto-attach to caster's first free Support Zone ──
     onPlay: async (ctx) => {
+      if (ctx.cardZone !== 'hand' || ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
       const gs = engine.gs;
       const pi = ctx.cardOwner;
-      const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
-
-      // Find target support zone — use specific slot if provided, else auto-find
-      let targetHero = -1;
-      let targetSlot = -1;
-
-      // Specific zone from drag-drop
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
-        const si = gs._attachmentZoneSlot;
-        const slot = (ps.supportZones[heroIdx] || [])[si] || [];
-        if (slot.length === 0) { targetHero = heroIdx; targetSlot = si; }
-      }
-
-      // Auto-find: try caster hero first
-      if (targetSlot < 0) {
-      const casterSup = ps.supportZones[heroIdx] || [[], [], []];
-      for (let si = 0; si < casterSup.length; si++) {
-        if ((casterSup[si] || []).length === 0) { targetHero = heroIdx; targetSlot = si; break; }
-      }
-      }
-
-      // Fallback: any other hero
-      if (targetSlot < 0) {
-        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          if (hi === heroIdx) continue;
-          const hero = ps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          const sz = ps.supportZones[hi] || [[], [], []];
-          for (let si = 0; si < sz.length; si++) {
-            if ((sz[si] || []).length === 0) { targetHero = hi; targetSlot = si; break; }
-          }
-          if (targetSlot >= 0) break;
-        }
-      }
-
-      if (targetSlot < 0) return;
-
-      // ── Anti Magic gate ──
-      // Intrude is a Lv 0 Spell — any Anti Magic Lv 1+ attached to
-      // the caster's chosen host Hero covers it. Bail BEFORE the
-      // support-zone push so the server's standard post-resolve path
-      // routes the card to the caster's discard.
-      const destHeroObj = ps?.heroes?.[targetHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, 'Intrude')) {
-        engine.log('equip_blocked', { card: 'Intrude', target: destHeroObj.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // Place in support zone
-      if (!ps.supportZones[targetHero]) ps.supportZones[targetHero] = [[], [], []];
-      if (!ps.supportZones[targetHero][targetSlot]) ps.supportZones[targetHero][targetSlot] = [];
-      ps.supportZones[targetHero][targetSlot].push('Intrude');
-
-      // Re-track card instance from hand → support
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === 'Intrude' && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard('Intrude', pi, 'support', targetHero, targetSlot);
-      gs._spellPlacedOnBoard = true;
-
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'gold_sparkle', owner: pi, heroIdx: targetHero, zoneSlot: targetSlot,
+      // v650: Anlegen ueber den geteilten Vorgang (eigene Seite, Caster-
+      // Held als Vorgabe, sonst Prompt).
+      // „Attach this Spell to the user / the Hero that uses it": NUR der
+      // Caster-Held (kein anderer, auch wenn er keinen Platz hat).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        preferCaster: true, heroFilter: (h, hi) => hi === ctx.cardHeroIdx,
+        description: 'Choose a Hero you control to attach Intrude to.',
+        confirmLabel: '🕵️ Attach!', animationType: 'gold_sparkle',
       });
-
+      if (!res) return;
+      const { host, inst } = res;
+      const targetHero = host.heroIdx;
       engine.log('intrude_placed', {
         player: ps.username, hero: ps.heroes[targetHero]?.name,
       });

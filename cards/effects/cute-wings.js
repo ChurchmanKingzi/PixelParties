@@ -32,6 +32,14 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+
+  /**
+   * „Equip this card to a Hero you control." — Seitenbindung, siehe
+   * `equipOwnSideOnly` in CARD_API.md. Ohne die Fahne gilt die
+   * Hausvorgabe „Ausruestung darf an beide Seiten" (Al, 5.9.: der
+   * Kartentext ist bindend).
+   */
+  equipOwnSideOnly: true,
   isEquip: true,
   activeIn: ['support'],
 };

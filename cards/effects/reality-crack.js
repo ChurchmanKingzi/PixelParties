@@ -15,6 +15,7 @@
 
 const { placePollutionTokens } = require('./_pollution-shared');
 const { hasCardType } = require('./_hooks');
+const { isTutorableArea } = require('./_area-shared');
 
 module.exports = {
   placesPollutionTokens: true,
@@ -62,20 +63,17 @@ module.exports = {
       // Effective-level filter — picks the post-reduction level so
       // Cataclysm-rebated Areas (and any future Area-level modifier)
       // pass the Lv≤3 gate correctly.
-      const effLvl = (cd) => engine.effectiveCardLevel(cd, pi);
+      // Eignung kommt aus `_area-shared.js` — dieselbe Regel wie bei
+      // Planet in a Bottle und Cooldin. Vorher stand hier
+      // `cardType !== 'Spell'`, was Blood Rock (Area ATTACK) ausschloss,
+      // obwohl der Kartentext wortgleich "a level 3 or lower Area" sagt.
       for (const n of (ps.hand || [])) {
         if (n === ctx.cardName) continue; // Exclude the Reality Crack being played
-        const cd = cardDB[n];
-        if (!cd || cd.cardType !== 'Spell') continue;
-        if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-        if (effLvl(cd) > 3) continue;
+        if (!isTutorableArea(cardDB[n], engine, pi)) continue;
         areaFromHand[n] = (areaFromHand[n] || 0) + 1;
       }
       for (const n of (ps.mainDeck || [])) {
-        const cd = cardDB[n];
-        if (!cd || cd.cardType !== 'Spell') continue;
-        if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-        if (effLvl(cd) > 3) continue;
+        if (!isTutorableArea(cardDB[n], engine, pi)) continue;
         areaFromDeck[n] = (areaFromDeck[n] || 0) + 1;
       }
 
@@ -129,8 +127,10 @@ module.exports = {
         if (idx >= 0) { ps.hand.splice(idx, 1); found = true; }
       }
       if (!found) {
-        const idx = (ps.mainDeck || []).indexOf(chosenName);
-        if (idx >= 0) { ps.mainDeck.splice(idx, 1); found = true; engine.shuffleDeck(pi, 'main'); }
+        const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: 'reality-crack' });   // v820: Stapel-Schicht
+        if (_taken_idx) {
+          found = true; engine.shuffleDeck(pi, 'main');
+        }
       }
       if (!found) {
         // Extremely edge-case — card disappeared between gallery build and

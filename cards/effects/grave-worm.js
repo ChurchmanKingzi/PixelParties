@@ -229,7 +229,7 @@ module.exports = {
       // ONLY the listener that fired this prompt — sibling Grave
       // Worm trackers (other copies still in discard) keep their
       // listeners so future deaths can still trigger them.
-      ps.discardPile.splice(dpIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'discard', dpIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       if (ctx.card?.id != null) engine._untrackCard(ctx.card.id);
 
       // SUMMON (not placement) at the dying creature's slot —

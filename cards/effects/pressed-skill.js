@@ -81,6 +81,9 @@ function buildGallery(engine, pi) {
 }
 
 module.exports = {
+  // v826: NICHT "nur Stapel-Bewegung" (auch aus der HAND spielbar); die Auto-Erkennung
+  // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
+  blockedByPileLock: false,
   isPotion: true,
   blockedByHandLock: true,
 
@@ -156,16 +159,15 @@ module.exports = {
     // ── Step 3: route the chosen Ability into hand so the canonical
     //    customPlacement-aware attach helper can place it. ──
     if (source === 'deck') {
-      const idx = ps.mainDeck.indexOf(abilityName);
-      if (idx < 0) return { cancelled: true };
-      ps.mainDeck.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'deck', abilityName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_idx) return { cancelled: true };
+      const idx = _taken_idx.idx;
       engine._broadcastEvent('deck_search_add', { cardName: abilityName, playerIdx: pi });
       engine.shuffleDeck(pi, 'main');
       ps.hand.push(abilityName);
     } else if (source === 'discard') {
-      const idx = ps.discardPile.indexOf(abilityName);
-      if (idx < 0) return { cancelled: true };
-      ps.discardPile.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'discard', abilityName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_idx) return { cancelled: true };
       ps.hand.push(abilityName);
     } else { // hand
       if (ps.hand.indexOf(abilityName) < 0) return { cancelled: true };

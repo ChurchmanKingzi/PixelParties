@@ -92,9 +92,8 @@ module.exports = {
     const isCreature = chosenData?.cardType === 'Creature';
 
     // Remove from deck
-    const deckIdx = ps.mainDeck.indexOf(chosenName);
-    if (deckIdx < 0) return false;
-    ps.mainDeck.splice(deckIdx, 1);
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: 'trapping' });   // v820: Stapel-Schicht
+    if (!_taken_deckIdx) return false;
 
     // Shuffle deck
     engine.shuffleDeck(activator);

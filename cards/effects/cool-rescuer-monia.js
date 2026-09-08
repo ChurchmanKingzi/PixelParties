@@ -12,9 +12,29 @@
 //  intercept status, healing, control changes.
 // ═══════════════════════════════════════════
 
+const { JETPACK_NAME, hasEquipped, checkMoniaAscension } = require('./_monia-shared');
+
 module.exports = {
   heroEffect: true,
   activeIn: ['hero'],
+
+  // ── Aufstieg (v668) zu „Monia Bot, the Foretold Rescuer of Coolness"
+  // mit Cool Tech Jetpack. Bedingung in `_monia-shared.js`; Bereit-
+  // schaft sync-getrieben (Dajan-Muster), weil das Jetpack praktisch
+  // nur ueber Cool Repair liegen bleibt.
+  ascensionItems: [JETPACK_NAME],
+  cheatAscensionBlocked: true,
+  ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== 'Cool Rescuer Monia' || hero.ascensionReady) return false;
+    return cardName === JETPACK_NAME && !hasEquipped(engine, pi, hi, JETPACK_NAME);
+  },
+  ascensionProgress(engine, pi, hi) {
+    return hasEquipped(engine, pi, hi, JETPACK_NAME) ? 1 : 0;
+  },
+  refreshAscensionReadiness(engine, pi, hi) {
+    checkMoniaAscension(engine, pi, hi, null);
+  },
 
   // Gerrymander redirect — when opp's Monia opens the multi-side
   // "save 0's vs save 1's" picker, our Gerrymander forces opp to

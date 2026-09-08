@@ -127,9 +127,8 @@ async function offerAttach(ctx) {
       skipAbilityGivenCheck: true,
     });
   } else {
-    const deckIdx = ps.mainDeck.indexOf(chosenAbility);
-    if (deckIdx < 0) return;
-    ps.mainDeck.splice(deckIdx, 1);
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenAbility, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (!_taken_deckIdx) return;
 
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     ps.abilityZones[heroIdx] = abZones;

@@ -9,6 +9,11 @@ const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeSta
 const { loadCardEffect } = require('./_loader');
 const { charges: ladungenLesen } = require('./_charges');
 
+// Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
+// Testen auf „ab sofort" aus (31.8., zurueckgebaut am selben Tag).
+// Endregel: NUR der gestempelte Zug — „during your next turn".
+const ASCENSION_GRANT_TESTFENSTER = false;
+
 const MAX_CHAIN_DEPTH = 10;   // Prevent infinite chain loops
 // Safety caps to terminate runaway trigger fan-out / infinite summons
 // before they exhaust heap. Normal matches stay well under both.
@@ -152,7 +157,7 @@ const { isCardinalBeastByName } = require('./_cardinal-shared');
 const MAX_ACTION_RECURSION = 20;
 // Per-turn hook-call cap. Catches tight loops that don't go through
 // actionHeal / actionDealDamage — e.g. a card effect repeatedly firing
-// a hook via runHooks. Normal turns fire a few hundred hook invocations;
+// a hook via runHooks. Normal turns fire a few hundred hook invocations
 // 10,000 in one turn is pathological. Counter resets in startTurn.
 const MAX_HOOKS_PER_TURN = 10000;
 // Per-turn damage-event cap. Companion to MAX_HOOKS_PER_TURN aimed
@@ -216,6 +221,7 @@ const DISCARD_PACE_MS = 500;
 // und der Tod soll sich nicht ziehen.
 const DEATH_EQUIP_PACE_MS = 320;
 const EFFECT_GLOW_LEAD_MS = 500;
+const BLEED_BASE_DAMAGE = 50;   // v712: Bleed-Schaden nach einer Handlung
 // Als Kosmetik-Ruling (Cute Cat vs Cute Commando): Self-Mills, die per
 // `opts.centerReveal` opten, zeigen jede gemillte Karte NACHEINANDER —
 // Deck → Bildschirmmitte (Flip face-up, kurzer Hold) → Discard-Pile.
@@ -392,7 +398,25 @@ class CardInstance {
     const script = override ? loadCardEffect(override) : this.loadScript();
     if (!script) return false;
     if (!script.activeIn) return true; // No restriction = always active
-    return script.activeIn.includes(zone || this.zone);
+    const z = zone || this.zone;
+    // ★ ANGELEGTE HELDEN (Als Bugmeldung 28.8.) ─────────────────────
+    // Ein Held, der als Ausruestung an einem anderen Helden liegt
+    // (Initiation Ritual, `treatAsEquip`), steht in einer SUPPORT
+    // Zone — sein Skript deklariert aber `activeIn: ['hero']`, wie
+    // 115 der 120 Helden-Skripte. Damit fiel er hier durch und feuerte
+    // KEINEN einzigen passiven Hook. Initiation Rituals Versprechen
+    // „gains all effects of the equipped Hero" trug deshalb bisher nur
+    // die AKTIVIERBAREN Effekte: die sammelt `getActiveHeroEffects`
+    // ueber einen eigenen treatAsEquip-Zweig ein, die Passiven hatte
+    // niemand.
+    //
+    // Die Hooks laufen dann mit `heroIdx` des WIRTS — genau richtig:
+    // der lebende Held bekommt die Effekte, nicht die angelegte Karte.
+    if (z === ZONES.SUPPORT
+        && this.counters?.treatAsEquip
+        && !this.counters?._suppressEquipHooks
+        && script.activeIn.includes('hero')) return true;
+    return script.activeIn.includes(z);
   }
 
   /** Get a specific hook function, or null.
@@ -450,6 +474,9 @@ function _isExternalDiscardSource(fromZone) {
 // ═══════════════════════════════════════════
 //  GAME ENGINE
 // ═══════════════════════════════════════════
+// Crestinas Vorrat haengt an DIESEM Helden (siehe isCreationZoneUsable).
+const CRESTINA_ASCENDED = 'True Fairy Crestina, the Primordial Goddess';
+
 class GameEngine {
   /**
    * @param {object} room - The room object from server.js
@@ -544,7 +571,7 @@ class GameEngine {
     this._hookHeapProfileEnabled = process.env.MCTS_HOOK_HEAP_PROFILE === '1';
     // PP_COVERAGE=1: Effekt-Coverage-Audit — zählt LIVE-Hook-Feuerungen
     // pro Karte+Hook prozessglobal (global.__ppCoverage). Nachweis, dass
-    // ein Karteneffekt tatsächlich RESOLVED (nicht nur gespielt wurde);
+    // ein Karteneffekt tatsächlich RESOLVED (nicht nur gespielt wurde)
     // Auswertung durch den Trainingsrunner (Dump nach coverage.json).
     this._coverageEnabled = process.env.PP_COVERAGE === '1';
     // Throttle flag for the post-overload force-GC. Set when MCTS overload
@@ -704,6 +731,15 @@ class GameEngine {
     // (Bamboo Shield's `_permanentlyRevealedHandIndices` is the
     // boolean analogue of this value field).
     this.registerHandIndexedField('_handCostReductionsPermanent', { kind: 'value' });
+    // Perilous Journey (v676): AUFSTIEGS-ERLASS JE PHYSISCHER KOPIE.
+    // Wert = { turn, byCard }. `turn` ist der Zug, in dem der Erlass
+    // gilt (der eigene NAECHSTE nach dem Wirken); `byCard` benennt das
+    // Skript, dessen `onAscensionGrantUsed` beim Einloesen den Preis
+    // eintreibt. Folgt der Kopie durch Splices/Umsortierungen und
+    // faellt mit ihr aus der Hand — genau deshalb ein Handindex-Feld
+    // und kein Merker am Namen: Als Ruling 31.8., der Erlass gilt fuer
+    // DIESE eine gesuchte Karte, nicht fuer Kopien von ihr.
+    this.registerHandIndexedField('_handAscensionGrants', { kind: 'value' });
     // Transient sibling of `_handLevelOffsets`. Same lookup semantics
     // (negative numbers reduce level), but DELIBERATELY no
     // `onCardSummonedFromHand` callback — the offset is purely an
@@ -714,6 +750,16 @@ class GameEngine {
     // rebate, which only applies while the tutored card is in hand.
     // Rocky Slime's persistent counterpart stays on `_handLevelOffsets`.
     this.registerHandIndexedField('_handLevelOffsetsTransient', { kind: 'value' });
+    // v654: Verfallsstempel fuer `_handLevelOffsetsTransient`. Ein
+    // Eintrag `[handIdx] = gs.turn` sagt: „dieser transiente Rabatt
+    // gilt nur fuer den Zug, in dem er gesetzt wurde" (Fiona, the Empty
+    // Vessel: „reduced by 3 for the rest of the turn" — fuer GENAU DIE
+    // EINE hinzugefuegte Kopie, Als Ruling 30.8.). Der Zugbeginn
+    // loescht Offset + Stempel, wenn der Stempel aelter ist als der
+    // laufende Zug. Eintraege OHNE Stempel (Sparkfly Queen) bleiben wie
+    // bisher, solange die Karte auf der Hand liegt. Als hand-indiziertes
+    // Feld wandert der Stempel bei Hand-Splices mit dem Offset mit.
+    this.registerHandIndexedField('_handLevelOffsetsExpireTurn', { kind: 'value' });
     // Sparkfly Queen's per-hand-index hero filter. Sibling map to
     // `_handLevelOffsets` / `_handLevelOffsetsTransient` — when set,
     // the offset at the same index applies ONLY when the asking hero
@@ -1322,7 +1368,7 @@ class GameEngine {
     };
     // Periodic snapshot-size sample for diagnostics. Once every 200
     // snapshots, JSON-serialize the snap and trail-write its size.
-    // Cheap-to-skip in the common case (just an integer mod check);
+    // Cheap-to-skip in the common case (just an integer mod check)
     // expensive only on the sample tick (~100KB-MB stringify) so the
     // amortized cost stays low. If snap size grows turn-over-turn,
     // gs has accumulating state — that's the structural leak.
@@ -1630,6 +1676,25 @@ class GameEngine {
       const eligible = promptData.eligibleIndices;
       const idx = eligible ? eligible[0] : 0;
       return { cardName: ps.hand[idx], handIndex: idx };
+    }
+
+    // ★ 28.8., Als Befund: „die CPU benutzt Crestinas Schutzeffekt nicht
+    // mehr." Der Abwurf aus dem Vorrat ist seit heute eine EIGENE
+    // Prompt-Art (`creationDiscard`); der Automat kannte nur
+    // `cardGallery` und lieferte deshalb nichts zurueck — die Karte
+    // brach ab, statt zu negieren.
+    //
+    // Das ist die Kehrseite jeder neuen Prompt-Art: der Automat muss
+    // sie MITLERNEN, sonst faellt genau die Wirkung aus, fuer die sie
+    // gebaut wurde.
+    if (type === 'creationDiscard') {
+      const ps = this.gs.players[promptPi];
+      const zone = ps?.creationZone || [];
+      if (zone.length === 0) return null;
+      const erlaubt = promptData.eligibleIndices;
+      const idx = Array.isArray(erlaubt) && erlaubt.length > 0 ? erlaubt[0] : 0;
+      if (!zone[idx]) return null;
+      return { creationIndex: idx, cardName: zone[idx] };
     }
 
     if (type === 'cardGallery') {
@@ -2020,6 +2085,22 @@ class GameEngine {
         this._trackCard(cardName, pi, ZONES.HAND);
       }
 
+      // ★★ 28.8., Als Befund: „Luna Kiai laesst sich aus dem Vorrat
+      // nicht aktivieren, der Klick tut nichts."
+      //
+      // DAS war die Ursache — nicht der Klickweg. Crestinas Suche
+      // verfolgt die Karten, die sie ablegt; ein PUZZLE, das
+      // `ps.creationZone` direkt setzt, tat es nicht. `doHandActivate`
+      // sucht ueber `_findHandInstanceAt` die Instanz und bricht bei
+      // `if (!realInst) return false;` still ab — sichtbar passiert
+      // dann gar nichts.
+      //
+      // Dieselbe Luecke wie bei Hand, Area und Coolness Stack, die hier
+      // schon aus genau diesem Grund stehen.
+      for (const cardName of (ps.creationZone || [])) {
+        this._trackCard(cardName, pi, ZONES.CREATION);
+      }
+
       // Coolness Stack — puzzle init may pre-populate ps.coolnessStack
       // (and `Wowhalla` re-creates it during play, but live games go
       // through actionPushDeckTopToCoolnessStack which tracks per-push).
@@ -2212,6 +2293,7 @@ class GameEngine {
       { key: 'discardPile', zone: ZONES.DISCARD },
       { key: 'deletedPile', zone: ZONES.DELETED },
       { key: 'coolnessStack', zone: ZONES.COOLNESS_STACK },
+      { key: 'creationZone', zone: ZONES.CREATION },
     ];
 
     for (let pi = 0; pi < 2; pi++) {
@@ -2270,6 +2352,99 @@ class GameEngine {
    * @param {string} [opts.source] - Card / effect name driving the move
    *   (logged + propagated to the hook so listeners can attribute).
    */
+  /**
+   * ★ DISCARD-OUT-SPERRE — EINE Auslegung (v626).
+   *
+   * „You cannot move cards out of your discard pile for the rest of the
+   * turn" (Staff of the Teleporter, Staff of Uncontrollable Destruction,
+   * The Eye of Ren). Der Lock ist `ps._discardLockedTurn === gs.turn`.
+   *
+   * The Eye of Ren haengt einen FREIKAUF daran (`ps._discardLockBuyout`):
+   * „unless you pay an additional 6 Gold" — nach Als Ruling (29.8.)
+   * EINMALIG je Zug: erste Bewegung aus dem Discard kostet 6, danach ist
+   * der Rest des Zuges frei. Ist der Effekt PFLICHT (`opts.mandatory`,
+   * z.B. The First Circle of Hell), zahlt der Spieler, was er hat (auch
+   * 0), und die Bewegung findet statt. Ist er optional, wird bei
+   * ausreichend Gold gefragt; ohne Gold oder bei Ablehnung bleibt die
+   * Sperre. Ohne Freikauf (Staebe) ist die Sperre hart.
+   *
+   * Alle Wege aus dem Discard fragen HIER: addCardFromDiscardToHand,
+   * actionRecycleCards, actionPlaceCreature (source 'discard'),
+   * actionMoveCard (fromZone discard) und die Massen-Loeschung des First
+   * Circle. `opts._bypassDiscardLock` umgeht alles (Engine-interne
+   * Wege). Rueckgabe: true = bewegen erlaubt.
+   */
+  async _discardOutAllowed(pi, opts = {}) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    if (opts._bypassDiscardLock) return true;
+    if (!this.pileOutAllowed(pi, 'discard', opts)) {          // v818 (Knight of Kings [B])
+      this.log('pile_out_blocked', { player: ps.username, pile: 'discard' });
+      return false;
+    }
+    if (ps._discardLockedTurn !== this.gs.turn) return true;
+    const buy = ps._discardLockBuyout;
+    if (!buy || buy.turn !== this.gs.turn) return false;      // harte Sperre (Staebe)
+    if (buy.paidTurn === this.gs.turn) return true;            // schon freigekauft
+    const gold = ps.gold || 0;
+    const spend = async (amount) => {
+      if (amount <= 0) return true;
+      const ok = await this.actionSpendGold(pi, amount, { cardName: buy.source, reason: 'discard_lock_buyout' });
+      return ok !== false;
+    };
+    if (opts.mandatory) {
+      const pay = Math.min(buy.cost, gold);
+      if (pay > 0) await spend(pay); // goldLocked → 0 gezahlt, Pflicht bleibt Pflicht
+      buy.paidTurn = this.gs.turn;
+      this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: pay, mandatory: true });
+      this.sync();
+      return true;
+    }
+    if (!this.canAffordGold(pi, buy.cost, buy.source)) {
+      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', needGold: buy.cost });
+      return false;
+    }
+    const yes = opts.silent ? true : await this.promptGeneric(pi, {
+      type: 'confirm',
+      title: buy.source,
+      message: `Your discard pile is locked by ${buy.source}. Pay ${buy.cost} Gold to move cards out of it for the rest of this turn?`,
+      showCard: buy.source,
+      confirmLabel: `💰 Pay ${buy.cost} Gold`,
+      cancelLabel: 'No',
+      cancellable: true,
+    });
+    if (!yes) {
+      this.log('discard_out_blocked', { player: ps.username, reason: 'discard_locked', declined: true });
+      this.gs._discardOutDeclined = this.gs.turn; // → `_applyDiscardOutDecline`
+      return false;
+    }
+    if (!(await spend(buy.cost))) return false;
+    buy.paidTurn = this.gs.turn;
+    this.log('discard_lock_buyout', { player: ps.username, source: buy.source, paid: buy.cost, mandatory: false });
+    this.sync();
+    return true;
+  }
+
+  /**
+   * v627 (Als Regel 29.8.): Lehnt der Spieler den Eye-of-Ren-Freikauf ab,
+   * gilt das Ausspielen der Karte als ABGEBROCHEN wie jede andere
+   * Cancellation — die Karte bleibt in der Hand, die Kosten kommen
+   * zurueck. Das Gate stempelt `gs._discardOutDeclined = gs.turn`; der
+   * Chain-Auflöser ruft dies nach `resolve()` und macht aus dem Ergebnis
+   * `{ cancelled: true }`, sofern das Skript nicht `discardOutDeclineConsumes`
+   * setzt (fuer Karten, die VOR der Discard-Bewegung schon etwas Bleibendes
+   * getan haben — dann ist die Karte verbraucht).
+   */
+  _applyDiscardOutDecline(cardName, result) {
+    if (this.gs._discardOutDeclined !== this.gs.turn) return result;
+    delete this.gs._discardOutDeclined;
+    if (result && (result.aborted || result.cancelled)) return result;
+    const script = cardName ? loadCardEffect(cardName) : null;
+    if (script?.discardOutDeclineConsumes) return result;
+    this.log('play_cancelled', { card: cardName, reason: 'discard_lock_declined' });
+    return { cancelled: true };
+  }
+
   async addCardFromDiscardToHand(toPlayerIdx, cardName, fromOwnerIdx, opts = {}) {
     const fromPs = this.gs.players[fromOwnerIdx];
     const toPs   = this.gs.players[toPlayerIdx];
@@ -2280,8 +2455,7 @@ class GameEngine {
     // intentionally exempt — the staff text says "you cannot move cards
     // out of YOUR discard pile", not "cards cannot leave your discard".
     if (fromOwnerIdx === toPlayerIdx
-        && fromPs._discardLockedTurn === this.gs.turn
-        && !opts._bypassDiscardLock) {
+        && !(await this._discardOutAllowed(fromOwnerIdx, opts))) {
       this.log('discard_to_hand_blocked', { player: fromPs.username, card: cardName, reason: 'discard_locked' });
       return null;
     }
@@ -2338,7 +2512,113 @@ class GameEngine {
    * @param {object} hookCtx - Context data for the hook
    * @returns {object} hookCtx (possibly modified by cards)
    */
+  // ── Bleed (v712) ──────────────────────────────────────────────────
+  /** Bleed-Schaden fuer ein Ziel — Basis 50, per Hook `beforeBleedDamage`
+   *  veraenderbar (Als Ruling: „standardmaessig 50, Effekte koennen ihn
+   *  veraendern"). `targetInfo`: { kind:'hero'|'creature', owner, heroIdx,
+   *  inst? } */
+  async _bleedDamageAmount(targetInfo) {
+    const hookCtx = { amount: BLEED_BASE_DAMAGE, bleedTarget: targetInfo, _skipReactionCheck: true };
+    try { await this.runHooks('beforeBleedDamage', hookCtx); } catch { /* Beiwerk */ }
+    return Math.max(0, Math.round(hookCtx.amount || 0));
+  }
+
+  /** Gilt diese aufgeloeste Handlung als Bleed-Ausloeser? (Als Regeln 3./4.9.) */
+  _bleedTriggersForAction(info) {
+    const t = String(info?.actionType || '');
+    if (t === 'creature' || t === 'spell' || t === 'attack') return true; // Attack/Spell/Creature — auch Zusatz-, Inherent-, Frei-Aktionen (Attacks haben cardType 'Attack')
+    if (t === 'hero_effect') return true;                         // Heldeneffekt (mit oder ohne Action-Kosten)
+    if (t === 'ability_activation') return !info.isInherent && !info.isFree; // nur mit Action-Kosten
+    return false;                                                 // equipment, artifact, potion, area …
+  }
+
+  /**
+   * Nach einer vollstaendig aufgeloesten Handlung eines Helden: blutet er,
+   * nimmt er Bleed-Schaden (Status-Schaden ohne Besitzer: kein
+   * Zielwahl-/Vinny-Fenster, Schilde greifen, kann toeten). Aufrufer:
+   * `runHooks('onAnyActionResolved')` (alle Action-Pfade) und
+   * `resolveHeroEffectActivation` (Heldeneffekt OHNE Action-Kosten).
+   */
+  async _processBleedAfterAction(info) {
+    if (!info || this._aborted) return false;
+    if (!this._bleedTriggersForAction(info)) return false;
+    const pi = info.playerIdx;
+    const hi = info.heroIdx;
+    const hero = this.gs.players?.[pi]?.heroes?.[hi];
+    if (!hero?.name || hero.hp <= 0 || !hero.statuses?.bleeding) return false;
+    const amount = await this._bleedDamageAmount({ kind: 'hero', owner: pi, heroIdx: hi });
+    if (amount <= 0) return false;
+    this.log('bleed_damage', { player: this.gs.players[pi]?.username, hero: hero.name, amount, after: info.actionType });
+    this._broadcastEvent('bleed_tick', { heroes: [{ owner: pi, heroIdx: hi, heroName: hero.name }] });
+    this._broadcastEvent('play_zone_animation', { type: 'bleed_tick', owner: pi, heroIdx: hi, zoneSlot: -1 });
+    await this._delay(350);
+    await this.actionDealDamage({ name: 'Bleed' }, hero, amount, 'status', {
+      isStatusDamage: true, skipSurpriseCheck: true, canBeNegated: true,
+    });
+    this.sync();
+    return true;
+  }
+
+  /** Nach dem aktiven Effekt einer blutenden Creature: 50 an die Creature. */
+  async _processBleedAfterCreatureEffect(inst) {
+    if (!inst || this._aborted || inst.zone !== ZONES.SUPPORT || !inst.counters?.bleeding) return false;
+    const owner = inst.controller ?? inst.owner;
+    const amount = await this._bleedDamageAmount({ kind: 'creature', owner, heroIdx: inst.heroIdx, inst });
+    if (amount <= 0) return false;
+    this.log('bleed_damage', { player: this.gs.players[owner]?.username, creature: inst.name, amount, after: 'creature_effect' });
+    await this.processCreatureDamageBatch([{
+      inst, amount, type: 'status', source: { name: 'Bleed' }, sourceOwner: -1,
+      canBeNegated: true, isStatusDamage: true, animType: 'bleed_tick',
+    }]);
+    this.sync();
+    return true;
+  }
+
   async runHooks(hookName, hookCtx = {}) {
+    // ── ZUERST stempeln, DANN die Zuhoerer rufen (v745) ──────────────
+    // Der Stempel unten ist eine Tatsache des Spielstands. Stand er
+    // hinter der Zuhoerer-Runde, sah eine Karte, die im selben Hook
+    // darauf reagiert (Coreling in der Hand), noch den alten Wert und
+    // rechnete mit „kein Kill" — der Effekt griff erst eine Phase
+    // spaeter (Als Befund 5.9.).
+    // v744: Gegenstueck dazu — „you have defeated an OPPONENT'S target
+    // since the beginning of this turn" (Coreling). Das ist eine
+    // Tatsache des Spielstands, kein Beobachtungsergebnis einer
+    // einzelnen Karte: eine Coreling, die ERST NACH dem Kill gezogen
+    // wird, muss ihn genauso sehen. Deshalb steht der Stempel hier, an
+    // der einen Stelle, durch die jeder Tod laeuft.
+    if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
+      const opfer = hookCtx.creature || hookCtx.hero;
+      const quelle = hookCtx.source;
+      const taeter = quelle?.owner ?? quelle?.controller;
+      if (opfer && Number.isInteger(taeter) && taeter >= 0) {
+        let opferSeite = hookCtx.creature
+          ? (hookCtx.creature.controller ?? hookCtx.creature.owner)
+          : -1;
+        if (opferSeite < 0 && hookCtx.hero) {
+          for (let p = 0; p < (this.gs.players || []).length && opferSeite < 0; p++) {
+            const hi = (this.gs.players[p]?.heroes || []).indexOf(hookCtx.hero);
+            if (hi >= 0) opferSeite = this.heroSideOf(p, hookCtx.hero);
+          }
+        }
+        if (opferSeite >= 0 && opferSeite !== taeter) {
+          const tps = this.gs.players?.[taeter];
+          if (tps) tps._defeatedOppTargetTurn = this.gs.turn;
+        }
+      }
+    }
+    const result = await this._runHooksImpl(hookName, hookCtx);
+    // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
+    // einziger zentraler Punkt fuer alle Action-Pfade (Spell/Attack,
+    // Creature, Ability, Heldeneffekt mit Action-Kosten, Immediate Actions).
+    if (hookName === 'onAnyActionResolved' && !hookCtx._noBleed) {
+      try { await this._processBleedAfterAction(hookCtx); }
+      catch (err) { console.error('[Bleed] after action failed:', err.message); }
+    }
+    return result;
+  }
+
+  async _runHooksImpl(hookName, hookCtx = {}) {
     // Absturz-Sonde VOR dem Kill-Switch: der Inline-Heap-Check weiter
     // unten liegt HINTER `_turnHooksKilled` und ist damit stumm, sobald
     // das CPU-Zeitlimit oder die Hook-Obergrenze einmal getroffen hat.
@@ -2604,25 +2884,15 @@ class GameEngine {
         // `gs._chillyDogActiveFor[<pi>] = true` while at least one
         // Chilly Dog is in play on that side. `bypassStatusFilter` on
         // the listener's own script still wins regardless.
-        const hostPiForFilter = c.controller ?? c.owner;
-        const chillyDogFreezeExempt = this._isChillyDogActiveFor(hostPiForFilter);
-        if ((c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter) {
-          // Stunned always silences.
-          if ((hero.statuses?.stunned || hero.statuses?.webbed)) return false;
-          // Frozen silences UNLESS the controller has Chilly Dog.
-          if (hero.statuses?.frozen && !chillyDogFreezeExempt) return false;
-          // Negated silences (independent of Chilly Dog).
-          if (hero.statuses?.negated) return false;
-        }
-        // Mummy Token in the hero's support zone silences ALL of that
-        // hero's effects — not just the active hero effect the engine
-        // swaps for Mummy Token's own (see server.js doActivateHeroEffect),
-        // but passives too. Matches the "fully wrapped / silenced" theme
-        // and ensures e.g. Nomu's draw bonus hook filter also drops out.
-        // `bypassStatusFilter` (Beato's onGameStart) still wins so orb
-        // tracking can be initialised even on a mummified Beato.
+        // Alle Formen der Stummschaltung (Stunned / Webbed, Frozen ohne
+        // Chilly Dog, Negated, Mummy Token) leben in EINEM Helfer —
+        // `_isHeroEffectSilenced` — damit Engine-Stellen, die dieselbe
+        // Frage stellen (Tempestes „nur solange nicht Frozen / Stunned /
+        // Negated"), exakt dieselbe Antwort bekommen wie der Hook-Filter.
+        // `bypassStatusFilter` auf dem Skript des Listeners gewinnt
+        // weiterhin.
         if ((c.zone === 'hero' || c.zone === 'ability') && !loadCardEffect(c.name)?.bypassStatusFilter
-            && this._isHeroMummified(c.controller ?? c.owner, c.heroIdx)) return false;
+            && this._isHeroEffectSilenced(c.controller ?? c.owner, c.heroIdx)) return false;
       }
       // Creature-level negation/freeze/stun (Dark Gear, Necromancy, Slimes, Null Zone, etc.)
       // `bypassStatusFilter` on the card's script lets the listener fire
@@ -2637,15 +2907,12 @@ class GameEngine {
           && !loadCardEffect(c.name)?.bypassStatusFilter) {
         const hostPiCC = c.controller ?? c.owner;
         const chillyDogFreezeExemptC = this._isChillyDogActiveFor(hostPiCC);
-        if (c.counters?.negated || c.counters?.nulled) return false;
-        if (c.counters?.stunned) return false;
-        if (c.counters?.frozen && !chillyDogFreezeExemptC) return false;
-        // `magic_silenced` (Anti Magic Zone) — fully silences a
-        // Creature's effects, same as `negated` / `nulled`. The
-        // status is cleansable so individual Creatures can recover
-        // (Juice, Beer, Cure, etc.) while the Zone window still
-        // applies to the rest of the board.
-        if (c.counters?.magic_silenced) return false;
+        // v818: EIN Praedikat fuer negated/nulled/stunned/magic_silenced/
+        // frozen (Chilly Dog beachtet). `honorNegStatusImmune: false`
+        // haelt das bisherige Verhalten: Lunatics Immunitaet hob HIER
+        // nie die Stummschaltung auf, nur bei der aktiven Nutzung.
+        void chillyDogFreezeExemptC;
+        if (this.isCreatureEffectSuppressed(c, { honorNegStatusImmune: false })) return false;
       }
       // Face-down surprise creatures (Bakhm slots) don't fire hooks
       if (c.faceDown) return false;
@@ -2927,12 +3194,44 @@ class GameEngine {
       }
     }
 
+    // ── Eintritts-Fenster „Creature betritt eine Support Zone" (v699).
+    // EIGENER Block, absichtlich OHNE `_skipReactionCheck`-Gate (siehe
+    // _checkSurpriseOnCreatureEnterSupport): das Flag meint die
+    // Hand-Reaktionskette und steht an fast jedem Eintrittspfad —
+    // Slippery-/Dark-Gear-Bewegungen wuerden sonst nie gesehen.
+    // `hookCtx.card` ist die actionMoveCard-Form desselben Ereignisses.
+    // v704 (Puppets): reaktive Zonensperre — siehe _enforceSupportZoneLock.
+    if (hookName === 'onCardEnterZone' && hookCtx.toZone === 'support') {
+      const _lockCard = hookCtx.enteringCard || hookCtx.card || null;
+      if (_lockCard && await this._enforceSupportZoneLock(_lockCard)) return;
+    }
+
+    if (hookName === 'onCardEnterZone' && !this._inSurpriseResolution
+        && !hookCtx._skipEnterSupportSurprise
+        && hookCtx.toZone === 'support') {
+      const _eintritt = hookCtx.enteringCard || hookCtx.card || null;
+      if (_eintritt) {
+        await this._checkSurpriseOnCreatureEnterSupport(_eintritt, {
+          isMove: !!hookCtx._isMove, isPlacement: !!hookCtx._isPlacement,
+          heroIdx: hookCtx.toHeroIdx,
+        });
+      }
+    }
+
     // Hand-Reaktionsfenster auf den Kreaturentod (Troop Annihilation).
     // Haengt am Hook-Verteiler statt an den einzelnen Todeswegen: der
     // Schadens-Batch und `actionMoveCard` feuern beide `onCreatureDeath`,
     // also deckt eine Stelle hier alle ab — auch kuenftige Routen.
     // `_skipPostDefeatReaction` erlaubt einer Feuerstelle, es gezielt
     // zu unterdruecken.
+    // v645: „a Creature you control was defeated since the start of your
+    // turn" (Call for Help) — EIN Stempel je Spieler, gesetzt an der
+    // einen Stelle, durch die jeder Kreaturentod laeuft.
+    if (hookName === HOOKS.ON_CREATURE_DEATH && hookCtx.creature) {
+      const ctrl = hookCtx.creature.controller ?? hookCtx.creature.owner;
+      const cps = this.gs.players?.[ctrl];
+      if (cps) cps._lastCreatureDefeatedTurn = this.gs.turn;
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH && !hookCtx._skipPostDefeatReaction) {
       await this._checkCreatureDefeatedHandReactions(hookCtx.creature, hookCtx.source);
     }
@@ -3013,6 +3312,11 @@ class GameEngine {
     const ctx = {
       // Hook event data (spread first so card-specific props override)
       ...hookCtx,
+      // `amount` als LIVE-Projektion (Punkt vor Strich), damit ein
+      // Listener sieht, was die Vorgaenger derselben Runde gesammelt
+      // haben. Direkte Zuweisung wirkt wie setAmount.
+      get amount() { return engine._projectedAmount(hookCtx); },
+      set amount(v) { hookCtx.amount = v; hookCtx._flat = 0; hookCtx._mul = 1; },
 
       // ── Card-specific info (always refers to the card whose hook is firing) ──
       card: cardInstance,
@@ -3059,15 +3363,66 @@ class GameEngine {
       // tries to reduce after the lock simply no-ops; engine sites that
       // apply multipliers check the flag explicitly. INCREASES are still
       // allowed (the rule is "cannot be reduced", not "frozen").
+      // ── PUNKT VOR STRICH (Als Regel 1.9.) ───────────────────────
+      // Halbieren/Verdoppeln wird ZUERST verrechnet, flat Modifikatoren
+      // (Tempeste −100, Warhorse +Bonus …) danach — unabhaengig davon,
+      // in welcher Reihenfolge die Listener laufen. Deshalb sammelt die
+      // Hook-Runde beide Kategorien getrennt (`_mul` Produkt, `_flat`
+      // Summe) und die Engine rechnet NACH der Runde, zusammen mit den
+      // Buff-Multiplikatoren (Cloudy …), `ceil(basis × _mul) + _flat`.
+      // `setAmount` bleibt absolut (Deckel, Nullsetzen) und loescht die
+      // gesammelten relativen Aenderungen — wie heute, wo ein spaeteres
+      // setAmount(0) fruehere Boni ueberschrieb. `ctx.amount` liest den
+      // PROJIZIERTEN Betrag (siehe Getter unten), nicht die Basis.
       modifyAmount(delta) {
         if (hookCtx.amount === undefined) return;
         if (hookCtx.cannotBeReduced && delta < 0) return;
-        hookCtx.amount += delta;
+        // v743: Steht die Klammer bereits, prallt JEDE Erhoehung sofort
+        // ab — nicht erst im Nachhinein. Sonst haetten Listener, die
+        // nach der Klammer laufen, sichtbare Nebenwirkungen (Logzeilen,
+        // Zaehler) fuer einen Bonus, der nie ankommt.
+        if (hookCtx.cannotBeIncreased && delta > 0) return;
+        hookCtx._flat = (hookCtx._flat || 0) + delta;
+      },
+      multiplyAmount(factor) {
+        if (hookCtx.amount === undefined) return;
+        if (!(factor >= 0)) return;
+        if (hookCtx.cannotBeReduced && factor < 1) return;
+        // v743 (Als Befund: zwei Spirits stapelten): „cannot be
+        // increased" schliesst WEITERE VERDOPPLUNGEN ein, nicht nur
+        // flat Boni. Ein zweiter Verdoppler laeuft damit ins Leere.
+        if (hookCtx.cannotBeIncreased && factor > 1) return;
+        hookCtx._mul = (hookCtx._mul ?? 1) * factor;
+      },
+      /**
+       * „…, but cannot be increased by other effects" (v742).
+       * Setzt die einseitige Klammer und merkt sich den JETZIGEN Betrag
+       * als Obergrenze — spaetere Erhoehungen werden nach der Hook-Runde
+       * zurueckgenommen, Reduktionen wirken weiter.
+       *
+       * Muss ein Helfer sein: ein Hook bekommt einen WRAPPER um den
+       * hookCtx, ein `ctx.cannotBeIncreased = true` landete also nur auf
+       * dem Wrapper und die Klammer bliebe wirkungslos.
+       */
+      preventIncrease() {
+        if (hookCtx.amount === undefined) return;
+        hookCtx.cannotBeIncreased = true;
+        // PROJEKTION merken, nicht die Rohbasis: waehrend der Hook-Runde
+        // ist `hookCtx.amount` (das Feld) noch der Grundbetrag, die
+        // Multiplikatoren stehen in `_mul`. Erst der Projektionswert
+        // enthaelt die eigene Verdopplung.
+        // Nie ANHEBEN: steht schon eine Obergrenze, bleibt die
+        // niedrigere stehen (zweiter Spirit, spaeterer Deckel).
+        const jetzt = engine._projectedAmount(hookCtx);
+        hookCtx._noIncreaseFrom = (hookCtx._noIncreaseFrom != null)
+          ? Math.min(hookCtx._noIncreaseFrom, jetzt) : jetzt;
       },
       setAmount(val) {
         if (hookCtx.amount === undefined) return;
-        if (hookCtx.cannotBeReduced && val < hookCtx.amount) return;
+        if (hookCtx.cannotBeReduced && val < engine._projectedAmount(hookCtx)) return;
         hookCtx.amount = val;
+        hookCtx._flat = 0;
+        hookCtx._mul = 1;
       },
       /**
        * Lock the current damage amount as a floor — no further effect
@@ -3076,7 +3431,15 @@ class GameEngine {
        * mean "my reduction (or lack thereof) is the final word."
        * Idempotent.
        */
-      lockReduction() { hookCtx.cannotBeReduced = true; },
+      lockReduction() {
+        hookCtx.cannotBeReduced = true;
+        // Punkt vor Strich: flat Abzuege werden NACH der Multiplikation
+        // verrechnet — ein bereits gesammelter Abzug (Tempeste −100 vor
+        // Dichotomys Halbierung in der Listener-Reihenfolge) waere also
+        // eine „weitere" Reduktion und faellt mit der Sperre weg. Die
+        // Reihenfolge der Listener darf das Ergebnis nicht bestimmen.
+        if ((hookCtx._flat || 0) < 0) hookCtx._flat = 0;
+      },
       negate() { hookCtx.negated = true; },
       /** Set a flag on the hookCtx (survives through all hooks → read by engine after) */
       setFlag(key, value) { hookCtx[key] = value; },
@@ -3326,8 +3689,15 @@ class GameEngine {
       // ── Player input (async — pauses until client responds) ──
       async promptTarget(validTargets, config) {
         // ── Truth-Seeing Eye ── (see _sourceHasTruthSeeingEye)
-        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
-          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+          // v616: Truth-Seeing Eye ODER ein Skript mit
+          // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
+          // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
+          // choose any target" verbietet keine Umlenkung.
+          config = {
+            ...config, ignoreUntargetable: true, _truthSeeingEye: true,
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+          };
         }
         // Auto-filter: remove non-Creature support zone targets unless explicitly allowed
         let targets = validTargets;
@@ -3342,24 +3712,18 @@ class GameEngine {
         }
         // General rule: surface the source card's image in the targeting
         // panel (overridable via an explicit `previewCardName`).
-        const selectedIds = await engine.promptEffectTarget(cardInstance.controller, targets,
-          { previewCardName: cardInstance.name, ...config });
-
-        // ── Target redirect check (Challenge, etc.) ──
-        // Only for single-target selections with hero/creature targets
-        if (selectedIds && selectedIds.length === 1 && !config?.cannotBeRedirected && !config?._skipRedirectCheck) {
-          const selected = validTargets.find(t => t.id === selectedIds[0]);
-          if (selected && selected.owner >= 0) {
-            const redirected = await engine._checkTargetRedirect(
-              selected.owner, selected, validTargets, config || {}, cardInstance
-            );
-            if (redirected) {
-              return [redirected.id]; // Return the redirected target's ID
-            }
-          }
-        }
-
-        return selectedIds;
+        // ── Target redirect check (Challenge, Monia Bot, …) ──
+        // v672: KEIN eigenes Fenster mehr hier. `promptEffectTarget`
+        // oeffnet es seit v670 selbst — dieser Block lief also ein
+        // ZWEITES Mal ueber dieselbe Auswahl (Challenge konnte
+        // hintereinander zweimal umleiten). Statt der Doppelung reichen
+        // wir nur noch die echte Quelle hinein: `cardInstance` traegt
+        // Besitzer und Zone, waehrend der Dispatcher sonst aus
+        // `config.source` eine Ersatzquelle bauen muesste. Damit gibt es
+        // genau EINE Auslegung (`applyRedirectWindows`), und sie ist
+        // mehrzielfaehig.
+        return await engine.promptEffectTarget(cardInstance.controller, targets,
+          { previewCardName: cardInstance.name, ...config, _redirectSource: config?._redirectSource || cardInstance });
       },
       async chooseTarget(type, filter) {
         return engine.promptChooseTarget(cardInstance.controller, type, filter);
@@ -3574,10 +3938,13 @@ class GameEngine {
           // for placements 2+ since there's no previous step to return to.
           // Read by the zonePick renderer in `app-board.jsx` (~L25420).
           cancelLabel: config.cancelLabel,
-          // Optional preview card name — renders a CardMini above the
-          // prompt so the player sees what they're placing. Defaults to
-          // the source card (general "show which card is prompting" rule);
-          // overridable by passing an explicit `previewCardName`.
+          // v783 (Als Befund 5.9.): ein Klick auf die HELDENKARTE waehlt
+          // sonst automatisch dessen linkeste taugliche Zone. Das passt
+          // zu „waehle einen PLATZ" (Platzierung, Beschwoerung), nicht
+          // zu „waehle die KARTE, die dort liegt" — dort entfernte ein
+          // Klick auf den Helden kommentarlos seine linkeste
+          // Ausruestung. Solche Prompts setzen `heroShortcut: false`.
+          heroShortcut: config.heroShortcut !== false,
           previewCardName: config.previewCardName || cardInstance.name,
         });
       },
@@ -3884,8 +4251,15 @@ class GameEngine {
         // Martyry / Anti-Magnet). Post-target NEGATION reactions
         // (Invisibility Cloak / Storm Ring) are deliberately NOT
         // suppressed — they still resolve normally.
-        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
-          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+          // v616: Truth-Seeing Eye ODER ein Skript mit
+          // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
+          // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
+          // choose any target" verbietet keine Umlenkung.
+          config = {
+            ...config, ignoreUntargetable: true, _truthSeeingEye: true,
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+          };
         }
 
         // ── Single "does this picker deal damage?" signal ──
@@ -3952,8 +4326,10 @@ class GameEngine {
                 (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
               // Only actual Creatures are targetable — not Equipment, Heroes, etc.
+              // v704 (Puppets): Tokens mit `choosableAsCreature` („can still
+              // be chosen like one") laufen mit — siehe isChoosableAsCreature.
               const cd = (inst ? engine.getEffectiveCardData(inst) : null) || cardDB[creatureName];
-              if (!cd || !hasCardType(cd, 'Creature')) continue;
+              if (!cd || !engine.isChoosableAsCreature(inst, cd)) continue;
               if (inst?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst };
               if (config.condition && !config.condition(t, engine)) continue;
@@ -4086,6 +4462,35 @@ class GameEngine {
             if (shieldedFrom === pi) {
               targets.splice(i, 1);
             }
+          }
+          if (targets.length === 0) return null;
+        }
+        // ── Board of Kings (v818): gedeckte Kreaturen sind nicht waehlbar ──
+        // Truth-Seeing Eye umgeht ueber `ignoreUntargetable` NUR das
+        // Waehlen — „unaffected" prueft die Engine an den Effektstellen.
+        if (!config.ignoreUntargetable) {
+          for (let i = targets.length - 1; i >= 0; i--) {
+            const t = targets[i];
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (engine._boardGuardsCreatureChoice(t.cardInstance, pi)) targets.splice(i, 1);
+          }
+          if (targets.length === 0) return null;
+        }
+
+        // ── Creature HARD-untargetable filter (Thicket, v724) ─────────
+        // „That Creature cannot be chosen by cards and effects" — ohne
+        // Zusatz „by your opponent", also fuer BEIDE Seiten, den
+        // Kontrolleur eingeschlossen. Kein „ausser es ist das einzige
+        // Ziel"-Ventil: die weiche Variante darunter ist Perfect
+        // Disguise, diese hier ist absolut. Flaechen-Effekte, die gar
+        // nicht WAEHLEN, bleiben unberuehrt (dieselbe Auslegung, die
+        // Perfect Disguise dokumentiert).
+        if (!config.ignoreUntargetable) {
+          for (let i = targets.length - 1; i >= 0; i--) {
+            const t = targets[i];
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (!t.cardInstance.counters?.untargetable_all) continue;
+            targets.splice(i, 1);
           }
           if (targets.length === 0) return null;
         }
@@ -4273,13 +4678,29 @@ class GameEngine {
         // ── Target redirect check (Challenge, etc.) ──
         // After target is selected, check if the target's owner has a redirect card.
         // Skipped if config explicitly disables redirection.
-        if (selected && !config.cannotBeRedirected && !config._skipRedirectCheck) {
+        if (selected && !config._skipRedirectCheck) {
           // Determine target's owner
           const tgtOwner = selected.owner;
           if (tgtOwner >= 0) {
+            // `cannotBeRedirected` sperrt nur Umleitungen, nicht
+            // Negationen (v701, Rolling Boulder).
+            const _rcfg = config.cannotBeRedirected ? { ...config, _noRedirectOutcome: true } : config;
             const redirected = await engine._checkTargetRedirect(
-              tgtOwner, selected, filteredTargets, config, reactionSource
+              tgtOwner, selected, filteredTargets, _rcfg, reactionSource
             );
+            if (redirected?._redirectNegated || redirected?._dropTargetIds) {
+              // v704: `_dropTargetIds` (Vinny) wirkt bei EINEM Ziel wie
+              // eine Negation — das einzige Ziel ist geschuetzt.
+              // Negation statt Umleitung (v701, Rolling Boulder): der
+              // Effekt ist negiert — Targeting abbrechen wie bei einer
+              // Fenster-Negation weiter unten. Ziel aus dem Spell-Log
+              // nehmen, der Effekt hat nie verbunden.
+              if (gs._spellDamageLog) {
+                const negIdx = gs._spellDamageLog.findIndex(t => t.id === selected.id);
+                if (negIdx >= 0) gs._spellDamageLog.splice(negIdx, 1);
+              }
+              return null;
+            }
             if (redirected) {
               // Update the spell damage log to reflect the new target
               if (gs._spellDamageLog && gs._spellDamageLog.length > 0) {
@@ -4294,10 +4715,17 @@ class GameEngine {
         // ── Surprise window check ──
         // After target is confirmed (and possibly redirected), check if the targeted
         // hero has a face-down Surprise that should trigger.
-        if (selected && selected.type === 'hero' && !config._skipSurpriseCheck) {
+        // v703: auch ein Kreaturenziel geht ins Fenster — dort filtert
+        // `surpriseFiresOnSupportCreature` (nur Mountain Tear River bisher).
+        // Der Vorab-Stempel `_surpriseCheckedHeroes` bleibt Heldenzielen
+        // vorbehalten: Kreaturenschaden oeffnet in actionDealDamage kein
+        // Helden-Fenster, es gibt also nichts zu deduplizieren.
+        if (selected && (selected.type === 'hero' || selected.type === 'creature') && !config._skipSurpriseCheck) {
           // Mark this hero as surprise-checked so actionDealDamage doesn't re-check
-          if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
-          gs._surpriseCheckedHeroes.add(`${selected.owner}-${selected.heroIdx}`);
+          if (selected.type === 'hero') {
+            if (!gs._surpriseCheckedHeroes) gs._surpriseCheckedHeroes = new Set();
+            gs._surpriseCheckedHeroes.add(`${selected.owner}-${selected.heroIdx}`);
+          }
           const surpriseResult = await engine._checkSurpriseWindow(
             [selected], reactionSource, { damageType: config.damageType }
           );
@@ -4407,8 +4835,15 @@ class GameEngine {
         const types = config.types || ['hero', 'creature'];
 
         // ── Truth-Seeing Eye ── (see promptDamageTarget for rationale)
-        if (engine._sourceHasTruthSeeingEye(cardInstance)) {
-          config = { ...config, ignoreUntargetable: true, cannotBeRedirected: true, _truthSeeingEye: true };
+        if (engine._sourceIgnoresTargetingRestrictions(cardInstance)) {
+          // v616: Truth-Seeing Eye ODER ein Skript mit
+          // `ignoresTargetingRestrictions` (Piercer of Heavens). Die
+          // Unumlenkbarkeit bleibt dem Auge vorbehalten — „can always
+          // choose any target" verbietet keine Umlenkung.
+          config = {
+            ...config, ignoreUntargetable: true, _truthSeeingEye: true,
+            cannotBeRedirected: !!config.cannotBeRedirected || engine._sourceHasTruthSeeingEye(cardInstance),
+          };
         }
 
         const addHeroes = (playerIdx) => {
@@ -4438,8 +4873,9 @@ class GameEngine {
                 (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
               );
               // Only actual Creatures are targetable — not Equipment, Tokens, Spells, etc.
+              // v704 (Puppets): Ausnahme Tokens mit `choosableAsCreature`.
               const cd = (inst2 ? engine.getEffectiveCardData(inst2) : null) || cardDB[creatureName];
-              if (!cd || !hasCardType(cd, 'Creature')) continue;
+              if (!cd || !engine.isChoosableAsCreature(inst2, cd)) continue;
               if (inst2?.faceDown) continue; // Face-down Bakhm surprises are not targetable
               const t = { id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx, heroIdx: hi, slotIdx: si, cardName: creatureName, cardInstance: inst2 };
               if (config.condition && !config.condition(t, engine)) continue;
@@ -4481,7 +4917,7 @@ class GameEngine {
         // there). Pool-shared across `untargetable` (Butterfly
         // Cloud / Perfect Disguise / Golden-Wings hero flag) AND
         // `invisible` (Invisibility Attachment Spell) — if any hero
-        // on the side is non-tagged, the tagged ones are dropped;
+        // on the side is non-tagged, the tagged ones are dropped
         // if EVERY hero on a side is tagged (any combination), the
         // filter collapses and all stay choosable. Chuck's
         // `ignoresOppUntargetable` continues to bypass the whole
@@ -4561,6 +4997,33 @@ class GameEngine {
             if (inst.counters.untargetable_by_opponent_pi === pi) {
               targets.splice(i, 1);
             }
+          }
+          if (targets.length === 0) return [];
+        }
+        // ── Board of Kings (v818): gedeckte Kreaturen sind nicht waehlbar ──
+        if (!config.ignoreUntargetable) {
+          for (let i = targets.length - 1; i >= 0; i--) {
+            const t = targets[i];
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (engine._boardGuardsCreatureChoice(t.cardInstance, pi)) targets.splice(i, 1);
+          }
+          if (targets.length === 0) return [];
+        }
+
+        // ── Creature HARD-untargetable filter (Thicket, v724) ─────────
+        // „That Creature cannot be chosen by cards and effects" — ohne
+        // Zusatz „by your opponent", also fuer BEIDE Seiten, den
+        // Kontrolleur eingeschlossen. Kein „ausser es ist das einzige
+        // Ziel"-Ventil: die weiche Variante darunter ist Perfect
+        // Disguise, diese hier ist absolut. Flaechen-Effekte, die gar
+        // nicht WAEHLEN, bleiben unberuehrt (dieselbe Auslegung, die
+        // Perfect Disguise dokumentiert).
+        if (!config.ignoreUntargetable) {
+          for (let i = targets.length - 1; i >= 0; i--) {
+            const t = targets[i];
+            if (t.type !== 'equip' || !t.cardInstance) continue;
+            if (!t.cardInstance.counters?.untargetable_all) continue;
+            targets.splice(i, 1);
           }
           if (targets.length === 0) return [];
         }
@@ -4720,7 +5183,8 @@ class GameEngine {
 
         // ── Surprise window check ──
         if (!config._skipSurpriseCheck) {
-          const heroTargets = result.filter(t => t.type === 'hero');
+          // v703: Kreaturenziele laufen mit (Opt-in-Filter im Fenster).
+          const heroTargets = result.filter(t => t.type === 'hero' || t.type === 'creature');
           if (heroTargets.length > 0) {
             const surpriseResult = await engine._checkSurpriseWindow(heroTargets, cardInstance, { damageType: config.damageType });
             if (surpriseResult?.effectNegated) {
@@ -5120,7 +5584,16 @@ class GameEngine {
     const hookCtx = { source, target, amount: Math.max(0, baseDamage || 0) };
     await this.runHooks('onAttackDeclare', hookCtx);
     if (source) source._attackDeclareFired = true;
-    return Math.max(0, hookCtx.amount || 0);
+    // ── v760: PROJEKTION statt Rohwert ───────────────────────────────
+    // `ctx.modifyAmount` / `ctx.multiplyAmount` schreiben in die
+    // Sammler `_flat` / `_mul` und NICHT nach `amount` — das
+    // Zusammenrechnen passiert im Schadenspfad. Dieses Fenster hat es
+    // nie getan und gab den Rohwert zurueck: JEDER Bonus, den ein
+    // Zuhoerer hier auflegte, verfiel stillschweigend (Als Befund
+    // 5.9. an Shattered Trident; betraf ebenso Angler Angel und
+    // Great Detective Doq auf diesem Weg).
+    const projiziert = this._projectedAmount(hookCtx);
+    return Math.max(0, (projiziert !== undefined ? projiziert : hookCtx.amount) || 0);
   }
 
   async actionDealDamage(source, target, amount, type, opts) {
@@ -5183,6 +5656,220 @@ class GameEngine {
    * damage pipeline) are intentionally unaffected — the card only
    * zeroes DAMAGE.
    */
+  /**
+   * Ist dieser Held gerade in irgendeiner Form stummgeschaltet? Die
+   * eine Wahrheit fuer Hero- und Ability-Effekte:
+   *   • Stunned (auch Webbed) — immer.
+   *   • Frozen — ausser der Controller hat Chilly Dog im Spiel.
+   *   • Negated — immer, unabhaengig von Chilly Dog.
+   *   • Mummy Token in seiner Support Zone — alles wird gedaempft (siehe
+   *     server.js doActivateHeroEffect fuer den aktiven Effekt).
+   * Gleiche Regel wie der Listener-Filter in `runHooks`; wer sie an
+   * anderer Stelle braucht (Tempeste), fragt HIER, statt sie
+   * nachzubauen.
+   */
+  /**
+   * Kreaturen-Eintrag auf Sammler-Semantik heben (Punkt vor Strich).
+   * `amount` wird Accessor: get → ceil(basis × _mul) + _flat, set →
+   * absolut (setzt Basis, loescht Sammler). Helfer wie im Heldenpfad.
+   */
+  _armCreatureEntry(e) {
+    if (!e || typeof e.multiplyAmount === 'function') return;
+    const engine = this;
+    e._base = Math.max(0, e.amount || 0);
+    e._flat = 0;
+    e._mul = 1;
+    Object.defineProperty(e, 'amount', {
+      configurable: true, enumerable: true,
+      get() { return Math.max(0, Math.ceil(e._base * (e._mul ?? 1)) + (e._flat || 0)); },
+      set(v) { e._base = Math.max(0, v || 0); e._flat = 0; e._mul = 1; },
+    });
+    e.modifyAmount = (delta) => {
+      if (e.cannotBeReduced && delta < 0) return;
+      e._flat += delta;
+    };
+    e.multiplyAmount = (factor) => {
+      if (!(factor >= 0)) return;
+      if (e.cannotBeReduced && factor < 1) return;
+      e._mul *= factor;
+    };
+    e.setAmount = (v) => {
+      if (e.cannotBeReduced && v < e.amount) return;
+      e.amount = v;
+    };
+    e.lockReduction = () => {
+      e.cannotBeReduced = true;
+      if (e._flat < 0) e._flat = 0;   // gesammelte Abzuege waeren „weitere" Reduktion
+    };
+    void engine;
+  }
+
+  /** Sammler verrechnen, Eintrag wieder eine plain Zahl. */
+  _settleCreatureEntry(e) {
+    if (!e || typeof e.multiplyAmount !== 'function') return;
+    const endwert = e.amount;
+    delete e.amount;                 // Accessor entfernen …
+    e.amount = endwert;              // … und als Datenfeld neu setzen
+    delete e._base; delete e._flat; delete e._mul;
+    delete e.modifyAmount; delete e.multiplyAmount; delete e.setAmount; delete e.lockReduction;
+  }
+
+  /** Projizierter Schadensbetrag einer laufenden Hook-Runde: Basis × Produkt + Summe. */
+  _projectedAmount(hookCtx) {
+    if (hookCtx?.amount === undefined) return undefined;
+    const mul = hookCtx._mul ?? 1, flat = hookCtx._flat || 0;
+    return Math.max(0, Math.ceil(hookCtx.amount * mul) + flat);
+  }
+
+  _isHeroEffectSilenced(pi, heroIdx) {
+    const hero = this.gs.players[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return true;
+    if (hero.statuses?.stunned || hero.statuses?.webbed) return true;
+    if (hero.statuses?.frozen && !this._isChillyDogActiveFor(pi)) return true;
+    if (hero.statuses?.negated) return true;
+    if (this._isHeroMummified(pi, heroIdx)) return true;
+    return false;
+  }
+
+  /**
+   * „Damage this Hero takes cannot be reduced or negated" — Gegenstueck
+   * zu `_isHeroSelfDamageImmune`, nur ZIELSEITIG statt quellseitig:
+   * Prophecy of Tempeste setzt `cannotBeNegated` an seiner eigenen
+   * Quelle, ein Held wie Tempeste, the Weather Fairy muss es fuer
+   * Schaden aus JEDER Quelle erzwingen. Ein Heldenskript exportiert
+   * `heroDamageCannotBeReducedOrNegated` (true oder Praedikat
+   * `(engine, ownerIdx, heroIdx) → bool`).
+   *
+   * Anders als Carris' Immunitaet ist das ein EFFEKT des Helden und
+   * gilt deshalb nur, solange er nicht stummgeschaltet ist (Als Ruling
+   * 1.9.: „NUR solange Tempeste nicht Frozen, Stunned oder Negated —
+   * in welcher Form auch immer — ist"). Und nur solange er lebt.
+   */
+  /**
+   * Helden-Konterfenster fuer Reaktionen OHNE Kette (v692) — das
+   * Pre-Damage-Fenster (Strong Shield, Bamboo Shield, …) loest seine
+   * Karte direkt auf, dort gibt es keine Kette, an die ein Held wie
+   * Key haengen koennte. Dieses Fenster bietet den Helden des ANDEREN
+   * Spielers ihre `isHeroReaction` an, mit einem Pseudo-Link der
+   * gerade gespielten Karte als `chainCtx`. Stiehlt einer, kommt
+   * `{ stolenBy, negated }` zurueck und der Aufrufer routet die Karte
+   * in dessen Hand statt in die Ablage; sonst `null`. Keys Skript
+   * bleibt dabei unveraendert — es sieht denselben Vertrag wie in der
+   * Kette.
+   */
+  async _offerHeroCounterToHandReaction(reactorOwner, { cardName, cardType, goldCost }) {
+    const gegner = reactorOwner === 0 ? 1 : 0;
+    const gps = this.gs.players[gegner];
+    if (!gps) return null;
+    const link = {
+      id: uuidv4().substring(0, 12), cardName, owner: reactorOwner,
+      cardType: cardType || 'Unknown', goldCost: goldCost || 0,
+      isInitialCard: false, negated: false, chainClosed: false, fromBoard: false,
+    };
+    const chain = [link];
+    const chainCtx = { chain, eventDesc: `${this.gs.players[reactorOwner]?.username} plays ${cardName}`, hookName: 'preDamageReaction', hookCtx: {} };
+    for (let hi = 0; hi < (gps.heroes || []).length; hi++) {
+      const hero = gps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      const script = loadCardEffect(hero.name);
+      if (!script?.isHeroReaction || typeof script.heroReactionCondition !== 'function') continue;
+      if (this._isHeroEffectSilenced(gegner, hi)) continue;
+      let ok = false;
+      try { ok = !!script.heroReactionCondition(this.gs, gegner, this, chainCtx, hi); } catch { ok = false; }
+      if (!ok) continue;
+      const ja = await this.promptGeneric(gegner, {
+        type: 'confirm', title: hero.name,
+        message: `${chainCtx.eventDesc}. Activate ${hero.name}?`,
+        showCard: cardName, confirmLabel: 'Activate!', cancelLabel: 'No', cancellable: true,
+      });
+      if (!ja) continue;
+      if (typeof script.payActivationCost === 'function') {
+        const paid = await script.payActivationCost(this, gegner, chainCtx, hi);
+        if (paid === false) continue;
+      }
+      this._broadcastEvent('hero_effect_reaction', { owner: gegner, heroIdx: hi, heroName: hero.name });
+      await this.showTriggeredEffect(hero.name, { replace: true, delayMs: 300 });   // v694: loest die Reaktion ab
+      this.log('reaction_activated', { card: hero.name, player: gps.username, chainPosition: 0, source: 'hero' });
+      if (typeof script.heroReactionResolve === 'function') {
+        await script.heroReactionResolve(this, gegner, chain, 1, hi);
+      }
+      if (link.negated) {
+        this._broadcastEvent('reaction_chain_link_negated', {
+          linkIndex: 0, cardName, owner: reactorOwner, negationStyle: link.negationStyle || null,
+        });
+        this.log('card_negated', { card: cardName, owner: reactorOwner });
+        return { stolenBy: Number.isInteger(link._negatedToHandOf) ? link._negatedToHandOf : null, negated: true };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * ★ GRUNDREGEL (Al 21.8./1.9./6.9., in CARD_API.md ganz oben):
+   * Wenn sich der PASSIVE Effekt einer Karte per Trigger aktiviert
+   * („Whenever …", „When … you may …", Reaktionsfenster aus einem
+   * Hook heraus), wird diese Karte IMMER an BEIDE Spieler gestreamt —
+   * der `card_reveal` links neben dem Feld, damit jeder sieht, WAS sich
+   * gerade aktiviert hat. Die expliziten Aktivierungspfade (Hero-
+   * Effekt, Ability, Creature-Effekt, Artefakt, Surprise) tun das im
+   * Server; aus einem Hook heraus gibt es keinen Aktivierungsweg —
+   * deshalb ruft das Kartenskript DIESEN Helfer. Er ist seit v817 der
+   * EINZIGE dafuer (`announceHookActivation` ist nur noch ein Alias).
+   *
+   * Zeitpunkt (v736): in dem Moment, in dem der Effekt WIRKLICH feuert
+   * — nach einem „you may" also erst nach dem Ja, damit ein abgelehnter
+   * Trigger nichts zeigt.
+   *
+   * Optionen:
+   *   replace   Reveal-Stapel raeumen (Reaktion loest die Karte ab, auf
+   *             die sie reagiert — Key).
+   *   source    Quellobjekt/-kennung des Ausloesers. Feuert derselbe
+   *             Trigger mehrfach aus EINER Quelle (Flaechenschlag trifft
+   *             drei Helden, ein Zug bringt drei Karten), zeigt sich die
+   *             Karte nur EINMAL (Als Regel 21.8.). Ohne `source` greift
+   *             ein Zeitfenster (`windowMs`, Vorgabe 0 = aus) — nur
+   *             setzen, wo es eine echte Quelle nicht gibt.
+   *   playerIdx Besitzer (Log-/Seitenzuordnung im Client, optional).
+   *   sfx       Klang, Vorgabe `ability_activate`.
+   *   delayMs   Haltezeit danach (Vorgabe 250; 0 = nicht warten).
+   */
+  async showTriggeredEffect(cardName, opts = {}) {
+    if (!cardName || this._inMctsSim || this._fastMode) return;
+
+    // Entprellung je Quelle (dieselbe Bauart wie `effectSourceGlow`).
+    const src = opts.source;
+    const win = opts.windowMs ?? 0;
+    const letzte = this._lastHookAnnounce;
+    if (letzte && letzte.card === cardName) {
+      if (src && letzte.src === src) return;                       // gleiche Quelle
+      if (!src && win > 0 && (Date.now() - letzte.at) < win) return;
+    }
+    this._lastHookAnnounce = { card: cardName, src: src || null, at: Date.now() };
+
+    const payload = {
+      cardName, sfx: opts.sfx || 'ability_activate', replace: !!opts.replace,
+    };
+    if (opts.playerIdx === 0 || opts.playerIdx === 1) payload.playerIdx = opts.playerIdx;
+    this._broadcastEvent('card_reveal', payload);
+    if (opts.delayMs !== 0) await this._delay(opts.delayMs ?? 250);
+  }
+
+  _isHeroDamageUnstoppable(target) {
+    if (!target || target.hp === undefined || target.hp <= 0) return false;
+    const owner = this._findHeroOwner(target);
+    if (owner < 0) return false;
+    const heroIdx = (this.gs.players[owner]?.heroes || []).indexOf(target);
+    if (heroIdx < 0) return false;
+    const flag = loadCardEffect(target.name)?.heroDamageCannotBeReducedOrNegated;
+    if (!flag) return false;
+    if (this._isHeroEffectSilenced(owner, heroIdx)) return false;
+    if (typeof flag === 'function') {
+      try { return !!flag(this, owner, heroIdx); }
+      catch { return false; }
+    }
+    return flag === true;
+  }
+
   _isHeroSelfDamageImmune(target) {
     if (!target || target.hp === undefined) return false;
     const owner = this._findHeroOwner(target);
@@ -5644,6 +6331,21 @@ class GameEngine {
         } catch { /* eine defekte Karte darf das Zielen nicht sprengen */ }
       }
     }
+    // v634: auch ABILITIES duerfen das Zielen blocken (Stealth). Je
+    // Ability-Name einmal; der Level steckt in der Slot-Belegung, das
+    // Skript zaehlt ihn selbst ueber `countAbilitiesForSchool`.
+    const seen = new Set();
+    for (const slot of (ps.abilityZones?.[heroIdx] || [])) {
+      for (const abName of (Array.isArray(slot) ? slot : [])) {
+        if (!abName || seen.has(abName)) continue;
+        seen.add(abName);
+        const script = loadCardEffect(abName);
+        if (typeof script?.blocksTargeting !== 'function') continue;
+        try {
+          if (script.blocksTargeting(this.gs, this, { ...info, heroOwner, heroIdx })) return true;
+        } catch { /* eine defekte Ability darf das Zielen nicht sprengen */ }
+      }
+    }
     return false;
   }
 
@@ -5831,6 +6533,17 @@ class GameEngine {
       this._flashHeroDamageZero(target);
       return { dealt: 0, cancelled: true };
     }
+    // ── damage_proof (Storm Piano, v628) ────────────────────────────
+    // „prevent any damage the Hero would take until the end of your next
+    // turn": ein positiver Heldenstatus, der JEDEN normalen Schaden
+    // verhindert. True Damage (`actionDealTrueDamage`) laeuft an diesem
+    // Pfad vorbei und trifft weiterhin — wie bei Carris ist die
+    // Ausnahme davon ausdruecklich in dessen Kartentext, hier nicht.
+    if (target && target.hp !== undefined && amount > 0 && target.statuses?.damage_proof) {
+      this.log('damage_blocked', { target: this._heroLabel(target), reason: 'damage_proof', amount, source: source?.name });
+      this._flashHeroDamageZero(target);
+      return { dealt: 0, cancelled: true };
+    }
 
     // ── Anti Magic Enchantment shield ──
     // Fires here, AFTER the spell's own animations have already broadcast
@@ -5859,6 +6572,25 @@ class GameEngine {
     // _activeSurpriseHeroes handles true self-recursion, and the depth
     // counter in _activateSurprise still caps runaway nesting.
     const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil', 'other']);
+    // ── EFFEKT-IMMUNITAET, unabhaengig von der Quellenform (v805) ─────
+    // Bisher stand die Pruefung NUR im Surprise-Zweig darunter, der
+    // `source.heroIdx >= 0` verlangt. Artefakte und andere Quellen ohne
+    // Helden-Index (Book of Doom: `{ name, owner }`) liefen daran vorbei
+    // — Barrier of Faith triggerte, der Schaden kam trotzdem an (Als
+    // Befund 6.9.). Ausgenommen sind NUR echte Status-Ticks (status/
+    // burn/poison): die gehoeren nicht zur laufenden Aufloesung. Der Typ
+    // 'other' dagegen ist der Schadenstyp von Artefakten wie Book of
+    // Doom (zweiter Befund 6.9.: kam trotz Immunitaet durch) und muss
+    // abprallen wie jeder andere Karteneffekt.
+    const IMMUNITY_SKIP_TYPES = new Set(['status', 'burn', 'poison']);
+    if (target && target.hp !== undefined && amount > 0 && !IMMUNITY_SKIP_TYPES.has(type)) {
+      const immOwner = this._findHeroOwner(target);
+      const immHeroIdx = immOwner >= 0 ? (this.gs.players[immOwner]?.heroes || []).indexOf(target) : -1;
+      if (immHeroIdx >= 0 && this.hasEffectImmunity(immOwner, immHeroIdx, source)) {
+        this.log('effect_immunity', { hero: target?.name, source: source?.name || null });
+        return { dealt: 0, cancelled: true, effectImmune: true };
+      }
+    }
     if (
       !opts?.skipSurpriseCheck &&
       target && target.hp !== undefined &&
@@ -5926,10 +6658,10 @@ class GameEngine {
     //   • which of the owner's heroes hosts the surprise (the standard
     //     window's `tgtPs.surpriseZones?.[tgtHeroIdx]` check is wrong
     //     here — `_checkDamageSurpriseWindow` scans ALL of the owner's
-    //     surprise zones internally);
+    //     surprise zones internally)
     //   • whether the damage source is a Hero (`source.heroIdx >= 0`)
     //     or an Artifact / Spell with no host hero (`heroIdx === -1`,
-    //     as Book of Doom uses);
+    //     as Book of Doom uses)
     //   • the damage type (`SURPRISE_SKIP_TYPES` excludes 'other' and
     //     'recoil' for the standard window's purposes — Banner Bearer's
     //     card text is "with a card or effect", which covers both).
@@ -5939,15 +6671,28 @@ class GameEngine {
     // semantics. Self-damage is filtered by `srcOwner === tgtOwner`
     // since "your opponent" must be the source.
     const DMG_SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison']);
+    // Status-Ticks (Burn/Poison — Quelle ohne owner, Typen 'fire'/
+    // 'poison' aus processBurn-/processPoisonDamage) galten bisher
+    // pauschal nicht als „would deal damage". v697 (Als Ruling zu
+    // Aquatic Shield): sie zaehlen als „takes ANY damage" — aber nur
+    // fuer Skripte mit `firesOnStatusTickDamage: true`; Bestandskarten
+    // (Banner Bearer & Co.) sehen Ticks weiterhin nicht.
+    const _isStatusTick = (source?.owner == null || source.owner < 0)
+      && (source?.name === 'Burn' || source?.name === 'Poison');
     if (
       !opts?.skipSurpriseCheck &&
       target && target.hp !== undefined &&
       amount > 0 &&
-      source?.owner >= 0 &&
+      (source?.owner >= 0 || _isStatusTick) &&
       !DMG_SURPRISE_SKIP_TYPES.has(type)
     ) {
       const tgtOwner = this._findHeroOwner(target);
-      if (tgtOwner >= 0 && source.owner !== tgtOwner) {
+      // v697 (Aquatic Shield): auch EIGENQUELLIGER Schaden (The Yeeting
+      // auf den eigenen Helden) oeffnet das Fenster — aber nur fuer
+      // Skripte mit `firesOnSelfSourcedDamage: true`; alle Bestandskarten
+      // sehen weiterhin nur Gegner-Schaden (Filter in der Fenster-Schleife).
+      // Status-Ticks laufen als eigene Kategorie mit (`statusTick`).
+      if (tgtOwner >= 0) {
         const tgtHeroIdx = (this.gs.players[tgtOwner]?.heroes || []).indexOf(target);
         if (tgtHeroIdx >= 0) {
           let syntheticSource = source.cardInstance
@@ -5959,7 +6704,9 @@ class GameEngine {
           syntheticSource = this._rewriteSourceForCreatureCaster(syntheticSource);
           const dmgSurprise = await this._checkDamageSurpriseWindow(
             { kind: 'hero', owner: tgtOwner, heroIdx: tgtHeroIdx, hero: target, cardName: target.name },
-            { amount, source: syntheticSource, damageType: type },
+            { amount, source: syntheticSource, damageType: type,
+              selfSourced: !_isStatusTick && source.owner === tgtOwner,
+              statusTick: _isStatusTick },
           );
           if (dmgSurprise?.effectNegated) {
             return { dealt: 0, cancelled: true, surpriseNegated: true };
@@ -5994,11 +6741,44 @@ class GameEngine {
     }
 
     const hookCtx = { source, target, amount, type: type || 'normal', sourceHeroIdx: source?.heroIdx ?? -1, cancelled: false };
+    // Eingangsbetrag fuer den Null-Floater am Ende (Al 1.9.: wird
+    // Schaden auf 0 reduziert, IMMER eine 0 zeigen — egal wodurch).
+    const _eingangsBetrag = amount;
     // Alleria redirect: damage cannot be reduced/negated except by Surprises
     if (this.gs._redirectedOnlyReducibleBySurprise) {
       hookCtx.cannotBeNegated = true;
       hookCtx.onlyReducibleBySurprise = true;
       delete this.gs._redirectedOnlyReducibleBySurprise;
+    }
+    // v668: „True Damage" nach einer Selbst-Umleitung (Monia Bot). Der
+    // Umleiter setzt `gs._redirectedTrueDamage = { owner, heroIdx, turn }`;
+    // der NAECHSTE Treffer auf genau diesen Helden kann weder verringert
+    // noch negiert werden UND ignoriert die Unsterblichkeits-Deckel
+    // (immortal, capAtHPMinus1, lethalProtection) — Als Vorgabe 30.8.:
+    // „damit man sie nicht unzerstoerbar machen kann". Der Stempel
+    // faellt mit dem Treffer oder am Zugbeginn.
+    {
+      const rt = this.gs._redirectedTrueDamage;
+      if (rt && target?.hp !== undefined && rt.turn === this.gs.turn
+          && this.gs.players[rt.owner]?.heroes?.[rt.heroIdx] === target) {
+        hookCtx.cannotBeNegated = true;
+        hookCtx.cannotBeReduced = true;
+        hookCtx.trueDamage = true;
+        delete this.gs._redirectedTrueDamage;
+        this.log('true_damage', { target: this._heroLabel(target), source: source?.name });
+      }
+    }
+    // v687: zielseitige Unangreifbarkeit (Tempeste, the Weather Fairy).
+    // VOR BEFORE_DAMAGE gesetzt, damit jeder Listener `ctx.cannotBe…`
+    // schon liest und setAmount/modifyAmount die Reduktion abweisen
+    // die Piercing-Riegel dahinter (Abbruch, Buffs, Anti Magic,
+    // Handreaktionen wie Strong Shield) greifen dann ohnehin. KEIN
+    // `trueDamage`: die Unsterblichkeits-Deckel bleiben — der Text
+    // sagt „nicht verringert oder negiert", nicht „ignoriert alles".
+    if (target?.hp !== undefined && !hookCtx.cannotBeReduced && this._isHeroDamageUnstoppable(target)) {
+      hookCtx.cannotBeNegated = true;
+      hookCtx.cannotBeReduced = true;
+      this.log('unstoppable_damage', { target: this._heroLabel(target), source: source?.name });
     }
 
     await this.runHooks(HOOKS.BEFORE_DAMAGE, hookCtx);
@@ -6011,6 +6791,10 @@ class GameEngine {
     // haben Nebenwirkungen); nur ein hoeherer Betrag wird
     // zurueckgenommen. Verwandt mit `amountIsFinal` darunter, das
     // symmetrisch klemmt.
+    // Eine von einem HOOK gesetzte Klammer (`ctx.preventIncrease`,
+    // v742) wird NICHT hier ausgewertet, sondern nach dem Zusammen-
+    // rechnen weiter unten: hier steht `hookCtx.amount` noch als
+    // Rohbasis, die Multiplikatoren liegen erst in `_mul`.
     if (opts?.cannotBeIncreased && !hookCtx.cancelled && hookCtx.amount > amount) {
       this.log('damage_increase_blocked', {
         source: source?.name, target: this._heroLabel?.(target),
@@ -6128,28 +6912,40 @@ class GameEngine {
     // multipliers below 1 (Cloudy, medusa_petrified, …) must not trim
     // the amount. Multipliers ≥ 1 (any future damage-amplifier buff)
     // still apply because the lock is only a floor, not a freeze.
-    const _amountBeforeBuffMul = hookCtx.amount;
+    const _amountBeforeBuffMul = this._projectedAmount(hookCtx);
     if (!hookCtx.cannotBeNegated && target?.buffs) {
       for (const [, buffData] of Object.entries(target.buffs)) {
         if (buffData.damageMultiplier != null) {
           if (hookCtx.cannotBeReduced && buffData.damageMultiplier < 1) continue;
-          hookCtx.amount = Math.ceil(hookCtx.amount * buffData.damageMultiplier);
+          hookCtx._mul = (hookCtx._mul ?? 1) * buffData.damageMultiplier;
         }
       }
     }
-    // If the buff-multiplier pass fully absorbed an incoming hit
-    // (Damage Immune, Petrified, …), surface a red "0" floater so the
-    // player sees the block — the diff-based damage-number detector
-    // wouldn't fire because HP didn't change.
-    if (_amountBeforeBuffMul > 0 && hookCtx.amount === 0 && target?.hp !== undefined) {
-      const _zeroOwner = this._findHeroOwner?.(target);
-      if (typeof _zeroOwner === 'number' && _zeroOwner >= 0) {
-        const _zeroHi = (this.gs.players[_zeroOwner]?.heroes || []).indexOf(target);
-        if (_zeroHi >= 0) {
-          this._broadcastEvent('play_damage_zero', { owner: _zeroOwner, heroIdx: _zeroHi, zoneSlot: -1 });
-        }
-      }
+    // PUNKT VOR STRICH: jetzt EINMAL zusammenrechnen — Basis (inkl.
+    // Arrows) × alle Multiplikatoren (Karten-Hooks + Buffs), dann die
+    // flat Modifikatoren. Danach ist `hookCtx.amount` der endgueltige
+    // flache Betrag; die Sammler sind verbraucht.
+    hookCtx.amount = this._projectedAmount(hookCtx);
+    hookCtx._flat = 0;
+    hookCtx._mul = 1;
+    // ── Hook-Klammer „cannot be increased" (v742) ──────────────────
+    // Erst JETZT vergleichbar: waehrend der Hook-Runde war `amount` die
+    // Rohbasis. `_noIncreaseFrom` ist die Projektion zum Zeitpunkt von
+    // `ctx.preventIncrease()` — alles, was danach an flat Boni oder
+    // weiteren Multiplikatoren dazukam, faellt zurueck. Reduktionen
+    // bleiben erlaubt, die Klammer ist einseitig.
+    if (hookCtx.cannotBeIncreased && hookCtx._noIncreaseFrom != null
+        && !hookCtx.cancelled && hookCtx.amount > hookCtx._noIncreaseFrom) {
+      this.log('damage_increase_blocked', {
+        source: source?.name, target: this._heroLabel?.(target),
+        from: hookCtx.amount, to: hookCtx._noIncreaseFrom,
+      });
+      hookCtx.amount = hookCtx._noIncreaseFrom;
     }
+    // (Der Null-Floater sitzt seit v690 EINMAL am Ende des Pfads —
+    // gegen den Eingangsbetrag, damit auch flat Reduktionen (Tempeste)
+    // und Handreaktionen eine 0 zeigen, nicht nur Buff-Multiplikatoren.)
+    void _amountBeforeBuffMul;
 
     // Niu-Enhanced consumption (Guardian Beast Niu). The buff lives on
     // the SOURCE hero (independent of Niu still being on the board) and
@@ -6173,6 +6969,21 @@ class GameEngine {
     // per-arrow Attack bonus). Added AFTER the multiplier pass so
     // halving / doubling effects can't touch it.
     if (hookCtx._flatBonus) hookCtx.amount += hookCtx._flatBonus;
+
+    // ── Einmal-Schadensschilde (v697) — flat, nach allen Multiplikatoren.
+    // `cannotBeReduced` laesst sie wirkungslos und UNVERBRAUCHT.
+    if (hookCtx.amount > 0 && !hookCtx.cannotBeReduced
+        && target?._oneShotDmgShields?.length) {
+      const _tOwnerS = this._findHeroOwner(target);
+      hookCtx.amount = this._consumeOneShotDamageShields(
+        target._oneShotDmgShields, hookCtx.amount,
+        _tOwnerS >= 0 ? {
+          type: 'shield_block', owner: _tOwnerS,
+          heroIdx: (this.gs.players[_tOwnerS]?.heroes || []).indexOf(target),
+          zoneSlot: -1,
+        } : null,
+      );
+    }
 
     // Shielded heroes (first-turn protection) are immune to ALL damage
     if (this.gs.firstTurnProtectedPlayer != null && target && target.hp !== undefined) {
@@ -6222,8 +7033,8 @@ class GameEngine {
       }
     }
 
-    // Immortal buff: damage cannot drop HP below 1
-    if (target?.buffs?.immortal && target.hp !== undefined && target.hp > 0) {
+    // Immortal buff: damage cannot drop HP below 1 (v668: nicht bei True Damage)
+    if (!hookCtx.trueDamage && target?.buffs?.immortal && target.hp !== undefined && target.hp > 0) {
       const maxDmg = Math.max(0, target.hp - 1);
       if (hookCtx.amount > maxDmg) {
         hookCtx.amount = maxDmg;
@@ -6233,7 +7044,7 @@ class GameEngine {
 
     // Generic HP-1 cap (set by beforeDamage hooks, e.g. Ghuanjun)
     // Runs AFTER all modifiers (Sacred Hammer bonus, etc.) so it's the final word
-    if (hookCtx.capAtHPMinus1 && target?.hp !== undefined && target.hp > 0) {
+    if (hookCtx.capAtHPMinus1 && !hookCtx.trueDamage && target?.hp !== undefined && target.hp > 0) {
       const maxDmg = Math.max(0, target.hp - 1);
       if (hookCtx.amount > maxDmg) {
         hookCtx.amount = maxDmg;
@@ -6248,7 +7059,7 @@ class GameEngine {
     // dispatches, applies returned damage overrides, and consumes
     // protectors that opt in via `consumeSelf`. Loop stops as soon
     // as damage falls below lethal.
-    if (target?.hp > 0 && target.hp !== undefined && hookCtx.amount >= target.hp) {
+    if (!hookCtx.trueDamage && target?.hp > 0 && target.hp !== undefined && hookCtx.amount >= target.hp) {
       const targetOwner = this._findHeroOwner(target);
       if (targetOwner >= 0) {
         const heroIdx = this.gs.players[targetOwner].heroes.indexOf(target);
@@ -6311,7 +7122,8 @@ class GameEngine {
     //     `amountOverride: 0` for "negate the damage but keep everything
     //     else" semantics.
     if (target && target.hp !== undefined && hookCtx.amount > 0) {
-      const reactRes = await this._checkPreDamageHandReactions(target, source, hookCtx.amount, type);
+      const reactRes = await this._checkPreDamageHandReactions(target, source, hookCtx.amount, type,
+        { cannotBeNegated: !!hookCtx.cannotBeNegated, cannotBeReduced: !!hookCtx.cannotBeReduced });
       // Piercing override (Ida etc.) — `cannotBeNegated` vetoes a full
       // negation; `cannotBeReduced` vetoes a reducing amount override
       // (≥-the-current-amount override stays). Cost paid by the
@@ -6366,6 +7178,13 @@ class GameEngine {
     }
 
     const actualAmount = Math.max(0, hookCtx.amount);
+    // Null-Floater (v690): kam Schaden > 0 herein und geht 0 raus —
+    // egal ob Buff, flat Reduktion (Tempeste), Deckel oder
+    // Handreaktion —, zeigt der Held eine rote 0. Der HP-Diff-Detektor
+    // des Clients feuert bei unveraenderten HP nicht.
+    if (target?.hp !== undefined && _eingangsBetrag > 0 && actualAmount === 0) {
+      this._flashHeroDamageZero(target);
+    }
     const hpBefore = (target && target.hp !== undefined) ? target.hp : actualAmount;
     if (target && target.hp !== undefined) {
       target.hp = Math.max(0, target.hp - actualAmount);
@@ -6374,6 +7193,7 @@ class GameEngine {
       // ("affect only targets that have not taken damage yet this turn").
       // Not card-specific — any future "damaged this turn" lookup uses this.
       if (actualAmount > 0) this._noteDamageTaken(target, actualAmount);
+      if (actualAmount > 0) this._noteDamageDealt(source, actualAmount);
     }
     // "Real" dealt: HP-drop, capped at the target's pre-hit HP so
     // overkill doesn't count. Consumers (Golden Arrow's gold ratio, any
@@ -6434,6 +7254,16 @@ class GameEngine {
       // eben nicht besiegt.
       await this._checkSurpriseAfterDamage(
         target, source, realDealt, type, { defeated: target.hp <= 0 },
+      );
+      // ── Fenster des Verursachers (v697, Aquatic Spear) ──
+      const _tOwner = this._findHeroOwner(target);
+      await this._checkSurpriseOnDealtDamage(
+        {
+          kind: 'hero', owner: _tOwner,
+          heroIdx: (this.gs.players[_tOwner]?.heroes || []).indexOf(target),
+          cardName: target.name, alive: target.hp > 0,
+        },
+        source, realDealt, type,
       );
     }
 
@@ -6575,6 +7405,7 @@ class GameEngine {
       target.hp = Math.max(0, target.hp - amount);
       const dealt = hpBefore - target.hp;
       if (dealt > 0) this._noteDamageTaken(target, dealt);
+      if (dealt > 0) this._noteDamageDealt(source, dealt);
 
       this.log('damage', {
         source: source?.name, target: this._heroLabel(target),
@@ -6604,6 +7435,18 @@ class GameEngine {
       if (dealt > 0 && target && target.hp !== undefined) {
         await this._checkSurpriseAfterDamage(
           target, source, dealt, type, { defeated: target.hp <= 0 },
+        );
+        // ── Fenster des Verursachers (v697), auch fuer echten Schaden —
+        // „cannot be reduced or negated" verbietet das Abfangen, nicht
+        // das REAGIEREN des Austeilers.
+        const _tOwner2 = this._findHeroOwner(target);
+        await this._checkSurpriseOnDealtDamage(
+          {
+            kind: 'hero', owner: _tOwner2,
+            heroIdx: (this.gs.players[_tOwner2]?.heroes || []).indexOf(target),
+            cardName: target.name, alive: target.hp > 0,
+          },
+          source, dealt, type,
         );
       }
 
@@ -6875,6 +7718,36 @@ class GameEngine {
       return { defeated: false };
     }
 
+    // ── VOR-NIEDERLAGE-FENSTER (v718, Als Befund 4.9.) ───────────────
+    // „Play this card immediately when a Hero you control would be
+    // defeated" muss auch gegen Insta-Kills greifen (Eraser Beam, Hand
+    // of Death). Bisher hing dieses Fenster ausschliesslich am
+    // Schadenspfad, weshalb Escape, Emergency Spell Armor und Paraseed
+    // Zombie hier stumm blieben — ein Loch im Weg, kein Kartenfehler.
+    //
+    // Der synthetische Betrag ist die aktuelle HP-Zahl: die Bedingungen
+    // dieser Karten pruefen auf „toedlich", und toedlicher als das geht
+    // es nicht. `instaKill` filtert das Angebot auf die Reaktionen,
+    // die einen Tod wirklich ersetzen koennen (s. dort).
+    // Ein Selbstopfer (`isSacrifice`) oeffnet kein Fenster: der
+    // Kontrolleur gibt den Helden absichtlich her.
+    if (!opts.isSacrifice && !opts.skipDefeatReactions) {
+      const rx = await this._checkPreDamageHandReactions(
+        target, source, target.hp, 'defeat', { instaKill: true });
+      // `negated` deckt beide Faelle ab: die reine Negation (Escape)
+      // und die Ersetzung, bei der die Reaktion die HP selbst setzt
+      // (Paraseed Zombie: „that Hero's HP drop to 1 instead").
+      if (rx?.negated) {
+        this.log('defeat_negated', {
+          hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat',
+        });
+        return { defeated: false };
+      }
+      // Hat eine Reaktion den Helden zwischenzeitlich geheilt oder
+      // entfernt, gilt derselbe Abbruch.
+      if (target.hp <= 0) return { defeated: false };
+    }
+
     target.hp = 0;
     target.diedOnTurn = this.gs.turn;
     this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat' });
@@ -7114,6 +7987,17 @@ class GameEngine {
   async actionHealCreature(source, target, amount) {
     if (!target || !target.counters) return;
     if (target.faceDown) return; // Face-down surprises cannot be healed
+    // v704 (Puppets): Shared HP pool — Heilung eines Puppet-Tokens heilt
+    // den Helden der Spalte.
+    if (loadCardEffect(target.counters?._effectOverride || target.name)?.sharesHpWithHero) {
+      const pooledOwner = target.controller ?? target.owner;
+      const pooledHero = this.gs.players[pooledOwner]?.heroes?.[target.heroIdx];
+      if (pooledHero?.name && pooledHero.hp > 0) {
+        this.log('pooled_heal_to_hero', { token: target.name, hero: pooledHero.name, amount });
+        return await this.actionHealHero(source, pooledHero, amount);
+      }
+      return;
+    }
     // Poisoned creatures can't be healed while any `blocksPoisonHeal`
     // Area is up.
     {
@@ -7205,7 +8089,9 @@ class GameEngine {
     this.log('hero_revived', { hero: hero.name, player: ps.username, hp: reviveHp, by: opts.source || 'unknown' });
 
     const animType = opts.animationType || 'holy_revival';
-    this._broadcastEvent('play_zone_animation', { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1 });
+    // `opts.animDuration` (v631): laengere Auftritte (Konzert der Hymne)
+    // leben laenger als die 1000-ms-Vorgabe des Clients.
+    this._broadcastEvent('play_zone_animation', { type: animType, owner: playerIdx, heroIdx, zoneSlot: -1, ...(opts.animDuration ? { duration: opts.animDuration } : {}) });
     this.sync();
     await this._delay(opts.animDelay != null ? opts.animDelay : 1200);
 
@@ -7599,6 +8485,8 @@ class GameEngine {
   }
 
   async actionDrawCards(playerIdx, count, opts = {}) {
+    this._drawBatchSeq = (this._drawBatchSeq || 0) + 1;
+    const batchId = this._drawBatchSeq;
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
     // `opts._unpreventable: true` lets a card-effect draw bypass both
@@ -7704,6 +8592,12 @@ class GameEngine {
       await this.runHooks(HOOKS.ON_DRAW, {
         playerIdx, card: inst, cardName,
         _isResourceDraw: !!opts._isResourceDraw,
+        // v815: Ziehvorgang-Kennung — ONE Ziehvorgang („draws 1 or more
+        // cards") feuert ON_DRAW je KARTE; Reaktionen, die je Vorgang
+        // genau einmal antworten (Cute Meanie Melissa), entprellen
+        // daran. `_drawCount` = bestellte Menge, `_drawIndex` = Position.
+        _drawBatch: batchId, _drawCount: count, _drawIndex: i,
+        _drawSource: opts.source || null,
       });
 
       // Visual pacing: sync + delay between draws so cards appear one by one.
@@ -7932,7 +8826,7 @@ class GameEngine {
     // Merker spaetestens mit dem naechsten Halbzug wieder wertlos —
     // und bis dahin ueberschreibt ihn die naechste Aktivierung.
     this._activationSource = cardName
-      ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn }
+      ? { cardName, owner: ownerIdx ?? null, turn: this.gs?.turn, origin: origin === 'hand' ? 'hand' : 'board' }
       : null;
   }
 
@@ -8000,55 +8894,56 @@ class GameEngine {
   }
 
   /**
-   * ★ AUFTRITT EINES PASSIVEN EFFEKTS, DER SICH AKTIVIERT (v554)
-   *
-   * [Als Regel 21.8.] „Jeder passive Effekt, der sich aktiviert, statt
-   * einfach permanent passiv zu laufen, sollte on-activation so einen
-   * Reveal haben." Gemeint ist die Karte LINKS am Feld.
-   *
-   * Aus einem HOOK heraus gibt es keinen Aktivierungsweg, der das
-   * erledigt — und `announceActiveEffect` schickt den Reveal nur an den
-   * Besitzer, weil der Gegner ihn sonst aus `_firePendingCardReveal`
-   * bekommt (was bei einem passiven Ausloeser nie passiert). Deshalb
-   * hier an den ganzen Raum.
-   *
-   * ★ [Als Regel 21.8.] „Bei AoE-Attacken/mehreren Triggern mit einem
-   * Ausloeser/einer Source einfach nur EINMAL abspielen statt einmal pro
-   * Trigger." Genau dafuer ist `source`: ein Flaechenschlag reicht EIN
-   * Quellobjekt an jeden Treffer weiter (dieselbe Eigenschaft, auf der
-   * die Effekt-Immunitaet beruht), also erkennt der Identitaetsvergleich
-   * die Wiederholung. Ohne `source` greift ein Zeitfenster als
-   * Rueckfall — dieselbe Bauart wie bei `effectSourceGlow`.
-   *
-   * @param {string} cardName  Karte, die sich zeigt
-   * @param {number} ownerIdx  Besitzer (fuer die Log-Zuordnung)
-   * @param {object} [opts]    { source, holdMs, windowMs }
+   * ALIAS (seit v817) fuer `showTriggeredEffect` — die aeltere Bauform
+   * von v554 (Als Regel 21.8.). 21 Kartenskripte rufen sie noch; neue
+   * Karten nehmen `showTriggeredEffect`. Unterschiede zur Vorgabe des
+   * Haupthelfers: Haltezeit 420 ms und Zeitfenster 1500 ms ohne
+   * `source` — beides bleibt hier erhalten, damit sich an den
+   * bestehenden Karten nichts aendert.
    */
   async announceHookActivation(cardName, ownerIdx, opts = {}) {
-    if (!cardName || this._inMctsSim || this._fastMode) return;
-
-    const src = opts.source;
-    const letzte = this._lastHookAnnounce;
-    if (letzte && letzte.card === cardName) {
-      if (src && letzte.src === src) return;               // gleiche Quelle
-      if (!src && (Date.now() - letzte.at) < (opts.windowMs ?? 1500)) return;
-    }
-    this._lastHookAnnounce = { card: cardName, src: src || null, at: Date.now() };
-
-    this._broadcastEvent('card_reveal', {
-      cardName, playerIdx: ownerIdx, sfx: 'ability_activate',
+    return this.showTriggeredEffect(cardName, {
+      playerIdx: ownerIdx,
+      source: opts.source,
+      windowMs: opts.windowMs ?? 1500,
+      delayMs: opts.holdMs ?? 420,
     });
-    await this._delay(opts.holdMs ?? 420);
   }
 
-  async effectSourceGlow(ownerIdx, sourceName) {
+  async effectSourceGlow(ownerIdx, sourceName, opts = {}) {
     if (!sourceName || this._inMctsSim) return;
     const now = Date.now();
     if (this._lastGlowName === sourceName && (now - (this._lastGlowAt || 0)) < 1500) return;
     this._lastGlowName = sourceName;
     this._lastGlowAt = now;
+    // v641 (Als Befund): der Glow findet Karten per NAME — bei einem
+    // BRETT-Effekt (Plant Golem, jede Kreatur mit aktivem Effekt)
+    // leuchtete deshalb auch die Handkopie mit. Der Ursprung der
+    // laufenden Aktivierung (`armEffectAnnounce`) entscheidet jetzt:
+    // 'board' → der Client laesst Handkarten aus.
+    let origin = opts.origin
+      || (this._activationSource?.cardName === sourceName ? this._activationSource.origin : undefined);
+    // v704 (Als Befund 3.9., Cute Hydra): der Glanz gehoert zur INSTANZ,
+    // nicht zum Namen. Liegt genau eine Brett-Instanz dieses Namens auf
+    // der Seite des Besitzers (Support/Held), reisen ihre Koordinaten
+    // mit — der Client leuchtet dann nur diesen Platz an. Ohne Brett-
+    // Instanz bleibt es beim Namen (Zauber aus der Hand), aber Handkopien
+    // des GEGNERS leuchten nie (Client filtert per playerIdx).
+    let inst = opts.inst || null;
+    if (!inst) {
+      const cands = this.cardInstances.filter(c => c.name === sourceName
+        && (c.controller ?? c.owner) === ownerIdx
+        && (c.zone === ZONES.SUPPORT || c.zone === ZONES.HERO) && !c.faceDown);
+      if (cands.length === 1 && origin !== 'hand') inst = cands[0];
+    }
+    if (inst && !origin) origin = 'board';
     try {
-      this._broadcastEvent('effect_source_glow', { playerIdx: ownerIdx, cardName: sourceName });
+      // v658: optionaler Klang (`opts.sfx`) reist mit dem Glow — fuer
+      // Aktivierungen, die keinen eigenen Auftritt haben (Dajan scharf).
+      this._broadcastEvent('effect_source_glow', {
+        playerIdx: ownerIdx, cardName: sourceName, origin, sfx: opts.sfx,
+        zone: inst?.zone, heroIdx: inst?.heroIdx, zoneSlot: inst?.zoneSlot,
+      });
     } catch { /* rein kosmetisch */ }
     await this._delay(EFFECT_GLOW_LEAD_MS);
   }
@@ -8098,6 +8993,40 @@ class GameEngine {
     return besitzer.size === 1 ? [...besitzer][0] : null;
   }
 
+  // ── ABWURF-TAKT ÜBER ALLE DREI HAND-ABWURFWEGE (v696) ─────────────
+  //  Als Befund (Cute Hydra, von der CPU via Monami beschworen): die
+  //  Handkarten flogen ALLE GLEICHZEITIG in die Ablage statt einzeln.
+  //  Ursache: `actionDiscardHandCard` (Klick-Abwurf, von Hydras Schleife
+  //  je Karte gerufen) kannte den Takt nicht — bei menschlicher Wahl
+  //  entsteht der Abstand von allein, die CPU antwortet aber sofort,
+  //  und die Syncs landen beim Client in EINEM React-Batch: der
+  //  Hand-Diff sah die Hand um N schrumpfen und startete N Flüge auf
+  //  einmal. `actionPromptForceDiscard` und `actionDiscardCardsAnimated`
+  //  takten intern (0,5 s je Karte), aber nur zwischen ihren EIGENEN
+  //  Karten.
+  //
+  //  Lösung: eine gemeinsame Zeitmarke (Wanduhr, NICHT im Spielzustand,
+  //  damit Snapshot/Restore sie nicht anfasst). Jeder Hand→Ablage-Abwurf
+  //  stempelt sie; jeder Abwurf wartet vorher, bis seit dem letzten
+  //  mindestens DISCARD_PACE_MS vergangen sind. Damit sind auch GEMISCHTE
+  //  Folgen getaktet (Annoyance Mini: Tutor-Abwurf + Klick-Abwurf,
+  //  Draw-Schleife, Champions Spiegelabwürfe …), ohne dass eine Karte
+  //  selbst takten muss. Ist genug Zeit vergangen (menschlicher Klick,
+  //  eigener Takt des Aufrufers), kostet der Aufruf nichts.
+  //  Sim-sicher: in Fast Mode / MCTS weder warten noch stempeln.
+  async _paceHandDiscard() {
+    if (this._fastMode || this._inMctsSim || this._aborted) return;
+    const since = Date.now() - (this._lastHandDiscardAt || 0);
+    if (since >= DISCARD_PACE_MS) return;
+    this.sync();
+    await this._delay(DISCARD_PACE_MS - since);
+  }
+
+  _stampHandDiscard() {
+    if (this._fastMode || this._inMctsSim) return;
+    this._lastHandDiscardAt = Date.now();
+  }
+
   async actionDiscardCardsAnimated(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
@@ -8109,6 +9038,7 @@ class GameEngine {
     const toDiscard = Math.min(count, ps.hand.length);
     if (toDiscard <= 0) return;
     if (opts.source) await this.effectSourceGlow(opts.sourceOwner ?? playerIdx, opts.source);
+    await this._paceHandDiscard();   // v696: Abstand zum vorigen Hand-Abwurf
     for (let i = 0; i < toDiscard; i++) {
       const cardName = ps.hand.pop();
       const fromHandIdx = ps.hand.length; // Pre-Splice-Index des gepoppten Slots
@@ -8124,6 +9054,7 @@ class GameEngine {
         owner: playerIdx, cardName, from: 'hand', to: 'discard', fromHandIdx,
         ...(pileOwner !== playerIdx ? { fromOwner: playerIdx, toOwner: pileOwner } : {}),
       });
+      this._stampHandDiscard();   // v696
       if (inst) {
         inst.zone = ZONES.DISCARD;
         if (pileOwner !== playerIdx) inst.owner = pileOwner;
@@ -8368,6 +9299,30 @@ class GameEngine {
     bag._damagedOnTurn = turn;
   }
 
+  /**
+   * ★ „Damage dealt this game" (v622, Meteor Crash) — EINE Zaehlstelle.
+   * Summe alles tatsaechlich gefallenen Schadens (> 0), dessen Quelle
+   * dem Spieler gehoert (`source.owner ?? source.controller`) — jeder
+   * Zieltyp, jede Seite, jeder Schadenstyp; Statusschaden zaehlt mit,
+   * sofern die Engine ihm einen Verursacher-Spieler zuschreibt. Wird
+   * NIE zurueckgesetzt und lebt auf `ps.damageDealtThisGame` (Teil des
+   * Spielerzustands → Snapshot/Restore und Puzzle-Serialisierung
+   * laufen automatisch mit). Aufgerufen von allen drei Schadenspfaden
+   * (Helden, True Damage Helden, Kreaturen-Stapel) direkt neben
+   * `_noteDamageTaken`.
+   */
+  _noteDamageDealt(source, amount) {
+    if (!(amount > 0)) return;
+    const pi = source?.owner ?? source?.controller;
+    if (pi !== 0 && pi !== 1) return;
+    const ps = this.gs.players[pi];
+    if (!ps) return;
+    ps.damageDealtThisGame = (ps.damageDealtThisGame || 0) + amount;
+  }
+  /** Gesamtschaden, den der Spieler in diesem Spiel verursacht hat. */
+  damageDealtThisGame(pi) {
+    return this.gs.players[pi]?.damageDealtThisGame || 0;
+  }
   /** Wie viel Schaden hat dieses Ziel in diesem Zug schon genommen? */
   damageTakenThisTurn(bag) {
     if (!bag) return 0;
@@ -8413,14 +9368,22 @@ class GameEngine {
   actionShuffleBackToDeck(playerIdx, cardNames, source) {
     const ps = this.gs.players[playerIdx];
     if (!ps || !cardNames.length) return;
+    const fremdeDecks = new Set();
     for (const cn of cardNames) {
       const idx = ps.hand.indexOf(cn);
       if (idx >= 0) {
         ps.hand.splice(idx, 1);
-        ps.mainDeck.push(cn);
+        // v693: gestohlene Karten (Key, Infiltration, Hunting …) kehren
+        // ins Deck des URSPRUENGLICHEN Besitzers zurueck — wie beim
+        // Mulligan. `_consumeHandCardOrigin` liefert `playerIdx` fuer
+        // eigene Karten.
+        const besitzer = this._consumeHandCardOrigin(playerIdx, cn);
+        (this.gs.players[besitzer] || ps).mainDeck.push(cn);
+        if (besitzer !== playerIdx) fremdeDecks.add(besitzer);
       }
     }
     this.shuffleDeck(playerIdx);
+    for (const b of fremdeDecks) this.shuffleDeck(b);
     this.log('shuffle_back', { player: ps.username, count: cardNames.length, source: source || null });
     this.sync();
   }
@@ -8468,6 +9431,14 @@ class GameEngine {
   async actionDestroyCard(source, targetCard, opts = {}) {
     if (!targetCard) return;
     if (targetCard.counters?.immovable) return; // Cannot be destroyed or removed
+    // v704 (Puppets, Vinny): Effekt-Waechter fuer Zerstoerung.
+    if (targetCard.zone === ZONES.SUPPORT && !opts._skipBoardGuard) {
+      const negatedIds = await this._offerBoardEffectGuard([targetCard], source, 'destroy');
+      if (negatedIds.has(targetCard.id)) {
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'board_guard' });
+        return;
+      }
+    }
     if (targetCard.counters?._cardinalImmune) return; // Cardinal Beast immunity (source-blind)
     // Sparkfly Attendant gift: blocks destroys from the opponent only.
     // Own-side sacrifices etc. still resolve.
@@ -8562,9 +9533,34 @@ class GameEngine {
     //
     // Scoped to board zones with a known slot (support / ability /
     // surprise / permanent). Area destroys are handled by the
-    // standalone `area → discard` emit further down in actionMoveCard;
+    // standalone `area → discard` emit further down in actionMoveCard
     // hand / deck / pile sources don't have a slot rect to fly from.
-    if (!opts.skipPileTransfer) {
+    // ── ANSPRUCHSFENSTER (v683) — auch fuer Zerstoerungen ──────────
+    // Als Vorgabe 1.9.: „Wenn der Hero eine Creature toetet, egal wie,
+    // zaehlt das." Insta-Kills wie Ralzish laufen hier durch und nicht
+    // durch den Schadens-Batch, der sein Fenster bereits hat. Gleiche
+    // Stelle wie dort: die Zerstoerung ist entschieden (alle
+    // Abbruchpfade oben sind durch), der Kadaver aber noch nicht
+    // abgelegt und der Flug dorthin noch nicht gesendet.
+    if (targetCard.zone === ZONES.SUPPORT && !targetCard._deathClaim) {
+      const cdZ = this._getCardDB()[targetCard.name];
+      if (cdZ && hasCardType(cdZ, 'Creature')) {
+        await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
+          creature: {
+            name: targetCard.name, owner: targetCard.owner,
+            originalOwner: targetCard.originalOwner,
+            controller: targetCard.controller ?? targetCard.owner,
+            heroIdx: targetCard.heroIdx, zoneSlot: targetCard.zoneSlot,
+            instId: targetCard.id, turnPlayed: targetCard.turnPlayed,
+          },
+          source, type: 'destroy', _skipReactionCheck: true,
+        });
+        if (targetCard._deathClaim) this._sendDeathClaimHold(targetCard);
+      }
+    }
+    // Beanspruchter Kadaver: kein Flug zum Stapel — er geht gleich
+    // von seiner Zone aus in die Hand oder in die neue Zone.
+    if (!opts.skipPileTransfer && !targetCard._deathClaim) {
       const fromZone = targetCard.zone;
       const isBoardZone = fromZone === ZONES.SUPPORT
         || fromZone === ZONES.ABILITY
@@ -8625,9 +9621,267 @@ class GameEngine {
     });
   }
 
+  /**
+   * Loest einen Kadaver-Anspruch (`_deathClaim`) ein — GEMEINSAM fuer
+   * beide Todespfade: den Schadens-Batch und den Zerstoerungspfad
+   * (`actionDestroyCard` → `actionMoveCard`). Laeuft, nachdem die
+   * sterbende Instanz enttrackt ist. `herkunft` haelt fest, wo die
+   * Creature stand und seit wann (fuer Flug und `turnPlayed`).
+   */
+  /**
+   * Kadaver-Halter (v686): der Client soll die beanspruchte Creature
+   * an ihrem Slot WEITERZEIGEN, obwohl sie im Zustand gleich gesplict
+   * wird — bis ihr Flug beginnt. Gesendet im Anspruchsfenster, also
+   * solange der Slot noch gerendert ist; geloest im Client beim
+   * Flugstart (play_card_transfer / play_pile_transfer). Ohne ihn war
+   * die Creature waehrend der Todes-Effekte (Heragas' Draw) unsichtbar
+   * (Als Befund 1.9.).
+   */
+  _sendDeathClaimHold(inst) {
+    this._broadcastEvent('death_claim_hold', {
+      owner: inst.controller ?? inst.owner,
+      heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, cardName: inst.name,
+    });
+  }
+
+  async _redeemDeathClaim(claim, herkunft) {
+    if (!claim) return;
+    {
+      const zuPs = this.gs.players[claim.owner];
+      if (zuPs && claim.to === 'hand') {
+        const zielIdx = zuPs.hand.length;   // Platz, auf dem sie landet
+        zuPs.hand.push(claim.name);
+        // Herkunft (v693): gehoert weiter dem urspruenglichen Besitzer.
+        this._tagHandCardOrigin(claim.owner, claim.name, herkunft.originalOwner ?? herkunft.owner);
+        // Flug von der STERBEZONE in die Hand — nicht aus einem
+        // Ablagestapel (Als Befund 31.8.: die Karte flog vom
+        // EIGENEN Discard statt vom gegnerischen).
+        //
+        // `toHandIdx` + `finalHandSize` sind das, was den Flug auf
+        // den RICHTIGEN Handplatz zielen laesst. Ohne sie faellt
+        // der Client auf die Mitte des Handbereichs zurueck (Als
+        // Befund 31.8.) und blendet die landende Karte auch nicht
+        // aus, bis der Flug ankommt.
+        this._broadcastEvent('play_pile_transfer', {
+          cardName: claim.name, from: 'support', to: 'hand',
+          fromOwner: herkunft.owner, toOwner: claim.owner,
+          fromHeroIdx: herkunft.heroIdx,
+          fromSlotIdx: herkunft.zoneSlot,
+          toHandIdx: zielIdx, finalHandSize: zuPs.hand.length,
+        });
+        this.log('death_claim_to_hand', {
+          card: claim.name, by: claim.by, player: zuPs.username,
+        });
+        this.sync();
+        await this._delay(320);
+      } else if (zuPs && claim.to === 'support') {
+        // KEINE BESCHWOERUNG — reine Bewegung (Als Ruling 31.8.).
+        // Deshalb kein `summonCreatureWithHooks`: das setzt
+        // `turnPlayed` auf den aktuellen Zug (→ Summoning Sickness)
+        // und feuert on-summon-Reiter. Stattdessen eine Instanz von
+        // Hand, die `turnPlayed` der alten UEBERNIMMT — damit ist
+        // die Creature weder krank noch faelschlich „frisch" fuer
+        // Alice/Hive's Crown/Singing-Filter.
+        const slots = zuPs.supportZones?.[claim.heroIdx];
+        if (slots && (slots[claim.zoneSlot] || []).length === 0) {
+          // Sichtbare Wanderung von der alten in die neue Zone —
+          // derselbe Flug, den `actionTransferCreature` fuer Dark
+          // Gear spielt. Ohne ihn erscheint die Creature einfach
+          // am Ziel (Als Befund 31.8.: „teleportiert sich").
+          // VOR dem Eintrag ins Board-Array gesendet, damit die
+          // Quellzone beim Abflug noch gerendert ist, und
+          // abgewartet, damit der Flug ankommt, bevor die Karte
+          // am Ziel auftaucht.
+          // Zwei Zeiten, EINMAL hier festgelegt und an beide
+          // Animationen gegeben: `fangMs` ist der Vorlauf, in dem
+          // die Begleitanimation das Ziel packt, `flugMs` die
+          // Wanderung. Der Kartenflug startet erst NACH dem
+          // Vorlauf und dauert genau `flugMs` — laufen die Werte
+          // auseinander, laeuft auch das Begleitbild von der Karte
+          // weg (Als Befund 31.8.: Netz und Creature waren
+          // unterschiedlich schnell).
+          const fangMs = 420;
+          const flugMs = 800;
+          // Begleitanimation der beanspruchenden Karte (Huntings
+          // Netz). Sie gehoert GENAU hierher — im Anspruchsfenster
+          // gesendet liefe sie lange vor dem Kartenflug, weil
+          // dazwischen der ganze Todeszweig steckt.
+          if (claim.redeemEvent?.type) {
+            this._broadcastEvent(claim.redeemEvent.type, {
+              ...(claim.redeemEvent.data || {}),
+              catchMs: fangMs, flyMs: flugMs,
+            });
+            await this._delay(fangMs);
+          }
+          this._broadcastEvent('play_card_transfer', {
+            sourceOwner: herkunft.owner,
+            sourceHeroIdx: herkunft.heroIdx,
+            sourceZoneSlot: herkunft.zoneSlot,
+            targetOwner: claim.owner,
+            targetHeroIdx: claim.heroIdx,
+            targetZoneSlot: claim.zoneSlot,
+            cardName: claim.name, duration: flugMs,
+          });
+          await this._delay(flugMs + 100);
+          slots[claim.zoneSlot] = [claim.name];
+          const neu = this._trackCard(claim.name, claim.owner, ZONES.SUPPORT,
+            claim.heroIdx, claim.zoneSlot);
+          if (neu) {
+            neu.zoneSlot = claim.zoneSlot;
+            neu.turnPlayed = herkunft.turnPlayed || 0;
+            if (claim.keepOriginalOwner != null) {
+              neu.originalOwner = claim.keepOriginalOwner;
+            }
+            // „Fully heal its HP" — frische Instanz auf gedruckte HP.
+            const cd = this.getEffectiveCardData(neu) || this._getCardDB()[claim.name];
+            if (!neu.counters) neu.counters = {};
+            if (cd?.hp != null) neu.counters.currentHp = cd.hp;
+            if (claim.negate) {
+              await this.actionNegateCreature(neu, claim.by || null, {
+                expiresAtTurn: this.gs.turn + 1,
+                expiresForPlayer: claim.owner === 0 ? 1 : 0,
+                selfInflicted: true,
+              });
+            }
+          }
+          this.log('death_claim_moved', {
+            card: claim.name, by: claim.by,
+            player: zuPs.username, negated: !!claim.negate,
+          });
+          this.sync();
+          await this._delay(320);
+          // ── Eintritts-Fenster (v699, Aquatic Arrows): die Uebernahme
+          // ist per Als Ruling reine BEWEGUNG ohne on-summon-Hooks —
+          // aber auch eine Bewegung BETRITT die Support Zone. Kein
+          // onCardEnterZone hier (das wuerde on-enter-Reiter wecken,
+          // die die Bewegungs-Semantik gerade ausschliesst), nur das
+          // eine Fenster direkt.
+          if (neu) {
+            await this._checkSurpriseOnCreatureEnterSupport(neu, { isMove: true });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * ★ FENSTER „vom Brett per Effekt in die Ablage geschickt" (v697,
+   * Aquatic-Serie). Feuert, NACHDEM eine Karte durch einen EFFEKT von
+   * einer Brettzone (support / surprise / ability / area) in einen
+   * Discard Pile gewandert ist — also fuer The Yeeting, Mizunes Opfer
+   * und jede kuenftige Entfernung. Ausdruecklich NICHT dabei:
+   *   • die normale Ablage einer Surprise am Ende ihrer EIGENEN
+   *     Aufloesung (_activateSurprise legt direkt ab, kein Effekt
+   *     „schickt" sie),
+   *   • Schadenstode von Creatures (der Batch legt selbst ab — ein Tod
+   *     durch Schaden ist kein „sent by an effect"),
+   *   • Abwuerfe aus der Hand (nicht „from the board").
+   * Die Karte selbst reagiert: ihr Skript exportiert
+   * `onBoardSentToDiscard(ctx)` und bekommt Herkunftszone, Held und
+   * Verursacher. Tiefenriegel gegen Endlosketten (Aquatic Arrows
+   * zerstoert eine Karte, die wieder eine Aquatic ist, …) — bewusst
+   * grosszuegig, Ketten sind Design, nur Endlosschleifen nicht.
+   */
+  async _fireBoardSentToDiscard({ cardName, ownerIdx, fromZone, fromHeroIdx, zoneSlot, source, sourceOwner }) {
+    if (this._aborted) return;
+    // v730: Ging eine SURPRISE per Effekt ab, oeffnet das zusaetzlich
+    // das Fenster fuer Karten, die auf genau das reagieren (Water
+    // Golem). Laeuft VOR dem Eigen-Hook der abgelegten Karte und
+    // unabhaengig davon, ob diese ueberhaupt einen hat.
+    if (fromZone === ZONES.SURPRISE) {
+      try {
+        await this._checkSurpriseOnSurpriseDiscarded({
+          zoneOwner: ownerIdx, fromHeroIdx, zoneSlot,
+          cardName, source: source || null,
+          sourceOwner: (typeof sourceOwner === 'number') ? sourceOwner : null,
+        });
+      } catch (err) {
+        console.error('[surprise-discard window]', err.message);
+      }
+    }
+    const script = loadCardEffect(cardName);
+    if (!script?.onBoardSentToDiscard) return;
+    this._boardDiscardDepth = (this._boardDiscardDepth || 0) + 1;
+    try {
+      if (this._boardDiscardDepth > 6) {
+        this.log('board_sent_to_discard_depth_cap', { card: cardName });
+        return;
+      }
+      await script.onBoardSentToDiscard({
+        _engine: this,
+        cardOwner: ownerIdx,
+        cardName,
+        fromZone, fromHeroIdx, zoneSlot,
+        source: source || null,
+        sourceOwner: (typeof sourceOwner === 'number') ? sourceOwner : null,
+      });
+    } finally {
+      this._boardDiscardDepth -= 1;
+    }
+  }
+
+  /**
+   * ★ EINMAL-SCHADENSSCHILD (v697, Aquatic Shield): „reduce the next
+   * damage <target> would take … by 100". Engine-generisch, damit
+   * kuenftige Karten dieselbe Mechanik nutzen: Schilde liegen als Liste
+   * auf dem Ziel (`hero._oneShotDmgShields` bzw.
+   * `inst.counters._oneShotDmgShields`), werden beim NAECHSTEN
+   * Schadensereignis > 0 KOMPLETT verbraucht (mehrere Schilde addieren
+   * sich auf dasselbe Ereignis — jedes verspricht „the next damage")
+   * und verfallen unverbraucht zu Beginn des Zuges ihres Besitzers
+   * (`ownerIdx`). PUNKT VOR STRICH: der Abzug ist flat und greift NACH
+   * der Multiplikator-Verrechnung. `cannotBeReduced` (Tempeste, Ida)
+   * laesst Schilde wirkungslos UND unverbraucht — sie konnten nichts
+   * abfangen. Sichtbar per bestehender `shield_block`-Animation.
+   */
+  _grantOneShotDamageShield(kind, holder, amount, sourceName, ownerIdx) {
+    if (!holder || !(amount > 0)) return;
+    const eintrag = { amount, source: sourceName || null, ownerIdx };
+    if (kind === 'hero') {
+      if (!holder._oneShotDmgShields) holder._oneShotDmgShields = [];
+      holder._oneShotDmgShields.push(eintrag);
+    } else {
+      if (!holder.counters) holder.counters = {};
+      if (!holder.counters._oneShotDmgShields) holder.counters._oneShotDmgShields = [];
+      holder.counters._oneShotDmgShields.push(eintrag);
+    }
+  }
+
+  /** Verbraucht alle Einmal-Schilde des Ziels gegen `amount`; gibt den
+   *  reduzierten Betrag zurueck. Broadcast + Log uebernimmt der Helfer. */
+  _consumeOneShotDamageShields(list, amount, anim) {
+    if (!Array.isArray(list) || list.length === 0 || !(amount > 0)) return amount;
+    let summe = 0;
+    for (const sch of list) summe += sch.amount || 0;
+    list.length = 0;
+    if (summe <= 0) return amount;
+    const reduziert = Math.max(0, amount - summe);
+    this.log('one_shot_shield', { absorbed: amount - reduziert, remaining: reduziert });
+    if (anim) this._broadcastEvent('play_zone_animation', anim);
+    return reduziert;
+  }
+
   async actionMoveCard(cardInstance, toZone, toHeroIdx, toSlot, opts = {}) {
     // Immovable cards cannot leave their zone
     if (cardInstance.counters?.immovable && toZone !== cardInstance.zone) return;
+    // v704 (Puppets): „Cannot be moved to a different Support Zone" —
+    // Skript-Flag `cannotChangeSupportZone`; Zerstoerung/Ablage bleibt
+    // moeglich (anders als `immovable`). Der Puppet-Tausch selbst laeuft
+    // nicht ueber actionMoveCard.
+    if (cardInstance.zone === ZONES.SUPPORT && toZone === ZONES.SUPPORT
+        && (toHeroIdx !== cardInstance.heroIdx || toSlot !== cardInstance.zoneSlot
+            || (opts.newOwner != null && opts.newOwner !== (cardInstance.controller ?? cardInstance.owner)))
+        && loadCardEffect(cardInstance.name)?.cannotChangeSupportZone) {
+      this.log('move_blocked', { card: cardInstance.name, reason: 'cannot_change_support_zone' });
+      return;
+    }
+    // v704 (Puppets): Zielspalte mit gesperrten Support Zones.
+    if (toZone === ZONES.SUPPORT && !(cardInstance.zone === ZONES.SUPPORT && toHeroIdx === cardInstance.heroIdx)
+        && this.isSupportZoneLocked(opts.newOwner ?? (cardInstance.controller ?? cardInstance.owner), toHeroIdx,
+                                    { source: opts.source, cardName: cardInstance.name, via: 'move' })) {
+      this.log('move_blocked', { card: cardInstance.name, reason: 'support_zones_locked', toHeroIdx });
+      return;
+    }
     if (cardInstance.counters?._cardinalImmune && toZone !== cardInstance.zone) return; // Cardinal Beast immunity
     // `_oppEffectImmune` (Sparkfly Attendant gift) is source-AWARE and
     // therefore checked at call sites that pass source — actionDestroyCard,
@@ -8636,6 +9890,20 @@ class GameEngine {
     // can't distinguish own-side bounces (which must pass through) from
     // opp displaces here; the immunity is lenient at this site.
     const fromZone = cardInstance.zone;
+    // v626: Discard-out-Sperre (Staebe, The Eye of Ren) — auch fuer
+    // generische Bewegungen aus dem eigenen Discard (nach Deleted, Deck,
+    // Brett …). `opts.mandatory` fuer Pflichteffekte (Freikauf mit allem
+    // vorhandenen Gold), `opts._bypassDiscardLock` fuer Engine-Wege.
+    if (fromZone === ZONES.DISCARD && cardInstance
+        && !(await this._discardOutAllowed(cardInstance.owner, opts))) {
+      this.log('discard_out_blocked', { card: cardInstance.name, to: toZone, reason: 'discard_locked' });
+      return;
+    }
+    if (fromZone === ZONES.DECK && cardInstance
+        && !this.pileOutAllowed(cardInstance.owner, 'deck', opts)) {   // v818
+      this.log('pile_out_blocked', { card: cardInstance.name, to: toZone, pile: 'deck' });
+      return;
+    }
     const fromHeroIdx = cardInstance.heroIdx;
 
     // Defending the Gate: protect support zone cards
@@ -8735,7 +10003,11 @@ class GameEngine {
 
     // Cards can set _returnToHand = true in onCardLeaveZone to redirect
     // a discard/delete into a return-to-hand (e.g. The White Eye).
-    if (cardInstance._returnToHand && toZone === ZONES.DISCARD) {
+    // v759: Die Umleitung galt bisher nur fuer die Ablage. Karten, die
+    // „would be moved from the board to ANYWHERE EXCEPT your hand"
+    // abfangen (Spirit of the Shattered Trident), brauchen sie fuer
+    // jedes Ziel — Deleted Pile, Deck, Ablage.
+    if (cardInstance._returnToHand && toZone !== ZONES.HAND) {
       delete cardInstance._returnToHand;
       toZone    = ZONES.HAND;
       toHeroIdx = -1;
@@ -8760,7 +10032,7 @@ class GameEngine {
     // ── selfDeleteOnExternalDiscard redirect ──
     // Cards (Rebelliokai Creatures, etc.) that self-delete when sent
     // to discard from anywhere except the hand or the board. Only
-    // "external" sources (deck / discard / deleted / potion) qualify;
+    // "external" sources (deck / discard / deleted / potion) qualify
     // hand and any board zone (support / ability / area / surprise /
     // hero / permanent) route to discard normally.
     //
@@ -8963,6 +10235,22 @@ class GameEngine {
         source: opts.deathSource || null,
         _skipReactionCheck: true,
       });
+      // Beanspruchter Kadaver (v683): NICHT ablegen. Die Creature war
+      // fuer jeden on-death-Effekt regulaer tot; jetzt wird der
+      // Anspruch eingeloest — derselbe Weg wie im Schadens-Batch.
+      if (cardInstance._deathClaim) {
+        const claim = cardInstance._deathClaim;
+        const herkunft = {
+          owner: cardInstance.controller ?? cardInstance.owner,
+          heroIdx: fromHeroIdx, zoneSlot: cardInstance.zoneSlot,
+          turnPlayed: cardInstance.turnPlayed,
+          originalOwner: cardInstance.originalOwner,
+        };
+        this._untrackCard(cardInstance.id);
+        await this._redeemDeathClaim(claim, herkunft);
+        if (fromZone === ZONES.SUPPORT) await this._checkIdentityAnchors();
+        return;
+      }
     }
 
     // Update instance
@@ -8981,6 +10269,23 @@ class GameEngine {
     // Spielstaende und Mitschnitte lesbar bleiben.
     await this.runHooks(HOOKS.ON_CARD_ENTER_ZONE, { card: cardInstance, toZone, toHeroIdx });
 
+    // ── „Vom Brett per Effekt in die Ablage" (v697) ─────────────────
+    // Jede Bewegung durch actionMoveCard IST effektgetrieben (Destroys,
+    // Bounces, Verschiebungen); Schadenstode laufen nicht hier durch.
+    if (toZone === ZONES.DISCARD
+        && (fromZone === ZONES.SUPPORT || fromZone === ZONES.SURPRISE
+            || fromZone === ZONES.ABILITY || fromZone === ZONES.AREA)) {
+      const _src = opts.deathSource?.name || (typeof opts.source === 'string' ? opts.source : opts.source?.name) || opts.sourceName || null;
+      const _srcOwner = (typeof opts.sourceOwner === 'number') ? opts.sourceOwner
+        : (typeof opts.source === 'object' && opts.source ? (opts.source.controller ?? opts.source.owner) : undefined);
+      await this._fireBoardSentToDiscard({
+        cardName: cardInstance.name,
+        ownerIdx: cardInstance.controller ?? cardInstance.owner,
+        fromZone, fromHeroIdx, zoneSlot: cardInstance.zoneSlot,
+        source: _src, sourceOwner: _srcOwner,
+      });
+    }
+
     // Reactive hand-limit enforcement: if a card that was contributing to the
     // owner's hand-size cap leaves the support zone (most notably Royal Corgi's
     // -3 bonus via Goldify / The Yeeting / any destroy or bounce), the owner
@@ -8990,6 +10295,69 @@ class GameEngine {
     if (fromZone === ZONES.SUPPORT && (cardInstance.counters?.handLimitReduction || 0) !== 0) {
       await this._checkReactiveHandLimits(cardInstance.owner);
     }
+
+    // ── VERANKERTE IDENTITAETEN ────────────────────────────────────
+    // Verlaesst eine Karte das Brett, an der die Identitaet eines
+    // anderen Traegers haengt, faellt diese Identitaet mit. Siehe
+    // `_checkIdentityAnchors`.
+    if (fromZone === ZONES.SUPPORT) await this._checkIdentityAnchors();
+  }
+
+  /**
+   * ★ IDENTITAET AN EINEN TRAEGER GEBUNDEN (Als Vorgabe 28.8.).
+   *
+   * „???, the Shapeshifter" haelt seine Gestalt nur, solange der
+   * angelegte Held auf dem Brett liegt: „Seine neue Identitaet ist an
+   * seinen equippten Hero gebunden." Wird der entfernt — Fire Bomb,
+   * Bounce, was auch immer —, verwandelt er sich sofort zurueck, nicht
+   * erst am Ende der Gegnerrunde.
+   *
+   * Warum als Engine-Pruefung und nicht als Hook der Karte: dieselbe
+   * Begruendung wie beim Zugende-Sweep. Der Traeger heisst waehrend der
+   * Verwandlung wie die GELIEHENE Karte, ein eigener `onCardLeaveZone`
+   * waere also nie erreicht. Und die angelegte Karte selbst traegt
+   * `_suppressEquipHooks` — sie ist ausdruecklich keine Effektquelle.
+   *
+   * Die Pruefung ist billig: sie laeuft nur, wenn ueberhaupt eine
+   * verankerte Identitaet existiert, und das ist fast nie der Fall.
+   */
+  async _checkIdentityAnchors() {
+    const verankert = this.cardInstances.filter(c => c?.counters?._identityAnchorInst);
+    if (verankert.length === 0) return;
+    // Die Ruecknahme legt ihrerseits Karten ab und laeuft damit erneut
+    // durch `actionMoveCard`. Die Karte raeumt ihren Anker zwar als
+    // ERSTES ab (dann findet der zweite Durchlauf nichts mehr), aber
+    // darauf will ich mich nicht verlassen: ein Riegel kostet nichts,
+    // eine Endlosrekursion den Zug.
+    if (this._inIdentityAnchorCheck) return;
+    this._inIdentityAnchorCheck = true;
+    try {
+    for (const traeger of verankert) {
+      const ankerId = traeger.counters._identityAnchorInst;
+      const anker = this.cardInstances.find(c => c.id === ankerId && c.zone === ZONES.SUPPORT);
+      if (anker) continue;   // Traeger liegt noch, Identitaet haelt
+      const eigenes = loadCardEffect(traeger.counters._identityCleanupCard || traeger.name);
+      if (typeof eigenes?.onIdentityExpire === 'function') {
+        try {
+          await eigenes.onIdentityExpire(this._createContext(traeger, { event: 'identityAnchorLost' }));
+        } catch (err) {
+          console.error(`[Engine] onIdentityExpire (Anker) ${traeger.name}:`, err.message);
+        }
+      }
+      // In JEDEM Fall abraeumen — eine haengengebliebene Identitaet
+      // waere der schlimmere Zustand (gleiche Haltung wie im Sweep).
+      if (traeger.counters) {
+        delete traeger.counters._effectOverride;
+        delete traeger.counters._cardDataOverride;
+        delete traeger.counters._identityExpiresTurn;
+        delete traeger.counters._identityCleanupCard;
+        delete traeger.counters._identityAnchorInst;
+      }
+    }
+    } finally {
+      this._inIdentityAnchorCheck = false;
+    }
+    this.sync();
   }
 
   async actionDiscardCards(playerIdx, count, opts = {}) {
@@ -9026,6 +10394,16 @@ class GameEngine {
    * @param {object} [opts]
    * @param {string} [opts.source] Effect name driving the discard (logged).
    * @param {boolean} [opts.skipReactionCheck=true]
+   * @param {string}  [opts.flightStyle] Client-Flugstil des Hand→Ablage-
+   *   Flugs (Champion: 'windstorm'); ohne Angabe Standardflug.
+   * @param {boolean} [opts._noFlight] Der AUFRUFER sendet den Flug-
+   *   Broadcast selbst (Draw: beide Flüge auf EINEM Takt, vor beiden
+   *   Splices). Sonst sendet der Helfer ihn hier — eine Karte darf nie
+   *   zweimal fliegen.
+   * @param {boolean} [opts._noPace] Kein Abwurf-Takt vor dieser Karte —
+   *   nur für Aufrufer mit eigener, bewusst abweichender Zeitführung
+   *   (Champions Windsturm-Kaskade, Draws Gleichschritt). Gestempelt
+   *   wird trotzdem, damit der NÄCHSTE Abwurf Abstand hält.
    */
   async actionDiscardHandCard(playerIdx, cardName, handIdx, opts = {}) {
     // Als Kosmetik-Ruling: auch Einzel-Abwürfe mit Effekt-Quelle
@@ -9048,6 +10426,14 @@ class GameEngine {
       return false;
     }
 
+    // Abwurf-Takt (v696): folgt dieser Abwurf zu dicht auf den vorigen
+    // (CPU-Klickschleifen wie Cute Hydra), erst den Abstand herstellen.
+    // Nach dem Warten kann sich die Hand nicht verändert haben — der
+    // rufende Ablauf hält den Zug, solange wir hier stehen. Der Index
+    // wird ohnehin erst danach gegen den Namen geprüft.
+    if (!opts._noPace) await this._paceHandDiscard();
+    // Nach dem Reaktionsfenster kann die Hand geschrumpft sein — Index
+    // erst jetzt auflösen (wie zuvor).
     let idx = handIdx;
     if (idx == null || idx < 0 || idx >= ps.hand.length || ps.hand[idx] !== cardName) {
       idx = ps.hand.indexOf(cardName);
@@ -9063,11 +10449,21 @@ class GameEngine {
     const pileOwner = this._handCardPileOwner(playerIdx, cardName);
     const pilePs = this.gs.players[pileOwner] || ps;
     pilePs.discardPile.push(cardName);
-    if (pileOwner !== playerIdx) {
+    // Expliziter Per-Karte-Flug vom exakten Hand-Slot (v696, gleiches
+    // Muster wie actionPromptForceDiscard / actionDiscardCardsAnimated):
+    // Broadcast VOR dem sync, damit der Client das Slot-Rect fängt,
+    // solange React den Slot noch hält. Bis v695 hing dieser Weg allein
+    // am Hand-Diff des Clients, der beim CPU-Burst alle Flüge in einen
+    // Render packte. Gestohlene Karten fliegen weiter zur fremden Ablage.
+    if (!opts._noFlight) {
       this._broadcastEvent('play_pile_transfer', {
-        cardName, from: 'hand', to: 'discard',
-        fromOwner: playerIdx, toOwner: pileOwner, fromHandIdx: idx,
+        owner: playerIdx, cardName, from: 'hand', to: 'discard', fromHandIdx: idx,
+        flightStyle: opts.flightStyle,
+        ...(pileOwner !== playerIdx ? { fromOwner: playerIdx, toOwner: pileOwner } : {}),
       });
+    }
+    this._stampHandDiscard();
+    if (pileOwner !== playerIdx) {
       this.log('stolen_card_returned', {
         card: cardName, from: ps.username,
         to: this.gs.players[pileOwner]?.username, via: 'discard',
@@ -9090,6 +10486,13 @@ class GameEngine {
         (this.gs._batchDiscardCountByPlayer[playerIdx] || 0) + 1;
     }
     this.log('discard', { player: ps.username, card: cardName, source: opts.source || null });
+    // Zustand sofort hinausgeben (v696): der Flug-Broadcast oben liegt
+    // beim Client 700 ms lang als Vormerkung bereit; kommt der nächste
+    // sync erst nach einem längeren Reaktor (on-discard-Prompt ohne
+    // eigenen sync), würde der Hand-Diff den Abwurf ein zweites Mal
+    // animieren. Der Splice und der Stapel-Push sind bereits verbucht,
+    // der sync zeigt also nichts Vorläufiges.
+    this.sync();
     const discardCtx = {
       playerIdx, card: inst, cardName, discardedCardName: cardName,
       // Propagate the calling effect's source tag so listeners can
@@ -9148,6 +10551,23 @@ class GameEngine {
   async actionMillCards(playerIdx, count, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps || !ps.mainDeck || ps.mainDeck.length === 0) return [];
+    if (!this.pileOutAllowed(playerIdx, 'deck', opts)) {       // v818: auch Self-Mill (Als Ruling)
+      this.log('pile_out_blocked', { player: ps.username, pile: 'deck', reason: 'mill' });
+      return [];
+    }
+    // ── Mill-Spur (v610) ────────────────────────────────────────────
+    // Jeder ECHTE Mill (keine Simulation) hinterlaesst eine Konsolenzeile
+    // mit Quelle, Menge, Modus und den obersten Aufrufer-Frames. Anlass:
+    // Salute to the Fallen loeste im Livespiel ein zweites, reveal-loses
+    // Mill von 5 aus, das aus dem Code nicht herleitbar war. Bleibt
+    // drin — ein Mill ist selten genug, dass die Zeile nie stoert.
+    if (!this._fastMode && !this._inMctsSim) {
+      const frames = String(new Error().stack || '').split('\n').slice(2, 6)
+        .map(l => l.trim().replace(/^at /, '')).join(' ← ');
+      console.log(`[mill-trace] p${playerIdx} count=${count} source=${opts.source || '-'} `
+        + `reveal=${!!opts.centerReveal} delete=${!!opts.deleteMode} target=${opts.targetCardName || (opts.targetCardNames || []).join('|') || '-'} `
+        + `deck=${ps.mainDeck.length} turn=${this.gs.turn} phase=${this.gs.currentPhase} | ${frames}`);
+    }
 
     // First-turn protection: cannot be milled by opponent effects on turn 1
     if (!opts.selfInflicted && this.gs.firstTurnProtectedPlayer === playerIdx) {
@@ -9169,23 +10589,19 @@ class GameEngine {
     // gate when destination is the deletedPile. For normal mills the
     // gate is a cheap script-lookup miss and we fall through to the
     // ordinary push.
-    const pushOrRescue = async (cardName) => {
-      // selfDeleteOnExternalDiscard redirect: a deck → discard mill is
-      // an external-source discard. Cards that opt in (Rebelliokai
-      // Creatures) genuinely transit through the discard pile —
-      // appearing in it briefly when the deck→discard animation
-      // lands, then vanishing as they fly to the deleted pile. The
-      // pile-state transitions for those cards are owned end-to-end
-      // by `_scheduleSelfDeleteTransit` (Phase A pushes to
-      // discardPile, Phase B splices, Phase C pushes to deletedPile)
-      // — so we DO NOT push them to discardPile here, otherwise the
-      // pile UI updates immediately at sync-time and the card "pops"
-      // into the discard pile while the deck→discard flying animation
-      // is still in mid-air.
-      //
-      // Mills that ALREADY head to the deleted pile (`opts.deleteMode`)
-      // skip the redirect path — they animate straight to deleted as
-      // before.
+    // v611: in zwei Schritte geteilt, damit der Mitten-Auftritt
+    // (`centerReveal`) die Karte ERST NACH ihrem Flug landen lassen
+    // kann (Als Wunsch 29.8.: „am Ende jeder Animation ist die Karte
+    // vom Deck weg und liegt oben auf dem Discard").
+    //   klassifiziere(name) → { redirected, rescued } — entscheidet die
+    //     selfDeleteOnExternalDiscard-Umleitung (Rebelliokai-Kreaturen
+    //     wandern vom Deck durch den Discard in den Deleted-Stapel) und
+    //     oeffnet das Rettungsfenster (`_tryBeforeDelete`) fuer Ziele im
+    //     Deleted-Stapel — VOR dem Flug, damit Gerettetes nicht fliegt.
+    //   lande(name, redirected) — der eigentliche Stapel-Push.
+    //   pushOrRescue — beides hintereinander (Ziel-Mills, Flug ohne
+    //     Mitten-Auftritt).
+    const klassifiziere = async (cardName) => {
       let wasRedirected = false;
       if (!opts.deleteMode) {
         const _selfDelScript = loadCardEffect(cardName);
@@ -9193,34 +10609,28 @@ class GameEngine {
           wasRedirected = true;
         }
       }
-
-      // Delete-rescue gate: cards heading to the deleted pile (either
-      // because `opts.deleteMode` is set, OR the
-      // selfDeleteOnExternalDiscard rule is going to redirect them
-      // there shortly) get a chance to claim a beforeDelete rescue.
-      // For redirected cards we run the gate UPFRONT so a rescue
-      // suppresses the entire transit (no animation, no pile pushes).
       if (opts.deleteMode || wasRedirected) {
         const rescued = await this._tryBeforeDelete(cardName, playerIdx, {
           fromZone: ZONES.DECK,
           fromInstance: null,
           source: opts.source || 'mill',
         });
-        if (rescued) return false; // rescue claimed it — no push
+        if (rescued) return { redirected: wasRedirected, rescued: true };
       }
-
-      // Destination push:
-      //  - opts.deleteMode  → straight to deletedPile (no transit)
-      //  - wasRedirected    → DEFER all pushes to the transit helper
-      //                       (Phase A pushes to discardPile only when
-      //                       the deck→discard animation lands)
-      //  - default          → discardPile (normal mill)
-      if (wasRedirected) {
+      return { redirected: wasRedirected, rescued: false };
+    };
+    const lande = (cardName, redirected) => {
+      if (redirected) {
         redirectedToDeleted.push(cardName);
       } else {
         const pile = opts.deleteMode ? 'deletedPile' : 'discardPile';
         ps[pile].push(cardName);
       }
+    };
+    const pushOrRescue = async (cardName) => {
+      const k = await klassifiziere(cardName);
+      if (k.rescued) return false; // rescue claimed it — no push
+      lande(cardName, k.redirected);
       return true;
     };
 
@@ -9246,6 +10656,35 @@ class GameEngine {
           milledCards.push(targetName);
         }
       }
+    } else if (opts.centerReveal) {
+      // ── Mitten-Auftritt, Karte fuer Karte (v611) ─────────────────
+      // Reihenfolge je Karte: vom Deck nehmen → Rettungsfenster →
+      // Auftritt (Deck → Mitte → Stapel) → NACH dem Flug auf den
+      // Stapel legen → sync. So sinkt der Deckzaehler mit jedem
+      // gelandeten Blatt um eins und die gerade bewegte Karte liegt
+      // oben auf dem Discard — statt „alle fuenf auf einmal am Ende".
+      // Umgeleitete (Self-Delete-)Karten bekommen ihren eigenen Flug
+      // unten wie bisher.
+      const revealMs = opts.centerRevealMs || MILL_CENTER_REVEAL_MS;
+      for (let i = 0; i < toMill; i++) {
+        const cardName = ps.mainDeck.shift();
+        if (!cardName) break;
+        if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
+        const k = await klassifiziere(cardName);
+        if (k.rescued) continue;
+        milledCards.push(cardName);
+        if (k.redirected) { lande(cardName, true); continue; }
+        this._broadcastEvent('mill_center_reveal', {
+          owner:      playerIdx,
+          cardNames:  [cardName],
+          deleteMode: !!opts.deleteMode,
+          revealMs,
+        });
+        await this._delay(revealMs);
+        lande(cardName, false);
+        this.sync();
+      }
+      await this._delay(150);
     } else {
       // Normal mill: take from the top of the deck
       for (let i = 0; i < toMill; i++) {
@@ -9333,7 +10772,12 @@ class GameEngine {
       ? milledCards.filter(c => !redirectedSet.has(c))
       : milledCards;
 
-    if (nonRedirectedMilled.length > 0) {
+    // v611: beim Top-Mill mit Mitten-Auftritt ist jede Karte schon in
+    // der Schleife oben geflogen und gelandet; nur Ziel-Mills
+    // (targetCardName/s) nutzen noch den gesammelten Auftritt hier.
+    const _topMillRevealedPerCard = !!opts.centerReveal
+      && !opts.targetCardName && !(Array.isArray(opts.targetCardNames) && opts.targetCardNames.length > 0);
+    if (nonRedirectedMilled.length > 0 && !_topMillRevealedPerCard) {
       if (opts.centerReveal) {
         // Sequential centre reveal (opt-in via `opts.centerReveal` —
         // Cute Cat's self-mill). ONE broadcast carries all cards; the
@@ -9431,10 +10875,31 @@ class GameEngine {
    * @param {number} zoneSlot - Desired zone slot
    * @returns {{ inst: CardInstance, actualSlot: number } | null}
    */
-  safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot) {
+  safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return null;
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
+
+    // ── VERDECKTE KARTE UEBERBAUEN (v776, „Monster Nest") ────────────
+    // Der Name einer verdeckten Karte bleibt im Platz stehen, damit der
+    // Platz aus Spielersicht nie leer wird (Als Vorgabe 5.9.). Fuer die
+    // Platzierung heisst das: der Platz sieht belegt aus, ist es aber
+    // nur von einer Karte, die logisch gar nicht auf dem Brett steht.
+    //
+    // AUSDRUECKLICH opt-in ueber `opts.coverNested` — ein beliebiger
+    // fremder Beschwoerungseffekt darf hier NICHT hineinrutschen. Die
+    // neue Karte wird per `unshift` VORNE eingefuegt: `slot[0]` ist und
+    // bleibt die Karte, die den Platz definiert, und jeder der rund 131
+    // `slot[0]`-Leser liest weiterhin die richtige.
+    let coverHere = false;
+    if (opts.coverNested && zoneSlot >= 0) {
+      const drin = ps.supportZones[heroIdx][zoneSlot] || [];
+      const nurVerdeckt = drin.length > 0 && drin.every(n =>
+        this.cardInstances.some(c => c.zone === ZONES.NESTED && c.name === n
+          && c.heroIdx === heroIdx && c.zoneSlot === zoneSlot
+          && (c.controller ?? c.owner) === playerIdx));
+      if (nurVerdeckt) coverHere = true;
+    }
 
     let actualSlot = zoneSlot;
     // ── Geteilte Zonen (Alice, the Transfer Student) ─────────────────
@@ -9471,7 +10936,7 @@ class GameEngine {
 
     // Check if desired slot is occupied
     let shareHere = false;
-    if ((ps.supportZones[heroIdx][actualSlot] || []).length > 0) {
+    if (!coverHere && (ps.supportZones[heroIdx][actualSlot] || []).length > 0) {
       if (mayShare(actualSlot)) {
         // Gewuenschter Platz ist besetzt, aber von einer Namensgleichen
         // — die Karte stoesst dazu, statt woandershin verschoben zu
@@ -9501,7 +10966,8 @@ class GameEngine {
 
     // Place the card
     if (!ps.supportZones[heroIdx][actualSlot]) ps.supportZones[heroIdx][actualSlot] = [];
-    if (shareHere) ps.supportZones[heroIdx][actualSlot].push(cardName);
+    if (coverHere) ps.supportZones[heroIdx][actualSlot].unshift(cardName);
+    else if (shareHere) ps.supportZones[heroIdx][actualSlot].push(cardName);
     else ps.supportZones[heroIdx][actualSlot] = [cardName];
     const inst = this._trackCard(cardName, playerIdx, 'support', heroIdx, actualSlot);
     // Drain pending hand-indexed-field captures for this cardName. The
@@ -9600,7 +11066,7 @@ class GameEngine {
 
   summonCreature(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
     this._trailWrite('summon', { cardName, note: `p${playerIdx}/h${heroIdx}` });
-    const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot);
+    const placeResult = this.safePlaceInSupport(cardName, playerIdx, heroIdx, zoneSlot, { coverNested: !!opts.coverNested });
     if (!placeResult) {
       // Placement fizzled after a Spider cost-payment marker was set
       // (cost was paid but no free slot was found). Drop the marker
@@ -9622,7 +11088,7 @@ class GameEngine {
     // Spider archetype "surprise-cost summon" flourish — anchored to
     // the Spider's actual Support Zone slot. The cost-payment helper
     // in _spider-shared.js stashes a pending marker on gs (it runs
-    // INSIDE beforeSummon, before the destination slot is known);
+    // INSIDE beforeSummon, before the destination slot is known)
     // we consume it here once `actualSlot` is resolved. Both the
     // engine's `summonCreatureWithHooks` and the server's
     // `doPlayCreature` reach this primitive, so the visual fires for
@@ -9707,6 +11173,13 @@ class GameEngine {
    * Use this when you want the full summon lifecycle including hooks.
    */
   async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad) — nur
+    // der Held selbst und Puppet-Tokens duerfen hinein (Skript-Vertrag
+    // `supportZonesLocked`).
+    if (this.isSupportZoneLocked(playerIdx, heroIdx, { source: opts.source, cardName, via: 'summon' })) {
+      this.log('summon_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
+      return null;
+    }
     // ── Cross-Side-Sperre (Als Ruling) ────────────────────────────────
     // Creatures, die laut Text NUR in GEGNERISCHE Zonen gelegt werden
     // koennen (`placesOnOpponentBoard`, derzeit Powder Keg), duerfen auch
@@ -10343,7 +11816,7 @@ class GameEngine {
     });
 
     // ── Anlege-Effekt auf dem NEUEN Traeger (Als Befund 19.8.) ──
-    // `onCardLeaveZone` hat den Buff beim alten Helden zurueckgezogen;
+    // `onCardLeaveZone` hat den Buff beim alten Helden zurueckgezogen
     // ohne dieses Feuern bliebe der neue leer aus. Equips tragen ihre
     // „wende meinen Bonus an"-Logik in `onPlay` (Ancient Tech Infinite
     // Energy Core, Blade of the Swamp Witch, die ganze Familie), also
@@ -10708,6 +12181,20 @@ class GameEngine {
    * @returns {number} The player index whose discard / deleted pile
    *                  receives the card.
    */
+  /**
+   * Fremde Herkunft einer Handkarte merken (v692) — Magic-Lamp-Muster:
+   * eine getrackte Hand-Instanz mit `originalOwner`. Beim Spielen /
+   * Abwerfen liest `_consumeHandCardOrigin` sie und routet in die
+   * Ablage des URSPRUENGLICHEN Besitzers; `actionMulliganCards` legt
+   * sie in DESSEN Deck zurueck. Fuer gestohlene Karten (Key).
+   */
+  _tagHandCardOrigin(holderIdx, cardName, originalOwner) {
+    if (!Number.isInteger(holderIdx) || !Number.isInteger(originalOwner) || holderIdx === originalOwner) return null;
+    const inst = this._trackCard(cardName, holderIdx, 'hand');
+    if (inst) inst.originalOwner = originalOwner;
+    return inst;
+  }
+
   _consumeHandCardOrigin(pi, cardName) {
     const foreign = this.cardInstances.find(c =>
       c.zone === 'hand' && c.owner === pi && c.name === cardName
@@ -11154,6 +12641,7 @@ class GameEngine {
             fromHandIdx: resolvedHandIdx,
             flightStyle: opts.flightStyle,
           });
+          this._stampHandDiscard();   // v696: gemeinsame Taktmarke
         }
 
         // Als Takt (Kosmetik-Ruling): mehrere erzwungene Abwürfe
@@ -11698,6 +13186,19 @@ class GameEngine {
     const sourceObj = typeof opts.source === 'string'
       ? { name: opts.source }
       : (opts.source || (opts.sourceCard || undefined));
+    // v704 (Puppets, Vinny): Effekt-Waechter fuer Status-Anwendung.
+    if (inst.zone === ZONES.SUPPORT && !opts._skipBoardGuard) {
+      const guardSrc = sourceObj && typeof (sourceObj.owner ?? sourceObj.controller) === 'number'
+        ? sourceObj
+        : (typeof opts.sourceOwner === 'number' ? { ...(sourceObj || {}), owner: opts.sourceOwner } : null);
+      if (guardSrc) {
+        const negatedIds = await this._offerBoardEffectGuard([inst], guardSrc, 'status');
+        if (negatedIds.has(inst.id)) {
+          this.log('status_blocked', { card: inst.name, status: statusName, reason: 'board_guard' });
+          return false;
+        }
+      }
+    }
     // Defending the Gate: support-zone status applies (Frozen / Stunned /
     // Burned / Poisoned / Negated …) get the same shield prompt as damage
     // and destroys. canApplyCreatureStatus already reads the shield flag
@@ -12220,6 +13721,16 @@ class GameEngine {
     if (this.isOppEffectImmuneFrom(inst, source)) return;
     const { CARDINAL_NAMES } = require('./_cardinal-shared');
     if (CARDINAL_NAMES.includes(inst.name)) return;
+    // v818 (Queen of Kings [B], Als Ruling): solange ein Negations-
+    // Waechter steht, wird `negated`/`nulled` durch den Gegner gar nicht
+    // erst angelegt. Eigene Negationen (Platzierungen) bleiben moeglich.
+    {
+      const negOwner = source?.owner ?? source?.controller;
+      if (negOwner !== (inst.controller ?? inst.owner) && this._creatureNegationProof(inst)) {
+        this.log('negation_blocked', { creature: inst.name, source: source?.name || 'effect', reason: 'negation_proof' });
+        return;
+      }
+    }
     const statusKey = opts.statusKey || 'negated';
     inst.counters[statusKey] = 1;
     // Per-instance cleansable override (Unwanted Audience). Normally
@@ -12549,11 +14060,16 @@ class GameEngine {
    * (auto-cleanses, splice rebases) and shouldn't be blocked.
    */
   isOppEffectImmuneFrom(inst, source) {
-    if (!inst?.counters?._oppEffectImmune) return false;
+    if (!inst) return false;
     const sourceOwner = source?.owner ?? source?.controller;
-    if (sourceOwner == null) return false;
     const targetController = inst.controller ?? inst.owner;
-    return sourceOwner !== targetController;
+    if (inst.counters?._oppEffectImmune && sourceOwner != null && sourceOwner !== targetController) return true;
+    // v818: Fenster-Immunitaet (Rook of Kings [B], Castling) und
+    // dynamische Brett-Waechter (Board of Kings).
+    if (this.creatureHasEffectImmunity(inst)) return true;
+    if (sourceOwner != null && sourceOwner !== targetController
+        && this._boardGuardsCreature(inst, sourceOwner, source)) return true;
+    return false;
   }
 
   /**
@@ -12562,11 +14078,516 @@ class GameEngine {
    * this so opp damage on protected Queens fizzles too; the inherited
    * gift does NOT, matching its "except damage" clause.
    */
-  isOppDamageImmuneFrom(inst, sourceOwner) {
-    if (!inst?.counters?._oppDamageImmune) return false;
-    if (sourceOwner == null) return false;
+  isOppDamageImmuneFrom(inst, sourceOwner, source = null) {
+    if (!inst) return false;
     const targetController = inst.controller ?? inst.owner;
-    return sourceOwner !== targetController;
+    if (inst.counters?._oppDamageImmune && sourceOwner != null && sourceOwner !== targetController) return true;
+    // v818: Fenster-Immunitaet einer Kreatur (Rook of Kings [B],
+    // Castling) und dynamische Brett-Waechter (Board of Kings).
+    if (this.creatureHasEffectImmunity(inst)) return true;
+    if (sourceOwner != null && sourceOwner !== targetController
+        && this._boardGuardsCreature(inst, sourceOwner, source || { owner: sourceOwner })) return true;
+    return false;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  v818 — „of Kings"-Vertraege (siehe CARD_API.md)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Effekt-Immunitaet einer KREATUR fuer die laufende Aufloesung —
+   * Gegenstueck zu `grantEffectImmunity` (Helden). Eintrag in derselben
+   * Liste `gs._effectImmunities` (wird zu Beginn jedes Zielfensters
+   * geleert), quellenblind wie beim Helden (Als Befund 21.8.).
+   */
+  grantCreatureEffectImmunity(inst, sourceObj) {
+    if (!inst || !sourceObj || typeof sourceObj !== 'object') return false;
+    if (!this.gs._effectImmunities) this.gs._effectImmunities = [];
+    this.gs._effectImmunities.push({ instId: inst.id, src: sourceObj });
+    return true;
+  }
+
+  creatureHasEffectImmunity(inst) {
+    const liste = this.gs._effectImmunities;
+    if (!inst || !liste || liste.length === 0) return false;
+    return liste.some(e => e.instId != null && e.instId === inst.id);
+  }
+
+  /**
+   * Dynamische Brett-Waechter: ein Skript einer Brettkarte (Area oder
+   * Support) exportiert `guardsCreatureFromOpp(engine, inst, sourceOwner,
+   * source, guardInst) → bool` — „diese Kreatur ist gegen diese Quelle
+   * unaffected". Gelesen von `isOppEffectImmuneFrom` /
+   * `isOppDamageImmuneFrom`, also an denselben Stellen wie Sparkfly
+   * Attendants Aura. Areas beider Seiten, Support-Karten nur der
+   * Kreaturenseite, nie stummgeschaltete.
+   */
+  _boardGuardsCreature(inst, sourceOwner, source) {
+    if (!inst) return false;
+    const side = inst.controller ?? inst.owner;
+    for (const g of this.cardInstances) {
+      if (g.zone !== 'area' && g.zone !== 'support') continue;
+      if (g.zone === 'support' && (g.controller ?? g.owner) !== side) continue;
+      if (g.faceDown) continue;
+      const script = loadCardEffect(g.name);
+      if (typeof script?.guardsCreatureFromOpp !== 'function') continue;
+      if (g.zone === 'support' && this.isCreatureEffectSuppressed(g)) continue;
+      try { if (script.guardsCreatureFromOpp(this, inst, sourceOwner, source, g)) return true; }
+      catch (err) { console.error(`[guardsCreatureFromOpp] ${g.name}:`, err.message); }
+    }
+    return false;
+  }
+
+  /** Zielwahl-Zwilling: `guardsCreatureChoice(engine, inst, choosingPi, guardInst) → bool`. */
+  _boardGuardsCreatureChoice(inst, choosingPi) {
+    if (!inst) return false;
+    for (const g of this.cardInstances) {
+      if (g.zone !== 'area' && g.zone !== 'support') continue;
+      if (g.faceDown) continue;
+      const script = loadCardEffect(g.name);
+      if (typeof script?.guardsCreatureChoice !== 'function') continue;
+      if (g.zone === 'support' && this.isCreatureEffectSuppressed(g)) continue;
+      try { if (script.guardsCreatureChoice(this, inst, choosingPi, g)) return true; }
+      catch (err) { console.error(`[guardsCreatureChoice] ${g.name}:`, err.message); }
+    }
+    return false;
+  }
+
+  /**
+   * „The effects of other Creatures you control cannot be negated by
+   *  negative status effects or your opponent's effects" (Queen of Kings
+   * [B]). Ein Skript exportiert `protectsCreatureEffects(engine, inst,
+   * guardInst) → bool`; der Waechter selbst muss frei von CC sein und
+   * schuetzt sich nie selbst.
+   */
+  _creatureNegationProof(inst) {
+    if (!inst || inst.zone !== 'support') return false;
+    const side = inst.controller ?? inst.owner;
+    for (const g of this.cardInstances) {
+      if (g.zone !== 'support' || g.id === inst.id || g.faceDown) continue;
+      if ((g.controller ?? g.owner) !== side) continue;
+      const script = loadCardEffect(g.name);
+      if (typeof script?.protectsCreatureEffects !== 'function') continue;
+      const gc = g.counters || {};
+      if (gc.negated || gc.nulled || gc.stunned || gc.magic_silenced) continue;
+      if (gc.frozen && !this._isChillyDogActiveFor(side)) continue;
+      try { if (script.protectsCreatureEffects(this, inst, g)) return true; }
+      catch (err) { console.error(`[protectsCreatureEffects] ${g.name}:`, err.message); }
+    }
+    return false;
+  }
+
+  /**
+   * EIN Praedikat (v818): sind die EFFEKTE dieser Kreatur stummgeschaltet?
+   * Vorher stand dieselbe Frage an ~10 Stellen als verstreute
+   * `negated/nulled/frozen/stunned`-Abfragen. CC-Eimer: negated, nulled,
+   * stunned, magic_silenced, frozen (Chilly Dog hebt Frozen auf).
+   * Ausnahmen: Lunatic-Immunitaet (`negative_status_immune`, per
+   * `opts.honorNegStatusImmune`, Vorgabe true) und ein Negations-Waechter
+   * (Queen of Kings [B]).
+   */
+  isCreatureEffectSuppressed(inst, opts = {}) {
+    if (!inst) return true;
+    if (inst.faceDown) return true;
+    const c = inst.counters || {};
+    const hasCC = !!(c.negated || c.nulled || c.stunned || c.magic_silenced
+      || (c.frozen && !this._isChillyDogActiveFor(inst.controller ?? inst.owner)));
+    if (!hasCC) return false;
+    if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
+    if (this._creatureNegationProof(inst)) return false;
+    return true;
+  }
+
+  /**
+   * HAND-SPIELSPERRE (v818, Knight of Kings [W]): „you can't play any
+   * more cards from your hand for the rest of the turn". Rundenstempel
+   * `ps._handPlayLock = { turn, allow }` — `allow: 'of-kings'` laesst
+   * bei liegendem Board of Kings Karten durch, deren Name ODER Effekt
+   * „of Kings" enthaelt. Gilt fuer ALLES aus der Hand, auch Reaktionen.
+   */
+  _handPlayLockedFor(ps, cardName) {
+    // v834: Summon-only-Karten unter `summonLocked`, Pile-only-Karten unter
+    // der Stapel-Sperre — gilt in JEDEM Fenster, in dem dieses Praedikat
+    // haengt (validateActionPlay, Spielbarkeitsliste, 22 Reaktionsfenster).
+    if (ps && cardName) {
+      const sc = loadCardEffect(cardName);
+      if (sc?.blockedBySummonLock && ps.summonLocked) return true;
+      if (sc?.blockedByPileLock) {
+        const pi = (this.gs?.players || []).indexOf(ps);
+        if (pi >= 0 && this.isPileLockedFor(pi)) return true;
+      }
+    }
+    const lock = ps?._handPlayLock;
+    if (!lock || lock.turn !== (this.gs?.turn || 0)) return false;
+    if (lock.allow === 'of-kings') {
+      const { mentionsOfKings, boardOfKingsOnBoard } = require('./_of-kings-shared');
+      if (boardOfKingsOnBoard(this) && mentionsOfKings(this._getCardDB()[cardName])) return false;
+    }
+    return true;
+  }
+
+  isHandPlayLocked(pi, cardName) {
+    return this._handPlayLockedFor(this.gs?.players?.[pi], cardName);
+  }
+
+  /**
+   * STAPEL-AUSGANGSSPERRE (v818, Knight of Kings [B]): „your opponent
+   * cannot move cards from their deck or discard pile to anywhere else
+   * (but they can still draw)". Synchrones Praedikat fuer Engine-
+   * Primitive UND Kartenskripte, die selbst splicen (MANDATORY fuer
+   * neue Skripte). Gesperrt ist nur die EIGENE Bewegung des Besitzers —
+   * wer die Sperre haelt, darf in den fremden Stapel greifen. Der
+   * Bewegende ist die laufende Effektquelle, sonst der Zugspieler.
+   * Draws laufen nie ueber dieses Gate.
+   */
+  pileOutAllowed(pi, pile, opts = {}) {
+    const ps = this.gs?.players?.[pi];
+    if (!ps) return false;
+    if (opts._bypassPileLock) return true;
+    const mover = opts.sourceOwner ?? opts.source?.owner ?? opts.source?.controller
+      ?? this._currentEffectSource?.owner ?? this._activationSource?.owner ?? this.gs.activePlayer;
+    if (mover !== pi) return true;
+    return !this._boardBlocksPileOut(pi, pile);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  STAPEL-SCHICHT (v820, Als Auftrag 7.9.)
+  //
+  //  EIN Ausgang aus Deck, Ablage und Geloescht-Stapel: `takeFromPile`.
+  //  Dort sitzen — ein einziges Mal — die Sperren (Knight of Kings [B]
+  //  `pileOutAllowed`, Stab-Sperre `_discardOutAllowed`), die Pflege des
+  //  sichtbaren Deckkopfs, das Untracken verwaister Ablage-Instanzen und
+  //  das Log. Darauf duenne Komposita fuer die Ablaeufe, die Karten-
+  //  skripte bisher von Hand nachgebaut haben: `summonFromPile`,
+  //  `placeFromPile`, `addFromPileToHand`, `deleteFromPile`, `takeTop`,
+  //  `revealTop`, `reorderDeck`. Kartenskripte splicen NIE selbst
+  //  (CARD_API.md ★-Regel 7.9., Waechter `scripts/check-no-splice.js`).
+  //
+  //  Rueckgabe-Konvention: `takeFromPile` gibt `{ name, idx }` oder null
+  //  (nicht da / gesperrt); Komposita geben die Instanz bzw. true/false
+  //  und legen die Karte bei Fehlschlag auf den Stapel ZURUECK.
+  // ═══════════════════════════════════════════════════════════════
+
+  _pileArray(ps, pile) {
+    if (!ps) return null;
+    if (pile === 'deck') return ps.mainDeck || (ps.mainDeck = []);
+    if (pile === 'discard') return ps.discardPile || (ps.discardPile = []);
+    if (pile === 'deleted') return ps.deletedPile || (ps.deletedPile = []);
+    if (pile === 'hand') return ps.hand || (ps.hand = []);
+    return null;
+  }
+
+  /**
+   * Karte aus einem Stapel ENTNEHMEN (Deck / Ablage / Geloescht / Hand).
+   * `what` ist ein Name (erste Kopie; `opts.last` = letzte Kopie) oder ein
+   * Index. Gates: `pileOutAllowed` (deck/discard), `_discardOutAllowed`
+   * (discard). Kein Broadcast — das Ziel entscheidet, welcher Flug
+   * gezeigt wird. `opts.shuffle` mischt das Deck nach der Entnahme.
+   * @returns {{ name: string, idx: number } | null}
+   */
+  /** `pi` darf auch der Spielerzustand selbst sein (Migrationskomfort). */
+  _resolvePi(pi) {
+    if (typeof pi === 'number') return pi;
+    const i = (this.gs?.players || []).indexOf(pi);
+    return i;
+  }
+
+  async takeFromPile(pi, pile, what, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    const arr = this._pileArray(ps, pile);
+    if (!arr) return null;
+    const idx = typeof what === 'number' ? what
+      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+    if (idx < 0 || idx >= arr.length) return null;
+    const name = arr[idx];
+    if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
+      this.log('pile_out_blocked', { player: ps.username, pile, card: name, by: opts.source || null });
+      return null;
+    }
+    if (pile === 'discard' && !(await this._discardOutAllowed(pi, opts))) {
+      this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
+      return null;
+    }
+    return this._takeFromPileCore(pi, ps, arr, pile, idx, name, opts);
+  }
+
+  /**
+   * Synchrone Form fuer Stellen ohne `await` (CPU-Bewertungsproben,
+   * Hilfsfunktionen). Deck: identisch. Ablage: die Stab-Sperre gilt als
+   * hart (kein Freikauf-Prompt moeglich) — vorher umgingen diese Stellen
+   * sie ganz.
+   */
+  takeFromPileSync(pi, pile, what, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    const arr = this._pileArray(ps, pile);
+    if (!arr) return null;
+    const idx = typeof what === 'number' ? what
+      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+    if (idx < 0 || idx >= arr.length) return null;
+    const name = arr[idx];
+    if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
+      this.log('pile_out_blocked', { player: ps.username, pile, card: name, by: opts.source || null });
+      return null;
+    }
+    if (pile === 'discard' && !opts._bypassDiscardLock && ps._discardLockedTurn === this.gs.turn) {
+      const buy = ps._discardLockBuyout;
+      if (!(buy && buy.turn === this.gs.turn && buy.paidTurn === this.gs.turn)) {
+        this.log('discard_out_blocked', { card: name, reason: 'discard_locked', by: opts.source || null });
+        return null;
+      }
+    }
+    return this._takeFromPileCore(pi, ps, arr, pile, idx, name, opts);
+  }
+
+  _takeFromPileCore(pi, ps, arr, pile, idx, name, opts) {
+    arr.splice(idx, 1);
+    if (pile === 'deck' && idx === 0 && ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
+    if (pile === 'discard' || pile === 'deleted') {
+      const orphan = this.cardInstances.find(c => c.owner === pi && c.zone === pile && c.name === name);
+      if (orphan) this._untrackCard(orphan.id);
+    }
+    if (pile === 'deck' && opts.shuffle) this.shuffleDeck(pi, 'main');
+    this.log('pile_take', { player: ps.username, pile, card: name, by: opts.source || null });
+    return { name, idx };
+  }
+
+  /** Rueckgabe nach geplatztem Komposit — Gegenstueck zu `takeFromPile`. */
+  returnToPile(pi, pile, name, idx = null) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    const arr = this._pileArray(ps, pile);
+    if (!arr || !name) return false;
+    // Mit Index: exakt dorthin zurueck (Zustand wie vor der Entnahme,
+    // kein Mischen). Ohne Index: ans Ende, Deck wird gemischt.
+    if (idx != null && idx >= 0 && idx <= arr.length) { arr.splice(idx, 0, name); return true; }
+    arr.push(name);
+    if (pile === 'deck') this.shuffleDeck(pi, 'main');
+    return true;
+  }
+
+  _pileFlight(pi, name, from, to, extra = {}) {
+    if (this._fastMode || this._inMctsSim) return;
+    this._broadcastEvent('play_pile_transfer', { owner: pi, cardName: name, from, to, ...extra });
+  }
+
+  /**
+   * Kreatur aus Hand/Deck/Ablage BESCHWOEREN (echte Beschwoerung:
+   * `summonCreatureWithHooks`, Level-/Schulcheck macht der Aufrufer).
+   * @returns {CardInstance|null}
+   */
+  async summonFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
+    pi = this._resolvePi(pi);
+    const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
+    if (!taken) return null;
+    const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx };
+    if (pile === 'hand') flight.fromHandIdx = taken.idx;
+    this._pileFlight(pi, taken.name, pile, 'support', flight);
+    const summon = await this.summonCreatureWithHooks(taken.name, pi, heroIdx, slotIdx, {
+      source: opts.source || 'summonFromPile', hookExtras: { _summonedFromPile: pile, ...(opts.hookExtras || {}) },
+      ...(opts.summonOpts || {}),
+    });
+    if (!summon?.inst) { this.returnToPile(pi, pile, taken.name, pile === 'hand' ? taken.idx : null); this.sync(); return null; }
+    return summon.inst;
+  }
+
+  /**
+   * Kreatur aus Hand/Deck/Ablage PLATZIEREN (regardless of level, keine
+   * Aktion, auch zu toten/Frozen/Stunned/Negated Helden). Hand und
+   * Ablage laufen durch `actionPlaceCreature` (Lethe-Stempel dort);
+   * Deck wird hier entnommen, gemischt und mit Flug uebergeben.
+   * @returns {CardInstance|null}
+   */
+  async placeFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
+    pi = this._resolvePi(pi);
+    const placeOpts = { sourceName: opts.source || opts.sourceName || 'Placement', ...(opts.placeOpts || {}) };
+    if (pile === 'hand' || pile === 'discard') {
+      return this.actionPlaceCreature(cardName, pi, heroIdx, slotIdx, { ...placeOpts, source: pile });
+    }
+    const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
+    if (!taken) return null;
+    this._pileFlight(pi, taken.name, pile, 'support', { toHeroIdx: heroIdx, toSlotIdx: slotIdx });
+    const inst = await this.actionPlaceCreature(taken.name, pi, heroIdx, slotIdx, {
+      ...placeOpts, source: pile, skipPileTransfer: true,
+    });
+    if (!inst) this.returnToPile(pi, pile, taken.name);
+    return inst;
+  }
+
+  /**
+   * Karte aus Deck/Ablage/Geloescht auf die HAND. Deck = Tutor mit Reveal
+   * (`actionAddCardFromDeckToHand`), Ablage = `addCardFromDiscardToHand`
+   * (Bamboo-Listener), Geloescht = Entnahme + Hand + Hook.
+   * @returns {boolean}
+   */
+  async addFromPileToHand(pi, pile, cardName, opts = {}) {
+    pi = this._resolvePi(pi);
+    if (pile === 'deck') return this.actionAddCardFromDeckToHand(pi, cardName, opts);
+    if (pile === 'discard') return !!(await this.addCardFromDiscardToHand(pi, cardName, pi, opts));
+    const ps = this.gs.players[pi];
+    if (!ps || (ps.handLocked && !opts._bypassHandLock)) return false;
+    const taken = await this.takeFromPile(pi, pile, cardName, opts);
+    if (!taken) return false;
+    ps.hand.push(taken.name);
+    const inst = this._trackCard(taken.name, pi, ZONES.HAND);
+    this._pileFlight(pi, taken.name, pile, 'hand', { toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length });
+    this._autoRevealOnEnterHand(pi, ps.hand.length - 1, taken.name);
+    await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, { playerIdx: pi, card: inst, cardName: taken.name });
+    this.sync();
+    return true;
+  }
+
+  /**
+   * Karte aus Deck/Ablage LOESCHEN. Getrackte Ablage-Instanzen wandern
+   * ueber `actionMoveCard` (Zonen-Hooks bleiben erhalten), sonst
+   * Entnahme + Geloescht-Stapel + Flug.
+   * @returns {boolean}
+   */
+  async deleteFromPile(pi, pile, cardName, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    if (pile === 'discard') {
+      const inst = this.cardInstances.find(c => c.owner === pi && c.zone === 'discard' && c.name === cardName);
+      if (inst) {
+        const before = (ps.deletedPile || []).length;
+        await this.actionMoveCard(inst, ZONES.DELETED, -1, -1, { source: opts.source, sourceOwner: opts.sourceOwner });
+        return (ps.deletedPile || []).length > before;
+      }
+    }
+    const taken = await this.takeFromPile(pi, pile, cardName, opts);
+    if (!taken) return false;
+    if (!ps.deletedPile) ps.deletedPile = [];
+    ps.deletedPile.push(taken.name);
+    this._trackCard(taken.name, pi, ZONES.DELETED);
+    this._pileFlight(pi, taken.name, pile, 'deleted');
+    this.log('card_deleted', { player: ps.username, card: taken.name, from: pile, by: opts.source || null });
+    this.sync();
+    return true;
+  }
+
+  /** Oberste `n` Karten ANSEHEN (keine Bewegung). */
+  revealTop(pi, n, pile = 'deck') {
+    pi = this._resolvePi(pi);
+    const arr = this._pileArray(this.gs.players[pi], pile);
+    return arr ? arr.slice(0, Math.max(0, n)) : [];
+  }
+
+  /** Oberste `n` Karten ENTNEHMEN (Trade, Birthday Present) — gesperrt wie jede Entnahme. */
+  async takeTop(pi, n, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    const arr = this._pileArray(ps, 'deck');
+    if (!arr || n <= 0) return [];
+    if (!this.pileOutAllowed(pi, 'deck', opts)) {
+      this.log('pile_out_blocked', { player: ps.username, pile: 'deck', reason: 'take_top', by: opts.source || null });
+      return [];
+    }
+    const cards = arr.splice(0, n);
+    if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.splice(0, cards.length);
+    this.log('pile_take_top', { player: ps.username, count: cards.length, by: opts.source || null });
+    return cards;
+  }
+
+  /** Einzelne Karte INNERHALB des Decks versetzen (keine Bewegung im Sinne der Sperre). */
+  moveWithinDeck(pi, fromIdx, toIdx = 0) {
+    pi = this._resolvePi(pi);
+    const arr = this._pileArray(this.gs.players[pi], 'deck');
+    if (!arr || fromIdx < 0 || fromIdx >= arr.length) return false;
+    const [name] = arr.splice(fromIdx, 1);
+    arr.splice(Math.max(0, Math.min(toIdx, arr.length)), 0, name);
+    return true;
+  }
+
+  /**
+   * Deck-innere Umsortierung (Premonition): `names` kommen in dieser
+   * Reihenfolge nach oben — KEINE Bewegung im Sinne der Sperre (Als
+   * Ruling 7.9.). Namen, die nicht im Deck sind, werden ignoriert.
+   */
+  reorderDeck(pi, names, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    const arr = this._pileArray(ps, 'deck');
+    if (!arr) return false;
+    const rest = [...arr];
+    const top = [];
+    for (const n of names) { const i = rest.indexOf(n); if (i >= 0) { top.push(n); rest.splice(i, 1); } }
+    arr.length = 0; arr.push(...top, ...rest);
+    if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.length = 0;
+    this.log('deck_reordered', { player: ps.username, top: top.length, by: opts.source || null });
+    return true;
+  }
+
+  /**
+   * Bequemform fuer Kartenskripte, die den Spielerzustand statt des
+   * Index in der Hand haben (v819-Sweep): `ps` → Index ueber Identitaet.
+   * Unbekanntes Objekt (Snapshot, Fremdzustand) → erlaubt, nie Blocker.
+   */
+  pileOutAllowedFor(ps, pile, opts = {}) {
+    const pi = (this.gs?.players || []).indexOf(ps);
+    if (pi < 0) return true;
+    return this.pileOutAllowed(pi, pile, opts);
+  }
+
+  /**
+   * Gilt fuer `pi` gerade eine Stapel-Ausgangssperre (eigene Bewegung
+   * aus Deck oder Ablage blockiert)? Fuer `blockedByPileLock`-Karten
+   * (nur Stapel-Bewegung, Magnetic Potion) — die sind dann gar nicht
+   * spielbar, Praezedenz `blockedByHandLock` (v826).
+   */
+  isPileLockedFor(pi) {
+    return !this.pileOutAllowed(pi, 'deck', { sourceOwner: pi })
+      || !this.pileOutAllowed(pi, 'discard', { sourceOwner: pi });
+  }
+
+  /** Skript-Vertrag: `blocksOpponentPileOut(engine, pileOwner, pile, guardInst) → bool`. */
+  _boardBlocksPileOut(pileOwner, pile) {
+    for (const g of this.cardInstances) {
+      if (g.zone !== 'support' && g.zone !== 'area') continue;
+      if ((g.controller ?? g.owner) === pileOwner) continue;
+      if (g.faceDown) continue;
+      const script = loadCardEffect(g.name);
+      if (typeof script?.blocksOpponentPileOut !== 'function') continue;
+      if (g.zone === 'support' && this.isCreatureEffectSuppressed(g)) continue;
+      try { if (script.blocksOpponentPileOut(this, pileOwner, pile, g)) return true; }
+      catch (err) { console.error(`[blocksOpponentPileOut] ${g.name}:`, err.message); }
+    }
+    return false;
+  }
+
+  /**
+   * BOARD-SEITIGES POST-TARGET-FENSTER (v818). Das Hand-Fenster
+   * (`_checkPostTargetHandReactions`) scannt nur Handkarten; Karten, die
+   * vom BRETT aus auf „would be affected" reagieren (Castling, Rook of
+   * Kings [B]), exportieren `isPostTargetBoardReaction: true`,
+   * `postTargetBoardCondition(gs, pi, engine, targets, source, inst, info)`
+   * und `postTargetBoardResolve(engine, pi, targets, source, inst, info)`.
+   * Reihenfolge: Verteidiger zuerst, dann der andere Spieler.
+   */
+  async _checkPostTargetBoardReactions(targetedHeroes, sourceCard, opts = {}) {
+    if (!targetedHeroes || targetedHeroes.length === 0) return;
+    const sourceOwner = sourceCard?.controller ?? sourceCard?.owner ?? -1;
+    const info = { ...opts, sourceOwner };
+    const targetOwners = [...new Set(targetedHeroes.map(t => t.owner))];
+    const order = [...targetOwners, ...[0, 1].filter(i => !targetOwners.includes(i))];
+    for (const pi of order) {
+      for (const inst of [...this.cardInstances]) {
+        if (inst.zone !== 'support' && inst.zone !== 'area') continue;
+        if ((inst.controller ?? inst.owner) !== pi) continue;
+        if (inst.faceDown) continue;
+        const script = loadCardEffect(inst.name);
+        if (!script?.isPostTargetBoardReaction) continue;
+        if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn()) continue;
+        if (inst.zone === 'support' && this.isCreatureEffectSuppressed(inst)) continue;
+        let ok = false;
+        try { ok = !!script.postTargetBoardCondition(this.gs, pi, this, targetedHeroes, sourceCard, inst, info); }
+        catch (err) { console.error(`[postTargetBoardCondition] ${inst.name}:`, err.message); }
+        if (!ok) continue;
+        try { await script.postTargetBoardResolve(this, pi, targetedHeroes, sourceCard, inst, info); }
+        catch (err) { console.error(`[postTargetBoardResolve] ${inst.name}:`, err.message); }
+      }
+    }
   }
 
   /**
@@ -12711,7 +14732,7 @@ class GameEngine {
     if (!inst) return false;
     if (inst.faceDown) return false;
     if (inst.zone === ZONES.SUPPORT) {
-      if (inst.counters?.negated || inst.counters?.nulled || inst.counters?.frozen || inst.counters?.stunned) return false;
+      if (this.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false })) return false;
       // Creatures and Tokens are INDEPENDENT of their slot's Hero —
       // they remain active even when the Hero is dead or the slot
       // is empty (e.g. left over from Quetzahuitl's mass-delete).
@@ -12752,7 +14773,11 @@ class GameEngine {
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     const eligible = [];
     const seen = new Set();
-    for (const cardName of (ps.hand || [])) {
+    // ★ 28.8.: Crestinas Vorrat zaehlt hier mit — „playable as if they
+    // were part of your hand". Dahintergehaengt, damit jede Karte
+    // dieselben Pruefungen durchlaeuft wie eine Handkarte.
+    const vorrat = this.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []) : [];
+    for (const cardName of [...(ps.hand || []), ...vorrat]) {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
@@ -12765,8 +14790,14 @@ class GameEngine {
         const reactScript = loadCardEffect(cardName);
         if (!reactScript?.proactivePlay) continue;
       }
-      // Check spell school / level requirements (centralized)
-      if (!this.heroMeetsLevelReq(playerIdx, heroIdx, cd)) continue;
+      // Check spell school / level requirements (centralized).
+      // v664: derselbe Caster-Bypass wie in validateActionPlay — ein
+      // Zusatzaktions-Token mit `bypassesCasterRequirement` (Wolflesia,
+      // Heart-Shaped Bows „regardless of its level") muss die Karte
+      // auch in den Sofort-Zug-Prompts sichtbar machen, sonst bietet
+      // `performImmediateAction` sie nie an.
+      if (!this.canBypassCasterRequirementForSpell(playerIdx, heroIdx, cd, cardName)
+          && !this.heroMeetsLevelReq(playerIdx, heroIdx, cd)) continue;
       // Wisdom hand-size affordability check — spells that ONLY meet
       // the level requirement via Wisdom paid coverage need enough
       // hand cards to actually pay the discard cost (the spell itself
@@ -12855,6 +14886,50 @@ class GameEngine {
     return out;
   }
 
+  /**
+   * ★ 28.8.: IST CRESTINAS VORRAT GERADE BENUTZBAR?
+   *
+   * Kartentext: „While you control this Hero, you may play cards
+   * placed by this effect as if they were part of your hand."
+   * Dazu Als Ruling: „Wird Crestina Frozen, Stunned, negated oder
+   * sonstwie behindert, werden die Bonuskarten EBENFALLS temporaer
+   * unbenutzbar." Die Karten bleiben dabei liegen — sie verschwinden
+   * nicht und kommen zurueck, wenn Crestina zurueckkommt.
+   *
+   * ★ DIESE FUNKTION IST DIE EINZIGE WAHRHEIT DAZU. Anzeige
+   * (Ausgrauen) und Server-Pruefung lesen BEIDE sie. In dieser
+   * Sitzung sind dreimal Anzeige und Klick auseinandergelaufen, weil
+   * dieselbe Frage an zwei Stellen beantwortet wurde — hier nicht.
+   */
+  isCreationZoneUsable(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps || (ps.creationZone || []).length === 0) return false;
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (hero?.name !== CRESTINA_ASCENDED) continue;
+      if (hero.hp <= 0) continue;                      // tot
+      const st = hero.statuses || {};
+      if (st.frozen || st.stunned || st.webbed || st.negated || st.bound) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Die Kartenliste, aus der ein `handIndex` aufzuloesen ist.
+   *
+   * Statt einen `source`-Parameter durch sieben Spielwege zu faedeln,
+   * loesen alle ueber diesen einen Helfer auf. `opts.fromCreation`
+   * reist im ohnehin vorhandenen Parameterbeutel mit.
+   */
+  handSourceList(playerIdx, fromCreation) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return null;
+    if (!fromCreation) return ps.hand;
+    if (!this.isCreationZoneUsable(playerIdx)) return null;
+    return ps.creationZone;
+  }
+
   getHeroPlayableCards(playerIdx) {
     const gs = this.gs;
     const ps = gs.players[playerIdx];
@@ -12869,9 +14944,17 @@ class GameEngine {
     const heroActed = (ps.heroesActedThisTurn?.length || 0) > 0;
 
     // Collect unique action cards from hand
+    //
+    // ★ 28.8.: UND aus Crestinas Vorrat. „Playable as if they were part
+    // of your hand" heisst genau das — dieselben Stufen-, Schul- und
+    // Aktionspruefungen, nur eine andere Herkunft. Der Vorrat wird
+    // dahintergehaengt statt in einer zweiten Liste gefuehrt: so
+    // durchlaeuft jede Karte automatisch alle Pruefungen, die es hier
+    // schon gibt, und keine muss verdoppelt werden.
+    const vorrat = this.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []) : [];
     const handCards = [];
     const seen = new Set();
-    for (const cardName of (ps.hand || [])) {
+    for (const cardName of [...(ps.hand || []), ...vorrat]) {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
@@ -12906,6 +14989,12 @@ class GameEngine {
       // the hero as a valid caster while every action attempt silently
       // fails.
       if (this.isHeroSkillLocked(playerIdx, hi)) { own[hi] = playable; continue; }
+      // v641: Helden, denen eine Support-Karte (Plant Golem) oder ihr
+      // eigenes Skript (Saint Nicolas) jede Aktion verbietet, bieten
+      // keine Handkarten an — sie werden im Client wie Frozen/Stunned
+      // ausgegraut, und Karten, die nur solche Helden als Nutzer
+      // haetten, sind in der Hand komplett grau.
+      if (!this.canHeroPerformAction(playerIdx, hi)) { own[hi] = playable; continue; }
 
       // Pre-load hero script and equip scripts for per-card checks
       const heroScript = loadCardEffect(hero.name);
@@ -12932,6 +15021,7 @@ class GameEngine {
       const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && actionsPlayed === 1;
 
       for (const cd of handCards) {
+        if (this._handPlayLockedFor(ps, cd.name)) continue;   // v818 Hand-Spielsperre
         // Frozen / Stunned heroes only host PLACEMENTS. A card opts
         // into this path by exporting canBypassFreeZoneRequirement
         // and returning true right now (Deepsea when a bounceable
@@ -13003,6 +15093,9 @@ class GameEngine {
         if (cd.cardType === 'Attack'
             && hero.statuses?.berserked
             && (hero._attacksThisTurn || 0) >= 2) continue;
+        // Alleiniger Angriff (v726) — Spiegel des Gates in
+        // `validateActionPlay`, damit der Client die Karte ausgraut.
+        if (cd.cardType === 'Attack' && ps._soleAttackTurn === gs.turn) continue;
         // Blinded heroes can't play targeting Spells / Attacks. Mirrors
         // the play-time gate in validateActionPlay; when set, the client
         // grays this card out under the affected hero so its hand
@@ -13012,7 +15105,7 @@ class GameEngine {
           if (s?.requiresTarget === true) continue;
         }
         // Generic per-player Spell lock (Eraser Beam / any future "only Spell
-        // this turn" card). Blocks further Spell plays once the lock is set;
+        // this turn" card). Blocks further Spell plays once the lock is set
         // cleared in the turn-start reset path alongside other per-turn flags.
         // Silence grants _silenceBonusSpell for one extra Spell past the lock.
         if (cd.cardType === 'Spell'
@@ -13117,9 +15210,8 @@ class GameEngine {
             // Mirrors the server's validatePlayActionCardCommon gate — `inherent
             // Action` is the same facility in both phases (Main Phase or Action
             // Phase after the hero has acted), so the UI must honour it in both.
-            const cardScript = loadCardEffect(cd.name);
-            let isInherent = cardScript?.inherentAction === true
-              || (typeof cardScript?.inherentAction === 'function' && cardScript.inherentAction(gs, playerIdx, hi, this));
+            // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
+            let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
             // Berserk's free-Attack grant — mirror of the override in
             // `getValidationContext`. While the charge is unspent, the
             // Berserked Hero's Attacks count as inherent (no action
@@ -13137,9 +15229,8 @@ class GameEngine {
 
         // Main Phase: action cards need inherent action or additional action coverage
         if (isMainPhase) {
-          const cardScript = loadCardEffect(cd.name);
-          let isInherent = cardScript?.inherentAction === true
-            || (typeof cardScript?.inherentAction === 'function' && cardScript.inherentAction(gs, playerIdx, hi, this));
+          // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel).
+          let isInherent = this.cardHasInherentAction(playerIdx, hi, cd);
           // Berserk's free-Attack grant — see the post-acted Action
           // Phase branch above for rationale. Mirror here so the
           // Berserked Hero can play Attacks in the Main Phase
@@ -13186,6 +15277,10 @@ class GameEngine {
           if (eScript?.canPlayCard) equipScripts.push(eScript);
         }
 
+        // v665: Bonus-Slots des handelnden Spielers (siehe eigener Zweig).
+        const hasBonusAction = isActionPhase && ps.bonusActions?.heroIdx === hi && ps.bonusActions.remaining > 0;
+        const hasBonusMainAction = isActionPhase && (ps._bonusMainActions || 0) > 0 && (ps._actionsPlayedThisPhase || 0) === 1;
+
         const playable = [];
         for (const cd of handCards) {
           // Reaction subtype: not proactively playable unless script opts in
@@ -13200,6 +15295,7 @@ class GameEngine {
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
+          if (cd.cardType === 'Attack' && ps._soleAttackTurn === gs.turn) continue;   // v726
           // Generic per-player Spell lock — `ps` here is the acting player,
           // since Spell-play restrictions follow the caster not the hero owner.
           // _silenceBonusSpell is Silence's one-use bypass token.
@@ -13230,6 +15326,33 @@ class GameEngine {
             // above. Runs against the hero-owner side (the charmed
             // hero's board) since that's where the Creature would land.
             if (!this.isCreatureSummonable(cd.name, oppIdx, hi)) continue;
+          }
+          // ── v665: Aktionsoekonomie auch fuer uebernommene Helden ──
+          // (Als Befund 30.8.: unter Molinda leuchteten Handkarten des
+          // gecharmten Helden, obwohl keine Aktion mehr uebrig war.)
+          // Dieselbe phasenbewusste Pruefung wie im eigenen Zweig oben:
+          // nach verbrauchter Aktion bzw. in der Main Phase braucht die
+          // Karte Bonus-, inhaerente oder Zusatzaktions-Deckung. Die
+          // Heldenvertraege (`cardHasInherentAction`) werden gegen die
+          // Seite gelesen, auf der der Held physisch steht.
+          if (isActionPhase && heroActed) {
+            if (hasBonusMainAction) {
+              // Torchure-Gnadenslot: ohne Helden-/Typbindung.
+            } else if (hasBonusAction) {
+              const allowed = ps.bonusActions.allowedTypes || [];
+              if (allowed.length > 0 && !allowed.includes(cd.cardType)) continue;
+            } else {
+              let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
+              if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
+                  && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
+              if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
+            }
+          }
+          if (isMainPhase) {
+            let isInherent = this.cardHasInherentAction(oppIdx, hi, cd);
+            if (!isInherent && cd.cardType === 'Attack' && hero.statuses?.berserked
+                && hero._berserkChargeUsedTurn !== gs.turn) isInherent = true;
+            if (!isInherent && !this.findAdditionalActionForCard(playerIdx, cd.name, hi)) continue;
           }
           playable.push(cd.name);
         }
@@ -13282,6 +15405,11 @@ class GameEngine {
     return Array.from(out);
   }
 
+  /** v641: Cross-Side-Kreaturen, die NUR auf die Gegnerseite duerfen (`playOnOppSideOnly`). */
+  getOppSideOnlyCards(playerIdx) {
+    return this.getCrossSidePlayableCards(playerIdx)
+      .filter(name => loadCardEffect(name)?.playOnOppSideOnly === true);
+  }
   /**
    * Artifacts in `playerIdx`'s hand that drop onto the OPPONENT's
    * board (Powder Keg etc.) — script declares `placesOnOpponentBoard: true`.
@@ -13452,6 +15580,13 @@ class GameEngine {
       if ((cd.subtype || '').toLowerCase() !== 'equipment') continue; // pure Equipment only
       const script = loadCardEffect(cardName);
       if (typeof script?.canEquipToHero === 'function') continue;     // restricted → own-side only
+      // v796 (Als Befund 5.9.): ausdrueckliche Seitenbindung. „Equip
+      // this card to a Hero YOU CONTROL" liess sich bisher nur ueber
+      // ein `canEquipToHero` erzwingen — also ueber einen Vertrag, der
+      // eigentlich EINZELNE Helden aussiebt und die Karte nebenbei in
+      // `equipEligibleHeroes` schreibt. `equipOwnSideOnly` sagt genau
+      // das eine, was gemeint ist, und sonst nichts.
+      if (script?.equipOwnSideOnly === true) continue;
       if (script?.placesOnOpponentBoard === true) continue;           // Powder-Keg cross-side path
       out.add(cardName);
     }
@@ -13507,6 +15642,31 @@ class GameEngine {
 
     const ps = gs.players[pi];
     if (!ps) return null;
+    // ── AKTIONSSPERRE (Overflowing Chalice, Kent) ──────────────────
+    // Sperrt JEDE Aktion fuer den Rest des Zuges: die normale, Bonus-
+    // Aktionen (Psychic Scout) und inherente Zusatzaktionen
+    // (Aggressive Town Guard). Deshalb steht sie HIER, vor jeder
+    // Fallunterscheidung — die drei Wege trennen sich erst weiter
+    // unten, und ein Riegel je Weg waere dreimal dieselbe Wahrheit.
+    //
+    // ★ PLATZIEREN ist bewusst NICHT betroffen (Als Ruling 28.8.).
+    // Effekte, die eine Creature *platzieren* (Staff of Illusions,
+    // Monster in a Bottle, Wiederbelebungen, Surprise-Creatures, die
+    // Deepsea-Swaps …), laufen ueber `actionPlaceCreature` und
+    // betreten diesen Pfad gar nicht. Platzieren ist regeltechnisch
+    // keine Aktion — die Abgrenzung entsteht hier also von selbst und
+    // braucht weder Ausnahmeliste noch neuen Vertrag. Was den Riegel
+    // sehr wohl trifft, ist eine KARTE, die platziert: Create Illusion
+    // ist ein Spell von der Hand und damit eine Aktion, auch wenn ihr
+    // Ertrag eine Platzierung ist.
+    //
+    // ★ 28.8.: frueher stand hier `ps.actionLocked` und weiter unten
+    // ein zweiter Riegel `areActionsBlocked` — zwei Wahrheiten fuer
+    // dieselbe Frage. Jetzt nur noch die eine, und weil sie hier oben
+    // steht, deckt sie auch die Wege ab, die frueher nur eine der
+    // beiden sahen.
+    if (this.areActionsBlocked(pi)) return null;
+    if (this._handPlayLockedFor(ps, cardName)) return null;   // v818 (Knight of Kings [W])
 
     // Re-entry guard. A card is mid-resolve for this player (e.g. a
     // Spell awaiting a picker / target prompt inside its own onPlay).
@@ -13524,11 +15684,21 @@ class GameEngine {
     if (ps._resolvingCard) return null;
 
     // Hand validation
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return null;
+    // ★ 28.8.: die Quelle kann die Hand ODER Crestinas Vorrat sein.
+    // `opts.fromCreation` reist im ohnehin vorhandenen Parameterbeutel
+    // mit — kein neuer Parameter durch sieben Spielwege. Ist der
+    // Vorrat gerade nicht benutzbar (Crestina tot, weg, eingefroren,
+    // negiert), liefert der Helfer `null` und die Karte ist damit
+    // unspielbar; dieselbe Wahrheit, die auch das Ausgrauen liest.
+    const quelle = this.handSourceList(pi, opts.fromCreation);
+    if (!quelle) return null;
+    if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return null;
 
     // Card data lookup (uses engine's cached card DB)
     const cardData = this._getCardDB()[cardName];
     if (!cardData || !expectedTypes.includes(cardData.cardType)) return null;
+    // v656: scharfgestellter Gratis-Artefakt-Kauf — nur Artefakte.
+    if (cardData.cardType !== 'Artifact' && this.freeArtifactArmed(pi)) return null;
 
     // Divine Gift of Creation lock — cards with locked names can't be played this turn
     if (ps._creationLockedNames?.has(cardName)) return null;
@@ -13654,6 +15824,17 @@ class GameEngine {
       return null;
     }
 
+    // ── ALLEINIGER ANGRIFF (v726, Knife Throw) ────────────────────
+    // „This must be the only Attack you play this turn." Die Karte,
+    // die das fordert, stempelt `ps._soleAttackTurn = gs.turn`; danach
+    // ist in diesem Zug KEIN weiterer Attack mehr spielbar — fuer
+    // KEINEN Helden, denn der Text sagt „you", nicht „this Hero".
+    // Generischer Vertrag: jede kuenftige Karte mit diesem Satz setzt
+    // denselben Stempel.
+    if (cardData.cardType === 'Attack' && ps._soleAttackTurn === this.gs.turn) {
+      return null;
+    }
+
     // Blinded heroes can't play Attacks or Spells whose script declares
     // `requiresTarget: true`. AoE-only cards (no requiresTarget flag)
     // are still legal — that's the whole point of the status. Mirror in
@@ -13711,9 +15892,8 @@ class GameEngine {
     if (hero._maxActionsPerTurn && (hero._actionsThisTurn || 0) >= hero._maxActionsPerTurn) return null;
     // One-turn action lock (Treasure Hunter's Backpack, etc.)
     if (hero._actionLockedTurn === this.gs.turn) return null;
-    // Spielerweite Aktionssperre (Kent bei negativem Gold) — gleicher
-    // Geltungsbereich wie der Rundenstempel darueber.
-    if (this.areActionsBlocked(pi)) return null;
+    // (Die spielerweite Sperre steht weiter oben, vor der Fall-
+    // unterscheidung — hier stand bis 28.8. eine zweite Kopie.)
 
     // Spell school / level requirements — centralized check (handles levelOverrideCards, bypassLevelReq, negation).
     // Wolflesia-style Creature spell-cast: bypasses the host hero's
@@ -13767,6 +15947,7 @@ class GameEngine {
     // activated effect is a separate, already-gated step.
     if (script?.blockedByHandLock && ps.handLocked && cardData.cardType !== 'Creature') return null;
     if (script?.blockedByDrawLock && ps.drawLocked && cardData.cardType !== 'Creature') return null;
+    if (script?.blockedByPileLock && cardData.cardType !== 'Creature' && this.isPileLockedFor(pi)) return null;   // v826
 
     // Hero-specific card restrictions (e.g. duplicate attack bans)
     const heroScript = loadCardEffect(hero.name);
@@ -13792,9 +15973,10 @@ class GameEngine {
     const usingSilenceBonus = cardData.cardType === 'Spell'
       && ps._spellLockTurn === gs.turn
       && ps._silenceBonusSpell === gs.turn;
-    let isInherentAction = usingSilenceBonus || (typeof script?.inherentAction === 'function'
-      ? script.inherentAction(gs, pi, heroIdx, this, { zoneSlot: opts.zoneSlot })
-      : script?.inherentAction === true);
+    // v601: Karten- UND Heldenvertrag an einer Stelle (Baaliel) —
+    // `zoneSlot` geht weiterhin an den Kartenvertrag.
+    let isInherentAction = usingSilenceBonus
+      || this.cardHasInherentAction(pi, heroIdx, cardData, { zoneSlot: opts.zoneSlot });
 
     // Berserk free-Attack grant. A Berserked Hero's Attack is treated
     // as inherent (additional Action — doesn't consume the
@@ -13825,7 +16007,33 @@ class GameEngine {
       wasBerserkGranted = true;
     }
 
+    // v654: Lauscher ueber die BESTANDENE Pruefung informieren, solange
+    // die Karte noch auf der Hand liegt (Handindex-Rabatte sind nach dem
+    // Splice weg). Forbidden Grimoire misst hier, ob der Spell OHNE sie
+    // spielbar gewesen waere. Rein synchron, kein Reaktionsfenster.
+    this._notifyPlayValidated(heroOwner, heroIdx, cardData, handIndex);
+
     return { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction, wasBerserkGranted };
+  }
+
+  /**
+   * v654 — Vertrag `onPlayValidated(cardData, engine, ownerIdx, inst,
+   * heroIdx, handIndex)`: jede aktive Instanz des castenden Spielers
+   * darf synchron vermerken, dass ein Handspiel die Pruefung bestanden
+   * hat. Wird VOR dem Hand-Splice gerufen; darf keinen Zustand
+   * veraendern ausser dem eigenen Instanz-Zaehler. Rueckgabewert egal.
+   * Nicht gerufen fuer Effekt-Casts aus Deck/Ablage (castSpellFromPool),
+   * die keine Level-Pruefung durchlaufen.
+   */
+  _notifyPlayValidated(ownerIdx, heroIdx, cardData, handIndex) {
+    for (const inst of this.cardInstances) {
+      if (inst.faceDown || inst.controller !== ownerIdx) continue;
+      if (typeof inst.isActiveIn === 'function' && !inst.isActiveIn()) continue;
+      const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (typeof script?.onPlayValidated !== 'function') continue;
+      try { script.onPlayValidated(cardData, this, ownerIdx, inst, heroIdx, handIndex); }
+      catch (err) { console.error(`[Engine] onPlayValidated failed for "${inst.name}":`, err.message); }
+    }
   }
 
   /**
@@ -13883,6 +16091,28 @@ class GameEngine {
     const hero = ps.heroes[heroIdx];
     if (!hero?.name || hero.hp <= 0) return { played: false };
 
+    // ── ★ 28.8. (Als Vorgabe): ABBRUCH FUEHRT ZURUECK ZUR AUSWAHL ──
+    // Wer eine Aktion waehlt und sie dann abbricht (Zielwahl weg-
+    // geklickt, Bestaetigung verneint), hat sich umentschieden — nicht
+    // auf die ganze Zusatzaktion verzichtet. Frueher war jeder Abbruch
+    // das Ende: die Aktion war weg, und bei einem Zauber sogar die
+    // Karte (sie wanderte trotz Abbruch in die Ablage — siehe die
+    // Rueckabwicklung in `_resolveImmediateActionPick`).
+    //
+    // Nur der Abbruch DES AUSWAHL-PROMPTS selbst („Cancel (Esc)")
+    // beendet die Zusatzaktion. Die Listen werden je Runde NEU
+    // erhoben: eine Aktivierung kann den Zustand veraendert haben,
+    // und die zweite Runde soll den aktuellen Stand anbieten.
+    // Obergrenze und Log-Schluessel wie in `performImmediateActionAnyHero`,
+    // wo diese Schleife seit laengerem steht (dort allerdings nur fuer
+    // den Kreatur-Fall) — zwei Zahlen fuer dieselbe Reissleine waeren
+    // zwei Wahrheiten.
+    let _repromptGuard = 0;
+    while (true) {
+      if (++_repromptGuard > 24) {
+        this.log('immediate_action_reprompt_capped', { by: config.title });
+        return { played: false };
+      }
     let eligible = this.getHeroEligibleActionCards(playerIdx, heroIdx);
 
     // Optional card type filter (e.g. ['Attack', 'Spell'] for Invisibility Cloak)
@@ -13903,25 +16133,39 @@ class GameEngine {
       } catch { eligible = []; }
     }
 
-    // Also check for activatable abilities on this hero (unless skipped)
-    const activatableAbilities = [];
-    if (!config.skipAbilities) {
-    for (let zi = 0; zi < (ps.abilityZones[heroIdx] || []).length; zi++) {
-      const slot = (ps.abilityZones[heroIdx] || [])[zi] || [];
-      if (slot.length === 0) continue;
-      const abilityName = slot[0];
-      const script = loadCardEffect(abilityName);
-      if (!script?.actionCost) continue;
-      const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
-      if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
-      // Bound doesn't block ability activations — see the comment on
-      // doActivateAbility in server.js for the full rationale.
-      if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) continue;
-      activatableAbilities.push({ heroIdx, zoneIdx: zi, abilityName, level: slot.length });
-    }
-    } // end skipAbilities check
+    // ── WAS DIE ZUSATZAKTION SONST NOCH BEZAHLEN KANN ──────────────
+    // ★ Als Ruling 28.8.: der Held bekommt eine Aktion FUER SICH
+    // SELBST. Damit kann er alles, was er auch in der Action Phase
+    // koennte — eine Handkarte spielen (oben), seinen eigenen
+    // aktiven Effekt zuenden (Champion) oder eine Ability mit
+    // Aktionskosten benutzen (Adventurousness).
+    //
+    // AUSDRUECKLICH NICHT: Kreatur-Effekte mit `creatureActionCost`
+    // (The Spawn Mother). Eine Kreatur ist unabhaengig von ihrem
+    // Slot-Helden — die geschenkte Aktion gehoert dem Helden, nicht
+    // seiner Support Zone. Deshalb steht hier kein Sammler dafuer,
+    // und das ist Absicht, kein Vergessen.
+    //
+    // Beide Listen kommen aus den ECHTEN Sammlern mit
+    // `ignoreActionEconomy` — vorher stand hier eine verkuerzte
+    // Nachbildung der Ability-Pruefung, die `canActivateAction`
+    // (Adventurousness' Gold-Riegel), Boris und den
+    // Distracting-Crystal-Riegel nicht kannte. Zwei Wahrheiten fuer
+    // dieselbe Frage, und die schwaechere gewann.
+    const activatableAbilities = config.skipAbilities ? [] : this.getActivatableAbilities(playerIdx, {
+      ignoreActionEconomy: true, onlyHeroIdx: heroIdx, ownSideOnly: true,
+    });
 
-    if (eligible.length === 0 && activatableAbilities.length === 0) return { played: false };
+    // Ein Karten-Typfilter (Invisibility Cloak „nur Attack", Spider
+    // Dance „nur Spider") beschreibt eine eingeschraenkte Aktion — die
+    // bezahlt dann auch keinen Brett-Effekt.
+    const eingeschraenkt = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
+    const activatableHeroEffects = (eingeschraenkt || config.skipHeroEffects) ? [] : this.getActiveHeroEffects(playerIdx, {
+      ignoreActionEconomy: true, onlyHeroIdx: heroIdx, onlyActionCost: true,
+    });
+
+    if (eligible.length === 0 && activatableAbilities.length === 0
+        && activatableHeroEffects.length === 0) return { played: false };
 
     // Show hero-action prompt
     const actionResult = await this.promptGeneric(playerIdx, {
@@ -13930,22 +16174,109 @@ class GameEngine {
       heroName: hero.name,
       eligibleCards: eligible,
       activatableAbilities,
+      activatableHeroEffects,
+      // ── KOSMETIK (Als Vorgaben 28.8.) ──────────────────────────
+      // `showCard`: der Held, dem die Aktion gehoert, als Bild rechts
+      // am Panel — dieselbe Infrastruktur, die confirm/optionPicker
+      // schon nutzen. Bei diesem Prompt steht der Held fest, also
+      // ist das Bild eindeutig (die AnyHero-Variante laesst es
+      // deshalb weg).
+      showCard: hero.name,
+      // `panelPlacement`: das Panel sass mittig ueber der EIGENEN
+      // Bretthaelfte — also genau ueber den Zonen und der Hand, mit
+      // denen der Spieler die Aktion ausfuehren soll. Es gehoert auf
+      // die Gegnerseite, wo waehrend der eigenen Aktion nichts zu
+      // klicken ist. Gilt fuer JEDE Zusatzaktion (Coffee, Mana
+      // Beacon …), nicht nur fuer Chalice — die Begruendung ist bei
+      // allen dieselbe.
+      panelPlacement: 'oppSide',
       title: config.title || 'Immediate Action',
       description: config.description || `Use an action with ${hero.name}!`,
       cancellable: true,
     });
 
+    // Abbruch des Auswahl-Prompts = „ich will gar keine Aktion".
     if (!actionResult || actionResult.cancelled) return { played: false };
+
+    const ergebnis = await this._resolveImmediateActionPick(
+      playerIdx, heroIdx, hero, actionResult, config, { activatableHeroEffects });
+    if (!ergebnis?.retry) return ergebnis;
+    // sonst: naechste Runde, Auswahl erneut anbieten
+    }
+  }
+
+  /**
+   * EINE gewaehlte Zusatzaktion aufloesen.
+   *
+   * Rueckgabe `{ retry: true }` heisst: die Aktion kam nicht zustande
+   * und der Spieler soll zurueck zur Auswahl. Jeder solche Ausgang
+   * muss VORHER alles zurueckgebaut haben, was er angefasst hat —
+   * Handkarte, HOPT-Stempel, Verfolgungs-Instanz.
+   */
+  async _resolveImmediateActionPick(playerIdx, heroIdx, hero, actionResult, config = {}, angebot = {}) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return { played: false };
+    const activatableHeroEffects = angebot.activatableHeroEffects || [];
+
+    // ── Helden-Effekt als Zusatzaktion ─────────────────────────────
+    if (actionResult.heroEffectActivation) {
+      const eintrag = activatableHeroEffects.find(e =>
+        e.heroIdx === heroIdx
+        && (!actionResult.effectName || e.effectName === actionResult.effectName));
+      if (!eintrag) return { retry: true };
+      const script = loadCardEffect(eintrag.effectName);
+      if (!script?.onHeroEffect) return { retry: true };
+      const inst = this.cardInstances.find(c =>
+        c.owner === playerIdx && c.zone === 'hero' && c.heroIdx === heroIdx
+      );
+      if (!inst) return { retry: true };
+
+      // Wiedereintritts-Riegel wie in `doActivateHeroEffect` — ein
+      // zweiter Klick waehrend eines offenen Ziel-Prompts wuerde den
+      // Effekt sonst doppelt aufloesen.
+      const inProgressKey = `${playerIdx}:${heroIdx}`;
+      if (!this.gs._heroEffectInProgress) this.gs._heroEffectInProgress = {};
+      if (this.gs._heroEffectInProgress[inProgressKey]) return { played: false };
+      this.gs._heroEffectInProgress[inProgressKey] = true;
+      this._lastPromptGerryDeclined = false;
+      let heErgebnis = null;
+      try {
+        heErgebnis = await this.resolveHeroEffectActivation(playerIdx, heroIdx, {
+          name: eintrag.effectName,
+          script,
+          inst,
+          hoptKey: `hero-effect:${eintrag.effectName}:${playerIdx}:${heroIdx}`,
+        }, {
+          // Die Aktion WURDE bezahlt (vom gewaehrenden Effekt), also
+          // feuert `onAnyActionResolved` — aber als Zusatzaktion, und
+          // ohne Phasenwechsel: der Haupt-Slot ist unberuehrt.
+          isActionCost: true,
+          istZusatzaktion: true,
+          hauptSlotVerbraucht: false,
+        });
+      } finally {
+        delete this.gs._heroEffectInProgress[inProgressKey];
+      }
+      this.sync();
+      // Abgebrochen (`onHeroEffect` lieferte false, kein Gerrymander-
+      // Veto): der Kern hat den HOPT-Stempel gar nicht erst gesetzt,
+      // es ist also nichts zurueckzubauen — zurueck zur Auswahl.
+      if (!heErgebnis?.resolved) return { retry: true };
+      this.log('immediate_action', {
+        hero: hero.name, card: eintrag.effectName, cardType: 'Hero Effect', by: config.title,
+      });
+      return { played: true, cardName: eintrag.effectName, cardType: 'Hero Effect' };
+    }
 
     // Handle ability activation
     if (actionResult.abilityActivation) {
       const { zoneIdx } = actionResult;
       const slot = (ps.abilityZones[heroIdx] || [])[zoneIdx] || [];
-      if (slot.length === 0) return { played: false };
+      if (slot.length === 0) return { retry: true };
       const abilityName = slot[0];
       const level = slot.length;
       const script = loadCardEffect(abilityName);
-      if (!script?.actionCost || !script?.onActivate) return { played: false };
+      if (!script?.actionCost || !script?.onActivate) return { retry: true };
 
       const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
       if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
@@ -13954,32 +16285,66 @@ class GameEngine {
       const inst = this.cardInstances.find(c =>
         c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === heroIdx && c.zoneSlot === zoneIdx
       );
-      if (!inst) return { played: false };
+      if (!inst) {
+        // Stempel wieder loesen — die Aktivierung hat nie stattgefunden.
+        delete this.gs.hoptUsed[hoptKey];
+        return { retry: true };
+      }
 
       this._broadcastEvent('ability_activated', { owner: playerIdx, heroIdx, zoneIdx, abilityName });
       const ctx = this._createContext(inst, {});
-      await script.onActivate(ctx, level);
+      const abErgebnis = await script.onActivate(ctx, level);
+      // ── Abbruch (Als Vorgabe 28.8.) ────────────────────────────
+      // `onActivate` liefert `false`, wenn der Spieler die eigene
+      // Abfrage der Ability weggeklickt hat. Der normale Weg
+      // (`doActivateAbility`) loest dann den HOPT-Stempel wieder —
+      // hier genauso, sonst waere die Ability fuer diesen Zug
+      // verbrannt, ohne gefeuert zu haben. Ein Gerrymander-Veto
+      // zaehlt dagegen als Verbrauch, gleiche Regel wie dort.
+      if (abErgebnis === false) {
+        if (this._lastPromptGerryDeclined) {
+          this._lastPromptGerryDeclined = false;
+          this.log('gerrymander_veto', { player: ps.username, ability: abilityName });
+          this.sync();
+          return { played: false };
+        }
+        delete this.gs.hoptUsed[hoptKey];
+        this.sync();
+        return { retry: true };
+      }
+      // ★ 28.8.: fehlte hier. Der normale Weg (`doActivateAbility`)
+      // feuert den Haken; ueber eine Zusatzaktion aktiviert blieb
+      // dieselbe Ability fuer Flashbang und Lunatic Cycle unsichtbar.
+      await this.runHooks('onAnyActionResolved', {
+        actionType: 'ability_activation', playerIdx, abilityName, heroIdx,
+        isAdditional: true, isInherent: false, isFree: false,
+        _skipReactionCheck: true,
+      });
       this.sync();
       return { played: true, cardName: abilityName, cardType: 'Ability' };
     }
 
-    const { cardName, handIndex, zoneSlot } = actionResult;
-    if (!cardName) return { played: false };
+    const { cardName, handIndex, zoneSlot, fromCreation } = actionResult;
+    if (!cardName) return { retry: true };
 
     const cardDB = this._getCardDB();
     const cardData = cardDB[cardName];
-    if (!cardData) return { played: false };
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return { played: false };
+    if (!cardData) return { retry: true };
+    // ★ 28.8.: Ein geschenkter Sofort-Zug ist ein SPIELEN im Sinne von
+    // Crestinas Text, also gilt der Vorrat auch hier.
+    const quelle = this.handSourceList(playerIdx, fromCreation);
+    if (!quelle) return { retry: true };
+    if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { retry: true };
 
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
-    if (!ACTION_TYPES.includes(cardData.cardType)) return { played: false };
+    if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
 
     if (hasCardType(cardData, 'Creature')) {
-      if (zoneSlot === undefined || zoneSlot < 0) return { played: false };
+      if (zoneSlot === undefined || zoneSlot < 0) return { retry: true };
       if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-      if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { played: false };
+      if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) return { retry: true };
 
-      ps.hand.splice(handIndex, 1);
+      quelle.splice(handIndex, 1);
 
       // Route through `summonCreatureWithHooks` so beforeSummon (sacrifice
       // costs, by-Cosmic gates, etc.) fires. The earlier path called
@@ -14004,9 +16369,17 @@ class GameEngine {
           delete ps._placementConsumedByCard;
           this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title, selfPlaced: true });
         } else {
-          ps.hand.push(cardName);
+          // An die URSPRUENGLICHE Stelle zurueck, nicht ans Ende —
+          // die Handreihenfolge ist fuer den Spieler und fuer
+          // handIndex-basierte Effekte sichtbar.
+          const _retIdx = Math.min(handIndex, quelle.length);
+          quelle.splice(_retIdx, 0, cardName);
+          this._broadcastEvent('play_pile_transfer', {
+            owner: playerIdx, cardName, from: 'hand', to: 'hand',
+            fromHandIdx: _retIdx, toHandIdx: _retIdx,
+          });
           this.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_or_placement_failed', by: config.title });
-          return { played: false };
+          return { retry: true };
         }
       } else {
         const { actualSlot } = placeResult;
@@ -14021,91 +16394,18 @@ class GameEngine {
       // Reached only when a Creature was actually summoned (the refund
       // path returns earlier).
       await this.runHooks('onAnyActionResolved', {
-        actionType: 'creature', playerIdx, cardName, heroIdx,
+        actionType: 'creature', playerIdx, cardName, playedCardName: cardName, heroIdx,
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
       });
 
     } else {
-      // Spell or Attack
-      ps.hand.splice(handIndex, 1);
-      const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
-      // Wisdom (level-gap coverage) cost — same contract as the
-      // regular doPlaySpell flow. Pay BEFORE running the spell's
-      // onPlay so the cost lands deterministically. Spell has just
-      // left hand at the splice above, so the full hand counts now.
-      if (cardData.cardType === 'Spell') {
-        const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
-        if (wisdomCost > 0) {
-          await this.actionPromptForceDiscard(playerIdx, wisdomCost, {
-            title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-          });
-        }
-      }
-      this.gs._immediateActionContext = true;
-      // Start a fresh damage log so afterSpellResolved sees the targets
-      // this spell actually hit (Bartas needs the unique-target list to
-      // decide whether to offer a second cast).
-      const hadPriorLog = this.gs._spellDamageLog !== undefined;
-      if (!hadPriorLog) this.gs._spellDamageLog = [];
-      // Apply target exclusion if configured (Invisibility Cloak, etc.)
-      if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
-      // Spell-in-flight counter — gates advancePhase so the active player
-      // can't end the turn while this spell is mid-resolve. Bumped before
-      // onPlay (which may open targeting prompts) and released in finally.
-            // Stale-flag safety net (Als Rain-vs-DDG-Report follow-up): a
-      // depth-0 negation used to leave `_spellNegatedByEffect` stamped
-      // with nothing to delete it, silently voiding the NEXT spell's
-      // damage. preDamageMultiTargetWindow no longer stamps at depth 0,
-      // and this guard clears any leaked flag when an OUTERMOST
-      // resolution begins (depth 0 -> 1 only — nested casts must keep
-      // an outer negated spell's flag intact).
-      if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
-
-      this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
-      // Resolving-Spell stack: tracked alongside the depth counter so
-      // `addHeroStatus` / `actionAddBuff` / `_actionHealHeroImpl` can
-      // auto-honor Anti Magic without scripts threading a source
-      // argument. Only Spells push (Attacks don't — Anti Magic only
-      // blocks Spells); for Attacks the stack stays at whatever the
-      // caller had.
-      if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
-      try {
-        await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
-        if (config.excludeTargets) delete this.gs._spellExcludeTargets;
-        delete this.gs._immediateActionContext;
-
-        // Fire afterSpellResolved for Spells AND Attacks — parity with
-        // the normal spell-play path in server.js so hero passives like
-        // Bartas (Bomb Berserker), Andras, Beato, Luck, Pharaoh's
-        // Divinity Counter, etc. trigger off immediate-action Spells
-        // AND Attacks too (was Spell-only, which silently dropped
-        // immediate-action Attacks).
-        if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
-            && !this.gs._spellNegatedByEffect) {
-          const uniqueTargets = [];
-          const seenIds = new Set();
-          for (const t of (this.gs._spellDamageLog || [])) {
-            if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-          }
-          await this.runHooks('afterSpellResolved', {
-            spellName: cardName, spellCardData: cardData,
-            heroIdx, casterIdx: playerIdx,
-            damageTargets: uniqueTargets,
-            isSecondCast: !!this.gs._bartasSecondCast,
-            _skipReactionCheck: true,
-          });
-        }
-        if (!hadPriorLog) delete this.gs._spellDamageLog;
-        delete this.gs._spellNegatedByEffect;
-      } finally {
-        this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
-        if (cardData.cardType === 'Spell') this._popResolvingSpell();
-      }
-
-      ps.discardPile.push(cardName);
-      this._untrackCard(inst.id);
-      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: config.title });
+      // v646: der eigentliche Guss steht in `_castSpellImmediately` — Call
+      // for Help giesst damit auch direkt aus dem DECK.
+      const r = await this._castSpellImmediately(playerIdx, heroIdx, cardName, {
+        fromZone: 'hand', pool: quelle, poolIndex: handIndex, by: config.title, excludeTargets: config.excludeTargets,
+      });
+      if (r.cancelled) return { retry: true };
     }
 
     this.sync();
@@ -14116,13 +16416,122 @@ class GameEngine {
     if (this.gs._spellFreeAction) {
       delete this.gs._spellFreeAction;
       this.log('free_action_refund', { card: cardName, hero: hero.name, by: config.title });
-      const another = await this.performImmediateAction(playerIdx, heroIdx, config);
+      // Die Nachschlag-Aktion oeffnet dieselbe Auswahl wie die erste:
+      // bei einer AnyHero-Zusatzaktion darf der Spieler den Helden
+      // erneut frei waehlen.
+      const another = angebot.chainAnyHero
+        ? await this.performImmediateActionAnyHero(playerIdx, config)
+        : await this.performImmediateAction(playerIdx, heroIdx, config);
       return { played: true, cardName, cardType: cardData.cardType, chainedAction: another };
     }
 
     return { played: true, cardName, cardType: cardData.cardType };
   }
 
+  /**
+   * ★ SPELL/ATTACK SOFORT GIESSEN — EINE Auslegung (v646).
+   *
+   * Der Kern des Zusatz-Gusses aus `_resolveImmediateActionPick`,
+   * herausgezogen, damit Karten wie Call for Help denselben Weg auch
+   * aus dem DECK gehen koennen („play it immediately … as if it were
+   * part of your hand"): Wisdom-Kosten, Aufloesungstiefe, Spell-Stack,
+   * Schadensprotokoll, `onPlay`, `afterSpellResolved`, Abbruch-Rueckgabe
+   * und Discard-Routing an EINER Stelle.
+   *
+   * @param {object} opts
+   *   fromZone    'hand' | 'deck' — woher die Karte kommt (Log/Animation)
+   *   pool        Array, aus dem sie genommen wird (Hand, Creation Zone, Deck)
+   *   poolIndex   Index darin; bei Abbruch kommt sie dorthin zurueck
+   *   by          Name der ausloesenden Karte (Log)
+   *   excludeTargets  optionale Zielausschlussliste
+   * @returns {{ cancelled: boolean }}
+   */
+  async _castSpellImmediately(playerIdx, heroIdx, cardName, opts = {}) {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    const cardData = this._getCardDB()[cardName];
+    if (!ps || !hero || !cardData) return { cancelled: true };
+    const pool = opts.pool || ps.hand;
+    const poolIndex = typeof opts.poolIndex === 'number' ? opts.poolIndex : pool.indexOf(cardName);
+    if (poolIndex < 0 || pool[poolIndex] !== cardName) return { cancelled: true };
+    const fromZone = opts.fromZone || 'hand';
+    if (fromZone === 'deck' && !this.pileOutAllowed(playerIdx, 'deck', opts)) return { cancelled: true };   // v818
+    pool.splice(poolIndex, 1);
+    if (fromZone === 'deck') {
+      this._broadcastEvent('deck_search_add', { cardName, playerIdx });
+      this.log('spell_cast_from_deck', { player: ps.username, card: cardName, by: opts.by || null });
+    }
+    const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
+    const _cancelVorher = this.gs._spellCancelled;
+    this.gs._spellCancelled = false;
+    if (cardData.cardType === 'Spell') {
+      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
+      if (wisdomCost > 0) {
+        await this.actionPromptForceDiscard(playerIdx, wisdomCost, {
+          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+        });
+      }
+    }
+    this.gs._immediateActionContext = true;
+    const hadPriorLog = this.gs._spellDamageLog !== undefined;
+    if (!hadPriorLog) this.gs._spellDamageLog = [];
+    if (opts.excludeTargets) this.gs._spellExcludeTargets = opts.excludeTargets;
+    if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
+    this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
+    if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
+    try {
+      await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+      if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
+      delete this.gs._immediateActionContext;
+      if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
+          && !this.gs._spellNegatedByEffect) {
+        const uniqueTargets = [];
+        const seenIds = new Set();
+        for (const t of (this.gs._spellDamageLog || [])) {
+          if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
+        }
+        await this.runHooks('afterSpellResolved', {
+          // v778: siehe Zwillingsstelle in server.js — wessen Heldenreihe
+          // `heroIdx` meint. Der Sofort-Guss laeuft ueber den Helden des
+          // Giessers, sofern der Aufrufer nichts anderes sagt.
+          heroOwner: opts.heroOwner ?? playerIdx,
+          spellName: cardName, spellCardData: cardData,
+          heroIdx, casterIdx: playerIdx,
+          damageTargets: uniqueTargets,
+          isSecondCast: !!this.gs._bartasSecondCast,
+          _skipReactionCheck: true,
+        });
+      }
+      if (!hadPriorLog) delete this.gs._spellDamageLog;
+      delete this.gs._spellNegatedByEffect;
+    } finally {
+      this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
+      if (cardData.cardType === 'Spell') this._popResolvingSpell();
+    }
+    const abgebrochen = this.gs._spellCancelled && !this.gs._spellNegatedByEffect;
+    this.gs._spellCancelled = _cancelVorher;
+    if (abgebrochen) {
+      const _retIdx = Math.min(poolIndex, pool.length);
+      pool.splice(_retIdx, 0, cardName);
+      this._untrackCard(inst.id);
+      if (fromZone === 'hand') {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName, from: 'hand', to: 'hand',
+          fromHandIdx: _retIdx, toHandIdx: _retIdx,
+        });
+      }
+      delete this.gs._pendingCardReveal;
+      delete this.gs._pendingPlayLog;
+      if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
+      this.log('immediate_action_cancelled', { hero: hero.name, card: cardName, by: opts.by || null });
+      this.sync();
+      return { cancelled: true };
+    }
+    ps.discardPile.push(cardName);
+    this._untrackCard(inst.id);
+    this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
+    return { cancelled: false };
+  }
   /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
    * without restricting to a single hero — the player drags a card onto
@@ -14162,6 +16571,11 @@ class GameEngine {
     const eligibleSet = new Set();
     const heroIndicesByCard = {};
     const activatableAbilities = [];
+    const activatableHeroEffects = [];
+    // Ein Typ-/Namensfilter beschreibt eine EINGESCHRAENKTE Aktion
+    // (Invisibility Cloak, Spider Dance) — die bezahlt keinen
+    // Brett-Effekt. Gleiche Regel wie in `performImmediateAction`.
+    const eingeschraenktAny = !!config.allowedCardTypes || typeof config.cardNameFilter === 'function';
 
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
@@ -14188,24 +16602,24 @@ class GameEngine {
         heroIndicesByCard[name].push(hi);
       }
 
-      // Activatable abilities on this hero
+      // Activatable abilities on this hero — ueber den echten Sammler,
+      // gleiche Begruendung wie in `performImmediateAction`.
       if (!config.skipAbilities) {
-        if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) continue;
-        for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
-          const slot = (ps.abilityZones[hi] || [])[zi] || [];
-          if (slot.length === 0) continue;
-          const abilityName = slot[0];
-          const script = loadCardEffect(abilityName);
-          if (!script?.actionCost) continue;
-          const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
-          if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
-          activatableAbilities.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
-        }
+        for (const e of this.getActivatableAbilities(playerIdx, {
+          ignoreActionEconomy: true, onlyHeroIdx: hi, ownSideOnly: true,
+        })) activatableAbilities.push(e);
+      }
+      // Aktive Helden-Effekte mit Aktionskosten (Champion & Co.)
+      if (!eingeschraenktAny && !config.skipHeroEffects) {
+        for (const e of this.getActiveHeroEffects(playerIdx, {
+          ignoreActionEconomy: true, onlyHeroIdx: hi, onlyActionCost: true,
+        })) activatableHeroEffects.push(e);
       }
     }
 
     const eligible = [...eligibleSet];
-    if (eligible.length === 0 && activatableAbilities.length === 0) return { played: false };
+    if (eligible.length === 0 && activatableAbilities.length === 0
+        && activatableHeroEffects.length === 0) return { played: false };
 
     // Show heroAction prompt with no specific hero — player can use any
     const actionResult = await this.promptGeneric(playerIdx, {
@@ -14214,6 +16628,11 @@ class GameEngine {
       eligibleCards: eligible,
       heroIndicesByCard,
       activatableAbilities,
+      activatableHeroEffects,
+      // Kein `showCard` — hier steht der handelnde Held noch nicht
+      // fest, ein Bild waere geraten. Die Platzierung gilt trotzdem:
+      // geklickt wird auf der eigenen Seite.
+      panelPlacement: 'oppSide',
       title: config.title || 'Immediate Action',
       description: config.description || 'Use an Action with any Hero!',
       cancellable: config.cancellable !== undefined ? config.cancellable : false,
@@ -14221,204 +16640,29 @@ class GameEngine {
 
     if (!actionResult || actionResult.cancelled) return { played: false };
 
-    // Handle ability activation
-    if (actionResult.abilityActivation) {
-      const { heroIdx: abHeroIdx, zoneIdx } = actionResult;
-      if (abHeroIdx == null) return { played: false };
-      const slot = (ps.abilityZones[abHeroIdx] || [])[zoneIdx] || [];
-      if (slot.length === 0) return { played: false };
-      const abilityName = slot[0];
-      const level = slot.length;
-      const script = loadCardEffect(abilityName);
-      if (!script?.actionCost || !script?.onActivate) return { played: false };
+    // ── ★ 28.8.: EINE Aufloesung fuer beide Auswahl-Wege ───────────
+    // Hier standen ~200 Zeilen, die den Helden-Effekt-, Ability-,
+    // Kreatur- und Zauber-Zweig von `performImmediateAction` Wort fuer
+    // Wort wiederholten — mit Abweichungen, die niemand gewollt hat:
+    // die Rueckkehr zur Auswahl gab es NUR fuer Kreaturen, ein
+    // abgebrochener Zauber verlor seine Karte in die Ablage, und eine
+    // abgebrochene Ability behielt ihren Once-per-turn-Stempel.
+    // Der einzige echte Unterschied ist, WELCHER Held handelt: hier
+    // sagt es die Antwort, dort steht er fest. Das gilt fuer alle drei
+    // Antwortformen — Handkarte, Ability und Helden-Effekt tragen den
+    // Helden alle im selben Feld.
+    const handelnderHeld = actionResult.heroIdx;
+    if (handelnderHeld == null) return { played: false };
+    const heldObjekt = ps.heroes[handelnderHeld];
+    if (!heldObjekt?.name || heldObjekt.hp <= 0) return { played: false };
 
-      const hoptKey = `ability-action:${abilityName}:${playerIdx}`;
-      if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
-      this.gs.hoptUsed[hoptKey] = this.gs.turn;
-
-      const inst = this.cardInstances.find(c =>
-        c.owner === playerIdx && c.zone === 'ability' && c.heroIdx === abHeroIdx && c.zoneSlot === zoneIdx
-      );
-      if (!inst) return { played: false };
-
-      this._broadcastEvent('ability_activated', { owner: playerIdx, heroIdx: abHeroIdx, zoneIdx, abilityName });
-      const ctx = this._createContext(inst, {});
-      await script.onActivate(ctx, level);
-      this.sync();
-      return { played: true, cardName: abilityName, cardType: 'Ability' };
-    }
-
-    // Handle card play — heroIdx comes from the client response
-    const { cardName, handIndex, heroIdx: responseHeroIdx, zoneSlot } = actionResult;
-    if (!cardName || responseHeroIdx == null) return { played: false };
-
-    const cardData = cardDB[cardName];
-    if (!cardData) return { played: false };
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return { played: false };
-
-    const hero = ps.heroes[responseHeroIdx];
-    if (!hero?.name || hero.hp <= 0) return { played: false };
-
-    const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
-    if (!ACTION_TYPES.includes(cardData.cardType)) return { played: false };
-
-    if (cardData.cardType === 'Creature') {
-      // Splice the card from hand FIRST (matches the normal play path
-      // — beforeSummon hooks like Dragon Pilot's tribute and Dark
-      // Deepsea God's bounce-place expect the spell-target to already
-      // be off the hand stack when they prompt for sacrifice). If
-      // anything fizzles below we refund the splice.
-      ps.hand.splice(handIndex, 1);
-      const placeResult = await this.summonCreatureWithHooks(
-        cardName, playerIdx, responseHeroIdx, zoneSlot ?? -1,
-        {
-          source: config.title,
-          // `_isNormalSummon: true` — additional-action paths should
-          // fire on-summon triggers gated on this flag (Spawn Mother's
-          // AOE, Orthos's Loyal trigger, etc.). Same rationale as the
-          // hero-locked variant.
-          hookExtras: { _isNormalSummon: true },
-        },
-      );
-      if (!placeResult) {
-        // beforeSummon failed (sacrifice cancelled, beforeSummon
-        // refused, or zone unavailable). Some cards self-place
-        // inside beforeSummon (DDG bounce-place, 500 Piranhas) and
-        // signal it via `_placementConsumedByCard`. In that case the
-        // card is on the board already — leave it. Otherwise refund
-        // to hand so the player isn't punished for cancelling.
-        if (ps._placementConsumedByCard === cardName) {
-          delete ps._placementConsumedByCard;
-          this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title, selfPlaced: true });
-        } else {
-          // Glow back into the player's OWN hand (see Spell/Attack
-          // branch — same-slot pile-transfer suppresses the wrong
-          // "slid in from opponent's hand" auto-animation).
-          const _retIdx = ps.hand.length;
-          this._broadcastEvent('play_pile_transfer', {
-            owner: playerIdx, cardName, from: 'hand', to: 'hand',
-            fromHandIdx: _retIdx, toHandIdx: _retIdx,
-          });
-          ps.hand.push(cardName);
-          this.log('creature_fizzle', { card: cardName, reason: 'beforeSummon_or_placement_failed', by: config.title });
-          this.sync();
-          continue; // cancelled its own picker → re-prompt the bonus-Action chooser
-        }
-      } else {
-        const { actualSlot } = placeResult;
-        this._broadcastEvent('summon_effect', { owner: playerIdx, heroIdx: responseHeroIdx, zoneSlot: actualSlot, cardName });
-        this.log('immediate_action', { hero: hero.name, card: cardName, cardType: 'Creature', by: config.title });
-      }
-
-      // Universal action-resolved hook for the immediate-action creature
-      // summon — parity with server.js doPlayCreature so hero passives
-      // that react to "this Hero summoned a Creature" (Pharaoh's Divinity
-      // Counter, etc.) fire here too. Reached only when a Creature was
-      // actually summoned (the refund path `continue`s above).
-      await this.runHooks('onAnyActionResolved', {
-        actionType: 'creature', playerIdx, cardName, heroIdx: responseHeroIdx,
-        isAdditional: true, isInherent: false, isFree: false,
-        _skipReactionCheck: true,
-      });
-    } else {
-      // Spell or Attack
-      ps.hand.splice(handIndex, 1);
-      const inst = this._trackCard(cardName, playerIdx, 'hand', responseHeroIdx, -1);
-      this.gs._immediateActionContext = true;
-      if (config.excludeTargets) this.gs._spellExcludeTargets = config.excludeTargets;
-      // Fresh cancel flag so we can tell if the player backed out of
-      // THIS Spell/Attack's own picker (vs. it resolving/being negated).
-      this.gs._spellCancelled = false;
-      // Fresh damage log so afterSpellResolved sees this play's targets
-      // (parity with the hero-locked variant + server.js doPlaySpell).
-      const hadPriorLog = this.gs._spellDamageLog !== undefined;
-      if (!hadPriorLog) this.gs._spellDamageLog = [];
-            // Stale-flag safety net (Als Rain-vs-DDG-Report follow-up): a
-      // depth-0 negation used to leave `_spellNegatedByEffect` stamped
-      // with nothing to delete it, silently voiding the NEXT spell's
-      // damage. preDamageMultiTargetWindow no longer stamps at depth 0,
-      // and this guard clears any leaked flag when an OUTERMOST
-      // resolution begins (depth 0 -> 1 only — nested casts must keep
-      // an outer negated spell's flag intact).
-      if ((this.gs._spellResolutionDepth || 0) === 0) delete this.gs._spellNegatedByEffect;
-
-      this.gs._spellResolutionDepth = (this.gs._spellResolutionDepth || 0) + 1;
-      // Resolving-Spell stack — see hero-locked variant above for full
-      // rationale. Mirrored here so the any-hero immediate-action path
-      // (Lunar Eclipse, The Master's Plan replacement Actions, etc.)
-      // also auto-honors Anti Magic in its non-damage helpers.
-      if (cardData.cardType === 'Spell') this._pushResolvingSpell(cardName);
-      try {
-        await this.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx: responseHeroIdx, _skipReactionCheck: true });
-        if (config.excludeTargets) delete this.gs._spellExcludeTargets;
-        delete this.gs._immediateActionContext;
-        // Player cancelled the chosen Spell/Attack via its OWN back/
-        // cancel (not negated by an effect) → DON'T consume the bonus
-        // Action: refund the card and re-open the chooser.
-        if (this.gs._spellCancelled && !this.gs._spellNegatedByEffect) {
-          this.gs._spellCancelled = false;
-          // Card just reappears in the player's OWN hand with a glow —
-          // a same-slot `play_pile_transfer` (src ≈ dst) suppresses the
-          // hand-diff auto-animation (which would otherwise wrongly
-          // slide it in from the opponent's hand) and shows the glow.
-          const _retIdx = ps.hand.length;
-          this._broadcastEvent('play_pile_transfer', {
-            owner: playerIdx, cardName, from: 'hand', to: 'hand',
-            fromHandIdx: _retIdx, toHandIdx: _retIdx,
-          });
-          ps.hand.push(cardName);
-          this._untrackCard(inst.id);
-          if (!hadPriorLog) delete this.gs._spellDamageLog;
-          this.sync();
-          continue;
-        }
-        // Fire afterSpellResolved for Spells AND Attacks — parity with
-        // the hero-locked variant + server.js so hero passives like
-        // Bartas, Andras, Pharaoh's Divinity Counter, etc. trigger off
-        // immediate-action-ANY-hero plays (Lunar Eclipse / The Master's
-        // Plan replacement Actions). Was previously absent here, so
-        // those replacement Spells/Attacks silently skipped the hook.
-        if ((cardData.cardType === 'Spell' || cardData.cardType === 'Attack')
-            && !this.gs._spellNegatedByEffect) {
-          const uniqueTargets = [];
-          const seenIds = new Set();
-          for (const t of (this.gs._spellDamageLog || [])) {
-            if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-          }
-          await this.runHooks('afterSpellResolved', {
-            spellName: cardName, spellCardData: cardData,
-            heroIdx: responseHeroIdx, casterIdx: playerIdx,
-            damageTargets: uniqueTargets,
-            isSecondCast: !!this.gs._bartasSecondCast,
-            _skipReactionCheck: true,
-          });
-        }
-        if (!hadPriorLog) delete this.gs._spellDamageLog;
-        delete this.gs._spellNegatedByEffect;
-      } finally {
-        this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
-        if (cardData.cardType === 'Spell') this._popResolvingSpell();
-      }
-      ps.discardPile.push(cardName);
-      this._untrackCard(inst.id);
-      this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: config.title });
-    }
-
-    this.sync();
-    await this._delay(400);
-
-    if (this.gs._spellFreeAction) {
-      delete this.gs._spellFreeAction;
-      this.log('free_action_refund', { card: cardName, hero: hero.name, by: config.title });
-      const another = await this.performImmediateActionAnyHero(playerIdx, config);
-      return { played: true, cardName, cardType: cardData.cardType, chainedAction: another };
-    }
-
-    return { played: true, cardName, cardType: cardData.cardType };
+    const ergebnis = await this._resolveImmediateActionPick(
+      playerIdx, handelnderHeld, heldObjekt, actionResult, config,
+      { activatableHeroEffects, chainAnyHero: true });
+    if (!ergebnis?.retry) return ergebnis;
+    continue;
     } // end re-prompt while-loop
   }
-
-  // ─── TURN / PHASE MANAGEMENT ───────────────
 
   /**
    * Start the game's first turn. Call once after init().
@@ -14523,7 +16767,20 @@ class GameEngine {
     for (const ps of this.gs.players) {
       if (!ps) continue;
       for (const hero of (ps.heroes || [])) {
-        if (hero?.charmedBy != null) {
+        // DAUERHAFTE UEBERNAHME (v718, Paraseed Control) laeuft NICHT
+        // zurueck. Sie benutzt dieselbe Marke `charmedBy` wie Charme —
+        // daran haengen Client, Server und saemtliche Ziel-/Aktions-
+        // sammler — und wird hier am Stempel `permaControlBy` erkannt
+        // und neu gesetzt statt geloescht. Der Charme-Status selbst
+        // wird bei ihr bewusst NICHT gefuehrt: ein dauerhaft
+        // uebernommener Held zaehlt wie ein eigener (Als Ruling 4.9.)
+        // und muss deshalb ausruestbar bleiben (heroCanBeEquipped).
+        if (hero?.permaControlBy != null) {
+          hero.charmedBy = hero.permaControlBy;
+          hero.charmedFromOwner = hero.permaControlFrom;
+          hero.charmedHeroIdx = hero.permaControlHeroIdx;
+          if (hero.statuses?.charmed) delete hero.statuses.charmed;
+        } else if (hero?.charmedBy != null) {
           delete hero.charmedBy;
           delete hero.charmedFromOwner;
           delete hero.charmedHeroIdx;
@@ -14537,6 +16794,10 @@ class GameEngine {
       }
     }
     delete this.gs._charmedSupportLocked;
+    // Support-Zonen-Sperre der dauerhaft uebernommenen Helden neu
+    // aufbauen — die Liste oben ist eine Zug-Liste, der Besitzwechsel
+    // ist es nicht.
+    this._rebuildPermanentSupportLocks();
 
     // ── Revert temporarily-stolen creatures (Deepsea Succubus, generic) ──
     // Mirrors the Charme Lv3 revert: creatures whose controller was flipped
@@ -14588,6 +16849,11 @@ class GameEngine {
     for (const ps of this.gs.players) {
       if (ps) {
         ps.summonLocked = false;
+        // Overflowing Chalice: keine Aktionen mehr diesen Zug. BEIDE
+        // Spieler zuruecksetzen, nicht nur der aktive — sonst schleppt
+        // sich eine in gegnerischer Runde gesetzte Sperre in den
+        // eigenen Zug hinueber.
+        ps.actionLocked = false;
         ps.summonLockExceptGreatmaw = false; // Greatmaw Remora partial lock
         ps.handLocked = false;
         ps.drawLocked = false;   // reiner Zieh-Lock (Sacred Jewel)
@@ -14600,6 +16866,7 @@ class GameEngine {
         ps.supportSpellUsedThisTurn = false;
         ps.potionsUsedThisTurn = 0;
         ps.attacksPlayedThisTurn = 0;
+        delete ps._soleAttackTurn;        // v726: Stempel ist zugbezogen
         ps.spellsPlayedThisTurn = 0;
         ps.comboLockHeroIdx = null;
         ps.heroesActedThisTurn = [];
@@ -14644,11 +16911,27 @@ class GameEngine {
         delete ps._handCostReductions;
         // Misfires namensweiter Nullpreis gilt ebenfalls nur „this turn".
         delete ps._freeArtifactNames;
-        // Effekt-Immunitaeten enden mit ihrer Quelle (Objektidentitaet);
+        // v656: ein nicht eingeloester Gratis-Artefakt-Riegel verfaellt.
+        delete ps._freeArtifactArmed;
+        // v668: verwaister True-Damage-Stempel (Monia Bot) verfaellt.
+        delete this.gs._redirectedTrueDamage;
+        // Effekt-Immunitaeten enden mit ihrer Quelle (Objektidentitaet)
         // der Zugbeginn raeumt trotzdem auf, damit die Liste nicht
         // ueber eine ganze Partie mitwaechst.
         if (this.gs._effectImmunities) this.gs._effectImmunities.length = 0;
         delete ps._magicLevelReductions;
+        // v654: zugweise befristete Kopien-Rabatte (siehe Registrierung
+        // von `_handLevelOffsetsExpireTurn`). Stempel aus einem
+        // frueheren Zug → Offset und Stempel fallen; Hero-Filter der
+        // Sparkfly Queen bleibt unberuehrt (sie stempelt nicht).
+        if (ps._handLevelOffsetsExpireTurn) {
+          for (const k of Object.keys(ps._handLevelOffsetsExpireTurn)) {
+            if (ps._handLevelOffsetsExpireTurn[k] < this.gs.turn) {
+              if (ps._handLevelOffsetsTransient) delete ps._handLevelOffsetsTransient[k];
+              delete ps._handLevelOffsetsExpireTurn[k];
+            }
+          }
+        }
         delete ps._bonusAbilityAttachments;
         // Drop the visible Divine Gift of Skill "Blessed" buff icon
         // alongside the bonus-attachments map — the bonus and the
@@ -14711,6 +16994,25 @@ class GameEngine {
     // reset is a cheap no-op).
     this._hookHeapDeltaByName = Object.create(null);
     this._hookHeapDeltaByCard = Object.create(null);
+
+    // ── Einmal-Schadensschilde verfallen (v697): „until the start of
+    // your next turn" — zu Beginn des Zuges ihres BESITZERS, VOR den
+    // Status-Ticks (die Ticks des neuen Zuges sind nicht mehr gedeckt).
+    {
+      const _ap = this.gs.activePlayer;
+      const _sweep = (list) => {
+        if (!Array.isArray(list) || list.length === 0) return;
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (list[i].ownerIdx === _ap) list.splice(i, 1);
+        }
+      };
+      for (const _p of this.gs.players) {
+        for (const _h of (_p?.heroes || [])) _sweep(_h?._oneShotDmgShields);
+      }
+      for (const _c of this.cardInstances) {
+        if (_c.zone === ZONES.SUPPORT) _sweep(_c.counters?._oneShotDmgShields);
+      }
+    }
 
     // Process status effects FIRST — before any card hooks fire
     // This ensures burn damage only hits burns from previous turns,
@@ -15281,7 +17583,7 @@ class GameEngine {
     }
     // Heap snapshot at turn boundary — lets us see growth across the
     // game without waiting for the heap-trip threshold to fire. If
-    // rss climbs steadily turn-over-turn, there's a structural leak;
+    // rss climbs steadily turn-over-turn, there's a structural leak
     // if it stays flat, the per-turn GC is keeping up.
     const mu = process.memoryUsage();
     const rssM = Math.round(mu.rss / 1024 / 1024);
@@ -15631,7 +17933,7 @@ class GameEngine {
     const ps = this.gs.players[pi];
     if (!ps) return false;
     // The main turn Action is only a "right now" option DURING the
-    // Action Phase (currentPhase 3). In MAIN1 it is a future phase;
+    // Action Phase (currentPhase 3). In MAIN1 it is a future phase
     // by MAIN2 it is spent or forfeit — either way not spendable here.
     const isActionPhase = (this.gs.currentPhase || 0) === 3;
     if (isActionPhase && (ps.heroesActedThisTurn || []).length === 0) return true;
@@ -16141,6 +18443,49 @@ class GameEngine {
    * @param {number} playerIdx
    * @returns {boolean}
    */
+  // ── v656: „Naechstes Artefakt gratis" — Dajan, Conqueror ───────────
+  // Scharfgestellter Gratis-Kauf: solange gesetzt, ist NUR ein Artefakt
+  // aus der Hand spielbar (Al 30.8.: alle anderen Handkarten grau, die
+  // Artefakte zeigen Cost 0). Der Server nimmt bei der Bezahlung den
+  // vollen Grundpreis heraus und loest den Riegel beim tatsaechlichen
+  // Spielen; der Zugbeginn raeumt ihn ab. Turn-gestempelt, damit ein
+  // verwaister Eintrag nie in einen spaeteren Zug hineinreicht.
+  armFreeArtifact(playerIdx, heroIdx, sourceName) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return;
+    ps._freeArtifactArmed = { heroIdx, source: sourceName || null, turn: this.gs.turn };
+  }
+  disarmFreeArtifact(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (ps) delete ps._freeArtifactArmed;
+  }
+  freeArtifactArmed(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    const a = ps?._freeArtifactArmed;
+    return (a && a.turn === this.gs.turn) ? a : null;
+  }
+  /**
+   * Gratis-Kauf einloesen: der scharfstellende Held bekommt jetzt den
+   * regulaeren Heldeneffekt-HOPT-Stempel (`hero-effect:<name>:<pi>:<hi>`
+   * — derselbe Schluessel, den der Server nach onHeroEffect setzt), der
+   * Riegel faellt. Vom Server an den drei Artefakt-Zahlstellen gerufen.
+   */
+  consumeFreeArtifact(playerIdx, cardName) {
+    const armed = this.freeArtifactArmed(playerIdx);
+    if (!armed) return false;
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[armed.heroIdx];
+    if (hero?.name) {
+      if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+      this.gs.hoptUsed[`hero-effect:${hero.name}:${playerIdx}:${armed.heroIdx}`] = this.gs.turn;
+    }
+    delete ps._freeArtifactArmed;
+    this.log('free_artifact_used', {
+      player: ps?.username, hero: hero?.name || armed.source, card: cardName,
+    });
+    return true;
+  }
+
   areActionsBlocked(playerIdx) {
     const ps = this.gs?.players?.[playerIdx];
     if (!ps) return false;
@@ -16153,6 +18498,17 @@ class GameEngine {
     // deshalb steht er hier VOR dem Heldenlauf: der findet nur lebende
     // Helden, ein toter Kent haette die Sperre sonst aufgehoben.
     if (ps._playerActionLockedTurn === (this.gs?.turn || 0)) return true;
+    // ── RUNDENWEITER RIEGEL (Overflowing Chalice) ──────────────────
+    // ★ 28.8.: `ps.actionLocked` war ein ZWEITES Sperrsystem neben
+    // diesem hier — dieselbe Bedeutung, aber an disjunkten Stellen
+    // geprueft. Chalice sperrte nur Handkarten und Kreatur-Effekte,
+    // Kent nur Handkarten, Abilities und Helden-Effekte; jede Sperre
+    // liess genau das durch, was die andere abdeckte. Das Flag bleibt
+    // (Puzzle-Editor, Client-Banner, Zuruecksetzung beim Zugbeginn),
+    // aber gelesen wird es ab jetzt NUR NOCH hier. Wer wissen will, ob
+    // eine Aktion erlaubt ist, fragt `areActionsBlocked` — sonst
+    // niemanden.
+    if (ps.actionLocked) return true;
     for (const hero of (ps.heroes || [])) {
       if (!hero?.name || hero.hp <= 0) continue;
       let script = null;
@@ -16561,6 +18917,10 @@ class GameEngine {
     // drawing cards" clause. Same shape as actionDrawCards' opts.
     // _unpreventable bypass.
     if (ps.handLocked && !opts._bypassHandLock) return false;
+    if (!this.pileOutAllowed(pi, 'deck', opts)) {              // v818 (Knight of Kings [B])
+      this.log('pile_out_blocked', { player: ps.username, pile: 'deck', card: cardName });
+      return false;
+    }
     const idx = (ps.mainDeck || []).indexOf(cardName);
     if (idx < 0) return false;
 
@@ -16601,12 +18961,24 @@ class GameEngine {
 
     // Universal tutor signal — listeners (Analyzer / Gatherer / future
     // hand-add reactors) react to ANY card added to hand from the deck
-    // via an effect. Mass Multiplication already fires this directly;
+    // via an effect. Mass Multiplication already fires this directly
     // routing it through the canonical helper makes the hook reliable
     // for every script that uses this path.
     await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, {
       playerIdx: pi, card: inst, cardName,
     });
+
+    // ── TUTOR-STRICHLISTE (v734, Koperniko) ──────────────────────────
+    // „when an Artifact or Spell allows you to add EXACTLY 1 card from
+    // your deck to your hand" laesst sich im Moment des Zugriffs nicht
+    // beantworten — ob ein zweiter folgt, weiss man erst am Ende der
+    // Aufloesung. Deshalb fuehrt die Engine eine Strichliste je
+    // Quelle; ausgewertet wird sie in `afterSpellResolved` /
+    // `afterArtifactUsed`, wo die Zahl feststeht.
+    //
+    // Sie liegt bewusst auf der ENGINE, nicht auf `gs`: `searchSpec`
+    // darf eine Funktion enthalten, und `gs` wird serialisiert.
+    this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
 
     if (opts.shuffle) this.shuffleDeck(pi, 'main');
     this.sync();
@@ -16623,6 +18995,169 @@ class GameEngine {
       });
     }
     return true;
+  }
+
+  /**
+   * AKTIVEFFEKT EINER CREATURE ERNEUT AUSLOESEN (v740, Kohta).
+   *
+   * Spiegelt die Kern-Aufloesung aus `doActivateCreatureEffect`
+   * (server.js): Kontext, Prompt-Stapel, `_currentEffectSource`,
+   * Auftritt, Bleed-Nachlauf. BEWUSST OHNE die Wirtschaft drumherum —
+   * keine Kostenpruefung, kein HOPT-Stempel, keine Aktion: dies ist
+   * eine geschenkte Wiederholung, kein zweiter regulaerer Einsatz.
+   *
+   * @returns {boolean} ob der Effekt durchlief (`false` = Skript hat
+   *                    selbst abgebrochen)
+   */
+  /**
+   * ZIELWAHL VORZIEHEN (v749) — erste Stufe des zweistufigen
+   * Kreaturen-Vertrags.
+   *
+   * Exportiert ein Kreaturenskript `async prepareCreatureEffect(ctx)`,
+   * darf es dort seine Ziele erfragen und gibt einen PLAN zurueck (ein
+   * beliebiges Objekt, das nur es selbst versteht) — ohne den
+   * Spielstand anzufassen. `onCreatureEffect` bekommt den Plan spaeter
+   * als `ctx.plan` und ueberspringt damit seine eigene Zielwahl.
+   *
+   * Damit lassen sich mehrere Effekte ECHT gleichzeitig aufloesen:
+   * erst alle Plaene einsammeln, dann alle wirken (Spirit of the
+   * Forbidden Grimoire).
+   *
+   * @returns {{ok:boolean, plan:any}} `ok:false` = Skript hat
+   *          abgebrochen oder kennt den Vertrag nicht.
+   */
+  async prepareCreatureEffectFor(inst, playerIdx, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT) return { ok: false, plan: null };
+    const script = loadCardEffect(inst.name);
+    if (!script?.prepareCreatureEffect) return { ok: false, plan: null };
+    if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return { ok: false, plan: null };
+
+    const ctx = this._createContext(inst, {});
+    ctx._isRetrigger = true;
+    ctx._planningOnly = true;
+    this._promptCardStack.push(inst.name);
+    const prevSrc = this._currentEffectSource;
+    this._currentEffectSource = {
+      cardName: inst.name, owner: playerIdx, cardType: 'CreatureEffect',
+    };
+    const prevAktiv = this._activeCreatureEffect;
+    this._activeCreatureEffect = { instId: inst.id, cardName: inst.name, owner: playerIdx };
+    if (opts.forceResolve) this._forceNonCancellable = (this._forceNonCancellable || 0) + 1;
+    let plan = null;
+    try {
+      plan = await script.prepareCreatureEffect(ctx);
+    } finally {
+      if (opts.forceResolve) this._forceNonCancellable--;
+      this._promptCardStack.pop();
+      this._currentEffectSource = prevSrc;
+      this._activeCreatureEffect = prevAktiv;
+    }
+    if (!plan) return { ok: false, plan: null };
+    return { ok: true, plan };
+  }
+
+  async reactivateCreatureEffect(inst, playerIdx, opts = {}) {
+    if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+    const script = loadCardEffect(inst.name);
+    if (!script?.onCreatureEffect) return false;
+    if ((inst.counters?.negated || inst.counters?.nulled) && !this._creatureNegationProof(inst)) return false;
+    // v748: „cannot be used another time for the rest of the turn in
+    // ANY way" (Spirit of the Forbidden Grimoire). Die Marke sperrt
+    // auch geschenkte Wiederholungen — Kohta kann einen so verbrauchten
+    // Effekt nicht nachzuenden.
+    // `ignoreEffectLock` ist fuer die Karte gedacht, die die Sperre
+    // gerade SELBST setzt (Grimoire sperrt vor dem Lauf, damit ein
+    // Effekt sich nicht selbst noch einmal anstossen kann).
+    if (!opts.ignoreEffectLock && inst.counters?._effectLockedTurn === this.gs.turn) return false;
+    // v752: Die EIGENE Aktivierungsbedingung der Karte gilt auch fuer
+    // eine geliehene oder geschenkte Aufloesung (Als Befund 5.9.:
+    // Grimoire liess Cosmic Skeleton feuern, obwohl dessen Bedingung
+    // nicht erfuellt war). `canActivateCreatureEffect` ist der Ort, an
+    // dem eine Karte ihre Voraussetzungen fuehrt — wer ihren Effekt
+    // ausloest, fragt sie.
+    if (!opts.ignoreOwnCondition && typeof script.canActivateCreatureEffect === 'function') {
+      try {
+        const pruefCtx = this._createContext(inst, {});
+        if (!script.canActivateCreatureEffect(pruefCtx)) return false;
+      } catch (err) {
+        console.error('[canActivateCreatureEffect]', inst.name, err.message);
+        return false;
+      }
+    }
+
+    const ctx = this._createContext(inst, {});
+    ctx._isRetrigger = true;                 // Skripte koennen das lesen
+    // v749: vorgezogener Plan aus `prepareCreatureEffectFor`. Liegt er
+    // an, ueberspringt das Skript seine Zielwahl und wirkt nur noch.
+    if (opts.plan != null) ctx.plan = opts.plan;
+    if (opts.skipHopt !== false) ctx._skipCreatureEffectHopt = true;
+
+    this._promptCardStack.push(inst.name);
+    const prevSrc = this._currentEffectSource;
+    this._currentEffectSource = {
+      cardName: inst.name, owner: playerIdx, cardType: 'CreatureEffect',
+    };
+    // Derselbe hook-feste Marker wie in `doActivateCreatureEffect`.
+    const prevAktiv = this._activeCreatureEffect;
+    this._activeCreatureEffect = { instId: inst.id, cardName: inst.name, owner: playerIdx };
+    this.armEffectAnnounce(inst.name, playerIdx, 'board');
+    // Die Wiederholung ist ZUGESAGT — ab hier kein Abbruch mehr
+    // (Als Vorgabe 5.9.). Zaehler statt Flagge, damit verschachtelte
+    // Faelle sauber zurueckfallen.
+    this._forceNonCancellable = (this._forceNonCancellable || 0) + 1;
+    let resolved;
+    try {
+      resolved = await script.onCreatureEffect(ctx);
+      if (resolved !== false) this.announceActiveEffect();
+    } finally {
+      this._forceNonCancellable--;
+      this.clearEffectAnnounce();
+      this._promptCardStack.pop();
+      this._currentEffectSource = prevSrc;
+      this._activeCreatureEffect = prevAktiv;
+    }
+    if (resolved !== false) {
+      try { await this._processBleedAfterCreatureEffect(inst); }
+      catch (err) { console.error('[Bleed] retrigger failed:', err.message); }
+      // v750: Auch eine geliehene oder geschenkte Aufloesung ist ein
+      // abgeschlossener AKTIVER Kreatureffekt — das Fenster gehoert
+      // deshalb auch hierher, nicht nur in den regulaeren Weg im
+      // Server. Sonst sah Kohta einen Kill, den ein per Grimoire
+      // geliehener Effekt gemacht hat, nie (Als Befund 5.9.).
+      try {
+        await this.runHooks('afterCreatureEffect', {
+          creature: inst, cardName: inst.name,
+          activator: playerIdx, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+          _isRetrigger: true, _skipReactionCheck: true,
+        });
+      } catch (err) {
+        console.error('[afterCreatureEffect retrigger]', err.message);
+      }
+    }
+    this.sync();
+    return resolved !== false;
+  }
+
+  /**
+   * TUTOR-STRICHLISTE (v734) — eine Stelle fuer „welche Karte hat
+   * gerade WIE VIELE Karten aus dem Deck auf die Hand geholt, und was
+   * durfte sie dabei suchen?".
+   *
+   * `actionAddCardFromDeckToHand` ruft das selbst; Karten, die ihren
+   * Zugriff aus historischen Gruenden von Hand buchen (Gate to the
+   * Armory, Nerdy Cheese), rufen es zusaetzlich, damit sie fuer
+   * Verdoppler wie Koperniko sichtbar sind.
+   *
+   * Liegt bewusst auf der ENGINE statt auf `gs`: `spec.filter` ist
+   * eine Funktion, und `gs` wird serialisiert.
+   */
+  noteDeckTutor(pi, cardName, source, spec) {
+    if (!this._deckAddTally || this._deckAddTally.source !== source
+        || this._deckAddTally.pi !== pi) {
+      this._deckAddTally = { pi, source, names: [], spec: spec || null };
+    }
+    this._deckAddTally.names.push(cardName);
+    if (spec) this._deckAddTally.spec = spec;
   }
 
   /**
@@ -16739,7 +19274,7 @@ class GameEngine {
     // pile for the rest of the turn. `_discardLockedTurn === gs.turn` is
     // the canonical flag — auto-expires on turn change so no cleanup
     // needed. Mirrors the `handLocked` short-circuit in actionDrawCards.
-    if (ps._discardLockedTurn === this.gs.turn && !opts._bypassDiscardLock) {
+    if (!(await this._discardOutAllowed(pi, opts))) {
       this.log('recycle_blocked', { player: ps.username, reason: 'discard_locked' });
       return [];
     }
@@ -16841,6 +19376,234 @@ class GameEngine {
   }
 
   /**
+   * EINEN HELDEN RESTLOS LOESCHEN (v762).
+   *
+   * Anders als „besiegt" bleibt hier nichts stehen: der Platz in der
+   * Spalte wird LEER. Gebraucht von Karten, deren Text den Helden
+   * selbst loescht (Spirit of the Super-Killing Knife) — ein bloss
+   * gefallener Held liegt weiter im Feld und laesst sich wiederbeleben.
+   *
+   * Was mitgeht: die Karten in seinen Ability Zones und alles, was in
+   * seinen Support Zones liegt — beides haengt an einem Helden, der es
+   * nicht mehr gibt. Der Held selbst wandert in den Deleted Pile
+   * seines Besitzers.
+   */
+  async deleteHero(playerIdx, heroIdx, sourceName = 'an effect') {
+    const ps = this.gs.players[playerIdx];
+    const hero = ps?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const name = hero.name;
+
+    // ── Erst die Karten AM Helden, dann er selbst (v765/766) ─────────
+    // GELOESCHT wird nur, was der Kartentext nennt: die ABILITY ZONES.
+    // Die Support Zones folgen der Standardregel fuer einen sterbenden
+    // Helden (Al 5.9.): Equips, Attachments und angelegte Helden gehen
+    // in die ABLAGE, Creatures bleiben im Spiel stehen.
+    //
+    // Diese Aufraeumung muss hier passieren und nicht dem engine-
+    // eigenen `handleHeroDeathCleanup` ueberlassen bleiben: der sucht
+    // den Helden ueber `heroes.findIndex(h => h === hero)` und findet
+    // ihn nicht mehr, sobald sein Platz geleert ist.
+    //
+    // Jede Karte bekommt einen AUSDRUECKLICHEN Flug. Ohne ihn
+    // verschwinden sie beim Sync einfach (Als Befund 5.9.) —
+    // `actionMoveCard` allein sagt keinen an, und der Diff-Erkenner des
+    // Clients greift bei einem Helden, der im selben Zug verschwindet,
+    // zu spaet. Der ausdrueckliche Flug unterdrueckt ausserdem den
+    // Doppelklang.
+    const cardDB = this._getCardDB();
+    const mitnehmen = [];
+    for (let zi = 0; zi < (ps.abilityZones?.[heroIdx] || []).length; zi++) {
+      for (const kartenName of [...(ps.abilityZones[heroIdx][zi] || [])]) {
+        mitnehmen.push({ zone: ZONES.ABILITY, zoneKey: 'ability', zi, kartenName, ziel: 'deleted' });
+      }
+    }
+    // Support Zones: nur die Nicht-Kreaturen, und die in die Ablage.
+    for (const inst of (this.cardInstances || [])) {
+      if (inst.owner !== playerIdx || inst.zone !== ZONES.SUPPORT) continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      if (inst.counters?.immovable) continue;          // bleibt liegen
+      const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
+      if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) continue;  // bleibt im Spiel
+      // v767: Eine ABILITY in einer Support Zone (Xal) ist eine
+      // Ability — sie teilt deren Schicksal und wird GELOESCHT, nicht
+      // abgelegt (Als Ruling 5.9.).
+      const istAbility = cd && hasCardType(cd, 'Ability');
+      mitnehmen.push({
+        zone: ZONES.SUPPORT, zoneKey: 'support', zi: inst.zoneSlot,
+        kartenName: inst.name, ziel: istAbility ? 'deleted' : 'discard',
+      });
+    }
+
+    for (let i = 0; i < mitnehmen.length; i++) {
+      const { zone, zoneKey, zi, kartenName, ziel } = mitnehmen[i];
+      this._broadcastEvent('play_pile_transfer', {
+        owner: playerIdx, cardName: kartenName,
+        from: zoneKey, to: ziel,
+        fromHeroIdx: heroIdx, fromSlotIdx: zi,
+      });
+      const inst = (this.cardInstances || []).find(c =>
+        c.zone === zone && c.owner === playerIdx
+        && c.heroIdx === heroIdx && c.zoneSlot === zi && c.name === kartenName);
+      if (inst) {
+        await this.actionMoveCard(inst, ziel, -1, -1, { sourceName });
+      } else {
+        const liste = zoneKey === 'ability'
+          ? ps.abilityZones[heroIdx][zi] : ps.supportZones[heroIdx][zi];
+        const idx = (liste || []).indexOf(kartenName);
+        if (idx >= 0) liste.splice(idx, 1);
+        (ziel === 'deleted' ? ps.deletedPile : ps.discardPile).push(kartenName);
+      }
+      if (i < mitnehmen.length - 1) await this._delay(90);   // gestaffelt
+    }
+    if (mitnehmen.length > 0) {
+      this.sync();
+      await this._delay(380);          // Fluege sichtbar, bevor der Held geht
+    }
+
+    // ── Sichtbarer Flug ins Deleted Pile (v763/764) ──────────────────
+    // REIHENFOLGE ist hier alles:
+    //   1. Flug ansagen, SOLANGE der Held noch im Feld steht — der
+    //      Client greift das Quell-Element synchron im Ereignis-
+    //      Handler ueber `data-hero-zone` ab.
+    //   2. SOFORT danach den Platz leeren und syncen. Socket.io haelt
+    //      die Reihenfolge, der Client hat den Startpunkt also schon
+    //      die Zone wird leer gezeichnet, waehrend die fliegende Karte
+    //      unterwegs ist. Ohne diesen Schritt stand der tote Held bis
+    //      zum Ende der Animation doppelt da (Als Befund 5.9.).
+    //   3. Erst DANN die Flugzeit abwarten.
+    this._broadcastEvent('play_pile_transfer', {
+      owner: playerIdx, cardName: name,
+      from: 'hero', to: 'deleted',
+      fromHeroIdx: heroIdx,
+    });
+
+    const heroInst = (this.cardInstances || []).find(c =>
+      c.zone === ZONES.HERO && c.owner === playerIdx && c.heroIdx === heroIdx);
+    if (heroInst) this._untrackCard(heroInst.id);
+
+    // Ein leerer Platz ist ein bekannter Zustand: alle Leser pruefen
+    // `hero?.name`.
+    ps.heroes[heroIdx] = { name: null, hp: 0, maxHp: 0, atk: 0, baseAtk: 0, statuses: {} };
+    ps.deletedPile.push(name);
+    this.log('hero_deleted', {
+      player: ps.username, hero: name, by: sourceName,
+    });
+    this.sync();
+
+    await this._delay(560);
+    await this.checkAllHeroesDead();
+    return true;
+  }
+
+  /**
+   * Wer kontrolliert diesen Helden GERADE? (v718)
+   *
+   * Eine Stelle fuer die Frage „auf wessen Seite steht der Held?" —
+   * physische Spalte, temporaerer Charme, dauerhafte Uebernahme.
+   * Reihenfolge: Charme (inkl. der dauerhaften Uebernahme, die
+   * dieselbe Marke setzt) schlaegt die Spalte.
+   *
+   * @param {number} physOwner - Spalte, in der der Held steht
+   * @param {object} hero      - Heldenobjekt
+   * @returns {number} Spielerindex des Kontrolleurs
+   */
+  heroSideOf(physOwner, hero) {
+    if (!hero) return physOwner;
+    if (hero.charmedBy != null) return hero.charmedBy;
+    if (hero.permaControlBy != null) return hero.permaControlBy;
+    return physOwner;
+  }
+
+  /**
+   * Alle Helden, die `playerIdx` gerade kontrolliert — eigene Spalte
+   * ohne die abgegebenen, plus die aus der Gegenspalte uebernommenen.
+   * @returns {Array<{physOwner:number, heroIdx:number, hero:object}>}
+   */
+  heroesControlledBy(playerIdx, opts = {}) {
+    const out = [];
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
+      const heroes = this.gs.players[pi]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
+        if (!hero?.name) continue;
+        const seite = opts.permanentOnly
+          ? (hero.permaControlBy ?? pi)
+          : this.heroSideOf(pi, hero);
+        if (seite !== playerIdx) continue;
+        out.push({ physOwner: pi, heroIdx: hi, hero });
+      }
+    }
+    return out;
+  }
+
+  /** Support-Zonen-Sperren der dauerhaft uebernommenen Helden setzen. */
+  _rebuildPermanentSupportLocks() {
+    for (let pi = 0; pi < (this.gs.players || []).length; pi++) {
+      const heroes = this.gs.players[pi]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        if (heroes[hi]?.permaControlBy == null) continue;
+        if (!this.gs._charmedSupportLocked) this.gs._charmedSupportLocked = [];
+        this.gs._charmedSupportLocked.push({ owner: pi, heroIdx: hi });
+      }
+    }
+  }
+
+  /**
+   * DAUERHAFTE UEBERNAHME eines Helden (v718, Paraseed Control).
+   *
+   * Als Ruling (4.9.): „Ein dauerhaft gestohlener Held zaehlt genau
+   * wie ein Held, den man von Anfang an beherrscht." Er bleibt
+   * physisch in der Spalte seines urspruenglichen Besitzers stehen —
+   * Helden haben, anders als Creatures, keinen freien Platz auf der
+   * anderen Seite —, gehoert aber in jeder Rechnung dem neuen
+   * Kontrolleur: Niederlagebedingung, Flaechenschaden, Zielwahl,
+   * spielbare Karten, Ausruestung.
+   *
+   * Umgesetzt ueber die BESTEHENDE Charme-Marke `charmedBy`, an der
+   * Client, Server und alle Sammler bereits haengen, plus den
+   * dauerhaften Stempel `permaControlBy`, den der Zugbeginn nicht
+   * loescht (s. `startTurn`). Der Charme-STATUS wird nicht gesetzt:
+   * er sperrt das Ausruesten, und ein eigener Held ist ausruestbar.
+   */
+  async actionTakeHeroPermanently(newControllerPi, heroOwnerPi, heroIdx, opts = {}) {
+    const gs = this.gs;
+    const hero = gs.players[heroOwnerPi]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (hero.permaControlBy === newControllerPi) return false;
+    if (newControllerPi === this.heroSideOf(heroOwnerPi, hero)) return false;
+
+    hero.permaControlBy = newControllerPi;
+    hero.permaControlFrom = heroOwnerPi;
+    hero.permaControlHeroIdx = heroIdx;
+    hero.charmedBy = newControllerPi;
+    hero.charmedFromOwner = heroOwnerPi;
+    hero.charmedHeroIdx = heroIdx;
+    if (hero.statuses?.charmed) delete hero.statuses.charmed;
+    if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
+    gs._charmedSupportLocked.push({ owner: heroOwnerPi, heroIdx });
+
+    this.log('hero_taken_permanently', {
+      by: opts.sourceName || 'Control', target: hero.name,
+      controller: gs.players[newControllerPi]?.username,
+      original: gs.players[heroOwnerPi]?.username,
+    });
+    this.sync();
+
+    await this.runHooks('onTakeControl', {
+      controllerPi: newControllerPi,
+      originalOwnerPi: heroOwnerPi,
+      targetType: 'hero',
+      targetName: hero.name,
+      targetHero: hero,
+      heroIdx,
+      kind: 'permanent',
+      sourceName: opts.sourceName || 'Control',
+    });
+    return true;
+  }
+
+  /**
    * Temporarily steal an opponent's Creature. Flips `inst.controller`,
    * leaves `inst.owner` on the original owner's side, optionally flags
    * `_stealImmortal`. Reverts at turn start.
@@ -16926,6 +19689,11 @@ class GameEngine {
     const gs = this.gs;
     const ps = gs.players[playerIdx];
     if (!ps) return null;
+    // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad).
+    if (this.isSupportZoneLocked(playerIdx, heroIdx, { source: opts.source, cardName, via: 'place' })) {
+      this.log('placement_blocked', { card: cardName, reason: 'support_zones_locked', heroIdx });
+      return null;
+    }
 
     // ── ARTIFACT-CREATURE-RIEGEL (Als Ruling 17.8.) ──────────────────
     // Dieselbe Sperre wie in `summonCreatureWithHooks`. Sie MUSS hier
@@ -16975,15 +19743,35 @@ class GameEngine {
     const source = opts.source || 'hand';
     const sourceName = opts.sourceName || 'Placement';
 
+    let _handFlug = false;
     if (source === 'hand') {
       const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (idx < 0) return null;
+      // ── SICHTBARER FLUG Hand → Support Zone (v700, Als Befund:
+      // Monamis geplacte Creature „erschien einfach" in der Zone).
+      // Broadcast VOR dem Splice (der Quell-Slot muss noch rendern)
+      // der Client versteckt das Ziel-Slot-Rendering fuer die
+      // 700-ms-Transitzeit selbst (`to === 'support'`-Hide). Kein
+      // einziger der 22 Aufrufer sendete bisher einen eigenen Flug —
+      // die Poof-Animation unten und die Eintritts-Hooks warten per
+      // `_handFlug` auf die Landung, damit Folge-Effekte (Monamis
+      // Draw) nicht VOR dem sichtbaren Eintreffen ablaufen
+      // (Hunting-Lehre v685). `opts.skipPileTransfer` fuer kuenftige
+      // Aufrufer mit eigener Choreographie.
+      if (!opts.skipPileTransfer && !this._fastMode && !this._inMctsSim) {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName,
+          from: 'hand', to: 'support', fromHandIdx: idx,
+          toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+        });
+        _handFlug = true;
+      }
       ps.hand.splice(idx, 1);
     } else if (source === 'discard') {
       // Discard-out lock — same gate as actionRecycleCards /
       // addCardFromDiscardToHand. Block placements that yank the
       // creature out of the locked player's own discard pile.
-      if (ps._discardLockedTurn === gs.turn && !opts._bypassDiscardLock) {
+      if (!(await this._discardOutAllowed(playerIdx, opts))) {
         this.log('placement_blocked', {
           card: cardName, by: opts.sourceName || 'Placement', reason: 'discard_locked',
         });
@@ -16994,7 +19782,7 @@ class GameEngine {
       ps.discardPile.splice(idx, 1);
     }
     // Lethe per-pile stamp carries onto the new board instance — only
-    // for `source === 'discard'` (or future `'deleted'`) placements;
+    // for `source === 'discard'` (or future `'deleted'`) placements
     // hand placements never carry stamps. Consume here so the bonus
     // doesn't get dropped by the next stamp reconciliation.
     const _letheBonus = (source === 'discard' || source === 'deleted')
@@ -17053,6 +19841,11 @@ class GameEngine {
     if (opts.countAsSummon) {
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
     }
+
+    // Landung des Hand-Flugs abwarten (v700), bevor Poof und Hooks
+    // laufen — sonst feuert z.B. Monamis Draw, waehrend die Karte noch
+    // fliegt.
+    if (_handFlug) { this.sync(); await this._delay(720); }
 
     const animType = opts.animationType || 'summon';
     if (animType === 'summon') {
@@ -17142,6 +19935,100 @@ class GameEngine {
    * the looser legacy filter: dead Heroes allowed, empty slots
    * excluded. Default is the new "all free slots" behaviour.
    */
+  /**
+   * v704 (Puppets): „This does not count as a Creature, but can still be
+   * chosen like one." Ein Token, dessen Skript `choosableAsCreature: true`
+   * exportiert, ist in den Zielwaehlern, der Aktivierungsliste und der
+   * „any target"-AoE wie eine Creature waehlbar — zaehlt aber NIRGENDS als
+   * Creature (`hasCardType` bleibt unveraendert: Alice, Opfer, „Creatures
+   * you control" sehen sie nicht).
+   */
+  /**
+   * v704 (Puppets): „No cards can be placed into this Hero's Support
+   * Zones, except …". Der Held der Spalte exportiert
+   *   supportZonesLocked(engine, playerIdx, heroIdx, { source, cardName, via })
+   * → true = gesperrt. Gate an den zentralen Pfaden (doPlayCreature,
+   * summonCreatureWithHooks, actionPlaceCreature, actionMoveCard,
+   * getFreeSupportZones). Exotische Direkt-Schreiber in Zonen (Bakhm-
+   * Sets u.ae.) sind nicht abgedeckt.
+   */
+  isSupportZoneLocked(playerIdx, heroIdx, opts = {}) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    const script = loadCardEffect(hero.name);
+    if (typeof script?.supportZonesLocked !== 'function') return false;
+    try { return !!script.supportZonesLocked(this, playerIdx, heroIdx, opts); }
+    catch { return false; }
+  }
+
+  /**
+   * v704 (Tri Ad): Namen aller Hero-Karten, deren Skript `plainHeroForm`
+   * exportiert — der Client bedient sie wie Ascended Heroes (Drag auf den
+   * Helden / Klick → `ascend_hero`). Einmal aus der DB gesammelt.
+   */
+  getPlainHeroFormNames() {
+    if (this._plainHeroFormNames) return this._plainHeroFormNames;
+    const out = [];
+    const cardDB = this._getCardDB();
+    for (const [name, cd] of Object.entries(cardDB)) {
+      if (cd?.cardType !== 'Hero') continue;
+      try { if (loadCardEffect(name)?.plainHeroForm) out.push(name); } catch { /* ignore */ }
+    }
+    this._plainHeroFormNames = out;
+    return out;
+  }
+
+  isChoosableAsCreature(inst, cd) {
+    if (cd && hasCardType(cd, 'Creature')) return true;
+    if (!inst?.name) return false;
+    return !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.choosableAsCreature;
+  }
+
+  /**
+   * v704 (Puppets): Shared HP pool. Kreaturenschaden an eine Instanz,
+   * deren Skript `sharesHpWithHero: true` exportiert, wird auf den Helden
+   * derselben Spalte umgebucht (Heldenpfad inkl. Punkt-vor-Strich,
+   * Schilden, Immunitaeten — aber OHNE Zielwahl-Surprise-Fenster, der
+   * Held wurde nicht gewaehlt). Status-Ticks laufen automatisch mit.
+   * Gibt die verbleibenden Batch-Eintraege zurueck; umgebuchte Eintraege
+   * tragen `_pooledToHero` und ihr `amount`/`cancelled` spiegelt den
+   * Heldenpfad, damit `actionDealCreatureDamage` `{dealt}` korrekt meldet.
+   */
+  async _reroutePooledCreatureDamage(entries) {
+    const keep = [];
+    for (const e of entries) {
+      const inst = e.inst;
+      const script = inst?.name ? loadCardEffect(inst.counters?._effectOverride || inst.name) : null;
+      if (!script?.sharesHpWithHero) { keep.push(e); continue; }
+      const owner = inst.controller ?? inst.owner;
+      const hero = this.gs.players[owner]?.heroes?.[inst.heroIdx];
+      e._pooledToHero = true;
+      if (!hero?.name || hero.hp <= 0) {
+        e.cancelled = true; e.amount = 0;
+        this.log('pooled_damage_fizzle', { token: inst.name, reason: 'no_living_hero' });
+        continue;
+      }
+      if (e.animType) {
+        this._broadcastEvent('play_zone_animation', {
+          type: e.animType, owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+        });
+      }
+      const res = await this.actionDealDamage(e.source, hero, e.amount, e.type, {
+        skipSurpriseCheck: true,
+        isStatusDamage: !!e.isStatusDamage,
+        canBeNegated: e.canBeNegated !== false,
+        cannotBeIncreased: !!e.cannotBeIncreased,
+        _pooledFromToken: inst,
+      });
+      e.amount = res?.dealt || 0;
+      e.cancelled = !!res?.cancelled;
+      this.log('pooled_damage_to_hero', {
+        token: inst.name, hero: hero.name, amount: e.amount, type: e.type,
+      });
+    }
+    return keep;
+  }
+
   getFreeSupportZones(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -17152,13 +20039,23 @@ class GameEngine {
       const hero = ps.heroes[hi];
       if (livingOnly && (!hero?.name || hero.hp <= 0)) continue;
       if (namedOnly && !hero?.name) continue;
-      for (let si = 0; si < 3; si++) {
+      // v704 (Puppets): gesperrte Zonen nicht anbieten (Opt-out includeLocked).
+      if (!opts.includeLocked && this.isSupportZoneLocked(playerIdx, hi, { source: opts.source, via: 'pick' })) continue;
+      // v607: Insel-Zonen (Flying Island in the Sky, Slots 3+) zaehlen
+      // mit — sie duerfen laut Kartentext „only be occupied by
+      // Creatures", und jeder Aufrufer dieses Sammlers platziert
+      // Kreaturen. Vorher endete die Schleife bei 3, wodurch Dark Gear,
+      // Deepsea Bats, Drill Sergeant & Co. eine freie Inselzone nie als
+      // Ziel bekamen.
+      const slotCount = Math.max(3, (ps.supportZones[hi] || []).length);
+      for (let si = 0; si < slotCount; si++) {
         const slot = (ps.supportZones[hi] || [])[si] || [];
         if (slot.length === 0) {
           const heroLabel = hero?.name
             ? (hero.hp <= 0 ? `${hero.name} (KO)` : hero.name)
             : `Column ${hi + 1}`;
-          zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — Slot ${si + 1}` });
+          const slotLabel = si >= 3 ? `Island ${si - 2}` : `Slot ${si + 1}`;
+          zones.push({ heroIdx: hi, slotIdx: si, label: `${heroLabel} — ${slotLabel}`, isIsland: si >= 3 });
         }
       }
     }
@@ -17298,7 +20195,7 @@ class GameEngine {
     // substitution requires a LEGAL TRIBUTE FOR THIS COST on the board,
     // not merely any Creature. Measured on the fully-narrowed board list:
     //   • after the self-exclusion — a Creature paying its own cost can't
-    //     tribute itself, so it isn't a Creature you could sacrifice;
+    //     tribute itself, so it isn't a Creature you could sacrifice
     //   • after `spec.filter` — a board full of Creatures summoned this
     //     turn does NOT enable a cost that demands older ones.
     // The substitute itself stays exempt from `spec.filter` below: the
@@ -17837,6 +20734,8 @@ class GameEngine {
 
     const abZones = ps.abilityZones?.[heroIdx] || [[], [], []];
     while (abZones.length < 3) abZones.push([]);
+    if (!ps.abilityZones) ps.abilityZones = [];
+    ps.abilityZones[heroIdx] = abZones;
 
     // Auto-attach as many copies of every offered ability as physically
     // possible. No prompt: each ability claims a slot (existing same-name
@@ -17845,18 +20744,44 @@ class GameEngine {
     // slot caps at level 3. The first ability's placement may consume
     // a free zone, which is why each subsequent ability re-resolves
     // its slot against the freshly-mutated abZones.
+    //
+    // v655 (Als Befund 30.8.): jede Kopie wird EINZELN geflogen und
+    // erst bei ihrer Landung in den Zustand geschrieben und gesynct.
+    // Vorher wurden alle Kopien auf einmal platziert, die Fluege als
+    // Gruppen gestartet und der Zustand erst NACH allen Fluegen gesynct
+    // — die Abilities erschienen deshalb als ein Block am Ende, nicht
+    // am Ende ihrer jeweiligen Bewegung. Die Flugdauer (600 ms, Ziel bei
+    // 80 %) steht im Client (`onDeckToAbility`); der Sync kommt, wenn
+    // die Karte ueber dem Slot ist.
+    const FLIGHT_MS = 600;
+    const LAND_AT_MS = Math.round(FLIGHT_MS * 0.8);
     const placedInsts = [];
-    const placeOne = (name, slotIdx, source) => {
+    const placeOne = async (name, slotIdx, source) => {
+      let handInst = null;
+      let handIdx = -1;
+      if (source === 'deck') {
+        if (ps.mainDeck.indexOf(name) < 0) return false;
+      } else {
+        handIdx = ps.hand.indexOf(name);
+        if (handIdx < 0) return false;
+      }
+      // Flug starten, dann bis zur Landung warten — erst dann den
+      // Zustand aendern, damit die Karte genau dort auftaucht, wo der
+      // Flug endet.
+      this._broadcastEvent('deck_to_ability_animation', {
+        owner: pi, heroIdx, slotIdx, cardName: name, count: 1, source,
+      });
+      await this._delay(LAND_AT_MS);
       if (source === 'deck') {
         const deckIdx = ps.mainDeck.indexOf(name);
         if (deckIdx < 0) return false;
         ps.mainDeck.splice(deckIdx, 1);
       } else {
-        const handIdx = ps.hand.indexOf(name);
+        handIdx = ps.hand.indexOf(name);
         if (handIdx < 0) return false;
         // Untrack the matching hand inst BEFORE splicing the name so
         // _findHandInstanceAt's rank-by-name math still maps correctly.
-        const handInst = this._findHandInstanceAt(pi, handIdx);
+        handInst = this._findHandInstanceAt(pi, handIdx);
         if (handInst) this._untrackCard(handInst.id);
         ps.hand.splice(handIdx, 1);
       }
@@ -17864,6 +20789,8 @@ class GameEngine {
       abZones[slotIdx].push(name);
       const inst = this._trackCard(name, pi, 'ability', heroIdx, slotIdx);
       placedInsts.push({ inst, name, slotIdx, source });
+      this.sync();
+      await this._delay(FLIGHT_MS - LAND_AT_MS);
       return true;
     };
 
@@ -17871,17 +20798,33 @@ class GameEngine {
       let slotIdx = abZones.findIndex(s => s.length > 0 && s[0] === name);
       if (slotIdx < 0) slotIdx = abZones.findIndex(s => s.length === 0);
       if (slotIdx < 0) continue;
-      while (abZones[slotIdx].length < 3) {
-        if (!placeOne(name, slotIdx, 'deck')) break;
+      if (abZones[slotIdx].length >= 3) continue;
+      if (!ps.mainDeck.includes(name) && !ps.hand.includes(name)) continue;
+      // v670 (Al 30.8.): der Bonus ist OPTIONAL — je Ability ein Ja/Nein
+      // („Add Resistance to Monia?"). Die CPU bejaht immer
+      // (`_cpuAutoConfirm`, cpuGenericChoice), ein Mensch darf ablehnen,
+      // etwa um eine Zone frei zu halten.
+      const heroName = ps.heroes?.[heroIdx]?.name || 'this Hero';
+      const antwort = await this.promptGeneric(pi, {
+        type: 'confirm', title: 'Ascension Bonus',
+        message: `Add ${name} to ${heroName}?`,
+        confirmLabel: `✨ Add ${name}!`, cancelLabel: 'No, thanks',
+        cancellable: true, _cpuAutoConfirm: true,
+      });
+      if (!antwort || antwort.cancelled || antwort.confirmed === false) {
+        this.log('ascension_bonus_declined', { player: ps.username, hero: heroName, ability: name });
+        continue;
       }
       while (abZones[slotIdx].length < 3) {
-        if (!placeOne(name, slotIdx, 'hand')) break;
+        if (!(await placeOne(name, slotIdx, 'deck'))) break;
+      }
+      while (abZones[slotIdx].length < 3) {
+        if (!(await placeOne(name, slotIdx, 'hand'))) break;
       }
     }
 
     if (placedInsts.length === 0) return;
 
-    ps.abilityZones[heroIdx] = abZones;
     this.shuffleDeck(pi);
 
     for (const { inst, name, slotIdx } of placedInsts) {
@@ -17893,24 +20836,7 @@ class GameEngine {
       });
     }
 
-    // Animate per (slot, name, source) group so deck-sourced and hand-
-    // sourced copies fly from the right origin element on the client.
-    const animGroups = new Map();
-    for (const { name, slotIdx, source } of placedInsts) {
-      const key = `${slotIdx}-${name}-${source}`;
-      if (!animGroups.has(key)) animGroups.set(key, { slotIdx, name, source, count: 0 });
-      animGroups.get(key).count++;
-    }
-    let totalCount = 0;
-    for (const g of animGroups.values()) {
-      this._broadcastEvent('deck_to_ability_animation', {
-        owner: pi, heroIdx, slotIdx: g.slotIdx, cardName: g.name,
-        count: g.count, source: g.source,
-      });
-      totalCount += g.count;
-    }
-
-    await this._delay(totalCount * 300 + 400);
+    await this._delay(250);
 
     // Log per (slot, name) — players care about the total per ability,
     // not the deck-vs-hand split.
@@ -17966,6 +20892,30 @@ class GameEngine {
         if (side === _ftProtected) validTargets.splice(i, 1);
       }
       if (validTargets.length === 0) return [];
+    }
+    // Erzwungene Aufloesung (v741) — s. `promptGeneric`.
+    if (this._forceNonCancellable > 0 && config?.cancellable) {
+      config = { ...config, cancellable: false };
+    }
+
+    // ── HARTE UNWAEHLBARKEIT (Thicket, v724) ─────────────────────────
+    // „cannot be chosen by cards and effects" — fuer JEDEN Waehler,
+    // auch den Kontrolleur. Die beiden Ziel-Sammler filtern die Marke
+    // bereits, aber Karten, die ihre Liste SELBST bauen und direkt
+    // hierher reichen (Book of Doom ueber `getCreatureTargets`, jede
+    // andere Targeting-Artifact-Karte), liefen daran vorbei — Als
+    // Befund 4.9. Dieser Flaschenhals ist die Stelle, an der ALLE
+    // Zielwahlen zusammenlaufen. Opt-out wie ueberall:
+    // `ignoreUntargetable` (Truth-Seeing Eye).
+    if (!config.ignoreUntargetable) {
+      let entfernt = false;
+      for (let i = validTargets.length - 1; i >= 0; i--) {
+        const inst = validTargets[i]?.cardInstance || validTargets[i]?._cardInstance;
+        if (!inst?.counters?.untargetable_all) continue;
+        validTargets.splice(i, 1);
+        entfernt = true;
+      }
+      if (entfernt && validTargets.length === 0) return [];
     }
     // Non-damage opponent shield filter (The Great Wall of Deri, any
     // future "your Creatures can't be chosen by opp's non-damage
@@ -18058,6 +21008,13 @@ class GameEngine {
           cancelLabel: config.cancelLabel,
           exclusiveTypes: config.exclusiveTypes || false,
           maxPerType: config.maxPerType || {},
+          // v751: Die Konfiguration ist eine WEISSE LISTE — was hier
+          // nicht steht, erreicht den Client nie. `uniqueBy` und
+          // `maxBudget` waren in v750 zwar im Client eingebaut, wurden
+          // aber nie durchgereicht, und der Picker liess zwei Kopien
+          // derselben Karte zu (Als Befund 5.9.).
+          uniqueBy: config.uniqueBy,
+          maxBudget: config.maxBudget,
           // ── `selectCount` / `minSelect` ALS ALIAS (Als Report 16.8.) ──
           // Es gibt zwei Prompt-Familien mit UNTERSCHIEDLICHEN Feldnamen:
           // die Karten-Galerie liest `selectCount`/`minSelect`, die
@@ -18154,7 +21111,26 @@ class GameEngine {
       }
     }
 
-    return _pickedIds;
+    // ★ UMLEITUNGS-FENSTER AUCH HIER (v670, Als Befund: Monia Bot konnte
+    //   sich nicht vor Book of Doom werfen). Bis v669 oeffnete
+    //   `_checkTargetRedirect` nur in `ctx.promptTarget` und
+    //   `promptDamageTarget`; alles, was ueber diesen Dispatcher zielt
+    //   (Ziel-Artefakte, Heldeneffekte, Traenke, viele Zauber), kannte
+    //   keine Umleitung. Riegel wie beim Reaktionsfenster: ein Ziel mit
+    //   Besitzer, eine echte Quelle, Rekursionssperre (die Umleiter
+    //   zielen selbst ueber diesen Dispatcher). Karten mit
+    //   eigener Quellenart-Sperre
+    //   (Challenge & Co.: nur Attack/Spell/Kreatur) filtern in ihrem
+    //   `canRedirect` — Monia Bot nimmt alles, was nicht
+    //   `cannotBeRedirected` ist.
+    //
+    //   v672: die Schranke „genau EIN Ziel" ist gefallen. Das Fenster
+    //   oeffnet je gewaehltem Ziel EINZELN — die Schleife steht in
+    //   `applyRedirectWindows`, der einen Auslegung fuer alle drei
+    //   Eingaenge (hier, `ctx.promptTarget`, `doConfirmPotion`).
+    return await this.applyRedirectWindows(
+      _pickedIds, validTargets, config, this._redirectSourceFor(playerIdx, config)
+    );
   }
 
   /**
@@ -18213,10 +21189,24 @@ class GameEngine {
   /**
    * Broadcast a pending card_reveal to the opponent once the player has confirmed.
    * Called from resolveEffectPrompt / resolveGenericPrompt after a non-cancelled response.
+   *
+   * ── ZURUECKHALTEN (v781, Als Befund 5.9.) ────────────────────────
+   * Der Reveal feuert bei JEDER bestaetigten Antwort — bei einer Karte
+   * mit mehrstufiger Auswahl also schon beim ersten Klick. Bricht der
+   * Spieler danach ab, hat der Gegner die Karte trotzdem gesehen,
+   * obwohl sie in der Hand bleibt und nichts verbraucht wurde.
+   *
+   * `gs._holdCardReveal` haelt die Ankuendigung zurueck, bis die Karte
+   * selbst sie freigibt. Wer die Sperre setzt, MUSS sie in einem
+   * `finally` wieder loeschen — sonst bliebe die naechste Karte stumm.
+   * Der Server raeumt `_pendingCardReveal` im Abbruchzweig ohnehin weg
+   * und feuert es sonst nach der Aufloesung nach; die Sperre kann also
+   * hoechstens verzoegern, nichts verschlucken.
    */
   _firePendingCardReveal() {
     const pending = this.gs._pendingCardReveal;
     if (!pending) return;
+    if (this.gs._holdCardReveal) return;
     delete this.gs._pendingCardReveal;
     const oi = pending.ownerIdx === 0 ? 1 : 0;
     const oppSid = this.gs.players[oi]?.socketId;
@@ -18719,13 +21709,55 @@ class GameEngine {
    * Anti-Magnet / Shield of Wisdom can still redirect a Creature
    * effect even from an Eye-equipped Hero (matches the card text).
    */
+  /**
+   * ★ „Kann jedes Ziel waehlen" — EINE Auslegung (v616).
+   * Wahr, wenn die Quelle das Auge traegt ODER ihr Skript
+   * `ignoresTargetingRestrictions: true` erklaert (Piercer of Heavens:
+   * „this Spell can always choose any target, ignoring any other
+   * effects"). Die drei Ziel-Picker fragen HIER; die
+   * Redirect-Kurzschliessung fragt weiterhin nur das Auge.
+   */
+  /**
+   * ★ ART EINER EFFEKTQUELLE (v637) — EINE Auslegung.
+   * Liefert 'attack' | 'spell' | 'creature' | 'hero' | 'artifact' |
+   * 'potion' | 'ability' | 'surprise' | null fuer die Karteninstanz, die
+   * einen Ziel-Picker oder Schaden ausloest. Reihenfolge: erst die Zone
+   * (Held in der Heldenzone, Kreatur in der Support Zone, verdeckte
+   * Surprise), dann der Kartentyp aus der Datenbank. Nutzer:
+   * Umleitungs-Vertraege („for an Attack, Spell or Creature effect").
+   */
+  sourceEffectKind(sourceCard) {
+    if (!sourceCard) return null;
+    const zone = sourceCard.zone;
+    if (zone === 'hero') return 'hero';
+    if (zone === 'surprise') return 'surprise';
+    const cd = sourceCard.name ? this._getCardDB()[sourceCard.name] : null;
+    if (!cd) return null;
+    if (zone === 'support' && hasCardType(cd, 'Creature')) return 'creature';
+    if (hasCardType(cd, 'Attack')) return 'attack';
+    if (hasCardType(cd, 'Spell')) return 'spell';
+    if (hasCardType(cd, 'Creature')) return 'creature';
+    if (hasCardType(cd, 'Potion')) return 'potion';
+    if (hasCardType(cd, 'Artifact')) return 'artifact';
+    if (hasCardType(cd, 'Ability')) return 'ability';
+    if (hasCardType(cd, 'Hero')) return 'hero';
+    return null;
+  }
+
+  _sourceIgnoresTargetingRestrictions(sourceCard) {
+    if (this._sourceHasTruthSeeingEye(sourceCard)) return true;
+    if (!sourceCard?.name) return false;
+    const script = loadCardEffect(sourceCard.name);
+    return !!script?.ignoresTargetingRestrictions;
+  }
+
   _sourceHasTruthSeeingEye(sourceCard) {
     if (!sourceCard) return false;
     const owner = sourceCard.controller ?? sourceCard.owner ?? -1;
     const heroIdx = sourceCard.heroIdx ?? -1;
     if (owner < 0 || heroIdx < 0) return false;
     // Source must be an actual Attack or Spell card — not a Creature /
-    // Artifact / Hero effect (effective data handles type overrides;
+    // Artifact / Hero effect (effective data handles type overrides
     // fall back to the static DB by name).
     const cd = (this.getEffectiveCardData ? this.getEffectiveCardData(sourceCard) : null)
       || (sourceCard.name ? this._getCardDB()[sourceCard.name] : null);
@@ -18737,7 +21769,7 @@ class GameEngine {
       if ((inst.controller ?? inst.owner) !== owner) continue;
       if (inst.heroIdx !== heroIdx) continue;
       if (inst.faceDown) continue;
-      if (inst.counters?.negated) continue;
+      if (inst.counters?.negated && !this._creatureNegationProof(inst)) continue;
       return true;
     }
     return false;
@@ -18764,6 +21796,110 @@ class GameEngine {
    * @param {number} [_depth] - Internal recursion guard
    * @returns {object|null} Final redirected target, or null if none fired
    */
+  /**
+   * ★ EINE Auslegung fuer „Umleitungsfenster je gewaehltem Ziel" (v672).
+   *
+   * Vorher stand dieselbe Vorpruefung an DREI Stellen — `ctx.promptTarget`,
+   * `promptEffectTarget` (v670) und `doConfirmPotion` in server.js (v671) —
+   * und alle drei trugen dieselbe Schranke `selectedIds.length === 1`. Ein
+   * Effekt mit MEHREREN Zielen (Book of Doom) kam damit an jeder Umleitung
+   * vorbei: bei einem Ziel meldete Monia Bot sich, ab zwei Zielen nie
+   * wieder — Als Befund 31.8.
+   *
+   * Als Vorgabe (bindend, 31.8.): ein Umleiter reagiert auf JEDES Ziel
+   * EINZELN und beliebig oft pro Runde. Deshalb laeuft hier eine Schleife
+   * ueber die getroffene Auswahl; jedes Ziel bekommt sein eigenes Fenster.
+   * Leiten zwei Ziele auf denselben Helden um, steht seine ID zweimal in
+   * der Rueckgabe — der Effekt trifft ihn dann auch zweimal. Das ist
+   * gewollt: „auf jedes Ziel einzeln reagieren" heisst, jede einzelne
+   * Wirkung landet auf dem Umleiter.
+   *
+   * Laenge und Reihenfolge der Liste bleiben unangetastet — Aufrufer, die
+   * ihre Kosten aus `selectedIds.length` rechnen (Book of Doom), bleiben
+   * dadurch unberuehrt.
+   *
+   * @param {Array} pickedIds - Die gewaehlten Ziel-IDs
+   * @param {Array} validTargets - Alle gueltigen Ziele des Effekts
+   * @param {object} config - Targeting-Konfiguration
+   * @param {object} sourceCard - Quelle MIT Besitzer (siehe _redirectSourceFor)
+   * @returns {Promise<Array>} neue ID-Liste
+   */
+  async applyRedirectWindows(pickedIds, validTargets, config = {}, sourceCard = null) {
+    if (!Array.isArray(pickedIds) || pickedIds.length === 0) return pickedIds;
+    if (!sourceCard) return pickedIds;
+    if (config._skipRedirectCheck) return pickedIds;
+    // `cannotBeRedirected` sperrt nur Umleitungen, nicht Negationen (v701).
+    if (config.cannotBeRedirected) config = { ...config, _noRedirectOutcome: true };
+    // Rekursionssperre: die Umleiter zielen selbst ueber dieselben
+    // Dispatcher (Escape Device laesst waehlen, welcher Held entkommt) —
+    // ohne den Riegel riefe sich das Fenster selbst auf.
+    if (this._inRedirectWindow) return pickedIds;
+
+    const liste = pickedIds.slice();
+    // Pick-Anzahl fuer Fenster, die auf „exactly 1 target" gaten
+    // (Rolling Boulder) — v701. Nur eine Kopie, das Original bleibt
+    // unangetastet.
+    config = { ...config, _redirectPickCount: liste.length };
+    this._inRedirectWindow = true;
+    try {
+      for (let i = 0; i < liste.length; i++) {
+        const sel = (validTargets || []).find(t => t && t.id === liste[i]);
+        if (!sel) continue;
+        // v704 (Puppets, Vinny): Brett-Waechter sehen die GANZE aktuelle
+        // Auswahl, um alle geschuetzten Ziele in einem Zug fallen zu lassen.
+        config._redirectPickedIds = liste.slice();
+        // Nur Helden und Support-Zonen-Karten: die Umleiter (Challenge,
+        // Martyry, Anti-Magnet, Monia Bot) kennen nur diese beiden Arten.
+        if (sel.type !== 'hero' && sel.type !== 'equip') continue;
+        if (typeof sel.owner !== 'number' || sel.owner < 0) continue;
+        const redirected = await this._checkTargetRedirect(
+          sel.owner, sel, validTargets, config, sourceCard
+        );
+        if (!redirected) continue;
+        // Negation (v701): der GANZE Effekt ist negiert — leere Auswahl
+        // zurueck, jedes Karten-Skript bricht darauf sauber ab. (Der
+        // Fall entsteht nur bei Fenstern, die auf genau 1 Pick gaten.)
+        if (redirected._redirectNegated) return [];
+        // v704 (Puppets, Vinny): Teil-Negation — nur die genannten Ziele
+        // fallen aus der Auswahl, der Effekt trifft den Rest weiter.
+        if (Array.isArray(redirected._dropTargetIds)) {
+          const drop = new Set(redirected._dropTargetIds);
+          for (let j = liste.length - 1; j >= 0; j--) {
+            if (drop.has(liste[j])) { liste.splice(j, 1); if (j <= i) i--; }
+          }
+          if (liste.length === 0) return [];
+          continue;
+        }
+        // Eine ID, die nicht in der Zielliste des Aufrufers steht, ginge
+        // dort stumm verloren — dann lieber gar nicht umleiten.
+        if (!(validTargets || []).some(t => t && t.id === redirected.id)) continue;
+        liste[i] = redirected.id;
+      }
+    } finally {
+      this._inRedirectWindow = false;
+    }
+    return liste;
+  }
+
+  /**
+   * Quelle fuer `applyRedirectWindows` mit BESITZER normalisieren.
+   *
+   * Viele Aufrufer reichen nur den Namen (`source: 'Cool Repair'`). Der
+   * Waehlende ist der Kontrolleur des Effekts — ohne Besitzer meldete
+   * Monia Bot sich beim EIGENEN Cool Repair (Als Befund 30.8.).
+   */
+  _redirectSourceFor(playerIdx, config = {}) {
+    const roh = config._redirectSource || config.sourceCard || config.source || null;
+    if (!roh) return null;
+    if (typeof roh === 'string') {
+      return { name: roh, owner: playerIdx, controller: playerIdx, heroIdx: -1, zone: 'hand' };
+    }
+    if (roh.owner == null && roh.controller == null) {
+      return { ...roh, owner: playerIdx, controller: playerIdx };
+    }
+    return roh;
+  }
+
   async _checkTargetRedirect(targetOwnerIdx, selected, validTargets, config, sourceCard, _depth = 0) {
     // Demon's Gate-style "Creature casts a Spell": present the Creature
     // as the source so redirect cards (Challenge / Martyry / Anti-Magnet)
@@ -18779,11 +21915,18 @@ class GameEngine {
     // der jeweilige Aufrufer setzen musste — ein Kartenmerkmal galt
     // damit nur dort, wo jemand daran gedacht hat. Hier greift es an
     // der EINEN Stelle, durch die jede Ziel-Umleitung laeuft.
+    //
+    // v701 (Als Ruling): „cannot be redirected" ist NICHT „cannot be
+    // negated". Das Merkmal sperrt deshalb nur die UMLEITUNGS-Ausgaenge
+    // des Fensters (Hand, Held, umleitende Surprises); negierende
+    // Surprises (`isSurpriseNegation`, Rolling Boulder) werden weiter
+    // angeboten. Dafuer traegt `config._noRedirectOutcome` die Sperre
+    // in den Scan, statt hier hart abzubrechen.
     if (sourceCard?.name) {
       const srcScript = loadCardEffect(sourceCard.name);
       if (srcScript?.cannotBeRedirected) {
         this.log('redirect_blocked', { source: sourceCard.name, reason: 'cannotBeRedirected' });
-        return null;
+        config = { ...config, _noRedirectOutcome: true };
       }
     }
 
@@ -18791,6 +21934,9 @@ class GameEngine {
       targetOwnerIdx, selected, validTargets, config, sourceCard
     );
     if (!redirected) return null;
+    // Negation (v701): es GIBT kein neues Ziel — nichts zu rekursieren.
+    if (redirected._redirectNegated) return redirected;
+    if (redirected._dropTargetIds) return redirected; // v704: Teil-Negation, keine Rekursion
     if (_depth >= 8) return redirected; // backstop — see header
     // The NEW target's owner may also redirect (Anti-Magnet → Shield
     // of Wisdom, Challenge → opponent's Martyry, …). Recurse on the
@@ -18814,6 +21960,28 @@ class GameEngine {
    * @param {CardInstance} sourceCard - The card that initiated the targeting
    * @returns {object|null} Redirected target, or null
    */
+  /**
+   * ★ EINE Auslegung fuer „hat der Spieler JA gesagt?" (v672).
+   *
+   * Die Rueckgabeform-Falle, dritter Fund. `promptGeneric` liefert bei
+   * einem Nein je nach Pfad drei verschiedene Dinge: der Mensch schickt
+   * `{ cancelled: true }`, die Standard-CPU `null` — ein Kartenskript mit
+   * eigenem `cpuResponse` aber `{ confirmed: false }`, und das ist ein
+   * WAHRHEITSFAEHIGES OBJEKT. Wer nur `if (!confirmed)` prueft, liest ein
+   * Nein als Ja.
+   *
+   * Konkret aufgefallen an Monia Bot: ihr `cpuResponse` reicht
+   * `{ confirmed: protectionDecision(...) }` durch, `normalizeConfirm`
+   * laesst ein vorhandenes `confirmed` unangetastet — lehnte der
+   * Lernkanal die Umleitung ab, leitete sie trotzdem um.
+   */
+  _confirmSaidYes(antwort) {
+    if (!antwort) return false;
+    if (antwort === true) return true;
+    if (antwort.cancelled) return false;
+    return antwort.confirmed !== false;
+  }
+
   async _checkTargetRedirectOnce(targetOwnerIdx, selected, validTargets, config, sourceCard) {
     const ps = this.gs.players[targetOwnerIdx];
     if (!ps) return null;
@@ -18829,12 +21997,17 @@ class GameEngine {
     // caller. The helper is Attack/Spell-scoped, so an opponent's
     // Creature effect (even from the same Eye Hero) still flows through
     // to the Anti-Magnet / Shield of Wisdom scans below.
-    if (this._sourceHasTruthSeeingEye(sourceCard)) return null;
+    if (this._sourceHasTruthSeeingEye(sourceCard)) config = { ...config, _noRedirectOutcome: true };
+
+    // v701: Umleitungs-Ausgaenge gesperrt (cannotBeRedirected / Eye) —
+    // Hand- und Helden-Scans entfallen, nur negierende Surprises bleiben.
+    const _nurNegation = !!config._noRedirectOutcome;
 
     // Scan hand for redirect cards
     const seen = new Set();
-    for (let hi = 0; hi < ps.hand.length; hi++) {
+    for (let hi = 0; hi < (_nurNegation ? 0 : ps.hand.length); hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -18842,7 +22015,9 @@ class GameEngine {
       if (!script?.isTargetRedirect) continue;
 
       // Check card-specific redirect eligibility
-      if (script.canRedirect && !script.canRedirect(this.gs, targetOwnerIdx, selected, validTargets, config, this)) continue;
+      // v670: `sourceCard` als 7. Argument — Handkarten mit Quellenart-
+      // Filter (Challenge, Martyry, Anti-Magnet) lesen die Quelle jetzt.
+      if (script.canRedirect && !script.canRedirect(this.gs, targetOwnerIdx, selected, validTargets, config, this, sourceCard)) continue;
 
       // Prompt the target's owner
       const attackerName = config.title || sourceCard?.name || 'an effect';
@@ -18864,13 +22039,13 @@ class GameEngine {
         // feuerten für die CPU NIE (10 Declines in einem Testspiel).
         showCard: cardName,
         message: `Your ${selected.cardName} was targeted by ${attackerName}! Activate ${cardName}?`,
-        confirmLabel: `⚔️ ${cardName}!`,
+        confirmLabel: `↪️ ${cardName}!`,   // v673: Pfeil zur Seite statt Waffen-/Netz-Symbolik (Al 31.8.)
         cancelLabel: 'No',
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — opt-in target redirect.
       });
 
-      if (!confirmed) continue; // Declined — check next redirect card
+      if (!this._confirmSaidYes(confirmed)) continue; // Declined — check next redirect card
 
       // Run the card's redirect logic (hero selection, chain UI, etc.)
       const result = await script.onRedirect(this, targetOwnerIdx, selected, validTargets, config, sourceCard);
@@ -18928,7 +22103,7 @@ class GameEngine {
 
     // ── Hero-based redirects (Alleria, etc.) ──
     // Scan heroes for redirect capabilities (heroRedirect flag on script)
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+    for (let hi = 0; hi < (_nurNegation ? 0 : (ps.heroes || []).length); hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated) continue;
@@ -18937,7 +22112,11 @@ class GameEngine {
       if (!heroScript?.heroRedirect) continue;
 
       // Check card-specific redirect eligibility
-      if (heroScript.canHeroRedirect && !heroScript.canHeroRedirect(this.gs, targetOwnerIdx, hi, selected, validTargets, config, this)) continue;
+      // v637: die Quelle wird mitgegeben (8. Argument) + ihre ART ueber
+      // `sourceEffectKind` — Alleria leitet nur Attacks, Spells und
+      // Kreatureneffekte um, keine Helden-, Artefakt- oder Potion-Effekte
+      // (Als Befund: Lockes Heldeneffekt wurde umgeleitet).
+      if (heroScript.canHeroRedirect && !heroScript.canHeroRedirect(this.gs, targetOwnerIdx, hi, selected, validTargets, config, this, sourceCard)) continue;
 
       // Prompt the target's owner
       const attackerName = config.title || sourceCard?.name || 'an effect';
@@ -18954,12 +22133,12 @@ class GameEngine {
         protMeta: { d: Number(config?.baseDamage) || 0, hp: _redirHpH, pi: targetOwnerIdx },
         message: `Redirect ${attackerName}?`,
         showCard: sourceCard?.name || null,
-        confirmLabel: '🕸️ Redirect!',
+        confirmLabel: '↪️ Redirect!',
         cancelLabel: 'No',
         cancellable: true,
       });
 
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       // Run the hero's redirect logic (hero selection, animation, etc.)
       const result = await heroScript.onHeroRedirect(this, targetOwnerIdx, hi, selected, validTargets, config, sourceCard);
@@ -18993,6 +22172,80 @@ class GameEngine {
     // (`onSurpriseActivate` → `{ redirectTo }`). `_activateSurprise`
     // handles the flip / reveal / hooks / discard and returns that
     // result, which we propagate up exactly like a hand/hero redirect.
+    // ── v704 (Puppets): BRETT-UMLEITER / -WAECHTER ────────────────
+    // Support-Zonen-Instanzen des Zielbesitzers mit `isBoardRedirect`
+    // (Lucky Puppet Laki: Umleitung; Preserving Puppet Vinny mit
+    // `isBoardNegation`: Teil-Negation per `dropTargetIds`). Vertrag:
+    //   canBoardRedirect(gs, ownerIdx, inst, selected, validTargets,
+    //                    config, sourceCard, engine) → bool
+    //   onBoardRedirect(engine, ownerIdx, inst, selected, validTargets,
+    //                   config, sourceCard) → { redirectTo } |
+    //                   { dropTargetIds: [...] }
+    // Stummgeschaltete Instanzen (Stunned/Negated/Nulled) schweigen.
+    // v708: auch HELDEN-Instanzen (lebend) tragen Waechter — Tri Fecta /
+    // Tri Ad loesen Luck/Preserve Counter ein, ohne dass Laki/Vinny
+    // liegen muessen (Als Ruling 3.9.). Ein Skript darf mehrere Waechter
+    // als `boardGuards: [ … ]` exportieren (Luck-Umleitung + Preserve-
+    // Negation getrennt); ohne Array ist das Skript selbst der Waechter.
+    for (const bInst of this.cardInstances) {
+      if ((bInst.controller ?? bInst.owner) !== targetOwnerIdx) continue;
+      if (bInst.faceDown) continue;
+      if (bInst.zone === ZONES.HERO) {
+        const hObj = ps.heroes?.[bInst.heroIdx];
+        if (!hObj?.name || hObj.hp <= 0 || hObj.name !== bInst.name) continue;
+      } else if (bInst.zone !== ZONES.SUPPORT) continue;
+      const bScript = loadCardEffect(bInst.counters?._effectOverride || bInst.name);
+      if (!bScript) continue;
+      const guardsB = Array.isArray(bScript.boardGuards) ? bScript.boardGuards : [bScript];
+      if ((bInst.counters?.negated || bInst.counters?.nulled || bInst.counters?.stunned) && !this._creatureNegationProof(bInst)) continue;
+      for (const g of guardsB) {
+      if (!g?.isBoardRedirect || typeof g.onBoardRedirect !== 'function') continue;
+      if (_nurNegation && !g.isBoardNegation) continue;
+      if (g.isBoardNegation) {
+        const _srcScriptB = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
+        if (config.cannotBeNegated || _srcScriptB?.cannotBeNegated) continue;
+      }
+      if (typeof g.canBoardRedirect === 'function'
+          && !g.canBoardRedirect(this.gs, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard, this)) continue;
+
+      const guardNameB = g.guardCardName || bInst.name;
+      const attackerNameB = config.title || sourceCard?.name || 'an effect';
+      const confirmedB = await this.promptGeneric(targetOwnerIdx, {
+        type: 'confirm',
+        title: guardNameB,
+        message: g.boardRedirectPrompt
+          ? g.boardRedirectPrompt(attackerNameB, selected, this)
+          : `${g.isBoardNegation ? 'Negate' : 'Redirect'} ${attackerNameB}?`,
+        showCard: sourceCard?.name || null,
+        showCardLeft: guardNameB,
+        confirmLabel: g.isBoardNegation ? '🛡️ Negate!' : '↪️ Redirect!',
+        cancelLabel: 'No',
+        cancellable: true,
+        promptConfig: { extra: { _boardInstId: bInst.id, _selectedId: selected?.id } },
+      });
+      if (!this._confirmSaidYes(confirmedB)) {
+        if (g.isBoardNegation) this._noteBoardGuardDeclined(targetOwnerIdx, sourceCard?.name);
+        continue;
+      }
+
+      const resultB = await g.onBoardRedirect(this, targetOwnerIdx, bInst, selected, validTargets, config, sourceCard);
+      if (Array.isArray(resultB?.dropTargetIds) && resultB.dropTargetIds.length > 0) {
+        this.log('target_negated_by_board', {
+          card: guardNameB, targets: resultB.dropTargetIds, player: ps.username,
+        });
+        return { _dropTargetIds: resultB.dropTargetIds, _byBoard: guardNameB };
+      }
+      if (!resultB?.redirectTo) continue;
+      this.log('target_redirect', {
+        redirectCard: guardNameB,
+        originalTarget: selected.cardName,
+        newTarget: resultB.redirectTo.cardName,
+        player: ps.username,
+      });
+      return resultB.redirectTo;
+      }
+    }
+
     for (let shi = 0; shi < (ps.heroes || []).length; shi++) {
       const sHero = ps.heroes[shi];
       if (!sHero?.name || sHero.hp <= 0) continue;
@@ -19001,6 +22254,15 @@ class GameEngine {
       const sName = sz[0];
       const sScript = loadCardEffect(sName);
       if (!sScript?.isSurprise || !sScript.isSurpriseRedirect || !sScript.canSurpriseRedirect) continue;
+      // v701: Umleiter schweigen bei gesperrten Umleitungs-Ausgaengen
+      // Negierer (`isSurpriseNegation`) schweigen nur, wenn der Effekt
+      // selbst „cannot be negated" ist (Quell-Skript oder Targeting-
+      // Konfiguration).
+      if (_nurNegation && !sScript.isSurpriseNegation) continue;
+      if (sScript.isSurpriseNegation) {
+        const _srcScript = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
+        if (config.cannotBeNegated || _srcScript?.cannotBeNegated) continue;
+      }
 
       // Surprise instance must still be face-down in the zone.
       const sInst = this.cardInstances.find(c =>
@@ -19017,12 +22279,14 @@ class GameEngine {
         title: sName,
         message: `Your ${selected.cardName} was chosen by ${attackerName}! Activate ${sName}?`,
         showCard: sourceCard?.name || null,
+        // v700-Konvention auch hier: links die angebotene Surprise.
+        showCardLeft: sName,
         confirmLabel: `🛡️ ${sName}!`,
         cancelLabel: 'No',
         cancellable: true,
         gerrymanderEligible: true, // True "you may" — opt-in redirect.
       });
-      if (!confirmed) continue;
+      if (!this._confirmSaidYes(confirmed)) continue;
 
       const sInfo = {
         cardName: sourceCard?.name,
@@ -19034,6 +22298,21 @@ class GameEngine {
         selected, validTargets, _redirectMode: true,
       };
       const sResult = await this._activateSurprise(targetOwnerIdx, shi, sName, sInfo, sScript);
+      // ── NEGATION statt Umleitung (v701, Rolling Boulder) ───────────
+      // Eine `isSurpriseRedirect`-Karte darf statt `{ redirectTo }` auch
+      // `{ negateEffect: true }` liefern: der anvisierende Effekt wird
+      // KOMPLETT negiert. Der Scan reicht das als Sentinel nach oben
+      // `_checkTargetRedirect` rekursiert darauf nicht (es gibt kein
+      // neues Ziel), und die drei Eingaenge uebersetzen es einheitlich
+      // in „keine Ziele" (Karten-Skripte brechen auf leerer Auswahl ab)
+      // bzw. Abbruch des Targeting-Pfads.
+      if (sResult?.negateEffect) {
+        this.log('target_negated_by_surprise', {
+          surprise: sName, source: sourceCard?.name,
+          target: selected.cardName, player: ps.username,
+        });
+        return { _redirectNegated: true, _bySurprise: sName };
+      }
       if (!sResult?.redirectTo) continue; // Declined / cancelled inside
 
       this.log('target_redirect', {
@@ -19109,7 +22388,14 @@ class GameEngine {
     const betroffen = this.cardInstances.filter(c =>
       c?.counters?._identityExpiresTurn === turn);
     for (const inst of betroffen) {
-      const eigenes = loadCardEffect(inst.name);
+      // ★ 28.8.: Normalerweise ist die Ruecknahme das Skript der
+      // Traegerkarte selbst. Eine Karte, die ihre Identitaet durch
+      // UMBENENNEN annimmt (??? , the Shapeshifter — Helden folgen dem
+      // Ascension-Muster, nicht dem Override-Muster), heisst hier aber
+      // bereits wie die geliehene Karte; `inst.name` faende dann deren
+      // Skript. Solche Karten hinterlegen deshalb, wessen Ruecknahme
+      // laufen soll.
+      const eigenes = loadCardEffect(inst.counters._identityCleanupCard || inst.name);
       if (typeof eigenes?.onIdentityExpire === 'function') {
         try {
           await eigenes.onIdentityExpire(this._createContext(inst, { event: 'identityExpire' }));
@@ -19123,6 +22409,7 @@ class GameEngine {
       delete inst.counters._effectOverride;
       delete inst.counters._cardDataOverride;
       delete inst.counters._identityExpiresTurn;
+      delete inst.counters._identityCleanupCard;
       delete inst.counters.treatAsEquip;
     }
     if (betroffen.length > 0) this.sync();
@@ -19134,6 +22421,16 @@ class GameEngine {
     // Sofort mit "abgebrochen" zurueck, damit die alte Kette schnell
     // auslaeuft statt auf eine Antwort zu warten, die nie kommt.
     if (this._aborted) return null;
+    // ── ERZWUNGENE AUFLOESUNG (v741) ─────────────────────────────────
+    // Waehrend einer geschenkten Wiederholung (Kohta) darf der Spieler
+    // den Effekt nicht doch noch abwuergen — er hat die Wiederholung
+    // gerade zugesagt, und ein Abbruch mittendrin haette den Auftritt
+    // und die Rundensperre schon verbraucht. Die Wahl WELCHES Ziel /
+    // welcher Modus bleibt; nur der Abbruchknopf faellt weg.
+    if (this._forceNonCancellable > 0 && promptData && promptData.cancellable) {
+      promptData = { ...promptData, cancellable: false };
+      delete promptData.cancelLabel;
+    }
     // General rule: a prompt that asks the player to activate an effect,
     // choose between effects, or cancel ('confirm' / 'optionPicker')
     // shows the source card's image. When the calling card didn't set
@@ -19358,8 +22655,7 @@ class GameEngine {
       if ((inst.controller ?? inst.owner) !== pi) continue;
       const script = loadCardEffect(inst.name);
       if (!script?.isGerrymander) continue;
-      if (inst.counters?.frozen || inst.counters?.stunned
-          || inst.counters?.negated || inst.counters?.nulled) continue;
+      if (this.isCreatureEffectSuppressed(inst, { honorNegStatusImmune: false })) continue;
       return inst;
     }
     return null;
@@ -19652,10 +22948,38 @@ class GameEngine {
       if (inst.zone !== 'support') continue;
       if (pi != null && inst.owner !== pi) continue;
       if (heroIdx != null && inst.heroIdx !== heroIdx) continue;
-      if (!this.countsAsAbilityInZone(inst.name, inst)) continue;
+      // v771: ECHTE Abilities in einer Support Zone (Xal, Xalibur)
+      // gehoeren genauso hierher wie Karten, die dort nur als Ability
+      // GELTEN (Cloak of Edge). Sonst finden Karten, die Abilities
+      // waehlen (Fire Bomb & Co.), sie nicht — Als Befund 5.9.
+      const _cd = this.getEffectiveCardData(inst) || this._getCardDB()[inst.name];
+      const _istEchteAbility = !!_cd && hasCardType(_cd, 'Ability')
+        && this.heroAcceptsAbilitiesInSupport(inst.owner, inst.heroIdx);
+      if (!_istEchteAbility && !this.countsAsAbilityInZone(inst.name, inst)) continue;
+      // v805: ein echter Stapel (3x Fighting bei Xalibur) hat DREI
+      // Instanzen im selben Slot — er ist trotzdem EIN Eintrag, so wie
+      // ein Ability-Zonen-Stapel. Sonst zaehlte jeder Kartenzaehler ihn
+      // dreifach und der Brett-Picker bekam drei Ziele mit derselben id.
+      // Vertreten wird der Stapel von seiner OBERSTEN Kopie (letzter Name
+      // im Slot), damit `discardAbilityTopCopy` dieselbe abwirft.
+      if (_istEchteAbility) {
+        const slotNames = this.gs.players[inst.owner]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot] || [];
+        const already = out.find(e => e.istEchteAbility && e.owner === inst.owner
+          && e.heroIdx === inst.heroIdx && e.slotIdx === inst.zoneSlot);
+        if (already) {
+          if (inst.name === slotNames[slotNames.length - 1]) already.inst = inst;
+          continue;
+        }
+      }
       out.push({
         inst, cardName: inst.name, owner: inst.owner,
         heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
+        // Ein echter Ability-Stapel traegt sein Level; eine Karte, die
+        // nur als Ability gilt, ist immer Stufe 1.
+        level: _istEchteAbility
+          ? ((this.gs.players[inst.owner]?.supportZones?.[inst.heroIdx]?.[inst.zoneSlot] || []).length || 1)
+          : 1,
+        istEchteAbility: _istEchteAbility,
       });
     }
     return out;
@@ -20033,9 +23357,21 @@ class GameEngine {
         title: entry.cardName,
         message: `${msg} Activate ${entry.cardName} on ${heroName}?`,
         showCard: promptConfig.showCard || undefined,
+        // v700 (Als Vorgabe): links die angebotene Surprise selbst,
+        // rechts (showCard) der Ausloeser — auf einen Blick sichtbar,
+        // WAS man da aktivieren wuerde.
+        showCardLeft: entry.cardName,
         confirmLabel: promptConfig.confirmLabel || '💥 Activate Surprise!',
         cancelLabel: 'No',
         cancellable: true,
+        // v697: Traeger-Position als nackte Zahl mitsenden, damit ein
+        // Karten-`cpuResponse` seinen Aktivierungswert lagebezogen
+        // schaetzen kann (Aquatic Arrows: "same position"). Bewusst nur
+        // serialisierbare Skalare — keine Instanzen in Prompt-Payloads.
+        _hostHeroIdx: entry.heroIdx,
+        // Fenster-spezifische Zusatz-Skalare (Aquatic Spear:
+        // `_targetIsOwn`). Der Aufrufer buergt fuer Serialisierbarkeit.
+        ...(promptConfig.extra || {}),
       });
 
       if (!confirmed) continue;
@@ -20152,6 +23488,49 @@ class GameEngine {
    * @param {string} type    damageType
    * @param {object} opts    { defeated }
    */
+  /**
+   * ★ Nach-Schaden-Fenster des VERURSACHERS (v697, Aquatic Spear):
+   * „Activate this Surprise when you deal damage to any target on the
+   * board." Gescannt werden die Surprises des Spielers, der den
+   * Schaden AUSGETEILT hat — das Spiegelbild von
+   * `_checkSurpriseAfterDamage`, das den Getroffenen scannt. Deckt
+   * Helden- UND Kreaturenziele (targetInfo.kind), laeuft an denselben
+   * Stellen im Schadensweg mit demselben `realDealt`. Status-Ticks
+   * (status/burn/poison) zaehlen wie bei Banner Bearer nicht als
+   * frisches „you deal damage".
+   */
+  async _checkSurpriseOnDealtDamage(targetInfo, source, amount, type) {
+    if (this._inSurpriseResolution) return null;
+    if (!targetInfo || !(amount > 0)) return null;
+    if (type === 'status' || type === 'burn' || type === 'poison') return null;
+    const dealerIdx = source?.heroOwner ?? source?.controller ?? source?.owner ?? -1;
+    if (dealerIdx < 0 || dealerIdx > 1) return null;
+
+    const info = {
+      cardName: source?.name,
+      owner: dealerIdx,
+      heroIdx: source?.heroIdx ?? -1,
+      cardInstance: source,
+      damageType: type,
+      amount,
+      // Ziel-Payload — Helden- oder Kreaturengestalt, je nach kind.
+      targetKind: targetInfo.kind,
+      targetOwner: targetInfo.owner,
+      targetHeroIdx: targetInfo.heroIdx,
+      targetSlotIdx: targetInfo.slotIdx ?? -1,
+      targetInst: targetInfo.inst || null,
+      targetCardName: targetInfo.cardName,
+      targetAlive: !!targetInfo.alive,
+    };
+    const dealerName = this.gs.players[dealerIdx]?.username || 'A player';
+    const tgtLabel = targetInfo.cardName || 'a target';
+    return this._scanSurpriseEntriesForPlayer(dealerIdx, 'surpriseDealtDamageTrigger', info, {
+      message: () => `${dealerName} dealt ${amount} damage to ${tgtLabel}!`,
+      showCard: source?.name,
+      extra: { _targetIsOwn: targetInfo.owner === dealerIdx },
+    });
+  }
+
   async _checkSurpriseAfterDamage(target, source, amount, type, opts = {}) {
     if (this._inSurpriseResolution) return null;
     if (!target || !(amount > 0)) return null;
@@ -20306,6 +23685,83 @@ class GameEngine {
       if (result) return result;
     }
     return null;
+  }
+
+  /**
+   * ★ Fenster „eine Creature BETRITT eine Support Zone" (v699,
+   * Aquatic Arrows). Der bewusst WEITE Begriff aus Als Effekttext
+   * („enters a Support Zone"): Beschwoerungen, place-Effekte (ohne
+   * Helden-Beteiligung) UND reine Bewegungen (Slippery-Familie,
+   * Slippery Skates, Dark Gear, Engine-Transfers) zaehlen alle.
+   *
+   * Gefeuert aus dem onCardEnterZone-Verteiler in `runHooks` — dort
+   * ABSICHTLICH OHNE den `_skipReactionCheck`-Gate des aelteren
+   * Surprise-Verteilers: fast jeder Eintrittspfad traegt das Flag
+   * (es meint die HAND-Reaktionskette), weshalb der alte Verteiler
+   * praktisch nur fuer Sonderpfade feuert und Beschwoerungen ihre
+   * Fenster ueber explizite Aufrufe bekommen. Eigener Unterdruecker:
+   * `_skipEnterSupportSurprise` im hookCtx. Zusaetzlich explizit aus
+   * `_redeemDeathClaim` (Hunting-Uebernahme ist reine Bewegung ohne
+   * Hooks — betritt die Zone aber trotzdem).
+   *
+   * NICHT dabei: verdeckte Eintritte (Bakhm-Sets — verdeckt verraet
+   * die Karte ihre Art nicht) und der Flip eines bereits liegenden
+   * Bakhm-Hosts (der BETRITT die Zone nicht, er lag schon; offene
+   * Lesart, siehe aquatic-arrows.js). Gescannt werden BEIDE Spieler,
+   * wie beim Beschwoerungs-Fenster.
+   */
+  async _checkSurpriseOnCreatureEnterSupport(enterCard, extras = {}) {
+    if (this._inSurpriseResolution) return null;
+    if (!enterCard || enterCard.faceDown) return null;
+    const cd = this._getCardDB()[enterCard.name];
+    if (!cd || !hasCardType(cd, 'Creature')) return null;
+    const zoneOwner = enterCard.controller ?? enterCard.owner;
+    const heroIdx = extras.heroIdx ?? enterCard.heroIdx;
+    if (zoneOwner == null || zoneOwner < 0 || heroIdx == null || heroIdx < 0) return null;
+    const info = {
+      zoneOwner, heroIdx,
+      cardName: enterCard.name, cardInstance: enterCard,
+      isMove: !!extras.isMove, isPlacement: !!extras.isPlacement,
+    };
+    const zoneHeroName = this.gs.players[zoneOwner]?.heroes?.[heroIdx]?.name || 'a Hero';
+    for (let checkPlayer = 0; checkPlayer < 2; checkPlayer++) {
+      const result = await this._scanSurpriseEntriesForPlayer(checkPlayer, 'surpriseCreatureEnterSupportTrigger', info, {
+        message: () => `${enterCard.name} entered ${zoneHeroName}'s Support Zone!`,
+        showCard: enterCard.name,
+      });
+      if (result) return result;
+    }
+    return null;
+  }
+
+  /**
+   * FENSTER „eine Surprise auf meiner Seite wurde per Effekt abgelegt"
+   * (v730, Water Golem).
+   *
+   * Geoeffnet aus `_fireBoardSentToDiscard`, also genau dort, wo die
+   * Engine ohnehin schon weiss, dass eine BRETTKARTE durch einen EFFEKT
+   * in die Ablage ging — Schadenstode und Handabwuerfe laufen dort
+   * bewusst nicht durch, und die Selbst-Ablage einer aufgeloesten
+   * Surprise ebenfalls nicht.
+   *
+   * Der Ausloeser ist AUSDRUECKLICH die Ablage einer ANDEREN Surprise:
+   * die abgelegte Karte hat ihre Zone in diesem Moment bereits
+   * verlassen, kann sich also gar nicht selbst anbieten — und der
+   * Vergleich unten schliesst sie zusaetzlich aus, falls ein kuenftiger
+   * Weg die Karte noch in der Zone stehen laesst.
+   *
+   * Opt-in der Karte: `surpriseSurpriseDiscardedTrigger` (bool oder
+   * Filterfunktion wie bei jedem anderen getypten Ausloeser).
+   */
+  async _checkSurpriseOnSurpriseDiscarded(info) {
+    if (this._inSurpriseResolution) return null;
+    const ownerIdx = info?.zoneOwner;
+    if (!Number.isInteger(ownerIdx) || ownerIdx < 0) return null;
+    const heldName = this.gs.players[ownerIdx]?.heroes?.[info.fromHeroIdx]?.name || 'a Hero';
+    return this._scanSurpriseEntriesForPlayer(ownerIdx, 'surpriseSurpriseDiscardedTrigger', info, {
+      message: () => `${info.cardName} was sent from ${heldName}'s Surprise Zone to the discard pile!`,
+      showCard: info.cardName,
+    });
   }
 
   async _checkSurpriseOnStatus(targetOwnerIdx, targetHeroIdx, statusName, opts) {
@@ -20608,11 +24064,25 @@ class GameEngine {
     } catch { return null; }
   }
 
-  async _checkPreDamageHandReactions(target, source, amount, type) {
+  async _checkPreDamageHandReactions(target, source, amount, type, opts = {}) {
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
     const NULL_RESULT = { negated: false, amountOverride: undefined };
+    // v687: Ist der Treffer UNAUFHALTBAR (weder verringerbar noch
+    // negierbar — Tempeste, the Weather Fairy; Monia-Bot-True-Damage),
+    // wird das Angebot uebersprungen statt vetoiert. Jede Reaktion in
+    // diesem Fenster (Strong Shield, Bamboo Shield, Escape, Homerun,
+    // Sculpture Guards, Spectral Armor) kann NUR negieren oder
+    // verringern; sie anzubieten hiesse, die Karte fuer nichts zu
+    // verbrauchen — „Kosten bleiben bezahlt" waere hier eine Falle.
+    // Nur-`cannotBeNegated` (Ida) bleibt beim alten Verhalten.
+    if (opts.cannotBeNegated && opts.cannotBeReduced) {
+      this.log('pre_damage_reactions_skipped', {
+        target: this._heroLabel(target), source: source?.name, reason: 'unstoppable_damage',
+      });
+      return NULL_RESULT;
+    }
     if (this.isDarkOceanActive() && this._currentEffectSourceIsCreature()) return NULL_RESULT;
     if (this._inPreDamageReaction) return NULL_RESULT;
 
@@ -20640,11 +24110,21 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
       const script = loadCardEffect(cardName);
       if (!script?.isPreDamageReaction) continue;
+      // ── INSTA-KILLS (v718, Als Befund 4.9.) ────────────────────────
+      // Eraser Beam und Hand of Death toeten ohne Schaden. Dieses
+      // Fenster steht ihnen jetzt offen (`actionDefeatHero` ruft es),
+      // aber NUR fuer Reaktionen, die den Tod ERSETZEN koennen:
+      // „would be defeated" (Escape, Paraseed Zombie). Karten, die
+      // bloss Schaden verringern (Spectral Armor „halve that damage",
+      // Cloud in a Bottle), haetten hier nichts zu halbieren — sie
+      // anzubieten hiesse, sie fuer nichts zu verbrauchen.
+      if (opts.instaKill && !script.firesOnDefeat) continue;
 
       const cardData = allCards[cardName];
       // Boomerang's "no Artifacts for the rest of this turn" lockout —
@@ -20664,6 +24144,11 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, targetOwner, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script, { targetHeroIdx });
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       // Once-per-game gate (mirrors after-damage handler).
@@ -20682,7 +24167,9 @@ class GameEngine {
         type: 'confirm',
         title: cardName,
         _handReactionWindow: true,
-        message: `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
+        message: opts.instaKill
+          ? `${heroName} is about to be defeated by ${srcName}! Activate ${cardName}?`
+          : `${heroName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
         confirmLabel: '✨ Activate!',
         cancelLabel: 'No',
@@ -20694,6 +24181,7 @@ class GameEngine {
         // exposing damage data in the human-facing message.
         _preDamageContext: {
           targetOwner, targetHeroIdx, amount, type,
+          casterHeroIdx: rxCast.casterIdx, wisdomCost: rxCast.wisdomCost,
           sourceName: srcName,
           sourceOwner: source?.owner ?? -1,
         },
@@ -20721,6 +24209,47 @@ class GameEngine {
       }
       if (actualIdx < 0) actualIdx = ps.hand.indexOf(cardName);
       if (actualIdx < 0) continue;
+      // Reveal VOR dem Konterfenster (v693, Als Wunsch): der Gegner
+      // soll die Reaktion angezeigt bekommen, als wuerde sie aufloesen,
+      // BEVOR er gefragt wird, ob Key sie stiehlt. Frueher kam das
+      // Reveal erst nach Entnahme und Aufloesung.
+      this._broadcastEvent('card_reveal', { cardName, playerIdx: targetOwner });
+      await this._delay(300);
+      // ── Helden-Konter (v692): Key darf die Reaktion stehlen ───────
+      // VOR dem Flug zur Ablage, vor Entnahme, vor Bezahlung. Bei
+      // Diebstahl: Karte von der Hand des Reagierenden in die Hand des
+      // Diebes, kein Preis, keine Aufloesung — der Schaden laeuft
+      // weiter (NULL_RESULT).
+      {
+        const konter = await this._offerHeroCounterToHandReaction(targetOwner, {
+          cardName, cardType: cardData?.cardType, goldCost: cost,
+        });
+        if (konter?.negated) {
+          const consumedInst = this._findHandInstanceAt(targetOwner, actualIdx);
+          ps.hand.splice(actualIdx, 1);
+          if (consumedInst) this._untrackCard(consumedInst.id);
+          if (Number.isInteger(konter.stolenBy) && this.gs.players[konter.stolenBy]) {
+            const diebPs = this.gs.players[konter.stolenBy];
+            const zielIdx = diebPs.hand.length;
+            diebPs.hand.push(cardName);
+            // Herkunft merken: kehrt spaeter in die Ablage/das Deck des
+            // URSPRUENGLICHEN Besitzers zurueck.
+            this._tagHandCardOrigin(konter.stolenBy, cardName, targetOwner);
+            this._broadcastEvent('play_pile_transfer', {
+              cardName, from: 'hand', to: 'hand',
+              fromOwner: targetOwner, toOwner: konter.stolenBy,
+              fromHandIdx: actualIdx, toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+            });
+            this.log('negated_card_stolen', { card: cardName, from: ps.username, to: diebPs.username });
+          } else {
+            this._broadcastEvent('play_pile_transfer', { owner: targetOwner, cardName, from: 'hand', to: 'discard', fromHandIdx: actualIdx });
+            ps.discardPile.push(cardName);
+          }
+          this.sync();
+          await this._delay(650);
+          return NULL_RESULT;
+        }
+      }
       // Hand → discard/deleted flight animation. Fire BEFORE the
       // splice so the client can pin the source rect to the live
       // hand slot. Same pattern used by every other hand-reaction
@@ -20759,6 +24288,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -20771,9 +24301,7 @@ class GameEngine {
       // while the play_pile_transfer flight is still in the air.
       this.sync();
 
-      this._broadcastEvent('card_reveal', { cardName, playerIdx: targetOwner });
-      await this._delay(300);
-
+      // (card_reveal lief bereits VOR dem Konterfenster — v693.)
       this.log('pre_damage_reaction', { card: cardName, player: ps.username });
 
       let negated = false;
@@ -20854,6 +24382,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -20868,6 +24397,11 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -20928,6 +24462,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21009,6 +24544,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -21023,6 +24559,11 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, ownerIdx, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21041,6 +24582,7 @@ class GameEngine {
         _handReactionWindow: true,
         message: `${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
+        showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '🛡️ Activate!',
         cancelLabel: 'No',
         cancellable: true,
@@ -21075,6 +24617,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21149,6 +24692,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -21163,6 +24707,11 @@ class GameEngine {
         ? (script.dynamicCost(this.gs, pi, this) ?? baseCost)
         : baseCost;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21181,6 +24730,7 @@ class GameEngine {
         _handReactionWindow: true,
         message: `Your opponent's ${tgtName} is about to take ${amount} damage from ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
+        showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '🛡️ Activate!',
         cancelLabel: 'No',
         cancellable: true,
@@ -21214,6 +24764,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21297,6 +24848,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -21306,6 +24858,11 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21324,6 +24881,7 @@ class GameEngine {
         _handReactionWindow: true,
         message: `${tgtName} is about to be defeated by ${srcName}! Activate ${cardName}?`,
         showCard: cardName,
+        showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '🛡️ Activate!',
         cancelLabel: 'No',
         cancellable: true,
@@ -21334,6 +24892,7 @@ class GameEngine {
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21464,6 +25023,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < (ps.hand || []).length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -21473,6 +25033,11 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21490,6 +25055,7 @@ class GameEngine {
         _handReactionWindow: true,
         message: `${tgtName} was defeated! Activate ${cardName}?`,
         showCard: cardName,
+        showCardLeft: (deathInfo?.name || deathInfo?.creature?.name), // v621: die betroffene Kreatur links (Als Wunsch)
         confirmLabel: '💥 Activate!',
         cancelLabel: 'No',
         cancellable: true,
@@ -21514,6 +25080,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
       if (script.oncePerGame || script.oncePerGameKey) {
@@ -21574,7 +25141,7 @@ class GameEngine {
 
     // Whose hand may hold a reaction to this Hero's damage / defeat:
     //  • the damaged Hero's owner — always (the long-standing behaviour
-    //    for every after-damage reaction);
+    //    for every after-damage reaction)
     //  • that owner's OPPONENT — but ONLY for cards that opt in via
     //    `firesForOpponentDefeat`, and ONLY when that opponent is a
     //    HUMAN. CPUs are deliberately never offered the opponent-defeat
@@ -21595,6 +25162,8 @@ class GameEngine {
       const seen = new Set();
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
         seen.add(cardName);
 
@@ -21618,9 +25187,12 @@ class GameEngine {
         // is dead — and the opponent pass never owns it — so a
         // firesOnLethalDamage reaction is cast by ANY living Hero of
         // the activating player instead.
-        const canCast = (reactorIdx === targetOwner && !_defeated)
-          ? this._canHeroActivateSurprise(targetOwner, targetHeroIdx, cardName)
-          : this._anyHeroCanActivateSurprise(reactorIdx, cardName);
+        // v619: Artefakte/Potions brauchen keinen Caster (Als Regel:
+        // Strong Shield hat diese Einschraenkungen nicht).
+        const _rxNeedsHero = this._rxHandCastingHero(reactorIdx, cardName) !== null;
+        const canCast = !_rxNeedsHero || ((reactorIdx === targetOwner && !_defeated)
+          ? this._canHeroActivateSurprise(targetOwner, targetHeroIdx, cardName, { spellInHand: true })
+          : this._anyHeroCanActivateSurprise(reactorIdx, cardName));
         if (!canCast) continue;
 
         // Prompt
@@ -21768,7 +25340,7 @@ class GameEngine {
 
     // Whose hand may hold a reaction to this Creature's defeat:
     //  • the defeated Creature's controller — always (the long-standing
-    //    behaviour for every after-creature-damage reaction);
+    //    behaviour for every after-creature-damage reaction)
     //  • that controller's OPPONENT — but ONLY for cards that opt in via
     //    `firesForOpponentDefeat`, and ONLY when that opponent is a
     //    HUMAN. CPUs are deliberately never offered the opponent-defeat
@@ -21788,6 +25360,8 @@ class GameEngine {
       const seen = new Set();
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
         seen.add(cardName);
 
@@ -21800,6 +25374,11 @@ class GameEngine {
         const cardData = allCards[cardName];
         const cost = cardData?.cost || 0;
         this._noteRxWindow(ps, cardName, 'seen');
+        // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+        // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+        // und Potions nicht — siehe `_rxHandCastingHero`.
+        const rxCast = this._rxCastPlan(ps, cardName, script);
+        if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
         if (script.oncePerGame || script.oncePerGameKey) {
@@ -21818,6 +25397,7 @@ class GameEngine {
           _handReactionWindow: true,
           message: `${tgtName} took ${amount} damage from ${srcName}! Activate ${cardName}?`,
           showCard: cardName,
+        showCardLeft: creatureInst.name, // v621: die betroffene Kreatur links (Als Wunsch)
           confirmLabel: '🔥 Activate!',
           cancelLabel: 'No',
           cancellable: true,
@@ -21840,6 +25420,7 @@ class GameEngine {
         if (destPile === 'deleted') ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
         await this._rxPay(ps, cost);
+        await this._rxPayWisdom(ps, rxCast);
         if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
 
         if (script.oncePerGame || script.oncePerGameKey) {
@@ -21927,12 +25508,18 @@ class GameEngine {
    */
   _noteRxWindow(ps, cardName, key) {
     if (this._inMctsSim || !ps || !cardName) return;
+    // Die Konsolen-Spur von v620 (`[rx-trace]`, eine Zeile je
+    // Fenster-Entscheidung samt Aufrufkette) ist ENTFERNT — sie war die
+    // Messhilfe fuer den Chasing-the-Legend-Fall und flutet im Normal-
+    // betrieb die Serverkonsole (Als Befund 5.9.). Die Zaehler unten
+    // bleiben; wer die Spur wieder braucht, holt sie fuer die Dauer
+    // einer Messung zurueck statt sie dauerhaft mitlaufen zu lassen.
     const players = this.gs?.players || [];
     const pi = players[0] === ps ? 0 : (players[1] === ps ? 1 : -1);
     if (pi < 0) return;
     if (!this._rxWindowStats) this._rxWindowStats = [Object.create(null), Object.create(null)];
     const bucket = this._rxWindowStats[pi];
-    const e = bucket[cardName] || (bucket[cardName] = { seen: 0, gold: 0 });
+    const e = bucket[cardName] || (bucket[cardName] = { seen: 0, gold: 0, hero: 0 });
     if (e[key] != null) e[key]++;
   }
 
@@ -21949,6 +25536,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -21958,6 +25546,11 @@ class GameEngine {
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
       this._noteRxWindow(ps, cardName, 'seen');
+      // v619: Reaction-Attack/Spell/Creature braucht einen castenden Helden
+      // (Level, Schule, lebend, nicht Frozen/Stunned/Negated); Artefakte
+      // und Potions nicht — siehe `_rxHandCastingHero`.
+      const rxCast = this._rxCastPlan(ps, cardName, script);
+      if (!rxCast) { this._noteRxWindow(ps, cardName, 'hero'); continue; }
       if (cost > 0 && !this._rxCanAfford(ps, cost, cardName)) { this._noteRxWindow(ps, cardName, 'gold'); continue; }
 
       if (script.resourcePhaseCondition &&
@@ -22003,6 +25596,7 @@ class GameEngine {
         ps.discardPile.push(cardName);
       }
       await this._rxPay(ps, cost);
+      await this._rxPayWisdom(ps, rxCast);
       if (this.gs._scTracking && playerIdx >= 0 && playerIdx < 2) {
         this.gs._scTracking[playerIdx].cardsPlayedFromHand++;
       }
@@ -22065,6 +25659,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -22245,6 +25840,8 @@ class GameEngine {
       let _bwHadCard = false;
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         if (seen.has(cardName)) continue;
         seen.add(cardName);
 
@@ -22368,6 +25965,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -22509,6 +26107,7 @@ class GameEngine {
     const seen = new Set();
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       if (seen.has(cardName)) continue;
       seen.add(cardName);
 
@@ -22644,11 +26243,19 @@ class GameEngine {
     try {
 
     for (const target of targetedHeroes) {
-      if (target.type !== 'hero') continue;
+      // v703 (Mountain Tear River): „the user OR a Creature in one of its
+      // Support Zones is chosen". Ein Kreaturenziel oeffnet das Fenster
+      // seines Slot-Helden — aber NUR fuer Skripte, die das per
+      // `surpriseFiresOnSupportCreature: true` ausdruecklich anbieten
+      // alle Bestands-Surprises bleiben reine Helden-Fenster. Das
+      // Skript sieht die gewaehlte Kreatur als `sourceInfo.chosenCreature`.
+      const viaCreature = target.type === 'creature';
+      if (target.type !== 'hero' && !viaCreature) continue;
       const tOwner = target.owner;
       const tHeroIdx = target.heroIdx;
       const ps = this.gs.players[tOwner];
       if (!ps) continue;
+      if (viaCreature && !(tHeroIdx >= 0)) continue;
 
       // Per-hero re-entry guard. If THIS specific hero is already in the
       // middle of firing their own surprise, don't let the same slot fire
@@ -22687,6 +26294,7 @@ class GameEngine {
         const script = loadCardEffect(surpriseCardName);
         if (!script?.isSurprise) continue;
         if (!script.onSurpriseActivate) continue;
+        if (viaCreature && !script.surpriseFiresOnSupportCreature) continue;
         // Skip surprises that have their own dedicated trigger systems
         if (script.surpriseDrawTrigger || script.surpriseSummonTrigger || script.surpriseEquipTrigger ||
             script.surpriseStatusTrigger || script.surpriseHeroEffectTrigger || script.surpriseAbilityTrigger ||
@@ -22698,6 +26306,9 @@ class GameEngine {
             script.surpriseTurnEndTrigger ||
             script.surpriseBeforeOppDrawTrigger ||
             script.surpriseBeforeOppDeckSearchTrigger ||
+            script.surpriseDealtDamageTrigger ||
+            script.surpriseCreatureEnterSupportTrigger ||
+            script.surpriseSurpriseDiscardedTrigger ||   // v730
             script.isSurpriseRedirect ||
             script.isDefendingGate) continue;
 
@@ -22723,6 +26334,9 @@ class GameEngine {
           heroIdx: sourceCard?.heroIdx ?? -1,
           cardInstance: sourceCard,
           damageType: opts.damageType,
+          // v703: gesetzt, wenn nicht der Held, sondern eine Kreatur in
+          // seiner Support Zone gewaehlt wurde (sonst null).
+          chosenCreature: viaCreature ? target : null,
         };
 
         // Check surprise trigger condition — the activator's idx is
@@ -22736,6 +26350,11 @@ class GameEngine {
 
         // Prompt the owner to activate
         const heroName = ps.heroes[tHeroIdx]?.name || 'Hero';
+        // v703: bei einem Kreaturenziel benennt der Prompt die Kreatur
+        // und ordnet sie ihrem Helden zu.
+        const targetLabel = viaCreature
+          ? `${target.cardName || 'a Creature'} (in ${heroName}'s Support Zone)`
+          : heroName;
 
         // Build descriptive prompt showing WHO is attacking with WHAT
         let promptMsg;
@@ -22744,9 +26363,9 @@ class GameEngine {
         const srcHero = srcOwnerPs?.heroes?.[sourceInfo.heroIdx];
         const srcHeroName = srcHero?.name;
         if (srcHeroName) {
-          promptMsg = `${srcHeroName}'s ${srcCardName} is targeting ${heroName}!`;
+          promptMsg = `${srcHeroName}'s ${srcCardName} is targeting ${targetLabel}!`;
         } else {
-          promptMsg = `${srcCardName} is targeting ${heroName}!`;
+          promptMsg = `${srcCardName} is targeting ${targetLabel}!`;
         }
         if (hostHeroIdx !== tHeroIdx) {
           const hostName = ps.heroes[hostHeroIdx]?.name || `Hero ${hostHeroIdx + 1}`;
@@ -22832,6 +26451,10 @@ class GameEngine {
       if (!script?.isSurprise) continue;
       if (script.firesOnAnyDamageTarget !== true) continue;
       if (!script.onSurpriseActivate) continue;
+      // Eigenquelliger Schaden (v697): nur ausdrueckliche Opt-ins.
+      if (dmgInfo.selfSourced && script.firesOnSelfSourcedDamage !== true) continue;
+      // Status-Ticks (v697): ebenfalls nur ausdrueckliche Opt-ins.
+      if (dmgInfo.statusTick && script.firesOnStatusTickDamage !== true) continue;
 
       // Per-hero re-entry guard — same shape as `_checkSurpriseWindow`.
       const heroKey = `${ownerIdx}-${hi}`;
@@ -22870,9 +26493,15 @@ class GameEngine {
         title: surpriseCardName,
         message: `${srcLabel} would damage ${tgtLabel}! Activate ${surpriseCardName}?`,
         showCard: srcLabel,
+        // v700: links die Surprise selbst (siehe Scanner-Fenster).
+        showCardLeft: surpriseCardName,
         confirmLabel: '💥 Activate Surprise!',
         cancelLabel: 'No',
         cancellable: true,
+        // v697: nackte Skalare fuer Karten-`cpuResponse` (Aquatic
+        // Shield schaetzt seinen Wert am anrollenden Betrag).
+        _hostHeroIdx: hi,
+        _damageAmount: dmgInfo.amount,
       });
       if (!confirmed) continue;
 
@@ -23311,6 +26940,12 @@ class GameEngine {
     if (!targetedHeroes || targetedHeroes.length === 0) return null;
     if (this._inPostTargetReaction) return null;
 
+    // v818: Brettkarten zuerst (Castling, Rook of Kings [B]) — sie
+    // gewaehren Immunitaeten fuer genau diese Aufloesung.
+    await this._checkPostTargetBoardReactions(targetedHeroes, sourceCard, {
+      damageType: opts.damageType, dealsDamage: opts.dealsDamage !== false,
+    });
+
     // Demon's Gate-style "Creature casts a Spell": annotate the source
     // with the casting Creature so post-target reactions that route by
     // attacker identity (Storm Ring's negation animation, etc.) see
@@ -23359,6 +26994,8 @@ class GameEngine {
 
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         const script = loadCardEffect(cardName);
         if (!script?.isPostTargetReaction) continue;
 
@@ -23681,6 +27318,7 @@ class GameEngine {
 
     for (let hi = 0; hi < ps.hand.length; hi++) {
       const cardName = ps.hand[hi];
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
       const script = loadCardEffect(cardName);
       if (!script?.isAscensionReaction) continue;
 
@@ -23781,11 +27419,107 @@ class GameEngine {
   }
 
   /**
+   * ★ HAND-REAKTION: WER CASTET, UND WAS KOSTET WISDOM? (v800, Als
+   * Vorgabe 6.9.)
+   *
+   * Bis v799 kannten die Hand-Reaktionsfenster keinen Caster: sie
+   * fragten nur „kann IRGENDEIN Held die Karte?" (`_rxHandCardCastable`)
+   * und zahlten Gold. Wisdom wurde dabei nie eingezogen — ein Held, der
+   * Spectral Armor oder Escape nur ueber Wisdom erreicht, spielte sie
+   * kostenlos, obwohl v619 „Wisdom zaehlt" versprach.
+   *
+   * Dieser Plan legt den Caster fest und liefert die Wisdom-Kosten mit:
+   *   • `script.casterIsTarget` (Escape, Emergency Spell Armor, Weapon
+   *     Absorption — „a Hero you control that can use it" / „the user"):
+   *     der GETROFFENE Held muss die Karte castfaehig sein, sonst kein
+   *     Angebot. Nur das Helden-Vor-Schadens-Fenster reicht
+   *     `targetHeroIdx`; in den anderen Fenstern gibt es kein Ziel.
+   *   • sonst: unter allen castfaehigen Helden der mit den GERINGSTEN
+   *     Wisdom-Kosten (0 gewinnt sofort, Reihenfolge entscheidet bei
+   *     Gleichstand). Bewusst KEINE Helden-Abfrage — die Fenster haben
+   *     nie danach gefragt, und ein Picker bei jeder Reaktion waere ein
+   *     UI-Einschnitt, den Al nicht bestellt hat.
+   *   • `script.handlesOwnWisdomCost`: die Karte zieht Wisdom selbst
+   *     ein (Weapon Absorption entscheidet erst NACH der Auswahl, ob
+   *     ueberhaupt eine Luecke bleibt).
+   * Artefakte und Potions brauchen keinen Caster → `{ casterIdx: null }`.
+   *
+   * @returns {{casterIdx: number|null, wisdomCost: number}|null} null =
+   *   kein castfaehiger Held, Karte nicht anbieten
+   */
+  _rxCastPlan(ps, cardName, script, opts = {}) {
+    const pi = this._rxOwnerIdx(ps, '_rxCastPlan');
+    if (pi < 0) return null;
+    const cd = this._getCardDB()[cardName];
+    if (!cd) return null;
+    const needsHero = hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature');
+    if (!needsHero) return { casterIdx: null, wisdomCost: 0 };
+    const heroes = ps.heroes || [];
+    const candidates = (script?.casterIsTarget && Number.isInteger(opts.targetHeroIdx))
+      ? [opts.targetHeroIdx]
+      : heroes.map((_, hi) => hi);
+    let best = null;
+    for (const hi of candidates) {
+      if (!this._canHeroActivateSurprise(pi, hi, cardName, { spellInHand: true })) continue;
+      const w = (cd.cardType === 'Spell' && !script?.handlesOwnWisdomCost)
+        ? Math.max(0, this.getWisdomDiscardCost(pi, hi, cd)) : 0;
+      if (!best || w < best.wisdomCost) best = { casterIdx: hi, wisdomCost: w };
+      if (best.wisdomCost === 0) break;
+    }
+    return best;
+  }
+
+  /** Wisdom-Abwurf fuer eine Hand-Reaktion — direkt nach dem Gold. */
+  async _rxPayWisdom(ps, plan) {
+    if (!(plan?.wisdomCost > 0)) return;
+    const pi = this._rxOwnerIdx(ps, '_rxPayWisdom');
+    if (pi < 0) return;
+    await this.actionPromptForceDiscard(pi, plan.wisdomCost, {
+      title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+    });
+    this.sync();
+  }
+
+  /**
    * True iff ANY of `playerIdx`'s Heroes can currently activate the
    * named hand card. Used by the after-damage hero hub for reactions
    * to a Hero's DEFEAT: the defeated Hero itself can't be the caster
    * (it's dead), so any living Hero of the activating player qualifies.
    */
+  /**
+   * ★ HAND-REAKTION: WER CASTET? — EINE Auslegung (v619, Als Regel 29.8.)
+   *
+   * Reaction-ATTACKS, -SPELLS und -CREATURES aus der Hand brauchen einen
+   * castenden Helden: lebend, nicht Frozen/Stunned/Negated, der Schule
+   * UND Level der Karte erfuellt (Wisdom zaehlt; `spellInHand`, weil
+   * die Karte beim Cast die Hand verlaesst). Reaction-Creatures brauchen
+   * zusaetzlich eine freie Support Zone (im Helfer enthalten).
+   * ARTEFAKTE und POTIONS haben KEINE dieser Einschraenkungen — Strong
+   * Shield feuert auch bei drei toten Helden.
+   *
+   * Rueckgabe: Index des ersten castfaehigen Helden, -1 wenn keiner —
+   * oder `null`, wenn die Karte gar keinen Caster braucht.
+   * `_rxHandCardCastable(ps, cardName)` ist die Bool-Form fuer die
+   * Fenster, die den Spieler nur als `ps` kennen.
+   */
+  _rxHandCastingHero(playerIdx, cardName) {
+    const cd = this._getCardDB()[cardName];
+    if (!cd) return -1;
+    const needsHero = hasCardType(cd, 'Attack') || hasCardType(cd, 'Spell') || hasCardType(cd, 'Creature');
+    if (!needsHero) return null;
+    const ps = this.gs.players[playerIdx];
+    for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
+      if (this._canHeroActivateSurprise(playerIdx, hi, cardName, { spellInHand: true })) return hi;
+    }
+    return -1;
+  }
+  _rxHandCardCastable(ps, cardName) {
+    const players = this.gs?.players || [];
+    const pi = players[0] === ps ? 0 : (players[1] === ps ? 1 : -1);
+    if (pi < 0) return false;
+    return this._rxHandCastingHero(pi, cardName) !== -1;
+  }
+
   _anyHeroCanActivateSurprise(playerIdx, cardName) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
@@ -23804,6 +27538,10 @@ class GameEngine {
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name || hero.hp <= 0) return false;
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed)) return false;
+    // v619 (Als Regel 29.8.): ein NEGIERTER Held castet keine Reaktion —
+    // jede Form der Negation, auch die Effekt-Only-Variante des
+    // Weakening Crystal. Gilt fuer Surprises UND Hand-Reaktionen.
+    if (hero.statuses?.negated) return false;
 
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
@@ -23956,7 +27694,7 @@ class GameEngine {
         if (idx >= 0) supportSlot.splice(idx, 1);
       }
 
-      // `_onlyCard: inst` — only the leaving card's own cleanup fires;
+      // `_onlyCard: inst` — only the leaving card's own cleanup fires
       // other cards (Flying Island, etc.) shouldn't think THEY left.
       await this.runHooks('onCardLeaveZone', {
         _onlyCard: inst, leavingCard: inst,
@@ -24526,7 +28264,8 @@ class GameEngine {
         // No reactions — resolve normally (no chain visualization)
         this._inReactionCheck = false;
         let resolveResult = null;
-        if (resolve) resolveResult = await resolve();
+        delete this.gs._discardOutDeclined;
+        if (resolve) resolveResult = this._applyDiscardOutDecline(cardName, await resolve());
         result = { negated: false, chainFormed: false, resolveResult, negatedToDeleted: false };
       } else {
         result = {
@@ -24536,6 +28275,7 @@ class GameEngine {
           // Lunar Eclipse flags a negated card for deletion instead of
           // discard — server play paths route via routeNegatedInitialCard.
           negatedToDeleted: !!initialLink._negatedToDeleted,
+          negatedToHandOf: Number.isInteger(initialLink._negatedToHandOf) ? initialLink._negatedToHandOf : null,
         };
       }
     } finally {
@@ -24698,6 +28438,8 @@ class GameEngine {
       const countByName = new Map();
       for (let hi = 0; hi < ps.hand.length; hi++) {
         const cardName = ps.hand[hi];
+        if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
+      if (this._handPlayLockedFor(ps, cardName)) continue;   // v818 Hand-Spielsperre
         // Skip the card currently being played/resolved (prevents self-
         // chaining, e.g. a Reaction Spell trying to chain onto itself
         // while it's still in hand mid-play).
@@ -24813,6 +28555,30 @@ class GameEngine {
         countByName.set(sName, 1);
       }
 
+      // ── Helden-Effekt-Reaktionen (v691) ────────────────────────────
+      // Ein Held, dessen Skript `isHeroReaction` + `heroReactionCondition`
+      // traegt (Key, the Cursed Thief), nimmt am selben Fenster teil —
+      // ohne Handkarte, ohne Zone. Nur lebend und nicht stummgeschaltet
+      // (dieselbe Regel wie der Hook-Filter). Additiv: Hand- und
+      // Surprise-Zweige oben sind unveraendert.
+      for (let hhi = 0; hhi < (ps.heroes || []).length; hhi++) {
+        const hero = ps.heroes[hhi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (eligibleByName.has(hero.name)) continue;
+        const hScript = loadCardEffect(hero.name);
+        if (!hScript?.isHeroReaction || typeof hScript.heroReactionCondition !== 'function') continue;
+        if (this._isHeroEffectSilenced(pi, hhi)) continue;
+        let okH = false;
+        try { okH = !!hScript.heroReactionCondition(this.gs, pi, this, chainCtx, hhi); } catch { okH = false; }
+        if (!okH) continue;
+        eligibleByName.set(hero.name, {
+          handIdx: -1, cost: 0, script: hScript, cardData: allCards[hero.name] || null, cardName: hero.name,
+          eligibleHeroIdxs: [hhi], wisdomCost: 0,
+          fromHero: { heroIdx: hhi }, source: 'hero',
+        });
+        countByName.set(hero.name, 1);
+      }
+
       if (eligibleByName.size === 0) continue;
 
       // ── Prompt the player ─────────────────────────────────────────
@@ -24846,6 +28612,10 @@ class GameEngine {
           cards,
           title: 'Chain a Reaction?',
           description: `${eventDesc}. Click a card to chain it, or decline.`,
+          // v693: WORAUF reagiere ich? Die juengste fremde Karte der
+          // Kette (sonst die Initialkarte) neben dem Text zeigen — der
+          // Einfach-Confirm hatte das schon (`showCard`), die Galerie nicht.
+          showCard: ([...chain].reverse().find(l => l.owner !== pi && !l.fromHero) || chain[0])?.cardName || null,
           cancelLabel: 'No Reaction',
           cancellable: true,
         });
@@ -24859,6 +28629,47 @@ class GameEngine {
       if (!info) continue;
       const { cost, script, cardData } = info;
       const eligibleHeroIdxs = info.eligibleHeroIdxs || [];
+
+      // ── Helden-Effekt-Reaktion aktivieren (v691) ──────────────────
+      // Kein Kartenflug, keine Ablage: der Held bleibt, wo er ist. Der
+      // Link traegt `fromHero`, damit die Kettenauflösung ihn weder
+      // ablegt noch als Karte behandelt. Aktivierungskosten (Keys Gold)
+      // zahlt `payActivationCost`; `false` = nicht bezahlt/abgelehnt →
+      // keine Reaktion.
+      if (info.fromHero) {
+        const hHeroIdx = info.fromHero.heroIdx;
+        if (typeof script.payActivationCost === 'function') {
+          const paid = await script.payActivationCost(this, pi, chainCtx, hHeroIdx);
+          if (paid === false) continue;
+        }
+        this._broadcastEvent('hero_effect_reaction', { owner: pi, heroIdx: hHeroIdx, heroName: chosenName });
+        // v694 (Al): der Held wird bei der Aktivierung ANGEZEIGT und
+        // loest damit die Karte ab, auf die er reagiert.
+        await this.showTriggeredEffect(chosenName, { replace: true, delayMs: 300 });
+        this.log('reaction_activated', { card: chosenName, player: ps.username, chainPosition: chain.length, source: 'hero' });
+        const engine = this;
+        const link = {
+          id: uuidv4().substring(0, 12),
+          cardName: chosenName, owner: pi,
+          cardType: 'Hero Effect',
+          casterHeroIdx: hHeroIdx, heroIdx: hHeroIdx,
+          goldCost: 0, wisdomCost: 0,
+          isInitialCard: false, negated: false, chainClosed: false,
+          fromHero: true,
+          resolve: typeof script.heroReactionResolve === 'function'
+            ? async (ch, idx) => script.heroReactionResolve(engine, pi, ch, idx, hHeroIdx)
+            : null,
+          script,
+        };
+        chain.push(link);
+        if (chain.length >= 2) this._broadcastChainUpdate(chain);
+        await this.runHooks('onReactionActivated', {
+          reactionCardName: chosenName, reactionOwner: pi, chain,
+          _skipReactionCheck: true, _isReaction: true,
+        });
+        this.sync();
+        return true;
+      }
 
       // ── Surprise-sourced reaction activation ──────────────────────
       // Self-contained so the hand-Reaction path below is byte-for-
@@ -24874,7 +28685,7 @@ class GameEngine {
           if (paid === false) continue;
         }
         // Flip the Surprise FACE-UP but leave it IN its Surprise Zone
-        // (still tracked). It stays visible there for the whole chain;
+        // (still tracked). It stays visible there for the whole chain
         // `_resolveReactionChain`'s end-of-chain cleanup sends it to
         // discard — visually leaving the zone — only AFTER the card it
         // negated has been processed. The card's `skipPostResolveDiscard`
@@ -25091,7 +28902,34 @@ class GameEngine {
         // `skipPostResolveDiscard` cards (surprise reactions that
         // remain in their zone until end-of-chain) are routed by the
         // post-chain cleanup instead, so skip them here.
-        if (!link.isInitialCard
+        if (link.fromHero) {
+          // Helden-Effekt-Link (v691): nichts abzulegen.
+        } else if (!link.isInitialCard
+            && Number.isInteger(link._negatedToHandOf)
+            && this.gs.players[link._negatedToHandOf]) {
+          // v691 (Key): negiertes Reaktions-Artefakt in die Hand des
+          // Diebes. Der Reaktionspreis war beim Ketten schon abgezogen —
+          // zurueckgeben (Tool-Freezer-Muster: „doesn't have to pay").
+          const dieb = link._negatedToHandOf;
+          const diebPs = this.gs.players[dieb];
+          const oppPs = this.gs.players[link.owner];
+          const zielIdx = diebPs.hand.length;
+          diebPs.hand.push(link.cardName);
+          this._tagHandCardOrigin(dieb, link.cardName, link.owner);   // kehrt spaeter zum Besitzer zurueck
+          if ((link.goldCost || 0) > 0 && oppPs) {
+            oppPs.gold = (oppPs.gold || 0) + link.goldCost;
+            this.log('gold_refund', { player: oppPs.username, amount: link.goldCost, reason: 'stolen reaction' });
+            this._broadcastEvent('gold_change', { owner: link.owner, amount: link.goldCost });
+          }
+          this._broadcastEvent('play_pile_transfer', {
+            cardName: link.cardName, from: 'hand', to: 'hand',
+            fromOwner: link.owner, toOwner: dieb,
+            toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+          });
+          this.log('negated_card_stolen', { card: link.cardName, from: oppPs?.username, to: diebPs.username });
+          this.sync();
+          await this._delay(650);
+        } else if (!link.isInitialCard
             && !loadCardEffect(link.cardName)?.skipPostResolveDiscard) {
           const ps = this.gs.players[link.owner];
           if (ps) {
@@ -25121,8 +28959,9 @@ class GameEngine {
 
         if (link.resolve) {
           try {
+            delete this.gs._discardOutDeclined;
             const result = await link.resolve(chain, i);
-            if (link.isInitialCard) link.resolveResult = result;
+            if (link.isInitialCard) link.resolveResult = this._applyDiscardOutDecline(link.cardName, result);
           } catch (err) {
             console.error(`[Engine] Chain resolve failed for "${link.cardName}":`, err.message);
           }
@@ -25164,7 +29003,7 @@ class GameEngine {
         // — a negated Reaction Creature paid its cost but didn't
         // actually land, so the discard pile is its correct
         // destination there.
-        if (!link.isInitialCard) {
+        if (!link.isInitialCard && !link.fromHero) {   // v691: Helden-Links haben keine Karte
           const linkScript = loadCardEffect(link.cardName);
           // `gs._spellPlacedOnBoard` lets a hook fired during this
           // link's resolve (e.g. Card Game Player Inya turning the
@@ -25252,6 +29091,12 @@ class GameEngine {
       // `negatedToDeleted`; honored for non-initial links in
       // _resolveReactionChain. Used by Lunar Eclipse.
       if (opts.deleteCard) chain[linkIndex]._negatedToDeleted = true;
+      // v691 (Key, the Cursed Thief): die negierte Karte wandert in die
+      // HAND des Spielers `stealToHandOf` statt in eine Ablage. Fuer die
+      // Initialkarte via `chainResult.negatedToHandOf` →
+      // routeNegatedInitialCard; fuer Reaktions-Links in
+      // _resolveReactionChain.
+      if (Number.isInteger(opts.stealToHandOf)) chain[linkIndex]._negatedToHandOf = opts.stealToHandOf;
     }
   }
 
@@ -25265,6 +29110,26 @@ class GameEngine {
   async routeNegatedInitialCard(ownerIdx, cardName, chainResult, fromHandIdx, opts = {}) {
     const ps = this.gs.players[ownerIdx];
     if (!ps) return;
+    // v691: gestohlen (Key) — in die Hand des Diebes, mit Flug von der
+    // Hand des Spielers zur Hand des Diebes (Handplatz-Ziel wie beim
+    // Kadaver-Anspruch, sonst landet der Flug in der Handmitte).
+    const dieb = chainResult?.negatedToHandOf;
+    if (Number.isInteger(dieb) && this.gs.players[dieb]) {
+      const diebPs = this.gs.players[dieb];
+      const zielIdx = diebPs.hand.length;
+      diebPs.hand.push(cardName);
+      this._tagHandCardOrigin(dieb, cardName, ownerIdx);   // kehrt spaeter zum Besitzer zurueck
+      this._broadcastEvent('play_pile_transfer', {
+        cardName, from: 'hand', to: 'hand',
+        fromOwner: ownerIdx, toOwner: dieb,
+        ...(Number.isInteger(fromHandIdx) && fromHandIdx >= 0 ? { fromHandIdx } : {}),
+        toHandIdx: zielIdx, finalHandSize: diebPs.hand.length,
+      });
+      this.log('negated_card_stolen', { card: cardName, from: ps.username, to: diebPs.username });
+      this.sync();
+      await this._delay(650);
+      return;
+    }
     const toDeleted = !!chainResult?.negatedToDeleted;
     const pile = toDeleted ? 'deletedPile' : 'discardPile';
     if (toDeleted) {
@@ -25715,7 +29580,7 @@ class GameEngine {
       const hero = ps.heroes[hi];
       if (!hero?.name) continue;
       const heroScript = loadCardEffect(hero.name);
-      if (typeof heroScript?.canBypassLevelReqForCard !== 'function') continue;
+      const heroSide = typeof heroScript?.canBypassLevelReqForCard === 'function';
       const bypassed = [];
       const seen = new Set();
       for (const cn of (ps.hand || [])) {
@@ -25724,7 +29589,16 @@ class GameEngine {
         const cd = cardDB[cn];
         if (!cd) continue;
         try {
-          if (heroScript.canBypassLevelReqForCard(this.gs, playerIdx, hi, cd, this)) {
+          if (heroSide && heroScript.canBypassLevelReqForCard(this.gs, playerIdx, hi, cd, this)) {
+            bypassed.push(cn);
+            continue;
+          }
+          // v714: KARTEN-seitiger Bypass, der ein normaler Beschwoerungsweg
+          // ist (Doctor Fester, Fighting 2) — Opt-in `normalSummonBypass`,
+          // damit Placement-Bypaesse (Deepsea) weiter keine Zonen aufleuchten.
+          const cardScript = loadCardEffect(cn);
+          if (cardScript?.normalSummonBypass && typeof cardScript.canBypassLevelReq === 'function'
+              && hero.hp > 0 && cardScript.canBypassLevelReq(this.gs, playerIdx, hi, cd, this)) {
             bypassed.push(cn);
           }
         } catch (err) {
@@ -25778,6 +29652,12 @@ class GameEngine {
   getCreatureSpellCasters(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
+    // ★ 28.8.: eine Kreatur, die einen Zauber wirkt, wirkt ihn als
+    // AKTION — der Server wies das unter Sperre laengst zurueck
+    // (`validateActionPlay`), der Client hielt die Handkarte aber
+    // ungegraut, weil `canActionCardBePlayed` ueber diesen Sammler
+    // einen Ersatz-Sprecher fand. Vierte Anzeigeluecke derselben Bauart.
+    if (this.areActionsBlocked(playerIdx)) return [];
     const cardDB = this._getCardDB();
     const result = [];
     for (const inst of this.cardInstances) {
@@ -25924,7 +29804,12 @@ class GameEngine {
           (c.owner === playerIdx || c.controller === playerIdx) && c.zone === 'support' && c.heroIdx === hi && c.zoneSlot === si
         );
         const cd = (inst ? this.getEffectiveCardData(inst) : null) || cardDB[slot[0]];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !this.isChoosableAsCreature(inst, cd)) continue; // v704: + choosableAsCreature
+        // Harte Unwaehlbarkeit (Thicket, v724): gar nicht erst in die
+        // Liste. Dieser Sammler speist die Targeting-Artefakte
+        // (Book of Doom, Dark Gear, Capture Net …), die sonst an den
+        // Filtern der Prompt-Sammler vorbeilaufen.
+        if (inst?.counters?.untargetable_all) continue;
         targets.push({
           id: `equip-${playerIdx}-${hi}-${si}`, type: 'equip', owner: playerIdx,
           heroIdx: hi, slotIdx: si, cardName: slot[0], cardInstance: inst || null,
@@ -25973,7 +29858,7 @@ class GameEngine {
       return true;
     };
 
-    // 1. Echte Ability-Zonen. Ein Slot stapelt gleichnamige Karten;
+    // 1. Echte Ability-Zonen. Ein Slot stapelt gleichnamige Karten
     //    die Stapelhoehe IST das Level der Ability.
     for (let hi = 0; hi < (ps.abilityZones || []).length; hi++) {
       const zonen = ps.abilityZones[hi] || [];
@@ -25996,10 +29881,68 @@ class GameEngine {
         id: `equip-${playerIdx}-${eintrag.heroIdx}-${eintrag.slotIdx}`,
         type: 'equip', zoneKind: 'support',
         owner: playerIdx, heroIdx: eintrag.heroIdx, slotIdx: eintrag.slotIdx,
-        cardName: eintrag.cardName, level: 1, cardInstance: eintrag.inst,
+        cardName: eintrag.cardName, level: eintrag.level || 1, cardInstance: eintrag.inst,
+        istEchteAbility: !!eintrag.istEchteAbility,
       });
     }
     return out;
+  }
+
+  /**
+   * ★ EINE BRETTKARTE PER EFFEKT IN DEN ABLAGESTAPEL (v800).
+   *
+   * Der EINE Weg fuer „send it to the discard pile" von einer Support-
+   * oder Ability-Zone aus — ohne Zerstoerungs-Semantik (keine
+   * Board-Waechter, keine Immunitaeten gegen Gegnereffekte, kein
+   * `destroy`-Anlass). Die Bewegung selbst laeuft ueber `actionMoveCard`,
+   * damit ALLES mitlaeuft, was dort haengt: `onCardLeaveZone` (Fighting
+   * nimmt seinen ATK-Bonus zurueck, Toughness seine HP), Untracking,
+   * Stapel des URSPRUENGLICHEN Besitzers, Identitaets-Anker,
+   * Handlimit-Nachpruefung, `onBoardSentToDiscard` (Aquatic-Serie) und
+   * das Cosmic-Malfunction-Fenster bei gegnerischer Quelle.
+   *
+   * Vorher gab es diesen Weg dreimal von Hand (`discardAbilityTopCopy`,
+   * `_crusader-shared.artefaktInDieAblage`, Ragnarock/Arm Cannon inline)
+   * — und der Ability-Zweig vergass dabei das Untracking UND den
+   * Leave-Hook: eine per Cybug Ladybug abgeworfene Fighting liess den
+   * ATK-Bonus stehen und eine Leiche in `cardInstances` zurueck.
+   *
+   * Der Flug wird VOR dem Splice gesendet (Ability-Zone:
+   * `ability_zone_to_discard`, Support-Zone: `play_pile_transfer`), so
+   * wie es die Client-Handler erwarten. Unbewegliche Karten
+   * (`immovable`, Cardinal-Immunitaet) prallen ab, OHNE dass ein Flug
+   * gesendet wird.
+   *
+   * @param {object} inst - getrackte Instanz in SUPPORT oder ABILITY
+   * @param {object} [opts]
+   *   @param {object|string} [opts.source] Verursacher (fuer die Fenster,
+   *     die nach der Quelle fragen)
+   *   @param {number} [opts.sourceOwner]
+   * @returns {Promise<boolean>} true, wenn die Karte die Zone verlassen hat
+   */
+  async sendBoardCardToDiscard(inst, opts = {}) {
+    if (!inst) return false;
+    const zone = inst.zone;
+    if (zone !== ZONES.SUPPORT && zone !== ZONES.ABILITY) return false;
+    if (inst.counters?.immovable || inst.counters?._cardinalImmune) return false;
+    const ownerIdx = inst.owner;
+    if (!this.gs.players[ownerIdx]) return false;
+    if (zone === ZONES.SUPPORT) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: ownerIdx, cardName: inst.name,
+        from: 'support', to: 'discard',
+        fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
+      });
+    } else {
+      this._broadcastEvent('ability_zone_to_discard', {
+        owner: ownerIdx, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot, cardName: inst.name,
+      });
+    }
+    await this.actionMoveCard(inst, ZONES.DISCARD, -1, -1, {
+      ignoreGateShield: true,
+      source: opts.source, sourceName: opts.sourceName, sourceOwner: opts.sourceOwner,
+    });
+    return inst.zone !== zone;
   }
 
   /**
@@ -26016,13 +29959,17 @@ class GameEngine {
    * nicht". Jetzt gibt es sie. Der Support-Zweig ist der Grund, warum
    * das nicht in eine Karte gehoert: eine Karte, die in einer
    * SUPPORT-Zone als Ability zaehlt (Cloak of Edge), hat gar keinen
-   * Stapel — sie wandert als Ganzes und braucht `onCardLeaveZone`
-   * plus Untracking, sonst bleibt eine Leiche in `cardInstances`.
+   * Stapel — sie wandert als Ganzes.
+   *
+   * Seit v800 laufen beide Zweige ueber `sendBoardCardToDiscard`; der
+   * Ability-Zweig nimmt dabei die INSTANZ der obersten Kopie mit
+   * (vorher wanderte nur der Name, der Leave-Hook blieb stumm).
    *
    * @param {object} eintrag - Element aus `getAbilityTargets`
+   * @param {object} [opts] - wird an `sendBoardCardToDiscard` gereicht
    * @returns {Promise<boolean>} true, wenn eine Kopie abgeworfen wurde
    */
-  async discardAbilityTopCopy(eintrag) {
+  async discardAbilityTopCopy(eintrag, opts = {}) {
     if (!eintrag) return false;
     const ownerIdx = eintrag.owner;
     const ps = this.gs.players[ownerIdx];
@@ -26031,38 +29978,21 @@ class GameEngine {
     // ── Support-Zone: die Karte wandert als Ganzes ──
     if (eintrag.zoneKind === 'support') {
       const inst = eintrag.cardInstance;
-      if (!inst || inst.zone !== 'support') return false;
-      const heroIdx = inst.heroIdx;
-      const slotIdx = inst.zoneSlot;
-      const name = inst.name;
-      const zone = ((ps.supportZones || [])[heroIdx] || [])[slotIdx] || [];
-      const zi = zone.indexOf(name);
-      if (zi >= 0) zone.splice(zi, 1);
-      this._broadcastEvent('play_pile_transfer', {
-        owner: ownerIdx, cardName: name,
-        from: 'support', to: 'discard',
-        fromHeroIdx: heroIdx, fromSlotIdx: slotIdx,
-      });
-      await this.runHooks('onCardLeaveZone', {
-        _onlyCard: inst, card: inst, leavingCard: inst,
-        fromZone: 'support', fromHeroIdx: heroIdx, fromZoneSlot: slotIdx,
-        fromOwner: ownerIdx, toZone: 'discard',
-      });
-      this.cardInstances = this.cardInstances.filter(c => c.id !== inst.id);
-      // Fremdherkunft (Magic Lamp & Co.) landet im Stapel des
-      // urspruenglichen Besitzers — dieselbe Regel wie ueberall sonst.
-      const ziel = this.gs.players[inst.originalOwner ?? ownerIdx];
-      if (ziel) {
-        if (!ziel.discardPile) ziel.discardPile = [];
-        ziel.discardPile.push(name);
-      }
-      return true;
+      if (!inst || inst.zone !== ZONES.SUPPORT) return false;
+      return this.sendBoardCardToDiscard(inst, opts);
     }
 
     // ── Ability-Zone: eine Kopie vom Stapel ──
     const slot = (ps.abilityZones?.[eintrag.heroIdx] || [])[eintrag.slotIdx];
     if (!slot?.length) return false;
     const name = slot[slot.length - 1];
+    const inst = this.cardInstances.find(c =>
+      c.zone === ZONES.ABILITY && c.owner === ownerIdx
+      && c.heroIdx === eintrag.heroIdx && c.zoneSlot === eintrag.slotIdx && c.name === name);
+    if (inst) return this.sendBoardCardToDiscard(inst, opts);
+    // Ohne Instanz (sollte nicht vorkommen — jede Kopie wird beim
+    // Anlegen getrackt): Namensweg wie frueher, damit der Effekt nicht
+    // ins Leere laeuft.
     slot.pop();
     if (!ps.discardPile) ps.discardPile = [];
     ps.discardPile.push(name);
@@ -26198,12 +30128,21 @@ class GameEngine {
     // copies of the same name share the same answer.
     const scriptCache = new Map();
     const canCache = new Map();
-    for (let handIndex = 0; handIndex < (ps.hand || []).length; handIndex++) {
-      const cardName = ps.hand[handIndex];
+    // ★ 28.8. (Als Ruling): Hand UND Crestinas Vorrat. Zwei
+    // Durchgaenge, weil der Index je Quelle zaehlt — eine
+    // zusammengehaengte Liste haette Vorrats-Indizes erzeugt, die auf
+    // Handkarten zeigen (die Gratiskopie-Fehlerklasse).
+    const _quellen = [
+      { liste: ps.hand || [], ausVorrat: false },
+      { liste: this.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []) : [], ausVorrat: true },
+    ];
+    for (const { liste: _liste, ausVorrat } of _quellen) {
+    for (let handIndex = 0; handIndex < _liste.length; handIndex++) {
+      const cardName = _liste[handIndex];
       // Per-instance reveal flag: the inst at this hand slot may have
       // been revealed earlier this turn (Luna Kiai). Robust to hand
       // mutations because the flag travels with the inst, not the slot.
-      const inst = this._findHandInstanceAt(playerIdx, handIndex);
+      const inst = this._findHandInstanceAt(playerIdx, handIndex, ausVorrat);
       if (inst?.counters?._revealedThisTurn) continue;
       let script;
       if (scriptCache.has(cardName)) script = scriptCache.get(cardName);
@@ -26219,7 +30158,12 @@ class GameEngine {
         }
         if (!ok) continue;
       }
-      result.push({ cardName, handIndex, label: script.handActivateLabel || cardName });
+      result.push({
+        cardName, handIndex,
+        fromCreation: ausVorrat || undefined,
+        label: script.handActivateLabel || cardName,
+      });
+    }
     }
     return result;
   }
@@ -26237,7 +30181,7 @@ class GameEngine {
    * stamp lets cancellable prompts preserve the activation slot on a
    * cancel.
    */
-  async doHandActivate(playerIdx, cardName, handIndex) {
+  async doHandActivate(playerIdx, cardName, handIndex, fromCreation = false) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return false;
     if (this.gs.activePlayer !== playerIdx) return false;
@@ -26246,8 +30190,11 @@ class GameEngine {
     if (this.gs.potionTargeting) return false;
     if (this.gs.effectPrompt) return false;
     if (typeof handIndex !== 'number' || handIndex < 0) return false;
-    if (handIndex >= (ps.hand || []).length) return false;
-    if (ps.hand[handIndex] !== cardName) return false;
+    // ★ 28.8.: Hand ODER Crestinas Vorrat (Als Ruling).
+    const quelle = this.handSourceList(playerIdx, fromCreation);
+    if (!quelle) return false;
+    if (handIndex >= quelle.length) return false;
+    if (quelle[handIndex] !== cardName) return false;
     // Map hand-position handIndex → real CardInstance using the same
     // FIFO match the server's reveal-snapshot uses (Bamboo Shield et al.):
     // walk the hand, match each name to the next available un-flagged
@@ -26255,7 +30202,7 @@ class GameEngine {
     // is the one whose reveal flag will be stamped on success — keying
     // by inst (not by hand index) makes the reveal robust to any later
     // hand mutation.
-    const realInst = this._findHandInstanceAt(playerIdx, handIndex);
+    const realInst = this._findHandInstanceAt(playerIdx, handIndex, fromCreation);
     if (!realInst) return false;
     // This specific copy already revealed — ignore.
     if (realInst.counters?._revealedThisTurn) return false;
@@ -26291,20 +30238,26 @@ class GameEngine {
    * hand was hand-rebuilt without re-tracking — shouldn't happen in
    * normal play).
    */
-  _findHandInstanceAt(playerIdx, handIndex) {
+  _findHandInstanceAt(playerIdx, handIndex, fromCreation = false) {
     const ps = this.gs.players[playerIdx];
-    if (!ps?.hand || handIndex < 0 || handIndex >= ps.hand.length) return null;
-    const targetName = ps.hand[handIndex];
-    // Count how many times this name appears in the hand BEFORE the
-    // clicked slot — that's the inst rank we want.
+    // ★ 28.8. (Als Ruling): auch Crestinas Vorrat — die Karten sind
+    // dort „als waeren sie auf der Hand“, also auch fuer
+    // `handActivatedEffect`. Die Rang-Zaehlung bleibt identisch, nur
+    // die Liste und die Instanz-Zone wechseln.
+    const liste = fromCreation ? ps?.creationZone : ps?.hand;
+    const zone = fromCreation ? 'creationZone' : 'hand';
+    if (!liste || handIndex < 0 || handIndex >= liste.length) return null;
+    const targetName = liste[handIndex];
+    // Count how many times this name appears BEFORE the clicked slot —
+    // that's the inst rank we want.
     let rankAmongName = 0;
     for (let i = 0; i < handIndex; i++) {
-      if (ps.hand[i] === targetName) rankAmongName++;
+      if (liste[i] === targetName) rankAmongName++;
     }
     let seen = 0;
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
-      if (inst.zone !== 'hand') continue;
+      if (inst.zone !== zone) continue;
       if (inst.name !== targetName) continue;
       if (seen === rankAmongName) return inst;
       seen++;
@@ -26351,10 +30304,22 @@ class GameEngine {
    * Checks: script has actionCost, hero alive/not frozen/stunned, HOPT not used.
    * Returns array of { heroIdx, zoneIdx, abilityName, level }
    */
-  getActivatableAbilities(playerIdx) {
+  /**
+   * @param {number} playerIdx
+   * @param {object} [opts]
+   * @param {boolean} [opts.ignoreActionEconomy] Aktion ist bereits
+   *   gewaehrt (siehe `getActiveHeroEffects`). Phase, Zug und
+   *   Aktions-Slot entfallen; Sperren und Legalitaets-Gates bleiben.
+   * @param {number} [opts.onlyHeroIdx] nur dieser Held.
+   * @param {boolean} [opts.ownSideOnly] fremde Zonen (Charme, Kontrolle,
+   *   Lizbeth-Leihe) auslassen — eine Zusatzaktion gehoert dem Helden,
+   *   der sie bekommen hat.
+   */
+  getActivatableAbilities(playerIdx, opts = {}) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
-    if (this.gs.activePlayer !== playerIdx) return [];
+    const granted = !!opts.ignoreActionEconomy;
+    if (!granted && this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isActionPhase = currentPhase === 3;
@@ -26362,10 +30327,11 @@ class GameEngine {
 
     // Check if action is available (Action Phase or Additional Action with ability_activation)
     const hasAdditional = isMainPhase && this.hasAdditionalActionForCategory(playerIdx, 'ability_activation');
-    if (!isActionPhase && !hasAdditional) return [];
+    if (!granted && !isActionPhase && !hasAdditional) return [];
 
     const chillyDogOwnSide = this._isChillyDogActiveFor(playerIdx);
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
       // Bound blocks "Actions" (Spell/Attack/Creature plays from
@@ -26387,8 +30353,22 @@ class GameEngine {
       // Generic hero-script Action gate (Saint Nicolas no-Potion lock).
       if (!this.canHeroPerformAction(playerIdx, hi)) continue;
 
-      for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
-        const slot = (ps.abilityZones[hi] || [])[zi] || [];
+      // v769: Support-Zonen-Abilities (Xal) sind aktivierbar wie jede
+      // andere. Sie laufen durch DIESELBE Schleife; nur die Herkunft
+      // wird mitgefuehrt (`zoneKind`), damit Server und Client wissen,
+      // in welcher Zonenart der Stapel liegt.
+      const _zonenListe = [
+        ...((ps.abilityZones[hi] || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }))),
+        ...this.heroSupportAbilityStacks(playerIdx, hi).map((slot) => ({
+          slot,
+          zi: (ps.supportZones[hi] || []).findIndex(s => (s || [])[0] === slot[0]),
+          zoneKind: 'support',
+        })),
+      ];
+      for (const _eintrag of _zonenListe) {
+        const zi = _eintrag.zi;
+        const slot = _eintrag.slot;
+        if (zi < 0) continue;
         if (slot.length === 0) continue;
         const abilityName = slot[0]; // Base ability name (wildcard abilities stack on top)
         const script = loadCardEffect(abilityName);
@@ -26406,6 +30386,8 @@ class GameEngine {
         // Generic draw/search lock
         if (script.blockedByHandLock && ps.handLocked) continue;
         if (script.blockedByDrawLock && ps.drawLocked) continue;
+        if (script.blockedByPileLock && this.isPileLockedFor(playerIdx)) continue;   // v826
+        if (script.blockedBySummonLock && ps.summonLocked) continue;   // v834
 
         // Distracting Crystal in hand blocks any effect that would
         // shuffle cards from hand / discard / board back to deck —
@@ -26413,9 +30395,14 @@ class GameEngine {
         // click a button that silently rejects.
         if (script.shufflesFromHandOrDiscardIntoDeck && this._handShuffleBackFullyBlocked(playerIdx)) continue;
 
-        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length });
+        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, zoneKind: _eintrag.zoneKind });
       }
     }
+
+    // Eine gewaehrte Zusatzaktion gehoert EINEM Helden auf der eigenen
+    // Seite — Charme, Kontrolle und die Lizbeth-Leihe sind eigene Wege
+    // mit eigener Oekonomie und gehoeren nicht in den Prompt.
+    if (opts.ownSideOnly) return result;
 
     // Also check charmed opponent heroes (Charme Lv3)
     const oi = playerIdx === 0 ? 1 : 0;
@@ -26653,14 +30640,240 @@ class GameEngine {
     return this.gs?.firstTurnProtectedPlayer === opp;
   }
 
-  getActiveHeroEffects(playerIdx) {    const ps = this.gs.players[playerIdx];
+  /**
+   * EINEN HELDEN-EFFEKT AUFLOESEN — der eine Weg.
+   *
+   * ★ 28.8.: dieser Block stand ausschliesslich in `server.js`
+   * (`doActivateHeroEffect`) und war damit fuer die Engine
+   * unerreichbar. `performImmediateAction` konnte deshalb Handkarten
+   * und Abilities anbieten, aber keinen Helden-Effekt — Champions
+   * „spend your Action" liess sich mit einer gewaehrten Zusatzaktion
+   * (Overflowing Chalice, Coffee, Mana Beacon …) nicht bezahlen.
+   *
+   * Bewusst NICHT hier drin: die Aktions-Oekonomie. Wer den Kern ruft,
+   * hat die Aktion bereits bezahlt oder geschenkt bekommen und sagt
+   * ueber `opts`, was daraus fuer `onAnyActionResolved` und den
+   * Phasenwechsel folgt. So bleibt der Unterschied zwischen „normale
+   * Aktivierung" und „Zusatzaktion" genau eine Parameterzeile statt
+   * zweier Kopien desselben Ablaufs.
+   *
+   * @param {number} pi        aktivierender Spieler
+   * @param {number} heroIdx
+   * @param {object} chosen    { name, script, inst, hoptKey }
+   * @param {object} [opts]
+   * @param {number|null} [opts.charmedOwner]
+   * @param {boolean} [opts.isActionCost]  hat die Aktivierung eine Aktion gekostet?
+   * @param {boolean} [opts.isActionPhase]
+   * @param {boolean} [opts.istZusatzaktion] Aktion kam aus einem Zusatzaktions-Geber
+   * @param {boolean} [opts.hauptSlotVerbraucht] nur dann wird die Phase weitergeschaltet
+   * @param {function} [opts.onCancel] Rueckerstattung bei Abbruch
+   * @returns {Promise<boolean>}
+   */
+  async resolveHeroEffectActivation(pi, heroIdx, chosen, opts = {}) {
+    const {
+      charmedOwner = null,
+      isActionCost = false,
+      isActionPhase = this.gs.currentPhase === 3,
+      istZusatzaktion = false,
+      hauptSlotVerbraucht = false,
+      onCancel = () => {},
+    } = opts;
+    const heroOwner = charmedOwner != null ? charmedOwner : pi;
+    const hero = this.gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || !chosen?.script?.onHeroEffect || !chosen?.inst) return false;
+
+    // `actionCost` discriminator — true iff this hero-effect
+    // activation consumed the Action resource (heroEffectActionCost
+    // heroes like Champion, the Stormbringer). FREE hero effects
+    // (Cooldin's terraform, Magenta's mill, etc.) log the same type
+    // but with `actionCost: false`, so log scanners that count
+    // "Actions performed this turn" (Tengu Windstorm) only see the
+    // ones that actually spent the slot.
+    this._setPendingPlayLog('hero_effect_activated', {
+      player: this.gs.players[pi].username, hero: hero.name, effect: chosen.name,
+      actionCost: !!isActionCost,
+    });
+
+    // Hero-Effekt-Timing-Lernkanal: Aktivierungs-ENTSCHEIDUNG mit
+    // Handgrößen-Bucket des Aktivierers stempeln (auch wenn der Gegner
+    // gleich negiert — die Timing-Entscheidung war so getroffen).
+    // Nur live; MCTS-Rollouts erzeugen keine Lerndaten.
+    if (!this._inMctsSim) {
+      const _hl = this.gs.players[pi]?.hand?.length ?? 0;
+      const _hb = _hl <= 1 ? '0-1' : _hl <= 3 ? '2-3' : '4+';
+      (this._heroEffectLog = this._heroEffectLog || []).push({
+        pi, hero: hero.baseName || hero.name, bucket: _hb,
+      });
+    }
+
+    const chainResult = await this.executeCardWithChain({
+      cardName: chosen.name, owner: pi, cardType: 'Hero', goldCost: 0, resolve: null,
+      fromBoard: true,
+    });
+
+    if (chainResult.negated) {
+      if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+      this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
+      return true;
+    }
+
+    const surprise = await this._checkSurpriseOnHeroEffect(pi, heroIdx, chosen.name);
+    if (surprise?.negateEffect) {
+      delete this.gs._pendingCardReveal;
+      delete this.gs._pendingPlayLog;
+      return true;
+    }
+
+    const origController = chosen.inst.controller;
+    const origOwner = chosen.inst.owner;
+    if (charmedOwner != null) {
+      chosen.inst.controller = pi;
+      chosen.inst.owner = pi;
+      chosen.inst.heroOwner = charmedOwner;
+    }
+
+    this.gs._pendingCardReveal = { cardName: chosen.name, ownerIdx: pi };
+    // Live CPU: stream the Hero card before its effect resolves
+    // (no-op for humans / PvP / MCTS sim; idempotent below).
+    this.maybeFireCpuRevealEarly();
+    const ctx = this._createContext(chosen.inst, {});
+    this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
+    let gerryVeto = false;
+    const resolved = await chosen.script.onHeroEffect(ctx);
+    if (resolved !== false) this.announceActiveEffect();
+    this.clearEffectAnnounce();
+    await this._flushSurpriseDrawChecks();
+    // Aufgeschobene Surprises abarbeiten (Jumpscare: "After the Attack,
+    // Spell or effect resolves"). Fehlte hier — ein Helden-Effekt, der
+    // einen gegnerischen Helden anvisiert, stellte den Eintrag in die
+    // Warteschlange, und niemand loeste sie ein. Er blieb dort liegen,
+    // bis IRGENDWANN ein Zauber gespielt wurde, und feuerte dann im
+    // falschen Zug (Als Demo vom 9.8.: Zug 3 ausgeloest, Zug 4 aufgeloest).
+    await this._executeDeferredSurprises();
+
+    if (charmedOwner != null) {
+      chosen.inst.controller = origController;
+      chosen.inst.owner = origOwner;
+      delete chosen.inst.heroOwner;
+    }
+
+    if (resolved !== false) {
+      // Aktivierung hat stattgefunden — unabhängig vom Sperr-Stempel.
+      this.noteActivationOutcome(`hero-effect:${pi}:${heroIdx}`, true);
+      // v712 (Bleed): Heldeneffekt OHNE Action-Kosten (Elana) blutet auch —
+      // der Action-Pfad meldet nur kostenpflichtige ueber onAnyActionResolved.
+      if (!isActionCost) {
+        try { await this._processBleedAfterAction({ actionType: 'hero_effect', playerIdx: pi, heroIdx, isFree: true }); }
+        catch (err) { console.error('[Bleed] hero effect failed:', err.message); }
+      }
+      if (this.gs._pendingCardReveal) this._firePendingCardReveal();
+      else this._firePendingPlayLog();
+      // Gegenstück zu `_skipCreatureEffectHopt`: Helden-Effekte mit
+      // MEHREREN Nutzungen pro Runde (Kassaran, 3×) führen ihren
+      // Verbrauch selbst und lassen die Engine-Sperre offen, bis sie
+      // aufgebraucht ist. Vorher gab es dafür nur den Umweg "immer
+      // false zurückgeben" — der bedeutet aber gleichzeitig
+      // "abgebrochen" und hat deshalb `onAnyActionResolved` und die
+      // CPU-Erkennung mit ausgehebelt.
+      if (!ctx._skipHeroEffectHopt) {
+        if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+        this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
+      }
+      delete this.gs._preventPhaseAdvance;
+      // Universal action-resolved hook.
+      //
+      // ALS RULING (4.8.): Ein Helden-Effekt löst diesen Haken NUR aus,
+      // wenn er die Ressource "Aktion" tatsächlich VERBRAUCHT — also bei
+      // `heroEffectActionCost: true`, egal ob der Haupt-Slot oder eine
+      // gewährte Zusatzaktion bezahlt hat. Aktive Effekte, die keine
+      // Aktion kosten, SIND regeltechnisch auch keine Aktion.
+      //
+      // Der frühere Kommentar an dieser Stelle behauptete pauschal, jede
+      // Helden-Effekt-Aktivierung zähle für Flashbang als Aktion. Das war
+      // falsch und traf zwei Karten wörtlich am Text vorbei:
+      //   • Flashbang — "after they perform their first Action"
+      //   • Lunatic Cycle - Crescent Moon — "Any time the equipped Hero
+      //     performs an Action"
+      // Beide feuerten bisher auch auf kostenlose Helden-Effekte.
+      //
+      // Die Verbraucher, die den Haken für Helden-Effekte WIRKLICH
+      // brauchen, hängen alle an `heroEffectActionCost` und laufen
+      // unverändert weiter: Giga Steroids' Zweitaktions-Abwicklung
+      // (Champion) sowie Güldefaber und Pharaoh, die ohnehin auf
+      // actionType attack/spell bzw. creature filtern.
+      if (isActionCost) {
+        await this.runHooks('onAnyActionResolved', {
+          actionType:   'hero_effect',
+          playerIdx:    pi,
+          cardName:     chosen.name,
+          playedCardName: chosen.name,
+          heroIdx,
+          isAdditional: !!istZusatzaktion,
+          // Immer false: der Haken feuert hier nur noch, wenn eine
+          // Aktion bezahlt wurde — "inherent" hieße das Gegenteil.
+          isInherent:   false,
+          isFree:       false,
+          _skipReactionCheck: true,
+        });
+      }
+      // Action-cost activation auto-advance: same path as doPlaySpell /
+      // doPlayCreature when the main Action slot was the resource.
+      // Stays in Action Phase only when a second-action grant is alive
+      // (matches the auto-advance gate over there).
+      if (isActionCost && isActionPhase && hauptSlotVerbraucht && !this.gs._preventPhaseAdvance) {
+        await this.advanceToPhase(pi, 4);
+      }
+    } else {
+      delete this.gs._pendingCardReveal;
+      delete this.gs._pendingPlayLog;
+      // Gerrymander veto on a "may" confirm consumes the once-per-turn
+      // even though `resolved` came back false — the activator did
+      // commit, opp's Gerrymander declined for them.
+      if (this._lastPromptGerryDeclined) {
+        this._lastPromptGerryDeclined = false;
+        gerryVeto = true;
+        if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
+        this.gs.hoptUsed[chosen.hoptKey] = this.gs.turn;
+        this.log('gerrymander_veto', { player: this.gs.players[pi].username, hero: hero.name, effect: chosen.name });
+      } else if (isActionCost) {
+        // Plain cancellation (no Gerrymander veto, no commitment past
+        // chain resolution) — refund the action resource so the player
+        // didn't burn their slot for a back-out.
+        onCancel();
+      }
+    }
+
+    // `resolved === false` heisst: der Spieler hat die eigene Abfrage
+    // des Effekts weggeklickt — die Zusatzaktion fuehrt ihn dann
+    // zurueck zur Auswahl. Ein Gerrymander-Veto zaehlt dagegen als
+    // Verbrauch (oben ist bereits gestempelt): der Aktivierende hat
+    // sich festgelegt, der Gegner hat fuer ihn abgelehnt.
+    return { ok: true, resolved: resolved !== false || gerryVeto, negated: false };
+  }
+
+  /**
+   * @param {number} playerIdx
+   * @param {object} [opts]
+   * @param {boolean} [opts.ignoreActionEconomy] Die Aktion ist bereits
+   *   GEWAEHRT (Overflowing Chalice, Coffee & Co.) — Phase, Zug und
+   *   Aktions-Slot werden nicht mehr gefragt, die Aktionssperre und
+   *   alle Legalitaets-Gates dagegen sehr wohl. Trennt „darf dieser
+   *   Effekt ueberhaupt feuern" von „kann der Spieler jetzt eine
+   *   Aktion bezahlen" — vorher war beides untrennbar verdrahtet, und
+   *   `performImmediateAction` musste die halbe Liste nachbauen.
+   * @param {number} [opts.onlyHeroIdx] nur dieser Held.
+   * @param {boolean} [opts.onlyActionCost] nur Effekte mit
+   *   `heroEffectActionCost` — was eine Zusatzaktion bezahlen kann.
+   */
+  getActiveHeroEffects(playerIdx, opts = {}) {    const ps = this.gs.players[playerIdx];
     if (!ps) return [];
-    if (this.gs.activePlayer !== playerIdx) return [];
+    const granted = !!opts.ignoreActionEconomy;
+    if (!granted && this.gs.activePlayer !== playerIdx) return [];
     const result = [];
     const currentPhase = this.gs.currentPhase;
     const isMainPhase = currentPhase === 2 || currentPhase === 4;
     const isActionPhase = currentPhase === 3;
-    if (!isMainPhase && !isActionPhase) return [];
+    if (!granted && !isMainPhase && !isActionPhase) return [];
     // Weakening Crystal's hero-effect lock is now applied as a real
     // `negated` status on every alive Hero on the side that holds a
     // copy in hand (see `_refreshWeakeningCrystalNegation`). The
@@ -26688,10 +30901,25 @@ class GameEngine {
       return false;
     };
 
+    // ── AKTIONSSPERRE (Chalice, Kent) ──────────────────────────────
+    // ★ 28.8.: dieser Sammler pruefte die Sperre bisher GAR NICHT —
+    // Champions Effekt blieb unter Chalice hervorgehoben und klickbar,
+    // und weil `doActivateHeroEffect` seinerseits nur Kents Riegel
+    // kannte, lief die Aktivierung auch wirklich durch. Nur Effekte
+    // mit Aktionskosten sind betroffen; freie Helden-Effekte (Cooldins
+    // Terraform, Magentas Mill) SIND regeltechnisch keine Aktion und
+    // bleiben erlaubt (Als Ruling 16.8.).
+    const actionsBlocked = this.areActionsBlocked(playerIdx);
+
     const chillyDogOwnSideHE = this._isChillyDogActiveFor(playerIdx);
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (opts.onlyHeroIdx != null && hi !== opts.onlyHeroIdx) continue;
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
+      // Per-Held-Riegel (Treasure Hunter's Backpack, Lethe) — gleicher
+      // Geltungsbereich wie die spielerweite Sperre: nur Effekte mit
+      // Aktionskosten. Die Pruefung sitzt unten beim `isActionCost`.
+      const heroLocked = hero._actionLockedTurn === this.gs.turn;
       // Bound restricts only "Actions" (Spell/Attack/Creature plays).
       // Hero-effect activations are an "effect" per the spec and stay
       // available under Bound. Stunned / Negated still silence them.
@@ -26722,8 +30950,20 @@ class GameEngine {
       //     (with action availability per `canSpendHeroActionCost`).
       //   • Standard hero effects — Main Phase only (free activation).
       const isActionCost = !!script.heroEffectActionCost;
+      if (opts.onlyActionCost && !isActionCost) continue;
       if (isActionCost) {
-        if (!canSpendHeroActionCost(hi)) continue;
+        // Sperren zuerst — sie gelten auch fuer eine bereits gewaehrte
+        // Zusatzaktion. Wer keine Aktionen mehr ausfuehren darf, darf
+        // auch die geschenkte nicht in einen Helden-Effekt stecken.
+        if (actionsBlocked || heroLocked) continue;
+        if (this.isHeroSkillLocked(playerIdx, hi)) continue;
+        if (!this.canHeroPerformAction(playerIdx, hi)) continue;
+        if (!granted && !canSpendHeroActionCost(hi)) continue;
+      } else if (granted) {
+        // Eine gewaehrte Aktion bezahlt nur Effekte, die eine Aktion
+        // KOSTEN. Freie Effekte kann der Spieler ohnehin jederzeit in
+        // der Main Phase zuenden — sie gehoeren nicht in den Prompt.
+        continue;
       } else if (!isMainPhase) {
         continue;
       }
@@ -26747,8 +30987,17 @@ class GameEngine {
         }
       }
 
-      result.push({ heroIdx: hi, heroName: hero.name });
+      // `effectName` ist bei einem Basis-Helden der Heldenname selbst —
+      // gebraucht wird es von `performImmediateAction`, das den
+      // gewaehlten Effekt beim Server-Vertrag `chosenEffectName`
+      // wieder einreicht. Fuer die bestehenden Leser ist es ein
+      // zusaetzliches Feld ohne Wirkung.
+      result.push({ heroIdx: hi, heroName: hero.name, effectName: hero.name, actionCost: isActionCost });
     }
+    // Eine gewaehrte Zusatzaktion sieht nur die Basis-Helden-Effekte:
+    // der Equip-Zweig darunter ist per Definition frei und Main-Phase-
+    // only, also nie etwas, das eine Aktion bezahlen koennte.
+    if (granted) return result;
 
     // Also check equipped hero cards in support zones (Initiation Ritual).
     // Equipped Hero-effect cards are free Main-Phase activations only —
@@ -26766,6 +31015,12 @@ class GameEngine {
       for (const inst of this.cardInstances) {
         if (inst.owner !== playerIdx || inst.zone !== 'support' || inst.heroIdx !== hi) continue;
         if (!inst.counters?.treatAsEquip) continue;
+        // ★ 28.8.: Eine Ausruestung, die KEINE eigenstaendige
+        // Effektquelle ist (die Gestalt von „???, the Shapeshifter" —
+        // der Held traegt ihren Effekt bereits ueber seinen Namen),
+        // gehoert hier nicht hinein. Ohne diesen Riegel stand der
+        // kopierte Held ZWEIMAL im Aktivierungsmenue.
+        if (inst.counters?._suppressEquipHooks) continue;
         const equipScript = loadCardEffect(inst.name);
         if (!equipScript?.heroEffect) continue;
         // Equipped Artifacts are explicitly NOT blocked by Blinded —
@@ -27032,6 +31287,13 @@ class GameEngine {
     // provider that covers 'ability_activation'. Cached once per call.
     const hasAdditionalForActionCost = isMainPhase
       && this.hasAdditionalActionForCategory(playerIdx, 'ability_activation');
+    // ── AKTIONSSPERRE (Chalice, Kent) ──────────────────────────────
+    // ★ 28.8.: der Sammler kannte sie nicht. Der Server sperrte Spawn
+    // Mothers Bounce zwar (einzige Stelle, die `actionLocked` las),
+    // aber die Oberflaeche bot sie weiter an — Klick ins Leere. Nur
+    // `creatureActionCost` ist betroffen; freie Kreatur-Effekte sind
+    // keine Aktion.
+    const actionsBlockedCr = this.areActionsBlocked(playerIdx);
 
     const result = [];
     const cardDB = this._getCardDB();
@@ -27080,13 +31342,13 @@ class GameEngine {
           // Universal negative-status immunity (Lunatic Golem 2+) negates
           // the EFFECT of CC it still carries — it stays activatable
           // despite Frozen / Stunned / Negated / Nulled.
-          if (!this._creatureNegStatusImmune(inst)) {
-            if (inst.counters?.stunned || inst.counters?.negated || inst.counters?.nulled) continue;
-            if (inst.counters?.frozen && !chillyDogLiftsCreatureFrozen) continue;
-          }
+          void chillyDogLiftsCreatureFrozen;
+          if (this.isCreatureEffectSuppressed(inst)) continue;
 
           const cd = this.getEffectiveCardData(inst) || cardDB[creatureName];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          // v704 (Puppets): Tokens mit `choosableAsCreature` + creatureEffect
+          // (Puppet-Aktive) sind aktivierbar wie Creatures.
+          if (!cd || !this.isChoosableAsCreature(inst, cd)) continue;
 
           const effectName = inst.counters?._effectOverride || creatureName;
           const script = loadCardEffect(effectName);
@@ -27101,11 +31363,12 @@ class GameEngine {
           // a `blinded` status anyway).
           if (script.requiresTarget === true && (inst.counters?.blinded || hero?.statuses?.blinded)) continue;
 
-          // Phase gate: free creature effects are Main-Phase-only;
+          // Phase gate: free creature effects are Main-Phase-only
           // action-cost creatures are Action Phase or Main Phase with
           // an additional-action provider for 'ability_activation'.
           const isActionCost = !!script.creatureActionCost;
           if (isActionCost) {
+            if (actionsBlockedCr) continue;
             if (!isActionPhase && !hasAdditionalForActionCost) continue;
           } else {
             if (!isMainPhase) continue;
@@ -27191,7 +31454,7 @@ class GameEngine {
                 || inst.counters?.negated || inst.counters?.nulled)) continue;
 
         const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
-        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        if (!cd || !this.isChoosableAsCreature(inst, cd)) continue; // v704: + choosableAsCreature
 
         const effectName = inst.counters?._effectOverride || inst.name;
         const script = loadCardEffect(effectName);
@@ -27200,6 +31463,7 @@ class GameEngine {
 
         const isActionCost = !!script.creatureActionCost;
         if (isActionCost) {
+          if (actionsBlockedCr) continue;
           if (!isActionPhase && !hasAdditionalForActionCost) continue;
         } else {
           if (!isMainPhase) continue;
@@ -27329,7 +31593,7 @@ class GameEngine {
     // ohne jede Anzeige — der Gegner sah gar nicht, welche Area gerade
     // gefeuert hat. Deshalb hier BEIDE Haelften:
     //   • `_pendingCardReveal` = der gegnerseitige Reveal, genau wie ihn
-    //     die uebrigen Wege im Server setzen;
+    //     die uebrigen Wege im Server setzen
     //   • `armEffectAnnounce` = der Reveal fuer den Aktivierenden selbst.
     // Beide feuern erst NACH dem Handler und nur, wenn nicht abgebrochen
     // wurde — eine zurueckgenommene Zielwahl zeigt niemandem etwas.
@@ -27560,8 +31824,20 @@ class GameEngine {
       if ((hero.statuses?.stunned || hero.statuses?.webbed)) continue;
       if (hero.statuses?.frozen && !chillyDogFreeAbilLift) continue;
 
-      for (let zi = 0; zi < (ps.abilityZones[hi] || []).length; zi++) {
-        const slot = (ps.abilityZones[hi] || [])[zi] || [];
+      // v769: auch die Support-Zonen-Abilities (Xal) — dieselbe
+      // Schleife, nur mit mitgefuehrter Herkunft.
+      const _freieZonen = [
+        ...((ps.abilityZones[hi] || []).map((slot, zi) => ({ slot: slot || [], zi, zoneKind: 'ability' }))),
+        ...this.heroSupportAbilityStacks(playerIdx, hi).map((slot) => ({
+          slot,
+          zi: (ps.supportZones[hi] || []).findIndex(s => (s || [])[0] === slot[0]),
+          zoneKind: 'support',
+        })),
+      ];
+      for (const _eintrag of _freieZonen) {
+        const zi = _eintrag.zi;
+        const slot = _eintrag.slot;
+        if (zi < 0) continue;
         if (slot.length === 0) continue;
         const abilityName = slot[0];
         const script = loadCardEffect(abilityName);
@@ -27584,6 +31860,14 @@ class GameEngine {
         // Generic draw/search lock
         let handLockBlocked = false;
         if (canActivate && script.blockedByHandLock && ps.handLocked) {
+          canActivate = false;
+          handLockBlocked = true;
+        }
+        if (canActivate && script.blockedByPileLock && this.isPileLockedFor(playerIdx)) {   // v826
+          canActivate = false;
+          handLockBlocked = true;
+        }
+        if (canActivate && script.blockedBySummonLock && ps.summonLocked) {   // v834
           canActivate = false;
           handLockBlocked = true;
         }
@@ -27612,7 +31896,7 @@ class GameEngine {
           }
         }
 
-        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, handLockBlocked });
+        result.push({ heroIdx: hi, zoneIdx: zi, abilityName, level: slot.length, canActivate, exhausted, handLockBlocked, zoneKind: _eintrag.zoneKind });
       }
     }
 
@@ -27734,6 +32018,14 @@ class GameEngine {
 
           let handLockBlocked = false;
           if (canActivate && script.blockedByHandLock && ps.handLocked) {
+            canActivate = false;
+            handLockBlocked = true;
+          }
+          if (canActivate && script.blockedByPileLock && this.isPileLockedFor(playerIdx)) {   // v826
+            canActivate = false;
+            handLockBlocked = true;
+          }
+          if (canActivate && script.blockedBySummonLock && ps.summonLocked) {   // v834
             canActivate = false;
             handLockBlocked = true;
           }
@@ -28041,9 +32333,96 @@ class GameEngine {
    * 2 opponents each with Lv1 Summoning Magic let her summon Lv2
    * Creatures, which is wrong.
    */
+  /**
+   * NIMMT DIESER HELD ABILITIES IN SEINEN SUPPORT ZONES? (v767)
+   *
+   * Zwei Quellen, verodert:
+   *   ① der Held selbst (Xal, the Animated Armor) ueber das
+   *      Skript-Flag `abilitiesInSupportZones: true`;
+   *   ② ein an ihm ausgeruestetes Artefakt mit demselben Flag
+   *      (Xalibur).
+   * So kommt jede kuenftige Karte mit dieser Eigenschaft ohne
+   * Namenspruefung aus.
+   */
+  heroAcceptsAbilitiesInSupport(playerIdx, heroIdx, excludeInstId = null) {
+    const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name) return false;
+    if (loadCardEffect(hero.name)?.abilitiesInSupportZones) return true;
+    return (this.cardInstances || []).some(c =>
+      c.zone === ZONES.SUPPORT && c.owner === playerIdx && c.heroIdx === heroIdx
+      && !c.faceDown
+      // `excludeInstId`: die abgehende Karte zaehlt nicht mehr mit. Ihr
+      // `onCardLeaveZone` feuert, BEVOR sie die Zone verlaesst — ohne
+      // die Ausnahme saehe Xalibur sich selbst noch liegen und liesse
+      // die Abilities stehen (Als Befund 5.9.).
+      && c.id !== excludeInstId
+      && loadCardEffect(c.counters?._effectOverride || c.name)?.abilitiesInSupportZones);
+  }
+
+  /**
+   * HAT DIESER HELD DIESE ABILITY SCHON? (v769)
+   *
+   * Sucht in BEIDEN Zonenarten und liefert
+   * `{ zoneKind, slotIdx, level }` oder null. Ein Held fuehrt je
+   * Ability hoechstens EINEN Stapel — ohne diese Pruefung liess sich
+   * bei Xal ein zweiter Stapel derselben Ability in einer Support Zone
+   * eroeffnen (Als Befund 5.9.).
+   */
+  heroAbilityStackOf(playerIdx, heroIdx, abilityName) {
+    const ps = this.gs.players[playerIdx];
+    const abZones = ps?.abilityZones?.[heroIdx] || [];
+    for (let z = 0; z < abZones.length; z++) {
+      const slot = abZones[z] || [];
+      if (slot.length > 0 && slot[0] === abilityName) {
+        return { zoneKind: 'ability', slotIdx: z, level: slot.length };
+      }
+    }
+    if (!this.heroAcceptsAbilitiesInSupport(playerIdx, heroIdx)) return null;
+    const supZones = ps?.supportZones?.[heroIdx] || [];
+    const cardDB = this._getCardDB();
+    for (let z = 0; z < supZones.length; z++) {
+      const slot = supZones[z] || [];
+      if (slot.length === 0 || slot[0] !== abilityName) continue;
+      const cd = cardDB[slot[0]];
+      if (!cd || !hasCardType(cd, 'Ability')) continue;
+      return { zoneKind: 'support', slotIdx: z, level: slot.length };
+    }
+    return null;
+  }
+
+  /**
+   * Die Ability-STAPEL, die in den Support Zones dieses Helden liegen
+   * (v767). Form wie eine Ability-Zone: je Slot ein Array
+   * gleichnamiger Karten, die Stapelhoehe IST das Level.
+   *
+   * Leere Liste, wenn der Held das nicht kann — dann aendert sich an
+   * keiner Rechnung etwas.
+   */
+  heroSupportAbilityStacks(playerIdx, heroIdx) {
+    if (!this.heroAcceptsAbilitiesInSupport(playerIdx, heroIdx)) return [];
+    const ps = this.gs.players[playerIdx];
+    const zonen = ps?.supportZones?.[heroIdx] || [];
+    const cardDB = this._getCardDB();
+    const out = [];
+    for (const slot of zonen) {
+      if (!slot || slot.length === 0) continue;
+      const cd = cardDB[slot[0]];
+      if (!cd || !hasCardType(cd, 'Ability')) continue;
+      out.push([...slot]);
+    }
+    return out;
+  }
+
   _getCandidateAbilityZoneSets(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
-    const own = ps?.abilityZones?.[heroIdx] || [[], [], []];
+    // v767: Support-Zonen-Abilities (Xal) zaehlen wie echte
+    // Ability-Zonen. Sie hier anzuhaengen genuegt fuer den GANZEN
+    // Level-Vertrag — `heroMeetsLevelReq` prueft ausschliesslich ueber
+    // diese Kandidatenmengen.
+    const own = [
+      ...(ps?.abilityZones?.[heroIdx] || [[], [], []]),
+      ...this.heroSupportAbilityStacks(playerIdx, heroIdx),
+    ];
     const sets = [own];
     const sources = this._getAbilityBorrowSources(playerIdx, heroIdx, 'passive');
     for (const src of sources) {
@@ -28144,7 +32523,10 @@ class GameEngine {
     const ovr = this.gs._castSchoolOverride;
     if (ovr && typeof ovr[school] === 'number') return ovr[school];
     const ps = this.gs.players[pi];
-    const abZones = ps?.abilityZones?.[heroIdx] || [];
+    const abZones = [
+      ...(ps?.abilityZones?.[heroIdx] || []),
+      ...this.heroSupportAbilityStacks(pi, heroIdx),   // v767 (Xal)
+    ];
     return this.countAbilitiesForSchool(school, abZones);
   }
 
@@ -28259,6 +32641,19 @@ class GameEngine {
     const ps = this.gs?.players?.[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
     if (!hero?.name) return true;
+    // v640: Support-Karten in den Zonen dieses Helden koennen seine
+    // Aktionen sperren (`blocksHostHeroActions: true` — Plant Golem:
+    // „The corresponding Hero cannot perform Actions"). Negierte und
+    // verdeckte Instanzen sperren nicht. Kreatureneffekte mit
+    // `creatureActionCost` laufen NICHT ueber dieses Gate (Kreatur ist
+    // unabhaengig vom Helden) — der Golem-Kill bleibt damit moeglich.
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'support' || inst.faceDown || inst.heroIdx !== heroIdx) continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      if (inst.counters?.negated) continue;
+      const sc = this.supportCardScript(playerIdx, heroIdx, inst.name);
+      if (sc?.blocksHostHeroActions) return false;
+    }
     const script = loadCardEffect(hero.name);
     if (typeof script?.canPerformAction !== 'function') return true;
     try {
@@ -28340,6 +32735,54 @@ class GameEngine {
    *     bump (gap coverage via Divinity / Wisdom still applies).
    * @returns {boolean}
    */
+  /**
+   * ★ INHERENTE AKTION — EINE Auslegung (v601).
+   *
+   * Zwei Quellen, an einer Stelle zusammengefuehrt:
+   *   • das Skript der KARTE: `inherentAction` (bool oder Funktion
+   *     `(gs, pi, heroIdx, engine, opts) → bool`) — Quick Attack,
+   *     Deepsea-Bounce-Place, Overheal Shock, …
+   *   • das Skript des HELDEN, der die Karte spielt:
+   *     `grantsInherentActionForCard(gs, pi, heroIdx, cardData, engine)`
+   *     — Baaliel („summoning a Horned Demon with this Hero counts as
+   *     an additional Action"). Der heldenseitige Zwilling von
+   *     `canBypassLevelReqForCard`; nur ein LEBENDER Held gewaehrt.
+   *
+   * Vorher stand der Kartenvertrag an drei Engine-Stellen und zwei
+   * Server-Listen einzeln ausgeschrieben — ein Helden-Vertrag haette
+   * an jeder davon nachgezogen werden muessen (die Berserk-Sonderregel
+   * ist genau so entstanden). Jetzt fragen alle diese Stellen hier.
+   * Die Berserk-Regel bleibt an den Aufrufstellen, weil sie eine
+   * Ladung verbraucht (`wasBerserkGranted`) und deshalb nicht rein
+   * lesend ist.
+   *
+   * `opts` wird nur an den Kartenvertrag weitergereicht (`zoneSlot`).
+   */
+  cardHasInherentAction(playerIdx, heroIdx, cardData, opts) {
+    if (!cardData?.name) return false;
+    const gs = this.gs;
+    const script = loadCardEffect(cardData.name);
+    if (script?.inherentAction === true) return true;
+    if (typeof script?.inherentAction === 'function') {
+      try {
+        if (opts !== undefined ? script.inherentAction(gs, playerIdx, heroIdx, this, opts)
+                               : script.inherentAction(gs, playerIdx, heroIdx, this)) return true;
+      } catch (err) {
+        console.error(`[inherentAction] ${cardData.name} threw:`, err.message);
+      }
+    }
+    const hero = gs.players[playerIdx]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return false;
+    const heroScript = loadCardEffect(hero.name);
+    if (typeof heroScript?.grantsInherentActionForCard !== 'function') return false;
+    try {
+      return !!heroScript.grantsInherentActionForCard(gs, playerIdx, heroIdx, cardData, this);
+    } catch (err) {
+      console.error(`[grantsInherentActionForCard] ${hero.name} threw:`, err.message);
+      return false;
+    }
+  }
+
   heroMeetsLevelReq(playerIdx, heroIdx, cardData, opts = {}) {
     const ps = this.gs.players[playerIdx];
     const hero = ps?.heroes?.[heroIdx];
@@ -28425,7 +32868,7 @@ class GameEngine {
     // Test the level requirement against each candidate ability-zone
     // set. For non-borrowers this is just the hero's own zones (the
     // legacy single-pass behaviour). For Lizbeth-style borrowers, each
-    // opponent hero is its own candidate (own + that opponent's zones);
+    // opponent hero is its own candidate (own + that opponent's zones)
     // we return true as soon as ANY candidate passes — never summed
     // across opponents. "Hard" Negation blanks ability zones: only
     // Lv0 cards without a school requirement remain playable.
@@ -28604,6 +33047,10 @@ class GameEngine {
       // effects like Spider Hive that reduce face-down Surprise levels
       // on BOTH sides of the board.
       if (!script.globalReduceCardLevel && inst.controller !== playerIdx) continue;
+      // v654: `evalOpts.excludeReducerInstId` — „waere die Karte auch
+      // OHNE diese eine Quelle spielbar?" (Forbidden Grimoire misst
+      // damit ihre eigene Unentbehrlichkeit).
+      if (evalOpts.excludeReducerInstId && inst.id === evalOpts.excludeReducerInstId) continue;
       try {
         // Pass the contributing instance as a 4th arg + the casting Hero's
         // heroIdx as a 5th arg + the evaluation opts as a 6th arg so per-
@@ -29324,6 +33771,13 @@ class GameEngine {
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
         const hero = ps.heroes[hi];
         if (!hero?.name || !hero.statuses) continue;
+        // damage_proof (Storm Piano, v628): „until the end of your next
+        // turn" — laeuft am Zugende des BESITZERS ab, sofern das nicht
+        // noch der Zug ist, in dem der Schutz entstand.
+        const dp = hero.statuses.damage_proof;
+        if (dp && dp.armedTurn !== this.gs.turn) {
+          await this.removeHeroStatus(ap, hi, 'damage_proof');
+        }
         let clearedCC = false;
         if (hero.statuses.frozen) {
           // Frozen supports a multi-turn `duration` counter (Cold Coffin etc.),
@@ -29350,7 +33804,17 @@ class GameEngine {
             clearedCC = true;
           }
         }
-        if (hero.statuses.negated) { await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true; }
+        // ── QUELLGEBUNDENE STATUS (v731) ───────────────────────────
+        // Ein Status, den eine Karte auf dem BRETT aufrecht haelt
+        // („while this Creature remains on the board" — Water Golem),
+        // laeuft NICHT zum Zugende ab: er endet mit seiner Quelle, und
+        // die nimmt ihn selbst zurueck. Ohne diese Ausnahme fiel er
+        // jede Runde ab und wurde erst zur naechsten Phase wieder
+        // aufgelegt — mit falschem Tooltip und einem Fenster
+        // dazwischen. Marke: `sourceBound` am Status.
+        if (hero.statuses.negated && !hero.statuses.negated.sourceBound) {
+          await this.removeHeroStatus(ap, hi, 'negated'); clearedCC = true;
+        }
         // Bound: same default semantics as stunned/frozen — clears at
         // end of the active player's turn unless the source applied an
         // explicit `expiresAtTurn` (Forbidden Zone uses that to extend
@@ -29470,6 +33934,17 @@ class GameEngine {
         delete inst.counters.softUntargetable_by_opponent_pi;
         this.log('counter_removed', { target: inst.name, counter: 'softUntargetable_by_opponent' });
       }
+      // Harte Unwaehlbarkeit (Thicket, v724): „bis zum Beginn deines
+      // naechsten Zuges". Der Stempel merkt sich den WIRKER, nicht die
+      // Spalte — wechselt die Kreatur zwischenzeitlich die Seite, faellt
+      // die Marke trotzdem zum richtigen Zeitpunkt.
+      for (const inst of this.cardInstances) {
+        if (!inst.counters?.untargetable_all) continue;
+        if (inst.counters.untargetable_all_pi !== ap) continue;
+        delete inst.counters.untargetable_all;
+        delete inst.counters.untargetable_all_pi;
+        this.log('counter_removed', { target: inst.name, counter: 'untargetable_all' });
+      }
       // Butterfly Cloud cooldown: rotate flags each turn
       // _butterflyCloudUsedThisTurn (set during play) → _butterflyCooldown (blocks next turn) → cleared
       if (ps._butterflyCooldown) delete ps._butterflyCooldown;
@@ -29490,6 +33965,188 @@ class GameEngine {
    * @param {object} config - See ctx.aoeHit() jsdoc for full config
    * @returns {{ heroes: Array, creatures: Array, wasSingleTarget: boolean, cancelled: boolean }}
    */
+  /**
+   * v704 (Puppets): AoE-Waechter auf dem Brett. Fuer jeden Zielbesitzer
+   * werden Support-Instanzen mit `boardAoeGuard` gefragt:
+   *   canGuardAoe(gs, ownerIdx, inst, entries, sourceCard, engine) → bool
+   *   onGuardAoe(engine, ownerIdx, inst, entries, sourceCard) →
+   *     { dropInstIds: [...] }  (Instanz-IDs, die nicht getroffen werden)
+   * Nur gegnerische Quellen (sourceOwner !== Zielbesitzer). Gibt die
+   * verbleibenden Eintraege zurueck.
+   */
+  /**
+   * v704 (Puppets, Vinny — Lueckenschluss): generischer BRETT-EFFEKT-
+   * WAECHTER fuer Pfade OHNE Zielwahl-Fenster (manuelle Schadensschleifen
+   * im Cataclysm-Stil, Zerstoerung, Status). Instanzen des Zielbesitzers
+   * mit `boardEffectGuard`:
+   *   canGuardEffect(gs, ownerIdx, guardInst, targetInsts, source, kind, engine) → bool
+   *   onGuardEffect(engine, ownerIdx, guardInst, targetInsts, source, kind)
+   *     → { dropInstIds: [...] }
+   * `kind` ∈ 'damage' | 'destroy' | 'status'. Nur gegnerische Quellen;
+   * Status-Ticks (ohne Besitzer) fragen nicht. Wer im Zielwahl-Fenster
+   * schon ABGELEHNT hat, wird fuer dieselbe Quelle im selben Zug nicht
+   * erneut gefragt (`gs._boardGuardDeclined`). Gibt die Menge der
+   * negierten Instanz-IDs zurueck.
+   */
+  async _offerBoardEffectGuard(targetInsts, source, kind) {
+    const negated = new Set();
+    const list = (targetInsts || []).filter(Boolean);
+    if (list.length === 0) return negated;
+    const srcOwner = source?.heroOwner ?? source?.controller ?? source?.owner;
+    if (typeof srcOwner !== 'number' || srcOwner < 0) return negated;
+    const srcName = source?.name || null;
+    const srcScript = srcName ? loadCardEffect(srcName) : null;
+    if (srcScript?.cannotBeNegated) return negated;
+    const owners = [...new Set(list.map(t => t.controller ?? t.owner))];
+    for (const ownerIdx of owners) {
+      if (ownerIdx == null || ownerIdx === srcOwner) continue;
+      if (srcName && this.gs._boardGuardDeclined?.[`${ownerIdx}:${srcName}`] === this.gs.turn) continue;
+      const mine = list.filter(t => (t.controller ?? t.owner) === ownerIdx && !negated.has(t.id));
+      if (mine.length === 0) continue;
+      for (const gInst of this._boardGuardInstances(ownerIdx)) {
+        const gScript = loadCardEffect(gInst.counters?._effectOverride || gInst.name);
+        if (!gScript) continue;
+        if (gInst.counters?.negated || gInst.counters?.nulled || gInst.counters?.stunned) continue;
+        const guards = Array.isArray(gScript.boardGuards) ? gScript.boardGuards : [gScript];
+        for (const g of guards) {
+        if (!g?.boardEffectGuard || typeof g.onGuardEffect !== 'function') continue;
+        if (typeof g.canGuardEffect === 'function'
+            && !g.canGuardEffect(this.gs, ownerIdx, gInst, mine, source, kind, this)) continue;
+        const guardName = g.guardCardName || gInst.name;
+        const confirmed = await this.promptGeneric(ownerIdx, {
+          type: 'confirm',
+          title: guardName,
+          message: g.boardEffectGuardPrompt
+            ? g.boardEffectGuardPrompt(srcName || 'an effect', mine, kind, this)
+            : `Negate ${srcName || 'this effect'} on your protected Creatures?`,
+          showCard: srcName,
+          showCardLeft: guardName,
+          confirmLabel: '🛡️ Negate!',
+          cancelLabel: 'No',
+          cancellable: true,
+          promptConfig: { extra: { _boardInstId: gInst.id, _kind: kind } },
+        });
+        if (!this._confirmSaidYes(confirmed)) {
+          if (srcName) {
+            if (!this.gs._boardGuardDeclined) this.gs._boardGuardDeclined = {};
+            this.gs._boardGuardDeclined[`${ownerIdx}:${srcName}`] = this.gs.turn;
+          }
+          continue;
+        }
+        const res = await g.onGuardEffect(this, ownerIdx, gInst, mine, source, kind);
+        for (const id of (res?.dropInstIds || [])) negated.add(id);
+        if (res?.dropInstIds?.length) {
+          this.log('effect_negated_by_board', {
+            card: guardName, kind, count: res.dropInstIds.length, player: this.gs.players[ownerIdx]?.username,
+          });
+        }
+        }
+      }
+    }
+    return negated;
+  }
+
+  /** v704: Ablehnung im Zielwahl-Fenster fuer den Effekt-Waechter merken. */
+  _noteBoardGuardDeclined(ownerIdx, sourceName) {
+    if (!sourceName) return;
+    if (!this.gs._boardGuardDeclined) this.gs._boardGuardDeclined = {};
+    this.gs._boardGuardDeclined[`${ownerIdx}:${sourceName}`] = this.gs.turn;
+  }
+
+  /**
+   * v704 (Puppets — Lueckenschluss Zonensperre): REAKTIVE Durchsetzung
+   * fuer Direkt-Schreiber, die an den Gates vorbeilaufen (Bakhm-Sets,
+   * Mummy Token, Ushabti, Illusionen …). Betritt eine nicht erlaubte
+   * Karte eine gesperrte Spalte, wird die Platzierung zurueckgenommen:
+   * echte Karten kehren in die Hand ihres Besitzers zurueck, Tokens gehen
+   * ins Deleted. Laeuft im onCardEnterZone-Verteiler; Puppet-Tokens
+   * passieren die Sperre ueber `supportZonesLocked` (cardName).
+   */
+  async _enforceSupportZoneLock(inst) {
+    if (!inst || inst.zone !== ZONES.SUPPORT || inst._zoneLockReverting) return false;
+    const zoneOwner = inst.controller ?? inst.owner;
+    if (zoneOwner == null || zoneOwner < 0 || !(inst.heroIdx >= 0)) return false;
+    if (!this.isSupportZoneLocked(zoneOwner, inst.heroIdx, { cardName: inst.name, via: 'enter' })) return false;
+    const cd = this._getCardDB()[inst.name];
+    const isToken = !!(cd && hasCardType(cd, 'Token'));
+    inst._zoneLockReverting = true;
+    this.log('placement_reverted', {
+      card: inst.name, reason: 'support_zones_locked', heroIdx: inst.heroIdx,
+      to: isToken ? 'deleted' : 'hand', player: this.gs.players[zoneOwner]?.username,
+    });
+    this._broadcastEvent('play_zone_animation', {
+      type: 'shield_bubble', owner: zoneOwner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
+    });
+    await this._delay(350);
+    await this.actionMoveCard(inst, isToken ? ZONES.DELETED : ZONES.HAND, -1, -1, {
+      source: 'support_zones_locked', _skipReactionCheck: true,
+    });
+    this.sync();
+    return true;
+  }
+
+  /**
+   * v708: Instanzen, die Brett-Waechter tragen duerfen — offene Support-
+   * Instanzen des Spielers UND seine lebenden Helden (Tri Fecta / Tri Ad
+   * loesen Luck/Preserve Counter ohne Tokens ein).
+   */
+  _boardGuardInstances(ownerIdx) {
+    const ps = this.gs.players[ownerIdx];
+    return this.cardInstances.filter(inst => {
+      if ((inst.controller ?? inst.owner) !== ownerIdx || inst.faceDown) return false;
+      if (inst.zone === ZONES.SUPPORT) return true;
+      if (inst.zone !== ZONES.HERO) return false;
+      const h = ps?.heroes?.[inst.heroIdx];
+      return !!h?.name && h.hp > 0 && h.name === inst.name;
+    });
+  }
+
+  async _applyBoardAoeGuards(entries, sourcePi, sourceCard) {
+    let kept = entries.slice();
+    const owners = [...new Set(kept.map(e => e.inst?.controller ?? e.inst?.owner))];
+    for (const ownerIdx of owners) {
+      if (ownerIdx == null || ownerIdx === sourcePi) continue;
+      const mine = kept.filter(e => (e.inst?.controller ?? e.inst?.owner) === ownerIdx);
+      if (mine.length === 0) continue;
+      for (const gInst of this._boardGuardInstances(ownerIdx)) {
+        const gScript = loadCardEffect(gInst.counters?._effectOverride || gInst.name);
+        if (!gScript) continue;
+        if (gInst.counters?.negated || gInst.counters?.nulled || gInst.counters?.stunned) continue;
+        const _srcScriptG = sourceCard?.name ? loadCardEffect(sourceCard.name) : null;
+        if (_srcScriptG?.cannotBeNegated) continue;
+        const guards = Array.isArray(gScript.boardGuards) ? gScript.boardGuards : [gScript];
+        for (const g of guards) {
+        if (!g?.boardAoeGuard || typeof g.onGuardAoe !== 'function') continue;
+        if (typeof g.canGuardAoe === 'function'
+            && !g.canGuardAoe(this.gs, ownerIdx, gInst, mine, sourceCard, this)) continue;
+        const guardName = g.guardCardName || gInst.name;
+        const confirmed = await this.promptGeneric(ownerIdx, {
+          type: 'confirm',
+          title: guardName,
+          message: g.boardAoeGuardPrompt
+            ? g.boardAoeGuardPrompt(sourceCard?.name || 'an effect', mine, this)
+            : `Negate ${sourceCard?.name || 'this effect'} on your protected Creatures?`,
+          showCard: sourceCard?.name || null,
+          showCardLeft: guardName,
+          confirmLabel: '🛡️ Negate!',
+          cancelLabel: 'No',
+          cancellable: true,
+          promptConfig: { extra: { _boardInstId: gInst.id } },
+        });
+        if (!this._confirmSaidYes(confirmed)) continue;
+        const res = await g.onGuardAoe(this, ownerIdx, gInst, mine, sourceCard);
+        const drop = new Set(res?.dropInstIds || []);
+        if (drop.size === 0) continue;
+        this.log('aoe_negated_by_board', {
+          card: guardName, count: drop.size, player: this.gs.players[ownerIdx]?.username,
+        });
+        kept = kept.filter(e => !drop.has(e.inst?.id));
+        }
+      }
+    }
+    return kept;
+  }
+
   async actionAoeHit(cardInst, config = {}) {
     const gs = this.gs;
     const pi = cardInst.controller;
@@ -29595,13 +34252,30 @@ class GameEngine {
     const allHeroes = [];       // for animation (includes shielded)
     const hitHeroes = [];       // for damage (excludes shielded)
     if (types.includes('hero')) {
-      for (const tpi of targetPlayers) {
+      // ── Spalten durchlaufen, SEITEN entscheiden (v718) ─────────────
+      // Frueher lief diese Schleife nur ueber die Spalten in
+      // `targetPlayers`. Ein Held der EIGENEN Spalte, den der Gegner
+      // dauerhaft kontrolliert, kam bei „all enemy Heroes" deshalb gar
+      // nicht erst vorbei. Jetzt laufen beide Spalten durch und der
+      // Seitenfilter unten entscheidet — Al 4.9.: Flame Avalanche muss
+      // ihn treffen.
+      for (let tpi = 0; tpi < (gs.players || []).length; tpi++) {
         const ps = gs.players[tpi];
+        if (!ps) continue;
         for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
           const hero = ps.heroes[hi];
           if (!hero?.name || hero.hp <= 0) continue;
-          // Skip heroes charmed by the caster (they're on the caster's side)
-          if (hero.charmedBy === pi && tpi !== pi) continue;
+          // ── Seite statt Spalte (v718) ────────────────────────────
+          // Getroffen wird, wer auf der gemeinten SEITE steht, nicht
+          // wer in der Spalte steht. Ein vom Wirker kontrollierter
+          // Held (Charme oder dauerhafte Uebernahme) faellt aus einem
+          // Gegnerflaechenschlag heraus — und umgekehrt gehoert ein
+          // Held der EIGENEN Spalte, den der Gegner kontrolliert, zur
+          // Gegenseite und wird von „all enemy Heroes" getroffen
+          // (Als Ruling 4.9.: Flame Avalanche trifft ihn).
+          // Die Schleife laeuft ueber SPALTEN, jeder Held kommt also
+          // genau einmal vorbei; entschieden wird an seiner SEITE.
+          if (!targetPlayers.includes(this.heroSideOf(tpi, hero))) continue;
           // HP threshold filters
           if (config.heroMinHp !== undefined && hero.hp < config.heroMinHp) continue;
           if (config.heroMaxHp !== undefined && hero.hp > config.heroMaxHp) continue;
@@ -29624,7 +34298,11 @@ class GameEngine {
           if ((inst.owner !== tpi && inst.controller !== tpi) || inst.zone !== 'support') continue;
           if (inst.faceDown) continue; // Face-down surprises are immune to AOE
           const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
-          if (!cd || !hasCardType(cd, 'Creature')) continue;
+          // v704 (Puppets, Als Ruling): „all Creatures"-AoE trifft die
+          // Puppet-Tokens NICHT (keine Creatures); eine AoE auf „any
+          // target" (Helden UND Creatures) trifft sie wie Einzelziele.
+          if (!cd || !(hasCardType(cd, 'Creature')
+                       || (types.includes('hero') && this.isChoosableAsCreature(inst, cd)))) continue;
           // HP threshold filters
           const currentHp = inst.counters.currentHp ?? (cd.hp || 0);
           if (config.creatureMinHp !== undefined && currentHp < config.creatureMinHp) continue;
@@ -29641,6 +34319,15 @@ class GameEngine {
           });
         }
       }
+    }
+
+    // v704 (Puppets, Vinny): Brett-Waechter fuer AoE — `boardAoeGuard`
+    // darf gegnerische AoE-Eintraege auf geschuetzten Creatures fallen
+    // lassen (Vertrag siehe _applyBoardAoeGuards).
+    if (creatureEntries.length > 0 && !config._skipRedirectCheck) {
+      const kept = await this._applyBoardAoeGuards(creatureEntries, pi, cardInst || { name: sourceName, owner: pi, heroIdx });
+      creatureEntries.length = 0;
+      for (const e of kept) creatureEntries.push(e);
     }
 
     // ── Surprise window check (AoE) ──
@@ -29745,6 +34432,34 @@ class GameEngine {
     // Filter out face-down surprise creatures — they cannot be damaged
     entries = entries.filter(e => !e.inst?.faceDown);
     if (entries.length === 0) return;
+
+    // v704 (Puppets): Shared HP pool — Schaden an Puppet-Tokens geht an
+    // den Helden der Spalte (siehe _reroutePooledCreatureDamage).
+    entries = await this._reroutePooledCreatureDamage(entries);
+    if (entries.length === 0) return;
+
+    // v704 (Puppets, Vinny): Effekt-Waechter fuer Schaden ohne Zielwahl-
+    // Fenster (manuelle Schleifen). Status-Ticks fragen nicht.
+    {
+      const bySource = new Map();
+      for (const e of entries) {
+        if (e.isStatusDamage || !e.inst) continue;
+        const so = e.source?.heroOwner ?? e.source?.controller ?? e.source?.owner ?? e.sourceOwner;
+        if (typeof so !== 'number' || so < 0) continue;
+        const key = `${so}:${e.source?.name || ''}`;
+        if (!bySource.has(key)) bySource.set(key, { source: { ...(e.source || {}), owner: so }, insts: [] });
+        bySource.get(key).insts.push(e.inst);
+      }
+      for (const { source, insts } of bySource.values()) {
+        const negated = await this._offerBoardEffectGuard(insts, source, 'damage');
+        if (negated.size === 0) continue;
+        for (const e of entries) {
+          if (negated.has(e.inst?.id)) { e.cancelled = true; e._negatedByBoardGuard = true; }
+        }
+        entries = entries.filter(e => !negated.has(e.inst?.id));
+      }
+      if (entries.length === 0) return;
+    }
 
     // ── DARK OCEAN ───────────────────────────────────────────────────
     // "Creatures take no damage, except from Attacks and Spells."
@@ -29870,7 +34585,7 @@ class GameEngine {
       } else if (inst?.counters?._stealImmortal) {
         // Temporarily stolen (Deepsea Succubus): cannot take damage while stolen.
         e._immuneCreature = true;
-      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner)) {
+      } else if (this.isOppDamageImmuneFrom(inst, e.sourceOwner, e.source)) {
         // Source-aware opp-damage immunity (Sparkfly Attendant LIVE
         // aura). Only fizzles damage coming FROM THE OPPONENT — friendly
         // self-damage (Cluster's blast on own creatures, etc.) still
@@ -30019,6 +34734,18 @@ class GameEngine {
     // `cannotBeIncreased`-Klammer darunter.
     const _vorHook = entries.map(e => e.amount);
 
+    // ── PUNKT VOR STRICH, Kreaturenseite (Als Regel 1.9., v689) ────
+    // Dieselbe Bauform wie im Heldenpfad: Multiplikatoren und flat
+    // Modifikatoren werden getrennt gesammelt und NACH der Hook-Runde
+    // zusammen mit den Buff-Multiplikatoren einmal verrechnet. Der
+    // Eintrag bekommt dafuer Helfer und `amount` wird zum Accessor:
+    // Lesen liefert die Projektion, direktes Schreiben (`e.amount = x`,
+    // die alte Form) bleibt ABSOLUT wie `setAmount`. Karten, die
+    // halbieren/verdoppeln, nehmen `multiplyAmount`; flat Modifikatoren
+    // `modifyAmount`. Nach dem Verrechnen (unten) ist `amount` wieder
+    // eine plain Zahl.
+    for (const e of entries) this._armCreatureEntry(e);
+
     // Fire batch hook — cards like Diamond can inspect/cancel entries
     await this.runHooks(HOOKS.BEFORE_CREATURE_DAMAGE_BATCH, {
       entries,
@@ -30031,12 +34758,16 @@ class GameEngine {
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
       if (!e?.cannotBeIncreased || e.cancelled) continue;
-      if (e.amount > _vorHook[i]) {
+      // v742: Hat ein HOOK die Klammer gesetzt (Spirit of the Ultimate
+      // Gun), gilt sein Betrag als Obergrenze statt des Wertes von vor
+      // der Hook-Runde — sonst faellt seine eigene Verdopplung mit weg.
+      const grenze = (e._noIncreaseFrom != null) ? e._noIncreaseFrom : _vorHook[i];
+      if (e.amount > grenze) {
         this.log('damage_increase_blocked', {
           source: e.source?.name, target: e.inst?.name,
-          from: e.amount, to: _vorHook[i],
+          from: e.amount, to: grenze,
         });
-        e.amount = _vorHook[i];
+        e.amount = grenze;
       }
     }
 
@@ -30050,9 +34781,17 @@ class GameEngine {
       const { applyArrowsBeforeDamage } = require('./_arrows-shared');
       for (const e of entries) {
         if (e.cancelled || e._immuneCreature) continue;
-        const proxy = { amount: e.amount, type: e.type, cancelled: false };
+        // Arrows sind Teil der BASIS (werden mitmultipliziert). Bei
+        // armiertem Eintrag deshalb auf `_base` arbeiten — ein
+        // `e.amount = …` waere absolut und backte die gesammelten flat
+        // Modifikatoren in die Basis (Punkt vor Strich kaputt).
+        const armiert = typeof e.multiplyAmount === 'function';
+        const proxy = { amount: armiert ? e._base : e.amount, type: e.type, cancelled: false };
         applyArrowsBeforeDamage(this, e.source, e.inst, proxy);
-        e.amount = proxy.amount;
+        if (armiert) {
+          e._base = Math.max(0, proxy.amount || 0);
+          if (proxy._zeroedByArrow) { e._flat = 0; e._mul = 1; }   // Hydra Blood: absolut
+        } else e.amount = proxy.amount;
       }
     }
 
@@ -30062,9 +34801,10 @@ class GameEngine {
     // entry actually gets the boost (helper consumes the buff).
     for (const e of entries) {
       if (e.cancelled || e._immuneCreature) continue;
-      const proxy = { source: e.source, target: e.inst, type: e.type, amount: e.amount };
+      const armiert = typeof e.multiplyAmount === 'function';
+      const proxy = { source: e.source, target: e.inst, type: e.type, amount: armiert ? e._base : e.amount };
       this._applyEmpoweredStrikeIfApplicable(proxy);
-      e.amount = proxy.amount;
+      if (armiert) e._base = Math.max(0, proxy.amount || 0); else e.amount = proxy.amount;   // Basis, s.o.
       if (proxy.cannotBeReduced) e.cannotBeReduced = true;
       if (proxy.cannotBeNegated) e.cannotBeNegated = true;
     }
@@ -30092,7 +34832,7 @@ class GameEngine {
     // Flame Avalanche lock: if source player's damageLocked is true,
     // ALL damage to opponent's creatures becomes 0 (ABSOLUTE — overrides everything)
     for (const e of entries) {
-      if (e.cancelled) continue;
+      if (e.cancelled) { this._settleCreatureEntry(e); continue; }   // auch abgebrochene flachlegen
       // Apply buff damage modifiers (Cloudy, etc.) — skipped for un-reducible
       // damage. Also skipped for reduce-only multipliers when the entry
       // carries `cannotBeReduced`: a beforeCreatureDamageBatch listener
@@ -30104,9 +34844,26 @@ class GameEngine {
         for (const [, bd] of Object.entries(e.inst.counters.buffs)) {
           if (bd.damageMultiplier != null) {
             if (e.cannotBeReduced && bd.damageMultiplier < 1) continue;
-            e.amount = Math.ceil(e.amount * bd.damageMultiplier);
+            if (typeof e.multiplyAmount === 'function') e._mul = (e._mul ?? 1) * bd.damageMultiplier;
+            else e.amount = Math.ceil(e.amount * bd.damageMultiplier);
           }
         }
+      }
+      // PUNKT VOR STRICH: jetzt einmal verrechnen, Eintrag wieder flach.
+      this._settleCreatureEntry(e);
+      // ── Einmal-Schadensschilde (v697) — Kreaturenziel, gleiche Regeln
+      // wie im Heldenpfad (flat nach Multiplikatoren; cannotBeReduced
+      // laesst sie unverbraucht). VOR dem Null-Floater, damit eine
+      // Vollabsorption die 0 zeigt.
+      if (e.amount > 0 && !e.cannotBeReduced
+          && e.inst.counters?._oneShotDmgShields?.length) {
+        e.amount = this._consumeOneShotDamageShields(
+          e.inst.counters._oneShotDmgShields, e.amount,
+          {
+            type: 'shield_block', owner: e.inst.controller ?? e.inst.owner,
+            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+          },
+        );
       }
       // Fully-absorbed creature hit → red "0" floater so the player
       // can see the block. Same rationale as the hero path above.
@@ -30374,6 +35131,7 @@ class GameEngine {
       e.inst.counters.currentHp -= actualAmount;
       // Generic damage-tracking flag — mirrors the hero path above.
       this._noteDamageTaken(e.inst.counters, actualAmount);
+      this._noteDamageDealt(e.source, actualAmount);
       this.log('creature_damage', { source: e.source?.name || e.source, target: e.inst.name, amount: actualAmount, damageType: e.type, owner: e.inst.owner });
 
       // Stamp the actual HP delta onto the entry — capped at pre-hit HP
@@ -30396,6 +35154,22 @@ class GameEngine {
       // Elixir of Cold rider (creature target). Mirror of hero path.
       await this._applyColdStrikeFreezeIfApplicable(e.source, e.inst, e.type, e.realDealt);
 
+      // ── Fenster des Verursachers (v697, Aquatic Spear) — Kreaturenziel.
+      // Nach dem Treffer, mit realDealt; die erste erfolgreiche
+      // Aktivierung nimmt die Karte vom Brett, weitere Eintraege im
+      // selben Batch finden dann nichts mehr (AoE feuert also einmal).
+      if (e.realDealt > 0 && !e.isStatusDamage) {
+        await this._checkSurpriseOnDealtDamage(
+          {
+            kind: 'creature', owner: e.inst.controller ?? e.inst.owner,
+            heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot,
+            inst: e.inst, cardName: e.inst.name,
+            alive: (e.inst.counters?.currentHp ?? 0) > 0,
+          },
+          e.source, e.realDealt, e.type,
+        );
+      }
+
       // ── SC tracking: creature overkill ──
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {
         const cd = cardDB[e.inst.name];
@@ -30413,6 +35187,24 @@ class GameEngine {
         // `summonCreatureWithHooks` eine FRISCHE Instanz, der Stempel
         // auf der alten steht dem also nicht im Weg.
         e.inst._deathResolved = true;
+        // ── ANSPRUCHSFENSTER (v679b) ────────────────────────────────
+        // Laeuft VOR der Ablage und vor dem Flug dorthin. Wer den
+        // Kadaver beansprucht, stempelt `_deathClaim`; der Tod laeuft
+        // danach normal weiter (on-death feuert), aber die Karte wird
+        // NICHT abgelegt und fliegt auch nicht sichtbar dorthin.
+        await this.runHooks(HOOKS.ON_CREATURE_DEATH_CLAIM, {
+          creature: {
+            name: e.inst.name, owner: e.inst.owner,
+            originalOwner: e.inst.originalOwner,
+            controller: e.inst.controller ?? e.inst.owner,
+            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+            instId: e.inst.id,
+            turnPlayed: e.inst.turnPlayed,
+          },
+          source: e.source, type: e.type, _skipReactionCheck: true,
+        });
+        const _claim = e.inst._deathClaim || null;
+        if (_claim) this._sendDeathClaimHold(e.inst);
         // PHYSICAL side is where the supportZones array actually contains
         // the card name. Stays equal to `owner` for normal creatures and
         // for temporary steals (Deepsea Succubus leaves the card on
@@ -30445,10 +35237,18 @@ class GameEngine {
           const idx = supSlot.indexOf(e.inst.name);
           if (idx >= 0) supSlot.splice(idx, 1);
         }
+        // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.) — vor dem
+        // Ablegen und vor dem Flug dorthin, damit „Monster Nest" schon
+        // im Platz steht, waehrend die getoetete Creature wegfliegt.
+        // Zwillingsstelle zu `_removeCardFromState`; dieser Pfad hat
+        // seinen eigenen Splice und laeuft dort nicht durch.
+        this._surfaceNestedUnder(e.inst);
         // Cards return to their ORIGINAL owner's discard pile (Tokens go to deleted pile)
         const creatureDiscardPs = this.gs.players[e.inst.originalOwner];
         let _creatureDest = null;
-        if (creatureDiscardPs) {
+        // Beanspruchter Kadaver: kein Stapel, kein Flug dorthin. Die
+        // Karte geht gleich in die Hand oder direkt in ihre neue Zone.
+        if (creatureDiscardPs && !_claim) {
           const effectiveCd = this.getEffectiveCardData(e.inst);
           if (effectiveCd && hasCardType(effectiveCd, 'Token')) {
             creatureDiscardPs.deletedPile.push(e.inst.name);
@@ -30519,7 +35319,19 @@ class GameEngine {
         // "the Creature was actually killed and then revived, NOT
         // protected".
         const reviveAfterDeath = e.inst._reviveAfterDeath;
+        // ── EINLOESUNG DES ANSPRUCHS (v679b) ────────────────────────
+        // Laeuft nach ALLEN Todeslistenern und nach dem Untracking —
+        // die Creature war fuer jeden on-death-Effekt regulaer tot.
+        // Der Kadaver wurde oben NICHT abgelegt, es gibt also weder
+        // einen Zwischenstopp im Ablagestapel noch einen Flug dorthin.
+        const _claimHerkunft = {
+          owner: e.inst.controller ?? e.inst.owner,
+          heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+          turnPlayed: e.inst.turnPlayed,
+          originalOwner: e.inst.originalOwner,
+        };
         this._untrackCard(e.inst.id);
+        await this._redeemDeathClaim(_claim, _claimHerkunft);
         if (reviveAfterDeath) {
           this._broadcastEvent('play_zone_animation', {
             type: 'holy_revival',
@@ -30901,6 +35713,12 @@ class GameEngine {
         if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
         const cd = this.getEffectiveCardData(c) || cardDB[c.name];
         if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return false;
+        // v770: ABILITIES, die in einer Support Zone liegen (Xal,
+        // Xalibur), bleiben beim normalen Heldentod liegen — genau wie
+        // die Abilities in den echten Ability-Zonen (Als Vorgabe 5.9.).
+        // Weg sind sie erst, wenn der Held das Brett verlaesst; das
+        // erledigt `deleteHero` und loescht sie dann auch.
+        if (cd && hasCardType(cd, 'Ability')) return false;
         return true;
       });
 
@@ -30993,10 +35811,28 @@ class GameEngine {
     const totalZones = ps.supportZones[heroIdx].length;
     const firstRemoveIdx = totalZones - removeCount;
 
+    // ── MEHRZONEN-KREATUREN ZUERST (v787, Als Vorgabe 5.9.) ──────────
+    // Eine Kreatur, die mehrere Zonen einnimmt („Land Sharks",
+    // „Populated Island Turtle"), stirbt hier NICHT mit: reichen die
+    // verbleibenden Zonen noch, wird sie dorthin umgeschichtet, sonst
+    // geht sie in die Ablage. Muss VOR der Todesschleife laufen, damit
+    // die eine bereits umgezogene Kreatur nicht mehr vorfindet.
+    try {
+      await require('./_multizone-shared')
+        .handleIslandRemoval(this, playerIdx, heroIdx, firstRemoveIdx);
+    } catch (err) {
+      console.error('[island] handleIslandRemoval:', err.message);
+    }
+
     // Defeat creatures in the island zones being removed (rightmost block)
     for (let zi = firstRemoveIdx; zi < totalZones; zi++) {
       const zoneCards = ps.supportZones[heroIdx][zi] || [];
       for (const cardName of [...zoneCards]) {
+        // Platzhalter einer Mehrzonen-Kreatur sind KEINE Karte — sie
+        // wanderten sonst als Zeichenkette in den Ablagestapel. Nach
+        // dem Umschichten oben koennen hier ohnehin nur noch
+        // verwaiste uebrig sein.
+        if (cardName === '_ZoneBlocked') continue;
         // Fire death hooks for the creature
         const hero = ps.heroes[heroIdx];
         this.log('island_zone_defeat', { card: cardName, hero: hero?.name });
@@ -31504,8 +36340,29 @@ class GameEngine {
     const wiped = [false, false];
     for (let pi = 0; pi < 2; pi++) {
       const ps = this.gs.players[pi];
-      const heroes = ps?.heroes || [];
-      const allDead = heroes.length > 0 && heroes.every(h => !h.name || h.hp <= 0);
+      // ── KONTROLLE statt Spalte (v718, Als Ruling 4.9.) ─────────────
+      // Ein dauerhaft uebernommener Held zaehlt fuer seinen neuen
+      // Kontrolleur wie ein eigener — auch wenn er der letzte ist.
+      // Gezaehlt wird deshalb, was dieser Spieler KONTROLLIERT: eigene
+      // Spalte ohne die abgegebenen Helden, plus die uebernommenen.
+      // Ohne kontrollierte Helden ist die Seite ausgeloescht; die
+      // Spalte selbst kann dabei durchaus noch lebende Helden zeigen,
+      // die dann aber dem Gegner gehoeren.
+      // NUR DAUERHAFTE Kontrolle (Als Klarstellung 4.9.): wer per Love
+      // Shot / Charme voruebergehend den letzten gegnerischen Helden
+      // haelt, gewinnt dadurch NICHT — die Leihgabe geht am Zugbeginn
+      // zurueck. Gezaehlt wird der Besitz, nicht der Zugriff.
+      const controlled = this.heroesControlledBy(pi, { permanentOnly: true });
+      // v762: Gezaehlt werden PLAETZE, nicht Namen. Ein Held kann
+      // inzwischen restlos aus dem Spiel geloescht werden (Spirit of
+      // the Super-Killing Knife) — seine Spalte ist dann leer, und eine
+      // leere Spalte ohne uebernommene Helden ist eine ausgeloeschte
+      // Seite. Frueher stand hier `some(h => h?.name)`; damit hatte ein
+      // Spieler, dessen Helden alle GELOESCHT (statt nur besiegt)
+      // wurden, nie verloren.
+      const hatSpalte = (ps?.heroes || []).length > 0;
+      const allDead = (hatSpalte || controlled.length > 0)
+        && controlled.every(({ hero }) => hero.hp <= 0);
       if (!allDead) continue;
       // Any permanent opted into `preventsAllHeroesDeadLoss: true`
       // suspends the loss on this side (Elixir of Immortality and
@@ -31567,6 +36424,31 @@ class GameEngine {
   // ─── GAME STATE HELPERS ───────────────────
 
   /** Remove a card from its current position in the raw game state arrays. */
+  /**
+   * Deckt eine unter `inst` verdeckte Karte auf, sobald `inst` ihren
+   * Support-Platz verlaesst (v775).
+   *
+   * Aufzurufen NACH dem Herausloesen aus dem Platz und VOR dem Flug zum
+   * Stapel / zur Hand. Zwei Stellen rufen das: `_removeCardFromState`
+   * (alles, was ueber `actionMoveCard` laeuft — Bounce, Ablage,
+   * Loeschen, Umzug) und der Schadens-Todespfad, der seinen eigenen
+   * Splice hat. Ohne Verdeckung kostet der Aufruf einen Suchlauf ueber
+   * die Instanzen und steigt sofort wieder aus.
+   *
+   * Modul erst hier laden, wie bei `_alice-shared` und
+   * `_cardinal-shared` — die Kartenmodule duerfen die Engine nicht
+   * beim Laden zurueckziehen.
+   */
+  _surfaceNestedUnder(inst) {
+    try {
+      const { surfaceOnDeparture } = require('./_nest-shared');
+      return surfaceOnDeparture(this, inst);
+    } catch (err) {
+      console.error('[nest] surfaceOnDeparture:', err.message);
+      return false;
+    }
+  }
+
   _removeCardFromState(inst) {
     const ps = this.gs.players[inst.owner];
     if (!ps) return;
@@ -31582,6 +36464,13 @@ class GameEngine {
           const arr = ps.supportZones?.[inst.heroIdx]?.[inst.zoneSlot];
           if (arr) { const idx = arr.indexOf(inst.name); if (idx >= 0) arr.splice(idx, 1); }
         }
+        // ★ VERDECKTE KARTE AUFDECKEN (v775, Als Befund 5.9.).
+        // Der Platz ist gerade frei geworden, der Flug zum Stapel /
+        // zur Hand ist aber noch nicht gesendet. Genau hier gehoert
+        // eine darunter verdeckte Karte („Monster Nest") zurueck ins
+        // Feld — sonst steht es fuer die ganze Flugdauer leer und die
+        // Karte poppt erst danach herein.
+        this._surfaceNestedUnder(inst);
         break;
       }
       case ZONES.ABILITY: {
@@ -31906,7 +36795,7 @@ class GameEngine {
     }
     // `opts.toSpectators: false` fuer Ereignisse, die den Zuschauern auf
     // einem ANDEREN Weg schon zugestellt werden — sonst saehen sie sie
-    // doppelt (Beispiel: der eigene card_reveal des Aktivierenden;
+    // doppelt (Beispiel: der eigene card_reveal des Aktivierenden
     // die Gegner-Seite schickt denselben Reveal bereits an sie mit).
     if (opts?.toSpectators !== false && this.room?.spectators) {
       for (const spec of this.room.spectators) {
@@ -31936,6 +36825,7 @@ class GameEngine {
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
+    this._refreshAscensionReadiness();
     // Re-apply Weakening Crystal's negation aura before every state
     // push. Runs in fast mode too — MCTS rollouts need the negated
     // status visible to the hook gates so a simulated Hero with a
@@ -32013,23 +36903,112 @@ class GameEngine {
     if (!ps) return { success: false };
 
     const hero = ps.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return { success: false };
+    if (!hero?.name) return { success: false };
+    // ── AUFSTIEG AUS DEM TOD HERAUS (v718) ───────────────────────────
+    // Der Normalfall verlangt einen lebenden Helden. Eine Ascended-
+    // Karte, deren gedruckte Bedingung GENAU der Tod der Grundform ist
+    // („… when it is defeated by the Poison of a 'Paraseed'"), erklaert
+    // das ueber `ascendsFromDefeat: true` — dann traegt der Aufstieg
+    // den gefallenen Helden. Die Karte MUSS in diesem Fall selbst HP
+    // setzen (Ascended Bloom: „its current and max HP become 500"),
+    // sonst steigt eine Leiche auf und faellt sofort wieder um.
+    if (hero.hp <= 0 && !loadCardEffect(cardName)?.ascendsFromDefeat) {
+      return { success: false };
+    }
 
-    // Validate hand
-    if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== cardName) return { success: false };
+    // Validate hand — oder Crestinas Vorrat (★ 28.8.).
+    const quelle = this.handSourceList(pi, opts.fromCreation);
+    if (!quelle) return { success: false };
+    if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { success: false };
 
     // Card data lookup
     const cardDB = this._getCardDB();
     const newCardData = cardDB[cardName];
-    if (!newCardData || newCardData.cardType !== 'Ascended Hero') return { success: false };
+    // v704 (Puppets, Tri Ad): `opts.plainHeroForm` — ein NORMALER Hero
+    // (cardType 'Hero') wird als Form auf einen Helden gelegt. Nur
+    // zusammen mit `notAnAscension` (kein Bonus, keine Trigger, kein
+    // Zugende); die Karte gilt weiterhin NICHT als Ascended (DB-Typ).
+    // Skript-Vertrag `plainHeroForm: true` (Tri Ad): die Karte laeuft
+    // dann ueber die NORMALE Ascension-Bedienung (Drag auf den Helden /
+    // Klick, `ascend_hero`), wird aber als Form gelegt — nie als Aufstieg.
+    const plainForm = newCardData?.cardType === 'Hero'
+      && !!(opts.plainHeroForm || loadCardEffect(cardName)?.plainHeroForm);
+    if (plainForm) opts = { ...opts, plainHeroForm: true, notAnAscension: true };
+    if (!newCardData || (newCardData.cardType !== 'Ascended Hero' && !plainForm)) return { success: false };
 
     // Load scripts
     const oldHeroScript = loadCardEffect(hero.name);
     const ascendedScript = loadCardEffect(cardName);
 
     // Cheat check: if cheat mode, verify the base hero doesn't block it
-    if (opts.cheat) {
+    if (opts.skipCondition && this.isAscensionConditionUnskippable(cardName)) {
+      // ★ 28.8. (Als Hinweis): SECHS Ascended Heroes sperren das
+      // Ueberspringen ausdruecklich. Ein Weg, der die Bedingung
+      // ignoriert, prallt an ihnen ab — siehe
+      // `isAscensionConditionUnskippable`.
+      return { success: false, blockedByUnskippable: true };
+    }
+    let _ascGrant = null;
+    if (opts.skipCondition) {
+      // ── ★ 28.8.: AUFSTIEG AUF FREMDE RECHNUNG ──────────────────────
+      // „???, the Throne Robber": „Ascend this Hero to an Ascended Hero
+      // …, ignoring its Ascension condition."
+      //
+      // Das ist NICHT `opts.cheat`: der Cheat-Weg prueft
+      // `cheatAscensionBlocked` der alten Form und ueberspringt
+      // ausserdem Kosten und Reaktionsfenster. Hier soll NUR die
+      // Eintrittsbedingung der ZIELKARTE entfallen — alles andere
+      // (Negation, Reaktionen, Aufzeichnung) laeuft normal weiter.
+      //
+      // Warum als Option am AUFRUF und nicht als Flag auf der Karte:
+      // die drei Sonderregeln des Textes (Bedingung ignorieren, kein
+      // Bonus, kein Zugende) gelten fuer DIESEN WEG, gleichgueltig zu
+      // welchem der 28 Ascended Heroes es geht. Ein Flag auf der
+      // Zielkarte muesste an 28 Karten haengen und waere auf jedem
+      // anderen Aufstiegsweg falsch.
+    } else if (this._heroHasAscensionSkip(pi, heroIdx)
+               && !this.isAscensionConditionUnskippable(cardName)) {
+      // ── „Divine Awakening" ─────────────────────────────────────────
+      // „That Hero can Ascend to an appropriate Ascended Hero without
+      // fulfilling its Ascension Conditions."
+      //
+      // Die NAMENSBINDUNG der Zielkarte bleibt bestehen — sie steckt
+      // nicht in `ascensionCondition`, sondern im gedruckten „on top of
+      // a 'X' you control". Genau das meint „appropriate": das
+      // Attachment erlaesst die Zusatzbedingung, nicht die Zugehoerigkeit.
+    } else if (opts.cheat) {
       if (oldHeroScript?.cheatAscensionBlocked) return { success: false };
+    } else if ((_ascGrant = (!opts.cheat
+                             && this._handAscensionGrantFor(pi, cardName, handIndex)
+                             && !this.isAscensionConditionUnskippable(cardName)
+                             && this.getAscendedFormsFor(hero.name).includes(cardName)
+                             && hero.name !== cardName
+                             // Normalweg-Vorrang INNERHALB der Zuweisung:
+                             // `_ascGrant` ist genau dann gesetzt, wenn
+                             // dieser Zweig wirklich traegt. Stuende der
+                             // Vorrang als zweite Bedingung DANEBEN,
+                             // bliebe die Variable auch bei genommenem
+                             // Normalweg gefuellt — und der Preis-
+                             // Rueckruf am Ende feuerte faelschlich
+                             // (genau so gefunden, Probe 4).
+                             && !(typeof ascendedScript?.ascensionCondition === 'function'
+                                  ? ascendedScript.ascensionCondition(gs, pi, heroIdx, this)
+                                  : hero.ascensionReady)
+                             && this._handAscensionGrantFor(pi, cardName, handIndex)) || null)) {
+      // ── AUFSTIEGS-ERLASS JE HANDKOPIE (Perilous Journey, v676) ─────
+      // „you may Ascend an appropriate Hero to that Ascended Hero,
+      //  ignoring its Ascension condition, but if you do, …"
+      //
+      // NUR ALS LETZTER AUSWEG: steht der Normalweg offen (Bedingung
+      // erfuellt bzw. `ascensionReady`), nimmt der naechste Zweig ihn —
+      // niemand zahlt den Preis des Erlasses, wenn er ihn nicht
+      // braucht. Nur wenn der Normalweg VERSCHLOSSEN ist, traegt der
+      // Erlass, und `_ascGrant` merkt sich das: nach erfolgreichem
+      // Aufstieg treibt `byCard.onAscensionGrantUsed` den Preis ein.
+      //
+      // Die Namensbindung („appropriate") und die sechs Unumgehbaren
+      // werden hier DURCHGESETZT, nicht nur angezeigt — dieselbe
+      // Doppelrolle wie beim Awakening-Zweig oben.
     } else if (typeof ascendedScript?.ascensionCondition === 'function') {
       // ── Card-supplied ascension condition ──
       // The default route is the spell-school orb path (`ascensionReady`).
@@ -32062,7 +37041,12 @@ class GameEngine {
     // routeNegatedInitialCard in den richtigen Stapel — dieselbe
     // Route, die auch negierte Spells aus der Hand nimmt (inkl.
     // Loeschstapel bei Lunar Eclipse).
-    if (!opts.cheat && !this._inMctsSim) {
+    // `opts.notAnAscension` (v673, Open Invitation): die Karte wird
+    // PLATZIERT, nicht gespielt — und sie steckt bereits in der Kette
+    // der platzierenden Karte. Ein zweites Fenster hier waere eine
+    // Kette in der Kette und ein zweiter Negationspunkt fuer denselben
+    // Zug.
+    if (!opts.cheat && !opts.notAnAscension && !this._inMctsSim) {
       const ascendChain = await this.executeCardWithChain({
         cardName, owner: pi, cardType: 'Ascended Hero',
         heroIdx, goldCost: 0,
@@ -32084,16 +37068,46 @@ class GameEngine {
     // Index neu suchen: das Reaktionsfenster oben kann die Hand
     // veraendert haben (Abwuerfe, Kosten anderer Reaktionen).
     {
-      const freshIdx = ps.hand.indexOf(cardName);
+      let freshIdx = -1;
+      if (_ascGrant) {
+        // Erlass: GENAU die gestempelte Kopie verbrauchen, nicht die
+        // erstbeste namensgleiche (Als Ruling 31.8.). Nach dem
+        // Reaktionsfenster frisch aufloesen — das Handindex-Feld ist
+        // durch etwaige Splices mitgewandert. Ist die gestempelte
+        // Kopie weg, ist der Erlass mit ihr gestorben: dann KEIN
+        // stiller Wechsel auf eine ungestempelte Kopie.
+        const frisch = this._handAscensionGrantFor(pi, cardName);
+        if (!frisch) return { success: false };
+        freshIdx = frisch.idx;
+      } else {
+        freshIdx = ps.hand.indexOf(cardName);
+      }
       if (freshIdx < 0) return { success: false };
       handIndex = freshIdx;
     }
-    ps.hand.splice(handIndex, 1);
+    // ── SICHTBARER FLUG Hand → Held (v718, Als Befund 4.9.) ──────────
+    // Der Aufstieg hatte gar keine Wanderung: die Karte verschwand aus
+    // der Hand, der Held war getauscht. Beim Drag sieht der Spieler
+    // wenigstens seine eigene Handbewegung — bei einem ERZWUNGENEN
+    // Aufstieg (Ascended Bloom) und beim Gegner fehlte jeder Hinweis.
+    // Genutzt wird der bestehende `attach_hero_fly` mit `destZoneSlot:
+    // -1` (= Heldenfeld). Broadcast VOR dem Splice, damit der Client
+    // den Quell-Slot noch findet.
+    if (!this._fastMode && !this._inMctsSim) {
+      this._broadcastEvent('attach_hero_fly', {
+        ownerIdx: pi, source: opts.fromCreation ? 'coolnessStack' : 'hand',
+        handIndex, cardName,
+        destOwner: pi, destHeroIdx: heroIdx, destZoneSlot: -1,
+      });
+      this.sync();
+      await this._delay(700);
+    }
+    quelle.splice(handIndex, 1);
     if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
 
     // Pay the card-supplied cost now that the play is committed. The
     // condition above guarantees it is affordable.
-    if (!opts.cheat && typeof ascendedScript?.payAscensionCost === 'function') {
+    if (!opts.cheat && !_ascGrant && typeof ascendedScript?.payAscensionCost === 'function') {
       ascendedScript.payAscensionCost(this, pi, heroIdx);
     }
 
@@ -32150,16 +37164,36 @@ class GameEngine {
       ascendedScript.onAscendSetup(gs, pi, heroIdx, this);
     }
 
-    this.log('hero_ascension', { player: ps.username, oldHero: oldName, newHero: cardName });
+    // Der Broadcast bleibt in beiden Faellen `hero_ascension` — er ist
+    // die ANZEIGE des Formwechsels, kein Regelbegriff. Der LOG-Eintrag
+    // dagegen ist das, was der Spieler liest, und der muss die beiden
+    // Wege auseinanderhalten.
+    this.log(opts.notAnAscension ? 'hero_form_placed' : 'hero_ascension',
+      { player: ps.username, oldHero: oldName, newHero: cardName });
     this._broadcastEvent('hero_ascension', { owner: pi, heroIdx, oldHero: oldName, newHero: cardName });
     // ── Form stack ──
     // Cards that can Descend need to know what they came FROM. Pushed
     // for every Ascension of a stack-forming card so a later Descend
     // pops exactly one level (Waflav: base → Stormkissed → Deep-Drowned
     // descends back to Stormkissed, not to base).
-    if (ascendedScript?.formsAscensionStack) {
+    // ★ 28.8.: `opts.forceFormStack` — das Flag haengt an der Karte, zu
+    // der man aufsteigt, und genau das traegt hier nicht. Throne Robber
+    // steigt zu BELIEBIGEN Ascended Heroes auf; keiner der 28 fuehrt
+    // `formsAscensionStack`. Ohne Zwang am Aufrufer bliebe der Stapel
+    // leer, und der spaetere Descend wuerde still fehlschlagen, weil
+    // `performDescend` ohne `_formStack` sofort aussteigt.
+    if (ascendedScript?.formsAscensionStack || opts.forceFormStack) {
       if (!Array.isArray(hero._formStack)) hero._formStack = [];
       hero._formStack.push(oldName);
+    }
+    // v707 (Puppets, Als Befund): der Formwechsel ist ab HIER im Gang —
+    // die Zeit bis `onPlainFormPlaced` (Flourish + 800 ms) war ein
+    // Fenster, in dem Brett-Effekte der Spalte noch klickbar waren.
+    // Generischer Stempel `gs._formChangeInProgress[pi-hi] = { turn }`;
+    // Skripte fragen ihn ab (Puppets: isPuppetSwapInProgress).
+    if (plainForm) {
+      if (!gs._formChangeInProgress) gs._formChangeInProgress = {};
+      gs._formChangeInProgress[`${pi}-${heroIdx}`] = { turn: gs.turn };
     }
     // Flashy transformation flourish, opt-in per card so ordinary
     // Ascensions keep their existing presentation.
@@ -32174,13 +37208,25 @@ class GameEngine {
     await this._delay(800);
 
     // ── Fire ON_ASCENSION hook (reaction window) ──
-    await this.runHooks(HOOKS.ON_ASCENSION, {
-      playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: cardName,
-      hero, ascendedCardData: newCardData,
-    });
+    // ★ `opts.notAnAscension` (v673, Als Ruling zu Open Invitation:
+    //   „This does not count as that Hero Ascending"). Das sperrt DREI
+    //   Dinge, die alle am Begriff „Ascending" haengen: dieses
+    //   Auslesefenster, den Aufstiegsbonus und die Aufstiegs-Reaktionen
+    //   aus der Hand. Die reine Zustandsuebertragung (Name, HP, Zonen,
+    //   Instanz-Umhaengung) laeuft dagegen unveraendert — sie ist das
+    //   PLATZIEREN, und genau das tut die Karte.
+    if (!opts.notAnAscension) {
+      await this.runHooks(HOOKS.ON_ASCENSION, {
+        playerIdx: pi, heroIdx, oldHeroName: oldName, newHeroName: cardName,
+        hero, ascendedCardData: newCardData,
+      });
+    }
 
     // ── Ascension Bonus (card-specific) ──
-    if (ascendedScript?.onAscensionBonus) {
+    // `opts.skipBonus`: „but you don't get the Ascension Bonus of the
+    // Hero you Ascend to" (Throne Robber). Gilt fuer den WEG, nicht
+    // fuer die Zielkarte — deshalb hier und nicht als Kartenflag.
+    if (ascendedScript?.onAscensionBonus && !opts.skipBonus && !opts.notAnAscension) {
       await ascendedScript.onAscensionBonus(this, pi, heroIdx);
     }
 
@@ -32192,13 +37238,56 @@ class GameEngine {
     // free additional Action with any Hero before the turn wraps up.
     // The helper iterates the ascending player's hand for cards flagged
     // `isAscensionReaction: true`, HOPT-guarded via each card's own key.
-    await this._checkAscensionHandReactions(pi, heroIdx);
+    if (!opts.notAnAscension) await this._checkAscensionHandReactions(pi, heroIdx);
+
+    // ── Preis eines Handkopie-Erlasses (v676) ──────────────────────
+    // NACH dem vollzogenen Aufstieg samt Bonus und Reaktionen: „if you
+    // do" ist eingetreten. Der Preis steht auf der GEWAEHRENDEN Karte
+    // (Perilous Journey: Dauerbrand auf alles Eigene), nicht in der
+    // Engine — die kennt nur den Rueckruf.
+    if (_ascGrant?.grant?.byCard) {
+      const gewaehrer = loadCardEffect(_ascGrant.grant.byCard);
+      if (typeof gewaehrer?.onAscensionGrantUsed === 'function') {
+        try {
+          await gewaehrer.onAscensionGrantUsed(this, pi, heroIdx);
+        } catch (err) {
+          console.error('[Engine] onAscensionGrantUsed error:', err.message);
+        }
+      }
+      this.log('ascension_grant_used', {
+        player: ps.username, card: cardName, by: _ascGrant.grant.byCard,
+      });
+    }
 
     // ── Determine if turn should skip to End Phase ──
     let skipEndPhase = false;
-    if (pi === gs.activePlayer) {
+    // `notAnAscension`: das Zugende ist hier GRUNDMECHANIK des Aufstiegs
+    // und der findet nicht statt. Endet die platzierende Karte den Zug
+    // (Open Invitation tut es), sagt sie das selbst ueber
+    // `gs._spellEndsTurn` — dann greift auch der Zug-Ende-Schutz
+    // (Tuscan Prisoner), weil es dann ein KARTENeffekt ist.
+    if (pi === gs.activePlayer && !opts.notAnAscension) {
       // Default: skip to End Phase. Ascended hero can block this.
       skipEndPhase = ascendedScript?.blockEndPhaseOnAscend ? false : true;
+    }
+    // `opts.noEndPhase`: „Ascending this way does not end your turn."
+    // `blockEndPhaseOnAscend` waere das falsche Werkzeug — es sitzt auf
+    // der ZIELKARTE (Bloom nutzt es zu Recht so) und wuerde hier
+    // verlangen, es an alle 28 Ascended Heroes zu haengen.
+    if (opts.noEndPhase) skipEndPhase = false;
+
+    // v704 (Tri Ad): Nachlauf des Formwechsels (HOPT-Stempel, Token-Tausch).
+    if (plainForm) {
+      try {
+        if (typeof ascendedScript?.onPlainFormPlaced === 'function') {
+          await ascendedScript.onPlainFormPlaced(this, pi, heroIdx);
+        }
+      } catch (err) {
+        console.error(`[Engine] onPlainFormPlaced failed for "${cardName}":`, err.message);
+      } finally {
+        if (gs._formChangeInProgress) delete gs._formChangeInProgress[`${pi}-${heroIdx}`];
+        this.sync();
+      }
     }
 
     return { success: true, skipEndPhase };
@@ -32222,18 +37311,342 @@ class GameEngine {
    *
    * @returns {{success: boolean, newName?: string}}
    */
+  /**
+   * v656 — Vertrag `refreshAscensionReadiness(engine, pi, heroIdx)` am
+   * BASIS-Helden: bei jedem `sync()` gerufen, damit eine Bedingung, die
+   * an keiner Zonenbewegung haengt (Dajan: „while you have 60 or more
+   * Gold"), ihre Anzeige-Flags (`ascensionReady`/`ascensionTarget(s)`)
+   * nachfuehrt. Muss idempotent und billig sein — Skripte, die ihre
+   * Bereitschaft ueber Zonen-Hooks pflegen (Arthor, Fiona), brauchen
+   * ihn nicht.
+   */
+  _refreshAscensionReadiness() {
+    const players = this.gs?.players || [];
+    for (let pi = 0; pi < players.length; pi++) {
+      const heroes = players[pi]?.heroes || [];
+      for (let hi = 0; hi < heroes.length; hi++) {
+        const hero = heroes[hi];
+        if (!hero?.name) continue;
+        const script = loadCardEffect(hero.name);
+        if (typeof script?.refreshAscensionReadiness !== 'function') continue;
+        try { script.refreshAscensionReadiness(this, pi, hi); }
+        catch (err) { console.error(`[Engine] refreshAscensionReadiness failed for "${hero.name}":`, err.message); }
+      }
+    }
+  }
+
+  /**
+   * Sperrt diese Ascended-Hero-Karte das Ueberspringen ihrer
+   * Aufstiegsbedingung?
+   *
+   * ★ 28.8., Als Hinweis: „manche Ascended Heroes sagen explizit, dass
+   * ihre Condition nicht geskippt werden kann". Sechs tun das:
+   * „Bloom", Beato, Chuck, Definitely not Andras, Sparrow, Styx.
+   *
+   * Warum ZWEI Quellen und nicht nur ein Kartenflag: von den sechs hat
+   * genau EINE (Beato) ueberhaupt ein Skript. Ein reines Flag haette
+   * die anderen fuenf still durchgelassen — und still ist hier das
+   * teuerste Ergebnis, weil ein uebersprungener Riegel wie ein
+   * funktionierender Aufstieg aussieht. Deshalb:
+   *
+   *   ① `ascensionConditionUnskippable: true` im Skript — verbindlich,
+   *      sobald eine Karte gebaut ist.
+   *   ② sonst der gedruckte Text aus `cards.json`. Der Satz IST das
+   *      Ruling, und cards.json ist in diesem Projekt die Autoritaet.
+   *      Faellt die Sperre spaeter ins Skript, gewinnt ① von selbst.
+   *
+   * Der Text kennt zwei Familien — „cannot be negated or substituted"
+   * (Bloom, Sparrow, Styx) und „cannot be ignored (or substituted)"
+   * (Beato, Chuck, Andras). Beide sperren hier. Das ist die
+   * VORSICHTIGE Lesart: streng genommen nennt die erste Familie das
+   * Ignorieren nicht. Zu weit gesperrt faellt beim Spielen auf; zu eng
+   * gesperrt laesst einen Aufstieg durch, den es nicht geben sollte.
+   */
+  /**
+   * Traegt dieser Held ein Attachment, das seine Aufstiegsbedingung
+   * erlaesst? Fragt die Karten, statt Namen fest zu verdrahten —
+   * kuenftige Karten derselben Bauart haengen sich ueber
+   * `grantsAscensionSkip` von selbst ein.
+   */
+  /**
+   * Erlass-Eintrag fuer eine bestimmte Karte in der Hand von `pi` —
+   * oder null. Gueltig nur im gestempelten Zug UND wenn `pi` am Zug
+   * ist („during your next turn"). Liefert den INDEX mit, weil der
+   * Erlass an der physischen Kopie haengt: genau diese muss beim
+   * Aufstieg verbraucht werden, nicht die erstbeste namensgleiche.
+   */
+  _handAscensionGrantFor(pi, cardName, handIndex = null) {
+    const ps = this.gs.players[pi];
+    const grants = ps?._handAscensionGrants;
+    if (!grants) return null;
+    if (this.gs.activePlayer !== pi) return null;
+    for (const [idxStr, g] of Object.entries(grants)) {
+      const idx = Number(idxStr);
+      // ★ v677b (Als Befund): mit Index gefragt, zaehlt NUR die Kopie
+      //   an genau diesem Index. Ohne die Bindung genuegte irgendein
+      //   namensgleicher Stempel — und die UNGESTEMPELTE Zweitkopie
+      //   war spielbar. Der indexlose Aufruf bleibt fuer die
+      //   Wiederauffindung nach dem Reaktionsfenster (der Stempel ist
+      //   durch Splices gewandert, die Route hat die Bindung schon
+      //   geprueft).
+      if (handIndex != null && idx !== handIndex) continue;
+      // ★ TESTMODUS: `gs.turn <= g.turn` statt exakter Treffer — siehe
+      //   Schalter am Dateikopf.
+      const imFenster = ASCENSION_GRANT_TESTFENSTER
+        ? this.gs.turn <= g.turn
+        : this.gs.turn === g.turn;
+      if (!g || !imFenster) continue;
+      if (ps.hand?.[idx] !== cardName) continue;
+      return { idx, grant: g };
+    }
+    return null;
+  }
+
+  _heroHasAscensionSkip(pi, heroIdx) {
+    const ps = this.gs.players[pi];
+    if (!ps) return false;
+    for (const inst of this.cardInstances) {
+      if (inst.owner !== pi || inst.zone !== ZONES.SUPPORT) continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      const script = loadCardEffect(inst.name);
+      if (typeof script?.grantsAscensionSkip !== 'function') continue;
+      if (script.grantsAscensionSkip(this, pi, heroIdx)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * ★ 28.8. (Als Befund): WELCHE ASCENDED-FORMEN HAT DIESER HELD?
+   *
+   * Es gab dafuer bisher NICHTS — weder ein Feld in `cards.json` noch
+   * eine Zuordnung im Code. Gebraucht wird sie von „Divine Awakening"
+   * („kann an jeden eigenen Hero angelegt werden, WENN dieser eine
+   * Ascended-Form besitzt") und kuenftig von jeder Karte, die nach der
+   * Aufstiegslinie fragt.
+   *
+   * Abgeleitet wird sie aus dem gedruckten Text der Ascended Heroes —
+   * dort steht die Bindung, und `cards.json` ist die Autoritaet. Zwei
+   * Formulierungen kommen vor:
+   *   • „on top of a \"X\" you control"   (26 Karten)
+   *   • „Ascend from \"X\""               (nur Beato)
+   *
+   * Und zwei Sonderfaelle, beide nachgemessen:
+   *   ① Die fuenf Waflav-Formen nennen schlicht „Waflav" — kein
+   *      Kartenname, sondern die FAMILIE. Deshalb greift neben dem
+   *      exakten Vergleich ein Enthaltensein-Vergleich, wie ihn das
+   *      Spiel auch sonst fuer Namensfamilien nutzt.
+   *   ② „Sparrow, the Buffoon of the Treasure Cave" nennt
+   *      „Sparrow, the Bumbling Buffoon" — die Basiskarte heisst aber
+   *      „Sparrow, the Bumbling BAFFOON". Ein Tippfehler in einem der
+   *      beiden Namen; die Zuordnung faellt dort aus. NICHT still
+   *      geraten: das gehoert in `cards.json` korrigiert, nicht hier
+   *      weginterpretiert.
+   *
+   * Einmal geparst und gemerkt — die Quelle ist statisch.
+   */
+  _getAscensionLineage() {
+    if (this._ascensionLineage) return this._ascensionLineage;
+    const cardDB = this._getCardDB();
+    const paare = [];
+    for (const name of Object.keys(cardDB)) {
+      const cd = cardDB[name];
+      if (cd?.cardType !== 'Ascended Hero') continue;
+      const text = String(cd.effect || '').replace(/\s+/g, ' ');
+      const basen = new Set();
+      for (const m of text.matchAll(/on top of (?:a|an|the)\s+"([^"]+)"/gi)) basen.add(m[1]);
+      for (const m of text.matchAll(/Ascend from\s+"([^"]+)"/gi)) basen.add(m[1]);
+      for (const b of basen) paare.push({ ascended: name, basis: b });
+    }
+    this._ascensionLineage = paare;
+    return paare;
+  }
+
+  /** Alle Ascended-Formen, die diesen Helden als Basis nennen. */
+  getAscendedFormsFor(heroName) {
+    if (!heroName) return [];
+    const raus = [];
+    for (const { ascended, basis } of this._getAscensionLineage()) {
+      // Exakt, oder Familienname (die Waflav-Formen nennen „Waflav").
+      if (heroName === basis || heroName.includes(basis)) raus.push(ascended);
+    }
+    return raus;
+  }
+
+  /** Hat dieser Held ueberhaupt eine Ascended-Form? */
+  heroHasAscendedForm(heroName) {
+    return this.getAscendedFormsFor(heroName).length > 0;
+  }
+
+  /**
+   * ★ 28.8. (Als Vorgabe): DROP-ZONEN EINER ANLEGE-KARTE.
+   *
+   * „Wenn ich die Karte per Drag-and-Drop bediene, sollten alle Heroes
+   * und Support Zones gehighlightet sein, die die Karte EMPFANGEN
+   * koennen, NICHT diejenigen, die sie einsetzen koennen."
+   *
+   * Der Client hebt beim Ziehen sonst ueber `canHeroPlayCard` hervor —
+   * also ueber die Frage, wer WIRKEN kann. Bei einem Attachment sind
+   * das zwei verschiedene Rollen: wer wirkt, muss die Stufe erfuellen;
+   * wer es TRAEGT, muss nur das Ziel sein duerfen.
+   *
+   * Karten erklaeren ihre Empfaenger ueber `attachmentHosts(gs, pi,
+   * engine)`. Bauform und Uebertragungsweg wie bei
+   * `getBouncePlacementTargets` (Deepsea) — dieselbe Frage, dieselbe
+   * Antwortform, also derselbe Mechanismus statt eines zweiten.
+   *
+   * @returns {Object} cardName → [{ heroIdx, slotIdx }]
+   */
+  getAttachmentHostTargets(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    const raus = {};
+    const gesehen = new Set();
+    for (const cardName of (ps.hand || [])) {
+      if (gesehen.has(cardName)) continue;
+      gesehen.add(cardName);
+      const script = loadCardEffect(cardName);
+      if (typeof script?.attachmentHosts !== 'function') continue;
+      const hosts = script.attachmentHosts(this.gs, playerIdx, this) || [];
+      if (hosts.length > 0) raus[cardName] = hosts;
+    }
+    return raus;
+  }
+
+  /**
+   * ★ 28.8. (Als Befund): „Ich gebe meinem Arthor Divine Awakening,
+   * waehrend ich Ascended Arthor auf der Hand habe — und kann Arthor
+   * nicht ascenden."
+   *
+   * Die Engine liess den Aufstieg laengst zu. Der CLIENT bietet ihn
+   * aber nur an, wenn der Held `ascensionReady` traegt UND die
+   * Handkarte in `ascensionTarget(s)` steht — genau das fuenfte
+   * Kettenglied, das schon beim Shapeshifter gefehlt hat. Ein
+   * Attachment, das eine Bedingung ERLAESST, setzt diese Felder
+   * naturgemaess nicht.
+   *
+   * Deshalb ein EIGENES, abgeleitetes Feld statt eines Eingriffs in
+   * `hero.ascensionReady`: Waflav und der Shapeshifter pflegen ihre
+   * Listen selbst, und ein zweiter Schreiber auf demselben Feld
+   * muesste sich merken, was er hinzugefuegt hat, um es beim Entfernen
+   * wieder herauszunehmen. Der Client verodert die beiden Quellen
+   * stattdessen — additiv, ohne Besitzstreit.
+   *
+   * @returns {Object} heroIdx → [Ascended-Kartennamen]
+   */
+  getAscensionSkipTargets(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    const raus = {};
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      const hero = ps.heroes[hi];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (!this._heroHasAscensionSkip(playerIdx, hi)) continue;
+      // Die Namensbindung bleibt: nur Formen, die DIESEN Helden als
+      // Basis nennen. Und die sechs Karten mit gedrucktem Verbot
+      // fallen auch hier heraus — sonst boete die Oberflaeche einen
+      // Aufstieg an, den der Server gleich wieder ablehnt.
+      const formen = this.getAscendedFormsFor(hero.name)
+        .filter(n => !this.isAscensionConditionUnskippable(n));
+      if (formen.length > 0) raus[hi] = formen;
+    }
+
+    return raus;
+  }
+
+  /**
+   * ★ v677b (Als Befund): ERLASSE SIND JE-KOPIE — auch in der ANZEIGE.
+   *
+   * Der erste Wurf speiste die Erlasse in `ascensionSkipTargets` ein.
+   * Diese Liste kennt nur NAMEN — und damit leuchteten bei zwei
+   * Handkopien desselben Ascended BEIDE als spielbar, obwohl nur die
+   * gesuchte den Stempel traegt. Deshalb ein EIGENES, indexbasiertes
+   * Feld: `{ handIdx: [heroIdx, …] }`. Der Client verodert es mit der
+   * Namensliste; die Route prueft dieselbe Bindung serverseitig
+   * (`_handAscensionGrantFor` mit Index).
+   *
+   * @returns {Object} handIdx → [heroIdx]
+   */
+  getAscensionGrantOffers(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps) return {};
+    if (this.gs.activePlayer !== playerIdx) return {};
+    const raus = {};
+    const grants = ps._handAscensionGrants || {};
+    for (const [idxStr, g] of Object.entries(grants)) {
+      const idx = Number(idxStr);
+      // ★ TESTMODUS — siehe Schalter am Dateikopf.
+      const imFenster = ASCENSION_GRANT_TESTFENSTER
+        ? this.gs.turn <= g.turn
+        : this.gs.turn === g.turn;
+      if (!g || !imFenster) continue;
+      const name = ps.hand?.[idx];
+      if (!name) continue;
+      if (this.isAscensionConditionUnskippable(name)) continue;
+      const helden = [];
+      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+        const hero = ps.heroes[hi];
+        if (!hero?.name || hero.hp <= 0) continue;
+        if (hero.name === name) continue;
+        if (!this.getAscendedFormsFor(hero.name).includes(name)) continue;
+        helden.push(hi);
+      }
+      if (helden.length > 0) raus[idx] = helden;
+    }
+    return raus;
+  }
+
+  isAscensionConditionUnskippable(cardName) {
+    const script = loadCardEffect(cardName);
+    if (script && typeof script.ascensionConditionUnskippable === 'boolean') {
+      return script.ascensionConditionUnskippable;
+    }
+    const text = this._getCardDB()?.[cardName]?.effect || '';
+    return /\bcondition cannot be (?:negated|ignored|substituted)/i.test(text)
+        || /\bcondition cannot be (?:negated|ignored)\s+or\s+substituted/i.test(text);
+  }
+
   async performDescend(pi, heroIdx, opts = {}) {
     const gs = this.gs;
     const ps = gs.players[pi];
     if (!ps) return { success: false };
 
     const hero = ps.heroes?.[heroIdx];
-    if (!hero?.name || hero.hp <= 0) return { success: false };
-
-    const stack = Array.isArray(hero._formStack) ? hero._formStack : null;
-    if (!stack || stack.length === 0) return { success: false };
+    // ★ 28.8., `opts.evenIfDefeated`: „At the end of your opponent's next
+    // turn, Descend this Hero (even if it is defeated …)". Der normale
+    // Weg steigt bei einem toten Helden aus — hier ist der Abstieg
+    // gerade dann faellig. Ein Slot, der mit fremdem Namen und fremden
+    // Werten liegenbleibt, waere der schlimmere Zustand.
+    if (!hero?.name) return { success: false };
+    if (hero.hp <= 0 && !opts.evenIfDefeated) return { success: false };
 
     const cardDB = this._getCardDB();
+    let stack = Array.isArray(hero._formStack) ? hero._formStack : null;
+    // ── v675: RUECKFALL AUF DIE ABSTAMMUNGSLINIE ──────────────────────
+    // Den Stapel fuehren nur die Waflav-Familie (`formsAscensionStack`)
+    // und erzwungene Aufstiege (Throne Robber, Open Invitation — dort
+    // ist die getragene Form GELIEHEN und nur der Stapel kennt die
+    // Wahrheit). Ein NORMAL aufgestiegener Held (Monia Bot ueber das
+    // Jetpack) hat KEINEN Stapel — und war damit fuer jede
+    // Descend-Karte unsichtbar: `performDescend` stieg still aus.
+    // Aufgefallen an „Audience with a hostile King".
+    //
+    // Der Rueckfall gilt nur, wenn die getragene Form laut Datenbank
+    // ein Ascended Hero ist UND ihre Linien-Basis eine echte Karte ist.
+    // Letzteres schuetzt die Waflav-Familie: deren Linien-Basis ist das
+    // Familien-Kuerzel „Waflav", keine Karte — welcher konkrete Waflav
+    // darunter steckt, weiss nur der Stapel, und den fuehren Waflavs
+    // immer. Ein Basis-Held ohne Aufstieg faellt weiter durch (kein
+    // Ascended-Eintrag), wie bisher.
+    if (!stack || stack.length === 0) {
+      if (cardDB[hero.name]?.cardType === 'Ascended Hero') {
+        const paar = this._getAscensionLineage().find(x => x.ascended === hero.name);
+        if (paar?.basis && cardDB[paar.basis]) {
+          stack = hero._formStack = [paar.basis];
+        }
+      }
+    }
+    if (!stack || stack.length === 0) return { success: false };
+
     const oldName = hero.name;
     const newName = stack[stack.length - 1];
     const newCardData = cardDB[newName];
@@ -32242,12 +37655,68 @@ class GameEngine {
     stack.pop();
     if (stack.length === 0) delete hero._formStack;
 
-    // Reverse the intrinsic HP delta, floored at 1.
+    // ── HP BEIM ABSTIEG (Als Ruling 31.8., BINDEND) ────────────────
+    //   „Bei Abstieg soll der Hero niemals revived oder geheilt werden.
+    //    Seine HP werden konsequent um die Differenz zwischen Ascended
+    //    max HP und normal max HP reduziert. Ist diese Differenz negativ
+    //    (Base Form hat mehr max HP als Ascended), wird sie als Heilung
+    //    gutgeschrieben, kann aber trotzdem nicht wiederbeleben, falls
+    //    der Hero inzwischen tot ist! Aber ein Hero KANN durch diesen
+    //    Differenz-'Schaden' (der NICHT als Schaden gilt!) sterben, wenn
+    //    die HP auf 0 fallen."
+    //
+    //   Vorher stand hier `Math.max(1, …)`. Dieser eine Boden tat DREI
+    //   falsche Dinge auf einmal: er belebte einen toten Helden mit 1 HP
+    //   wieder, er machte den Abstieg unmoeglich toedlich, und er
+    //   verschleierte beides, weil das Ergebnis immer „lebt" hiess.
+    //   (Aufgefallen an Open Invitation, gilt aber fuer JEDEN Abstieg —
+    //   Waflav und Throne Robber eingeschlossen.)
+    //
+    //   Die Differenz wird aus den GEDRUCKTEN Werten gebildet, nicht aus
+    //   `hero.maxHp`: Buffs und Ausruestung gehoeren dem Helden, nicht
+    //   der Form, und duerfen beim Formwechsel nicht mitwandern.
     const oldBaseMaxHp = cardDB[oldName]?.hp || 0;
     const newBaseMaxHp = newCardData.hp || oldBaseMaxHp;
     const descendDelta = newBaseMaxHp - oldBaseMaxHp;   // negative going down
+    const alteHp = hero.hp || 0;
+    const warBesiegt = alteHp <= 0;
     hero.maxHp = Math.max(1, (hero.maxHp || oldBaseMaxHp) + descendDelta);
-    hero.hp = Math.max(1, Math.min(hero.maxHp, (hero.hp || 0) + descendDelta));
+
+    const rohHp = alteHp + descendDelta;
+    // ── TOEDLICH NUR BEIM PSEUDO-ABSTIEG (Als Korrektur 31.8.) ──────
+    //   „Ein Abstieg via Throne Robber oder Waflav SOLL unmoeglich
+    //    toedlich sein. Nur der neue Pseudo-Abstieg durch das nicht
+    //    echte Ascenden vorher soll potentiell toedlich sein."
+    //
+    //   `opts.notADescend` traegt beides, weil es DASSELBE unterscheidet:
+    //   es markiert die Ruecknahme einer nur PLATZIERTEN Form (Open
+    //   Invitation) gegenueber einem echten Abstieg. Der echte Abstieg
+    //   ist Teil des Waflav-Kreislaufs und darf ihn nicht abwuergen; die
+    //   Ruecknahme einer geliehenen Form ist der Preis dafuer, die
+    //   Bedingung umgangen zu haben.
+    //
+    //   Ein bereits besiegter Held faellt in KEINEM der beiden Faelle
+    //   ein zweites Mal.
+    const stirbtAnDerDifferenz = !warBesiegt && rohHp <= 0 && !!opts.notADescend;
+    if (warBesiegt) {
+      // Kein Revive, auch nicht ueber die Gutschrift bei negativer
+      // Differenz — auf BEIDEN Wegen. Bleibt liegen.
+      hero.hp = 0;
+    } else if (stirbtAnDerDifferenz) {
+      // HP bleiben vorerst stehen; der Tod laeuft am ENDE ueber
+      // `actionDefeatHero`, damit der Held als BASISFORM stirbt und
+      // jedes „when dying" (Ausruestung ablegen, Extra-Leben, Guardian
+      // Angel, Cybug SCARAB, Siegpruefung) genau einmal und an der
+      // ueblichen Stelle laeuft. Ein eigener Todesweg waere der fuenfte
+      // — und der vierte hatte schon kein Netz.
+    } else if (rohHp <= 0) {
+      // Echter Abstieg: unmoeglich toedlich, der Held bleibt bei 1.
+      hero.hp = 1;
+    } else {
+      // Die Gutschrift heilt hoechstens bis maxHp — aber nie unter das,
+      // wo der Held ohnehin schon stand (Overheal bleibt Overheal).
+      hero.hp = Math.min(rohHp, Math.max(hero.maxHp, alteHp));
+    }
     hero.name = newName;
     hero.atk = newCardData.atk || hero.atk;
 
@@ -32266,7 +37735,16 @@ class GameEngine {
     const newScript = loadCardEffect(newName);
     if (newScript?.onAscendSetup) newScript.onAscendSetup(gs, pi, heroIdx, this);
 
-    this.log('hero_descend', { player: ps.username, oldHero: oldName, newHero: newName });
+    // ★ `opts.notADescend` (v673, Als Ruling zu Open Invitation: „Den
+    //   Ascended ins Deck zu shuffeln gilt auch nicht als Descending").
+    //   HEUTE gibt es keinen einzigen on-descend-Ausloeser — nachgesehen,
+    //   `_hooks.js` kennt kein ON_DESCEND. Die Option ist deshalb bewusst
+    //   VORAB da: sie unterscheidet den Log-Eintrag und ist die EINE
+    //   Stelle, die ein kuenftiges Descend-Fenster abfragen muss. Ohne
+    //   sie wuerde die erste on-descend-Karte Open Invitation still
+    //   mitausloesen — und still ist hier das teuerste Ergebnis.
+    this.log(opts.notADescend ? 'hero_form_returned' : 'hero_descend',
+      { player: ps.username, oldHero: oldName, newHero: newName });
     this._broadcastEvent('hero_ascension', {
       owner: pi, heroIdx, oldHero: oldName, newHero: newName, descend: true,
     });
@@ -32295,6 +37773,21 @@ class GameEngine {
       });
       ps.discardPile.push(oldName);
       this.log('waflav_form_discarded', { player: ps.username, card: oldName });
+    }
+
+    // ── Tod durch die Differenz, nur beim Pseudo-Abstieg ───────────
+    // Ganz am Schluss: der Held ist zu diesem Zeitpunkt bereits die
+    // Basisform, die abgelegte Form liegt in der Ablage. `reason`
+    // statt einer Quelle mit Besitzer — es gibt keinen Verursacher,
+    // der Schaden „zugefuegt" haette; genau das meint „gilt NICHT als
+    // Schaden". Und `respectFirstTurnProtection: false` aus demselben
+    // Grund: der Anfangsschild wehrt fremde Sofort-Kills ab, nicht die
+    // Buchhaltung der eigenen Form (dieselbe Ausnahme wie beim
+    // freiwilligen Opfer).
+    if (stirbtAnDerDifferenz && hero.hp > 0) {
+      await this.actionDefeatHero(null, hero, {
+        reason: 'descend', respectFirstTurnProtection: false,
+      });
     }
 
     this.sync();

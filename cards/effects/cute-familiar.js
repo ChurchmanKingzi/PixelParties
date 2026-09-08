@@ -275,9 +275,8 @@ module.exports = {
 
       // Pop one copy out of the discard pile array & untrack the
       // listener instance to avoid an orphan tracked in 'discard'.
-      const dpIdx = (ps.discardPile || []).indexOf(CARD_NAME);
-      if (dpIdx < 0) return;
-      ps.discardPile.splice(dpIdx, 1);
+      const _taken_dpIdx = await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_dpIdx) return;
 
       const oldInst = ctx.card;
       if (oldInst && oldInst.zone === 'discard') {
@@ -377,8 +376,7 @@ module.exports = {
 
       // Pop from discard pile array (the dead Familiar) and untrack
       // the parker before placing.
-      const dpIdx = (ps.discardPile || []).indexOf(CARD_NAME);
-      if (dpIdx >= 0) ps.discardPile.splice(dpIdx, 1);
+      await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
       engine._untrackCard(ctx.card.id);
 
       // Use safePlaceInSupport + manual on-play hooks (Necromancy's

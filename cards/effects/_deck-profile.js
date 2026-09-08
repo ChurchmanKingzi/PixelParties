@@ -2501,7 +2501,385 @@ function poolFeatureValue(engine, pi, quelle, karte) {
   } catch { return 0; }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  ABILITY-KOSTEN-KANAL (v801, Als Auftrag 6.9.)
+//
+//  „Weapon Absorption" und jede kuenftige Karte, die mit ABILITIES
+//  bezahlt: welche Ability ist weniger wert als eine andere, und wann
+//  lohnt es sich, wie viele zu zahlen? Getaggter Entscheidungskanal
+//  nach dem Muster von counterSpend/descend — Karten-VERTRAG statt
+//  Kartenwissen im Piloten: die Karte legt an ihren Auswahl-Prompt
+//
+//    config._abilityCost = { cardName, heroIdx, sent, abilitiesSent,
+//                            needMore, amount }
+//
+//  (`needMore` = die Level-Luecke ist noch offen, es MUSS eine Ability
+//  kommen; `amount` = der anstehende Schaden, 0 wenn keiner). Das
+//  Gehirn entscheidet je Schleifenschritt „diese Karte schicken" oder
+//  „aufhoeren"; jeder Kandidat traegt seine eigenen Tags, damit der
+//  Trainer lernt, welche Abilities (ac:ab:<Name>) in welcher Lage
+//  (ac:dmg:*, ac:hp:*, ac:behind|even|ahead) geschickt wurden und ob
+//  das gut ausging. Ohne Profil liefert `abilityCostPick` undefined →
+//  die Karten-Heuristik entscheidet, exakt wie ohne Kanal.
+// ═══════════════════════════════════════════════════════════════════
+
+const AC_SCHOOL_CORE = 8;   // ab so vielen Deckkarten gilt eine Schule als tragend
+
+/** Wie viele Karten des Spielers (Deck + Hand + Ablage) brauchen diese Schule? */
+function _abilityCostSchoolWeight(engine, pi, school) {
+  try {
+    const ps = engine.gs.players[pi];
+    const db = engine._getCardDB();
+    const { hasSpellSchool: hss } = require('./_hooks');
+    let n = 0;
+    for (const arr of [ps.mainDeck, ps.hand, ps.discardPile, ps.deletedPile]) {
+      for (const name of (arr || [])) {
+        const cd = db[name];
+        if (cd && (cd.spellSchool1 || cd.spellSchool2) && hss(cd, school)) n++;
+      }
+    }
+    return n;
+  } catch { return 0; }
+}
+
+/**
+ * Tags fuer EINEN Kandidaten (Ziel-Objekt aus der Brett-Auswahl mit
+ * type 'ability'|'equip', cardName, slotIdx, cardInstance) in der Lage
+ * `state` (= config._abilityCost).
+ */
+function classifyAbilityCostTags(engine, pi, target, state) {
+  const tags = [];
+  try {
+    const ps = engine.gs.players[pi];
+    const hero = ps?.heroes?.[state.heroIdx];
+    const isAbility = target.type === 'ability';
+    tags.push(isAbility ? 'ac:kind:ability' : 'ac:kind:equip');
+    if (isAbility) {
+      tags.push(`ac:ab:${target.cardName}`);
+      const slot = ps?.abilityZones?.[state.heroIdx]?.[target.slotIdx];
+      const lvl = Array.isArray(slot) ? slot.length : 1;
+      tags.push(`ac:lvl:${lvl >= 3 ? '3' : lvl}`);
+      // Traegt die Schule das Deck? (Deckzusammensetzung + bisherige Nutzung)
+      const w = _abilityCostSchoolWeight(engine, pi, target.cardName);
+      tags.push(`ac:school:${w >= AC_SCHOOL_CORE ? 'core' : (w > 0 ? 'side' : 'none')}`);
+      const used = engine._schoolUse?.[pi]?.[target.cardName];
+      const casts = (used?.casts || 0) + (used?.activations || 0);
+      tags.push(`ac:used:${casts === 0 ? '0' : (casts <= 2 ? '1-2' : '3+')}`);
+    } else {
+      const cd = engine._getCardDB()[target.cardName];
+      const cost = Number(cd?.cost) || 0;
+      tags.push(`ac:equip-cost:${cost <= 3 ? 'lo' : (cost <= 7 ? 'mid' : 'hi')}`);
+    }
+    // Lage
+    tags.push(state.needMore ? 'ac:need' : 'ac:optional');
+    if (state.wisdomPending) tags.push('ac:wisdom-pending');
+    tags.push(`ac:sent:${state.sent >= 3 ? '3+' : state.sent}`);
+    const amount = Number(state.amount) || 0;
+    if (hero && amount > 0) {
+      tags.push(`ac:dmg:${amount >= hero.hp ? 'lethal' : (amount * 2 >= hero.hp ? 'heavy' : 'light')}`);
+    }
+    if (hero?.maxHp > 0) {
+      const frac = hero.hp / hero.maxHp;
+      tags.push(`ac:hp:${frac < 0.34 ? 'lo' : (frac < 0.67 ? 'mid' : 'hi')}`);
+    }
+    // Stand nach lebenden Helden (Als Granularitaets-Wunsch 24.8.)
+    const alive = (idx) => (engine.gs.players[idx]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    const diff = alive(pi) - alive(pi === 0 ? 1 : 0);
+    tags.push(`ac:${diff < 0 ? 'behind' : (diff > 0 ? 'ahead' : 'even')}`);
+    const t = engine.gs?.turn || 1;
+    tags.push(`ac:t:${t <= 4 ? 'early' : (t <= 9 ? 'mid' : 'late')}`);
+  } catch { /* Tags sind Beiwerk */ }
+  return tags;
+}
+
+function abilityCostPrior(engine, pi, cardName, tags) {
+  try {
+    const rules = profileFor(engine, pi)?.abilityCostRules?.[cardName];
+    if (!rules) return 0;
+    const raw = (tags || []).reduce((s, g) => s + (rules[g] || 0), 0);
+    return Math.max(-20, Math.min(20, raw));
+  } catch { return 0; }
+}
+
+/**
+ * 'send' | 'stop' | null je Kandidat — Regel, sonst Exploration im
+ * Training (PP_ABILITYCOST_EXPLORE, Default 0.25) plus ε-Rest trotz
+ * Regel (PP_RULE_EXPLORE), aus demselben Grund wie im Counter-Kanal.
+ */
+function abilityCostDecision(engine, pi, cardName, tags) {
+  try {
+    if (!tags || tags.length === 0) return null;
+    const rules = profileFor(engine, pi)?.abilityCostRules?.[cardName];
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = abilityCostPrior(engine, pi, cardName, tags);
+      if (score >= 4) return 'send';
+      if (score <= -4) return 'stop';
+      return null;
+    }
+    const explore = parseFloat(process.env.PP_ABILITYCOST_EXPLORE || '0.25');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) {
+      return Math.random() < 0.5 ? 'stop' : 'send';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/**
+ * Der Schleifenschritt fuer das Gehirn: Kandidaten bewerten, EINEN
+ * schicken oder aufhoeren. Rueckgabe wie `_getCpuTargetResponse`
+ * ([id] | [] = aufhoeren) oder undefined = keine Meinung, die
+ * Karten-Heuristik entscheidet. Loggt jeden Kandidaten (fired = wurde
+ * geschickt) nach `engine._abilityCostLog`, damit der Trainer die
+ * Kontraste „geschickt vs behalten" je Tag bekommt.
+ *
+ * Ist die Luecke offen (`needMore`), ist „aufhoeren" keine Option und
+ * ein Equip loest sie nicht — dann kommt nur eine Ability in Frage.
+ */
+function abilityCostPick(engine, validTargets, config, pi) {
+  const state = config?._abilityCost;
+  if (!state || !Array.isArray(validTargets) || validTargets.length === 0) return undefined;
+  if (engine.isPuzzle) return undefined;              // Puzzle: Engine-Standard (alles schicken)
+  const cardName = state.cardName || config.title;
+  const cands = validTargets
+    .filter(t => !state.needMore || t.type === 'ability')
+    .map(t => ({ t, tags: classifyAbilityCostTags(engine, pi, t, state) }));
+  if (cands.length === 0) return undefined;
+  for (const c of cands) {
+    c.dec = abilityCostDecision(engine, pi, cardName, c.tags);
+    c.score = abilityCostPrior(engine, pi, cardName, c.tags);
+  }
+  // Stimmt irgendein Kandidat fuer „send"? Den mit dem besten Prior.
+  // Sonst „stop", wenn mindestens einer dafuer ist UND aufhoeren
+  // erlaubt ist (Luecke zu, schon etwas geschickt). Sonst keine Meinung.
+  let bestDec = null;
+  const sender = cands.filter(c => c.dec === 'send').sort((a, b) => b.score - a.score)[0];
+  if (sender) bestDec = { pick: sender };
+  else if (cands.some(c => c.dec === 'stop') && !state.needMore && state.sent > 0) bestDec = { stop: true };
+  if (!bestDec) return undefined;
+  try {
+    if (!engine._inMctsSim) {
+      if (!engine._abilityCostLog) engine._abilityCostLog = [];
+      const t = engine.gs?.turn || 0;
+      for (const c of cands) {
+        engine._abilityCostLog.push({ pi, c: cardName, t, tags: c.tags, fired: !!(bestDec.pick && bestDec.pick === c), item: c.t.cardName });
+      }
+    }
+  } catch { /* Log darf nie stoeren */ }
+  return bestDec.stop ? [] : [bestDec.pick.t.id];
+}
+
+/**
+ * Nachtrag fuer den Fall, dass die KARTEN-HEURISTIK entschieden hat
+ * (Kanal ohne Meinung): auch diese Schritte gehoeren ins Log, sonst
+ * lernt der Trainer nur aus Exploration. `pickedId` = geschickte Karte
+ * oder null (aufgehoert).
+ */
+function noteAbilityCostChoice(engine, validTargets, config, pi, pickedId) {
+  try {
+    const state = config?._abilityCost;
+    if (!state || engine._inMctsSim || engine.isPuzzle) return;
+    if (!engine._abilityCostLog) engine._abilityCostLog = [];
+    const cardName = state.cardName || config.title;
+    const t = engine.gs?.turn || 0;
+    for (const tgt of (validTargets || [])) {
+      engine._abilityCostLog.push({ pi, c: cardName, t, tags: classifyAbilityCostTags(engine, pi, tgt, state), fired: tgt.id === pickedId, item: tgt.cardName });
+    }
+  } catch { /* Log darf nie stoeren */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ZIEH-ENTSCHEIDUNGS-KANAL (v816, Als Auftrag 6.9.)
+//
+//  „You may draw N cards" — Kartenziehen ist meistens gut und wird
+//  schlecht, wenn man sich damit ausmillt. Getaggter Kanal JE KARTE
+//  (Als Ruling 24.8.: „You may" nie deckweit gemittelt): Cute Meanie
+//  Melissa, Prayers Extra-Karte, Emergency Spell Armor und jede
+//  kuenftige Nachfrage laufen ueber `optionalDrawChoice(engine, pi,
+//  cardName, count)` → true/false. Regel aus dem Profil
+//  (`drawDecisionRules[cardName][tag]`), sonst Exploration im Training,
+//  sonst die Mill-Heuristik: ziehen, wenn nach dem Zug noch mindestens
+//  DRAW_MILL_GUARD Karten im Deck liegen. Im Puzzle immer ja.
+// ═══════════════════════════════════════════════════════════════════
+
+const DRAW_MILL_GUARD = 3;
+
+function classifyDrawTags(engine, pi, count) {
+  const tags = [];
+  try {
+    const gs = engine.gs;
+    const ps = gs.players[pi];
+    const deck = (ps?.mainDeck || []).length;
+    const hand = (ps?.hand || []).length;
+    const n = Math.max(1, count || 1);
+    tags.push(`dr:deck:${deck <= 2 ? '0-2' : (deck <= 5 ? '3-5' : (deck <= 10 ? '6-10' : '11+'))}`);
+    tags.push(`dr:hand:${hand <= 2 ? '0-2' : (hand <= 5 ? '3-5' : '6+')}`);
+    tags.push(`dr:count:${n >= 3 ? '3+' : n}`);
+    if (deck - n < DRAW_MILL_GUARD) tags.push('dr:mill-risk');
+    const t = gs?.turn || 1;
+    tags.push(`dr:t:${t <= 4 ? 'early' : (t <= 9 ? 'mid' : 'late')}`);
+    const alive = (idx) => (gs.players[idx]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    const diff = alive(pi) - alive(pi === 0 ? 1 : 0);
+    tags.push(`dr:${diff < 0 ? 'behind' : (diff > 0 ? 'ahead' : 'even')}`);
+    tags.push(gs.activePlayer === pi ? 'dr:own-turn' : 'dr:opp-turn');
+  } catch { /* Tags sind Beiwerk */ }
+  return tags;
+}
+
+function drawDecisionPrior(engine, pi, cardName, tags) {
+  try {
+    const rules = profileFor(engine, pi)?.drawDecisionRules?.[cardName];
+    if (!rules) return 0;
+    const raw = (tags || []).reduce((s, g) => s + (rules[g] || 0), 0);
+    return Math.max(-20, Math.min(20, raw));
+  } catch { return 0; }
+}
+
+/** 'draw' | 'hold' | null — Regel, sonst Exploration im Training. */
+function drawDecision(engine, pi, cardName, tags) {
+  try {
+    if (!tags || tags.length === 0) return null;
+    const rules = profileFor(engine, pi)?.drawDecisionRules?.[cardName];
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = drawDecisionPrior(engine, pi, cardName, tags);
+      if (score >= 4) return 'draw';
+      if (score <= -4) return 'hold';
+      return null;
+    }
+    const explore = parseFloat(process.env.PP_DRAW_EXPLORE || '0.2');
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < explore) {
+      return Math.random() < 0.5 ? 'hold' : 'draw';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/**
+ * Die Antwort auf „You may draw N": true = ziehen. Loggt jede
+ * Entscheidung (fired = gezogen) nach `engine._drawDecisionLog`.
+ */
+function optionalDrawChoice(engine, pi, cardName, count = 1) {
+  if (engine.isPuzzle) return true;
+  const ps = engine.gs?.players?.[pi];
+  const deck = (ps?.mainDeck || []).length;
+  if (deck <= 0) return false;
+  const tags = classifyDrawTags(engine, pi, count);
+  let dec = drawDecision(engine, pi, cardName, tags);
+  let fired;
+  if (dec === 'draw') fired = true;
+  else if (dec === 'hold') fired = false;
+  else fired = (deck - Math.max(1, count)) >= DRAW_MILL_GUARD;      // Mill-Heuristik
+  try {
+    if (!engine._inMctsSim) {
+      if (!engine._drawDecisionLog) engine._drawDecisionLog = [];
+      engine._drawDecisionLog.push({ pi, c: cardName, t: engine.gs?.turn || 0, tags, fired });
+    }
+  } catch { /* Log darf nie stoeren */ }
+  return fired;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SYNERGIE-KANAL (v818, Als Auftrag 7.9.): „Kreaturen, die zusammen
+//  sein wollen". Eine Kreatur auf der Hand wird wertvoller, wenn ihr
+//  Pendant schon auf dem Brett liegt (Schachfiguren, die ihre Effekte
+//  gegenseitig ausloesen). Je Karte gelernt (Als 24.8.-Ruling: keine
+//  deckweiten Mittelwerte): `synergyRules[card]['syn:<Partner>']`.
+//
+//  Entscheidungspunkt = jeder eigene CPU-Zug: am Zugbeginn werden fuer
+//  jede Hand-Kreatur die Partner-Tags des Bretts festgehalten, am
+//  Zugende gilt sie als „fired", wenn sie in diesem Zug beschworen
+//  wurde. Der Trainer kontrastiert fired vs held je Tag (Welch-t,
+//  Praevalenzfilter, Schrumpfung) — dieselbe Bauart wie drawDecision-
+//  Rules. Ohne Profil ist der Prior 0 → Altverhalten.
+//
+//  PARTNER-NAMEN: Familienstamm ohne `[B]`/`[W]` (dieselbe Karte in zwei
+//  Farben, Al 6.9.) PLUS die Alias-Namen aus dem Karten-Vertrag
+//  `cpuMeta.boardAliasNames(engine, inst) → string[]` — die Queen of
+//  Kings meldet sich damit als Knight, Bishop UND Rook, ohne dass der
+//  Pilot Schachwissen traegt. So gilt sie fuer die CPU als alle
+//  relevanten Namen und ist entsprechend variabel wertvoll.
+// ═══════════════════════════════════════════════════════════════════
+const SYNERGY_FAMILY_RE = /\s*\[(B|W)\]$/;
+function synergyFamilyName(name) {
+  return String(name || '').replace(SYNERGY_FAMILY_RE, '');
+}
+
+/** Partner-Tags des eigenen Bretts: `syn:<Name>` je Kreatur (+ Aliasse). */
+function boardPartnerTags(engine, pi, excludeInstId) {
+  const tags = new Set();
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.faceDown) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (excludeInstId != null && inst.id === excludeInstId) continue;
+    const cd = engine._getCardDB?.()[inst.name];
+    const ct = cd?.cardType || '';
+    if (!/Creature|Token/.test(ct) && !/Creature|Token/.test(cd?.subtype || '')) continue;
+    tags.add(`syn:${synergyFamilyName(inst.name)}`);
+    try {
+      const alias = require('./_loader').loadCardEffect(inst.name)?.cpuMeta?.boardAliasNames;
+      if (typeof alias === 'function') {
+        for (const n of (alias(engine, inst) || [])) if (n) tags.add(`syn:${synergyFamilyName(n)}`);
+      }
+    } catch { /* Alias ist Zusatz */ }
+  }
+  return [...tags];
+}
+
+/** Gelernter Aufschlag fuer `cardName` auf der Hand bei den aktuellen Partnern. */
+function synergyPrior(engine, pi, cardName, partnerTags) {
+  const prof = profileFor(engine, pi);
+  const rules = prof?.synergyRules?.[cardName];
+  if (!rules) return 0;
+  const tags = partnerTags || boardPartnerTags(engine, pi);
+  let sum = 0;
+  for (const g of tags) {
+    const v = rules[g];
+    if (typeof v === 'number') sum += v;
+  }
+  if (sum === 0) return 0;
+  return Math.max(-20, Math.min(20, sum)) * confidence(prof);
+}
+
+/** Zugbeginn: Hand-Kreaturen mit Partner-Tags festhalten (nur Training). */
+function noteSynergyTurnStart(engine, pi) {
+  if (engine._inMctsSim) return;
+  const ps = engine.gs?.players?.[pi];
+  if (!ps) return;
+  const cardDB = engine._getCardDB?.() || {};
+  const tags = boardPartnerTags(engine, pi);
+  const cards = [...new Set((ps.hand || []).filter(n => {
+    const cd = cardDB[n];
+    return cd && (cd.cardType === 'Creature' || (cd.cardType || '').split('/').includes('Creature'));
+  }))];
+  if (!engine._synergyTurnSnap) engine._synergyTurnSnap = {};
+  engine._synergyTurnSnap[pi] = { turn: engine.gs?.turn || 0, tags, cards };
+}
+
+/** Zugende: fired = in diesem Zug beschworen (kein Platzieren). */
+function noteSynergyTurnEnd(engine, pi) {
+  if (engine._inMctsSim) return;
+  const snap = engine._synergyTurnSnap?.[pi];
+  if (!snap || snap.turn !== (engine.gs?.turn || 0)) return;
+  delete engine._synergyTurnSnap[pi];
+  if (snap.cards.length === 0) return;
+  const summoned = new Set();
+  for (const inst of (engine.cardInstances || [])) {
+    if (inst.zone !== 'support' || inst.turnPlayed !== snap.turn) continue;
+    if ((inst.controller ?? inst.owner) !== pi) continue;
+    if (inst.counters?.isPlacement) continue;
+    summoned.add(inst.name);
+  }
+  if (!engine._synergyLog) engine._synergyLog = [];
+  for (const c of snap.cards) {
+    engine._synergyLog.push({ pi, c, t: snap.turn, tags: snap.tags, fired: summoned.has(c) });
+  }
+}
+
 module.exports = {
+  synergyFamilyName, boardPartnerTags, synergyPrior, noteSynergyTurnStart, noteSynergyTurnEnd,
   decisionStateTags,
   optInDecision,
   targetIntentBonus,
@@ -2558,5 +2936,14 @@ module.exports = {
   descendDecision,
   noteDescend,
   classifyFormTurn,
+  classifyDrawTags,
+  drawDecisionPrior,
+  drawDecision,
+  optionalDrawChoice,
+  classifyAbilityCostTags,
+  abilityCostPrior,
+  abilityCostDecision,
+  abilityCostPick,
+  noteAbilityCostChoice,
   __getProfile: profileFor,
 };

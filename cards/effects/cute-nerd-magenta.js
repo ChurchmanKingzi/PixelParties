@@ -98,14 +98,14 @@ module.exports = {
     let bestScore = -Infinity;
     for (const c of pool) {
       const name = c.name;
-      const idx = (ps.mainDeck || []).indexOf(name);
-      if (idx < 0) continue;
-      ps.mainDeck.splice(idx, 1);
+      const _taken_idx = engine.takeFromPileSync(ps, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_idx) continue;
+      const idx = _taken_idx.idx;
       ps.discardPile.push(name);
       let score = -Infinity;
       try { score = evalState(pi); } catch {}
       ps.discardPile.pop();
-      ps.mainDeck.splice(idx, 0, name);
+      engine.returnToPile(ps, 'deck', name, idx);   // v820: Stapel-Schicht
 
       // Declarative `cpuMeta.onMillBenefit` — eval-delta above only
       // captures "card moved from deck to discard"; it does NOT fire

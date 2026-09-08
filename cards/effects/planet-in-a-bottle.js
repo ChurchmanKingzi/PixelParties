@@ -28,29 +28,25 @@
 // ═══════════════════════════════════════════
 
 // ───────────────────────────────────────────────────────────────────
-//  HELPERS — card-local, intentionally NOT in a shared module.
-//  The "fetch an Area from any pile and place it" logic is specific
-//  enough to this card (and the superficially-similar Reality Crack
-//  already rolls its own) that extracting a shared helper now would
-//  be premature. If a second "bring an Area into play" card arrives,
-//  consider promoting `buildAreaGallery` + `bringAreaIntoPlay` into
-//  a new `_area-fetch-shared.js`.
+//  HELPERS — der EIGNUNGSFILTER liegt seit 28.8. gemeinsam in
+//  `_area-shared.js` (Planet, Reality Crack, Cooldin teilen ihn).
+//  Das Holen und Platzieren selbst (`buildAreaGallery`,
+//  `bringAreaIntoPlay`) bleibt kartenlokal: Planet zieht aus DREI
+//  Stapeln inklusive Ablage, Reality Crack nur aus zweien und raeumt
+//  vorher das Brett. Diese Ablaeufe zusammenzulegen waere eine
+//  Scheinvereinheitlichung.
 // ───────────────────────────────────────────────────────────────────
 
+const { isTutorableArea } = require('./_area-shared');
+
 /**
- * Lv3-or-lower Area (Spells or Attacks with subtype 'Area'). Level
- * check uses `engine.effectiveCardLevel` so Cataclysm's hand-level
- * rebate / Mana Absorbing Crystal +1 / any future Area-level
- * modifier flows through.
+ * Waehlbare Area — Regel und Begruendung stehen in `_area-shared.js`,
+ * gemeinsam mit Reality Crack und Cooldin. Vorher hatte jede der drei
+ * Karten ihren eigenen Filter, obwohl alle drei wortgleich
+ * "a level 3 or lower Area" sagen.
  */
 function isEligibleArea(cd, engine, pi) {
-  if (!cd) return false;
-  if ((cd.subtype || '').toLowerCase() !== 'area') return false;
-  const lvl = engine?.effectiveCardLevel
-    ? engine.effectiveCardLevel(cd, pi)
-    : (cd.level || 0);
-  if (lvl > 3) return false;
-  return true;
+  return isTutorableArea(cd, engine, pi);
 }
 
 /** Player already controls an Area → Planet in a Bottle is locked out. */
@@ -156,15 +152,17 @@ module.exports = {
       const idx = (ps.hand || []).indexOf(chosenName);
       if (idx >= 0) { ps.hand.splice(idx, 1); found = true; }
     } else if (chosenSource === 'deck') {
-      const idx = (ps.mainDeck || []).indexOf(chosenName);
-      if (idx >= 0) {
-        ps.mainDeck.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: 'planet-in-a-bottle' });   // v820: Stapel-Schicht
+      if (_taken_idx) {
+        const idx = _taken_idx.idx;
         found = true;
         engine.shuffleDeck(pi, 'main');
       }
     } else if (chosenSource === 'discard') {
-      const idx = (ps.discardPile || []).indexOf(chosenName);
-      if (idx >= 0) { ps.discardPile.splice(idx, 1); found = true; }
+      const _taken_idx = await engine.takeFromPile(ps, 'discard', chosenName, { source: 'planet-in-a-bottle' });   // v820: Stapel-Schicht
+      if (_taken_idx) {
+        found = true;
+      }
     }
     if (!found) {
       // Extremely edge-case — card disappeared between gallery build and

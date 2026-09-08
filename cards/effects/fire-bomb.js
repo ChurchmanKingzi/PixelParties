@@ -139,6 +139,15 @@ module.exports = {
           const inst = engine.cardInstances.find(c =>
             c.owner === t.owner && c.zone === 'ability' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === removed
           );
+          // ★ 28.8.: derselbe fehlende Vorab-Flug wie im Equip-Zweig
+          // darunter. Der laeuft inzwischen ueber `actionDestroyCard`
+          // und bekommt ihn dort geschenkt; dieser Zweig entfernt die
+          // Ability weiterhin von Hand, also hier ausdruecklich.
+          engine._broadcastEvent('play_pile_transfer', {
+            owner: inst?.originalOwner ?? t.owner,
+            cardName: removed, from: 'ability', to: 'discard',
+            fromHeroIdx: t.heroIdx, fromSlotIdx: t.slotIdx,
+          });
           if (inst) {
             await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'ability', fromHeroIdx: t.heroIdx });
             engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
@@ -155,19 +164,28 @@ module.exports = {
           c.owner === t.owner && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx && c.name === t.cardName
         );
         if (inst) {
-          await engine._triggerGateCheck(inst.controller ?? inst.owner, 'Fire Bomb');
-          if (engine._isGateShielded(inst.controller ?? inst.owner)) {
-            engine.log('destroy_blocked', { card: t.cardName, reason: 'Defending the Gate' });
-            continue;
-          }
-          await engine.runHooks('onCardLeaveZone', { _onlyCard: inst, card: inst, fromZone: 'support', fromHeroIdx: t.heroIdx });
-          // Remove from zone
-          const zone = (ps.supportZones[t.heroIdx] || [])[t.slotIdx] || [];
-          const idx = zone.indexOf(t.cardName);
-          if (idx >= 0) zone.splice(idx, 1);
-          const fbSupDiscardPs = engine.gs.players[inst.originalOwner];
-          if (fbSupDiscardPs) fbSupDiscardPs.discardPile.push(t.cardName);
-          engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
+          // ★ Als Befund 28.8.: hier stand eine HANDGESCHRIEBENE
+          // Entfernung — Zone splicen, Namen in die Ablage schieben,
+          // Instanz aus `cardInstances` filtern. Zwei Folgen:
+          //
+          //  ① Der VORAB-FLUG fiel aus. `actionDestroyCard` sendet vor
+          //     dem Umzug ein `play_pile_transfer`, und genau das ist
+          //     es, was die Karte in dem Moment zeigt, in dem sie vom
+          //     Brett verschwindet. Ohne ihn war sie unsichtbar, bis
+          //     der Diff-Animator ihren Flug begann — derselbe Befund
+          //     wie am 18.8. bei Trial of Dominance, im Kommentar dort
+          //     woertlich festgehalten.
+          //  ② Kein Hook bekam die Entfernung mit. Die Gestalt von
+          //     „???, the Shapeshifter" blieb deshalb bestehen, obwohl
+          //     ihr Traeger weg war.
+          //
+          // Der Gate-Check darueber ist damit doppelt (actionDestroyCard
+          // macht ihn selbst) — deshalb `ignoreGateShield`, sonst
+          // liefe das Fenster zweimal.
+          await engine.actionDestroyCard(
+            { name: 'Fire Bomb', owner: playerIdx }, inst,
+            { ignoreGateShield: true, sourceName: 'Fire Bomb' },
+          );
           engine.log('destroy', { card: t.cardName, by: 'Fire Bomb' });
         }
       }

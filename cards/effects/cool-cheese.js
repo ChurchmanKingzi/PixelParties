@@ -89,6 +89,8 @@ module.exports = {
     // gain Change Counters off it like any other tutor.
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Cool Cheese',
+      // v734: „an Attack".
+      searchSpec: { label: 'Attack', filter: (cd) => hasCardType(cd, 'Attack') },
       reveal: true,
     });
 

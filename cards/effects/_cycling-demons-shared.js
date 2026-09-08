@@ -377,7 +377,7 @@ function buildDemonHooks(cardName) {
         // successor's onPlay even on a dead host; `_summonedByDemon`
         // is the provenance the successor's onPlay reads to fire its
         // own on-summon bonus.
-        ps.mainDeck.splice(deckIdx2, 1);
+        if (!(await engine.takeFromPile(ps, 'deck', deckIdx2, { source: cardName }))) return;   // v820: Stapel-Schicht
         const placed = await engine.summonCreatureWithHooks(
           successor, pi, death.heroIdx, death.zoneSlot,
           {
@@ -388,7 +388,7 @@ function buildDemonHooks(cardName) {
         );
         if (!placed) {
           // Roll back the deck removal if the placement bailed defensively.
-          ps.mainDeck.splice(deckIdx2, 0, successor);
+          engine.returnToPile(ps, 'deck', successor, deckIdx2);   // v820: Stapel-Schicht
           return;
         }
 

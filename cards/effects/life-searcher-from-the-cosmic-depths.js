@@ -111,10 +111,8 @@ module.exports = {
       });
       if (!pick?.cardName) return;
       const chosen = pick.cardName;
-      const idx = (ps.mainDeck || []).indexOf(chosen);
-      if (idx < 0) return;
-
-      ps.mainDeck.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_idx) return;
       ps.hand.push(chosen);
       const inst = engine._trackCard(chosen, pi, 'hand');
 
@@ -251,7 +249,10 @@ module.exports = {
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'no_upgrade_post_shuffle' });
       return true;
     }
-    ps.mainDeck.splice(upIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', upIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
+      engine.log('life_searcher_fizzle', { player: ps.username, reason: 'deck_locked' });
+      return true;
+    }
 
     engine._broadcastEvent('deck_search_add', { cardName: chosen, playerIdx: pi });
     engine._broadcastEvent('play_zone_animation', {

@@ -53,6 +53,7 @@
 
 const { hasCardType } = require('./_hooks');
 
+const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const CARD_NAME    = 'Prophecy of Tempeste';
 const DAMAGE_CAP   = 100;
 const ANIM_FLY_MS  = 700;
@@ -100,6 +101,8 @@ module.exports = {
     return undefined;
   },
 
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
+
   hooks: {
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;
@@ -113,55 +116,17 @@ module.exports = {
       if (!ps) { gs._spellCancelled = true; return; }
 
       // ── Pick destination Hero + slot ──
-      let destHero = -1;
-      let destSlot = -1;
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
-        const si = gs._attachmentZoneSlot;
-        const slot = (ps.supportZones[heroIdx] || [])[si] || [];
-        if (slot.length === 0) { destHero = heroIdx; destSlot = si; }
-      }
-      if (destSlot < 0) {
-        const si = findFreeSlot(ps, heroIdx);
-        if (si >= 0) { destHero = heroIdx; destSlot = si; }
-      }
-      if (destSlot < 0) {
-        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          if (hi === heroIdx) continue;
-          const h = ps.heroes[hi];
-          if (!h?.name || h.hp <= 0) continue;
-          const si = findFreeSlot(ps, hi);
-          if (si >= 0) { destHero = hi; destSlot = si; break; }
-        }
-      }
-      if (destSlot < 0) { gs._spellCancelled = true; return; }
-
-      // ── Anti Magic gate ──
-      // Prophecy of Tempeste is Lv 3. A host Hero with
-      // `magic_immune.level >= 3` (Anti Magic Lv 3 attached) is
-      // immune to its effect — the attachment must NOT land. Bail
-      // BEFORE the support-zone push + `_spellPlacedOnBoard` flag so
-      // the server's standard post-resolve path routes the card to
-      // the caster's discard pile.
+      // v650: Anlegen ueber den geteilten Vorgang — Caster-Held bevorzugt,
+      // sonst ein anderer eigener Held (wie bisher: kein Prompt noetig,
+      // der Baustein fragt nur, wenn mehrere Plaetze in Frage kommen).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        preferCaster: true,
+        description: 'Choose a Hero you control to attach Prophecy of Tempeste to.',
+        confirmLabel: '🔮 Attach!', skipEnterHook: true,
+      });
+      if (!res) return;
+      const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
       const destHeroObj = ps?.heroes?.[destHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
-        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // ── Place into the chosen Support Zone ──
-      if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
-      if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];
-      ps.supportZones[destHero][destSlot].push(CARD_NAME);
-
-      // Re-track from hand → support
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand' && c.id === ctx.card.id
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard(CARD_NAME, pi, 'support', destHero, destSlot);
-      gs._spellPlacedOnBoard = true;
 
       // Permanent rain overlay — client owns the lifetime by listening
       // to start + stop pairs keyed on (owner, heroIdx, zoneSlot).

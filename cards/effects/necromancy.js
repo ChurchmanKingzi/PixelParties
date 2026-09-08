@@ -280,9 +280,8 @@ module.exports = {
     await engine._delay(800);
 
     // Remove creature from discard pile
-    const discardIdx = ps.discardPile.indexOf(creatureName);
-    if (discardIdx < 0) return false; // Safety — card no longer in discard
-    ps.discardPile.splice(discardIdx, 1);
+    const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', creatureName, { source: 'necromancy' });   // v820: Stapel-Schicht
+    if (!_taken_discardIdx) return false; // Safety — card no longer in discard
     // Capture the highest Lethe pile-stamp for this name BEFORE the
     // reconcile that the next stamp read would trigger, so the bonus
     // follows the Creature onto the board instead of being silently

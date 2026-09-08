@@ -137,14 +137,12 @@ module.exports = {
       // hold the same name in both — prefer deck (then shuffle), fall
       // back to discard. Matches the standard tutor convention.
       let removedFromDeck = false;
-      const deckIdx = (ps.mainDeck || []).indexOf(chosenName);
-      if (deckIdx >= 0) {
-        ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (_taken_deckIdx) {
         removedFromDeck = true;
       } else {
-        const dIdx = (ps.discardPile || []).indexOf(chosenName);
-        if (dIdx < 0) return;
-        ps.discardPile.splice(dIdx, 1);
+        const _taken_dIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_dIdx) return;
       }
 
       await engine.revealSearchedCards(pi, [chosenName], CARD_NAME);

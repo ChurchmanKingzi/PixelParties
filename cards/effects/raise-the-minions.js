@@ -65,7 +65,7 @@ module.exports = {
 
   // Per-Hero gate. Card text restricts placement to the casting Hero's
   // OWN free Support Zones, so a Hero with no free slots can't cast
-  // this Spell at all (the client greys the card out for that Hero;
+  // this Spell at all (the client greys the card out for that Hero
   // direct socket plays re-check at line 8271 of _engine.js).
   canPlayWithHero(gs, pi, heroIdx, cardData, engine) {
     const ps = gs.players[pi];
@@ -173,9 +173,8 @@ module.exports = {
         await engine._delay(800);
 
         // Splice from discard.
-        const discardIdx = ps.discardPile.indexOf(name);
-        if (discardIdx < 0) continue;
-        ps.discardPile.splice(discardIdx, 1);
+        const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_discardIdx) continue;
 
         // Place. `source: 'deck'` is a sentinel that bypasses the
         // helper's hand/discard splice — we already pulled from discard.

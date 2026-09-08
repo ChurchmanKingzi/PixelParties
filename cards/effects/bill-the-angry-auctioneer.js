@@ -265,9 +265,8 @@ module.exports = {
 
       for (const { equipName, heroIdx, slotIdx } of assignments) {
         // Remove from deck
-        const deckIdx = ps.mainDeck.indexOf(equipName);
-        if (deckIdx < 0) continue;
-        ps.mainDeck.splice(deckIdx, 1);
+        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', equipName, { source: 'bill-the-angry-auctioneer' });   // v820: Stapel-Schicht
+        if (!_taken_deckIdx) continue;
 
         const freeSlot = slotIdx;
 

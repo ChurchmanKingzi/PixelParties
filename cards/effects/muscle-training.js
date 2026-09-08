@@ -124,7 +124,7 @@ module.exports = {
       await engine._delay(1600);
 
       // ── Remove Fighting from deck ──
-      ps.mainDeck.splice(deckIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Muscle Training' }))) return;   // v820: Stapel-Schicht
 
       // ── Find target ability zone ──
       const abZones = ps.abilityZones[heroIdx] || [[], [], []];

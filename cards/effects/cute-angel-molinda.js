@@ -78,7 +78,33 @@ function _molindaFreeZones(engine, ctx) {
   return zones;
 }
 
+const { BOW_NAME, LOVE_SHOT, LOVE_SHOTS_NEEDED, hasEquipped, loveShotsCast, checkMolindaAscension } = require('./_molinda-shared');
+
 module.exports = {
+  // ── Aufstieg (v664/v667) zu „Molinda, the Cutest Being in the Sky":
+  // Heart-Shaped Bow UND mindestens 2 selbst gecastete Love Shots.
+  // Bedingung in `_molinda-shared.js`; die Bereitschaft laeuft ueber
+  // `refreshAscensionReadiness` (sync-getrieben, Dajan-Muster), weil
+  // der Love-Shot-Zaehler an keiner Zonenbewegung haengt.
+  ascensionItems: [BOW_NAME],
+  cheatAscensionBlocked: true,
+  ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== 'Cute Angel Molinda' || hero.ascensionReady) return false;
+    if (cardName === BOW_NAME) return !hasEquipped(engine, pi, hi, BOW_NAME);
+    if (cardName === LOVE_SHOT) return loveShotsCast(hero) < LOVE_SHOTS_NEEDED;
+    return false;
+  },
+  ascensionProgress(engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    const bow = hasEquipped(engine, pi, hi, BOW_NAME) ? 1 : 0;
+    const shots = Math.min(LOVE_SHOTS_NEEDED, loveShotsCast(hero)) / LOVE_SHOTS_NEEDED;
+    return (bow + shots) / 2;
+  },
+  refreshAscensionReadiness(engine, pi, hi) {
+    checkMolindaAscension(engine, pi, hi, null);
+  },
+
   // BORIS-SPERRE (Klausel 2): uebernimmt die Kontrolle ueber ein gegnerisches Ziel
   // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
   // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
@@ -98,6 +124,22 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
+    // v667: Love-Shot-Zaehler — nur Casts DIESER Molinda (Caster = ihr
+    // Besitzer, heroIdx = ihr Platz), aufgeloest (negierte erreichen den
+    // Hook nicht), Erst-Cast (kein Second-Cast-Echo). Die Bereitschaft
+    // zieht der naechste sync() ueber refreshAscensionReadiness nach.
+    afterSpellResolved: (ctx) => {
+      if (ctx.spellName !== LOVE_SHOT || ctx.isSecondCast) return;
+      if (ctx.casterIdx !== ctx.cardOwner || ctx.heroIdx !== ctx.cardHeroIdx) return;
+      const engine = ctx._engine;
+      const hero = engine.gs.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];
+      if (!hero?.name || hero.name !== 'Cute Angel Molinda') return;
+      hero._loveShotsCast = (hero._loveShotsCast || 0) + 1;
+      engine.log('molinda_love_shot_count', {
+        player: engine.gs.players[ctx.cardOwner]?.username, count: hero._loveShotsCast, needed: LOVE_SHOTS_NEEDED,
+      });
+    },
+
     /**
      * Effect 1 — zero out damage entries sourced from Molinda's
      * hero on Creature targets when the type is an Attack or

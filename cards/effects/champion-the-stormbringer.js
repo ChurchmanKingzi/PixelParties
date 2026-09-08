@@ -145,17 +145,10 @@ module.exports = {
       }
       if (resolvedIdx < 0) continue;
 
-      engine._broadcastEvent('play_pile_transfer', {
-        owner:       pi,
-        cardName,
-        from:        'hand',
-        to:          'discard',
-        fromHandIdx: resolvedIdx,
-        flightStyle: 'windstorm',
-      });
-
+      // v696: der Flug kommt aus dem Helfer (Stil durchgereicht); die
+      // Windsturm-Kaskade behält ihren eigenen, engeren Takt.
       await engine.actionDiscardHandCard(pi, cardName, resolvedIdx, {
-        source: CARD_NAME,
+        source: CARD_NAME, flightStyle: 'windstorm', _noPace: true,
       });
 
       if (i < picked.length - 1) await engine._delay(STAGGER_MS);

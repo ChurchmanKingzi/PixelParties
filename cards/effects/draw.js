@@ -74,10 +74,14 @@ async function dumpHandsTogether(engine, pi, oppIdx) {
             owner: oppIdx, cardName: oppCard, from: 'hand', to: 'discard', fromHandIdx: 0,
           });
         }
+        // v696: der Helfer fliegt und taktet seit v696 selbst — hier
+        // beides aus, weil BEIDE Flüge oben auf einem Takt starten und
+        // der Gleichschritt (BEAT_MS) die Zeitführung ist.
+        const lockstep = { source: CARD_NAME, _noFlight: true, _noPace: true };
         if (myCard != null
-            && await engine.actionDiscardHandCard(pi, myCard, 0, { source: CARD_NAME })) my++;
+            && await engine.actionDiscardHandCard(pi, myCard, 0, lockstep)) my++;
         if (oppCard != null
-            && await engine.actionDiscardHandCard(oppIdx, oppCard, 0, { source: CARD_NAME })) opp++;
+            && await engine.actionDiscardHandCard(oppIdx, oppCard, 0, lockstep)) opp++;
 
         engine.sync();
         const more = (me?.hand?.length || 0) > 0 || (op?.hand?.length || 0) > 0;

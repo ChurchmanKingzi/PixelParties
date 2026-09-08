@@ -287,9 +287,8 @@ module.exports = {
       ps.hand.splice(idx, 1);
       if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
     } else {
-      const idx = (ps.mainDeck || []).indexOf(chosenName);
-      if (idx < 0) return false;
-      ps.mainDeck.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_idx) return false;
       // Reveal to opp on a deck-search.
       engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
     }

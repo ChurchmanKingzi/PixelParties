@@ -90,14 +90,7 @@ module.exports = {
       cancellable: true,
     });
     if (!pick || pick.cancelled || pick.cardName == null) return false;
-    // Animate the discard: the chosen card flies from its hand slot to
-    // the discard pile. Broadcast the flight BEFORE the state mutation
-    // (the source slot must still render); `play_pile_transfer`'s
-    // built-in suppressor stops the diff-detector double-firing.
-    engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName: pick.cardName,
-      from: 'hand', to: 'discard', fromHandIdx: pick.handIndex,
-    });
+    // Flug vom Hand-Slot zur Ablage kommt seit v696 aus dem Helfer.
     const ok = await engine.actionDiscardHandCard(pi, pick.cardName, pick.handIndex, {
       source: CARD_NAME,
     });

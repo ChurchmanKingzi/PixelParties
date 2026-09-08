@@ -116,9 +116,8 @@ async function doDeckAttach(engine, pi, heroIdx) {
   const picked = choice?.cardName || null;
   if (!picked) return false;
 
-  const deckIdx = ps.mainDeck.indexOf(picked);
-  if (deckIdx < 0) return false;
-  ps.mainDeck.splice(deckIdx, 1);
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', picked, { source: CARD_NAME });   // v820: Stapel-Schicht
+  if (!_taken_deckIdx) return false;
 
   // Route through the hand-attach helper so placement, level caps and
   // customPlacement all behave exactly as a normal attachment — the

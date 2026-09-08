@@ -148,9 +148,8 @@ async function tryTimeRescue(engine, pi, ps, names) {
   // so we splice the most recently added copy (matches the natural
   // "the card that just landed" semantics for duplicates).
   for (const name of inDiscard) {
-    const idx = ps.discardPile.lastIndexOf(name);
-    if (idx < 0) continue;
-    ps.discardPile.splice(idx, 1);
+    const _taken_idx = await engine.takeFromPile(ps, 'discard', name, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+    if (!_taken_idx) continue;
     ps.hand.push(name);
     // Re-anchor a tracked instance from 'discard' to 'hand'. If none
     // exists (e.g. raw push paths that don't call _trackCard), create

@@ -110,6 +110,18 @@ module.exports = {
       c.zoneSlot === target.slotIdx &&
       c.name     === removedName
     );
+    // ★ 28.8., Als Befund: ohne diesen Vorab-Flug ist die Karte in dem
+    // Moment UNSICHTBAR, in dem sie die Zone verlaesst — bis der
+    // Diff-Animator ihren Weg zeichnet. Der Vorab-Flug ist genau das,
+    // was sie in diesem Moment zeigt (Lehre vom 18.8., in
+    // `actionDestroyCard` woertlich kommentiert), und er meldet den
+    // Namen im Unterdrueckungs-Eimer des Clients an, sodass kein
+    // zweiter Flug daneben laeuft.
+    engine._broadcastEvent('play_pile_transfer', {
+      owner: inst?.originalOwner ?? target.owner,
+      cardName: removedName, from: 'ability', to: 'discard',
+      fromHeroIdx: target.heroIdx, fromSlotIdx: target.slotIdx,
+    });
     if (inst) {
       await engine.runHooks('onCardLeaveZone', {
         _onlyCard:   inst,

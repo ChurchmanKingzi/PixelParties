@@ -132,10 +132,11 @@ module.exports = {
       // Mutate state. Remove the first matching name from the front of
       // opp's deck — duplicates within the peeked window are
       // interchangeable (cards are name-only in mainDeck).
-      const deckIdx = ops.mainDeck.indexOf(pickedName);
-      if (deckIdx >= 0) ops.mainDeck.splice(deckIdx, 1);
+      await engine.takeFromPile(ops, 'deck', pickedName, { source: CARD_NAME });   // v820: Stapel-Schicht
       ps.hand.push(pickedName);
-      engine._trackCard(pickedName, pi, 'hand');
+      // v693: getrackt MIT Herkunft (ersetzt das nackte _trackCard) —
+      // die Karte kehrt in Ablage/Deck des Besitzers zurueck.
+      engine._tagHandCardOrigin(pi, pickedName, oi);
       picksTaken++;
 
       engine.log('enigma_take', {
@@ -166,9 +167,8 @@ module.exports = {
 
     const stripped = [];
     for (const name of remainingPeeked) {
-      const idx = ops.mainDeck.indexOf(name);
-      if (idx >= 0) {
-        ops.mainDeck.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ops, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (_taken_idx) {
         stripped.push(name);
       }
     }

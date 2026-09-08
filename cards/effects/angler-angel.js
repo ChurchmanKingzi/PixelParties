@@ -189,8 +189,9 @@ module.exports = {
       if (!vonAndererEigenerKreatur(engine, ctx.source, pi, inst.id)) return;
       if (!darfErhoehen(engine, ctx, ctx.source, pi)) return;
 
-      const neu = ctx.amount + BONUS;
-      ctx.setAmount(neu);
+      // flat Bonus (Punkt vor Strich: wird NACH Multiplikatoren addiert)
+      ctx.modifyAmount(BONUS);
+      const neu = ctx.amount;
       engine.log('angler_boost', {
         player: engine.gs.players[pi]?.username,
         source: ctx.source?.name, target: ctx.target?.name,

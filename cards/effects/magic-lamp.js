@@ -92,8 +92,7 @@ module.exports = {
 
     // Remove chosen cards from deck
     for (const name of chosenNames) {
-      const idx = ps.mainDeck.indexOf(name);
-      if (idx >= 0) ps.mainDeck.splice(idx, 1);
+      await engine.takeFromPile(ps, 'deck', name, { source: 'magic-lamp' });   // v820: Stapel-Schicht
     }
     engine.sync();
 

@@ -273,7 +273,7 @@ module.exports = {
         // for this name (the pile-listener safety net might have
         // tracked one; we want the new support-zone summon to be the
         // canonical inst from here on).
-        ps.discardPile.splice(dIdx, 1);
+        if (!(await engine.takeFromPile(ps, 'discard', dIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
         const stale = engine.cardInstances.find(c =>
           c.owner === pi && c.name === name && c.zone === 'discard',
         );

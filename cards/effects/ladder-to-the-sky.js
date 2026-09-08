@@ -132,10 +132,8 @@ async function doLadderSearch(engine, pi, sacLevel) {
     dest = { heroIdx: zr.heroIdx, slotIdx: zr.slotIdx };
   }
 
-  const deckIdx = ps.mainDeck.indexOf(chosenName);
-  if (deckIdx < 0) return;
-  ps.mainDeck.splice(deckIdx, 1);
-  engine.shuffleDeck(pi);
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+  if (!_taken_deckIdx) return;
 
   const res = await engine.summonCreatureWithHooks(
     chosenName, pi, dest.heroIdx, dest.slotIdx,

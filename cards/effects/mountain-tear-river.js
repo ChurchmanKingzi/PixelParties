@@ -3,7 +3,7 @@
 //  Spell (Destruction Magic Lv 1, Surprise)
 //
 //  Activate when the user (or a Creature in one
-//  of the user's Surprise Zones) is chosen by an
+//  of the user's Support Zones) is chosen by an
 //  Attack, Spell, or Creature effect. Burn the
 //  attacker. With Destruction Magic 3 on the
 //  user, Burn up to 2 additional targets
@@ -11,6 +11,15 @@
 //
 //  Implementation
 //  ──────────────
+//  • v703: `surpriseFiresOnSupportCreature: true`
+//    — das generische Fenster (`_checkSurpriseWindow`)
+//    laesst Kreaturenziele nur fuer Skripte mit
+//    diesem Opt-in zu; bis v702 feuerte der Fluss
+//    NUR, wenn der Held selbst gewaehlt wurde
+//    (Kartentext: „or a Creature in one of its
+//    Support Zones"). Die gewaehlte Kreatur steht
+//    in `sourceInfo.chosenCreature`; der Angreifer
+//    bleibt `sourceInfo.owner/heroIdx/cardInstance`.
 //  • Standard Surprise lifecycle (Booby Trap
 //    pattern) MINUS the negation behaviour —
 //    Mountain Tear River does NOT cancel the
@@ -39,6 +48,8 @@
 //    filtered out so the prompt doesn't waste
 //    the player's pick on a no-op.
 // ═══════════════════════════════════════════
+
+const { isAttackSpellOrCreatureSource } = require('./_hooks');
 
 const CARD_NAME = 'Mountain Tear River';
 const REQUIRED_DM_LEVEL = 3;
@@ -82,6 +93,9 @@ function isAlreadyBurned(target, engine) {
 
 module.exports = {
   isSurprise: true,
+  // v703: Kartentext „the user or a Creature in one of its Support
+  // Zones" — Kreaturenziele oeffnen das Fenster des Slot-Helden.
+  surpriseFiresOnSupportCreature: true,
 
   /**
    * Trigger condition — fires when the host hero is targeted by an
@@ -104,6 +118,9 @@ module.exports = {
     if (!sourceInfo) return false;
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
     if (sourceInfo.cardInstance?._isAoeCheck) return false;
+    // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
+    // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
 
     // Source must be alive — burning a corpse is meaningless.
     const srcInst = sourceInfo.cardInstance;

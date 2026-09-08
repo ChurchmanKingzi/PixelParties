@@ -231,6 +231,11 @@ function applyArrowsBeforeDamage(engine, source, target, hookCtx) {
     // pass ran. The card-text exception for Darge is "unaffected by
     // effects that double damage" — multipliers, not zeroing.
     hookCtx._flatBonus = 0;
+    // v689 (Punkt vor Strich): auch die getrennt gesammelten
+    // Modifikatoren der Hook-Runde fallen — die Null ist absolut.
+    hookCtx._flat = 0;
+    hookCtx._mul = 1;
+    hookCtx._zeroedByArrow = true;
   }
 
   // Stash the PRE-ZERO total (flat-bumps + any _flatBonus already

@@ -70,13 +70,12 @@ async function deleteCybugFuel(engine, pi, fuelCardName) {
   }
 
   // Fall back to deck.
-  const deckIdx = (ps.mainDeck || []).indexOf(fuelCardName);
-  if (deckIdx >= 0) {
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', fuelCardName, { source: '_cybug-shared' });   // v820: Stapel-Schicht
+  if (_taken_deckIdx) {
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: fuelCardName,
       from: 'deck', to: 'deleted',
     });
-    ps.mainDeck.splice(deckIdx, 1);
     if (!ps.deletedPile) ps.deletedPile = [];
     ps.deletedPile.push(fuelCardName);
     engine.log('cybug_fuel_delete', {
@@ -125,7 +124,7 @@ async function recoverCybugFuel(engine, pi, fuelCardName, sourceName) {
     toHandIdx,
     finalHandSize: toHandIdx + 1,
   });
-  ps.discardPile.splice(idx, 1);
+  if (!(await engine.takeFromPile(ps, 'discard', idx, { source: 'Cybug' }))) return;   // v820: Stapel-Schicht
   if (!ps.hand) ps.hand = [];
   ps.hand.push(fuelCardName);
   engine._trackCard(fuelCardName, pi, ZONES.HAND);

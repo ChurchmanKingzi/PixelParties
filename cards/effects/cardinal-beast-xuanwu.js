@@ -127,7 +127,7 @@ module.exports = {
     if (destHeroIdx == null || destSlot == null) return false;
 
     // Place the creature
-    ps.discardPile.splice(discardIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Cardinal Beast Xuanwu' }))) return false;   // v820: Stapel-Schicht
     const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
     ps.supportZones[destHeroIdx][destSlot] = [chosenName];

@@ -42,6 +42,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
+const { mainActionSlotFree } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Gate to the Armory';
 
@@ -98,15 +99,17 @@ module.exports = {
     const isActionPhase = gs.currentPhase === 3;
     const heroActed = (ps.heroesActedThisTurn || []).includes(heroIdx);
 
-    // Action Phase + caster hasn't acted yet → main slot available.
-    if (isActionPhase && !heroActed) return false;
-
     // External additional-Action source matches this Spell → engine
     // consumes that source (no end-turn).
     if (engine.findAdditionalActionForCard(pi, CARD_NAME, heroIdx)) return false;
 
-    // No slot available — fall back to the inherent grant. The
-    // post-resolve clause in onPlay will end the turn.
+    // v818 (Als Ruling 6.9., Frage 7): auch bei FREIEM Haupt-Slot ist
+    // die Karte inhaerent — der Spieler bekommt in `onPlay` die WAHL
+    // „Zusatzaktion (Zugende) oder normale Aktion?". Bisher entschied
+    // die Engine stumm fuer die normale Aktion. Ein „Nein" stempelt
+    // `gs._spellForcesActionConsume` (Curse-Vertrag), womit der Server
+    // die Hauptaktion doch verbraucht.
+    void isActionPhase; void heroActed;
     return true;
   },
 
@@ -115,6 +118,13 @@ module.exports = {
    * discard. The direct-equip clause is optional — the Spell still
    * resolves with just the tutor portion.
    */
+  /** CPU: bei freiem Haupt-Slot die normale Aktion nehmen (kein Zugende). */
+  cpuResponse(engine, kind, payload) {
+    if (kind === 'generic' && payload?.type === 'confirm' && payload?.title === CARD_NAME
+        && /additional Action\?/.test(payload?.message || '')) return false;
+    return undefined;
+  },
+
   spellPlayCondition(gs, pi, engine) {
     if (!engine) return true;
     return _getEligibleArtifacts(engine, pi).length > 0;
@@ -135,7 +145,24 @@ module.exports = {
       // any sub-cast or follow-on play we trigger from here on out
       // could overwrite it (each cast computes its own), so snapshot
       // now and read the local at the end of resolve.
-      const wasInherent = gs._spellWasInherent === true;
+      let wasInherent = gs._spellWasInherent === true;
+
+      // ── v818: Wahl bei freiem Haupt-Slot (Als Ruling 6.9.) ──
+      if (wasInherent && mainActionSlotFree(engine, pi, heroIdx)) {
+        const asAdditional = await engine.promptGeneric(pi, {
+          type: 'confirm',
+          title: CARD_NAME,
+          message: 'Play Gate to the Armory as an additional Action? If you do, your turn ends after it resolves. Otherwise it uses this Hero\'s normal Action.',
+          showCard: CARD_NAME,
+          confirmLabel: '⚡ Additional Action (turn ends)',
+          cancelLabel: '⚔️ Normal Action',
+          cancellable: true,
+        });
+        if (!asAdditional) {
+          gs._spellForcesActionConsume = true;
+          wasInherent = false;
+        }
+      }
 
       // ── Pick an Artifact ──
       const eligible = _getEligibleArtifacts(engine, pi);
@@ -172,6 +199,16 @@ module.exports = {
       // Track the new hand instance so subsequent hooks have an
       // instance to fire on (some Artifacts listen from hand).
       engine._trackCard(pickedName, pi, 'hand');
+
+      // v734: Diese Karte bucht ihren Zugriff historisch von Hand.
+      // Damit Verdoppler (Koperniko) sie sehen, wird die Strichliste
+      // nachgetragen — nur fuer den DECK-Zweig, aus der Ablage ist es
+      // kein Decksuchen.
+      if (pickedEntry.source === 'deck') {
+        engine.noteDeckTutor(pi, pickedName, 'Gate to the Armory', {
+          label: 'Artifact', filter: (cd) => hasCardType(cd, 'Artifact'),
+        });
+      }
 
       engine._broadcastEvent('card_reveal', { cardName: pickedName, playerIdx: pi });
       engine.log('gate_to_armory_tutor', {

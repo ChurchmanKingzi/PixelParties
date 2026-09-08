@@ -25,6 +25,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 
 const CARD_NAME = 'Gathering Storm';
 const EYE_NAME  = 'The White Eye';
@@ -149,16 +150,10 @@ module.exports = {
    * fallback to other side-mates only when the caster itself has no
    * free slot.)
    */
-  spellPlayCondition(gs, playerIdx) {
-    const ps = gs.players[playerIdx];
-    if (!ps) return false;
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (findFreeSlot(ps, hi) >= 0) return true;
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return attachmentHostsFor(gs, pi, engine).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
 
   hooks: {
     onPlay: async (ctx) => {
@@ -172,74 +167,23 @@ module.exports = {
       if (!ps) return;
 
       // ── Pick destination Hero + slot ──
-      let destHero = -1;
-      let destSlot = -1;
-
-      // Drag-drop hint from the client first (caster's hero only).
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
-        const si = gs._attachmentZoneSlot;
-        const slot = (ps.supportZones[heroIdx] || [])[si] || [];
-        if (slot.length === 0) { destHero = heroIdx; destSlot = si; }
-      }
-      // Auto-attach to caster's own first free slot.
-      if (destSlot < 0) {
-        const si = findFreeSlot(ps, heroIdx);
-        if (si >= 0) { destHero = heroIdx; destSlot = si; }
-      }
-      // Fallback: any other living hero on this side.
-      if (destSlot < 0) {
-        for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-          if (hi === heroIdx) continue;
-          const h = ps.heroes[hi];
-          if (!h?.name || h.hp <= 0) continue;
-          const si = findFreeSlot(ps, hi);
-          if (si >= 0) { destHero = hi; destSlot = si; break; }
-        }
-      }
-      if (destSlot < 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // ── Anti Magic gate ──
-      // Gathering Storm is a Lv 3 Spell attaching to one of the
-      // caster's own Heroes. A host Hero with `magic_immune.level >= 3`
-      // (own Anti Magic Lv 3 attached) is immune to the effect — the
-      // attachment must NOT land. Bail BEFORE the support-zone push
-      // + `_spellPlacedOnBoard` flag so the server routes to discard.
-      const destHeroObj = ps?.heroes?.[destHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
-        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // ── Place into the chosen Support Zone ──
-      if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
-      if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];
-      ps.supportZones[destHero][destSlot].push(CARD_NAME);
-
-      // Re-track from hand → support
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand' && c.id === ctx.card.id
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard(CARD_NAME, pi, 'support', destHero, destSlot);
-      gs._spellPlacedOnBoard = true;
-
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'electric_strike', owner: pi, heroIdx: destHero, zoneSlot: destSlot,
+      // v650: Anlegen ueber den geteilten Vorgang (eigene Seite, Caster-
+      // Held als Vorgabe; sonst Prompt statt stillem Fallback auf den
+      // naechsten Helden).
+      // „Attach this Spell to the user / the Hero that uses it": NUR der
+      // Caster-Held (kein anderer, auch wenn er keinen Platz hat).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        preferCaster: true, heroFilter: (h, hi) => hi === ctx.cardHeroIdx,
+        description: 'Choose a Hero you control to attach Gathering Storm to.',
+        confirmLabel: '⛈️ Attach!', animationType: 'electric_strike',
       });
-
+      if (!res) return;
+      const { host, inst } = res;
+      const destHero = host.heroIdx;
       engine.log('gathering_storm_attached', {
         player: ps.username, hero: ps.heroes[destHero]?.name,
       });
 
-      await engine.runHooks('onCardEnterZone', {
-        enteringCard: inst, toZone: 'support', toHeroIdx: destHero,
-        _skipReactionCheck: true,
-      });
       engine.sync();
     },
 

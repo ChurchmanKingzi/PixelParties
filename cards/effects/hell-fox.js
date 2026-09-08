@@ -89,9 +89,8 @@ module.exports = {
       // ── Step 1: re-route corpse from discard → deleted ──
       // Walk the discard pile from the back (the engine pushed it
       // last, so the most-recent copy of the name is the dying one).
-      const discardIdx = ownerPs.discardPile.lastIndexOf(CARD_NAME);
-      if (discardIdx >= 0) {
-        ownerPs.discardPile.splice(discardIdx, 1);
+      const _taken_discardIdx = await engine.takeFromPile(ownerPs, 'discard', CARD_NAME, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+      if (_taken_discardIdx) {
         ownerPs.deletedPile.push(CARD_NAME);
       } else {
         // Defensive: if some other reaction already pulled the corpse

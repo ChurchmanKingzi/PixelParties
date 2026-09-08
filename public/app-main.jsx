@@ -2,10 +2,11 @@
 //  PIXEL PARTIES — APP ROOT
 //  PlayScreen, MusicManager, and App component
 // ═══════════════════════════════════════════
-const { useState, useEffect, useRef, useCallback, useContext } = React;
+const { useState, useEffect, useRef, useCallback, useContext, useMemo } = React;
 const { api, socket, AppContext, Notification, CardMini, loadCardDB,
         isDeckLegal, isCubeDeck, emitSocket } = window;
-const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCreator, VolumeControl } = window;
+const { AuthScreen, MainMenu, ProfileScreen, ShopScreen, RulesScreen, PuzzleCreator, VolumeControl,
+  MenuBackgroundParticles } = window;
 const { DeckBuilder } = window;
 const { GameBoard } = window;
 let _pendingGameState = null;
@@ -2035,6 +2036,43 @@ function _bgmResolveTrack(target) {
 // Neuladen-Schaltfläche. Der Fehler geht zusätzlich als
 // `[client-error]` in die Konsole, damit er auch dann auffindbar ist,
 // wenn jemand die Seite reflexartig neu lädt.
+/**
+ * ═══ OBERFLAECHEN-MASSSTAB (v803) ═══════════════════════════════════
+ * Setzt `--ui-scale` aus der Fenstergroesse. style.css legt den Wert per
+ * `zoom` auf die Bildschirme (siehe dort, „OBERFLAECHEN-MASSSTAB").
+ *
+ * Gerechnet wird wie beim Kampffeld — Einpassen auf eine Bezugsgroesse
+ * —, aber auf BEIDEN Achsen. Genau das fehlte dem Brett-Regler und ist
+ * der Grund, warum beim Reinzoomen Dinge nach oben und unten aus dem
+ * Bild fielen: die Hoehe kam in seiner Rechnung gar nicht vor.
+ *
+ * BEZUG und GRENZEN sind die beiden Zahlen zum Nachjustieren:
+ *   • BEZUG_B/H — bei dieser Fenstergroesse ist der Massstab genau 1.
+ *   • MIN/MAX  — wie weit er ueberhaupt ausschlagen darf.
+ * Bei 1920x1080 ergibt der aktuelle Bezug 1.20, bei 1600x900 genau 1.0,
+ * bei 1280x720 dann 0.80.
+ */
+function UiScaler() {
+  React.useEffect(() => {
+    const BEZUG_B = 1600, BEZUG_H = 900;
+    const MIN = 0.70, MAX = 1.60;
+    const setzen = () => {
+      const b = window.innerWidth || BEZUG_B;
+      const h = window.innerHeight || BEZUG_H;
+      const roh = Math.min(b / BEZUG_B, h / BEZUG_H);
+      const wert = Math.max(MIN, Math.min(MAX, roh));
+      document.documentElement.style.setProperty('--ui-scale', wert.toFixed(3));
+    };
+    setzen();
+    window.addEventListener('resize', setzen);
+    return () => {
+      window.removeEventListener('resize', setzen);
+      document.documentElement.style.removeProperty('--ui-scale');
+    };
+  }, []);
+  return null;
+}
+
 class GameErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { err: null, info: null }; }
   static getDerivedStateFromError(err) { return { err }; }
@@ -2647,6 +2685,14 @@ function App() {
       <TextBox />
       <OpponentUnlockPopup />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
+      <UiScaler />
+      {/* Pixel-Partikel hinter dem gesamten Menue (v808). Liegt fest im
+          Fenster, hinter allen Bildschirminhalten; die Bildschirme sind
+          dafuer durchsichtig und der Verlauf ist auf `body` gewandert.
+          Sobald ein Kampffeld im Baum haengt, blendet CSS die Schicht
+          aus — dort deckt das Brett sie ohnehin ab, und laufende
+          Animationen waehrend einer Partie kosten nur Bildrate. */}
+      <MenuBackgroundParticles />
       <GameErrorBoundary>
         {!user ? <AuthScreen /> :
           user.isGuest ? <SingleplayerScreen /> :

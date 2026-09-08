@@ -148,9 +148,8 @@ module.exports = {
 
       // ── Step 3: remove from deck, reveal, place ──────────────────────
 
-      const deckIdx = ps.mainDeck.indexOf(chosenName);
-      if (deckIdx < 0) { gs._spellCancelled = true; return; }
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) { gs._spellCancelled = true; return; };
 
       // Reveal to opponent
       await engine.revealSearchedCards(pi, [chosenName], CARD_NAME);

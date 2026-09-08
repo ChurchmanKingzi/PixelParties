@@ -188,7 +188,7 @@ module.exports = {
       for (const e of (ctx.entries || [])) {
         if (e.cancelled || !e.inst || e.inst.id !== meId) continue;
         if (!(e.amount > 0)) continue;
-        e.amount = Math.ceil(e.amount / 2);
+        e.multiplyAmount(0.5);   // Punkt vor Strich
       }
     },
 

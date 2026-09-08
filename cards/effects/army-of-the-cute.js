@@ -206,7 +206,7 @@ module.exports = {
         if (idx < 0) { src = 'discard'; idx = (ps.discardPile || []).indexOf(name); }
         if (idx < 0) continue; // copy gone (race) — skip
         if (src === 'hand') ps.hand.splice(idx, 1);
-        else ps.discardPile.splice(idx, 1);
+        else if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) continue;   // v820: Stapel-Schicht
 
         if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
         if (!ps.supportZones[heroIdx][slot]) ps.supportZones[heroIdx][slot] = [];

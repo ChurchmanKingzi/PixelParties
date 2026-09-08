@@ -1,64 +1,34 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Cool Repair"
-//  Artifact (Normal) — Choose an equippable
-//  Artifact from your discard pile that was
-//  not sent there this turn. Equip it to a
-//  Hero you control without paying its Cost.
-//  This Artifact's Cost becomes half the
-//  equipped Artifact's Cost (rounded up).
+//  Artifact (Normal, Cost 1)
 //
-//  Uses snapshot tracking at turn start to
-//  determine which cards were already in the
-//  discard pile before this turn.
+//  "Choose an equippable Artifact from your discard pile and equip it
+//   to a Hero you control without paying its Cost. This Artifact's
+//   Cost becomes half the equipped Artifact's Cost (rounded up)."
+//   (Text v669, Al 30.8.: der „since the beginning of your last turn"-
+//   Filter ist gestrichen — der Turn-Snapshot liess frisch abgelegte
+//   Karten nie zu.)
 //
-//  Equip detection: cardDB subtype 'Equipment'
-//  (Initiation Ritual heroes with treatAsEquip
-//  are tracked separately and not in discard.)
+//  Nicht mehr `isTargetingArtifact` (v669): der vorgeschaltete
+//  Bestaetigungsdialog war ueberfluessig, die Galerie hat ihren
+//  eigenen Cancel — ein Abbruch dort liefert `{ cancelled: true }`,
+//  der Server laesst die Karte dann in der Hand und zahlt nichts.
+//  `manualGoldCost`: den halben Preis zahlt die Karte selbst, erst
+//  nachdem der Zielplatz steht.
+//
+//  Beim Anlegen setzt sie `inst.counters._viaCoolRepair` — Cool Tech
+//  Jetpack bleibt nur ueber diesen Weg liegen.
 // ═══════════════════════════════════════════
-
 const { loadCardEffect } = require('./_loader');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 // ─── MODULE-LEVEL CARD DB (cached) ───────
-
-// ─── DISCARD SNAPSHOT HELPERS ────────────
-
-/** Initialize or retrieve the turn-start discard snapshot. */
-function _ensureSnapshot(gs) {
-  const turn = gs.turn || 0;
-  if (!gs._coolRepairSnapshots) gs._coolRepairSnapshots = {};
-  // Return existing snapshot for this turn
-  if (gs._coolRepairSnapshots[turn]) return gs._coolRepairSnapshots[turn];
-  // No snapshot yet (Cool Repair wasn't in hand at turn start) → fallback:
-  // Snapshot the current state (slightly lenient — cards discarded before this
-  // point in the turn will be treated as "not discarded this turn")
-  gs._coolRepairSnapshots[turn] = [
-    [...(gs.players[0]?.discardPile || [])],
-    [...(gs.players[1]?.discardPile || [])],
-  ];
-  return gs._coolRepairSnapshots[turn];
-}
 
 /** Count occurrences of a card name in an array. */
 function _countIn(arr, name) {
   let n = 0;
   for (const x of arr) if (x === name) n++;
   return n;
-}
-
-/**
- * Get the number of ELIGIBLE copies of a card in the discard pile.
- * Eligible = was already in the discard at the start of this turn.
- */
-function _eligibleCount(gs, pi, cardName) {
-  const snapshot = _ensureSnapshot(gs);
-  const snapshotPile = snapshot[pi] || [];
-  const currentPile = gs.players[pi]?.discardPile || [];
-  const currentCount = _countIn(currentPile, cardName);
-  const snapshotCount = _countIn(snapshotPile, cardName);
-  // Cards in snapshot = were there before this turn → eligible
-  // Additional copies beyond snapshot count = added this turn → ineligible
-  return Math.min(currentCount, snapshotCount);
 }
 
 // ─── EQUIP ELIGIBILITY ───────────────────
@@ -87,7 +57,7 @@ function _hasHeroWithFreeZone(ps) {
  * Build deduplicated gallery of eligible equips from the player's discard pile.
  * Each entry: { name, cost, count } where count = eligible copies.
  */
-function _buildEligibleGallery(gs, pi) {
+function _buildEligibleGallery(gs, pi, engine) {
   const ps = gs.players[pi];
   const cardDB = _getCardDB();
   const gold = ps.gold || 0;
@@ -97,15 +67,12 @@ function _buildEligibleGallery(gs, pi) {
     if (!_isEquipByData(cardName)) continue;
     const cd = cardDB[cardName];
     const equipCost = cd.cost || 0;
-    // Cost filter: equip cost ≤ 2× player's current gold
-    if (equipCost > gold * 2) continue;
+    // Bezahlbarkeit des halben Preises (inkl. Kreditrahmen).
+    if (engine && !engine.canAffordGold(pi, Math.ceil(equipCost / 2), 'Cool Repair')) continue;
+    if (!engine && Math.ceil(equipCost / 2) > gold) continue;
 
     if (seen.has(cardName)) continue; // Dedup — count handled below
-
-    const eligible = _eligibleCount(gs, pi, cardName);
-    if (eligible <= 0) continue;
-
-    seen.set(cardName, { cost: equipCost, count: eligible });
+    seen.set(cardName, { cost: equipCost, count: _countIn(ps.discardPile, cardName) });
   }
 
   return [...seen.entries()]
@@ -134,51 +101,15 @@ module.exports = {
   },
 
 
-  isTargetingArtifact: true,
   manualGoldCost: true,
   activeIn: ['hand'],
 
-  hooks: {
-    /**
-     * At each turn start, snapshot both players' discard piles.
-     * Used for "not sent there this turn" eligibility check.
-     */
-    onTurnStart: async (ctx) => {
-      const gs = ctx._engine.gs;
-      const turn = gs.turn || 0;
-      if (!gs._coolRepairSnapshots) gs._coolRepairSnapshots = {};
-      gs._coolRepairSnapshots[turn] = [
-        [...(gs.players[0]?.discardPile || [])],
-        [...(gs.players[1]?.discardPile || [])],
-      ];
-      // Cleanup old snapshots (keep last 4 turns)
-      for (const t of Object.keys(gs._coolRepairSnapshots)) {
-        if (Number(t) < turn - 3) delete gs._coolRepairSnapshots[t];
-      }
-    },
-  },
-
-  canActivate(gs, pi) {
+  canActivate(gs, pi, engine) {
     const ps = gs.players[pi];
     if (!_hasHeroWithFreeZone(ps)) return false;
-    const gallery = _buildEligibleGallery(gs, pi);
+    const gallery = _buildEligibleGallery(gs, pi, engine);
     return gallery.length > 0;
   },
-
-  // Self-targeting — card gallery handles selection
-  getValidTargets: () => [],
-
-  targetingConfig: {
-    description: 'Recover an Equipment Artifact from your discard pile.',
-    confirmLabel: '🔧 Repair!',
-    confirmClass: 'btn-info',
-    cancellable: true,
-    alwaysConfirmable: true,
-  },
-
-  validateSelection: () => true,
-
-  animationType: 'none',
 
   resolve: async (engine, pi) => {
     const gs = engine.gs;
@@ -186,8 +117,8 @@ module.exports = {
     const cardDB = _getCardDB();
 
     // ── Step 1: Build eligible equip gallery ──
-    const gallery = _buildEligibleGallery(gs, pi);
-    if (gallery.length === 0) return { aborted: true };
+    const gallery = _buildEligibleGallery(gs, pi, engine);
+    if (gallery.length === 0) return { cancelled: true };
 
     // Show card gallery with cost info
     const result = await engine.promptGeneric(pi, {
@@ -198,16 +129,13 @@ module.exports = {
       cancellable: true,
     });
 
-    if (!result || !result.cardName) return { aborted: true };
+    if (!result || result.cancelled || !result.cardName) return { cancelled: true };
 
     const equipName = result.cardName;
     const cd = cardDB[equipName];
-    if (!cd) return { aborted: true };
-
-    // Verify the card is still eligible
-    const stillEligible = _eligibleCount(gs, pi, equipName);
-    if (stillEligible <= 0) return { aborted: true };
-    if (!_isEquipByData(equipName)) return { aborted: true };
+    if (!cd) return { cancelled: true };
+    if (!ps.discardPile.includes(equipName)) return { cancelled: true };
+    if (!_isEquipByData(equipName)) return { cancelled: true };
 
     // ── Step 2: Calculate and check dynamic cost ──
     const equipCost = cd.cost || 0;
@@ -218,7 +146,7 @@ module.exports = {
     // bereits erlaubt hat — Als Book-of-Doom-Report.
     if (!engine.canAffordGold(pi, repairCost, 'Cool Repair')) {
       engine.log('cool_repair_no_gold', { player: ps.username, needed: repairCost, have: ps.gold || 0 });
-      return { aborted: true };
+      return { cancelled: true };
     }
 
     // ── Step 3: Select destination hero + support zone ──
@@ -253,7 +181,7 @@ module.exports = {
       }
     }
 
-    if (destTargets.length === 0) return { aborted: true };
+    if (destTargets.length === 0) return { cancelled: true };
 
     const destIds = await engine.promptEffectTarget(pi, destTargets, {
       title: `Cool Repair — Equip ${equipName}`,
@@ -267,10 +195,10 @@ module.exports = {
       maxPerType: { hero: 1, equip: 1 },
     });
 
-    if (!destIds || destIds.length === 0) return { aborted: true };
+    if (!destIds || destIds.length === 0) return { cancelled: true };
 
     const dest = destTargets.find(t => t.id === destIds[0]);
-    if (!dest) return { aborted: true };
+    if (!dest) return { cancelled: true };
 
     let destHeroIdx, destSlot;
     if (dest.type === 'equip') {
@@ -285,11 +213,11 @@ module.exports = {
           break;
         }
       }
-      if (destSlot === undefined) return { aborted: true };
+      if (destSlot === undefined) return { cancelled: true };
     }
 
     // Final validation: slot still free?
-    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };
+    if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { cancelled: true };
 
     // ── Step 4: Deduct dynamic gold cost ──
     if (repairCost > 0) {
@@ -298,9 +226,8 @@ module.exports = {
     }
 
     // ── Step 5: Remove equip from discard pile ──
-    const discardIdx = ps.discardPile.indexOf(equipName);
-    if (discardIdx < 0) return { aborted: true };
-    ps.discardPile.splice(discardIdx, 1);
+    const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', equipName, { source: 'cool-repair' });   // v820: Stapel-Schicht
+    if (!_taken_discardIdx) return { cancelled: true };
 
     // ── Step 6: Place equip in support zone ──
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
@@ -309,6 +236,9 @@ module.exports = {
 
     // Track as card instance
     const inst = engine._trackCard(equipName, pi, 'support', destHeroIdx, destSlot);
+    // v668: Herkunftsmarke — Cool Tech Jetpack bleibt NUR liegen, wenn es
+    // ueber Cool Repair kam („except with the effect of Cool Repair").
+    inst.counters._viaCoolRepair = true;
 
     engine.sync();
 

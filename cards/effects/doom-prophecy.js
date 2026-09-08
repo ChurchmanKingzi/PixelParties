@@ -63,7 +63,7 @@ module.exports = {
         if (wahl?.optionId === 'opp') ziel = oi;
       }
 
-      ps.mainDeck.splice(idx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       const inst = engine._trackCard(D.CLOCK_NAME, ziel, 'deck');
       await engine.placeArea(ziel, inst);
       engine.log('doom_prophecy_place', {

@@ -26,7 +26,9 @@
 //  Hero heals 80 even though only one inst fired.
 // ═══════════════════════════════════════════
 
-const HEAL_BY_LEVEL = [40, 80, 150]; // index = level - 1, cap at 3
+const { scaledByLevel } = require('./_hooks');
+
+const HEAL_BY_LEVEL = [40, 80, 150]; // Stufe 1/2/3, geklemmt via scaledByLevel
 
 /** Heal a Cannibalism Hero off the death of an ally. Shared between
  *  the onCreatureDeath and onHeroKO listeners. */
@@ -76,8 +78,13 @@ async function tryEat(ctx, deadName, deadOwnerSide) {
   if (!gs.hoptUsed) gs.hoptUsed = {};
   gs.hoptUsed[hoptKey] = gs.turn;
 
+  // v784: ueber den kanonischen Skalierer statt `[level - 1]`. Die alte
+  // Handarbeit las bei Stufe 0 den Index -1 und lieferte `undefined`;
+  // die Regel (Al, 5.9.) lautet „bei 0 das Minimum, ueber der Liste das
+  // Maximum". Fuer jede tatsaechlich vorkommende Stufe (1-3) ist das
+  // Ergebnis unveraendert.
   const level = Math.min(stack.length, HEAL_BY_LEVEL.length);
-  const healAmount = HEAL_BY_LEVEL[level - 1];
+  const healAmount = scaledByLevel(stack.length, HEAL_BY_LEVEL);
 
   // Visual: meat drumstick chomp + green healing particles on the
   // eating Hero. Anchored at the hero zone (zoneSlot: -1) so it

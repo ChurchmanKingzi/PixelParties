@@ -113,7 +113,7 @@ module.exports = {
         const srcName = e.source?.cardInstance?.name || e.source?.name;
         const srcData = srcName ? cardDB[srcName] : null;
         if (!srcData || srcData.subtype !== 'Surprise') continue;
-        e.amount = (e.amount || 0) + bonus;
+        e.modifyAmount(bonus);   // flat (Punkt vor Strich)
       }
     },
   },

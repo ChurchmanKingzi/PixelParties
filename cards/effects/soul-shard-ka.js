@@ -176,9 +176,8 @@ module.exports = {
       }
 
       // Splice from deck and summon via the canonical helper.
-      const deckIdx = ps.mainDeck.indexOf(chosenName);
-      if (deckIdx < 0) return;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return;
 
       const placeRes = await engine.summonCreatureWithHooks(
         chosenName, pi, chosenHost.heroIdx, chosenHost.slotIdx,

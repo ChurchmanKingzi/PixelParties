@@ -1,3 +1,4 @@
+const { hasCardType } = require('./_hooks');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Graveyard Gathering"
 //  Spell (Magic Arts Lv1) — Inherent additional
@@ -63,25 +64,18 @@ module.exports = {
         if (!chosenName || !seen.has(chosenName)) chosenName = galleryCards[0].name;
       }
 
-      // Remove from deck and add to hand
-      const idx = ps.mainDeck.indexOf(chosenName);
-      if (idx < 0) return;
-      ps.mainDeck.splice(idx, 1);
-      ps.hand.push(chosenName);
-      const inst = engine._trackCard(chosenName, pi, 'hand');
-
-      // Universal tutor signal so listeners (Cosmic Depths Analyzer /
-      // Gatherer, etc.) react. Mirrors the firing in
-      // actionAddCardFromDeckToHand.
-      await engine.runHooks('onCardAddedToHand', {
-        playerIdx: pi, card: inst, cardName: chosenName,
+      // v734: ueber den KANONISCHEN Helfer statt von Hand. Der macht
+      // Splice, Hand, Instanz, Suchanimation, Log, den
+      // `ON_CARD_ADDED_TO_HAND`-Hook, den Reveal und das Mischen in
+      // einem — und traegt die Tutor-Strichliste mit, an der Koperniko
+      // haengt. Vorher lief das hier an ihr vorbei (Als Sweep 5.9.).
+      if (ps.mainDeck.indexOf(chosenName) < 0) return;
+      await engine.actionAddCardFromDeckToHand(pi, chosenName, {
+        source: 'Graveyard Gathering',
+        reveal: true,
+        shuffle: true,
+        searchSpec: { label: 'Ascended Hero', filter: (cd) => hasCardType(cd, 'Ascended Hero') },
       });
-
-      // Reveal to opponent (opponent confirms)
-      await engine.revealSearchedCards(pi, [chosenName], 'Graveyard Gathering');
-
-      // Shuffle deck
-      engine.shuffleDeck(pi);
     },
   },
 };

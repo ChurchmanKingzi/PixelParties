@@ -97,16 +97,9 @@ module.exports = {
     // Sort descending so each splice doesn't shift remaining indices.
     picked.sort((a, b) => b.handIndex - a.handIndex);
 
-    // Stagger the discards: per-card pile-transfer broadcast +
-    // sync + brief delay. Without staggering, `actionDiscardHand-
-    // Card` mutates state silently and the client only sees the
-    // cumulative shrink on the first post-discard sync — every
-    // discard "fly to pile" animation is lost AND the first draw's
-    // sync arrives with a net-negative hand delta, which the diff
-    // detector doesn't classify as a draw event so its hand-fly-in
-    // animation is skipped too. Matches Champion the Stormbringer's
-    // explicit-broadcast pattern.
-    const STAGGER_MS = 120;
+    // v696: Flug (vom exakten Hand-Slot) und Abwurf-Takt (0,5 s je
+    // Karte) kommen aus `actionDiscardHandCard` selbst — der frühere
+    // eigene Broadcast + 120-ms-Stagger ist entfallen.
     let discarded = 0;
     for (const { cardName, handIndex } of picked) {
       // Re-resolve the index — a chained hook between picks could
@@ -117,24 +110,11 @@ module.exports = {
         resolvedIdx = ps.hand.indexOf(cardName);
       }
       if (resolvedIdx < 0) continue;
-      // Broadcast the hand → discard flight BEFORE the splice so
-      // the client captures the source slot's bounding rect while
-      // it's still rendered.
-      engine._broadcastEvent('play_pile_transfer', {
-        owner: pi, cardName,
-        from: 'hand', to: 'discard',
-        fromHandIdx: resolvedIdx,
-      });
       const ok = await engine.actionDiscardHandCard(pi, cardName, resolvedIdx, {
         source: CARD_NAME,
       });
       if (!ok) continue;
       discarded++;
-      // Sync each discard so the client commits the hand-shrink
-      // separately, and pause briefly so successive discards
-      // visibly chain rather than fire as a single mass.
-      engine.sync();
-      if (discarded < picked.length) await engine._delay(STAGGER_MS);
     }
     if (discarded === 0) return false;
 

@@ -172,7 +172,7 @@ module.exports = {
       // The slot is empty already (engine cleared it before firing
       // ON_CREATURE_DEATH). Use the same hero+slot the dying Loyal
       // occupied. summonCreatureWithHooks fires the full lifecycle.
-      ps.mainDeck.splice(deckIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
 
       const placed = await engine.summonCreatureWithHooks(
         replacementName, pi, death.heroIdx, death.zoneSlot,

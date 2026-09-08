@@ -91,9 +91,8 @@ module.exports = {
     await ctx.popCoolnessStackTo(pi, 'delete', { source: CARD_NAME });
 
     // Move chosen card from deck to hand.
-    const deckIdx = ps.mainDeck.indexOf(choice.cardName);
-    if (deckIdx >= 0) {
-      ps.mainDeck.splice(deckIdx, 1);
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (_taken_deckIdx) {
       ps.hand.push(choice.cardName);
       engine._trackCard(choice.cardName, pi, 'hand');
       // Shuffle the remaining deck.

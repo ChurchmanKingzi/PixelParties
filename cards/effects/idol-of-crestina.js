@@ -114,6 +114,8 @@ module.exports = {
       source: CARD_NAME,
       reveal: true,
       shuffle: true,
+      // v734: „any card" — keine Einschraenkung.
+      searchSpec: { label: 'card', filter: null },
     });
     engine.log('idol_of_crestina_search', { player: ps.username, card: pickedName });
   },

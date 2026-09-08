@@ -21,6 +21,14 @@
 const CARD_NAME = 'The White Eye';
 
 module.exports = {
+
+  /**
+   * „Equip this card to a Hero you control." — Seitenbindung, siehe
+   * `equipOwnSideOnly` in CARD_API.md. Ohne die Fahne gilt die
+   * Hausvorgabe „Ausruestung darf an beide Seiten" (Al, 5.9.: der
+   * Kartentext ist bindend).
+   */
+  equipOwnSideOnly: true,
   // CPU: confirm this card's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (afterSpell
   // trigger), which would otherwise make this discard a no-op for the CPU.

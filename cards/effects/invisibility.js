@@ -56,6 +56,7 @@
 //    attach safe).
 // ═══════════════════════════════════════════
 
+const { attachmentHostsFor, attachToHero } = require('./_attachment-shared');
 const CARD_NAME = 'Invisibility';
 
 /** Free Support Zone slot index on `heroIdx` of `ps`, or -1. */
@@ -109,20 +110,14 @@ module.exports = {
    *     (4) would fire on the same tick as the cast — pointless to
    *     play).
    */
-  spellPlayCondition(gs, pi) {
-    const ps = gs.players[pi];
-    if (!ps) return false;
-    const heroes = ps.heroes || [];
-    let livingCount = 0;
-    let hasFreeSlotHost = false;
-    for (let hi = 0; hi < heroes.length; hi++) {
-      const h = heroes[hi];
-      if (!h?.name || h.hp <= 0) continue;
-      livingCount++;
-      if (findFreeSlot(ps, hi) >= 0) hasFreeSlotHost = true;
-    }
-    return livingCount >= 2 && hasFreeSlotHost;
+  spellPlayCondition(gs, pi, engine) {
+    // Eigene Regel bleibt: mindestens ZWEI lebende Helden (die Karte
+    // braucht einen anderen Helden, der gewaehlt werden kann) plus ein
+    // freier Platz — Letzteres ueber den geteilten Sammler.
+    const living = (gs.players[pi]?.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    return living >= 2 && attachmentHostsFor(gs, pi, engine).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
 
   hooks: {
     onPlay: async (ctx) => {
@@ -142,89 +137,17 @@ module.exports = {
       // free Support slot. Honour the drag-drop hint
       // (`gs._attachmentZoneSlot`) when the player dropped on a
       // specific free slot of the caster Hero.
-      const targets = [];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        if (findFreeSlot(ps, hi) < 0) continue;
-        targets.push({
-          id: `hero-${pi}-${hi}`, type: 'hero',
-          owner: pi, heroIdx: hi, cardName: hero.name,
-        });
-      }
-      if (targets.length === 0) { gs._spellCancelled = true; return; }
-
-      let destHero;
-      let destSlot;
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0) {
-        const si = gs._attachmentZoneSlot;
-        const slot = (ps.supportZones[casterHeroIdx] || [])[si] || [];
-        if (slot.length === 0) { destHero = casterHeroIdx; destSlot = si; }
-      }
-      if (destHero == null) {
-        let picked;
-        if (targets.length === 1) {
-          picked = targets[0];
-        } else {
-          // `engine.promptEffectTarget` is the correct call — the
-          // ctx wrapper doesn't expose a `promptEffectTarget`
-          // method. Curse / Gathering Storm / Divine Zeal all go
-          // through the engine path directly.
-          const result = await engine.promptEffectTarget(pi, targets, {
-            title: CARD_NAME,
-            description: 'Choose one of your Heroes to make Invisible.',
-            confirmLabel: '👻 Hide!',
-            confirmClass: 'btn-info',
-            cancellable: true,
-            exclusiveTypes: true,
-            maxPerType: { hero: 1 },
-            maxTotal: 1,
-            greenSelect: true,
-          });
-          if (!result || result.length === 0) { gs._spellCancelled = true; return; }
-          picked = targets.find(t => t.id === result[0]);
-          if (!picked) { gs._spellCancelled = true; return; }
-        }
-        destHero = picked.heroIdx;
-        destSlot = findFreeSlot(ps, destHero);
-        if (destSlot < 0) { gs._spellCancelled = true; return; }
-      }
-
-      // ── Anti Magic gate ──
-      // Lv 1 Spell — any Anti Magic Lv 1+ on the host covers it.
-      // Bail BEFORE the support-zone push so the server routes the
-      // card to the caster's discard via the standard fizzle path.
+      // v650: Anlegen ueber den geteilten Vorgang (eigene Helden).
+      const res = await attachToHero(ctx, CARD_NAME, {
+        preferCaster: true,
+        description: 'Choose a Hero you control to attach Invisibility to.',
+        confirmLabel: '👻 Attach!', skipEnterHook: true,
+      });
+      if (!res) return;
+      const destHero = res.host.heroIdx, destSlot = res.host.slotIdx, inst = res.inst;
       const destHeroObj = ps.heroes?.[destHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
-        engine.log('equip_blocked', {
-          card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune',
-        });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // ── Attach into the chosen Support Zone ──
-      if (!ps.supportZones[destHero]) ps.supportZones[destHero] = [[], [], []];
-      if (!ps.supportZones[destHero][destSlot]) ps.supportZones[destHero][destSlot] = [];
-      ps.supportZones[destHero][destSlot].push(CARD_NAME);
-
-      // Re-track from hand → support. originalOwner stamping keeps
-      // the discard routed to the caster regardless of any future
-      // control flip.
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand' && c.id === ctx.card.id,
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-      const inst = engine._trackCard(CARD_NAME, pi, 'support', destHero, destSlot);
-      inst.originalOwner = pi;
-
-      // Stamp the hero. `invisible` is the new status — the engine's
-      // hero-targeting filter pools it with `untargetable` (any-combo
-      // → if all heroes on a side are tagged, the filter collapses).
       if (!destHeroObj.statuses) destHeroObj.statuses = {};
       destHeroObj.statuses.invisible = true;
-
-      gs._spellPlacedOnBoard = true;
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'gold_sparkle', owner: pi, heroIdx: destHero, zoneSlot: -1,

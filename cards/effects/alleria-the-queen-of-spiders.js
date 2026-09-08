@@ -46,10 +46,16 @@ module.exports = {
    *  - At least 1 OTHER hero (not the target) has a Surprise in its Surprise Zone
    *  - Soft HOPT not yet consumed this turn
    */
-  canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine) {
+  canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard) {
     // HOPT check
     const hoptKey = `alleria_redirect:${ownerIdx}:${heroIdx}`;
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
+    // v637: „for an Attack, Spell or Creature effect" — Helden-, Artefakt-,
+    // Potion- und Ability-Effekte werden NICHT umgeleitet (Als Befund:
+    // Lockes Turn-Start-Effekt wurde umgeleitet). Ohne bekannte Quelle
+    // keine Umleitung.
+    const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
+    if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
 
     // Only redirect hero targets on our own side
     if (selected.type !== 'hero' || selected.owner !== ownerIdx) return false;

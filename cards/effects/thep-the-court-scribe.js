@@ -154,9 +154,8 @@ module.exports = {
     // discard hooks fire (Ka searches deck, Khet revives, etc.).
     // `_summonedFromDiscard: true` is the discard-trigger flag every
     // Shard reads in its onPlay gate.
-    const idx = ps.discardPile.indexOf(chosenName);
-    if (idx < 0) return false;
-    ps.discardPile.splice(idx, 1);
+    const _taken_idx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (!_taken_idx) return false;
 
     const placeRes = await engine.summonCreatureWithHooks(
       chosenName, pi, heroIdx, chosenSlot,

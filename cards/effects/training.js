@@ -209,11 +209,8 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
   if (!picked || !picked.cardName) return false;
 
   // Verify the card is in the deck
-  const deckIdx = ps.mainDeck.indexOf(picked.cardName);
-  if (deckIdx < 0) return false;
-
-  // Remove from deck
-  ps.mainDeck.splice(deckIdx, 1);
+  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', picked.cardName, { source: 'training' });   // v820: Stapel-Schicht
+  if (!_taken_deckIdx) return false;
 
   // Attach to hero's ability zone
   const abZones = ps.abilityZones[heroIdx] || [[], [], []];

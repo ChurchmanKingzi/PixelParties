@@ -8,6 +8,8 @@
 //  opponent's next turn).
 // ═══════════════════════════════════════════
 
+const { isAttackSpellOrCreatureSource } = require('./_hooks');
+
 module.exports = {
   isSurprise: true,
 
@@ -19,6 +21,8 @@ module.exports = {
     if (sourceInfo?.cardInstance?._isAoeCheck) return false;
     // Must be an opponent's effect
     if (sourceInfo?.owner === tOwner) return false;
+    // v666 (Sweep): „opponent's Attack, Spell or Creature effect“.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
     return true;
   },
 

@@ -87,7 +87,7 @@ module.exports = {
     // there aren't enough zones for all tokens.)
     if (countFreeZones(gs, pi) === 0) return false;
     // Need at least one level-≤3 Creature in the deck.
-    // Defer the actual check to onPlay to keep spellPlayCondition cheap;
+    // Defer the actual check to onPlay to keep spellPlayCondition cheap
     // approximate here by requiring a non-empty deck.
     return (ps.mainDeck || []).length > 0;
   },
@@ -180,9 +180,8 @@ module.exports = {
       }
 
       // ── Remove one copy from the deck and shuffle ──
-      const deckIdx = ps.mainDeck.indexOf(creatureName);
-      if (deckIdx >= 0) {
-        ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', creatureName, { source: 'living-illusion' });   // v820: Stapel-Schicht
+      if (_taken_deckIdx) {
       }
 
       // Deck-search reveal animation

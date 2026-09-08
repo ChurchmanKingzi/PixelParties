@@ -66,9 +66,8 @@ module.exports = {
 
     if (picked && !picked.cancelled && picked.cardName) {
       const ps = engine.gs.players[pi];
-      const idx = ps.discardPile.indexOf(picked.cardName);
-      if (idx >= 0) {
-        ps.discardPile.splice(idx, 1);
+      const _taken_idx = await engine.takeFromPile(ps, 'discard', picked.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (_taken_idx) {
         ps.hand.push(picked.cardName);
         engine._broadcastEvent('card_reveal', { cardName: picked.cardName, playerIdx: pi });
         await engine.runHooks('onCardAddedFromDiscardToHand', {

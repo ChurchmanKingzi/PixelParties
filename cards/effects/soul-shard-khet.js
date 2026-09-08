@@ -134,9 +134,8 @@ module.exports = {
       // the placed Creature gets full on-play / entering-zone hooks.
       // Pass `_summonedFromDiscard: true` so a chained Soul Shard
       // correctly fires its own discard-trigger.
-      const discardIdx = ps.discardPile.indexOf(chosenName);
-      if (discardIdx < 0) return;
-      ps.discardPile.splice(discardIdx, 1);
+      const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_discardIdx) return;
 
       const placeRes = await engine.summonCreatureWithHooks(
         chosenName, pi, chosenHost.heroIdx, chosenHost.slotIdx,

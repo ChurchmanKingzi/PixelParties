@@ -59,22 +59,11 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+// v701: Pruefung „gegnerischer Creature-Effekt" ist ins geteilte Modul
+// gewandert — Rolling Boulder nutzt dieselbe Auslegung.
+const { isOppCreatureEffect } = require('./_targeting-shared');
 
 const CARD_NAME = 'Shield of Wisdom';
-
-/**
- * The source is an OPPONENT's Creature effect: a Creature card
- * instance sitting in a Support Zone, controlled by the other player.
- */
-function isOppCreatureEffect(engine, pi, sourceCard) {
-  if (!sourceCard) return false;
-  const srcOwner = sourceCard.controller ?? sourceCard.owner ?? -1;
-  if (srcOwner < 0 || srcOwner === pi) return false;          // opponent's only
-  if (sourceCard.zone !== 'support') return false;            // a board Creature
-  const cd = (engine.getEffectiveCardData ? engine.getEffectiveCardData(sourceCard) : null)
-    || (sourceCard.name ? engine._getCardDB()[sourceCard.name] : null);
-  return !!(cd && hasCardType(cd, 'Creature'));
-}
 
 /**
  * Every target the source's controller (the opponent) controls —

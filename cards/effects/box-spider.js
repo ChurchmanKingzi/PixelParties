@@ -88,9 +88,8 @@ module.exports = {
       if (!surpriseCounts.has(chosenName)) return;
 
       // Splice from deck, shuffle, place face-down in Surprise Zone.
-      const deckIdx = ps.mainDeck.indexOf(chosenName);
-      if (deckIdx < 0) return;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return;
 
       ps.surpriseZones[heroIdx] = [chosenName];
       const surpriseInst = engine._trackCard(chosenName, owner, 'surprise', heroIdx, 0);

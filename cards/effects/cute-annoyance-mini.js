@@ -156,11 +156,8 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const chosenCd = cardDB[chosenName];
     if (!chosenCd) return false;
-    const deckIdx = ps.mainDeck.indexOf(chosenName);
-    if (deckIdx < 0) return false;
-
-    // ── Step 3: splice from deck → push to hand, reveal ──
-    ps.mainDeck.splice(deckIdx, 1);
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (!_taken_deckIdx) return false;
     ps.hand.push(chosenName);
     const newInst = engine._trackCard(chosenName, pi, 'hand');
     engine.shuffleDeck?.(pi, 'main');

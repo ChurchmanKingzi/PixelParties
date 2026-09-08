@@ -1187,36 +1187,53 @@ function MenuPlayerPanel({ top, height }) {
   );
 }
 
-// Decorative pixel particles that drift around the main-menu logo. Pure
-// cosmetic — `aria-hidden`, pointer-events:none. Positions / timings /
-// colours are randomised ONCE (useMemo) so they don't reshuffle on every
-// render. Each particle reads its randomised values from CSS custom
-// properties consumed by the `pp-particle-float` keyframes in style.css.
-function LogoParticles() {
+// ── PIXEL-PARTIKEL (verallgemeinert v808) ────────────────────────────
+// Rein dekorativ — `aria-hidden`, `pointer-events: none`. Lage, Dauer
+// und Farbe werden EINMAL ausgewuerfelt (`useMemo`), damit sie bei jedem
+// Render an derselben Stelle bleiben; jedes Teilchen liest seine Werte
+// aus CSS-Variablen, die `pp-particle-float` in style.css auswertet.
+//
+// Der Baustein hiess bis v808 `LogoParticles` und konnte nur eines. Al
+// wollte Partikel „ueberall im Hintergrund, aber um den Schriftzug
+// herum mehr" — statt eines zweiten, fast gleichen Bausteins bekommt
+// dieser hier Parameter. Der Schriftzug und der Menuehintergrund
+// unterscheiden sich damit nur noch in Anzahl, Groesse und Reichweite.
+function PixelParticles({
+  anzahl = 64,
+  klasse = 'pp-logo-particles',
+  teilchenKlasse = 'pp-logo-particle',
+  minGroesse = 2,
+  maxGroesse = 8,
+  driftX = 30,
+  driftY = 40,
+  dauerMin = 1.8,
+  dauerSpanne = 3.4,
+}) {
   const particles = useMemo(() => {
-    const N = 64;
     const arr = [];
-    for (let i = 0; i < N; i++) {
-      const dur = 1.8 + Math.random() * 3.4;            // 1.8–5.2s (snappier)
+    for (let i = 0; i < anzahl; i++) {
+      const dur = dauerMin + Math.random() * dauerSpanne;
       arr.push({
-        top:   Math.random() * 100,                      // % within the expanded box
+        top:   Math.random() * 100,
         left:  Math.random() * 100,
-        size:  2 + Math.floor(Math.random() * 6),        // 2–7px pixel squares
+        size:  minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
         dur,
-        delay: -Math.random() * dur,                     // negative → mid-cycle stagger
-        dx:    (Math.random() * 2 - 1) * 30,             // -30..30px horizontal drift
-        dy:    -(14 + Math.random() * 40),               // bigger upward drift
-        max:   0.7 + Math.random() * 0.3,                // peak opacity (brighter)
-        // Mostly player-colour, a third sparkle white for a festive pop.
+        delay: -Math.random() * dur,                     // negativ → mitten im Zyklus starten
+        dx:    (Math.random() * 2 - 1) * driftX,
+        dy:    -(14 + Math.random() * driftY),
+        max:   0.7 + Math.random() * 0.3,
+        // Ueberwiegend Spielerfarbe, ein Drittel weiss fuer den Funkeleffekt.
         color: Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)',
       });
     }
     return arr;
+    // Absichtlich einmalig: die Streuung soll sich beim Rendern nicht
+    // neu wuerfeln. Die Parameter aendern sich zur Laufzeit nicht.
   }, []);
   return (
-    <div className="pp-logo-particles" aria-hidden="true">
+    <div className={klasse} aria-hidden="true">
       {particles.map((p, i) => (
-        <span key={i} className="pp-logo-particle" style={{
+        <span key={i} className={teilchenKlasse} style={{
           top: p.top + '%', left: p.left + '%',
           '--p-size': p.size + 'px',
           '--p-color': p.color,
@@ -1229,6 +1246,37 @@ function LogoParticles() {
       ))}
     </div>
   );
+}
+
+// ── Anzahlen an EINER Stelle (v811) ──────────────────────────────────
+// Al, 5.9.: „erhoehe noch die Anzahl, noch sind sie zu subtil."
+// Die beiden Zahlen sind die Stellschrauben; alles andere haengt daran.
+const PARTIKEL_LOGO = 150;        // um den Schriftzug, dichter Bereich
+const PARTIKEL_HINTERGRUND = 160; // ganzer Bildschirm, weiter gestreut
+
+/** Um den Schriftzug: dicht gedraengt, kleine Teilchen, kurze Wege. */
+function LogoParticles() {
+  return <PixelParticles anzahl={PARTIKEL_LOGO} />;
+}
+
+/**
+ * Hinter dem gesamten Menue: weiter gestreut, groessere Teilchen,
+ * laengere Wege — sonst wirkt dieselbe Dichte auf Bildschirmgroesse wie
+ * Rauschen. Die Schicht liegt fest im Fenster und wird abgeschaltet,
+ * sobald ein Kampffeld im Baum haengt (siehe style.css).
+ */
+function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
+  return <PixelParticles
+    anzahl={PARTIKEL_HINTERGRUND}
+    klasse={klasse}
+    teilchenKlasse="pp-bg-particle"
+    minGroesse={2}
+    maxGroesse={7}
+    driftX={70}
+    driftY={110}
+    dauerMin={5}
+    dauerSpanne={9}
+  />;
 }
 
 // ═══════════════════════════════════════════
@@ -1670,6 +1718,15 @@ function MainMenu() {
            ...(menuTopPad !== null && { justifyContent: 'flex-start', paddingTop: menuTopPad }),
          }}>
       <MenuCardBackground />
+      {/* Partikel im Hauptmenue (v810): HIER und nicht ueber die feste
+          Schicht in App. Die Kartenwand darueber ist ein DECKENDER
+          Vollbildkasten (`.menu-card-bg`, `background: var(--bg1)`) —
+          alles dahinter ist unsichtbar, und genau deshalb waren die
+          Partikel im Login zu sehen, im Hauptmenue aber nicht.
+          Diese Schicht liegt direkt NACH der Wand und damit ueber ihr,
+          aber vor dem Menueinhalt: beide stehen auf z-Ebene 0, ueber die
+          Reihenfolge im Baum entschieden. */}
+      <MenuBackgroundParticles klasse="pp-menu-particles" />
       <MenuLeaderboardPanel top={panelTop} height={panelHeight} />
       <MenuPlayerPanel top={panelTop} height={panelHeight} />
       {/* Brand logo (data/logo.png) — decoupled from the top row and centered
@@ -4483,3 +4540,8 @@ window.ShopScreen = ShopScreen;
 window.SingleplayerScreen = SingleplayerScreen;
 window.HeroArtCrop = HeroArtCrop;
 window.RulesScreen = RulesScreen;
+// v809: Die Bundles reichen ihre Bausteine AUSDRUECKLICH ueber `window`
+// weiter — wer hier fehlt, ist in den anderen Dateien schlicht nicht da.
+// Genau daran hing v808: die Hintergrund-Partikel wurden nie gezeichnet,
+// weil `MenuBackgroundParticles` in app-main.jsx ein unbekannter Name war.
+window.MenuBackgroundParticles = MenuBackgroundParticles;

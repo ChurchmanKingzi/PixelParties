@@ -1194,6 +1194,129 @@ function ThawEffect({ x, y }) {
 }
 
 // Electric strike — small lightning bolts from all directions converging on target
+// ─── Monia Bot: Jetpack-Dash (`trailType: 'fire'`) ──────────────────
+// Die Anteile beschreiben denselben Flug wie die Keyframe
+// `ramJetCharge` in style.css — wer hier etwas verschiebt, muss dort
+// mitziehen. `arriveAt` ist zusaetzlich mit dem `_delay(280)` in
+// monia-bot-*.js verzahnt: der umgeleitete Treffer soll direkt nach
+// dem Aufprall folgen (0.45 × 600 ms = 270 ms).
+const JET = { igniteAt: 0.10, arriveAt: 0.45, leaveAt: 0.60, homeAt: 0.92 };
+// Nachlauf, den die Ebene ueber die Kartendauer hinaus braucht, damit
+// der letzte Puff des Rueckflugs noch ausglueht.
+const JET_TAIL_MS = 280;
+
+/**
+ * Monia Bots Jetpack-Schweif.
+ *
+ * Der generische `.ram-flame-trail` klebt AN der Karte und pulst auf der
+ * Stelle — er kann per Bauart keinen Schweif ergeben. Hier liegen die
+ * Flammen deshalb als eigene Ebene ENTLANG DER FLUGBAHN: jeder Puff hat
+ * seine feste Position und zuendet genau dann, wenn die Karte an ihm
+ * vorbeikommt (`verzug`). Dadurch bleibt der Schweif hinter ihr stehen
+ * und verglueht, statt mitzufliegen. Hin- und Rueckflug bekommen eigene
+ * Puffs, der Rueckflug schwaecher.
+ */
+function MoniaJetTrail({ r }) {
+  const dur = r.dur || 600;
+  const dx = r.tgtX - r.srcX;
+  const dy = r.tgtY - r.srcY;
+  const laenge = Math.hypot(dx, dy) || 1;
+  const bahnWinkel = Math.atan2(dy, dx) * 180 / Math.PI;
+  // Senkrechte zur Flugbahn — Streuung quer zur Richtung, nicht in x/y.
+  const qx = -dy / laenge, qy = dx / laenge;
+  const punkt = (t, seit) => ({
+    left: r.srcX + dx * t + qx * (seit || 0),
+    top: r.srcY + dy * t + qy * (seit || 0),
+  });
+
+  const puffs = useMemo(() => {
+    const liste = [];
+    const hin = Math.max(8, Math.min(20, Math.round(laenge / 26)));
+    for (let i = 0; i < hin; i++) {
+      const t = hin === 1 ? 1 : i / (hin - 1);
+      liste.push({
+        key: 'h' + i, t, seit: (Math.random() * 2 - 1) * 7,
+        verzug: (JET.igniteAt + t * (JET.arriveAt - JET.igniteAt)) * dur,
+        dauer: 300 + Math.random() * 110,
+        skala: 0.78 + (1 - t) * 0.45,
+        drift: (Math.random() * 2 - 1) * 12,
+      });
+    }
+    const zurueck = Math.max(5, Math.round(hin * 0.6));
+    for (let i = 0; i < zurueck; i++) {
+      const t = zurueck === 1 ? 0 : i / (zurueck - 1);
+      liste.push({
+        key: 'z' + i, t, seit: (Math.random() * 2 - 1) * 6,
+        verzug: (JET.leaveAt + (1 - t) * (JET.homeAt - JET.leaveAt)) * dur,
+        dauer: 210 + Math.random() * 80,
+        skala: 0.5 + t * 0.28,
+        drift: (Math.random() * 2 - 1) * 10,
+        schwach: true,
+      });
+    }
+    return liste;
+  }, []);
+
+  const glut = useMemo(() => Array.from({ length: 14 }, () => {
+    const t = 0.08 + Math.random() * 0.9;
+    return {
+      t, seit: (Math.random() * 2 - 1) * 22,
+      dx: (Math.random() * 2 - 1) * 30,
+      dy: 24 + Math.random() * 44,
+      groesse: 3 + Math.random() * 5,
+      dauer: 300 + Math.random() * 200,
+      verzug: (JET.igniteAt + t * (JET.arriveAt - JET.igniteAt)) * dur + Math.random() * 55,
+      farbe: ['#fff3c4', '#ffd166', '#ff9a1f', '#ff5b00'][Math.floor(Math.random() * 4)],
+    };
+  }), []);
+
+  return (
+    <div className="ram-jet-layer">
+      {/* Speed-Streak: zieht sich waehrend des Flugs auf und verglueht */}
+      <div className="ram-jet-streak" style={{
+        left: r.srcX, top: r.srcY, width: laenge,
+        '--jsAngle': bahnWinkel + 'deg',
+        animationDelay: Math.round(JET.igniteAt * dur) + 'ms',
+        animationDuration: Math.round((JET.arriveAt - JET.igniteAt) * dur + 220) + 'ms',
+      }} />
+      <div className="ram-jet-streak ram-jet-streak-back" style={{
+        left: r.tgtX, top: r.tgtY, width: laenge,
+        '--jsAngle': (bahnWinkel + 180) + 'deg',
+        animationDelay: Math.round(JET.leaveAt * dur) + 'ms',
+        animationDuration: Math.round((JET.homeAt - JET.leaveAt) * dur + 180) + 'ms',
+      }} />
+      {puffs.map(p => {
+        const pos = punkt(p.t, p.seit);
+        return (
+          <div key={p.key} className={'ram-jet-puff' + (p.schwach ? ' ram-jet-puff-dim' : '')} style={{
+            left: pos.left, top: pos.top,
+            '--jpScale': p.skala, '--jpDrift': p.drift + 'px',
+            animationDelay: Math.round(p.verzug) + 'ms',
+            animationDuration: Math.round(p.dauer) + 'ms',
+          }} />
+        );
+      })}
+      {glut.map((g, i) => {
+        const pos = punkt(g.t, g.seit);
+        return (
+          <div key={'g' + i} className="ram-jet-ember" style={{
+            left: pos.left, top: pos.top,
+            width: g.groesse, height: g.groesse, background: g.farbe,
+            '--jeDx': g.dx + 'px', '--jeDy': g.dy + 'px',
+            animationDelay: Math.round(g.verzug) + 'ms',
+            animationDuration: Math.round(g.dauer) + 'ms',
+          }} />
+        );
+      })}
+      {/* Aufprall: Hitzering genau beim Ankommen */}
+      <div className="ram-jet-impact" style={{
+        left: r.tgtX, top: r.tgtY,
+        animationDelay: Math.round(JET.arriveAt * dur) + 'ms',
+      }} />
+    </div>
+  );
+}
+
 function ElectricStrikeEffect({ x, y }) {
   const bolts = useMemo(() => Array.from({ length: 16 }, () => {
     const angle = Math.random() * Math.PI * 2;
@@ -1311,6 +1434,274 @@ function BlackFlameStrikeEffect({ x, y, intensity = 1 }) {
         <div key={'bfs'+i} className="anim-explosion-particle" style={{
           '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
           '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Feuersaeule (Horned Demon, v602) ─────────────────────────────
+// Als Vorgabe: „normal gefaerbtes (orange-rotes) Feuer, als eigene
+// Animationsklasse, distinct von bestehenden Feuer-Animationen —
+// eine FeuerSAEULE, die unter dem Ziel hervorschiesst und es einhuellt."
+//
+// Aufbau (Zeit 0-1000 ms, Schaden faellt bei ~450 ms):
+//   1. Bodenriss-Glut unter der Karte (0-200 ms)
+//   2. die Saeule schiesst von UNTEN hoch (transform-origin unten,
+//      scaleY 0→1 in ~260 ms) und ueberragt die Karte oben deutlich
+//   3. Flammenzungen (🔥) und Glutfunken steigen an den Raendern auf
+//   4. Ausbrennen (700-1000 ms)
+// `intensity` = Zahl der Demon Counter: mehr Zungen, breitere und
+// hoehere Saeule (gedeckelt bei 5). `w`/`h` kommen von der Zielkarte,
+// die Saeule ist also immer so breit wie das Ziel.
+function DemonFirePillarEffect({ x, y, w = 80, h = 110, intensity = 1 }) {
+  const k = Math.min(Math.max(intensity || 1, 1), 5);
+  const width  = Math.max(48, w * (0.85 + k * 0.05));
+  const height = h * (1.35 + k * 0.12);
+  const tongues = useMemo(() => Array.from({ length: 10 + k * 4 }, () => ({
+    xOff: (-0.5 + Math.random()) * width * 0.9,
+    startY: h * 0.5 + Math.random() * 10,
+    rise: 60 + Math.random() * height * 0.7,
+    size: 12 + Math.random() * 12 + k * 1.5,
+    delay: 120 + Math.random() * 380,
+    dur: 380 + Math.random() * 320,
+    sway: -14 + Math.random() * 28,
+  })), []);
+  const embers = useMemo(() => Array.from({ length: 12 + k * 3 }, () => ({
+    xOff: (-0.5 + Math.random()) * width,
+    rise: 80 + Math.random() * height,
+    size: 2 + Math.random() * 4,
+    color: ['#ffd23a', '#ff9a1f', '#ff6a00', '#ff3d00', '#ffe7a0'][Math.floor(Math.random() * 5)],
+    delay: 200 + Math.random() * 450,
+    dur: 450 + Math.random() * 350,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {/* Bodenglut: schmale Ellipse unter der Kartenunterkante */}
+      <div className="anim-fire-pillar-ground" style={{ '--pw': width + 'px', '--ph': h + 'px' }} />
+      {/* Die Saeule selbst — transform-origin unten, schiesst hoch */}
+      <div className="anim-fire-pillar-column" style={{ '--pw': width + 'px', '--pheight': height + 'px', '--ph': h + 'px' }} />
+      {/* Heller Kern */}
+      <div className="anim-fire-pillar-core" style={{ '--pw': width + 'px', '--pheight': height + 'px', '--ph': h + 'px' }} />
+      {tongues.map((t, i) => (
+        <div key={'fpt'+i} className="anim-fire-pillar-tongue" style={{
+          left: t.xOff + 'px', top: t.startY + 'px', fontSize: t.size + 'px',
+          '--rise': t.rise + 'px', '--sway': t.sway + 'px',
+          animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
+        }}>🔥</div>
+      ))}
+      {embers.map((e, i) => (
+        <div key={'fpe'+i} className="anim-fire-pillar-ember" style={{
+          left: e.xOff + 'px', top: (h * 0.5) + 'px', width: e.size + 'px', height: e.size + 'px',
+          background: e.color, '--rise': e.rise + 'px',
+          animationDelay: e.delay + 'ms', animationDuration: e.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Kavallerie-Sturm (Cavalry, v604) ─────────────────────────────
+// Eine Reiterreihe (🐎) galoppiert von links durch die Zielkarte und
+// hinaus, Staubwolken hinterher, kurzer Ruck des Ziels beim
+// Durchbrechen. Klang `attack_ram` (ZONE_ANIM_SFX). Gespielt auf der
+// HELDENkarte; der Schaden an seinen Support-Zonen folgt ueber aoeHit.
+function CavalryChargeEffect({ x, y, w = 80, h = 110 }) {
+  const span = Math.max(260, w * 3.2);
+  const riders = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+    yOff: -h * 0.35 + (i % 3) * (h * 0.32) + (Math.random() - 0.5) * 8,
+    delay: i * 55 + Math.random() * 40,
+    dur: 520 + Math.random() * 120,
+    size: 22 + Math.random() * 8,
+  })), []);
+  const dust = useMemo(() => Array.from({ length: 22 }, () => ({
+    xOff: -span * 0.5 + Math.random() * span,
+    yOff: h * 0.15 + Math.random() * h * 0.35,
+    size: 6 + Math.random() * 12,
+    delay: 120 + Math.random() * 480,
+    dur: 380 + Math.random() * 300,
+    color: ['#c9a86a', '#b08d55', '#d9c08f', '#8f7040'][Math.floor(Math.random() * 4)],
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      {riders.map((r, i) => (
+        <div key={'cvr'+i} className="anim-cavalry-rider" style={{
+          top: r.yOff + 'px', fontSize: r.size + 'px', '--span': span + 'px',
+          animationDelay: r.delay + 'ms', animationDuration: r.dur + 'ms',
+        }}><span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🐎</span></div>
+      ))}
+      {dust.map((d, i) => (
+        <div key={'cvd'+i} className="anim-cavalry-dust" style={{
+          left: d.xOff + 'px', top: d.yOff + 'px', width: d.size + 'px', height: d.size + 'px',
+          background: d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Giftschaedel (Poisoned Meat, v615) ────────────────────────────
+// Als Vorgabe: „Totenschaedel, die ueber der Creature kreisen und
+// dabei nach und nach transparent werden." Fuenf Schaedel auf einer
+// flachen Ellipse oberhalb der Karte, gestaffelt, mit gruenlichem
+// Giftschein; ein schwacher Giftdunst darunter. Klang `poison`.
+function PoisonSkullsEffect({ x, y, w = 80, h = 110 }) {
+  const skulls = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+    phase: (i / 5) * 360,
+    delay: i * 90,
+    size: 18 + (i % 2) * 6,
+    dur: 1500 + (i % 3) * 120,
+  })), []);
+  const rx = Math.max(34, w * 0.55);
+  const flat = 0.32; // Ellipse: Hoehe = 32 % der Breite (perspektivisch „von schraeg oben")
+  return (
+    <div style={{ position: 'fixed', left: x, top: y - h * 0.38, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-poison-skull-haze" style={{ '--hw': (rx * 2.4) + 'px' }} />
+      {/* Flach gedrueckte Bahn: der Wrapper staucht den Kreis zur Ellipse,
+          der Schaedel bekommt die Gegenstauchung + Gegenrotation, damit
+          er aufrecht und unverzerrt bleibt. */}
+      <div style={{ position: 'absolute', left: 0, top: 0, transform: `scaleY(${flat})` }}>
+        {skulls.map((s, i) => (
+          <div key={'psk'+i} className="anim-poison-skull-orbit" style={{
+            '--rx': rx + 'px', '--phase': s.phase + 'deg',
+            animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+          }}>
+            <span className="anim-poison-skull" style={{
+              fontSize: s.size + 'px', '--phase': s.phase + 'deg', '--unflat': (1 / flat),
+              animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }}>💀</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Blitzregen (Piercer of Heavens, v617) ──────────────────────────
+// Als Vorgabe: „ein Regen aus Blitzen auf das Ziel, von denen jeder
+// einen eigenen Impact-Sound haben soll". Acht gezackte Blitze fallen
+// gestaffelt vom oberen Bildrand auf leicht versetzte Punkte der
+// Zielkarte; jeder Einschlag: Blitz sichtbar, Aufschlagblitz UND ein
+// eigener `elem_lightning` (leicht variierte Tonhoehe) — deshalb kein
+// Eintrag in ZONE_ANIM_SFX, die Klaenge kommen aus der Komponente.
+function LightningRainEffect({ x, y, w = 80, h = 110 }) {
+  const bolts = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+    const ox = (Math.random() - 0.5) * w * 0.9;
+    const oy = (Math.random() - 0.5) * h * 0.7;
+    // Zackenpfad von oben (y = -H) bis zum Einschlag (0,0), 6 Segmente
+    const H = 900;
+    const pts = [[ox + (Math.random() - 0.5) * 60, -H]];
+    for (let k = 1; k <= 6; k++) {
+      const t = k / 6;
+      pts.push([ox + (1 - t) * (Math.random() - 0.5) * 70, -H + t * (H + oy)]);
+    }
+    pts[pts.length - 1] = [ox, oy];
+    return { ox, oy, pts: pts.map(p => p.join(',')).join(' '), delay: 60 + i * 110 + Math.random() * 40, width: 2 + Math.random() * 2, rate: 0.85 + Math.random() * 0.4 };
+  }), []);
+  useEffect(() => {
+    const timers = bolts.map(b => setTimeout(() => {
+      // KEINE Kategorie und dedupe 0: die Kategorie 'effect' wuerde alle
+      // Einschlaege innerhalb von 400 ms auf einen Klang zusammenfalten.
+      if (window.playSFX) window.playSFX('elem_lightning', { rate: b.rate, volume: 0.75, dedupe: 0 });
+    }, b.delay + 40));
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <svg style={{ position: 'absolute', left: -600, top: -1000, overflow: 'visible' }} width="1200" height="1200" viewBox="-600 -1000 1200 1200" xmlns="http://www.w3.org/2000/svg">
+        {bolts.map((b, i) => (
+          <g key={'lrb'+i} className="anim-lightning-rain-bolt" style={{ animationDelay: b.delay + 'ms' }}>
+            <polyline points={b.pts} fill="none" stroke="#7fd3ff" strokeWidth={b.width + 4} strokeLinejoin="round" strokeLinecap="round" opacity="0.45" />
+            <polyline points={b.pts} fill="none" stroke="#ffffff" strokeWidth={b.width} strokeLinejoin="round" strokeLinecap="round" />
+          </g>
+        ))}
+      </svg>
+      {bolts.map((b, i) => (
+        <div key={'lrf'+i} className="anim-lightning-rain-flash" style={{ left: b.ox + 'px', top: b.oy + 'px', animationDelay: (b.delay + 30) + 'ms' }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Nebelschleier (Chasing the Legend, v618) ───────────────────────
+// Weisse Nebelschwaden quellen um die Karte auf, waehrend sie (per
+// `play_cloak_vanish`) verblasst. Klang `elem_wind` tief.
+function MistVeilEffect({ x, y, w = 80, h = 110 }) {
+  const wisps = useMemo(() => Array.from({ length: 14 }, () => ({
+    xOff: (Math.random() - 0.5) * w * 1.4,
+    yOff: (Math.random() - 0.5) * h * 1.2,
+    size: 30 + Math.random() * 40,
+    drift: (Math.random() - 0.5) * 40,
+    rise: -10 - Math.random() * 25,
+    delay: Math.random() * 500,
+    dur: 900 + Math.random() * 600,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10099 }}>
+      {wisps.map((m, i) => (
+        <div key={'mv'+i} className="anim-mist-wisp" style={{
+          left: m.xOff + 'px', top: m.yOff + 'px', width: m.size + 'px', height: (m.size * 0.6) + 'px',
+          '--drift': m.drift + 'px', '--rise': m.rise + 'px',
+          animationDelay: m.delay + 'ms', animationDuration: m.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Meteor (Meteor Crash, v623) ────────────────────────────────────
+// Ein gluehender Felsbrocken faellt von SCHRAEG OBEN RECHTS ins Bild,
+// zieht einen Feuerschweif hinter sich her und schlaegt auf dem Ziel
+// ein: Aufschlagblitz, Erdbrocken und Glut nach allen Seiten. Mit
+// `intensity` (300er-Fall) groesser und mehr Truemmer. Klang
+// `heavy_impact` beim Aufschlag (ZONE_ANIM_SFX, ~520 ms).
+function MeteorCrashEffect({ x, y, w = 80, intensity = 1 }) {
+  const k = Math.min(Math.max(intensity || 1, 1), 3);
+  const size = 34 + k * 10;
+  const startX = Math.max(320, window.innerWidth - x + 60);   // von rechts ausserhalb des Bildes
+  const startY = -(y + 80);                                     // von oben ausserhalb des Bildes
+  // v624: Schweif exakt entgegen der Flugrichtung — Winkel vom Ziel
+  // zurueck zum Startpunkt (vorher fest -38°, was je nach Ziel schief
+  // aussah).
+  const tailAngle = Math.atan2(startY, startX) * 180 / Math.PI;
+  // v625: der KNALL kommt komplett aus der Komponente. Grund: Klaenge
+  // aus ZONE_ANIM_SFX laufen in der Kategorie 'effect' und werden dort
+  // innerhalb von 400 ms auf EINEN Klang zusammengefaltet — der
+  // Spell-Cast-Cue schluckte den Einschlag. Hier: ohne Kategorie,
+  // dedupe 0, drei Ebenen gestaffelt: tiefer schwerer Einschlag,
+  // Feuerstoss und ein zweiter Impact als Nachhall.
+  useEffect(() => {
+    const play = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    const ts = [
+      play('heavy_impact', { rate: 0.55, volume: 1 }, 505),
+      play('elem_fire', { rate: 0.6, volume: 1 }, 520),
+      play('critical_strike', { rate: 0.7, volume: 0.9 }, 540),
+      play('heavy_impact', { rate: 0.8, volume: 0.6 }, 700),
+    ];
+    return () => ts.forEach(clearTimeout);
+  }, []);
+  const debris = useMemo(() => Array.from({ length: 22 + k * 8 }, () => {
+    const a = Math.PI + Math.random() * Math.PI;               // nach oben faechernd
+    const sp = 40 + Math.random() * (70 + k * 20);
+    return { dx: Math.cos(a) * sp, dy: Math.sin(a) * sp * 0.8, size: 4 + Math.random() * 7,
+      color: ['#6b4a2a', '#8a5a30', '#ff8a1f', '#ffd25a', '#3a2412', '#ff4d00'][Math.floor(Math.random() * 6)],
+      delay: 520 + Math.random() * 80, dur: 420 + Math.random() * 320 };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-meteor-rock" style={{ '--sx': startX + 'px', '--sy': startY + 'px', '--size': size + 'px', '--tail': tailAngle + 'deg' }}>
+        <div className="anim-meteor-tail" />
+        <div className="anim-meteor-core" />
+      </div>
+      {/* v624: grosser Einschlag — Blitz, Druckwelle, Bodenriss-Glut */}
+      <div className="anim-meteor-flash" style={{ '--fw': (w * (2.2 + k * 0.5)) + 'px' }} />
+      <div className="anim-meteor-shockwave" style={{ '--fw': (w * (3 + k * 0.8)) + 'px' }} />
+      <div className="anim-meteor-shockwave anim-meteor-shockwave--late" style={{ '--fw': (w * (2.2 + k * 0.6)) + 'px' }} />
+      <div className="anim-meteor-crater" style={{ '--fw': (w * (1.6 + k * 0.2)) + 'px' }} />
+      {debris.map((d, i) => (
+        <div key={'mtd'+i} className="anim-explosion-particle" style={{
+          '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px', '--color': d.color,
+          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
         }} />
       ))}
     </div>
@@ -1716,6 +2107,124 @@ function CosmicDepthsOverlay() {
   );
 }
 
+// Paraseed Greenhouse (v747) — Al 5.9.: „alles mit grellbunten Blumen
+// vollgestellt, die ungesund und abartig wirken". Also KEIN huebsches
+// Beet: giftgruener Dunst, ueberzuechtete Blueten in Neonfarben, die
+// nicht zusammenpassen, viele davon dicht an dicht, dazu wabernde
+// Sporen und ein paar Blueten mit Auge in der Mitte. Die Layouts
+// werden einmal beim Mount gewuerfelt (useMemo), damit sie nicht bei
+// jedem Render neu springen.
+function ParaseedGreenhouseOverlay() {
+  const NEON = ['#ff2fd0', '#c9ff2f', '#ff8a00', '#00ffc8', '#b026ff', '#ffe600', '#ff0044'];
+  const blumen = useMemo(() => Array.from({ length: 46 }, () => ({
+    x: Math.random() * 100,
+    y: 24 + Math.random() * 74,
+    scale: 0.55 + Math.random() * 1.5,
+    tilt: -22 + Math.random() * 44,
+    farbe: NEON[Math.floor(Math.random() * NEON.length)],
+    kern: NEON[Math.floor(Math.random() * NEON.length)],
+    blaetter: 5 + Math.floor(Math.random() * 4),
+    auge: Math.random() < 0.22,
+    delay: -Math.random() * 5,
+    dur: 3 + Math.random() * 3.5,
+  })), []);
+  const sporen = useMemo(() => Array.from({ length: 26 }, () => ({
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 3 + Math.random() * 7,
+    delay: -Math.random() * 9,
+    dur: 7 + Math.random() * 8,
+    farbe: NEON[Math.floor(Math.random() * NEON.length)],
+  })), []);
+  return (
+    <div className="greenhouse-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Gewaechshausluft: gruenlich, schwuel, leicht faulig */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background:
+          'radial-gradient(ellipse at 50% 110%, rgba(60,140,40,0.55) 0%, rgba(28,70,32,0.72) 40%, rgba(10,26,16,0.9) 100%)',
+      }} />
+      {/* Beschlagene Scheiben — diagonale Streiflichter */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.16,
+        background: 'repeating-linear-gradient(72deg, rgba(255,255,255,.5) 0 2px, transparent 2px 58px)',
+      }} />
+      {/* Wucherndes Beet am unteren Rand */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(20,52,18,0.55) 50%, rgba(6,20,8,0.9) 100%)',
+      }} />
+      {sporen.map((s2, i) => (
+        <div key={'spore' + i} style={{
+          position: 'absolute', left: s2.x + '%', top: s2.y + '%',
+          width: s2.size + 'px', height: s2.size + 'px', borderRadius: '50%',
+          background: s2.farbe, opacity: 0.35,
+          filter: 'blur(1px)',
+          boxShadow: `0 0 ${s2.size * 2}px ${s2.farbe}`,
+          animation: `greenhouseDrift ${s2.dur}s ease-in-out ${s2.delay}s infinite`,
+        }} />
+      ))}
+      {blumen.map((b, i) => {
+        const d = 26 * b.scale;
+        return (
+          <div key={'bloom' + i} style={{
+            position: 'absolute', left: b.x + '%', top: b.y + '%',
+            width: d + 'px', height: d + 'px',
+            transform: `translate(-50%, -50%) rotate(${b.tilt}deg)`,
+            animation: `greenhouseSway ${b.dur}s ease-in-out ${b.delay}s infinite`,
+          }}>
+            {/* Stiel */}
+            <div style={{
+              position: 'absolute', left: '48%', top: '55%',
+              width: Math.max(2, d * 0.09) + 'px', height: (d * 1.5) + 'px',
+              background: 'linear-gradient(180deg, #4e9b2a, #24571a)',
+              transformOrigin: 'top center',
+            }} />
+            {/* Blueten — ueberzaehlige, ungleiche Blaetter */}
+            {Array.from({ length: b.blaetter }).map((_, k) => (
+              <div key={k} style={{
+                position: 'absolute', left: '50%', top: '50%',
+                width: (d * 0.52) + 'px', height: (d * 0.9) + 'px',
+                marginLeft: (-d * 0.26) + 'px', marginTop: (-d * 0.75) + 'px',
+                borderRadius: '50% 50% 45% 45% / 62% 62% 38% 38%',
+                background: `radial-gradient(circle at 50% 80%, ${b.kern} 0%, ${b.farbe} 55%, ${b.farbe}00 100%)`,
+                boxShadow: `0 0 ${d * 0.4}px ${b.farbe}aa`,
+                transformOrigin: '50% 83%',
+                transform: `rotate(${(360 / b.blaetter) * k}deg)`,
+                opacity: 0.92,
+              }} />
+            ))}
+            {/* Kern — bei manchen ein Auge */}
+            <div style={{
+              position: 'absolute', left: '50%', top: '50%',
+              width: (d * 0.34) + 'px', height: (d * 0.34) + 'px',
+              marginLeft: (-d * 0.17) + 'px', marginTop: (-d * 0.17) + 'px',
+              borderRadius: '50%',
+              background: b.auge
+                ? `radial-gradient(circle at 50% 50%, #0a0a0a 0 26%, #f6f2e8 27% 62%, ${b.kern} 63%)`
+                : `radial-gradient(circle, ${b.kern}, #1d2a12)`,
+              boxShadow: `0 0 ${d * 0.5}px ${b.kern}`,
+            }} />
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes greenhouseSway {
+          0%, 100% { filter: hue-rotate(0deg) saturate(1.6); }
+          50%      { filter: hue-rotate(22deg) saturate(2.1); }
+        }
+        @keyframes greenhouseDrift {
+          0%   { transform: translate(0, 0) scale(1); opacity: .18; }
+          50%  { transform: translate(14px, -22px) scale(1.35); opacity: .45; }
+          100% { transform: translate(0, 0) scale(1); opacity: .18; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Graveyard of Limited Power — dark cemetery backdrop. Tombstones are
 // scattered randomly across the lower half of the screen; each carries
 // a pulsing red light. Random positions / sizes / tilts are seeded once
@@ -1883,6 +2392,197 @@ function FirstCircleOfHellOverlay() {
           15%  { opacity: var(--ashOpacity, 1); }
           90%  { opacity: var(--ashOpacity, 1); }
           100% { transform: translate(var(--drift, 0), -120vh); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  AREA-HINTERGRÜNDE — Schichtsystem (Al 7.9.)
+//
+//  Jede Area hat ein Overlay (CARD_API ★-Regel). Liegen mehrere, gilt:
+//   • opaque       — füllt den Hintergrund vollständig (Schachbrett,
+//                    Dark Ocean, Doom Clock, Slippery Ice, Blood Rock,
+//                    Temple of Sacrifice, Cosmic Depths) → immer ZUUNTERST.
+//   • translucent  — deckt alles, aber halbdurchsichtig (Graveyard,
+//                    Greenhouse, First Circle, Floating Island, Deepsea
+//                    Castle, War Council, Cottage) → in der Mitte.
+//   • partial      — deckt nur Teile (Stinky Stables, Spider Hive,
+//                    Wowhalla-Zahnräder, Acid Rain, Bonegrinder, Crystal
+//                    Well) → obenauf.
+//  Zwei VERSCHIEDENE opaque-Areas gleichzeitig: faseriger Schnitt
+//  diagonal von links oben nach rechts unten — links/unten die Area des
+//  betrachtenden Spielers, rechts/oben die des Gegners.
+//  Neue Area: Komponente schreiben und HIER eintragen — sonst wird sie
+//  nicht gerendert.
+// ═══════════════════════════════════════════════════════════════════
+const AREA_TIER_ORDER = ['opaque', 'translucent', 'partial'];
+const AREA_OVERLAYS = {
+  'Board of Kings':               { tier: 'opaque',      C: () => <BoardOfKingsOverlay /> },
+  'Dark Ocean':                   { tier: 'opaque',      C: () => <DarkOceanOverlay /> },
+  'Doom Clock':                   { tier: 'opaque',      C: () => <DoomClockOverlay /> },
+  'Slippery Ice':                 { tier: 'opaque',      C: () => <SlipperyIceOverlay /> },
+  'Blood Rock':                   { tier: 'opaque',      C: () => <BloodRockOverlay /> },
+  'Temple of Sacrifice':          { tier: 'opaque',      C: () => <TempleOfSacrificeOverlay /> },
+  'The Cosmic Depths':            { tier: 'opaque',      C: () => <CosmicDepthsOverlay /> },
+  'Graveyard of Limited Power':   { tier: 'translucent', C: () => <GraveyardOfLimitedPowerOverlay /> },
+  'Paraseed Greenhouse':          { tier: 'translucent', C: () => <ParaseedGreenhouseOverlay /> },
+  'The First Circle of Hell':     { tier: 'translucent', C: () => <FirstCircleOfHellOverlay /> },
+  "Tarleinn's Floating Island":   { tier: 'translucent', C: () => <FloatingIslandOverlay /> },
+  'Deepsea Castle':               { tier: 'translucent', C: () => <DeepseaCastleOverlay /> },
+  'War Council Gathering Place':  { tier: 'translucent', C: () => <WarCouncilOverlay /> },
+  "Cottage at the Forest's Edge": { tier: 'translucent', C: () => <CottageOverlay /> },
+  'Acid Rain':                    { tier: 'partial',     C: () => <AcidRainOverlay /> },
+  'The Bonegrinder':              { tier: 'partial',     C: () => <BonegrinderOverlay /> },
+  'Crystal Well':                 { tier: 'partial',     C: () => <CrystalWellOverlay /> },
+  'Spider Hive':                  { tier: 'partial',     C: () => <SpiderHiveOverlay /> },
+  'Wowhalla, the Hall of the Cool': { tier: 'partial',   C: () => <WowhallaGearsOverlay /> },
+  'Stinky Stables':               { tier: 'partial',     C: () => <StinkyStablesOverlay /> },
+};
+
+/** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
+function buildFrayedSeam(steps = 30) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const jitter = (i === 0 || i === steps) ? 0 : (Math.random() - 0.5) * 2.6;   // ±1.3 % quer zur Diagonale
+    pts.push({ x: t * 100 + jitter, y: t * 100 - jitter });
+  }
+  return pts;
+}
+
+// Jede Schicht bekommt `isolation: isolate`: einige Overlays (Crystal
+// Well, Dark Ocean, Doom Clock) tragen an ihrer Wurzel `zIndex: -1` und
+// rutschten sonst im gemeinsamen Stapelkontext UNTER die opaque-Schicht
+// (v825: Crystal Well unsichtbar hinter dem Schachbrett). Ein eigener
+// Stapelkontext je Schicht haelt das innere z-Index innen; die Reihen-
+// folge der Schichten ist die DOM-Reihenfolge.
+function AreaBackgrounds({ areaZones, myIdx, oppIdx }) {
+  const seam = useMemo(() => buildFrayedSeam(), []);
+  const mine = areaZones?.[myIdx] || [];
+  const theirs = areaZones?.[oppIdx] || [];
+  const layers = [];
+  for (const tier of AREA_TIER_ORDER) {
+    const mineT = mine.filter(n => AREA_OVERLAYS[n]?.tier === tier);
+    const theirsT = theirs.filter(n => AREA_OVERLAYS[n]?.tier === tier);
+    if (tier === 'opaque') {
+      // Je Seite zählt die zuletzt gelegte opaque-Area.
+      const a = mineT[mineT.length - 1];
+      const b = theirsT[theirsT.length - 1];
+      if (a && b && a !== b) {
+        const diag = seam.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(', ');
+        const clipMine = `polygon(${diag}, 0% 100%)`;          // links/unten
+        const clipTheirs = `polygon(${diag}, 100% 0%)`;        // rechts/oben
+        const A = AREA_OVERLAYS[a].C, B = AREA_OVERLAYS[b].C;
+        layers.push(
+          <div key={`op-${b}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipTheirs }}><B /></div>,
+          <div key={`op-${a}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate', clipPath: clipMine }}><A /></div>,
+          <svg key="op-seam" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+            viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
+              stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
+              style={{ filter: 'blur(1.2px)' }} />
+            <polyline points={seam.map(p => `${p.x},${p.y}`).join(' ')} fill="none"
+              stroke="rgba(255,240,220,0.35)" strokeWidth="0.25" strokeLinejoin="round"
+              strokeDasharray="1.2 0.7 0.4 0.9" vectorEffect="non-scaling-stroke" />
+          </svg>,
+        );
+      } else {
+        const only = a || b;
+        if (only) { const C = AREA_OVERLAYS[only].C; layers.push(<div key={`op-${only}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate' }}><C /></div>); }
+      }
+      continue;
+    }
+    for (const n of [...new Set([...mineT, ...theirsT])]) {
+      const C = AREA_OVERLAYS[n].C;
+      layers.push(<div key={`${tier}-${n}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', isolation: 'isolate' }}><C /></div>);
+    }
+  }
+  return <>{layers}</>;
+}
+
+// Board of Kings — a chessboard seen from a slight angle: wide dark
+// wooden frame, 8×8 squares in warm ivory / walnut, faint grain, and
+// the chess-piece silhouettes of the archetype drifting up like the
+// dust of a long game. Sits under the cards (no zIndex → below the
+// zone-has-card layer), pointer-events off. Als Regel 7.9.: JEDE Area
+// definiert einen Hintergrund, solange sie liegt.
+function BoardOfKingsOverlay() {
+  const pieces = useMemo(() => {
+    const glyphs = ['♟', '♞', '♝', '♜', '♛', '♚'];
+    return Array.from({ length: 14 }, (_, i) => ({
+      glyph: glyphs[i % glyphs.length],
+      x: 3 + Math.random() * 94,
+      delay: -Math.random() * 18,
+      dur: 16 + Math.random() * 14,
+      size: 18 + Math.random() * 26,
+      drift: -10 + Math.random() * 20,
+      opacity: 0.10 + Math.random() * 0.18,
+      dark: i % 2 === 0,
+    }));
+  }, []);
+  // 2×2-Kachel als SVG mit eigenem Seitenverhaeltnis: `background-size:
+  // auto 25%` macht die Kachelhoehe zu einem Viertel der Bretthoehe
+  // (= 8 Reihen), die Breite folgt dem Seitenverhaeltnis — die Felder
+  // bleiben QUADRATISCH, und in der Breite passen so viele hinein, wie
+  // das Spielfeld hergibt (mehr als acht; Al 7.9.).
+  const checkerTile = useMemo(() => {
+    const light = '#dccaa6', dark = '#4a2e1a';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'>`
+      + `<rect width='2' height='2' fill='${light}'/>`
+      + `<rect x='1' y='0' width='1' height='1' fill='${dark}'/>`
+      + `<rect x='0' y='1' width='1' height='1' fill='${dark}'/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  }, []);
+  return (
+    <div className="board-of-kings-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Layer 1: dark walnut frame around the whole field. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(180deg, #2a1a10 0%, #3a2416 50%, #1e120a 100%)',
+      }} />
+      {/* Layer 2: the board in perspective — 8 rows high, square
+          cells, as many columns as the width allows. */}
+      <div style={{
+        position: 'absolute', left: '4%', right: '4%', top: '4%', bottom: '4%',
+        backgroundImage: checkerTile,
+        backgroundSize: 'auto 25%',
+        backgroundRepeat: 'repeat',
+        backgroundPosition: 'center top',
+        transform: 'perspective(1400px) rotateX(9deg)', transformOrigin: '50% 60%',
+        boxShadow: 'inset 0 0 40px rgba(0,0,0,0.35), 0 0 0 10px #4a2f1c, 0 0 0 14px #1a0f08, 0 30px 60px rgba(0,0,0,0.6)',
+        opacity: 0.92,
+      }} />
+      {/* Layer 3: soft wood grain across everything. */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.16, mixBlendMode: 'multiply',
+        background: 'repeating-linear-gradient(94deg, rgba(0,0,0,0.0) 0 6px, rgba(0,0,0,0.35) 6px 7px, rgba(0,0,0,0.0) 7px 15px)',
+      }} />
+      {/* Layer 4: vignette so the cards stay the brightest thing. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45) 100%)',
+      }} />
+      {/* Layer 5: drifting piece silhouettes. */}
+      {pieces.map((p, i) => (
+        <div key={i} style={{
+          position: 'absolute', left: `${p.x}%`, bottom: '-8%',
+          fontSize: p.size, lineHeight: 1,
+          color: p.dark ? 'rgba(20,12,6,0.9)' : 'rgba(240,228,200,0.9)',
+          opacity: p.opacity,
+          textShadow: p.dark ? '0 0 6px rgba(0,0,0,0.6)' : '0 0 6px rgba(255,240,200,0.5)',
+          animation: `bokPieceRise ${p.dur}s linear ${p.delay}s infinite`,
+          '--bok-drift': `${p.drift}px`,
+        }}>{p.glyph}</div>
+      ))}
+      <style>{`
+        @keyframes bokPieceRise {
+          0%   { transform: translate(0, 0) rotate(0deg); }
+          50%  { transform: translate(var(--bok-drift), -55vh) rotate(6deg); }
+          100% { transform: translate(0, -115vh) rotate(-4deg); }
         }
       `}</style>
     </div>
@@ -4069,6 +4769,28 @@ function BurnedOverlay({ ticking }) {
   );
 }
 
+// Bleeding overlay (v712) — persistent red drips running down the card;
+// `ticking` pulses when Bleed damage lands (like burn-ticking).
+function BleedingOverlay({ ticking }) {
+  const drips = useMemo(() => Array.from({ length: 7 }, () => ({
+    x: 6 + Math.random() * 88,
+    y: Math.random() * 40,
+    len: 10 + Math.random() * 18,
+    delay: Math.random() * 2.2,
+    dur: 1.4 + Math.random() * 1.2,
+  })), []);
+  return (
+    <div className={'status-bleeding-overlay' + (ticking ? ' bleed-ticking' : '')}>
+      {drips.map((d, i) => (
+        <span key={i} className="bleeding-drip" style={{
+          left: d.x + '%', top: d.y + '%', height: d.len,
+          animationDelay: d.delay + 's', animationDuration: d.dur + 's',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function PoisonedOverlay({ stacks }) {
   const bubbles = useMemo(() => Array.from({ length: 8 }, () => ({
     x: 10 + Math.random() * 80,
@@ -5154,6 +5876,93 @@ function BomblebeeFuseEffect({ x, y, w }) {
 // receives the slot's anchor coordinates from `GameAnimationRenderer`;
 // inner CSS positions everything relative to that anchor so the
 // bubble auto-centers regardless of slot size.
+// ── Bleed (v714) ─────────────────────────────────────────────────
+// Blood splatter — bursting droplets flung outward plus a few heavy
+// drops that arc and drip. Used ON TOP of whatever attack animation
+// already played (Devlin's hits) and as the Bleed-damage pulse.
+function BloodSplatterEffect({ x, y }) {
+  const drops = useMemo(() => Array.from({ length: 26 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 22 + Math.random() * 54;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 10,
+      size: 3 + Math.random() * 8,
+      delay: Math.random() * 90,
+      dur: 380 + Math.random() * 320,
+      color: ['#b3001b', '#d40f2b', '#8a0014', '#e0324c', '#6e000f'][Math.floor(Math.random() * 5)],
+      stretch: 1 + Math.random() * 1.6,
+      rot: angle * 180 / Math.PI,
+    };
+  }), []);
+  const smears = useMemo(() => Array.from({ length: 5 }, () => ({
+    ox: (Math.random() - 0.5) * 36, oy: (Math.random() - 0.5) * 30,
+    w: 14 + Math.random() * 22, h: 10 + Math.random() * 16,
+    rot: Math.random() * 360, delay: 40 + Math.random() * 120,
+  })), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-blood-burst" />
+      {smears.map((m, i) => (
+        <div key={'sm' + i} className="anim-blood-smear" style={{
+          left: m.ox, top: m.oy, width: m.w, height: m.h,
+          transform: `translate(-50%, -50%) rotate(${m.rot}deg)`, animationDelay: m.delay + 'ms',
+        }} />
+      ))}
+      {drops.map((d, i) => (
+        <div key={'bd' + i} className="anim-blood-drop" style={{
+          '--bdx': d.dx + 'px', '--bdy': d.dy + 'px', '--bgy': (d.dy + 34) + 'px',
+          width: d.size, height: d.size * d.stretch, background: d.color,
+          transform: `rotate(${d.rot}deg)`,
+          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// Bloody cut — a jagged, glistening gash torn open across the card:
+// dark wound line, wet red inner edge, tissue flaps, then heavy drips
+// running off the lower lip. Doctor Fester / Ghoul Guard.
+function BloodyCutEffect({ x, y }) {
+  const drips = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+    ox: -34 + i * 14 + (Math.random() - 0.5) * 8,
+    len: 14 + Math.random() * 22,
+    delay: 260 + Math.random() * 260,
+    dur: 520 + Math.random() * 300,
+  })), []);
+  const spurts = useMemo(() => Array.from({ length: 10 }, () => {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
+    const speed = 18 + Math.random() * 30;
+    return { dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, size: 3 + Math.random() * 5,
+      delay: 120 + Math.random() * 120, dur: 380 + Math.random() * 220 };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-cut-flash" />
+      <svg className="anim-cut-svg" viewBox="-60 -30 120 60" width="120" height="60">
+        {/* Wundlippen (Gewebe) */}
+        <path className="anim-cut-flesh" d="M-46,-2 L-30,-8 L-14,-3 L2,-9 L18,-2 L34,-7 L46,0 L34,9 L18,4 L2,11 L-14,5 L-30,10 Z" />
+        {/* nasse Innenkante */}
+        <path className="anim-cut-wet" d="M-44,0 L-30,-5 L-14,-1 L2,-6 L18,0 L34,-4 L44,1 L34,6 L18,2 L2,8 L-14,3 L-30,7 Z" />
+        {/* dunkler Schnitt */}
+        <path className="anim-cut-line" d="M-46,0 L-30,-4 L-14,0 L2,-5 L18,1 L34,-3 L46,1" />
+      </svg>
+      {spurts.map((d, i) => (
+        <div key={'cs' + i} className="anim-blood-drop" style={{
+          '--bdx': d.dx + 'px', '--bdy': d.dy + 'px', '--bgy': (d.dy + 30) + 'px',
+          width: d.size, height: d.size * 1.6, background: '#c1121f',
+          animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+      {drips.map((d, i) => (
+        <div key={'cd' + i} className="anim-cut-drip" style={{
+          left: d.ox, height: d.len, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function ShieldBubbleEffect({ x, y }) {
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
@@ -5314,6 +6123,61 @@ function SnakeBiteEffect({ x, y }) {
   );
 }
 
+// Land Sharks (v785): ein Haigebiss schnappt auf dem Ziel zu. Zwei
+// Kiefer — oben und unten — fahren mit gezackten Zaehnen aufeinander
+// zu, treffen sich bei ~310 ms in der Mitte, halten kurz und ziehen
+// sich wieder zurueck. Dazu ein blaugruener Aufschlagblitz und
+// Gischtspritzer.
+//
+// Wie beim Schlangenbiss ist die Gleichzeitigkeit der Punkt: die Karte
+// sendet ALLE `shark_bite`-Ereignisse in einem Rahmen los und wartet
+// danach EINEN gemeinsamen Takt, bevor der Schaden faellt. So schnappen
+// bei drei Zielen drei Gebisse zugleich zu, statt nacheinander.
+// Gesamtlaufzeit ~750 ms.
+function SharkBiteEffect({ x, y }) {
+  // Zaehne: oben und unten je 7, leicht unterschiedlich hoch, damit die
+  // Reihe nicht wie ein Kamm aussieht.
+  const zaehne = useMemo(() => ({
+    oben: Array.from({ length: 7 }, (_, i) => ({ i, h: 13 + Math.random() * 7 })),
+    unten: Array.from({ length: 7 }, (_, i) => ({ i, h: 11 + Math.random() * 7 })),
+  }), []);
+  const gischt = useMemo(() => Array.from({ length: 16 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 16 + Math.random() * 30;
+    return {
+      dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed - 6,
+      size: 3 + Math.random() * 5,
+      color: ['#bfefff', '#7fd4ee', '#e8fbff', '#5ec8e5', '#a9e6f7'][Math.floor(Math.random() * 5)],
+      delay: 300 + Math.random() * 140,
+      dur: 320 + Math.random() * 260,
+    };
+  }), []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+      <div className="anim-shark-jaw anim-shark-jaw-top">
+        {zaehne.oben.map(z => (
+          <div key={'to' + z.i} className="anim-shark-tooth anim-shark-tooth-down"
+            style={{ left: (z.i * 13) + 'px', height: z.h + 'px' }} />
+        ))}
+      </div>
+      <div className="anim-shark-jaw anim-shark-jaw-bottom">
+        {zaehne.unten.map(z => (
+          <div key={'tu' + z.i} className="anim-shark-tooth anim-shark-tooth-up"
+            style={{ left: (z.i * 13 + 6) + 'px', height: z.h + 'px' }} />
+        ))}
+      </div>
+      <div className="anim-shark-bite-flash" />
+      {gischt.map((g, i) => (
+        <div key={'sg' + i} className="anim-explosion-particle" style={{
+          '--dx': g.dx + 'px', '--dy': g.dy + 'px', '--size': g.size + 'px',
+          '--color': g.color, animationDelay: g.delay + 'ms', animationDuration: g.dur + 'ms',
+          boxShadow: `0 0 6px ${g.color}`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 // Cannibalism (Mao's starting Ability): a meat drumstick wobbles
 // over the eating Hero and "shrinks in bites" — three quick scale-
 // down beats sell the "eat-eat-eat" read. Green healing particles
@@ -5355,6 +6219,27 @@ function CannibalismChompEffect({ x, y }) {
     </div>
   );
 }
+
+// ── KURZE PHASENNAMEN (v807, Als Vorgabe 5.9.) ───────────────────────
+// Die Phasenzeile ueberlappte die linke Area-Zone. Ueber den Massstab
+// allein war das nicht zu loesen: aus Als Screenshot gerechnet haette es
+// Faktor 0.58 gebraucht, also 5,2 px Schrift — unlesbar. Der Platz
+// steckt in den Beschriftungen, nicht in der Groesse. 70 Zeichen werden
+// zu 34, die Zeile schrumpft dadurch staerker als jede vertretbare
+// Skalierung es koennte, und die Schrift bleibt lesbar.
+//
+// ★ `data-phase-name` behaelt den VOLLEN Namen. Das Tutorial zeigt ueber
+// genau dieses Attribut auf einzelne Phasen
+// (`[data-phase-name="Action Phase"]` u.a. in app-shared.jsx) — waere
+// hier gekuerzt worden, faende es seine Ziele nicht mehr.
+const PHASEN_KURZ = {
+  'Start Phase': 'Start',
+  'Resource Phase': 'Resource',
+  'Main Phase 1': 'Main 1',
+  'Action Phase': 'Action',
+  'Main Phase 2': 'Main 2',
+  'End Phase': 'End',
+};
 
 // ── Hand-Reaktionsfenster → Logtext (Als Regel 20.8.) ────────────────
 // „Jede Karte, die eingesetzt wird, sollte einen Logeintrag haben."
@@ -5781,8 +6666,10 @@ const ANIM_REGISTRY = {
   // dome flares over its slot (flash + scanlined dome + expanding
   // rings + a shield glyph) just before the Projection flies off to
   // the discard pile.
+  // v800: `glyph` ist frei belegbar, damit `weapon_absorption` dieselbe
+  // Sog-Animation mit eigenem Zeichen (und eigenem Klang) nutzen kann.
   idej_projection_absorb: (function () {
-    return function IdejProjectionAbsorbEffect({ x, y, w }) {
+    return function IdejProjectionAbsorbEffect({ x, y, w, glyph }) {
       const base = Math.max(w || 72, 60);
       const rings = useMemo(() => [base * 1.7, base * 2.3, base * 2.9], [base]);
       const domeSz = base * 1.9;
@@ -5804,9 +6691,49 @@ const ANIM_REGISTRY = {
           }} />
           <div className="anim-idej-absorb-glyph" style={{
             width: glyphSz, height: glyphSz, left: -glyphSz / 2, top: -glyphSz / 2,
-          }}>🛡</div>
+          }}>{glyph || '🛡'}</div>
         </div>
       );
+    };
+  })(),
+  // Weapon Storm (v804): Einschlag der Explosion, eigener Typ mit
+  // Klingen-Klang. Barrier of Faith (v804): Schutzblase des Escape
+  // Device als eigener Typ. Weapon Unleashing (v804): Sog-Ringe der
+  // Idej-Projektion mit 💥. (Vorbild trex_chomp — Alias + eigener Klang.)
+  weapon_storm: (function () {
+    return function WeaponStormEffect(props) {
+      const Boom = ANIM_REGISTRY.explosion;
+      return Boom ? <Boom {...props} /> : null;
+    };
+  })(),
+  barrier_of_faith: (function () {
+    return function BarrierOfFaithEffect(props) {
+      const Bubble = ANIM_REGISTRY.shield_bubble;
+      return Bubble ? <Bubble {...props} /> : null;
+    };
+  })(),
+  weapon_unleashing: (function () {
+    return function WeaponUnleashingEffect(props) {
+      const Sog = ANIM_REGISTRY.idej_projection_absorb;
+      return Sog ? <Sog {...props} glyph="💥" /> : null;
+    };
+  })(),
+  // Emergency Spell Armor (v803): dieselbe Teal-Ruestung wie Spectral
+  // Armor, aber als eigener Typ mit eigenem Klang (Vorbild trex_chomp).
+  emergency_spell_armor: (function () {
+    return function EmergencySpellArmorEffect(props) {
+      const Armor = ANIM_REGISTRY.spectral_armor;
+      return Armor ? <Armor {...props} /> : null;
+    };
+  })(),
+  // Weapon Absorption (v800): der Held saugt seine Ausruestung und
+  // Abilities ein — Sog-Ringe der Idej-Projektion mit Wirbel-Zeichen.
+  // Eigener Typ, damit der Klang nur hier haengt (Vorbild trex_chomp).
+  weapon_absorption: (function () {
+    return function WeaponAbsorptionEffect(props) {
+      const Sog = ANIM_REGISTRY.idej_projection_absorb;
+      if (!Sog) return null;
+      return <Sog {...props} glyph="🌀" />;
     };
   })(),
   // Capture Net — a rope-mesh net plummets from the top of the screen
@@ -6201,6 +7128,7 @@ const ANIM_REGISTRY = {
   stun_strike: StunStrikeEffect,
   niu_powerup: NiuPowerUpEffect,
   snake_bite: SnakeBiteEffect,
+  shark_bite: SharkBiteEffect,
   cannibalism_chomp: CannibalismChompEffect,
   cosmic_summon: CosmicSummonEffect,
   // Mini's tutor-summon flair — small purple hearts orbit and rise
@@ -6534,6 +7462,12 @@ const ANIM_REGISTRY = {
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
   black_flame_strike: BlackFlameStrikeEffect,
+  demon_fire_pillar: DemonFirePillarEffect,
+  cavalry_charge: CavalryChargeEffect,
+  poison_skulls: PoisonSkullsEffect,
+  lightning_rain: LightningRainEffect,
+  mist_veil: MistVeilEffect,
+  meteor_crash: MeteorCrashEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
   // ── Bomblebee archetype (7 explosion variants) ─────────────────────
@@ -7934,6 +8868,48 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // v724 (Thicket, Als Vorgabe 4.9.: „deutlich mehr Pflanzen").
+  // Ein DICHTES Dickicht statt eines Rankenkranzes: 34 Blaetter und
+  // Halme schlagen aus dem Zonenrand nach innen zusammen, bleiben
+  // kurz als Wand stehen und sinken leicht ab. Bewusst mehr Teile,
+  // groessere Spanne und laengerer Halt als `biomancy_vines`, damit
+  // man auf einen Blick sieht: da ist etwas VERSTECKT, nicht nur
+  // bewachsen. Klang: `elem_biomancy` (ZONE_ANIM_SFX).
+  thicket_cover: (() => {
+    return function ThicketCoverEffect({ x, y }) {
+      const teile = useMemo(() => Array.from({ length: 34 }, (_, i) => {
+        // Aus dem Rand nach innen: Startpunkt auf einer Ellipse, Ziel
+        // nahe der Mitte, damit sich das Blattwerk schliesst.
+        const winkel = (i / 34) * Math.PI * 2 + Math.random() * 0.35;
+        const weite = 46 + Math.random() * 26;
+        return {
+          sx: Math.cos(winkel) * weite,
+          sy: Math.sin(winkel) * weite * 0.72,
+          dx: Math.cos(winkel) * (6 + Math.random() * 12),
+          dy: Math.sin(winkel) * (4 + Math.random() * 9) + 6,
+          rot: Math.random() * 360,
+          spin: (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 55),
+          delay: i * 14 + Math.random() * 60,
+          dur: 900 + Math.random() * 500,
+          emoji: ['🌿', '🌱', '☘️', '🍃', '🌾', '🌳', '🍀'][Math.floor(Math.random() * 7)],
+          size: 15 + Math.random() * 16,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {teile.map((t, i) => (
+            <span key={i} className="anim-thicket-leaf" style={{
+              '--tsx': t.sx + 'px', '--tsy': t.sy + 'px',
+              '--tdx': t.dx + 'px', '--tdy': t.dy + 'px',
+              '--trot': t.rot + 'deg', '--tspin': (t.rot + t.spin) + 'deg',
+              fontSize: t.size + 'px',
+              animationDelay: t.delay + 'ms', animationDuration: t.dur + 'ms',
+            }}>{t.emoji}</span>
+          ))}
+        </div>
+      );
+    };
+  })(),
   biomancy_vines: (() => {
     return function BiomancyVinesEffect({ x, y }) {
       const vines = useMemo(() => Array.from({ length: 12 }, (_, i) => {
@@ -8971,6 +9947,150 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── GESTALTWANDEL (Als Vorgabe 28.8.) ────────────────────────────
+  // „Die Verwandlung von ??? in einen anderen Hero sollte auch eine
+  //  kleine Animation haben; ein weißes Leuchten und Particles."
+  //
+  // EINE Komponente, zwei Richtungen — `shapeshift_into` zieht das
+  // Licht nach innen, `shapeshift_back` löst es nach außen auf. Ein
+  // zweiter Baukasten für dieselbe Formensprache wäre die zweite
+  // Wahrheit gewesen; der Unterschied ist genau der Name der
+  // Keyframes und die Richtung der Partikel.
+  //
+  // Bewusst klein gehalten: der Wandel passiert einmal pro Zug und
+  // sitzt auf einer Heldenkarte, nicht über dem ganzen Brett.
+  ...(function () {
+    function ShapeshiftEffect({ x, y, herein }) {
+      const teilchen = useMemo(() => Array.from({ length: 18 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = 38 + Math.random() * 46;
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite,
+          groesse: 3 + Math.random() * 5,
+          verzug: Math.random() * 260,
+          dauer: 520 + Math.random() * 420,
+          farbe: ['#ffffff', '#f2f8ff', '#e8f4ff', '#dcecff'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Weiches weißes Leuchten, zweilagig für einen harten Kern */}
+          <div style={{
+            position: 'absolute', width: 150, height: 150, marginLeft: -75, marginTop: -75,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.92) 0%, rgba(226,240,255,.45) 38%, rgba(200,225,255,.12) 62%, transparent 78%)',
+            animation: `${herein ? 'shiftGlowIn' : 'shiftGlowOut'} 820ms ease-out forwards`,
+          }} />
+          <div style={{
+            position: 'absolute', width: 84, height: 84, marginLeft: -42, marginTop: -42,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.98) 0%, rgba(245,250,255,.55) 45%, transparent 72%)',
+            animation: `${herein ? 'shiftGlowIn' : 'shiftGlowOut'} 620ms ease-out 120ms forwards`,
+            opacity: 0,
+          }} />
+          {/* Lichtstreifen — der Moment, in dem das Bild wechselt */}
+          <div style={{
+            position: 'absolute', width: 118, height: 14, marginLeft: -59, marginTop: -7,
+            background: 'linear-gradient(to right, transparent, rgba(255,255,255,.95) 45%, rgba(255,255,255,.95) 55%, transparent)',
+            filter: 'blur(2px)',
+            animation: 'shiftSweep 700ms ease-in-out 90ms forwards',
+            opacity: 0,
+          }} />
+          {teilchen.map((t, i) => (
+            <div key={'ss' + i} style={{
+              position: 'absolute', left: -t.groesse / 2, top: -t.groesse / 2,
+              width: t.groesse, height: t.groesse, borderRadius: '50%',
+              background: t.farbe,
+              boxShadow: `0 0 ${t.groesse * 2}px rgba(255,255,255,.9)`,
+              '--dx': `${t.dx}px`, '--dy': `${t.dy}px`,
+              animation: `${herein ? 'shiftMoteIn' : 'shiftMoteOut'} ${t.dauer}ms ease-out ${t.verzug}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+        </div>
+      );
+    }
+    return {
+      shapeshift_into: (props) => <ShapeshiftEffect {...props} herein />,
+      shapeshift_back: (props) => <ShapeshiftEffect {...props} herein={false} />,
+    };
+  })(),
+
+  // „Divine Awakening" — dasselbe Bild wie holy_revival, aber ein
+  // eigener Eintrag, damit die Karte ihren eigenen Klang bekommt
+  // (`ascension` statt `revive`). Kein zweiter Baukasten fuer dieselbe
+  // Optik: die Zuweisung unten zeigt auf denselben Bauplan.
+  // ── Konzert (Hymn of Rebirth, v631) ─────────────────────────────
+  // Ein grosses Konzert weckt das Ziel: goldener Lichtkegel von oben,
+  // Notenwolke (♪ ♫ ♩ ♬) steigt in Wellen auf, dazu Scheinwerfer-Strahlen
+  // und ein warmer Puls. Klang `revive` aus ZONE_ANIM_SFX (Standard des
+  // Revive-Helfers), dazu spielt die Komponente `ability_activate` als
+  // Auftakt (dedupe 0, ohne Kategorie — siehe CARD_API 'effect').
+  concert_revival: (() => {
+    return function ConcertRevivalEffect({ x, y, w = 80, h = 110 }) {
+      const notes = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+        glyph: ['♪', '♫', '♩', '♬', '♭', '♯'][Math.floor(Math.random() * 6)],
+        xOff: (Math.random() - 0.5) * w * 2.2,
+        rise: 70 + Math.random() * 160,
+        sway: (Math.random() - 0.5) * 50,
+        size: 16 + Math.random() * 18,
+        color: ['#ffd700', '#fff3b0', '#ffffff', '#ffb347', '#ffe9a8'][Math.floor(Math.random() * 5)],
+        delay: 100 + i * 55 + Math.random() * 60,
+        dur: 900 + Math.random() * 600,
+      })), []);
+      const beams = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+        angle: -32 + i * 16 + (Math.random() - 0.5) * 6,
+        delay: 80 + i * 90,
+      })), []);
+      // v632: das Konzert als KLANGSERIE. Der Katalog hat keine Instrumente,
+      // also wird `ping` als Glocke gestimmt (rate = 2^(Halbton/12)) und
+      // zu einer Melodie gesetzt: Auftakt (Trommel = chain_add), eine
+      // aufsteigende Dur-Figur, ein Tremolo-Lauf, Schluss-Akkord (drei
+      // Glocken gleichzeitig) und der Anschwell-Klang (ascension) als
+      // Chor. Alles dedupe 0 und ohne Kategorie, sonst frisst das
+      // 'effect'-Fenster die Toene (CARD_API). Der `revive`-Klang selbst
+      // kommt aus ZONE_ANIM_SFX bei 350 ms dazu.
+      useEffect(() => {
+        if (!window.playSFX) return;
+        const st = (n) => Math.pow(2, n / 12);          // Halbtoene → Abspielrate
+        const at = (ms, name, opts) => setTimeout(() => window.playSFX(name, { dedupe: 0, ...opts }), ms);
+        const ts = [];
+        // Auftakt: Tusch
+        ts.push(at(0,   'ability_activate', { rate: 0.9, volume: 0.8 }));
+        ts.push(at(0,   'chain_add',        { rate: 0.8, volume: 0.7 }));
+        ts.push(at(180, 'chain_add',        { rate: 0.8, volume: 0.5 }));
+        // Melodie (C E G c e g) — Glocken
+        const melody = [0, 4, 7, 12, 16, 19];
+        melody.forEach((semi, i) => ts.push(at(300 + i * 130, 'ping', { rate: st(semi), volume: 0.75 })));
+        // Tremolo-Lauf abwaerts
+        [19, 17, 16, 14, 12].forEach((semi, i) => ts.push(at(1120 + i * 70, 'ping', { rate: st(semi), volume: 0.5 })));
+        // Chor schwillt an
+        ts.push(at(900,  'ascension', { rate: 1.0, volume: 0.9 }));
+        // Schluss-Akkord: C-E-G als drei Glocken zugleich + Trommelschlag
+        [0, 4, 7].forEach((semi) => ts.push(at(1500, 'ping', { rate: st(semi + 12), volume: 0.9 })));
+        ts.push(at(1500, 'chain_add', { rate: 0.7, volume: 0.9 }));
+        ts.push(at(1520, 'buff',      { rate: 1.1, volume: 0.6 }));
+        return () => ts.forEach(clearTimeout);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-concert-cone" style={{ '--cw': (w * 2.4) + 'px', '--ch': (h * 2.2) + 'px' }} />
+          {beams.map((b, i) => (
+            <div key={'cb'+i} className="anim-concert-beam" style={{ '--angle': b.angle + 'deg', animationDelay: b.delay + 'ms' }} />
+          ))}
+          <div className="anim-concert-pulse" style={{ '--pw': (w * 1.8) + 'px' }} />
+          {notes.map((n, i) => (
+            <div key={'cn'+i} className="anim-concert-note" style={{
+              left: n.xOff + 'px', top: (h * 0.3) + 'px', fontSize: n.size + 'px', color: n.color,
+              '--rise': n.rise + 'px', '--sway': n.sway + 'px',
+              animationDelay: n.delay + 'ms', animationDuration: n.dur + 'ms',
+            }}>{n.glyph}</div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   holy_revival: (() => {
     // Golden-white holy light rising upward — revival/resurrection effect
     return function HolyRevivalEffect({ x, y }) {
@@ -9123,6 +10243,13 @@ const ANIM_REGISTRY = {
   shadow_summon: ShadowSummonEffect,
   gold_sparkle: GoldSparkleEffect,
   diamond_sparkle: DiamondSparkleEffect,
+  // ── Puppets (v706): Aliase mit eigenem Klang je Token (ZONE_ANIM_SFX) ──
+  puppet_swap_shishi: FlameStrikeEffect,
+  puppet_swap_vinny: ShieldBubbleEffect,
+  puppet_swap_laki: GoldSparkleEffect,
+  puppet_swap_saras: DiamondSparkleEffect,
+  puppet_luck: GoldSparkleEffect,
+  puppet_preserve: ShieldBubbleEffect,
   spider_summon: SpiderSummonEffect,
   beer_bubbles: BeerBubblesEffect,
   monkee_shield: (() => {
@@ -9525,6 +10652,74 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ── Shattering Strike (v814, Als Vorgabe) ─────────────────
+  //  Hammerschlag von oben wie magic_hammer, aber ~70 % so gross,
+  //  und statt Funken wirbelt ERDE auf: braune Brocken in einem
+  //  Kegel nach oben-aussen (mit Fall und Drehung) und ein flacher
+  //  Staubring. Gleicher Nachbar-Squash wie beim Hammer.
+  shattering_strike: (() => {
+    const CLODS = ['#6b4a2b', '#8a6238', '#4e3419', '#a37a4a', '#5c3f22', '#7d5a33'];
+    const DUST = ['#b79a70', '#d2b98e', '#9a7f5b'];
+    return function ShatteringStrikeEffect({ x, y, w, h }) {
+      const targetH = h || 90;
+      const hammerW = 38, hammerH = 56;
+      const clods = useMemo(() => Array.from({ length: 18 }, () => {
+        const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2; // Kegel nach oben-aussen
+        const speed = 26 + Math.random() * 46;
+        return {
+          dx: Math.cos(angle) * speed, dy: -Math.abs(Math.sin(angle) * speed) - 10,
+          size: 4 + Math.random() * 7, rot: (Math.random() - .5) * 720,
+          color: CLODS[Math.floor(Math.random() * CLODS.length)],
+          delay: 300 + Math.random() * 70, dur: 420 + Math.random() * 260,
+        };
+      }), []);
+      const dust = useMemo(() => Array.from({ length: 12 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 18 + Math.random() * 30;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed * 0.35,
+          size: 3 + Math.random() * 5, color: DUST[Math.floor(Math.random() * DUST.length)],
+          delay: 310 + Math.random() * 60, dur: 380 + Math.random() * 220,
+        };
+      }), []);
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          const els = document.querySelectorAll('[data-hero-zone],[data-support-zone]');
+          let best = null, bestDist = Infinity;
+          els.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+            if (d < bestDist) { bestDist = d; best = el; }
+          });
+          if (best && bestDist < 80) {
+            best.classList.add('magic-hammer-squashed');
+            setTimeout(() => best.classList.remove('magic-hammer-squashed'), 550);
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-hammer-head anim-hammer-head-small" style={{
+            width: hammerW, height: hammerH, marginLeft: -hammerW / 2, marginTop: -targetH / 2 - hammerH,
+          }} />
+          <div className="anim-earth-ring" />
+          {clods.map((c, i) => (
+            <div key={'sc'+i} className="anim-earth-clod" style={{
+              '--dx': c.dx + 'px', '--dy': c.dy + 'px', '--size': c.size + 'px', '--rot': c.rot + 'deg',
+              '--color': c.color, animationDelay: c.delay + 'ms', animationDuration: c.dur + 'ms',
+            }} />
+          ))}
+          {dust.map((s, i) => (
+            <div key={'sd'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   // ── 3-Headed Giant — Stachelkeule ─────────────────────────
   //  Grobe Holzkeule mit Stacheln, die von oben auf das Ziel
   //  kracht. Bewusst am magic_hammer gebaut (gleiche Struktur:
@@ -9730,6 +10925,86 @@ const ANIM_REGISTRY = {
             <div key={'ms'+i} className="anim-explosion-particle" style={{
               '--dx': d.dx + 'px', '--dy': d.dy + 'px', '--size': d.size + 'px',
               '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Shattered Trident: rosa Glas zerspringt auf dem Ziel (v660) ──
+  //  Eine rosa Glasscheibe blitzt ueber dem Ziel auf, bekommt Risse
+  //  und zerspringt nach ~220 ms in dreieckige Scherben, die
+  //  auseinanderfliegen und sich drehen; dazu ein rosa Lichtring.
+  //  [Als Vorgabe 30.8.: „Animation splitternden rosanen Glases
+  //   inklusive Sound auf dem Ziel".]
+  // Glass Sword (v810): dieselbe Scherben-Animation wie der Trident,
+  // aber in Tuerkis-Blau — eigener Typ mit eigenem Klang (Vorbild trex_chomp).
+  glass_shatter: (function () {
+    const PAL = {
+      shards: ['#8ff3ff', '#5fd9f2', '#c9fbff', '#38bfe0', '#a6eefc'],
+      dust: ['#effdff', '#bff2fb', '#7fdcf0'],
+      vars: {
+        '--gp-pane-a': 'rgba(170,240,255,.45)', '--gp-pane-b': 'rgba(70,190,225,.35)', '--gp-pane-c': 'rgba(220,250,255,.5)',
+        '--gp-border': 'rgba(140,225,245,.9)', '--gp-glow': 'rgba(90,205,235,.8)',
+        '--gp-crack': 'rgba(230,252,255,.9)',
+        '--gp-ring-a': 'rgba(215,250,255,.95)', '--gp-ring-b': 'rgba(120,215,240,.55)', '--gp-ring-c': 'rgba(50,160,200,.25)',
+        '--gp-shard-deep': 'rgba(30,120,165,.9)',
+      },
+    };
+    return function GlassShatterEffect(props) {
+      const Pink = ANIM_REGISTRY.pink_glass_shatter;
+      return Pink ? <Pink {...props} palette={PAL} /> : null;
+    };
+  })(),
+  pink_glass_shatter: (() => {
+    const TRI = [
+      'polygon(0 0, 100% 0, 30% 100%)', 'polygon(0 0, 100% 40%, 0 100%)',
+      'polygon(20% 0, 100% 0, 100% 100%)', 'polygon(0 30%, 100% 0, 60% 100%)',
+      'polygon(0 0, 100% 60%, 20% 100%)', 'polygon(40% 0, 100% 100%, 0 80%)',
+    ];
+    // v810: `palette` erlaubt andere Farben (Glass Sword: tuerkis-blau) —
+    // Scherben/Staub als Farblisten, Scheibe/Risse/Ring ueber CSS-Variablen
+    // (`--gp-*`, Defaults in style.css sind das Rosa des Tridents).
+    return function PinkGlassShatterEffect({ x, y, palette }) {
+      const pal = palette || {};
+      const SHARDS = pal.shards || ['#ffb3de', '#ff8ccf', '#ffd6ec', '#f574bd', '#ffc2e6'];
+      const DUST = pal.dust || ['#fff0f8', '#ffc8e8', '#ff9ad6'];
+      const shards = useMemo(() => Array.from({ length: 22 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 34 + Math.random() * 78;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed + 14,
+          size: 8 + Math.random() * 14,
+          rot: (Math.random() - .5) * 540,
+          clip: TRI[Math.floor(Math.random() * TRI.length)],
+          hue: SHARDS[Math.floor(Math.random() * SHARDS.length)],
+          delay: 220 + Math.random() * 60, dur: 420 + Math.random() * 260,
+        };
+      }), []);
+      const dust = useMemo(() => Array.from({ length: 16 }, () => {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 50;
+        return {
+          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
+          size: 2 + Math.random() * 4, color: DUST[Math.floor(Math.random() * DUST.length)],
+          delay: 230 + Math.random() * 60, dur: 300 + Math.random() * 200,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, ...(pal.vars || {}) }}>
+          <div className="anim-pink-glass-pane" />
+          <div className="anim-pink-glass-cracks" />
+          <div className="anim-pink-glass-ring" />
+          {shards.map((s, i) => (
+            <div key={'pg'+i} className="anim-pink-glass-shard" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px', '--rot': s.rot + 'deg',
+              '--color': s.hue, clipPath: s.clip, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+          {dust.map((s, i) => (
+            <div key={'pd'+i} className="anim-explosion-particle" style={{
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
+              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
             }} />
           ))}
         </div>
@@ -10337,6 +11612,12 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // Divine Awakening zeigt dasselbe Bild wie `holy_revival` — goldweisses
+  // Licht, das aufsteigt — hat aber einen eigenen Registernamen, damit
+  // ihm ein eigener Klang zugeordnet werden kann (`ascension`). Der
+  // Bauplan wird geteilt, nicht kopiert.
+  get divine_awakening() { return this.holy_revival; },
+
   golden_ankh_revival: (() => {
     return function GoldenAnkhRevivalEffect({ x, y }) {
       const ankhs = useMemo(() => Array.from({ length: 12 }, () => ({
@@ -11366,6 +12647,428 @@ const ANIM_REGISTRY = {
               '--thought-rise': `${b.rise}px`,
             }}>{b.emoji}</span>
           ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Rolling Boulder (v702, Als Vorgabe): ein RIESIGER Fels startet am
+  // rechten Bildschirmrand auf 50 % der Spielfeld-Hoehe (Mittellinie
+  // zwischen den Haelften), rollt in einem WINKEL geradlinig auf die
+  // Creature zu, ueberrollt sie und rollt in derselben Linie weiter,
+  // bis er aus dem Bild ist — statt waagerecht ueber alle Support
+  // Zones. Er ROLLT wirklich: Drehung an die Wegstrecke gekoppelt
+  // (Umfang π·d), gegen den Uhrzeigersinn (Fahrt nach links), konstante
+  // Geschwindigkeit. Der Aufprall liegt FEST bei T_IN — die Einlauf-
+  // strecke ist darauf normiert, der Auslauf faehrt mit derselben
+  // Geschwindigkeit bis hinter den Rand (Dauer bildschirmabhaengig;
+  // die Karte sendet eine grosszuegige `duration`). Kein Abprallen,
+  // keine Stauchung — nur Staub und Splitter beim Ueberrollen.
+  rolling_boulder: (() => {
+    return function RollingBoulderEffect({ x, y }) {
+      const D = 150;                                       // Durchmesser
+      const vw = (typeof window !== 'undefined' ? window.innerWidth : 1400);
+      const vh = (typeof window !== 'undefined' ? window.innerHeight : 900);
+      // 50 % Spielfeld-Hoehe = die Mittellinie des Bretts; Fallback
+      // Bildschirmmitte.
+      let midY = vh / 2;
+      try {
+        const mid = document.querySelector('.board-mid-row') || document.querySelector('.board-area-zones-center');
+        if (mid) { const r = mid.getBoundingClientRect(); midY = r.top + r.height / 2; }
+      } catch (_) {}
+      // Startpunkt relativ zum Ziel (Container sitzt auf dem Ziel).
+      const sx = (vw + D) - x;                             // rechts hinter dem Rand
+      const sy = midY - y;
+      const lenIn = Math.max(200, Math.hypot(sx, sy));
+      const ux = -sx / lenIn, uy = -sy / lenIn;            // Einheitsrichtung Start→Ziel
+      // Auslauf: derselben Linie folgen, bis der Fels den Bildschirm
+      // (plus Durchmesser) verlassen hat.
+      let lenOut = 0;
+      for (let t = 0; t <= 4000; t += 25) {
+        const px = x + ux * t, py = y + uy * t;
+        if (px < -D || py < -D || py > vh + D) { lenOut = t; break; }
+        lenOut = t;
+      }
+      lenOut = Math.max(lenOut, 300);
+      const ex = ux * lenOut, ey = uy * lenOut;
+      const T_IN = 380;                                    // Aufprall — schneller (Als Vorgabe)
+      const speed = lenIn / T_IN;                          // px/ms, konstant
+      const tOut = Math.round(lenOut / speed);
+      const gradIn = Math.round(lenIn / (Math.PI * D) * 360);
+      const gradOut = Math.round(lenOut / (Math.PI * D) * 360);
+      const staub = useMemo(() => Array.from({ length: 14 }, () => {
+        const w = Math.PI + Math.random() * Math.PI;      // nach oben faechern
+        const weite = 40 + Math.random() * 70;
+        return {
+          dx: Math.cos(w) * weite, dy: Math.sin(w) * weite * 0.6,
+          size: 10 + Math.random() * 16,
+          delay: 370 + Math.random() * 90,
+          dur: 400 + Math.random() * 300,
+        };
+      }), []);
+      const splitter = useMemo(() => Array.from({ length: 10 }, () => {
+        const w = Math.random() * Math.PI * 2;
+        const weite = 50 + Math.random() * 60;
+        return { dx: Math.cos(w) * weite, dy: Math.sin(w) * weite - 30, size: 4 + Math.random() * 6, delay: 370 + Math.random() * 40, dur: 300 + Math.random() * 220 };
+      }), []);
+      const bahn = `rbIn ${T_IN}ms linear forwards, rbOut ${tOut}ms linear ${T_IN}ms forwards`;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150,
+          '--rb-sx': `${sx}px`, '--rb-sy': `${sy}px`, '--rb-ex': `${ex}px`, '--rb-ey': `${ey}px`,
+          '--rb-rin': `${gradIn}deg`, '--rb-rout': `${gradIn + gradOut}deg` }}>
+          {/* Bodenschatten: laeuft mit, bleibt flach */}
+          <div style={{
+            position: 'absolute', left: -D * 0.45, top: D * 0.32, width: D * 0.9, height: D * 0.28,
+            borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(0,0,0,.45) 0%, rgba(0,0,0,0) 70%)',
+            animation: `rbShadowIn ${T_IN}ms linear forwards, rbShadowOut ${tOut}ms linear ${T_IN}ms forwards`, opacity: 0,
+          }} />
+          {/* Der Fels: Bahn (translate) und Rollen (rotate) in einer Kette */}
+          <div style={{
+            position: 'absolute', left: -D / 2, top: -D / 2, width: D, height: D,
+            animation: bahn, opacity: 0,
+          }}>
+            <div style={{
+              width: '100%', height: '100%', borderRadius: '50%',
+              background:
+                'radial-gradient(circle at 34% 30%, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 28%),' +
+                'radial-gradient(circle at 62% 66%, #4d443c 0%, #4d443c 9%, rgba(0,0,0,0) 10%),' +
+                'radial-gradient(circle at 28% 62%, #5a5048 0%, #5a5048 7%, rgba(0,0,0,0) 8%),' +
+                'radial-gradient(circle at 70% 30%, #5e544b 0%, #5e544b 6%, rgba(0,0,0,0) 7%),' +
+                'radial-gradient(circle at 45% 50%, #8a7d70 0%, #6f6358 55%, #4a4038 100%)',
+              boxShadow: 'inset -14px -18px 30px rgba(0,0,0,.55), inset 10px 12px 20px rgba(255,255,255,.12), 0 0 0 3px rgba(40,32,26,.7)',
+              filter: 'drop-shadow(0 10px 8px rgba(0,0,0,.4))',
+            }}>
+              {/* Risse, damit die Drehung sichtbar ist */}
+              <div style={{ position: 'absolute', left: '22%', top: '18%', width: '46%', height: 3, background: 'rgba(30,24,20,.75)', transform: 'rotate(-28deg)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', left: '55%', top: '58%', width: '30%', height: 3, background: 'rgba(30,24,20,.7)', transform: 'rotate(40deg)', borderRadius: 2 }} />
+              <div style={{ position: 'absolute', left: '12%', top: '66%', width: '26%', height: 2, background: 'rgba(30,24,20,.6)', transform: 'rotate(12deg)', borderRadius: 2 }} />
+            </div>
+          </div>
+          {/* Aufprall: Staubwolke + Splitter, exakt beim Ueberrollen (T_IN) */}
+          {staub.map((st, i) => (
+            <span key={'rbd'+i} style={{
+              position: 'absolute', left: -st.size/2, top: -st.size/2 + 30, width: st.size, height: st.size,
+              borderRadius: '50%', background: 'radial-gradient(circle, rgba(190,175,150,.85) 0%, rgba(150,135,115,.4) 60%, rgba(150,135,115,0) 100%)',
+              opacity: 0, animation: `rbDust ${st.dur}ms ease-out ${st.delay}ms forwards`,
+              '--rb-tx': `${st.dx}px`, '--rb-ty': `${st.dy}px`,
+            }} />
+          ))}
+          {splitter.map((sp, i) => (
+            <span key={'rbs'+i} style={{
+              position: 'absolute', left: -sp.size/2, top: -sp.size/2, width: sp.size, height: sp.size * 0.8,
+              borderRadius: 2, background: '#6b5f55', boxShadow: '0 0 3px rgba(0,0,0,.5)',
+              opacity: 0, animation: `rbDust ${sp.dur}ms ease-out ${sp.delay}ms forwards`,
+              '--rb-tx': `${sp.dx}px`, '--rb-ty': `${sp.dy}px`,
+            }} />
+          ))}
+          <div style={{
+            position: 'absolute', left: -70, top: -36, width: 140, height: 72, borderRadius: '50%',
+            border: '3px solid rgba(180,160,130,.7)', opacity: 0,
+            animation: `rbRing 420ms ease-out ${T_IN}ms forwards`,
+          }} />
+          <style>{`
+            @keyframes rbIn {
+              0%   { opacity: 0; transform: translate(var(--rb-sx), var(--rb-sy)) rotate(0deg); }
+              6%   { opacity: 1; }
+              100% { opacity: 1; transform: translate(0, 0) rotate(calc(-1 * var(--rb-rin))); }
+            }
+            @keyframes rbOut {
+              0%   { opacity: 1; transform: translate(0, 0) rotate(calc(-1 * var(--rb-rin))); }
+              94%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--rb-ex), var(--rb-ey)) rotate(calc(-1 * var(--rb-rout))); }
+            }
+            @keyframes rbShadowIn {
+              0%   { opacity: 0; transform: translate(var(--rb-sx), var(--rb-sy)); }
+              6%   { opacity: .85; }
+              100% { opacity: .9; transform: translate(0, 0); }
+            }
+            @keyframes rbShadowOut {
+              0%   { opacity: .9; transform: translate(0, 0); }
+              94%  { opacity: .85; }
+              100% { opacity: 0; transform: translate(var(--rb-ex), var(--rb-ey)); }
+            }
+            @keyframes rbDust {
+              0%   { opacity: .95; transform: translate(0, 0) scale(.6); }
+              100% { opacity: 0; transform: translate(var(--rb-tx), var(--rb-ty)) scale(1.6); }
+            }
+            @keyframes rbRing {
+              0%   { opacity: .8; transform: scale(.3); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Aquatic Arrows (v700): etliche Wasserpfeile prasseln von oben
+  // auf die Creature — Als Vergleich: Rain of Arrows (`arrow_rain`),
+  // hier als Wasser-Fassung: blaugruene Pfeile, Tropfen-Einschlaege
+  // und ein kurzer Gischt-Schimmer statt Feuerfarben. Laeuft je
+  // getroffener Creature (animType am Schadens-Batch-Eintrag).
+  aquatic_arrow_rain: (() => {
+    return function AquaticArrowRainEffect({ x, y }) {
+      const arrows = useMemo(() => Array.from({ length: 26 }, () => ({
+        xOff: -60 + Math.random() * 120,
+        startY: -150 - Math.random() * 100,
+        delay: Math.random() * 550,
+        dur: 200 + Math.random() * 200,
+        rot: 172 + Math.random() * 16,
+        len: 18 + Math.random() * 14,
+      })), []);
+      const drops = useMemo(() => Array.from({ length: 16 }, () => ({
+        xOff: -46 + Math.random() * 92,
+        delay: 240 + Math.random() * 480,
+        dur: 320 + Math.random() * 220,
+        size: 3 + Math.random() * 5,
+        color: ['#9fe4ff','#5fc4f5','#2f9fe0','#c9f2ff','#77d3ff'][Math.floor(Math.random() * 5)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="anim-flame-flash" style={{ width: 80, height: 80, marginLeft: -40, marginTop: -40, background: 'radial-gradient(circle, rgba(120,210,255,.5) 0%, rgba(60,160,230,.22) 50%, transparent 80%)', animationDelay: '280ms' }} />
+          {arrows.map((a, i) => (
+            <div key={'aw'+i} style={{
+              position: 'absolute', left: a.xOff, top: a.startY,
+              animation: `arrowFall ${a.dur}ms ease-in ${a.delay}ms forwards`,
+              opacity: 0,
+            }}>
+              <div style={{
+                width: 2.5, height: a.len,
+                background: 'linear-gradient(to bottom, transparent 0%, #c9f2ff 20%, #5fc4f5 75%, #1f8fd6 100%)',
+                borderRadius: '0 0 1px 1px',
+                boxShadow: '0 0 5px rgba(110,205,255,.75)',
+                transform: `rotate(${a.rot}deg)`,
+                transformOrigin: 'center top',
+              }}>
+                <div style={{ position: 'absolute', bottom: -4, left: -3, width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #1f8fd6' }} />
+              </div>
+            </div>
+          ))}
+          {drops.map((d, i) => (
+            <div key={'ad'+i} className="anim-explosion-particle" style={{
+              '--dx': d.xOff + 'px', '--dy': (Math.random() * -22) + 'px', '--size': d.size + 'px',
+              '--color': d.color, animationDelay: d.delay + 'ms', animationDuration: d.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ── Schild-Block (v700): eine schimmernde Barriere faengt den
+  // Treffer ab — Sechseck-Schild, Aufprall-Blitz, Wellenring.
+  // Der Typ wurde seit jeher gesendet (Shield of Wisdom, Aquatic
+  // Shield, Einmal-Schild-Verbrauch), war aber NIE registriert:
+  // die Broadcasts liefen still ins Leere (Als Befund v700).
+  shield_block: (() => {
+    return function ShieldBlockEffect({ x, y }) {
+      const funken = useMemo(() => Array.from({ length: 10 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = 26 + Math.random() * 30;
+        return {
+          dx: Math.cos(winkel) * weite, dy: Math.sin(winkel) * weite * 0.7 - 8,
+          size: 3 + Math.random() * 4,
+          delay: 120 + Math.random() * 120,
+          dur: 300 + Math.random() * 200,
+          color: ['#dff3ff','#a9dcff','#7fc4ff','#e8f9ff'][Math.floor(Math.random() * 4)],
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Barriere: gerundetes Sechseck, flackert auf und haelt kurz */}
+          <div style={{
+            position: 'absolute', left: -42, top: -50, width: 84, height: 100,
+            clipPath: 'polygon(50% 0, 96% 25%, 96% 75%, 50% 100%, 4% 75%, 4% 25%)',
+            background: 'linear-gradient(160deg, rgba(200,236,255,.65) 0%, rgba(120,190,255,.35) 45%, rgba(70,140,230,.5) 100%)',
+            boxShadow: '0 0 18px rgba(130,200,255,.8), inset 0 0 14px rgba(220,245,255,.7)',
+            opacity: 0,
+            animation: 'shieldBlockPlate 620ms ease-out forwards',
+          }} />
+          {/* Aufprall-Blitz am Zentrum */}
+          <div style={{
+            position: 'absolute', left: -18, top: -18, width: 36, height: 36,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(170,220,255,.7) 45%, transparent 75%)',
+            opacity: 0,
+            animation: 'shieldBlockFlash 300ms ease-out 90ms forwards',
+          }} />
+          {/* Wellenring nach aussen */}
+          <div style={{
+            position: 'absolute', left: -30, top: -30, width: 60, height: 60,
+            borderRadius: '50%',
+            border: '3px solid rgba(150,210,255,.85)',
+            boxShadow: '0 0 10px rgba(150,210,255,.6)',
+            opacity: 0,
+            animation: 'shieldBlockRing 460ms ease-out 110ms forwards',
+          }} />
+          {funken.map((f, i) => (
+            <span key={'sf'+i} style={{
+              position: 'absolute', left: -f.size/2, top: -f.size/2,
+              width: f.size, height: f.size, borderRadius: '50%',
+              background: f.color, boxShadow: `0 0 5px ${f.color}`,
+              opacity: 0,
+              animation: `shieldBlockSpark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              '--sb-dx': `${f.dx}px`, '--sb-dy': `${f.dy}px`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes shieldBlockPlate {
+              0% { opacity: 0; transform: scale(.55); }
+              18% { opacity: 1; transform: scale(1.06); }
+              38% { opacity: .95; transform: scale(.98); }
+              70% { opacity: .85; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.04); }
+            }
+            @keyframes shieldBlockFlash {
+              0% { opacity: 0; transform: scale(.4); }
+              35% { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes shieldBlockRing {
+              0% { opacity: .9; transform: scale(.4); }
+              100% { opacity: 0; transform: scale(1.7); }
+            }
+            @keyframes shieldBlockSpark {
+              0% { opacity: .95; transform: translate(0,0) scale(1); }
+              100% { opacity: 0; transform: translate(var(--sb-dx), var(--sb-dy)) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── Aquatic Spear (v698): ein tuerkiser Wasserspeer stuerzt steil
+  // von oben herab und SPIESST das Ziel AUF — Schaft + Klinge aus CSS,
+  // beim Einschlag Blitz, Wasserscherben und ein enger Splash-Ring;
+  // der Speer bleibt zitternd stecken und verglueht dann. Laeuft
+  // NEBEN dem whirlpool derselben Karte (Als Vorgabe: Wasser UND
+  // Speer). Einschlag bei ~280 ms — der Klang (ZONE_ANIM_SFX,
+  // 'projectile' tiefer gefahren) sitzt genau dort.
+  aquatic_spear_strike: (() => {
+    return function AquaticSpearStrike({ x, y }) {
+      // v699 (Als Befund „fliegt schief"): der Sturz-Translate sass auf
+      // dem SCHAFT im rotierten Container — Kind-Transforms werden vom
+      // Eltern-Rotate mitgedreht, die BILDSCHIRM-Flugbahn stand also
+      // ~44° aus der Senkrechten, waehrend der Speer nur 24° geneigt
+      // war: Spitze nicht in Flugrichtung. Jetzt liegt der Sturz auf
+      // einem UNROTIERTEN Wrapper (Bildschirmkoordinaten), und WINKEL
+      // ist exakt der Winkel des Flugvektors: Start (+70, −190) →
+      // atan(70/190) ≈ 20° aus der Senkrechten, nach links unten.
+      const WINKEL = 20;
+      const scherben = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+        angle: 200 + (i / 10) * 140 + Math.random() * 12,
+        dist: 30 + Math.random() * 45,
+        size: 4 + Math.random() * 6,
+        delay: 280 + Math.random() * 60,
+        dur: 380 + Math.random() * 220,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 9999 }}>
+          {/* Speer: Ankerpunkt ist die SPITZE — sie landet exakt auf (x,y).
+              REIHENFOLGE der Ebenen (v699): aussen der Sturz-Wrapper in
+              Bildschirmkoordinaten, darin die feste Rotation, darin der
+              Schaft mit Zittern+Verglimmen — so bleibt die Spitze in
+              Flugrichtung vorne. */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0, width: 0, height: 0,
+            opacity: 0,
+            animation: 'aquaSpearFall 280ms cubic-bezier(.5,0,.9,.4) forwards',
+          }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 0, width: 0, height: 0,
+            transform: `rotate(${WINKEL}deg)`,
+          }}>
+            <div style={{
+              position: 'absolute', left: -3, bottom: 0, width: 6, height: 120,
+              transformOrigin: '50% 100%',
+              animation: 'aquaSpearQuiver 90ms linear 280ms 4, aquaSpearFade 250ms ease-in 650ms forwards',
+            }}>
+              {/* Klinge */}
+              <div style={{
+                position: 'absolute', left: -6, bottom: -2, width: 18, height: 30,
+                clipPath: 'polygon(50% 100%, 0 18%, 50% 0, 100% 18%)',
+                background: 'linear-gradient(180deg, #d8f6ff 0%, #6fd4ff 45%, #1b7fd4 100%)',
+                boxShadow: '0 0 10px rgba(90,200,255,.9)',
+                filter: 'drop-shadow(0 0 4px rgba(150,230,255,.8))',
+              }} />
+              {/* Schaft */}
+              <div style={{
+                position: 'absolute', left: 0, bottom: 26, width: 6, height: 94,
+                borderRadius: 3,
+                background: 'linear-gradient(180deg, rgba(120,220,255,.25) 0%, #3aa8e8 30%, #1d6fb8 100%)',
+                boxShadow: '0 0 8px rgba(80,190,255,.7)',
+              }} />
+              {/* Wasserschweif am Schaftende */}
+              <div style={{
+                position: 'absolute', left: -4, bottom: 96, width: 14, height: 46,
+                borderRadius: '50% 50% 40% 40% / 70% 70% 30% 30%',
+                background: 'linear-gradient(180deg, rgba(150,230,255,0) 0%, rgba(110,210,255,.55) 70%, rgba(80,190,255,.8) 100%)',
+                filter: 'blur(2px)',
+              }} />
+            </div>
+          </div>
+          </div>
+          {/* Einschlagblitz */}
+          <div style={{
+            position: 'absolute', left: -22, top: -22, width: 44, height: 44,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(140,225,255,.8) 40%, rgba(60,170,255,0) 75%)',
+            opacity: 0,
+            animation: 'aquaSpearFlash 260ms ease-out 280ms forwards',
+          }} />
+          {/* enger Splash-Ring */}
+          <div style={{
+            position: 'absolute', left: -26, top: -26, width: 52, height: 52,
+            borderRadius: '50%',
+            border: '3px solid rgba(90,200,255,.85)',
+            boxShadow: '0 0 12px rgba(90,200,255,.7), inset 0 0 8px rgba(140,225,255,.5)',
+            opacity: 0,
+            animation: 'aquaSpearRing 420ms ease-out 290ms forwards',
+          }} />
+          {scherben.map((sc, i) => {
+            const rad = (sc.angle * Math.PI) / 180;
+            return (
+              <span key={'s'+i} style={{
+                position: 'absolute', left: -sc.size/2, top: -sc.size/2,
+                width: sc.size, height: sc.size * 1.6,
+                borderRadius: '50% 50% 60% 60%',
+                background: 'linear-gradient(180deg, #cdefff 0%, #58b9ef 100%)',
+                boxShadow: '0 0 5px rgba(110,210,255,.8)',
+                opacity: 0,
+                animation: `aquaSpearShard ${sc.dur}ms ease-out ${sc.delay}ms forwards`,
+                '--as-tx': `${Math.cos(rad) * sc.dist}px`,
+                '--as-ty': `${Math.sin(rad) * sc.dist - 14}px`,
+              }} />
+            );
+          })}
+          <style>{`
+            @keyframes aquaSpearFall {
+              0%   { opacity: 0; transform: translate(70px, -190px); }
+              12%  { opacity: 1; }
+              100% { opacity: 1; transform: translate(0, 0); }
+            }
+            @keyframes aquaSpearQuiver {
+              0% { transform: translate(0,0) rotate(0deg); }
+              /* (Zittern liegt auf dem Schaft IM rotierten Rahmen —
+                 kleine Auslenkungen quer zur Speerachse.) */
+              25% { transform: translate(0.5px,-1px) rotate(1.4deg); }
+              75% { transform: translate(-0.5px,0.5px) rotate(-1.2deg); }
+              100% { transform: translate(0,0) rotate(0deg); }
+            }
+            @keyframes aquaSpearFade {
+              0% { opacity: 1; } 100% { opacity: 0; }
+            }
+            @keyframes aquaSpearFlash {
+              0% { opacity: 0; transform: scale(.3); }
+              30% { opacity: 1; transform: scale(1.15); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes aquaSpearRing {
+              0% { opacity: .9; transform: scale(.25); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes aquaSpearShard {
+              0% { opacity: .95; transform: translate(0,0) scale(1); }
+              100% { opacity: 0; transform: translate(var(--as-tx), var(--as-ty)) scale(.35); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -12682,26 +14385,42 @@ const ANIM_REGISTRY = {
     };
   })(),
   guardian_shield: (() => {
+      // ★ 28.8., Als Befund: „der Kreis sitzt in der oberen linken
+      // Ecke statt zentriert."
+      // Die Huelle zentrierte per `translate(-50%, -50%)` — das
+      // Keyframe setzte aber DASSELBE `translate` noch einmal auf
+      // den KREIS, der gar nicht absolut positioniert ist. Er
+      // wanderte dadurch um seine halbe Groesse nach oben links,
+      // zusaetzlich zur Huellen-Verschiebung.
+      // Jetzt wie die uebrigen fuenfzig Animationen: absolute Lage
+      // mit negativem Rand, und das Keyframe skaliert nur noch.
+      // Betrifft auch „Divine Gift of the Guardian", das dieselbe
+      // Animation nutzt — dort auf kleineren Zonen, wo der Versatz
+      // weniger auffiel.
     return function GuardianShieldEffect({ x, y }) {
       return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100, transform: 'translate(-50%, -50%)' }}>
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           <div style={{
-            width: 70, height: 70, borderRadius: '50%',
+            position: 'absolute',
+            width: 70, height: 70, marginLeft: -35, marginTop: -35,
+            borderRadius: '50%',
             border: '3px solid rgba(255,60,60,.9)',
             boxShadow: '0 0 20px rgba(255,40,40,.6), inset 0 0 14px rgba(255,60,60,.3)',
             animation: 'guardianShieldFlash 1000ms ease-out forwards',
           }} />
           <div style={{
-            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            position: 'absolute', width: 40, height: 40, marginLeft: -20, marginTop: -20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 32, filter: 'drop-shadow(0 0 8px rgba(255,40,40,.8))',
             animation: 'guardianShieldFlash 1000ms ease-out forwards',
           }}>🛡️</div>
           <style>{`
+            /* Nur noch skalieren — die Lage macht der negative Rand. */
             @keyframes guardianShieldFlash {
-              0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-              25% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-              60% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
-              100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+              0% { transform: scale(0.3); opacity: 0; }
+              25% { transform: scale(1.2); opacity: 1; }
+              60% { transform: scale(1); opacity: 0.8; }
+              100% { transform: scale(1.5); opacity: 0; }
             }
           `}</style>
         </div>
@@ -15139,20 +16858,415 @@ const ANIM_REGISTRY = {
   // A dagger plunges down into the target zone, pauses on contact, and
   // a small spray of blood droplets bursts outward. Composes the same
   // particle / shockwave primitives the rest of the registry uses.
-  knife_sacrifice: (() => {
-    return function KnifeSacrificeEffect({ x, y }) {
-      const droplets = useMemo(() => Array.from({ length: 14 }, () => {
-        const angle = -Math.PI + Math.random() * Math.PI; // -180° to 0°: outward + upward
-        const speed = 28 + Math.random() * 36;
+  // ── Knife Throw (v727) ─────────────────────────────────────────────
+  // Al 4.9.: „Das Messer sollte von der Seite schnell auf das Ziel
+  // zugeflogen kommen und beim Impact Blut spritzen lassen."
+  // Also KEIN Fallen von oben (das ist das Opfermesser), sondern ein
+  // flacher, schneller Wurf aus dem Bildrand: 180 ms Flug mit
+  // Bewegungsunschaerfe, Einschlag mit Blitz und Schockwelle, dann ein
+  // Blutfaecher, der GEGEN die Flugrichtung zurueckspritzt, und
+  // liegenbleibende Flecken. Die Seite wechselt zufaellig.
+  // Klang: `projectile` beim Abflug + `slash` auf dem Einschlag
+  // (ZONE_ANIM_SFX, Sequenz).
+  // ── Refreshing Night (v732) ────────────────────────────────────────
+  // Das Ziel schlaeft ein: drei Zzz steigen versetzt auf, wachsen dabei
+  // leicht und kippen sanft hin und her — dazu ein weicher, dunkler
+  // Schleier ueber der Karte, damit man das „Nacht" im Namen sieht.
+  // Klang: `heal` (die Heilung) plus ein tiefer `debuff` nach 260 ms
+  // (die Betaeubung) — die Karte tut beides, und beides soll man hoeren.
+  // ── Blind Destruction (v738) ───────────────────────────────────────
+  // Al 5.9.: „hohe Stichflammen, die erst die Equips einhuellen und
+  // danach die Heroes". Also keine Explosion (punktuell, nach aussen),
+  // sondern eine SAEULE: eine schmale, sehr hohe Flamme schiesst aus
+  // dem Zonenboden nach oben, huellt die Karte ein und faellt in sich
+  // zusammen. 26 Zungen unterschiedlicher Hoehe geben ihr die zackige
+  // Silhouette, dazu Funken und ein Hitzeflimmern am Fuss.
+  // Klang: `elem_fire`, leicht tiefer und laenger gefahren.
+  // ── Spirit of the Barbarian Sword (v746) ───────────────────────────
+  // Al 5.9.: „feurige Schwertstreiche auf allen gegnerischen Zielen
+  // gleichzeitig". Also KEIN Projektil und keine Explosion, sondern ein
+  // Hieb: eine breite, leicht gebogene Klingenspur faehrt schraeg durch
+  // das Feld, brennt kurz nach und wirft Glut ab. Zwei Streiche im
+  // Kreuz, der zweite leicht versetzt — ein Barbarenschlag, kein
+  // Fechthieb. Die Karte loest ihn fuer JEDES Ziel im selben Moment
+  // aus, das Gleichzeitige entsteht also serverseitig.
+  // Klang: `slash` mit `elem_fire` darunter.
+  flaming_slash: (() => {
+    return function FlamingSlashEffect({ x, y }) {
+      const streiche = useMemo(() => ([
+        { rot: -38, delay: 0,   laenge: 118, dicke: 13 },
+        { rot: 26,  delay: 130, laenge: 96,  dicke: 9 },
+      ]), []);
+      const glut = useMemo(() => Array.from({ length: 18 }, () => ({
+        dx: -40 + Math.random() * 80,
+        dy: -10 - Math.random() * 46,
+        size: 3 + Math.random() * 5,
+        delay: 60 + Math.random() * 220,
+        dur: 380 + Math.random() * 300,
+        farbe: ['#ffd23f', '#ff8a1c', '#ff5200'][Math.floor(Math.random() * 3)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {streiche.map((h, i) => (
+            <div key={'fs' + i} style={{
+              position: 'absolute',
+              left: (-h.laenge / 2) + 'px', top: (-h.dicke / 2) + 'px',
+              width: h.laenge + 'px', height: h.dicke + 'px',
+              borderRadius: '50%',
+              background: 'linear-gradient(90deg, transparent, #fff2b0 18%, #ff9d1c 48%, #ff3b00 78%, transparent)',
+              boxShadow: '0 0 16px #ff7a1c, 0 0 34px #ff3b0088',
+              transform: `rotate(${h.rot}deg) scaleX(0)`,
+              opacity: 0,
+              '--slashRot': h.rot + 'deg',
+              animation: `flamingSlashSweep 460ms cubic-bezier(.15,.85,.3,1) ${h.delay}ms forwards`,
+            }} />
+          ))}
+          {/* Nachglühen der Schnittstelle */}
+          <div style={{
+            position: 'absolute', left: -30, top: -30,
+            width: 60, height: 60, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,190,90,.55), transparent 68%)',
+            opacity: 0,
+            animation: 'flamingSlashGlow 620ms ease-out 120ms forwards',
+          }} />
+          {glut.map((g, i) => (
+            <div key={'fg' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: g.size + 'px', height: g.size + 'px', borderRadius: '50%',
+              background: g.farbe,
+              boxShadow: `0 0 ${g.size * 2}px ${g.farbe}`,
+              opacity: 0,
+              '--fgx': g.dx + 'px', '--fgy': g.dy + 'px',
+              animation: `flamingSlashEmber ${g.dur}ms ease-out ${g.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes flamingSlashSweep {
+              0%   { opacity: 0; transform: rotate(var(--slashRot)) scaleX(0) scaleY(.5); }
+              18%  { opacity: 1; }
+              55%  { opacity: 1; transform: rotate(var(--slashRot)) scaleX(1) scaleY(1.15); }
+              100% { opacity: 0; transform: rotate(var(--slashRot)) scaleX(1.12) scaleY(.35); }
+            }
+            @keyframes flamingSlashGlow {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes flamingSlashEmber {
+              0%   { opacity: 0; transform: translate(0,0) scale(.4); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fgx), var(--fgy)) scale(.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  flame_jet: (() => {
+    return function FlameJetEffect({ x, y }) {
+      const zungen = useMemo(() => Array.from({ length: 26 }, (_, i) => {
+        const mitte = (i / 25 - 0.5);                 // -0.5 … +0.5
+        // Aussen kuerzer, innen am hoechsten — Stichflammen-Silhouette.
+        const hoehe = (1 - Math.abs(mitte) * 1.35) * (110 + Math.random() * 70);
         return {
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed * 0.5 + 8 + Math.random() * 12,
-          size: 4 + Math.random() * 5,
-          delay: 380 + Math.random() * 120,
-          dur: 380 + Math.random() * 220,
-          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a'][Math.floor(Math.random() * 4)],
+          dx: mitte * 46,
+          h: Math.max(26, hoehe),
+          breite: 5 + Math.random() * 8,
+          delay: Math.abs(mitte) * 90 + Math.random() * 60,
+          dur: 520 + Math.random() * 260,
+          farbe: ['#ffd23f', '#ff9d1c', '#ff6a00', '#ff3b00', '#fff1a8'][Math.floor(Math.random() * 5)],
         };
       }), []);
+      const funken = useMemo(() => Array.from({ length: 16 }, () => ({
+        dx: -26 + Math.random() * 52,
+        dy: -(60 + Math.random() * 90),
+        size: 3 + Math.random() * 4,
+        delay: 120 + Math.random() * 260,
+        dur: 420 + Math.random() * 300,
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Hitzeflimmern am Fuss */}
+          <div style={{
+            position: 'absolute', left: -34, top: 6,
+            width: 68, height: 22, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(255,170,60,.75), transparent 70%)',
+            opacity: 0,
+            animation: 'flameJetBase 760ms ease-out forwards',
+          }} />
+          {zungen.map((z, i) => (
+            <div key={'fj' + i} style={{
+              position: 'absolute',
+              left: z.dx + 'px', bottom: 0, top: 'auto',
+              width: z.breite + 'px', height: z.h + 'px',
+              borderRadius: '50% 50% 42% 42% / 72% 72% 18% 18%',
+              background: `linear-gradient(to top, ${z.farbe} 0%, ${z.farbe}cc 45%, transparent 100%)`,
+              boxShadow: `0 0 12px ${z.farbe}aa`,
+              transformOrigin: 'bottom center',
+              opacity: 0,
+              animation: `flameJetRise ${z.dur}ms cubic-bezier(.2,.75,.3,1) ${z.delay}ms forwards`,
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <div key={'fs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: f.size + 'px', height: f.size + 'px', borderRadius: '50%',
+              background: '#ffe08a',
+              boxShadow: '0 0 8px #ffb43c',
+              opacity: 0,
+              '--fjx': f.dx + 'px', '--fjy': f.dy + 'px',
+              animation: `flameJetSpark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes flameJetBase {
+              0% { opacity: 0; transform: scaleX(.4); }
+              25% { opacity: 1; transform: scaleX(1.1); }
+              100% { opacity: 0; transform: scaleX(1.4); }
+            }
+            @keyframes flameJetRise {
+              0%   { opacity: 0; transform: translateY(18px) scaleY(.15) scaleX(.7); }
+              22%  { opacity: 1; transform: translateY(0) scaleY(1.05) scaleX(1); }
+              55%  { opacity: 1; transform: translateY(-4px) scaleY(.92) scaleX(1.08); }
+              100% { opacity: 0; transform: translateY(6px) scaleY(.25) scaleX(.6); }
+            }
+            @keyframes flameJetSpark {
+              0%   { opacity: 0; transform: translate(0, 8px) scale(.5); }
+              20%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fjx), var(--fjy)) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  sleep_zzz: (() => {
+    return function SleepZzzEffect({ x, y }) {
+      const zs = useMemo(() => [0, 1, 2].map(i => ({
+        delay: i * 320,
+        dur: 1500,
+        dx: -6 + i * 13,
+        size: 20 + i * 9,
+        kipp: (i % 2 === 0 ? -1 : 1) * (8 + Math.random() * 6),
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Nachtschleier ueber der Karte */}
+          <div style={{
+            position: 'absolute', left: -42, top: -56,
+            width: 84, height: 112, borderRadius: 8,
+            background: 'radial-gradient(ellipse at 50% 40%, rgba(40,52,110,0.42), rgba(12,16,40,0.30) 70%, transparent)',
+            opacity: 0,
+            animation: 'sleepVeil 1700ms ease-in-out forwards',
+          }} />
+          {zs.map((z, i) => (
+            <div key={'zzz' + i} style={{
+              position: 'absolute', left: z.dx + 'px', top: '-10px',
+              fontSize: z.size + 'px', fontWeight: 700,
+              color: '#dfe6ff',
+              textShadow: '0 0 8px rgba(120,150,255,.9), 0 2px 3px rgba(0,0,0,.8)',
+              opacity: 0,
+              '--zKipp': z.kipp + 'deg',
+              animation: `sleepZzzRise ${z.dur}ms ease-out ${z.delay}ms forwards`,
+            }}>z</div>
+          ))}
+          <style>{`
+            @keyframes sleepVeil {
+              0%   { opacity: 0; }
+              25%  { opacity: 1; }
+              70%  { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            @keyframes sleepZzzRise {
+              0%   { opacity: 0; transform: translate(0, 6px) scale(.5) rotate(0deg); }
+              20%  { opacity: 1; transform: translate(4px, -14px) scale(1) rotate(var(--zKipp)); }
+              60%  { opacity: 1; transform: translate(-4px, -40px) scale(1.15) rotate(calc(var(--zKipp) * -1)); }
+              100% { opacity: 0; transform: translate(6px, -68px) scale(1.3) rotate(var(--zKipp)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  knife_throw_fly: (() => {
+    return function KnifeThrowFlyEffect({ x, y }) {
+      const vonLinks = useMemo(() => Math.random() < 0.5, []);
+      const richtung = vonLinks ? 1 : -1;
+      const FLUG = 180;                       // ms bis zum Einschlag
+      // Drehung, die die SPITZE des Emojis nach RECHTS bringt.
+      //
+      // GEMESSEN, nicht geraten (Als Rueckmeldung 4.9.): mit 45° zeigte
+      // die Klinge nach UNTEN, also 90° zu viel. 🔪 zeigt demnach von
+      // Haus aus nach unten rechts (+45° im Bildschirmsinn), und für
+      // „nach rechts" (0°) sind es −45°, d.h. 315°.
+      // EINE Zahl fuer alle Richtungen: rechts = SPITZE,
+      // links = SPITZE + 180. Zeichnet eine andere Schrift das Messer
+      // anders, reicht es, diesen Wert zu aendern.
+      const SPITZE = 315;
+      const spritzer = useMemo(() => Array.from({ length: 26 }, () => {
+        // Faecher entgegen der Flugrichtung, leicht nach oben gestreut.
+        const basis = vonLinks ? Math.PI : 0;
+        const winkel = basis + (Math.random() - 0.5) * 1.9;
+        const speed = 34 + Math.random() * 56;
+        return {
+          dx: Math.cos(winkel) * speed,
+          dy: Math.sin(winkel) * speed * 0.5 - 6 + Math.random() * 26,
+          size: 4 + Math.random() * 8,
+          delay: FLUG + Math.random() * 110,
+          dur: 380 + Math.random() * 260,
+          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a', '#8b0000'][Math.floor(Math.random() * 5)],
+        };
+      }), [vonLinks]);
+      const flecken = useMemo(() => Array.from({ length: 8 }, () => ({
+        fx: -26 + Math.random() * 52,
+        fy: 4 + Math.random() * 24,
+        size: 7 + Math.random() * 12,
+        delay: FLUG + 30 + Math.random() * 120,
+        color: ['#7f0808', '#a01010', '#6b0505'][Math.floor(Math.random() * 3)],
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Das Messer: aus dem Rand herangeflogen, SPITZE VORAN.
+              Das Emoji zeigt von Haus aus nach oben rechts (Richtung
+              (1,−1), also −45° zur Waagerechten). Um die Spitze nach
+              RECHTS zu drehen, braucht es +45°; nach LINKS 225°.
+              Frueher stand hier `scaleX(±1)` — das spiegelt zwar die
+              Klinge, dreht sie aber nicht: das Messer flog seitwaerts
+              mit der Spitze schraeg nach oben (Als Befund 4.9.).
+              Gespiegelt wird deshalb gar nicht mehr, nur gedreht. */}
+          <div style={{
+            position: 'absolute', left: -18, top: -6,
+            fontSize: 48, lineHeight: '40px',
+            filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.85)) drop-shadow(0 0 3px rgba(255,255,255,0.35))',
+            '--ktFrom': (richtung * -300) + 'px',
+            '--ktDeg': (vonLinks ? SPITZE : SPITZE + 180) + 'deg',
+            animation: `knifeThrowFly ${FLUG}ms cubic-bezier(0.25, 0.6, 0.35, 1) forwards`,
+          }}>🔪</div>
+          {/* Flugspur */}
+          <div style={{
+            position: 'absolute', left: -8, top: 6,
+            width: 120, height: 3, borderRadius: 2,
+            background: `linear-gradient(${vonLinks ? 90 : 270}deg, transparent, rgba(255,255,255,.75))`,
+            transformOrigin: vonLinks ? 'right center' : 'left center',
+            opacity: 0,
+            '--ktFrom': (richtung * -300) + 'px',
+            animation: `knifeThrowTrail ${FLUG}ms ease-out forwards`,
+          }} />
+          {/* Einschlagblitz */}
+          <div style={{
+            position: 'absolute', left: -26, top: -6,
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,190,190,0.45) 40%, transparent 75%)',
+            opacity: 0,
+            animation: `knifeThrowImpact 300ms ease-out ${FLUG}ms forwards`,
+          }} />
+          {/* Schockwelle */}
+          <div style={{
+            position: 'absolute', left: -14, top: 0,
+            width: 30, height: 30, borderRadius: '50%',
+            border: '3px solid rgba(190, 25, 25, 0.9)',
+            opacity: 0,
+            animation: `knifeThrowShock 460ms ease-out ${FLUG}ms forwards`,
+          }} />
+          {spritzer.map((d, i) => (
+            <div key={'ktd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: d.size + 'px', height: d.size + 'px',
+              borderRadius: '50% 55% 40% 60% / 60% 40% 60% 40%',
+              background: `radial-gradient(circle at 35% 30%, ${d.color}, ${d.color}aa 70%)`,
+              boxShadow: `0 0 ${d.size * 1.5}px ${d.color}88`,
+              opacity: 0,
+              '--ktDx': d.dx + 'px', '--ktDy': d.dy + 'px',
+              animation: `knifeThrowDrop ${d.dur}ms ease-out ${d.delay}ms forwards`,
+            }} />
+          ))}
+          {flecken.map((f, i) => (
+            <div key={'kts' + i} style={{
+              position: 'absolute', left: f.fx + 'px', top: f.fy + 'px',
+              width: f.size + 'px', height: (f.size * 0.7) + 'px',
+              borderRadius: '55% 45% 60% 40% / 65% 55% 45% 35%',
+              background: f.color,
+              boxShadow: `0 0 ${f.size}px ${f.color}66`,
+              opacity: 0,
+              animation: `knifeThrowStain 900ms ease-out ${f.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes knifeThrowFly {
+              /* Die Drehung bleibt ueber den ganzen Flug KONSTANT — ein
+                 geworfenes Messer, das trifft, liegt in seiner Bahn. */
+              0%   { transform: translate(var(--ktFrom), -6px) rotate(var(--ktDeg)); opacity: 0; }
+              15%  { opacity: 1; }
+              85%  { transform: translate(4px, 0) rotate(var(--ktDeg)); opacity: 1; }
+              100% { transform: translate(0, 2px) rotate(var(--ktDeg)); opacity: 1; }
+            }
+            @keyframes knifeThrowTrail {
+              0%   { opacity: 0; transform: translate(var(--ktFrom), 0) scaleX(.3); }
+              40%  { opacity: .9; transform: translate(calc(var(--ktFrom) * .35), 0) scaleX(1); }
+              100% { opacity: 0; transform: translate(0, 0) scaleX(.15); }
+            }
+            @keyframes knifeThrowImpact {
+              0%   { opacity: 0; transform: scale(0.4); }
+              25%  { opacity: 1; transform: scale(1.15); }
+              100% { opacity: 0; transform: scale(1.7); }
+            }
+            @keyframes knifeThrowShock {
+              0%   { opacity: .95; transform: scale(0.5); border-width: 3px; }
+              100% { opacity: 0; transform: scale(3.4); border-width: 0.5px; }
+            }
+            @keyframes knifeThrowDrop {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+              20%  { opacity: 1; transform: translate(calc(var(--ktDx) * 0.35), calc(var(--ktDy) * 0.35)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--ktDx), calc(var(--ktDy) + 14px)) scale(0.55); }
+            }
+            @keyframes knifeThrowStain {
+              0%   { opacity: 0; transform: scale(0.2); }
+              20%  { opacity: 0.95; transform: scale(1.1); }
+              65%  { opacity: 0.8; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  knife_sacrifice: (() => {
+    return function KnifeSacrificeEffect({ x, y }) {
+      // v727 (Als Vorgabe 4.9.: „auch die Sacrifice-Animation sollte
+      // Blut spritzen lassen"): aus 14 zaghaften Tropfen werden 30 in
+      // breiterem Bogen, groesser und schneller — plus die Spritzer
+      // unten, die als Flecken liegenbleiben und langsam verblassen.
+      const droplets = useMemo(() => Array.from({ length: 30 }, () => {
+        const angle = -Math.PI + Math.random() * Math.PI; // -180° bis 0°: nach aussen und oben
+        const speed = 38 + Math.random() * 58;
+        return {
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed * 0.55 + 10 + Math.random() * 18,
+          size: 5 + Math.random() * 8,
+          delay: 370 + Math.random() * 150,
+          dur: 420 + Math.random() * 280,
+          color: ['#a01010', '#c01818', '#7f0808', '#d62a2a', '#8b0000'][Math.floor(Math.random() * 5)],
+        };
+      }), []);
+      // Drehung, die die SPITZE nach UNTEN bringt.
+      //
+      // GEMESSEN (Als Rueckmeldung 4.9.): mit 135° fiel der Dolch
+      // „genau falsch rum, Griff vorn" — also exakt 180° daneben.
+      // Richtig sind demnach 315°. Dass hier derselbe Wert steht wie
+      // beim Wurf oben, ist kein Zufall: 🗡️ zeigt von Haus aus nach
+      // unten LINKS (135°), 🔪 nach unten rechts (45°) — die Ziele
+      // unterscheiden sich um genau denselben Betrag wie die
+      // Ausgangslagen. Zeichnet eine Schrift den Dolch anders, ist es
+      // wieder nur diese eine Zahl.
+      const SPITZE_UNTEN = 315;
+      // Liegenbleibende Flecken um die Einschlagstelle.
+      const flecken = useMemo(() => Array.from({ length: 9 }, () => ({
+        fx: -30 + Math.random() * 60,
+        fy: 2 + Math.random() * 26,
+        size: 7 + Math.random() * 13,
+        delay: 400 + Math.random() * 130,
+        color: ['#7f0808', '#a01010', '#6b0505'][Math.floor(Math.random() * 3)],
+      })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
           {/* Dagger — falls from ~80px above to the centre, then sticks */}
@@ -15160,6 +17274,9 @@ const ANIM_REGISTRY = {
             position: 'absolute', left: -20, top: 0,
             fontSize: 56, lineHeight: '40px',
             filter: 'drop-shadow(0 0 6px rgba(0,0,0,0.85)) drop-shadow(0 0 3px rgba(255,255,255,0.4))',
+            '--ksDeg': SPITZE_UNTEN + 'deg',
+            '--ksDegKipp': (SPITZE_UNTEN - 13) + 'deg',
+            '--ksDegKipp2': (SPITZE_UNTEN - 7) + 'deg',
             animation: 'knifeSacPlunge 480ms cubic-bezier(0.4, 0, 0.85, 1) forwards',
           }}>🗡️</div>
           {/* Impact flash + dust ring on contact */}
@@ -15192,12 +17309,36 @@ const ANIM_REGISTRY = {
               animation: `knifeSacDroplet ${d.dur}ms ease-out ${d.delay}ms forwards`,
             }} />
           ))}
+          {/* Flecken — bleiben liegen und verblassen langsam */}
+          {flecken.map((f, i) => (
+            <div key={'kbs' + i} style={{
+              position: 'absolute', left: f.fx + 'px', top: f.fy + 'px',
+              width: f.size + 'px', height: (f.size * 0.7) + 'px',
+              borderRadius: '55% 45% 60% 40% / 65% 55% 45% 35%',
+              background: f.color,
+              boxShadow: `0 0 ${f.size}px ${f.color}66`,
+              opacity: 0,
+              animation: `knifeSacStain 900ms ease-out ${f.delay}ms forwards`,
+            }} />
+          ))}
           <style>{`
+            @keyframes knifeSacStain {
+              0%   { opacity: 0; transform: scale(0.2); }
+              20%  { opacity: 0.95; transform: scale(1.1); }
+              65%  { opacity: 0.8; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1); }
+            }
             @keyframes knifeSacPlunge {
-              0%   { transform: translate(0, -90px) rotate(20deg); opacity: 0; }
-              25%  { transform: translate(0, -45px) rotate(15deg); opacity: 1; }
-              80%  { transform: translate(0, 4px)   rotate(0deg);  opacity: 1; }
-              100% { transform: translate(0, 6px)   rotate(0deg);  opacity: 1; }
+              /* SPITZE NACH UNTEN (v727): das Emoji zeigt von Haus aus
+                 nach oben rechts (−45°), fuer „nach unten" (+90°)
+                 braucht es 135°. Vorher stand hier 20° → 0°, das
+                 Messer stach also schraeg nach oben statt nach unten
+                 (Als Befund 4.9.). Der kleine Ueberschwung von 148° auf
+                 135° bleibt als Kippen beim Aufsetzen. */
+              0%   { transform: translate(0, -90px) rotate(var(--ksDegKipp)); opacity: 0; }
+              25%  { transform: translate(0, -45px) rotate(var(--ksDegKipp2)); opacity: 1; }
+              80%  { transform: translate(0, 4px)   rotate(var(--ksDeg)); opacity: 1; }
+              100% { transform: translate(0, 6px)   rotate(var(--ksDeg)); opacity: 1; }
             }
             @keyframes knifeSacImpact {
               0%   { opacity: 0; transform: scale(0.4); }
@@ -16074,6 +18215,17 @@ const ANIM_REGISTRY = {
     };
   })(),
 };
+// v706 (Puppets): Aliase auf inline definierte Effekte — nach dem Objekt,
+// weil die Originale IIFEs innerhalb des Literals sind.
+ANIM_REGISTRY.puppet_swap_brammi = ANIM_REGISTRY.modifier_sparkle;
+// v712/v714 (Bleed): Status-Erhalt (Devlin-Treffer) und Schaden-Puls =
+// spritzendes Blut ZUSAETZLICH zur normalen Angriffs-Animation; Doctor
+// Fester / Ghoul Guard = blutiger Schnitt (eigene Animation).
+ANIM_REGISTRY.bleed_apply = BloodSplatterEffect;
+ANIM_REGISTRY.bleed_tick = BloodSplatterEffect;
+ANIM_REGISTRY.blood_splatter = BloodSplatterEffect;
+ANIM_REGISTRY.bloody_cut = BloodyCutEffect;
+ANIM_REGISTRY.puppet_swap_pavi = ANIM_REGISTRY.mini_hearts;
 
 function IceEncaseEffect({ x, y }) {
   // Ice shards from ALL sides converging on target
@@ -16136,9 +18288,19 @@ function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
 //   • `mimicCreature` — Soul Shard Sah's `_effectOverride` mimic
 //     (🎭 badge — show the Creature whose effect Sah is currently
 //     copying so the player can tell at a glance which kit is loaded).
+//   • `shapeshiftBase` — „???, the Shapeshifter" in fremder Gestalt.
+//     UMGEKEHRTE Richtung zu den beiden darueber: ungehovert steht die
+//     KOPIERTE Karte da (das ist der Spielzustand), beim Hovern kommt
+//     die eigene Karte zum Vorschein (Als Vorgabe 28.8.). Deshalb ein
+//     eigenes Feld statt `mimicCreature` — der Text im Abzeichen liest
+//     sich sonst verkehrt herum.
 // When not hovered, shows the Creature's own art with the appropriate
 // corner badge.
-function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...boardCardProps }) {
+//   • `nestedUnder` — „Monster Nest": auf der verdeckten Karte liegt
+//     eine andere Kreatur. Richtung wie bei `attachedHero` — ungehovert
+//     steht die OBENLIEGENDE Kreatur da (das ist der Spielzustand),
+//     beim Hovern kommt die verdeckte Karte zum Vorschein (🪺).
+function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, shapeshiftBase, nestedUnder, ...boardCardProps }) {
   // `useStickyHoverFlag` statt eines nackten useState: der Hover TAUSCHT
   // hier das Kartenbild, der Knoten unter dem Zeiger wird also mitten in
   // der Bewegung ersetzt — genau die Lage, in der ein mouseleave
@@ -16147,13 +18309,21 @@ function AttachableCreatureCard({ creatureName, attachedHero, mimicCreature, ...
   // wirklich noch drueber ist.
   const wrapRef = useRef(null);
   const [hovered, hoverProps] = useStickyHoverFlag(wrapRef);
-  const overlay = attachedHero || mimicCreature;
+  const overlay = attachedHero || mimicCreature || shapeshiftBase || nestedUnder;
   const showName = hovered ? overlay : creatureName;
-  const isMimic = !attachedHero && !!mimicCreature;
-  const badgeIcon = isMimic ? '🎭' : '📎';
-  const badgeColor = isMimic ? '#cf9bff' : '#ffd700';
-  const badgeShortName = (overlay || '').split(',')[0] || (isMimic ? 'Mimic' : 'Hero');
-  const badgeTitle = isMimic ? `Mimicking: ${overlay}` : `Attached: ${overlay}`;
+  const isNest = !attachedHero && !shapeshiftBase && !mimicCreature && !!nestedUnder;
+  const isMimic = !attachedHero && !shapeshiftBase && !isNest && !!mimicCreature;
+  const isShift = !!shapeshiftBase;
+  const badgeIcon = isShift ? '🎭' : isMimic ? '🎭' : isNest ? '🪺' : '📎';
+  const badgeColor = isShift ? '#9bd8ff' : isMimic ? '#cf9bff' : isNest ? '#9ad19a' : '#ffd700';
+  // Beim Shapeshifter nennt das Abzeichen die EIGENE Karte — die
+  // kopierte sieht man ja bereits. Bei den anderen umgekehrt.
+  const badgeShortName = (overlay || '').split(',')[0]
+    || (isShift ? '???' : isMimic ? 'Mimic' : isNest ? 'Nest' : 'Hero');
+  const badgeTitle = isShift ? `Shapeshifted: ${creatureName} (hover for ${overlay})`
+    : isMimic ? `Mimicking: ${overlay}`
+    : isNest ? `Placed on top of: ${overlay} — at the end of your turn this Creature is removed and deleted`
+    : `Attached: ${overlay}`;
   return (
     <div className="attachable-creature-wrap" ref={wrapRef}
       style={{ position: 'relative', width: '100%', height: '100%' }}
@@ -16438,9 +18608,9 @@ function CardNamePickerPrompt({ ep, onRespond }) {
                 style={{ padding: '5px 10px', cursor: 'pointer', fontSize: 12,
                   borderBottom: '1px solid var(--bg3)', display: 'flex', alignItems: 'center', gap: 8,
                 }}
-                onMouseEnter={() => { if (card) _boardTooltipSetter?.(card); }}
-                onMouseLeave={() => { _boardTooltipSetter?.(null); }}
-                onClick={() => { _boardTooltipSetter?.(null); onRespond({ cardName: name }); }}>
+                onMouseEnter={() => { if (card) window._boardTooltipSetter?.(card); }}
+                onMouseLeave={() => { window._boardTooltipSetter?.(null); }}
+                onClick={() => { window._boardTooltipSetter?.(null); onRespond({ cardName: name }); }}>
                 <span style={{ color: tc, fontWeight: 600, fontSize: 8, minWidth: 48, textTransform: 'uppercase' }}>
                   {card?.cardType || '?'}
                 </span>
@@ -16702,7 +18872,11 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
     return (entry?.name || '').toLowerCase().includes(searchLower);
   };
 
-  const totalCost = maxBudget != null
+  // v630: `exactBudget` (Weather Orchestra) zaehlt die Kosten wie `maxBudget`
+  // und graut alles aus, was die Restsumme ueberschreitet — der Spieler
+  // sieht damit nur Karten, die noch auf genau den Zielwert fuehren koennen.
+  const _budgetCap = maxBudget != null ? maxBudget : (ep.exactBudget != null ? ep.exactBudget : null);
+  const totalCost = _budgetCap != null
     ? selected.reduce((sum, idx) => sum + (cards[idx]?.[costKey] || 0), 0)
     : 0;
 
@@ -16765,10 +18939,17 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
         }
       }
       // Budget check
-      if (maxBudget != null) {
+      if (_budgetCap != null) {
         const entryCost = cards[idx]?.[costKey] || 0;
         const currentTotal = prev.reduce((sum, i) => sum + (cards[i]?.[costKey] || 0), 0);
-        if (currentTotal + entryCost > maxBudget) return prev;
+        if (currentTotal + entryCost > _budgetCap) return prev;
+      }
+      // `distinctNames` (v629, The Weather Orchestra): „different
+      // Artifacts" — ein Name darf nur einmal in der Auswahl sein, auch
+      // wenn er aus mehreren Quellen (Hand/Deck/Discard) angeboten wird.
+      if (ep.distinctNames) {
+        const nm = cards[idx]?.name;
+        if (nm && prev.some(i => cards[i]?.name === nm)) return prev;
       }
       // Per-type cap check.
       if (galleryCardTypes && galleryTypeLimits) {
@@ -16784,10 +18965,15 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
     });
   };
 
+  // `exactBudget` (v628, The Weather Orchestra): die Summe der `costKey`-
+  // Werte der Auswahl muss GENAU diesen Wert treffen, sonst kein Confirm.
+  const exactBudget = ep.exactBudget;
+  const meetsExactBudget = exactBudget == null
+    || selected.reduce((sum, i) => sum + (cards[i]?.[costKey] || 0), 0) === exactBudget;
   const canConfirm = (validCounts
     ? validCounts.includes(selected.length)
     : (selected.length >= minSelect && selected.length <= maxSelect))
-    && meetsUniqueGate;
+    && meetsUniqueGate && meetsExactBudget;
 
   const confirmSelection = () => {
     onRespond({
@@ -16828,6 +19014,16 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
           {maxBudget != null && !ep.hideCostUI && (
             <span style={{ marginLeft: 8, color: totalCost > maxBudget * 0.8 ? '#ffaa33' : 'var(--accent)', fontWeight: 600 }}>
               ({ep.budgetLabel || 'Cost'}: {totalCost}/{maxBudget})
+            </span>
+          )}
+          {/* exactBudget (v631, Weather Orchestra): laufende Summe, gruen bei
+              genau, rot darueber, neutral darunter. */}
+          {maxBudget == null && ep.exactBudget != null && !ep.hideCostUI && (
+            <span style={{
+              marginLeft: 8, fontWeight: 800, fontSize: 13,
+              color: totalCost === ep.exactBudget ? 'var(--success)' : (totalCost > ep.exactBudget ? '#ff4d4d' : 'var(--accent)'),
+            }}>
+              ({ep.budgetLabel || 'Cost'}: {totalCost}/{ep.exactBudget})
             </span>
           )}
           {uniqueNamesPicked && (
@@ -16879,7 +19075,9 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               if (!matchesSearch(entry)) return null;
               const isSel = selected.includes(i);
               const entryCost = entry[costKey] || 0;
-              const wouldExceedBudget = maxBudget != null && !isSel && totalCost + entryCost > maxBudget;
+              const wouldExceedBudget = _budgetCap != null && !isSel && totalCost + entryCost > _budgetCap;
+              // distinctNames (v629): derselbe Name aus einer anderen Quelle ist ausgegraut.
+              const dupName = !!ep.distinctNames && !isSel && selected.some(si => cards[si]?.name === entry.name);
               // Per-type cap: grey out a card once its type's limit is
               // fully selected (Idej Lords picking Projections + Blades).
               const wouldExceedTypeCap = (() => {
@@ -16897,7 +19095,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
               // Already-selected cards are exempt so the player can
               // still toggle them off if they made a mistake.
               const blockedByUniqueGate = onlyNewUniqueAllowed && !isSel && !isNewUniqueContribution(i);
-              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate || wouldExceedTypeCap;
+              const dimmed = wouldExceedBudget || atMax || blockedByUniqueGate || wouldExceedTypeCap || dupName;
               // Pile-side badge for Guardian Beast deletion pickers:
               // entries from the activator's discard pile carry
               // `pileSide: 'own'`, opp's pile entries `pileSide: 'opp'`.
@@ -16920,7 +19118,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                     }} />
                   {isSel && <div style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent)', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 3, zIndex: 5 }}>✓</div>}
                   {pileBadge && <div style={{ position: 'absolute', top: 3, left: 3, background: pileBadge.bg, color: pileBadge.color, fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 3, zIndex: 5, letterSpacing: '0.5px', textShadow: '0 0 2px rgba(0,0,0,0.9)' }}>{pileBadge.text}</div>}
-                  {maxBudget != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
+                  {_budgetCap != null && !ep.hideCostUI && <div style={{ position: 'absolute', bottom: 3, left: 3, background: 'rgba(0,0,0,.7)', color: '#ffd700', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, zIndex: 5 }}>{entryCost}G</div>}
                 </div>
               );
             })}
@@ -17351,12 +19549,118 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Mitte zwischen den zugewandten Kanten der beiden Haelften
   // zurueckgegriffen.
   useEffect(() => {
-    const apply = () => {
+    // Nur schreiben, wenn sich der Wert wirklich geaendert hat. Jede
+    // Zuweisung an eine Custom Property auf `documentElement` macht die
+    // Stilrechnung des GANZEN Dokuments ungueltig — bei einem Lauscher,
+    // der an `scroll` haengt, ist das der Unterschied zwischen fluessig
+    // und haklig (Als Befund 5.9.).
+    const setzeVar = (st, name, wert) => {
+      if (st.getPropertyValue(name) !== wert) st.setProperty(name, wert);
+    };
+    /**
+     * Masse der beiden Platten. Geschrieben wird auf die EBENE selbst,
+     * nicht auf `documentElement` (v799): Custom Properties vererben,
+     * die Platten lesen sie also unveraendert — aber die Stilrechnung
+     * wird nur noch fuer diese drei Knoten ungueltig statt fuer das
+     * ganze Dokument. Beim Scrollen aendern sich diese Werte in JEDEM
+     * Bild, `setzeVar` kann da nichts ueberspringen; also muss der
+     * Wirkungskreis klein sein.
+     */
+    const messePlatte = (col) => {
+      // Die Platte sitzt IN der gekippten Ebene (siehe JSX), ihre Masse
+      // muessen also aus Bildschirm- in LOKALE Koordinaten zurueck.
+      //
+      // Der Massstab kommt aus derselben Zonenreihe: waagerecht aus
+      // ihrer eigenen Breite (`offsetWidth` ist die Layoutbreite,
+      // `rect.width` die projizierte), senkrecht aus einer Area-Zone
+      // darin. Das genuegt, weil `rotateX` die Tiefe NUR ueber Y
+      // veraendert — auf einer festen Hoehe ist die Abbildung in X
+      // linear, und die Platte ist ein flaches Band auf genau dieser
+      // Hoehe.
+      // Eigene Abfrage statt einer Bindung aus `apply`: die Funktion
+      // laeuft auch ALLEIN — der schlanke Scroll-Lauf ruft nur sie.
+      const azc = document.querySelector('.board-area-zones-center');
+      const ebene = document.querySelector('.phase-plate-layer');
+      const st = (ebene || document.documentElement).style;
+      if (azc) {
+        const ar = azc.getBoundingClientRect();
+        const sx = azc.offsetWidth > 0 ? (ar.width / azc.offsetWidth) : 1;
+        // Senkrechter Massstab wieder getrennt: die Platte ist
+        // mitgekippt (Als Entscheidung 5.9.), traegt also die
+        // cos-Stauchung der Neigung mit. Gemessen an einer Area-Zone,
+        // die auf derselben Hoehe liegt.
+        const zone = azc.querySelector('.board-zone');
+        const sy = (zone && zone.offsetHeight > 0)
+          ? (zone.getBoundingClientRect().height / zone.offsetHeight) : sx;
+        /**
+         * `luft` (v802): waagerechte Zugabe in Bildschirmpixeln.
+         *
+         * Al: „mache die untere Box breiter, die ist aktuell am Ende
+         * fast abgeschnitten." Gemessen wird zusaetzlich die HUELLE
+         * ueber die Kinder der Zeile — steht ein Kind ueber den Kasten
+         * hinaus (das „Ask before End Turn"-Kaestchen traegt
+         * `white-space: nowrap` und kann breiter werden als der Fluss
+         * der Zeile erwartet), zaehlt es trotzdem mit. Die Zugabe
+         * obendrauf haelt Abstand zum letzten Zeichen.
+         */
+        const platte = (sel, key, luft = 0) => {
+          const row = col.querySelector(sel);
+          if (!row) { setzeVar(st, `--phase-plate-${key}-op`, '0'); return; }
+          const eigen = row.getBoundingClientRect();
+          let links = eigen.left, rechts = eigen.right;
+          let oben = eigen.top, unten = eigen.bottom;
+          for (const kind of row.children) {
+            const kr = kind.getBoundingClientRect();
+            if (kr.width <= 0 || kr.height <= 0) continue;
+            if (kr.left < links) links = kr.left;
+            if (kr.right > rechts) rechts = kr.right;
+            if (kr.top < oben) oben = kr.top;
+            if (kr.bottom > unten) unten = kr.bottom;
+          }
+          const r = {
+            left: links - luft, top: oben,
+            width: (rechts - links) + luft * 2, height: unten - oben,
+          };
+          if (!(r.width > 0) || !(r.height > 0) || !(sx > 0) || !(sy > 0)) {
+            setzeVar(st, `--phase-plate-${key}-op`, '0');
+            return;
+          }
+          setzeVar(st, `--phase-plate-${key}-x`, ((r.left - ar.left) / sx) + 'px');
+          setzeVar(st, `--phase-plate-${key}-y`, ((r.top - ar.top) / sy) + 'px');
+          setzeVar(st, `--phase-plate-${key}-w`, (r.width / sx) + 'px');
+          setzeVar(st, `--phase-plate-${key}-h`, (r.height / sy) + 'px');
+          setzeVar(st, `--phase-plate-${key}-op`, '1');
+        };
+        platte('.board-phase-tracker', 'a', 2);
+        // Fehlt beim Zuschauer ganz — dann meldet `platte` Deckung 0.
+        // Mehr Luft als oben: die Knopfzeile endet mit einem Text, die
+        // Phasenzeile mit einem eigenen Kaestchenrahmen.
+        platte('.phase-buttons-row', 'b', 8);
+      }
+    };
+
+    /**
+     * `nurPlatte` (v799): der schlanke Lauf fuer das Scrollen.
+     *
+     * Beim waagerechten Scrollen aendert sich AUSSCHLIESSLICH der
+     * Versatz der Platte — die Faltlinie, die Hoehe der Phasenzeile und
+     * die Inhaltskante des Bretts bleiben, wo sie sind. Der volle Lauf
+     * misst die aber alle mit und schreibt drei weitere Variablen.
+     * Beim Scrollen wird deshalb nur noch die Platte nachgezogen.
+     */
+    const apply = (nurPlatte = false) => {
+      // Waehrend ein Kartenzug laeuft, aendert sich die Brettgeometrie
+      // nicht — jede Messung hier waere ein erzwungener Umbruch pro
+      // Mausbewegung. Nach dem Loslassen laeuft ohnehin ein Render und
+      // der 400-ms-Takt darunter.
+      if (document.body.classList.contains('pp-dragging-card')) return;
       const col = document.querySelector('.phase-column');
       if (!col) return;
       const parent = col.offsetParent || document.documentElement;
-      const pr = parent.getBoundingClientRect();
+      const pr = nurPlatte ? null : parent.getBoundingClientRect();
+      // Faltlinie, Zeilenhoehe und Inhaltskante nur im VOLLEN Lauf.
       let y = null;
+      if (nurPlatte) { messePlatte(col); return; }
       // ERSTE WAHL: `.board-area-zones-center`. Das ist die Faltlinie, an
       // der das ganze Brett haengt — `position: absolute; top: 50%;
       // translateY(-50%); height: 0`, und die Area-Zonen sind daran
@@ -17392,16 +19696,51 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       if (y == null) return;
-      document.documentElement.style.setProperty('--phase-mid-y', (y - pr.top) + 'px');
+      setzeVar(document.documentElement.style, '--phase-mid-y', (y - pr.top) + 'px');
       // Hoehe NUR der Phasenzeile — das CSS verschiebt die Spalte um die
       // Haelfte davon nach oben, damit genau diese Zeile auf der Linie
       // liegt und die Button-Reihe darunter haengt.
       const tracker = col.querySelector('.board-phase-tracker');
       if (tracker) {
         const th = tracker.getBoundingClientRect().height;
-        if (th > 0) document.documentElement.style.setProperty('--phase-tracker-h', th + 'px');
+        if (th > 0) setzeVar(document.documentElement.style, '--phase-tracker-h', th + 'px');
       }
+
+      // ── UNTERLAGE DER PHASENSPALTE (v792, Als Vorgabe 5.9.) ────────
+      // Die Platte muss HINTER den Karten und VOR den Area-Hintergruenden
+      // liegen. Beide sind Geschwister INNERHALB von `.board-plane-clip`,
+      // und `.board-center` ist ein eigener Stapelkontext
+      // (`isolation: isolate`) — von aussen kann man sich zwischen die
+      // beiden nicht schieben. Die Spalte selbst bleibt trotzdem
+      // draussen: sie ist bedienbar und darf beim Insel-Scrollen nicht
+      // aus dem Bild wandern.
+      //
+      // Deshalb Weg C (Als Entscheidung): nur der HINTERGRUND wandert
+      // hinein, als reine Deko-Ebene, und wird hier auf die Zeilen der
+      // echten Spalte vermessen. Beide Rechtecke kommen aus
+      // `getBoundingClientRect`, sind also Bildschirmkoordinaten — die
+      // Differenz zum Clip stimmt damit AUTOMATISCH bei jeder
+      // Scrollposition. Zusammen mit dem Scroll-Lauscher unten kann die
+      // Platte deshalb nicht von den Phasen weglaufen.
+      const scrollBox = document.querySelector('.board-center');
+      // Die Spalte buendig an die INHALTSKANTE des Schlachtfelds legen
+      // (`--phase-col-x`), statt sie mit `--sidebar-w` grob daneben zu
+      // setzen. Zweck ist nicht Kosmetik: nur so ist der gemessene
+      // Plattenversatz nie negativ. Im Scrollmodus klippt
+      // `.board-plane-clip` waagerecht, und eine Platte mit negativem x
+      // wuerde am linken Rand angeschnitten.
+      //
+      // Gemessen wird an `.board-center` selbst, nicht am Clip: die Box
+      // bleibt beim Scrollen stehen, der Clip wandert darunter weg.
+      if (scrollBox) {
+        const sb = scrollBox.getBoundingClientRect();
+        const padL = parseFloat(getComputedStyle(scrollBox).paddingLeft) || 0;
+        setzeVar(document.documentElement.style, '--phase-col-x', (sb.left + padL - pr.left) + 'px');
+      }
+
+      messePlatte(col);
     };
+
     apply();
     const raf = requestAnimationFrame(apply);
     const center = document.querySelector('.board-center');
@@ -17412,13 +19751,34 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Naht, ohne die beobachtete Box zu resizen — dieselbe Blindstelle,
     // die der Board-Scaler mit seinem scaleKick umgeht.
     const poll = setInterval(apply, 400);
+    // Waagerechtes Scrollen (Flying-Island-Bretter) verschiebt den Clip
+    // unter der stehenden Spalte weg — ohne diesen Lauscher liefe die
+    // Platte davon.
+    //
+    // GEBUENDELT auf ein Bild (v798): `scroll` feuert deutlich oefter
+    // als der Bildschirm zeichnet, und jeder Lauf misst und schreibt.
+    // Ungebuendelt war genau das die Ursache fuer das hakelige
+    // Seitwaertsscrollen, das Al gemeldet hat — mein eigener Zusatz aus
+    // v792.
+    let scrollRaf = 0;
+    const onScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; apply(true); });
+    };
+    if (center) center.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       cancelAnimationFrame(raf);
       if (ro) ro.disconnect();
       window.removeEventListener('resize', apply);
+      if (center) center.removeEventListener('scroll', onScroll);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
       clearInterval(poll);
-      document.documentElement.style.removeProperty('--phase-mid-y');
-      document.documentElement.style.removeProperty('--phase-tracker-h');
+      const st = document.documentElement.style;
+      st.removeProperty('--phase-mid-y');
+      st.removeProperty('--phase-tracker-h');
+      st.removeProperty('--phase-col-x');
+      // Die Platten-Variablen liegen auf der Ebene selbst (v799) und
+      // verschwinden mit ihr — hier ist nichts abzuraeumen.
     };
   }, []);
 
@@ -17531,28 +19891,52 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const available = container.clientWidth;
       const scale = Math.max(MIN_SCALE, Math.min(1, available / IDEAL_WIDTH));
       document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
+      // Zweite, gleich grosse Variable (v805). Sie existiert nur, damit
+      // Teilbereiche des Bretts ihren eigenen Massstab bilden koennen:
+      // `--board-scale` DORT zu ueberschreiben und dabei auf sich selbst
+      // zu verweisen waere ein Zyklus und damit ungueltig. Ueber diese
+      // unangetastete Quelle geht es (siehe `.phase-column` in
+      // style.css).
+      document.documentElement.style.setProperty('--board-scale-live', scale.toFixed(4));
     };
     const ro = new ResizeObserver(updateScale);
     ro.observe(container);
     updateScale();
-    return () => { ro.disconnect(); document.documentElement.style.setProperty('--board-scale', '1'); };
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.setProperty('--board-scale', '1');
+      document.documentElement.style.setProperty('--board-scale-live', '1');
+    };
   }, []);
 
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
   // Compute resolving card index from LOCAL hand order + server marker
-  const resolvingHandIndex = useMemo(() => {
+  /**
+   * ★ 28.8., Als Befund: der Ausgrau-Filter reagierte auf die Karten im
+   * VORRAT statt in der Hand.
+   *
+   * Ursache war ueberall dieselbe: die Pruefungen vergleichen nur den
+   * INDEX. Seit der Vorrat eigene Indizes fuehrt, trifft Vorrat 1 auch
+   * Hand 1. Der Auflaesungs-Index braucht deshalb die Herkunft, und
+   * `getCardDimmed` unten ebenso.
+   */
+  const resolvingIdx = useMemo(() => {
     const rc = me.resolvingCard;
-    if (!rc) return -1;
+    if (!rc) return { idx: -1, fromCreation: false };
+    const liste = rc.fromCreation ? (me.creationZone || []) : hand;
     let count = 0;
-    for (let i = 0; i < hand.length; i++) {
-      if (hand[i] === rc.name) {
+    for (let i = 0; i < liste.length; i++) {
+      if (liste[i] === rc.name) {
         count++;
-        if (count === rc.nth) return i;
+        if (count === rc.nth) return { idx: i, fromCreation: !!rc.fromCreation };
       }
     }
-    return -1;
-  }, [hand, me.resolvingCard]);
+    return { idx: -1, fromCreation: !!rc.fromCreation };
+  }, [hand, me.creationZone, me.resolvingCard]);
+  // Rueckwaertskompatibler Name fuer die HAND — alle alten Leser meinen
+  // die Hand, und die sollen Vorratskarten NICHT treffen.
+  const resolvingHandIndex = resolvingIdx.fromCreation ? -1 : resolvingIdx.idx;
   const handKeyRef = useRef(JSON.stringify(me.hand || []));
   const [drawAnimCards, setDrawAnimCards] = useState([]); // [{id, cardName, origIdx}]
   const prevHandLenRef = useRef((me.hand || []).length);
@@ -17876,7 +20260,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [bounceOutgoingHidden, setBounceOutgoingHidden] = useState(new Set());
   const prevOppHandCountRef = useRef(opp.handCount || 0);
   if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
-  useEffect(() => {
+  // ★ v816 (Als Befund 6.9.): `useLayoutEffect` statt `useEffect`. Der
+  // neue Zustand (Hand +1) wurde EINEN Frame lang gemalt, bevor der
+  // Effekt `setOppDrawHidden` setzte — die gezogene Karte blitzte in der
+  // Gegnerhand auf, verschwand und flog dann erst. Layout-Effekte laufen
+  // vor dem Malen, das Verstecken steht also schon beim ersten Frame.
+  useLayoutEffect(() => {
     const newCount = opp.handCount || 0;
     const prevCount = prevOppHandCountRef.current;
     // Pile-transfer handshake (opponent view): cards arriving via a
@@ -18016,6 +20405,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const chatBodyRef = useRef(null);
   const actionLogRef = useRef(null);
   const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
+  // Kadaver-Halter (v686): eine beanspruchte Creature (Hunting) ist im
+  // Zustand schon aus ihrem Slot gesplict, ihr Flug startet aber erst
+  // nach allen Todes-Effekten (Heragas' Draw …). Ohne Halter waere sie
+  // in dieser Zeit unsichtbar (Als Befund 1.9.). Der Halter ist ein
+  // stehender BoardCard am alten Slot — genau das Bild, das der Flug
+  // dann aufnimmt — und wird in DEM Moment geloest, in dem der Flug
+  // beginnt (siehe onCardTransfer / onPileTransfer).
+  const [claimHolds, setClaimHolds] = useState([]);
+  const releaseClaimHold = (owner, heroIdx, slot) => {
+    const key = `${owner}-${heroIdx}-${slot}`;
+    setClaimHolds(prev => prev.some(h => h.key === key) ? prev.filter(h => h.key !== key) : prev);
+  };
   const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
   const [tempesteRainInsts, setTempesteRainInsts] = useState([]); // Active Prophecy of Tempeste instance ids — one rain overlay per
   const [discardAnims, setDiscardAnims] = useState([]);
@@ -18896,7 +21297,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return false;
   };
 
-  const getCardDimmed = (cardName, handIdx) => {
+  const getCardDimmed = (cardName, handIdx, fromCreation = false) => {
     if (gameState.awaitingFirstChoice) return false; // Let player see hand clearly
     if (gameState.mulliganPending) return false; // Let player see hand during mulligan
     if (gameState.potionTargeting) {
@@ -18905,7 +21306,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // this hand index, the card is clickable instead of dimmed.
       const pt = gameState.potionTargeting;
       if (pt.ownerIdx === myIdx && Number.isInteger(handIdx)) {
-        const isHandTarget = (pt.validTargets || []).some(
+        // Ziel-Eintraege vom Typ 'hand' meinen die HAND. Eine
+        // Vorratskarte mit demselben Index ist nicht gemeint.
+        const isHandTarget = !fromCreation && (pt.validTargets || []).some(
           t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === handIdx
         );
         if (isHandTarget) return false;
@@ -18913,14 +21316,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return true; // All other cards dimmed during targeting.
     }
 
+    // v715 (Als Befund, Doctor Fester): ein Immediate-Action-Prompt, der
+    // diese Karte ausdruecklich als spielbar listet, schlaegt den
+    // „wird gerade aufgeloest"-Dimmer. Fester aktiviert sich AUS DER HAND
+    // und oeffnet dann den Prompt fuer sich selbst — sein eigener
+    // resolvingIdx dimmte ihn, der Drag startete nie (der Klick-Pfad
+    // fragt `dimmed` nicht, deshalb ging der).
+    {
+      const _hap = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
+      if (_hap && (_hap.eligibleCards || []).includes(cardName)) return false;
+    }
+
     // The specific resolving card instance is always dimmed (non-interactive)
-    if (handIdx != null && resolvingHandIndex >= 0 && resolvingHandIndex === handIdx) return true;
+    if (handIdx != null && resolvingIdx.idx >= 0
+        && resolvingIdx.idx === handIdx
+        && !!resolvingIdx.fromCreation === !!fromCreation) return true;
 
     // Hand-activated-effect: if THIS specific hand index is still
     // activatable (not already revealed, per-copy check), keep it
     // clickable. The rest of the dim logic below only bears on SUMMON
     // eligibility — reveal remains a valid click for this slot.
-    if (handIdx != null && (gameState.handActivatableCards || []).some(h => h.handIndex === handIdx)) return false;
+    // ★ Herkunft MIT vergleichen — sonst hebt ein aktivierbarer
+    // Vorrats-Eintrag das Ausgrauen der gleichnamigen Handposition auf
+    // (genau Als Befund).
+    if (handIdx != null && (gameState.handActivatableCards || []).some(
+      h => h.handIndex === handIdx && !!h.fromCreation === !!fromCreation)) return false;
 
     // Hero Action mode (Coffee) — only eligible cards are playable
     const heroActionPrompt = gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt.ownerIdx === myIdx ? gameState.effectPrompt : null;
@@ -18940,6 +21360,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // the rest so the player's eye lands on the legal picks.
     const pickHandCard = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (pickHandCard) {
+      // Handzugriffs-Effekte meinen die HAND — Vorratskarten sind
+      // keine legalen Ziele (Als Ruling), also immer ausgegraut.
+      if (fromCreation) return true;
       const eligible = gameState.effectPrompt.eligibleIndices;
       return !(!eligible || eligible.includes(handIdx));
     }
@@ -18947,6 +21370,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand Pick mode (Shard of Chaos) — dim ineligible cards
     const handPickActive = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickActive) {
+      if (fromCreation) return true;   // siehe oben
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       return !eligible.includes(handIdx);
     }
@@ -18960,12 +21384,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!isMyTurn) return true;
     const card = CARDS_BY_NAME[cardName];
     if (!card) return false;
+    // v656: Dajan, Conqueror — Gratis-Artefakt scharf: alles ausser
+    // Artefakten grau, bis eines gespielt (oder Dajan erneut geklickt) ist.
+    if (me.freeArtifactArmed && (card.cardType !== 'Artifact'
+        || (me.manualCostArtifactsInHand || []).includes(cardName))) return true;
 
     // Base Hero cards in hand can never be proactively played — they're
     // board pieces, not action cards. Ascended Heroes are handled by
     // their own dedicated case in the Main-Phase block below (they CAN
     // play, via ascension on an eligible base hero). Always grey out.
-    if (card.cardType === 'Hero') return true;
+    // v704 (Tri Ad): Ausnahme sind Helden-FORMEN (`plainHeroForms` vom
+    // Server) — sie laufen wie Ascended Heroes ueber die Ascension-Bedienung.
+    if (card.cardType === 'Hero' && !(gameState.plainHeroForms || []).includes(cardName)) return true;
 
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
@@ -18998,6 +21428,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // pruefung muss also hier stehen. Fuer normale Creatures bleibt sie
     // dort, wo sie war.
     if (countsAsSummon && card.cardType !== 'Creature') {
+      // Aktionssperre: alles, was eine Aktion kostet, ist unbenutzbar.
+      if (me.actionLocked) return true;
       if (me.summonLocked) return true;
       if ((gameState.summonBlocked || []).includes(cardName)) return true;
     }
@@ -19094,8 +21526,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gray out spells/attacks with custom play conditions that aren't met (Flame Avalanche, etc.)
       if ((gameState.blockedSpells || []).includes(cardName)) return true;
       // Gray out Ascended Heroes if no eligible base hero exists
-      if (card.cardType === 'Ascended Hero') {
-        const hasEligible = (me.heroes || []).some(h => h?.name && h.hp > 0 && h.ascensionReady && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName)));
+      // (v704: Helden-Formen wie Tri Ad ebenso)
+      if (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) {
+        const hasEligible = (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, handIdx));
         return !hasEligible;
       }
       return false;
@@ -19373,6 +21806,74 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [pendingAdditionalPlay, setPendingAdditionalPlay] = useState(null); // { cardName, handIndex, heroIdx, zoneSlot, providers: [{cardId, cardName, heroIdx, zoneSlot}] }
   const [pendingAbilityActivation, setPendingAbilityActivation] = useState(null); // { heroIdx, zoneIdx, abilityName, level }
   const [spellHeroPick, setSpellHeroPick] = useState(null); // { cardName, handIndex, card, eligible, isHeroAction }
+  // ★ v809 (Als UX-Vorgabe 6.9.): die Wahl des Helden fuer eine Karte aus
+  // der Hand — EIN Weg fuer den Namens-Button im Menue UND den Klick auf
+  // die Heldenkarte selbst. `h` ist ein Eintrag aus `spellHeroPick.eligible`.
+  const commitSpellHeroPick = (h) => {
+    const pick = spellHeroPick;
+    if (!pick || !h) return;
+    setSpellHeroPick(null);
+      if (pick.isSurprise) {
+        socket.emit('play_surprise', {
+          roomId: gameState.roomId, cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          bakhmSlot: h.bakhmSlot,
+          });
+      } else if (pick.isAscension) {
+        hideGameTooltip(); socket.emit('ascend_hero', {
+          roomId: gameState.roomId, cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          });
+      } else if (pick.isHeroAction) {
+        // For Creature picks in heroAction mode (Hu's
+        // any-hero variant), zoneSlot is required by
+        // `performImmediateActionAnyHero`. The picker's
+        // eligible-entries carry it (the host-slot we
+        // probed up-front via findFreeSupportSlot).
+        const response = {
+          cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
+          heroIdx: h.idx,
+        };
+        if (pick.isCreature && h.zoneSlot != null) {
+          response.zoneSlot = h.zoneSlot;
+        }
+        socket.emit('effect_prompt_response', {
+          roomId: gameState.roomId,
+          response,
+        });
+      } else if (pick.isArtifactCreature) {
+        // Artifact Creature: derselbe Picker, aber der Weg
+        // aufs Feld ist `play_artifact` (doPlayArtifact hat
+        // den isArtifactCreature-Zweig), nicht play_creature.
+        // MUSS vor `pick.isCreature` stehen — die Ueberschrift
+        // kommt ueber genau diese Fahne.
+        socket.emit('play_artifact', {
+          roomId: gameState.roomId, cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          zoneSlot: h.zoneSlot,
+          clickPlaced: true,
+          });
+      } else if (pick.isCreature) {
+        socket.emit('play_creature', {
+          roomId: gameState.roomId, cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          zoneSlot: h.zoneSlot,
+        });
+      } else {
+        // Spell. For creature casters, heroIdx routes to the
+        // host slot — engine's bypass additional-action picks
+        // it up automatically. `viaCreatureInstId` tells the
+        // server to anchor animations on the Creature's
+        // support slot, not the host hero's zone.
+        socket.emit('play_spell', {
+          roomId: gameState.roomId, cardName: pick.cardName,
+          handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
+          charmedOwner: h.charmedOwner,
+          viaCreatureInstId: h.creatureInstId,
+        });
+      }
+  };
   // Click-to-swap state for Deepsea-style bounce-place cards. When set,
   // the board shows highlights on every legal drop target (bounce
   // candidates + free Support Zones) and the user clicks one to
@@ -19492,12 +21993,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     }
     // Doesn't have it — needs a free zone
-    return abZones.some(slot => (slot || []).length === 0);
+    if (abZones.some(slot => (slot || []).length === 0)) return true;
+    // v768: Xal / Xalibur — eine freie (oder gleichnamige) SUPPORT Zone
+    // zaehlt genauso. Ohne das blieb die Handkarte grau, sobald die drei
+    // echten Zonen voll waren.
+    if ((gameState.abilitySupportHeroes || []).includes(heroIdx)) {
+      const supZones = playerData.supportZones?.[heroIdx] || [];
+      return supZones.some(slot => (slot || []).length === 0
+        || ((slot || [])[0] === abilityName && slot.length < 3));
+    }
+    return false;
   };
 
   // Check if a hero can play a card (fully server-driven via heroPlayableCards).
   // All action economy logic (bonus actions, additional actions, inherent actions,
   // phase restrictions) is computed server-side in getHeroPlayableCards().
+  /**
+   * ★ 28.8.: Darf dieser Held zu DIESER Ascended-Karte aufsteigen?
+   *
+   * Zwei Quellen, verodert:
+   *   ① die Felder am Helden (`ascensionReady` + `ascensionTarget(s)`)
+   *      — Orb-Weg, Waflav, „???, the Shapeshifter";
+   *   ② `ascensionSkipTargets` vom Server — Aufstiege, die ein
+   *      Attachment freischaltet („Divine Awakening").
+   *
+   * Vorher stand diese Bedingung FUENFMAL wortgleich im Code; ein
+   * zweiter Weg haette fuenfmal nachgezogen werden muessen. Genau so
+   * ist der gemeldete Fehler entstanden.
+   */
+  const heroCanAscendTo = (h, heroIdx, cardName, handIdx) => {
+    if (!h?.name || h.hp <= 0) return false;
+    if (h.ascensionReady
+        && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName))) return true;
+    if (((gameState.ascensionSkipTargets || {})[heroIdx] || []).includes(cardName)) return true;
+    // ③ v677b: Erlasse je Handkopie (Perilous Journey) — INDEXBASIERT.
+    //    Ohne die Bindung leuchteten bei zwei namensgleichen Kopien
+    //    beide, obwohl nur die gesuchte den Stempel traegt (Als
+    //    Befund). Alle fuenf Aufrufer reichen ihren Handindex durch.
+    return handIdx != null
+      && (((gameState.ascensionGrantOffers || {})[handIdx]) || []).includes(heroIdx);
+  };
+
   const canHeroPlayCard = (playerData, heroIdx, card) => {
     const isOwn = playerData === me;
     const playableMap = isOwn
@@ -19809,18 +22345,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (!gameState.result) setScEarned(null);
   }, [gameState.result]);
 
-  const onHandMouseDown = (e, idx) => {
+  /**
+   * @param {boolean} [fromCreation] Die Karte kommt aus Crestinas
+   *   Vorrat statt aus der Hand (Als Vorgabe 28.8.).
+   *
+   * ★ EINE Funktion fuer beide Quellen, keine zweite Kopie. Die
+   *   Zweige darin (Abwurfzwang, Handzugriff, Ability-Anlegen,
+   *   Namenssperren …) gelten fuer HANDkarten; eine Vorratskarte
+   *   ueberspringt sie, weil sie ausdruecklich KEINE Handkarte ist
+   *   (Als Ruling: kein Ziel fuer Loot the Leftovers & Co.). Danach
+   *   laeuft sie durch dieselbe Spielbarkeits- und Ziehmaschine.
+   */
+  const onHandMouseDown = (e, idx, fromCreation = false) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
     if (isSpectator) return; // Spectators can't interact with cards
-    const cardName = hand[idx];
-    const dimmed = getCardDimmed(cardName, idx);
+    const cardName = fromCreation ? (me.creationZone || [])[idx] : hand[idx];
+    if (!cardName) return;
+    const dimmed = getCardDimmed(cardName, idx, fromCreation);
 
     // Generic hand-target click (Rocky Slime, etc.) — if the active
     // potion-targeting prompt lists a `type: 'hand'` entry for this
     // hand slot, route the click through `togglePotionTarget` so it
     // shares the same auto-confirm / max-total / cancellable plumbing
     // as board target clicks.
-    if (gameState.potionTargeting?.ownerIdx === myIdx) {
+    // ★ Alle folgenden Zweige bis zum Ziehstart betreffen HANDkarten:
+    // Handzugriff-Zielwahl, Abwurfzwang, blinde Auswahl, Ability-
+    // Anlegen, Namenssperren. Eine Vorratskarte ist ausdruecklich
+    // KEINE Handkarte (Als Rulings 28.8.) und ueberspringt sie
+    // deshalb geschlossen — sonst koennte ein Abwurfzwang sie
+    // treffen, was der Text verbietet.
+    if (!fromCreation && gameState.potionTargeting?.ownerIdx === myIdx) {
       const handTarget = (gameState.potionTargeting.validTargets || []).find(
         t => t?.type === 'hand' && t?.owner === myIdx && t?.handIndex === idx
       );
@@ -19832,7 +22386,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Force Discard mode — any card in hand can be discarded EXCEPT the specific resolving card
-    const forceDiscardActive = gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
+    const forceDiscardActive = !fromCreation && gameState.effectPrompt?.type === 'forceDiscard' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
       const eligible = gameState.effectPrompt.eligibleIndices;
@@ -19843,7 +22397,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Cancellable Force Discard mode (Training, etc.) — clicking a card discards it
-    const forceDiscardCancellableActive = gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
+    const forceDiscardCancellableActive = !fromCreation && gameState.effectPrompt?.type === 'forceDiscardCancellable' && gameState.effectPrompt.ownerIdx === myIdx;
     if (forceDiscardCancellableActive) {
       if (resolvingHandIndex >= 0 && resolvingHandIndex === idx) return; // Can't discard the resolving card
       // Same `eligibleIndices` narrowing as the forced variant —
@@ -19868,13 +22422,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `targetHeroIdx` + `targetSlotIdx` in the response so the
     // script can skip its zone-pick prompt. Plain clicks behave
     // identically to the existing flow.
-    const pickHandCardActive = gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
+    const pickHandCardActive = !fromCreation && gameState.effectPrompt?.type === 'pickHandCard' && gameState.effectPrompt.ownerIdx === myIdx;
     const pickHandCardPrompt = pickHandCardActive ? gameState.effectPrompt : null;
     const pickHandCardHosts = pickHandCardPrompt?.eligibleHostsByCardName?.[cardName] || null;
     const pickHandCardDragMode = pickHandCardActive
       && pickHandCardPrompt.dragSummonMode === true
       && Array.isArray(pickHandCardHosts)
       && pickHandCardHosts.length > 0;
+    // v673: `hostZoneKind: 'hero'` — der Wirt ist die HELDEN-Zone, nicht
+    // eine Support Zone (Open Invitation legt einen Ascended Hero auf
+    // einen Helden). Die Hosts tragen dann `slotIdx: -1`.
+    const pickHandCardHeroMode = pickHandCardDragMode
+      && pickHandCardPrompt.hostZoneKind === 'hero';
     if (pickHandCardActive) {
       const eligible = pickHandCardPrompt.eligibleIndices;
       if (eligible && !eligible.includes(idx)) return;
@@ -19890,7 +22449,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
 
     // Hand Pick mode (Shard of Chaos, Leadership) — toggle card selection
-    const handPickPrompt = gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
+    const handPickPrompt = !fromCreation && gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt.ownerIdx === myIdx;
     if (handPickPrompt) {
       const eligible = gameState.effectPrompt.eligibleIndices || [];
       if (!eligible.includes(idx)) return;
@@ -20065,16 +22624,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       && ([0,1,2].some(hi => { const h = me.heroes[hi]; return h && h.name && h.hp > 0 && ((me.surpriseZones || [])[hi] || []).length === 0; })
         || (card.cardType === 'Creature' && (gameState.bakhmSurpriseSlots || []).some(b => b.freeSlots.length > 0)));
     const isAscensionPlayable = !dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 4) && card
-      && card.cardType === 'Ascended Hero'
-      && (me.heroes || []).some((h) => h?.name && h.hp > 0 && h.ascensionReady && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName)));
+      && (card.cardType === 'Ascended Hero' || (gameState.plainHeroForms || []).includes(cardName)) // v704: Helden-Formen (Tri Ad)
+      && (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, idx));
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
     let dragging = false;
 
     // Helper: check if cursor is inside the hand zone
+    /**
+     * ★ 28.8.: NUR der Kartenkasten der Hand, nicht der aeussere
+     * Container. `handRef` haengt an `.game-hand-me` und umschliesst
+     * seit heute auch Crestinas Vorrat — ohne diese Einengung galt
+     * ein Zeiger ueber dem Vorrat als „in der Hand" und startete die
+     * Handsortierung mit einem Vorrats-Index (Als Befund 28.8.:
+     * „erzeugt einen temporaeren Klon in der Haupt-Hand").
+     */
+    const zoneRect = (sel) => handRef.current?.querySelector(sel)?.getBoundingClientRect();
     const isInsideHandZone = (mx, my) => {
-      const r = handRef.current?.getBoundingClientRect();
-      return r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
+      const r = zoneRect('.game-hand-cards');
+      return !!r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
+    };
+    const isInsideCreationZone = (mx, my) => {
+      const r = zoneRect('.game-hand-creation-cards');
+      return !!r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
     };
 
     const onMove = (mx, my) => {
@@ -20083,13 +22655,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         dragging = true;
       }
 
-      const inHand = isInsideHandZone(mx, my);
+      // ★ Jede Haelfte sortiert nur SICH SELBST (Als Regel 28.8.:
+      // „nicht zwischen beiden Piles wechseln"). Eine Vorratskarte
+      // ueber der Hand loest also KEINE Sortierung aus — und
+      // umgekehrt.
+      const inHand = !fromCreation && isInsideHandZone(mx, my);
+      const inCreation = fromCreation && isInsideCreationZone(mx, my);
 
-      // Inside hand zone → always reorder mode (any card type, even dimmed)
-      if (inHand) {
+      // Inside own zone → always reorder mode (any card type, even dimmed)
+      if (inHand || inCreation) {
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation });
         return;
       }
 
@@ -20105,7 +22682,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // drag UX.
       if (pickHandCardDragMode) {
         let targetHero = -1, targetSlot = -1;
-        const supEls = document.querySelectorAll('[data-support-zone]');
+        const supEls = pickHandCardHeroMode ? [] : document.querySelectorAll('[data-support-zone]');
         for (const el of supEls) {
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
@@ -20137,6 +22714,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           idx, cardName, card, mouseX: mx, mouseY: my,
           targetHero, targetSlot,
           pickHandCardDrag: true,
+          // Im Hero-Modus ist `targetSlot` immer -1 — der Abwurf-Riegel
+          // in `onUp` verlangt sonst `>= 0` und verwuerfe jeden Drop.
+          pickHandCardHeroDrop: pickHandCardHeroMode,
         });
         return;
       }
@@ -20170,6 +22750,30 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
+        // ── v768: SUPPORT Zones als Ability-Ziel (Xal, Xalibur) ──────
+        // Bei diesen Helden sind sie vollwertige Ability-Zonen. Welche
+        // Helden das koennen, sagt der Server (`abilitySupportHeroes`) —
+        // der Client baut keine Kartenregeln nach.
+        let targetSupportZone = -1;
+        if (targetHero < 0 && !isCustomDrag) {
+          const supEls = document.querySelectorAll('[data-support-zone]');
+          for (const el of supEls) {
+            const r = el.getBoundingClientRect();
+            if (mx < r.left || mx > r.right || my < r.top || my > r.bottom) continue;
+            if (el.dataset.supportOwner !== 'me') continue;
+            const hi = parseInt(el.dataset.supportHero);
+            const zi = parseInt(el.dataset.supportSlot);
+            if (!(gameState.abilitySupportHeroes || []).includes(hi)) continue;
+            const held = me.heroes[hi];
+            if (!held?.name || held.hp <= 0) continue;
+            if ((me.abilityGivenThisTurn || [])[hi]
+                && !((held?.buffs?.blessed_skill?.remaining) || 0)) continue;
+            const slot = (me.supportZones[hi] || [])[zi] || [];
+            const passt = slot.length === 0 || (slot[0] === cardName && slot.length < 3);
+            if (!passt) continue;
+            targetHero = hi; targetZone = -1; targetSupportZone = zi;
+          }
+        }
         // Check ability zones (more specific target)
         if (targetHero < 0) {
           const abEls = document.querySelectorAll('[data-ability-zone]');
@@ -20200,7 +22804,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetZone });
+        // ★ 28.8., Als Befund: „Ability aus der Creation Zone schnappt
+        // zurueck". Die Sendung las `prev.fromCreation` — das hier
+        // aber nie gesetzt wurde. Der Server prueft dann den
+        // VORRATS-Index gegen die HAND, findet einen anderen Namen und
+        // lehnt ab; die Karte springt zurueck. Dieselbe Herkunft wie
+        // in den anderen drei Ziehzustaenden.
+        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetZone, targetSupportZone, fromCreation });
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
@@ -20347,7 +22957,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
               } else {
-                const canPlayHere = isHeroAction || canHeroPlayCard(me, hi, card);
+                // Anlege-Karten: der Treffer entscheidet ueber den
+                // EMPFAENGER, nicht ueber den Wirker (Als Vorgabe 28.8.).
+                // Ohne diesen Zweig faende der Zeiger die Zone eines
+                // Helden, der nicht wirken kann, gar nicht — obwohl sie
+                // gerade hervorgehoben ist.
+                const attHosts = (gameState.attachmentHostTargets || {})[cardName] || null;
+                const canPlayHere = attHosts
+                  ? attHosts.some(h => h.heroIdx === hi && h.slotIdx === si)
+                  : (isHeroAction || canHeroPlayCard(me, hi, card));
                 if (!canPlayHere) continue;
                 if (si >= ((me.supportZones[hi] || []).length || 3)) continue;
                 targetHero = hi; targetSlot = si;
@@ -20401,7 +23019,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost , fromCreation });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes.
         // Cross-side artifacts (Powder Keg etc., server-published in
@@ -20535,11 +23153,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetBakhmSlot, isSurprise: true });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetBakhmSlot, isSurprise: true , fromCreation });
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
         let targetSlot = -1;
+        let targetAttachOwner = undefined; // v651: Zielseite eines Cross-Side-Attachments
         let targetCharmedOwner = undefined;
         let surpriseTarget = false;
         const heroActionHeroIdx2 = heroActionPrompt?.heroIdx;
@@ -20608,7 +23227,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
 
         // Attachment spells/attacks: also check support zones (like creatures/equipment)
+        //
+        // ★ 28.8., zweiter Anlauf: Es gibt ZWEI Ziehen-Zweige — einen
+        // fuer Kreaturen und diesen fuer Spells/Attacken. Beim ersten
+        // Anlauf hatte ich nur den Kreatur-Zweig auf die
+        // Empfaengerliste umgestellt; ein Attachment ist aber ein
+        // SPELL und laeuft hier durch. Ergebnis: die Zonen leuchteten
+        // (die Hervorhebung sitzt im Render und war schon richtig),
+        // aber der Zeiger fand sie nicht, und die Karte sprang zurueck
+        // auf die Hand. Genau das Muster „Anzeige und Klick auf
+        // verschiedenen Bedingungen", das in dieser Sitzung schon
+        // zweimal zugeschlagen hat.
         if (!surpriseTarget && isAttachmentCard) {
+          const attHostsSp = (gameState.attachmentHostTargets || {})[cardName] || null;
           const supEls = document.querySelectorAll('[data-support-zone]');
           for (const el of supEls) {
             const r = el.getBoundingClientRect();
@@ -20617,9 +23248,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               const si = parseInt(el.dataset.supportSlot);
               const isOwn = el.dataset.supportOwner === 'me';
               const isIsland = el.dataset.supportIsland === 'true';
-              if (isOwn && !isIsland && si < 3 && canHeroPlayCard(me, hi, card)) {
-                const slotCards = (me.supportZones[hi] || [])[si] || [];
-                if (slotCards.length === 0) { targetHero = hi; targetSlot = si; }
+              // Empfaengerliste schlaegt die Wirker-Pruefung.
+              // v651: Hosts tragen eine Seite (`owner`, Standard = ich). Ein
+              // Attachment, das an gegnerische Helden darf (Overheal Shock,
+              // Berserk …), fuehrt gegnerische Zonen — die sind dann Drop-Ziel.
+              const zoneOwnerIdx = isOwn ? myIdx : (myIdx === 0 ? 1 : 0);
+              const darfHier = attHostsSp
+                ? attHostsSp.some(h => (h.owner ?? myIdx) === zoneOwnerIdx && h.heroIdx === hi && h.slotIdx === si)
+                : (isOwn && canHeroPlayCard(me, hi, card));
+              if (!isIsland && si < 3 && darfHier) {
+                const zonePs = isOwn ? me : opp;
+                const slotCards = (zonePs.supportZones?.[hi] || [])[si] || [];
+                if (slotCards.length === 0) { targetHero = hi; targetSlot = si; targetAttachOwner = zoneOwnerIdx; }
               }
             }
           }
@@ -20669,13 +23309,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const r = el.getBoundingClientRect();
           if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) {
             const hi = parseInt(el.dataset.heroIdx);
+            // v651: Cross-Side-Attachment auf einen GEGNERISCHEN Helden gezogen
+            if (el.dataset.heroOwner !== 'me' && isAttachmentCard) {
+              const oppIdx2 = myIdx === 0 ? 1 : 0;
+              const attHostsOpp = (gameState.attachmentHostTargets || {})[cardName] || null;
+              if (attHostsOpp && attHostsOpp.some(h => h.owner === oppIdx2 && h.heroIdx === hi)) {
+                targetHero = hi; targetAttachOwner = oppIdx2;
+              }
+              if (targetHero >= 0) break;
+              continue;
+            }
             if (el.dataset.heroOwner === 'me') {
               if (heroActionHeroIdx2 !== undefined && hi !== heroActionHeroIdx2) continue;
               // During heroAction, isHeroAction already asserts the card is
               // playable with this hero — skip canHeroPlayCard (which uses
               // the normal action-economy gate and returns false for a hero
               // who's already acted this turn).
-              if (isHeroAction || canHeroPlayCard(me, hi, card)) {
+              // Anlege-Karten: auch hier entscheidet die Empfaengerliste,
+              // damit das Ablegen auf die HELDENKARTE (Auto-Platz) fuer
+              // dieselben Helden funktioniert wie das auf eine Zone.
+              const attHostsHz = isAttachmentCard
+                ? ((gameState.attachmentHostTargets || {})[cardName] || null) : null;
+              const darfWirken = attHostsHz
+                ? attHostsHz.some(h => (h.owner ?? myIdx) === myIdx && h.heroIdx === hi)
+                : (isHeroAction || canHeroPlayCard(me, hi, card));
+              if (darfWirken) {
                 if (isAttachmentCard) {
                   // Auto-place: only if hero has a free support zone
                   const supZones = me.supportZones[hi] || [];
@@ -20695,7 +23353,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -20706,18 +23364,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (el.dataset.heroOwner === 'me') {
               const hi = parseInt(el.dataset.heroIdx);
               const hero = me.heroes[hi];
-              if (hero?.name && hero.hp > 0 && hero.ascensionReady && (hero.ascensionTarget === cardName || (hero.ascensionTargets || []).includes(cardName))) {
+              if (heroCanAscendTo(hero, hi, cardName, idx)) {
                 targetHero = hi;
               }
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, isAscension: true });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, isAscension: true , fromCreation });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation });
       }
     };
 
@@ -20741,7 +23399,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         setPlayDrag(prev => {
           if (!prev) return null;
-          if (prev.targetHero >= 0 && prev.targetSlot >= 0) {
+          if (prev.targetHero >= 0 && (prev.targetSlot >= 0 || prev.pickHandCardHeroDrop)) {
             if (window.playSFX) window.playSFX('ui_click');
             socket.emit('effect_prompt_response', {
               roomId: gameState.roomId,
@@ -20772,7 +23430,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // PER-COPY: this specific hand slot is activatable iff its index
         // is listed in `handActivatableByIdx`. Already-revealed copies are
         // not in that list, so they drop through to the normal click flow.
-        const canHandActivate = handActivatableByIdx.has(idx);
+        const canHandActivate = (fromCreation ? creationActivatableByIdx : handActivatableByIdx).has(idx);
         if (canHandActivate && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4)) {
           let summonEligible = [];
           if (isPlayable && card?.cardType === 'Creature') {
@@ -20784,10 +23442,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
           if (summonEligible.length > 0) {
-            setSummonOrRevealPick({ cardName, handIndex: idx, card, summonEligible });
+            // ★ 28.8., Als Befund: „Luna Kiai ist gehighlightet, aber der
+            // Klick tut nichts." Luna Kiai ist eine CREATURE, der Klick
+            // landet also in diesem Waehler — und der trug die Herkunft
+            // nicht weiter. Beide Knoepfe sendeten danach einen
+            // Vorrats-Index als HAND-Index; der Server lehnte ab, und
+            // sichtbar passierte nichts.
+            setSummonOrRevealPick({ cardName, handIndex: idx, fromCreation, card, summonEligible });
           } else {
             if (window.playSFX) window.playSFX('ui_click');
-            socket.emit('activate_hand_card', { roomId: gameState.roomId, cardName, handIndex: idx });
+            socket.emit('activate_hand_card', {
+              roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+            });
           }
           setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
           return;
@@ -20795,7 +23461,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Click (no drag) — check for potion or non-equip artifact activation
         if (!dimmed && isMyTurn && (currentPhase === 2 || currentPhase === 3 || currentPhase === 4) && card) {
           if (card.cardType === 'Potion') {
-            socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
+            socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+          });
           } else if (isEquipPlayable && (gameState.ownSideSummonArtifacts || []).includes(cardName)) {
             // Klick-zu-Beschwoeren fuer Artifact Creatures (Als Vorgabe
             // 17.8.): „genau wie bei einer Lv-0-Creature auch." Bis dahin
@@ -20821,21 +23488,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (acEligible.length === 1) {
               socket.emit('play_artifact', {
                 roomId: gameState.roomId, cardName,
-                handIndex: idx, heroIdx: acEligible[0].idx,
+                handIndex: idx, fromCreation, heroIdx: acEligible[0].idx,
                 zoneSlot: acEligible[0].zoneSlot,
                 clickPlaced: true,
-              });
+            fromCreation: fromCreation || undefined,
+          });
             } else if (acEligible.length > 1) {
               // `isCreature: true` nur fuer Ueberschrift und Text des
               // Panels („🐾 Summon …"); versendet wird ueber den eigenen
               // `isArtifactCreature`-Zweig, der VOR `isCreature` steht.
               setSpellHeroPick({
-                cardName, handIndex: idx, card,
+                cardName, handIndex: idx, fromCreation, card,
                 eligible: acEligible, isCreature: true, isArtifactCreature: true,
               });
             }
           } else if (card.cardType === 'Artifact' && (card.subtype || '').toLowerCase() !== 'equipment') {
-            socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+            socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+          });
           } else if (isEquipPlayable && card.cardType === 'Artifact') {
             // Click-to-equip — same UX as click-to-summon a Creature:
             // enter board placement-pick mode (reuses the
@@ -20856,7 +23525,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Heroes (no inherent canEquipToHero restriction).
             const anyTarget = _hostFree(me) || (_cspFreeSide && _hostFree(opp));
             if (anyTarget) {
-              setCrossSidePlayPick({ cardName, handIndex: idx, card, isEquip: true, isFreeSideEquip: _cspFreeSide });
+              setCrossSidePlayPick({ cardName, handIndex: idx, fromCreation, card, isEquip: true, isFreeSideEquip: _cspFreeSide });
             }
             setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
             return;
@@ -20870,7 +23539,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (isHeroAction && heroActionPrompt.heroIdx !== undefined) {
               socket.emit('effect_prompt_response', {
                 roomId: gameState.roomId,
-                response: { cardName, handIndex: idx, heroIdx: heroActionPrompt.heroIdx },
+                response: { cardName, handIndex: idx, fromCreation, heroIdx: heroActionPrompt.heroIdx },
               });
             } else {
               // Either Action Phase normal play OR any-hero heroAction
@@ -20921,13 +23590,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (isHeroAction) {
                   socket.emit('effect_prompt_response', {
                     roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, heroIdx: eligible[0].idx },
+                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx },
                   });
                 } else {
-                  socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
+                  socket.emit('play_spell', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, charmedOwner: eligible[0].charmedOwner, viaCreatureInstId: eligible[0].creatureInstId });
                 }
               } else if (eligible.length > 1) {
-                setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isHeroAction });
+                setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isHeroAction });
               }
             }
           } else if (card.cardType === 'Ability' && isAbilityPlayable && !isAbilityAttachEligible) {
@@ -20936,7 +23605,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // ability or empty ability slots become clickable.
             const anyEligible = (me.heroes || []).some((_, hi) => canHeroReceiveAbility(me, hi, cardName));
             if (anyEligible) {
-              setAbilityAttachPick({ cardName, handIndex: idx, card });
+              setAbilityAttachPick({ cardName, handIndex: idx, fromCreation, card });
             }
           } else if (card.cardType === 'Creature' && isPlayable) {
             // heroAction Creature click. Two sub-modes:
@@ -20958,7 +23627,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (lockedSlot >= 0) {
                   socket.emit('effect_prompt_response', {
                     roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, heroIdx: lockedHi, zoneSlot: lockedSlot },
+                    response: { cardName, handIndex: idx, fromCreation, heroIdx: lockedHi, zoneSlot: lockedSlot },
                   });
                 }
               } else {
@@ -20983,10 +23652,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (eligible.length === 1) {
                   socket.emit('effect_prompt_response', {
                     roomId: gameState.roomId,
-                    response: { cardName, handIndex: idx, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot },
+                    response: { cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, zoneSlot: eligible[0].zoneSlot },
                   });
                 } else if (eligible.length > 1) {
-                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isCreature: true, isHeroAction: true });
+                  setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isCreature: true, isHeroAction: true });
                 }
               }
               setHandDrag(null); setPlayDrag(null); setAbilityDrag(null); return;
@@ -21037,7 +23706,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 }
               }
               if (hasFree) {
-                setCrossSidePlayPick({ cardName, handIndex: idx, card });
+                setCrossSidePlayPick({ cardName, handIndex: idx, fromCreation, card });
                 setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
                 return;
               }
@@ -21061,7 +23730,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 normalTargets.push({ heroIdx: hi, slotIdx: slot });
               }
               setPendingBouncePick({
-                cardName, handIndex: idx, card,
+                cardName, handIndex: idx, fromCreation, card,
                 bounceTargets: [...bpTargets, ...normalTargets],
               });
             } else {
@@ -21090,7 +23759,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   if (fz >= 0) freeTargets.push({ heroIdx: hi, slotIdx: fz });
                 }
                 setPendingBouncePick({
-                  cardName, handIndex: idx, card,
+                  cardName, handIndex: idx, fromCreation, card,
                   bounceTargets: [...shareTargets, ...freeTargets],
                 });
                 setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
@@ -21131,18 +23800,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (pickList.length === 1) {
                 socket.emit('play_creature', {
                   roomId: gameState.roomId, cardName,
-                  handIndex: idx, heroIdx: pickList[0].idx,
+                  handIndex: idx, fromCreation, heroIdx: pickList[0].idx,
                   zoneSlot: pickList[0].zoneSlot,
                 });
               } else if (pickList.length > 1) {
                 if (usesCustomHostPick) {
                   socket.emit('play_creature', {
                     roomId: gameState.roomId, cardName,
-                    handIndex: idx, heroIdx: pickList[0].idx,
+                    handIndex: idx, fromCreation, heroIdx: pickList[0].idx,
                     zoneSlot: pickList[0].zoneSlot,
                   });
                 } else {
-                  setSpellHeroPick({ cardName, handIndex: idx, card, eligible: pickList, isCreature: true });
+                  setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible: pickList, isCreature: true });
                 }
               }
             }
@@ -21151,14 +23820,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const eligible = [];
             for (let hi = 0; hi < (me.heroes || []).length; hi++) {
               const h = me.heroes[hi];
-              if (h?.name && h.hp > 0 && h.ascensionReady && (h.ascensionTarget === cardName || (h.ascensionTargets || []).includes(cardName))) {
+              if (heroCanAscendTo(h, hi, cardName, idx)) {
                 eligible.push({ idx: hi, name: h.name });
               }
             }
             if (eligible.length === 1) {
-              hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx });
+              hideGameTooltip(); socket.emit('ascend_hero', { roomId: gameState.roomId, heroIdx: eligible[0].idx, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+          });
             } else if (eligible.length > 1) {
-              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isAscension: true });
+              setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isAscension: true });
             }
           } else if (isSurprisePlayable) {
             // Click on a Surprise card — find heroes with empty surprise zones
@@ -21180,9 +23850,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             }
             if (eligible.length === 1) {
-              socket.emit('play_surprise', { roomId: gameState.roomId, cardName, handIndex: idx, heroIdx: eligible[0].idx, bakhmSlot: eligible[0].bakhmSlot });
+              socket.emit('play_surprise', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation, heroIdx: eligible[0].idx, bakhmSlot: eligible[0].bakhmSlot,
+            fromCreation: fromCreation || undefined,
+          });
             } else if (eligible.length > 1) {
-              setSpellHeroPick({ cardName, handIndex: idx, card, eligible, isSurprise: true });
+              setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible, isSurprise: true });
             }
           }
         }
@@ -21190,7 +23862,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       // Determine if dropped inside the hand zone
-      const droppedInHand = isInsideHandZone(upX, upY);
+      // ── Umsortieren im Vorrat (Als Vorgabe 28.8.) ───────────────
+      // Eigener Zweig, weil der Handzweig darunter eine Indexkarte
+      // fuer handindizierte Zustaende baut (Luna Kiais Reveal-Marken
+      // u.a.). Der Vorrat hat davon nichts — er ist keine Hand — und
+      // braucht nur die neue Reihenfolge.
+      if (fromCreation) {
+        if (isInsideCreationZone(upX, upY)) {
+          const alt = me.creationZone || [];
+          const neu = [...alt];
+          neu.splice(idx, 1);
+          const dropIdx = calcCreationDropIdx(upX, idx);
+          neu.splice(dropIdx, 0, cardName);
+          socket.emit('reorder_creation', { roomId: gameState.roomId, creationZone: neu });
+          setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+          return;
+        }
+        // Ueber der HAND losgelassen: nichts tun. Ein Wechsel zwischen
+        // den Haelften ist ausgeschlossen (Als Regel 28.8.), und ein
+        // stiller Abbruch ist hier richtiger als ein Fehlerton.
+        if (isInsideHandZone(upX, upY)) {
+          setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
+          return;
+        }
+      }
+
+      const droppedInHand = !fromCreation && isInsideHandZone(upX, upY);
 
       if (droppedInHand) {
         // Dropped inside hand zone — ALWAYS reorder, regardless of card type.
@@ -21227,7 +23924,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               handIndex: prev.idx,
               heroIdx: prev.targetHero,
               zoneSlot: prev.targetZone,
-            });
+              // v768: auf eine Support Zone gezogen (Xal, Xalibur).
+              supportSlot: (prev.targetSupportZone != null && prev.targetSupportZone >= 0)
+                ? prev.targetSupportZone : undefined,
+            fromCreation: prev.fromCreation || undefined,
+          });
           }
           return null;
         });
@@ -21244,7 +23945,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               handIndex: prev.idx,
               heroIdx: prev.targetHero,
               bakhmSlot: prev.targetBakhmSlot >= 0 ? prev.targetBakhmSlot : undefined,
-            });
+            fromCreation: prev.fromCreation || undefined,
+          });
             return null;
           }
 
@@ -21312,6 +24014,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               roomId: gameState.roomId, cardName: prev.cardName,
               handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
               additionalActionProvider: allProviders[0].cardId,
+              fromCreation: prev.fromCreation || undefined,
             });
           } else {
             socket.emit('play_creature', {
@@ -21321,6 +24024,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // would normally prompt for the host hero (Waitress) trust
               // the explicit drag target and skip the picker.
               viaDragDrop: true,
+              fromCreation: prev.fromCreation || undefined,
             });
           }
           return null;
@@ -21337,6 +24041,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // Chosen host side (cross-side / free-side equips); omitted
             // for normal own-side equips → server defaults to caster.
             targetOwner: prev.targetOwner,
+            fromCreation: prev.fromCreation || undefined,
           });
           return null;
         });
@@ -21349,6 +24054,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             handIndex: prev.idx,
             heroIdx: prev.targetHero,
             bakhmSlot: prev.targetBakhmSlot >= 0 ? prev.targetBakhmSlot : undefined,
+            fromCreation: prev.fromCreation || undefined,
           });
           return null;
         });
@@ -21364,7 +24070,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               cardName: prev.cardName,
               handIndex: prev.idx,
               heroIdx: prev.targetHero,
-            });
+            fromCreation: prev.fromCreation || undefined,
+          });
             return null;
           }
 
@@ -21377,20 +24084,46 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return null;
           }
 
+          // ★ Anlege-Karten trennen die Rollen: `targetHero` ist der
+          // EMPFAENGER, der Wirker muss extra gesucht werden — sonst
+          // schickte der Client einen Helden als Caster, der die Karte
+          // gar nicht wirken darf, und der Server lehnte ab.
+          const _attHostsEmit = (gameState.attachmentHostTargets || {})[prev.cardName] || null;
+          let _casterIdx = prev.targetHero;
+          let _attachHeroIdx;
+          let _attachOwner;
+          if (_attHostsEmit && prev.targetHero >= 0) {
+            _attachHeroIdx = prev.targetHero;
+            _attachOwner = prev.targetAttachOwner;
+            // v651: liegt das Ziel beim Gegner, ist der Empfaenger kein
+            // Caster — der Wirker ist der erste eigene Held, der die Karte
+            // wirken darf.
+            if (_attachOwner != null && _attachOwner !== myIdx) {
+              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+            } else if (!canHeroPlayCard(me, _casterIdx, prev.card)) {
+              _casterIdx = [0, 1, 2].find(hi => canHeroPlayCard(me, hi, prev.card));
+            }
+          }
           socket.emit('play_spell', {
             roomId: gameState.roomId,
             cardName: prev.cardName,
             handIndex: prev.idx,
-            heroIdx: prev.targetHero,
+            heroIdx: _casterIdx,
             charmedOwner: prev.charmedOwner,
             attachmentZoneSlot: prev.targetSlot >= 0 ? prev.targetSlot : undefined,
+            attachHeroIdx: _attachHeroIdx,
+            attachOwner: _attachOwner,
             viaCreatureInstId: prev.creatureCasterInstId || undefined,
+            // ★ Herkunft: Hand oder Crestinas Vorrat. Der Server loest
+            // `handIndex` damit in der richtigen Liste auf.
+            fromCreation: prev.fromCreation || undefined,
           });
           return null;
         });
       } else if (isArtifactActivatable) {
         // Non-equip artifact dragged outside hand — activate
-        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx });
+        socket.emit('use_artifact_effect', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+          });
       } else if (isAscensionPlayable) {
         // Ascended Hero dropped on eligible base hero
         setPlayDrag(prev => {
@@ -21398,12 +24131,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           hideGameTooltip(); socket.emit('ascend_hero', {
             roomId: gameState.roomId, heroIdx: prev.targetHero,
             cardName: prev.cardName, handIndex: prev.idx,
+            fromCreation: prev.fromCreation || undefined,
           });
           return null;
         });
       } else if (isPotionActivatable) {
         // Potion dragged outside hand — activate
-        socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx });
+        socket.emit('use_potion', { roomId: gameState.roomId, cardName, handIndex: idx, fromCreation: fromCreation || undefined,
+          });
       }
       // Clean up all drag states
       setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
@@ -21414,7 +24149,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   const calcDropIdx = (mouseX, excludeIdx) => {
     if (!handRef.current) return 0;
-    const slots = handRef.current.querySelectorAll('.hand-slot:not(.hand-dragging)');
+    // ★ Nur die Handplaetze. Der Vorrat traegt seit heute eine eigene
+    // Klasse (`creation-slot`), damit er hier nicht mitgezaehlt wird.
+    const slots = handRef.current.querySelectorAll('.game-hand-cards .hand-slot:not(.hand-dragging)');
     let targetIdx = slots.length;
     for (let i = 0; i < slots.length; i++) {
       const r = slots[i].getBoundingClientRect();
@@ -21425,19 +24162,65 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return targetIdx;
   };
 
+  /** Tropfindex im Vorrat — gleiche Rechnung wie `calcDropIdx`, nur
+   *  ueber die Vorratsplaetze. */
+  const calcCreationDropIdx = (mouseX, excludeIdx) => {
+    if (!handRef.current) return 0;
+    const slots = handRef.current.querySelectorAll('.creation-slot:not(.hand-dragging)');
+    let targetIdx = slots.length;
+    for (let i = 0; i < slots.length; i++) {
+      const r = slots[i].getBoundingClientRect();
+      if (mouseX < r.left + r.width / 2) { targetIdx = i; break; }
+    }
+    return targetIdx;
+  };
+
+  /**
+   * Anzeige des Vorrats mit Zieh-Luecke — dasselbe Muster wie
+   * `displayHand` (Als Vorgabe 28.8.: „exakt das Drag/Drop-Pattern
+   * der Hand imitieren"). Die gezogene Karte bleibt im Array, damit
+   * ihr DOM-Knoten fuer die Beruehrungssteuerung bestehen bleibt; das
+   * Verstecken macht die Klasse.
+   */
+  const displayCreation = useMemo(() => {
+    const zone = me.creationZone || [];
+    const drag = (handDrag?.fromCreation && handDrag)
+      || (playDrag?.fromCreation && playDrag) || null;
+    const items = zone.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
+    if (handDrag?.fromCreation) {
+      const dropIdx = calcCreationDropIdx(handDrag.mouseX, handDrag.idx);
+      let insertAt = dropIdx;
+      if (insertAt >= handDrag.idx) insertAt++;
+      items.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true });
+    }
+    return items.map(it => ({ ...it, isDragged: !!drag && drag.idx === it.origIdx }));
+  }, [me.creationZone, handDrag, playDrag]);
+
   // Build display hand with gap
+  // ★ 28.8.: Ein Zug aus Crestinas Vorrat geht die Hand nichts an —
+  // sonst versteckt sie die Handkarte mit demselben Index und schiebt
+  // eine Luecke ein, was wie ein Klon der Vorratskarte aussieht.
+  //
+  // ★ Auf KOMPONENTENEBENE, nicht im useMemo: der Render-Rumpf liest
+  // sie ebenfalls (`isBeingDragged`). Im useMemo deklariert waren sie
+  // dort nicht sichtbar und das Brett lief auf einen Fehler — und
+  // `check-scope` hat es nicht gemeldet, zum zweiten Mal in dieser
+  // Sitzung ein blinder Fleck des Werkzeugs bei React-Rumpfcode.
+  const handDragEigen = handDrag && !handDrag.fromCreation ? handDrag : null;
+  const playDragEigen = playDrag && !playDrag.fromCreation ? playDrag : null;
+
   const displayHand = useMemo(() => {
-    const dragIdx = handDrag?.idx ?? playDrag?.idx ?? abilityDrag?.idx ?? null;
+    const dragIdx = handDragEigen?.idx ?? playDragEigen?.idx ?? abilityDrag?.idx ?? null;
     if (dragIdx === null) return hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
     // Keep dragged card in array (DOM element must persist for mobile touch tracking).
     // The render code applies hand-dragging class to hide it visually.
     const items = hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
     // Only show gap for reorder drag, not play drag
-    if (handDrag) {
-      const dropIdx = calcDropIdx(handDrag.mouseX, handDrag.idx);
+    if (handDragEigen) {
+      const dropIdx = calcDropIdx(handDragEigen.mouseX, handDragEigen.idx);
       // Adjust for drag source still being in the array
       let insertAt = dropIdx;
-      if (insertAt >= handDrag.idx) insertAt++;
+      if (insertAt >= handDragEigen.idx) insertAt++;
       items.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true });
     }
     return items;
@@ -21453,10 +24236,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // copy is clickable for Reveal iff its index is in this map. This is
   // what lets the owner click a SPECIFIC Luna Kiai (and not some other
   // copy) to reveal it.
+  // ★ 28.8. (Als Ruling): `handActivatedEffect` gilt auch fuer
+  // Crestinas Vorrat. ZWEI Karteien, nicht eine: der Index zaehlt je
+  // Quelle, eine gemeinsame Map wuerde Vorrat 0 und Hand 0
+  // verwechseln.
   const handActivatableByIdx = useMemo(() => {
     const out = new Map();
     for (const h of (gameState.handActivatableCards || [])) {
-      if (typeof h?.handIndex === 'number') out.set(h.handIndex, h);
+      if (typeof h?.handIndex === 'number' && !h.fromCreation) out.set(h.handIndex, h);
+    }
+    return out;
+  }, [gameState.handActivatableCards]);
+
+  const creationActivatableByIdx = useMemo(() => {
+    const out = new Map();
+    for (const h of (gameState.handActivatableCards || [])) {
+      if (typeof h?.handIndex === 'number' && h.fromCreation) out.set(h.handIndex, h);
     }
     return out;
   }, [gameState.handActivatableCards]);
@@ -21493,8 +24288,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => { socket.off('sc_earned', onSC); socket.off('sc_earned_spectator', onSCSpec); socket.off('user_stats_updated', onStatsUpdated); };
   }, []);
   const [showFirstChoice, setShowFirstChoice] = useState(false);
-  const [deckViewer, setDeckViewer] = useState(null); // 'deck' | 'potion' | null
-  const [pileViewer, setPileViewer] = useState(null); // { title, cards } | null
+  const [deckViewer, _setDeckViewerRaw] = useState(null); // 'deck' | 'potion' | null
+  const [pileViewer, _setPileViewerRaw] = useState(null); // { title, cards } | null
+  // v647 (Als Wunsch): Oeffnen eines Stapels (Deck, Potion Deck, Discard,
+  // Deleted) klingt — `ui_prompt_open`; Schliessen bleibt stumm.
+  const setDeckViewer = useCallback((v) => { if (v && window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.7 }); _setDeckViewerRaw(v); }, []);
+  const setPileViewer = useCallback((v) => { if (v && window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.7 }); _setPileViewerRaw(v); }, []);
   const [hoveredPileCard, setHoveredPileCard] = useState(null); // card name for pile tooltip
   const [handPickSelected, setHandPickSelected] = useState(new Set()); // hand indices selected for handPick prompt
   const [blindPickSelected, setBlindPickSelected] = useState(new Set()); // opp hand indices selected for blindHandPick prompt
@@ -21615,7 +24414,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [typeDeclaration, setTypeDeclaration] = useState(null); // Thebinxan-Ansage
   const [summonGlow, setSummonGlow] = useState(null); // { owner, heroIdx, zoneSlot }
   const [oppTargetHighlight, setOppTargetHighlight] = useState([]); // Target IDs highlighted on opponent's screen
-  const [burnTickingHeroes, setBurnTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
+  const [burnTickingHeroes, setBurnTickingHeroes] = useState([]);
+  const [bleedTickingHeroes, setBleedTickingHeroes] = useState([]); // Hero keys ('pi-hi') currently showing burn escalation
   const [abilityFlash, setAbilityFlash] = useState(null); // { owner, heroIdx, zoneIdx } — flashing ability zone
   const [abilityBlockFlash, setAbilityBlockFlash] = useState(null); // { owner, heroIdx, zoneIdx } — white block flash (Resistance absorbing an effect)
   const [levelChanges, setLevelChanges] = useState([]); // [{id, delta, owner, heroIdx, zoneSlot}]
@@ -21670,7 +24470,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // schicken ihren eigenen Klang mit, weil Kreatur-, Helden-, Area-
     // und Equip-Effekte sonst voellig stumm waeren. Alle uebrigen
     // Reveals kommen ohne das Feld und klingen unveraendert.
-    const onReveal = ({ cardName, sfx }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...prev, { id: Date.now() + Math.random(), cardName }]); };
+    // `replace` (v694): raeumt den Stapel und zeigt NUR diese Karte —
+    // ein Held, der in die Kette greift (Key), loest die Karte ab, auf
+    // die er reagiert, statt sich daneben zu stellen.
+    const onReveal = ({ cardName, sfx, replace }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx) {
@@ -21770,6 +24573,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setBurnTickingHeroes(keys);
       setTimeout(() => setBurnTickingHeroes([]), 1500);
     };
+    // v712 (Bleed): Puls der Blut-Overlay, wenn Bleed-Schaden landet.
+    const onBleedTick = ({ heroes }) => {
+      const keys = (heroes || []).map(h => `${h.owner}-${h.heroIdx}`);
+      setBleedTickingHeroes(keys);
+      setTimeout(() => setBleedTickingHeroes([]), 1500);
+    };
     const onZoneAnim = ({ type, owner, heroIdx, zoneSlot, zoneType, permId, ...rest }) => {
       // The big chokepoint for per-card battle animations (Fireball,
       // Heal, Burning Finger, Frozen, every status apply, every spell
@@ -21828,6 +24637,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
         sel = '.game-hand-me';
+      } else if (zoneType === 'supportRow' && heroIdx >= 0) {
+        // v606: EINE Animation quer ueber ALLE Support Zones eines Helden
+        // (inkl. Insel-Zonen von Flying Island in the Sky). Der Anker ist
+        // die Vereinigung der Zonen-Rechtecke; `playAnimation` braucht
+        // nur `getBoundingClientRect`, deshalb ein synthetisches Element.
+        setTimeout(() => {
+          const zones = document.querySelectorAll(
+            `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"]`);
+          if (!zones.length) return;
+          let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+          zones.forEach(z => { const q = z.getBoundingClientRect(); l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); });
+          const anchor = { getBoundingClientRect: () => ({ left: l, top: t, right: r, bottom: b, width: r - l, height: b - t }) };
+          playAnimation(type, anchor, { duration: 1000, ...rest });
+        }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
+        return;
       } else if (zoneSlot >= 0) {
         sel = `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`;
       } else {
@@ -21846,7 +24670,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setLevelChanges(prev => [...prev, entry]);
       setTimeout(() => setLevelChanges(prev => prev.filter(e => e.id !== entry.id)), 1600);
     };
-    const onAbilityActivated = ({ owner, heroIdx, zoneIdx, abilityName }) => {
+    const onAbilityActivated = ({ owner, heroIdx, zoneIdx, abilityName, zoneKind }) => {
       // Training (and similar effects) re-broadcasts ability_activated as
       // a visual flash for the secondary zone it affects. Dedupe 800ms
       // collapses those extra flashes into the single "ability triggered"
@@ -21854,9 +24678,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ability activations play their own sound.
       if (window.playSFX) window.playSFX('ability_activate', { dedupe: 800 });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
-      const abSel = `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneIdx}"]`;
+      // v773: Eine Ability kann in einer SUPPORT Zone liegen (Xal,
+      // Xalibur). Ohne die Unterscheidung blitzte die Ability-Zone mit
+      // DEMSELBEN Index auf — also die falsche Karte (Als Befund 5.9.).
+      const abSel = (zoneKind === 'support')
+        ? `[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneIdx}"]`
+        : `[data-ability-zone][data-ability-owner="${ownerLabel}"][data-ability-hero="${heroIdx}"][data-ability-slot="${zoneIdx}"]`;
       // Set flash overlay on the ability zone (visible to both players)
-      setAbilityFlash({ owner, heroIdx, zoneIdx });
+      setAbilityFlash({ owner, heroIdx, zoneIdx, zoneKind });
       setTimeout(() => setAbilityFlash(null), 1800);
       // Big flashy burst on the ability zone — staggered multi-layer
       setTimeout(() => playAnimation('gold_sparkle', abSel, { duration: 1400 }), 50);
@@ -22078,9 +24907,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           ? document.querySelector('[data-my-deck]')
           : document.querySelector('[data-opp-deck]');
       }
-      const destEl = document.querySelector(
-        `[data-support-zone][data-support-owner="${destLabel}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destZoneSlot}"]`
-      );
+      // v718: `destZoneSlot: -1` zielt auf das HELDENFELD statt auf eine
+      // Support Zone — gebraucht fuer den Aufstieg, bei dem die Ascended-
+      // Karte aus der Hand auf den Helden fliegt. Bisher gab es fuer den
+      // Aufstieg gar keinen Flug: die Karte verschwand aus der Hand und
+      // der Held war ausgetauscht (Als Befund 4.9.: „teleportiert").
+      const destEl = (destZoneSlot === -1 || destZoneSlot == null)
+        ? document.querySelector(
+            `[data-hero-zone][data-hero-owner="${destLabel}"][data-hero-idx="${destHeroIdx}"]`
+          )
+        : document.querySelector(
+            `[data-support-zone][data-support-owner="${destLabel}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destZoneSlot}"]`
+          );
       if (!sourceEl || !destEl) return;
       const sr = sourceEl.getBoundingClientRect();
       const dr = destEl.getBoundingClientRect();
@@ -22109,11 +24947,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // pulst golden auf, bevor ihre Abwürfe fliegen — der Spieler sieht,
     // WELCHER Effekt gleich wirkt. Klassen-Neustart via Reflow, damit
     // schnelle Folge-Glows sichtbar neu zünden.
-    const onEffectGlow = ({ cardName }) => {
+    const onEffectGlow = ({ cardName, origin, sfx, playerIdx, zone, heroIdx, zoneSlot }) => {
       if (!cardName) return;
+      if (sfx && window.playSFX) window.playSFX(sfx, { dedupe: 300, category: 'effect' });
       try {
         const sel = `[data-hero-name="${CSS.escape(cardName)}"], [data-card-name="${CSS.escape(cardName)}"]`;
-        document.querySelectorAll(sel).forEach(el => {
+        // v704 (Als Befund 3.9., Cute Hydra): der Glanz gehoert zur
+        // INSTANZ. Kommen Koordinaten mit (Support/Held), leuchtet nur
+        // dieser Platz; sonst per Name — aber Handkarten nur, wenn der
+        // Effekt dem EIGENEN Spieler gehoert (die CPU-Hydra darf meine
+        // Handkopie nicht anzuenden).
+        const ownerLabel = typeof playerIdx === 'number' ? (playerIdx === myIdx ? 'me' : 'opp') : null;
+        let nodes = null;
+        if (ownerLabel && zone === 'support' && heroIdx >= 0 && zoneSlot >= 0) {
+          nodes = document.querySelectorAll(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+        } else if (ownerLabel && zone === 'hero' && heroIdx >= 0) {
+          nodes = document.querySelectorAll(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+        }
+        if (!nodes || nodes.length === 0) nodes = document.querySelectorAll(sel);
+        nodes.forEach(el => {
+          // v641: ein Brett-Effekt laesst Handkopien desselben Namens aus.
+          if (origin === 'board' && el.hasAttribute('data-hand-idx')) return;
+          // v704: fremde Effekte lassen meine Hand in Ruhe.
+          if (ownerLabel === 'opp' && el.hasAttribute('data-hand-idx')) return;
           el.classList.remove('effect-source-glow');
           void el.offsetWidth;
           el.classList.add('effect-source-glow');
@@ -22218,6 +25074,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('fighting_atk_change', onFightingAtk);
     socket.on('summon_effect', onSummon);
     socket.on('burn_tick', onBurnTick);
+    socket.on('bleed_tick', onBleedTick);
     socket.on('play_zone_animation', onZoneAnim);
 
     // ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────────
@@ -22613,6 +25470,250 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => eye.remove(), 1300);
     };
     socket.on('dark_control', onDarkControl);
+    // Dunkles Ritual (Audience with a hostile King): verbotene Magie
+    // reisst die Ascended-Form vom Helden. Bewusst OHNE das Auge —
+    // das gehoert der Gedankenkontrolle (dark_control); hier sind es
+    // ein sich schliessender Beschwoerungskreis, schwarzviolette
+    // Flammen, fallende Glyphen und ein Abwaertssog.
+    const onDarkRitual = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('elem_dark', { category: 'effect' });
+      const ownerLabel = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // Abdunkelung ueber der Zone
+      const schleier = document.createElement('div');
+      schleier.style.cssText = `
+        position:fixed;left:${r.left - 8}px;top:${r.top - 8}px;
+        width:${r.width + 16}px;height:${r.height + 16}px;border-radius:10px;
+        background:radial-gradient(circle at 50% 60%, rgba(70,0,110,.55), rgba(10,0,20,.8));
+        pointer-events:none;z-index:9998;opacity:0;
+        animation:darkRitualShade 1.15s ease-in-out forwards;
+      `;
+      document.body.appendChild(schleier);
+      setTimeout(() => schleier.remove(), 1300);
+      // Beschwoerungskreis, der sich um den Helden schliesst
+      const kreis = document.createElement('div');
+      kreis.style.cssText = `
+        position:fixed;left:${cx - 70}px;top:${cy - 70}px;
+        width:140px;height:140px;border-radius:50%;
+        border:2px dashed #b04dff;
+        box-shadow:0 0 14px #7a00cc, inset 0 0 18px rgba(122,0,204,.6);
+        pointer-events:none;z-index:10000;opacity:0;
+        animation:darkRitualRing 1.05s cubic-bezier(.3,.7,.3,1) forwards;
+      `;
+      document.body.appendChild(kreis);
+      setTimeout(() => kreis.remove(), 1250);
+      // Schwarzviolette Flammenzungen, die am Rand aufsteigen
+      for (let i = 0; i < 9; i++) {
+        const flamme = document.createElement('div');
+        const winkel = (i / 9) * Math.PI * 2 + Math.random() * 0.4;
+        const fx = cx + Math.cos(winkel) * (30 + Math.random() * 18);
+        const fy = cy + Math.sin(winkel) * (18 + Math.random() * 14) + 18;
+        flamme.style.cssText = `
+          position:fixed;left:${fx - 7}px;top:${fy - 20}px;
+          width:14px;height:40px;
+          border-radius:50% 50% 45% 45% / 65% 65% 35% 35%;
+          background:linear-gradient(180deg, rgba(200,120,255,.9) 0%, rgba(110,20,190,.85) 40%, rgba(30,0,50,.9) 100%);
+          filter:blur(1.5px);
+          pointer-events:none;z-index:10001;opacity:0;
+          animation:darkRitualFlame ${(0.55 + Math.random() * 0.35).toFixed(2)}s ease-out ${(i * 70)}ms forwards;
+        `;
+        document.body.appendChild(flamme);
+        setTimeout(() => flamme.remove(), 1250 + i * 70);
+      }
+      // Verbotene Glyphen, die aufsteigen und verloeschen
+      const glyphen = ['⛧', '☽', '✕', '⟁', '☍'];
+      for (let i = 0; i < 5; i++) {
+        const g = document.createElement('div');
+        const gx = cx + (Math.random() - 0.5) * 70;
+        g.textContent = glyphen[i % glyphen.length];
+        g.style.cssText = `
+          position:fixed;left:${gx - 9}px;top:${cy + 8}px;
+          font-size:18px;color:#d9a6ff;
+          text-shadow:0 0 8px #8a2be2, 0 0 16px #4b0082;
+          pointer-events:none;z-index:10002;opacity:0;
+          animation:darkRitualGlyph ${(0.7 + Math.random() * 0.3).toFixed(2)}s ease-out ${(120 + i * 130)}ms forwards;
+        `;
+        document.body.appendChild(g);
+        setTimeout(() => g.remove(), 1400 + i * 130);
+      }
+      // Abwaertssog zum Schluss — die Form wird HERUNTERgerissen
+      const sog = document.createElement('div');
+      sog.style.cssText = `
+        position:fixed;left:${cx - 26}px;top:${cy - 40}px;
+        width:52px;height:80px;border-radius:50%;
+        background:linear-gradient(180deg, transparent 0%, rgba(90,0,150,.0) 30%, rgba(90,0,150,.55) 70%, rgba(20,0,35,.9) 100%);
+        filter:blur(3px);
+        pointer-events:none;z-index:10001;opacity:0;
+        animation:darkRitualPull .5s ease-in .62s forwards;
+      `;
+      document.body.appendChild(sog);
+      setTimeout(() => sog.remove(), 1300);
+    };
+    socket.on('dark_ritual', onDarkRitual);
+    // Hunting (v679): ein NETZ faengt die besiegte Creature an ihrem
+    // Sterbeplatz und zieht sie in ihre neue Zone. Zwei Anker, also
+    // zwei Rechtecke — geworfen wird von der Zielzone aus, gezogen
+    // wird dorthin.
+    const onHuntingNet = ({ fromOwner, fromHeroIdx, fromSlot, toOwner, toHeroIdx, toSlot, cardName, catchMs, flyMs }) => {
+      // ZWEI PHASEN mit Dauern VOM SERVER (Als Befund 31.8.: Netz und
+      // Creature liefen unterschiedlich schnell). `catchMs` ist das
+      // Fangen ueber dem Opfer — es laeuft ab, BEVOR der Server den
+      // Kartenflug sendet. `flyMs` ist danach die Wanderung, und die
+      // benutzt exakt dieselbe Kurve wie `cardTransferFly`: 800 ms
+      // ease-in-out mit -30px-Bogen und Skalenspitze 1.15 bei 50 %.
+      // Nur so bleiben Netz und Karte aneinander.
+      const _fang = catchMs || 420;
+      const _flug = flyMs || 800;
+      if (window.playSFX) window.playSFX('whoosh', { category: 'effect' });
+      const sel = (owner, hi, slot) => {
+        const lab = owner === myIdx ? 'me' : 'opp';
+        return slot >= 0
+          ? `[data-support-zone][data-support-owner="${lab}"][data-support-hero="${hi}"][data-support-slot="${slot}"]`
+          : `[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${hi}"]`;
+      };
+      const von = document.querySelector(sel(fromOwner, fromHeroIdx, fromSlot));
+      const zu  = document.querySelector(sel(toOwner, toHeroIdx, toSlot));
+      if (!von || !zu) return;
+      const rv = von.getBoundingClientRect(), rz = zu.getBoundingClientRect();
+      const vx = rv.left + rv.width / 2, vy = rv.top + rv.height / 2;
+      const zx = rz.left + rz.width / 2, zy = rz.top + rz.height / 2;
+
+      // ── Das Netz in zwei Schichten ───────────────────────────────
+      //  • TRAEGER: nur die Wanderung — identische Keyframes zum
+      //    Kartenflug, gleiche Dauer, gleiche Kurve, gleicher Bogen.
+      //  • INNENTEIL: nur das Aufgehen und Zuschnueren waehrend
+      //    `catchMs`; danach haelt es seine Form (`forwards`).
+      //  Getrennt, weil beide `transform` animieren — auf EINEM
+      //  Element wuerden sie sich gegenseitig ueberschreiben.
+      const traeger = document.createElement('div');
+      traeger.style.cssText = `
+        position:fixed;left:${vx - 44}px;top:${vy - 44}px;
+        width:88px;height:88px;pointer-events:none;z-index:10001;
+        --hn-x:${zx - vx}px;--hn-y:${zy - vy}px;
+        animation:huntingNetCarry ${_flug}ms ease-in-out ${_fang}ms both;
+      `;
+      const netz = document.createElement('div');
+      netz.style.cssText = `
+        position:absolute;inset:0;opacity:0;
+        animation:huntingNetCatch ${_fang}ms ease-out forwards,
+                  huntingNetFade 220ms ease-in ${_fang + _flug - 140}ms forwards;
+      `;
+      traeger.appendChild(netz);
+      // Maschen als zwei gekreuzte Strichscharen + Rand.
+      const maschen = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      maschen.setAttribute('viewBox', '0 0 88 88');
+      maschen.setAttribute('width', '88');
+      maschen.setAttribute('height', '88');
+      maschen.style.cssText = 'position:absolute;inset:0;overflow:visible;';
+      const linie = (x1, y1, x2, y2, w) => {
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+        l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+        l.setAttribute('stroke', '#e8dcc0');
+        l.setAttribute('stroke-width', w || 1.6);
+        l.setAttribute('stroke-linecap', 'round');
+        l.setAttribute('opacity', '.92');
+        l.style.filter = 'drop-shadow(0 0 3px rgba(0,0,0,.7))';
+        return l;
+      };
+      for (let i = 0; i <= 5; i++) {
+        const t = (i / 5) * 88;
+        maschen.appendChild(linie(t, 0, 88 - t, 88));   // ↘
+        maschen.appendChild(linie(88 - t, 0, t, 88));   // ↙
+      }
+      const rand = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      rand.setAttribute('cx', '44'); rand.setAttribute('cy', '44'); rand.setAttribute('r', '43');
+      rand.setAttribute('fill', 'none'); rand.setAttribute('stroke', '#c8b48a');
+      rand.setAttribute('stroke-width', '3'); rand.setAttribute('opacity', '.95');
+      maschen.appendChild(rand);
+      // Knoten an den Kreuzungspunkten.
+      for (let i = 1; i < 5; i++) {
+        for (let j = 1; j < 5; j++) {
+          const k = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          k.setAttribute('cx', (i / 5) * 88); k.setAttribute('cy', (j / 5) * 88);
+          k.setAttribute('r', '1.8'); k.setAttribute('fill', '#f2e8cf'); k.setAttribute('opacity', '.8');
+          maschen.appendChild(k);
+        }
+      }
+      netz.appendChild(maschen);
+      document.body.appendChild(traeger);
+      setTimeout(() => traeger.remove(), _fang + _flug + 260);
+
+      // Zappeln des Gefangenen: ein paar Staubkoerner, die beim
+      // Zuschnueren wegspritzen.
+      for (let i = 0; i < 8; i++) {
+        const p = document.createElement('div');
+        const a = Math.random() * Math.PI * 2, d = 22 + Math.random() * 26;
+        p.style.cssText = `
+          position:fixed;left:${vx}px;top:${vy}px;
+          width:3px;height:3px;border-radius:50%;
+          background:#e8dcc0;box-shadow:0 0 4px rgba(232,220,192,.9);
+          pointer-events:none;z-index:10000;opacity:0;
+          animation:huntingStruggle ${Math.round(_fang * 0.7)}ms ease-out ${Math.round(_fang * 0.25) + i * 24}ms forwards;
+          --hs-x:${Math.cos(a) * d}px;--hs-y:${Math.sin(a) * d}px;
+        `;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), _fang + 260 + i * 24);
+      }
+
+      // Die Leine, an der gezogen wird — vom Ziel zum Opfer.
+      const laenge = Math.hypot(zx - vx, zy - vy);
+      const winkel = Math.atan2(zy - vy, zx - vx) * 180 / Math.PI;
+      const leine = document.createElement('div');
+      leine.style.cssText = `
+        position:fixed;left:${vx}px;top:${vy}px;
+        width:${laenge}px;height:2px;transform-origin:0 50%;
+        transform:rotate(${winkel}deg);
+        background:repeating-linear-gradient(90deg,#e8dcc0 0 6px,transparent 6px 11px);
+        pointer-events:none;z-index:9999;opacity:0;
+        animation:huntingLine ${_fang + _flug}ms ease-in-out forwards;
+      `;
+      document.body.appendChild(leine);
+      setTimeout(() => leine.remove(), _fang + _flug + 260);
+    };
+    socket.on('hunting_net', onHuntingNet);
+    const onDeathClaimHold = ({ owner, heroIdx, zoneSlot, cardName }) => {
+      const lab = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-support-zone][data-support-owner="${lab}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const key = `${owner}-${heroIdx}-${zoneSlot}`;
+      setClaimHolds(prev => [...prev.filter(h => h.key !== key), {
+        id: `hold-${Date.now()}-${Math.random()}`, key, cardName,
+        // Gleiche Ankerformel wie der Kartenflug, damit Halter und
+        // Flugobjekt deckungsgleich sind.
+        x: r.left + r.width / 2 - 34, y: r.top + r.height / 2 - 48,
+      }]);
+      // Sicherheitsnetz: faellt der Flug aus, verschwindet der Halter
+      // trotzdem irgendwann.
+      setTimeout(() => setClaimHolds(prev => prev.filter(h => h.key !== key)), 12000);
+    };
+    socket.on('death_claim_hold', onDeathClaimHold);
+    // Helden-Effekt-Reaktion (v691, Key): kurzer Aufblitz am Helden, der
+    // ohne Karte in die Kette greift — sonst saehe der Spieler nur ein
+    // Glied mit Heldennamen auftauchen.
+    const onHeroEffectReaction = ({ owner, heroIdx }) => {
+      if (window.playSFX) window.playSFX('ability_activate', { category: 'effect' });
+      const lab = owner === myIdx ? 'me' : 'opp';
+      const el = document.querySelector(`[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${heroIdx}"]`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const ring = document.createElement('div');
+      ring.style.cssText = `
+        position:fixed;left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;
+        width:${Math.max(r.width, r.height) * 1.1}px;height:${Math.max(r.width, r.height) * 1.1}px;
+        margin-left:${-Math.max(r.width, r.height) * .55}px;margin-top:${-Math.max(r.width, r.height) * .55}px;
+        border-radius:50%;pointer-events:none;z-index:10050;
+        border:3px solid #d9b45a;box-shadow:0 0 18px rgba(217,180,90,.85), inset 0 0 14px rgba(217,180,90,.5);
+        animation:heroReactionRing 720ms ease-out forwards;
+      `;
+      document.body.appendChild(ring);
+      setTimeout(() => ring.remove(), 800);
+    };
+    socket.on('hero_effect_reaction', onHeroEffectReaction);
     const onBurningFingerSlash = ({ owner, heroIdx, zoneSlot }) => {
       if (window.playSFX) window.playSFX('slash', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
@@ -24341,6 +27442,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const sr = srcEl?.getBoundingClientRect();
       const dst = getPileCenter(`[data-${sidePrefix}-discard]`);
       if (!sr || !dst) return;
+      // ★ DOPPELFLUG (Als Befund 6.9., v802): dieser ausdrueckliche Flug
+      // hatte sich nie im Vormerk-Eimer eingetragen — der Stapelwachstums-
+      // Erkenner fand die Karte danach ueber ihre Ability-Zonen-Rect
+      // (`captureBoardRects` erfasst Ability-Zonen) und schickte sie ein
+      // ZWEITES Mal los. Gleicher Handschlag wie bei `play_pile_transfer`
+      // mit `from: 'ability'`: Name vormerken, 700 ms Verfall.
+      {
+        const ref = isMe ? handToPilePendingMeRef : handToPilePendingOppRef;
+        const bucket = ref.current.discard;
+        const entry = { cardName };
+        bucket.push(entry);
+        setTimeout(() => {
+          const idx = bucket.indexOf(entry);
+          if (idx >= 0) bucket.splice(idx, 1);
+        }, 700);
+      }
       const id = Date.now() + Math.random();
       const setHidden = isMe ? setMyDiscardHidden : setOppDiscardHidden;
       setDiscardAnims(prev => [...prev, {
@@ -24351,7 +27468,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         dest: 'discard',
       }]);
       setHidden(p => p + 1);
-      if (window.playSFX) window.playSFX('discard', { dedupe: 80 });
+      // Klang: auf der eigenen Seite hier (und den Wachstums-Klang
+      // vormerken, s. `pileSoundSuppressRef`); auf der Gegnerseite
+      // spielt der Wachstums-Erkenner ohnehin — ein zweiter Klang hier
+      // waere der Doppler dazu.
+      if (isMe) {
+        if (window.playSFX) window.playSFX('discard', { dedupe: 80 });
+        pileSoundSuppressRef.current.discard = (pileSoundSuppressRef.current.discard || 0) + 1;
+        setTimeout(() => {
+          pileSoundSuppressRef.current.discard = Math.max(0, (pileSoundSuppressRef.current.discard || 1) - 1);
+        }, 1500);
+      }
       setTimeout(() => {
         setDiscardAnims(prev => prev.filter(a => a.id !== id));
         setHidden(p => Math.max(0, p - 1));
@@ -24403,7 +27530,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         srcZoneSlot: (sourceZoneSlot != null && sourceZoneSlot >= 0) ? sourceZoneSlot : -1,
         dur, angle, trailType,
       }]);
-      setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)), dur);
+      // v672: Der Jetpack-Schweif glüht über die Kartendauer hinaus aus
+      // (letzter Puff des Rückflugs). Die Karte hält ihren Endzustand
+      // per `forwards` an der Ursprungsposition — der Nachlauf ist
+      // deshalb unsichtbar, er hält nur die Ebene am Leben.
+      setTimeout(() => setRamAnims(prev => prev.filter(a => a.id !== id)),
+        dur + (trailType === 'fire' ? JET_TAIL_MS : 0));
     };
     socket.on('play_ram_animation', onRamAnimation);
 
@@ -24444,6 +27576,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
     const onCardTransfer = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneKind, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneKind, cardName, duration, particles }) => {
       if (window.playSFX) window.playSFX('placement');
+      // Kadaver-Halter loesen — im selben Zug, in dem der Flug beginnt.
+      releaseClaimHold(sourceOwner, sourceHeroIdx, sourceZoneSlot);
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       // Zone resolution: `sourceZoneKind` / `targetZoneKind` may be
@@ -24454,6 +27588,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const resolveZone = (kind, label, hero, slot) => {
         if (kind === 'ability') {
           return document.querySelector(`[data-ability-zone][data-ability-owner="${label}"][data-ability-hero="${hero}"][data-ability-slot="${slot}"]`);
+        }
+        // v776: der DECKSTAPEL als Flugquelle. Gebraucht fuer Karten,
+        // die eine Kreatur aus dem Deck direkt aufs Brett legen
+        // („Monster Nest") — ohne das sah der Spieler die Karte einfach
+        // erscheinen. Hero-/Slot-Angaben sind hier bedeutungslos.
+        if (kind === 'deck') {
+          return document.querySelector(label === 'me' ? '[data-my-deck]' : '[data-opp-deck]');
         }
         if (slot < 0) {
           return document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${hero}"]`);
@@ -24506,8 +27647,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle }) => {
-      if (window.playSFX) window.playSFX('projectile', { category: 'effect' });
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx }) => {
+      // `sfx` (v613): optionaler Klang statt des Standard-`projectile`
+      // (Javelin Throw: Wind). Nur Namen aus dem Katalog.
+      if (window.playSFX) window.playSFX(sfx || 'projectile', { category: 'effect' });
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
       const srcEl = (sourceZoneSlot != null && sourceZoneSlot >= 0)
@@ -24560,6 +27703,62 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 200);
     };
     socket.on('play_projectile_animation', onProjectileAnimation);
+    // ★ WEAPON STORM (v805, Als Vorgabe): eine Barrage aus 10-20
+    // Schwertern, Speeren und Aexten verschiedener Groesse, die in extrem
+    // schneller Folge vom Nutzer auf das Ziel schiessen — ein Strahl aus
+    // Waffen. Baut auf dem Projektil-Zustand auf: je Waffe ein kurzer
+    // Flug (240-320 ms), 40 ms versetzt, mit seitlichem Zittern um die
+    // Fluglinie, damit es ein Strahl und keine Perlenkette wird.
+    const onWeaponBarrage = ({ sourceOwner, sourceHeroIdx, targetOwner, targetHeroIdx, targetZoneSlot, count }) => {
+      const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
+      const tgtLabel = targetOwner === myIdx ? 'me' : 'opp';
+      const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
+      const tgtEl = (targetZoneSlot != null && targetZoneSlot >= 0)
+        ? document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`)
+        : document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
+      if (!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect();
+      const tr = tgtEl.getBoundingClientRect();
+      const sxPx = sr.left + sr.width / 2, syPx = sr.top + sr.height / 2;
+      const txPx = tr.left + tr.width / 2, tyPx = tr.top + tr.height / 2;
+      const baseAngle = Math.atan2(tyPx - syPx, txPx - sxPx) * 180 / Math.PI;
+      // Senkrechte zur Fluglinie fuer das Zittern
+      const len = Math.hypot(txPx - sxPx, tyPx - syPx) || 1;
+      const nx = -(tyPx - syPx) / len, ny = (txPx - sxPx) / len;
+      const WEAPONS = ['🗡️', '⚔️', '🪓', '🔱', '🗡️', '🪓', '⚔️', '🔱'];
+      // Grundausrichtung der Glyphen (Twemoji/Noto/Segoe stimmen hier
+      // ueberein): 🗡️ Spitze nach UNTEN-LINKS (Bildschirm 135°), 🔱 Spitze
+      // nach OBEN (−90°), 🪓 Blatt nach OBEN-RECHTS (−45°), ⚔️ symmetrisch
+      // — eine Klinge zeigt nach oben-rechts (−45°). Der Offset dreht die
+      // Spitze auf 0° (Ost); danach zeigt sie mit `baseAngle` aufs Ziel.
+      const FACING = { '🗡️': -135, '⚔️': 45, '🪓': 45, '🔱': 90 };
+      const n = Math.max(10, Math.min(20, count || 14));
+      const STEP = 40;
+      for (let i = 0; i < n; i++) {
+        setTimeout(() => {
+          const emoji = WEAPONS[(i * 5 + Math.floor(Math.random() * 3)) % WEAPONS.length];
+          const size = 18 + Math.floor(Math.random() * 22);         // 18..40 px
+          const jitter = (Math.random() - 0.5) * 34;                 // ± 17 px quer
+          const dur = 240 + Math.floor(Math.random() * 80);
+          const id = Date.now() + Math.random();
+          setProjectileAnims(prev => [...prev, {
+            id, emoji,
+            trailClass: null,
+            emojiStyle: { fontSize: `${size}px` },
+            projectileClass: null,   // Emoji-Projektil (ein Klassen-Projektil wuerde das Emoji verstecken)
+            projectileShape: null,
+            noTrail: false,
+            srcX: sxPx + nx * jitter * 0.4, srcY: syPx + ny * jitter * 0.4,
+            tgtX: txPx + nx * jitter, tgtY: tyPx + ny * jitter,
+            angle: baseAngle + (FACING[emoji] || 0) + (Math.random() - 0.5) * 8,
+            dur,
+          }]);
+          setTimeout(() => setProjectileAnims(prev => prev.filter(a => a.id !== id)), dur + 120);
+          if (window.playSFX && i % 3 === 0) window.playSFX('slash', { category: 'effect', rate: 1.2 + Math.random() * 0.5, dedupe: 30 });
+        }, i * STEP);
+      }
+    };
+    socket.on('play_weapon_barrage', onWeaponBarrage);
     const onButterflyCloud = ({ sourceOwner, sourceHeroIdx, targets }) => {
       const srcLabel = sourceOwner === myIdx ? 'me' : 'opp';
       const srcEl = document.querySelector(`[data-hero-zone][data-hero-owner="${srcLabel}"][data-hero-idx="${sourceHeroIdx}"]`);
@@ -25432,6 +28631,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
     const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown }) => {
+      // Kadaver-Halter loesen (Hunting Stufe 1: Sterbezone → Hand).
+      if (from === 'support' && fromSlotIdx != null) releaseClaimHold(fromOwner ?? owner, fromHeroIdx, fromSlotIdx);
       // Backward-compatible: when only `owner` is supplied the source AND
       // destination both belong to that player (Mass Multiplication's
       // discard→deleted, the Deepsea bounce-place hand-swap, etc.). Cross-
@@ -25529,6 +28730,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (pile === 'permanent' && extras.permId != null) {
           return document.querySelector(`[data-perm-id="${extras.permId}"][data-perm-owner="${ownerLabel}"]`);
         }
+        // ★ 28.8., Als Befund: „die Bewegungs-Animationen beginnen
+        // immer beim jeweiligen Index in der HAND statt im Creation-
+        // Bereich". Der Vorrat war als Flugquelle gar nicht bekannt,
+        // also fiel der Anker auf den Handkasten zurueck — und dort
+        // zeigte derselbe Index auf eine fremde Karte.
+        if (pile === 'creation') {
+          // ★ 28.8., Als Befund: „wirft der GEGNER aus seiner Creation
+          // Zone ab, beginnt die Animation in MEINER". Die Seite war
+          // fest verdrahtet — `isMe` steht hier zur Verfuegung und
+          // wird von jeder anderen Zone auch gelesen.
+          const cz = document.querySelector(
+            isMe ? '[data-creation-owner="me"]' : '[data-creation-owner="opp"]');
+          if (!cz) return null;
+          if (extras.handIdx != null) {
+            const platz = cz.querySelector(`[data-creation-idx="${extras.handIdx}"]`);
+            if (platz) return platz;
+          }
+          return cz;
+        }
         if (pile === 'hand') {
           const base = isMe ? '.game-hand-me' : '.game-hand-opp';
           if (extras.handIdx != null) {
@@ -25624,15 +28844,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Source-slot hide for support → anywhere transitions. Same
       // `bounceOutgoingHidden` set the destination block above uses;
       // the support-zone renderer reads `data-bounce-hiding` and
-      // visibility-hides the slot's children for the duration. The
-      // engine has already spliced the card out of `supportZones[h][z]`
-      // by the time the broadcast lands, so the new render is empty
-      // anyway — this is a defensive belt to cover any frame where
-      // React hasn't committed yet, plus the temp-steal case where
-      // the flying-card div briefly overlapped the still-rendered
-      // source slot for the full 700ms transit.
+      // visibility-hides the slot's children for the duration.
+      //
+      // ★ KARTENSPEZIFISCH seit v776 (Als Befund 5.9., „Monster Nest").
+      // Die alte Annahme im Kommentar hier — „die Engine hat die Karte
+      // ohnehin schon aus `supportZones[h][z]` geloest, der neue Render
+      // ist also leer" — stimmt nicht mehr, sobald unter der
+      // abfliegenden Karte eine VERDECKTE liegt: der Platz zeigt dann
+      // die aufgedeckte Karte, und das Versteck hat sie 720 ms lang
+      // mitgenommen. Genau das war die leere Zone.
+      //
+      // Der Schluessel traegt jetzt den Namen der abfliegenden Karte.
+      // Zeigt der Platz noch sie, wird versteckt (der Doppelbild-Fall,
+      // fuer den die Sicherung gedacht war); zeigt er inzwischen etwas
+      // anderes, bleibt es sichtbar.
       if (from === 'support' && fromHeroIdx != null && fromSlotIdx != null) {
-        const hideKey = `${srcOwner}-${fromHeroIdx}-${fromSlotIdx}`;
+        const hideKey = `${srcOwner}-${fromHeroIdx}-${fromSlotIdx}::${cardName || ''}`;
         setBounceOutgoingHidden(prev => {
           const next = new Set(prev);
           next.add(hideKey);
@@ -26994,6 +30221,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         document.body.appendChild(card);
         setTimeout(() => card.remove(), delay + 700);
+        // v662 (Als Befund): Landung vertonen — derselbe `placement`-
+        // Cue, den ein normal angelegtes Ability ueber den Log-Eintrag
+        // `ability_attached` bekommt. Bei 80 % des Flugs (480 ms) sitzt
+        // die Karte ueber dem Slot; `dedupe: 0`, weil der Bonus die
+        // Kopien seit v655 einzeln nacheinander fliegt.
+        // Etwas lauter als das normale Anlegen (Al 30.8.).
+        setTimeout(() => { if (window.playSFX) window.playSFX('placement', { dedupe: 0, volume: 1.6 }); }, delay + 480);
+        // v670: Abflug aus dem Deck hoerbar machen — derselbe Cue wie
+        // eine Ziehung (die Karte verlaesst den Stapel).
+        setTimeout(() => { if (window.playSFX) window.playSFX('draw', { dedupe: 0 }); }, delay);
       }
     };
     socket.on('deck_to_ability_animation', onDeckToAbility);
@@ -27289,7 +30526,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setStealHighlightMe(new Set(indices || []));
     };
     socket.on('blind_pick_highlight', onBlindPickHighlight);
-    const onCloakVanish = ({ owner, heroIdx, zoneSlot }) => {
+    const onCloakVanish = ({ owner, heroIdx, zoneSlot, fadeMs, holdMs }) => {
+      // v618: `fadeMs`/`holdMs` optional — Chasing the Legend laesst die
+      // Kreatur schneller verschwinden und nicht wieder auftauchen (sie
+      // geht auf die Hand; die dann LEERE Zone wird nur wieder sichtbar).
       const label = owner === myIdx ? 'me' : 'opp';
       let el;
       if (zoneSlot !== undefined && zoneSlot >= 0) {
@@ -27298,12 +30538,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
       }
       if (!el) return;
-      // Fade out over 1s
-      el.style.transition = 'opacity 1s ease';
+      const fade = fadeMs || 1000, hold = holdMs ?? 1000;
+      el.style.transition = `opacity ${fade}ms ease`;
       el.style.opacity = '0';
-      // Stay invisible for 1s, then fade back in over 1s
-      setTimeout(() => { el.style.transition = 'opacity 1s ease'; el.style.opacity = '1'; }, 2000);
-      setTimeout(() => { el.style.transition = ''; }, 3000);
+      setTimeout(() => { el.style.transition = `opacity ${fade}ms ease`; el.style.opacity = '1'; }, fade + hold);
+      setTimeout(() => { el.style.transition = ''; }, fade * 2 + hold);
     };
     socket.on('play_cloak_vanish', onCloakVanish);
     const onSkullBurst = ({ owner, heroIdx }) => {
@@ -27609,7 +30848,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('reaction_chain_link_resolving', onChainLinkResolving); socket.off('reaction_chain_link_resolved', onChainLinkResolved);
       socket.off('reaction_chain_link_negated', onChainLinkNegated); socket.off('reaction_chain_done', onChainDone);
       socket.off('camera_flash', onCameraFlash); socket.off('toughness_hp_change', onToughnessHp); socket.off('kiai_hp_split', onKiaiHpSplit); socket.off('creature_zone_move', onCreatureZoneMove); socket.off('fighting_atk_change', onFightingAtk); socket.off('zhu_skip_turn_animation', onZhuSkipTurn);
-      socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick);
+      socket.off('summon_effect', onSummon); socket.off('burn_tick', onBurnTick); socket.off('bleed_tick', onBleedTick);
       socket.off('play_zone_animation', onZoneAnim); socket.off('level_change', onLevelChange);
       socket.off('play_card_showcase', onCardShowcase);
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
@@ -27621,6 +30860,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('willy_leprechaun', onWillyLeprechaun);
       socket.off('alleria_spider_redirect', onAlleriaSpiderRedirect);
       socket.off('dark_control', onDarkControl);
+      socket.off('dark_ritual', onDarkRitual);
+      socket.off('hunting_net', onHuntingNet);
+      socket.off('death_claim_hold', onDeathClaimHold);
+      socket.off('hero_effect_reaction', onHeroEffectReaction);
       socket.off('burning_finger_slash', onBurningFingerSlash);
       socket.off('punch_impact', onPunchImpact);
       socket.off('play_pusher_fling', onPusherFling);
@@ -27656,6 +30899,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_tharxian_charge', onTharxianCharge);
       socket.off('play_card_transfer', onCardTransfer);
       socket.off('play_projectile_animation', onProjectileAnimation);
+      socket.off('play_weapon_barrage', onWeaponBarrage);
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
       socket.off('divine_rain_start', onDivineRainStart);
@@ -27751,6 +30995,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const el = boardCenterRef.current;
     if (!el) return;
     const check = () => {
+      // ── WAEHREND EINES KARTENZUGS NICHT MESSEN (v798) ──────────────
+      // Al: „Wenn ich eine Karte dragge, hat sie leichte Latenz […] und
+      // fliegt leicht hinter meinem Cursor her."
+      //
+      // Der Zieh-Zustand liegt in React, jede Mausbewegung ist also ein
+      // Render — und weil dieser Effekt KEINE Abhaengigkeitsliste hat,
+      // laeuft `check()` danach jedes Mal. Die Messung unten schaltet
+      // `board-flat-measure` um und liest Dutzende Rechtecke; im
+      // Scrollmodus zusaetzlich jedes `.board-zone` einzeln. Das ist ein
+      // erzwungener Umbruch PRO MAUSBEWEGUNG, und genau er laesst die
+      // Karte dem Cursor hinterherhinken.
+      //
+      // Waehrend eines Zugs aendert sich die Brettgeometrie nicht:
+      // keine Zone kommt, keine geht, der Massstab bleibt. Es gibt hier
+      // also nichts zu messen. Nach dem Loslassen laeuft ohnehin ein
+      // Render und damit ein voller Durchlauf.
+      if (document.body.classList.contains('pp-dragging-card')) return;
+
       // This effect has NO dependency array — check() runs after EVERY
       // render (the turn timer alone re-renders each second). The
       // measurement below must therefore be side-effect-free for an
@@ -27910,11 +31172,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
     };
+    // GEBUENDELT auf ein Bild (v798): mehrere Renders innerhalb eines
+    // Rahmens (Zustandsketten, Socket-Nachrichten, ResizeObserver und
+    // der Render danach) loesten bisher jeweils eine eigene volle
+    // Messung aus. Der Zustand, den `check()` liest, kann sich innerhalb
+    // eines Rahmens ohnehin nicht mehrfach aendern.
+    let checkRaf = 0;
+    const checkBald = () => {
+      if (checkRaf) return;
+      checkRaf = requestAnimationFrame(() => { checkRaf = 0; check(); });
+    };
     check();
-    const obs = new ResizeObserver(check);
+    const obs = new ResizeObserver(checkBald);
     obs.observe(el);
-    window.addEventListener('resize', check);
-    return () => { obs.disconnect(); window.removeEventListener('resize', check); };
+    window.addEventListener('resize', checkBald);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener('resize', checkBald);
+      if (checkRaf) cancelAnimationFrame(checkRaf);
+    };
   });
 
   /** Play a visual animation at a DOM element's position. */
@@ -28139,6 +31415,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (summonerPick) { setSummonerPick(null); return; }
       if (mulliganActive) { setMulliganDecided(true); socket.emit('mulligan_decision', { roomId: gameState.roomId, accept: false }); return; }
       if (pendingAbilityActivation) { setPendingAbilityActivation(null); return; }
+      // v658: Gratis-Artefakt scharf (Dajan) — Esc entschaerft.
+      if (!gameState.effectPrompt && !gameState.potionTargeting && gameState.players?.[myIdx]?.freeArtifactArmed) {
+        socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: gameState.players[myIdx].freeArtifactArmed.heroIdx });
+        return;
+      }
       if (gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx && gameState.effectPrompt.cancellable !== false) {
         socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { cancelled: true } });
       } else if (gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx) {
@@ -28158,7 +31439,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     window.addEventListener('keydown', handleEsc, true);
     return () => window.removeEventListener('keydown', handleEsc, true);
-  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, abilityAttachPick, summonOrRevealPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator]);
+  }, [showSurrender, showEndTurnConfirm, cancelEndTurn, spellHeroPick, abilityAttachPick, summonOrRevealPick, pendingBouncePick, deckViewer, pileViewer, gameState.potionTargeting, gameState.effectPrompt, pendingAdditionalPlay, pendingAbilityActivation, gameState.mulliganPending, mulliganDecided, gameState.result, isSpectator, gameState.players?.[myIdx]?.freeArtifactArmed]);
 
   // Enter/Space confirms active confirmation dialogs and prompts
   useEffect(() => {
@@ -28619,6 +31900,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
         }
+        // v712: Gained bleeding → slash animation
+        if (cur.bleeding && !prev.bleeding) {
+          const selB = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
+          const animB = cur.bleeding?.animationType || 'bleed_apply';   // v714: Fester/Ghoul Guard → bloody_cut
+          setTimeout(() => playAnimation(animB, selB, { duration: animB === 'bloody_cut' ? 1300 : 900 }), 50);
+        }
         // Gained burned → flame strike animation
         if (cur.burned && !prev.burned) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
@@ -28692,6 +31979,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       for (const t of selectable) blocked.add(t.id);
     }
 
+    // (b2) v752: dieselben Regeln, die `togglePotionTarget` beim Klick
+    // anwendet, auch OPTISCH — ein Ziel, das nicht mehr waehlbar ist,
+    // wird ausgegraut statt den Klick stumm zu schlucken (Als Befund
+    // 5.9.). Beide Faelle haengen an der AKTUELLEN Auswahl und
+    // aktualisieren sich deshalb mit jedem Klick.
+    if (cfg.uniqueBy) {
+      const belegt = new Set(all.filter(t => sel.has(t.id)).map(t => t[cfg.uniqueBy]));
+      if (belegt.size > 0) {
+        for (const t of selectable) if (belegt.has(t[cfg.uniqueBy])) blocked.add(t.id);
+      }
+    }
+    if (cfg.maxBudget != null) {
+      const verbraucht = all.filter(t => sel.has(t.id))
+        .reduce((n, t) => n + (t.budgetCost ?? 0), 0);
+      for (const t of selectable) {
+        if (verbraucht + (t.budgetCost ?? 0) > cfg.maxBudget) blocked.add(t.id);
+      }
+    }
+
     // (c) Obergrenze fuer Ziele ausserhalb der eigenen Support-Zonen.
     const maxNonOwn = cfg.maxNonOwnSupport;
     if (maxNonOwn !== undefined) {
@@ -28739,6 +32045,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const without = prev.filter(id => !sameType.includes(id));
         return [...without, targetId];
       }
+      // ── v750: zwei weitere Auswahlregeln, live im Picker ─────────
+      // `uniqueBy`: zwei Ziele duerfen sich in diesem Feld nicht
+      // gleichen (Grimoire: „Creatures with different names").
+      if (config.uniqueBy) {
+        const wert = target[config.uniqueBy];
+        const schonDa = prev.some(id => {
+          const t2 = pt.validTargets.find(t => t.id === id);
+          return t2 && t2[config.uniqueBy] === wert;
+        });
+        if (schonDa) return prev;                 // Klick prallt ab
+      }
+      // `maxBudget` + `budgetCost` je Ziel: Summenregel (Grimoire:
+      // „whose combined levels do not exceed 4").
+      if (config.maxBudget != null) {
+        const kosten = target.budgetCost ?? 0;
+        const verbraucht = prev.reduce((n, id) => {
+          const t2 = pt.validTargets.find(t => t.id === id);
+          return n + (t2?.budgetCost ?? 0);
+        }, 0);
+        if (verbraucht + kosten > config.maxBudget) return prev;
+      }
+
       const maxNonOwnSupport = config.maxNonOwnSupport;
       if (maxNonOwnSupport !== undefined && !target.ownSupport) {
         const currentNonOwn = prev.filter(id => {
@@ -28820,8 +32148,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // that hero has at least one eligible Support Zone) auto-routes the
   // click to that hero's first eligible slot, mirroring the normal-
   // summoning UX where the Hero zone is also clickable.
+  //
+  // ★ ABSCHALTBAR seit v783 (Als Befund 5.9.). Die Abkuerzung passt zu
+  // „waehle einen PLATZ" (Platzierung, Beschwoerung): dort ist der
+  // Held gemeint und der Platz nur das Wohin. Sie passt NICHT zu
+  // „waehle eine KARTE, die dort liegt" (Overcharge): ein Klick auf den
+  // Helden entfernte dann kommentarlos dessen linkeste Ausruestung,
+  // obwohl der Spieler den Helden gemeint hat. Prompts dieser Sorte
+  // setzen `heroShortcut: false`.
   const zonePickHeroFirstSlot = new Map();
   if (isMyEffectPrompt && ep.type === 'zonePick') {
+    const heroShortcutErlaubt = ep.heroShortcut !== false;
     for (const z of (ep.zones || [])) {
       // Zones default to OWN side (myIdx). Cards that prompt for an
       // OPP-side zone (Analyzer's Invader-Token spawn, …) pass an
@@ -28831,7 +32168,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // shouldn't auto-respond.
       const zoneOwner = z.owner ?? myIdx;
       zonePickSet.add(`${zoneOwner}-${z.heroIdx}-${z.slotIdx}`);
-      if (zoneOwner === myIdx && !zonePickHeroFirstSlot.has(z.heroIdx)) {
+      if (heroShortcutErlaubt && zoneOwner === myIdx && !zonePickHeroFirstSlot.has(z.heroIdx)) {
         zonePickHeroFirstSlot.set(z.heroIdx, z.slotIdx);
       }
     }
@@ -29240,6 +32577,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'ability_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} activated {cName(entry.card)} (Lv{entry.level})!</span>; }
       if (t === 'hero_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} activated their effect!</span>; }
       if (t === 'creature_effect_activated') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} activated its effect!</span>; }
+      // v653: Level-Rabatte „for the rest of the turn" (Fiona, the Empty Vessel; Divine Gift of Magic hatte bisher keinen Client-Fall).
+      if (t === 'fiona_vessel_spell') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} took {cName(entry.spell)} from the deck — its level is reduced by {entry.amount} this turn.</span>; }
+      if (t === 'riffel_ultimate') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Riffel took {cName(entry.card)} from the deck{entry.milled ? ` and sent ${entry.milled} more cop${entry.milled === 1 ? 'y' : 'ies'} to the discard pile` : ''}.</span>; }
+      if (t === 'heart_bow_love_shot') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} follows up with a free Love Shot!</span>; }
+      if (t === 'molinda_love_shot_count') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Molinda has used {entry.count}/{entry.needed} Love Shots.</span>; }
+      if (t === 'molinda_charm') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Molinda charms {entry.target ? cName(entry.target) : 'a target'} for the rest of the turn.</span>; }
+      if (t === 'ascension_bonus_declined') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} declined {entry.ability} for {entry.hero}.</span>; }
+      if (t === 'monia_bot_redirect') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Monia Bot takes {entry.source ? cName(entry.source) : 'the effect'} in place of {entry.from ? cName(entry.from) : 'its ally'}!</span>; }
+      if (t === 'true_damage') { return <span>{entry.target} takes true damage — it cannot be reduced or negated.</span>; }
+      if (t === 'jetpack_negate') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} fires the Jetpack — {entry.negated ? cName(entry.negated) : 'the effect'} is negated!</span>; }
+      if (t === 'jetpack_discarded') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} goes straight to the discard pile.</span>; }
+      // v659: Lolek-Familie
+      if (t === 'lolek_equip') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.by} equipped {cName(entry.card)} from the {entry.from} to {entry.hero}{entry.cost ? ` (${entry.cost}G)` : ' for free'}.</span>; }
+      if (t === 'lolek_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s Lolek sent {cName(entry.card)} from the {entry.from} to the discard pile.</span>; }
+      if (t === 'trident_shatter') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} shatters the Trident — this Attack deals +{entry.bonus} damage!</span>; }
+      if (t === 'free_artifact_used') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} let {cName(entry.card)} be played for free!</span>; }
+      if (t === 'free_artifact_disarmed') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} stands down — no free Artifact this time.</span>; }
+      if (t === 'free_artifact_armed') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {entry.hero} is ready to play an Artifact for free.</span>; }
+      if (t === 'grimoire_spent') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)}'s {cName(entry.card)} was spent — {entry.hero} could not have cast {cName(entry.spell)} without it.</span>; }
+      if (t === 'divine_gift_magic') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} revealed {cName(entry.spell)} — its level is reduced by {entry.amount} this turn.</span>; }
       // Areas und Equip-Effekte hatten als einzige der Aktivierungs-
       // Familie keinen Renderer — die Engine protokollierte sie, der
       // Client verwarf sie still (unbekannte Typen fallen ans Ketten-
@@ -29409,6 +32766,48 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bezug = entry.target || entry.trigger || entry.hero;
         return <span className="log-status">⚡ {pName(p.name, p.color)} played {cName(entry.card)} in reaction — {REAKTIONS_ANLAESSE[t]}{bezug ? ` (${bezug})` : ''}.</span>;
       }
+      // ── „Monster Nest" (v774) ────────────────────────────────────
+      // Drei Zeilen fuer den ganzen Kreislauf: Auflegen, Aufraeumen am
+      // Zugende, Auftauchen der verdeckten Karte. Ohne eigenen Fall
+      // waeren sie UNSICHTBAR — `formatLogEntry` gibt fuer unbekannte
+      // Typen null zurueck.
+      if (t === 'nest_covered') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} placed {cName(entry.card)} on top of {cName(entry.nest)} — it replaces it until the end of the turn.</span>; }
+      if (t === 'nest_cleared') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName(entry.nest)} removed {cName(entry.card)} and deleted it. This does not count as it being defeated.</span>; }
+      if (t === 'nest_surfaced') { return <span className="log-info">{cName(entry.card)} is no longer covered and returns to the board.</span>; }
+      if (t === 'nest_surface_failed') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName(entry.card)} had no free Support Zone to return to and went to the discard pile.</span>; }
+      // „Gobbo, Chief of Goblin" (v778): die HP-Kosten eines Angriffs
+      // ueber seiner Fighting-Stufe. Ohne eigene Zeile bliebe voellig
+      // unklar, warum der Held gerade HP verliert — es ist KEIN Schaden
+      // und erzeugt deshalb auch keinen Schadens-Eintrag.
+      // „Overcharge" (v780): der Ausruestungs-Tausch. Nennt beide
+      // Kosten, damit das 1–10-Fenster im Log nachvollziehbar ist.
+      // „Land Sharks" (v784): der Mehrfachbiss. Nennt auch das
+      // erlaubte Maximum, damit die Skalierung nach Summoning Magic
+      // im Log nachvollziehbar ist.
+      if (t === 'land_sharks_bite') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s Land Sharks bit <span className="log-amount">{entry.targets}</span> target{entry.targets === 1 ? '' : 's'} (max {entry.max}) for <span className="log-amount">{entry.damage}</span> each.</span>; }
+      if (t === 'multizone_reseated') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.card)} shifted to free Support Zones on {entry.hero} after the Island zones went away.</span>; }
+      if (t === 'multizone_no_room') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName(entry.card)} had no room left on {entry.hero} and went to the discard pile.</span>; }
+      if (t === 'land_sharks_zones_claimed') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s Land Sharks spread across all 3 Support Zones.</span>; }
+      if (t === 'overcharge_swap') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} overcharged {cName(entry.from)} ({entry.fromCost} Gold) on {entry.hero} into {cName(entry.to)} ({entry.toCost} Gold).</span>; }
+      // „Weapon Absorption" (v800): wie viele Karten der Held eingesogen
+      // hat und was das gebracht hat.
+      if (t === 'weapon_absorption') { const p = playerByName(entry.player); return entry.sent > 0
+        ? <span className="log-heal">{pName(p.name, p.color)}'s {entry.hero} absorbed <span className="log-amount">{entry.sent}</span> card{entry.sent === 1 ? '' : 's'} ({entry.abilities} Abilit{entry.abilities === 1 ? 'y' : 'ies'}) and healed <span className="log-amount">{entry.heal}</span> HP!</span>
+        : <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} absorbed nothing.</span>; }
+      // „Emergency Spell Armor" (v803): der Held ueberlebt auf 1 HP / 1 Max-HP.
+      if (t === 'emergency_spell_armor') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} is saved by <span className="log-card">Emergency Spell Armor</span> — current and max HP drop to <span className="log-amount">1</span>!</span>; }
+      if (t === 'emergency_spell_armor_draw') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} draws <span className="log-amount">{entry.count}</span> card{entry.count === 1 ? '' : 's'} from <span className="log-card">Emergency Spell Armor</span>.</span>; }
+      if (t === 'weapon_storm') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} sends <span className="log-amount">{entry.sent}</span> card{entry.sent === 1 ? '' : 's'} into <span className="log-card">Weapon Storm</span> — <span className="log-amount">{entry.damage}</span> damage ({entry.sent} × {entry.rate})!</span>; }
+      if (t === 'barrier_of_faith') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} sends <span className="log-amount">{entry.sent}</span> Abilit{entry.sent === 1 ? 'y' : 'ies'} to the discard pile — <span className="log-card">Barrier of Faith</span> negates every effect of <span className="log-card">{entry.negated}</span> on it!</span>; }
+      if (t === 'weapon_unleashing') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} unleashes <span className="log-card">{entry.ability}</span> ×3 — <span className="log-card">Weapon Unleashing</span> grants a second Action this turn!</span>; }
+      if (t === 'glass_sword_shatter') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s <span className="log-card">Glass Sword</span> shatters — {entry.hero}'s {entry.attack ? <span className="log-card">{entry.attack}</span> : 'Attack'} deals <span className="log-amount">+{entry.bonus}</span> damage!</span>; }
+      if (t === 'prayer_attached') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} attaches <span className="log-card">Prayer</span> to {entry.hero}.</span>; }
+      if (t === 'prayer_exchange') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} prays — discards <span className="log-amount">{entry.discarded}</span> Abilit{entry.discarded === 1 ? 'y' : 'ies'} and draws <span className="log-amount">{entry.drawn}</span> card{entry.drawn === 1 ? '' : 's'}.</span>; }
+      if (t === 'prayer_extra_draw') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} draws <span className="log-amount">1</span> extra card from <span className="log-card">Prayer</span> — no more draws this turn.</span>; }
+      if (t === 'shattering_strike_chain') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s <span className="log-card">Shattering Strike</span> shatters on — <span className="log-amount">{entry.damage}</span> damage to <span className="log-card">{entry.target}</span>!</span>; }
+      if (t === 'shattering_strike_done') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {entry.hero} lands <span className="log-amount">{entry.hits}</span> Shattering Strike hit{entry.hits === 1 ? '' : 's'} ({entry.damage} each), <span className="log-amount">{entry.defeats}</span> Creature{entry.defeats === 1 ? '' : 's'} defeated.</span>; }
+      if (t === 'melissa_draw') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s <span className="log-card">Cute Meanie Melissa</span> draws <span className="log-amount">{entry.drawn}</span> card — the opponent drew via an effect.</span>; }
+      if (t === 'gobbo_hp_cost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} used {cName(entry.attack)} (Lv {entry.attackLevel}) above Fighting {entry.fighting} — current and max HP reduced by <span className="log-amount">{entry.lost}</span>, now <span className="log-amount">{entry.hp}</span>/<span className="log-amount">{entry.maxHp}</span>.</span>; }
       if (t === 'zsos_ssar_cost') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} inflicted Poison on {entry.target} (Serpent's Cost).</span>; }
       if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
       if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }
@@ -29645,7 +33044,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             return false;
           })();
           const isCharmedByMe = isOpp && hero?.charmedBy === myIdx;
-          const spellAttackIneligible = (!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card);
+          // Anlege-Karten: nicht der Wirker entscheidet ueber das
+          // Ausgrauen, sondern der Empfaenger (Als Vorgabe 28.8.).
+          const _attHostsHero = (!isOpp && playDrag?.card)
+            ? ((gameState.attachmentHostTargets || {})[playDrag.card.name] || null)
+            : null;
+          const _attHostsHeroOwn = _attHostsHero ? _attHostsHero.filter(h => (h.owner ?? myIdx) === myIdx) : null;
+          const spellAttackIneligible = _attHostsHeroOwn
+            ? !_attHostsHeroOwn.some(h => h.heroIdx === i)
+            : ((!isOpp || isCharmedByMe) && playDrag && !playDrag.isEquip && (playDrag.card?.cardType === 'Spell' || playDrag.card?.cardType === 'Attack') && !heroActionEligibleHere && !canHeroPlayCard(p, i, playDrag.card));
           // Persistent "dragging a Surprise card" check (true throughout the
           // whole drag, not just when the cursor is currently over a Surprise
           // Zone) — so eligible zones can stay highlighted the entire time.
@@ -29664,9 +33071,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const surpriseTarget = isDraggingSurpriseCard && playDrag?.isSurprise && playDrag.targetHero === i;
           const ascensionIneligible = !isOpp && playDrag?.isAscension && (() => {
             const h = heroes[i];
-            return !(h?.name && h.hp > 0 && h.ascensionReady && (h.ascensionTarget === playDrag.cardName || (h.ascensionTargets || []).includes(playDrag.cardName)));
+            return !heroCanAscendTo(h, i, playDrag.cardName, playDrag.idx);
           })();
           const ascensionTarget = !isOpp && playDrag?.isAscension && playDrag.targetHero === i;
+          // v673: pickHandCard-Drag auf HELDEN-Zonen (Open Invitation).
+          // Dieselbe Optik wie ein Aufstiegs-Drag — es ist derselbe
+          // Vorgang aus Spielersicht: ein Ascended Hero geht auf einen
+          // Helden. Gueltige Wirte kommen aus dem Prompt, nicht aus
+          // `ascensionReady` (die Karte umgeht die Bedingung ja gerade).
+          const pickHeroHosts = (!isOpp && playDrag?.pickHandCardHeroDrop)
+            ? (gameState.effectPrompt?.eligibleHostsByCardName?.[playDrag.cardName] || [])
+            : null;
+          const pickHeroDropTarget = !!pickHeroHosts && playDrag.targetHero === i;
+          const pickHeroDropIneligible = !!pickHeroHosts && !pickHeroHosts.some(h => h.heroIdx === i);
           // During heroAction, dim all heroes except the Coffee hero
           const heroActionDimmed = !isOpp && gameState.effectPrompt?.type === 'heroAction' && gameState.effectPrompt?.ownerIdx === myIdx && gameState.effectPrompt?.heroIdx !== undefined && gameState.effectPrompt?.heroIdx !== i;
           // Dim heroes that can't use hero-restricted additional actions
@@ -29729,7 +33146,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             && (playDrag.isFreeSideEquip
                   ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
                   : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
-          const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && (playDrag.charmedOwner != null ? isOpp : !isOpp) && !(playDrag.creatureCasterSlot >= 0);
+          // v652: Cross-Side-Attachments (Overheal Shock) — die Zielseite
+          // steckt in `targetAttachOwner`; ohne sie gilt die alte Regel.
+          const _spellTargetSideOk = playDrag?.targetAttachOwner != null
+            ? (isOpp ? playDrag.targetAttachOwner !== myIdx : playDrag.targetAttachOwner === myIdx)
+            : (playDrag?.charmedOwner != null ? isOpp : !isOpp);
+          const spellTarget = playDrag && playDrag.isSpell && playDrag.targetHero === i && _spellTargetSideOk && !(playDrag.creatureCasterSlot >= 0);
           const pi = isOpp ? oppIdx : myIdx;
           const heroTargetId = `hero-${pi}-${i}`;
           const isValidHeroTarget = isTargeting && validTargetIds.has(heroTargetId);
@@ -29745,6 +33167,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isNegated = hero?.statuses?.negated;
           const isNulled = hero?.statuses?.nulled;
           const isBurned = hero?.statuses?.burned;
+          const isBleeding = hero?.statuses?.bleeding;
           const isPoisoned = hero?.statuses?.poisoned;
           const isShielded = hero?.statuses?.shielded;
           const isHealReversed = hero?.statuses?.healReversed;
@@ -29764,10 +33187,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const isCursed = !!hero?.statuses?.cursed;
           // Check if this hero has an active hero effect
           const heroEffectEntry = (gameState.activeHeroEffects || []).find(e => e.heroIdx === i && ((!isOpp && !e.charmedOwner) || (isOpp && e.charmedOwner === pi)));
-          const isHeroEffectActive = !!heroEffectEntry;
-          const isCharmed = !!hero?.statuses?.charmed;
+          // ── Helden-Effekt als ZUSATZAKTION (Als Ruling 28.8.) ──────
+          // Waehrend eines heroAction-Prompts (Overflowing Chalice,
+          // Coffee, Mana Beacon …) darf der Held seine geschenkte
+          // Aktion auch in seinen eigenen aktiven Effekt stecken.
+          // `activeHeroEffects` ist dann leer — der Sammler kennt in
+          // diesem Moment keine bezahlbare Aktion mehr —, deshalb ein
+          // eigener Kanal aus dem Prompt heraus. Ohne ihn bliebe die
+          // Heldenkarte unbeleuchtet und der Klick tot; genau das
+          // Muster, das bei Control Device vier Anlaeufe gekostet hat.
+          const heroActionEffectEntry = (!isOpp
+            && gameState.effectPrompt?.type === 'heroAction'
+            && gameState.effectPrompt?.ownerIdx === myIdx)
+            ? (gameState.effectPrompt.activatableHeroEffects || []).find(e => e.heroIdx === i)
+            : null;
+          const isHeroEffectActive = !!heroEffectEntry || !!heroActionEffectEntry;
+          // v718: die DAUERHAFTE Uebernahme (Paraseed Control) fuehrt
+          // bewusst KEINEN `charmed`-Status — der wuerde das Ausruesten
+          // sperren, und ein dauerhaft uebernommener Held zaehlt wie ein
+          // eigener. Der farbige Rahmen soll trotzdem zeigen, wem er
+          // gerade gehoert, deshalb faellt `permaControlBy` hier mit
+          // unter „charmed".
+          const isPermaControlled = hero?.permaControlBy != null;
+          const isCharmed = !!hero?.statuses?.charmed || isPermaControlled;
           const isControlled = hero?.controlledBy != null && !isCharmed;
-          const charmedByColor = isCharmed ? (hero.charmedBy === myIdx ? me.color : opp.color)
+          const charmedByColor = isCharmed
+            ? ((hero.permaControlBy ?? hero.charmedBy) === myIdx ? me.color : opp.color)
             : isControlled ? (hero.controlledBy === myIdx ? me.color : opp.color)
             : null;
           // Only hero-originated rams hide the hero tile during flight —
@@ -29805,7 +33250,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })()
             : -1;
           const isCsppHeroTarget = !!crossSidePlayPick && _csppHeroFreeSlot >= 0;
-          const onHeroClick = isCsppHeroTarget
+          // v809: waehrend das Helden-Menue fuer eine Handkarte offen ist,
+          // ist die Karte jedes waehlbaren Helden selbst klickbar —
+          // gleichwertig zum Namens-Button.
+          const spellPickEntry = (spellHeroPick && ownerLabel === 'me')
+            ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner == null && e.idx === i) || null
+            : null;
+          const onHeroClick = spellPickEntry
+            ? () => commitSpellHeroPick(spellPickEntry)
+            : isCsppHeroTarget
             ? () => {
                 const cspp = crossSidePlayPick;
                 setCrossSidePlayPick(null);
@@ -29852,7 +33305,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 setAbilityAttachPick(null);
                 socket.emit('play_ability', {
                   roomId: gameState.roomId, cardName: pick.cardName,
-                  handIndex: pick.handIndex, heroIdx: i, zoneSlot: targetSlot,
+                  handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined,
+                  heroIdx: i, zoneSlot: targetSlot,
                 });
               }
             : isChainPickValid
@@ -29862,8 +33316,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               }
             : isZonePickHero
             ? () => respondToPrompt({ heroIdx: i, slotIdx: zonePickHeroFirstSlot.get(i) })
-            : (isHeroEffectActive && !isEffectLocked && !isValidHeroTarget)
-            ? () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner })
+            : (isHeroEffectActive && (!isEffectLocked || heroActionEffectEntry) && !isValidHeroTarget)
+            ? (heroActionEffectEntry
+                // Zusatzaktion: die Antwort geht an den offenen Prompt,
+                // NICHT an `activate_hero_effect` — der Server-Handler
+                // wuerde sonst seine eigene Aktions-Oekonomie anwenden
+                // und die geschenkte Aktion gar nicht kennen.
+                ? () => respondToPrompt({
+                    heroEffectActivation: true, heroIdx: i,
+                    effectName: heroActionEffectEntry.effectName,
+                  })
+                : () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner }))
             : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
           const heroGroup = (
             <div key={i} className="board-hero-group">
@@ -29871,19 +33334,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || attachPickEligibleHero || isCsppHeroTarget) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
-                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
+                style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
                 {isChainPickSelected && <div className="chain-pick-number">{chainPickStep + 1}</div>}
+                {/* v718: dauerhaft uebernommener Held. Der pulsende
+                    Rahmen allein sagt nur „hier stimmt etwas nicht" —
+                    das Schild sagt, WEM der Held jetzt gehoert, und
+                    steht auf beiden Seiten des Bretts. */}
+                {isPermaControlled && (
+                  <div className={'hero-owned-badge' + (hero.permaControlBy === myIdx ? ' hero-owned-mine' : '')}>
+                    {hero.permaControlBy === myIdx ? '⛓ Yours' : '⛓ ' + (opp?.username || 'Opponent') + "'s"}
+                  </div>
+                )}
                 {hero?.name && !isRamming ? (
-                  <BoardCard cardName={hero.name} hp={hero.hp} maxHp={hero.maxHp} atk={hero.atk} hpPosition="hero" skins={gameSkins}
-                    abilities={p.abilityZones?.[i]}
-                    style={{
-                      ...(isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
-                      ...(isInvisible ? { opacity: 0.4 } : null),
-                      transition: 'opacity 0.4s ease, filter 0.5s ease',
-                    }} />
+                  (() => {
+                    const heroCardProps = {
+                      hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
+                      skins: gameSkins, abilities: p.abilityZones?.[i],
+                      style: {
+                        ...(isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
+                        ...(isInvisible ? { opacity: 0.4 } : null),
+                        transition: 'opacity 0.4s ease, filter 0.5s ease',
+                      },
+                    };
+                    // „???, the Shapeshifter" in fremder Gestalt: Brett
+                    // zeigt die kopierte Karte, Hover die eigene —
+                    // dasselbe Hover-Umschlagen wie bei Performance und
+                    // den angelegten Helden (Als Vorgabe 28.8.).
+                    // `useStickyHoverFlag` steckt in der Komponente und
+                    // faengt den verlorenen mouseleave ab, der beim
+                    // Bildtausch unter dem Zeiger entsteht.
+                    if (hero._shapeshiftBase && CARDS_BY_NAME[hero._shapeshiftBase]) {
+                      return <AttachableCreatureCard
+                        creatureName={hero.name}
+                        shapeshiftBase={hero._shapeshiftBase}
+                        tooltipCardOverride={CARDS_BY_NAME[hero._shapeshiftBase]}
+                        {...heroCardProps} />;
+                    }
+                    return <BoardCard cardName={hero.name} {...heroCardProps} />;
+                  })()
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
                 ) : (
@@ -29911,13 +33402,47 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isStunned?._baihuPetrify && <div className="baihu-petrify-overlay" />}
                 {hero?.name && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
+                {hero?.name && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isPoisoned && <PoisonedOverlay stacks={isPoisoned.stacks || 1} />}
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && isBerserked && <BerserkedOverlay />}
                 {hero?.name && hasLightBall && <LightBallAura />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isBerserked || isCursed || hero._extraLife) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isBerserked || isCursed || hero._extraLife || (hero._oneShotDmgShields && hero._oneShotDmgShields.length > 0)) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                {/* v704 (Puppets, Lucky Puppet Laki): Luck Counter auf dem Helden */}
+                {hero?.name && hero._luckCounter > 0 && (
+                  <div className="status-immune-icon puppet-counter-badge"
+                    onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it to another target you control.')}
+                    onMouseLeave={hideGameTooltip}
+                  >🍀{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
+                )}
+                {/* Aktionssperre (v642, Plant Golem u.a.): vom Server abgeleitet, kein Status */}
+                {hero?.name && p.actionBlockedHeroes?.[i] && !isFrozen && !isStunned && (
+                  <div className="status-immune-icon status-action-blocked-icon"
+                    onMouseEnter={e => showGameTooltip(e, 'This Hero cannot perform Actions (blocked by a card in its zones or its own effect).')}
+                    onMouseLeave={hideGameTooltip}
+                  >⛔</div>
+                )}
+                {/* Stealth (v634): Abzeichen strikt aus der Ability-Zone abgeleitet —
+                    kein Status, nichts fuer den Puzzle-Editor. Level = Belegungen. */}
+                {hero?.name && (() => {
+                  const lvl = (p.abilityZones?.[i] || []).reduce((n, slot) => n + (Array.isArray(slot) ? slot.filter(a => a === 'Stealth').length : 0), 0);
+                  if (lvl <= 0) return null;
+                  return (
+                    <div className="status-immune-icon status-stealth-icon"
+                      onMouseEnter={e => showGameTooltip(e, `Stealth ${lvl}: cannot be chosen by the opponent's level ${lvl} or lower Attacks/Spells while you control other Heroes that can be chosen.`)}
+                      onMouseLeave={hideGameTooltip}
+                    >🥷<span className="status-stealth-lvl">{lvl}</span></div>
+                  );
+                })()}
+                {/* damage_proof (Storm Piano, v628): Schadensschutz bis zum Ende des naechsten eigenen Zuges */}
+                {hero?.name && hero?.statuses?.damage_proof && !isShielded && (
+                  <div className="status-immune-icon status-damage-proof-icon"
+                    onMouseEnter={e => showGameTooltip(e, 'Damage-proof (Storm Piano): this Hero takes no damage until the end of its controller\'s next turn. Damage that cannot be negated still hits.')}
+                    onMouseLeave={hideGameTooltip}
+                  >🎹</div>
+                )}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
                   <div className="mummified-icon"
                     onMouseEnter={e => showGameTooltip(e, "This Hero's effect has been replaced by a Mummy Token's.")}
@@ -30126,7 +33651,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   </div>
                 )}
                 {/* ── Ascension drag highlight ── */}
-                {!isOpp && playDrag?.isAscension && playDrag.targetHero === i && (
+                {/* v673: der pickHandCard-Drag auf eine Heldenzone nutzt
+                    denselben Schein — aus Spielersicht ist es derselbe
+                    Vorgang. */}
+                {!isOpp && ((playDrag?.isAscension && playDrag.targetHero === i) || pickHeroDropTarget) && (
                   <div className="ascension-drop-glow" />
                 )}
                 {!isOpp && gameState.bonusActions?.heroIdx === i && gameState.bonusActions.remaining > 0 && (
@@ -30385,7 +33913,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && ((gameState.borisBlocked?.abilities) || []).includes(cards[0]);
                 const canActivate = !isBorisBlockedAbility
                   && (isActivatable || isHeroActionActivatable || isFreeActivatable);
-                const isFlashing = abilityFlash && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
+                const isFlashing = abilityFlash && abilityFlash.zoneKind !== 'support'
+                  && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z;
                 const isBlocking = abilityBlockFlash && abilityBlockFlash.owner === (isOpp ? oppIdx : myIdx) && abilityBlockFlash.heroIdx === i && abilityBlockFlash.zoneIdx === z;
                 // Friendship highlight: ability has an available additional action with eligible hand cards
                 const isFriendshipActive = !isOpp && cards.includes('Friendship') && (gameState.additionalActions || []).some(aa =>
@@ -30454,13 +33983,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       setAbilityAttachPick(null);
                       socket.emit('play_ability', {
                         roomId: gameState.roomId, cardName: pick.cardName,
-                        handIndex: pick.handIndex, heroIdx: i, zoneSlot: z,
+                        handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: i, zoneSlot: z,
                       });
                     }
-                  : (canActivate && !isEffectLocked) ? () => {
+                  // ★ 28.8., Als Befund: die Ability war hervorgehoben,
+                  // der Klick tot. `isEffectLocked` ist waehrend JEDES
+                  // offenen Prompts wahr — also auch waehrend der
+                  // Zusatzaktion, die die Ability ueberhaupt erst
+                  // anbietet. Die Hervorhebung haengt an `canActivate`
+                  // allein und leuchtete deshalb weiter.
+                  // ZWEITE Stelle desselben Musters in dieser Sitzung
+                  // (Helden-Portrait war die erste). Merksatz: wer eine
+                  // Aktivierung aus einem Prompt heraus anbietet, muss
+                  // die Prompt-Sperre am Klickpfad ausdruecklich oeffnen
+                  // — Anbieten und Anklicken sind zwei Bedingungen.
+                  : (canActivate && (!isEffectLocked || isHeroActionActivatable)) ? () => {
                       if (isFreeActivatable) {
                         // Free activation — no confirmation needed, activate directly
-                        socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
+                        socket.emit('activate_free_ability', { roomId: gameState.roomId, heroIdx: i, zoneIdx: z, zoneKind: freeAbilityEntry?.zoneKind, charmedOwner: freeAbilityEntry?.charmedOwner, borrowedFromOwner: freeAbilityEntry?.borrowedFromOwner });
                       } else {
                         setPendingAbilityActivation({ heroIdx: i, zoneIdx: z, abilityName: cards[0], level: cards.length, isHeroAction: isHeroActionActivatable, charmedOwner: activatableEntry?.charmedOwner, borrowedFromOwner: activatableEntry?.borrowedFromOwner });
                       }
@@ -30594,8 +34134,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && (playDrag.isFreeSideEquip
                       ? (playDrag.targetOwner === (isOpp ? oppIdx : myIdx))
                       : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
+              // v652: Zonen-Highlight seitenbewusst — Cross-Side-Attachments
+              // tragen die Zielseite in `targetAttachOwner`.
+              const _zoneSideOk = playDrag?.targetAttachOwner != null
+                ? (isOpp ? playDrag.targetAttachOwner !== myIdx : playDrag.targetAttachOwner === myIdx)
+                : !isOpp;
               const isPlayTarget = (_equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === z)
-                || (!isOpp && playDrag && !playDrag.isEquip && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z));
+                || (_zoneSideOk && playDrag && !playDrag.isEquip && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z));
               const isAutoTarget = _equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
               const pi = isOpp ? oppIdx : myIdx;
               // Check all possible equip target IDs for this zone
@@ -30610,7 +34155,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // `!isOpp` guard makes opp-side zone picks (e.g. Analyzer's
               // Token spawn) clickable on opp's row.
               const isZonePickTarget = zonePickSet.has(`${pi}-${i}-${z}`);
+              // v768: Ability-Ziehen auf eine Support Zone (Xal).
+              const isAbilitySupportTarget = !isOpp && abilityDrag
+                && abilityDrag.targetHero === i && abilityDrag.targetSupportZone === z;
               // During creature drag: highlight valid zones, dim invalid ones.
+              // v769: Eine AKTIVIERBARE Ability in dieser Support Zone
+              // (Alchemy, Adventurousness …). Der Server meldet sie in
+              // derselben Liste wie alle anderen, nur mit
+              // `zoneKind: 'support'`.
+              // v771: Liegt in dieser Support Zone eine ABILITY? Dann
+              // wird sie bei totem oder stillgelegtem Helden ausgegraut,
+              // genau wie eine Ability-Zone (Als Befund 5.9.).
+              const istSupportAbility = (() => {
+                const erste = ((p.supportZones[i] || [])[z] || [])[0];
+                return !!erste && CARDS_BY_NAME[erste]?.cardType === 'Ability';
+              })();
+              const heldHier = p.heroes[i];
+              const isDead = !!heldHier && heldHier.hp !== undefined && heldHier.hp <= 0;
+              // Kein `chillyDogOwnSide` in diesem Block — Frozen wird
+              // hier bewusst NICHT ausgegraut, weil die Chilly-Dog-Aura
+              // es aufheben kann. Stunned/Webbed sind eindeutig.
+              const isFrozenOrStunnedSup = !!heldHier
+                && (heldHier.statuses?.stunned || heldHier.statuses?.webbed);
+              const supportAbilityEntry = !isOpp
+                ? ((gameState.activatableAbilities || []).find(a =>
+                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z)
+                   || (gameState.freeActivatableAbilities || []).find(a =>
+                      a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z && a.canActivate !== false))
+                : null;
+              const supportAbilityFrei = !!supportAbilityEntry
+                && (gameState.freeActivatableAbilities || []).some(a =>
+                     a.zoneKind === 'support' && a.heroIdx === i && a.zoneIdx === z);
               // Surprise-subtype creatures skip the invalid-zone dimming
               // entirely (we only want the orange surprise highlight on
               // eligible zones — the other zones should stay neutral, not
@@ -30634,9 +34209,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // economy gate which would reject a hero who already acted.
               // Both sides of the OR must short-circuit cleanly when
               // `playDrag` is null (idle state with no drag in progress).
-              const heroActionCoversCard = !!(heroActionActive && heroActionHeroIdx === i && playDrag?.card
-                && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name));
-              const canPlayHere = heroActionCoversCard || (!!playDrag?.card && canHeroPlayCard(me, i, playDrag.card));
+              // v707 (Als Befund, Pavi): im Any-Hero-Modus (`heroIdx` leer,
+              // `heroIndicesByCard` gesetzt — Spider Dance, Pavi) gilt die
+              // Spalte als spielbar, wenn der Server sie fuer diese Karte
+              // freigibt; sonst blieben alle Zonen grau, weil die normale
+              // Aktionsoekonomie (Held hat schon gehandelt) dagegen sprach.
+              const heroActionCoversCard = !!(heroActionActive && playDrag?.card
+                && (gameState.effectPrompt.eligibleCards || []).includes(playDrag.card.name)
+                && (heroActionHeroIdx === i
+                    || (heroActionHeroIdx === undefined
+                        && ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).includes(i))));
+              // ★ 28.8. (Als Vorgabe): ANLEGE-KARTEN heben ihre EMPFAENGER
+              // hervor, nicht ihre Wirker. „Wenn ich einen ??? habe, der
+              // Awakening casten kann, und einen Arthor, der das NICHT
+              // kann, sollen trotzdem die Support Zones BEIDER Heroes
+              // als Drop Zones eligible sein."
+              // Der Server liefert die Liste je Karte
+              // (`attachmentHostTargets`, Bauform von
+              // `bouncePlacementTargets`); liegt eine vor, ersetzt sie
+              // die normale „wer kann wirken"-Pruefung vollstaendig.
+              const _attHostsAll = playDrag?.card
+                ? ((gameState.attachmentHostTargets || {})[playDrag.card.name] || null)
+                : null;
+              // v651: Hosts mit `owner` — fuer diese Zone nur die passende Seite
+              const _zoneOwnerIdx = isOpp ? (myIdx === 0 ? 1 : 0) : myIdx;
+              const _attHosts = _attHostsAll
+                ? _attHostsAll.filter(h => (h.owner ?? myIdx) === _zoneOwnerIdx)
+                : null;
+              const canPlayHere = _attHosts
+                ? _attHosts.some(h => h.heroIdx === i && h.slotIdx === z)
+                : (heroActionCoversCard || (!!playDrag?.card && canHeroPlayCard(me, i, playDrag.card)));
               // Bounce-place target: OCCUPIED slot listed server-side as
               // a valid swap destination for the card being dragged. Used
               // by the Deepsea archetype (drop on an existing bounceable
@@ -30670,13 +34272,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // can *normally* summon this card should light up an empty
               // slot. Attachment Spells and other non-Creature drags keep
               // using the broad canHeroPlayCard check.
+              // v641: Karten aus `oppSideOnlyCards` (Plant Golem) duerfen NUR
+              // auf gegnerische Zonen — eigene Zonen sind kein Ziel.
+              const _isOppOnlyDrag = !!playDrag?.cardName && (gameState.oppSideOnlyCards || []).includes(playDrag.cardName);
               const emptyCanPlayHere = isDraggingCreature && playDrag?.card
                 ? (
-                    // Cross-side-playable cards (Chilly Wizard) accept
-                    // any alive own Hero's empty Support Zone, regardless
-                    // of whether THAT hero could normally summon the card.
-                    (_isCrossSideCreatureDrag && me.heroes?.[i]?.hp > 0)
-                    || canHeroNormalSummon(me, i, playDrag.card)
+                    !_isOppOnlyDrag && (
+                      heroActionCoversCard   // v707: Immediate-Action-Freigabe (Pavi/Spider Dance)
+                      // Cross-side-playable cards (Chilly Wizard) accept
+                      // any alive own Hero's empty Support Zone, regardless
+                      // of whether THAT hero could normally summon the card.
+                      || (_isCrossSideCreatureDrag && me.heroes?.[i]?.hp > 0)
+                      || canHeroNormalSummon(me, i, playDrag.card)
+                    )
                   )
                 : canPlayHere;
               // Cross-side empty-zone eligibility (opp side): requires an
@@ -30866,9 +34474,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
-                  onClick={isCsppEmptySlot ? () => {
+                  onClick={supportAbilityEntry ? () => {
+                    // v769: Aktivierbare Ability in einer Support Zone
+                    // (Xal). Derselbe Kanal wie in einer echten
+                    // Ability-Zone — nur `zoneKind` sagt, wo sie liegt.
+                    if (window.playSFX) window.playSFX('ui_click');
+                    socket.emit(supportAbilityFrei ? 'activate_free_ability' : 'activate_ability', {
+                      roomId: gameState.roomId,
+                      heroIdx: supportAbilityEntry.heroIdx,
+                      zoneIdx: supportAbilityEntry.zoneIdx,
+                      zoneKind: 'support',
+                    });
+                  } : isCsppEmptySlot ? () => {
                     // Click-pick destination chosen → route through the
                     // summoner picker / auto-summoner helper. Destination
                     // is the clicked slot (same- or opp-side).
@@ -30957,7 +34576,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ...((isCsppEmptySlot || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
-                  data-bounce-hiding={bounceOutgoingHidden.has(`${pi}-${i}-${z}`) ? 'true' : undefined}
+                  data-bounce-hiding={(bounceOutgoingHidden.has(`${pi}-${i}-${z}`)
+                    || bounceOutgoingHidden.has(`${pi}-${i}-${z}::${cards[0] || ''}`)) ? 'true' : undefined}
                   data-support-ramming={isSupportRamming ? 'true' : undefined}>
                   {isChainPickCreatureSelected && <div className="chain-pick-number">{chainPickCreatureStep + 1}</div>}
                   {(isPlayTarget || isAutoTarget) && playDrag.card ? (
@@ -30968,6 +34588,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
+                    // v772: Ein ABILITY-Stapel in einer Support Zone
+                    // (Xal, Xalibur) wird wie in einer Ability-Zone
+                    // gezeichnet — mit Versatz und Stufenzahl. Vorher
+                    // sah ein Stapel der Hoehe 2 wie eine einzelne
+                    // Karte aus (Als Befund 5.9.).
+                    if (CARDS_BY_NAME[cards[0]]?.cardType === 'Ability') {
+                      return <AbilityStack cards={cards} />;
+                    }
                     // Multi-zone Creature placeholder slot (Populated
                     // Island Turtle's `_ZoneBlocked` sentinel). The
                     // engine pushes this name into companion slots
@@ -31026,8 +34654,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         skins={gameSkins}
                       />;
                     }
-                    const _ccType = cc?._cardDataOverride?.cardType || CARDS_BY_NAME[cards[cards.length-1]]?.cardType || '';
-                    const _ccSubtype = cc?._cardDataOverride?.subtype || CARDS_BY_NAME[cards[cards.length-1]]?.subtype || '';
+                    // v777: Welcher Name BESTIMMT diesen Platz? Normal der
+                    // letzte (Ausruestungsstapel, Alice-Kopien tragen ohnehin
+                    // denselben). Bei einer Verdeckung („Monster Nest") ist es
+                    // der ERSTE — die Karte, die oben liegt; der zweite Name
+                    // ist die verdeckte Karte darunter.
+                    const _slotTopName = cc?._nestedUnder ? cards[0] : cards[cards.length-1];
+                    const _ccType = cc?._cardDataOverride?.cardType || CARDS_BY_NAME[_slotTopName]?.cardType || '';
+                    const _ccSubtype = cc?._cardDataOverride?.subtype || CARDS_BY_NAME[_slotTopName]?.subtype || '';
                     // Check cardType AND subtype — Artifact-Creature hybrids
                     // (Pollution Spewer) are Creatures by subtype even though
                     // their cardType is Artifact, and must render with the
@@ -31039,9 +34673,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     // Deepsea archetype card is rendered dark-red and its
                     // tooltip is prefixed with "Deepsea " to surface the
                     // archetype shift. Already-Deepsea cards stay as-is.
-                    const _ccCardDataForSpores = CARDS_BY_NAME[cards[cards.length-1]];
+                    const _ccCardDataForSpores = CARDS_BY_NAME[_slotTopName];
                     const _ccIsAlreadyDeepsea = (_ccCardDataForSpores?.archetype === 'Deepsea')
-                      || cards[cards.length-1] === 'Infected Squirrel';
+                      || _slotTopName === 'Infected Squirrel';
                     const _ccSporified = isCreature && gameState.deepseaSporesActive && !_ccIsAlreadyDeepsea;
                     const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
                       : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 }
@@ -31057,6 +34691,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             onMouseLeave={hideGameTooltip}
                           >{ladung.remaining}</div>
                         ) : null}
+                        {/* v704 (Puppets): Luck (Laki) / Preserve (Vinny) Counter */}
+                        {cc?.luck > 0 ? (
+                          <div className="status-immune-icon puppet-counter-badge"
+                            onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
+                            onMouseLeave={hideGameTooltip}
+                          >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                        ) : null}
+                        {cc?.preserve > 0 ? (
+                          <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
+                            onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
+                            onMouseLeave={hideGameTooltip}
+                          >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                        ) : null}
                         {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                         {cc?.balance > 0 ? (
                           <div className="head-counter-badge"
@@ -31071,7 +34718,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       </>
                     ) : (
                     <>
-                    {cards.length === 1 ? (
+                    {/* ★ v777: `cards.length === 1` war die Schranke fuer
+                        „genau eine Kreatur im Platz". Ein Platz mit einer
+                        VERDECKTEN Karte darunter („Monster Nest") traegt
+                        aber ZWEI Namen — er fiel deshalb in den
+                        Alice-Stapelzweig darunter, der `cards[cards.length-1]`
+                        zeichnet: also das NEST mit einem „2\"-Abzeichen,
+                        statt der Kreatur darauf (Als Befund 5.9.).
+                        Eine Verdeckung ist kein geteilter Platz — sie
+                        nimmt denselben Weg wie eine einzelne Kreatur. */}
+                    {(cards.length === 1 || cc?._nestedUnder) ? (
                       (() => {
                         const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp;
                         const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp;
@@ -31127,6 +34783,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             skins={gameSkins} style={creatureStyle}
                             tooltipCardOverride={tooltipOverride}
                           />;
+                        }
+                        // „Monster Nest" (v776): das Nest liegt als
+                        // GRUNDSCHICHT dauerhaft im Platz, die gelegte
+                        // Kreatur wird DARUEBER gezeichnet. Als Vorgabe
+                        // 5.9. woertlich: „aus Perspektive des Spielers
+                        // verlaesst Monster Nest die Zone nie und die
+                        // andere Creature kommt nur darueber."
+                        //
+                        // Deshalb zwei Ebenen statt einer Karte mit
+                        // Hover-Tausch: geht die obere Kreatur weg,
+                        // bleibt die untere stehen, ohne dass irgendein
+                        // Zustandsversand oder Render-Wechsel dazwischen
+                        // eine Luecke reissen kann. Der Hover-Tausch auf
+                        // der oberen Karte bleibt zusaetzlich erhalten —
+                        // so sieht man das Nest auch vollstaendig.
+                        if (cc?._nestedUnder) {
+                          return (
+                            <>
+                              <div className="nest-base-layer">
+                                <BoardCard cardName={cc._nestedUnder} skins={gameSkins} />
+                              </div>
+                              <AttachableCreatureCard
+                                creatureName={cards[0]}
+                                nestedUnder={cc._nestedUnder}
+                                hp={curHp} maxHp={mHp} hpPosition="creature"
+                                skins={gameSkins} style={creatureStyle}
+                                tooltipCardOverride={tooltipOverride}
+                              />
+                            </>
+                          );
                         }
                         // Soul Shard Sah's mimic: `_effectOverride`
                         // names the Creature whose effect Sah currently
@@ -31240,6 +34926,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         <span className="head-counter-num">×{cc.headCounter}</span>
                       </div>
                     ) : null}
+                    {cc?.demonCounter > 0 ? (
+                      <div className="head-counter-badge head-counter-badge--raised"
+                        onMouseEnter={e => showGameTooltip(e, `Demon Counters: ${cc.demonCounter}. Horned Demon's strike deals 50 damage per Demon Counter.`)}
+                        onMouseLeave={hideGameTooltip}
+                        style={{ background: 'linear-gradient(135deg, #6a1b9a, #b71c1c)', borderColor: '#3a0a12' }}
+                      >
+                        <span className="head-counter-icon">😈</span>
+                        <span className="head-counter-num">×{cc.demonCounter}</span>
+                      </div>
+                    ) : null}
                     {cc?.bombCounters > 0 ? (
                       <div className="head-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, `Bomb Counters: ${cc.bombCounters}. While Time Bomblebee has Bomb Counters, it cannot take damage or be defeated. At the start of the opponent's turn, all Bomb Counters are removed and 150 damage is dealt to a chosen Creature.`)}
@@ -31320,10 +35016,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onMouseLeave={hideGameTooltip}
                     >🌀</div> : null}
                     {cc?.burned ? <BurnedOverlay /> : null}
+                    {cc?.bleeding ? <BleedingOverlay /> : null}
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.poisoned || cc?.negated || cc?.nulled || cc?.magic_silenced || cc?._baihuStunned || cc?.sirenLinked || cc?._extraLife) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.bleeding || cc?.poisoned || cc?.negated || cc?.nulled || cc?.magic_silenced || cc?._baihuStunned || cc?.sirenLinked || cc?.untargetable_all || cc?._extraLife || (cc?._oneShotDmgShields && cc._oneShotDmgShields.length > 0)) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {/* v704 (Puppets): Luck (Laki) / Preserve (Vinny) Counter */}
+                    {cc?.luck > 0 ? (
+                      <div className="status-immune-icon puppet-counter-badge"
+                        onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
+                        onMouseLeave={hideGameTooltip}
+                      >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                    ) : null}
+                    {cc?.preserve > 0 ? (
+                      <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
+                        onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
+                        onMouseLeave={hideGameTooltip}
+                      >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                    ) : null}
                     {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
                     {ladung ? (
                       <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
@@ -31356,7 +35066,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   };
 
   return (
-    <div className="screen-full no-crt" style={{ background: '#0c0c14' }}>
+    <div className="screen-full no-crt ui-noscale" style={{ background: '#0c0c14' }}>
       <div className="top-bar" style={{ justifyContent: 'space-between', position: 'relative' }}>
         {isSpectator ? (
           <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
@@ -31544,6 +35254,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               );
             })}
           </div>
+          {/* ── Crestinas Vorrat des GEGNERS ────────────────────────
+              „place it next to you FACE-UP" — der Gegner soll sehen,
+              worauf man zugreifen kann. Der Server schickt die Zone
+              seit dem Fundament offen an beide Seiten; hier war sie
+              bisher nur auf der eigenen Haelfte gezeichnet.
+              Nur Anzeige: kein Ziehgriff, kein Ausgrauen. */}
+          {(opp.creationZone || []).length > 0 && (
+            <div className="game-hand-creation" data-creation-owner="opp">
+              <div className="game-hand-creation-label orbit-font">Creation</div>
+              <div className="game-hand-creation-cards">
+                {(opp.creationZone || []).map((cardName, ci) => (
+                  <div key={'oppcz' + ci} className="creation-slot"
+                    data-creation-idx={ci} data-card-name={cardName}>
+                    <BoardCard cardName={cardName} skins={gameSkins} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="game-gold-display">
             <span className="game-gold-icon">🪙</span>
             <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
@@ -31554,6 +35283,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           {/* ── Generic Player Debuff Warnings (top of battlefield) ── */}
           {(() => {
             const debuffs = [];
+            if (me.actionLocked) debuffs.push({ key: 'action-me', icon: '⛔', text: 'You cannot perform any more Actions this turn! (Placing Creatures still works.)', color: '#ff4466' });
+            if (opp.actionLocked) debuffs.push({ key: 'action-opp', icon: '⛔', text: `${opp.username} cannot perform any more Actions this turn!`, color: '#cc3355' });
             if (me.summonLocked) debuffs.push({ key: 'summon-me', text: 'You cannot summon any more Creatures this turn!', color: '#ff6644' });
             if (opp.summonLocked) debuffs.push({ key: 'summon-opp', text: `${opp.username} cannot summon any more Creatures this turn!`, color: '#cc8800' });
             if (me.damageLocked) debuffs.push({ key: 'damage-me', icon: '🔥', text: 'You cannot deal any more damage to your opponent this turn!', color: '#ff4444' });
@@ -31577,6 +35308,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
             if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#ff6644' });
             if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#cc8800' });
+            // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
+            if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#ff6644' });
+            if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ffaa44' });
+            if (opp.handPlayLock === 'all') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn!`, color: '#cc8800' });
+            if (opp.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-opp', icon: '♞', text: `${opp.username} cannot play any more cards from their hand this turn — except "of Kings" cards!`, color: '#cc8800' });
             if (me.flashbanged) debuffs.push({ key: 'flashbanged-me', icon: '⚪', text: 'Flashbanged — your turn will end after your first Action!', color: '#ffffff' });
             if (opp.flashbanged) debuffs.push({ key: 'flashbanged-opp', icon: '⚪', text: `Flashbanged — ${opp.username}'s turn will end after their first Action!`, color: '#dddddd' });
             // Giga Steroids — owner-wide second-Action grant for
@@ -31646,7 +35382,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     data-phase-name={phase}
                     style={isActive ? { borderColor: phaseColor, boxShadow: `0 0 10px ${phaseColor}44` } : undefined}
                     onClick={() => { if (canClick) tryAdvancePhase(i); }}>
-                    {phase}
+                    {PHASEN_KURZ[phase] || phase}
                   </div>
                 );
               })}
@@ -31683,7 +35419,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             );
           })()}
 
-          <div className="board-center-spacer" />
+          {/* v788 (Als Befund 5.9.): der `board-center-spacer` ist HIER
+              ENTFERNT. Er war ein reiner Symmetrie-Platzhalter fuer die
+              Chat-Spalte rechts (324px, schrumpfbar) und hat links neben
+              dem Brett Platz belegt, den `overflow-x: clip` dann als
+              dunklen Streifen erscheinen liess: mit Inselzonen wurde der
+              linke Rand des Bretts dort abgeschnitten, was aussah wie
+              eine Abdeckung UEBER den zusaetzlichen Zonen.
+              Erst bei genau drei Flying Islands schaltete die
+              `can-scroll`-Erkennung um, die den Platzhalter auf 0 setzt
+              — und weil diese Erkennung eine Hysterese hat und einmal
+              eingerastet bleibt, kam der Streifen auch nach „Retry"
+              nicht wieder. Der Kommentar in style.css sagte selbst, der
+              Platzhalter existiere „only for visual symmetry". */}
           <div className="board-center" ref={boardCenterRef} style={{ position: 'relative', isolation: 'isolate' }}>
             {pendingAdditionalPlay && <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 200, fontSize: 13, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 10px rgba(255,200,0,.5), 2px 2px 0 #000', textAlign: 'center', pointerEvents: 'none', animation: 'summonLockPulse 1.5s ease-in-out infinite', whiteSpace: 'nowrap' }}>Choose which additional Action to use!</div>}
             {/* ── Pseudo-3D ground plane ─────────────────────────────────
@@ -31729,22 +35477,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {/* Ambient pixel motes — FIRST child on purpose: paints behind
                 every zone, card and area overlay (see BoardAmbiance). */}
             <BoardAmbiance colorMe={me.color} colorOpp={opp.color} />
-            {(((gameState.areaZones?.[0] || []).includes('Acid Rain')) || ((gameState.areaZones?.[1] || []).includes('Acid Rain'))) && <AcidRainOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('The Bonegrinder')) || ((gameState.areaZones?.[1] || []).includes('The Bonegrinder'))) && <BonegrinderOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Crystal Well')) || ((gameState.areaZones?.[1] || []).includes('Crystal Well'))) && <CrystalWellOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes("Cottage at the Forest's Edge")) || ((gameState.areaZones?.[1] || []).includes("Cottage at the Forest's Edge"))) && <CottageOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Deepsea Castle')) || ((gameState.areaZones?.[1] || []).includes('Deepsea Castle'))) && <DeepseaCastleOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Slippery Ice')) || ((gameState.areaZones?.[1] || []).includes('Slippery Ice'))) && <SlipperyIceOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('The Cosmic Depths')) || ((gameState.areaZones?.[1] || []).includes('The Cosmic Depths'))) && <CosmicDepthsOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Graveyard of Limited Power')) || ((gameState.areaZones?.[1] || []).includes('Graveyard of Limited Power'))) && <GraveyardOfLimitedPowerOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('The First Circle of Hell')) || ((gameState.areaZones?.[1] || []).includes('The First Circle of Hell'))) && <FirstCircleOfHellOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Blood Rock')) || ((gameState.areaZones?.[1] || []).includes('Blood Rock'))) && <BloodRockOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('War Council Gathering Place')) || ((gameState.areaZones?.[1] || []).includes('War Council Gathering Place'))) && <WarCouncilOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Dark Ocean')) || ((gameState.areaZones?.[1] || []).includes('Dark Ocean'))) && <DarkOceanOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Doom Clock')) || ((gameState.areaZones?.[1] || []).includes('Doom Clock'))) && <DoomClockOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Temple of Sacrifice')) || ((gameState.areaZones?.[1] || []).includes('Temple of Sacrifice'))) && <TempleOfSacrificeOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Spider Hive')) || ((gameState.areaZones?.[1] || []).includes('Spider Hive'))) && <SpiderHiveOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes("Tarleinn's Floating Island")) || ((gameState.areaZones?.[1] || []).includes("Tarleinn's Floating Island"))) && <FloatingIslandOverlay />}
+            <AreaBackgrounds areaZones={gameState.areaZones} myIdx={myIdx} oppIdx={oppIdx} />
             {(() => {
               // Gathering Storm is an Attachment Spell — it lives in a
               // hero's Support Zone rather than an Area Zone, so walk
@@ -31779,12 +35512,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               });
               return hasTempeste ? <TempesteRainOverlay /> : null;
             })()}
-            {/* Wowhalla — brass-gear ambient background while the Hall of */}
-            {/* the Cool is in either player's Area zone. */}
-            {(((gameState.areaZones?.[0] || []).includes('Wowhalla, the Hall of the Cool'))
-              || ((gameState.areaZones?.[1] || []).includes('Wowhalla, the Hall of the Cool')))
-              && <WowhallaGearsOverlay />}
-            {(((gameState.areaZones?.[0] || []).includes('Stinky Stables')) || ((gameState.areaZones?.[1] || []).includes('Stinky Stables'))) && <StinkyStablesOverlay />}
             <div className="board-plane">
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
@@ -31828,8 +35555,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const oppAreaEntry = activatableAreas.find(a => a.areaOwner === oppIdx);
                 const myAreaActivatable = !isEffectLocked && !!myAreaEntry?.canActivate;
                 const oppAreaActivatable = !isEffectLocked && !!oppAreaEntry?.canActivate;
-                const myAreaCls = (isMyAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(myAreaId) ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '') + (myAreaActivatable ? ' zone-ability-activatable' : '');
-                const oppAreaCls = (isOppAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(oppAreaId) ? ' potion-target-selected' : '') + (oppAreaActivatable ? ' zone-ability-activatable' : '');
+                // `area-zone-filled` entscheidet, ob die Zone UEBER oder
+                // UNTER der Phasenplatte liegt (v795, Als Befund 5.9.).
+                // Vorher hing das am z-index der KARTE in der Zone, der
+                // aus ihr herausreichen musste — das kippt, sobald
+                // irgendein Zustand die Zone zu einem Stapelkontext
+                // macht (Animation, Transform, Deckung). Genau das
+                // passierte beim Oeffnen des Battle-Menues: die Platte
+                // schob sich vor die Karte. An der Zone selbst haengt
+                // die Entscheidung stabil.
+                const myAreaFilled = (gameState.areaZones?.[myIdx] || []).length > 0;
+                const oppAreaFilled = (gameState.areaZones?.[oppIdx] || []).length > 0;
+                const myAreaCls = (isMyAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(myAreaId) ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '') + (myAreaActivatable ? ' zone-ability-activatable' : '') + (myAreaFilled ? ' area-zone-filled' : '');
+                const oppAreaCls = (isOppAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(oppAreaId) ? ' potion-target-selected' : '') + (oppAreaActivatable ? ' zone-ability-activatable' : '') + (oppAreaFilled ? ' area-zone-filled' : '');
                 const onMyAreaClick = isMyAreaValid
                   ? () => togglePotionTarget(myAreaId)
                   : (myAreaActivatable ? () => socket.emit('activate_area_effect', {
@@ -31845,6 +35583,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 const measured = areaPositions[0] != null && areaPositions[1] != null;
                 const hiddenStyle = measured ? null : { visibility: 'hidden' };
                 return (<>
+                  {/* ── Unterlage der Phasenspalte (v794, Als Vorgabe 5.9.)
+                      Gewuenschte Reihenfolge:
+                        Area-Hintergrund → Area-ZONE → PHASEN-PLATTE
+                        → Area-KARTE → Phasen-Text
+
+                      Die Platte muss also ZWISCHEN die Zone und die Karte
+                      DARIN. Zone und Karte sind Eltern und Kind, und beide
+                      stecken in `.board-plane`, die per `transform` alles
+                      versiegelt — von aussen ist zwischen sie nicht zu
+                      kommen. Deshalb sitzt die Platte jetzt HIER, als
+                      Geschwister der beiden Area-Zonen:
+                        LEERE Zone     z-auto  (unten)
+                        Platte         z-index 1
+                        GEFUELLTE Zone z-index 2  (Klasse
+                                       `area-zone-filled`)
+
+                      v795: die Entscheidung haengt an der ZONE, nicht am
+                      z-index der Karte darin. Der musste vorher aus der
+                      Zone herausreichen und kippte, sobald ein Zustand
+                      die Zone zu einem Stapelkontext machte — beim
+                      Oeffnen des Battle-Menues schob sich die Platte
+                      dadurch vor die Karte.
+
+                      Preis: die Platte liegt damit IN der gekippten Ebene
+                      und wuerde mitprojiziert. Deshalb rechnet die
+                      Messschleife ihre Masse in LOKALE Koordinaten zurueck
+                      (`--phase-plate-*`, Massstab aus dieser Zonenreihe
+                      selbst) — auf Bildschirmhoehe steht sie dann wieder
+                      genau unter dem flachen Phasentext. */}
+                  <div className="phase-plate-layer" aria-hidden="true">
+                    <div className="phase-plate phase-plate-a" />
+                    <div className="phase-plate phase-plate-b" />
+                  </div>
                   <BoardZone type="area" cards={gameState.areaZones?.[myIdx] || []} label="Area"
                     style={{...myBoardZone('area'), left: areaPositions[0], cursor: (isMyAreaValid || myAreaActivatable) ? 'pointer' : undefined, ...hiddenStyle}}
                     className={(myAreaCls + ' area-zone-me').trim()}
@@ -32153,7 +35924,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '') + (gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
               {displayHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
-                const isBeingDragged = (handDrag && handDrag.idx === item.origIdx) || (playDrag && playDrag.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
+                // ★ 28.8., Als Befund: „wird immer in der Main-Hand
+                // unsichtbar". Ein Zug aus Crestinas Vorrat traegt
+                // einen VORRATS-Index — der darf hier keine Handkarte
+                // treffen. `handDragEigen`/`playDragEigen` sind bereits
+                // auf die eigene Quelle gefiltert.
+                const isBeingDragged = (handDragEigen && handDragEigen.idx === item.origIdx) || (playDragEigen && playDragEigen.idx === item.origIdx) || (abilityDrag && abilityDrag.idx === item.origIdx);
                 const dimmed = getCardDimmed(item.card, item.origIdx);
                 const isHandLockBlocked = dimmed && me.handLocked && (me.handLockBlockedCards || []).includes(item.card);
                 const isDrawAnim = drawAnimCards.some(a => a.origIdx === item.origIdx);
@@ -32398,6 +36174,75 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               })}
             </div>
           )}
+          {/* ── Crestinas Vorrat (True Fairy Crestina) ────────────────
+              „Offen nebeneinander wie offene Handkarten" (Als Vorgabe
+              28.8.). Der Kasten erscheint NUR, wenn wirklich Karten
+              darin liegen — in 99 % aller Partien sieht man ihn nie,
+              und die Hand behaelt dann ihre volle Breite. Das Faechern
+              ab der fuenften Karte kommt vom bestehenden Flex-Layout
+              (`flex-shrink` + `min-width` je Platz), es braucht dafuer
+              keinen eigenen Mechanismus. */}
+          {(me.creationZone || []).length > 0 && (
+            <div className="game-hand-creation" data-creation-owner="me">
+              <div className="game-hand-creation-label orbit-font">Creation</div>
+              <div className="game-hand-creation-cards">
+                {displayCreation.map((item, ci) => {
+                  if (item.isGap) return <div key="czgap" className="hand-drop-gap" />;
+                  const cardName = item.card;
+                  const czCard = CARDS_BY_NAME[cardName];
+                  // ★ 28.8.: Ausgrauen genau wie in der Hand — und aus
+                  // DERSELBEN Quelle. `getCardDimmed` fragt
+                  // `heroPlayableCards`, und die Sammler erheben den
+                  // Vorrat seit heute mit. Waere hier eine eigene
+                  // Bedingung gebaut, liefen Anzeige und Server-
+                  // Pruefung wieder auseinander — das ist in dieser
+                  // Sitzung dreimal passiert.
+                  // ★ Echter Vorrats-Index statt -1 — mit -1 traf keine
+                  // einzige indexbasierte Regel, deshalb blieb eine
+                  // aktivierbare Luna Kiai im Vorrat ausgegraut.
+                  const czDimmed = getCardDimmed(cardName, item.origIdx, true);
+                  // ★ 28.8.: Abwurf-Prompt DIREKT IN DER ZONE, nach dem
+                  // Muster des Handabwurfs — statt einer zweiten
+                  // Galerie. Waehlbar ist nur, was der Server
+                  // freigegeben hat; die gerade aufloesende Karte ist
+                  // dort nicht dabei.
+                  const czPrompt = gameState.effectPrompt?.type === 'creationDiscard'
+                    && gameState.effectPrompt?.ownerIdx === myIdx;
+                  const czWaehlbar = czPrompt
+                    && (gameState.effectPrompt.eligibleIndices || []).includes(item.origIdx);
+                  return (
+                    <div key={'cz' + item.origIdx}
+                      className={'creation-slot' + (item.isDragged ? ' hand-dragging' : '')
+                        + (czPrompt
+                            ? (czWaehlbar ? ' hand-discard-target' : ' hand-card-dimmed')
+                            : (czDimmed ? ' hand-card-dimmed' : ''))}
+                      data-creation-idx={item.origIdx} data-card-name={cardName}
+                      // ★ DERSELBE Ziehstart wie die Hand, nur mit
+                      // Quellenangabe. Keine zweite Kopie — genau die
+                      // Doppelung hat in dieser Sitzung dreimal dazu
+                      // gefuehrt, dass Anzeige und Klick auseinanderliefen.
+                      onMouseDown={(e) => {
+                        // Waehrend des Abwurf-Prompts ist ein Klick die
+                        // Auswahl, kein Ziehstart.
+                        if (czPrompt) {
+                          if (!czWaehlbar) return;
+                          if (e.cancelable) e.preventDefault();
+                          socket.emit('effect_prompt_response', {
+                            roomId: gameState.roomId,
+                            response: { creationIndex: item.origIdx },
+                          });
+                          return;
+                        }
+                        onHandMouseDown(e, item.origIdx, true);
+                      }}
+                      onTouchStart={(e) => { if (!czPrompt) onHandMouseDown(e, item.origIdx, true); }}>
+                      <BoardCard cardName={cardName} skins={gameSkins} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {!isSpectator && (
             <div className="hand-actions">
               <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
@@ -32471,17 +36316,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
       {handDrag && (
-        <div className="hand-floating-card" style={{ left: handDrag.mouseX - 32, top: handDrag.mouseY - 45 }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${handDrag.mouseX - 32}px, ${handDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={handDrag.cardName} />
         </div>
       )}
       {playDrag && (
-        <div className="hand-floating-card" style={{ left: playDrag.mouseX - 32, top: playDrag.mouseY - 45 }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - 32}px, ${playDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={playDrag.cardName} />
         </div>
       )}
       {abilityDrag && (
-        <div className="hand-floating-card" style={{ left: abilityDrag.mouseX - 32, top: abilityDrag.mouseY - 45 }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${abilityDrag.mouseX - 32}px, ${abilityDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={abilityDrag.cardName} />
         </div>
       )}
@@ -32601,23 +36446,37 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Ram animations (hero charges to target and back) */}
       {ramAnims.map(r => (
-        <div key={r.id} className={'ram-anim-card' + (r.trailType === 'fire_stars' ? ' ram-fire-stars' : '')} style={{
-          left: r.srcX - 34, top: r.srcY - 48,
-          '--ramDx': (r.tgtX - r.srcX) + 'px',
-          '--ramDy': (r.tgtY - r.srcY) + 'px',
-          '--ramAngle': (r.angle || 0) + 'deg',
-          animationDuration: r.dur + 'ms',
-        }}>
-          <BoardCard cardName={r.cardName} noTooltip />
-          <div className="ram-flame-trail" />
-          {r.trailType === 'fire_stars' && <>
-            <div className="ram-fire-particle" style={{ '--fp-delay': '0s', '--fp-x': '-8px', '--fp-y': '12px' }}>🔥</div>
-            <div className="ram-fire-particle" style={{ '--fp-delay': '0.1s', '--fp-x': '10px', '--fp-y': '8px' }}>🔥</div>
-            <div className="ram-fire-particle" style={{ '--fp-delay': '0.15s', '--fp-x': '-4px', '--fp-y': '20px' }}>⭐</div>
-            <div className="ram-fire-particle" style={{ '--fp-delay': '0.2s', '--fp-x': '6px', '--fp-y': '16px' }}>⭐</div>
-            <div className="ram-fire-particle" style={{ '--fp-delay': '0.25s', '--fp-x': '-12px', '--fp-y': '6px' }}>🔥</div>
-          </>}
-        </div>
+        <React.Fragment key={r.id}>
+          {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort
+              flöge er mit und stünde nicht hinter ihr. Eigene Ebene. */}
+          {r.trailType === 'fire' && <MoniaJetTrail r={r} />}
+          <div className={'ram-anim-card' + (r.trailType === 'fire_stars' ? ' ram-fire-stars' : '') + (r.trailType === 'fire' ? ' ram-jet' : '')} style={{
+            left: r.srcX - 34, top: r.srcY - 48,
+            '--ramDx': (r.tgtX - r.srcX) + 'px',
+            '--ramDy': (r.tgtY - r.srcY) + 'px',
+            '--ramAngle': (r.angle || 0) + 'deg',
+            animationDuration: r.dur + 'ms',
+          }}>
+            <BoardCard cardName={r.cardName} noTooltip />
+            {r.trailType === 'fire' ? (
+              /* Auspuff-Fahne am Heck. Die Karte ist um `--ramAngle`
+                 gedreht (Oberkante zeigt zum Ziel), „unten" ist also
+                 immer entgegen der Flugrichtung. */
+              <div className="ram-jet-exhaust" style={{ animationDuration: r.dur + 'ms' }}>
+                <div className="ram-jet-exhaust-core" />
+              </div>
+            ) : (
+              <div className="ram-flame-trail" />
+            )}
+            {r.trailType === 'fire_stars' && <>
+              <div className="ram-fire-particle" style={{ '--fp-delay': '0s', '--fp-x': '-8px', '--fp-y': '12px' }}>🔥</div>
+              <div className="ram-fire-particle" style={{ '--fp-delay': '0.1s', '--fp-x': '10px', '--fp-y': '8px' }}>🔥</div>
+              <div className="ram-fire-particle" style={{ '--fp-delay': '0.15s', '--fp-x': '-4px', '--fp-y': '20px' }}>⭐</div>
+              <div className="ram-fire-particle" style={{ '--fp-delay': '0.2s', '--fp-x': '6px', '--fp-y': '16px' }}>⭐</div>
+              <div className="ram-fire-particle" style={{ '--fp-delay': '0.25s', '--fp-x': '-12px', '--fp-y': '6px' }}>🔥</div>
+            </>}
+          </div>
+        </React.Fragment>
       ))}
 
       {/* Tharxian (Trojan) Horse charges — a large wooden horse on
@@ -32763,6 +36622,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* Card transfer animations (Dark Gear creature steal, etc.) */}
+      {claimHolds.map(h => (
+        <div key={h.id} className="transfer-anim-card claim-hold-card" style={{ left: h.x, top: h.y }}>
+          <BoardCard cardName={h.cardName} noTooltip />
+        </div>
+      ))}
       {transferAnims.map(t => (
         <div key={t.id} className="transfer-anim-card" style={{
           left: t.srcX, top: t.srcY,
@@ -32797,6 +36661,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                  Plattform unterschiedlich eingefaerbt und lassen sich
                  nicht zuverlaessig gruen tinten. */
               <span className="projectile-bubble" style={p.emojiStyle || {}} />
+            ) : p.projectileShape === 'javelin' ? (
+              /* Speer (Javelin Throw, v614): langer, DUENNER Schaft mit
+                 schmaler Blattspitze, keine Befiederung — bewusst kein
+                 Emoji und kein Pfeil. Zeigt nativ nach OSTEN (0°), die
+                 Rotation zum Ziel kommt vom Wrapper. */
+              <svg className="projectile-arrow-shaft" viewBox="0 0 140 10"
+                   width="120" height="9" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0" y="4" width="112" height="2" fill="#b98a4a" />
+                <rect x="0" y="4" width="112" height="2" fill="none" stroke="#3a2410" strokeWidth="0.5" />
+                <polygon points="110,5 118,2.4 140,5 118,7.6" fill="#e6e6e6" />
+                <polygon points="110,5 118,2.4 140,5 118,7.6" fill="none" stroke="#222" strokeWidth="0.5" />
+                <rect x="108" y="3.3" width="4" height="3.4" fill="#8a8a8a" />
+              </svg>
             ) : p.projectileShape === 'arrow' ? (
               <svg className="projectile-arrow-shaft" viewBox="0 0 100 22"
                    width="78" height="18" xmlns="http://www.w3.org/2000/svg">
@@ -32849,6 +36726,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <BoardCard cardName={link.cardName} style={{ width: 80, height: 112, borderRadius: 4 }} />
                 {link.isInitialCard && <div className="chain-badge chain-badge-initial">INITIAL</div>}
                 {link.status === 'negated' && <div className="chain-negate-symbol">🚫</div>}
+                {link.status === 'negated' && link.negationStyle === 'thief' && (
+                  /* Key, the Cursed Thief (v691): ein Griff ins Glied —
+                     Schluesselchen kreisen, ein Schleier faellt ueber die
+                     Karte, ein Handschuh packt sie. */
+                  <div className="chain-thief-overlay">
+                    <div className="chain-thief-key" style={{ left: 10, top: 14, animationDelay: '0ms' }}>🗝</div>
+                    <div className="chain-thief-key" style={{ left: 52, top: 40, animationDelay: '120ms' }}>🗝</div>
+                    <div className="chain-thief-key" style={{ left: 22, top: 70, animationDelay: '240ms' }}>🗝</div>
+                    <div className="chain-thief-hand">🫳</div>
+                  </div>
+                )}
                 {link.status === 'negated' && link.negationStyle === 'ice' && (
                   <div className="chain-ice-overlay">
                     <div className="chain-ice-crystal" style={{ left: 8, top: 12, fontSize: 14, animationDelay: '0ms' }}>❄</div>
@@ -33683,6 +37571,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12 }}>{ep.description}</div>
+              {/* v693: Worauf reagiere ich? Kartenbild der Ursprungskarte. */}
+              {ep.showCard && CARDS_BY_NAME[ep.showCard] && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                  <div style={{ width: 64, height: 90, borderRadius: 4, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.5)' }}>
+                    <img src={cardImageUrl(ep.showCard)} alt={ep.showCard} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text2)' }}>Reacting to <b style={{ color: 'var(--text)' }}>{ep.showCard}</b></div>
+                </div>
+              )}
               <div className="deck-viewer-grid">
                 {cards.map((entry, i) => {
                   const card = CARDS_BY_NAME[entry.name];
@@ -33736,14 +37633,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         }}>×{entry.count}</div>
                       )}
                       <div className="gallery-source-badge" style={{
+                        // ★ 28.8.: `outside` ergaenzt. Karten von AUSSERHALB
+                        // des Spiels (Crestina, „???, the Throne Robber")
+                        // fielen bisher auf den Standardzweig und trugen
+                        // faelschlich „DECK" — was gerade bei diesen
+                        // Effekten der irrefuehrendste aller Werte ist:
+                        // die Karte liegt eben NICHT im Deck.
                         background: entry.source === 'hand' ? 'rgba(80,200,120,.85)'
                           : entry.source === 'discard' ? 'rgba(180,80,200,.85)'
                           : entry.source === 'stack' ? 'rgba(120,220,255,.9)'
+                          : entry.source === 'outside' ? 'rgba(230,190,90,.9)'
                           : 'rgba(80,140,220,.85)',
                       }}>
                         {entry.source === 'hand' ? 'HAND'
                           : entry.source === 'discard' ? 'DISCARD'
                           : entry.source === 'stack' ? 'STACK'
+                          : entry.source === 'outside' ? 'OUTSIDE'
                           : 'DECK'}
                       </div>
                     </div>
@@ -33948,13 +37853,56 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Effect Prompt: Hero Action (Coffee) ── */}
-      {isMyEffectPrompt && ep.type === 'heroAction' && (
-        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: '#8b6b4a' }}>
+      {/* ── Effect Prompt: Hero Action (Zusatzaktion) ──
+          `!gameState.potionTargeting`: waehrend einer Zielwahl ist das
+          Panel im Weg — dieselbe Bedingung, die das Warte-Panel weiter
+          unten schon traegt. `panelPlacement` schiebt es ueber die
+          gegnerische Bretthaelfte, weil der Spieler auf SEINER Seite
+          klicken muss (Als Vorgaben 28.8.). */}
+      {isMyEffectPrompt && ep.type === 'heroAction' && !gameState.potionTargeting && (
+        <DraggablePanel className={'first-choice-panel animate-in' + (ep.panelPlacement === 'oppSide' ? ' panel-opp-side' : '')}
+          style={{ borderColor: '#8b6b4a', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
           <div className="orbit-font" style={{ fontSize: 13, color: '#cc9966', marginBottom: 4 }}>{ep.title}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
-          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.heroName ? `Drag a highlighted card onto ${ep.heroName}'s zones to play it.` : 'Drag a highlighted card onto any Hero\'s zones to play it.'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{(() => {
+            // Der Hinweis nannte bisher nur den Zieh-Weg — Abilities
+            // waren schon immer klickbar, Helden-Effekte seit dem
+            // 28.8., und beides stand nirgends. Bausteine je nach dem,
+            // was der Prompt tatsaechlich anbietet.
+            const teile = [];
+            if ((ep.eligibleCards || []).length) {
+              teile.push(ep.heroName
+                ? `drag a highlighted card onto ${ep.heroName}'s zones`
+                : "drag a highlighted card onto any Hero's zones");
+            }
+            if ((ep.activatableAbilities || []).length) teile.push('click a highlighted Ability');
+            if ((ep.activatableHeroEffects || []).length) teile.push('click the Hero to use their effect');
+            if (!teile.length) return 'No Action available.';
+            const satz = teile.length === 1 ? teile[0]
+              : `${teile.slice(0, -1).join(', ')} or ${teile[teile.length - 1]}`;
+            return `To spend the Action, ${satz}.`;
+          })()}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
             onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+          </div>
+          {/* Bild des Helden, dem die Aktion gehoert — gleiche Bauform
+              wie in confirm/optionPicker, samt Tooltip beim Ueberfahren. */}
+          {ep.showCard && CARDS_BY_NAME[ep.showCard] && (() => {
+            const heroCardData = CARDS_BY_NAME[ep.showCard];
+            const heroCardImg = cardImageUrl(ep.showCard);
+            return (
+              <div className="board-card" style={{ width: 100, minHeight: 130, flexShrink: 0, alignSelf: 'center', borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+                onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(heroCardData); }}
+                onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+                {heroCardImg ? (
+                  <img src={heroCardImg} alt={ep.showCard} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{ep.showCard}</div>
+                )}
+              </div>
+            );
+          })()}
         </DraggablePanel>
       )}
 
@@ -33966,6 +37914,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>{ep.instruction || 'Click a highlighted card in your hand.'}</div>
           {ep.cancellable !== false && <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
             onClick={() => respondToPrompt({ cancelled: true })}>Cancel (Esc)</button>}
+        </DraggablePanel>
+      )}
+
+      {/* ── v658: Gratis-Artefakt scharf (Dajan, Conqueror) — Panel wie
+          pickHandCard: Erklaerung + Cancel (Esc). Die Handkarten bleiben
+          normal spielbar (nur Artefakte mit festem Preis sind hell);
+          Cancel klickt serverseitig den Helden erneut = entschaerfen. ── */}
+      {!isSpectator && !result && !isMyEffectPrompt && !gameState.potionTargeting && me?.freeArtifactArmed && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'rgba(255,210,77,.6)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: '#ffd24d', marginBottom: 4 }}>💰 {me.heroes?.[me.freeArtifactArmed.heroIdx]?.name || 'Free Artifact'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Play an Artifact with a set Cost from your hand without paying its Cost.</div>
+          <div style={{ fontSize: 11, color: 'var(--text2)', opacity: .7, marginBottom: 12 }}>Click a highlighted Artifact in your hand.</div>
+          <button className="btn" style={{ padding: '6px 16px', fontSize: 11, borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: me.freeArtifactArmed.heroIdx })}>Cancel (Esc)</button>
         </DraggablePanel>
       )}
 
@@ -33990,6 +37952,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :
              ep.type === 'deckSearchReveal' ? '🔍 Opponent is viewing...' :
              ep.type === 'optionPicker' ? '🤔 Opponent is deciding...' :
+             ep.type === 'creationDiscard' ? (ep.opponentTitle || '🗑 Opponent is deleting a placed card...') :
              ep.type === 'forceDiscard' || ep.type === 'forceDiscardCancellable' ? (ep.opponentTitle || '🗑 Opponent is discarding...') :
              ep.type === 'pickHandCard' ? (ep.opponentTitle || '🎴 Opponent is choosing a card...') :
              ep.type === 'pickFromOppHand' ? '✉️ Opponent is reading your hand...' :
@@ -34009,6 +37972,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'pengueAbilityMove' ? 'Waiting for opponent to move an Ability...' :
              ep.type === 'chainTargetPick' ? 'Waiting for opponent to select targets...' :
              ep.type === 'heroAction' ? 'Waiting for opponent to play a card...' :
+             ep.type === 'creationDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to choose a card from their Creation Zone...') :
              ep.type === 'forceDiscard' ? (ep.opponentSubtitle || 'Waiting for opponent to discard a card...') :
              ep.type === 'forceDiscardCancellable' ? 'Waiting for opponent to discard or pass...' :
              ep.type === 'pickHandCard' ? (ep.opponentSubtitle || 'Waiting for opponent to pick a card from their hand...') :
@@ -34051,7 +38015,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (pa.isHeroAction) {
                   socket.emit('effect_prompt_response', { roomId: gameState.roomId, response: { abilityActivation: true, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx } });
                 } else {
-                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
+                  socket.emit('activate_ability', { roomId: gameState.roomId, heroIdx: pa.heroIdx, zoneIdx: pa.zoneIdx, zoneKind: pa.zoneKind, charmedOwner: pa.charmedOwner, borrowedFromOwner: pa.borrowedFromOwner });
                 }
               }}>Yes!</button>
             <button className="btn" style={{ padding: '8px 20px', fontSize: 12, borderColor: 'var(--danger)', color: 'var(--danger)' }}
@@ -34110,70 +38074,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 : (h.charmedOwner != null ? `💕 ${h.name} (charmed)` : (me.heroes[h.idx]?.name || 'Hero ' + (h.idx + 1)));
               return (
               <button key={keyStr} className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor, color: borderColor, textAlign: 'left' }}
-                onClick={() => {
-                  const pick = spellHeroPick;
-                  setSpellHeroPick(null);
-                  if (pick.isSurprise) {
-                    socket.emit('play_surprise', {
-                      roomId: gameState.roomId, cardName: pick.cardName,
-                      handIndex: pick.handIndex, heroIdx: h.idx,
-                      bakhmSlot: h.bakhmSlot,
-                    });
-                  } else if (pick.isAscension) {
-                    hideGameTooltip(); socket.emit('ascend_hero', {
-                      roomId: gameState.roomId, cardName: pick.cardName,
-                      handIndex: pick.handIndex, heroIdx: h.idx,
-                    });
-                  } else if (pick.isHeroAction) {
-                    // For Creature picks in heroAction mode (Hu's
-                    // any-hero variant), zoneSlot is required by
-                    // `performImmediateActionAnyHero`. The picker's
-                    // eligible-entries carry it (the host-slot we
-                    // probed up-front via findFreeSupportSlot).
-                    const response = {
-                      cardName: pick.cardName,
-                      handIndex: pick.handIndex,
-                      heroIdx: h.idx,
-                    };
-                    if (pick.isCreature && h.zoneSlot != null) {
-                      response.zoneSlot = h.zoneSlot;
-                    }
-                    socket.emit('effect_prompt_response', {
-                      roomId: gameState.roomId,
-                      response,
-                    });
-                  } else if (pick.isArtifactCreature) {
-                    // Artifact Creature: derselbe Picker, aber der Weg
-                    // aufs Feld ist `play_artifact` (doPlayArtifact hat
-                    // den isArtifactCreature-Zweig), nicht play_creature.
-                    // MUSS vor `pick.isCreature` stehen — die Ueberschrift
-                    // kommt ueber genau diese Fahne.
-                    socket.emit('play_artifact', {
-                      roomId: gameState.roomId, cardName: pick.cardName,
-                      handIndex: pick.handIndex, heroIdx: h.idx,
-                      zoneSlot: h.zoneSlot,
-                      clickPlaced: true,
-                    });
-                  } else if (pick.isCreature) {
-                    socket.emit('play_creature', {
-                      roomId: gameState.roomId, cardName: pick.cardName,
-                      handIndex: pick.handIndex, heroIdx: h.idx,
-                      zoneSlot: h.zoneSlot,
-                    });
-                  } else {
-                    // Spell. For creature casters, heroIdx routes to the
-                    // host slot — engine's bypass additional-action picks
-                    // it up automatically. `viaCreatureInstId` tells the
-                    // server to anchor animations on the Creature's
-                    // support slot, not the host hero's zone.
-                    socket.emit('play_spell', {
-                      roomId: gameState.roomId, cardName: pick.cardName,
-                      handIndex: pick.handIndex, heroIdx: h.idx,
-                      charmedOwner: h.charmedOwner,
-                      viaCreatureInstId: h.creatureInstId,
-                    });
-                  }
-                }}>
+                onClick={() => commitSpellHeroPick(h)}>
                 {label}
               </button>
             );
@@ -34199,27 +38100,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'left' }}
                 onClick={() => {
-                  const { cardName: cn, handIndex: hi, card: c, summonEligible } = p;
+                  const { cardName: cn, handIndex: hi, fromCreation: fc, card: c, summonEligible } = p;
                   setSummonOrRevealPick(null);
                   if (!summonEligible || summonEligible.length === 0) return;
                   if (summonEligible.length === 1) {
                     socket.emit('play_creature', {
                       roomId: gameState.roomId, cardName: cn,
-                      handIndex: hi, heroIdx: summonEligible[0].idx,
+                      handIndex: hi, fromCreation: fc || undefined,
+                      heroIdx: summonEligible[0].idx,
                       zoneSlot: summonEligible[0].zoneSlot,
                     });
                   } else {
-                    setSpellHeroPick({ cardName: cn, handIndex: hi, card: c, eligible: summonEligible, isCreature: true });
+                    setSpellHeroPick({ cardName: cn, handIndex: hi, fromCreation: fc, card: c, eligible: summonEligible, isCreature: true });
                   }
                 }}>
                 🐾 Summon
               </button>
               <button className="btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#ffc84a', color: '#ffc84a', textAlign: 'left' }}
                 onClick={() => {
-                  const { cardName: cn, handIndex: hi } = p;
+                  const { cardName: cn, handIndex: hi, fromCreation: fc } = p;
                   setSummonOrRevealPick(null);
                   if (window.playSFX) window.playSFX('ui_click');
-                  socket.emit('activate_hand_card', { roomId: gameState.roomId, cardName: cn, handIndex: hi });
+                  socket.emit('activate_hand_card', {
+                    roomId: gameState.roomId, cardName: cn, handIndex: hi,
+                    fromCreation: fc || undefined,
+                  });
                 }}>
                 ⚡ {revealLabel}
               </button>
@@ -34231,6 +38136,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       })()}
 
       {/* ── Force Discard Prompt (Wheels) ── */}
+      {/* ── Abwurf aus Crestinas Vorrat (★ 28.8.) ────────────────
+          Gleiche Anmutung wie der Handabwurf, damit sich beides gleich
+          anfuehlt — nur zeigt die Anweisung auf die andere Zone. */}
+      {isMyEffectPrompt && ep.type === 'creationDiscard' && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
+          <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Delete'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>{ep.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--danger)', opacity: .8 }}>
+            {ep.instruction || 'Click a card in your Creation Zone to delete it.'}
+          </div>
+        </DraggablePanel>
+      )}
+
       {isMyEffectPrompt && ep.type === 'forceDiscard' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--danger)' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--danger)', marginBottom: 4 }}>{ep.title || 'Discard'}</div>
@@ -34857,6 +38775,7 @@ window.GameBoard = GameBoard;
 window.FrozenOverlay = FrozenOverlay;
 window.NegatedOverlay = NegatedOverlay;
 window.BurnedOverlay = BurnedOverlay;
+window.BleedingOverlay = BleedingOverlay;
 window.PoisonedOverlay = PoisonedOverlay;
 window.HealReversedOverlay = HealReversedOverlay;
 window.ImmuneIcon = ImmuneIcon;

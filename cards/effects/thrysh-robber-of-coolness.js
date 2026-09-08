@@ -185,9 +185,8 @@ module.exports = {
     let flySource;
     let stackInstId = null;
     if (picked.source === 'deck') {
-      const deckIdx = ps.mainDeck.indexOf(choice.cardName);
-      if (deckIdx < 0) return false;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return false;
       flySource = undefined; // omitted → 'attach_hero_fly' uses deck pile
     } else {
       // Stack pick — splice ANY occurrence by name; the inst we

@@ -84,6 +84,11 @@ module.exports = {
     if ((ps.mainDeck || []).indexOf(name) < 0) return { cancelled: true };
 
     await engine.actionAddCardFromDeckToHand(pi, name, {
+      // v734: „a copy of IT" — der Name steht fest. Damit findet ein
+      // Verdoppler (Koperniko) keine zweite Karte, die zugleich
+      // denselben Anforderungen genuegt UND anders heisst. Genau so
+      // gemeint.
+      searchSpec: { label: `copy of ${name}`, filter: (cd, n) => n === name },
       source: CARD_NAME,
       reveal: true,
     });

@@ -119,9 +119,8 @@ module.exports = {
 
         // Execute placement — remove from discard pile
         const cardName = selected.cardName;
-        const idx = ps.discardPile.indexOf(cardName);
-        if (idx < 0) return;
-        ps.discardPile.splice(idx, 1);
+        const _taken_idx = await ctx._engine.takeFromPile(ps, 'discard', cardName, { source: 'shadowy-slime' });   // v820: Stapel-Schicht
+        if (!_taken_idx) return;
 
         // Place into support zone
         const si = zone.slotIdx;

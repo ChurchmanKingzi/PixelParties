@@ -123,8 +123,7 @@ module.exports = {
           const idx = psp.hand.indexOf(opt.name);
           if (idx >= 0) psp.hand.splice(idx, 1);
         } else {
-          const idx = psp.mainDeck.indexOf(opt.name);
-          if (idx >= 0) psp.mainDeck.splice(idx, 1);
+          await eng.takeFromPile(psp, 'deck', opt.name, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
         }
         if (!psp.supportZones[heroIdx]) psp.supportZones[heroIdx] = [[], [], []];
         psp.supportZones[heroIdx][slot] = [opt.name];
@@ -296,8 +295,7 @@ module.exports = {
           const idx = ps.hand.indexOf(cardName);
           if (idx >= 0) ps.hand.splice(idx, 1);
         } else {
-          const idx = ps.mainDeck.indexOf(cardName);
-          if (idx >= 0) ps.mainDeck.splice(idx, 1);
+          await engine.takeFromPile(ps, 'deck', cardName, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
         }
 
         // Place into support zone

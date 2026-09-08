@@ -216,9 +216,8 @@ async function idejLordStartOfGame(ctx, caps) {
     for (let i = 0; i < picked.length; i++) {
       if (freeSupportSlots(ps, heroIdx).length === 0) break;
       const name = picked[i];
-      const di = ps.mainDeck.indexOf(name);
-      if (di < 0) continue;
-      ps.mainDeck.splice(di, 1);
+      const _taken_di = await engine.takeFromPile(ps, 'deck', name, { source: '_idej-shared' });   // v820: Stapel-Schicht
+      if (!_taken_di) continue;
       const inst = await attachIdejCardToHero(engine, pi, heroIdx, name, { fromPile: 'deck' });
       if (inst) attached.push(name);
       else ps.mainDeck.push(name);

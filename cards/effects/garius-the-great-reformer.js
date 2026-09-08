@@ -331,8 +331,12 @@ module.exports = {
         engine.sync();
         return true;
       }
-      ps.mainDeck.splice(deckIdx, 1);
-      engine.shuffleDeck(pi);
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
+        // Sacrifice already committed; deck locked. Bail cleanly —
+        // HOPT stays consumed (we did pay the sacrifice).
+        engine.sync();
+        return true;
+      }
 
       // (3) Place into the freshly emptied slot. `isPlacement: true`
       //     fires onPlay + onCardEnterZone in placement mode (skips

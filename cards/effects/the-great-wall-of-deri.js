@@ -53,6 +53,14 @@
 const CARD_NAME = 'The Great Wall of Deri';
 
 module.exports = {
+
+  /**
+   * „Equip this card to a Hero you control." — Seitenbindung, siehe
+   * `equipOwnSideOnly` in CARD_API.md. Ohne die Fahne gilt die
+   * Hausvorgabe „Ausruestung darf an beide Seiten" (Al, 5.9.: der
+   * Kartentext ist bindend).
+   */
+  equipOwnSideOnly: true,
   // Equipment lives in the support zone. The hook below only fires
   // while the card is there, which is the engine's canonical
   // "currently in play under your control" gate for Equipment.
@@ -86,7 +94,7 @@ module.exports = {
         // the floor a CEILING on the reduction rather than a floor on
         // the final damage — see the header comment.
         if (e.amount > 10) {
-          e.amount = Math.max(10, e.amount - 10);
+          if (e.amount > 10) e.modifyAmount(-Math.min(10, e.amount - 10));   // flat, Boden 10 (Punkt vor Strich)
         }
       }
     },

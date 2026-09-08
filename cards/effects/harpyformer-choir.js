@@ -91,7 +91,7 @@ module.exports = {
         if (entryOwner !== pi) continue;
 
         // Reduce by 100, minimum 0
-        entry.amount = Math.max(0, entry.amount - 100);
+        entry.modifyAmount(-Math.min(100, entry.amount));   // flat (Punkt vor Strich)
         inst.counters._choirShield = false;
         ctx._engine.log('choir_shield', {
           player: ctx.players[pi]?.username,

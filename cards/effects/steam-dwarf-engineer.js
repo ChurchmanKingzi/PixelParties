@@ -112,7 +112,7 @@ module.exports = attachSteamEngine({
 
     // Remove chosen card from deck first — prevents any recursive
     // summon path from double-using it.
-    ps.mainDeck.splice(deckIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
 
     // Sacrifice the Engineer — actionDestroyCard fires the proper
     // onCreatureDeath hooks and clears the zone.

@@ -15,7 +15,7 @@
 // Shared source→creature resolution (same helper Fireshield uses) so
 // the "hit the attacking Creature, not its host Hero" routing has a
 // single source of truth and never diverges between retaliation cards.
-const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 module.exports = {
   isSurprise: true,
@@ -27,6 +27,9 @@ module.exports = {
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
+    // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
+    // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
 
     if (isCreatureSource(engine, sourceInfo)) {
       // Creature source — only if the creature is still alive on board.

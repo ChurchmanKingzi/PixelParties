@@ -88,6 +88,9 @@ module.exports = {
     // Change Counters off it).
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Holy Cheese',
+      // v734: „a Support Magic Spell".
+      searchSpec: { label: 'Support Magic Spell', filter: (cd) => hasCardType(cd, 'Spell')
+        && (cd.spellSchool1 === 'Support Magic' || cd.spellSchool2 === 'Support Magic') },
       reveal: true,
     });
 

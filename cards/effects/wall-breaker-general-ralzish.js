@@ -24,7 +24,7 @@
 //
 //  ── "summoned since the end of your last turn" ──────────────────
 //  At the END of the controller's turn we stamp
-//  `ps._ralzishLastTurnEndTick = gs.turn`. A Creature is protected
+//  `ps._lastTurnEndTick = gs.turn` (shared). A Creature is protected
 //  from THIS effect iff its `turnPlayed` is greater than that tick
 //  (i.e. it was summoned during the opponent's turn that followed,
 //  or during the controller's current turn). Cards that aren't
@@ -41,6 +41,9 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+// v685: Zeitmarke und Schwelle leben in `_turn-end-recency-shared` —
+// Heragas liest dieselbe Marke mit umgekehrtem Vorzeichen.
+const { lastTurnEndTick, stampTurnEnd } = require('./_turn-end-recency-shared');
 
 const CARD_NAME = 'Wall Breaker General Ralzish';
 
@@ -50,8 +53,7 @@ const CARD_NAME = 'Wall Breaker General Ralzish';
  * last turn" and can't be chosen by Ralzish's effect.
  */
 function recencyThreshold(ps, gs) {
-  const tick = ps?._ralzishLastTurnEndTick;
-  return (typeof tick === 'number') ? tick : ((gs.turn || 0) - 2);
+  return lastTurnEndTick(ps, gs);
 }
 
 /** Count actual Creatures (not Equip Artifacts) in a Hero's Support Zones. */
@@ -371,11 +373,6 @@ module.exports = {
      * next turn) are off-limits to the effect until the window
      * rolls over again.
      */
-    onTurnEnd: async (ctx) => {
-      const controller = ctx.cardController ?? ctx.cardOwner;
-      if (ctx.activePlayer !== controller) return;
-      const ps = ctx._engine.gs.players[controller];
-      if (ps) ps._ralzishLastTurnEndTick = ctx._engine.gs.turn;
-    },
+    onTurnEnd: async (ctx) => { stampTurnEnd(ctx); },
   },
 };

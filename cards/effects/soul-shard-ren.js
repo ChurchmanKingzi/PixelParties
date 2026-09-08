@@ -67,9 +67,9 @@ module.exports = {
       let bestScore = -Infinity;
       for (const c of cards) {
         const name = c.name;
-        const idx = (ps.mainDeck || []).indexOf(name);
-        if (idx < 0) continue;
-        ps.mainDeck.splice(idx, 1);
+        const _taken_idx = engine.takeFromPileSync(ps, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_idx) continue;
+        const idx = _taken_idx.idx;
         // Project send-to-discard
         ps.discardPile.push(name);
         let scoreDiscard = -Infinity;
@@ -81,7 +81,7 @@ module.exports = {
         try { scoreHand = evalState(pi); } catch {}
         ps.hand.pop();
         // Restore deck position
-        ps.mainDeck.splice(idx, 0, name);
+        engine.returnToPile(ps, 'deck', name, idx);   // v820: Stapel-Schicht
         const score = Math.max(scoreDiscard, scoreHand);
         if (score > bestScore) { bestScore = score; best = c; }
       }
@@ -96,9 +96,9 @@ module.exports = {
       const m = /"([^"]+)"/.exec(promptData.description || '');
       const name = m && m[1];
       if (!name) return undefined;
-      const deckIdx = (ps.mainDeck || []).indexOf(name);
-      if (deckIdx < 0) return undefined;
-      ps.mainDeck.splice(deckIdx, 1);
+      const _taken_deckIdx = engine.takeFromPileSync(ps, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) return undefined;
+      const deckIdx = _taken_deckIdx.idx;
       ps.discardPile.push(name);
       let scoreDiscard = -Infinity;
       try { scoreDiscard = evalState(pi); } catch {}
@@ -107,7 +107,7 @@ module.exports = {
       let scoreHand = -Infinity;
       try { scoreHand = evalState(pi); } catch {}
       ps.hand.pop();
-      ps.mainDeck.splice(deckIdx, 0, name);
+      engine.returnToPile(ps, 'deck', name, deckIdx);   // v820: Stapel-Schicht
       return { optionId: scoreDiscard > scoreHand ? 'discard' : 'hand' };
     }
 
@@ -178,9 +178,8 @@ module.exports = {
       } else {
         // Send to discard. Splice + push directly — discard pile
         // adds don't fire ON_CARD_ADDED_TO_HAND.
-        const idx = ps.mainDeck.indexOf(chosenName);
-        if (idx < 0) return;
-        ps.mainDeck.splice(idx, 1);
+        const _taken_idx = engine.takeFromPileSync(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_idx) return;
         ps.discardPile.push(chosenName);
         engine._broadcastEvent('deck_to_discard_animation', {
           owner: pi, cardNames: [chosenName], source: CARD_NAME,

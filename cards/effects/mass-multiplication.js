@@ -188,8 +188,7 @@ module.exports = {
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: chosenName, from: 'discard', to: 'deleted',
         });
-        const idx = ps.discardPile.indexOf(chosenName);
-        if (idx >= 0) ps.discardPile.splice(idx, 1);
+        await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
       } else {
         const idx = ps.hand.indexOf(chosenName);
         if (idx >= 0) ps.hand.splice(idx, 1);

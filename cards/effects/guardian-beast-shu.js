@@ -140,9 +140,8 @@ module.exports = {
         });
         if (!ok) break;
       } else {
-        const deckIdx = ps.mainDeck.indexOf(targetName);
-        if (deckIdx < 0) break;
-        ps.mainDeck.splice(deckIdx, 1);
+        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', targetName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_deckIdx) break;
         ps.hand.push(targetName);
       }
       pulled++;

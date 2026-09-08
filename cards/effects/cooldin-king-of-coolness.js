@@ -1,4 +1,5 @@
 // ═══════════════════════════════════════════
+const { isTutorableArea } = require('./_area-shared');
 //  CARD EFFECT: "Cooldin, King of Coolness"
 //  Hero — Activated effect, once per turn.
 //
@@ -43,17 +44,11 @@ function collectAreasFromSource(names, cardDB, source, engine, pi) {
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
     const cd = cardDB[name];
-    if (!cd) continue;
-    // Areas come in BOTH subtypes: Area Spells AND Area Attacks
-    // (e.g. Blood Rock). Cooldin tutors either.
-    if (cd.cardType !== 'Spell' && cd.cardType !== 'Attack') continue;
-    if ((cd.subtype || '').toLowerCase() !== 'area') continue;
-    // Effective level (honours Cataclysm's `reduceCardLevel` for Area
-    // Spells in play, Mana Absorbing Crystal +1 in hand, etc.).
-    const lvl = engine?.effectiveCardLevel
-      ? engine.effectiveCardLevel(cd, pi)
-      : (cd.level || 0);
-    if (lvl > 3) continue;
+    // Eignung kommt aus `_area-shared.js` — dieselbe Regel wie bei
+    // Planet in a Bottle und Reality Crack. Cooldin hatte sie als
+    // Erster fast richtig (Spell + Attack), aber ohne Creature und ohne
+    // den Level-Riegel.
+    if (!isTutorableArea(cd, engine, pi)) continue;
     out.push({ name, source, sourceIdx: i });
   }
   return out;

@@ -284,7 +284,10 @@ module.exports = {
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'queen_left_deck' });
         return { cancelled: true };
       }
-      ps.mainDeck.splice(deckIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Hive\'s Crown' }))) {   // v820: Stapel-Schicht
+        engine.log('hives_crown_fizzle', { player: ps.username, reason: 'deck_locked' });
+        return { cancelled: true };
+      }
       // Reveal to opponent — standard deck-search reveal etiquette.
       const oi = pi === 0 ? 1 : 0;
       engine._broadcastEvent('card_reveal', { cardName: QUEEN_NAME });

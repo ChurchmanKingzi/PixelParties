@@ -1864,6 +1864,178 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
         + `, ${descGames} Spiele mit ≥1 Abstieg (${descTotal} gesamt)`);
     }
   }
+  // ── Zieh-Entscheidungs-Kanal (v816, Als Auftrag 6.9.) ──
+  //
+  // „You may draw N" je Karte: Ziehen ist meist gut und wird schlecht,
+  // wenn man sich ausmillt (Al 6.9.). Gleiche Bauart wie die anderen
+  // fired/held-Kanaele: je Karte, je Tag, Praevalenzfilter, Welch-t,
+  // Schrumpfung. Die Mill-Lage steckt in den Tags (dr:deck:*, dr:mill-risk).
+  const drawDecisionRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const DR_T_MIN = 2.5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.drawDecisions)) continue;
+      for (const d of g.drawDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        const y = ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome;
+        decs.push({ c: d.c, tags: d.tags || [], fired: !!d.fired, y });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        const inT = ds.filter(d => d.tags.includes(g));
+        const prevalence = inT.length / ds.length;
+        if (prevalence > 0.95 || prevalence < 0.05) continue;
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const mean = a => a.reduce((s, d) => s + d.y, 0) / a.length;
+        const vari = (a, m) => a.reduce((s, d) => s + (d.y - m) ** 2, 0) / Math.max(1, a.length - 1);
+        const mF = mean(fired), mH = mean(held);
+        const delta = mF - mH;
+        const se = Math.sqrt(vari(fired, mF) / fired.length + vari(held, mH) / held.length) || 1e-9;
+        if (Math.abs(delta / se) < DR_T_MIN) continue;
+        const nArm = Math.min(fired.length, held.length);
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120 * (nArm / (nArm + 60)))) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) drawDecisionRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      const sent = decs.filter(d => d.fired).length;
+      console.log(`Zieh-Entscheidungen: ${decs.length} Entscheidungen, ${sent} gezogen, ${Object.keys(drawDecisionRules).length} Karten mit Regeln`);
+      for (const [c, rs] of Object.entries(drawDecisionRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+  }
+  // ── Synergie-Kanal (v818, Als Auftrag 7.9.) ──
+  //
+  // „Kreaturen, die zusammen sein wollen": je Hand-Kreatur und eigenem
+  // Zug — fired = beschworen, Tags = Partner auf dem Brett (syn:<Name>,
+  // Queen meldet ihre Aliasse). Dieselbe Bauart wie der Zieh-Kanal;
+  // gelernt wird, welche Partner den Einsatz einer Karte lohnender
+  // machen. Nur syn:-Tags werden zu Regeln.
+  const synergyRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const SY_T_MIN = 2.5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.synergyDecisions)) continue;
+      for (const d of g.synergyDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        const y = ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome;
+        decs.push({ c: d.c, tags: (d.tags || []).filter(x => typeof x === 'string' && x.startsWith('syn:')), fired: !!d.fired, y });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        if (g === `syn:${c.replace(/\s*\[(B|W)\]$/, '')}`) continue;   // Kopie ihrer selbst: kein Partner
+        const inT = ds.filter(d => d.tags.includes(g));
+        const prevalence = inT.length / ds.length;
+        if (prevalence > 0.95 || prevalence < 0.05) continue;
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const mean = a => a.reduce((s, d) => s + d.y, 0) / a.length;
+        const vari = (a, m) => a.reduce((s, d) => s + (d.y - m) ** 2, 0) / Math.max(1, a.length - 1);
+        const mF = mean(fired), mH = mean(held);
+        const delta = mF - mH;
+        const se = Math.sqrt(vari(fired, mF) / fired.length + vari(held, mH) / held.length) || 1e-9;
+        if (Math.abs(delta / se) < SY_T_MIN) continue;
+        const nArm = Math.min(fired.length, held.length);
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120 * (nArm / (nArm + 60)))) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) synergyRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      const sent = decs.filter(d => d.fired).length;
+      console.log(`Synergie: ${decs.length} Hand-Kreatur-Zuege, ${sent} beschworen, ${Object.keys(synergyRules).length} Karten mit Partner-Regeln`);
+      for (const [c, rs] of Object.entries(synergyRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+  }
+  // ── Ability-Kosten-Kanal (v801, Als Auftrag 6.9.) ──
+  //
+  // „Weapon Absorption" und jede kuenftige Karte, die mit ABILITIES
+  // bezahlt: welche Ability ist entbehrlich, und wann lohnt es sich,
+  // wie viele zu zahlen? Je Schleifenschritt hat jeder Kandidat eine
+  // Zeile (fired = geschickt, sonst behalten). Gleiche Bauart wie der
+  // Descend-Kanal: je Karte, je Tag fired-vs-held, Praevalenzfilter,
+  // Welch-t-Gate und Schrumpfung. KEINE Label-Formung — der Nutzen des
+  // Zahlens muss sich ueber das normale Ergebnis-Label zeigen.
+  const abilityCostRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const AC_T_MIN = 2.5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.abilityCostDecisions)) continue;
+      for (const d of g.abilityCostDecisions) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        const y = ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome;
+        decs.push({ c: d.c, tags: d.tags || [], fired: !!d.fired, y, item: d.item });
+      }
+    }
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tags = new Set();
+      for (const d of ds) for (const g of d.tags) tags.add(g);
+      const rules = Object.create(null);
+      for (const g of tags) {
+        const inT = ds.filter(d => d.tags.includes(g));
+        const prevalence = inT.length / ds.length;
+        if (prevalence > 0.95 || prevalence < 0.05) continue;
+        const fired = inT.filter(d => d.fired);
+        const held = inT.filter(d => !d.fired);
+        if (fired.length < MIN_ARM || held.length < MIN_ARM) continue;
+        const mean = a => a.reduce((s, d) => s + d.y, 0) / a.length;
+        const vari = (a, m) => a.reduce((s, d) => s + (d.y - m) ** 2, 0) / Math.max(1, a.length - 1);
+        const mF = mean(fired), mH = mean(held);
+        const delta = mF - mH;
+        const se = Math.sqrt(vari(fired, mF) / fired.length + vari(held, mH) / held.length) || 1e-9;
+        if (Math.abs(delta / se) < AC_T_MIN) continue;
+        const nArm = Math.min(fired.length, held.length);
+        const pts = Math.round(Math.max(-20, Math.min(20, delta * 120 * (nArm / (nArm + 60)))) * 10) / 10;
+        if (Math.abs(pts) < 2) continue;
+        rules[g] = pts;
+      }
+      if (Object.keys(rules).length > 0) abilityCostRules[c] = rules;
+    }
+    if (decs.length > 0) {
+      const sent = decs.filter(d => d.fired).length;
+      const byItem = Object.create(null);
+      for (const d of decs) if (d.fired && d.item) byItem[d.item] = (byItem[d.item] || 0) + 1;
+      console.log(`Ability-Kosten: ${decs.length} Kandidaten-Zeilen, ${sent} geschickt, ${Object.keys(abilityCostRules).length} Karten mit Regeln`);
+      const top = Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 6)
+        .map(([k, v]) => `${k} ${v}`).join(', ');
+      if (top) console.log(`  am haeufigsten geschickt: ${top}`);
+      for (const [c, rs] of Object.entries(abilityCostRules)) {
+        console.log(`  ${c}: ${Object.entries(rs).map(([g, v]) => `${g} ${v > 0 ? '+' : ''}${v}`).join(', ')}`);
+      }
+    }
+  }
   // ── Descend-Kanal (Als Auftrag 6.8.) ──
   //
   // "Jetzt den Stapel abbauen oder noch weiterstapeln?" Gleiche Bauart
@@ -2572,7 +2744,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
   }
 
-  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, abilityCostRules, drawDecisionRules, synergyRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
@@ -3263,6 +3435,12 @@ function main() {
       ? advModel.counterSpendRules : undefined,
     descendRules: (advModel && advModel.descendRules && Object.keys(advModel.descendRules).length > 0)
       ? advModel.descendRules : undefined,
+    abilityCostRules: (advModel && advModel.abilityCostRules && Object.keys(advModel.abilityCostRules).length > 0)
+      ? advModel.abilityCostRules : undefined,
+    drawDecisionRules: (advModel && advModel.drawDecisionRules && Object.keys(advModel.drawDecisionRules).length > 0)
+      ? advModel.drawDecisionRules : undefined,
+    synergyRules: (advModel && advModel.synergyRules && Object.keys(advModel.synergyRules).length > 0)
+      ? advModel.synergyRules : undefined,
     // Gelernte Support-Zonen-Ökonomie (Placement-Kanal).
     placementRules: (advModel && advModel.placementRules && Object.keys(advModel.placementRules).length > 0)
       ? advModel.placementRules : undefined,

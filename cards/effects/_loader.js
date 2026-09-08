@@ -78,7 +78,85 @@ const NON_DRAW_PATTERNS = [
   'actionRevive',
 ];
 
+// ── „NUR Stapel-Bewegung" (v826, Al 8.9., Praezedenz `blockedByHandLock`) ──
+// Karten, deren EINZIGER Effekt eine Entnahme aus Deck/Ablage ist
+// (Magnetic Potion: „choose a card from your deck … add it to your
+// hand"), sind unter der Stapel-Ausgangssperre (Knight of Kings [B])
+// gar nicht erst spielbar — statt bezahlt zu werden und dann zu
+// verpuffen. Auto-Erkennung fuer `resolve`-Module (Potions/Artefakte)
+// und reine Handkarten mit `onPlay`; ein manuelles `blockedByPileLock`
+// am Modul gewinnt immer. Ziehen (`actionDrawCards`) zaehlt NICHT als
+// Stapel-Bewegung — Draws bleiben unter der Sperre erlaubt.
+const PILE_PATTERNS = [
+  'takeFromPile', 'takeFromPileSync', 'takeTop',
+  'addFromPileToHand', 'actionAddCardFromDeckToHand', 'addCardFromDiscardToHand',
+  'deleteFromPile', 'actionMillCards', 'millCards', 'actionRecycleCards',
+  "summonFromPile(", "placeFromPile(",
+];
+const NON_PILE_PATTERNS = [
+  'actionDrawCards', 'drawCards', 'actionDrawFromPotionDeck',   // echte Draws bleiben erlaubt
+  ...NON_DRAW_PATTERNS.filter(p => !['actionMillCards', 'millCards', 'actionRevive'].includes(p)),
+  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'actionDealDamage',
+  'actionGainGold', 'gainGold', 'actionSpendGold', 'actionSetHp',
+  'applyCreatureStatus', 'actionNegateCreature', 'grantEffectImmunity', 'grantCreatureEffectImmunity',
+  'attachToHero', 'summonCreatureWithHooks', 'placeArea', 'equipEffect',
+  'addBuff', 'applyBuff', 'actionChangeLevel', 'actionChangeAtk', 'modifyAtk',
+  'actionRevealHand', 'actionDiscardHandCard', 'actionShuffleHandIntoDeck',
+  'returnToPile(',   // Rueckgabe = keine Entnahme
+];
+function detectPileOnly(sourceText) {
+  sourceText = stripComments(sourceText);
+  if (!sourceText) return false;
+  if (!PILE_PATTERNS.some(p => sourceText.includes(p))) return false;
+  if (NON_PILE_PATTERNS.some(p => sourceText.includes(p))) return false;
+  // Geloescht-Stapel ist nicht gesperrt; Zugriff auf den GEGNER-Stapel
+  // ist eigene Bewegung des Wirkenden und ebenfalls frei.
+  if (/'deleted'|deletedPile/.test(sourceText)) return false;
+  if (/\b(oppPs|ops|oppIdx|opponentIdx|oppPlayer)\b|1 - pi\b|players\[1 - /.test(sourceText)) return false;
+  // summon/placeFromPile aus der HAND ist keine Stapel-Bewegung
+  if (/FromPile\(\s*[\w.]+,\s*'hand'/.test(sourceText)
+      && !/FromPile\(\s*[\w.]+,\s*'(deck|discard|deleted)'/.test(sourceText)
+      && !/takeFromPile|addFromPileToHand|actionAddCardFromDeckToHand|addCardFromDiscardToHand|deleteFromPile|takeTop|actionMillCards|actionRecycleCards/.test(sourceText)) return false;
+  return true;
+}
+
+// ── „NUR Beschwoerung/Platzierung" (v834, Al 8.9., Praezedenz blockedByHandLock) ──
+// Karten, deren EINZIGER Effekt eine Beschwoerung oder Platzierung ist
+// (Pawn Chain, Monster in a Bottle …), sind unter `ps.summonLocked`
+// nicht aktivierbar — auch nicht in Reaktionsfenstern.
+const SUMMON_PATTERNS = [
+  'summonFromPile', 'placeFromPile', 'summonCreatureWithHooks', 'actionPlaceCreature',
+  'placeFromHandOrDeck', 'summonFromHandOrDeck', 'safePlaceInSupport',
+];
+const NON_SUMMON_PATTERNS = [
+  'actionDrawCards', 'drawCards', 'actionDrawFromPotionDeck',
+  'addFromPileToHand', 'actionAddCardFromDeckToHand', 'addCardFromDiscardToHand', 'deleteFromPile',
+  'actionMillCards', 'millCards', 'actionRecycleCards', 'takeTop',
+  ...NON_DRAW_PATTERNS.filter(p => !['placeCreature', 'actionPlaceCreature', 'actionMillCards', 'millCards', 'actionRevive'].includes(p)),
+  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'actionDealDamage',
+  'actionGainGold', 'gainGold', 'actionSpendGold', 'actionSetHp',
+  'applyCreatureStatus', 'actionNegateCreature', 'grantEffectImmunity', 'grantCreatureEffectImmunity',
+  'attachToHero', 'placeArea', 'equipEffect', 'addBuff', 'applyBuff', 'actionChangeLevel', 'actionChangeAtk', 'modifyAtk',
+  'actionRevealHand', 'actionDiscardHandCard', 'actionShuffleHandIntoDeck', 'lockSummons',
+];
+/** Kommentare raus — die Muster-Erkennung soll nur CODE lesen (v834). */
+function stripComments(src) {
+  return String(src || '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/([^:'"`])\/\/.*$/gm, '$1');
+}
+
+function detectSummonOnly(sourceText) {
+  sourceText = stripComments(sourceText);
+  if (!sourceText) return false;
+  if (!SUMMON_PATTERNS.some(p => sourceText.includes(p))) return false;
+  if (NON_SUMMON_PATTERNS.some(p => sourceText.includes(p))) return false;
+  return true;
+}
+
 function detectDrawOnly(sourceText) {
+  sourceText = stripComments(sourceText);
   if (!sourceText) return false;
   const hasDraw = DRAW_PATTERNS.some(p => sourceText.includes(p));
   if (!hasDraw) return false;
@@ -148,6 +226,9 @@ function loadCardEffect(cardName) {
       const PASSIVE_GATE_FNS = [
         'canPlayCard',
         'canBypassLevelReqForCard',
+        // Heldenseitige Gratis-Aktion (v601, Baaliel) — Zwilling des
+        // Level-Bypasses, wird von `cardHasInherentAction` gelesen.
+        'grantsInherentActionForCard',
         'canBypassFreeZoneRequirement',
         'canBypassLevelReq',
         'canSummon',
@@ -204,8 +285,16 @@ function loadCardEffect(cardName) {
         // deren ganzer Inhalt dieser Vertrag ist, faellt sonst aus der
         // Ladung. (Copy Device traegt zwar auch `resolve`, aber die
         // Liste soll den Vertrag trotzdem kennen.)
-        || typeof mod.onIdentityExpire === 'function';
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+        || typeof mod.onIdentityExpire === 'function'
+        // v668: Aufstiegs- und Umleitungsvertraege ohne Heldeneffekt —
+        // Monia Bot ist ein reiner `heroRedirect`-Held mit
+        // `ascensionCondition`; bisher trug jede Ascended-Karte nebenbei
+        // `heroEffect` und fiel deshalb nie durch dieses Sieb.
+        || typeof mod.ascensionCondition === 'function'
+        || typeof mod.onAscensionBonus === 'function'
+        || typeof mod.refreshAscensionReadiness === 'function'
+        || mod.heroRedirect === true;
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !mod.abilitiesInSupportZones && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }
@@ -225,6 +314,20 @@ function loadCardEffect(cardName) {
           const src = fs.readFileSync(filePath, 'utf8');
           if (detectDrawOnly(src)) mod.blockedByHandLock = true;
         } catch { /* ignore — keep mod as loaded */ }
+      }
+      // v826: „nur Stapel-Bewegung" / v834: „nur Beschwoerung" — resolve-
+      // Module UND reine Handkarten (kein activeIn ausser 'hand'; onPlay
+      // ODER Reaktionsfenster).
+      if (mod) {
+        const handOnly = Array.isArray(mod.activeIn) && mod.activeIn.every(z => z === 'hand');
+        if (typeof mod.resolve === 'function' || handOnly) {
+          let src = null;
+          try { src = fs.readFileSync(filePath, 'utf8'); } catch { /* ignore */ }
+          if (src) {
+            if (!Object.prototype.hasOwnProperty.call(mod, 'blockedByPileLock') && detectPileOnly(src)) mod.blockedByPileLock = true;
+            if (!Object.prototype.hasOwnProperty.call(mod, 'blockedBySummonLock') && detectSummonOnly(src)) mod.blockedBySummonLock = true;
+          }
+        }
       }
     }
   } catch (err) {

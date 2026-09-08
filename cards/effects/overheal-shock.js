@@ -83,6 +83,9 @@ function countUsableHealSources(engine, pi) {
   return n;
 }
 
+const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const CARD_NAME = 'Overheal Shock';
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
@@ -143,32 +146,23 @@ module.exports = {
   // living, has a free Support Zone, AND isn't already carrying an OHS.
   // Without the OHS-absence check the card would spam-attach redundant
   // copies to the same hero.
-  spellPlayCondition(gs, pi) {
+  attachmentHosts(gs, pi, engine) {
+    // v651: Drop-Ziele beim GEGNER — Helden ohne healReversed / ohne Shock
     const oi = pi === 0 ? 1 : 0;
-    // First-turn protection: the only valid targets are the opponent's
-    // Heroes, but a first-turn-protected opponent can't be attached to — the
-    // card would just fizzle to the discard pile for no effect. Treat it as
-    // unplayable so neither the CPU nor a human wastes it (also grays it out
-    // in hand for humans via getBlockedSpells).
+    if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return [];
+    const ops = gs.players[oi];
+    const heroFilter = (h, hi) => !h.statuses?.healReversed
+      && !(ops?.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));
+    return attachmentHostsFor(gs, pi, engine, { sides: [oi], heroFilter });
+  },
+  spellPlayCondition(gs, pi, engine) {
+    const oi = pi === 0 ? 1 : 0;
     if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return false;
     const ops = gs.players[oi];
-    for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-      const hero = ops.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      // Traegt der Held den Zustand bereits, bringt eine zweite Shock
-      // NICHTS (Boolean). Beide Wege geprueft — Zustand und Karte.
-      if (hero.statuses?.healReversed) continue;
-      const zones = ops.supportZones[hi] || [];
-      // Already has an OHS attached → skip this hero.
-      if (zones.some(slot => (slot || []).includes('Overheal Shock'))) continue;
-      // Needs a free zone to accept the attachment.
-      for (let si = 0; si < 3; si++) {
-        if (((zones[si] || []).length === 0)) return true;
-      }
-    }
-    return false;
+    const heroFilter = (h, hi) => !h.statuses?.healReversed
+      && !(ops?.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));
+    return candidateHosts(gs, pi, engine, { sides: [oi], heroFilter }).length > 0;
   },
-
   inherentAction(gs, pi, heroIdx, engine) {
     const ps = gs.players[pi];
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
@@ -276,82 +270,18 @@ module.exports = {
       const ops = gs.players[oi];
 
       // ── Build targets: opponent heroes + their free support zones ──
-      const targets = [];
-      for (let hi = 0; hi < (ops.heroes || []).length; hi++) {
-        const hero = ops.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        let hasFreeZone = false;
-        for (let si = 0; si < 3; si++) {
-          const slot = (ops.supportZones[hi] || [])[si] || [];
-          if (slot.length === 0) {
-            hasFreeZone = true;
-            targets.push({
-              id: `equip-${oi}-${hi}-${si}`,
-              type: 'equip',
-              owner: oi,
-              heroIdx: hi,
-              slotIdx: si,
-              cardName: '',
-            });
-          }
-        }
-        if (hasFreeZone) {
-          targets.push({
-            id: `hero-${oi}-${hi}`,
-            type: 'hero',
-            owner: oi,
-            heroIdx: hi,
-            cardName: hero.name,
-          });
-        }
-      }
-
-      if (targets.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // ── Select target ──
-      let targetHeroIdx, targetSlot;
-
-      const heroTargets = targets.filter(t => t.type === 'hero');
-      const zoneTargets = targets.filter(t => t.type === 'equip');
-      if (heroTargets.length === 1 && zoneTargets.length === 1) {
-        targetHeroIdx = heroTargets[0].heroIdx;
-        targetSlot = zoneTargets[0].slotIdx;
-      } else {
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: 'Overheal Shock',
-          description: 'Attach to an opponent\'s Hero. Healing on that Hero becomes damage.',
-          confirmLabel: '⚡ Attach!',
-          confirmClass: 'btn-danger',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-        });
-
-        if (!picked || picked.length === 0) {
-          gs._spellCancelled = true;
-          return;
-        }
-
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-
-        if (target.type === 'equip') {
-          targetHeroIdx = target.heroIdx;
-          targetSlot = target.slotIdx;
-        } else {
-          targetHeroIdx = target.heroIdx;
-          for (let si = 0; si < 3; si++) {
-            if (((ops.supportZones[targetHeroIdx] || [])[si] || []).length === 0) {
-              targetSlot = si;
-              break;
-            }
-          }
-        }
-      }
-
+      // v650: Wirt ueber den geteilten Anlege-Vorgang — GEGNERseite; Helden,
+      // die schon healReversed tragen oder ein Overheal Shock haben, sind
+      // keine Ziele (wie bisher).
+      const heroFilter = (h, hi) => !h.statuses?.healReversed
+        && !(ops.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));
+      const host = await pickAttachmentHost(ctx, CARD_NAME, {
+        sides: [oi], heroFilter,
+        description: 'Attach Overheal Shock to a Hero your opponent controls. Healing on that Hero becomes damage.',
+        confirmLabel: '⚡ Attach!', confirmClass: 'btn-danger',
+      });
+      if (!host) return;
+      const targetHeroIdx = host.heroIdx, targetSlot = host.slotIdx;
       const targetHero = ops.heroes[targetHeroIdx];
       if (!targetHero?.name || targetSlot === undefined) return;
 
@@ -368,7 +298,7 @@ module.exports = {
       // `targetHero.statuses.healReversed = …` assignment below
       // bypasses `addHeroStatus` (and therefore the engine's
       // centralized magic_immune gate), so mirror it here.
-      if (engine._isHeroSpellProtected(targetHero, 'Overheal Shock')) {
+      if (engine._isHeroSpellProtected(targetHero, CARD_NAME)) {
         engine.log('equip_blocked', { card: 'Overheal Shock', target: targetHero.name, reason: 'magic_immune' });
         engine._playAntiMagicBlockedAnim(targetHero);
         return;
@@ -394,20 +324,10 @@ module.exports = {
       }
 
       // ── Place card in opponent's Support Zone ──
-      if (!ops.supportZones[targetHeroIdx]) ops.supportZones[targetHeroIdx] = [[], [], []];
-      if (!ops.supportZones[targetHeroIdx][targetSlot]) ops.supportZones[targetHeroIdx][targetSlot] = [];
-      ops.supportZones[targetHeroIdx][targetSlot].push('Overheal Shock');
-
-      // Re-track the card instance in the opponent's support zone
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === 'Overheal Shock' && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard('Overheal Shock', oi, 'support', targetHeroIdx, targetSlot);
-
-      // Tell the server NOT to discard this card — it stays on the board
-      gs._spellPlacedOnBoard = true;
+      // v650: Platzierung ueber den geteilten Vorgang (Anti-Magic wurde oben
+      // schon geprueft, deshalb hier uebersprungen).
+      const inst = await placeAttachment(ctx, CARD_NAME, { owner: oi, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipMagicImmune: true, skipEnterHook: true });
+      if (!inst) return;
 
       // Set healReversed status on the target hero
       if (!targetHero.statuses) targetHero.statuses = {};

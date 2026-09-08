@@ -83,7 +83,8 @@ module.exports = {
     if (!confirmed) return false;
 
     // Collect the top 5 cards
-    const cards = ps.mainDeck.splice(0, 5);
+    const cards = await engine.takeTop(ps, 5, { source: 'Trade' });   // v820: Stapel-Schicht
+    if (cards.length === 0) return false;
 
     engine.log('trade', { player: ps.username, cards, goldGain, level });
 

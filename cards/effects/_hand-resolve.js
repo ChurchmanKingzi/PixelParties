@@ -38,11 +38,24 @@
  * @param {number} handIndex  Der Slot, den der Spieler angeklickt hat
  * @returns {{name: string, nth: number}} der gesetzte Merker
  */
-function beginHandResolve(ps, cardName, handIndex) {
-  const hand = ps?.hand || [];
+/**
+ * ★ 28.8.: Die Liste, aus der aufgeloest wird — Hand ODER Crestinas
+ * Vorrat. Der Merker `_resolvingCard` traegt die Herkunft mit, damit
+ * `getResolvingHandIndex` und `commitHandResolve` spaeter in
+ * DERSELBEN Liste suchen wie `beginHandResolve`. Ohne das haette eine
+ * aus dem Vorrat gespielte Karte in der Hand gesucht, dort nichts
+ * gefunden und waere nie entnommen worden — sie laege nach dem Spielen
+ * doppelt.
+ */
+function quelleVon(ps, fromCreation) {
+  return (fromCreation ? ps?.creationZone : ps?.hand) || [];
+}
+
+function beginHandResolve(ps, cardName, handIndex, fromCreation) {
+  const hand = quelleVon(ps, fromCreation);
   // „Die wievielte Kopie von `cardName` ist der geklickte Slot?"
   const nth = hand.slice(0, handIndex + 1).filter(c => c === cardName).length;
-  ps._resolvingCard = { name: cardName, nth };
+  ps._resolvingCard = { name: cardName, nth, fromCreation: !!fromCreation };
   return ps._resolvingCard;
 }
 
@@ -52,8 +65,8 @@ function beginHandResolve(ps, cardName, handIndex) {
  */
 function getResolvingHandIndex(ps) {
   if (!ps?._resolvingCard) return -1;
-  const { name, nth } = ps._resolvingCard;
-  const hand = ps.hand || [];
+  const { name, nth, fromCreation } = ps._resolvingCard;
+  const hand = quelleVon(ps, fromCreation);
   let count = 0;
   let letzte = -1;
   for (let i = 0; i < hand.length; i++) {
@@ -95,9 +108,11 @@ function getResolvingHandIndex(ps) {
 function commitHandResolve(ps, opts = {}) {
   if (!ps?._resolvingCard) return -1;
   const idx = getResolvingHandIndex(ps);
+  const ausVorrat = ps._resolvingCard.fromCreation;
   ps._resolvingCard = null;
   if (idx < 0) return -1;
-  ps.hand.splice(idx, 1);
+  // ★ Aus DERSELBEN Liste entnehmen, in der gesucht wurde.
+  quelleVon(ps, ausVorrat).splice(idx, 1);
   if (typeof opts.onRemoved === 'function') opts.onRemoved(idx);
   return idx;
 }
@@ -118,9 +133,35 @@ function abortHandResolve(ps) {
  * schon. Als Funktion uebergeben, weil `actionPromptForceDiscard` die
  * Liste nach JEDEM Zug neu auswertet (die Indizes rutschen).
  */
+/**
+ * ★ 28.8., Als Befund: „ich darf die gerade benutzte, zum Abwerfen
+ * bestimmte Karte nochmal abwerfen — die mechanisch schon gar nicht
+ * mehr da ist."
+ *
+ * Spiegelbild zu `eligibleIndicesWithoutResolving`, nur fuer Crestinas
+ * Vorrat. Die aufgeschobene Entnahme laesst die gespielte Karte bis
+ * zum Ende der Aufloesung liegen; jede Auswahl AUS dem Vorrat muss sie
+ * deshalb ausblenden. Ohne das kann derselbe Kartenkoerper zweimal
+ * bezahlt werden.
+ *
+ * @returns {number[]} waehlbare Vorrats-Indizes
+ */
+function eligibleCreationIndices(ps) {
+  const gesperrt = ps?._resolvingCard?.fromCreation ? getResolvingHandIndex(ps) : -1;
+  const raus = [];
+  for (let i = 0; i < (ps?.creationZone || []).length; i++) {
+    if (i !== gesperrt) raus.push(i);
+  }
+  return raus;
+}
+
 function eligibleIndicesWithoutResolving(ps) {
   return () => {
-    const gesperrt = getResolvingHandIndex(ps);
+    // Loest gerade eine Karte AUS DEM VORRAT auf, ist in der Hand
+    // nichts zu sperren — ein Handabwurf kann sie gar nicht treffen
+    // (Als Ruling: Vorratskarten sind keine legalen Ziele fuer
+    // Handzugriffs-Effekte).
+    const gesperrt = ps?._resolvingCard?.fromCreation ? -1 : getResolvingHandIndex(ps);
     const alle = [];
     for (let i = 0; i < (ps?.hand || []).length; i++) {
       if (i !== gesperrt) alle.push(i);
@@ -130,6 +171,7 @@ function eligibleIndicesWithoutResolving(ps) {
 }
 
 module.exports = {
+  eligibleCreationIndices,
   beginHandResolve,
   getResolvingHandIndex,
   commitHandResolve,

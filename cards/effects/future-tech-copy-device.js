@@ -165,11 +165,11 @@ function kopierKosten(engine, pi, name) {
 
   const ps = engine.gs.players[pi];
   const idx = (ps?.discardPile || []).lastIndexOf(name);
-  if (idx >= 0) ps.discardPile.splice(idx, 1);      // wie nach dem Umbuchen
+  const _probe = idx >= 0 ? engine.takeFromPileSync(ps, 'discard', idx, { source: 'Copy Device' }) : null;   // v820: Stapel-Schicht (Kostenprobe, wie nach dem Umbuchen)
   try {
     kosten -= (sk.selfCostReduction(engine.gs, pi, cd, engine) || 0);
   } catch { /* eine defekte Rabattrechnung darf die Karte nicht sperren */ } finally {
-    if (idx >= 0) ps.discardPile.splice(idx, 0, name);
+    if (_probe) engine.returnToPile(ps, 'discard', name, idx);   // v820: Stapel-Schicht
   }
   return Math.max(0, kosten);
 }
@@ -453,7 +453,7 @@ module.exports = {
       owner: pi, cardName: gewaehlt, from: 'discard', to: 'deck',
     });
     await engine._delay(FLUG_MS);
-    ps.discardPile.splice(idx, 1);
+    if (!(await engine.takeFromPile(ps, 'discard', idx, { source: 'Copy Device' }))) return;   // v820: Stapel-Schicht
     ps.mainDeck.push(gewaehlt);
     engine.shuffleDeck(pi, 'main');               // schickt die Misch-Animation mit
 

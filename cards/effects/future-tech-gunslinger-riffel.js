@@ -24,6 +24,12 @@
 //  Bezieht sich auf DIESEN Helden, nicht auf das ganze Feld: dieselbe
 //  Karte darf an einem anderen Helden hängen.
 //
+//  ── Aufstieg (v661) ──
+//  Zu „Riffel, Master of the Ultimate Gun" mit Energy Core + Future
+//  Tech Gun. Die Bedingung steht in `_riffel-shared.js`; hier wird nur
+//  die Bereitschaft ueber die eigenen Support-Zone-Hooks nachgefuehrt
+//  (Fiona-Muster — die Equip-Skripte bleiben unberuehrt).
+//
 //  ── Rückgabevertrag ──
 //  [CARD_API, Als Befund 17.8.] Jeder Pfad, der nichts bewirkt, gibt
 //  `false` zurück — sonst stempelt die Engine das Einmal-pro-Zug
@@ -33,6 +39,7 @@
 
 const { hasCardType } = require('./_hooks');
 const { waehleAusNamen } = require('./_future-tech-shared');
+const { ASCENSION_ITEMS, hasEquipped, checkRiffelAscension } = require('./_riffel-shared');
 
 const CARD_NAME = 'Future Tech Gunslinger Riffel';
 
@@ -77,7 +84,43 @@ function kandidaten(gs, pi, heroIdx, engine) {
 }
 
 module.exports = {
+  activeIn: ['hero'],
   heroEffect: true,
+
+  // Beide Teile gehoeren zur Aufstiegsbedingung — die CPU bewegt sie
+  // nie vom nicht-aufgestiegenen Traeger weg (Arthor-Vertrag).
+  ascensionItems: ASCENSION_ITEMS,
+  cheatAscensionBlocked: true,
+  ascensionNeedsCard(cardName, _cardData, engine, pi, hi) {
+    const hero = engine.gs.players[pi]?.heroes?.[hi];
+    if (!hero || hero.name !== CARD_NAME || hero.ascensionReady) return false;
+    if (!ASCENSION_ITEMS.includes(cardName)) return false;
+    return !hasEquipped(engine, pi, hi, cardName);
+  },
+  ascensionProgress(engine, pi, hi) {
+    let n = 0;
+    for (const name of ASCENSION_ITEMS) if (hasEquipped(engine, pi, hi, name)) n++;
+    return n / ASCENSION_ITEMS.length;
+  },
+
+  hooks: {
+    onGameStart: (ctx) => {
+      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+    },
+    onTurnStart: (ctx) => {
+      checkRiffelAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
+    },
+    onCardEnterZone: (ctx) => {
+      if (ctx.toZone !== 'support' || ctx.toHeroIdx !== ctx.cardHeroIdx) return;
+      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+    },
+    onCardLeaveZone: (ctx) => {
+      if (ctx.fromZone !== 'support') return;
+      if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      // `ctx.card` ist der Lauscher, die gehende Karte `ctx.leavingCard`.
+      checkRiffelAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
+    },
+  },
 
   async onHeroEffect(ctx) {
     const engine = ctx._engine;
@@ -112,7 +155,7 @@ module.exports = {
     if (slots.length === 0) return false;
     const slot = slots[0];
 
-    ps.mainDeck.splice(deckIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
     ps.supportZones[heroIdx][slot] = [name];
     const inst = engine._trackCard(name, pi, 'support', heroIdx, slot);
 

@@ -18,7 +18,7 @@
 //    real triggering effect to negate and a real attacker to Freeze.
 // ═══════════════════════════════════════════
 
-const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
+const { resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource } = require('./_hooks');
 
 const CARD_NAME = 'Frost Rune';
 
@@ -40,6 +40,9 @@ module.exports = {
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
     if (!sourceInfo || sourceInfo.owner == null || sourceInfo.owner < 0) return false;
+    // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
+    // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
 
     if (isCreatureSource(engine, sourceInfo)) {
       return !!resolveSourceCreature(engine, sourceInfo);

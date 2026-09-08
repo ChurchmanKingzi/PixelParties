@@ -76,6 +76,8 @@ module.exports = {
       // + deck-search animation + log + hook + opp reveal.
       await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
         source: 'Brilliant Idea',
+        // v734: „a card" — keine Einschraenkung.
+        searchSpec: { label: 'card', filter: null },
         reveal: true,
       });
     },

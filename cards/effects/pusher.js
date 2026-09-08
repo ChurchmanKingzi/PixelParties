@@ -138,13 +138,9 @@ module.exports = {
       while (guard++ < 40) {
         const idx = (oppPs.hand || []).indexOf(name);
         if (idx < 0) break;
-        engine._broadcastEvent('play_pile_transfer', {
-          owner: oppIdx, cardName: name,
-          from: 'hand', to: 'discard', fromHandIdx: idx,
-        });
+        // v696: Flug und Takt (0,5 s je Karte) kommen aus dem Helfer.
         await engine.actionDiscardHandCard(oppIdx, name, idx, { source: CARD_NAME });
         sent++;
-        if ((oppPs.hand || []).indexOf(name) >= 0) await engine._delay(160);
       }
 
       // ── Deck copies → discard (splice all + one batched
@@ -152,7 +148,8 @@ module.exports = {
       //    instances — soul-shard-ren pattern). ──
       const deckHits = [];
       for (let i = (oppPs.mainDeck || []).length - 1; i >= 0; i--) {
-        if (oppPs.mainDeck[i] === name) { oppPs.mainDeck.splice(i, 1); deckHits.push(name); }
+        if (oppPs.mainDeck[i] !== name) continue;
+        if (await engine.takeFromPile(oppPs, 'deck', i, { source: CARD_NAME, sourceOwner: pi })) deckHits.push(name);   // v820: Stapel-Schicht
       }
       if (deckHits.length > 0) {
         for (const n of deckHits) oppPs.discardPile.push(n);

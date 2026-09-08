@@ -179,9 +179,8 @@ module.exports = {
         if (!ps._permanentlyRevealedHandIndices) ps._permanentlyRevealedHandIndices = {};
 
         for (const name of chosen) {
-          const deckIdx = ops.mainDeck.indexOf(name);
-          if (deckIdx < 0) continue;
-          ops.mainDeck.splice(deckIdx, 1);
+          const _taken_deckIdx = await engine.takeFromPile(ops, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
+          if (!_taken_deckIdx) continue;
           ps.hand.push(name);
           const newHandIdx = ps.hand.length - 1;
 

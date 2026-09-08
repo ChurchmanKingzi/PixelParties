@@ -64,38 +64,27 @@ module.exports = makeCrusaderArtifact({
     // Alle Abilities dieses Helden — nicht nur die auf Stufe 1. Der
     // Text sagt „send ALL Abilities attached to that Hero".
     //
-    // Eine Engine-Primitive dafuer gibt es nicht; das Muster stammt aus
-    // `ragnarock.js`: Zone leeren, Namen in den Ablagestapel, dazu das
-    // `ability_zone_to_discard`-Ereignis fuer den Flug. WICHTIG: eine
-    // Ability der Stufe N liegt als N Karten IM SELBEN Slot
-    // (`level: slot.length` in `getAbilityTargets`) — es muss also der
-    // ganze Stapel abgeraeumt werden, nicht nur die oberste Karte.
-    const opferPs = engine.gs.players[opferSeite];
-    const zonen = opferPs?.abilityZones?.[opferHeld] || [];
+    // v800: ueber `discardAbilityTopCopy` (→ `sendBoardCardToDiscard`)
+    // statt der alten Namens-Schleife — so wandert je Kopie die INSTANZ
+    // mit, und Fighting/Toughness nehmen ihre Boni zurueck. Eine Ability
+    // der Stufe N liegt als N Karten im selben Slot; der Stapel wird
+    // Kopie fuer Kopie abgeraeumt, mit Als Takt dazwischen (17.8.: „ein
+    // etwas groesserer Delay zwischen ihnen").
     let abgeworfen = 0;
-    for (let zi = 0; zi < zonen.length; zi++) {
-      const slot = zonen[zi];
-      if (!slot?.length) continue;
-      const anzahl = slot.length;
-      const name = slot[0];
-      slot.length = 0;
-      for (let k = 0; k < anzahl; k++) opferPs.discardPile.push(name);
-      engine._broadcastEvent('ability_zone_to_discard', {
-        owner: opferSeite, heroIdx: opferHeld, zoneSlot: zi, cardName: name,
-      });
-      abgeworfen += anzahl;
-      // Als Vorgabe 17.8.: „ein etwas groesserer Delay zwischen ihnen."
-      // Deshalb `ABILITY_TAKT_MS` statt des normalen Takts — drei
-      // Abilities hintereinander sollen einzeln lesbar bleiben.
+    for (const eintrag of abilities) {
+      if (eintrag.zoneKind !== 'ability') continue;
+      const hoehe = eintrag.level || 1;
+      for (let k = 0; k < hoehe; k++) {
+        if (!(await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi }))) break;
+        abgeworfen++;
+      }
       await takten(engine, ABILITY_TAKT_MS);
     }
     // Karten in SUPPORT-Zonen, die als Ability zaehlen (Cloak of Edge),
-    // liegen nicht in den Ability-Zonen — sie gehen ueber den
-    // Artefakt-Weg. `zoneKind` unterscheidet die beiden Herkuenfte.
-    const { artefaktInDieAblage } = require('./_crusader-shared');
+    // liegen nicht in den Ability-Zonen — sie gehen ueber denselben Weg.
     for (const eintrag of abilities) {
       if (eintrag.zoneKind !== 'support' || !eintrag.cardInstance) continue;
-      if (await artefaktInDieAblage(engine, eintrag.cardInstance)) abgeworfen++;
+      if (await engine.discardAbilityTopCopy(eintrag, { source: CARD_NAME, sourceOwner: pi })) abgeworfen++;
     }
     engine.log('crusader_arm_cannon_strip', {
       player: engine.gs.players[pi]?.username,

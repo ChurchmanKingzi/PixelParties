@@ -183,7 +183,7 @@ module.exports = {
       // otherwise it lands in discard. `deck_search_add` is the
       // canonical reveal animation used by Alex / Training /
       // Kassaran — both players see the picked Creature flip face-up.
-      ps.mainDeck.splice(deckIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       engine._broadcastEvent('deck_search_add', { cardName: revealedName, playerIdx: pi });
 
       // Reveal to opp via the standard `deckSearchReveal` prompt so

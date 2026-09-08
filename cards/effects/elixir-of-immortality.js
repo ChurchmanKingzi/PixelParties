@@ -314,7 +314,10 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  ps.discardPile.splice(discIdx, 1);
+  if (!(await engine.takeFromPile(ps, 'discard', discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
+    engine.log('elixir_fizzle', { reason: 'discard_locked', creature: chosen.name });
+    return;
+  }
 
   if (!ps.supportZones[targetHi]) ps.supportZones[targetHi] = [[], [], []];
   ps.supportZones[targetHi][targetSi] = [chosen.name];
@@ -343,9 +346,18 @@ async function reviveCreature(engine, pi, chosen) {
 async function removeElixir(engine, pi, perm) {
   const ps = engine.gs.players[pi];
   const idx = (ps.permanents || []).findIndex(p => p.id === perm.id);
+  const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'permanent' && c.counters.permId === perm.id);
+  // ★ 28.8., Als Befund: ohne diesen Vorab-Flug verschwindet das
+  // Permanent einfach, statt sichtbar in den Deleted Pile zu fliegen.
+  // Feldform wie im Permanent-Zweig von `actionDestroyCard`:
+  // `fromPermId` ist die INSTANZ-Id, nicht die des Permanents.
+  engine._broadcastEvent('play_pile_transfer', {
+    owner: pi, cardName: 'Elixir of Immortality',
+    from: 'permanent', to: 'deleted',
+    fromPermId: inst ? inst.id : perm.id,
+  });
   if (idx >= 0) ps.permanents.splice(idx, 1);
   ps.deletedPile.push('Elixir of Immortality');
-  const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'permanent' && c.counters.permId === perm.id);
   if (inst) engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
   engine.log('permanent_removed', { card: 'Elixir of Immortality', player: ps.username });
   engine.sync();

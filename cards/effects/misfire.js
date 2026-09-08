@@ -59,6 +59,9 @@ function wirkenderHeld(gs, pi, engine) {
 }
 
 module.exports = {
+  // v826: NICHT "nur Stapel-Bewegung" (Hauptwirkung ist die Negation); die Auto-Erkennung
+  // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
+  blockedByPileLock: false,
   isReaction: true,
   canActivate: () => false,
 
@@ -116,6 +119,8 @@ module.exports = {
 
     await engine.actionAddCardFromDeckToHand(besitzer, name, {
       source: CARD_NAME, reveal: true,
+      // v734: „a copy of THAT Artifact" — namensgebunden, s. Blueprints.
+      searchSpec: { label: `copy of ${name}`, filter: (cd, n) => n === name },
     });
 
     // Nullpreis auf den NAMEN — siehe Kopf. Gilt fuer jede Kopie, die

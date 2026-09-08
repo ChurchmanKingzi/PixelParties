@@ -146,7 +146,7 @@ module.exports = {
       if (!_userHasFreeSupportSlot(ps, heroIdx)) { gs._spellCancelled = true; return; }
 
       // ── Pop from discard and summon onto the user hero ───────────
-      ps.discardPile.splice(dpIdx, 1);
+      if (!(await engine.takeFromPile(ps, 'discard', dpIdx, { source: CARD_NAME }))) { gs._spellCancelled = true; return; }   // v820: Stapel-Schicht
       // Lethe pile-stamp carries over onto the revived instance.
       const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
 

@@ -9,6 +9,32 @@ const CARD_NAME = 'Cannon Tower';
 const DAMAGE    = 150;
 
 module.exports = {
+  /**
+   * ZWEISTUFIGER VERTRAG (v749) — nur Zielwahl, keine Wirkung.
+   *
+   * Gerufen von `engine.prepareCreatureEffectFor`, wenn mehrere
+   * Effekte ECHT gleichzeitig aufloesen sollen (Spirit of the
+   * Forbidden Grimoire): erst waehlen alle ihre Ziele, dann wirken
+   * alle. Der Plan geht als `ctx.plan` an `onCreatureEffect`.
+   *
+   * Regel fuer jede Karte, die das mitmacht: hier NICHTS am
+   * Spielstand aendern — nur fragen und zurueckgeben.
+   */
+  async prepareCreatureEffect(ctx) {
+    const target = await ctx.promptDamageTarget({
+      side: 'any',
+      types: ['hero', 'creature'],
+      damageType: 'creature',
+      baseDamage: DAMAGE,
+      title: CARD_NAME,
+      description: `Deal ${DAMAGE} damage to any target.`,
+      confirmLabel: `🏰 ${DAMAGE} Damage!`,
+      confirmClass: 'btn-danger',
+      cancellable: true,
+    });
+    return target ? { target } : null;
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,
@@ -25,7 +51,10 @@ module.exports = {
     // (cardOwner). Those diverge for a temporarily stolen creature.
     const sourceOwner = ctx.cardHeroOwner;
 
-    const target = await ctx.promptDamageTarget({
+    // v749: Liegt ein vorgezogener Plan an (zweistufiger Vertrag,
+    // s. `prepareCreatureEffect` unten), ist das Ziel bereits gewaehlt
+    // — dann wird hier NICHT mehr gefragt, sondern nur noch gewirkt.
+    const target = ctx.plan?.target || await ctx.promptDamageTarget({
       side: 'any',
       types: ['hero', 'creature'],
       damageType: 'creature',

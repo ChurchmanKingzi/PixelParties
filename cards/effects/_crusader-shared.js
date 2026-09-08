@@ -118,34 +118,13 @@ function darfAufHeld(gs, pi, heroIdx, engine, selbstName) {
  * richtigen Stapel faellt.
  */
 async function artefaktInDieAblage(engine, inst) {
+  // v800: laeuft ueber die Engine-Primitive `sendBoardCardToDiscard` —
+  // derselbe Weg wie `discardAbilityTopCopy` und Weapon Absorption.
+  // Vorher stand die Schleife (Splice, Flug, Leave-Hook, Untracking,
+  // Stapel des Erstbesitzers) hier ein zweites Mal von Hand und liess
+  // Identitaets-Anker und `onBoardSentToDiscard` aus.
   if (!inst || inst.zone !== 'support') return false;
-  const gs = engine.gs;
-  const ownerPs = gs.players[inst.owner];
-  const heroIdx = inst.heroIdx;
-  const slot = inst.zoneSlot;
-  const name = inst.name;
-
-  const zone = ((ownerPs?.supportZones || [])[heroIdx] || [])[slot] || [];
-  const zi = zone.indexOf(name);
-  if (zi >= 0) zone.splice(zi, 1);
-
-  engine._broadcastEvent('play_pile_transfer', {
-    owner: inst.owner, cardName: name,
-    from: 'support', to: 'discard',
-    fromHeroIdx: heroIdx, fromSlotIdx: slot,
-  });
-  await engine.runHooks('onCardLeaveZone', {
-    _onlyCard: inst, card: inst, leavingCard: inst,
-    fromZone: 'support', fromHeroIdx: heroIdx, fromZoneSlot: slot,
-    fromOwner: inst.owner, toZone: 'discard',
-  });
-  engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
-  const ziel = gs.players[inst.originalOwner ?? inst.owner];
-  if (ziel) {
-    if (!ziel.discardPile) ziel.discardPile = [];
-    ziel.discardPile.push(name);
-  }
-  return true;
+  return engine.sendBoardCardToDiscard(inst, { source: inst.name, sourceOwner: inst.owner });
 }
 
 /**
@@ -213,10 +192,8 @@ async function zugEndeKreislauf(ctx, selbstName) {
   // wirklich geklappt hat (der Zustand kann sich waehrend der Abfrage
   // verschoben haben).
   if (gewaehlt.source === 'deck') {
-    const di = (ps.mainDeck || []).indexOf(gewaehlt.name);
-    if (di < 0) return;
-    ps.mainDeck.splice(di, 1);
-    engine.shuffleDeck(pi);
+    const _taken_di = await engine.takeFromPile(ps, 'deck', gewaehlt.name, { source: '_crusader-shared', shuffle: true });   // v820: Stapel-Schicht
+    if (!_taken_di) return;
   } else {
     const hi = (ps.hand || []).indexOf(gewaehlt.name);
     if (hi < 0) return;

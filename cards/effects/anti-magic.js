@@ -42,6 +42,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 
 const CARD_NAME = 'Anti Magic';
 const MAX_LEVEL = 3;
@@ -76,6 +77,7 @@ function highestRemainingLevel(engine, ownerIdx, heroIdx, excludeInstId) {
 }
 
 module.exports = {
+  activeIn: ['hand', 'support'],
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
@@ -85,111 +87,30 @@ module.exports = {
   bypassesMagicImmune: true,
 
   // Need at least 1 Hero (any side) with a free Support Zone.
-  spellPlayCondition(gs) {
-    for (let p = 0; p < 2; p++) {
-      const ps = gs.players[p];
-      for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        const zones = ps.supportZones?.[hi] || [];
-        for (let si = 0; si < 3; si++) {
-          if (((zones[si] || []).length === 0)) return true;
-        }
-      }
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
+      if (ctx.cardZone !== 'hand' || ctx.playedCard?.id !== ctx.card.id) return;
       const engine = ctx._engine;
       const gs = ctx.gameState;
       const pi = ctx.cardOwner;
       const ps = gs.players[pi];
       const casterHeroIdx = ctx.cardHeroIdx;
-
-      // ── Build target list: any living Hero with a free Support slot ──
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        const tps = gs.players[p];
-        for (let hi = 0; hi < (tps?.heroes || []).length; hi++) {
-          const hero = tps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          const zones = tps.supportZones?.[hi] || [];
-          let hasFreeZone = false;
-          for (let si = 0; si < 3; si++) {
-            if (((zones[si] || []).length === 0)) {
-              hasFreeZone = true;
-              targets.push({
-                id: `equip-${p}-${hi}-${si}`,
-                type: 'equip',
-                owner: p, heroIdx: hi, slotIdx: si,
-                cardName: '',
-              });
-            }
-          }
-          if (hasFreeZone) {
-            targets.push({
-              id: `hero-${p}-${hi}`,
-              type: 'hero',
-              owner: p, heroIdx: hi,
-              cardName: hero.name,
-            });
-          }
-        }
-      }
-      if (targets.length === 0) {
-        gs._spellCancelled = true;
-        return;
-      }
-
-      // ── Pick target (auto if only one Hero + one slot) ──
-      let targetOwner, targetHeroIdx, targetSlot;
-      const heroTargets = targets.filter(t => t.type === 'hero');
-      const zoneTargets = targets.filter(t => t.type === 'equip');
-      if (heroTargets.length === 1 && zoneTargets.length === 1) {
-        targetOwner = heroTargets[0].owner;
-        targetHeroIdx = heroTargets[0].heroIdx;
-        targetSlot = zoneTargets[0].slotIdx;
-      } else {
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: CARD_NAME,
-          description: 'Attach Anti Magic to a Hero. That Hero becomes immune to other Spells up to your Support Magic level.',
-          confirmLabel: '🛡️ Attach!',
-          confirmClass: 'btn-info',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-          greenSelect: true,
-        });
-        if (!picked || picked.length === 0) {
-          gs._spellCancelled = true;
-          return;
-        }
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-        targetOwner = target.owner;
-        if (target.type === 'equip') {
-          targetHeroIdx = target.heroIdx;
-          targetSlot = target.slotIdx;
-        } else {
-          targetHeroIdx = target.heroIdx;
-          const tps = gs.players[targetOwner];
-          for (let si = 0; si < 3; si++) {
-            if (((tps.supportZones[targetHeroIdx] || [])[si] || []).length === 0) {
-              targetSlot = si;
-              break;
-            }
-          }
-        }
-      }
-      if (targetSlot === undefined) return;
-
+      // v650: Wirt ueber den geteilten Anlege-Vorgang (beide Seiten).
+      const host = await pickAttachmentHost(ctx, CARD_NAME, {
+        sides: [pi, pi === 0 ? 1 : 0],
+        description: 'Attach Anti Magic to a Hero. That Hero becomes immune to other Spells up to your Support Magic level.',
+        confirmLabel: '🛡️ Attach!', confirmClass: 'btn-info',
+      });
+      if (!host) return;
+      const targetOwner = host.owner, targetHeroIdx = host.heroIdx, targetSlot = host.slotIdx;
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero?.name || targetHero.hp <= 0) return;
-
-      // ── Compute X from caster's Support Magic level ──
       const X = computeLevel(engine, pi, casterHeroIdx);
 
       // ── Detach OTHER Spells of level ≤ X already attached ──
@@ -229,47 +150,15 @@ module.exports = {
       // re-check it's still empty (a same-slot Spell we just destroyed
       // landed in that slot). If not, pick the first remaining free
       // slot on the same hero.
-      let placeSlot = targetSlot;
-      const liveZones = tps.supportZones[targetHeroIdx] || [];
-      if ((liveZones[placeSlot] || []).length !== 0) {
-        let found = -1;
-        for (let si = 0; si < 3; si++) {
-          if (((liveZones[si] || []).length === 0)) { found = si; break; }
-        }
-        if (found < 0) {
-          // Should never happen — detaches just freed slot(s) — bail
-          // cleanly if it does.
-          gs._spellCancelled = true;
-          return;
-        }
-        placeSlot = found;
-      }
-
-      // ── Place Anti Magic in the target's Support Zone ──
-      if (!tps.supportZones[targetHeroIdx]) tps.supportZones[targetHeroIdx] = [[], [], []];
-      if (!tps.supportZones[targetHeroIdx][placeSlot]) tps.supportZones[targetHeroIdx][placeSlot] = [];
-      tps.supportZones[targetHeroIdx][placeSlot].push(CARD_NAME);
-
-      // Re-track the live inst at the new zone (untrack the hand copy).
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-      const inst = engine._trackCard(CARD_NAME, targetOwner, 'support', targetHeroIdx, placeSlot);
+      // v650: Platzierung ueber den geteilten Vorgang (Slot-Nachwahl bei
+      // belegtem Wunschplatz, Instanz, `_spellPlacedOnBoard`, EnterZone).
+      // Anti Magic ist selbst immun gegen den Anti-Magic-Schutz des Wirts
+      // (es ERZEUGT ihn) — `skipMagicImmune`.
+      const inst = await placeAttachment(ctx, CARD_NAME, { owner: targetOwner, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipMagicImmune: true, skipEnterHook: true });
+      if (!inst) { gs._spellCancelled = true; return; }
       inst.counters = inst.counters || {};
       inst.counters.antiMagicLevel = X;
-      // Originating side info (used by leave-zone cleanup to recompute
-      // the buff). Track who CAST this copy — informational, not
-      // load-bearing.
       inst.counters.antiMagicCastBy = pi;
-
-      // Tell the server not to discard — the card lives on the board.
-      gs._spellPlacedOnBoard = true;
-
-      // ── Apply / refresh the magic_immune buff ──
-      // If a previous Anti Magic was just detached, the buff might
-      // already be lifted (its leave-zone hook runs). Re-apply with
-      // the new level. `addBuff` overwrites existing buffs cleanly.
       await engine.actionAddBuff(targetHero, targetOwner, targetHeroIdx, 'magic_immune', {
         level: X,
         source: CARD_NAME,

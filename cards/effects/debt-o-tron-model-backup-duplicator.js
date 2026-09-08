@@ -121,7 +121,7 @@ module.exports = {
       // Von hinten nach vorn aus dem Deck nehmen, damit die noch
       // ausstehenden `deckIndex` gueltig bleiben.
       for (const k of geholt.slice().sort((a, b) => b.deckIndex - a.deckIndex)) {
-        ps.mainDeck.splice(k.deckIndex, 1);
+        if (!(await engine.takeFromPile(ps, 'deck', k.deckIndex, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
       }
       // EINE NACH DER ANDEREN auf die Hand fliegen lassen (Als Vorgabe
       // 16.8., Vorbild Magic Lamp): Flug melden, Karte anlegen, syncen,

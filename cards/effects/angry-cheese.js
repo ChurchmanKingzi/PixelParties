@@ -122,6 +122,10 @@ module.exports = {
     // identical to other tutors.
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Angry Cheese',
+      // v734: „a Destruction Magic Spell" — Koperniko darf ebenfalls
+      // nur eine Destruction-Magic-Spell nachlegen.
+      searchSpec: { label: 'Destruction Magic Spell', filter: (cd) => hasCardType(cd, 'Spell')
+        && (cd.spellSchool1 === 'Destruction Magic' || cd.spellSchool2 === 'Destruction Magic') },
       reveal: true,
     });
   },

@@ -100,14 +100,17 @@ function isBurnTick(source) {
   return source?.name === 'Burn';
 }
 
+const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+
 module.exports = {
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['hand', 'support'],
 
-  spellPlayCondition(gs /* , playerIdx, engine */) {
-    return anyPlayerHasAttachableHero(gs);
+  spellPlayCondition(gs, pi, engine) {
+    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
@@ -127,163 +130,17 @@ module.exports = {
       // least one free Support slot. Mixed hero + equip targets so the
       // picker highlights both the Hero portrait AND the candidate
       // slots — same shape Guardian Angel uses.
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        const tps = gs.players[p];
-        if (!tps) continue;
-        for (let hi = 0; hi < (tps.heroes || []).length; hi++) {
-          const hero = tps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          let hasFreeZone = false;
-          for (let si = 0; si < 3; si++) {
-            const slot = (tps.supportZones[hi] || [])[si] || [];
-            if (slot.length !== 0) continue;
-            hasFreeZone = true;
-            targets.push({
-              id: `equip-${p}-${hi}-${si}`,
-              type: 'equip',
-              owner: p,
-              heroIdx: hi,
-              slotIdx: si,
-              cardName: '',
-            });
-          }
-          if (hasFreeZone) {
-            targets.push({
-              id: `hero-${p}-${hi}`,
-              type: 'hero',
-              owner: p,
-              heroIdx: hi,
-              cardName: hero.name,
-            });
-          }
-        }
-      }
-      if (targets.length === 0) { gs._spellCancelled = true; return; }
-
-      // ── Resolve destination ────────────────────────────────────
-      // Priority order (drag UX always wins over the picker):
-      //   1. `gs._attachmentZoneSlot` set — the player drag-dropped on
-      //      a SPECIFIC support slot of the casting Hero. Use it.
-      //   2. Drag-onto-Hero (caster `heroIdx` known, slot unspecified):
-      //      auto-place on the caster's first free Support slot. This
-      //      restores the natural drag-to-attach flow — players who
-      //      drag the spell onto an own Hero with a free slot don't
-      //      have to confirm a picker first.
-      //   3. Click-from-hand or caster has no free slot: fall back to
-      //      the cross-board picker (any Hero with a free slot, own or
-      //      opponent's). The user can attach to an opponent's Hero
-      //      via this path — drag is intentionally limited to the
-      //      caster because the standard drag UI doesn't expose
-      //      opponent support zones as drop targets.
-      let destOwner = -1;
-      let destHero  = -1;
-      let destSlot  = -1;
-
-      // (1) — explicit slot drag. Match BOTH the slot index AND the
-      // heroIdx from the play context, so dropping on Hero 2's slot 0
-      // lands on Hero 2's slot 0 even when Hero 1 also has a free
-      // slot 0 (the previous version used only slot+owner and so
-      // routed every attachment to whichever Hero showed up first
-      // in `targets`).
-      if (gs._attachmentZoneSlot != null && gs._attachmentZoneSlot >= 0
-          && heroIdx != null && heroIdx >= 0) {
-        const preTarget = targets.find(t =>
-          t.type === 'equip'
-          && t.owner === pi
-          && t.heroIdx === heroIdx
-          && t.slotIdx === gs._attachmentZoneSlot
-        );
-        if (preTarget) {
-          destOwner = preTarget.owner;
-          destHero  = preTarget.heroIdx;
-          destSlot  = preTarget.slotIdx;
-        }
-      }
-
-      // (2) — drag onto the caster Hero (no specific slot), auto-place
-      // on the dropped Hero's first free slot.
-      if (destSlot < 0 && heroIdx != null && heroIdx >= 0) {
-        const ps = gs.players[pi];
-        const sup = ps?.supportZones?.[heroIdx] || [];
-        for (let si = 0; si < 3; si++) {
-          if ((sup[si] || []).length === 0) {
-            destOwner = pi;
-            destHero  = heroIdx;
-            destSlot  = si;
-            break;
-          }
-        }
-      }
-
-      // (3) — picker fallback (click-cast, or caster's slots all full).
-      if (destSlot < 0) {
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: CARD_NAME,
-          description: 'Choose a Hero to attach Dichotomy of Luna and Tempeste to.',
-          confirmLabel: '🌗 Attach!',
-          confirmClass: 'btn-info',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-          greenSelect: true,
-        });
-        if (!picked || picked.length === 0) { gs._spellCancelled = true; return; }
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-        if (target.type === 'equip') {
-          destOwner = target.owner;
-          destHero  = target.heroIdx;
-          destSlot  = target.slotIdx;
-        } else {
-          // Hero-portrait pick: auto-route to that Hero's first free slot.
-          destOwner = target.owner;
-          destHero  = target.heroIdx;
-          const tps = gs.players[destOwner];
-          for (let si = 0; si < 3; si++) {
-            if (((tps.supportZones[destHero] || [])[si] || []).length === 0) {
-              destSlot = si;
-              break;
-            }
-          }
-        }
-      }
-      if (destSlot < 0) { gs._spellCancelled = true; return; }
-
-      // ── Anti Magic gate ──
-      // Dichotomy is a Lv 3 Spell. A host Hero with
-      // `magic_immune.level >= 3` is immune to its effect — the
-      // attachment must NOT land. Bail BEFORE the support-zone push
-      // + `_spellPlacedOnBoard` flag so the server's standard
-      // post-resolve path routes the card to the caster's discard.
+      // v650: Anlegen ueber den geteilten Vorgang — beide Seiten, Caster-
+      // Held als Vorgabe (bisheriges Verhalten), Anti-Magic-Schutz inklusive.
+      const res = await attachToHero(ctx, CARD_NAME, {
+        sides: [pi, pi === 0 ? 1 : 0], preferCaster: true,
+        description: 'Choose a Hero to attach Dichotomy of Luna and Tempeste to.',
+        confirmLabel: '🌗 Attach!', confirmClass: 'btn-info', skipEnterHook: true,
+      });
+      if (!res) return;
+      const { host, inst } = res;
+      const destOwner = host.owner, destHero = host.heroIdx;
       const destPs = gs.players[destOwner];
-      const destHeroObj = destPs?.heroes?.[destHero];
-      if (destHeroObj && engine._isHeroSpellProtected(destHeroObj, CARD_NAME)) {
-        engine.log('equip_blocked', { card: CARD_NAME, target: destHeroObj.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(destHeroObj);
-        return;
-      }
-
-      // ── Place into the chosen Support Zone ──
-      if (!destPs.supportZones[destHero]) destPs.supportZones[destHero] = [[], [], []];
-      if (!destPs.supportZones[destHero][destSlot]) destPs.supportZones[destHero][destSlot] = [];
-      destPs.supportZones[destHero][destSlot].push(CARD_NAME);
-
-      // Re-track from caster's hand → destination Hero's support zone.
-      // The inst's `owner` stays at the caster (`pi`) so cardOwner-driven
-      // listener routing on Dichotomy itself keeps firing for the caster's
-      // hand-trigger context, while the inst's `heroIdx` reflects the
-      // physical host. The damage hooks use `_findHeroOwner(target)` to
-      // determine same-side-as-host eligibility, so attaching to an
-      // opponent's Hero correctly halves the OPPONENT's burned targets.
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand' && c.id === ctx.card.id
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-
-      const inst = engine._trackCard(CARD_NAME, destOwner, 'support', destHero, destSlot);
-      gs._spellPlacedOnBoard = true;
-
       engine.log('dichotomy_attached', {
         player: gs.players[pi].username,
         hero: destPs.heroes[destHero]?.name,
@@ -315,8 +172,9 @@ module.exports = {
       const targetOwnerIdx = ctx._engine._findHeroOwner?.(target);
       if (targetOwnerIdx !== ownerIdx) return;
 
-      const halved = Math.ceil(ctx.amount / 2);
-      ctx.setAmount(halved);
+      // Punkt vor Strich (Al 1.9.): Halbierung als MULTIPLIKATOR, flat
+      // Modifikatoren (Tempeste −100 …) rechnet die Engine danach.
+      ctx.multiplyAmount(0.5);
       ctx.lockReduction();
     },
 
@@ -345,7 +203,7 @@ module.exports = {
         if (isBurnTick(e.source)) continue;
         if (e.amount == null || e.amount <= 0) continue;
 
-        e.amount = Math.ceil(e.amount / 2);
+        e.multiplyAmount(0.5);   // Punkt vor Strich
         e.cannotBeReduced = true;
       }
     },

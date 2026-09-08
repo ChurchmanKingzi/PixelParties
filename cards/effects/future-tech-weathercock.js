@@ -66,6 +66,14 @@ function ausgeruesteterHeld(gs, pi, opts) {
 }
 
 module.exports = {
+
+  /**
+   * „Equip this card to a Hero you control." — Seitenbindung, siehe
+   * `equipOwnSideOnly` in CARD_API.md. Ohne die Fahne gilt die
+   * Hausvorgabe „Ausruestung darf an beide Seiten" (Al, 5.9.: der
+   * Kartentext ist bindend).
+   */
+  equipOwnSideOnly: true,
   activeIn: ['support'],
 
   // Mischt eine Kopie aus der ABLAGE ins eigene Deck zurück — damit
@@ -138,7 +146,7 @@ module.exports = {
     });
     await engine._delay(FLUG_MS);
 
-    ps.discardPile.splice(idx, 1);
+    if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
     ps.mainDeck.push(CARD_NAME);
     engine.shuffleDeck(pi, 'main');       // sendet auch die Misch-Animation
 

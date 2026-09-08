@@ -130,7 +130,7 @@ module.exports = {
         // Creature still counts as Lv0 for this passive.
         if (e.originalLevel !== 0) continue;
         if (e.amount > 0) {
-          e.amount = Math.max(0, e.amount - DAMAGE_REDUCTION);
+          e.modifyAmount(-Math.min(DAMAGE_REDUCTION, e.amount));   // flat (Punkt vor Strich)
         }
       }
     },

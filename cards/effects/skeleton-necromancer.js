@@ -104,7 +104,7 @@ module.exports = {
       engine.sync();
       return true; // cost was paid; activation counts.
     }
-    ps.discardPile.splice(discardIdx, 1);
+    if (!(await engine.takeFromPile(ps, 'discard', discardIdx, { source: CARD_NAME }))) { engine.sync(); return true; }   // v820: Stapel-Schicht
 
     // Step 5: place. Use actionPlaceCreature with source 'deck' as a
     // sentinel that bypasses the helper's own splice — we already

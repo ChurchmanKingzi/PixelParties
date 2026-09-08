@@ -349,9 +349,8 @@ module.exports = {
       }
 
       // ── Pop one copy from discard pile ──
-      const dpIdx = (ps.discardPile || []).indexOf(CARD_NAME);
-      if (dpIdx < 0) return; // Got moved between prompt and now (rare).
-      ps.discardPile.splice(dpIdx, 1);
+      const _taken_dpIdx = await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_dpIdx) return; // Got moved between prompt and now (rare).
 
       // Untrack the orphaned instance (this listener's own card).
       // Without this, the dead instance lingers in cardInstances at

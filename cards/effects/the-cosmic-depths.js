@@ -320,9 +320,8 @@ module.exports = {
     //            negate ────────────────────────────────────────────────
     if (!inst) {
       // Standard path (no self-place inside beforeSummon).
-      const stillIdx = ps.mainDeck.indexOf(chosenName);
-      if (stillIdx < 0) return true; // shifted out from under us
-      ps.mainDeck.splice(stillIdx, 1);
+      const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      if (!_taken_stillIdx) return true; // shifted out from under us
       engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: activator });
       engine.sync();
       await engine._delay(250);

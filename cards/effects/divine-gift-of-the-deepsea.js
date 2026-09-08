@@ -209,11 +209,9 @@ module.exports = {
       }
 
       // Pop the chosen card from its source pile.
-      const deckIdx = (ps.mainDeck || []).indexOf(repName);
-      if (deckIdx >= 0) {
-        ps.mainDeck.splice(deckIdx, 1);
-        engine.shuffleDeck(pi);
-      } else {
+      // Deck zuerst (Stapel-Schicht, mischt), sonst Hand.
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', repName, { source: 'Divine Gift of the Deepsea', shuffle: true });   // v820: Stapel-Schicht
+      if (!_taken_deckIdx) {
         const handIdx = (ps.hand || []).indexOf(repName);
         if (handIdx < 0) { engine.sync(); return; }
         // Untrack the matching hand instance so the support track is clean.

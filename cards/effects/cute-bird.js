@@ -106,8 +106,10 @@ module.exports = {
       }
 
       // Pull Phoenix out, shuffle deck, broadcast deck-search reveal.
-      ps.mainDeck.splice(deckIdx, 1);
-      engine.shuffleDeck(pi, 'main');
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
+        engine.log('cute_bird_fizzle', { player: ps.username, reason: 'deck_locked' });
+        return;
+      }
       engine._broadcastEvent('deck_search_add', { cardName: TUTOR_TARGET, playerIdx: pi });
 
       // Summon with full hooks. summonCreatureWithHooks handles slot-

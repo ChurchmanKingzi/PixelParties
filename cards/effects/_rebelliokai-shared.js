@@ -105,9 +105,9 @@ function countDifferentRebelliokaiInDiscard(ps, engine, max = Infinity) {
 function deleteFromDiscardByName(engine, playerIdx, cardName, opts = {}) {
   const ps = engine?.gs?.players?.[playerIdx];
   if (!ps || !cardName) return false;
-  const idx = (ps.discardPile || []).indexOf(cardName);
-  if (idx < 0) return false;
-  ps.discardPile.splice(idx, 1);
+  const _taken_idx = engine.takeFromPileSync(ps, 'discard', cardName, { source: '_rebelliokai-shared' });   // v820: Stapel-Schicht
+  if (!_taken_idx) return false;
+  const idx = _taken_idx.idx;
   ps.deletedPile.push(cardName);
 
   // Untrack any instance parked in the discard zone for this card
@@ -166,7 +166,7 @@ async function payRebelliokaiCost(engine, playerIdx, cardName, opts = {}) {
   if (orphan) engine._untrackCard(orphan.id);
 
   // Phase 1 — vanish from discard pile.
-  ps.discardPile.splice(idx, 1);
+  if (!engine.takeFromPileSync(ps, 'discard', idx, { source: opts.source || 'Rebelliokai' })) return;   // v820: Stapel-Schicht
   engine.sync();
 
   // Phase 2 — broadcast the chained flight animation. The client pre-

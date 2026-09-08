@@ -328,8 +328,7 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
 
   // Splice the discard entry + untrack the orphan inst before the
   // engine creates a fresh on-board instance.
-  const discardIdx = ps.discardPile.lastIndexOf(chosenName);
-  if (discardIdx >= 0) ps.discardPile.splice(discardIdx, 1);
+  await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
   const discardInst = engine.cardInstances.find(c =>
     c.owner === pi && c.zone === 'discard' && c.name === chosenName
   );

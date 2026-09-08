@@ -25,8 +25,58 @@
 //  before the impact resolves on the attacker.
 // ═══════════════════════════════════════════
 
+const { loadCardEffect } = require('./_loader');
+const { hasCardType, isAttackSpellOrCreatureSource } = require('./_hooks');
+
 const CARD_NAME = 'Firewall';
 const DAMAGE    = 100;
+
+/**
+ * v633 — Helden-Vertrag `firewallModifiers` (Luna, the Flame Fairy:
+ * „This Hero's Firewall Spells deal 100 additional damage and Burns all
+ * targets your opponent controls, not just the attacker"). Gelesen vom
+ * Helden, unter dem die Surprise liegt: `{ extraDamage, burnAllOpponentTargets }`.
+ * Der Kartentext des Helden nennt Firewall — ein Firewall-spezifischer
+ * Vertrag ist hier die ehrliche Form, kein Sondercode nach Heldennamen.
+ */
+function firewallMods(engine, pi, heroIdx) {
+  const hero = engine.gs.players[pi]?.heroes?.[heroIdx];
+  if (!hero?.name || hero.hp <= 0) return { extraDamage: 0, burnAllOpponentTargets: false };
+  const script = loadCardEffect(hero.name);
+  const m = (typeof script?.firewallModifiers === 'function')
+    ? script.firewallModifiers(engine.gs, pi, heroIdx, engine)
+    : script?.firewallModifiers;
+  return { extraDamage: m?.extraDamage || 0, burnAllOpponentTargets: !!m?.burnAllOpponentTargets };
+}
+
+/** Alle Ziele des Gegners (lebende Helden + Kreaturen) verbrennen — permanent. */
+async function burnAllOpponentTargets(engine, ctx) {
+  const gs = engine.gs;
+  const pi = ctx.cardOwner;
+  const oppIdx = pi === 0 ? 1 : 0;
+  const ops = gs.players[oppIdx];
+  const db = engine._getCardDB();
+  let burned = 0;
+  for (let hi = 0; hi < (ops?.heroes || []).length; hi++) {
+    const h = ops.heroes[hi];
+    if (!h?.name || h.hp <= 0 || h.statuses?.burned) continue;
+    engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: oppIdx, heroIdx: hi, zoneSlot: -1 });
+    await engine.addHeroStatus(oppIdx, hi, 'burned', { permanent: true, appliedBy: pi, _skipReactionCheck: true, source: CARD_NAME });
+    burned++;
+  }
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support' || inst.faceDown || (inst.controller ?? inst.owner) !== oppIdx) continue;
+    const cd = engine.getEffectiveCardData?.(inst) || db[inst.name];
+    if (!cd || !hasCardType(cd, 'Creature')) continue;
+    if ((inst.counters?.currentHp ?? cd.hp ?? 1) <= 0 || inst.counters?.burned) continue;
+    engine._broadcastEvent('play_zone_animation', { type: 'flame_strike', owner: oppIdx, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
+    const applied = await engine.applyCreatureStatus(inst, 'burned', { sourceOwner: pi, source: CARD_NAME });
+    if (applied) { burned++; engine.log('creature_burned', { card: inst.name, owner: inst.owner, by: CARD_NAME }); }
+  }
+  if (burned > 0) await engine._delay(400);
+  engine.log('firewall_burn_all', { player: gs.players[pi]?.username, burned });
+  return burned;
+}
 
 module.exports = {
   isSurprise: true,
@@ -35,6 +85,12 @@ module.exports = {
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
 
     const srcInst = sourceInfo.cardInstance;
+
+    // v665/666 (Als Befund 30.8.): „hit by an Attack, Spell or Creature
+    // effect" — Quellenart selbst pruefen, das Engine-Fenster oeffnet
+    // fuer jede Zielwahl (Molindas Heldeneffekt). Gemeinsamer Helfer.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
+
     if (srcInst?.zone === 'support') {
       // Creature attacker — alive?
       const cd = engine._getCardDB()[srcInst.name];
@@ -50,6 +106,9 @@ module.exports = {
     const engine = ctx._engine;
     const gs     = engine.gs;
     const cardDB = engine._getCardDB();
+    // v633: Helden-Verstaerkung (Luna) — mehr Schaden, Flaechen-Burn.
+    const mods = firewallMods(engine, ctx.cardOwner, ctx.cardHeroIdx);
+    const dmg = DAMAGE + mods.extraDamage;
 
     // ── Wall-of-flames animation on the host Hero who set up the Surprise ──
     engine._broadcastEvent('play_zone_animation', {
@@ -64,7 +123,7 @@ module.exports = {
         side: 'any',
         types: ['hero', 'creature'],
         damageType: 'destruction_spell',
-        baseDamage: DAMAGE,
+        baseDamage: dmg,
         title: CARD_NAME,
         // Statusangabe fuer den LERNKANAL (Als Vorgabe 9.8.): diese Karte
         // traegt Schaden UND Status. Das Ziel-Gate filtert deshalb NICHT —
@@ -72,8 +131,8 @@ module.exports = {
         // `stat:blocked`, damit `targetPriors` je Karte lernt, wie stark
         // das Haften die Schadens-Rangfolge verschiebt.
         appliesStatus: 'burned',
-        description: `Deal ${DAMAGE} damage to any target and Burn it.`,
-        confirmLabel: `🔥 ${DAMAGE} + Burn!`,
+        description: `Deal ${dmg} damage to any target and Burn it.`,
+        confirmLabel: `🔥 ${dmg} + Burn!`,
         confirmClass: 'btn-danger',
         cancellable: false,
         noSpellCancel: true,
@@ -93,7 +152,7 @@ module.exports = {
           // Capture cancellation so the Burn rider skips when the
           // damage was fully negated (Idej Projection, Spectral Armor
           // zero-cap, Anti Magic void) — "and all associated effects".
-          const r = await ctx.dealDamage(tgtHero, DAMAGE, 'destruction_spell');
+          const r = await ctx.dealDamage(tgtHero, dmg, 'destruction_spell');
           if (!r?.cancelled && tgtHero.hp > 0) {
             await engine.addHeroStatus(target.owner, target.heroIdx, 'burned', {
               permanent: true, appliedBy: ctx.cardOwner, _skipReactionCheck: true,
@@ -103,7 +162,7 @@ module.exports = {
       } else if (target.cardInstance) {
         const r = await engine.actionDealCreatureDamage(
           { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
-          target.cardInstance, DAMAGE, 'destruction_spell',
+          target.cardInstance, dmg, 'destruction_spell',
           { sourceOwner: ctx.cardOwner, canBeNegated: true }
         );
         if (!r?.cancelled && (target.cardInstance.counters?.currentHp ?? 1) > 0) {
@@ -116,6 +175,7 @@ module.exports = {
           });
         }
       }
+      if (mods.burnAllOpponentTargets) await burnAllOpponentTargets(engine, ctx);
       engine.sync();
       await engine._delay(300);
       return null; // No effect negation in telekinesis mode.
@@ -139,7 +199,7 @@ module.exports = {
 
       const creatureDmgResult = await engine.actionDealCreatureDamage(
         { name: CARD_NAME, owner: ctx.cardOwner, heroIdx: ctx.cardHeroIdx },
-        srcInst, DAMAGE, 'destruction_spell',
+        srcInst, dmg, 'destruction_spell',
         { sourceOwner: ctx.cardOwner, canBeNegated: true }
       );
 
@@ -156,6 +216,7 @@ module.exports = {
           card: srcInst.name, owner: srcInst.owner, by: CARD_NAME,
         });
       }
+      if (mods.burnAllOpponentTargets) await burnAllOpponentTargets(engine, ctx);
       engine.sync();
       await engine._delay(300);
       // Per card text: even if the retaliation killed the creature, the
@@ -173,7 +234,7 @@ module.exports = {
       });
       await engine._delay(400);
 
-      const heroDmgResult = await ctx.dealDamage(attacker, DAMAGE, 'destruction_spell');
+      const heroDmgResult = await ctx.dealDamage(attacker, dmg, 'destruction_spell');
 
       // Burn if still alive AND the damage actually landed — Idej
       // Projection / Spectral Armor / Anti Magic void all skip the
@@ -184,6 +245,7 @@ module.exports = {
         });
       }
 
+      if (mods.burnAllOpponentTargets) await burnAllOpponentTargets(engine, ctx);
       engine.sync();
       await engine._delay(300);
       // Per card text: the triggering Attack/Spell still resolves on

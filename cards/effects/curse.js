@@ -56,6 +56,7 @@
 // ═══════════════════════════════════════════
 
 const { getCleansableStatuses } = require('./_hooks');
+const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 
 const CARD_NAME = 'Curse';
 const STATUS_NAME = 'cursed';
@@ -141,20 +142,10 @@ module.exports = {
 
   // Need at least one Hero (any side) with a free Support slot to
   // physically attach to.
-  spellPlayCondition(gs) {
-    for (let p = 0; p < 2; p++) {
-      const ps = gs.players[p];
-      for (let hi = 0; hi < (ps?.heroes || []).length; hi++) {
-        const hero = ps.heroes[hi];
-        if (!hero?.name || hero.hp <= 0) continue;
-        const zones = ps.supportZones?.[hi] || [];
-        for (let si = 0; si < 3; si++) {
-          if (((zones[si] || []).length === 0)) return true;
-        }
-      }
-    }
-    return false;
+  spellPlayCondition(gs, pi, engine) {
+    return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
 
   hooks: {
     onPlay: async (ctx) => {
@@ -183,117 +174,29 @@ module.exports = {
       // attachment in the first place; mode A widens to all such
       // Heroes, mode B narrows to those that also qualify for the
       // inherent grant.
-      const targets = [];
-      for (let p = 0; p < 2; p++) {
-        const tps = gs.players[p];
-        for (let hi = 0; hi < (tps?.heroes || []).length; hi++) {
-          const hero = tps.heroes[hi];
-          if (!hero?.name || hero.hp <= 0) continue;
-          const zones = tps.supportZones?.[hi] || [];
-          let hasFreeZone = false;
-          for (let si = 0; si < 3; si++) {
-            if (((zones[si] || []).length === 0)) {
-              hasFreeZone = true;
-              break;
-            }
-          }
-          if (!hasFreeZone) continue;
-          // Mode B: filter to qualifying only.
-          if (!isNormalActionMode && !_heroQualifiesForCurse(engine, hero, p, hi)) continue;
-
-          for (let si = 0; si < zones.length; si++) {
-            if (((zones[si] || []).length === 0)) {
-              targets.push({
-                id: `equip-${p}-${hi}-${si}`,
-                type: 'equip',
-                owner: p, heroIdx: hi, slotIdx: si,
-                cardName: '',
-              });
-            }
-          }
-          targets.push({
-            id: `hero-${p}-${hi}`,
-            type: 'hero',
-            owner: p, heroIdx: hi,
-            cardName: hero.name,
-          });
-        }
-      }
-      if (targets.length === 0) {
-        // Fizzle to discard — NOT a player-cancel.
-        //
-        // Mode B (inherent additional Action) — Reactions between
-        // hand-cast validation and resolve-time (the chain window
-        // already ran inside `executeCardWithChain`) can scrub the
-        // last qualifying target: an opponent Cure'ing the
-        // Berserked / Frozen / etc. host, or attaching another Spell
-        // to it, both empty the qualifying-only filter applied
-        // above. Per the user's spec, "if no eligible target exists
-        // at moment of resolution, move Curse from hand to discard,
-        // it fizzles!" → DON'T set `_spellCancelled` (which would
-        // refund the play and keep the card in hand). Just return —
-        // server.js's post-resolve path routes the card to the
-        // caster's discard pile normally.
-        //
-        // Mode A (Action Phase pre-acted) — the same shape applies
-        // if every Hero with a free Support Zone is reacted away,
-        // though `spellPlayCondition` typically prevents this at
-        // validation. Either way the card fizzles to discard with
-        // no Action consumed (the Mode A flip only fires AFTER a
-        // target pick, which never happens here).
-        engine.log('curse_fizzle', {
-          player: gs.players[pi]?.username,
-          reason: isNormalActionMode ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve',
-        });
+      // v650: Wirt ueber den geteilten Anlege-Vorgang — beide Seiten;
+      // ausserhalb des normalen Aktionsmodus nur Helden, die fuer den
+      // inhaerenten Zusatz-Einsatz qualifizieren. Keine Kandidaten bei
+      // der Aufloesung → Curse verpufft (Discard, kein Refund) — die
+      // Nutzerspezifikation von einst; `_spellCancelled` bleibt also aus.
+      const sides = [pi, pi === 0 ? 1 : 0];
+      const heroFilter = (hero, hi, side) => isNormalActionMode || _heroQualifiesForCurse(engine, hero, side, hi);
+      if (candidateHosts(gs, pi, engine, { sides, heroFilter }).length === 0) {
+        engine.log('curse_fizzle', { player: gs.players[pi]?.username, reason: isNormalActionMode ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve' });
         return;
       }
-
-      // ── Pick target ──
-      let targetOwner, targetHeroIdx, targetSlot;
-      const heroTargets = targets.filter(t => t.type === 'hero');
-      const zoneTargets = targets.filter(t => t.type === 'equip');
-      if (heroTargets.length === 1 && zoneTargets.length === 1) {
-        targetOwner = heroTargets[0].owner;
-        targetHeroIdx = heroTargets[0].heroIdx;
-        targetSlot = zoneTargets[0].slotIdx;
-      } else {
-        const description = isNormalActionMode
+      const host = await pickAttachmentHost(ctx, CARD_NAME, {
+        sides, heroFilter,
+        description: isNormalActionMode
           ? 'Attach Curse to any Hero. If the target carries a cleansable status and has no Spell attached, this play becomes an additional Action.'
-          : 'Attach Curse to a Hero that carries a cleansable status and has no Spell attached. (Inherent additional Action.)';
-        const picked = await engine.promptEffectTarget(pi, targets, {
-          title: CARD_NAME,
-          description,
-          confirmLabel: '🧿 Curse!',
-          confirmClass: 'btn-danger',
-          cancellable: true,
-          exclusiveTypes: false,
-          maxPerType: { hero: 1, equip: 1 },
-          greenSelect: true,
-        });
-        if (!picked || picked.length === 0) { gs._spellCancelled = true; return; }
-        const target = targets.find(t => t.id === picked[0]);
-        if (!target) { gs._spellCancelled = true; return; }
-        targetOwner = target.owner;
-        if (target.type === 'equip') {
-          targetHeroIdx = target.heroIdx;
-          targetSlot = target.slotIdx;
-        } else {
-          targetHeroIdx = target.heroIdx;
-          const tps = gs.players[targetOwner];
-          for (let si = 0; si < 3; si++) {
-            if (((tps.supportZones[targetHeroIdx] || [])[si] || []).length === 0) {
-              targetSlot = si;
-              break;
-            }
-          }
-        }
-      }
-      if (targetSlot === undefined) return;
-
+          : 'Attach Curse to a Hero that carries a cleansable status and has no Spell attached. (Inherent additional Action.)',
+        confirmLabel: '🧿 Curse!', confirmClass: 'btn-danger',
+      });
+      if (!host) return;
+      const targetOwner = host.owner, targetHeroIdx = host.heroIdx, targetSlot = host.slotIdx;
       const tps = gs.players[targetOwner];
       const targetHero = tps.heroes[targetHeroIdx];
       if (!targetHero?.name || targetHero.hp <= 0) return;
-
       // ── Surprise window ──
       // Curse picks its target through `promptEffectTarget` (non-
       // damage targeting). That hub does NOT fire
@@ -335,51 +238,14 @@ module.exports = {
       // the chosen Hero covers it. Bail BEFORE the support-zone
       // push + `_spellPlacedOnBoard` so the server's standard
       // post-resolve path routes the card to the caster's discard.
-      if (engine._isHeroSpellProtected(targetHero, CARD_NAME)) {
-        engine.log('curse_blocked', { target: targetHero.name, reason: 'magic_immune' });
-        engine._playAntiMagicBlockedAnim(targetHero);
-        engine.sync();
-        return;
-      }
-
-      // ── Mode A post-pick reclassification ──
-      // In normal-Action mode, if the picked Hero does NOT qualify,
-      // flip the engine's inherent classification back to "consumes
-      // a main Action". server.js's post-onPlay logic reads this
-      // flag and rebinds `isInherentAction = false`, so the
-      // downstream auto-advance to Main Phase 2 fires normally.
       if (isNormalActionMode
           && !_heroQualifiesForCurse(engine, targetHero, targetOwner, targetHeroIdx)) {
         gs._spellForcesActionConsume = true;
       }
-
-      // ── Place Curse in target's Support Zone ──
-      if (!tps.supportZones[targetHeroIdx]) tps.supportZones[targetHeroIdx] = [[], [], []];
-      if (!tps.supportZones[targetHeroIdx][targetSlot]) tps.supportZones[targetHeroIdx][targetSlot] = [];
-      tps.supportZones[targetHeroIdx][targetSlot].push(CARD_NAME);
-
-      // Re-track from caster's hand → target's support zone. The
-      // `originalOwner` override matches the Berserk pattern: a
-      // cleanse-driven destroy on this card routes the card back
-      // to the caster's discard (not the host's).
-      const oldInst = engine.cardInstances.find(c =>
-        c.owner === pi && c.name === CARD_NAME && c.zone === 'hand'
-      );
-      if (oldInst) engine._untrackCard(oldInst.id);
-      const inst = engine._trackCard(CARD_NAME, targetOwner, 'support', targetHeroIdx, targetSlot);
-      inst.originalOwner = pi;
-
-      // Tell the server not to discard — the card lives on the board.
-      gs._spellPlacedOnBoard = true;
-
-      // ── Apply the boolean cursed status + ATK snapshot ──
-      // The engine's grant/revoke/temp-atk paths all key off
-      // `hero.statuses.cursed`, so the status MUST land before we
-      // zero out `hero.atk` — otherwise a re-entrant ATK mutation
-      // during the apply step could touch the wrong slot.
-      // Multiple-copy boolean rule: if the status already exists
-      // (a prior Curse on this Hero), skip the snapshot + zero so
-      // the second copy is the documented no-op.
+      // v650: Platzierung ueber den geteilten Vorgang (Anti-Magic-Schutz,
+      // Slot, Instanz, `_spellPlacedOnBoard`).
+      const inst = await placeAttachment(ctx, CARD_NAME, { owner: targetOwner, heroIdx: targetHeroIdx, slotIdx: targetSlot }, { skipEnterHook: true });
+      if (!inst) { engine.sync(); return; }
       if (!targetHero.statuses?.cursed) {
         // Snapshot the live ATK so the cleanse path can restore it.
         // Subsequent grant/revoke/temp-atk while cursed will accumulate

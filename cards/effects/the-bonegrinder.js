@@ -123,9 +123,8 @@ module.exports = {
       const inherentBranch = isMainPhase && candidates.length > 0;
 
       const consumeSkeleton = async (chosenName) => {
-        const idx = ps.discardPile.indexOf(chosenName);
-        if (idx < 0) return;
-        ps.discardPile.splice(idx, 1);
+        const _taken_idx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        if (!_taken_idx) return;
         if (!ps.deletedPile) ps.deletedPile = [];
         ps.deletedPile.push(chosenName);
         engine._broadcastEvent('play_pile_transfer', {
@@ -150,7 +149,7 @@ module.exports = {
         }
         await consumeSkeleton(chosenName);
         // No `gs._spellFreeAction` here — the inherent-Action path
-        // already skipped the regular Action consumption upstream;
+        // already skipped the regular Action consumption upstream
         // setting `_spellFreeAction` would refund a non-existent Action.
       } else if (candidates.length > 0) {
         // OPTIONAL: cast went through a regular Action / external
@@ -327,10 +326,9 @@ module.exports = {
 
       // Re-verify position (a parallel reaction during the prompt
       // could have shifted the pile).
-      const finalIdx = ps.discardPile.lastIndexOf(cardName);
-      if (finalIdx < 0) return;
-
-      ps.discardPile.splice(finalIdx, 1);
+      const _taken_finalIdx = await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+      if (!_taken_finalIdx) return;
+      const finalIdx = _taken_finalIdx.idx;
       if (!ps.deletedPile) ps.deletedPile = [];
       ps.deletedPile.push(cardName);
       engine._broadcastEvent('play_pile_transfer', {
@@ -397,10 +395,8 @@ module.exports = {
         });
         if (!confirmed) continue;
 
-        const finalIdx = ps.discardPile.lastIndexOf(cardName);
-        if (finalIdx < 0) continue;
-
-        ps.discardPile.splice(finalIdx, 1);
+        const _taken_finalIdx = await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+        if (!_taken_finalIdx) continue;
         if (!ps.deletedPile) ps.deletedPile = [];
         ps.deletedPile.push(cardName);
         engine._broadcastEvent('play_pile_transfer', {

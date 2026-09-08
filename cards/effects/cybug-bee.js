@@ -122,11 +122,7 @@ module.exports = {
 
     // Splice from opp's deck, push to controller's hand, track the
     // inst as an in-hand card on the controller's side.
-    oppPs.mainDeck.splice(deckIdx, 1);
-    if (oppPs.deckTopVisible && oppPs.deckTopVisible.length > 0
-        && deckIdx === 0) {
-      oppPs.deckTopVisible.shift();
-    }
+    if (!(await engine.takeFromPile(oppPs, 'deck', deckIdx, { source: CARD_NAME, sourceOwner: pi }))) return;   // v820: Stapel-Schicht
     if (!ps.hand) ps.hand = [];
     ps.hand.push(searchedCard);
     engine._trackCard(searchedCard, pi, ZONES.HAND);

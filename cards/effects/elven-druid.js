@@ -124,10 +124,8 @@ module.exports = {
     const chosenName = picked.cardName;
 
     // ── Remove from deck, shuffle ──
-    const idx = (ps.mainDeck || []).indexOf(chosenName);
-    if (idx < 0) return false; // Deck changed between prompt and confirm; fizzle
-    ps.mainDeck.splice(idx, 1);
-    engine.shuffleDeck(pi, 'main');
+    const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+    if (!_taken_idx) return false; // Deck changed between prompt and confirm; fizzle
 
     // Reveal to opponent via the standard deck-search gallery
     engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });

@@ -71,7 +71,7 @@ module.exports = {
       // Diver Helmet: equipped Hero is unaffected by Areas — no +50.
       const tgtHi = (engine.gs.players[targetOwner]?.heroes || []).indexOf(target);
       if (tgtHi >= 0 && heroHasDiverHelmet(engine, targetOwner, tgtHi)) return;
-      ctx.setAmount((ctx.amount || 0) + 50);
+      ctx.modifyAmount(50);   // flat (Punkt vor Strich)
     },
 
     // Creature-target damage path (processCreatureDamageBatch).
@@ -89,7 +89,7 @@ module.exports = {
         // Diver Helmet: Creatures in the equipped Hero's Support Zones
         // are unaffected by Areas — no +50.
         if (isAreaImmuneInst(engine, e.inst)) continue;
-        e.amount = (e.amount || 0) + 50;
+        e.modifyAmount(50);   // flat (Punkt vor Strich)
       }
     },
   },

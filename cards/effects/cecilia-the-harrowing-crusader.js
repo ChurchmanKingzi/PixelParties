@@ -169,21 +169,22 @@ module.exports = {
     // Broadcast VOR der Zustandsaenderung, damit die fliegende Karte
     // startet, waehrend der Stapel noch den alten Stand zeigt (Muster
     // aus `_engine.js`, Surprise-Loeschung).
-    const nochDa = (ps.discardPile || []).lastIndexOf(gewaehlt);
-    if (nochDa >= 0) {
+    const _taken_nochDa = await engine.takeFromPile(ps, 'discard', gewaehlt, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+    if (_taken_nochDa) {
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: gewaehlt,
         from: 'discard', to: 'deleted',
       });
-      ps.discardPile.splice(nochDa, 1);
       if (!ps.deletedPile) ps.deletedPile = [];
       ps.deletedPile.push(gewaehlt);
       // Die Instanz mitziehen, sonst haengt sie als Karteileiche mit
       // `zone: 'discard'` in `cardInstances`, obwohl der Stapel sie
       // nicht mehr fuehrt.
+      // v820: `takeFromPile` hat die Ablage-Instanz bereits untrackt —
+      // fuer den Geloescht-Stapel eine frische anlegen.
       const inst = (engine.cardInstances || []).find(
         c => c.name === gewaehlt && c.owner === pi && c.zone === 'discard');
-      if (inst) inst.zone = 'deleted';
+      if (inst) inst.zone = 'deleted'; else engine._trackCard(gewaehlt, pi, 'deleted');
       engine.sync();
     }
 

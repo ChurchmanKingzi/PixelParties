@@ -182,9 +182,8 @@ module.exports = {
     // Verify still in discard at the original index — a downstream
     // listener could have shifted the pile, so re-find rather than
     // trusting the cached index.
-    const finalIdx = ps.discardPile.indexOf(spellName);
-    if (finalIdx >= 0) {
-      ps.discardPile.splice(finalIdx, 1);
+    const _taken_finalIdx = await engine.takeFromPile(ps, 'discard', spellName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    if (_taken_finalIdx) {
       if (!ps.deletedPile) ps.deletedPile = [];
       ps.deletedPile.push(spellName);
       engine._broadcastEvent('play_pile_transfer', {

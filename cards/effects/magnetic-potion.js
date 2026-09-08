@@ -61,6 +61,10 @@ module.exports = {
     // push silently bypassed every hand-add reaction.
     await engine.actionAddCardFromDeckToHand(pi, result.cardName, {
       source: 'Magnetic Potion',
+      // v734: „a card" — keine Einschraenkung. (Potions oeffnen
+      // Kopernikos Fenster nicht, die Angabe kostet aber nichts und
+      // stimmt fuer jeden kuenftigen Leser.)
+      searchSpec: { label: 'card', filter: null },
       reveal: true,
     });
   },

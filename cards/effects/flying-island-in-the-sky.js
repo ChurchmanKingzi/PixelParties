@@ -10,6 +10,14 @@ module.exports = {
   activeIn: ['support'],
   isEquip: true,
 
+  /**
+   * „Equip this card to a Hero YOU CONTROL." — ohne diese Fahne war die
+   * Insel auch auf gegnerische Helden zu legen (Als Befund 5.9.):
+   * gewoehnliche Ausruestung ohne eigene Beschraenkung darf im Haus auf
+   * BEIDE Seiten, und die Insel fiel als unbeschraenkt durch.
+   */
+  equipOwnSideOnly: true,
+
   hooks: {
     onPlay: async (ctx) => {
       // Add 2 island zones to the equipped hero

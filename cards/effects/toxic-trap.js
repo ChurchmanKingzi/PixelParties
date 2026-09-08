@@ -11,6 +11,8 @@
 //  different payoff (Poison instead of damage).
 // ═══════════════════════════════════════════
 
+const { isAttackSpellOrCreatureSource } = require('./_hooks');
+
 module.exports = {
   isSurprise: true,
 
@@ -20,6 +22,9 @@ module.exports = {
    */
   surpriseTrigger: (gs, ownerIdx, heroIdx, sourceInfo, engine) => {
     if (sourceInfo.owner < 0 || sourceInfo.heroIdx < 0) return false;
+    // v666 (Sweep): „by an Attack, Spell or Creature effect“ — Helden-/
+    // Artefakt-/Trank-Effekte als Quelle loesen NICHT aus.
+    if (!isAttackSpellOrCreatureSource(engine, sourceInfo)) return false;
 
     // Creature source — check creature is still alive
     const srcInst = sourceInfo.cardInstance;

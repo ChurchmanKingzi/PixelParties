@@ -1086,6 +1086,21 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       const counterSpendDecisions = (engine._counterSpendLog || [])
         .filter(e => e.pi === pinnedIdx)
         .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      // Ability-Kosten-Kanal (v801): je Schleifenschritt und Kandidat
+      // „geschickt (fired) oder behalten" — Tags aus
+      // classifyAbilityCostTags, `item` = die Karte (fuer den Report).
+      // Zieh-Entscheidungen (v816): „You may draw N" je Karte, fired = gezogen.
+      const drawDecisions = (engine._drawDecisionLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      // Synergie-Kanal (v818): je eigenem Zug und Hand-Kreatur — Partner
+      // auf dem Brett (syn:<Name>, Aliasse inklusive), fired = beschworen.
+      const synergyDecisions = (engine._synergyLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0 }));
+      const abilityCostDecisions = (engine._abilityCostLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, tags, fired, item }) => ({ c, t, tags: tags || [], fired: fired ? 1 : 0, item }));
       // Zugende-Form je eigenem Zug: asc = in Ascended Form geendet,
       // evo = Zählerstand, ca = ein Aufstieg wäre bezahlbar gewesen.
       // Der Trainer formt daraus die Belohnung für den Kanal darüber und
@@ -1270,6 +1285,9 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         statusHealDecisions,
         marketCrashDecisions,
         counterSpendDecisions,
+        abilityCostDecisions,
+        drawDecisions,
+        synergyDecisions,
         formTurns,
         descends,
         descendDecisions,
