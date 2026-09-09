@@ -128,12 +128,66 @@ window.ppLayoutXY = ppLayoutXY;
 // Touch-Ursprung unterscheiden muessen, ohne sich auf `pointerType` zu
 // verlassen (Safari liefert `contextmenu` ohne).
 window._touchActive = false;
+let _touchStartPt = null;
 // Capture-Phase, also VOR Reacts Handlern: damit gilt `_isTouchDevice`
 // schon bei der allerersten Beruehrung (der alte Fenster-Listener kam
 // erst nach React dran, die erste Karte reagierte deshalb wie eine Maus).
-document.addEventListener('touchstart', () => { window._touchActive = true; window._isTouchDevice = true; }, { passive: true, capture: true });
+document.addEventListener('touchstart', (e) => {
+  window._touchActive = true; window._isTouchDevice = true;
+  const t = e.touches && e.touches[0];
+  _touchStartPt = t ? { x: t.clientX, y: t.clientY } : null;
+}, { passive: true, capture: true });
 document.addEventListener('touchend', () => { setTimeout(() => { window._touchActive = false; }, 400); }, { passive: true, capture: true });
 document.addEventListener('touchcancel', () => { window._touchActive = false; }, { passive: true, capture: true });
+
+// ═══ DOPPELTIPP = RECHTSKLICK (v838, Als Vorgabe 9.9.) ═══════════════════
+// „Generell soll Doppel-Tap in Mobile das Right-Click-Behavior haben."
+// Zentral statt in jedem Handler: zwei kurze Tipps innerhalb von
+// DOUBLE_TAP_MS und DOUBLE_TAP_PX (ohne Bewegung, kein Langdruck davor)
+// erzeugen ein synthetisches `contextmenu`-Ereignis auf dem Element des
+// ERSTEN Tipps — jeder vorhandene `onContextMenu`-Handler (Deck-Editor,
+// Puzzle-Creator: Hand, Zonen, Permanents, Stapel …) reagiert damit von
+// selbst. Das Ereignis traegt `_ppDoubleTap = true`; die `touchend` des
+// zweiten Tipps ebenfalls, und ihr `click` wird unterdrueckt.
+//
+// Wer auf den ERSTEN Tipp sofort reagiert (Menue oeffnen, Editor
+// aufmachen), verzoegert das um DOUBLE_TAP_MS und laesst es fallen, wenn
+// `_ppDoubleTapSeq` sich inzwischen erhoeht hat — siehe CardMini und die
+// Zonen im Puzzle-Creator.
+//
+// Der ECHTE Langdruck loest auf Android ebenfalls `contextmenu` aus;
+// das ist ab jetzt der Tooltip und sonst nichts — natives `contextmenu`
+// aus einer Beruehrung wird hier abgefangen, bevor React es sieht.
+const DOUBLE_TAP_MS = 320, DOUBLE_TAP_PX = 30;
+window.DOUBLE_TAP_MS = DOUBLE_TAP_MS;
+window._ppDoubleTapSeq = 0;
+let _letzterTipp = null; // { x, y, t, ziel }
+document.addEventListener('touchend', (e) => {
+  if (e.touches && e.touches.length > 0) return; // Mehrfingergeste
+  const t = e.changedTouches && e.changedTouches[0];
+  if (!t) return;
+  if (window._longPressFired) { _letzterTipp = null; return; }
+  if (_touchStartPt && (Math.abs(t.clientX - _touchStartPt.x) > 15 || Math.abs(t.clientY - _touchStartPt.y) > 15)) { _letzterTipp = null; return; }
+  const jetzt = Date.now();
+  if (_letzterTipp && jetzt - _letzterTipp.t < DOUBLE_TAP_MS
+      && Math.abs(t.clientX - _letzterTipp.x) < DOUBLE_TAP_PX && Math.abs(t.clientY - _letzterTipp.y) < DOUBLE_TAP_PX) {
+    const ziel = (_letzterTipp.ziel && _letzterTipp.ziel.isConnected) ? _letzterTipp.ziel : e.target;
+    _letzterTipp = null;
+    window._ppDoubleTapSeq++;
+    e._ppDoubleTap = true;
+    if (e.cancelable) e.preventDefault();
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: t.clientX, clientY: t.clientY, button: 2 });
+    ev._ppDoubleTap = true;
+    ziel.dispatchEvent(ev);
+    return;
+  }
+  _letzterTipp = { x: t.clientX, y: t.clientY, t: jetzt, ziel: e.target };
+}, { capture: true, passive: false });
+document.addEventListener('contextmenu', (e) => {
+  if (e._ppDoubleTap) return;
+  const pt = e.pointerType;
+  if (pt === 'touch' || pt === 'pen' || window._touchActive) { e.preventDefault(); e.stopPropagation(); }
+}, { capture: true });
 
 // ═══════════════════════════════════════════
 //  SOUND EFFECT MANAGER
@@ -1401,6 +1455,28 @@ async function api(path, opts = {}) {
 const socket = io();
 function emitSocket(event, data) { socket.emit(event, data); }
 
+// ═══ RE-AUTH NACH WIEDERVERBINDUNG (v838) ═══════════════════════════════
+// Al, 9.9.: „auf dem Handy passiert bei VS CPU gar nichts, und Attempt
+// Puzzle bleibt bei ‚Loading Puzzles' — am PC funktioniert dieselbe
+// Version". Beide Wege laufen ueber den Socket, und der Server prueft dort
+// `if (!currentUser) return;` — STILL. `currentUser` entsteht nur durch
+// `socket.emit('auth', token)`, und das schickte der Client genau EINMAL:
+// nach dem Login bzw. dem Auto-Login. Verliert der Socket die Verbindung
+// (Telefone tun das staendig: Bildschirm aus, App-Wechsel, Vollbild-
+// wechsel, Netzwechsel, Browser-Drosselung im Hintergrund), baut
+// socket.io still einen NEUEN Socket auf — serverseitig ohne
+// `currentUser`. Jedes Ereignis danach versandete. Nach F5 ging es, weil
+// der Auto-Login den neuen Socket authentifizierte.
+//
+// Jetzt: bei jeder Wiederverbindung wird das Token erneut gesendet. Der
+// erste `connect` bleibt aussen vor — dort haengt die Anmeldung wie
+// bisher am Login/Auto-Login (sein `emit` ist bis zum Verbinden gepuffert).
+let _socketWarVerbunden = false;
+socket.on('connect', () => {
+  if (_socketWarVerbunden && window.AUTH_TOKEN) socket.emit('auth', window.AUTH_TOKEN);
+  _socketWarVerbunden = true;
+});
+
 // Handle session superseded by another tab
 socket.on('superseded', ({ reason }) => {
   document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;text-align:center;padding:20px"><div><h2 style="color:#ff6644">⚠️ Session Taken Over</h2><p style="color:#aaa;max-width:400px">${reason || 'This session was opened in another tab.'}</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#4488ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px">Reload</button></div></div>`;
@@ -2213,13 +2289,13 @@ const TOP_BAR_H = 41; // top bar approximate height
 //     `onRightClick` — im Deck-Editor die Schnell-Hinzufuegung. Darum
 //     landete beim Nachschauen jedes Mal eine Karte im Deck. Jetzt wird
 //     `contextmenu` aus einer Beruehrung ignoriert.
-//   • DOPPELTIPP → `onRightClick` (Schnell-Hinzufuegen). Ein Einzeltipp
-//     wartet deshalb DOUBLE_TAP_MS auf einen zweiten, bevor `onClick`
-//     feuert — nur wenn es ueberhaupt eine Doppeltipp-Aktion gibt.
+//   • DOPPELTIPP → `onRightClick` — kommt seit v838 zentral als
+//     synthetisches `contextmenu` (siehe „DOPPELTIPP = RECHTSKLICK"). Ein
+//     Einzeltipp wartet deshalb DOUBLE_TAP_MS auf einen zweiten, bevor
+//     `onClick` feuert — nur wenn es ueberhaupt eine Doppeltipp-Aktion gibt.
 //   • `onTouchDragStart(e)`: Haken fuer den Aufrufer, der eine Karte per
 //     Finger ziehbar machen will (Deck-Editor-Galerie: [[app-deckbuilder]]).
 //     Wird zusaetzlich zum Langdruck-Timer bei `touchstart` gerufen.
-const DOUBLE_TAP_MS = 320;
 function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart }) {
   const [tt, setTT] = useState(null);
   const tapRef = useRef({ at: 0, timer: null });
@@ -2279,17 +2355,14 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       return;
     }
     if (window._isTouchDevice && onRightClick) {
-      const now = Date.now();
       const tap = tapRef.current;
-      if (tap.at && now - tap.at < DOUBLE_TAP_MS) {
-        // Zweiter Tipp: Doppeltipp-Aktion, der wartende Einzeltipp entfaellt.
-        clearTimeout(tap.timer); tap.at = 0; tap.timer = null;
-        onRightClick();
-        return;
-      }
-      tap.at = now;
+      const seq = window._ppDoubleTapSeq;
       clearTimeout(tap.timer);
-      tap.timer = setTimeout(() => { tap.at = 0; tap.timer = null; onClick && onClick(e); }, DOUBLE_TAP_MS);
+      tap.timer = setTimeout(() => {
+        tap.timer = null;
+        if (window._ppDoubleTapSeq !== seq) return; // war der erste Tipp eines Doppeltipps
+        onClick && onClick(e);
+      }, DOUBLE_TAP_MS);
       return;
     }
     onClick && onClick(e);
@@ -2306,9 +2379,11 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   };
   const handleContextMenu = (e) => {
     e.preventDefault();
-    // Aus einer Beruehrung (Langdruck): nichts tun — der Langdruck ist
-    // der Tooltip, die Schnellaktion liegt auf dem Doppeltipp.
-    const pt = e.nativeEvent && e.nativeEvent.pointerType;
+    const ne = e.nativeEvent;
+    if (ne && ne._ppDoubleTap) { clearTimeout(tapRef.current.timer); onRightClick && onRightClick(); return; }
+    // Echter Langdruck aus einer Beruehrung: nichts — das ist der Tooltip.
+    // (Wird zentral schon abgefangen; doppelter Boden.)
+    const pt = ne && ne.pointerType;
     if (pt === 'touch' || pt === 'pen' || window._touchActive) return;
     onRightClick && onRightClick();
   };

@@ -13391,7 +13391,13 @@ body:has(.textbox-overlay) .tooltip {
      tracker / buttons must stay in a single ROW (the intended layout).
      The previous override forced flex-direction: column, which stacked
      the phase items vertically and broke the strip. */
-  .phase-column { zoom: 0.9; left: 0 !important; }
+  /* v838 (Al, 9.9.): „Der Balken mit den Phasen sollte sich beim Wischen
+     NICHT mitbewegen." Auf dem Telefon scrollt `.board-center` senkrecht,
+     und die 400-ms-Messung in app-board.jsx (`--phase-mid-y`) folgte der
+     mitscrollenden Faltlinie — die Spalte lief dem Finger hinterher.
+     Hier fest auf die Mitte des Spielfelds; die Messung schreibt weiter,
+     wird aber ignoriert. */
+  .phase-column { zoom: 0.9; left: 0 !important; top: 50% !important; }
   .board-phase-tracker { flex-direction: row !important; gap: 1px !important; }
   .phase-buttons-row { flex-direction: row !important; }
 
@@ -14588,6 +14594,15 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   0%   { opacity: 0;    transform: scale(0.75); }
   8%   { opacity: 1;    transform: scale(1);    }
   100% { opacity: 0;    transform: scale(2.1);  }
+}
+/* Grundmass des Karten-Auftritts (app-board.jsx, `cardShowcase`). Auf
+   Telefonen (v838, Als Befund 9.9. „deutlich zu groess") an der
+   Bildschirmhoehe: 38 % → auf 390 px etwa 148 px, mit dem Wachstum auf
+   2,1 zum Schluss ~310 px. Das Kampffeld ist `ui-noscale`, `dvh` gilt
+   hier also direkt. */
+:root { --showcase-w: 260px; --showcase-h: 364px; }
+@media (max-height: 600px) {
+  :root { --showcase-w: calc(38dvh * 5 / 7); --showcase-h: 38dvh; }
 }
 
 /* ══════════════════════════════════════════════════════════

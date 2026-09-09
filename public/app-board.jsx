@@ -38756,8 +38756,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             animation: `pp-card-showcase ${cardShowcase.dur}ms ease-out forwards`,
           }}
         >
+          {/* Groesse seit v838 in style.css (`.pp-card-showcase-card`):
+              260×364 auf dem Desktop, auf Telefonen relativ zur
+              Bildschirmhoehe — die Animation waechst noch auf das
+              2,1-Fache, auf 390 px Hoehe war das eine Wand. */}
           <BoardCard cardName={cardShowcase.cardName} noTooltip
-            style={{ width: 260, height: 364, filter: 'drop-shadow(0 0 40px rgba(0,0,0,.9))' }} />
+            style={{ width: 'var(--showcase-w)', height: 'var(--showcase-h)', filter: 'drop-shadow(0 0 40px rgba(0,0,0,.9))' }} />
         </div>
       )}
     </div>

@@ -433,7 +433,7 @@ function PuzzleCreator() {
   const [mobileSelected, setMobileSelected] = useState(null); // { cardName, handIdx, handSource }
   const isTouchDevice = 'ontouchstart' in window;
   const touchStartRef = useRef(null);
-  const lastTapRef = useRef({ time: 0, handSource: null, handIdx: -1 }); // double-tap detection
+  // (Doppeltipp-Erkennung seit v838 zentral in app-shared — „DOPPELTIPP = RECHTSKLICK".)
 
   // Filtered card search results. Declared up here (before the scrollbar
   // effect below depends on it) so it's initialized when that effect's
@@ -2615,8 +2615,18 @@ function PuzzleCreator() {
         touchDragEnd(e);
         if (!wasDragging) {
           e.preventDefault();
-          if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
-          else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+          // v838: Doppeltipp = Rechtsklick = Karte entfernen (kommt als
+          // synthetisches `contextmenu`, siehe app-shared). Der Editor
+          // oeffnet deshalb erst nach DOUBLE_TAP_MS — und gar nicht, wenn
+          // bis dahin ein Doppeltipp gezaehlt wurde oder dies schon der
+          // zweite Tipp war.
+          if (e.nativeEvent && e.nativeEvent._ppDoubleTap) return;
+          const seq = window._ppDoubleTapSeq;
+          setTimeout(() => {
+            if (window._ppDoubleTapSeq !== seq) return;
+            if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
+            else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+          }, window.DOUBLE_TAP_MS || 320);
         }
       } : undefined,
     };
@@ -3207,7 +3217,7 @@ function PuzzleCreator() {
                     } : undefined}
                     onTouchStart={(e) => touchDragStart(cardName, i, 'oppHand', null, e)}
                     onTouchMove={touchDragMove}
-                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'oppHand' && lt.handIdx === i && now - lt.time < 350) { removeFromOppHand(i); if (window.playSFX) window.playSFX('discard'); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'oppHand', handIdx: i }; if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } } }}
+                    onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); /* v838: Doppeltipp entfernt zentral per contextmenu */ if (e.nativeEvent && e.nativeEvent._ppDoubleTap) return; if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' }); } }}
                     onContextMenu={(e) => { e.preventDefault(); removeFromOppHand(i); if (window.playSFX) window.playSFX('discard'); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
@@ -3428,7 +3438,7 @@ function PuzzleCreator() {
                 } : undefined}
                 onTouchStart={(e) => touchDragStart(cardName, i, 'hand', null, e)}
                 onTouchMove={touchDragMove}
-                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); const now = Date.now(); const lt = lastTapRef.current; if (lt.handSource === 'hand' && lt.handIdx === i && now - lt.time < 350) { removeFromHand(i); if (window.playSFX) window.playSFX('discard'); setMobileSelected(null); lastTapRef.current = { time: 0, handSource: null, handIdx: -1 }; } else { lastTapRef.current = { time: now, handSource: 'hand', handIdx: i }; if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } } }}
+                onTouchEnd={(e) => { const wasDragging = touchDragRef.current?.dragging; touchDragEnd(e); if (!wasDragging) { e.preventDefault(); /* v838: Doppeltipp entfernt zentral per contextmenu */ if (e.nativeEvent && e.nativeEvent._ppDoubleTap) return; if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null); else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' }); } }}
                 onContextMenu={(e) => { e.preventDefault(); removeFromHand(i); if (window.playSFX) window.playSFX('discard'); }}
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
