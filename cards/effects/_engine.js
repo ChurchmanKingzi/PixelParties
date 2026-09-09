@@ -2520,6 +2520,7 @@ class GameEngine {
   async _bleedDamageAmount(targetInfo) {
     const hookCtx = { amount: BLEED_BASE_DAMAGE, bleedTarget: targetInfo, _skipReactionCheck: true };
     try { await this.runHooks('beforeBleedDamage', hookCtx); } catch { /* Beiwerk */ }
+    this._settleAmount(hookCtx); // v840, siehe _settleAmount
     return Math.max(0, Math.round(hookCtx.amount || 0));
   }
 
@@ -5719,6 +5720,36 @@ class GameEngine {
     if (hookCtx?.amount === undefined) return undefined;
     const mul = hookCtx._mul ?? 1, flat = hookCtx._flat || 0;
     return Math.max(0, Math.ceil(hookCtx.amount * mul) + flat);
+  }
+
+  /**
+   * ═══ SAMMLER VERRECHNEN (v840, Als Befund 9.9.: „Semis Effekt ist
+   * allgemein kaputt — 4 statt 10 Gold") ═══════════════════════════════
+   * Seit PUNKT VOR STRICH (1.9.) schreibt `ctx.modifyAmount` NICHT mehr
+   * in `hookCtx.amount`, sondern sammelt in `_flat` (und
+   * `multiplyAmount` in `_mul`); die Engine rechnet NACH der Hook-Runde
+   * zusammen. Umgestellt wurde damals nur der Schadenspfad. Jede andere
+   * Stelle, die nach `runHooks` weiter `hookCtx.amount` las, bekam seither
+   * die ROHBASIS — jeder Bonus per `modifyAmount` verfiel stillschweigend:
+   *   • Goldgewinn (Semi +6, Wealth +4/8/12, Golden Vermin, Abomination),
+   *   • Goldausgabe (`onResourceSpend`),
+   *   • Bleed-Schaden (`beforeBleedDamage`),
+   *   • Giftschaden (Bloom, +Paraseed je Stack).
+   * `setAmount` und `ctx.amount = …` funktionierten weiter (die schreiben
+   * direkt), deshalb fiel es nicht ueberall auf. Dieselbe Bauform wie
+   * die Reparatur des Schadensvorschau-Fensters vom 5.9. (Shattered
+   * Trident) — nur diesmal als EIN Helfer fuer alle Nicht-Schadens-
+   * Stellen: rechnet zusammen, setzt `amount` auf das Ergebnis und leert
+   * die Sammler. Der Schadenspfad behaelt seinen eigenen Ablauf, weil er
+   * die Buff-Multiplikatoren noch VOR dem Zusammenrechnen einmischt.
+   */
+  _settleAmount(hookCtx) {
+    const p = this._projectedAmount(hookCtx);
+    if (p === undefined) return hookCtx?.amount;
+    hookCtx.amount = p;
+    hookCtx._flat = 0;
+    hookCtx._mul = 1;
+    return p;
   }
 
   _isHeroEffectSilenced(pi, heroIdx) {
@@ -18130,6 +18161,7 @@ class GameEngine {
     const hookCtx = { playerIdx, amount, cancelled: false, _isResourceGain: !!opts._isResourceGain };
     await this.runHooks(HOOKS.ON_RESOURCE_GAIN, hookCtx);
     if (hookCtx.cancelled) return;
+    this._settleAmount(hookCtx); // v840: modifyAmount-Boni (Semi, Wealth …) verrechnen
     // Opponent's Surprise window — Gold Trap (and any future
     // surpriseResourceGainTrigger surprise) intercepts the gain.
     // Fires AFTER own-side hooks so Golden Vermin's swap and
@@ -18184,7 +18216,7 @@ class GameEngine {
     const hookCtx = { playerIdx, amount, cancelled: false };
     await this.runHooks(HOOKS.ON_RESOURCE_SPEND, hookCtx);
     if (hookCtx.cancelled) return false;
-    const spent = hookCtx.amount;
+    const spent = this._settleAmount(hookCtx); // v840, siehe _settleAmount
     // KEINE Klemme: der Kreditrahmen oben hat die Zahlung erlaubt,
     // also darf sie unter 0 gehen (Debt-O-Tron).
     ps.gold -= spent;
@@ -35599,7 +35631,7 @@ class GameEngine {
   async calculatePoisonDamage(playerIdx, stacks) {
     const hookCtx = { amount: POISON_BASE_DAMAGE * stacks, baseDamage: POISON_BASE_DAMAGE, stacks, playerIdx };
     await this.runHooks(HOOKS.MODIFY_POISON_DAMAGE, hookCtx);
-    return Math.max(0, hookCtx.amount);
+    return Math.max(0, this._settleAmount(hookCtx)); // v840, siehe _settleAmount
   }
 
   /**

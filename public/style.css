@@ -5758,7 +5758,11 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   animation: cardRevealAnim 3.5s ease-in-out forwards;
 }
 .card-reveal-card {
-  width: 340px;
+  /* v839: auf Telefonen an der Bildschirmhoehe (Al, 9.9.: die
+     Einblendung beim Aufloesen war „nach wie vor zu gross" — 340px
+     breit heisst 476px hoch auf einem 390px-Schirm). Das Kampffeld ist
+     `ui-noscale`, `dvh` gilt hier direkt: 62 % → ~242px hoch. */
+  width: var(--reveal-card-w, 340px);
   aspect-ratio: 750 / 1050;
   box-shadow: 0 0 50px rgba(0,0,0,.7), 0 0 100px rgba(255,255,255,.08);
   border-radius: 8px;
@@ -13398,6 +13402,20 @@ body:has(.textbox-overlay) .tooltip {
      Hier fest auf die Mitte des Spielfelds; die Messung schreibt weiter,
      wird aber ignoriert. */
   .phase-column { zoom: 0.9; left: 0 !important; top: 50% !important; }
+  /* v839 (Al, 9.9.): „Die Background-Boxen fuer die Phasen sind noch
+     nicht gelockt." Die Platten (`.phase-plate`) liegen mit Absicht IN
+     der gekippten Ebene — zwischen Area-Hintergrund und Karten — und
+     scrollen dort mit `.board-center` mit; die Messschleife holt sie nur
+     im Nachlauf wieder ein. Auf dem Telefon werden sie deshalb
+     ausgeblendet und die beiden Zeilen der Spalte tragen ihre Optik
+     selbst (gleiche Werte wie `.phase-plate`). Kosmetischer Verzicht:
+     mobil liegt die Box ueber den Area-Zonen statt zwischen ihnen. */
+  .phase-plate { display: none !important; }
+  .board-phase-tracker, .phase-buttons-row {
+    background: rgba(10, 10, 18, .92);
+    border: 2px solid rgba(190, 200, 230, .35);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, .65), 0 0 0 1px rgba(0, 0, 0, .6);
+  }
   .board-phase-tracker { flex-direction: row !important; gap: 1px !important; }
   .phase-buttons-row { flex-direction: row !important; }
 
@@ -14602,7 +14620,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    hier also direkt. */
 :root { --showcase-w: 260px; --showcase-h: 364px; }
 @media (max-height: 600px) {
-  :root { --showcase-w: calc(38dvh * 5 / 7); --showcase-h: 38dvh; }
+  :root { --showcase-w: calc(38dvh * 5 / 7); --showcase-h: 38dvh; --reveal-card-w: calc(62dvh * 5 / 7); }
 }
 
 /* ══════════════════════════════════════════════════════════
