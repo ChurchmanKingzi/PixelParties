@@ -17,8 +17,12 @@ function CtxMenu({ x, y, items, onClose }) {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [onClose]);
+  // v837: `fixed` im gezoomten Bildschirm — `x`/`y` kommen als Fenster-
+  // pixel (clientX/Y), `left`/`top` zaehlen aber in Layoutpixeln.
+  const p = window.ppLayoutXY(x, y);
+  const maxX = window.innerWidth / p.s - 200, maxY = window.innerHeight / p.s - items.length * 40 - 10;
   return (
-    <div className="ctx-menu" style={{ left: Math.min(x, window.innerWidth - 200), top: Math.min(y, window.innerHeight - items.length * 40 - 10) }}>
+    <div className="ctx-menu" style={{ left: Math.min(p.x, maxX), top: Math.min(p.y, maxY) }}>
       {items.map((it, i) => (
         <div key={i} className={'ctx-menu-item' + (it.disabled ? ' disabled' : '')}
           onClick={() => { if (!it.disabled) { it.action(); onClose(); } }}>
@@ -71,7 +75,8 @@ function TipBtn({ tip, children, ...props }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const onEnter = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    setPos({ x: rect.left + rect.width / 2, y: rect.top });
+    // v837: Fenster- → Layoutpixel (gezoomter Bildschirm), siehe ppLayoutXY.
+    setPos(window.ppLayoutXY(rect.left + rect.width / 2, rect.top, e.currentTarget));
     setShow(true);
   };
   return (
@@ -918,7 +923,25 @@ function DeckBuilder() {
   }, [filters, isCube]);
 
   // Collapsing the filter panel frees vertical room, so show more cards per page.
-  const pageSize = filtersCollapsed ? 40 : 20;
+  // v837 (Als Vorgabe 8.9.): die Seitengroesse ist ein Vielfaches der
+  // tatsaechlichen Spaltenzahl des Rasters (style.css schaltet je nach
+  // Breite auf 4/3/2 Spalten), damit die letzte Zeile jeder Seite voll
+  // ist — bei 3 Spalten 21/39 statt 20/40.
+  const gridRef = useRef(null);
+  const [gridCols, setGridCols] = useState(4);
+  useLayoutEffect(() => {
+    const messen = () => {
+      const el = gridRef.current;
+      if (!el) return;
+      const n = getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length;
+      if (n > 0) setGridCols(prev => (prev === n ? prev : n));
+    };
+    messen();
+    window.addEventListener('resize', messen);
+    return () => window.removeEventListener('resize', messen);
+  }, [filtersCollapsed]);
+  const pageBasis = filtersCollapsed ? 40 : 20;
+  const pageSize = Math.max(gridCols, Math.round(pageBasis / gridCols) * gridCols);
   const pageCount = Math.ceil(filteredCards.length / pageSize);
   const pageCards = filteredCards.slice(cardPage * pageSize, (cardPage + 1) * pageSize);
   // ★ 4.9. (Als Befund): aendert sich die Galerie unter dem ruhenden Cursor
@@ -1023,6 +1046,68 @@ function DeckBuilder() {
       }
     );
   }, [currentDeck, reorderInSection, swapHeroes, handleDrop, removeFrom]);
+
+  // ── Galerie per Finger ziehen (v837, Als Vorgabe 8.9.) ──────────────
+  // Die Galeriekarten haengen am HTML5-Drag (`dragData`), das auf Touch
+  // nicht feuert. Hier dasselbe Muster wie beim Puzzle-Creator und den
+  // Deck-Abschnitten (`onDeckCardMouseDown`): eigene Fensterlistener,
+  // Schwelle 12 px, dann schwebende Karte, Luecke im Zielabschnitt
+  // (`galleryDragOver`), Ablage ueber `handleDrop` wie beim Mausdrag.
+  //
+  // Abgrenzung zum SCROLLEN der Galerie: die Karten tragen
+  // `touch-action: pan-y` (style.css). Zieht der Finger senkrecht,
+  // scrollt der Browser selbst und meldet die `touchmove`-Ereignisse als
+  // nicht abbrechbar — dann bleibt es beim Scrollen. Zieht er waagerecht
+  // (Richtung Deck), ist das Ereignis abbrechbar und wird zum Ziehen.
+  // Ruhig gehalten bleibt der Langdruck (Tooltip), der beim Ziehen
+  // abgebrochen wird.
+  const [galleryTouchDrag, setGalleryTouchDrag] = useState(null); // { card, mouseX, mouseY }
+  const startGalleryTouchDrag = useCallback((card, e) => {
+    if (!e.touches || !e.touches[0]) return;
+    const t0 = e.touches[0];
+    const startX = t0.clientX, startY = t0.clientY;
+    let dragging = false;
+    const onMove = (ev) => {
+      const t = ev.touches && ev.touches[0];
+      if (!t) return;
+      if (!dragging) {
+        if (Math.abs(t.clientX - startX) < 12 && Math.abs(t.clientY - startY) < 12) return;
+        if (!ev.cancelable) { cleanup(); return; } // der Browser scrollt bereits
+        dragging = true;
+        clearTimeout(window._longPressTimer);
+        window._longPressFired = false;
+        if (window.setTapTooltip) window.setTapTooltip(null);
+        window.deckDragState = { section: 'gallery', fromIdx: -1, cardName: card.name };
+      }
+      ev.preventDefault();
+      setGalleryTouchDrag({ card, mouseX: t.clientX, mouseY: t.clientY });
+      const dt = findDropTarget(t.clientX, t.clientY, null, -1);
+      onGalleryDragPos(dt ? dt.section : null, t.clientX, t.clientY);
+    };
+    const onEnd = (ev) => {
+      cleanup();
+      if (!dragging) return;
+      const t = ev.changedTouches && ev.changedTouches[0];
+      setGalleryTouchDrag(null);
+      onGalleryDragPos(null);
+      window.deckDragState = null;
+      if (!t) return;
+      const dt = findDropTarget(t.clientX, t.clientY, null, -1);
+      if (dt) {
+        handleDrop(dt.section, dt.section === 'hero'
+          ? { cardName: card.name, targetSlot: dt.idx }
+          : { cardName: card.name }, t.clientX, t.clientY);
+      }
+    };
+    function cleanup() {
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('touchcancel', onEnd);
+    }
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
+  }, [handleDrop, onGalleryDragPos]);
 
   const findDropTarget = (mouseX, mouseY, fromSection, fromIdx) => {
     // Check hero slots first
@@ -1700,7 +1785,7 @@ function DeckBuilder() {
           )}
           {/* Card grid */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-            <div className="db-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+            <div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
               {pageCards.map((card, i) => {
                 const canMain = canAddCard(currentDeck || {}, card.name, 'main');
                 const canHero = canAddCard(currentDeck || {}, card.name, 'hero');
@@ -1712,6 +1797,7 @@ function DeckBuilder() {
                     onClick={(e) => showAddMenu(card.name, e)}
                     onRightClick={() => autoAdd(card.name)}
                     dragData={canAny ? { cardName: card.name } : null}
+                    onTouchDragStart={canAny ? (e) => startGalleryTouchDrag(card, e) : undefined}
                     inGallery
                     style={{ width: '100%', height: 120 }} />
                 );
@@ -1781,12 +1867,18 @@ function DeckBuilder() {
         </div>
       )}
 
-      {/* Floating deck drag card */}
-      {deckDrag && deckDrag.card && (
-        <div className="hand-floating-card" style={{ left: deckDrag.mouseX - 43, top: deckDrag.mouseY - 60 }}>
+      {/* Floating deck drag card — v837: `fixed` im gezoomten Bildschirm,
+          Fingerposition (Fensterpixel) in Layoutpixel gewandelt. */}
+      {deckDrag && deckDrag.card && (() => { const p = window.ppLayoutXY(deckDrag.mouseX, deckDrag.mouseY); return (
+        <div className="hand-floating-card" style={{ left: p.x - 43, top: p.y - 60 }}>
           <CardMini card={deckDrag.card} onClick={() => {}} />
         </div>
-      )}
+      ); })()}
+      {galleryTouchDrag && (() => { const p = window.ppLayoutXY(galleryTouchDrag.mouseX, galleryTouchDrag.mouseY); return (
+        <div className="hand-floating-card" style={{ left: p.x - 43, top: p.y - 60 }}>
+          <CardMini card={galleryTouchDrag.card} onClick={() => {}} />
+        </div>
+      ); })()}
     </div>
   );
 }

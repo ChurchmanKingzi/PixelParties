@@ -12169,19 +12169,31 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   opacity: .85;
 }
 
-/* ── Puzzle Creator: mobile layout ── */
+/* ── Puzzle Creator: mobile layout ──
+   v837 (Als Befund 8.9.: „im Create-Puzzle-Screen fehlt auf Mobile die
+   Kartengalerie"): der Suchkasten war hier 160px breit, die Filterleiste
+   darin aber 200px fest (`flex-shrink: 0`) — die Galeriespalte
+   (`flex: 1; min-width: 0`) hatte damit BREITE NULL. Jetzt 360px fuer
+   den Kasten, 130px fuer die Filter, drei Karten pro Reihe (die Inline-
+   Vorgabe von 5 Spalten bei eingeklappten Filtern waere hier zu
+   kleinteilig). Das Brett daneben passt sich ueber `--board-scale` an. */
 @media (max-width: 900px) {
   .pz-search-panel {
-    width: 160px;
+    width: 360px;
     padding: 4px;
     gap: 4px;
   }
+  .pz-filter-sidebar { width: 130px; padding: 4px; gap: 4px; }
   .pz-search-results {
     gap: 3px;
+    grid-template-columns: repeat(3, 1fr) !important;
   }
+  /* Karten fuellen ihre Rasterzelle (das alte `width: calc((100% - 6px)
+     / 3)` stammte aus der Flex-Wrap-Zeit und machte im Raster jede Karte
+     ein Drittel so breit wie ihre Zelle). */
   .pz-search-card {
-    width: calc((100% - 6px) / 3);
-    height: 70px;
+    width: 100%;
+    height: auto;
   }
   .pz-hand-card {
     width: 40px;
@@ -12560,12 +12572,24 @@ body:has(.textbox-overlay) .tooltip {
 
 /* ═══ Deck Builder responsive ═══ */
 
-/* Narrow landscape (phones, small tablets in landscape) */
+/* Narrow landscape (phones, small tablets in landscape)
+   v837: die Galeriebreite steht in `--db-gallery-w`, damit der
+   Karten-Tooltip (`.card-tooltip-gallery`, `right:` = Galeriebreite)
+   an jedem Breakpoint LINKS NEBEN der Galerie sitzt statt in sie
+   hineinzuragen (bis v836 stand dort fest 200px, die Galerie war aber
+   280px breit). */
+:root { --db-gallery-w: 400px; }
 @media (max-width: 1100px) {
-  .db-panel-right { width: 280px !important; }
+  :root { --db-gallery-w: 280px; }
+  .db-panel-right { width: var(--db-gallery-w) !important; }
   .db-panel-left { width: 120px !important; }
   .db-card-grid { grid-template-columns: repeat(3, 1fr) !important; }
 }
+/* Galeriekarten per Finger (v837): senkrecht scrollt der Browser, waagerecht
+   zieht app-deckbuilder.jsx die Karte ins Deck (`startGalleryTouchDrag`).
+   Ohne `pan-y` haette der Browser jede Bewegung als Scrollen beansprucht.
+   Unterdrueckt zugleich den Doppeltipp-Zoom. */
+.db-card-grid .card-mini { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 @media (max-width: 850px) {
   /* Top bar: allow wrapping */
@@ -12574,7 +12598,8 @@ body:has(.textbox-overlay) .tooltip {
   .top-bar h2 { font-size: 11px !important; }
 
   /* Deck panels: shrink further */
-  .db-panel-right { width: 200px !important; }
+  :root { --db-gallery-w: 200px; }
+  .db-panel-right { width: var(--db-gallery-w) !important; }
   .db-panel-left { width: 90px !important; }
   .db-card-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
@@ -12593,7 +12618,8 @@ body:has(.textbox-overlay) .tooltip {
   /* Very narrow landscape: collapse left panel */
   .db-panel-left { width: 70px !important; }
   .db-panel-left .orbit-font { font-size: 7px !important; }
-  .db-panel-right { width: 160px !important; }
+  :root { --db-gallery-w: 160px; }
+  .db-panel-right { width: var(--db-gallery-w) !important; }
   .db-card-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 2px !important; }
 
   /* Filters: single column */
@@ -13393,16 +13419,17 @@ body:has(.textbox-overlay) .tooltip {
      from the responsive grid + aspect-ratio, so no pixel overrides. */
   .db-hero-row { gap: 8px !important; padding: 4px !important; }
 
-  /* ── Card tooltip: match right column width, image-only ── */
+  /* ── Card tooltip: image-only, v837 ~20 % groesser (240 statt 200,
+     Als Vorgabe 8.9.) ── */
   .card-tooltip {
-    width: 200px !important;
+    width: 240px !important;
     height: auto !important;
     max-height: calc(100 * var(--vh) - 40px) !important;
     top: 38px !important;
   }
   /* Gallery tooltip: position to the LEFT of the gallery panel */
   .card-tooltip-gallery {
-    right: 200px !important;
+    right: var(--db-gallery-w) !important;
   }
   /* Hide text info, show only card image */
   .card-tooltip .card-tooltip-info { display: none !important; }
@@ -13443,8 +13470,8 @@ body:has(.textbox-overlay) .tooltip {
 
 /* Tooltip width matches right panel at narrower breakpoints */
 @media (max-height: 500px) and (max-width: 700px) {
-  .card-tooltip { width: 160px !important; }
-  .card-tooltip-gallery { right: 160px !important; }
+  .card-tooltip { width: 192px !important; }
+  .card-tooltip-gallery { right: var(--db-gallery-w) !important; }
 }
 
 /* Profile heroes column — tighter on mobile */

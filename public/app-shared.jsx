@@ -100,6 +100,41 @@ function getPointerXY(e) {
 }
 window.getPointerXY = getPointerXY;
 
+// ═══ FENSTER-KOORDINATEN → LAYOUT-KOORDINATEN (v837) ═══════════════════
+// Die Menue-Bildschirme laufen unter `zoom: var(--ui-scale)` (style.css,
+// „OBERFLAECHEN-MASSSTAB"). Ein `position: fixed`-Element DARIN wird mit
+// `left`/`top` in LAYOUT-Pixeln gesetzt, die der Zoom beim Zeichnen mit
+// dem Massstab multipliziert — `clientX`/`clientY` und
+// `getBoundingClientRect()` liefern aber ECHTE Fensterpixel. Wer die
+// ungewandelt einsetzt, landet bei Massstab 0.70 bei 70 % der Position
+// (Als Befund 8.9.: „das Submenu erscheint deutlich oben links von der
+// Karte"). Diese Helfer teilen durch den Massstab, der fuer `el` gilt —
+// im Kampffeld (`ui-noscale`, dort ist `--ui-scale` lokal 1) aendern sie
+// nichts.
+function ppUiScale(el) {
+  try {
+    const v = parseFloat(getComputedStyle(el || document.documentElement).getPropertyValue('--ui-scale'));
+    return v > 0 ? v : 1;
+  } catch { return 1; }
+}
+function ppLayoutXY(x, y, el) {
+  const s = ppUiScale(el);
+  return { x: x / s, y: y / s, s };
+}
+window.ppUiScale = ppUiScale;
+window.ppLayoutXY = ppLayoutXY;
+
+// Laeuft gerade eine Beruehrung? (v837) Fuer Handler, die Maus- von
+// Touch-Ursprung unterscheiden muessen, ohne sich auf `pointerType` zu
+// verlassen (Safari liefert `contextmenu` ohne).
+window._touchActive = false;
+// Capture-Phase, also VOR Reacts Handlern: damit gilt `_isTouchDevice`
+// schon bei der allerersten Beruehrung (der alte Fenster-Listener kam
+// erst nach React dran, die erste Karte reagierte deshalb wie eine Maus).
+document.addEventListener('touchstart', () => { window._touchActive = true; window._isTouchDevice = true; }, { passive: true, capture: true });
+document.addEventListener('touchend', () => { setTimeout(() => { window._touchActive = false; }, 400); }, { passive: true, capture: true });
+document.addEventListener('touchcancel', () => { window._touchActive = false; }, { passive: true, capture: true });
+
 // ═══════════════════════════════════════════
 //  SOUND EFFECT MANAGER
 //  Preloads all /sounds/*.ogg (see SFX_EXT_OVERRIDES) once via
@@ -2172,8 +2207,23 @@ function FoilOverlay({ bands, shimmerOffset, sparkleDelays, foilType }) {
 const GALLERY_W = 400;
 const TOP_BAR_H = 41; // top bar approximate height
 
-function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins }) {
+// ── BEDIENUNG PER FINGER (v837, Als Vorgaben 8.9.) ─────────────────────
+//   • Langdruck (400 ms, ohne Bewegung) → Tooltip. Bis v836 loeste der
+//     Langdruck auf Android zusaetzlich `contextmenu` aus, und das rief
+//     `onRightClick` — im Deck-Editor die Schnell-Hinzufuegung. Darum
+//     landete beim Nachschauen jedes Mal eine Karte im Deck. Jetzt wird
+//     `contextmenu` aus einer Beruehrung ignoriert.
+//   • DOPPELTIPP → `onRightClick` (Schnell-Hinzufuegen). Ein Einzeltipp
+//     wartet deshalb DOUBLE_TAP_MS auf einen zweiten, bevor `onClick`
+//     feuert — nur wenn es ueberhaupt eine Doppeltipp-Aktion gibt.
+//   • `onTouchDragStart(e)`: Haken fuer den Aufrufer, der eine Karte per
+//     Finger ziehbar machen will (Deck-Editor-Galerie: [[app-deckbuilder]]).
+//     Wird zusaetzlich zum Langdruck-Timer bei `touchstart` gerufen.
+const DOUBLE_TAP_MS = 320;
+function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style, dragData, inGallery, isCover, skins, onTouchDragStart }) {
   const [tt, setTT] = useState(null);
+  const tapRef = useRef({ at: 0, timer: null });
+  useEffect(() => () => clearTimeout(tapRef.current.timer), []);
   const imgUrl = cardImageUrl(card.name, skins);
   const foilType = card.foil; // 'secret_rare' | 'diamond_rare' | null
   const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
@@ -2228,6 +2278,20 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       e.stopPropagation();
       return;
     }
+    if (window._isTouchDevice && onRightClick) {
+      const now = Date.now();
+      const tap = tapRef.current;
+      if (tap.at && now - tap.at < DOUBLE_TAP_MS) {
+        // Zweiter Tipp: Doppeltipp-Aktion, der wartende Einzeltipp entfaellt.
+        clearTimeout(tap.timer); tap.at = 0; tap.timer = null;
+        onRightClick();
+        return;
+      }
+      tap.at = now;
+      clearTimeout(tap.timer);
+      tap.timer = setTimeout(() => { tap.at = 0; tap.timer = null; onClick && onClick(e); }, DOUBLE_TAP_MS);
+      return;
+    }
     onClick && onClick(e);
   };
   const handleTouchStart = (e) => {
@@ -2238,6 +2302,15 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
       setTapTooltip(card.name);
       if (useSharedTooltip) window._boardTooltipSetter(card); else setTT(true);
     }, LONG_PRESS_MS);
+    if (onTouchDragStart) onTouchDragStart(e);
+  };
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    // Aus einer Beruehrung (Langdruck): nichts tun — der Langdruck ist
+    // der Tooltip, die Schnellaktion liegt auf dem Doppeltipp.
+    const pt = e.nativeEvent && e.nativeEvent.pointerType;
+    if (pt === 'touch' || pt === 'pen' || window._touchActive) return;
+    onRightClick && onRightClick();
   };
   const onDragStart = (e) => {
     if (dragData) {
@@ -2258,7 +2331,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onDragEnd={onDragEnd}
         onClick={handleClick}
         onTouchStart={handleTouchStart}
-        onContextMenu={(e) => { e.preventDefault(); onRightClick && onRightClick(); }}
+        onContextMenu={handleContextMenu}
         onMouseEnter={show} onMouseLeave={hide}
         data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
         {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
@@ -2557,8 +2630,11 @@ function GameTooltip() {
   // edge; cursor-anchored tips drop straight at the offset point so
   // the box appears below-right of the pointer (no Y-translate).
   const transform = tip.atCursor ? 'none' : 'translateY(-50%)';
+  // v837: `fixed` im gezoomten Bildschirm — Fensterpixel in Layoutpixel
+  // wandeln (Massstab des Ankers; im Kampffeld 1).
+  const pos = ppLayoutXY(tip.x, tip.y, tip.el && tip.el.isConnected ? tip.el : null);
   return (
-    <div className="game-tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform, zIndex: 10000, pointerEvents: 'none' }}>
+    <div className="game-tooltip" style={{ position: 'fixed', left: pos.x, top: pos.y, transform, zIndex: 10000, pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
