@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck_ Grand Rebellion!
+Cover: Rebelliokai Courtly Kirin
 
 == HEROES ==
 Johanna, Crusader of Light

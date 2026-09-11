@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Hellfire Battery
+Cover: Horned Demon
 
 == HEROES ==
 Tempeste, the Weather Fairy
