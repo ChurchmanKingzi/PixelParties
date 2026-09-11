@@ -122,7 +122,9 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'gold_sparkle', owner: ctx.cardHeroOwner, heroIdx, zoneSlot: -1 });
 
       // Deal damage to Diamond (type 'other', can kill)
-      await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace' }, hero, selfDamage, 'other');
+      // v845: Quelle mit Besitzer (siehe Angry Cheese) — sonst zaehlt der
+      // Selbstschaden fuer Hooks wie Tazunes Schild als besitzerlos.
+      await engine.actionDealDamage({ name: 'Diamond, the Keeper of Peace', owner: pi, controller: pi }, hero, selfDamage, 'other');
       engine.sync();
     },
   },

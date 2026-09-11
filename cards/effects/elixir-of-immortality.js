@@ -150,13 +150,28 @@ module.exports = {
         // Creatures dying on opp's side don't feed your Elixir.
         if ((e.inst.controller ?? e.inst.owner) !== pi) continue;
         if (e.inst.counters.currentHp !== undefined && e.inst.counters.currentHp <= 0) {
-          if (ps.discardPile.includes(e.inst.name)) {
+          // v847 (Als Befund): TOKENS landen im GELOESCHT-Stapel, nicht in
+          // der Ablage (`processCreatureDamageBatch`: Token → deletedPile).
+          // Die alte Pruefung sah nur `discardPile` — ein sterbender
+          // Biomancy-Token wurde deshalb nie eingesammelt und das Elixir
+          // loeste gar nicht aus. Der Stapel wird jetzt mitgefuehrt, damit
+          // die Wiederbelebung ihn aus dem richtigen holt.
+          const pile = ps.discardPile.includes(e.inst.name) ? 'discard'
+                     : ps.deletedPile.includes(e.inst.name) ? 'deleted'
+                     : null;
+          if (pile) {
             if (!perm._pendingCreatures) perm._pendingCreatures = [];
             if (!perm._pendingCreatures.some(pc => pc.name === e.inst.name && pc.heroIdx === e.inst.heroIdx && pc.zoneSlot === e.inst.zoneSlot)) {
               perm._pendingCreatures.push({
                 name: e.inst.name,
                 heroIdx: e.inst.heroIdx,
                 zoneSlot: e.inst.zoneSlot,
+                pile,
+                // Token-Identitaet mitnehmen (siehe TOKEN_STATE_KEYS):
+                // ohne sie kaeme die Potion als sie selbst zurueck, ohne
+                // Kreatur-Kartendaten, ohne Aktiveffekt und mit den
+                // 100 HP des Rueckfallwerts.
+                tokenState: captureTokenState(e.inst),
               });
             }
           }
@@ -216,6 +231,26 @@ module.exports = {
 //  SHARED RESOLVE LOGIC
 // ═══════════════════════════════════════════
 
+// ── Token-Identitaet (v847) ─────────────────────────────────────────
+// Ein Token ist kein Kartenname, sondern ein Satz Zaehler auf der
+// Instanz (siehe `_biomancy-shared.js`, "WAS EIN TOKEN AUSMACHT"):
+// `_cardDataOverride` macht die Potion zur Kreatur, `_effectOverride`
+// bestimmt das Skript, der Rest sind seine Werte. Bewusst GENERISCH
+// ueber diese Schluessel statt per Kartenname — jede kuenftige
+// Token-Bauart derselben Form wird damit automatisch richtig
+// wiederbelebt.
+const TOKEN_STATE_KEYS = ['_cardDataOverride', '_effectOverride', 'maxHp', 'biomancyDamage', 'biomancyLevel'];
+
+function captureTokenState(inst) {
+  const c = inst?.counters;
+  if (!c || !c._cardDataOverride) return null;
+  const out = {};
+  for (const k of TOKEN_STATE_KEYS) {
+    if (c[k] !== undefined) out[k] = k === '_cardDataOverride' ? { ...c[k] } : c[k];
+  }
+  return out;
+}
+
 async function resolveElixirPending(engine, pi, perm) {
   const ps = engine.gs.players[pi];
   const pendingHeroes = perm._pendingHeroes || [];
@@ -271,7 +306,10 @@ async function resolveElixirPending(engine, pi, perm) {
 async function reviveCreature(engine, pi, chosen) {
   const ps = engine.gs.players[pi];
 
-  const discIdx = ps.discardPile.indexOf(chosen.name);
+  // v847: Tokens liegen im Geloescht-Stapel (siehe Sammelstelle oben).
+  const pile = chosen.pile === 'deleted' ? 'deleted' : 'discard';
+  const pileArr = pile === 'deleted' ? ps.deletedPile : ps.discardPile;
+  const discIdx = pileArr.indexOf(chosen.name);
   if (discIdx < 0) return;
 
   let targetHi = -1, targetSi = -1;
@@ -314,7 +352,7 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  if (!(await engine.takeFromPile(ps, 'discard', discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
+  if (!(await engine.takeFromPile(ps, pile, discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
     engine.log('elixir_fizzle', { reason: 'discard_locked', creature: chosen.name });
     return;
   }
@@ -325,10 +363,24 @@ async function reviveCreature(engine, pi, chosen) {
   // v324: NICHT je Wiederbelebung die 0,83-MB-Kartendatei lesen und parsen,
   // nur um EINEN hp-Wert nachzuschlagen — dieselbe Klasse wie v323.
   const cd = require('./_card-db').getCardDB(engine)[chosen.name];
-  const maxHp = cd?.hp || 100;
+  // v847: Bei einem Token gelten SEINE Werte, nicht die der Karte darunter.
+  // Eine Potion hat `hp: null` — ohne diesen Zweig kam ein 40-HP-Token mit
+  // 50 HP zurueck (Rueckfallwert 100, halbiert).
+  const tokenState = chosen.tokenState;
+  const maxHp = tokenState?.maxHp ?? tokenState?._cardDataOverride?.hp ?? cd?.hp ?? 100;
   const reviveHp = Math.ceil(maxHp / 2);
 
   const newInst = engine._trackCard(chosen.name, pi, 'support', targetHi, targetSi);
+  // Token-Zaehler VOR den Eintritts-Hooks setzen: der Loader entscheidet
+  // ueber `_effectOverride`, welches Skript die Karte ueberhaupt hat.
+  if (tokenState) {
+    Object.assign(newInst.counters, {
+      ...tokenState,
+      _cardDataOverride: tokenState._cardDataOverride
+        ? { ...tokenState._cardDataOverride } : undefined,
+    });
+    newInst.counters.maxHp = maxHp;
+  }
   newInst.counters.currentHp = reviveHp;
   newInst.counters.isPlacement = 1;
 

@@ -21145,23 +21145,65 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
 
+      // ── BRETT-ABGAENGE SIND KEINE HANDKARTEN (v852) ────────────────
+      // Die Gegnerhand ist verdeckt, deshalb ordnet der Detektor unten
+      // rein ueber die ANZAHL zu: Hand um n kleiner ⇒ die naechsten n
+      // Stapel-Zuwaechse kamen von dort. Das ist blind gegenueber der
+      // Reihenfolge — liegt im selben Diff auch eine Karte, die
+      // nachweislich vom BRETT kam (Creature gestorben), schnappt sich
+      // die Hand-Zuordnung genau die und laesst sie aus der Hand
+      // fliegen. Gleiche Bugklasse wie der Namens-Kurzschluss in
+      // `animsFromBoard` (v142), nur eine Ebene frueher.
+      // Nachweis wie dort: war die Karte VOR dem Update auf dem Brett
+      // (aufgezeichnetes Rect) und ist sie DANACH weg, ist sie ein
+      // Brett-Abgang — sie wird hier uebersprungen und von
+      // `animsFromBoard` weiter unten richtig behandelt.
+      const _brettAbgang = (() => {
+        const rects = boardCardRectsRef.current.opp || {};
+        const _p = gameState.players?.[oppIdx] || {};
+        const nochDa = {};
+        const zaehle = (cn) => { if (cn) nochDa[cn] = (nochDa[cn] || 0) + 1; };
+        for (const hz of (_p.supportZones || [])) for (const slot of (hz || [])) for (const cn of (slot || [])) zaehle(cn);
+        for (const hz of (_p.abilityZones || [])) for (const slot of (hz || [])) for (const cn of (slot || [])) zaehle(cn);
+        for (const sz of (_p.surpriseZones || [])) for (const cn of (sz || [])) zaehle(cn);
+        const budget = {};
+        return (cn) => {
+          if (budget[cn] === undefined) budget[cn] = (rects[cn]?.length || 0) - (nochDa[cn] || 0);
+          if (budget[cn] <= 0) return false;
+          budget[cn]--;
+          return true;
+        };
+      })();
+      /** Ersten Eintrag entnehmen, der NICHT vom Brett kam. */
+      const _nimmHandEintrag = (entries) => {
+        for (let i = 0; i < entries.length; i++) {
+          if (_brettAbgang(entries[i])) continue;
+          return entries.splice(i, 1)[0];
+        }
+        return null;
+      };
+
       // 1. Match against hand removals (hand count decreased)
       if (newCount < prevCount) {
         const storedRects = oppHandRectsRef.current;
         let handSlotCursor = prevCount - 1;
         const handDiscardCount = Math.min(prevCount - newCount, newDiscardEntries.length);
+        let _handDiscardsGeflogen = 0;
         for (let i = 0; i < handDiscardCount; i++) {
+          const cardName = _nimmHandEintrag(newDiscardEntries);
+          if (cardName == null) break;          // nur noch Brett-Abgaenge
           const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
           if (!sr) continue;
-          const cardName = newDiscardEntries.shift();
+          _handDiscardsGeflogen++;
           const t = getPileCenter('[data-opp-discard]');
           if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
         }
-        const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
+        const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - _handDiscardsGeflogen), newDeletedEntries.length);
         for (let i = 0; i < handDeletedCount; i++) {
+          const cardName = _nimmHandEintrag(newDeletedEntries);
+          if (cardName == null) break;
           const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
           if (!sr) continue;
-          const cardName = newDeletedEntries.shift();
           const t = getPileCenter('[data-opp-deleted]');
           if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
         }
@@ -28670,10 +28712,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const bucket = ref.current[to];
         const entry = { cardName };
         bucket.push(entry);
+        // ★ HALTBARKEIT DER UNTERDRUECKUNG (v852, Als Befund zu Tryse) ──
+        // Die 700 ms reichen nur, solange der Stapel-Zuwachs KURZ nach
+        // dem Flug beim Client ankommt. Bei einem Brett-Abgang kann
+        // zwischen Flug und Zustands-Diff deutlich mehr liegen: der Tod
+        // der Creature fliegt sofort, der naechste sync kommt aber erst
+        // nach Effekt-Glow (500 ms), Abwurf-Takt (500 ms) und
+        // Karten-Auftritt (250 ms) — bei Tryse also gut eine Sekunde
+        // spaeter, gemeinsam mit dem ersten Handabwurf. War der Eintrag
+        // da schon verfallen, schrieb der Detektor den Namen der toten
+        // Creature dem Handabwurf zu und liess sie ein zweites Mal
+        // fliegen, diesmal AUS DER HAND.
+        // Handkarten behalten die kurze Frist (dort folgt der Diff
+        // unmittelbar); Brett-Quellen bekommen die lange.
+        const _ttl = from === 'hand' ? 700 : 3000;
         setTimeout(() => {
           const idx = bucket.indexOf(entry);
           if (idx >= 0) bucket.splice(idx, 1);
-        }, 700);
+        }, _ttl);
         // ★ KLANG-DOPPLER unterdruecken (Als Befund 19.8. zu Magenta).
         // Zwei Quellen feuern denselben Abwurf-Klang: der Aktionslog
         // (sofort, wenn die Engine `discard` loggt) und der
@@ -32662,8 +32718,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'destroy') { return <span className="log-damage">{cName(entry.target)} was destroyed!</span>; }
       if (t === 'all_heroes_dead') { return <span className="log-damage" style={{fontWeight:700}}>All heroes defeated!</span>; }
       if (t === 'reaction_activated') { return <span className="log-status">{cName(entry.card)} activated as a Reaction!</span>; }
-      if (t === 'burn_damage') { return <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#ff8833'}}>{entry.amount}</span> {styledStatus('burn')} damage!</span>; }
-      if (t === 'poison_damage') { return <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#bb66ff'}}>{entry.amount}</span> {styledStatus('poison')} damage!</span>; }
+      // v846: `amount` ist der TATSAECHLICH angekommene Schaden (Tempeste,
+      // Cloud Pillow, Negationen). 0 wird als „took no … damage" gezeigt.
+      if (t === 'burn_damage') { return entry.amount > 0
+        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#ff8833'}}>{entry.amount}</span> {styledStatus('burn')} damage!</span>
+        : <span className="log-damage">{entry.target} took no {styledStatus('burn')} damage.</span>; }
+      if (t === 'poison_damage') { return entry.amount > 0
+        ? <span className="log-damage">{entry.target} took <span className="log-amount" style={{color:'#bb66ff'}}>{entry.amount}</span> {styledStatus('poison')} damage!</span>
+        : <span className="log-damage">{entry.target} took no {styledStatus('poison')} damage.</span>; }
       if (t === 'level_change') { return <span className="log-info">{cName(entry.card)} is now Lv{entry.newLevel}.</span>; }
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
       if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }

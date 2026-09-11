@@ -1852,8 +1852,36 @@ const BGM_FILES = {
   // Entsperr-Durchlauf beim ersten Klick es mit erfasst — sonst lehnt
   // Chromium die Wiedergabe ab.
   campaign: '/music/bgm_menu.ogg',
+  // Deck-Editor (v843): laeuft, solange der DeckBuilder eingehaengt ist
+  // (Effekt dort, nach dem Muster des Shops). Die Endung der bereit-
+  // gelegten Datei war beim Einbau nicht bekannt — deshalb eine LISTE
+  // von Kandidaten: der erste wird geladen, bei Ladefehler (404/Decode)
+  // rueckt der naechste nach (siehe `_bgmEndungsKaskade`). Sobald die
+  // Endung feststeht, kann die Liste auf einen String schrumpfen.
+  deckEditor: ['/music/bgm_deckeditor.ogg', '/music/bgm_deckeditor.mp3', '/music/bgm_deckeditor.wav'],
 };
-const _mkBgm = (url) => (typeof Audio !== 'undefined' ? new Audio(url) : null);
+// Endungs-Kaskade: probiert die restlichen Kandidaten der Reihe nach
+// durch, bis einer laedt. Nach dem letzten wird der Handler geloescht,
+// damit ein spaeterer Decode-Fehler nicht in eine Endlosschleife laeuft.
+// Der `src`-Tausch am BESTEHENDEN Element ist bewusst — ein neues
+// Element waere nach der Entsperr-Geste nicht mehr entsperrt (siehe
+// Battle-Themes unten).
+function _bgmEndungsKaskade(el, rest) {
+  if (!rest.length) { el.onerror = null; return; }
+  el.onerror = () => {
+    const next = rest.shift();
+    _bgmEndungsKaskade(el, rest);
+    el.src = next;
+    try { el.load(); } catch {}
+  };
+}
+const _mkBgm = (url) => {
+  if (typeof Audio === 'undefined') return null;
+  const kandidaten = Array.isArray(url) ? url.slice() : [url];
+  const el = new Audio(kandidaten.shift());
+  if (kandidaten.length) _bgmEndungsKaskade(el, kandidaten);
+  return el;
+};
 const _bgmLogin = _mkBgm(BGM_FILES.login);
 const _bgmMenu = _mkBgm(BGM_FILES.menu);
 const _bgmBattle = _mkBgm(BGM_FILES.battle);
@@ -1866,12 +1894,20 @@ const _bgmWin = _mkBgm(BGM_FILES.win);
 const _bgmDefeat = _mkBgm(BGM_FILES.defeat);
 const _bgmShop = _mkBgm(BGM_FILES.shop);
 const _bgmCampaign = _mkBgm(BGM_FILES.campaign);
+const _bgmDeckEditor = _mkBgm(BGM_FILES.deckEditor);
+// Jedes Element, das hier steht, wird beim ersten Klick mitentsperrt.
+// Ein Ziel-Bezeichner in `setBgmMode(...)` muss ein Schluessel dieser
+// Tabelle sein (oder `battle:<slug>` / `campaign:<slug>`).
 const _bgmTracks = {
   login: _bgmLogin, menu: _bgmMenu, battle: _bgmBattle, puzzle: _bgmPuzzle, tutorial: _bgmTutorial, tutorialAntonia: _bgmTutorialAntonia,
   puzzleCreate: _bgmPuzzleCreate, puzzleAttempt: _bgmPuzzleAttempt,
   win: _bgmWin, defeat: _bgmDefeat, shop: _bgmShop, campaign: _bgmCampaign,
+  deckEditor: _bgmDeckEditor,
 };
-for (const t of [_bgmLogin, _bgmMenu, _bgmBattle, _bgmPuzzle, _bgmTutorial, _bgmTutorialAntonia, _bgmPuzzleCreate, _bgmPuzzleAttempt, _bgmWin, _bgmDefeat, _bgmShop, _bgmCampaign]) {
+// Grundeinstellung ueber die Tabelle selbst — vorher stand hier eine
+// zweite, von Hand gepflegte Liste derselben Elemente, die bei jedem
+// neuen Track haette nachgezogen werden muessen.
+for (const t of Object.values(_bgmTracks)) {
   if (t) {
     t.loop = true;
     // Start from the player's persisted volume (0 if they muted last session)
@@ -2493,7 +2529,8 @@ function App() {
   const [screen, setScreen] = useState('menu');
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
-  // bgmMode: 'menu' | 'battle' | 'puzzle' | 'shop'. setInBattle is
+  // bgmMode: ein Schluessel von _bgmTracks ('menu', 'battle', 'shop',
+  // 'deckEditor', ...) oder 'battle:<slug>' / 'campaign:<slug>'. setInBattle is
   // kept as a compatibility wrapper so existing callers continue to
   // work.
   const [bgmMode, setBgmMode] = useState('menu');
@@ -2619,11 +2656,20 @@ function App() {
           const r = el.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
           if (el.scrollHeight - el.clientHeight <= 1) continue;
-          // Found something to scroll.
-          e.preventDefault();
           const step = e.deltaMode === 1 ? e.deltaY * 16
                      : e.deltaMode === 2 ? e.deltaY * el.clientHeight
                      : e.deltaY;
+          // v844 (Al): steht der Tooltip in Radrichtung schon am
+          // Anschlag (ganz oben beim Hochrollen, ganz unten beim
+          // Runterrollen), geht das Rad an den Bildschirm — KEIN
+          // preventDefault, und auch kein Weiterreichen an den
+          // naechsten Kandidaten (der waere nur eine Huelle desselben
+          // Tooltips). Die 1-px-Toleranz faengt Subpixel-Reste ab.
+          const obenAmAnschlag = el.scrollTop <= 0;
+          const untenAmAnschlag = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+          if ((step < 0 && obenAmAnschlag) || (step > 0 && untenAmAnschlag)) return;
+          // Found something to scroll.
+          e.preventDefault();
           el.scrollTop += step;
           return;
         }

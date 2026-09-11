@@ -10321,6 +10321,22 @@ function normalizeValidTargets(validTargets, casterPi, engine, config) {
       }
     }
   }
+  // ── Taunt (v849, Als Befund: Book of Doom ignorierte Doomed Town
+  //    Guard) ────────────────────────────────────────────────────────
+  // Gleiche Luecke wie bei den beiden Filtern darueber: Ziel-Artefakte
+  // und -Traenke bauen ihre Zielliste selbst und laufen nicht durch
+  // `promptDamageTarget` / `promptMultiTarget`, wo der Taunt-Filter
+  // sitzt. Er gehoert deshalb auch hier hin — NACH der Erst-Runden- und
+  // der Schild-Pruefung, damit er auf der bereits bereinigten Liste
+  // arbeitet. Mehrfachziel-Karten („choose any number of targets")
+  // sind ausdruecklich eingeschlossen: der Schirm verbietet das
+  // WAEHLEN, nicht das Waehlen von genau einem Ziel.
+  // Truth-Seeing Eye hebt Ziel-Verbote auf und ueberspringt ihn, genau
+  // wie im Engine-Trichter.
+  if (engine && typeof casterPi === 'number' && !config?._truthSeeingEye
+      && typeof engine.applyForcedTargetingFilter === 'function') {
+    engine.applyForcedTargetingFilter(validTargets, casterPi);
+  }
   return validTargets;
 }
 

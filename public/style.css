@@ -11030,6 +11030,10 @@ body:has(.game-hand-me) .board-tooltip {
   cursor: pointer;
   vertical-align: middle;
 }
+/* v842: zwei Zeilen (MUSIC / SFX) im Lautstaerke-Fenster */
+.volume-row { display: flex; align-items: center; gap: 8px; }
+.volume-row + .volume-row { margin-top: 8px; }
+.volume-row-label { font-size: 9px; letter-spacing: 1px; color: var(--text2); width: 38px; text-align: right; }
 
 /* ===== PHASE BUTTONS ===== */
 .phase-buttons-row {

@@ -294,9 +294,37 @@ function _ppPersistedVolume() {
 }
 window._ppPersistedVolume = _ppPersistedVolume;
 
+// ═══ EFFEKT-PEGEL RELATIV ZUR MUSIK (v842) ═══════════════════════════════
+// Al, 9.9. (Android): „Sounds sind relativ zur Musik auf dem Handy
+// deutlich leiser als auf dem PC." Die Rechnung ist auf beiden gleich
+// (Musik = Regler, Effekte = Regler × 0,33), der Unterschied kommt vom
+// Geraet — Telefonlautsprecher nehmen kurzen, tiefen Klaengen die Wucht,
+// waehrend die Musik ihre Mitten behaelt. Deshalb ist der Effektpegel
+// jetzt ein EIGENER, pro Geraet gespeicherter Regler (Faktor 0,5–2,5
+// auf die alte Rechnung), mit Vorgabe 1,0 an der Maus und 1,7 am
+// Finger. Sichtbar als zweiter Schieber im Lautstaerke-Fenster.
+const SFX_GAIN_KEY = 'pp_sfx_gain';
+function _ppDefaultSfxGain() {
+  try { return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1.7 : 1.0; } catch { return 1.0; }
+}
+function _ppPersistedSfxGain() {
+  try {
+    const v = parseFloat(localStorage.getItem(SFX_GAIN_KEY));
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.5, v)) : _ppDefaultSfxGain();
+  } catch { return _ppDefaultSfxGain(); }
+}
+window._ppSfxGain = _ppPersistedSfxGain();
+window._ppSetSfxGain = (g) => {
+  window._ppSfxGain = Math.max(0.5, Math.min(2.5, g));
+  try { localStorage.setItem(SFX_GAIN_KEY, String(window._ppSfxGain)); } catch {}
+};
+
 function _sfxVolume() {
   const v = window._ppGetVolume ? window._ppGetVolume() : _ppPersistedVolume();
-  return Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.4));
+  const basis = Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.4));
+  // Deckel bei 1: der Web-Audio-Gain darf ueber 1, aber die Musik kann
+  // nicht mitziehen — mehr als Vollpegel bringt nur Uebersteuerung.
+  return Math.min(1, basis * (window._ppSfxGain || 1));
 }
 
 // Per-sound intrinsic volume. Applied on top of master + per-call volume.
@@ -2502,6 +2530,7 @@ function VolumeControl() {
     return saved != null ? parseFloat(saved) : DEFAULT_VOLUME;
   });
   const [muted, setMuted] = useState(() => localStorage.getItem('pp_muted') === '1');
+  const [sfxGain, setSfxGain] = useState(() => window._ppSfxGain || 1);
   const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const ref = useRef(null);
 
@@ -2551,9 +2580,21 @@ function VolumeControl() {
       </button>
       {open && (
         <div className="volume-slider-popup">
-          <input type="range" min="0" max="1" step="0.01" value={muted ? 0 : volume}
-            className="volume-slider"
-            onChange={e => { setVolume(parseFloat(e.target.value)); if (muted) setMuted(false); }} />
+          <label className="volume-row">
+            <span className="volume-row-label">MUSIC</span>
+            <input type="range" min="0" max="1" step="0.01" value={muted ? 0 : volume}
+              className="volume-slider"
+              onChange={e => { setVolume(parseFloat(e.target.value)); if (muted) setMuted(false); }} />
+          </label>
+          {/* v842: Effektpegel relativ zur Musik, pro Geraet gespeichert —
+              siehe `_ppSfxGain` oben. Beim Loslassen ein Probeklang. */}
+          <label className="volume-row">
+            <span className="volume-row-label">SFX</span>
+            <input type="range" min="0.5" max="2.5" step="0.05" value={sfxGain}
+              className="volume-slider"
+              onChange={e => { const g = parseFloat(e.target.value); setSfxGain(g); window._ppSetSfxGain(g); }}
+              onPointerUp={() => { if (window.playSFX) window.playSFX('draw', { dedupe: 150 }); }} />
+          </label>
         </div>
       )}
     </div>
@@ -2926,7 +2967,7 @@ function BuffColumn({ buffs, cardName }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` } };
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the

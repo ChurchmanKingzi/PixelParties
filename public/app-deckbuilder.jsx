@@ -98,7 +98,19 @@ function TipBtn({ tip, children, ...props }) {
 }
 
 function DeckBuilder() {
-  const { user, setScreen, notify } = useContext(AppContext);
+  const { user, setScreen, notify, setBgmMode } = useContext(AppContext);
+
+  // Musik (v843): eigenes Thema, solange der Deck-Editor eingehaengt
+  // ist; beim Verlassen zurueck aufs Menue. Gleiche Bauform wie im
+  // ShopScreen — die Zuordnung Bildschirm → Thema bleibt beim Bildschirm
+  // selbst statt in einer zentralen Tabelle in App. Die Datei steht in
+  // `BGM_FILES.deckEditor` (app-main.jsx).
+  useEffect(() => {
+    if (!setBgmMode) return;
+    setBgmMode('deckEditor');
+    return () => setBgmMode('menu');
+  }, [setBgmMode]);
+
   const [decks, setDecks] = useState([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [unsaved, setUnsaved] = useState(_persistedUnsaved);

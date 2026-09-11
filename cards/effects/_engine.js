@@ -246,6 +246,13 @@ const DECK_TO_DELETED_FLIGHT_MS = 500;
 //    inst.counters.forcesTargeting = true
 //    inst.counters.forcesTargeting_pi = casterIdx   // who is forced
 //    inst.counters.forcesTargeting_untilTurn = N    // expires when gs.turn > N
+//    inst.counters.forcesTargeting_creaturesOnly    // v849, optional
+//
+//  `forcesTargeting_creaturesOnly` schraenkt den Schutzschirm auf die
+//  CREATURES der eigenen Seite ein — die Helden dahinter bleiben
+//  waehlbar. Gebraucht fuer Karten vom Schlag „Your opponent can't
+//  choose OTHER CREATURES you control" (Doomed Town Guard). Ohne das
+//  Flag gilt weiter die volle Form (Creatures UND Helden, Horror Clown).
 //
 //  Matching `type` is derived from the forcing creature's own type: a
 //  Creature taunter filters out other Creatures on its side; Heroes on
@@ -328,12 +335,16 @@ function _applyForcesTargetingFilter(engine, targets, casterPi) {
     const forcerSide = forcer.controller ?? forcer.owner;
     const forcerTargetId = `equip-${forcerSide}-${forcer.heroIdx}-${forcer.zoneSlot}`;
     if (!targets.find(t => t.id === forcerTargetId)) continue;
+    // v849: Nur-Creatures-Variante (siehe Kopfkommentar).
+    const nurCreatures = !!(forcer.counters?.forcesTargeting_creaturesOnly
+      || forcer.counters?.buffs?.forcesTargeting_creaturesOnly);
     for (let i = targets.length - 1; i >= 0; i--) {
       const t = targets[i];
       if (forcerIds.has(t.id)) continue;
       if (t.owner !== forcerSide) continue;
       // Remove creatures AND heroes on the forcer's side.
       if (t.type !== 'equip' && t.type !== 'hero') continue;
+      if (nurCreatures && t.type !== 'equip') continue;   // Helden bleiben waehlbar
       targets.splice(i, 1);
     }
   }
@@ -1029,6 +1040,50 @@ class GameEngine {
    * or in fast mode (sims skip real delays). The MAX_HOOKS_PER_TURN
    * cap still guards against a genuine runaway, independent of this.
    */
+  /**
+   * ── MENSCHEN-WARTEZEIT (v848, Als Befund: Shield-of-Death-Prompt im
+   *    Gegnerzug verschwindet, Spiel haengt) ────────────────────────
+   * Ein Prompt an den SPIELER kann mitten im CPU-Zug aufgehen (jede
+   * Reaktion auf Schaden: Shield of Death, Shield of Life, Surprises).
+   * Die Uhren der CPU (`_cpuTurnDeadline` aus MAX_CPU_TURN_MS und
+   * `_cpuCardDeadline` aus dem Karten-Hardcap) laufen dabei WEITER,
+   * obwohl nicht die CPU rechnet, sondern der Mensch ueberlegt. Wer
+   * kurz in einen anderen Tab wechselt, reisst beide — die Folge war
+   * ein abgebrochener Zug oder (ueber den Hardcap-Timer) ein geleertes
+   * `potionTargeting` bei weiter offenem Promise: Prompt weg, Spiel
+   * fest.
+   *
+   * Diese beiden Helfer klammern jede Wartezeit aus. `beginHumanWait`
+   * merkt sich den Startzeitpunkt (verschachtelungsfest ueber einen
+   * Zaehler), `endHumanWait` schiebt beide Uhren um die verstrichene
+   * Zeit nach hinten. Die CPU verliert dadurch nichts von ihrem
+   * Rechenbudget, und der Spieler darf so lange nachdenken, wie er
+   * will. Der Hardcap-Timer in `_cpu.js` fragt zusaetzlich
+   * `isWaitingForHuman()` ab, bevor er eine Karte aufgibt.
+   */
+  isWaitingForHuman() {
+    return !!(this._pendingPrompt || this._pendingGenericPrompt);
+  }
+
+  beginHumanWait() {
+    if (this._inMctsSim || this._fastMode) return;
+    this._humanWaitDepth = (this._humanWaitDepth || 0) + 1;
+    if (this._humanWaitDepth === 1) this._humanWaitStartT = Date.now();
+  }
+
+  endHumanWait() {
+    if (this._inMctsSim || this._fastMode) return;
+    if (!this._humanWaitDepth) return;
+    this._humanWaitDepth--;
+    if (this._humanWaitDepth > 0) return;
+    const wartete = Date.now() - (this._humanWaitStartT || Date.now());
+    this._humanWaitStartT = null;
+    if (!(wartete > 0)) return;
+    this._humanWaitMsThisTurn = (this._humanWaitMsThisTurn || 0) + wartete;
+    if (typeof this._cpuTurnDeadline === 'number') this._cpuTurnDeadline += wartete;
+    if (typeof this._cpuCardDeadline === 'number') this._cpuCardDeadline += wartete;
+  }
+
   extendCpuTurnDeadline(ms) {
     // CRITICAL: never extend inside an MCTS rollout or fast mode. Sims
     // skip real `_delay()`s (there is no animation wall-clock to give
@@ -5883,6 +5938,27 @@ class GameEngine {
     if (opts.playerIdx === 0 || opts.playerIdx === 1) payload.playerIdx = opts.playerIdx;
     this._broadcastEvent('card_reveal', payload);
     if (opts.delayMs !== 0) await this._delay(opts.delayMs ?? 250);
+  }
+
+  /**
+   * ★ Taunt-Filter fuer Zielsitzungen AUSSERHALB der Engine-Trichter
+   *   (v849, Als Befund: Book of Doom ignorierte Doomed Town Guard).
+   *
+   * `promptDamageTarget` / `promptMultiTarget` rufen
+   * `_applyForcesTargetingFilter` selbst. Ziel-ARTEFAKTE und -TRAENKE
+   * bauen ihre Liste dagegen in `getValidTargets` und laufen ueber die
+   * `potionTargeting`-Sitzung am Dispatcher vorbei — dieselbe Luecke,
+   * die schon beim Erst-Runden-Schutz und beim Great-Wall-Schild
+   * auffiel. `normalizeValidTargets` (server.js) ist die gemeinsame
+   * Durchgangsstelle dieser Sitzungen und ruft diesen Helfer.
+   *
+   * Bewusst KEIN eigener Filter dort: die Auslegung von Taunt gibt es
+   * genau einmal, hier.
+   */
+  applyForcedTargetingFilter(targets, casterPi) {
+    if (!Array.isArray(targets) || typeof casterPi !== 'number') return targets;
+    _applyForcesTargetingFilter(this, targets, casterPi);
+    return targets;
   }
 
   _isHeroDamageUnstoppable(target) {
@@ -12262,6 +12338,13 @@ class GameEngine {
     //   GEGNER-Deck gewandert sind.
     let insEigeneDeck = 0;
     let insgesamt = 0;
+    // v841 (Als Befund 9.9.: „die Shuffle-Animation mischt BEIDE Decks"):
+    // gemischt wird nur, was tatsaechlich Karten zurueckbekommen hat —
+    // Schluessel `besitzer:deckTyp`. Bisher liefen unten pauschal alle
+    // vier Stapel (beide Spieler, Haupt- und Trankdeck) durch
+    // `shuffleDeck`, und seit dem Mischen sichtbar ist (21.8.), ruettelte
+    // damit bei jedem Elana/Leadership/Horn auch der Gegnerstapel.
+    const zuMischen = new Set();
 
     gs.handReturnToDeck = true;
     gs.handReturnToOppCards = [];
@@ -12286,10 +12369,12 @@ class GameEngine {
         insgesamt++;
         if (result.returnedToOwner !== playerIdx) gs.handReturnToOppCards.push(cardName);
         else insEigeneDeck++;
+        zuMischen.add((result.returnedToOwner ?? playerIdx) + ':' + (result.isPotion ? 'potion' : 'main'));
       } else {
         // Fallback: remove manually if instance not found
         const idx = gs.players[playerIdx]?.hand?.indexOf(cardName);
         if (idx >= 0) gs.players[playerIdx].hand.splice(idx, 1);
+        zuMischen.add(playerIdx + ':main');
       }
       this.sync();
       await this._delay(150);
@@ -12298,11 +12383,12 @@ class GameEngine {
     gs.handReturnToDeck = false;
     delete gs.handReturnToOppCards;
 
-    // Shuffle all players' decks (returned cards may have gone to opponent's deck)
-    for (let pi = 0; pi < gs.players.length; pi++) {
-      if (!gs.players[pi]) continue;
-      this.shuffleDeck(pi, 'main');
-      this.shuffleDeck(pi, 'potion');
+    // Nur die Stapel mischen, in die etwas zurueckging (v841, s.o.) —
+    // ein Gegnerdeck also nur, wenn eine gestohlene Karte dorthin
+    // zurueckkehrte.
+    for (const key of zuMischen) {
+      const [pi, deckType] = key.split(':');
+      if (gs.players[+pi]) this.shuffleDeck(+pi, deckType);
     }
 
     // Hatusbals Bonus: EIN Effekt, EINE Meldung — auch wenn die Karten
@@ -21021,6 +21107,7 @@ class GameEngine {
       t.owner = physSide;
       t.id = `equip-${physSide}-${t.heroIdx}-${t.slotIdx}`;
     }
+    this.beginHumanWait();   // v848: Uhren der CPU anhalten
     const picked = await new Promise((resolve) => {
       this._pendingPrompt = { resolve };
       this.gs.potionTargeting = {
@@ -21704,6 +21791,7 @@ class GameEngine {
     if (!this._pendingPrompt) return false;
     const { resolve } = this._pendingPrompt;
     this._pendingPrompt = null;
+    this.endHumanWait();     // v848
     this.gs.potionTargeting = null;
     // Explicit cancel (options.cancelled === true) resolves to null so
     // callers like resolveSacrificeCost can break out of a retry loop.
@@ -22541,6 +22629,7 @@ class GameEngine {
       // in eine Methode, die andere Module überschreiben dürfen.
       return response;
     }
+    this.beginHumanWait();   // v848: siehe beginHumanWait
     return new Promise((resolve) => {
       this._pendingGenericPrompt = { resolve };
       this.gs.effectPrompt = { ...promptData, ownerIdx: playerIdx };
@@ -22710,6 +22799,7 @@ class GameEngine {
     const promptType = this.gs.effectPrompt?.type;
     const wasGerryRewritten = !!this.gs.effectPrompt?._gerryRewritten;
     this._pendingGenericPrompt = null;
+    this.endHumanWait();     // v848
     this.gs.effectPrompt = null;
     const declined = !!response?.cancelled || (response && response.confirmed === false);
     if (wasGerryRewritten && promptType === 'confirm' && declined) {
@@ -35534,8 +35624,15 @@ class GameEngine {
     for (const { owner, heroIdx, heroName } of burnedHeroes) {
       const hero = ps.heroes[heroIdx];
       if (!hero || hero.hp <= 0) continue; // May have died from a previous burn this loop
-      this.log('burn_damage', { target: heroName, amount: BURN_BASE_DAMAGE, owner });
-      await this.actionDealDamage({ name: 'Burn' }, hero, BURN_BASE_DAMAGE, 'fire');
+      // v846 (Als Report): Protokoll NACH dem Schaden mit dem TATSAECHLICH
+      // angekommenen Betrag — vorher stand hier der Nennwert, und
+      // Reduktionen aus den beforeDamage-Hooks (Tempeste -100, Cloud
+      // Pillow, Negationen) blieben im Log unsichtbar („took 60 Burn
+      // damage", obwohl 0 ankamen). Der generische `damage`-Eintrag ist
+      // fuer Burn/Poison in _actionDealDamageImpl unterdrueckt, es bleibt
+      // also weiterhin genau EINE Zeile je Tick.
+      const burnRes = await this.actionDealDamage({ name: 'Burn' }, hero, BURN_BASE_DAMAGE, 'fire');
+      this.log('burn_damage', { target: heroName, amount: burnRes?.dealt ?? 0, nominal: BURN_BASE_DAMAGE, owner });
       this.sync();
       await this._delay(200);
     }
@@ -35598,8 +35695,10 @@ class GameEngine {
       const damage = await this.calculatePoisonDamage(ap, stacks);
       this._broadcastEvent('play_zone_animation', { type: 'poison_tick', owner: ap, heroIdx, zoneSlot: -1 });
       await this._delay(300);
-      this.log('poison_damage', { target: heroName, amount: damage, stacks, owner });
-      await this.actionDealDamage({ name: 'Poison' }, hero, damage, 'poison');
+      // v846: wie beim Burn-Tick — erst Schaden, dann Protokoll mit dem
+      // tatsaechlichen Betrag (siehe processBurnDamage).
+      const poisonRes = await this.actionDealDamage({ name: 'Poison' }, hero, damage, 'poison');
+      this.log('poison_damage', { target: heroName, amount: poisonRes?.dealt ?? 0, nominal: damage, stacks, owner });
       this.sync();
       await this._delay(200);
     }

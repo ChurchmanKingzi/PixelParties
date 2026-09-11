@@ -77,7 +77,12 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return;
 
     // Step 1: Deal 100 damage to the chosen own Hero (cost)
-    await engine.actionDealDamage({ name: 'Angry Cheese' }, hero, 100, 'other');
+    // v845: Quelle MIT Besitzer. Ein nacktes `{ name }` hat keinen `owner`,
+    // und Tazunes „Schaden durch eigene Karten"-Schild (wie jeder Hook,
+    // der die Quelle einem Spieler zuordnet) sah darin eine besitzerlose
+    // Quelle und liess die 100 durch — die CPU hat sich damit einen
+    // Tazune bei 60 HP selbst getoetet.
+    await engine.actionDealDamage({ name: 'Angry Cheese', owner: pi, controller: pi }, hero, 100, 'other');
     engine.sync();
     await engine._delay(400);
 

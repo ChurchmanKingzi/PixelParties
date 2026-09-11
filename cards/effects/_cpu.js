@@ -305,15 +305,29 @@ async function _runWithCardHardcap(engine, label, fn) {
   const turnAtStart = engine.gs?.turn;
   const activeAtStart = engine.gs?.activePlayer;
   const timeoutP = new Promise((_, reject) => {
-    timerId = setTimeout(() => {
+    const pruefen = () => {
       const movedOn = engine.gs
         && (engine.gs.turn !== turnAtStart || engine.gs.activePlayer !== activeAtStart);
       if (movedOn) {
         cpuLog(`      (hardcap ${label}: Spiel ist weitergezogen — Timer entschärft)`);
         return; // kein Reject: fn enthält das legitim laufende Spiel
       }
+      // ── v848 (Als Befund) ──────────────────────────────────────────
+      // Haengt hier ein PROMPT AN DEN SPIELER, rechnet nicht die CPU zu
+      // lange, sondern der Mensch ueberlegt (Shield of Death & Co.
+      // fragen mitten im Gegnerzug). Frueher lief der Timer trotzdem
+      // ab, gab die Karte auf und LEERTE `gs.potionTargeting` — der
+      // Prompt verschwand vom Bildschirm, das Promise blieb offen und
+      // die Partie stand. Jetzt wartet der Timer weiter, statt zu
+      // feuern; `endHumanWait` in der Engine schiebt danach beide
+      // CPU-Uhren um die Wartezeit nach hinten.
+      if (typeof engine.isWaitingForHuman === 'function' && engine.isWaitingForHuman()) {
+        timerId = setTimeout(pruefen, CARD_HANDLING_HARDCAP_MS);
+        return;
+      }
       reject(new Error(`hardcap:${label}`));
-    }, CARD_HANDLING_HARDCAP_MS);
+    };
+    timerId = setTimeout(pruefen, CARD_HANDLING_HARDCAP_MS);
   });
   try {
     return await Promise.race([Promise.resolve().then(fn), timeoutP]);
@@ -334,7 +348,15 @@ async function _runWithCardHardcap(engine, label, fn) {
       } catch { /* Diagnose darf nie den Abbruchpfad stören */ }
       cpuLog(`      !! hardcap ${label}`);
       abandoned = true;
-      try { if (engine.gs?.potionTargeting) engine.gs.potionTargeting = null; } catch {}
+      // v848: Die Zielsitzung NUR aufraeumen, wenn wirklich niemand mehr
+      // darauf wartet. Ein offener Spieler-Prompt gehoert zu einem
+      // Promise, das nur seine Antwort aufloest — ihn hier zu leeren
+      // hiesse, den Spieler ohne Bedienelement zurueckzulassen.
+      try {
+        const wartetAufMensch = typeof engine.isWaitingForHuman === 'function'
+          && engine.isWaitingForHuman();
+        if (engine.gs?.potionTargeting && !wartetAufMensch) engine.gs.potionTargeting = null;
+      } catch {}
       return false;
     }
     throw err;
