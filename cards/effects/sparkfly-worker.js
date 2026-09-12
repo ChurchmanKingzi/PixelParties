@@ -71,6 +71,7 @@ module.exports = {
       if (filteredTargets.length === 0) return;
 
       const picked = await engine.promptEffectTarget(pi, filteredTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: 'Pick any non-Hero card on the board and add it to your hand.',
         confirmLabel: '🪲 Steal!',

@@ -41,11 +41,13 @@ const {
 } = require('./_puppets-shared');
 const { collectNonHeroBoardTargets } = require('./_targeting-shared');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = SHISHI;
 
 function distinctNames(sel, targets) {
   const names = sel.map(id => targets.find(t => t.id === id)?.cardName).filter(Boolean);
-  return names.length === sel.length && new Set(names).size === names.length;
+  return names.length === sel.length && new Set(names.map(baseCardName)).size === names.length;   // v876
 }
 
 module.exports = {
@@ -69,8 +71,8 @@ module.exports = {
       const seen = new Set(); const out = [];
       const order = [...targets.filter(t => t.owner !== pi), ...targets.filter(t => t.owner === pi)];
       for (const t of order) {
-        if (seen.has(t.cardName)) continue;
-        seen.add(t.cardName); out.push(t.id);
+        if (seen.has(baseCardName(t.cardName))) continue;
+        seen.add(baseCardName(t.cardName)); out.push(t.id);
         if (out.length === 3) break;
       }
       return out.length === 3 ? { selectedIds: out } : null;

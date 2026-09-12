@@ -9,7 +9,7 @@
 // active effects, Ascension, and the targeting engine.
 
 const { loadCardEffect } = require('./_loader');
-const { PHASES, getCleansableStatuses, hasCardType } = require('./_hooks');
+const { PHASES, getCleansableStatuses, hasCardType, baseCardName } = require('./_hooks');
 // `hasCardType(cd, 'Creature')` statt `cd.cardType === 'Creature'` ueberall dort,
 // wo es um Karten AUF DEM FELD geht: eine Artifact Creature (Powder Keg,
 // Pollution Spewer, die Debt-O-Trons) ist in einer Support Zone eine Creature
@@ -2766,7 +2766,7 @@ function planArtifactPlay(engine, pi, cardName, handIdx, cardData) {
   const ps = gs.players[pi];
 
   if (ps.itemLocked && (ps.hand || []).length < 2) return null;
-  if (ps._creationLockedNames?.has(cardName)) return null;
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return null;   // v876
 
   const rawCost = cardData.cost || 0;
   const costReduction = ps._nextArtifactCostReduction || 0;
@@ -3096,7 +3096,7 @@ function isPotionPlayable(engine, pi, cardName) {
   const gs = engine.gs;
   const ps = gs.players[pi];
   if (engine.arePotionsLockedFor(pi)) return false;
-  if (ps._creationLockedNames?.has(cardName)) return false;
+  if (ps._creationLockedNames?.has(baseCardName(cardName))) return false;   // v876
 
   const script = loadCardEffect(cardName);
   if (!script?.isPotion) return false;
@@ -3222,7 +3222,17 @@ async function resolveTargetingPrompt(engine, helpers) {
     // dispatch needs it, so we merge `potionName` in here as the
     // canonical fallback.
     const cfg = { title: tgt.potionName, ...(tgt.config || {}) };
-    const picks = engine._getCpuTargetResponse(tgt.validTargets || [], cfg);
+    // ★ `ineligible` AUSSORTIEREN (v915, Als Befund 12.9.) ────────────
+    // `gs.potionTargeting.validTargets` traegt auch die als unwaehlbar
+    // MARKIERTEN Ziele — der Client graut sie nur aus. Dieser Weg gab
+    // die Rohliste an den Picker, und die CPU griff zu: ein Tryse mit
+    // Stealth 2 wurde von einer Lv-1-Quick-Attack getroffen, obwohl die
+    // Aufnahme ihn korrekt als `ineligible: true` fuehrte. Stealth war
+    // nie kaputt — die Markierung wurde hier schlicht nicht gelesen.
+    // `promptEffectTarget` filtert fuer seinen eigenen CPU-Zweig laengst
+    // (`_waehlbar`); dieser zweite Eingang tat es nicht.
+    const waehlbar = (tgt.validTargets || []).filter(t => !t?.ineligible);
+    const picks = engine._getCpuTargetResponse(waehlbar, cfg);
     const selectedIds = Array.isArray(picks) ? picks : [];
     cpuLog(`      → confirm targeting "${tgt.potionName}" selectedIds=${JSON.stringify(selectedIds)}`);
     await helpers.doConfirmPotion(helpers.room, engine._cpuPlayerIdx, { selectedIds });

@@ -39,6 +39,9 @@
 //  spell-resolution depth releases.
 // ═══════════════════════════════════════════
 
+// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Spreading Rumor';
 
 module.exports = {
@@ -132,6 +135,7 @@ module.exports = {
         return;
       }
       const declared = result.cardName;
+      const trifft = (n) => baseCardName(n) === baseCardName(declared);   // v875
 
       // Dump every copy of the declared name in one forced-discard
       // batch — multi-copy reveals (Glass of Marbles, Skull Necklace,
@@ -140,10 +144,13 @@ module.exports = {
       const discarded = await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
         let n = 0;
         while (true) {
-          const idx = (ops.hand || []).indexOf(declared);
+          // v875: Basisname (siehe Accusation) — abgeworfen wird unter
+          // dem echten Namen der gefundenen Karte.
+          const idx = (ops.hand || []).findIndex(trifft);
           if (idx < 0) break;
-          const ok = await engine.actionDiscardHandCard(oi, declared, idx, {
+          const ok = await engine.actionDiscardHandCard(oi, ops.hand[idx], idx, {
             source: CARD_NAME,
+            sourceOwner: pi,   // v860: fremder Zwangsabwurf (Erstrunden-Schutz)
           });
           if (!ok) break;
           n++;

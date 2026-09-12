@@ -407,6 +407,7 @@ module.exports = {
       }
 
       const cardPick = await engine.promptEffectTarget(pi, boardTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title:        CARD_NAME,
         description:  'Choose any card on the board that is not a Hero.',
         confirmLabel: '🌪️ Banish to deck!',

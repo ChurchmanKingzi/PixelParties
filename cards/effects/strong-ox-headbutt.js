@@ -141,6 +141,7 @@ module.exports = {
             if (wantsRemove) {
               // Highlight abilities and let player pick one
               const picked = await engine.promptEffectTarget(pi, abilityTargets, {
+                maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
                 title: 'Strong Ox Headbutt',
                 description: `Select an Ability on ${targetHero.name} to remove.`,
                 confirmLabel: '⚒️ Remove!',

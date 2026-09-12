@@ -29,6 +29,9 @@
 //     refunded by the server.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const {
   ownSupportCreatures,
   eligibleSwapReplacements,
@@ -182,7 +185,7 @@ module.exports = {
         cardDB[newName], pi,
         newHandIdx >= 0 ? { handIdx: newHandIdx } : {},
       );
-      if (newLevel > chosenLevel || newName === chosenName) {
+      if (newLevel > chosenLevel || baseCardName(newName) === baseCardName(chosenName)) {   // v876
         gs._spellCancelled = true; return;
       }
 

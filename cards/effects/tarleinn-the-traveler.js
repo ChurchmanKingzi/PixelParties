@@ -150,6 +150,7 @@ module.exports = {
       markTriggered(ctx.card);
 
       const picked = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: `Heal a target you control by ${healAmt}.`,
         confirmLabel: `💚 Heal ${healAmt}!`,

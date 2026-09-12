@@ -153,8 +153,10 @@ module.exports = {
       const log = gs._spellDamageLog;
       if (!log || log.length !== 1) return;
 
-      // Skip status/self damage types
-      const skipTypes = new Set(['burn', 'poison', 'recoil', 'status', 'other']);
+      // Skip status/self damage types. 'hero' (v905) kommt dazu:
+      // Heldeneffekt-Schaden lief bis dahin als 'other' und war damit
+      // schon ausgenommen — der Eintrag haelt das Verhalten gleich.
+      const skipTypes = new Set(['burn', 'poison', 'recoil', 'status', 'other', 'hero']);
       if (skipTypes.has(ctx.type)) return;
 
       // Count poisoned targets on the board

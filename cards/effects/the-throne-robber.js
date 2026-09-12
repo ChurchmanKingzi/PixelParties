@@ -50,6 +50,8 @@
 
 const { loadCardEffect } = require('./_loader');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = '???, the Throne Robber';
 const BASIS_FORM = '???, the Shapeshifter';
 /**
@@ -66,7 +68,7 @@ const NOETIGE_GESTALTEN = 3;
 /** Namen aller Helden, die der Spieler gerade kontrolliert. */
 function aktuelleHeldennamen(ps) {
   const namen = new Set();
-  for (const h of (ps.heroes || [])) if (h?.name) namen.add(h.name);
+  for (const h of (ps.heroes || [])) if (h?.name) namen.add(baseCardName(h.name));   // v876
   return namen;
 }
 
@@ -90,7 +92,7 @@ function aufstiegsziele(engine, pi, heroIdx) {
     // „with a different name from all Heroes you currently control" —
     // das schliesst Throne Robber selbst mit ein, solange er den Slot
     // haelt.
-    if (vergeben.has(name)) return false;
+    if (vergeben.has(baseCardName(name))) return false;
     // ★ SKRIPT-FILTER (Als Vorgabe 28.8.) — wie bei Crestina.
     // Eine Ascended-Hero-Karte ohne Skript ist ein reiner Werte-
     // Koerper; in eine solche Form aufzusteigen brächte einer Karte,

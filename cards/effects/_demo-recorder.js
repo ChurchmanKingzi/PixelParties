@@ -433,6 +433,13 @@ function attachDemoRecorder(engine, opts = {}) {
         validTargets: (validTargets || []).slice(0, 60).map(t => ({
           id: t?.id, type: t?.type, owner: t?.owner,
           cardName: t?.cardName || t?.cardInstance?.name,
+          // v855: `ineligible` MITSCHREIBEN. Ohne dieses Feld sah ein
+          // Mitschnitt so aus, als haette der Zielschutz (Stealth,
+          // Jetpack, jeder `blocksTargeting`-Vertrag) gar nicht
+          // gegriffen — dabei war die Markierung da und nur die
+          // Projektion warf sie weg. Genau daran habe ich mich bei Als
+          // Stealth-Meldung selbst verlesen.
+          ...(t?.ineligible ? { ineligible: true } : {}),
           state: stateOf(t),
         })),
       };

@@ -37,6 +37,7 @@ module.exports = {
       }
 
       const pick = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: 'Send any non-Hero card on the board (or the top of either Coolness Stack) to the discard pile.',
         confirmLabel: '⚡ Overcharge!',

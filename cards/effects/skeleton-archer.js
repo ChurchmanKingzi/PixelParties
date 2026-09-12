@@ -154,6 +154,7 @@ module.exports = {
     if (targets.length === 0) return false;
 
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: `Pick a target: deal ${DAMAGE} damage to a Hero / Creature, or destroy a face-down Surprise.`,
       confirmLabel: '🏹 Shoot!',

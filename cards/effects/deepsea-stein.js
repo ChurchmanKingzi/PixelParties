@@ -9,6 +9,9 @@
 //  1 per turn.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const {
   inherentActionIfBounceable,
   canBypassLevelReqIfBounceable,
@@ -56,8 +59,8 @@ module.exports = {
       const seen = new Set();
       const gallery = [];
       for (const n of ps.discardPile) {
-        if (seen.has(n)) continue;
-        seen.add(n);
+        if (seen.has(baseCardName(n))) continue;
+        seen.add(baseCardName(n));
         gallery.push({ name: n, source: 'discard' });
       }
       if (gallery.length === 0) return;

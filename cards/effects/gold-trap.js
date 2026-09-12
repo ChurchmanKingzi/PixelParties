@@ -103,6 +103,7 @@ module.exports = {
 
     if (targets.length > 0) {
       const picked = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: 'You may add 1 Creature on the board to your hand.',
         confirmLabel: '🪙 Take Creature!',

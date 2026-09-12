@@ -12,6 +12,9 @@
 //       as Alchemic Journal / Divine Gift).
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Inventing';
 
 module.exports = {
@@ -153,7 +156,7 @@ module.exports = {
 
     // Lock that card name for the rest of the turn (reuses creation lock system)
     if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
-    ps._creationLockedNames.add(foundName);
+    ps._creationLockedNames.add(baseCardName(foundName));   // v876
 
     engine.log('inventing_lv3', {
       player: ps.username, discarded: discardName, found: foundName,

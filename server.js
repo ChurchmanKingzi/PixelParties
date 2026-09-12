@@ -6920,6 +6920,19 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
               source: 'Artifact-Creature play',
               isPlacement: _isCrossSideArtifact,
               selfPlacement: true,
+              // ★ v857 (Als Befund): Powder Keg landete effektlos in der
+              // Ablage. Die zentrale Cross-Side-Sperre in
+              // `summonCreatureWithHooks` laesst eine Karte mit
+              // `placesOnOpponentBoard` NUR mit `crossSidePlacement`
+              // durch — ihr eigener Kommentar sagt „die Karte selbst
+              // platziert sich ueber denselben Helfer und opted per
+              // opts.crossSidePlacement ein", nur hat es diese eine
+              // Aufrufstelle nie mitgegeben. `selfPlacement` deckt den
+              // Artifact-Creature-Riegel DARUNTER ab, nicht die
+              // Cross-Side-Sperre darueber: zwei Riegel, zwei Fahnen.
+              // Ergebnis war `summonCreatureWithHooks` → null und der
+              // Fizzle-Zweig schob die Karte in den Ablagestapel.
+              crossSidePlacement: _isCrossSideArtifact,
               // Zustand SOFORT nach dem Setzen versenden, VOR Glanz und
               // Hooks (Als Report 17.8. zum Drag&Drop). Ohne das zeigt der
               // Client waehrend der ganzen Beschwoerung noch seinen alten
@@ -9813,6 +9826,27 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
 
 async function doConfirmPotion(room, pi, { selectedIds }) {
   if (!room?.engine || !room.gameState) return false;
+  // ★ UNWAEHLBARE ZIELE ABWEISEN (v915, Als Befund 12.9.) ────────────
+  // `ineligible` war bis hier rein kosmetisch: der Client graute die
+  // Ziele aus, der Server nahm sie trotzdem an. Damit kam jede Quelle,
+  // die den Picker umgeht oder die Rohliste liest, an Stealth, Jetpack
+  // und jedem anderen `blocksTargeting`-Schutz vorbei. Das ist der
+  // autoritative Flaschenhals — hier gehoert die Pruefung hin.
+  {
+    const _pt = room.gameState.potionTargeting;
+    if (_pt && Array.isArray(selectedIds) && selectedIds.length > 0) {
+      const _unwaehlbar = new Set(
+        (_pt.validTargets || []).filter(t => t?.ineligible).map(t => t.id));
+      if (selectedIds.some(id => _unwaehlbar.has(id))) {
+        room.engine.log?.('targeting_blocked', {
+          reason: 'ineligible_target_submitted',
+          source: _pt.potionName || null,
+          ids: selectedIds.filter(id => _unwaehlbar.has(id)),
+        });
+        return false;   // Abfrage bleibt offen, die Antwort zaehlt nicht
+      }
+    }
+  }
   const gs = room.gameState;
   if (!gs.potionTargeting) return false;
   if (pi !== gs.potionTargeting.ownerIdx) return false;
@@ -14091,6 +14125,15 @@ io.on('connection', (socket) => {
         if (h._ceciliaDefeatedOnce) {
           out._ceciliaDefeatedOnce = true;
         }
+        // Kopfgeld-Marke (v904, Vena, the Bounty Huntress): im Editor
+        // als `h._bountyBy` auf dem MARKIERTEN Helden gesetzt, Wert ist
+        // der Spielerindex der Jaegerin. Ohne diese Zeile startet jedes
+        // Vena-Puzzle ohne Kopfgeld — und da ihre Neuwahl ausdruecklich
+        // an ihrem eigenen toedlichen Schaden haengt (Als Ruling 12.9.),
+        // waere die Karte dort ueberhaupt nicht testbar.
+        if (typeof h._bountyBy === 'number') {
+          out._bountyBy = h._bountyBy;
+        }
         // Schon angenommene Gestalten von „???, the Shapeshifter" —
         // gleiche Bauart. Doppelt gebraucht: sie sperren dieselbe
         // Gestalt fuer den Rest des Spiels, UND ihre Anzahl ist die
@@ -14310,6 +14353,23 @@ io.on('connection', (socket) => {
             // standard `negated` counter set above.
             if (cs._dkSilenced) inst.counters._dkSilenced = 1;
             if (cs.poisoned) { inst.counters.poisoned = 1; inst.counters.poisonStacks = cs.poisoned.stacks || 1; }
+            // Alliance (v871): die im Editor gesetzte Verbindung. Zwei
+            // nackte Zahlen — genau die Zaehler, die das Kartenskript
+            // liest, und dieselben, die eine im Spiel gespielte
+            // Alliance setzt. Kein Sonderweg fuer den Editor.
+            if (cs.allyOwner != null && cs.allyHeroIdx != null) {
+              inst.counters.allyOwner = cs.allyOwner;
+              inst.counters.allyHeroIdx = cs.allyHeroIdx;
+            }
+            // Summoning Instructions (v886): das im Editor gesetzte X.
+            // Landet in demselben Zaehler, den auch der Spielweg setzt —
+            // die Engine und das Abzeichen lesen nur diesen einen.
+            if (cs.summoningInstructionsX) {
+              const x = Math.min(3, Math.max(1, cs.summoningInstructionsX.stacks || 1));
+              inst.counters.levelGapCoverage = x;
+              if (!inst.counters.buffs) inst.counters.buffs = {};
+              inst.counters.buffs.summoningInstructionsX = { level: x };
+            }
             if (cs.buffs) {
               if (!inst.counters.buffs) inst.counters.buffs = {};
               Object.assign(inst.counters.buffs, cs.buffs);
@@ -14325,6 +14385,16 @@ io.on('connection', (socket) => {
             // caster) and no untilTurn (= permanent).
             if (cs.buffs?.forcesTargeting) {
               inst.counters.forcesTargeting = true;
+            }
+            // Guarding (v849): Nur-Creatures-Variante des Taunts. Die
+            // Engine liest `forcesTargeting_creaturesOnly` zwar auch aus
+            // `counters.buffs`, aber der Schirm haengt am Taunt selbst —
+            // ohne `forcesTargeting` taete der Schalter gar nichts. Der
+            // Editor-Schalter setzt deshalb BEIDE Zaehler, so wie der
+            // Taunt-Spiegel direkt darueber.
+            if (cs.buffs?.forcesTargeting_creaturesOnly) {
+              inst.counters.forcesTargeting = true;
+              inst.counters.forcesTargeting_creaturesOnly = true;
             }
             // Anti Magic Enchantment buff on an Equip needs its functional
             // counter too — the `antiMagicEnchanted` counter is what the

@@ -56,7 +56,7 @@
 //  Karte zeigt.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 
 const { loadCardEffect } = require('./_loader');
 
@@ -146,8 +146,8 @@ function waehlbareGestalten(engine, pi, heroIdx) {
     // „Ascended Hero" ebenfalls auf „Hero" anschlagen, deshalb der
     // strikte Vergleich statt des Helfers.
     if (cd.cardType !== 'Hero') return false;
-    if (vergeben.has(name)) return false;
-    if (schonBenutzt.has(name)) return false;
+    if (vergeben.has(baseCardName(name))) return false;
+    if (schonBenutzt.has(baseCardName(name))) return false;
     return true;
   };
 

@@ -34,6 +34,9 @@
 
 const { schickeVonDeckInAblage, waehleAusNamen } = require('./_future-tech-shared');
 
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Iterative Testing';
 const MAX_SENDS = 2;
 const MA_SCHWELLE = 2;
@@ -43,7 +46,8 @@ function brauchbareHandkarten(gs, pi) {
   const ps = gs.players[pi];
   if (!ps) return [];
   const imDeck = new Set(ps.mainDeck || []);
-  return [...new Set(ps.hand || [])].filter(n => imDeck.has(n));
+  return [...new Set(ps.hand || [])].filter(n => imDeck.has(n)
+    || (ps.mainDeck || []).some(k => baseCardName(k) === baseCardName(n)));
 }
 
 /** Magic-Arts-Stufe des wirkenden Helden. */
@@ -96,7 +100,7 @@ module.exports = {
       engine.claimHOPT('iterative-testing', pi);
 
       // ② so viele Kopien wie vorhanden, höchstens zwei
-      const wieViele = Math.min(MAX_SENDS, (ps.mainDeck || []).filter(k => k === name).length);
+      const wieViele = Math.min(MAX_SENDS, (ps.mainDeck || []).filter(k => baseCardName(k) === baseCardName(name)).length);
       const bewegt = await schickeVonDeckInAblage(engine, pi, Array(wieViele).fill(name), CARD_NAME);
 
       engine.log('iterative_testing', {

@@ -6,6 +6,9 @@
 //  names, reveal and add to hand. If 2 chosen,
 //  those names are locked for the rest of the turn.
 // ═══════════════════════════════════════════
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 
 module.exports = {
   inherentAction: true,
@@ -29,10 +32,10 @@ module.exports = {
       const seen = new Set();
       const galleryCards = [];
       for (const cn of (ps.mainDeck || [])) {
-        if (seen.has(cn)) continue;
+        if (seen.has(baseCardName(cn))) continue;
         const cd = cardDB[cn];
         if (!cd) continue;
-        seen.add(cn);
+        seen.add(baseCardName(cn));
         galleryCards.push({ name: cn, source: 'deck' });
       }
       galleryCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -81,7 +84,7 @@ module.exports = {
       if (chosen.length >= 2) {
         if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
         for (const name of chosen) {
-          ps._creationLockedNames.add(name);
+          ps._creationLockedNames.add(baseCardName(name));   // v876
         }
         engine.log('creation_lock', { player: ps.username, cards: chosen });
       }

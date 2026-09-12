@@ -58,6 +58,8 @@
 
 const CARD_NAME = 'Kassaran, Seer of Everything';
 const { usesLeft, spendUse } = require('./_charges');
+// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const USE_KEY = 'kassaran';
 const MAX_USES_PER_TURN = 3;
 
@@ -138,7 +140,7 @@ module.exports = {
     spendUse(hero, gs, { key: USE_KEY, max: MAX_USES_PER_TURN });
 
     const topCard = ps.mainDeck[0];
-    const matched = (topCard === declared);
+    const matched = (baseCardName(topCard) === baseCardName(declared));   // v875
 
     engine.log('kassaran_declare', {
       player: ps.username, declared, revealed: topCard, matched,

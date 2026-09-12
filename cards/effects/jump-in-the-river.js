@@ -111,6 +111,7 @@ async function doJumpCascade(engine, pi) {
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Jump in the River',
         description: 'Select a Hero to submerge.',
         confirmLabel: '🌊 Dive!',

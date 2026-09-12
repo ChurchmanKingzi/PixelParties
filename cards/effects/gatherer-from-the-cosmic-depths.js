@@ -57,6 +57,7 @@ async function runMove(engine, inst, ctx) {
   // Step 1: pick the source card.
   const sourceEntries = sources.map(targetToPromptEntry);
   const srcPicked = await engine.promptEffectTarget(pi, sourceEntries, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: 'Move Change Counters FROM which of your cards?',
     confirmLabel: '🌌 Source',
@@ -94,6 +95,7 @@ async function runMove(engine, inst, ctx) {
     cardName: c.name, cardInstance: c,
   }));
   const dstPicked = await engine.promptEffectTarget(pi, destEntries, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: `Move ${n} counter${n === 1 ? '' : 's'} ONTO which "Cosmic Depths" Creature?`,
     confirmLabel: '🌌 Destination',

@@ -53,6 +53,14 @@ module.exports = {
     return false;
   },
 
+  // v856: Empfaenger-Zonen fuer das Ziehen. Ohne diesen Vertrag schickt
+  // der Client keinen `attachHeroIdx` mit und hebt die Zonen nicht als
+  // Drop-Ziel hervor — deshalb landete Intrude immer in der linkesten
+  // freien Zone. „Attach this Spell to the user": nur der Wirker-Held,
+  // also alle FREIEN Zonen eines eigenen lebenden Helden; welcher davon
+  // der Wirker ist, entscheidet der Server beim Spielen.
+  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
+
   hooks: {
     // ── Placement: auto-attach to caster's first free Support Zone ──
     onPlay: async (ctx) => {

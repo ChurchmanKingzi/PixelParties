@@ -130,6 +130,7 @@ module.exports = {
       }
 
       const picked = await engine.promptEffectTarget(pi, targets2, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Initiation Ritual — Placement',
         description: `Choose a living Hero to equip ${deadHeroName} to.`,
         confirmLabel: '🔮 Equip!',

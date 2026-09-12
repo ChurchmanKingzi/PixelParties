@@ -50,7 +50,7 @@
 //  gallery) makes the server refund it.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Timeless King Zi';
 const PICK_COUNT = 3;
@@ -70,14 +70,14 @@ function uniqueDeckSpells(engine, pi) {
   const seen = new Set();
   const out = [];
   for (const name of (ps.mainDeck || [])) {
-    if (seen.has(name)) continue;
+    if (seen.has(baseCardName(name))) continue;
     const cd = cardDB[name];
     if (!cd || !hasCardType(cd, 'Spell')) continue;
     // Surprises and Reactions can't be "performed" on demand by a Hero
     // — exclude them from the pool entirely.
     const sub = cd.subtype || '';
     if (sub === 'Surprise' || sub === 'Reaction') continue;
-    seen.add(name);
+    seen.add(baseCardName(name));
     out.push({ name, level: spellLevel(cd) });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));

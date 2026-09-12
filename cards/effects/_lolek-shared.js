@@ -99,6 +99,7 @@ async function chooseAndEquip(engine, pi, entries, opts = {}) {
       owner: d.side, heroIdx: d.heroIdx, slotIdx: d.slotIdx, cardName: '',
     }));
     const ids = await engine.promptEffectTarget(pi, zoneTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: `${opts.title} — Equip ${entry.name}`, source: opts.source || opts.title,
       description: cost > 0
         ? `Choose a Support Zone for ${entry.name} (pay ${cost} Gold).`

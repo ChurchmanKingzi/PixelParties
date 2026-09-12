@@ -7,6 +7,9 @@
 //  Resets at the start of owner's next turn.
 // ═══════════════════════════════════════════
 
+// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 module.exports = {
   activeIn: ['ability'],
   freeActivation: true,
@@ -114,7 +117,7 @@ module.exports = {
       // Only trigger on opponent's plays
       if (playedByOwner === pi) return;
       // Match card name
-      if (playedCardName !== target) return;
+      if (baseCardName(playedCardName) !== baseCardName(target)) return;   // v875
 
       const level = ctx.card.counters.luckLevel || 1;
       const drawCount = level + 1; // Lv1=2, Lv2=3, Lv3=4

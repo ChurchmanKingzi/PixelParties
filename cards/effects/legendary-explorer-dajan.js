@@ -144,6 +144,7 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
   if (destTargets.length === 0) return false;
 
   const destIds = await engine.promptEffectTarget(pi, destTargets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: `${CARD_NAME} — Equip ${cardName}`,
     description: `Select a Support Zone to equip ${cardName} to (Cost ${cost}).`,
     confirmLabel: '🗺️ Equip!',

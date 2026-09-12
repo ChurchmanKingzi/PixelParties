@@ -122,6 +122,7 @@ module.exports = {
 
     // Prompt player to choose target
     const selectedIds = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: 'Punch in the Box',
       description: `Deal ${recoil} recoil damage (half of ${amount}) to an opponent's target.`,
       confirmLabel: `🥊 Punch! (${recoil})`,
@@ -151,13 +152,13 @@ module.exports = {
       if (hero && hero.hp > 0) {
         await engine.actionDealDamage(
           { name: 'Punch in the Box', owner: pi },
-          hero, recoil, 'other'
+          hero, recoil, 'potion'
         );
       }
     } else if (chosen.cardInstance) {
       await engine.actionDealCreatureDamage(
         { name: 'Punch in the Box', owner: pi },
-        chosen.cardInstance, recoil, 'other',
+        chosen.cardInstance, recoil, 'potion',
         { sourceOwner: pi, canBeNegated: true },
       );
     }

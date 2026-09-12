@@ -183,6 +183,7 @@ module.exports = {
 
       // Mandatory pick — non-cancellable, always exactly 1 target.
       const picked = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: `Time Bomblebee detonates! Choose a Creature to deal ${DAMAGE} damage to. (Mandatory — pick any Creature on the board.)`,
         confirmLabel: `💥 ${DAMAGE} Damage!`,

@@ -158,6 +158,7 @@ module.exports = {
     if (boardTargets.length === 0) return { cancelled: true };
 
     const cardPick = await engine.promptEffectTarget(pi, boardTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: 'The Yeeting — Choose Target',
       // Der CPU-Dispatch in `_getCpuTargetResponse` schlägt `config.source
       // || config.title` als Kartenname nach. Ohne `source` landete hier

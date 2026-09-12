@@ -253,6 +253,16 @@ function puppetsInPlay(players) {
   return (players || []).some(p => (p?.heroes || []).some(h => h?.name && PUPPET_HERO_NAMES.has(h.name)));
 }
 
+// Gate des Kopfgeld-Schalters (v904, Vena, the Bounty Huntress): die
+// Marke liegt auf einem GEGNERISCHEN Helden, also ist sie nur dann
+// authorbar, wenn die ANDERE Seite eine Vena kontrolliert. Gate ueber
+// den Heldennamen statt ueber den markierten Helden — sonst liesse sich
+// der Ausgangszustand gar nicht erst herstellen.
+const VENA_NAME = 'Vena, the Bounty Huntress';
+function venaAufSeite(player) {
+  return (player?.heroes || []).some(h => h?.name === VENA_NAME);
+}
+
 // Gate des Demon-Counter-Editors: jede Karte, deren Text Demon Counter
 // nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
 // spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
@@ -376,6 +386,36 @@ function PuzzleCreator() {
   const galleryLeft = puzzleFiltersCollapsed ? 0 : PZ_FILTER_W;
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  // Alliance (v871, Als Vorgabe): Klick auf eine liegende Alliance
+  // startet die VERBINDUNGSWAHL statt des Statistik-Dialogs. Der
+  // Zustand haelt die Karte, die gerade verbunden wird; Klick auf einen
+  // gegnerischen Helden schliesst sie ab, Escape bricht ab.
+  const [allianceLink, setAllianceLink] = useState(null);
+  /**
+   * Alle im Editor gesetzten Allianzen (v872). Quelle ist derselbe
+   * Speicher, den der Server beim Laden liest — so zeigt der Editor
+   * genau das, was spaeter im Spiel gilt.
+   * Form: { userSi, userHi, slot, allySi, allyHi, userName }
+   */
+  const allianceLinks = useMemo(() => {
+    const out = [];
+    for (let si = 0; si < players.length; si++) {
+      const p = players[si];
+      for (let hi = 0; hi < (p.supportZones || []).length; hi++) {
+        for (let z = 0; z < (p.supportZones[hi] || []).length; z++) {
+          if (!(p.supportZones[hi][z] || []).includes('Alliance')) continue;
+          const cs = p._creatureStatuses?.[hi + '-' + z];
+          if (!cs || cs.allyOwner == null || cs.allyHeroIdx == null) continue;
+          out.push({
+            userSi: si, userHi: hi, slot: z,
+            allySi: cs.allyOwner, allyHi: cs.allyHeroIdx,
+            userName: p.heroes?.[hi]?.name || 'its user',
+          });
+        }
+      }
+    }
+    return out;
+  }, [players]);
   const [editHp, setEditHp] = useState('');
   const [editMaxHp, setEditMaxHp] = useState('');
   const [editAtk, setEditAtk] = useState('');
@@ -1945,6 +1985,11 @@ function PuzzleCreator() {
   // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
   // Evolution Counters. Null fuer alle anderen Helden.
   const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
+  // Kopfgeld-Marke (v904, Vena). Liegt als `hero._bountyBy` auf dem
+  // MARKIERTEN Helden und traegt den Spielerindex der Jaegerin. Null
+  // fuer jeden Helden, dessen Gegenseite keine Vena hat — dann bleibt
+  // der Abschnitt zu.
+  const [editBountyMark, setEditBountyMark] = useState(null);
   // For Charm of Balance: number of Balance Counters this Equipment starts
   // the puzzle with. Saved under `_creatureStatuses[hi-slot].balance` and
   // applied server-side as `inst.counters.balance` (alongside headCounter
@@ -1993,6 +2038,30 @@ function PuzzleCreator() {
     'Analyzer from the Cosmic Depths',
     'Gatherer from the Cosmic Depths',
   ]);
+  /**
+   * Alliance-Verbindung schreiben (v871). Gespeichert wird genau das,
+   * was auch eine im Spiel gespielte Alliance in ihre Zaehler schreibt
+   * — `allyOwner` / `allyHeroIdx` unter `_creatureStatuses`, wo der
+   * Server sie beim Laden in die Instanz uebernimmt. Kein Sonderformat
+   * fuer den Editor, sonst laufen Brett und Editor auseinander.
+   */
+  const setzeAllianz = useCallback((link, zielSi, zielHi) => {
+    updatePlayer(link.si, (p) => {
+      if (!p._creatureStatuses) p._creatureStatuses = {};
+      const key = link.hi + '-' + link.slot;
+      p._creatureStatuses[key] = {
+        ...(p._creatureStatuses[key] || {}),
+        allyOwner: zielSi, allyHeroIdx: zielHi,
+      };
+      return p;
+    });
+    // v872 (Als Befund): der Abschluss war stumm. `placement` ist der
+    // Klang fuers Ablegen einer Karte und ging hier unter; `buff` ist
+    // der aufsteigende Klang, den das Brett fuer „Verbindung steht"
+    // ohnehin nutzt.
+    if (window.playSFX) window.playSFX('buff', { volume: 1.1, dedupe: 0 });
+  }, [updatePlayer]);
+
   const openStatEditor = useCallback((si, zt, hi, slot) => {
     const p = players[si];
     // ── Klang beim Oeffnen (Als Vorgabe 18.8.) ────────────────────────
@@ -2067,6 +2136,9 @@ function PuzzleCreator() {
       setEditCeciliaDefeated(h.name === 'Cecilia, the Harrowing Crusader'
         ? !!h._ceciliaDefeatedOnce
         : null);
+      setEditBountyMark(venaAufSeite(players[si === 0 ? 1 : 0])
+        ? (h._bountyBy === (si === 0 ? 1 : 0))
+        : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
       const c = getCard(cards[0]);
@@ -2075,6 +2147,14 @@ function PuzzleCreator() {
       // Klick soll deshalb NICHTS oeffnen statt einen leeren Dialog
       // (Als Befund 5.9.).
       if (c?.cardType === 'Ability') return;
+      // Alliance: kein Statistik-Dialog, sondern die Verbindungswahl.
+      // Eine bestehende Verbindung wird dabei ueberschrieben.
+      if (cards[0] === 'Alliance') {
+        if (window.playSFX) window.playSFX('ui_click');
+        setEditTarget(null);
+        setAllianceLink({ si, hi, slot });
+        return;
+      }
       klangBeimOeffnen();
       setEditTarget({ si, zt, hi, slot });
       setEditHp(String(c?.hp ? (p._customSupportHp?.[hi]?.[slot] ?? c.hp) : '')); setEditMaxHp(''); setEditAtk('');
@@ -2092,6 +2172,16 @@ function PuzzleCreator() {
         delete csWithoutBuffs.negated;
         delete csWithoutBuffs._dkSilenced;
         csWithoutBuffs.silenced = true;
+      }
+      // v889: Schalter mit `alwaysOn` brauchen einen Wert, auch wenn im
+      // Puzzle noch keiner steht — sonst zeigte das Feld eine Zahl, die
+      // beim Speichern nirgends landet.
+      for (const st of STATUS_LIST) {
+        if (!st.alwaysOn) continue;
+        if (!statusScopePasst(st, { si, zt, hi, slot })) continue;
+        if (csWithoutBuffs[st.key] == null) {
+          csWithoutBuffs[st.key] = st.stacks ? { stacks: st.stackMin || 1 } : true;
+        }
       }
       setEditStatuses(csWithoutBuffs);
       setEditBuffs({ ...(cs.buffs || {}) });
@@ -2203,6 +2293,17 @@ function PuzzleCreator() {
         } else if (editCeciliaDefeated != null) {
           delete p.heroes[hi]._ceciliaDefeatedOnce;
         }
+        // Vena: die Marke traegt den Index der JAEGERIN, also die
+        // Gegenseite des markierten Helden. Beim Setzen zuerst jede
+        // andere Marke derselben Jaegerin loeschen — sie kann immer nur
+        // EIN Kopfgeld ausgeschrieben haben.
+        if (editBountyMark != null) {
+          const jaeger = si === 0 ? 1 : 0;
+          for (const hh of p.heroes) {
+            if (hh && hh._bountyBy === jaeger) delete hh._bountyBy;
+          }
+          if (editBountyMark) p.heroes[hi]._bountyBy = jaeger;
+        }
         if (editInvestCounter != null && editInvestCounter > 0) {
           p.heroes[hi]._investCounters = editInvestCounter;
         } else {
@@ -2242,6 +2343,17 @@ function PuzzleCreator() {
       if (isEquip) {
         merged = {};
         if (editBuffs.anti_magic_enchanted) merged.buffs = { anti_magic_enchanted: true };
+        // v888 (Als Befund): Der Ausruestungs-Zweig warf ALLES weg, damit
+        // keine alten Creature-Daten nach einem Tausch haengenbleiben.
+        // Kartenspezifische Schalter (Summoning Instructions: X) sind aber
+        // genau das, was hier bleiben MUSS — sonst laesst sich X zwar
+        // einstellen, aber nie speichern. Uebernommen wird nur, was fuer
+        // DIESE Karte deklariert ist; alles andere faellt weiter raus.
+        for (const st of STATUS_LIST) {
+          if (!st.scope || !st.scope.startsWith('equip')) continue;
+          if (!statusScopePasst(st, { si, zt, hi, slot })) continue;
+          if (editStatuses[st.key] != null) merged[st.key] = editStatuses[st.key];
+        }
       } else {
         merged = { ...editStatuses };
         // Defensive: always drop any legacy `buffs` field that might have
@@ -2333,7 +2445,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBountyMark, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -2406,6 +2518,7 @@ function PuzzleCreator() {
       // Pop-ups close one level at a time so a "viewing a deck pile"
       // Escape doesn't boot the whole creator. Order matters: most
       // transient overlay first, navigation away last.
+      if (allianceLink)       { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setAllianceLink(null);        return; }
       if (viewPile)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setViewPile(null); setPileSuche(''); return; }
       if (debuffMenuOpen)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDebuffMenuOpen(null);      return; }
       if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setRemovePopupPos(null);      return; }
@@ -2417,7 +2530,7 @@ function PuzzleCreator() {
       setScreen('menu');
     };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
-  }, [editTarget, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected]);
+  }, [editTarget, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected, allianceLink]);
 
   // ── Surprise eligibility: can the host Hero actually cast this
   //    Surprise (a Spell)? Mirrors the main board's canHeroPlayCard
@@ -2460,6 +2573,49 @@ function PuzzleCreator() {
   }, [getCard]);
 
   // ── Status effect and buff constants ──
+  /**
+   * Passt dieser Schalter zum gerade bearbeiteten Ziel? (v887)
+   * Vorher stand diese Logik nur im Renderfilter — der Abschnitt
+   * „Status Effects" selbst war fuer Ausruestung aber KOMPLETT
+   * ausgeblendet, also kam ein Schalter mit `scope: 'equip…'` nie zur
+   * Anzeige. Jetzt entscheidet dieselbe Funktion beides: welche
+   * Schalter gezeigt werden UND ob der Abschnitt ueberhaupt erscheint.
+   */
+  const statusScopePasst = useCallback((st, ziel) => {
+    if (!ziel) return false;
+    const p = players[ziel.si];
+    const karteInZone = () => {
+      if (ziel.zt !== 'support') return null;
+      const cc = p?.supportZones?.[ziel.hi]?.[ziel.slot] || [];
+      return cc.length ? cc[0] : null;
+    };
+    if (st.scope === 'hero') return ziel.zt === 'hero';
+    if (st.scope === 'oppHero') return ziel.zt === 'hero' && ziel.si === 1;
+    if (st.scope === 'equipSummoningInstructions') return karteInZone() === 'Summoning Instructions';
+    if (st.scope === 'creature') {
+      const n = karteInZone();
+      const c = n ? getCard(n) : null;
+      return !!c && (c.cardType === 'Creature' || c.cardType === 'Creature/Token');
+    }
+    // v888 (Als Befund): Ein Schalter OHNE Scope ist ein allgemeiner
+    // Statuseffekt (Burned, Poisoned, …). Der gehoert an Helden und
+    // Creatures — NICHT an eine Ausruestung, ein Attachment oder eine
+    // Ability. Vorher hing das an der Sichtbarkeit des ganzen
+    // Abschnitts; seit der fuer kartenspezifische Schalter aufgeht,
+    // muss die Regel hier stehen, sonst konnte man Summoning
+    // Instructions vergiften.
+    if (ziel.zt === 'support') {
+      const n = karteInZone();
+      const c = n ? getCard(n) : null;
+      if (!c) return false;
+      const sub = (c.subtype || '').toLowerCase();
+      if (c.cardType === 'Ability') return false;
+      if (c.cardType === 'Artifact' && sub === 'equipment') return false;
+      if (c.cardType === 'Spell' && sub === 'attachment') return false;
+    }
+    return true;
+  }, [players, getCard]);
+
   const STATUS_LIST = [
     { key: 'frozen', label: '❄️ Frozen', color: '#66ccff',
       tooltip: 'Frozen: cannot act and has its effects and Abilities negated. Wears off at the end of its owner\'s turn.' },
@@ -2485,6 +2641,21 @@ function PuzzleCreator() {
     // underlying primitive.
     { key: 'silenced', label: '🤐 Silenced', color: '#1f8a44',
       tooltip: 'Silenced: Heroes cannot perform Actions; Creatures have their effects negated. Skeleton Death Knight\'s effect.' },
+    // v879 (Howling in the Night, Als Vorgabe): fuer HELDEN setzbar.
+    // Der Status ist funktional die Spell-Sperre; der Editor speichert
+    // ihn als gewoehnlichen Heldenstatus, den die Engine beim Laden
+    // uebernimmt — kein Sonderweg.
+    // v886 (Summoning Instructions): X der ausgeruesteten Karte. Kein
+    // Status im Regelsinn, aber derselbe Schalterkasten — der Editor
+    // speichert es als Zaehler `levelGapCoverage`, genau den die Engine
+    // und das Abzeichen lesen.
+    { key: 'summoningInstructionsX', label: '📘 Summoning Instructions X', color: '#6688cc',
+      // v889 (Als Vorgabe): X ist keine Option, sondern eine Eigenschaft
+      // der Karte — immer aktiv, Vorgabe 1, abschalten gibt es nicht.
+      scope: 'equipSummoningInstructions', stacks: true, stackMin: 1, stackMax: 3, alwaysOn: true,
+      tooltip: 'X of Summoning Instructions (1-3): the equipped Hero may summon Creatures up to X levels above its Summoning Magic level (level 3 Creatures at most).' },
+    { key: 'frightened', label: '😱 Frightened', color: '#8866cc', scope: 'hero',
+      tooltip: 'Frightened: cannot use Spells. Attacks, Creatures, Abilities and Hero effects are unaffected.' },
     { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff',
       tooltip: 'Shielded: immune to ALL status effects (first-turn protection variant).' },
     { key: 'immune', label: '✨ Immune', color: '#ffdd88',
@@ -2519,6 +2690,13 @@ function PuzzleCreator() {
     // side = opponent picks any. Applies to Heroes AND Creatures.
     { key: 'forcesTargeting', label: '🎯 Taunt', color: '#ff5060',
       tooltip: 'Taunt: the opponent MUST target this with Attacks / Spells / Creature effects when possible. Multiple Taunters → opponent picks one.' },
+    // v849: Nur-Creatures-Variante des Taunts (Doomed Town Guard). Der
+    // Schutzschirm deckt ausschliesslich die CREATURES der eigenen
+    // Seite — die Helden dahinter bleiben waehlbar. Sinnlos ohne den
+    // Taunt selbst, deshalb setzt der Puzzle-Loader beide Zaehler,
+    // sobald dieser Schalter gesetzt ist (server.js).
+    { key: 'forcesTargeting_creaturesOnly', label: '🛡️ Guarding', color: '#ff8a60', scope: 'creature',
+      tooltip: 'Guarding (Taunt, Creatures only): your opponent cannot choose your OTHER Creatures while this Creature stands — your Heroes stay selectable. Implies Taunt.' },
     // Equip-Artifact-only buff: Anti Magic Enchantment. The scope tag below
     // flips rendering so this buff ONLY shows up when editing an Equipment
     // Artifact, and for that zone type ONLY this buff is offered (all
@@ -2551,8 +2729,18 @@ function PuzzleCreator() {
       zt === 'surprise' ? (p.surpriseZones[hi]||[])[0] :
       zt === 'area' ? areaZones[si][0] : null
     ) : null;
+    // Alliance-Verbindungswahl (v871): waehrend sie laeuft, tragen die
+    // LEGALEN Ziele — die Helden des ANDEREN Spielers — eine eigene
+    // Klasse. Die Hervorhebung liegt am DOM-Attribut, damit sie ohne
+    // Eingriff in die vorhandene Klassenkette auskommt.
+    const allianzZiel = !!allianceLink && zt === 'hero'
+      && si !== allianceLink.si && !!p.heroes[hi];
+    const allianzQuelle = !!allianceLink && zt === 'support'
+      && si === allianceLink.si && hi === allianceLink.hi && slot === allianceLink.slot;
     return {
       'data-pz-zone': `${si}-${zt}-${hi}-${slot}`,
+      'data-alliance-target': allianzZiel ? 'true' : undefined,
+      'data-alliance-source': allianzQuelle ? 'true' : undefined,
       draggable: !!hasCard && !isTouchDevice,
       onDragStart: (e) => {
         if (hasCard && zoneCardName) {
@@ -2600,6 +2788,18 @@ function PuzzleCreator() {
           else if (zt === 'area') placeArea(sel.cardName, si);
           else if (zt === 'permanent') placePermanent(sel.cardName, si);
           setMobileSelected(null);
+          return;
+        }
+        // Alliance-Verbindungswahl laeuft (v871): ein Klick auf einen
+        // GEGNERISCHEN Helden schliesst sie ab, alles andere bricht ab.
+        // Der Klick darf hier NICHT weiter in den Stat-Editor laufen.
+        if (allianceLink) {
+          if (zt === 'hero' && si !== allianceLink.si && p.heroes[hi]) {
+            setzeAllianz(allianceLink, si, hi);
+          } else if (window.playSFX) {
+            window.playSFX('ui_cancel', { volume: 0.4 });
+          }
+          setAllianceLink(null);
           return;
         }
         if (!isTouchDevice) {
@@ -2671,6 +2871,15 @@ function PuzzleCreator() {
                   {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.bleeding || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
                     <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
+                  {/* Alliance (v872): Abzeichen am VERBUENDETEN Helden —
+                      dieselbe Auskunft wie am Spielbrett, damit im
+                      Editor sichtbar ist, dass die Verbindung steht. */}
+                  {(() => {
+                    const l = allianceLinks.find(x => x.allySi === si && x.allyHi === hi);
+                    if (!l) return null;
+                    return <div className="status-immune-icon status-alliance-icon"
+                      title={`Allied with ${l.userName}`}>🤝</div>;
+                  })()}
                 </> : <div className="board-zone-empty">Hero</div>}
               </div>
               <div className="board-zone board-zone-surprise"
@@ -2891,7 +3100,18 @@ function PuzzleCreator() {
                         {cs.poisoned && <PoisonedOverlay stacks={cs.poisoned.stacks || 1} />}
                         {(cs.frozen || cs.stunned || cs.burned || cs.bleeding || cs.poisoned || cs.negated || cs._extraLife) &&
                           <StatusBadges statuses={cs} isHero={false} />}
-                        {cs.buffs && <BuffColumn buffs={cs.buffs} />}
+                        {/* v889 (Als Vorgabe): X von Summoning Instructions
+                            schon IM EDITOR als Abzeichen zeigen. Gerendert
+                            wird dieselbe Buff-Spalte wie im Spiel — der
+                            Editor speichert X als Zaehler, nicht als Buff,
+                            deshalb wird der Eintrag hier abgeleitet. */}
+                        {(() => {
+                          const x = cs.summoningInstructionsX?.stacks;
+                          const zusatz = (cards[0] === 'Summoning Instructions')
+                            ? { summoningInstructionsX: { level: x || 1 } } : null;
+                          const alle = zusatz ? { ...(cs.buffs || {}), ...zusatz } : cs.buffs;
+                          return alle ? <BuffColumn buffs={alle} /> : null;
+                        })()}
                         <CounterBadges source={cs} defs={PUZZLE_COUNTER_BADGES} />
                       </>;
                     })() : <div className="board-zone-empty">{item.isIsland ? 'Island' : 'Support'}</div>}
@@ -3897,6 +4117,21 @@ function PuzzleCreator() {
                 Stormkissed up to 4 for Deep-Drowned) and Descending places
                 more back. Saved as `hero._evolutionCounters`, which the
                 shared Waflav helpers read directly. */}
+            {editBountyMark != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  🎯 Bounty
+                </span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!editBountyMark}
+                    onChange={(e) => setEditBountyMark(e.target.checked)} />
+                  Marked by the opponent's Vena
+                </label>
+                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+                  "Vena, the Bounty Huntress" targets this Hero with all three of her effects. Only one Hero per side can carry the mark.
+                </div>
+              </div>
+            )}
             {editCeciliaDefeated != null && (
               <div style={{ marginBottom: 14 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -4229,23 +4464,21 @@ function PuzzleCreator() {
               // Ability, keine Creature — sie traegt weder Statuseffekte
               // noch Buffs (Als Befund 5.9.).
               const isAbility = c.cardType === 'Ability';
-              return isEquip || isAttachment || isAbility;
+              if (!(isEquip || isAttachment || isAbility)) return false;
+              // v887: … ES SEI DENN, fuer genau diese Karte gibt es
+              // einen eigenen Schalter (Summoning Instructions: X).
+              // Dann wird der Abschnitt gezeigt, aber nur mit den
+              // passenden Eintraegen — der Filter unten sortiert die
+              // allgemeinen Statuseffekte ohnehin aus.
+              return !STATUS_LIST.some(st => st.scope && st.scope !== 'creature'
+                && st.scope !== 'hero' && st.scope !== 'oppHero'
+                && statusScopePasst(st, editTarget));
             })()) && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Status Effects</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                {STATUS_LIST.filter(st => {
-                  // `scope: 'creature'` — nur bei einer echten Creature
-                  // in einer Support Zone anbieten (Helden, Equipment,
-                  // Attachments und Tokens gehen leer aus).
-                  if (st.scope !== 'creature') return true;
-                  if (editTarget.zt !== 'support') return false;
-                  const p = players[editTarget.si];
-                  const cards = p.supportZones[editTarget.hi]?.[editTarget.slot] || [];
-                  const c = cards.length ? getCard(cards[0]) : null;
-                  return !!c && (c.cardType === 'Creature' || c.cardType === 'Creature/Token');
-                }).map(st => {
-                  const active = !!editStatuses[st.key];
+                {STATUS_LIST.filter(st => statusScopePasst(st, editTarget)).map(st => {
+                  const active = st.alwaysOn ? true : !!editStatuses[st.key];
                   // Cursor-anchored hover tooltip — describes what the
                   // status does in-game so the puzzle author doesn't
                   // have to remember every status key. onMouseMove
@@ -4263,9 +4496,9 @@ function PuzzleCreator() {
                         borderColor: active ? st.color : 'var(--bg4)',
                         color: active ? st.color : 'var(--text2)',
                         background: active ? st.color + '18' : 'transparent',
-                      }} {...tipHandlers} onClick={() => setEditStatuses(prev => {
+                      }} {...tipHandlers} onClick={st.alwaysOn ? undefined : () => setEditStatuses(prev => {
                         const next = { ...prev };
-                        if (st.stacks) { next[st.key] = active ? undefined : { stacks: 1 }; }
+                        if (st.stacks) { next[st.key] = active ? undefined : { stacks: st.stackMin || 1 }; }
                         else { next[st.key] = active ? undefined : true; }
                         if (!next[st.key]) delete next[st.key];
                         return next;
@@ -4273,10 +4506,17 @@ function PuzzleCreator() {
                         {st.label}
                       </button>
                       {st.stacks && active && (
-                        <input className="input" type="number" min="1" value={editStatuses[st.key]?.stacks || 1}
+                        <input className="input" type="number" min={st.stackMin || 1} max={st.stackMax || undefined}
+                          value={editStatuses[st.key]?.stacks || st.stackMin || 1}
                           style={{ width: 40, padding: '2px 4px', fontSize: 10, textAlign: 'center' }}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setEditStatuses(prev => ({ ...prev, [st.key]: { stacks: Math.max(1, parseInt(e.target.value) || 1) } }))} />
+                          onChange={(e) => setEditStatuses(prev => {
+                            // v886: `stackMin`/`stackMax` klemmen den Wert — X von
+                            // Summoning Instructions ist auf 1..3 festgelegt.
+                            const roh = parseInt(e.target.value) || (st.stackMin || 1);
+                            const wert = Math.min(st.stackMax || 99, Math.max(st.stackMin || 1, roh));
+                            return { ...prev, [st.key]: { stacks: wert } };
+                          })} />
                       )}
                     </div>
                   );
@@ -4311,6 +4551,16 @@ function PuzzleCreator() {
                   if (bf.scope === 'equip') return false;
                   if (!bf.scope) return true;
                   if (bf.scope === 'oppHero') return editTarget.zt === 'hero' && editTarget.si === 1;
+                  // v849-Nachtrag: kreaturgebundene Buffs (Guarding) nur
+                  // anbieten, wenn in dieser Zone wirklich eine Creature
+                  // liegt — dieselbe Pruefung wie bei den Statuseffekten.
+                  if (bf.scope === 'creature') {
+                    if (editTarget.zt !== 'support') return false;
+                    const pc = players[editTarget.si];
+                    const cc = pc.supportZones[editTarget.hi]?.[editTarget.slot] || [];
+                    const cr = cc.length ? getCard(cc[0]) : null;
+                    return !!cr && (cr.cardType === 'Creature' || cr.cardType === 'Creature/Token');
+                  }
                   return true;
                 }).map(bf => {
                   const active = !!editBuffs[bf.key];

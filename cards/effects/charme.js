@@ -551,6 +551,7 @@ async function _activateLv3(engine, gs, pi, heroIdx, hero, oi, ops) {
   if (heroTargets.length === 0) return false;
 
   const picked = await engine.promptEffectTarget(pi, heroTargets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: `${hero.name} — Charme Lv3`,
     description: 'Choose an opponent\'s Hero to take control of!',
     confirmLabel: '💕 Charm!',

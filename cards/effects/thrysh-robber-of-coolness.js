@@ -157,6 +157,7 @@ module.exports = {
 
     // ── Stage 2: pick equip target (unified for deck and Stack) ──
     const pick = await engine.promptEffectTarget(pi, equipTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: choice.cardName,
       description: 'Equip to a Hero (auto-leftmost-free) or click a specific empty Support Zone.',
       confirmLabel: '⚔️ Equip',

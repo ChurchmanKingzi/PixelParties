@@ -88,6 +88,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   // player picks nothing, treat as a skip — neither HOPT stamp nor
   // animation should fire (no commitment without a hit).
   const picked = await engine.promptEffectTarget(pi, targets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: `An opponent target was defeated! Choose a target to deal ${DAMAGE} damage to.`,
     confirmLabel: `💥 ${DAMAGE} Damage!`,

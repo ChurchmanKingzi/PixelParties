@@ -121,6 +121,7 @@ async function runMove(engine, inst, ctx) {
   const targetEntries = allTargets.map(targetToPromptEntry);
 
   const picked = await engine.promptEffectTarget(pi, targetEntries, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: `Move ${n} Change Counter${n === 1 ? '' : 's'} onto which card?`,
     confirmLabel: '🌌 Move!',

@@ -12,6 +12,10 @@
 //    DM 2 → you 5 / opp 4
 //    DM 3 → you 6 / opp 3
 //
+//  ERSTE RUNDE (Als Regel 11.9.): Der Gegner ist von allem unbetroffen.
+//  Wird „Draw" in der allerersten Runde gespielt, wirkt sie NUR fuer den
+//  Nutzer — der Gegner behaelt seine Hand und zieht nichts.
+//
 //  Each player's hand-dump runs inside its own `withDiscardBatch`
 //  (the Gigantisaur Spinor pattern) so per-card on-discard reactors
 //  (Cute Bunny, Glass of Marbles, …) resolve AFTER the whole hand
@@ -45,9 +49,9 @@ const BEAT_MS = 260;
  * `countByPlayer`) so per-card reactors resolve AFTER the whole dump.
  * Returns `{ my, opp }` counts.
  */
-async function dumpHandsTogether(engine, pi, oppIdx) {
+async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt) {
   const me = engine.gs.players[pi];
-  const op = engine.gs.players[oppIdx];
+  const op = gegnerUnberuehrt ? null : engine.gs.players[oppIdx];
   let my = 0;
   let opp = 0;
 
@@ -80,8 +84,12 @@ async function dumpHandsTogether(engine, pi, oppIdx) {
         const lockstep = { source: CARD_NAME, _noFlight: true, _noPace: true };
         if (myCard != null
             && await engine.actionDiscardHandCard(pi, myCard, 0, lockstep)) my++;
+        // Gegnerseite MIT Quellenangabe: das ist ein fremder Zwangs-
+        // abwurf, kein Eigenabwurf. Damit oeffnet er das Ambush-Fenster
+        // und faellt unter den Erstrunden-Riegel (v860).
         if (oppCard != null
-            && await engine.actionDiscardHandCard(oppIdx, oppCard, 0, lockstep)) opp++;
+            && await engine.actionDiscardHandCard(oppIdx, oppCard, 0,
+                 { ...lockstep, sourceOwner: pi })) opp++;
 
         engine.sync();
         const more = (me?.hand?.length || 0) > 0 || (op?.hand?.length || 0) > 0;
@@ -106,25 +114,35 @@ module.exports = {
       const youDraw = 3 + dm;   // 4 / 5 / 6
       const oppDraw = 6 - dm;   // 5 / 4 / 3
 
+      // ★ ERSTE RUNDE: der Gegner bleibt voellig unberuehrt (Als Regel).
+      // Kein Abwurf seiner Hand UND kein Nachziehen fuer ihn — auch das
+      // Ziehen ist ein Eingriff in seine Partie. Der Nutzer bekommt
+      // seinen Teil ganz normal. Der Riegel in `actionDiscardHandCard`
+      // wuerde den Abwurf ohnehin abfangen; hier steht er, damit die
+      // Karte den Gegner gar nicht erst anfasst (kein Flug, kein Takt,
+      // kein Zug aus seinem Deck).
+      const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx;
+
       // ── Both players discard their entire hands, card by card, in
       //    lockstep (one card each per beat). The caster's hand
       //    includes the resolving Draw itself — the engine's
       //    self-discard path (getResolvingHandIndex → -1) handles
       //    that without a double-discard.
       const { my: myDiscarded, opp: oppDiscarded } =
-        await dumpHandsTogether(engine, pi, oppIdx);
+        await dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt);
       engine.sync();
       await engine._delay(200);
 
       // ── Then draw ──
       await engine.actionDrawCardsAnimated(pi, youDraw);
-      await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
+      if (!gegnerUnberuehrt) await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
 
       engine.log('draw_card', {
         player: gs.players[pi]?.username,
         decayLevel: dm,
         myDiscarded, oppDiscarded,
-        youDraw, oppDraw,
+        youDraw, oppDraw: gegnerUnberuehrt ? 0 : oppDraw,
+        ...(gegnerUnberuehrt ? { oppShielded: true } : {}),
       });
       engine.sync();
     },

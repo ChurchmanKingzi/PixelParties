@@ -243,6 +243,7 @@ module.exports = {
     if (cleanseCandidates.length === 0) return false; // race — statuses cleared
 
     const pickedCleanse = await engine.promptEffectTarget(pi, cleanseCandidates, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Heal one of your Heroes from ALL of their status effects.',
       confirmLabel: '🍺 Cleanse!',
@@ -303,6 +304,7 @@ module.exports = {
 
     // ── Step 1: pick the target ──
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Choose a target you control to cleanse.',
       confirmLabel: '🍺 Serve!',

@@ -128,6 +128,7 @@ module.exports = {
         owner: pi, heroIdx: hi, slotIdx: inst.zoneSlot, cardName: inst.name, cardInstance: inst,
       }));
       const picked = await engine.promptEffectTarget(pi, equipTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: `Choose an Artifact equipped to ${hero.name} to throw (it goes to the discard pile).`,
         confirmLabel: '↑ Throw this!',

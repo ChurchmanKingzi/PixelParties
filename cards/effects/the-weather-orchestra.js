@@ -112,6 +112,7 @@ module.exports = {
     const targets = equippedArtifactTargets(engine);
     if (targets.length === 0) return false;
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME, description: 'Choose an Artifact equipped to a Hero and send it to the discard pile.',
       confirmLabel: '🎼 Send it!', confirmClass: 'btn-danger', cancellable: true,
     });
@@ -195,6 +196,7 @@ module.exports = {
         let dest = dests[0];
         if (dests.length > 1) {
           const ids = await engine.promptEffectTarget(pi, zoneTargets, {
+            maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
             title: `${CARD_NAME} — Equip ${c.name}`, source: CARD_NAME,
             description: `Choose a Support Zone (any Hero on the board) for ${c.name}.`,
             confirmLabel: '🎼 Equip here!', confirmClass: 'btn-success', cancellable: false, greenSelect: true,

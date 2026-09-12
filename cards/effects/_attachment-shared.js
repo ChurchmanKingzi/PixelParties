@@ -86,13 +86,26 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   // 1) Drop-Hinweis des Servers: auf Held (und ggf. Zone) gezogen —
   //    `gs._attachmentOwner` nennt die Seite (v651), Standard eigene Seite.
   const hintHero = gs._attachmentHeroIdx;
+  const wanted = gs._attachmentZoneSlot;
+  const hintSide = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
   if (hintHero != null && hintHero >= 0) {
-    const wanted = gs._attachmentZoneSlot;
-    const hintSide = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
     const exact = hosts.find(h => h.side === hintSide && h.heroIdx === hintHero && wanted != null && wanted >= 0 && h.slotIdx === wanted);
     const any = hosts.find(h => h.side === hintSide && h.heroIdx === hintHero);
     const hit = exact || any;
     if (hit) return { owner: hit.side, heroIdx: hit.heroIdx, slotIdx: hit.slotIdx };
+  }
+  // ★ SLOT-HINWEIS OHNE HELDEN-HINWEIS (v856, Als Befund zu Intrude) ──
+  // Der Client schickt `attachHeroIdx` NUR fuer Karten, die den Vertrag
+  // `attachmentHosts` deklarieren — `attachmentZoneSlot` dagegen immer.
+  // Drei Anlege-Zauber haben den Vertrag nicht (Intrude, Anti Magic
+  // Enchantment, Idej Projection); bei ihnen fiel die ganze Hinweis-
+  // Stufe aus, weil sie am fehlenden Helden-Hinweis haengt, und Schritt
+  // 2 legte auf den linkesten freien Platz — egal, wohin gezogen wurde.
+  // Ein Slot-Hinweis allein ist eindeutig genug, sobald er mit dem
+  // Caster-Helden zusammen einen gueltigen Platz ergibt.
+  if ((hintHero == null || hintHero < 0) && wanted != null && wanted >= 0) {
+    const beimCaster = hosts.find(h => h.side === pi && h.heroIdx === ctx.cardHeroIdx && h.slotIdx === wanted);
+    if (beimCaster) return { owner: beimCaster.side, heroIdx: beimCaster.heroIdx, slotIdx: beimCaster.slotIdx };
   }
   // 2) Caster-Held als Standard, wenn gewuenscht und moeglich
   if (opts.preferCaster) {

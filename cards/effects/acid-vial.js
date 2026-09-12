@@ -95,7 +95,7 @@ module.exports = {
       if (!hero || hero.hp <= 0) return;
 
       const { dealt } = await engine.actionDealTrueDamage(source, hero, DAMAGE, {
-        type: 'other',
+        type: 'potion',
         _skipReactionCheck: true,
       });
 
@@ -115,7 +115,7 @@ module.exports = {
       );
       if (!inst) return;
 
-      await engine.actionDealTrueDamage(source, inst, DAMAGE, { type: 'other' });
+      await engine.actionDealTrueDamage(source, inst, DAMAGE, { type: 'potion' });
     }
 
     engine.sync();

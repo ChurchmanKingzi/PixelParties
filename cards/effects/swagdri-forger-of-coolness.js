@@ -138,6 +138,7 @@ module.exports = {
       }
       if (targets.length === 0) return;
       const pick = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: `Equip ${top} for free — pick a Hero or a specific empty Support Zone.`,
         confirmLabel: '⚒️ Equip',

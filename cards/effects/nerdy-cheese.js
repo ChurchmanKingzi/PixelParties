@@ -14,7 +14,7 @@
 //  deletion still resolves but nothing is added.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
@@ -122,7 +122,7 @@ module.exports = {
     // with the SAME NAME" ist namensgebunden — ein Verdoppler findet
     // damit nichts, was zugleich anders heisst. Genau so gemeint.
     engine.noteDeckTutor(pi, result.cardName, 'Nerdy Cheese', {
-      label: `copy of ${result.cardName}`, filter: (cd, n) => n === result.cardName,
+      label: `copy of ${result.cardName}`, filter: (cd, n) => baseCardName(n) === baseCardName(result.cardName),
     });
     engine.sync();
 

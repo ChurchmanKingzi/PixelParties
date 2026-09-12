@@ -128,6 +128,7 @@ module.exports = {
 
     // ── Step 1: pick the opp Creature to defeat ────────────────
     const picked = await engine.promptEffectTarget(pi, victims, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: FULL_NAME,
       description: 'Choose an opponent Creature to defeat. The Piranhas takes its slot.',
       confirmLabel: '🐟 Devour!',

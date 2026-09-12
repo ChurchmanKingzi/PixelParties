@@ -50,8 +50,11 @@ verbindliche Liste:
 |---|---|
 | `'creature'` | **Der Normalfall für Kreatureffekte.** Alles, was eine Creature mit ihrem Effekt an Schaden austeilt. |
 | `'attack'` | Ein Angriff eines HELDEN. Auch dann, wenn eine Creature ihn auslöst und der Text sagt „treated as that Hero hitting the target" (Infected Greatmaw) — die Quelle ist dann der Held. |
+| `'hero'` | **Der Normalfall für HELDEN-Effekte** (v905). Schaden, den ein Held mit seinem aktivierbaren Effekt austeilt, ohne dass der Text ihn zum Angriff erklärt. Öffnet Surprises und Reaktionen wie jeder andere gezielte Karteneffekt. |
 | `'destruction_spell'` | Schaden eines Zaubers. NICHT für Kreatureffekte, die zufällig groß sind. |
 | `'artifact'` | Schaden eines Artefakts. |
+| `'potion'` | Schaden einer Potion (v907). Acid Vial, Punch in the Box, Bottled Lightning. |
+| `'decay_spell'` | Verfallszauber (v907). Bisher nur Forbidden Zone. |
 | `'recoil'` | **Rückstoß** — Schaden, der auf einen Treffer hin zurückschlägt (Gigantisaur Stegon). Seit v520 in Gebrauch. |
 | `'status'` / `'poison'` / `'fire'` | Status-Ticks. Die Engine setzt sie selbst; Karten schreiben sie praktisch nie. |
 | `'other'` | Alles, was in keine Schublade passt — z.B. eine Selbstverletzung als Kosten (Ska Harpyformer). Bewusste Entscheidung, kein Auffangbecken. |
@@ -71,6 +74,14 @@ eine Fehlzuweisung ein echter Regelfehler, kein Schönheitsfleck:
 * **Surprise-Fenster** (`SURPRISE_SKIP_TYPES`): `status`, `burn`,
   `poison`, `recoil` und `other` öffnen das Standardfenster nicht.
 * **Zsos Ssar** benutzt dieselbe Ausnahmeliste.
+
+**Wächter (v905):** `node scripts/check-damage-types.js` prüft jeden
+Schadensaufruf mit LITERALEM Typ gegen genau diese Tabelle. Ratchet
+gegen `scripts/damage-types-baseline.json` wie bei `check-no-splice`:
+der Bestand darf stehen, NEUES nicht; nach einer Bereinigung
+`--update`. Wird der Typ über eine Variable gereicht, kann der Wächter
+nichts sagen und schweigt. Ein neuer Typ gehört ERST in diese Tabelle,
+dann in die Liste `VOKABULAR` im Wächter.
 
 Faustregel beim Bau einer Creature: **`'creature'`, außer der
 Kartentext sagt ausdrücklich etwas anderes.**
@@ -180,6 +191,42 @@ einer der beiden Area-Zonen liegt (beide Seiten, wie die Regel-Prüfung
    - `partial`: deckt nur Teile → obenauf.
    Was nicht in der Registry steht, wird NICHT gerendert.
 3. Dann `node scripts/build.js` + `check-bundles`, Bundle mitliefern.
+
+**4. Und die Karte muss sich SELBST in die Zone legen.** Areas landen
+nicht von allein im Slot. Ohne das greift in JEDEM Spielpfad die
+Standard-Entsorgung Hand → Ablage — die Karte wird bezahlt, die Aktion
+ist weg, und sie liegt in der Ablage (Lehre aus dem Cottage-Fall v186,
+noch einmal gebrochen von Pangaia, v902):
+
+```js
+module.exports = {
+  // 'hand' fuer das Selbstlegen, 'area' fuer die passiven Hooks.
+  // Fehlt 'hand', feuert onPlay beim Spielen GAR NICHT.
+  activeIn: ['hand', 'area'],
+  hooks: {
+    onPlay: async (ctx) => {
+      if (ctx.cardZone !== 'hand') return;              // beide Wachen noetig,
+      if (ctx.playedCard?.id !== ctx.card?.id) return;  // sonst legt sie sich
+      await ctx._engine.placeArea(ctx.cardOwner, ctx.card);  // bei FREMDEN Karten neu
+    },
+    // Jeder passive Hook wird gegengeguertet:
+    onCardEnterZone: async (ctx) => { if (ctx.cardZone !== 'area') return; /* … */ },
+  },
+};
+```
+
+Der `'hand'`-Eintrag in `activeIn` hat einen Preis: die passiven Hooks
+feuern damit AUCH aus der Hand. Jeder von ihnen braucht deshalb
+`if (ctx.cardZone !== 'area') return;` — sonst wirkt die Area schon aus
+der Hand (bei Pangaia hätte jede Lv3+-Beschwörung ihre +200 doppelt
+bekommen). Artefakt-Areas (Smuggler's Pier) gehen über `resolve` statt
+über die Hook-Kette und rufen `placeArea` dort.
+
+**Wächter:** `node scripts/check-areas.js` prüft alle drei Punkte für
+jede implementierte Area (Selbstlegen, `activeIn` mit `'hand'`,
+Registry-Eintrag) und gehört vor jede Auslieferung mit Area-Karten in
+die Prüfrunde — zusammen mit `check-no-splice`, `check-scope` und
+`check-bundles`.
 
 Eine Area ohne Overlay ist unfertig. Board of Kings: Schachbrett in
 leichter Perspektive mit Walnuss-Rahmen, Holzmaserung, Vignette und
@@ -2473,6 +2520,69 @@ EINE Auslegung, auf der alle 14 gebauten Attachments laufen:
   Besitzer = WIRT-Seite und `originalOwner` = Caster,
   `gs._spellPlacedOnBoard`, `onCardEnterZone`.
 - `attachToHero(ctx, CARD_NAME, opts)` — beides hintereinander.
+
+### ★ REGEL: `[B]` / `[W]` sind KOSMETIK, kein Namensbestandteil (Al 11.9.)
+
+Im Spiel heissen „Pawn of Kings [B]" und „Pawn of Kings [W]" beide
+schlicht **„Pawn of Kings"**. Das Anhaengsel unterscheidet nur die
+Variante (Effekt und Kartenbild) — fuer JEDEN Namensvergleich zaehlt der
+BASISNAME:
+
+```js
+const { sameCardName, baseCardName, cardVariantTag } = require('./_hooks');
+
+if (sameCardName(a, b)) { /* dieselbe Karte */ }          // ✅
+if (a === b) { /* [B] und [W] gelten faelschlich als verschieden */ }  // ❌
+```
+
+Betroffen ist alles, was ueber Namen entscheidet: „a card with a
+different name", „the same name", Namenssperren fuer den Rest des
+Zuges, Suchen nach „a card named X". `cardVariantTag` ist NUR fuer
+Anzeige und Bildauswahl da.
+
+Ausloesender Fall (Al 11.9.): Old Couple bot „Pawn of Kings [B]" als
+Partner zu „Pawn of Kings [W]" an — zwei Karten mit demselben Namen.
+
+**Stand:** Der Helfer liegt in `_hooks` (`_of-kings-shared.familyName`
+leitet darauf um). Alte Skripte, die Namen noch direkt vergleichen, sind
+NICHT durchgesweept — wer einen anfasst, stellt ihn um.
+
+### ★ REGEL: Gezogene Zone gewinnt (Als Vorgabe 11.9.)
+
+**Ein Equip oder Attachment landet in GENAU DER Support Zone, in die es
+gezogen wurde — solange die frei und erlaubt ist.** Die linkeste freie
+Zone ist der Rueckfall fuer den Fall, dass gar keine Zone benannt wurde
+(Drop auf die HELDEN-Kachel statt auf eine Zone, Klick statt Ziehen,
+Platzierung durch einen Effekt) — sie ist nie eine Korrektur einer
+Wahl, die der Spieler bereits getroffen hat.
+
+Die Hinweiskette dahinter, damit sie beim Kartenbau nicht abreisst:
+
+| Stufe | Traeger | Faellt aus, wenn … |
+|---|---|---|
+| Drop trifft Zone | Client setzt `targetSlot` | auf die Heldenkachel gezogen (dann `-1`, gewollt) |
+| Emit | `attachmentZoneSlot` **immer**, `attachHeroIdx` NUR bei deklariertem `attachmentHosts` | Karte deklariert den Vertrag nicht |
+| Server | `gs._attachmentZoneSlot` / `gs._attachmentHeroIdx` / `gs._attachmentOwner` | Hinweis kam nicht an |
+| Karte | `pickAttachmentHost` liest die Hinweise | — |
+
+**Daraus zwei Pflichten fuer jede neue Anlege-Karte:**
+
+1. `attachmentHosts(gs, pi, engine)` deklarieren (in aller Regel
+   `attachmentHostsFor(...)` mit demselben `heroFilter` wie beim
+   Anlegen). Ohne den Vertrag hebt der Client die Zonen beim Ziehen
+   nicht hervor UND schickt keinen Helden-Hinweis mit.
+2. Den Wirt ueber `pickAttachmentHost` / `attachToHero` waehlen, nie
+   selbst „erste freie Zone" rechnen — die Auslegung der Hinweise steht
+   an genau einer Stelle (`_attachment-shared.js`).
+
+`pickAttachmentHost` wertet seit v856 auch einen Slot-Hinweis OHNE
+Helden-Hinweis aus (Slot + Caster-Held ergeben einen eindeutigen Platz).
+Das ist ein Sicherheitsnetz, kein Ersatz fuer Pflicht 1.
+
+Der Fall, der die Regel ausgeloest hat (Als Befund 11.9.): Intrude
+deklarierte `attachmentHosts` nicht, der Helden-Hinweis fehlte deshalb,
+die ganze Hinweis-Stufe fiel aus — und die Karte landete unabhaengig
+vom Ziehziel immer in der linkesten freien Zone.
 
 **Cross-Side (v651):** `attachmentHostsFor(gs, pi, engine, { sides: [oppIdx] })`
 liefert Eintraege mit `owner` — der Client bietet dann gegnerische Zonen
@@ -5188,3 +5298,628 @@ Deck bleiben). Puzzle: immer ja. Tags: `dr:deck:0-2|3-5|6-10|11+`,
 `dr:mill-risk −20 / dr:deck:11+ +18.2`, Negativkontrolle leer.
 Traeger: Cute Meanie Melissa, Prayer (Extra-Karte), Emergency Spell Armor.
 
+## „Punkt vor Strich" gilt ÜBERALL — `_settleAmount` (v840)
+
+Seit dem Umbau auf Punkt-vor-Strich (1.9.) schreiben `ctx.modifyAmount`
+und `ctx.multiplyAmount` nicht mehr direkt auf `hookCtx.amount`, sondern
+sammeln in `hookCtx._flat` bzw. `hookCtx._mul`; zusammengerechnet wird
+erst NACH der Hook-Runde. Umgestellt worden war damals nur der
+Schadenspfad. Jede andere Stelle, die nach `runHooks` weiter
+`hookCtx.amount` las, bekam seither die ROHBASIS — jeder `modifyAmount`-
+Bonus verfiel dort **still**.
+
+Aufgefallen an Treasure Huntress Semi: 4 statt 10 Gold zu Rundenbeginn
+(Al, 9.9.). Betroffen waren vier Stellen — Goldgewinn, Goldausgabe
+(`onResourceSpend`), Bleed (`beforeBleedDamage`) und Gift
+(`modifyPoisonDamage`); Träger u.a. Semi, Wealth, Golden Vermin, Golden
+Abomination, Bloom/Paraseed. `setAmount` und `ctx.amount = …` liefen
+weiter, weil die direkt schreiben — deshalb fiel es nicht überall auf.
+
+```js
+// Engine, nach JEDER Hook-Runde, deren Ergebnis weiterverwendet wird:
+await this.runHooks('onResourceGain', hookCtx);
+this._settleAmount(hookCtx);      // projizieren, amount setzen, Sammler leeren
+const gain = hookCtx.amount;      // erst JETZT steht der echte Betrag drin
+```
+
+**Regel für neue Engine-Pfade:** wer `runHooks` mit einem `hookCtx`
+aufruft, der ein `amount` trägt, und den Betrag danach weiterverwendet,
+ruft `_settleAmount(hookCtx)` dazwischen. Der Schadenspfad behält seinen
+eigenen Ablauf (er mischt die Buff-Multiplikatoren noch VOR dem
+Zusammenrechnen ein). Gleiche Bugklasse wie der Shattered-Trident-Fix
+vom 5.9.: ein neuer Rechenweg wurde eingeführt, aber nur an einer von
+mehreren Lesestellen nachgezogen.
+
+
+## Selbstschaden IMMER mit Besitzer-Quelle (v845, Lehre 11.9.)
+
+Schilde und Schadensumlenkungen ordnen ihre Quelle einem Spieler zu über
+`source.owner ?? source.controller`. Eine Karte, die ein nacktes
+Objektliteral als Quelle übergibt, ist damit besitzerlos (`-1`) und
+rutscht durch jeden Schild, der „Schaden von der Gegenseite" prüft:
+Angry Cheese traf Tazune trotz stehender Ladungen.
+
+```js
+// FALSCH — besitzerlos:
+await engine.actionDealDamage(pi, hi, 100, { name: 'Angry Cheese' });
+// RICHTIG:
+await engine.actionDealDamage(pi, hi, 100, { name: 'Angry Cheese', owner: pi, controller: pi });
+// Am besten gar nicht selbst bauen:
+await ctx.dealDamage(ziel, 100);   // übergibt die Karteninstanz als Quelle
+```
+
+Betroffen waren genau zwei Stellen im Bestand (Angry Cheese, Diamond,
+the Keeper of Peace), beide gefixt. **Burn, Poison und Bleed sind
+absichtlich besitzerlos** — Tick-Schaden gehört keiner Quelle und soll
+durch solche Schilde hindurchgehen.
+
+
+## Prompts im GEGNERZUG halten die CPU-Uhren an — `beginHumanWait` (v848)
+
+Ein Prompt an den SPIELER kann mitten im CPU-Zug aufgehen — jede
+Schadensreaktion tut das (Shield of Death, Shield of Life, Surprises).
+Die Uhren der CPU liefen dabei weiter, obwohl nicht die CPU rechnet,
+sondern der Mensch überlegt: `_cpuCardDeadline` (Karten-Hardcap, 30 s)
+und `_cpuTurnDeadline` (`MAX_CPU_TURN_MS`, 90 s). Wer kurz in einen
+anderen Tab wechselte, riss beide — der Hardcap-Timer gab die Karte auf
+und leerte dabei `gs.potionTargeting`: Prompt weg, Promise weiter offen,
+Zug endet nie. Chronischer Hänger, von Al am 11.9. eingekreist.
+
+```js
+this.beginHumanWait();          // verschachtelungsfest über einen Zähler
+try { const antwort = await /* Wartezeit */; }
+finally { this.endHumanWait(); }  // schiebt BEIDE Uhren um die Wartezeit nach hinten
+```
+
+* `isWaitingForHuman()` — true, solange `_pendingPrompt` oder
+  `_pendingGenericPrompt` steht. Der Hardcap-Timer fragt das ab und legt
+  sich wieder schlafen, statt abzubrechen.
+* **No-Op in Sim und Fast-Mode.** Das ist Absicht: sonst leckt die
+  Verlängerung in den Live-Zug, genau wie seinerzeit bei
+  `extendCpuTurnDeadline`.
+* `promptEffectTarget` und `promptGeneric` klammern bereits selbst —
+  Kartenskripte brauchen die Helfer **nicht** aufzurufen. Wer einen
+  EIGENEN Wartepfad an der Engine vorbei baut, muss es tun.
+
+
+## Taunt nur für Creatures — `forcesTargeting_creaturesOnly` (v849)
+
+Der Schutzschirm des Taunts (`_applyForcesTargetingFilter`) entfernt
+normalerweise jedes andere Ziel auf der Seite des Taunters — Creatures
+UND Helden (Deepsea Horror Clown). Für Karten vom Schlag „your opponent
+cannot choose other **Creatures** you control" (Doomed Town Guard) gibt
+es die schmale Form:
+
+```js
+inst.counters.forcesTargeting = true;                  // der Taunt selbst
+inst.counters.forcesTargeting_creaturesOnly = true;    // v849: Helden bleiben wählbar
+```
+
+Die Engine liest das Flag auch aus `inst.counters.buffs`. Es wirkt NUR
+zusammen mit `forcesTargeting` und nur bei Creature-Taunern; ohne das
+Flag gilt unverändert die volle Form. Client-Abzeichen: 🛡️ „Guarding"
+(`BUFF_BADGES` in app-shared.jsx).
+
+**Puzzle-Editor (★-Regel 16.8.: jeder Counter muss setzbar sein):**
+Schalter `🛡️ Guarding` in `BUFF_LIST` (app-puzzle.jsx), `scope:
+'creature'` — er erscheint nur an einer Support Zone, in der wirklich
+eine Creature liegt. Der Puzzle-Loader in server.js setzt **beide**
+Zähler, weil die Variante ohne den Taunt selbst nichts täte; ein
+angehakter Schalter, der nichts bewirkt, wäre eine Falle für den
+Puzzle-Autor.
+
+
+## Area-Hintergründe: Nachzügler geschlossen (v902)
+
+Vollzähligkeitsprüfung 12.9.: drei implementierte Areas hatten kein
+Overlay und verletzten damit die ★-Regel vom 7.9. Nachgeliefert in
+app-board.jsx, Registry jetzt 23/23 — jede implementierte Area-Karte
+hat einen Hintergrund:
+
+| Area | tier | Bild |
+|---|---|---|
+| Pangaia, the Dino Domain | `opaque` | riesige Insel im Meer, Vulkan, wandernde Sauropoden |
+| Smuggler's Pier | `translucent` | Bohlendeck über dunklem Hafenwasser, Kisten, Laternen |
+| The Great Clock Tower „Big Gwen" | `partial` | Big-Ben-Turm am rechten Rand, laufende Zeiger |
+
+Die Prüfung ist mechanisch und gehört vor jede Auslieferung mit neuen
+Area-Karten: jede Karte mit `subtype: 'Area'`, zu der ein Skript
+existiert, MUSS als Schlüssel in `AREA_OVERLAYS` stehen — der Name dort
+ist der Kartenname aus cards.json, zeichengenau.
+
+Bei Big Gwen NICHT mit der Aktivierungs-Animation verwechseln
+(`big_gwen_clock_activation`, die große Uhr in der Brettmitte): die ist
+ein Ereignis und hat ihren Klang, der Hintergrund ist Ambiente und
+braucht keinen.
+
+
+## Pangaia: eine Area, die nie in der Zone ankam (v902, Als Befund 12.9.)
+
+Beim Spielen wanderte „Pangaia, the Dino Domain" direkt in die Ablage;
+lag sie (per Puzzle-Editor) schon in der Zone, wirkte ihr Effekt
+einwandfrei. Genau dieses Zwiegesicht ist die Signatur des Fehlers:
+gebrochen war nicht der Effekt, sondern der WEG dorthin.
+
+Zwei Defekte in derselben Datei, die einander verdeckten:
+
+* `activeIn: ['area']` — aus der Hand feuerte gar kein Hook.
+* kein `onPlay`, also nirgends ein `placeArea` — selbst mit gesetztem
+  `'hand'` hätte sich die Karte nicht gelegt.
+
+Beides ist unsichtbar für Syntaxprüfung, Loader (das Modul trägt Hooks
+und lädt sauber), `check-scope` und den Puzzle-Mode. Nur ein echter
+Spielweg zeigt es. Seitdem prüft `scripts/check-areas.js` den Vertrag
+mechanisch; die Gegenprobe gegen den alten Stand meldet beide Punkte.
+
+Offen für ein Ruling: die Engine KÖNNTE nach dem Auflösen einer Karte
+mit `subtype: 'Area'` prüfen, ob `gs._spellPlacedOnBoard` gestempelt
+wurde, und sonst selbst platzieren. Das wäre ein zweiter Gurt, ändert
+aber das Verhalten für alle Areas — deshalb nicht ohne Entscheidung.
+
+
+## Neue Karte: „Vena, the Bounty Huntress" (v904, Als Buff 12.9.)
+
+Held, 400 HP / 100 ATK. Markiert vor den Starthänden einen gegnerischen
+Helden als **Kopfgeld** und hat danach einmal pro Zug für **5 Gold** drei
+Wirkungen gegen genau diesen Helden zur Wahl: **150 Schaden** (von 100
+gebufft), eine Karte aus seinen Support Zones auf die Ablage, oder Stun
+für 1 Zug.
+
+**Die Marke liegt auf dem ZIEL, nicht auf Vena.** `hero._bountyBy =
+<Spielerindex der Jägerin>` auf dem markierten Helden. Eine gespeicherte
+Koordinate auf Vena hätte drei Dinge einzeln nachhalten müssen, die so
+von selbst stimmen: stirbt das Ziel, geht die Marke mit ihm (kein Zeiger
+ins Leere); Heldenwechsel und Ascension tragen sie mit; und beide Spieler
+können je eine Vena spielen, weil jede nur GEGNERISCHE Helden markiert
+und pro Seite höchstens eine Marke existiert. Beim Setzen räumt
+`bountyMarkieren` jede ältere Marke derselben Jägerin weg.
+
+**Ruling (Al, 12.9.): die Neuwahl hängt ausschließlich an Venas eigenem
+tödlichem Schaden.** Fällt das Kopfgeld anders — Angriff, Zauber, ein
+anderer Held —, bekommt Vena KEIN neues Ziel und ist für den Rest der
+Partie wirkungslos. `canActivateHeroEffect` gibt dann `false` zurück.
+Das ist ausdrücklich so gewollt und keine Lücke; wer hier später eine
+Auffangregel einbaut, ändert die Karte.
+
+**Aktionsfrei.** Der Text nennt keine Action, also KEIN
+`heroEffectActionCost` (★-Regel 7.9.).
+
+**Schadenstyp `'hero'` (v905).** Vena ist kein Angriff, kein Zauber,
+kein Kreatureffekt und kein Artefakt — deshalb der eigene Typ für
+Heldeneffekt-Schaden. Anders als das früher benutzte `'other'` umgeht er
+weder Surprises noch den Zielschutz. Siehe den Abschnitt
+„Schadenstyp `'hero'`" unten.
+
+**Support Zones halten NAMEN, nicht Instanzen.** Beim Bau ist mir genau
+das durchgerutscht: `gs.players[pi].supportZones[hi][slot]` ist ein
+Array von Kartennamen (ein Stapel — Monster Nest legt übereinander). Die
+Instanz mit `id`, `counters` und Zonenkoordinaten lebt in
+`engine.cardInstances`, und nur sie taugt für `actionMoveCard`. Der
+richtige Weg ist `engine.findCards({ controller, zone: 'support',
+heroIdx })`. Ein Zugriff über den Zonenspiegel sieht im Editor richtig
+aus und stirbt erst beim Ausführen mit `arr.indexOf is not a function`.
+
+**Puzzle-Editor (★-Regel 16.8.).** Schalter `🎯 Bounty` am Helden,
+sichtbar nur, wenn die GEGENSEITE eine Vena kontrolliert (Gate über den
+Heldennamen, nicht über die Marke — sonst ließe sich der
+Ausgangszustand gar nicht herstellen). Speicherform `hero._bountyBy`,
+durchgereicht vom Puzzle-Loader in server.js. Ohne das wäre die Karte im
+Puzzle nicht testbar, weil ihre Neuwahl am eigenen Kill hängt.
+
+**Das Markieren ist kein Effekt AUF den Helden** (Als Ruling 12.9.). Es
+ändert nichts an ihm, es notiert nur auf Venas Seite, wer das Kopfgeld
+ist. Die Zielwahl trägt deshalb `_skipPostTargetReactions: true` und
+`_skipRedirectCheck: true` — ohne die beiden Riegel negierte **Castling**
+die Markierung, und das Umleitungsfenster stand ebenfalls offen. Gilt
+für den Spielbeginn UND die Neuwahl nach einem tödlichen Treffer: beides
+ist dieselbe Buchführung. Die DREI Einzeleffekte sind davon unberührt —
+Schaden, Konfiszieren und Stun laufen über die normalen Aktionswege und
+bleiben voll reaktionsfähig.
+
+**Beide Zielwahlen tragen `maxTotal: 1`** (siehe eigener Abschnitt
+weiter unten). Ohne das fällt der Picker
+still auf „unbegrenzt" zurück: man klickt mehrere Ziele an, alle bleiben
+markiert, und der Effekt nimmt am Ende das ZUERST geklickte (Als Befund
+12.9.). Mit `maxTotal: 1` greift die Client-Regel „ein Klick TAUSCHT die
+Auswahl aus". Dieselbe Klasse Fehler fiel schon an Scrap Plow und Cheeky
+Monkee auf — **jede** neue Einfachauswahl über `promptEffectTarget`
+braucht `maxTotal: 1`, das ist keine Vena-Besonderheit.
+
+**Client.** Abzeichen 🎯 oben rechts am markierten Helden
+(`.vena-bounty-badge` in style.css), Tooltip unterscheidet eigene und
+gegnerische Jägerin. Zonen-Animationen sind durchweg vorhandene Typen
+(`anger_mark` beim Markieren, `gunshot_barrage` beim Schuss,
+`gold_sparkle` bei der Zahlung) — keine NEUE Animation, also kein neuer
+`ZONE_ANIM_SFX`-Eintrag nötig.
+
+
+## Schadenstyp `'hero'` — Heldeneffekt-Schaden (v905, Als Vorgabe 12.9.)
+
+Bis v904 lief Schaden aus einem aktivierbaren HELDEN-Effekt als
+`'other'`, weil keiner der übrigen Typen passt: kein Angriff, kein
+Zauber, kein Kreatureffekt, kein Artefakt. `'other'` steht aber in
+`SURPRISE_SKIP_TYPES` — mit zwei Folgen, die beide falsch waren:
+
+1. Das Standardfenster für die **Surprise-Zone des getroffenen Helden**
+   ging nicht auf.
+2. Im selben Block hängt **`heroBlocksTargeting`**. Ein Held, der
+   „cannot be chosen as a target" ist (Escape Device), wurde von solchem
+   Schaden trotzdem getroffen. Das war der ernstere Teil.
+
+Gemessen an der laufenden Engine öffnete ein `'other'`-Treffer sieben
+andere Fenster durchaus (Handreaktionen beider Seiten, die
+Reaktionskette, das breite Banner-Bearer-Fenster, beide Nach-Schaden-
+Fenster) — „öffnet keine Surprises" war zu grob. Gesperrt war genau das
+eine, plus der Zielschutz.
+
+`'hero'` steht bewusst NICHT in `SURPRISE_SKIP_TYPES` und verhält sich
+damit wie jeder andere gezielte Karteneffekt. Gleichzeitig ist er ein
+eigenes Merkmal, das künftige Karten abfragen können („damage from a
+Hero's effect") — was mit `'other'` nicht ginge, weil dort auch
+Selbstverletzung und Artefaktschaden liegen.
+
+```js
+await engine.actionDealDamage(quelle, hero, 150, 'hero');
+```
+
+**Wer ihn trägt:** Vena, the Bounty Huntress · Kit, the Shark Researcher
+· Deep-Drowned Waflav · Logan, the Investment Monkee (letzterer lief
+vorher als `'creature'`, was ihn fälschlich als Kreatureffekt auswies).
+
+**Wer ihn NICHT bekommt:** Brackle und Broghan bleiben `'attack'` — ihr
+Kartentext sagt ausdrücklich „This is treated as an Attack". Sleeping
+Beauty bleibt `'creature'`: sie IST eine Creature. Selbstverletzung als
+Kosten (Angry Cheese, Diamond, Mana Absorbing Crystal, Ska Harpyformer)
+und Rückstoß (Spiky Armor, Spike Trap, Smugness, Lizbeth) bleiben
+`'other'` bzw. `'recoil'` — dort ist die Sperre richtig.
+
+**Angepasste Leser:** `angler-angel.js` (`KEIN_EFFEKTSCHADEN`) und
+`zsos-ssar-the-serpent-warlord.js` (`skipTypes`) haben `'hero'`
+aufgenommen. Bei Angler Angel ist das nur der Gürtel — die tragende
+Prüfung ist ohnehin die Quelle; bei Zsos Ssar hält der Eintrag das
+Verhalten exakt gleich, weil `'other'` dort schon ausgenommen war.
+Dark Ocean braucht nichts: sie lässt ausschließlich `'attack'` und
+`'destruction_spell'` durch, `'hero'` ist wie `'other'` geblockt.
+
+Die zwei Altlasten, die der Wächter zutage gefördert hatte, sind mit
+`'potion'` und `'decay_spell'` erledigt (siehe unten) — die Grundlinie
+`damage-types-baseline.json` ist wieder leer.
+
+
+## Schadenstypen `'potion'` und `'decay_spell'` (v907, Als Vorgabe 12.9.)
+
+Zwei weitere Etiketten, damit künftige Effekte gezielt auf sie zugreifen
+können („damage from a Potion"). Heute liest sie **niemand** — kein
+Reader schließt sie ein oder aus.
+
+| Typ | Träger |
+|---|---|
+| `'potion'` | Acid Vial · Punch in the Box · Bottled Lightning |
+| `'decay_spell'` | Forbidden Zone |
+
+`bottled-lightning.js` lief bis dahin auf `'normal'` — ein Typ, der nie
+gültig war und den die v519-Bereinigung übersehen hatte.
+`forbidden-zone.js` führte `'decay_spell'` bereits, nur ohne
+Legitimation; jetzt steht er im Vokabular.
+
+**Die Umstellung ist verhaltensneutral, und das ist gemessen**, nicht
+geschlossen: gleiche Quellform, alter gegen neuen Typ, gezählt über
+alle Fenster und die Zielschutz-Prüfung. Acid Vial, Punch in the Box und
+Bottled Lightning tragen **keine Heldenquelle** (`heroIdx` fehlt bzw.
+ist `-1`), und das Standardfenster verlangt `source.heroIdx >= 0` — es
+ging bei ihnen vorher nicht auf und geht jetzt nicht auf. Forbidden Zone
+hat eine Heldenquelle und öffnet es, vorher wie nachher.
+
+**Eine Feinheit, die zu kennen ist:** die beiden neuen Typen verhalten
+sich NICHT ganz wie `'other'`. `'other'` steht in
+`SURPRISE_SKIP_TYPES` und in Zsos Ssars `skipTypes`; `'potion'` und
+`'decay_spell'` stehen in keiner der beiden Listen. Bei den vier
+heutigen Trägern macht das keinen Unterschied (siehe Messung oben),
+aber eine KÜNFTIGE Potion mit Heldenquelle würde das Standardfenster
+öffnen, wo eine `'other'`-Potion es überginge. Das ist Absicht und
+dieselbe Linie wie bei `'hero'`: ein gezielter Karteneffekt soll
+Surprises und Zielschutz nicht umgehen.
+
+
+## ★ EINFACHAUSWAHL BRAUCHT `maxTotal: 1` (v909, Bestandsdurchgang 12.9.)
+
+`promptEffectTarget` ohne `maxTotal` (bzw. `selectCount`) fällt im Client
+still auf „unbegrenzt" zurück. Der Spieler klickt mehrere Ziele an, ALLE
+bleiben markiert, und der Effekt nimmt am Ende nur das **zuerst**
+geklickte. Mit `maxTotal: 1` greift die längst vorhandene Client-Regel
+„ein Klick TAUSCHT die Auswahl aus" (`togglePotionTarget`).
+
+Al hatte das an Scrap Plow und Cheeky Monkee gesehen, dort wurde es
+einzeln geflickt — der Bestand blieb. Beim Durchgang am 12.9. hatten
+**53 von 59** unbegrenzten Zielwahlen genau dieses Problem; alle tragen
+jetzt `maxTotal: 1`.
+
+Nicht betroffen und bewusst unangetastet sind die vier echten
+Mehrfachauswahlen: `divine-zeal.js` (`maxPerType: { hero: 99, equip: 99 }`,
+`pickedIds.map`), `sun-beam.js` (`for (const t of picked)`),
+`mischief-militia-colored-snow.js` (reicht die Liste an `script.resolve`
+weiter) und `swagdri-forger-of-coolness.js` (bekommt die config als
+Variable, nicht als Literal).
+
+**Wächter:** `node scripts/check-single-target.js`. Ein Aufruf gilt als
+Einfachauswahl, wenn das Ergebnis ausschließlich über Index 0 gelesen
+wird (`ids[0]`, `ids?.[0]`) und nirgends durchlaufen, weitergereicht
+oder anders indiziert wird. Alles andere meldet er gar nicht erst — im
+Zweifel schweigt er lieber, als Fehlalarme zu produzieren.
+
+**Nebenbefund aus demselben Durchgang:** eine zeilenweise
+Kommentarentfernung, die Blockkommentare ersatzlos streicht, verschiebt
+alle Zeilennummern danach (bei großen Kopfkommentaren zweistellig). Beide
+Wächter ersetzen Blockkommentare jetzt durch ihre eigenen
+Zeilenumbrüche — `check-damage-types.js` hatte denselben Fehler in seinen
+Berichtszeilen.
+
+
+## Neue Karte: „Kohta, Master of Super-Killing" (v910, Als Update 12.9.)
+
+Ascended Hero, 400 HP / 90 ATK. Aufstieg von „Kohta, the Silent
+Observer", der **beide** Ausrüstungen trägt: „Super-Killing Knife, the
+Tool of Liquidation" UND „Summoning Instructions". Einmal pro Zug die
+**Aktion** ausgeben, ein beliebiges Ziel auf dem Brett wählen und es
+besiegen — als Angriff dieses Helden, der nie mehr als 1 Ziel trifft.
+
+**Aufstieg nach Riffel-Muster.** `_kohta-shared.js` hält Bedingung und
+Zustandspflege; der BASISHELD pflegt `ascensionReady` über
+Enter/Leave seiner eigenen Support Zones, die beiden Equip-Skripte
+bleiben unberührt. Die Ascended-Karte liest die Bedingung über
+`ascensionCondition`. Der Text nennt KEINE Ausnahme vom Zugende, also
+kein `blockEndPhaseOnAscend` — der Aufstieg beendet den Zug wie üblich.
+
+**Die HARTE Einmal-pro-Zug-Sperre (Al 12.9.).** Der Text sagt es
+zweimal; die zweite Zeile ist die harte Form. Der Engine-Stempel
+`hero-effect:<Name>:<pi>:<heroIdx>` reicht dafür NICHT: **Sleeping
+Beauty liest genau diesen Stempel als Beweis**, dass der Held seinen
+Effekt schon benutzt hat, und ruft danach `onHeroEffect` DIREKT auf — am
+Engine-Gate vorbei. Die Karte führt deshalb einen eigenen Schlüssel, der
+weder an der Heldeninstanz noch am Heldenplatz hängt, sondern nur am
+Spieler:
+
+```js
+const HOPT_KEY = 'kohta-super-kill';          // → `kohta-super-kill:<pi>`
+if (engine.gs.hoptUsed?.[`${HOPT_KEY}:${pi}`] === engine.gs.turn) return false;
+// … Zielwahl …
+if (!engine.claimHOPT(HOPT_KEY, pi)) return false;   // erst NACH der Wahl
+```
+
+Beansprucht wird erst nach der Zielwahl — sonst frisst ein Abbruch die
+Nutzung des Zuges. `canActivateHeroEffect` liest denselben Schlüssel,
+damit der Knopf bei stehender Sperre gar nicht erst anklickbar ist.
+
+**Das Muster ist allgemein:** wer eine WIRKLICH harte Einmal-pro-Zug-
+Sperre braucht, nimmt einen eigenen `claimHOPT`-Schlüssel ohne
+Heldenindex. Der Engine-Stempel allein sperrt nur den normalen
+Aktivierungsweg.
+
+**„Treated as this Hero hitting the target with an Attack".** Die
+Zielwahl läuft über `ctx.promptDamageTarget` mit `damageType: 'attack'`
+und `dealsDamage: false` (Niederlage statt Schaden — reine
+Schadensminderung wie Spectral Armor soll nicht ins Leere laufen).
+Danach wird das Angriffsfenster ausdrücklich erklärt:
+`engine._fireAttackDeclare(quelle, ziel, ATK)`. Fällt die Projektion auf
+0, hat ein Zuhörer den Angriff negiert (Future Tech Doomsday Bomb macht
+genau das über `setAmount(0)`) — dann IST der Angriff erklärt worden, er
+verpufft nur: kein Kill, aber Aktion und Sperre bleiben verbraucht.
+
+**„Can never hit more than 1 target"** ist über `maxTotal: 1` und den
+Verzicht auf jeden Flächenweg (`actionAoeHit`) umgesetzt. Im Bestand
+gibt es heute nichts, was einen Angriff auf mehr Ziele ausweiten würde;
+die Klausel ist ein Riegel für später.
+
+**Zielmenge:** Helden UND Kreaturen beider Seiten („any target on the
+board" schließt eigene ein). Artefakte, Abilities und Surprises sind
+NICHT dabei — „defeat" ist das Vokabular für HP-Ziele, alles andere
+würde „destroyed" heißen.
+
+
+## Neue Karte: „Rha'Bi, the Living Skeleton" (v912, Als Update 12.9.)
+
+Hero, 300 HP / 40 ATK, Necromancy + Toughness. Beliebig oft im eigenen
+Zug: aktuelle UND maximale HP um 100 senken, dafür die oberste Karte des
+eigenen Decks **verdeckt** in eine freie Support Zone eines gegnerischen
+Helden legen — nur bei einem Helden, der noch keine Karte aus diesem
+Effekt trägt. Zu Beginn des nächsten eigenen Zuges kommen alle noch
+liegenden Karten auf die Hand, die Trägerhelden nehmen je 200 Schaden,
+und Rha'Bi bekommt je Karte 100 aktuelle und maximale HP zurück.
+
+**Zwei Verträge, die man leicht falsch baut:**
+
+1. **Beliebig oft, nicht einmal pro Zug.** Die Engine stempelt nach
+   jedem wahrheitsgemäßen `onHeroEffect` ihren Einmal-pro-Zug-Schlüssel.
+   `ctx._skipHeroEffectHopt = true` setzt das aus (Muster von Kassaran).
+   Der naheliegende Weg „immer `false` zurückgeben" wäre falsch: für die
+   Engine heißt `false` **abgebrochen**, und die CPU könnte gefeuert
+   nicht von abgebrochen unterscheiden.
+
+2. **Das Einsammeln läuft auch bei gelähmtem Rha'Bi** (Als Ruling 12.9.:
+   „NUR sein Tod verhindert es"). Der Hook-Filter der Engine schaltet
+   Helden-Hooks stumm, sobald der Held Frozen, Stunned, Negated oder
+   Mummy ist (`_isHeroEffectSilenced`). Genau dafür gibt es
+   `bypassStatusFilter: true` — ohne das Flag wäre der Rückhol-Zug eines
+   gefrorenen Rha'Bi stillschweigend ausgefallen. Der Tod bleibt
+   wirksam: den fängt der Filter über `hero.hp <= 0` ohnehin ab, und der
+   Hook prüft ihn zusätzlich selbst.
+
+**Eine Karte in der Zone des GEGNERS.** Der Zonenspiegel liest
+`inst.owner`, die Stapel (Ablage, Delete) lesen `inst.originalOwner`.
+Also: `owner` = Gegner, `originalOwner` = Leger. Damit landet die Karte
+beim Zurückholen auf SEINER Hand und beim Löschen auf SEINEM
+Delete-Stapel, obwohl sie beim Gegner lag. Vor dem Zug auf die Hand wird
+`inst.owner` auf den Leger zurückgesetzt — sonst schriebe
+`_addCardToState` sie in die gegnerische Hand.
+
+**`_trackCard(name, owner, zone, heroIdx, slot)` BAUT die Instanz** und
+hängt sie in die Verfolgung. Nicht mit einer fertigen Instanz aufrufen:
+der erste Anlauf tat das und legte eine zweite, kaputte Instanz an,
+deren `name` ein Objekt war — der Hook-Filter stolperte dann über
+`cardName.toLowerCase is not a function`.
+
+**Bewusst ohne Beschwörungs-Hooks.** Eine verdeckte Karte ist keine
+beschworene Kreatur; `onCreatureSummoned` und Konsorten haben dort
+nichts zu suchen. Deshalb `_trackCard` + `_addCardToState` statt
+`actionPlaceCreature`.
+
+**Marke auf der KARTE, nicht auf Rha'Bi:**
+`inst.counters._rhabiPlaced = { by, turn }`. Sie verschwindet mit der
+Karte, überlebt jeden Zonenwechsel und trägt den Leger — so kommen sich
+zwei Rha'Bi (beide Seiten) nicht in die Quere.
+
+**Kostengrenze (Als Ruling 12.9.):** der Effekt ist schlicht nicht
+aktivierbar, solange einer der beiden HP-Werte unter 101 liegt. Grund:
+`decreaseMaxHp` klemmt bei maximal `maxHp − 1` ab — bei 100 maximalen HP
+würden also nur 99 abgezogen, und Rha'Bi bekäme die Platzierung zum
+Rabatt. 101 ist genau der Wert, bei dem die vollen 100 noch fallen
+(er landet dann auf 1/1).
+
+Geprüft wird an vier Stellen, die alle denselben Helfer `bezahlbar`
+lesen: `canActivateHeroEffect` (grauer Knopf),
+`cpuShouldUseHeroEffect`, der Einstieg in `onHeroEffect` und die
+Nachprüfung nach der Zielwahl. Die letzte ist nicht redundant —
+zwischen Anzeige und Antwort kann Rha'Bi Schaden genommen haben.
+
+
+## ★ DAS FELD HEISST `activePlayer` — `gs.currentPlayer` GIBT ES NICHT (v914, Als Befund 12.9.)
+
+Rha'Bis Rückhol-Hook lief nie: er verglich gegen `gs.currentPlayer`, ein
+Feld, das im ganzen Spiel nicht existiert. Der Vergleich war damit immer
+falsch, der Hook stieg sofort aus, die gelegten Karten blieben liegen.
+Kein Fehler, kein Log — ein erfundenes Feld liefert einfach `undefined`.
+
+Der Zugspieler heißt **`gs.activePlayer`**. Bei `onTurnStart` trägt der
+Hook-Ctx ihn ohnehin mit: `ctx.activePlayer ?? gs.activePlayer`.
+
+**Warum der Prüfstand das nicht gesehen hat** — und das ist die
+eigentliche Lehre: er baute seinen Spielstand selbst und schrieb
+`currentPlayer: 0` hinein, weil ich beim Test denselben Tippfehler
+machte wie im Code. Danach rief er den Hook DIREKT auf und übersprang so
+die Verteilung der Engine. Zwei Fehler, die sich gegenseitig bestätigt
+haben. Ein Hook-Test gehört über `engine.runHooks(...)` gefahren, nicht
+über `script.hooks.onX(...)` — nur so laufen Zonen- und Statusfilter mit.
+
+**Wächter:** `node scripts/check-gamestate-fields.js` meldet jedes
+`gs.<Feld>` in einem Kartenskript, das weder in `_engine.js`/`server.js`
+vorkommt noch von der Datei selbst gesetzt wird. Felder mit führendem
+Unterstrich sind ausgenommen — `gs._foo` ist die etablierte Form für
+karteneigenen Kramzustand (39 Stellen im Bestand). Der verräterische
+Fall ist genau das Feld, das nur GELESEN und nie geschrieben wird.
+
+
+## ★ `ineligible` WAR NUR KOSMETIK (v915, Als Befund 12.9.)
+
+Ein Tryse mit Stealth 2 wurde von einer Lv-1-Quick-Attack getroffen,
+obwohl andere Ziele offenstanden. **Stealth war nicht kaputt.** Die
+Aufnahme des Spiels führt ihn in `validTargets` korrekt mit
+`ineligible: true` — der Schutz hat gegriffen, er wurde nur nicht
+gelesen:
+
+* **`_cpu.js`, `resolveTargetingPrompt`** gab dem Ziel-Picker
+  `gs.potionTargeting.validTargets` **roh** weiter, also samt der als
+  unwählbar markierten Einträge. `promptEffectTarget` filtert für seinen
+  eigenen CPU-Zweig längst (`_waehlbar`) — dieser zweite Eingang tat es
+  nicht. Die CPU griff zu.
+* **`server.js`, `doConfirmPotion`** prüfte `ineligible` überhaupt nicht
+  nach. Das Wort kam im ganzen Server nicht vor. Der Client graut die
+  Ziele aus, der Server nahm sie trotzdem an — jede Quelle, die den
+  Picker umgeht, kam an Stealth, Jetpack und jedem anderen
+  `blocksTargeting`-Schutz vorbei.
+
+Beides geschlossen: die CPU sortiert vor dem Picken aus, und der Server
+weist eine Antwort mit unwählbarem Ziel ab (Abfrage bleibt offen, Log
+`targeting_blocked`). Die Serverprüfung ist der eigentliche Riegel — sie
+gilt für JEDEN Weg, nicht nur den der CPU.
+
+**Lehre:** ein Schutz, der nur eine Markierung in der Zielliste setzt,
+ist erst dann ein Schutz, wenn der autoritative Flaschenhals ihn prüft.
+Die Markierung allein ist eine Anzeige.
+
+
+## Handdiebstahl: der BESTOHLENE sah den Gegner nachziehen (v916, Als Befund 12.9.)
+
+Klaut der Gegner eine Handkarte (Charme Lv 2, Thieving Strike, Loot the
+Leftovers — alle über `play_hand_steal`), flog sie sichtbar von der
+eigenen Hand herüber, verschwand dort und der Gegner zog stattdessen
+eine Karte aus SEINEM DECK.
+
+Der Client hatte für den Fall genau einen Zähler, `stealSkipDrawRef`,
+und Phase 3 des Handlers setzte ihn **nur beim Dieb**:
+
+```js
+if (!iAmVictim) stealSkipDrawRef.current = stealIndices.length;
+```
+
+Der deckt die EIGENE Hand ab. Aus Sicht des Bestohlenen wächst aber die
+GEGNERHAND, und deren Diff-Melder ist ein eigener Block. Der fand keinen
+Diebstahl mehr im Gange — `stealInProgressRef` wird in derselben Phase 3
+gelöscht, und der Server wartet mit der Zustandsänderung bewusst so
+lange, bis Phase 3 durch ist — und ließ den Gegner die Karte aus seinem
+Deck ziehen.
+
+Gegenstück eingebaut: `oppStealSkipDrawRef`, in Phase 3 für das Opfer
+gesetzt und im Gegnerhand-Block **vor** Klang und Animation verbraucht.
+Wächst die Hand um mehr Karten als gestohlen wurden (Lillys Nachzieher
+auf einen Diebstahl), behält der Rest seinen normalen Deckflug — der
+Zähler nimmt nur so viele, wie er hat.
+
+**Gilt für alle Diebstahlwege**, nicht nur Charme: `actionStealFromHand`
+in `_engine.js` sendet dasselbe Ereignis in derselben Form, und über den
+Helfer laufen Thieving Strike, Loot the Leftovers und die
+Hand-Interaktions-Registry.
+
+**Muster, das hier zum zweiten Mal auffällt:** eine Animation, die es
+für die eigene Seite gibt, aber nicht für die gegnerische. Beim
+Ascension-Flug (v911) war es der Selektor, der immer die falsche Hand
+traf; hier ein Zähler, den nur eine der beiden Seiten setzt. Wer einen
+Flug zwischen zwei Händen baut, prüft ihn aus BEIDEN Perspektiven.
+
+
+## Neues Werkzeug: alle Profile gegen ein neues Deck (v917)
+
+Kommt ein Structure Deck dazu, kennen die vorhandenen Profile das
+Matchup nicht — sie wurden gegen ein Feld trainiert, in dem es noch
+nicht vorkam.
+
+```
+node scripts/train-vs-deck.js --deck "Hellfire Battery" --games 120
+```
+
+Das Werkzeug darunter gab es bereits: **`PP_TRAIN_OPP`** (Gegnerfilter,
+Substring) im Batch-Runner von server.js. Wer nur ein einzelnes Deck
+nachziehen will, kann es weiter von Hand setzen. Was fehlte, war der
+Durchstich: `train-all-decks.js` reicht die Variable nicht durch, und
+die Resume-Logik über die Zeilenzahl braucht eine AUFSTOCKENDE Zielzahl
+statt einer festen.
+
+Geschrieben wird in die **vorhandene** Sammeldatei
+`data/training/<deck>.jsonl` — das Profil entsteht danach aus altem Feld
+PLUS neuem Matchup. Eine eigene Datei würde entweder alles Bisherige
+verlieren oder erst zusammengeführt werden müssen.
+
+Schalter: `--games` (zusätzliche Spiele je Deck, Default 120), `--jobs`,
+`--only` / `--skip`, `--all` (auch Decks ohne Profil), `--fast 0`
+(volles MCTS-Budget), `--no-retrain`, `--list` (Trockenlauf mit
+Zeitschätzung), `--heap`.
+
+**Deck → Profil NICHT aus dem Dateinamen ableiten.** Das Sammeldeck
+heißt `Structure Deck Bamboo Warrior.txt` und trägt intern
+`Name: Structure Deck: Bamboo Warrior`, das Profil heißt aber
+`bamboo-warrior.json` und führt `deck: "Bamboo Warrior"`. Der erste
+Anlauf leitete den Profilnamen ab und verlor dabei 39 von 42 Decks. Das
+Skript liest den Deckbezug jetzt AUS den Profilen und ordnet über den
+normalisierten Namen zu.
+
+Serveraufruf (nie als root, nie ohne systemd):
+
+```
+sudo systemd-run --unit=pp-vsdeck --collect \
+  --slice=pixelparties-training.slice --uid=pixelparties --gid=pixelparties \
+  --working-directory=/opt/pixelparties \
+  $(command -v node) scripts/train-vs-deck.js --deck "Hellfire Battery" --games 120
+```
+
+Danach die Wirksamkeit nachmessen — mit eigenem `--tag`, damit die
+Messung nicht in den Topf der Grundmessung läuft:
+`node scripts/ab-all.js --games 400 --tag vs-hellfirebattery`

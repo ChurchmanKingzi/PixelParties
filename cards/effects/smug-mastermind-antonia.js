@@ -134,6 +134,7 @@ async function runAntoniaEffect(ctx) {
   // only after the player commits to a target, so a cancel doesn't burn
   // a card.
   const pick = await engine.promptEffectTarget(pi, boardTargets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: 'Smug Mastermind Antonia',
     description: 'Discard a card to destroy any non-Hero card on the board.',
     confirmLabel: '🗑️ Eliminate!',

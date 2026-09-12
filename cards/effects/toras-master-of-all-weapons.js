@@ -17,7 +17,7 @@
 //    check the same flag.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Toras, Master of all Weapons';
 const ATK_PER_ARTIFACT = 40;
@@ -49,7 +49,7 @@ function countUniqueArtifacts(engine, pi, heroIdx, excludeId) {
     if (engine.countsAsAbilityInZone(inst.name, inst)) continue;
     const cd = engine.getEffectiveCardData(inst) || cardDB[inst.name];
     if (!cd || !hasCardType(cd, 'Artifact')) continue;
-    names.add(inst.name);
+    names.add(baseCardName(inst.name));   // v876
   }
   return names.size;
 }

@@ -184,6 +184,7 @@ module.exports = {
     if (destTargets.length === 0) return { cancelled: true };
 
     const destIds = await engine.promptEffectTarget(pi, destTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: `Cool Repair — Equip ${equipName}`,
       source: 'Cool Repair', // Skript-Dispatch trotz dynamischem Titel
       description: `Select a Support Zone to equip ${equipName} to. (Cost: ${repairCost}G)`,

@@ -48,6 +48,9 @@
 //    hero.atk via `ctx.revokeAtk()`.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Ancient Tech Infinite Energy Core';
 const BONUS_PER_UNIQUE = 10;
 
@@ -67,7 +70,7 @@ function recomputeBonus(ctx) {
   if (!hero?.name) return;
 
   const ps = engine.gs.players[owner];
-  const uniqueCount = new Set(ps?.discardPile || []).size;
+  const uniqueCount = new Set((ps?.discardPile || []).map(baseCardName)).size;   // v876
   const newBonus = uniqueCount * BONUS_PER_UNIQUE;
 
   if (!inst.counters) inst.counters = {};

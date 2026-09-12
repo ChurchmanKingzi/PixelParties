@@ -96,6 +96,7 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
   if (targets.length === 0) return;
 
   const picked = await engine.promptEffectTarget(pi, targets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: 'Choose a non-Hero card on your opponent\'s side. It will be placed at the bottom of their deck.',
     confirmLabel: '🛬 Send to Bottom!',

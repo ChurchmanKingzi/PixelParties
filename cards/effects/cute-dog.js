@@ -46,7 +46,7 @@
 //      (cost is already paid).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME      = 'Cute Dog';
 const MIN_TUTOR_LEVEL = 3;
@@ -72,7 +72,7 @@ function distinctTutorNames(engine, ps) {
   const names = new Set();
   for (const cn of (ps.mainDeck || [])) {
     if (!isTutorEligible(cardDB[cn])) continue;
-    names.add(cn);
+    names.add(baseCardName(cn));   // v876
   }
   return names;
 }

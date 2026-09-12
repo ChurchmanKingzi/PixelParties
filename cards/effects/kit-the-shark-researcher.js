@@ -365,15 +365,16 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
   }).filter(Boolean));
 
   // Deal damage to each picked target. Sequential so afterDamage
-  // hooks settle per target. Hero damage = 'other' type (this is
-  // Hero-effect damage, not Spell / Attack).
+  // hooks settle per target. Hero damage = 'hero' type (v905: eigener
+  // Typ fuer Heldeneffekt-Schaden; vorher 'other', das die Surprise-
+  // Zone und den Zielschutz des Ziels mit abgewuergt hat).
   for (const id of picked) {
     const t = tgts.find(x => x.id === id);
     if (!t) continue;
     if (t.type === 'hero') {
       const hero = ops.heroes?.[t.heroIdx];
       if (!hero?.name || hero.hp <= 0) continue;
-      await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'other');
+      await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero');
     } else if (t.cardInstance) {
       await engine.actionDealCreatureDamage(
         source, t.cardInstance, MODE_B_DAMAGE, 'other',

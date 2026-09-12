@@ -40,6 +40,8 @@ const {
 } = require('./_deepsea-shared');
 const { isAreaImmuneInst } = require('./_diver-helmet-shared');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Deepsea Castle';
 
 // Creatures the activator controls that Deepsea Castle may bounce —
@@ -186,7 +188,7 @@ module.exports = {
       newHandIdx >= 0 ? { handIdx: newHandIdx } : {},
     );
     if (newLevel > chosenLevel) return false;
-    if (newName === chosenName) return false;
+    if (baseCardName(newName) === baseCardName(chosenName)) return false;   // v876
 
     // ── Step 3: atomic swap ─────────────────────────────────────
     // atomicSwap runs the replacement Creature's beforeSummon hook. If

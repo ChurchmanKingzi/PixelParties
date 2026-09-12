@@ -44,6 +44,9 @@
 //     at their printed level.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Sid, the King of Thieves';
 
 module.exports = {
@@ -88,7 +91,7 @@ module.exports = {
         const seen = new Set();
         const ranked = [...cards]
           .sort((a, b) => (cv[b.name] || 0) - (cv[a.name] || 0))
-          .filter(c => !seen.has(c.name) && seen.add(c.name))
+          .filter(c => !seen.has(baseCardName(c.name)) && seen.add(baseCardName(c.name)))   // v876
           .slice(0, maxCount);
         if (ranked.length) {
           if (!engine._inMctsSim) {

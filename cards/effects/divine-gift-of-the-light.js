@@ -250,6 +250,7 @@ module.exports = {
       if (targets.length === 0) return;
 
       const picked = await engine.promptEffectTarget(spellCasterIdx, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Divine Gift of The Light',
         description: `${hero.name} played a Support Spell! Choose a target to heal for 100 HP.`,
         confirmLabel: '✨ Bless! (100 HP)',

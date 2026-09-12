@@ -87,6 +87,7 @@ module.exports = {
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Martyry',
         description: 'Select a Hero to sacrifice themselves and take the hit.',
         confirmLabel: '💚 Protect!',

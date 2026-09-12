@@ -112,6 +112,7 @@ module.exports = {
           if (idx < 0) break;
           await engine.actionDiscardHandCard(oi, pick.cardName, idx, {
             source: CARD_NAME,
+            sourceOwner: pi,   // v860: fremder Zwangsabwurf (Erstrunden-Schutz)
           });
         }
       }

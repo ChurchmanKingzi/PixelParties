@@ -163,6 +163,7 @@ async function summonFromStack(engine, pi, cardName) {
   if (targets.length === 0) return { aborted: true, reason: 'no_legal_target' };
 
   const pick = await engine.promptEffectTarget(pi, targets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: cardName,
     description: `Summon ${cardName} from the Coolness Stack — pick a Hero (auto-leftmost-free) or a specific empty Support Zone.`,
     confirmLabel: '✨ Summon',

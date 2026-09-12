@@ -35,6 +35,8 @@
 
 const { loadCardEffect } = require('./_loader');
 
+// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Fairy Queen Crestina, the Creation Fairy';
 const PICKS = 3;
 
@@ -93,7 +95,7 @@ module.exports = {
       const candidates = [];
       for (const name of Object.keys(cardDB)) {
         if (name === CARD_NAME) continue;
-        if (locked.has(name)) continue;
+        if (locked.has(baseCardName(name))) continue;
         if (!loadCardEffect(name)) continue;
         candidates.push(name);
       }
@@ -146,7 +148,7 @@ module.exports = {
       const chosenSet = new Set();
       for (const name of (result?.selectedCards || [])) {
         if (typeof name !== 'string') continue;
-        if (!candidateSet.has(name)) continue;
+        if (!candidateSet.has(name) && !candidates.some(k => baseCardName(k) === baseCardName(name))) continue;
         if (chosenSet.has(name)) continue;
         chosenSet.add(name);
         chosenNames.push(name);
@@ -162,7 +164,7 @@ module.exports = {
 
       // Lock all 3 names for the rest of the game (picked + the two that
       // get removed-from-game alike, per card text).
-      for (const name of chosenNames) hero._crestinaLockedNames.push(name);
+      for (const name of chosenNames) hero._crestinaLockedNames.push(baseCardName(name));   // v876
       engine.sync();
 
       // Step 2: Opponent picks 1 of the 3. Reveal Crestina to the opp's

@@ -103,6 +103,7 @@ module.exports = {
       cardName: inst.name, cardInstance: inst,
     }));
     const picked = await engine.promptEffectTarget(pi, targetEntries, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Pick another Skeleton Creature you control to fire its once-per-turn effect again.',
       confirmLabel: '🎵 Encore!',

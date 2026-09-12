@@ -52,7 +52,7 @@
 //     aus dem Deck gesucht.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Troop Annihilation';
 // Takt zwischen zwei Setzvorgaengen (Als Vorgabe 19.8.).
@@ -184,8 +184,8 @@ module.exports = {
     const kandidaten = [];
     const gesehen = new Set();
     for (const name of (ps.mainDeck || [])) {
-      if (gesehen.has(name)) continue;
-      gesehen.add(name);
+      if (gesehen.has(baseCardName(name))) continue;
+      gesehen.add(baseCardName(name));
       if (!istSurpriseCreature(cardDB[name])) continue;
       kandidaten.push(name);
     }
@@ -218,7 +218,7 @@ module.exports = {
     for (const id of ids) {
       const eintrag = ziele.find(z => z.id === id);
       if (!eintrag) continue;
-      if (benutzteNamen.has(eintrag.cardName)) continue;   // Namensregel
+      if (benutzteNamen.has(baseCardName(eintrag.cardName))) continue;   // Namensregel (Basisname)
       // Zonen neu bestimmen: jede Setzung belegt eine.
       const frei = freieSurpriseZonen(gs, pi);
       if (frei.length === 0) break;

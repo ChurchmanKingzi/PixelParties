@@ -23,6 +23,9 @@
 //  • Auftritt beim Ja (★-Grundregel). CPU: abbrechbare Prompts werden
 //    hier beantwortet (Ja, erste Karte).
 // ═══════════════════════════════════════════
+
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Tamed Hell Fox';
 
 function isEffectSummon(ctx) {
@@ -88,7 +91,7 @@ module.exports = {
 
       // Zwei gesucht: Namenssperre + Selbstloeschung.
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
-      ps._creationLockedNames.add(first); ps._creationLockedNames.add(second);
+      ps._creationLockedNames.add(baseCardName(first)); ps._creationLockedNames.add(baseCardName(second));   // v876
       engine.log('tamed_hell_fox', { player: ps.username, searched: [first, second], locked: true, deleted: true });
       // Sichtbar vom Brett in den Geloescht-Stapel: `_redirectToDeleted` +
       // `actionDestroyCard` (Vacarn-/Remora-Vertrag) — der Flug geht

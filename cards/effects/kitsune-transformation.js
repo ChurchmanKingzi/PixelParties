@@ -97,6 +97,9 @@
 
 const { inFlightSpellMultiset } = require('./_log-scan-shared.js');
 
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 const CARD_NAME    = 'Kitsune Transformation';
 const KITSUNE_NAME = 'Rebelliokai Kind Kitsune';
 const MAX_PICK     = 3;
@@ -222,7 +225,7 @@ module.exports = {
       const cardDB = engine._getCardDB();
       const distinctNames = new Set();
       for (const cn of (ps.discardPile || [])) {
-        if (distinctNames.has(cn)) continue;
+        if (distinctNames.has(baseCardName(cn))) continue;
         const cd = cardDB[cn];
         if (!cd) continue;
         if (cd.cardType !== 'Creature') continue;

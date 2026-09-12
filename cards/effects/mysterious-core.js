@@ -28,7 +28,7 @@
 //  eine gezielte Entnahme; das Deck bleibt sonst unangetastet.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const { schickeVonDeckInAblage, waehleAusNamen } = require('./_future-tech-shared');
 
 const CARD_NAME = 'Mysterious Core';
@@ -65,7 +65,7 @@ module.exports = {
       // Galerie jedes Mal neu bauen: bereits gewählte Namen sind raus
       // („with different names"), und zwischenzeitliche Änderungen am
       // Deck sind berücksichtigt.
-      const kandidaten = artefakteImDeck(gs, pi, engine).filter(n => !gewaehlt.includes(n));
+      const kandidaten = artefakteImDeck(gs, pi, engine).filter(n => !gewaehlt.some(g => baseCardName(g) === baseCardName(n)));
       if (kandidaten.length === 0) break;
 
       const name = await waehleAusNamen(engine, pi, kandidaten, {

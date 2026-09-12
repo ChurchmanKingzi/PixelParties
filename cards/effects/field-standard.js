@@ -53,7 +53,7 @@
 //    not the Artifact slot.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Field Standard';
@@ -203,7 +203,7 @@ module.exports = {
     const seenNames = new Set();
     for (const inst of engine.cardInstances) {
       if (!_isEligible(engine, inst, pi)) continue;
-      if (seenNames.has(inst.name)) continue;
+      if (seenNames.has(baseCardName(inst.name))) continue;
       seenNames.add(inst.name);
       out.push({
         id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,

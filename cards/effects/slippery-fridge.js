@@ -259,6 +259,7 @@ module.exports = {
 
     // ── Step 2: Select equip to move (cancellable) ──
     const pickedIds = await engine.promptEffectTarget(pi, equipTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: 'Slippery Fridge',
       description: 'Select an equipped Artifact to move.',
       confirmLabel: '🧊 Select!',
@@ -312,6 +313,7 @@ module.exports = {
 
     // ── Step 4: Select destination (non-cancellable) ──
     const destIds = await engine.promptEffectTarget(pi, destTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: `Slippery Fridge — Move ${inst.name}`,
       description: `Select a Support Zone to move ${inst.name} to.`,
       confirmLabel: '🧊 Move!',

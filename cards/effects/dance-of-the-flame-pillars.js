@@ -29,6 +29,9 @@
 //    `destruction_spell` so reactions /
 //    Anti-Magic / Smug Coin all gate normally.
 // ═══════════════════════════════════════════
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Dance of the Flame Pillars';
 const PER_TARGET_DAMAGE  = 100;
@@ -45,8 +48,8 @@ function distinctDMSpellsInDiscard(engine, ps) {
   const cardDB = engine._getCardDB();
   const seen = new Set();
   for (const name of (ps.discardPile || [])) {
-    if (seen.has(name)) continue;
-    if (isDestructionMagicSpell(cardDB[name])) seen.add(name);
+    if (seen.has(baseCardName(name))) continue;
+    if (isDestructionMagicSpell(cardDB[name])) seen.add(baseCardName(name));
   }
   return seen.size;
 }

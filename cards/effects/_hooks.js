@@ -19,6 +19,14 @@ const HOOKS = {
   ON_BEFORE_HAND_DRAW: 'onBeforeHandDraw', // Fires before starting hands are drawn (Bill, etc.)
   ON_GAME_START:    'onGameStart',
   ON_TURN_START:    'onTurnStart',
+  // ★ GANZ AM ANFANG DES ZUGES (v867) — VOR Statusablauf und VOR
+  // Burn/Poison. `ON_TURN_START` feuert erst NACH dem Statusschaden;
+  // fuer Effekte, die zu Zugbeginn etwas ZURUECKBRINGEN, ist das zu
+  // spaet (Teleportation Powder: das zurueckkehrende Ziel soll den
+  // Statusschaden dieses Zuges noch abbekommen). Auch fuer
+  // Stapel-Bewohner gedacht — eine geloeschte Karte kann so ihre
+  // eigene Rueckkehr ausloesen.
+  ON_TURN_START_EARLY: 'onTurnStartEarly',
   ON_TURN_END:      'onTurnEnd',
   ON_PHASE_START:   'onPhaseStart',
   ON_PHASE_END:     'onPhaseEnd',
@@ -300,6 +308,15 @@ const STATUS_EFFECTS = {
   // independently. New Creatures summoned during the AMZ window
   // auto-receive the status (handled engine-side in `actionPlaceCreature`).
   magic_silenced: { negative: true, cleansable: true, label: 'Magic Silenced', icon: '🔕', immuneKey: 'magic_silence_immune' },
+  // `frightened` (v879, Howling in the Night): der HELD kann keine
+  // Spells mehr einsetzen. Attacks, Creatures, Abilities, Heldeneffekte
+  // und Artefakte bleiben frei — funktional dieselbe Schranke wie
+  // `magic_silenced`, aber ein EIGENER Status: andere Quelle, andere
+  // Dauer („bis zum Beginn deines naechsten Zuges"), eigenes Abzeichen,
+  // und im Puzzle-Editor getrennt setzbar. Der Kartentext sagt
+  // ausdruecklich „This counts as a negative status effect" — also
+  // negativ und heilbar wie Stunned.
+  frightened: { negative: true, cleansable: true, label: 'Frightened', icon: '😱', immuneKey: 'frighten_immune' },
   // `berserked` — applied by Berserk Attachment Spell. The bearer:
   //   • cannot cast Spells (gated in `validateActionPlay`'s Spell branch),
   //   • cannot summon Creatures (gated in `validateActionPlay`'s Creature branch),
@@ -821,7 +838,40 @@ function heroFightingLevel(engine, pi, heroIdx) {
   return heroAbilityLevel(engine, pi, heroIdx, 'Fighting');
 }
 
+// ═══════════════════════════════════════════
+//  KARTENNAMEN VERGLEICHEN (v875, Als Regel 11.9.)
+//
+//  „[W]" und „[B]" sind KOSMETIK, kein Namensbestandteil: im Spiel
+//  heissen beide Karten schlicht „Pawn of Kings". Fuer JEDEN
+//  Namensvergleich — „a card with a different name", „a card with the
+//  same name", Namenssperren fuer den Rest des Zuges — zaehlt deshalb
+//  der BASISNAME.
+//
+//  Der Helfer steht hier, weil `_hooks` ueberall importiert wird und
+//  selbst nichts importiert (kein Ringschluss). `_of-kings-shared`
+//  leitet sein `familyName` auf denselben Code um, damit es die Regel
+//  nur EINMAL gibt.
+// ═══════════════════════════════════════════
+const CARD_VARIANT_RE = /\s*\[(B|W)\]$/;
+
+/** „Pawn of Kings [W]" → „Pawn of Kings". */
+function baseCardName(name) {
+  return String(name || '').replace(CARD_VARIANT_RE, '');
+}
+
+/** Sind das im Spielsinn DIESELBE Karte? */
+function sameCardName(a, b) {
+  return baseCardName(a) === baseCardName(b);
+}
+
+/** 'B' | 'W' | null — nur fuer Anzeige und Bildauswahl. */
+function cardVariantTag(name) {
+  const m = CARD_VARIANT_RE.exec(String(name || ''));
+  return m ? m[1] : null;
+}
+
 module.exports = {
+  baseCardName, sameCardName, cardVariantTag,
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   heroAbilityLevel, heroFightingLevel, scaledByLevel,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,

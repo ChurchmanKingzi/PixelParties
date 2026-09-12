@@ -59,6 +59,7 @@ module.exports = {
       if (heroFlags?.forcesSingleTarget) {
         // Opponent picks only 1 target, only the first hit (200) applies
         const selected = await engine.promptEffectTarget(oppIdx, targets, {
+          maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
           title: 'Chain Lightning (Single Target)',
           description: 'Choose 1 target to take 200 damage.',
           confirmLabel: '⚡ Accept (200)',

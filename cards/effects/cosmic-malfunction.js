@@ -35,6 +35,9 @@
 //  about to land.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Cosmic Malfunction';
 
 module.exports = {
@@ -70,7 +73,7 @@ module.exports = {
     // next turn rollover, matching "for the rest of the turn".
     if (oppPs && source?.name) {
       if (!oppPs._creationLockedNames) oppPs._creationLockedNames = new Set();
-      oppPs._creationLockedNames.add(source.name);
+      oppPs._creationLockedNames.add(baseCardName(source.name));   // v876
     }
 
     // Animation: dramatic cosmic-portal flash on the saved CD Creature.

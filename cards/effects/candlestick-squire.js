@@ -205,6 +205,7 @@ module.exports = {
     if (targets.length === 0) return false; // race — burn went away
 
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Heal a Burned target from its Burn to summon Candlestick Squire.',
       confirmLabel: '🔥 Heal Burn!',

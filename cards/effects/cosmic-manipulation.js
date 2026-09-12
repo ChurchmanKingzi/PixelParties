@@ -179,6 +179,7 @@ module.exports = {
           slotIdx: t.slotIdx, cardName: t.cardName, cardInstance: t.ref,
         }));
         const picked = await engine.promptEffectTarget(pi, entries, {
+          maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
           title: CARD_NAME,
           description: `Place Change Counter ${i + 1}/${shuffled} on which of your cards?`,
           confirmLabel: '🌌 Place',

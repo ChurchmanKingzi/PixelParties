@@ -136,6 +136,7 @@ module.exports = {
       // mode === 'damage' — opp picks target.
       const targetEntries = ownTargets.map(targetToEntry);
       const picked = await engine.promptEffectTarget(oppIdx, targetEntries, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: CARD_NAME,
         description: `Choose a target your opponent (${ps.username}) controls to take ${DAMAGE} damage.`,
         confirmLabel: `💥 ${DAMAGE} Damage!`,

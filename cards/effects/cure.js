@@ -171,6 +171,7 @@ module.exports = {
       }
 
       const picked = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Cure',
         description: 'Choose a target to cleanse all negative status effects and heal.',
         confirmLabel: '💚 Cure!',
@@ -214,6 +215,7 @@ module.exports = {
     }
 
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: 'Cure',
       description: 'Choose a target to cleanse all negative status effects and heal.',
       confirmLabel: '💚 Cure!',

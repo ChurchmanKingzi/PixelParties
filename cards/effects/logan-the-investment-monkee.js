@@ -341,7 +341,7 @@ module.exports = {
       if (ziel.type === 'hero') {
         const zielHeld = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
         if (zielHeld && zielHeld.hp > 0) {
-          await engine.actionDealDamage(quelle, zielHeld, schaden, 'creature');
+          await engine.actionDealDamage(quelle, zielHeld, schaden, 'hero');
         }
       } else if (ziel.cardInstance) {
         await engine.actionDealCreatureDamage(

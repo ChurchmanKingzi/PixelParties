@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const { v4: uuidv4 } = require('uuid');
-const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE } = require('./_hooks');
+const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 const { charges: ladungenLesen } = require('./_charges');
 
@@ -2335,7 +2335,7 @@ class GameEngine {
     const PILE_RELEVANT_HOOKS = new Set([
       'onDiscard', 'onCardEnterZone', 'onCardLeaveZone',
       'onDelete', 'onCreatureDeath', 'onMill',
-      'onTurnStart', 'onTurnEnd',
+      'onTurnStart', 'onTurnStartEarly', 'onTurnEnd',
       // Ressourcen-Ereignisse: Resilient Monkee liegt im ABLAGESTAPEL und
       // reagiert von dort auf Goldgewinne. Ohne Eintrag hier bekommt er
       // gar keinen getrackten Listener und feuert nie (Als Befund 8.8.:
@@ -2643,6 +2643,18 @@ class GameEngine {
     // einzelnen Karte: eine Coreling, die ERST NACH dem Kill gezogen
     // wird, muss ihn genauso sehen. Deshalb steht der Stempel hier, an
     // der einen Stelle, durch die jeder Tod laeuft.
+    // ★ „hat seit Zugbeginn abgeworfen?" (v897, Missing People) ──────
+    // Eine Tatsache des Spielstands, kein Beobachtungsergebnis einer
+    // einzelnen Karte — deshalb hier, an der Stelle, durch die JEDER
+    // Abwurf laeuft (Hand, Kosten, Mill, Zwangsabwurf). Gestempelt wird
+    // der Zug; wer spaeter fragt, vergleicht ihn mit `gs.turn`.
+    if (hookName === HOOKS.ON_DISCARD) {
+      const wer = hookCtx?.playerIdx;
+      if (wer === 0 || wer === 1) {
+        if (!this.gs._discardedOnTurn) this.gs._discardedOnTurn = {};
+        this.gs._discardedOnTurn[wer] = this.gs.turn;
+      }
+    }
     if (hookName === HOOKS.ON_CREATURE_DEATH || hookName === HOOKS.ON_HERO_KO) {
       const opfer = hookCtx.creature || hookCtx.hero;
       const quelle = hookCtx.source;
@@ -3236,6 +3248,45 @@ class GameEngine {
         }
         if (cd && hasCardType(cd, 'Creature')) {
           await this._checkSurpriseOnSummon(enteringCard.controller ?? enteringCard.owner, enteringCard);
+          // ★ REAKTIONSFENSTER AUF EINE BESCHWOERUNG (v873) ────────────
+          // `HOOK_DESCRIPTIONS` fuehrte `onCreatureSummoned` seit jeher,
+          // aber NIEMAND hat den Hook je gefeuert — das Fenster gab es
+          // also nur auf dem Papier (dieselbe Bauart wie der
+          // `onHandInteraction`-Fall, an dem Ambush the Scout in v200
+          // still gescheitert ist). „Play this card immediately when you
+          // summon a Creature" (Old Couple) braucht genau dieses
+          // Fenster. Es haengt an DIESER einen Stelle, durch die jede
+          // Beschwoerung laeuft — Hand, Effekt und Platzierung.
+          const _sumOwner = enteringCard.controller ?? enteringCard.owner;
+          // Das offene Fenster auch als Engine-Zustand ablegen: die
+          // Aufloesung einer Hand-Reaktion bekommt nur die KETTE
+          // uebergeben, nicht den Hook-Kontext (`script.resolve(engine,
+          // pi, null, null, chain, idx)`). Ohne diesen Merker koennte
+          // Old Couple beim Wirken nicht mehr nachsehen, worauf es
+          // ueberhaupt reagiert hat.
+          const _vorherigesFenster = this._summonWindow;
+          this._summonWindow = {
+            summonerIdx: _sumOwner, heroIdx: enteringCard.heroIdx,
+            zoneSlot: enteringCard.zoneSlot, cardName: enteringCard.name,
+            level: cd.level ?? 0, turn: this.gs.turn,
+          };
+          try {
+          await this.runHooks('onCreatureSummoned', {
+            creature: enteringCard,
+            cardName: enteringCard.name,
+            summonerIdx: _sumOwner,
+            heroIdx: enteringCard.heroIdx,
+            zoneSlot: enteringCard.zoneSlot,
+            level: cd.level ?? 0,
+            _initialCard: {
+              cardName: enteringCard.name, owner: _sumOwner,
+              cardType: cd.cardType || 'Creature',
+            },
+          });
+          } finally {
+            if (_vorherigesFenster) this._summonWindow = _vorherigesFenster;
+            else delete this._summonWindow;
+          }
         }
         // Platzierungs-Fenster (Cybug RHINOCEROS) — deckt BEIDE Faelle
         // ab, Kreatur wie Nicht-Kreatur, und laeuft bewusst ZULETZT:
@@ -4166,7 +4217,7 @@ class GameEngine {
        * @param {string}   config.side           - 'enemy' | 'own' | 'both'
        * @param {string[]} [config.types]        - ['hero','creature'] (default both)
        * @param {number}   [config.damage]       - Damage to deal. 0 = collect + animate only. (default 0)
-       * @param {string}   [config.damageType]   - e.g. 'destruction_spell', 'attack', 'fire'
+       * @param {string}   [config.damageType]   - e.g. 'destruction_spell', 'attack', 'hero', 'fire'
        * @param {string}   config.sourceName     - Card name for logging & source tracking
        * @param {string}   [config.animationType]- Animation played on all targets
        * @param {number}   [config.animDelay]    - Delay after animation (default 300)
@@ -4207,7 +4258,7 @@ class GameEngine {
        *   side: 'enemy'|'my'|'any',
        *   types: ['hero','creature'] (default both),
        *   condition: (target) => bool (optional filter),
-       *   damageType: string (e.g. 'destruction_spell', 'attack', 'creature', 'status', 'artifact', 'other'),
+       *   damageType: string (e.g. 'destruction_spell', 'attack', 'creature', 'hero', 'status', 'artifact', 'other'),
        *   dealsDamage: bool (optional explicit override) — set FALSE for a
        *     targeted effect that deals NO damage (insta-kill / "defeat" /
        *     "destroy"); pure damage-mitigation post-target reactions
@@ -4476,6 +4527,18 @@ class GameEngine {
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
                       chooserIdx: pi,
+                      // v870: WELCHER HELD waehlt. Gebraucht fuer
+                      // Regeln zwischen zwei einzelnen Helden
+                      // (Alliance) — der Spielerindex allein reicht
+                      // dafuer nicht.
+                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      // v871 (Als Klarstellung): die LEGALEN Ziele
+                      // dieser Quelle. Eine Regel der Bauart „nur,
+                      // solange es andere moegliche Ziele gibt"
+                      // (Alliance, Submerged) darf nicht selbst raten,
+                      // was ein Ziel waere — trifft die Karte nur
+                      // Helden, sind Creatures keine Alternative.
+                      allTargets: targets,
                     })) untargetableIds.add(t.id);
               }
             }
@@ -5023,6 +5086,18 @@ class GameEngine {
                       damageType: config.damageType,
                       cardName: cardInstance?.name || null,
                       chooserIdx: pi,
+                      // v870: WELCHER HELD waehlt. Gebraucht fuer
+                      // Regeln zwischen zwei einzelnen Helden
+                      // (Alliance) — der Spielerindex allein reicht
+                      // dafuer nicht.
+                      chooserHeroIdx: cardInstance?.heroIdx ?? -1,
+                      // v871 (Als Klarstellung): die LEGALEN Ziele
+                      // dieser Quelle. Eine Regel der Bauart „nur,
+                      // solange es andere moegliche Ziele gibt"
+                      // (Alliance, Submerged) darf nicht selbst raten,
+                      // was ein Ziel waere — trifft die Karte nur
+                      // Helden, sind Creatures keine Alternative.
+                      allTargets: targets,
                     })) untargetableIds.add(t.id);
               }
             }
@@ -6453,6 +6528,23 @@ class GameEngine {
         } catch { /* eine defekte Ability darf das Zielen nicht sprengen */ }
       }
     }
+    // ★ ZIELREGELN, DIE NICHT AM ZIEL HAENGEN (v870) ─────────────────
+    // Die beiden Schleifen oben fragen die Zonen des ZIEL-Helden. Das
+    // reicht nicht fuer Karten, die eine Beziehung ZWISCHEN zwei Helden
+    // regeln: „Alliance" liegt beim Nutzer und verbietet auch, dass der
+    // Nutzer den verbuendeten Gegner waehlt — dort liegt die Karte
+    // nicht. Ein Skript kann sich per `blocksTargetingAnywhere` in
+    // diese zusaetzliche Runde einklinken; gefragt werden nur
+    // Instanzen, die den Vertrag ueberhaupt fuehren.
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== ZONES.SUPPORT && inst.zone !== ZONES.ABILITY) continue;
+      if (inst.faceDown) continue;
+      const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (typeof script?.blocksTargetingAnywhere !== 'function') continue;
+      try {
+        if (script.blocksTargetingAnywhere(this.gs, this, { ...info, heroOwner, heroIdx }, inst)) return true;
+      } catch { /* eine defekte Karte darf das Zielen nicht sprengen */ }
+    }
     return false;
   }
 
@@ -6678,6 +6770,11 @@ class GameEngine {
     // open on them). The per-hero lock in _checkSurpriseWindow /
     // _activeSurpriseHeroes handles true self-recursion, and the depth
     // counter in _activateSurprise still caps runaway nesting.
+    // 'hero' (v905, Als Vorgabe 12.9.) steht hier BEWUSST NICHT drin:
+    // Heldeneffekt-Schaden ist ein gezielter Karteneffekt und soll das
+    // Standardfenster oeffnen — samt der Zielschutz-Pruefung
+    // (`heroBlocksTargeting`), die im selben Block haengt. Frueher lief
+    // solcher Schaden als 'other' und umging beides.
     const SURPRISE_SKIP_TYPES = new Set(['status', 'burn', 'poison', 'recoil', 'other']);
     // ── EFFEKT-IMMUNITAET, unabhaengig von der Quellenform (v805) ─────
     // Bisher stand die Pruefung NUR im Surprise-Zweig darunter, der
@@ -7823,6 +7920,29 @@ class GameEngine {
         && targetOwner >= 0 && this.gs.firstTurnProtectedPlayer === targetOwner) {
       this.log('damage_blocked', { target: this._heroLabel(target), reason: 'shielded' });
       return { defeated: false };
+    }
+
+    // ★ EFFEKT-IMMUNITAET GEGEN GENAU DIESE QUELLE (v911, Als Befund
+    //   12.9. an Kohta + Castling) ─────────────────────────────────────
+    // Brett-Reaktionen wie Castling und Rook of Kings [B] melden KEINE
+    // Negation zurueck — sie gewaehren fuer genau diese Aufloesung eine
+    // Immunitaet (`gs._effectImmunities`, gesetzt in
+    // `_checkPostTargetBoardReactions`). Der Schadenspfad fragt sie an
+    // zwei Stellen ab, `addHeroStatus` an einer — der NIEDERLAGE-Pfad
+    // bisher an keiner. Folge: Castling loeste sichtbar aus, und der
+    // Held starb trotzdem. Betrifft JEDEN Insta-Kill, nicht nur Kohta
+    // (Eraser Beam, Hand of Death, Golem-Stufe 5 …), denn alle laufen
+    // hier durch.
+    // Bewusst NACH dem Erstrunden-Schild und VOR dem Vor-Niederlage-
+    // Fenster: eine Immunitaet ist kein Rettungsversuch, sondern
+    // bedeutet, dass der Effekt den Helden nie erreicht hat.
+    const _immHeroIdx = targetOwner >= 0
+      ? (this.gs.players[targetOwner]?.heroes || []).indexOf(target) : -1;
+    if (_immHeroIdx >= 0 && this.hasEffectImmunity(targetOwner, _immHeroIdx, source)) {
+      this.log('effect_immunity', {
+        hero: this._heroLabel(target), source: source?.name || null,
+      });
+      return { defeated: false, effectImmune: true };
     }
 
     // ── VOR-NIEDERLAGE-FENSTER (v718, Als Befund 4.9.) ───────────────
@@ -10329,6 +10449,47 @@ class GameEngine {
       // hier laeuft der Hook absichtlich, WAEHREND die Instanz noch
       // getrackt ist und `zone === 'support'` liest.
       cardInstance._deathResolved = true;
+      // ★ WAEHREND DES STERBENS NICHT MEHR ZEICHNEN (v898, Als Befund) ─
+      // Die Todes-Hooks laufen ABSICHTLICH, solange die Instanz noch in
+      // ihrer Zone steht (siehe Kommentar oben) — Karten wie Hunting
+      // lesen dort `zone === 'support'`. Der Client rendert die Zone
+      // aber aus genau diesem Zustand: Jeder `sync()` waehrend der
+      // Hooks holt die eben weggeflogene Creature optisch zurueck.
+      // Genau das war Als Befund zu Tryse — der Handabwurf dauert eine
+      // knappe Sekunde, und mittendrin blitzte die tote Creature wieder
+      // in ihrer Zone auf.
+      // Der Zaehler `_dying` reist mit den Kartenzaehlern zum Client
+      // (`creatureCounters`), der den Platz dann leer zeichnet. Am
+      // SPIELSTAND aendert er nichts — die Hooks sehen alles wie bisher.
+      cardInstance.counters = cardInstance.counters || {};
+      cardInstance.counters._dying = 1;
+      // v899 (Diagnose, Als Befund „Aufblitzen bei Tryse"): Die Marke
+      // allein hat das Aufblitzen NICHT behoben — die Ursache liegt
+      // also woanders. Damit ein Mitschnitt sie zeigt, wird der
+      // Sterbefall mit allem protokolliert, was ihn erklaeren koennte:
+      // steht die Karte noch in der Zone? ist die Instanz noch
+      // getrackt? liegt sie schon in der Ablage?
+      // Diagnose auf der SERVERKONSOLE (v900, Als Vorgabe: im
+      // Puzzle-Modus gibt es keine Mitschnitte). Das Fenster bleibt
+      // offen, bis die Instanz abgemeldet ist; jeder `sync()` dazwischen
+      // schreibt eine Zeile mit dem, was der Client in diesem Moment
+      // zu sehen bekaeme. Damit ist die entscheidende Frage beantwortbar:
+      // schickt der Server die tote Creature noch einmal in ihrer Zone?
+      // Stumm im Training und in MCTS-Rollouts.
+      if (!this._fastMode && process.env.PP_DEATH_WATCH === '1') {
+        const seite = cardInstance.controller ?? cardInstance.owner;
+        const zPs = this.gs.players[seite];
+        const slot = zPs?.supportZones?.[fromHeroIdx]?.[cardInstance.zoneSlot] || [];
+        this._deathWatch = {
+          name: cardInstance.name, id: cardInstance.id, seite,
+          heroIdx: fromHeroIdx, slotIdx: cardInstance.zoneSlot,
+          syncs: 0, t0: Date.now(),
+        };
+        console.log(`[TOD] „${cardInstance.name}" stirbt — Seite ${seite}, Held ${fromHeroIdx}, Platz ${cardInstance.zoneSlot}`);
+        console.log(`[TOD]   toZone=${toZone} | Ablage-Laenge: ${(this.gs.players[cardInstance.owner]?.discardPile || []).length}`);
+        console.log(`[TOD]   Zone jetzt: ${JSON.stringify(slot)} | getrackt: ja | in Ablage: `
+          + `${(this.gs.players[cardInstance.owner]?.discardPile || []).includes(cardInstance.name)}`);
+      }
       const deathInfo = {
         name: cardInstance.name,
         owner: cardInstance.owner,
@@ -10342,6 +10503,16 @@ class GameEngine {
         source: opts.deathSource || null,
         _skipReactionCheck: true,
       });
+      if (this._deathWatch?.id === cardInstance.id) {
+        const w = this._deathWatch;
+        // Ab hier faellt das Fenster; was danach noch aufblitzt, kommt
+        // NICHT mehr aus dem Spielstand dieser Instanz.
+        const zPs2 = this.gs.players[w.seite];
+        const slot2 = zPs2?.supportZones?.[w.heroIdx]?.[w.slotIdx] || [];
+        console.log(`[TOD] Hooks fertig nach ${Date.now() - w.t0} ms, ${w.syncs} sync(s) dazwischen`);
+        console.log(`[TOD]   Zone danach: ${JSON.stringify(slot2)}`);
+        this._deathWatch = null;
+      }
       // Beanspruchter Kadaver (v683): NICHT ablegen. Die Creature war
       // fuer jeden on-death-Effekt regulaer tot; jetzt wird der
       // Anspruch eingeloest — derselbe Weg wie im Schadens-Batch.
@@ -10521,6 +10692,25 @@ class GameEngine {
     }
     const ps = this.gs.players[playerIdx];
     if (!ps || !cardName) return false;
+
+    // ★ ERSTRUNDEN-SCHUTZ (v860, Als Befund zu „Draw") ───────────────
+    // „In der allererste Runde ist der Gegner von allem unbetroffen."
+    // Die vier Geschwister-Primitiven (`actionDiscardCards`,
+    // `actionDiscardCardsAnimated`, `actionPromptForceDiscard`, der
+    // Mill-Pfad) tragen diesen Riegel seit jeher — DIESE nicht. Jede
+    // Karte, die gezielt Handkarten abwirft, lief also am Schutz
+    // vorbei; „Draw" hat es sichtbar gemacht.
+    //
+    // Als FREMD gilt hier genau das, was eine Zeile weiter unten auch
+    // das Ambush-Fenster oeffnet: eine ausdruecklich genannte fremde
+    // Quelle. Damit bleiben Selbst-Abwuerfe als Kosten unberuehrt —
+    // auch die eines geschuetzten Spielers, der in Runde 1 eine
+    // Reaktion mit Abwurfpreis spielt.
+    if (opts.sourceOwner != null && opts.sourceOwner !== playerIdx
+        && this.gs.firstTurnProtectedPlayer === playerIdx) {
+      this.log('discard_blocked', { player: ps.username, reason: 'shielded' });
+      return false;
+    }
 
     // Zweiter Abwurfweg neben actionPromptForceDiscard: Karten, die
     // GEZIELT eine bestimmte Handkarte abwerfen (Accusation, Spreading
@@ -15181,7 +15371,7 @@ class GameEngine {
         // client grays the spell out when no non-silenced hero can
         // cast it, and so a silenced hero stops being highlighted as
         // a drag-drop / selection-menu target for Spells.
-        if (cd.cardType === 'Spell' && hero.statuses?.magic_silenced) {
+        if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {   // v879
           const s = loadCardEffect(cd.name);
           let ok = false;
           if (typeof s?.canPlayDespiteStatuses === 'function') {
@@ -15408,7 +15598,7 @@ class GameEngine {
           // Nulled (Null Zone) blocks Spells here just like for own heroes.
           if (cd.cardType === 'Spell' && hero.statuses?.nulled) continue;
           // Magic-Silenced (Anti Magic Zone) blocks Spells.
-          if (cd.cardType === 'Spell' && hero.statuses?.magic_silenced) continue;
+          if (cd.cardType === 'Spell' && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) continue;   // v879
           // Berserked blocks Spells AND Creature summons, and caps Attacks at 2/turn.
           if ((cd.cardType === 'Spell' || cd.cardType === 'Creature') && hero.statuses?.berserked) continue;
           if (cd.cardType === 'Attack' && hero.statuses?.berserked && (hero._attacksThisTurn || 0) >= 2) continue;
@@ -15818,7 +16008,7 @@ class GameEngine {
     if (cardData.cardType !== 'Artifact' && this.freeArtifactArmed(pi)) return null;
 
     // Divine Gift of Creation lock — cards with locked names can't be played this turn
-    if (ps._creationLockedNames?.has(cardName)) return null;
+    if (ps._creationLockedNames?.has(baseCardName(cardName))) return null;   // v876: Basisname
 
     // Hero validation — charmed heroes are on the opponent's side
     const heroOwner = opts.charmedOwner != null ? opts.charmedOwner : pi;
@@ -15895,7 +16085,7 @@ class GameEngine {
     // effects, and Artifacts are all still legal — only the Spell
     // card-type is blocked. Same `canPlayDespiteStatuses` opt-out as
     // the Nulled gate above.
-    if (hero.statuses?.magic_silenced && cardData.cardType === 'Spell') {
+    if ((hero.statuses?.magic_silenced || hero.statuses?.frightened) && cardData.cardType === 'Spell') {   // v879
       const cardScript = loadCardEffect(cardData.name);
       let bypass = false;
       if (typeof cardScript?.canPlayDespiteStatuses === 'function') {
@@ -16048,6 +16238,12 @@ class GameEngine {
 
     // Custom play conditions (spells/attacks)
     if (script?.spellPlayCondition && !script.spellPlayCondition(gs, pi, this)) return null;
+
+    // v856: Pflichtziel (siehe `hasRequiredTargetKind`). Derselbe
+    // Vertrag, den `getBlockedSpells` fuer den Grauton liest — hier als
+    // Durchsetzung, damit ein direkter Socket-Zug nicht daran vorbei
+    // kommt.
+    if (script?.requiresTargetKind && !this.hasRequiredTargetKind(pi, script.requiresTargetKind)) return null;
 
     // Card-level per-hero gate — same hook used by getPlayableActionCards
     // to filter the client-side eligible list, re-checked here so direct
@@ -17131,6 +17327,16 @@ class GameEngine {
       }
     }
 
+    // ★ ALLERERSTER SCHRITT DES ZUGES (v867) ─────────────────────────
+    // Vor Statusablauf und vor Burn/Poison. Gedacht fuer Effekte, die
+    // zu Zugbeginn etwas ins Spiel ZURUECKBRINGEN (Teleportation
+    // Powder): das Zurueckgekehrte soll den Statusschaden dieses Zuges
+    // noch abbekommen, also muss es vorher dastehen. `ON_TURN_START`
+    // ist dafuer zu spaet.
+    await this.runHooks(HOOKS.ON_TURN_START_EARLY, {
+      turn: this.gs.turn, activePlayer: this.gs.activePlayer,
+    });
+
     // Process status effects FIRST — before any card hooks fire
     // This ensures burn damage only hits burns from previous turns,
     // not burns applied during this turn's ON_TURN_START (e.g. Barker → Fiery Slime)
@@ -18113,6 +18319,51 @@ class GameEngine {
    * the board yet).
    * Returns array of blocked card names.
    */
+  /**
+   * ★ PFLICHTZIEL-VERTRAG (v856)
+   *
+   * `requiresTargetKind: 'oppCreature'` (oder eine Liste davon) auf
+   * einem Kartenskript heisst: ohne mindestens ein Ziel dieser Art ist
+   * die Karte wirkungslos und damit unspielbar. Bewusst DEKLARATIV
+   * statt als Bedingungsfunktion je Karte — die Auslegung steht hier,
+   * einmal, und eine neue Karte braucht eine Zeile.
+   *
+   * Bekannte Arten:
+   *   'oppCreature'  — mindestens eine Creature, die der GEGNER
+   *                    kontrolliert (aufgedeckt, keine Ausruestung)
+   *   'anyCreature'  — irgendeine Creature auf dem Brett
+   *   'ownCreature'  — mindestens eine eigene Creature
+   *
+   * Eine unbekannte Art gilt als erfuellt: ein Tippfehler im
+   * Kartenskript darf keine Karte stillschweigend sperren.
+   */
+  hasRequiredTargetKind(playerIdx, kinds) {
+    const liste = Array.isArray(kinds) ? kinds : [kinds];
+    const oppIdx = playerIdx === 0 ? 1 : 0;
+    const cardDB = this._getCardDB();
+    const zaehleCreatures = (seite) => {
+      let n = 0;
+      for (const inst of this.cardInstances) {
+        if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+        if (inst.counters?.treatAsEquip) continue;
+        if (seite != null && (inst.controller ?? inst.owner) !== seite) continue;
+        const cd = this.getEffectiveCardData(inst) || cardDB[inst.name];
+        if (!cd || !hasCardType(cd, 'Creature')) continue;
+        n++;
+      }
+      return n;
+    };
+    for (const art of liste) {
+      switch (art) {
+        case 'oppCreature': if (zaehleCreatures(oppIdx) === 0) return false; break;
+        case 'ownCreature': if (zaehleCreatures(playerIdx) === 0) return false; break;
+        case 'anyCreature': if (zaehleCreatures(null) === 0) return false; break;
+        default: break;   // unbekannte Art: nicht sperren
+      }
+    }
+    return true;
+  }
+
   getBlockedSpells(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -18159,6 +18410,19 @@ class GameEngine {
           console.error(`[Engine] spellPlayCondition "${cardName}" warf:`, err.message);
         }
         if (!spielbar) { blocked.push(cardName); continue; }
+      }
+      // ★ PFLICHTZIEL FEHLT (v856, Als Befund zu Shattering Strike) ────
+      // Eine Karte, deren Text ein Ziel einer bestimmten Art VERLANGT
+      // („Choose a Creature your opponent controls …"), tut ohne ein
+      // solches Ziel gar nichts — sie muss also grau sein. Bisher haette
+      // jede betroffene Karte das in einer eigenen
+      // `spellPlayCondition` nachbauen muessen; ein Einzeiler
+      // `requiresTargetKind` ist die Form, die man beim Kartenschreiben
+      // nicht vergisst. Ausgewertet an DIESER einen Stelle und im
+      // Server-Riegel `validateActionPlay` — Grauton ohne Durchsetzung
+      // waere nur die halbe Miete.
+      if (script?.requiresTargetKind && !this.hasRequiredTargetKind(playerIdx, script.requiresTargetKind)) {
+        blocked.push(cardName); continue;
       }
       // Equipment Artifacts: blocked when their inherent `canEquipToHero`
       // gate rejects EVERY Hero the player controls (no Hero it could
@@ -21086,10 +21350,24 @@ class GameEngine {
     // socket is nulled out in fast mode, so the Promise path below would
     // hang forever waiting for a player response that can never arrive.
     // Mirrors the matching gate in `promptGeneric`.
+    // ★ AUSGEGRAUTE ZIELE SIND NICHT WAEHLBAR (v853, Als Befund: Tryse
+    //   mit Stealth 2 wurde von einer Lv1-Attack der CPU angewaehlt) ──
+    // Seit v564 werden geschuetzte Ziele MARKIERT statt entfernt, damit
+    // der Client sie ausgegraut zeigen kann. Den serverseitigen Riegel
+    // dazu gab es aber nur im alten `promptChooseTarget`: hier lief die
+    // volle Liste unveraendert in die CPU-Wahl und in die Antwort-
+    // Pruefung, also konnte jeder Blocker (Stealth, Jetpack, jeder
+    // kuenftige `blocksTargeting`-Vertrag) von der CPU einfach ignoriert
+    // werden — und ein manipulierter Client haette dasselbe gekonnt.
+    // `_waehlbar` ist die Liste fuer JEDE Entscheidung; `validTargets`
+    // bleibt die Liste, die der Client zum ANZEIGEN bekommt.
+    const _waehlbar = validTargets.filter(t => !t.ineligible);
+    if (_waehlbar.length === 0 && validTargets.some(t => t.ineligible)) return [];
+
     if (this.isCpuPlayer(playerIdx) || this._inMctsSim || this._fastMode) {
       await this._delay(50);
-      const cpuPicked = await this._getCpuTargetResponse(validTargets, config, playerIdx);
-      return this._disambiguateStackedTargets(playerIdx, validTargets, cpuPicked);
+      const cpuPicked = await this._getCpuTargetResponse(_waehlbar, config, playerIdx);
+      return this._disambiguateStackedTargets(playerIdx, _waehlbar, cpuPicked);
     }
     // Rewrite equip-target IDs to use the creature's PHYSICAL side
     // before handing them to the client — see `normalizeValidTargets`
@@ -21196,7 +21474,13 @@ class GameEngine {
       };
       this.sync();
     });
-    const _pickedIds = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
+    // v853: serverseitiger Riegel gegen ausgegraute Ziele. Der Client
+    // laesst sie nicht anklicken — verlassen darf man sich darauf nicht.
+    const _pickedRoh = await this._disambiguateStackedTargets(playerIdx, validTargets, picked);
+    const _gesperrt = new Set(validTargets.filter(t => t.ineligible).map(t => t.id));
+    const _pickedIds = Array.isArray(_pickedRoh)
+      ? _pickedRoh.filter(id => !_gesperrt.has(id))
+      : _pickedRoh;
 
     // ★ POST-TARGET-FENSTER AUCH HIER (Als Vorgabe 21.8.: „stelle
     //   sicher, dass ALLE Effekte Escape Device und Invisibility Cloak
@@ -27668,6 +27952,24 @@ class GameEngine {
     const cardData = this._getCardDB()[cardName];
     if (!cardData) return false;
 
+    // ★ SPELL-SPERREN GELTEN AUCH HIER (v880, Als Befund) ─────────────
+    // „cannot use Spells" heisst JEDER Spell, nicht nur der normale
+    // Spielweg aus der Hand. Surprises und Hand-Reaktionen sind Spells
+    // und laufen ueber DIESES Gate, nicht ueber `validateActionPlay` —
+    // ohne den Riegel hier blieb ein erschreckter Held zwar vom
+    // normalen Zaubern ausgeschlossen, konnte aber weiter reagieren.
+    // Dieselbe Ausnahme wie im Hauptweg: eine Karte darf sich per
+    // `canPlayDespiteStatuses` ausdruecklich davon ausnehmen.
+    if (cardData.cardType === 'Spell'
+        && (hero.statuses?.magic_silenced || hero.statuses?.frightened)) {
+      const script = loadCardEffect(cardName);
+      let bypass = false;
+      if (typeof script?.canPlayDespiteStatuses === 'function') {
+        try { bypass = !!script.canPlayDespiteStatuses(this.gs, playerIdx, heroIdx, this); } catch {}
+      }
+      if (!bypass) return false;
+    }
+
     // Check spell school / level requirements (centralized — respects
     // Wisdom paid coverage, Performance wildcards, levelOverrideCards,
     // bypassLevelReq, etc.).
@@ -28714,6 +29016,15 @@ class GameEngine {
           type: 'confirm',
           title: onlyName,
           message: `${eventDesc}. Activate ${onlyName}?`,
+          // ★ v877 (Als Vorgabe): Der Prompt fragt nach DIESER Karte —
+          // sie gehoert LINKS an die Seite. Der Confirm-Dialog hat dafuer
+          // zwei Plaetze: `showCardLeft` links neben dem Text,
+          // `showCard` rechts. Rechts bleibt also der AUSLOESER stehen
+          // (worauf reagiert wird), links kommt die Reaktionskarte
+          // selbst dazu — beide Angaben auf einen Blick.
+          // In der GALERIE-Variante unten bleibt es beim Ausloeser
+          // allein: dort sind die Optionen ohnehin als Bilder zu sehen.
+          showCardLeft: onlyName,
           showCard: chain[0]?.cardName || null,
           confirmLabel: 'Activate!',
           cancelLabel: 'No',
@@ -28942,6 +29253,14 @@ class GameEngine {
         id: uuidv4().substring(0, 12),
         cardName: chosenName, owner: pi,
         cardType: cardData?.cardType || 'Unknown',
+        // v858 (Als Befund): Der Platz, den die Karte in der Hand hatte,
+        // als sie aktiviert wurde. Der Flug in die Ablage passiert erst
+        // beim Aufloesen der Kette — da ist die Karte laengst aus der
+        // Hand raus, und ohne diesen Merker fiel der Client auf die
+        // MITTE des Handbereichs zurueck. Genau das sah Al bei „The
+        // Master's Plan": die Karte flog aus der Handmitte statt von
+        // ihrem Platz.
+        fromHandIdx: actualHandIdx,
         casterHeroIdx: reactionCasterHeroIdx,
         heroIdx: reactionCasterHeroIdx,
         goldCost: cost,
@@ -29061,9 +29380,13 @@ class GameEngine {
             const pile = toDeleted ? 'deletedPile' : 'discardPile';
             // 2. Flug DORTHIN. Feld `owner:` wie in
             //    routeNegatedInitialCard, das nachweislich funktioniert.
+            // v858: gleicher Merker wie im Aufloesungszweig — eine
+            // NEGIERTE Reaktionskarte flog bisher ebenfalls aus der
+            // Handmitte.
             this._broadcastEvent('play_pile_transfer', {
               owner: link.owner, cardName: link.cardName,
               from: 'hand', to: toDeleted ? 'deleted' : 'discard',
+              ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
             });
             // 3. Landung ERST NACH der Animation.
             await this._delay(650);
@@ -29140,13 +29463,15 @@ class GameEngine {
             await this._delay(250);
             const ps = this.gs.players[link.owner];
             if (ps) {
-              // `fromHandIdx` faellt weg — die Karte hat die Hand beim
-              // Aktivieren verlassen, der Client nimmt den generischen
-              // Handbereich als Startpunkt. Feld `owner:` wie in
-              // routeNegatedInitialCard, das nachweislich funktioniert.
+              // v858: `fromHandIdx` kommt aus dem Link (Platz beim
+              // Aktivieren) — der Client startet den Flug damit am
+              // richtigen Handslot statt in der Mitte des Handbereichs.
+              // Fehlt der Merker (aeltere Linkquellen), bleibt der
+              // bisherige generische Startpunkt.
               this._broadcastEvent('play_pile_transfer', {
                 owner: link.owner, cardName: link.cardName,
                 from: 'hand', to: 'discard',
+                ...(Number.isInteger(link.fromHandIdx) ? { fromHandIdx: link.fromHandIdx } : {}),
               });
               // Push ERST NACH dem Flug: es gibt clientseitig kein
               // "Karte im Stapel verstecken, bis sie landet", also
@@ -33048,7 +33373,7 @@ class GameEngine {
       // coverage at the script level.
       const gap = this._spellLevelGap(cardData, level, abZones);
       if (gap > 0) {
-        const cov = this._findLevelGapCoverage(cardData, gap, abZones);
+        const cov = this._findLevelGapCoverage(cardData, gap, abZones, playerIdx, heroIdx);
         if (cov?.coverable) return true;
       }
     }
@@ -33428,7 +33753,7 @@ class GameEngine {
    *   coverLevelGap(cardData, abilityLevel, engine, gap) → { coverable, discardCost }
    * Returns the first successful coverage, or null if nothing covers it.
    */
-  _findLevelGapCoverage(cardData, gap, abZones) {
+  _findLevelGapCoverage(cardData, gap, abZones, playerIdx, heroIdx) {
     // Multi-ability gap-coverage. With both Divinity (free) and
     // Wisdom (paid in discards) attached to the same hero, the
     // engine should let Divinity cover as many levels as it can
@@ -33452,6 +33777,30 @@ class GameEngine {
     // doesn't expose `abilityLevel` info (e.g. an old card returning
     // `coverable: true, discardCost: 0` regardless of input).
     const coverers = [];
+    // ★ AUSRUESTUNG DECKT AUCH (v886, Summoning Instructions) ─────────
+    // Bisher schaute die Deckung nur in die ABILITY-Zonen. Eine
+    // Ausruestung, die eine Levelluecke schliesst, gab es noch nicht —
+    // jetzt schon. Der Vertrag ist derselbe (`coverLevelGap`); als
+    // „abilityLevel" reicht die Karte ihre eigene Staerke durch, die
+    // sie in ihren Zaehlern traegt (`levelGapCoverage` — Summoning
+    // Instructions legt dort ihr X ab). Ohne Zaehler zaehlt sie 1.
+    const ausruestungsGeber = [];
+    if (playerIdx != null && heroIdx != null) {
+      for (const inst of this.cardInstances) {
+        if (inst.zone !== ZONES.SUPPORT || inst.faceDown) continue;
+        if (inst.heroIdx !== heroIdx) continue;
+        if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+        const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
+        if (typeof script?.coverLevelGap !== 'function') continue;
+        ausruestungsGeber.push({ script, staerke: inst.counters?.levelGapCoverage || 1 });
+      }
+    }
+    for (const g of ausruestungsGeber) {
+      let probe = null;
+      try { probe = g.script.coverLevelGap(cardData, g.staerke, this, 1); } catch {}
+      if (!probe?.coverable) continue;
+      coverers.push({ name: 'equip', capacity: g.staerke, unitCost: probe.discardCost || 0 });
+    }
     for (const slot of abZones) {
       if (!slot || slot.length === 0) continue;
       const base = slot[0];
@@ -33576,7 +33925,7 @@ class GameEngine {
     const blr = hero.bypassLevelReq;
     if (blr && level <= blr.maxLevel && blr.types.includes(cardData.cardType)) return 0;
 
-    const cov = this._findLevelGapCoverage(cardData, gap, abZones);
+    const cov = this._findLevelGapCoverage(cardData, gap, abZones, playerIdx, heroIdx);
     if (cov?.coverable) return cov.discardCost || 0;
 
     return -1;
@@ -34540,7 +34889,7 @@ class GameEngine {
    * @param {Array} entries - [{
    *   inst: CardInstance,
    *   amount: number,
-   *   type: string ('fire','poison','destruction_spell','attack','other',...),
+   *   type: string ('fire','poison','destruction_spell','attack','hero','other',...),
    *   source: any (source card/object),
    *   sourceOwner: number (-1 = system/status),
    *   canBeNegated: boolean (default true),
@@ -35428,8 +35777,33 @@ class GameEngine {
         // so the dying card must still be tracked when the hook fires —
         // otherwise its own leave hook never runs (Pollution Piranha's
         // delete-a-card-on-leave, etc.). Untracking happens after.
+        // ★ ZUSTAND NACHZIEHEN, BEVOR DIE HOOKS LAUFEN (v901) ─────────
+        // Zone und Ablage sind oben schon umgebucht und der Flug ist
+        // angesagt — aber der Client hat den neuen Stand noch nicht.
+        // Ohne diesen `sync()` erfaehrt er vom Ablage-Zuwachs erst,
+        // wenn die Todes-Hooks fertig sind. Bei kurzen Hooks faellt das
+        // nicht auf; Tryses Handabwurf dauert fast eine Sekunde, und bis
+        // dahin ist die Vormerkung des Fluges abgelaufen: der
+        // Zuwachs-Erkenner haelt den Kadaver fuer einen NEUEN Eintrag
+        // und laesst ihn ein zweites Mal von seinem gemerkten Brettplatz
+        // losfliegen — Als „kurzes Aufblitzen in der Zone".
+        this.sync();
         await this.runHooks('onCardLeaveZone', { _onlyCard: e.inst, leavingCard: e.inst, fromZone: 'support', fromOwner: e.inst.owner, fromHeroIdx: e.inst.heroIdx, fromZoneSlot: e.inst.zoneSlot, _skipReactionCheck: true });
+        if (!this._fastMode && process.env.PP_DEATH_WATCH === '1') {
+          const wPs = this.gs.players[e.inst.controller ?? e.inst.owner];
+          const wSlot = wPs?.supportZones?.[e.inst.heroIdx]?.[e.inst.zoneSlot] || [];
+          console.log(`[TOD] „${e.inst.name}" stirbt (Schadens-Batch) — Zone=${JSON.stringify(wSlot)} `
+            + `Ablage=${(this.gs.players[e.inst.originalOwner]?.discardPile || []).length}`);
+          this._deathWatch = { name: e.inst.name, id: e.inst.id,
+            seite: e.inst.controller ?? e.inst.owner,
+            heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot, syncs: 0, t0: Date.now() };
+        }
         await this.runHooks(HOOKS.ON_CREATURE_DEATH, { creature: deathInfo, source: e.source, type: e.type, _skipReactionCheck: true });
+        if (this._deathWatch?.id === e.inst.id) {
+          console.log(`[TOD] Hooks fertig nach ${Date.now() - this._deathWatch.t0} ms, `
+            + `${this._deathWatch.syncs} sync(s) dazwischen`);
+          this._deathWatch = null;
+        }
         // Capture revive-after-death intent BEFORE untracking. "Kill
         // and revive" pre-defeat reactions (Loyal Bone Dog) stamp this
         // on the dying instance during their resolver — letting the
@@ -36502,7 +36876,13 @@ class GameEngine {
         const script = loadCardEffect(p.name);
         return script?.preventsAllHeroesDeadLoss;
       });
-      wiped[pi] = !hasLossSuspender;
+      // v867: Ein Held, der VORUEBERGEHEND aus dem Spiel entfernt ist
+      // (Teleportation Powder), haelt seine Seite am Leben — „A player
+      // does not lose the game, even if all their other Heroes are
+      // defeated." Der Zaehler haengt am Spieler, nicht an einer Karte:
+      // die ausloesende Potion liegt da laengst im Loeschstapel.
+      const hatEntrueckte = (ps._teleportedAway || 0) > 0;
+      wiped[pi] = !hasLossSuspender && !hatEntrueckte;
     }
 
     // ── Unentschieden ────────────────────────────────────────────────
@@ -36953,6 +37333,17 @@ class GameEngine {
 
   sync() {
     if (this._aborted) return;
+    // v900: Sterbefenster-Diagnose — siehe `_deathWatch` im Todeszweig.
+    if (this._deathWatch && !this._fastMode && process.env.PP_DEATH_WATCH === '1') {
+      const w = this._deathWatch;
+      w.syncs++;
+      const zPs = this.gs.players[w.seite];
+      const slot = zPs?.supportZones?.[w.heroIdx]?.[w.slotIdx] || [];
+      const inst = this.cardInstances.find(c => c.id === w.id);
+      console.log(`[TOD]   sync #${w.syncs} (+${Date.now() - w.t0} ms): Zone=${JSON.stringify(slot)} `
+        + `getrackt=${!!inst} dying=${inst?.counters?._dying ?? '-'} `
+        + `zaehlerGesendet=${inst ? Object.keys(inst.counters || {}).length > 0 : false}`);
+    }
     // Tick progress counter even in fast mode — the hook timeout watches
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;

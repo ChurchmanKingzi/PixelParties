@@ -13,6 +13,10 @@
 //  The buff is permanent on the affected Creature
 //  even after Pangaia leaves play (it's a one-shot
 //  +200 baked into `counters.{maxHp,currentHp}`).
+//
+//  v902: Die Karte legt sich jetzt selbst in die Area
+//  Zone (onPlay -> placeArea). Vorher fehlte das —
+//  sie wanderte beim Spielen direkt in die Ablage.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
@@ -23,10 +27,39 @@ const LV_THRESHOLD = 3;
 const HP_BONUS = 200;
 
 module.exports = {
-  activeIn: ['area'],
+  // 'hand' fuer das Selbstlegen in die Area Zone, 'area' fuer den
+  // passiven Buff-Hook. Bis v902 stand hier NUR 'area' — damit feuerte
+  // aus der Hand gar kein Hook, die Karte legte sich nie selbst und
+  // landete in JEDEM Spielpfad in der Ablage (Standard-Entsorgung).
+  activeIn: ['hand', 'area'],
 
   hooks: {
+    /**
+     * Areas landen nicht von selbst im Slot — die Karte muss sich
+     * selbst dorthin bringen und damit `gs._spellPlacedOnBoard`
+     * stempeln. Ohne das greift die Standard-Entsorgung Hand -> Ablage
+     * (Lehre aus dem Cottage-Fall, v186; identisches Muster in Dark
+     * Ocean, Spider Hive, Graveyard of Limited Power).
+     *
+     * Beide Wachen sind noetig: sonst platziert sich die Karte erneut,
+     * wenn eine FREMDE Karte gespielt wird, waehrend sie schon liegt.
+     */
+    onPlay: async (ctx) => {
+      if (ctx.cardZone !== 'hand') return;
+      if (ctx.playedCard?.id !== ctx.card?.id) return;
+      await ctx._engine.placeArea(ctx.cardOwner, ctx.card);
+      ctx._engine.log('pangaia_placed', {
+        player: ctx._engine.gs.players[ctx.cardOwner]?.username,
+      });
+      ctx._engine.sync();
+    },
+
     onCardEnterZone: async (ctx) => {
+      // Der Buff gilt nur, solange die Karte in der Area Zone LIEGT.
+      // Ohne diese Wache wuerde er seit dem 'hand'-Eintrag oben auch
+      // aus der Hand heraus feuern — jede Lv3+-Beschwoerung haette
+      // ihre +200 doppelt bekommen.
+      if (ctx.cardZone !== 'area') return;
       const entering = ctx.enteringCard;
       if (!entering) return;
       if (ctx.toZone !== 'support') return;

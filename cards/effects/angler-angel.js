@@ -91,7 +91,10 @@ const BONUS = 50;
  * Schadensarten, die NICHT „mit ihrem Effekt zugefuegt" sind.
  * Bewusst eine Ausschluss- statt einer Positivliste — siehe Kopf.
  */
-const KEIN_EFFEKTSCHADEN = new Set(['attack', 'poison', 'fire', 'burn', 'status']);
+// 'hero' (v905): Schaden aus einem HELDEN-Effekt. Die tragende Pruefung
+// ist ohnehin die Quelle (steht dort eine Creature unter meiner
+// Kontrolle?) — der Eintrag ist der Guertel dazu, genau wie 'attack'.
+const KEIN_EFFEKTSCHADEN = new Set(['attack', 'hero', 'poison', 'fire', 'burn', 'status']);
 
 /**
  * Ist das Quellobjekt eine langlebige CardInstance (so reicht

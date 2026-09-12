@@ -127,6 +127,7 @@ module.exports = {
     if (targets.length === 0) return { aborted: true, reason: 'no_legal_target' };
 
     const pick = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Equip Swellpnir to a Hero (auto-leftmost-free) or click a specific empty Support Zone.',
       confirmLabel: '🐎 Mount up!',

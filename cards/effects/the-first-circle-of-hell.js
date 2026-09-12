@@ -178,6 +178,10 @@ module.exports = {
       const dp = engine.gs.players[pi]?.discardPile;
       if (!dp || dp.length === 0) return;
       if (dp.length % 2 !== 1) return; // even → no-op
+      // v853 (Als Regel): JEDER passive Effekt zeigt beim AUSLOESEN
+      // seine Karte. Erst hier, nach der Paritaetspruefung — eine Runde,
+      // in der die Bedingung nicht zutrifft, ist kein Auftritt.
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });
       await massDeleteDiscardPile(engine, pi);
     },
 
@@ -190,6 +194,7 @@ module.exports = {
       const dPile = engine.gs.players[pi]?.deletedPile || [];
       if (dPile.length === 0) return;        // 0 is even but no-op
       if (dPile.length % 2 !== 0) return;    // odd → no-op
+      await engine.showTriggeredEffect(CARD_NAME, { playerIdx: ctx.cardOwner });   // v853
       massReturnDeletedPile(engine, pi);
     },
   },

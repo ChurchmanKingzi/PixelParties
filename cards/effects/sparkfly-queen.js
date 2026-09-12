@@ -543,6 +543,7 @@ async function runWorkerGift(ctx, engine, gs, pi, oi) {
 
   // Opponent MUST pick (non-cancellable).
   const picked = await engine.promptEffectTarget(oi, oppTargets, {
+    maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
     title: CARD_NAME,
     description: 'Choose any non-Hero card on YOUR side of the board. It will move to your opponent\'s hand.',
     confirmLabel: '📤 Surrender',

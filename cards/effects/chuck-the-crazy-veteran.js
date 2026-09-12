@@ -100,8 +100,34 @@ module.exports = {
      * Chuck is alone), the damage lands.
      */
     beforeDamage: (ctx) => {
+      // ── DIAGNOSE (v854, Als Befund 11.9.) ───────────────────────────
+      // Chuck nahm im Mitschnitt 240 Schaden von einer Quick Attack,
+      // obwohl Melissa und Tryse lebten und ungeschuetzt waren. Der
+      // Schild haelt in JEDER Nachstellung am echten Engine-Pfad
+      // (direkter Aufruf, Angriffsquelle mit `usesHeroAtk`, nach
+      // `_fireAttackDeclare`, mit belegten Ability-Zonen) — die Ursache
+      // liegt also in etwas, das die Nachstellung nicht enthielt
+      // (Verdacht: die Pfeil-Reaktionskette Angelfeather/Bomb/Arrow
+      // Slit). Diese Zeilen landen im Demo-Mitschnitt und beantworten
+      // beim naechsten Auftreten die einzige offene Frage: Ist der Hook
+      // ueberhaupt gelaufen, und wen hat er als verwundbar gesehen?
+      // Nach der Klaerung ersatzlos entfernen.
+      const _diag = (grund, extra) => {
+        try {
+          ctx._engine?.log?.('chuck_shield', {
+            grund, source: ctx.source?.name || '?', type: ctx.type,
+            amount: ctx.amount, ...(extra || {}),
+          });
+        } catch { /* Diagnose darf nie etwas kaputt machen */ }
+      };
+
       // Only protect Chuck himself.
-      if (ctx.target !== ctx.attachedHero) return;
+      if (ctx.target !== ctx.attachedHero) {
+        // Nur melden, wenn das Ziel ueberhaupt Chuck HEISST — sonst
+        // schreibt jede Schadensinstanz im Spiel eine Zeile.
+        if (ctx.target?.name === CARD_NAME) _diag('ziel-identitaet-weicht-ab');
+        return;
+      }
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
@@ -112,6 +138,7 @@ module.exports = {
       // is trivially true ⇒ Chuck takes the hit. Game-balance lever:
       // Chuck-alone isn't an unbreakable wall.
       let anyVulnerable = false;
+      let verwundbarerName = null;
       const heroes = ps.heroes || [];
       for (let i = 0; i < heroes.length; i++) {
         if (i === heroIdx) continue;
@@ -119,10 +146,19 @@ module.exports = {
         if (!h?.name || h.hp <= 0) continue;
         if (!_isImmuneToSource(h, ctx.type)) {
           anyVulnerable = true;
+          verwundbarerName = h.name;
           break;
         }
       }
-      if (anyVulnerable) ctx.setAmount(0);
+      if (anyVulnerable) {
+        ctx.setAmount(0);
+        _diag('schild-greift', { verwundbar: verwundbarerName });
+      } else {
+        _diag('schild-faellt', {
+          mitspieler: heroes.map((h, i) => (i === heroIdx ? null : (h?.name
+            ? `${h.name} hp${h.hp}${_isImmuneToSource(h, ctx.type) ? ' IMMUN' : ''}` : 'leer'))).filter(Boolean),
+        });
+      }
     },
   },
 };

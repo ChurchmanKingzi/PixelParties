@@ -75,6 +75,8 @@
 
 const { loadCardEffect } = require('./_loader');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Learning';
 
 /**
@@ -211,7 +213,7 @@ function getEligibleHandIndices(engine, ps, pi, heroIdx, level, triggeringName, 
   for (let i = 0; i < (ps.hand || []).length; i++) {
     if (i === triggerIdx) continue;
     const name = ps.hand[i];
-    if (name === triggeringName) continue;
+    if (baseCardName(name) === baseCardName(triggeringName)) continue;   // v876
     let ok = cache.get(name);
     if (ok === undefined) {
       ok = isNameEligibleForLearning(engine, ps, pi, heroIdx, name, requireMagicArts, wisdomPool, heroScript, cardDB);

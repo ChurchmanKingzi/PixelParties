@@ -85,12 +85,12 @@ module.exports = {
       if (tgt.type === 'hero') {
         const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
         if (hero && hero.hp > 0) {
-          await engine.actionDealDamage({ name: 'Bottled Lightning', owner: pi }, hero, dmg, 'normal');
+          await engine.actionDealDamage({ name: 'Bottled Lightning', owner: pi }, hero, dmg, 'potion');
         }
       } else if (tgt.cardInstance) {
         await engine.actionDealCreatureDamage(
           { name: 'Bottled Lightning', owner: pi },
-          tgt.cardInstance, dmg, 'normal',
+          tgt.cardInstance, dmg, 'potion',
           { sourceOwner: pi, canBeNegated: true },
         );
       }

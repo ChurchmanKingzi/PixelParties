@@ -856,6 +856,10 @@ const ZONE_ANIM_SFX = {
   // Komponente heraus (Als Wunsch: je Einschlag ein Impact-Sound).
   sunglasses_drop:         { name: 'sunglasses_drop' },
   critical_slash:          { name: 'critical_strike' },
+  // Kohtas Super-Kill (v911): derselbe `slash`, aber deutlich tiefer und
+  // auf volle Lautstaerke — das soll schwer und haesslich klingen, nicht
+  // elegant wie der normale Schnitt.
+  super_kill_cut:          { name: 'slash', opts: { rate: 0.62, volume: 2.4 } },
   // Future Tech Doping — die Spritze (`syringe_stab`). `heavy_impact`
   // tiefer und leiser ist der Einstich; der Versatz trifft den Moment,
   // in dem die Nadel steht (240 ms + 100 ms Einbau-Versatz).
@@ -1065,6 +1069,24 @@ const ZONE_ANIM_SFX = {
   claw_maul:               { name: 'slash' },
   scythe_cut:              { name: 'slash' },
   quick_slash:             { name: 'slash' },
+  // Massacre (v859): zehn gestaffelte Schnitte. EIN Klang je Schnitt
+  // waere Krach — stattdessen zwei Schlaege, die die Serie klammern:
+  // der Einsatz gleich zu Beginn, der zweite tiefer und leiser mitten
+  // drin. `dedupe` aus, sonst schluckt die Entprellung den zweiten.
+  // v861 (Als Rueckmeldung): der Treffer war viel zu leise. Der Grund
+  // ist nicht die Zuordnung, sondern der Pegel: `slash` laeuft hier
+  // gegen zehn sichtbare Schnitte an und ging darin unter. Beide
+  // Schlaege deutlich lauter; der zweite bleibt bewusst etwas leiser
+  // als der erste, damit die Serie einen Einsatz und einen Nachschlag
+  // hat statt zweimal desselben Knalls. `volume` ist ein Faktor auf den
+  // Grundpegel, Werte ueber 1 sind zulaessig (SFX_MASTER_MULTIPLIER
+  // zieht ohnehin alles auf ein Drittel).
+  massacre:                { name: 'slash', opts: { rate: 1.05, volume: 2.4, dedupe: 0 } },
+  // Howling in the Night (v880): tiefes Heulen — `elem_dark` weit
+  // heruntergestimmt, dazu ein zweiter, hoeherer Ruf kurz danach.
+  night_howl:              { name: 'elem_dark', opts: { rate: 0.55, volume: 1.6, dedupe: 0 } },
+  night_howl_echo:         { name: 'elem_dark', opts: { rate: 0.8, volume: 1.0, delay: 420, dedupe: 0 } },
+  massacre_second:         { name: 'slash', opts: { rate: 0.78, volume: 1.9, delay: 300, dedupe: 0 } },
   piranha_bite:            { name: 'slash' },
   warlord_bite:            { name: 'slash' },
   snake_devour:            { name: 'slash' },
@@ -2838,6 +2860,18 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
         + dur(s.magic_silenced || c.magic_silenced),
     });
   }
+  // v879 (Howling in the Night): eigener Status, eigenes Abzeichen.
+  // Gleiche Wirkung wie Magic Silenced, aber andere Quelle und Dauer —
+  // im Spiel soll man beide auseinanderhalten koennen.
+  if (s.frightened || c.frightened) {
+    badges.push({
+      key: 'frightened', icon: '😱',
+      tooltip: (isHero
+        ? 'Frightened: Cannot use Spells. Attacks, Creatures, Abilities and Hero effects are unaffected.'
+        : 'Frightened: Cannot use Spells.')
+        + dur(s.frightened || c.frightened),
+    });
+  }
   if (s.berserked) {
     badges.push({
       key: 'berserked', icon: '😡',
@@ -2940,9 +2974,40 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
   // onto one normally fires the card's mouseLeave and hides the preview.
   // Re-asserting the tooltip here, plus clearing it on badge leave, keeps
   // the two tooltips (status-description and card-preview) in sync.
-  const tooltipCard = cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
-  const showBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(tooltipCard); };
-  const hideBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(null); };
+  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
+  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
+  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
+  // Die statische Kartenliste ist nur der Rueckfall.
+  const tooltipCard = () => {
+    const letzte = window._boardTooltipLast;
+    if (letzte && cardName && letzte.name === cardName) return letzte;
+    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  };
+  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
+  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
+  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
+  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
+  // wie vor den Reparaturversuchen.
+  //
+  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
+  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
+  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
+  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
+  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
+  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
+  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
+  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
+  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
+  // rendern), nicht im Ereignis-Timing.
+  const showBoardTip = () => {
+    window._boardTooltipLock?.(true);
+    const t = tooltipCard();
+    if (t) window._boardTooltipSetter?.(t);
+  };
+  const hideBoardTip = () => {
+    window._boardTooltipLock?.(false);
+    if (tooltipCard()) window._boardTooltipSetter?.(null);
+  };
   return (
     <div className="status-badges-row">
       {badges.map(b => (
@@ -2967,7 +3032,8 @@ function BuffColumn({ buffs, cardName }) {
     let txt = `Blessed: This Hero can have up to ${remaining} more additional Abilities attached to it this turn!`;
     if (data?.locked) txt += ' But it cannot act this turn.';
     return txt;
-  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` } };
+  } }, cloudy: { icon: '☁️', tooltip: 'Takes half damage from all sources!' }, dark_gear_negated: { icon: '⚙️', tooltip: 'Effects negated by Dark Gear!' }, diplomacy_negated: { icon: '🕊️', tooltip: 'Effects negated due to Diplomacy!' }, necromancy_negated: { icon: '💀', tooltip: 'Effects negated due to Necromancy!' }, mao_negated: { icon: '🐈', tooltip: 'Mao-negated: This Creature\'s effects were re-fired by Mao and are now suppressed until the start of the activator\'s next turn.' }, freeze_immune: { icon: '🔥', tooltip: 'Cannot be Frozen!' }, immortal: { icon: '✨', tooltip: 'Cannot have its HP dropped below 1.' }, combo_locked: { icon: '🔒', tooltip: 'Cannot perform Actions this turn.' }, submerged: { icon: '🌊', tooltip: 'Unaffected by all cards and effects while other possible targets exist!' }, negative_status_immune: { icon: '😎', tooltip: 'Immune to all negative status effects!' }, charmed: { icon: '💕', tooltip: 'Charmed! Under opponent control and immune to all effects.' }, golden_wings: { icon: '🪽', tooltip: 'Golden Wings: Fully immune to opponent effects until end of this turn.' }, anti_magic_enchanted: { icon: '🛡️', tooltip: 'Anti Magic Enchantment: Once per turn, the controlling player may negate a Spell that hits this Artifact\'s equipped Hero.' }, forcesTargeting: { icon: '🎯', tooltip: 'Taunt: The opponent must target this with Attacks, Spells, and Creature effects if possible. When multiple targets have Taunt, the opponent may pick any.' }, forcesTargeting_creaturesOnly: { icon: '🛡️', tooltip: "Guarding: Your opponent cannot choose your other Creatures while this Creature stands. Your Heroes can still be chosen." }, niu_enhanced: { icon: '🐃', tooltip: (data) => `This Hero's next Attack will deal ${data?.totalDamage || 0} additional damage.` }, gou_protected: { icon: '🐕', tooltip: (data) => `Protected by Guardian Beast Gou — takes no damage from any source until the start of the activator's next turn.${(data?.grants?.length || 0) > 1 ? ` (${data.grants.length}× layered)` : ''}` }, second_action_grant: { icon: '🌑', tooltip: 'Second Action: This Hero may perform a second Action during the Action Phase this turn. The bonus is wasted if a different Hero performs the second Action first.' }, cold_strike: { icon: '❄️', tooltip: "Cold Strike: This Hero's Attacks and Spells Freeze each target they hit for 1 turn. Wears off at the end of this turn." }, empowered_strike: { icon: '💪', tooltip: "Empowered Strike: The next time this Hero hits exactly 1 target with an Attack, that Attack's damage is increased by 100 and cannot be reduced or negated." }, sparkfly_gift_architect: { icon: '📐', tooltip: "Architect's Gift: You may once per turn draw cards until you have the same number of cards in your hand as your opponent." }, sparkfly_gift_attendant: { icon: '🪶', tooltip: "Attendant's Gift: This Creature is unaffected by your opponent's cards and effects, except damage." }, sparkfly_gift_worker: { icon: '🪲', tooltip: "Worker's Gift: You may once per turn make your opponent choose any card on their side of the board that is not a Hero and add it to your hand." }, damage_immune: { icon: '💠', tooltip: 'Takes no damage from any sources.' }, disrupted: { icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.' }, magic_immune: { icon: '🛡️', tooltip: (data) => `The Hero is immune to Spells up to level ${data?.level ?? '?'}.` }, // v886 (Summoning Instructions): zeigt das beim Ausruesten gewaehlte X.
+  summoningInstructionsX: { icon: '📘', tooltip: (data) => `Summoning Instructions: X = ${data?.level ?? '?'} — the equipped Hero may summon Creatures up to ${data?.level ?? '?'} levels above its Summoning Magic level (level 3 Creatures at most).` } };
   // medusa_petrified is surfaced through the Stunned status badge (as the
   // "Petrified" variant), so don't also render it as a separate buff icon —
   // that would double-represent the same effect. null_zone_negated is the
@@ -2988,9 +3054,40 @@ function BuffColumn({ buffs, cardName }) {
   // on buff-icon hover so both tooltips (buff description + card preview)
   // stay in sync. The `.buff-icon:hover` entry in useCardTooltip's
   // hoverSelectors keeps the 300ms safety-sweep from wiping it back out.
-  const tooltipCard = cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
-  const showBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(tooltipCard); };
-  const hideBoardTip = () => { if (tooltipCard) window._boardTooltipSetter?.(null); };
+  // v880: Bevorzugt den zuletzt gezeigten REICHEN Tooltip derselben
+  // Karte (`_boardTooltipLast`, gesetzt von `setBoardTooltip`) — der
+  // traegt aktuelle HP, ATK und die tatsaechlich angelegten Abilities.
+  // Die statische Kartenliste ist nur der Rueckfall.
+  const tooltipCard = () => {
+    const letzte = window._boardTooltipLast;
+    if (letzte && cardName && letzte.name === cardName) return letzte;
+    return cardName && window.CARDS_BY_NAME ? window.CARDS_BY_NAME[cardName] : null;
+  };
+  // ── Stand nach dem Rueckbau (v885) ───────────────────────────────
+  // Beim Hovern eines Abzeichens wird der Karten-Tooltip neu gesetzt —
+  // mit dem REICHEN Stand (aktuelle Werte, echte Abilities); das ist die
+  // Reparatur aus v880 und bleibt. Beim Verlassen wird sofort geraeumt,
+  // wie vor den Reparaturversuchen.
+  //
+  // NICHT GELOEST: an der Naht zwischen Karte und Abzeichen kann der
+  // Tooltip verschwinden — das `mouseLeave` der darunterliegenden Karte
+  // trifft ein, ohne dass ein `mouseEnter` folgt. Drei Anlaeufe (Sperre,
+  // groessere Trefferflaeche, aufgeschobenes Ausblenden) haben es nicht
+  // behoben; der letzte machte den Tooltip spuerbar klebrig und wurde
+  // auf Als Wunsch zurueckgebaut. Wer es erneut versucht: die Abzeichen
+  // sind ein GESCHWISTER der Karte, das ueber ihr liegt — solange das so
+  // ist, erzeugt jeder Wechsel ein Verlassen-Ereignis. Die Loesung
+  // duerfte in der Struktur liegen (Abzeichen als KIND der Karte
+  // rendern), nicht im Ereignis-Timing.
+  const showBoardTip = () => {
+    window._boardTooltipLock?.(true);
+    const t = tooltipCard();
+    if (t) window._boardTooltipSetter?.(t);
+  };
+  const hideBoardTip = () => {
+    window._boardTooltipLock?.(false);
+    if (tooltipCard()) window._boardTooltipSetter?.(null);
+  };
   // snake_case → "Title-Case-Hyphenated" for buff keys with no
   // BUFF_ICONS entry. Auto-generated negate-style buffs (Forbidden Zone,
   // any future "<Source> negated" effect) inherit the same conventional

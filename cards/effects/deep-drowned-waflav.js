@@ -100,11 +100,11 @@ async function runSurge(ctx) {
     if (sel.type === 'hero') {
       const h = engine.gs.players[sel.owner]?.heroes?.[sel.heroIdx];
       if (!h?.name || h.hp <= 0) break;
-      await engine.actionDealDamage(source, h, SURGE_DAMAGE, 'other');
+      await engine.actionDealDamage(source, h, SURGE_DAMAGE, 'hero');
     } else {
       const inst = sel.cardInstance;
       if (!inst || inst.zone !== 'support') break;
-      await engine.actionDealDamage(source, inst, SURGE_DAMAGE, 'other');
+      await engine.actionDealDamage(source, inst, SURGE_DAMAGE, 'hero');
     }
     engine.sync();
     await engine._delay(220);

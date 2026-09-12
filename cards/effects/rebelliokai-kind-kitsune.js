@@ -44,6 +44,8 @@
 
 const { DISCARD_SOURCE_TAG } = require('./_rebelliokai-shared');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Rebelliokai Kind Kitsune';
 
 module.exports = {
@@ -157,7 +159,7 @@ module.exports = {
       // gate Cosmic Malfunction / Alchemic Journal / Brilliant Idea
       // all reuse. Cleared automatically at turn-start.
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
-      ps._creationLockedNames.add(chosenName);
+      ps._creationLockedNames.add(baseCardName(chosenName));   // v876
 
       engine.log('rebelliokai_kind_kitsune', {
         player:   ps.username,

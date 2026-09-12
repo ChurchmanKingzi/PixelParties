@@ -29,6 +29,8 @@
 
 const { isLoyalCreature, getLoyalsInDeck } = require('./_loyal-shared');
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Loyal Shepherd';
 
 module.exports = {
@@ -155,7 +157,7 @@ module.exports = {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
-      if (replacementName === death.name) {
+      if (baseCardName(replacementName) === baseCardName(death.name)) {   // v876
         // "Different name" guard, defensive.
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;

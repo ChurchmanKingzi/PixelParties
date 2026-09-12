@@ -66,6 +66,7 @@ module.exports = {
     if (targets.length === 0) { engine.sync(); return; }
 
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: `Choose one of your opponent's Creatures to deal ${BOMB_DAMAGE} damage to.`,
       confirmLabel: `💣 ${BOMB_DAMAGE} Damage!`,

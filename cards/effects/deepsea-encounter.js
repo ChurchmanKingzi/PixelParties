@@ -22,7 +22,7 @@
 //      calling context about the redirect
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType } = require('./_hooks');
+const { isPileCreature, hasCardType, baseCardName } = require('./_hooks');
 const { returnSupportCreatureToHand } = require('./_deepsea-shared');
 
 const CARD_NAME = 'Deepsea Encounter';
@@ -74,7 +74,7 @@ module.exports = {
       const bouncedLevel = cardDB[bouncedName]?.level || 0;
       const maxLevel = bouncedLevel + 1;
       for (const name of handNames) {
-        if (name === bouncedName) continue;
+        if (baseCardName(name) === baseCardName(bouncedName)) continue;   // v876
         if (name === CARD_NAME) continue;
         const cd = cardDB[name];
         if (!cd || !isPileCreature(cd)) continue;
@@ -112,7 +112,7 @@ module.exports = {
     const seen = new Set();
     const replacements = [];
     for (const n of (ps.hand || [])) {
-      if (seen.has(n)) continue;
+      if (seen.has(baseCardName(n))) continue;
       if (n === bouncedName) continue;
       if (n === CARD_NAME) continue;
       const cd = cardDB[n];

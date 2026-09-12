@@ -33,7 +33,7 @@
 //    gesammeltes Aufdecken, dann mischen.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const {
   TRIAL_KEYS, isTrialOfName, trialTurnIsClean, stampTrialLock,
 } = require('./_trials-shared');
@@ -135,9 +135,9 @@ module.exports = {
 
       // Nur Namen behalten, die wirklich im Deck liegen und im
       // Kandidatensatz standen (Doppelte fallen ueber das Set weg).
-      const allowed = new Set(candidates.map(c => c.name));
+      const allowed = new Set(candidates.map(c => baseCardName(c.name)));   // v876
       const chosen = [...new Set(result.selectedCards)]
-        .filter(n => allowed.has(n))
+        .filter(n => allowed.has(baseCardName(n)))
         .slice(0, MAX_PICKS);
 
       // ★ ALS VORGABE 18.8.: „sollte seine Searches einen nach dem

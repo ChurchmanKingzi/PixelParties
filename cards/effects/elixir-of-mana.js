@@ -10,6 +10,9 @@
 //  prevents cards from entering hand.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const MAX_PICKS = 3;
 
 function uniqueSpellsInDiscard(gs, pi, engine) {
@@ -19,10 +22,10 @@ function uniqueSpellsInDiscard(gs, pi, engine) {
   const seen = new Set();
   const result = [];
   for (const name of (ps.discardPile || [])) {
-    if (seen.has(name)) continue;
+    if (seen.has(baseCardName(name))) continue;
     const cd = cardDB[name];
     if (!cd || cd.cardType !== 'Spell') continue;
-    seen.add(name);
+    seen.add(baseCardName(name));
     result.push(name);
   }
   return result;

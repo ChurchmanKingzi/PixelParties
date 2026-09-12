@@ -129,6 +129,7 @@ module.exports = {
       }));
 
       const picked = await engine.promptEffectTarget(pi, heroTargets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Challenge',
         description: 'Select a Hero to take the Challenge.',
         confirmLabel: '⚔️ Challenge!',

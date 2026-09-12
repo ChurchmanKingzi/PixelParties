@@ -69,7 +69,7 @@
 //    accurate for "summoned this turn" reads).
 // ═══════════════════════════════════════════
 
-const { isPileCreature, hasCardType, isOwnSideSummonableCreature } = require('./_hooks');
+const { isPileCreature, hasCardType, isOwnSideSummonableCreature, baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Garius, the Great Reformer';
 
@@ -108,15 +108,15 @@ function _buildReplacementGallery(engine, pi, heroIdx, maxLevel, excludeName) {
   const cardDB = engine._getCardDB();
   const seen = new Map();
   for (const cn of (ps.mainDeck || [])) {
-    if (seen.has(cn)) continue;
-    if (excludeName && cn === excludeName) continue;
+    if (seen.has(baseCardName(cn))) continue;
+    if (excludeName && baseCardName(cn) === baseCardName(excludeName)) continue;   // v876
     const cd = cardDB[cn];
     if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
     if (hasCardType(cd, 'Token') || cd.subtype === 'Token') continue;
     const effLvl = engine.effectiveCardLevel(cd, pi);
     if (effLvl > maxLevel) continue;
     if (!engine.isCreatureSummonable(cn, pi, heroIdx)) continue;
-    seen.set(cn, { name: cn, source: 'deck', level: effLvl });
+    seen.set(baseCardName(cn), { name: cn, source: 'deck', level: effLvl });
   }
   return [...seen.values()].sort(
     (a, b) => (a.level - b.level) || a.name.localeCompare(b.name),

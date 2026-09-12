@@ -25,6 +25,9 @@
 
 const { zaehleInAblage, istFutureTech, waehleAusNamen } = require('./_future-tech-shared');
 
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 const CARD_NAME = 'Future Tech Database';
 
 /** Holbare Namen: Future Tech im Deck, aber nicht die Database selbst. */
@@ -32,7 +35,7 @@ function kandidaten(gs, pi, schonGewaehlt) {
   const ps = gs.players[pi];
   if (!ps) return [];
   return (ps.mainDeck || [])
-    .filter(n => istFutureTech(n) && n !== CARD_NAME && !schonGewaehlt.includes(n));
+    .filter(n => istFutureTech(n) && baseCardName(n) !== baseCardName(CARD_NAME) && !schonGewaehlt.some(g => baseCardName(g) === baseCardName(n)));
 }
 
 module.exports = {

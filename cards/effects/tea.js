@@ -254,6 +254,7 @@ module.exports = {
 
     // Step 4: Prompt for second target
     const picked = await engine.promptEffectTarget(pi, secondTargets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: 'Tea — Inflict',
       description: 'Choose a target to inflict the removed status effects.',
       confirmLabel: '🍵 Serve!',

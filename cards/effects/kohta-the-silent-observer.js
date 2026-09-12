@@ -83,8 +83,18 @@ function merken(ctx) {
   engine._kohtaPending = { pi, instId: taeter.id, name: taeter.name };
 }
 
+// Aufstiegs-Buchfuehrung (v910) — Bedingung und Zustandspflege liegen
+// gemeinsam in `_kohta-shared.js`, wie bei der Riffel-Familie.
+const { ASCENSION_ITEMS, hasEquipped, checkKohtaAscension } = require('./_kohta-shared');
+
 module.exports = {
   activeIn: ['hero'],
+
+  ascensionProgress(engine, pi, hi) {
+    let n = 0;
+    for (const name of ASCENSION_ITEMS) if (hasEquipped(engine, pi, hi, name)) n++;
+    return n / ASCENSION_ITEMS.length;
+  },
 
   cpuMeta: {
     // Der Wert haengt ganz am wiederholten Effekt — der Pilot sieht ihn
@@ -93,6 +103,23 @@ module.exports = {
   },
 
   hooks: {
+    // Bereitschaft bei jedem Wechsel in den eigenen Support Zones neu
+    // bewerten (v910, Riffel-Muster).
+    onGameStart: (ctx) => {
+      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+    },
+    onTurnStart: (ctx) => {
+      checkKohtaAscension(ctx._engine, ctx.cardOriginalOwner, ctx.cardHeroIdx, null);
+    },
+    onCardEnterZone: (ctx) => {
+      if (ctx.toZone !== 'support' || ctx.toHeroIdx !== ctx.cardHeroIdx) return;
+      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, null);
+    },
+    onCardLeaveZone: (ctx) => {
+      if (ctx.fromZone !== 'support') return;
+      if (ctx.fromHeroIdx !== undefined && ctx.fromHeroIdx !== ctx.cardHeroIdx) return;
+      checkKohtaAscension(ctx._engine, ctx.cardOwner, ctx.cardHeroIdx, ctx.leavingCard?.id);
+    },
     // ── ① Merken, waehrend der Effekt noch laeuft ─────────────────
     onHeroKO: async (ctx) => { merken(ctx); },
     onCreatureDeath: async (ctx) => { merken(ctx); },

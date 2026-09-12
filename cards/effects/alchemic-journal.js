@@ -6,6 +6,9 @@
 //  Hard once per turn.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 module.exports = {
   isTargetingArtifact: true,
   deferBroadcast: true,
@@ -38,7 +41,7 @@ module.exports = {
     const extraGold = (ps.gold || 0) - baseCost;
 
     // Check if "Choose" option is available: 5+ extra gold AND 2+ different potions in deck
-    const uniquePotions = new Set(ps.potionDeck);
+    const uniquePotions = new Set((ps.potionDeck || []).map(baseCardName));   // v876
     const canChoose = extraGold >= 5 && uniquePotions.size >= 2;
 
     let mode = 'draw';
@@ -68,8 +71,8 @@ module.exports = {
       const seen = new Set();
       const galleryCards = [];
       for (const cn of ps.potionDeck) {
-        if (seen.has(cn)) continue;
-        seen.add(cn);
+        if (seen.has(baseCardName(cn))) continue;
+        seen.add(baseCardName(cn));
         galleryCards.push({ name: cn, source: 'potion_deck' });
       }
       galleryCards.sort((a, b) => a.name.localeCompare(b.name));
@@ -93,7 +96,7 @@ module.exports = {
 
       // Lock chosen potion name for the turn
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
-      ps._creationLockedNames.add(chosenName);
+      ps._creationLockedNames.add(baseCardName(chosenName));   // v876: Basisname
 
       // Reveal to opponent (opponent confirms)
       await engine.revealSearchedCards(pi, [chosenName], 'Alchemic Journal');

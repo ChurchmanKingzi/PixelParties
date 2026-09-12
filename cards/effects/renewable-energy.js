@@ -14,6 +14,9 @@
 //  this card to deletedPile instead of discardPile.
 // ═══════════════════════════════════════════
 
+// v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 module.exports = {
   deleteOnUse: true,
   // Shuffles discard cards back into deck — flagged for "No Retreat!"
@@ -34,7 +37,7 @@ module.exports = {
     const seen = new Set();
     const gallery = [];
     for (const name of (ps.discardPile || [])) {
-      if (seen.has(name)) continue;
+      if (seen.has(baseCardName(name))) continue;
       seen.add(name);
       gallery.push({ name, source: 'discard' });
     }

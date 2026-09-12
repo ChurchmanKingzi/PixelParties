@@ -44,6 +44,12 @@ async function smash(engine, attackSource, target, amount) {
 }
 
 module.exports = {
+  // v856 (Als Befund): ohne eine gegnerische Creature ist die Karte
+  // wirkungslos — der Kartentext verlangt sie als Ziel. Der Vertrag
+  // wird zentral ausgewertet (`hasRequiredTargetKind` in _engine.js):
+  // Handkarte grau UND Server-Riegel.
+  requiresTargetKind: 'oppCreature',
+
   requiresTarget: true,
 
   hooks: {

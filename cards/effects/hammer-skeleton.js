@@ -73,6 +73,7 @@ module.exports = {
     if (targets.length === 0) return false;
 
     const picked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: 'Pick a Spell attached to a Hero or an Area in play. Send it to the discard pile.',
       confirmLabel: '🔨 Smash!',

@@ -319,6 +319,7 @@ module.exports = {
     if (targets.length === 0) return false;
 
     const tgtPicked = await engine.promptEffectTarget(pi, targets, {
+      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
       title: CARD_NAME,
       description: `Deal ${damage} damage to which target?`,
       confirmLabel: `💥 ${damage} Damage!`,

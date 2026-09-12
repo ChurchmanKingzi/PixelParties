@@ -8,6 +8,9 @@
 //  pile. Draw 1 card for every card discarded.
 // ═══════════════════════════════════════════
 
+// v875: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
+const { baseCardName } = require('./_hooks');
+
 const CARD_NAME = 'Accusation';
 
 module.exports = {
@@ -59,6 +62,7 @@ module.exports = {
         return;
       }
       const declared = result.cardName;
+      const trifft = (n) => baseCardName(n) === baseCardName(declared);   // v875
 
       // Reaktionsfenster (Ambush the Scout), Kategorie 'reveal': das
       // Aufdecken ist bereits die Hand-Interaktion und passiert VOR
@@ -89,10 +93,18 @@ module.exports = {
       // Hydra, Rebelliokai Kind Kitsune, etc.) fire per card.
       let discarded = 0;
       while (true) {
-        const idx = (ops.hand || []).indexOf(declared);
+        // v875: ueber den BASISNAMEN suchen — „Pawn of Kings [B]" und
+        // „[W]" heissen beide „Pawn of Kings", ein erklaerter Name
+        // trifft also beide. Abgeworfen wird die Karte unter ihrem
+        // ECHTEN Namen (`ops.hand[idx]`), sonst fande der Abwurf sie nicht.
+        const idx = (ops.hand || []).findIndex(trifft);
         if (idx < 0) break;
-        const ok = await engine.actionDiscardHandCard(oi, declared, idx, {
+        const ok = await engine.actionDiscardHandCard(oi, ops.hand[idx], idx, {
           source: CARD_NAME,
+          // v860: FREMDE Quelle ausdruecklich nennen — daran haengt der
+          // Erstrunden-Schutz in der Primitive (und das Ambush-Fenster,
+          // das hier bewusst schon oben lief).
+          sourceOwner: pi,
           // Fenster hier NICHT erneut oeffnen — es lief schon beim
           // Aufdecken oben, sonst kaeme es je abgeworfener Kopie neu.
           _skipHandInteractionCheck: true,

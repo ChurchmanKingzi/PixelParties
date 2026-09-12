@@ -33,6 +33,9 @@
 //  `manualGoldCost: true` so the engine skips its
 //  default `cost`-deduction step at the play site.
 // ═══════════════════════════════════════════
+// v875: Namensvergleiche ueber den BASISNAMEN — „[B]"/„[W]" sind
+// Kosmetik (siehe CARD_API, „Namen vergleichen").
+const { baseCardName } = require('./_hooks');
 
 const CARD_NAME = 'Cool Presents';
 
@@ -72,8 +75,8 @@ module.exports = {
       if (i === handIndex) continue;
       const name = ps.hand[i];
       if (!name) continue;
-      if (seen.has(name)) continue;
-      seen.add(name);
+      if (seen.has(baseCardName(name))) continue;
+      seen.add(baseCardName(name));
       out.push({
         id: `hand-${pi}-${i}`,
         type: 'hand',

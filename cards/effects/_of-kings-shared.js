@@ -35,18 +35,18 @@ const ROOK   = 'Rook of Kings';
 const QUEEN  = 'Queen of Kings';
 const KASPEROV = 'Kasperov, the King of Kings';
 
+// v875: Die Regel „[B]/[W] sind Kosmetik" gilt fuer den GANZEN Bestand,
+// nicht nur fuer diesen Archetyp — sie steht deshalb in `_hooks`. Die
+// beiden Namen hier bleiben als Fassade bestehen (die Kings-Skripte
+// lesen sie), zeigen aber auf denselben Code.
+const { baseCardName, cardVariantTag } = require('./_hooks');
 const VARIANT_RE = /\s*\[(B|W)\]$/;
 
 /** „Queen of Kings [W]" → „Queen of Kings". */
-function familyName(name) {
-  return String(name || '').replace(VARIANT_RE, '');
-}
+const familyName = baseCardName;
 
 /** 'B' | 'W' | null */
-function variantOf(name) {
-  const m = VARIANT_RE.exec(String(name || ''));
-  return m ? m[1] : null;
-}
+const variantOf = cardVariantTag;
 
 function isOfKingsName(name) {
   return typeof name === 'string' && name.includes(OF_KINGS);

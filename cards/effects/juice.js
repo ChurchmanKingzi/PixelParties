@@ -164,6 +164,7 @@ module.exports = {
       }
 
       const picked = await engine.promptEffectTarget(pi, targets, {
+        maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
         title: 'Juice',
         description: 'Select a target to cleanse.',
         confirmLabel: '🧃 Squeeze!',

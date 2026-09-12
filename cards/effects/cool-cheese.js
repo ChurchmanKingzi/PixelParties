@@ -18,7 +18,7 @@
 //  owner's turn start. No engine changes.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 const EXTRA_COST = 4; // Double of base cost — pay this much more to avoid the lock
@@ -118,7 +118,7 @@ module.exports = {
     // Step 4: If they didn't pay, lock the Attack name for the turn.
     if (!paidExtra) {
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();
-      ps._creationLockedNames.add(result.cardName);
+      ps._creationLockedNames.add(baseCardName(result.cardName));   // v876
       engine.log('cool_cheese_lock', { player: ps.username, card: result.cardName });
     }
     engine.sync();

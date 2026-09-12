@@ -88,7 +88,7 @@
 //  land even under the game-start grace shield.
 // ═══════════════════════════════════════════
 
-const { hasCardType } = require('./_hooks');
+const { hasCardType, baseCardName } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
 const CARD_NAME = 'Hel, the Bound Specter';
@@ -236,12 +236,12 @@ module.exports = {
       const seen = new Set();
       const eligible = [];
       for (const name of (ps.mainDeck || [])) {
-        if (seen.has(name)) continue;
+        if (seen.has(baseCardName(name))) continue;
         const cd = cardDB[name];
         if (!_isEquipmentArtifact(cd)) continue;
         if ((cd.cost || 0) > MAX_START_COST) continue;
         if (!_helCanUseEquip(engine, pi, helHeroIdx, name)) continue;
-        seen.add(name);
+        seen.add(baseCardName(name));
         eligible.push({ name, source: 'deck', cost: cd.cost || 0 });
       }
 
