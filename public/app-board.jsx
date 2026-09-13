@@ -193,7 +193,7 @@ function applyCrystalCostMods(me, cardName, baseCost) {
   return baseCost * 2;
 }
 
-function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge }) {
+function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosition, style, noTooltip, skins, tooltipCardOverride, inheritedEffects, copiedHeroes, revealTooltipWhenFaceDown, abilities, effectiveLevel, stampBonus, showLevelBadge }) {
   const card = faceDown ? null : CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name, skins) : null;
   // A caller (e.g. Biomancy Token in the puzzle builder) can override what
@@ -222,7 +222,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   const tooltipTarget = (() => {
     if (!tooltipBase) return null;
     const hasLiveAbilities = Array.isArray(abilities) && abilities.length > 0;
-    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && !hasLiveAbilities) return tooltipBase;
+    if (hp == null && maxHp == null && atk == null && effectiveLevel == null && (!inheritedEffects || inheritedEffects.length === 0) && (!copiedHeroes || copiedHeroes.length === 0) && !hasLiveAbilities) return tooltipBase;
     return {
       ...tooltipBase,
       _liveHp:    hp    != null ? hp    : tooltipBase._liveHp,
@@ -236,6 +236,12 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
       _inheritedEffects: (inheritedEffects && inheritedEffects.length > 0)
         ? inheritedEffects
         : tooltipBase._inheritedEffects,
+      // v981 (Als Vorgabe 12.9.): Namen der Helden, deren Effekte dieser
+      // Held gerade mittraegt (Dangerous Knowledge, Initiation Ritual).
+      // Stehen GANZ OBEN im Tooltip, direkt unter dem Namen.
+      _copiedHeroes: (copiedHeroes && copiedHeroes.length > 0)
+        ? copiedHeroes
+        : tooltipBase._copiedHeroes,
       // `_liveAbilities` is the per-Hero `abilityZones[heroIdx]`
       // shape — an array of slot arrays, each slot a stack of names
       // (`['Fighting','Fighting']`, `['Toughness']`, `[]`). The
@@ -740,6 +746,155 @@ function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardNa
 //   `birthdayPresentPick` prompt is open — enables click-to-pick on each
 //   of the three cards. Activator-side renders the same cards with
 //   `pointer-events: none` so they just watch.
+// ── Karte erscheint in der Hand (v995) ─────────────────────────────
+// Kein Flug — die Karte kommt von ausserhalb des Spiels und hat keinen
+// Herkunftsort. Gezeigt wird ein warmes Aufleuchten ueber der Hand mit
+// aufsteigenden Funken, dazu ein kurzer Lichtring.
+// ★ v998 (Als Befund, dritter Anlauf): GAR NICHT MEHR MESSEN.
+// Zwei Anlaeufe ueber `getBoundingClientRect` sassen daneben, weil die
+// Handplaetze schrumpfen und die Karten ueberlappen — die gemessene
+// Box war mal der Slot, mal die Karte, und die Rechnung stimmte nie
+// zuverlaessig. Der Effekt wird jetzt INNERHALB des Handplatzes
+// gezeichnet und per CSS auf die Kartenmitte gesetzt: eine Karte ist
+// 64×90 px mal `--board-scale`, ihre Mitte liegt also fest bei
+// 32/45 px vom linken oberen Eck des Platzes. Kein DOM, keine Messung,
+// kein Versatz.
+function HandMaterializeFxInline() {
+  return (
+    <div className="hand-materialize-fx">
+      <HandFxParticles />
+    </div>
+  );
+}
+
+/** Die Funken/Leuchten selbst — von beiden Varianten benutzt. */
+function HandFxParticles() {
+  const funken = useMemo(() => Array.from({ length: 16 }, () => ({
+    dx: (Math.random() - 0.5) * 150,
+    dy: -30 - Math.random() * 80,
+    groesse: 3 + Math.random() * 5,
+    dur: 620 + Math.random() * 420,
+    delay: Math.random() * 260,
+    farbe: ['#fff3c0', '#ffd77a', '#ffffff', '#ffe6a8'][Math.floor(Math.random() * 4)],
+  })), []);
+  return (
+    <>
+      <div style={{
+        position: 'absolute', left: -90, top: -60, width: 180, height: 120, borderRadius: '50%',
+        background: 'radial-gradient(ellipse, rgba(255,235,160,.75) 0%, rgba(255,200,80,.35) 45%, transparent 78%)',
+        animation: 'handFxGlow 900ms ease-out forwards', opacity: 0,
+      }} />
+      <div style={{
+        position: 'absolute', left: -54, top: -36, width: 108, height: 72, borderRadius: '50%',
+        border: '2px solid rgba(255,225,140,.9)', boxShadow: '0 0 18px rgba(255,205,90,.8)',
+        animation: 'handFxRing 700ms ease-out forwards', opacity: 0,
+      }} />
+      {funken.map((f, i) => (
+        <div key={'hf' + i} style={{
+          position: 'absolute', left: 0, top: 0,
+          width: f.groesse, height: f.groesse, borderRadius: '50%',
+          background: f.farbe, boxShadow: `0 0 7px ${f.farbe}`,
+          '--hfdx': f.dx + 'px', '--hfdy': f.dy + 'px',
+          animation: `handFxSpark ${f.dur}ms ease-out ${f.delay}ms forwards`, opacity: 0,
+        }} />
+      ))}
+      <style>{`
+        @keyframes handFxGlow {
+          0%   { opacity: 0; transform: scale(.5); }
+          25%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.25); }
+        }
+        @keyframes handFxRing {
+          0%   { opacity: 0; transform: scale(.4); }
+          35%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.6); }
+        }
+        @keyframes handFxSpark {
+          0%   { opacity: 0; transform: translate(0, 0) scale(.6); }
+          20%  { opacity: 1; }
+          100% { opacity: 0; transform: translate(var(--hfdx), var(--hfdy)) scale(.4); }
+        }
+      `}</style>
+    </>
+  );
+}
+
+function HandMaterializeFx({ x, y }) {
+  // Gegnerseite: dort gibt es keine Handindizes, also weiter der
+  // gemessene Weg (Mitte des Gegner-Handbereichs reicht — man sieht
+  // seine Karten ohnehin nur als Ruecken).
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10130 }}>
+      <HandFxParticles />
+    </div>
+  );
+}
+
+// ── Deck-Peek: aufgedeckte Karten liegen in der Bildmitte ──────────
+// (v968, „Spice Mortar", Als Vorgabe 12.9.)
+//
+// Die Karten fliegen EINZELN vom Deck in ein Raster in der Bildmitte
+// und BLEIBEN dort liegen — der Mitten-Auftritt des Mills
+// (`mill_center_reveal`) laesst sie weiterfliegen, hier bilden sie
+// stattdessen die Galerie, in der gewaehlt wird.
+//
+//   `state`: { cards: [{ name, selectable, highlight }], src: {x,y},
+//              chosen: null|string, done: bool }
+//   `interactive`: der Wahlberechtigte hat den `deckPeekPick`-Prompt
+//   offen — nur dann sind waehlbare Karten anklickbar.
+function DeckPeekReveal({ state, interactive, onPick, onDone, title }) {
+  const { cards, src, chosen, leaving, takeTo } = state;
+  const PRO_REIHE = 5, BREITE = 92, HOEHE = 129, LUECKE = 10;
+  const reihen = Math.ceil(cards.length / PRO_REIHE);
+  const gesamtHoehe = reihen * HOEHE + (reihen - 1) * LUECKE;
+  const oben = window.innerHeight / 2 - gesamtHoehe / 2 - 24;
+
+  return (
+    <>
+      {cards.map((eintrag, i) => {
+        const reihe = Math.floor(i / PRO_REIHE);
+        const inReihe = Math.min(PRO_REIHE, cards.length - reihe * PRO_REIHE);
+        const spalte = i - reihe * PRO_REIHE;
+        const reihenBreite = inReihe * BREITE + (inReihe - 1) * LUECKE;
+        const tx = window.innerWidth / 2 - reihenBreite / 2 + spalte * (BREITE + LUECKE);
+        const ty = oben + reihe * (HOEHE + LUECKE);
+        const card = CARDS_BY_NAME[eintrag.name];
+        const waehlbar = interactive && eintrag.selectable && !chosen && !leaving;
+        const cls = ['deck-peek-card'];
+        if (waehlbar) cls.push('pickable');
+        if (!eintrag.selectable) cls.push('dimmed');
+        if (chosen === eintrag.name) cls.push('taken');
+        else if (leaving) cls.push('leaving');
+        return (
+          <div key={eintrag.name + '-' + i}
+            className={cls.join(' ')}
+            style={{
+              '--sx': (src?.x ?? window.innerWidth / 2) + 'px',
+              '--sy': (src?.y ?? 0) + 'px',
+              '--tx': tx + 'px', '--ty': ty + 'px',
+              '--delay': (i * 190) + 'ms',
+              ...(chosen === eintrag.name && takeTo
+                ? { '--ex': takeTo.x + 'px', '--ey': takeTo.y + 'px' } : {}),
+            }}
+            onClick={waehlbar ? () => { if (window.playSFX) window.playSFX('ui_click'); onPick(eintrag.name); } : undefined}>
+            {card ? <img src={cardImageUrl(card.name)} alt={card.name} draggable={false} />
+              : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', color: 'var(--text)', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 4 }}>{eintrag.name}</div>}
+          </div>
+        );
+      })}
+      {!chosen && !leaving && (
+        <div className="deck-peek-bar" style={{ top: (oben + gesamtHoehe + 14) + 'px' }}>
+          <div className="deck-peek-title">{title}</div>
+          {interactive && (
+            <button className="btn btn-info" style={{ padding: '6px 18px', fontSize: 12 }}
+              onClick={() => { if (window.playSFX) window.playSFX('ui_click'); onDone(); }}>✓ DONE</button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function BirthdayPresentReveal({ state, interactive, onPick }) {
   const { cards, cardbackUrl, chosen, flights, sourceX, sourceY, castMode } = state;
   return (
@@ -2927,6 +3082,7 @@ const AREA_OVERLAYS = {
   'Wowhalla, the Hall of the Cool': { tier: 'partial',   C: () => <WowhallaGearsOverlay /> },
   'Stinky Stables':               { tier: 'partial',     C: () => <StinkyStablesOverlay /> },
   'The Great Clock Tower "Big Gwen"': { tier: 'partial',  C: () => <BigGwenOverlay /> },
+  'Shared Blood Tanks':           { tier: 'partial',     C: () => <SharedBloodTanksOverlay /> },
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -3083,6 +3239,84 @@ function BoardOfKingsOverlay() {
 // handful of tiny pixel-spiders crawl along independent looped paths.
 // The whole layer sits under the cards (no zIndex set — defaults to
 // auto, lower than the zone-has-card layer's z:10).
+// ── „Shared Blood Tanks" (v951) ───────────────────────────────────
+// Glastanks am unteren Rand, durch Schlaeuche quer ueber das Feld
+// verbunden: was in einem Tank steigt, steht in allen. Tier `partial` —
+// die Mitte bleibt frei, gefaerbt wird nur der Rand.
+const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
+  const tanks = useMemo(() => [12, 34, 56, 78].map((left, i) => ({
+    left,
+    breite: 7 + Math.random() * 2,
+    fuellung: 52 + Math.random() * 26,          // Fuellstand in %
+    dur: 3.4 + Math.random() * 2.2,             // Atmen der Oberflaeche
+    delay: -Math.random() * 3,
+    blasen: Array.from({ length: 4 }, () => ({
+      links: 20 + Math.random() * 60,
+      groesse: 2 + Math.random() * 3,
+      dur: 2.6 + Math.random() * 2.4,
+      delay: -Math.random() * 4,
+    })),
+    id: i,
+  })), []);
+
+  return (
+    <div className="shared-blood-tanks-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+    }}>
+      {/* Verbindungsschlauch quer ueber alle Tanks */}
+      <div style={{
+        position: 'absolute', left: '8%', right: '8%', bottom: '26%', height: 6,
+        borderRadius: 3,
+        background: 'linear-gradient(180deg, rgba(120,20,26,.85) 0%, rgba(190,40,48,.75) 45%, rgba(70,8,12,.9) 100%)',
+        boxShadow: '0 0 10px rgba(150,20,30,.55)',
+      }} />
+      {tanks.map(t => (
+        <div key={'sbt' + t.id} style={{
+          position: 'absolute', left: t.left + '%', bottom: '4%',
+          width: t.breite + '%', height: '24%',
+          borderRadius: '10% 10% 14% 14%',
+          border: '2px solid rgba(200,210,225,.35)',
+          background: 'linear-gradient(180deg, rgba(220,235,255,.10) 0%, rgba(180,200,225,.06) 100%)',
+          boxShadow: 'inset 0 0 14px rgba(200,225,255,.18), 0 0 12px rgba(120,20,30,.35)',
+          overflow: 'hidden',
+        }}>
+          {/* Blut im Tank */}
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: t.fuellung + '%',
+            background: 'linear-gradient(180deg, rgba(190,30,40,.78) 0%, rgba(120,12,20,.88) 60%, rgba(60,4,10,.95) 100%)',
+            animation: `sbtSurface ${t.dur}s ease-in-out ${t.delay}s infinite`,
+          }} />
+          {/* aufsteigende Blasen */}
+          {t.blasen.map((b, k) => (
+            <div key={'b' + k} style={{
+              position: 'absolute', left: b.links + '%', bottom: '4%',
+              width: b.groesse, height: b.groesse, borderRadius: '50%',
+              background: 'rgba(255,190,195,.6)',
+              animation: `sbtBubble ${b.dur}s linear ${b.delay}s infinite`,
+            }} />
+          ))}
+          {/* Stutzen zum Schlauch */}
+          <div style={{
+            position: 'absolute', left: '38%', top: -6, width: '24%', height: 8,
+            background: 'rgba(150,25,32,.8)', borderRadius: 2,
+          }} />
+        </div>
+      ))}
+      <style>{`
+        @keyframes sbtSurface {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-3px); }
+        }
+        @keyframes sbtBubble {
+          0%   { transform: translateY(0) scale(.7); opacity: 0; }
+          15%  { opacity: .85; }
+          100% { transform: translateY(-52px) scale(1.1); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+});
+
 function SpiderHiveOverlay() {
   // Stable per-mount randomization for the spiders so they don't
   // re-randomize every render.
@@ -9634,6 +9868,1410 @@ const ANIM_REGISTRY = {
               0%   { opacity: 0; transform: translate(0, 0) rotate(0deg); }
               20%  { opacity: 1; }
               100% { opacity: 0; transform: translate(var(--skx), var(--sky)) rotate(var(--skr)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Divine Punishment" (v919) ────────────────────────────────────
+  // Als Vorgabe: rote Blitze, die von oben auf den negierten Helden
+  // regnen. Jeder Blitz ist ein gezackter Pfad, der von ausserhalb des
+  // Bildes herunterschlaegt; unten ein kurzer Einschlagblitz.
+  // Klang: `divine_punishment` in ZONE_ANIM_SFX (`elem_lightning`,
+  // tiefer und lauter als der Standardblitz).
+  divine_punishment: (() => {
+    return function DivinePunishmentEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      // Zufall EINMAL einfrieren, sonst zucken die Blitze bei jedem
+      // Re-Render neu (Muster aller Animationen).
+      const blitze = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+        const zacken = [];
+        let px = 0;
+        for (let seg = 0; seg <= 6; seg++) {
+          px += -14 + Math.random() * 28;
+          zacken.push(`${px.toFixed(1)}px ${(seg * 16).toFixed(0)}%`);
+        }
+        return {
+          links: -ww * 0.55 + Math.random() * ww * 1.1,
+          hoehe: 200 + Math.random() * 160,
+          breite: 3 + Math.random() * 4,
+          delay: i * 70 + Math.random() * 60,
+          dur: 260 + Math.random() * 160,
+          zacken,
+        };
+      }), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10120 }}>
+          {blitze.map((b, i) => (
+            <div key={'dp' + i} style={{
+              position: 'absolute',
+              left: b.links, top: -b.hoehe,
+              width: b.breite + 'px', height: b.hoehe + 'px',
+              background: 'linear-gradient(180deg, rgba(255,120,120,0) 0%, rgba(255,70,70,.85) 25%,'
+                + ' rgba(255,235,235,1) 70%, rgba(255,40,40,.9) 100%)',
+              boxShadow: '0 0 10px rgba(255,60,60,.95), 0 0 26px rgba(180,0,0,.7)',
+              clipPath: `polygon(${b.zacken.map(z => z).join(', ')}, ${b.zacken.slice().reverse().map(z => {
+                const [px, py] = z.split(' ');
+                return `calc(${px} + ${b.breite}px) ${py}`;
+              }).join(', ')})`,
+              animation: `divinePunishBolt ${b.dur}ms steps(3, end) ${b.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          {/* Einschlag am Helden */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.6, top: -18,
+            width: ww * 1.2, height: 36, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(255,240,240,.95) 0%, rgba(255,60,60,.6) 45%, transparent 78%)',
+            animation: 'divinePunishFlash 420ms ease-out 180ms forwards',
+            opacity: 0,
+          }} />
+          <style>{`
+            @keyframes divinePunishBolt {
+              0%   { opacity: 0; transform: translateY(-24px) scaleY(.6); }
+              20%  { opacity: 1; transform: translateY(0) scaleY(1); }
+              60%  { opacity: .85; }
+              100% { opacity: 0; transform: translateY(6px) scaleY(1); }
+            }
+            @keyframes divinePunishFlash {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Realmniversal Emperor" (v941) ────────────────────────────────
+  // Als Vorgabe: Galaxie-/Kosmos-Thema, und die getroffenen Helden
+  // sollen VERZERRT werden. Zwei Haelften:
+  //
+  //   1. ueber der Heldenkarte oeffnet sich eine Spiralgalaxie — eine
+  //      gekippte Scheibe aus drei Armen (weiche Ellipsen, gegenlaeufig
+  //      gedreht), ein gleissender Kern, einstuerzende Sterne und ein
+  //      Verzerrungsring, der auf dem Hoehepunkt nach aussen laeuft.
+  //      Die Scheibe ist STATISCH gekippt (`rotateX`), gedreht wird nur
+  //      im Keyframe — Regel: Keyframes bewegen ausschliesslich
+  //      `transform` und `opacity`.
+  //
+  //   2. die Karte selbst wird durch die Verzerrung gezogen: die
+  //      Komponente haengt der naechstgelegenen Heldenzone die Klasse
+  //      `cosmic-warped` an (Muster `whirlwind_spin` /
+  //      `stranglehold_squeeze`). Die Klasse trifft bewusst die KINDER
+  //      der Zone, nicht die Zone selbst — deren Layoutbox berechnen die
+  //      Area Zones mit (Lehre von `.escape-dodging > *`).
+  //
+  // Klang: `cosmic_distortion` in ZONE_ANIM_SFX (dunkles Aufreissen
+  // sofort, Verzerrungsschlag auf dem Hoehepunkt).
+  cosmic_distortion: (() => {
+    return function CosmicDistortionEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 90, 90);
+      const hh = Math.max(h || 120, 120);
+      const scheibe = ww * 2.1;
+
+      // Die Karte selbst verzerren. Kleiner Vorlauf wie bei den anderen
+      // Element-Verformern, damit das Brett nach dem Zustands-Update
+      // steht, bevor die Klasse haengt.
+      useEffect(() => {
+        const t = setTimeout(() => {
+          const zonen = document.querySelectorAll('[data-hero-zone]');
+          let beste = null, abstand = Infinity;
+          zonen.forEach(el => {
+            const r = el.getBoundingClientRect();
+            const d = Math.abs(r.left + r.width / 2 - x) + Math.abs(r.top + r.height / 2 - y);
+            if (d < abstand) { abstand = d; beste = el; }
+          });
+          if (beste && abstand < 90) {
+            beste.classList.add('cosmic-warped');
+            setTimeout(() => beste.classList.remove('cosmic-warped'), 950);
+          }
+        }, 40);
+        return () => clearTimeout(t);
+      }, []);
+
+      // Zufall EINMAL einfrieren (Muster aller Animationen).
+      const sterne = useMemo(() => Array.from({ length: 22 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = ww * (0.55 + Math.random() * 0.75);
+        return {
+          sx: Math.cos(winkel) * weite,
+          sy: Math.sin(winkel) * weite * 0.5,
+          groesse: 2 + Math.random() * 4,
+          farbe: ['#ffffff', '#cbb0ff', '#8fe7ff', '#b98bff'][Math.floor(Math.random() * 4)],
+          delay: Math.random() * 320,
+          dur: 420 + Math.random() * 320,
+        };
+      }), [ww]);
+
+      const arme = [0, 120, 240];
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10140 }}>
+          {/* Gekippte Scheibe — die Kippung steht fest, gedreht wird im Keyframe */}
+          <div style={{
+            position: 'absolute', left: -scheibe / 2, top: -scheibe / 4,
+            width: scheibe, height: scheibe / 2,
+            transform: 'perspective(520px) rotateX(58deg)',
+            transformStyle: 'preserve-3d',
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              animation: 'cosmicDiscSpin 1000ms cubic-bezier(.25,.6,.3,1) forwards',
+              opacity: 0,
+            }}>
+              {arme.map((rot, i) => (
+                <div key={'arm' + i} style={{
+                  position: 'absolute', left: '50%', top: '50%',
+                  width: scheibe * 0.92, height: scheibe * 0.3,
+                  marginLeft: -scheibe * 0.46, marginTop: -scheibe * 0.15,
+                  borderRadius: '50%',
+                  background: i % 2
+                    ? 'radial-gradient(ellipse at 30% 50%, rgba(160,120,255,.75) 0%, rgba(120,70,230,.4) 38%, rgba(90,220,255,.18) 62%, transparent 82%)'
+                    : 'radial-gradient(ellipse at 70% 50%, rgba(200,170,255,.8) 0%, rgba(140,90,255,.42) 36%, rgba(70,190,255,.2) 64%, transparent 84%)',
+                  filter: 'blur(7px)',
+                  transform: `rotate(${rot}deg)`,
+                }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Kern — gleissend, kollabiert am Ende */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.28, top: -ww * 0.28,
+            width: ww * 0.56, height: ww * 0.56, borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffff 0%, #e9dcff 22%, rgba(150,90,255,.85) 48%, rgba(60,20,120,.55) 70%, transparent 84%)',
+            boxShadow: '0 0 28px rgba(170,120,255,.9), 0 0 70px rgba(80,40,180,.7)',
+            animation: 'cosmicCoreFlare 1000ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Einstuerzende Sterne */}
+          {sterne.map((s, i) => (
+            <div key={'cd' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.groesse, height: s.groesse, borderRadius: '50%',
+              marginLeft: -s.groesse / 2, marginTop: -s.groesse / 2,
+              background: s.farbe,
+              boxShadow: `0 0 8px ${s.farbe}`,
+              '--csx': s.sx + 'px', '--csy': s.sy + 'px',
+              animation: `cosmicStarFall ${s.dur}ms ease-in ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Verzerrungsring — laeuft auf dem Hoehepunkt nach aussen */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.5, top: -hh * 0.34,
+            width: ww, height: hh * 0.68, borderRadius: '50%',
+            border: '2px solid rgba(200,170,255,.85)',
+            boxShadow: '0 0 22px rgba(130,80,255,.8), inset 0 0 18px rgba(120,220,255,.55)',
+            animation: 'cosmicWarpRing 620ms ease-out 260ms forwards',
+            opacity: 0,
+          }} />
+
+          <style>{`
+            @keyframes cosmicDiscSpin {
+              0%   { opacity: 0; transform: rotate(0deg) scale(.25); }
+              22%  { opacity: .95; transform: rotate(150deg) scale(1); }
+              55%  { opacity: 1; transform: rotate(330deg) scale(1.12); }
+              100% { opacity: 0; transform: rotate(520deg) scale(.35); }
+            }
+            @keyframes cosmicCoreFlare {
+              0%   { opacity: 0; transform: scale(.2); }
+              18%  { opacity: 1; transform: scale(1); }
+              45%  { opacity: 1; transform: scale(1.25); }
+              70%  { opacity: .85; transform: scale(.8); }
+              100% { opacity: 0; transform: scale(.1); }
+            }
+            @keyframes cosmicStarFall {
+              0%   { opacity: 0; transform: translate(var(--csx), var(--csy)) scale(1); }
+              20%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(0, 0) scale(.2); }
+            }
+            @keyframes cosmicWarpRing {
+              0%   { opacity: 0; transform: scale(.3); }
+              35%  { opacity: 1; transform: scale(1.15); }
+              100% { opacity: 0; transform: scale(2.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Wavilion" (v943) ─────────────────────────────────────────────
+  // Als Vorgabe: ein BUFFENDER Wasserzauber auf dem Helden — Wavilion
+  // ist ein Fisch. Kein Treffer, kein Aufprall: das Wasser steigt von
+  // unten auf, traegt Schaum, Blasen und den Fisch mit sich hoch, und
+  // oben setzt sich der Segen als heller Ring ab.
+  // Klang: `water_blessing` in ZONE_ANIM_SFX (Wasser sofort, Buff-
+  // Funkeln auf dem Hoehepunkt).
+  water_blessing: (() => {
+    return function WaterBlessingEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 90, 90);
+      const hh = Math.max(h || 120, 120);
+
+      // Zufall EINMAL einfrieren (Muster aller Animationen).
+      const blasen = useMemo(() => Array.from({ length: 16 }, () => ({
+        links: (Math.random() - 0.5) * ww * 0.92,
+        drift: (Math.random() - 0.5) * ww * 0.3,
+        groesse: 4 + Math.random() * 9,
+        delay: Math.random() * 520,
+        dur: 620 + Math.random() * 420,
+        deckkraft: 0.45 + Math.random() * 0.45,
+      })), [ww]);
+
+      // Zwei Fische schwimmen im Bogen nach oben — der eine frueher,
+      // der andere gespiegelt.
+      const fische = [
+        { von: -ww * 0.38, nach: ww * 0.22, delay: 90, dur: 820, spiegel: false, groesse: ww * 0.3 },
+        { von: ww * 0.34, nach: -ww * 0.18, delay: 330, dur: 780, spiegel: true, groesse: ww * 0.22 },
+      ];
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10130 }}>
+          {/* Wassersaeule — steigt von unten hinter der Karte auf */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.46, top: -hh * 0.54,
+            width: ww * 0.92, height: hh * 1.08,
+            borderRadius: `${ww * 0.46}px ${ww * 0.46}px ${ww * 0.2}px ${ww * 0.2}px`,
+            background: 'linear-gradient(180deg, rgba(160,240,255,.15) 0%, rgba(70,190,255,.42) 38%,'
+              + ' rgba(30,120,220,.5) 72%, rgba(10,70,160,.55) 100%)',
+            boxShadow: 'inset 0 0 26px rgba(180,250,255,.55), 0 0 30px rgba(60,180,255,.45)',
+            transformOrigin: 'center bottom',
+            animation: 'waterBlessColumn 1100ms cubic-bezier(.2,.8,.35,1) forwards',
+            opacity: 0,
+          }} />
+
+          {/* Drei Schaumkronen, die die Saeule hochlaufen */}
+          {[0, 1, 2].map(i => (
+            <div key={'wc' + i} style={{
+              position: 'absolute', left: -ww * 0.5, top: hh * 0.46,
+              width: ww, height: ww * 0.26, borderRadius: '50%',
+              border: '2px solid rgba(225,252,255,.9)',
+              boxShadow: '0 0 16px rgba(140,235,255,.85)',
+              '--wcrise': (hh * 1.05) + 'px',
+              animation: `waterBlessCrest ${760 + i * 60}ms ease-out ${i * 190}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Blasen */}
+          {blasen.map((b, i) => (
+            <div key={'wb' + i} style={{
+              position: 'absolute', left: b.links, top: hh * 0.46,
+              width: b.groesse, height: b.groesse, borderRadius: '50%',
+              marginLeft: -b.groesse / 2,
+              background: 'radial-gradient(circle at 35% 30%, rgba(255,255,255,.95) 0%, rgba(175,240,255,.6) 45%, rgba(90,200,255,.25) 100%)',
+              boxShadow: '0 0 6px rgba(170,240,255,.8)',
+              '--wbdx': b.drift + 'px', '--wbrise': (-hh * (0.9 + Math.random() * 0.25)) + 'px',
+              '--wbop': b.deckkraft,
+              animation: `waterBlessBubble ${b.dur}ms ease-in-out ${b.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Wavilion selbst — schwimmt im Bogen nach oben */}
+          {fische.map((f, i) => (
+            <div key={'wf' + i} style={{
+              position: 'absolute', left: 0, top: hh * 0.4,
+              fontSize: f.groesse, lineHeight: 1,
+              marginLeft: -f.groesse / 2,
+              filter: 'drop-shadow(0 0 8px rgba(120,225,255,.9))',
+              '--wfvon': f.von + 'px', '--wfnach': f.nach + 'px',
+              '--wfrise': (-hh * 0.95) + 'px',
+              '--wfflip': f.spiegel ? '-1' : '1',
+              animation: `waterBlessFish ${f.dur}ms ease-in-out ${f.delay}ms forwards`,
+              opacity: 0,
+            }}>🐟</div>
+          ))}
+
+          {/* Der Segen setzt sich ab — heller Ring plus Aufleuchten */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.44, top: -hh * 0.3,
+            width: ww * 0.88, height: hh * 0.6, borderRadius: '50%',
+            border: '3px solid rgba(210,250,255,.95)',
+            boxShadow: '0 0 24px rgba(120,225,255,.9), inset 0 0 20px rgba(90,200,255,.6)',
+            animation: 'waterBlessSeal 520ms ease-out 620ms forwards',
+            opacity: 0,
+          }} />
+          <div style={{
+            position: 'absolute', left: -ww * 0.3, top: -ww * 0.3,
+            width: ww * 0.6, height: ww * 0.6, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,.9) 0%, rgba(150,235,255,.55) 45%, transparent 75%)',
+            animation: 'waterBlessGlow 620ms ease-out 600ms forwards',
+            opacity: 0,
+          }} />
+
+          <style>{`
+            @keyframes waterBlessColumn {
+              0%   { opacity: 0; transform: scaleY(.06) scaleX(.7); }
+              18%  { opacity: .95; transform: scaleY(1.04) scaleX(1); }
+              45%  { opacity: .9; transform: scaleY(.98) scaleX(1.02); }
+              75%  { opacity: .55; transform: scaleY(1) scaleX(.98); }
+              100% { opacity: 0; transform: scaleY(.9) scaleX(.9); }
+            }
+            @keyframes waterBlessCrest {
+              0%   { opacity: 0; transform: translateY(0) scale(.55); }
+              22%  { opacity: .95; transform: translateY(calc(var(--wcrise) * -.25)) scale(1); }
+              100% { opacity: 0; transform: translateY(calc(var(--wcrise) * -1)) scale(1.25); }
+            }
+            @keyframes waterBlessBubble {
+              0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+              20%  { opacity: var(--wbop, .7); transform: translate(calc(var(--wbdx) * .4), calc(var(--wbrise) * .3)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--wbdx), var(--wbrise)) scale(.8); }
+            }
+            @keyframes waterBlessFish {
+              0%   { opacity: 0; transform: translate(var(--wfvon), 0) scaleX(var(--wfflip)) rotate(0deg); }
+              20%  { opacity: 1; transform: translate(calc(var(--wfvon) * .45), calc(var(--wfrise) * .3)) scaleX(var(--wfflip)) rotate(-12deg); }
+              65%  { opacity: 1; transform: translate(calc(var(--wfnach) * .7), calc(var(--wfrise) * .72)) scaleX(var(--wfflip)) rotate(10deg); }
+              100% { opacity: 0; transform: translate(var(--wfnach), var(--wfrise)) scaleX(var(--wfflip)) rotate(-6deg); }
+            }
+            @keyframes waterBlessSeal {
+              0%   { opacity: 0; transform: scale(.5); }
+              40%  { opacity: 1; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.35); }
+            }
+            @keyframes waterBlessGlow {
+              0%   { opacity: 0; transform: scale(.4); }
+              35%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Aquanian Orkallion" (v944) ───────────────────────────────────
+  // Als Vorgabe: ein RIESIGER Strudel auf dem GANZEN Spielfeld — beim
+  // Hochkommen der Area wie beim Abreissen. Deshalb `zoneType: 'board'`
+  // (der Kanal fuer Effekte, die an keiner Zone haengen, v580): `w`/`h`
+  // sind hier das Brett, nicht eine Karte, und alles skaliert daran.
+  //
+  // Aufbau wie bei der Galaxie: die Scheibe ist STATISCH gekippt
+  // (`rotateX`), gedreht wird nur im Keyframe — Keyframes bewegen
+  // ausschliesslich `transform` und `opacity`. Fuenf Ringe laufen
+  // gegenlaeufig (gestrichelte Raender lassen die Drehung ueberhaupt
+  // erst sehen), in der Mitte steht der dunkle Trichter, aussen fliegt
+  // Gischt weg.
+  // Klang: `maelstrom` in ZONE_ANIM_SFX.
+  maelstrom: (() => {
+    return function MaelstromEffect({ x, y, w, h }) {
+      const breite = Math.max(w || 600, 280);
+      const hoehe = Math.max(h || 360, 200);
+      // Aussendurchmesser: fuellt das Brett, ohne ueber den Rand zu laufen.
+      const durch = Math.min(breite * 0.98, hoehe * 2.0);
+
+      const ringe = [
+        { anteil: 1.00, dur: 2000, richtung: 1, strich: '3px dashed rgba(190,245,255,.5)' },
+        { anteil: 0.82, dur: 1650, richtung: -1, strich: '4px dashed rgba(150,235,255,.65)' },
+        { anteil: 0.63, dur: 1300, richtung: 1, strich: '5px dashed rgba(210,250,255,.8)' },
+        { anteil: 0.45, dur: 1000, richtung: -1, strich: '4px solid rgba(235,253,255,.85)' },
+        { anteil: 0.28, dur: 780, richtung: 1, strich: '3px dashed rgba(255,255,255,.9)' },
+      ];
+
+      const gischt = useMemo(() => Array.from({ length: 22 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = durch * (0.45 + Math.random() * 0.35);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.4,
+          groesse: 4 + Math.random() * 10,
+          delay: 260 + Math.random() * 700,
+          dur: 520 + Math.random() * 420,
+        };
+      }), [durch]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150 }}>
+          {/* Gekippte Scheibe — Kippung fest, Drehung im Keyframe */}
+          <div style={{
+            position: 'absolute', left: -durch / 2, top: -durch / 4,
+            width: durch, height: durch / 2,
+            transform: 'perspective(900px) rotateX(58deg)',
+          }}>
+            {/* Wasserteller unter den Ringen */}
+            <div style={{
+              position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse at 50% 50%, rgba(4,22,48,.88) 0%, rgba(10,60,120,.7) 34%,'
+                + ' rgba(30,130,200,.45) 62%, rgba(90,200,255,.22) 82%, transparent 96%)',
+              boxShadow: 'inset 0 0 60px rgba(150,240,255,.35)',
+              animation: 'maelstromPool 2000ms ease-out forwards',
+              opacity: 0,
+            }} />
+            {ringe.map((r, i) => (
+              <div key={'mr' + i} style={{
+                position: 'absolute', left: '50%', top: '50%',
+                width: durch * r.anteil, height: durch * r.anteil * 0.5,
+                marginLeft: -durch * r.anteil / 2, marginTop: -durch * r.anteil * 0.25,
+                borderRadius: '50%', border: r.strich,
+                boxShadow: '0 0 18px rgba(120,225,255,.5)',
+                '--mdir': String(r.richtung),
+                animation: `maelstromSpin ${r.dur}ms linear ${i * 60}ms forwards`,
+                opacity: 0,
+              }} />
+            ))}
+            {/* Trichter — saugt in der Mitte nach unten */}
+            <div style={{
+              position: 'absolute', left: '50%', top: '50%',
+              width: durch * 0.2, height: durch * 0.1,
+              marginLeft: -durch * 0.1, marginTop: -durch * 0.05,
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, #000814 0%, rgba(4,26,60,.92) 45%, rgba(20,90,160,.5) 78%, transparent 100%)',
+              boxShadow: '0 0 40px rgba(10,40,90,.9)',
+              animation: 'maelstromFunnel 2000ms ease-in-out forwards',
+              opacity: 0,
+            }} />
+          </div>
+
+          {/* Gischt fliegt ueber die Scheibe hinaus */}
+          {gischt.map((g, i) => (
+            <div key={'mg' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: g.groesse, height: g.groesse, borderRadius: '50%',
+              marginLeft: -g.groesse / 2, marginTop: -g.groesse / 2,
+              background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(180,245,255,.8) 50%, rgba(80,190,255,.3) 100%)',
+              boxShadow: '0 0 8px rgba(170,240,255,.85)',
+              '--mgdx': g.dx + 'px', '--mgdy': g.dy + 'px',
+              animation: `maelstromSpray ${g.dur}ms ease-out ${g.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          <style>{`
+            @keyframes maelstromPool {
+              0%   { opacity: 0; transform: scale(.2); }
+              18%  { opacity: 1; transform: scale(1); }
+              72%  { opacity: 1; transform: scale(1.04); }
+              100% { opacity: 0; transform: scale(.35); }
+            }
+            @keyframes maelstromSpin {
+              0%   { opacity: 0; transform: rotate(0deg) scale(.25); }
+              15%  { opacity: 1; transform: rotate(calc(180deg * var(--mdir))) scale(1); }
+              70%  { opacity: 1; transform: rotate(calc(900deg * var(--mdir))) scale(.92); }
+              100% { opacity: 0; transform: rotate(calc(1400deg * var(--mdir))) scale(.2); }
+            }
+            @keyframes maelstromFunnel {
+              0%   { opacity: 0; transform: scale(.3); }
+              22%  { opacity: 1; transform: scale(1.6); }
+              60%  { opacity: 1; transform: scale(2.1); }
+              100% { opacity: 0; transform: scale(.4); }
+            }
+            @keyframes maelstromSpray {
+              0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+              25%  { opacity: 1; transform: translate(calc(var(--mgdx) * .45), calc(var(--mgdy) * .45)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--mgdx), var(--mgdy)) scale(.3); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Skullmael's Greatsword" (v954) ───────────────────────────────
+  // Als Vorgabe: schwarze Magie und Nekromantie — die Kreatur wird
+  // UNTOT wiederbelebt. Bewusst ein eigener Typ statt des vorhandenen
+  // `necromancy_summon`: das ist ein Schaedel-Ausbruch an der
+  // Ability-Zone, hier steigt etwas aus dem Boden. Eigener Typ heisst
+  // ausserdem eigener Klang (ZONE_ANIM_SFX haengt am Typ) — dieselbe
+  // Trennung wie `trex_chomp` vs `dino_bite`.
+  //
+  // Ablauf: ein Runenkreis oeffnet sich flach auf der Zone, nekrotische
+  // Flammen schlagen hoch, Knochen und ein Schaedel steigen auf, zum
+  // Schluss ein dunkler Blitz — genau dann kommt die Karte.
+  undead_revival: (() => {
+    return function UndeadRevivalEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 90, 90);
+      const hh = Math.max(h || 120, 120);
+
+      const flammen = useMemo(() => Array.from({ length: 14 }, () => ({
+        links: (Math.random() - 0.5) * ww * 0.95,
+        groesse: 8 + Math.random() * 16,
+        hoehe: hh * (0.5 + Math.random() * 0.5),
+        delay: 120 + Math.random() * 420,
+        dur: 620 + Math.random() * 420,
+        farbe: ['#7bff9e', '#a855ff', '#5de0c0', '#c77dff'][Math.floor(Math.random() * 4)],
+      })), [ww, hh]);
+
+      const knochen = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+        links: -ww * 0.36 + (i / 4) * ww * 0.72 + (Math.random() - 0.5) * 10,
+        groesse: ww * (0.13 + Math.random() * 0.08),
+        delay: 180 + i * 90 + Math.random() * 80,
+        dur: 700 + Math.random() * 300,
+        dreh: -35 + Math.random() * 70,
+        glyph: Math.random() < 0.5 ? '🦴' : '☠️',
+      })), [ww]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10135 }}>
+          {/* Runenkreis, flach auf der Zone */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.55, top: hh * 0.16,
+            width: ww * 1.1, height: ww * 0.44,
+            transform: 'perspective(420px) rotateX(62deg)',
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0, borderRadius: '50%',
+              border: '3px dashed rgba(150,90,255,.85)',
+              boxShadow: '0 0 22px rgba(120,40,220,.8), inset 0 0 26px rgba(90,255,160,.35)',
+              animation: 'undeadCircle 1400ms linear forwards',
+              opacity: 0,
+            }} />
+            <div style={{
+              position: 'absolute', left: '18%', top: '18%', width: '64%', height: '64%',
+              borderRadius: '50%', border: '2px solid rgba(110,255,180,.6)',
+              animation: 'undeadCircleInner 1400ms linear forwards',
+              opacity: 0,
+            }} />
+          </div>
+
+          {/* Nekrotische Flammen */}
+          {flammen.map((f, i) => (
+            <div key={'uf' + i} style={{
+              position: 'absolute', left: f.links, top: hh * 0.2,
+              width: f.groesse, height: f.groesse * 2.1,
+              marginLeft: -f.groesse / 2,
+              borderRadius: '50% 50% 45% 45%',
+              background: `radial-gradient(ellipse at 50% 80%, ${f.farbe} 0%, rgba(80,20,140,.55) 55%, transparent 85%)`,
+              filter: 'blur(1px)',
+              '--ufrise': (-f.hoehe) + 'px',
+              animation: `undeadFlame ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Knochen und Schaedel steigen auf */}
+          {knochen.map((k, i) => (
+            <div key={'uk' + i} style={{
+              position: 'absolute', left: k.links, top: hh * 0.22,
+              fontSize: k.groesse, lineHeight: 1,
+              marginLeft: -k.groesse / 2,
+              filter: 'drop-shadow(0 0 6px rgba(150,90,255,.9))',
+              '--ukrise': (-hh * 0.7) + 'px', '--ukdreh': k.dreh + 'deg',
+              animation: `undeadBone ${k.dur}ms ease-out ${k.delay}ms forwards`,
+              opacity: 0,
+            }}>{k.glyph}</div>
+          ))}
+
+          {/* Dunkler Blitz zum Schluss — hier kommt die Karte */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.42, top: -hh * 0.22,
+            width: ww * 0.84, height: hh * 0.52, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(230,210,255,.9) 0%, rgba(140,60,240,.6) 40%, rgba(40,0,80,.35) 70%, transparent 88%)',
+            boxShadow: '0 0 34px rgba(130,50,230,.85)',
+            animation: 'undeadBurst 520ms ease-out 760ms forwards',
+            opacity: 0,
+          }} />
+
+          <style>{`
+            @keyframes undeadCircle {
+              0%   { opacity: 0; transform: rotate(0deg) scale(.25); }
+              18%  { opacity: 1; transform: rotate(90deg) scale(1); }
+              70%  { opacity: .95; transform: rotate(330deg) scale(1.04); }
+              100% { opacity: 0; transform: rotate(460deg) scale(.9); }
+            }
+            @keyframes undeadCircleInner {
+              0%   { opacity: 0; transform: rotate(0deg) scale(.4); }
+              22%  { opacity: .9; transform: rotate(-120deg) scale(1); }
+              100% { opacity: 0; transform: rotate(-520deg) scale(.8); }
+            }
+            @keyframes undeadFlame {
+              0%   { opacity: 0; transform: translateY(0) scaleY(.4); }
+              25%  { opacity: 1; transform: translateY(calc(var(--ufrise) * .35)) scaleY(1); }
+              100% { opacity: 0; transform: translateY(var(--ufrise)) scaleY(1.25); }
+            }
+            @keyframes undeadBone {
+              0%   { opacity: 0; transform: translateY(0) rotate(0deg) scale(.5); }
+              25%  { opacity: 1; transform: translateY(calc(var(--ukrise) * .4)) rotate(calc(var(--ukdreh) * .5)) scale(1); }
+              100% { opacity: 0; transform: translateY(var(--ukrise)) rotate(var(--ukdreh)) scale(.85); }
+            }
+            @keyframes undeadBurst {
+              0%   { opacity: 0; transform: scale(.4); }
+              35%  { opacity: 1; transform: scale(1.08); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Golden Exploding Skull" (v955) ───────────────────────────────
+  // Als Vorgabe: eine GOLDENE Explosion. Bewusst ein eigener Typ neben
+  // der rot-orangen `explosion` — der Klang haengt am Typ, und hier
+  // gehoert der Muenzregen dazu.
+  golden_explosion: (() => {
+    return function GoldenExplosionEffect({ x, y, w }) {
+      const ww = Math.max(w || 80, 80);
+
+      const funken = useMemo(() => Array.from({ length: 24 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = ww * (0.5 + Math.random() * 0.8);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.8,
+          groesse: 3 + Math.random() * 7,
+          farbe: ['#fff6c4', '#ffd447', '#ffae1a', '#fff', '#e8a000'][Math.floor(Math.random() * 5)],
+          delay: Math.random() * 180,
+          dur: 420 + Math.random() * 380,
+        };
+      }), [ww]);
+
+      // Muenzen fliegen auf und fallen wieder — der Ertrag der Karte.
+      const muenzen = useMemo(() => Array.from({ length: 7 }, () => ({
+        dx: (Math.random() - 0.5) * ww * 1.3,
+        hoch: -(ww * (0.45 + Math.random() * 0.5)),
+        groesse: 12 + Math.random() * 12,
+        dreh: -180 + Math.random() * 360,
+        delay: 120 + Math.random() * 260,
+        dur: 700 + Math.random() * 380,
+      })), [ww]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10145 }}>
+          {/* Weissgoldener Blitz */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.55, top: -ww * 0.55,
+            width: ww * 1.1, height: ww * 1.1, borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffff 0%, #fff2b0 30%, rgba(255,190,40,.6) 55%, transparent 78%)',
+            animation: 'goldBoomFlash 420ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Feuerball */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.38, top: -ww * 0.38,
+            width: ww * 0.76, height: ww * 0.76, borderRadius: '50%',
+            background: 'radial-gradient(circle at 42% 38%, #fffbe0 0%, #ffd447 34%, #ffa514 62%, rgba(150,80,0,.55) 85%, transparent 100%)',
+            boxShadow: '0 0 30px rgba(255,190,60,.9), 0 0 70px rgba(255,150,0,.55)',
+            animation: 'goldBoomCore 720ms ease-out forwards',
+            opacity: 0,
+          }} />
+          {/* Druckwelle */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.5, top: -ww * 0.28,
+            width: ww, height: ww * 0.56, borderRadius: '50%',
+            border: '3px solid rgba(255,225,130,.9)',
+            boxShadow: '0 0 20px rgba(255,200,60,.8)',
+            animation: 'goldBoomRing 620ms ease-out 80ms forwards',
+            opacity: 0,
+          }} />
+          {/* Funken */}
+          {funken.map((f, i) => (
+            <div key={'gf' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: f.groesse, height: f.groesse, borderRadius: '50%',
+              marginLeft: -f.groesse / 2, marginTop: -f.groesse / 2,
+              background: f.farbe,
+              boxShadow: `0 0 8px ${f.farbe}`,
+              '--gfdx': f.dx + 'px', '--gfdy': f.dy + 'px',
+              animation: `goldBoomSpark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          {/* Muenzregen */}
+          {muenzen.map((m, i) => (
+            <div key={'gm' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              fontSize: m.groesse, lineHeight: 1,
+              marginLeft: -m.groesse / 2, marginTop: -m.groesse / 2,
+              filter: 'drop-shadow(0 0 5px rgba(255,200,60,.9))',
+              '--gmdx': m.dx + 'px', '--gmup': m.hoch + 'px', '--gmrot': m.dreh + 'deg',
+              animation: `goldBoomCoin ${m.dur}ms ease-out ${m.delay}ms forwards`,
+              opacity: 0,
+            }}>🪙</div>
+          ))}
+
+          <style>{`
+            @keyframes goldBoomFlash {
+              0%   { opacity: 0; transform: scale(.2); }
+              20%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.4); }
+            }
+            @keyframes goldBoomCore {
+              0%   { opacity: 0; transform: scale(.15); }
+              22%  { opacity: 1; transform: scale(1.05); }
+              60%  { opacity: .9; transform: scale(.92); }
+              100% { opacity: 0; transform: scale(.35); }
+            }
+            @keyframes goldBoomRing {
+              0%   { opacity: 0; transform: scale(.25); }
+              35%  { opacity: 1; transform: scale(1.1); }
+              100% { opacity: 0; transform: scale(2.2); }
+            }
+            @keyframes goldBoomSpark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
+              18%  { opacity: 1; transform: translate(calc(var(--gfdx) * .35), calc(var(--gfdy) * .35)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--gfdx), var(--gfdy)) scale(.3); }
+            }
+            @keyframes goldBoomCoin {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(.5); }
+              20%  { opacity: 1; transform: translate(calc(var(--gmdx) * .45), var(--gmup)) rotate(calc(var(--gmrot) * .6)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--gmdx), calc(var(--gmup) * -.35)) rotate(var(--gmrot)) scale(.9); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Phoenix Bombardment" (v960) ──────────────────────────────────
+  // Als Vorgabe: ein SCHWARM Phoenixe mit Feuer-Particles hinter ihnen,
+  // der ins Ziel kracht — je Vogel eine eigene Explosion.
+  //
+  // Jeder Phoenix fliegt aus einer eigenen Richtung von ausserhalb auf
+  // das Ziel zu (der Container sitzt auf dem Ziel, also fliegt alles
+  // auf 0,0), zieht einen Schweif aus Funken hinter sich her und
+  // detoniert bei der Ankunft. Die Einschlaege sind gestaffelt, damit
+  // es nach Bombardement klingt und nicht nach einem Schlag.
+  phoenix_bombardment: (() => {
+    return function PhoenixBombardmentEffect({ x, y, w }) {
+      const ww = Math.max(w || 90, 90);
+      // v974 (Als Vorgabe): deutlich mehr Voegel — aus sieben werden 22.
+      // Die Ankuenfte werden dafuer nicht laenger gestaffelt, sondern
+      // DICHTER: sie verteilen sich weiter ueber dasselbe Fenster
+      // (~200-1150 ms), sonst zoege sich das Bombardement endlos. Der
+      // Schweif je Vogel ist von fuenf auf drei Funken gekuerzt, damit
+      // die Zahl der Elemente im Rahmen bleibt (22 x 5 statt 7 x 7).
+      const ANZAHL = 22;
+
+      const voegel = useMemo(() => Array.from({ length: ANZAHL }, (_, i) => {
+        // Anflug aus dem oberen Halbkreis, breit gefaechert — zwei
+        // Durchgaenge ueber den Bogen, damit benachbarte Nummern nicht
+        // nebeneinander einschlagen.
+        const t = (i % 2 === 0 ? i : ANZAHL - i) / ANZAHL;
+        const winkel = -Math.PI + t * Math.PI + (Math.random() - 0.5) * 0.6;
+        const weite = 440 + Math.random() * 380;
+        const ankunft = 200 + (i / (ANZAHL - 1)) * 900 + Math.random() * 120;
+        return {
+          vonX: Math.cos(winkel) * weite,
+          vonY: Math.sin(winkel) * weite * 0.75,
+          groesse: ww * (0.2 + Math.random() * 0.16),
+          flug: 400 + Math.random() * 160,
+          ankunft,
+          dreh: (winkel * 180) / Math.PI,
+          // Funken im Schweif: dieselbe Bahn, nur spaeter gestartet und
+          // kuerzer — sie bleiben damit hinter dem Vogel zurueck.
+          funken: Array.from({ length: 3 }, (_, k) => ({
+            verzug: (k + 1) * 60,
+            groesse: 3 + Math.random() * 4,
+            farbe: ['#fff1b8', '#ffc24a', '#ff7a18', '#ff3b0f'][k % 4],
+          })),
+        };
+      }), [ww]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10155 }}>
+          {voegel.map((v, i) => (
+            <React.Fragment key={'pb' + i}>
+              {/* Feuerschweif — dieselbe Bahn, versetzt gestartet */}
+              {v.funken.map((f, k) => (
+                <div key={'pf' + i + '_' + k} style={{
+                  position: 'absolute', left: 0, top: 0,
+                  width: f.groesse, height: f.groesse, borderRadius: '50%',
+                  marginLeft: -f.groesse / 2, marginTop: -f.groesse / 2,
+                  background: f.farbe,
+                  boxShadow: `0 0 8px ${f.farbe}`,
+                  '--pbx': v.vonX + 'px', '--pby': v.vonY + 'px',
+                  animation: `phoenixDive ${v.flug}ms linear ${v.ankunft - v.flug + f.verzug}ms forwards`,
+                  opacity: 0,
+                }} />
+              ))}
+              {/* Der Phoenix selbst: Koerper mit Schwingen, in Flugrichtung gedreht */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0,
+                width: v.groesse * 1.8, height: v.groesse,
+                marginLeft: -v.groesse * 0.9, marginTop: -v.groesse / 2,
+                '--pbx': v.vonX + 'px', '--pby': v.vonY + 'px',
+                animation: `phoenixDive ${v.flug}ms linear ${v.ankunft - v.flug}ms forwards`,
+                opacity: 0,
+              }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  transform: `rotate(${v.dreh}deg)`,
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(90deg, rgba(255,60,10,.15) 0%, #ff7a18 38%, #ffd447 72%, #fffbe0 100%)',
+                    clipPath: 'polygon(100% 50%, 55% 32%, 62% 0%, 34% 30%, 0% 22%, 22% 50%, 0% 78%, 34% 70%, 62% 100%, 55% 68%)',
+                    filter: 'drop-shadow(0 0 8px rgba(255,150,30,.95))',
+                    animation: 'phoenixFlap 220ms ease-in-out infinite',
+                  }} />
+                </div>
+              </div>
+              {/* Einschlag dieses Vogels */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0,
+                width: ww * 0.62, height: ww * 0.62, borderRadius: '50%',
+                marginLeft: -ww * 0.31, marginTop: -ww * 0.31,
+                background: 'radial-gradient(circle, #fffbe0 0%, #ffd447 26%, #ff7a18 52%, rgba(180,40,0,.45) 74%, transparent 92%)',
+                boxShadow: '0 0 26px rgba(255,140,30,.9)',
+                animation: `phoenixBoom 460ms ease-out ${v.ankunft}ms forwards`,
+                opacity: 0,
+              }} />
+            </React.Fragment>
+          ))}
+
+          <style>{`
+            @keyframes phoenixDive {
+              0%   { opacity: 0; transform: translate(var(--pbx), var(--pby)) scale(.65); }
+              12%  { opacity: 1; }
+              88%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(0, 0) scale(1.05); }
+            }
+            @keyframes phoenixFlap {
+              0%, 100% { transform: scaleY(1); }
+              50%      { transform: scaleY(.55); }
+            }
+            @keyframes phoenixBoom {
+              0%   { opacity: 0; transform: scale(.2); }
+              28%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.55); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Wire Hatchling" (v963) ───────────────────────────────────────
+  // Als Vorgabe: etliche kleine Blitze, die das Ziel von ALLEN SEITEN
+  // treffen und es paralysieren.
+  //
+  // 14 Blitze schlagen aus einem Ring rundum ein, jeder als gezackter
+  // Pfad (zwei gespiegelte Zickzack-Kanten via clipPath), in
+  // Flugrichtung gedreht und nur kurz sichtbar — das Flackern macht
+  // das Gewitter. Darueber ein Starrkrampf: ein elektrischer Kaefig,
+  // der zweimal hell aufblitzt und dann stehenbleibt.
+  paralyzing_bolts: (() => {
+    return function ParalyzingBoltsEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 90, 90);
+      const hh = Math.max(h || 110, 110);
+      const radius = Math.max(ww, hh) * 0.95;
+
+      const blitze = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+        const winkel = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+        const laenge = radius * (0.75 + Math.random() * 0.45);
+        return {
+          // Startpunkt auf dem Ring, Blitz zeigt nach innen auf 0,0
+          x: Math.cos(winkel) * laenge,
+          y: Math.sin(winkel) * laenge * 0.8,
+          laenge,
+          dicke: 3 + Math.random() * 4,
+          dreh: (winkel * 180) / Math.PI + 180,
+          delay: Math.random() * 620,
+          dur: 130 + Math.random() * 90,
+          farbe: ['#eaf6ff', '#9fd8ff', '#5eb8ff', '#fff'][Math.floor(Math.random() * 4)],
+        };
+      }), [radius]);
+
+      const funken = useMemo(() => Array.from({ length: 12 }, () => ({
+        links: (Math.random() - 0.5) * ww * 0.9,
+        oben: (Math.random() - 0.5) * hh * 0.9,
+        groesse: 2 + Math.random() * 4,
+        delay: 120 + Math.random() * 700,
+        dur: 260 + Math.random() * 260,
+      })), [ww, hh]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10160 }}>
+          {/* Einschlagende Blitze */}
+          {blitze.map((b, i) => (
+            <div key={'pz' + i} style={{
+              position: 'absolute', left: b.x, top: b.y,
+              width: b.laenge, height: b.dicke * 3,
+              marginTop: -b.dicke * 1.5,
+              transformOrigin: '0 50%',
+              transform: `rotate(${b.dreh}deg)`,
+              opacity: 0,
+              animation: `paraBolt ${b.dur}ms steps(2, end) ${b.delay}ms 2 forwards`,
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: `linear-gradient(90deg, ${b.farbe} 0%, rgba(140,220,255,.85) 55%, rgba(90,180,255,0) 100%)`,
+                clipPath: 'polygon(0% 45%, 18% 15%, 30% 48%, 48% 8%, 60% 50%, 78% 20%, 100% 46%, 100% 54%, 78% 80%, 60% 50%, 48% 92%, 30% 52%, 18% 85%, 0% 55%)',
+                filter: `drop-shadow(0 0 6px ${b.farbe})`,
+              }} />
+            </div>
+          ))}
+
+          {/* Starrkrampf: elektrischer Kaefig um das Ziel */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.46, top: -hh * 0.46,
+            width: ww * 0.92, height: hh * 0.92,
+            border: '2px solid rgba(160,225,255,.9)',
+            borderRadius: 6,
+            boxShadow: '0 0 18px rgba(110,190,255,.85), inset 0 0 22px rgba(150,220,255,.55)',
+            animation: 'paraCage 1200ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Knisternde Funken auf dem Ziel */}
+          {funken.map((f, i) => (
+            <div key={'pf' + i} style={{
+              position: 'absolute', left: f.links, top: f.oben,
+              width: f.groesse, height: f.groesse, borderRadius: '50%',
+              background: '#eaf8ff',
+              boxShadow: '0 0 7px #7cc8ff',
+              animation: `paraSpark ${f.dur}ms steps(2, end) ${f.delay}ms 2 forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          <style>{`
+            /* NUR opacity: die Drehung steht inline am Element. Ein
+               transform im Keyframe wuerde sie ueberschreiben und alle
+               Blitze waagerecht schnappen lassen. */
+            @keyframes paraBolt {
+              0%   { opacity: 0; }
+              25%  { opacity: 1; }
+              55%  { opacity: .35; }
+              75%  { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            @keyframes paraCage {
+              0%   { opacity: 0; transform: scale(1.25); }
+              18%  { opacity: 1; transform: scale(1); }
+              34%  { opacity: .35; }
+              48%  { opacity: 1; }
+              78%  { opacity: .75; transform: scale(1.02); }
+              100% { opacity: 0; transform: scale(1); }
+            }
+            @keyframes paraSpark {
+              0%   { opacity: 0; transform: scale(.4); }
+              40%  { opacity: 1; transform: scale(1.2); }
+              100% { opacity: 0; transform: scale(.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Moonlight Butterfly" (v966) ──────────────────────────────────
+  // Als Vorgabe: blaeuliches MONDLICHT, das von oben auf das Ziel
+  // faellt. Ein breiter, nach unten leicht aufgefaecherter Lichtschacht
+  // faehrt herab, darin schweben Staubfunken nach oben, unten sammelt
+  // sich ein Lichtteich — dazu eine kalte Mondscheibe ganz oben.
+  moonlight_beam: (() => {
+    return function MoonlightBeamEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 90, 90);
+      const hh = Math.max(h || 120, 120);
+      const hoehe = hh * 2.3;                          // von weit oberhalb
+
+      const staub = useMemo(() => Array.from({ length: 16 }, () => ({
+        links: (Math.random() - 0.5) * ww * 0.82,
+        start: Math.random() * hoehe * 0.75,
+        groesse: 2 + Math.random() * 4,
+        dur: 1500 + Math.random() * 1100,
+        delay: -Math.random() * 1600,
+        weite: (Math.random() - 0.5) * 14,
+      })), [ww, hoehe]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150 }}>
+          {/* Mondscheibe ueber dem Ziel */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.16, top: -hoehe - ww * 0.2,
+            width: ww * 0.32, height: ww * 0.32, borderRadius: '50%',
+            background: 'radial-gradient(circle at 38% 34%, #f2f8ff 0%, #cfe4ff 45%, #8fb6e8 78%, rgba(120,160,220,0) 100%)',
+            boxShadow: '0 0 26px rgba(170,205,255,.9)',
+            animation: 'moonDisc 1400ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Der Lichtschacht — oben schmal, unten breit */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.52, top: -hoehe,
+            width: ww * 1.04, height: hoehe + hh * 0.35,
+            background: 'linear-gradient(180deg, rgba(190,220,255,.05) 0%, rgba(165,205,255,.30) 35%, rgba(150,195,255,.42) 78%, rgba(140,190,255,.12) 100%)',
+            clipPath: 'polygon(40% 0%, 60% 0%, 96% 100%, 4% 100%)',
+            filter: 'blur(1px)',
+            transformOrigin: '50% 0%',
+            animation: 'moonShaft 1400ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Heller Kern im Schacht */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.2, top: -hoehe,
+            width: ww * 0.4, height: hoehe + hh * 0.3,
+            background: 'linear-gradient(180deg, rgba(235,245,255,.1) 0%, rgba(225,240,255,.45) 45%, rgba(210,235,255,.25) 100%)',
+            clipPath: 'polygon(42% 0%, 58% 0%, 88% 100%, 12% 100%)',
+            transformOrigin: '50% 0%',
+            animation: 'moonShaft 1400ms ease-out 120ms forwards',
+            opacity: 0,
+          }} />
+
+          {/* Staub, der im Licht nach oben treibt */}
+          {staub.map((s, i) => (
+            <div key={'mb' + i} style={{
+              position: 'absolute', left: s.links, top: -s.start,
+              width: s.groesse, height: s.groesse, borderRadius: '50%',
+              background: 'rgba(240,250,255,.95)',
+              boxShadow: '0 0 6px rgba(180,215,255,.9)',
+              '--mbx': s.weite + 'px',
+              animation: `moonDust ${s.dur}ms linear ${s.delay}ms infinite`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Lichtteich auf dem Ziel */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.48, top: hh * 0.14,
+            width: ww * 0.96, height: ww * 0.34, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(225,240,255,.75) 0%, rgba(160,200,255,.4) 45%, transparent 78%)',
+            animation: 'moonPool 1400ms ease-out 160ms forwards',
+            opacity: 0,
+          }} />
+
+          <style>{`
+            @keyframes moonDisc {
+              0%   { opacity: 0; transform: scale(.6); }
+              22%  { opacity: 1; transform: scale(1); }
+              76%  { opacity: .95; }
+              100% { opacity: 0; transform: scale(.9); }
+            }
+            @keyframes moonShaft {
+              0%   { opacity: 0; transform: scaleY(.12); }
+              26%  { opacity: 1; transform: scaleY(1); }
+              72%  { opacity: .9; transform: scaleY(1); }
+              100% { opacity: 0; transform: scaleY(1); }
+            }
+            @keyframes moonDust {
+              0%   { opacity: 0; transform: translate(0, 0); }
+              18%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--mbx), -70px); }
+            }
+            @keyframes moonPool {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1); }
+              80%  { opacity: .85; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Boulder in a Bottle" (v973) ──────────────────────────────────
+  // Als Vorgabe: Felsen, die auf die FREIEN Support Zones des Ziel-
+  // Helden herabfallen und sie blockieren. Ein Aufruf je Zone (die
+  // Karte staffelt sie), darum hier bewusst EIN Fels und nicht drei.
+  //
+  // Ablauf: der Brocken faellt von oben mit leichter Drehung in die
+  // Zone, schlaegt auf (kurzer Stauchimpuls), wirft eine Staubwelle und
+  // Geroell nach aussen und bleibt liegen, bis die Karte da ist.
+  falling_boulder: (() => {
+    return function FallingBoulderEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const groesse = ww * 0.74;
+
+      const geroell = useMemo(() => Array.from({ length: 9 }, () => {
+        const winkel = -Math.PI * (0.1 + Math.random() * 0.8);   // nach oben/aussen
+        const weite = ww * (0.35 + Math.random() * 0.5);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.5,
+          groesse: 3 + Math.random() * 6,
+          dreh: -180 + Math.random() * 360,
+          dur: 420 + Math.random() * 260,
+        };
+      }), [ww]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10140 }}>
+          {/* Schatten, der mit dem Fels groesser wird */}
+          <div style={{
+            position: 'absolute', left: -groesse * 0.42, top: hh * 0.16,
+            width: groesse * 0.84, height: groesse * 0.3, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(0,0,0,.6) 0%, rgba(0,0,0,.25) 55%, transparent 80%)',
+            animation: 'boulderShadow 540ms cubic-bezier(.55,0,.85,.4) forwards',
+            opacity: 0,
+          }} />
+
+          {/* Der Brocken */}
+          <div style={{
+            position: 'absolute', left: -groesse / 2, top: -groesse / 2,
+            width: groesse, height: groesse,
+            animation: 'boulderDrop 540ms cubic-bezier(.55,0,.85,.4) forwards',
+            opacity: 0,
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(circle at 34% 28%, #9c9a95 0%, #6f6c66 42%, #4a4844 72%, #302e2b 100%)',
+              clipPath: 'polygon(30% 4%, 64% 0%, 88% 22%, 100% 54%, 82% 84%, 52% 100%, 20% 92%, 2% 62%, 6% 26%)',
+              boxShadow: 'inset -6px -8px 12px rgba(0,0,0,.55), inset 6px 6px 10px rgba(255,255,255,.14)',
+            }} />
+          </div>
+
+          {/* Staubwelle beim Aufschlag */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.5, top: hh * 0.06,
+            width: ww, height: ww * 0.42, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(190,180,165,.85) 0%, rgba(150,140,125,.45) 45%, transparent 78%)',
+            animation: 'boulderDust 620ms ease-out 470ms forwards',
+            opacity: 0,
+          }} />
+
+          {/* Geroell */}
+          {geroell.map((g, i) => (
+            <div key={'fb' + i} style={{
+              position: 'absolute', left: 0, top: hh * 0.1,
+              width: g.groesse, height: g.groesse, borderRadius: 2,
+              marginLeft: -g.groesse / 2,
+              background: 'linear-gradient(135deg, #8c8982 0%, #52504b 100%)',
+              '--fbdx': g.dx + 'px', '--fbdy': g.dy + 'px', '--fbrot': g.dreh + 'deg',
+              animation: `boulderDebris ${g.dur}ms ease-out 470ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          <style>{`
+            @keyframes boulderDrop {
+              0%   { opacity: 0; transform: translateY(-320px) rotate(-22deg) scale(.92); }
+              12%  { opacity: 1; }
+              82%  { opacity: 1; transform: translateY(0) rotate(6deg) scale(1); }
+              90%  { transform: translateY(0) rotate(6deg) scale(1.06, .9); }
+              100% { opacity: 1; transform: translateY(0) rotate(4deg) scale(1); }
+            }
+            @keyframes boulderShadow {
+              0%   { opacity: 0; transform: scale(.25); }
+              70%  { opacity: .5; transform: scale(.7); }
+              100% { opacity: .9; transform: scale(1); }
+            }
+            @keyframes boulderDust {
+              0%   { opacity: 0; transform: scale(.3); }
+              25%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.6); }
+            }
+            @keyframes boulderDebris {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+              15%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--fbdx), var(--fbdy)) rotate(var(--fbrot)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Garius, the Great Reformer" (v990) ───────────────────────────
+  // Als Vorgabe: eine GROSSE Befoerderung auf der Support Zone, in der
+  // der Tausch passiert ist — die neue Kreatur wird sichtbar nach oben
+  // gereicht.
+  //
+  // Aufbau von unten nach oben: ein Lichtsockel unter der Zone, ein
+  // Saeulenschacht, der nach oben zieht, 26 Funken, die IM Schacht
+  // aufsteigen (nicht herunterfallen — es geht hinauf), drei
+  // Aufstiegsringe, die nacheinander durchlaufen, und ein goldener
+  // Kranz, der sich am Ende schliesst.
+  promotion_burst: (() => {
+    return function PromotionBurstEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+
+      const funken = useMemo(() => Array.from({ length: 26 }, () => ({
+        links: (Math.random() - 0.5) * ww * 0.95,
+        start: hh * (0.1 + Math.random() * 0.35),
+        groesse: 3 + Math.random() * 5,
+        hoch: hh * (0.9 + Math.random() * 0.9),
+        dur: 620 + Math.random() * 520,
+        delay: Math.random() * 520,
+        farbe: ['#fff6c4', '#ffd447', '#ffffff', '#ffe9a0'][Math.floor(Math.random() * 4)],
+      })), [ww, hh]);
+
+      const ringe = useMemo(() => [0, 1, 2].map(i => ({
+        delay: 120 + i * 190,
+        dur: 620,
+      })), []);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150 }}>
+          {/* Lichtsockel */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.52, top: hh * 0.2,
+            width: ww * 1.04, height: ww * 0.34, borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(255,235,150,.9) 0%, rgba(255,200,60,.45) 45%, transparent 78%)',
+            animation: 'promoBase 1100ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Saeulenschacht */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.34, top: -hh * 0.9,
+            width: ww * 0.68, height: hh * 1.25,
+            background: 'linear-gradient(0deg, rgba(255,214,90,.55) 0%, rgba(255,236,170,.3) 55%, rgba(255,255,255,0) 100%)',
+            clipPath: 'polygon(14% 100%, 86% 100%, 66% 0%, 34% 0%)',
+            filter: 'blur(1px)',
+            transformOrigin: '50% 100%',
+            animation: 'promoShaft 1100ms ease-out forwards',
+            opacity: 0,
+          }} />
+
+          {/* Aufstiegsringe */}
+          {ringe.map((r, i) => (
+            <div key={'pr' + i} style={{
+              position: 'absolute', left: -ww * 0.44, top: hh * 0.16,
+              width: ww * 0.88, height: ww * 0.3, borderRadius: '50%',
+              border: '3px solid rgba(255,226,130,.95)',
+              boxShadow: '0 0 16px rgba(255,200,70,.85)',
+              '--prUp': (-hh * 1.05) + 'px',
+              animation: `promoRing ${r.dur}ms ease-out ${r.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Funken, die IM Schacht aufsteigen */}
+          {funken.map((f, i) => (
+            <div key={'pf' + i} style={{
+              position: 'absolute', left: f.links, top: f.start,
+              width: f.groesse, height: f.groesse, borderRadius: '50%',
+              background: f.farbe,
+              boxShadow: `0 0 8px ${f.farbe}`,
+              '--pfUp': (-f.hoch) + 'px',
+              animation: `promoSpark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          {/* Kranz, der sich schliesst */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.42, top: -hh * 0.12,
+            width: ww * 0.84, height: ww * 0.84, borderRadius: '50%',
+            border: '4px solid rgba(255,236,170,.95)',
+            boxShadow: '0 0 26px rgba(255,205,70,.9), inset 0 0 18px rgba(255,230,140,.6)',
+            animation: 'promoCrown 640ms cubic-bezier(.2,.8,.3,1) 620ms forwards',
+            opacity: 0,
+          }} />
+
+          <style>{`
+            @keyframes promoBase {
+              0%   { opacity: 0; transform: scale(.3); }
+              20%  { opacity: 1; transform: scale(1); }
+              70%  { opacity: .9; transform: scale(1.06); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+            @keyframes promoShaft {
+              0%   { opacity: 0; transform: scaleY(.15); }
+              25%  { opacity: 1; transform: scaleY(1); }
+              75%  { opacity: .85; transform: scaleY(1); }
+              100% { opacity: 0; transform: scaleY(1.05); }
+            }
+            @keyframes promoRing {
+              0%   { opacity: 0; transform: translateY(0) scale(.7); }
+              20%  { opacity: 1; transform: translateY(calc(var(--prUp) * .2)) scale(1); }
+              100% { opacity: 0; transform: translateY(var(--prUp)) scale(1.25); }
+            }
+            @keyframes promoSpark {
+              0%   { opacity: 0; transform: translateY(0) scale(.5); }
+              18%  { opacity: 1; transform: translateY(calc(var(--pfUp) * .2)) scale(1); }
+              100% { opacity: 0; transform: translateY(var(--pfUp)) scale(.4); }
+            }
+            @keyframes promoCrown {
+              0%   { opacity: 0; transform: scale(1.5) rotate(-25deg); }
+              45%  { opacity: 1; transform: scale(1) rotate(0deg); }
+              100% { opacity: 0; transform: scale(1.08) rotate(8deg); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Breaking Strike" (v1007) ─────────────────────────────────────
+  // Als Vorgabe: ein Schwertstreich, der klirrend Glasscherben
+  // hinterlaesst, als waere eine Glasklinge am Ziel zerschellt.
+  //
+  // Drei Takte: (1) die Klinge faehrt als schmaler, glasiger Streifen
+  // schraeg durchs Bild, (2) am Einschlag blitzt ein weisser Riss auf,
+  // (3) 22 Scherben stieben auseinander und fallen dabei — jede ist ein
+  // schmales Dreieck mit Glanzkante, das sich beim Fliegen dreht.
+  glass_blade_shatter: (() => {
+    return function GlassBladeShatterEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+
+      const scherben = useMemo(() => Array.from({ length: 22 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = ww * (0.35 + Math.random() * 0.85);
+        return {
+          dx: Math.cos(winkel) * weite,
+          // Scherben fliegen auseinander UND fallen: die Senkrechte
+          // bekommt einen Schwerkraft-Zuschlag.
+          dy: Math.sin(winkel) * weite * 0.55 + hh * (0.3 + Math.random() * 0.4),
+          laenge: 6 + Math.random() * 14,
+          breite: 2 + Math.random() * 5,
+          dreh: -540 + Math.random() * 1080,
+          dur: 620 + Math.random() * 520,
+          delay: 140 + Math.random() * 220,
+          kippen: Math.random() * 360,
+        };
+      }), [ww, hh]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10160 }}>
+          {/* (1) Die Klinge — schmaler glasiger Streifen, schraeg.
+              ★ v1008 (Als Befund): MITTIG auf dem Ankerpunkt, nicht
+              darueber. `top: -hh * 0.7` setzte den Streifen weit ueber
+              die Zielkarte; der Schlag muss durch SIE gehen. Bei
+              Hoehe 10 liegt die Mitte auf -5. */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.95, top: -5,
+            width: ww * 1.9, height: 10,
+            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(210,245,255,.95) 45%, rgba(255,255,255,1) 55%, rgba(180,230,255,0) 100%)',
+            boxShadow: '0 0 18px rgba(190,240,255,.9)',
+            transformOrigin: '50% 50%',
+            animation: 'glassSlash 320ms cubic-bezier(.2,.7,.3,1) forwards',
+            opacity: 0,
+          }} />
+
+          {/* (2) Riss am Einschlag */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.3, top: -ww * 0.3,
+            width: ww * 0.6, height: ww * 0.6,
+            background: 'radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(200,240,255,.5) 35%, transparent 72%)',
+            animation: 'glassCrack 420ms ease-out 220ms forwards',
+            opacity: 0,
+          }} />
+
+          {/* (3) Scherben */}
+          {scherben.map((s, i) => (
+            <div key={'gs' + i} style={{
+              position: 'absolute', left: 0, top: 0,
+              width: s.breite, height: s.laenge,
+              background: 'linear-gradient(160deg, rgba(255,255,255,.98) 0%, rgba(190,235,255,.85) 45%, rgba(120,190,225,.7) 100%)',
+              boxShadow: '0 0 6px rgba(210,245,255,.8)',
+              clipPath: 'polygon(50% 0%, 100% 78%, 22% 100%)',
+              '--gsdx': s.dx + 'px', '--gsdy': s.dy + 'px', '--gsrot': s.dreh + 'deg',
+              '--gstilt': s.kippen + 'deg',
+              animation: `glassShard ${s.dur}ms cubic-bezier(.25,.6,.5,1) ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+
+          <style>{`
+            @keyframes glassSlash {
+              0%   { opacity: 0; transform: rotate(-32deg) translateX(-60%) scaleX(.4); }
+              35%  { opacity: 1; }
+              100% { opacity: 0; transform: rotate(-32deg) translateX(30%) scaleX(1.15); }
+            }
+            @keyframes glassCrack {
+              0%   { opacity: 0; transform: scale(.2); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes glassShard {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(var(--gstilt)) scale(1.1); }
+              15%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--gsdx), var(--gsdy)) rotate(var(--gsrot)) scale(.75); }
             }
           `}</style>
         </div>
@@ -20950,6 +22588,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // it; `birthday_present_pick_resolved` fills `chosen` + (200ms later)
   // `flights` and schedules cleanup after the fly-out completes.
   const [bdayPresent, setBdayPresent] = useState(null);
+  // v968: Deck-Peek — aufgedeckte Karten, die in der Bildmitte liegen bleiben.
+  const [deckPeek, setDeckPeek] = useState(null);
+  // v995: Karten, die OHNE Flug in der Hand erscheinen (Barkeeper,
+  // Crestina — „from outside the game"). Sichtbar als Leuchten und
+  // Funken an der Hand, nicht als Bewegung von irgendwoher.
+  const [handFx, setHandFx] = useState([]);
+  // ★ v999 (Als Befund): Wie viele Karten faeden gerade ein? Eine ZAHL,
+  // kein Index-Satz. Der Index wurde im Socket-Handler aus `gameState`
+  // gelesen — und der ist dort STALE (der Effekt-Haken haengt nicht an
+  // jeder Zustandsaenderung). Deshalb landete die Marke auf einem
+  // falschen Platz: bei einer Karte gar keine Animation, bei mehreren
+  // nur eine. Der Zaehler kommt ohne Index aus; beim Rendern gelten die
+  // LETZTEN n Handkarten als frisch erschienen, und die Handlaenge
+  // stammt dort aus dem AKTUELLEN Zustand.
+  const [handFxPending, setHandFxPending] = useState(0);
   // Brackle catapult animations — array (matches kassaranFlips shape)
   // so multiple catapults in flight on the same board (unlikely but
   // defensible) don't stomp each other. Entries auto-removed after
@@ -25074,6 +26727,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const handDragEigen = handDrag && !handDrag.fromCreation ? handDrag : null;
   const playDragEigen = playDrag && !playDrag.fromCreation ? playDrag : null;
 
+  // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
+  // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
+  // werden hinten angehaengt, ihre `origIdx` sind also die hoechsten.
+  const istFrischErschienen = (origIdx) =>
+    handFxPending > 0 && origIdx >= (hand.length - handFxPending);
+
   const displayHand = useMemo(() => {
     const dragIdx = handDragEigen?.idx ?? playDragEigen?.idx ?? abilityDrag?.idx ?? null;
     if (dragIdx === null) return hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
@@ -25579,7 +27238,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // dreilagige Linie, nur entlang eines gezackten Pfades statt gerade
     // — und mit `elem_lightning` statt `laser`. Ohne das Feld aendert
     // sich fuer alle bisherigen Aufrufer nichts.
-    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneType, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim, bolt, sourceSelector, targetSelector }) => {
+    const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneType, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim, bolt, sourceSelector, targetSelector, offset }) => {
       if (window.playSFX) {
         // Volle Lautstaerke — 0.7 war zu leise (Als Rueckmeldung 21.8.).
         if (bolt) window.playSFX('elem_lightning', { dedupe: 50, category: 'effect' });
@@ -25630,8 +27289,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         endX = cardCx + lean * (tr.width * 0.85 + 18);
         endY = tr.top + tr.height * (0.35 + Math.random() * 0.35);
       }
-      const startX = sr.left + sr.width / 2;
-      const startY = sr.top + sr.height / 2;
+      let startX = sr.left + sr.width / 2;
+      let startY = sr.top + sr.height / 2;
+      // ── Seitlicher Versatz (v945) ─────────────────────────────────
+      // `offset` verschiebt den GANZEN Strahl quer zu seiner
+      // Flugrichtung (Pixel, Vorzeichen = Seite). Damit lassen sich
+      // mehrere Strahlen nebeneinander legen, statt sie deckungsgleich
+      // uebereinander zu zeichnen — Sarcophagus of Sealed Magic feuert
+      // zwei duenne rote Laser mit +7 / −7. Ohne das Feld aendert sich
+      // fuer alle bisherigen Aufrufer nichts.
+      if (offset) {
+        const odx = endX - startX, ody = endY - startY;
+        const olen = Math.hypot(odx, ody) || 1;
+        const onx = -ody / olen, ony = odx / olen;   // Normale
+        startX += onx * offset; startY += ony * offset;
+        endX += onx * offset; endY += ony * offset;
+      }
       // Zackenpfad fuer den Blitzmodus: acht Stuetzstellen mit
       // seitlichem Versatz quer zur Flugrichtung. Der Versatz waechst
       // zur Mitte hin und laeuft an beiden Enden auf null aus, damit
@@ -30661,6 +32334,112 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('birthday_present_pick_resolved', onBdayPresentResolved);
 
+    // ── Deck-Peek (v968, „Spice Mortar") ──────────────────────────
+    // Die Karten fliegen einzeln vom Deck des `owner` in ein Raster in
+    // der Bildmitte und BLEIBEN liegen. Beide Spieler sehen sie; nur
+    // wer den `deckPeekPick`-Prompt hat, kann waehlen.
+    const onDeckPeekReveal = ({ owner, cards, title }) => {
+      if (!Array.isArray(cards) || cards.length === 0) return;
+      const isMe = owner === myIdx;
+      const deckEl = document.querySelector(isMe ? '[data-my-deck]' : '[data-opp-deck]');
+      const r = deckEl ? deckEl.getBoundingClientRect() : null;
+      setDeckPeek({
+        cards, title: title || '',
+        src: r ? { x: r.left, y: r.top } : null,
+        chosen: null, leaving: false, takeTo: null,
+      });
+    };
+    socket.on('deck_peek_reveal', onDeckPeekReveal);
+
+    // Aufloesung: die gewaehlte Karte fliegt in die Hand des Nehmers,
+    // der Rest sinkt ab. Danach raeumt sich die Anzeige selbst weg.
+    const onDeckPeekClear = ({ chosen, toOwner }) => {
+      // ★ v969 (Als Befund): die Karte kommt aus dem GEGNERDECK, also
+      // waechst gleich meine Hand, ohne dass MEIN Deck kleiner wird.
+      // Genau dieser Fall faellt im Handzuwachs-Erkenner in den
+      // Rueckfallzweig „vermutlich aus der Gegnerhand gestohlen" und
+      // spielte eine ZWEITE Bewegung Gegnerhand → meine Hand, nachdem
+      // die Karte laengst aus der Mitte geflogen war. Derselbe
+      // Handschlag wie beim Mitten-Auftritt mit `dest: 'hand'`: je
+      // genommener Karte eine Gutschrift, die der Erkenner verbraucht,
+      // statt zu animieren.
+      if (chosen && toOwner === myIdx) stealSkipDrawRef.current += 1;
+      let ziel = null;
+      if (chosen) {
+        const base = toOwner === myIdx ? '.game-hand-me' : '.game-hand-opp';
+        const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
+        const letzter = slots[slots.length - 1];
+        if (letzter) {
+          const hr = letzter.getBoundingClientRect();
+          ziel = { x: hr.left + hr.width / 2 - 46, y: hr.top + hr.height / 2 - 64 };
+        } else {
+          ziel = { x: window.innerWidth / 2 - 46, y: window.innerHeight - 120 };
+        }
+      }
+      setDeckPeek(prev => prev ? { ...prev, chosen: chosen || null, leaving: true, takeTo: ziel } : prev);
+      setTimeout(() => setDeckPeek(null), 700);
+    };
+    socket.on('deck_peek_clear', onDeckPeekClear);
+
+    // ── Karte erscheint in der Hand (v995, Als Vorgabe 12.9.) ──────
+    // „from outside the game" hat keinen Herkunftsort — also KEIN Flug.
+    // Frueher sprang der Handzuwachs-Erkenner ein und liess die Karte
+    // aus der GEGNERHAND anfliegen (derselbe Rueckfallzweig wie beim
+    // Deck-Peek, v969). Die Gutschrift verbraucht er hier genauso;
+    // gezeigt wird stattdessen ein Leuchten mit Funken an der Hand.
+    const onHandMaterialize = ({ playerIdx, cardName, count }) => {
+      const n = Math.max(1, count || 1);
+      if (playerIdx === myIdx) stealSkipDrawRef.current += n;
+      // ★ v996 (Als Befund): Der Effekt gehoert auf die GERADE
+      // erschienene Karte, nicht in die Mitte des Handbereichs. Die
+      // neue Karte landet am ENDE der Hand — ihr Slot existiert im DOM
+      // erst nach dem naechsten Anstrich, deshalb wird im naechsten
+      // Bild gemessen (rAF) und bis dahin die Kartenzahl gemerkt.
+      const eigen = playerIdx === myIdx;
+      const basis = '.game-hand-opp';
+      if (eigen) {
+        // ★ v998/v999: Die eigene Seite misst nichts und rechnet mit
+        // keinem Index. Der Zaehler sagt nur „n Karten sind gerade
+        // erschienen"; welche das sind, entscheidet der Renderer anhand
+        // der AKTUELLEN Hand (die letzten n). Die Marke laesst die Karte
+        // einfaden UND zeichnet Leuchten samt Funken per CSS auf ihrer
+        // Mitte (`HandMaterializeFxInline`).
+        setHandFxPending(v => v + n);
+        setTimeout(() => setHandFxPending(v => Math.max(0, v - n)), 1100);
+      }
+      if (window.playSFX) window.playSFX('draw', { category: null, dedupe: 260, rate: 1.2 });
+      if (eigen) return;                       // fertig — der Rest ist die Gegnerseite
+
+      const id = Math.random().toString(36).slice(2);
+      requestAnimationFrame(() => {
+        // ★ v997 (Als Befund): NICHT den Slot messen, sondern die KARTE
+        // darin. `.game-hand-cards .hand-slot` ist `flex: 0 1 68px` mit
+        // `min-width: 18px` — bei voller Hand schrumpfen die Plaetze und
+        // die Karten ueberlappen. Die Mitte des zusammengedrueckten
+        // Slots liegt dann ungefaehr am LINKEN RAND der sichtbaren
+        // Karte, und genau dort sass der Effekt.
+        const kartenRect = (el) => {
+          if (!el) return null;
+          const karte = el.classList?.contains('board-card') ? el : el.querySelector('.board-card');
+          return (karte || el).getBoundingClientRect();
+        };
+        // Nur die GEGNERseite kommt hier an (die eigene ist oben schon
+        // fertig): dort gibt es keine Handindizes, also die letzte
+        // Karte des Bereichs.
+        const alle = document.querySelectorAll(`${basis} .hand-slot, ${basis} .hand-card`);
+        const r = kartenRect(alle[alle.length - 1]);
+        const el = document.querySelector(basis);
+        const rb = el ? el.getBoundingClientRect() : null;
+        setHandFx(prev => [...prev, {
+          id, cardName,
+          x: r ? r.left + r.width / 2 : (rb ? rb.left + rb.width / 2 : window.innerWidth / 2),
+          y: r ? r.top + r.height / 2 : (rb ? rb.top + rb.height / 2 : window.innerHeight - 90),
+        }]);
+      });
+      setTimeout(() => setHandFx(prev => prev.filter(f => f.id !== id)), 1400);
+    };
+    socket.on('hand_card_materialize', onHandMaterialize);
+
     // ── Timeless King Zi: dismiss the centre reveal after the pick ──
     // Reuses the Birthday-Present reveal (`birthday_present_reveal_start`
     // + `birthdayPresentPick`). Unlike Birthday Present the chosen Spell
@@ -31906,6 +33685,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('chaos_magic_reveal', onChaosMagicReveal);
       socket.off('mill_center_reveal', onMillCenterReveal);
+      socket.off('deck_peek_reveal', onDeckPeekReveal);
+      socket.off('deck_peek_clear', onDeckPeekClear);
+      socket.off('hand_card_materialize', onHandMaterialize);
       socket.off('deck_shuffle', onDeckShuffle);
       socket.off('zone_fade', onZoneFade);
       socket.off('play_hand_card_animation', onHandCardAnim);
@@ -33843,6 +35625,57 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'intrude_placed') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} attached {cName('Intrude')} to {entry.hero}.</span>; }
       if (t === 'intrude_negate') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Intrude negated {entry.target}'s draw of {entry.blocked} card{entry.blocked!==1?'s':''}!</span>; }
       if (t === 'intrude_copy') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s Intrude copied {entry.from}'s draw — drew {entry.copied} card{entry.copied!==1?'s':''}!</span>; }
+      // ── Todes-Flaechenschlaege (v940) ────────────────────────────
+      // Ohne eigenen Fall bliebe die Zeile UNSICHTBAR: formatLogEntry
+      // gibt fuer unbekannte Typen null zurueck. Exploding Skull loggte
+      // seit jeher korrekt, hatte aber nie einen Client-Fall.
+      if (t === 'realmniversal_blast') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName('Realmniversal Emperor')} was defeated — <span className="log-amount">{entry.damage}</span> damage to {entry.targets} opposing Hero{entry.targets === 1 ? '' : 'es'}!</span>; }
+      if (t === 'exploding_skull_blast') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName('Exploding Skull')} exploded — <span className="log-amount">{entry.damage}</span> damage to {entry.targets} target{entry.targets === 1 ? '' : 's'}!</span>; }
+      if (t === 'sarcophagus_unseal') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName('Sarcophagus of Sealed Magic')} unsealed <span className="log-amount">{entry.schools}</span> Spell School Abilit{entry.schools === 1 ? 'y' : 'ies'} — <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
+      // „Spice Mortar" (v946): die zehn aufgedeckten Karten gehoeren
+      // ins Log — es ist der einzige Kanal, ueber den BEIDE Spieler sie
+      // sehen (`deckSearchReveal` zeigt genau eine Karte).
+      if (t === 'spice_mortar_reveal') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} revealed the top <span className="log-amount">{entry.count}</span> cards of {entry.opponent}'s deck: {(entry.cards || []).map((n, i) => <span key={i}>{i > 0 ? ', ' : ''}{cName(n)}</span>)}.</span>; }
+      if (t === 'spice_mortar_take') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} took {cName(entry.card)} from {entry.opponent}'s deck.</span>; }
+      if (t === 'spice_mortar_shuffle') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} shuffled their deck.</span>; }
+      if (t === 'rakah_collect') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {cName('Rakah, the Loan Shark')} collected {cName(entry.creature)} — Attack permanently <span className="log-amount">+{entry.amount}</span> (now <span className="log-amount">{entry.newAtk}</span>).</span>; }
+      if (t === 'shared_blood_tanks_placed') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} set up {cName('Shared Blood Tanks')}.</span>; }
+      if (t === 'shared_blood_tanks_share') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Shared Blood Tanks')} shared the bleeding — <span className="log-amount">{entry.targets}</span> other Bleeding target{entry.targets === 1 ? '' : 's'} of {pName(p.name, p.color)} bled too.</span>; }
+      if (t === 'hat_of_madness_gift') { const p = playerByName(entry.player); return <span className="log-status">{cName('Hat of Madness')} made {pName(p.name, p.color)} hand {cName(entry.card)} to {entry.opponent}.</span>; }
+      if (t === 'skullmael_greatsword_summon') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} summoned {cName(entry.creature)} from the discard pile with {cName("Skullmael's Greatsword")}.</span>; }
+      if (t === 'golden_skull_blast') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Golden Exploding Skull')} burst — <span className="log-amount">{entry.damage}</span> damage to <span className="log-amount">{entry.targets}</span> of {pName(p.name, p.color)}'s own target{entry.targets === 1 ? '' : 's'}, <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold.</span>; }
+      if (t === 'quisto_boost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} paid <span className="log-amount" style={{color:'#ffcc44'}}>{entry.paid}</span> Gold — this Attack deals <span className="log-amount">+{entry.bonus}</span> damage.</span>; }
+      if (t === 'quisto_bounty') { const p = playerByName(entry.player); return <span className="log-info">{cName('Don Quisto, the Gold Seeker')} collected the bounty on <span className="log-amount">{entry.targets}</span> target{entry.targets === 1 ? '' : 's'} — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold for {pName(p.name, p.color)}.</span>; }
+      if (t === 'teocuilatl_offering') { const p = playerByName(entry.player); return entry.kind === 'hero'
+        ? <span className="log-status">{pName(p.name, p.color)} offered {entry.hero} to the Gods — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold, turn ends.</span>
+        : <span className="log-info">{pName(p.name, p.color)} offered a Creature to the Gods — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold.</span>; }
+      if (t === 'boulder_placed') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} dropped {cName('Boulder in a Bottle')} onto {entry.opponent}'s {entry.hero} — it blocks every free Support Zone there.</span>; }
+      if (t === 'boulder_zones_claimed') { const p = playerByName(entry.player); return <span className="log-info">{cName('Boulder in a Bottle')} fills the free Support Zones of {pName(p.name, p.color)}'s Hero.</span>; }
+      if (t === 'phoenix_bombardment') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} bombarded {entry.target} down to <span className="log-amount">1</span> HP — <span className="log-amount">{entry.reduced}</span> HP burned off, the same amount recoils.</span>; }
+      if (t === 'difficulty_lever') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} pulled {cName('Difficulty Lever')} — {entry.hero} casts {cName(entry.spell)} regardless of its level.</span>; }
+      if (t === 'dangerous_knowledge') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} learned the effect of {cName(entry.learned)} — permanently, in addition to its own.</span>; }
+      if (t === 'wire_hatchling_halve') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Wire Hatchling')} halved {entry.target} — <span className="log-amount">{entry.amount}</span> damage for {pName(p.name, p.color)}.</span>; }
+      if (t === 'pyraga_burst') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Pyraga')} answered {cName(entry.trigger)} — <span className="log-amount">{entry.amount}</span> damage to {entry.target} ({entry.used}/4 this turn).</span>; }
+      if (t === 'duigno_lockout') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} took the second Action from {cName('Duigno, the Flaming Phoenix')} — no other additional Actions this turn.</span>; }
+      if (t === 'moonlight_butterfly') { const p = playerByName(entry.player); return entry.target
+        ? <span className="log-damage">{cName('Moonlight Butterfly')} flew back to {pName(p.name, p.color)}'s hand — <span className="log-amount">{entry.amount}</span> moonlight damage to {entry.target}.</span>
+        : <span className="log-info">{cName('Moonlight Butterfly')} flew back to {pName(p.name, p.color)}'s hand — no Hero opposite.</span>; }
+      if (t === 'duigno_grant_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{cName('Duigno, the Flaming Phoenix')} stays quiet — {pName(p.name, p.color)} had already used an Action before this phase.</span>; }
+      if (t === 'gravedigger_choice') { const p = playerByName(entry.player); return entry.mode === 'mill'
+        ? <span className="log-info">{pName(p.name, p.color)} milled <span className="log-amount">{entry.count}</span> cards to {cName('Gravedigger')}.</span>
+        : <span className="log-status">{pName(p.name, p.color)} let {cName('Gravedigger')} delete <span className="log-amount">{entry.count}</span> cards from their discard pile.</span>; }
+      if (t === 'gravedigger_dig') { const p = playerByName(entry.player); return <span className="log-info">{cName('Gravedigger')} buried {cName(entry.card)} from {entry.opponent}'s deck for {pName(p.name, p.color)}.</span>; }
+      if (t === 'gnome_level') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} set {cName('Inconspicuous Lawn Gnome')} to level <span className="log-amount">{entry.level}</span> ({entry.where === 'hand' ? 'in hand' : 'on the board'}).</span>; }
+      if (t === 'barkeeper_round') { const p = playerByName(entry.player); return <span className="log-info">{cName('Barkeeper')} poured <span className="log-amount">{entry.count}</span> × {cName(entry.card)} for {pName(p.name, p.color)}.</span>; }
+      if (t === 'gwen_hands_recover') { const p = playerByName(entry.player); return <span className="log-info">{cName('The Hands of Big Gwen')} reached back for {cName(entry.card)} — {pName(p.name, p.color)} takes it to hand.</span>; }
+      if (t === 'pillar_of_light') { const p = playerByName(entry.player); return entry.found
+        ? <span className="log-status">{pName(p.name, p.color)} named {cName(entry.declared)} — {entry.opponent} found it and takes it to hand.</span>
+        : <span className="log-info">{pName(p.name, p.color)} named {cName(entry.declared)} — {entry.opponent} has none.</span>; }
+      if (t === 'pillar_of_light_cost') { const p = playerByName(entry.player); return <span className="log-info">{cName('Pillar of Light')} missed — it costs {pName(p.name, p.color)} an Action after all.</span>; }
+      if (t === 'mission_light_brigade') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} sounds the charge — <span className="log-amount">{entry.count}</span> additional Actions, and no others this turn.</span>; }
+      if (t === 'breaking_strike') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Breaking Strike')} — {pName(p.name, p.color)} shattered <span className="log-amount">{entry.discarded}</span> Artifact(s) for <span className="log-amount">{entry.damage}</span> damage ({entry.atk} × {entry.discarded}).</span>; }
+      if (t === 'aurora_borealis') { const p = playerByName(entry.player); return <span className="log-info">{cName('Aurora Borealis')} lit the sky for {pName(p.name, p.color)} — {(entry.cards || []).map((c, i) => <span key={i}>{i > 0 ? ', ' : ''}{cName(c)}</span>)} to hand (Magic Arts {entry.level}).</span>; }
+      if (t === 'aurora_perform') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} deleted two Spells to perform {cName(entry.card)} at once.</span>; }
     } catch(e) {}
     return null;
   };
@@ -34372,9 +36205,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {hero?.name && !isRamming ? (
                   (() => {
+                    // v981: Welche fremden Heldeneffekte traegt er mit?
+                    // Die Namen stehen oben im Tooltip, die vollen Texte
+                    // im vorhandenen „Inherited Effects"-Block darunter.
+                    const _kopiert = Array.isArray(hero.gainedEffectNames) ? hero.gainedEffectNames : [];
                     const heroCardProps = {
                       hp: hero.hp, maxHp: hero.maxHp, atk: hero.atk, hpPosition: 'hero',
                       skins: gameSkins, abilities: p.abilityZones?.[i],
+                      copiedHeroes: _kopiert,
+                      inheritedEffects: _kopiert
+                        .map(n => ({ label: n, text: CARDS_BY_NAME[n]?.effect || '' }))
+                        .filter(e => e.text),
                       style: {
                         ...(isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
                         ...(isInvisible ? { opacity: 0.4 } : null),
@@ -35794,8 +37635,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         nimmt denselben Weg wie eine einzelne Kreatur. */}
                     {(cards.length === 1 || cc?._nestedUnder) ? (
                       (() => {
-                        const curHp = cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp;
-                        const mHp = cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp;
+                        // v925 (Bonded Companions): Karten mit geteiltem
+                        // HP-Pool (`sharesHpWithHero`) haben KEINEN eigenen
+                        // Vorrat — in der Datenbank stehen 0 HP, und aller
+                        // Schaden wird auf den Helden umgebucht. Angezeigt
+                        // gehoert deshalb der Wert des HELDEN derselben
+                        // Spalte, sonst liest man eine 0 an einer Karte,
+                        // die putzmunter ist.
+                        const _poolHeld = cc?._sharesHpWithHero
+                          ? ((gameState.players?.[pi]?.heroes) || [])[i] : null;
+                        const curHp = _poolHeld
+                          ? _poolHeld.hp
+                          : (cc?.currentHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp);
+                        const mHp = _poolHeld
+                          ? _poolHeld.maxHp
+                          : (cc?.maxHp ?? cc?._cardDataOverride?.hp ?? CARDS_BY_NAME[cards[0]]?.hp);
                         // Biomancy Token: customize the hover tooltip with
                         // the level-scaled effect text. Any creature with
                         // `_cardDataOverride` falls through to a tooltip
@@ -36385,6 +38239,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // / fizzle / expire by Giga Steroids' hooks.
             if (me.onSteroids) debuffs.push({ key: 'steroids-me', icon: '💪', text: 'On Steroids — You can use a second Action for an active effect this Action Phase!', color: '#ff66dd' });
             if (opp.onSteroids) debuffs.push({ key: 'steroids-opp', icon: '💪', text: `On Steroids — Your opponent can use a second Action for an active effect this Action Phase!`, color: '#cc44aa' });
+            // ★ v1004: „Mission of the Light Brigade" — die offenen
+            // Ladungen stehen in derselben Leiste. Sie sind Segen und
+            // Fluch zugleich: zwei Zusatzaktionen, aber KEINE anderen.
+            if (me.missionActions > 0) debuffs.push({ key: 'mission-me', icon: '🎺', text: `Light Brigade — ${me.missionActions} additional Action${me.missionActions === 1 ? '' : 's'} left (no other additional Actions this turn).`, color: '#ffcc44' });
+            if (opp.missionActions > 0) debuffs.push({ key: 'mission-opp', icon: '🎺', text: `${opp.username} has ${opp.missionActions} Light Brigade Action${opp.missionActions === 1 ? '' : 's'} left.`, color: '#ccaa33' });
             if (debuffs.length === 0) return null;
             return (
               <div className="phase-debuffs">
@@ -37197,13 +39056,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   && handEffectiveCost > handCardData.cost;
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
-                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '')}
+                    className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
                     style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
                     onMouseLeave={() => isAnyDiscard && setHoveredPileCard(null)}>
                     <BoardCard cardName={item.card} noTooltip={isAnyDiscard} skins={gameSkins} />
+                    {istFrischErschienen(item.origIdx) && <HandMaterializeFxInline />}
                     {handEffectiveLevel != null && (() => {
                       // "Boosted" = effective level is HIGHER than the
                       // printed base (Mana Absorbing Crystal's +1).
@@ -37367,6 +39227,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           floating card resolves the `birthdayPresentPick` prompt; the
           activator just watches. `interactive` flips on iff the prompt
           is open and addressed to this client. */}
+      {handFx.map(f => <HandMaterializeFx key={f.id} x={f.x} y={f.y} cardName={f.cardName} />)}
+      {deckPeek && (
+        <DeckPeekReveal
+          state={deckPeek}
+          title={deckPeek.title}
+          interactive={!!(isMyEffectPrompt && gameState.effectPrompt?.type === 'deckPeekPick')}
+          onPick={(cardName) => respondToPrompt({ cardName, source: 'deck' })}
+          onDone={() => respondToPrompt({ cancelled: true })}
+        />
+      )}
       {bdayPresent && (
         <BirthdayPresentReveal
           state={bdayPresent}
@@ -38670,11 +40540,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const displayCard = stamp > 0 && effLvl != null
                     ? { ...card, level: effLvl, _liveLevel: effLvl, _stampBonus: stamp }
                     : card;
+                  // ── v967: Galerie mit NICHT waehlbaren Eintraegen ──
+                  // `entry.selectable === false` macht einen Eintrag zur
+                  // reinen Anzeige (abgedunkelt, nicht anklickbar),
+                  // `entry.highlight === true` hebt ihn hervor. Gebraucht
+                  // fuer Galerien, die ALLES zeigen, aber nur einen Teil
+                  // zur Wahl stellen (Spice Mortar: zehn aufgedeckte
+                  // Karten, waehlbar sind die Potions).
+                  const waehlbar = entry.selectable !== false;
                   return (
-                    <div key={entry.name + '-' + entry.source + '-' + i} style={{ position: 'relative' }}>
+                    <div key={entry.name + '-' + entry.source + '-' + i} style={{
+                      position: 'relative',
+                      opacity: waehlbar ? 1 : 0.42,
+                      filter: waehlbar ? 'none' : 'grayscale(0.75)',
+                      borderRadius: 6,
+                      boxShadow: entry.highlight ? '0 0 0 2px var(--accent), 0 0 12px rgba(120,220,255,.65)' : 'none',
+                    }}>
                       <CardMini card={displayCard}
-                        onClick={() => { if (window.playSFX) window.playSFX('ui_click'); respondToPrompt({ cardName: entry.name, source: entry.source }); }}
-                        style={{ width: '100%', height: 120, cursor: 'pointer' }} />
+                        onClick={waehlbar
+                          ? () => { if (window.playSFX) window.playSFX('ui_click'); respondToPrompt({ cardName: entry.name, source: entry.source }); }
+                          : undefined}
+                        style={{ width: '100%', height: 120, cursor: waehlbar ? 'pointer' : 'default' }} />
                       {effLvl != null && (
                         <div style={{
                           position: 'absolute', top: 2, left: 2,
@@ -39037,7 +40923,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* ── Waiting for opponent (when they have an active effect prompt) ── */}
-      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && ep?.type !== 'birthdayPresentPick' && (
+      {(isOppEffectPrompt || isActivePlayerPromptForOpp) && !gameState.potionTargeting && ep?.type !== 'birthdayPresentPick' && ep?.type !== 'deckPeekPick' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
           <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
             {ep.type === 'cardGallery' || ep.type === 'cardGalleryMulti' ? '🔍 Opponent is choosing...' :

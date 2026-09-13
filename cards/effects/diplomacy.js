@@ -86,7 +86,7 @@ function getEligibleCreatures(engine, pi, maxCreatureLevel) {
     // reducers fire from opp's own board state, so a rebated Whoolmoth
     // (Lv0) becomes a legal Diplomacy target. Level is read from opp's
     // perspective (the controller of the Creature).
-    if (engine.effectiveCardLevel(cd, oppIdx, { heroIdx: inst.heroIdx }) > maxCreatureLevel) continue;
+    if (engine.effectiveCardLevel(cd, oppIdx, { heroIdx: inst.heroIdx, inst }) > maxCreatureLevel) continue;
     targets.push({
       id: `equip-${inst.owner}-${inst.heroIdx}-${inst.zoneSlot}`,
       type: 'equip',

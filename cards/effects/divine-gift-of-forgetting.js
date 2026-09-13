@@ -104,7 +104,12 @@ function collectRemovableAbilities(engine, playerIdx) {
 }
 
 module.exports = {
-  inherentAction: true,
+  // KEIN `inherentAction` (Als Befund 12.9.): der Kartentext nennt keine
+  // Zusatzaktion, also kostet der Spell die Aktion des Zuges wie jeder
+  // andere (Regelwerk: Attacks/Spells/Creatures kosten die eine Aktion).
+  // Stand hier faelschlich auf `true` — vermutlich aus der
+  // Divine-Gift-Familie uebernommen, wo die meisten Karten die
+  // Zusatzaktion tatsaechlich im Text nennen.
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
 

@@ -828,6 +828,119 @@ const ZONE_ANIM_SFX = {
   // etwas tiefer abgespielt, damit ein 10x-Schulden-Treffer wuchtiger
   // klingt als ein normaler Brandschaden.
   debt_flames:             { name: 'burn', opts: { rate: 0.85 } },
+  // Realmniversal Emperor (v941) — kosmische Verzerrung. Zwei Lagen:
+  // `elem_dark` tief und sofort ist das Aufreissen (uebernimmt die
+  // 'effect'-Sammelkategorie und faellt damit bei mehreren gleichzeitig
+  // getroffenen Helden zu EINEM Klang zusammen), `ddg_manifest` auf dem
+  // Hoehepunkt der Verzerrung ist der Schlag. Der zweite Teil laeuft
+  // bewusst OHNE Kategorie (sonst schluckt ihn die eigene erste Lage)
+  // und deduped ueber den NAMEN — sonst spielte er drei Mal
+  // uebereinander. 320 + 100 ms Einbau-Versatz treffen den Ring
+  // (`cosmicWarpRing` ab 260 ms, Spitze ~480 ms).
+  cosmic_distortion: [
+    { name: 'elem_dark',    opts: { rate: 0.6, volume: 1.0 } },
+    { name: 'ddg_manifest', opts: { rate: 1.1, volume: 1.0, delay: 320, category: null, dedupe: 700 } },
+  ],
+  // Wavilion (v943) — buffender Wasserzauber. Zwei Lagen: `elem_water`
+  // sofort ist die aufsteigende Saeule (uebernimmt die Sammelkategorie
+  // 'effect'), `buff` bei 500 ms ist der Segen, der sich oben absetzt
+  // (Ring + Aufleuchten ab 600 ms im Keyframe, minus 100 ms
+  // Einbau-Versatz). Zweite Lage OHNE Kategorie, sonst schluckt sie die
+  // eigene erste — und mit Namens-Dedupe, falls zwei Wavilions beim
+  // selben Helden gleichzeitig ausloesen.
+  water_blessing: [
+    { name: 'elem_water', opts: { rate: 0.95, volume: 1.0 } },
+    { name: 'buff',       opts: { rate: 1.1, volume: 0.9, delay: 500, category: null, dedupe: 600 } },
+  ],
+  // Aquanian Orkallion (v944) — der brettweite Strudel. Zwei Lagen:
+  // `elem_water` tief und sofort ist das Aufreissen des Trichters,
+  // `elem_wind` tiefer und leiser bei 620 ms der Sog, wenn die Ringe
+  // auf voller Drehzahl laufen. Zweite Lage ohne Kategorie (sonst
+  // schluckt die erste sie) und mit Namens-Dedupe. Der Strudel laeuft
+  // je Ereignis genau einmal, ein Dedupe auf der ersten Lage braucht es
+  // deshalb nicht.
+  maelstrom: [
+    { name: 'elem_water', opts: { rate: 0.5, volume: 1.2 } },
+    { name: 'elem_wind',  opts: { rate: 0.65, volume: 0.75, delay: 620, category: null, dedupe: 900 } },
+  ],
+  // Skullmael's Greatsword (v954) — die untote Wiederbelebung. Zwei
+  // Lagen: `elem_dark` tief und sofort ist der sich oeffnende
+  // Runenkreis, `summon` beim dunklen Blitz (760 ms im Keyframe minus
+  // 100 ms Einbau-Versatz) ist der Moment, in dem die Kreatur steht.
+  // Bewusst ein eigener Eintrag statt `necromancy_summon`: der Klang
+  // haengt am Typ, und die Ability soll weiter nur ihren Schaedelknall
+  // haben.
+  undead_revival: [
+    { name: 'elem_dark', opts: { rate: 0.8, volume: 1.0 } },
+    { name: 'summon',    opts: { rate: 0.85, volume: 0.9, delay: 660, category: null, dedupe: 700 } },
+  ],
+  // Golden Exploding Skull (v955) — die goldene Explosion. Zwei Lagen:
+  // `heavy_impact` sofort ist der Knall (übernimmt die Sammelkategorie
+  // 'effect' und faellt bei mehreren getroffenen Zielen zu EINEM
+  // Klang zusammen), `gold_gain` bei 320 ms ist der Muenzregen — ohne
+  // Kategorie, sonst schluckt ihn die eigene erste Lage, und mit
+  // Namens-Dedupe, damit er bei vier Zielen nicht vierfach klingt.
+  golden_explosion: [
+    { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.95 } },
+    { name: 'gold_gain',    opts: { rate: 1.0, volume: 0.9, delay: 320, category: null, dedupe: 700 } },
+  ],
+  // Phoenix Bombardment (v960) — der Schwarm. Drei Lagen, weil das
+  // Bombardement drei Momente hat: `elem_fire` sofort (der Anflug,
+  // uebernimmt die Sammelkategorie 'effect'), dann zwei versetzte
+  // `heavy_impact` fuer die gestaffelten Einschlaege (erster Vogel bei
+  // 240 ms, letzter bei ~900 ms im Keyframe; minus 100 ms
+  // Einbau-Versatz). Beide Schlaege ohne Kategorie — sonst schluckt
+  // sie die erste Lage — und mit eigenem Dedupe-Fenster, damit sie
+  // sich nicht gegenseitig verschlucken.
+  phoenix_bombardment: [
+    { name: 'elem_fire',    opts: { rate: 1.05, volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 1.25, volume: 0.85, delay: 160, category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 1.05, volume: 1.0, delay: 950, category: null, dedupe: 0 } },
+  ],
+  // Wire Hatchling (v963) — die paralysierenden Blitze. Zwei Lagen:
+  // `elem_lightning` hoeher und sofort fuer das Gewitter der
+  // Einschlaege, `stun` bei 560 ms fuer den Starrkrampf, mit dem der
+  // Kaefig steht — zweite Lage ohne Kategorie und mit Namens-Dedupe,
+  // sonst schluckt die erste sie.
+  paralyzing_bolts: [
+    { name: 'elem_lightning', opts: { rate: 1.25, volume: 1.0 } },
+    // (`stun` gibt es im Katalog NICHT — ein erfundener Name faellt
+    //  still auf 404 und bliebe stumm; `debuff` ist der passende.)
+    { name: 'debuff',         opts: { rate: 0.9, volume: 0.85, delay: 560, category: null, dedupe: 600 } },
+  ],
+  // Moonlight Butterfly (v966) — das herabfallende Mondlicht. Zwei
+  // Lagen: `elem_holy` tief und sofort ist der Lichtschacht,
+  // `elem_ice` hoeher bei 420 ms das kalte Funkeln im Strahl — ohne
+  // Kategorie (sonst schluckt sie die erste Lage) und mit
+  // Namens-Dedupe, weil der Typ zweimal je Ausloesung laeuft
+  // (Ruecknahme des Falters und Schlag gegenueber).
+  moonlight_beam: [
+    { name: 'elem_holy', opts: { rate: 0.78, volume: 0.9 } },
+    { name: 'elem_ice',  opts: { rate: 1.3, volume: 0.55, delay: 420, category: null, dedupe: 800 } },
+  ],
+  // Boulder in a Bottle (v973) — der herabfallende Fels. Eine Lage:
+  // `heavy_impact` tief beim Aufschlag (470 ms im Keyframe minus
+  // 100 ms Einbau-Versatz). Die Karte ruft den Typ EINMAL JE FREIER
+  // ZONE; die Sammelkategorie 'effect' faellt das von selbst zu einem
+  // Poltern zusammen, statt dreimal zu knallen.
+  falling_boulder: { name: 'heavy_impact', opts: { rate: 0.8, volume: 1.0, delay: 370 } },
+  // Garius, the Great Reformer (v990) — die Befoerderung. Zwei Lagen:
+  // `buff` sofort fuer den Lichtsockel, `gold_gain` bei 540 ms fuer
+  // den Kranz, der sich schliesst — zweite Lage ohne Kategorie
+  // (sonst schluckt sie die erste) und mit Namens-Dedupe.
+  promotion_burst: [
+    { name: 'buff',      opts: { rate: 0.85, volume: 1.0 } },
+    { name: 'gold_gain', opts: { rate: 1.1, volume: 0.85, delay: 540, category: null, dedupe: 700 } },
+  ],
+  // Breaking Strike (v1007) — die zerschellende Glasklinge. Zwei
+  // Lagen: `slash` sofort fuer den Streich, `elem_ice` bei 220 ms fuer
+  // das Klirren der Scherben (der Katalog hat keinen Glasklang; die
+  // Eislage kommt dem Splittern am naechsten, hoch abgespielt).
+  // Zweite Lage ohne Kategorie, sonst schluckt sie die erste.
+  glass_blade_shatter: [
+    { name: 'slash',    opts: { rate: 1.15, volume: 1.0 } },
+    { name: 'elem_ice', opts: { rate: 1.45, volume: 0.85, delay: 220, category: null, dedupe: 600 } },
+  ],
   // Signature
   orbital_laser_red:       { name: 'orbital_laser', opts: { rate: 0.6 } },
   blood_moon_pulse:        { name: 'elem_dark' },
@@ -860,6 +973,9 @@ const ZONE_ANIM_SFX = {
   // auf volle Lautstaerke — das soll schwer und haesslich klingen, nicht
   // elegant wie der normale Schnitt.
   super_kill_cut:          { name: 'slash', opts: { rate: 0.62, volume: 2.4 } },
+  // Divine Punishment (v919): Blitzregen. `elem_lightning` tiefer
+  // gestimmt und laut — das soll strafend klingen, nicht spritzig.
+  divine_punishment:       { name: 'elem_lightning', opts: { rate: 0.78, volume: 2.0 } },
   // Future Tech Doping — die Spritze (`syringe_stab`). `heavy_impact`
   // tiefer und leiser ist der Einstich; der Versatz trifft den Moment,
   // in dem die Nadel steht (240 ms + 100 ms Einbau-Versatz).
@@ -1877,6 +1993,21 @@ function isCubeDeck(deck) { return !!deck && deck.mode === 'cube'; }
 window.CUBE_SIZE = CUBE_SIZE;
 window.isCubeDeck = isCubeDeck;
 
+// ── „Zhigao, the Heavenly Emperor" (v991, Als Vorgabe 12.9.) ────────
+// „If this is one of your starting Heroes, you may only bring 1 other
+// starting Hero to the game." — mit Zhigao besteht die Aufstellung aus
+// GENAU ZWEI Helden statt drei. Die Grenze steht hier bei den uebrigen
+// Aufstellungsregeln, nicht im Kartenskript.
+const ZHIGAO = 'Zhigao, the Heavenly Emperor';
+function hasZhigaoHero(deck) {
+  return (deck?.heroes || []).some(h => sameCopyFamily(h?.hero, ZHIGAO));
+}
+/** Wie viele Starthelden verlangt diese Aufstellung? */
+function requiredHeroCount(deck) {
+  return hasZhigaoHero(deck) ? 2 : 3;
+}
+window.requiredHeroCount = requiredHeroCount;
+
 function isDeckLegal(deck) {
   if (!deck) return { legal: false, reasons: ['No deck'] };
   const reasons = [];
@@ -1887,18 +2018,24 @@ function isDeckLegal(deck) {
   }
   if ((deck.mainDeck || []).length !== 60) reasons.push('Main deck needs exactly 60 cards (' + (deck.mainDeck||[]).length + '/60)');
   const filledHeroes = (deck.heroes || []).filter(h => h && h.hero);
-  if (filledHeroes.length !== 3) reasons.push('Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
+  const heroSoll = requiredHeroCount(deck);
+  if (filledHeroes.length !== heroSoll) {
+    reasons.push(heroSoll === 2
+      ? 'With ' + ZHIGAO + ' you may only bring 1 other Hero (' + filledHeroes.length + '/2)'
+      : 'Need exactly 3 Heroes (' + filledHeroes.length + '/3)');
+  }
   const pc = (deck.potionDeck || []).length;
   if (pc !== 0 && (pc < 5 || pc > 15)) reasons.push('Potion Deck must have 0 or 5-15 cards (' + pc + ')');
-  // Main deck potions require Nicolas
+  // Potions im Main Deck brauchen Nicolas ODER einen Gewuerz-Platz
+  // („Secret Spice"-Artefakte, siehe spiceMainDeckAllowance).
   const mainPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion');
-  if (mainPotions.length > 0 && !hasNicolasHero(deck)) reasons.push('Main deck contains Potions but no Nicolas, the Hidden Alchemist');
-  // Combined Potion cap across main + Potion Deck — never more than 15
-  // total. With Nicolas in the team this is reachable by mixing the two
-  // sections; without Nicolas main-Potions are already rejected above
-  // and the Potion-Deck-only cap (5..15) covers the case.
-  const totalPotions = mainPotions.length + (deck.potionDeck || []).length;
-  if (totalPotions > 15) reasons.push('Combined Potions in Main + Potion Deck cannot exceed 15 (' + totalPotions + '/15)');
+  const ungedeckt = hasNicolasHero(deck) ? 0 : Math.max(0, mainPotions.length - spiceExemptMainPotions(deck));
+  if (ungedeckt > 0) reasons.push('Main deck contains ' + ungedeckt + ' Potion' + (ungedeckt === 1 ? '' : 's')
+    + ' without Nicolas, the Hidden Alchemist or a matching "Secret Spice" Artifact');
+  // Gemeinsame Grenze Main + Potion Deck: hoechstens 15 — Gewuerz-
+  // Plaetze im Main Deck ausgenommen (Als Vorgabe 12.9.).
+  const gezaehltePotions = countedPotions(deck);
+  if (gezaehltePotions > 15) reasons.push('Combined Potions in Main + Potion Deck cannot exceed 15 (' + gezaehltePotions + '/15)');
   return { legal: reasons.length === 0, reasons };
 }
 
@@ -1958,6 +2095,133 @@ const CECILIA_CRUSADER = 'Cecilia, the Harrowing Crusader';
 const CECILIA_TYPES = new Set(['Attack', 'Spell', 'Artifact']);
 function hasCeciliaCopyBonus(deck) {
   return (deck?.heroes || []).some(h => h?.hero === CECILIA_CRUSADER);
+}
+
+// ── „SECRET SPICE"-KLAUSEL (v948, Lesart nach Als Vorgabe 12.9.) ──
+// „For every 2 copies of this card in your deck, your deck may contain
+//  a copy of \"X\" or \"Y\"."
+//
+// Fuenf Artefakte der Reihe „Spices" sagen das, jedes mit eigener
+// Liste. Sie sind reine DECKBAU-Karten — im Spiel tun sie nichts und
+// brauchen deshalb auch kein Effektskript; die ganze Karte lebt hier.
+//
+// ★ WAS SIE OEFFNEN, IST DAS MAIN DECK. Ins Potion Deck duerfen 2
+// Kopien jeder Potion ohnehin — das waere kein Effekt. Die Gewuerze
+// wirken wie ein auf einzelne Namen beschraenkter Nicolas: je 2 Kopien
+// des Gewuerzes darf EINE Kopie einer der genannten Potions ins MAIN
+// Deck (und ist damit ziehbar). Der Platz ist geteilt — „a copy of X
+// or Y" ist ein Platz mit freier Wahl, und jede Kopie einer anderen
+// Potion derselben Liste im Main Deck verbraucht ihn.
+//
+// Die Obergrenze von 2 Kopien je Potion ueber Main- und Potion-Deck
+// ZUSAMMEN bleibt unangetastet (wie bei Nicolas) — mehr Gewuerze
+// heben sie nicht auf, sie verteilen nur mehr Plaetze.
+//
+// Die Tabelle wird aus dem KARTENTEXT gelesen, nicht abgeschrieben:
+// jedes Artefakt mit Archetyp „Spices" und diesem Satz traegt seine
+// Namen in Anfuehrungszeichen. Ein sechstes Gewuerz wirkt damit von
+// selbst, ohne Code-Aenderung.
+const SPICE_ARCHETYPE = 'Spices';
+const SPICE_TEXT_RE = /for every 2 copies of this card in your deck, your deck may contain a copy of ([^.]+)/i;
+const POTION_BASE_MAX = 2;
+let _spiceTable = null;
+function spiceTable() {
+  if (_spiceTable) return _spiceTable;
+  const db = window.CARDS_BY_NAME || {};
+  const namen = Object.keys(db);
+  if (namen.length === 0) return {};          // DB noch nicht geladen — nicht merken
+  const out = {};
+  for (const n of namen) {
+    const c = db[n];
+    if (!c || c.cardType !== 'Artifact' || c.archetype !== SPICE_ARCHETYPE) continue;
+    const m = SPICE_TEXT_RE.exec(String(c.effect || '').replace(/\s+/g, ' '));
+    if (!m) continue;
+    const freigaben = (m[1].match(/"([^"]+)"/g) || [])
+      .map(s => s.slice(1, -1))
+      .filter(name => db[name]);
+    if (freigaben.length > 0) out[c.name] = freigaben;
+  }
+  _spiceTable = out;
+  return out;
+}
+
+// „Zamorin, the Spice Rajah": „Every \"Secret Spice\" Artifact you add to
+// your deck during deck building counts as two copies of itself for its
+// own effect." Erkannt wird er ueber den Archetyp „Spices" auf einem
+// HELDEN im Team — und zwar bewusst so: der Teilstring „Secret Spice"
+// traefe nach der Namensbezug-Regel nur den „Secret Spice Jar", nicht
+// „Secret Blue Spice" & Co. Gemeint ist ersichtlich die ganze Reihe.
+function hasSpiceRajah(deck) {
+  return (deck?.heroes || []).some(h => {
+    const c = h?.hero && window.CARDS_BY_NAME[h.hero];
+    return !!c && c.cardType === 'Hero' && c.archetype === SPICE_ARCHETYPE;
+  });
+}
+
+/** Kopien dieses Namens im MAIN Deck (die Gewuerz-Plaetze gelten nur dort). */
+function countInMainDeck(deck, cardName) {
+  return (deck?.mainDeck || []).filter(n => sameCopyFamily(n, cardName)).length;
+}
+
+/**
+ * Wie viele Kopien dieser Potion die Gewuerze im MAIN DECK erlauben.
+ * 0 = die Potion steht auf keiner Liste oder es liegt kein (ausreichendes)
+ * Gewuerz im Deck. Gedeckelt durch die normale 2-Kopien-Grenze.
+ */
+function spiceMainDeckAllowance(deck, potionName) {
+  const tabelle = spiceTable();
+  const spices = Object.keys(tabelle).filter(s => tabelle[s].includes(potionName));
+  if (spices.length === 0) return 0;
+  const faktor = hasSpiceRajah(deck) ? 2 : 1;
+  let plaetze = 0;
+  for (const spice of spices) {
+    const pool = Math.floor((countInDeck(deck, spice) * faktor) / 2);
+    if (pool <= 0) continue;
+    let belegt = 0;
+    for (const andere of tabelle[spice]) {
+      if (andere === potionName) continue;
+      belegt += countInMainDeck(deck, andere);      // nur das Main Deck zaehlt
+    }
+    plaetze += Math.max(0, pool - belegt);
+  }
+  return Math.min(POTION_BASE_MAX, plaetze);
+}
+
+/** Darf diese Potion (noch) ins MAIN Deck? Nicolas oeffnet es fuer alle. */
+function potionAllowedInMainDeck(deck, potionName) {
+  if (hasNicolasHero(deck)) return true;
+  return countInMainDeck(deck, potionName) < spiceMainDeckAllowance(deck, potionName);
+}
+
+/**
+ * ★ Gewuerz-Plaetze zaehlen NICHT gegen die 15-Potion-Grenze (Als
+ * Vorgabe 12.9.). Mit Zamorin und 16 Gewuerz-Artefakten duerfen also 16
+ * Potions im Main Deck liegen UND weiterhin 5-15 im Potion Deck.
+ *
+ * Befreit sind je Name so viele Main-Deck-Kopien, wie die Gewuerze
+ * hergeben — der Rest (also alles, was nur ueber Nicolas dort liegt)
+ * zaehlt normal mit. Die Rechnung ist in sich schluessig, weil
+ * `spiceMainDeckAllowance` die Main-Deck-Kopien der ANDEREN Potions
+ * derselben Liste bereits abzieht: die Summe der Befreiungen kann den
+ * Vorrat des Gewuerzes nie ueberschreiten.
+ */
+function spiceExemptMainPotions(deck) {
+  const tabelle = spiceTable();
+  const namen = new Set();
+  for (const s of Object.keys(tabelle)) for (const p of tabelle[s]) namen.add(p);
+  let frei = 0;
+  for (const p of namen) {
+    const imMain = countInMainDeck(deck, p);
+    if (imMain <= 0) continue;
+    frei += Math.min(imMain, spiceMainDeckAllowance(deck, p));
+  }
+  return frei;
+}
+
+/** Potions, die gegen die 15er-Grenze zaehlen (Gewuerz-Plaetze ausgenommen). */
+function countedPotions(deck) {
+  const imMain = (deck?.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length;
+  return (deck?.potionDeck || []).length + Math.max(0, imMain - spiceExemptMainPotions(deck));
 }
 
 // Heroes whose card text explicitly allows multiple copies in the team
@@ -2045,7 +2309,10 @@ function getCardMax(deck, cardName) {
   // though the global cap is 5. Multi-team heroes (Peter Röll) get
   // Infinity here — the per-section caps cover their actual limits.
   if (ct === 'Hero') return MULTI_TEAM_HEROES.has(cardName) ? Infinity : 5;
-  if (ct === 'Potion') return 2;
+  // Potions: 2 Kopien über Main- und Potion-Deck zusammen. Die
+  // Gewürz-Klausel ändert daran NICHTS — sie entscheidet nur, ob eine
+  // Potion überhaupt ins MAIN Deck darf (siehe canAddCard).
+  if (ct === 'Potion') return POTION_BASE_MAX;
   if (ct === 'Ability') return Infinity;
   // Erst die Sonderklauseln sammeln, dann die grosszuegigste nehmen —
   // so schliessen zwei Erlaubnisse einander nicht aus.
@@ -2085,14 +2352,17 @@ function canAddCard(deck, cardName, section) {
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
-    // Potions allowed in main deck ONLY if Nicolas is a hero
+    // Potions im MAIN Deck: Nicolas öffnet es für alle, die
+    // „Secret Spice"-Artefakte für die von ihnen genannten Namen
+    // (je 2 Kopien des Gewürzes ein Platz, geteilt über seine Liste).
     if (ct === 'Potion') {
-      if (!hasNicolasHero(deck)) return false;
+      // Ueber einen Gewuerz-Platz? Dann zaehlt die Karte NICHT gegen die
+      // 15er-Grenze (Als Vorgabe 12.9.) — nur was allein ueber Nicolas
+      // im Main Deck liegt, tut das.
+      const ueberGewuerz = countInMainDeck(deck, cardName) < spiceMainDeckAllowance(deck, cardName);
+      if (!ueberGewuerz && !hasNicolasHero(deck)) return false;
       if ((deck.mainDeck || []).length >= 60) return false;
-      // Total potions across main + potion deck cannot exceed 15
-      const totalPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length
-        + (deck.potionDeck || []).length;
-      if (totalPotions >= 15) return false;
+      if (!ueberGewuerz && countedPotions(deck) >= 15) return false;
       if (countInDeck(deck, cardName) >= effMax) return false;
       return true;
     }
@@ -2104,14 +2374,12 @@ function canAddCard(deck, cardName, section) {
   if (section === 'potion') {
     if (ct !== 'Potion') return false;
     if ((deck.potionDeck || []).length >= 15) return false;
-    // Combined cap across main + Potion Deck — Potions in the main deck
-    // (only possible with Nicolas) count against the same 15-Potion
-    // ceiling. The symmetric check in the 'main' branch above blocks
-    // adds there; this one blocks adds to the Potion Deck when the
-    // total is already at 15.
-    const totalPotions = (deck.mainDeck || []).filter(n => window.CARDS_BY_NAME[n]?.cardType === 'Potion').length
-      + (deck.potionDeck || []).length;
-    if (totalPotions >= 15) return false;
+    // Gemeinsame Grenze ueber Main- und Potion-Deck: hoechstens 15
+    // Potions. Was ueber einen Gewuerz-Platz im Main Deck liegt, zaehlt
+    // dabei NICHT mit (Als Vorgabe 12.9.) — das Potion Deck bleibt also
+    // auch dann voll bespielbar, wenn das Main Deck voller
+    // Gewuerz-Potions steckt.
+    if (countedPotions(deck) >= 15) return false;
     if (countInDeck(deck, cardName) >= effMax) return false;
     return true;
   }
@@ -2119,6 +2387,14 @@ function canAddCard(deck, cardName, section) {
     if (ct !== 'Hero') return false;
     if (isNonStartingHero(cardName)) return false; // v704: „cannot be one of your Starting Heroes"
     if (!(deck.heroes || []).some(h => !h || !h.hero)) return false;
+    // ★ Zhigao-Grenze (v991): mit ihm im Team sind es ZWEI Helden. Ist
+    // die Zahl erreicht, geht kein weiterer mehr hinein — und Zhigao
+    // selbst passt nicht mehr dazu, wenn schon zwei andere stehen.
+    {
+      const belegt = (deck.heroes || []).filter(h => h && h.hero).length;
+      const mitZhigao = hasZhigaoHero(deck) || sameCopyFamily(cardName, ZHIGAO);
+      if (mitZhigao && belegt >= 2) return false;
+    }
     // Team slot: only ONE copy of each Hero may be in the team — except
     // for Heroes whose text allows multiple copies (Peter Röll). Those
     // are still gated by the 3 available team slots (the .some check
@@ -2182,6 +2458,24 @@ function trimOverLimitCopies(deck) {
         }
       }
       if (count <= max) break;
+    }
+  }
+  // ── Gewuerz-Plaetze im MAIN Deck (v948) ─────────────────────────
+  // Faellt ein „Secret Spice" (oder Zamorin) aus dem Deck, verlieren
+  // die freigeschalteten Potions ihren Platz im Main Deck. Sie wandern
+  // dann ins Potion Deck, solange dort Platz ist — dieselbe Behandlung,
+  // die der Deck-Builder beim Entfernen von Nicolas von Hand macht —
+  // und fallen sonst heraus. Mit Nicolas im Team passiert hier nichts:
+  // er oeffnet das Main Deck fuer jede Potion.
+  if (!hasNicolasHero(out)) {
+    for (let i = out.mainDeck.length - 1; i >= 0; i--) {
+      const name = out.mainDeck[i];
+      if (window.CARDS_BY_NAME[name]?.cardType !== 'Potion') continue;
+      // Zaehlt ohne DIESE Kopie: passt sie noch in die Freigabe?
+      const ohneDiese = { ...out, mainDeck: out.mainDeck.filter((_, j) => j !== i) };
+      if (countInMainDeck(ohneDiese, name) < spiceMainDeckAllowance(ohneDiese, name)) continue;
+      out.mainDeck.splice(i, 1);
+      if (out.potionDeck.length < 15) out.potionDeck.push(name);
     }
   }
   return out;
@@ -3210,6 +3504,19 @@ function CardTooltipContent({ card, children, imageUrl }) {
             short labeled list immediately under the base rules text so
             the player sees ALL of the card's current effects at a
             glance, not just the printed ones. */}
+        {/* v981 (Als Vorgabe 12.9.): Wer traegt hier fremde Effekte mit?
+            Die NAMEN stehen ganz oben — direkt beim Kartentext, noch vor
+            den geerbten Texten weiter unten. */}
+        {Array.isArray(card._copiedHeroes) && card._copiedHeroes.length > 0 && (
+          <div style={{
+            marginBottom: 8, padding: '4px 8px', borderRadius: 6,
+            background: 'rgba(255,204,68,.12)', border: '1px solid rgba(255,204,68,.35)',
+            fontSize: 12, lineHeight: 1.4,
+          }}>
+            <span style={{ color: '#ffcc44', fontWeight: 700 }}>Also has the effects of: </span>
+            <span>{card._copiedHeroes.join(', ')}</span>
+          </div>
+        )}
         {Array.isArray(card._inheritedEffects) && card._inheritedEffects.length > 0 && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.2)' }}>
             <div style={{ fontSize: 12, color: '#ffcc44', fontWeight: 700, marginBottom: 4 }}>Inherited Effects</div>

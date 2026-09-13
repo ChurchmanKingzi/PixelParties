@@ -242,9 +242,11 @@ function hasBounceableDeepsea(gs, playerIdx) {
  * holds card NAMES, not instances — the next time the card is played or
  * placed, a fresh instance is created.
  *
+ * @param {object} [opts] - { animationType } ueberschreibt das Bild
+ *   der Ruecknahme (Standard: `deep_sea_bubbles`).
  * @returns {Promise<{ returned: boolean }>}
  */
-async function returnSupportCreatureToHand(engine, inst, sourceName) {
+async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) {
   if (!inst || inst.zone !== 'support') return { returned: false };
   const gs = engine.gs;
   const ownerIdx = inst.owner; // Hand-return ALWAYS goes to original owner.
@@ -258,8 +260,12 @@ async function returnSupportCreatureToHand(engine, inst, sourceName) {
   // Bounce animation plays FIRST, even on Cardinal-immune targets —
   // visual feedback that the bounce attempted to hit. The actual
   // board-state change is gated below.
+  // v966: Der Ruecknahme-Weg ist laengst nicht mehr nur Deepsea —
+  // `opts.animationType` laesst fremde Karten ihr eigenes Bild setzen
+  // (Moonlight Butterfly steigt ins Mondlicht statt in Blasen). Ohne
+  // Angabe bleibt alles wie bisher.
   engine._broadcastEvent('play_zone_animation', {
-    type: 'deep_sea_bubbles', owner: ownerIdx, heroIdx, zoneSlot: slotIdx,
+    type: opts.animationType || 'deep_sea_bubbles', owner: ownerIdx, heroIdx, zoneSlot: slotIdx,
   });
 
   // Cardinal Beast immunity is the engine's absolute "this card cannot

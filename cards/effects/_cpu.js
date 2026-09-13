@@ -11283,6 +11283,19 @@ function evaluateState(engine, cpuIdx) {
   score += computePileFuelContribution(ps, cpuIdx);
   score -= computePileFuelContribution(opp, oppIdx);
 
+  // ── Gelernter Discard-Wert (v987, Als Auftrag 12.9.) ────────────
+  // `pileFuel` oben ist von Hand geschrieben — auf der VERBRAUCHENDEN
+  // Karte. Was die eigene Ablage darueber hinaus wert ist, lernt der
+  // Kanal `discardValueRules` je Deckprofil. Hier zaehlt AUSDRUECKLICH
+  // nur der gelernte Anteil (`learnedOnly` im Helfer): ohne Training
+  // ist der Term 0 und nichts am bestehenden Verhalten kippt, mit
+  // Training bekommt „meine Ablage ist mir etwas wert" ein Gewicht,
+  // das aus Ergebnissen stammt statt aus einer geratenen Zahl.
+  try {
+    score += deckProfile.discardPileValue(engine, cpuIdx);
+    score -= deckProfile.discardPileValue(engine, oppIdx);
+  } catch { /* defensiv */ }
+
   // ── Once-per-game spend cost ────────────────────────────────────
   // Generic "this card carries a finite, high-impact effect that's
   // gone once fired" eval term. Cards opt in via:

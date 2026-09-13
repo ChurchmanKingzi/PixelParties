@@ -207,8 +207,13 @@ module.exports = {
       // animation; the actual splice/track mirrors Magic Lamp's manual
       // path (no actionAddCardFromDeckToHand because the card never
       // lived in any deck).
+      // ★ v995 (Als Vorgabe 12.9.): kein Flug — die Karte kam von
+      // AUSSERHALB des Spiels und hat keinen Herkunftsort. Frueher
+      // liess der Handzuwachs-Erkenner sie aus der GEGNERHAND
+      // anfliegen; `hand_card_materialize` zeigt stattdessen Leuchten
+      // und Funken an der Hand und verbraucht die Gutschrift.
       engine._broadcastEvent('card_reveal', { cardName: oppChoice });
-      engine._broadcastEvent('deck_search_add', { cardName: oppChoice, playerIdx: pi });
+      engine._broadcastEvent('hand_card_materialize', { cardName: oppChoice, playerIdx: pi, count: 1 });
       ps.hand.push(oppChoice);
       engine._trackCard(oppChoice, pi, 'hand');
 

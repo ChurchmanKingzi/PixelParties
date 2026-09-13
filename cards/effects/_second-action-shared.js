@@ -188,6 +188,10 @@ async function secondActionGrant(ctx, opts = {}) {
       || ['creature', 'spell', 'attack', 'ability_activation', 'hero_effect_activation'],
     heroRestricted,
     isSecondActionGrant: true,
+    // v983: strengere Spielart — der Zuschlag darf nur die zweite
+    // Aktion des ZUGES sein (Duigno). Ohne die Flagge bleibt es bei
+    // „zweite Aktion dieser Action Phase".
+    ...(opts.secondActionOfTurn ? { secondActionOfTurn: true } : {}),
     sourceLabel: sourceLabel || inst.name,
   });
   engine.grantAdditionalAction(inst, typeId);

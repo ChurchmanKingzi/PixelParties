@@ -563,6 +563,114 @@ function reviveBonus(engine, pi, cardName) {
   return Math.max(-10, Math.min(25, best * confidence(prof)));
 }
 
+// ── Discard-Wert-Lernkanal (v987, Als Auftrag 12.9.) ─────────────────
+// „Was ist eine Karte in MEINER Ablage wert?" war bisher NICHT lernbar:
+// es gab nur `cpuMeta.pileFuel` — von Hand geschriebene Zahlen auf der
+// VERBRAUCHENDEN Karte (Soul Shards, Cute Phoenix). Ein Deck, das aus
+// der Ablage lebt (Necromancy, Skelette) oder sie als Treibstoff
+// benutzt, konnte den Wert seiner eigenen Ablage nicht LERNEN.
+//
+// Dieser Kanal schließt die Lücke:
+//   • `profile.discardValueRules[cardName]` — gelernte Punktzahl je
+//     Karte und Deckprofil, gefittet aus „geloescht vs. behalten"-
+//     Entscheidungen gegen den Ausgang (Trainer, s. train-deck-profile).
+//   • Ohne Regel: eine BERECHNETE Ersatzzahl aus dem, was schon da ist
+//     — passende `pileFuel`-Quellen auf meiner Seite und der gelernte
+//     Wiederbelebungswert. Sie dient nur der Entscheidung, NICHT dem
+//     Eval (sonst zaehlte pileFuel doppelt).
+//
+// `learnedOnly: true` liefert ausschliesslich den gelernten Anteil —
+// das benutzt das Eval, damit ohne Training nichts kippt.
+function loadCardEffectSafe(name) {
+  try { return require('./_loader').loadCardEffect(name); } catch { return null; }
+}
+
+function discardCardValue(engine, pi, cardName, opts = {}) {
+  try {
+    const prof = profileFor(engine, pi);
+    const gelernt = prof?.discardValueRules?.[cardName];
+    if (typeof gelernt === 'number') return gelernt * confidence(prof);
+    if (opts.learnedOnly) return 0;
+
+    // ── Ersatzzahl aus vorhandenen Erklaerungen ──────────────────────
+    const gs = engine?.gs;
+    const ps = gs?.players?.[pi];
+    if (!ps) return 0;
+    const cd = engine._getCardDB?.()[cardName];
+    if (!cd) return 0;
+    let wert = 0;
+
+    // (1) Ist die Karte Treibstoff fuer etwas, das ich kontrolliere?
+    for (const inst of (engine.cardInstances || [])) {
+      if ((inst.controller ?? inst.owner) !== pi) continue;
+      if (inst.faceDown || inst.counters?.negated) continue;
+      const meta = loadCardEffectSafe(inst.name)?.cpuMeta?.pileFuel;
+      if (!meta?.discardFilter || !meta.discardValue) continue;
+      try { if (meta.discardFilter(cd)) wert += meta.discardValue; } catch { /* defensiv */ }
+    }
+    // (2) Holt mein Deck Kreaturen aus der Ablage zurueck?
+    if (cd.cardType === 'Creature') wert += reviveBonus(engine, pi, cardName) * 0.5;
+    return wert;
+  } catch { return 0; }
+}
+
+/** Summe des GELERNTEN Discard-Werts einer Seite (fuer das Eval). */
+function discardPileValue(engine, pi) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps?.discardPile?.length) return 0;
+  let total = 0;
+  for (const name of ps.discardPile) total += discardCardValue(engine, pi, name, { learnedOnly: true });
+  return total;
+}
+
+/**
+ * Wie viele Karten verlassen mein Deck im Schnitt je Zug? Gemessen am
+ * laufenden Spiel (Startgroesse minus jetzige Groesse, geteilt durch die
+ * eigenen Zuege), mit 1.0 als Untergrenze — gezogen wird immer.
+ * Gebraucht fuer „wird mein Deck gefaehrlich klein?": die Frage ist
+ * nicht die absolute Zahl, sondern wie viele Zuege sie noch traegt.
+ */
+function deckDrainPerTurn(engine, pi) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps) return 1;
+  const start = typeof ps._startDeckSize === 'number' ? ps._startDeckSize : 30;
+  const jetzt = (ps.mainDeck || []).length;
+  const zuege = Math.max(1, Math.ceil((engine.gs?.turn || 1) / 2));
+  return Math.max(1, (start - jetzt) / zuege);
+}
+
+/** Traegt mein Deck noch genug Zuege? (Runden bis Deck-Out.) */
+function deckTurnsLeft(engine, pi) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps) return 99;
+  return (ps.mainDeck || []).length / deckDrainPerTurn(engine, pi);
+}
+
+/**
+ * Gelernte Entscheidung „Ablage loeschen ODER Deck millen" (Gravedigger
+ * und kuenftige Karten derselben Bauart). Tags beschreiben die Lage,
+ * die Regel kommt aus dem Profil.
+ *   Rueckgabe: 'delete' | 'mill' | null (dann entscheidet die Heuristik)
+ */
+function discardVsMillDecision(engine, pi, tags) {
+  try {
+    const prof = profileFor(engine, pi);
+    const rules = prof?.discardVsMillRules;
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      const score = (tags || []).reduce((sum, g) => sum + (rules[g] || 0), 0);
+      if (score >= 4) return 'delete';
+      if (score <= -4) return 'mill';
+      return null;
+    }
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < 0.4) {
+      return Math.random() < 0.5 ? 'delete' : 'mill';      // beide Arme erzeugen
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
 /**
  * Gelernter Starthand-Score für die Mulligan-Entscheidung.
  * Summe der startHandValues über die Handkarten (Duplikate zählen
@@ -2903,6 +3011,11 @@ module.exports = {
   equipPlacementBonus,
   lockOrderPenalty,
   reviveBonus,
+  discardCardValue,
+  discardPileValue,
+  deckDrainPerTurn,
+  deckTurnsLeft,
+  discardVsMillDecision,
   startHandScore,
   heroEffectTimingPrior,
   boardPairBonus,

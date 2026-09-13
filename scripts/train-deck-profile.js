@@ -1573,6 +1573,68 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
   }
 
+  // ── Discard-Wert-Kanal (v987, Als Auftrag 12.9.) ─────────────────
+  // Zwei Fits aus denselben Spielen:
+  //   `discardValueRules[card]` — was es kostet, GENAU DIESE Karte aus
+  //      der eigenen Ablage zu verlieren (Arme: geloescht vs. behalten).
+  //   `discardVsMillRules[tag]` — welcher Weg sich in welcher Lage
+  //      lohnt (Arme: 'delete' vs. 'mill', Tags aus der Entscheidung).
+  const discardValueRules = Object.create(null);
+  const discardVsMillRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const fates = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.discardCardFates)) continue;
+      for (const d of g.discardCardFates) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        fates.push({ c: d.c, deleted: !!d.deleted,
+          y: ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome });
+      }
+    }
+    const byCardDisc = Object.create(null);
+    for (const d of fates) (byCardDisc[d.c] = byCardDisc[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCardDisc)) {
+      const gel = ds.filter(d => d.deleted);
+      const beh = ds.filter(d => !d.deleted);
+      if (gel.length < MIN_ARM || beh.length < MIN_ARM) continue;
+      // Behalten besser als loeschen → die Karte ist in der Ablage etwas
+      // wert (positiver Wert). Umgekehrt: Ballast.
+      const delta = (beh.reduce((s, d) => s + d.y, 0) / beh.length)
+        - (gel.reduce((s, d) => s + d.y, 0) / gel.length);
+      const pts = Math.round(Math.max(-15, Math.min(15, delta * 100)) * 10) / 10;
+      if (Math.abs(pts) >= 1) discardValueRules[c] = pts;
+    }
+
+    const discDecs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.discardChoices)) continue;
+      for (const d of g.discardChoices) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        discDecs.push({ tags: d.tags || [], mode: d.mode,
+          y: ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome });
+      }
+    }
+    const discTags = new Set();
+    for (const d of discDecs) for (const t of d.tags) discTags.add(t);
+    for (const tag of discTags) {
+      const mit = discDecs.filter(d => d.tags.includes(tag));
+      const del = mit.filter(d => d.mode === 'delete');
+      const mil = mit.filter(d => d.mode === 'mill');
+      if (del.length < MIN_ARM || mil.length < MIN_ARM) continue;
+      const delta = (del.reduce((s, d) => s + d.y, 0) / del.length)
+        - (mil.reduce((s, d) => s + d.y, 0) / mil.length);
+      const pts = Math.round(Math.max(-10, Math.min(10, delta * 60)) * 10) / 10;
+      if (Math.abs(pts) >= 1) discardVsMillRules[tag] = pts;
+    }
+    if (fates.length > 0 || discDecs.length > 0) {
+      console.log(`Discard-Wert: ${fates.length} Kartenschicksale → ${Object.keys(discardValueRules).length} Karten mit Wert, `
+        + `${discDecs.length} Weg-Entscheidungen → ${Object.keys(discardVsMillRules).length} Tag-Regeln`);
+    }
+  }
+
   const surpriseRules = Object.create(null);
   {
     const MIN_ARM = 5;
@@ -2744,7 +2806,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
   }
 
-  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, abilityCostRules, drawDecisionRules, synergyRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, discardValueRules, discardVsMillRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, abilityCostRules, drawDecisionRules, synergyRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
@@ -3421,6 +3483,13 @@ function main() {
     // Gelernte Surprise-Fire/Hold-Regeln je Karte und turnBucket.
     surpriseRules: (advModel && advModel.surpriseRules && Object.keys(advModel.surpriseRules).length > 0)
       ? advModel.surpriseRules : undefined,
+    // v987: Discard-Wert-Kanal — was eine Karte in der eigenen Ablage
+    // wert ist, und welcher Weg (loeschen/millen) sich in welcher Lage
+    // lohnt.
+    discardValueRules: (advModel && advModel.discardValueRules && Object.keys(advModel.discardValueRules).length > 0)
+      ? advModel.discardValueRules : undefined,
+    discardVsMillRules: (advModel && advModel.discardVsMillRules && Object.keys(advModel.discardVsMillRules).length > 0)
+      ? advModel.discardVsMillRules : undefined,
     reactionRules: (advModel && advModel.reactionRules && Object.keys(advModel.reactionRules).length > 0)
       ? advModel.reactionRules : undefined,
     impactWeights: (advModel && advModel.impactWeights) ? advModel.impactWeights : undefined,

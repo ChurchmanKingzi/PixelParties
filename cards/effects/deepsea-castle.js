@@ -61,7 +61,7 @@ function _instLevel(engine, inst) {
   const cd = cardDB[inst.name];
   if (!cd) return 0;
   const owner = inst.controller ?? inst.owner;
-  return engine.effectiveCardLevel(cd, owner, { heroIdx: inst.heroIdx });
+  return engine.effectiveCardLevel(cd, owner, { heroIdx: inst.heroIdx, inst });
 }
 
 module.exports = {

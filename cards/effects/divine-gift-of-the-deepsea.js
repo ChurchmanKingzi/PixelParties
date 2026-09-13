@@ -87,7 +87,7 @@ function hasValidReplacement(engine, ps, pi, inst) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[inst.name];
   if (!cd) return false;
-  const bouncedLevel = engine.effectiveCardLevel(cd, pi, { heroIdx: inst.heroIdx });
+  const bouncedLevel = engine.effectiveCardLevel(cd, pi, { heroIdx: inst.heroIdx, inst });
   return buildReplacementGallery(engine, ps, pi, bouncedLevel, inst.name).length > 0;
 }
 
@@ -157,7 +157,7 @@ module.exports = {
       const bouncedHeroIdx = bouncedInst.heroIdx;
       const bouncedSlot = bouncedInst.zoneSlot;
       const bouncedLevel = engine.effectiveCardLevel(
-        cardDB[bouncedInst.name], pi, { heroIdx: bouncedHeroIdx },
+        cardDB[bouncedInst.name], pi, { heroIdx: bouncedHeroIdx, inst: bouncedInst },
       );
 
       // ── Step 2: bounce ──

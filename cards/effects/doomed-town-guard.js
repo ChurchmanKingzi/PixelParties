@@ -121,7 +121,8 @@ async function reagiereAufTod(ctx, opferName) {
   const handIdx = ps.hand.indexOf(CARD_NAME);
   ps.hand.splice(handIdx, 1);
   const res = await engine.summonCreatureWithHooks(
-    CARD_NAME, pi, dest.heroIdx, dest.slotIdx, { source: CARD_NAME },
+    CARD_NAME, pi, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
+        { source: CARD_NAME, fromHandIdx: handIdx },
   );
   if (!res?.inst) { ps.hand.push(CARD_NAME); return; }
 

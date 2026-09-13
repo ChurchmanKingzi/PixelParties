@@ -386,13 +386,6 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
     from: selectedAb.heroName,
   });
 
-  // Als Kosmetik-Ruling: die kopierte Ability erscheint zentral auf
-  // dem Screen (CardRevealOverlay — wie ein Search-Confirm-Fenster,
-  // fadet aber nach 3.5s von selbst aus). Gilt für CPU UND Mensch —
-  // dieser Skript-Pfad läuft für beide; in Sims ist _broadcastEvent
-  // stumm (_fastMode-Guard).
-  engine._broadcastEvent('card_reveal', { cardName: selectedAb.abName, playerIdx: pi });
-
   // Propagate the borrowed ability's cancel return: when an ability
   // returns `false` from its onFreeActivate/onActivate (player backed
   // out of an internal prompt), Charme's outer wrapper must also
@@ -411,6 +404,18 @@ async function _activateLv1(engine, gs, pi, heroIdx, hero, oi, ops) {
   // OWN copy of the same ability the same turn (Adventurousness etc.).
   // Skipped on cancel (the borrow didn't actually commit).
   if (result !== false) {
+    // ★ AUFTRITT ERST NACH DEM COMMIT (Als Regel 12.9.) ──────────────
+    // Stand hier frueher VOR `activateFn`. Die geliehene Ability oeffnet
+    // aber ihrerseits eine abbrechbare Abfrage (Leadership: waehle, was
+    // zurueckgelegt wird) — brach der Spieler dort ab, hatte der Gegner
+    // laengst ein „Leadership" gesehen, das nie passiert ist. Der
+    // Auftritt gehoert an den Punkt, ab dem nichts mehr zurueckgenommen
+    // werden kann.
+    // Als Kosmetik-Ruling: die kopierte Ability erscheint zentral auf
+    // dem Screen (CardRevealOverlay, fadet nach 3.5 s aus). Gilt fuer
+    // CPU UND Mensch; in Sims ist `_broadcastEvent` ohnehin stumm.
+    engine._broadcastEvent('card_reveal', { cardName: selectedAb.abName, playerIdx: pi });
+
     if (!gs.hoptUsed) gs.hoptUsed = {};
     // Einheitlich der namensbasierte Schluessel — auch fuer Karten aus
     // der Support-Zone (Cloak of Edge). Sie sind hart einmal pro Runde

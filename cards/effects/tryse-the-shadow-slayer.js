@@ -42,6 +42,8 @@
 //  hier ist sie richtig.
 // ═══════════════════════════════════════════
 
+const { isCreatureSource } = require('./_hooks');
+
 const CARD_NAME = 'Tryse, the Shadow Slayer';
 const MAX_PER_TURN = 2;
 const DISCARD_COUNT = 2;
@@ -59,6 +61,16 @@ function istDieserHeld(ctx) {
   const srcOwner = src.controller ?? src.owner ?? -1;
   if (srcOwner !== ctx.cardOwner) return false;
   if ((src.heroIdx ?? -1) !== ctx.cardHeroIdx) return false;
+  // ★ KREATUREN DER EIGENEN SPALTE AUSSCHLIESSEN (Als Befund 12.9.) ──
+  // Die alte Wache `src.zone === 'support'` griff nur bei LIVE-Instanzen.
+  // Kreaturen bauen ihre Schadensquelle aber meist synthetisch
+  // (`{ name, owner, controller, heroIdx }`) — ohne `zone`, dafuer mit
+  // dem heroIdx IHRER SPALTE. Damit sah jede Kreatur in Tryses Zonen
+  // aus wie Tryse selbst, und ihre Kills loesten seinen Effekt aus
+  // (aufgefallen an Thuly). `isCreatureSource` typisiert stattdessen
+  // ueber den KARTENNAMEN und faellt nur bei unbekannten Namen auf das
+  // `zone`-Signal zurueck.
+  if (isCreatureSource(ctx._engine, src)) return false;
   if (src.zone === 'support') return false;
   return true;
 }

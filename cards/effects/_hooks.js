@@ -483,6 +483,39 @@ function hasSpellSchool(cd, school) {
 }
 
 /**
+ * ★ „SPELL SCHOOL ABILITY" — DIE FUENF (Als Vorgabe 12.9., verbindlich)
+ *
+ * Genau diese fuenf Ability-Karten sind Zauberschulen. Fighting ist
+ * KEINE (das Regelheft nennt sie ausdruecklich „die einzige
+ * Nicht-Zauberschule"), und die reinen Nutz-Abilities (Adventurousness,
+ * Luck, Wisdom, Performance …) sind es auch nicht — Performance zaehlt
+ * beim LEVEL als Joker mit, ist aber selbst keine Schule.
+ *
+ * Jede Karte, deren Text „Spell School Ability" sagt, liest diese Liste
+ * — nie eine eigene. Cosmic Skeleton nimmt sie ohne Summoning Magic
+ * („except Summoning Magic"), Sarcophagus of Sealed Magic komplett.
+ */
+const SPELL_SCHOOL_ABILITIES = [
+  'Decay Magic', 'Destruction Magic', 'Magic Arts', 'Summoning Magic', 'Support Magic',
+];
+
+/**
+ * Welche Zauberschul-Abilities liegen an DIESEM Helden? Gibt die Namen
+ * zurueck (je Zone der Stapelname, also `slot[0]`), ohne Wiederholung.
+ *
+ * @param {Array<Array<string>>} abZones Ability Zones EINES Helden
+ * @param {Array<string>} [erlaubt] Teilmenge; Standard sind alle fuenf
+ */
+function spellSchoolAbilitiesOn(abZones, erlaubt = SPELL_SCHOOL_ABILITIES) {
+  const raus = new Set();
+  for (const slot of (abZones || [])) {
+    if (!slot || slot.length === 0) continue;
+    if (erlaubt.includes(slot[0])) raus.add(slot[0]);
+  }
+  return [...raus];
+}
+
+/**
  * "Artifact-Creature" hybrid: a card whose cardType is `Artifact` AND whose
  * subtype contains `Creature` (Pollution Spewer is the reference implementation).
  * Plays like an Artifact — pays gold, goes to a Support Zone during Main
@@ -876,7 +909,7 @@ module.exports = {
   heroAbilityLevel, heroFightingLevel, scaledByLevel,
   STATUS_EFFECTS, getNegativeStatuses, getCleansableStatuses,
   getParalysisStatuses, getTargetingBlockingStatuses, getStatusDamageSourceNames, BUFF_EFFECTS,
-  hasCardType, hasSpellSchool, isArtifactCreature, isPileCreature, hasNumericCreatureLevel, isCreatureNegated,
+  hasCardType, hasSpellSchool, SPELL_SCHOOL_ABILITIES, spellSchoolAbilitiesOn, isArtifactCreature, isPileCreature, hasNumericCreatureLevel, isCreatureNegated,
   heroCanBeEquipped,
   isOwnSideSummonableCreature,
   resolveSourceCreature, isCreatureSource, isAttackSpellOrCreatureSource,

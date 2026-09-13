@@ -21,7 +21,7 @@
 //    a support zone on either side.
 //  • If `distinctCount > viableTargets`: full-
 //    board AOE for 150 via `aoeHit`.
-//  • Else: prompt for up to `distinctCount`
+//  • Else: prompt for EXACTLY `distinctCount` (Als Befund 12.9.)
 //    DIFFERENT targets via `promptMultiTarget`
 //    (the multi-target prompt enforces unique
 //    selections natively).
@@ -120,15 +120,21 @@ module.exports = {
         return;
       }
 
-      // ── Multi-target mode: choose up to N DIFFERENT targets ──
+      // ── Multi-target mode: GENAU N verschiedene Ziele ───────────────
+      // ★ „Choose as many different targets as there are …" ist eine
+      // ZAHL, kein Hoechstwert (Als Befund 12.9.): wer waehlen kann,
+      // MUSS voll waehlen. `min: N` statt `min: 1`. Der Fall „weniger
+      // Ziele auf dem Brett als Zahlen in der Ablage" ist oben schon
+      // abgefangen — dort schlaegt die Karte flaechendeckend zu; hier
+      // unten stehen also immer mindestens N Ziele zur Verfuegung.
       const selected = await ctx.promptMultiTarget({
         side: 'any',
         types: ['hero', 'creature'],
-        min: 1,
+        min: N,
         max: N,
         baseDamage: PER_TARGET_DAMAGE,
         title: CARD_NAME,
-        description: `Choose up to ${N} different target${N > 1 ? 's' : ''}. Deal ${PER_TARGET_DAMAGE} damage to each.`,
+        description: `Choose ${N} different target${N > 1 ? 's' : ''}. Deal ${PER_TARGET_DAMAGE} damage to each.`,
         confirmLabel: `🔥 Strike! (${PER_TARGET_DAMAGE} ×N)`,
         confirmClass: 'btn-danger',
         cancellable: true,

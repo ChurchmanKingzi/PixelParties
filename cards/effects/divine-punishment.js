@@ -43,7 +43,7 @@ module.exports = {
     if (!targetLink) return;
 
     engine._broadcastEvent('play_zone_animation', {
-      type: 'holy_revival', owner: targetLink.owner,
+      type: 'divine_punishment', owner: targetLink.owner,
       heroIdx: targetLink.heroIdx ?? 0, zoneSlot: -1,
     });
     await engine._delay(500);

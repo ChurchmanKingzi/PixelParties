@@ -13,7 +13,13 @@
 //  Self-target: red laser show in all directions.
 // ═══════════════════════════════════════════
 
-const VALID_SCHOOLS = ['Destruction Magic', 'Decay Magic', 'Magic Arts', 'Support Magic'];
+// Die Schulliste liegt zentral in `_hooks.js` (Als Vorgabe 12.9.):
+// „Spell School Abilities" sind genau die fuenf. Cosmic Skeleton nimmt
+// sie ohne Summoning Magic („except Summoning Magic" im Kartentext) —
+// abgeleitet statt abgeschrieben, damit es nur EINE Stelle gibt.
+const { SPELL_SCHOOL_ABILITIES, spellSchoolAbilitiesOn } = require('./_hooks');
+
+const VALID_SCHOOLS = SPELL_SCHOOL_ABILITIES.filter(s => s !== 'Summoning Magic');
 
 module.exports = {
   requiresTarget: true,
@@ -31,11 +37,7 @@ module.exports = {
    */
   cpuPrefersSummonerHero(engine, pi, hi, cardData) {
     const abZones = engine.gs.players[pi]?.abilityZones?.[hi] || [];
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      if (VALID_SCHOOLS.includes(slot[0])) return true;
-    }
-    return false;
+    return spellSchoolAbilitiesOn(abZones, VALID_SCHOOLS).length > 0;
   },
 
   /**
@@ -50,11 +52,7 @@ module.exports = {
     if (!hero?.name || hero.hp <= 0) return false;
 
     const abZones = gs.players[heroOwner].abilityZones[heroIdx] || [];
-    for (const slot of abZones) {
-      if (!slot || slot.length === 0) continue;
-      if (VALID_SCHOOLS.includes(slot[0])) return true;
-    }
-    return false;
+    return spellSchoolAbilitiesOn(abZones, VALID_SCHOOLS).length > 0;
   },
 
   async onCreatureEffect(ctx) {

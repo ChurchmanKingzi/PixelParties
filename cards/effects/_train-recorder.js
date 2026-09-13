@@ -1037,6 +1037,17 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       const targetPicks = (engine._targetLog || [])
         .filter(e => e.pi === pinnedIdx)
         .map(({ c, t, tags }) => ({ c, t, tags }));
+      // Discard-Wert-Lernkanal (v987): je Entscheidung eine Zeile mit
+      // dem gewaehlten Weg und den Lage-Tags, dazu je betroffener Karte
+      // „geloescht (1) oder behalten (0)". Aus dem zweiten Teil fittet
+      // der Trainer `discardValueRules` — was es kostet, genau DIESE
+      // Karte aus der eigenen Ablage zu verlieren.
+      const discardChoices = (engine._discardChoiceLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ t, mode, tags }) => ({ t, mode, tags: tags || [] }));
+      const discardCardFates = (engine._discardFateLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, deleted }) => ({ c, t, deleted: deleted ? 1 : 0 }));
       // Surprise-Fire/Hold-Log der pinned Seite (Surprise-Lernkanal).
       const surpriseDecisions = (engine._surpriseLog || [])
         .filter(e => e.pi === pinnedIdx)
@@ -1259,6 +1270,8 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         protectionDecisions,
         targetPicks,
         surpriseDecisions,
+        discardChoices,
+        discardCardFates,
         reactionDecisions,
         damageImpacts,
         // Bounce-Swap-Historie: jedes Return-to-Hand-Ereignis der

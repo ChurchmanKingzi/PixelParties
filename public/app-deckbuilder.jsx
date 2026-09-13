@@ -992,6 +992,26 @@ function DeckBuilder() {
   const hasUnsaved = currentDeck && unsaved[currentDeck.id];
   escStateRef.current = { showLeaveConfirm, skinGallery, ctxMenu, renaming, hasUnsaved, isSampleMode, deckDropdownOpen };
   const heroes = currentDeck?.heroes || [{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null },{ hero:null,ability1:null,ability2:null }];
+  // ★ v992: Wie viele Helden verlangt diese Aufstellung? Mit
+  // „Zhigao, the Heavenly Emperor" sind es ZWEI statt drei
+  // (`requiredHeroCount` in app-shared.jsx — eine Quelle fuer
+  // Editor und Legalitaetspruefung).
+  const heroSoll = (window.requiredHeroCount ? window.requiredHeroCount(currentDeck) : 3);
+  // ★ v993 (Als Praezisierung 12.9.): Die gesperrten Plaetze haengen an
+  // der KAPAZITAET, nicht daran, ob schon jemand dasteht. Zhigao allein
+  // im Team heisst bereits „-1 Platz" — der wird sofort durchgekreuzt,
+  // damit man sieht, dass nur noch EIN Mitstreiter passt.
+  // Gesperrt werden die HINTEREN freien Plaetze.
+  const gesperrteHeldenPlaetze = (() => {
+    const raus = new Set();
+    let offen = Math.max(0, heroes.length - heroSoll);
+    for (let i = heroes.length - 1; i >= 0 && offen > 0; i--) {
+      if (heroes[i] && heroes[i].hero) continue;      // besetzt bleibt besetzt
+      raus.add(i);
+      offen--;
+    }
+    return raus;
+  })();
 
   const importFileRef = useRef(null);
 
@@ -1647,9 +1667,15 @@ function DeckBuilder() {
               const slot = dt && dt.section === 'hero' ? dt.idx : null;
               handleDrop('hero', { ...d, targetSlot: slot }, mx, my);
             }} onDragPos={onGalleryDragPos} className="deck-section">
-              <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={3} />
+              <SecHeader sec="heroes" color="#bb77ff" icon="👑" label="HEROES" count={heroes.filter(h=>h&&h.hero).length} max={heroSoll} />
               <div className="db-hero-row" data-deck-section="hero">
                 {heroes.map((h, i) => {
+                  // ★ v992 (Als Vorgabe 12.9.): Mit „Zhigao, the Heavenly
+                  // Emperor" im Team besteht die Aufstellung aus ZWEI
+                  // Helden. Der uebrige Platz ist nicht nutzbar und wird
+                  // durchgekreuzt — dieselbe Optik wie eine von „Boulder
+                  // in a Bottle" blockierte Support Zone.
+                  const gesperrt = !(h && h.hero) && gesperrteHeldenPlaetze.has(i);
                   const isDropTarget = (() => {
                     if (galleryDragOver && galleryDragOver.section === 'hero') return true;
                     if (deckDrag) {
@@ -1673,6 +1699,12 @@ function DeckBuilder() {
                           <button style={{ position: 'absolute', top: -5, right: -5, background: 'var(--danger)', color: '#fff',
                             border: 'none', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                             onClick={() => removeFrom(h.hero, 'hero', i)}>✕</button>
+                        </div>
+                      ) : gesperrt ? (
+                        <div className="db-hero-card">
+                          <div className="card-slot db-hero-slot-blocked">
+                            <span className="db-hero-slot-x">✕</span>
+                          </div>
                         </div>
                       ) : (
                         <div className="db-hero-card">

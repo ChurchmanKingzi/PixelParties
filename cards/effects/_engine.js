@@ -488,6 +488,8 @@ function _isExternalDiscardSource(fromZone) {
 // Crestinas Vorrat haengt an DIESEM Helden (siehe isCreationZoneUsable).
 const CRESTINA_ASCENDED = 'True Fairy Crestina, the Primordial Goddess';
 
+const MISSION_AA_TYPE = 'mission_light_brigade';   // v1004, s. missionLockActive
+
 class GameEngine {
   /**
    * @param {object} room - The room object from server.js
@@ -2611,6 +2613,14 @@ class GameEngine {
     await this.actionDealDamage({ name: 'Bleed' }, hero, amount, 'status', {
       isStatusDamage: true, skipSurpriseCheck: true, canBeNegated: true,
     });
+    // ★ Fenster „ein Ziel hat Bleed-Schaden genommen" (v951, Shared Blood
+    // Tanks). Gegenstueck zu `beforeBleedDamage`: dort wird der Betrag
+    // verhandelt, hier ist er gefallen. Beide Bleed-Wege feuern es mit
+    // derselben Nutzlast, damit eine Karte nicht zwei Faelle braucht.
+    await this.runHooks('afterBleedDamage', {
+      bleedTarget: { kind: 'hero', owner: pi, heroIdx: hi },
+      amount, after: info.actionType, _skipReactionCheck: true,
+    });
     this.sync();
     return true;
   }
@@ -2626,6 +2636,11 @@ class GameEngine {
       inst, amount, type: 'status', source: { name: 'Bleed' }, sourceOwner: -1,
       canBeNegated: true, isStatusDamage: true, animType: 'bleed_tick',
     }]);
+    // ★ Dasselbe Fenster wie im Heldenpfad (v951).
+    await this.runHooks('afterBleedDamage', {
+      bleedTarget: { kind: 'creature', owner, heroIdx: inst.heroIdx, inst },
+      amount, after: 'creature_effect', _skipReactionCheck: true,
+    });
     this.sync();
     return true;
   }
@@ -2679,6 +2694,36 @@ class GameEngine {
     // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
     // einziger zentraler Punkt fuer alle Action-Pfade (Spell/Attack,
     // Creature, Ability, Heldeneffekt mit Action-Kosten, Immediate Actions).
+    // ★ AKTIONEN DIESES ZUGES (v983) ─────────────────────────────────
+    // `_actionsPlayedThisPhase` zaehlt NUR in der Action Phase — eine
+    // Zusatzaktion aus einer Main Phase (Quick Attack, Dangerous
+    // Knowledge) taucht dort nicht auf. Fuer „das ist die zweite
+    // Aktion dieses ZUGES" braucht es einen eigenen Zaehler, und er
+    // gehoert genau hierher: `onAnyActionResolved` ist die eine Stelle,
+    // durch die JEDER Aktionspfad laeuft (dieselbe Begruendung wie beim
+    // Bleed-Schaden darunter). Ausgelesen von
+    // `_isSecondActionGrantAvailable` fuer Zuschlaege, die ausdruecklich
+    // die ZWEITE Aktion des Zuges sein muessen (Duigno).
+    if (hookName === 'onAnyActionResolved' && this._bleedTriggersForAction(hookCtx)) {
+      const _aps = this.gs?.players?.[hookCtx.playerIdx];
+      if (_aps) _aps._actionsPlayedThisTurn = (_aps._actionsPlayedThisTurn || 0) + 1;
+    }
+    // ★ v1004: Missions Ladung fuer eine INHAERENTE Zusatzaktion. Die
+    // ausdruecklich gewaehlten Zusatzaktionen bucht die Maschinerie
+    // selbst (`consumeAdditionalAction`); der inhaerente Weg kennt
+    // keinen Verbrauch — hier wird er nachgeholt.
+    if (hookName === 'onAnyActionResolved' && hookCtx.isInherent
+        && this.missionLockActive(hookCtx.playerIdx)
+        && this.missionChargesLeft(hookCtx.playerIdx) > 0) {
+      // `consumeAdditionalAction` bucht die Instanz-Ladung und ruft
+      // `onConsume` (das den Spielerzaehler senkt). Findet es keine
+      // Instanz mehr, wird der Zaehler direkt gesenkt — die Zahl des
+      // Spielers ist die fuehrende.
+      const _mps = this.gs.players[hookCtx.playerIdx];
+      if (!this.consumeAdditionalAction(hookCtx.playerIdx, MISSION_AA_TYPE) && _mps) {
+        _mps._missionCharges = Math.max(0, (_mps._missionCharges || 0) - 1);
+      }
+    }
     if (hookName === 'onAnyActionResolved' && !hookCtx._noBleed) {
       try { await this._processBleedAfterAction(hookCtx); }
       catch (err) { console.error('[Bleed] after action failed:', err.message); }
@@ -4722,6 +4767,7 @@ class GameEngine {
           // card; a caller can override (e.g. preview the equip it's
           // offering) by passing `previewCardName` explicitly.
           previewCardName: config.previewCardName || cardInstance.name,
+          _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           // Optional override for the cancel button label. Used when
           // cancelling means "step back" rather than "abort" — e.g.
           // Brackle's "↩ Back" returns to the sacrifice picker.
@@ -5260,8 +5306,13 @@ class GameEngine {
           : null;
         const forceSingleByIda = !!(casterHeroFlag?.forcesSingleTarget
           && config.damageType === 'destruction_spell');
+        // ★ v935 (Friedhelm): dieselbe Begrenzung, aber TYPUNABHAENGIG
+        // und nur fuer die EINE Aufloesung, die der Held angestossen hat
+        // („that Attack or Spell cannot affect more than 1 target").
+        // Idas Flagge bleibt auf Destruction Spells beschraenkt.
+        const forceSingleAny = !!casterHeroFlag?.forcesSingleTargetAny;
         const forceSingleByToras = !!casterHeroFlag?.singleTargetAttack;
-        const maxCap = (forceSingleByToras || forceSingleByIda)
+        const maxCap = (forceSingleByToras || forceSingleByIda || forceSingleAny)
           ? 1
           : (config.max || targets.length);
         const max = Math.min(maxCap, targets.length);
@@ -5275,6 +5326,7 @@ class GameEngine {
           cancellable: config.cancellable !== false,
           // General rule: show the source card's image in the picker.
           previewCardName: config.previewCardName || cardInstance.name,
+          _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           maxTotal: max,
           minRequired: min,
           // Forward intent fields — see promptDamageTarget for rationale.
@@ -9357,7 +9409,14 @@ class GameEngine {
       });
       // Sync THIS draw immediately so the client kicks off its
       // flight animation now, even when this is the final card.
-      if (interDrawDelay > 0) this.sync();
+      // ★ v927 (Als Befund 12.9.): frueher nur `if (interDrawDelay > 0)`
+      // — und `interDrawDelay` ist bei EINER Karte 0. Ein einzelner
+      // Potion-Zug (Mellvy) bekam damit gar keinen eigenen Sync: die
+      // Karte erschien erst beim naechsten Sync des Aufrufers, gebuendelt
+      // mit allem anderen, und der Hand-Diff-Melder des Clients hatte
+      // keinen Moment, in dem NUR dieser Zug passiert ist. Ergebnis: die
+      // Karte poppte ohne Flug in die Hand.
+      this.sync();
       // Stagger only between draws — the trailing tail covers the
       // last card's landing time.
       if (interDrawDelay > 0 && i < count - 1) {
@@ -11470,6 +11529,21 @@ class GameEngine {
    * Use this when you want the full summon lifecycle including hooks.
    */
   async summonCreatureWithHooks(cardName, playerIdx, heroIdx, zoneSlot = -1, opts = {}) {
+    // ★ FLUG VON DER HAND (v933, Als Befund 12.9.) ────────────────────
+    // Der regulaere Spielweg sendet den Flug im Server; der HOOK-Weg
+    // (Reaktions-Kreaturen: Explosive Drone, Doomed Town Guard, Chaorc
+    // Rider Warg, Rebelliokai Courtly Kirin) tat es bei keiner einzigen
+    // Karte — die Kreatur erschien ohne Bewegung in der Zone. Der
+    // Aufrufer nimmt die Karte VOR dem Beschwoeren aus der Hand und
+    // uebergibt den Platz als `opts.fromHandIdx`; nur dann fliegt sie.
+    if (opts.fromHandIdx != null && opts.fromHandIdx >= 0) {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: playerIdx, cardName,
+        from: 'hand', to: 'support',
+        fromHandIdx: opts.fromHandIdx,
+        toHeroIdx: heroIdx, toSlotIdx: zoneSlot,
+      });
+    }
     // v704 (Puppets): gesperrte Support Zones (Tri Fecta / Tri Ad) — nur
     // der Held selbst und Puppet-Tokens duerfen hinein (Skript-Vertrag
     // `supportZonesLocked`).
@@ -15394,6 +15468,17 @@ class GameEngine {
           }
           if (!ok) continue;
         }
+        // ★ ZONENSPERRE SPIEGELN (v926, Als Befund 12.9.) ─────────────
+        // `doPlayCreature` weist eine Beschwoerung in eine gesperrte
+        // Spalte ab (`isSupportZoneLocked`) — die Spielbarkeitsliste
+        // wusste davon nichts. Folge: ein Held mit einem Bonded
+        // Companion wurde samt seiner freien Support Zones als gueltiges
+        // Ziel angezeigt, der Server lehnte dann ab. Die Sperre kennt
+        // den anklopfenden Kartennamen, blockt also gezielt.
+        if (cd.cardType === 'Creature'
+            && this.isSupportZoneLocked(playerIdx, hi, {
+              cardName: cd.name, via: 'playability',
+            })) continue;
         // Berserked 2-Attack/turn cap — mirror of the validateActionPlay
         // gate. A berserked hero who has already played 2 Attacks this
         // turn must stop appearing as a legal Attack target.
@@ -16633,6 +16718,15 @@ class GameEngine {
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
       });
+      // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+      // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+      // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+      // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+      // gegnerische Melissa aus —, landete der Eintrag in
+      // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+      // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+      // ging dann verspaetet an einer voellig fremden Kette auf.
+      await this._flushSurpriseDrawChecks();
       this.sync();
       return { played: true, cardName: abilityName, cardType: 'Ability' };
     }
@@ -16711,6 +16805,15 @@ class GameEngine {
         isAdditional: true, isInherent: false, isFree: false,
         _skipReactionCheck: true,
       });
+      // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+      // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+      // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+      // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+      // gegnerische Melissa aus —, landete der Eintrag in
+      // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+      // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+      // ging dann verspaetet an einer voellig fremden Kette auf.
+      await this._flushSurpriseDrawChecks();
 
     } else {
       // v646: der eigentliche Guss steht in `_castSpellImmediately` — Call
@@ -16769,7 +16872,19 @@ class GameEngine {
     if (poolIndex < 0 || pool[poolIndex] !== cardName) return { cancelled: true };
     const fromZone = opts.fromZone || 'hand';
     if (fromZone === 'deck' && !this.pileOutAllowed(playerIdx, 'deck', opts)) return { cancelled: true };   // v818
-    pool.splice(poolIndex, 1);
+    // ★ DIE KARTE BLEIBT IN DER HAND, BIS DER ZAUBER WIRKLICH LAEUFT
+    // (v979, Als Vorgabe 12.9.). Bis v978 wurde sie hier oben aus der
+    // Hand geschnitten — beim Hebel also schon bei der Caster-Wahl, und
+    // sie fehlte waehrend der ganzen Zielwahl. Entnahme UND Flug stehen
+    // jetzt am Ende, in dem Moment, in dem der Zauber aufloest; ein
+    // Abbruch laesst die Hand voellig unberuehrt (kein Hin- und
+    // Rueckflug mehr).
+    // Der DECK-Fall entnimmt weiter sofort: dort gibt es keinen
+    // Handplatz, der stehenbleiben koennte, und `deck_search_add` zeigt
+    // die Karte ohnehin von Anfang an.
+    if (fromZone === 'deck') {
+      pool.splice(poolIndex, 1);
+    }
     if (fromZone === 'deck') {
       this._broadcastEvent('deck_search_add', { cardName, playerIdx });
       this.log('spell_cast_from_deck', { player: ps.username, card: cardName, by: opts.by || null });
@@ -16780,9 +16895,16 @@ class GameEngine {
     if (cardData.cardType === 'Spell') {
       const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
       if (wisdomCost > 0) {
+        // ★ Die Karte liegt seit v979 waehrend der Aufloesung noch in
+        // der Hand — fuer die Wisdom-Abfrage muss sie raus, sonst
+        // koennte der Spieler ausgerechnet den Zauber abwerfen, den er
+        // gerade wirkt. Danach kommt sie auf ihren Platz zurueck.
+        const _wIdx = fromZone === 'deck' ? -1 : pool.indexOf(cardName);
+        if (_wIdx >= 0) pool.splice(_wIdx, 1);
         await this.actionPromptForceDiscard(playerIdx, wisdomCost, {
           title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
         });
+        if (_wIdx >= 0) pool.splice(Math.min(_wIdx, pool.length), 0, cardName);
       }
     }
     this.gs._immediateActionContext = true;
@@ -16821,18 +16943,31 @@ class GameEngine {
       this.gs._spellResolutionDepth = Math.max(0, (this.gs._spellResolutionDepth || 1) - 1);
       if (cardData.cardType === 'Spell') this._popResolvingSpell();
     }
+    // ★ v1003: Nachtraeglich verbrauchte Aktion — dieselbe Marke, die
+    // `doPlaySpell` nach seiner Aufloesung abarbeitet. Hier steht sie,
+    // weil ein Zauber auch ueber diese Bruecke laufen kann (Difficulty
+    // Lever, Friedhelm, jede Zusatzaktion). Erst NACH dem Freigeben der
+    // Aufloesungstiefe, sonst weist `advanceToPhase` wieder ab.
+    if (this.gs._pendingActionBurn && (this.gs._spellResolutionDepth || 0) === 0) {
+      const burn = this.gs._pendingActionBurn;
+      delete this.gs._pendingActionBurn;
+      if (!this.gs.result) {
+        try { await this.burnUpcomingAction(burn.pi, burn.heroIdx || 0); }
+        catch (err) { console.error('[burnUpcomingAction]', err.message); }
+      }
+    }
+
     const abgebrochen = this.gs._spellCancelled && !this.gs._spellNegatedByEffect;
     this.gs._spellCancelled = _cancelVorher;
     if (abgebrochen) {
-      const _retIdx = Math.min(poolIndex, pool.length);
-      pool.splice(_retIdx, 0, cardName);
-      this._untrackCard(inst.id);
-      if (fromZone === 'hand') {
-        this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName, from: 'hand', to: 'hand',
-          fromHandIdx: _retIdx, toHandIdx: _retIdx,
-        });
+      // ★ v979: Aus der HAND ist nichts zurueckzulegen — die Karte hat
+      // sie nie verlassen, und es ist auch nichts geflogen. Nur der
+      // DECK-Fall legt zurueck (dort wurde oben entnommen).
+      if (fromZone === 'deck') {
+        const _retIdx = Math.min(poolIndex, pool.length);
+        pool.splice(_retIdx, 0, cardName);
       }
+      this._untrackCard(inst.id);
       delete this.gs._pendingCardReveal;
       delete this.gs._pendingPlayLog;
       if (opts.excludeTargets) delete this.gs._spellExcludeTargets;
@@ -16840,7 +16975,32 @@ class GameEngine {
       this.sync();
       return { cancelled: true };
     }
-    ps.discardPile.push(cardName);
+    // ★ JETZT ERST: ENTNAHME UND FLUG (v979) ──────────────────────────
+    // Der Zauber hat aufgeloest — hier verlaesst die Karte die Hand,
+    // und zwar sichtbar (Hausregel 17.8.: Flug VOR der Entnahme; jeder
+    // Weg in die Ablage zeigt eine Bewegung, Als Regel 12.9.).
+    //
+    // Hat der Effekt die Karte selbst schon aus der Hand bewegt (ein
+    // Zauber, der die eigene Hand abwirft, liegt ja noch mit drin),
+    // findet die Suche nichts — dann ist sie bereits woanders und wir
+    // ruehren sie nicht an. Ohne diese Pruefung laege sie doppelt in
+    // der Ablage.
+    if (fromZone === 'deck') {
+      this._broadcastEvent('play_pile_transfer', {
+        owner: playerIdx, cardName, from: 'deck', to: 'discard',
+      });
+      ps.discardPile.push(cardName);
+    } else {
+      const _endIdx = pool.indexOf(cardName);
+      if (_endIdx >= 0) {
+        this._broadcastEvent('play_pile_transfer', {
+          owner: playerIdx, cardName, from: 'hand', to: 'discard',
+          fromHandIdx: _endIdx,
+        });
+        pool.splice(_endIdx, 1);
+        ps.discardPile.push(cardName);
+      }
+    }
     this._untrackCard(inst.id);
     this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
     return { cancelled: false };
@@ -17183,6 +17343,7 @@ class GameEngine {
         ps.spellsPlayedThisTurn = 0;
         ps.comboLockHeroIdx = null;
         ps.heroesActedThisTurn = [];
+        ps._actionsPlayedThisTurn = 0;        // v983, s. runHooks
         ps.heroesAttackedThisTurn = [];
         ps._creaturesSummonedThisTurn = 0;
         // Chaorcs: per-turn count of Creatures this player sacrificed
@@ -17610,6 +17771,47 @@ class GameEngine {
    * Advance to the next phase. Called by player action (socket event).
    * Returns true if advance was valid.
    */
+  /**
+   * ★ EINE KOMMENDE AKTION NACHTRAEGLICH VERBRAUCHEN (v1003).
+   *
+   * Fuer Karten, die als ZUSATZaktion gespielt werden und ihre Aktion
+   * erst beim Aufloesen bezahlen, wenn eine Bedingung fehlschlaegt
+   * („Pillar of Light": trifft die Namensansage nicht, kostet sie
+   * doch eine Aktion).
+   *
+   * Drei Schritte, in dieser Reihenfolge:
+   *   1. Liegt die Aktion in einer KOMMENDEN Phase (Main Phase 1),
+   *      erst dorthin wechseln. Das ist kein Beiwerk: der Wechsel
+   *      faehrt `onPhaseStart`, und daran haengen die
+   *      Zweitaktions-Zuschlaege (Zhigao).
+   *   2. Den Helden als gehandelt stempeln.
+   *   3. In der Action Phase den Phasenzaehler hochsetzen und
+   *      `advanceToPhase(…, MAIN2)` rufen — dessen Riegel entscheidet
+   *      selbst, ob ein einloesbarer Zweitaktions-Zuschlag den Spieler
+   *      in der Action Phase haelt.
+   *
+   * ★ NICHT waehrend der Aufloesung aufrufen: `advanceToPhase` weist
+   * jeden Phasenwechsel ab, solange `_spellResolutionDepth > 0`. Karten
+   * setzen deshalb `gs._pendingActionBurn = { pi, heroIdx }`; der
+   * Spielweg ruft diese Methode, sobald die Aufloesung durch ist.
+   */
+  async burnUpcomingAction(playerIdx, heroIdx = 0) {
+    const gs = this.gs;
+    const ps = gs?.players?.[playerIdx];
+    if (!ps || gs.result) return false;
+    if (gs.currentPhase === PHASES.MAIN1) {
+      await this.advanceToPhase(playerIdx, PHASES.ACTION);
+    }
+    if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
+    if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
+    if (gs.currentPhase === PHASES.ACTION) {
+      ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+      await this.advanceToPhase(playerIdx, PHASES.MAIN2);
+    }
+    this.sync();
+    return true;
+  }
+
   async advancePhase(playerIdx) {
     // Only the active player can advance
     if (playerIdx !== this.gs.activePlayer) return false;
@@ -17737,7 +17939,13 @@ class GameEngine {
           if (inst.owner !== playerIdx) continue;
           for (const [typeId] of this._instAAEntries(inst)) {
             const config = this._additionalActionTypes?.[typeId];
-            if (config?.isSecondActionGrant) {
+            // ★ v985: „reachable" heisst EINLOESBAR — nicht bloss
+            // „vorhanden". Ein Zuschlag mit strengerer Bedingung
+            // (`secondActionOfTurn`, Duigno) kann hier laengst tot sein;
+            // ihn trotzdem als Grund zu nehmen, hielte den Spieler in
+            // einer Phase fest, in der er nichts mehr tun kann.
+            if (config?.isSecondActionGrant
+                && this._isSecondActionGrantAvailable(playerIdx, config)) {
               this.sync();
               return true; // Stay in Action Phase — second-action grant is reachable
             }
@@ -20338,9 +20546,27 @@ class GameEngine {
     const hero = this.gs.players[playerIdx]?.heroes?.[heroIdx];
     if (!hero?.name) return false;
     const script = loadCardEffect(hero.name);
-    if (typeof script?.supportZonesLocked !== 'function') return false;
-    try { return !!script.supportZonesLocked(this, playerIdx, heroIdx, opts); }
-    catch { return false; }
+    if (typeof script?.supportZonesLocked === 'function') {
+      try { if (script.supportZonesLocked(this, playerIdx, heroIdx, opts)) return true; }
+      catch { /* kaputtes Heldenskript darf die Zone nicht sperren */ }
+    }
+    // ★ v924 (Bonded Companions): auch KARTEN IN DER SPALTE duerfen
+    //   sperren. Bisher war die Sperre rein heldenseitig — fuer „A Hero
+    //   can only have 1 'Bonded Companion' Creature in its Support
+    //   Zones" ist die Bedingung aber die schon liegende Karte, nicht
+    //   der Held. Die Sperrfunktion sieht `opts.cardName` und kann
+    //   deshalb GEZIELT blocken (hier: nur weitere Bonded Companions)
+    //   statt die ganze Spalte dichtzumachen.
+    for (const inst of this.cardInstances) {
+      if (!inst || inst.zone !== 'support') continue;
+      if (inst.heroIdx !== heroIdx) continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      const sc = loadCardEffect(inst.counters?._effectOverride || inst.name);
+      if (typeof sc?.supportZonesLocked !== 'function') continue;
+      try { if (sc.supportZonesLocked(this, playerIdx, heroIdx, { ...opts, lockingInstance: inst })) return true; }
+      catch { /* kaputtes Kartenskript darf die Zone nicht sperren */ }
+    }
+    return false;
   }
 
   /**
@@ -20358,6 +20584,25 @@ class GameEngine {
     }
     this._plainHeroFormNames = out;
     return out;
+  }
+
+  /**
+   * ★ v924 (Bonded Companions): „unaffected by cards and effects that
+   * can't affect Heroes". Die Instanz faellt aus jeder Zielsammlung,
+   * die AUSSCHLIESSLICH Kreaturen treffen kann. Kann die Abfrage auch
+   * Helden treffen (`types` enthaelt `hero`), bleibt sie waehlbar —
+   * genau das sagt der Kartentext.
+   *
+   * @param {object} inst   Karteninstanz
+   * @param {string[]} typen `config.types` der laufenden Abfrage
+   */
+  isUnaffectedByCreatureOnly(inst, typen) {
+    if (!inst?.name) return false;
+    if (!loadCardEffect(inst.counters?._effectOverride || inst.name)?.unaffectedByCreatureOnly) return false;
+    // Keine Typangabe = die Abfrage grenzt nicht ein; dann greift die
+    // Klausel nicht (sie schuetzt nur vor KREATUR-ONLY).
+    if (!Array.isArray(typen) || typen.length === 0) return false;
+    return !typen.includes('hero');
   }
 
   isChoosableAsCreature(inst, cd) {
@@ -20481,6 +20726,14 @@ class GameEngine {
       // Baihu is a Baihu regardless of how it landed on the board.
       if (inst.counters?._cardinalImmune) continue;
       if (CARDINAL_NAMES.includes(inst.name)) continue;
+      // ★ „This Creature cannot be sacrificed" (v958, Boulder in a
+      // Bottle). Eigener, enger Vertrag statt `_cardinalImmune`: der
+      // sperrt JEDEN Effekt, hier geht es nur um das Opfern. Das
+      // Skript-Flag deckt den Normalfall, der Zaehler die Faelle, in
+      // denen eine Instanz ihre Kartenidentitaet erst zur Laufzeit
+      // bekommt (Override-Tokens, Puzzle-Aufbau).
+      if (inst.counters?.cannotBeSacrificed) continue;
+      if (loadCardEffect(inst.name)?.cannotBeSacrificed) continue;
       // EFFEKTIVE Kartendaten, nicht die rohe Datenbank (Fix 16.8., Als
       // Bugreport zu Kyli). Ein Biomancy-Token wird unter dem Namen der
       // zugrundeliegenden POTION getrackt und erst ueber
@@ -20622,12 +20875,25 @@ class GameEngine {
    * Interactive sacrifice resolution — prompts the caster to pick a
    * valid subset, destroys them, invokes `spec.onResolved(ctx, sacs)`.
    * Returns true on success; caller aborts the summon on false.
+   *
+   * `spec.extraTargets` (v972): zusaetzliche Picker-Ziele, die KEINE
+   * Opfer sind. Wird eines geklickt, opfert der Helfer nichts und gibt
+   * `{ extraPicked: <ziel> }` zurueck — der Aufrufer entscheidet dann
+   * selbst. So bleibt „Kreatur ODER etwas anderes" EINE Zielwahl auf
+   * dem Brett, ohne die Opfer-Maschinerie (Hand-Ersatz, Immunitaeten,
+   * Animation, Batch-Hooks) nachzubauen.
    */
   async resolveSacrificeCost(ctx, spec) {
     const pi = ctx.cardOwner;
     const selfId = ctx.card?.id;
     const candidates = this._collectSacrificeCandidates(pi, spec, selfId);
-    if (!this.hasValidSacrificeSet(candidates, spec.minCount, spec.minMaxHp || 0, spec.minSumLevel || 0)) {
+    // ★ v972: Mit Fremdzielen (`spec.extraTargets`) ist „kein gueltiges
+    // Opfer vorhanden" KEIN Grund zu verpuffen — der Waehler oeffnet
+    // dann eben nur mit den Fremdzielen. Sonst waere Teocuilatls
+    // Helden-Weg unerreichbar, sobald keine Kreatur opferbar ist.
+    const _hatExtra = Array.isArray(spec.extraTargets) && spec.extraTargets.length > 0;
+    if (!_hatExtra
+        && !this.hasValidSacrificeSet(candidates, spec.minCount, spec.minMaxHp || 0, spec.minSumLevel || 0)) {
       this.log('sacrifice_fizzle', {
         card: ctx.cardName, player: this.gs.players[pi]?.username,
         reason: 'no_valid_set',
@@ -20704,6 +20970,20 @@ class GameEngine {
       }
     }
 
+    // ── ★ FREMDZIELE IM SELBEN WAEHLER (v972) ───────────────────────
+    // `spec.extraTargets` haengt Ziele an, die KEINE Opfer sind — der
+    // Waehler zeigt sie neben den Tributen, und wird eines davon
+    // geklickt, endet der Aufruf sofort mit
+    // `{ extraPicked: <ziel> }` statt mit einer Opferung.
+    // Anlass: „Teocuilatl" bietet Kreatur ODER Held in EINER Zielwahl
+    // an (Als Vorgabe 12.9.) und braucht dafuer trotzdem die ganze
+    // Opfer-Maschinerie — vor allem den Hand-Ersatz „Chosen
+    // Sacrifice", der ausserhalb dieses Helfers nicht zu haben ist.
+    const extraIds = new Set();
+    if (Array.isArray(spec.extraTargets) && spec.extraTargets.length > 0) {
+      for (const t of spec.extraTargets) { targets.push(t); extraIds.add(t.id); }
+    }
+
     const defaultDescParts = [];
     if (spec.minMaxHp) defaultDescParts.push(`combined max HP ≥ ${spec.minMaxHp}`);
     if (spec.minSumLevel) defaultDescParts.push(`combined levels ≥ ${spec.minSumLevel}`);
@@ -20750,6 +21030,12 @@ class GameEngine {
           card: ctx.cardName, player: this.gs.players[pi]?.username,
         });
         return false;
+      }
+      // Fremdziel geklickt (s.o.) — kein Opfer, Rueckgabe an den Aufrufer.
+      if (extraIds.size > 0 && Array.isArray(ids)) {
+        const extra = ids.map(id => targets.find(t => t.id === id))
+          .find(t => t && extraIds.has(t.id));
+        if (extra) return { extraPicked: extra };
       }
       if (!ids || ids.length < spec.minCount) continue;
       const chosen = ids.map(id => targets.find(t => t.id === id)).filter(Boolean);
@@ -21279,6 +21565,10 @@ class GameEngine {
     if (this._forceNonCancellable > 0 && config?.cancellable) {
       config = { ...config, cancellable: false };
     }
+    // ★ Abbruch heisst hier „zurueck" (v976) — s. `promptGeneric`.
+    if (this._promptCancelLabel && config?.cancellable && !config.cancelLabel) {
+      config = { ...config, cancelLabel: this._promptCancelLabel };
+    }
 
     // ── HARTE UNWAEHLBARKEIT (Thicket, v724) ─────────────────────────
     // „cannot be chosen by cards and effects" — fuer JEDEN Waehler,
@@ -21299,6 +21589,50 @@ class GameEngine {
       }
       if (entfernt && validTargets.length === 0) return [];
     }
+    // ★ KARTEN-VERTRAG `blocksTargeting` AM FLASCHENHALS (v919, Als
+    //   Befund 12.9. an Stealth vs Overheal Shock) ────────────────────
+    // Bisher fragten NUR `promptDamageTarget` und `promptMultiTarget`
+    // den Vertrag ab. Jede Karte, die ihre Zielliste selbst baut und
+    // hier hereinreicht — Attachments (`_attachment-shared`), Ziel-
+    // Artefakte, Heldeneffekte, viele Zauber — lief daran vorbei:
+    // Stealth, Jetpack und jeder andere `blocksTargeting`-Schutz
+    // existierte fuer sie schlicht nicht. Overheal Shock (Spell Lv 1,
+    // Attachment) hing sich so an einen Tryse mit Stealth 2.
+    // Markiert wird, nicht geloescht: der Client graut aus, der
+    // CPU-Zweig filtert ueber `_waehlbar`, und die Serverpruefung
+    // (v915) weist eine Antwort mit markiertem Ziel ab.
+    if (!config.ignoreUntargetable && !config._truthSeeingEye) {
+      const _quelle = config.sourceCardName
+        || (typeof config.sourceCard === 'string' ? config.sourceCard : config.sourceCard?.name)
+        || config.source || config.previewCardName || config.title || null;
+      const _srcData = _quelle ? this._getCardDB()[_quelle] : null;
+      // ★ v924: „unaffected by cards and effects that can't affect
+      //   Heroes" (Bonded Companions). Kann die Abfrage ueberhaupt
+      //   keinen Helden treffen, fallen diese Karten heraus.
+      const _nurKreaturen = Array.isArray(config.types)
+        && config.types.length > 0 && !config.types.includes('hero');
+      if (_nurKreaturen) {
+        for (const t of validTargets) {
+          if (!t || t.type === 'hero' || t.ineligible) continue;
+          const inst = t.cardInstance || this.cardInstances.find(c =>
+            c.zone === 'support' && (c.controller ?? c.owner) === t.owner
+            && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+          if (this.isUnaffectedByCreatureOnly(inst, config.types)) t.ineligible = true;
+        }
+      }
+
+      for (const t of validTargets) {
+        if (!t || t.type !== 'hero' || t.ineligible) continue;
+        if (this.heroBlocksTargeting(t.owner, t.heroIdx, {
+          sourceData: _srcData,
+          cardName: _quelle,
+          chooserIdx: playerIdx,
+          chooserHeroIdx: config.chooserHeroIdx ?? -1,
+          damageType: config.damageType,
+        })) t.ineligible = true;
+      }
+    }
+
     // Non-damage opponent shield filter (The Great Wall of Deri, any
     // future "your Creatures can't be chosen by opp's non-damage
     // cards/effects" card). promptDamageTarget / promptMultiTarget
@@ -21511,6 +21845,35 @@ class GameEngine {
         } finally {
           this._inPostTargetWindow = false;
         }
+      }
+    }
+
+    // ★ SURPRISE-FENSTER AUCH HIER (v920, Als Befund 12.9. an Spike Trap
+    //   vs Overheal Shock) ────────────────────────────────────────────
+    // Dasselbe Loch wie beim Zielschutz (v919): das Fenster hing NUR an
+    // `promptDamageTarget`, `promptMultiTarget` und `actionAoeHit`. Ein
+    // Attachment wie Overheal Shock waehlt seinen Helden ueber diesen
+    // Dispatcher — und Spike Trap („Activate when the user is chosen by
+    // an Attack or Spell") bekam nie die Gelegenheit. Gleiche Riegel wie
+    // beim Reaktionsfenster darueber: nur HELDEN, nur mit echter Quelle,
+    // Rekursionssperre. `_callerHandlesSurprise` setzen die beiden
+    // Picker, die es selbst oeffnen.
+    if (!config._callerHandlesSurprise && !config._skipSurpriseCheck
+        && !this._inSurpriseResolution && !this._inPostTargetWindow) {
+      const _qName = config.sourceCardName
+        || (typeof config.sourceCard === 'string' ? config.sourceCard : config.sourceCard?.name)
+        || config.source || config.previewCardName || config.title || null;
+      const _ids = new Set(Array.isArray(_pickedIds) ? _pickedIds : [_pickedIds]);
+      const _helden = (validTargets || []).filter(t => t?.type === 'hero' && _ids.has(t.id));
+      if (_qName && _helden.length > 0) {
+        const _quelle = (typeof config.sourceCard === 'object' && config.sourceCard)
+          ? config.sourceCard
+          : { name: _qName, owner: playerIdx, controller: playerIdx,
+              heroIdx: config.chooserHeroIdx ?? -1, zone: 'hand' };
+        const _sr = await this._checkSurpriseWindow(_helden, _quelle, {
+          damageType: config.damageType,
+        });
+        if (_sr?.effectNegated) return [];
       }
     }
 
@@ -22834,6 +23197,17 @@ class GameEngine {
     if (this._forceNonCancellable > 0 && promptData && promptData.cancellable) {
       promptData = { ...promptData, cancellable: false };
       delete promptData.cancelLabel;
+    }
+    // ── ★ ABBRUCH HEISST HIER „ZURUECK" (v976) ──────────────────────
+    // Faehrt eine Karte einen FREMDEN Effekt und faengt dessen Abbruch
+    // selbst ab, um einen Schritt zurueckzuspringen (Difficulty Lever:
+    // Abbruch der Zielwahl → zurueck zur Caster-Wahl), dann soll auch
+    // der Knopf das sagen. Der Aufrufer setzt `_promptCancelLabel` um
+    // den fremden Aufruf herum; Prompts mit EIGENEM Label bleiben
+    // unberuehrt.
+    if (this._promptCancelLabel && promptData && promptData.cancellable
+        && !promptData.cancelLabel) {
+      promptData = { ...promptData, cancelLabel: this._promptCancelLabel };
     }
     // General rule: a prompt that asks the player to activate an effect,
     // choose between effects, or cancel ('confirm' / 'optionPicker')
@@ -29699,6 +30073,41 @@ class GameEngine {
    *   filter?: (cardData) → bool - optional hand card filter (for creature/spell/attack)
    * }
    */
+  // ─── „MISSION OF THE LIGHT BRIGADE" (v1004) ──────────────────────
+  // „You may perform up to 2 additional Actions this turn. You cannot
+  // perform any other additional Actions this turn."
+  //
+  // Als Auslegung (12.9.): ALLES, was nicht die erste Aktion der Action
+  // Phase ist, ist eine ZUSATZaktion — auch „zweite Aktionen" (Zhigao,
+  // Duigno, Torchure) und auch INHAERENTE (Quick Attack). Solange die
+  // Sperre laeuft, zaehlen nur noch Missions eigene Ladungen: jede darf
+  // fuer ALLES ausgegeben werden, und ist keine mehr da, geht nichts.
+  //
+  // Drei Beruehrungspunkte, hier gebuendelt:
+  //   • die drei Zuschlag-Sucher lassen nur noch Missions Typ durch,
+  //   • `cardHasInherentAction` verneint ohne Ladung,
+  //   • `runHooks(onAnyActionResolved)` zieht bei einer INHAERENTEN
+  //     Aktion eine Ladung ab (die Maschinerie bucht nur die
+  //     ausdruecklich gewaehlten Zusatzaktionen selbst).
+
+  /** Laeuft die Mission-Sperre fuer diesen Spieler gerade? */
+  missionLockActive(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    return !!ps && ps._missionLockTurn === this.gs.turn;
+  }
+
+  /**
+   * Wie viele Mission-Ladungen sind noch offen?
+   * Fuehrend ist der SPIELERZAEHLER (`_missionCharges`) — er ueberlebt
+   * jedes Instanz-Schicksal. Die Ladungen an der Instanz sind nur das,
+   * was die Zuschlag-Maschinerie fuer Menue und Auswahl braucht;
+   * `onConsume` haelt beide Zahlen zusammen (v1005).
+   */
+  missionChargesLeft(playerIdx) {
+    if (!this.missionLockActive(playerIdx)) return 0;
+    const ps = this.gs?.players?.[playerIdx];
+    return Math.max(0, ps?._missionCharges || 0);
+  }
   registerAdditionalActionType(typeId, config) {
     // config additionally supports:
     //   expiresAtTurnEnd?: bool — unspent grants of this type are
@@ -29870,7 +30279,15 @@ class GameEngine {
     if (!ps) return false;
     const isActionPhase = (this.gs.currentPhase || 0) === PHASES.ACTION;
     const actionsPlayed = ps._actionsPlayedThisPhase || 0;
-    return isActionPhase && actionsPlayed === 1;
+    if (!isActionPhase || actionsPlayed !== 1) return false;
+    // ★ v983 (Als Praezisierung 12.9., Duigno): strengere Spielart —
+    // der Zuschlag darf NUR die zweite Aktion des ZUGES sein. Wer in
+    // einer Main Phase schon gehandelt hat (Quick Attack, Dangerous
+    // Knowledge), ist mit der Aktion der Action Phase bereits bei
+    // zwei; dann gibt es hier nichts mehr. Andere Zuschlaege ohne die
+    // Flagge bleiben bei der alten, phasenbezogenen Regel.
+    if (config.secondActionOfTurn && (ps._actionsPlayedThisTurn || 0) !== 1) return false;
+    return true;
   }
 
   /**
@@ -29894,6 +30311,8 @@ class GameEngine {
         // window so the bonus can't be spent as a third action, fired
         // mid-Main-Phase, etc.
         if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
+        if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
         if (!byType[typeId]) byType[typeId] = { typeId, label: config.label, allowedCategories: config.allowedCategories || [], heroRestricted: !!config.heroRestricted, providers: [], eligibleHandCards: [] };
         byType[typeId].providers.push({ cardId: inst.id, cardName: inst.name, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot });
       }
@@ -30142,6 +30561,7 @@ class GameEngine {
   }
 
   findAdditionalActionForCard(playerIdx, cardName, heroIdx) {
+    if (this.additionalActionsLocked(playerIdx)) return null;   // v965
     const allCards = this._getCardDB();
     const cardData = allCards[cardName];
     if (!cardData) return null;
@@ -30159,6 +30579,8 @@ class GameEngine {
         // Second-action grants are only available as the actual second
         // action of the Action Phase — see `_isSecondActionGrantAvailable`.
         if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
+        // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
+        if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
         // Hero-restricted: provider must be on the same hero as the spell caster
         if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
         // Check category
@@ -30524,7 +30946,25 @@ class GameEngine {
    * Used by ability / creature-effect activation paths to find a
    * matching second-action grant when the player is at the action-2 slot.
    */
+  /**
+   * ZUSATZAKTIONS-SPERRE auf Spielerebene (v965, „Duigno, the Flaming
+   * Phoenix": „if you do, you cannot perform any other additional
+   * Actions during your turn").
+   *
+   * Gegenstueck zu `areActionsBlocked`, aber enger: gesperrt sind nur
+   * ZUSATZaktionen, die regulaere Zug-Aktion bleibt erlaubt. Ein
+   * Rundenstempel am Spieler, gelesen an den beiden Stellen, durch die
+   * JEDE Suche nach einem Zusatzaktions-Anbieter laeuft — Client-
+   * Ausgrauung und Server-Pruefung teilen sich damit dieselbe Antwort.
+   */
+  additionalActionsLocked(playerIdx) {
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps) return false;
+    return ps._additionalActionsLockedTurn === (this.gs?.turn || 0);
+  }
+
   findAdditionalActionForCategory(playerIdx, category, heroIdx) {
+    if (this.additionalActionsLocked(playerIdx)) return null;   // v965
     for (const inst of this.cardInstances) {
       if (inst.owner !== playerIdx) continue;
       for (const [typeId] of this._instAAEntries(inst)) {
@@ -30533,6 +30973,8 @@ class GameEngine {
         if (!this._isSecondActionGrantAvailable(playerIdx, config)) continue;
         if (config.heroRestricted && heroIdx != null && inst.heroIdx !== heroIdx) continue;
         if (!config.allowedCategories?.includes(category)) continue;
+        // ★ v1004: Mission sperrt alle FREMDEN Zuschlaege.
+        if (this.missionLockActive(playerIdx) && typeId !== MISSION_AA_TYPE) continue;
         return typeId;
       }
     }
@@ -31262,6 +31704,15 @@ class GameEngine {
           isFree:       false,
           _skipReactionCheck: true,
         });
+        // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+        // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+        // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+        // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+        // gegnerische Melissa aus —, landete der Eintrag in
+        // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+        // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+        // ging dann verspaetet an einer voellig fremden Kette auf.
+        await this._flushSurpriseDrawChecks();
       }
       // Action-cost activation auto-advance: same path as doPlaySpell /
       // doPlayCreature when the main Action slot was the resource.
@@ -33208,6 +33659,11 @@ class GameEngine {
   cardHasInherentAction(playerIdx, heroIdx, cardData, opts) {
     if (!cardData?.name) return false;
     const gs = this.gs;
+    // ★ v1004: Unter Missions Sperre ist auch eine INHAERENTE
+    // Zusatzaktion (Quick Attack) eine Zusatzaktion — sie kostet eine
+    // Mission-Ladung. Ohne Ladung ist sie schlicht nicht mehr
+    // durchfuehrbar.
+    if (this.missionLockActive(playerIdx) && this.missionChargesLeft(playerIdx) <= 0) return false;
     const script = loadCardEffect(cardData.name);
     if (script?.inherentAction === true) return true;
     if (typeof script?.inherentAction === 'function') {
@@ -33260,6 +33716,15 @@ class GameEngine {
     if (hero.levelOverrideCards && cardData.name && hero.levelOverrideCards[cardData.name] != null) {
       rawLevel = hero.levelOverrideCards[cardData.name];
     }
+    // ★ ABSOLUTE STUFEN-SETZUNG JE HANDKOPIE (v988, Inconspicuous Lawn
+    // Gnome). Anders als die Offsets darunter SETZT sie die Stufe statt
+    // sie zu senken — und sie haengt an der INSTANZ, nicht am Slot, so
+    // dass sie Handbewegungen ueberlebt. Mit `opts.handIdx` gilt genau
+    // diese Kopie, ohne ihn die niedrigste im Bestand (dieselbe
+    // „wenn IRGENDEINE Kopie spielbar ist"-Lesart wie bei den Offsets;
+    // der Spielweg loest die konkrete Kopie beim Splice auf).
+    const _setLvl = this._handLevelSetFor(playerIdx, cardData.name, opts.handIdx);
+    if (_setLvl != null) rawLevel = _setLvl;
     // Per-instance hand-card level offsets (Rocky Slime). The map lives
     // at `ps._handLevelOffsets[handIdx]` — keyed by the SPECIFIC hand
     // slot, so different copies of the same card can hold different
@@ -33338,6 +33803,31 @@ class GameEngine {
    * whether `abZones` alone is enough to play `cardData` from `hero`.
    * Side-effect-free.
    */
+  /**
+   * Absolute Stufen-Setzung einer HANDKOPIE (v988).
+   * @returns {number|null} gesetzte Stufe oder null, wenn keine gilt.
+   */
+  _handLevelSetFor(playerIdx, cardName, handIdx) {
+    if (!cardName) return null;
+    const ps = this.gs?.players?.[playerIdx];
+    if (!ps?.hand?.length) return null;
+    if (handIdx != null) {
+      if (ps.hand[handIdx] !== cardName) return null;
+      const inst = this._findHandInstanceAt?.(playerIdx, handIdx);
+      const v = inst?.counters?.levelSet;
+      return typeof v === 'number' ? v : null;
+    }
+    let best = null;
+    for (const inst of this.cardInstances) {
+      if (inst.zone !== 'hand' || inst.name !== cardName) continue;
+      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+      const v = inst.counters?.levelSet;
+      if (typeof v !== 'number') continue;
+      if (best == null || v < best) best = v;
+    }
+    return best;
+  }
+
   _testLevelReqForZones(playerIdx, heroIdx, cardData, hero, rawLevel, abZones, evalOpts = {}) {
     // Apply generic pre-reductions (Mana Mining and any future ability
     // that silently lowers spell levels). Abilities opt in by exporting
@@ -33571,6 +34061,18 @@ class GameEngine {
    * @returns {number} The effective level (≥ 0).
    */
   effectiveCardLevel(cardData, playerIdx, opts = {}) {
+    // ★ INSTANZ SCHLAEGT DATENBANK (v989, Als Befund 12.9.) ───────────
+    // Eine Karte auf dem Brett kann eine ANDERE Identitaet tragen als
+    // ihr Datenbankeintrag: `counters._cardDataOverride` (Lawn Gnome
+    // setzt seine Stufe, Boulder in a Bottle wird zur Kreatur,
+    // Biomancy-Token tragen den Namen einer Potion). Wer hier den rohen
+    // DB-Eintrag hereinreicht, rechnet mit der GEDRUCKTEN Stufe — genau
+    // daran lasen Garius und Brackle den Gnom falsch.
+    // Kommt die Instanz mit, gilt ihre wirksame Kartenidentitaet.
+    if (opts.inst) {
+      const eff = this.getEffectiveCardData(opts.inst);
+      if (eff) cardData = eff;
+    }
     if (!cardData) return 0;
     const heroIdx = opts.heroIdx;
     const handIdx = opts.handIdx;
@@ -33587,6 +34089,12 @@ class GameEngine {
         raw = hero.levelOverrideCards[cardData.name];
       }
     }
+
+    // (1b) ★ Absolute Stufen-Setzung je Handkopie (v988) — s.
+    // `_handLevelSetFor`. Steht VOR den Offsets: sie setzt, die Offsets
+    // senken danach weiter.
+    const _setLvl2 = this._handLevelSetFor(playerIdx, cardData.name, handIdx);
+    if (_setLvl2 != null) raw = _setLvl2;
 
     // (2) Per-hand-position offset (only when a specific slot is given).
     if (handIdx != null && ps?.hand && cardData.name) {
@@ -34645,7 +35153,11 @@ class GameEngine {
     // Auto-generate singleTargetPrompt for Destruction Spells when Ida's
     // forcesSingleTarget is active and no explicit prompt was provided.
     let singleTargetPrompt = config.singleTargetPrompt || null;
-    if (heroFlags?.forcesSingleTarget && !singleTargetPrompt && damageType === 'destruction_spell') {
+    // v935: `forcesSingleTargetAny` (Friedhelm) gilt fuer JEDEN Typ —
+    // Idas `forcesSingleTarget` weiter nur fuer Destruction Spells.
+    if ((heroFlags?.forcesSingleTargetAny
+         || (heroFlags?.forcesSingleTarget && damageType === 'destruction_spell'))
+        && !singleTargetPrompt) {
       singleTargetPrompt = {
         title: sourceName,
         description: `Deal ${damage} damage to a single target.`,
@@ -34654,7 +35166,8 @@ class GameEngine {
         cancellable: false,
       };
     }
-    const isSingleTarget = !!(heroFlags?.forcesSingleTarget && singleTargetPrompt);
+    const isSingleTarget = !!((heroFlags?.forcesSingleTarget || heroFlags?.forcesSingleTargetAny)
+      && singleTargetPrompt);
 
     if (isSingleTarget) {
       const prompt = singleTargetPrompt;

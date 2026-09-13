@@ -4,10 +4,10 @@
 //  Beliebig oft im eigenen Zug: aktuelle UND maximale HP um 100 senken,
 //  dafuer die oberste Karte des eigenen Decks VERDECKT in eine freie
 //  Support Zone eines gegnerischen Helden legen — aber nur bei einem
-//  Helden, der noch KEINE Karte aus diesem Effekt in irgendeiner seiner
-//  Support Zones hat. Zu Beginn des naechsten eigenen Zuges kommen alle
+//  Helden, der in DIESEM ZUG noch nicht gewaehlt wurde (v1011, neuer
+//  Wortlaut: „that has not been chosen by this effect yet this turn"). Zu Beginn des naechsten eigenen Zuges kommen alle
 //  noch liegenden Karten auf die Hand zurueck, die jeweiligen
-//  Traegerhelden nehmen 200 Schaden, und Rha'Bi bekommt je Karte 100
+//  Traegerhelden nehmen 150 Schaden, und Rha'Bi bekommt je Karte 100
 //  aktuelle und maximale HP.
 //
 //  ── ZWEI VERTRAEGE, DIE MAN LEICHT FALSCH BAUT ────────────────────
@@ -42,7 +42,7 @@
 
 const CARD_NAME = "Rha'Bi, the Living Skeleton";
 const KOSTEN    = 100;
-const SCHADEN   = 200;
+const SCHADEN   = 150;   // v1011 (Als Anpassung 12.9., war 200)
 const ZUWACHS   = 100;
 const MARKE     = '_rhabiPlaced';
 // Abstand zwischen zwei zurueckfliegenden Karten. Kurz genug, dass ein
@@ -56,9 +56,35 @@ function platzierte(engine, pi) {
     c && c.zone === 'support' && c.counters?.[MARKE]?.by === pi);
 }
 
-/** Traegt dieser gegnerische Held schon eine Karte aus dem Effekt? */
-function heldSchonBelegt(engine, pi, gegner, heroIdx) {
-  return platzierte(engine, pi).some(c => c.owner === gegner && c.heroIdx === heroIdx);
+/**
+ * ★ WURDE DIESER HELD IN DIESEM ZUG SCHON GEWAEHLT? (v1011, neuer
+ * Wortlaut 12.9.: „a Hero … that has not been chosen by this effect yet
+ * THIS TURN".)
+ *
+ * Frueher war die Sperre an die liegende KARTE gebunden („hat schon
+ * eine Karte aus dem Effekt"). Jetzt haengt sie am ZUG: ein Held, dem
+ * die Karte zwischendurch abhanden kommt, ist trotzdem fuer den Rest
+ * des Zuges tabu — und im naechsten Zug ist jeder wieder frei, auch
+ * wenn dort noch etwas liegt.
+ *
+ * Gefuehrt wird die Liste am SPIELER (nicht an der Karte), weil genau
+ * das die Sperre beschreibt: seine Wahl in diesem Zug.
+ */
+function schonGewaehlt(engine, pi, heroIdx) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps || ps._rhabiChosenTurn !== engine.gs.turn) return false;
+  return (ps._rhabiChosenHeroes || []).includes(heroIdx);
+}
+
+/** Wahl vermerken (s.o.). */
+function merkeWahl(engine, pi, heroIdx) {
+  const ps = engine?.gs?.players?.[pi];
+  if (!ps) return;
+  if (ps._rhabiChosenTurn !== engine.gs.turn) {
+    ps._rhabiChosenTurn = engine.gs.turn;
+    ps._rhabiChosenHeroes = [];
+  }
+  if (!ps._rhabiChosenHeroes.includes(heroIdx)) ps._rhabiChosenHeroes.push(heroIdx);
 }
 
 /** Erster freier Slot in den Support Zones eines Helden, sonst -1. */
@@ -88,7 +114,7 @@ function moeglicheZiele(engine, pi) {
   for (let hi = 0; hi < helden.length; hi++) {
     const h = helden[hi];
     if (!h?.name || h.hp <= 0) continue;
-    if (heldSchonBelegt(engine, pi, gegner, hi)) continue;
+    if (schonGewaehlt(engine, pi, hi)) continue;          // ★ je ZUG, s.o.
     if (freierSlot(engine, gegner, hi) < 0) continue;
     out.push({ id: `hero-${gegner}-${hi}`, type: 'hero', owner: gegner, heroIdx: hi, cardName: h.name });
   }
@@ -146,7 +172,7 @@ module.exports = {
     if (quelle !== CARD_NAME) return undefined;
     const ziele = payload?.validTargets || [];
     if (ziele.length === 0) return undefined;
-    // Der Held, den die 200 spaeter am haertesten treffen: der mit den
+    // Der Held, den die 150 spaeter am haertesten treffen: der mit den
     // wenigsten HP, den der Schaden also am ehesten umlegt.
     let bestes = ziele[0];
     let wenigste = Infinity;
@@ -188,7 +214,7 @@ module.exports = {
     // sich alles geaendert haben (Reaktion, Abwurf, Tod).
     const slot = freierSlot(engine, ziel.owner, ziel.heroIdx);
     if (slot < 0) return false;
-    if (heldSchonBelegt(engine, pi, ziel.owner, ziel.heroIdx)) return false;
+    if (schonGewaehlt(engine, pi, ziel.heroIdx)) return false;   // ★ je ZUG
     if (!bezahlbar(rhabi(engine, pi, heroIdx))) return false;
 
     // Oberste Deckkarte ueber die Stapel-Schicht entnehmen (★-Regel:
@@ -216,6 +242,7 @@ module.exports = {
     inst.controller = ziel.owner;
     inst.faceDown = true;
     inst.counters[MARKE] = { by: pi, turn: gs.turn };
+    merkeWahl(engine, pi, ziel.heroIdx);                  // ★ je ZUG gesperrt
     engine._addCardToState(inst);
 
     engine._broadcastEvent('play_zone_animation', {
@@ -260,30 +287,26 @@ module.exports = {
 
       await engine.showTriggeredEffect(CARD_NAME);
 
-      const getroffen = [];
+      // ★ JEDE KARTE IST EIN EIGENER TRIGGER (Als Ruling 12.9.) ─────
+      // Nicht erst alle einsammeln, dann alle Schaeden, dann heilen.
+      // Karte fliegt zurueck → dieses Ziel nimmt SOFORT seine 150 →
+      // Rha'Bi bekommt SOFORT seine 100 → erst dann die naechste.
+      // Dadurch oeffnet jede Karte ihre eigenen On-Hit-Fenster beim
+      // jeweiligen Ziel, statt dass drei Treffer als Block ankommen.
+      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
+      let zurueck = 0;
+
       for (const inst of liegend) {
+        // Abbruch mitten in der Kette: faellt Rha'Bi durch eine Reaktion
+        // auf den vorigen Treffer, kommt nichts mehr zurueck.
+        const lebt = rhabi(engine, pi, ctx.cardHeroIdx);
+        if (!lebt?.name || lebt.hp <= 0) break;
+
         const zielOwner = inst.owner;
         const zielHeroIdx = inst.heroIdx;
         delete inst.counters[MARKE];
-        // ★ REIHENFOLGE (Als Befund 12.9.) ────────────────────────────
-        // Beide Seiten des Umzugs lesen `inst.owner`: `_removeCardFromState`
-        // raeumt damit die Zone, `_addCardToState` waehlt damit die Hand.
-        // Wer den Besitz VOR dem Zug umhaengt, laesst die Karte im
-        // Zonenspiegel des Gegners stehen — sie lag danach aufgedeckt
-        // weiter dort UND auf der Hand. Also: erst mit dem ALTEN Besitz
-        // ausraeumen, dann umhaengen, dann mit dem NEUEN einlegen.
-        // Bewusst ohne `actionMoveCard`: die Platzierung hat aus
-        // demselben Grund keine Zonen-Hooks gefeuert (eine verdeckte
-        // Karte ist keine beschworene Kreatur), der Rueckweg tut es
-        // symmetrisch ebenfalls nicht.
-        // ── FLUG, EINE NACH DER ANDEREN (Als Vorgabe 12.9.) ──────────
-        // `play_pile_transfer` ist der Kanal fuer „Brettkarte → Hand",
-        // auch seitenuebergreifend (Sparkfly Worker nimmt denselben).
-        // Er unterdrueckt zugleich den Hand-Diff-Melder, der die Karte
-        // sonst aus dem DECK ziehen liesse. Broadcast VOR der
-        // Zustandsaenderung, damit der Client den Quell-Slot noch
-        // findet; danach warten, sodass die Karten nacheinander
-        // ankommen statt alle auf einmal (wie bei „Draw 3").
+
+        // ── ① Flug ───────────────────────────────────────────────────
         engine._broadcastEvent('play_pile_transfer', {
           fromOwner: zielOwner, toOwner: pi,
           cardName: inst.name,
@@ -295,6 +318,9 @@ module.exports = {
         engine.sync();
         await engine._delay(FLUG_MS);
 
+        // ── ② Auf die Hand ───────────────────────────────────────────
+        // Reihenfolge: erst mit dem ALTEN Besitz ausraeumen (beide
+        // Seiten lesen `inst.owner`), dann umhaengen, dann einlegen.
         engine._removeCardFromState(inst);
         inst.owner = pi;
         inst.controller = pi;
@@ -303,30 +329,34 @@ module.exports = {
         inst.zoneSlot = -1;
         inst.faceDown = false;
         engine._addCardToState(inst);
-        getroffen.push({ owner: zielOwner, heroIdx: zielHeroIdx, name: inst.name });
-      }
+        engine.sync();
 
-      // „the corresponding Heroes of each added card take 200 damage"
-      const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };
-      for (const t of getroffen) {
-        const opfer = gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (!opfer?.name || opfer.hp <= 0) continue;
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'bloody_cut', owner: t.owner, heroIdx: t.heroIdx, zoneSlot: -1,
+        // ── ③ Der zugehoerige Held nimmt seine 150 ───────────────────
+        const opfer = gs.players[zielOwner]?.heroes?.[zielHeroIdx];
+        if (opfer?.name && opfer.hp > 0) {
+          engine._broadcastEvent('play_zone_animation', {
+            type: 'bloody_cut', owner: zielOwner, heroIdx: zielHeroIdx, zoneSlot: -1,
+          });
+          await engine.actionDealDamage(quelle, opfer, SCHADEN, 'hero');
+        }
+
+        // ── ④ Rha'Bi bekommt SOFORT seine 100 ────────────────────────
+        const jetzt = rhabi(engine, pi, ctx.cardHeroIdx);
+        if (jetzt?.name && jetzt.hp > 0) engine.increaseMaxHp(jetzt, ZUWACHS);
+
+        zurueck++;
+        engine.log('rhabi_return', {
+          player: gs.players[pi]?.username,
+          card: inst.name,
+          target: opfer?.name || null,
+          damage: SCHADEN,
         });
-        await engine.actionDealDamage(quelle, opfer, SCHADEN, 'hero');
-      }
-
-      // „… increased by 100 per card added" — der Held kann inzwischen
-      // gefallen sein (Reaktion auf den Schaden); dann kein Zuwachs.
-      const danach = rhabi(engine, pi, ctx.cardHeroIdx);
-      if (danach?.name && danach.hp > 0 && getroffen.length > 0) {
-        engine.increaseMaxHp(danach, ZUWACHS * getroffen.length);
+        engine.sync();
       }
 
       engine.log('rhabi_harvest', {
         player: gs.players[pi]?.username,
-        cards: getroffen.length,
+        cards: zurueck,
         damage: SCHADEN,
       });
       engine.sync();

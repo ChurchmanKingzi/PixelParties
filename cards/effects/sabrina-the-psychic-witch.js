@@ -147,7 +147,9 @@ module.exports = {
     const sacTarget = sacTargets.find(t => t.id === sacIds[0]);
     if (!sacTarget) return false;
     const sacInst = sacTarget.cardInstance;
-    const sacLevel = engine._getCardDB()[sacInst.name]?.level || 0;
+    // ★ v989: wirksame Stufe der INSTANZ — ein Lawn Gnome (gesetzte
+    // Stufe) oder ein Token traegt eine andere als seine gedruckte.
+    const sacLevel = engine.getEffectiveCardData(sacInst)?.level || 0;
 
     // Build the eligible-Surprise list NOW (before sacrifice) — the
     // sacrifice firing hooks shouldn't be able to change deck contents

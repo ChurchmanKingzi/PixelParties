@@ -4469,6 +4469,9 @@ function sendGameState(room, playerIdx, extra) {
       // expire by Giga Steroids' hooks. Read by the client to render
       // the "On Steroids" buff badge in the top-of-board strip.
       onSteroids: ps.onSteroids || false,
+      // v1004: offene Ladungen von „Mission of the Light Brigade" —
+      // die Leiste oben links zeigt sie an.
+      missionActions: room.engine ? room.engine.missionChargesLeft(pi) : 0,
       creationLockedNames: (pi === playerIdx && ps._creationLockedNames) ? [...ps._creationLockedNames] : [],
       // Reiner Zieh-Lock (Sacred Jewel): graut nur Karten mit
       // blockedByDrawLock — Search-Karten bleiben spielbar.
@@ -4860,8 +4863,14 @@ function sendGameState(room, playerIdx, extra) {
           })();
         const isFaceDown = !!inst.faceDown;
         const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
+        // v925: Karten mit geteiltem HP-Pool haben keinen eigenen
+        // Vorrat (0 HP in der Datenbank). Der Client zeigt stattdessen
+        // die HP des Helden derselben Spalte — dafuer muss er wissen,
+        // dass der Pool geteilt ist.
+        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp) {
           cc[key] = { ...inst.counters };
+          if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
           if (isStolen) cc[key]._stolenBy = inst.stolenBy;
@@ -5337,6 +5346,9 @@ function sendSpectatorGameState(room) {
       // expire by Giga Steroids' hooks. Read by the client to render
       // the "On Steroids" buff badge in the top-of-board strip.
       onSteroids: ps.onSteroids || false,
+      // v1004: offene Ladungen von „Mission of the Light Brigade" —
+      // die Leiste oben links zeigt sie an.
+      missionActions: room.engine ? room.engine.missionChargesLeft(spi) : 0,
       supportSpellLocked: ps.supportSpellLocked || false,
       permanents: ps.permanents || [],
       coolnessStack: ps.coolnessStack || [],
@@ -5465,8 +5477,14 @@ function sendSpectatorGameState(room) {
           })();
         const isFaceDown = !!inst.faceDown;
         const isStolen = inst.stolenBy != null && inst.controller !== inst.owner;
-        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen) {
+        // v925: Karten mit geteiltem HP-Pool haben keinen eigenen
+        // Vorrat (0 HP in der Datenbank). Der Client zeigt stattdessen
+        // die HP des Helden derselben Spalte — dafuer muss er wissen,
+        // dass der Pool geteilt ist.
+        const _teiltHp = !!loadCardEffect(inst.counters?._effectOverride || inst.name)?.sharesHpWithHero;
+        if (hasCounters || hasSummoningSickness || isFaceDown || isStolen || _teiltHp) {
           cc[key] = { ...inst.counters };
+          if (_teiltHp) cc[key]._sharesHpWithHero = true;
           if (hasSummoningSickness) cc[key].summoningSickness = true;
           if (isFaceDown) cc[key].faceDown = true;
           if (isStolen) cc[key]._stolenBy = inst.stolenBy;
@@ -7656,6 +7674,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       isFree: !!becameFreeAction,
       _skipReactionCheck: true,
     });
+    // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+    // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+    // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+    // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+    // gegnerische Melissa aus —, landete der Eintrag in
+    // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+    // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+    // ging dann verspaetet an einer voellig fremden Kette auf.
+    await room.engine._flushSurpriseDrawChecks();
 
     // Spell-driven force-end-of-turn rider. A Spell's onPlay sets
     // `gs._spellEndsTurn = true` to request that the turn end as soon
@@ -7674,6 +7701,21 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         if (cur === 2 || cur === 3 || cur === 4) {
           await room.engine.advanceToPhase(pi, 5);
         }
+      }
+    }
+    // ★ NACHTRAEGLICH VERBRAUCHTE AKTION (v1003, Als Befund 12.9.) ─────
+    // Dieselbe Bauform wie `_spellEndsTurn` daneben, aus demselben
+    // Grund: `advanceToPhase` weist JEDEN Phasenwechsel ab, solange
+    // `_spellResolutionDepth > 0`. Eine Karte, die ihre Aktion erst
+    // beim Aufloesen bezahlt („Pillar of Light"), kann den Wechsel
+    // deshalb nicht selbst fahren — sie hinterlaesst die Marke, und
+    // hier, nach `_releaseSpellDepth()`, wird sie abgearbeitet.
+    if (gs._pendingActionBurn) {
+      const burn = gs._pendingActionBurn;
+      delete gs._pendingActionBurn;
+      if (!gs.result) {
+        try { await room.engine.burnUpcomingAction(burn.pi, burn.heroIdx || 0); }
+        catch (err) { console.error('[burnUpcomingAction]', err.message); }
       }
     }
     // Spreading Rumor fumble rider — the inherent path was taken
@@ -7775,10 +7817,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // don't represent unspent Action resource — they shouldn't trap
       // the player in Action Phase after the second Action has been
       // performed.
+      // ★ v991: „noch ein Zuschlag" reicht NICHT — er muss auch
+      // EINLOESBAR sein. Zwei Quellen (Zhigao und Duigno) meinen
+      // dieselbe zweite Aktion: ist sie verbraucht, steht der zweite
+      // Zuschlag zwar noch da, kann aber nichts mehr, und der Spieler
+      // saesse sonst in einer aktionslosen Action Phase fest.
       const hasMoreSecondAction = room.engine.cardInstances.some(c => {
         if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
         const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
-        return !!config?.isSecondActionGrant;
+        if (!config?.isSecondActionGrant) return false;
+        return room.engine._isSecondActionGrantAvailable(pi, config);
       });
       if (!hasMoreSecondAction) {
         await room.engine.advanceToPhase(pi, 4);
@@ -8968,21 +9016,44 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       isFree: false,
       _skipReactionCheck: true,
     });
+    // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+    // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+    // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+    // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+    // gegnerische Melissa aus —, landete der Eintrag in
+    // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+    // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+    // ging dann verspaetet an einer voellig fremden Kette auf.
+    await room.engine._flushSurpriseDrawChecks();
     if (isActionPhase && !usingAdditional && !effectiveIsInherent) {
       await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && usingAdditional) {
       // Only `isSecondActionGrant` providers gate the post-action-2
       // advance — see the doPlaySpell counterpart for rationale.
+      // ★ v991: „noch ein Zuschlag" reicht NICHT — er muss auch
+      // EINLOESBAR sein. Zwei Quellen (Zhigao und Duigno) meinen
+      // dieselbe zweite Aktion: ist sie verbraucht, steht der zweite
+      // Zuschlag zwar noch da, kann aber nichts mehr, und der Spieler
+      // saesse sonst in einer aktionslosen Action Phase fest.
       const hasMoreSecondAction = room.engine.cardInstances.some(c => {
         if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
         const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
-        return !!config?.isSecondActionGrant;
+        if (!config?.isSecondActionGrant) return false;
+        return room.engine._isSecondActionGrantAvailable(pi, config);
       });
       if (!hasMoreSecondAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
     }
+    // ★ FLAG VERBRAUCHEN (v985, Als Befund 12.9.) ──────────────────────
+    // `_preventPhaseAdvance` ist EINMALIG: der Zauberweg prueft und
+    // loescht es, der Kreaturweg loeschte es nie. Eine Kreatur, die beim
+    // Beschwoeren einen Zweitaktions-Zuschlag gibt (Duigno), setzt es —
+    // und das Flag blieb liegen und verschluckte den Phasenwechsel NACH
+    // der zweiten Aktion. Der Spieler sass in einer aktionslosen Action
+    // Phase fest.
+    delete gs._preventPhaseAdvance;
   } catch (err) {
     console.error('[Engine] doPlayCreature error:', err.message);
   } finally {
@@ -9306,6 +9377,15 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       isAdditional: !!usingAdditional, isInherent: false, isFree: false,
       _skipReactionCheck: true,
     });
+    // ★ v928 (Als Befund 12.9.): Zieh-Surprises NACH dem Aktions-Hook
+    // einloesen. `onAnyActionResolved` feuert in JEDEM Aktionspfad
+    // hinter dem letzten `_flushSurpriseDrawChecks()`. Zieht eine
+    // Karte erst in diesem Hook (Mellvy) — und loest dabei eine
+    // gegnerische Melissa aus —, landete der Eintrag in
+    // `_pendingSurpriseDraws` und blieb dort liegen, bis die NAECHSTE
+    // Aufloesung ihn leerte. Das Fenster fuer Pure Advantage Camel
+    // ging dann verspaetet an einer voellig fremden Kette auf.
+    await room.engine._flushSurpriseDrawChecks();
 
     // Force-end-of-turn rider — same flag the doPlaySpell path consumes
     // (see the comment block there for why the advance has to happen
@@ -18808,6 +18888,24 @@ async function runNetBenchmark() {
       + `(mit --verbose sichtbar).`);
   }
 
+  // ── NACHTRAG ZUR SCOPE-REGRESSION (v938, Als Lauf 12.9.) ──────────
+  // Der Fix von v378 hat diese sieben Deklarationen aus
+  // `diagnoseDrucken()` herausgezogen — aber nur bis HINTER den
+  // Null-Partien-Zweig. Der ruft `diagnoseDrucken()` jedoch VORHER,
+  // und `let` ist bis zu seiner Auswertung in der temporalen Todeszone:
+  //   ReferenceError: Cannot access 'cpuAlle' before initialization
+  // Damit starb der Bericht ausgerechnet in dem Fall, fuer den die
+  // Diagnose gebaut wurde — keine Partie kommt durch. Genau dieselbe
+  // Verwechslung wie damals, nur eine Ebene frueher: die FUNKTION ist
+  // hoisted, ihre `let`-Variablen sind es nicht.
+  let cpuAlle = 0;
+  let deckListe = [];
+  let fires = [];
+  let leaks = [];
+  let timeouts = [];
+  let griffe = [];
+  let notbremsen = [];
+
   const gewertet = proPartie.filter(p2 => p2.gewertet).length;
   if (gewertet === 0) {
     sag('');
@@ -18912,13 +19010,7 @@ async function runNetBenchmark() {
   // Der Textbericht war ebenfalls weg — beide Dateien entstehen in
   // derselben Anweisungsfolge. Deshalb: hier deklariert, drinnen nur
   // noch zugewiesen.
-  let cpuAlle = 0;
-  let deckListe = [];
-  let fires = [];
-  let leaks = [];
-  let timeouts = [];
-  let griffe = [];
-  let notbremsen = [];
+  // (Deklarationen stehen jetzt weiter OBEN — siehe dort.)
 
   // Als HOISTETE Funktion deklariert (nicht `const`), damit sie auch
   // oben im Null-Partien-Zweig aufgerufen werden kann.

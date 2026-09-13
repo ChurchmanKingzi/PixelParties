@@ -254,7 +254,11 @@ module.exports = {
         // where requested.
         const res = await engine.summonCreatureWithHooks(
           CARD_NAME, pi, death.heroIdx, death.zoneSlot,
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false }
+          // `fromHandIdx`: Flug von der Hand in die Zone (v934). Ohne
+          // das erscheint die Kreatur ohne Bewegung im Slot — der
+          // HOOK-Weg sendet den Flug nicht von selbst, anders als der
+          // regulaere Spielweg im Server.
+          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, fromHandIdx: handIdx }
         );
         if (!res) {
           // Extremely unlikely (no free slot after all). Put back.

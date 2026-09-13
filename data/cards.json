@@ -795,7 +795,7 @@
     "name": "Aquanian Orkallion",
     "cardType": "Creature",
     "subtype": "Normal",
-    "level": 2,
+    "level": 1,
     "hp": 100,
     "atk": null,
     "cost": null,
@@ -1357,7 +1357,7 @@
     "hp": 30,
     "atk": null,
     "cost": null,
-    "effect": "While you control this Creature, all your effects that trigger X times trigger an additional time.",
+    "effect": "When you summon this Creature, you may add copies of \"Beer\" from outside the game to your hand until your hand contains 7 cards.",
     "archetype": "",
     "setID": "PP WAW",
     "banned": "",
@@ -2103,7 +2103,8 @@
     "spellSchool2": "",
     "startingAbility1": "",
     "startingAbility2": "",
-    "foil": null
+    "foil": null,
+    "maxCopies": 1
   },
   {
     "name": "Bonded Companion Mellvy",
@@ -2121,7 +2122,8 @@
     "spellSchool2": "",
     "startingAbility1": "",
     "startingAbility2": "",
-    "foil": null
+    "foil": null,
+    "maxCopies": 1
   },
   {
     "name": "Bonded Companion Orphy",
@@ -2139,7 +2141,8 @@
     "spellSchool2": "",
     "startingAbility1": "",
     "startingAbility2": "",
-    "foil": null
+    "foil": null,
+    "maxCopies": 1
   },
   {
     "name": "Bonded Companion Thuly",
@@ -2157,7 +2160,8 @@
     "spellSchool2": "",
     "startingAbility1": "",
     "startingAbility2": "",
-    "foil": null
+    "foil": null,
+    "maxCopies": 1
   },
   {
     "name": "Booby Trap",
@@ -5114,12 +5118,12 @@
   {
     "name": "Dangerous Knowledge",
     "cardType": "Spell",
-    "subtype": "Reaction",
+    "subtype": "Normal",
     "level": 1,
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose a Hero your opponent controls with a different name from all Heroes you control (including defeated ones). The user gains that Hero's unique effect in addition to its own for the rest of the game. A Hero's effect can only be gained once per game with this effect.",
+    "effect": "Choose a Hero your opponent controls with a different name from all Heroes you control (including defeated ones). The user gains that Hero's effects in addition to its own for the rest of the game. A Hero's effects can only be gained once per game with this effect. This counts as an additional Action.",
     "archetype": "",
     "setID": "PP ART",
     "banned": "Banned",
@@ -7598,12 +7602,12 @@
   {
     "name": "Explosive Drone",
     "cardType": "Creature",
-    "subtype": "Normal",
+    "subtype": "Reaction",
     "level": 0,
     "hp": 10,
     "atk": null,
     "cost": null,
-    "effect": "When this Creature is defeated by an opponent's card or effect, choose a target and deal 150 damage to it.",
+    "effect": "You may immediately summon this Creature as an additional Action when a target you control is defeated by an opponent's card or effect. When this Creature is defeated by an opponent's card or effect, choose a target and deal 150 damage to it.",
     "archetype": "",
     "setID": "PP GBT",
     "banned": "",
@@ -9831,7 +9835,7 @@
     "name": "Gravedigger",
     "cardType": "Creature",
     "subtype": "Normal",
-    "level": 1,
+    "level": 0,
     "hp": 20,
     "atk": null,
     "cost": null,
@@ -10590,7 +10594,7 @@
     "level": null,
     "hp": null,
     "atk": null,
-    "cost": 10,
+    "cost": 6,
     "effect": "Whenever the equipped Hero performs an Action, its controller must add a card from their hand to their opponent's hand.",
     "archetype": "",
     "setID": "PP MSGB",
@@ -15812,7 +15816,7 @@
     "level": null,
     "hp": null,
     "atk": null,
-    "cost": 4,
+    "cost": 12,
     "effect": "Choose a target you control. That target cannot be chosen by your opponent during their next turn, except if it is your only legal target. You can only play 1 \"Perfect Disguise\" per game.",
     "archetype": "",
     "setID": "PP MBS1",
@@ -17146,7 +17150,7 @@
     "hp": 350,
     "atk": 0,
     "cost": null,
-    "effect": "Whenever you sacrifice a Creature you control with 100 or less HP, this Hero's Attack stat is permanently increased by that Creature's current HP.",
+    "effect": "Whenever you sacrifice a Creature you control with 150 or less HP, this Hero's Attack stat is permanently increased by that Creature's current HP.",
     "archetype": "",
     "setID": "PP MBS1",
     "banned": "",
@@ -17686,7 +17690,7 @@
     "hp": 300,
     "atk": 40,
     "cost": null,
-    "effect": "As many times as you want during your turn, you may reduce this Hero's current and max HP by 100 to place the top card of your deck face-down into the free Support Zone of a Hero your opponent controls that does not already have a card in any of its Support Zones from this effect. At the start of your next turn, if a card placed by this effect is still in a Support Zone and this Hero is not defeated, add those cards to your hand. Then, the corresponding Heroes of each added card take 200 damage and this Hero's current and max HP are increased by 100 per card added. If this Hero is defeated, delete all cards placed by this effect still in Support Zones.",
+    "effect": "As many times as you want during your turn, you may reduce this Hero's current and max HP by 100 to place the top card of your deck face-down into the free Support Zone of a Hero your opponent controls that has not been chosen by this effect yet this turn. At the start of your next turn, add all cards placed by this effect to your hand and deal 150 damage to the corresponding Heroes, then increase this hero's current and max HP by 100 for each card added to your hand. When this Hero is defeated, delete all cards placed by this effect that are still in Support Zones.",
     "archetype": "",
     "setID": "PP DD",
     "banned": "",
@@ -21700,7 +21704,7 @@
     "hp": 500,
     "atk": 80,
     "cost": null,
-    "effect": "You may once per turn sacrifice a Creature you control that was not summoned this turn to gain 10 Gold OR a Hero you control to gain 30 Gold. After you have sacrificed a Hero with this effect, immediately end your turn. You can only sacrifice 1 Hero per game with this effect.",
+    "effect": "You may once per turn sacrifice a Creature you control that was not summoned this turn to gain 10 Gold OR a Hero you control, except this one, to gain 30 Gold. After you sacrificed a Hero with this effect, immediately end your turn. You can only sacrifice 1 Hero per game with this effect.",
     "archetype": "",
     "setID": "PP MSAZ",
     "banned": "Banned",
@@ -24285,7 +24289,7 @@
     "foil": null
   },
   {
-    "name": "Wavillion",
+    "name": "Wavilion",
     "cardType": "Creature",
     "subtype": "Normal",
     "level": 0,
@@ -25343,6 +25347,42 @@
     "spellSchool2": "Magic Arts",
     "startingAbility1": "",
     "startingAbility2": "",
+    "foil": null
+  },
+  {
+    "name": "Shared Blood Tanks",
+    "cardType": "Spell",
+    "subtype": "Area",
+    "level": 1,
+    "hp": null,
+    "atk": null,
+    "cost": null,
+    "effect": "A Bleeding Hero may perform this Spell regardless of its level.\nWhenever a target takes Bleed damage, except from this effect, all other Bleeding targets its owner controls also take Bleed damage.",
+    "archetype": "",
+    "setID": "",
+    "banned": "",
+    "spellSchool1": "Decay Magic",
+    "spellSchool2": "",
+    "startingAbility1": "",
+    "startingAbility2": "",
+    "foil": null
+  },
+  {
+    "name": "Zhigao, the Heavenly Emperor",
+    "cardType": "Hero",
+    "subtype": "",
+    "level": null,
+    "hp": 300,
+    "atk": 0,
+    "cost": null,
+    "effect": "If this is one of your starting Heroes, you may only bring 1 other starting Hero to the game. This Hero may perform a second Action during each of your Action Phases.",
+    "archetype": "",
+    "setID": "",
+    "banned": "",
+    "startingAbility1": "Divinity",
+    "startingAbility2": "Divinity",
+    "spellSchool1": "",
+    "spellSchool2": "",
     "foil": null
   }
 ]

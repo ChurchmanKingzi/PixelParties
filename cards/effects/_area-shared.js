@@ -55,15 +55,26 @@ function effectiveLevel(cd, engine, pi) {
  * @param {object} cd     Kartendaten aus cards.json
  * @param {object} engine Engine (fuer das effektive Level); optional
  * @param {number} pi     Spielerindex; optional
+ * @param {object} [opts] `maxLevel` ueberschreibt die Schwelle 3.
+ *
+ * ── OHNE SCHWELLE (v944, Aquanian Orkallion) ──────────────────────
+ * Die drei Karten oben sagen 》a level 3 or lower Area《; Orkallion sagt
+ * 》regardless of its level《. Der REST der Regel ist derselbe (Typ,
+ * Subtyp, und vor allem: die Karte muss ueberhaupt ein Level haben —
+ * sonst zoege auch er Smuggler's Pier). Deshalb ist nur die Schwelle
+ * beweglich, `maxLevel: Infinity` hebt sie auf. Der Level-Riegel bleibt
+ * in JEDEM Fall stehen: 》regardless of its level《 setzt ein Level
+ * voraus, es hebt den Begriff nicht auf.
  */
-function isTutorableArea(cd, engine, pi) {
+function isTutorableArea(cd, engine, pi, opts = {}) {
   if (!cd) return false;
   if (!TUTORBARE_TYPEN.includes(cd.cardType)) return false;
   if ((cd.subtype || '').toLowerCase() !== 'area') return false;
   // Kein Level = nicht tutorbar. Steht VOR der Schwellenpruefung, weil
   // `(null || 0)` sonst als 0 durchginge.
   if (cd.level === null || cd.level === undefined) return false;
-  if (effectiveLevel(cd, engine, pi) > MAX_LEVEL) return false;
+  const schwelle = opts.maxLevel ?? MAX_LEVEL;
+  if (effectiveLevel(cd, engine, pi) > schwelle) return false;
   return true;
 }
 

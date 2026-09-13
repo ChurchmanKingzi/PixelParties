@@ -9027,6 +9027,27 @@ body:has(.game-hand-me) .board-tooltip {
   100% { transform: translateY(0px) scale(0.8); opacity: 0; }
 }
 
+/* Realmniversal Emperor (v941) — die getroffene Heldenkarte wird durch
+   die Verzerrung gezogen: gekippt, gestaucht, geschert, dann zurueck.
+   Bewusst auf die KINDER der Zone, nicht auf die Zone selbst: deren
+   Layoutbox berechnen die Area Zones mit (dieselbe Lehre wie bei
+   `.escape-dodging > *`). Die Klasse haengt `cosmic_distortion` in
+   app-board.jsx an und nimmt sie nach 950 ms wieder ab. */
+.cosmic-warped > * {
+  animation: cosmicWarp 900ms cubic-bezier(.3, .7, .4, 1) forwards;
+  transform-origin: center center;
+}
+@keyframes cosmicWarp {
+  0%   { transform: none; }
+  14%  { transform: perspective(420px) rotateY(16deg) skewY(-5deg) scale(1.06, .9); }
+  30%  { transform: perspective(420px) rotateY(-26deg) skewY(7deg) scale(.8, 1.18); }
+  46%  { transform: perspective(420px) rotateY(30deg) skewX(10deg) scale(1.16, .76); }
+  62%  { transform: perspective(420px) rotateY(-15deg) skewX(-7deg) scale(.88, 1.12); }
+  78%  { transform: perspective(420px) rotateY(9deg) skewY(4deg) scale(1.06, .94); }
+  90%  { transform: perspective(420px) rotateY(-4deg) scale(.98, 1.02); }
+  100% { transform: none; }
+}
+
 /* Whirlwind Strike spin effect on attacker */
 .whirlwind-spinning {
   animation: whirlwindSpin 2s ease-in-out forwards !important;
@@ -16072,4 +16093,120 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 @keyframes alliancePulse {
   0%, 100% { box-shadow: 0 0 6px 1px rgba(255, 200, 100, .45); }
   50%      { box-shadow: 0 0 16px 4px rgba(255, 200, 100, .8); }
+}
+
+/* ── Deck-Peek: aufgedeckte Karten bleiben in der Bildmitte liegen ──
+   (v968, „Spice Mortar"). Die Karten fliegen einzeln vom Deck an ihren
+   Platz im Raster und BLEIBEN dort, bis die Wahl steht — anders als der
+   Mitten-Auftritt des Mills, der sie weiterfliegen laesst.
+   `--sx`/`--sy` ist der Startpunkt (Deckposition, clientseitig
+   gemessen), `--tx`/`--ty` der Rasterplatz, `--delay` staffelt. */
+.deck-peek-card {
+  position: fixed;
+  width: 92px;
+  height: 129px;
+  left: var(--tx);
+  top: var(--ty);
+  z-index: 10100;
+  pointer-events: none;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,.6);
+  animation: deck-peek-in 420ms cubic-bezier(.2,.7,.3,1) var(--delay, 0ms) backwards;
+}
+@keyframes deck-peek-in {
+  0%   { transform: translate(calc(var(--sx) - var(--tx)), calc(var(--sy) - var(--ty))) scale(.55) rotateY(90deg); opacity: 0; }
+  55%  { opacity: 1; }
+  100% { transform: translate(0, 0) scale(1) rotateY(0deg); opacity: 1; }
+}
+.deck-peek-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.deck-peek-card.dimmed { opacity: .4; filter: grayscale(.8); }
+.deck-peek-card.pickable {
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 16px rgba(120,220,255,.8), 0 6px 18px rgba(0,0,0,.6);
+}
+.deck-peek-card.pickable:hover { transform: scale(1.07); transition: transform 160ms ease-out; z-index: 10110; }
+.deck-peek-card.leaving { animation: deck-peek-out 380ms ease-in forwards; }
+@keyframes deck-peek-out {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(0, 26px) scale(.82); opacity: 0; }
+}
+.deck-peek-card.taken { animation: deck-peek-take 620ms cubic-bezier(.4,.05,.6,1) forwards; }
+@keyframes deck-peek-take {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(calc(var(--ex) - var(--tx)), calc(var(--ey) - var(--ty))) scale(.5); opacity: 0; }
+}
+.deck-peek-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10120;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.deck-peek-bar .deck-peek-title {
+  font-size: 12px;
+  color: var(--text2);
+  background: rgba(0,0,0,.7);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+}
+.deck-peek-bar .btn { pointer-events: auto; }
+
+/* ── Gesperrter Heldenplatz im Deck-Editor ─────────────────────────
+   (v992, „Zhigao, the Heavenly Emperor"): Mit ihm im Team besteht die
+   Aufstellung aus zwei Helden — der uebrige Platz ist nicht nutzbar.
+   Optik bewusst identisch zur blockierten Support Zone von „Boulder in
+   a Bottle" (dunkelroter Verlauf, gestrichelter roter Rand, grosses
+   rotes ✕), damit „hier geht nichts" im ganzen Spiel gleich aussieht. */
+.card-slot.db-hero-slot-blocked {
+  background: radial-gradient(ellipse at center, rgba(60,0,0,.55) 0%, rgba(20,0,0,.7) 80%);
+  border: 2px dashed rgba(220, 40, 40, .55);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.db-hero-slot-blocked .db-hero-slot-x {
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 900;
+  color: #ff3333;
+  text-shadow: 0 0 8px rgba(255,30,30,.95), 0 0 16px rgba(255,30,30,.6);
+  opacity: .9;
+}
+
+/* ── Karte faedet in der Hand ein (v996) ───────────────────────────
+   Karten „from outside the game" (Barkeeper, Crestina) fliegen nicht,
+   sie ERSCHEINEN — also von 100 % Transparenz her, waehrend Leuchten
+   und Funken an ihrem Platz laufen. */
+.hand-slot.hand-card-materializing {
+  animation: hand-card-materialize 760ms ease-out;
+}
+@keyframes hand-card-materialize {
+  0%   { opacity: 0; transform: scale(.86); }
+  35%  { opacity: .55; }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Erscheinen in der Hand: Ankerpunkt auf der KARTENMITTE (v998) ──
+   Zwei Anlaeufe mit `getBoundingClientRect` sassen daneben, weil die
+   Handplaetze schrumpfen (`flex: 0 1 68px`, `min-width: 18px`) und die
+   64x90-Karten ueber ihren Platz hinausragen. Die Kartenmitte liegt
+   aber IMMER fest bei 32/45 px (mal `--board-scale`) vom linken oberen
+   Eck des Platzes — also wird sie gerechnet, nicht gemessen. */
+.hand-slot .hand-materialize-fx {
+  position: absolute;
+  left: calc(32px * var(--board-scale));
+  top: calc(45px * var(--board-scale));
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 40;
 }

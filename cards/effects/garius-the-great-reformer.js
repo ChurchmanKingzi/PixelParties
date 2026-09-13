@@ -132,7 +132,7 @@ function _hasReplacement(engine, pi, candidateInst) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[candidateInst.name];
   if (!cd) return false;
-  const lvl = engine.effectiveCardLevel(cd, pi, { heroIdx: candidateInst.heroIdx });
+  const lvl = engine.effectiveCardLevel(cd, pi, { heroIdx: candidateInst.heroIdx, inst: candidateInst });
   return _buildReplacementGallery(
     engine, pi, candidateInst.heroIdx, lvl, candidateInst.name,
   ).length > 0;
@@ -175,12 +175,14 @@ module.exports = {
       if (!Array.isArray(validTargets) || validTargets.length === 0) return undefined;
       const own = validTargets.filter(t => t.type === 'equip' && t.cardInstance);
       if (own.length === 0) return undefined;
-      const cardDB = engine._getCardDB();
-      const sorted = own.slice().sort((a, b) => {
-        const aLvl = cardDB[a.cardName]?.level ?? 0;
-        const bLvl = cardDB[b.cardName]?.level ?? 0;
-        return aLvl - bLvl;
-      });
+      // ★ v989: die WIRKSAME Stufe der Instanz, nicht die gedruckte —
+      // sonst sortiert die CPU einen Lawn Gnome mit gesetzter Stufe
+      // (oder einen Token) nach dem falschen Wert.
+      const stufe = (t) => {
+        try { return engine.effectiveCardLevel(null, t.owner, { inst: t.cardInstance }) || 0; }
+        catch { return 0; }
+      };
+      const sorted = own.slice().sort((a, b) => stufe(a) - stufe(b));
       return [sorted[0].id];
     }
     if (kind === 'generic' && payload?.type === 'cardGallery') {
@@ -252,7 +254,7 @@ module.exports = {
       // Sacrificed Creature's CURRENT level — Whoolmoth-style reducers
       // can lower it, in which case the replacement cap follows suit.
       const sacLevel    = engine.effectiveCardLevel(
-        cardDB[sacInst.name], pi, { heroIdx: sacInst.heroIdx },
+        cardDB[sacInst.name], pi, { heroIdx: sacInst.heroIdx, inst: sacInst },
       );
       const sacName     = sacInst.name;
       const sacHeroIdx  = sacInst.heroIdx;
@@ -363,8 +365,16 @@ module.exports = {
       if (!summonRes.inst.counters) summonRes.inst.counters = {};
       summonRes.inst.counters._hasHaste = true;
 
-      // (5) Reformer flair on Garius's hero zone — visual link
-      //     between the activator and the placed Creature.
+      // (5) ★ BEFOERDERUNG AUF DER TAUSCH-ZONE (v990, Als Vorgabe 12.9.).
+      //     Die grosse Animation gehoert dorthin, wo der Tausch
+      //     passiert ist — Lichtsockel, Saeule, aufsteigende Funken,
+      //     Kranz. Der kleine Funke auf GARIUS' Heldenzone bleibt als
+      //     Hinweis, wer das veranlasst hat.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'promotion_burst',
+        owner: pi, heroIdx: sacHeroIdx, zoneSlot: sacZoneSlot,
+        duration: 1400,
+      });
       engine._broadcastEvent('play_zone_animation', {
         type: 'gold_sparkle',
         owner: pi, heroIdx: gariusHeroIdx, zoneSlot: -1,

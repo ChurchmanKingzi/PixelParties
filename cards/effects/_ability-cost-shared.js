@@ -89,13 +89,21 @@ async function sendCardsLoop(engine, pi, heroIdx, opts) {
     if (ziele.length === 0) break;
     const remaining = Math.max(0, min - sent);
     const fertigErlaubt = remaining === 0 && sent > 0;
+    // ★ ABBRUCH VOR DER ERSTEN KARTE (v1009, Als Vorgabe 12.9.).
+    // `opts.cancelAtZero` macht den ERSTEN Waehler abbrechbar: wer es
+    // sich anders ueberlegt, bevor irgendetwas abgelegt ist, kommt ohne
+    // Verlust heraus — der Aufrufer bekommt `{ aborted: true, sent: 0 }`
+    // und laesst seine Karte nicht aufloesen. Danach ist Schluss damit:
+    // ab der ersten abgelegten Karte heisst der Knopf wieder „Done" und
+    // beendet nur das Sammeln (Lehre 6.9. bei Weapon Storm).
+    const abbruchErlaubt = sent === 0 && !!opts.cancelAtZero;
     const gewaehlt = await engine.promptEffectTarget(pi, ziele, {
       title: opts.cardName,
       description: opts.describe ? opts.describe(sent, abilitiesSent, remaining) : '',
       confirmLabel: opts.confirmLabel || '📤 Send',
       confirmClass: opts.confirmClass || 'btn-info',
-      cancelLabel: '✓ Done',
-      cancellable: fertigErlaubt,
+      cancelLabel: abbruchErlaubt ? (opts.cancelAtZeroLabel || '✕ CANCEL') : '✓ Done',
+      cancellable: fertigErlaubt || abbruchErlaubt,
       previewCardName: opts.cardName,
       autoConfirm: true,
       maxTotal: 1,
@@ -112,10 +120,12 @@ async function sendCardsLoop(engine, pi, heroIdx, opts) {
     // ist nur die stillgelegte Engine.
     if (gewaehlt == null) {
       if (engine._aborted) { aborted = true; break; }
+      if (abbruchErlaubt) { aborted = true; break; }     // ★ echter Abbruch
       if (fertigErlaubt) break;
       continue;
     }
     if (gewaehlt.length === 0) {
+      if (abbruchErlaubt) { aborted = true; break; }     // ★ echter Abbruch
       if (fertigErlaubt) break;
       continue;
     }

@@ -265,6 +265,12 @@ module.exports = {
       cancellable: true,
       exclusiveTypes: true,
       maxPerType: { equip: 1, ability: 1, perm: 1, area: 1, surprise: 1, coolnessStackTop: 1 },
+      // Einfachauswahl auch ausdruecklich deklariert (v940): die Karte
+      // liest nur `pick[0]`, und `exclusiveTypes` + `maxPerType: 1`
+      // begrenzen zwar faktisch schon auf eine Karte — `maxTotal` ist
+      // aber die Stelle, an der der Waechter `check-single-target`
+      // nachsieht.
+      maxTotal: 1,
     });
     if (!pick || pick.length === 0) return false; // cancelled — keep HOPT
 
