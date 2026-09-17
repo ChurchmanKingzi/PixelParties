@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════
 
 const { placePollutionTokens, countFreeZones } = require('./_pollution-shared');
+const { areaTargetId } = require('./_targeting-shared');
 
 const POLLUTION_TOKEN = 'Pollution Token';
 const SUN_BEAM_MAX = 3;
@@ -77,13 +78,16 @@ module.exports = {
             cardName: inst.name, cardInstance: inst, _cardInstance: inst,
           });
         } else if (inst.zone === 'area') {
-          // The BoardZone for "area" displays the top entry of areaZones[owner].
-          // Filter to only that entry — a second area instance on the same side
-          // isn't visually targetable with the current board layout.
+      // ★ v1054: JEDE Area der Zone ist ihr eigenes Ziel. Der frühere
+      // Filter auf den obersten Eintrag stammt aus der Zeit, als eine
+      // Seite nur eine Area halten konnte — seit „Spatial Crevice"
+      // machte er die unteren unauswählbar, und die Wahl landete
+      // stumm auf der obersten. Die ID trägt den Stapelplatz.
           const areaArr = gs.areaZones?.[inst.owner] || [];
-          if (areaArr.length > 0 && areaArr[areaArr.length - 1] !== inst.name) continue;
+          const stapelPlatz = areaArr.indexOf(inst.name);
+          if (stapelPlatz < 0) continue;
           targets.push({
-            id: `area-${inst.owner}`,
+            id: areaTargetId(inst.owner, stapelPlatz),
             type: 'area', owner: inst.owner, heroIdx: -1,
             cardName: inst.name, cardInstance: inst, _cardInstance: inst,
           });
@@ -160,17 +164,23 @@ module.exports = {
 
       // ── Destroy each target via the correct removal path ──
       let destroyed = 0;
-      for (const t of picked) {
-        const inst = t._cardInstance;
-        if (!inst) continue;
-        if (inst.zone === 'area') {
-          await engine.removeArea(inst, 'Sun Beam');
-          destroyed++;
-        } else {
-          await engine.actionDestroyCard(ctx.card, inst);
-          destroyed++;
+      // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Zaehlt die
+      // GEWAEHLTEN Ziele — bei genau einem bleibt es eine
+      // Einzelzerstoerung und der Dog darf feuern.
+      engine.beginDestroyScope(picked.length);
+      try {
+        for (const t of picked) {
+          const inst = t._cardInstance;
+          if (!inst) continue;
+          if (inst.zone === 'area') {
+            await engine.removeArea(inst, 'Sun Beam');
+            destroyed++;
+          } else {
+            await engine.actionDestroyCard(ctx.card, inst);
+            destroyed++;
+          }
         }
-      }
+      } finally { engine.endDestroyScope(); }
 
       engine.sync();
       await engine._delay(300);

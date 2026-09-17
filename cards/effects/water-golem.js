@@ -58,6 +58,7 @@ async function negationAuffrischen(engine, golem) {
     if (ziel.hero.statuses?.negated) return;
     await engine.addHeroStatus(ziel.owner, ziel.heroIdx, 'negated', {
       source: CARD_NAME, _skipReactionCheck: true,
+      appliedBy: golem.controller ?? golem.owner,   // v1067: Quelle ist Pflicht
       // Zustandsgebunden: der Golem haelt sie aufrecht, ein Abfaenger
       // haette nichts davon (v718-Vertrag).
       noAbsorb: true,

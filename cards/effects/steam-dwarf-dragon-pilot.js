@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Kosten sind Opfer-Kreaturen, kein Handabwurf (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Steam Dwarf Dragon Pilot"
 //  Creature (Summoning Magic Lv1, archetype

@@ -133,6 +133,8 @@ module.exports = {
     if (!ps.drawLocked && !ps.handLocked && (ps.mainDeck || []).length > 0) {
       const extra = await engine.promptGeneric(pi, {
         type: 'confirm',
+        costFor: 'Prayer',   // ★ v1041: Kosten-Abwurf-Lernkanal
+        costKind: 'draw',
         title: CARD_NAME,
         message: 'Draw 1 extra card? You cannot draw any more cards this turn afterwards.',
         showCard: CARD_NAME,

@@ -121,6 +121,7 @@ module.exports = {
         const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
         if (!hero?.name || hero.hp <= 0) return;
         await engine.actionAddBuff(hero, target.owner, target.heroIdx, 'disrupted', {
+          sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           expiresAtTurn,
           expiresForPlayer,
           source: CARD_NAME,

@@ -2,10 +2,13 @@
 //  CARD EFFECT: "Great Offensive"
 //  Spell (Destruction Magic + Support Magic, Lv2, Normal)
 //
-//  „All Creatures you control immediately use their active effects an
+//  „All Creatures you control use their active effects an
 //   additional time (even if they were summoned this turn)."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
+//  • ★ v1166 (Balancing, Al 17.9.): „Immediately end your turn
+//    afterwards." — `gs._spellEndsTurn = true` am Ende der Aufloesung,
+//    derselbe Weg wie Premonition und Open Invitation.
 //  • „All Creatures you control" geht nach KONTROLLE, nicht Besitz:
 //    eine geklaute Creature in meiner Reihe zaehlt mit, eine eigene,
 //    die beim Gegner steht, nicht.
@@ -169,6 +172,12 @@ module.exports = {
           await engine._delay(180);
         }
       }
+
+      // ★★ v1166 (Balancing, Al 17.9.): „Immediately end your turn
+      // afterwards." — derselbe Weg wie Premonition/Open Invitation:
+      // `doPlaySpell` liest die Flagge nach der Aufloesung und beendet
+      // den Zug (inkl. Zug-Ende-Schutz).
+      gs._spellEndsTurn = true;
 
       engine.log('great_offensive_done', {
         player: gs.players[pi]?.username, fired: gefeuert, offered: ids.length,

@@ -1,3 +1,7 @@
+// COST-DISCARD-CHANNEL: n/a in dieser Datei — die Kosten („eine Karte
+//   abwerfen, um das Juwel zu behalten") sitzen im geteilten Helfer
+//   `_magic-gem-shared.js`, der den Kanal fuer alle sieben Gems
+//   bedient (v1041).
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Magic Emerald"
 //  Artifact (Normal, Cost 6)

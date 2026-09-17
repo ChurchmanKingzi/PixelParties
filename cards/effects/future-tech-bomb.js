@@ -85,6 +85,11 @@ module.exports = {
 
     // EIN Quellobjekt für den ganzen Schlag — siehe Kopf.
     const quelle = { name: CARD_NAME, owner: pi, heroIdx: -1, controller: pi };
+    // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
+    // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
+    // lebenden Ziel greift der Schutz nicht (Als Vorgabe 12.9.).
+    engine.beginMultiHit(ziele.filter(t => t.type !== 'hero' || (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length);
+    try {
     const stapel = [];
     for (const t of ziele) {
       if (t.type === 'hero') {
@@ -98,6 +103,9 @@ module.exports = {
       }
     }
     if (stapel.length > 0) await engine.processCreatureDamageBatch(stapel);
+    } finally {
+      engine.endMultiHit();
+    }
     engine.sync();
   },
 };

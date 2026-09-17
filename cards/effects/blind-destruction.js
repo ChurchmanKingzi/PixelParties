@@ -122,16 +122,23 @@ module.exports = {
       await engine._delay(430);
 
       // ── Schritt 1: abraeumen, und dabei zaehlen, was WIRKLICH faellt ──
-      for (const eintrag of betroffen) {
-        eintrag.gefallen = 0;
-        for (const inst of eintrag.ausruestung) {
-          const vorher = inst.zone;
-          await engine.actionDestroyCard(ctx.card, inst, { sourceName: CARD_NAME });
-          // Nur zaehlen, was die Zone tatsaechlich verlassen hat —
-          // Schutzklauseln lassen `actionDestroyCard` still aussteigen.
-          if (vorher === 'support' && inst.zone !== 'support') eintrag.gefallen++;
+      // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer ueber ALLE
+      // Helden hinweg — der Zauber raeumt eine ganze Ausruestungswelle
+      // ab, das ist nie eine Einzelzerstoerung.
+      const _gesamt = betroffen.reduce((n, e) => n + (e.ausruestung || []).length, 0);
+      engine.beginDestroyScope(_gesamt);
+      try {
+        for (const eintrag of betroffen) {
+          eintrag.gefallen = 0;
+          for (const inst of eintrag.ausruestung) {
+            const vorher = inst.zone;
+            await engine.actionDestroyCard(ctx.card, inst, { sourceName: CARD_NAME });
+            // Nur zaehlen, was die Zone tatsaechlich verlassen hat —
+            // Schutzklauseln lassen `actionDestroyCard` still aussteigen.
+            if (vorher === 'support' && inst.zone !== 'support') eintrag.gefallen++;
+          }
         }
-      }
+      } finally { engine.endDestroyScope(); }
       engine.sync();
       await engine._delay(260);
 

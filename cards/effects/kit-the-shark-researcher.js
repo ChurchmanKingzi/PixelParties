@@ -368,20 +368,27 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
   // hooks settle per target. Hero damage = 'hero' type (v905: eigener
   // Typ fuer Heldeneffekt-Schaden; vorher 'other', das die Surprise-
   // Zone und den Zielschutz des Ziels mit abgewuergt hat).
-  for (const id of picked) {
-    const t = tgts.find(x => x.id === id);
-    if (!t) continue;
-    if (t.type === 'hero') {
-      const hero = ops.heroes?.[t.heroIdx];
-      if (!hero?.name || hero.hp <= 0) continue;
-      await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero');
-    } else if (t.cardInstance) {
-      await engine.actionDealCreatureDamage(
-        source, t.cardInstance, MODE_B_DAMAGE, 'other',
-        { sourceOwner: pi, canBeNegated: true },
-      );
+  // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
+  // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
+  // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
+  // Einzeltreffer und der Schutz greift korrekt nicht.
+  engine.beginMultiHit(picked.length);
+  try {
+    for (const id of picked) {
+      const t = tgts.find(x => x.id === id);
+      if (!t) continue;
+      if (t.type === 'hero') {
+        const hero = ops.heroes?.[t.heroIdx];
+        if (!hero?.name || hero.hp <= 0) continue;
+        await engine.actionDealDamage(source, hero, MODE_B_DAMAGE, 'hero');
+      } else if (t.cardInstance) {
+        await engine.actionDealCreatureDamage(
+          source, t.cardInstance, MODE_B_DAMAGE, 'other',
+          { sourceOwner: pi, canBeNegated: true },
+        );
+      }
     }
-  }
+  } finally { engine.endMultiHit(); }
 
   engine.log('kit_mode_b', {
     player: ps.username,

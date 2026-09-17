@@ -102,6 +102,7 @@ async function tryTutor(ctx) {
 
   const picked = await engine.promptGeneric(pi, {
     type: 'cardGallery',
+    searchToHand: true, searchPile: 'discard',   // v1121
     cards: galleryCards,
     title: CARD_NAME,
     description: `Choose a card from either discard pile to add to your hand.`,

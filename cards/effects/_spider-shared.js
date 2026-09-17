@@ -140,6 +140,10 @@ async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName,
   // of pile flights — matches the project's simultaneous-pile-
   // flight stagger rule for visible card transit.
   const STAGGER_MS = 260;
+  // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer ueber die
+  // GEWAEHLTEN Surprises — bei genau einer darf der Dog feuern.
+  engine.beginDestroyScope(picks.length);
+  try {
   for (let i = 0; i < picks.length; i++) {
     const pick = picks[i];
     const inst = pick.instId != null
@@ -157,6 +161,7 @@ async function paySurpriseCostToSummon(engine, playerIdx, count, sourceCardName,
     );
     if (i < picks.length - 1) await engine._delay(STAGGER_MS);
   }
+  } finally { engine.endDestroyScope(); }
   engine.sync();
 
   // ── Summon flourish: webs descend, small spiders crawl out ──

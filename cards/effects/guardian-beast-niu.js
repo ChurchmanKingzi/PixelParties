@@ -123,6 +123,7 @@ module.exports = {
     // "end of THIS turn" — buff doesn't survive into a fresh own turn).
     const oi = pi === 0 ? 1 : 0;
     await engine.actionAddBuff(buffHero, pi, buffHeroIdx, BUFF_NAME, {
+      sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       totalDamage: newTotal,
       stacks: newStacks,
       perCardBonus: DAMAGE_PER_CARD,

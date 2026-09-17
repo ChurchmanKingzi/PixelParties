@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Auszahlung BEIM Abgeworfenwerden, keine Kosten (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Skull Necklace"
 //  Artifact (Normal, cost 0)

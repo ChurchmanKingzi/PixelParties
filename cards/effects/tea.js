@@ -12,15 +12,9 @@ function getTargetStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.statuses) return [];
-    return getCleansableStatuses()
-      .filter(k => hero.statuses[k])
-      .map(k => {
-        const s = { key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon };
-        if (k === 'poisoned') s.stacks = hero.statuses.poisoned.stacks || 1;
-        // Capture full status properties (duration, _baihuPetrify, unhealable, etc.)
-        s.statusData = { ...hero.statuses[k] };
-        return s;
-      });
+    // v1101: gemeinsamer Bauer — er liefert `stacks` und `statusData`
+    // gleich mit und kennt zusaetzlich die Anhaengsel.
+    return engine.cleansableHeroEntries(target.owner, target.heroIdx);
   }
   if (target.type === 'equip') {
     const inst = engine.cardInstances.find(c =>

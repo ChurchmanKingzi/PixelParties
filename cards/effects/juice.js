@@ -11,11 +11,9 @@ const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 function getTargetStatuses(target, engine) {
   if (target.type === 'hero') {
-    const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-    if (!hero?.statuses) return [];
-    return getCleansableStatuses()
-      .filter(k => hero.statuses[k])
-      .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
+    // v1093: EIN gemeinsamer Bauer — er kennt auch Anhaengsel, die
+    // „als negativer Statuseffekt zaehlen" („Decisive Defeat").
+    return engine.cleansableHeroEntries(target.owner, target.heroIdx);
   }
   if (target.type === 'equip') {
     const inst = engine.cardInstances.find(c =>

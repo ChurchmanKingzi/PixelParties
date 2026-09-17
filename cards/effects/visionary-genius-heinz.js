@@ -70,6 +70,8 @@ module.exports = {
     const eligibleIndices = (ps.hand || []).map((_, i) => i);
     const result = await engine.promptGeneric(pi, {
       type: 'handPick',
+      costFor: CARD_NAME,   // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'draw',
       title: CARD_NAME,
       description: 'Click a card in your hand. Click further copies of the same card to mark them too. Click again to unmark. Up to 4 total.',
       eligibleIndices,

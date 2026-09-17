@@ -239,6 +239,7 @@ module.exports = {
 
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       cards: galleryCards,
       title: CARD_NAME,
       description: 'Choose a level 3 or lower Area from your hand or deck to reshape the world. Your turn ends afterwards.',

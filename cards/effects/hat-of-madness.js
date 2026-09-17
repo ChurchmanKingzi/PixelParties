@@ -46,12 +46,15 @@
 
 const CARD_NAME = 'Hat of Madness';
 
+const { handlungsHooks } = require('./_action-shared');
+
 module.exports = {
   isEquip: true,
   activeIn: ['support'],
 
   hooks: {
-    onAnyActionResolved: async (ctx) => {
+    // v1157: auch Reaktionen dieses Helden (`_action-shared.js`)
+    ...handlungsHooks(async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;
       const ich = ctx.card;
@@ -99,6 +102,6 @@ module.exports = {
         card: wahl.cardName, after: ctx.actionType,
       });
       engine.sync();
-    },
+    }),
   },
 };

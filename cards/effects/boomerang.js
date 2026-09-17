@@ -101,6 +101,7 @@ module.exports = {
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'discard',   // v1121
       cards: galleryCards,
       title: CARD_NAME,
       description: 'Choose an Artifact from your discard pile to add to your hand.',

@@ -40,24 +40,34 @@
 // ═══════════════════════════════════════════
 
 const { artefaktInDieAblage } = require('./_crusader-shared');
+const { areaTargetId } = require('./_targeting-shared');
 
 const CARD_NAME = 'Excavator Bucket';
 
-/** Die sichtbaren (obersten) Areas beider Seiten als Ziele. */
+/**
+ * ALLE Areas beider Seiten als Ziele.
+ *
+ * ★ v1054: frueher nur die oberste je Seite („die sichtbaren"). Seit
+ * „Spatial Crevice" zeigt die Zone alle, und die unteren waren damit
+ * nicht bloss schwer zu treffen, sondern gar nicht erst im Angebot —
+ * die Wahl fiel stumm auf die oberste.
+ */
 function areaZiele(engine) {
   const gs = engine.gs;
   const ziele = [];
   for (let owner = 0; owner < 2; owner++) {
     const arr = gs.areaZones?.[owner] || [];
-    if (arr.length === 0) continue;
-    const name = arr[arr.length - 1];
-    const inst = engine.cardInstances.find(c =>
-      c.zone === 'area' && c.owner === owner && c.name === name);
-    if (!inst) continue;
-    ziele.push({
-      id: `area-${owner}`, type: 'area', owner, heroIdx: -1,
-      cardName: name, cardInstance: inst, _cardInstance: inst,
-    });
+    for (let platz = 0; platz < arr.length; platz++) {
+      const name = arr[platz];
+      const inst = engine.cardInstances.find(c =>
+        c.zone === 'area' && c.owner === owner && c.name === name);
+      if (!inst) continue;
+      ziele.push({
+        id: areaTargetId(owner, platz), type: 'area', owner, heroIdx: -1,
+        slotIdx: platz,
+        cardName: name, cardInstance: inst, _cardInstance: inst,
+      });
+    }
   }
   return ziele;
 }

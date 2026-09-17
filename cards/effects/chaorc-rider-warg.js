@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der Abwurf ist KEINE Wahl — die Karte kommt als Reaktion aufs Brett (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Chaorc Rider Warg"
 //  Creature (Summoning Magic Lv2, 50 HP, subtype Reaction)

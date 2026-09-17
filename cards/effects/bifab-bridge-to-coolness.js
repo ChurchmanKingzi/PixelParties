@@ -33,6 +33,15 @@ const CARD_NAME = 'Bifab, Bridge to Coolness';
 const HOPT_KEY  = 'bifabUsedThisTurn';
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: aus dem Coolness-Stack: reine Suche, kostet die Karte.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   playableFromCoolnessStack: true,
   // Greys out the card in hand — it has no effect when played from
   // there. Stack-top play remains available via the dedicated
@@ -76,6 +85,7 @@ module.exports = {
     const cards = [...new Set(ps.mainDeck)].map(name => ({ name, source: 'deck' }));
     const choice = await engine.promptGeneric(pi, {
       type: 'cardGallery', cards,
+      searchToHand: true,   // v1119: Suche AUF DIE HAND
       title: CARD_NAME,
       description: 'Choose any card from your deck to reveal and add to your hand.',
       confirmLabel: '🌉 Bridge!',
@@ -91,7 +101,7 @@ module.exports = {
     await ctx.popCoolnessStackTo(pi, 'delete', { source: CARD_NAME });
 
     // Move chosen card from deck to hand.
-    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
       ps.hand.push(choice.cardName);
       engine._trackCard(choice.cardName, pi, 'hand');

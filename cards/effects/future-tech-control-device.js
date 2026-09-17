@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der GEGNER wirft ab, nicht der Entscheider (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Future Tech Control Device"
 //  Artifact (Equipment, Cost 4)

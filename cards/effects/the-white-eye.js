@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der GEGNER wirft ab (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "The White Eye"
 //  Artifact (Equipment, Cost 50)

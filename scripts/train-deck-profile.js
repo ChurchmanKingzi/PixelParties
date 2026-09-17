@@ -1635,6 +1635,66 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
   }
 
+  // ── ★ KOSTEN-ABWURF-KANAL (v1037, Als Auftrag 12.9.) ─────────────
+  // „Lohnt es sich, fuer DIESEN Effekt eine Karte zu zahlen?" Zwei
+  // Arme je Quellkarte (gezahlt / abgelehnt), dazu Lage-Regeln unter
+  // `tag:<Lage>` als Rueckfall, solange eine einzelne Karte noch zu
+  // wenige Daten hat. Positiv = zahlen hat sich ausgezahlt.
+  const costDiscardRules = Object.create(null);
+  {
+    const MIN_ARM = 5;
+    const decs = [];
+    for (const g of trainGames) {
+      if (!hasData(g) || !Array.isArray(g.costDiscards)) continue;
+      for (const d of g.costDiscards) {
+        const adv = playAdvantage(clampCurveForAdv(g.evalCurve), d.t);
+        if (adv === null) continue;
+        decs.push({ c: d.c, tags: d.tags || [], paid: !!d.paid,
+          y: ADV_BLEND * sigmoid((adv - aMean) / aSd) + (1 - ADV_BLEND) * g.outcome });
+      }
+    }
+    const delta = (ds, skala) => {
+      const gez = ds.filter(d => d.paid);
+      const abg = ds.filter(d => !d.paid);
+      if (gez.length < MIN_ARM || abg.length < MIN_ARM) return null;
+      const roh = (gez.reduce((s, d) => s + d.y, 0) / gez.length)
+        - (abg.reduce((s, d) => s + d.y, 0) / abg.length);
+      const pts = Math.round(Math.max(-12, Math.min(12, roh * skala)) * 10) / 10;
+      return Math.abs(pts) < 1 ? null : pts;
+    };
+    const byCard = Object.create(null);
+    for (const d of decs) (byCard[d.c] = byCard[d.c] || []).push(d);
+    for (const [c, ds] of Object.entries(byCard)) {
+      const p = delta(ds, 80);
+      if (p !== null) costDiscardRules[c] = p;
+    }
+    // ★ v1038 (Als Praezisierung): ZUERST je KARTE UND Lage — „goldBroke"
+    // heisst fuer den Goldeffekt etwas anderes als fuer den
+    // Schadenseffekt, und „killed" gibt es nur beim zweiten. Die
+    // allgemeinen Tag-Regeln bleiben als Rueckfall fuer Karten mit zu
+    // wenigen eigenen Daten.
+    for (const [c, ds] of Object.entries(byCard)) {
+      const tagsDerKarte = new Set();
+      for (const d of ds) for (const t of d.tags) tagsDerKarte.add(t);
+      for (const tag of tagsDerKarte) {
+        const p = delta(ds.filter(d => d.tags.includes(tag)), 70);
+        if (p !== null) costDiscardRules[c + '|' + tag] = p;
+      }
+    }
+    const tagSet = new Set();
+    for (const d of decs) for (const t of d.tags) tagSet.add(t);
+    for (const tag of tagSet) {
+      const p = delta(decs.filter(d => d.tags.includes(tag)), 60);
+      if (p !== null) costDiscardRules['tag:' + tag] = p;
+    }
+    if (decs.length > 0) {
+      console.log(`Kosten-Abwurf: ${decs.length} Entscheidungen → ${Object.keys(costDiscardRules).length} Regeln `
+        + `(${Object.keys(costDiscardRules).filter(k => !k.includes('|') && !k.startsWith('tag:')).length} Karten, `
+        + `${Object.keys(costDiscardRules).filter(k => k.includes('|')).length} Karte×Lage, `
+        + `${Object.keys(costDiscardRules).filter(k => k.startsWith('tag:')).length} allgemeine Lagen)`);
+    }
+  }
+
   const surpriseRules = Object.create(null);
   {
     const MIN_ARM = 5;
@@ -2806,7 +2866,7 @@ function buildAdvantageModel(trainGames, holdGames, support0) {
     }
   }
 
-  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, discardValueRules, discardVsMillRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, abilityCostRules, drawDecisionRules, synergyRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
+  return { w, wSe, keep, support, uplifts, upliftStats, decisionChannels, clusterDeltas, casterDeltas, standingDeltas, standingEvalThreshold, deckoutGuard: deckoutGuardMap, deckoutDangerSize, menuOfferRules, menuOfferByCluster, menuOfferByStanding, targetPriors, surpriseRules, discardValueRules, discardVsMillRules, costDiscardRules, reactionRules, impactWeights, impactRules, statusHealRules, marketCrashRules, counterSpendRules, descendRules, abilityCostRules, drawDecisionRules, synergyRules, placementRules, bounceRules, playOrderRules, tutorPickRules };
 }
 
 function main() {
@@ -3490,6 +3550,10 @@ function main() {
       ? advModel.discardValueRules : undefined,
     discardVsMillRules: (advModel && advModel.discardVsMillRules && Object.keys(advModel.discardVsMillRules).length > 0)
       ? advModel.discardVsMillRules : undefined,
+    // ★ v1037: „lohnt sich die Zahlung fuer DIESEN Effekt?" — je
+    // Quellkarte, dazu Lage-Regeln unter `tag:<Lage>` als Rueckfall.
+    costDiscardRules: (advModel && advModel.costDiscardRules && Object.keys(advModel.costDiscardRules).length > 0)
+      ? advModel.costDiscardRules : undefined,
     reactionRules: (advModel && advModel.reactionRules && Object.keys(advModel.reactionRules).length > 0)
       ? advModel.reactionRules : undefined,
     impactWeights: (advModel && advModel.impactWeights) ? advModel.impactWeights : undefined,

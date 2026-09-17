@@ -18,6 +18,11 @@ const { resolveSourceCreature, isCreatureSource } = require('./_hooks');
 
 module.exports = {
   isAfterDamageReaction: true,
+  // ★ v1155: „a Hero you control that CAN USE IT takes damage" — der
+  // getroffene Held selbst wirkt. Seit das Nach-Schadens-Fenster die
+  // allgemeine Wirkerregel nutzt (jeder castfaehige Held, bei 2+ mit
+  // Auswahl), haelt dieses Flag Fireshield beim Zielhelden.
+  casterIsTarget: true,
 
   /**
    * Triggers on opponent combat damage (Attack/Spell/Creature effect)

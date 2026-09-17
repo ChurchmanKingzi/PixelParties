@@ -217,12 +217,21 @@ module.exports = {
     }
     await engine._delay(420);
 
+    // ★ v1043 („Interference"): ein Schlag auf die ganze Gegnerseite —
+    // Helden UND Kreaturen. Gezaehlt wird, was WIRKLICH getroffen wird.
+    const _lebendeHelden = (opp.heroes || []).filter(h => h?.name && h.hp > 0).length;
+    const _oppKreaturen = (engine.cardInstances || []).filter(
+      (i) => i && i.zone === 'support' && (i.controller ?? i.owner) === oppIdx,
+    ).length;
+    let oppCreatures = [];
+    engine.beginMultiHit(_lebendeHelden + _oppKreaturen);
+    try {
     for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
       const hero = opp.heroes[hi];
       if (!hero?.name || !(hero.hp > 0)) continue;
       await ctx.dealDamage(hero, DAMAGE, 'creature');
     }
-    const oppCreatures = (engine.cardInstances || []).filter(
+    oppCreatures = (engine.cardInstances || []).filter(
       (i) => i && i.zone === 'support' && (i.controller ?? i.owner) === oppIdx,
     );
     for (const victim of oppCreatures) {
@@ -232,6 +241,9 @@ module.exports = {
         victim, DAMAGE, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     engine.log('thebinxan_punish', {

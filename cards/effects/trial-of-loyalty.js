@@ -69,6 +69,13 @@ function eligibleDeckTrials(engine, ps) {
 }
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Search your deck for up to 5 „Trial of“ … add them to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   oncePerGame: true,
   oncePerGameKey: TRIAL_KEYS[CARD_NAME],
 
@@ -113,6 +120,7 @@ module.exports = {
       const maxPicks = Math.min(MAX_PICKS, candidates.length);
       const result = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
         cards: candidates,
         selectCount: maxPicks,
         minSelect: 1,

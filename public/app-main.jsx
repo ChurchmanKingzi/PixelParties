@@ -1132,7 +1132,7 @@ function PlayScreen() {
     const onJoinError = (msg) => notify(msg, 'error');
     const onPlayerJoined = (data) => setPlayerJoined(data.username);
     const onGameStarted = (r) => { setLobby(r); if (window.playSFX) window.playSFX('match_found'); };
-    const onGameState = (state) => { setGameState(state); };
+    const onGameState = (state) => { if (window.ppZustandVeraltet?.(state)) return; setGameState(state); };
     const onCubeDraftState = (state) => { setCubeDraftState(state); };
     const onCubeBuildState = (state) => { setCubeBuildState(state); };
     const onCubeTournamentState = (state) => { setCubeTournamentStateLocal(state); };

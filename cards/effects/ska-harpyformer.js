@@ -225,6 +225,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'tutor',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to attach any Ability from your deck to a Hero you control.`,
       source: CARD_NAME,
@@ -289,6 +290,7 @@ module.exports = {
     const heroName = ps.heroes[targetHeroIdx]?.name || 'Hero';
     const abilityPick = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: CARD_NAME,
       description: `Choose an Ability from your deck to attach to ${heroName}.`,

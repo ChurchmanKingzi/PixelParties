@@ -241,8 +241,34 @@ module.exports = {
     engine._broadcastEvent('play_zone_animation', explEvent);
     await engine._delay(200);
 
-    // ── Deal 150 artifact damage to the Hero ──
     const dmgSource = { name: 'The Yeeting', owner: pi, heroIdx };
+
+    // ── Zerstoerungs-Reaktion ZUERST (v1057, Als Regel 14.9.) ────────
+    // „Negate that card or effect — die ganze Karte, ausser was schon
+    // resolved ist", und gemeint ist LOGISCHE Abhaengigkeit, nicht
+    // Code-Reihenfolge: bei „Deal 150 damage. If this kills, remove 1
+    // card" MUSS der Schaden vorher fallen. Hier nicht — der Recoil ist
+    // keine Voraussetzung fuer die Zerstoerung, er stand nur zufaellig
+    // zuerst im Code. Al 14.9.: „Aus Benutzer-Sicht passieren bei
+    // Yeeting der Recoil und das Removal gleichzeitig", und bei einer
+    // Negation faellt BEIDES weg.
+    //
+    // Das Fenster deshalb VOR den Recoil gezogen. Es negiert nur, wenn
+    // der Verteidiger wirklich reagiert; sonst laeuft alles wie bisher.
+    {
+      const _opferSeite = targetInst.controller ?? targetInst.owner;
+      const negiert = await engine._checkDestroyReactions(_opferSeite, targetInst.name, dmgSource, {
+        sourceOwner: pi, sourceName: 'The Yeeting',
+        victimZone: targetInst.zone, victimInst: targetInst,
+      });
+      if (negiert) {
+        engine.log('yeet_negated', { card: sel.cardName });
+        engine.sync();
+        return true;
+      }
+    }
+
+    // ── Deal 150 artifact damage to the Hero ──
     await engine.actionDealDamage(dmgSource, hero, 150, 'artifact');
     engine.sync();
     await engine._delay(400);

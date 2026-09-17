@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Abwurf ist Teil des Beschwoerungswegs, keine Wahl (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Soul Shard Shut" (Shadow)
 //  Creature (Summoning Magic Lv1, Normal, 50 HP)

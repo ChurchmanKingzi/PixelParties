@@ -46,6 +46,7 @@ module.exports = {
       const cards = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => ({ name, source: 'deck', count }));
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGallery', cards, title: CARD_NAME,
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
         description: 'Search your deck for an Attack or Spell — reveal it and add it to your hand.',
         confirmLabel: '🎻 Take it!', confirmClass: 'btn-success', cancellable: false,
       });

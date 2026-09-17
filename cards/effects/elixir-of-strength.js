@@ -69,6 +69,7 @@ module.exports = {
     // No expiry — buff persists across turns until consumed by the
     // engine's BEFORE_DAMAGE rider.
     await engine.actionAddBuff(hero, target.owner, target.heroIdx, 'empowered_strike', {
+      sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       source: 'Elixir of Strength',
       addAnim: 'empowered_strike_apply',
     });

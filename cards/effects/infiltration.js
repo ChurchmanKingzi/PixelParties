@@ -67,48 +67,21 @@ module.exports = {
   },
 };
 
+const { takeTopFromOpponentDeck } = require('./_opponent-deck-shared');
+
 // ═══════════════════════════════════════════
 //  LEVEL 1: take top card of opp's deck
 // ═══════════════════════════════════════════
 
 async function _activateLv1(engine, gs, pi, oi, ps, ops) {
-  if (ops.mainDeck.length === 0) return false;
-  const cardName = ops.mainDeck[0];
-
-  // Broadcast the deck→hand flight FIRST so the card visibly comes
-  // from OPP's deck pile. `play_pile_transfer` pre-registers
-  // `pileTransferToHandPendingMeRef` on the client, which masks
-  // exactly one slot of the upcoming hand-grew diff so the auto
-  // draw-anim skips this stolen card. Any chained Lilly-draw still
-  // gets its deck-flight animation from OUR deck. Without this
-  // pre-broadcast both cards would appear to come from the
-  // controller's deck pile.
-  engine._broadcastEvent('play_pile_transfer', {
-    fromOwner: oi, toOwner: pi, cardName, from: 'deck', to: 'hand',
-    // Target slot the card will land in. Broadcast fires BEFORE the
-    // state mutation, so the slot doesn't exist yet on the client —
-    // the resolver falls back to a synthetic "right of last slot"
-    // rect so the flight aims at where the new card actually appears.
-    toHandIdx: ps.hand.length,
-  });
-  await engine._delay(700);
-
-  // Now apply the state mutation.
-  ops.mainDeck.shift();
-  ps.hand.push(cardName);
-  engine._tagHandCardOrigin(pi, cardName, oi);   // v693: kehrt zum Besitzer zurueck
+  // ★ v1106: derselbe Weg, den jetzt auch „Love Shot" geht — Flug,
+  // Zustand, Herkunftsmarke, einseitiges Aufdecken UND der
+  // `onCardTakenFromOpponent`-Hook, an dem Lilly haengt. Der Block
+  // stand frueher hier ausgeschrieben; als die zweite Karte ihn
+  // brauchte, war eine Kopie die naheliegende und falsche Antwort.
+  const cardName = await takeTopFromOpponentDeck(engine, pi, { source: 'Infiltration' });
+  if (!cardName) return false;
   engine.log('infiltration_take', { player: ps.username, card: cardName, level: 1 });
-
-  // Reveal the taken card to OUR side only — the opp didn't see
-  // their own deck top, so neither side has prior knowledge; they
-  // just see a card leave their deck.
-  const mySid = ps.socketId;
-  if (mySid && engine.io) engine.io.to(mySid).emit('card_reveal', { cardName });
-
-  // Fire the steal hook so Lilly et al. can react.
-  await engine.runHooks('onCardTakenFromOpponent', {
-    takerPi: pi, fromZone: 'deck', cardName,
-  });
 
   // Lv1 cost: opp draws 1.
   await engine.actionDrawCards(oi, 1);

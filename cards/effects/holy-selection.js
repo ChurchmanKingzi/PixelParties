@@ -290,6 +290,10 @@ module.exports = {
       // creatures second. `_skipReactionCheck: true` on every call so
       // the spell doesn't open nested counter windows — Surprise +
       // post-target windows already ran above.
+      // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
+      // gezaehlt wird die ECHTE Zielmenge (verschonte zaehlen nicht).
+      engine.beginMultiHit(heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length + creatureTargets.filter(t => t.inst.zone === 'support').length);
+      try {
       for (const t of heroTargets) {
         const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -303,6 +307,9 @@ module.exports = {
           source, t.inst, DAMAGE, 'destruction_spell',
           { sourceOwner: pi, _skipReactionCheck: true },
         );
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.log('holy_selection_resolved', {

@@ -118,14 +118,18 @@ module.exports = {
       // stagger the per-body deleted-pile flights.
       const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx, controller: pi };
       let defeated = 0;
-      for (const inst of creatures) {
-        // Still a live support Creature? (an earlier death-trigger in
-        // this same loop could have removed it.)
-        if (!inst || inst.zone !== 'support') continue;
-        inst._redirectToDeleted = true; // discard→deleted reroute
-        await engine.actionDestroyCard(source, inst);
-        defeated++;
-      }
+      // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
+      engine.beginDestroyScope(creatures.length);
+      try {
+        for (const inst of creatures) {
+          // Still a live support Creature? (an earlier death-trigger in
+          // this same loop could have removed it.)
+          if (!inst || inst.zone !== 'support') continue;
+          inst._redirectToDeleted = true; // discard→deleted reroute
+          await engine.actionDestroyCard(source, inst);
+          defeated++;
+        }
+      } finally { engine.endDestroyScope(); }
 
       engine.log('trial_of_dominance', { player: ps.username, defeated });
       engine.sync();

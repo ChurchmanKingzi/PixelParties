@@ -60,6 +60,13 @@ function ascendedImDeck(engine, pi) {
 }
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Search your deck for an Ascended Hero … add it to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   /** Spielbar nur mit mindestens einem Ascended Hero im Deck. */
   spellPlayCondition(gs, pi, engine) {
     return ascendedImDeck(engine, pi).length > 0;
@@ -81,6 +88,7 @@ module.exports = {
       if (kandidaten.length > 1) {
         const res = await engine.promptGeneric(pi, {
           type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
           cards: kandidaten.map(n => ({ name: n, source: 'deck' })),
           title: CARD_NAME,
           description: 'Search your deck for an Ascended Hero to reveal and add to your hand.',

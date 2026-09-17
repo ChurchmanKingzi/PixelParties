@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Abwurf der Karte selbst, keine Wahl aus der Hand (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Cool Tech Jetpack"
 //  Artifact (Equipment, Cost 4) — Secret Rare

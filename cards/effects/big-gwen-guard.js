@@ -139,6 +139,7 @@ async function _payDiscardCost(engine, pi) {
   if (eligibleIndices.length === 0) return false;
   const result = await engine.promptGeneric(pi, {
     type: 'forceDiscardCancellable',
+    costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
     title: CARD_NAME,
     description: `Discard one of your auto-revealed cards to summon ${CARD_NAME} as an additional Action.`,
     instruction: 'Click a highlighted auto-revealed card in your hand to discard it.',

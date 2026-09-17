@@ -60,6 +60,7 @@ module.exports = {
       if (!gewaehlt) {
         const wahl = await engine.promptGeneric(pi, {
           type: 'cardGallery',
+          searchToHand: true, searchPile: 'deck',   // v1121
           cards: karten,
           title: CARD_NAME,
           description: 'Choose a card from your discard pile to add to your hand.',
@@ -70,7 +71,7 @@ module.exports = {
         gewaehlt = wahl.cardName;
       }
 
-      const genommen = await engine.takeFromPile(ps, 'discard', gewaehlt, { source: CARD_NAME });
+      const genommen = await engine.takeFromPile(ps, 'discard', gewaehlt, { source: CARD_NAME, toHand: true });
       if (!genommen) return;
 
       // ── BEIDE FLUEGE GLEICHZEITIG (v893, Als Vorgabe) ─────────────

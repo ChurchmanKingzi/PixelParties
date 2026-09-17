@@ -149,6 +149,10 @@ module.exports = {
     if (!picked || picked.length === 0) return false;
 
     let defeated = 0;
+    // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Zaehlt die
+    // GEWAEHLTEN Ziele — bei genau einem darf der Dog feuern.
+    engine.beginDestroyScope(picked.length);
+    try {
     for (const t of picked) {
       const victim = t.cardInstance;
       if (!victim || victim.zone !== 'support') continue;
@@ -162,6 +166,7 @@ module.exports = {
       );
       defeated++;
     }
+    } finally { engine.endDestroyScope(); }
 
     engine.log('censpartan_equalize', {
       player: gs.players[pi]?.username, mine, theirs, defeated,

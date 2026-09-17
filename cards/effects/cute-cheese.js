@@ -11,6 +11,15 @@ const { isPileCreature, hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: der ganze Text ist die Suche.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   blockedByHandLock: true,
   isTargetingArtifact: true,
 
@@ -62,6 +71,7 @@ module.exports = {
     // Show gallery prompt
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: 'Cute Cheese',
       description: 'Choose a Creature to add to your hand.',

@@ -38,6 +38,7 @@ async function pickOne(engine, pi, deck, exclude) {
   if (names.length === 0) return null;
   const res = await engine.promptGeneric(pi, {
     type: 'cardGallery', title: CARD_NAME, showCard: CARD_NAME,
+    searchToHand: true,   // v1119: Suche AUF DIE HAND
     cards: names.map(n => ({ name: n, source: 'deck' })),
     description: exclude
       ? `Search a second card with a different name than "${exclude}" — or stop here.`

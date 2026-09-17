@@ -1,3 +1,43 @@
+// ═══════════════════════════════════════════
+//  VERALTETE ZUSTAENDE VERWERFEN  (v1135)
+// ═══════════════════════════════════════════
+// ★ Al 15.9.: „Skull erscheint wieder in der Support Zone … Fox UND
+// Skull verschwinden aus ihren Support Zones." Dass BEIDE Karten
+// zurueckkommen und gemeinsam wieder gehen, passt zu keinem
+// Einzelfehler — aber genau zu einem ZUSTAND, der zu spaet ankommt und
+// einen neueren ueberschreibt.
+//
+// Die Server-Diagnose konnte das nie zeigen: der alte Zustand WAR
+// korrekt, als er gebaut wurde. Erst seine Reihenfolge beim Eintreffen
+// macht ihn falsch.
+//
+// `stateSeq` ist eine laufende Nummer je Raum. Ein Zustand mit
+// kleinerer Nummer als der zuletzt angewandte ist veraltet und wird
+// verworfen. Ohne Nummer (aeltere Serverfassung) gilt wie bisher:
+// annehmen.
+// ★ Ueber `window` bereitgestellt — das ist der Weg, auf dem
+// app-shared seine Bausteine an die uebrigen Buendel gibt (siehe
+// scripts/build.js: „app-shared defines the window.* API the rest").
+const _ppLetzteSeq = { n: -1, raum: null };
+function ppZustandVeraltet(state) {
+  if (!state || typeof state.stateSeq !== 'number') return false;
+  if (_ppLetzteSeq.raum !== state.roomId) {          // neuer Raum: neu zaehlen
+    _ppLetzteSeq.raum = state.roomId;
+    _ppLetzteSeq.n = state.stateSeq;
+    return false;
+  }
+  if (state.stateSeq < _ppLetzteSeq.n) {
+    if (window.PP_ZONE_WATCH) {
+      console.log('%c[ZUSTAND] veraltet verworfen: #' + state.stateSeq
+        + ' (aktuell #' + _ppLetzteSeq.n + ')', 'color:#fff;background:#7a5c00;padding:2px 6px');
+    }
+    return true;
+  }
+  _ppLetzteSeq.n = state.stateSeq;
+  return false;
+}
+window.ppZustandVeraltet = ppZustandVeraltet;
+
 /* ============================================================
    PIXEL PARTIES TCG — Frontend Application
    ============================================================ */
@@ -880,6 +920,45 @@ const ZONE_ANIM_SFX = {
   // Klang zusammen), `gold_gain` bei 320 ms ist der Muenzregen — ohne
   // Kategorie, sonst schluckt ihn die eigene erste Lage, und mit
   // Namens-Dedupe, damit er bei vier Zielen nicht vierfach klingt.
+  // ★ v1127 („Giant Exploding Skull", Al 15.9.: „Ausserdem fehlt der
+  // Explosion noch ein Sound!"). DREI Lagen, weil die Detonation drei
+  // Momente hat und ein einzelner Knall sie flach klingen liesse:
+  //   • `heavy_impact` sofort, tief und laut — der Knall selbst;
+  //   • ein zweiter, tiefer gestimmter bei 90 ms — die Druckwelle, die
+  //     im Bild als Schockring laeuft;
+  //   • `elem_fire` bei 260 ms fuer die Glut, die nachbrennt.
+  // Die beiden spaeteren ohne Kategorie, sonst schluckt sie die erste
+  // Lage; mit eigenem Dedupe, damit eine Kette aus zwei Skulls nicht
+  // sechsfach knallt.
+  skull_detonation: [
+    { name: 'heavy_impact', opts: { rate: 0.72, volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 0.5,  volume: 0.85, delay: 90,  category: null, dedupe: 500 } },
+    { name: 'elem_fire',    opts: { rate: 0.85, volume: 0.7,  delay: 260, category: null, dedupe: 600 } },
+  ],
+  // ★★ v1146 — Armageddon: der Knall beim Wirker, das Rollen der
+  // Feuerwalze, der Feuerregen. Tief gestimmt (rate < 1) fuer Wucht;
+  // spaetere Lagen ohne Kategorie und mit eigenem Dedupe, sonst schluckt
+  // die erste Lage sie.
+  armageddon: [
+    { name: 'heavy_impact', opts: { rate: 0.45, volume: 1.0 } },
+    { name: 'elem_fire',    opts: { rate: 0.6,  volume: 1.0,  delay: 120,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.6,  volume: 0.9,  delay: 520,  category: null, dedupe: 0 } },
+    { name: 'elem_fire',    opts: { rate: 0.8,  volume: 0.85, delay: 900,  category: null, dedupe: 0 } },
+    { name: 'heavy_impact', opts: { rate: 0.8,  volume: 0.7,  delay: 1300, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1154 — Enthauptung: das Pfeifen der Klinge, der Treffer, der
+  // dumpfe Nachschlag unter der Fontaene.
+  decapitation: [
+    { name: 'slash',           opts: { rate: 0.7, volume: 1.0 } },
+    { name: 'critical_strike', opts: { rate: 0.9, volume: 1.0, delay: 170, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',    opts: { rate: 0.55, volume: 0.8, delay: 230, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1161 — Portal („Teleportal"): dunkles Aufreissen, dann das
+  // Aufblitzen der durchgereichten Karte.
+  portal_warp: [
+    { name: 'elem_dark', opts: { rate: 0.85, volume: 1.0 } },
+    { name: 'reveal',    opts: { rate: 1.1, volume: 0.7, delay: 320, category: null, dedupe: 0 } },
+  ],
   golden_explosion: [
     { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.95 } },
     { name: 'gold_gain',    opts: { rate: 1.0, volume: 0.9, delay: 320, category: null, dedupe: 700 } },
@@ -940,6 +1019,23 @@ const ZONE_ANIM_SFX = {
   glass_blade_shatter: [
     { name: 'slash',    opts: { rate: 1.15, volume: 1.0 } },
     { name: 'elem_ice', opts: { rate: 1.45, volume: 0.85, delay: 220, category: null, dedupe: 600 } },
+  ],
+  // Cute Conversion (v1015) — die Herzen. Ein weicher Zauberklang,
+  // kein Treffer: `buff` traegt das Wohlwollen, `heal` legt die
+  // Waerme darueber (zweite Lage ohne Kategorie, sonst schluckt sie
+  // die erste).
+  cute_hearts: [
+    { name: 'buff', opts: { rate: 1.1, volume: .95 } },
+    { name: 'heal', opts: { rate: 1.25, volume: .7, delay: 160, category: null, dedupe: 600 } },
+  ],
+  // Last Resort (v1027) — die grosse Explosion. Drei Lagen: der
+  // schwere Einschlag, das Feuer darueber, und der Todesklang des
+  // Nutzers als Nachhall. Lagen ab der zweiten ohne Kategorie,
+  // sonst schluckt die erste sie.
+  last_resort_blast: [
+    { name: 'heavy_impact', opts: { rate: 0.82, volume: 1.0 } },
+    { name: 'elem_fire',    opts: { rate: 0.7, volume: 1.0, delay: 60, category: null, dedupe: 600 } },
+    { name: 'hero_death',   opts: { rate: 0.95, volume: .85, delay: 520, category: null, dedupe: 600 } },
   ],
   // Signature
   orbital_laser_red:       { name: 'orbital_laser', opts: { rate: 0.6 } },
@@ -1158,6 +1254,7 @@ const ZONE_ANIM_SFX = {
   golden_ankh_revival:     { name: 'revive' },
   // Dark
   petrify:                 { name: 'elem_dark' },
+  stone_break:             { name: 'heavy_impact', opts: { rate: 1.2 } },   // v1164
   spooky_ghost:            { name: 'elem_dark' },
   death_skulls:            { name: 'elem_dark' },
   dark_swarm:              { name: 'elem_dark' },
@@ -1682,6 +1779,47 @@ window.SKINS_DB = {}; // cardName → [skinName, ...]
 //  When adding a future card that modifies the hand cap, add its entry
 //  here and its effect module — keep them in sync.
 // ═══════════════════════════════════════════
+/**
+ * ═══ AREA-LIMIT, CLIENTSEITIG (v1051) ════════════════════════════════
+ * Spiegel des Engine-Vertrags `areaLimit` (siehe `_engine.js#
+ * areaLimitFor`). Notwendig, weil der PUZZLE-EDITOR offline arbeitet:
+ * er hat weder Engine noch Kartenskripte, muss beim Bauen eines Bretts
+ * aber dieselbe Regel einhalten wie das Spiel.
+ *
+ * Gleiche Bauform wie `CARD_HAND_LIMIT_MODIFIERS` daneben — ein
+ * Namens-Register. ★ Damit die Kopie nicht still auseinanderlaeuft,
+ * vergleicht `scripts/check-area-limits.js` sie bei jedem Lauf gegen die
+ * `areaLimit`-Exporte der Kartenskripte.
+ *
+ * Im LIVE-Spiel wird das Register nicht gebraucht: dort schickt der
+ * Server `areaLimits` mit.
+ */
+window.CARD_AREA_LIMITS = {
+  'Spatial Crevice': 3,
+};
+
+/** Wie viele Areas darf diese Seite mit DIESER Zone halten? Grundwert 1. */
+window.computeAreaLimit = function (areaZone) {
+  let limit = 1;
+  for (const cardName of (areaZone || [])) {
+    const l = window.CARD_AREA_LIMITS[cardName];
+    if (typeof l === 'number' && l > limit) limit = l;
+  }
+  return limit;
+};
+
+/**
+ * Darf `cardName` auf diese Zone? Zwei Bedingungen, identisch zu
+ * `_engine.js#canPlaceAnotherArea`: Platz unter dem Limit UND keine
+ * zweite Kopie derselben Area („up to 3 DIFFERENT Areas").
+ */
+window.canPlaceAnotherArea = function (areaZone, cardName) {
+  const zone = areaZone || [];
+  if (zone.length >= window.computeAreaLimit(zone)) return false;
+  if (cardName && zone.includes(cardName)) return false;
+  return true;
+};
+
 window.CARD_HAND_LIMIT_MODIFIERS = {
   'Pollution Token': { zone: 'support', delta: 1 },
   'Royal Corgi':     { zone: 'support', delta: -3 },
@@ -3066,32 +3204,126 @@ function GameTooltip() {
   // wandeln (Massstab des Ankers; im Kampffeld 1).
   const pos = ppLayoutXY(tip.x, tip.y, tip.el && tip.el.isConnected ? tip.el : null);
   return (
-    <div className="game-tooltip" style={{ position: 'fixed', left: pos.x, top: pos.y, transform, zIndex: 10000, pointerEvents: 'none' }}>
+    // ★ v1032: 10020 statt 10000. Der kleine Texttooltip lag auf
+    // GENAU der Hoehe der Staging-Hand im Puzzle-Editor (10000) — bei
+    // Gleichstand entscheidet der Stapelkontext, also mal so, mal so.
+    // Jetzt eindeutig darueber, aber weiterhin unter den Animationen
+    // (ab 10150) und dem Entfernen-Knopf des Editors.
+    <div className="game-tooltip" style={{ position: 'fixed', left: pos.x, top: pos.y, transform, zIndex: 10020, pointerEvents: 'none' }}>
       {tip.text}
     </div>
   );
 }
 
-function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
+// ★★ v1166 — DOPPELSCHULEN-FILTER (Al 17.9.)
+//
+// „Double only" zeigt ausschliesslich Attacks, Spells und Creatures mit
+// MEHR ALS EINER Spell School (Iceage, Giant Exploding Skull …) — die
+// mechanisch eigene Gruppe. Alles andere faellt heraus.
+//
+// Die Option ist AUSGEGRAUT, sobald die uebrige Filterung keine Attacks,
+// Spells oder Creatures mehr enthaelt (z.B. Kartentyp auf „Artifact"):
+// dann schloesse sie sich mit dem uebrigen Filter gegenseitig aus. Ist
+// sie gesetzt und wird dadurch unmoeglich, greift sie einfach nicht.
+// Deck-Builder und Puzzle-Macher teilen sich diese drei Helfer.
+function doppelTypPasst(c) {
+  return !!c && (c.cardType === 'Attack' || c.cardType === 'Spell' || c.cardType === 'Creature');
+}
+
+function istDoppelKarte(c) {
+  if (!doppelTypPasst(c)) return false;
+  const a = (c.spellSchool1 || '').trim();
+  const b = (c.spellSchool2 || '').trim();
+  return !!b && b !== a;
+}
+
+/** Enthaelt die bisher gefilterte Menge ueberhaupt Attacks/Spells/Creatures? */
+function doppelFilterMoeglich(karten) {
+  return (karten || []).some(doppelTypPasst);
+}
+
+/** Wendet die Option an — nur, wenn sie hier ueberhaupt etwas bedeutet. */
+function doppelFilterAnwenden(karten, wert) {
+  if (wert !== 'double') return karten;
+  if (!doppelFilterMoeglich(karten)) return karten;
+  return karten.filter(istDoppelKarte);
+}
+
+function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
   const s = statuses || {};
   const c = counters || {};
   // Buffs live on the hero/creature separately from statuses/counters. For
   // creatures they're also nested under counters.buffs, so fall back there.
   const b = buffs || c.buffs || {};
-  const dur = (statusData) => {
-    if (!statusData || typeof statusData !== 'object') return ' Wears off at the end of its owner\'s turn.';
-    if (statusData.duration != null && statusData.duration > 1) return ` Lasts for ${statusData.duration} of its owner's turns.`;
+  // ★ v1046: ZWEI SCHREIBWEISEN FUER DIE DAUER (Als Befund 12.9.).
+  //   • `duration: n` — „haelt n Runden" (Frost, Stun).
+  //   • `expiresAtTurn` + `expiresForPlayer` — „laeuft in Zug X aus"
+  //     (Negierung von „Null, the Mage Slayer", Locke, Bishop).
+  // Der Helfer kannte nur die erste und behauptete bei der zweiten
+  // „bis zum Ende des Zuges" — bei einer 2-Runden-Negierung schlicht
+  // falsch. `restrunden` rechnet sie in Runden um; den Bezugspunkt
+  // (den laufenden Zug) stellt das Brett global bereit.
+  const restrunden = (statusData) => {
+    if (!statusData || typeof statusData !== 'object') return null;
+    if (statusData.duration != null && statusData.duration > 1) return statusData.duration;
+    const ziel = statusData.expiresAtTurn;
+    const jetzt = (typeof window !== 'undefined') ? window._ppTurn : null;
+    if (ziel == null || jetzt == null) return null;
+    // Ein Halbzug je Spieler: die Differenz sind eigene Zuege.
+    const runden = Math.ceil((ziel - jetzt) / 2);
+    return runden > 1 ? runden : null;
+  };
+  // ★ v1047 (Als Befund 12.9.): BEI KREATUREN STEHT DIE FRIST IM BUFF.
+  // `actionNegateCreature` setzt `counters.negated = 1` und legt die
+  // Frist daneben in `counters.buffs[...]` ab — erkennbar daran, dass
+  // der Buff beim Ablauf genau diesen Zaehler raeumt
+  // (`clearCountersOnExpire`). Wer nur `counters.negated` liest, sieht
+  // eine „1" und keine Dauer; deshalb hier die Suche im Buff.
+  const fristAusBuffs = (statusKey) => {
+    const bs = b || {};
+    for (const k of Object.keys(bs)) {
+      const eintrag = bs[k];
+      if (!eintrag || typeof eintrag !== 'object') continue;
+      const raeumt = eintrag.clearCountersOnExpire;
+      if (!Array.isArray(raeumt) || !raeumt.includes(statusKey)) continue;
+      if (eintrag.expiresAtTurn != null) return eintrag;
+    }
+    return null;
+  };
+  /**
+   * Restrunden aus ALLEN drei Ablagen (v1048):
+   *   ① `statusData.duration`            — Held (Iceage, Null)
+   *   ② `counters.<status>Duration`      — Kreatur (`applyCreatureStatus`)
+   *   ③ `counters.buffs[...].expiresAtTurn` — Ablaufzug (Locke, Bishop)
+   * Die zweite war bisher eine Sonderbehandlung nur fuer den Frost
+   * (v1013); jetzt gilt sie fuer jeden Status, der so gesetzt wird.
+   */
+  const restrundenFuer = (statusKey, statusData) => {
+    const ausStatus = restrunden(statusData);
+    if (ausStatus) return ausStatus;
+    const ausZaehler = c[statusKey + 'Duration'];
+    if (typeof ausZaehler === 'number' && ausZaehler > 1) return ausZaehler;
+    return restrunden(fristAusBuffs(statusKey));
+  };
+  const dur = (statusData, statusKey) => {
+    const n = statusKey ? restrundenFuer(statusKey, statusData) : restrunden(statusData);
+    if (n) return ` Lasts for ${n} of its owner's turns.`;
     return ' Wears off at the end of its owner\'s turn.';
   };
   const durStart = (statusData) => ' Wears off at the start of its owner\'s turn.';
   if (s.frozen || c.frozen) {
+    // ★ v1163: Restrunden ueber den ALLGEMEINEN Helfer `restrundenFuer`
+    // (Status-Objekt beim Helden, `counters.<status>Duration` bei der
+    // Kreatur, Ablaufzug aus Buffs) — der frueher hier eingebaute
+    // Sonderweg fuer den Frost war dessen Vorlaeufer.
     const fr = s.frozen || c.frozen;
-    const remaining = (fr && typeof fr === 'object' && fr.duration != null) ? fr.duration : null;
+    const rest = restrundenFuer('frozen', fr);
     badges.push({
       key: 'frozen', icon: '❄️',
-      tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '') + dur(fr),
-      duration: remaining,
+      tooltip: 'Frozen: Cannot act and has its effects and Abilities negated.' + (isHero ? ' Cannot be equipped with Artifacts.' : '')
+        + dur(fr, 'frozen'),
+      duration: rest && rest > 1 ? rest : null,
     });
   }
   if (s.stunned || c.stunned) {
@@ -3099,13 +3331,25 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
     // drops all incoming damage to 0 — surface that directly on the stun
     // badge so the player can see "this stun is the damage-immune variant"
     // without having to read the buff column.
+    // ★★ v1163 (Al 17.9.: „Beim 3-Runden-Stun fehlt die Rest-Runden-
+    // Anzeige neben dem Badge" — Petrifier). Dieselbe Zahl wie beim
+    // Frost, aus demselben Helfer.
+    const st = s.stunned || c.stunned;
+    const stRest = restrundenFuer('stunned', st);
+    const stDauer = stRest && stRest > 1 ? stRest : null;
     if (b.medusa_petrified) {
       badges.push({
         key: 'stunned', icon: '🗿',
-        tooltip: "Stunned (Petrified): Cannot act and has its effects and Abilities negated. Takes 0 damage from all sources. (Medusa's Curse)",
+        tooltip: "Stunned (Petrified): Cannot act and has its effects and Abilities negated. Takes 0 damage from all sources. (Medusa's Curse)"
+          + (stDauer ? ` Lasts for ${stDauer} of its owner's turns.` : ''),
+        duration: stDauer,
       });
     } else {
-      badges.push({ key: 'stunned', icon: '⚡', tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(s.stunned || c.stunned) });
+      badges.push({
+        key: 'stunned', icon: '⚡',
+        tooltip: 'Stunned: Cannot act and has its effects and Abilities negated.' + dur(st, 'stunned'),
+        duration: stDauer,
+      });
     }
   }
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
@@ -3125,13 +3369,53 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
     if (c._dkSilenced) {
       badges.push({
         key: 'negated', icon: '🤐',
-        tooltip: 'Silenced: Has its effects negated.' + dur(c.negated),
+        tooltip: 'Silenced: Has its effects negated.' + dur(c.negated, 'negated'),
+        duration: restrundenFuer('negated', c.negated),
       });
     } else {
       // v731: quellgebundene Negation — sie endet nicht zum Zugende,
       // sondern mit der Karte, die sie aufrecht haelt (Water Golem).
       // Der Standardsatz „Wears off at the end of its owner's turn"
       // waere hier schlicht falsch.
+      // ★★ v1114 (Als Testbefund 15.9.): „Der Negated-Status-Badge, den
+      // Defeat anlegt, behauptet faelschlicherweise, der Effekt wuerde
+      // auch Abilities negieren und am Rundenende aufhoeren; beides
+      // stimmt fuer DIESEN Negated-Zustand nicht!"
+      //
+      // Stimmt. Der Standardtext beschreibt die RUNDENGEBUNDENE
+      // Vollnegation. Eine von einer KARTE getragene Negation ist etwas
+      // anderes:
+      //   • sie trifft nur den HELDENEFFEKT, nicht die Abilities
+      //     („Decisive Defeat": „that Hero's effect is negated");
+      //   • sie endet nicht zum Zugende, sondern mit der Karte.
+      //
+      // Erkannt an `_fromAttachment` (Anhaengsel) bzw.
+      // `_byWeakeningCrystal` (Handkarte) — denselben Marken, an denen
+      // auch die Heilbarkeit haengt.
+      //
+      // ★ v1115 (Al 15.9.): der Zusatz nennt die Karte BEIM NAMEN und
+      // sagt, WO sie liegen muss — „the card is in play" war beides
+      // nicht. Die beiden Quellen liegen an verschiedenen Orten:
+      //   • Anhaengsel  → am Helden
+      //   • Handkarte   → in der Hand (Weakening Crystal)
+      const negAnhang = s.negated?._fromAttachment;
+      const negHand = s.negated?._byWeakeningCrystal ? 'Weakening Crystal' : null;
+      const kartenQuelle = negAnhang || negHand;
+      if (kartenQuelle) {
+        // ★ v1116 (Al 15.9.): „Weakening Crystal" liegt in der HAND —
+        // und zwar in der des Spielers, dessen Helden negiert sind.
+        // Schaut der GEGNER auf diesen Helden, waere „your hand" falsch.
+        // `isOpponentSide` kommt vom Aufrufer, der weiss, wessen Reihe
+        // er zeichnet.
+        const wo = negAnhang
+          ? 'attached to this Hero'
+          : (isOpponentSide ? "in their owner's hand" : 'in your hand');
+        badges.push({
+          key: 'negated', icon: '🚫',
+          tooltip: `Negated (${kartenQuelle}): Has its effect negated. `
+            + `Abilities still work. Lasts as long as ${kartenQuelle} remains ${wo}.`,
+        });
+      } else {
       const quelle = s.negated?.sourceBound ? s.negated.source : c.negatedSourceBound;
       if (quelle) {
         badges.push({
@@ -3140,18 +3424,36 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
             + ` Lasts while ${quelle} remains on the board.`,
         });
       } else {
-        badges.push({ key: 'negated', icon: '🚫', tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.') + dur(s.negated || c.negated) });
+        // ★ v1046: Restrunden ans Badge (wie beim Frost), damit eine
+        // mehrrundige Negierung nicht wie eine einrundige aussieht.
+        const ng = s.negated || c.negated;
+        badges.push({
+          key: 'negated', icon: '🚫',
+          tooltip: (isHero ? 'Negated: Has its effects and Abilities negated.' : 'Negated: Has its effects negated.')
+            + dur(ng, 'negated'),
+          duration: restrundenFuer('negated', ng),
+        });
+      }
       }
     }
   }
-  if (s.nulled || c.nulled) badges.push({ key: 'nulled', icon: '🔇', tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(s.nulled || c.nulled) });
+  if (s.nulled || c.nulled) {
+    const nu = s.nulled || c.nulled;
+    const nuRest = restrundenFuer('nulled', nu);
+    badges.push({
+      key: 'nulled', icon: '🔇',
+      tooltip: (isHero ? 'Nulled: Cannot cast Spells.' : 'Nulled: Has its effects negated.') + dur(nu, 'nulled'),
+      duration: nuRest && nuRest > 1 ? nuRest : null,   // v1163
+    });
+  }
   if (s.magic_silenced || c.magic_silenced) {
     badges.push({
       key: 'magic_silenced', icon: '🔕',
       tooltip: (isHero
         ? 'Magic Silenced: Cannot cast Spells. Attacks, Abilities, and Hero effects are unaffected.'
         : 'Magic Silenced: Has its effects negated.')
-        + dur(s.magic_silenced || c.magic_silenced),
+        + dur(s.magic_silenced || c.magic_silenced, 'magic_silenced'),
+      duration: (() => { const r = restrundenFuer('magic_silenced', s.magic_silenced || c.magic_silenced); return r > 1 ? r : null; })(),   // v1163
     });
   }
   // v879 (Howling in the Night): eigener Status, eigenes Abzeichen.
@@ -3163,7 +3465,8 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
       tooltip: (isHero
         ? 'Frightened: Cannot use Spells. Attacks, Creatures, Abilities and Hero effects are unaffected.'
         : 'Frightened: Cannot use Spells.')
-        + dur(s.frightened || c.frightened),
+        + dur(s.frightened || c.frightened, 'frightened'),
+      duration: (() => { const r = restrundenFuer('frightened', s.frightened || c.frightened); return r > 1 ? r : null; })(),   // v1163
     });
   }
   if (s.berserked) {
@@ -3178,6 +3481,16 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
       tooltip: 'Cursed: This Hero\'s Attack stat is forced to 0 (overrides every ATK-increasing effect).',
     });
   }
+  // ★★ v1143 („Forbidden Curse of Aging"): eigener Status, eigenes
+  // Abzeichen — nach dem Muster von Cursed und Decisive Defeats Negated.
+  if (s.aged) {
+    badges.push({
+      key: 'aged', icon: '⏳',
+      tooltip: 'Aged: This Hero cannot be healed, its other status effects cannot be removed, '
+        + 'and its "Charme" Abilities are negated. Lasts as long as Forbidden Curse of Aging '
+        + 'remains attached to this Hero.',
+    });
+  }
   if (s.bound) {
     // Skeleton Death Knight tags bound with `source = "Skeleton Death
     // Knight"`; render the badge as the "Silenced" variant in that
@@ -3186,21 +3499,42 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName }) {
     if (s.bound?.source === 'Skeleton Death Knight') {
       badges.push({
         key: 'bound', icon: '🤐',
-        tooltip: 'Silenced: Cannot perform Actions.' + dur(s.bound),
+        tooltip: 'Silenced: Cannot perform Actions.' + dur(s.bound, 'bound'),
+        duration: (() => { const r = restrundenFuer('bound', s.bound); return r > 1 ? r : null; })(),   // v1163
       });
     } else {
-      badges.push({ key: 'bound', icon: '⛓️', tooltip: 'Bound: Cannot perform Actions.' + dur(s.bound) });
+      badges.push({
+        key: 'bound', icon: '⛓️',
+        tooltip: 'Bound: Cannot perform Actions.' + dur(s.bound, 'bound'),
+        duration: (() => { const r = restrundenFuer('bound', s.bound); return r > 1 ? r : null; })(),   // v1163
+      });
     }
   }
+  // ★ v1059 (Als Befund 14.9.): ZWEI Blendungs-Arten mit verschiedenen
+  // Endbedingungen, die gleichzeitig anliegen koennen — also zwei
+  // getrennte Abzeichen. Vorher trug die „bis zum naechsten Schaden"-
+  // Blendung den Text der Rundenende-Variante und behauptete eine
+  // Dauer, die es bei ihr gar nicht gibt.
+  const BLIND_TEXT = 'Blinded: Cannot use Attacks, Spells, or activated effects that need to pick a target. Full AoE effects still work.';
   if (s.blinded || c.blinded) {
     const bl = s.blinded || c.blinded;
     badges.push({
       key: 'blinded', icon: '👁️', className: 'status-blinded',
-      tooltip: 'Blinded: Cannot use Attacks, Spells, or activated effects that need to pick a target. Full AoE effects still work.' + dur(bl),
+      tooltip: BLIND_TEXT + dur(bl, 'blinded'),
+      duration: (() => { const r = restrundenFuer('blinded', bl); return r > 1 ? r : null; })(),   // v1163
     });
   }
-  if (s.immune) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
-  if (s.shielded) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
+  if (s.blinded_hit || c.blinded_hit) {
+    badges.push({
+      key: 'blinded_hit', icon: '🌫️', className: 'status-blinded',
+      tooltip: BLIND_TEXT + ' Lasts until this target next takes damage.',
+    });
+  }
+  // ★★ v1143: Helden zeigen Immune/Shielded ueber ihr eigenes Schild
+  // (`ImmuneIcon`). Seit die Badge-Zeile nicht mehr hinter einer
+  // Handliste steht, wuerde das Schild sonst doppelt erscheinen.
+  if (s.immune && !isHero) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
+  if (s.shielded && !isHero) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
   // v724 (Thicket): harte Unwaehlbarkeit fuer BEIDE Seiten — im
   // Gegensatz zum weichen `untargetable` darueber gibt es hier kein
@@ -4516,3 +4850,7 @@ window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;
 // weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.
 window.SPARKLE_POSITIONS = SPARKLE_POSITIONS;
 window.setTapTooltip = setTapTooltip;
+// v1166: Doppelschulen-Filter fuer Deck-Builder und Puzzle-Macher.
+window.istDoppelKarte = istDoppelKarte;
+window.doppelFilterMoeglich = doppelFilterMoeglich;
+window.doppelFilterAnwenden = doppelFilterAnwenden;

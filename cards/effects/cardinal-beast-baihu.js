@@ -95,6 +95,10 @@ module.exports = {
     if (picked.type === 'hero') {
       await engine.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', {
         duration: 3,
+        appliedBy: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
+        // v1085: gemeinsamer Marker fuer die Versteinerungs-Optik.
+        // `_baihuPetrify` bleibt fuer alte Spielstaende stehen.
+        _petrified: true,
         _baihuPetrify: true,
       });
     } else if (picked.cardInstance) {

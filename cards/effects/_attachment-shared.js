@@ -80,13 +80,25 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   const engine = ctx._engine;
   const gs = engine.gs;
   const pi = ctx.cardOwner;
-  const hosts = candidateHosts(gs, pi, engine, opts);
+  const alle = candidateHosts(gs, pi, engine, opts);
+  // ★★ v1143b (Al 17.9., „Forbidden Curse of Aging"): zwei weiche Stufen
+  // NEBEN dem harten `heroFilter`:
+  //   • `opts.heroDim(hero, hi, side)`    → Held bleibt SICHTBAR, aber
+  //     ausgegraut und nicht waehlbar (`t.ineligible`);
+  //   • `opts.heroAccent(hero, hi, side)` → Hervorhebungsfarbe des Ziels
+  //     (`t.accent`, z.B. 'green': „dieses Ziel macht den Einsatz zur
+  //     Zusatz-Aktion").
+  const gedimmt = (h) => !!opts.heroDim?.(gs.players[h.side]?.heroes?.[h.heroIdx], h.heroIdx, h.side, engine);
+  const hosts = alle.filter(h => !gedimmt(h));
   if (hosts.length === 0) { gs._spellCancelled = true; return null; }
 
   // 1) Drop-Hinweis des Servers: auf Held (und ggf. Zone) gezogen —
   //    `gs._attachmentOwner` nennt die Seite (v651), Standard eigene Seite.
-  const hintHero = gs._attachmentHeroIdx;
-  const wanted = gs._attachmentZoneSlot;
+  // ★★ v1143b: `opts.ignoreDropHints` — der Drop bestimmt bei solchen
+  // Karten den WIRKER, nicht den Wirt (Als Vorgabe 17.9.: „Drag/Drop NUR
+  // auf moegliche Caster, DAS oeffnet dann die Zielauswahl").
+  const hintHero = opts.ignoreDropHints ? null : gs._attachmentHeroIdx;
+  const wanted = opts.ignoreDropHints ? null : gs._attachmentZoneSlot;
   const hintSide = (gs._attachmentOwner === 0 || gs._attachmentOwner === 1) ? gs._attachmentOwner : pi;
   if (hintHero != null && hintHero >= 0) {
     const exact = hosts.find(h => h.side === hintSide && h.heroIdx === hintHero && wanted != null && wanted >= 0 && h.slotIdx === wanted);
@@ -115,13 +127,24 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   // 3) Genau ein Held mit genau einem Platz → automatisch
   const byHero = new Map();
   for (const h of hosts) { const k = `${h.side}-${h.heroIdx}`; if (!byHero.has(k)) byHero.set(k, []); byHero.get(k).push(h); }
-  if (byHero.size === 1 && hosts.length === 1) return { owner: hosts[0].side, heroIdx: hosts[0].heroIdx, slotIdx: hosts[0].slotIdx };
+  if (byHero.size === 1 && hosts.length === 1 && alle.length === hosts.length) return { owner: hosts[0].side, heroIdx: hosts[0].heroIdx, slotIdx: hosts[0].slotIdx };
+  // Ausgegraute Helden kommen fuer die ANZEIGE dazu (hinter die waehlbaren).
+  for (const h of alle) {
+    if (!gedimmt(h)) continue;
+    const k = `${h.side}-${h.heroIdx}`;
+    if (!byHero.has(k)) byHero.set(k, []);
+    byHero.get(k).push({ ...h, _gedimmt: true });
+  }
   // 4) Prompt: Helden (linkester freier Platz) und konkrete Zonen
   const targets = [];
   for (const [, list] of byHero) {
     const { side, heroIdx } = list[0];
-    for (const h of list) targets.push({ id: `equip-${side}-${heroIdx}-${h.slotIdx}`, type: 'equip', owner: side, heroIdx, slotIdx: h.slotIdx, cardName: '' });
-    targets.push({ id: `hero-${side}-${heroIdx}`, type: 'hero', owner: side, heroIdx, cardName: gs.players[side].heroes[heroIdx].name, _autoSlot: list[0].slotIdx });
+    const zusatz = {};
+    if (list[0]._gedimmt) zusatz.ineligible = true;
+    const akzent = opts.heroAccent?.(gs.players[side]?.heroes?.[heroIdx], heroIdx, side, engine);
+    if (akzent && !zusatz.ineligible) zusatz.accent = akzent;
+    for (const h of list) targets.push({ id: `equip-${side}-${heroIdx}-${h.slotIdx}`, type: 'equip', owner: side, heroIdx, slotIdx: h.slotIdx, cardName: '', ...zusatz });
+    targets.push({ id: `hero-${side}-${heroIdx}`, type: 'hero', owner: side, heroIdx, cardName: gs.players[side].heroes[heroIdx].name, _autoSlot: list[0].slotIdx, ...zusatz });
   }
   const result = await engine.promptEffectTarget(pi, targets, {
     title: CARD_NAME,
@@ -132,7 +155,7 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
   });
   if (!result || result.length === 0) { gs._spellCancelled = true; return null; }
   const picked = targets.find(t => t.id === result[0]);
-  if (!picked) { gs._spellCancelled = true; return null; }
+  if (!picked || picked.ineligible) { gs._spellCancelled = true; return null; }
   return { owner: picked.owner, heroIdx: picked.heroIdx, slotIdx: picked.type === 'hero' ? picked._autoSlot : picked.slotIdx };
 }
 
@@ -194,4 +217,117 @@ async function attachToHero(ctx, CARD_NAME, opts = {}) {
   return inst ? { host, inst } : null;
 }
 
-module.exports = { freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero };
+// ═══════════════════════════════════════════
+//  ★★ v1143 — ANHAENGSEL, DIE EINEN STATUS TRAGEN
+//
+//  „Forbidden Curse of Aging\" (`aged`) und „Decisive Defeat\"
+//  (`negated`) legen einen ECHTEN Status an, der genau so lange lebt wie
+//  die Karte. Beide bauten das Aufraeumen bisher selbst — und Decisive
+//  Defeat pruefte dabei nicht, WELCHE Karte die Zone verlaesst:
+//  `ctx.card` ist im Hook die LAUSCHENDE Karte, die gehende steht in
+//  `ctx.leavingCard`. Verliess irgendeine andere Karte irgendeine Zone,
+//  nahm Decisive Defeat seine Negierung zurueck.
+//
+//    setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS)
+//      Legt den Status am Wirt an, markiert mit `_fromAttachment`.
+//
+//    anhaengselStatusHooks(CARD_NAME, STATUS, { heilenWirftAb })
+//      → { onCardEnterZone, onCardLeaveZone, onStatusRemoved? }
+//      • Eintritt in eine Support Zone: Status anlegen (auch nach einem
+//        Umzug an einen anderen Helden).
+//      • Austritt: Status nehmen, wenn keine zweite Kopie mehr am Wirt
+//        haengt.
+//      • `heilenWirftAb: true` — wird der Status entfernt (Cleanse,
+//        Einzelentfernung), gehen alle Kopien am Wirt in die Ablage
+//        ihres URSPRUENGLICHEN Besitzers. Bis dahin wirken sie schon
+//        nicht mehr (`engine._attachmentStatusHaelt`).
+// ═══════════════════════════════════════════
+
+function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME) {
+  const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
+  if (!wirt?.name || wirt.hp <= 0) return false;
+  if (!wirt.statuses) wirt.statuses = {};
+  wirt.statuses[STATUS_NAME] = {
+    permanent: true,
+    appliedTurn: engine.gs.turn || 0,
+    _fromAttachment: CARD_NAME,
+  };
+  return true;
+}
+
+function kopienAmWirt(engine, CARD_NAME, owner, heroIdx, ausser) {
+  return (engine.cardInstances || []).filter(c =>
+    c !== ausser && c.name === CARD_NAME && c.zone === 'support'
+    && c.owner === owner && c.heroIdx === heroIdx && !c.faceDown);
+}
+
+function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
+  const hooks = {
+    onCardEnterZone: async (ctx) => {
+      const inst = ctx.card;
+      if (!inst || inst.name !== CARD_NAME) return;
+      if (ctx.enteringCard?.id !== inst.id) return;
+      if (ctx.toZone && ctx.toZone !== 'support') return;
+      if (inst.zone !== 'support' || inst.faceDown) return;
+      const engine = ctx._engine;
+      const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+      if (!wirt?.name || wirt.statuses?.[STATUS_NAME]) return;
+      setzeAnhaengselStatus(engine, inst.owner, inst.heroIdx, CARD_NAME, STATUS_NAME);
+      engine.sync();
+    },
+
+    onCardLeaveZone: async (ctx) => {
+      const inst = ctx.card;
+      if (!inst || inst.name !== CARD_NAME) return;
+      // ★ Nur die EIGENE Karte — einige Austrittswege tragen nur `_onlyCard`.
+      const gehend = ctx.leavingCard || ctx._onlyCard;
+      if (gehend?.id !== inst.id) return;
+      if (ctx.fromZone && ctx.fromZone !== 'support') return;
+      const engine = ctx._engine;
+      const owner = ctx.fromOwner ?? inst.owner;
+      const heroIdx = ctx.fromHeroIdx ?? inst.heroIdx;
+      const wirt = engine.gs.players[owner]?.heroes?.[heroIdx];
+      if (!wirt?.statuses?.[STATUS_NAME]) return;
+      if (wirt.statuses[STATUS_NAME]._fromAttachment !== CARD_NAME) return;
+      if (kopienAmWirt(engine, CARD_NAME, owner, heroIdx, inst).length > 0) return;
+      // Direkt statt `removeHeroStatus`: kein `onStatusRemoved`, sonst
+      // liefe `heilenWirftAb` gegen die Karte, die ohnehin schon geht.
+      delete wirt.statuses[STATUS_NAME];
+      engine.log('status_remove', { target: wirt.name, status: STATUS_NAME, by: CARD_NAME });
+      engine.sync();
+    },
+  };
+
+  if (optionen.heilenWirftAb) {
+    hooks.onStatusRemoved = async (ctx) => {
+      if (ctx.status !== STATUS_NAME) return;
+      const inst = ctx.card;
+      if (!inst || inst.name !== CARD_NAME || inst.zone !== 'support') return;
+      const engine = ctx._engine;
+      const wirt = engine.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+      if (!wirt) return;
+      // Nur der eigene Wirt — `actionRemoveStatus` liefert keine
+      // Koordinaten, also ueber das Heldenobjekt selbst.
+      const passt = ctx.target
+        ? ctx.target === wirt
+        : (ctx.heroOwner === inst.owner && ctx.heroIdx === inst.heroIdx);
+      if (!passt || wirt.statuses?.[STATUS_NAME]) return;
+      // Alle Kopien hoeren denselben Hook; die erste raeumt ab, die
+      // uebrigen finden nichts mehr (sie selbst stehen nicht mehr im
+      // Support).
+      for (const kopie of [inst, ...kopienAmWirt(engine, CARD_NAME, inst.owner, inst.heroIdx, inst)]) {
+        if (kopie.zone !== 'support') continue;
+        engine.log('status_remove', { target: kopie.name, status: 'attachment', by: STATUS_NAME });
+        // ★★ v1143b: sichtbar — der EINE Brett→Ablage-Weg mit Flug.
+        await engine.sendBoardCardToDiscard(kopie, { source: { name: STATUS_NAME } });
+      }
+      engine.sync();
+    };
+  }
+  return hooks;
+}
+
+module.exports = {
+  freeSlots, candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment, attachToHero,
+  setzeAnhaengselStatus, anhaengselStatusHooks,
+};

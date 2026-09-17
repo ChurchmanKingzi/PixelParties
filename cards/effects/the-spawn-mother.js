@@ -235,6 +235,10 @@ module.exports = {
       // Hero damage — one actionDealDamage per hero (the engine's hero
       // damage path is per-target). Each fires its own afterDamage so
       // listeners (Vinepire-style trackers) see each hit.
+      // ★ v1043 („Interference"): ein Schlag auf Helden UND Kreaturen.
+      // Gezaehlt wird, was WIRKLICH getroffen wird.
+      engine.beginMultiHit(heroHits.filter(x => x.hero?.hp > 0).length + creatureHits.length);
+      try {
       for (const { hero } of heroHits) {
         if (hero.hp <= 0) continue; // May have died from a previous hit this loop
         await engine.actionDealDamage(source, hero, AOE_DAMAGE, 'creature');
@@ -251,6 +255,9 @@ module.exports = {
           source, sourceOwner: pi, canBeNegated: true,
         }));
         await engine.processCreatureDamageBatch(entries);
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       // Restore the AoE flag we set above. Defensive: only delete if

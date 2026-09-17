@@ -155,18 +155,24 @@ module.exports = {
       await engine._delay(EXPLOSIONS_MS);
     }
     let besiegt = 0;
-    for (const inst of opfer) {
-      if (inst.zone !== 'support') continue;          // zwischenzeitlich weg
-      await engine.actionDestroyCard(
-        { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
-        inst,
-        { sourceOwner: pi, sourceName: CARD_NAME },
-      );
-      // Nur zählen, was wirklich gefallen ist — Schutzeffekte
-      // (Defending the Gate, Cardinal Beast, Monia) können eine
-      // Kreatur stehen lassen.
-      if (inst.zone !== 'support') besiegt++;
-    }
+    // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
+    // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
+    // saehe er beim ersten Opfer eine Einzelzerstoerung.
+    engine.beginDestroyScope(opfer.length);
+    try {
+      for (const inst of opfer) {
+        if (inst.zone !== 'support') continue;          // zwischenzeitlich weg
+        await engine.actionDestroyCard(
+          { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
+          inst,
+          { sourceOwner: pi, sourceName: CARD_NAME },
+        );
+        // Nur zählen, was wirklich gefallen ist — Schutzeffekte
+        // (Defending the Gate, Cardinal Beast, Monia) können eine
+        // Kreatur stehen lassen.
+        if (inst.zone !== 'support') besiegt++;
+      }
+    } finally { engine.endDestroyScope(); }
     engine.log('troop_annihilation_wipe', {
       player: ps.username, defeated: besiegt, trigger: deathInfo?.name,
     });

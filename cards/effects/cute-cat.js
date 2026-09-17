@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — die Karte wirft sich selbst ab, keine Wahl (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Cute Cat"
 //  Creature (Summoning Magic Lv 1, 20 HP — Cute archetype)

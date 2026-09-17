@@ -61,7 +61,7 @@ module.exports = {
         // Apply burn to the single target
         for (const { hero, heroIdx: hi, owner } of result.heroes) {
           if (hero && hero.hp > 0 && !hero.statuses?.burned) {
-            await engine.addHeroStatus(owner, hi, 'burned', { permanent: true });
+            await engine.addHeroStatus(owner, hi, 'burned', { permanent: true, appliedBy: pi });
           }
         }
         for (const { inst } of result.creatures) {
@@ -112,7 +112,7 @@ module.exports = {
       // Apply Burned status to all collected heroes (batch — no individual reaction windows)
       for (const { hero, heroIdx: hi, owner } of result.heroes) {
         if (!hero || hero.hp <= 0 || hero.statuses?.burned) continue;
-        await engine.addHeroStatus(owner, hi, 'burned', { permanent: true, _skipReactionCheck: true });
+        await engine.addHeroStatus(owner, hi, 'burned', { permanent: true, appliedBy: pi, _skipReactionCheck: true });
       }
 
       // Apply Burned to all collected creatures

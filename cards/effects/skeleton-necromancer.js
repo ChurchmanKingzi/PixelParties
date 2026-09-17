@@ -80,6 +80,7 @@ module.exports = {
     // `play_pile_transfer` broadcast — no extra spacing needed here.
     if ((ps.hand || []).length === 0) return false;
     await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
       title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
     });
 

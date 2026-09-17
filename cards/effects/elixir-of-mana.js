@@ -53,6 +53,7 @@ module.exports = {
     const maxPicks = Math.min(MAX_PICKS, galleryCards.length);
     const result = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
+      searchToHand: true, searchPile: 'discard',   // v1121
       cards: galleryCards,
       selectCount: maxPicks,
       minSelect: 1,

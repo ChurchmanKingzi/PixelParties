@@ -124,7 +124,7 @@ function DeckBuilder() {
   const [showStarters, setShowStarters] = useState(true);
   const [sampleActive, setSampleActive] = useState(-1);
   const isSampleMode = sampleActive >= 0;
-  const [filters, setFilters] = useState({ name:'',effect:'',cardType:'',subtype:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' });
+  const [filters, setFilters] = useState({ name:'',effect:'',cardType:'',subtype:'',doubles:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' });
   const [cardPage, setCardPage] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState('');
@@ -911,7 +911,11 @@ function DeckBuilder() {
   const isCube = isCubeDeck(currentDeck);
 
   // Filter cards
-  const filteredCards = useMemo(() => {
+  // ★ v1166: ERST alle uebrigen Filter (`basisCards`), DANN die
+  // Doppelschulen-Option. Nur so laesst sich sagen, ob die Option in
+  // dieser Auswahl ueberhaupt etwas bedeutet — sie darf sich nicht
+  // selbst beurteilen.
+  const basisCards = useMemo(() => {
     let result = AVAILABLE_CARDS;
     // Cubes accept any card except non-Performance Abilities (Performance
     // is the only Ability that's draftable; the rest are tied to specific
@@ -933,6 +937,10 @@ function DeckBuilder() {
     if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
     return result;
   }, [filters, isCube]);
+
+  const doppelMoeglich = useMemo(() => window.doppelFilterMoeglich(basisCards), [basisCards]);
+  const filteredCards = useMemo(
+    () => window.doppelFilterAnwenden(basisCards, filters.doubles), [basisCards, filters.doubles]);
 
   // Collapsing the filter panel frees vertical room, so show more cards per page.
   // v837 (Als Vorgabe 8.9.): die Seitengroesse ist ein Vielfaches der
@@ -1811,6 +1819,16 @@ function DeckBuilder() {
               <input className="db-filter-input" placeholder="Search effect text..." value={filters.effect} onChange={e => setFilters(p => ({ ...p, effect: e.target.value }))} style={{ gridColumn: '1/3' }} />
               <select className="db-filter-select" value={filters.cardType} onChange={e => setFilters(p => ({ ...p, cardType: e.target.value }))}><option value="">All Types</option>{CARD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
               <select className="db-filter-select" value={filters.subtype} onChange={e => setFilters(p => ({ ...p, subtype: e.target.value }))}><option value="">All Subtypes</option>{SUBTYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+              {/* ★ v1166: Doppelschulen — nur Attacks/Spells/Creatures mit zwei Spell Schools */}
+              <select className="db-filter-select" value={filters.doubles} disabled={!doppelMoeglich}
+                title={doppelMoeglich
+                  ? 'Show only Attacks, Spells and Creatures with two Spell Schools'
+                  : 'No Attacks, Spells or Creatures in the current selection'}
+                onChange={e => setFilters(p => ({ ...p, doubles: e.target.value }))}
+                style={{ gridColumn: '1/3', opacity: doppelMoeglich ? 1 : .45 }}>
+                <option value="">Spell Schools: Show all</option>
+                <option value="double">Spell Schools: Double only</option>
+              </select>
               <select className="db-filter-select" value={filters.archetype} onChange={e => setFilters(p => ({ ...p, archetype: e.target.value }))} style={{ gridColumn: '1/3' }}><option value="">All Archetypes</option>{ARCHETYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
               <select className="db-filter-select" value={filters.ss1} onChange={e => setFilters(p => ({ ...p, ss1: e.target.value }))}><option value="">Spell School 1</option>{SPELL_SCHOOLS.map(t => <option key={t} value={t}>{t}</option>)}</select>
               <select className="db-filter-select" value={filters.ss2} onChange={e => setFilters(p => ({ ...p, ss2: e.target.value }))}><option value="">Spell School 2</option>{SPELL_SCHOOLS.map(t => <option key={t} value={t}>{t}</option>)}</select>
@@ -1823,7 +1841,7 @@ function DeckBuilder() {
             </div>
             {(() => { const anyActive = Object.values(filters).some(v => v !== ''); return (
               <button className="btn" style={{ width: '100%', padding: 4, fontSize: 10, marginTop: 5 }} disabled={!anyActive}
-                onClick={() => setFilters({ name:'',effect:'',cardType:'',subtype:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' })}>CLEAR FILTERS</button>
+                onClick={() => setFilters({ name:'',effect:'',cardType:'',subtype:'',doubles:'',archetype:'',sa1:'',sa2:'',ss1:'',ss2:'',level:'',cost:'',hp:'',atk:'' })}>CLEAR FILTERS</button>
             ); })()}
           </div>
           )}

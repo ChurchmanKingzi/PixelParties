@@ -106,6 +106,7 @@ module.exports = {
 
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
         cards: gallery,
         title: CARD_NAME,
         description: 'Search your deck for a "Sparkfly" card or "Hive\'s Crown" and add it to your hand.',

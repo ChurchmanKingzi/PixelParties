@@ -16,6 +16,15 @@ const { hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: Suche plus ein Vorteil fuer den GEGNER — ohne Suche nur der Nachteil.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   isTargetingArtifact: true,
   blockedByHandLock: true,
 
@@ -69,6 +78,7 @@ module.exports = {
 
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: 'Holy Cheese',
       description: 'Choose a Support Magic Spell to add to your hand.',

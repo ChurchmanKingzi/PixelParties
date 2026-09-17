@@ -1,3 +1,4 @@
+const { areaTargetId } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Hammer Skeleton"
 //  Creature (Summoning Magic Lv1, Skeletons) — 50 HP
@@ -42,13 +43,16 @@ function collectTargets(engine) {
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'area' && sub === 'area') {
+      // ★ v1054: JEDE Area der Zone ist ihr eigenes Ziel. Der frühere
+      // Filter auf den obersten Eintrag stammt aus der Zeit, als eine
+      // Seite nur eine Area halten konnte — seit „Spatial Crevice"
+      // machte er die unteren unauswählbar, und die Wahl landete
+      // stumm auf der obersten. Die ID trägt den Stapelplatz.
       const arr = gs.areaZones?.[inst.owner] || [];
-      // Multiple Area instances stack visually onto the top entry —
-      // mirror The Yeeting / Antonia's "top of area only" filter so
-      // we don't surface two pickable copies of the same area.
-      if (arr.length > 0 && arr[arr.length - 1] !== inst.name) continue;
+      const stapelPlatz = arr.indexOf(inst.name);
+      if (stapelPlatz < 0) continue;
       targets.push({
-        id: `area-${inst.owner}`,
+        id: areaTargetId(inst.owner, stapelPlatz),
         type: 'area', owner: inst.owner, heroIdx: -1,
         cardName: inst.name, _cardInstance: inst,
       });

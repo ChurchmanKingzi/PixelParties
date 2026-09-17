@@ -51,6 +51,7 @@ module.exports = {
       if (pawns.length > 1) {
         const res = await engine.promptGeneric(pi, {
           type: 'cardGallery', title: CARD_NAME,
+          searchToHand: true,   // v1119: Suche AUF DIE HAND
           cards: pawns.map(n => ({ name: n, source: 'deck' })),
           description: 'Choose which "Pawn of Kings" to add to your hand.', cancellable: false,
         });

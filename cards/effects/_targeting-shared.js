@@ -33,6 +33,23 @@ function isOppCreatureEffect(engine, pi, sourceCard) {
  * ist der zweite Nutzer. Erst-Runden-Schutz und `immovable` werden
  * hier schon gefiltert. Jedes Ziel traegt `_cardInstance`.
  */
+/**
+ * ★ DIE EINE STELLE, an der eine Area-Ziel-ID entsteht (v1054).
+ *
+ * Vorher baute jede Karte `area-${owner}` selbst zusammen — neun
+ * Kopien, alle mit der stillen Annahme „es gibt nur eine Area je
+ * Seite". Seit „Spatial Crevice" stimmt die nicht mehr, und ohne den
+ * Stapelplatz in der ID kann der Client zwei Eintraege nicht
+ * unterscheiden.
+ *
+ * Der Client baut dieselbe ID aus seinem Render-Index (`gs.areaZones`
+ * ist auf beiden Seiten dieselbe Namensliste, die Indizes stimmen also
+ * ueberein).
+ */
+function areaTargetId(owner, stapelPlatz) {
+  return `area-${owner}-${stapelPlatz}`;
+}
+
 function collectNonHeroBoardTargets(gs, engine) {
   const targets = [];
   const seen = new Set();
@@ -80,15 +97,27 @@ function collectNonHeroBoardTargets(gs, engine) {
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'area') {
-      // Area zones count as non-Hero board cards — anything that can
-      // target a Permanent should also be able to target an Area. The
-      // BoardZone displays the top entry of areaZones[owner], so
-      // filter to just that entry.
+      // ★ v1054 (Als Befund 14.9.: „The Yeeting trifft immer die
+      // oberste Area statt der gewaehlten").
+      //
+      // Hier stand ein Filter auf den OBERSTEN Eintrag, mit der
+      // Begruendung „die BoardZone zeigt ohnehin nur den". Seit
+      // „Spatial Crevice" zeigt sie ALLE — und die unteren waren damit
+      // nicht nur unsichtbar fuer die Zielwahl, sie waren gar nicht
+      // erst im Angebot. Die Auswahl landete auf der einzigen ID, die
+      // es gab, und die gehoerte der obersten Karte.
+      //
+      // Jede Area ist jetzt ihr eigenes Ziel. Die ID traegt den
+      // STAPELPLATZ, weil der Client nur Namen kennt (gs.areaZones ist
+      // eine Namensliste) und ohne ihn zwei Eintraege nicht
+      // auseinanderhalten koennte.
       const areaArr = gs.areaZones?.[inst.owner] || [];
-      if (areaArr.length > 0 && areaArr[areaArr.length - 1] !== inst.name) continue;
+      const stapelPlatz = areaArr.indexOf(inst.name);
+      if (stapelPlatz < 0) continue;      // Instanz haengt nicht mehr in der Zone
       targets.push({
-        id: `area-${inst.owner}`,
+        id: areaTargetId(inst.owner, stapelPlatz),
         type: 'area', owner: inst.owner, heroIdx: -1,
+        slotIdx: stapelPlatz,
         cardName: inst.name, _cardInstance: inst,
       });
     } else if (inst.zone === 'surprise') {
@@ -117,4 +146,4 @@ function collectNonHeroBoardTargets(gs, engine) {
   return targets;
 }
 
-module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets };
+module.exports = { isOppCreatureEffect, collectNonHeroBoardTargets, areaTargetId };

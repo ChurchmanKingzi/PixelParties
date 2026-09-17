@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Teleportation Powder"   (Potion)
 //
-//  „Choose any undefeated Hero on the board and remove it, its
+//  „Choose an undefeated Hero your opponent controls and remove it, its
 //   Abilities, and all cards equipped or attached to it from the game
 //   completely. At the beginning of your next turn, return those cards
 //   to the Zones they were removed from. A player does not lose the
@@ -101,31 +101,27 @@ module.exports = {
   oncePerGame: true,
   oncePerGameKey: CARD_NAME,
 
+  // ★ NUR GEGNERISCHE HELDEN (v1029, Als Textaenderung 12.9.):
+  // „Choose an undefeated Hero YOUR OPPONENT controls" — vorher stand
+  // dort „any … on the board", eigene Helden waren also waehlbar.
   canActivate(gs, playerIdx) {
-    for (let pi = 0; pi < 2; pi++) {
-      for (const hero of (gs.players[pi]?.heroes || [])) {
-        if (hero?.name && hero.hp > 0) return true;
-      }
-    }
-    return false;
+    const oi = playerIdx === 0 ? 1 : 0;
+    if (gs.firstTurnProtectedPlayer === oi) return false;   // Runde-1-Schutz
+    return (gs.players[oi]?.heroes || []).some(h => h?.name && h.hp > 0);
   },
 
   getValidTargets(gs, playerIdx, engine) {
     if (!engine) return [];
-    const out = [];
-    // „any undefeated Hero on the board" — beide Seiten. Der
-    // Erstrunden-Schutz gilt trotzdem: in Runde 1 ist der Gegner
-    // unantastbar.
-    for (let pi = 0; pi < 2; pi++) {
-      if (pi !== playerIdx && gs.firstTurnProtectedPlayer === pi) continue;
-      out.push(...engine.getHeroTargets(pi));
-    }
-    return out;
+    const oi = playerIdx === 0 ? 1 : 0;
+    // Der Erstrunden-Schutz gilt weiterhin: in Runde 1 ist der Gegner
+    // unantastbar — und damit gibt es gar kein Ziel mehr.
+    if (gs.firstTurnProtectedPlayer === oi) return [];
+    return engine.getHeroTargets(oi);
   },
 
   targetingConfig: {
     title: CARD_NAME,
-    description: 'Remove an undefeated Hero — with its Abilities, Equipments and Attachments — from the game. It all returns at the beginning of your next turn.',
+    description: "Remove an undefeated Hero your opponent controls — with its Abilities, Equipments and Attachments — from the game. It all returns at the beginning of your next turn.",
     confirmLabel: '✨ Teleport!',
     confirmClass: 'btn-info',
     cancellable: true,

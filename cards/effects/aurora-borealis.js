@@ -122,6 +122,7 @@ module.exports = {
       // ── Auswahl ─────────────────────────────────────────────────
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+        searchToHand: true, searchPile: 'deck',   // v1121
         cards: kandidaten,
         title: CARD_NAME,
         description: `Choose up to ${anzahl} Spell${anzahl > 1 ? 's' : ''} with different names from your deck `
@@ -143,7 +144,7 @@ module.exports = {
       for (const name of namen) {
         const idx = (ps.mainDeck || []).indexOf(name);
         if (idx < 0) continue;
-        if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME, shuffle: true }))) continue;
+        if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME, shuffle: true, toHand: true }))) continue;
         engine._broadcastEvent('card_reveal', { cardName: name });
         engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
         ps.hand.push(name);

@@ -139,6 +139,7 @@ async function runRiderTutor(engine, pi) {
 
   const picked = await engine.promptGeneric(pi, {
     type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
     cards: gallery,
     title: CARD_NAME,
     description: 'Choose an Elven Creature from your deck to add to your hand.',

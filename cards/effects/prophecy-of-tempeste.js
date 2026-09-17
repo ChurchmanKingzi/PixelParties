@@ -76,12 +76,30 @@ function ownerHasAttachableHero(ps) {
   return false;
 }
 
+/** Liegt schon eine Kopie an einem eigenen Helden? (v1166) */
+function bereitsImSpiel(ps) {
+  for (const heldenZonen of (ps.supportZones || [])) {
+    for (const slot of (heldenZonen || [])) {
+      if ((slot || []).includes(CARD_NAME)) return true;
+    }
+  }
+  return false;
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
 
+  /**
+   * ★★ v1166 (Balancing, Al 17.9.): „You can only have 1 „Prophecy of
+   * Tempeste" in play at a time." — liegt schon eine an einem eigenen
+   * Helden, ist jede weitere Kopie grau und auch ueber fremde Effekte
+   * (aus Deck/Ablage spielen, Kopien) nicht aktivierbar: die Sperre
+   * haengt an `spellPlayCondition`, dem Tor fuer JEDEN Spielweg.
+   */
   spellPlayCondition(gs, playerIdx /* , engine */) {
     const ps = gs.players[playerIdx];
     if (!ps) return false;
+    if (bereitsImSpiel(ps)) return false;
     return ownerHasAttachableHero(ps);
   },
 
@@ -101,7 +119,10 @@ module.exports = {
     return undefined;
   },
 
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine); },
+  attachmentHosts(gs, pi, engine) {
+    if (bereitsImSpiel(gs.players[pi] || {})) return [];   // v1166
+    return attachmentHostsFor(gs, pi, engine);
+  },
 
   hooks: {
     onPlay: async (ctx) => {

@@ -50,7 +50,9 @@ module.exports = {
       const { pi, heroIdx } = fired;
       const hero = gs.players[pi]?.heroes?.[heroIdx];
       if (!hero?.name || hero.hp <= 0) { engine.log('storm_piano', { player: gs.players[pi]?.username, hero: hero?.name || null, applied: false }); return; }
-      await engine.addHeroStatus(pi, heroIdx, 'damage_proof', { armedTurn: gs.turn, source: CARD_NAME });
+      // v1067: Quelle ist Pflicht. Eigener Held — loest korrekt KEINEN
+      // Gegner-Trigger aus (siehe _affected-shared).
+      await engine.addHeroStatus(pi, heroIdx, 'damage_proof', { armedTurn: gs.turn, source: CARD_NAME, appliedBy: pi });
       engine._broadcastEvent('play_zone_animation', { type: 'shield_bubble', owner: pi, heroIdx, zoneSlot: -1 });
       engine.log('storm_piano', { player: gs.players[pi]?.username, hero: hero.name, applied: true });
       engine.sync();

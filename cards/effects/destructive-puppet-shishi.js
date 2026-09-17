@@ -106,6 +106,8 @@ module.exports = {
     // ── Kosten: 1 Handkarte abwerfen ──
     const pick = await engine.promptGeneric(pi, {
       type: 'forceDiscard',
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'disrupt',
       title: CARD_NAME,
       description: 'Discard 1 card to activate Shishi.',
       instruction: 'Click a card in your hand to discard it.',

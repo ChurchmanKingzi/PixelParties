@@ -104,13 +104,17 @@ async function runEffect(engine, pi) {
   // before destruction. Counters die with the inst — leftover
   // bombCounters don't matter post-destroy.
   const source = { name: CARD_NAME, owner: pi };
-  for (const inst of targets) {
-    if (inst.zone !== 'support') continue;
-    if (inst.counters?._damageDestroyImmune) {
-      delete inst.counters._damageDestroyImmune;
+  // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer.
+  engine.beginDestroyScope(targets.length);
+  try {
+    for (const inst of targets) {
+      if (inst.zone !== 'support') continue;
+      if (inst.counters?._damageDestroyImmune) {
+        delete inst.counters._damageDestroyImmune;
+      }
+      await engine.actionDestroyCard(source, inst, { fireCreatureDeath: true });
     }
-    await engine.actionDestroyCard(source, inst, { fireCreatureDeath: true });
-  }
+  } finally { engine.endDestroyScope(); }
 
   engine.log('burning_fuse_resolve', {
     player: ps.username, count: targets.length,

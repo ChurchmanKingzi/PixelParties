@@ -6692,6 +6692,17 @@ function installCpuBrain(engine) {
           });
           if (verschenkt) priorPick = null;
         }
+        // ★★ v1145 (Al 17.9.): auch der Prior darf eine REINE HP-Heilung
+        // nie auf einen Helden mit Heilsperre (Aged) legen. Heilungen, die
+        // auch Status entfernen (Cure), bleiben frei — dort ist das
+        // Entfernen von „Aged" selbst der Nutzen.
+        if (priorPick) {
+          const _hcd = srcName ? engine._getCardDB()[srcName] : null;
+          const _reinHp = (config.isHealing || looksLikeHeal(_hcd, config)) && !looksLikeCleanseText(_hcd);
+          if (_reinHp && priorPick.some(id => heroHealBlocked(engine, validTargets.find(x => x && x.id === id)))) {
+            priorPick = null;
+          }
+        }
       }
       const picked = (cardPick !== undefined) ? cardPick
         : (scriptedPick || priorPick || engine._getCpuTargetResponse(validTargets, config, playerIdx));
@@ -7103,7 +7114,10 @@ function cpuPickTargets(engine, validTargets, config, promptedPlayerIdx) {
     if (config.cancellable !== false) return [];
     // Forced heal with no great target — heal the highest-HP own hero as a
     // no-op fallback. Never heal an enemy unless Overheal-Shocked.
-    const fallback = ownTargets.find(t => t.type === 'hero') || ownTargets[0];
+    // v1145: ein Aged-Held nur, wenn wirklich nichts anderes bleibt.
+    const fallback = ownTargets.find(t => t.type === 'hero' && !heroHealBlocked(engine, t))
+      || ownTargets.find(t => !heroHealBlocked(engine, t))
+      || ownTargets[0];
     return fallback ? [fallback.id] : [];
   }
 
@@ -7169,18 +7183,16 @@ function pickHealTargetsMulti(engine, ownTargets, enemyTargets, cardName, maxSel
     if (targetIsPreferDead(engine, t)) return false;
     return true;
   });
-  // 3) Fresh Lifeforce Howitzer priority
+  // 3) Fresh Lifeforce Howitzer priority (v1145: nicht an Heilsperre)
   for (const t of safeOwn) {
+    if (heroHealBlocked(engine, t)) continue;
     if (targetHasFreshLifeforceHowitzer(engine, t)) add(t);
   }
   // 4) Injured heroes — Ascended / Ascendable heroes first, then by HP
   //    missing desc. See `pickHealTarget` for the rationale.
   const ownHeroesByMissing = safeOwn
     .filter(t => t.type === 'hero')
-    .map(t => {
-      const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
-      return { t, missing: (h?.maxHp || 0) - (h?.hp || 0) };
-    })
+    .map(t => ({ t, missing: heroHealRoom(engine, t) }))   // v1145: Aged → 0
     .filter(x => x.missing > 0)
     .sort((a, b) => {
       const aAsc = targetIsAscendedOrAscendableHero(engine, a.t) ? 1 : 0;
@@ -8309,6 +8321,36 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
     // for. Covers Ascended Heroes (score ~310), Cardinal Beasts (~150),
     // and any eval-tracked combo piece. Regular scarce cards (~110)
     // still get discarded; only clear win-condition pieces cancel.
+    // ── ★ KOSTEN-ABWURF: GELERNTE ENTSCHEIDUNG (v1037) ─────────────
+    // Traegt der Prompt `costFor`, ist der Abwurf die KOSTE eines
+    // Effekts — „abbrechen" heisst dann nicht „ich nehme den Schaden",
+    // sondern „der Effekt passiert nicht". Die 150er-Schwelle darunter
+    // stammt aus dem Abwurf-DUELL (Bottled Flame) und misst hier das
+    // Falsche. Stattdessen entscheidet der Lernkanal
+    // (`costDiscardRules`, gefittet aus `_costDiscardLog`); ohne Daten
+    // faellt es auf das alte Verhalten zurueck.
+    if (type === 'forceDiscardCancellable' && promptData.costFor) {
+      let gelernt = null;
+      try {
+        const dp = require('./_deck-profile');
+        gelernt = dp.costDiscardDecision(engine, cpuIdx, promptData.costFor,
+          dp.costDiscardTags(engine, cpuIdx, {
+            kind: promptData.costKind, extra: promptData.costTags,   // v1038
+          }));
+      } catch { /* ohne Profil normal weiter */ }
+      if (gelernt === 'refuse') {
+        cpuLog(`  [Kosten-Abwurf] "${promptData.costFor}": gelernt → NICHT zahlen`);
+        return null;
+      }
+      if (gelernt === 'pay') {
+        cpuLog(`  [Kosten-Abwurf] "${promptData.costFor}": gelernt → zahlen mit ${pick.name}`);
+        return { cardName: pick.name, handIndex: pick.idx };
+      }
+      // Keine Meinung: wie bisher, aber ohne die duell-eigene
+      // 150er-Sperre — sonst entstuenden fuer teure Haende NIE
+      // Zahl-Beispiele, und der Kanal bliebe auf einem Arm blind.
+      return { cardName: pick.name, handIndex: pick.idx };
+    }
     if (type === 'forceDiscardCancellable' && pick.value >= 150) {
       return null; // "Take it!" — eat the damage to save the card
     }
@@ -8534,7 +8576,7 @@ function isTargetImmune(engine, target) {
     const hero = gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero || hero.hp <= 0) return true;
     if (hero.statuses?.immune) return true;
-    if (hero.statuses?.stunned?._baihuPetrify) return true;
+    if (hero.statuses?.stunned?._petrified || hero.statuses?.stunned?._baihuPetrify) return true;   // v1085
     if (hero.charmedBy != null && hero.charmedBy !== target.owner) return true;
     // Submerged (Als Demo-Befund, damage_blocked reason 'submerged'):
     // die Engine blockt Schaden UND Status-Effekte auf getauchte
@@ -8559,7 +8601,7 @@ function isTargetImmune(engine, target) {
     if (inst.counters?.targeting_immune) return true;
     if (inst.counters?.control_immune) return true;
     if (inst.counters?._cardinalImmune) return true;
-    if (inst.counters?._baihuPetrify) return true;
+    if (inst.counters?._petrified || inst.counters?._baihuPetrify) return true;   // v1085
     // Registry-Audit (Als Auftrag): golden_wings setzt zusätzlich
     // untargetable_by_opponent — für Ziele der GEGENSEITE immun (eigene
     // Kreaturen mit dem Counter bleiben für den Besitzer wählbar).
@@ -8713,8 +8755,11 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
     return true;
   });
 
+  // v1145: fuer HP-Heilung zaehlen gesperrte Helden (Aged) gar nicht.
+  const hpOwn = safeOwn.filter(t => !heroHealBlocked(engine, t));
+
   // 3) Priority: own target equipped with Lifeforce Howitzer that hasn't used effect yet.
-  const lifeforce = safeOwn.filter(t => targetHasFreshLifeforceHowitzer(engine, t));
+  const lifeforce = hpOwn.filter(t => targetHasFreshLifeforceHowitzer(engine, t));
   if (lifeforce.length) return randomOf(lifeforce);
 
   // 4) Status-cleansing precedence: cards like Juice that "heal from
@@ -8756,7 +8801,9 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
   const effect = (cd?.effect || '').toLowerCase();
   const looksLikeCleanse = /negative status|cleanse|remove .* status/i.test(effect);
   if (allOwnHaveStatus || looksLikeCleanse) {
-    const statusOwn = safeOwn.filter(targetHasCleansableStatus);
+    // v1145: ohne Reinigungstext ist es eine HP-Heilung — Helden mit
+    // Heilsperre (Aged) scheiden dann auch hier aus.
+    const statusOwn = (looksLikeCleanse ? safeOwn : hpOwn).filter(targetHasCleansableStatus);
     if (statusOwn.length > 0) {
       const heroes = statusOwn.filter(t => t.type === 'hero');
       if (heroes.length > 0) {
@@ -8773,7 +8820,7 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
           const tickDmg = STATUS_DMG_PER_STACK * (burn + poison);
           const lethal = tickDmg > 0 && tickDmg >= h.hp ? 10000 : 0;
           const ascended = targetIsAscendedOrAscendableHero(engine, t) ? 1000 : 0;
-          const missing = (h.maxHp || 0) - (h.hp || 0);
+          const missing = heroHealRoom(engine, t);   // v1145: Aged → 0
           return lethal + ascended + missing;
         };
         heroes.sort((a, b) => scoreHero(b) - scoreHero(a));
@@ -8794,10 +8841,9 @@ function pickHealTarget(engine, ownTargets, enemyTargets, cardName, _config) {
   }
 
   // 5) Most-missing-HP own Hero; else lowest-HP own Creature.
-  const ownHeroes = safeOwn.filter(t => t.type === 'hero').map(t => {
-    const h = gs.players[t.owner]?.heroes?.[t.heroIdx];
-    return { t, missing: (h?.maxHp || 0) - (h?.hp || 0) };
-  }).filter(x => x.missing > 0);
+  // v1145: Heilsperre → 0 fehlende HP → faellt heraus.
+  const ownHeroes = hpOwn.filter(t => t.type === 'hero').map(t => ({ t, missing: heroHealRoom(engine, t) }))
+    .filter(x => x.missing > 0);
   if (ownHeroes.length) {
     // Ascended / Ascendable heroes get the top tier — keeping the deck's
     // plan piece alive beats a bigger-number heal on a regular hero.
@@ -9051,6 +9097,36 @@ function heroHealReversed(engine, t) {
 }
 
 /**
+ * ★★ v1145 (Al 17.9.): „HP-Heilung darf NIEMALS aged Heroes als Ziel
+ * waehlen — sie gelten als ‚erhaelt 0 HP durch diese Heilung', als
+ * staenden sie schon ueber Max-HP."
+ *
+ * Gefragt wird die Engine (`_heroHealBlocked`), nicht der Statusname:
+ * dieselbe Stelle, an der die Heilung wirklich verpufft. Damit gilt die
+ * Regel fuer „Aged" und jede kuenftige Heilsperre gleich.
+ */
+function heroHealBlocked(engine, t) {
+  if (t?.type !== 'hero') return false;
+  return !!engine._heroHealBlocked?.(t.owner, t.heroIdx);
+}
+
+/** Wieviel HP kann diese Heilung am Helden hoechstens bewirken? (0 bei Sperre) */
+function heroHealRoom(engine, t) {
+  if (heroHealBlocked(engine, t)) return 0;
+  const h = engine.gs.players?.[t.owner]?.heroes?.[t.heroIdx];
+  return Math.max(0, (h?.maxHp || 0) - (h?.hp || 0));
+}
+
+/**
+ * Reine HP-Heilung — im Unterschied zu Heilungen, die (auch) Status
+ * entfernen. Bei denen bleibt ein Aged-Held ein sinnvolles Ziel: das
+ * Entfernen von „Aged" selbst ist der Nutzen.
+ */
+function looksLikeCleanseText(cd) {
+  return /negative status|cleanse|remove .* status/i.test(cd?.effect || '');
+}
+
+/**
  * Creature whose card script declares `cpuMeta.preferDead: true` —
  * the CPU should NEVER spend defensive resources (heal, cleanse,
  * buff) on it. Cute Cat is the prototype: its on-summon self-discard
@@ -9112,7 +9188,8 @@ function hasHealableOwnTarget(engine) {
   const ps = engine.gs.players[cpuIdx];
   // Any alive hero missing HP?
   for (const h of (ps?.heroes || [])) {
-    if (h?.name && h.hp > 0 && h.hp < h.maxHp) return true;
+    if (h?.name && h.hp > 0 && h.hp < h.maxHp
+        && !engine._heroHealBlocked?.(cpuIdx, ps.heroes.indexOf(h))) return true;   // v1145
   }
   // Any own creature missing HP?
   for (let hi = 0; hi < (ps?.supportZones || []).length; hi++) {
@@ -10162,6 +10239,72 @@ function abilitySearchUnlockBonus(engine, pi, abilityName) {
   return Math.min(36, bonus);
 }
 
+/**
+ * ★ „INTERFERENCE"-MALUS FUER FLAECHENKARTEN (v1049, Als Auftrag 14.9.)
+ *
+ * Liefert den ANTEIL des Kartenwerts, den ein Flaechenschlag gerade
+ * verliert, weil der Gegner ihn per „Interference" wegdrueckt — 0 = kein
+ * Verlust, 1 = die Karte ist gegen diese Seite wertlos.
+ *
+ * WARUM ES DIESEN ZWEITEN WEG GIBT (neben `projectImpactFeatures`):
+ * die exakte Projektion wirkt nur, wenn die Karte `cpuProjectedDamage`
+ * deklariert UND ein trainiertes Profil `impactWeights`/`impactRules`
+ * dafuer traegt. Dieser Malus hier braucht beides nicht und greift
+ * deshalb auch im frisch aufgesetzten Spiel — er ist der grobe,
+ * profilunabhaengige Gurt, die Projektion der feine.
+ *
+ * RECHNUNG: jedes Ziel, das der Schlag treffen wuerde, bekommt sein
+ * Gewicht aus DENSELBEN Wertfunktionen, mit denen `pickEnemyTargets`
+ * im Fall „Schadenshoehe unbekannt" arbeitet (Held `100 × value`,
+ * Kreatur `50 × value − 30`) — hier ist die Schadenshoehe ebenfalls
+ * unbekannt, also ist das genau die passende Skala und keine neu
+ * erfundene. Der blockierte Anteil ist die Summe `Gewicht × share`
+ * ueber die Helden, geteilt durch das Gesamtgewicht aller Ziele.
+ * Kreaturen tragen zum Nenner bei, aber nie zum Zaehler: „Interference"
+ * schuetzt ausdruecklich nur Helden.
+ *
+ * Damit fallen Als drei Stufen von selbst heraus, ohne eine zweite
+ * Regelkopie: `interferenceShare` liefert 0.5 / 1 / 1-fuer-alle, und
+ * genau diese Anteile gewichtet die Summe.
+ *
+ * ★ BEWUSSTE NAEHERUNG: gewertet wird immer gegen die GEGNERSEITE, auch
+ * bei Karten, deren Schlag `side: 'own'` oder `'both'` trifft — der
+ * Wert einer Flaechenkarte fuer die CPU steckt in dem, was sie drueben
+ * anrichtet. Die echte Seitenwahl steht in der `config` im Kartenrumpf
+ * und ist von aussen nicht lesbar; die Naeherung kann den Malus
+ * unterschaetzen, nie ueberschaetzen.
+ */
+function interferenceAoeDiscount(engine, pi, cardName) {
+  try {
+    if (!loadCardEffect(cardName)?.hitsMultipleTargets) return 0;
+    if (typeof engine.interferenceShare !== 'function') return 0;
+    if (typeof engine.collectAoeHeroTargets !== 'function') return 0;
+    const opp = pi === 0 ? 1 : 0;
+    const heroes = engine.collectAoeHeroTargets([opp], {})
+      .filter(e => !e.hero.statuses?.shielded);
+    const creatures = engine.collectAoeCreatureTargets([opp], {}, ['hero', 'creature']);
+    // „hits other targets IN ADDITION to it" — unter zwei Zielen ist der
+    // Schlag gar kein Flaechenschlag und „Interference" greift nicht.
+    if (heroes.length + creatures.length < 2) return 0;
+
+    const teamMax = mctsTeamMaxSchoolLvl(engine.gs, opp);
+    let gesamt = 0, blockiert = 0;
+    for (const { hero, heroIdx, owner } of heroes) {
+      const gewicht = 100 * mctsEnemyHeroDynamicValue(engine, owner, heroIdx, teamMax);
+      if (!(gewicht > 0)) continue;
+      gesamt += gewicht;
+      const anteil = engine.interferenceShare(owner, hero) || 0;
+      blockiert += gewicht * Math.max(0, Math.min(1, anteil));
+    }
+    for (const { inst } of creatures) {
+      const gewicht = Math.max(0, 50 * mctsEnemyCreatureValue(engine, inst) - 30);
+      gesamt += gewicht;
+    }
+    if (!(gesamt > 0)) return 0;
+    return Math.max(0, Math.min(1, blockiert / gesamt));
+  } catch { return 0; }
+}
+
 function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
   const cardDB = engine._getCardDB();
   const cd = cardDB[cardName];
@@ -10352,6 +10495,17 @@ function estimateHandCardValueFor(engine, pi, cardName, seenCount = 0) {
     // freischalten würde, +6 für bloßen Fortschritt, Cap 36.
     if (cd.cardType === 'Ability') {
       base += abilitySearchUnlockBonus(engine, pi, cardName);
+    }
+    // ── „Interference"-Malus fuer Flaechenkarten (v1049) ─────────────
+    // Multiplikativ, weil der Gegner einen ANTEIL des Ertrags wegnimmt
+    // und nicht einen festen Betrag. Steht bewusst HIER — vor den
+    // Ascension-/Cardinal-Boeden und der Kazena-Umkehr, gleiche
+    // Reihenfolge wie beim Profil-Blend: ausdrueckliche Plan-Regeln
+    // behalten Vorrang vor der Lagebewertung. Ein positiver Grundwert
+    // kann dadurch gegen 0 laufen, aber nie das Vorzeichen wechseln.
+    if (base > 0) {
+      const malus = interferenceAoeDiscount(engine, pi, cardName);
+      if (malus > 0) base *= (1 - malus);
     }
   }
   // Ascension-critical floor — applies UNIVERSALLY to any card that

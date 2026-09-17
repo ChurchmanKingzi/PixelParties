@@ -63,6 +63,7 @@ module.exports = {
 
       // ── Apply negative_status_immune buff ──
       await engine.actionAddBuff(hero, pi, targetHeroIdx, 'negative_status_immune', {
+        sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         source: 'Divine Gift of Coolness',
         permanent: true,
       });

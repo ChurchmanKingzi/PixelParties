@@ -66,6 +66,7 @@ module.exports = {
     // "caster's next turn"; we want one tick earlier.
     const oi = pi === 0 ? 1 : 0;
     await engine.actionAddBuff(hero, target.owner, target.heroIdx, 'cold_strike', {
+      sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
       expiresAtTurn: gs.turn + 1,
       expiresForPlayer: oi,
       source: 'Elixir of Cold',

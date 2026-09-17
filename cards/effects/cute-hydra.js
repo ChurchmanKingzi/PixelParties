@@ -252,6 +252,12 @@ module.exports = {
   },
 
   // ── 2. HEAD COUNTERS ON SUMMON ──────────────────────────────────
+  // ★★ v1134: dasselbe Muster wie „Hell Fox" — die Karte routet ihren
+  // Kadaver beim Tod von der Ablage ins Geloeschte um. Ohne diese
+  // Deklaration fliegt sie sichtbar ZUERST zur Ablage, und der
+  // Diff-Animator schickt sie gleich darauf ein zweites Mal weiter.
+  deletesSelfOnDeath: true,
+
   hooks: {
     onPlay: async (ctx) => {
       const inst = ctx.card;

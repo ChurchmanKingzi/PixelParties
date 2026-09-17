@@ -110,6 +110,9 @@ module.exports = {
     };
 
     const stapel = [];
+    // ★ v1043 („Interference"): ein Schlag auf alle Ziele.
+    engine.beginMultiHit(ziele.length);
+    try {
     for (const t of ziele) {
       if (t.type === 'hero') {
         const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
@@ -128,6 +131,9 @@ module.exports = {
           animType: null,
         });
       }
+    }
+    } finally {
+      engine.endMultiHit();
     }
     if (stapel.length > 0) await engine.processCreatureDamageBatch(stapel);
 

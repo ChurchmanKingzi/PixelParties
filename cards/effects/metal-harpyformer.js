@@ -57,6 +57,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'damage',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to deal 50 damage to any target.`,
       source: CARD_NAME,
@@ -88,18 +89,32 @@ module.exports = {
     });
     await engine._delay(400);
 
+    // ★ v1038: Fuer den Kosten-Lernkanal zaehlt nicht nur die LAGE vor
+    // der Zahlung, sondern auch, was dabei herauskam — „hat der Schaden
+    // getoetet?" (Als Praezisierung 12.9.). Deshalb den Zustand VORHER
+    // festhalten und danach als Ausgangs-Tag nachtragen.
+    const warGegner = tgtOwner !== pi;
+    let getoetet = false;
     if (target.type === 'hero') {
       const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
       if (tgtHero && tgtHero.hp > 0) {
         await ctx.dealDamage(tgtHero, 50, 'creature');
+        getoetet = !!(tgtHero && tgtHero.hp <= 0);
       }
     } else if (target.cardInstance) {
+      const inst = target.cardInstance;
       await engine.actionDealCreatureDamage(
         { name: CARD_NAME, owner: pi, heroIdx },
-        target.cardInstance, 50, 'creature',
+        inst, 50, 'creature',
         { sourceOwner: pi, canBeNegated: true },
       );
+      getoetet = inst.zone !== 'support';
     }
+    engine.noteCostDiscardOutcome(pi, CARD_NAME, [
+      getoetet ? 'killed' : 'noKill',
+      warGegner ? 'hitOpp' : 'hitSelf',
+      target.type === 'hero' ? 'hitHero' : 'hitCreature',
+    ]);
 
     engine.log('metal_strike', { player: ps.username, target: target.cardName });
     engine.sync();

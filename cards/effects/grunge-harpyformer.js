@@ -60,6 +60,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'burn',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to permanently Burn any target.`,
       source: CARD_NAME,
@@ -110,7 +111,7 @@ module.exports = {
     if (target.type === 'hero') {
       const tgtHero = gs.players[tgtOwner]?.heroes?.[tgtHeroIdx];
       if (tgtHero && tgtHero.hp > 0 && !tgtHero.statuses?.burned) {
-        await engine.addHeroStatus(tgtOwner, tgtHeroIdx, 'burned', { permanent: true });
+        await engine.addHeroStatus(tgtOwner, tgtHeroIdx, 'burned', { permanent: true, appliedBy: pi });
       }
     } else if (target.cardInstance) {
       const inst = target.cardInstance;

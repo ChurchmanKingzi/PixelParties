@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der GEGNER wirft ab (v1041)
 // ═══════════════════════════════════════════
 //  HERO EFFECT: "Mary Crestmas"  (Crestmas, Crystals)
 //

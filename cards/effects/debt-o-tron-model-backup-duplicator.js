@@ -87,6 +87,7 @@ module.exports = {
 
       const gewaehlt = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
         title: CARD_NAME,
         description: `You overspent by ${treffer.excess} Gold. Add up to ${wieviele} "Debt-O-Tron" Artifact${wieviele === 1 ? '' : 's'} from your deck to your hand.`,
         cards: kandidaten,

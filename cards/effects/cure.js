@@ -35,7 +35,11 @@ function getValidTargets(gs, engine, excludeHeroKey) {
       if (excludeHeroKey && `${t.owner}-${t.heroIdx}` === excludeHeroKey) continue;
       const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
       if (!hero?.statuses) continue;
-      if (negKeys.some(k => hero.statuses[k])) targets.push(t);
+      // v1093: auch Anhaengsel, die „als negativer Statuseffekt
+      // zaehlen" („Decisive Defeat") machen den Helden zum Ziel —
+      // sonst waere ein Held, der NUR diese Karte traegt, fuer Cure
+      // unsichtbar.
+      if (engine.cleansableHeroEntries(t.owner, t.heroIdx).length > 0) targets.push(t);
     }
     for (const t of engine.getCreatureTargets(pi)) {
       const inst = t.cardInstance;
@@ -81,8 +85,14 @@ async function doCure(engine, pi, target, casterHeroIdx) {
     await engine._delay(400);
 
     // Remove all negative statuses (centralized — skips unhealable)
-    const removedKeys = engine.cleanseHeroStatuses(hero, target.owner, target.heroIdx, negKeys, 'Cure');
-    removed = removedKeys.length;
+    // v1093: die Anhaengsel-Schluessel gehen MIT — sonst faellt
+    // „Decisive Defeat" zwar (Vollheilungs-Weg), zaehlt aber nicht fuer
+    // die Heilmenge „100 × entfernt".
+    const eintraege = engine.cleansableHeroEntries(target.owner, target.heroIdx);
+    const anhaengsel = eintraege.filter(e => String(e.key).startsWith('attach:')).map(e => e.key);
+    const removedKeys = engine.cleanseHeroStatuses(
+      hero, target.owner, target.heroIdx, [...negKeys, ...anhaengsel], 'Cure');
+    removed = removedKeys.length + anhaengsel.length;
 
     // Heal 100 × removed
     if (removed > 0 && hero.hp > 0) {

@@ -524,6 +524,49 @@ function instrumentiere(engine) {
         fuer = playerIdx; playerIdx = umgeleitetAn;
       }
     } catch { /* egal */ }
+    // ── ★ KOSTEN-ABWURF-LERNKANAL (v1037, Als Auftrag 12.9.) ────────
+    // Jeder Abwurf, der als KOSTEN eines Effekts gefordert wird
+    // (`costFor` am Prompt), landet als eigene Zeile: welche Karte
+    // wollte etwas, wurde gezahlt, womit, und in welcher Lage. Der
+    // Trainer fittet daraus `costDiscardRules` — „lohnt es sich, fuer
+    // DIESEN Effekt zu zahlen?". Eine feste Punktzahl kann das nicht
+    // beantworten (Als Begruendung 12.9.: die Effekte sind nicht
+    // gegeneinander aufrechenbar).
+    //
+    // Hier statt im Kartenskript, damit JEDE kuenftige Karte mit
+    // `costFor` den Kanal ohne eigenes Zutun bedient.
+    try {
+      const costFor = promptData && promptData.costFor;
+      if (costFor) {
+        // ★ v1041: Zwei Prompt-Formen zahlen Kosten. Der WAEHLER liefert
+        // die abgeworfene Karte (`cardName`); ein reiner JA/NEIN-Prompt
+        // („eine Karte abwerfen, um …?") liefert nur die Zusage. Beide
+        // sind dieselbe Entscheidung und gehoeren in denselben Kanal.
+        const zusage = response === true
+          || !!(response && !response.cancelled
+            && (response.cardName != null || response.confirmed === true));
+        const gezahlt = !!zusage;
+        const dp = require('./_deck-profile');
+        if (!engine._costDiscardLog) engine._costDiscardLog = [];
+        engine._costDiscardLog.push({
+          pi: playerIdx,
+          t: engine.gs?.turn || 0,
+          c: costFor,
+          paid: gezahlt ? 1 : 0,
+          card: (gezahlt && response && response.cardName) ? response.cardName : null,
+          // ★ v1038: Die Sorte der Gegenleistung kommt vom Prompt
+          // (`costKind`), damit die Lage-Tags zur Frage passen —
+          // Goldstand beim Goldeffekt, gegnerische Restpunkte beim
+          // Schadenseffekt. Zusatztags fuer Einzelfaelle via
+          // `costTags`.
+          tags: dp.costDiscardTags(engine, playerIdx, {
+            kind: promptData.costKind,
+            extra: promptData.costTags,
+          }),
+        });
+      }
+    } catch { /* Aufzeichnung darf nie stoeren */ }
+
     try {
       notiere(engine, playerIdx, {
         art, karte,

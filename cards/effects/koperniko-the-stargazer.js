@@ -86,6 +86,7 @@ async function zusatzSuche(engine, pi, heroIdx, tally) {
   const heldName = gs.players[pi]?.heroes?.[heroIdx]?.name || CARD_NAME;
   const wahl = await engine.promptGeneric(pi, {
     type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
     cards: galerie,
     title: CARD_NAME,
     description: `${heldName} reads the stars: you may add a second ${spec.label} with a different name from your deck.`,

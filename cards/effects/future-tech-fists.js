@@ -102,30 +102,37 @@ module.exports = {
     // EIN Quellobjekt fuer alle Treffer — Reaktionen und die
     // Effekt-Immunitaet sehen den Streuschlag als EINEN Vorgang.
     const quelle = { name: hero.name, owner: pi, heroIdx };
-    for (const id of ids) {
-      const ziel = kandidaten.find(t => t.id === id);
-      if (!ziel) continue;
+    // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
+    // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
+    // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
+    // Einzeltreffer und der Schutz greift korrekt nicht.
+    engine.beginMultiHit(ids.length);
+    try {
+      for (const id of ids) {
+        const ziel = kandidaten.find(t => t.id === id);
+        if (!ziel) continue;
 
-      // Silbrige Faust — erst der Schlag, dann die Wirkung.
-      engine._broadcastEvent('punch_impact', {
-        owner: ziel.owner, heroIdx: ziel.heroIdx,
-        zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
-        metal: true,
-      });
-      await engine._delay(FAUST_MS);
+        // Silbrige Faust — erst der Schlag, dann die Wirkung.
+        engine._broadcastEvent('punch_impact', {
+          owner: ziel.owner, heroIdx: ziel.heroIdx,
+          zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
+          metal: true,
+        });
+        await engine._delay(FAUST_MS);
 
-      if (ziel.type === 'hero') {
-        const th = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
-        if (th?.name && th.hp > 0) {
-          await engine.actionDealDamage(quelle, th, atk, 'attack');
+        if (ziel.type === 'hero') {
+          const th = gs.players[ziel.owner]?.heroes?.[ziel.heroIdx];
+          if (th?.name && th.hp > 0) {
+            await engine.actionDealDamage(quelle, th, atk, 'attack');
+          }
+        } else if (ziel.cardInstance) {
+          await engine.actionDealCreatureDamage(
+            quelle, ziel.cardInstance, atk, 'attack',
+            { sourceOwner: pi, canBeNegated: true },
+          );
         }
-      } else if (ziel.cardInstance) {
-        await engine.actionDealCreatureDamage(
-          quelle, ziel.cardInstance, atk, 'attack',
-          { sourceOwner: pi, canBeNegated: true },
-        );
       }
-    }
+    } finally { engine.endMultiHit(); }
 
     engine.log('ft_fists', {
       player: gs.players[pi]?.username, hits: ids.length,

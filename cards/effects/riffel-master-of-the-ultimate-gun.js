@@ -68,6 +68,7 @@ module.exports = {
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       // `count` → das kleine „×N"-Badge, das auch Loyal Shepherd, Raise the
       // Minions & Co. in ihren Galerien zeigen (Al 30.8.: nicht die grosse
       // Layn-Variante).

@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Beschwoerungsbedingung, keine Abwurfkosten (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Guardian Beast Shu" (Rat)
 //  Creature (Summoning Magic Lv0, 60 HP).
@@ -161,6 +162,7 @@ module.exports = {
       const oi = pi === 0 ? 1 : 0;
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
+        searchToHand: true, searchPile: 'deck',   // v1121
         cardName: targetName,
         searcherName: ps.username,
         title: CARD_NAME,

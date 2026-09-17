@@ -8,6 +8,13 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Choose a card from your deck … add it to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   blockedByHandLock: true,
   spellPlayCondition(gs, pi) {
     const ps = gs.players[pi];
@@ -59,6 +66,7 @@ module.exports = {
       // Show gallery prompt
       const result = await engine.promptGeneric(pi, {
         type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
         cards: galleryCards,
         title: 'Brilliant Idea',
         description: 'Pick the perfect card — inspiration strikes!',

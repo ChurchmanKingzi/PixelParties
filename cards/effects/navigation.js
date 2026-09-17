@@ -76,6 +76,8 @@ module.exports = {
 
       const result = await engine.promptGeneric(pi, {
         type: 'forceDiscard',
+        costFor: 'Navigation',          // ★ v1041: Kosten-Abwurf-Lernkanal
+        costKind: 'tutor',
         count: 1,
         title: `Navigation Lv${level}`,
         description: chosenCardName
@@ -143,6 +145,7 @@ module.exports = {
 
     const searchResult = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: `Navigation Lv${level}`,
       description: 'Choose a card to add to your hand.',

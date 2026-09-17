@@ -1,3 +1,4 @@
+const { areaTargetId } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Kappa Sword Slash"
 //  Attack (Fighting Lv5, Normal)
@@ -162,29 +163,33 @@ module.exports = {
       }
 
       // ── Step 3: optional Area removal ──
-      // Areas are bound to per-player zones with the canonical
-      // `[data-area-zone][data-area-owner=...]` selector. Each player
-      // has at most one VISIBLE area at a time (top of areaZones[pi]),
-      // so the target list is at most 2 entries (one per side). Use
-      // `type: 'area'` to match The Yeeting's targeting shape — the
-      // click handlers wire that to the area-zone selector.
+      // Areas sind an die Spieler-Zonen gebunden (`[data-area-zone]
+      // [data-area-owner=...]`). Typ 'area' wie bei The Yeeting — daran
+      // haengen die Klick-Handler.
+      //
+      // ★ v1054: JEDE Area der Zone ist ein eigenes Ziel. Der frueher
+      // hier stehende Kommentar „each player has at most one VISIBLE
+      // area at a time" gilt seit „Spatial Crevice" nicht mehr; die
+      // unteren Areas waren dadurch unauswaehlbar.
       const areaTargets = [];
       for (let aoi = 0; aoi < 2; aoi++) {
         const arr = gs.areaZones?.[aoi] || [];
-        if (arr.length === 0) continue;
-        const topName = arr[arr.length - 1];
-        const inst = engine.cardInstances.find(c =>
-          c.owner === aoi && c.zone === 'area' && c.name === topName,
-        );
-        if (!inst) continue;
-        areaTargets.push({
-          id:       `area-${aoi}`,
-          type:     'area',
-          owner:    aoi,
-          heroIdx:  -1,
-          cardName: topName,
-          _cardInstance: inst,
-        });
+        for (let platz = 0; platz < arr.length; platz++) {
+          const name = arr[platz];
+          const inst = engine.cardInstances.find(c =>
+            c.owner === aoi && c.zone === 'area' && c.name === name,
+          );
+          if (!inst) continue;
+          areaTargets.push({
+            id:       areaTargetId(aoi, platz),
+            type:     'area',
+            owner:    aoi,
+            heroIdx:  -1,
+            slotIdx:  platz,
+            cardName: name,
+            _cardInstance: inst,
+          });
+        }
       }
 
       if (areaTargets.length > 0) {

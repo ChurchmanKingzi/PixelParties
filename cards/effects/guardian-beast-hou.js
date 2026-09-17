@@ -111,19 +111,26 @@ module.exports = {
     // Phase 2: apply the damage to each target. Damage events still
     // fire sequentially (so individual death/onCreatureDeath/onHeroKO
     // hooks resolve in order), but the visuals are already in sync.
-    for (const id of tgtIds) {
-      const tgt = refreshedTargets.find(t => t.id === id);
-      if (!tgt) continue;
-      if (tgt.type === 'hero') {
-        const hero = engine.gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
-        if (hero && hero.hp > 0) await engine.actionDealDamage(source, hero, DAMAGE_PER_HIT, 'creature');
-      } else if (tgt.cardInstance) {
-        await engine.actionDealCreatureDamage(
-          source, tgt.cardInstance, DAMAGE_PER_HIT, 'creature',
-          { sourceOwner: pi, canBeNegated: true },
-        );
+    // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
+    // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
+    // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
+    // Einzeltreffer und der Schutz greift korrekt nicht.
+    engine.beginMultiHit(tgtIds.length);
+    try {
+      for (const id of tgtIds) {
+        const tgt = refreshedTargets.find(t => t.id === id);
+        if (!tgt) continue;
+        if (tgt.type === 'hero') {
+          const hero = engine.gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
+          if (hero && hero.hp > 0) await engine.actionDealDamage(source, hero, DAMAGE_PER_HIT, 'creature');
+        } else if (tgt.cardInstance) {
+          await engine.actionDealCreatureDamage(
+            source, tgt.cardInstance, DAMAGE_PER_HIT, 'creature',
+            { sourceOwner: pi, canBeNegated: true },
+          );
+        }
       }
-    }
+    } finally { engine.endMultiHit(); }
 
     engine.log('guardian_beast_hou_strike', {
       player: engine.gs.players[pi]?.username, hits: tgtIds.length, deleted: deleted.length,

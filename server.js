@@ -4457,6 +4457,24 @@ function sendGameState(room, playerIdx, extra) {
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(pi) : 30,
       handLocked: ps.handLocked || false,
       drawLocked: ps.drawLocked || false,
+      // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
+      // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
+      // Ability-Sperrzustand wird MITGESCHICKT. Er gilt fuer BEIDE
+      // Spieler zugleich — deshalb kein Pro-Spieler-Wert, sondern
+      // derselbe an beiden Seiten; der Client zeigt daraus zwei
+      // Debuff-Zeilen.
+      abilityActivationBlocked: !!room.engine?.abilityActivationBlocked?.(),
+      // v1090: ABGELEITETE Stufe — sie kann von der Flagge (Cats of the
+      // Pharaoh) ODER vom Brett kommen („Siege"). Der Client zeigt
+      // sonst kein Abzeichen, obwohl die Sperre greift.
+      searchLocked: (() => {
+        const l = room.engine?.searchLockLevel?.(pi);
+        return l ? (l.deck || l.discard) : (ps.searchLocked || false);
+      })(),
+      searchLockedIncludesDiscard: (() => {
+        const l = room.engine?.searchLockLevel?.(pi);
+        return l ? l.discard : (ps.searchLockedIncludesDiscard || false);
+      })(),
       // v828: Hand-SPIELsperre (Knight of Kings [W]) — 'all' oder 'of-kings'
       // (Board liegt → „of Kings"-Karten bleiben spielbar).
       handPlayLock: (ps._handPlayLock && ps._handPlayLock.turn === gs.turn)
@@ -4484,6 +4502,21 @@ function sendGameState(room, playerIdx, extra) {
           const cd = dlDB[cn];
           if (cd?.cardType === 'Ability' || cd?.cardType === 'Creature') continue;
           blocked.add(cn);
+        }
+        return [...blocked];
+      })() : [],
+      // v1069: reiner Such-Lock (Cats of the Pharaoh) — graut Karten aus,
+      // die NUR suchen. Zwei Stufen: Deck-Sucher sind schon bei der
+      // schwachen Sperre tot, Ablage-Sucher erst bei der starken.
+      searchLockBlockedCards: (((room.engine?.searchLockLevel?.(pi)?.deck
+        || room.engine?.searchLockLevel?.(pi)?.discard
+        || ps.searchLocked)) && pi === playerIdx) ? (() => {
+        const blocked = new Set();
+        const slDB = getCardDB();
+        for (const cn of ps.hand) {
+          const scr = loadCardEffect(cn);
+          if (!scr) continue;
+          if (room.engine?._cardBlockedBySearchLock?.(scr, slDB[cn], ps, pi)) blocked.add(cn);
         }
         return [...blocked];
       })() : [],
@@ -4827,6 +4860,8 @@ function sendGameState(room, playerIdx, extra) {
     handReturnToDeck: gs.handReturnToDeck || false,
     handReturnToOppCards: gs.handReturnToOppCards || [],
     potionTargeting: gs.potionTargeting || null,
+    // v1150: Zielmarken (#1, #2 …) — siehe `engine.setzeZielMarke`.
+    zielMarken: gs.zielMarken || [],
     effectPrompt: gs.effectPrompt || null,
     surprisePending: gs.surprisePending || false,
     heroEffectPending: gs.heroEffectPending || null,
@@ -5098,6 +5133,12 @@ function sendGameState(room, playerIdx, extra) {
     discardEntries: room.engine ? room.engine.getDiscardEntries(playerIdx) : [],
     activatablePermanents: room.engine ? room.engine.getActivatablePermanents(playerIdx) : [],
     activatableAreas: room.engine ? room.engine.getActivatableAreas(playerIdx) : [],
+    // ★ v1050: wie viele Areas jede Seite gleichzeitig halten darf.
+    // Grundwert 1, „Spatial Crevice" hebt auf 3. Der Client kennt nur
+    // cards.json, nicht die Kartenskripte — ohne diese Zahl koennte er
+    // die Drop-Zone nicht mehr korrekt hervorheben, sobald das Limit
+    // nicht mehr fest bei 1 liegt.
+    areaLimits: room.engine ? [room.engine.areaLimitFor(0), room.engine.areaLimitFor(1)] : [1, 1],
     heroPlayableCards: room.engine ? room.engine.getHeroPlayableCards(playerIdx) : { own: {}, charmed: {} },
     // Abilities, die als Joker auf einem fremden Schul-Stapel mitzählen
     // (Performance). Der Client spiegelt die Schulzählung der Engine für
@@ -5219,6 +5260,19 @@ function sendGameState(room, playerIdx, extra) {
       spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
     },
     ...extra,
+    // ★★ v1135 — LAUFENDE NUMMER JE ZUSTAND (Als Befund 15.9.: „Skull
+    // erscheint wieder in der Support Zone … Fox UND Skull verschwinden
+    // aus ihren Support Zones").
+    //
+    // Dass BEIDE Karten zurueckkommen und gemeinsam wieder gehen,
+    // passt zu keinem Einzelfehler — aber genau zu einem ZUSTAND, der
+    // zu spaet ankommt und einen neueren ueberschreibt. Die
+    // Server-Diagnose sah das nie, weil der alte Zustand ja korrekt
+    // war, ALS er gebaut wurde.
+    //
+    // Mit einer laufenden Nummer kann der Client einen veralteten
+    // Zustand erkennen und verwerfen.
+    stateSeq: (room._stateSeq = (room._stateSeq || 0) + 1),
   };
   io.to(p.socketId).emit('game_state', state);
 }
@@ -5334,6 +5388,24 @@ function sendSpectatorGameState(room) {
       poisonDamagePerStack: room.engine ? room.engine.getPoisonDamagePerStack(spi) : 30,
       handLocked: ps.handLocked || false,
       drawLocked: ps.drawLocked || false,
+      // v1068: reiner Such-Lock (Cats of the Pharaoh) — Draws bleiben frei.
+      // ★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.): der
+      // Ability-Sperrzustand wird MITGESCHICKT. Er gilt fuer BEIDE
+      // Spieler zugleich — deshalb kein Pro-Spieler-Wert, sondern
+      // derselbe an beiden Seiten; der Client zeigt daraus zwei
+      // Debuff-Zeilen.
+      abilityActivationBlocked: !!room.engine?.abilityActivationBlocked?.(),
+      // v1090: ABGELEITETE Stufe — sie kann von der Flagge (Cats of the
+      // Pharaoh) ODER vom Brett kommen („Siege"). Der Client zeigt
+      // sonst kein Abzeichen, obwohl die Sperre greift.
+      searchLocked: (() => {
+        const l = room.engine?.searchLockLevel?.(spi);
+        return l ? (l.deck || l.discard) : (ps.searchLocked || false);
+      })(),
+      searchLockedIncludesDiscard: (() => {
+        const l = room.engine?.searchLockLevel?.(spi);
+        return l ? l.discard : (ps.searchLockedIncludesDiscard || false);
+      })(),
       // v828: Hand-SPIELsperre (Knight of Kings [W]) — 'all' oder 'of-kings'
       // (Board liegt → „of Kings"-Karten bleiben spielbar).
       handPlayLock: (ps._handPlayLock && ps._handPlayLock.turn === gs.turn)
@@ -5434,6 +5506,7 @@ function sendSpectatorGameState(room) {
     mulliganPending: gs.mulliganPending || false,
     handReturnToDeck: gs.handReturnToDeck || false,
     handReturnToOppCards: gs.handReturnToOppCards || [],
+    zielMarken: gs.zielMarken || [],   // v1150
     potionTargeting: gs.potionTargeting ? {
       potionName: gs.potionTargeting.potionName,
       ownerIdx: gs.potionTargeting.ownerIdx,
@@ -5508,6 +5581,7 @@ function sendSpectatorGameState(room) {
     discardEntries: [],
     activatablePermanents: [],
     activatableAreas: [],
+    areaLimits: [1, 1],
     heroPlayableCards: { own: {}, charmed: {} },
     heroStrictLevelCards: {},
     crossSidePlayableCards: [],
@@ -6547,6 +6621,7 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     const _scr = loadCardEffect(cardName);
     const _me = gs.players[pi];
     if (_scr?.blockedByDrawLock && _me?.drawLocked && cardData.cardType !== 'Creature') return false;
+    if (room.engine?._cardBlockedBySearchLock?.(_scr, cardData, _me, pi)) return false;   // v1069
     if (_scr?.blockedByHandLock && _me?.handLocked && cardData.cardType !== 'Creature') return false;
     if (_scr?.blockedByPileLock && cardData.cardType !== 'Creature' && room.engine.isPileLockedFor(pi)) return false;   // v826
     if (_scr?.blockedBySummonLock && cardData.cardType !== 'Creature' && _me?.summonLocked) return false;   // v834
@@ -7067,6 +7142,17 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Spell', 'Attack'], { charmedOwner, fromCreation });
   if (!v) return _bail('validateActionPlay: nein (Level/Schule, Sperre, Handindex oder spellPlayCondition)');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, wasBerserkGranted } = v;
+
+  // ★ EINMAL PRO SPIEL — DAS TOR FEHLTE HIER (v1030, Als Auftrag 12.9.).
+  // Der Zauberweg STEMPELTE zwar laengst, pruefte den Stempel aber
+  // nie: die Sperre lebte allein von der Ausgrauung im Client
+  // (`getPlayableCards`). Ein zweiter Versuch am Server — Doppelklick,
+  // CPU, Wiederholung — waere durchgegangen. Jetzt wie bei Artefakt,
+  // Ueberraschung, Trank und Kreatur.
+  if (script?.oncePerGame || script?.oncePerGameKey) {
+    const _opgKey = script.oncePerGameKey || cardName;
+    if (ps._oncePerGameUsed?.has(_opgKey)) return _bail('once-per-game');
+  }
   // `isInherentAction` is mutable post-onPlay: Curse (and any future
   // card with the same dual-mode shape) sets `gs._spellForcesActionConsume`
   // during its onPlay to flip the engine's "inherent" classification
@@ -7388,6 +7474,34 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     if (gs._spellForcesActionConsume) {
       isInherentAction = false;
       delete gs._spellForcesActionConsume;
+      // ★★ v1143 („Forbidden Curse of Aging", Al 17.9.): DIE NAECHSTE
+      // VERFUEGBARE AKTION WIRKLICH VERBRAUCHEN.
+      //
+      // Bisher drehte die Flagge nur `isInherentAction` um. Das bezahlt
+      // allein in der Action Phase VOR der ersten Aktion etwas (Held
+      // „acted", Sprung nach Main Phase 2). Ueberall sonst ging es leer:
+      //   • Main Phase 1 — der Held wurde bloss als „acted" markiert, kein
+      //     Phasensprung;
+      //   • Main Phase 2 bzw. Action Phase nach der ersten Aktion — ein
+      //     bereitstehender Geber (Duigno, Zhigao …) blieb unberuehrt.
+      //
+      // Jetzt dieselbe Reihenfolge wie bei einem gewoehnlichen Einsatz
+      // der Karte (Als Bestaetigung 17.9.): wo ein normaler Guss einen
+      // Geber braucht (Main Phase, Aktion schon verbraucht), zahlt der
+      // passende Geber; fehlt er, verbrennt Main Phase 1 die Aktion der
+      // Action Phase (`burnUpcomingAction` nach der Aufloesung — der
+      // Pillar-of-Light-Weg, Sprung nach Main Phase 2).
+      if (!isReactionSubtype && !additionalConsumed && (isMainPhase || actionAlreadyUsed)) {
+        const rueckfallTyp = room.engine.findAdditionalActionForCard(pi, cardName, heroIdx);
+        if (rueckfallTyp) {
+          consumedInst = room.engine.consumeAdditionalAction(pi, rueckfallTyp);
+          additionalConsumed = true;
+          room.engine.log('forced_action_consume', { player: ps.username, card: cardName, via: 'additional' });
+        } else if (gs.currentPhase === 2) {
+          gs._pendingActionBurn = { pi, heroIdx };
+          room.engine.log('forced_action_consume', { player: ps.username, card: cardName, via: 'upcoming' });
+        }
+      }
     }
     await room.engine._flushSurpriseDrawChecks();
 
@@ -7809,6 +7923,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     }
     if (isActionPhase && !additionalConsumed && !isInherentAction && !becameFreeAction && !gs._preventPhaseAdvance) {
       await room.engine.advanceToPhase(pi, 4);
+    } else if (isActionPhase && (isInherentAction || becameFreeAction) && !gs._preventPhaseAdvance
+               && room.engine.inherentCountsAsExtraAction(pi)) {
+      // ★ v1019 (Als Ruling): eine inhaerente Aktion NACH der ersten
+      // ist die ZWEITE Aktion der Phase — der Zweitaktions-Zuschlag
+      // (Zhigao) ist damit durch. Der hochgesetzte Zaehler laesst den
+      // Riegel in `advanceToPhase` erkennen, dass nichts mehr offen
+      // ist; steht noch ein WEITERER einloesbarer Zuschlag (Mission),
+      // haelt er den Spieler weiterhin hier.
+      ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
+      await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && additionalConsumed && !gs._preventPhaseAdvance) {
       // Only `isSecondActionGrant` providers gate the post-action-2
@@ -7925,12 +8049,26 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   // puzzle-placed Cardinals never fire, so the name fallback is
   // the load-bearing gate for puzzle setups.
   const { CARDINAL_NAMES: CARDS_CARDINAL } = require('./cards/effects/_cardinal-shared');
-  if (charmedOwner != null && charmedOwner !== pi
+  // ★ AUSNAHME: EIGENE LEIHGABE (v1016, Als Befund 12.9.). Eine Kreatur,
+  // die ICH mir mit `omniImmune` geliehen habe (Cute Conversion), liegt
+  // weiter physisch beim Gegner — die Aktivierung kommt deshalb mit
+  // `charmedOwner = Gegner` herein und lief genau in dieses Tor. Die
+  // Immunitaet richtet sich aber gegen FREMDE Karten und Effekte, nicht
+  // gegen den Kontrolleur, der den Effekt der geliehenen Kreatur
+  // benutzt. Ein echter Cardinal Beast kann hier nicht durchrutschen:
+  // `actionStealCreature` verweigert den Diebstahl omni-immuner
+  // Kreaturen, `stolenBy` kann bei ihnen also gar nicht stehen.
+  const _eigeneLeihgabe = inst.stolenBy === pi && !!inst.counters?._stealOmniImmune;
+  if (!_eigeneLeihgabe && charmedOwner != null && charmedOwner !== pi
       && (inst.counters?._cardinalImmune || CARDS_CARDINAL.includes(inst.name))) return false;
 
   const effectName = inst.counters?._effectOverride || creatureName;
   const script = loadCardEffect(effectName);
   if (!script?.creatureEffect || !script?.onCreatureEffect) return false;
+  // ★ EINMAL PRO SPIEL FUER DEN EFFEKT (v1030, Als Auftrag 12.9.).
+  // Eigener Schluessel (`effect:…`), damit „1 Beschwoerung je Partie"
+  // und „1 Aktivierung je Partie" nebeneinander stehen koennen.
+  if (room.engine.oncePerGameEffectUsed(pi, script, effectName)) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, effectName, room.engine)) return false;
 
   // Phase + action-economy gate. The default creature-effect path is
@@ -8198,6 +8336,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
       }
+      // ★ v1030: … und die Partie-Grenze, falls die Karte eine hat.
+      room.engine.markOncePerGameEffect(pi, script, effectName);
       // Action-cost creatures consume the Action on success. Mirror
       // the doPlaySpell / doActivateAbility bookkeeping: bump the phase
       // counter, push the activating Hero into `heroesActedThisTurn`
@@ -8332,6 +8472,9 @@ function doTriggerTreacherousCrystal(room, pi) {
 
 async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
+  // v1073 („The Thing in the Ship"): harte Sperre. Die Listen in der
+  // Engine sind nur die Oberflaeche — ohne diese Zeile liesse sich die
+  // Aktivierung per Socket-Nachricht trotzdem ausloesen.
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   if (gs.potionTargeting) return false;
@@ -8375,6 +8518,15 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
 
   const script = loadCardEffect(abilityName);
   if (!script?.freeActivation || !script?.onFreeActivate) return false;
+  // v1073 („The Thing in the Ship"): harte Sperre fuer AKTIVE
+  // Ability-Effekte, solange eine Kreatur mit
+  // `blocksAbilityActivation` auf dem Brett liegt. Die Listen in der
+  // Engine sind nur die Oberflaeche — ohne diese Zeile liesse sich die
+  // Aktivierung per Socket-Nachricht trotzdem ausloesen.
+  if (room.engine.abilityActivationBlocked()) return false;
+  // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
+  // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
+  if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
   if (isActionPhase && !script.actionPhaseEligible) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
@@ -8593,6 +8745,17 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot, fromCreation });
   if (!v) return _no('validate-nein');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
+
+  // ★ EINMAL PRO SPIEL — AUCH FUER BESCHWOERUNGEN (v1030, Als Auftrag
+  // 12.9.). Zauber, Artefakte, Ueberraschungen und (seit v1028)
+  // Traenke pruefen und stempeln das laengst; der Kreaturweg kannte es
+  // nicht. Der Stempel sitzt unten, wo die Beschwoerung wirklich
+  // gelandet ist — eine negierte oder abgebrochene Beschwoerung darf
+  // die Partie-Grenze nicht verbrauchen.
+  if (script?.oncePerGame || script?.oncePerGameKey) {
+    const _opgKey = script.oncePerGameKey || cardName;
+    if (ps._oncePerGameUsed?.has(_opgKey)) return _no('once-per-game');
+  }
 
   if (ps.summonLocked) return _no('summon-locked');
   const freshBlocked = room.engine.getSummonBlocked(pi);
@@ -8817,16 +8980,25 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         if (!ps.heroesActedThisTurn) ps.heroesActedThisTurn = [];
         if (!ps.heroesActedThisTurn.includes(heroIdx)) ps.heroesActedThisTurn.push(heroIdx);
       }
-      if (isActionPhase && !usingAdditional) {
+      // ★ v1018 (Als Befund 12.9.): `!isInherentAction` FEHLTE HIER.
+      // Eine inhaerent gespielte Kreatur (Aggressive Town Guard, wenn
+      // noch nichts beschworen wurde) kostet gar keine Aktion — der
+      // Stempel oben unterbleibt deshalb zu Recht. Ohne denselben
+      // Riegel an der Phasenschaltung flog der Spieler aber trotzdem
+      // aus der Action Phase: die Beschwoerung wurde negiert, Off Duty
+      // gab (richtig) keine Ersatzaktion, und die eigentliche Aktion
+      // war weg. Der Normalweg unten prueft `!effectiveIsInherent`
+      // seit jeher; der Negat-Zweig ist jetzt angeglichen — samt der
+      // v991-Pruefung „der zweite Zuschlag muss auch EINLOESBAR sein".
+      if (isActionPhase && !usingAdditional && !isInherentAction) {
         await room.engine.advanceToPhase(pi, 4);
       }
       if (isActionPhase && usingAdditional) {
-        // Only `isSecondActionGrant` providers gate the post-action-2
-        // advance — see the doPlaySpell counterpart for rationale.
         const hasMoreSecondAction = room.engine.cardInstances.some(c => {
           if (c.owner !== pi || !c.counters?.additionalActionAvail) return false;
           const config = room.engine._additionalActionTypes?.[c.counters.additionalActionType];
-          return !!config?.isSecondActionGrant;
+          if (!config?.isSecondActionGrant) return false;
+          return room.engine._isSecondActionGrantAvailable(pi, config);
         });
         if (!hasMoreSecondAction) await room.engine.advanceToPhase(pi, 4);
       }
@@ -8990,6 +9162,13 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       // summonCreatureWithHooks), muss den Stempel aus `_runBeforeSummon`
       // also selbst einloesen — sonst bliebe der Vertrag auf dem
       // Hauptweg des Spiels stumm.
+      // ★ v1030: Die Partie-Grenze wird JETZT verbraucht — die
+      // Beschwoerung ist gelandet. Frueher (beim Tor oben) waere sie
+      // auch bei einer negierten oder abgebrochenen Beschwoerung weg.
+      if (script?.oncePerGame || script?.oncePerGameKey) {
+        if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+        ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+      }
       const _tribExtra = room.engine.takeTributeSummonExtras(cardName, pi);
       await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: actualZoneSlot, _isNormalSummon: true, ..._tribExtra });
       await room.engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _isNormalSummon: true, ..._tribExtra });
@@ -9026,6 +9205,12 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     // ging dann verspaetet an einer voellig fremden Kette auf.
     await room.engine._flushSurpriseDrawChecks();
     if (isActionPhase && !usingAdditional && !effectiveIsInherent) {
+      await room.engine.advanceToPhase(pi, 4);
+    } else if (isActionPhase && effectiveIsInherent
+               && room.engine.inherentCountsAsExtraAction(pi)) {
+      // ★ v1019 — siehe doPlaySpell: inhaerent NACH der ersten Aktion
+      // ist die zweite Aktion der Phase.
+      ps._actionsPlayedThisPhase = (ps._actionsPlayedThisPhase || 0) + 1;
       await room.engine.advanceToPhase(pi, 4);
     }
     if (isActionPhase && usingAdditional) {
@@ -9069,6 +9254,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
 
 async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmedOwner, borrowedFromOwner }) {
   if (!room?.engine || !room.gameState) return false;
+  // v1073 („The Thing in the Ship"): harte Sperre. Die Listen in der
+  // Engine sind nur die Oberflaeche — ohne diese Zeile liesse sich die
+  // Aktivierung per Socket-Nachricht trotzdem ausloesen.
   const gs = room.gameState;
   if (pi !== gs.activePlayer) return false;
   if (gs.potionTargeting) return false;
@@ -9117,6 +9305,15 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
 
   const script = loadCardEffect(abilityName);
   if (!script?.actionCost || !script?.onActivate) return false;
+  // v1073 („The Thing in the Ship"): harte Sperre fuer AKTIVE
+  // Ability-Effekte, solange eine Kreatur mit
+  // `blocksAbilityActivation` auf dem Brett liegt. Die Listen in der
+  // Engine sind nur die Oberflaeche — ohne diese Zeile liesse sich die
+  // Aktivierung per Socket-Nachricht trotzdem ausloesen.
+  if (room.engine.abilityActivationBlocked()) return false;
+  // v1096: einzelne Ability am Wirtshelden negiert („Forbidden Curse of
+  // Aging" gegen Charme). Auch hier hart, nicht nur in der Liste.
+  if (room.engine._abilityNegatedOnHero?.(pi, heroIdx, abilityName)) return false;
   if (isShuffleIntoDeckBlockedByDistractingCrystal(gs, pi, abilityName, room.engine)) return false;
   // Boris beim Gegner sperrt Steal-/Kontroll-Effekte. Abilities laufen
   // NICHT ueber validateActionPlay — Charme (Lv2 stiehlt eine Handkarte)
@@ -9475,6 +9672,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         const ctx = room.engine._createContext(mummyInst, { event: 'canHeroEffectCheck' });
         ok = mummyScript.canActivateHeroEffect(ctx);
       }
+      if (ok && room.engine.oncePerGameEffectUsed(pi, mummyScript, 'Mummy Token')) ok = false;   // ★ v1030
       if (ok) availableEffects.push({ name: 'Mummy Token', script: mummyScript, inst: mummyInst, hoptKey });
     }
   } else if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
@@ -9487,6 +9685,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
         ok = ownScript.canActivateHeroEffect(ctx);
       }
+      if (ok && room.engine.oncePerGameEffectUsed(pi, ownScript, hero.name)) ok = false;        // ★ v1030
       if (ok) availableEffects.push({ name: hero.name, script: ownScript, inst, hoptKey });
     }
   }
@@ -9509,6 +9708,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
         ok = eqScript.canActivateHeroEffect(ctx);
       } catch { ok = false; }
     }
+    if (ok && room.engine.oncePerGameEffectUsed(pi, eqScript, ci.name)) ok = false;            // ★ v1030
     if (ok) availableEffects.push({ name: ci.name, script: eqScript, inst: ci, hoptKey });
   }
 
@@ -9904,6 +10104,19 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
   return true;
 }
 
+/**
+ * ★ „You can only play 1 … per game" fuer TRAENKE (v1028).
+ * Zauber, Artefakte und Ueberraschungen stempeln laengst selbst; der
+ * Trankweg tat es nicht, und ohne Stempel blieb jedes Tor wirkungslos.
+ * Wird an BEIDEN Verbrauchsstellen gerufen — mit und ohne Zielwahl.
+ */
+function _markOncePerGamePotion(ps, script, cardName) {
+  if (!ps || !script) return;
+  if (!script.oncePerGame && !script.oncePerGameKey) return;
+  if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
+  ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
+}
+
 async function doConfirmPotion(room, pi, { selectedIds }) {
   if (!room?.engine || !room.gameState) return false;
   // ★ UNWAEHLBARE ZIELE ABWEISEN (v915, Als Befund 12.9.) ────────────
@@ -10212,6 +10425,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     } else if (cardType === 'Potion') {
       const potionHookCtx = { potionName, potionOwner: pi, placed: false, _skipReactionCheck: true };
       await room.engine.runHooks('afterPotionUsed', potionHookCtx);
+      _markOncePerGamePotion(ps, loadCardEffect(potionName), potionName);   // ★ v1028
       if (!potionHookCtx.placed) pilePs.deletedPile.push(potionName);
       checkPotionLock(ps, gs, pi);
     } else {
@@ -10480,6 +10694,16 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
 
   const script = loadCardEffect(cardName);
   if (!script?.isPotion) return false;
+  // ★ EINMAL PRO SPIEL — AUCH FUER TRAENKE (v1028, Als Befund 12.9.).
+  // Der Zauber-, Artefakt- und Ueberraschungsweg pruefen das laengst;
+  // der Trankweg kannte es NICHT, und gestempelt wurde dort auch nie.
+  // Folge: „Teleportation Powder" liess sich ueber zwei Zuege zweimal
+  // spielen. Hier das Tor, der Stempel sitzt an den beiden
+  // Verbrauchsstellen (`_markOncePerGamePotion`).
+  if (script.oncePerGame || script.oncePerGameKey) {
+    const _opgKey = script.oncePerGameKey || cardName;
+    if (ps._oncePerGameUsed?.has(_opgKey)) return false;
+  }
   if (script.canActivate && !script.canActivate(gs, pi, room.engine)) return false;
   if (script.blockedByHandLock && ps.handLocked) return false;
   if (script.blockedByPileLock && room.engine.isPileLockedFor(pi)) return false;   // v826: „nur Stapel-Bewegung" unter Knight of Kings [B]
@@ -10583,6 +10807,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
           placed: false, _skipReactionCheck: true,
         };
         await room.engine.runHooks('afterPotionUsed', potionHookCtx);
+        _markOncePerGamePotion(ps, script, cardName);      // ★ v1028
         if (potionHookCtx.placed) {
           checkPotionLock(ps, gs, pi);
         } else {
@@ -10694,6 +10919,7 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
     const _scr = loadCardEffect(cardName);
     const _me = gs.players[pi];
     if (_scr?.blockedByDrawLock && _me?.drawLocked && cardData.cardType !== 'Creature') return false;
+    if (room.engine?._cardBlockedBySearchLock?.(_scr, cardData, _me, pi)) return false;   // v1069
     if (_scr?.blockedByHandLock && _me?.handLocked && cardData.cardType !== 'Creature') return false;
     if (_scr?.blockedByPileLock && cardData.cardType !== 'Creature' && room.engine.isPileLockedFor(pi)) return false;   // v826
     if (_scr?.blockedBySummonLock && cardData.cardType !== 'Creature' && _me?.summonLocked) return false;   // v834
@@ -13349,6 +13575,42 @@ io.on('connection', (socket) => {
   });
 
   // Activate a hero's active effect (Main Phase, no action cost)
+  // ★★ v1164 — STATUS-KLICK-OPTION (Al 17.9., „Petrifying Potion").
+  //
+  // Ein Status kann eine Option tragen, die der Spieler durch KLICK auf
+  // den betroffenen Helden ausloest:
+  //     hero.statuses.<status>._klickHeilung = { card, by }
+  // Der Helden-Effekt-Weg schied dafuer aus — der sperrt gestunnte
+  // Helden ausdruecklich, und genau die sind hier gemeint. Die Karte
+  // beantwortet den Klick in `onStatusClickOption(engine, pi,
+  // heroOwner, heroIdx)`; Rueckfragen stellt sie selbst.
+  socket.on('status_click_option', (params) => {
+    if (!currentUser) return;
+    const room = rooms.get(params?.roomId);
+    if (!room?.gameState || !room.engine) return;
+    const gs = room.gameState;
+    const pi = gs.players.findIndex(ps => ps.userId === currentUser.userId);
+    if (pi < 0) return;
+    if (gs._chainResolvingLock || gs._forceDiscardLock === pi) return;
+    if (gs.activePlayer !== pi) return;              // „during YOUR turn"
+    if (gs.effectPrompt || gs.potionTargeting) return;
+    const heroOwner = params?.heroOwner === 0 || params?.heroOwner === 1 ? params.heroOwner : pi;
+    const heroIdx = params?.heroIdx;
+    const hero = gs.players[heroOwner]?.heroes?.[heroIdx];
+    if (!hero?.name || hero.hp <= 0) return;
+    let marke = null;
+    for (const st of Object.values(hero.statuses || {})) {
+      if (st && typeof st === 'object' && st._klickHeilung?.by === pi && st._klickHeilung?.card) {
+        marke = st._klickHeilung; break;
+      }
+    }
+    if (!marke) return;
+    const script = loadCardEffect(marke.card);
+    if (!script?.onStatusClickOption) return;
+    Promise.resolve(script.onStatusClickOption(room.engine, pi, heroOwner, heroIdx))
+      .catch(err => console.error('[status_click_option]', err.message));
+  });
+
   socket.on('activate_hero_effect', (params) => {
     if (!currentUser) return;
     const room = rooms.get(params?.roomId);
@@ -14205,6 +14467,17 @@ io.on('connection', (socket) => {
         if (h._ceciliaDefeatedOnce) {
           out._ceciliaDefeatedOnce = true;
         }
+        // ★★ v1143 („Forbidden Curse of Aging"): „has not taken any damage
+        // yet this game". Im Puzzle hat nie ein Schaden stattgefunden, der
+        // Merker `_jeGetroffen` fehlte also JEDEM Helden — auch einem mit
+        // halben HP. Jeder Held galt als unversehrt, die Karte war im
+        // Puzzle praktisch immer gratis. Der Editor setzt den Merker
+        // ausdruecklich (true/false); aeltere Puzzles ohne Angabe gelten
+        // als getroffen, sobald HP unter dem Maximum stehen.
+        if (h._jeGetroffen === true
+            || (h._jeGetroffen === undefined && (out.hp ?? 0) < (out.maxHp ?? 0))) {
+          out._jeGetroffen = true;
+        }
         // Kopfgeld-Marke (v904, Vena, the Bounty Huntress): im Editor
         // als `h._bountyBy` auf dem MARKIERTEN Helden gesetzt, Wert ist
         // der Spielerindex der Jaegerin. Ohne diese Zeile startet jedes
@@ -14317,6 +14590,60 @@ io.on('connection', (socket) => {
     // backdate all support zone instances to turn 0.
     for (const inst of room.engine.cardInstances) {
       if (inst.zone === 'support') inst.turnPlayed = 0;
+    }
+
+    // ── ★ ANHAENGSEL-EFFEKTE HERSTELLEN (v1112, Als Vorgabe 15.9.) ──
+    //
+    // „Wird im Puzzle Mode einem Hero Decisive Defeat in die Support
+    // Zone getan, soll er automatisch das Puzzle negiert beginnen.
+    // Dasselbe gilt fuer ALLE Attachments, die Statuseffekte applyen!"
+    //
+    // Im Puzzle laeuft KEIN `onPlay` — die Karten werden direkt in die
+    // Zonen gesetzt. Anhaengsel zerfallen damit in zwei Gruppen:
+    //
+    //   ① PASSIVE (Siege):
+    //      ihre Wirkung wird bei jeder Abfrage neu aus dem Brett
+    //      gelesen (`silencesHostHero`, `blocksHostHeal`,
+    //      `blocksSearchFor`). Die wirken im Puzzle VON SELBST, sobald
+    //      die Instanz in der Zone steht — nichts zu tun.
+    //
+    //   ② STATUS-SETZENDE (Berserk → `berserked`, Curse → `cursed`,
+    //      Decisive Defeat → `negated`, Forbidden Curse of Aging → `aged`):
+    //      ihr Effekt haengt an einem Status, den sonst `onPlay`
+    //      anlegt. Der fehlt hier. Die Karte deklariert ihn ueber
+    //      `attachmentStatus`, und wir legen ihn an.
+    //
+    // `appliedTurn: 0` passt zur Backdatierung darueber: der Status
+    // gilt als „schon vorher zugefuegt", damit Coffee & Co. ihn als
+    // nicht-in-dieser-Runde behandeln.
+    for (const inst of room.engine.cardInstances) {
+      if (inst.zone !== 'support') continue;
+      if (inst.heroIdx == null || inst.heroIdx < 0) continue;
+      const scr = room.engine._loadCardEffect
+        ? room.engine._loadCardEffect(inst.name)
+        : require('./cards/effects/_loader').loadCardEffect(inst.name);
+      const statusName = scr?.attachmentStatus;
+      const buffName = scr?.attachmentBuff;
+      if (!statusName && !buffName) continue;
+      const owner = inst.controller ?? inst.owner;
+      const hero = gs.players[owner]?.heroes?.[inst.heroIdx];
+      if (!hero?.name || hero.hp <= 0) continue;
+      if (statusName && !hero.statuses?.[statusName]) {
+        if (!hero.statuses) hero.statuses = {};
+        hero.statuses[statusName] = { appliedTurn: 0, permanent: true, _fromAttachment: inst.name };
+        room.engine.log('puzzle_attachment_status', {
+          hero: hero.name, status: statusName, by: inst.name,
+        });
+      }
+      // ★ Dieselbe Luecke fuer BUFFS: „Alliance" und „Anti Magic
+      // Enchantment" legen ihren Buff sonst in `onPlay` an.
+      if (buffName && !hero.buffs?.[buffName]) {
+        if (!hero.buffs) hero.buffs = {};
+        hero.buffs[buffName] = { permanent: true, _fromAttachment: inst.name };
+        room.engine.log('puzzle_attachment_buff', {
+          hero: hero.name, buff: buffName, by: inst.name,
+        });
+      }
     }
 
     // ── Apply player-state starting debuffs ──
@@ -14765,6 +15092,13 @@ io.on('connection', (socket) => {
         if (!vorhanden) room.engine._trackCard(areaName, pi, 'area');
       }
     }
+
+    // ★★ v1165 (Al 17.9.): Area-AUREN gelten ab dem ersten Bild.
+    // Im Puzzle wird die Zone direkt befuellt — der Eintritts-Hook, an
+    // dem „Rioting Village" seine Verdopplung anstoesst, laeuft nie.
+    // Der zentrale Abgleich (`heroAtkMultiplier`) braucht keinen Hook
+    // und holt jede Multiplikator-Aura nach.
+    room.engine.syncAlleAtkAuren();
 
     // Doom Clock: Startzaehler aus den Puzzle-Daten (Als Vorgabe 5.8.).
     // `puzzleData.doomCounters` ist [meineUhr, gegnerUhr].
@@ -19401,13 +19735,21 @@ initDatabase().then(async () => {
         ['PP_STATUS_DEBUG',     'Statuseffekte'],
         ['PP_DMG_DEBUG',        'Schadensberechnung'],
         ['PP_SNAP_DEBUG',       'MCTS-Snapshots'],
+        // ★ v1128: fehlte hier. Deshalb meldete der Banner „keine
+        // Diagnose-Schalter aktiv", obwohl Al ihn gesetzt hatte — und
+        // die Warnung vor der cmd-Falle eine Zeile weiter unten, die
+        // genau seinen Fall beschreibt, blieb stumm.
+        ['PP_DEATH_WATCH',      'Kreaturentode (Zonen-Zustand je sync)'],
       ];
-      const aktiv = DEBUG_FLAGS.filter(([k]) => process.env[k] === '1');
+      // Werte werden getrimmt: `set X=1 && …` in cmd liefert „1 ".
+      const wert = (k) => String(process.env[k] ?? '').trim().toLowerCase();
+      const anAus = (k) => ['1', 'true', 'ja', 'on'].includes(wert(k));
+      const aktiv = DEBUG_FLAGS.filter(([k]) => anAus(k));
       if (aktiv.length) {
         console.log('[diagnose] AKTIV: ' + aktiv.map(([k, d]) => k + ' (' + d + ')').join(', '));
       } else {
         const gesetztAberFalsch = DEBUG_FLAGS
-          .filter(([k]) => process.env[k] != null && process.env[k] !== '1');
+          .filter(([k]) => process.env[k] != null && !anAus(k));
         // Haeufigste Ursache in cmd: `set X=1 && ...` nimmt das
         // Leerzeichen vor && in den WERT mit, also "1 " statt "1".
         if (gesetztAberFalsch.length) {

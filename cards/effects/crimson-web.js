@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Surprise-Negierung, der Abwurf ist Nebenwirkung (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Crimson Web"
 //  Spell (Decay Magic Lv3, Surprise)

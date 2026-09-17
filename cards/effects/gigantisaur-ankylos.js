@@ -59,6 +59,8 @@ module.exports = {
     // pitched card later in the same activation flow.
     const handBefore = ps.hand.length;
     await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'disrupt',
       title: CARD_NAME,
       source: CARD_NAME,
       selfInflicted: true,

@@ -91,6 +91,7 @@ module.exports = {
 
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       cards: names.map(name => ({ name, source: 'deck' })),
       title: CARD_NAME,
       source: CARD_NAME,

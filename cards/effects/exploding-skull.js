@@ -146,6 +146,10 @@ module.exports = {
       // shape Book of Doom uses for its multi-target burst. The brief
       // post-broadcast delay lets the explosion flash render before
       // the damage numbers fly out.
+      // ★ v1043 („Interference"): ein Schlag auf alle Ziele —
+      // Helden UND Kreaturen, gezaehlt wird die echte Zielmenge.
+      engine.beginMultiHit(targets.length);
+      try {
       for (const t of targets) {
         engine._broadcastEvent('play_zone_animation', {
           type: 'explosion',
@@ -197,6 +201,9 @@ module.exports = {
 
       if (creatureBatch.length > 0) {
         await engine.processCreatureDamageBatch(creatureBatch);
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.log('exploding_skull_blast', {

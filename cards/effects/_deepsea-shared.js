@@ -813,8 +813,13 @@ function resetPerTurnSummons(ps) {
 // prompt through one helper so the UI language stays consistent. Returns
 // true when the controller confirms; false/null on cancel.
 
-async function promptOptionalOnSummon(ctx, title, message) {
-  return !!(await ctx.promptConfirmEffect({ title, message }));
+/**
+ * @param {object} [opts] ★ v1121: `{ searchToHand: true, searchPile }`
+ *   markiert das Angebot als Such-Frage — unter einer Such-Sperre wird
+ *   es dann gar nicht erst gestellt.
+ */
+async function promptOptionalOnSummon(ctx, title, message, opts = {}) {
+  return !!(await ctx.promptConfirmEffect({ title, message, ...opts }));
 }
 
 // ─── Generic creature atomic swap ────────────

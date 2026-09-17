@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der GEGNER darf abwerfen, nicht der Spieler (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Spike Trap"
 //  Spell (Surprise, Lv2, Decay Magic)

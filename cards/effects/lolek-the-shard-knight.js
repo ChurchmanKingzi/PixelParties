@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Kosten ist ein Artefakt aus Deck/Hand, kein Handabwurf-Waehler (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Lolek, the Shard Knight"
 //  Hero — 500 HP / 80 ATK — Fighting / Leadership — BANNED

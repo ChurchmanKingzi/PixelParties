@@ -84,6 +84,7 @@ module.exports = {
       await engine.addHeroStatus(pi, target.heroIdx, 'poisoned', {
         stacks: 2,
         permanent: true,
+        appliedBy: pi,   // v1067: eigener Held — loest korrekt KEINEN Gegner-Trigger aus
       });
 
       engine.log('torchure_poison', {

@@ -84,7 +84,7 @@ module.exports = {
         // Apply Stun (respects immunities). Duration 2 = ticks down at the
         // end of each of the target's turns, expiring at the end of their
         // NEXT turn — matches Baihu's "lasts through next turn" pattern.
-        await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 2 });
+        await eng.addHeroStatus(picked.owner, picked.heroIdx, 'stunned', { duration: 2, appliedBy: pi });
 
         eng.log('jumpscare_stun', {
           player: eng.gs.players[pi]?.username,

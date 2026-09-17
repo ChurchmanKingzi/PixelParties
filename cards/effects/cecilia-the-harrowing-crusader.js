@@ -141,6 +141,7 @@ module.exports = {
 
     const wahl = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       cards: galerie,
       title: CARD_NAME,
       description: `Delete an Artifact from your discard pile and add a copy from your deck to your hand. This costs ALL your Gold (${gold}).`,

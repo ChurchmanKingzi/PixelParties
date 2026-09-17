@@ -77,6 +77,8 @@ module.exports = {
         const isFirst = n === 0;
         const result = await engine.promptGeneric(pi, {
           type: 'forceDiscardCancellable',
+          costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+          costKind: 'draw',
           title: CARD_NAME,
           description: isFirst
             ? `Discard a Gigantisaur Creature from your hand. (You'll draw 2× the number discarded.)`

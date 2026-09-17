@@ -16,11 +16,9 @@ const CARD_NAME = 'Beer';
 function getTargetStatuses(target, engine) {
   // Hero statuses
   if (target.type === 'hero') {
-    const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-    if (!hero?.statuses) return [];
-    return Object.keys(hero.statuses)
-      .filter(k => STATUS_EFFECTS[k]?.negative && STATUS_EFFECTS[k]?.cleansable !== false)
-      .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
+    // v1093: gemeinsamer Bauer — kennt auch Anhaengsel, die „als
+    // negativer Statuseffekt zaehlen" („Decisive Defeat").
+    return engine.cleansableHeroEntries(target.owner, target.heroIdx);
   }
   // Creature statuses (stored in counters)
   if (target.type === 'equip') {

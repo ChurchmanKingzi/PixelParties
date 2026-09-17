@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Abwurf der Karte selbst als Schutz, keine Wahl aus der Hand (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Idej Projection"
 //  Spell / Attachment (Magic Arts, Lv0)

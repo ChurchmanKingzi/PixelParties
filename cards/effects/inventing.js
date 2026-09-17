@@ -63,6 +63,8 @@ module.exports = {
           if ((ps.hand || []).length === 0) break;
           const result = await engine.promptGeneric(pi, {
             type:        'forceDiscardCancellable',
+            costFor:     CARD_NAME,   // ★ v1041: Kosten-Abwurf-Lernkanal
+            costKind:    'draw',
             title:       `${CARD_NAME} Lv${level}`,
             description: i === 0
               ? `Click a card to discard it and draw 1 card.${maxDiscard > 1 ? ' You may discard a second card.' : ''}`

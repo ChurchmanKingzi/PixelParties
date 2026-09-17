@@ -149,6 +149,7 @@ const HOOKS = {
   // ── Reaction chain ──
   ON_REACTION_ACTIVATED: 'onReactionActivated',  // Fires when a reaction card is added to the chain
   ON_CARD_ACTIVATION:    'onCardActivation',      // Fires before a card's effect resolves (for reaction window)
+  ON_REACTION_RESOLVED:  'onReactionResolved',    // v1157: ein Held hat eine Reaktion gewirkt (Reaktions-Haelfte von „performs an Action")
   AFTER_SPELL_RESOLVED:  'afterSpellResolved',    // Fires after a spell/attack's onPlay completes (for Bartas, etc.)
   AFTER_POTION_USED:     'afterPotionUsed',       // Fires after a potion resolves; hookCtx.placed can be set to prevent deletion
 
@@ -287,6 +288,17 @@ const STATUS_EFFECTS = {
   // `requiresTarget: true` flag to decide. Cleansable like Stunned.
   // Status icon is rendered as 👁 with a CSS strikethrough line.
   blinded: { negative: true, cleansable: true,  label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
+  // ★ v1059 (Als Befund 14.9.): ZWEITE Blendungs-Art mit anderer
+  // Endbedingung — „until the next time it takes damage" („Trunk Sand")
+  // statt Smoke Vials Rundenende. Bewusst ein EIGENER Status und keine
+  // Variante von `blinded`:
+  //   • ein Statusobjekt kann nur EINE Endbedingung tragen, die zweite
+  //     Anwendung haette die erste ueberschrieben;
+  //   • und welche laenger haelt, ist nie vorher klar — Al ausdruecklich:
+  //     „theoretisch koennen auch beide Blinds gleichzeitig anliegen".
+  // Beide wirken identisch; wer „ist geblendet?" fragt, benutzt
+  // `BLIND_STATUSES` bzw. `engine._isHeroBlinded` / `_isCreatureBlinded`.
+  blinded_hit: { negative: true, cleansable: true, label: 'Blinded', icon: '👁️', immuneKey: 'blind_immune', blocksTargeting: true },
   // `webbed` — applied by Crimson Web. Silences the bearer exactly like
   // Stunned ("cannot act and its Abilities are negated"), but PERMANENT
   // by default (never auto-expires at turn end) and removed only by
@@ -339,6 +351,14 @@ const STATUS_EFFECTS = {
   // Curse card module restores `hero.atk` from the accumulator and
   // discards all Curse attachments to their original owners' piles.
   cursed:    { negative: true, cleansable: true, label: 'Cursed',    icon: '🧿', immuneKey: 'curse_immune' },
+  // `aged` (v1143) — angelegt von „Forbidden Curse of Aging" und
+  // AUSSCHLIESSLICH an diese Karte gebunden (`attachmentStatus`). Der
+  // Status ist der Schalter ihrer drei Wirkungen: Heilsperre, Sperre der
+  // UEBRIGEN Status, Negierung von „Charme" (`_attachmentStatusHaelt`).
+  // Heilbar wie Cursed; wird er entfernt, faellt die Karte in die Ablage
+  // ihres urspruenglichen Besitzers. Die Sperre der uebrigen Status
+  // nimmt ihn selbst aus („its OTHER status effects").
+  aged:      { negative: true, cleansable: true, label: 'Aged',      icon: '⏳', immuneKey: 'aged_immune' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
   // Storm Piano (v628): verhindert jeden normalen Schaden bis zum Ende des naechsten eigenen Zuges.
@@ -903,7 +923,16 @@ function cardVariantTag(name) {
   return m ? m[1] : null;
 }
 
+/**
+ * ★ ALLE Blendungs-Status (v1059). Wer „ist geblendet?" fragt, fragt
+ * diese Liste — nicht `statuses.blinded` direkt. Eine zweite Art kam
+ * mit „Trunk Sand" dazu; ohne den gemeinsamen Namen haette jede der
+ * zwoelf Lesestellen in der Engine still nur die erste gesehen.
+ */
+const BLIND_STATUSES = ['blinded', 'blinded_hit'];
+
 module.exports = {
+  BLIND_STATUSES,
   baseCardName, sameCardName, cardVariantTag,
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,
   heroAbilityLevel, heroFightingLevel, scaledByLevel,

@@ -134,6 +134,12 @@ function nutzerHatAndereWaehlbare(engine, nutzer) {
 }
 
 module.exports = {
+  // ★ v1112: dieselbe Luecke wie bei den status-setzenden Anhaengseln
+  // (Als Vorgabe 15.9.) — im Puzzle laeuft kein `onPlay`, der Buff
+  // wuerde fehlen. `attachmentBuff` sagt dem Puzzle-Aufbau, was
+  // dazugehoert.
+  attachmentBuff: 'alliance',
+
   activeIn: ['hand', 'support'],
 
   /** Zonen fuer das Ziehen (siehe CARD_API, „Gezogene Zone gewinnt"). */

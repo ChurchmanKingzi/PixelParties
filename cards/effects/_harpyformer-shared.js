@@ -56,6 +56,18 @@ async function harpyformerDiscardCost(engine, pi, abilityName, opts = {}) {
 
   const result = await engine.promptGeneric(pi, {
     type: 'forceDiscardCancellable',
+    // ★ v1037: Dieser Abwurf ist eine KOSTE, kein Abwurf-Duell. Die
+    // Marke `costFor` unterscheidet beides — daran haengen der
+    // Lernkanal (`_costDiscardLog`) und die CPU-Entscheidung
+    // („lohnt sich die Zahlung fuer DIESEN Effekt?"). Jede kuenftige
+    // Karte mit Abwurfkosten sollte sie ebenso setzen.
+    costFor: opts.title || abilityName,
+    // ★ v1038: Die SORTE der Gegenleistung entscheidet, welche Lage
+    // ueberhaupt zaehlt (Gold beim Goldeffekt, gegnerische Restpunkte
+    // beim Schadenseffekt). Ein Wort je Karte; die Buckets stehen in
+    // `_deck-profile.costDiscardTags`.
+    ...(opts.costKind ? { costKind: opts.costKind } : {}),
+    ...(opts.costTags ? { costTags: opts.costTags } : {}),
     title: opts.title || 'Discard Ability',
     description: opts.description || `Discard "${abilityName}" to activate this effect.`,
     instruction: `Click a "${abilityName}" in your hand to discard it.`,

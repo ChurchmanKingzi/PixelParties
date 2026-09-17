@@ -19,6 +19,7 @@
 // ═══════════════════════════════════════════
 
 const { ZONES } = require('./_hooks');
+const { trefferHooks } = require('./_affected-shared');
 
 const CARD_NAME = 'Charm of Balance';
 const HAND_LIMIT = 7;
@@ -30,11 +31,6 @@ const HAND_LIMIT = 7;
  * less effects (status ticks with no clear caster, etc.) and self-
  * sourced effects.
  */
-function _isOppSource(source, pi) {
-  if (!source) return false;
-  const srcOwner = source.controller ?? source.owner ?? -1;
-  return srcOwner >= 0 && srcOwner !== pi;
-}
 
 function _addBalance(ctx, n = 1) {
   const inst = ctx.card;
@@ -138,25 +134,28 @@ module.exports = {
   },
 
   hooks: {
-    // ── Counter accumulation: damage from an opponent ──
-    afterDamage: (ctx) => {
-      if (ctx.target !== ctx.attachedHero) return;
-      if (!_isOppSource(ctx.source, ctx.cardOwner)) return;
-      _addBalance(ctx, 1);
-      ctx._engine.sync();
-    },
-
-    // ── Counter accumulation: opponent applies a status to this hero ──
-    // appliedBy lives on the just-stamped status options object; the
-    // engine sets it from `opts.appliedBy` on the addHeroStatus call.
-    onStatusApplied: (ctx) => {
-      if (ctx.target !== ctx.attachedHero) return;
-      const statusOpts = ctx.target?.statuses?.[ctx.statusName];
-      const appliedBy = statusOpts?.appliedBy ?? -1;
-      if (appliedBy < 0 || appliedBy === ctx.cardOwner) return;
-      _addBalance(ctx, 1);
-      ctx._engine.sync();
-    },
+    // ── Zaehler: „whenever that Hero is affected by an opponent's card
+    //    or effect" — ALLE VIER Wege (v1067, Als Befund 14.9.).
+    //
+    // ★ VORHER UNVOLLSTAENDIG: hier standen nur `afterDamage` und
+    // `onStatusApplied`. Heilungen und Buffs des Gegners liefen daran
+    // vorbei, obwohl der Kartentext sie ausdruecklich einschliesst
+    // („affected by an opponent's card or effect"). Der gemeinsame
+    // Helfer deckt jetzt Schaden, Heilung, Status UND Buff ab — und
+    // „The Stormblade" benutzt denselben, sodass beide Karten nicht
+    // wieder auseinanderlaufen koennen.
+    ...trefferHooks(
+      (ctx) => {
+        const inst = ctx.card;
+        if (!inst || inst.zone !== 'support') return null;
+        if (inst.heroIdx == null || inst.heroIdx < 0) return null;
+        return { owner: inst.controller ?? inst.owner, heroIdx: inst.heroIdx };
+      },
+      (ctx) => {
+        _addBalance(ctx, 1);
+        ctx._engine.sync();
+      },
+    ),
 
     // ── Hand-size guard: every path that can grow the controller's hand ──
     // Uses async hooks because actionMoveCard awaits sync + onCardLeaveZone.

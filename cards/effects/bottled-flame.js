@@ -34,7 +34,7 @@ module.exports = {
     for (let hi = 0; hi < (takerPs.heroes || []).length; hi++) {
       const hero = takerPs.heroes[hi];
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.burned) continue;
-      await engine.addHeroStatus(takerIdx, hi, 'burned', { permanent: true, _skipReactionCheck: true });
+      await engine.addHeroStatus(takerIdx, hi, 'burned', { permanent: true, appliedBy: pi, _skipReactionCheck: true });
       engine._broadcastEvent('play_zone_animation', {
         type: 'flame_strike', owner: takerIdx, heroIdx: hi, zoneSlot: -1,
       });

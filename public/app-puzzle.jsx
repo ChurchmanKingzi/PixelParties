@@ -263,6 +263,21 @@ function venaAufSeite(player) {
   return (player?.heroes || []).some(h => h?.name === VENA_NAME);
 }
 
+// ★★ v1143 — Gate des Schalters „Has taken damage this game". Karten,
+// die die Schadens-Historie eines Helden lesen (`hero._jeGetroffen`).
+// Ein frisches Puzzle hat nie Schaden gesehen; ohne Schalter galt jeder
+// Held als unversehrt, und „Forbidden Curse of Aging" war dort immer
+// gratis. Sichtbar, sobald eine dieser Karten IRGENDWO im Puzzle liegt.
+const SCHADENS_HISTORIE_KARTEN = new Set(['Forbidden Curse of Aging']);
+function schadensHistorieImPuzzle(players, hand, oppHand) {
+  const trifft = (liste) => (liste || []).some(n => SCHADENS_HISTORIE_KARTEN.has(n));
+  if (trifft(hand) || trifft(oppHand)) return true;
+  return (players || []).some(p => p && (
+    trifft(p.mainDeck) || trifft(p.discardPile) || trifft(p.deletedPile) || trifft(p.creationZone)
+    || (p.supportZones || []).some(hz => (hz || []).some(slot => trifft(slot)))
+  ));
+}
+
 // Gate des Demon-Counter-Editors: jede Karte, deren Text Demon Counter
 // nennt (Als Regel 16.8.: lieber Archetyp/Text als Kartenname, damit ein
 // spaeterer Verwandter — Great Vanguard Demon — ohne Editor-Umbau geht).
@@ -369,7 +384,7 @@ function PuzzleCreator() {
   // mutable global between the two screens. The sidebar's `name` field is
   // the only name-search surface — there's no separate quick-search input.
   const [puzzleFilters, setPuzzleFilters] = useState({
-    name: '', effect: '', cardType: '', subtype: '', archetype: '',
+    name: '', effect: '', cardType: '', subtype: '', doubles: '', archetype: '',
     sa1: '', sa2: '', ss1: '', ss2: '',
     level: '', cost: '', hp: '', atk: '',
   });
@@ -479,7 +494,9 @@ function PuzzleCreator() {
   // effect below depends on it) so it's initialized when that effect's
   // dependency array is evaluated during render — otherwise referencing it
   // later triggers a temporal-dead-zone error.
-  const searchResults = useMemo(() => {
+  // ★ v1166: wie im Deck-Builder — erst alle uebrigen Filter, dann die
+  // Doppelschulen-Option (`doppelFilterAnwenden`).
+  const searchBasis = useMemo(() => {
     let result = window.AVAILABLE_CARDS || [];
     // Sidebar filter set — mirrors the deck builder's filter pipeline.
     const f = puzzleFilters;
@@ -498,6 +515,11 @@ function PuzzleCreator() {
     if (f.atk !== '') result = result.filter(c => c.atk != null && c.atk === parseInt(f.atk));
     return result;
   }, [puzzleFilters]);
+
+  const doppelMoeglich = useMemo(() => window.doppelFilterMoeglich(searchBasis), [searchBasis]);
+  const searchResults = useMemo(
+    () => window.doppelFilterAnwenden(searchBasis, puzzleFilters.doubles),
+    [searchBasis, puzzleFilters.doubles]);
 
   // ── Sichtfenster der Galerie (Fix 16.8., Als Bericht) ──────────────
   //
@@ -779,6 +801,7 @@ function PuzzleCreator() {
   // ── Puzzle Battle: socket listeners ──
   useEffect(() => {
     const onGameState = (state) => {
+      if (window.ppZustandVeraltet?.(state)) return;
       if (!state.isPuzzle || puzzleIgnoreRef.current) return;
       puzzleRoomRef.current = state.roomId;
       setPuzzleGameState(state);
@@ -804,6 +827,8 @@ function PuzzleCreator() {
     // Read result before clearing
     const result = gs?.result;
     const success = result?.isPuzzle && result?.puzzleResult === 'success';
+    // v1146: eine laufende Loss-Fanfare endet mit dem Verlassen.
+    if (window.stopSFX) window.stopSFX('defeat');
     // Clean up server-side
     if (roomId) socket.emit('leave_game', { roomId });
     // Return to creator
@@ -1415,11 +1440,39 @@ function PuzzleCreator() {
     updatePlayer(si, (p) => { p.surpriseZones[hi] = [cardName]; return p; });
   }, [players, updatePlayer, notify]);
 
+  /**
+   * ★ v1051: ANHAENGEN statt ersetzen. Seit „Spatial Crevice" kann eine
+   * Seite mehrere Areas halten, der Editor muss den Stapel also bauen
+   * koennen. Geprueft wird mit DERSELBEN Regel wie im Spiel
+   * (`window.canPlaceAnotherArea` spiegelt `_engine.js#
+   * canPlaceAnotherArea`): Platz unter dem Limit UND keine Dublette.
+   *
+   * Frueher schob diese Funktion die vorhandene Area zurueck auf die
+   * Hand — das war die Ersetzungs-Logik eines Ein-Karten-Slots und
+   * wuerde den Stapel jetzt jedes Mal abraeumen. Ersetzen geht im
+   * Editor wie in jeder anderen Zone: Karte per Rechtsklick weg, neue
+   * drauf.
+   */
   const placeArea = useCallback((cardName, si) => {
+    const zone = areaZones[si] || [];
+    if (!window.canPlaceAnotherArea(zone, cardName)) {
+      const grund = zone.includes(cardName)
+        ? `„${cardName}" liegt bereits — es sind nur VERSCHIEDENE Areas erlaubt.`
+        : `Area-Limit erreicht (${window.computeAreaLimit(zone)}). „Spatial Crevice" hebt es auf 3.`;
+      notify(grund, 'info');
+      if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 });
+      return;
+    }
     if (window.playSFX) window.playSFX('placement');
-    if (areaZones[si].length > 0) setHand(prev => [...prev, ...areaZones[si]]);
-    updateArea(si, () => [cardName]);
-  }, [areaZones, updateArea]);
+    // ★ Die Pruefung steht ZUSAETZLICH im Updater, nicht nur oben: `zone`
+    // stammt aus dem Closure und ist bei zwei Aufrufen im selben Tick
+    // beide Male der ALTE Stand. Nur hier drin sieht die Regel den
+    // wirklich aktuellen Zoneninhalt — damit kann kein Aufrufweg, auch
+    // kein kuenftiger, versehentlich doppelt anhaengen.
+    updateArea(si, (prev) => (
+      window.canPlaceAnotherArea(prev, cardName) ? [...prev, cardName] : prev
+    ));
+  }, [areaZones, updateArea, notify]);
 
   const placePermanent = useCallback((cardName, si) => {
     if (window.playSFX) window.playSFX('placement');
@@ -1452,7 +1505,9 @@ function PuzzleCreator() {
       return p;
     });
     else if (zt === 'surprise') updatePlayer(si, (p) => { p.surpriseZones[hi] = []; return p; });
-    else if (zt === 'area') updateArea(si, () => []);
+    // ★ v1051: `slot` ist der Platz IM STAPEL — es faellt genau eine
+    // Area, nicht die ganze Zone.
+    else if (zt === 'area') updateArea(si, (prev) => prev.filter((_, i) => i !== slot));
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
   }, [updatePlayer, updateArea]);
 
@@ -1508,10 +1563,14 @@ function PuzzleCreator() {
       return isCreatureLike || c.subtype === 'Equipment' || c.subtype === 'Attachment';
     }
     if (zt === 'surprise') return !!p.heroes[hi] && c.subtype === 'Surprise';
-    if (zt === 'area') return c.subtype === 'Area';
+    // ★ v1051: dieselbe Regel wie im Spiel — Platz UND keine Dublette.
+    // Ohne das leuchtete die Zone auch dann auf, wenn der Ablegen-Pfad
+    // die Karte gleich wieder abweist.
+    if (zt === 'area') return c.subtype === 'Area'
+      && window.canPlaceAnotherArea(areaZones[si], c.name);
     if (zt === 'permanent') return true;
     return false;
-  }, [getCard, players, akzeptiertAbilities]);
+  }, [getCard, players, akzeptiertAbilities, areaZones]);
 
   // ── Drag ──
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
@@ -1576,7 +1635,11 @@ function PuzzleCreator() {
       return p;
     });
     else if (zt === 'surprise') updatePlayer(si, (p) => { p.surpriseZones[hi] = []; return p; });
-    else if (zt === 'area') updateArea(si, () => []);
+    // ★ v1051: `clearZone` raeumt die QUELLE eines Zonenwechsels. Bei
+    // einem Area-Stapel darf das nur den bewegten Platz treffen — ein
+    // `() => []` haette beim Verschieben einer von drei Areas die
+    // anderen beiden mitgeloescht.
+    else if (zt === 'area') updateArea(si, (prev) => prev.filter((_, i) => i !== slot));
     else if (zt === 'permanent') updatePlayer(si, (p) => { p.permanents.splice(slot, 1); return p; });
   }, [updatePlayer, updateArea]);
 
@@ -1985,6 +2048,8 @@ function PuzzleCreator() {
   // ueberhaupt nicht testen — dieselbe Begruendung wie bei Waflavs
   // Evolution Counters. Null fuer alle anderen Helden.
   const [editCeciliaDefeated, setEditCeciliaDefeated] = useState(null);
+  // v1143: Schadens-Historie (`hero._jeGetroffen`). Null = Abschnitt zu.
+  const [editJeGetroffen, setEditJeGetroffen] = useState(null);
   // Kopfgeld-Marke (v904, Vena). Liegt als `hero._bountyBy` auf dem
   // MARKIERTEN Helden und traegt den Spielerindex der Jaegerin. Null
   // fuer jeden Helden, dessen Gegenseite keine Vena hat — dann bleibt
@@ -2096,6 +2161,7 @@ function PuzzleCreator() {
     setEditEvolutionCounter(null);
     setEditInvestCounter(null);
     setEditCeciliaDefeated(null);
+    setEditJeGetroffen(null);
     setEditBalanceCounter(null);
     setEditBunnyBombCounter(null);
     setEditDemonCounter(null);
@@ -2138,6 +2204,11 @@ function PuzzleCreator() {
         : null);
       setEditBountyMark(venaAufSeite(players[si === 0 ? 1 : 0])
         ? (h._bountyBy === (si === 0 ? 1 : 0))
+        : null);
+      // v1143: ohne gespeicherten Wert gilt ein Held unter Maximal-HP als
+      // getroffen — dieselbe Regel wie im Server-Loader.
+      setEditJeGetroffen(schadensHistorieImPuzzle(players, hand, oppHand)
+        ? (typeof h._jeGetroffen === 'boolean' ? h._jeGetroffen : ((h.hp ?? 0) < (h.maxHp ?? h.hp ?? 0)))
         : null);
     } else if (zt === 'support') {
       const cards = p.supportZones[hi][slot]; if (!cards.length) return;
@@ -2242,7 +2313,7 @@ function PuzzleCreator() {
         ? Math.max(1, Math.min(3, cs.antiMagicLevel || 1))
         : null);
     }
-  }, [players, getCard]);
+  }, [players, getCard, hand, oppHand]);
 
   const saveStats = useCallback(() => {
     if (!editTarget) return;
@@ -2293,6 +2364,9 @@ function PuzzleCreator() {
         } else if (editCeciliaDefeated != null) {
           delete p.heroes[hi]._ceciliaDefeatedOnce;
         }
+        // v1143: ausdruecklich true/false speichern — „nicht gesetzt"
+        // bedeutet im Loader „aus den HP ableiten".
+        if (editJeGetroffen != null) p.heroes[hi]._jeGetroffen = !!editJeGetroffen;
         // Vena: die Marke traegt den Index der JAEGERIN, also die
         // Gegenseite des markierten Helden. Beim Setzen zuerst jede
         // andere Marke derselben Jaegerin loeschen — sie kann immer nur
@@ -2445,7 +2519,7 @@ function PuzzleCreator() {
       return p;
     });
     setEditTarget(null);
-  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editBountyMark, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
+  }, [editTarget, editHp, editMaxHp, editAtk, editStatuses, editBuffs, editBiomancyLevel, editAttachedHero, editHeadCounter, editLinkedHeroSlot, editChangeCounter, editEvolutionCounter, editInvestCounter, editCeciliaDefeated, editJeGetroffen, editBountyMark, editBalanceCounter, editBunnyBombCounter, editDemonCounter, editSparkflyGifts, editAntiMagicLevel, updatePlayer, getCard, statusScopePasst]);
 
   const toggleHeroDead = useCallback(() => {
     if (!editTarget || editTarget.zt !== 'hero') return;
@@ -2720,14 +2794,14 @@ function PuzzleCreator() {
     // Determine if this zone has a card (for making it draggable)
     const hasCard = (zt === 'hero' && p.heroes[hi]) || (zt === 'ability' && (p.abilityZones[hi]?.[slot]||[]).length > 0) ||
       (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length > 0) || (zt === 'surprise' && (p.surpriseZones[hi]||[]).length > 0) ||
-      (zt === 'area' && areaZones[si].length > 0);
+      (zt === 'area' && !!areaZones[si][slot]);   // v1051: je Stapelplatz
     // Get the card name for dragging
     const zoneCardName = hasCard ? (
       zt === 'hero' ? p.heroes[hi]?.name :
       zt === 'ability' ? (p.abilityZones[hi]?.[slot]||[])[0] :
       zt === 'support' ? (p.supportZones[hi]?.[slot]||[])[0] :
       zt === 'surprise' ? (p.surpriseZones[hi]||[])[0] :
-      zt === 'area' ? areaZones[si][0] : null
+      zt === 'area' ? areaZones[si][slot] : null
     ) : null;
     // Alliance-Verbindungswahl (v871): waehrend sie laeuft, tragen die
     // LEGALEN Ziele — die Helden des ANDEREN Spielers — eine eigene
@@ -2868,8 +2942,8 @@ function PuzzleCreator() {
                   {hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                   {hero.statuses?.immune && !hero.statuses?.shielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                   <CounterBadges source={hero} defs={PUZZLE_HERO_COUNTER_BADGES} />
-                  {(hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.burned || hero.statuses?.bleeding || hero.statuses?.poisoned || hero.statuses?.negated || hero.statuses?.nulled || hero.statuses?.healReversed || hero.statuses?.untargetable || hero.statuses?.charmed || hero.statuses?.bound || hero._extraLife) &&
-                    <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />}
+                  {/* v1143: ohne Handliste — StatusBadges liefert selbst null */}
+                  <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />
                   {hero.buffs && <BuffColumn buffs={hero.buffs} />}
                   {/* Alliance (v872): Abzeichen am VERBUENDETEN Helden —
                       dieselbe Auskunft wie am Spielbrett, damit im
@@ -3098,8 +3172,7 @@ function PuzzleCreator() {
                         {cs.bleeding && <BleedingOverlay />}
                         {cs.negated && <NegatedOverlay />}
                         {cs.poisoned && <PoisonedOverlay stacks={cs.poisoned.stacks || 1} />}
-                        {(cs.frozen || cs.stunned || cs.burned || cs.bleeding || cs.poisoned || cs.negated || cs._extraLife) &&
-                          <StatusBadges statuses={cs} isHero={false} />}
+                        <StatusBadges statuses={cs} isHero={false} />
                         {/* v889 (Als Vorgabe): X von Summoning Instructions
                             schon IM EDITOR als Abzeichen zeigen. Gerendert
                             wird dieselbe Buff-Spalte wie im Spiel — der
@@ -3256,6 +3329,18 @@ function PuzzleCreator() {
               <option value="">All Subtypes</option>
               {(window.SUBTYPES || []).map(t => <option key={t} value={t}>{t}</option>)}
             </select>
+            {/* ★ v1166: Doppelschulen — nur Attacks/Spells/Creatures mit zwei Spell Schools */}
+            <select className="db-filter-select"
+              value={puzzleFilters.doubles}
+              disabled={!doppelMoeglich}
+              title={doppelMoeglich
+                ? 'Show only Attacks, Spells and Creatures with two Spell Schools'
+                : 'No Attacks, Spells or Creatures in the current selection'}
+              style={{ opacity: doppelMoeglich ? 1 : .45 }}
+              onChange={e => setPuzzleFilters(p => ({ ...p, doubles: e.target.value }))}>
+              <option value="">Spell Schools: Show all</option>
+              <option value="double">Spell Schools: Double only</option>
+            </select>
             <select className="db-filter-select"
               value={puzzleFilters.archetype}
               onChange={e => setPuzzleFilters(p => ({ ...p, archetype: e.target.value }))}>
@@ -3307,7 +3392,7 @@ function PuzzleCreator() {
                   style={{ width: '100%', padding: 4, fontSize: 10, marginTop: 4 }}
                   disabled={!anyActive}
                   onClick={() => setPuzzleFilters({
-                    name: '', effect: '', cardType: '', subtype: '', archetype: '',
+                    name: '', effect: '', cardType: '', subtype: '', doubles: '', archetype: '',
                     sa1: '', sa2: '', ss1: '', ss2: '',
                     level: '', cost: '', hp: '', atk: '',
                   })}>
@@ -3581,9 +3666,51 @@ function PuzzleCreator() {
                 );
                 if (hi === 2) return [group];
                 const si = hi; // gap 0 → your area, gap 1 → opp area
+                // ★ v1051: AREA-STAPEL im Editor. Dieselbe Optik wie im
+                // Spiel (`.board-area-stack`, `--area-stack-offset`),
+                // damit der Autor sieht, was er baut.
+                //
+                // Die Zonen-Huelle traegt den Ablegen-Platz am ENDE des
+                // Stapels (`zh(..., laenge)`) — ein Drop irgendwo in der
+                // Zone haengt also an, statt einen Platz zu ueberschreiben.
+                // Jede Karte bekommt ihre EIGENEN Griffe mit ihrem
+                // Stapelplatz: Rechtsklick entfernt genau sie, Ziehen
+                // bewegt genau sie.
+                const azStack = areaZones[si] || [];
                 const zone = (
-                  <div key={'az' + si} className="board-zone pz-area-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', si, 0, 0) }} {...zh('area', si, 0, 0)}>
-                    {areaZones[si].length > 0 ? <BoardCard cardName={areaZones[si][0]} /> : <div className="board-zone-empty">{si === 0 ? 'Your Area' : 'Opp Area'}</div>}
+                  <div key={'az' + si} className="board-zone pz-area-zone" style={{ ...(zs('area') || {}), borderColor: 'rgba(255,51,102,.5)', backgroundColor: zs('area') ? undefined : 'rgba(255,51,102,.08)', ...hl('area', si, 0, azStack.length) }} {...zh('area', si, 0, azStack.length)}>
+                    {azStack.length > 0 ? (
+                      <div className="board-area-stack">
+                        {azStack.map((nm, ai) => {
+                          // ★ NUR die Griffe, die der EINZELNEN Karte
+                          // gehoeren: Ziehen und Entfernen. Ablegen,
+                          // Klicken und Dragover bleiben ALLEIN bei der
+                          // Zonen-Huelle.
+                          //
+                          // Der ganze `zh(...)`-Satz hier war ein Fehler:
+                          // ein Drop auf eine Karte lief erst durch ihren
+                          // eigenen Handler und blubberte dann zur Zone —
+                          // `handleDrop` feuerte also ZWEIMAL. Weil beide
+                          // Aufrufe dieselbe (noch nicht aktualisierte)
+                          // Zone aus dem Closure lasen, bestanden beide
+                          // die Legalitaetspruefung und haengten an:
+                          // zwei Kopien auf einen Schlag. Derselbe Weg
+                          // haette ausserdem zwei Handkarten verbraucht.
+                          const g = zh('area', si, 0, ai);
+                          return (
+                            <div key={nm + ':' + ai} className="board-area-stack-card"
+                              style={{ top: `calc(var(--area-stack-offset) * ${ai})` }}
+                              data-pz-zone={g['data-pz-zone']}
+                              draggable={g.draggable}
+                              onDragStart={g.onDragStart}
+                              onDragEnd={g.onDragEnd}
+                              onContextMenu={g.onContextMenu}>
+                              <BoardCard cardName={nm} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : <div className="board-zone-empty">{si === 0 ? 'Your Area' : 'Opp Area'}</div>}
                   </div>
                 );
                 return [group, zone];
@@ -3775,7 +3902,16 @@ function PuzzleCreator() {
 
       {/* ── Card Tooltip Panel ── */}
       {tooltipCard && (
-        <div className="board-tooltip" style={tooltipSide === 'right'
+        // ★ ÜBER DER HAND (v1032, Als Befund 12.9.): `.board-tooltip`
+        // liegt auf z-index 9999, die Staging-Hand des Puzzle-Editors
+        // aber auf 10000 — der Tooltip verschwand also samt Kartentext
+        // hinter den Handkarten. Der Aufschlag steht HIER statt im
+        // gemeinsamen CSS, weil er eine Eigenart dieses Editors
+        // ausgleicht: im Spielbrett gibt es keine Hand auf 10000, und
+        // eine Anhebung dort koennte andere Ebenen stoeren. 10020 liegt
+        // ueber Hand (10000) und Debuff-Klappe (10001), aber unter dem
+        // Entfernen-Knopf (999999).
+        <div className="board-tooltip" style={{ zIndex: 10020, ...(tooltipSide === 'right'
           ? { left: PZ_PANEL_W, right: 'auto', borderLeft: '1px solid var(--accent)', borderRight: 'none' }
           : {
               // Deckungsgleich mit der Card Gallery statt "ungefaehr
@@ -3793,8 +3929,7 @@ function PuzzleCreator() {
               borderRight: '1px solid var(--accent)',
               borderLeft: 'none',
               boxShadow: '4px 0 20px rgba(0,0,0,.8)',
-            }
-        }>
+            }) }}>
           <CardTooltipContent card={tooltipCard}>
             {tooltipCard.cardType === 'Ascended Hero' && ascensionMap[tooltipCard.name] &&
               <div style={{ fontSize: 13, color: '#ff44ff', marginTop: 6 }}>Base Hero: {ascensionMap[tooltipCard.name]}</div>}
@@ -4129,6 +4264,21 @@ function PuzzleCreator() {
                 </label>
                 <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
                   "Vena, the Bounty Huntress" targets this Hero with all three of her effects. Only one Hero per side can carry the mark.
+                </div>
+              </div>
+            )}
+            {editJeGetroffen != null && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⏳ Damage History
+                </span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!editJeGetroffen}
+                    onChange={(e) => setEditJeGetroffen(e.target.checked)} />
+                  Has taken damage this game
+                </label>
+                <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+                  "Forbidden Curse of Aging" counts as an additional Action against Heroes that have not taken any damage yet this game.
                 </div>
               </div>
             )}

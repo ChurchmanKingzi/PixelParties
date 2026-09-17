@@ -7,6 +7,13 @@ const { hasCardType } = require('./_hooks');
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Search your deck for an Ascended Hero … add it to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   inherentAction: true,
   // Engine + client gate: a hand-locked controller cannot search any
   // more cards into their hand this turn. Causes the spell to fizzle
@@ -55,6 +62,7 @@ module.exports = {
       } else {
         const result = await engine.promptGeneric(pi, {
           type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
           cards: galleryCards,
           title: 'Graveyard Gathering',
           description: 'Choose an Ascended Hero from your deck to add to your hand.',

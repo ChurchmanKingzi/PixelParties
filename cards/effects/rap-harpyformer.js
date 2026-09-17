@@ -61,6 +61,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'poison',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to add 1 Poison Stack to any target.`,
       source: CARD_NAME,

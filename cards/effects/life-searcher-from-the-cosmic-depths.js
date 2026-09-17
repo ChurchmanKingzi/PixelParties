@@ -82,6 +82,8 @@ module.exports = {
 
       // Pay the discard cost (player picks the card to discard).
       await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'tutor',
         title: `${CARD_NAME} — Discard 1`,
         source: CARD_NAME,
         selfInflicted: true,
@@ -104,6 +106,7 @@ module.exports = {
 
       const pick = await engine.promptGeneric(pi, {
         type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
         cards: gallery,
         title: CARD_NAME,
         description: 'Choose a "Cosmic Depths" card to add to your hand.',
@@ -130,6 +133,7 @@ module.exports = {
       const oi = pi === 0 ? 1 : 0;
       await engine.promptGeneric(oi, {
         type: 'deckSearchReveal',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
         cardName: chosen,
         searcherName: ps.username,
         title: CARD_NAME,
@@ -197,6 +201,7 @@ module.exports = {
 
     const pick = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: gallery,
       title: CARD_NAME,
       description: `Shuffle ${CARD_NAME} back into your deck, then place a Lv${targetLvl} "Cosmic Depths" Creature into the same Support Zone.`,

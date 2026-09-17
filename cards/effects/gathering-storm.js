@@ -286,29 +286,36 @@ module.exports = {
       }
       await engine._delay(400);
 
-      for (const t of chosen) {
-        if (t.type === 'hero') {
-          const tgtHero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-          if (tgtHero && tgtHero.hp > 0) {
-            // Auftritt links am Feld (Als Regel 21.8.: beim Schadenzufuegen).
-            // `source` als Schluessel: ein Flaechenschlag reicht dasselbe
-            // Objekt an jeden Treffer weiter → EIN Auftritt, nicht je Ziel.
-            await engine.announceHookActivation(CARD_NAME, ownerIdx, { source });
-            await engine.actionDealDamage(source, tgtHero, dmg, 'destruction_spell');
-          }
-        } else {
-          const inst = t.cardInstance || engine.cardInstances.find(c =>
-            c.owner === t.owner && c.zone === 'support' &&
-            c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
-          );
-          if (inst && inst.zone === 'support') {
-            await engine.actionDealCreatureDamage(
-              source, inst, dmg, 'destruction_spell',
-              { sourceOwner: ownerIdx, canBeNegated: true }
+      // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
+      // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
+      // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
+      // Einzeltreffer und der Schutz greift korrekt nicht.
+      engine.beginMultiHit(chosen.length);
+      try {
+        for (const t of chosen) {
+          if (t.type === 'hero') {
+            const tgtHero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+            if (tgtHero && tgtHero.hp > 0) {
+              // Auftritt links am Feld (Als Regel 21.8.: beim Schadenzufuegen).
+              // `source` als Schluessel: ein Flaechenschlag reicht dasselbe
+              // Objekt an jeden Treffer weiter → EIN Auftritt, nicht je Ziel.
+              await engine.announceHookActivation(CARD_NAME, ownerIdx, { source });
+              await engine.actionDealDamage(source, tgtHero, dmg, 'destruction_spell');
+            }
+          } else {
+            const inst = t.cardInstance || engine.cardInstances.find(c =>
+              c.owner === t.owner && c.zone === 'support' &&
+              c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx
             );
+            if (inst && inst.zone === 'support') {
+              await engine.actionDealCreatureDamage(
+                source, inst, dmg, 'destruction_spell',
+                { sourceOwner: ownerIdx, canBeNegated: true }
+              );
+            }
           }
         }
-      }
+      } finally { engine.endMultiHit(); }
 
       engine.log('gathering_storm_tick', {
         player: gs.players[ownerIdx]?.username,

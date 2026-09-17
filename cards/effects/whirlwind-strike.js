@@ -122,6 +122,12 @@ module.exports = {
         await engine.preDamageMultiTargetWindow(attackSource, allTgts);
       }
 
+      // ★ v1042 („Interference"): EIN Schlag, mehrere Ziele — Helden UND
+      // ihre Kreaturen. Die Klammer macht das fuer den Schadensweg
+      // sichtbar; ohne sie waere Whirlwind fuer „Interference" ein
+      // Haufen Einzeltreffer gewesen.
+      engine.beginMultiHit(heroDamageTargets.length + allCreatureEntries.length);
+      try {
       // ── RAM + DAMAGE per hero target ──
       for (let ti = 0; ti < heroDamageTargets.length; ti++) {
         const { hero: tgtHero, tgt } = heroDamageTargets[ti];
@@ -157,6 +163,9 @@ module.exports = {
           });
         }
         await engine.processCreatureDamageBatch(allCreatureEntries);
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       // Wait for ram return + spin down

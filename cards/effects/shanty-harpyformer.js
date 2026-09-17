@@ -77,6 +77,7 @@ module.exports = {
 
     // ── Step 1: discard a Navigation Ability from hand (in-hand click)
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'tutor',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard a "${ABILITY_NAME}" Ability from your hand, then reveal a card to search for a copy.`,
       source: CARD_NAME,
@@ -106,6 +107,7 @@ module.exports = {
 
     const revealResult = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: handGallery,
       title: CARD_NAME,
       description: 'Reveal a card from your hand to search the deck for a copy of it.',

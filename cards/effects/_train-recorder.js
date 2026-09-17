@@ -1048,6 +1048,12 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
       const discardCardFates = (engine._discardFateLog || [])
         .filter(e => e.pi === pinnedIdx)
         .map(({ c, t, deleted }) => ({ c, t, deleted: deleted ? 1 : 0 }));
+      // ★ Kosten-Abwurf-Lernkanal (v1037): je Entscheidung eine Zeile —
+      // welcher Effekt wollte etwas, wurde gezahlt, womit, in welcher
+      // Lage. Daraus fittet der Trainer `costDiscardRules`.
+      const costDiscards = (engine._costDiscardLog || [])
+        .filter(e => e.pi === pinnedIdx)
+        .map(({ c, t, paid, card, tags }) => ({ c, t, paid: paid ? 1 : 0, card: card || null, tags: tags || [] }));
       // Surprise-Fire/Hold-Log der pinned Seite (Surprise-Lernkanal).
       const surpriseDecisions = (engine._surpriseLog || [])
         .filter(e => e.pi === pinnedIdx)
@@ -1271,6 +1277,7 @@ function attachTrainingRecorder(engine, { pinnedIdx, pinnedName, opponentName, f
         targetPicks,
         surpriseDecisions,
         discardChoices,
+        costDiscards,
         discardCardFates,
         reactionDecisions,
         damageImpacts,

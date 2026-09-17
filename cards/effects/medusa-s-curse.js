@@ -111,6 +111,7 @@ module.exports = {
         });
         // Parallel damage-block buff (damageMultiplier: 0 comes from BUFF_EFFECTS).
         await engine.actionAddBuff(ht.hero, ht.owner, ht.heroIdx, 'medusa_petrified', {
+          sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           expiresAtTurn,
           expiresForPlayer,
         });

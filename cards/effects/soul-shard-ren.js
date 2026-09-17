@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Abwurf ist Teil des Beschwoerungswegs, keine Wahl (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Soul Shard Ren" (Name)
 //  Creature (Summoning Magic Lv1, Normal, 50 HP)
@@ -149,14 +150,31 @@ module.exports = {
       if (ps.mainDeck.indexOf(chosenName) < 0) return;
 
       // Step 2: hand-vs-discard choice.
+      //
+      // ★★ v1119 (Als Sonderfall 15.9.): „nur der «add to hand»-Zweig
+      // ist blockiert, der Effekt bietet trotzdem den Self-Mill-Zweig
+      // an!"
+      //
+      // Deshalb traegt die GALERIE oben bewusst KEIN `searchToHand` —
+      // sie darf unter einer Such-Sperre oeffnen. Erst hier faellt die
+      // Hand-Option weg, und der Ablage-Zweig bleibt spielbar. Wer die
+      // Galerie mitgesperrt haette, haette der Karte auch ihren
+      // legalen Teil genommen.
+      const handGesperrt = engine._isSearchBlocked(pi, {}, 'deck');
+      const zielOptionen = [
+        ...(handGesperrt ? [] : [{ id: 'hand', label: 'Add it to your hand' }]),
+        { id: 'discard', label: 'Send it to your discard pile' },
+      ];
+      if (handGesperrt) {
+        engine.log('soul_shard_ren_hand_blocked', {
+          player: engine.gs.players[pi]?.username, card: chosenName,
+        });
+      }
       const dest = await engine.promptGeneric(pi, {
         type: 'optionPicker',
         title: CARD_NAME,
         description: `What should happen to "${chosenName}"?`,
-        options: [
-          { id: 'hand',    label: 'Add it to your hand' },
-          { id: 'discard', label: 'Send it to your discard pile' },
-        ],
+        options: zielOptionen,
         cancellable: false,
         // Distinct effect paths — Gerrymander redirect eligible. Hand
         // is generally better for the searcher; discard fuels future
@@ -164,7 +182,9 @@ module.exports = {
         // decision that opp's Gerrymander would want to flip.
         gerrymanderEligible: true,
       });
-      const destId = dest?.optionId || 'hand';
+      // ★ Rueckfall auf 'discard', wenn die Hand gesperrt ist — sonst
+      // liefe eine ausbleibende Antwort in den verbotenen Zweig.
+      const destId = dest?.optionId || (handGesperrt ? 'discard' : 'hand');
 
       if (destId === 'hand') {
         // Route through the canonical helper so ON_CARD_ADDED_TO_HAND

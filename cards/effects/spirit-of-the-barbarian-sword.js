@@ -97,9 +97,16 @@ async function feuerschlag(engine, pi, inst) {
       source: inst, sourceOwner: pi, animType: 'none',
     })));
   }
+  // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
+  // gezaehlt wird, was WIRKLICH getroffen wird.
+  engine.beginMultiHit(ziele.length);
+  try {
   for (const z of ziele.filter(x => x.type === 'hero')) {
     if (z.hero.hp <= 0) continue;
     await engine.actionDealDamage(inst, z.hero, DAMAGE, 'creature');
+  }
+  } finally {
+    engine.endMultiHit();
   }
   engine.sync();
 }

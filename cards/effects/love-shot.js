@@ -10,6 +10,34 @@
 //  controlled Hero cannot take any damage while
 //  it is controlled by this effect.
 //
+//  ★★ NEUER TEXT (Al 15.9.) — cards.json ist mitgeaendert:
+//
+//  „This Spell can be used by Heroes with the «Charme» Ability
+//   REGARDLESS OF ITS LEVEL. Draw a card FROM YOUR OPPONENT'S DECK.
+//   Then, choose a Hero your opponent controls and perform an Attack or
+//   Spell from your hand with it, if possible. That Attack or Spell
+//   counts as an ADDITIONAL ACTION. For that Attack or Spell only, the
+//   Hero is treated as controlled by you."
+//
+//  DREI AENDERUNGEN, alle folgenreich:
+//
+//  ① NEU: Charme traegt die Karte, unabhaengig von ihrer Stufe
+//     (`canBypassLevelReqForCard`). Die SCHULE bleibt unberuehrt.
+//
+//  ② Gezogen wird aus dem GEGNERDECK statt aus dem eigenen — ueber
+//     `takeTopFromOpponentDeck`, damit „Lilly" feuert (Al ausdruecklich).
+//
+//  ③ ★ DIE SCHADENS-IMMUNITAET IST GESTRICHEN. Der alte Satz „The
+//     controlled Hero cannot take any damage while it is controlled by
+//     this effect" steht nicht mehr da. Die Immunitaet kam nie aus
+//     dieser Karte, sondern als Beifang des geliehenen
+//     `charmed`-Status (Charme Lv3 macht immun). Seit v1106 fragt der
+//     Schadensweg den Marker `_loveShot` mit ab: geliehene Kontrolle
+//     schuetzt NICHT, echter Charme Lv3 weiterhin schon.
+//
+//     Praktisch heisst das: waehrend der geliehenen Aktion kann der
+//     Held Rueckstoss, Gegenschlaege und Reaktionen abbekommen.
+//
 //  Implementation
 //  ──────────────
 //  Reuses the existing charmedBy mechanic (the
@@ -51,8 +79,34 @@
 
 const CARD_NAME = 'Love Shot';
 
+const { takeTopFromOpponentDeck } = require('./_opponent-deck-shared');
+
 module.exports = {
   requiresTarget: true,
+
+  /**
+   * ★ „This Spell can be used by Heroes with the «Charme» Ability
+   * REGARDLESS OF ITS LEVEL." (v1106, neu)
+   *
+   * ★ DER RICHTIGE VERTRAG IST `canBypassLevelReq` (karten-seitig).
+   * Meine erste Fassung nahm `canBypassLevelReqForCard` — den gibt es
+   * auch, aber der wird am HELDEN gelesen (Cute Princess Mary). Auf
+   * einem Spell liegend wurde er NIE gefragt, und die Klausel tat
+   * schweigend nichts. Al hat es im ersten Test gemerkt.
+   *
+   * Der Motor fragt `canBypassLevelReq` bei der Spielbarkeitspruefung. Charme in JEDER Stufe genuegt — auch Lv1
+   * traegt den Lv1-Magic-Arts-Zauber, und wuerde die Karte spaeter
+   * hoeher eingestuft, traegt Charme sie weiterhin.
+   *
+   * ★ Die SCHULE bleibt unberuehrt: Charme ersetzt nur die STUFE. Wer
+   * gar keine Magic Arts hat, kommt weiter ueber Wisdom/Divinity —
+   * dieselbe Trennung wie bei „Last Resort" (v1104).
+   */
+  canBypassLevelReq(gs, pi, heroIdx, cardData) {
+    if (cardData?.name !== CARD_NAME) return false;
+    const zonen = gs.players[pi]?.abilityZones?.[heroIdx] || [];
+    return zonen.some(slot => Array.isArray(slot) && slot[0] === 'Charme');
+  },
   // ^ Blinded gating — Blinded Heroes can't play targeting cards.
   activeIn: ['hand'],
 
@@ -66,8 +120,24 @@ module.exports = {
       const ops = gs.players[oi];
       if (!ps || !ops) return;
 
-      // ── Draw (always — first clause) ─────────────────
-      await ctx.drawCards(pi, 1);
+      // ── ① „Draw a card FROM YOUR OPPONENT'S DECK" ────
+      //
+      // ★ v1106 (Al 15.9.): frueher zog die Karte aus dem EIGENEN Deck.
+      // Al ausdruecklich: „Draw from opponent's deck existiert schon in
+      // Infiltration; achte darauf, dass es z.B. Lillys Effekt
+      // triggert."
+      //
+      // Deshalb ueber `takeTopFromOpponentDeck` — denselben Weg, den
+      // Infiltration Lv1 seit v1106 geht. Er traegt den Flug aus dem
+      // GEGNER-Deck, die Herkunftsmarke, das einseitige Aufdecken und
+      // vor allem `onCardTakenFromOpponent`, den Hook von „Lilly, the
+      // Charming Infiltrator". Eine handgeschriebene Kopie haette
+      // genau diesen Hook vergessen koennen, ohne dass es auffaellt.
+      // ★ `asDraw: true` — der Kartentext sagt ausdruecklich „DRAW a
+      // card from your opponent's deck". Damit feuert auch `onDraw`,
+      // und „Cute Meanie Melissa" auf der Gegenseite antwortet
+      // (Al 15.9.). „Infiltration" sagt dagegen „ADD" und laesst es.
+      await takeTopFromOpponentDeck(engine, pi, { source: CARD_NAME, asDraw: true });
 
       // ── Build opp-Hero target list ───────────────────
       // Per the card's intent, only Heroes that can actually
@@ -233,7 +303,12 @@ module.exports = {
         // — keyed to the now-charmed Hero. Trial-of-Coolness's
         // _attackSpellLockedTurn isn't covered by that path; check
         // separately.
-        const playableMap = engine.getHeroPlayableCards(pi);
+        // ★ v1116: OHNE Kapazitaetspruefung — die Karte gewaehrt die
+        // Aktion selbst („That Attack or Spell counts as an additional
+        // Action"). Sonst faellt die ganze Liste weg, sobald Love Shot
+        // seinerseits als Zusatzaktion gespielt wurde (Learning Lv1) —
+        // und die Abfrage wird kommentarlos uebersprungen.
+        const playableMap = engine.getHeroPlayableCards(pi, { charmedIgnoresActionCost: true });
         const fromCharmed = (playableMap.charmed && playableMap.charmed[sel.heroIdx]) || [];
         const cardDB = engine._getCardDB();
         const eligibleNames = new Set();

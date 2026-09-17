@@ -1,3 +1,7 @@
+// COST-DISCARD-CHANNEL: n/a in dieser Datei — die Kosten („eine Karte
+//   abwerfen, um das Juwel zu behalten") sitzen im geteilten Helfer
+//   `_magic-gem-shared.js`, der den Kanal fuer alle sieben Gems
+//   bedient (v1041).
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Magic Sapphire"
 //  Artifact (Normal, Cost 10)
@@ -58,6 +62,7 @@ module.exports = {
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       cards: gallery,
       title: CARD_NAME,
       description: 'Choose a Spell to recover from your discard pile.',
@@ -66,7 +71,7 @@ module.exports = {
 
     if (picked && !picked.cancelled && picked.cardName) {
       const ps = engine.gs.players[pi];
-      const _taken_idx = await engine.takeFromPile(ps, 'discard', picked.cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_idx = await engine.takeFromPile(ps, 'discard', picked.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (_taken_idx) {
         ps.hand.push(picked.cardName);
         engine._broadcastEvent('card_reveal', { cardName: picked.cardName, playerIdx: pi });

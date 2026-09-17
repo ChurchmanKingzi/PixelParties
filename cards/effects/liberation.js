@@ -152,7 +152,7 @@ async function bergen(engine, pi, ctx) {
       .map(name => ({ name, source: stapel, count: zaehler[name] }));
 
     const wahl = await engine.promptGeneric(pi, {
-      type: 'cardGallery', title: CARD_NAME,
+      type: 'cardGallery', searchToHand: true, searchPile: 'discard',   // v1121 title: CARD_NAME,
       description: genommen.length === 0
         ? `Choose a Creature to add to your hand (up to ${MAX_PICKS}).`
         : `Choose another Creature (${genommen.length}/${MAX_PICKS}), or stop here.`,
@@ -231,6 +231,13 @@ async function befreien(engine, pi) {
 }
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Creatures aus dem Ablagestapel auf die Hand.)
+  // — unter der starken Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLockDiscard: true,
   activeIn: ['hand'],
   // Holt Ziele auf die eigene Seite zurueck — dieselbe Marke, die
   // Boris & Co. lesen.

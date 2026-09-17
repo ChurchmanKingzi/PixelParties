@@ -12,6 +12,7 @@
 
 const { companion, companionGlow } = require('./_bonded-companions-shared');
 const { usesLeft, spendUse } = require('./_charges');
+const { handlungsHooks } = require('./_action-shared');
 
 const CARD_NAME = 'Bonded Companion Mellvy';
 const USE_KEY   = 'mellvyPotion';
@@ -20,7 +21,8 @@ const MAX_USES  = 1;
 module.exports = companion({
   name: CARD_NAME,
   eigeneHooks: {
-    onAnyActionResolved: async (ctx) => {
+    // v1157: auch Reaktionen dieses Helden (`_action-shared.js`)
+    ...handlungsHooks(async (ctx) => {
       if (ctx.playerIdx !== ctx.cardOwner) return;
       if (ctx.heroIdx !== ctx.cardHeroIdx) return;
 
@@ -47,6 +49,6 @@ module.exports = companion({
       ctx._engine.log('mellvy_potion_draw', {
         player: gs.players[ctx.cardOwner]?.username, action: ctx.actionType,
       });
-    },
+    }),
   },
 });

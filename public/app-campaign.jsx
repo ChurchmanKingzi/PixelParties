@@ -2032,7 +2032,7 @@ function CampaignScreen() {
 
   // ── Duell-Anbindung ────────────────────────────────────────────
   useEffect(() => {
-    const onGameState = (gs) => { if (gs && gs.isCampaign) setDuelState(gs); };
+    const onGameState = (gs) => { if (window.ppZustandVeraltet?.(gs)) return; if (gs && gs.isCampaign) setDuelState(gs); };
     const onResult = (r) => { duelOutcomeRef.current = !!r.won; };
     const onError = (msg) => {
       notify('Duel: ' + msg, 'error');

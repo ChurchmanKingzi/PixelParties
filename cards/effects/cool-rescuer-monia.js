@@ -196,7 +196,7 @@ module.exports = {
 
       // ── Discard 1 card (player chooses) ──
       if (ps.hand.length > 0) {
-        await engine.actionPromptForceDiscard(pi, 1, { title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
+        await engine.actionPromptForceDiscard(pi, 1, { costFor: 'Cool Rescuer Monia', costKind: 'protect',   /* ★ v1041 Lernkanal */ title: `${hero.name} — Discard 1`, source: hero.name, selfInflicted: true });
       }
     },
 

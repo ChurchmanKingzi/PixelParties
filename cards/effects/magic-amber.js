@@ -1,3 +1,6 @@
+// COST-DISCARD-CHANNEL: n/a fuer den Haupteffekt — dort wirft der GEGNER ab.
+//   Die eigenen Kosten („eine Karte abwerfen, um das Juwel zu behalten")
+//   sitzen im geteilten Helfer `_magic-gem-shared.js` (v1041).
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Magic Amber"
 //  Artifact (Normal, Cost 2)

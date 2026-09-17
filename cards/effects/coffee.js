@@ -9,8 +9,16 @@
 const { STATUS_EFFECTS, getCleansableStatuses } = require('./_hooks');
 
 /** Get non-this-turn negative statuses on a hero */
-function getEligibleStatuses(hero, currentTurn) {
+function getEligibleStatuses(hero, currentTurn, engine, owner, heroIdx) {
   if (!hero?.statuses) return [];
+  // ★ v1101: gemeinsamer Bauer, wenn die Herkunft bekannt ist — er
+  // liefert `appliedTurn` fuer Status UND Anhaengsel („Decisive
+  // Defeat", „Curse of Aging"), sodass Coffees Runden-Filter auch auf
+  // sie passt. Ohne Engine-Angabe bleibt der alte Weg.
+  if (engine && typeof owner === 'number' && typeof heroIdx === 'number') {
+    return engine.cleansableHeroEntries(owner, heroIdx)
+      .filter(e => e.appliedTurn !== undefined && e.appliedTurn < currentTurn);
+  }
   const negKeys = getCleansableStatuses();
   return negKeys
     .filter(k => {
@@ -50,7 +58,7 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const hero = ps.heroes[hi];
       if (!hero?.name || hero.hp <= 0) continue;
-      const statuses = getEligibleStatuses(hero, currentTurn);
+      const statuses = getEligibleStatuses(hero, currentTurn, engine, pi, hi);
       if (statuses.length === 0) continue;
       targets.push({
         id: `hero-${pi}-${hi}`,
@@ -88,7 +96,7 @@ module.exports = {
     const currentTurn = engine.gs.turn || 0;
 
     // Step 1: Status selection (only non-this-turn statuses)
-    const statuses = getEligibleStatuses(hero, currentTurn);
+    const statuses = getEligibleStatuses(hero, currentTurn, engine, pi, target.heroIdx);
     if (statuses.length === 0) return;
 
     const statusResult = await engine.promptGeneric(pi, {

@@ -114,6 +114,12 @@ module.exports = {
       );
       if (_negR?.effectNegated) return;
 
+      // ★ v1042 („Interference"): Der Blitz springt zwar von Ziel zu
+      // Ziel, ist aber EINE Quelle, die mehrere Ziele trifft — genau
+      // der Fall, gegen den die Ability schuetzt (Als Beispiel 12.9.).
+      // Die Klammer umschliesst die ganze Kette.
+      engine.beginMultiHit(selectedTargets.length);
+      try {
       // Chain lightning animation + damage
       let prevOwner = selectedTargets[0].owner;
       let prevHeroIdx = selectedTargets[0].heroIdx;
@@ -156,6 +162,9 @@ module.exports = {
         prevOwner = tgt.owner;
         prevHeroIdx = tgt.heroIdx;
         prevZoneSlot = tgtZoneSlot;
+      }
+      } finally {
+        engine.endMultiHit();
       }
     },
   },

@@ -31,7 +31,9 @@ function grant(ctx) {
   const hero = engine.gs.players[pi]?.heroes?.[hi];
   if (!hero?.name || hero.hp <= 0) return;
   if (hero.buffs?.[BUFF]) return; // already immune (any source)
-  engine.actionAddBuff(hero, pi, hi, BUFF, { source: CARD_NAME, permanent: true });
+  // v1067: Quelle ist Pflicht (siehe _affected-shared). Hier der eigene
+  // Held — die Klausel loest damit korrekt KEINEN Gegner-Trigger aus.
+  engine.actionAddBuff(hero, pi, hi, BUFF, { source: CARD_NAME, sourceOwner: pi, permanent: true });
   // Mirror Divine Gift of Coolness: clear any negatives already on it.
   try {
     engine.cleanseHeroStatuses(hero, pi, hi, getNegativeStatuses(), CARD_NAME);

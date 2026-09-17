@@ -59,16 +59,22 @@ module.exports = makeCrusaderArtifact({
 
     const source = { name: CARD_NAME, owner: pi, controller: pi };
     let gefallen = 0;
-    for (const inst of opfer) {
-      if (!inst || inst.zone !== 'support') continue;   // Trigger war schneller
-      await engine.actionDestroyCard(source, inst);
-      // GETAKTET (Als Befund 17.8.): ohne Pause laufen alle Opfer in
-      // einem Tick aus ihren Zonen und der Client raeumt das Brett auf
-      // einen Schlag ab — die Einzelfluege spielen dann ins Leere.
-      // Zustand raus, kurz warten, naechstes Opfer.
-      await takten(engine, TAKT_MS);
-      gefallen++;
-    }
+    // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
+    // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
+    // saehe er beim ersten Opfer eine Einzelzerstoerung.
+    engine.beginDestroyScope(opfer.length);
+    try {
+      for (const inst of opfer) {
+        if (!inst || inst.zone !== 'support') continue;   // Trigger war schneller
+        await engine.actionDestroyCard(source, inst);
+        // GETAKTET (Als Befund 17.8.): ohne Pause laufen alle Opfer in
+        // einem Tick aus ihren Zonen und der Client raeumt das Brett auf
+        // einen Schlag ab — die Einzelfluege spielen dann ins Leere.
+        // Zustand raus, kurz warten, naechstes Opfer.
+        await takten(engine, TAKT_MS);
+        gefallen++;
+      }
+    } finally { engine.endDestroyScope(); }
     engine.log('crusader_cutlass_wipe', {
       player: engine.gs.players[pi]?.username, defeated: gefallen,
     });

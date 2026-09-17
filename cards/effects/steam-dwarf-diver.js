@@ -71,6 +71,7 @@ module.exports = attachSteamEngine({
     // Show the gallery — cancellable so the player can back out
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: CARD_NAME,
       description: `Pay ${HP_COST} current & max HP and search your deck for any card. Revealed to your opponent.`,

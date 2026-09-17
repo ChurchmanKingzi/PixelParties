@@ -161,6 +161,7 @@ module.exports = {
       const typeLabel = normType === 'Action' ? 'Attack/Spell/Creature' : normType;
       const galleryResult = await engine.promptGeneric(pi, {
         type: 'cardGallery',
+        searchToHand: true, searchPile: 'discard',   // v1121
         cards: deduped,
         title: `Shard of Chaos — Retrieve ${typeLabel}`,
         description: `Choose ${actualCount} ${typeLabel} card(s) from your discard pile.`,

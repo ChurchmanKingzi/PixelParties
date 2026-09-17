@@ -2,13 +2,23 @@
 //  CARD EFFECT: "Healing Potion"
 //  Potion (Normal) — Choose any target (either
 //  player's) with current HP < max HP and heal
-//  it for 200 HP.
+//  it for HEAL_AMOUNT HP.
 //
 //  Animation: red/green hearts and pluses rising
 //  from the healed target.
+//
+//  ★ v1065 (Als Balanceaenderung 14.9.): 200 → 250.
+//  Der Wert stand an VIER Stellen als Literal —
+//  Beschreibung, Helden-Heilung, Kreaturen-Heilung
+//  und Log. Jetzt EINE Konstante, damit die
+//  naechste Anpassung nicht drei Stellen vergisst
+//  und der angezeigte Text vom echten Wert
+//  abweicht.
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+
+const HEAL_AMOUNT = 250;
 
 module.exports = {
   isPotion: true,
@@ -76,7 +86,7 @@ module.exports = {
   },
 
   targetingConfig: {
-    description: 'Choose a target to heal for 200 HP.',
+    description: `Choose a target to heal for ${HEAL_AMOUNT} HP.`,
     confirmLabel: '💚 Heal!',
     confirmClass: 'btn-success',
     cancellable: true,
@@ -109,7 +119,7 @@ module.exports = {
 
       await engine.actionHealHero(
         { name: 'Healing Potion', owner: pi },
-        hero, 200
+        hero, HEAL_AMOUNT
       );
     } else if (target.type === 'equip' && target.cardInstance) {
       engine._broadcastEvent('play_zone_animation', {
@@ -119,14 +129,14 @@ module.exports = {
 
       await engine.actionHealCreature(
         { name: 'Healing Potion', owner: pi },
-        target.cardInstance, 200
+        target.cardInstance, HEAL_AMOUNT
       );
     }
 
     engine.log('healing_potion', {
       player: gs.players[pi].username,
       target: target.cardName,
-      amount: 200,
+      amount: HEAL_AMOUNT,
     });
 
     engine.sync();

@@ -72,9 +72,16 @@ async function runOpponentDeathPayload(engine, inst, opts = {}) {
     await engine.preDamageMultiTargetWindow(source, allTgts);
   }
 
+  // ★ v1043 („Interference"): ein Schlag auf alle getroffenen
+  // Helden. Gezaehlt wird, was WIRKLICH getroffen wird.
+  engine.beginMultiHit(heroHits.filter(({ hero }) => hero.hp > 0).length);
+  try {
   for (const { hi, hero } of heroHits) {
     if (hero.hp <= 0) continue; // May have died from a prior hit in this loop
     await engine.actionDealDamage(source, hero, DAMAGE, 'creature');
+  }
+  } finally {
+    engine.endMultiHit();
   }
 
   engine.log('carpet_bomblebee_strike', {

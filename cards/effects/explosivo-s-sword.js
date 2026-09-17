@@ -169,6 +169,14 @@ async function _explode(ctx, excludeKey) {
   }
   await engine._delay(450);
 
+  // ★ v1043 („Interference", Als Ruling 12.9.): NUR dieser 100er-Splash
+  // ist ein Flaechenschlag — der urspruengliche Angriffsschaden des
+  // Traegers laeuft getrennt davon und bleibt unberuehrt. Die Klammer
+  // sitzt deshalb eng um die Splash-Phase.
+  engine.beginMultiHit(
+    heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length
+    + creatureTargets.filter(i => i && i.zone === 'support').length);
+  try {
   // Heroes — sequential so each afterDamage / KO chain resolves
   // cleanly. The `heroIdx: -1` source (above) is what keeps Booby
   // Trap & co. from chaining; we deliberately do NOT pass
@@ -188,6 +196,10 @@ async function _explode(ctx, excludeKey) {
       source, inst, SPLASH_DAMAGE, 'artifact',
       { sourceOwner: pi, canBeNegated: true }
     );
+  }
+
+  } finally {
+    engine.endMultiHit();
   }
 
   engine.log('explosivo_sword', {

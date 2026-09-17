@@ -272,6 +272,21 @@ module.exports = {
      * incapacitated, cleanse every sibling Hero's negative statuses
      * with a golden-light animation on each affected slot.
      */
+    /**
+     * ★ v1166 (Al 17.9.): Wird Johannas Effekt KOPIERT oder GEERBT
+     * (Shapeshifter, Initiation Ritual), reinigt er die Mitstreiter
+     * sofort — wie beim Auftauen einer eingefrorenen Johanna.
+     */
+    onIdentityGained: async (ctx) => {
+      const engine = ctx._engine;
+      const inst = ctx.card;
+      if (!inst) return;
+      const ownerPs = engine.gs.players[inst.owner];
+      const johannaHero = ownerPs?.heroes?.[inst.heroIdx];
+      if (!_johannaActive(johannaHero)) return;
+      await _cleanseAllies(engine, inst.owner, inst.heroIdx);
+    },
+
     onStatusRemoved: async (ctx) => {
       const engine = ctx._engine;
       const gs = engine.gs;

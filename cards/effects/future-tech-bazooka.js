@@ -103,44 +103,51 @@ async function schiessen(ctx) {
   // Effekt-Immunitaet den Schuss als EINEN Vorgang.
   const quelle = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
   let getroffen = 0;
-  for (const id of ids) {
-    const ziel = kandidaten.find(t => t.id === id);
-    if (!ziel?.cardInstance) continue;
+  // ★ v1061 („Interference", Als Rulings 14.9.): EIN Einsatz, mehrere
+  // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
+  // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
+  // Einzeltreffer und der Schutz greift korrekt nicht.
+  engine.beginMultiHit(ids.length);
+  try {
+    for (const id of ids) {
+      const ziel = kandidaten.find(t => t.id === id);
+      if (!ziel?.cardInstance) continue;
 
-    // ── Projektil vom ausgeruesteten Helden zum Ziel ──
-    // Bauform von Crusader's Flintlock (Als Vorgabe 21.8.), nur
-    // groesser: eine Bazooka schiesst keine Pistolenkugel. Der Schaden
-    // faellt beim EINSCHLAG, nicht beim Abschuss — deshalb erst die
-    // Flugzeit abwarten, dann treffen.
-    engine._broadcastEvent('play_projectile_animation', {
-      sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,
-      targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
-      targetZoneSlot: ziel.slotIdx,
-      emoji: '•',
-      emojiStyle: {
-        fontSize: 44,                       // Flintlock: 26
-        color: '#ffe1a8',
-        textShadow: '0 0 16px rgba(255,170,60,1), 0 0 6px rgba(255,255,255,.9)',
-      },
-      duration: FLUGZEIT_MS,
-    });
-    await engine._delay(FLUGZEIT_MS);
-    // `explosion` — dieselbe Animation wie bei Explosivo's Sword (Als
-    // Vorgabe 21.8.: die Feuersaeule passte nicht zum Einschlag).
-    // Sie war bis v559 STUMM; statt ihr wie bei Future Tech Bomb
-    // auszuweichen, hat sie jetzt einen Klangeintrag bekommen — das
-    // hilft allen Nutzern der Animation auf einmal.
-    engine._broadcastEvent('play_zone_animation', {
-      type: 'explosion',
-      owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
-    });
+      // ── Projektil vom ausgeruesteten Helden zum Ziel ──
+      // Bauform von Crusader's Flintlock (Als Vorgabe 21.8.), nur
+      // groesser: eine Bazooka schiesst keine Pistolenkugel. Der Schaden
+      // faellt beim EINSCHLAG, nicht beim Abschuss — deshalb erst die
+      // Flugzeit abwarten, dann treffen.
+      engine._broadcastEvent('play_projectile_animation', {
+        sourceOwner: pi, sourceHeroIdx: ctx.cardHeroIdx, sourceZoneSlot: -1,
+        targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
+        targetZoneSlot: ziel.slotIdx,
+        emoji: '•',
+        emojiStyle: {
+          fontSize: 44,                       // Flintlock: 26
+          color: '#ffe1a8',
+          textShadow: '0 0 16px rgba(255,170,60,1), 0 0 6px rgba(255,255,255,.9)',
+        },
+        duration: FLUGZEIT_MS,
+      });
+      await engine._delay(FLUGZEIT_MS);
+      // `explosion` — dieselbe Animation wie bei Explosivo's Sword (Als
+      // Vorgabe 21.8.: die Feuersaeule passte nicht zum Einschlag).
+      // Sie war bis v559 STUMM; statt ihr wie bei Future Tech Bomb
+      // auszuweichen, hat sie jetzt einen Klangeintrag bekommen — das
+      // hilft allen Nutzern der Animation auf einmal.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'explosion',
+        owner: ziel.owner, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,
+      });
 
-    await engine.actionDealCreatureDamage(
-      quelle, ziel.cardInstance, DAMAGE, 'artifact',
-      { sourceOwner: pi, canBeNegated: true },
-    );
-    getroffen++;
-  }
+      await engine.actionDealCreatureDamage(
+        quelle, ziel.cardInstance, DAMAGE, 'artifact',
+        { sourceOwner: pi, canBeNegated: true },
+      );
+      getroffen++;
+    }
+  } finally { engine.endMultiHit(); }
 
   engine.log('ft_bazooka', {
     player: gs.players[pi]?.username, hits: getroffen, max: grenze,

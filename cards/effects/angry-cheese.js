@@ -19,6 +19,14 @@ const { hasCardType } = require('./_hooks');
 const { getCardDB: _getCardDB } = require('./_card-db');
 
 module.exports = {
+  // ★ v1070 (Als Befund 14.9.: „Wieso drei Cheese-Karten? Davon gibt es
+  // sechs!"). Die Autoerkennung liess diese Karte als spielbar durch,
+  // weil sie neben der Suche noch etwas anderes tut — bei ihr ist das
+  // aber eine KOSTE bzw. ein NACHTEIL, kein zweiter Ertrag. Unter der
+  // Such-Sperre zahlt man also und bekommt nichts. Handgesetzt, weil
+  // ein rein syntaktischer Erkenner Kosten nicht von Ertrag
+  // unterscheiden kann; das manuelle Flag gewinnt im Loader.
+  blockedBySearchLock: true,
   isTargetingArtifact: true,
   blockedByHandLock: true,
 
@@ -104,6 +112,7 @@ module.exports = {
 
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
       cards: galleryCards,
       title: 'Angry Cheese',
       description: 'Choose a Destruction Magic Spell to add to your hand.',

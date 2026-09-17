@@ -41,13 +41,45 @@ const cache = new Map(); // normalizedName -> module | null
 //   • When adding a new non-draw engine action, append its name to
 //     NON_DRAW_PATTERNS below.
 
-const DRAW_PATTERNS = [
+// ── Zwei Halbmengen (v1069) ───────────────────────────────────────
+// `DRAW_PATTERNS` blieb bisher EINE Liste aus Ziehen UND Suchen. Fuer
+// den Hand-Lock ist das richtig — er sperrt beides. Der neue SUCH-Lock
+// (v1068, „Cats of the Pharaoh") sperrt aber NUR das Suchen, und dafuer
+// muessen die beiden Haelften unterscheidbar sein.
+//
+// `DRAW_PATTERNS` bleibt unveraendert die Vereinigung, damit
+// `detectDrawOnly` bit-identisch weiterarbeitet.
+const PURE_DRAW_PATTERNS = [
   'actionDrawCards', 'drawCards',
   'actionDrawFromPotionDeck',
-  'actionAddCardToHand', 'addCardToHand',
+];
+// ★ v1069: DECK und ABLAGE getrennt. Die schwache Such-Sperre
+// (`searchLocked`, Cats of the Pharaoh) laesst den ABLAGESTAPEL offen —
+// eine Karte, die nur dort sucht (Elixir of Mana, Boomerang), bleibt
+// darunter also voll spielbar und darf NICHT ausgegraut werden. Erst
+// die starke Stufe (`searchLockedIncludesDiscard`, fuer „Siege")
+// erfasst sie. Ein einziges Flag koennte das nicht ausdruecken.
+const DECK_SEARCH_PATTERNS = [
+  // ★ v1070: `actionAddCardToHand` ist BEWUSST nicht dabei — der Weg ist
+  // generisch und bedient auch Quellen, die die Such-Sperre nicht meint
+  // („Gold Trap" holt damit eine Kreatur vom BRETT; Al 14.9.: Gruppe D
+  // ist nicht betroffen). Nur die wirklich deck-gebundenen Wege zaehlen.
   'actionAddCardFromDeckToHand',
   'searchDeckForNamedCard',
+  'addFromPileToHand',
 ];
+const DISCARD_SEARCH_PATTERNS = [
+  'addCardFromDiscardToHand',
+];
+// ★ v1071: `takeFromPile(..., { toHand: true })` ist der VIERTE Weg auf
+// die Hand — Karten mit eigener Animation (Shooting Star) nehmen ihn.
+// Seit die Absicht am Aufruf steht (`toHand`), ist er erkennbar; vorher
+// brauchten diese Karten ein handgesetztes Flag. Welcher Stapel gemeint
+// ist, steht im zweiten Argument.
+const TO_HAND_DECK = /takeFromPile\([^)]*['"]deck['"][^)]*toHand\s*:\s*true/s;
+const TO_HAND_DISCARD = /takeFromPile\([^)]*['"]discard['"][^)]*toHand\s*:\s*true/s;
+const SEARCH_PATTERNS = [...DECK_SEARCH_PATTERNS, ...DISCARD_SEARCH_PATTERNS];
+const DRAW_PATTERNS = [...PURE_DRAW_PATTERNS, ...SEARCH_PATTERNS];
 
 const NON_DRAW_PATTERNS = [
   // Damage / healing / HP
@@ -76,6 +108,12 @@ const NON_DRAW_PATTERNS = [
   'resolveSacrificeCost',
   'performAscensionBonus',
   'actionRevive',
+  // v1069 nachgetragen: ohne diese galten „Misfire" (negiert ein
+  // Artefakt) und „Shard of Chaos" (loescht Handkarten) als reine
+  // Such-Karten und waeren unter der Such-Sperre faelschlich
+  // unspielbar geworden.
+  'negateChainLink', 'actionNegate', 'negateSpell',
+  'actionDeleteCard', 'deleteCard', 'actionDeleteFromHand',
 ];
 
 // ── „NUR Stapel-Bewegung" (v826, Al 8.9., Praezedenz `blockedByHandLock`) ──
@@ -153,6 +191,55 @@ function detectSummonOnly(sourceText) {
   if (!SUMMON_PATTERNS.some(p => sourceText.includes(p))) return false;
   if (NON_SUMMON_PATTERNS.some(p => sourceText.includes(p))) return false;
   return true;
+}
+
+// ── „trifft mehrere Ziele in EINEM Schlag" (v1049) ───────────────────
+// Das Erkennungsmerkmal ist dasselbe, an dem auch der Schutz durch
+// „Interference" haengt: die Flaechenklammer. Eine Karte gilt als
+// Flaechenquelle, wenn sie den generischen Trichter `aoeHit(` benutzt
+// ODER sich mit `beginMultiHit(` selbst klammert (die 14 Karten mit
+// eigenem Schadensweg aus v1043). Damit gibt es genau EINE Wahrheit:
+// was sich klammert, ist AoE — fuer die Engine wie fuer den Piloten.
+//
+// Karten, die nacheinander mehrere EINZELinstanzen austeilen (Rha'Bi),
+// klammern sich bewusst nicht und werden hier korrekt nicht erfasst.
+// `neverMultiTarget` (Basketskull-Vertrag) schliesst aus: diese Karten
+// koennen per Kartentext nie mehr als ein Ziel treffen.
+const MULTI_HIT_PATTERNS = ['aoeHit(', 'beginMultiHit('];
+function detectMultiHit(sourceText) {
+  sourceText = stripComments(sourceText);
+  if (!sourceText) return false;
+  return MULTI_HIT_PATTERNS.some(p => sourceText.includes(p));
+}
+
+
+// ── „NUR Suchen" (v1069, Al 14.9., Praezedenz `detectDrawOnly`) ──────
+// Karten, deren EINZIGER Effekt eine Suche bzw. ein Add auf die Hand
+// ist (Magnetic Potion: „choose a card from your deck … add it to your
+// hand"), sind unter der Such-Sperre (`searchLocked`, Cats of the
+// Pharaoh) voellig wirkungslos und sollen deshalb gar nicht erst
+// spielbar sein — Al: „Draw-Lock sorgt da schon fuer."
+//
+// ★ ABGRENZUNG ZU `detectDrawOnly`: eine Karte, die AUCH zieht, bleibt
+// spielbar — unter der Such-Sperre wirkt ihr Zieh-Teil weiter. Deshalb
+// schliessen die reinen Zieh-Muster hier aus, statt mitzuzaehlen.
+function detectSearchOnly(sourceText, muster) {
+  sourceText = stripComments(sourceText);
+  if (!sourceText) return false;
+  const eigen = (muster === DECK_SEARCH_PATTERNS) ? TO_HAND_DECK : TO_HAND_DISCARD;
+  const fremd = (muster === DECK_SEARCH_PATTERNS) ? TO_HAND_DISCARD : TO_HAND_DECK;
+  const trifft = muster.some(p => sourceText.includes(p)) || eigen.test(sourceText);
+  if (!trifft) return false;
+  if (fremd.test(sourceText)) return false;
+  if (PURE_DRAW_PATTERNS.some(p => sourceText.includes(p))) return false;
+  // Sucht die Karte AUSSERDEM in der jeweils anderen Quelle, bleibt sie
+  // unter der schwaecheren Sperre nuetzlich → nicht ausgrauen.
+  const andere = (muster === DECK_SEARCH_PATTERNS) ? DISCARD_SEARCH_PATTERNS : DECK_SEARCH_PATTERNS;
+  if (andere.some(p => sourceText.includes(p))) return false;
+  // `takeFromPile` OHNE `toHand` ist kein Hand-Add (Beschwoerung, Mill,
+  // Coolness-Stack) — solche Karten bleiben spielbar.
+  if (/takeFromPile\(/.test(sourceText) && !eigen.test(sourceText)) return false;
+  return !NON_DRAW_PATTERNS.some(p => sourceText.includes(p));
 }
 
 function detectDrawOnly(sourceText) {
@@ -293,8 +380,22 @@ function loadCardEffect(cardName) {
         || typeof mod.ascensionCondition === 'function'
         || typeof mod.onAscensionBonus === 'function'
         || typeof mod.refreshAscensionReadiness === 'function'
-        || mod.heroRedirect === true;
-      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !mod.abilitiesInSupportZones && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
+        || mod.heroRedirect === true
+        // v1073: „The Thing in the Ship" ist eine reine ZUSTANDS-Karte —
+        // ihr ganzer Inhalt ist dieses eine Flag, sie hat weder Hooks
+        // noch Effekte. Genau die Klasse, die dieser Filter sonst still
+        // wegwirft (siehe die Faelle darueber). Ohne den Eintrag wurde
+        // sie geladen, verworfen und wirkte nie — und der einzige
+        // Hinweis war eine Warnzeile in der Konsole.
+        || mod.blocksAbilityActivation === true;
+      // ★ v1100 („Ifrit"): drei weitere Vertraege einer REINEN
+      // ZUSTANDS-KARTE. Ifrit hat keinen einzigen Hook — sie wirkt
+      // ausschliesslich ueber Flaggen, die ANDERE Stellen lesen
+      // (Beschwoerungs-Gate, Schadensweg, Armageddons Rechnung).
+      // Fehlt eine solche Flagge hier, verwirft der Loader die Karte
+      // STILL und sie tut gar nichts — dieselbe Falle wie bei „The
+      // Thing in the Ship" (v1073).
+      if (!mod.hooks && !mod.effects && !mod.isPotion && !mod.isEquip && !mod.isTargetingArtifact && !mod.isReaction && !mod.actionCost && !mod.freeActivation && !mod.heroEffect && !mod.creatureEffect && !mod.equipEffect && !mod.isTargetRedirect && !mod.isSurprise && !mod.resolve && !mod.reduceSpellLevel && !mod.reduceCardLevel && !mod.coverLevelGap && !mod.abilitiesInSupportZones && !mod.summonOnlyFromHand && !Array.isArray(mod.immuneToSourceNames) && !mod.armageddonBonus && typeof mod.protectsCreatureFromDamage !== 'function' && !hasPassiveGate && !hasEngineEntry && !Object.keys(mod).some(k => k.startsWith('is') && mod[k] === true)) {
         console.warn(`[Loader] Card "${cardName}" (${normalized}.js) has no hooks, effects, or card type flags — ignored.`);
         mod = null;
       }
@@ -308,12 +409,43 @@ function loadCardEffect(cardName) {
       // their hand-adding sub-effects are already gated at the engine
       // primitive level (actionDrawCards etc. check handLocked).
       // A manual `blockedByHandLock` on the module always wins.
-      if (mod && typeof mod.resolve === 'function'
-          && !Object.prototype.hasOwnProperty.call(mod, 'blockedByHandLock')) {
-        try {
-          const src = fs.readFileSync(filePath, 'utf8');
-          if (detectDrawOnly(src)) mod.blockedByHandLock = true;
-        } catch { /* ignore — keep mod as loaded */ }
+      // Quelltext EINMAL lesen (v1049): vorher las dieser Block die
+      // Datei bis zu zweimal je Modul, und mit der AoE-Erkennung waere
+      // ein dritter Lesevorgang dazugekommen. Lazy, damit Module ohne
+      // jede Erkennung die Datei gar nicht erst anfassen.
+      let _src;
+      const quelltext = () => {
+        if (_src === undefined) {
+          try { _src = fs.readFileSync(filePath, 'utf8'); } catch { _src = null; }
+        }
+        return _src;
+      };
+      const hatEigenes = (feld) => Object.prototype.hasOwnProperty.call(mod, feld);
+
+      if (mod && typeof mod.resolve === 'function' && !hatEigenes('blockedByHandLock')) {
+        const src = quelltext();
+        if (src && detectDrawOnly(src)) mod.blockedByHandLock = true;
+      }
+      // v1069: „nur Suchen" → unter der Such-Sperre unspielbar.
+      // Zwei Flaggen, weil die schwache Stufe den Ablagestapel offen laesst.
+      //
+      // ★ v1071: AUCH `hooks.onPlay`-Module. Die aeltere Zeile daueber
+      // (`detectDrawOnly`) prueft nur `mod.resolve` — Karten, die ihren
+      // Effekt ueber `hooks.onPlay` umsetzen (Shooting Star, Aurora
+      // Borealis, Bifab), wurden dort nie angesehen. Das ist der Grund,
+      // warum diese drei zunaechst ein handgesetztes Flag brauchten,
+      // obwohl ihre Quelle die Suche klar zeigt.
+      //
+      // ⚠ Fuer `blockedByHandLock` ist die Luecke bewusst NICHT
+      // mitgeschlossen: das wuerde Karten unter dem Hand-Lock neu
+      // sperren, die es heute nicht sind — eine Verhaltensaenderung, die
+      // Al entscheiden sollte, keine Fehlerbehebung.
+      if (mod && (typeof mod.resolve === 'function' || typeof mod.hooks?.onPlay === 'function')) {
+        const src = quelltext();
+        if (src && !hatEigenes('blockedBySearchLock')
+            && detectSearchOnly(src, DECK_SEARCH_PATTERNS)) mod.blockedBySearchLock = true;
+        if (src && !hatEigenes('blockedBySearchLockDiscard')
+            && detectSearchOnly(src, DISCARD_SEARCH_PATTERNS)) mod.blockedBySearchLockDiscard = true;
       }
       // v826: „nur Stapel-Bewegung" / v834: „nur Beschwoerung" — resolve-
       // Module UND reine Handkarten (kein activeIn ausser 'hand'; onPlay
@@ -321,13 +453,20 @@ function loadCardEffect(cardName) {
       if (mod) {
         const handOnly = Array.isArray(mod.activeIn) && mod.activeIn.every(z => z === 'hand');
         if (typeof mod.resolve === 'function' || handOnly) {
-          let src = null;
-          try { src = fs.readFileSync(filePath, 'utf8'); } catch { /* ignore */ }
+          const src = quelltext();
           if (src) {
-            if (!Object.prototype.hasOwnProperty.call(mod, 'blockedByPileLock') && detectPileOnly(src)) mod.blockedByPileLock = true;
-            if (!Object.prototype.hasOwnProperty.call(mod, 'blockedBySummonLock') && detectSummonOnly(src)) mod.blockedBySummonLock = true;
+            if (!hatEigenes('blockedByPileLock') && detectPileOnly(src)) mod.blockedByPileLock = true;
+            if (!hatEigenes('blockedBySummonLock') && detectSummonOnly(src)) mod.blockedBySummonLock = true;
           }
         }
+      }
+      // v1049: „trifft mehrere Ziele in einem Schlag". Gilt fuer JEDEN
+      // Kartentyp (Spell, Attack, Creature, Artifact, Area), deshalb
+      // ohne die handOnly/resolve-Einschraenkung oben. Manuelles
+      // true/false am Modul gewinnt wie bei den anderen drei Flags.
+      if (mod && !hatEigenes('hitsMultipleTargets') && mod.neverMultiTarget !== true) {
+        const src = quelltext();
+        if (src && detectMultiHit(src)) mod.hitsMultipleTargets = true;
       }
     }
   } catch (err) {

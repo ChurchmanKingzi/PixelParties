@@ -146,6 +146,7 @@ module.exports = {
     }));
     const pick = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: gallery,
       title: CARD_NAME,
       description: 'Pick a "Cute" Creature from your deck to add to your hand.',
@@ -170,6 +171,7 @@ module.exports = {
     await engine._delay(300);
     await engine.promptGeneric(oi, {
       type: 'deckSearchReveal',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cardName: chosenName,
       searcherName: ps.username,
       title: CARD_NAME,
@@ -216,6 +218,8 @@ module.exports = {
     const handBefore2 = ps.hand.length;
     const result = await engine.promptGeneric(pi, {
       type: 'forceDiscard',
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'tutor',
       title: CARD_NAME,
       description: 'Discard 1 card to pay for the additional Summon.',
       instruction: 'Click a card in your hand to discard it.',

@@ -122,6 +122,23 @@ module.exports = {
 
     await engine._delay(400);
 
+    // ★ v1060 („Interference", Als Befund 14.9.: „funktioniert noch
+    // nicht gegen Book of Doom"). Bei ZWEI ODER MEHR gewaehlten Zielen
+    // ist das ein Flaechenschlag — EINE Quelle, mehrere Ziele —, und
+    // genau dagegen schuetzt „Interference". Die Klammer fehlte, weil
+    // die Karte ihren Schaden selbst austeilt statt ueber `aoeHit`;
+    // der v1043-Durchgang hatte nur Karten mit eigenem SCHADENSWEG
+    // erfasst, nicht die mit eigener ZIELWAHL.
+    //
+    // ★ ES ZAEHLT DIE ECHTE ZIELMENGE: `targets` ist bereits das, was
+    // der Spieler gewaehlt hat — bei einem einzigen Ziel bleibt es ein
+    // Einzeltreffer und der Schutz greift korrekt nicht.
+    //
+    // Die Klammer umschliesst BEIDE Wege (Helden einzeln, Kreaturen im
+    // Stapel), weil auch die Kreaturen zur Zielzahl gehoeren: „hits
+    // other targets in addition to it" ist egal welcher Art.
+    engine.beginMultiHit(targets.length);
+    try {
     // Deal damage — heroes individually, creatures batched
     const creatureBatch = [];
     for (const target of targets) {
@@ -152,6 +169,7 @@ module.exports = {
     if (creatureBatch.length > 0) {
       await engine.processCreatureDamageBatch(creatureBatch);
     }
+    } finally { engine.endMultiHit(); }
 
     engine.sync();
     await engine._delay(400);

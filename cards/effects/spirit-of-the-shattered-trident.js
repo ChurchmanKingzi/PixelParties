@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Kosten ist ein geloeschtes Artefakt, kein Handabwurf (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Spirit of the Shattered Trident"
 //  Creature (Normal, Lv0, 100 HP, Summoning Magic)

@@ -76,6 +76,36 @@ function highestRemainingLevel(engine, ownerIdx, heroIdx, excludeInstId) {
   return best;
 }
 
+/**
+ * Wer hat die STAERKSTE verbliebene Anti-Magic-Instanz gewirkt?
+ *
+ * v1067: Der Buff braucht seit `_affected-shared` eine Quelle. Bei der
+ * AUFFRISCHUNG ist das nicht der Held-Besitzer, sondern der urspruengliche
+ * Wirker — er steht seit jeher am Zaehler `antiMagicCastBy`. Ohne diese
+ * Unterscheidung saehe „Charm of Balance" eine Auffrischung der eigenen
+ * Anti Magic faelschlich als Gegner-Treffer.
+ *
+ * Geschwister zu `highestRemainingLevel` daneben und bewusst nach
+ * DERSELBEN Instanz gewaehlt, damit Stufe und Wirker zusammenpassen.
+ */
+function highestRemainingCastBy(engine, ownerIdx, heroIdx, excludeInstId) {
+  let best = 0, castBy = null;
+  for (const inst of engine.cardInstances) {
+    if (inst.zone !== 'support') continue;
+    if (inst.name !== CARD_NAME) continue;
+    if (inst.owner !== ownerIdx) continue;
+    if (inst.heroIdx !== heroIdx) continue;
+    if (excludeInstId != null && inst.id === excludeInstId) continue;
+    const lvl = inst.counters?.antiMagicLevel || 0;
+    if (lvl > best) {
+      best = lvl;
+      const c = inst.counters?.antiMagicCastBy;
+      castBy = (typeof c === 'number') ? c : null;
+    }
+  }
+  return castBy;
+}
+
 module.exports = {
   activeIn: ['hand', 'support'],
   requiresTarget: true,
@@ -139,12 +169,18 @@ module.exports = {
         if (!inst) continue;
         toDetach.push(inst);
       }
-      for (const inst of toDetach) {
-        await engine.actionDestroyCard(
-          { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx },
-          inst,
-        );
-      }
+      // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
+      // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
+      // saehe er beim ersten Opfer eine Einzelzerstoerung.
+      engine.beginDestroyScope(toDetach.length);
+      try {
+        for (const inst of toDetach) {
+          await engine.actionDestroyCard(
+            { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx },
+            inst,
+          );
+        }
+      } finally { engine.endDestroyScope(); }
 
       // After detach, the slot we initially chose MAY have shifted —
       // re-check it's still empty (a same-slot Spell we just destroyed
@@ -160,6 +196,7 @@ module.exports = {
       inst.counters.antiMagicLevel = X;
       inst.counters.antiMagicCastBy = pi;
       await engine.actionAddBuff(targetHero, targetOwner, targetHeroIdx, 'magic_immune', {
+        sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         level: X,
         source: CARD_NAME,
       });
@@ -208,6 +245,10 @@ module.exports = {
       if (remaining > 0) {
         // Refresh the buff to the highest remaining level.
         await engine.actionAddBuff(hero, hostOwner, hostHeroIdx, 'magic_immune', {
+          // v1067: Quelle ist Pflicht. Bei der AUFFRISCHUNG ist das der
+          // urspruengliche Wirker — er steht seit jeher am Zaehler
+          // `antiMagicCastBy` der verbliebenen Anti-Magic-Instanz.
+          sourceOwner: highestRemainingCastBy(engine, hostOwner, hostHeroIdx, card.id) ?? hostOwner,
           level: remaining,
           source: CARD_NAME,
         });

@@ -131,6 +131,11 @@ module.exports = {
         if (_negR?.effectNegated) return;
       }
 
+      // ★ v1043 („Interference"): ein Schlag, Helden UND Kreaturen.
+      // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
+      // lebenden Ziel greift der Schutz nicht.
+      engine.beginMultiHit(heroTargets.filter(t => (oppPs.heroes[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length);
+      try {
       // ── Step 3: deal damage + apply lockout to every alive opp Hero ──
       for (const t of heroTargets) {
         const hero = oppPs.heroes[t.heroIdx];
@@ -178,6 +183,9 @@ module.exports = {
           expiresAtTurn,
           expiresForPlayer,
         });
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       // ── Step 5: route the spell into the deleted pile ──

@@ -12,10 +12,27 @@
 //   • `revealOnEnterHand: true` — engine auto-
 //     stamps `_permanentlyRevealedHandIndices` on
 //     every canonical add-to-hand path.
-//   • Hero-effect negation — handled in the
-//     engine's `getActiveHeroEffects` gate: it
-//     short-circuits to `[]` when the
-//     controller's hand contains a copy.
+//   • Hero-effect negation — als ECHTER `negated`-
+//     Status mit `_byWeakeningCrystal`-Marke.
+//
+//  ★ v1103 (Als Ruling 15.9.): „Den Status zu
+//  cleansen, entfernt ihn TEMPORAER. Solange
+//  Crystal auf der Hand ist, wird der Effekt (mit
+//  kleiner Animation) zu Beginn jeder Runde des
+//  Betroffenen neu appliziert."
+//
+//  Frueher schrieb JEDER `sync()` den Status neu —
+//  eine Heilung war dadurch wirkungslos, der
+//  naechste Zustandspush machte sie im selben
+//  Augenblick rueckgaengig. Genau deshalb stand
+//  die Karte im Status-Sweep (v1102) als
+//  „behauptet einen Status, ist aber keiner".
+//
+//  Jetzt: anlegen nur beim Eintritt in die Hand,
+//  zum Rundenbeginn des Betroffenen und beim Laden
+//  eines Spielstands. Der Sync raeumt nur noch AUF.
+//  `negated` bleibt global unheilbar; NUR die
+//  Instanz mit `_byWeakeningCrystal` ist heilbar.
 //   • The Artifact has no Spell-style "play me"
 //     payoff — using it as an Artifact pays the
 //     gold cost and discards. The mere presence
@@ -31,6 +48,13 @@ module.exports = {
   cpuMeta: { alwaysCommit: true },
   isTargetingArtifact: true,
   revealOnEnterHand: true,
+
+  // ★ v1103: die Karte legt ihren Status NICHT selbst an, sondern der
+  // Motor tut es fuer sie (`_crystals-shared.refreshWeakeningCrystalNegation`)
+  // — sie liegt ja in der HAND und hat keinen eigenen Aufloesungspunkt.
+  // Diese Deklaration sagt dem Waechter `check-status-claims`, welcher
+  // Status gemeint ist, und dokumentiert es zugleich fuer Leser.
+  declaresStatus: 'negated',
 
   // No board targets — playing it just discards the Crystal for its
   // gold cost (handled by the engine as a normal Artifact play).

@@ -25,6 +25,13 @@
 const CARD_NAME = 'Idol of Crestina';
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Instead of drawing a card, search your deck … add it to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   isResourcePhaseReaction: true,
 
   // Strictly reactive: never directly playable, never a chain
@@ -89,6 +96,7 @@ module.exports = {
 
     const searchResult = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
       cards: galleryCards,
       title: CARD_NAME,
       description: 'Choose a card from your deck to add to your hand.',

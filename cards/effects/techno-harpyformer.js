@@ -63,6 +63,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'draw',        // ★ v1039: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to draw 2 cards.`,
       source: CARD_NAME,

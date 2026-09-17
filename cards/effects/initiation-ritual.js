@@ -230,6 +230,10 @@ module.exports = {
 
     // Mark as equip artifact (susceptible to destruction by Fire Bomb, etc.)
     equippedInst.counters.treatAsEquip = true;
+    // ★ v1166: „gains the effect of the Hero equipped to it" — auch die
+    // ANFANGSROUTINE des geerbten Skripts (Willys Startmerker, Sol Ryms
+    // Freigaben, Johannas Reinigung).
+    await engine.initGainedHeroEffect(equippedInst, 'initiationRitual');
 
     // Override isActiveIn so the dead Hero's hooks fire from support zone
     // This makes the living Hero gain the dead Hero's passive effects

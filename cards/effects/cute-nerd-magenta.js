@@ -157,6 +157,8 @@ module.exports = {
     // `actionPromptForceDiscard` macht all das an EINER Stelle; der
     // Helfer kann seit v507 auch abbrechen und liefert die Namen.
     const abgeworfen = await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'mill',
       source: CARD_NAME,
       selfInflicted: true,           // freiwillige Kosten, kein Zwang
       // ★ NICHT abbrechbar (Als Vorgabe 19.8.): „Der Effekt sollte,

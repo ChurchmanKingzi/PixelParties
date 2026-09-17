@@ -89,7 +89,8 @@ async function syncParaseedPoison(engine, physOwner, heroIdx, ignoreInstId) {
   // `ignoreInstId`: der Verlass-Hook feuert, BEVOR die Karte aus der
   // Zone ausgebucht ist — die abgehende Instanz wird deshalb beim
   // Zaehlen uebergangen.
-  const traegt = heroHasParaseed(engine, physOwner, heroIdx, ignoreInstId);
+  const liegende = paraseedsOnHero(engine, physOwner, heroIdx, ignoreInstId);
+  const traegt = liegende.length > 0;
   const gift = hero.statuses?.poisoned;
 
   if (traegt) {
@@ -105,6 +106,11 @@ async function syncParaseedPoison(engine, physOwner, heroIdx, ignoreInstId) {
     }
     await engine.addHeroStatus(physOwner, heroIdx, 'poisoned', {
       unhealable: true, _paraseed: true, permanent: true,
+      // v1067: Quelle ist Pflicht (siehe _affected-shared). Der Wirker
+      // ist der KONTROLLEUR der Paraseed, nicht der Besitzer des
+      // vergifteten Helden — beide koennen verschieden sein, seit die
+      // Cross-Side-Platzierung existiert.
+      appliedBy: (liegende[0]?.controller ?? liegende[0]?.owner ?? physOwner),
       // `noAbsorb`: Abfang-Effekte (Resistance) sollen hier keine
       // Ladung verbrennen — das Gift liegt im naechsten Abgleich
       // ohnehin wieder auf (Als Ruling 4.9.).

@@ -342,7 +342,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
   );
 }
 
-function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities }) {
+function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children, onClick, onHoverCard, style, className, dataAttrs, ownerLetheStamps, badge, pileIdentities, renderStack }) {
   const cls = 'board-zone board-zone-' + type + (className ? ' ' + className : '') + ((cards?.length > 0) ? ' zone-has-card' : '');
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
@@ -402,7 +402,16 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
       {badge ? (
         <span className="board-zone-badge">{badge}</span>
       ) : null}
+      {/* ── Opt-in-Renderer (v1050) ────────────────────────────────
+          Die Standard-Darstellung eines Stapels zeigt NUR die oberste
+          Karte samt Stueckzahl — richtig fuer Ablage und Deck, falsch
+          fuer die Area-Zone, seit dort mehrere Areas GLEICHZEITIG
+          liegen und jede einzeln anklickbar sein muss. `renderStack`
+          laesst die Aufrufstelle die Darstellung uebernehmen, ohne dass
+          BoardZone Area-Wissen bekommt. Ohne die Prop aendert sich
+          nichts. */}
       {cards && cards.length > 0 ? (
+        renderStack ? renderStack(cards) : (
         cards.length === 1 ? (
           <BoardCard cardName={cards[0]} faceDown={faceDown} flipped={flipped} label={stackLabel} noTooltip={suppressChildTooltip}
             effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
@@ -411,7 +420,7 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
             <BoardCard cardName={cards[cards.length - 1]} faceDown={faceDown} flipped={flipped} label={stackLabel || (cards.length + '')} noTooltip={suppressChildTooltip}
               effectiveLevel={topLevelInfo?.effectiveLevel} stampBonus={topLevelInfo?.stampBonus} showLevelBadge={topLevelInfo != null} />
           </div>
-        )
+        ))
       ) : children || (
         <div className="board-zone-empty">{label || ''}</div>
       )}
@@ -1001,9 +1010,80 @@ function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl
   );
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay }) {
+// ═══════════════════════════════════════════
+//  DIAGNOSE-SCHALTER IM BROWSER  (v1132)
+// ═══════════════════════════════════════════
+// ★ Al hat sie 15.9. als SERVER-Variablen gesetzt — `set
+// PP_FLIGHT_WATCH=true && node server.js`. Das konnte nicht wirken:
+// beide leben im BROWSER. Mein Fehler, ich hatte sie neben die
+// Server-Schalter geschrieben, ohne den Unterschied zu nennen.
+//
+// Deshalb jetzt drei Wege, und der erste braucht keine Konsole:
+//
+//   ① http://localhost:3000/?watch=zone      (oder ?watch=flug, ?watch=alle)
+//   ② window.PP_ZONE_WATCH = true            in der Browser-Konsole
+//   ③ window.PP_FLIGHT_WATCH = true          ebenso
+//
+// Beim Laden meldet sich jeder aktive Schalter — „kein Output" ist
+// damit eindeutig und nie mehr ein Bedienfehler.
+(function ppDiagnoseSchalter() {
+  try {
+    const p = new URLSearchParams(window.location.search).get('watch') || '';
+    const w = p.toLowerCase();
+    if (w === 'zone' || w === 'alle' || w === 'all') window.PP_ZONE_WATCH = true;
+    if (w === 'flug' || w === 'flight' || w === 'alle' || w === 'all') window.PP_FLIGHT_WATCH = true;
+    const an = [];
+    if (window.PP_ZONE_WATCH) an.push('PP_ZONE_WATCH (Zonen-Renderstelle)');
+    if (window.PP_FLIGHT_WATCH) an.push('PP_FLIGHT_WATCH (Flug-Neustarts)');
+    if (an.length) console.log('%c[Diagnose] AKTIV: ' + an.join(', '), 'color:#e08a5e;font-weight:bold');
+    else console.log('[Diagnose] keine Browser-Sonde aktiv — ?watch=alle an die Adresse haengen.');
+  } catch (e) { /* egal */ }
+})();
+
+/**
+ * ★ v1133: Jetzt-Zeitpunkt fuer Fluege.
+ *
+ * Al 15.9.: der Skull tauchte im Flug-Protokoll GAR NICHT auf, „Hell
+ * Fox" schon. Der Grund: `launchFlight` ist nur EINER von acht Wegen,
+ * auf denen ein Flug entsteht — die uebrigen reihen direkt in
+ * `discardAnims` ein und trugen keine Startzeit. Ohne die greift der
+ * Schutz gegen einen Animations-Neustart (v1131) dort nicht.
+ */
+function ppJetzt() {
+  return (typeof performance !== 'undefined' ? performance.now() : Date.now());
+}
+
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0 }) {
   const dx = endX - startX;
   const dy = endY - startY;
+  // ★★ v1131 — DER FLUG DARF NICHT VON VORN BEGINNEN (Als Befund 15.9.:
+  // „der Skull erscheint noch mal in seiner Support Zone").
+  //
+  // Die Keyframes starten am BRETTPLATZ der Karte. Wird die Animation
+  // neu gestartet — weil React den Knoten neu einhaengt, etwa wenn
+  // „Hell Fox" mitten im Flug seine Galerie oeffnet und den Teilbaum
+  // austauscht —, springt die Karte sichtbar an ihren Ausgangspunkt
+  // zurueck. Genau das sieht man: die Kreatur taucht kurz wieder in
+  // ihrer Zone auf.
+  //
+  // Mit einem NEGATIVEN `animation-delay` in Hoehe der bereits
+  // verstrichenen Zeit setzt eine neu gestartete Animation dort fort,
+  // wo sie war. Beim ERSTEN Bild ist die verstrichene Zeit ~0, es
+  // aendert sich also nichts; nur ein Neustart wird unsichtbar.
+  const verstrichen = (typeof t0 === 'number')
+    ? Math.max(0, (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0)
+    : 0;
+  const versatz = (delay || 0) - verstrichen;
+  if (window.PP_FLIGHT_WATCH) {
+    // ★ v1133: Im Lauf vom 15.9. kam eine Zeile fuer „Hell Fox", aber
+    // KEINE fuer den Skull — der ist also nie geflogen. Das ist selbst
+    // ein Befund; deshalb meldet die Sonde weiterhin jeden Start.
+    // ★ v1132: JEDEN Durchlauf melden, nicht nur die Neustarts. Sonst
+    // ist „keine Meldung" wieder mehrdeutig — Sonde aus, oder Flug ohne
+    // Neustart? Jetzt sagt die Zeile es selbst.
+    console.log('[FLUG]', cardName, verstrichen > 30 ? 'NEUSTART' : 'Start',
+      '— verstrichen', Math.round(verstrichen), 'ms, Versatz', Math.round(versatz), 'ms');
+  }
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   const isDeleted = dest === 'deleted';
@@ -1014,7 +1094,8 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay }) 
   // exactly the "wait your turn, then go" cascade we want.
   return (
     <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')}
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px', animationDelay: delay ? delay + 'ms' : undefined }}>
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px',
+        animationDelay: versatz ? versatz + 'ms' : undefined }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
         : <div className="board-card-text">{cardName || '?'}</div>}
@@ -1540,21 +1621,27 @@ function ElectricStrikeEffect({ x, y }) {
 }
 
 // Negated overlay — persistent small electricity sparks on the hero
+// ★ v1047 (Als Befund 12.9.): DIE DAUER-ANZEIGE zeigte Blitze — das
+// sah aus wie eine Betaeubung, obwohl die Karte VERSTUMMT ist. Der
+// einmalige Einschlag ist seit v1046 ein Siegel; hier fehlte das
+// Gegenstueck fuer die ganze Zeit, in der der Status anliegt.
+// Jetzt: gedaempfte Siegelzeichen, die langsam auf- und abblenden,
+// in demselben Violett wie `silence_seal`. Kein Gezucke.
 function NegatedOverlay() {
-  const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
-    x: 8 + Math.random() * 84,
-    y: 8 + Math.random() * 84,
-    size: 7 + Math.random() * 6,
-    delay: Math.random() * 2,
-    dur: 0.4 + Math.random() * 0.6,
+  const zeichen = useMemo(() => Array.from({ length: 7 }, () => ({
+    x: 10 + Math.random() * 80,
+    y: 10 + Math.random() * 80,
+    size: 8 + Math.random() * 7,
+    delay: Math.random() * 3,
+    dur: 2.2 + Math.random() * 1.6,
   })), []);
   return (
     <div className="status-negated-overlay">
-      {sparks.map((s, i) => (
-        <span key={i} className="negated-spark" style={{
-          left: s.x + '%', top: s.y + '%', fontSize: s.size,
-          animationDelay: s.delay + 's', animationDuration: s.dur + 's',
-        }}>⚡</span>
+      {zeichen.map((z, i) => (
+        <span key={i} className="negated-glyph" style={{
+          left: z.x + '%', top: z.y + '%', fontSize: z.size,
+          animationDelay: z.delay + 's', animationDuration: z.dur + 's',
+        }}>🚫</span>
       ))}
     </div>
   );
@@ -3057,6 +3144,110 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
 //  Neue Area: Komponente schreiben und HIER eintragen — sonst wird sie
 //  nicht gerendert.
 // ═══════════════════════════════════════════════════════════════════
+/**
+ * Die Koerner des „Pocket Sand"-Projektils (v1059). EINMAL gewuerfelt
+ * und als Modul-Konstante gehalten: bei jedem Render neu zu streuen
+ * liesse den Haufen im Flug flackern.
+ */
+// ★★ v1148 (Al 17.9.: „deutlich mehr Particles und kleiner — eine
+// wirkliche Sanddusche"). Aus 22 Koernern zu 3–9 px werden 90 zu 1–3 px,
+// dicht in einer leicht gestreckten Wolke. Ein Teil davon RIESELT im Flug
+// nach hinten unten ab (`streu`) — das ist die Spur, die vorher ein
+// grosser Leuchtfleck vortaeuschte.
+const SAND_FARBEN = ['#f3dfa6', '#e2c07a', '#c9995a', '#a8783f'];
+const sandZufall = (start) => {
+  let t = start >>> 0;
+  return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+};
+const SAND_KOERNER = (() => {
+  const r = sandZufall(1059);
+  return Array.from({ length: 90 }, (_, i) => {
+    const winkel = i * 2.399 + r() * 0.5;               // goldener Winkel + Rauschen
+    const radius = Math.sqrt(r()) * 20;                 // dichter Kern, lockerer Rand
+    return {
+      x: Math.cos(winkel) * radius * 1.25,
+      y: Math.sin(winkel) * radius * 0.7,
+      g: 1 + Math.round(r() * 20) / 10,                 // 1.0 … 3.0 px
+      farbe: SAND_FARBEN[Math.floor(r() * SAND_FARBEN.length)],
+      verzug: Math.round(r() * 300),
+      streu: i % 3 === 0,
+      dx: -(8 + r() * 22), dy: 6 + r() * 18,
+    };
+  });
+})();
+
+/**
+ * ★★ v1149 — „Trunk Sand" als SANDSTRAHL (Al 17.9.: „ein richtiger
+ * Strahl aus Sand, der auf das Ziel geschossen wird — vgl. Sandwirbel
+ * aus Pokemon").
+ *
+ * Kein einzelnes Projektil mehr, das eine Wolke traegt, sondern ein
+ * STROM: ueber ~70 % der Laufzeit werden laufend Koerner vom Werfer
+ * abgeschossen, jedes fliegt einzeln zum Ziel. An der Duese eng, am Ziel
+ * gefaechert — ein Kegel. Dazu Schlieren (lange, duenne Striche entlang
+ * der Flugrichtung) fuer die Geschwindigkeit und ein blasser Staubkanal
+ * zwischen beiden Punkten.
+ *
+ * Gerendert statt des normalen Projektil-Wrappers, wenn
+ * `projectileShape === 'sandStream'`; Start, Ziel und Dauer kommen aus
+ * dem gewoehnlichen `play_projectile_animation`.
+ */
+function SandStrahl({ p }) {
+  const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
+  const laenge = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / laenge, uy = dy / laenge;       // Flugrichtung
+  const nx = -uy, ny = ux;                         // Senkrechte
+  const dauer = p.dur || 950;
+  const strom = Math.round(dauer * 0.7);
+  const teile = useMemo(() => {
+    const r = sandZufall(Math.round(p.srcX * 7 + p.tgtY * 13));
+    const gauss = () => (r() + r() + r()) / 3 - 0.5;   // Glocke um 0
+    const koerner = Array.from({ length: 280 }, () => {
+      const start = gauss() * 10, ende = gauss() * 64;
+      const flug = Math.round(240 + r() * 150);
+      return {
+        x: p.srcX + nx * start + ux * r() * 14, y: p.srcY + ny * start + uy * r() * 14,
+        dx: dx + nx * (ende - start), dy: dy + ny * (ende - start),
+        g: 1 + Math.round(r() * 25) / 10,
+        farbe: SAND_FARBEN[Math.floor(r() * SAND_FARBEN.length)],
+        verzug: Math.round(r() * strom), flug,
+      };
+    });
+    const schlieren = Array.from({ length: 34 }, () => {
+      const start = gauss() * 8, ende = gauss() * 44;
+      return {
+        x: p.srcX + nx * start, y: p.srcY + ny * start,
+        dx: dx + nx * (ende - start), dy: dy + ny * (ende - start),
+        l: 8 + r() * 14, verzug: Math.round(r() * strom), flug: Math.round(200 + r() * 90),
+      };
+    });
+    return { koerner, schlieren };
+  }, [p.id]);
+  const winkel = Math.atan2(dy, dx) * 180 / Math.PI;
+  return (
+    <div className="sand-strahl" aria-hidden="true">
+      <div className="sand-strahl-kanal" style={{
+        left: p.srcX, top: p.srcY, width: laenge, transform: `rotate(${winkel}deg)`,
+        animation: `sandKanal ${dauer}ms ease-out forwards`,
+      }} />
+      {teile.schlieren.map((k, i) => (
+        <i key={'sl' + i} className="sand-schliere" style={{
+          left: k.x, top: k.y, width: k.l,
+          '--sdx': k.dx + 'px', '--sdy': k.dy + 'px', '--sw': winkel + 'deg',
+          animation: `sandStrahlFlug ${k.flug}ms linear ${k.verzug}ms forwards`,
+        }} />
+      ))}
+      {teile.koerner.map((k, i) => (
+        <i key={'sk' + i} className="sand-strahl-korn" style={{
+          left: k.x, top: k.y, width: k.g, height: k.g, background: k.farbe,
+          '--sdx': k.dx + 'px', '--sdy': k.dy + 'px', '--sw': '0deg',
+          animation: `sandStrahlFlug ${k.flug}ms linear ${k.verzug}ms forwards`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 const AREA_TIER_ORDER = ['opaque', 'translucent', 'partial'];
 const AREA_OVERLAYS = {
   'Board of Kings':               { tier: 'opaque',      C: () => <BoardOfKingsOverlay /> },
@@ -3081,8 +3272,14 @@ const AREA_OVERLAYS = {
   'Spider Hive':                  { tier: 'partial',     C: () => <SpiderHiveOverlay /> },
   'Wowhalla, the Hall of the Cool': { tier: 'partial',   C: () => <WowhallaGearsOverlay /> },
   'Stinky Stables':               { tier: 'partial',     C: () => <StinkyStablesOverlay /> },
+  'Rioting Village':              { tier: 'opaque',      C: () => <RiotingVillageOverlay /> },   // v1165: ganze Szene
   'The Great Clock Tower "Big Gwen"': { tier: 'partial',  C: () => <BigGwenOverlay /> },
   'Shared Blood Tanks':           { tier: 'partial',     C: () => <SharedBloodTanksOverlay /> },
+  // ★ v1050: BEWUSST 'partial'. Spatial Crevice ist die Karte, die
+  // zwei WEITERE Areas ueberhaupt erst erlaubt — ein deckender
+  // Hintergrund wuerde genau die Hintergruende verdraengen, fuer die
+  // sie Platz schafft.
+  'Spatial Crevice':              { tier: 'partial',     C: () => <SpatialCreviceOverlay /> },
 };
 
 /** Faserige Diagonale: Punkte von links oben nach rechts unten, leicht gezackt. */
@@ -4427,6 +4624,89 @@ function TempesteRainOverlay() {
   );
 }
 
+/**
+ * „Rioting Village" (v1086): Fackelschein und aufsteigende Funken —
+ * das Dorf brennt. BEWUSST 'partial': die Area verdoppelt ATK fuer
+ * beide Seiten und muss die Karten darunter lesbar lassen.
+ */
+// ★★ v1165 — „Rioting Village\": ein BRENNENDES, VERWUESTETES DORF
+// (Al 17.9.: „scheint noch keinen Hintergrund darzustellen\"). Vorher war
+// es nur ein schwacher Schein mit Funken — jetzt eine ganze Szene:
+// Nachthimmel mit Feuerschein, Ruinen-Silhouetten (eingestuerzte Daecher,
+// zerbrochener Zaun, Brunnen), Flammen in den Haeusern, Rauchfahnen und
+// aufsteigende Glut. Animiert werden nur `opacity` und `transform`
+// (Projektregel).
+function RiotingVillageOverlay() {
+  const FUNKEN = React.useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+    left: 3 + (i * 3.9) % 94,
+    dauer: 2.2 + (i % 5) * 0.5,
+    verzug: (i % 9) * 0.35,
+    groesse: 2 + (i % 3),
+  })), []);
+  const FLAMMEN = React.useMemo(() => [
+    { left: 16, unten: 16, breite: 26, hoehe: 46, dauer: 1.1, verzug: 0 },
+    { left: 33, unten: 20, breite: 18, hoehe: 34, dauer: 1.4, verzug: .3 },
+    { left: 57, unten: 14, breite: 30, hoehe: 54, dauer: 1.2, verzug: .15 },
+    { left: 74, unten: 19, breite: 20, hoehe: 36, dauer: 1.5, verzug: .45 },
+    { left: 89, unten: 15, breite: 16, hoehe: 28, dauer: 1.3, verzug: .6 },
+  ], []);
+  const RAUCH = React.useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+    left: 12 + i * 13, groesse: 60 + (i % 3) * 34,
+    dauer: 9 + (i % 4) * 2.5, verzug: -(i * 2.2),
+  })), []);
+  return (
+    <div className="area-overlay riot-village-overlay">
+      <div className="riot-himmel" />
+      <div className="riot-glow" />
+      {RAUCH.map((r, i) => (
+        <span key={'rvr' + i} className="riot-rauch" style={{
+          left: r.left + '%', width: r.groesse, height: r.groesse,
+          animationDuration: r.dauer + 's', animationDelay: r.verzug + 's',
+        }} />
+      ))}
+      {/* Ruinen: Silhouetten in zwei Tiefen */}
+      <svg className="riot-ruinen riot-ruinen-fern" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,60 L0,44 L10,34 L20,44 L20,60 Z M28,60 L28,38 L40,28 L52,38 L52,60 Z
+                 M60,60 L60,46 L70,39 L78,46 L78,60 Z M96,60 L96,36 L108,26 L120,36 L120,60 Z
+                 M132,60 L132,42 L142,34 L152,42 L152,60 Z M166,60 L166,40 L178,30 L190,40 L190,60 Z"
+          fill="rgba(18,10,14,.85)" />
+      </svg>
+      <svg className="riot-ruinen riot-ruinen-nah" viewBox="0 0 200 70" preserveAspectRatio="none" aria-hidden="true">
+        {/* eingestuerztes Haus links, halbes Dach */}
+        <path d="M6,70 L6,40 L24,26 L34,34 L34,70 Z" fill="rgba(10,6,9,.95)" />
+        <path d="M6,40 L24,26 L30,31 L12,45 Z" fill="rgba(30,16,12,.95)" />
+        {/* Ruine mit gebrochener Wand */}
+        <path d="M46,70 L46,34 L58,24 L72,34 L72,52 L64,52 L64,70 Z" fill="rgba(10,6,9,.95)" />
+        {/* Brunnen */}
+        <path d="M86,70 L86,56 L104,56 L104,70 Z" fill="rgba(10,6,9,.95)" />
+        <path d="M84,56 L106,56 L95,48 Z" fill="rgba(26,14,10,.95)" />
+        {/* grosses brennendes Haus rechts */}
+        <path d="M118,70 L118,36 L140,20 L162,36 L162,70 Z" fill="rgba(8,5,8,.96)" />
+        <path d="M130,70 L130,52 L150,52 L150,70 Z" fill="rgba(40,18,8,.9)" />
+        {/* zerbrochener Zaun */}
+        <path d="M172,70 L172,58 L176,58 L176,70 Z M180,70 L180,54 L184,54 L184,70 Z
+                 M188,70 L188,60 L192,60 L192,70 Z" fill="rgba(12,8,10,.9)" />
+      </svg>
+      {FLAMMEN.map((f, i) => (
+        <span key={'rvfl' + i} className="riot-flamme" style={{
+          left: f.left + '%', bottom: f.unten + '%',
+          width: f.breite, height: f.hoehe,
+          animationDuration: f.dauer + 's', animationDelay: f.verzug + 's',
+        }} />
+      ))}
+      <div className="riot-boden" />
+      {FUNKEN.map((f, i) => (
+        <span key={'rvf' + i} className="riot-spark" style={{
+          left: f.left + '%',
+          width: f.groesse, height: f.groesse,
+          animationDuration: f.dauer + 's',
+          animationDelay: f.verzug + 's',
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function AcidRainOverlay() {
   // Spawn a large pool of drops with staggered delays / durations so the
   // rain reads as "continuous" without any visible reset point.
@@ -4512,6 +4792,133 @@ function AcidRainOverlay() {
 //   • Random scatter is pre-computed via `useMemo([])` so the same
 //     positions persist across the component's lifetime — picking
 //     up Bonegrinder mid-game and replaying doesn't reshuffle.
+/**
+ * „Spatial Crevice" — Risse im Raum (v1050).
+ *
+ * Tier 'partial': nur ein paar leuchtende Spruenge ueber dem Brett, kein
+ * flaechiger Wash. Die Karte existiert, damit ZWEI weitere Areas liegen
+ * koennen; ihr eigener Hintergrund muss sich deshalb zurueckhalten.
+ *
+ * Die Risse werden einmal gewuerfelt (`useMemo` ohne Abhaengigkeiten),
+ * damit sie bei jedem Re-Render an derselben Stelle bleiben — dieselbe
+ * Bauform wie Crystal Well und Bonegrinder.
+ */
+/**
+ * ═══ AREA-STAPEL (v1050, Als Vorgabe 14.9.) ═══════════════════════════
+ *
+ * Seit „Spatial Crevice" kann eine Seite mehrere Areas gleichzeitig
+ * kontrollieren. Die Standard-Stapel-Darstellung (nur die oberste Karte
+ * plus Stueckzahl) verschweigt die anderen — hier liegen deshalb ALLE
+ * offen, in Y versetzt.
+ *
+ * ★ REIHENFOLGE (Als Ruling 14.9.): die NEUESTE Area liegt vorne und
+ * unten — dieselbe Richtung wie der Ability-Stapel. DOM-Reihenfolge
+ * entscheidet, kein z-index: der letzte Eintrag wird zuletzt gezeichnet
+ * und deckt damit die aelteren, die nur mit ihrem oberen Streifen
+ * herausschauen.
+ *
+ * ★ TOOLTIP UND KLICK GEHOEREN DER KARTE, NICHT DER ZONE. Beides faellt
+ * durch normales Hit-Testing von allein richtig aus: unter dem Cursor
+ * gewinnt, was dort ganz oben liegt. Eine teilverdeckte Area reagiert
+ * also nur auf ihrem freiliegenden Streifen — und genau deshalb ist der
+ * Versatz hier ein Vielfaches der 5 px des Ability-Stapels
+ * (`--area-stack-offset`): man muss eine untere Area gezielt treffen
+ * koennen, um sie zu aktivieren.
+ *
+ * `stopPropagation` auf dem Karten-Klick haelt die Aktivierung von der
+ * Zielwahl der Zone getrennt — die Zone bleibt fuer Potion-Ziele
+ * zustaendig, die Karte fuer ihre eigene Aktivierung.
+ */
+function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting }) {
+  return (
+    <div className="board-area-stack">
+      {cards.map((name, i) => {
+        const eintrag = (entries || []).find(e => e.areaName === name);
+        const aktivierbar = !effectLocked && !!eintrag?.canActivate;
+        // ★ ZIELWAHL JE KARTE (v1054, Als Befund 14.9.: „The Yeeting
+        // trifft immer die oberste Area statt der gewaehlten").
+        // Die Ziel-ID traegt den Stapelplatz und entsteht hier aus
+        // demselben Index, den die Engine benutzt — `gs.areaZones` ist
+        // auf beiden Seiten dieselbe Namensliste.
+        const zielId = targeting ? `area-${targeting.owner}-${i}` : null;
+        const waehlbar = !!zielId && !!targeting?.validIds?.has(zielId);
+        const gewaehlt = !!zielId && !!targeting?.selectedIds?.has(zielId);
+        const klick = waehlbar
+          ? (e) => { e.stopPropagation(); targeting.onToggle(zielId); }
+          : (aktivierbar ? (e) => { e.stopPropagation(); onActivate(name); } : undefined);
+        return (
+          <div key={name + ':' + i}
+            className={'board-area-stack-card'
+              + (aktivierbar && !waehlbar ? ' area-stack-activatable' : '')
+              + (waehlbar ? ' potion-target-valid' : '')
+              + (gewaehlt ? ' potion-target-selected' : '')}
+            style={{ top: `calc(var(--area-stack-offset) * ${i})`,
+              cursor: (waehlbar || aktivierbar) ? 'pointer' : undefined }}
+            onClick={klick}>
+            <BoardCard cardName={name} />
+          </div>
+        );
+      })}
+      {/* Ladungen einer „up to X times per turn"-Area (The Bonegrinder).
+          ★ Sass frueher im `children`-Slot von BoardZone — und der wird
+          NUR gerendert, solange die Zone LEER ist. Das Abzeichen war
+          damit nie zu sehen, weil es eine Area voraussetzt. Jetzt haengt
+          es am Stapel selbst. */}
+      {charge ? (
+        <div className={'zone-charge-badge' + (charge.remaining === 0 ? ' zone-charge-empty' : '')}
+          onMouseEnter={e => showGameTooltip(e, `Noch ${charge.remaining} von ${charge.max} Einsätzen in dieser Runde.`)}
+          onMouseLeave={hideGameTooltip}
+        >{charge.remaining}</div>
+      ) : null}
+    </div>
+  );
+}
+
+const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
+  const risse = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+    // Grob diagonal verteilt, damit sich die Risse nicht haeufen.
+    const x = 8 + (i * 13) + Math.random() * 8;
+    const y = 12 + Math.random() * 70;
+    return {
+      left: x,
+      top: y,
+      laenge: 12 + Math.random() * 26,       // in Prozent der Hoehe
+      breite: 0.5 + Math.random() * 1.4,     // in Prozent der Breite
+      rot: -35 + Math.random() * 70,
+      opacity: 0.35 + Math.random() * 0.45,
+      dauer: 4 + Math.random() * 5,
+      verzug: Math.random() * 4,
+    };
+  }), []);
+
+  return (
+    <div className="spatial-crevice-overlay" style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none',
+      zIndex: -1, overflow: 'hidden',
+    }}>
+      {risse.map((r, i) => (
+        <span key={'sc' + i} style={{
+          position: 'absolute',
+          left: r.left + '%', top: r.top + '%',
+          width: r.breite + '%', height: r.laenge + '%',
+          // ★ Die Drehung MUSS als Variable an die Keyframes gehen: eine
+          // laufende Animation ersetzt `transform` komplett, ein hier
+          // gesetztes `rotate(...)` waere ab dem ersten Frame weg und
+          // alle Risse staenden senkrecht.
+          '--sc-rot': r.rot + 'deg',
+          transform: `rotate(${r.rot}deg)`,
+          transformOrigin: 'center',
+          opacity: r.opacity,
+          borderRadius: '50%',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(10,0,25,0.95) 20%, rgba(150,80,255,0.9) 50%, rgba(10,0,25,0.95) 80%, rgba(0,0,0,0) 100%)',
+          boxShadow: '0 0 10px 2px rgba(160,90,255,0.55), 0 0 22px 6px rgba(90,40,180,0.30)',
+          animation: `spatial-crevice-pulse ${r.dauer}s ease-in-out ${r.verzug}s infinite`,
+        }} />
+      ))}
+    </div>
+  );
+});
+
 const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   // Bone scatter — fully random rotations + wide size range so the
   // pile reads as chaotic. Position is independent x/y random so
@@ -9723,6 +10130,441 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★ v1058 („Trunk Sand"): Staubwolke am Einschlag des Pocket Sand.
+  // Mehrere Koerner, die kurz auseinanderstieben — der Wurf soll
+  // staubig enden, nicht als sauberer Treffer.
+  // ★★ v1148 (Al 17.9.): „deutlich mehr Particles, kleiner — eine
+  // wirkliche Sanddusche". Drei Lagen statt 14 dicker Koerner:
+  //   ① SPRUEH: 110 Koerner (1–3 px) stieben vom Einschlag auseinander
+  //      und fallen danach unter der Schwerkraft ab;
+  //   ② DUSCHE: 70 Koerner rieseln von oberhalb ueber das Ziel herab;
+  //   ③ STAUB: ein feiner, flacher Dunst statt einer satten Scheibe.
+  // Alle Bahnen sind vorberechnet (fester Startwert), die Animation
+  // faehrt nur `transform` und `opacity`. Jede Bahn endet vor 950 ms:
+  // Zonen-Animationen werden nach 1000 ms abgebaut (auch der zweite
+  // Aufruf ueber `addHeroStatus` → `animationType`).
+  sand_burst: (() => {
+    const r = sandZufall(1058);
+    const SPRUEH = Array.from({ length: 110 }, () => {
+      const winkel = -Math.PI * (0.05 + r() * 0.9) + (r() < 0.25 ? Math.PI * r() : 0);
+      const weite = 18 + Math.pow(r(), 0.7) * 62;
+      return {
+        sx: Math.cos(winkel) * weite, sy: Math.sin(winkel) * weite * 0.8,
+        fall: 30 + r() * 45, g: 1 + Math.round(r() * 20) / 10,
+        farbe: SAND_FARBEN[Math.floor(r() * SAND_FARBEN.length)],
+        verzug: Math.round(r() * 120), dauer: Math.round(550 + r() * 250),
+      };
+    });
+    const DUSCHE = Array.from({ length: 70 }, () => ({
+      x: (r() - 0.5) * 96, von: -(60 + r() * 50), bis: 10 + r() * 40,
+      g: 1 + Math.round(r() * 15) / 10,
+      farbe: SAND_FARBEN[Math.floor(r() * SAND_FARBEN.length)],
+      verzug: Math.round(40 + r() * 360), dauer: Math.round(350 + r() * 170),
+    }));
+    return function SandBurstEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div className="sand-staub" />
+          {SPRUEH.map((k, i) => (
+            <i key={'ss' + i} className="sand-korn" style={{
+              width: k.g, height: k.g, marginLeft: -k.g / 2, marginTop: -k.g / 2,
+              background: k.farbe,
+              '--sx': k.sx + 'px', '--sy': k.sy + 'px', '--sfall': (k.sy + k.fall) + 'px',
+              animation: `sandSpruehFall ${k.dauer}ms cubic-bezier(.2,.7,.4,1) ${k.verzug}ms forwards`,
+            }} />
+          ))}
+          {DUSCHE.map((k, i) => (
+            <i key={'sd' + i} className="sand-korn" style={{
+              width: k.g, height: k.g * 1.6, marginLeft: -k.g / 2,
+              left: k.x, top: k.von, background: k.farbe,
+              '--sbis': (k.bis - k.von) + 'px',
+              animation: `sandDusche ${k.dauer}ms linear ${k.verzug}ms forwards`,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ★ v1082 („Festive Werz", Als Vorgabe 14.9.: „Seine Animation
+  // sollten Geschenke sein"). Bunte Paeckchen steigen ueber dem
+  // Empfaenger auf und platzen kurz auf — das Gold wandert ja als
+  // „Geschenk" zum Gegner.
+  // ★ v1088 („Cleansing of the Land"): Feuerwalze ueber das ganze
+  // Feld. Wird mit `zoneType: 'board', layer: 'background'` gesendet
+  // und mountet damit in die Atmosphaeren-Ebene — Karten und Zonen
+  // painten darueber, die Walze zieht UNTER ihnen durch.
+  // ★ v1089 („Alluring Light", Als Vorgabe 14.9.): rhythmisches
+  // Leuchten auf dem Ziel, das ANGEGRIFFEN werden soll — das Licht,
+  // das den fremden Helden anlockt. Laeuft VOR der Ramm-Animation und
+  // ist damit die Vorwarnung, wohin der Held gleich faehrt.
+  // ★ v1091 („Memory Blast", Als Vorgabe 14.9.): dunkle Magie, die das
+  // Ziel in einem Blast trifft — und zwar GROESSER und zerstoererischer,
+  // je hoeher der Schaden ausfaellt. Die Staerke kommt als `power`
+  // (0..1) am Ereignis mit; ohne Angabe bleibt es bei einem mittleren
+  // Schlag.
+  //
+  // Skaliert werden nur `--mb-scale` (Groesse) und `--mb-shards`
+  // (Splitterzahl) — die Animation selbst faehrt weiter ausschliesslich
+  // `opacity` und `transform`.
+  // ★ v1094 („Decapitating Strike", Als Vorgabe 14.9.: „ein brutaler
+  // Schwertschlag, neue Animation!"). Eine Klinge faehrt diagonal durch
+  // das Ziel, dahinter bleibt kurz die Schnittlinie stehen, dann
+  // spritzt es. Kein Emoji — die Klinge ist ein getinteter Balken
+  // (gleiche Begruendung wie beim Pocket-Sand-Projektil, v1059).
+  // ★ v1103 („Weakening Crystal", Als Vorgabe 15.9.: „mit kleiner
+  // Animation!"). Bewusst KLEIN und auf der Hintergrund-Ebene: das
+  // laeuft zu JEDEM Rundenbeginn, solange die Karte auf der Hand liegt.
+  // Eine auffaellige Animation waere nach drei Runden eine Zumutung.
+  crystal_drain: (() => {
+    const SPLITTER = Array.from({ length: 7 }, (_, i) => ({
+      left: 12 + i * 12.5,
+      verzug: i * 90,
+      hoehe: 16 + (i % 3) * 9,
+    }));
+    return function CrystalDrainEffect() {
+      return (
+        <div className="crystal-drain" aria-hidden="true">
+          {SPLITTER.map((sp, i) => (
+            <span key={'cd' + i} className="crystal-shard" style={{
+              left: sp.left + '%', height: sp.hoehe,
+              animationDelay: sp.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ★★ v1154 — „Decapitating Strike\" (Al 17.9.: „gross und blutig, als
+  // wuerde das Ziel wirklich enthauptet\"). Ersetzt `sword_cleave`, das
+  // seine Position (`x`/`y`) gar nicht las: `.sword-cleave` stand mit
+  // `left: 50%; top: 50%` in der Mitte der Animationsebene — also immer
+  // ungefaehr ueber dem eigenen mittleren Helden, egal wen es traf.
+  //
+  // Ablauf (1,6 s, alles fest am Rechteck des Ziels):
+  //   ① eine grosse Klinge fegt in Halshoehe quer durch (180 ms), mit
+  //      Lichtbogen;
+  //   ② die Schnittlinie reisst auf, Treffer-Stopp mit Ruetteln, roter
+  //      Bildschirm-Blitz;
+  //   ③ arterielle Fontaene in drei Stoessen (80 Tropfen mit Schwerkraft);
+  //   ④ Blutflecken klatschen auf und um das Ziel, Rinnsale laufen vom
+  //      Schnitt herab, feiner roter Nebel.
+  decapitation: (() => {
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    const r = zufall(7331);
+    const TROPFEN = Array.from({ length: 80 }, (_, i) => {
+      const stoss = i % 3;                                  // drei Pulse
+      return {
+        ax: (r() - 0.5) * 0.9,                              // Anteil der Breite entlang des Schnitts
+        dx: (r() - 0.5) * 2.4,                              // Anteil der Breite seitlich
+        hoch: 0.35 + r() * 0.9,                             // Anteil der Hoehe nach oben
+        fall: 0.5 + r() * 0.9,                              // Anteil der Hoehe nach unten
+        g: 3 + r() * 8,
+        verzug: 200 + stoss * 190 + Math.round(r() * 120),
+        dauer: 650 + Math.round(r() * 350),
+        hell: r() < 0.35,
+      };
+    });
+    const FLECKEN = Array.from({ length: 12 }, () => ({
+      x: (r() - 0.5) * 1.5, y: (r() - 0.3) * 1.2, g: 0.12 + r() * 0.22,
+      form: `${40 + r() * 30}% ${50 + r() * 20}% ${45 + r() * 25}% ${55 + r() * 20}% / ${45 + r() * 25}% ${50 + r() * 25}% ${40 + r() * 30}% ${55 + r() * 20}%`,
+      verzug: 260 + Math.round(r() * 520), dreh: Math.round(r() * 360),
+    }));
+    const RINNSALE = Array.from({ length: 9 }, () => ({
+      ax: (r() - 0.5) * 0.8, laenge: 0.25 + r() * 0.45, breite: 2 + r() * 3,
+      verzug: 380 + Math.round(r() * 500),
+    }));
+    return function DecapitationEffect({ x, y, w, h }) {
+      const W = Math.max(w || 90, 60), H = Math.max(h || 120, 80);
+      const halsY = y - H * 0.2;
+      return (
+        <div className="deka" aria-hidden="true">
+          <div className="deka-rot" />
+          <div className="deka-feld" style={{ left: x, top: halsY }}>
+            <div className="deka-nebel" style={{ width: W * 1.9, height: H * 0.9 }} />
+            {FLECKEN.map((f, i) => (
+              <span key={'df' + i} className="deka-fleck" style={{
+                left: f.x * W, top: f.y * H, width: f.g * W * 1.4, height: f.g * W,
+                borderRadius: f.form, '--dreh': f.dreh + 'deg', animationDelay: f.verzug + 'ms',
+              }} />
+            ))}
+            {RINNSALE.map((d, i) => (
+              <span key={'dr' + i} className="deka-rinnsal" style={{
+                left: d.ax * W, width: d.breite, '--laenge': d.laenge * H + 'px', animationDelay: d.verzug + 'ms',
+              }} />
+            ))}
+            <div className="deka-bogen" style={{ width: W * 2.6, height: H * 0.7 }} />
+            <div className="deka-klinge" style={{ width: W * 1.5, '--weg': W * 1.6 + 'px' }} />
+            <div className="deka-schnitt" style={{ width: W * 1.25 }} />
+            {TROPFEN.map((t, i) => (
+              <span key={'dt' + i} className={'deka-tropfen' + (t.hell ? ' hell' : '')} style={{
+                left: t.ax * W, width: t.g, height: t.g * 1.25,
+                '--dx': t.dx * W + 'px', '--hoch': -t.hoch * H + 'px', '--fall': t.fall * H + 'px',
+                animation: `dekaFontaene ${t.dauer}ms cubic-bezier(.25,.6,.55,1) ${t.verzug}ms both`,
+              }} />
+            ))}
+          </div>
+        </div>
+      );
+    };
+  })(),
+  // ★★ v1161 — „Teleportal\" (Al 17.9.: „dunkel-lilane Portal-Animation
+  // auf der Karte\"): ein Wirbel aus dunklem Violett legt sich ueber die
+  // offen gelegte Karte. Liest `x`/`y`/`w`/`h` und sitzt damit genau auf
+  // ihr (Lehre aus v1154).
+  portal_warp: (() => {
+    const FUNKEN = Array.from({ length: 18 }, (_, i) => {
+      const winkel = (i / 18) * Math.PI * 2 + (i % 3) * 0.3;
+      return {
+        winkel, radius: 0.45 + (i % 5) * 0.12,
+        g: 2 + (i % 3), verzug: (i % 6) * 70,
+      };
+    });
+    return function PortalWarpEffect({ x, y, w, h }) {
+      const W = Math.max(w || 80, 50), H = Math.max(h || 110, 60);
+      const R = Math.max(W, H) * 0.62;
+      return (
+        <div className="portal-warp" style={{ left: x, top: y, width: W, height: H }} aria-hidden="true">
+          <span className="pw-schlund" style={{ width: R * 2, height: R * 2 }} />
+          <span className="pw-ring" style={{ width: R * 2.1, height: R * 2.1 }} />
+          <span className="pw-ring pw-ring2" style={{ width: R * 2.1, height: R * 2.1 }} />
+          <span className="pw-kern" style={{ width: R * 0.7, height: R * 0.7 }} />
+          {FUNKEN.map((f, i) => (
+            <span key={'pw' + i} className="pw-funke" style={{
+              width: f.g, height: f.g,
+              '--px': (Math.cos(f.winkel) * R * f.radius).toFixed(1) + 'px',
+              '--py': (Math.sin(f.winkel) * R * f.radius * 0.8).toFixed(1) + 'px',
+              animationDelay: f.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  dark_blast: (() => {
+    const SPLITTER = Array.from({ length: 18 }, (_, i) => ({
+      winkel: (i / 18) * Math.PI * 2 + (i % 3) * 0.2,
+      laenge: 30 + (i % 6) * 14,
+      breite: 3 + (i % 3) * 2,
+      verzug: (i % 5) * 45,
+    }));
+    return function DarkBlastEffect({ power }) {
+      const p = Math.max(0, Math.min(1, typeof power === 'number' ? power : 0.5));
+      const skala = 0.7 + p * 1.5;                    // 0.7 … 2.2
+      const anzahl = Math.max(6, Math.round(6 + p * 12));
+      return (
+        <div className="dark-blast" style={{ '--mb-scale': skala }} aria-hidden="true">
+          <span className="dark-blast-core" />
+          <span className="dark-blast-ring" />
+          {p > 0.55 && <span className="dark-blast-ring dark-blast-ring2" />}
+          {SPLITTER.slice(0, anzahl).map((sp, i) => (
+            <span key={'db' + i} className="dark-blast-shard" style={{
+              '--sx': `${Math.cos(sp.winkel) * sp.laenge}px`,
+              '--sy': `${Math.sin(sp.winkel) * sp.laenge}px`,
+              width: sp.breite, height: sp.laenge * 0.5,
+              animationDelay: sp.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  // ★★ v1146 — „Armageddon" (Al 17.9.): „eine riesige Feuer-Explosion,
+  // die beim Caster losgeht und das komplette Battlefield einhuellt, mit
+  // Flammen und Feuerregen. Wirklich apokalyptisch, und in der Staerke
+  // mit dem Schaden skalierend."
+  //
+  // Ablauf (alle Zeiten skalieren mit `power` = Schaden / 450, max 1):
+  //   ① Glutkern am Wirker (`ox/oy`, vom Verteiler aus `originOwner` /
+  //      `originHeroIdx` aufgeloest), greller Blitz;
+  //   ② Feuerball und Druckringe rollen vom Wirker ueber das ganze
+  //      Brett — Radius bis zur entferntesten Ecke;
+  //   ③ Flammen schlagen dort hoch, wo die Welle ankommt (Verzug nach
+  //      Abstand zum Wirker);
+  //   ④ Feuerregen mit Einschlaegen, danach aufsteigende Glut und Rauch.
+  // Staerke wirkt auf Groesse, Helligkeit, Beben und die ANZAHL der
+  // Flammen/Tropfen (50 Schaden: ein Glimmen, 450+: Weltuntergang).
+  // Das Beben wackelt nur die eigene Ebene — ein Transform auf dem Brett
+  // wuerde alle `position: fixed`-Elemente darunter verschieben.
+  armageddon: (() => {
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    return function ArmageddonEffect({ x, y, w, h, ox, oy, power, duration }) {
+      const p = Math.max(0.05, Math.min(1, typeof power === 'number' ? power : 0.4));
+      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
+      const links = x - W / 2, oben = y - H / 2;
+      const oX = (typeof ox === 'number' ? ox : x) - links;
+      const oY = (typeof oy === 'number' ? oy : y + H * 0.3) - oben;
+      const R = Math.max(
+        Math.hypot(oX, oY), Math.hypot(W - oX, oY),
+        Math.hypot(oX, H - oY), Math.hypot(W - oX, H - oY)) * 1.15;
+      const dauer = duration || Math.round(1800 + 1400 * p);
+      const welle = Math.round(520 + 380 * p);
+      const teile = useMemo(() => {
+        const r = zufall(Math.round(W * 7 + H * 13 + p * 1000));
+        const flammen = Array.from({ length: Math.round(10 + 40 * p) }, () => {
+          const fx = r() * W, fy = r() * H;
+          const abstand = Math.hypot(fx - oX, fy - oY) / R;
+          const groesse = (22 + r() * 40) * (0.6 + 0.8 * p);
+          return { fx, fy, groesse, verzug: Math.round(welle * abstand * 0.9 + r() * 140),
+            laenge: Math.round(650 + r() * 520), kipp: Math.round((r() - 0.5) * 24) };
+        });
+        const tropfen = Array.from({ length: Math.round(8 + 44 * p) }, () => {
+          const zx = r() * W, zy = H * 0.1 + r() * H * 0.9;
+          const drift = (r() - 0.35) * 160;
+          return { zx, zy, drift, groesse: (5 + r() * 7) * (0.8 + 0.6 * p),
+            verzug: Math.round(welle * 0.55 + r() * (dauer - welle - 700)), fall: Math.round(420 + r() * 260) };
+        });
+        const glut = Array.from({ length: Math.round(6 + 26 * p) }, () => ({
+          gx: r() * W, gy: H * 0.35 + r() * H * 0.65, groesse: 3 + r() * 5,
+          verzug: Math.round(dauer * 0.45 + r() * dauer * 0.3), steig: 60 + r() * 140,
+        }));
+        return { flammen, tropfen, glut };
+      }, [W, H, oX, oY, p, R, welle, dauer]);
+      const ringe = p > 0.6 ? [0, 130, 260] : p > 0.25 ? [0, 160] : [0];
+      return (
+        <div className="arma-root" aria-hidden="true" style={{
+          left: links, top: oben, width: W, height: H,
+          '--arma-amp': (2 + 9 * p).toFixed(1) + 'px',
+          animation: `armaBeben ${Math.round(welle + 500)}ms linear 80ms both`,
+        }}>
+          <div className="arma-tint" style={{
+            background: `radial-gradient(circle at ${oX}px ${oY}px, rgba(255,210,120,.55) 0%, rgba(255,90,20,.5) 18%, rgba(170,20,0,.55) 45%, rgba(40,0,0,.72) 100%)`,
+            '--arma-tint': (0.35 + 0.55 * p).toFixed(2),
+            animation: `armaTint ${dauer}ms ease-out forwards`,
+          }} />
+          <div className="arma-feuerball" style={{
+            left: oX - R, top: oY - R, width: R * 2, height: R * 2,
+            animation: `armaFeuerball ${dauer}ms cubic-bezier(.12,.72,.28,1) forwards`,
+            '--arma-welle-anteil': (welle / dauer).toFixed(3),
+          }} />
+          {ringe.map((v, i) => (
+            <div key={'ar' + i} className="arma-ring" style={{
+              left: oX - R, top: oY - R, width: R * 2, height: R * 2,
+              borderWidth: Math.round(5 + 10 * p - i * 2),
+              animation: `armaRing ${welle + 260}ms ease-out ${v}ms forwards`,
+            }} />
+          ))}
+          <div className="arma-kern" style={{
+            left: oX, top: oY, '--arma-kern': (1.6 + 3.2 * p).toFixed(2),
+            animation: `armaKern ${Math.round(420 + 180 * p)}ms ease-out forwards`,
+          }} />
+          {teile.flammen.map((f, i) => (
+            <div key={'af' + i} className="arma-flamme" style={{
+              left: f.fx, top: f.fy, width: f.groesse, height: f.groesse * 1.7,
+              marginLeft: -f.groesse / 2, marginTop: -f.groesse * 1.5,
+              '--arma-kipp': f.kipp + 'deg',
+              animation: `armaFlamme ${f.laenge}ms ease-out ${f.verzug}ms both`,
+            }} />
+          ))}
+          {teile.tropfen.map((t, i) => (
+            <React.Fragment key={'at' + i}>
+              <div className="arma-tropfen" style={{
+                left: t.zx, top: t.zy, width: t.groesse, height: t.groesse * 5,
+                marginLeft: -t.groesse / 2, marginTop: -t.groesse * 5,
+                '--arma-vonx': (-t.drift) + 'px', '--arma-vony': (-(t.zy + 120)) + 'px',
+                '--arma-dreh': Math.round(Math.atan2(t.drift, t.zy + 120) * -57.3) + 'deg',
+                animation: `armaFall ${t.fall}ms cubic-bezier(.5,0,1,1) ${t.verzug}ms both`,
+              }} />
+              <div className="arma-einschlag" style={{
+                left: t.zx, top: t.zy, width: t.groesse * 6, height: t.groesse * 3,
+                marginLeft: -t.groesse * 3, marginTop: -t.groesse * 1.5,
+                animation: `armaEinschlag 420ms ease-out ${t.verzug + t.fall}ms both`,
+              }} />
+            </React.Fragment>
+          ))}
+          {teile.glut.map((g, i) => (
+            <div key={'ag' + i} className="arma-glut" style={{
+              left: g.gx, top: g.gy, width: g.groesse, height: g.groesse,
+              '--arma-steig': (-g.steig) + 'px',
+              animation: `armaGlut ${Math.round(dauer * 0.5)}ms ease-out ${g.verzug}ms both`,
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  lure_beacon: (() => {
+    const RINGE = [0, 260, 520];
+    return function LureBeaconEffect() {
+      return (
+        <div className="lure-beacon" aria-hidden="true">
+          {RINGE.map((v, i) => (
+            <span key={'lb' + i} className="lure-ring" style={{ animationDelay: v + 'ms' }} />
+          ))}
+          <span className="lure-core" />
+        </div>
+      );
+    };
+  })(),
+  fire_sweep: (() => {
+    const ZUNGEN = Array.from({ length: 22 }, (_, i) => ({
+      left: (i * 4.7) % 100,
+      hoehe: 40 + (i % 6) * 22,
+      breite: 16 + (i % 4) * 9,
+      verzug: (i % 9) * 55,
+    }));
+    return function FireSweepEffect() {
+      return (
+        <div className="fire-sweep-layer" aria-hidden="true">
+          <div className="fire-sweep-front" />
+          {ZUNGEN.map((z, i) => (
+            <span key={'fs' + i} className="fire-sweep-tongue" style={{
+              left: z.left + '%',
+              width: z.breite, height: z.hoehe,
+              animationDelay: z.verzug + 'ms',
+            }} />
+          ))}
+          <div className="fire-sweep-scorch" />
+        </div>
+      );
+    };
+  })(),
+  gift_shower: (() => {
+    const FARBEN = ['#e4484f', '#3fa34d', '#f0b429', '#4a7fd4', '#b05fc9'];
+    const PAKETE = Array.from({ length: 9 }, (_, i) => ({
+      x: -46 + i * 11 + (i % 3) * 4,
+      groesse: 13 + (i % 4) * 4,
+      farbe: FARBEN[i % FARBEN.length],
+      verzug: (i % 5) * 90,
+      drift: -10 + (i % 4) * 7,
+      kippen: -22 + (i % 5) * 11,
+    }));
+    return function GiftShowerEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {PAKETE.map((p, i) => (
+            <div key={'gs' + i} style={{
+              position: 'absolute',
+              left: p.x, top: 0,
+              width: p.groesse, height: p.groesse,
+              background: p.farbe,
+              border: '1px solid rgba(0,0,0,.35)',
+              borderRadius: 2,
+              boxShadow: `0 0 6px 1px ${p.farbe}88`,
+              '--gx': `${p.drift}px`,
+              '--grot': `${p.kippen}deg`,
+              animation: `giftRise 1s ease-out ${p.verzug}ms forwards`,
+            }}>
+              {/* Schleifenband: zwei Streifen ueber das Paket */}
+              <span style={{
+                position: 'absolute', left: '42%', top: 0, width: '16%', height: '100%',
+                background: 'rgba(255,255,255,.85)',
+              }} />
+              <span style={{
+                position: 'absolute', left: 0, top: '42%', width: '100%', height: '16%',
+                background: 'rgba(255,255,255,.85)',
+              }} />
+            </div>
+          ))}
+        </div>
+      );
+    };
+  })(),
   ox_impact: (() => {
     return function OxImpactEffect({ x, y }) {
       return (
@@ -10506,6 +11348,98 @@ const ANIM_REGISTRY = {
   // Als Vorgabe: eine GOLDENE Explosion. Bewusst ein eigener Typ neben
   // der rot-orangen `explosion` — der Klang haengt am Typ, und hier
   // gehoert der Muenzregen dazu.
+  // ★ v1125 („Giant Exploding Skull", Al 15.9.: „Füge eine riesige, über
+  // dem Skull selbst zentrierte Explosion hinzu!").
+  //
+  // ★ RIESIG heißt hier wirklich riesig: der Radius geht weit über die
+  // eigene Zone hinaus, weil der Effekt das GANZE Brett räumt. Eine
+  // zonengroße Explosion hätte ausgesehen, als träfe sie nur den
+  // Nachbarn. `overflow: visible` am Container ist dafür Bedingung —
+  // sonst schneidet die Zone alles ab, was hinausragt.
+  skull_detonation: (() => {
+    // ★ v1126 (Al 15.9.: „Die Explosion ist noch zu schwach, da geht
+    // mehr"). Aufgedreht an FUENF Stellen statt nur an der Groesse —
+    // eine blosse Vergroesserung haette sie duenn wirken lassen:
+    //   Splitter 34 → 70, Ringe 3 → 5, Reichweite 3.2 → 5.0 Zonen,
+    //   dazu ein SCHOCKWELLEN-Verzug ueber dem Brett und Glutstuecke,
+    //   die nachgluehen statt sauber zu verschwinden.
+    const SPLITTER = 70;
+    const RINGE = 5;
+    const GLUT = 14;
+    return function SkullDetonationEffect({ x, y, w }) {
+      const ww = Math.max(w || 80, 80);
+      const R = ww * 5.0;                     // Reichweite: das ganze Brett
+
+      const splitter = useMemo(() => Array.from({ length: SPLITTER }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = R * (0.35 + Math.random() * 0.75);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.82,
+          groesse: 5 + Math.random() * 18,
+          farbe: ['#fff', '#fff4d0', '#ffe9b0', '#ffb347', '#ff7518', '#d94a12', '#8a8f98', '#5a5f66'][Math.floor(Math.random() * 8)],
+          delay: Math.random() * 190,
+          dur: 620 + Math.random() * 760,
+          dreh: (Math.random() - 0.5) * 1440,
+        };
+      }), [R]);
+
+      // Drei Druckringe, zeitlich versetzt — das gibt der Detonation
+      // Wucht, ohne dass ein einzelner Ring riesig wirken muss.
+      const ringe = useMemo(() => Array.from({ length: RINGE }, (_, i) => ({
+        delay: i * 95,
+        dur: 640 + i * 140,
+        maxR: R * (0.55 + i * 0.3),
+      })), [R]);
+
+      // Glutstuecke: fliegen langsamer, gluehen nach und fallen. Sie
+      // sind es, die der Explosion GEWICHT geben — reine Funken wirken
+      // wie ein Feuerwerk, nicht wie eine Detonation.
+      const glut = useMemo(() => Array.from({ length: GLUT }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = R * (0.25 + Math.random() * 0.5);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.abs(Math.sin(winkel)) * weite * 0.5,
+          groesse: 10 + Math.random() * 16,
+          delay: 60 + Math.random() * 220,
+          dur: 900 + Math.random() * 700,
+        };
+      }), [R]);
+
+      return (
+        <div className="skull-detonation" style={{
+          left: x, top: y, width: ww, height: ww,
+        }} aria-hidden="true">
+          <span className="sd-flash" />
+          {ringe.map((r, i) => (
+            <span key={'r' + i} className="sd-ring" style={{
+              animationDelay: r.delay + 'ms',
+              animationDuration: r.dur + 'ms',
+              '--sd-max': r.maxR + 'px',
+            }} />
+          ))}
+          {splitter.map((sp, i) => (
+            <span key={'s' + i} className="sd-shard" style={{
+              width: sp.groesse, height: sp.groesse, background: sp.farbe,
+              animationDelay: sp.delay + 'ms', animationDuration: sp.dur + 'ms',
+              '--sd-dx': sp.dx + 'px', '--sd-dy': sp.dy + 'px',
+              '--sd-rot': sp.dreh + 'deg',
+            }} />
+          ))}
+          {glut.map((g, i) => (
+            <span key={'g' + i} className="sd-ember" style={{
+              width: g.groesse, height: g.groesse,
+              animationDelay: g.delay + 'ms', animationDuration: g.dur + 'ms',
+              '--sd-dx': g.dx + 'px', '--sd-dy': g.dy + 'px',
+            }} />
+          ))}
+          <span className="sd-smoke" />
+          <span className="sd-shock" />
+        </div>
+      );
+    };
+  })(),
   golden_explosion: (() => {
     return function GoldenExplosionEffect({ x, y, w }) {
       const ww = Math.max(w || 80, 80);
@@ -11272,6 +12206,285 @@ const ANIM_REGISTRY = {
               0%   { opacity: 0; transform: translate(0, 0) rotate(var(--gstilt)) scale(1.1); }
               15%  { opacity: 1; }
               100% { opacity: 0; transform: translate(var(--gsdx), var(--gsdy)) rotate(var(--gsrot)) scale(.75); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Cute Conversion" (v1015) ─────────────────────────────────────
+  // Als Vorgabe: tiefrote Herzen auf dem Ziel, die langsam groesser und
+  // durchsichtiger werden. Sieben Herzen, leicht versetzt und
+  // unterschiedlich gross, jedes mit eigener Verzoegerung — so wirkt es
+  // wie ein Aufschweben statt wie ein Stempel. Das Herz ist aus zwei
+  // gedrehten Quadraten mit aufgesetztem Kreisrund gebaut (reines CSS,
+  // kein Zeichensatz-Emoji, damit die Farbe wirklich tiefrot ist).
+  cute_hearts: (() => {
+    return function CuteHeartsEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 60);
+      const hh = Math.max(h || 110, 80);
+
+      const herzen = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+        dx: (Math.random() - 0.5) * ww * 0.8,
+        dy: (Math.random() - 0.5) * hh * 0.5,
+        groesse: 14 + Math.random() * 20,
+        delay: i * 90 + Math.random() * 80,
+        dur: 1150 + Math.random() * 450,
+        kippen: -18 + Math.random() * 36,
+      }), []), [ww, hh]);
+
+      const Herz = ({ s }) => (
+        <div style={{ position: 'relative', width: s, height: s }}>
+          <div style={{
+            position: 'absolute', left: 0, top: s * 0.25,
+            width: s * 0.55, height: s * 0.55, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 30%, #d4173a 0%, #8e0a22 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', left: s * 0.45, top: s * 0.25,
+            width: s * 0.55, height: s * 0.55, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 30%, #d4173a 0%, #8e0a22 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', left: s * 0.145, top: s * 0.38,
+            width: s * 0.71, height: s * 0.71,
+            background: 'linear-gradient(135deg, #c2142f 0%, #7d071d 100%)',
+            transform: 'rotate(45deg)',
+          }} />
+        </div>
+      );
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10150 }}>
+          {herzen.map((hz, i) => (
+            <div key={'ch' + i} style={{
+              position: 'absolute', left: hz.dx, top: hz.dy,
+              '--chrot': hz.kippen + 'deg',
+              animation: `cuteHeartRise ${hz.dur}ms cubic-bezier(.25,.6,.4,1) ${hz.delay}ms forwards`,
+              opacity: 0,
+              filter: 'drop-shadow(0 0 6px rgba(190,20,50,.75))',
+            }}>
+              <Herz s={hz.groesse} />
+            </div>
+          ))}
+          <style>{`
+            @keyframes cuteHeartRise {
+              0%   { opacity: 0;  transform: translate(-50%, -50%) rotate(var(--chrot)) scale(.35); }
+              20%  { opacity: .95; }
+              100% { opacity: 0;  transform: translate(-50%, -50%) rotate(var(--chrot)) scale(2.6); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Last Resort" (v1027) ─────────────────────────────────────────
+  // Als Vorgabe: eine GROSSE, eigene Explosion beim Einschlag — der
+  // Nutzer hat sich ja selbst hineingeworfen. Fuenf Lagen, alle vom
+  // Einschlagpunkt aus:
+  //   ① weisser Kern, der in einem Wimpernschlag aufblitzt
+  //   ② Feuerball, der weit ueber die Zone hinauswaechst
+  //   ③ zwei Druckwellenringe, zeitversetzt
+  //   ④ 26 Truemmersplitter nach aussen, mit Schwerkraft im Fall
+  //   ⑤ 14 Funken, die laenger nachgluehen
+  // Deutlich groesser angelegt als `explosion`: der Feuerball misst
+  // gut das Dreifache einer Zone, damit es sich vom Alltagsknall
+  // abhebt.
+  last_resort_blast: (() => {
+    return function LastResortBlastEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const R = Math.max(ww, hh) * 3.1;          // Reichweite des Feuerballs
+
+      const splitter = useMemo(() => Array.from({ length: 26 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = R * (0.3 + Math.random() * 0.55);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.8 + hh * (0.25 + Math.random() * 0.5),
+          laenge: 7 + Math.random() * 18,
+          breite: 3 + Math.random() * 6,
+          dreh: -720 + Math.random() * 1440,
+          dur: 700 + Math.random() * 560,
+          delay: 60 + Math.random() * 160,
+        };
+      }), [R, hh]);
+
+      const funken = useMemo(() => Array.from({ length: 14 }, () => {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = R * (0.45 + Math.random() * 0.6);
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite,
+          gr: 3 + Math.random() * 5,
+          dur: 900 + Math.random() * 600,
+          delay: 40 + Math.random() * 260,
+        };
+      }), [R]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10260 }}>
+          {/* ① Kern */}
+          <div style={{
+            position: 'absolute', left: -R * 0.35, top: -R * 0.35, width: R * 0.7, height: R * 0.7,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #ffffff 0%, #fff3c4 45%, rgba(255,220,140,0) 72%)',
+            animation: 'lrCore 380ms ease-out forwards', opacity: 0,
+          }} />
+          {/* ② Feuerball */}
+          <div style={{
+            position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,246,214,.98) 0%, #ffb03a 26%, #f2591b 52%, #8c1c07 74%, rgba(60,10,4,0) 88%)',
+            animation: 'lrBall 980ms cubic-bezier(.15,.75,.35,1) forwards', opacity: 0,
+            filter: 'blur(1px)',
+          }} />
+          {/* ③ Druckwellen */}
+          {[0, 190].map((d, i) => (
+            <div key={'lrw' + i} style={{
+              position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
+              borderRadius: '50%', border: '4px solid rgba(255,226,170,.85)',
+              boxShadow: '0 0 26px rgba(255,180,80,.7) inset',
+              animation: `lrWave 760ms ease-out ${d}ms forwards`, opacity: 0,
+            }} />
+          ))}
+          {/* ④ Truemmer */}
+          {splitter.map((s, i) => (
+            <div key={'lrs' + i} style={{
+              position: 'absolute', left: 0, top: 0, width: s.breite, height: s.laenge,
+              background: 'linear-gradient(160deg, #ffd89a 0%, #d9601f 55%, #5b1a06 100%)',
+              clipPath: 'polygon(50% 0%, 100% 72%, 18% 100%)',
+              '--lrdx': s.dx + 'px', '--lrdy': s.dy + 'px', '--lrrot': s.dreh + 'deg',
+              animation: `lrShard ${s.dur}ms cubic-bezier(.2,.6,.4,1) ${s.delay}ms forwards`,
+              opacity: 0,
+            }} />
+          ))}
+          {/* ⑤ Funken */}
+          {funken.map((f, i) => (
+            <div key={'lrf' + i} style={{
+              position: 'absolute', left: 0, top: 0, width: f.gr, height: f.gr, borderRadius: '50%',
+              background: 'radial-gradient(circle, #fffbe8 0%, #ffb648 60%, rgba(255,140,40,0) 100%)',
+              boxShadow: '0 0 10px rgba(255,190,110,.95)',
+              '--lrdx': f.dx + 'px', '--lrdy': f.dy + 'px',
+              animation: `lrSpark ${f.dur}ms ease-out ${f.delay}ms forwards`, opacity: 0,
+            }} />
+          ))}
+          <style>{`
+            @keyframes lrCore {
+              0%   { opacity: 0; transform: scale(.1); }
+              12%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes lrBall {
+              0%   { opacity: 0; transform: scale(.12); }
+              14%  { opacity: 1; transform: scale(.75); }
+              48%  { opacity: .95; transform: scale(1.05); }
+              100% { opacity: 0; transform: scale(1.3); }
+            }
+            @keyframes lrWave {
+              0%   { opacity: 0; transform: scale(.1); }
+              18%  { opacity: .95; }
+              100% { opacity: 0; transform: scale(1.45); }
+            }
+            @keyframes lrShard {
+              0%   { opacity: 0; transform: translate(0,0) rotate(0deg) scale(1.15); }
+              12%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--lrdx), var(--lrdy)) rotate(var(--lrrot)) scale(.7); }
+            }
+            @keyframes lrSpark {
+              0%   { opacity: 0; transform: translate(0,0) scale(1.4); }
+              15%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--lrdx), var(--lrdy)) scale(.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+
+  // ── „Silence" — Standardbild der NEGIERUNG (v1046) ────────────────
+  // Als Vorgabe 12.9.: die Negierung zeigte bisher `electric_strike`
+  // und sah damit aus wie eine Betaeubung. Sie ist aber kein Schlag,
+  // sondern ein VERSTUMMEN. Vier Lagen, alle gedaempft statt grell:
+  //   ① ein Siegelring, der sich von aussen zusammenzieht
+  //   ② ein Verbotszeichen, das kurz aufscheint und verblasst
+  //   ③ eine dunkle Schwade, die das Ziel ueberzieht
+  //   ④ sechs kleine Zeichen, die nach innen fallen und erloeschen
+  // Farbe: gedecktes Violett-Grau — der Gegensatz zum gelben Blitz.
+  silence_seal: (() => {
+    return function SilenceSealEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 60);
+      const hh = Math.max(h || 110, 80);
+      const R = Math.max(ww, hh) * 1.25;
+
+      const zeichen = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+        const winkel = (i / 6) * Math.PI * 2 + Math.random() * 0.4;
+        return {
+          dx: Math.cos(winkel) * R * 0.75,
+          dy: Math.sin(winkel) * R * 0.75,
+          gr: 5 + Math.random() * 5,
+          delay: 60 + i * 55,
+        };
+      }), [R]);
+
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10155 }}>
+          {/* ① Siegelring, zieht sich zusammen */}
+          <div style={{
+            position: 'absolute', left: -R / 2, top: -R / 2, width: R, height: R,
+            borderRadius: '50%', border: '3px solid rgba(178,150,214,.85)',
+            boxShadow: '0 0 18px rgba(150,120,190,.55), 0 0 22px rgba(80,60,110,.5) inset',
+            animation: 'silenceRing 880ms cubic-bezier(.3,.7,.35,1) forwards', opacity: 0,
+          }} />
+          {/* ② Verbotszeichen */}
+          <div style={{
+            position: 'absolute', left: -R * 0.22, top: -R * 0.22, width: R * 0.44, height: R * 0.44,
+            borderRadius: '50%', border: `${Math.max(3, R * 0.045)}px solid rgba(206,186,230,.92)`,
+            animation: 'silenceMark 760ms ease-out 140ms forwards', opacity: 0,
+          }}>
+            <div style={{
+              position: 'absolute', left: '50%', top: '-6%', width: Math.max(3, R * 0.045), height: '112%',
+              background: 'rgba(206,186,230,.92)', transform: 'translateX(-50%) rotate(45deg)',
+              transformOrigin: '50% 50%',
+            }} />
+          </div>
+          {/* ③ Schwade */}
+          <div style={{
+            position: 'absolute', left: -ww * 0.55, top: -hh * 0.55, width: ww * 1.1, height: hh * 1.1,
+            background: 'radial-gradient(ellipse at center, rgba(40,28,60,.62) 0%, rgba(40,28,60,.28) 55%, transparent 80%)',
+            animation: 'silenceVeil 980ms ease-out forwards', opacity: 0,
+          }} />
+          {/* ④ Zeichen, die nach innen fallen */}
+          {zeichen.map((z, i) => (
+            <div key={'sz' + i} style={{
+              position: 'absolute', left: 0, top: 0, width: z.gr, height: z.gr, borderRadius: '2px',
+              background: 'linear-gradient(140deg, rgba(214,198,235,.95), rgba(120,96,160,.7))',
+              '--szdx': z.dx + 'px', '--szdy': z.dy + 'px',
+              animation: `silenceGlyph 700ms ease-in ${z.delay}ms forwards`, opacity: 0,
+            }} />
+          ))}
+          <style>{`
+            @keyframes silenceRing {
+              0%   { opacity: 0; transform: scale(1.6) rotate(-25deg); }
+              25%  { opacity: .95; }
+              100% { opacity: 0; transform: scale(.55) rotate(12deg); }
+            }
+            @keyframes silenceMark {
+              0%   { opacity: 0; transform: scale(.4); }
+              35%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.12); }
+            }
+            @keyframes silenceVeil {
+              0%   { opacity: 0; }
+              30%  { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            @keyframes silenceGlyph {
+              0%   { opacity: 0; transform: translate(var(--szdx), var(--szdy)) scale(1.2); }
+              20%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(0, 0) scale(.3); }
             }
           `}</style>
         </div>
@@ -18295,6 +19508,40 @@ const ANIM_REGISTRY = {
   //  Held mostly static — petrification is stasis, not motion.
   //  A few stone-chip particles fall off afterward to sell the
   //  "turned to stone" read.
+  // ★★ v1164 — „Petrifying Potion\": die Versteinerung BRICHT. Umkehrung
+  // von `petrify` — die Steinschicht springt, Brocken fliegen nach aussen,
+  // ein heller Stoss bleibt zurueck. Liest `x`/`y`/`w`/`h` (Lehre v1154).
+  stone_break: (() => {
+    return function StoneBreakEffect({ x, y, w, h }) {
+      const W = w || 100, H = h || 140;
+      const brocken = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+        const winkel = (i / 16) * Math.PI * 2 + (i % 3) * 0.2;
+        const weite = 30 + (i % 5) * 16;
+        return {
+          dx: Math.cos(winkel) * weite,
+          dy: Math.sin(winkel) * weite * 0.8 + 26,       // Schwerkraft
+          g: 4 + (i % 4) * 3,
+          dreh: Math.round((i % 2 ? 1 : -1) * (120 + i * 25)),
+          verzug: (i % 5) * 45,
+          ton: ['#8e8e8e', '#6a6a6a', '#a3a3a3', '#767676'][i % 4],
+        };
+      }), []);
+      return (
+        <div className="stone-break" style={{ left: x, top: y }} aria-hidden="true">
+          <span className="sb-blitz" style={{ width: W + 18, height: H + 18 }} />
+          <span className="sb-riss" style={{ width: W * 0.9, height: 3 }} />
+          <span className="sb-riss sb-riss2" style={{ width: H * 0.8, height: 3 }} />
+          {brocken.map((b, i) => (
+            <span key={'sb' + i} className="sb-brocken" style={{
+              width: b.g, height: b.g * 0.85, background: b.ton,
+              '--bx': b.dx.toFixed(1) + 'px', '--by': b.dy.toFixed(1) + 'px',
+              '--bdreh': b.dreh + 'deg', animationDelay: b.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
   petrify: (() => {
     return function PetrifyEffect({ x, y, w, h }) {
       const cw = w || 100;
@@ -20654,6 +21901,118 @@ function IceEncaseEffect({ x, y }) {
   );
 }
 
+/**
+ * ★★ v1151 — ZIELMARKEN-EBENE (Al 17.9.).
+ *
+ * Eine feste Ebene UEBER dem Brett statt Abzeichen IN den Zonen: dort
+ * schnitt die Zone (bzw. die Karte) den Marker oben ab. Hier liegt alles
+ * `position: fixed`, gemessen an den echten Bildschirm-Rechtecken der
+ * Zonen — auch in der gekippten Brett-Perspektive.
+ *
+ *   • Abzeichen „#N" oben mittig an jedem gewaehlten Ziel;
+ *   • VORHERGESAGTER ZIELPFAD: halbtransparente, laufend gestrichelte
+ *     Linien #1 → #2 → #3 … je Quelle, mit Pfeilspitze;
+ *   • WAHL-BLITZ bei JEDER Wahl (v1152): ein grosses Fadenkreuz rastet
+ *     auf das Ziel ein, Schockwelle, rotes Aufleuchten und die Nummer
+ *     gross darueber — „Your #N", „Opponent's #N" bzw. „Target #N" fuer
+ *     Zuschauer.
+ *
+ * Die Rechtecke werden bei jeder Aenderung und alle 150 ms neu gemessen,
+ * solange die Ebene steht (Karten und Brett koennen sich bewegen).
+ */
+function ZielMarkenEbene({ marken, blitze, myIdx }) {
+  const schluessel = (m) => `${m.type}-${m.owner}-${m.heroIdx}-${m.slotIdx}`;
+  const [rects, setRects] = useState({});
+  const alle = [...marken, ...blitze];
+  const signatur = alle.map(schluessel).join('|');
+  useEffect(() => {
+    const messen = () => {
+      const out = {};
+      for (const m of alle) {
+        const k = schluessel(m);
+        if (out[k]) continue;
+        const lbl = m.owner === myIdx ? 'me' : 'opp';
+        const el = m.type === 'hero'
+          ? document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${m.heroIdx}"]`)
+          : document.querySelector(`[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${m.heroIdx}"][data-support-slot="${m.slotIdx}"]`);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        out[k] = { x: r.left, y: r.top, w: r.width, h: r.height };
+      }
+      setRects(prev => (JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
+    };
+    messen();
+    const t = setInterval(messen, 150);
+    window.addEventListener('resize', messen);
+    return () => { clearInterval(t); window.removeEventListener('resize', messen); };
+  }, [signatur, myIdx]);
+
+  // Pfad je Quelle in Wahl-Reihenfolge
+  const proQuelle = {};
+  for (const m of marken) (proQuelle[m.quelle || '-'] = proQuelle[m.quelle || '-'] || []).push(m);
+  const segmente = [];
+  for (const liste of Object.values(proQuelle)) {
+    for (let i = 1; i < liste.length; i++) {
+      const a = rects[schluessel(liste[i - 1])], b = rects[schluessel(liste[i])];
+      if (!a || !b) continue;
+      const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
+      const d = Math.hypot(bx - ax, by - ay) || 1;
+      const kuerz = Math.min(0.28 * d, Math.min(b.w, b.h) * 0.42);   // Spitze vor der Zone
+      segmente.push({ key: schluessel(liste[i]) + i, ax, ay, bx: bx - (bx - ax) / d * kuerz, by: by - (by - ay) / d * kuerz });
+    }
+  }
+  // Abzeichen: alle Nummern je Ziel zusammengefasst
+  const abzeichen = {};
+  for (const m of marken) (abzeichen[schluessel(m)] = abzeichen[schluessel(m)] || []).push(m.label);
+
+  return (
+    <div className="ziel-ebene" aria-hidden="true">
+      <svg className="ziel-pfad" width="100%" height="100%">
+        <defs>
+          <marker id="zielPfadSpitze" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,90,80,.75)" />
+          </marker>
+        </defs>
+        {segmente.map(sg => (
+          <g key={sg.key}>
+            <line x1={sg.ax} y1={sg.ay} x2={sg.bx} y2={sg.by} className="ziel-pfad-schatten" />
+            <line x1={sg.ax} y1={sg.ay} x2={sg.bx} y2={sg.by} className="ziel-pfad-linie" markerEnd="url(#zielPfadSpitze)" />
+          </g>
+        ))}
+      </svg>
+      {Object.entries(abzeichen).map(([k, labels]) => {
+        const r = rects[k];
+        if (!r) return null;
+        const neu = blitze.some(b => schluessel(b) === k);
+        return (
+          <div key={'zm' + k} className={'ziel-marke' + (neu ? ' ziel-marke-neu' : '')}
+            style={{ left: r.x + r.w / 2, top: r.y }}>{labels.join(' ')}</div>
+        );
+      })}
+      {blitze.map(b => {
+        const r = rects[schluessel(b)];
+        if (!r) return null;
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        const gross = Math.max(r.w, r.h);
+        const beschriftung = b.wer === 'mine' ? 'Your' : b.wer === 'opp' ? "Opponent's" : 'Target';
+        return (
+          <React.Fragment key={'zb' + b.id}>
+            <div className="ziel-blitz-flaeche" style={{ left: r.x - 6, top: r.y - 6, width: r.w + 12, height: r.h + 12 }} />
+            <div className="ziel-blitz-welle" style={{ left: cx, top: cy, width: gross * 1.3, height: gross * 1.3 }} />
+            <div className="ziel-blitz-kreuz" style={{ left: cx, top: cy, width: gross * 1.15, height: gross * 1.15 }}>
+              <span className="k-ring" /><span className="k-strich k-o" /><span className="k-strich k-u" />
+              <span className="k-strich k-l" /><span className="k-strich k-r" />
+            </div>
+            <div className="ziel-blitz-nummer" style={{ left: cx, top: r.y - 8 }}>
+              <small>{beschriftung}</small>{b.label}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 function GameAnimationRenderer({ type, x, y, w, h, ...rest }) {
   const Component = ANIM_REGISTRY[type];
   if (!Component) return null;
@@ -20890,18 +22249,34 @@ function OptionPickerSlider({ ep, respondToPrompt }) {
   const [wert, setWert] = useState(
     Number.isFinite(ep.sliderDefault) ? Math.min(max, Math.max(min, ep.sliderDefault)) : max
   );
-  const klemmen = (n) => Math.min(max, Math.max(min, Math.floor(Number(n) || min)));
+  // ★★ v1137 (Al 15.9.: „ein Slider mit Fuenferschritten statt
+  // individueller Buttons … wobei nur Fuenferschritte moeglich sind").
+  //
+  // `sliderStep` gab es noch nicht — der Regler lief immer in
+  // Einerschritten. Die Schrittweite wird AUCH beim Klemmen angewandt,
+  // nicht nur am Eingabefeld: sonst koennte die Zahleneingabe daneben
+  // einen ungueltigen Wert einschleusen (17 statt 15).
+  const schritt = Number.isFinite(ep.sliderStep) && ep.sliderStep > 0 ? ep.sliderStep : 1;
+  const klemmen = (n) => {
+    const roh = Math.min(max, Math.max(min, Math.floor(Number(n) || min)));
+    if (schritt <= 1) return roh;
+    // Auf das naechste gueltige Vielfache ab `min` runden, dann in die
+    // Grenzen zurueckholen — der Hoechstwert selbst bleibt erreichbar,
+    // auch wenn er kein volles Vielfaches ist.
+    const gerundet = min + Math.round((roh - min) / schritt) * schritt;
+    return Math.min(max, Math.max(min, gerundet));
+  };
   const einheit = ep.sliderUnit || '';
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="effect-slider" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <input
-          type="range" min={min} max={max} step={1} value={wert}
+          type="range" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(klemmen(e.target.value))}
           style={{ flex: 1, accentColor: 'var(--accent)' }}
         />
         <input
-          type="number" min={min} max={max} step={1} value={wert}
+          type="number" min={min} max={max} step={schritt} value={wert}
           onChange={e => setWert(e.target.value === '' ? min : klemmen(e.target.value))}
           onBlur={e => setWert(klemmen(e.target.value))}
           style={{
@@ -21764,6 +23139,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     window._ppBorisBlocked = gameState?.borisBlocked || null;
   }, [gameState?.borisBlocked]);
 
+  // ★ v1046: Der aktuelle Zug fuer die Status-Badges. Manche Status
+  // merken sich ihr Ende nicht als Rundenzahl, sondern als ZUG, an dem
+  // sie auslaufen (`expiresAtTurn`, z.B. „Null, the Mage Slayer" und
+  // Locke). Ohne den Bezugspunkt kann das Badge daraus keine
+  // Restrundenzahl rechnen und behauptete „bis Zugende" (Als Befund
+  // 12.9.). Gleiche Bauform wie `_ppBorisBlocked` daneben.
+  React.useEffect(() => {
+    window._ppTurn = gameState?.turn ?? null;
+    window._ppMyIdx = myIdx;
+  }, [gameState?.turn, myIdx]);
+
   // Ketten-Anzeige beim Wechsel in eine ANDERE Partie hart zuruecksetzen.
   // Bricht man einen Puzzle-Versuch mitten in einer Kette ab, kam vom
   // alten Spiel nie ein `reaction_chain_done` — die Anzeige blieb im
@@ -21916,6 +23302,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // schaltet. Nur bei Erfolg, und mit `dedupe`, damit der
       // Editor-Pfad unten nicht doppelt anschlaegt.
       if (won && window.playSFX) window.playSFX('victory', { dedupe: 3000 });
+      // ★★ v1146 (Al 17.9.): „Eine Niederlage im Puzzle-Mode sollte auch
+      // die Loss-Fanfare abspielen (die aber sofort beendet wird, wenn man
+      // das Puzzle neustartet oder verlaesst!)." Gleiche Bauart wie die
+      // Sieges-Fanfare; Retry und Verlassen rufen `stopSFX('defeat')`.
+      if (!won && window.playSFX) window.playSFX('defeat', { dedupe: 3000 });
     } else {
       // Normale Kaempfe behalten den kurzen Fanfaren-SFX; das
       // Ergebnis-Thema setzen dort die Screen-Effekte, und der
@@ -22179,6 +23570,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Spaltenbreite (`--chat-col-w`), die Util-Leiste rechts daneben, oder
   // der eingeklappte Zustand (28px). Deshalb live messen und als
   // Variablen bereitstellen.
+  // ★ v1060 (Als Vorgabe 14.9.): die Breite haengt an der AUSGEKLAPPTEN
+  // Spalte, NICHT am aktuellen Zustand. Seit Log und Chat standardmaessig
+  // eingeklappt starten (v1056), mass die Kopplung sonst die 28 px der
+  // zusammengeschobenen Leiste — der Kartentooltip war damit ein
+  // Streifen. Die Bounds der aufgeklappten Spalte sind die gewollte
+  // Breite; ob sie gerade sichtbar ist, darf daran nichts aendern.
+  const ttBreiteRef = useRef(null);
   useEffect(() => {
     const apply = () => {
       const col = document.querySelector('.chat-log-column');
@@ -22186,10 +23584,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!col) { root.style.removeProperty('--tt-col-w'); return; }
       const r = col.getBoundingClientRect();
       if (r.width <= 0) return;
-      // Rechts bis zum Bildschirmrand (das war schon richtig), links
-      // buendig mit der Chat-Spalte — die Breite ist also der Abstand von
-      // deren linker Kante bis zum Fensterrand, nicht die Spaltenbreite.
-      root.style.setProperty('--tt-col-w', Math.max(0, window.innerWidth - r.left) + 'px');
+      const eingeklappt = col.classList.contains('chat-log-collapsed');
+      // Ausgeklappt: die echte Breite messen und merken. Eingeklappt:
+      // die gemerkte nehmen — und beim Kaltstart (die Spalte startet
+      // eingeklappt, es gab also nie eine Messung) `--chat-col-w`, an
+      // der auch die Spalte selbst haengt. Vom Element gelesen, damit
+      // eine responsive Ueberschreibung mitgenommen wird.
+      if (!eingeklappt) ttBreiteRef.current = r.width;
+      let breite = eingeklappt ? ttBreiteRef.current : r.width;
+      if (!(breite > 0)) {
+        breite = parseFloat(getComputedStyle(col).getPropertyValue('--chat-col-w')) || 324;
+      }
+      // Rechts bis zum Bildschirmrand (das war schon richtig), links um
+      // die AUSGEKLAPPTE Breite davor. Ausgeklappt ist das rechnerisch
+      // exakt das alte Ergebnis (`innerWidth - r.left`).
+      const abstandRechts = Math.max(0, window.innerWidth - r.right);
+      root.style.setProperty('--tt-col-w', (abstandRechts + breite) + 'px');
     };
     apply();
     const col = document.querySelector('.chat-log-column');
@@ -22838,6 +24248,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [projectileAnims, setProjectileAnims] = useState([]); // Projectile animations (phoenix cannon, etc.)
   const [tempesteRainInsts, setTempesteRainInsts] = useState([]); // Active Prophecy of Tempeste instance ids — one rain overlay per
   const [discardAnims, setDiscardAnims] = useState([]);
+  // v1138: fliegende Geschenke zwischen den Goldanzeigen.
+  const [goldGifts, setGoldGifts] = useState([]);
   const [myDiscardHidden, setMyDiscardHidden] = useState(0);
   const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
   const [myDeletedHidden, setMyDeletedHidden] = useState(0);
@@ -23129,7 +24541,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const dl = newAnims.filter(a => a.dest === 'deleted').length;
     if (dc > 0) setDiscardHidden(prev => prev + dc);
     if (dl > 0) setDeletedHidden(prev => prev + dl);
-    setDiscardAnims(prev => [...prev, ...newAnims]);
+    setDiscardAnims(prev => [...prev, ...newAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
     // Cleanup must outlast the LAST (most-delayed) card's flight, or a
     // staggered batch's tail cards get yanked mid-air and the pile-
     // hidden counter lifts before they land. 500ms already buffers the
@@ -23292,7 +24704,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
           }
           if (returnAnims.length > 0) {
-            setDiscardAnims(prev => [...prev, ...returnAnims]);
+            setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
             setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
           }
         }
@@ -23519,7 +24931,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest: isToOpp ? 'opp-deck' : isPotion ? 'potion' : 'deck' });
       }
       if (returnAnims.length > 0) {
-        setDiscardAnims(prev => [...prev, ...returnAnims]);
+        setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
         setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
       }
     }
@@ -23719,7 +25131,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
         }
         if (returnAnims.length > 0) {
-          setDiscardAnims(prev => [...prev, ...returnAnims]);
+          setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
           setTimeout(() => setDiscardAnims(prev => prev.filter(a => !returnAnims.some(n => n.id === a.id))), 500);
         }
       }
@@ -23895,6 +25307,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Hand-lock: dim non-Ability cards that are blocked by handLock
     if (me.handLocked && card.cardType !== 'Ability' && (me.handLockBlockedCards || []).includes(cardName)) return true;
     if (me.drawLocked && card.cardType !== 'Ability' && (me.drawLockBlockedCards || []).includes(cardName)) return true;
+    // v1069: reiner Such-Lock — Karten, die NUR suchen, sind tot.
+    if (me.searchLocked && card.cardType !== 'Ability' && (me.searchLockBlockedCards || []).includes(cardName)) return true;
 
     // Never-playable cards (e.g. Glass of Marbles, Mystery Box) — always dimmed
     if ((me.neverPlayableCards || []).includes(cardName)) return true;
@@ -24648,7 +26062,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (level <= 0 && !card.spellSchool1) return true;
     // Negated heroes contribute no abilities for level-req purposes — only
     // Lv0 creatures without a school requirement can still land on them.
-    const abZones = hero.statuses?.negated ? [] : (playerData.abilityZones?.[heroIdx] || []);
+    // v1114: die LEICHTE Negation blendet die Abilities NICHT aus.
+    const nStat = hero.statuses?.negated;
+    const hartNegiert = !!nStat && !(nStat._byWeakeningCrystal || nStat._fromAttachment);
+    const abZones = hartNegiert ? [] : (playerData.abilityZones?.[heroIdx] || []);
     // Spiegel von `countAbilitiesForSchool` in _engine.js — INKLUSIVE
     // der Joker-Regel: eine Ability mit `isWildcardAbility` (Performance)
     // zählt für die Schule, wenn sie auf einem Stapel liegt, dessen BASIS
@@ -25689,7 +27106,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // to cast the card and routes the play through them. Falls back to
         // the normal hero-zone drop below if the cursor isn't over the
         // area zone.
-        if (isAreaCard && ((me.areaZones || [])[0] === undefined || ((gameState.areaZones?.[myIdx] || []).length === 0))) {
+        // ★ v1050: Platzpruefung statt Leer-Pruefung (siehe areaLimits).
+        if (isAreaCard && ((gameState.areaZones?.[myIdx] || []).length < (gameState.areaLimits?.[myIdx] ?? 1))) {
           const areaEls = document.querySelectorAll('[data-area-zone][data-area-owner="me"]');
           for (const el of areaEls) {
             const r = el.getBoundingClientRect();
@@ -27131,11 +28549,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // gepresst (`querySelector` mit Komma liefert die erste Stelle im
       // Dokument, nicht die bevorzugte).
       if (zoneType === 'board') {
-        const brett = document.querySelector('.board-center')
+        // ★ v1088 („Cleansing of the Land", Als Vorgabe 14.9.: „aber auf
+        // Hintergrund-Layer!"). `zoneType: 'board'` traf bisher immer
+        // die OBERE Ebene — richtig fuer eine Explosion, falsch fuer
+        // eine Feuerwalze, die UNTER den Karten durchlaufen soll.
+        //
+        // `layer: 'background'` mountet stattdessen in die
+        // Atmosphaeren-Ebene (`.board-plane-clip`), in der auch
+        // BoardAmbiance und die Area-Hintergruende liegen — dort
+        // paintet alles VOR der Walze.
+        const brett = (rest.layer === 'background'
+          ? document.querySelector('.board-plane-clip')
+          : null)
+          || document.querySelector('.board-center')
           || document.querySelector('.game-board');
         if (!brett) return;
-        setTimeout(() => playAnimation(type, brett, { duration: 2000, ...rest }),
-                   window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
+        // ★★ v1146: optionaler URSPRUNG einer Brett-Animation — ein Held
+        // (`originOwner` + `originHeroIdx`). Die Komponente bekommt seine
+        // Bildschirmmitte als `ox`/`oy` („Armageddon" bricht beim Wirker
+        // los und rollt von dort ueber das Brett).
+        setTimeout(() => {
+          const extra = {};
+          if (typeof rest.originHeroIdx === 'number' && rest.originHeroIdx >= 0
+              && (rest.originOwner === 0 || rest.originOwner === 1)) {
+            const lbl = rest.originOwner === myIdx ? 'me' : 'opp';
+            const held = document.querySelector(`[data-hero-zone][data-hero-owner="${lbl}"][data-hero-idx="${rest.originHeroIdx}"]`);
+            if (held) {
+              const q = held.getBoundingClientRect();
+              extra.ox = q.left + q.width / 2;
+              extra.oy = q.top + q.height / 2;
+            }
+          }
+          playAnimation(type, brett, { duration: 2000, ...rest, ...extra });
+        }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
         return;
       }
       let sel;
@@ -27611,6 +29057,137 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     });
 
     socket.on('effect_source_glow', onEffectGlow);
+    // ── „Deepsea Treasure" — Aufdecken in der Bildmitte (v1023) ──────
+    // Als Vorgabe, in drei Takten und mit JS statt einer einzigen
+    // CSS-Kurve — weil der ZIELPLATZ erst spaet feststeht:
+    //   ① Deck → Bildmitte, dabei wachsend und aufklappend
+    //   ② kurz verharren (man soll sie lesen koennen)
+    //   ③ Mitte → IHR Handplatz, dort bleibt sie dauerhaft sichtbar
+    //
+    // ★ Warum der Platz erst spaet gesucht wird (Als Befund 12.9.: „die
+    //   Karten fliegen zur Mitte der HAND statt an ihre Position"): der
+    //   Handplatz existiert beim Losfliegen noch gar nicht. Bei Takt ③
+    //   ist der Zustand laengst durch — dann steht der echte Slot da
+    //   und wird gemessen; nur als Rueckfall wird er projiziert
+    //   (dieselbe Rechnung wie im Flug-Handler: die Hand ist zentriert,
+    //   die Reihe rueckt beim Wachsen).
+    //
+    // ★ Und die Karte wird am Zielplatz VERSTECKT, bis der Flug
+    //   ankommt (`setBounceReturnHidden`) — sonst laege sie schon in
+    //   der Hand, waehrend sie noch durchs Bild fliegt. Zusaetzlich
+    //   wird die Ankunft vorangemeldet, damit die automatische
+    //   Zieh-Animation nicht zusaetzlich vom Deck losfliegt (das war
+    //   die „ungewollte Zieh-Animation").
+    const onTreasureReveal = ({ cardName, playerIdx, handIdx, finalHandSize }) => {
+      if (window._playAnimations === false) return;
+      const istMeins = playerIdx === myIdx;
+      const karte = CARDS_BY_NAME[cardName];
+      if (!karte) return;
+      const basis = istMeins ? '.game-hand-me' : '.game-hand-opp';
+
+      // Die automatische Zieh-Animation unterdruecken (s.o.).
+      if (istMeins) pileTransferToHandPendingMeRef.current  += 1;
+      else          pileTransferToHandPendingOppRef.current += 1;
+
+      // Zielplatz bis zur Ankunft verstecken.
+      const hideKey = handIdx != null ? `${playerIdx}-${handIdx}` : null;
+      if (hideKey) {
+        setBounceReturnHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
+      }
+
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const mitte = { x: vw / 2, y: vh / 2 };
+      const deckEl = document.querySelector(istMeins ? '[data-my-deck]' : '[data-opp-deck]');
+      const startR = deckEl ? deckEl.getBoundingClientRect() : null;
+      const start = startR
+        ? { x: startR.left + startR.width / 2, y: startR.top + startR.height / 2 }
+        : { x: vw * 0.85, y: vh * 0.5 };
+
+      /** Wo landet die Karte? Echter Slot, sonst projiziert. */
+      const handplatz = () => {
+        if (handIdx != null) {
+          const echt = document.querySelector(`${basis} .hand-slot[data-hand-idx="${handIdx}"]`)
+            || document.querySelector(`${basis} [data-hand-idx="${handIdx}"]`);
+          if (echt) {
+            const r = echt.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+          }
+          const slots = document.querySelectorAll(`${basis} .hand-slot, ${basis} [data-hand-idx]`);
+          if (slots.length > 0) {
+            const lr = slots[slots.length - 1].getBoundingClientRect();
+            const breit = lr.width, alt = slots.length;
+            const endzahl = finalHandSize
+              ? Math.max(finalHandSize, handIdx + 1)
+              : Math.max(handIdx + 1, alt + 1);
+            const C = lr.right - (alt * breit) / 2;
+            const links = C - (endzahl * breit) / 2 + handIdx * breit;
+            return { x: links + breit / 2, y: lr.top + lr.height / 2, w: breit, h: lr.height };
+          }
+        }
+        const el = document.querySelector(basis) || document.querySelector('.hand-container');
+        if (el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: 64, h: 90 }; }
+        return { x: vw / 2, y: istMeins ? vh * 0.92 : vh * 0.08, w: 64, h: 90 };
+      };
+
+      const el = document.createElement('div');
+      const bild = cardImageUrl(karte.name);
+      el.style.cssText = `
+        position:fixed; z-index:10240; pointer-events:none;
+        left:${start.x}px; top:${start.y}px; width:46px; height:64px;
+        transform:translate(-50%,-50%) rotateY(90deg);
+        border-radius:8px; overflow:hidden; opacity:0;
+        box-shadow:0 0 26px rgba(120,220,255,.75), 0 6px 20px rgba(0,0,0,.55);
+        transition:left 780ms cubic-bezier(.25,.7,.35,1), top 780ms cubic-bezier(.25,.7,.35,1),
+                   width 780ms cubic-bezier(.25,.7,.35,1), height 780ms cubic-bezier(.25,.7,.35,1),
+                   transform 780ms cubic-bezier(.25,.7,.35,1), opacity 220ms linear;
+      `;
+      el.innerHTML = bild
+        ? `<img src="${bild}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text1);font-size:13px;text-align:center;padding:6px">${karte.name}</div>`;
+      document.body.appendChild(el);
+      if (window.playSFX) window.playSFX('reveal', { category: 'effect', dedupe: 150 });
+
+      // ① in die Mitte
+      requestAnimationFrame(() => {
+        el.style.opacity = '1';
+        el.style.left = `${mitte.x}px`;
+        el.style.top = `${mitte.y}px`;
+        el.style.width = '168px';
+        el.style.height = '234px';
+        el.style.transform = 'translate(-50%,-50%) rotateY(0deg)';
+      });
+
+      // ③ nach dem Verharren an den Handplatz (Platz JETZT suchen)
+      // ★ v1024 (Als Befund): Das Verharren ist fast null — bei 620 ms
+      // erreichte die zweite Karte die Mitte, waehrend die erste noch
+      // dort stand, und sie ueberlagerten sich. 90 ms reichen als
+      // Atempause zwischen Hin- und Weiterflug; aufgedeckt sieht man
+      // die Karte trotzdem, weil sie GROSS in die Mitte kommt und
+      // erst danach schrumpft.
+      const HALT_MS = 90, FLUG2_MS = 620;
+      setTimeout(() => {
+        const ziel = handplatz();
+        el.style.transition = `left ${FLUG2_MS}ms cubic-bezier(.4,.1,.3,1), top ${FLUG2_MS}ms cubic-bezier(.4,.1,.3,1), `
+          + `width ${FLUG2_MS}ms ease-in, height ${FLUG2_MS}ms ease-in`;
+        el.style.left = `${ziel.x}px`;
+        el.style.top = `${ziel.y}px`;
+        el.style.width = `${ziel.w}px`;
+        el.style.height = `${ziel.h}px`;
+      }, 780 + HALT_MS);
+
+      // Ankunft: Overlay weg, echte Handkarte sichtbar.
+      setTimeout(() => {
+        el.remove();
+        if (hideKey) {
+          setBounceReturnHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const n = new Set(prev); n.delete(hideKey); return n;
+          });
+        }
+      }, 780 + HALT_MS + FLUG2_MS);
+    };
+    socket.on('treasure_reveal', onTreasureReveal);
+
     socket.on('card_reveal', onReveal);
     socket.on('play_type_declaration', onTypeDeclaration);
     socket.on('deck_search_add', onDeckSearchAdd);
@@ -29342,6 +30919,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => coin.remove(), delay + dur + 100);
       }
     };
+    // ★★ v1138 („Festive Werz", Al 15.9.): bunte Geschenke von der
+    // eigenen Goldanzeige zur gegnerischen.
+    //
+    // ★ Die Anker sind dieselben wie beim Gold-Diebstahl
+    // (`[data-gold-player]`) — kein neuer Aufhaenger, keine neue
+    // Fehlerquelle. Die Anzahl richtet sich nach dem Betrag, ist aber
+    // gedeckelt: 20 Gold sollen nicht 20 Paeckchen bedeuten.
+    const onGoldGiftFlight = ({ fromPlayer, toPlayer, amount, durationMs }) => {
+      if (window._playAnimations === false) return;
+      const von = document.querySelector(`[data-gold-player="${fromPlayer}"]`);
+      const nach = document.querySelector(`[data-gold-player="${toPlayer}"]`);
+      if (!von || !nach) return;
+      const a = von.getBoundingClientRect();
+      const b = nach.getBoundingClientRect();
+      const anzahl = Math.max(3, Math.min(8, Math.round((Number(amount) || 5) / 5) + 2));
+      const dauer = Number(durationMs) || 1100;
+      const eintraege = Array.from({ length: anzahl }, (_, i) => ({
+        id: Date.now() + Math.random(),
+        startX: a.left + a.width / 2 + (Math.random() - 0.5) * 26,
+        startY: a.top + a.height / 2 + (Math.random() - 0.5) * 14,
+        dx: (b.left + b.width / 2) - (a.left + a.width / 2) + (Math.random() - 0.5) * 30,
+        dy: (b.top + b.height / 2) - (a.top + a.height / 2) + (Math.random() - 0.5) * 20,
+        // Ein Bogen nach oben, damit die Paeckchen nicht schnurgerade
+        // ueber das Brett rutschen.
+        bogen: -(60 + Math.random() * 90),
+        farbe: ['#e5484d', '#3fa96a', '#3b82f6', '#f0b429', '#a855f7', '#ec4899'][i % 6],
+        band: ['#ffe9b0', '#fff', '#ffd6e7'][i % 3],
+        groesse: 16 + Math.random() * 12,
+        delay: i * (dauer * 0.055),
+        dur: dauer * 0.8,
+        dreh: (Math.random() - 0.5) * 540,
+      }));
+      setGoldGifts(prev => [...prev, ...eintraege]);
+      setTimeout(() => {
+        const ids = new Set(eintraege.map(e => e.id));
+        setGoldGifts(prev => prev.filter(g => !ids.has(g.id)));
+      }, dauer + 400);
+    };
+    socket.on('gold_gift_flight', onGoldGiftFlight);
     socket.on('gold_steal_burst', onGoldStealBurst);
     const onJumpscareBox = ({ owner, heroIdx }) => {
       if (window.playSFX) window.playSFX('jumpscare', { category: 'effect' });
@@ -29866,13 +31482,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         const id = Date.now() + Math.random();
         const entry = {
+          // ★★ v1131: Startzeit des Fluges. Siehe `DiscardAnimCard` —
+          // sie macht den Flug gegen einen Neustart der Animation
+          // unempfindlich.
+          t0: ppJetzt(),
           id, cardName,
           startX: srcRect.left + srcRect.width / 2 - 32,
           startY: srcRect.top + srcRect.height / 2 - 45,
           endX: dstRect.x, endY: dstRect.y,
           dest: animDest,
         };
-        setDiscardAnims(prev => [...prev, entry]);
+        setDiscardAnims(prev => [...prev, (entry.t0 == null ? { ...entry, t0: ppJetzt() } : entry)]);
         setTimeout(() => {
           setDiscardAnims(prev => prev.filter(a => a.id !== id));
           if (hideOnDest === 'stack') setStackHidden(p => Math.max(0, p - 1));
@@ -29966,7 +31586,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               endX: dstRect.x, endY: dstRect.y,
               dest: 'deleted',
             };
-            setDiscardAnims(prev => [...prev, entry]);
+            setDiscardAnims(prev => [...prev, (entry.t0 == null ? { ...entry, t0: ppJetzt() } : entry)]);
             setTimeout(() => {
               setDiscardAnims(prev => prev.filter(a => a.id !== id));
               setDelHidden(p => Math.max(0, p - 1));
@@ -30549,6 +32169,105 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       document.body.appendChild(overlay);
     };
+    // ── „Iceage" — der Blizzard (v1012, Als Vorgabe 12.9.) ─────────
+    // Ein GEWALTIGER, kurzer Wettereinbruch ueber dem ganzen Bild:
+    // weisser Schleier, 220 schraeg jagende Schneestreifen, Frost, der
+    // von allen vier Raendern hereinwaechst, und ein Kaelteblitz zum
+    // Einschlag. Bauform wie der Divine-Rain-Vorhang (direkt ins DOM,
+    // nicht als React-Komponente) — nur zeitlich begrenzt: nach 2,6 s
+    // raeumt er sich selbst ab, es gibt kein Gegenstueck zum Abschalten.
+    const onIceageBlizzard = () => {
+      if (window._playAnimations === false) return;
+      const alt = document.getElementById('iceage-overlay');
+      if (alt) alt.remove();
+      if (!document.getElementById('iceage-keyframes')) {
+        const style = document.createElement('style');
+        style.id = 'iceage-keyframes';
+        style.textContent = `
+          @keyframes iceageFlake {
+            0%   { transform: translate(0, -12vh) rotate(-18deg); opacity: 0; }
+            10%  { opacity: 1; }
+            100% { transform: translate(-24vw, 118vh) rotate(-18deg); opacity: 0; }
+          }
+          @keyframes iceageVeil {
+            0%   { opacity: 0; }
+            18%  { opacity: .85; }
+            70%  { opacity: .55; }
+            100% { opacity: 0; }
+          }
+          @keyframes iceageFlash {
+            0%   { opacity: 0; }
+            6%   { opacity: .55; }
+            22%  { opacity: 0; }
+            100% { opacity: 0; }
+          }
+          @keyframes iceageFrost {
+            0%   { opacity: 0; transform: scale(1.25); }
+            25%  { opacity: 1; transform: scale(1); }
+            75%  { opacity: .9; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.05); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      const overlay = document.createElement('div');
+      overlay.id = 'iceage-overlay';
+      overlay.style.cssText = `
+        position:fixed; top:0; left:0; width:100vw; height:100vh;
+        z-index:9600; pointer-events:none; overflow:hidden;
+      `;
+      // Schleier
+      const veil = document.createElement('div');
+      veil.style.cssText = `
+        position:absolute; inset:0;
+        background: linear-gradient(180deg, rgba(200,235,255,.5) 0%, rgba(150,205,245,.32) 45%, rgba(120,180,230,.42) 100%);
+        animation: iceageVeil 2600ms ease-out forwards;
+      `;
+      overlay.appendChild(veil);
+      // Frost von den Raendern
+      const frost = document.createElement('div');
+      frost.style.cssText = `
+        position:absolute; inset:0;
+        background:
+          radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(225,245,255,.75) 82%),
+          repeating-linear-gradient(115deg, rgba(255,255,255,.16) 0 3px, transparent 3px 9px);
+        animation: iceageFrost 2600ms ease-out forwards;
+      `;
+      overlay.appendChild(frost);
+      // Kaelteblitz
+      const flash = document.createElement('div');
+      flash.style.cssText = `
+        position:absolute; inset:0; background: rgba(235,250,255,.95);
+        animation: iceageFlash 2600ms ease-out forwards;
+      `;
+      overlay.appendChild(flash);
+      // Schneestreifen
+      for (let i = 0; i < 220; i++) {
+        const f = document.createElement('div');
+        const x = Math.random() * 125 - 5;
+        const dur = 0.5 + Math.random() * 0.7;
+        const delay = Math.random() * 1.5;
+        const laenge = 10 + Math.random() * 26;
+        const breite = 1 + Math.random() * 2.5;
+        const deck = 0.25 + Math.random() * 0.6;
+        f.style.cssText = `
+          position:absolute; left:${x}%; top:0;
+          width:${breite}px; height:${laenge}px; border-radius:${breite}px;
+          background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(240,252,255,${deck}));
+          animation: iceageFlake ${dur}s linear ${delay}s infinite;
+        `;
+        overlay.appendChild(f);
+      }
+      document.body.appendChild(overlay);
+      if (window.playSFX) {
+        window.playSFX('elem_ice', { category: null, volume: 1.0 });
+        window.playSFX('elem_wind', { category: null, delay: 180, volume: .9, dedupe: 0 });
+      }
+      setTimeout(() => { overlay.style.transition = 'opacity 320ms'; overlay.style.opacity = '0'; }, 2300);
+      setTimeout(() => overlay.remove(), 2700);
+    };
+    socket.on('iceage_blizzard', onIceageBlizzard);
+
     socket.on('divine_rain_start', onDivineRainStart);
     // Stop = fade the overlay out and remove it. Fired by the engine's
     // turn-end broadcast flush (queueTurnEndBroadcast) at the end of
@@ -31183,7 +32902,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Generic pile-to-pile flying card animation. Used for moves the
     // automatic hand → pile detector can't see — specifically
     // discard → deleted (Mass Multiplication's consumed source card).
-    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown }) => {
+    const onPileTransfer = ({ owner, cardName, from, to, fromOwner, toOwner, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId, toHandIdx, toHeroIdx, toSlotIdx, finalHandSize, flightStyle, faceDown, sfx }) => {
+      // ★ v1122 (Al 15.9.: „fuer die 4 Karten, die vom Discard ins Deck
+      // fliegen, fehlt jeweils ein Woosh-Sound-Effect (wie beim Ziehen
+      // von Karten)"). Ein Flug konnte bisher keinen Klang mitbringen —
+      // nur der Deck→Hand-Weg hat seinen eigenen (v1111). Jetzt darf
+      // JEDER Flug einen nennen; `dedupe` haelt Serien zusammen.
+      if (sfx && window.playSFX) {
+        setTimeout(() => window.playSFX(sfx, { dedupe: 60 }), 40);
+      }
       // Kadaver-Halter loesen (Hunting Stufe 1: Sterbezone → Hand).
       if (from === 'support' && fromSlotIdx != null) releaseClaimHold(fromOwner ?? owner, fromHeroIdx, fromSlotIdx);
       // Backward-compatible: when only `owner` is supplied the source AND
@@ -31205,6 +32932,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (to === 'hand') {
         if (tgtIsMe) pileTransferToHandPendingMeRef.current  += 1;
         else         pileTransferToHandPendingOppRef.current += 1;
+        // ★ v1111 (Als Testbefund 15.9.: „Die vom Gegner-Deck gezogene
+        // Karte spielt noch keinen Draw-Sound ab").
+        //
+        // Die Maske eine Zeile darueber ist genau die Ursache: sie
+        // blendet diesen Handplatz aus der Zuwachs-Erkennung aus, und
+        // AN DER haengt auch der Zieh-Klang. Gewollt ist nur, die
+        // doppelte FLUG-Animation zu unterdruecken — der Klang faellt
+        // als Beifang mit weg.
+        //
+        // Also hier zurueckgeben. `dedupe` faengt den Fall ab, dass ein
+        // Weg doch beide Pfade ausloest; die Verzoegerung legt ihn auf
+        // die Landung statt auf den Abflug.
+        if (from === 'deck' && window.playSFX) {
+          setTimeout(() => window.playSFX('draw', { dedupe: 120 }), 260);
+        }
       }
       // Pre-register hand / support / ability / surprise → pile
       // transfers so the diff-based fly-out detector below suppresses
@@ -31436,6 +33178,59 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Zeigt der Platz noch sie, wird versteckt (der Doppelbild-Fall,
       // fuer den die Sicherung gedacht war); zeigt er inzwischen etwas
       // anderes, bleibt es sichtbar.
+      // ★ ABFLIEGENDE HANDKARTE VERDECKEN (v1036, Als Befund 12.9.):
+      //   Bei `from: 'hand'` bleibt die Karte ABSICHTLICH noch im
+      //   Zustand, bis der Flug angekommen ist — der Client braucht den
+      //   Handplatz als Startpunkt (`fromHandIdx`), und die Negat-Wege
+      //   verzoegern ihren Sync genau deswegen. Folge: waehrend des
+      //   Fluges lagen ZWEI Kopien sichtbar da — die fliegende und die
+      //   in der Hand. Betrifft jeden Hand-Abflug mit Startplatz, also
+      //   auch „Lunar Eclipse" (Hand → Geloescht) und „Key" (Hand →
+      //   fremde Hand), nicht nur „Off Duty" (Hand → Deck).
+      //
+      //   Der Platz selbst BLEIBT im DOM (nur `visibility: hidden`),
+      //   sonst verloere der Flug seinen Anker. Aufgeraeumt wird nach
+      //   der Flugdauer: danach hat der Sync die Karte ohnehin entfernt,
+      //   und ein stehengebliebener Schluessel wuerde nach dem
+      //   Nachruecken die FALSCHE Handkarte verdecken.
+      if (from === 'hand' && fromHandIdx != null && fromHandIdx >= 0) {
+        // ★ v1063 (Als Befund 14.9.: „die nachrueckende Karte wird
+        // kurzzeitig unsichtbar"). Der Schluessel war rein POSITIONELL
+        // und wurde 700 ms lang gehalten. Der Sync entfernt die
+        // abfliegende Karte aber sofort, die folgenden ruecken nach —
+        // und ab da verdeckte der Schluessel die FALSCHE Karte. Genau
+        // diese Moeglichkeit stand schon als Warnung im Kommentar
+        // darunter; die Zeitschranke allein hat sie nicht verhindert.
+        //
+        // Der Platz-Nachbar direkt darunter (`bounceOutgoingHidden` fuer
+        // Support-Zonen) macht es seit jeher richtig: er haengt den
+        // KARTENNAMEN an den Schluessel und verdeckt damit nur, solange
+        // der Platz noch dieselbe Karte zeigt.
+        //
+        // Hier geht das nicht ueber den Namen — die GEGNERHAND kennt
+        // keine Namen, dort liegen Rueckseiten. Stattdessen die
+        // HANDGROESSE beim Abflug: schrumpft die Hand, passt der
+        // Schluessel nicht mehr und die Verdeckung faellt von selbst
+        // weg, ohne auf den Zeitgeber zu warten. Dieselbe Bauform wie
+        // die Zaehler-Absicherung von `stealHiddenOpp` daneben.
+        //
+        // Die ANKOMMENDEN Reservierungen (Kassaran, Geburtstagsgeschenk)
+        // benutzen weiterhin den schlichten Schluessel — dort ist der
+        // Platz leer, bis die Karte landet, ein Nachruecken gibt es
+        // nicht.
+        const _reihe = srcIsMe ? '.game-hand-me' : '.game-hand-opp';
+        const _handJetzt = document.querySelectorAll(`${_reihe} .hand-slot`).length
+          || document.querySelectorAll(`${_reihe} .hand-card`).length;
+        const handHideKey = `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
+        setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
+        setTimeout(() => {
+          setBounceReturnHidden(prev => {
+            if (!prev.has(handHideKey)) return prev;
+            const n = new Set(prev); n.delete(handHideKey); return n;
+          });
+        }, 700);
+      }
+
       if (from === 'support' && fromHeroIdx != null && fromSlotIdx != null) {
         const hideKey = `${srcOwner}-${fromHeroIdx}-${fromSlotIdx}::${cardName || ''}`;
         setBounceOutgoingHidden(prev => {
@@ -31641,13 +33436,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => setHidden(prev => Math.max(0, prev - 1)),
           (laneDelay || 0) + Math.round(durationMs * 0.8));
       }
+      // ★ v1062: Start UND Weg auf ganze Pixel runden. `srcX`/`srcY`
+      // kommen aus `getBoundingClientRect()` und sind fast immer
+      // gebrochen; zusammen mit der laufenden `scale()`-Fahrt muss die
+      // Kartenkunst dann bei jedem Frame neu zwischen Pixeln
+      // interpoliert werden, was als Flimmern sichtbar wird. Das Ziel
+      // verschiebt sich dadurch um höchstens einen halben Pixel.
       card.style.cssText = [
         'position:fixed',
-        `left:${srcX - 32}px`, `top:${srcY - 44}px`,
+        `left:${Math.round(srcX - 32)}px`, `top:${Math.round(srcY - 44)}px`,
         'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
         'border-radius:4px', 'overflow:hidden',
         glow,
-        `--ptDx:${dx}px`, `--ptDy:${dy}px`,
+        `--ptDx:${Math.round(dx)}px`, `--ptDy:${Math.round(dy)}px`,
         `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
@@ -33406,6 +35207,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_damage_zero', onDamageZero);
+    // ★★ v1150: eine frisch gesetzte Zielmarke leuchtet einmal rot auf —
+    // das Live-Feedback, WELCHES Ziel gerade gewaehlt wurde (Ricochet).
+    const onZielMarkeBlitz = (m) => {
+      if (!m) return;
+      const id = Date.now() + Math.random();
+      // ★★ v1152 (Al 17.9.): das Einrasten laeuft bei JEDER Wahl, auch
+      // bei der eigenen — nur die Beschriftung unterscheidet sich.
+      const wer = isSpectator || m.waehler == null ? 'target' : (m.waehler === myIdx ? 'mine' : 'opp');
+      setZielBlitz(prev => [...prev, { ...m, id, wer }]);
+      setTimeout(() => setZielBlitz(prev => prev.filter(x => x.id !== id)), 1500);
+      // ★★ v1153 (Al 17.9.): kleiner Zielerfassungs-Klang zur Animation —
+      // ein leises „Erfassen" beim Einblenden und ein hellerer Ping, wenn
+      // das Fadenkreuz einrastet (~30 % der Animation). Jede weitere
+      // Position der Kette klingt einen Halbton hoeher (#1, #2, #3 …).
+      if (window.playSFX) {
+        const nr = Math.max(1, parseInt(String(m.label || '').replace(/\D/g, ''), 10) || 1);
+        const hoeher = Math.pow(2, Math.min(nr - 1, 12) / 12);
+        window.playSFX('ping', { rate: 1.25 * hoeher, volume: 0.35, dedupe: 0, category: null });
+        window.playSFX('ping', { rate: 1.9 * hoeher, volume: 0.55, dedupe: 0, category: null, delay: 420 });
+      }
+    };
+    socket.on('ziel_marke_blitz', onZielMarkeBlitz);
     const onGuardianAngel = ({ owner, heroIdx }) => {
       const label = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${label}"][data-hero-idx="${heroIdx}"]`);
@@ -33597,7 +35420,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Stagger the animations
       for (const anim of newAnims) {
         setTimeout(() => {
-          setDiscardAnims(prev => [...prev, anim]);
+          setDiscardAnims(prev => [...prev, (anim.t0 == null ? { ...anim, t0: ppJetzt() } : anim)]);
           // v337 (Als Befund): der Flug in den Deleted Pile war stumm —
           // Trade schickte fuenf Karten lautlos weg. Derselbe Klang wie
           // beim Abwurf, je Karte und im Takt ihres Fluges; ein eigener
@@ -33610,6 +35433,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('deck_to_deleted', onDeckToDeleted);
     return () => {
+      socket.off('treasure_reveal', onTreasureReveal);
       socket.off('effect_source_glow', onEffectGlow); socket.off('card_reveal', onReveal); socket.off('play_type_declaration', onTypeDeclaration); socket.off('deck_search_add', onDeckSearchAdd);
       socket.off('hand_to_board_fly', onHandToBoard);
       socket.off('attach_hero_fly', onAttachHeroFly);
@@ -33647,6 +35471,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('boulder_fall', onBoulderFall);
       socket.off('slow_dark_magic', onSlowDarkMagic);
       socket.off('card_effect_flash', onCardEffectFlash);
+      socket.off('gold_gift_flight', onGoldGiftFlight);
       socket.off('gold_steal_burst', onGoldStealBurst);
       socket.off('jumpscare_box', onJumpscareBox);
       socket.off('anti_magic_bubble', onAntiMagicBubble);
@@ -33671,6 +35496,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_weapon_barrage', onWeaponBarrage);
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
+      socket.off('iceage_blizzard', onIceageBlizzard);
       socket.off('divine_rain_start', onDivineRainStart);
       socket.off('divine_rain_stop', onDivineRainStop);
       // Hard cleanup: the rain overlay lives on document.body, OUTSIDE
@@ -33711,6 +35537,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('play_heal_beam', onHealBeam);
       socket.off('play_heal_zero', onHealZero);
       socket.off('play_damage_zero', onDamageZero);
+      socket.off('ziel_marke_blitz', onZielMarkeBlitz);
       socket.off('play_guardian_angel', onGuardianAngel);
       socket.off('hero_announcement', onHeroAnnouncement);
       socket.off('dark_deepsea_god_manifest', onDDGManifest);
@@ -34428,6 +36255,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [damageNumbers, setDamageNumbers] = useState([]);
   const [healNumbers, setHealNumbers] = useState([]);
   const [creatureDamageNumbers, setCreatureDamageNumbers] = useState([]);
+  // v1151: Zielmarken-Blitze (je Wahl ein Eintrag; die Ebene zeichnet sie).
+  const [zielBlitz, setZielBlitz] = useState([]);
   // Server-driven 0-heal feedback. Diff-based detection can't see "heal
   // landed but produced no HP gain" since the HP is identical pre/post,
   // so the engine broadcasts `play_heal_zero` from the overheal-blocked
@@ -34653,12 +36482,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const animType = cur.stunned?.animationType;
           if (animType) setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
-        // Gained negated → electric strike animation. Skip Weakening
-        // Crystal's aura (passive in-hand effect — re-applied every
-        // sync, would otherwise re-fire the burst on each refresh).
-        if (cur.negated && !prev.negated && !cur.negated._byWeakeningCrystal) {
+        // Gained negated → Silence-Siegel. ★ v1046 (Als Vorgabe 12.9.):
+        // frueher `electric_strike` — das sah aus wie eine Betaeubung.
+        // Die Negierung ist aber kein Schlag, sondern ein VERSTUMMEN;
+        // `silence_seal` zeigt Siegelring, Verbotszeichen und Schwade
+        // in gedecktem Violett statt gelber Blitze. Eine Karte kann
+        // weiterhin ihr eigenes Bild vorgeben (`animationType`).
+        // Skip Weakening Crystal's aura (passive in-hand effect —
+        // re-applied every sync, would otherwise re-fire the burst on
+        // each refresh).
+        // v1114: auch Anhaengsel-Negation ist die LEICHTE Form.
+        if (cur.negated && !prev.negated && !(cur.negated._byWeakeningCrystal || cur.negated._fromAttachment)) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
-          const animType = cur.negated?.animationType || 'electric_strike';
+          const animType = cur.negated?.animationType || 'silence_seal';
           setTimeout(() => playAnimation(animType, sel, { duration: 1000 }), 50);
         }
         // Lost frozen or stunned → thaw animation
@@ -34669,7 +36505,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Lost negated → thaw animation. Same skip — losing a Crystal-
         // sourced aura (player discarded their last Crystal) is a
         // silent wakeup, not a thaw burst.
-        if (!cur.negated && prev.negated && !prev.negated._byWeakeningCrystal) {
+        if (!cur.negated && prev.negated && !(prev.negated._byWeakeningCrystal || prev.negated._fromAttachment)) {
           const sel = `[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${hi}"]`;
           setTimeout(() => playAnimation('thaw', sel, { duration: 900 }), 50);
         }
@@ -34789,6 +36625,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Pilot's ≤Lv1 requirement on the inherent path).
   const validTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => !t.ineligible && !blockedTargetIds.has(t.id)).map(t => t.id)) : new Set();
   const ineligibleTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => t.ineligible || blockedTargetIds.has(t.id)).map(t => t.id)) : new Set();
+  // ★★ v1143b: Ziel-Akzent (`t.accent`) — eine zweite Farbe fuer waehlbare
+  // Ziele mit Sonderwirkung, z.B. gruen bei „Forbidden Curse of Aging":
+  // gegen dieses Ziel ist der Einsatz eine Zusatz-Aktion.
+  const accentGreenTargetIds = isTargeting ? new Set((pt.validTargets || []).filter(t => t.accent === 'green' && validTargetIds.has(t.id)).map(t => t.id)) : new Set();
   const selectedSet = new Set(potionSelection);
 
   const togglePotionTarget = (targetId) => {
@@ -35256,7 +37096,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ── Collapse state for log/chat ──
   const [logCollapsed, setLogCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 900);
+  // ★ v1056 (Als Vorgabe 14.9.): Log und Chat starten EINGEKLAPPT —
+  // auf jedem Bildschirm, nicht nur auf schmalen. Das Brett bekommt
+  // damit von Anfang an die volle Breite; wer mitlesen will, klappt
+  // die Spalte auf.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const toggleLogCollapse = () => { setLogCollapsed(v => !v); if (chatCollapsed) setChatCollapsed(false); };
   const toggleChatCollapse = () => { setChatCollapsed(v => !v); if (logCollapsed) setLogCollapsed(false); };
 
@@ -35615,6 +37459,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'zsos_ssar_boost') { return <span className="log-damage">{entry.hero}'s damage boosted by <span className="log-amount">+{entry.bonus}</span> ({entry.poisonedCount} poisoned target{entry.poisonedCount !== 1 ? 's' : ''})!</span>; }
       if (t === 'peszet_plague') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} poisoned {entry.target} ({cName(entry.trigger)} summoned).</span>; }
       if (t === 'logan_invest') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} invested <span className="log-amount" style={{color:'#ffcc44'}}>{entry.paid}</span> Gold — now at <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''}.</span>; }
+      // ★★ v1141 („Forbidden Curse of Aging"): die Karte protokollierte
+      // ihre Entscheidung, aber NIEMAND zeichnete sie — fuer Al war
+      // unsichtbar, ob die Zusatz-Aktion greift oder nicht. Ein Log
+      // ohne Darstellung ist so gut wie kein Log.
+      if (t === 'curse_of_aging_attached') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)} aged {cName(entry.hero)} — its HP cannot be healed and its other statuses are frozen.</span>; }
+      if (t === 'curse_of_aging_no_free_action') { const p = playerByName(entry.player); return <span className="log-info">{cName('Forbidden Curse of Aging')} cost {pName(p.name, p.color)} an Action — the chosen target has no {cName('Charme')} and has already taken damage this game.</span>; }
+      if (t === 'status_select_auto') { const p = playerByName(entry.player); return <span className="log-info">Only one status could be removed from {cName(entry.target)} — {cName(entry.status)} was chosen automatically.</span>; }
       if (t === 'logan_payout_gold') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} for <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold!</span>; }
       if (t === 'logan_payout_damage') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} cashed in <span className="log-amount">{entry.counters}</span> Invest Counter{entry.counters !== 1 ? 's' : ''} — <span className="log-amount">{entry.damage}</span> damage to {entry.target}!</span>; }
             if (t === 'kent_overdraft') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName(entry.hero)} went into debt — Gold is now <span className="log-amount">{entry.gold}</span>. No more Actions this turn.</span>; }
@@ -35676,6 +37527,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'breaking_strike') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Breaking Strike')} — {pName(p.name, p.color)} shattered <span className="log-amount">{entry.discarded}</span> Artifact(s) for <span className="log-amount">{entry.damage}</span> damage ({entry.atk} × {entry.discarded}).</span>; }
       if (t === 'aurora_borealis') { const p = playerByName(entry.player); return <span className="log-info">{cName('Aurora Borealis')} lit the sky for {pName(p.name, p.color)} — {(entry.cards || []).map((c, i) => <span key={i}>{i > 0 ? ', ' : ''}{cName(c)}</span>)} to hand (Magic Arts {entry.level}).</span>; }
       if (t === 'aurora_perform') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} deleted two Spells to perform {cName(entry.card)} at once.</span>; }
+      if (t === 'iceage') { const p = playerByName(entry.player); return <span className="log-status">{cName('Iceage')} swept the board — {pName(p.name, p.color)} froze <span className="log-amount">{entry.targets}</span> target(s) for <span className="log-amount">{entry.duration}</span> turn(s).</span>; }
+      if (t === 'bomb_mite_detonate') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Bomb Mite')} went off — <span className="log-amount">{entry.damage}</span> damage to {entry.targets} of {pName(p.name, p.color)}'s opposing Hero(es).</span>; }
+      if (t === 'bomb_mite_backfire') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Bomb Mite')} was cracked open — <span className="log-amount">{entry.damage}</span> damage to {entry.targets} of {pName(p.name, p.color)}'s OWN Hero(es).</span>; }
+      if (t === 'cute_conversion') { const p = playerByName(entry.player); return <span className="log-status">{cName('Cute Conversion')} — {pName(p.name, p.color)} charmed <span className="log-amount">{entry.count}</span> Creature(s) for the rest of the turn.</span>; }
+      if (t === 'off_duty') { const p = playerByName(entry.player); return <span className="log-status">{cName('Off Duty')} — {pName(p.name, p.color)} negated the summon of {cName(entry.negated)}; it was shuffled back into the deck.</span>; }
+      if (t === 'negated_to_deck') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} was shuffled back into {pName(p.name, p.color)}'s deck.</span>; }
+      if (t === 'creepy_villager_swap') { const p = playerByName(entry.player); return <span className="log-status">{cName('Creepy Villager')} slipped away — {cName('Dark Deepsea God')} rose from its Support Zone for {pName(p.name, p.color)}.</span>; }
+      if (t === 'creepy_villager_toll') { const p = playerByName(entry.player); return <span className="log-info">{cName('Creepy Villager')} was defeated — {pName(p.name, p.color)} discarded <span className="log-amount">{entry.discarded}</span> card(s).</span>; }
+      if (t === 'deepsea_treasure') { const p = playerByName(entry.player); return <span className="log-info">{cName('Deepsea Treasure')} — {pName(p.name, p.color)} revealed {(entry.cards || []).map((c, i) => <span key={i}>{i > 0 ? ', ' : ''}{cName(c)}</span>)}.</span>; }
+      if (t === 'deepsea_treasure_played') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} played {cName(entry.card)} for free.</span>; }
+      if (t === 'deepsea_treasure_free') { const p = playerByName(entry.player); return <span className="log-info">{cName(entry.card)} costs nothing for {pName(p.name, p.color)} this turn.</span>; }
+      if (t === 'mass_routing') { const p = playerByName(entry.player); return <span className="log-status">{cName('Mass Routing')} — {pName(p.name, p.color)} routed <span className="log-amount">{entry.shuffled}</span> Creature(s) up to level {entry.maxLevel} back into their decks.</span>; }
+      if (t === 'last_resort') { const p = playerByName(entry.player); return <span className="log-damage">{cName('Last Resort')} — {pName(p.name, p.color)} spent {entry.hero} for <span className="log-amount">{entry.damage}</span> damage.</span>; }
+      if (t === 'classical_harpyformer_gold') { const p = playerByName(entry.player); return <span className="log-info">{cName('Classical Harpyformer')} — {pName(p.name, p.color)} traded {cName('Wealth')} for <span className="log-amount">{entry.amount}</span> Gold.</span>; }
+      if (t === 'null_silence') { const p = playerByName(entry.player); return <span className="log-status">{cName('Null, the Mage Slayer')} silenced {cName(entry.target)} for <span className="log-amount">{entry.turns}</span> turns.</span>; }
     } catch(e) {}
     return null;
   };
@@ -35953,9 +37819,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // there. The pre-existing `me.bonusActions?.remaining` access was
           // always undefined, which silently made the Ghuanjun bypass a
           // no-op too.
+          // ★ v1020 (Als Befund 12.9.): Waehrend einer SOFORT-AKTION MIT
+          // FREIER HELDENWAHL darf gar nichts ausgegraut werden. Der
+          // Prompt (`type: 'heroAction'` OHNE `heroIdx`) erlaubt jeden
+          // lebenden Helden — die Zhigao-Ausgrauung liess es aber so
+          // aussehen, als koenne nur er die Ersatzaktion ausfuehren
+          // (Off Duty negiert seine Beschwoerung → Ersatzaktion).
+          // Rein optisch, aber irrefuehrend: der Klick auf einen
+          // anderen Helden ging die ganze Zeit durch.
+          const freieHeldenwahlOffen = gameState.effectPrompt?.type === 'heroAction'
+            && gameState.effectPrompt?.ownerIdx === myIdx
+            && gameState.effectPrompt?.heroIdx === undefined;
           const additionalActionDimmed = !isOpp && !isDead && isMyTurn && currentPhase === 3 && (me.heroesActedThisTurn?.length > 0)
             && !(gameState.bonusActions?.remaining > 0)
             && !(gameState.bonusMainActions > 0)
+            && !freieHeldenwahlOffen
             && (() => {
             const aas = gameState.additionalActions || [];
             if (aas.length === 0) return false;
@@ -36035,7 +37913,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const hasLightBall = (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Light Ball'));
           const isSirenLinked = !!hero?.statuses?.sirenLinked;
           const isBound = !!hero?.statuses?.bound;
-          const isBlinded = !!hero?.statuses?.blinded;
+          // v1059: beide Blendungs-Arten zaehlen (siehe BLIND_STATUSES).
+          const isBlinded = !!(hero?.statuses?.blinded || hero?.statuses?.blinded_hit);
           const isMagicSilenced = !!hero?.statuses?.magic_silenced;
           const isFrightened = !!hero?.statuses?.frightened;   // v879
           const isBerserked = !!hero?.statuses?.berserked;
@@ -36111,6 +37990,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const spellPickEntry = (spellHeroPick && ownerLabel === 'me')
             ? (spellHeroPick.eligible || []).find(e => e.creatureInstId == null && e.charmedOwner == null && e.idx === i) || null
             : null;
+          // ★★ v1164: traegt ein Status dieses Helden eine Klick-Option
+          // fuer MICH (`_klickHeilung.by`), ist er in meinem Zug
+          // anklickbar — solange nichts anderes laeuft.
+          const klickHeilungOffen = !isSpectator
+            && gameState.activePlayer === myIdx
+            && !gameState.effectPrompt && !gameState.potionTargeting
+            && !spellHeroPick && !crossSidePlayPick && !abilityAttachPick
+            && Object.values(hero?.statuses || {}).some(st =>
+              st && typeof st === 'object' && st._klickHeilung?.by === myIdx);
           const onHeroClick = spellPickEntry
             ? () => commitSpellHeroPick(spellPickEntry)
             : isCsppHeroTarget
@@ -36182,14 +38070,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     effectName: heroActionEffectEntry.effectName,
                   })
                 : () => socket.emit('activate_hero_effect', { roomId: gameState.roomId, heroIdx: i, charmedOwner: heroEffectEntry?.charmedOwner }))
-            : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined);
+            : (klickHeilungOffen
+              // ★★ v1164: Status-Klick-Option („Petrifying Potion"):
+              // der betroffene Held ist anklickbar, auch auf der
+              // Gegenseite. Die Rueckfrage stellt der Server.
+              ? () => socket.emit('status_click_option', {
+                  roomId: gameState.roomId,
+                  heroOwner: isOpp ? oppIdx : myIdx, heroIdx: i,
+                })
+              : (isValidHeroTarget ? () => togglePotionTarget(heroTargetId) : undefined));
           const heroGroup = (
             <div key={i} className="board-hero-group">
               {columnLayout[i].maxZones > 3 && Array.from({ length: columnLayout[i].maxLeft }).map((_, s) => (
                 <div key={'lpad-'+s} className="board-zone-spacer" />
               ))}
               <div className="board-zone-spacer" />
-              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + (isHeroEffectActive ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
+              <div className={'board-zone board-zone-hero' + (hero?.name ? ' zone-has-card' : '') + (isDead ? ' board-zone-dead' : '') + ((abilityIneligible || equipIneligible || creatureIneligible || spellAttackIneligible || surpriseIneligible || ascensionIneligible || pickHeroDropIneligible || heroActionDimmed || additionalActionDimmed || attachPickHeroDim) ? ' board-zone-dead' : '') + (attachPickHeroDim ? ' attach-pick-dim' : '') + ((abilityTarget || equipTarget || spellTarget || surpriseTarget || ascensionTarget || pickHeroDropTarget || attachPickEligibleHero || isCsppHeroTarget || spellPickEntry) ? ' board-zone-play-target' : '') + (attachPickEligibleHero ? ' attach-pick-target' : '') + (isValidHeroTarget ? ' potion-target-valid' : '') + (isValidHeroTarget && accentGreenTargetIds.has(heroTargetId) ? ' potion-target-accent-green' : '') + (isIneligibleHeroTarget ? ' potion-target-ineligible' : '') + (isSelectedHeroTarget ? ' potion-target-selected' : '') + (oppTargetHighlight.includes(heroTargetId) ? ' opp-target-highlight' : '') + ((isHeroEffectActive || klickHeilungOffen) ? ' zone-hero-effect-active' : '') + (isCharmed ? ' hero-charmed' : '') + (isControlled ? ' hero-charmed' : '') + (isChainPickValid ? ' chain-pick-valid' : '') + (isChainPickSelected ? ' chain-pick-selected' : '') + (isZonePickHero ? ' zone-pick-target' : '') + ((allianzHover && allianzHover.some(a => a.owner === (isOpp ? oppIdx : myIdx) && a.heroIdx === i)) ? ' zone-alliance-linked' : '')}
                 data-hero-zone="1" data-hero-idx={i} data-hero-owner={ownerLabel} data-hero-name={hero?.name || ''}
                 onClick={onHeroClick}
                 style={zsMerge('hero', { ...((isCsppHeroTarget || isHeroEffectActive || isValidHeroTarget || isChainPickValid || attachPickEligibleHero || isZonePickHero || spellPickEntry) ? { cursor: 'pointer' } : undefined), ...((isCharmed || isControlled) ? { '--charmed-color': charmedByColor || '#ff69b4' } : undefined) })}>
@@ -36217,7 +38113,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         .map(n => ({ label: n, text: CARDS_BY_NAME[n]?.effect || '' }))
                         .filter(e => e.text),
                       style: {
-                        ...(isStunned?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
+                        // v1085: GEMEINSAMER Marker statt eines Karten-eigenen. Baihu
+                        // stempelte `_baihuPetrify`, „Petrifier" braucht
+                        // denselben Anblick — ohne den gemeinsamen Namen
+                        // haette jede weitere Versteinerungs-Karte ihren
+                        // eigenen Zweig gebraucht.
+                        ...((isStunned?._petrified || isStunned?._baihuPetrify) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)' } : null),
                         ...(isInvisible ? { opacity: 0.4 } : null),
                         transition: 'opacity 0.4s ease, filter 0.5s ease',
                       },
@@ -36261,8 +38162,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })()}
                 {isDead && hero?.name && <div className="hero-dead-marker">🪦</div>}
                 {hero?.name && isFrozen && <FrozenOverlay />}
-                {hero?.name && isStunned && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
-                {hero?.name && isStunned?._baihuPetrify && <div className="baihu-petrify-overlay" />}
+                {hero?.name && isStunned && !isStunned._petrified && !isStunned._baihuPetrify && <div className="status-stunned-overlay"><div className="stun-bolt s1" /><div className="stun-bolt s2" /><div className="stun-bolt s3" /></div>}
+                {hero?.name && (isStunned?._petrified || isStunned?._baihuPetrify) && <div className="baihu-petrify-overlay" />}
                 {hero?.name && isNegated && !isNegated._byWeakeningCrystal && <NegatedOverlay />}
                 {hero?.name && isBurned && <BurnedOverlay ticking={burnTickingHeroes.includes(`${pi}-${i}`)} />}
                 {hero?.name && isBleeding && <BleedingOverlay ticking={bleedTickingHeroes.includes(`${pi}-${i}`)} />}
@@ -36270,7 +38171,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {hero?.name && isHealReversed && <HealReversedOverlay />}
                 {hero?.name && isBerserked && <BerserkedOverlay />}
                 {hero?.name && hasLightBall && <LightBallAura />}
-                {hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || isNegated || isNulled || isHealReversed || isUntargetable || isInvisible || isSirenLinked || isBound || isBlinded || isMagicSilenced || isFrightened || isBerserked || isCursed || hero._extraLife || (hero._oneShotDmgShields && hero._oneShotDmgShields.length > 0)) && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} />}
+                {/* ★★ v1143: KEINE HANDLISTE MEHR vor der Badge-Zeile.
+                    `StatusBadges` liefert selbst `null`, wenn nichts anliegt —
+                    die Bedingung davor war eine zweite Liste aller Status, die
+                    jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
+                    ihr standen auch Bleeding und Charmed). */}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {/* v704 (Puppets, Lucky Puppet Laki): Luck Counter auf dem Helden */}
@@ -37365,7 +39271,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 || brackleSourceHidden.has(`${pi}-${i}-${z}`)
                 || pusherFlungHidden.has(`${pi}-${i}-${z}`);
               return (
-                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
+                <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
                   onClick={supportAbilityEntry ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
@@ -37467,6 +39373,56 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     ...((isCsppEmptySlot || isValidEquipTarget || isZonePickTarget || isProviderZone || isCreatureActivatable || isEquipActivatable || isSkatesCreature || isSkatesDest || isSlipperyCreature || isSlipperyDest || isChainPickCreatureValid) ? { cursor: 'pointer' } : undefined),
                     ...(isStolen && stolenColor ? { '--charmed-color': stolenColor } : undefined),
                   })}
+                  ref={(el) => {
+                    // ★★ v1132 — VOLLSTAENDIGE SONDE. Die erste meldete
+                    // nur, wenn eine Karte GEZEICHNET wurde; „kein
+                    // Output" blieb dadurch mehrdeutig (Sonde aus? oder
+                    // Platz wirklich leer?).
+                    //
+                    // Diese hier meldet JEDEN Durchlauf dieses Platzes —
+                    // auch den leeren — und dazu, was wirklich im
+                    // Element steht. Damit ist beim naechsten Glitch
+                    // eindeutig, ob die Karte aus dem Zustand kommt
+                    // (dann steht sie in `zustand`) oder von einer
+                    // fremden Ebene darueber (dann ist `zustand` leer,
+                    // `imDom` aber nicht).
+                    if (!window.PP_ZONE_WATCH || !el) return;
+                    const key = `${pi}-${i}-${z}`;
+                    const cc2 = (gameState.creatureCounters || {})[key];
+                    const imDom = el.querySelector('img') ? 'BILD' : (el.textContent || '').trim().slice(0, 24);
+                    const vorher = el.__ppLetzte;
+                    const jetzt = JSON.stringify(cards) + '|' + imDom;
+                    if (vorher === jetzt) return;          // nur Aenderungen melden
+                    // ★★ v1133 — DIE RUECKKEHR AUSDRUECKLICH ERKENNEN.
+                    //
+                    // Als Lauf 15.9. endete genau vor dem interessanten
+                    // Moment: bis dahin war alles sauber (`Zustand= []`,
+                    // `_dying= 1`). Was danach kommt, ist die Antwort —
+                    // und soll nicht zwischen zwanzig aehnlichen Zeilen
+                    // untergehen.
+                    //
+                    // War dieser Platz schon einmal LEER und mit `_dying`
+                    // markiert, und steht jetzt wieder eine Karte darin,
+                    // ist genau der Glitch passiert.
+                    if (cc2?._dying || (!cards.length && el.__ppWarTot)) el.__ppWarTot = 1;
+                    const rueckkehr = el.__ppWarTot && cards.length > 0;
+                    el.__ppLetzte = jetzt;
+                    if (rueckkehr) {
+                      console.log('%c[ZONE] ★★ RUECKKEHR ' + key + ' — ' + JSON.stringify(cards)
+                        + ' | imDOM= ' + (imDom || '(leer)')
+                        + ' | _dying= ' + (cc2?._dying ?? '-')
+                        + ' | Zaehler= ' + (cc2 ? Object.keys(cc2).join(',') : 'KEINE')
+                        + ' | Abfrage= ' + (gameState.effectPrompt
+                            ? (gameState.effectPrompt.title || gameState.effectPrompt.type) : 'nein'),
+                        'color:#fff;background:#b3261e;font-weight:bold;padding:2px 6px');
+                      return;
+                    }
+                    console.log('[ZONE]', key, '| Zustand=', JSON.stringify(cards),
+                      '| imDOM=', imDom || '(leer)',
+                      '| _dying=', cc2?._dying ?? '-',
+                      '| Abfrage=', gameState.effectPrompt
+                        ? (gameState.effectPrompt.title || gameState.effectPrompt.type) : 'nein');
+                  }}
                   data-bounce-hiding={(bounceOutgoingHidden.has(`${pi}-${i}-${z}`)
                     || bounceOutgoingHidden.has(`${pi}-${i}-${z}::${cards[0] || ''}`)) ? 'true' : undefined}
                   data-support-ramming={isSupportRamming ? 'true' : undefined}
@@ -37488,11 +39444,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <BoardCard cardName={oppPendingPlacement.cardName} hp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} maxHp={CARDS_BY_NAME[oppPendingPlacement.cardName]?.hp} hpPosition="creature" style={{ opacity: 0.6 }} />
                   ) : cards.length > 0 ? (
                     (() => { const cKey = `${pi}-${i}-${z}`; const cc = (gameState.creatureCounters || {})[cKey];
-                    // v898: Eine STERBENDE Creature wird nicht mehr
-                    // gezeichnet. Sie steht im Spielstand noch in ihrer
-                    // Zone (die Todes-Hooks brauchen das), ist optisch
-                    // aber schon weggeflogen — ohne diesen Riegel holt
-                    // sie jeder `sync()` waehrend der Hooks zurueck.
                     if (cc?._dying) return null;
                     // v772: Ein ABILITY-Stapel in einer Support Zone
                     // (Xal, Xalibur) wird wie in einer Ability-Zone
@@ -37583,7 +39534,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     const _ccIsAlreadyDeepsea = (_ccCardDataForSpores?.archetype === 'Deepsea')
                       || _slotTopName === 'Infected Squirrel';
                     const _ccSporified = isCreature && gameState.deepseaSporesActive && !_ccIsAlreadyDeepsea;
-                    const creatureStyle = cc?._baihuPetrify ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
+                    const creatureStyle = (cc?._petrified || cc?._baihuPetrify) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
                       : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 }
                       : _ccSporified ? { filter: 'brightness(0.78) sepia(0.6) hue-rotate(-50deg) saturate(1.7) contrast(1.05)', transition: 'filter 0.5s' }
                       : undefined; return !isCreature ? (
@@ -37939,7 +39890,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     {cc?.frozen ? <FrozenOverlay /> : null}
                     {(cc?.negated || cc?.nulled) ? <NegatedOverlay /> : null}
                     {cc?.poisoned ? <PoisonedOverlay stacks={cc.poisonStacks || 1} /> : null}
-                    {(cc?.frozen || cc?.stunned || cc?.burned || cc?.bleeding || cc?.poisoned || cc?.negated || cc?.nulled || cc?.magic_silenced || cc?._baihuStunned || cc?.sirenLinked || cc?.untargetable_all || cc?._extraLife || (cc?._oneShotDmgShields && cc._oneShotDmgShields.length > 0)) ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
+                    {/* v1143: ohne Handliste, siehe Heldenreihe */}
+                    {cc ? <StatusBadges counters={cc} isHero={false} player={p} cardName={cards[cards.length-1]} /> : null}
                     {/* v704 (Puppets): Luck (Laki) / Preserve (Vinny) Counter */}
                     {cc?.luck > 0 ? (
                       <div className="status-immune-icon puppet-counter-badge"
@@ -38127,7 +40079,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     + (isFull ? ' hand-card-dimmed' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
                     + (isPickFromOppHand && !pickEligible ? ' hand-card-dimmed' : '')}
-                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : undefined)}
+                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
+                  || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : undefined)}
                   onClick={isBlindPick ? () => {
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
@@ -38227,6 +40180,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (opp.handLocked) debuffs.push({ key: 'hand-opp', icon: '🔒', text: `${opp.username} cannot draw or search any more cards this turn!`, color: '#cc8800' });
             if (me.drawLocked && !me.handLocked) debuffs.push({ key: 'draw-me', icon: '💎', text: 'You cannot draw any more cards this turn (searches still work)!', color: '#ff6644' });
             if (opp.drawLocked && !opp.handLocked) debuffs.push({ key: 'draw-opp', icon: '💎', text: `${opp.username} cannot draw any more cards this turn (searches still work)!`, color: '#cc8800' });
+            // v1068: Gegenstueck zum Zieh-Lock — Suchen gesperrt, Ziehen frei.
+            // Der Zusatz nennt ausdruecklich, ob der Ablagestapel mitgesperrt
+            // ist, weil das der einzige Unterschied der starken Stufe ist.
+            // ★★ v1123 („The Thing in the Ship", Als Vorgabe 15.9.: der
+            // Zustand „Active Abilities locked" soll als Spieler-Debuff
+            // erscheinen).
+            //
+            // ★ Die Karte sperrt BEIDE Seiten — deshalb zwei Zeilen aus
+            // EINEM Zustand, nicht zwei getrennte Werte. Wer nur eine
+            // zeigte, liesse den Spieler glauben, der Gegner duerfe
+            // noch. Farben wie bei den uebrigen Sperren: die eigene
+            // Zeile rot, die des Gegners gedaempft.
+            if (me.abilityActivationBlocked) {
+              debuffs.push({ key: 'abil-me', icon: '⛔',
+                text: 'You cannot activate any Ability effects while "The Thing in the Ship" is on the board!',
+                color: '#ff6644' });
+              debuffs.push({ key: 'abil-opp', icon: '⛔',
+                text: `${opp.username} cannot activate any Ability effects either — the lock hits both players!`,
+                color: '#cc8800' });
+            }
+            if (me.searchLocked && !me.handLocked) debuffs.push({ key: 'search-me', icon: '🔒', text: `You cannot search or add cards to your hand this turn${me.searchLockedIncludesDiscard ? ', not even from your discard pile' : ' (your discard pile still works)'} — but you can still draw!`, color: '#ff6644' });
+            if (opp.searchLocked && !opp.handLocked) debuffs.push({ key: 'search-opp', icon: '🔒', text: `${opp.username} cannot search or add cards to their hand this turn${opp.searchLockedIncludesDiscard ? ', not even from their discard pile' : ''} (they can still draw)!`, color: '#cc8800' });
             // v828: Hand-Spielsperre (Knight of Kings [W]) — zwei Modi.
             if (me.handPlayLock === 'all') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn!', color: '#ff6644' });
             if (me.handPlayLock === 'of-kings') debuffs.push({ key: 'handplay-me', icon: '♞', text: 'You cannot play any more cards from your hand this turn — except "of Kings" cards (Board of Kings)!', color: '#ffaa44' });
@@ -38440,10 +40415,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             <div className="board-player-side board-side-opp">{renderPlayerSide(opp, true)}</div>
             <div className="board-area-zones-center">
               {(() => {
-                const myAreaId = `area-${myIdx}`;
-                const oppAreaId = `area-${oppIdx}`;
-                const isMyAreaValid = isTargeting && validTargetIds.has(myAreaId);
-                const isOppAreaValid = isTargeting && validTargetIds.has(oppAreaId);
+                // ★ v1054: es gibt keine EINE Area-Ziel-ID mehr je Seite —
+                // jeder Stapelplatz hat seine eigene (`area-<owner>-<i>`).
+                // Die Zone selbst ist nur noch Rahmen; gewaehlt wird an
+                // der Karte (siehe `AreaStack`).
+                const areaIdsFor = (owner) => (gameState.areaZones?.[owner] || [])
+                  .map((_, i) => `area-${owner}-${i}`);
+                const isMyAreaValid = isTargeting && areaIdsFor(myIdx).some(id => validTargetIds.has(id));
+                const isOppAreaValid = isTargeting && areaIdsFor(oppIdx).some(id => validTargetIds.has(id));
+                const myAreaSelected = areaIdsFor(myIdx).some(id => selectedSet.has(id));
+                const oppAreaSelected = areaIdsFor(oppIdx).some(id => selectedSet.has(id));
+                const zielwahlFuer = (owner) => (isTargeting ? {
+                  owner, validIds: validTargetIds, selectedIds: selectedSet, onToggle: togglePotionTarget,
+                } : null);
                 // Area drag highlight: light up the player's own empty Area
                 // Zone whenever they're dragging an Area-subtype card they
                 // have at least one hero capable of casting. During any-
@@ -38467,18 +40451,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         : ((gameState.effectPrompt.heroIndicesByCard || {})[playDrag.card.name] || []).length > 0)
                     : (me.heroes || []).some((h, hi) => canHeroPlayCard(me, hi, playDrag.card))
                 );
-                const myAreaEmpty = (gameState.areaZones?.[myIdx] || []).length === 0;
-                const myAreaDropEligible = draggingArea && anyCasterForArea && myAreaEmpty;
+                // ★ v1050: nicht mehr „Zone leer", sondern „Zone hat noch
+                // Platz". Das Limit kommt vom Server (`areaLimits`), weil
+                // der Client die Kartenskripte nicht kennt; faellt es aus,
+                // gilt der alte Grundwert 1.
+                const myAreaLimit = gameState.areaLimits?.[myIdx] ?? 1;
+                const myAreaHasRoom = (gameState.areaZones?.[myIdx] || []).length < myAreaLimit;
+                const myAreaDropEligible = draggingArea && anyCasterForArea && myAreaHasRoom;
                 // Area-effect activation — card exports `areaEffect: true`
                 // + `onAreaEffect(ctx)`. The engine publishes an entry per
                 // activatable area per player; we look up each side and
                 // mark the zone clickable when the player can fire the
                 // effect (Main Phase, HOPT fresh, per-card gate passes).
+                // ★ v1050: `getActivatableAreas` liefert EINEN Eintrag JE
+                // AREA und tat das schon immer — die Oberflaeche nahm
+                // aber nur den ersten je Seite. Mit mehreren Areas
+                // gleichzeitig ist das falsch: jede Karte hat ihre
+                // eigene HOPT und ihr eigenes `canActivateAreaEffect`.
+                // Deshalb wandern die ganzen Listen in den Stapel, der
+                // je Karte entscheidet.
                 const activatableAreas = gameState.activatableAreas || [];
-                const myAreaEntry = activatableAreas.find(a => a.areaOwner === myIdx);
-                const oppAreaEntry = activatableAreas.find(a => a.areaOwner === oppIdx);
-                const myAreaActivatable = !isEffectLocked && !!myAreaEntry?.canActivate;
-                const oppAreaActivatable = !isEffectLocked && !!oppAreaEntry?.canActivate;
+                const myAreaEntries = activatableAreas.filter(a => a.areaOwner === myIdx);
+                const oppAreaEntries = activatableAreas.filter(a => a.areaOwner === oppIdx);
+                const myAreaActivatable = !isEffectLocked && myAreaEntries.some(e => e.canActivate);
+                const oppAreaActivatable = !isEffectLocked && oppAreaEntries.some(e => e.canActivate);
+                const activateArea = (areaOwner) => (areaName) => socket.emit('activate_area_effect', {
+                  roomId: gameState.roomId, areaOwner, areaName,
+                });
                 // `area-zone-filled` entscheidet, ob die Zone UEBER oder
                 // UNTER der Phasenplatte liegt (v795, Als Befund 5.9.).
                 // Vorher hing das am z-index der KARTE in der Zone, der
@@ -38490,18 +40489,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // die Entscheidung stabil.
                 const myAreaFilled = (gameState.areaZones?.[myIdx] || []).length > 0;
                 const oppAreaFilled = (gameState.areaZones?.[oppIdx] || []).length > 0;
-                const myAreaCls = (isMyAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(myAreaId) ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '') + (myAreaActivatable ? ' zone-ability-activatable' : '') + (myAreaFilled ? ' area-zone-filled' : '');
-                const oppAreaCls = (isOppAreaValid ? 'potion-target-valid' : '') + (selectedSet.has(oppAreaId) ? ' potion-target-selected' : '') + (oppAreaActivatable ? ' zone-ability-activatable' : '') + (oppAreaFilled ? ' area-zone-filled' : '');
-                const onMyAreaClick = isMyAreaValid
-                  ? () => togglePotionTarget(myAreaId)
-                  : (myAreaActivatable ? () => socket.emit('activate_area_effect', {
-                      roomId: gameState.roomId, areaOwner: myIdx, areaName: myAreaEntry.areaName,
-                    }) : undefined);
-                const onOppAreaClick = isOppAreaValid
-                  ? () => togglePotionTarget(oppAreaId)
-                  : (oppAreaActivatable ? () => socket.emit('activate_area_effect', {
-                      roomId: gameState.roomId, areaOwner: oppIdx, areaName: oppAreaEntry.areaName,
-                    }) : undefined);
+                // Die Zone markiert nur noch, DASS hier etwas waehlbar ist;
+                // die Auswahl selbst sitzt an der einzelnen Karte.
+                const myAreaCls = (myAreaSelected ? ' potion-target-selected' : '') + (myAreaDropEligible ? ' area-drop-eligible' : '') + (myAreaActivatable ? ' zone-ability-activatable' : '') + (myAreaFilled ? ' area-zone-filled' : '');
+                const oppAreaCls = (oppAreaSelected ? ' potion-target-selected' : '') + (oppAreaActivatable ? ' zone-ability-activatable' : '') + (oppAreaFilled ? ' area-zone-filled' : '');
+                // Der Zonen-Klick macht nur noch die ZIELWAHL (Potion-
+                // Ziele treffen die Zone, nicht eine einzelne Karte). Die
+                // Aktivierung gehoert der Karte im Stapel — sonst liesse
+                // sich bei drei Areas nicht sagen, welche gemeint ist.
+                // Kein Zonen-Klick mehr fuer die Zielwahl (v1054): bei
+                // mehreren Areas liesse sich daraus nicht ablesen, welche
+                // gemeint ist. Der Klick gehoert der Karte.
+                const onMyAreaClick = undefined;
+                const onOppAreaClick = undefined;
                 // Hide until measured so the zones don't flash at left:auto and
                 // then "move" into place when the measurement resolves.
                 const measured = areaPositions[0] != null && areaPositions[1] != null;
@@ -38546,29 +40546,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'me' }}
                     badge={(gameState.areaZones?.[myIdx] || []).includes('Doom Clock')
                       ? `☠️${gameState.doomCounters?.[myIdx] || 0}/20` : null}
-                    onClick={onMyAreaClick}>
-                    {/* Ladungen einer „up to X times per turn"-Area
-                        (The Bonegrinder). Eigenes Abzeichen statt des
-                        `badge`-Props, damit es sich mit der Doom-Clock-
-                        Anzeige nicht in die Quere kommt. */}
-                    {(() => {
-                      const lad = (gameState.zoneCharges || []).find(c => c.zone === 'area');
-                      if (!lad) return null;
-                      return (
-                        <div className={'zone-charge-badge' + (lad.remaining === 0 ? ' zone-charge-empty' : '')}
-                          onMouseEnter={e => showGameTooltip(e, `Noch ${lad.remaining} von ${lad.max} Einsätzen in dieser Runde.`)}
-                          onMouseLeave={hideGameTooltip}
-                        >{lad.remaining}</div>
-                      );
-                    })()}
-                  </BoardZone>
+                    onClick={onMyAreaClick}
+                    renderStack={(cards) => (
+                      <AreaStack cards={cards} entries={myAreaEntries}
+                        onActivate={activateArea(myIdx)} effectLocked={isEffectLocked}
+                        targeting={zielwahlFuer(myIdx)}
+                        charge={(gameState.zoneCharges || []).find(c => c.zone === 'area') || null} />
+                    )} />
                   <BoardZone type="area" cards={gameState.areaZones?.[oppIdx] || []} label="Area"
                     style={{...oppBoardZone('area'), left: areaPositions[1], cursor: (isOppAreaValid || oppAreaActivatable) ? 'pointer' : undefined, ...hiddenStyle}}
                     className={(oppAreaCls + ' area-zone-opp').trim()}
                     dataAttrs={{ 'data-area-zone': '1', 'data-area-owner': 'opp' }}
                     badge={(gameState.areaZones?.[oppIdx] || []).includes('Doom Clock')
                       ? `☠️${gameState.doomCounters?.[oppIdx] || 0}/20` : null}
-                    onClick={onOppAreaClick} />
+                    onClick={onOppAreaClick}
+                    renderStack={(cards) => (
+                      <AreaStack cards={cards} entries={oppAreaEntries}
+                        onActivate={activateArea(oppIdx)} effectLocked={isEffectLocked}
+                        targeting={zielwahlFuer(oppIdx)}
+                        charge={null} />
+                    )} />
                 </>);
               })()}
             </div>
@@ -38608,6 +40605,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onClick={handlePermClick}
                       style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
                       <BoardCard cardName={perm.name} />
+                      {perm.teleportalUntil != null && (
+                        <div className="perm-tohand-badge"
+                          title="Joins their hand at the start of their next turn">
+                          ➜✋
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -38675,6 +40678,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       onClick={handlePermClick}
                       style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
                       <BoardCard cardName={perm.name} />
+                      {/* ★ v1084 („Teleportal", Als Vorgabe 14.9.): das
+                          offene Permanent ist hier nur ZWISCHENSTATION —
+                          es kommt am naechsten Rundenbeginn auf die Hand.
+                          Ohne Abzeichen saehe es aus wie ein dauerhaftes
+                          Permanent. */}
+                      {perm.teleportalUntil != null && (
+                        <div className="perm-tohand-badge"
+                          title="Joins your hand at the start of your next turn">
+                          ➜✋
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -39057,7 +41071,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
-                    style={(isDrawAnim || isPendingPlay || isStealHidden || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)) ? { visibility: 'hidden' } : undefined}
+                    style={(isDrawAnim || isPendingPlay || isStealHidden
+                      || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)
+                      // v1063: abfliegende Handkarte — nur solange die Hand
+                      // noch so gross ist wie beim Abflug (siehe onPileTransfer).
+                      || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}`)
+                    ) ? { visibility: 'hidden' } : undefined}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
@@ -39259,10 +41278,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* Floating discard animation cards */}
+      {goldGifts.map(g => (
+        <div key={g.id} className="gold-gift" style={{
+          left: g.startX, top: g.startY, width: g.groesse, height: g.groesse,
+          background: g.farbe,
+          animationDelay: g.delay + 'ms', animationDuration: g.dur + 'ms',
+          '--gg-dx': g.dx + 'px', '--gg-dy': g.dy + 'px',
+          '--gg-bogen': g.bogen + 'px', '--gg-rot': g.dreh + 'deg',
+        }}>
+          <span className="gold-gift-band" style={{ background: g.band }} />
+          <span className="gold-gift-band gold-gift-band-quer" style={{ background: g.band }} />
+        </div>
+      ))}
+
       {discardAnims.map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
-          delay={anim.delay} />
+          delay={anim.delay} t0={anim.t0} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
@@ -39320,6 +41352,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {fightingAtkChanges.map(fa => (
         <FightingAtkNumber key={fa.id} amount={fa.amount} owner={fa.owner} heroIdx={fa.heroIdx} myIdx={myIdx} />
       ))}
+
+      {/* v1151: Zielmarken, vorhergesagter Zielpfad, Wahl-Blitze */}
+      {((gameState.zielMarken || []).length > 0 || zielBlitz.length > 0) && (
+        <ZielMarkenEbene marken={gameState.zielMarken || []} blitze={zielBlitz} myIdx={myIdx} />
+      )}
 
       {/* Modular game animations (explosions, etc.) */}
       {gameAnims.map(a => (
@@ -39590,7 +41627,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
 
       {/* Projectile animations (phoenix cannon, arrow shafts, etc.) */}
-      {projectileAnims.map(p => (
+      {projectileAnims.map(p => p.projectileShape === 'sandStream' ? (
+        <SandStrahl key={p.id} p={p} />
+      ) : (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
           '--projDx': (p.tgtX - p.srcX) + 'px',
@@ -39606,7 +41645,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               ride this rotation, so any projectile with a clear
               "front" leads with that front for the whole flight. */}
           <div className="projectile-rotation-wrap">
-            {p.projectileShape === 'bubble' ? (
+            {p.projectileShape === 'sand' ? (
+              /* ★ v1059 (Als Befund 14.9.: „kein Oasen-Emote!"): eine
+                 Handvoll gelb-brauner Koerner statt eines Emojis.
+                 Gleiche Begruendung wie bei der Energieblase daneben —
+                 Emojis sind plattformabhaengig eingefaerbt und lassen
+                 sich nicht tinten; hier kommt dazu, dass 🏜️ eine Oase
+                 zeigt und nicht geworfenen Sand. */
+              <span className="projectile-sand" style={p.emojiStyle || {}}>
+                {SAND_KOERNER.map((k, i) => (
+                  <i key={'pk' + i} className={k.streu ? 'sand-streu' : undefined} style={{
+                    left: k.x + 'px', top: k.y + 'px',
+                    width: k.g + 'px', height: k.g + 'px',
+                    background: k.farbe,
+                    '--sdx': k.dx + 'px', '--sdy': k.dy + 'px',
+                    animationDelay: k.verzug + 'ms',
+                  }} />
+                ))}
+              </span>
+            ) : p.projectileShape === 'bubble' ? (
               /* Gruene Energieblase (Energy Drain): kein Emoji, sondern
                  eine echte Kugel mit Glanzpunkt — Emojis sind je nach
                  Plattform unterschiedlich eingefaerbt und lassen sich
@@ -40160,6 +42217,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const handleRetry = () => {
           showTextBox(null);
           setShowSurrender(false);
+          if (window.stopSFX) { window.stopSFX('victory'); window.stopSFX('defeat'); }   // v1146
           socket.emit('retry_puzzle', { roomId: gameState.roomId });
         };
         return (
@@ -41443,9 +43501,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
+      {/* ★ ÜBER DER HAND (v1033, Als Befund 12.9.): `.modal-overlay` liegt
+           auf z-index 1000, die eigene Handleiste (`.game-hand-me`) aber auf
+           10000 — und in der Handy-Queransicht quellen ihre Karten nach OBEN
+           über das Brett. Dort verdeckten sie den Endbildschirm samt Rematch-
+           und Cancel-Knopf. 10080 liegt über der Hand und über dem
+           Deck-Such-Fenster (10070), aber unter den Animationen (ab 10150).
+           Nur die drei ERGEBNIS-Overlays werden angehoben, nicht
+           `.modal-overlay` global: das tragen auch Lobby und Deckbau, und
+           deren Ebenen sollen sich nicht mitverschieben. */}
       {/* Win/Loss overlay — round result (non-final) */}
       {result && !showFirstChoice && !result.setOver && result.format > 1 && !sideDeckPhase && (
-        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.65)' }}>
+        <div className="modal-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.65)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{
               fontSize: 28, marginBottom: 12,
@@ -41465,7 +43532,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Set complete overlay — fireworks + final score */}
       {result && !showFirstChoice && result.setOver && result.format > 1 && (
-        <div className="modal-overlay set-complete-overlay" style={{ background: 'rgba(0,0,0,.8)' }}>
+        <div className="modal-overlay set-complete-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.8)' }}>
           <div className="set-fireworks">
             {Array.from({ length: 24 }).map((_, i) => (
               <div key={i} className="firework-particle" style={{
@@ -41639,7 +43706,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       {/* Win/Loss overlay — Bo1 or fallback */}
       {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
-        <div className="modal-overlay" style={{ background: 'rgba(0,0,0,.75)' }}>
+        <div className="modal-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.75)' }}>
           <div className="animate-in" style={{ textAlign: 'center' }}>
             <div className="pixel-font" style={{
               fontSize: 36, marginBottom: 16,

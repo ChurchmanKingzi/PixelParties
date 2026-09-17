@@ -83,7 +83,7 @@ function countUsableHealSources(engine, pi) {
   return n;
 }
 
-const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 const CARD_NAME = 'Overheal Shock';
 
 module.exports = {
@@ -146,15 +146,10 @@ module.exports = {
   // living, has a free Support Zone, AND isn't already carrying an OHS.
   // Without the OHS-absence check the card would spam-attach redundant
   // copies to the same hero.
-  attachmentHosts(gs, pi, engine) {
-    // v651: Drop-Ziele beim GEGNER — Helden ohne healReversed / ohne Shock
-    const oi = pi === 0 ? 1 : 0;
-    if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return [];
-    const ops = gs.players[oi];
-    const heroFilter = (h, hi) => !h.statuses?.healReversed
-      && !(ops?.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));
-    return attachmentHostsFor(gs, pi, engine, { sides: [oi], heroFilter });
-  },
+  // ★★ v1145 (Al 17.9.): KEIN `attachmentHosts` mehr — gezogen wird wie
+  // bei jedem Spell auf den WIRKER, die Zielwahl oeffnet `onPlay`
+  // (`ignoreDropHints`). Mit dem Vertrag wurde der Held, auf den man zog,
+  // sofort zum Ziel, und einen Wirker liess der Ziehweg nicht waehlen.
   spellPlayCondition(gs, pi, engine) {
     const oi = pi === 0 ? 1 : 0;
     if (gs.firstTurnProtectedPlayer != null && oi === gs.firstTurnProtectedPlayer) return false;
@@ -277,6 +272,7 @@ module.exports = {
         && !(ops.supportZones?.[hi] || []).some(slot => (slot || []).includes(CARD_NAME));
       const host = await pickAttachmentHost(ctx, CARD_NAME, {
         sides: [oi], heroFilter,
+        ignoreDropHints: true,
         description: 'Attach Overheal Shock to a Hero your opponent controls. Healing on that Hero becomes damage.',
         confirmLabel: '⚡ Attach!', confirmClass: 'btn-danger',
       });

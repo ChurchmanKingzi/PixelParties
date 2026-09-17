@@ -146,6 +146,26 @@ nach einer Auswahl erst nach der bindenden Wahl. Ein abgelehnter Trigger
 zeigt NICHTS. Details unten unter „Auftritt erst, wenn der Effekt
 WIRKLICH läuft".
 
+**★★ v1122 — DIE REGEL GILT FÜR JEDE SICHTBARKEIT, nicht nur für
+Trigger-Auftritte.** Al 15.9.: „Brainstorming verlässt aktuell die Hand,
+BEVOR sie confirmed wurde! Man kann also noch abbrechen, nachdem sie
+visuell schon weggeflogen ist!"
+
+Genau diese Regel stand hier — und ich habe sie mit einem
+`play_pile_transfer` verletzt, weil ich sie nur auf `play_card_appear`
+bezogen gelesen hatte. Sie gilt für **Flüge, Animationen, Aufdeckungen,
+Klänge — alles, was der Spieler wahrnimmt**.
+
+Die Prüffrage beim Bauen: *Kann der Spieler nach dieser Zeile noch nein
+sagen?* Wenn ja, darf hier nichts sichtbar werden. Bei „Brainstorming"
+ist der verbindliche Punkt der geglückte Hand-Add; der Selbst-Flug steht
+seitdem dahinter, und ein Testfall prüft, dass ein Abbruch **gar keinen**
+Flug auslöst.
+
+**★ Flüge können jetzt einen Klang mitbringen (v1122):**
+`play_pile_transfer` nimmt `sfx: 'draw'` entgegen. Vorher hatte nur der
+Deck→Hand-Weg seinen eigenen (v1111) — jeder andere Flug war stumm.
+
 **Einmal je Auslöser (Als Regel 21.8.):** trifft ein Flächenschlag drei
 Helden oder bringt EIN Ziehvorgang drei Karten und der Trigger antwortet
 je Treffer/Karte, zeigt sich die Karte trotzdem nur EINMAL. Dafür das
@@ -8669,3 +8689,5346 @@ this Hero is not defeated" beim Einsammeln fehlt im neuen Wortlaut,
 ändert aber nichts: die Defeat-Klausel löscht die Karten ohnehin, und
 die Todesprüfung im Einsammel-Hook bleibt als Gürtel-und-Hosenträger
 stehen.
+
+
+## Neue Karte: „Iceage" (v1012)
+
+Spell, Decay Magic + Magic Arts, **Level 2 → 3**, neuer Text: „Freeze
+all targets your opponent controls for 1 turn. You may treat this
+Spell's level as 4 when you use it. If you do, Freeze those targets for
+2 turns instead."
+
+„all targets your opponent controls" = seine lebenden **Helden** und
+alle **Kreaturen** auf seiner Seite; Ausrüstung und Abilities sind keine
+Ziele. Frost über die zwei vorhandenen Wege (`addHeroStatus` /
+`applyCreatureStatus`), beide mit `appliedBy`.
+
+**★ DIE STUFENWAHL PASSIERT BEIM WIRKEN.** Gespielt wird die Karte als
+Stufe 3 (das normale Tor); erst in der Auflösung fragt sie, ob sie als
+Stufe 4 gelten soll. Angeboten wird das nur, wenn der Nutzer eine
+Stufe-4-Karte dieser Schulen überhaupt wirken könnte — geprüft mit
+denselben Kartendaten, nur `level: 4` (`heroMeetsLevelReq`). So bleibt
+die Entscheidung dort, wo der Text sie hinlegt, ohne dem Spielweg ein
+zweites Levelgatter unterzuschieben.
+
+**Wichtig beim Testen:** Bei ZWEI Schulen **summiert** die Engine beide
+Stufen (`_testLevelReqForZones`: `combined >= level`). Decay 3 +
+Magic Arts 3 erfüllt also auch Stufe 4 — für den Fall „Stufe 3 ja,
+Stufe 4 nein" braucht ein Repro Summe genau 3.
+
+**Animation:** ein globaler Blizzard (`iceage_blizzard`) als
+Vollbild-Overlay direkt im DOM, Bauform wie der Divine-Rain-Vorhang —
+Schleier, 220 schräg jagende Schneestreifen, Frost von allen vier
+Rändern, Kälteblitz, Klang `elem_ice` + `elem_wind`. Anders als der
+Regen räumt er sich nach 2,6 s **selbst** ab (kein Gegenstück zum
+Abschalten), und der Handler meldet sich beim Aufräumen wieder ab. Dazu
+je Ziel ein `ice_encase`, damit man sieht, wen es erwischt hat.
+
+
+## ★ Mehrrundiger Frost an KREATUREN wurde nie angezeigt (v1013, Als Befund 12.9.)
+
+Beim HELDEN ist `statuses.frozen` ein Objekt mit `duration`. Bei der
+KREATUR setzt `applyCreatureStatus` nur **`counters.frozen = 1`** und
+legt die Dauer daneben in **`counters.frozenDuration`** — genau den
+Zähler, den der Rundenabbau herunterzählt (und den es nur gibt, wenn
+`duration > 1`).
+
+`StatusBadges` schaute ausschließlich nach `fr.duration`. Für Kreaturen
+war das immer `null`, also stand am Badge nie eine Rundenzahl und der
+Tooltip sagte „wears off at the end of its owner's turn" — bei jeder
+mehrrundigen Kreatur-Vereisung falsch: **Iceage Stufe 4, Divine Gift of
+Biseria, Blue Ice Dragon**. Der Zustand war immer richtig, nur die
+Anzeige log.
+
+Das Badge liest jetzt beide Stellen. Wer eine neue mehrrundige
+Kreatur-Statuslage baut, muss denselben Doppelweg bedenken:
+`counters.<status>` ist nur die Anwesenheit, die Dauer steht in
+`counters.<status>Duration`.
+
+
+## Neue Karte: „Bomb Mite" (v1014)
+
+Creature, Summoning Magic Lv 0, 1 HP. Zündschaden **150 → 100** (Als
+Vorgabe 12.9.); der Rückschlag bleibt bei 100.
+
+**★ „AT THE END OF YOUR NEXT TURN AFTER SUMMONING IT" ist das ZWEITE
+eigene Zugende**, nicht das erste: beschworen in Zug T, zündet sie am
+Ende von Zug T+2, weil der gegnerische Zug dazwischenliegt. Geprüft
+mit `ctx.isMyTurn && gs.turn > inst.turnPlayed` — am eigenen Zugende ist
+das erst beim nächsten eigenen Zug wahr.
+
+**★ Der Rückschlag braucht einen FREMDEN Täter.** `ctx.source` des
+Todes-Hooks trägt die tötende Karte; ohne Quelle (Zustands-Tod,
+Selbstopfer) und bei eigener Quelle passiert nichts — „by an OPPONENT's
+card or effect". Ohne diese Prüfung sprengt sich der Spieler beim
+eigenen Opferritual die Helden weg. Zusätzlich setzt der Zünd-Zweig
+`_bombMiteSelfSend`, damit die eigene Detonation nicht über den
+Todes-Zweig zurückschlägt (im Repro festgehalten).
+
+**Waldweg-Notiz:** `check-damage-types` hat meinen ersten Anlauf mit
+einem erfundenen Typ `'effect'` zu Recht rot gemeldet — für
+Kreatureffekte ist **`'creature'`** der Normalfall (so macht es auch
+Exploding Skull).
+
+
+## Neue Karte: „Cute Conversion" (v1015) — und `omniImmune` beim Diebstahl
+
+Spell, Magic Arts Lv 2, Archetyp „Cute". „Take control of all Creatures
+your opponent controls for the rest of the turn. Creatures controlled by
+this effect are unaffected by all cards and effects while they are
+controlled. This Spell's level in your hand is reduced by the number of
+„Cute" Creatures you control."
+
+Kontrolle über `actionStealCreature` — derselbe Weg wie im
+Kreaturzweig von Deepsea Succubus. Der Diebstahl ist von Haus aus
+temporär: `_revertStolenCreatures` gibt zu Zugbeginn alles zurück, ganz
+ohne eigenen Aufräumhook.
+
+**★ NEUE OPTION `omniImmune` (Engine).** Für „unaffected by all cards
+and effects" reicht `damageImmune` NICHT — das deckt nur Schaden.
+`actionStealCreature(pi, inst, { omniImmune: true })` setzt jetzt
+dieselben Marken wie bei den Cardinal Beasts:
+
+| Marke | wofür |
+|---|---|
+| `_cardinalImmune` | lesen Schadens-, Status-, Zonen-, Zerstörungs- **und Opferpfade** direkt |
+| `_omniImmune` | deckt `isOmniImmune` mit ab |
+| `_stealOmniImmune` | merkt sich, dass die Immunität zum Diebstahl gehört |
+
+Die dritte Marke ist die wichtige: `_revertStolenCreatures` räumt
+`_cardinalImmune` / `_omniImmune` **nur dann** ab, wenn sie mit dem
+Diebstahl kamen — eine von woanders stammende Immunität (Golden Wings)
+bleibt stehen. Im Repro beide Richtungen festgehalten.
+
+**★ NACHTRAG v1016 (Als Befund):** Die geliehenen Kreaturen ließen sich
+nicht mehr AKTIVIEREN, Succubus-geliehene schon. Ursache: sie liegen
+physisch weiter beim Gegner, die Aktivierung kommt deshalb mit
+`charmedOwner = Gegner` herein — und `doActivateCreatureEffect` weist
+`charmedOwner !== pi` **plus `_cardinalImmune`** ab (ein Tor gegen
+Treacherous Crystals Verleih an Cardinal Beasts). Die Immunität richtet
+sich aber gegen FREMDE Karten, nicht gegen den Kontrolleur, der den
+Effekt seiner Leihgabe benutzt. Das Tor kennt jetzt die Ausnahme
+„eigene Leihgabe" (`inst.stolenBy === pi && _stealOmniImmune`). Ein
+echter Cardinal kann dadurch nicht durchrutschen: `actionStealCreature`
+verweigert den Diebstahl omni-immuner Kreaturen, `stolenBy` steht bei
+ihnen also nie.
+
+Damit können die geliehenen Kreaturen insbesondere **nicht geopfert
+werden** (Als Vorgabe 12.9.). Das scheiterte zwar schon daran, dass
+`owner` beim Gegner bleibt und `getSacrificableCreatures` nach `owner`
+filtert — jetzt hängt es aber am Vertrag statt am Zufall.
+
+Level in der Hand über `reduceCardLevel` nach der Ruin-Mourner-Bauform:
+nur die Handkopie mit der kleinsten ID trägt bei, sonst multipliziert
+die Engine die Senkung je Kopie.
+
+**Animation `cute_hearts`:** sieben tiefrote Herzen je Ziel, versetzt
+und unterschiedlich groß, die aufsteigend größer und durchsichtiger
+werden (bis `scale(2.6)` bei Deckkraft 0). Reines CSS — zwei Kreise
+plus gedrehtes Quadrat —, damit das Rot wirklich tiefrot ist und nicht
+vom Zeichensatz abhängt.
+
+
+## Neue Karte: „Off Duty" (v1017) — und `toDeck` beim Negieren
+
+Spell (Reaction), Decay Magic Lv 2. „Play this card immediately when
+your opponent summons a Creature. Negate the summoning and shuffle the
+Creature back into the deck. If the Creature was their Action, your
+opponent may immediately perform a different Action afterwards."
+
+Bauform **Lunar Eclipse** (gleiche Textform: negieren, anders
+entsorgen, Ersatzaktion anbieten).
+
+**★ „NEGATE THE SUMMONING" = DAS SPIEL ERKENNT DIE BESCHWÖRUNG GAR
+NICHT AN** (Als Vorgabe 12.9.): kein On-Summon-Effekt, kein Hook, kein
+Trigger. Dafür braucht es **kein neues Fenster** — das KETTENFENSTER
+leistet es schon: `executeCardWithChain` läuft in `doPlayCreature`
+**vor** `_runBeforeSummon` und vor der Platzierung. Wird dort negiert,
+hat die Beschwörung nie stattgefunden, statt hinterher
+zurückgedreht zu werden.
+
+Daraus folgt Als geforderte Reihenfolge von selbst: Off Dutys Trigger
+liegt VOR allen anderen On-Summon-Reaktionen, weil die
+(`_checkPostSummonHandReactions` am `onCardEnterZone`) an der
+GELANDETEN Karte hängen und nie erreicht werden. Im Repro sind beide
+Reihenfolgen am Bauplan festgehalten.
+
+**★ NEUE OPTION `toDeck` (Engine).** `negateChainLink(chain, i,
+{ toDeck: true })` setzt `_negatedToDeck`; `executeCardWithChain` reicht
+es als `chainResult.negatedToDeck` durch, und `routeNegatedInitialCard`
+fliegt die Karte sichtbar zum Deckstapel und **mischt danach** — sonst
+läge sie obenauf und der Gegner zöge sie sofort wieder. Reiht sich neben
+die vorhandenen Ziele `negatedToDeleted` (Lunar Eclipse) und
+`negatedToHandOf` (Key).
+
+**Ersatzaktion:** wie bei Lunar Eclipse — die Aktion IST verbraucht, der
+Gegner bekommt eine neue angeboten, und zwar über
+`queuePostChainAction` NACH der Kette (währenddessen sperrt der
+Reaktionsriegel noch jedes Kartenspiel, das Angebot liefe ins Leere).
+Nur bei einer echten Aktion: keine Initialkarte oder inhärente
+Beschwörung → kein Angebot.
+
+
+## ★ Negierte INHÄRENTE Beschwörung kostete trotzdem die Aktion (v1018, Als Befund 12.9.)
+
+Symptom: eine Kreatur, die inhärent gespielt werden kann (Aggressive
+Town Guard, solange noch nichts beschworen wurde), wird in der Action
+Phase von „Off Duty" negiert. Off Duty gibt **richtig** keine
+Ersatzaktion — die Beschwörung hat ja gar keine gekostet. Trotzdem flog
+der Spieler aus der Action Phase.
+
+Ursache: der Negat-Zweig von `doPlayCreature` schaltete die Phase mit
+`if (isActionPhase && !usingAdditional)` weiter — **ohne
+`!isInherentAction`**. Der Helden-Stempel eine Zeile darüber hatte den
+Riegel, die Phasenschaltung nicht. Der Normalweg prüft
+`!effectiveIsInherent` seit jeher, der Zauberweg ebenso; nur dieser
+Zweig fiel durch.
+
+Angeglichen — samt der v991-Nachbesserung, dass ein zweiter Zuschlag
+auch **einlösbar** sein muss, nicht nur vorhanden. Merksatz: wer im
+Negat-Zweig etwas an der Aktionswirtschaft ändert, muss beide Riegel
+(Stempel UND Phasenschaltung) am Normalweg gegenprüfen.
+
+
+## ★ Inhärent NACH der ersten Aktion ist die ZWEITE Aktion (v1019, Als Ruling 12.9.)
+
+**Regel:** Alles, was nicht die ERSTE Aktion der Action Phase ist, ist
+eine Zusatzaktion — auch eine **inhärente** (Aggressive Town Guard,
+Quick Attack). Wer mit einem Zweitaktions-Zuschlag (Zhigao) in der
+Action Phase steht, seine erste Aktion hatte und dann etwas Inhärentes
+spielt, hat damit seine zweite Aktion gemacht: der Zuschlag ist durch,
+die Phase endet.
+
+Vorher war eine inhärente Aktion **durchgehend** gratis und rührte die
+Aktionswirtschaft gar nicht an — der Spieler blieb mit unverbrauchtem
+Zhigao in der Action Phase hängen, obwohl er zwei Aktionen gemacht
+hatte. Aufgefallen ist das an einer Kette, die genau dorthin führt:
+Beschwörung → von „Off Duty" negiert → Ersatzaktion → inhärente
+Beschwörung.
+
+Implementiert als ein Prädikat in der Engine
+(`inherentCountsAsExtraAction`), gelesen an **beiden** Spielwegen
+(`doPlaySpell` für Zauber und Attacken, `doPlayCreature`). Dort wird
+`_actionsPlayedThisPhase` hochgesetzt und DANN gewechselt — die
+Reihenfolge ist load-bearing: der Riegel in `advanceToPhase` liest
+genau diesen Zähler, um zu erkennen, dass Zhigaos Zuschlag nicht mehr
+einlösbar ist. Steht ein WEITERER einlösbarer Zuschlag bereit (Mission
+of the Light Brigade), hält er den Spieler weiterhin in der Phase —
+auch das ergibt sich aus demselben Riegel.
+
+**Die erste Aktion der Phase bleibt ausgenommen:** eine inhärente Karte
+vor jeder anderen Aktion ist weiterhin gratis.
+
+
+## ★ Ausgrauung während einer Sofort-Aktion mit freier Heldenwahl (v1020, Als Befund 12.9.)
+
+Zhigaos Ausgrauung (`additionalActionDimmed`) greift, sobald der Spieler
+seine erste Aktion hatte und alle offenen Zuschläge **heldengebunden**
+sind — dann sind die übrigen Helden grau. Das ist richtig, solange es um
+die zweite Aktion der Action Phase geht.
+
+Es galt aber auch **während einer Sofort-Aktion mit freier Heldenwahl**
+(`performImmediateActionAnyHero`, z.B. Off Dutys Ersatzaktion). Dort darf
+jeder lebende Held handeln — der Prompt lässt `heroIdx` bewusst weg —,
+die Anzeige behauptete aber das Gegenteil. Rein optisch: der Klick auf
+einen anderen Helden ging die ganze Zeit durch.
+
+Die Ausgrauung weicht jetzt einem offenen `heroAction`-Prompt **ohne**
+`heroIdx` (und nur dem eigenen). Der Fall mit festem Helden (Coffee)
+graut die anderen unverändert aus — dafür sorgt `heroActionDimmed`
+daneben, das genau auf `heroIdx !== undefined` prüft.
+
+
+## Neue Karte: „Creepy Villager" (v1021) — und `controlCannotChange`
+
+Creature, Summoning Magic Lv 0, 1 HP. Drei Teile:
+
+**★ „CONTROL OF THIS CREATURE CANNOT CHANGE" ist ein EIGENER, ENGER
+VERTRAG** (`controlCannotChange: true`) — ausdrücklich **nicht** die
+Omni-Immunität der Cardinal Beasts. Der Villager bleibt angreifbar,
+zerstörbar und **opferbar**; nur der Kontrolleur steht fest. Gelesen von
+`engine.controlIsLocked(inst)` an **beiden** Kontrollwegen:
+`actionTransferCreature` (dauerhaft) und `actionStealCreature`
+(temporär). Eine Instanzmarke `counters._controlLocked` tut es ebenso —
+so kann ein Effekt die Sperre später auch verleihen.
+
+**Der Tausch** ist die Abkürzung zum Dark Deepsea God: statt zwei
+Kreaturen mit zusammen Level 4+ **und** einer Aktion geht EIN Villager
+zurück auf die Hand, und der Gott nimmt seine Zone. Bedingungen: nicht
+in diesem Zug beschworen, ein DDG auf der Hand. Der Villager nennt keine
+Aktion → aktionsfrei (★-Regel 7.9.); „once per turn" trägt die
+generische Kreatureffekt-HOPT.
+
+**★ Platzieren durch einen Effekt zählt als Effekt-Beschwörung und löst
+On-Summon-Effekte aus** (Als Ruling 8.9.). DDGs Flächenschaden liegt
+aber in seinem `beforeSummon`, nicht in `onPlay` — er würde bei einer
+Platzierung also NICHT feuern. DDG exportiert deshalb jetzt seinen
+AoE-Helfer (`fireDdgAoE`), den der Villager ausdrücklich zündet. Der
+Einmal-pro-Zug-Riegel (`ddg_aoe`) steckt im Helfer selbst, der Weg kann
+also nicht doppelt zünden.
+
+**Der Abwurf beim Tod** trifft den KONTROLLEUR („this Creature YOU
+control"), nicht den Besitzer. `actionPromptForceDiscard` nimmt die
+Handgröße von selbst als Obergrenze — „oder die ganze Hand" braucht
+keinen Sonderfall.
+
+
+## Neue Karte: „Deepsea Treasure" (v1022) — und `treasure_reveal`
+
+Spell, Support Magic Lv 2. Von 2 auf **3** Karten erhöht, Text neu:
+„Reveal the top 3 cards of your deck. You may play any Artifacts you
+find there immediately without paying their Cost. Add all other revealed
+cards to your hand."
+
+**★ NEUER CLIENT-TAKT `treasure_reveal`** (Als Vorgabe): die Karte
+fliegt vom Deckstapel in die **Bildmitte**, klappt dabei auf, verharrt
+kurz — und fliegt dann an **ihren** Handplatz, wo sie ab der Ankunft
+dauerhaft liegt.
+
+**★ Das Verharren ist fast null** (90 ms, v1024, Als Befund): bei 620 ms
+erreichte die zweite Karte die Mitte, während die erste noch dort stand
+— sie überlagerten sich. Der Versatz zwischen den Karten (560 ms) muss
+größer bleiben als die Haltezeit; beide Zahlen stehen in Client UND
+Kartenskript und werden im Repro gegeneinander geprüft.
+
+**★ Drei Takte in JS statt einer CSS-Kurve** (v1023, Als Befund): der
+Zielplatz existiert beim Losfliegen noch nicht, eine vorab berechnete
+Kurve landete deshalb in der **Mitte des Handkastens**. Takt ③ sucht den
+Platz erst beim Abflug dorthin — zuerst den echten
+`.hand-slot[data-hand-idx]`, als Rückfall projiziert (mit
+`finalHandSize`, denn die Hand ist zentriert und die Reihe rückt beim
+Wachsen; ohne die Endgröße landet jede Karte eine halbe Kartenbreite
+daneben).
+
+Zwei Dinge gehören zwingend dazu:
+* **Der Zielplatz wird bis zur Ankunft verdeckt** (`setBounceReturnHidden`)
+  — die Karte steht schon im Zustand (sonst gäbe es den Platz beim
+  Anflug nicht), läge also sonst doppelt da.
+* **Die Ankunft wird vorangemeldet**
+  (`pileTransferToHandPendingMeRef`) — sonst legt die automatische
+  Zieh-Animation zusätzlich einen Flug vom Deck obendrauf („die
+  ungewollte Zieh-Animation").
+
+**Alle drei gehen auf die Hand**, auch die Artefakte: der Text sagt
+„play any Artifacts … immediately", gespielt wird also VON der Hand.
+Wer das Angebot ausschlägt, behält sie dort.
+
+**★ Was „sofort spielen" heißt, hängt an der Unterart:**
+
+| Unterart | Weg |
+|---|---|
+| Equipment | `equipArtifactToHero` — sofort an einen gewählten Helden, mit `onPlay` / `onCardEnterZone` |
+| Artifact/Creature | `actionPlaceCreature` — sofort in eine gewählte Support Zone |
+| alles andere (Normal, Reaction, Area, Surprise) | Nullpreis-Vermerk `_freeArtifactNames[name]` (Misfire-Vertrag) — der Spieler spielt sie im selben Zug regulär, aber kostenlos |
+
+Der letzte Fall ist bewusst so: `doPlayArtifact` im Server sind ~570
+Zeilen mit Kettenfenster, Zielwahl, HOPT und drei Zahlstellen — das
+lässt sich aus einem Kartenskript nicht sauber nachbauen, und der
+Nullpreis-Vermerk erreicht dasselbe Ergebnis über den regulären Weg.
+
+
+## Neue Karte: „Mass Routing" (v1025)
+
+Spell, Decay Magic Lv 1 — **steht weiter auf der Bannliste** (nicht
+angerührt). Zug je Kreatur von 2 auf **1** gesenkt: „Shuffle all
+Creatures on the board up to level 1/2/3 back into their original
+owners' decks. Then, both players draw 1 card for each of their
+Creatures shuffled back by this effect."
+
+**★ „1/2/3" ist das Decay-Magic-Level des Nutzers** — dieselbe Lesart
+wie bei Create Illusion und Iceage, gelesen mit
+`effectiveSchoolLevelForCaster` (zählt Ability-Stapel in Support Zones
+mit) und auf 1..3 begrenzt.
+
+**★ Geprüft wird das WIRKSAME Level** (`getEffectiveCardData`), nicht
+der Datenbankwert — sonst liefe jede Stufensetzung ins Leere (Lawn
+Gnome, Shapeshift); `check-level-source` sieht genau darauf.
+
+**★ Ziel ist das Deck des `originalOwner`**, nicht des Kontrolleurs:
+eine übernommene Kreatur geht nach Hause. Daran hängt auch das Ziehen —
+„their Creatures" meint die eigenen, egal wer sie zuletzt kontrollierte.
+
+Gemischt wird **einmal je betroffenem Deck**, nachdem alles drin ist.
+Omni-immune Kreaturen bleiben stehen und zählen dann auch nicht fürs
+Ziehen.
+
+**Testhinweis:** Nach dem Mischen ZIEHT der Besitzer — eine
+zurückgemischte Karte kann also im Deck **oder** schon auf seiner Hand
+liegen. Ein Repro darf deshalb nicht auf der Deckgröße bestehen,
+sondern muss den Weg prüfen (Log-Zähler bzw. „Deck oder Hand").
+
+
+## Neue Karte: „Last Resort" (v1026)
+
+Spell, Destruction Magic Lv 3. Neuer Schlusssatz (von „Flame Avalanche"
+übernommen): „You cannot deal any other damage the turn you activate
+this card."
+
+**★ Der Schaden steht VOR dem eigenen Tod:** „twice the user's CURRENT
+HP" wird gelesen, bevor der Nutzer fällt — andersherum wäre es immer 0.
+
+**★ Die Spielende-Prüfung wird bis zum Schluss angehalten**
+(`_deferGameOverCheck`, Bauform Bunny Bombs). Sonst wertete die Engine
+schon nach dem Schaden aus, während der Nutzer noch lebt — „if all
+Heroes of BOTH players are defeated" könnte dann gar nicht zutreffen.
+
+**★ Der Gewinn bei doppelter Auslöschung** läuft über
+`gs._drawLoserIdx` — dieselbe Stelle, an der Bunny Bombs den Verlierer
+benennt, nur andersherum: hier verliert der GEGNER. Ohne den Hinweis
+entschiede die Schleifenreihenfolge (Spieler 0 verlöre stillschweigend).
+Ein vorhandener Hinweis wird gesichert und danach wiederhergestellt.
+
+Die Niederlage des Nutzers ist **kein Schaden**, sondern
+`actionDefeatHero` mit `respectFirstTurnProtection: false` (ein
+freiwilliges Selbstopfer darf nicht am eigenen Schutzschild scheitern)
+und `skipAllDeadCheck: true` (die Auswertung kommt gleich, einmal).
+
+Die Sperre `ps.damageLocked` wird **zuletzt** gesetzt — vorher blockte
+sie den eigenen Treffer. Wie bei Flame Avalanche ist die Karte zudem gar
+nicht spielbar, wenn in diesem Zug schon Schaden ausgeteilt wurde.
+
+**★ Animation (v1027, Als Vorgabe):** erst der **Ansturm**
+(`play_ram_animation`, Bauform Phoenix Tackle: der Nutzer wirft sich
+selbst ins Ziel), dann im Moment der Berührung — bei ~12 % der
+Flugdauer, also nach 150 ms — die **eigene große Explosion**
+`last_resort_blast` plus schwerer Bildrüttler. Fünf Lagen: weißer Kern,
+Feuerball über gut **drei Zonenbreiten**, zwei zeitversetzte
+Druckwellen, 26 Trümmersplitter mit Schwerkraft im Fall, 14 nachglühende
+Funken. Klang dreilagig (`heavy_impact` → `elem_fire` → `hero_death`).
+Dieselbe Explosion noch einmal auf dem Platz des Nutzers, wenn er fällt;
+der Rücksprung des Rams geht darin unter.
+
+**Testhinweis:** Kreaturinstanzen führen ihren Stand in
+`counters.currentHp`; `inst.hp` ist bei ihnen `undefined`.
+
+
+## ★ „Einmal pro Spiel" galt für TRÄNKE gar nicht (v1028, Als Befund 12.9.)
+
+Symptom: „Teleportation Powder" ließ sich über zwei Züge **zweimal**
+spielen, obwohl das Skript `oncePerGame` meldet.
+
+Ursache: Der Zauber-, Artefakt- und Überraschungsweg prüfen `oncePerGame`
+UND setzen die Marke `ps._oncePerGameUsed`. Der **Trankweg tat beides
+nicht** — weder `doUsePotion` noch `doConfirmPotion`. Ohne Stempel wäre
+selbst ein Tor wirkungslos geblieben, also musste beides nachgezogen
+werden:
+
+* Tor am Anfang von `doUsePotion`,
+* Stempel über `_markOncePerGamePotion(ps, script, cardName)` an **beiden**
+  Verbrauchsstellen — ohne Zielwahl in `doUsePotion`, mit Zielwahl in
+  `doConfirmPotion`. Die zweite ist die, über die Powder tatsächlich
+  läuft; nur eine zu stempeln hätte den Fehler bloß verschoben.
+
+**Merksatz:** Wer einem Trank eine neue Einmal-Regel gibt, prüft beide
+Enden — Tränke haben zwei Spielwege, je nachdem ob sie ein Ziel
+brauchen.
+
+## Textänderungen (v1029)
+
+* **„Learning"** — „you **may** choose" in allen drei Stufen (nur Text).
+* **„Rha'Bi, the Living Skeleton"** — Schaden 150 → **100** (Text und
+  `SCHADEN` im Skript).
+* **„Teleportation Powder"** — „Choose an undefeated Hero **your
+  opponent controls**" statt „any … on the board". `getValidTargets`
+  liefert jetzt nur noch `getHeroTargets(oi)`, und `canActivate`
+  verlangt einen lebenden Gegnerhelden. Der Erstrunden-Schutz gilt
+  weiter — unter ihm gibt es nun gar kein Ziel mehr, die Karte ist also
+  schlicht nicht spielbar.
+
+
+## ★ „Einmal pro Spiel" — vollständige Bestandsaufnahme (v1030, Als Auftrag 12.9.)
+
+Nach dem Trank-Fund (v1028) habe ich **alle** Wege durchgesehen. Die
+Regel braucht immer ZWEI Hälften: ein **Tor** (gegen einen zweiten
+Versuch am Server — Doppelklick, CPU, Wiederholung) und einen
+**Stempel** (ohne ihn greift kein Tor).
+
+| Weg | vorher | jetzt |
+|---|---|---|
+| Zauber (`doPlaySpell`) | nur Stempel — **Tor fehlte** | beides |
+| Artefakt | beides | beides |
+| Überraschung | beides | beides |
+| Trank | **keins von beidem** (v1028) | beides |
+| Kreatur-Beschwörung | **keins von beidem** | beides |
+
+Beim Zauberweg lebte die Sperre allein von der Ausgrauung im Client
+(`getPlayableCards`) — am Server wäre ein zweiter Versuch
+durchgegangen.
+
+**Beschwörungen stempeln erst, wenn die Kreatur GELANDET ist** (direkt
+vor `onPlay`/`onCardEnterZone`), nicht schon am Tor: eine negierte oder
+abgebrochene Beschwörung („Off Duty") darf die Partie-Grenze nicht
+verbrauchen.
+
+### Neu: `oncePerGameEffect` für AKTIVIERTE Effekte
+
+`oncePerGame` begrenzt das SPIELEN einer Karte. „You can only use this
+effect once per game" ist etwas anderes — und beides kann nebeneinander
+stehen (Black Marketeer: 1 Beschwörung je Partie, Effekt je Zug).
+Deshalb ein eigener Vertrag:
+
+* Karten melden **`oncePerGameEffect: true`** (optional
+  `oncePerGameEffectKey`, wenn mehrere Karten sich eine Grenze teilen).
+* Engine: `oncePerGameEffectUsed(pi, script, cardName)` /
+  `markOncePerGameEffect(…)`. Gespeichert im selben Set
+  `ps._oncePerGameUsed`, aber mit Präfix **`effect:`** — so erbt der
+  Vertrag Serialisierung und Snapshot-Wiederherstellung, ohne mit dem
+  Kartenschlüssel zu kollidieren.
+* Gelesen wird er an vier Stellen: `getActivatableCreatures` und die
+  Heldeneffekt-Liste (damit die Knöpfe verschwinden),
+  `doActivateCreatureEffect` und alle **drei** Sammelzweige von
+  `doActivateHeroEffect` (eigener Held, Mummy Token, Ausrüstung).
+* **Der Stempel für Heldeneffekte sitzt in
+  `resolveHeroEffectActivation` (Engine), nicht im Server-Handler** —
+  `performImmediateAction` fährt denselben Weg, und eine zweite
+  Wahrheit wäre genau die Lücke, durch die die Regel wieder durchfiele.
+
+Die beiden bestehenden Karten mit einer Partie-Grenze (**Black
+Marketeer**: „only summon 1 per game", **Teocuilatl**: „only sacrifice
+1 Hero per game") führen ihre Marke weiterhin selbst am Spielerzustand
+und sind unverändert — sie funktionierten schon. Der neue Vertrag ist
+für alles Künftige da.
+
+
+## ★ Die geteilte „Divine Gift"-Grenze — geprüft und eine Lücke geschlossen (v1031, Als Frage 12.9.)
+
+Alle **17** „Divine Gift"-Karten melden korrekt
+`oncePerGame: true` + `oncePerGameKey: 'divineGift'`, teilen sich also
+eine Partie-Grenze. Das ist die richtige Bauform — aber sie greift nur
+dort, wo der Spielweg sie liest.
+
+**Die Lücke:** Vier der siebzehn sind **Reaktionen** (Rain, Guardian,
+Time, Edge). Die werden im **generischen Kettenfenster**
+(`executeCardWithChain`) aus der Hand angeboten — und das prüfte
+`oncePerGame` NICHT und stempelte auch nicht. Ein bereits verbrauchtes
+Geschenk wäre dort wieder angeboten worden. Die
+Schadens-Fenster (`_checkPreDamageHandReactions` & Co.) hatten beides
+seit jeher; nur dieses eine Fenster fiel durch.
+
+Jetzt hat es beides. **Der Stempel sitzt dort, wo die Karte die Hand
+verlässt** — ab da IST sie aktiviert („You can only ACTIVATE 1 … per
+game"), unabhängig davon, ob ein Gegenzug sie später negiert.
+
+Mitgeprüft und in Ordnung:
+* Die 12 Normal-Spells und die eine Attack laufen über `doPlaySpell` —
+  Tor seit v1030, Stempel seit jeher.
+* Die Marke `ps._oncePerGameUsed` ist ein **Set** und überlebt
+  Snapshot/Restore als Set (der JSON-Rückfallpfad rehydriert Sets
+  ausdrücklich) — sonst wäre die Grenze nach jedem MCTS-Rollout weg.
+* Ausgrauung im Client: `getBlockedSpells`,
+  `getHeroEligibleActionCards` und die Projektion `oncePerGameUsed`.
+
+
+## ★ Puzzle-Editor: Tooltip lag unter der Hand (v1032, Als Befund 12.9.)
+
+`.board-tooltip` liegt im gemeinsamen CSS auf **z-index 9999**, die
+Staging-Hand des Puzzle-Editors aber auf **10000** — der Karten-Tooltip
+verschwand also samt Kartentext hinter den Handkarten.
+
+Der Aufschlag steht **im Editor** (inline `zIndex: 10020` am
+`.board-tooltip`-div von `app-puzzle.jsx`), nicht im gemeinsamen CSS:
+das Problem ist eine Eigenart dieses Editors — im Spielbrett gibt es
+keine Hand auf 10000, und eine Anhebung dort könnte andere Ebenen
+stören. 10020 liegt über Hand (10000) und Debuff-Klappe (10001), aber
+unter dem Entfernen-Knopf (999999).
+
+Der kleine Texttooltip (`.game-tooltip`, `app-shared.jsx`) lag auf
+**genau** 10000 — bei Gleichstand entscheidet der Stapelkontext, also
+mal so, mal so. Ebenfalls auf 10020, weiterhin unter den Animationen
+(ab 10150).
+
+
+## ★ Endbildschirm lag unter der Hand (v1033, Als Befund 12.9.)
+
+`.modal-overlay` liegt auf **z-index 1000**, die eigene Handleiste
+(`.game-hand-me`) aber auf **10000** — und in der Handy-Queransicht
+quellen ihre Karten nach OBEN über das Brett (`overflow: visible`,
+absichtlich). Dort verdeckten sie den Victory-/Defeat-Screen samt
+Rematch- und Cancel-Knopf.
+
+Angehoben auf **10080** wurden gezielt:
+* die drei Ergebnis-Overlays in `app-board.jsx` (Rundenergebnis,
+  Set-Abschluss, Bo1/Rückfall),
+* `.first-choice-panel` (das Rematch-Panel nach einer Niederlage, war
+  9600) — es bleibt klein und verschiebbar, die Hand also weiterhin
+  sichtbar; es gewinnt nur die Überlappung.
+
+**`.modal-overlay` bleibt global auf 1000**: die Klasse tragen auch
+Lobby, Deckbau und andere Fenster, deren Ebenen sich nicht
+mitverschieben sollen. 10080 liegt über der Hand (10000) und über dem
+Deck-Such-Fenster (10070), aber unter den Animationen (ab 10150).
+
+**Waldweg-Notiz:** Ein JSX-Kommentar `{/* … */}` darf NICHT direkt
+hinter `{bedingung && (` stehen — dort wird ein Ausdruck erwartet, und
+Babel bricht mit `UnexpectedToken` ab. Der Kommentar gehört über die
+Bedingung.
+
+
+## ★ Kartenauftritte: aktiv nur beim Gegner, passiv bei beiden (v1034, Als Regel 12.9.)
+
+Die große Kartenansicht links vom Brett ging bisher an beide Seiten. Für
+den handelnden Spieler ist sie Störung statt Information — er weiß, was
+er anklickt, und die Ansicht verdeckt ihm dabei das Brett. Neue Regel:
+
+* **Aktiver Einsatz** (Karte gespielt, Kreatur-/Helden-/Ability-/Area-/
+  Equip-Effekt aktiviert) → **nur der Gegner** (und die Zuschauer).
+* **Passiver Effekt**, der von allein anspringt (Baaliel sammelt Zähler)
+  → **weiterhin beide**. Genau die will der Spieler sehen, weil er sie
+  nicht selbst ausgelöst hat.
+
+Zwei Stellen tragen das:
+
+1. **`showTriggeredEffect`** unterscheidet über den Aktivierungsmerker
+   `_activationSource` (den `armEffectAnnounce` an JEDEM aktiven Weg
+   setzt): meldet sich die Karte **selbst** während ihres **eigenen**
+   aktiven Einsatzes, geht der Auftritt mit `toPlayers: [Gegner]` raus.
+   Jede andere Meldung — anderer Kartenname, kein Merker, oder ein
+   Merker aus einem früheren Halbzug — geht wie bisher an beide. Das
+   deckt auch die vielen Kartenskripte ab, die sich in ihrem eigenen
+   `onPlay` selbst ankündigen.
+
+2. **`announceActiveEffect`** sendete genau EINE Sache: die Kopie für
+   den Aktivierenden (Regel 12.8.). Die entfällt. Der Gegner hatte
+   seinen Auftritt ohnehin über `_firePendingCardReveal`, das an jedem
+   aktiven Weg gesetzt wird und an Gegner **und** Zuschauer geht.
+
+Der Klang bleibt dem Spieler erhalten — der Klick auf einen Effekt hat
+seinen eigenen; der Auftritt war nie die einzige Rückmeldung.
+
+
+## Neue Karte: „Classical Harpyformer" (v1035) — inkl. cards.json
+
+Creature, Summoning Magic Lv 0, 50 HP, Archetyp **Harpyformers**
+(neuer Eintrag in `data/cards.json`, Werte und Set wie die neun
+Geschwister; die Datei ist NICHT alphabetisch sortiert — der Eintrag
+steht bei den anderen Harpyformern).
+
+Die Familienform, drei Klauseln:
+
+① **`inherentAction: harpyformerInherentAction`** — gratis, solange in
+diesem Zug noch keine Kreatur beschworen wurde. Das ist eine KAUSALE
+Bedingung, keine Wertfrage: kommt eine andere Kreatur zuerst, ist die
+Gratis-Aktion ersatzlos weg. Deshalb trägt die Karte wie ihre
+Geschwister `cpuMeta.playOrderPriority: 100`.
+
+② **★ Die Suche kostet NICHTS** — anders als bei Ska, der 50 Schaden am
+Wirtshelden zahlt. Der Text nennt keine Kosten. Das „you may" bleibt
+trotzdem als Frage, weil die Suche die Karte dem Gegner aufdeckt.
+
+③ Einmal je Zug: eine „Wealth"-Ability abwerfen für **5 Gold**. Abwurf
+über `harpyformerDiscardCost` (feuert den regulären Abwurf-Hook, damit
+„wenn abgeworfen"-Karten es mitbekommen), Gold über `actionGainGold` —
+das achtet auf die Goldsperre (Golden Arrow, im Repro mitgeprüft).
+Bricht der Abwurf ab, meldet `onCreatureEffect` **false**, damit die
+Engine den Einmal-je-Zug-Stempel nicht setzt.
+
+
+## ★ Zwei Kopien beim Hand-Abflug (v1036, Als Befund 12.9.)
+
+Symptom: Wird eine Kreatur von „Off Duty" aus der Hand ins Deck
+gemischt, bleibt die Handkarte sichtbar, während der Flug schon läuft —
+zwei Kopien gleichzeitig.
+
+Ursache liegt NICHT bei Off Duty: die Negat-Wege lassen die Karte bei
+`from: 'hand'` **absichtlich** noch im Zustand und verzögern ihren Sync
+(`if (vonZone !== 'hand') this.sync();`), weil der Client den Handplatz
+als Startpunkt des Fluges braucht (`fromHandIdx`). Nur fehlte das
+Gegenstück: der Platz wurde nie verdeckt.
+
+Der Client verdeckt jetzt jeden Hand-Abflug mit Startplatz
+(`bounceReturnHidden`, Schlüssel `owner-handIdx`) und räumt nach der
+Flugdauer (700 ms) wieder auf — danach hat der Sync die Karte ohnehin
+entfernt, und ein stehengebliebener Schlüssel würde nach dem Nachrücken
+die FALSCHE Handkarte verdecken. Der Platz bleibt dabei im DOM
+(`visibility: hidden`), sonst verlöre der Flug seinen Anker.
+
+**Das betraf alle Hand-Abflüge**, nicht nur Off Duty: „Lunar Eclipse"
+(Hand → Gelöscht) und „Key" (Hand → fremde Hand) laufen über denselben
+Flug. Beide Handseiten lesen dasselbe Versteck.
+
+
+## ★ Lernkanal für ABWURFKOSTEN (v1037, Als Auftrag 12.9.)
+
+**Anlass:** Ob sich ein Effekt eine Handkarte wert ist, lässt sich nicht
+gegen eine feste Punktzahl messen — die Effekte sind nicht
+gegeneinander aufrechenbar. Vorher entschied genau das: eine
+150er-Schwelle aus dem Abwurf-DUELL (Bottled Flame), wo „abbrechen"
+= „ich nehme den Schaden" heißt. Bei Kosten heißt es „der Effekt
+passiert nicht" — die Bedeutung war invertiert.
+
+**Die Kette, Ende zu Ende:**
+
+| Stufe | Wo | Was |
+|---|---|---|
+| Markierung | Prompt | `costFor: <Quellkarte>` am `forceDiscardCancellable` |
+| Aufzeichnung | `_decision-log.js` | `engine._costDiscardLog`: `{pi, t, c, paid, card, tags}` |
+| Lage-Tags | `_deck-profile.costDiscardTags` | Grundtags + **sortenabhängige** Tags (s.u.) |
+| Sammlung | `_train-recorder.js` | `costDiscards` je Spiel, nur die gepinnte Seite |
+| Fit | `scripts/train-deck-profile.js` | `costDiscardRules[Karte]` + `['tag:<Lage>']`, ≥5 Beispiele je Arm |
+| Nutzung | `_cpu.js` | eigener Zweig für `costFor`-Prompts, fragt `costDiscardDecision` |
+
+**★ Die Aufzeichnung sitzt in der Prompt-Hülle, nicht im Kartenskript** —
+damit bedient JEDE künftige Karte den Kanal, sobald sie ihren
+Abwurf-Prompt mit `costFor` kennzeichnet. Die zehn Harpyformer tun das
+über `_harpyformer-shared.js` von selbst.
+
+**★ Beide Arme müssen entstehen:** `costDiscardDecision` würfelt unter
+`PP_TRAIN` mit `PP_RULE_EXPLORE` (bzw. 40 %, solange es keine Regeln
+gibt) bewusst zwischen zahlen und ablehnen. Ohne Gegenbeispiele kann der
+Trainer nichts fitten — und das alte Verhalten zahlte fast immer.
+
+**Ohne Meinung wird gezahlt**, nicht abgelehnt: die 150er-Sperre gilt
+nur noch für das Abwurf-Duell, für das sie gedacht war.
+
+**Nachgemessen:** ein Trainingslauf mit „Bamboo Warrior" (enthält
+Harpyformer) schreibt Zeilen der Form
+`{c:'Ska Harpyformer', t:14, paid:1, card:'Performance',
+tags:['handFull','late','boardWide']}`.
+
+
+## ★ Kosten-Lernkanal: die Lage hängt vom EFFEKT ab (v1038, Als Präzisierung 12.9.)
+
+„Die Kriterien sind je nach Effekt unterschiedlich — es ist wirklich
+case-by-case." Drei Ausbaustufen:
+
+**① Sorten-Tags.** Jede Karte nennt am Prompt die **Art ihrer
+Gegenleistung** (`costKind`), und `costDiscardTags` hängt die passenden
+Lage-Tags an:
+
+| `costKind` | zusätzliche Lage |
+|---|---|
+| `gold` | Goldstand (`goldBroke` … `goldRich`) |
+| `damage` / `burn` / `poison` | Restpunkte des schwächsten gegnerischen Helden (`oppLethalRange` / `oppHurt` / `oppHealthy`) + gegnerische Brettbreite |
+| `heal` | schlechtester eigener HP-Anteil (`selfCritical` / `selfHurt` / `selfHealthy`) |
+| `tutor` / `draw` | Deckrest (`deckThin` / `deckMid` / `deckDeep`) |
+| `draw` zusätzlich | `deckoutRisk` / `deckSafe` — der Netto-Gewinn ist fest (+1), die EINZIGE Frage ist das Ausmillen (Als Vorgabe 12.9.). Gemessen an `deckTurnsLeft` + `deckoutDangerSizeOf`, nicht an der blanken Deckgröße |
+| `protect` | Wert der besten eigenen Kreatur (`guardPrize` / `guardSolid` / `guardCheap`) **und ihr Zustand** (`guardSquishy` / `guardWorn` / `guardTanky`); ohne Kreatur `noCreature` |
+
+Die Grundtags (Handgröße, Zug, eigene Brettbreite) bleiben überall
+dabei — „kann ich mir die Karte leisten?" stellt sich immer gleich.
+`costTags: [...]` nimmt Sondertags für Einzelfälle.
+
+**② Ausgangs-Tags.** Manches entscheidet sich erst NACH der Zahlung —
+„hat der Schaden getötet?". Dafür `engine.noteCostDiscardOutcome(pi,
+Quellkarte, tags)`: hängt Tags an die jüngste eigene Zeile derselben
+Quellkarte im selben Zug. Metal Harpyformer nutzt es
+(`killed`/`noKill`, `hitOpp`/`hitSelf`, `hitHero`/`hitCreature`).
+
+**③ Fit je Karte × Lage.** Der Trainer fittet jetzt
+`costDiscardRules['Karte|tag']` zuerst; die allgemeine `tag:`-Regel
+bleibt Rückfall für Karten mit zu wenigen eigenen Daten. Der Leser
+bevorzugt entsprechend die karteneigene Regel. Damit kann „goldBroke"
+für den Goldeffekt etwas anderes bedeuten als für den Schadenseffekt —
+und „killed" gibt es nur dort, wo es einen Sinn hat.
+
+**Nachgemessen** (Bamboo Warrior, echte Trainingszeile):
+`{c:'Metal Harpyformer', paid:1, card:'Fighting',
+tags:['handFull','mid','boardWide','oppLethalRange','oppBoardWide','killed','hitOpp','hitHero']}`.
+
+
+## Kosten-Sorten der zehn Harpyformer (v1039, Als Vorgaben 12.9.)
+
+| Karte | Gegenleistung | `costKind` |
+|---|---|---|
+| Classical | 5 Gold | `gold` |
+| Country | 6 Gold | `gold` |
+| Metal | 50 Schaden | `damage` (+ Ausgangs-Tags) |
+| Grunge | Brand | `burn` |
+| Rap | Gift | `poison` |
+| Ballad | 100 Heilung | `heal` |
+| Shanty / Ska | Suchen bzw. Ability anlegen | `tutor` |
+| Techno | 2 Karten ziehen | `draw` |
+| Choir | Schadensminderung an einer Kreatur | `protect` |
+
+**★ Choir ist ohne eigene Kreatur nicht mehr aktivierbar** (Als Vorgabe:
+„Hat man keine Creatures, sollte Choir nie genutzt werden") — der Schutz
+verpuffte sonst samt Ability-Karte. Der Choir selbst zählt mit, er ist
+ja eine Kreatur.
+
+**Waldweg-Notiz zu den `guard`-Tags:** Der Startwert für „beste eigene
+Kreatur" muss `null` sein, nicht 0. Ohne gelerntes Profil ist jeder
+Kartenwert 0, und mit `wert > bestWert` bliebe der ZUSTAND auf seinem
+Anfangswert stehen — eine fast tote Kreatur galt dann als „zäh". Bei
+Wertgleichstand entscheidet jetzt der schlechtere Zustand: die
+gefährdete Kreatur ist die, um die es geht.
+
+
+## ★ PFLICHT: „you may discard X to do Y" gehört in den Lernkanal (v1040, Als Regel 12.9.)
+
+**Diese Regel gilt für JEDEN künftigen Effekt mit Abwurfkosten**, nicht
+nur für Harpyformer. Sobald der Spieler freiwillig eine Karte abwirft,
+um etwas auszulösen, ist das eine Kosten-Entscheidung — und die ist
+nicht objektiv gegen eine Zahl messbar (Als Begründung: „die Kriterien
+sind je nach Effekt unterschiedlich, es ist wirklich case-by-case").
+Ohne Kennzeichnung lernt die CPU für diese Karte **nie**, wann sich die
+Zahlung lohnt; sie fällt auf eine Faustregel zurück, die für
+Abwurf-DUELLE (Bottled Flame) geschrieben wurde und hier das Falsche
+misst.
+
+**Was eine neue Karte tun muss:**
+
+```js
+const antwort = await engine.promptGeneric(pi, {
+  type: 'forceDiscardCancellable',
+  costFor: CARD_NAME,        // ← PFLICHT: schaltet den Lernkanal ein
+  costKind: 'gold',          // ← Sorte der Gegenleistung (Tabelle oben)
+  costTags: ['…'],           //   optional: Sondertags für Einzelfälle
+  eligibleIndices, cancellable: true, …
+});
+```
+
+Läuft der Abwurf über `harpyformerDiscardCost`, ist `costFor` schon
+gesetzt — dann genügt `costKind` am Aufrufer.
+
+**Entscheidet sich der Nutzen erst NACH der Zahlung** (hat der Schaden
+getötet? hat die Suche etwas gefunden?), gehört das dazu:
+
+```js
+engine.noteCostDiscardOutcome(pi, CARD_NAME, [getoetet ? 'killed' : 'noKill']);
+```
+
+**Keine frei gewählten Kosten?** Erzwungener Abwurf, Abwurf als
+Nebenwirkung, Abwurf-Duell — dann ausdrücklich abmelden, mit
+Begründung:
+
+```js
+// COST-DISCARD-CHANNEL: n/a — erzwungener Abwurf, keine Wahl des Spielers
+```
+
+**Wächter `check-cost-discard.js`** liest die Kartentexte, sucht das
+Muster „discard … to …" und meldet jede Karte, deren Skript weder
+`costFor` noch `harpyformerDiscardCost` noch die Abmeldung trägt. Der
+**Grundlinie ist LEER** (v1041): der Altbestand wurde einzeln
+durchgegangen. Jede Karte mit Abwurfkosten bedient jetzt entweder den
+Kanal oder trägt die Abmeldung mit Begründung. Grundlinie bewusst neu
+schreiben: `node scripts/check-cost-discard.js --update`.
+
+### Der Altbestand, case-by-case (v1041)
+
+**Angeschlossen (25), mit Sorte:**
+
+| Sorte | Karten |
+|---|---|
+| `tutor` | Cute Annoyance Mini, Cute Dog, Life-Searcher, Lunatic Cycle – New Moon, Navigation, Paraseed Greenhouse, Training |
+| `draw` | Gigantisaur Pteranos, Gigantisaur Triceras, Inventing, Prayer, Visionary Genius Heinz |
+| `protect` | Cool Rescuer Monia, Cute Phoenix, Gigantisaur Brachion, Gigantisaur Stegon |
+| `disrupt` *(neu)* | Destructive Puppet Shishi, Gigantisaur Ankylos, Plant Golem, Smug Mastermind Antonia |
+| `mill` *(neu)* | Cute Nerd Magenta |
+| nur Grundtags | Big Gwen Guard, Cute Bird, Skeleton Necromancer, die sieben **Magic**-Gems (über `_magic-gem-shared.js`) |
+
+Zwei Sorten kamen dabei dazu: **`mill`** (eigenes Deck füttern —
+derselbe Zwiespalt wie beim Ziehen, mit Deckout-Tags) und **`disrupt`**
+(Störung auf der Gegnerseite — nicht Schaden zählt, sondern wie viel
+dort steht: `oppBoardEmpty` / `oppBoardThin` / `oppBoardWide` +
+`oppHurt`).
+
+**Abgemeldet (27)**, jede mit Begründung im Skriptkopf. Drei Muster:
+* **der GEGNER wirft ab** — Jean, Mary Crestmas, Spike Trap, The White
+  Eye, Future Tech Control Device, Magic Ambers Haupteffekt;
+* **die Karte wirft sich SELBST ab** — Cute Cat, Cool Tech Jetpack,
+  Idej Projection, Loyal Bone Dog, Stormkissed Waflav, Skull Necklace;
+* **die Kosten sind keine Handkarte** — Lolek (Artefakt), Spirit of the
+  Shattered Trident (gelöschtes Artefakt), Steam Dwarf (Opfer),
+  Guardian Beast Shu (Beschwörungsbedingung), …
+
+**★ Zwei Fallen aus diesem Durchgang:**
+1. **Ein Prompt gehört nicht automatisch dem Zahlenden.** Bei *Magic
+   Amber* landete die Marke zuerst am Abwurf des GEGNERS (dem
+   Haupteffekt); die eigenen Kosten sitzen im geteilten Gem-Helfer, der
+   jetzt alle sieben Juwelen auf einmal versorgt.
+2. **Ein Kosten-Prompt muss kein Abwurf-Wähler sein.** „Eine Karte
+   abwerfen, um …?" kommt auch als Ja/Nein-Frage oder Kartengalerie.
+   Die Aufzeichnungshülle wertet beides aus (`cardName` **oder**
+   `confirmed`), und `actionPromptForceDiscard` reicht die Marken jetzt
+   an seinen internen Prompt durch.
+
+**Nachgemessen** (Cute Commando, 4 Spiele): 56 Kosten-Zeilen über fünf
+Karten — Inventing 29×, Visionary Genius Heinz 14×, Cute Dog 5×,
+Cool Rescuer Monia 5×, Cute Annoyance Mini 3×.
+
+
+## Neue Ability: „Interference" (v1042) — Schutz gegen FLÄCHENSCHADEN
+
+```
+1) This Hero takes half damage from sources that hit other targets in addition to it (rounded up).
+2) This Hero takes no damage from sources that hit other targets in addition to it.
+3) No Heroes you control take damage from sources that hit other targets in addition to them.
+```
+
+**★ ENTSCHEIDEND IST „EINE QUELLE, MEHRERE ZIELE IN EINEM SCHLAG"**
+(Als Vorgabe 12.9.). Eine Karte, die nacheinander mehrere
+EINZELinstanzen austeilt — Rha'Bi — ist NICHT betroffen. Der Schutz
+hängt deshalb **nicht am Kartennamen**, sondern an einer Klammer, die
+nur die Flächenwege setzen:
+
+```js
+engine.beginMultiHit(anzahlZiele);   // Helden UND Kreaturen zählen
+try { …Schaden austeilen… } finally { engine.endMultiHit(); }
+```
+
+`actionDealDamage` liest den Merker: ab **zwei** Zielen („in addition to
+it") greift `interferenceShare(besitzer, held)` — 0.5 bei Stufe 1
+(`Math.ceil` auf den Rest, also „rounded up"), 1 bei Stufe 2, und bei
+Stufe 3 für JEDEN Helden dieser Seite, egal an welchem Helden die
+Ability hängt. Die Stufe kommt aus `countAbilitiesForSchool`, zählt also
+Wildcard-Abilities korrekt mit.
+
+Die Klammer ist **verschachtelbar** (Tiefenzähler) und wird im `finally`
+gelöst, damit ein abgebrochener Schlag sie nicht stehen lässt — sonst
+wären alle folgenden Einzeltreffer fälschlich geschützt.
+
+**Wer klammert schon:**
+* `actionAoeHit` — der generische Trichter, damit **12 Karten auf einen
+  Schlag** (Flame Avalanche, Blood Rock, Rain of Arrows, Boiling Oil,
+  Butterfly Cloud, Cavalry, Dance of the Flame Pillars, Divine Gift of
+  Fire, Energy Drain, Future Tech Organnon, Rebelliokai Oblivious Oni,
+  Spider Avalanche);
+* **Chain Lightning** — springt zwar von Ziel zu Ziel, ist aber EINE
+  Quelle über die ganze Kette;
+* **Whirlwind Strike** — zwei Helden plus deren Kreaturen in einem
+  Schlag.
+
+**Nachgezogen (v1043, Als Rulings 12.9.)** — 14 weitere Karten mit
+eigenem Schadensweg klammern jetzt selbst: Bomb Mite, Carpet Bomblebee,
+Cataclysm, Dark Deepsea God, Exploding Skull, Explosivo's Sword,
+Forbidden Zone, Future Tech Bomb, Gangster Angel, Holy Selection, Laser
+Volley, Spirit of the Barbarian Sword, The Spawn Mother, Thebinxan War
+Counselor.
+
+Zwei Sonderfälle:
+* **Explosivo's Sword** — nur der 100er-Splash ist ein Flächenschlag;
+  der ursprüngliche Angriffsschaden des Trägers läuft getrennt und
+  bleibt unberührt. Die Klammer sitzt deshalb eng um die Splash-Phase.
+* **Invisibility** — ausdrücklich NICHT betroffen, keine Klammer.
+
+**★ ES ZÄHLT DIE ECHTE ZIELMENGE, NICHT DIE GEPLANTE** (Als Ruling
+12.9.). Jede Klammer bekommt die Zahl der Ziele, die WIRKLICH getroffen
+werden:
+* „Ida" macht aus einem Flächenzauber einen Einzelzauber — dieser Weg
+  kehrt in `actionAoeHit` **vor** der Klammer zurück, also kein Schutz;
+* verschonte Ziele (Laser Volley) und tote Helden werden
+  herausgefiltert;
+* ist der Interference-Held das einzige legale Ziel, steht die Zahl auf
+  1 und der Schutz greift nicht.
+
+Deshalb überall `filter(… hp > 0 …)` bzw. `filter(t => !spared…)` statt
+der rohen Zielliste — eine Klammer mit geplanten statt getroffenen
+Zielen wäre die stille Variante desselben Fehlers.
+
+
+## ★ „Interference" v1049 — Träger-Gate, Xal, und was die CPU davon weiß
+
+**① BUGFIX: der Schutz hängt am HANDLUNGSFÄHIGEN Träger** (Als Ruling
+14.9.). Die Erstfassung prüfte gar keinen Zustand — ein eingefrorener
+oder negierter Held schützte weiter, auf Stufe 3 sogar die ganze Seite.
+Jetzt läuft jede Stufe über den neuen Helfer:
+
+```js
+engine.interferenceLevel(ownerIdx, heroIdx)   // 0, wenn er nicht schützen kann
+```
+
+Er verlangt einen LEBENDEN und nicht stummgeschalteten Träger und fragt
+dafür `_isHeroEffectSilenced` — **dasselbe Prädikat, das den globalen
+Hook-Filter speist** (Stunned / Webbed, Frozen mit Chilly-Dog-Ausnahme,
+Negated in jeder Form, Mummy). Tempeste benutzt es für die wortgleiche
+Formulierung. Eine zweite Statusliste an dieser Stelle wäre genau die
+Dublette, die bei der nächsten Status-Änderung still ausschert.
+
+**② Xals Support-Zonen-Abilities zählen mit** (Als Ruling 14.9.). Der
+Helfer hängt `heroSupportAbilityStacks` an die echten Ability-Zonen —
+derselbe Griff wie in `_getCandidateAbilityZoneSets` und
+`effectiveSchoolLevelForCaster`. Performance-Wildcards rechnet
+`countAbilitiesForSchool` wie gewohnt mit.
+
+**③ ZIELSAMMLER, EINE WAHRHEIT.** Aus `actionAoeHit` herausgelöst, weil
+der Pilot dieselbe Zielmenge braucht:
+
+| Methode | liefert |
+|---|---|
+| `aoeTargetPlayers(pi, config)` | die gemeinten Seiten (`enemy`/`own`/`both`) |
+| `collectAoeHeroTargets(targetPlayers, config)` | `{hero, heroIdx, owner}`, Seiten-statt-Spalten-Vertrag v718, ohne `shielded`-Filter |
+| `collectAoeCreatureTargets(targetPlayers, config, types)` | `{inst, cd, currentHp}`, Puppet-Regel v704 |
+| `projectAoeTargets(pi, config)` | die CPU-Projektion: `{kind, hp, owner, heroIdx}` |
+
+Eine nachgebaute Sammelschleife im Piloten wäre bei jeder Filter-Änderung
+still auseinandergelaufen — Rain of Arrows' handgeschriebene Fassung
+kannte weder v718 noch geschirmte Helden.
+
+**④ `cpuProjectedDamage` trägt jetzt ZIEL-IDENTITÄT.** Neue Felder
+`owner` und (bei Helden) `heroIdx`; ohne sie kann
+`projectImpactFeatures` die Minderung nicht je Held nachschlagen. Alte
+Deklarationen ohne die Felder verhalten sich unverändert. Muster:
+
+```js
+cpuProjectedDamage(gs, pi, engine) {
+  return {
+    amount: 150,
+    targets: engine.projectAoeTargets(pi, { side: 'enemy', types: ['hero', 'creature'] }),
+  };
+}
+```
+
+**⑤ ★ NICHT „halber Wert", sondern HALBIERTER SCHADEN** (Als Korrektur
+14.9.). `projectImpactFeatures` rechnet je Held mit
+`Math.ceil(amount × (1 − share))` weiter — die Engine-Rundung. Der
+Unterschied zählt bei Overkill: 150 auf einen 40-HP-Helden bleiben
+halbiert mit 75 tödlich, der Held-Kill fällt also NICHT weg; 150 auf
+100 HP verlieren ihn. Eine pauschale Halbierung des Beitrags hätte
+beides falsch bewertet.
+
+**⑥ MODUL-FLAG `hitsMultipleTargets`** (Loader-Autoerkennung
+`detectMultiHit`, Bauform von `blockedByPileLock` v826 /
+`blockedBySummonLock` v834). Erkannt wird `aoeHit(` oder
+`beginMultiHit(` im Quelltext, Kommentare vorher gestrippt; manuelles
+true/false am Modul gewinnt, `neverMultiTarget` schließt aus.
+**Erkennungsmerkmal ist damit dieselbe Flächenklammer, an der auch der
+Schutz hängt** — was sich klammert, ist AoE, für Engine wie Pilot.
+Trifft heute 28 Karten. Der Loader liest den Quelltext dafür nur noch
+EINMAL je Modul (vorher bis zu zweimal).
+
+**⑦ Der Pilot hat zwei Gurte, mit Absicht.** Die exakte Projektion aus
+④/⑤ wirkt nur mit `cpuProjectedDamage` UND trainiertem Profil
+(`impactWeights` + `impactRules`). Darunter liegt ein grober,
+profilunabhängiger Malus in `estimateHandCardValueFor`
+(`interferenceAoeDiscount`): blockierter Anteil = Σ `Gewicht × share`
+über die Helden, geteilt durch das Gesamtgewicht aller Ziele. Die
+Gewichte kommen aus denselben Wertfunktionen, die `pickEnemyTargets` im
+Fall „Schadenshöhe unbekannt" benutzt (Held `100 × value`, Kreatur
+`50 × value − 30`) — hier ist sie ebenfalls unbekannt, also keine neu
+erfundene Skala. Kreaturen zählen nur im Nenner: „Interference" schützt
+ausdrücklich nur Helden. Der Malus steht VOR den Ascension-/Cardinal-
+Böden und der Kazena-Umkehr, gleiche Rangfolge wie beim Profil-Blend.
+
+**Bewusste Näherung:** gewertet wird immer gegen die Gegnerseite, auch
+bei Karten mit `side: 'own'`/`'both'` — die echte Seitenwahl steht in
+der `config` im Kartenrumpf und ist von außen nicht lesbar. Die Näherung
+kann den Malus unterschätzen, nie überschätzen.
+
+
+## Neue Karte: „Spatial Crevice" (v1050) — MEHRERE AREAS GLEICHZEITIG
+
+```
+Spell · Area · Magic Arts Lv1
+You may control up to 3 different Areas. At the end of each turn, the
+turn player may search their deck for an Area, reveal it and add it to
+their hand.
+```
+
+**① `areaLimit` — der neue Vertrag.** Bis v1049 war „nur EINE Area je
+Seite" eine harte Bedingung an zwei Stellen (`validateActionPlay` und
+die Spielbarkeitsliste). Jetzt entscheidet:
+
+```js
+engine.areaLimitFor(playerIdx)      // Grundwert 1
+engine.canPlaceAnotherArea(playerIdx)
+```
+
+Eine Area hebt das Limit, indem ihr Skript `areaLimit: 3` exportiert.
+**★ HOECHSTWERT, NICHT SUMME** — zwei Spatial Crevices ergeben weiter 3,
+nicht 5: der Kartentext nennt eine Obergrenze, keinen Zuschlag. Kein
+Kartenname steht in der Engine.
+
+**★ „DIFFERENT" (Als Praezisierung 14.9.).** `canPlaceAnotherArea` nimmt
+optional den Kartennamen und lehnt ab, wenn die Seite bereits eine Area
+dieses Namens kontrolliert — zwei Kopien derselben Area gehen nie
+zugleich. Der Riegel sitzt generisch im Gate statt in Crevice: beim
+Grundlimit 1 aendert er nichts (mehr als eine Area gibt es dort ohnehin
+nicht), und jede kuenftige Limit-Karte erbt ihn von selbst.
+
+**★ Die Karte zaehlt sich selbst mit** (Als Ruling 14.9.): effektiv zwei
+„echte" Areas plus Crevice. Das faellt von allein heraus, weil das Gate
+die Zonengroesse prueft und Crevice in der Zone liegt.
+
+**② `enforceAreaLimit` — das Limit wirkt auch RUECKWIRKEND.** Verlaesst
+Crevice das Brett, muss der Ueberhang weg, und **der Besitzer waehlt**,
+was in die Ablage geht (Als Ruling 14.9.). Der Aufruf haengt
+bedingungslos am Ende von `removeArea` — no-op, solange die Zone passt,
+deshalb muss ihn kein Verursacher selbst ausloesen. `_skipLimitEnforce`
+bricht die Rekursion, weil die Durchsetzung selbst ueber `removeArea`
+abraeumt. In Rollouts und im Schnellmodus faellt die zuletzt gelegte
+Area ohne Abfrage, damit die Simulation nicht an einem Prompt haengt.
+
+Spatial Crevice haengt zusaetzlich einen `onCardLeaveZone`-Rueckfall
+dran: er deckt die Wege ab, die an `removeArea` vorbeilaufen
+(generisches `actionMoveCard`, Loesch-Effekte). Doppelt ist gefahrlos,
+weil `enforceAreaLimit` idempotent ist.
+
+**③ „the TURN PLAYER", nicht „you".** Der Rundenende-Trigger gehoert dem
+Spieler am Zug, ganz gleich wem Crevice gehoert — Al 14.9. ausdruecklich:
+„es ist absolut moeglich, dass der Gegner den Effekt nutzt". Im Hook
+steht deshalb `gs.activePlayer`, KEIN `cardOwner`-Filter. Wer so etwas
+nachbaut: der `isMyTurn`-Reflex aus `onTurnStart` waere hier falsch.
+
+**④ Der Hintergrund ist bewusst `tier: 'partial'`.** Spatial Crevice ist
+die Karte, die zwei WEITERE Areas ueberhaupt erst erlaubt; ein deckender
+Hintergrund wuerde genau die Hintergruende verdraengen, fuer die sie
+Platz schafft.
+
+
+## ★ Area-Zone: der STAPEL (v1050, Als Vorgabe 14.9.)
+
+Seit mehrere Areas gleichzeitig liegen koennen, zeigt die Zone **alle**
+statt nur der obersten. Bauform wie `.board-ability-stack`:
+
+* **Richtung:** die NEUESTE Area liegt **vorne und unten**, genau wie bei
+  Abilities. DOM-Reihenfolge entscheidet, kein z-index — die aelteren
+  schauen mit ihrem oberen Streifen heraus.
+* **Versatz:** `--area-stack-offset` (24 % der Kartenhoehe), ein
+  Vielfaches der 5 px des Ability-Stapels. Grund ist nicht Optik,
+  sondern Bedienbarkeit: **eine untere Area muss gezielt anklickbar
+  sein**, um sie zu aktivieren.
+* **Tooltip und Klick gehoeren der KARTE, nicht der Zone.** Beides faellt
+  durch normales Hit-Testing richtig aus: unter dem Cursor gewinnt, was
+  dort ganz oben liegt; eine teilverdeckte Area antwortet nur auf ihrem
+  freiliegenden Streifen. Die Zone bleibt fuer die Zielwahl zustaendig
+  (Potion-Ziele treffen die ZONE), die Karte fuer ihre Aktivierung —
+  getrennt per `stopPropagation`.
+
+**★ KEIN `pointer-events: none` auf den nicht aktivierbaren Karten.**
+Genau daran haengt der Tooltip; ohne Maus-Ereignisse waere die halbe
+Vorgabe tot. Klicks auf eine nicht aktivierbare Area blubbern ohnehin
+zur Zone hoch.
+
+**Drei Stellen, die „genau eine Area" still voraussetzten** und jetzt
+mitziehen:
+1. `getActivatableAreas` lieferte schon immer EINEN Eintrag JE AREA — die
+   Oberflaeche nahm aber nur den ersten je Seite. Jede Karte hat ihre
+   eigene HOPT und ihr eigenes `canActivateAreaEffect`.
+2. Die Drop-Hervorhebung prueft „Zone hat Platz" statt „Zone leer". Das
+   Limit kommt als `areaLimits: [n, n]` aus dem Sync, weil der Client
+   die Kartenskripte nicht kennt.
+3. `BoardZone` bekam den Opt-in `renderStack(cards)`. Ohne die Prop
+   aendert sich nichts; mit ihr uebernimmt die Aufrufstelle die
+   Darstellung, sodass BoardZone kein Area-Wissen braucht.
+
+**Nebenbefund, mitgefixt:** das Ladungs-Abzeichen der „up to X times per
+turn"-Areas (The Bonegrinder) sass im `children`-Slot von `BoardZone` —
+und der wird NUR gerendert, solange die Zone **leer** ist. Das Abzeichen
+war damit nie zu sehen, weil es eine liegende Area voraussetzt. Es haengt
+jetzt am Stapel.
+
+
+## ★ Area-Stapel im PUZZLE-EDITOR (v1051, Als Vorgabe 14.9.)
+
+Der Editor muss denselben Stapel bauen koennen wie das Spiel — bis zu
+drei Areas, nur verschiedene, mehr als eine nur mit „Spatial Crevice".
+
+**Das Problem: der Editor arbeitet OFFLINE.** Er hat weder Engine noch
+Kartenskripte, kann `areaLimitFor` also nicht aufrufen. Im Spiel schickt
+der Server `areaLimits` mit; im Editor gibt es keinen Server. Deshalb
+eine clientseitige Kopie in `public/app-shared.jsx` — gleiche Bauform
+wie das vorhandene `CARD_HAND_LIMIT_MODIFIERS` daneben:
+
+```js
+window.CARD_AREA_LIMITS = { 'Spatial Crevice': 3 };
+window.computeAreaLimit(areaZone)                  // Grundwert 1
+window.canPlaceAnotherArea(areaZone, cardName)     // Platz UND keine Dublette
+```
+
+**★ ZWEI KOPIEN DERSELBEN REGEL LAUFEN AUSEINANDER — deshalb ein
+Waechter.** `scripts/check-area-limits.js` vergleicht das Register gegen
+die `areaLimit`-Exporte aller Kartenskripte, in BEIDE Richtungen. Ohne
+ihn waere der Schaden still: der Editor liesse entweder zu wenig zu (die
+Karte wirkt kaputt) oder zu viel (das gebaute Puzzle ist im Spiel
+ungueltig). Eine neue Limit-Karte braucht also beide Eintraege.
+
+**Vier Stellen im Editor, die „genau eine Area" voraussetzten:**
+1. `placeArea` ERSETZTE die Zone und schob die alte Area zurueck auf die
+   Hand — die Ersetzungs-Logik eines Ein-Karten-Slots, die den Stapel
+   jedes Mal abgeraeumt haette. Jetzt haengt sie an und lehnt mit
+   Begruendung ab, wenn Limit oder „different" es verbieten.
+2. `canDrop` liess jede Area fallen; jetzt prueft es dieselbe Regel, so
+   dass die Zone nicht mehr aufleuchtet, wenn der Ablegen-Pfad die Karte
+   ohnehin abweist.
+3. `removeCard` UND `clearZone` leerten die ganze Zone (`() => []`).
+   `clearZone` raeumt die QUELLE eines Zonenwechsels — beim Verschieben
+   einer von drei Areas haette das die anderen beiden mitgeloescht.
+   Beide entfernen jetzt genau den Stapelplatz.
+4. `zh(...)` las immer `areaZones[si][0]`. Jetzt bekommt jede Karte ihre
+   eigenen Griffe mit ihrem Stapelplatz (Rechtsklick entfernt genau sie,
+   Ziehen bewegt genau sie), und die Zonen-Huelle traegt den Platz am
+   ENDE — ein Drop irgendwo in der Zone haengt an.
+
+`.pz-area-zone` braucht ein eigenes `overflow: visible`: die Editor-Zone
+traegt nicht `board-zone-area` und haette den Stapel sonst am Rand
+abgeschnitten.
+
+**★ FALLE, EINMAL HINEINGETAPPT (v1052, Als Befund 14.9.: „es werden
+zwei Kopien auf einmal hinzugefuegt").** Die Stapelkarten hatten
+zunaechst den GANZEN `zh(...)`-Satz — also auch `onDrop` und `onClick`.
+Ein Drop auf eine Karte lief damit durch ihren eigenen Handler UND
+blubberte zur Zonen-Huelle: `handleDrop` feuerte zweimal. Beide Aufrufe
+lasen dieselbe, noch nicht aktualisierte Zone aus dem Closure, bestanden
+beide die Legalitaetspruefung und haengten an. Derselbe Weg haette
+ausserdem zwei Handkarten verbraucht.
+
+Zwei Riegel, absichtlich beide:
+1. **Zustaendigkeiten trennen.** Die Karte bekommt nur, was IHR gehoert
+   (`draggable`, `onDragStart`, `onDragEnd`, `onContextMenu`); Ablegen,
+   Klicken und Dragover bleiben allein bei der Huelle. Das beseitigt die
+   Ursache.
+2. **Das Anhaengen idempotent machen.** Die Regel wird ZUSAETZLICH im
+   Updater gegen `prev` geprueft, nicht nur gegen den Closure-Stand —
+   nur dort sieht sie den wirklich aktuellen Zoneninhalt. Damit kann
+   auch kein kuenftiger Aufrufweg versehentlich doppelt anhaengen.
+
+Lehre fuer jede weitere gestapelte Zone im Editor: **verschachtelte
+Zonen-Griffe sind ein Doppelfeuer**, und ein Handler, der seinen
+Zielzustand aus dem Closure liest, merkt es nicht.
+
+**Der Puzzle-START brauchte nichts.** Die Instanz-Schleife in `server.js`
+laeuft schon immer ueber ALLE Eintraege von `gs.areaZones[pi]`.
+
+
+## Neue Karte: „Festive Werz" (v1082)
+
+```
+Creature · Summoning Magic Lv0 · 70 HP   (banned)
+When you summon this Creature, pay your opponent any amount of Gold.
+Then, draw a card for every 5 Gold paid that way, to a maximum of 4.
+You can only activate this effect once per turn.
+```
+
+**Verwandt mit „Smuggler's Pier", aber drei Unterschiede entscheiden den
+Bau:**
+
+**① DAS GOLD GEHT AN DEN GEGNER**, es wird nicht bloss ausgegeben —
+zwei Buchungen: `_payCardCost` beim Zahler UND `actionGainGold` beim
+Empfaenger.
+**★ Traegt der Gegner eine Gold-Sperre** (`goldLocked`, Golden Arrow),
+kommt die Zahlung bei ihm NICHT an. Der Zahler hat trotzdem bezahlt und
+zieht trotzdem — das ist die Wirkung der Sperre, kein Fehlschlag der
+Karte. Ein Testfall haelt alle drei Teile dieses Falls fest.
+
+**② „ANY AMOUNT OF GOLD"**, nicht „a multiple of 5". Gezogen wird nur je
+VOLLE fuenf Gold, deshalb bietet die Auswahl nur die sinnvollen Stufen
+(5/10/15/20) plus die Null an. **Das ist eine Darstellungsentscheidung,
+keine Regelaenderung** — wer 7 zahlen wollte, bekaeme dieselbe eine
+Karte wie fuer 5.
+
+**③ KEINE Zieh-Sperre danach.** Smuggler's Pier setzt `handLocked`;
+Werz' Text sagt davon nichts, also bleibt die Hand offen.
+
+Die Obergrenze ist dreifach gedeckelt: 4 Karten, verfuegbares Gold,
+Deckgroesse. Alle drei haben eigene Testfaelle.
+
+**Animation** (Al 14.9.: „Geschenke"): neuer Zonen-Effekt `gift_shower`
+— bunte Paeckchen mit Schleifenband steigen ueber dem EMPFAENGER auf.
+Die Drehung faehrt ueber CSS-Variablen, weil eine laufende Animation ein
+inline gesetztes `transform` ersetzt (dieselbe Falle wie beim
+Pocket-Sand-Projektil, v1059).
+
+
+## ★ ZWEI LIVE-BEFUNDE zu „Love Shot" (v1108, Al 15.9.)
+
+Beide fielen erst im echten Spiel auf — kein Testfall haette sie
+gefangen, weil beide an Motor-VERTRAEGEN hingen, nicht an der Kartenlogik.
+
+### ① Der Charme-Bypass wurde NIE GEFRAGT
+
+Al: „Mein Charme-Hero kann Love Shot NICHT casten."
+
+**Es gibt ZWEI aehnlich benannte Vertraege, und ich hatte den falschen:**
+
+| Vertrag | wird gelesen am | Beispiel |
+|---|---|---|
+| `canBypassLevelReq` | der **KARTE** | Placement-Karten, jetzt Love Shot |
+| `canBypassLevelReqForCard` | dem **HELDEN** | Cute Princess Mary |
+
+Auf einem Spell liegend wurde `canBypassLevelReqForCard` nie gefragt —
+die Klausel tat schweigend gar nichts. **Ein Testfall, der nur die
+Funktion aufruft, haette das nicht gefangen**; jetzt prueft er
+`heroMeetsLevelReq` END-TO-END mit einem Charme-Helden ohne Magic Arts.
+
+### ② Die geliehene Aktion sah die eigenen Ermaessigungen nicht
+
+Al: „Ich wollte einen auf 0 reduzierten «Cataclysm» mit dem gestohlenen
+Hero spielen, durfte das aber nicht."
+
+**★ DIE FRAGE IST: WESSEN ERMAESSIGUNGEN GELTEN?** Der geliehene Held
+steht auf der GEGENSEITE — von dort kommen Schulen und Stufen. Die Karte
+liegt aber in MEINER Hand, und dort wirken Area-Rabatte, Ethan und die
+Hand-Offsets. `heroMeetsLevelReq` las beides von derselben Seite.
+
+Neu: **`opts.levelSourcePi`** benennt die Seite, deren HAND und
+Ermaessigungen zaehlen; ohne Angabe bleibt es bei `playerIdx`, alle
+bisherigen Aufrufer sind unveraendert. Der `charmed`-Zweig von
+`getHeroPlayableCards` reicht sie durch — und weil der Spielweg dieselbe
+Liste liest, greift der Fix an beiden Enden.
+
+**★★ ZWEITE RUNDE (v1109): ES GIBT VIER STUFENQUELLEN, nicht drei.**
+Al meldete den Fehler NACH v1108 erneut: „Der uebernommene Hero kann nach
+wie vor den Lv-0-Cataclysm nicht casten — einen anderen Spell, den er
+nativ casten koennte, aber schon."
+
+v1108 hatte nur die HAND-seitigen Quellen umgestellt. Die vierte laeuft
+woanders:
+
+| Quelle | wo | in v1108 |
+|---|---|---|
+| gestempelter Handwert (`_handLevelSetFor`) | `heroMeetsLevelReq` | ✓ |
+| Hand-Offset-Maps | `heroMeetsLevelReq` | ✓ |
+| Mana-Absorbing-Zuschlag | `heroMeetsLevelReq` | ✓ |
+| **brettweite Senker** (Area-Rabatte, Ethan, Taios Sun-Fencer) | **`_testLevelReqForZones` → `_applyCardLevelReductions`** | **✗** |
+
+Die vierte sitzt eine Ebene tiefer und fragte weiter die Seite des
+GELIEHENEN Helden. Jetzt reicht `_testLevelReqForZones` `levelSourcePi`
+durch; `heroIdx` bleibt der SPIELENDE Held, damit pro-Held-Rabatte am
+richtigen Helden greifen.
+
+**★ LEHRE, doppelt gelernt:** „wessen Stufenquelle" ist nicht EINE
+Frage, sondern eine pro Quelle. Ich hatte drei gefunden und die vierte
+uebersehen, weil sie in einer anderen Funktion steht. Der Testfall
+stellt jetzt den ECHTEN Fall nach — Senker auf dem BRETT, nicht nur
+Hand-Offsets — samt Gegenprobe ohne Senker.
+
+
+## „Memory Blast" ENTSCHAERFT (v1107) — zwei Klauseln gestrichen
+
+```
+Choose a target your opponent controls and deal damage equal to 10 times
+the number of cards in your opponent's discard pile to it. If that
+target was originally controlled by you, permanently regain control of
+it instead.
+```
+
+Die Karte war mit zwei Bremsen gebaut; Al hat 15.9. beide gestrichen:
+
+| gestrichen | Umsetzung faellt weg |
+|---|---|
+| „This must be the ONLY DAMAGE you deal this turn" | `ps.damageLocked` |
+| „can NEVER HIT MORE THAN 1 TARGET" | `neverMultiTarget` |
+
+**★ FOLGE DER ZWEITEN STREICHUNG, die man kennen sollte:**
+Verdopplungs-Effekte duerfen die Karte jetzt ausweiten. „Bomb Berserker
+Bartas" liest genau diese Flagge und liess Memory Blast bisher in Ruhe —
+bei vollem gegnerischem Ablagestapel trifft der Zauber dann **zweimal
+mit voller Wucht**. Das ist kein Versehen, sondern was die gestrichene
+Klausel bisher verhindert hat.
+
+Was bleibt: die Schadensformel und die Abzweigung („originally
+controlled by you" → zurueckholen statt Schaden, ohne Rueckfall).
+
+**Testfaelle umgebaut statt geloescht:** sie pruefen jetzt, dass nach
+Memory Blast in derselben Runde **weiterer Schaden durchgeht**, und dass
+weder im Code noch in `cards.json` eine der beiden Bremsen uebrig ist.
+
+## Stufenaenderungen (Al 15.9.)
+
+| Karte | alt | neu |
+|---|---|---|
+| Siege | Lv 3 | **Lv 2** |
+| Decisive Defeat | Lv 2 | **Lv 1** |
+
+Beide Stufen sind in den jeweiligen Pruefstaenden festgenagelt — samt
+Schule und Subtyp, damit eine spaetere Aenderung auffaellt statt
+stillschweigend durchzugehen.
+
+
+## „Love Shot" NEU GEFASST (v1106) — inkl. cards.json
+
+```
+This Spell can be used by Heroes with the "Charme" Ability regardless of
+its level. Draw a card from your opponent's deck. Then, choose a Hero
+your opponent controls and perform an Attack or Spell from your hand
+with it, if possible. That Attack or Spell counts as an additional
+Action. For that Attack or Spell only, the Hero is treated as controlled
+by you.
+```
+
+**DREI AENDERUNGEN, alle folgenreich:**
+
+**① NEU: Charme traegt die Karte, egal in welcher Stufe.** Ueber
+`canBypassLevelReqForCard`. Die SCHULE bleibt unberuehrt — Charme
+ersetzt nur die STUFE, wie Wisdom/Divinity die Ability ersetzen (siehe
+v1104).
+
+**② Gezogen wird aus dem GEGNERDECK** statt aus dem eigenen.
+
+## ★ NEU: `_opponent-deck-shared.js` — EIN Weg ins Gegnerdeck
+
+Al ausdruecklich: „Draw from opponent's deck existiert schon in
+Infiltration; achte darauf, dass es z.B. Lillys Effekt triggert."
+
+Der Vorgang ist **kein Einzeiler**, sondern eine Kette mit fuenf
+Gliedern, von denen jedes einzeln vergessen werden kann:
+
+1. der **Flug-Broadcast MUSS VOR der Zustandsaenderung** raus — er
+   registriert die Client-Maske, die den normalen Zieh-Anim fuer genau
+   diesen Handplatz unterdrueckt. Danach gesendet, saehe die Karte aus,
+   als kaeme sie aus dem EIGENEN Deck;
+2. Deck kuerzen, auf die Hand legen;
+3. `_tagHandCardOrigin` — die Karte kehrt am Ende zum Besitzer zurueck;
+4. nur der EIGENEN Seite aufdecken;
+5. **`onCardTakenFromOpponent`** — der Hook, an dem „Lilly, the Charming
+   Infiltrator" haengt;
+6. bei `asDraw: true` zusaetzlich **`onDraw`** — der Hook von „Cute
+   Meanie Melissa" (siehe unten).
+
+## ★★★ v1166 — Area-Auren beim Entfernen; geerbte Heldeneffekte; Doppelschulen-Filter; zwei Balance-Aenderungen
+
+### Area-Auren fallen jetzt auf JEDEM Weg (Al 17.9.)
+`removeArea` glich ab, der allgemeine Kartenweg nicht — „The Yeeting",
+Zerstoerung und Rueckhand liessen die Verdopplung stehen. `syncAlleAtkAuren()`
+haengt jetzt zentral an `placeArea`, `removeArea` und `actionMoveCard`
+(Austritt aus der Area Zone). Das Kartenskript braucht dafuer keine Hooks mehr.
+
+### ★ KOPIERTE UND GEERBTE HELDENEFFEKTE
+Die Hooks liefen (seit 28.8. kennt `isActiveIn` angelegte Helden), aber die
+ANFANGSROUTINE des uebernommenen Skripts nicht — die steht in `onGameStart`
+und ist mitten im Spiel laengst vorbei. Darum fehlte einem kopierten „Willy"
+`_willyFirstTurn` (sein Zugende-Trigger prueft ihn), „Sol Rym" seine
+`levelOverrideCards` und „Johanna" ihr Reinigungsstoss.
+
+| Engine | Wirkung |
+|---|---|
+| `initGainedHeroEffect(inst, grund)` | feuert `onIdentityGained`, sonst `onGameStart`, fuer genau diese Instanz |
+| `loseHeroEffect(inst, grund)` | feuert `onIdentityLost` — Aufraeumen am Ende einer Leihe |
+
+Angebunden: „???, the Shapeshifter" (nach dem Umbenennen), „Initiation
+Ritual" (beim Anlegen), und der Identitaets-Sweep ruft `loseHeroEffect`.
+Karten: Johanna bekommt `onIdentityGained` (reinigt sofort), Sol Rym
+`onIdentityLost` (nimmt Freigabe und Aktionsgrenze zurueck).
+
+### ★ HERO-EFFEKT-HERVORHEBUNG (Al 17.9.)
+`getActiveHeroEffects` verlangt jetzt ein aufrufbares `onHeroEffect` — ohne
+das gibt es nichts zu aktivieren. Alleria, beide Beatos, Monia und Willy
+tragen `heroEffect: true` nur als Merker fuer passive Kanaele; ihre Karten
+leuchteten trotzdem, und der Klick lief ins Leere. Die inhaltlichen Gates
+(??? ohne freie Zone / ohne Kandidaten, Garius ohne Opfer) liefen schon
+richtig ueber `canActivateHeroEffect`.
+
+### Doppelschulen-Filter (Deck-Builder + Puzzle-Macher)
+`app-shared.jsx`: `istDoppelKarte`, `doppelFilterMoeglich`,
+`doppelFilterAnwenden` (ueber `window` in beiden Bundles). Neue Auswahl unter
+„Subtypes": „Spell Schools: Show all" (Standard) / „Double only" — zeigt nur
+Attacks, Spells und Creatures mit ZWEI Spell Schools (36 Karten). Die Option
+ist ausgegraut, sobald die uebrige Filterung keine Attacks/Spells/Creatures
+mehr enthaelt, und greift dann auch gesetzt nicht.
+
+### Balance
+* **Great Offensive:** „Immediately end your turn afterwards."
+  (`gs._spellEndsTurn = true`).
+* **Prophecy of Tempeste:** „You can only have 1 in play at a time." — Sperre
+  in `spellPlayCondition` (Tor JEDES Spielwegs) und in `attachmentHosts`.
+
+## ★★★ v1165 — ATK-MULTIPLIKATOR-AUREN zentral; „Rioting Village" als Szene
+
+**★ Der alte Weg war kaputt.** „Rioting Village" spiegelte jede ATK-Aenderung
+selbst nach (`afterHeroAtkChange`), und das Schloss `_atkAuraTiefe` oeffnete
+sich sofort wieder: `runHooks` ist ASYNCHRON, der `finally`-Block wartet nicht
+auf sie. Schon EIN Dorf lief in eine Endlosschleife (MAX_HOOKS_PER_TURN, ATK
+im fuenfstelligen Bereich).
+
+**Neuer Vertrag — `heroAtkMultiplier`** (Zahl oder
+`(gs, pi, hi, engine, inst) => Zahl`): die Engine rechnet
+GRUNDWERT × Produkt aller Faktoren und fuehrt die Differenz in
+`hero._atkAuraGrant`.
+
+| Engine | Wirkung |
+|---|---|
+| `_atkAuraFaktor(pi, hi)` | Produkt aller aktiven Faktoren |
+| `_syncHeroAtkAura(hero, pi, hi)` | bringt einen Helden auf Grundwert × Faktor (der ZWEITE erlaubte `hero.atk`-Schreiber, im Waechter `check-atk-funnel` eingetragen) |
+| `syncAlleAtkAuren()` | alle Helden — beim Eintritt/Abgang einer Aura und beim Puzzle-Start |
+
+Damit: **zwei Doerfer = ×4** (Al 17.9.), drei = ×8; spaetere Aenderungen des
+Grundwerts ziehen automatisch nach, ein Aufstieg (`_signalHeroAtkReset`)
+verwirft die Buchfuehrung und rechnet frisch. Die Karte gibt ihren Faktor nur
+zurueck, solange ihr Name in `gs.areaZones` steht — `removeArea` streicht den
+Eintrag VOR dem Austritts-Hook.
+
+**Puzzle-Start:** Areas werden dort direkt in die Zone geschrieben, ein
+Eintritts-Hook laeuft nie — `syncAlleAtkAuren()` holt jede Multiplikator-Aura
+beim Start nach.
+
+**Hintergrund:** „Rioting Village" hatte nur einen schwachen Schein mit
+Funken; jetzt eine ganze Szene (Tier `opaque`): Nachthimmel mit Feuerschein,
+Ruinen-Silhouetten in zwei Tiefen (eingestuerztes Dach, gebrochene Wand,
+Brunnen, zerbrochener Zaun), fuenf flackernde Flammen, sieben Rauchfahnen,
+26 Glutfunken.
+
+## ★★ v1164 — NEUE KARTE „Petrifying Potion" + STATUS-KLICK-OPTION
+
+**Karte (Potion):** „Choose any Hero and Stun it for 3 turns. Damage a Hero
+Stunned by this effect would take becomes 0. You may heal a Hero Stunned by
+this effect from this Stun at any time during your turn." Ziele sind Helden
+BEIDER Seiten; die Schadensnull haengt wie bei „Petrifier" am gemeinsamen
+Marker `_petrified` AM Stun-Objekt.
+
+**★ Getrennt gefuehrter Stun (Als Regel 17.9.):** `addHeroStatus` ERSETZT ein
+vorhandenes Status-Objekt — zwei Stuns nebeneinander kennt die Engine nicht.
+Die Potion nimmt den vorgefundenen Stun deshalb in Verwahrung
+(`stunned._ppFremd = { obj, seit }`) und stellt ihn beim Heilen mit seiner
+Restdauer wieder her (eine Besitzer-Runde = zwei `gs.turn`). Geheilt wird also
+nur der Potion-Stun.
+
+**★ NEUER ALLGEMEINER MECHANISMUS — STATUS-KLICK-OPTION:**
+
+| Baustein | Wirkung |
+|---|---|
+| `hero.statuses.<status>._klickHeilung = { card, by }` | macht den Helden fuer `by` anklickbar (auch auf der Gegenseite), solange dessen Zug laeuft und nichts anderes offen ist |
+| Socket `status_click_option` | Server prueft Zug, Marke und Besitzer und ruft `script.onStatusClickOption(engine, pi, heroOwner, heroIdx)` |
+| Client | Klick auf den Helden feuert das Ereignis; der Held traegt den Aktiv-Glanz wie ein Held mit offenem Effekt. Die Rueckfrage stellt die KARTE (Server-Prompt) |
+
+Der Helden-Effekt-Weg schied aus: `doActivateHeroEffect` sperrt gestunnte
+Helden ausdruecklich — hier ist der Stun gerade die Voraussetzung.
+
+**Animation:** neue `stone_break` (Blitz, zwei Risse, 16 Brocken mit
+Schwerkraft), Klang `heavy_impact` hoeher gestimmt.
+
+## v1163 — Rest-Runden am Stun-Badge (Petrifier); Teleportal-Testschalter raus
+
+* **Rest-Runden:** das Stun-Abzeichen trug keine Zahl — beim 3-Runden-Stun
+  („Petrifier") sah man die Restdauer nirgends. Jetzt kommt sie wie beim
+  Frost aus `restrundenFuer(statusKey, statusData)` (Status-Objekt beim
+  Helden, `counters.<status>Duration` bei der Kreatur, Ablaufzug aus Buffs)
+  — auch fuer die Medusa-Variante. Mitgezogen, weil dieselbe Luecke:
+  **Nulled, Magic Silenced, Frightened, Bound/Silenced, Blinded**. Der
+  Frost-Zweig benutzt jetzt denselben Helfer statt seines Vorlaeufers.
+  Einrundige Status zeigen weiterhin keine Zahl.
+* **Teleportal:** der temporaere Testschalter `TEST_ENDE_DIESES_ZUGES` ist
+  entfernt; die Karte kommt wieder zu Beginn des naechsten eigenen Zuges auf
+  die Hand.
+
+## v1162 — Zwei Sitz-Fehler: Portal-Mitte und Ziel-Handplatz
+
+* **★ LEHRE (CSS):** Prozent-Margins rechnen BEIDE gegen die BREITE des
+  Elternteils. `margin-left/-top: -50%` ZUSAETZLICH zu
+  `transform: translate(-50%, -50%)` verschiebt ein Teil um eine halbe
+  Elternbreite nach links OBEN — der Portal-Wirbel sass deshalb auf der
+  oberen linken Ecke der Karte. Zentriert wird nur noch per `transform`.
+* **★ LEHRE (Flug zur Hand):** ohne `toHandIdx` (+ `finalHandSize`) faellt
+  der Client auf den Handkasten zurueck und landet in dessen MITTE. Beide
+  Zahlen gehoeren in jeden `play_pile_transfer` mit `to: 'hand'`; die Hand
+  ist zentriert, der Zielpunkt haengt an der Endgroesse.
+
+## ★ v1161 — „Teleportal": Flug aus der offenen Zone, Auftritt, Portal-Wirbel
+
+* **Flug:** `play_pile_transfer` mit `from: 'permanent'`, `to: 'hand'` und
+  `fromPermId` = Id des Permanent-Eintrags (`data-perm-id`). Ohne den
+  Broadcast raet der Client die Herkunft aus dem Handzuwachs — die Karte
+  startete in der GEGNER-Hand.
+* **Auftritt:** `announceHookActivation` beim Abholen (Sas'Za-Muster), einmal
+  je Zustellung.
+* **Portal-Wirbel:** neue Animation `portal_warp` (dunkles Violett: Schlund,
+  zwei Ringe, Kern, 18 Funken) auf der frisch offen gelegten Karte —
+  `zoneType: 'permanent'` + `permId`, nach einem `sync()` plus kurzer Pause,
+  damit ihr Kasten im Client schon steht. Klang: `elem_dark` → `reveal`.
+
+## ★★ v1160 — „Teleportal": die offene Karte kam NIE zurueck; Testschalter fuers Timing
+
+**★ LEHRE:** die offen abgelegte Karte ist eine Instanz MIT IHREM EIGENEN
+NAMEN — ihr Skript ist das der gesuchten Karte, nicht das der suchenden.
+Teleportals Rundenhaken lasen `ctx.card` (die TELEPORTAL-Instanz); die liegt
+nach dem Guss in der Ablage, die `activeIn` gar nicht kannte. Der Haken lief
+also nie, die Karte kam nie auf die Hand. Jetzt lauscht Teleportal aus Hand,
+Ablage UND offener Zone und holt beim Rundenhaken alle faelligen eigenen
+Eintraege ab (`zustellenAlleFaelligen`); mehrere Kopien stoeren sich nicht.
+
+**★ TEMPORAERER TESTSCHALTER (Al 17.9.):** `TEST_ENDE_DIESES_ZUGES` am Kopf
+von `teleportal.js`. `true` = Karte kommt am ENDE DIESES Zuges auf die Hand
+(auch die Prompt-Beschreibung sagt das), `false` = Kartentext (Beginn des
+naechsten eigenen Zuges). Zuruecknehmen heisst: eine Zeile auf `false`.
+
+## ★★ v1159 — LEERE GALERIE: Eintraege statt roher Namen (`cardGallery`)
+
+Al 17.9.: „Teleportal zeigt eine leere Galerie, obwohl das Deck Karten hat."
+
+**★ VERTRAG:** `cardGallery` / `cardGalleryMulti` erwarten OBJEKTE
+`{ name, source?, count?, selectable?, highlight? }` — Client, CPU-Heuristik
+und MCTS-Verzweigung lesen alle `entry.name`. Teleportal (`cards:
+[...ps.mainDeck]`) und **Cleansing of the Land** (`[...new Set(...)]`)
+uebergaben rohe Namen; `CARDS_BY_NAME[undefined]` liess jeden Eintrag
+ausfallen — die Galerie blieb leer.
+
+**Zentral abgefangen:** `promptGeneric` normalisiert Zeichenketten jetzt zu
+Eintraegen und fasst Doppelte zu `count` zusammen (`source` = `searchPile`
+oder `'deck'`). Damit kann diese Falle keine Karte mehr treffen. Beide Karten
+liefern das Format zusaetzlich selbst, dedupliziert wie „Magnetic Glove".
+
+## v1158 — „The Stormblade" (Balancing, Al 17.9.)
+
+Neuer Text: „**Once per turn**, when the equipped Hero performs an Action
+**during your Action Phase** … You can only have **1** „The Stormblade"
+equipped to your Heroes at a time." (`data/cards.json`, Kosten bleiben 6).
+
+| Grenze | Umsetzung |
+|---|---|
+| einmal pro Runde | Einheitszaehler `_charges.js` (`usesLeft`/`spendUse`) an der INSTANZ, `max: 1` — bewusst ohne Ladungsanzeige; verbraucht wird erst, wenn der Zyklus wirklich lief (leere Hand loest nicht aus) |
+| nur die eigene Action Phase | `gs.currentPhase === 3` UND `gs.activePlayer === Besitzer` |
+| nur eine Klinge je Seite | `canEquipToHero` prueft ALLE eigenen Support-Zonen (Wanted Poster prueft nur den Zielhelden) |
+
+Der Treffer-Effekt beim Gegner bleibt unbegrenzt und in jeder Phase. Die
+Reaktions-Haelfte des Ausloesers (v1157) bleibt: eine Reaktion, die der Held
+in der EIGENEN Action Phase wirkt, zaehlt weiter als Handlung — fuer Crescent
+Moon ohnehin unveraendert.
+
+## ★★★ v1157 — Reaktionen sind Handlungen des Wirkers; `onReactionResolved`
+
+**Al 17.9.:** „performs an Action" reagiert auch auf Reactions (Stormblade,
+Crescent Moon — und damit alle Karten mit diesem Wortlaut).
+
+| Baustein | Wirkung |
+|---|---|
+| `engine._rxAufgeloest(ps, cardName, casterIdx, { spellHook })` | nach der Aufloesung JEDER Hand-Reaktion (alle 14 Fenster) und jeder Kettenreaktion mit Wirker: `afterSpellResolved` fuer Attack/Spell (sofern das Fenster ihn nicht selbst feuert) + neuer Hook `onReactionResolved` |
+| `HOOKS.ON_REACTION_RESOLVED` = `'onReactionResolved'` | `{ playerIdx, heroIdx, cardName, playedCardName, actionType, isReaction: true }` |
+| `_action-shared.js` → `handlungsHooks(fn)` | `{ onAnyActionResolved: fn, onReactionResolved: fn }` — „performs an Action" |
+
+Umgestellt: **The Stormblade, Lunatic Cycle - Crescent Moon, Hat of Madness,
+Bonded Companion Mellvy** (alle „performs an Action").
+
+**★ `onAnyActionResolved` bleibt reaktionsfrei** — Flashbang („first Action"),
+Bleed und die Aktions-Oekonomie haengen daran; fuer sie ist eine Reaktion
+keine Aktion.
+
+**Nebenbei geschlossen (Santa Klaus):** die Vor-Schadens- (Held/Kreatur, beide
+Seiten), Vor-Niederlage-, Kreatur-besiegt-, Ressourcen-, Beschwoerungs-,
+CD-Bewegungs- und gegnerische-Aktionsphasen-Fenster feuerten nie
+`afterSpellResolved` — Santa zahlte dort nicht. Jetzt ueber `_rxAufgeloest`.
+Diese Fenster markieren ihren Hand-Transfer deshalb mit `asPlay: true` statt
+`'sole'`: der Trainings-Recorder zaehlt Attack/Spell ueber
+`afterSpellResolved`, sonst doppelt.
+
+**Kosten:** The Stormblade 10 → 6 Gold (`data/cards.json`).
+
+## ★★ v1156 — „The Stormblade": neuer Text, jede Aktion loest aus, Auftritt
+
+**Neuer Kartentext (Al 17.9.):** der eigene Effekt mischt „any number of cards
+from your hand" statt der ganzen Hand — `handPick` in der eigenen Hand wie
+Horn in a Bottle / Crescent Moon, Pflicht-Ausloeser mit `minSelect: 0`, nicht
+abbrechbar. Der Treffer-Effekt beim Gegner bleibt die ganze Hand. `data/cards.json`
+angepasst.
+
+**★ LEHRE — „performs an Action" heisst `onAnyActionResolved`, nicht
+`onActionUsed`.** `onActionUsed` ueberspringt inhaerente Zusatzaktionen (Quick
+Attack) und Frei-Aktionen; `onAnyActionResolved` feuert in jedem Aktionspfad,
+Heldeneffekte nur mit Aktionskosten (Als Ruling 4.8.). Crescent Moon, Hat of
+Madness und Bonded Companion Mellvy hingen schon richtig; die Stormblade hing
+am falschen Haken.
+
+**Auftritt:** beide Effekte rufen `announceHookActivation` beim Ausloesen (vor
+der nicht abbrechbaren Auswahl), bei leerer Hand weiterhin kein Ausloesen.
+
+## ★★★ v1155 — WIRKER-PICKER fuer Hand-Reaktionen (Als Regel 17.9.)
+
+„Koennen 2+ Heroes eine Reaction spielen, muss man eine Auswahl bekommen,
+welcher legale Hero sie aktivieren soll!"
+
+| Engine | Wirkung |
+|---|---|
+| `_rxCastKandidaten(ps, cardName, script, opts)` | alle castfaehigen Helden mit Wisdom-Kosten; `null` = kein Wirker noetig; `casterIsTarget` → nur der Zielheld |
+| `_rxCastPlan(...)` | wie bisher der guenstigste Kandidat — nur noch fuer das GATE („ist die Reaktion ueberhaupt spielbar?") |
+| `_rxCastWirkerWaehlen(ps, cardName, script, plan, opts)` | nach der Bestaetigung, VOR Entnahme und Zahlung: bei 2+ Kandidaten `optionPicker` mit Heldennamen (dieselbe Oberflaeche wie die Reaktionskette); Abbruch → `false`, die Reaktion findet nicht statt; setzt `plan.casterIdx`/`wisdomCost` |
+
+**Angebunden an alle 14 Hand-Reaktionswege** (Vor-Schaden Held/Kreatur und
+Gegenseite, Vor-Niederlage, Kreatur besiegt, Nach-Schaden Held/Kreatur,
+Ressourcenphase, nach Beschwoerung, CD-Bewegung, gegnerische Action Phase,
+Post-Target, Ascension). Die Reaktionskette hatte ihren Picker schon.
+
+**CPU:** kein Prompt — bevorzugt einen Helden ohne eigenes `canPlayCard`
+(Santa Klaus' Kartenpreis), dann die niedrigsten Wisdom-Kosten.
+
+**Nach-Schaden (Held) auf die allgemeine Regel gezogen:** vorher durfte bei einem
+ueberlebenden eigenen Helden NUR dieser wirken. Jetzt jeder castfaehige Held
+(v619-Regel), mit Wisdom-Zahlung wie ueberall. **Fireshield** („a Hero you
+control that can use it takes damage") traegt dafuer `casterIsTarget: true`.
+
+## ★★★ v1154 — Enthauptung am richtigen Ziel; Hero-Kosten („Santa Klaus") in ALLEN Spielwegen
+
+### Decapitating Strike
+
+`sword_cleave` las seine Position nicht: `.sword-cleave` stand mit `left: 50%;
+top: 50%` in der Mitte der Animationsebene — ungefaehr ueber dem eigenen
+mittleren Helden, egal wen es traf. **LEHRE:** eine Zonen-Animation muss `x`/`y`
+(und fuer ihre Groesse `w`/`h`) aus den Props lesen und `position: fixed` daran
+ausrichten. Ersetzt durch `decapitation`: Klinge in Halshoehe mit Lichtbogen,
+aufreissender Schnitt mit Treffer-Stopp, roter Bildschirm-Blitz, arterielle
+Fontaene in drei Stoessen (80 Tropfen), 12 Blutflecken, 9 Rinnsale, Nebel —
+1,7 s; Klang `ZONE_ANIM_SFX.decapitation` (slash → critical_strike →
+heavy_impact). Die Niederlage folgt nach 700 ms. Kreaturziele laufen ueber die
+physische Seite.
+
+### Hero-Kosten fuer Attacks/Spells in Reaktionen und Surprises
+
+Santa zahlte nie fuer Reaktionen. Drei Luecken, alle allgemein:
+
+1. **`afterSpellResolved` feuerte in den Reaktionswegen nur fuer SPELLS**
+   (Nach-Schaden Held/Kreatur, Post-Target, Ascension, Surprise, Kette). Der
+   normale Spielweg feuert fuer Attacks UND Spells — jetzt alle Wege.
+2. **Kein Wirker:** die Nach-Schadens-Wege meldeten `heroIdx: -1`, sobald nicht
+   der ueberlebende eigene Held wirkte. Jetzt der Held aus
+   `_rxHandCastingHero` (dieselbe Wahl wie in den uebrigen Reaktionswegen:
+   der erste Held, der die Karte wirken kann) plus `heroOwner`.
+3. **`canPlayCard` galt nur im normalen Spielweg.** `_canHeroActivateSurprise`
+   prueft jetzt das `canPlayCard` des Helden und seiner Ausruestung, mit
+   `herkunft.fromHand` = `opts.spellInHand`. `_anyHeroCanActivateSurprise`
+   reicht die Optionen durch; der Gegenseiten-Pass der Nach-Schadens-Reaktion
+   gibt `spellInHand: true` mit.
+
+Attachment- und Area-Spells laufen ueber `doPlaySpell` und waren schon richtig
+(getestet).
+
+## v1153 — Klang zum Wahl-Blitz
+
+Jeder `ziel_marke_blitz` spielt im Client einen kleinen Zielerfassungs-Klang
+aus `ping`: leise beim Einblenden (rate 1.25), heller beim Einrasten des
+Fadenkreuzes nach 420 ms (rate 1.9). Jede weitere Position der Kette klingt
+einen Halbton hoeher (bis #13). Ohne Dedupe und ohne Kategorie, damit schnell
+aufeinanderfolgende Wahlen nicht verschluckt werden.
+
+## ★★ v1152 — ALLGEMEINE REGEL: Schadenszahlen SOFORT; Einrasten bei jeder Wahl
+
+**Schadenszahlen (Al 17.9.: „IMMER sofort anzeigen").** Der Client leitet
+Schadenszahlen aus HP-Differenzen zwischen zwei Spielstaenden ab. Weder
+`actionDealDamage` noch `processCreatureDamageBatch` synchronisierten nach
+dem Treffer — bei Mehrfachtreffern (Ricochet) kamen alle Zahlen gesammelt am
+Ende, nur die per Ereignis gesendeten Nullen sofort. Jetzt sendet jeder
+Treffer mit `actualAmount > 0` (ausser Simulation/Schnellmodus) einen
+Spielstand:
+
+* **Held:** nach `afterDamage` und den Pfeil-Ridern (Luna Kiai & Co. schicken
+  dort eigene Popups samt Diff-Sperre, die vorher ankommen muessen), vor Tod
+  und Handreaktionen;
+* **Kreatur:** nach dem Elixir-of-Cold-Rider, vor Verursacher-Fenster und
+  Todeszweig.
+
+**Wahl-Blitz:** das Einrasten des Fadenkreuzes laeuft bei JEDER Wahl, auch bei
+der eigenen; die Beschriftung lautet „YOUR #N", „OPPONENT'S #N" bzw.
+„TARGET #N" fuer Zuschauer.
+
+## ★★ v1151 — Zielmarken-Ebene: Pfad, deutlicher Gegner-Blitz, keine Beschneidung; Ricochet-CPU
+
+**Ebene statt Abzeichen in der Zone.** Die Marke „#N" wurde oben von ihrer
+Zone abgeschnitten. `ZielMarkenEbene` (app-board.jsx) liegt jetzt als feste
+Ebene ueber dem Brett und misst die Bildschirm-Rechtecke der Zonen (bei jeder
+Aenderung und alle 150 ms). Sie zeichnet:
+
+* Abzeichen „#N" oben mittig am Ziel;
+* den **vorhergesagten Zielpfad**: halbtransparente, laufend gestrichelte
+  Linien #1 → #2 → #3 … je Quelle, mit Pfeilspitze vor der Zielzone;
+* den **Wahl-Blitz**: `setzeZielMarke(ziel, label, quelle, waehler)` traegt
+  jetzt den Waehler. Waehlte der GEGNER (oder man schaut zu), rastet ein
+  grosses Fadenkreuz auf das Ziel ein, eine Schockwelle laeuft, die Zone
+  blinkt dreimal rot und „OPPONENT'S #N" springt gross darueber (1,5 s).
+  Die eigene Wahl blitzt nur kurz.
+
+**Ricochet-CPU:** jede Wahl sendet `baseDamage` = Schaden an DIESER Position
+(`schadenAnPosition`: ATK, halbiert und aufgerundet je Vorgaenger) und
+`damageType: 'attack'`. Der Pilot zielt damit wie bei einem normalen
+Einzelziel-Angriff (`pickEnemyTargets`: Zielwert, landender Schaden,
+Kill-Bonus); bereits gewaehlte Ziele stehen nicht im Angebot. Nach einer
+CPU-Wahl wartet Ricochet 1,1 s, damit der Blitz ablaufen kann.
+
+## ★★ v1150 — „Ricochet": Zielwahl repariert; ZIELMARKEN als allgemeiner Mechanismus
+
+**Bug:** `promptEffectTarget` liefert **IDs** (`'hero-1-0'`), keine
+Zielobjekte. Ricochet behandelte die ID als Objekt — der Duplikat-Filter
+bildete fuer jede Wahl denselben Schluessel und filterte nie etwas heraus
+(Endlos-Auswahl bis zum 40er-Gurt), und im Schadensteil fehlten `type` und
+`owner`, kein Treffer landete. **LEHRE:** Antworten von `promptEffectTarget`
+immer ueber `targets.find(t => t.id === id)` auf das Zielobjekt zurueckfuehren.
+
+**Zielmarken — fuer jede Karte mit einer Zielfolge:**
+
+| Engine | Wirkung |
+|---|---|
+| `engine.setzeZielMarke(ziel, label, quelle)` | Marke in `gs.zielMarken` (Spielstand, beide Spieler + Zuschauer) + Ereignis `ziel_marke_blitz` |
+| `engine.loescheZielMarken(quelle)` | alle Marken dieser Quelle weg |
+
+Client: Abzeichen `.ziel-marke` („#1") oben mittig an Held bzw. Support-Zone,
+beim Setzen ein roter Blitz `.ziel-marke-blitz` — das Live-Feedback, welches
+Ziel der Gegner gerade gewaehlt hat. Waehlt die CPU, wartet Ricochet 650 ms,
+damit der Blitz sichtbar ist. Die Marken bleiben stehen, bis die Kette
+abgefeuert ist.
+
+## v1149 — „Trunk Sand" als Sandstrahl (`projectileShape: 'sandStream'`)
+
+Al 17.9.: „ein richtiger Strahl aus Sand, der auf das Ziel geschossen wird
+(vgl. Sandwirbel aus Pokemon)". Die Wolke aus v1148 war zu klein.
+
+`play_projectile_animation` mit `projectileShape: 'sandStream'` rendert statt
+des Projektil-Wrappers die Komponente `SandStrahl`: 280 Koerner (1–3.5 px)
+werden ueber 70 % der Dauer laufend vom Werfer abgeschossen, jedes fliegt
+einzeln (240–390 ms) zum Ziel — eng an der Duese, am Ziel zum Kegel
+gefaechert (Streuung Mittel ~12 px). Dazu 34 Schlieren entlang der
+Flugrichtung und ein blasser Staubkanal. Letzte Bahn endet vor `dur + 200`
+(Abbau des Projektils). Allgemein nutzbar fuer jeden Werfer mit
+Start/Ziel aus dem Projektil-Ereignis.
+
+Trunk Sand: Strahl 950 ms, Klang `elem_wind`; die Sanddusche (`sand_burst`)
+startet nach 380 ms, wenn die ersten Koerner ankommen, der Schaden 300 ms
+spaeter — beides unter dem noch fliessenden Strahl.
+
+## v1148 — „Trunk Sand": echte Sanddusche
+
+Al 17.9.: „deutlich mehr Particles, kleiner — eine wirkliche Sanddusche".
+
+| Teil | vorher | jetzt |
+|---|---|---|
+| Projektil (`projectileShape: 'sand'`, `SAND_KOERNER`) | 22 Koerner, 3–9 px, Leuchtspur | 90 Koerner, 1–3 px, 4 Sandtoene; jedes dritte rieselt im Flug nach hinten unten ab (`.sand-streu`), Spur nur noch zarter Schleier |
+| Einschlag (`sand_burst`) | 14 Koerner, 5–14 px, satte Scheibe | 110 Spruehkoerner (auseinander, dann Schwerkraft), 70 Duschkoerner von oben, flacher Staubdunst |
+
+**Zeitbudget:** jede Bahn endet vor 950 ms — Zonen-Animationen werden nach
+1000 ms abgebaut, auch beim zweiten Aufruf ueber `addHeroStatus`
+(`animationType`). Wer die Dusche verlaengert, muss `duration` mitsenden.
+
+## ★ v1147 — Sas'Za: Einheitszaehler und Auftritt; alle Waechter gruen
+
+**Kein Regelfehler** (Al 17.9.: der Test lief mit Level-0-Creatures, die
+0 Karten ziehen). Nachgezogen wurden zwei Luecken:
+
+* **Einheitszaehler statt eigenem `hoptUsed`-Schluessel** — „Up to 3 times
+  per turn" laeuft ueber `_charges.js` (`usesLeft` / `spendUse`) am
+  HELDENOBJEKT, deklariert mit `chargesPerTurn: 3` + `chargeKey`. Damit
+  zeigt der Client die verbleibenden Ziehungen am Heldenportrait (v417-Regel:
+  EIN Zaehler fuer alle „up to X times per turn"-Effekte).
+* **Auftritt bei BEIDEN Effekten** nach dem Muster von „Cute Meanie
+  Melissa": `showTriggeredEffect` + `equip_flash` am Helden — beim Ziehen
+  vor dem Zug, beim Rueckholen erst NACH dem Ja (v736).
+
+Die Waechter `check-triggered-reveal` und `check-cost-discard` sind damit
+wieder gruen: „Giant Exploding Skull" streamt seinen Auftritt beim
+Ausloesen der Explosion; „Cats of the Pharaoh" wirft nichts als Kosten ab
+und ist per `COST-DISCARD-CHANNEL: n/a` abgemeldet (der Waechter schlug auf
+„discard pile" als Beschwoerungsherkunft an).
+
+## ★★★ v1146 — Doppelte Stufensenkung durch Helden; „0" bei jeder Schadenspraevention; Armageddon-Animation
+
+### ★ Helden-Stufensenker zaehlten ZWEIMAL
+
+`_applyCardLevelReductions` hatte seit v1100 eine eigene Schleife ueber die
+Helden — in der Annahme, Helden stuenden nicht in `cardInstances`. Sie stehen
+dort (`init()` trackt sie in der Zone `hero`), die Instanzschleife rief ihr
+`reduceCardLevel` also ein zweites Mal. Folgen: **Damus** senkte Armageddon
+doppelt, sobald er selbst wirkte (2 Ifrits → Lv 3 − 4 = 0), **Thalia, the Fun
+Fairy** senkte Support-Magic-Spells bei JEDEM Wirker doppelt. Die
+Heldenschleife ist weg.
+
+**Vertrag fuer Helden mit `reduceCardLevel`:** der eigene Platz steht in
+`inst.heroIdx` / `inst.owner` (Instanz in der Zone `hero`), der WIRKER in
+`heroIdx` (kann `undefined` sein — Anzeige ohne Wirker). Pro-Wirker-Senker
+(Taio) vergleichen beide, handweite Senker (Damus, Thalia) lesen nur den
+eigenen Platz.
+
+### ★ ALLGEMEINE REGEL (Al 17.9.): verhinderter Schaden zeigt eine „0"
+
+„Reduzierter Schaden soll als «0»-Schadenszahl angezeigt und nicht einfach
+ausgeblendet werden — fuer jede Schadenspraevention, ohne den zugehoerigen
+Effekt an sich zu negieren."
+
+| Helfer | wann |
+|---|---|
+| `_flashHeroDamageZero(hero)` | Held: Schaden faellt weg |
+| `_flashCreatureDamageZero(inst)` | Kreatur: Schaden faellt weg |
+
+Neu nachgezogen: Kreaturen mit `_immuneCreature` (Quellen-Immunitaet wie
+Ifrit gegen Armageddon, `protectsCreatureFromDamage` wie Damus, Cardinal,
+Versteinerung, Schilde …), `creature_pre_damage_save`; Helden bei
+Erst-Runden-Schild (beide Schadenswege), Charme-Immunitaet, Versteinerung und
+negierender Vor-Schaden-Reaktion. Ein Eintrag zeigt seine „0" nur einmal
+(`e._nullGezeigt`). **Nicht** gemeint: negierte Effekte („unaffected by all
+cards and effects", Anti Magic Enchantment), Umleitungen.
+
+### Armageddon-Animation und Brett-Ursprung
+
+`play_zone_animation` mit `zoneType: 'board'` kennt jetzt einen optionalen
+**Ursprung** `originOwner` + `originHeroIdx`; der Verteiler gibt die
+Bildschirmmitte dieses Helden als `ox`/`oy` an die Komponente.
+Typ `armageddon`: Glutkern am Wirker → Feuerball und Druckringe ueber das
+ganze Brett → Flammen (nach Abstand verzoegert) → Feuerregen → Glut.
+`power` = Schaden / 450 (0.1 … 1) steuert Groesse, Beben, Dauer
+(1800 + 1400·power ms) und die Mengen (Flammen 14 → 50, Tropfen 13 → 52).
+Klang: Sequenz in `ZONE_ANIM_SFX.armageddon`.
+
+## ★★ v1145 — Wirker-Drop fuer alle Fluch-Anhaengsel; CPU heilt nie „Aged"
+
+**Umgestellt (Al 17.9.):** Decisive Defeat, Curse, Berserk und Overheal Shock
+tragen kein `attachmentHosts` mehr und rufen `pickAttachmentHost` mit
+`ignoreDropHints: true` — gezogen wird auf den WIRKER, die Zielwahl oeffnet
+`onPlay`. Curse spricht dieselbe Zielwahl-Sprache wie Aging: GRUEN =
+qualifiziert (Zusatz-Aktion), im Zusatz-Modus die uebrigen AUSGEGRAUT.
+`attachmentHosts` (28.8.) bleibt fuer Anlege-Karten ohne echte Zielwahl.
+
+**CPU-Heilung (Als Regel):** HP-Heilung waehlt NIE einen Helden mit
+Heilsperre. Gefragt wird `engine._heroHealBlocked` — dieselbe Stelle, an der
+die Heilung verpufft; also „Aged" und jede kuenftige Heilsperre.
+
+| Stelle in `_cpu.js` | Wirkung |
+|---|---|
+| `heroHealRoom(engine, t)` | fehlende HP, bei Sperre **0** („als staende er schon ueber Max-HP") |
+| `pickHealTarget` / `pickHealTargetsMulti` | Lifeforce-Vorrang und HP-Zweig ohne gesperrte Helden; Reinigungszweig nur bei Reinigungstext mit ihnen |
+| erzwungene Heilung ohne gutes Ziel | gesperrter Held nur, wenn nichts anderes bleibt |
+| gelernter Ziel-Prior | wird verworfen, wenn er eine REINE HP-Heilung auf einen gesperrten Helden legt |
+| `hasHealableOwnTarget` | gesperrte Helden zaehlen nicht als verletzt |
+
+Heilungen, die AUCH Status entfernen („Cure", Text mit „negative status" /
+„cleanse" / „remove … status"), duerfen den Aged-Helden weiter waehlen: das
+Entfernen von „Aged" ist dort der Nutzen.
+
+## ★★ v1144 — Anlege-Karten mit Zielwahl: Wirker ziehen, Ziele einfaerben
+
+**Drop = Wirker, nicht Wirt.** `attachmentHosts` (28.8.) macht den Drop zum
+EMPFAENGER — richtig fuer Karten ohne echte Zielwahl, falsch fuer „Forbidden
+Curse of Aging": gezogen auf den eigenen Helden, der wirken sollte, wurde der
+verflucht. Aging traegt den Vertrag nicht mehr; der Client hebt dann wie bei
+jedem Spell die WIRKER hervor (`canHeroPlayCard`), und `onPlay` fragt nach dem
+Ziel.
+
+**Neue Optionen in `pickAttachmentHost` / `attachToHero`:**
+
+| Option | Wirkung |
+|---|---|
+| `ignoreDropHints: true` | `gs._attachmentHeroIdx` / `_attachmentZoneSlot` werden ignoriert — immer Zielwahl |
+| `heroDim(hero, hi, side, engine)` | Held bleibt SICHTBAR, aber ausgegraut (`t.ineligible`), nicht waehlbar; keine Auto-Wahl, solange gedimmte Helden zu zeigen sind |
+| `heroAccent(hero, hi, side, engine)` | `t.accent` am Ziel, z.B. `'green'` |
+
+**Ziel-Akzent im Client:** `t.accent === 'green'` → Klasse
+`.potion-target-accent-green` (gruener Puls ueber `.potion-target-valid`) an
+Held und Support-Zone. Allgemein nutzbar fuer jeden `promptEffectTarget`.
+
+**Brett → Ablage immer mit Flug:** `sendBoardCardToDiscard` ist der Weg. Neu:
+er fliegt zur Ablage des URSPRUENGLICHEN Besitzers (`fromOwner`/`toOwner`),
+wenn die Karte auf der anderen Seite lag. Der Anhaengsel-Status-Helfer,
+`cleanseAttachmentByKey` und `cleanseNegativeAttachments` nutzen ihn jetzt —
+vorher nacktes `actionMoveCard` ohne Flug (dort landete `{ source }` zudem im
+Parameter `toHeroIdx`).
+
+## ★★★ v1143 — „Forbidden Curse of Aging": echter Status `aged`, Aktion wird wirklich bezahlt
+
+**Warum v1140–v1142 nie einen Badge zeigten:** der Server schrieb
+`heroAttachmentBadges` in das Objekt JEDES SPIELERS, der Client las es auf
+oberster Ebene von `gameState` — dort stand immer `undefined`. Der ganze
+Nebenkanal ist entfernt (Server, `anhaengsel`-Prop, `negativeStatusTooltip`).
+
+### ★ Vertrag: ANHAENGSEL MIT STATUS — der Status ist der Schalter
+
+| Baustein | wo | Wirkung |
+|---|---|---|
+| `attachmentStatus: '<n>'` | Kartenskript | Status gehoert zur Karte; Puzzle-Start legt ihn an |
+| `engine._attachmentStatusHaelt(inst, script)` | `_hostAttachmentWith`, `_abilityNegatedOnHero` | Karten-Vertraege (`blocksHostHeal`, `blocksHostStatusRemoval`, `negatesHostAbilities`) wirken NUR, solange der Status liegt |
+| `anhaengselStatusHooks(CARD, STATUS, { heilenWirftAb })` | `_attachment-shared.js` | Eintritt → Status an; Austritt der EIGENEN Karte → Status weg (zweite Kopie haelt ihn); `heilenWirftAb`: Status entfernt → alle Kopien in die Ablage des urspruenglichen Besitzers |
+| `setzeAnhaengselStatus(engine, owner, hi, CARD, STATUS)` | `_attachment-shared.js` | legt den Status mit `_fromAttachment` an |
+
+**★ LEHRE (Decisive Defeat, gleich mitgefixt):** im `onCardLeaveZone` ist
+`ctx.card` die LAUSCHENDE Karte, die gehende steht in `ctx.leavingCard`
+(manche Wege tragen nur `_onlyCard`). Der alte Hook von Decisive Defeat
+pruefte das nicht — verliess irgendeine Karte irgendeine Zone, war die
+Negierung weg.
+
+**„its OTHER status effects":** `_heroStatusRemovalBlocked(pi, hi, statusName)`
+nimmt den Status des Sperrers selbst aus. `cleanseHeroStatuses` bewertet die
+Sperre als SCHNAPPSCHUSS zu Beginn — sonst hinge das Ergebnis eines Cure an
+der Schluesselreihenfolge. `cleansableHeroEntries` filtert pro Schluessel und
+fuehrt eine Anhaengsel-Negierung nur noch EINMAL (als `attach:`).
+
+### ★ `gs._spellForcesActionConsume` bezahlt jetzt wirklich
+
+Bisher drehte die Flagge nur `isInherentAction` um — das kostete allein in der
+Action Phase vor der ersten Aktion etwas. Jetzt, in derselben Reihenfolge wie
+ein gewoehnlicher Guss (Als Bestaetigung 17.9.):
+
+| Lage | bezahlt |
+|---|---|
+| Action Phase, Grund-/Bonus-Aktion frei | Grund-Aktion (wie bisher, Sprung nach Main Phase 2) |
+| Main Phase oder Aktion verbraucht, passender Geber da | der Geber (`consumeAdditionalAction`) |
+| Main Phase 1 ohne Geber | `gs._pendingActionBurn` → `burnUpcomingAction` (Sprung nach Main Phase 2) |
+
+Betrifft ausser Aging auch **Pawn Sacrifice** (schaltet in jeder Phase zurueck).
+Curse, Board of Kings, Gate to the Armory und Temple of Sacrifice schalten nur
+in der Action Phase vor der ersten Aktion zurueck und sind unveraendert.
+
+`hasNormalActionAvailable`: **Main Phase 2 hat keine Grund-Aktion mehr** (war
+`true`).
+
+### ★ Schadens-Historie im Puzzle
+
+`hero._jeGetroffen` fehlte jedem Puzzle-Helden. Editor-Schalter „⏳ Damage
+History" (sichtbar, sobald eine Karte aus `SCHADENS_HISTORIE_KARTEN` im Puzzle
+liegt); aeltere Puzzles ohne Angabe gelten als getroffen, wenn HP < max.
+
+### ★ Badge-Zeile ohne Handliste
+
+Vor `<StatusBadges>` stand in Brett und Puzzle-Editor eine zweite Liste aller
+Status — genau die, an der v1142 scheiterte (Bleeding und Charmed standen nie
+drin). Die Komponente liefert selbst `null`; die Listen sind weg. Helden zeigen
+Immune/Shielded weiter nur ueber `ImmuneIcon`.
+
+## ★★★ v1142 — DIE BADGE-ZEILE ENTSTAND GAR NICHT
+
+Al 15.9.: „Badge ist nicht sichtbar, **vergleich das mit existierenden
+Debuffs wie Poisoned!**"
+
+★ Genau der Vergleich fuehrt hin. Die gesamte Badge-Zeile haengt an
+einer langen Bedingung:
+
+```jsx
+{hero?.name && (isFrozen || isStunned || isBurned || isPoisoned || … ) && <StatusBadges …
+```
+
+Ein Held mit AUSSCHLIESSLICH einem Anhaengsel-Zustand („Aged") faellt
+durch jede dieser Pruefungen. **Die Zeile wurde nie gezeichnet — und
+meine beiden vorherigen Aenderungen an ihrem INHALT (v1140: Badge
+gebaut; v1141: Badge aus dem falschen Zweig geholt) konnten deshalb gar
+nichts bewirken.**
+
+Drei Anlaeufe, drei verschiedene Stellen derselben Kette: erst der
+Inhalt, dann der Zweig, jetzt die Existenz. Die Lehre ist dieselbe wie
+beim Regler-Griff (v1138): **bevor man den Inhalt aendert, pruefen, ob
+das Element ueberhaupt entsteht.**
+
+## Zur Zusatz-Aktion: was nachgemessen ist
+
+Al: „ich kann nach wie vor Curse immer als additional einsetzen …
+Vielleicht macht der generelle Aufbau es somehow immer additional?"
+
+Nachgemessen, Schicht fuer Schicht — alle vier stimmen:
+
+| Schicht | Befund |
+|---|---|
+| `_jeGetroffen` nach echtem Schaden | gesetzt |
+| `zielIstGratis` fuer dieses Ziel | false |
+| `hasPayableActionFor` ohne freie Aktion | false → Zielliste eingeschraenkt |
+| `_spellForcesActionConsume` | wird in `doPlaySpell` gelesen und bindet `isInherentAction` um |
+
+**★ Was die Struktur trotzdem hergibt:** `inherentAction` entscheidet
+VOR der Zielwahl und sagt ja, sobald IRGENDEIN Ziel taugt — so hat Al
+es selbst vorgegeben. Hat der Spieler noch eine Aktion frei, ist die
+Zielliste deshalb offen, und die Korrektur nach der Wahl kostet ihn die
+Aktion. Hat er KEINE mehr, wird die Liste eingeschraenkt. Beides ist
+getestet.
+
+**Die drei neuen Logzeilen (v1141) zeigen ab jetzt, welcher Zweig lief** —
+„cost … a normal Action" oder nicht.
+
+
+## ★★★ v1141 — DREI FEHLER, DIE ALLE „NICHTS PASSIERT" AUSSAHEN
+
+Al 15.9.: „Nichts davon hat funktioniert? … Hast du im letzten Zip
+einfach nicht die geupdateten Dateien gezippt?"
+
+**Die berechtigte Frage zuerst: doch, alles war im Paket.** Nachgeprueft,
+Datei fuer Datei. Es waren drei getrennte echte Fehler — und jeder sah
+von aussen aus wie „die Aenderung ist nicht angekommen".
+
+### ① Der Badge lag im FALSCHEN ZWEIG
+
+Mein v1140-Block stand INNERHALB von `if (s.negated || c.negated)` —
+also nur fuer Helden, die ohnehin negiert sind. „Forbidden Curse of
+Aging" negiert aber gar nichts am Helden, sie FRIERT nur. Der Badge
+konnte nie erscheinen.
+
+Anhaengsel-Badges haengen jetzt an KEINER Bedingung. Ein Testfall prueft
+die Reihenfolge im Code, nicht nur die Existenz.
+
+### ② Die Cleanse-Liste zeigte, was gar nicht entfernbar ist
+
+`cleansableHeroEntries` fuehrte weiterhin `frozen`, `poisoned` & Co. auf,
+obwohl „Aging" deren Entfernung sperrt (`blocksHostStatusRemoval`) und
+`removeHeroStatus` sie ohnehin ablehnt.
+
+**Damit schrumpfte die Liste nie auf EINEN Eintrag — und die Abkuerzung
+aus v1140 griff nie.** Zwei Fehler, die einander verdeckten: die
+Abkuerzung war richtig gebaut, bekam aber nie die Lage, fuer die sie
+gedacht war.
+
+Jetzt filtert die Liste, was der Motor ohnehin verweigert. Die Karte
+selbst bleibt drin — sie ist ja das, was man loswerden kann.
+
+### ③ Die Entscheidung war UNSICHTBAR
+
+`curse_of_aging_no_free_action` wurde protokolliert, aber **niemand
+zeichnete die Zeile**. Fuer den Spieler war nicht erkennbar, ob die
+Zusatz-Aktion greift oder nicht — „kostenlos" und „hat eine Aktion
+gekostet" sahen identisch aus.
+
+**★ Ein Logeintrag ohne Darstellung ist so gut wie kein Logeintrag.**
+Drei Zeilen haben jetzt eine: die Verfluchung, der Aktionsverbrauch und
+die automatische Statuswahl.
+
+
+## ★★ v1140 — Der Schadens-Merker gehoert an die EINE Zaehlstelle
+
+Al 15.9.: „Selbst, wenn ich einem Hero via Book of Doom Schaden zufuege,
+ist dieser danach noch immer als additional verfluchbar!"
+
+**★ In v1139 sass `_jeGetroffen` an ZWEI einzelnen Schadenszeilen** —
+also wieder das Muster, das in dieser Sitzung schon vier Mal zugeschlagen
+hat (acht Flugwege, zwei Galerie-Wege, zwei Todespfade, zwei
+Landezeitpunkte). Jetzt sitzt er in **`_noteDamageTaken`**, der EINEN
+Stelle, die jeder Schadensweg ohnehin durchlaeuft — dieselbe, an der
+auch `_damagedOnTurn` fuer „Medusa's Curse" entsteht. Wer kuenftig einen
+Schadensweg baut, bekommt die Historie geschenkt.
+
+Ein Testfall prueft, dass es **genau eine** Setzstelle gibt und dass sie
+dort liegt.
+
+## ★ „Aged" bekommt einen Badge — und zwar generisch
+
+Al: „«Aged» braucht einen Status-Badge!"
+
+Die Karte setzt KEINEN Status; sie wirkt als Anhaengsel. Der Badge liest
+deshalb das BRETT: der Server meldet je Held die Anhaengsel mit
+`countsAsNegativeStatus` (`heroAttachmentBadges`), der Client zeichnet
+sie. **Das gilt damit fuer JEDES kuenftige Anhaengsel dieser Art**, nicht
+nur fuer „Aging" — „Decisive Defeat" bekommt seinen Badge gratis dazu.
+
+Neu am Kartenvertrag: `negativeStatusTooltip` fuer den Erklaertext.
+
+## ★★ NUR EINE WAHL? DANN NICHT FRAGEN
+
+Al: „Status-Cleanser wie Juice sollten gar nicht erst eine
+Statusauswahl ANZEIGEN, wenn sie ein Aged-Ziel anvisieren; dann kann nur
+Aged entfernt werden, also wird das automatisch ausgewaehlt."
+
+Zentral in `promptGeneric`: ein `statusSelect` mit **genau einem**
+Eintrag wird ohne Rueckfrage beantwortet. **Die Regel ist allgemeiner
+als ihr Anlass** — eine Auswahl mit einem Eintrag ist keine Auswahl, sie
+kostet nur einen Klick und suggeriert eine Entscheidung, die es nicht
+gibt. Bei „Aging" entsteht der Fall zwangslaeufig: die Karte friert alle
+ANDEREN Status ein, also bleibt nur sie selbst uebrig.
+
+Alle acht Karten mit `statusSelect` profitieren davon.
+
+
+## ★★ v1139 — „Forbidden Curse of Aging": ZWEI Zielbedingungen
+
+```
+… If the target has any "Charme" Abilities attached to it or has not
+taken any damage yet this game, this counts as an additional Action.
+```
+
+**★ DIE DECAY-3-KLAUSEL IST ERSATZLOS GESTRICHEN.** An ihre Stelle
+treten zwei unabhaengige Bedingungen — und beide haengen jetzt am ZIEL,
+nicht mehr am Wirker. Das ist der eigentliche Unterschied: vorher konnte
+der eigene Held die Karte bedingungslos gratis machen, jetzt entscheidet
+allein, wen man trifft.
+
+**Neu: `hero._jeGetroffen`** — eine Schadens-HISTORIE je Held, gesetzt
+an BEIDEN Schadenswegen (die Lehre aus v1136 gleich angewandt) und **nie
+zurueckgesetzt**: „yet this game" meint die Partie, nicht die Runde.
+Null Schaden zaehlt nicht.
+
+**Als Regel fuer die Zielliste, woertlich umgesetzt:** angeboten, solange
+EIN Ziel eine der Bedingungen erfuellen kann; ohne verfuegbare
+Rueckfall-Aktion auf die tauglichen Ziele beschraenkt; sonst offen fuer
+jedes Ziel, verbraucht dann aber die naechste Aktion
+(`zaehltAlsZusatzAktion` schaltet nach der Wahl zurueck).
+
+**★ DER PRUEFSTAND MUSSTE UMGESTELLT WERDEN, und zwar aus einem
+lehrreichen Grund:** frische Testhelden haben NIE Schaden genommen —
+sie erfuellen die neue Bedingung also alle. Sieben Faelle wurden dadurch
+gruen, die „keine Bedingung erfuellt" pruefen wollten. Die Grundlage
+markiert ihre Helden jetzt als getroffen; `unversehrt(E, pi, hi)` dreht
+das fuer einzelne zurueck.
+
+Drei weitere Faelle prueften die gestrichene Decay-3-Klausel — sie sind
+umgedreht und dokumentieren jetzt, dass sie NICHT mehr gilt.
+
+
+## ★ v1138 — „Festive Werz": Geschenkflug, fliessende Anzeige, groesserer Griff
+
+Al 15.9.: „Bunte Geschenke, die von der eigenen Goldanzeige zur
+gegnerischen fliegen, waehrend das Gold nicht in einem Schritt, sondern
+als fliessende Anzeige reduziert/erhoeht wird." Und: „der dragbare Teil
+des Sliders ist etwas klein … vor allem auf Mobile."
+
+**★ DIE FLIESSENDE ANZEIGE GAB ES SCHON.** `play_gold_crash` zaehlt die
+Goldanzeigen weich von einem Stand zum anderen (gebaut fuer Market
+Crash und Loan Shredder) und nimmt mit `to` ein ZIEL je Spieler — genau
+das, was hier gebraucht wird: einer runter, einer rauf. Nachgebaut haette
+ich einen zweiten Mechanismus fuer dieselbe Sache.
+
+**Neu ist nur der Flug**: `gold_gift_flight`, gezeichnet als bunte
+Paeckchen mit Band, im Bogen statt schnurgerade. **Die Anker sind
+dieselben wie beim Gold-Diebstahl** (`[data-gold-player]`) — kein neuer
+Aufhaenger, keine neue Fehlerquelle. Die Anzahl richtet sich nach dem
+Betrag, gedeckelt auf 8: 20 Gold sollen nicht 20 Paeckchen bedeuten.
+
+**★ Beides laeuft VOR der Buchung** und gleich lang. Sonst zaehlte die
+Anzeige von einem Stand herunter, den es im Zustand schon nicht mehr
+gibt — ein Testfall prueft die Reihenfolge.
+
+## ★★ Der Reglergriff — und eine Falle beim Stylen
+
+Der Griff ist jetzt 30 px statt der Browser-Vorgabe von etwa 12; unter
+~24 px ist auf einem Telefon kaum etwas zu treffen. Gesetzt fuer
+`::-webkit-slider-thumb` UND `::-moz-range-thumb`, sonst bleibt Firefox
+beim Kleinen.
+
+**★ DAS CSS HAETTE INS LEERE GEGRIFFEN:** der Regler trug gar keine
+Klasse. Ein Testfall prueft deshalb ausdruecklich, dass
+`className="effect-slider"` gesetzt ist — Stil ohne Aufhaenger ist
+stiller Stillstand, und im Browser sieht man nur „hat sich nichts
+geaendert".
+
+
+## ★★★ v1137 — „Festive Werz" tat NICHTS: `optionId` statt `id`
+
+Al 15.9.: „Der komplette Effekt funktioniert aktuell schlicht nicht.
+Egal, wie viel Gold ich angebe zahlen zu wollen, ich zahle keines und
+ziehe nichts!"
+
+**Der Client antwortet auf einen `optionPicker` mit `{ optionId }` — die
+Karte las `wahl?.id`.** Das war IMMER `undefined`, `kosten` damit 0, und
+die Karte stieg eine Zeile spaeter kommentarlos aus. Kein Fehler, kein
+Log, gar nichts.
+
+Gelesen wird jetzt `wahl?.optionId ?? wahl?.id` — die alte Form bleibt
+verstanden, falls irgendwo noch eine Antwort so gebaut wird. Ein
+Testfall prueft BEIDE Formen.
+
+**★ „Brainstorming" hatte denselben Fehler** (von mir, heute frueh
+gebaut) und ist mitgefixt, bevor er auffallen konnte. Wer einen
+`optionPicker` auswertet, liest `optionId`.
+
+## ★ Der Regler bekommt Schrittweiten (v1137)
+
+Al: „ein Slider mit Fuenferschritten statt individueller Buttons. Slider
+von 0 bis min(eigenes Gold, 20), wobei nur Fuenferschritte moeglich
+sind."
+
+**Den Regler gab es schon** (`renderAs: 'slider'`, gebaut fuer Logans
+Invest Counters) — nur lief er immer in Einerschritten. Neu:
+`sliderStep`.
+
+**★ Die Schrittweite wird AUCH beim Klemmen angewandt, nicht nur am
+Regler.** Neben dem Schieber steht ein Zahlenfeld; ohne das Runden im
+Klemmen haette man dort 17 eintippen koennen und der Betrag waere
+ungueltig gewesen. Der Hoechstwert selbst bleibt erreichbar, auch wenn
+er kein volles Vielfaches ist.
+
+„Festive Werz" nutzt ihn mit `sliderMin: 0`, `sliderStep: 5` und
+`sliderMax: min(eigenes Gold, 20)`. **Die Optionsliste bleibt daneben
+bestehen** — sie ist der ordinale Lernkanal (FORM 3), und ihre
+Beschriftungen tragen die Zahlenreihe.
+
+
+## ★★★ v1136 — DIE ZWEI TODESPFADE LANDEN ZU VERSCHIEDENEN ZEITPUNKTEN
+
+Al 15.9., und die Differenzierung ist seine: „Hell Fox erscheint im
+Deleted-Pile ERST, NACHDEM sein Search durchgefuehrt wurde. Ebenso
+erscheint auch der Skull erst danach im Discard! … Die Differenzierung
+ist NICHT Giant Exploding Skull — sondern **«Hell Fox stirbt per
+NICHT-Schaden»**! Auch Yeeting loest das aus. Vielleicht ist da ein Pfad
+inkorrekt?"
+
+**Ja — und es ist die Reihenfolge:**
+
+| Todespfad | Reihenfolge |
+|---|---|
+| Schadens-Batch | Karte **landet im Stapel**, dann laufen die Todes-Hooks |
+| `actionMoveCard` (jeder NICHT-Schadens-Tod) | Hooks laufen, **dann** landet die Karte |
+
+Bei einer Karte, deren Hook Sekunden blockiert — „Hell Fox" oeffnet eine
+Galerie —, haengt der Stapel deshalb sichtbar hinterher. **Und mit ihm
+ALLES, was in derselben Kette noch auf seine Landung wartet**: der
+Skull, dessen Explosion die Kette gestartet hat, landet erst, wenn der
+Fuchs fertig ist.
+
+Der Kadaver landet jetzt in beiden Pfaden **vor** den Hooks, mit einem
+`sync()` unmittelbar danach, damit der Stapel sofort waechst. Ein
+Stempel (`_ppSchonGelandet`) verhindert, dass er spaeter ein zweites Mal
+abgelegt wird; ein Testfall prueft beides — waehrend des Hooks schon da,
+danach genau EINE Kopie.
+
+**★ WARUM ALS BEOBACHTUNG DEN AUSSCHLAG GAB:** „nicht Skull, sondern
+Nicht-Schaden, auch Yeeting" verschiebt die Frage von einer KARTE auf
+einen PFAD. Danach war es eine Minute Arbeit, die beiden Pfade
+nebeneinanderzulegen. Meine eigenen Versuche zuvor suchten immer im
+Client, weil der Server-Zustand ja „korrekt" war — er war nur zu spaet.
+
+
+## ★★ v1135 — ZWEI BEFUNDE AUS ALS ABLAUFBESCHREIBUNG
+
+Al 15.9., der genaue Ablauf: „Skull detoniert, geht waehrend seiner
+Animation zum Discard, Schaden passiert, Hell Fox stirbt, **Skull
+erscheint wieder in der Support Zone**, Fox bewegt sich zum Discard und
+oeffnet seine Gallery, **Fox UND Skull verschwinden** aus ihren Support
+Zones."
+
+### ① Der Schadens-Batch kannte `deletesSelfOnDeath` nicht
+
+Al: „Hell Fox fliegt jetzt visuell vom Board zum Discard, ehe es im
+Deleted Pile landet. Das ist falsch."
+
+**★ ES GIBT ZWEI TODESPFADE** — `actionDestroyCard` und den
+Schadens-Batch. Ich hatte in v1134 nur den ersten umgestellt; der zweite
+routet Ziel UND Flug voellig eigenstaendig. Beide lesen die Flagge
+jetzt. **Derselbe Fehler wie bei den acht Flugwegen (v1133): eine
+Absicherung an EINER Stelle ist keine Absicherung.**
+
+### ② „BEIDE Karten kommen zurueck und gehen gemeinsam wieder"
+
+Das passt zu keinem Einzelfehler — aber genau zu einem **ZUSTAND, der zu
+spaet ankommt** und einen neueren ueberschreibt. Der alte Zustand WAR
+korrekt, als er gebaut wurde; erst seine Reihenfolge beim Eintreffen
+macht ihn falsch. **Deshalb konnte die Server-Diagnose ihn nie zeigen.**
+
+Neu: **`stateSeq`**, eine laufende Nummer je Raum an jedem Zustand. Der
+Client verwirft einen Zustand mit kleinerer Nummer als der zuletzt
+angewandte (`window.ppZustandVeraltet`, in allen drei Oberflaechen —
+Spiel, Puzzle, Kampagne). Ohne Nummer gilt wie bisher: annehmen.
+
+Mit `?watch=alle` meldet der Client jeden verworfenen Zustand:
+
+```
+[ZUSTAND] veraltet verworfen: #412 (aktuell #418)
+```
+
+**★ Kommt diese Zeile beim Glitch, ist die Ursache bewiesen** — und
+zugleich behoben. Kommt sie NICHT, war auch diese Erklaerung falsch,
+und der naechste Verdacht ist die Flug-Ebene.
+
+
+## ★★★ v1134 — GEFUNDEN: „Hell Fox" flog ZWEIMAL
+
+Als Protokoll vom 15.9. zeigt es woertlich:
+
+```
+22:17:43.275 [FLUG] Hell Fox Start    — verstrichen  2 ms
+22:17:43.301 [FLUG] Hell Fox Start    — verstrichen 28 ms   ← ZWEITER Flug
+22:17:43.330 [FLUG] Hell Fox NEUSTART — verstrichen 57 ms
+```
+
+Zwei „Start"-Zeilen fuer dieselbe Karte, 26 ms auseinander — und im
+Vergleichslauf ohne „Hell Fox" **keine einzige** Flugzeile. Damit ist
+der Ausloeser eindeutig.
+
+**★ DIE URSACHE: ZWEI BEWEGUNGEN STATT EINER.** Der Text sagt „delete
+it" — die Karte landete aber ERST in der Ablage (Flug 1) und wurde DANN
+ins Geloeschte umgebucht. Diese zweite Bewegung hat keinen eigenen
+Flug-Broadcast, also bemerkte der **Diff-Animator** die schrumpfende
+Ablage und den wachsenden Geloescht-Stapel und zeichnete selbst einen
+Flug — mit einem Startpunkt, den er sich sucht. Das ist die Karte, die
+im Brettbereich auftaucht.
+
+Die Zonensonde war dabei die ganze Zeit sauber (`Zustand= []`,
+`imDOM= Support`) und meldete nie eine RUECKKEHR — der Zustand war nie
+falsch. Es war immer nur ein zweites, ueberfluessiges Bild.
+
+**Die Loesung: EINE Bewegung.**
+
+```js
+deletesSelfOnDeath: true      // am Kartenskript
+```
+
+Der Motor liest die Flagge schon beim **Vorab-Flug** und schickt die
+Karte gleich zum Geloescht-Stapel. Der `onCardLeaveZone`-Hook setzt
+zusaetzlich `_redirectToDeleted`, damit auch der Zustand in einem Zug
+stimmt; der alte Umbuch-Code bleibt als Rueckfall, falls ein anderer
+Effekt dazwischenfunkt.
+
+**★ WARUM DIE FLAGGE UND NICHT NUR DER HOOK:** `actionDestroyCard`
+broadcastet den Vorab-Flug, BEVOR `onCardLeaveZone` laufen kann. Eine
+Karte, die sich selbst loescht, muss das also VORHER sagen — sonst
+fliegt sie sichtbar zur Ablage und wird gleich darauf weitergereicht.
+
+**„Cute Hydra" hat dasselbe Muster** und ist mitgezogen.
+
+**★ LEHRE: eine Karte, die ihren Kadaver umbucht, erzeugt IMMER ein
+zweites Bild.** Wer „delete it", „shuffle it back" oder „return it"
+nach dem Tod umsetzt, macht daraus EINE Bewegung — oder er sieht sie
+zweimal fliegen.
+
+
+## ★★ v1133 — ACHT FLUGWEGE, EINER ABGESICHERT
+
+Als Lauf 15.9. brachte zwei Befunde:
+
+**① Bis zum Ende des Ausschnitts ist alles sauber.** Beide Plaetze
+melden `Zustand= [] | imDOM= Support | _dying= 1` — Zustand UND DOM sind
+leer. Der Glitch passiert danach; die Aufzeichnung endet davor.
+
+**② ★ DER SKULL TAUCHT IM FLUG-PROTOKOLL GAR NICHT AUF.** Fuer „Hell
+Fox" kam `[FLUG] Hell Fox Start`, fuer den Skull KEINE Zeile. Er ist
+also nie ueber die instrumentierte Bahn geflogen.
+
+**Der Grund: `launchFlight` ist nur EINER von ACHT Wegen**, auf denen
+ein Flug entsteht. Die uebrigen sieben reihen direkt in `discardAnims`
+ein — und trugen keine Startzeit. Damit greift der Schutz gegen einen
+Animations-Neustart (v1131) dort **gar nicht**, und die Sonde sah sie
+auch nicht.
+
+Alle acht tragen jetzt `t0` (ueber den Helfer `ppJetzt()`).
+
+**★ LEHRE: eine Absicherung an EINER Einstiegsstelle ist keine
+Absicherung.** Ich hatte `launchFlight` gefunden, fuer den einzigen Weg
+gehalten und nicht nachgezaehlt — derselbe Fehler wie beim
+Galerie-Scan (v1120), wo ich die Karten-Dateien durchsuchte und den
+Kontext-Helfer uebersah.
+
+## ★ RUECKKEHR-Erkennung in der Zonensonde
+
+War ein Platz schon einmal leer und mit `_dying` markiert, und steht
+jetzt wieder eine Karte darin, meldet die Sonde das rot hinterlegt als
+`★★ RUECKKEHR` — samt Zustand, DOM-Inhalt, Zaehlern und offener Abfrage.
+So geht der entscheidende Moment nicht mehr zwischen zwanzig aehnlichen
+Zeilen unter.
+
+**Browser-Sonden aktivieren:** `?watch=alle` an die Adresse haengen
+(v1132). Sie sind BROWSER-Schalter, keine Server-Variablen — das hatte
+ich beim ersten Mal nicht dazugesagt, und Al setzte sie folgerichtig
+falsch.
+
+
+## ★★★ v1131 — DER FLUG DARF NICHT VON VORN BEGINNEN
+
+Al 15.9.: der Glitch bleibt, **und im Browser kam KEINE `[ZONE]`-Zeile**
+— obwohl die Karte sichtbar war.
+
+**★ DAS IST DIE ENTSCHEIDENDE AUSKUNFT.** Die Sonde sitzt in der
+Renderstelle fuer Support-Karten. Kein Output bei sichtbarer Karte
+heisst: **die Karte wird dort gar nicht gezeichnet.** Sie kommt aus der
+FLUG-Ebene.
+
+Und dort steht die Erklaerung im Code selbst: die Keyframes von
+`.discard-anim-card` starten am BRETTPLATZ der Karte
+(`left: startX; top: startY`). Wird die Animation **neu gestartet** —
+weil React den Knoten neu einhaengt, etwa wenn „Hell Fox" mitten im Flug
+seine Galerie oeffnet und den Teilbaum austauscht —, springt die Karte
+sichtbar an ihren Ausgangspunkt zurueck. Genau das sieht man.
+
+**Das erklaert ALLE Beobachtungen auf einmal:**
+
+| Beobachtung | Erklaerung |
+|---|---|
+| nur wenn „Hell Fox" das erste Opfer ist | nur dessen Galerie oeffnet mitten im Flug |
+| andere Kreatur-Effekte harmlos | keine Abfrage, kein Neu-Einhaengen |
+| der gegnerische Skull harmlos | die Galerie gehoert dem anderen Client |
+| Server durchgehend sauber | es war nie der Zustand |
+| keine `[ZONE]`-Zeile | es ist nicht die Zonen-Renderstelle |
+
+**Die Loesung: ein NEGATIVER `animation-delay`** in Hoehe der bereits
+verstrichenen Flugzeit. Eine neu gestartete Animation setzt damit dort
+fort, wo sie war, statt von vorn zu beginnen. Beim ersten Bild ist die
+verstrichene Zeit ~0 — es aendert sich also nichts; **nur der Neustart
+wird unsichtbar**.
+
+Der Flug traegt dafuer seine Startzeit (`t0`) mit sich.
+
+**★ Das gilt fuer JEDEN Flug, nicht nur fuer den Skull.** Jede Karte,
+die fliegt, waehrend irgendetwas den Baum neu einhaengt, sprang bisher
+an ihren Startpunkt zurueck — nur faellt es selten so deutlich auf wie
+bei einer Kreatur, die dadurch scheinbar von den Toten zurueckkehrt.
+
+**Sonden zum Nachmessen:** `window.PP_FLIGHT_WATCH = true` meldet jeden
+erkannten Neustart mit verstrichener Zeit. `window.PP_ZONE_WATCH = true`
+meldet sich jetzt beim ersten Durchlauf mit „Sonde aktiv", damit „kein
+Output" eindeutig bleibt.
+
+
+## ★★ v1129/v1130 — DER SKULL-GLITCH: was gesichert ist
+
+Al hat den Ausloeser praezise eingegrenzt (15.9.): **nicht** Skull gegen
+Skull, sondern **„Hell Fox" als erstes Opfer** — sobald dessen Suche
+aufloest, blitzt der Skull in seiner Zone wieder auf.
+
+**★ WAS DIE DIAGNOSE AUSSCHLIESST.** Jede Zeile des Laufs meldet
+`Zone=[] getrackt=true dying=1 zaehlerGesendet=true` — auch die des
+Skulls selbst. Der Server schickt die Karte also zu KEINEM Zeitpunkt in
+ihrer Zone, und die Abschirmung liegt an. Damit sind raus: Zonen-Array,
+`creatureCounters`, `supportStacks`, der Zaehler-Filter.
+
+**★ WARUM DIE SKULLS IM ERSTEN LAUF FEHLTEN (v1129).** Die Diagnose
+hatte EINEN Platz; ein Tod waehrend eines Todes ueberschrieb ihn — also
+genau der Fall, den die Explosion erzeugt. Im Log fehlten fuer beide
+Skulls die `sync`-Zeilen, und die 4171 ms der Explosion standen
+faelschlich bei „Hell Fox". Jetzt ein STAPEL: jeder `sync` meldet an ALLE
+offenen Fenster, eingerueckt nach Tiefe und mit Kartenname je Zeile.
+
+**★ CLIENT-SONDE (v1130).** Weil der Fehler nur noch im Client liegen
+kann, meldet die Renderstelle auf Wunsch jeden Fall, in dem ein Platz
+eine Karte zeichnet:
+
+```js
+window.PP_ZONE_WATCH = true      // Browser-Konsole
+[ZONE] 0-0-2 ["Giant Exploding Skull"] | _dying= - | Zaehler= KEINE | Abfrage= Hell Fox
+```
+
+Die vier Angaben beantworten die offene Frage: steht die Karte im
+Client-Zustand (dann kam ein alter Zustand durch), fehlt die
+Abschirmung (dann ist der Zaehler verlorengegangen), und lief gerade
+eine Abfrage (Hell Fox' Galerie).
+
+**★ ZWEI FALSCHE FIXES ZUVOR, beide dokumentiert** (v1126: `inst.zone`
+vorgezogen — zerstoerte die Abschirmung; v1127: zurueckgenommen). Die
+Lehre daraus steht bei v1127: **im Todes-Hook `inst.zone` nicht
+anfassen**, die Abschirmung laeuft ueber `_dying`.
+
+
+## ★★★ v1127 — MEIN v1126-FIX WAR FALSCH UND HAT GESCHADET
+
+Al: „Das hat den Bug NICHT gefixt, der Skull erscheint noch immer
+zurueck in seiner Zone!"
+
+**Er hat ihn nicht nur nicht gefixt — er hat die vorhandene Abschirmung
+ZERSTOERT.** Ich hatte `inst.zone = 'discard'` vorgezogen, um den
+Zwischenstand „ehrlich" zu machen. Der Server baut `creatureCounters`
+aber so:
+
+```js
+for (const inst of room.engine.cardInstances) {
+  if (inst.zone !== 'support') continue;      // ← genau hier
+```
+
+Eine Instanz ausserhalb von `support` liefert also **gar keine Zaehler**
+— auch nicht die Marke `_dying`, an der der Client seit v898 erkennt,
+dass er den Platz leer zeichnen soll. Mein Eingriff nahm der Karte
+damit genau den Schutz, den sie brauchte.
+
+**★ LEHRE: `inst.zone` waehrend der Todes-Hooks NICHT anfassen.** Der
+Motor haelt die Instanz absichtlich auf `support` — die Hooks lesen dort
+ihre Zone, und der Zaehler-Transport haengt daran. Die Abschirmung
+laeuft ueber `_dying`, nicht ueber die Zone. Zwei Testfaelle halten das
+jetzt als INVARIANTE fest (vorher prueften sie meine falsche Annahme).
+
+**★ WAS DIE EINGEBAUTE DIAGNOSE ZEIGT** (`PP_DEATH_WATCH=1`, v899/v900):
+waehrend des Fensters steht `inst.zone === 'support'`, das Zonen-Array
+ist `[]`, und `_dying = 1` ist gesetzt. Der Server SCHICKT die Marke
+also, und der Client hat genau EINE Renderstelle fuer Support-Karten
+— die sie prueft. Damit sind ausgeschlossen: Zonen-Array,
+`supportStacks` (greift erst ab Stapelhoehe 2), Zaehler-Filter und ein
+zweiter Renderpfad.
+
+**Der Fall bleibt offen** — es ist derselbe, den v899 schon nicht loesen
+konnte („Die Marke allein hat das Aufblitzen NICHT behoben — die Ursache
+liegt also woanders"). Neu ist nur, dass er seit v1125 haeufiger
+auftritt: die Detonation haelt das Todes-Fenster jetzt eine halbe
+Sekunde offen, waehrend es vorher Bruchteile einer Millisekunde dauerte.
+
+## ★ Klang der Detonation (v1127)
+
+Drei Lagen, weil die Detonation drei Momente hat: `heavy_impact` tief
+und sofort (der Knall), ein zweiter, noch tiefer gestimmter bei 90 ms
+(die Druckwelle, im Bild der Schockring), und `elem_fire` bei 260 ms
+fuer die nachbrennende Glut. Die spaeteren ohne Kategorie, sonst
+schluckt sie die erste Lage; eigenes Dedupe, damit eine Kette aus zwei
+Skulls nicht sechsfach knallt.
+
+
+## ★★ v1126 — DAS TODES-FENSTER: „die Zone ist leer, die Marke sagt support"
+
+Al 15.9.: „Wenn mein Giant Exploding Skull einen gegnerischen hochjagt,
+wird dieser, nachdem er schon visuell zum Discard geflogen ist, noch mal
+in seiner Support Zone sichtbar."
+
+**★ DER GRUND STEHT IM MOTOR SELBST.** `actionDestroyCard` feuert den
+Todes-Hook „between splice and zone-update" — also in einem Fenster, in
+dem **die Support Zone bereits leer, die Instanz aber noch als
+`'support'` markiert** ist.
+
+**Alles, was in diesem Fenster einen Zustand veroeffentlicht, zeigt die
+Karte noch einmal an ihrem alten Platz.** Bei „Giant Exploding Skull"
+sind das gleich drei Anlaesse: die eigene Explosion mit ihrer Wartezeit,
+jede Folge-Zerstoerung und der abschliessende `sync()`.
+
+**Die Loesung: die Marke sofort auf ihren Endstand setzen.** Der
+Zerstoerungspfad tut das eine Zeile spaeter ohnehin — wir ziehen es nur
+vor, damit kein Zwischenstand mehr luegt. Der Zonen-PLATZ wird vorher
+gemerkt, sonst zeigte die Explosion auf eine Zone, die die Karte nicht
+mehr kennt.
+
+**★ WER IM TODES-HOOK WARTET ODER SYNCT, muss das beachten.** Das gilt
+fuer jede kuenftige Karte mit einem Todes-Effekt, der etwas Sichtbares
+tut — ein Testfall prueft, dass waehrend der ganzen Explosion nie mehr
+`'support'` gemeldet wird.
+
+## ★ Die Detonation aufgedreht (v1126)
+
+Al: „Die Explosion ist noch zu schwach/unbeeindruckend, da geht mehr."
+
+Aufgedreht an FUENF Stellen statt nur an der Groesse — eine blosse
+Vergroesserung haette sie duenn wirken lassen:
+
+| | vorher | jetzt |
+|---|---|---|
+| Splitter | 34 | **70** |
+| Druckringe | 3 | **5** |
+| Reichweite | 3,2 Zonen | **5,0 Zonen** |
+| Glutstuecke | — | **14, gluehen nach und fallen** |
+| Schockwelle | — | **Verzerrung ueber das ganze Brett** |
+
+**★ Die beiden NEUEN Teile tragen den Unterschied.** Reine Funken wirken
+wie ein Feuerwerk; es sind die traegen, nachgluehenden Glutstuecke und
+die kurze Verzerrung, die aus „ein Effekt lief" ein „da ist etwas
+explodiert" machen.
+
+
+## ★ v1125 — die Detonation des „Giant Exploding Skull"
+
+Al 15.9.: „Fuege eine riesige, ueber dem Skull selbst zentrierte
+Explosion hinzu!"
+
+`skull_detonation` — Blitz, drei versetzte Druckringe, 34 Splitter und
+eine Rauchkugel, zentriert auf die EIGENE Zone der Karte: die Karte ist
+die Bombe, nicht das Brett.
+
+**★ RIESIG heisst hier wirklich riesig.** Der Radius geht mit `ww * 3.2`
+weit ueber die eigene Zone hinaus, weil der Effekt das GANZE Brett
+raeumt — eine zonengrosse Explosion haette ausgesehen, als traefe sie nur
+den Nachbarn. **Bedingung dafuer ist `overflow: visible` am Container**,
+sonst schneidet die Zone alles ab, was hinausragt; ein Testfall prueft
+genau diese CSS-Zeile.
+
+**★ ZEITPUNKT: VOR den Zerstoerungen.** Sonst raeumt sich das Brett still
+ab und die Explosion erklaert hinterher nichts mehr. Das widerspricht
+NICHT der v736/v1122-Regel (Sichtbarkeit erst hinter dem verbindlichen
+Punkt): wir sind im Todes-Hook, es gibt nichts mehr abzubrechen. Ein
+Testfall haelt die Reihenfolge fest.
+
+Drei versetzte Ringe statt eines grossen: das gibt Wucht, ohne dass ein
+einzelner Ring riesig wirken muss.
+
+
+## ★★ v1124 — ZWEI „Giant Exploding Skull" ergaben eine ENDLOSSCHLEIFE
+
+Al 15.9.: „Der Versuch, Giant Exploding Skull auszuloesen, erzeugt
+(vermutlich) unendlich viele Kopien von Skull, die dann zum Discard
+gehen! BEIDE SPIELER hatten je einen — womoeglich haben sie sich
+rekursiv immer wieder gegenseitig getoetet."
+
+**Genau das war es.** Und Als Verdacht traf auch den Grund: sie wurden
+nicht rechtzeitig abgeraeumt.
+
+```
+A explodiert → toetet B → B explodiert → toetet A → A explodiert → …
+```
+
+A lag zu diesem Zeitpunkt noch in `support` — sein Tod wurde ja gerade
+erst abgearbeitet —, wurde also ein ZWEITES Mal zerstoert, feuerte
+erneut, und jede Runde legte eine weitere Kopie in die Ablage.
+
+**★ DIE KETTE SELBST IST RICHTIG.** Die Explosion IST ein
+Kreatur-Effekt, also loest ein zweiter Skull, den sie mitnimmt,
+seinerseits aus — so steht es auf der Karte. Falsch war nur, dass sie
+nie endete. Zwei Riegel machen daraus eine endliche Kette:
+
+| Riegel | Aufgabe |
+|---|---|
+| `_skullExploded` | jede Instanz explodiert **hoechstens einmal** |
+| `_skullExploding` | wer gerade explodiert, ist **kein Ziel** |
+
+Der zweite ist der weniger offensichtliche: ohne ihn zerstoerte B den
+noch auf dem Brett stehenden A ein zweites Mal, und der erste Riegel
+haette die Kopienflut nur verlangsamt.
+
+**★ Der Testfall stellt Als Lage nach** (ein Skull pro Seite, dazu
+Beifang) und prueft drei Dinge: die Kette endet (mit Zeitwaechter), jede
+Instanz traegt genau eine Explosion, und **hoechstens eine Kopie je
+Seite** landet in der Ablage — das war der sichtbare Schaden. Eine
+Gegenprobe mit entfernten Riegeln laesst den Prueffall wirklich fallen.
+
+
+## ★ v1123 — „The Thing in the Ship" als SPIELER-DEBUFF
+
+Al 15.9.: „Sein «Active Abilities locked»-Zustand (fuer beide Spieler)
+sollte den Spielern als Player-Debuff dargestellt werden!"
+
+**★ DER ZUSTAND KAM GAR NICHT BEIM CLIENT AN.** `abilityActivationBlocked()`
+stand nur in der Engine und sperrte still — der Spieler sah ausgegraute
+Abilities und keinen Grund dafuer.
+
+Der Server schickt ihn jetzt in beiden Zustands-Bloecken mit; der Client
+macht daraus **zwei Zeilen aus EINEM Wert**:
+
+```
+⛔ You cannot activate any Ability effects while
+   "The Thing in the Ship" is on the board!
+⛔ <Gegner> cannot activate any Ability effects either —
+   the lock hits both players!
+```
+
+**★ ZWEI ZEILEN AUS EINEM WERT, nicht zwei Werte.** Die Karte sperrt
+beide Seiten gleichzeitig; wer nur die eigene Zeile zeigte, liesse den
+Spieler glauben, der Gegner duerfe noch. Die Gegner-Zeile sagt das
+ausdruecklich — ein Testfall prueft den Satz.
+
+Farbgebung wie bei den uebrigen Sperren: eigene Zeile rot, die des
+Gegners gedaempft.
+
+
+## ★★★ v1121 — DAS SUCH-TEMPLATE (`_search-shared.js`)
+
+Al 15.9.: „Fuege dem Spiel Search-Lock als extrem wichtigen Test fuer
+kuenftige Karten hinzu … Idealerweise haben alle Such-Effekte ein
+aehnliches Template, auf der kuenftige Karten ganz automatisch
+aufbauen."
+
+**Die vier Bauformen stehen jetzt an EINER Stelle**
+(`cards/effects/_search-shared.js`), mit Helfern dafuer:
+
+| Bauform | Beispiel | unter Sperre | Werkzeug |
+|---|---|---|---|
+| ① nur Suchen / Suche ist Schritt 1 | Brilliant Idea, Brainstorming | **gar nicht spielbar** | `blockedBySearchLock: true` |
+| ② aktivierbarer Effekt, Schritt 1 ist Suche | Cute Annoyance Mini | **nicht angeboten** | `skipIfSearchBlocked(...)` |
+| ③ Suche als EINE von mehreren Optionen | Soul Shard Ren | nur die **Option** faellt | `filterSearchOption(...)` |
+| ④ Suche passiert nebenbei | | **Schritt** uebersprungen | `searchBlocked(...)` |
+
+Dazu `suchAbfrage(pile)` — die Kennzeichnung fuer jede Such-Abfrage:
+
+```js
+const { suchAbfrage } = require('./_search-shared');
+await ctx.promptCardGallery(karten, { ...suchAbfrage('deck'), title, … });
+```
+
+**NEUER WAECHTER `scripts/check-search-template.js`** prueft die eine
+Sache, die man am leichtesten vergisst: wer eine Auswahl oeffnet UND
+danach aus Deck/Ablage auf die Hand holt, muss die Abfrage kennzeichnen.
+**Er fand sofort 19 weitere Karten**, die auf keiner Liste standen —
+Aurora Borealis, Beato, Boomerang, Cecilia, Cooldin, Cuteness Sensor,
+Dajan, Elixir of Mana, Fiona, Guardian Beast Shu, Liberation, Magic
+Sapphire, Magnetic Glove, Magnetic Potion, Riffel, Shard of Chaos,
+Shooting Star, Spatial Crevice, Xiong. Alle nachgezogen.
+
+## ★ DAS ANGEBOT WIRD JETZT AUCH UNTERDRUECKT
+
+Al: „Karten wie Deepsea Witch sollten nicht mal ihren optionalen Effekt
+ANBIETEN, das sollte alles geskipped werden!"
+
+Ein `confirm`, das nur fragt „moechtest du suchen?", traegt jetzt
+dieselbe Kennzeichnung wie die Galerie dahinter — `promptGeneric`
+unterdrueckt damit schon die FRAGE. Durchgereicht wird sie von
+`ctx.promptConfirmEffect` und `promptOptionalOnSummon`.
+
+## ★ WARUM ES ZWEI GALERIEN GIBT — und was daran zusammengelegt wurde
+
+Als Frage: „Waere es nicht viel sauberer, nur EINE Standard-Galerie zu
+haben?"
+
+**Im CLIENT sind es wirklich zwei verschiedene Ansichten:** die
+Einzelwahl stempelt pro Instanz (Zaehler auf Ablage-/Geloescht-
+Kreaturen), die Mehrfachwahl fuehrt Auswahlzahl, Mindestmenge und ein
+Kostenbudget. Beide Renderer zusammenzulegen hiesse, sie neu zu
+schreiben — bei 182 Aufrufstellen.
+
+**Die AUFRUFSEITE ist jetzt EINE**, und dort lag der eigentliche Aerger:
+`ctx.promptCardGallery` schaltet selbst auf die Mehrfachansicht um,
+sobald die Konfiguration mehr als eine Karte verlangt. Wer eine Galerie
+braucht, kennt ab jetzt genau eine Funktion.
+
+
+## ★★ v1120 — MEIN SCAN WAR BLIND FUER `ctx.promptCardGallery`
+
+Al 15.9.: „Du liegst auf jeden Fall falsch — MINDESTENS Deepsea Witch
+oeffnet (auch jetzt immer noch) einen Dialog."
+
+**Stimmt.** Ich hatte die KARTENDATEIEN nach `type: 'cardGallery'`
+durchsucht — „Deepsea Witch" ruft aber `ctx.promptCardGallery(...)`, den
+Kontext-Helfer. In ihrer Datei steht kein `type:`, also fand mein Scan
+sie nicht und ich erklaerte sie fuer dialoglos.
+
+**Der Helfer reicht die Kennzeichnung jetzt durch:**
+
+```js
+ctx.promptCardGallery(cards, { searchToHand: true, searchPile: 'deck' })
+```
+
+Gleiches fuer `promptCardGalleryMulti`. Markiert sind „Deepsea Witch"
+und `_cycling-demons-shared.js` — die beiden, die ueber diesen Weg auf
+die Hand suchen.
+
+**★ LEHRE: ein Scan nach Prompt-TYPEN findet nur die Karten, die den
+Prompt selbst bauen.** Wer ueber einen Helfer geht, faellt durch. Beim
+naechsten Mal zuerst nach den HELFERN suchen.
+
+## ★ SPIELSPERREN nach Als eigener Liste
+
+Al hat die Liste selbst gezogen; sie deckt sich mit meiner bis auf drei
+Karten, die ich zusaetzlich gesperrt hatte und die gesperrt bleiben:
+**Brilliant Idea** („Choose a card from your deck … add it to your
+hand" — reiner als das geht es nicht, war schon vor heute gesetzt),
+**Teleportal** und **Cleansing of the Land** (beide mit Begruendung in
+ihren Dateikoepfen).
+
+**Nicht gesperrt** bleiben Helden, Abilities, Equips und Kreaturen — bei
+ihnen greift die Sperre nur an der Effekt-Aktivierung, die Karte selbst
+bleibt spielbar.
+
+## Neue Karte: „Brainstorming" (v1120)
+
+```
+Spell · Normal · Magic Arts Lv1
+You can only play this card when there are 4 cards with the same name in
+your discard pile. Search your deck for any card, reveal it and add it
+to your hand. Then, shuffle 4 cards with the same name from your discard
+pile back into your deck. This counts as an additional Action.
+```
+
+**„4 cards with the same NAME"** — vier Kopien EINER Karte, nicht vier
+beliebige. Ein Testfall prueft, dass vier verschiedene Namen NICHT
+genuegen.
+
+**★ DIE REIHENFOLGE STEHT AUF DER KARTE und ist nicht beliebig:**
+„Search … THEN shuffle". Wer erst mischt, koennte eine gerade
+zurueckgemischte Karte sofort wieder heraussuchen. Ein Testfall prueft,
+dass die Galerie nur das Deck VOR dem Mischen anbietet.
+
+Gibt es mehrere Vierergruppen, waehlt der Spieler — die Wahl ist real,
+weil die zurueckgemischten Karten aus der Ablage verschwinden
+(Necromancy & Co. verlieren ihr Material).
+
+**Vollstaendig gesperrt** (Al: „der Search ist Voraussetzung fuer den
+restlichen Effekt!") — ohne Suche bliebe nur das Zurueckmischen, also
+reiner Verlust.
+
+
+## ★ v1119 — ALS KARTENLISTE abgearbeitet (15.9.)
+
+Al hat die betroffenen Karten aufgezaehlt. Zwei Arbeiten daraus:
+
+**① 33 Such-Galerien markiert** (`searchToHand: true`), in allen sechs
+Cheeses, Hell Fox und Tamed Hell Fox, Cute Dog, Elven Rider, Sparkfly
+Architect, Steam Dwarf Diver, Koperniko, Navigation, Rain Viola, Bishop
+of Kings [W], Cute Annoyance Mini, Creative Puppet Brammi,
+Life-Searcher, Debt-O-Tron Backup Duplicator, Bifab, Shanty- und
+Ska-Harpyformer sowie den schon markierten aus v1118.
+
+**② Reine Such-Karten komplett gesperrt** — Al: „VIELE davon haben
+Search als ihren einzigen Effekt und muessten entsprechend komplett
+geblockt und gar nicht erst aktivierbar sein." `blockedBySearchLock`
+neu auf:
+
+| Karte | warum rein |
+|---|---|
+| Cute Cheese | der ganze Text ist die Suche |
+| Cool Cheese | Suche plus EINSCHRAENKUNG — ohne Suche bliebe nur der Nachteil |
+| Holy Cheese | Suche plus ein Vorteil fuer den GEGNER — dito |
+| Bifab, Bridge to Coolness | aus dem Coolness-Stack reine Suche, kostet die Karte |
+| Spider Dance | die Bonus-Beschwoerung haengt an den gesuchten Karten |
+| Tanuki Escape | Rueckmischen + Suche; sonst nur Kosten und Zugende |
+
+**★ BEWUSST NICHT gesperrt** sind Kreaturen, Helden und Abilities, deren
+KOERPER oder andere Zweige weiterhin nuetzen (Hell Fox, Elven Rider,
+Koperniko, Navigation, Steam Dwarf Diver …). Eine Spielsperre dort
+naehme mehr weg, als der Text hergibt.
+
+## ★★ „Soul Shard Ren" — nur der HAND-Zweig faellt
+
+Al ausdruecklich: „SPECIAL CASE, nur der «add to hand»-Zweig ist
+blockiert, der Effekt bietet trotzdem den Self-Mill-Zweig an!"
+
+Die Karte sucht im Deck und laesst DANACH waehlen: auf die Hand oder in
+die Ablage. Ihre Galerie traegt deshalb **kein** `searchToHand` — sie
+darf oeffnen. Erst die Zielwahl streicht die Hand-Option, wenn gesperrt;
+der Ablage-Zweig bleibt.
+
+**★ Der Rueckfall geht dann in die ABLAGE, nicht auf die Hand** — sonst
+liefe eine ausbleibende Antwort in genau den verbotenen Zweig.
+
+**Offen:** „Brainstorming" hat noch kein Skript (rein suchend, gehoert
+bei Bau gesperrt). „Deepsea Witch", „Madaga", „Rebelliokai Kappa" und
+„Inventing" oeffnen keine Galerie — bei ihnen greift weiterhin die
+Sperre am Hand-Add.
+
+
+## ★★ v1118 — „durchsuchen" ist NICHT „auf die Hand nehmen"
+
+Al 15.9.: „Das Search-Lock verhindert ausschliesslich Effekte wie Hell
+Fox oder die Cheeses, die eine Karte vom Deck gezielt AUF DIE HAND
+nehmen, NICHT Garius, der eine bestimmte Creature vom Deck sucht und
+INS SPIEL bringt."
+
+**★ MEINE v1117-ERKENNUNG LAS NUR DIE QUELLE.** „Kommt aus dem Deck" ist
+aber kein Kriterium — **das ZIEL entscheidet**. „Garius, the Great
+Reformer" durchsucht ebenfalls das Deck und war damit faelschlich
+gesperrt.
+
+Ein Prompt muss es jetzt ausdruecklich sagen:
+
+```js
+searchToHand: true,
+searchPile: 'deck' | 'discard',   // ohne Angabe: 'deck'
+```
+
+**Ohne diese Angabe passiert die Abfrage.** Die alte Sperre am HAND-ADD
+greift dort weiterhin — der Spieler waehlt dann eben ins Leere, so wie
+vor v1117. Das ist die sichere Richtung: **lieber ein Dialog zu viel als
+ein blockierter Garius.**
+
+**Gekennzeichnet sind die kanonischen Hand-Sucher** (14 Abfragen in 13
+Karten): Hell Fox, die drei Cheeses, Brilliant Idea, Divine Gift of
+Creation, Graveyard Gathering, Idol of Crestina, Perilous Journey,
+Spontaneous Reappearance, Trial of Loyalty, Cleansing of the Land und
+Teleportal. Wer eine weitere findet, setzt die beiden Felder.
+
+## ★ KEIN MISCHEN NACH EINER UNTERDRUECKTEN SUCHE
+
+Al: „Ausserdem braucht das Deck nicht gemischt zu werden, wenn ein
+Search unterdrueckt wird." Stimmt — es wurde ja nichts angesehen.
+
+Die Suchkarten mischen nach einem Abbruch von sich aus („search implies
+a shuffle"). Die unterdrueckte Abfrage hinterlaesst deshalb einen
+**EINMAL-Gutschein** (`_skipNextShuffle`), den `shuffleDeck` einloest.
+
+**★ Der Gutschein wird IMMER verbraucht**, auch wenn die Karte gar nicht
+mischt — er gilt nur fuer den naechsten Versuch und darf nicht
+liegenbleiben, sonst verschluckt er irgendwann einen fremden
+Mischvorgang. Ein Testfall prueft beides: Reihenfolge unveraendert, und
+der Gutschein ist danach weg.
+
+
+## ★★ v1117 — SUCH-SPERRE GREIFT JETZT VOR DER ABFRAGE
+
+Al 15.9.: „Ich habe einen Hell Fox verloren, waehrend ich under siege
+war, also nichts hinzufuegen durfte. Trotzdem musste ich waehlen, welche
+Karte ich gerne hinzufuegen WUERDE, dann aber eben nicht durfte. Under
+siege sollten ALLE Search-Galerien/Dialoge unterdrueckt sein!"
+
+**★ DER RIEGEL SASS NUR AM HAND-ADD — also NACH der Wahl.** Jede
+Suchkarte oeffnete ihre Galerie, der Spieler waehlte, und dann passierte
+nichts. Funktional richtig, aber als Spielgefuehl unzumutbar.
+
+**Jetzt greift er in `promptGeneric`** — fuer ALLE Suchkarten auf
+einmal, ohne dass eine einzelne etwas dafuer tun muss:
+
+```js
+_suchQuelleDerAbfrage(promptData) → 'deck' | 'discard' | null
+```
+
+Erkannt wird an der QUELLE der angebotenen Karten:
+* `promptData.searchPile: 'deck'|'discard'` — ausdrueckliche Angabe;
+* `type: 'deckSearchReveal'` — immer Deck;
+* sonst: ALLE Eintraege tragen `source: 'deck'` bzw. `'discard'`.
+
+**★ DIE ERKENNUNG IST BEWUSST VORSICHTIG.** Eine gemischte oder
+unbenannte Liste bleibt unberuehrt — lieber eine Suche uebersehen als
+eine harmlose Handauswahl abwuergen. Fuenf Testfaelle halten die
+Nicht-Treffer fest (keine Quelle, Handauswahl, gemischt, anderer
+Prompt-Typ, leere Liste).
+
+**Reichweite:** 127 Karten mit Galerie nennen ihre Quelle erkennbar und
+sind damit abgedeckt; 46 bleiben unberuehrt. Wer eine davon nachruestet,
+setzt `searchPile` — „Hell Fox" hat es als erste bekommen.
+
+**★ TESTFALLE:** `bauEngine` ersetzt `promptGeneric` durch einen Stub —
+der neue Riegel lief im ersten Anlauf gar nicht. Wer ihn pruefen will,
+muss `GameEngine.prototype.promptGeneric.call(E, …)` nehmen.
+
+
+## ★★ v1116 — „Love Shot" ALS Zusatzaktion sprang den Kern ueber
+
+Al 15.9.: „Ich nutze Learning (Lv1), um Love Shot als ADDITIONAL zu
+spielen … aber ich bekomme KEINE Moeglichkeit, einen Spell mit dem
+geklauten Hero zu nutzen, das wird einfach uebersprungen!"
+
+**★ DER CHARMED-ZWEIG PRUEFTE, OB NOCH EINE AKTION FREI IST.** War Love
+Shot selbst die Zusatzaktion, ist danach keine mehr da — **jede** Karte
+fiel aus der Liste, die Abfrage entfiel kommentarlos, und die Karte tat
+sichtbar nichts.
+
+Die Karte sagt aber ausdruecklich: „That Attack or Spell counts as an
+**ADDITIONAL Action**." Sie gewaehrt die Aktion selbst; sie zu verlangen
+ist der Fehler.
+
+```js
+engine.getHeroPlayableCards(pi, { charmedIgnoresActionCost: true })
+```
+
+Der Schalter gilt **nur fuer den charmed-Zweig** — der eigene bleibt
+gesperrt; ein Testfall prueft das eigens.
+
+**★ WARUM ES MIT EINER NORMALEN AKTION NIE AUFFIEL:** dann war die
+Kapazitaet noch da und das Tor liess alles durch. Der Fehler brauchte
+eine KETTE aus zwei Zusatzaktionen, um sichtbar zu werden. Der Testfall
+stellt genau die nach: Aktion verbraucht, kein Granter mehr, und misst
+die Liste einmal mit und einmal ohne Schalter.
+
+**★ TESTFALLE:** die Kontrolle haengt an `hero.charmedBy`, NICHT am
+`charmed`-Status — der macht nur Optik und Immunitaet. Mein Aufbau setzte
+erst nur den Status; die Heldenschleife fand dann gar nichts.
+
+## ★ v1115/v1116 — Badge-Wortlaut
+
+```
+Negated (Decisive Defeat): … Lasts as long as Decisive Defeat remains
+attached to this Hero.
+
+Negated (Weakening Crystal): … Lasts as long as Weakening Crystal
+remains in your hand.        (beim GEGNER: „in their owner's hand")
+```
+
+Der Zusatz nennt die Karte beim Namen und sagt, WO sie liegen muss — die
+beiden Quellen liegen an verschiedenen Orten (Anhaengsel am Helden,
+Crystal in der Hand). Die Blickrichtung kommt ueber `isOpponentSide`
+vom Aufrufer, der weiss, wessen Reihe er zeichnet.
+
+
+## ★ v1114 — EIGENER BADGE, und die LEICHTE Negation
+
+Al 15.9.: „Der Negated-Status-Badge, den Defeat anlegt, behauptet
+faelschlicherweise, der Effekt wuerde auch Abilities negieren und am
+Rundenende aufhoeren; beides stimmt fuer DIESEN Negated-Zustand nicht!"
+
+**★ BEIM NACHSEHEN ZEIGTE SICH: NICHT NUR DER TEXT LOG.** Der Motor
+kannte schon zwei Formen von `negated` —
+
+| Form | Wirkung | endet |
+|---|---|---|
+| **HART** (Standard) | Heldeneffekt UND Ability-Zonen ausgeblendet | zum Zugende bzw. nach Dauer |
+| **LEICHT** | nur der Heldeneffekt | mit der Karte |
+
+— aber die leichte war an `_byWeakeningCrystal` allein gebunden.
+**„Decisive Defeat" lief in der HARTEN Form** und blendete die
+Ability-Zonen wirklich aus, obwohl ihr Text nur sagt: „that Hero's
+EFFECT is negated". Der Badge log also nicht, er beschrieb das falsche
+Verhalten korrekt.
+
+**Jetzt ist die leichte Form an die KARTEN-HERKUNFT gebunden** —
+`_byWeakeningCrystal` (Handkarte) ODER `_fromAttachment` (Anhaengsel) —
+an fuenf Stellen in Engine und Client. Zwei Testfaelle stellen hart und
+leicht nebeneinander: dieselbe Lage, einmal unspielbar, einmal spielbar.
+
+**Der eigene Badge** (Wortlaut nach Als Vorgabe, v1115):
+
+```
+Negated (Decisive Defeat): Has its effect negated. Abilities still
+work. Lasts as long as Decisive Defeat remains attached to this Hero.
+
+Negated (Weakening Crystal): Has its effect negated. Abilities still
+work. Lasts as long as Weakening Crystal remains in your hand.
+```
+
+**★ DER ZUSATZ NENNT DIE KARTE BEIM NAMEN UND SAGT, WO SIE LIEGEN
+MUSS.** Erste Fassung schrieb „Lasts as long as the card is in play" —
+beides nicht. Die beiden Quellen liegen naemlich an verschiedenen Orten:
+ein Anhaengsel am HELDEN, „Weakening Crystal" in der HAND. Der Ort
+haengt deshalb an derselben Marke wie die Heilbarkeit
+(`_fromAttachment` / `_byWeakeningCrystal`).
+
+Der Badge spricht von EINEM Effekt statt „effects and Abilities" und
+nennt kein Rundenende. Der Standardtext bleibt fuer die harte Form
+unveraendert.
+
+**★ TESTFALLE, zum dritten Mal dieselbe:** mein Pruefaufbau gab dem
+Helden Decay Magic und liess ihn „Icebolt" (Destruction Magic Lv2)
+spielen. Beide Formen waren dann korrekt unspielbar, und der Test
+beschuldigte den Fix. **Wer eine Stufenpruefung testet, muss dem Helden
+GENAU die Schule der Karte geben.**
+
+
+## ★★ v1113 — „Decisive Defeat" war WIRKUNGSLOS, nicht nur im Puzzle
+
+Al 15.9.: „Das hat ueberhaupt nicht geklappt. Wenn ich ein Puzzle starte
+und ein Hero dabei Decisive Defeat angelegt hat, wird dieser NICHT mit
+einem Effekt belegt!"
+
+**★ DIE URSACHE WAR GRUNDLEGENDER ALS DAS PUZZLE.** Die Karte trug seit
+v1092 `silencesHostHero` — eine EIGENE Abfrage, beantwortet von
+`_isHeroEffectSilenced`. **Der Spielbetrieb fragt sie nie.** Er liest
+`hero.statuses.negated` DIREKT: 27 Stellen in der Engine, 8 im Server,
+2 im Client. Die Karte war damit praktisch wirkungslos — im Puzzle wie
+im normalen Spiel.
+
+**Meine v1092-Begruendung war falsch.** Ich hatte den `negated`-Status
+verworfen, weil er global nicht cleansbar ist — und daraus eine zweite,
+parallel gefuehrte Wahrheit gebaut. Die richtige Loesung lag seit v1103
+vor: den ECHTEN Status anlegen und die EINZELNE Instanz heilbar machen
+(Weakening-Crystal-Muster).
+
+**Jetzt:**
+
+```js
+attachmentStatus: 'negated',     // legt den echten Status an
+countsAsNegativeStatus: true,    // bleibt in den Heil-Auswahllisten
+```
+
+Der Status traegt `_fromAttachment: 'Decisive Defeat'`. Die
+Cleanse-Ausnahme aus v1103 ist verallgemeinert: heilbar ist **jede
+Negation, die von einer KARTE getragen wird** — Hand (Crystal) oder
+Anhaengsel. Der Statustyp bleibt global unheilbar.
+
+`onCardLeaveZone` raeumt den Status ab — **aber erst, wenn die LETZTE
+Kopie faellt**; ein Testfall prueft beide Schritte.
+
+**`silencesHostHero` ist ERSATZLOS ENTFALLEN**, samt
+`_heroSilencedByAttachment`. Ein Vertrag, den niemand liest, ist
+schlimmer als keiner: er sieht im Kartenskript nach Wirkung aus.
+
+**★ WARUM KEIN TEST DAS GEFANGEN HAT:** meine Faelle prueften
+`_isHeroEffectSilenced` — also genau die Abfrage, die ich selbst gebaut
+hatte. Sie war konsistent mit sich und mit nichts sonst. Die Testfaelle
+messen jetzt gegen `hero.statuses.negated`, das Tor des Spielbetriebs.
+
+
+## ★ PUZZLE MODE: Anhaengsel wirken ab Start (v1112)
+
+Al 15.9.: „Wird im Puzzle Mode einem Hero Decisive Defeat in die Support
+Zone getan, soll er automatisch das Puzzle negiert beginnen. Dasselbe
+gilt fuer ALLE Attachments, die Statuseffekte applyen!"
+
+**Im Puzzle laeuft KEIN `onPlay`** — die Karten werden direkt in die
+Zonen gesetzt. Anhaengsel zerfallen dadurch in zwei Gruppen, und nur
+eine braucht Hilfe:
+
+| Gruppe | Beispiele | im Puzzle |
+|---|---|---|
+| **PASSIV** — Wirkung wird bei jeder Abfrage neu aus dem Brett gelesen | Decisive Defeat, Forbidden Curse of Aging, Siege, Energy Aura | wirkt **von selbst**, nichts zu tun |
+| **STATUS/BUFF-SETZEND** — Effekt haengt an etwas, das `onPlay` anlegt | Berserk (`berserked`), Curse (`cursed`), Alliance, Anti Magic Enchantment | war **wirkungslos** |
+
+**★ DECISIVE DEFEAT WAR SCHON RICHTIG** — sie gehoert zur passiven
+Gruppe, weil `silencesHostHero` das Brett zur Laufzeit fragt. Ein
+Testfall belegt das jetzt (Instanz direkt in die Zone, kein `onPlay`,
+Held sofort stumm). Genau dafuer war die v1092-Entscheidung gut, den
+Zustand an die KARTE zu haengen statt an einen Status.
+
+**Zwei neue Deklarationen** fuer die andere Gruppe:
+
+```js
+attachmentStatus: 'berserked'          // Berserk, Curse
+attachmentBuff:   'alliance'           // Alliance, Anti Magic Enchantment
+```
+
+`createPuzzleGame` geht nach dem Backdatieren einmal ueber alle
+Support-Instanzen und stellt her, was fehlt (`appliedTurn: 0`, passend
+zur Backdatierung: der Status gilt als „schon vorher zugefuegt", damit
+Coffee & Co. ihn richtig einordnen).
+
+**★ DIE BUFF-HAELFTE FIEL ERST BEIM NACHZAEHLEN AUF.** Als Wortlaut sagt
+„Statuseffekte" — „Alliance" und „Anti Magic Enchantment" legen aber
+einen BUFF an, kein Status. Dieselbe Luecke, anderes Feld; beide sind
+mitgefixt.
+
+**NEUER WAECHTER `scripts/check-attachment-status.js`** verlangt die
+Deklaration von jedem Anhaengsel, das einen Helden-Status oder -Buff
+setzt. 23 Anhaengsel haben ein Skript, vier brauchten sie.
+
+
+## ★ ZIEH-KLANG BEIM DECK-FLUG (v1111)
+
+Al 15.9.: „Die vom Gegner-Deck gezogene Karte spielt noch keinen
+Draw-Sound ab."
+
+**★ DIE URSACHE IST DIE MASKE, die den doppelten Flug unterdrueckt.**
+`play_pile_transfer` registriert auf dem Client
+`pileTransferToHandPendingMeRef` und blendet damit genau diesen
+Handplatz aus der Zuwachs-Erkennung aus — **und an der haengt auch der
+Zieh-Klang**. Gewollt war nur, die doppelte ANIMATION zu unterdruecken;
+der Klang fiel als Beifang mit weg.
+
+Zurueckgegeben wird er jetzt im selben Zweig, **nur fuer Fluege aus dem
+DECK** (`from === 'deck'`), mit `dedupe` gegen Doppelklang und einer
+kleinen Verzoegerung, damit er auf die Landung faellt statt auf den
+Abflug.
+
+**Das repariert nicht nur Love Shot:** 15 Kartendateien schicken
+Deck→Hand-Fluege (Sid, Enigma, Crestina, Paraseed, Cybug, Aquatic …) —
+alle waren stumm, alle klingen jetzt.
+
+
+## ★ „ADD" ODER „DRAW"? Die Karte entscheidet (v1110)
+
+Al 15.9.: „Zieht ein Spieler vom Deck seines Gegners, triggert das noch
+NICHT Melissas Effekt."
+
+„Cute Meanie Melissa": *„Whenever your opponent **DRAWS** 1 or more
+cards via an effect, you may draw 1 card."*
+
+**★ BEIDE KARTEN NEHMEN MECHANISCH DASSELBE — aber nur eine nennt es
+Ziehen:**
+
+| Karte | Wortlaut | `onDraw`? |
+|---|---|---|
+| „Love Shot" | „**DRAW** a card from your opponent's deck" | ✓ |
+| „Infiltration" Lv1 | „**ADD** the top card of opponent's deck to your hand" | ✗ |
+
+Deshalb entscheidet der AUFRUFER ueber `opts.asDraw`, nicht der Helfer.
+Melissa entprellt ueber `_drawBatch`; der Helfer vergibt eine eigene
+Kennung, damit ein Vorgang genau EINE Antwort ausloest.
+
+**Beide Hooks feuern nebeneinander und gehoeren verschiedenen Seiten:**
+Lilly steht beim NEHMER, Melissa beim BESTOHLENEN. Vier Testfaelle
+halten beide Richtungen fest, samt der Gegenprobe, dass Infiltration
+kein `onDraw` ausloest.
+
+**Falls „Infiltration" spaeter auch als Ziehen gelten soll**, ist es ein
+Wort im Aufruf — aber es waere eine Regelaenderung, keine Korrektur.
+
+**★ Wer das nachbaut, vergisst ④ oder ⑤ — und es faellt nicht auf**,
+weil die Karte ja trotzdem auf der Hand landet. Lilly bliebe einfach
+still. Deshalb steht der Block jetzt EINMAL; Infiltration Lv1 ist
+mitgezogen. Ein Testfall faengt den Hook ab und prueft ihn.
+
+## ★ ③ DIE SCHADENS-IMMUNITAET IST GESTRICHEN
+
+Der alte Satz „The controlled Hero cannot take any damage while it is
+controlled by this effect" steht nicht mehr da.
+
+**Die Immunitaet kam nie aus dieser Karte**, sondern als Beifang des
+geliehenen `charmed`-Status — Charme Lv3 macht immun, und Love Shot
+leiht sich denselben Mechanismus fuer die KONTROLLE. Seit v1106 fragt
+der Schadensweg den Marker `_loveShot` mit ab, den die Karte ohnehin
+schon setzte: **geliehene Kontrolle schuetzt NICHT, echter Charme Lv3
+weiterhin schon.** Beide Faelle haben einen Testfall.
+
+Praktisch heisst das: waehrend der geliehenen Aktion kann der Held
+Rueckstoss, Gegenschlaege und Reaktionen abbekommen.
+
+
+## ★ NEU: `levelCannotBeReduced` (v1104) — „Last Resort"
+
+Al 15.9.: „Sein Level hat jetzt eine 'non-reducable'-Klausel, was sehr
+wichtig fuer Balancing ist."
+
+```
+This Spell's level can never be reduced. Choose a target and deal damage
+equal to twice the user's current HP to it. …
+```
+
+Ohne die Klausel liesse sich ein **Lv3-Zauber mit Sofortsieg-Bedingung**
+verbilligen — und die Senkungsquellen sind zahlreich geworden: „Ethan,
+the Prodigy" senkt JEDEN Spell in der Hand, „Damus" senkt Armageddon je
+Ifrit, Schul-Ermaessigungen (`_magicLevelReductions`) kommen aus
+Abilities.
+
+```js
+levelCannotBeReduced: true   // am Kartenskript
+```
+
+**★ DIE SPERRE SITZT GANZ VORN in `_applyCardLevelReductions`** — vor
+jeder einzelnen Quelle. Eine Pruefung weiter unten haette bei der
+naechsten neuen Senkungsart wieder eine Luecke gelassen; hier ist sie
+strukturell dicht. Ein Testfall laesst drei Senker gleichzeitig auf die
+Karte los und erwartet unveraendert 3.
+
+**★ NICHT VERWECHSELN mit dem vorhandenen `cannotBeReduced`** — das
+betrifft SCHADEN (`ctx.lockReduction()`), nicht Stufen. Die beiden
+Namen sind bewusst verschieden; ein Testfall prueft, dass beide
+nebeneinander im Motor stehen.
+
+**★ WISDOM UND DIVINITY SIND DAVON NICHT BETROFFEN** (Al 15.9.:
+„diese beiden agieren als Standins fuer die noetigen Abilities selbst,
+sie reduzieren das Level des Spells nicht").
+
+Der Motor sieht das genauso: die beiden laufen ueber `coverLevelGap` /
+`_findLevelGapCoverage` — einen EIGENEN Weg, der
+`_applyCardLevelReductions` gar nicht anfasst. Die Sperre konnte sie
+also nie treffen. **Nachgemessen statt angenommen:** „Last Resort"
+bleibt mit Divinity 3 und mit Wisdom 3 spielbar, und ihre Stufe bleibt
+dabei 3.
+
+Vier Testfaelle halten das fest — samt der Gegenprobe, dass sie OHNE
+passende Ability unspielbar ist, und einer Strukturpruefung, dass die
+Luecken-Deckung ein eigener Weg bleibt. **Wer die beiden Wege je
+zusammenlegt, muss die Ausnahme ausdruecklich wieder herstellen**; ein
+Kommentar an der Sperre sagt das.
+
+
+## NEU: Damus / Ifrit / Armageddon (v1100) — das Apokalypse-Trio
+
+Drei Karten, die kreuz und quer aufeinander verweisen. Gemeinsame
+Abfragen stehen in `_apocalypse-shared.js`, weil „wieviele Ifrits
+kontrolliert X" an sechs Stellen gebraucht wird.
+
+**Als Textaenderungen (14.9.), in cards.json uebernommen:**
+* Damus: „place an Ifrit" → „place an Ifrit **FROM YOUR HAND**"
+* Damus: Support Zone **frei waehlbar**
+* Damus: „Ifrits are **unaffected by** your opponent's cards and
+  effects" → „**take no damage from** your opponent's cards or effects".
+  ★ Deutliche Verengung: Zerstoerung, Uebernahme und Status greifen
+  wieder. Ein Testfall haelt fest, dass `actionDestroyCard` durchgeht.
+
+**Neue Motor-Vertraege:**
+
+```js
+summonOnlyFromHand: true              // Ifrit: kein Deck, keine Ablage
+immuneToSourceNames: ['Armageddon']   // Karte/Held: Schaden dieser Quelle = 0
+immuneToSourceCondition(engine,pi,hi) // Held: Immunitaet an Bedingung geknuepft
+armageddonBonus: 100                  // Ifrit: Aufschlag, an EINER Stelle gelesen
+protectsCreatureFromDamage(engine, inst, source, pi, heroIdx)  // Held schuetzt Kreaturen
+```
+
+**★ HELDEN-SKRIPTE ZAEHLEN JETZT AUCH BEI `reduceCardLevel` MIT.** Der
+Motor ging nur Karten-INSTANZEN durch — ein Held, der Stufen senkt, kam
+dort nie vor. Damus ist der erste; ohne diesen Zweig haette seine
+Armageddon-Klausel STILL gar nichts getan.
+
+## ★★ DIE TEUERSTE FALLE DIESER RUNDE: `continue` STATT MARKIEREN
+
+`processCreatureDamageBatch` hat einen Loop, der Immunitaeten
+**MARKIERT** (`e._immuneCreature = true`) — er wendet keinen Schaden an.
+Meine erste Fassung setzte dort ein `continue`: damit uebersprang sie
+die MARKIERUNG, nicht den Schaden. Die immunen Ifrits starben dadurch
+**erst recht**.
+
+Das hat fuenf Anlaeufe gekostet, weil die Immunitaet ISOLIERT
+einwandfrei funktionierte — `inst.zone` blieb sogar 'support', waehrend
+die Zone laengst geleert war. **Lehre: vor einem `continue` in einem
+fremden Loop pruefen, was der Loop eigentlich TUT.**
+
+## ★ ARMAGEDDON ZAEHLT DIE KREATUREN HINTERHER
+
+Ich hatte die Zaehlung zwischenzeitlich VOR die Heldenschlaege gezogen,
+mit der Begruendung, der Tod der letzten Heldenreihe raeume das Brett
+mit ab. **Al: das stimmt nicht — Kreaturen ueberleben den Tod ihres
+Helden.** Die leeren Zonen kamen vom `continue`-Fehler oben.
+
+Und Nachher-Zaehlen ist nicht nur unschaedlich, sondern noetig:
+**Armageddon toetet selbst Kreaturen**, die duerfen nicht mitzaehlen.
+Drei Testfaelle halten das fest, darunter einer, bei dem der Gegner
+VORHER zwei haette und HINTERHER null.
+
+**Siegbedingung nur bei TOTALER Ausloeschung** (Al): steht auch nur ein
+Held, greift die normale Regel. Umgesetzt ueber `_deferGameOverCheck`
+(Bunny-Bombs-Vertrag) plus `_drawLoserIdx` — Gleichstand heisst
+ausdruecklich, dass der WIRKER verliert.
+
+
+## „Forbidden Curse of Aging" NEU GEFASST (v1096) — DREI Wirt-Vertraege
+
+```
+Spell · Attachment · Decay Magic Lv1
+The HP of the Hero this Spell is attached to cannot be healed, and its
+other status effects cannot be removed. Additionally, negate the effects
+of all "Charme" Abilities attached to it. This counts as a status
+effect. If the user has Decay Magic 3 or the target has any "Charme"
+Abilities attached to it, this counts as an additional Action.
+```
+
+**Was sich gegenueber dem Bestandstext aendert:**
+1. „other NEGATIVE status effects" → „other STATUS EFFECTS". Das Wort
+   faellt weg, die Sperre wird breiter: auch POSITIVE Status lassen sich
+   nicht mehr abnehmen. Ein Testfall haelt genau das fest.
+2. „counts as a NEGATIVE status effect" → „counts as a STATUS EFFECT".
+   Fuer die Entfernbarkeit aendert das nichts (v1093-Auswahllisten), sie
+   zaehlt jetzt aber auch fuer Effekte, die bloss „ein Statuseffekt"
+   verlangen.
+3. NEU: die Zusatz-Aktions-Klausel.
+
+**★ DREI NEUE KARTEN-VERTRAEGE, alle am WIRT und alle fallen mit der
+Karte:**
+
+```js
+blocksHostHeal: true                // Heilung am Wirt verpufft
+blocksHostStatusRemoval: true       // seine uebrigen Status eingefroren
+negatesHostAbilities: ['Charme']    // Charme am Wirt ist tot
+```
+
+Die Ability-Negation sitzt an denselben **8 Aktivierungs-Toren** wie
+„The Thing in the Ship" (v1073) **plus 2 harten Server-Sperren** — ein
+Testfall zaehlt beide Zahlen nach.
+
+**★ „OTHER" IST DER KNACKPUNKT.** Die Karte selbst bleibt entfernbar —
+sonst waere sie ein unloesbares Schloss und der Satz „This counts as a
+status effect" liefe leer. Die Sperre fragt nach STATUS-Namen; die Karte
+ist keiner, sie haengt als Anhaengsel daneben.
+
+**★ FEHLER, DEN DER TEST GEFANGEN HAT: der Riegel landete zuerst in
+`actionAddStatus` statt in `removeHeroStatus`** — er haette das
+HINZUFUEGEN von Status blockiert statt das Entfernen. Seitdem gibt es
+dafuer einen eigenen Testfall („neue Status lassen sich weiterhin
+auflegen"). Die `bypassUnhealable`-Ausnahme gilt auch hier: ein
+Schutz-Effekt, der einen Status auf der Auftrag-Kante abfaengt, wird
+nicht umgedeutet.
+
+## ★ DIE ZUSATZ-AKTION HAENGT AM ZIEL — der Motor fragt aber VORHER
+
+**Al fand die Luecke (14.9.):** `inherentAction` wird gefragt, BEVOR das
+Ziel feststeht. Meine erste Fassung antwortete optimistisch mit
+„irgendein Held traegt Charme" und liess danach JEDEN Wirt zu — wer kein
+Decay Magic 3 hatte, bekam die Gratis-Aktion und durfte damit einen
+Helden OHNE Charme verfluchen.
+
+**★ DIE LOESUNG IST DIE DOPPELNATUR VON „CURSE"**, nicht eine
+Zielbeschraenkung: optimistisch als Zusatz-Aktion einsteigen, und wenn
+sich beim Zielen zeigt, dass die Bedingung nicht erfuellt ist, ueber
+`gs._spellForcesActionConsume` auf eine normale Aktion
+zurueckschalten — der Server bindet `isInherentAction` nach `onPlay`
+eigens dafuer neu.
+
+Das ist treuer als ein Zielverbot: die Karte sagt nicht „du darfst nur
+Charme-Traeger treffen", sondern „gegen die zaehlt es als
+Zusatz-Aktion". Wer einen Helden ohne Charme verfluchen will, darf das —
+es kostet dann die normale Aktion.
+
+Die Entscheidung liegt als eigener Export `zaehltAlsZusatzAktion(gs,
+wirkerPi, wirkerHi, wirtPi, wirtHi)` vor, damit sie pruefbar ist, ohne
+die ganze Zielwahl nachzustellen.
+
+**★ ABER DER RUECKFALL BRAUCHT ETWAS ZUM VERBRAUCHEN** (Als
+Nachfrage 14.9., v1098). "Dann kostet es eben die normale Aktion"
+funktioniert nur, solange eine zur Verfuegung steht. In der Action
+Phase, nachdem ein Held gehandelt hat, gibt es keine -- der Zauber liefe
+dann DOCH gratis gegen einen Wirt ohne Charme.
+
+**★ UND "eine Aktion" heisst NICHT nur die Grund-Aktion** (Als
+zweiter Befund 14.9., v1099): "Es gibt auch noch andere Action-Granter
+als nur die normale Action for turn (etwa Duigno oder Zhigao)."
+
+Zwei Motor-Helfer:
+
+```js
+engine.hasNormalActionAvailable(playerIdx) -> bool
+// nur die Grund-Aktion: Action Phase verbraucht, sobald ein Held
+// gehandelt hat; Main Phases verfuegbar.
+
+engine.hasPayableActionFor(playerIdx, cardName, heroIdx?) -> bool
+// ALLE vier Quellen des Aktions-Haushalts:
+//   1. die Grund-Aktion
+//   2. heldengebundene Bonus-Aktionen (`bonusActions`)
+//   3. allgemeine Bonus-Hauptaktionen (`_bonusMainActions`, Torchure)
+//   4. KARTENPASSENDE Zusatz-Aktionen (`findAdditionalActionForCard`)
+// `heroIdx` weglassen = JEDER eigene Held zaehlt.
+```
+
+Punkt 4 ist der wichtige: `findAdditionalActionForCard` prueft die
+KATEGORIE der Karte mit, deckt also Duigno, Zhigao, Lunatic Hawk und
+jeden kuenftigen Granter automatisch ab -- ohne Namensliste.
+
+Die Karte koppelt ihre WIRTSLISTE daran: ohne Decay Magic 3 UND ohne
+irgendeine bezahlbare Aktion werden Nicht-Charme-Helden per `heroFilter`
+gar nicht erst angeboten. Sonst bleibt die Liste offen, weil der
+Rueckfall dort zahlbar ist. Zwoelf Testfaelle fahren die Kombinationen
+ab, je einer pro Quelle.
+
+**Damit greifen zwei Mechanismen gestaffelt:** solange eine Aktion da
+ist, entscheidet der Rueckfall (treu zum Text, jeder Wirt erlaubt);
+sobald keine mehr da ist, entscheidet die Zielliste. Keiner allein
+haette gereicht.
+
+## ★ MEHRERE ANHAENGSEL AM SELBEN HELDEN (Als Vorsichtsfrage 14.9.)
+
+Liegen ZWEI Curses (oder zwei „Decisive Defeat") am selben Helden und
+wird EINE entfernt, muss die Wirkung bleiben. **Das war schon richtig**,
+weil alle Wirt-Sperren nach einer PASSENDEN INSTANZ suchen statt einen
+Zustand zu fuehren — aber es war ungetestet. Jetzt haben beide Karten
+Testfaelle, die erst nach der ZWEITEN Entfernung eine Aenderung
+erwarten.
+
+
+## „MOE Shield" NEU GEFASST (v1095) — inkl. cards.json
+
+```
+Spell · Reaction · Support Magic Lv1
+Play this card immediately when your opponent activates a Spell that
+would affect 1 or more targets you control. Negate that Spell. If the
+Spell would have affected exactly 1 target, you cannot draw cards until
+the end of your next turn (including your Resource Phase).
+```
+
+Frueher kostete JEDE Nutzung die Zieh-Sperre. Jetzt nur noch gegen
+EINZELZIEL-Zauber — gegen einen Flaechenschlag ist der Schild gratis
+(Als Absicht: „um die Karte gegen AoE staerker zu machen").
+
+**★ FUER DEN REAKTIONS-ZEITPUNKT GIBT ES ETWAS BESSERES ALS
+INTERFERENCES SCHADENS-KLAMMER.** Al verwies auf Interference; dessen
+Erkennung sitzt aber IM Schadensweg, und hier wird VOR der Aufloesung
+entschieden. Das passende Werkzeug ist `isPostTargetReaction`: das
+Fenster `_checkPostTargetHandReactions` feuert EINMAL je Zauber,
+NACHDEM der Wirker seine Ziele gewaehlt hat und BEVOR er aufloest — mit
+der ECHTEN Zielliste.
+
+Das ist **genauer als jede Karten-Flagge**: ein Zauber, der mehrere
+Ziele treffen KOENNTE, den der Wirker aber auf eines gerichtet hat,
+kommt mit Laenge 1 an und zaehlt korrekt als Einzelziel. „Storm Ring"
+nutzt dasselbe Fenster fuer dieselbe Frage.
+
+**Gezaehlt wird ueber BEIDE Seiten** (Storm-Ring-Muster): „affected
+exactly 1 TARGET" nennt keine Seite. Ein Ziel bei mir + eines beim
+Gegner sind ZWEI → gratis. Nur die erste Bedingung („1 or more targets
+YOU control") ist seitenbezogen. Doppelte Eintraege werden entdoppelt.
+
+## ★ NEU: Zieh-Sperren ueber die Runde hinaus (v1095)
+
+„until the end of your NEXT turn" — der uebliche `drawLocked` faellt am
+Rundenwechsel. `ps.drawLockedUntilTurn` traegt jetzt die ZIELRUNDE; der
+Rundenwechsel setzt `drawLocked` bis dahin NEU, statt es zu loeschen,
+und raeumt den Stempel danach weg.
+
+**Zielrunde statt Countdown**, gleiche Begruendung wie bei „Teleportal":
+ein Countdown muss bei jedem Wechsel angefasst werden und geht verloren,
+wenn ein Effekt Runden ueberspringt.
+
+„including your Resource Phase" ist damit von selbst erfuellt — die
+Sperre steht schon, wenn die Phase beginnt. Die Zielrunde haengt daran,
+wer gerade dran ist: im Gegnerzug die naechste Zugnummer, im eigenen
+Zug die uebernaechste.
+
+
+## Neue Karte: „Decapitating Strike" (v1094)
+
+```
+Attack · Reaction · Fighting Lv1
+Play this card immediately when a target is left at 50 or less HP after
+taking damage. Defeat that target.
+```
+
+**★ DIE SCHWELLE MISST DEN REST, NICHT DEN SCHADEN** („left at 50 or
+less HP AFTER taking damage"). Beide Nach-Schadens-Fenster liefern genau
+das: `isAfterDamageReaction` (Helden) und
+`isAfterCreatureDamageReaction` (Kreaturen). „a target" nennt weder Art
+noch Seite — also beide Fenster und beide Seiten
+(`firesForOpponentDefeat`).
+
+**★ ABER NICHT AUF EINEN BEREITS TOTEN.** Bei 0 HP ist das Ziel schon
+besiegt; „left at 50 or less" meint eins, das NOCH STEHT. Deshalb
+**KEIN `firesOnLethalDamage`** — anders als bei „Corpse Explosion", die
+es ausdruecklich braucht. Ohne diese Grenze waere die Karte auf jedem
+Kill ein wirkungsloser Leerlauf. Ein Testfall prueft die Schwelle bei
+400 / 51 / 50 / 1 / 0 HP einzeln.
+
+**„Defeat that target"** ist ein Insta-Kill, kein Schaden — er laeuft an
+Schadensminderung und Versteinerung vorbei, greift aber in die
+Niederlage-Fenster (Extra-Leben, Guardian Angel), was richtig ist.
+Bei Kreaturen geht er ueber `actionDestroyCard` und damit durch das
+Fenster von „Enhanced Guard Dog" — als EINZELNE Zerstoerung, der Dog
+darf sie also abfangen.
+
+**Animation** (Al 14.9.: „ein brutaler Schwertschlag, neue
+Animation!"): `sword_cleave` — die Klinge faehrt diagonal durch, die
+Schnittlinie bleibt kurz stehen, dann spritzt es. Kein Emoji, gleiche
+Begruendung wie beim Pocket-Sand-Projektil.
+
+**★ FALLE: `actionDefeatHero(source, target, opts)` — die QUELLE steht
+VORN.** Mein erster Aufruf uebergab das Ziel zuerst; er lief STILL ins
+Leere, der Held blieb einfach stehen. Kein Fehler, keine Warnung — nur
+ein Testfall, der „das Ziel ist besiegt" prueft, faengt so etwas.
+
+
+## ★ SWEEP: „counts as a status effect" — wer behauptet es, wer ist es? (v1102)
+
+Al 15.9.: „Check auch einmal per Sweep den umgekehrten Fall: Gibt es
+Effekte, die als Status gelten, aber noch nicht wahrgenommen werden?"
+
+**21 Karten** sagen in ihrem Text, dass sie als Statuseffekt zaehlen.
+Das Ergebnis ist beruhigend: **alle bis auf zwei legen einen ECHTEN
+Engine-Status an** und sind damit von selbst versorgt — Heilung,
+Anzeige und jede „ist betroffen von"-Abfrage greifen ohne Zutun.
+
+★ Besonders die beiden, die man verdaechtigen wuerde:
+* **Berserk** haengt seine Regeln an `berserked`, nicht an der
+  angehaengten Karte — der Dateikopf sagt sogar ausdruecklich
+  „Cleansable".
+* **Curse** haengt an `cursed`, ebenfalls cleansbar. Die
+  ATK-0-Regel liest den STATUS, nicht die Karte.
+
+Beide Status stehen in `getCleansableStatuses()`. Es gab also nichts zu
+reparieren — nur zu belegen.
+
+**Zwei begruendete Sonderwege**, beide in der Allowlist des Waechters:
+* **Unwanted Audience** wirkt auf KREATUREN und haengt an
+  `getCleansableCreatureStatusKeys`.
+* **Weakening Crystal** — von Al entschieden, siehe unten.
+
+**NEUER WAECHTER `scripts/check-status-claims.js`**: jede Karte, deren
+Text „counts as a status effect" sagt, muss entweder einen echten Status
+anlegen ODER `countsAsNegativeStatus` tragen. Sonst steht der Satz nur
+auf dem Papier. Sieben der 21 haben noch kein Skript — der Waechter
+nennt sie, ohne sie als Fehler zu werten.
+
+## ★ „Weakening Crystal": HEILBAR, ABER WIEDERKEHREND (v1103)
+
+Al 15.9.: „Den Status zu cleansen, entfernt ihn TEMPORAER von einem
+Ziel. Solange Crystal auf der Hand ist, wird der Effekt (mit kleiner
+Animation!) zu Beginn jeder Runde des Betroffenen neu appliziert."
+
+**★ DIE KARTE HATTE EIN ECHTES PROBLEM, nicht bloss eine Luecke.** Sie
+legte zwar einen `negated`-Status an — aber bei JEDEM `sync()` neu. Eine
+Heilung war dadurch wirkungslos: der naechste Zustandspush machte sie im
+selben Augenblick rueckgaengig. Der Status-Sweep (v1102) hat sie genau
+deshalb erwischt.
+
+**Neue Bauart — angelegt nur an drei Zeitpunkten** (`reapply: true`):
+Eintritt in die Hand, Rundenbeginn des Betroffenen, Laden eines
+Spielstands. Dazwischen **raeumt der Sync nur noch AUF**: verlaesst die
+Karte die Hand, faellt der Status SOFORT, nicht erst zum naechsten Zug.
+
+**★ EINE BEGRUENDETE AUSNAHME IM CLEANSE-RIEGEL.** `negated` bleibt
+global unheilbar (echte Negation ist ein permanenter Lockout) — heilbar
+ist NUR die Instanz mit `_byWeakeningCrystal`. Das ist kein Umgehen der
+Regel, sondern ein Aufschub: die Karte legt den Fluch selbst wieder an.
+Ein Testfall prueft beide Seiten (Crystal-Fluch geht, echtes `negated`
+bleibt).
+
+In den Heil-Listen erscheint er als **„Negated (Weakening Crystal)"**.
+
+**Animation** `crystal_drain` — bewusst KLEIN und auf der
+Hintergrund-Ebene: sie laeuft zu jedem Rundenbeginn, solange die Karte
+liegt. Sie feuert nur, wenn wirklich NEU angelegt wurde; liegt der Fluch
+schon, bleibt es still.
+
+**★ NEU: `declaresStatus: '<name>'`** — dritter anerkannter Weg fuer
+`check-status-claims`. Fuer Karten, deren Status der MOTOR anlegt, weil
+sie keinen eigenen Aufloesungspunkt haben (Crystal liegt in der Hand).
+Macht die Zustaendigkeit im Kartenskript sichtbar, statt sie in einem
+geteilten Modul zu verstecken.
+
+
+## ★ GIFT-STAPEL JETZT IN ALLEN SIEBEN HEIL-KARTEN (Als QoL-Vorgabe)
+
+Bisher zeigte nur „Tea" die Stapelzahl an, weil nur Tea sie in ihre
+selbstgebaute Liste schrieb. Seit alle sieben ueber
+`cleansableHeroEntries` gehen, kommen `stacks`, `statusData` und
+`appliedTurn` ueberall an — ohne dass eine Karte etwas dafuer tun muss.
+Das ist der Nebengewinn der Konsolidierung.
+
+
+## Neue Karte: „Decisive Defeat" (v1092) — ZWEI neue Anhaengsel-Vertraege
+
+```
+Spell · Attachment · Decay Magic Lv2
+While this card is attached to a Hero, that Hero's effect is negated.
+This counts as a negative status effect.
+```
+
+**★ WARUM NICHT EINFACH DER `negated`-STATUS? Genau daran haengt der
+zweite Satz.** `negated` ist in der Engine ausdruecklich NICHT cleansbar
+— der Kommentar an `getCleansableStatuses` nennt ihn einen „permanent
+lockout", dessen Aufhebung „intended card balance" braeche. Decisive
+Defeat sagt aber, dass es ALS NEGATIVER STATUS ZAEHLT, also entfernbar
+sein soll. Beides zugleich geht mit dem Status nicht.
+
+Der Zustand haengt deshalb an der KARTE:
+
+```js
+silencesHostHero: true        // _isHeroEffectSilenced fragt Anhaengsel mit
+countsAsNegativeStatus: true  // eine Vollheilung raeumt die Karte weg
+```
+
+Faellt die Karte, ist der Held im selben Moment wieder bei Sinnen — kein
+Aufraeumen, kein Status, der haengenbleiben koennte.
+
+**An BEIDE Seiten anhaengbar:** der Text sagt nur „a Hero", ohne
+Seitenangabe (anders als „Siege": „one of YOUR Heroes").
+
+## ★ AUSWAEHLBAR IN JEDER HEIL-KARTE (v1093, Als Vorgabe 14.9.)
+
+Die Grenze aus v1092 („nur eine Vollheilung entfernt sie") ist WEG. Das
+Anhaengsel steht jetzt als eigener Eintrag in den Auswahllisten:
+
+```js
+engine.cleansableHeroEntries(pi, heroIdx)
+// → [{ key: 'attach:<instId>', label: 'Negated (Decisive Defeat)', icon: '🚫' }, …]
+```
+
+Die Beschriftung kommt aus dem Kartenskript
+(`negativeStatusLabel` / `negativeStatusIcon`).
+
+**★ EIN BAUER STATT SIEBEN** (v1101, Als Nachfrage 15.9.: „Bist du
+sicher, dass diese drei die einzigen Karten sind? Was ist mit Tea,
+Coffee, Elixir of Recovery usw.?").
+
+Waren sie nicht. **NEUNZEHN Karten rufen `cleanseHeroStatuses`, SIEBEN
+davon bauen dem Spieler eine Auswahlliste** — Juice, Beer, Cure, Tea,
+Coffee, Elixir of Recovery, Waitress. Ich hatte drei umgestellt; die
+uebrigen vier haetten „Decisive Defeat" und „Forbidden Curse of Aging"
+nie angezeigt.
+
+Alle sieben lesen jetzt `engine.cleansableHeroEntries(pi, heroIdx)`. Der
+Bauer liefert dafuer vier Felder: `key`, `label`, `icon` plus `stacks`,
+`statusData` und `appliedTurn` — letztere, weil „Tea" Gift-Stapel
+anzeigt und „Coffee" nach der Runde filtert, in der ein Status kam.
+Anhaengsel bekommen `appliedTurn` aus `inst.turnPlayed`, damit Coffees
+Filter auch auf sie passt.
+
+**NEUER WAECHTER `scripts/check-cleanse-lists.js`** meldet jede neue
+Handkopie. Er unterscheidet HELDEN- von KREATUR-Listen: die
+Kreatur-Zweige derselben Karten bauen weiter selbst, und das ist richtig
+— Anhaengsel haengen an Helden. Sein erster Entwurf tat das nicht und
+meldete vier korrekte Stellen als Fehler.
+
+**Cure brauchte zwei Nachbesserungen:** seine ZIELBERECHTIGUNG verlangte
+einen cleansbaren STATUS — ein Held, der nur „Decisive Defeat" traegt,
+waere fuer Cure unsichtbar geblieben. Und die Heilmenge „100 × entfernt"
+zaehlt das Anhaengsel jetzt mit.
+
+**★ SIE GEHT IN DIE ABLAGE IHRES URSPRUENGLICHEN BESITZERS** (Als
+Ruling): `actionMoveCard` routet ueber `originalOwner`, das die Instanz
+eigens dafuer fuehrt. Spielt Spieler 0 die Karte auf einen Helden von
+Spieler 1, liegt sie physisch drueben — faellt aber zu Spieler 0
+zurueck. Ein Testfall prueft beide Seiten.
+
+**Erinnerung (v1064-Lehre):** erste Fassung schickte `negate_flash` —
+einen Animationstyp, den es nicht gibt. Ein unbekannter Typ tut STILL
+gar nichts. Jetzt `silence_seal`, das im Register steht; ein Testfall
+prueft genau das.
+
+
+## Neue Karte: „Memory Blast" (v1091)
+
+```
+Spell · Normal · Destruction Magic Lv2
+Choose a target your opponent controls and deal damage equal to 10 times
+the number of cards in your opponent's discard pile to it. This must be
+the only damage you deal this turn, and this Spell can never hit more
+than 1 target. If that target was originally controlled by you,
+permanently regain control of it instead.
+```
+
+**① Schaden = 10 × GEGNERISCHER Ablagestapel**, nicht der eigene — die
+Karte bestraft den, der viel abgelegt hat.
+
+**② „the only damage you deal this turn"** ueber `ps.damageLocked`
+(Flame-Avalanche-Vertrag): danach wird jeder weitere Schaden dieses
+Spielers an gegnerischen Zielen zu 0.
+**★ GESETZT WIRD NACH DEM EIGENEN SCHLAG.** Vorher haette die Karte
+ihren eigenen Schaden geloescht — ein Testfall prueft beides in dieser
+Reihenfolge.
+
+**③ „can never hit more than 1 target"** → `neverMultiTarget: true`
+(Basketskull-Vertrag). Loader und „Bomb Berserker Bartas" lesen ihn,
+kein Verdopplungs-Effekt kann die Karte ausweiten.
+
+**★ ④ DIE ABZWEIGUNG: „If that target was ORIGINALLY CONTROLLED BY YOU
+… INSTEAD."** Statt Schaden. Gemessen an `inst.originalOwner`, das sich
+nie aendert (die Engine fuehrt es ausdruecklich fuer solche Faelle).
+Hat der Gegner mir eine Kreatur gestohlen, hole ich sie zurueck und tue
+ihr NICHTS — **auch keine Schadenssperre**, denn es wurde ja kein
+Schaden ausgeteilt.
+
+**★ „instead" KENNT KEINEN RUECKFALL:** ist auf meiner Seite kein Platz
+frei, passiert schlicht gar nichts — nicht ersatzweise Schaden. Ein
+Testfall haelt das fest.
+
+**Animation** (Al 14.9.): `dark_blast` bekommt die Staerke als `power`
+(0..1) mit — groesserer Kern, zweiter Ring ab der Haelfte, mehr
+Splitter. Die Skala steht VOR dem Start fest (`--mb-scale`), animiert
+werden weiter nur `opacity` und `transform`. Volle Wucht ab 300 Schaden;
+darueber waechst sie nicht weiter, sonst spraengte ein voller
+Ablagestapel das halbe Brett.
+
+
+## Neue Karte: „Siege" (v1090) — die STARKE Such-Sperre, brettgetragen
+
+```
+Spell · Attachment · Magic Arts Lv3
+Attach this card to one of your Heroes. While this card is attached to a
+Hero, your opponent cannot add cards from their deck or discard pile to
+their hand outside their Resource Phase (but they can still draw cards).
+```
+
+Die zweite Stufe der Such-Sperre, fuer die seit „Cats of the Pharaoh"
+(v1068) das Fundament lag: **Deck UND Ablagestapel**. „but they can
+still draw cards" bestaetigt die Wahl — es ist die SUCH-Sperre, nicht
+`handLocked`.
+
+## ★ NEU: `blocksSearchFor` — Sperre als ZUSTAND statt als Flagge
+
+Cats setzt eine Flagge, die am Zugende faellt. **Siege ist ein
+Zustand:** die Sperre gilt, solange die Karte haengt, und zusaetzlich
+nur AUSSERHALB der Resource Phase des Gegners. Eine Flagge muesste dafuer
+bei jedem Phasenwechsel nachgefuehrt werden — und liefe beim ersten
+vergessenen Pfad aus dem Tritt.
+
+```js
+blocksSearchFor(gs, pi, quelle, engine, inst) → true = GESPERRT
+// pi = wer suchen will, quelle = 'deck' | 'discard'
+```
+
+`engine.searchLockLevel(pi)` fasst Flagge UND Brett zu
+`{ deck, discard }` zusammen; `_isSearchBlocked` und
+`_cardBlockedBySearchLock` lesen nur noch daraus. Kein Aufraeumen —
+faellt die Karte vom Helden, antwortet sie nicht mehr.
+
+**★ DER SERVER MUSSTE MIT.** Er schickte bisher die ROHE Flagge; eine
+brettgetragene Sperre haette der Client nie gesehen — kein Abzeichen,
+keine ausgegrauten Karten, obwohl die Sperre greift. Jetzt geht die
+ABGELEITETE Stufe raus. Ein Struktur-Testfall von Cats prueft seitdem
+genau diese Zeile (er fiel beim Umbau auf und wurde nachgezogen, statt
+ihn zu loeschen).
+
+**„outside THEIR Resource Phase"** meint die des GESPERRTEN Spielers.
+In einer fremden Runde ist er nie in seiner eigenen Resource Phase — die
+Sperre gilt dort also durchgehend. Geprueft wird deshalb BEIDES: sein
+Zug UND die Resource Phase. Drei Testfaelle fahren die Kombinationen ab.
+
+
+## Neue Karte: „Alluring Light" (v1089)
+
+```
+Spell · Normal · Decay Magic Lv1
+Choose a Hero your opponent controls and a target you control. Your
+chosen target takes damage equal to the chosen Hero's Attack stat.
+This is treated as the chosen Hero attacking your chosen target.
+```
+
+**★ DIE KARTE DREHT DIE RICHTUNG UM — und das liest man leicht falsch.**
+Man waehlt einen GEGNERISCHEN Helden als Angreifer und ein EIGENES Ziel
+als Opfer. Der Schaden geht also auf die EIGENE Seite. Wer die Seiten
+vertauscht, baut eine voellig andere Karte.
+
+Der Sinn steckt in der letzten Zeile: **„treated as the chosen Hero
+ATTACKING"** — der Angriff zaehlt dem GEGNER, samt allem, was daran
+haengt (seine Angriffszaehler, Rueckstoss-Effekte wie „Rioting Village",
+Gegenschlaege). Man laesst den Gegner auf sich selbst einschlagen.
+Umgesetzt ueber eine Angriffsquelle mit `owner`/`controller` des
+GEGNERS; ein Testfall faengt genau diese Quelle ab und prueft ihre
+Seite.
+
+**Der Attack stat ist der AKTUELLE Wert des GEGNER-Helden** — damit ist
+diese Karte eine der 48, die den Stat lesen, ohne selbst ein Attack zu
+sein. Genau der Grund, warum „Rioting Village" den STAT verdoppeln muss
+und nicht den Attack-Schaden (siehe dort).
+
+**Animation** (Als Vorgabe 14.9.): erst `lure_beacon` — rhythmisch
+pulsende Ringe plus blinkender Kern auf dem OPFER, das Licht, das lockt
+—, dann die Standard-Ramme `play_ram_animation` vom angelockten Helden
+aus. Die Reihenfolge ist ein Testfall, nicht nur eine Absicht.
+
+**★ TESTFALLE:** `counters.damageTaken` ist NICHT der Zaehler fuer
+Kreaturenschaden — er blieb `undefined`, obwohl der Aufruf `dealt: 40`
+meldete. Wer Kreaturenschaden pruefen will, beobachtet den AUFRUF
+(Quelle, Betrag, Typ) statt eines vermuteten Zaehlers.
+
+
+## Neue Karte: „Cleansing of the Land" (v1088)
+
+```
+Spell · Normal · Magic Arts Lv1
+Choose an Area from your deck and add it to your hand. If one of your
+Heroes can use that Area, you may immediately use it as an additional
+Action.
+```
+
+**„If one of your Heroes CAN USE that Area"** ist die Stufenpruefung,
+nicht „hast du einen lebenden Helden". `heroMeetsLevelReq` ist genau
+diese Frage und beruecksichtigt Schule, Stufe, Wisdom und jede
+Ermaessigung von selbst. Dazu `canPlaceAnotherArea` (v1050) — es muss
+auch PLATZ sein, und keine Dublette.
+
+**„as an additional Action"** kostet hier nichts: der Einsatz laeuft
+mitten in der Aufloesung. Die Formulierung stellt nur klar, dass der Zug
+nicht verbraucht wird.
+
+**Such-Sperre handgesetzt** (Gruppe A): die Autoerkennung laesst die
+Karte durch, weil sie neben der Suche `placeArea` aufruft — fuer sie ein
+zweiter Effekt. Hier haengt der Einsatz aber VOLLSTAENDIG an der Suche;
+ohne gefundene Karte gibt es nichts zu legen.
+
+## ★ NEU: `layer: 'background'` fuer feldweite Animationen (v1088)
+
+`zoneType: 'board'` (v580) traf bisher immer die OBERE Ebene — richtig
+fuer eine Explosion, falsch fuer eine Feuerwalze, die UNTER den Karten
+durchziehen soll (Al 14.9.: „aber auf Hintergrund-Layer!").
+
+```js
+engine._broadcastEvent('play_zone_animation', {
+  type: 'fire_sweep', zoneType: 'board', layer: 'background', …
+});
+```
+
+`layer: 'background'` mountet in `.board-plane-clip` — die
+Atmosphaeren-Ebene, in der auch `BoardAmbiance` und die
+Area-Hintergruende liegen. Alles Uebrige paintet davor.
+
+**★ TESTFALLE, wieder eine andere:** „Acid Rain" ist **Decay Magic
+Lv2**. Mein Testheld trug Magic Arts — die Einsatz-Abfrage blieb dann
+KORREKT aus, und der Test beschuldigte die Karte. Wer eine
+Stufenpruefung testet, muss dem Helden GENAU die Schule geben, die die
+Karte verlangt, nicht irgendeine.
+
+
+## ★ DER ATK-TRICHTER IST JETZT DICHT (v1087) — plus Waechter
+
+Al 14.9.: „Bekannte Luecken oder Grenzen sollen IMMER gefixt werden!"
+
+`_applyHeroAtkDelta` war als DER Trichter dokumentiert — **war es aber
+nicht.** Der Waechter `scripts/check-atk-funnel.js` fand **neun**
+Zuweisungen daneben. Seit v1086 haengt daran mehr als der
+Fluch-Zwischenspeicher: ATK-AUREN hoeren auf `afterHeroAtkChange`, eine
+Umgehung macht also zweierlei still kaputt.
+
+**Auf den Trichter gezogen (echte Deltas):**
+* `cleanseHeroStatuses` — Rueckgabe nach dem Fluch;
+* `curse.js` — dieselbe Rueckgabe im Kartenskript;
+* Ablauf befristeter Gaben — war eine WORTGLEICHE Nachbildung des
+  Trichters, beide Zweige taten exakt dasselbe;
+* `actionGrantAtk`, das Widerrufen und `grantTempHeroAtk`.
+
+**★ NEU: `_signalHeroAtkReset(hero, heroIdx)` fuer IDENTITAETSWECHSEL.**
+Aufstieg und Gestaltwechsel setzen `hero.atk = newCardData.atk` — das
+ist kein Delta, sondern ein Schnitt, der Trichter passt nicht. Die
+Stelle meldet stattdessen `afterHeroAtkChange` mit `reset: true`; wer
+eine Aura fuehrt, verwirft seine Buchfuehrung fuer diesen Helden und
+legt auf dem NEUEN Wert frisch an. Ohne das rechnete „Rioting Village"
+nach einem Aufstieg mit einem Betrag weiter, den es nicht mehr gibt.
+
+**Begruendete Ausnahmen** (in der Allowlist des Waechters, jede mit
+Grund im Code): das Absenken beim Auflegen des Fluchs (zu dem Zeitpunkt
+ist `cursed` noch nicht gesetzt, der Trichter wuerde sichtbar buchen
+statt in den Zwischenspeicher), der Identitaetswechsel selbst, und das
+Leeren eines Heldenplatzes (der ganze Held wird auf null gesetzt, nicht
+seine ATK veraendert).
+
+**★ LEHRE: „kanonischer Trichter" im Kommentar ist keine Zusicherung.**
+Die Dokumentation an `_applyHeroAtkDelta` sagte seit jeher „EVERY direct
+`hero.atk += N` pattern should route through here" — und neun Stellen
+taten es nicht. Erst ein Waechter macht aus dem Vorsatz eine Regel.
+
+
+## Neue Karte: „Rioting Village" (v1086) — ZWEI neue Motor-Vertraege
+
+```
+Spell · Area · Destruction Magic Lv1
+While this Area Spell remains on the board, all Heroes have their Attack
+stats doubled, but no player can use more than 1 Attack per turn and
+when a Hero deals damage with an Attack, it takes half the damage dealt
+as recoil (rounded up). This recoil damage cannot be reduced or negated.
+```
+
+Alle drei Wirkungen gelten fuer BEIDE Seiten — „all Heroes", „no
+player". Wer sie legt, legt sie auch gegen sich selbst.
+
+## ★ NEU: `afterHeroAtkChange` — ATK-Auren, die MITWACHSEN
+
+ATK ist im Motor ein MUTIERTER Wert, keine Rechnung. Jede vorhandene
+Aura gibt einmal beim Eintritt und nimmt einmal beim Abgang (Bauform
+„Blade of the Frostbringer"). **Fuer eine VERDOPPLUNG reicht das
+nicht:** gewinnt ein Held spaeter ATK dazu, muss die Verdopplung
+mitwachsen, sonst friert sie auf dem Platzierungszeitpunkt ein.
+
+Der kanonische Trichter `_applyHeroAtkDelta` meldet deshalb jede
+Aenderung als `afterHeroAtkChange`. Ein Tiefenschloss (`_atkAuraTiefe`)
+verhindert, dass eine Nachlage sich selbst ausloest.
+
+**★ DAS SCHLOSS REICHT NICHT ALLEIN.** Die Eintritts-Schleife der Karte
+ruft `_applyHeroAtkDelta` NICHT verschachtelt auf — der Hook feuert
+also, und die Karte zaehlte ihre eigene Gabe ein zweites Mal: aus der
+Verdopplung wurde eine Verdreifachung (100 → 300 statt 200), und der
+Abgang rechnete doppelt zurueck auf 0. **Wer den Hook benutzt, braucht
+ein eigenes Schloss um seine eigenen Gaben** (hier
+`counters._rvSyncing`). Beide Faelle haben Testfaelle.
+
+## ★ NEU: `blocksCardPlay` — brettweite Spielsperren
+
+`canPlayCard` sitzt am HELDEN und an seiner Ausruestung. Eine AREA
+gehoert keiner Heldenreihe an und hatte bisher keinen Platz, an dem sie
+ein Kartenspiel verbieten kann.
+
+```js
+blocksCardPlay(gs, pi, cardData, engine, inst) → true = GESPERRT
+```
+
+Umgekehrtes Vorzeichen zu `canPlayCard`. `validateActionPlay` fragt
+JEDE Instanz, deren `activeIn` sie gerade aktiv macht — also auch
+Permanents, Surprises und Kreaturen, falls spaeter eine solche Karte
+entsteht. Beide Seiten werden gefragt.
+
+## Rueckstoss
+
+„half the damage DEALT" — es zaehlt der WIRKLICH angekommene Schaden
+(`ctx.realDealt`), nicht der angekuendigte; ein Testfall fuettert
+200 angekuendigt / 40 angekommen und erwartet 20.
+
+„cannot be reduced or negated" → `actionDealTrueDamage`. Kein Kreisel:
+der Rueckstoss traegt `type: 'recoil'`, ist also selbst kein
+Attack-Schaden, plus ein Tiefenschloss als Rueckfall.
+
+
+## Neue Karte: „Petrifier" (v1085) — GEMEINSAMER Versteinerungs-Marker
+
+```
+Spell · Normal · Decay Magic Lv2
+Choose a target and Stun it for 3 turns. Damage a target Stunned by this
+effect would take becomes 0.
+```
+
+**★ DIE NULL HAENGT AM STUN, NICHT AN EINEM EIGENEN STATUS.** „a target
+STUNNED BY THIS EFFECT" — laeuft die Betaeubung aus, faellt die
+Unverwundbarkeit mit. Deshalb kein zweiter Status und kein eigenes
+Ablaufdatum: der Marker sitzt AM Stun.
+
+**★ DIE OPTIK GAB ES SCHON — unter einem karteneigenen Namen.**
+„Cardinal Beast Baihu" stempelte `_baihuPetrify`, und **vier Stellen**
+lasen genau diesen einen Namen: der Helden-Schadenspfad, der
+Kreaturen-Schadens-Batch, der Client-Filter (Held und Kreatur) und die
+CPU-Zielbewertung. Ohne Verallgemeinerung haette „Petrifier" an jeder
+dieser Stellen einen eigenen Zweig gebraucht — und die naechste
+Versteinerungs-Karte wieder.
+
+Seit v1085 ist **`_petrified` der gemeinsame Name**. Baihu setzt ihn
+mit; `_baihuPetrify` bleibt daneben stehen, damit laufende Spielstaende
+nicht brechen. Bei Kreaturen kommt er als Begleitzaehler
+(`counters._petrified`), weil Kreaturen-Status blosse Praesenz-Flaggen
+sind.
+
+**★ FALLE, IN DIE ICH GELAUFEN BIN: ich habe die Immunitaet zuerst NEU
+GEBAUT.** Meine Fassung sass direkt hinter `damage_proof` — die
+vorhandene Baihu-Pruefung stand 500 Zeilen weiter unten in derselben
+Funktion. Zwei Stellen, die dasselbe tun, waeren genau die Dublette, die
+beim naechsten Regelwechsel auseinanderlaeuft. Zurueckgenommen und die
+VORHANDENE Stelle verallgemeinert.
+
+**Aufraeumen:** beim HELDEN faellt der Marker automatisch mit dem
+Status (er sitzt auf dem Statusobjekt). Bei der KREATUR musste er
+ausdruecklich mitgeloescht werden — sonst bliebe sie dauerhaft
+unverwundbar und grau, obwohl die Betaeubung laengst vorbei ist. Ein
+Testfall prueft genau diesen Ablauf.
+
+**True Damage geht durch**, gleiche Abgrenzung wie bei `damage_proof`.
+
+
+## Neue Karte: „Teleportal" (v1084)
+
+```
+Spell · Normal · Magic Arts Lv1
+Search your deck for a card and place it openly in front of you. At the
+beginning of your next turn, add it to your hand. If this is the first
+Spell you use this turn, this counts as an additional Action.
+```
+
+**„Openly in front of you"** ist dieselbe offene Zone wie bei „Elixir of
+Immortality" (Al 14.9.): `ps.permanents` plus eine getrackte Instanz in
+der Zone `'permanent'`.
+
+**★ ABER DIE ABGELEGTE KARTE IST NICHT TELEPORTAL SELBST**, sondern die
+GESUCHTE — und sie liegt dort nur als Zwischenstation. Der Eintrag
+traegt deshalb `teleportalUntil` (am Permanent) bzw.
+`counters._teleportalUntil` (an der Instanz). Ohne diesen Stempel waere
+sie optisch und im Zustand von einem dauerhaften Permanent nicht zu
+unterscheiden.
+
+**Abzeichen** (Als Vorgabe 14.9.): `.perm-tohand-badge` (➜✋) am
+Permanent, auf BEIDEN Seiten gerendert — der Gegner soll sehen, was da
+gleich auf die Hand kommt.
+
+**★ DER STEMPEL TRAEGT DIE ZIELRUNDE, NICHT EINEN COUNTDOWN**
+(`gs.turn + 1`). Ein Countdown muesste bei jedem Rundenwechsel
+heruntergezaehlt werden und geht verloren, wenn ein Effekt Runden
+ueberspringt — ein Testfall prueft genau den Fall (Rueckkehr auch nach
+vier uebersprungenen Runden).
+
+**„First Spell this turn"** ueber `inherentAction` in Funktionsform. Der
+Zaehler `ps.spellsPlayedThisTurn` wird vom Server ERHOEHT, BEVOR der
+Effekt laeuft — zum Pruefzeitpunkt steht er also noch auf 0, wenn
+Teleportal der erste Zauber ist.
+
+**★ SUCH-SPERRE: HANDGESETZT, mit Begruendung.** Die Autoerkennung sieht
+hier keinen bekannten Hand-Add-Weg — `takeFromPile` OHNE `toHand` (die
+Karte geht ja zunaechst in die offene Zone) und eine Runde spaeter der
+generische `actionAddCardToHand`, der bewusst NICHT als Deck-Suche
+zaehlt (Gruppe D). Der Ertrag IST aber eine Deck-Suche auf die Hand,
+also Gruppe A. Damit verschwindet Teleportal auch aus der Hinweisliste
+von `check-effect-source.js` — genau der Kreislauf, fuer den der Hinweis
+gebaut wurde.
+
+
+## ★ „Wie viel zahlen?" GEHOERT INS ML, nicht in die Karte (v1083)
+
+Al 14.9.: „Statt arbitraer die Haelfte zu zahlen, sollte die CPU per ML
+lernen, wann wie viel zu zahlen ist."
+
+**Meine erste Fassung von „Festive Werz" hatte eine handgeschriebene
+Regel (》hoechstens die Haelfte des Vorrats《). Die war nicht nur geraten,
+sondern SCHAEDLICH:** ein `cpuResponse('generic')` greift VOR dem
+Piloten — die Karte haette den Lernkanal dauerhaft blockiert und nie
+eine Kontrastgruppe erzeugt. Dieselbe Falle wie bei
+`cpuMeta.reactionHeuristic` (6.9.).
+
+**Der passende Kanal existiert schon: `ordinalPick` / `ordinalRules` —
+》FORM 3: ORDINAL (wie viel)《.** Er liest die Zahlenreihe aus den
+Optionsbeschriftungen und waehlt die Stufe, die der GELERNTEN Zielhoehe
+am naechsten kommt, **je Karte** getrennt (Als Ruling 24.8.: keine
+deckweiten 》You may《-Kanaele). `PP_OPTION_EXPLORE` streut im Training,
+damit Kontrast entsteht.
+
+**★ DIE KARTE MUSS NICHTS ANMELDEN — ABER ZWEI DINGE RICHTIG MACHEN:**
+
+1. **Jede Option braucht eine ZAHL in der Beschriftung.** Der Kanal
+   liest die erste Ziffer je Zeile; fehlt sie auch nur bei einer Option,
+   verstummt er komplett (`zahlen.some(x => x === null)` → null). „Pay
+   nothing" haette den ganzen Kanal abgeschaltet — es heisst deshalb
+   **„Pay 0 Gold"**.
+2. **Aufsteigend sortieren.** Der Rueckfall des Piloten ist
+   》letzte Option《 und meint dokumentiert 》all in《. Mit der Null am Ende
+   haette die CPU ohne Profil IMMER nichts gezahlt.
+
+**★ TESTFALLE:** das Profil haengt am **Engine-Cache**
+(`engine._deckProfileCache`), nicht am Spielerobjekt. Ein Profil an
+`ps._deckProfile` zu haengen sieht plausibel aus und wirkt nicht — der
+Kanal bleibt still und der Test beschuldigt die Karte.
+
+
+## Neue Karte: „Ethan, the Prodigy" (v1081)
+
+```
+Creature · Summoning Magic Lv1 · 50 HP   (banned)
+You may immediately summon this Creature as an additional Action when
+you use a Spell with an original level of 4 or higher. While this
+Creature is on the board, the levels of all Spells in both players'
+hands are reduced by 1 while in hand. You can only control 1 „Ethan,
+the Prodigy".
+```
+
+**★ „ORIGINAL LEVEL" IST HIER NICHT KOSMETIK.** Ethan senkt selbst
+Stufen — haette man den EFFEKTIVEN Wert genommen, koennte ein zweiter
+Ethan sich nie mehr ausloesen, sobald der erste liegt (und ein Lv4-Spell
+faellt unter die Schwelle, kaum dass Ethan wirkt). Gelesen wird deshalb
+`cardData.level` aus der Kartendatenbank, NICHT `effectiveCardLevel`.
+
+**Die Senkung nutzt `reduceCardLevel` + `globalReduceCardLevel: true`.**
+Das Flag hebt den Standardfilter auf, der sonst nur die eigene Seite
+beliefert — „both players' hands" verlangt genau das. `evalOpts.pileSide`
+markiert Auswertungen aus Deck, Ablage und Geloeschtem; dort gilt die
+Senkung nicht („while in hand", Ruin-Mourner-Muster). Und sie wirkt nur,
+solange Ethan im SUPPORT liegt — auf der Hand oder in der Ablage nicht.
+
+**Folge, die woertlich aus dem Text faellt:** je ein Ethan pro Seite
+ergibt **-2** in BEIDEN Haenden. „You can only control 1" begrenzt nur
+die eigene Seite.
+
+**★ `beforeSummon` IST KEIN HOOK**, sondern eine Karten-Funktion, die
+der Motor vor JEDER Beschwoerung dieser Karte aufruft; `false` bricht ab.
+Dadurch greift „You can only control 1" gegen die normale Beschwoerung
+UND gegen den Sofort-Weg, ohne dass beide es einzeln pruefen. Meine
+erste Fassung hatte sie faelschlich unter `hooks` gestellt — dort haette
+sie nie gefeuert.
+
+**★ TESTFALLE, wiederholt aufgetreten:** ein `promptGeneric`-Stub, der
+pauschal `{confirmed:true}` liefert, beantwortet die ZONEN-Abfrage nicht.
+Die Beschwoerung scheitert dann still an `undefined`-Koordinaten, und der
+Test beschuldigt die Karte. Stubs muessen JEDEN Prompt-Typ bedienen, den
+die Karte oeffnet.
+
+
+## Neue Karte: „Giant Exploding Skull" (v1079)
+
+```
+Creature · Destruction Magic / Summoning Magic Lv1 · 1 HP
+You may once per turn defeat this Creature. When this Creature is
+defeated by a Creature's effect or damage inflicted by a Creature's
+effect, defeat all Creatures on the board.
+```
+
+**★ DIE BEIDEN HAELFTEN GREIFEN INEINANDER: der Selbstmord IST ein
+Kreatur-Effekt** — naemlich der eigene (Al bestaetigt 14.9.). Wer den
+Schaedel per Knopfdruck sprengt, loest damit den Brett-Wischer aus; das
+ist der Zweck der Karte und kein Nebenweg. Der Selbstmord meldet sich
+deshalb mit dem EIGENEN Namen als Quelle an.
+
+**★ UND DAS WIRD END-TO-END GEMESSEN**, nicht ueber einen gebauten
+Todes-Kontext: der Pruefstand drueckt den Knopf und schaut, ob das Brett
+danach leer ist. Der erste Pruefstand hatte nur „die Sprengung laeuft"
+und „der Schaedel ist weg" gezeigt — beides waere auch dann gruen
+gewesen, wenn der AoE gar nicht zuendet. Dazu eine Gegenprobe im
+gleichen Aufbau: derselbe Tod durch einen SPELL laesst alles stehen.
+
+Die Einmal-pro-Runde-Grenze fuehrt die Engine selbst
+(`creature-effect:<instId>`), die Karte braucht keinen eigenen Zaehler —
+`creatureEffect: true` genuegt.
+
+**★ DIE ERKENNUNG IST DIE BREMSE DER KARTE.** Zwei Wege zuenden:
+* **Schaden** aus einem Kreatur-Effekt → Schadenstyp `'creature'`, so
+  setzt ihn „Exploding Skull" fuer genau diese Bedeutung;
+* **Zerstoerung** durch einen Kreatur-Effekt → die Quelle traegt den
+  Namen einer Karte vom Typ `Creature` (oder `Token`).
+
+**Alles andere zuendet NICHT** — Spell, Attack, Artefakt, Heldeneffekt
+sprengen den Schaedel wirkungslos. Genau das macht die Karte trotz
+Brett-Wischer spielbar; wer hier grosszuegig erkennt, baut eine ganz
+andere Karte. Vier Testfaelle halten die Nicht-Ausloeser einzeln fest.
+
+**„all Creatures on the board"** heisst BEIDE Seiten, auch die eigenen.
+**Zerstoerungs-Klammer** (v1057) drumherum: hier faellt nie nur eine
+Karte, „Enhanced Guard Dog" darf also nicht feuern.
+
+**CPU:** bewusst KEINE pauschale Zusage — der Knopf raeumt auch das
+eigene Brett ab. Sie zuendet nur, wenn der Gegner mehr Kreaturen
+verliert als sie selbst.
+
+
+## Neue Karte: „Sas'Za, the Snaka Adventurer" (v1078)
+
+```
+Hero — Adventurousness / Hunting · 450 HP / 80 ATK   (banned)
+Up to 3 times per turn, when a Creature is defeated by its opponent's
+card or effect, draw cards equal to that Creature's level. You may add
+your Creatures that are defeated by an opponent's card or effect back to
+your hand instead of sending them to the discard pile.
+```
+
+**★ DER TEXT SIEHT SYMMETRISCH AUS, IST ES ABER NICHT.** Das ist die
+ganze Schwierigkeit dieser Karte:
+
+| Haelfte | Wortlaut | Reichweite |
+|---|---|---|
+| Ziehen | „when **A** Creature is defeated by **ITS** opponent's …" | JEDE Kreatur, gemessen an IHREM eigenen Gegner |
+| Auf die Hand | „**YOUR** Creatures … by **AN OPPONENT's** …" | nur eigene, nur vom Gegner erledigt |
+
+Al 14.9. ausdruecklich: „Der Draw-Effekt triggert auch fuer GEGNERISCHE
+Creatures, wenn sie vom Sas'Za-Spieler besiegt werden." Sas'Za zieht
+also **in beide Richtungen** — wenn der Gegner eigene Kreaturen
+abraeumt UND wenn der eigene Spieler gegnerische abraeumt. Ein eigenes
+Opfer (Sacrifice) gibt dagegen nichts, weder Karten noch Rueckholung.
+
+**„Up to 3 times per turn" gehoert dem ZIEHEN**, nicht dem
+Handrueckholen — der Nebensatz steht im ersten Satz. Gezaehlt werden
+AUSLOESUNGEN, nicht gezogene Karten: eine Stufe-3-Kreatur zieht drei
+Karten und verbraucht trotzdem nur eine der drei Gelegenheiten.
+
+**★ ZWEI VERSCHIEDENE HOOKS, mit Absicht:**
+* `onCreatureDeathClaim` fuer das Handrueckholen — das Anspruchsfenster
+  laeuft VOR der Ablage (v679b), die Karte macht dort also keinen
+  Zwischenstopp, weder sichtbar noch im Zustand. Anspruch per
+  `_deathClaim` stempeln, Hunting-Muster. Ein FRUEHERER Anspruch
+  gewinnt.
+* `onCreatureDeath` fuer das Ziehen — erst wenn der Tod feststeht, sonst
+  zoege man fuer eine Kreatur, die ein Anspruch noch wegschnappt.
+
+
+## Neue Karte: „Santa Klaus" (v1076)
+
+```
+Hero — Divinity / Infiltration · 400 HP / 40 ATK
+Whenever this Hero uses an Attack or Spell, you must add 2 cards from
+your hand to your opponent's hand.
+```
+
+**★ EIN PFLICHT-PREIS BRAUCHT EINE SPIELBARKEITS-SPERRE** (Al 14.9.:
+„He cannot act while the player has fewer than 2 cards in hand, not
+counting the card used for the Action"). Ohne sie koennte Santa einen
+Zauber wirken, dessen „must"-Kosten danach nicht zu bezahlen waeren.
+
+Umgesetzt ueber den vorhandenen Helden-Riegel **`canPlayCard`** in
+`validateActionPlay`.
+
+**★ `canPlayCard` HAT SEIT v1077 EIN SECHSTES ARGUMENT: die HERKUNFT.**
+
+```js
+canPlayCard(gs, pi, heroIdx, cardData, engine, { handIndex, fromHand, fromCreation })
+```
+
+Die Schwelle haengt daran, ob die Karte ueberhaupt von der Hand kommt:
+
+| Herkunft | noetige Handkarten | warum |
+|---|---|---|
+| von der HAND | **3** | die gespielte Karte liegt noch mit drin und ist keine Reserve |
+| NICHT von der Hand (Coolness-Stack, Bifab, Ability-Aktion wie Adventurousness) | **2** | die Hand ist unangetastet |
+
+Die Angabe stammt aus dem `handIndex`, den `validateActionPlay` ohnehin
+bekommt — sie war da, wurde nur nicht weitergereicht. Der Parameter ist
+rein additiv; bestehende `canPlayCard`-Fassungen ignorieren ihn.
+
+**Ohne Herkunftsangabe** (aeltere Aufrufer) nimmt Santa den Hand-Fall an
+— die strenge Richtung, weil ein unbezahlbarer „must" schlimmer waere
+als eine zu strenge Sperre.
+
+Nur Attacks und Spells sind gesperrt. Eine Kreatur zu beschwoeren oder
+eine Ability anzulegen loest den Preis nicht aus und darf deshalb auch
+nicht blockiert werden; ein Testfall haelt alle vier anderen Kartentypen
+frei.
+
+**Der Preis haengt an `afterSpellResolved`**, nicht an `onActionUsed`:
+der Hook feuert nur, wenn die Karte WIRKLICH aufgeloest hat — ein
+negierter Zauber kostet also nichts — und deckt ausdruecklich auch die
+Sonderwege ab (zusaetzliche, freie, sofortige und Ersatz-Aktionen).
+Dieselbe Wahl wie bei „Pharaoh, the Lone Living Being", der denselben
+Textbaustein traegt; dessen Kopf begruendet sie ausfuehrlich.
+
+Gegeben wird ueber `actionTransferCardToOppHand` (Chatty-Town-Guard-Weg),
+das die Handsperren der Gegenseite mittraegt. Der Spieler waehlt selbst,
+die Abfrage ist `cancellable: false`.
+
+
+## Neue Karte: „Ricochet" (v1075)
+
+```
+Attack · Normal · Fighting Lv2
+Both players take turns choosing targets their opponent controls that
+have not been chosen with this effect yet until a player cannot choose a
+new target. You choose first. The first target takes damage equal to the
+attacker's Attack stat. Every subsequent target takes half as much
+damage as the previous one (rounded up).
+```
+
+**★ DIE WAHL SPRINGT ZWISCHEN DEN SEITEN.** „targets THEIR OPPONENT
+controls" gilt je WAEHLER: der Angreifer waehlt auf der Gegenseite, der
+Gegner danach auf der Angreiferseite, und so weiter. Das ist der
+Namensgeber der Karte und leicht zu ueberlesen — es steht NICHT „targets
+YOUR opponent controls". Ein Ziel kann ueber beide Seiten hinweg nur
+EINMAL gewaehlt werden.
+
+Die Wahl ist **nicht abbrechbar**: „until a player CANNOT choose" kennt
+kein Aussteigen, nur „keine Ziele mehr".
+
+**Erst alles waehlen, dann schiessen.** Der Kartentext listet die
+Zielwahl vollstaendig auf, bevor er vom Schaden spricht — und ein
+Querschlaeger, der die ganze Kette entlangspringt, passt auch besser als
+Wahl-Schuss-Wahl-Schuss. Verschwindet ein Ziel dazwischen, faellt nur
+DIESER Treffer aus; die Halbierung laeuft weiter, denn sie haengt an der
+POSITION in der Kette, nicht am Erfolg des Vorgaengers.
+
+**★ EIGENSCHAFT, BEIM TESTEN AUFGEFALLEN: die Kette ist nie kuerzer als
+2.** Der ANGREIFER selbst ist fuer den Gegner ein gueltiges Ziel — und
+er muss leben, sonst spielt er die Karte nicht. Ricochet trifft also
+faktisch IMMER mehrere Ziele und ist damit immer ein Flaechenschlag.
+Mein erster Testfall wollte den Einzelziel-Fall pruefen und war schlicht
+nicht konstruierbar.
+
+**Flaechenklammer** wie „Chain Lightning" („springt zwar von Ziel zu
+Ziel, ist aber EINE Quelle ueber die ganze Kette") — „Interference"
+schuetzt dagegen.
+
+**Animation** (Al 14.9.): die Flintlock-Kugel, die von Ziel zu Ziel
+springt. Der erste Flug geht vom Helden aus, jeder weitere vom
+vorherigen EINSCHLAG. **Der Klang kommt von selbst** —
+`play_projectile_animation` spielt je Flug `sfx || 'projectile'`, „mit
+einem Sound jedes Mal" ist also nichts Zusaetzliches.
+
+
+## Neue Karte: „The Thing in the Ship" (v1073)
+
+```
+Creature · Normal · Decay Magic / Summoning Magic Lv2 · 100 HP
+While this Creature remains on the board, neither player can activate
+the active effects of their Abilities.
+```
+
+Vertrag: **`blocksAbilityActivation: true`** — mehr steht nicht in der
+Karte. Die Arbeit macht `engine.abilityActivationBlocked()`.
+
+**★ WAS EIN „AKTIVER EFFEKT" IST** (Al 14.9.: „solche wie Alchemy,
+Charme etc.") steht nicht in den Kartendaten, sondern an der Bauform des
+Skripts:
+
+```js
+GameEngine.abilityHasActiveEffect(script)
+// true bei `onFreeActivate` (Alchemy, Charme, Trade …)
+//      oder `onActivate`     (Adventurousness)
+```
+
+Passive Abilities (Toughness, Resistance, Interference) haben nur
+`hooks` und bleiben unberuehrt — sie werden ja auch nicht „aktiviert".
+Heute trifft die Sperre **18 der 41** Abilities.
+
+**★ `actionCost` ALLEIN REICHT NICHT ALS MERKMAL** — es bedeutet nur
+„kostet eine Aktion" und traegt genau EINE Ability (Adventurousness);
+Alchemy und Charme sind FREIE Aktivierungen und waeren durchs Netz
+gefallen. Ein Testfall haelt beide Zahlen (1 gegen 18) fest, damit die
+Abkuerzung nicht irgendwann doch genommen wird.
+
+**Es zaehlt aber MIT** (Als Vorgabe 14.9.: „Auch Action-Cost zaehlt als
+aktiver Effekt"). Heute ist das redundant — Adventurousness hat ohnehin
+`onActivate` —, aber es faengt kuenftige Karten ab, die eine Aktion
+kosten und ihren Effekt anders umsetzen.
+
+**★ VERHAELTNIS ZU „Ragnarock" (Als Nachfrage 14.9.): KEINE Dublette.**
+Ragnarock stellt dieselbe Frage zu einem anderen Zeitpunkt. Es reagiert
+auf eine LAUFENDE Aktivierung und liest dafuer den Ketten-Marker
+`fromBoard: true`, den die beiden Aktivierungswege setzen — die
+praezisere Auskunft im Moment des Geschehens. `abilityHasActiveEffect`
+fragt VORHER („darf ueberhaupt aktiviert werden?"). Ragnarock bleibt
+deshalb unveraendert.
+
+**Die beiden Mengen muessen aber deckungsgleich sein**, und das wird
+GEMESSEN statt behauptet: ein Testfall geht den ganzen Kartenbestand
+durch und weist nach, dass nichts, was der Server aktivieren laesst
+(`freeActivation` + `onFreeActivate` bzw. `actionCost` + `onActivate`),
+durch `abilityHasActiveEffect` faellt.
+
+**Vorrang statt Konflikt:** liegt „The Thing in the Ship", kommt es gar
+nicht erst zu einer Aktivierung — Ragnarock hat dann nichts, worauf es
+reagieren koennte.
+
+**Acht Listen-Tore plus zwei harte Server-Sperren.** Die Engine-Listen
+sind nur die Oberflaeche — ohne die Sperre in `doActivateFreeAbility`
+und `doActivateAbility` liesse sich die Aktivierung per Socket-Nachricht
+trotzdem ausloesen.
+
+**„neither player"**: der Riegel fragt nur, OB so eine Kreatur auf dem
+Brett liegt, nicht wem sie gehoert. Verdeckte Surprises zaehlen nicht.
+**„while … remains"**: rein zustandsgebunden, keine Hooks, kein
+Aufraeumen — verlaesst sie das Brett, ist die Sperre im selben Moment
+weg.
+
+**★ FALLE: DER LOADER WARF DIE KARTE WEG.** Ihr ganzer Inhalt ist EIN
+Flag — keine Hooks, keine Effekte. Genau die Klasse, die der
+„has no hooks, effects, or card type flags"-Filter still verwirft; der
+einzige Hinweis war eine Warnzeile in der Konsole, und die Karte wirkte
+schlicht nie. Neue ZUSTANDS-Vertraege muessen in dieser Filterliste
+eingetragen werden (dort stehen aus demselben Grund schon
+`onIdentityExpire`, `ascensionCondition`, `heroRedirect` …).
+
+
+## ★ Such-Sperre: Nachzuegler und die Kreaturen-Zusicherung (v1072)
+
+**Automatische Einordnung neuer Karten** (Al 14.9.). Die Einordnung
+passiert im Loader und greift von selbst, sobald eine Karte ihr Skript
+bekommt — vorausgesetzt, sie benutzt die Standard-Wege
+(`searchDeckForNamedCard`, `actionAddCardFromDeckToHand`,
+`addCardFromDiscardToHand` oder `takeFromPile({ toHand: true })`).
+
+Damit man SIEHT, wenn eine neue Karte NICHT angekommen ist, meldet
+`check-effect-source.js` jetzt zusaetzlich einen Hinweis: alle Karten,
+deren TEXT eine Suche verspricht, die aber keine der beiden Flaggen
+tragen. **Bewusst nur ein Hinweis, kein Fehler** — Side Deck (Divine
+Gift of Edge), Add aufs BRETT statt auf die Hand (Gold Trap, Capture
+Net) und Kosten-statt-Ertrag (Kitsune Transformation) sind legitime
+Gruende.
+
+**★ KREATUREN STEHEN NUR IN DER LISTE, SIE SIND NIE GESPERRT.** Die
+breitere Erkennung (v1071) flaggt auch Kreaturen; das Tor
+`_cardBlockedBySearchLock` nimmt sie ausdruecklich aus, und die
+Ausgrau-Liste des Servers baut auf genau dieser Funktion auf. Ein
+Testfall prueft das nicht als Behauptung, sondern misst es: er holt ALLE
+geflaggten Kreaturen aus `cards.json` und weist nach, dass keine einzige
+gesperrt ist — plus eine Gegenprobe, dass eine Nicht-Kreatur mit
+derselben Flagge sehr wohl gesperrt ist.
+
+
+## ★ Statt Sonderfall: der Standard lernt die Form (v1071)
+
+Al 14.9.: „Sollte man dann nicht die Karten so umbauen, dass sie
+Standard-Systeme nutzen und also detektierbar sind?" — ja, aber der
+Umbau ging in die andere Richtung als gedacht.
+
+**Warum die Karten ihren eigenen Weg gehen:** „Shooting Star" holt per
+`takeFromPile` und legt selbst auf die Hand, weil Hin- und Rueckflug
+sich kreuzen sollen (v893, Als eigene Vorgabe). Der fertige Helfer kann
+das nicht. Die Karte auf ihn zu zwingen haette die Animation
+zurueckgebaut.
+
+**Also lernt der Standard die Form:** `takeFromPile(..., { toHand: true })`.
+Die Absicht steht damit am Aufruf, der Riegel bleibt zentral, und die
+Animation bleibt.
+
+```js
+// v1071 in takeFromPile:
+if (opts.toHand && this._isSearchBlocked(pi, opts, pile === 'discard' ? 'discard' : 'deck')) return null;
+```
+
+Ein Griff ins Deck OHNE `toHand` (Beschwoerung, Mill, Coolness-Stack)
+bleibt unberuehrt — das ist der ganze Zweck der Unterscheidung.
+
+**★ DIE EIGENTLICHE URSACHE LAG TIEFER: die Erkennung sah nur Module mit
+`resolve`.** Karten, die ihren Effekt ueber `hooks.onPlay` umsetzen
+(Shooting Star, Aurora Borealis, Bifab), wurden nie angesehen. Deshalb
+brauchten sie zunaechst handgesetzte Flaggen, obwohl ihre Quelle die
+Suche klar zeigt. Seit die Erkennung auch `hooks.onPlay` prueft, fallen
+alle drei Handflaggen weg.
+
+**⚠ DIESELBE LUECKE STECKT NOCH IN `detectDrawOnly`** (nur `mod.resolve`).
+Bewusst NICHT mitgeschlossen: das wuerde Karten unter dem Hand-Lock neu
+sperren, die es heute nicht sind — eine Verhaltensaenderung, die Al
+entscheiden sollte, keine Fehlerbehebung.
+
+**Nebenwirkung, harmlos aber sichtbar:** die breitere Erkennung flaggt
+jetzt auch einige KREATUREN (Harpyformer, Deepsea Witch, Soul Shard Ren
+…). Das Tor nimmt Kreaturen ausdruecklich aus (gleiche Begruendung wie
+beim Zieh-Lock), die Flagge ist dort also wirkungslos — ein Testfall
+haelt das fest.
+
+
+## ★ Such-Sperre: die vier Gruppen (v1070, Als Rulings 14.9.)
+
+Al hat die Frage „gilt das immer?" in vier Gruppen entschieden:
+
+| Gruppe | was die Karte tut | Folge |
+|---|---|---|
+| **A** | sucht im **DECK**, Suche ist der ganze Ertrag — auch mit Kosten/Nachteil daneben | unspielbar unter der **schwachen** Sperre |
+| **B** | sucht in der **ABLAGE** | unspielbar unter der **starken** Sperre |
+| **C** | legt gar nicht auf die HAND (Masterpiece → Surprise-Zone, Prophecy of Coolness → Coolness-Stack, Teleportal → vor sich hin) | **nicht betroffen** |
+| **D** | Add aus BRETT oder GEGNERHAND (Capture Net, Kidnapping, Secret Entrance, Loot the Leftovers, Gold Trap) | **nicht betroffen** |
+
+**★ KOSTEN SIND KEIN ERTRAG — und ein syntaktischer Erkenner sieht das
+nicht.** Die Autoerkennung schliesst jede Karte aus, die neben der Suche
+noch etwas tut. Bei „Angry Cheese" (100 Eigenschaden), „Sickly Cheese"
+(Gift) und „Nerdy Cheese" (loescht erst einen Spell) ist das andere aber
+eine KOSTE bzw. ein NACHTEIL: unter der Sperre zahlt man und bekommt
+nichts. Diese Faelle bekommen ein **manuelles** `blockedBySearchLock`,
+das im Loader gewinnt.
+
+**★ FUER GRUPPE D MUSSTE DAS TOR ZURUECK.** `actionAddCardToHand` sah
+aus wie ein Such-Weg, ist aber der GENERISCHE — „Gold Trap" holt damit
+eine Kreatur vom BRETT. Die Sperre sitzt jetzt nur noch an den wirklich
+quell-gebundenen Wegen (`searchDeckForNamedCard`,
+`actionAddCardFromDeckToHand` fuer das Deck,
+`addCardFromDiscardToHand` fuer die Ablage), und `actionAddCardToHand`
+ist auch aus den Erkennungsmustern raus.
+
+**★ OFFENE LUECKE, ehrlich vermerkt: `takeFromPile` + eigener
+Hand-Push.** Mehrere Karten (Aurora Borealis, Magic Sapphire, Shooting
+Star, Bifab) holen die Karte per `takeFromPile` und legen sie selbst auf
+die Hand — an ALLEN Toren vorbei. Die Sperre kann sie zur Laufzeit also
+nicht aufhalten. Abgefangen wird das hier ueber die
+Spielbarkeits-Flagge: wer die Karte gar nicht spielen kann, laeuft auch
+nicht in die Luecke. Sauberer waere, diese Karten auf die Helfer
+umzustellen; das ist als Schuld vermerkt.
+
+**Stand v1070:** 19 Deck-Sucher, 7 Ablage-Sucher. **Nicht eingeordnet**,
+weil sie noch kein Skript haben oder zu verschachtelt sind: Brainstorming,
+Cleansing of the Land, Crushing Defeat, Grasp the Future, Kidnapping,
+Masterpiece, Secret Entrance, Teleportal, The Second Circle of Hell,
+Ultimate Weapon Experiment, Kitsune Transformation, Tanuki Escape,
+Bifab, Divine Gift of Edge (Side Deck).
+
+
+## ★ Unter Such-Sperre: reine Such-Karten sind UNSPIELBAR (v1069)
+
+Al 14.9.: „Karten, die NUR suchen (etwa Magnetic Potion), sollen gar
+nicht erst spielbar sein. Draw-Lock sorgt da schon fuer."
+
+Zwei automatisch erkannte Modul-Flaggen, Bauform von `detectDrawOnly`:
+
+| Flagge | Karte sucht nur im … | gesperrt ab |
+|---|---|---|
+| `blockedBySearchLock` | **Deck** | schwacher Stufe |
+| `blockedBySearchLockDiscard` | **Ablagestapel** | starker Stufe |
+
+**★ WARUM ZWEI FLAGGEN:** die schwache Sperre laesst den Ablagestapel
+offen. Eine Karte, die nur dort sucht („Elixir of Mana", „Boomerang"),
+bleibt darunter voll spielbar und darf NICHT ausgegraut werden. Mit
+einem einzigen Flag waere das nicht ausdrueckbar gewesen — meine erste
+Fassung hatte genau diesen Fehler.
+
+**★ ZWEI FEHLKLASSIFIKATIONEN der ersten Fassung**, beide beim
+Durchsehen der Trefferliste gefunden:
+* **Misfire** negiert ein Artefakt — `negateChainLink` fehlte in der
+  Ausschlussliste;
+* **Shard of Chaos** loescht Handkarten — die Loesch-Aufrufe fehlten
+  ebenfalls.
+
+Beide waeren unter der Sperre faelschlich unspielbar geworden. **Die
+Trefferliste einer Autoerkennung IMMER durchlesen**, statt nur die
+Gesamtzahl zu pruefen: eine zu grosse Liste macht Karten tot, und das
+faellt im Spiel erst auf, wenn jemand sie spielen will.
+
+Eine Karte, die AUCH zieht, bleibt spielbar — ihr Zieh-Teil wirkt
+weiter. Kreaturen sind ausgenommen, gleiche Begruendung wie beim
+Zieh-Lock: Koerper, HP und Trigger ueber den Such-Effekt hinaus.
+
+Verdrahtet an denselben fuenf Stellen wie `blockedByDrawLock`:
+`validateActionPlay`, die Ability-Aktivierungsliste, beide
+Server-Validierungen, die Ausgrau-Liste `searchLockBlockedCards` im
+Sync und die Handkarten-Optik im Client.
+
+
+## Neue Karte: „Cats of the Pharaoh" (v1068) — NEUE SPIELER-SPERRE
+
+```
+Creature · Normal · Summoning Magic Lv1 · 10 HP
+At the start of your turn, if you control no Creatures, you may summon
+this Creature from your discard pile as an additional Action, but if you
+do, you cannot search or add cards to your hand for the rest of the turn
+afterwards (but you can still draw).
+```
+
+**★ DRITTE HAND-SPERRE, und die genaue Ergaenzung zu den beiden
+vorhandenen:**
+
+| Flagge | sperrt Draws | sperrt Suchen/Adds |
+|---|---|---|
+| `handLocked` | ja | ja |
+| `drawLocked` (Sacred Jewel) | ja | nein |
+| **`searchLocked`** (v1068) | **nein** | **ja** |
+
+Genau diese Kombination fehlte. Der Riegel sitzt in
+`_engine.js#_isSearchBlocked(pi, opts, quelle)`; die Karte setzt nur das
+Flag. Zurueckgesetzt wird es am Zugwechsel, neben `drawLocked`.
+
+**★ ZWEI STUFEN, weil „Siege" die staerkere braucht** (Al 14.9.: „aber
+eine staerkere Version, die den Discard einschliesst"):
+
+```js
+ps.searchLocked = true;                  // Deck-Suche und Adds
+ps.searchLockedIncludesDiscard = true;   // zusaetzlich der Ablagestapel
+```
+
+Cats setzt bewusst nur die erste — sein Ablagestapel bleibt offen.
+
+**★ FALLE BEIM VERDRAHTEN, einmal hineingetappt:** `addFromPileToHand`
+sieht aus wie das Tor fuer „aus der Ablage auf die Hand", ist es aber
+nicht — fuer `pile === 'discard'` **delegiert es vorher** an
+`addCardFromDiscardToHand` und erreicht seine eigene Pruefung nie. Der
+Riegel gehoert in die zweite Methode. Der Test fand das sofort; wer nur
+die offensichtliche Stelle belegt, baut eine Sperre, die still nicht
+greift.
+
+**„but if you do"** — der Preis faellt NUR bei geglueckter Beschwoerung
+an. Lehnt der Spieler ab oder scheitert ein Gatter, bleibt die Sperre
+aus und die Karte liegt weiter in der Ablage (Thep-Muster: bei
+abgelehnter Beschwoerung zurueck in den Stapel, damit niemand still eine
+Karte verliert).
+
+**„if you control no Creatures"** zaehlt ueber `controller`, nicht
+`owner` — eine per Cross-Side-Platzierung in der Gegnerspalte liegende
+eigene Kreatur zaehlt mit. Verdeckte Surprises zaehlen nicht.
+
+**Oberflaeche:** beide Flaggen gehen im Sync mit, und der Client zeigt
+ein eigenes Abzeichen, das ausdruecklich nennt, ob der Ablagestapel
+mitgesperrt ist — das ist der einzige sichtbare Unterschied der starken
+Stufe.
+
+**★ TESTFALLE:** eine ERLAUBTE Deck-Suche oeffnet ein Aufdeck-Fenster.
+Ohne `promptGeneric`-Stub wirft der Aufruf, und weil die Suite in einer
+async-Kette lief, brach sie ab diesem Punkt STILL ab — die restlichen
+Faelle sahen aus, als gaebe es sie nicht. Seitdem faengt der Pruefstand
+`unhandledRejection` ab und meldet es laut.
+
+
+## ★ „Vom Gegner getroffen": EIN Helfer, vier Wege (v1067)
+
+Al 14.9.: „Warum dann nicht das Buff-System so erweitern, dass die
+Quelle immer mitgegeben wird? … Es gibt ziemlich sicher schon andere
+Effekte, die auf jeden Hit reagieren — da muss auch das neue
+On-Buff-System benutzt werden."
+
+**Beides stimmte.** „Charm of Balance" traegt woertlich denselben
+Trigger wie „The Stormblade" („Whenever that Hero is affected by an
+opponent's card or effect") und lauschte nur auf ZWEI der vier Wege —
+Schaden und Status. **Gegnerische Heilungen und Buffs liefen daran
+vorbei**, obwohl der Kartentext sie einschliesst.
+
+**`cards/effects/_affected-shared.js`** ist jetzt die einzige Stelle,
+die die vier Hook-Formen kennt:
+
+```js
+const { trefferHooks } = require('./_affected-shared');
+...trefferHooks(holeHeld, async (ctx, verursacher) => { … })
+```
+
+| Weg | Hook | feuert |
+|---|---|---|
+| Schaden | `afterDamage` | Schaden ist gelandet |
+| Heilung | `afterHeal` | Heilung ist gelandet |
+| Status | `onStatusApplied` | Status liegt an |
+| Buff | `afterBuff` | Buff liegt an (v1066 neu) |
+
+Jeder Hook liefert Ziel und Quelle in einer ANDEREN Form; wer den
+Trigger nachbaut, muss die Formen nicht mehr kennen. Beide Karten
+benutzen den Helfer, koennen also nicht wieder auseinanderlaufen.
+
+## ★ QUELLE IST PFLICHT — und ein Waechter haelt das (v1067)
+
+Die Lücke war messbar: von 14 `actionAddBuff`-Aufrufen gab genau EINER
+eine Quelle mit. Ohne sie kann kein „affected by an OPPONENT's card or
+effect"-Effekt entscheiden, ob er ausloesen darf — und schweigt dann
+lieber, was den Kartentext still unvollstaendig macht.
+
+**Nachgeruestet:** alle 14 Buff-Aufrufe (`sourceOwner`) und die
+verbliebenen Status-Aufrufe ohne Quelle (`appliedBy`). Bei Status war
+die Lage besser als befuerchtet — 77 von 95 hatten sie schon.
+
+**`scripts/check-effect-source.js`** verlangt sie ab jetzt bei jedem
+Helden-Buff und -Status. `source: 'Kartenname'` genuegt NICHT: daraus
+folgt keine Seite. Durchreicher (`...opts`) und generische Trichter
+stehen in einer benannten Ausnahmeliste.
+
+**★ ZWEI FEHLER IM WAECHTER SELBST, beide beim ersten Lauf gefunden:**
+1. Die Kurzschreibweise `appliedBy,` (ohne Doppelpunkt) galt als
+   „keine Quelle" — vier Fehlalarme.
+2. Die Zeilennummern zeigten auf unbeteiligten Code, weil das
+   Kommentar-Strippen die Positionen verschob. Jetzt werden Kommentare
+   durch gleich lange Leerzeichen ersetzt, damit die Offsets stimmen.
+   **Ein Waechter, der die falsche Zeile nennt, schickt die Suche in
+   die Irre und ist schlimmer als keiner.**
+
+**Feinheit bei Anti Magic:** bei der AUFFRISCHUNG des `magic_immune`-
+Buffs ist die Quelle nicht der Held-Besitzer, sondern der urspruengliche
+Wirker — er steht am Zaehler `antiMagicCastBy`. Neuer Helfer
+`highestRemainingCastBy` waehlt ihn nach DERSELBEN Instanz wie
+`highestRemainingLevel`, damit Stufe und Wirker zusammenpassen. Ohne das
+saehe „Charm of Balance" eine Auffrischung der EIGENEN Anti Magic als
+Gegner-Treffer.
+
+
+## „The Stormblade" ausgebaut (v1066) — war nur ein STUB
+
+Die Datei trug bis dahin allein `equipOwnSideOnly`; der gesamte Effekt
+fehlte. **Beim Abarbeiten einer Kartenliste also zuerst pruefen, ob eine
+vorhandene Datei die Karte wirklich implementiert** — eine Datei zu
+finden heisst nicht, dass es den Effekt gibt.
+
+**★ „These draw effects cannot be prevented" schliesst den
+SPIELER-STATUS ein** (Als Ruling 14.9.), nicht nur abfangende
+Karteneffekte. Der Vertrag dafuer existiert:
+`actionDrawCards(..., { _unpreventable: true })` umgeht `handLocked`,
+`drawLocked` UND den `BEFORE_DRAW_BATCH`-Hook, ueber den Karten wie
+Intrude eine Ziehung abfangen. „Champion, the Stormbringer" benutzt ihn
+fuer dieselbe Textzeile.
+
+**★ „HITS … WITH A CARD OR EFFECT" = ALLES, was den Helden erreicht**
+(Als Ruling 14.9.): Schaden, Heilung, Buffs, Debuffs — nicht nur
+Schaden. Vier Hooks, die erst feuern, wenn etwas WIRKLICH angekommen
+ist: `afterDamage` · `afterHeal` · `onStatusApplied` · `afterBuff`.
+
+**NEU: `afterBuff` (v1066).** Fuer Buffs gab es nur das abbrechbare
+`BEFORE_HERO_EFFECT` — wer dort lauscht, zaehlt auch Buffs mit, die
+spaeter noch abgebrochen werden. Der neue Hook ist das Gegenstueck zum
+vorhandenen `afterHeal` und feuert, wenn der Buff liegt.
+
+**★ GRENZE: `actionAddBuff` nimmt KEIN Quellen-Argument** (der Kommentar
+in der Kreatur-Fassung sagt das ausdruecklich). Ein Buff loest den Sturm
+deshalb nur aus, wenn der Aufrufer `opts.sourceOwner` / `opts.source`
+mitgibt. Bewusst diese Richtung: lieber einmal NICHT ausloesen als beim
+eigenen Staerkungszauber.
+
+**Bei leerer Hand loest die Karte gar nicht aus** (Als Ruling 14.9.) —
+nicht „mischt nichts und zieht null".
+
+Der Zyklus selbst ist der Weg von „Elana, the Rocky Rebel", inklusive
+ihrer beiden teuer gelernten Feinheiten: `shuffleBackEligibleHandCards`
+filtert Hatusbal-gesperrte Karten und gezogen wird, was TATSAECHLICH
+zurueckging; Karten aus dem POTION-Deck werden auch von dort
+nachgezogen. Dazu ein Re-Entranz-Riegel — der Zyklus zieht Karten, und
+Ziehen kann Effekte ausloesen, die den Helden treffen.
+
+**★ TESTFALLE, einmal hineingetappt:** „nach dem Zyklus sind alle
+Handkarten neu" ist KEINE gueltige Zusicherung. Die Hand wird
+ZURUECKGEMISCHT und kann dieselben Karten wieder ziehen — der Test
+schlug zwischen Laeufen mal an, mal nicht. Belastbar ist die BILANZ:
+Hand wieder gleich gross, Deck gleich gross, Hand+Deck dieselbe
+Kartenmenge wie vorher.
+
+
+## Neue Karte: „Life Serum" (v1064) — inkl. cards.json
+
+```
+Potion · Normal
+Choose any target on the board and increase its current and max HP by 150.
+```
+
+**v1065 (Als Balanceaenderung 14.9.):** Life Serum 200 → **150**,
+Healing Potion 200 → **250**. Beide Betraege stehen jetzt als EINE
+benannte Konstante im Skript (`HP_GAIN` / `HEAL_AMOUNT`) — bei Healing
+Potion lag der Wert vorher als Literal an VIER Stellen (Beschreibung,
+Helden-Heilung, Kreaturen-Heilung, Log). Genau so entsteht eine Karte,
+deren angezeigter Text nicht mehr zu ihrer Wirkung passt; ein Testfall
+haelt beides jetzt gegeneinander.
+
+**cards.json geaendert:** Subtyp **Reaction → Normal**, und der alte
+Text („Play this card immediately when either player activates a
+Potion…") ist ersetzt. Die Karte ist damit eine normale Potion mit
+Zielwahl, kein Reaktionsfenster mehr.
+
+**★ DIE ARBEIT MACHT `engine.increaseMaxHp(ziel, HP_GAIN)`** — der Helfer
+deckt BEIDE Zielarten ab und kennt die Feinheiten, die man von aussen
+leicht falsch macht:
+
+* **Helden:** `maxHp` UND `hp` steigen, und `maxHpCapped` wird beachtet.
+  Der Helfer meldet zurueck, wie viel wirklich ankam — bei einer
+  Deckelung auch 0.
+* **Kreaturen:** `counters.maxHp` / `counters.currentHp` statt der
+  Kartendaten, und zwar BEIDE um den vollen Betrag. Das ist Absicht und
+  traegt den Nao-Ueberheil-Fall: `currentHp` darf `maxHp` uebersteigen.
+
+Ein eigener Rechenweg in der Karte waere genau die Dublette, die bei der
+naechsten HP-Regel ausschert.
+
+**★ KEIN Ausschluss der rundengeschuetzten Seite**, anders als bei der
+Vorlage „Acid Vial". Der Erstrundenschutz haelt SCHADEN ab; hier wird
+niemand angegriffen, sondern beschenkt. Die Vorlage zu uebernehmen
+haette ihre FORM kopiert statt ihrer BEGRUENDUNG. „Any target on the
+board" heisst zudem woertlich beide Seiten — die Karte kann dem Gegner
+nuetzen, das steht so im Text.
+
+**★ ANIMATIONSTYP AUS DEM REGISTER NEHMEN.** Ein `animationType`, der
+nicht im Zonen-Register von `app-board.jsx` steht, tut STILL gar nichts
+— der Fehler faellt erst im Spiel auf. Erste Fassung hatte sich
+`heal_glow` ausgedacht; es gibt nur `healing_hearts`. Beim Bauen einer
+Karte immer gegen das Register pruefen (ein Testfall haelt das hier
+fest).
+
+
+## ★ Abfliegende Handkarte: der Schluessel zeigte nach dem Nachruecken
+## auf die falsche Karte (v1063, Als Befund 14.9.)
+
+**Der Befund:** „Spiele ich Book of Doom, wird die Karte, die in dessen
+Handposition nachrueckt, kurzzeitig unsichtbar, waehrend Book zum
+Discard fliegt."
+
+**Kein neuer Fehler — er stammt aus v1036** und betrifft JEDEN
+Hand-Abflug, nicht nur Book of Doom: Off Duty, Lunar Eclipse, Key, jede
+Karte, die aus der Hand auf einen Stapel fliegt.
+
+**Die Ursache:** der Verdeckungs-Schluessel war rein POSITIONELL
+(`${owner}-${handIdx}`) und wurde 700 ms lang gehalten. Der Sync
+entfernt die abfliegende Karte aber SOFORT, die folgenden ruecken nach —
+ab da verdeckte derselbe Schluessel die nachgerueckte Karte.
+
+**★ DIE WARNUNG STAND SCHON IM CODE.** Im Kommentar darueber:
+„ein stehengebliebener Schluessel wuerde nach dem Nachruecken die
+FALSCHE Handkarte verdecken." Die Antwort darauf war eine Zeitschranke
+von 700 ms — die aber genau so lang laeuft wie der Flug, waehrend das
+Nachruecken viel frueher passiert. **Eine erkannte Gefahr mit einem
+Zeitgeber zu beantworten heisst, auf ein Rennen zu setzen.**
+
+**Der richtige Bau lag direkt darunter:** `bounceOutgoingHidden` fuer
+Support-Zonen haengt seit jeher den KARTENNAMEN an den Schluessel und
+verdeckt nur, solange der Platz dieselbe Karte zeigt.
+
+Ueber den Namen geht es in der Hand nicht — die GEGNERHAND kennt keine
+Namen, dort liegen Rueckseiten. Stattdessen traegt der Schluessel jetzt
+die HANDGROESSE beim Abflug (`${owner}-${idx}#${handLen}`): schrumpft
+die Hand, passt er nicht mehr und die Verdeckung faellt von selbst weg,
+ohne auf den Zeitgeber zu warten. Dieselbe Bauform wie die
+Zaehler-Absicherung von `stealHiddenOpp` daneben.
+
+**Die ANKOMMENDEN Reservierungen** (Kassaran, Geburtstagsgeschenk)
+benutzen weiterhin den schlichten Schluessel — dort ist der Platz leer,
+bis die Karte landet, ein Nachruecken gibt es nicht.
+
+
+## ★ Kartenfluege: eigene Zeichenebene (v1062, Als Befund 14.9.)
+
+**Der Befund:** „Der Flug von Karten zum Discard Pile sieht minimal
+ruckelig aus" — in Opera OHNE Grafikbeschleunigung, in Firefox fluessig.
+
+**★ UND GENAU DESHALB WURDE ES GEAENDERT.** Al testet bewusst im
+Software-Rendering, als Fruehwarnsystem fuer zu teure Stellen. „Laeuft
+auf der GPU fluessig" heisst nur, dass die Karte den Aufwand kaschiert,
+nicht dass er noetig ist. Das Warnsystem hat angeschlagen, also war es
+eine echte Meldung — nicht bloss eine Umgebungsfrage wie im v472-Fall.
+
+**Was die Flugkarte je Frame kostete:** ein `<img>` mit `object-fit`,
+eine `border-radius`-Beschneidung, ein weicher `box-shadow`-Schein — und
+darueber eine `scale()`-Fahrt von 1 → 1.08 → 0.92 → 0.7. Ohne eigene
+Ebene wird dieser ganze Teilbaum in JEDEM Frame neu gerastert, statt
+einmal gerastert und dann nur noch transformiert zu werden. Die
+Keyframes selbst waren schon sauber (nur `transform`/`opacity`) — die
+Kosten lagen NICHT in der animierten Eigenschaft, sondern darin, was
+unter ihr liegt.
+
+Neue Regeln `.card-flight` und `.card-flight-tilt` in `style.css`. Die
+Klasse haengt bereits an allen neun Flugstellen (Ablage, Deck, Hand,
+Support, Coolness-Stack); EINE Regel deckt sie alle ab. Die
+Neigungsebene bekommt ihre eigene, weil sie ein zweites,
+VERSCHACHTELTES `rotateX` innerhalb der beschnittenen Flugkarte faehrt —
+die teuerste Einzelstelle des Fluges.
+
+**★ ABGRENZUNG ZU v811** („KEIN `will-change` bei 160 Teilchen"): dort
+waeren es 160 DAUERHAFTE Ebenen gewesen. Eine Flugkarte lebt 700 ms, und
+es fliegen selten mehr als eine Handvoll gleichzeitig. **Die Regel
+lautet nicht „nie will-change", sondern „Kosten × Anzahl ×
+Lebensdauer"** — dieselbe Denkweise wie die v470-Lehre („der Unterschied
+ist nicht die Eigenschaft allein, sondern Eigenschaft × Anzahl").
+
+Dazu die Startkoordinaten des Ablage-Fluges auf ganze Pixel gerundet:
+`getBoundingClientRect()` liefert fast immer gebrochene Werte, und
+zusammen mit der `scale()`-Fahrt muss die Kartenkunst sonst bei jedem
+Frame zwischen Pixeln interpoliert werden. Das Ziel verschiebt sich
+dadurch um hoechstens einen halben Pixel.
+
+
+## ★ „Interference": die ZWEITE Luecke (v1060, Als Befund 14.9.)
+
+**Der Befund:** „Interference funktioniert noch nicht gegen Book of
+Doom (was bei 2+ Zielen auch AoE ist)."
+
+Der v1043-Durchgang hatte Karten mit eigenem **SCHADENSWEG** erfasst.
+Book of Doom hat aber einen eigenen **ZIELWÄHLER**: `maxTotal` laesst
+den Spieler mehrere Ziele picken, danach teilt die Karte den Schaden
+selbst aus. Genau diese Gattung fehlte.
+
+```js
+engine.beginMultiHit(targets.length);   // die ECHTE, gewaehlte Zielmenge
+try { …Helden einzeln, Kreaturen im Stapel… }
+finally { engine.endMultiHit(); }
+```
+
+Die Klammer umschliesst BEIDE Wege, weil auch Kreaturen zur Zielzahl
+zaehlen — „hits other targets in addition to it" ist egal welcher Art.
+Bei EINEM gewaehlten Ziel bleibt es ein Einzeltreffer und der Schutz
+greift korrekt nicht; beides ist nachgemessen.
+
+**★ MERKMAL FUER DIE SUCHE nach weiteren Luecken:** nicht „teilt die
+Karte Schaden selbst aus?", sondern **„kann EIN Einsatz dieser Karte
+mehrere Ziele treffen?"** — also `maxTotal` / `maxSelect` groesser als
+1 mit eigenem Schaden dahinter.
+
+**Nachgezogen (v1061, Als Rulings 14.9.)** — fuenf weitere Karten
+klammern jetzt: Future Tech Bazooka (ab 2 Zielen), Future Tech Fists,
+Gathering Storm, Guardian Beast Hou, Kit the Shark Researcher.
+
+**★ AUSDRUECKLICH NICHT: „Sword in a Bottle".** Dort waehlt der Spieler
+den ANGREIFER und das eine Ziel — `maxSelect: 2` meint also zwei
+Rollen, nicht zwei Opfer. Ein Beispiel dafuer, dass die Zahl im
+Zielwaehler allein nichts beweist: geprueft gehoert, WEN sie zaehlt.
+
+
+## ★ Tooltip-Breite vom Einklapp-Zustand entkoppelt (v1060)
+
+Der Kartentooltip misst seine Breite an `.chat-log-column`. Seit Log und
+Chat standardmaessig eingeklappt starten (v1056), mass er die 28 px der
+zusammengeschobenen Leiste — der Tooltip war ein Streifen.
+
+Al 14.9.: „Die Bounds des AUFGEKLAPPTEN Fensters sind die ideale Breite,
+aber der Tooltip soll NICHT daran gebunden sein, ob es aufgeklappt ist."
+
+Gerechnet wird jetzt vom RECHTEN Rand der Spalte (der sich beim
+Einklappen nicht bewegt) plus der ausgeklappten Breite. Die kommt aus
+der letzten Messung im ausgeklappten Zustand; gab es die nie — und seit
+v1056 ist das der Normalfall —, aus `--chat-col-w`, am Element gelesen,
+damit eine responsive Ueberschreibung mitgenommen wird. Im ausgeklappten
+Zustand ist das rechnerisch exakt das alte Ergebnis.
+
+
+## Neue Karte: „Trunk Sand" (v1058) — NEUE STATUS-ABLAUFFORM
+
+```
+Attack · Normal · Fighting Lv1
+Choose a target and deal damage equal to the attacker's Attack stat to
+it and Blind it until the next time it takes damage.
+```
+
+**★ DRITTE ABLAUFFORM: `untilDamaged`.** Neben `duration: n` („haelt n
+Runden") und `expiresAtTurn` („laeuft in Zug X aus") gibt es jetzt „bis
+zum naechsten Schaden".
+
+**★ EINE STELLE FUER ALLE DREI SCHADENSWEGE.** Abgeraeumt wird in
+`_noteDamageTaken` — dem Helfer, den Helden-Schaden, True Damage und der
+Kreaturen-Stapel ohnehin alle drei aufrufen, und zwar **nur bei
+`amount > 0`**. Damit stimmt „nimmt Schaden" von selbst: ein
+vollstaendig weggedrueckter Treffer (Spectral Armor, „Interference",
+„Energy Aura") loest den Status NICHT. Das ist nachgemessen, nicht
+behauptet — der Pruefstand faehrt einen Interference-Lv2-Treffer dagegen.
+
+**Zwei Speicherformen, weil Status je nach Traeger anders liegen:**
+
+| Traeger | Ablage | Merkmal |
+|---|---|---|
+| Held | `statuses[name]` ist ein OBJEKT | `untilDamaged: true` reist mit den opts mit |
+| Kreatur | `counters[name] = 1`, blosse Praesenz-Flagge | Begleitzaehler `counters[name + 'UntilDamaged']` |
+
+Die Kreaturen-Form folgt der vorhandenen Konvention neben
+`…Duration` / `…AppliedBy`; beim Abraeumen fallen die Begleiter mit,
+sonst bliebe Kram liegen.
+
+**★ GRENZE, bewusst in Kauf genommen:** das Entfernen laeuft direkt und
+feuert KEINE `onStatusRemoved`-Listener — `_noteDamageTaken` ist
+synchron und steckt mitten im Schadenspfad. Heute nutzt nur `blinded`
+diese Form, und darauf hoert nichts. Bekommt ein Status mit
+Abgangs-Effekt spaeter `untilDamaged`, gehoert das Entfernen an die drei
+Aufrufstellen mit `await`.
+
+**★ REIHENFOLGE IN DER KARTE: erst Schaden, DANN blenden.** Andersherum
+haette der eigene Treffer die Blendung im selben Atemzug wieder
+abgeraeumt — der Kartentext waere wirkungslos gewesen.
+
+**Attack stat, nicht base ATK.** „Ferocious Tiger Kick" (dieselbe
+Bauform, dieselbe Schule) sagt ausdruecklich „base Attack stat" und
+liest `hero.baseAtk`; hier steht „the attacker's Attack stat", also
+`hero.atk` samt Buffs und Ausruestung. Die beiden Formulierungen sind im
+Bestand bewusst verschieden — beim Nachbauen immer den Text lesen.
+
+**Blinded auf KREATUREN.** Die Engine hatte den Fall schon vorgesehen
+(`inst.counters?.blinded`, mit dem Kommentar „a future card may apply
+that"); Trunk Sand ist diese Karte.
+
+**Animation „Pocket Sand":** `play_projectile_animation` mit
+`projectileShape: 'sand'` wirft eine Handvoll gelb-brauner Koerner vom
+Anwender zum Ziel, danach `sand_burst` als Staubwolke am Einschlag
+(neuer Eintrag im Zonen-Animationsregister plus Keyframes).
+
+**★ KEIN EMOJI** (Als Befund 14.9.: „kein Oasen-Emote!"). Die
+Erstfassung warf 🏜️ — das zeigt eine Oase, nicht geworfenen Sand.
+Dieselbe Begruendung wie bei der Energieblase daneben: Emojis sind
+plattformabhaengig eingefaerbt und lassen sich nicht tinten. Wer ein
+gefaerbtes oder abstraktes Projektil braucht, nimmt `projectileShape`
+(`bubble`, `javelin`, `arrow`, `sand`) statt eines Emojis.
+
+
+## ★ ZWEI BLENDUNGS-ARTEN (v1059, Als Befund 14.9.)
+
+**Der Befund:** der Tooltip der Trunk-Sand-Blendung behauptete weiter
+„bis zum Ende der Gegnerrunde" — der Text der Smoke-Vial-Variante.
+
+**Die Ursache war nicht der Tooltip, sondern das Datenmodell:** beide
+Karten schrieben in DASSELBE `statuses.blinded`. Ein Statusobjekt kann
+aber nur EINE Endbedingung tragen, die zweite Anwendung haette die
+erste ueberschrieben — und welche laenger haelt, ist nie vorher klar.
+Al: „theoretisch koennen auch beide Blinds gleichzeitig anliegen".
+
+Deshalb ein EIGENER Status `blinded_hit` neben `blinded`. Beide wirken
+identisch, beide tragen `blocksTargeting: true`, beide sind cleansable
+und teilen `blind_immune`. Nur ihr Ende unterscheidet sich.
+
+**★ EINE FRAGE, ZWEI STATUS.** Wer „ist geblendet?" fragt, fragt nicht
+mehr `statuses.blinded`:
+
+```js
+const { BLIND_STATUSES } = require('./_hooks');   // ['blinded','blinded_hit']
+engine._isHeroBlinded(pi, heroIdx)
+engine._isCreatureBlinded(inst)
+```
+
+**Zwoelf Lesestellen in der Engine** haetten sonst still nur die erste
+Art gesehen — der Held waere geblendet gewesen und haette trotzdem
+zielen duerfen. Genau dafuer gibt es die gemeinsame Liste; eine neue
+Blendungs-Art braucht kuenftig nur dort einen Eintrag.
+
+Die Rundenende-Abrechnung fasst weiterhin NUR `blinded` an —
+`blinded_hit` hat kein Rundenende und faellt ausschliesslich ueber
+`untilDamaged`. Im Client sind es zwei Abzeichen (👁️ mit Dauer, 🌫️
+mit „until this target next takes damage").
+
+
+## Neue Karte: „Enhanced Guard Dog" (v1057) — inkl. cards.json
+
+```
+Creature · Reaction · Summoning Magic Lv1 · 50 HP
+Immediately summon this Creature as an additional Action when exactly 1
+card from your side of the board would be sent to the discard pile by an
+opponent's card or effect. Negate that card or effect.
+```
+
+**★ DIE GANZE ABGRENZUNG STECKT IN DER WAHL DER STELLE.** Das Fenster
+haengt an `actionDestroyCard` — und daraus folgen BEIDE Rulings ohne
+eine einzige Sonderregel:
+
+* **„NUR direkte Zerstoerung, NICHT Tod durch Schaden"** (Als
+  wichtigstes Ruling 14.9.): der Schadenstod routet seinen Tod im
+  Schadens-Batch und kommt hier nie vorbei. Das steht im Code sogar
+  schon als Begruendung am Cosmic-Depths-Fenster.
+* **„sent to the DISCARD PILE"**: `actionDestroyCard` routet IMMER in
+  die Ablage. „Tengu Windstorm" schickt ins DECK und loest deshalb
+  korrekt nicht aus (Als Befund 14.9.).
+
+**★ UMGEKEHRT BEWUSST NICHT AN `actionMoveCard`**, obwohl auch dort
+Karten in die Ablage wandern: genau dort laeuft der Schadenstod durch.
+Wer dieses Fenster spaeter „vollstaendiger" machen will, hebelt damit
+das Kern-Ruling aus.
+
+**Vertrag am Kartenskript:**
+
+```js
+isDestroyReaction: true
+destroyReactionCondition(gs, pi, engine, lage) → bool
+async onDestroyReaction(engine, pi, lage) → bool   // true = negiert
+```
+
+`lage` traegt `victimSide`, `victimName`, `victimZone`, `victimInst`,
+`sourceName`, `sourceOwner`. Seiten-Pruefung („by an OPPONENT's card")
+und Einzelzerstoerung erledigt das Fenster; die Karte prueft nur ihr
+Eigenes. Ohne freie Support-Zone kann der Dog nicht reagieren — ohne
+Beschwoerung keine Negation (Als Bestaetigung 14.9.).
+
+**Deckt jede Zone ab** — Support, Ability, Area, Surprise, Permanent.
+**Helden NICHT:** Al hatte sie zunaechst eingeschlossen, der finale Text
+sagt aber „sent to the discard pile", und eine Helden-Niederlage schickt
+keine Karte in die Ablage. Der Zweig waere nicht bloss ungenutzt,
+sondern falsch gewesen — er haette Insta-Kills geblockt.
+
+
+## ★ ZERSTOERUNGS-KLAMMER `beginDestroyScope` (v1057)
+
+Gegenstueck zu `beginMultiHit`. „exactly 1 card" laesst sich nicht aus
+`actionDestroyCard` ablesen: der laeuft je Karte einzeln und wuesste
+beim ersten Opfer nichts vom zweiten. Ein Effekt, der mehrere Karten
+abraeumt, klammert deshalb seine Schleife:
+
+```js
+engine.beginDestroyScope(opfer.length);
+try { …zerstoeren… } finally { engine.endDestroyScope(); }
+```
+
+Verschachtelbar (Tiefenzaehler), im `finally` zu loesen — sonst bliebe
+sie stehen und ALLE folgenden Einzelzerstoerungen waeren stumm.
+`istEinzelzerstoerung()` ist die Frage, die das Fenster stellt; ohne
+Klammer lautet die Antwort „ja".
+
+**Zwoelf Karten klammern** (Stand v1057): Anti Magic, Berserk, Blind
+Destruction, Burning Fuse, Censpartan War Counselor, Crusader's
+Cutlass, Curse, Sun Beam, The Shapeshifter, Trial of Dominance, Troop
+Annihilation, das Spider-Modul. **Bewusst NICHT geklammert:** „Super
+Killing Knife" — es zerstoert je gelandetem Treffer EINZELN, jede
+Zerstoerung ist dort also wirklich eine.
+
+**Fuer Zaehlungen gilt die ECHTE Zielmenge**, nicht die geplante —
+Sun Beam und Censpartan klammern die GEWAEHLTEN Ziele, bei genau einem
+darf der Dog also feuern. Gleiche Lehre wie bei „Interference".
+
+
+## ★ „Negate that card" — WAS genau faellt weg (v1057, Als Regel 14.9.)
+
+**Die ganze Karte, ausser was schon resolved ist — und gemeint ist
+LOGISCHE Abhaengigkeit, nicht Code-Reihenfolge.**
+
+* „Deal 150 damage. If this kills, remove 1 card" → der Schaden MUSS
+  vorher gefallen sein, damit das Removal ueberhaupt ausloest. Er bleibt
+  stehen, nur das Removal faellt weg.
+* **The Yeeting** → der 150er-Recoil ist KEINE Voraussetzung fuer die
+  Zerstoerung, er stand nur zufaellig zuerst im Code. Al 14.9.: „Aus
+  Benutzer-Sicht passieren Recoil und Removal gleichzeitig", und eine
+  Negation nimmt beides.
+
+Automatisch ableiten laesst sich das nicht. **Die Regel ist eine
+PLATZIERUNGS-Frage je Karte:** das Fenster gehoert an die Stelle, an der
+die Karte logisch noch nichts getan hat. Bei The Yeeting ist es deshalb
+VOR den Recoil gezogen worden, damit Code- und Wirkungsreihenfolge
+uebereinstimmen. Wer eine neue Zerstoerungskarte baut, stellt sich
+dieselbe Frage: musste irgendetwas davor passieren, damit diese
+Zerstoerung ueberhaupt ansteht?
+
+Die Negation selbst laeuft ueber `gs._spellNegatedByEffect`, die
+vorhandene kanonische Marke; `actionDestroyCard` kehrt ohnehin sofort
+zurueck.
+
+
+## ★ Area-Limit: der ZWEITE Funnel (v1055, Als Befund 14.9.)
+
+**Der Befund:** „Entferne ich Crevice und habe danach noch 2 Areas,
+werde ich NICHT aufgefordert, eine zu waehlen."
+
+**Zwei Fehler gleichzeitig, beide sehenswert.**
+
+**① Der falsche Funnel.** `enforceAreaLimit` hing nur am Ende von
+`removeArea`. Eine ZERSTOERTE Area laeuft da aber nicht durch:
+`actionDestroyCard` routet sie als area→discard durch
+**`actionMoveCard`** (The Yeeting, Hammer Skeleton, jede kuenftige
+Zerstoerung). Die Obergrenze fiel also genau dann aus, wenn sie
+gebraucht wird. Der Aufruf steht jetzt zusaetzlich am Ende von
+`actionMoveCard` — direkt neben der reaktiven Handkarten-Grenze, die aus
+demselben Anlass dort sitzt: eine Karte verlaesst das Brett und senkt
+dadurch eine Obergrenze.
+
+**② Der Rueckfall im Kartenskript war stiller Schrott.** Spatial Crevice
+hatte einen `onCardLeaveZone`-Haken als Netz. Er hat nie gegriffen:
+
+* Der Leave-Hook feuert **VOR** dem Zonenwechsel. Die Karte stand also
+  noch in `areaZones`, das Limit war noch 3, und die Pruefung „zu
+  viele?" sagte voellig korrekt nein.
+* Der Ausweg dagegen — `queueMicrotask` plus ein Promise ohne `await`
+  und mit leerem `catch` — lief immer noch VOR den offenen `await`s des
+  Umzugs. Und haette er geworfen, haette es niemand erfahren.
+
+Der Haken ist ersatzlos raus. **Ein abgekoppelter async-Aufruf in einem
+Hook ist die Bauform, die Fehler verschluckt statt sie zu zeigen** — wer
+nach dem Zonenwechsel arbeiten muss, gehoert an die Stelle, die den
+Wechsel vollzieht, nicht in einen Hook davor.
+
+**Lehre:** bei einer reaktiven Regel reicht es nicht, EINEN Weg zu
+decken. Die Frage ist immer „welche Wege fuehren hier heraus?" — fuer
+Areas sind es zwei: `removeArea` (der benannte Weg) und `actionMoveCard`
+(jeder generische). Mein Prueflauf hatte nur den ersten getestet und war
+deshalb gruen, waehrend das Spiel den zweiten ging.
+
+
+## ★ Area-ZIELWAHL im Stapel (v1054, Als Befund 14.9.)
+
+**Der Befund:** „Ich wollte per The Yeeting gezielt Crevice zerstoeren,
+stattdessen traf es den obersten Area-Spell."
+
+**Die Ursache war NICHT The Yeeting**, sondern ein Filter im Ziel-Sammler
+`_targeting-shared.js#collectNonHeroBoardTargets`:
+
+```js
+// alt:
+if (areaArr.length > 0 && areaArr[areaArr.length - 1] !== inst.name) continue;
+// Begruendung im Code: „die BoardZone zeigt ohnehin nur den obersten"
+```
+
+Seit „Spatial Crevice" zeigt sie ALLE. Die unteren Areas waren damit
+nicht bloss schwer zu treffen — sie standen gar nicht im Angebot, und
+es gab nur EINE Ziel-ID je Seite (`area-<owner>`). Die Auswahl konnte
+also nur auf der obersten landen.
+
+**Dieselbe Annahme steckte in NEUN Dateien** — `_targeting-shared`,
+`_sparkfly-shared`, Coolness Overcharge, Excavator Bucket, Hammer
+Skeleton, Kappa Sword Slash, Smug Mastermind Antonia, Sun Beam, Tengu
+Windstorm, Wall Breaker General Ralzish. Jede baute ihre ID selbst
+zusammen und filterte selbst. Jetzt gibt es EINE Stelle:
+
+```js
+const { areaTargetId } = require('./_targeting-shared');
+areaTargetId(owner, stapelPlatz)   // → `area-<owner>-<platz>`
+```
+
+**★ WARUM DER STAPELPLATZ IN DIE ID MUSS:** `gs.areaZones` ist eine
+NAMENSLISTE — der Client kennt keine Instanz-IDs. Ohne den Platz koennte
+er zwei Eintraege nicht auseinanderhalten. Er baut dieselbe ID aus
+seinem Render-Index; beide Seiten indizieren dieselbe Liste, die Indizes
+stimmen also ueberein. Jedes Ziel traegt den Platz zusaetzlich als
+`slotIdx`.
+
+**Client (v1054):** Zielwahl und Klick gehoeren jetzt der KARTE, nicht
+der Zone — genauso wie schon Tooltip und Aktivierung. Die Zone markiert
+nur noch, dass dort etwas waehlbar ist; ein Zonen-Klick fuer die
+Zielwahl gibt es nicht mehr, weil sich daraus bei drei Areas nicht
+ablesen liesse, welche gemeint ist.
+
+**Lehre:** „die Oberflaeche zeigt ohnehin nur X" ist eine Begruendung
+mit Verfallsdatum. Sie stand hier als Kommentar im Code und war beim
+Schreiben richtig — der Filter ueberlebte die Oberflaechen-Aenderung um
+genau eine Version.
+
+
+## Neue Karte: „Energy Aura" (v1053) — SPELL-SCHILD, inkl. cards.json
+
+```
+Spell · Attachment · Support Magic Lv1
+Attach this card to a Hero you control. Negate the next time the Hero
+this card is attached to would be affected by a Spell, and if you do,
+send this attached card to your discard pile and draw 2 cards. A Hero
+can only have 1 "Energy Aura" attached to it at a time.
+```
+
+**★ „VON EINEM SPELL BETROFFEN" HAT FUENF WEGE DURCH DIE ENGINE** —
+Schaden (`actionDealDamage`), Heilung (`actionHealHero`), Buff
+(`actionAddBuff`), Status (`addHeroStatus`) und NIEDERLAGE
+(`actionDefeatHero`, Als Ruling 14.9.: „affect" schliesst Insta-Kills
+ein). Anti Magic (`magic_immune`) musste dieselben fuenf Stellen
+belegen. Eine Karte, die sich das selbst zusammenbaut, verpasst
+unweigerlich einen Weg — deshalb gibt es EINEN gemeinsamen Riegel:
+
+```js
+engine.heroSpellWardBlocks(target, sourceCardName, { piercing })
+```
+
+Vertrag am Kartenskript: **`heroSpellWard: true`**. Mehr braucht die
+naechste Karte dieser Bauart nicht.
+
+**Unterschiede zu Anti Magic**, alle aus Als Rulings 14.9.:
+* **keine Stufenschranke** — jeder Spell, egal welchen Levels;
+* **auch EIGENE Spells** loesen aus („kann z.B. vor einem eigenen
+  Cataclysm schuetzen");
+* **einmalig**, und zwar zwangslaeufig beim NAECHSTEN Spell — genau das
+  ist die Einschraenkung der Karte, man hat keine Wahl;
+* **der Spell wird NICHT negiert**; der Held gilt weiter als getroffen,
+  wie bei „Interference" Stufe 2 (vgl. die Null-Regel: getroffen heisst
+  getroffen, auch mit 0 Schaden);
+* bei Flaechenzaubern faellt nur die Wirkung an GENAU diesem Helden aus.
+
+**★ PIERCING GEHT DURCH UND LOEST NICHT AUS** (Als Ruling 14.9.): ein
+`cannotBeNegated`-Treffer verbraucht die Aura nicht und gewaehrt keine
+Karten. Dafuer gibt es `opts.piercing`.
+
+**★ TESTFALLE, einmal hineingetappt:** `cannotBeNegated` kommt NICHT aus
+`opts` von `actionDealDamage` — die Engine setzt es selbst (Ida ueber
+ihren `beforeDamage`-Hook per `ctx.setFlag`, Tempeste ueber die
+zielseitige Unangreifbarkeit, Alleria ueber den Redirect). Ein Test, der
+`{ cannotBeNegated: true }` uebergibt, prueft nichts und schlaegt
+scheinbar die Karte fehl. Der echte Weg ist einer der drei Setzer.
+
+**★ „ANVISIERT" IST NICHT „BETROFFEN".** Wird ein Held nur als Anker
+gewaehlt, um „the Creatures in that Hero's Support Zones" zu treffen,
+laeuft das gar nicht durch die fuenf Wege — die Regel ergibt sich von
+allein, es braucht keine Sonderbehandlung.
+
+**★ ABRAEUMEN ERST NACH DER AUFLOESUNG** (Als Freigabe 14.9.) — und das
+ist nicht nur einfacher, sondern die einzige Fassung, die STIMMT: waere
+die Karte sofort weg, kaeme der ZWEITE Effekt desselben Zaubers (Schaden
+plus Status) ungebremst durch. Der Riegel merkt sich den Zauber an der
+Instanz (`counters._wardSpentOn`, gleiche Bauform wie das vorhandene
+`counters._skipAfterResolveName`) und blockt weiter, solange derselbe
+laeuft.
+
+Abgeraeumt wird an DREI Zeitpunkten, weil `afterSpellResolved` **nicht**
+feuert, wenn der Spell unterwegs negiert wird (`_spellNegatedByEffect`):
+der Normalfall plus `onTurnStart` / `onTurnEnd` als Rueckfall. Das
+Abraeumen ist ueber `counters._wardSettled` idempotent — ohne den Riegel
+zoege ein Ueberschneiden der drei Zeitpunkte 4 oder 6 Karten statt 2.
+
+**cards.json geaendert:** der alte Text sagte „Attach this card to the
+user" und „an OPPONENT's Spell". Beides ist weg — die Karte geht jetzt
+auf jeden eigenen Helden und triggert auf jeden Spell.
+
+
+## Neue Karte: „Null, the Mage Slayer" (v1044) — inkl. cards.json
+
+Hero, 450 HP / 100 ATK, Start-Abilities **Fighting + Interference**.
+„Negate the effects of any targets hit by this Hero's Attacks for
+2 turns. This counts as a status effect."
+
+**Zwei Haken, ein Vertrag:** getroffene Helden über `afterDamage`,
+getroffene Kreaturen über `afterCreatureDamageBatch` — der Schadensweg
+ist für beide getrennt, die Regel dieselbe (Bauform Ghuanjun).
+
+**★ „hit by THIS Hero's Attacks" sind drei Bedingungen zusammen:**
+Schadensart `attack`, Quelle gehört mir, **und** ihr `heroIdx` ist
+dieser Held. Ohne die dritte würde jeder Angriff der anderen eigenen
+Helden mitnegieren.
+
+**★ GETROFFEN HEISST GETROFFEN — AUCH MIT 0 SCHADEN** (Als Korrektur
+12.9.). Wer den Schaden nur wegdrückt (Spectral Armor, **Interference**,
+ein Schild), wird trotzdem zum Schweigen gebracht. Nur **negierte oder
+ausgewichene** Angriffe (Invisibility Cloak) bringen nichts — und die
+erreichen die Haken ohnehin nie: der Schadenspfad kehrt dort
+**vor** `runHooks(AFTER_DAMAGE)` zurück
+(`return { dealt: 0, cancelled: true }`), und Batch-Einträge tragen
+`cancelled`. Eine Betragsprüfung wäre also nicht nur falsch, sondern
+auch überflüssig — `!e.cancelled` ist die ganze Trennlinie.
+
+Weil der Text „counts as a status effect" ausdrücklich sagt, läuft die
+Negierung über die STATUS-Wege (`addHeroStatus('negated')` /
+`actionNegateCreature`) — damit greifen Immunitäten, „Defending the
+Gate" und die Statusanzeige von selbst. Ablauf wie bei Locke:
+`expiresAtTurn: gs.turn + 2`, `expiresForPlayer: pi`.
+
+**Der Auftritt gehört dazu** (`check-triggered-reveal` hat ihn
+eingefordert): einmal je Schlag, über `source` entprellt, damit ein
+Batch mit drei Kreaturen nicht dreimal ankündigt. Er geht an beide
+Seiten — ein passiver Trigger, kein aktiver Einsatz (Regel v1034).
+
+
+## ★ Negierung: Restrunden im Badge + eigenes Bild (v1046, Als Befunde 12.9.)
+
+**① Zwei Schreibweisen für „wie lange noch".** Die Badges kannten nur
+`duration: n` („hält n Runden", Frost/Stun). Die Negierung merkt sich
+ihr Ende aber als ZUG (`expiresAtTurn` + `expiresForPlayer`, so machen
+es Null, Locke und Bishop) — das Badge zeigte deshalb keine Zahl und
+behauptete „wears off at the end of its owner's turn", bei einer
+2-Runden-Negierung schlicht falsch.
+
+`restrunden(statusData)` versteht jetzt beides und rechnet
+`expiresAtTurn` in eigene Runden um (`Math.ceil((ziel - jetzt) / 2)` —
+ein Halbzug je Spieler). Den Bezugspunkt stellt das Brett global bereit
+(`window._ppTurn`, gleiche Bauform wie `_ppBorisBlocked`); ohne ihn
+kann eine reine Anzeigekomponente das nicht rechnen.
+
+Das quellgebundene 🚫-Badge (Water Golem: „solange X liegt") bleibt
+bewusst ohne Zahl — es endet mit der Karte, nicht mit der Zeit.
+
+**② Silence statt Blitz.** Die Negierung zeigte `electric_strike` und
+sah damit aus wie eine Betäubung. Neu ist `silence_seal`: Siegelring,
+der sich zusammenzieht, aufscheinendes Verbotszeichen, dunkle Schwade
+und sechs nach innen fallende Zeichen — gedecktes Violett-Grau statt
+gelber Blitze. Umgestellt an drei Stellen: der Client-Pfad „Held
+bekommt negiert" und **beide** Standardtabellen der Engine (Kreatur und
+Held). Eine Karte kann weiterhin ihr eigenes Bild vorgeben
+(`opts.animationType`).
+
+
+## ★ Negierung, zweiter Durchgang (v1047, Als Befunde 12.9.)
+
+**① Bei KREATUREN steht die Frist im BUFF.** `actionNegateCreature`
+setzt `counters.negated = 1` und legt die Frist daneben in
+`counters.buffs[...]` ab — erkennbar daran, dass der Buff beim Ablauf
+genau diesen Zähler räumt (`clearCountersOnExpire`). Wer nur
+`counters.negated` liest, sieht eine „1" und keine Dauer. Das Badge
+sucht jetzt über `fristAusBuffs(statusKey)` auch dort nach
+`expiresAtTurn`.
+
+**Dasselbe Muster wie beim Frost (v1013), nur eine Ebene tiefer:** dort
+lag die Dauer in einem Geschwisterfeld (`frozenDuration`), hier in einem
+Buff-Eintrag. Wer eine neue mehrrundige Kreatur-Statuslage baut, muss
+beide Ablagen bedenken.
+
+**② Die DAUER-Anzeige zeigte weiter Blitze.** v1046 hatte nur den
+einmaligen Einschlag umgestellt; `NegatedOverlay` — das, was während
+des ganzen Status auf der Karte liegt — blieb gelb und zuckte
+(`negated-spark`, ⚡). Jetzt gedämpfte Siegelzeichen (🚫,
+`negated-glyph`) in demselben Violett wie `silence_seal`, mit ruhigem
+Auf- und Abblenden statt Flackern.
+
+**★ `NegatedOverlay` existiert ZWEIMAL** — in `app-board.jsx` und in
+`app.jsx`. Wer nur eine ändert, sieht die alte Anzeige weiterhin in
+jeder Oberfläche, die die andere Datei lädt. Im Repro wird jetzt
+geprüft, dass `negated-spark` in KEINER der beiden mehr vorkommt.
+
+
+## ★ Dauer: die richtige Ablage wählen (v1048, Als Befund 12.9.)
+
+„Nulls Silence zeigt keine Rundenanzahl, Iceages Lv-4-Frost schon" —
+und genau darin lag es. Es gibt **drei** Ablagen, und nur zwei davon
+tragen eine anzeigbare Rundenzahl:
+
+| Ablage | Gesetzt von | Rundenzahl? |
+|---|---|---|
+| `statuses.<status>.duration` | `addHeroStatus(… { duration: n })` | **ja** |
+| `counters.<status>Duration` | `applyCreatureStatus(… { duration: n })` | **ja** |
+| `counters.buffs[…].expiresAtTurn` | `actionNegateCreature` / `addHeroStatus(… { expiresAtTurn })` | nein — „bis Zug X" |
+
+**Regel: „hält n Runden" schreibt man als `duration: n`.** Der Ablaufzug
+ist die Sonderform für „bis zum Beginn deines nächsten Zuges" (Locke,
+Bishop) und trägt keine Zahl — er kann nur als Frist gelesen werden.
+Null schrieb versehentlich diese Form und war deshalb stumm.
+
+Umgestellt: Held → `addHeroStatus('negated', { duration: 2 })`,
+Kreatur → `applyCreatureStatus(inst, 'negated', { duration: 2 })` — also
+genau die beiden Wege, die Iceage für seinen Zwei-Runden-Frost geht.
+Damit wird die Dauer angezeigt UND heruntergezählt.
+
+Das Badge liest jetzt alle drei Ablagen (`restrundenFuer`), damit auch
+Karten mit Ablaufzug wenigstens eine umgerechnete Zahl zeigen; die
+`<status>Duration`-Ablage war bis v1013 eine Sonderbehandlung nur für
+den Frost und gilt nun generisch.

@@ -120,7 +120,7 @@ module.exports = {
     if (picked.type === 'hero') {
       const hero = gs.players[picked.owner]?.heroes?.[picked.heroIdx];
       if (hero && hero.hp > 0 && !hero.statuses?.burned) {
-        await engine.addHeroStatus(picked.owner, picked.heroIdx, 'burned', { permanent: true });
+        await engine.addHeroStatus(picked.owner, picked.heroIdx, 'burned', { permanent: true, appliedBy: pi });
       }
       // Also burn all creatures in this hero's support zones. PHYSICAL
       // side identifies which player's board the slot is on — stolen

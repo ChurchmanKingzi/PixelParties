@@ -75,6 +75,7 @@ module.exports = {
       if (!hero?.name || hero.hp <= 0) return false;
 
       await engine.actionAddBuff(hero, pi, target.heroIdx, 'cloudy', {
+        sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
         expiresAtTurn: expiresTurn,
         expiresForPlayer: pi,
         source: 'Cloud Pillow',

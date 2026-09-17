@@ -62,6 +62,7 @@ module.exports = {
     // copies of the named Ability highlight). Cancellable — bailing
     // here returns false so HOPT isn't stamped.
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'heal',        // ★ v1038: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to heal a friendly target by 100 HP.`,
       source: CARD_NAME,

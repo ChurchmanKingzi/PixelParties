@@ -187,6 +187,7 @@ async function doJumpCascade(engine, pi) {
 
         // Apply Submerged buff — expires at start of owner's next turn
         await engine.actionAddBuff(hero, pi, heroIdxCapture, 'submerged', {
+          sourceOwner: pi,   // v1067: Quelle ist Pflicht (siehe _affected-shared)
           source: 'Jump in the River',
           expiresAtTurn: gs.turn + 1,
           expiresForPlayer: pi,

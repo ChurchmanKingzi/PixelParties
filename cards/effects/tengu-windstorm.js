@@ -1,3 +1,4 @@
+const { areaTargetId } = require('./_targeting-shared');
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Tengu Windstorm"
 //  Spell (Decay Magic Lv0, Normal). BANNED.
@@ -141,10 +142,16 @@ function _collectBoardTargets(gs, engine) {
         _cardInstance: inst,
       });
     } else if (inst.zone === 'area') {
+      // ★ v1054: JEDE Area der Zone ist ihr eigenes Ziel. Der frühere
+      // Filter auf den obersten Eintrag stammt aus der Zeit, als eine
+      // Seite nur eine Area halten konnte — seit „Spatial Crevice"
+      // machte er die unteren unauswählbar, und die Wahl landete
+      // stumm auf der obersten. Die ID trägt den Stapelplatz.
       const areaArr = gs.areaZones?.[inst.owner] || [];
-      if (areaArr.length > 0 && areaArr[areaArr.length - 1] !== inst.name) continue;
+      const stapelPlatz = areaArr.indexOf(inst.name);
+      if (stapelPlatz < 0) continue;
       targets.push({
-        id:       `area-${inst.owner}`,
+        id:       areaTargetId(inst.owner, stapelPlatz),
         type:     'area',
         owner:    inst.owner,
         heroIdx:  -1,

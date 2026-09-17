@@ -47,6 +47,7 @@ module.exports = {
     if (galleryCards.length === 0) return false;
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: CARD_NAME,
       description: 'Search your deck for a card — it is revealed and added to your hand.',

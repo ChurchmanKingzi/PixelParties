@@ -67,6 +67,8 @@ module.exports = {
     // discard a freshly-drawn card and the cost loses its bite).
     const handBefore = ps.hand.length;
     await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'draw',
       title: CARD_NAME,
       source: CARD_NAME,
       selfInflicted: true,

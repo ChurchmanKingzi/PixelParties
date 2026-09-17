@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — Token-Platzierung, kein Abwurf aus der Hand (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Invader from the Cosmic Depths"
 //  Creature (Summoning Magic Lv4, Normal, 150 HP)

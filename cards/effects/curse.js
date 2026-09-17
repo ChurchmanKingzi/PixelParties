@@ -56,7 +56,7 @@
 // ═══════════════════════════════════════════
 
 const { getCleansableStatuses } = require('./_hooks');
-const { candidateHosts, attachmentHostsFor, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
+const { candidateHosts, pickAttachmentHost, placeAttachment } = require('./_attachment-shared');
 
 const CARD_NAME = 'Curse';
 const STATUS_NAME = 'cursed';
@@ -127,6 +127,16 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 }
 
 module.exports = {
+  // ★ v1112 (Als Vorgabe 15.9.): „Wird im Puzzle Mode einem Hero
+  // [ein Anhaengsel] in die Support Zone getan, soll er automatisch
+  // das Puzzle [mit dem Effekt] beginnen. Dasselbe gilt fuer ALLE
+  // Attachments, die Statuseffekte applyen."
+  //
+  // Im Puzzle laeuft kein `onPlay` — die Karte wird direkt in die Zone
+  // gesetzt. `attachmentStatus` sagt dem Puzzle-Aufbau, welcher Status
+  // dazugehoert; er legt ihn beim Start an.
+  attachmentStatus: 'cursed',
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
@@ -145,7 +155,10 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
+  // ★★ v1145 (Al 17.9.): KEIN `attachmentHosts` mehr — gezogen wird wie
+  // bei jedem Spell auf den WIRKER, die Zielwahl oeffnet `onPlay`
+  // (`ignoreDropHints`). Mit dem Vertrag wurde der Held, auf den man zog,
+  // sofort zum Ziel, und einen Wirker liess der Ziehweg nicht waehlen.
 
   hooks: {
     onPlay: async (ctx) => {
@@ -185,12 +198,20 @@ module.exports = {
         engine.log('curse_fizzle', { player: gs.players[pi]?.username, reason: isNormalActionMode ? 'no_free_support_slots' : 'no_qualifying_targets_at_resolve' });
         return;
       }
+      // ★★ v1145: dieselbe Zielwahl-Sprache wie „Forbidden Curse of
+      // Aging" — GRUEN: qualifizierende Helden (Zusatz-Aktion); im
+      // Zusatz-Modus sind die uebrigen AUSGEGRAUT statt verschwiegen.
+      const qualifiziert = (hero, hi, side) => _heroQualifiesForCurse(engine, hero, side, hi);
       const host = await pickAttachmentHost(ctx, CARD_NAME, {
-        sides, heroFilter,
+        sides,
+        heroAccent: (hero, hi, side) => (qualifiziert(hero, hi, side) ? 'green' : null),
+        heroDim: isNormalActionMode ? null : (hero, hi, side) => !qualifiziert(hero, hi, side),
+        ignoreDropHints: true,
         description: isNormalActionMode
-          ? 'Attach Curse to any Hero. If the target carries a cleansable status and has no Spell attached, this play becomes an additional Action.'
-          : 'Attach Curse to a Hero that carries a cleansable status and has no Spell attached. (Inherent additional Action.)',
+          ? 'Attach Curse to any Hero. Green Heroes carry a cleansable status and no Spell — against them this becomes an additional Action.'
+          : 'Attach Curse to a green Hero (a cleansable status and no Spell attached). This is an additional Action.',
         confirmLabel: '🧿 Curse!', confirmClass: 'btn-danger',
+        promptExtras: { greenSelect: false },
       });
       if (!host) return;
       const targetOwner = host.owner, targetHeroIdx = host.heroIdx, targetSlot = host.slotIdx;
@@ -252,6 +273,12 @@ module.exports = {
         // into this same slot (see _isHeroAtkSuppressed in _engine.js).
         targetHero._cursedAtkSuppressed = targetHero.atk || 0;
         const dropAmount = targetHero.atk || 0;
+        // ★ v1087: das ABSENKEN laeuft bewusst weiter direkt — zu
+        // diesem Zeitpunkt ist `cursed` noch NICHT gesetzt, der Trichter
+        // wuerde den Abzug also sichtbar buchen statt in den
+        // Zwischenspeicher. Der Broadcast bleibt deshalb hier; die
+        // ATK-Auren erfahren es ueber den Hook unten am Trichter, wenn
+        // der Fluch faellt.
         targetHero.atk = 0;
         if (dropAmount > 0) {
           engine._broadcastEvent('fighting_atk_change', {
@@ -333,12 +360,18 @@ module.exports = {
         const targets = [...copies];
         engine.gs._curseCleanseInProgress = true;
         try {
-          for (const inst of targets) {
-            await engine.actionDestroyCard(
-              { name: CARD_NAME, owner: ctx.cardOwner ?? ownerIdx, heroIdx: ctx.cardHeroIdx ?? heroIdx },
-              inst,
-            );
-          }
+          // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
+          // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
+          // saehe er beim ersten Opfer eine Einzelzerstoerung.
+          engine.beginDestroyScope(targets.length);
+          try {
+            for (const inst of targets) {
+              await engine.actionDestroyCard(
+                { name: CARD_NAME, owner: ctx.cardOwner ?? ownerIdx, heroIdx: ctx.cardHeroIdx ?? heroIdx },
+                inst,
+              );
+            }
+          } finally { engine.endDestroyScope(); }
         } finally {
           delete engine.gs._curseCleanseInProgress;
         }
@@ -383,12 +416,13 @@ module.exports = {
       if (hero.statuses?.cursed) {
         delete hero.statuses.cursed;
         const restored = hero._cursedAtkSuppressed || 0;
-        hero.atk = restored;
         delete hero._cursedAtkSuppressed;
         if (restored > 0) {
-          engine._broadcastEvent('fighting_atk_change', {
-            owner: hostOwner, heroIdx: hostHeroIdx, amount: restored,
-          });
+          // ★ v1087: ueber den kanonischen Trichter, damit ATK-Auren
+          // („Rioting Village") die Rueckgabe sehen. `cursed` ist eine
+          // Zeile darueber geloescht, also bucht der Trichter sichtbar
+          // — gleiches Ergebnis wie das fruehere `hero.atk = restored`.
+          engine._applyHeroAtkDelta(hero, hostOwner, hostHeroIdx, restored);
         }
         await engine.runHooks('onStatusRemoved', {
           target: hero, status: STATUS_NAME,

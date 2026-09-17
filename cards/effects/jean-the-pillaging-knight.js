@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — der GEGNER muss abwerfen (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Jean, the Pillaging Knight"
 //  Hero — 400 HP, 50 ATK — BANNED

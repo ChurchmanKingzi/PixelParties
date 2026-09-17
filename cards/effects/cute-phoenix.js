@@ -246,6 +246,8 @@ module.exports = {
       // Pay 2 discards. The standard force-discard prompt lets the
       // player pick — `selfInflicted: true` skips first-turn shield.
       await engine.actionPromptForceDiscard(ctx.cardOwner, 2, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'protect',
         title: `${CARD_NAME} — Discard 2`,
         source: CARD_NAME,
         selfInflicted: true,

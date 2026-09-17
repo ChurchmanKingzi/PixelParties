@@ -37,7 +37,16 @@ module.exports = {
    * gemeinsame Extraktor daraus ab, damit Karten nur ihre eigene Formel
    * kennen müssen.
    *
-   * @returns {{amount:number, targets:Array<{kind:string, hp:number}>}|null}
+   * ★ v1049: die Zielliste kommt jetzt aus `engine.projectAoeTargets`,
+   * demselben Sammler, den auch `actionAoeHit` benutzt. Die frühere
+   * handgeschriebene Schleife hier war eine Dublette und kannte weder
+   * den Seiten-statt-Spalten-Vertrag (v718: ein übernommener Held
+   * gehört zur Gegenseite) noch die geschirmten Helden. Sie lieferte
+   * ausserdem keine Ziel-IDENTITÄT — ohne `owner`/`heroIdx` kann
+   * `projectImpactFeatures` die „Interference"-Minderung nicht je Held
+   * nachschlagen. Die Karte kennt damit nur noch ihre eigene Formel.
+   *
+   * @returns {{amount:number, targets:Array<{kind:string, hp:number, owner:number, heroIdx?:number}>}|null}
    */
   cpuProjectedDamage(gs, pi, engine) {
     try {
@@ -49,19 +58,10 @@ module.exports = {
       const creatureCount = (engine.cardInstances || []).filter(inst =>
         inst.controller === pi && inst.zone === 'support' && !inst.faceDown && isCreature(inst)
       ).length;
-      const amount = 30 * creatureCount;
-      const opp = 1 - pi;
-      const targets = [];
-      for (const h of (gs.players?.[opp]?.heroes || [])) {
-        if (h && h.hp > 0 && !h.defeated) targets.push({ kind: 'hero', hp: h.hp });
-      }
-      for (const inst of (engine.cardInstances || [])) {
-        if (inst.controller !== opp || inst.zone !== 'support' || inst.faceDown) continue;
-        if (!isCreature(inst)) continue;
-        const hp = inst.counters?.hp ?? cardDB[inst.name]?.hp ?? 0;
-        if (hp > 0) targets.push({ kind: 'creature', hp });
-      }
-      return { amount, targets };
+      return {
+        amount: 30 * creatureCount,
+        targets: engine.projectAoeTargets(pi, { side: 'enemy', types: ['hero', 'creature'] }),
+      };
     } catch { return null; }
   },
 

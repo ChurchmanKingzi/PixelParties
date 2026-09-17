@@ -22,6 +22,13 @@
 const { placePollutionTokens } = require('./_pollution-shared');
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Karten aus dem Ablagestapel auf die Hand.)
+  // — unter der starken Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLockDiscard: true,
   placesPollutionTokens: true,
   // Free action in both phases — no action cost, no phase advance.
   inherentAction: true,
@@ -58,6 +65,7 @@ module.exports = {
 
       const picked = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
         cards: gallery,
         selectCount: gallery.length, // allow up to every card in the pile
         minSelect: 0, // "any number" — literally zero is also valid

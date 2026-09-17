@@ -108,7 +108,21 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
-    return (ps?.hand || []).includes(ABILITY_NAME);
+    if (!(ps?.hand || []).includes(ABILITY_NAME)) return false;
+    // ★ v1039 (Als Vorgabe 12.9.): „Hat man keine Creatures, sollte
+    // Choir nie genutzt werden." Der Schutz gilt der naechsten Kreatur,
+    // die Schaden naehme — ohne eine auf dem Brett verpufft die
+    // Ability-Karte ersatzlos. Gilt auch fuer den Choir selbst: er IST
+    // eine Kreatur und kann sich schuetzen, darum zaehlt er mit.
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const eigene = (engine.cardInstances || []).some(c => {
+      if ((c.controller ?? c.owner) !== pi || c.zone !== 'support' || c.faceDown) return false;
+      if (engine.isEquipInZone(c.name, c)) return false;
+      const cd = engine.getEffectiveCardData(c);
+      return !!cd && cd.cardType === 'Creature';
+    });
+    return eigene;
   },
 
   async onCreatureEffect(ctx) {
@@ -119,6 +133,7 @@ module.exports = {
     if (!ps) return false;
 
     const ok = await harpyformerDiscardCost(engine, pi, ABILITY_NAME, {
+      costKind: 'protect',        // ★ v1039: Lernkanal-Lage passend zur Gegenleistung
       title: CARD_NAME,
       description: `Discard "${ABILITY_NAME}" to reduce the next damage a Creature you control takes by 100 until your next turn.`,
       source: CARD_NAME,

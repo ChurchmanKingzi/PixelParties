@@ -52,9 +52,9 @@ function getTargetCleansableStatuses(target, engine) {
   if (target.type === 'hero') {
     const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
     if (!hero?.statuses) return [];
-    return getCleansableStatuses()
-      .filter(k => hero.statuses[k])
-      .map(k => ({ key: k, label: STATUS_EFFECTS[k].label, icon: STATUS_EFFECTS[k].icon }));
+    // v1101: gemeinsamer Bauer — kennt auch Anhaengsel, die „als
+    // negativer Statuseffekt zaehlen" (Decisive Defeat, Curse of Aging).
+    return engine.cleansableHeroEntries(target.owner, target.heroIdx);
   }
   if (target.type === 'equip') {
     const inst = target.cardInstance;

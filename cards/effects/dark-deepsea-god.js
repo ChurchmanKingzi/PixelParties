@@ -152,12 +152,19 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
     })),
   ]);
 
+  // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
+  // gezaehlt wird, was WIRKLICH getroffen wird.
+  engine.beginMultiHit(heroTargetsList.filter(ht => (ops.heroes?.[ht.heroIdx]?.hp || 0) > 0).length);
+  try {
   for (const ht of heroTargetsList) {
     const h = ops.heroes?.[ht.heroIdx];
     if (!h?.name || h.hp <= 0) continue;
     await engine.actionDealDamage(sourceInst, h, DAMAGE, 'creature', {
       sourceOwner: pi, canBeNegated: true,
     });
+  }
+  } finally {
+    engine.endMultiHit();
   }
 
   if (creatureEntries.length > 0) {
@@ -173,6 +180,15 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
 }
 
 module.exports = {
+
+  // ★ v1021: Der AoE-Helfer wird jetzt AUCH von „Creepy Villager"
+  // gebraucht (die Karte PLATZIERT einen DDG in ihre eigene Zone).
+  // Platzieren durch einen Effekt zaehlt als Effekt-Beschwoerung und
+  // loest On-Summon-Effekte aus (Als Ruling 8.9.) — und DDGs
+  // On-Summon-Effekt liegt hier, nicht in `onPlay`. Der HOPT-Riegel
+  // (`ddg_aoe`) steckt im Helfer selbst, der Weg kann also nicht
+  // doppelt zuenden.
+  fireDdgAoE: (engine, pi, sourceInst, isCopy) => _fireAoEAsSource(engine, pi, sourceInst, !!isCopy),
 
   // Als Ruling nach dem Batch-21-09-32-Befund: der Standing-Kanal
   // lernte behind −13.5, real gewinnen behind-Spiele MIT DDG-Cast

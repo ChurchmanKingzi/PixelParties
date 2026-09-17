@@ -60,9 +60,19 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
   return n;
 }
 
-const { candidateHosts, attachmentHostsFor, attachToHero } = require('./_attachment-shared');
+const { candidateHosts, attachToHero } = require('./_attachment-shared');
 
 module.exports = {
+  // ★ v1112 (Als Vorgabe 15.9.): „Wird im Puzzle Mode einem Hero
+  // [ein Anhaengsel] in die Support Zone getan, soll er automatisch
+  // das Puzzle [mit dem Effekt] beginnen. Dasselbe gilt fuer ALLE
+  // Attachments, die Statuseffekte applyen."
+  //
+  // Im Puzzle laeuft kein `onPlay` — die Karte wird direkt in die Zone
+  // gesetzt. `attachmentStatus` sagt dem Puzzle-Aufbau, welcher Status
+  // dazugehoert; er legt ihn beim Start an.
+  attachmentStatus: 'berserked',
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
 
@@ -70,7 +80,10 @@ module.exports = {
   spellPlayCondition(gs, pi, engine) {
     return candidateHosts(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }).length > 0;
   },
-  attachmentHosts(gs, pi, engine) { return attachmentHostsFor(gs, pi, engine, { sides: [pi, pi === 0 ? 1 : 0] }); }, // v651: beide Seiten als Drop-Ziel
+  // ★★ v1145 (Al 17.9.): KEIN `attachmentHosts` mehr — gezogen wird wie
+  // bei jedem Spell auf den WIRKER, die Zielwahl oeffnet `onPlay`
+  // (`ignoreDropHints`). Mit dem Vertrag wurde der Held, auf den man zog,
+  // sofort zum Ziel, und einen Wirker liess der Ziehweg nicht waehlen.
 
   hooks: {
     onPlay: async (ctx) => {
@@ -84,6 +97,7 @@ module.exports = {
       // Discard des Casters, wie bisher).
       const res = await attachToHero(ctx, CARD_NAME, {
         sides: [pi, pi === 0 ? 1 : 0],
+        ignoreDropHints: true,
         description: 'Attach Berserk to any Hero. That Hero can only Attack (max 2/turn) but gets one free additional Attack per turn.',
         confirmLabel: '😡 Attach!', confirmClass: 'btn-danger', skipEnterHook: true,
       });
@@ -166,19 +180,25 @@ module.exports = {
       const targets = [...copies];
       engine.gs._berserkCleanseInProgress = true;
       try {
-        for (const inst of targets) {
-          await engine.actionDestroyCard(
-            { name: CARD_NAME, owner: ctx.cardOwner ?? ownerIdx, heroIdx: ctx.cardHeroIdx ?? heroIdx },
-            inst,
-            // Cleanse-driven destroy doesn't need the cosmic-malfunction
-            // / gate-shield interaction — it's the natural cleanup
-            // path. `skipPileTransfer` left default; multiple
-            // simultaneous flights would stagger via the standard
-            // diff-animator if we didn't, but with the canonical
-            // per-destroy `play_pile_transfer` baseline already in
-            // place the flights read fine.
-          );
-        }
+        // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer. Der Dog
+        // darf nur bei EINZELNEN Zerstoerungen feuern; ohne diese Klammer
+        // saehe er beim ersten Opfer eine Einzelzerstoerung.
+        engine.beginDestroyScope(targets.length);
+        try {
+          for (const inst of targets) {
+            await engine.actionDestroyCard(
+              { name: CARD_NAME, owner: ctx.cardOwner ?? ownerIdx, heroIdx: ctx.cardHeroIdx ?? heroIdx },
+              inst,
+              // Cleanse-driven destroy doesn't need the cosmic-malfunction
+              // / gate-shield interaction — it's the natural cleanup
+              // path. `skipPileTransfer` left default; multiple
+              // simultaneous flights would stagger via the standard
+              // diff-animator if we didn't, but with the canonical
+              // per-destroy `play_pile_transfer` baseline already in
+              // place the flights read fine.
+            );
+          }
+        } finally { engine.endDestroyScope(); }
       } finally {
         delete engine.gs._berserkCleanseInProgress;
       }

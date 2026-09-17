@@ -125,6 +125,11 @@ module.exports = {
       const _negR = await engine.preDamageMultiTargetWindow(source, allTargets);
       if (_negR?.effectNegated) return;
 
+      // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
+      // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
+      // lebenden Ziel greift der Schutz nicht (Als Vorgabe 12.9.).
+      engine.beginMultiHit(heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length + creatureTargets.filter(i => i.zone === 'support').length);
+      try {
       // Heroes — sequential dealDamage so afterDamage hooks fire cleanly per target.
       for (const ht of heroTargets) {
         const live = gs.players[ht.owner]?.heroes?.[ht.heroIdx];
@@ -142,6 +147,9 @@ module.exports = {
       }
 
       engine.sync();
+      } finally {
+        engine.endMultiHit();
+      }
       await engine._delay(300);
 
       // ── Wipe every Area on the board ──

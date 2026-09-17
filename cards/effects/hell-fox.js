@@ -54,7 +54,30 @@ module.exports = {
     onDeathBenefit: 12,
   },
 
+  // ★★ v1134: „delete it" — die Karte loescht sich bei ihrem Tod
+  // selbst. Der Motor liest das schon beim VORAB-FLUG, damit die Karte
+  // gleich zum Geloescht-Stapel fliegt statt erst zur Ablage und dann
+  // weiter (zwei Fluege, Als Befund 15.9.).
+  deletesSelfOnDeath: true,
+
   hooks: {
+    /**
+     * ★★ v1134: „delete it" in EINER Bewegung.
+     *
+     * `actionMoveCard` bietet dafuer `_redirectToDeleted` an: im
+     * `onCardLeaveZone`-Hook gesetzt, biegt es das Ziel um, BEVOR die
+     * Karte landet. Damit faellt der zweite Flug weg — und mit ihm die
+     * Karte, die der Diff-Animator im Brettbereich zeichnete.
+     */
+    onCardLeaveZone: async (ctx) => {
+      const inst = ctx.card;
+      if (!inst || ctx.leavingCard?.id !== inst.id) return;   // nur ich selbst
+      if (inst.name !== CARD_NAME) return;
+      if (ctx.fromZone !== 'support') return;                 // nur vom Brett
+      if (ctx.toZone !== 'discard') return;                   // nur den Ablage-Weg
+      inst._redirectToDeleted = true;
+    },
+
     onCreatureDeath: async (ctx) => {
       const death = ctx.creature;
       if (!death || death.name !== CARD_NAME) return;
@@ -86,17 +109,30 @@ module.exports = {
         zoneSlot: death.zoneSlot,
       });
 
-      // ── Step 1: re-route corpse from discard → deleted ──
-      // Walk the discard pile from the back (the engine pushed it
-      // last, so the most-recent copy of the name is the dying one).
-      const _taken_discardIdx = await engine.takeFromPile(ownerPs, 'discard', CARD_NAME, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
-      if (_taken_discardIdx) {
-        ownerPs.deletedPile.push(CARD_NAME);
-      } else {
-        // Defensive: if some other reaction already pulled the corpse
-        // out (Beato-style "send to top of deck" effects), still push
-        // a deleted entry so the card text resolves consistently.
-        ownerPs.deletedPile.push(CARD_NAME);
+      // ── Step 1: Kadaver ins Geloeschte ──
+      //
+      // ★★ v1134 (Als Logs 15.9.): frueher landete die Karte ERST in der
+      // Ablage und wurde DANN umgebucht — zwei Bewegungen, und der
+      // Client zeichnete zwei Fluege. Im Protokoll steht es woertlich:
+      //
+      //     [FLUG] Hell Fox Start — verstrichen 2 ms
+      //     [FLUG] Hell Fox Start — verstrichen 28 ms
+      //
+      // Der zweite Flug ist der Diff-Animator, der die schrumpfende
+      // Ablage und den wachsenden Geloescht-Stapel bemerkt. Er sucht
+      // sich seinen Startpunkt selbst — und zeichnet dabei eine Karte
+      // im Brettbereich, wo laengst keine mehr sein sollte.
+      //
+      // Der Motor kann das in EINER Bewegung: `_redirectToDeleted`
+      // (siehe `actionMoveCard`) biegt das Ziel um, BEVOR die Karte
+      // landet. Gesetzt wird es im `onCardLeaveZone`-Hook weiter unten;
+      // hier bleibt nur der Rueckfall fuer den Fall, dass die Umleitung
+      // nicht griff (z. B. weil ein anderer Effekt den Kadaver
+      // zwischendurch weggezogen hat).
+      if ((ownerPs.discardPile || []).includes(CARD_NAME)
+          && !(ownerPs.deletedPile || []).includes(CARD_NAME)) {
+        const _taken = await engine.takeFromPile(ownerPs, 'discard', CARD_NAME, { source: CARD_NAME, last: true });
+        if (_taken) ownerPs.deletedPile.push(CARD_NAME);
       }
 
       engine.log('hell_fox_deleted', {
@@ -147,8 +183,15 @@ module.exports = {
         return;
       }
 
+      // ★ v1117: Unter einer Such-Sperre („Siege") oeffnet
+      // `promptGeneric` die Galerie gar nicht erst und gibt null
+      // zurueck — die Abfrage wird dann wie ein Abbruch behandelt
+      // (Deck mischen, fertig). Die Karte braucht dafuer nichts zu tun;
+      // `source: 'deck'` an den Eintraegen genuegt als Kennzeichnung.
       const searchResult = await engine.promptGeneric(controllerIdx, {
         type: 'cardGallery',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
+        searchPile: 'deck',
         cards: galleryCards,
         title: CARD_NAME,
         description: 'Choose a card from your deck to add to your hand.',

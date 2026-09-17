@@ -285,6 +285,8 @@ module.exports = {
     // verbrauchen — Standard fuer Abwurf-Kosten ab v718.
     const handVorher = (ps.hand || []).length;
     await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'tutor',
       title: CARD_NAME, source: CARD_NAME, selfInflicted: true,
       cancellable: true,
       description: modus === 'plant'

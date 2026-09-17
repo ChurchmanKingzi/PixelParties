@@ -135,6 +135,8 @@ module.exports = {
         // Pay the discard cost. If it fails (race), bail.
         const handBefore = ps.hand.length;
         await engine.actionPromptForceDiscard(pi, 1, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'protect',
           title: CARD_NAME,
           source: CARD_NAME,
           selfInflicted: true,

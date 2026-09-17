@@ -92,6 +92,7 @@ module.exports = {
 
       // Pay the discard cost.
       await engine.actionPromptForceDiscard(pi, DISCARD_COST, {
+      costFor: CARD_NAME,          // ★ v1041: Kosten-Abwurf-Lernkanal
         title: `${CARD_NAME} — Discard ${DISCARD_COST}`,
         source: CARD_NAME,
         selfInflicted: true,

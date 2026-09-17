@@ -7,7 +7,7 @@
 //  Helden, der in DIESEM ZUG noch nicht gewaehlt wurde (v1011, neuer
 //  Wortlaut: „that has not been chosen by this effect yet this turn"). Zu Beginn des naechsten eigenen Zuges kommen alle
 //  noch liegenden Karten auf die Hand zurueck, die jeweiligen
-//  Traegerhelden nehmen 150 Schaden, und Rha'Bi bekommt je Karte 100
+//  Traegerhelden nehmen 100 Schaden, und Rha'Bi bekommt je Karte 100
 //  aktuelle und maximale HP.
 //
 //  ── ZWEI VERTRAEGE, DIE MAN LEICHT FALSCH BAUT ────────────────────
@@ -42,7 +42,7 @@
 
 const CARD_NAME = "Rha'Bi, the Living Skeleton";
 const KOSTEN    = 100;
-const SCHADEN   = 150;   // v1011 (Als Anpassung 12.9., war 200)
+const SCHADEN   = 100;   // v1029 (Als Anpassung 12.9.; 200 → 150 → 100)
 const ZUWACHS   = 100;
 const MARKE     = '_rhabiPlaced';
 // Abstand zwischen zwei zurueckfliegenden Karten. Kurz genug, dass ein
@@ -172,7 +172,7 @@ module.exports = {
     if (quelle !== CARD_NAME) return undefined;
     const ziele = payload?.validTargets || [];
     if (ziele.length === 0) return undefined;
-    // Der Held, den die 150 spaeter am haertesten treffen: der mit den
+    // Der Held, den die 100 spaeter am haertesten treffen: der mit den
     // wenigsten HP, den der Schaden also am ehesten umlegt.
     let bestes = ziele[0];
     let wenigste = Infinity;
@@ -289,7 +289,7 @@ module.exports = {
 
       // ★ JEDE KARTE IST EIN EIGENER TRIGGER (Als Ruling 12.9.) ─────
       // Nicht erst alle einsammeln, dann alle Schaeden, dann heilen.
-      // Karte fliegt zurueck → dieses Ziel nimmt SOFORT seine 150 →
+      // Karte fliegt zurueck → dieses Ziel nimmt SOFORT seine 100 →
       // Rha'Bi bekommt SOFORT seine 100 → erst dann die naechste.
       // Dadurch oeffnet jede Karte ihre eigenen On-Hit-Fenster beim
       // jeweiligen Ziel, statt dass drei Treffer als Block ankommen.
@@ -331,7 +331,7 @@ module.exports = {
         engine._addCardToState(inst);
         engine.sync();
 
-        // ── ③ Der zugehoerige Held nimmt seine 150 ───────────────────
+        // ── ③ Der zugehoerige Held nimmt seine 100 ───────────────────
         const opfer = gs.players[zielOwner]?.heroes?.[zielHeroIdx];
         if (opfer?.name && opfer.hp > 0) {
           engine._broadcastEvent('play_zone_animation', {

@@ -85,28 +85,65 @@ function selfRevealEffectsSuppressed(engine, pi) {
  * Big Gwen Guard's suppression aura turns this off. Idempotent —
  * safe to call repeatedly.
  */
-function refreshWeakeningCrystalNegation(engine) {
+/**
+ * ★ v1103 (Als Ruling 15.9.): „Den Status zu cleansen, entfernt ihn
+ * TEMPORAER von einem Ziel. Solange Crystal auf der Hand ist, wird der
+ * Effekt zu Beginn jeder Runde neu appliziert."
+ *
+ * Damit wechselt die Karte ihre Bauart grundlegend:
+ *
+ *   FRUEHER  jeder `sync()` schrieb den Status neu. Eine Heilung war
+ *            dadurch wirkungslos — der naechste Zustandspush machte sie
+ *            im selben Augenblick rueckgaengig. Genau deshalb stand die
+ *            Karte im Sweep als „behauptet Status, ist aber keiner".
+ *
+ *   JETZT    angelegt wird nur an DREI Zeitpunkten (`reapply: true`):
+ *            beim Eintritt in die Hand, zu Beginn der Runde des
+ *            Betroffenen, und beim Laden eines Spielstands. Dazwischen
+ *            raeumt der Sync nur noch AUF — er nimmt den Status weg,
+ *            wenn die Karte die Hand verlassen hat.
+ *
+ * @param {object} engine
+ * @param {object} [opts]
+ * @param {boolean} [opts.reapply]  false = nur aufraeumen (Standard)
+ * @param {number}  [opts.onlyFor]  nur diese Seite anfassen
+ */
+function refreshWeakeningCrystalNegation(engine, opts = {}) {
   const players = engine?.gs?.players;
   if (!Array.isArray(players)) return;
   for (let pi = 0; pi < players.length; pi++) {
+    if (typeof opts.onlyFor === 'number' && opts.onlyFor !== pi) continue;
     const ps = players[pi];
     if (!ps?.heroes) continue;
     const hasCrystal = (ps.hand || []).includes(WEAKENING_CRYSTAL)
       && !selfRevealEffectsSuppressed(engine, pi);
+    let neuAngelegt = 0;
     for (const hero of ps.heroes) {
       if (!hero?.name) continue;
       if (hasCrystal) {
+        if (!opts.reapply) continue;               // nur aufraeumen
         const cur = hero.statuses?.negated;
-        if (!cur || cur._byWeakeningCrystal === true) {
-          if (!hero.statuses) hero.statuses = {};
-          hero.statuses.negated = {
-            _byWeakeningCrystal: true,
-            appliedTurn: cur?.appliedTurn ?? engine.gs?.turn ?? 0,
-          };
-        }
+        // Ein FREMDES `negated` nicht ueberschreiben.
+        if (cur && cur._byWeakeningCrystal !== true) continue;
+        if (cur) continue;                         // liegt schon
+        if (!hero.statuses) hero.statuses = {};
+        hero.statuses.negated = {
+          _byWeakeningCrystal: true,
+          appliedTurn: engine.gs?.turn ?? 0,
+        };
+        neuAngelegt++;
       } else if (hero.statuses?.negated?._byWeakeningCrystal === true) {
+        // ★ Die Karte ist weg → der Status faellt SOFORT, nicht erst
+        // zum naechsten Rundenbeginn.
         delete hero.statuses.negated;
       }
+    }
+    // Kleine Animation, wenn wirklich neu angelegt wurde (Als Vorgabe).
+    if (neuAngelegt > 0 && typeof engine._broadcastEvent === 'function') {
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'crystal_drain', zoneType: 'board', layer: 'background',
+        owner: pi, heroIdx: -1, zoneSlot: -1, duration: 1200,
+      });
     }
   }
 }

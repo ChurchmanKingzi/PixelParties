@@ -221,6 +221,10 @@ module.exports = {
       // Deal 200 to every unspared target. Skip-reaction-check so a
       // single Spell doesn't open multiple nested counter windows
       // — Spike Trap / Anti-Magic etc. already ran in the chain.
+      // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
+      // gezaehlt wird die ECHTE Zielmenge (verschonte zaehlen nicht).
+      engine.beginMultiHit(targets.filter(t => !sparedIds.has(t.id)).length);
+      try {
       for (const t of targets) {
         if (sparedIds.has(t.id)) continue;
         const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx };
@@ -240,6 +244,9 @@ module.exports = {
             );
           }
         }
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.sync();

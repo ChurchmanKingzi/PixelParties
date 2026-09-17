@@ -36,6 +36,15 @@ const {
 const CARD_NAME = 'Spider Dance';
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: die Bonus-Beschwoerung haengt an den gesuchten Karten.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -66,6 +75,7 @@ module.exports = {
         const cap = Math.min(N, surpriseGallery.length);
         const pickResult = await engine.promptGeneric(pi, {
           type: 'cardGalleryMulti',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
           cards: surpriseGallery,
           title: CARD_NAME,
           description: `Search your deck for up to ${cap} different Surprises to reveal and add to your hand.`,

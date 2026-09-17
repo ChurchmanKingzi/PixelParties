@@ -210,6 +210,9 @@ module.exports = {
 
     const picked = await engine.promptGeneric(pi, {
       type: 'cardGalleryMulti',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
+      costFor: 'Cute Dog',   // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'tutor',
       cards: gallery,
       title: CARD_NAME,
       description: tutorCount === 1

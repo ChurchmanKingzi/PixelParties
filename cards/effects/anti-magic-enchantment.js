@@ -47,6 +47,12 @@ const { placePollutionTokens, hasFreeZone, countFreeZones } = require('./_pollut
 const AME_FLUG_MS = 480;
 
 module.exports = {
+  // ★ v1112: dieselbe Luecke wie bei den status-setzenden Anhaengseln
+  // (Als Vorgabe 15.9.) — im Puzzle laeuft kein `onPlay`, der Buff
+  // wuerde fehlen. `attachmentBuff` sagt dem Puzzle-Aufbau, was
+  // dazugehoert.
+  attachmentBuff: 'anti_magic_enchanted',
+
   // Zählt als "Spell that places Pollution Tokens" (Als Golden-Wings-
   // Ruling Juli 2026, gleiche Bauart): Der Token ist Einsatz-KOSTEN
   // ("by placing 1 Pollution Token into your free Support Zone"), gilt

@@ -60,6 +60,7 @@ module.exports = {
     // Show gallery prompt
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+      searchToHand: true, searchPile: 'deck',   // v1121
       cards: galleryCards,
       title: 'Cuteness Sensor',
       description: 'Choose a "Cute" card to add to your hand.',

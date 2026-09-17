@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — wirft sich selbst ab, keine Wahl aus der Hand (v1041)
 // ═══════════════════════════════════════════
 //  ASCENDED HERO: "Stormkissed Waflav"
 //  400 HP, 100 ATK — Waflav archetype

@@ -115,6 +115,8 @@ module.exports = {
       const gallery = stillThere.map(n => ({ name: n, source: 'deck' }));
       const res = await engine.promptGeneric(pi, {
         type: 'cardGallery',
+        costFor: 'Lunatic Cycle - New Moon',   // ★ v1041: Kosten-Abwurf-Lernkanal
+        costKind: 'tutor',
         cards: gallery,
         title: CARD_NAME,
         description: 'Search your deck for a "Lunatic Cycle" card to add to your hand.',

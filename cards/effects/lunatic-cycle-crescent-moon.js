@@ -18,6 +18,7 @@
 // ═══════════════════════════════════════════
 
 const { lunaticCycleCountByName } = require('./_lunatic-shared');
+const { handlungsHooks } = require('./_action-shared');
 
 const CARD_NAME = 'Lunatic Cycle - Crescent Moon';
 const PREREQ = 'Lunatic Cycle - New Moon';
@@ -37,7 +38,8 @@ module.exports = {
   },
 
   hooks: {
-    onAnyActionResolved: async (ctx) => {
+    // v1157: auch Reaktionen dieses Helden (`_action-shared.js`)
+    ...handlungsHooks(async (ctx) => {
       const inst = ctx.card;
       if (!inst || inst.zone !== 'support') return;
       // The equip's controller, and the EXACT equipped Hero, must be
@@ -110,6 +112,6 @@ module.exports = {
       } finally {
         delete inst.counters._crescentBusy;
       }
-    },
+    }),
   },
 };

@@ -24,6 +24,15 @@ const { getCardDB: _getCardDB } = require('./_card-db');
 const EXTRA_COST = 4; // Double of base cost — pay this much more to avoid the lock
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: Suche plus eine EINSCHRAENKUNG — ohne Suche nur der Nachteil.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   isTargetingArtifact: true,
   blockedByHandLock: true,
 
@@ -71,6 +80,7 @@ module.exports = {
 
     const result = await engine.promptGeneric(pi, {
       type: 'cardGallery',
+        searchToHand: true,   // v1119: Suche AUF DIE HAND
       cards: galleryCards,
       title: 'Cool Cheese',
       description: 'Choose an Attack to add to your hand.',

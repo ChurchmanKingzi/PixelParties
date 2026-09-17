@@ -81,6 +81,12 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
 
   const result = await engine.promptGeneric(pi, {
     type: 'forceDiscardCancellable',
+    // ★ v1041: „eine Karte abwerfen, um das Juwel zu BEHALTEN" ist
+    // eine Kostenentscheidung — und zwar fuer alle sieben Gems
+    // zugleich, weil sie alle ueber diesen Helfer laufen. Sorte:
+    // keine der Vorlagen passt (es geht um Kartenvorteil), also
+    // nur die Grundtags.
+    costFor: gemName,
     title: gemName,
     description: `You may discard a card to keep ${gemName} in your hand. Click a card to pay, or cancel to send ${gemName} to the discard pile.`,
     cancelLabel: 'Send to Discard',

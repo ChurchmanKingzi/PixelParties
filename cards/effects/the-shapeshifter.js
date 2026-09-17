@@ -396,6 +396,10 @@ module.exports = {
     if (heldInst) {
       heldInst.name = gestaltName;
       heldInst.script = null;   // Cache-Reset, siehe performAscension
+      // ★ v1166: die Anfangsroutine des neuen Skripts nachholen —
+      // sonst fehlen kopierten Helden ihre Startmerker (Willy) oder
+      // Freigaben (Sol Rym), und Johanna reinigt nicht.
+      Promise.resolve().then(() => engine.initGainedHeroEffect(heldInst, 'shapeshift'));
       heldInst.counters = heldInst.counters || {};
       // Ruling ②: die Rueckverwandlung am Ende der GEGNERRUNDE — oder,
       // solange der Testschalter oben steht, am eigenen Zugende.
@@ -473,6 +477,10 @@ module.exports = {
     // Mehrzahl, deshalb ueber die Marke gesammelt statt ueber die
     // eine Zone, die gerade gemerkt ist.
     const angelegt = angelegteGestalten(engine, pi, heroIdx);
+    // ★ v1057 („Enhanced Guard Dog"): Zerstoerungs-Klammer — „send ALL
+    // Heroes equipped this way" ist Mehrzahl.
+    engine.beginDestroyScope(angelegt.length);
+    try {
     for (const eq of angelegt) {
       // Marken ZUERST loesen, dann ablegen: sonst liefe der Abgang
       // noch ueber die Hooks der angelegten Karte (Copy-Device-Lehre).
@@ -486,6 +494,7 @@ module.exports = {
         { toOwnerDiscard: true },
       );
     }
+    } finally { engine.endDestroyScope(); }
 
     // Zurueck in der eigenen Gestalt: jetzt kann die Bereitschaft
     // wieder greifen — mit der inzwischen groesseren Gestaltenzahl.

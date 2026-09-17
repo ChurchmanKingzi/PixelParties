@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — erzwungener Abwurf am Zugende, keine frei gewaehlte Kosten (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Invader Token"
 //  Token Creature (50 HP). Spawned by Analyzer's

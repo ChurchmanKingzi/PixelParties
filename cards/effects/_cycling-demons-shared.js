@@ -164,6 +164,7 @@ async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
   if (entries.length === 0) return;
 
   const selected = await ctx.promptCardGallery(entries, {
+        searchToHand: true, searchPile: 'deck',   // v1120
     title: 'Herbithorn Demon',
     description: 'Choose a card from any discard pile and add it to your hand.',
     cancellable: true,

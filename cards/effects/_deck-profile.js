@@ -652,6 +652,221 @@ function deckTurnsLeft(engine, pi) {
  * die Regel kommt aus dem Profil.
  *   Rueckgabe: 'delete' | 'mill' | null (dann entscheidet die Heuristik)
  */
+/**
+ * ★ KOSTEN-ABWURF: LOHNT SICH DIE ZAHLUNG? (v1037, Als Auftrag 12.9.)
+ *
+ * Fuer Effekte, die zum Auslosen eine Karte KOSTEN (die zehn
+ * Harpyformer, und jede kuenftige Karte, die ihren Abwurf-Prompt mit
+ * `costFor` kennzeichnet). Die Frage „ist mir der Effekt diese Karte
+ * wert?" laesst sich nicht sinnvoll gegen eine feste Punktzahl messen —
+ * deshalb ein eigener Lernkanal statt einer Konstante.
+ *
+ * Gelesen wird `prof.costDiscardRules`, zweistufig:
+ *   • `costDiscardRules[Quellkarte]` — der Fit fuer GENAU diesen
+ *     Effekt (z.B. „Classical Harpyformer"),
+ *   • `costDiscardRules['tag:<Lage>']` — Lage-Regeln, wenn es fuer die
+ *     Karte selbst noch zu wenige Daten gibt.
+ * Positiv heisst „zahlen hat sich ausgezahlt", negativ „lieber lassen".
+ *
+ * Waehrend des Trainings wird mit Wahrscheinlichkeit `PP_RULE_EXPLORE`
+ * bewusst gewuerfelt, damit BEIDE Arme entstehen — ohne Gegenbeispiele
+ * kann der Trainer nichts fitten. Genau daran war der Kanal sonst
+ * blind: das alte Verhalten zahlte fast immer.
+ *
+ * @returns {'pay'|'refuse'|null} null = keine Meinung (Aufrufer
+ *          entscheidet wie bisher).
+ */
+function costDiscardDecision(engine, pi, sourceCard, tags) {
+  try {
+    const prof = profileFor(engine, pi);
+    const rules = prof?.costDiscardRules;
+    const ruleEps = parseFloat(process.env.PP_RULE_EXPLORE || '0.15');
+    const epsRoll = process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < ruleEps;
+    if (rules && !epsRoll) {
+      let score = 0, gesehen = false;
+      if (sourceCard && typeof rules[sourceCard] === 'number') {
+        score += rules[sourceCard]; gesehen = true;
+      }
+      for (const g of (tags || [])) {
+        // ★ v1038: ZUERST die kartenEIGENE Lage-Regel — „goldBroke"
+        // heisst fuer den Goldeffekt etwas anderes als fuer den
+        // Schadenseffekt. Die allgemeine Tag-Regel bleibt als
+        // Rueckfall, solange eine Karte zu wenige Daten hat.
+        const eigen = sourceCard ? rules[sourceCard + '|' + g] : undefined;
+        if (typeof eigen === 'number') { score += eigen; gesehen = true; continue; }
+        const v = rules['tag:' + g];
+        if (typeof v === 'number') { score += v; gesehen = true; }
+      }
+      if (gesehen) {
+        if (score >= 3) return 'pay';
+        if (score <= -3) return 'refuse';
+      }
+      return null;
+    }
+    // Trainingslauf ohne (oder trotz) Regeln: beide Arme erzeugen.
+    if (process.env.PP_TRAIN && !engine._inMctsSim && Math.random() < 0.4) {
+      return Math.random() < 0.5 ? 'pay' : 'refuse';
+    }
+  } catch { /* defensiv */ }
+  return null;
+}
+
+/**
+ * Lage-Tags fuer den Kosten-Abwurf.
+ *
+ * ZWEI EBENEN (v1038, Als Praezisierung 12.9.: „die Kriterien sind je
+ * nach Effekt unterschiedlich — es ist wirklich case-by-case"):
+ *
+ *   • GRUNDTAGS, immer dabei: Handgroesse, Zug, Brettbreite. Das ist
+ *     die Frage „kann ich mir die Karte ueberhaupt leisten?", und die
+ *     stellt sich bei jedem Kostenabwurf gleich.
+ *
+ *   • ★ SORTEN-TAGS je nach GEGENLEISTUNG (`opts.kind`): Gold
+ *     interessiert beim Goldeffekt, die Restpunkte des schwaechsten
+ *     gegnerischen Helden beim Schadenseffekt, die eigene
+ *     Heldengesundheit beim Heileffekt, der Deckrest beim Suchen. Ein
+ *     Wort am Aufrufer genuegt; die Buckets stehen hier, damit sie
+ *     ueberall gleich geschnitten sind.
+ *
+ * Der Trainer fittet die Tags ZUSAETZLICH je Quellkarte
+ * (`costDiscardRules['Karte|tag']`) — dieselbe Lage kann fuer zwei
+ * Effekte Verschiedenes bedeuten.
+ */
+function costDiscardTags(engine, pi, opts = {}) {
+  const tags = [];
+  try {
+    const gs = engine.gs;
+    const ps = gs.players[pi];
+    const oi = pi === 0 ? 1 : 0;
+
+    // ── Grundtags ────────────────────────────────────────────────
+    const hand = (ps?.hand || []).length;
+    tags.push(hand <= 2 ? 'handTiny' : hand <= 4 ? 'handSmall' : 'handFull');
+    const t = gs?.turn || 0;
+    tags.push(t <= 4 ? 'early' : t <= 9 ? 'mid' : 'late');
+    const kreaturen = engine.cardInstances.filter(c =>
+      (c.controller ?? c.owner) === pi && c.zone === 'support' && !c.faceDown).length;
+    tags.push(kreaturen >= 3 ? 'boardWide' : 'boardThin');
+
+    // ── Sorten-Tags ──────────────────────────────────────────────
+    const kind = opts.kind;
+    if (kind === 'gold') {
+      const g = ps?.gold || 0;
+      tags.push(g <= 5 ? 'goldBroke' : g <= 20 ? 'goldTight' : g <= 50 ? 'goldOk' : 'goldRich');
+    }
+    if (kind === 'damage' || kind === 'burn' || kind === 'poison') {
+      let min = null;
+      for (const h of (gs.players[oi]?.heroes || [])) {
+        if (!h?.name || h.hp <= 0) continue;
+        if (min == null || h.hp < min) min = h.hp;
+      }
+      tags.push(min == null ? 'oppNoHero'
+        : min <= 50 ? 'oppLethalRange' : min <= 150 ? 'oppHurt' : 'oppHealthy');
+      const kreaturenGegner = engine.cardInstances.filter(c =>
+        (c.controller ?? c.owner) === oi && c.zone === 'support' && !c.faceDown).length;
+      tags.push(kreaturenGegner >= 2 ? 'oppBoardWide' : 'oppBoardThin');
+    }
+    if (kind === 'heal') {
+      let schlimmster = null;
+      for (const h of (ps?.heroes || [])) {
+        if (!h?.name || h.hp <= 0) continue;
+        const anteil = h.maxHp > 0 ? h.hp / h.maxHp : 1;
+        if (schlimmster == null || anteil < schlimmster) schlimmster = anteil;
+      }
+      tags.push(schlimmster == null ? 'selfNoHero'
+        : schlimmster <= 0.34 ? 'selfCritical' : schlimmster <= 0.7 ? 'selfHurt' : 'selfHealthy');
+    }
+    if (kind === 'tutor' || kind === 'draw') {
+      const deck = (ps?.mainDeck || []).length;
+      tags.push(deck <= 5 ? 'deckThin' : deck <= 15 ? 'deckMid' : 'deckDeep');
+    }
+    if (kind === 'mill') {
+      // ★ v1041: Eigenes Deck fuettern — derselbe Zwiespalt wie beim
+      // Ziehen: gut fuer Ablage-Decks, gefaehrlich nah am Ausmillen.
+      const deck = (ps?.mainDeck || []).length;
+      tags.push(deck <= 5 ? 'deckThin' : deck <= 15 ? 'deckMid' : 'deckDeep');
+      try {
+        const uebrig = deckTurnsLeft(engine, pi);
+        tags.push((typeof uebrig === 'number' && uebrig <= 4) ? 'deckoutRisk' : 'deckSafe');
+      } catch { /* ohne Helfer kein Tag */ }
+    }
+    if (kind === 'disrupt') {
+      // ★ v1041: Stoerung auf der Gegnerseite (Stun, Entfernen,
+      // Zerstoeren). Nicht der Schaden zaehlt, sondern WIE VIEL beim
+      // Gegner steht — und ob seine Helden schon wackeln.
+      const kreaturenGegner = engine.cardInstances.filter(c =>
+        (c.controller ?? c.owner) === oi && c.zone === 'support' && !c.faceDown).length;
+      tags.push(kreaturenGegner >= 3 ? 'oppBoardWide'
+        : kreaturenGegner >= 1 ? 'oppBoardThin' : 'oppBoardEmpty');
+      let min = null;
+      for (const h of (gs.players[oi]?.heroes || [])) {
+        if (!h?.name || h.hp <= 0) continue;
+        if (min == null || h.hp < min) min = h.hp;
+      }
+      tags.push(min != null && min <= 150 ? 'oppHurt' : 'oppHealthy');
+    }
+    if (kind === 'draw') {
+      // ★ v1039 (Als Vorgabe 12.9.): Beim Ziehen ist der Netto-Gewinn
+      // fest (+1) — die EINZIGE Frage ist, ob man sich ausmillt. Der
+      // Deckrest allein beantwortet das nicht: entscheidend ist, wie
+      // viele Zuege er noch traegt. Genau dafuer gibt es die beiden
+      // Deckout-Helfer, die auch der Trainingsbetrieb benutzt.
+      try {
+        const uebrig = deckTurnsLeft(engine, pi);
+        const gefahr = deckoutDangerSizeOf(engine, pi);
+        const knapp = (typeof uebrig === 'number' && uebrig <= 4)
+          || (typeof gefahr === 'number' && (ps?.mainDeck || []).length <= gefahr);
+        tags.push(knapp ? 'deckoutRisk' : 'deckSafe');
+      } catch { /* ohne Helfer kein Tag */ }
+    }
+    if (kind === 'protect') {
+      // ★ v1039 (Als Vorgabe): Schadensschutz fuer eine eigene Kreatur.
+      // Zwei Fragen: LOHNT sich der Schutz (wie wertvoll ist die beste
+      // eigene Kreatur?) und BRAUCHT sie ihn (sehr zaeh = nein, sehr
+      // zerbrechlich = vermutlich dringend). Ohne Kreatur gibt es
+      // nichts zu schuetzen — das eigene Tag macht diesen Fall im
+      // Training sichtbar, unabhaengig davon, dass die Karte ihn
+      // ohnehin sperren sollte.
+      const eigene = engine.cardInstances.filter(c =>
+        (c.controller ?? c.owner) === pi && c.zone === 'support' && !c.faceDown
+        && !engine.isEquipInZone(c.name, c));
+      if (eigene.length === 0) {
+        tags.push('noCreature');
+      } else {
+        // ★ Die BESTE eigene Kreatur bestimmt beide Tags — ihr Wert und
+        // IHR Zustand. Startwert bewusst `null` statt 0: ohne gelerntes
+        // Profil ist jeder Wert 0, und mit `wert > bestWert` bliebe der
+        // Zustand auf dem Anfangswert stehen — eine fast tote Kreatur
+        // galt dann als „zaeh". Bei Gleichstand entscheidet der
+        // SCHLECHTERE Zustand: die gefaehrdete Kreatur ist die, um die
+        // es geht.
+        let bestWert = null, bestAnteil = 1;
+        for (const inst of eigene) {
+          const cd = engine.getEffectiveCardData(inst);
+          if (!cd || cd.cardType !== 'Creature') continue;
+          // Gelernter Kartenwert; ohne Profil traegt der Rueckfall
+          // (0) nur die HP-Frage — besser als gar kein Tag.
+          const wert = learnedCardValue(engine, pi, inst.name, 0) || 0;
+          const hp = inst.counters?.currentHp ?? cd.hp ?? 0;
+          const maxHp = inst.counters?.maxHp ?? cd.hp ?? 0;
+          const anteil = maxHp > 0 ? hp / maxHp : 1;
+          if (bestWert === null || wert > bestWert
+              || (wert === bestWert && anteil < bestAnteil)) {
+            bestWert = wert; bestAnteil = anteil;
+          }
+        }
+        bestWert = bestWert || 0;
+        tags.push(bestWert >= 60 ? 'guardPrize' : bestWert >= 30 ? 'guardSolid' : 'guardCheap');
+        tags.push(bestAnteil <= 0.34 ? 'guardSquishy' : bestAnteil >= 0.8 ? 'guardTanky' : 'guardWorn');
+      }
+    }
+    // Vom Aufrufer mitgegebene Sondertags (fuer Einzelfaelle, die keine
+    // Sorte abdeckt).
+    for (const extra of (opts.extra || [])) if (extra) tags.push(String(extra));
+  } catch { /* defensiv */ }
+  return tags;
+}
+
 function discardVsMillDecision(engine, pi, tags) {
   try {
     const prof = profileFor(engine, pi);
@@ -1257,11 +1472,41 @@ function projectImpactFeatures(engine, pi, cardName) {
     if (typeof script?.cpuProjectedDamage !== 'function') return null;
     const proj = script.cpuProjectedDamage(engine.gs, pi, engine);
     if (!proj || !(proj.amount >= 0) || !Array.isArray(proj.targets)) return null;
+    // ★ „Interference"-Minderung (v1049, Als Auftrag 14.9.) ────────────
+    // Trifft die Karte mehrere Ziele in EINEM Schlag, greift auf der
+    // Gegenseite derselbe Schutz wie im echten Schadenspfad. Der Anteil
+    // kommt aus `engine.interferenceShare` — derselben Funktion, die
+    // live den Schaden kürzt. Damit gibt es keine zweite Regelkopie im
+    // Piloten: ändert sich die Regel, ändert sich beides zugleich.
+    //
+    // Al 14.9.: NICHT pauschal „halber Wert", sondern der HALBIERTE
+    // SCHADEN durchgerechnet. Der Unterschied zählt bei Overkill —
+    // 300 Schaden auf einen 100-HP-Helden bleiben halbiert mit 150
+    // tödlich, der Held-Kill fällt also nicht weg. Die Rundung ist die
+    // der Engine (`Math.ceil`, Kartentext „rounded up").
+    //
+    // Nur Ziele MIT Identität (`owner`, bei Helden zusätzlich
+    // `heroIdx`) werden gemindert; ältere Deklarationen ohne diese
+    // Felder verhalten sich unverändert.
+    const mehrfachschlag = proj.targets.filter(t => t && t.hp > 0).length >= 2;
+    const geminderterSchaden = (t) => {
+      if (!mehrfachschlag || t.kind !== 'hero' || t.owner == null || t.heroIdx == null) {
+        return proj.amount;
+      }
+      const hero = engine.gs?.players?.[t.owner]?.heroes?.[t.heroIdx];
+      if (!hero) return proj.amount;
+      let anteil = 0;
+      try { anteil = engine.interferenceShare(t.owner, hero) || 0; } catch { anteil = 0; }
+      if (anteil <= 0) return proj.amount;
+      if (anteil >= 1) return 0;
+      return Math.ceil(proj.amount * (1 - anteil));
+    };
     let dmg = 0, hk = 0, ck = 0;
     for (const t of proj.targets) {
       if (!t || !(t.hp > 0)) continue;
-      dmg += Math.min(proj.amount, t.hp);   // Overkill zählt nicht als Schaden
-      if (proj.amount >= t.hp) { if (t.kind === 'hero') hk++; else ck++; }
+      const betrag = geminderterSchaden(t);
+      dmg += Math.min(betrag, t.hp);   // Overkill zählt nicht als Schaden
+      if (betrag >= t.hp) { if (t.kind === 'hero') hk++; else ck++; }
     }
     return { dmg, hk, ck };
   } catch { return null; }
@@ -3016,6 +3261,8 @@ module.exports = {
   deckDrainPerTurn,
   deckTurnsLeft,
   discardVsMillDecision,
+  costDiscardDecision,
+  costDiscardTags,
   startHandScore,
   heroEffectTimingPrior,
   boardPairBonus,

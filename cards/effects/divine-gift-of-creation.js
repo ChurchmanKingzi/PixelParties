@@ -11,6 +11,13 @@
 const { baseCardName } = require('./_hooks');
 
 module.exports = {
+  // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
+  // dieser Karte (Search your deck for up to 2 cards … add them to your hand.)
+  // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht
+  // erst spielbar. Handgesetzt: die Autoerkennung laesst sie durch,
+  // weil daneben noch eine Kosten-/Nachteilszeile steht bzw. weil sie
+  // ueber `takeFromPile` statt ueber die erkannten Helfer geht.
+  blockedBySearchLock: true,
   inherentAction: true,
   oncePerGame: true,
   oncePerGameKey: 'divineGift',
@@ -46,6 +53,7 @@ module.exports = {
       const maxPicks = Math.min(2, galleryCards.length);
       const result = await engine.promptGeneric(pi, {
         type: 'cardGalleryMulti',
+        searchToHand: true,   // v1118: Suche AUF DIE HAND
         cards: galleryCards,
         selectCount: maxPicks,
         minSelect: 1,

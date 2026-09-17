@@ -82,6 +82,15 @@ const COST_NAME    = 'Rebelliokai Timid Tanuki';
 const MAX_BOUNCE   = 3;
 
 module.exports = {
+  // ★ v1119 (Als Liste 15.9.: „VIELE davon haben Search als ihren
+  // einzigen Effekt und muessten entsprechend komplett geblockt und gar
+  // nicht erst aktivierbar sein").
+  //
+  // Grund hier: Rueckmischen + Suche; ohne Suche bleibt nur Kosten und Zugende.
+  // Unter einer Deck-Such-Sperre bleibt nichts uebrig, was die Karte
+  // noch tun koennte — sie wird deshalb schon in der Hand ausgegraut.
+  blockedBySearchLock: true,
+
   // Mischt aus HAND bzw. ABLAGE ins eigene Deck zurueck. Von
   // Distracting Crystal gesperrt und von Hatusbal, the Leader of
   // Tusca mitgelesen. Als Ruling 16.8.: der Krystall deckt NUR

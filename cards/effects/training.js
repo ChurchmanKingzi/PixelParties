@@ -165,6 +165,8 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
 
     const discardResult = await engine.promptGeneric(playerIdx, {
       type: 'forceDiscardCancellable',
+      costFor: 'Training',          // ★ v1041: Kosten-Abwurf-Lernkanal
+      costKind: 'tutor',
       title: 'Training — Discard Cost',
       description: `Discard 1 card to search your deck for an Ability for ${heroName}.`,
       cancellable: true,

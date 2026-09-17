@@ -1,3 +1,4 @@
+// COST-DISCARD-CHANNEL: n/a — wirft sich selbst ab, keine Wahl aus der Hand (v1041)
 // ═══════════════════════════════════════════
 //  CARD EFFECT: "Loyal Bone Dog"
 //  Creature (Summoning Magic Lv1) — 50 HP
