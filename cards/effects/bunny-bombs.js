@@ -75,6 +75,13 @@ function collectBoardTargets(engine, selfId) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
 
   // ── CPU-Bewertungshinweis ─────────────────────────────────────────
@@ -156,6 +163,18 @@ module.exports = {
         }
         await engine._delay(300);
 
+        // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „Deal damage …
+        // to all targets on the board" ist ein Schlag auf mehrere Ziele —
+        // beides fehlte bisher.
+        {
+          const lebendeHelden = heroes.filter(t => t.hero.hp > 0);
+          const lebendeKreaturen = creatures.filter(i => i.zone === 'support');
+          await engine.beginAoeStrike(lebendeHelden.length + lebendeKreaturen.length, {
+            creatures: lebendeKreaturen, source: ctx.card,
+            amount: damage, type: 'creature', sourceOwner: pi,
+          });
+        }
+        try {
         for (const t of heroes) {
           if (t.hero.hp <= 0) continue;                     // schon gefallen
           await ctx.dealDamage(t.hero, damage, 'creature');
@@ -166,6 +185,9 @@ module.exports = {
             ctx.card, inst, damage, 'creature',
             { sourceOwner: pi, canBeNegated: true },
           );
+        }
+        } finally {
+          engine.endMultiHit();
         }
       } finally {
         gs._deferGameOverCheck = Math.max(0, (gs._deferGameOverCheck || 1) - 1);

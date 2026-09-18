@@ -41,6 +41,12 @@ function stacksOf(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'weapon_unleashing' }, impactMs: 260 },
+
   activeIn: ['hand', 'discard'],
   // Als Korrektur 6.9.: KEINE Reaction (cards.json: Subtype Normal),
   // sondern eine ganz normale INHERENTE Zusatzaktion — das Spielen

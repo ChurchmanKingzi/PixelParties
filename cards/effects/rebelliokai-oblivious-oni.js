@@ -47,6 +47,13 @@ const HOPT_KEY        = 'rebelliokai-oblivious-oni-aoe';
 const SUMMON_THRESHOLD = 5;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'club_bash' }, impactMs: 260,
+  },
+
   selfDeleteOnExternalDiscard: true,
   activeIn: ['support'],
   creatureEffect: true,

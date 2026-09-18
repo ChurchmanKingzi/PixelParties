@@ -78,6 +78,15 @@ function zieleAuf(engine, seite) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
+  // Negation spielt die Engine diese Bilder, damit der abgewehrte
+  // Zauber sichtbar bleibt.
+  spellVisual: {
+    projectile: { emoji: '•', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'arrow_impact' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Blinded-Gate: die Karte oeffnet eine Zielwahl.
 
@@ -179,7 +188,17 @@ module.exports = {
       let vonSlot = -1;
       let schaden = atk;
 
-      engine.beginMultiHit(kette.length);
+      // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen der Kette an
+      // das Anti-AoE-Fenster (Deepsea Idol).
+      await engine.beginAoeStrike(kette.length, {
+        creatures: kette
+          .filter(z => z.type !== 'hero')
+          .map(z => z.cardInstance || engine.cardInstances.find(c =>
+            c.owner === z.owner && c.zone === 'support'
+            && c.heroIdx === z.heroIdx && c.zoneSlot === z.slotIdx))
+          .filter(Boolean),
+        source: attackSource, amount: atk, type: 'attack', sourceOwner: pi,
+      });
       try {
         for (const ziel of kette) {
           const zielSlot = ziel.type === 'hero' ? -1 : ziel.slotIdx;

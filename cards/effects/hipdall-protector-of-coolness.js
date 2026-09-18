@@ -13,6 +13,13 @@ const CARD_NAME = 'Hipdall, Protector of Coolness';
 const HOPT_KEY  = 'hipdallRecoverThisTurn';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'coolness_summon' }, impactMs: 260,
+  },
+
   activeIn: ['support', 'coolnessStack'],
   summonableFromCoolnessStack: true,
 

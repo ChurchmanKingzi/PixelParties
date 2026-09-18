@@ -25,6 +25,13 @@ const MAX_PER_TURN = 3;
 const { usesLeft, spendUse } = require('./_charges');
 const USE_KEY = 'hountriever';
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'gold_sparkle' }, impactMs: 260,
+  },
+
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
   chargesPerTurn: 3,

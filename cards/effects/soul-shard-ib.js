@@ -32,6 +32,13 @@ const CARD_NAME = 'Soul Shard Ib';
 const HEAL_PER_CREATURE = 40;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'heal_sparkle' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
   bypassNecromancyNegation: true,
   canSummon: canSummonSoulShard,

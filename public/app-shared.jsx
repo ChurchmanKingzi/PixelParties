@@ -959,6 +959,39 @@ const ZONE_ANIM_SFX = {
     { name: 'elem_dark', opts: { rate: 0.85, volume: 1.0 } },
     { name: 'reveal',    opts: { rate: 1.1, volume: 0.7, delay: 320, category: null, dedupe: 0 } },
   ],
+  // ★★ v1170 — „Cleansing of the Land": leise Feuergeraeusche, die mit
+  // der Wand ueber das Brett wandern (Al 17.9.).
+  fire_sweep: [
+    // v1171: lauter (Al 17.9.: „noch zu leise").
+    { name: 'elem_fire', opts: { rate: 0.62, volume: 1.0 } },
+    { name: 'burn',      opts: { rate: 0.9,  volume: 0.8, delay: 620, category: null, dedupe: 0 } },
+    { name: 'elem_fire', opts: { rate: 0.8,  volume: 0.7, delay: 1250, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1176 — „Memory Blast": der Einschlag klingt nach seiner Wucht
+  // (`power` = Schaden ÷ voller Wucht). Leise und kurz bei duenner
+  // Ablage, tief und wuchtig bei voller.
+  dark_blast: ({ power }) => {
+    const p = Math.max(0, Math.min(1, typeof power === 'number' ? power : 0.5));
+    const teile = [
+      { name: 'elem_dark',     opts: { rate: 1.05 - p * 0.35, volume: 0.55 + p * 0.45 } },
+      { name: 'heavy_impact',  opts: { rate: 1.1 - p * 0.4, volume: 0.45 + p * 0.5, delay: 120, category: null, dedupe: 0 } },
+    ];
+    if (p > 0.55) {
+      teile.push({ name: 'critical_strike', opts: { rate: 0.85, volume: 0.5 + p * 0.3, delay: 230, category: null, dedupe: 0 } });
+    }
+    return teile;
+  },
+  // ★★ v1177 — „MOE Shield": ein heller Kling beim Aufbluehen, ein
+  // weicher Nachklang beim Verblassen.
+  moe_heart: [
+    { name: 'buff',   opts: { rate: 1.35, volume: 0.95 } },
+    { name: 'heal',   opts: { rate: 1.25, volume: 0.55, delay: 280, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1178 — der abgewehrte Zauber zerschellt am Herz-Schild.
+  negate_shatter: [
+    { name: 'negate',       opts: { rate: 1.05, volume: 0.95 } },
+    { name: 'critical_strike', opts: { rate: 1.3, volume: 0.45, delay: 110, category: null, dedupe: 0 } },
+  ],
   golden_explosion: [
     { name: 'heavy_impact', opts: { rate: 1.15, volume: 0.95 } },
     { name: 'gold_gain',    opts: { rate: 1.0, volume: 0.9, delay: 320, category: null, dedupe: 700 } },
@@ -1340,6 +1373,63 @@ const ZONE_ANIM_SFX = {
   slimy_heal_goo:          null,
   heart_burst:             null,
   steam_puff:              null,
+  // ★★ v1188 „Tempeluna, the Convergence Fairy": ZISCHENDER DAMPF.
+  // Einen eigenen Dampf-Klang gibt es im 52er-Katalog nicht. Flamme
+  // trifft Wasser, also zwei Schichten: `elem_water` deutlich HOEHER
+  // gefahren gibt das Zischen, `elem_wind` darunter das Wallen der
+  // Schwaden. Beide leise — der Dampf laeuft ueber zwei Sekunden und
+  // soll den Aufstiegsklang nicht zudecken.
+  // ★★ v1191 „Dive Down": der Held versinkt. `elem_water` ist der
+  // vorhandene Wasser-Klang; etwas TIEFER gefahren, weil es ein
+  // Untertauchen ist und kein Spritzer, und mit kurzem Verzug, damit
+  // er mit der steigenden Wasserlinie kommt statt mit dem Ereignis.
+  // ★ v1192 (Al: „zu leise"): beide Schichten deutlich lauter. Der
+  // Wasserklang laeuft jetzt auf voller Lautstaerke, der Sog darunter
+  // auf 0.85 statt 0.5 — er soll als Tiefe hoerbar sein, nicht nur
+  // geahnt.
+  dive_down: [
+    { name: 'elem_water', opts: { rate: 0.82, volume: 1, delay: 120 } },
+    // Zweite Schicht: `elem_wind` tief gefahren als dumpfer Sog unter
+    // Wasser. Einen eigenen Tauch-Klang gibt es im 52er-Katalog nicht.
+    { name: 'elem_wind',  opts: { rate: 0.6, volume: 0.85, delay: 420 } },
+  ],
+  tempeluna_steam: [
+    { name: 'elem_water', opts: { rate: 1.6, volume: 0.55 } },
+    { name: 'elem_wind',  opts: { rate: 0.9, volume: 0.4, delay: 180 } },
+  ],
+  // Der Moment, in dem die beiden Feen zusammenfallen und Tempeluna
+  // erscheint — vor der Loeschsequenz, also VOR dem regulaeren
+  // `ascension`-Klang des Aufstiegs-Logs.
+  tempeluna_converge:      { name: 'ascension', opts: { rate: 1.18, volume: 0.9 } },
+  // ★★ v1192: eine Fee wird angelegt und ihr Effekt geht ueber. Zwei
+  // Schichten — `reveal` hell als Funkeln, darunter ein kurzer
+  // Dampfstoss (`elem_water` hoch gefahren, wie beim Aufstieg).
+  // ★★ v1194: `category: null` an JEDER Schicht. Ohne das landen alle
+  // drei in der Sammelkategorie 'effect', die pro Rahmen genau EINEN
+  // Klang durchlaesst — und der war hier schon vom `placement`-Klang
+  // des Karten-Flugs belegt, der unmittelbar davor laeuft. Ergebnis:
+  // man hoerte GAR NICHTS (Als Befund 18.9.). Muster von
+  // `ddg_manifest` / `buff` / `elem_wind` weiter oben: eigener Slot
+  // plus `dedupe`, damit eine Serie trotzdem nicht matscht.
+  // ★★ v1196 „Golden Apple": Gold wechselt den Besitzer. `gold_gain`
+  // ist der vorhandene Muenzklang, etwas tiefer fuer das Gewicht eines
+  // ganzen Helden; darunter `elem_holy` als warmer Schein. Eigene
+  // Slots, sonst laesst die Sammelkategorie nur einen durch (CARD_API ⑤).
+  golden_apple_burst: [
+    { name: 'gold_gain',  opts: { rate: 0.85, volume: 1, category: null, dedupe: 600 } },
+    { name: 'elem_holy',  opts: { rate: 1.1, volume: 0.7, delay: 220, category: null, dedupe: 600 } },
+  ],
+  tempeluna_infuse: [
+    // ★ `elem_holy` ist die TRAGENDE Schicht (Als Vorgabe): die
+    // Uebergabe eines Feen-Effekts klingt geweiht, nicht technisch.
+    { name: 'elem_holy',  opts: { volume: 1, category: null, dedupe: 600 } },
+    { name: 'reveal',     opts: { rate: 1.25, volume: 0.9, delay: 90, category: null, dedupe: 600 } },
+    { name: 'elem_water', opts: { rate: 1.55, volume: 0.55, delay: 200, category: null, dedupe: 600 } },
+  ],
+  // Die geloeschte Fee. `hero_death` waere falsch (sie faellt nicht,
+  // sie wird ausgeloescht); `negate` ist der vorhandene „ist weg"-Klang,
+  // tiefer gefahren fuer das Gewicht eines Helden.
+  tempeluna_erase:         { name: 'negate', opts: { rate: 0.8, volume: 0.95, delay: 120 } },
   dark_gear_spin_cw:       null,
   dark_gear_spin_ccw:      null,
   cloud_gather:            null,
@@ -1456,10 +1546,17 @@ const ZONE_ANIM_NONEFFECT = new Set([
 const ZONE_ANIM_MOUNT_DELAY_MS = 100;
 window.ZONE_ANIM_MOUNT_DELAY_MS = ZONE_ANIM_MOUNT_DELAY_MS;
 
-function playSFXForZoneAnim(type) {
+function playSFXForZoneAnim(type, payload = {}) {
   if (!type) return;
   if (!(type in ZONE_ANIM_SFX)) return;
-  const entry = ZONE_ANIM_SFX[type];
+  let entry = ZONE_ANIM_SFX[type];
+  // ★★ v1176: Ein Eintrag darf eine FUNKTION sein und die Nutzlast der
+  // Animation lesen — so richtet sich der Klang nach der Wucht
+  // (`power`), statt fuer jede Groesse gleich zu klingen.
+  if (typeof entry === 'function') {
+    try { entry = entry(payload || {}); }
+    catch (err) { console.error('[ZONE_ANIM_SFX]', type, err.message); return; }
+  }
   if (!entry) return;
   // v702: ein Eintrag darf auch eine SEQUENZ sein (Array von
   // {name, opts}) — fuer Animationen, die ueber ihre Laufzeit mehrere
@@ -2673,6 +2770,16 @@ const BAND_GRADIENTS = [
   'linear-gradient(to right, transparent 0%, rgba(200,100,255,.05) 10%, rgba(160,60,255,.3) 25%, rgba(255,60,255,.35) 40%, rgba(100,60,255,.3) 55%, rgba(180,100,255,.25) 70%, rgba(200,100,255,.05) 85%, transparent 100%)',
 ];
 
+// ★ v1205 — Bandpalette der Diamond Rares (Als Vorgabe 18.9.:
+// „tuerkis-blaues Theming"). Bewusst KEINE Regenbogenverlaeufe wie bei
+// der Secret Rare: Diamond bleibt in Tuerkis/Aqua/Tiefblau mit weissem
+// Glanz, sonst sind die beiden Seltenheiten nicht auseinanderzuhalten.
+const DIAMOND_BAND_GRADIENTS = [
+  'linear-gradient(to right, transparent 0%, rgba(255,255,255,.05) 10%, rgba(64,224,208,.42) 26%, rgba(150,255,245,.5) 40%, rgba(60,190,230,.42) 56%, rgba(40,150,225,.3) 72%, rgba(255,255,255,.05) 86%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, transparent 22%, rgba(200,255,250,.5) 44%, rgba(255,255,255,.7) 50%, rgba(200,255,250,.5) 56%, transparent 78%, transparent 100%)',
+  'linear-gradient(to right, transparent 0%, rgba(120,235,245,.06) 12%, rgba(45,175,205,.36) 28%, rgba(120,250,235,.44) 44%, rgba(80,200,255,.36) 60%, rgba(140,245,230,.26) 74%, transparent 100%)',
+];
+
 // Sparkle positions — secret rare (warm)
 const SPARKLE_POSITIONS = [
   { x: 15, y: 20, color: '#ffe080', dur: 2.2, delay: 0 },
@@ -2689,76 +2796,511 @@ const SPARKLE_POSITIONS = [
   { x: 20, y: 40, color: '#ffe0a0', dur: 2.3, delay: 1.9 },
 ];
 
-// Sparkle positions — diamond rare: white + teal sparkles, no bands
+// Sparkle positions — diamond rare. ★ v1205: durchgehend tuerkis-blau,
+// weisse Glanzpunkte nur noch als Akzent dazwischen.
 const DIAMOND_SPARKLE_POSITIONS = [
   { x: 15, y: 10, color: '#ffffff', dur: 1.5, delay: 0.0 },
-  { x: 80, y: 8,  color: '#70e8d0', dur: 1.7, delay: 0.4 },
-  { x: 45, y: 28, color: '#ffffff', dur: 1.4, delay: 0.9 },
-  { x: 8,  y: 45, color: '#80f0e0', dur: 1.6, delay: 0.2 },
+  { x: 80, y: 8,  color: '#40e0d0', dur: 1.7, delay: 0.4 },
+  { x: 45, y: 28, color: '#8ff8ea', dur: 1.4, delay: 0.9 },
+  { x: 8,  y: 45, color: '#5ad7e8', dur: 1.6, delay: 0.2 },
   { x: 70, y: 42, color: '#ffffff', dur: 1.3, delay: 1.1 },
-  { x: 35, y: 55, color: '#90f0e8', dur: 1.8, delay: 0.6 },
-  { x: 88, y: 58, color: '#ffffff', dur: 1.5, delay: 1.4 },
-  { x: 20, y: 75, color: '#70e0d0', dur: 1.4, delay: 0.3 },
+  { x: 35, y: 55, color: '#48c8f0', dur: 1.8, delay: 0.6 },
+  { x: 88, y: 58, color: '#a8fff2', dur: 1.5, delay: 1.4 },
+  { x: 20, y: 75, color: '#40e0d0', dur: 1.4, delay: 0.3 },
   { x: 60, y: 72, color: '#ffffff', dur: 1.7, delay: 1.0 },
-  { x: 50, y: 90, color: '#80eed8', dur: 1.6, delay: 0.7 },
+  { x: 50, y: 90, color: '#6ae8dc', dur: 1.6, delay: 0.7 },
 ];
 
-// Hook: spawns random shine bands at random intervals
-function useFoilBands(enabled) {
-  const [bands, setBands] = useState([]);
-  const nextId = useRef(0);
-  const timerRef = useRef(null);
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1204 — WIE DIE BAENDER LAUFEN
+//
+//  Bis v1203 schob ein JS-Zeitgeber je Foil-Karte alle 150-850 ms ein
+//  frisches Band in den React-Zustand. Das ist fuer reine Deko teuer:
+//  bei 20 Foil-Karten auf dem Schirm sind das Dutzende Re-Renders je
+//  Sekunde, und jede kostet auf Als Handy genau dort, wo das Brett
+//  ohnehin schon ruckelt.
+//
+//  Jetzt bekommt jede Karte EINMAL fuenf Bandbeschreibungen; laufen
+//  tun sie danach allein per CSS (`foilSweepLoop`, endlos). Jedes Band
+//  belegt nur die ersten 40 % seines Taktes und wartet den Rest
+//  unsichtbar ab. Weil die fuenf Laufzeiten nicht ineinander aufgehen,
+//  ergibt das dieselbe unregelmaessige Dichte wie der Zufallszeitgeber
+//  vorher — im Mittel ein bis zwei Baender gleichzeitig — aber nach
+//  dem ersten Render KEINE React-Arbeit mehr.
+// ═══════════════════════════════════════════════════════════════
 
-  useEffect(() => {
-    if (!enabled) return;
-    const spawn = () => {
-      const id = nextId.current++;
-      const dur = 0.7 + Math.random() * 1.6;
-      const w = 12 + Math.random() * 38;
-      const grad = Math.floor(Math.random() * BAND_GRADIENTS.length);
-      const o = 0.25 + Math.random() * 0.45;
-      const from = -200 - Math.round(Math.random() * 100);
-      const to = Math.ceil(10000 / w) + 200 + Math.round(Math.random() * 100);
+const FOIL_BAND_COUNT = 5;
+const FOIL_DIAMOND_BAND_COUNT = 3;
+const FOIL_MOTE_COUNT = 6;
 
-      setBands(prev => [...prev, { id, dur, w, grad, o, from, to }]);
-      setTimeout(() => setBands(prev => prev.filter(b => b.id !== id)), dur * 1000 + 50);
-      timerRef.current = setTimeout(spawn, 150 + Math.random() * 700);
+/**
+ * Baender einer Karte. Secret Rare: fuenf schmale, schnelle,
+ * regenbogenfarbene Streifen. Diamond Rare: drei breite, deutlich
+ * langsamere in Tuerkis — Licht, das ueber eine geschliffene Flaeche
+ * GLEITET, statt Folie, die blitzt. ★ v1205: dass Diamond ueberhaupt
+ * Baender bekommt, ist neu (vorher nur Schimmer und Funken).
+ */
+function makeFoilBands(isDiamond) {
+  const palette = isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS;
+  const anzahl = isDiamond ? FOIL_DIAMOND_BAND_COUNT : FOIL_BAND_COUNT;
+  return Array.from({ length: anzahl }, (_, i) => {
+    const w = isDiamond ? 26 + Math.random() * 30 : 14 + Math.random() * 26;
+    return {
+      w,
+      grad: Math.floor(Math.random() * palette.length),
+      o: isDiamond ? 0.45 + Math.random() * 0.3 : 0.35 + Math.random() * 0.35,
+      // Gestaffelt statt frei gewuerfelt: so kann kein Satz entstehen,
+      // in dem alle fuenf fast gleich schnell sind und im Pulk laufen.
+      dur: isDiamond ? 5.2 + i * 1.7 + Math.random() * 1.2
+                     : 2.4 + i * 0.95 + Math.random() * 0.9,
+      delay: -Math.random() * 12,                    // Phase verwuerfeln
+      rot: isDiamond ? 8 + Math.random() * 8 : 16 + Math.random() * 11,
+      from: -200 - Math.random() * 100,              // in % der BANDbreite
+      to: Math.ceil(10000 / w) + 200 + Math.random() * 100,
     };
-    timerRef.current = setTimeout(spawn, Math.random() * 400);
-    return () => clearTimeout(timerRef.current);
-  }, [enabled]);
-
-  return bands;
+  });
 }
 
-// Pure foil overlay renderer — receives bands from parent
-function FoilOverlay({ bands, shimmerOffset, sparkleDelays, foilType }) {
+/** Staubkoerner, die langsam durch das Licht steigen. */
+function makeFoilMotes(isDiamond) {
+  return Array.from({ length: FOIL_MOTE_COUNT }, (_, i) => ({
+    x: 5 + Math.random() * 90,
+    y: 30 + Math.random() * 65,                      // starten unten
+    color: isDiamond ? (i % 2 ? '#8ff3e4' : '#7fd8f5') : (i % 2 ? '#ffe6a8' : '#ffd0f0'),
+    size: 1.5 + Math.random() * 1.5,
+    dur: 4.5 + Math.random() * 4.5,
+    delay: -Math.random() * 9,
+    dx: -14 + Math.random() * 28,
+    dy: -50 + Math.random() * 32,
+    o: 0.45 + Math.random() * 0.5,
+  }));
+}
+
+/** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
+function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType }) {
   const isDiamond = foilType === 'diamond_rare';
-  const sparkles = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
+  const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   return (
     <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '')}>
-      {/* Secret rare: travelling shine bands */}
-      {!isDiamond && bands.map(b => (
-        <div key={b.id} className="foil-band" style={{
-          '--band-dur': b.dur + 's',
+      {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
+             sie ist die Oberflaeche, auf der das Licht der Baender
+             etwas zu tun hat. */}
+      <div className="foil-texture" />
+      {/* 2) Farbige Interferenz der ganzen Karte. */}
+      <div className={isDiamond ? 'foil-iridescent-diamond' : 'foil-iridescent'}
+        style={{ '--shimmer-offset': shimmerOffset }} />
+      {/* 3) Wandernde Lichtstreifen — seit v1205 in BEIDEN Seltenheiten,
+             bei Diamond breiter, flacher geneigt und rund doppelt so
+             langsam (Palette und Takt kommen aus makeFoilBands). */}
+      {(bands || []).map((b, i) => (
+        <div key={'b' + i} className="foil-band" style={{
           '--band-w': b.w + '%',
           '--band-o': b.o,
+          '--band-dur': b.dur + 's',
+          '--band-delay': b.delay + 's',
+          '--band-rot': b.rot + 'deg',
           '--band-from': b.from + '%',
           '--band-to': b.to + '%',
-          backgroundImage: BAND_GRADIENTS[b.grad],
+          backgroundImage: (isDiamond ? DIAMOND_BAND_GRADIENTS : BAND_GRADIENTS)[b.grad],
         }} />
       ))}
-      <div className={isDiamond ? 'foil-iridescent-diamond' : 'foil-iridescent'} style={{ '--shimmer-offset': shimmerOffset }} />
-      {sparkles.map((sp, i) => (
-        <div key={i} className="foil-sparkle"
-          style={{
-            left: sp.x + '%', top: sp.y + '%', color: sp.color,
-            '--sp-dur': sp.dur + 's',
-            '--sp-delay': (sparkleDelays[i % sparkleDelays.length] || 0) + 's',
-          }} />
+      {/* 4) Glanzpunkte und Staub. */}
+      {posn.map((sp, i) => {
+        const f = (sparkles && sparkles[i]) || null;
+        return (
+          <div key={'s' + i} className="foil-sparkle"
+            style={{
+              left: sp.x + '%', top: sp.y + '%', color: sp.color,
+              '--sp-dur': sp.dur + 's',
+              '--sp-delay': (f ? f.delay : sp.delay) + 's',
+              '--sp-size': (f ? f.size : 4.5) + 'px',
+            }} />
+        );
+      })}
+      {(motes || []).map((m, i) => (
+        <div key={'m' + i} className="foil-mote" style={{
+          left: m.x + '%', top: m.y + '%', color: m.color,
+          '--mote-size': m.size.toFixed(1) + 'px',
+          '--mote-dur': m.dur.toFixed(1) + 's',
+          '--mote-delay': m.delay.toFixed(1) + 's',
+          '--mote-dx': m.dx.toFixed(0) + 'px',
+          '--mote-dy': m.dy.toFixed(0) + 'px',
+          '--mote-o': m.o.toFixed(2),
+        }} />
       ))}
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1203 — CardFoil: EINE Stelle fuer die komplette Foil-Schicht
+//
+//  Vorher trug JEDE Anzeigestelle ihre eigene Kopie der immer gleichen
+//  sechs Zeilen (Typ lesen → isFoil → useFoilBands → Zufallsmetadaten
+//  in einem Ref → FoilOverlay). Vier Kopien, und beim Herausloesen des
+//  grossen Tooltips in `CardTooltipContent` fiel die Band-Quelle weg:
+//  dort stand `bands={[]}`, `sparkleDelays={[]}`. Die Karte funkelte
+//  (reine CSS-Animation), aber KEIN Glanzband lief je ueber sie —
+//  genau Als Befund.
+//
+//  Die Bauform dagegen: eine Komponente, die den ganzen Zustand selbst
+//  haelt. Aufrufer schreiben nur noch `<CardFoil card={card} />`; ist
+//  die Karte keine Foil-Karte, rendert sie nichts. Damit kann eine
+//  einzelne Stelle nicht mehr „halb\" angeschlossen sein.
+//
+//  ★ v1204: Es gibt hier keinen Zeitgeber und keinen Zustand mehr —
+//  alles Gewuerfelte entsteht EINMAL je Karte, danach laeuft die
+//  Schicht allein per CSS.
+// ═══════════════════════════════════════════════════════════════
+function CardFoil({ card, foilType }) {
+  const type = foilType || card?.foil || null;
+  const isFoil = type === 'secret_rare' || type === 'diamond_rare';
+  // Je Karte EINMAL gewuerfelt: Baender, Staub, Schimmerphase und der
+  // Versatz der Funken. `card?.name` im Schluessel, damit ein Tooltip
+  // beim Wechsel auf die naechste Karte nicht deren Takt uebernimmt —
+  // sonst laeuft die zweite Karte synchron zur ersten und der Zufall
+  // sieht wie ein Muster aus.
+  const meta = useMemo(() => {
+    if (!isFoil) return null;
+    const isDiamond = type === 'diamond_rare';
+    const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
+    return {
+      shimmerOffset: `${-Math.random() * 5000}ms`,
+      // Groesse je Funken streuen: ein paar grosse Glanzpunkte zwischen
+      // vielen kleinen liest sich als Lichtbrechung, zwoelf gleich
+      // grosse Punkte als Raster.
+      sparkles: posn.map(sp => ({
+        delay: sp.delay + Math.random() * 2,
+        size: 3 + Math.random() * 4,
+      })),
+      bands: makeFoilBands(isDiamond),
+      motes: makeFoilMotes(isDiamond),
+    };
+  }, [type, isFoil, card?.name]);
+  if (!isFoil || !meta) return null;
+  return (
+    <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
+      sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} />
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1206 — ZONEN-EINSCHLAG (Als Vorgabe 18.9.)
+//
+//  „Wird eine Karte in einer Zone platziert (Abilities, Creatures,
+//  Equips, Attachments, Heroes, voellig egal), soll allgemein immer
+//  eine huebsche kleine Particle-Animation gespielt werden."
+//
+//  BEWUSST OHNE REACT. Der Effekt haengt an keinem Bauteil, sondern
+//  wird auf ein beliebiges DOM-Element gelegt — damit koennen Kampf-
+//  brett UND Puzzle-Editor dieselbe Funktion rufen, obwohl ihre
+//  Zonen in voellig verschiedenen Baeumen leben. Dieselbe Bauform
+//  wie die Kartenfluege (`hand-to-board-fly`): eine feste Schicht auf
+//  `document.body`, Koordinaten aus `getBoundingClientRect`.
+//
+//  Der Aufrufer sagt nur WO und WELCHE FARBE; alles Zeitliche steckt
+//  in den Keyframes (style.css). Nach dem Einhaengen passiert kein
+//  JS mehr.
+// ═══════════════════════════════════════════════════════════════
+
+const ZONE_FX_MS = 820;          // Laufzeit des laengsten Teils
+const ZONE_FX_SUMMON_MS = 1300;  // Beschwoerung laeuft laenger
+const ZONE_FX_DEDUPE_MS = 260;   // derselbe Platz feuert nicht zweimal
+const _zoneFxLetzte = new Map();
+
+function _zoneFxSchicht() {
+  let l = document.getElementById('pp-zone-fx-layer');
+  if (!l) {
+    l = document.createElement('div');
+    l.id = 'pp-zone-fx-layer';
+    // Unter den Kartenfluegen (10150), ueber Brett und Karten.
+    l.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:10140;overflow:hidden';
+    document.body.appendChild(l);
+  }
+  return l;
+}
+
+/**
+ * Spielt den Einschlag auf `el`.
+ *   opts.color — Grundfarbe (Standard: Kartentypfarbe des Aufrufers)
+ *   opts.key   — Platzschluessel gegen Doppelausloesung
+ */
+function spawnZoneLandFx(el, opts) {
+  opts = opts || {};
+  // „Play Animations: aus" (Profil) schaltet den Effekt komplett ab —
+  // die globale CSS-Regel wuerde ihn ohnehin auf 0s stauchen, aber so
+  // entstehen die Knoten gar nicht erst.
+  if (!el || window._playAnimations === false) return;
+  const jetzt = (window.performance ? performance.now() : Date.now());
+  if (opts.key) {
+    const l = _zoneFxLetzte.get(opts.key);
+    if (l != null && jetzt - l < ZONE_FX_DEDUPE_MS) return;
+    _zoneFxLetzte.set(opts.key, jetzt);
+  }
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return;                       // nicht gezeichnet
+  if (r.bottom < 0 || r.right < 0
+      || r.top > window.innerHeight || r.left > window.innerWidth) return;   // ausserhalb des Bildes
+
+  // Auf Telefonen die halbe Funkenzahl — dieselbe Schwelle wie der
+  // Lite-Modus in style.css.
+  const sparsam = window.matchMedia
+    && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches;
+  const farbe = opts.color || '#ffd77a';
+  // Grosse Zonen bekommen etwas mehr Funken als kleine, damit der
+  // Einschlag auf einer 64-px-Karte nicht zur Konfettikanone wird.
+  const n = Math.round((sparsam ? 5 : 10) * Math.min(1.5, Math.max(.7, r.width / 70)));
+
+  // Funken in alle Richtungen — vom Einschlag UND von der Beschwoerung
+  // genutzt (★ v1209, Als Befund: „zu klein, weil sie nicht die ganze
+  // Karte highlightet").
+  const funkenHtml = (anzahl) => {
+    const out = [];
+    for (let i = 0; i < anzahl; i++) {
+      const w = (i / anzahl) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
+      const weite = r.width * (0.45 + Math.random() * 0.45);
+      const dx = Math.cos(w) * weite;
+      const dy = Math.sin(w) * weite * 0.72 - 8 - Math.random() * 16;
+      // Der Funke wird als kurzer Strich GEZOGEN, ausgerichtet auf seine
+      // eigene Flugbahn — ein runder Punkt allein liest sich bei dieser
+      // Groesse als Staubkorn, nicht als Funkenflug.
+      const winkelGrad = Math.atan2(dy, dx) * 180 / Math.PI;
+      out.push(`<i class="zone-land-spark" style="--zdx:${dx.toFixed(0)}px;--zdy:${dy.toFixed(0)}px;`
+        + `--zdur:${(560 + Math.random() * 380).toFixed(0)}ms;`
+        + `--zdelay:${(Math.random() * 110).toFixed(0)}ms">`
+        + `<b style="--zang:${winkelGrad.toFixed(0)}deg;`
+        + `--zlen:${(7 + Math.random() * 9).toFixed(0)}px;`
+        + `--zdick:${(2 + Math.random() * 2).toFixed(1)}px"></b></i>`);
+    }
+    return out;
+  };
+
+  const mitte = `left:${(r.left + r.width / 2).toFixed(1)}px;top:${(r.top + r.height / 2).toFixed(1)}px;`;
+  const masse = `--zfx-w:${r.width.toFixed(1)}px;--zfx-h:${r.height.toFixed(1)}px;color:${farbe}`;
+
+  // ★ v1209 (Als Vorgabe 18.9.): DIE BESCHWOERUNG LIEGT IN ZWEI EBENEN.
+  // „Die Lichtsaeule soll durchaus ueber der Karte sein, nur der
+  // Kreis-Teil soll darunter gelayert werden." Also zwei Knoten:
+  //
+  //   UNTEN  — die Runenringe, in den Brettbaum gehaengt (nach den
+  //            Area-Hintergruenden, vor die Ebene mit den Karten).
+  //            Die Karte steht damit IM Kreis.
+  //   OBEN   — Saeule, Schein, Glanzstreifen, Irrlichter und Funken auf
+  //            der festen Schicht. Die highlighten die ganze Karte,
+  //            statt nur unten herum zu leuchten.
+  if (opts.variant === 'summon') {
+    const wirt = el.closest('.board-plane-clip') || el.closest('.pz-plane-clip');
+    const ebene = wirt && wirt.querySelector(':scope > .board-plane, :scope > .pz-board-plane');
+
+    if (wirt && ebene) {
+      // ★ v1209, Als Befund: „nicht mehr mittig unter der Karte und zu
+      // weit unten". Ursache war der OBERFLAECHEN-MASSSTAB: der Wirt
+      // liegt unter `zoom: var(--ui-scale)`, `getBoundingClientRect`
+      // liefert aber echte Fensterpixel. Ungewandelt eingesetzt landet
+      // der Kreis um genau diesen Faktor daneben — derselbe Fall, fuer
+      // den `ppUiScale` seit v837 existiert (Als Befund 8.9. zu den
+      // Untermenues). Im Kampffeld (`ui-noscale`) ist der Faktor 1.
+      const massstab = ppUiScale(wirt);
+      const bezug = wirt.getBoundingClientRect();
+      const unten = document.createElement('div');
+      unten.className = 'zone-land-fx zone-land-summon zone-land-summon-unter';
+      unten.style.cssText =
+        `left:${((r.left + r.width / 2 - bezug.left) / massstab).toFixed(1)}px;`
+        + `top:${((r.top + r.height / 2 - bezug.top) / massstab).toFixed(1)}px;`
+        + `--zfx-w:${(r.width / massstab).toFixed(1)}px;`
+        + `--zfx-h:${(r.height / massstab).toFixed(1)}px;color:${farbe}`;
+      unten.innerHTML =
+        '<i class="zone-summon-ring zone-summon-ring-aussen"><b></b></i>'
+        + '<i class="zone-summon-ring zone-summon-ring-innen"><b></b></i>';
+      wirt.insertBefore(unten, ebene);
+      setTimeout(() => unten.remove(), ZONE_FX_SUMMON_MS + 150);
+    }
+
+    const oben = document.createElement('div');
+    oben.className = 'zone-land-fx zone-land-summon'
+      + ((wirt && ebene) ? '' : ' zone-land-summon-ohne-wirt');
+    oben.style.cssText = mitte + masse;
+    const teileS = [
+      '<i class="zone-land-glow"></i>',
+      '<i class="zone-summon-shine"><b></b></i>',
+      '<i class="zone-summon-beam"></i>',
+    ];
+    // Ohne Wirt (Zonen ausserhalb der Brettebene) muessen die Ringe hier
+    // mitlaufen, sonst fehlt der Kreis ganz.
+    if (!(wirt && ebene)) {
+      teileS.push('<i class="zone-summon-ring zone-summon-ring-aussen"><b></b></i>',
+                  '<i class="zone-summon-ring zone-summon-ring-innen"><b></b></i>');
+    }
+    const nW = sparsam ? 5 : 9;
+    for (let i = 0; i < nW; i++) {
+      // Irrlichter starten auf dem Kreis (also seitlich gestreut) und
+      // steigen die Karte hinauf, leicht schlingernd.
+      teileS.push(`<i class="zone-summon-wisp" style="`
+        + `--wx:${((Math.random() - 0.5) * r.width * 1.3).toFixed(0)}px;`
+        + `--wdx:${((Math.random() - 0.5) * 22).toFixed(0)}px;`
+        + `--wdy:${(-r.height * (0.85 + Math.random() * 0.7)).toFixed(0)}px;`
+        + `--wsize:${(2.5 + Math.random() * 3).toFixed(1)}px;`
+        + `--wdur:${(760 + Math.random() * 420).toFixed(0)}ms;`
+        + `--wdelay:${(Math.random() * 300).toFixed(0)}ms"></i>`);
+    }
+    teileS.push(...funkenHtml(n));
+    oben.innerHTML = teileS.join('');
+    _zoneFxSchicht().appendChild(oben);
+    setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
+    return;
+  }
+
+  const box = document.createElement('div');
+  box.className = 'zone-land-fx';
+  box.style.cssText = mitte + masse;
+
+  const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
+  box.innerHTML = teile.join('');
+  _zoneFxSchicht().appendChild(box);
+  setTimeout(() => box.remove(), ZONE_FX_MS + 150);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1210 — HANDKARTEN NEIGEN SICH VOM ZEIGER WEG
+//
+//  Als Vorgabe 18.9.: „Wenn man eine Karte in der Hand hin- und
+//  herschiebt, werden die anderen Handkarten automatisch so bewegt,
+//  dass ihre Anordnung sich an die neue Reihenfolge anpasst. Ich
+//  moechte, dass die Handkarten sich, wenn sie dadurch bewegt werden,
+//  auch von der aktuellen Cursorposition weg neigen."
+//
+//  Die Neigung faellt mit dem Abstand zum Zeiger ab: die Nachbarn der
+//  Luecke kippen am staerksten weg, weiter aussen wird es schnell
+//  ruhig. Quadratischer Abfall statt linear — linear sieht aus wie
+//  ein Faecher, quadratisch wie ein Verdraengen.
+//
+//  KEIN React: die Werte gehen als CSS-Variable direkt an die Knoten.
+//  Die Hand rendert waehrend eines Zuges ohnehin bei jeder Maus-
+//  bewegung; hier noch Requisiten durchzureichen waere Arbeit ohne
+//  Gegenwert, und die Uebergaenge macht CSS sowieso.
+//
+//  MESSUNG OHNE RUECKKOPPLUNG: gedreht wird die KARTE, gemessen wird
+//  ihr Platz (`slot`), der nie gedreht ist — plus `offsetWidth` der
+//  Karte, das vom `transform` unberuehrt bleibt. Wuerde man den
+//  Kartenrahmen selbst messen, aendert die Neigung die Messung, die
+//  Messung die Neigung, und das Ganze zittert.
+// ═══════════════════════════════════════════════════════════════
+
+// ★ v1211 (Als Vorgabe 18.9.): PAUSCHAL, nicht abgestuft. Der erste
+// Anlauf liess die Neigung mit dem Abstand zum Zeiger abfallen — „sieht
+// so leider gar nicht gut aus". Jetzt steht JEDE Handkarte im selben
+// Winkel, nur die Richtung haengt davon ab, auf welcher Seite des
+// Zeigers sie liegt. Damit ist die Hand waehrend des Ziehens eine klare
+// Geste statt eines weichen Verlaufs.
+//
+// ★ v1212: 5 statt 30 Grad (Als Befund: „viel zu gross"). Die Neigung
+// ist ein Hinweis, keine Faecherbewegung — bei 30 Grad kippten die
+// Karten uebereinander und die Hand war nicht mehr zu lesen.
+const HAND_TILT_GRAD = 5;
+
+function applyHandTilt(slots, mouseX, opts) {
+  opts = opts || {};
+  const els = slots ? Array.from(slots) : [];
+  if (!els.length) return;
+  if (window._playAnimations === false) return;
+  const innen = opts.inner || null;
+  const grad = opts.grad != null ? opts.grad : HAND_TILT_GRAD;
+  for (const el of els) {
+    const ziel = innen ? el.querySelector(innen) : el;
+    if (!ziel) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width) continue;                       // gezogene Karte ist 0 breit
+    // Nur die SEITE entscheidet. Gemessen wird trotzdem der Platz und
+    // nicht die Karte: deren Rahmen dreht sich mit, und eine Messung,
+    // die ihr eigenes Ergebnis beeinflusst, kippt an der Grenze hin und
+    // her.
+    const mitte = r.left + (innen ? ziel.offsetWidth : r.width) / 2;
+    ziel.style.setProperty('--hand-tilt', (mitte < mouseX ? -grad : grad) + 'deg');
+  }
+}
+
+function clearHandTilt(slots, opts) {
+  opts = opts || {};
+  for (const el of (slots ? Array.from(slots) : [])) {
+    const ziel = opts.inner ? el.querySelector(opts.inner) : el;
+    if (ziel) ziel.style.removeProperty('--hand-tilt');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1210 — KLAENGE FUER ZIEHEN UND ABLEGEN (Als Vorgabe 18.9.)
+//
+//  Vier Momente, EINE Stelle — damit Kampf, Puzzle-Editor und
+//  Deck-Bauer nicht drei verschiedene Handschriften bekommen. Die
+//  Auswahl steht hier und nicht in den Aufrufern, damit sie sich an
+//  genau einem Ort aendern laesst.
+//
+//  Die Klaenge sind nach ihrem gemessenen Charakter gewaehlt, nicht
+//  nach ihrem Namen: `ui_click` ist kurz und hell (0,25 s, 95 % der
+//  Energie im ersten Fuenftel) — heruntergestimmt ein Anheben;
+//  `draw` ist der kurze Kartenrutscher; `ui_cancel` faellt ab.
+//  `placement` (1,07 s, dunkel) spielt die Engine beim Landen
+//  ohnehin, hier kommt beim Loslassen nur ein leiser Tick dazu.
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1211 — PEGEL (Als Befund 18.9.: „viel zu leise, beim Pick-Up
+//  hoere ich GAR NICHTS"). Nachgerechnet: `ui_click` traegt eine
+//  Eigenlautstaerke von 0,5 (`SFX_VOLUME_OVERRIDES`), darauf liegt der
+//  globale Daempfer von 0,33 — mit meinen 0,38 kam der Anhebe-Klang bei
+//  rund 6 % Pegel heraus, also gar nicht. Werte ueber 1 sind hier
+//  ausdruecklich zulaessig; die Zahlen unten sind so gewaehlt, dass am
+//  Ausgang ~0,26 bis 0,36 der Nutzerlautstaerke stehen — auf einer
+//  Hoehe mit `placement` (1 x 1 x 0,33 = 0,33), dem Klang, gegen den
+//  sie sich behaupten muessen.
+const CARD_DRAG_SFX = {
+  pickup:  { name: 'ui_click',  opts: { volume: 2.2, rate: 0.90, dedupe: 60 } },  // → .363
+  reorder: { name: 'draw',      opts: { volume: 1.1, rate: 1.12, dedupe: 50 } },  // → .363
+  release: { name: 'ui_click',  opts: { volume: 1.6, rate: 1.30, dedupe: 50 } },  // → .264
+  cancel:  { name: 'ui_cancel', opts: { volume: 1.0, dedupe: 60 } },              // → .330
+};
+function playCardDragSFX(art) {
+  const e = CARD_DRAG_SFX[art];
+  if (e && window.playSFX) window.playSFX(e.name, e.opts);
+}
+
+/** Bequemlichkeit: Einschlag auf das erste Element eines Selektors. */
+function spawnZoneLandFxAt(selektor, opts) {
+  spawnZoneLandFx(document.querySelector(selektor), opts);
+}
+
+/**
+ * Mehrere Einschlaege auf einmal — GESTAFFELT.
+ *
+ * Ein Zustandssprung kann viele Plaetze gleichzeitig fuellen: der
+ * Spielstart legt sechs Helden und ein Dutzend Abilities auf einen
+ * Schlag, ein geladenes Puzzle das ganze Brett. Achtzehn Einschlaege
+ * im selben Bild sind kein Effekt mehr, sondern ein Blitz. Also 45 ms
+ * Versatz je Platz und eine Obergrenze — was darueber liegt, ist
+ * ohnehin ein Aufbau und keine Platzierung.
+ */
+const ZONE_FX_MAX_BATCH = 14;
+function spawnZoneLandFxBatch(liste) {
+  if (!Array.isArray(liste) || !liste.length) return;
+  liste.slice(0, ZONE_FX_MAX_BATCH).forEach((e, i) => {
+    if (i === 0) { spawnZoneLandFxAt(e.selector, e); return; }
+    setTimeout(() => spawnZoneLandFxAt(e.selector, e), i * 45);
+  });
+}
+
+/**
+ * Aussehen eines Einschlags aus der Karte: Farbe nach `typeColor`, und
+ * fuer Kreaturen die Beschwoerungs-Variante.
+ *
+ * Kreatur ist hier: Kartentyp mit „Creature" im Namen (`Creature`,
+ * `Creature/Token`) ODER ein Token MIT HP — die Spielsteine mit HP
+ * (Mummy, Invader, Leprochaun, Biomancy) stehen als Kreatur auf dem
+ * Brett, der Pollution Token und die Puppets nicht.
+ */
+function zoneLandStyle(cardName) {
+  const c = cardName ? window.CARDS_BY_NAME[cardName] : null;
+  if (!c) return { color: '#ffd77a', variant: null };
+  const t = c.cardType || '';
+  const istKreatur = t.includes('Creature') || (t === 'Token' && c.hp != null);
+  return { color: typeColor(t), variant: istKreatur ? 'summon' : null };
 }
 
 // Gallery panel dimensions
@@ -2784,19 +3326,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   useEffect(() => () => clearTimeout(tapRef.current.timer), []);
   const imgUrl = cardImageUrl(card.name, skins);
   const foilType = card.foil; // 'secret_rare' | 'diamond_rare' | null
-  const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
   const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
-  const foilBands = useFoilBands(isFoil);
-  const foilMeta = useRef(null);
-  // Keep foilMeta in sync when isFoil changes (e.g. sort/reorder swaps card at same index)
-  if (isFoil && !foilMeta.current) {
-    foilMeta.current = {
-      shimmerOffset: `${-Math.random() * 5000}ms`,
-      sparkleDelays: SPARKLE_POSITIONS.map(sp => sp.delay + Math.random() * 2),
-    };
-  } else if (!isFoil && foilMeta.current) {
-    foilMeta.current = null;
-  }
 
   // Use shared board tooltip if available (game context), otherwise inline tooltip
   const useSharedTooltip = !!window._boardTooltipSetter;
@@ -2891,7 +3421,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
         onContextMenu={handleContextMenu}
         onMouseEnter={show} onMouseLeave={hide}
         data-card-mini={card.name} data-in-gallery={inGallery ? '1' : undefined}>
-        {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
+        <CardFoil card={card} />
         {imgUrl ? (
           <img src={imgUrl} alt={card.name}
             style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', borderRadius:1 }}
@@ -2931,7 +3461,7 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
                 width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
                 border: ttBorderColor
               }} />
-              {isFoil && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
+              <CardFoil card={card} />
             </div>
           )}
           <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
@@ -3249,6 +3779,30 @@ function doppelFilterAnwenden(karten, wert) {
   return karten.filter(istDoppelKarte);
 }
 
+// ★★ v1192: Abzeichen fuer `hero._targetBlockers` (Engine v1191) —
+// Zielregeln von Karten, die nicht mehr auf dem Brett liegen. Je Karte
+// ein Eintrag; fehlt einer, wird still kein Abzeichen gezeigt.
+const TARGET_BLOCKER_BADGES = {
+  'Dive Down': {
+    icon: '🫧',
+    tooltip: 'Dived Down: Cannot be chosen or hit by the opponent\'s Attacks, '
+      + 'Spells or Creature effects while you control other targets that can be '
+      + 'chosen or hit. Until the end of the turn.',
+  },
+};
+
+// ★★ v1198 (Als Vorgabe 18.9.): „Sie muss einen GROSSEN Marker tragen."
+// Eine Kreatur, die in der Zone eines geliehenen Helden beschworen
+// wurde, steht dauerhaft auf der GEGNERISCHEN Brettseite und gehoert
+// trotzdem mir. Ohne deutliches Zeichen ist das auf einen Blick nicht
+// zu sehen — und es bleibt nach dem Zugende bestehen.
+const CROSS_SIDE_BADGE = {
+  icon: '⚑',
+  tooltip: 'Foreign Ground: This Creature was summoned with a borrowed Hero. '
+    + 'It sits in that Hero\'s Support Zone on the opposing board, but it is '
+    + 'permanently controlled by its summoner.',
+};
+
 function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isOpponentSide }) {
   const badges = [];
   const s = statuses || {};
@@ -3535,7 +4089,26 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // Handliste steht, wuerde das Schild sonst doppelt erscheinen.
   if (s.immune && !isHero) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
   if (s.shielded && !isHero) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
+  if (c.crossSideControlled != null) {
+    badges.push({ key: 'crossSide', icon: CROSS_SIDE_BADGE.icon, tooltip: CROSS_SIDE_BADGE.tooltip, big: true });
+  }
   if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
+  // ★★ v1192: ZIELSPERREN EINER KARTE, DIE NICHT MEHR LIEGT.
+  // `hero._targetBlockers` (Engine v1191) traegt Regeln von Karten, die
+  // sich beim Aufloesen selbst geloescht haben — ohne Abzeichen waere
+  // der Schutz unsichtbar, obwohl er sich wie ein Buff verhaelt. Der
+  // Eintrag nennt nur den Kartennamen; Symbol und Text stehen hier, an
+  // EINER Stelle fuer alle kuenftigen Karten dieser Bauart.
+  if (Array.isArray(s._targetBlockers)) {
+    for (const eintrag of s._targetBlockers) {
+      const beschreibung = TARGET_BLOCKER_BADGES[eintrag?.card];
+      if (!beschreibung) continue;
+      badges.push({
+        key: 'blocker-' + eintrag.card, icon: beschreibung.icon,
+        tooltip: beschreibung.tooltip,
+      });
+    }
+  }
   // v724 (Thicket): harte Unwaehlbarkeit fuer BEIDE Seiten — im
   // Gegensatz zum weichen `untargetable` darueber gibt es hier kein
   // „ausser es ist das einzige Ziel"-Ventil.
@@ -3774,7 +4347,6 @@ function CardTooltipContent({ card, children, imageUrl }) {
   // hero's stats).
   const imgUrl = imageUrl || cardImageUrl(card.name);
   const foilType = card.foil || null;
-  const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
   const displayName = card.displayName || card.name;
   return (
     <>
@@ -3785,7 +4357,7 @@ function CardTooltipContent({ card, children, imageUrl }) {
             border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)'
                  : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none'
           }} />
-          {isFoil && <FoilOverlay bands={[]} shimmerOffset="0ms" sparkleDelays={[]} foilType={foilType} />}
+          <CardFoil card={card} />
         </div>
       )}
       <div style={{ padding: '10px 12px' }}>
@@ -4821,7 +5393,20 @@ window.AppContext = AppContext;
 window.Notification = Notification;
 window.CardMini = CardMini;
 window.FoilOverlay = FoilOverlay;
-window.useFoilBands = useFoilBands;
+// ★ v1203: Die EINE Anschlussstelle fuer Foil-Karten. `FoilOverlay`
+// bleibt exportiert (Rohteil), angeschlossen wird aber ueber CardFoil —
+// `scripts/check-foil.js` haelt das fest. `useFoilBands` ist mit v1204
+// entfallen: die Baender laufen jetzt per CSS, es gibt keinen Hook mehr.
+window.CardFoil = CardFoil;
+// ★ v1206: Zonen-Einschlag. Kampfbrett und Puzzle-Editor rufen
+// dieselbe Funktion — es gibt nur EINE Stelle, die den Effekt kennt.
+window.spawnZoneLandFx = spawnZoneLandFx;
+window.spawnZoneLandFxAt = spawnZoneLandFxAt;
+window.spawnZoneLandFxBatch = spawnZoneLandFxBatch;
+window.applyHandTilt = applyHandTilt;
+window.clearHandTilt = clearHandTilt;
+window.playCardDragSFX = playCardDragSFX;
+window.zoneLandStyle = zoneLandStyle;
 window.VolumeControl = VolumeControl;
 window.CardTooltipContent = CardTooltipContent;
 window.useCardTooltip = useCardTooltip;

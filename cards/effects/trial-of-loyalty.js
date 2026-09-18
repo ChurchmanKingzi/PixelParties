@@ -69,6 +69,12 @@ function eligibleDeckTrials(engine, ps) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'loyalty_birds' }, impactMs: 260 },
+
   // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
   // dieser Karte (Search your deck for up to 5 „Trial of“ … add them to your hand.)
   // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht

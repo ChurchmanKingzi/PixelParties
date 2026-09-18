@@ -32,6 +32,14 @@ const CARD_NAME = 'Energy Drain';
 const HEAL_AMOUNT = 100;
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
+  // Negation spielt die Engine diese Bilder, damit der abgewehrte
+  // Zauber sichtbar bleibt.
+  spellVisual: {
+    projectile: { projectileShape: 'bubble', duration: 520 },
+    stagger: 110, flightMs: 330,
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

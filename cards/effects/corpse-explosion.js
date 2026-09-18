@@ -86,6 +86,12 @@ async function explode(engine, defeatedControllerSide, loc) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'corpse_explosion' }, impactMs: 260 },
+
   // Required so the after-damage hubs still offer this card on the
   // killing blow (without it they skip it on every lethal hit).
   firesOnLethalDamage: true,

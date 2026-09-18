@@ -79,6 +79,13 @@ function blindImpact(engine, pi, helpers) {
 }
 
 module.exports = {
+  // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
+  // Autoerkennung des Loaders haengt an der Schadensklammer —
+  // diese Karte teilt keinen Schaden aus (Blinded auf ALLE gegnerischen Helden), waere
+  // also fuer Engine und CPU-Pilot keine AoE-Karte gewesen.
+  // Deshalb von Hand deklariert (Waechter `check-aoe-text`).
+  hitsMultipleTargets: true,
+
   isPotion: true,
 
   // ── CPU-Sonderlogik (Als Ruling) ─────────────────────────────────

@@ -9,6 +9,15 @@ const CARD_NAME = 'Cannon Tower';
 const DAMAGE    = 150;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { emoji: '💣', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   /**
    * ZWEISTUFIGER VERTRAG (v749) — nur Zielwahl, keine Wirkung.
    *

@@ -19,6 +19,13 @@
 const { countFreeZones, placePollutionTokens } = require('./_pollution-shared');
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'flame_strike' }, impactMs: 260,
+  },
+
   placesPollutionTokens: true,
 
   hooks: {
@@ -71,6 +78,13 @@ module.exports = {
       await engine._delay(400);
 
       // ── Deal damage to ALL targets — heroes individually, creatures batched ──
+      //
+      // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Sie fehlte
+      // hier ganz, obwohl die Karte per Kartentext mehrere Ziele in
+      // EINEM Schlag trifft. Das Anti-AoE-Fenster (Deepsea Idol) oeffnet
+      // der Batch weiter selbst — alle Kreaturen liegen in EINEM Aufruf.
+      engine.beginMultiHit(hitTargets.length);
+      try {
       const creatureBatch = [];
       for (const target of hitTargets) {
         if (target.type === 'hero') {
@@ -97,6 +111,9 @@ module.exports = {
       // Process all creature damage as a single batch
       if (creatureBatch.length > 0) {
         await engine.processCreatureDamageBatch(creatureBatch);
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       // Single sync after all damage — damage numbers appear simultaneously

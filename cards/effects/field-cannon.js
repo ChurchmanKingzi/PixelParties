@@ -9,6 +9,15 @@ const CARD_NAME = 'Field Cannon';
 const DAMAGE    = 300;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { emoji: '💣', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   creatureEffect: true,

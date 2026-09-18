@@ -21,6 +21,12 @@
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'poison_pollen_rain' }, impactMs: 260 },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;

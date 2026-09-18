@@ -28,6 +28,12 @@ module.exports = {
   inherentAction(gs, pi, heroIdx, engine) {
     return T.hasTribute(engine, pi);
   },
+  // ★ v1167: Die Ersetzung KOSTET ein Opfer — das ist eine Handlung des
+  // Helden. Ein eingefrorener, betaeubter oder negierter Held darf sie
+  // deshalb NICHT ausfuehren (der Zonen-Bypass allein waere sonst ein
+  // Freibrief, siehe `heroParalyzed` in der Engine).
+  requiresActiveCaster: true,
+
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
     return T.sacrificeableSlots(engine, pi, CARD_NAME).some(s => s.heroIdx === heroIdx);
   },

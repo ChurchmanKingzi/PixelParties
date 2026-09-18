@@ -73,6 +73,12 @@ function countAllValidTargets(engine) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'flame_pillars' }, impactMs: 260 },
+
   /**
    * Need at least one matching Spell in the controller's discard
    * pile, otherwise the card has no targets to even reach for.
@@ -144,6 +150,16 @@ module.exports = {
         return;
       }
 
+      // ★★ v1185: Der Mehrfachzweig hatte GAR KEINE Flaechenklammer —
+      // weder „Interference" noch „Deepsea Idol" sahen ihn, obwohl er
+      // ein Schlag auf N Ziele ist. `beginAoeStrike` setzt beides; die
+      // Saeulen fallen weiter nacheinander.
+      await engine.beginAoeStrike(selected.length, {
+        creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+        source: dmgSource, amount: PER_TARGET_DAMAGE,
+        type: 'destruction_spell', sourceOwner: pi,
+      });
+      try {
       for (const t of selected) {
         const tSlot = t.type === 'hero' ? -1 : t.slotIdx;
         engine._broadcastEvent('play_zone_animation', {
@@ -162,6 +178,9 @@ module.exports = {
             { sourceOwner: pi, canBeNegated: true },
           );
         }
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.log('dance_of_flame_pillars_multi', {

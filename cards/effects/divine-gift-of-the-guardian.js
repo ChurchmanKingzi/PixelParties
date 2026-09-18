@@ -18,6 +18,13 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'guardian_shield' }, impactMs: 260,
+  },
+
   // CPU: confirm this reaction's "protect?" prompt — the default brain
   // declines cancellable confirms outside a card-cast (damage trigger), and
   // its confirmLabel lacks the reaction-branch marker, so without this it

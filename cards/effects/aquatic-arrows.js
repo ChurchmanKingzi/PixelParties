@@ -70,6 +70,13 @@ function allBoardCreatures(engine) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'whirlpool' }, impactMs: 260,
+  },
+
   isSurprise: true,
 
   // ── TRIGGER: Creature betritt die Gegner-Zone gleicher Position ───
@@ -122,11 +129,19 @@ module.exports = {
     // die Burn-Ticks. Der Klang laeuft ueber ZONE_ANIM_SFX mit
     // dedupe (eine Salve, nicht drei uebereinander).
     const source = { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx ?? -1 };
-    await engine.processCreatureDamageBatch(ziele.map(inst => ({
-      inst, amount: AOE_DAMAGE, type: 'destruction_spell',
-      source, sourceOwner: pi,
-      animType: 'aquatic_arrow_rain',
-    })));
+    // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Das
+    // Anti-AoE-Fenster (Deepsea Idol) oeffnet der Batch selbst —
+    // alle Kreaturen liegen in EINEM Aufruf.
+    engine.beginMultiHit(ziele.length);
+    try {
+      await engine.processCreatureDamageBatch(ziele.map(inst => ({
+        inst, amount: AOE_DAMAGE, type: 'destruction_spell',
+        source, sourceOwner: pi,
+        animType: 'aquatic_arrow_rain',
+      })));
+    } finally {
+      engine.endMultiHit();
+    }
 
     engine.log('aquatic_arrows_volley', {
       player: engine.gs.players[pi]?.username,

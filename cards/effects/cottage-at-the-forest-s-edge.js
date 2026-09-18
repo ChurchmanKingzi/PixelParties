@@ -66,6 +66,13 @@ function revivableHeroes(engine, pi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'holy_revival' }, impactMs: 260,
+  },
+
   // 'hand' so the self-placing onPlay below fires while the card is
   // still in hand, 'area' so the activation stays live once it lies on
   // the board.

@@ -57,6 +57,13 @@ function zielSchluessel(t) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'moe_heart' }, impactMs: 260,
+  },
+
   // Reaction-only: weder `proactivePlay` noch `isReaction` — die Karte
   // ist nie aus der Hand anklickbar und wirkt ausschliesslich durch das
   // Nach-Zielwahl-Fenster.
@@ -105,10 +112,61 @@ module.exports = {
       });
     }
 
+    // ★★ v1177/v1178 (Al 17.9.): Auf JEDEM Ziel, das der Zauber getroffen
+    // haette, blueht ein grosses pinkes Herz auf — als SCHILD. Die
+    // eigene Animation des abgewehrten Zaubers laeuft nicht: sie steckt
+    // in seinem Effekt-Rumpf, und der ist negiert. Gezeigt wird deshalb
+    // der Abwehr-Vorgang selbst: Schilde stehen, der Zauber fliegt vom
+    // Wirker heran und zerschellt an ihnen.
+    // Entdoppelt ueber dieselbe Kennung wie die Zaehlung.
+    // ★★ v1181 (Al 17.9.): Die Herzen erscheinen erst KURZ NACH dem
+    // Beginn der Zauberbilder — sie fangen den Zauber ab, sie kommen ihm
+    // nicht zuvor. Die Engine startet `waehrendBilder` parallel zu den
+    // Bildern des abgewehrten Zaubers; das Zerschellen folgt danach als
+    // `nachBilder`.
+    const gezeigt = new Set();
+    const schilde = [];
+    for (const t of (targets || [])) {
+      if (!t) continue;
+      const key = zielSchluessel(t);
+      if (gezeigt.has(key)) continue;
+      gezeigt.add(key);
+      if (t.owner == null || t.heroIdx == null) continue;
+      schilde.push(t);
+    }
+
     engine.log('moe_shield_negate', {
       player: ps?.username, spell: sourceCard?.name || '?',
       targets: anzahl, kostenlos: anzahl !== 1,
     });
-    return { effectNegated: true };
+    return {
+      effectNegated: true,
+      // Schilde: kurz nach dem Beginn der Zauberbilder.
+      waehrendBilder: async (eng) => {
+        await eng._delay(300);
+        for (const t of schilde) {
+          eng._broadcastEvent('play_zone_animation', {
+            type: 'moe_heart', shield: true,
+            owner: t.owner, heroIdx: t.heroIdx,
+            zoneSlot: t.type === 'hero' ? -1 : (t.slotIdx ?? -1),
+            zoneType: (t.type === 'hero' || t.slotIdx == null) ? undefined : 'support',
+            duration: 2000,
+          });
+        }
+      },
+      // Nachlauf: der abgewehrte Zauber zerschellt an den Herzen.
+      nachBilder: async (eng) => {
+        for (const t of schilde) {
+          eng._broadcastEvent('play_zone_animation', {
+            type: 'negate_shatter',
+            owner: t.owner, heroIdx: t.heroIdx,
+            zoneSlot: t.type === 'hero' ? -1 : (t.slotIdx ?? -1),
+            zoneType: (t.type === 'hero' || t.slotIdx == null) ? undefined : 'support',
+            duration: 900,
+          });
+        }
+        await eng._delay(820);
+      },
+    };
   },
 };

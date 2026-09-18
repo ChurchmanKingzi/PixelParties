@@ -49,6 +49,13 @@ function hostHasWhiteEye(engine, ownerIdx, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'electric_strike' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   // Active in 'hand' for self-cast onPlay; in 'support' for the
@@ -290,7 +297,17 @@ module.exports = {
       // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
       // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
       // Einzeltreffer und der Schutz greift korrekt nicht.
-      engine.beginMultiHit(chosen.length);
+      // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+      // Anti-AoE-Fenster (Deepsea Idol).
+      await engine.beginAoeStrike(chosen.length, {
+        creatures: chosen
+          .filter(t => t.type !== 'hero')
+          .map(t => t.cardInstance || engine.cardInstances.find(c =>
+            c.owner === t.owner && c.zone === 'support' &&
+            c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx))
+          .filter(Boolean),
+        source, amount: dmg, type: 'destruction_spell', sourceOwner: ownerIdx,
+      });
       try {
         for (const t of chosen) {
           if (t.type === 'hero') {

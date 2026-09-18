@@ -35,7 +35,27 @@
 
 const CARD_NAME = 'Alluring Light';
 
+/**
+ * ★ Antwort einer Zielwahl auf das ZIELOBJEKT zurueckfuehren.
+ * `promptEffectTarget` liefert IDs; nur die angebotene Liste kennt die
+ * Felder (`type`, `owner`, `heroIdx`, `slotIdx`, `cardInstance`).
+ */
+function zielVonAntwort(antwort, angebot) {
+  const roh = Array.isArray(antwort) ? antwort[0] : antwort;
+  if (!roh) return null;
+  if (typeof roh === 'object' && roh.type) return roh;     // schon ein Ziel
+  const id = typeof roh === 'object' ? roh.id : roh;
+  return (angebot || []).find(t => t.id === id) || null;
+}
+
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'lure_beacon' }, impactMs: 260,
+  },
+
   requiresTarget: true,
 
   spellPlayCondition(gs, pi, engine) {
@@ -54,14 +74,21 @@ module.exports = {
       const oppIdx = pi === 0 ? 1 : 0;
 
       // ── ① Den ANGREIFER waehlen: ein Held des GEGNERS ─────────────
-      const heldWahl = await engine.promptEffectTarget(pi, engine.getHeroTargets(oppIdx), {
+      const gegnerZiele = engine.getHeroTargets(oppIdx);
+      const heldWahl = await engine.promptEffectTarget(pi, gegnerZiele, {
         title: CARD_NAME,
         description: "Choose an opponent's Hero — it will be lured into attacking.",
         confirmLabel: '✨ Lure!',
-        maxSelect: 1,
+        maxSelect: 1, maxTotal: 1,
         cancellable: true,
       });
-      const angreiferZiel = Array.isArray(heldWahl) ? heldWahl[0] : heldWahl;
+      // ★★ v1172 (Al 17.9.: „nach der Heldenwahl passiert gar nichts"):
+      // `promptEffectTarget` liefert die IDs der gewaehlten Ziele
+      // (`'hero-1-0'`), NICHT die Zielobjekte — dieselbe Falle wie bei
+      // „Ricochet" (v1150). Hier las die Karte `heldWahl[0].heroIdx` an
+      // einer Zeichenkette, bekam `undefined` und brach still ab, bevor
+      // die zweite Zielwahl ueberhaupt aufging.
+      const angreiferZiel = zielVonAntwort(heldWahl, gegnerZiele);
       if (!angreiferZiel) { gs._spellCancelled = true; return; }
       const angreifer = gs.players[oppIdx]?.heroes?.[angreiferZiel.heroIdx];
       if (!angreifer?.name || angreifer.hp <= 0) { gs._spellCancelled = true; return; }
@@ -76,20 +103,23 @@ module.exports = {
         title: CARD_NAME,
         description: `Choose one of YOUR targets for ${angreifer.name} to attack.`,
         confirmLabel: '💥 Take the hit!',
-        maxSelect: 1,
+        maxSelect: 1, maxTotal: 1,
         cancellable: true,
       });
-      const opfer = Array.isArray(opferWahl) ? opferWahl[0] : opferWahl;
+      const opfer = zielVonAntwort(opferWahl, eigene);
       if (!opfer) { gs._spellCancelled = true; return; }
 
       const opferSlot = opfer.type === 'hero' ? -1 : opfer.slotIdx;
       const atk = angreifer.atk || 0;
 
       // ── Animation ① das Anlock-Leuchten auf dem OPFER ─────────────
+      // ★ v1173: laenger stehen lassen (Al 17.9.) — die Ebene raeumt die
+      // Animation nach `duration` ab, der Guss wartet entsprechend.
       engine._broadcastEvent('play_zone_animation', {
         type: 'lure_beacon', owner: opfer.owner, heroIdx: opfer.heroIdx, zoneSlot: opferSlot,
+        duration: 2400,
       });
-      await engine._delay(700);
+      await engine._delay(1300);
 
       // ★ „treated as the chosen Hero attacking" — die Quelle ist der
       // GEGNERISCHE Held, nicht der Spieler dieser Karte. Damit zaehlt

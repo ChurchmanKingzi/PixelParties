@@ -45,6 +45,12 @@ function countCreaturesInOwnDiscard(engine, ps) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'red_cut' }, impactMs: 260 },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js.
 

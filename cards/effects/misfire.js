@@ -59,6 +59,13 @@ function wirkenderHeld(gs, pi, engine) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'electric_strike' }, impactMs: 260,
+  },
+
   // v826: NICHT "nur Stapel-Bewegung" (Hauptwirkung ist die Negation); die Auto-Erkennung
   // des Loaders wuerde sonst unter Knight of Kings [B] die ganze Karte sperren.
   blockedByPileLock: false,

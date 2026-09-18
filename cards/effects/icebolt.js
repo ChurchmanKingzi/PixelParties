@@ -8,6 +8,19 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★★ v1179 — ENTKOPPELTE ZAUBERBILDER: Eisgeschoss zum Ziel, dann die
+  // Eishuelle. Rein visuell.
+  spellVisual: {
+    projectile: {
+      projectileClass: 'projectile-ice-bolt',
+      trailClass: 'projectile-ice-trail',
+      duration: 500,
+    },
+    flightMs: 450,
+    impact: { type: 'ice_encase' },
+    impactMs: 300,
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {
@@ -38,34 +51,13 @@ module.exports = {
 
       if (!target) return; // Cancelled
 
-      // Play ice projectile animation from casting hero to target
-      engine._broadcastEvent('play_projectile_animation', {
-        sourceOwner: ctx.cardHeroOwner,
-        sourceHeroIdx: heroIdx,
-        targetOwner: target.owner,
-        targetHeroIdx: target.heroIdx,
-        targetZoneSlot: target.type === 'equip' ? target.slotIdx : -1,
-        projectileClass: 'projectile-ice-bolt',
-        trailClass: 'projectile-ice-trail',
-        duration: 500,
+      // ★★ v1179: Bilder ueber `spellVisual` (unten) — dieselbe Folge
+      // laeuft auch, wenn der Zauber abgefangen wird.
+      await engine.spielZauberBilder('Icebolt', {
+        owner: ctx.cardHeroOwner, heroIdx, zoneSlot: ctx.card?.zoneSlot,
+        targets: [target],
       });
 
-      await engine._delay(450); // Wait for projectile to arrive
-
-      // Play ice impact animation on target
-      if (target.type === 'hero') {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'ice_encase', owner: target.owner,
-          heroIdx: target.heroIdx, zoneSlot: -1,
-        });
-      } else {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'ice_encase', owner: target.owner,
-          heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
-        });
-      }
-
-      await engine._delay(300);
 
       // Deal 120 damage. Capture cancellation so the Freeze rider
       // skips when the hit was fully negated by a reaction (Idej

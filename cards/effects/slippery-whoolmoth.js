@@ -58,6 +58,13 @@ function eachAliveHeroHasCreature(engine, ownerIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'mammoth_stomp' }, impactMs: 260,
+  },
+
   // 'hand' for the in-hand level reduction; 'support' for the
   // turn-start auto-slide + on-move damage trigger.
   activeIn: ['hand', 'support'],

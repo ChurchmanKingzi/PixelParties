@@ -51,6 +51,13 @@ function getEligibleRedirectHeroes(gs, pi, selected, validTargets) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'heal_sparkle' }, impactMs: 260,
+  },
+
   isTargetRedirect: true,
 
   spellPlayCondition() {

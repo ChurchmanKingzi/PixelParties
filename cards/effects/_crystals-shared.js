@@ -129,6 +129,10 @@ function refreshWeakeningCrystalNegation(engine, opts = {}) {
         if (!hero.statuses) hero.statuses = {};
         hero.statuses.negated = {
           _byWeakeningCrystal: true,
+          // ★ v1169: PASSIV — die Karte auf der Hand haelt den Status
+          // aufrecht. Heilen wirkt nur bis zum naechsten Rundenbeginn,
+          // uebertragen (Tea) geht gar nicht.
+          sourceBound: true,
           appliedTurn: engine.gs?.turn ?? 0,
         };
         neuAngelegt++;

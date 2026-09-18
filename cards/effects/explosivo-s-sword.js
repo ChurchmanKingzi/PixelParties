@@ -173,9 +173,18 @@ async function _explode(ctx, excludeKey) {
   // ist ein Flaechenschlag — der urspruengliche Angriffsschaden des
   // Traegers laeuft getrennt davon und bleibt unberuehrt. Die Klammer
   // sitzt deshalb eng um die Splash-Phase.
-  engine.beginMultiHit(
-    heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length
-    + creatureTargets.filter(i => i && i.zone === 'support').length);
+  // ★★ v1185: dieselbe enge Klammer, jetzt mit Kreaturenmeldung an das
+  // Anti-AoE-Fenster (Deepsea Idol).
+  {
+    const splashKreaturen = creatureTargets.filter(i => i && i.zone === 'support');
+    await engine.beginAoeStrike(
+      heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length
+      + splashKreaturen.length,
+      {
+        creatures: splashKreaturen, source,
+        amount: SPLASH_DAMAGE, type: 'artifact', sourceOwner: pi,
+      });
+  }
   try {
   // Heroes — sequential so each afterDamage / KO chain resolves
   // cleanly. The `heroIdx: -1` source (above) is what keeps Booby

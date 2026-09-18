@@ -223,7 +223,17 @@ module.exports = {
       // — Spike Trap / Anti-Magic etc. already ran in the chain.
       // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
       // gezaehlt wird die ECHTE Zielmenge (verschonte zaehlen nicht).
-      engine.beginMultiHit(targets.filter(t => !sparedIds.has(t.id)).length);
+      // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+      // Anti-AoE-Fenster (Deepsea Idol) — verschonte zaehlen auch dort
+      // nicht mit.
+      await engine.beginAoeStrike(targets.filter(t => !sparedIds.has(t.id)).length, {
+        creatures: targets
+          .filter(t => !sparedIds.has(t.id) && t.kind === 'creature')
+          .map(t => engine.cardInstances.find(c => c.id === t.instId))
+          .filter(Boolean),
+        source: { name: CARD_NAME, owner: pi, heroIdx: ctx.cardHeroIdx },
+        amount: VOLLEY_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
+      });
       try {
       for (const t of targets) {
         if (sparedIds.has(t.id)) continue;

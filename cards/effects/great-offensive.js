@@ -2,7 +2,7 @@
 //  CARD EFFECT: "Great Offensive"
 //  Spell (Destruction Magic + Support Magic, Lv2, Normal)
 //
-//  „All Creatures you control use their active effects an
+//  „All level 2 and lower Creatures you control use their active effects an
 //   additional time (even if they were summoned this turn)."
 //
 //  ── AUSLEGUNG ─────────────────────────────────────────────────────
@@ -70,6 +70,11 @@ function eigeneAktivKreaturen(engine, pi) {
     if (inst.counters?.treatAsEquip) continue;
     const script = loadCardEffect(inst.counters?._effectOverride || inst.name);
     if (typeof script?.onCreatureEffect !== 'function') continue;
+    // ★★ v1167 (Balancing, Al 17.9.): „All LEVEL 2 AND LOWER Creatures".
+    // Massgeblich ist die Karte, die gerade wirkt — bei geliehener
+    // Identitaet (`_cardDataOverride`, Copy Device) also deren Stufe.
+    const cd = engine._getCardDB()[inst.counters?._cardDataOverride || inst.counters?._effectOverride || inst.name];
+    if ((cd?.level ?? 99) > 2) continue;
     out.push(inst);
   }
   out.sort((a, b) => (a.heroIdx - b.heroIdx) || (a.zoneSlot - b.zoneSlot));
@@ -84,6 +89,12 @@ function platzLabel(engine, pi, inst) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'field_standard_rally' }, impactMs: 260 },
+
   // Die CPU waehlt die linkeste offene Creature — dieselbe Reihenfolge,
   // die auch der Rueckfall nimmt. Ohne diesen Eintrag lehnt der
   // generische Responder ab und die Karte fiele nach der ersten

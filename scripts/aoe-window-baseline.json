@@ -1,0 +1,9 @@
+{
+  "blood-moon-under-the-sea.js": "Je zurueckgekehrter Karte ein EIGENER Zielprompt — mehrere Einzelinstanzen nacheinander, kein Flaechenschlag (Als Ruling 12.9.).",
+  "elven-leader.js": "\"Repeat as many times as …\" = 1 Basis + N Wiederholungen, je eine eigene Schadensinstanz (Als Ruling zum Kartentext).",
+  "future-tech-barrage.js": "\"Trigger this effect as many times as …\" — eigenstaendige Ausloesungen mit eigener Zielwahl.",
+  "future-tech-mech.js": "\"Repeat this effect as many times as …\" — je Wiederholung eine eigene Zielwahl und eigene Instanz.",
+  "gigantisaur-stegon.js": "Rueckstoss trifft genau den EINEN Angreifer; die Schleife laeuft ueber die Batch-Eintraege, nicht ueber Ziele.",
+  "kirin-firebreath.js": "\"Deal 50 damage to it as many times as …\" — mehrere Instanzen auf DASSELBE Ziel.",
+  "skeleton-reaper.js": "Kettet nur bei Erfolg weiter und waehlt jedes Mal neu — nacheinander, nie gleichzeitig."
+}

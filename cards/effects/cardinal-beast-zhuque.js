@@ -10,6 +10,13 @@ const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 const { hasCardType } = require('./_hooks');
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'flame_strike' }, impactMs: 260,
+  },
+
   // ── CPU: Ziel-Intercept (Shield-of-Life-Klasse) ──────────────────
   // Cancellable Utility-Ziel ohne baseDamage fällt sonst auf den
   // Engine-Decline durch. Politik: Burn auf GEGNER-Held (brennt dessen Kreaturen mit)

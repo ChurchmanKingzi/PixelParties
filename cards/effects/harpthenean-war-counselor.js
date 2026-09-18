@@ -48,6 +48,13 @@ const DAMAGE_PER_GOLD = 5;
 const DAMAGE_CAP = 300;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'golden_feathers' }, impactMs: 260,
+  },
+
   // Harte Obergrenze dieses Schadens. Minocretes Verdoppler liest sie und
   // klemmt danach wieder auf 300 — "cannot exceed 300" gilt auch mit
   // fremder Hilfe (Als Ruling 8.8.).

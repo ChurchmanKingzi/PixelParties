@@ -50,6 +50,12 @@ function getFreeSupportZonesForHero(ps, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'necromancy_summon' }, impactMs: 260 },
+
   // Player-wide gate (is this card playable AT ALL this turn?). True
   // iff the caster has at least one Skeleton in their discard pile AND
   // at least one of their living Heroes has a free Support Zone.

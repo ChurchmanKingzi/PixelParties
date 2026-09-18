@@ -24,6 +24,13 @@ const CARD_NAME = 'Cataclysm';
 const DAMAGE    = 100;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'cataclysm' }, impactMs: 260,
+  },
+
   // Active in 'hand' so the level reduction hook fires while in hand.
   activeIn: ['hand'],
 
@@ -128,7 +135,17 @@ module.exports = {
       // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
       // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
       // lebenden Ziel greift der Schutz nicht (Als Vorgabe 12.9.).
-      engine.beginMultiHit(heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length + creatureTargets.filter(i => i.zone === 'support').length);
+      // ★★ v1185: `beginAoeStrike` statt `beginMultiHit` — die Klammer
+      // meldet dem Anti-AoE-Fenster (Deepsea Idol) zusaetzlich die
+      // Kreaturen des Schlags.
+      {
+        const lebendeHelden = heroTargets.filter(ht => (gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.hp || 0) > 0).length;
+        const lebendeKreaturen = creatureTargets.filter(i => i.zone === 'support');
+        await engine.beginAoeStrike(lebendeHelden + lebendeKreaturen.length, {
+          creatures: lebendeKreaturen, source,
+          amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
+        });
+      }
       try {
       // Heroes — sequential dealDamage so afterDamage hooks fire cleanly per target.
       for (const ht of heroTargets) {

@@ -90,6 +90,12 @@ function cuteGallery(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'heart_burst' }, impactMs: 260 },
+
   // Loose hand-grey gate: at least one Cute Creature reachable. The
   // per-cast specifics (this Hero's budget + free zones) are resolved
   // in onPlay and cancel cleanly back to hand if unmet.

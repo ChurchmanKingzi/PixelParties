@@ -134,7 +134,16 @@ module.exports = {
       // ★ v1043 („Interference"): ein Schlag, Helden UND Kreaturen.
       // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
       // lebenden Ziel greift der Schutz nicht.
-      engine.beginMultiHit(heroTargets.filter(t => (oppPs.heroes[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length);
+      // ★★ v1185: Klammer meldet die Kreaturen an das Anti-AoE-Fenster.
+      await engine.beginAoeStrike(
+        heroTargets.filter(t => (oppPs.heroes[t.heroIdx]?.hp || 0) > 0).length + creatureTargetIds.length,
+        {
+          creatures: creatureTargetIds
+            .map(id => engine.cardInstances.find(c => c.id === id))
+            .filter(Boolean),
+          source: { name: CARD_NAME, owner: pi, heroIdx },
+          amount: DAMAGE, type: 'decay_spell', sourceOwner: pi,
+        });
       try {
       // ── Step 3: deal damage + apply lockout to every alive opp Hero ──
       for (const t of heroTargets) {

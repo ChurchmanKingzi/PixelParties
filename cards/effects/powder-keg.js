@@ -400,7 +400,14 @@ module.exports = {
         isStatusDamage: false,
         animType: null,
       }));
-      await engine.processCreatureDamageBatch(batch);
+      // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Das
+      // Anti-AoE-Fenster (Deepsea Idol) oeffnet der Batch selbst.
+      engine.beginMultiHit(batch.length);
+      try {
+        await engine.processCreatureDamageBatch(batch);
+      } finally {
+        engine.endMultiHit();
+      }
 
       engine.log('powder_keg_blast', {
         damage: DEATH_DAMAGE,

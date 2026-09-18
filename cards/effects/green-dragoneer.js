@@ -94,6 +94,13 @@ function makeSacrificeSpec(engine) {
 
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'fireball' }, impactMs: 260,
+  },
+
 
   // ── CPU-Bewertungshinweis (v333) ──────────────────────────────────
   // HANDQUELLE: Green Dragoneer reagiert aus der HAND — stirbt ein

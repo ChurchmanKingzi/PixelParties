@@ -91,6 +91,13 @@ function kandidaten(engine, pi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'gold_sparkle' }, impactMs: 260,
+  },
+
   requiresTarget: true,
 
   // Ohne waehlbaren Gegnerhelden ist die Karte gar nicht erst spielbar
@@ -160,11 +167,18 @@ module.exports = {
       // Instanz OHNE Zonenplatz: sie belegt nichts, ist unsichtbar und
       // unzerstoerbar — aber `getActiveHeroEffects` (Equip-Zweig) und der
       // Hook-Verteiler finden sie.
-      const wissen = engine._trackCard(ziel.cardName, pi, 'support', heroIdx, -1);
-      wissen.counters = wissen.counters || {};
-      wissen.counters.treatAsEquip = true;
-      wissen.counters._gainedEffectOnly = true;
-      wissen.isActiveIn = () => true;
+      // ★★ v1186: zentraler Weg statt Handarbeit. `grantHeroEffect`
+      // baut genau diese Traegerinstanz (Support, zoneSlot -1,
+      // `treatAsEquip` + `_gainedEffectOnly`, `isActiveIn`) UND traegt
+      // den Namen in `hero.gainedEffectNames` ein. Das ist derselbe
+      // Eintrag, den der Tooltip schon liest — nur ist er jetzt auch
+      // die Quelle fuer `heroScriptOf`. Dadurch wirken ab v1186 auch
+      // die VERTRAEGE des kopierten Helden (Flags wie Lunas
+      // `firewallModifiers`), nicht mehr nur seine Hooks.
+      const wissen = engine.grantHeroEffect(pi, heroIdx, ziel.cardName,
+        { grund: 'dangerousKnowledge' });
+      if (!wissen) return false;          // schon gelernt oder eigener Name
+      await engine.finishGainedHeroEffects(pi, heroIdx);
 
       if (!ps._dangerousKnowledgeGained) ps._dangerousKnowledgeGained = new Set();
       ps._dangerousKnowledgeGained.add(baseCardName(ziel.cardName));
@@ -175,9 +189,6 @@ module.exports = {
       // mittraegt. Die Liste haengt am HELDEN und wird mitsynchronisiert;
       // der Client zeigt die Namen ganz oben und die vollen Texte im
       // vorhandenen „Inherited Effects"-Block.
-      if (!Array.isArray(user.gainedEffectNames)) user.gainedEffectNames = [];
-      if (!user.gainedEffectNames.includes(ziel.cardName)) user.gainedEffectNames.push(ziel.cardName);
-
       engine._broadcastEvent('play_zone_animation', {
         type: 'gold_sparkle', owner: pi, heroIdx, zoneSlot: -1,
       });

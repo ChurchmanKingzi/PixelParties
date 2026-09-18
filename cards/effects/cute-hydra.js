@@ -84,6 +84,13 @@ function getHostHeroes(engine, pi) {
 // ─── CARD MODULE ─────────────────────────
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'hydra_goo' }, impactMs: 260,
+  },
+
   // 'support' — HOPT effect, counter storage, defeat-redirect listener.
   // The delete-rescue (#1) does NOT go through `activeIn` filtering —
   // the engine calls `beforeDelete(ctx)` as a top-level script export
@@ -398,6 +405,14 @@ module.exports = {
     // damage — not destruction, not status). Cute Hydra spits viscous
     // purple goo onto each target via the dedicated `hydra_goo`
     // animation (see ANIM_REGISTRY in app-board.jsx / app.jsx).
+    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „Bis zu N
+    // verschiedene Ziele, HOPT_DAMAGE auf jedes" ist ein Schlag auf
+    // mehrere Ziele; die Koepfe schlagen weiter nacheinander zu.
+    await engine.beginAoeStrike(selected.length, {
+      creatures: selected.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      source: dmgSource, amount: HOPT_DAMAGE, type: 'creature', sourceOwner: pi,
+    });
+    try {
     for (const target of selected) {
       const tgtZoneSlot = target.type === 'hero' ? -1 : target.slotIdx;
       engine._broadcastEvent('play_zone_animation', {
@@ -417,6 +432,9 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     engine.log('cute_hydra_strike', {

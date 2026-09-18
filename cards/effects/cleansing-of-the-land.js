@@ -48,6 +48,13 @@ function einsetzbar(engine, pi, cd) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'fire_sweep' }, impactMs: 260,
+  },
+
   // ★ SUCH-SPERRE: handgesetzt, mit Grund (Als Ruling 14.9., Gruppe A).
   // Die Autoerkennung laesst die Karte durch, weil sie neben der Suche
   // noch `placeArea` aufruft — das gilt ihr als zweiter Effekt. Hier
@@ -56,7 +63,22 @@ module.exports = {
   // wirkungslos.
   blockedBySearchLock: true,
 
+  /**
+   * ★★ v1170 (Al 17.9.): „While there is at least 1 Area on the board,
+   * this Spell can be used as an additional Action." — dieselbe Form wie
+   * bei „Guardian of Teocuilatl": eine Funktion, die den Brettzustand
+   * liest.
+   */
+  inherentAction(gs) {
+    return (gs.areaZones || []).some(z => Array.isArray(z) && z.length > 0);
+  },
+
+  /**
+   * Spielbar, sobald es etwas zu tun gibt: eine Area auf dem Brett zum
+   * Abraeumen ODER eine Area im Deck zum Holen. (Vorher: nur Letzteres.)
+   */
   spellPlayCondition(gs, pi, engine) {
+    if ((gs.areaZones || []).some(z => Array.isArray(z) && z.length > 0)) return true;
     const db = engine._getCardDB();
     return (gs.players[pi]?.mainDeck || []).some(n => db[n]?.subtype === 'Area');
   },
@@ -80,7 +102,11 @@ module.exports = {
       const areas = [...areaZaehler.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([name, count]) => ({ name, source: 'deck', count }));
-      if (areas.length === 0) { gs._spellCancelled = true; return; }
+
+      // ★★ v1170: „Send all Areas on the board to the discard pile." —
+      // erst abraeumen, dann suchen. Die Feuerwand laeuft waehrenddessen.
+      const areasAufDemBrett = (gs.areaZones || []).some(z => Array.isArray(z) && z.length > 0);
+      if (!areasAufDemBrett && areas.length === 0) { gs._spellCancelled = true; return; }
 
       // ── Die Feuerwalze, auf der HINTERGRUND-Ebene ─────────────────
       engine._broadcastEvent('play_zone_animation', {
@@ -88,6 +114,22 @@ module.exports = {
         owner: pi, heroIdx: -1, zoneSlot: -1, duration: 2200,
       });
       await engine._delay(900);
+
+      if (areasAufDemBrett) {
+        // -2 heisst „keine Seite ausnehmen" — ALLE Areas.
+        const weg = await engine.removeAllAreas(-2, CARD_NAME);
+        engine.log('cleansing_of_the_land_wipe', { player: ps.username, areas: weg });
+        engine.sync();
+        await engine._delay(500);
+      }
+
+      // „You MAY then choose an Area from your deck" — ohne Area im Deck
+      // (oder bei Abbruch) endet die Karte hier; abgeraeumt ist trotzdem.
+      if (areas.length === 0) {
+        engine.log('cleansing_of_the_land', { player: ps.username, card: null, used: false });
+        engine.sync();
+        return;
+      }
 
       const wahl = await engine.promptGeneric(pi, {
         type: 'cardGallery',
@@ -98,11 +140,20 @@ module.exports = {
         cancellable: true,
       });
       const name = wahl?.cardName;
-      if (!name) { gs._spellCancelled = true; return; }
+      // Abbruch ist erlaubt („you MAY"), der Guss bleibt gueltig: das
+      // Abraeumen ist schon passiert.
+      if (!name) {
+        engine.log('cleansing_of_the_land', { player: ps.username, card: null, used: false });
+        engine.sync();
+        return;
+      }
 
       // ① Auf die Hand — kanonischer Deck-Weg.
-      const ok = await engine.actionAddCardFromDeckToHand(pi, name, { source: CARD_NAME });
-      if (!ok) { gs._spellCancelled = true; return; }
+      // „openly add it to your hand" — die Karte wird beim Holen gezeigt.
+      const ok = await engine.actionAddCardFromDeckToHand(pi, name, { source: CARD_NAME, reveal: true });
+      // (`actionAddCardFromDeckToHand` zeigt die Karte von sich aus —
+      // „openly" ist damit erfuellt, ein zweiter Auftritt waere doppelt.)
+      if (!ok) { engine.sync(); return; }
 
       // ② „If one of your Heroes can use that Area, you MAY immediately
       // use it."
@@ -133,7 +184,20 @@ module.exports = {
       const handIdx = (ps.hand || []).indexOf(name);
       if (handIdx < 0 || !einsetzbar(engine, pi, cd)) { engine.sync(); return; }
 
+      // ★★ v1171 (Al 17.9.): Die Karte soll SICHTBAR von ihrem Platz in
+      // der Hand auf das Brett fliegen. `placeArea` meldet nur das
+      // Herabsinken in die Area-Zone — den Weg dorthin muss der Guss
+      // selbst melden, wie jeder andere Hand→Brett-Weg auch.
+      engine._broadcastEvent('play_pile_transfer', {
+        owner: pi, cardName: name,
+        from: 'hand', to: 'area',
+        fromHandIdx: handIdx,
+        finalHandSize: Math.max(0, (ps.hand || []).length - 1),
+      });
       ps.hand.splice(handIdx, 1);
+      engine.sync();
+      await engine._delay(420);
+
       const inst = engine._trackCard(name, pi, 'hand', -1, -1);
       await engine.placeArea(pi, inst);
 

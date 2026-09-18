@@ -15,6 +15,9 @@
 // ═══════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
+// ★ v1196: das Uebernahme-Verfahren liegt im gemeinsamen Modul —
+// „Charme" Lv3, „Love Shot" und „Golden Apple" lesen dieselben Schritte.
+const { temporaereKontrolle } = require('./_charm-shared');
 
 module.exports = {
   // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
@@ -614,15 +617,18 @@ async function _activateLv3(engine, gs, pi, heroIdx, hero, oi, ops) {
   }
 
   // ── Take control ──
-  targetHero.charmedBy = pi;
-  targetHero.charmedFromOwner = oi;
-  targetHero.charmedHeroIdx = sel.heroIdx;
-
-  if (!targetHero.statuses) targetHero.statuses = {};
-  targetHero.statuses.charmed = { controller: pi, appliedTurn: gs.turn };
-
-  if (!gs._charmedSupportLocked) gs._charmedSupportLocked = [];
-  gs._charmedSupportLocked.push({ owner: oi, heroIdx: sel.heroIdx });
+  // ★★ v1196: der Ablauf liegt jetzt in `_charm-shared.js` — dieselben
+  // Schritte, die auch „Golden Apple" braucht. Die Riegel oben
+  // (Erst-Zug, Resistance, Effekt-Immunitaet) hat das Modul ebenfalls;
+  // sie stehen hier bewusst weiterhin davor, weil Charme seinen HOPT
+  // schon vorher verbucht und die Meldungen kartenspezifisch sind.
+  // Charme schuetzt gegen ALLES und sperrt AUCH die Support Zones
+  // („It and its Support Zones are unaffected") — beides der
+  // Grundfall, also keine Marke und `supportZonesLocked: true`.
+  await temporaereKontrolle(engine, {
+    controllerPi: pi, ownerPi: oi, heroIdx: sel.heroIdx,
+    sourceName: 'Charme', supportZonesLocked: true,
+  });
 
   engine.log('charme_control', {
     player: gs.players[pi].username, hero: hero.name,

@@ -50,6 +50,34 @@ const PRO_KARTE = 10;
 const VOLLE_WUCHT = 300;
 
 module.exports = {
+  /**
+   * ★★ v1179 — ENTKOPPELTE ZAUBERBILDER. Eigene Funktion, weil die Wucht
+   * (`power`) Flugdauer und Einschlag skaliert. Rein visuell.
+   * Bei einer Negation kennt die Engine die Wucht nicht — dann steht sie
+   * auf halber Kraft, damit der abgewehrte Stoss trotzdem sichtbar ist.
+   */
+  async spellVisual(engine, info) {
+    const wucht = typeof info.power === 'number' ? info.power : 0.5;
+    const ziel = (info.targets || [])[0];
+    if (!ziel) return;
+    const flug = 620 + Math.round(wucht * 260);
+    engine._broadcastEvent('play_projectile_animation', {
+      sourceOwner: info.owner, sourceHeroIdx: info.heroIdx ?? -1,
+      targetOwner: ziel.owner, targetHeroIdx: ziel.heroIdx,
+      targetZoneSlot: ziel.type === 'hero' ? undefined : ziel.slotIdx,
+      projectileShape: 'darkBlast', noTrail: true,
+      power: wucht, duration: flug, sfx: 'elem_dark',
+    });
+    await engine._delay(flug);
+    engine._broadcastEvent('play_zone_animation', {
+      type: 'dark_blast', power: wucht,
+      owner: ziel.owner, heroIdx: ziel.heroIdx,
+      zoneSlot: ziel.type === 'hero' ? -1 : ziel.slotIdx,
+      duration: 1100,
+    });
+    await engine._delay(420);
+  },
+
   requiresTarget: true,
   // ★ v1107: `neverMultiTarget` ENTFERNT — die Klausel steht nicht mehr
   // auf der Karte.
@@ -105,9 +133,9 @@ module.exports = {
           engine.sync();
           return;
         }
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'dark_blast', power: 0.35,
-          owner: target.owner, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
+        // Rueckholung: derselbe Stoss, nur kleiner.
+        await engine.spielZauberBilder(CARD_NAME, {
+          owner: pi, heroIdx: ctx.cardHeroIdx, targets: [target], power: 0.35,
         });
         await engine._delay(420);
         await engine.actionTransferCreature(inst, pi, ziel.hi, ziel.zi, {
@@ -120,12 +148,12 @@ module.exports = {
 
       // ── Sonst: Schaden ───────────────────────────────────────────
       const wucht = Math.max(0, Math.min(1, schaden / VOLLE_WUCHT));
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'dark_blast', power: wucht,
-        owner: target.owner, heroIdx: target.heroIdx,
-        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+      // ★★ v1179: Bilder ueber `spellVisual` (unten) — dieselbe Folge
+      // laeuft auch, wenn der Zauber abgefangen wird. Die Wucht reicht
+      // die Karte als `power` mit.
+      await engine.spielZauberBilder(CARD_NAME, {
+        owner: pi, heroIdx: ctx.cardHeroIdx, targets: [target], power: wucht,
       });
-      await engine._delay(420);
 
       if (schaden > 0) {
         const quelle = { name: CARD_NAME, owner: pi, controller: pi, heroIdx: ctx.cardHeroIdx };

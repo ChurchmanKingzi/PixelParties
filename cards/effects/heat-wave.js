@@ -121,6 +121,14 @@ function collectTargets(engine, pi, casterHeroIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { emoji: '🔥', trailClass: 'projectile-flame-trail', duration: 520 },
+    stagger: 110, flightMs: 330,
+  },
+
   /**
    * Gate the card out of hand-playability when it would do literally
    * nothing. Over-inclusive on caster identity (see header), which is
@@ -204,6 +212,24 @@ module.exports = {
       const sourceInst = ctx.card;
       const hadFlag = sourceInst?._isAoeCheck;
       if (sourceInst) sourceInst._isAoeCheck = true;
+      // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „Every target on
+      // the board" ist der Lehrbuchfall — es fehlte trotzdem beides.
+      // Gemeldet wird nur, was WIRKLICH Schaden nimmt: die schon
+      // brennenden Ziele (der Rest bekommt Burned, keinen Schaden), und
+      // nur, solange die Schadenssperre nicht laeuft.
+      {
+        const schadensZiele = damageLocked
+          ? []
+          : targets.filter((t, i) => preBurned[i]);
+        await engine.beginAoeStrike(schadensZiele.length, {
+          creatures: schadensZiele
+            .filter(t => t.type !== 'hero')
+            .map(t => engine.cardInstances.find(c => c.id === t.inst.id))
+            .filter(Boolean),
+          source: { name: CARD_NAME, owner: pi, heroIdx },
+          amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
+        });
+      }
       try {
       for (let i = 0; i < targets.length; i++) {
         const t = targets[i];
@@ -251,6 +277,7 @@ module.exports = {
         // already played, which matches the user's spec).
       }
       } finally {
+        engine.endMultiHit();
         // Restore the AoE flag. Defensive: only delete if WE set it —
         // a parent path that already had it set keeps it (currently
         // no such caller, but cheap idempotent cleanup).

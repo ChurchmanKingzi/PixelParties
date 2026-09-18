@@ -63,6 +63,13 @@ const CARD_NAME = 'Hand of Death';
 const HOPT_KEY = 'hand-of-death';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'dark_swarm' }, impactMs: 260,
+  },
+
   activeIn: ['hand', 'discard'],
 
   /** Greys out in hand after one cast this turn. */

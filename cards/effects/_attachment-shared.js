@@ -312,6 +312,10 @@ function anhaengselStatusHooks(CARD_NAME, STATUS_NAME, optionen = {}) {
         ? ctx.target === wirt
         : (ctx.heroOwner === inst.owner && ctx.heroIdx === inst.heroIdx);
       if (!passt || wirt.statuses?.[STATUS_NAME]) return;
+      // ★★ v1168: Wird der Status UEBERTRAGEN (Tea), zieht die Karte mit
+      // um statt abzufallen. Der uebertragende Effekt setzt die Marke vor
+      // dem Heilen und raeumt sie danach wieder ab.
+      if (inst.counters?._anhaengselZiehtUm) return;
       // Alle Kopien hoeren denselben Hook; die erste raeumt ab, die
       // uebrigen finden nichts mehr (sie selbst stehen nicht mehr im
       // Support).

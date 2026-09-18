@@ -48,6 +48,13 @@ function _ownerHasFreeSupportZone(gs, ownerIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'shield_block' }, impactMs: 260,
+  },
+
   isSurprise: true,
   // Opt-in to the engine's _checkDamageSurpriseWindow. Existing
   // surprises (Booby Trap, etc.) do NOT carry this flag and are

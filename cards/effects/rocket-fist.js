@@ -24,6 +24,15 @@
 const CARD_NAME = 'Rocket Fist';
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
+  // Negation spielt die Engine diese Bilder, damit der abgewehrte
+  // Zauber sichtbar bleibt.
+  spellVisual: {
+    projectile: { emoji: '🤜', trailClass: 'rocket-fist-trail', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
 
   hooks: {
     onPlay: async (ctx) => {

@@ -27,6 +27,12 @@ const LV_THRESHOLD = 3;
 const HP_BONUS = 200;
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'green_pulse' }, impactMs: 260 },
+
   // 'hand' fuer das Selbstlegen in die Area Zone, 'area' fuer den
   // passiven Buff-Hook. Bis v902 stand hier NUR 'area' — damit feuerte
   // aus der Hand gar kein Hook, die Karte legte sich nie selbst und

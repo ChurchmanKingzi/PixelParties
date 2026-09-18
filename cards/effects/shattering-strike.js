@@ -44,6 +44,12 @@ async function smash(engine, attackSource, target, amount) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'shattering_strike' }, impactMs: 260 },
+
   // v856 (Als Befund): ohne eine gegnerische Creature ist die Karte
   // wirkungslos — der Kartentext verlangt sie als Ziel. Der Vertrag
   // wird zentral ausgewertet (`hasRequiredTargetKind` in _engine.js):

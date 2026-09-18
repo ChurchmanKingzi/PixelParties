@@ -51,6 +51,14 @@ module.exports = {
     }
     await engine._delay(400); // Beams travel
 
+    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster — „bis zu 2 Ziele,
+    // 100 Schaden auf jedes" ist ein Schlag auf mehrere Ziele.
+    await engine.beginAoeStrike(targets.length, {
+      creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      source: { name: CARD_NAME, owner: pi, heroIdx },
+      amount: DAMAGE, type: 'creature', sourceOwner: pi,
+    });
+    try {
     for (const target of targets) {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
@@ -62,6 +70,9 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     await engine._delay(600); // Beams finish

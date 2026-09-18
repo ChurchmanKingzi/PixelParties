@@ -55,6 +55,12 @@ async function schlag(engine, owner, heroIdx, zoneSlot) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'decapitation' }, impactMs: 260 },
+
   // Reaction-only: weder `proactivePlay` noch `isReaction`, damit die
   // Karte nie aus der Hand anklickbar ist (Corpse-Explosion-Muster).
 

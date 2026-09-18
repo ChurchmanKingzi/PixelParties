@@ -35,6 +35,19 @@ function hasPoisonableOwnCreature(gs, pi, engine) {
 }
 
 module.exports = {
+  // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
+  // Autoerkennung des Loaders haengt an der Schadensklammer —
+  // diese Karte teilt keinen Schaden aus (Gift auf ALLE Kreaturen des Bretts), waere
+  // also fuer Engine und CPU-Pilot keine AoE-Karte gewesen.
+  // Deshalb von Hand deklariert (Waechter `check-aoe-text`).
+  hitsMultipleTargets: true,
+
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'toxic_fumes_gas' }, impactMs: 260 },
+
   // Inherent action while the caster has at least one non-immune Creature
   // on their board — the effect will land a stack on it, satisfying the
   // "additional Action" clause.

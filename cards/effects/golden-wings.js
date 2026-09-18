@@ -168,6 +168,13 @@ async function promptAndApply(engine, pi, promptCtxShim) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'golden_wings' }, impactMs: 260,
+  },
+
   // Zählt als "Spell that places Pollution Tokens" (Als Ruling Juli 2026)
   // — der Token ist hier Einsatz-KOSTEN ("to use this Spell") statt
   // Wirkung, gilt aber trotzdem. Praktisch relevant für Mana Beacons

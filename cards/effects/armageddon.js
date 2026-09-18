@@ -110,6 +110,12 @@ function heldGefeit(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'armageddon' }, impactMs: 260 },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -188,7 +194,15 @@ module.exports = {
       // zaehlt Kreaturen mit, die der Zauber gerade weggeraeumt hat —
       // „the player controlling the most Creatures" meint den Stand
       // NACH der Aufloesung.
-      if (zielzahl >= 2) engine.beginMultiHit(zielzahl);
+      // ★★ v1185: die Klammer meldet dem Anti-AoE-Fenster (Deepsea Idol)
+      // die vollstaendige Kreaturenliste des Schlags — sonst sieht es je
+      // Kreatur einen Batch der Groesse 1 und geht nie auf.
+      if (zielzahl >= 2) {
+        await engine.beginAoeStrike(zielzahl, {
+          creatures: kreaturen, source: quelle,
+          amount: dmg, type: 'destruction_spell', sourceOwner: pi,
+        });
+      }
       try {
         for (const { hero } of helden) {
           if (hero.hp <= 0) continue;

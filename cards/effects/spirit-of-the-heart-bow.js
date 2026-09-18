@@ -68,6 +68,15 @@ function beute(engine, pi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { emoji: '💘', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'love_burst' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
   creatureEffect: true,
   // Holt Ziele auf die eigene Seite — dieselbe Marke, die Boris & Co.

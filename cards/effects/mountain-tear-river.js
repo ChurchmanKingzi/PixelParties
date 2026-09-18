@@ -92,6 +92,13 @@ function isAlreadyBurned(target, engine) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'flame_strike' }, impactMs: 260,
+  },
+
   isSurprise: true,
   // v703: Kartentext „the user or a Creature in one of its Support
   // Zones" — Kreaturenziele oeffnen das Fenster des Slot-Helden.

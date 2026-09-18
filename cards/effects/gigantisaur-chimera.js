@@ -61,6 +61,13 @@ function _availableDistinctGigantisaurNames(ps, engine, excludeHandIdx = -1) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'dino_bite' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
   // Free additional Action — the summon itself doesn't consume the
   // host's action slot. The post-summon advanceToPhase(END) is what

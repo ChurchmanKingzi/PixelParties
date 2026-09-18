@@ -32,6 +32,13 @@ const { discardAttachedIdejCard } = require('./_idej-shared');
 const CARD_NAME = 'Idej Projection';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'idej_projection_absorb' }, impactMs: 260,
+  },
+
   // Only relevant while attached in a Support Zone — inert in hand
   // (it has no play-effect) and elsewhere.
   activeIn: ['support'],

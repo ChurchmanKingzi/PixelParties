@@ -22,6 +22,23 @@ const CARD_NAME = 'Fireball';
 const FIREBALL_DAMAGE = 150;
 
 module.exports = {
+  // ★★ v1179 — ENTKOPPELTE ZAUBERBILDER: ein Feuerball je Ziel vom
+  // Wirker, dann die Flammenexplosion. Rein visuell — kein Zustand.
+  spellVisual: {
+    projectile: {
+      emoji: '🔥',
+      // Das Emoji zeigt von Natur aus nach OBEN; `baseAngle: 90` dreht
+      // es in die Flugrichtung.
+      baseAngle: 90,
+      emojiStyle: { fontSize: 44 },
+      duration: 520,
+    },
+    stagger: 130,
+    flightMs: 300,
+    impact: { type: 'flame_explosion' },
+    impactMs: 220,
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -64,60 +81,71 @@ module.exports = {
       // Staggered so two fireballs read as a quick volley, then we
       // wait out the trailing flight so the impact flames + damage
       // numbers land together with the projectiles.
-      const FLIGHT = 520;
-      const STAGGER = 130;
-      for (let i = 0; i < targets.length; i++) {
-        const t = targets[i];
-        engine._broadcastEvent('play_projectile_animation', {
-          sourceOwner: pi,
-          sourceHeroIdx: srcHeroIdx,
-          // Originate from the CASTER: a Hero cast leaves the source
-          // card's zoneSlot at -1 (→ Hero portrait), while a Creature
-          // performing the Fireball (Chaorc Friendly Fireballer) carries
-          // its own Support-Zone slot (→ the Creature fires it).
-          sourceZoneSlot: ctx.card?.zoneSlot,
-          targetOwner: t.owner,
-          targetHeroIdx: t.heroIdx,
-          targetZoneSlot: t.type === 'hero' ? undefined : t.slotIdx,
-          emoji: '🔥',
-          // The projectile-rotation wrapper assumes an EAST-facing
-          // visual (rotation = the src→tgt angle). The 🔥 emoji points
-          // UP by nature, so it reads 90° off — `baseAngle: 90` rotates
-          // it to lead tip-first along the caster→target axis.
-          baseAngle: 90,
-          emojiStyle: { fontSize: 44 },
-          duration: FLIGHT,
-        });
-        if (i < targets.length - 1) await engine._delay(STAGGER);
-      }
-      await engine._delay(Math.max(FLIGHT - STAGGER * (targets.length - 1), 250));
+      // ★★ v1179: Die Bilder liegen jetzt in `spellVisual` (unten) — die
+      // Engine spielt sie hier UND wenn eine Reaktion den Zauber
+      // abfaengt („MOE Shield"), wo der Effekt selbst nie laeuft.
+      await engine.spielZauberBilder(CARD_NAME, {
+        owner: pi, heroIdx: srcHeroIdx, zoneSlot: ctx.card?.zoneSlot,
+        targets,
+      });
 
       // ── Impact: flame explosion + 150 damage per target ──
       // Reaction/surprise windows already ran inside promptMultiTarget,
       // so skip them here (no nested counter windows per target).
+      // ★★ v1184 (Als Befund 17.9.: „Deepsea Idol triggert nicht"):
+      // Kreaturtreffer laufen jetzt in EINEM Batch, wie bei „Aquatic
+      // Arrows" & Co. Der Einzelweg `actionDealCreatureDamage` verpackt
+      // jeden Treffer in einen eigenen Batch mit genau EINEM Eintrag —
+      // das Fenster fuer „2+ eigene Kreaturen aus einer Quelle"
+      // (Deepsea Idol) ging deshalb nie auf. Helden bleiben beim
+      // Einzelweg; sie haben ihre eigenen Fenster.
+      //
+      // ★★ v1185: Erst SAMMELN, dann klammern, dann schlagen. Die
+      // Flaechenklammer (`beginMultiHit`, „Interference") fehlte hier
+      // ganz — sie braucht die echte Zielzahl, und die steht erst nach
+      // dem Sammeln fest. Das Anti-AoE-Fenster (Deepsea Idol) oeffnet
+      // der Batch weiter selbst, weil alle Kreaturen in EINEM Aufruf
+      // liegen; hier genuegt deshalb die reine Interference-Klammer.
+      const heldenZiele = [];
+      const kreaturZiele = [];
       for (const t of targets) {
         if (t.type === 'hero') {
           const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-          if (!hero?.name || hero.hp <= 0) continue;
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'flame_strike', owner: t.owner, heroIdx: t.heroIdx, zoneSlot: -1,
-          });
-          await engine.actionDealDamage(source, hero, FIREBALL_DAMAGE, 'destruction_spell', {
-            _skipReactionCheck: true,
-          });
+          if (!hero || hero.hp <= 0) continue;
+          heldenZiele.push({ t, hero });
         } else {
           const inst = t.cardInstance
             || engine.cardInstances.find(c =>
               (c.owner === t.owner || c.controller === t.owner)
               && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
           if (!inst) continue;
-          engine._broadcastEvent('play_zone_animation', {
-            type: 'flame_strike', owner: inst.owner, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,
-          });
-          await engine.actionDealCreatureDamage(source, inst, FIREBALL_DAMAGE, 'destruction_spell', {
-            sourceOwner: pi, _skipReactionCheck: true,
-          });
+          kreaturZiele.push(inst);
         }
+      }
+
+      engine.beginMultiHit(heldenZiele.length + kreaturZiele.length);
+      try {
+      for (const { t, hero } of heldenZiele) {
+        if (!hero || hero.hp <= 0) continue;
+        engine._broadcastEvent('play_zone_animation', {
+          type: 'flame_strike', owner: t.owner, heroIdx: t.heroIdx, zoneSlot: -1,
+        });
+        await engine.actionDealDamage(source, hero, FIREBALL_DAMAGE, 'destruction_spell', {
+          _skipReactionCheck: true,
+        });
+      }
+
+      if (kreaturZiele.length > 0) {
+        // `animType` am Eintrag statt eigener Broadcasts — derselbe Weg
+        // wie bei Aquatic Arrows; der Batch spielt die Bilder selbst.
+        await engine.processCreatureDamageBatch(kreaturZiele.map(inst => ({
+          inst, amount: FIREBALL_DAMAGE, type: 'destruction_spell',
+          source, sourceOwner: pi, animType: 'flame_strike',
+          _skipReactionCheck: true,
+        })));
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.log('fireball', {

@@ -227,6 +227,16 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
     await engine._delay(450);
   }
 
+  // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. „That damage is dealt
+  // to ALL targets your opponent controls instead" macht aus einem
+  // Einzeltreffer einen Flaechenschlag — beides fehlte bisher.
+  await engine.beginAoeStrike(heroHits.length + creatureHitIds.length, {
+    creatures: creatureHitIds
+      .map(id => engine.cardInstances.find(c => c.id === id))
+      .filter(Boolean),
+    source: carriedSource, amount, type, sourceOwner: pi,
+  });
+  try {
   // Phase 2: deliver hero damage in turn order — sequential so
   // afterDamage hooks settle per target.
   for (const { hi } of heroHits) {
@@ -244,5 +254,8 @@ async function _spreadDamage(engine, pi, targetCtrlPi, source, amount, type) {
       carriedSource, inst, amount, type,
       { sourceOwner: pi, canBeNegated: true },
     );
+  }
+  } finally {
+    engine.endMultiHit();
   }
 }

@@ -4,7 +4,7 @@
 //  prompts, and the main GameBoard component
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
-const { api, emitSocket, socket, AppContext, CardMini, FoilOverlay, useFoilBands,
+const { api, emitSocket, socket, AppContext, CardMini, CardFoil,
         cardImageUrl, skinImageUrl, typeColor, typeClass, CARDS_BY_NAME, SKINS_DB,
         useStickyHoverFlag } = window;
 
@@ -253,20 +253,11 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
     };
   })();
 
-  // Foil support
+  // Foil support — Bänder, Schimmer und Funken kommen komplett aus
+  // `CardFoil` (app-shared, v1203). Hier bleibt nur die Randklasse, die
+  // am Kartenrahmen selbst haengt.
   const foilType = card?.foil || null;
-  const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
   const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
-  const foilBands = useFoilBands(isFoil);
-  const foilMeta = useRef(null);
-  if (isFoil && !foilMeta.current) {
-    foilMeta.current = {
-      shimmerOffset: `${-Math.random() * 5000}ms`,
-      sparkleDelays: SPARKLE_POSITIONS.map(sp => sp.delay + Math.random() * 2),
-    };
-  } else if (!isFoil && foilMeta.current) {
-    foilMeta.current = null;
-  }
 
   return (
     <div className={'board-card' + (faceDown ? ' face-down' : '') + (flipped ? ' flipped' : '') + (foilClass ? ' ' + foilClass : '')}
@@ -282,7 +273,7 @@ function BoardCard({ cardName, faceDown, flipped, label, hp, maxHp, atk, hpPosit
           setBoardTooltip(tooltipTarget);
         }, window.LONG_PRESS_MS || 400);
       }}>
-      {isFoil && foilMeta.current && <FoilOverlay bands={foilBands} shimmerOffset={foilMeta.current.shimmerOffset} sparkleDelays={foilMeta.current.sparkleDelays} foilType={foilType} />}
+      <CardFoil card={card} />
       {faceDown ? (
         <img src="/cardback.png" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
       ) : imgUrl ? (
@@ -426,6 +417,63 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
       )}
     </div>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1206 — WELCHE KARTE IST NEU IN EINER ZONE?
+//
+//  Der Einschlagseffekt soll bei JEDER Platzierung laufen — aus der
+//  Hand gespielt, per Effekt beschworen, wiederbelebt, gestohlen,
+//  umgezogen, im Puzzle geladen. Einen Kanal je Weg abzuhorchen waere
+//  ein Fass ohne Boden (allein die Kartenskripte platzieren an Dutzenden
+//  Stellen). Also wird nicht der WEG beobachtet, sondern das ERGEBNIS:
+//  jede Zustandsaenderung liefert eine Belegungstabelle
+//  `Platzschluessel -> Stapelhoehe|oberste Karte`, und was sich darin
+//  aendert, ist eine Platzierung.
+//
+//  Der Schluessel traegt die Art mit (`h` Held, `a` Ability, `s`
+//  Support, `x` Surprise, `r` Area, `p` Permanent), damit die
+//  Gegenstelle daraus den DOM-Selektor bauen kann.
+// ═══════════════════════════════════════════════════════════════
+function zonenBelegung(gs) {
+  const m = new Map();
+  if (!gs) return m;
+  const oben = (arr) => (arr && arr.length) ? (arr.length + '|' + arr[arr.length - 1]) : null;
+  for (const pi of [0, 1]) {
+    const p = gs.players?.[pi];
+    if (!p) continue;
+    (p.heroes || []).forEach((h, hi) => { if (h?.name) m.set(`h:${pi}:${hi}`, h.name); });
+    (p.abilityZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
+      const v = oben(slot); if (v) m.set(`a:${pi}:${hi}:${si}`, v);
+    }));
+    (p.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, si) => {
+      const v = oben(slot); if (v) m.set(`s:${pi}:${hi}:${si}`, v);
+    }));
+    (p.surpriseZones || []).forEach((slot, hi) => {
+      const v = oben(slot); if (v) m.set(`x:${pi}:${hi}`, v);
+    });
+    (p.permanents || []).forEach((perm) => {
+      if (perm?.name) m.set(`p:${pi}:${perm.id != null ? perm.id : perm.name}`, perm.name);
+    });
+  }
+  (gs.areaZones || []).forEach((arr, pi) => (arr || []).forEach((n, i) => {
+    if (n) m.set(`r:${pi}:${i}`, n);
+  }));
+  return m;
+}
+
+/** Platzschluessel -> DOM-Selektor der zugehoerigen Zone. */
+function zonenSelektor(schluessel, myIdx) {
+  const t = schluessel.split(':');
+  const art = t[0];
+  const seite = Number(t[1]) === myIdx ? 'me' : 'opp';
+  if (art === 'h') return `[data-hero-zone][data-hero-owner="${seite}"][data-hero-idx="${t[2]}"]`;
+  if (art === 'a') return `[data-ability-zone][data-ability-owner="${seite}"][data-ability-hero="${t[2]}"][data-ability-slot="${t[3]}"]`;
+  if (art === 's') return `[data-support-zone][data-support-owner="${seite}"][data-support-hero="${t[2]}"][data-support-slot="${t[3]}"]`;
+  if (art === 'x') return `[data-surprise-zone][data-surprise-owner="${seite}"][data-surprise-hero="${t[2]}"]`;
+  if (art === 'r') return `[data-area-zone][data-area-owner="${seite}"]`;
+  if (art === 'p') return seite === 'me' ? '.board-permanents-me' : '.board-permanents-opp';
+  return null;
 }
 
 // Briefly tints a board-zone red to signal that the hero/creature in
@@ -3192,6 +3240,79 @@ const SAND_KOERNER = (() => {
  * `projectileShape === 'sandStream'`; Start, Ziel und Dauer kommen aus
  * dem gewoehnlichen `play_projectile_animation`.
  */
+/**
+ * ★★ v1175 — „Memory Blast": BLAST AUS NEGATIVER ENERGIE vom Wirker zum
+ * Ziel (Al 17.9.). Wie `SandStrahl` (v1149) eine eigene Projektilform
+ * (`projectileShape: 'darkBlast'`), nur eben ein einzelner, dicker
+ * Energiestoss statt eines Stroms: Kopf mit Wirbelring, gestreckter
+ * Schweif, Ranken aus Dunkelenergie und Funken. `p.power` (0…1, aus der
+ * Zahl der Karten in der gegnerischen Ablage) skaliert Dicke, Laenge,
+ * Rankenzahl und Leuchtkraft — mehr Schaden, groesserer Blast.
+ */
+function DunkelBlastStrahl({ p }) {
+  const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
+  const laenge = Math.max(1, Math.hypot(dx, dy));
+  const winkel = Math.atan2(dy, dx) * 180 / Math.PI;
+  const wucht = Math.max(0, Math.min(1, typeof p.power === 'number' ? p.power : 0.5));
+  const dauer = p.dur || 900;
+  const kopf = 26 + wucht * 62;                     // Durchmesser
+  const schweif = kopf * (2.2 + wucht * 2.6);
+  const ranken = useMemo(() => {
+    const r = [];
+    const anzahl = Math.round(6 + wucht * 14);
+    for (let i = 0; i < anzahl; i++) {
+      r.push({
+        seite: i % 2 ? 1 : -1,
+        ab: (i / anzahl) * 0.8 + 0.1,
+        l: kopf * (0.5 + ((i * 37) % 60) / 100),
+        b: 2 + ((i * 17) % 4),
+        verzug: (i % 5) * 60,
+      });
+    }
+    return r;
+  }, [p.id]);
+  const funken = useMemo(() => Array.from({ length: Math.round(8 + wucht * 18) }, (_, i) => ({
+    ab: ((i * 29) % 90) / 100,
+    quer: (((i * 53) % 100) / 100 - 0.5) * kopf * 1.6,
+    g: 2 + ((i * 13) % 4),
+    verzug: (i % 7) * 55,
+  })), [p.id]);
+  return (
+    <div className="dunkel-blast" aria-hidden="true">
+      <div className="db-flug" style={{
+        left: p.srcX, top: p.srcY,
+        '--ddx': dx + 'px', '--ddy': dy + 'px',
+        animationDuration: dauer + 'ms',
+      }}>
+        <div className="db-koerper" style={{ transform: `rotate(${winkel}deg)` }}>
+          <span className="db-schweif" style={{ width: schweif, height: kopf * 0.62 }} />
+          <span className="db-kopf" style={{ width: kopf, height: kopf }} />
+          <span className="db-wirbel" style={{ width: kopf * 1.5, height: kopf * 1.5 }} />
+          {ranken.map((k, i) => (
+            <span key={'dr' + i} className="db-ranke" style={{
+              left: -k.ab * schweif, width: k.l, height: k.b,
+              transform: `translateY(${k.seite * kopf * 0.42}px) rotate(${k.seite * 18}deg)`,
+              animationDelay: k.verzug + 'ms',
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <span key={'df' + i} className="db-funke" style={{
+              left: -f.ab * schweif, top: f.quer,
+              width: f.g, height: f.g, animationDelay: f.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      </div>
+      <div className="db-spur" style={{
+        left: p.srcX, top: p.srcY, width: laenge,
+        height: Math.max(4, kopf * 0.3),
+        transform: `rotate(${winkel}deg)`,
+        animationDuration: dauer + 300 + 'ms',
+      }} />
+    </div>
+  );
+}
+
 function SandStrahl({ p }) {
   const dx = p.tgtX - p.srcX, dy = p.tgtY - p.srcY;
   const laenge = Math.max(1, Math.hypot(dx, dy));
@@ -3784,13 +3905,20 @@ function TempleOfSacrificeOverlay() {
             + '0 2px 4px rgba(0,0,0,0.5)',
         }} />
       ))}
-      {/* Layer 3: warm gilded glow + slow shimmer (screen blend so it
-          brightens the gold rather than washing it out). */}
+      {/* Layer 3: warmer gilded glow + slow shimmer.
+          ★★ v1167 (Tester-Bericht 17.9.: „hat das Spiel zum Laggen
+          gebracht"): KEIN `mix-blend-mode: screen` mehr. Der Blendmodus
+          zwang den Browser, bei JEDEM Schritt der Dauer-Animation die
+          ganze Ebene darunter neu zusammenzurechnen — 88 gedrehte,
+          schattierte Ziegel eingeschlossen. Ein gewoehnlicher Verlauf mit
+          `will-change: opacity` bekommt seine eigene Ebene; die Ziegel
+          werden einmal gerastert und bleiben liegen. Die Farbe ist dafuer
+          etwas kraeftiger, damit das Gold weiter warm leuchtet. */}
       <div style={{
-        position: 'absolute', inset: 0, mixBlendMode: 'screen',
+        position: 'absolute', inset: 0, willChange: 'opacity',
         background:
-          'radial-gradient(ellipse at 50% 38%, rgba(255,210,90,0.30) 0%, '
-          + 'rgba(200,150,30,0.12) 45%, rgba(0,0,0,0) 78%)',
+          'radial-gradient(ellipse at 50% 38%, rgba(255,214,104,0.34) 0%, '
+          + 'rgba(206,156,36,0.16) 45%, rgba(0,0,0,0) 78%)',
         animation: 'templeGoldGlow 4.5s ease-in-out infinite',
       }} />
     </div>
@@ -9628,6 +9756,341 @@ const ANIM_REGISTRY = {
   // A puff of white/grey steam clouds rising upward. Used as a
   // generic "steam engine fired" feedback — +HP on discard, brewing,
   // engineer activation, miner end-of-turn draw, etc.
+  // ── „Golden Apple" (v1196) ───────────────────────────────────────
+  // Al 18.9.: „viele goldene Particles auf dem Ziel". Drei Schichten,
+  // damit es nach Gold aussieht und nicht nach gelben Punkten:
+  // aufsteigende Funken in drei Goldtoenen, ein paar traege
+  // Blattgold-Flitter, die kippend heruntersegeln, und ein kurzer
+  // warmer Schein ueber der Karte.
+  //
+  // ★ Keyframes stehen LOKAL (CARD_API ④) — die Animation laeuft
+  //   allein, nicht im Verbund mit einer anderen.
+  golden_apple_burst: (() => {
+    return function GoldenAppleBurstEffect({ x, y, duration }) {
+      const laufzeit = Math.max(700, Number(duration) || 1500);
+      const funken = useMemo(() => Array.from({ length: 34 }, (_, i) => ({
+        dx: -46 + Math.random() * 92,
+        dy: -(14 + Math.random() * 86),
+        size: 4 + Math.random() * 6,
+        delay: (i / 34) * (laufzeit - 500) + Math.random() * 140,
+        dur: 520 + Math.random() * 380,
+        farbe: ['#ffe680', '#ffc23d', '#fff3c4'][i % 3],
+      })), [laufzeit]);
+      const flitter = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+        x: -40 + Math.random() * 80,
+        dy: 40 + Math.random() * 46,
+        w: 5 + Math.random() * 6,
+        h: 8 + Math.random() * 9,
+        delay: (i / 12) * (laufzeit - 620) + Math.random() * 160,
+        dur: 880 + Math.random() * 420,
+        dreh: -220 + Math.random() * 440,
+      })), [laufzeit]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {/* Warmer Schein ueber der Karte */}
+          <div style={{
+            position: 'absolute', left: -52, top: -66, width: 104, height: 132,
+            borderRadius: 10,
+            background: 'radial-gradient(ellipse at center, rgba(255,215,110,.55) 0%, rgba(255,190,60,.22) 45%, transparent 72%)',
+            opacity: 0,
+            animation: `golden-apple-glow ${Math.round(laufzeit * 0.8)}ms ease-out forwards`,
+          }} />
+          {funken.map((f, i) => (
+            <div key={'gaf' + i} style={{
+              position: 'absolute', left: 0, top: 16,
+              width: f.size, height: f.size, borderRadius: '50%',
+              background: f.farbe,
+              boxShadow: `0 0 12px ${f.farbe}, 0 0 4px #fff8e0`,
+              opacity: 0,
+              animation: `golden-apple-spark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              '--gadx': f.dx + 'px', '--gady': f.dy + 'px',
+            }} />
+          ))}
+          {flitter.map((fl, i) => (
+            <div key={'gal' + i} style={{
+              position: 'absolute', left: fl.x, top: -34,
+              width: fl.w, height: fl.h, borderRadius: 2,
+              background: 'linear-gradient(135deg, #fff2b0 0%, #ffc23d 55%, #c98a1b 100%)',
+              boxShadow: '0 0 6px rgba(255,200,80,.85)',
+              opacity: 0,
+              animation: `golden-apple-leaf ${fl.dur}ms ease-in ${fl.delay}ms forwards`,
+              '--galdy': fl.dy + 'px', '--galrot': fl.dreh + 'deg',
+            }} />
+          ))}
+          <style>{`
+            @keyframes golden-apple-glow {
+              0%   { opacity: 0; transform: scale(0.8); }
+              30%  { opacity: 1; transform: scale(1.04); }
+              100% { opacity: 0; transform: scale(1.1); }
+            }
+            @keyframes golden-apple-spark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.35); }
+              22%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--gadx), var(--gady)) scale(0.3); }
+            }
+            @keyframes golden-apple-leaf {
+              0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+              20%  { opacity: 1; }
+              100% { opacity: 0; transform: translateY(var(--galdy)) rotate(var(--galrot)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── „Tempeluna" — eine Fee wird angelegt (v1192/v1194) ───────────
+  // Al 18.9.: die Partikel gehoeren NUR auf Tempeluna selbst.
+  // Drei Schichten: aufsteigende Dampfschwaden, helle Funken und
+  // Sterne, die aufblitzen und wieder vergehen.
+  //
+  // ★★ v1194 — ZWEI FEHLER, DIE SIE UNSICHTBAR MACHTEN:
+  // ① Die Schwaden liefen auf `tempeluna-steam-rise` — einem Keyframe,
+  //    der im `<style>` der ANDEREN Komponente (`tempeluna_steam`)
+  //    steht. Laeuft die nicht gleichzeitig, existiert der Keyframe
+  //    nicht, und die Schwaden blieben bei `opacity: 0` stehen. Jede
+  //    Komponente bringt ihre Keyframes SELBST mit, auch wenn sie
+  //    gleich aussehen.
+  // ② Funken (2 px) und Sterne (Null-Box) waren zu klein, um neben
+  //    dem Kartenbild aufzufallen. Jetzt 4-9 px mit doppeltem Schein
+  //    und Sterne in einer echten Box mit 16-30 px.
+  tempeluna_infuse: (() => {
+    return function TempelunaInfuseEffect({ x, y, duration }) {
+      const laufzeit = Math.max(600, Number(duration) || 1100);
+      const schwaden = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+        startX: -28 + Math.random() * 56,
+        startY: 24 + Math.random() * 16,
+        dx: -18 + Math.random() * 36,
+        dy: -(56 + Math.random() * 64),
+        size: 20 + Math.random() * 26,
+        delay: (i / 14) * (laufzeit - 520) + Math.random() * 110,
+        dur: 780 + Math.random() * 380,
+        opacity: 0.30 + Math.random() * 0.3,
+        shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
+      })), [laufzeit]);
+      const funken = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+        dx: -40 + Math.random() * 80,
+        dy: -(8 + Math.random() * 70),
+        size: 4 + Math.random() * 5,
+        delay: (i / 22) * (laufzeit - 420) + Math.random() * 130,
+        dur: 460 + Math.random() * 280,
+        farbe: ['#fff6c8', '#bde9ff', '#ffd9f2'][i % 3],
+      })), [laufzeit]);
+      const sterne = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+        x: -36 + Math.random() * 72,
+        y: -40 + Math.random() * 84,
+        size: 16 + Math.random() * 14,
+        delay: (i / 9) * (laufzeit - 480) + Math.random() * 150,
+        dur: 660 + Math.random() * 260,
+        dreh: -40 + Math.random() * 80,
+      })), [laufzeit]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {schwaden.map((p, i) => (
+            <div key={'tin' + i} style={{
+              position: 'absolute', left: p.startX + 'px', top: p.startY + 'px',
+              width: p.size + 'px', height: p.size + 'px', borderRadius: '50%',
+              filter: 'blur(1.5px)',
+              background: `radial-gradient(circle, ${p.shade} 0%, ${p.shade}88 50%, transparent 76%)`,
+              opacity: 0,
+              animation: `tempeluna-infuse-wisp ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--tiwdx': p.dx + 'px', '--tiwdy': p.dy + 'px', '--tiwop': p.opacity,
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <div key={'tif' + i} style={{
+              position: 'absolute', left: 0, top: 10,
+              width: f.size + 'px', height: f.size + 'px', borderRadius: '50%',
+              background: f.farbe, boxShadow: `0 0 12px ${f.farbe}, 0 0 4px #fff`,
+              opacity: 0,
+              animation: `tempeluna-infuse-spark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              '--tifdx': f.dx + 'px', '--tifdy': f.dy + 'px',
+            }} />
+          ))}
+          {sterne.map((st, i) => (
+            <div key={'tis' + i} style={{
+              position: 'absolute',
+              left: st.x + 'px', top: st.y + 'px',
+              width: st.size + 'px', height: st.size + 'px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: st.size + 'px', lineHeight: 1,
+              color: '#fff3b0', textShadow: '0 0 12px rgba(255,225,130,1), 0 0 4px #fff',
+              opacity: 0,
+              animation: `tempeluna-infuse-star ${st.dur}ms ease-out ${st.delay}ms forwards`,
+              '--tisrot': st.dreh + 'deg',
+            }}>✦</div>
+          ))}
+          <style>{`
+            @keyframes tempeluna-infuse-wisp {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.35); }
+              22%  { opacity: var(--tiwop, 0.5); }
+              100% { opacity: 0; transform: translate(var(--tiwdx), var(--tiwdy)) scale(2.0); }
+            }
+            @keyframes tempeluna-infuse-spark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              25%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--tifdx), var(--tifdy)) scale(0.25); }
+            }
+            @keyframes tempeluna-infuse-star {
+              0%   { opacity: 0; transform: scale(0.2) rotate(0deg); }
+              35%  { opacity: 1; transform: scale(1.35) rotate(var(--tisrot)); }
+              100% { opacity: 0; transform: scale(0.5) rotate(var(--tisrot)); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── „Dive Down" (v1191) ──────────────────────────────────────────
+  // Der Held VERSINKT in seiner eigenen Zone: eine Wasserlinie steigt
+  // von unten ueber die Karte, Blasen perlen auf, an der Oberflaeche
+  // laufen Ringe. Die Zone selbst bleibt stehen — es ist der HELD, der
+  // untergeht, nicht das Feld.
+  //
+  // `duration` kommt aus dem Broadcast, damit Bild und Wartezeit im
+  // Kartenskript dieselbe Zahl benutzen.
+  dive_down: (() => {
+    return function DiveDownEffect({ x, y, w, h, duration }) {
+      const laufzeit = Math.max(700, Number(duration) || 1400);
+      const breite = Math.max(60, Number(w) || 90);
+      const hoehe = Math.max(80, Number(h) || 126);
+      const blasen = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+        dx: -breite * 0.35 + Math.random() * breite * 0.7,
+        size: 4 + Math.random() * 9,
+        delay: (i / 18) * (laufzeit * 0.75) + Math.random() * 120,
+        dur: 620 + Math.random() * 520,
+        drift: -10 + Math.random() * 20,
+      })), [laufzeit, breite]);
+      const ringe = useMemo(() => Array.from({ length: 3 }, (_, i) => ({
+        delay: laufzeit * 0.45 + i * 170,
+        dur: 760,
+      })), [laufzeit]);
+      return (
+        <div style={{
+          position: 'fixed', left: x - breite / 2, top: y - hoehe / 2,
+          width: breite, height: hoehe, pointerEvents: 'none',
+          zIndex: 10090, overflow: 'hidden',
+        }}>
+          {/* Der Wasserspiegel steigt von unten ueber die Karte. */}
+          <div style={{
+            position: 'absolute', left: 0, bottom: 0, width: '100%', height: '100%',
+            background: 'linear-gradient(to top, rgba(28,96,150,.82) 0%, rgba(58,148,208,.62) 55%, rgba(120,200,240,.30) 100%)',
+            borderTop: '2px solid rgba(190,235,255,.85)',
+            transform: 'translateY(100%)',
+            animation: `dive-down-flood ${laufzeit}ms ease-in forwards`,
+          }} />
+          {blasen.map((b, i) => (
+            <div key={'dd' + i} style={{
+              position: 'absolute',
+              left: breite / 2 + b.dx, bottom: -10,
+              width: b.size, height: b.size, borderRadius: '50%',
+              background: 'radial-gradient(circle at 32% 30%, rgba(255,255,255,.95), rgba(170,225,255,.55) 60%, rgba(120,190,230,.2) 100%)',
+              boxShadow: '0 0 5px rgba(200,240,255,.7)',
+              opacity: 0,
+              animation: `dive-down-bubble ${b.dur}ms ease-out ${b.delay}ms forwards`,
+              '--ddx': b.drift + 'px', '--ddy': -(hoehe + 16) + 'px',
+            }} />
+          ))}
+          {ringe.map((r, i) => (
+            <div key={'ddr' + i} style={{
+              position: 'absolute', left: '50%', top: '32%',
+              width: 10, height: 6, marginLeft: -5,
+              border: '2px solid rgba(205,240,255,.8)', borderRadius: '50%',
+              opacity: 0,
+              animation: `dive-down-ring ${r.dur}ms ease-out ${r.delay}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes dive-down-flood {
+              0%   { transform: translateY(100%); }
+              70%  { transform: translateY(6%); }
+              100% { transform: translateY(0%); }
+            }
+            @keyframes dive-down-bubble {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+              18%  { opacity: 0.95; }
+              100% { opacity: 0; transform: translate(var(--ddx), var(--ddy)) scale(1.1); }
+            }
+            @keyframes dive-down-ring {
+              0%   { opacity: 0.9; transform: scale(0.4); }
+              100% { opacity: 0; transform: scale(5.5); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  // ── „Tempeluna, the Convergence Fairy" (v1188) ───────────────────
+  // Flamme (Luna) trifft Wetter (Tempeste) — heraus kommt DAMPF. Die
+  // Schwaden steigen waehrend der ganzen Loeschsequenz der zweiten Fee
+  // von der frisch erschienenen Tempeluna auf, sind also deutlich
+  // laenger und ruhiger als `steam_puff` (der ist ein einmaliger
+  // Auspuffstoss der Steam Dwarfs): mehr Schwaden, groesser, langsamer,
+  // ueber die volle Laufzeit gestaffelt statt in einem Stoss.
+  tempeluna_steam: (() => {
+    return function TempelunaSteamEffect({ x, y, duration }) {
+      const laufzeit = Math.max(900, Number(duration) || 2200);
+      const schwaden = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+        startX: -34 + Math.random() * 68,
+        startY: 30 + Math.random() * 22,
+        dx: -22 + Math.random() * 44,
+        dy: -(70 + Math.random() * 90),
+        size: 22 + Math.random() * 34,
+        // Ueber die ganze Laufzeit verteilt — nicht alle auf einmal.
+        delay: (i / 26) * (laufzeit - 700) + Math.random() * 160,
+        dur: 1100 + Math.random() * 600,
+        opacity: 0.30 + Math.random() * 0.34,
+        shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
+      })), [laufzeit]);
+      // Ein paar warme Funken, weil Lunas Flamme darin steckt.
+      const funken = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+        dx: -20 + Math.random() * 40,
+        dy: -(20 + Math.random() * 45),
+        size: 2 + Math.random() * 3,
+        delay: (i / 9) * (laufzeit - 500) + Math.random() * 120,
+        dur: 520 + Math.random() * 260,
+      })), [laufzeit]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {schwaden.map((p, i) => (
+            <div key={'tls' + i} style={{
+              position: 'absolute',
+              left: p.startX + 'px', top: p.startY + 'px',
+              width: p.size + 'px', height: p.size + 'px',
+              borderRadius: '50%',
+              filter: 'blur(1.5px)',
+              background: `radial-gradient(circle, ${p.shade} 0%, ${p.shade}88 50%, transparent 76%)`,
+              opacity: 0,
+              animation: `tempeluna-steam-rise ${p.dur}ms ease-out ${p.delay}ms forwards`,
+              '--tlsdx': p.dx + 'px', '--tlsdy': p.dy + 'px', '--tlsop': p.opacity,
+            }} />
+          ))}
+          {funken.map((f, i) => (
+            <div key={'tlf' + i} style={{
+              position: 'absolute', left: 0, top: 26,
+              width: f.size + 'px', height: f.size + 'px',
+              borderRadius: '50%',
+              background: '#ffd27a', boxShadow: '0 0 7px #ffab3d',
+              opacity: 0,
+              animation: `tempeluna-steam-spark ${f.dur}ms ease-out ${f.delay}ms forwards`,
+              '--tlfdx': f.dx + 'px', '--tlfdy': f.dy + 'px',
+            }} />
+          ))}
+          <style>{`
+            @keyframes tempeluna-steam-rise {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.35); }
+              22%  { opacity: var(--tlsop, 0.5); }
+              100% { opacity: 0; transform: translate(var(--tlsdx), var(--tlsdy)) scale(2.1); }
+            }
+            @keyframes tempeluna-steam-spark {
+              0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+              30%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--tlfdx), var(--tlfdy)) scale(0.2); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
   steam_puff: (() => {
     return function SteamPuffEffect({ x, y }) {
       const puffs = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
@@ -10343,22 +10806,106 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
-  dark_blast: (() => {
-    const SPLITTER = Array.from({ length: 18 }, (_, i) => ({
-      winkel: (i / 18) * Math.PI * 2 + (i % 3) * 0.2,
-      laenge: 30 + (i % 6) * 14,
-      breite: 3 + (i % 3) * 2,
-      verzug: (i % 5) * 45,
-    }));
-    return function DarkBlastEffect({ power }) {
-      const p = Math.max(0, Math.min(1, typeof power === 'number' ? power : 0.5));
-      const skala = 0.7 + p * 1.5;                    // 0.7 … 2.2
-      const anzahl = Math.max(6, Math.round(6 + p * 12));
+  // ★★ v1175 — „Memory Blast\" (Al 17.9.: „liegt nicht auf dem Ziel, und
+  // die Animation ist nicht schoen\"). Der Einschlag las `x`/`y` nicht —
+  // `.dark-blast` stand per CSS in der Mitte der Ebene (dieselbe Lehre
+  // wie v1154). Jetzt am Rechteck des Ziels, und die Wucht (`power`,
+  // aus der Zahl der Karten in der gegnerischen Ablage) bestimmt
+  // Groesse, Ringzahl, Splitterzahl und Dauer.
+  // ★★ v1177 — „MOE Shield\" (Al 17.9.): auf JEDEM Ziel, das der negierte
+  // Zauber getroffen haette, blueht ein grosses pinkes Herz auf, dehnt
+  // sich und wird ueber eine Sekunde durchsichtig. Liest `x`/`y`/`w`/`h`
+  // (Lehre v1154) und sitzt damit genau auf dem Ziel.
+  // ★★ v1178 — der abgewehrte Zauber ZERSCHELLT am Schild: ein heller
+  // Aufprallring und Scherben, die nach aussen stieben.
+  negate_shatter: (() => {
+    const SCHERBEN = Array.from({ length: 14 }, (_, i) => {
+      const winkel = (i / 14) * Math.PI * 2 + (i % 3) * 0.2;
+      return {
+        dx: Math.cos(winkel), dy: Math.sin(winkel),
+        l: 10 + (i % 5) * 7, b: 2 + (i % 3),
+        dreh: Math.round((i % 2 ? 1 : -1) * (90 + i * 20)),
+        verzug: (i % 4) * 45,
+      };
+    });
+    return function NegateShatterEffect({ x, y, w, h }) {
+      const R = Math.max(w || 90, h || 120);
       return (
-        <div className="dark-blast" style={{ '--mb-scale': skala }} aria-hidden="true">
+        <div className="negate-shatter" style={{ left: x, top: y }} aria-hidden="true">
+          <span className="ns-blitz" style={{ width: R * 1.2, height: R * 1.2 }} />
+          <span className="ns-ring" style={{ width: R * 0.9, height: R * 0.9 }} />
+          {SCHERBEN.map((sp, i) => (
+            <span key={'ns' + i} className="ns-scherbe" style={{
+              width: sp.b, height: sp.l,
+              '--nx': (sp.dx * R * 0.7).toFixed(1) + 'px',
+              '--ny': (sp.dy * R * 0.7).toFixed(1) + 'px',
+              '--ndreh': sp.dreh + 'deg',
+              animationDelay: sp.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  moe_heart: (() => {
+    const FUNKEN = Array.from({ length: 10 }, (_, i) => {
+      const winkel = (i / 10) * Math.PI * 2 + (i % 3) * 0.25;
+      return {
+        dx: Math.cos(winkel), dy: Math.sin(winkel),
+        g: 5 + (i % 3) * 3, verzug: (i % 5) * 70,
+      };
+    });
+    return function MoeHeartEffect({ x, y, w, h, shield }) {
+      const R = Math.max(w || 90, h || 120) * 2.0;
+      // ★★ v1178 (Al 17.9.): Als SCHILD steht das Herz erst still vor dem
+      // Ziel (mit Schutzring), faengt den Zauber ab und dehnt sich dann
+      // wie gehabt aus. Ohne `shield` bleibt es die kurze Fassung.
+      return (
+        <div className={'moe-heart' + (shield ? ' moe-heart-shield' : '')}
+          style={{ left: x, top: y }} aria-hidden="true">
+          {shield && <span className="moe-heart-ring" style={{ width: R * 0.82, height: R * 0.82 }} />}
+          <svg className="moe-heart-main" width={R} height={R} viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 29S3.5 20.6 3.5 12.2C3.5 7.9 6.9 4.7 11 4.7c2.4 0 4.2 1.2 5 2.6.8-1.4 2.6-2.6 5-2.6 4.1 0 7.5 3.2 7.5 7.5C28.5 20.6 16 29 16 29z"
+              fill="url(#moeHeartFill)" stroke="#ffd7ef" strokeWidth="1.1" />
+            <defs>
+              <radialGradient id="moeHeartFill" cx="42%" cy="34%">
+                <stop offset="0%" stopColor="#ffd9f1" />
+                <stop offset="45%" stopColor="#ff5fb4" />
+                <stop offset="100%" stopColor="#d81b78" />
+              </radialGradient>
+            </defs>
+          </svg>
+          {FUNKEN.map((f, i) => (
+            <span key={'mh' + i} className="moe-heart-funke" style={{
+              width: f.g, height: f.g,
+              '--mx': (f.dx * R * 0.55).toFixed(1) + 'px',
+              '--my': (f.dy * R * 0.55).toFixed(1) + 'px',
+              animationDelay: f.verzug + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+  dark_blast: (() => {
+    const SPLITTER = Array.from({ length: 30 }, (_, i) => ({
+      winkel: (i / 30) * Math.PI * 2 + (i % 3) * 0.2,
+      laenge: 34 + (i % 7) * 16,
+      breite: 3 + (i % 4) * 2,
+      verzug: (i % 6) * 40,
+    }));
+    return function DarkBlastEffect({ x, y, w, h, power }) {
+      const p = Math.max(0, Math.min(1, typeof power === 'number' ? power : 0.5));
+      const R = Math.max(w || 90, h || 120);
+      const skala = (0.8 + p * 1.9) * (R / 110);        // Wucht × Zielgroesse
+      const anzahl = Math.max(8, Math.round(8 + p * 22));
+      return (
+        <div className="dark-blast" style={{ left: x, top: y, '--mb-scale': skala }} aria-hidden="true">
+          <span className="dark-blast-schatten" />
           <span className="dark-blast-core" />
           <span className="dark-blast-ring" />
-          {p > 0.55 && <span className="dark-blast-ring dark-blast-ring2" />}
+          {p > 0.35 && <span className="dark-blast-ring dark-blast-ring2" />}
+          {p > 0.7 && <span className="dark-blast-ring dark-blast-ring3" />}
           {SPLITTER.slice(0, anzahl).map((sp, i) => (
             <span key={'db' + i} className="dark-blast-shard" style={{
               '--sx': `${Math.cos(sp.winkel) * sp.laenge}px`,
@@ -10488,37 +11035,101 @@ const ANIM_REGISTRY = {
       );
     };
   })(),
+  // ★★ v1173 — „Alluring Light\": das Anlock-Leuchten (Al 17.9.: „wieder
+  // in der Bildschirmmitte statt auf dem Ziel, und zu klein und zu
+  // kurz\"). Es las `x`/`y` gar nicht — `.lure-beacon` stand per CSS bei
+  // `left: 50%; top: 50%` der Animationsebene. Jetzt `position: fixed`
+  // am Rechteck des Ziels (Lehre aus v1154), rund doppelt so gross, mit
+  // vier Ringen, acht Lichtstrahlen und laengerem Nachleuchten.
   lure_beacon: (() => {
-    const RINGE = [0, 260, 520];
-    return function LureBeaconEffect() {
+    const RINGE = [0, 240, 480, 720];
+    const STRAHLEN = Array.from({ length: 8 }, (_, i) => i * 45);
+    return function LureBeaconEffect({ x, y, w, h }) {
+      const R = Math.max(Math.max(w || 90, h || 120) * 1.15, 90);
       return (
-        <div className="lure-beacon" aria-hidden="true">
-          {RINGE.map((v, i) => (
-            <span key={'lb' + i} className="lure-ring" style={{ animationDelay: v + 'ms' }} />
+        <div className="lure-beacon" style={{ left: x, top: y }} aria-hidden="true">
+          <span className="lure-halo" style={{ width: R * 2.4, height: R * 2.4 }} />
+          {STRAHLEN.map((g, i) => (
+            <span key={'ls' + i} className="lure-strahl" style={{
+              width: R * 1.9, height: Math.max(6, R * 0.10),
+              transform: `translate(-50%, -50%) rotate(${g}deg)`,
+              animationDelay: (i % 4) * 140 + 'ms',
+            }} />
           ))}
-          <span className="lure-core" />
+          {RINGE.map((v, i) => (
+            <span key={'lb' + i} className="lure-ring" style={{
+              width: R * 1.5, height: R * 1.5,
+              marginLeft: -R * 0.75, marginTop: -R * 0.75,
+              animationDelay: v + 'ms',
+            }} />
+          ))}
+          <span className="lure-core" style={{
+            width: R * 0.62, height: R * 0.62,
+            marginLeft: -R * 0.31, marginTop: -R * 0.31,
+          }} />
         </div>
       );
     };
   })(),
+  // ★★ v1170 — „Cleansing of the Land\": eine WAND AUS FLAMMEN, die sich
+  // einmal quer ueber das Brett frisst (Al 17.9.: vorher „eher eine
+  // orange Linie\"). Die Wand ist ein mitwanderndes Buendel: Glutkern,
+  // 34 Flammenzungen ueber die ganze Hoehe, aufsteigende Funken und
+  // Rauch; dahinter bleibt eine verkohlte Spur, die langsam verglimmt.
+  // Laeuft weiterhin auf der Atmosphaeren-Ebene, also unter den Karten.
   fire_sweep: (() => {
-    const ZUNGEN = Array.from({ length: 22 }, (_, i) => ({
-      left: (i * 4.7) % 100,
-      hoehe: 40 + (i % 6) * 22,
-      breite: 16 + (i % 4) * 9,
-      verzug: (i % 9) * 55,
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    const r = zufall(8801);
+    const ZUNGEN = Array.from({ length: 34 }, () => ({
+      x: r() * 100,                        // Anteil der WANDBREITE
+      y: r() * 100,                        // Anteil der Hoehe
+      b: 26 + r() * 46,
+      h: 56 + r() * 92,
+      dauer: 480 + r() * 420,
+      verzug: r() * 700,
+      hell: r() < 0.4,
+    }));
+    const FUNKEN = Array.from({ length: 26 }, () => ({
+      x: r() * 100, y: 40 + r() * 60,
+      g: 2 + r() * 3,
+      dauer: 700 + r() * 700, verzug: r() * 1400,
+      drift: (r() - 0.5) * 60,
+    }));
+    const RAUCH = Array.from({ length: 8 }, () => ({
+      x: r() * 100, g: 60 + r() * 70,
+      dauer: 1500 + r() * 900, verzug: r() * 900,
     }));
     return function FireSweepEffect() {
       return (
         <div className="fire-sweep-layer" aria-hidden="true">
-          <div className="fire-sweep-front" />
-          {ZUNGEN.map((z, i) => (
-            <span key={'fs' + i} className="fire-sweep-tongue" style={{
-              left: z.left + '%',
-              width: z.breite, height: z.hoehe,
-              animationDelay: z.verzug + 'ms',
-            }} />
-          ))}
+          <div className="fw-narbe" />
+          <div className="fw-wand">
+            <div className="fw-kern" />
+            <div className="fw-hitze" />
+            {ZUNGEN.map((z, i) => (
+              <span key={'fz' + i} className={'fw-zunge' + (z.hell ? ' hell' : '')} style={{
+                left: z.x + '%', top: z.y + '%',
+                width: z.b, height: z.h,
+                animationDuration: z.dauer + 'ms', animationDelay: z.verzug + 'ms',
+              }} />
+            ))}
+            {FUNKEN.map((f, i) => (
+              <span key={'ff' + i} className="fw-funke" style={{
+                left: f.x + '%', top: f.y + '%', width: f.g, height: f.g,
+                '--fdrift': f.drift + 'px',
+                animationDuration: f.dauer + 'ms', animationDelay: f.verzug + 'ms',
+              }} />
+            ))}
+            {RAUCH.map((q, i) => (
+              <span key={'fq' + i} className="fw-rauch" style={{
+                left: q.x + '%', width: q.g, height: q.g,
+                animationDuration: q.dauer + 'ms', animationDelay: q.verzug + 'ms',
+              }} />
+            ))}
+          </div>
           <div className="fire-sweep-scorch" />
         </div>
       );
@@ -13711,6 +14322,25 @@ const ANIM_REGISTRY = {
             filter: 'drop-shadow(0 0 8px rgba(255,215,110,.95))',
             animation: 'pp-monkee-shield-icon 900ms ease-out forwards',
           }}>🛡️</div>
+          {/* ★★ v1194: die beiden Keyframes fehlten SEIT v347 — weder
+              hier noch in style.css. Die Animation lief also nie; man
+              sah einen statischen Ring, der nach 900 ms verschwand.
+              Gefunden vom neuen Waechter `check-anim-keyframes`,
+              derselbe Fehler wie bei Tempelunas Anlege-Dampf. */}
+          <style>{`
+            @keyframes pp-monkee-shield {
+              0%   { opacity: 0; transform: scale(0.55); }
+              28%  { opacity: 1; transform: scale(1.08); }
+              60%  { opacity: 0.85; transform: scale(0.98); }
+              100% { opacity: 0; transform: scale(1.25); }
+            }
+            @keyframes pp-monkee-shield-icon {
+              0%   { opacity: 0; transform: scale(0.4) translateY(6px); }
+              30%  { opacity: 1; transform: scale(1.15) translateY(0); }
+              70%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(0.9) translateY(-10px); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -23150,6 +23780,36 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     window._ppMyIdx = myIdx;
   }, [gameState?.turn, myIdx]);
 
+  // ★ v1206: EINSCHLAG BEIM PLATZIEREN (Als Vorgabe 18.9.).
+  // Vergleicht die Belegung aller Zonen mit der vorigen und laesst auf
+  // jedem Platz, der neu belegt oder aufgestockt wurde, den Effekt
+  // laufen. Die Farbe kommt aus dem Kartentyp.
+  //
+  // Beim ERSTEN Lauf und nach einem Partiewechsel wird nur die
+  // Grundlinie gesetzt — sonst detoniert beim Betreten eines laufenden
+  // Spiels (oder als Zuschauer) das halbe Brett auf einmal.
+  const belegungRef = useRef(null);
+  const belegungRaumRef = useRef(null);
+  useEffect(() => {
+    const neuBelegt = zonenBelegung(gameState);
+    const alt = belegungRef.current;
+    const raum = gameState?.roomId || null;
+    const raumWechsel = belegungRaumRef.current !== raum;
+    belegungRef.current = neuBelegt;
+    belegungRaumRef.current = raum;
+    if (!alt || raumWechsel) return;
+    const einschlaege = [];
+    for (const [schluessel, wert] of neuBelegt) {
+      if (alt.get(schluessel) === wert) continue;
+      const sel = zonenSelektor(schluessel, myIdx);
+      if (!sel) continue;
+      const name = String(wert).includes('|') ? String(wert).split('|').slice(1).join('|') : wert;
+      const stil = window.zoneLandStyle?.(name) || {};
+      einschlaege.push({ selector: sel, key: schluessel, color: stil.color, variant: stil.variant });
+    }
+    window.spawnZoneLandFxBatch?.(einschlaege);
+  }, [gameState, myIdx]);
+
   // Ketten-Anzeige beim Wechsel in eine ANDERE Partie hart zuruecksetzen.
   // Bricht man einen Puzzle-Versuch mitten in einer Kette ab, kam vom
   // alten Spiel nie ein `reaction_chain_done` — die Anzeige blieb im
@@ -24264,6 +24924,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // hervorheben, auch wenn einer davon besiegt ist. Der Zustand haelt
   // die zwei Helden, nicht die Karte: gerendert wird an den Heldenzonen.
   const [allianzHover, setAllianzHover] = useState(null);
+  // ★★ v1188 (Als Vorgabe 18.9.): VORGEZOGENER FORMWECHSEL.
+  // Beim Aufstieg laeuft erst der Preis (Tempeluna loescht die zweite
+  // Fee), danach erst der Identitaetswechsel. Optisch stand die alte
+  // Fee waehrend der ganzen Loeschsequenz noch da. Eine Karte kann den
+  // Wechsel jetzt VORZIEHEN: `hero_form_preview` zeichnet den Helden
+  // sofort als die neue Karte; der echte `sync()` loest das Bild
+  // danach lautlos ab. Reines ANZEIGE-Vorziehen — der Spielstand
+  // wechselt weiterhin genau dann, wenn die Engine ihn wechselt.
+  const [formPreview, setFormPreview] = useState(null);
   // Alle Allianzen auf dem Brett, aus dem Spielstand abgeleitet: die
   // Karte liegt beim NUTZER und traegt den Verbuendeten in ihren
   // Zaehlern. Beide Spieler sehen dieselbe Liste — die Verbindung ist
@@ -25768,6 +26437,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           roomId: gameState.roomId, cardName: pick.cardName,
           handIndex: pick.handIndex, fromCreation: pick.fromCreation || undefined, heroIdx: h.idx,
           zoneSlot: h.zoneSlot,
+          charmedOwner: h.charmedOwner,   // v1199: geliehener Held
         });
       } else {
         // Spell. For creature casters, heroIdx routes to the
@@ -26588,6 +27258,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!dragging) {
         if (Math.abs(mx - startX) + Math.abs(my - startY) < 5) return;
         dragging = true;
+        // ★ v1210: Die Karte hebt ab (Als Vorgabe 18.9.). Erst HIER,
+        // nicht schon beim Druecken — sonst klickt jeder Klick auf eine
+        // Handkarte mit, auch der, der nur ein Menue oeffnet.
+        window.playCardDragSFX?.('pickup');
       }
 
       // ★ Jede Haelfte sortiert nur SICH SELBST (Als Regel 28.8.:
@@ -26757,6 +27431,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // payload field for the server's `play_creature` handler, which
         // stashes it as a destination hint for the script's `onPlay`.
         let crossSideHost = null;
+        // ★★ v1199: Beschwoerung mit einem GELIEHENEN Helden. Die Zone
+        // gehoert dem Gegner, die Beschwoerung mir — der Server will
+        // dafuer `charmedOwner` (v1198).
+        let dropCharmedOwner;
         const heroActionHeroIdx = heroActionPrompt?.heroIdx;
         const isSurpriseCard = (card.subtype || '').toLowerCase() === 'surprise';
         const crossSidePlayable = (gameState.crossSidePlayableCards || []).includes(cardName);
@@ -26838,6 +27516,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 // hero already qualifies. Skip during heroAction (the
                 // immediate-action prompt locks placement to one own
                 // Hero) and during bounce mode.
+                // ★★ v1199: ZUERST der geliehene Held. Seine Zonen sind
+                // ein ganz normales Beschwoerungsziel — `canHeroPlayCard`
+                // liest dafuer `heroPlayableCards.charmed`, also genau die
+                // Liste, die der Server ohnehin schickt.
+                {
+                  const geliehen = opp.heroes?.[hi];
+                  const zielCards = (opp.supportZones?.[hi] || [])[si] || [];
+                  if (card.cardType === 'Creature'
+                      && !hasBounceTargets && heroActionHeroIdx === undefined
+                      && geliehen?.charmedBy === myIdx && geliehen.hp > 0
+                      && zielCards.length === 0
+                      && si < ((opp.supportZones?.[hi] || []).length || 3)
+                      && canHeroPlayCard(opp, hi, card)) {
+                    targetHero = hi; targetSlot = si; dropCharmedOwner = oppIdx;
+                    continue;
+                  }
+                }
                 if (!crossSidePlayable || hasBounceTargets || heroActionHeroIdx !== undefined) continue;
                 const oppHero = opp.heroes?.[hi];
                 if (!oppHero?.name || oppHero.hp <= 0) continue;
@@ -26954,7 +27649,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost, charmedOwner: dropCharmedOwner, fromCreation });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes.
         // Cross-side artifacts (Powder Keg etc., server-published in
@@ -27316,6 +28011,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
 
     const onUp = (upX, upY) => {
+      // ★ v1210: EIN Ort fuer den Loslass-Klang statt eines Aufrufs je
+      // Zweig — `onUp` hat ueber ein Dutzend davon, und jeder neue
+      // waere wieder einer, der ihn vergisst. Im eigenen Bereich
+      // losgelassen heisst Umsortieren (Kartenrutscher), sonst ein
+      // leiser Tick; landet die Karte wirklich, spielt die Engine ihren
+      // `placement`-Klang ohnehin gleich hinterher.
+      if (dragging) {
+        const imEigenen = fromCreation
+          ? isInsideCreationZone(upX, upY)
+          : isInsideHandZone(upX, upY);
+        window.playCardDragSFX?.(imEigenen ? 'reorder' : 'release');
+      }
+
       // pickHandCard drag-summon intercept — handles both the
       // click path (no drag) and the drop-on-zone path. Plain click
       // emits the standard `{cardName, handIndex}` so the script
@@ -27711,6 +28419,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 if (slot < 0) continue;
                 eligible.push({ idx: hi, name: me.heroes[hi].name, zoneSlot: slot });
               }
+              // ★★ v1199 (Als Befund 18.9.): GELIEHENE HELDEN FEHLTEN.
+              // Der Spell-Picker fuehrt sie seit jeher, der Kreaturen-
+              // Picker lief nur ueber `me.heroes`. `canHeroPlayCard(opp, …)`
+              // liest `heroPlayableCards.charmed` — dieselbe Liste, die
+              // auch der Drag benutzt.
+              for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
+                const geliehen = opp.heroes[hi];
+                if (geliehen?.charmedBy !== myIdx || geliehen.hp <= 0) continue;
+                if (!canHeroPlayCard(opp, hi, card)) continue;
+                const frei = findFreeSupportSlot(opp, hi);
+                if (frei < 0) continue;
+                eligible.push({ idx: hi, name: geliehen.name, zoneSlot: frei, charmedOwner: oppIdx });
+              }
               // Caster-Filter (Als Bugreport zu Chilly Wizard): dieser
               // Picker fragt "welcher Hero BESCHWÖRT die Creature?" —
               // `canHeroPlayCard` beantwortet aber "darf Hero X die Karte
@@ -27738,6 +28459,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   roomId: gameState.roomId, cardName,
                   handIndex: idx, fromCreation, heroIdx: pickList[0].idx,
                   zoneSlot: pickList[0].zoneSlot,
+                  charmedOwner: pickList[0].charmedOwner,   // v1199
                 });
               } else if (pickList.length > 1) {
                 if (usesCustomHostPick) {
@@ -27745,6 +28467,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     roomId: gameState.roomId, cardName,
                     handIndex: idx, fromCreation, heroIdx: pickList[0].idx,
                     zoneSlot: pickList[0].zoneSlot,
+                  charmedOwner: pickList[0].charmedOwner,   // v1199
                   });
                 } else {
                   setSpellHeroPick({ cardName, handIndex: idx, fromCreation, card, eligible: pickList, isCreature: true });
@@ -27951,6 +28674,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               handIndex: prev.idx, heroIdx: prev.targetHero, zoneSlot: prev.targetSlot,
               additionalActionProvider: allProviders[0].cardId,
               fromCreation: prev.fromCreation || undefined,
+              // ★ v1198: geliehener Held — ohne diese Angabe loest der
+              // Server `heroIdx` gegen die EIGENE Heldenreihe auf.
+              charmedOwner: prev.charmedOwner,
             });
           } else {
             socket.emit('play_creature', {
@@ -27961,6 +28687,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // the explicit drag target and skip the picker.
               viaDragDrop: true,
               fromCreation: prev.fromCreation || undefined,
+              charmedOwner: prev.charmedOwner,   // v1198
             });
           }
           return null;
@@ -28144,6 +28871,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Sitzung ein blinder Fleck des Werkzeugs bei React-Rumpfcode.
   const handDragEigen = handDrag && !handDrag.fromCreation ? handDrag : null;
   const playDragEigen = playDrag && !playDrag.fromCreation ? playDrag : null;
+
+  // ★ v1210: HANDKARTEN NEIGEN SICH VOM ZEIGER WEG (Als Vorgabe 18.9.).
+  // Als Effekt und nicht im Render-Rumpf: `handDragEigen` ist bei jeder
+  // Mausbewegung ein neues Objekt, der Effekt laeuft also im Takt der
+  // Bewegung — und schreibt die Winkel direkt an die Knoten, ohne dass
+  // die Hand dafuer Requisiten durchreichen muesste. Die Rueckstellung
+  // haengt am selben Effekt: faellt der Ziehzustand, richten sich alle
+  // Karten wieder auf (weich, ueber den CSS-Uebergang).
+  //
+  // ★ Der Effekt steht BEWUSST hier unten, direkt hinter dem Zustand,
+  // den er liest. Weiter oben waere die Abhaengigkeitsliste beim
+  // Rendern `undefined` — `transform-block-scoping` macht aus dem
+  // `const` ein hochgezogenes `var`, der Rumpf laeuft also spaeter
+  // richtig, die Liste wird aber SOFORT ausgewertet. Der Effekt liefe
+  // dann genau einmal und die Neigung stuende still. Dieselbe Falle
+  // steht als Warnung in `scripts/build.js`.
+  // ★ v1211: JEDER Kartenzug neigt die Hand, nicht nur das Umsortieren
+  // (Als Vorgabe 18.9.: „solange eine Karte per Drag/Drop bewegt wird").
+  // Zieht man eine Karte aufs Brett, liegt der Zeiger weit rechts oder
+  // oben — dann stehen eben alle Handkarten geschlossen in dieselbe
+  // Richtung. Das ist gewollt: der Winkel zeigt vom Zeiger weg, egal
+  // wo der gerade ist.
+  // ★ v1212 (Als Befund 18.9.): Es neigt sich NUR die Haelfte, in der
+  // gezogen wird. Hand und Vorrat sind zwei getrennte Reihen (Als Regel
+  // 28.8.: eine Vorratskarte ist keine Handkarte) — beide zugleich zu
+  // kippen behauptet einen Zusammenhang, den es nicht gibt.
+  const handZieh = handDrag || playDrag || abilityDrag || null;
+  useEffect(() => {
+    const alle = document.querySelectorAll(
+      '.game-hand-me .game-hand-cards .hand-slot, .game-hand-me .game-hand-creation-cards .creation-slot');
+    const reihe = handZieh?.fromCreation
+      ? '.game-hand-me .game-hand-creation-cards .creation-slot'
+      : '.game-hand-me .game-hand-cards .hand-slot';
+    window.clearHandTilt?.(alle, { inner: ':scope > .board-card' });
+    if (handZieh && handZieh.mouseX != null) {
+      window.applyHandTilt?.(document.querySelectorAll(reihe), handZieh.mouseX,
+        { inner: ':scope > .board-card' });
+    }
+  }, [handZieh]);
 
   // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
   // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
@@ -28537,7 +29303,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // ENTIRE rendering side here — including the SFX-for-anim cue,
       // since it's gated on the visual.
       if (window._playAnimations === false) return;
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type);
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(type, rest);
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       // ── `zoneType: 'board'` — die ganze Kampfflaeche (v580) ─────────
       // Fuer Effekte, die NICHT an einer Zone haengen, sondern das
@@ -29312,6 +30078,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('ability_block_flash', onAbilityBlockFlash);
     const onHeroAscension = ({ owner, heroIdx, oldHero, newHero }) => {
+      setFormPreview(null);   // v1188: der echte Wechsel loest das Vorziehen ab
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
       if (!el) return;
@@ -29384,6 +30151,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       document.body.appendChild(ring);
       setTimeout(() => ring.remove(), 1600);
     };
+    const onHeroFormPreview = ({ owner, heroIdx, cardName }) => {
+      if (owner == null || heroIdx == null || !cardName) return;
+      setFormPreview({ owner, heroIdx, cardName });
+      // Notbremse: faellt der Aufstieg aus (Negation mitten im Preis),
+      // kommt kein `hero_ascension` — dann darf das Bild nicht kleben.
+      clearTimeout(onHeroFormPreview._t);
+      onHeroFormPreview._t = setTimeout(() => setFormPreview(null), 6000);
+    };
+    socket.on('hero_form_preview', onHeroFormPreview);
     socket.on('hero_ascension', onHeroAscension);
     // ── Waflav-Evolution: flashiger Formwechsel ──────────────────────
     // Der Server feuert `play_evolution_animation` fuer jede Karte mit
@@ -31820,7 +32596,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
     };
     socket.on('play_card_transfer', onCardTransfer);
-    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx }) => {
+    const onProjectileAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, targetOwner, targetHeroIdx, targetZoneSlot, targetZoneType, emoji, duration, trailClass, emojiStyle, projectileClass, projectileShape, noTrail, baseAngle, sfx, power }) => {
       // `sfx` (v613): optionaler Klang statt des Standard-`projectile`
       // (Javelin Throw: Wind). Nur Namen aus dem Katalog.
       if (window.playSFX) window.playSFX(sfx || 'projectile', { category: 'effect' });
@@ -31868,6 +32644,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         projectileClass: projectileClass || null,
         projectileShape: projectileShape || null,
         noTrail: !!noTrail,
+        // ★★ v1176: `power` gehoert zum Eintrag — ohne diese Zeile kam die
+        // Wucht nie bei der Form an (`darkBlast` fiel auf 0.5 zurueck).
+        power: typeof power === 'number' ? power : null,
         srcX: sxPx, srcY: syPx,
         tgtX: txPx, tgtY: tyPx,
         angle: angleDeg,
@@ -33873,7 +34652,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         || document.querySelector(`${base} [data-hand-idx="${handIdx}"]`)
         || document.querySelector(base);
       if (!el) return;
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType);
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animType, { count, duration });
       playAnimation(animType, el, { duration: duration || 900, count: count || 1 });
     };
     socket.on('play_hand_card_animation', onHandCardAnim);
@@ -35448,6 +36227,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('rain_of_spores_activated', onRainOfSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
       socket.off('ability_activated', onAbilityActivated); socket.off('ability_block_flash', onAbilityBlockFlash); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('hero_form_preview', onHeroFormPreview);
+      clearTimeout(onHeroFormPreview._t);
       socket.off('hero_ascension', onHeroAscension);
       socket.off('play_evolution_animation', onEvolutionAnimation);
       socket.off('willy_leprechaun', onWillyLeprechaun);
@@ -35816,7 +36597,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Potion animations are dispatched directly via playAnimation (below)
       // rather than play_zone_animation, so route the SFX through the zone-
       // animation dispatcher here so `acid_splash → elem_acid` etc. fires.
-      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animationType);
+      if (window.playSFXForZoneAnim) window.playSFXForZoneAnim(animationType, {});
       setExplosions(destroyedIds);
       setTimeout(() => setExplosions([]), 800);
       // Spawn particle animations on each target after a tiny delay for DOM to update
@@ -36688,7 +37469,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         });
         if (currentNonOwn.length >= maxNonOwnSupport) return prev;
       }
-      const maxTotal = config.maxTotal ?? Infinity;
+      // ★★ v1174: `maxSelect`/`selectCount` zaehlen hier genauso wie
+      // `maxTotal` — die Engine normalisiert das inzwischen, aber ein
+      // alter Prompt (Wiederverbindung, Spielstand) soll ebenfalls
+      // richtig tauschen statt beide Markierungen stehen zu lassen.
+      const maxTotal = config.maxTotal
+        ?? config.selectCount
+        ?? config.maxSelect
+        ?? Infinity;
       if (prev.length >= maxTotal) {
         if (maxTotal === 1) return [targetId];
         return prev;
@@ -38137,7 +38925,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         tooltipCardOverride={CARDS_BY_NAME[hero._shapeshiftBase]}
                         {...heroCardProps} />;
                     }
-                    return <BoardCard cardName={hero.name} {...heroCardProps} />;
+                    // v1188: vorgezogene Gestalt (siehe formPreview)
+                    const _vorgezogen = (formPreview
+                      && formPreview.owner === (isOpp ? oppIdx : myIdx)
+                      && formPreview.heroIdx === i
+                      && CARDS_BY_NAME[formPreview.cardName])
+                      ? formPreview.cardName : null;
+                    return <BoardCard cardName={_vorgezogen || hero.name} {...heroCardProps} />;
                   })()
                 ) : hero?.name && isRamming ? (
                   <div className="board-zone-empty" style={{ opacity: 0.3 }}>{hero.name.split(',')[0]}</div>
@@ -38176,7 +38970,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     die Bedingung davor war eine zweite Liste aller Status, die
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
-                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
+                {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
                 {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
                 {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
                 {/* v704 (Puppets, Lucky Puppet Laki): Luck Counter auf dem Helden */}
@@ -38933,9 +39727,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       : (playDrag.isCrossSideEquip ? isOpp : !isOpp));
               // v652: Zonen-Highlight seitenbewusst — Cross-Side-Attachments
               // tragen die Zielseite in `targetAttachOwner`.
+              // ★★ v1200 (Als Befund 18.9.): beim Beschwoeren in die Zone
+              // eines GELIEHENEN Helden leuchtete die eigene Zone mit
+              // demselben Index als „hier landet sie" — `_zoneSideOk`
+              // fiel ohne `targetAttachOwner` pauschal auf `!isOpp`
+              // zurueck, und `targetHero`/`targetSlot` sind blosse
+              // Indizes ohne Seite. Traegt der Zug ein `charmedOwner`,
+              // liegt das Ziel auf der GEGENseite.
               const _zoneSideOk = playDrag?.targetAttachOwner != null
                 ? (isOpp ? playDrag.targetAttachOwner !== myIdx : playDrag.targetAttachOwner === myIdx)
-                : !isOpp;
+                : (playDrag?.charmedOwner != null ? isOpp : !isOpp);
               const isPlayTarget = (_equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === z)
                 || (_zoneSideOk && playDrag && !playDrag.isEquip && playDrag.targetHero === i && (playDrag.targetSlot === z || playDrag.creatureCasterSlot === z));
               const isAutoTarget = _equipDragSideMatch && playDrag.targetHero === i && playDrag.targetSlot === -1 && z === autoSlot;
@@ -39135,7 +39936,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 && emptyCanPlayHere
                 && z < ((me.supportZones[i] || []).length || 3)
                 && (heroActionHeroIdx === undefined || heroActionHeroIdx === i);
-              const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid;
+              // ★★ v1199 (Als Befund 18.9.): GELIEHENE HELDEN ALS
+              // BESCHWOERUNGSZIEL. Die Zonen eines verzauberten
+              // gegnerischen Helden leuchteten beim Kreatur-Drag nicht —
+              // es gab schlicht keine Bedingung dafuer. Der Server kann
+              // es seit v1198 (`charmedOwner` im Kreaturenweg), die
+              // Optik hinkte hinterher.
+              //
+              // `canHeroPlayCard(opp, i, …)` liest `heroPlayableCards.charmed`
+              // — dieselbe Liste, die der Server ohnehin schickt und die
+              // Zonenfreiheit, Stufe, Schule und Aktionsoekonomie schon
+              // beruecksichtigt. Zusaetzlich nur noch: Platz wirklich frei
+              // und Held wirklich von MIR verzaubert.
+              const isOppCharmedSummonValid = isOpp && isDraggingCreature && !!playDrag?.card
+                && cards.length === 0
+                && opp.heroes?.[i]?.charmedBy === myIdx
+                && (opp.heroes?.[i]?.hp > 0)
+                && z < ((opp.supportZones?.[i] || []).length || 3)
+                && canHeroPlayCard(opp, i, playDrag.card);
+              const isDragValidZoneAny = isDragValidZone || isShareDragZone || isOppCrossSideValid || isOppCrossSideEquipValid || isOppFreeSideEquipValid || isOppCharmedSummonValid;
               // Zonen-Ausgrauen beim Ausruestungs-Drag (Als Vorgaben 17.8.).
               // Bisher dimmte ein Equip-Drag ueberhaupt KEINE Zone — die
               // Bedingung unten kennt nur Creature- und Attachment-Draege.
@@ -39534,6 +40353,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     const _ccIsAlreadyDeepsea = (_ccCardDataForSpores?.archetype === 'Deepsea')
                       || _slotTopName === 'Infected Squirrel';
                     const _ccSporified = isCreature && gameState.deepseaSporesActive && !_ccIsAlreadyDeepsea;
+                    // ★★ v1200 (Als Vorgabe 18.9.): DAUERHAFTE HERVORHEBUNG.
+                    // Eine Kreatur, die auf der gegnerischen Brettseite
+                    // steht und trotzdem mir gehoert, muss man auf einen
+                    // Blick erkennen — nicht erst am Abzeichen. Kraeftiger
+                    // Ring in der Farbe des Besitzers plus ruhiges Pulsen;
+                    // liegt UEBER den Zustandsfiltern, damit es auch an
+                    // einer versteinerten Kreatur sichtbar bleibt.
+                    const _fremdBoden = cc?.crossSideControlled != null;
+                    const _fremdRing = _fremdBoden ? {
+                      outline: `3px solid ${cc.crossSideControlled === myIdx ? (me.color || '#4ad9ff') : (opp.color || '#ff7a4a')}`,
+                      outlineOffset: '-2px',
+                      borderRadius: 7,
+                      boxShadow: `0 0 12px 3px ${cc.crossSideControlled === myIdx ? (me.color || '#4ad9ff') : (opp.color || '#ff7a4a')}`,
+                      animation: 'pp-crossside-pulse 1.8s ease-in-out infinite',
+                    } : null;
                     const creatureStyle = (cc?._petrified || cc?._baihuPetrify) ? { filter: 'saturate(0) brightness(0.7) contrast(1.1)', transition: 'filter 0.5s' }
                       : (cc?._xuanwuRevived || cc?._illusionSummon) ? { filter: 'sepia(0.2) hue-rotate(180deg) brightness(1.1)', opacity: 0.75 }
                       : _ccSporified ? { filter: 'brightness(0.78) sepia(0.6) hue-rotate(-50deg) saturate(1.7) contrast(1.05)', transition: 'filter 0.5s' }
@@ -39714,7 +40548,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         const _effLvl = CARDS_BY_NAME[cards[0]]?.level != null || cc?._cardDataOverride?.level != null
                           ? _cardLvl + _delta + _letheBonus
                           : null;
-                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
+                        return <BoardCard cardName={cards[0]} hp={curHp} maxHp={mHp} hpPosition="creature" skins={gameSkins} style={_fremdRing ? { ...(creatureStyle || {}), ..._fremdRing } : creatureStyle} tooltipCardOverride={tooltipOverride} inheritedEffects={cc?._inheritedEffects}
                           effectiveLevel={_effLvl} stampBonus={_letheBonus} />;
                       })()
                     ) : (
@@ -41629,6 +42463,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Projectile animations (phoenix cannon, arrow shafts, etc.) */}
       {projectileAnims.map(p => p.projectileShape === 'sandStream' ? (
         <SandStrahl key={p.id} p={p} />
+      ) : p.projectileShape === 'darkBlast' ? (
+        <DunkelBlastStrahl key={p.id} p={p} />
       ) : (
         <div key={p.id} className="projectile-anim" style={{
           left: p.srcX, top: p.srcY,
@@ -41864,7 +42700,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (!card) return null;
         const imgUrl = cardImageUrl(card.name);
         const foilType = card.foil || null;
-        const isFoil = foilType === 'secret_rare' || foilType === 'diamond_rare';
         const shownLevel = hoverEffLvl != null ? hoverEffLvl : card.level;
         return (
           <div className="board-tooltip">
@@ -41872,6 +42707,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
                 <img src={imgUrl} style={{ width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
                   border: foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : 'none' }} />
+                {/* ★ v1203: Dieses Vorschaubild rechnete `isFoil` aus und
+                    zeichnete die Schicht dann NIE — dritte Stelle derselben
+                    Bauart. Jetzt haengt auch sie an CardFoil. */}
+                <CardFoil card={card} />
               </div>
             )}
             <div style={{ padding: '10px 12px' }}>
@@ -43144,6 +43983,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       handIndex: hi, fromCreation: fc || undefined,
                       heroIdx: summonEligible[0].idx,
                       zoneSlot: summonEligible[0].zoneSlot,
+                      charmedOwner: summonEligible[0].charmedOwner,   // v1199
                     });
                   } else {
                     setSpellHeroPick({ cardName: cn, handIndex: hi, fromCreation: fc, card: c, eligible: summonEligible, isCreature: true });
@@ -43820,6 +44660,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 // ===== CROSS-FILE EXPORTS =====
 window.BoardCard = BoardCard;
 window.GameBoard = GameBoard;
+// ★ v1202: Die Area-Hintergruende sind ab jetzt auch ausserhalb des
+// Kampfbretts nutzbar — der Puzzle-Creator zeichnet damit DIESELBE
+// Schicht (app-puzzle.jsx, in `.pz-plane-clip`). Die Registry
+// AREA_OVERLAYS bleibt hier die EINZIGE Auslegungsstelle: sie ist das,
+// was `scripts/check-areas.js` prueft, und eine neue Area bekommt ihren
+// Hintergrund damit an genau einer Stelle — Creator inklusive.
+window.AreaBackgrounds = AreaBackgrounds;
 window.FrozenOverlay = FrozenOverlay;
 window.NegatedOverlay = NegatedOverlay;
 window.BurnedOverlay = BurnedOverlay;

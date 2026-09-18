@@ -69,6 +69,18 @@ module.exports = {
       selectedTargets,
     );
 
+    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. Die Kette ist EINE
+    // Quelle ueber alle drei Ziele — derselbe Fall wie Chain Lightning
+    // (Als Beispiel 12.9.); beides fehlte hier.
+    await engine.beginAoeStrike(selectedTargets.length, {
+      creatures: selectedTargets
+        .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
+        .filter(k => k.inst),
+      source: { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
+      type: 'creature', sourceOwner: pi,
+    });
+    try {
+
     // Chain lightning from Qinglong → target 1 → target 2 → target 3
     let prevOwner = pi, prevHeroIdx = heroIdx, prevZoneSlot = zoneSlot;
 
@@ -104,6 +116,9 @@ module.exports = {
       prevOwner = tgt.owner;
       prevHeroIdx = tgt.heroIdx;
       prevZoneSlot = tgtZoneSlot;
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     return true;

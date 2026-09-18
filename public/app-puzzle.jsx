@@ -62,7 +62,55 @@ function PzAmbiance({ variant }) {
     </div>
   );
 }
-const { GameBoard } = window;
+const { GameBoard, CardFoil } = window;
+
+// ★ v1202: Schluessel der Ansichtsvorliebe „Area-Hintergruende". Steht
+// hier oben neben den uebrigen Modulkonstanten, damit es genau EINEN
+// Schreibweisen-Ort gibt (Leser und Schreiber liegen im Bauteil weit
+// auseinander).
+const PZ_BG_KEY = 'pz-creator-backgrounds';
+
+// ★ v1212: Ziehquelle → Kartenreihe, die sich neigt. Modulweit, nicht
+// im Bauteil: die Tabelle ist konstant, und der Creator rendert
+// waehrend eines Zuges bei jeder Mausbewegung neu.
+const PZ_HAND_REIHEN = {
+  hand: '[data-pz-hand="hand"] .pz-hand-card',
+  oppHand: '[data-pz-hand="oppHand"] .pz-hand-card',
+  creation: '[data-pz-hand="creationZone"] .pz-hand-card',
+  oppCreation: '[data-pz-hand="oppCreationZone"] .pz-hand-card',
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1206 — BELEGUNG DER EDITOR-ZONEN
+//
+//  Gegenstueck zu `zonenBelegung` im Kampfbrett: dieselbe Idee (nicht
+//  den WEG einer Platzierung abhorchen, sondern das ERGEBNIS
+//  vergleichen), nur auf dem lokalen Editor-Zustand. Die Schluessel
+//  sind absichtlich EXAKT die `data-pz-zone`-Werte der Zonen, damit
+//  aus einem geaenderten Schluessel ohne Umrechnung der Selektor wird.
+// ═══════════════════════════════════════════════════════════════
+function pzZonenBelegung(players, areaZones) {
+  const m = new Map();
+  const oben = (arr) => (arr && arr.length) ? (arr.length + '|' + arr[arr.length - 1]) : null;
+  (players || []).forEach((p, si) => {
+    if (!p) return;
+    (p.heroes || []).forEach((h, hi) => { if (h?.name) m.set(`${si}-hero-${hi}-0`, h.name); });
+    (p.abilityZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, z) => {
+      const v = oben(slot); if (v) m.set(`${si}-ability-${hi}-${z}`, v);
+    }));
+    (p.supportZones || []).forEach((zonen, hi) => (zonen || []).forEach((slot, z) => {
+      const v = oben(slot); if (v) m.set(`${si}-support-${hi}-${z}`, v);
+    }));
+    (p.surpriseZones || []).forEach((slot, hi) => {
+      const v = oben(slot); if (v) m.set(`${si}-surprise-${hi}-0`, v);
+    });
+    (p.permanents || []).forEach((pm, i) => { if (pm?.name) m.set(`perm|${si}-${i}`, pm.name); });
+  });
+  (areaZones || []).forEach((arr, si) => (arr || []).forEach((n, i) => {
+    if (n) m.set(`${si}-area-0-${i}`, n);
+  }));
+  return m;
+}
 
 const emptyPlayer = () => ({
   heroes: [null, null, null],
@@ -365,6 +413,22 @@ function PuzzleCreator() {
       : [emptyPlayer(), emptyPlayer()]
   );
   const [areaZones, setAreaZones] = useState(saved?.areaZones || [[], []]);
+  // ★ v1202: ANSICHTS-Schalter fuer die Area-Hintergruende (Als Vorgabe
+  // 18.9.). Er gehoert bewusst NICHT zum Puzzle: weder `start_puzzle`
+  // noch der Export kennen ihn, und im Testkampf zeichnet das echte
+  // GameBoard seine Hintergruende unabhaengig davon weiter.
+  //
+  // Eigener localStorage-Schluessel, NICHT `pz-creator-state`: dieser
+  // wird beim RESET geloescht, die Ansichtsvorliebe soll das aber
+  // ueberleben. Voreinstellung = an (Paritaet zum Kampfbrett); nur ein
+  // ausdrueckliches '0' schaltet ab, damit ein fehlender Eintrag oder
+  // gesperrter Speicher nie zu einem leeren Brett fuehrt.
+  const [showAreaBgs, setShowAreaBgs] = useState(() => {
+    try { return localStorage.getItem(PZ_BG_KEY) !== '0'; } catch (_) { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(PZ_BG_KEY, showAreaBgs ? '1' : '0'); } catch (_) {}
+  }, [showAreaBgs]);
   // Doom Clock: Startzaehler je Seite (Als Vorgabe 5.8.). 0..19 —
   // 20 waere sofortige Niederlage, das ergibt als AUFBAU keinen Sinn.
   const [doomCounters, setDoomCounters] = useState(saved?.doomCounters || [0, 0]);
@@ -769,6 +833,59 @@ function PuzzleCreator() {
   // ── Puzzle Battle State ──
   const [puzzleGameState, setPuzzleGameState] = useState(null);
   const puzzleRoomRef = useRef(null); // stores roomId during puzzle battle
+
+  // ★ v1206: EINSCHLAG BEIM PLATZIEREN, auch im Editor (Als Vorgabe
+  // 18.9.: „im Puzzle-Editor UND im laufenden Spiel"). Gleiche Bauform
+  // wie im Kampf: Belegung vergleichen, auf jedem neu belegten Platz
+  // den Effekt spielen. Der erste Lauf setzt nur die Grundlinie —
+  // sonst knallt beim Oeffnen eines gespeicherten Aufbaus das ganze
+  // Brett auf einmal.
+  const pzBelegungRef = useRef(null);
+  useEffect(() => {
+    const neuBelegt = pzZonenBelegung(players, areaZones);
+    const alt = pzBelegungRef.current;
+    pzBelegungRef.current = neuBelegt;
+    if (!alt) return;
+    const einschlaege = [];
+    for (const [schluessel, wert] of neuBelegt) {
+      if (alt.get(schluessel) === wert) continue;
+      const sel = schluessel.startsWith('perm|')
+        ? `[data-pz-perm="${schluessel.slice(5)}"]`
+        : `[data-pz-zone="${schluessel}"]`;
+      const name = String(wert).includes('|') ? String(wert).split('|').slice(1).join('|') : wert;
+      const stil = window.zoneLandStyle?.(name) || {};
+      einschlaege.push({ selector: sel, key: 'pz:' + schluessel, color: stil.color, variant: stil.variant });
+    }
+    window.spawnZoneLandFxBatch?.(einschlaege);
+  }, [players, areaZones]);
+
+  // ★ v1211: NEIGUNG WAEHREND JEDES ZUGES (Als Vorgabe 18.9.). Der
+  // Zeiger wandert beim Ziehen ueber das ganze Fenster — ein Horcher
+  // am Dokument bekommt das mit, egal ueber welchem Ziel er gerade
+  // steht. Nur waehrend eines laufenden Zuges angehaengt, danach
+  // wieder ab; das Aufraeumen stellt die Hand gleich mit zurueck.
+  // ★ v1212 (Als Befund 18.9.: „im Puzzle-Mode werden BEIDE Haende
+  // gedreht"): Der Editor hat VIER Kartenreihen — eigene Hand,
+  // Gegnerhand und je eine Creation Zone. Gedreht wird genau die, aus
+  // der die gezogene Karte stammt; kommt sie aus der Galerie oder von
+  // einer Brettzone, neigt sich gar keine.
+  useEffect(() => {
+    const alle = () => document.querySelectorAll('.pz-hand-card');
+    const reihe = PZ_HAND_REIHEN[dragHandSource];
+    if (dragCardName == null || !reihe) { window.clearHandTilt?.(alle()); return undefined; }
+    const auf = (e) => {
+      const x = e.clientX != null ? e.clientX
+        : (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+      if (x != null) window.applyHandTilt?.(document.querySelectorAll(reihe), x);
+    };
+    document.addEventListener('dragover', auf);
+    document.addEventListener('touchmove', auf, { passive: true });
+    return () => {
+      document.removeEventListener('dragover', auf);
+      document.removeEventListener('touchmove', auf);
+      window.clearHandTilt?.(alle());
+    };
+  }, [dragCardName, dragHandSource]);
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
@@ -1574,6 +1691,8 @@ function PuzzleCreator() {
 
   // ── Drag ──
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
+    // ★ v1210: derselbe Anhebe-Klang wie im Kampf (Als Vorgabe 18.9.).
+    window.playCardDragSFX?.('pickup');
     setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
     // Erst im naechsten Tick verstecken — siehe `ziehLaeuft`.
     setZiehLaeuft(false);
@@ -1616,7 +1735,12 @@ function PuzzleCreator() {
     e.dataTransfer.setDragImage(ghost, 30, 42);
     setTimeout(() => { try { document.body.removeChild(ghost); } catch {} }, 0);
   }, []);
-  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null; }, []);
+  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
+    // ★ v1210: Neigung zuruecknehmen. Am Ziehende UND nicht erst beim
+    // Ablegen — ein abgebrochener Zug (Escape, Ablegen ins Leere) laeuft
+    // nur hier durch, und die Hand bliebe sonst schief stehen.
+    window.clearHandTilt?.(document.querySelectorAll('.pz-hand-card'));
+  }, []);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -1810,7 +1934,7 @@ function PuzzleCreator() {
     if (dragHandSource === 'hand' && dragHandIdx != null) {
       const ziel = tropfIndex(e.clientX, '[data-pz-hand="hand"]');
       sortiereUm('hand', dragHandIdx, ziel);
-      if (window.playSFX) window.playSFX('ui_click', { dedupe: 80 });
+      window.playCardDragSFX?.('reorder');
       setDragCardName(null); setDragHandIdx(null); setDragSource(null);
       setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false);
       dragEntityData.current = null;
@@ -3022,7 +3146,11 @@ function PuzzleCreator() {
               {hi === 2 && (
                 <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: ((areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') ? 'calc((50px + 16px) * var(--board-scale))' : 'calc(8px * var(--board-scale))'), display: 'flex', flexDirection: 'column', gap: 'calc(3px * var(--board-scale))' }}>
                   {p.permanents.map((pm, i) => (
-                    <div key={pm.id} title={pm.name} onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
+                    // ★ v1206: eigenes Attribut statt `data-pz-zone` — Letzteres
+                    // wird vom Drag/Drop-Finder ausgewertet und wuerde hier
+                    // einen Ablegeplatz vortaeuschen, den es nicht gibt.
+                    <div key={pm.id} title={pm.name} data-pz-perm={si + '-' + i}
+                      onContextMenu={(e) => { e.preventDefault(); if (window.playSFX) window.playSFX('discard', { dedupe: 60 }); removeCard(si, 'permanent', 0, i); }}>
                       <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(255,215,0,.5)', background: 'rgba(255,215,0,.08)', cursor: 'pointer' }}>
                         <BoardCard cardName={pm.name} />
                       </div>
@@ -3294,6 +3422,18 @@ function PuzzleCreator() {
           ) : null
         ))}
         <div style={{ flex: 1 }} />
+        {/* ★ v1202: Ansichtsschalter fuer die Area-Hintergruende. Steht
+            bewusst VOR den Aktionsknoepfen und ist immer sichtbar —
+            ein Haekchen, das mit der ersten gelegten Area erscheint und
+            mit der letzten wieder verschwindet, waere im Aufbau nicht
+            auffindbar. Aendert NICHTS am Puzzle, nur an der Ansicht. */}
+        <label title="Show each Area's background on the creator board, exactly as it looks in battle."
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0, fontSize: 10, letterSpacing: 1, cursor: 'pointer', userSelect: 'none', color: showAreaBgs ? 'var(--player-color)' : 'var(--text2)' }}>
+          <input type="checkbox" checked={showAreaBgs}
+            onChange={(e) => setShowAreaBgs(e.target.checked)}
+            style={{ accentColor: 'var(--player-color)', cursor: 'pointer', flexShrink: 0 }} />
+          🖼️ BACKGROUNDS
+        </label>
         <button className="btn btn-danger" onClick={handleReset} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>↺ RESET</button>
         <button className="btn" onClick={handleVerify} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
         <button className="btn" onClick={handleExport} disabled={!validated}
@@ -3453,6 +3593,7 @@ function PuzzleCreator() {
                       <span style={{ fontSize: 8, color: 'var(--text2)' }}>{c.cardType}</span>
                     </div>
                   )}
+                  <CardFoil card={c} />
                 </div>
               );
             })}
@@ -3530,6 +3671,7 @@ function PuzzleCreator() {
                     {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                       <div className="pz-hand-card-text"><span>{cardName}</span></div>
                     )}
+                    <CardFoil card={getCard(cardName)} />
                   </div>
                   </React.Fragment>
                 );
@@ -3579,6 +3721,7 @@ function PuzzleCreator() {
                         {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                           <div className="pz-hand-card-text"><span>{cardName}</span></div>
                         )}
+                        <CardFoil card={getCard(cardName)} />
                       </div>
                       </React.Fragment>
                     );
@@ -3637,6 +3780,33 @@ function PuzzleCreator() {
           <div className="pz-plane-clip">
           {/* Ambient motes — FIRST child: paints behind the tilted plane. */}
           <PzAmbiance variant="board" />
+          {/* ★ v1202: AREA-HINTERGRUENDE IM CREATOR (Als Vorgabe 18.9.).
+              Liegt eine Area in einer der beiden Zonen, zeichnet der
+              Editor jetzt genau den Hintergrund, den das laufende Spiel
+              auch zeigen wuerde — gleiche Komponente, gleiche Registry
+              (`AreaBackgrounds` / `AREA_OVERLAYS` aus app-board.jsx,
+              ueber `window` exportiert). KEINE Kopie der Overlays hier:
+              eine neue Area traegt sich in die Registry ein und
+              erscheint damit automatisch auch im Creator.
+
+              Platz in der Geschwisterfolge = Kampfbrett-Paritaet:
+              Ambiente → Area-Hintergruende → Ebene. `.pz-plane-clip`
+              ist position:relative OHNE eigenen Stapelkontext und die
+              Ebene traegt ein transform, also malt sie wie ein
+              Stapelkontext mit z-index 0 — die Reihenfolge ist reine
+              DOM-Reihenfolge, die Hintergruende liegen unter Zonen und
+              Karten. Die Schichten selbst sind pointerEvents:none,
+              Drag/Drop auf die Zonen bleibt unberuehrt.
+
+              Seitenzuordnung wie im Kampf: myIdx 0 = die untere Seite
+              (YOU), oppIdx 1 = oben (OPPONENT). Damit landet bei zwei
+              deckenden Areas die eigene links/unten und die gegnerische
+              rechts/oben, genau wie im Spiel.
+
+              Der Schalter in der Kopfleiste haengt die Schicht ganz aus
+              (Als Vorgabe 18.9.) — die Overlays animieren dauerhaft, und
+              beim Bauen soll man sie abschalten koennen. */}
+          {showAreaBgs && <AreaBackgrounds areaZones={areaZones} myIdx={0} oppIdx={1} />}
           <div className="pz-board-plane">
           {renderSide(1, true)}
 
@@ -3793,6 +3963,7 @@ function PuzzleCreator() {
                 {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                   <div className="pz-hand-card-text"><span>{cardName}</span></div>
                 )}
+                <CardFoil card={getCard(cardName)} />
               </div>
               </React.Fragment>
             );
@@ -3858,6 +4029,7 @@ function PuzzleCreator() {
                     {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
                       <div className="pz-hand-card-text"><span>{cardName}</span></div>
                     )}
+                    <CardFoil card={getCard(cardName)} />
                   </div>
                   </React.Fragment>
                 );
@@ -3994,6 +4166,7 @@ function PuzzleCreator() {
                       {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 2 }} draggable={false} /> : (
                         <div className="pz-hand-card-text"><span>{cardName}</span></div>
                       )}
+                      <CardFoil card={getCard(cardName)} />
                     </div>
                   );
                 })}

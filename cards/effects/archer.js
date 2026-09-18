@@ -57,6 +57,13 @@ const { usesLeft, spendUse } = require('./_charges');
 // Schluessel des einheitlichen Rundenzaehlers (v417).
 const USE_KEY = 'archerShot';
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'electric_strike' }, impactMs: 260,
+  },
+
   // Ladungsanzeige oben rechts (Als Vorgabe 16.8.): nur LESEN,
   // niemals den Zaehler anfassen — laeuft bei jedem Zustandsversand.
   chargesPerTurn: 3,

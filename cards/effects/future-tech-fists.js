@@ -106,7 +106,16 @@ module.exports = {
     // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
     // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
     // Einzeltreffer und der Schutz greift korrekt nicht.
-    engine.beginMultiHit(ids.length);
+    // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen des Streuschlags
+    // an das Anti-AoE-Fenster (Deepsea Idol).
+    await engine.beginAoeStrike(ids.length, {
+      creatures: ids
+        .map(id => kandidaten.find(t => t.id === id))
+        .filter(z => z && z.type !== 'hero')
+        .map(z => z.cardInstance)
+        .filter(Boolean),
+      source: quelle, amount: atk, type: 'attack', sourceOwner: pi,
+    });
     try {
       for (const id of ids) {
         const ziel = kandidaten.find(t => t.id === id);

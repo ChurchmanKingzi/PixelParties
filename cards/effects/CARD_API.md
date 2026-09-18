@@ -8,6 +8,264 @@ available on the `ctx` object inside hooks.
 
 ---
 
+## ★★★ DIE STILLEN FEHLSCHLÄGE — LESEN, BEVOR DU EINE KARTE BAUST
+
+> Zusammengetragen am 18.9.2026 beim Bau von „Tempeluna, the Convergence
+> Fairy" und „Dive Down". In dieser einen Sitzung sind **sieben** Fehler
+> aufgetreten, und sie hatten alle dieselbe Form.
+
+### Die Form
+
+Ein Feldname zeigt ins Leere, oder eine Prüfung steigt vorzeitig aus —
+und **nichts sagt etwas**. Keine Ausnahme, kein Log, keine rote Zeile in
+der Konsole. Die Karte tut einfach nur nicht, was sie soll:
+
+* der Drag-and-Drop bleibt folgenlos,
+* die Galerie öffnet sich leer,
+* die Karte erscheint ohne Flug an ihrem Platz,
+* die Animation läuft nicht,
+* der Schutz greift beim Zielen, aber nicht beim Treffen.
+
+Das ist die mit Abstand häufigste Fehlerklasse in diesem Projekt und die
+teuerste zu finden, weil es nichts zu lesen gibt. **Wer eine neue Karte
+baut, prüft die folgenden sieben Stellen aktiv, statt auf eine
+Fehlermeldung zu warten.**
+
+---
+
+### ① Aufstieg: es sind ZWEI Riegel, an ZWEI Karten
+
+**Symptom:** Der Held hat die Bedingung erfüllt, der Drag der
+Ascended-Karte auf ihn bleibt folgenlos. Keine Meldung.
+
+| Was | Wo | Wozu |
+|---|---|---|
+| `ascensionCondition(gs, pi, heroIdx, engine)` | auf der **Ascended**-Karte | der Server prüft beim Ausführen |
+| `refreshAscensionReadiness(engine, pi, hi)` | auf **jedem Basis**-Helden | setzt `ascensionReady` + `ascensionTarget(s)` — **erst danach bietet der Client den Aufstieg an** |
+
+Die Bedingung allein reicht nicht: `heroCanAscendTo` im Client verlangt
+`ascensionReady` UND die Zielkarte in `ascensionTarget(s)`. Die
+Bereitschaft **nimmt sich auch wieder zurück**, und zwar nur die eigene
+(`hero.ascensionTarget === MEINE_KARTE` prüfen), sonst löscht eine Karte
+die Bereitschaft einer anderen mit. Muster: `checkTempelunaAscension`
+in `_fairy-shared.js`, `checkMoniaAscension` in `_monia-shared.js`.
+
+**Dazu:** `_getAscensionLineage` liest die Basen aus dem gedruckten Text
+(`on top of a "X"`). Nennt der Satz **mehrere** Basen („… or „Y" you
+control"), werden seit v1187 alle gelesen — vorher nur die erste, und
+die zweite war als Basis unsichtbar.
+
+**Verhindern:** Eine neue Ascended-Karte ist erst fertig, wenn jeder
+Held, der zu ihr aufsteigen kann, `refreshAscensionReadiness` trägt.
+Testfall: `engine._refreshAscensionReadiness()` aufrufen und
+`hero.ascensionTargets` prüfen.
+
+---
+
+### ② Galerie-Einträge: `name` rein, `cardName` raus
+
+**Symptom:** Die Galerie öffnet sich **leer**.
+
+```
+HINEIN:  [{ name, source?, count?, cost?, selectable? }]
+ZURÜCK:  { cardName, source }
+```
+
+Der Vertrag ist asymmetrisch. Wer die Antwortform für die Eingabe hält —
+der naheliegende Schluss — baut `{ cardName: … }`, der Client liest
+`entry.name`, findet `undefined` und zeichnet nichts.
+
+Seit v1189 **vereinheitlicht `promptGeneric` die Einträge selbst**
+(`name` / `cardName` / `card` / blosser String) und warnt auf der
+Konsole, wenn gar kein Name zu holen ist. Das ist ein Netz, kein
+Freibrief: `scripts/check-gallery-entries.js` hält den Quelltext auf der
+kanonischen Form.
+
+**Verhindern:** Beim Schreiben laut mitsprechen — „rein `name`, raus
+`cardName`". Und die eigenen Teststubs müssen die **Antwortform**
+nachbilden (`{ cardName: eintrag.name }`), sonst spiegeln sie den Fehler
+und der Test wird grün, obwohl nichts geht. Genau so ist es passiert.
+
+---
+
+### ③ Kartenflug: Quelle und Ziel haben getrennte Feldsätze
+
+**Symptom:** Die Karte erscheint ohne Bewegung an ihrem Platz.
+
+```
+QUELLE:  from, fromOwner?, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId
+ZIEL:    to,   toOwner?,   toHeroIdx,   toSlotIdx,   toHandIdx
+```
+
+Der Handler steigt **still** aus, wenn eines der beiden Elemente fehlt:
+`if (!srcEl || !tgtEl) return;`. Wer beim Ziel die Quellnamen schreibt
+(`heroIdx` statt `toHeroIdx`), bekommt gar keine Bewegung.
+
+| `to` | braucht |
+|---|---|
+| `support` / `ability` | `toHeroIdx` + `toSlotIdx` |
+| `surprise` / `hero` | `toHeroIdx` |
+| `hand` | `toHandIdx` (+ `finalHandSize`) |
+| `discard` / `deleted` / `deck` / `potionDeck` / `area` / `coolnessStack` | nichts |
+
+Zwei Reihenfolge-Regeln: der Flug wird **vor** dem Splice aus der Hand
+gesendet (sonst ist der Startplatz weg), und ist die Karte bereits
+entnommen, lässt man `fromHandIdx` **weg** — der Handler nimmt dann den
+Handbereich als Ganzes. Ein `sfx: '<klang>'` gibt dem Flug einen Klang;
+fürs Anlegen aufs Brett ist `placement` der passende.
+
+Wächter: `scripts/check-flight-targets.js`.
+
+---
+
+### ④ Animationen: Keyframes gehören in die eigene Komponente
+
+**Symptom:** Die Animation läuft an einer Stelle, an einer anderen nicht
+— bei identischem Code.
+
+Ein Keyframe aus dem `<style>`-Block einer **anderen** Komponente
+existiert nur, solange die gerade gemountet ist. Läuft sie nicht mit,
+bleibt das Element bei `opacity: 0` stehen.
+
+Erlaubt sind genau zwei Quellen: der **eigene** `<style>`-Block oder
+`public/style.css` (global geteilt, z.B. `healSparkleParticle`,
+`waterRipple`). Wächter: `scripts/check-anim-keyframes.js` — er hat
+gleich einen zweiten Fall gefunden, `monkee_shield` (v347), dessen
+Animation seit ihrer Entstehung nie lief.
+
+**Verhindern:** Wer eine Animation baut, die nur manchmal zusammen mit
+einer anderen läuft, testet sie **auch allein**. Und: Partikel sollen
+sichtbar sein — 2-px-Punkte und Null-Boxen gehen neben dem Kartenbild
+unter, 4–9 px mit doppeltem Schein nicht.
+
+---
+
+### ⑤ Geschichtete Klänge brauchen `category: null`
+
+**Symptom:** Von drei Klangschichten hört man eine oder keine.
+
+`playSFXForZoneAnim` stempelt jede Schicht ohne eigene Angabe auf
+`category: 'effect'`, und diese Sammelkategorie lässt pro Rahmen genau
+**einen** Klang durch. Richtig für gleichzeitige Treffer (Bauregel 7 der
+SFX-Familie), falsch für einen geschichteten Cue.
+
+**Verhindern:** Ein mehrschichtiger Klang setzt an JEDER Schicht
+`category: null` plus ein `dedupe`, damit eine Serie trotzdem nicht
+matscht. Vorbilder: `ddg_manifest`, `buff`, `tempeluna_infuse`.
+
+---
+
+### ⑥ Zielschutz: „cannot be chosen" ist NICHT „or hit"
+
+**Symptom:** Der Gegner kann den Helden nicht anklicken, Flächenschaden
+trifft ihn trotzdem.
+
+Der `untargetable`-Status wird **nur** in den Zielwählern durchgesetzt.
+Sagt der Kartentext „cannot be chosen **or hit**", braucht es
+`blocksTargeting(gs, engine, info)` — die Engine liest den Vertrag an
+drei Stellen: beide Zielwähler und `_actionDealDamageImpl`.
+
+Zwei Dinge, an denen das bis v1193 trotzdem scheiterte und die jetzt
+stimmen: die Prüfung im Schadenspfad stand **innerhalb** des
+Surprise-Blocks und erbte dessen Bedingungen (`skipSurpriseCheck`,
+`source.heroIdx >= 0`, Typfilter) — `actionAoeHit` schaltete sie damit
+komplett ab. Und `chooserIdx` wurde nicht mitgegeben, worauf jedes
+Skript gatet, das „your opponent's" prüfen will.
+
+**Verhindern:** Wer einen Zielschutz baut, testet ihn mit **beidem** —
+einem gezielten Spell und einer echten Flächenkarte. Und liest genau:
+„other **Heroes**" (Stealth) ist etwas anderes als „other **targets**"
+(Dive Down, Kreaturen zählen mit). Gemeinsam bleibt: ein zweiter
+gleichgeschützter Held zählt **nicht** als Ausweichziel, sonst schützen
+zwei einander ins Nichts.
+
+**Liegt die regelgebende Karte nicht mehr auf dem Brett** (eine
+Reaction, die sich selbst löscht), hängt sie ihre Regel an den Helden:
+`engine.addHeroTargetBlocker(pi, heroIdx, 'Dive Down', { untilTurn })`.
+Der Eintrag nennt nur den Kartennamen, die Regel bleibt im Skript. Und:
+**ein Schutz, der sich wie ein Buff verhält, braucht ein Abzeichen** —
+Eintrag in `TARGET_BLOCKER_BADGES` (app-shared.jsx), sonst sucht der
+Gegner den Grund, warum er nicht klicken kann.
+
+---
+
+### ⑦ AoE: Anti-AoE muss reagieren können
+
+**Symptom:** „Deepsea Idol" geht nicht auf, „Interference" greift nicht.
+
+Es sind **zwei** Klammern, und sie hängen an verschiedenen Dingen:
+`beginMultiHit(n)` bedient Interference (Heldenseite), **2+ Einträge in
+EINEM `processCreatureDamageBatch`** bedienen Deepsea Idol
+(Kreaturenseite). Wer seine Kreaturen in einer Schleife einzeln
+abarbeitet, erzeugt je Kreatur einen Batch der Größe 1 — das Fenster
+verlangt zwei. Details und die zwei erlaubten Bauformen im Kapitel
+„ANTI-AoE MUSS REAGIEREN KÖNNEN"; `beginAoeStrike` setzt beides auf
+einmal.
+
+**Karten ohne Schaden zählen mit** (Als Regel 18.9.): Gift, Freeze,
+Negation, Buffs auf eine ganze Gruppe deklarieren
+`hitsMultipleTargets: true` von Hand — die Autoerkennung hängt an der
+Schadensklammer und sieht sie sonst nicht.
+
+---
+
+### ⑧ Abzeichen: drei Stellen, an denen es sterben kann
+
+Dieselbe Klasse, schon dreimal getroffen (v1140–v1142, dazu v1192).
+Ein Abzeichen erscheint nur, wenn **alle drei** Stellen stimmen:
+
+1. **Die Zeile entsteht.** Die Badge-Zeile des Helden hing früher an
+   einer langen Oder-Bedingung (`isFrozen || isStunned || …`) — ein
+   Held mit ausschließlich einem neuen Zustand fiel durch jede Prüfung
+   und die Zeile wurde nie gezeichnet. Sie hängt seit v1142 nur noch an
+   `hero?.name`; wer eine neue Zeile baut, macht es genauso.
+2. **Der Block liegt im richtigen Zweig.** v1141: der Eintrag stand
+   innerhalb von `if (s.negated || c.negated)` und konnte für eine
+   Karte, die gar nichts negiert, nie erscheinen. Anhängsel- und
+   Zustands-Abzeichen hängen an **keiner** äußeren Bedingung.
+3. **Die Daten kommen an.** `StatusBadges` bekommt `statuses` /
+   `counters` / `buffs` — alles andere muss ausdrücklich
+   durchgereicht werden (`_targetBlockers: hero._targetBlockers`,
+   v1192). Ein Feld, das nur am Helden hängt und nicht im
+   Props-Objekt steht, ist für die Abzeichen unsichtbar.
+
+**Verhindern:** Beim Bau eines Abzeichens mit einem **vorhandenen**
+vergleichen, das sicher funktioniert (Als Hinweis 15.9.: „vergleich das
+mit existierenden Debuffs wie Poisoned"). Und einen Testfall schreiben,
+der die Karte mit **ausschließlich** diesem einen Zustand aufstellt —
+nur so fällt auf, wenn die Zeile gar nicht erst entsteht.
+
+### Die Wächter — was wovon abgedeckt ist
+
+Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
+
+| Wächter | fängt |
+|---|---|
+| `check-aoe-window` | Kreaturenschaden in einer Schleife ohne Flächenklammer |
+| `check-aoe-text` | AoE laut Kartentext, aber nicht als AoE erkennbar (Ratchet) |
+| `check-gallery-entries` | Galerie-Einträge mit `cardName` statt `name` |
+| `check-flight-targets` | Flüge ins Brett ohne `toHeroIdx`/`toSlotIdx` |
+| `check-anim-keyframes` | Animationen, deren Keyframes nirgends stehen |
+| `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
+| `check-damage-types` · `check-no-splice` · `check-areas` · … | siehe die jeweiligen Kopfkommentare |
+
+**Vor jeder Auslieferung laufen alle**, nicht nur die passenden:
+
+```
+for w in scripts/check-*.js; do node $w || echo "ROT: $w"; done
+```
+
+### Prüfliste für eine neue Karte
+
+1. Alle Wächter grün.
+2. Alle Skripte laden (`require` über `cards/effects/`).
+3. Testfälle gegen die **echte Engine**, nicht gegen Mocks — und die
+   Stubs müssen die echten Antwortformen nachbilden.
+4. Für jede sichtbare Wirkung eine **Gegenprobe**: Läuft die Animation
+   auch allein? Fliegt die Karte? Öffnet sich die Galerie mit Inhalt?
+   Greift der Schutz auch gegen Flächenschaden?
+5. Ist die Karte fertig, liegt sie im ZIP — mit `data/cards.json`.
+
 ## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
 > „Jede NEUE Animation soll einen Sound haben. Bestehende lasse ich
@@ -212,6 +470,17 @@ einer der beiden Area-Zonen liegt (beide Seiten, wie die Regel-Prüfung
    Was nicht in der Registry steht, wird NICHT gerendert.
 3. Dann `node scripts/build.js` + `check-bundles`, Bundle mitliefern.
 
+**Ein Eintrag genügt — der Puzzle Creator hängt mit dran (v1202).** Die
+Schicht ist die Komponente `<AreaBackgrounds areaZones myIdx oppIdx />`
+(app-board.jsx, per `window.AreaBackgrounds` exportiert); der Creator
+rendert dieselbe Komponente in `.pz-plane-clip` (app-puzzle.jsx), mit
+`myIdx: 0` (YOU, unten) und `oppIdx: 1` (OPPONENT, oben). Eine neue Area
+erscheint damit automatisch AUCH im Editor — keine zweite Registry, kein
+Nachziehen. Der Schalter „🖼️ BACKGROUNDS" in der Creator-Kopfleiste
+blendet die ganze Schicht aus; er ist reine Ansicht (eigener
+localStorage-Schlüssel `pz-creator-backgrounds`, überlebt RESET) und hat
+auf Puzzle-Daten, Export und den Testkampf keinen Einfluss.
+
 **4. Und die Karte muss sich SELBST in die Zone legen.** Areas landen
 nicht von allein im Slot. Ohne das greift in JEDEM Spielpfad die
 Standard-Entsorgung Hand → Ablage — die Karte wird bezahlt, die Aktion
@@ -251,6 +520,227 @@ die Prüfrunde — zusammen mit `check-no-splice`, `check-scope` und
 Eine Area ohne Overlay ist unfertig. Board of Kings: Schachbrett in
 leichter Perspektive mit Walnuss-Rahmen, Holzmaserung, Vignette und
 aufsteigenden Figuren-Silhouetten.
+
+## ★ FOIL-KARTEN: EIN ANSCHLUSS, `<CardFoil card={…} />` (v1203)
+
+`foil` steht in cards.json auf der Karte selbst (`secret_rare` |
+`diamond_rare`) und ist damit eine Eigenschaft der KARTE, nicht des
+einzelnen Exemplars. Die Schicht darüber hat seit v1204 **vier Lagen**:
+
+1. **Textur** — die Prägung der Folie. Secret Rare: feine Schrägrillen;
+   Diamond Rare: breite 45°-Facetten (ein feines Gitter beißt sich mit
+   dem Pixelraster der Karten). Bewusst fast unsichtbar.
+   **★ v1205 (Als Befund 18.9.): ab 120 px Kartenbreite fällt die
+   Prägung weg** — Rillen haben eine feste Breite und werden auf einer
+   groß gezeichneten Karte zu gemalten Balken. Das gilt für die Lage
+   selbst UND für die Rillen im Band (`.foil-band::after`), die dieselbe
+   Prägung nur beleuchtet zeigen. Umgesetzt als Größenregel, nicht als
+   Liste von Stellen: `.foil-shine-overlay` ist `container-type:
+   inline-size`, die Lagen hängen an `@container (min-width: 120px)`.
+   Damit greift es automatisch im großen Tooltip, in den Helden-Plätzen
+   des Deck-Editors, im Karten-Auftritt und in allem, was später
+   dazukommt; Brett, Hand und Galerien liegen mit 64–100 px darunter.
+2. **Schimmer** — farbige Interferenz über die ganze Karte.
+3. **Bänder** — wandernde Lichtstreifen, `mix-blend-mode: screen`, mit
+   heißem weißem Kern (`::before`) und den Rillen der Prägung als
+   Schatten IM Licht (`::after`, multiply). Dass die Textur beleuchtet
+   statt aufgemalt wird, ist das, was sie physisch wirken lässt.
+   **★ v1205: Diamond Rare hat jetzt ebenfalls Bänder** (vorher keine) —
+   drei statt fünf, deutlich breiter, flacher geneigt und rund doppelt
+   so langsam, in Türkis/Aqua/Tiefblau mit weißem Kern. Licht, das über
+   eine geschliffene Fläche GLEITET, statt Folie, die blitzt; die
+   Palette steht in `DIAMOND_BAND_GRADIENTS`.
+4. **Funken + Staub** — Lichtkreuze mit langen Spitzen und Bloom, dazu
+   langsam aufsteigende Staubkörner.
+
+**Alles läuft per CSS.** Bis v1203 schob ein JS-Zeitgeber je Karte alle
+150–850 ms ein Band in den React-Zustand — Dutzende Re-Renders je
+Sekunde für reine Deko. Seit v1204 bekommt jede Karte EINMAL fünf
+Bandbeschreibungen mit gestaffelten Laufzeiten; jedes Band belegt nur
+40 % seines Taktes und wartet den Rest unsichtbar ab. Gleiche
+unregelmäßige Dichte, null React-Arbeit nach dem ersten Render.
+
+Jede animierte Lage hat einen Grundzustand, der ohne Animation richtig
+aussieht (`opacity: 0` bei Funken/Bändern/Staub, `.18` beim Schimmer) —
+sonst stünden bei „Play Animations: aus" starre Lichtkreuze auf der
+Karte.
+
+Genau das war die Bruchstelle: jede Anzeigestelle trug ihre eigene
+Kopie derselben sechs Anschlusszeilen, und eine davon (der große
+Tooltip, beim Herauslösen aus BoardCard) stand auf `bands={[]}` — die
+Karte funkelte weiter, aber kein Band lief je über sie. Eine zweite
+rechnete `isFoil` aus und zeichnete gar nichts, eine dritte (die
+Handkarten des Puzzle-Creators) hatte nie eine Schicht bekommen.
+
+**Deshalb gilt: wer ein Kartenbild zeigt, hängt `<CardFoil card={…} />`
+als Geschwister direkt daneben — mehr nicht.** Die Komponente
+(app-shared, per `window.CardFoil`) hält Bänder, Schimmerphase und
+Funkenversatz selbst und rendert bei Nicht-Foil-Karten `null`. Der
+Elternknoten braucht `position: relative` (die Schicht liegt absolut
+auf `inset: 0`) — sonst hängt sie sich an den nächsten positionierten
+Vorfahren, im Zweifel die ganze Leiste.
+
+`FoilOverlay` bleibt exportiert, ist aber ein Rohteil:
+`scripts/check-foil.js` lässt `<FoilOverlay>` nur noch im Rumpf von
+`CardFoil` stehen und meldet jede neue Kopie. `useFoilBands` ist mit
+v1204 entfallen.
+
+**Diamond Rare ist durchgehend türkis-blau gehalten** (Als Vorgabe
+18.9.): Rahmenpuls, Schimmerfolie, Facetten, Bänder, Funken und Staub
+ziehen alle an derselben Palette. Die Trennung zur Secret Rare ist
+bewusst farblich UND im Takt — Regenbogen/schnell gegen Türkis/langsam;
+sonst sind die beiden Seltenheiten auf einen Blick nicht zu
+unterscheiden.
+
+
+## ★ ZONEN-EINSCHLAG: JEDE PLATZIERUNG WIRD SICHTBAR (v1206 — Als Vorgabe 18.9.)
+
+„Wird eine Karte in einer Zone platziert (Abilities, Creatures, Equips,
+Attachments, Heroes, völlig egal), soll allgemein immer eine hübsche
+kleine Particle-Animation gespielt werden."
+
+**Für Kartenskripte ist dabei NICHTS zu tun.** Der Effekt hängt an
+keinem Platzierungsweg, sondern am Ergebnis: Kampfbrett und
+Puzzle-Editor vergleichen nach jeder Zustandsänderung die Belegung
+aller Zonen (`Platzschlüssel → Stapelhöhe|oberste Karte`) mit der
+vorigen, und was sich ändert, ist eine Platzierung. Gespielt,
+beschworen, platziert, wiederbelebt, gestohlen, umgezogen, per Puzzle
+geladen — alles fällt automatisch darunter, auch alles, was später
+dazukommt. Einen Kanal je Weg abzuhorchen wäre bei Dutzenden
+platzierenden Skripten ein Fass ohne Boden.
+
+Was daraus folgt, wenn du an der Oberfläche baust:
+
+* Die Zone muss ihr **DOM-Anker-Attribut** tragen — im Kampf
+  `data-hero-zone` / `data-ability-zone` / `data-support-zone` /
+  `data-surprise-zone` / `data-area-zone` (jeweils mit `-owner` und den
+  Index-Attributen), im Editor `data-pz-zone="<si>-<zt>-<hi>-<slot>"`
+  bzw. `data-pz-perm`. Eine neue Zonenart ohne Anker bekommt keinen
+  Einschlag; die Zuordnung steht in `zonenSelektor` (app-board).
+* **Zähler, HP und Status lösen nichts aus** — nur Name oder
+  Stapelhöhe zählen. Ein Equip auf eine Kreatur erhöht den Stapel und
+  feuert also; 40 Schaden auf denselben Helden nicht.
+* Die **Farbe kommt aus dem Kartentyp** (`typeColor`): Creatures grün,
+  Heroes violett, Abilities blau, Artefakte gold. Der Blick weiß damit
+  schon an der Farbe, was gelandet ist.
+* **★ v1207: Kreaturen werden BESCHWOREN statt eingeschlagen.**
+  Statt Ring und Funken zwei gegenläufige Runenringe am Fuß der Zone
+  (flachgedrückt, damit sie auf dem gekippten Spielfeld am Boden
+  liegen), eine Lichtsäule nach oben und aufsteigende Irrlichter —
+  langsamer als der Einschlag, weil Beschwörung ein Vorgang ist und
+  kein Aufprall. Wer die Variante bekommt, entscheidet
+  `zoneLandStyle`: Kartentyp mit „Creature" (`Creature`,
+  `Creature/Token`) **oder ein Token MIT HP** — die Spielsteine mit HP
+  (Mummy, Invader, Leprochaun, Biomancy) stehen als Kreatur auf dem
+  Brett, der Pollution Token und die HP-losen Puppets nicht. Aktuell
+  trifft das 418 der 1413 Karten. Weitere Varianten hängen sich an
+  derselben Stelle ein (`opts.variant` in `spawnZoneLandFx`).
+* Gefüllt wird über `spawnZoneLandFxBatch` — mehrere Plätze auf einen
+  Schlag laufen **gestaffelt** (45 ms) und gedeckelt (14). Der
+  Spielstart legt sechs Helden und ein Dutzend Abilities gleichzeitig;
+  ohne Staffelung wäre das ein Blitz statt eines Effekts.
+* Der **erste Durchlauf setzt nur die Grundlinie** (ebenso nach einem
+  Partiewechsel und beim Öffnen eines gespeicherten Puzzles) — sonst
+  detoniert beim Betreten eines laufenden Spiels das halbe Brett.
+
+Der Effekt selbst (`spawnZoneLandFx`, app-shared) ist bewusst **ohne
+React** gebaut: eine feste Schicht auf `document.body`, Koordinaten aus
+`getBoundingClientRect`, drei CSS-Lagen (Schein, Ring in Zonenform,
+gezogene Funken). Dieselbe Bauform wie die Kartenflüge — und der Grund,
+warum Kampfbrett und Editor, die in völlig verschiedenen Bäumen leben,
+dieselbe Funktion rufen können.
+
+**★ v1209 — die Beschwörung liegt in ZWEI Ebenen** (Als Vorgabe 18.9.:
+„Die Lichtsäule soll durchaus über der Karte sein, nur der Kreis-Teil
+darunter"). **Unten**, im Brettbaum: nur die Runenringe — die Karte
+steht damit im Kreis. **Oben**, auf der festen Schicht: Lichtsäule,
+Schein, ein diagonaler Glanzstreifen über die ganze Karte, Irrlichter
+und derselbe Funkenflug wie beim Einschlag. Ohne den zweiten Teil
+leuchtete nur der Fuß der Karte und der Effekt wirkte zu klein.
+
+Beim Einhängen in den Brettbaum gilt `ppUiScale` (v837): der Wirt liegt
+unter `zoom: var(--ui-scale)`, `getBoundingClientRect` liefert aber
+echte Fensterpixel. Ungewandelt landet der Kreis um genau diesen Faktor
+daneben — im Kampffeld (`ui-noscale`) fällt es nicht auf, im
+Puzzle-Editor sofort. Gegen drei Maßstäbe (0,7 / 1 / 1,25) geprüft.
+
+**★ v1208 — Einschlag liegt OBEN, Beschwörung UNTEN.** Ein Kreis am
+Boden, der über der Karte liegt, ist ein Widerspruch (Als Befund
+18.9.). Der Einschlag bleibt auf der festen Schicht — er schlägt ja auf
+der Karte ein. Die Beschwörung wird stattdessen in den Brettbaum
+gehängt: in `.board-plane-clip` bzw. `.pz-plane-clip`, **nach** den
+Area-Hintergründen und **vor** die Ebene mit den Karten. Eine eigene
+Schicht mit kleinerem `z-index` reicht dafür NICHT — die Karten liegen
+hinter dem `transform` der Brettebene in einem eigenen Stapelkontext,
+da kommt ein Geschwister auf `document.body` nicht drunter. Zonen
+außerhalb der Ebene (Permanents) fallen automatisch auf die feste
+Schicht zurück.
+
+## ★ HANDKARTEN: NEIGUNG UND ZIEH-KLÄNGE (v1210 — Als Vorgabe 18.9.)
+
+**Neigung.** Solange eine Karte gezogen wird — umsortiert ODER aufs
+Brett — stehen alle Karten **der gezogenen Reihe** um denselben festen
+Winkel (`HAND_TILT_GRAD`, **5°**) vom Zeiger weggedreht; nur die
+Richtung hängt davon ab, auf welcher Seite des Zeigers die Karte liegt.
+`applyHandTilt` (app-shared) schreibt den Wert als `--hand-tilt` an die
+Knoten, das Aussehen steht in style.css, `clearHandTilt` stellt zurück.
+
+Zwei Korrekturen aus Als Tests, beide mit Anlass:
+
+* **Pauschal statt abgestuft** (v1211). Der erste Anlauf ließ die
+  Neigung mit dem Abstand zum Zeiger abfallen — „sieht so leider gar
+  nicht gut aus". Pauschal ist eine klare Geste, der Verlauf war Matsch.
+  `opts.grad` bleibt als Regler, die Vorgabe ist flach.
+* **5° statt 30°** und **nur die gezogene Reihe** (v1212). 30° kippten
+  die Karten übereinander, die Hand war nicht mehr zu lesen — die
+  Neigung ist ein Hinweis, keine Fächerbewegung. Und es gibt mehrere
+  Kartenreihen: im Kampf Hand und Vorrat, im Editor zusätzlich beide
+  Gegnerreihen. Gedreht wird die, aus der die Karte stammt
+  (`fromCreation` im Kampf, `dragHandSource` → `PZ_HAND_REIHEN` im
+  Editor); kommt sie aus der Galerie oder von einer Brettzone, neigt
+  sich keine. Beide zugleich zu kippen behauptet einen Zusammenhang,
+  den es nicht gibt — eine Vorratskarte ist keine Handkarte (Als Regel
+  28.8.).
+
+Zwei Fallen, die dabei schon zugeschnappt sind:
+
+* **Messung ohne Rückkopplung.** Gedreht wird die KARTE, gemessen ihr
+  PLATZ (`hand-slot`, nie gedreht) plus `offsetWidth` der Karte, das vom
+  `transform` unberührt bleibt. Wer den Kartenrahmen selbst misst,
+  bekommt Neigung → Messung → Neigung und damit Zittern. Im
+  Puzzle-Editor IST die Karte der Platz — dort liegt der Drehpunkt
+  deshalb in der Mitte (`50% 50%`), wo die Kartenmitte unter der Drehung
+  fest bleibt; im Kampf darf er unten liegen (`50% 85%`, Fächer-Optik).
+* **Der Effekt steht HINTER dem Zustand, den er liest.** Weiter oben
+  wäre die Abhängigkeitsliste beim Rendern `undefined`:
+  `transform-block-scoping` macht aus dem `const` ein hochgezogenes
+  `var`, der Rumpf läuft also später richtig, die Liste wird aber sofort
+  ausgewertet — der Effekt liefe genau einmal und die Neigung stünde
+  still. Steht als Warnung auch in `scripts/build.js`.
+
+**Klänge.** `playCardDragSFX(art)` mit `pickup` | `reorder` | `release` |
+`cancel` — eine Tabelle in app-shared, damit Kampf, Puzzle-Editor und
+Deck-Bauer nicht drei Handschriften bekommen. Ausgewählt nach dem
+gemessenen Charakter der Dateien, nicht nach ihrem Namen: `ui_click`
+ist kurz und hell (0,25 s, 95 % der Energie im ersten Fünftel) —
+heruntergestimmt ein Anheben; `draw` ist der kurze Kartenrutscher.
+`placement` (1,07 s, dunkel) spielt die Engine beim Landen ohnehin, beim
+Loslassen kommt darum nur ein leiser Tick dazu.
+
+**★ PEGEL RECHNEN, NICHT SCHÄTZEN (v1211, Als Befund: „viel zu leise,
+beim Pick-Up höre ich GAR NICHTS").** Am Ausgang stehen DREI Faktoren
+übereinander: die Eigenlautstärke des Klangs
+(`SFX_VOLUME_OVERRIDES` — `ui_click` steht auf **0,5**), der globale
+Dämpfer `SFX_MASTER_MULTIPLIER` (**0,33**) und erst dann `opts.volume`.
+Ein „leiser" 0,38 wird damit zu 6 % Pegel, also zu nichts. Werte über 1
+sind ausdrücklich zulässig; als Maßstab dient `placement` bei
+1 × 1 × 0,33 = 0,33. Die Tabelle steht heute bei 0,26–0,36 und nennt den
+gerechneten Endwert je Zeile im Kommentar.
+
+Der Loslass-Klang sitzt an EINER Stelle ganz oben in `onUp` und nicht in
+den Zweigen: `onUp` hat über ein Dutzend davon, und jeder neue wäre
+wieder einer, der ihn vergisst. Im eigenen Bereich losgelassen heißt
+Umsortieren, sonst Loslassen.
 
 ## ★ AKTIVE EFFEKTE KOSTEN NUR DANN EINE AKTION, WENN SIE ES SAGEN (Als Regel 7.9. — MANDATORY)
 
@@ -10065,6 +10555,379 @@ Gliedern, von denen jedes einzeln vergessen werden kann:
 6. bei `asDraw: true` zusaetzlich **`onDraw`** — der Hook von „Cute
    Meanie Melissa" (siehe unten).
 
+## ★★ v1184 — „Fireball" klammert seine Kreaturtreffer (Deepsea Idol greift wieder)
+
+Ursache ② aus v1183 behoben: Fireball arbeitete seine Ziele in einer Schleife
+ab, und `actionDealCreatureDamage` verpackt JEDEN Treffer in einen eigenen
+Batch mit genau einem Eintrag — das Fenster „2+ eigene Kreaturen aus einer
+Quelle" ging nie auf. Jetzt sammelt die Karte ihre Kreaturziele und gibt sie
+in EINEM `processCreatureDamageBatch` ab, mit `animType: 'flame_strike'` am
+Eintrag statt eigener Broadcasts — genau das Muster von „Aquatic Arrows".
+Helden bleiben beim Einzelweg, sie haben ihre eigenen Fenster.
+
+**Messung:** Fireball und Flame Avalanche melden jetzt beide `fired: 1`, die
+Abfrage erreicht den Verteidiger, und die Kreaturen ueberleben.
+
+**★ NOCH OFFEN — dieselbe Klammer fehlt 22 weiteren Karten**, die mehrere
+Kreaturen in einer Schleife treffen (u.a. Armageddon, Explosion, Heat Wave,
+Laser Volley, Cataclysm, Future Tech Barrage, Land Sharks). Fuer sie gilt
+derselbe Umbau; einige brauchen dabei Ergebnisse je Treffer (Rider), das ist
+je Karte zu pruefen.
+
+## ★★ v1183 — „Deepsea Idol" triggerte nicht: ZWEI Ursachen (Als Befund 17.9.)
+
+Gemessen mit `engine._batchWindowStats` (Zaehler im Batch-Fenster).
+
+**① Flaechen-Zauber (Flame Avalanche) — Quellen-Zaehlung nach Objekt-Identitaet.**
+Das Fenster verlangt „2+ eigene Kreaturen aus EINER Quelle" und gruppierte
+dafuer nach der OBJEKT-IDENTITAET von `e.source`. Der Flaechen-Weg legt je
+Eintrag ein eigenes Quell-Objekt an — also zaehlte jede Kreatur als eigene
+Quelle, `_maxSameSource` blieb 1, Ausgang `srcMiss`. **Behoben:** stabiler
+Schluessel aus Kartenname + Seite + Held (+ Instanz-Id); Statusschaden (Burn,
+Gift) bleibt bewusst je Eintrag getrennt. Messung vorher `srcMiss: 1`,
+nachher `fired: 1` samt Abfrage an den Verteidiger.
+
+**② Schleifen-Zauber (Fireball) — gar kein Batch.** `actionDealCreatureDamage`
+ruft IMMER `processCreatureDamageBatch([entry])` mit genau EINEM Eintrag.
+Eine Karte, die ihre Ziele in einer Schleife abarbeitet, erzeugt damit N
+Batches zu je 1 — das Fenster oeffnet gar nicht (`entries.length < 2`), im
+Zaehler taucht es nicht einmal auf. Das trifft JEDE Mehrziel-Karte, die nicht
+ueber `actionAoeHit` laeuft. **Noch offen**: Behebung heisst, solche Karten
+ihre Kreaturtreffer in EINEM `processCreatureDamageBatch` abgeben zu lassen
+(oder eine Sammel-Klammer in der Engine).
+
+## ★★★ v1182 — Flaechen-Weg angebunden; Bilder fuer Attacks UND Creatures
+
+**Warum „Flame Avalanche" stumm blieb — zwei Luecken:**
+1. Die Karte animiert ueber `ctx.aoeHit({ animationType })`, nicht ueber
+   eigene Broadcasts — die Migration von v1181 suchte nur nach
+   `play_zone_animation`.
+2. Der FLAECHEN-Weg (`actionAoeHit`) hat eigene Negationsfenster
+   (Surprise + Post-Target) — auch die rufen jetzt `negationsBilder`.
+
+**Zweite Migrationswelle:** Die Animationstypen werden gegen die
+`ANIM_REGISTRY` des Clients gepruefen (250 Eintraege), damit Prompt- und
+Schadenstypen (`confirm`, `hero`, `equip`, `destruction_spell` …) nicht
+faelschlich als Bilder gelten. Erkannt werden `type:` UND `animationType:`.
+Neu deklariert: **230 Karten** — 128 Creatures, 87 Spells, 15 Attacks.
+
+**Stand:** 301 von 616 Karten mit eigener Deklaration; die uebrigen 315
+(meist ohne jede eigene Animation) fallen auf die Schul-Bilder zurueck
+(v1181), bleiben also ebenfalls sichtbar.
+
+## ★★★ v1181 — ALLE offensiven Zauber am neuen Bilder-System; Abwehr-Timing
+
+**Timing (Al 17.9.):** Die Abwehr soll erst KURZ NACH dem Beginn der
+Zauberbilder sichtbar werden. Dafuer gibt es neben `nachBilder` jetzt
+`waehrendBilder`: die Engine startet es PARALLEL zu den Bildern des
+abgewehrten Zaubers (nicht abgewartet), die Karte legt ihre Pause selbst
+fest. „MOE Shield" wartet 300 ms und setzt dann seine Schilde; das
+Zerschellen bleibt `nachBilder`. Reihenfolge im Test:
+Flug → Herz → Einschlag → Zerschellen.
+
+**Migration:** 71 Zauber und Attacks tragen jetzt `spellVisual` —
+66 mit ihrem Einschlag (genau eine Zonen-Animation im Skript), 5 zusaetzlich
+mit ihrem Geschoss (Basketskull, Energy Drain, Hammer Throw, Ricochet, Rocket
+Fist). Die Deklaration wird NUR im Negationsfall gespielt; im normalen Weg
+bleibt es bei den Broadcasts im Effekt selbst, also kein Doppelbild.
+Vollstaendig entkoppelt (Karte ruft `spielZauberBilder` selbst) sind wie
+gehabt Fireball, Icebolt und Memory Blast — das Muster fuer neue Karten.
+
+**★ ALLGEMEINER RUECKFALL:** Ein Zauber ganz ohne `spellVisual` bleibt bei
+einer Negation trotzdem sichtbar — `_standardZauberBilder` gibt ihm ein
+Geschoss nach seiner Zauberschule (Destruction 🔥, Decay 💀, Magic Arts ✨,
+Summoning 🌀, Support 💫, Fighting 💥) und einen passenden Einschlag. Eine
+eigene Deklaration schlaegt den Rueckfall immer.
+
+## ★★ v1180 — Negationsbilder an ALLEN Stellen; Nachlauf der Abwehrkarte
+
+v1179 haengte die Bilder nur an die zwei Negationsstellen in
+`promptEffectTarget`. Fireball und Memory Blast laufen aber ueber
+`promptDamageTarget` / `promptMultiTarget` — dort wird `_spellNegatedByEffect`
+an VIER weiteren Stellen gesetzt, und genau die blieben stumm. Sichtbar war
+dann nur „MOE Shield"s Platzhalter-Flug (✨).
+
+**Jetzt EIN Weg:** `engine.negationsBilder(quelle, ziele, ergebnis)` haengt an
+allen sechs Stellen (beide Fenster in `promptEffectTarget`, je zwei in
+`promptDamageTarget` und `promptMultiTarget`). Er spielt
+
+1. die eigenen Bilder des abgewehrten Zaubers (`spellVisual`, v1179) und
+2. danach den **Nachlauf der Abwehrkarte**: eine Reaktion darf ihrem Ergebnis
+   `nachBilder: async (engine, info) => { … }` mitgeben.
+
+**MOE Shield** nutzt das: die Herzen stehen als Schilde, die Engine spielt die
+echten Bilder des Zaubers, und erst danach zerschellt er an ihnen
+(`negate_shatter`). Der Platzhalter-Flug ist raus.
+
+## ★★★ v1179 — ZAUBERBILDER SIND VOM EFFEKT ENTKOPPELT (Al 17.9.)
+
+Bilder steckten bisher im Effekt-Rumpf. Wurde ein Zauber negiert („MOE
+Shield"), lief der Rumpf nie — man sah vom abgewehrten Zauber nichts.
+
+**VERTRAG `spellVisual`** am Kartenskript, rein visuell (kein Zustand, kein
+Schaden):
+
+```js
+spellVisual: {
+  projectile: { emoji?, projectileClass?, trailClass?, projectileShape?,
+                baseAngle?, emojiStyle?, sfx?, duration?, power? },
+  flightMs?, stagger?,            // Wartezeit / Versatz bei mehreren Zielen
+  impact: { type, power?, duration? },   // Zonen-Animation am Ziel
+  impactMs?,
+}
+// oder als Funktion fuer eigene Ablaeufe:
+async spellVisual(engine, info) { … }   // info: { cardName, owner, heroIdx,
+                                        //   zoneSlot, targets, power, negiert }
+```
+
+**Engine:**
+* `engine.spielZauberBilder(cardName, info)` — die Karte ruft es an der
+  Stelle auf, an der frueher ihre Broadcasts standen;
+* `engine.spielNegierteZauberBilder(quelle, ziele)` — ruft die ENGINE selbst,
+  wenn eine Reaktion oder ein Surprise den Zauber in `promptEffectTarget`
+  abfaengt (beide Negationsstellen). Der Effekt laeuft dann nicht, die Bilder
+  schon; die Karte erkennt den Fall an `info.negiert`.
+
+**Umgestellt:** Fireball (Volley + Flammenexplosion), Icebolt (Eisgeschoss +
+Eishuelle), Memory Blast (Funktion, weil die Wucht Flug und Einschlag
+skaliert — bei Negation halbe Kraft). Weitere Zauber folgen demselben Muster;
+ohne `spellVisual` verhaelt sich eine Karte wie bisher.
+
+## v1178 — „MOE Shield": Herzen SCHIRMEN ab, der Zauber zerschellt
+
+Al 17.9.: „Die Animation des blockierten Spells sollte trotzdem spielen; die
+Herzen schirmen die Ziele ab."
+
+**★ Was NICHT geht und warum:** die eigene Animation des abgewehrten Zaubers
+steckt in seinem Effekt-Rumpf (`onPlay` nach der Zielwahl). Wird er negiert,
+liefert `promptEffectTarget` eine leere Auswahl, die Karte bricht davor ab —
+ihre Bilder laufen nie. Sie nachtraeglich zu starten hiesse, den Effekt selbst
+laufen zu lassen; nur der SCHADEN wird zentral abgefangen, andere Wirkungen
+(Ziehen, Zerstoeren, Status) nicht.
+
+**Gezeigt wird deshalb der Abwehr-Vorgang:**
+1. die Herzen stehen als SCHILDE vor jedem Ziel (`shield: true` — Schutzring
+   dreht sich, das Herz haelt still statt sofort zu verblassen);
+2. der abgewehrte Zauber fliegt vom WIRKER auf jedes Ziel
+   (`play_projectile_animation`, Klang `spell_cast`);
+3. er zerschellt an den Schilden (neue Animation `negate_shatter`: Blitz,
+   Aufprallring, 14 Scherben; Klang `negate` + heller `critical_strike`);
+4. danach dehnen sich die Herzen aus und verblassen wie gehabt.
+
+## v1177 — „MOE Shield": pinke Herzen auf allen geschuetzten Zielen
+
+Die Karte hatte gar keine Animation. Jetzt blueht auf JEDEM Ziel, das der
+negierte Zauber getroffen haette, ein grosses pinkes Herz auf (`moe_heart`):
+es dehnt sich und wird ueber eine Sekunde durchsichtig, dazu zehn Funken
+nach aussen. Groesse ≈ 2× die Kartenseite, gesetzt am Rechteck des Ziels
+(`x`/`y`, Lehre v1154).
+
+Die Ziele werden mit derselben Kennung entdoppelt wie die Zaehlung (ein
+doppelt genanntes Ziel = EIN Herz) und um 90 ms gestaffelt angestossen, damit
+es wie eine Kette klingt. Klang: `buff` (hell) plus ein weicher `heal` im
+Nachklang.
+
+## ★ v1176 — Klang zum „Memory Blast"; ZONE_ANIM_SFX darf rechnen
+
+* **★ Gefunden beim Nachruesten:** `onProjectileAnimation` zerlegt die
+  Nutzlast in eine feste Feldliste — `power` war nicht dabei und kam bei der
+  Projektilform NIE an (`darkBlast` fiel immer auf 0.5 zurueck). Jetzt
+  gehoert `power` zum Eintrag.
+* **ZONE_ANIM_SFX-Eintrag darf eine FUNKTION sein** und die Nutzlast der
+  Animation lesen: `playSFXForZoneAnim(type, payload)`. Die drei Aufrufer im
+  Client reichen sie durch (Zonen-, Handkarten- und Aufloesungs-Animation).
+  Bestehende Eintraege (Objekt oder Sequenz) bleiben unveraendert gueltig.
+* **`dark_blast`:** `elem_dark` + `heavy_impact`, beide tiefer und lauter mit
+  steigender Wucht (vol 0.64/0.55 bei power 0.2 → 1.00/0.95 bei 1.0), ab
+  power > 0.55 zusaetzlich ein `critical_strike`. Der Flug selbst klingt
+  weiterhin mit `elem_dark` vom Wirker los.
+
+## v1175 — „Memory Blast": Stoss aus negativer Energie, Einschlag am Ziel
+
+* **Sitz:** `dark_blast` las `x`/`y` nicht — `.dark-blast` stand per CSS in
+  der Mitte der Animationsebene (dieselbe Lehre wie v1154). Jetzt
+  `position: fixed` am Rechteck des Ziels.
+* **Neue Projektilform `darkBlast`** (`DunkelBlastStrahl`, Bauart wie
+  `sandStream` v1149): ein Stoss vom WIRKER zum Ziel — Kopf mit Wirbelring,
+  gestreckter Schweif, Ranken aus Dunkelenergie, Funken und eine
+  Leuchtspur. Klang `elem_dark`.
+* **Skaliert mit dem Schaden** (`power` = Schaden ÷ voller Wucht, also der
+  Zahl der Karten in der gegnerischen Ablage): Kopf 35 → 88 px, Ranken
+  8 → 20, Funken 11 → 26, Flugdauer 620 → 880 ms; am Einschlag Skala
+  1.26 → 3.14, Ringe 1 → 3, Splitter 11 → 30. Die Einschlagsgroesse
+  beruecksichtigt zusaetzlich die Groesse des Ziels.
+
+## ★★ v1174 — EINFACHAUSWAHL TAUSCHT IMMER (Al 17.9.)
+
+**Bug:** Ein zweiter Klick markierte ein weiteres Ziel, statt das erste
+abzuwaehlen — der Effekt nahm dann das ZUERST geklickte. Der Client tauscht
+nur, wenn er eine Obergrenze kennt, und die liest er aus `maxTotal`; Karten,
+die nur `maxSelect: 1` (oder `selectCount: 1`) mitgeben, fielen durch.
+
+**Zwei Riegel statt Nachtragen je Karte:**
+* `promptEffectTarget` uebersetzt `maxSelect`/`selectCount` von 1 in
+  `maxTotal: 1`, bevor die Abfrage rausgeht — gilt fuer JEDE Karte;
+* der Client liest in `togglePotionTarget` zusaetzlich `selectCount` und
+  `maxSelect` als Obergrenze (alte Abfragen nach Wiederverbindung).
+
+Betroffen waren 5 Aufrufe (Cheeky Monkee, Resilient Monkee, Logan, beide
+Debt-O-Tron-Modelle) plus „Alluring Light", das die Grenze jetzt auch
+ausdruecklich mitgibt. Der Waechter `check-single-target` bleibt als Netz
+fuer Einfachauswahlen ganz ohne Angabe.
+
+## v1173 — „Alluring Light": Anlock-Leuchten sitzt am Ziel, groesser und laenger
+
+Dieselbe Lehre wie bei „Decapitating Strike" (v1154): die Komponente las
+`x`/`y` nicht, `.lure-beacon` stand per CSS bei `left: 50%; top: 50%` der
+Animationsebene — also in der Bildschirmmitte. Jetzt `position: fixed` am
+Rechteck des Ziels; die Komponente liefert `left`/`top` und rechnet ihre
+Groessen aus `w`/`h` (Ring ≈ 1,7× der Kartenbreite).
+
+Dazu (Al 17.9.): ein weicher Halo, acht pulsende Lichtstrahlen, VIER statt
+drei Ringe und ein groesserer Kern; die Zonen-Animation laeuft 2,4 s
+(`duration`), der Guss wartet 1,3 s statt 0,7 s, bevor der Angriff losgeht.
+
+## ★★ v1172 — „Alluring Light" blieb nach der ersten Zielwahl stehen; Waechter dagegen
+
+**Dieselbe Falle wie bei „Ricochet" (v1150):** `promptEffectTarget` liefert
+die IDs der gewaehlten Ziele (`'hero-1-0'`), NICHT die Zielobjekte. Die Karte
+las `heldWahl[0].heroIdx` an einer Zeichenkette, bekam `undefined` und brach
+still ab — die zweite Zielwahl ging nie auf. Jetzt fuehrt ein kleiner Helfer
+(`zielVonAntwort(antwort, angebot)`) die Antwort ueber die ANGEBOTENE Liste
+auf das Zielobjekt zurueck.
+
+**★ NEUER WAECHTER `scripts/check-target-answers.js`:** meldet jede Stelle,
+die die Antwort einer Zielwahl direkt wie ein Zielobjekt liest
+(`.heroIdx`, `.slotIdx`, `.type`, `.owner`, `.cardInstance`), ohne sie ueber
+`ziele.find(t => t.id === id)` oder `zielVonAntwort(...)` zurueckzufuehren.
+Gegen die kaputte Fassung von „Alluring Light" gegengeprueft: meldet beide
+Stellen, mit der Reparatur wieder gruen.
+
+## v1171 — „Cleansing of the Land": Flug aus der Hand, lauteres Feuer
+
+* **Flug Hand → Area:** `placeArea` meldet nur das Herabsinken IN die Zone;
+  den Weg dorthin meldet der Guss selbst — `play_pile_transfer` mit
+  `from: 'hand'`, `fromHandIdx` (Platz in der Hand), `to: 'area'` und
+  `finalHandSize`, dann erst die Entnahme. Lehre fuer jeden Hand→Brett-Weg,
+  der nicht ueber `doPlaySpell` laeuft.
+* **Klang lauter:** `ZONE_ANIM_SFX.fire_sweep` jetzt 1.0 / 0.8 / 0.7 statt
+  0.42 / 0.30 / 0.26.
+
+## v1170 — „Cleansing of the Land": Feuerwand, Klang, erweiterter Effekt
+
+**Animation:** `fire_sweep` war eine orange Linie. Jetzt eine WAND: ein
+mitwanderndes Buendel aus Glutkern, Hitzeschleier, 34 flackernden
+Flammenzungen ueber die ganze Hoehe, 26 Funken und 8 Rauchfahnen; dahinter
+waechst eine verkohlte Spur, die verglimmt. Weiterhin auf der
+Atmosphaeren-Ebene (unter den Karten), animiert werden nur `opacity` und
+`transform` — die Wand wandert als Ganzes, ihre Flammen flackern an Ort und
+Stelle. **Klang:** `ZONE_ANIM_SFX.fire_sweep` — leises `elem_fire`, `burn`
+und ein zweites `elem_fire` im Nachlauf.
+
+**Effekt (Al 17.9.):**
+* „While there is at least 1 Area on the board, this Spell can be used as an
+  additional Action." → `inherentAction(gs)` liest die Area-Zonen.
+* „Send all Areas on the board to the discard pile." → `removeAllAreas(-2)`
+  direkt nach der Feuerwand.
+* Die Suche ist jetzt ein „may": ohne Area im Deck oder bei Abbruch endet die
+  Karte, das Abraeumen bleibt — KEIN `_spellCancelled` mehr.
+* „openly add it to your hand" — `actionAddCardFromDeckToHand` zeigt die
+  Karte ohnehin beim Holen.
+* `spellPlayCondition`: spielbar, sobald es etwas zu tun gibt — Area auf dem
+  Brett ODER Area im Deck.
+
+## ★★★ v1169 — ZUGEFUEGTE vs. PASSIVE STATUSEFFEKTE (Al 17.9.)
+
+v1168 machte `negated` pauschal heilbar — richtig fuer ZUGEFUEGTE Negierung
+(Null, Decisive Defeat), falsch fuer Negierung, die eine KARTE aufrecht
+haelt. Die Unterscheidung heisst jetzt ausdruecklich so, und die Marke dafuer
+gab es schon: `sourceBound: true` am Status (v731, Water Golem).
+
+| Art | Beispiele | heilbar | uebertragbar (Tea) | Ablauf |
+|---|---|---|---|---|
+| **zugefuegt** | Nulls Negierung, Frost, Gift, Anhaengsel-Status (Decisive Defeat) | ja | ja | eigene Dauer; Anhaengsel folgen ihrem Status (v1168) |
+| **passiv** (`sourceBound`) | Bishop of Kings [B], Water Golem, Weakening Crystal | ja — aber nur VORUEBERGEHEND | **nein**, „Tea" heilt ihn nur | endet mit der Quelle, nicht zum Zugende; die Quelle legt ihn zum naechsten Rundenbeginn und bei ihrer Erneuerung sofort neu an |
+
+**Engine:** `istPassiverStatus(statusData)` / `istPassiverHeldenStatus(pi, hi, key)`.
+**Tea:** passive Status fallen aus `transferStatuses` heraus — sie werden
+geheilt, aber nicht weitergereicht (und ein zweites Ziel wird gar nicht erst
+erfragt, wenn nichts uebrig bleibt).
+**Weakening Crystal** traegt jetzt ebenfalls `sourceBound` (Hand-Passiv).
+Bishop [B] und Water Golem trugen es schon; ihre Wiederanlage laeuft ueber
+`onTurnStart` / `onCardEnterZone` (Erneuerung) wie gefordert.
+
+## ★★★ v1168 — ANHAENGSEL FOLGEN IHREM STATUS; `negated` ist heilbar; Stranglehold
+
+### ★ ALLGEMEINE REGEL (Al 17.9.)
+„Wird ein per Anhaengsel zugefuegter Status GEHEILT, geht die Karte in die
+Ablage ihres URSPRUENGLICHEN Besitzers (mit Flug); wird er UEBERTRAGEN, geht
+sie in die Support Zone des neuen Traegers. Wer keine freie Support Zone hat,
+kann als neuer Traeger nicht gewaehlt werden."
+
+| Baustein | Wirkung |
+|---|---|
+| `anhaengselStatusHooks(CARD, STATUS, { heilenWirftAb: true })` | Heilen → `sendBoardCardToDiscard` (Flug, Ablage des urspruenglichen Besitzers). Decisive Defeat nutzt es jetzt |
+| `engine.anhaengselFuerStatus(pi, hi, status)` | die Karte hinter einem `_fromAttachment`-Status |
+| `engine.hatFreienSupportPlatz(pi, hi)` | Filter fuer neue Traeger |
+| `engine.anhaengselUmziehen(inst, owner, heroIdx)` | Umzug samt Flug und Zonenpflege |
+| `inst.counters._anhaengselZiehtUm` | setzt der uebertragende Effekt VOR dem Heilen — sonst wuerfe der Status-Hook die Karte schon dabei ab |
+
+**Tea** merkt sich die Anhaengsel vor dem Heilen, bietet als zweites Ziel nur
+Helden mit freier Support Zone an und zieht die Karten nach der Uebertragung
+um; scheitert ein Umzug, greift wieder die Heil-Regel. In
+`cleansableHeroEntries` steht ein Anhaengsel mit eigenem Status nur noch
+EINMAL — als sein Status.
+
+### ★ `negated` ist ein Status wie jeder andere
+Die globale Sperre `cleansable: false` (v1103) machte Nulls Negierung
+unheilbar und mit „Tea" nicht uebertragbar. Jetzt `cleansable: true`; wer
+haerter binden will, setzt `unhealable: true` an der einzelnen Anwendung. Der
+Sonderweg fuer `_byWeakeningCrystal` / `_fromAttachment` entfaellt.
+
+### Balance
+**Stranglehold:** Level 0 → 1; der Basis-ATK-Bonus haengt jetzt an Fighting 3
+statt Fighting 1 (`data/cards.json` + Skript).
+
+## ★★★ v1167 — Tester-Batch: Kreatur-Wirker, Opfer-Beschwoerung, Set-Bildschirm, Zhigao-Decks
+
+### ★ WER HAT DEN ZAUBER GEWIRKT? (Frost Rune fror den Wirt statt der Kreatur)
+Die Engine kann einen Kreatur-Wirker laengst als Quelle ausweisen
+(`gs._spellCasterCreature` → `_rewriteSourceForCreatureCaster` →
+`isCreatureSource`), aber JEDE castende Kreatur musste die Marke selbst
+setzen — von sechs taten es drei. Jetzt setzt die Engine sie waehrend JEDES
+`onCreatureEffect` (beide Aufrufstellen: `_engine.js` und `server.js`).
+Damit trifft jede Reaktion, die ihre Quelle angreift (Frost Rune, Booby
+Trap, Fireshield …), die Kreatur — Chaorc Friendly Fireballer, Demon's Gate
+und alle kuenftigen ohne eigene Zeile.
+
+### ★ `requiresActiveCaster` — Opfer-Beschwoerung braucht einen wachen Helden
+`canBypassFreeZoneRequirement` galt im `heroParalyzed`-Zweig (Karten-Karte
+UND `validateActionPlay`) als Freibrief: „Guardian of Teocuilatl",
+„Suspicious Monster", Archer/Warrior of Teocuilatl liessen sich mit komplett
+eingefrorener Aufstellung beschwoeren. Wer OPFERT, meldet jetzt
+`requiresActiveCaster: true`; reine Platzierungen (Deepsea, DDG) bleiben
+erlaubt.
+
+### Weitere Meldungen
+* **Set-Bildschirm zerrissen:** `.set-complete-overlay { position: relative }`
+  ueberschrieb das `position: fixed` von `.modal-overlay` — der Abschluss war
+  ein Block IM Seitenfluss. Jetzt wieder `fixed`.
+* **Ungewolltes Rematch:** der 2-Sekunden-Timer fuers naechste Satzspiel lief
+  weiter, wenn der Satz in der Zwischenzeit vorzeitig endete. `endGame`
+  loescht ihn, `advanceToNextGame` bricht bei entschiedenem Satz ab.
+* **Temple of Sacrifice ruckelte:** `mix-blend-mode: screen` auf der
+  dauer-animierten Glanzebene zwang die 88 gedrehten Ziegel darunter zu
+  staendigem Neurechnen. Jetzt gewoehnlicher Verlauf mit
+  `will-change: opacity`.
+* **Shapeshifter-Gestalt blieb liegen,** wenn sie (Slippery Fridge) zu einem
+  anderen Helden zog: die Ruecknahme suchte in der urspruenglichen Zone.
+  Jetzt zaehlt die Marke `_shapeshiftEquip`, nicht der Platz.
+* **Zhigao-Decks galten als „incomplete":** der Server verlangte an vier
+  Stellen drei Helden. Gemeinsamer Helfer `benoetigteHeldenzahl` /
+  `heldenzahlOk` (Kopien-Familie eingeschlossen).
+* **Icebolt:** Decay Magic + Destruction Magic. **Great Offensive:** nur noch
+  Creatures mit Level ≤ 2 (`data/cards.json` + Skript).
+
 ## ★★★ v1166 — Area-Auren beim Entfernen; geerbte Heldeneffekte; Doppelschulen-Filter; zwei Balance-Aenderungen
 
 ### Area-Auren fallen jetzt auf JEDEM Weg (Al 17.9.)
@@ -14032,3 +14895,830 @@ Das Badge liest jetzt alle drei Ablagen (`restrundenFuer`), damit auch
 Karten mit Ablaufzug wenigstens eine umgerechnete Zahl zeigen; die
 `<status>Duration`-Ablage war bis v1013 eine Sonderbehandlung nur für
 den Frost und gilt nun generisch.
+
+
+## ★★ ANTI-AoE MUSS REAGIEREN KÖNNEN (v1185, Als Auftrag 18.9.) — PFLICHT
+
+> **Regel für JEDE künftige Karte, die 2+ Ziele treffen kann:** sie MUSS
+> ihren Schaden so austeilen, dass die Anti-AoE-Karten darauf reagieren.
+> Nicht optional, nicht „später nachziehen". Der Wächter
+> `scripts/check-aoe-window.js` erzwingt sie.
+
+### Warum es ZWEI Klammern sind — und was v1184 falsch machte
+
+Es gibt zwei Anti-AoE-Wege, und sie hängen an verschiedenen Dingen:
+
+| Karte | Seite | Woran sie hängt |
+|---|---|---|
+| **Interference** (Ability) | Helden | `beginMultiHit(n)` — der Merker, den `interferenceShare` liest |
+| **Deepsea Idol** (Reaction Artifact) | Kreaturen | **2+ Einträge in EINEM `processCreatureDamageBatch`** |
+
+Das wurde verwechselt. Eine Karte, die ihre Kreaturen in einer Schleife
+einzeln über `actionDealCreatureDamage` abarbeitet, erzeugt je Kreatur
+EINEN Batch mit genau einem Eintrag. `_checkCreatureDamageBatchReactions`
+steigt bei `entries.length < 2` sofort aus — das Fenster ging **nie** auf.
+
+**Armageddon war genau das:** `beginMultiHit` gesetzt, Interference lief,
+Idol trotzdem tot. Dieselbe Bauart hatten 15 weitere Karten. Umgekehrt
+gab es fünf Karten, die sauber batchten, aber die Interference-Klammer
+nicht setzten (Fireball, Pyroblast, Aquatic Arrows, Powder Keg,
+Yolomungandr) — und elf, denen **beides** fehlte, darunter
+Dance of the Flame Pillars, Explosion, Heat Wave und Bunny Bombs.
+
+### Die zwei erlaubten Bauformen
+
+**(a) Gesammelt — alle Kreaturen in EINEN Batch.** Dann öffnet die
+Engine das Idol-Fenster selbst; es braucht nur noch die
+Interference-Klammer:
+
+```js
+engine.beginMultiHit(helden.length + kreaturen.length);
+try {
+  for (const h of helden) await ctx.dealDamage(h, dmg, typ);
+  if (kreaturen.length) {
+    await engine.processCreatureDamageBatch(kreaturen.map(inst => ({
+      inst, amount: dmg, type: typ, source: quelle, sourceOwner: pi,
+      animType: 'flame_strike',
+    })));
+  }
+} finally { engine.endMultiHit(); }
+```
+
+**(b) Nacheinander — `beginAoeStrike`.** Für Karten, deren Optik von der
+Reihenfolge lebt (Chain Lightning springt, Dance of the Flame Pillars
+lässt Säule für Säule fallen). Die Klammer setzt `beginMultiHit` UND
+meldet dem Idol-Fenster **einmal** die vollständige Kreaturenliste des
+Schlags; abgewehrte Instanzen fallen danach in jedem Einzeltreffer still
+aus:
+
+```js
+await engine.beginAoeStrike(zielzahl, {
+  creatures,              // Instanzen ODER { inst, amount } bei abgestuftem Schaden
+  source: quelle,
+  amount: dmg, type: 'destruction_spell', sourceOwner: pi,
+});
+try {
+  …Einzeltreffer genau wie bisher…
+} finally { engine.endMultiHit(); }
+```
+
+`beginAoeStrike` ist **async** — das `await` ist Pflicht, sonst läuft der
+Schaden am noch offenen Fenster vorbei. Sie gibt das `Set` der
+abgewehrten Instanz-Ids zurück, falls die Karte es braucht.
+
+### Verboten
+
+`actionDealCreatureDamage` in einer **Schleife** ohne `beginAoeStrike`.
+Genau das meldet der Wächter.
+
+### Die eine Ausnahme: mehrere EINZELinstanzen
+
+Karten, die per Kartentext mehrere getrennte Schadensinstanzen austeilen
+— „Repeat as many times as …" (Elven Leader, Future Tech Mech),
+„Trigger this effect … times" (Future Tech Barrage), „deal 50 damage to
+it as many times as …" (Kirin Firebreath), oder je Auslösung ein eigener
+Zielprompt (Blood Moon under the Sea) — sind **kein** Flächenschlag
+(Als Ruling 12.9., Rha'Bi-Präzedenz). Sie gehören mit Begründung in
+`scripts/aoe-window-baseline.json`, nicht in eine Klammer.
+
+### Zahlen und Randfälle
+
+* **Es zählt die ECHTE Zielmenge** (Als Ruling 12.9.). `zielzahl` ist die
+  Zahl der WIRKLICH getroffenen Ziele — tote Helden, verschonte Ziele
+  (Laser Volley) und Ziele, die gar keinen Schaden nehmen (Heat Wave
+  brennt die einen nur an), bleiben draußen.
+* Immune Kreaturen zählen für das Idol-Fenster nicht mit;
+  `beginAoeStrike` fragt dafür `_markCreatureDamageImmunity` — **dieselbe**
+  Markierung, die auch der Batch benutzt.
+* Unter zwei Kreaturen öffnet die Klammer gar kein Fenster und bleibt
+  reine Interference-Klammer.
+* Ein Scope fragt **genau einmal**: läuft danach noch ein echter Batch
+  durch (Bauform a und b gemischt), überspringt der sein eigenes Fenster.
+* Die Autoerkennung `hitsMultipleTargets` im Loader kennt jetzt drei
+  Muster: `aoeHit(`, `beginMultiHit(`, `beginAoeStrike(`. Damit stieg der
+  erkannte AoE-Bestand von **28 auf 52 Karten** — und der CPU-Pilot
+  bewertet seither auch diese 24 korrekt gegen Interference.
+
+### Bilder laufen auch bei abgewehrtem Schaden (v1185)
+
+In `processCreatureDamageBatch` stand die Abbruchprüfung **vor** dem
+`animType`-Broadcast. Eine von Idol (oder Gate Shield, oder einer
+Surprise) abgewehrte Kreatur sprang aus der Schleife, bevor ihr Bild
+lief — bei Flame Avalanche sah man die Flammen auf den Helden und auf
+den geschützten Kreaturen **nichts**. Jetzt läuft das Bild immer, danach
+entscheidet sich der Schaden, und die verhinderte Zahl erscheint als
+„0" (Als allgemeine Regel 17.9.). Für neue Karten heißt das: `animType`
+am Batch-Eintrag ist der richtige Ort für das Trefferbild — er ist
+negationsfest.
+
+### Hand-Reaktionsfenster brauchen ihren Kartenflug
+
+Das Batch-Fenster war das letzte der Hand-Reaktionsfenster ohne
+`play_pile_transfer`: es spliced nur aus der Hand und schob den Namen
+später in den Ablagestapel — die Karte verschwand und tauchte woanders
+wieder auf, ohne dazwischen zu fliegen. Neunte Fundstelle dieser Art
+nach Escape, Spectral Armor und Cosmic Malfunction.
+
+★ **Bewusst OHNE `asPlay`.** Dieses Fenster meldet seinen Play bereits
+über das Log-Ereignis `creature_damage_batch_reaction`
+(`HAND_REACTION_PLAY_EVENTS` im Recorder). Mit Marker stünde Deepsea
+Idol — ein Artifact, also nicht vom Spell/Attack-Gate gedeckt — in jedem
+Report **doppelt**. Wer ein neues Reaktionsfenster baut, entscheidet sich
+für genau EINEN der beiden Wege.
+
+
+## ★★ AoE OHNE SCHADEN MUSS SICH SELBST MELDEN (v1186, Als Regel 18.9.)
+
+Ergänzung zur Pflichtregel oben. Die Autoerkennung des Loaders
+(`detectMultiHit`) hängt an der **Schadensklammer** — `aoeHit(`,
+`beginMultiHit(`, `beginAoeStrike(`. Eine Karte, die stattdessen Gift,
+Burn, Frozen, eine Negation, einen Buff oder eine Kontrollübernahme
+auf eine ganze Gruppe legt, teilt keinen Schaden aus und war deshalb
+für Engine wie CPU-Pilot **keine** AoE-Karte. „Poisoned Well" (1 Stack
+Gift auf alle gegnerischen Ziele) ist der Musterfall.
+
+**Regel:** solche Karten deklarieren es von Hand am Modul —
+
+```js
+module.exports = {
+  hitsMultipleTargets: true,   // AoE ohne Schaden
+  …
+};
+```
+
+Eine manuelle Angabe gewinnt im Loader seit jeher gegen die
+Autoerkennung; `neverMultiTarget: true` bleibt das Gegenstück für
+Karten, die per Kartentext nie mehr als ein Ziel treffen können.
+
+**Der Wächter `scripts/check-aoe-text.js`** prüft es nach, mit dem
+**Kartentext als Orakel**: was in `data/cards.json` „all targets /
+all Heroes / all Creatures / every … / each …" sagt, muss als AoE
+erkennbar sein — entweder über eine Schadensklammer im Skript oder
+über die Handdeklaration. Der Text ist das einzige Orakel, das
+unabhängig vom Code ist; eine Prüfung „Skript legt Status in einer
+Schleife an" würde genau die Karten übersehen, die ihre Schleife
+anders schreiben.
+
+Er arbeitet als **Ratchet** gegen `scripts/aoe-text-baseline.json`:
+gemeldet wird nur, was NEU dazukommt. Al hat den Altbestand
+ausdrücklich nicht als Bedingung gesetzt („Probleme dürfen im Lauf
+der Zeit auffallen und dann gefixt werden") — entscheidend ist, dass
+es bei neuen Karten nie wieder passiert. In v1186 gekennzeichnet:
+Poisoned Well, Iceage, Medusa's Curse, Toxic Fumes, Snowstorm
+Mischief, Null Zone, Mass Routing, Cute Conversion, Healing Melody,
+Anti Magic Zone, Deepsea Spores, Smoke Vial, Light Ball, Troop
+Annihilation. 40 Altfälle stehen in der Baseline.
+
+
+## ★★ „THIS HERO GAINS THE EFFECTS OF X" (v1186)
+
+Vier Karten tragen diesen Satz: **Tempeluna, the Convergence Fairy**,
+**Night, the Herald of Chess**, **Pseudonia, the Skill Devourer** und
+**Initiation Ritual** (plus **Dangerous Knowledge** als Teilfall). Er
+hat ZWEI Hälften, und bis v1186 war nur die erste umgesetzt.
+
+### ① Hooks hängen an einer KARTENINSTANZ
+
+Liegt die gewonnene Karte als Ausrüstung am Helden, ist **sie** der
+Träger: `counters.treatAsEquip = true` plus die vorhandene Regel in
+`CardInstance.isActiveIn` lassen ein `activeIn: ['hero']`-Skript aus
+der Support Zone feuern — mit dem `heroIdx` des **Wirts**.
+
+Gibt es die Karte nicht mehr (Tempelunas beide Grundfeen: eine ist
+überbaut, die andere gelöscht), trägt eine **unsichtbare Support-
+Instanz ohne Zonenplatz** (`zoneSlot: -1`). Das ist die Hausform seit
+Dangerous Knowledge (v981): sie belegt nichts, ist auf dem Brett
+unsichtbar und unzerstörbar, aber der Hook-Verteiler und
+`getActiveHeroEffects` finden sie.
+
+### ② Verträge hängen am NAMEN — und genau daran scheiterte es
+
+Flags und Prädikate schlägt die Engine über `loadCardEffect(hero.name)`
+direkt am Helden nach. Lunas ganze Wirkung steckt in
+`canBypassLevelReqForCard` und `firewallModifiers`, Tempestes
+Nachteil in `heroDamageCannotBeReducedOrNegated` — **kein einziger
+Hook**. Eine angelegte Karteninstanz sieht davon nichts.
+
+Deshalb `_gained-effects-shared.js`:
+
+| Export | Bedeutung |
+|---|---|
+| `heroScriptOf(hero)` | Das Skript, das Engine und Server befragen: sein eigenes, ergänzt um die Verträge der gewonnenen |
+| `heroScriptsOf(hero)` | Alle Skripte einzeln, eigenes zuerst |
+| `gainedNames(hero)` | Die Namen aus `hero.gainedEffectNames` |
+| `gainedEffectTexts(hero, cardDB)` | Die Effekttexte für den Tooltip |
+
+**Eine reine Funktion, keine Engine-Methode** — die Frage wird auch
+aus `server.js` gestellt (Helden-Effekt-Liste, Bakhm-Zonen,
+Potion-Sperre), und dort ist nicht überall eine Engine-Referenz zur
+Hand. Der ganze Zustand steht ohnehin am Helden. `engine.heroScript(pi,
+heroIdx)` delegiert dorthin und nimmt wahlweise ein Heldenobjekt.
+
+**★ OHNE gewonnene Effekte liefert `heroScriptOf` das eigene Skript
+UNVERÄNDERT** — dasselbe Objekt, das `loadCardEffect` liefert. Die
+Umstellung der **42 Abfragestellen** (37 in `_engine.js`, 5 in
+`server.js`) ist damit für jede normale Partie ein No-op, und der
+Schnellweg kostet einen Feldzugriff. Das war die Bedingung dafür,
+Stellen im Hook-Filter und im Schadenspfad überhaupt anfassen zu
+dürfen.
+
+**★ Zwei der 37 Stellen stehen in `_createContext`** — dort heißt die
+Engine `engine`, nicht `this` (v822-Lehre). Ein `this.heroScript(…)`
+wäre dort still „is not a function".
+
+### ③ Die Denylist — was NICHT mitwandert
+
+„Effekt" meint die gedruckte **Wirkung** der Karte, nicht ihre
+Identität und nicht ihren Lebenslauf. Ohne die Liste erbte Tempeluna
+die Aufstiegsbedingung einer angelegten Fee und wäre von da an selbst
+deren Grundform:
+
+`hooks`, `activeIn`, `isActiveIn`, `ascensionCondition`,
+`ascensionConditionUnskippable`, `payAscensionCost`, `onAscendSetup`,
+`onAscensionBonus`, `formsAscensionStack`, `blockEndPhaseOnAscend`,
+`evolutionAnimation`, `ascendsFromDefeat`, `plainHeroForm`,
+`cheatAscensionBlocked`, `gameStartPickPriority`, `startingAbilities`,
+`onIdentityGained`, `onIdentityLost`, `neverPlayable`, `banned`.
+
+Beim Verschmelzen gewinnt das **eigene** Skript jeden Schlüssel — ein
+gewonnener Effekt ergänzt, er überschreibt nie; unter den gewonnenen
+gewinnt der zuerst gewonnene.
+
+### ④ Die Registry
+
+```js
+engine.grantHeroEffect(pi, heroIdx, cardName, { traeger?, grund? })  // SYNCHRON
+await engine.finishGainedHeroEffects(pi, heroIdx)                    // Anfangsroutinen
+await engine.revokeHeroEffect(pi, heroIdx, cardName, grund)
+```
+
+`grantHeroEffect` ist bewusst **synchron**, damit es aus dem
+synchronen `onAscendSetup` heraus aufrufbar ist; die Anfangsroutine
+des geerbten Skripts (`onIdentityGained` / `onGameStart`) holt
+`finishGainedHeroEffects` nach. Die Liste steht in
+`hero.gainedEffectNames` — **demselben Feld, das der Tooltip seit
+v981 liest** (`_copiedHeroes` oben im Tooltip, `_inheritedEffects` als
+Textblock darunter). Eine zweite Liste wäre eine zweite Wahrheit
+gewesen; Dangerous Knowledge ist auf den zentralen Weg konsolidiert
+und gewinnt dadurch die Verträge des kopierten Helden mit.
+
+`revokeHeroEffect` räumt nur die **unsichtbare** Trägerinstanz. Liegt
+die gewonnene Karte als echte Ausrüstung in einer Zone, gehört sie dem
+Weg, der sie dorthin gebracht hat — der Widerruf kommt ja gerade
+daher, dass sie die Zone verlässt.
+
+### ⑤ Stummschaltung — ein nebenbei geschlossenes Loch
+
+Eine Heldenkarte, die als Ausrüstung an einem Helden liegt, lief
+bisher am Stummschalt-Tor des Hook-Verteilers vorbei (das prüfte nur
+`zone === 'hero' || 'ability'`). Eine eingefrorene Tempeluna hätte
+Tempestes Reduktion behalten, obwohl die Heldin selbst dabei stumm
+gewesen wäre. Jetzt zählt sie mit: Support-Zone + (`treatAsEquip` oder
+`_gainedEffectOnly`) + `cardType === 'Hero'` → dasselbe
+`_isHeroEffectSilenced`, das auch den eigenen Effekt gated. Betrifft
+ebenso Initiation Ritual und Dangerous Knowledge.
+
+### ⑥ Nur EIN `heroEffect` je Held — und was das für Menüs heißt
+
+Die Engine kennt je Held genau einen aktivierbaren `heroEffect`.
+Gewinnt ein Held einen zweiten (Tempeluna + „Jenny, the Class Fairy"),
+muss die Karte selbst ein Menü öffnen und **eigene HOPT-Schlüssel**
+je Effekt führen — sonst verbraucht Jennys Einsatz Tempelunas
+Anlegen. Muster in `tempeluna-the-convergence-fairy.js`: `optionPicker`
+mit den offenen Einträgen, dann `return false`, damit der
+Engine-Stempel unterdrückt bleibt (siehe „Several once-per-turn
+effects on one Hero Effect").
+
+### ⑦ `payAscensionCost` wird jetzt AWAITED
+
+Der Preis kann eine Karte vom Brett räumen (Tempeluna löscht die
+zweite Fee samt Abilities über `deleteHero`), und das läuft über
+Hooks. Ohne `await` lief der Aufstieg daran vorbei und die Löschung
+landete irgendwann mitten im nächsten Schritt. Synchrone Preise
+(Waflav & Co.) merken davon nichts.
+
+
+## ★★ NEUE ASCENDED-KARTE: BEIDES BAUEN (v1187, Als Befund 18.9.)
+
+Tempeluna liess sich nicht aufsteigen, obwohl Luna UND Tempeste auf
+dem Brett standen — der Drag blieb folgenlos, ohne jede Meldung. Die
+Bedingung war richtig; es fehlte die andere Hälfte.
+
+**Ein Aufstieg hat ZWEI Riegel, und sie wohnen an verschiedenen
+Karten:**
+
+| | wo | wozu |
+|---|---|---|
+| `ascensionCondition(gs, pi, heroIdx, engine)` | auf der **Ascended**-Karte | der Server prüft beim Ausführen |
+| `refreshAscensionReadiness(engine, pi, hi)` | auf **jedem Basis**-Helden | setzt `hero.ascensionReady` + `ascensionTarget(s)`; **nur danach bietet der Client den Aufstieg überhaupt an** |
+
+`heroCanAscendTo` in `app-board.jsx` verlangt `ascensionReady` UND die
+Zielkarte in `ascensionTarget(s)`. Die Engine läuft
+`refreshAscensionReadiness` bei **jedem** `sync()` über alle Helden —
+die Bereitschaft ist also immer aktuell, aber sie entsteht nicht von
+selbst. Muster: `checkMoniaAscension` (`_monia-shared.js`),
+`checkTempelunaAscension` (`_fairy-shared.js`).
+
+**Nimmt die Bereitschaft auch wieder zurück** — und nur die eigene
+(`hero.ascensionTarget === MEINE_KARTE` prüfen), sonst löscht eine
+Karte die Bereitschaft einer anderen mit.
+
+### Mehrere Basen in einem Satz — `_getAscensionLineage`
+
+Die Abstammungstabelle liest die Basen aus dem gedruckten Text
+(`on top of a "X"`). Tempeluna sagt **„on top of a „Luna…" or
+„Tempeste…" you control"** — das alte Muster nahm nur den ERSTEN
+Namen, Tempeste war als Basis unsichtbar (betraf
+`getAscendedFormsFor`, die Erlass-Wege und „appropriate Hero").
+Seit v1187 liest es die ganze Aufzählung (`, / or / and`).
+
+### Tote Basis, lebender Aufsteiger (Als Ruling 18.9.)
+
+Tempelunas Partnerin darf **tot** sein — sie wird ohnehin gelöscht,
+und `deleteHero` fragt nur nach dem Namen. Der **aufsteigende Held
+selbst** muss leben; das setzt `performAscension` von sich aus durch
+(`hp <= 0` → Abbruch, außer `ascendsFromDefeat`). In der
+Bereitschaftsprüfung deshalb `hero.hp > 0` für den Aufsteiger, aber
+**kein** hp-Filter für die Partnerin.
+
+
+## ★★ AoE-ERKENNUNG WAR GROSS-/KLEINSCHREIBUNGSEMPFINDLICH (v1187)
+
+Beim Tempeluna-Bau gefunden: `MULTI_HIT_PATTERNS` im Loader suchte
+den Token `'aoeHit('` als Teilstring. Das trifft den ctx-Weg
+`ctx.aoeHit(` — aber **nicht** den Engine-Weg `engine.actionAoeHit(`,
+weil dort ein großes `A` steht. Vier Karten benutzten den kanonischen
+Flächentrichter und galten trotzdem für Loader und CPU-Pilot als
+Einzelziel-Karten: **Corpse Explosion, Golden Exploding Skull, MOE
+Bomb, Realmniversal Emperor** — seit v1049 still danebengelaufen.
+
+Jetzt entscheidet ein Muster ohne Präfixbindung (`/aoeHit\(/i`).
+★ **Kein `\b` davor**: zwischen `n` und `A` in `actionAoeHit(` steht
+keine Wortgrenze, beides sind Wortzeichen — mit Grenze trifft das
+Muster genau die vier Karten nicht, um die es geht. Derselbe Fix im
+Wächter `check-aoe-text.js`.
+
+Der erkannte AoE-Bestand steht damit bei **71 Karten** (v1049: 28,
+v1185: 52, v1186: 66).
+
+Dazu gekennzeichnet: **Giant Exploding Skull** — sie ZERSTÖRT alle
+Kreaturen statt Flächenschaden auszuteilen; ihre Klammer
+(`beginDestroyScope`) ist ein anderer Vertrag und wird von der
+Schadens-Autoerkennung nicht gesehen.
+
+
+## ★★ VORGEZOGENER FORMWECHSEL — `hero_form_preview` (v1188)
+
+Ein Aufstieg zahlt seinen Preis, **bevor** die Engine die Identität
+tauscht (`payAscensionCost` läuft vor dem `hero.name =`-Block in
+`performAscension`). Bei einem Preis, der etwas vom Brett räumt, stand
+die alte Karte deshalb während der ganzen Sequenz noch da und wurde
+erst hinterher ausgetauscht — bei Tempeluna, deren Preis eine ganze
+Heldin löscht, sind das über zwei Sekunden.
+
+Eine Karte kann die **Anzeige** jetzt vorziehen:
+
+```js
+engine._broadcastEvent('hero_form_preview', { owner: pi, heroIdx, cardName });
+```
+
+Der Client zeichnet den Helden ab sofort als diese Karte
+(`formPreview` in app-board.jsx); der echte `hero_ascension` löst das
+Vorziehen lautlos ab. **Reines Anzeige-Vorziehen** — der Spielstand
+wechselt weiterhin genau dann, wenn die Engine ihn wechselt. Eine
+Notbremse räumt das Bild nach 6 s weg, falls der Aufstieg mitten im
+Preis noch negiert wird und nie ein `hero_ascension` folgt.
+
+## Klang und Bild einer Aufstiegs-Inszenierung
+
+Der Aufstieg selbst klingt über das Log (`hero_ascension` → `ascension`
+in `playSFXForLog`). Alles, was davor im Preis passiert, ist **stumm**,
+solange die Karte nichts sagt — das war Tempelunas „hat keine Sounds".
+
+Der billigste Weg zu Klang ist ein `play_zone_animation` mit einem
+Eintrag in `ZONE_ANIM_SFX`. **Ein Typ ohne Registry-Eintrag ist
+erlaubt**: `GameAnimationRenderer` gibt für unbekannte Typen `null`
+zurück, der Klang läuft trotzdem — so lassen sich reine Klangmarken
+setzen (`tempeluna_converge`, `tempeluna_erase`), ohne eine Animation
+zu erfinden.
+
+Für Tempeluna neu: `tempeluna_steam` (26 Schwaden + 9 warme Funken,
+über die per `duration` übergebene Laufzeit gestaffelt statt als
+einmaliger Stoß wie `steam_puff`), Klang aus zwei Schichten —
+`elem_water` hoch gefahren für das Zischen, `elem_wind` darunter für
+das Wallen. Einen eigenen Dampf-Klang gibt es im 52er-Katalog nicht.
+
+
+## ★★ GALERIE-EINTRÄGE: `name` REIN, `cardName` RAUS (v1189)
+
+Der Vertrag von `cardGallery` / `cardGalleryMulti` ist **asymmetrisch**,
+und daran stolpert regelmäßig eine neue Karte:
+
+```
+HINEIN:  [{ name, source?, count?, cost?, selectable?, highlight? }]
+ZURÜCK:  { cardName, source }
+```
+
+Wer die Antwortform für die Eingabe hält — ein sehr naheliegender
+Schluss — baut `{ cardName: … }`. Der Client liest `entry.name`, findet
+`undefined` und zeichnet eine **leere Galerie**. Kein Fehler, keine
+Meldung, nichts. Dieselbe Falle in der anderen Hälfte: wer nur Namen
+übergibt (`cards: [...ps.mainDeck]`), bekam bis v1159 ebenfalls eine
+leere Galerie. Aufgelaufen sind daran „Teleportal", „Cleansing of the
+Land" (v1159) und „Tempeluna" (v1189, beide Galerien).
+
+**Seit v1189 vereinheitlicht `promptGeneric` die Einträge selbst** —
+an derselben Stelle, an der v1159 schon die String-Variante abfängt:
+
+| Übergeben | Wird zu |
+|---|---|
+| `'Firewall'` | `{ name: 'Firewall', source: searchPile \|\| 'deck', count: n }` |
+| `{ cardName: 'Firewall', source: 'deck' }` | `{ name: 'Firewall', source: 'deck' }` |
+| `{ card: 'Firewall' }` | `{ name: 'Firewall' }` |
+| `{ name: 'Firewall', … }` | unverändert |
+
+Die übrigen Felder bleiben unangetastet — es fehlt ja nur der Name.
+Die **Antwortform bleibt `{ cardName, source }`**: 182 Aufrufstellen
+lesen sie so, und ein Umbau dort wäre ein zweiter Fehler statt einer
+Lösung.
+
+Bleibt an einem Eintrag gar kein Name zu holen, schreibt die Engine
+eine Warnung mit dem Quellnamen auf die Konsole — eine leere Galerie
+soll man wenigstens **sehen**.
+
+**★ Die Normalisierung ist ein Netz, kein Freibrief.** Der Wächter
+`scripts/check-gallery-entries.js` hält den Quelltext auf der
+kanonischen Form (`name`); er erkennt beide Bauformen — Array inline
+im Aufruf und Array über eine Variable (`x.push({…})`,
+`const x = […].map(() => ({…}))`). Wer `cardName` schreibt, meint
+erfahrungsgemäß auch sonst die falsche Form.
+
+
+## ★★ FLUG-ZIELFELDER: `to*` STATT `from*` (v1190, Als Befund 18.9.)
+
+`play_pile_transfer` löst Quelle und Ziel über **zwei getrennte
+Feldsätze** auf:
+
+```
+QUELLE:  from, fromOwner?, fromHeroIdx, fromSlotIdx, fromHandIdx, fromPermId
+ZIEL:    to,   toOwner?,   toHeroIdx,   toSlotIdx,   toHandIdx
+```
+
+Und der Handler steigt **still** aus, wenn eines der beiden Elemente
+nicht gefunden wird:
+
+```js
+if (!srcEl || !tgtEl) return;
+```
+
+Wer beim Ziel die Quellnamen schreibt — `heroIdx` statt `toHeroIdx`,
+`zoneSlot` statt `toSlotIdx` —, bekommt deshalb **gar keine
+Bewegung**: kein Fehler, keine Meldung, die Karte erscheint einfach
+ohne Flug an ihrem Platz. Aufgelaufen sind daran „Tempeluna" (v1190)
+und „???, the Shapeshifter" (seit v1000 stumm, gleich mitgezogen).
+
+**Brett-Ziele und ihre Pflichtfelder:**
+
+| `to` | braucht |
+|---|---|
+| `support` / `ability` | `toHeroIdx` + `toSlotIdx` |
+| `surprise` / `hero` | `toHeroIdx` |
+| `hand` | `toHandIdx` (+ `finalHandSize`) |
+| `discard` / `deleted` / `deck` / `potionDeck` / `area` / `coolnessStack` | nichts |
+
+Der Wächter `scripts/check-flight-targets.js` prüft das und weist
+ausdrücklich auf den häufigsten Fehlgriff hin (Quellnamen am Ziel).
+
+**Zwei Dinge zur Reihenfolge**, beide schon mehrfach falsch gemacht:
+
+* Der Flug wird **vor** dem Splice aus der Hand gesendet — sonst ist
+  der Startplatz weg, wenn der Client ihn sucht. Ist die Karte bereits
+  aus ihrer Quelle entnommen, lässt man `fromHandIdx` einfach **weg**:
+  der Handler nimmt dann den Handbereich als Ganzes, was für Hand,
+  Deck und Ablage gleichermaßen passt (Shapeshifter-Muster).
+* `sfx: '<klang>'` am Flug gibt ihm einen Klang (v1122) — für ein
+  Anlegen aufs Brett ist `placement` der passende.
+
+
+## ★★ ZIELREGELN EINER KARTE, DIE NICHT MEHR LIEGT (v1191)
+
+`heroBlocksTargeting` — der Sammler hinter „cannot be chosen **or
+hit**" — fragte bisher drei Quellen ab: die Support-Zonen des Ziels
+(Future Tech Jetpack), seine Ability-Zonen (Stealth) und
+`blocksTargetingAnywhere` auf Brettinstanzen (Alliance). Alle drei
+setzen voraus, dass die regelgebende Karte **irgendwo liegt**.
+
+Eine Reaction, die sich nach dem Auflösen selbst löscht, liegt
+nirgends mehr — und trägt ihre Regel trotzdem bis zum Zugende. Dafür
+die vierte Quelle:
+
+```js
+engine.addHeroTargetBlocker(pi, heroIdx, 'Dive Down', { untilTurn: gs.turn });
+```
+
+Der Eintrag landet als `hero._targetBlockers` und nennt nur den
+**Kartennamen** — die Regel selbst bleibt im Skript der Karte, in
+ihrem `blocksTargeting(gs, engine, info)`, genau wie bei Jetpack und
+Stealth. Der Eintrag wird als `info.blocker` durchgereicht.
+
+Abgelaufene Einträge (`untilTurn < gs.turn`) räumt der Sammler
+**beiläufig** weg. Ein eigener Aufräum-Hook wäre eine zweite Stelle,
+die man vergessen kann — und weil der Sammler ohnehin bei jeder
+Zielfrage läuft, ist er die einzige Stelle, die garantiert drankommt.
+
+**Warum nicht der `untargetable`-Status:** der wird NUR in den
+Zielwählern durchgesetzt, nicht im Schadenspfad. Er deckt „cannot be
+chosen" ab, aber nicht „or hit" — Flächenschaden träfe weiter.
+`blocksTargeting` deckt beides, weil die Engine es an drei Stellen
+liest (zwei Zielwähler + `_actionDealDamageImpl`).
+
+### „other targets" ist mehr als „other Heroes"
+
+Der Anti-Lock steht bei Stealth auf anderen **Heroes**, bei Dive Down
+auf anderen **Zielen** — Kreaturen zählen dort mit. Wer eine solche
+Karte baut, liest den Satz genau: die beiden Formulierungen kommen im
+Bestand nebeneinander vor und meinen Verschiedenes.
+
+Gemeinsam bleibt die Lehre aus Stealth: ein zweiter gleichgeschützter
+Held zählt **nicht** als Ausweichziel, sonst schützen zwei einander
+ins Nichts.
+
+### Abzeichen für Zielsperren (v1192)
+
+`hero._targetBlockers` geht mit dem Spielstand an den Client (das Feld
+hängt am Helden, `heroes: ps.heroes` sendet es mit). Der Held reicht es
+an `StatusBadges` durch; Symbol und Text stehen in der Registry
+`TARGET_BLOCKER_BADGES` in app-shared.jsx — **eine Stelle für alle
+künftigen Karten dieser Bauart**. Dive Down: 🫧 „Dived Down". Fehlt ein
+Eintrag, wird still kein Abzeichen gezeigt; die Regel wirkt trotzdem.
+
+Ein Schutz, der sich wie ein Buff verhält, braucht ein Abzeichen —
+sonst sucht der Gegner den Grund, warum er einen Helden nicht anklicken
+kann.
+
+### ★★ „or HIT" lief seit v563 ins Leere (v1193, Als Befund 18.9.)
+
+Der Zielschutz stand im Schadenspfad **innerhalb** des Surprise-Blocks
+und erbte dessen drei Bedingungen — keine davon hat mit Zielschutz zu
+tun:
+
+* `!opts.skipSurpriseCheck` — `actionAoeHit` führt sein eigenes
+  Surprise-Fenster und schaltete den Zielschutz damit ab. **Genau das
+  war Als Befund: „Dive Down verhindert das Zielen, Flame Avalanche
+  trifft trotzdem."**
+* `source.heroIdx >= 0` — Artefakte und Potions fielen heraus.
+* `!SURPRISE_SKIP_TYPES.has(type)` — `'other'` und `'recoil'` fielen
+  heraus.
+
+Und `chooserIdx` wurde gar nicht erst mitgegeben. Jedes Skript, das
+„your opponent's" prüfen will — Stealth tut das seit v634, Dive Down
+seit v1191 — gatet darauf und fiel hier still aus.
+
+Seit v1193 steht der Zielschutz in einem **eigenen Block**, direkt
+nach der Effekt-Immunität, gegated nur auf „Heldenziel, Schaden > 0,
+kein Status-Tick", und reicht `chooserIdx`
+(`source.controller ?? source.owner`) sowie `opts.ignoreUntargetable`
+durch. Verhinderter Schaden zeigt dort jetzt auch die „0" (Als Regel
+17.9.).
+
+Das repariert nicht nur Dive Down: **Future Tech Jetpack und Stealth
+haben ihr „or hit" damit zum ersten Mal wirklich.**
+
+
+## ★★ EINE ANIMATION BRINGT IHRE KEYFRAMES SELBST MIT (v1194)
+
+Tempelunas Anlege-Animation war komplett unsichtbar — dieselbe Zeile
+Code, die beim Aufstieg Dampf zeigt. Zwei unabhängige Gründe, und
+beide sind Fallen für die nächste Karte:
+
+**① Fremde Keyframes.** Die Dampfschwaden liefen auf
+`tempeluna-steam-rise`, definiert im `<style>`-Block der
+**Aufstiegs**-Animation. Ein Keyframe aus dem `<style>` einer anderen
+Komponente existiert nur, solange die gerade gemountet ist — läuft sie
+nicht mit, bleibt das Element bei `opacity: 0` stehen. Kein Fehler,
+keine Meldung.
+
+Erlaubt sind genau zwei Quellen: der **eigene** `<style>`-Block oder
+`public/style.css` (global, z.B. `healSparkleParticle`, `waterRipple`
+— von vielen Karten geteilt). Der Wächter
+`scripts/check-anim-keyframes.js` prüft das für alle 179 Komponenten.
+Er hat dabei gleich einen zweiten Fall gefunden: **`monkee_shield`
+(Resilient Monkee, v347)** verwies auf zwei Keyframes, die es
+nirgends gab — die Animation lief seit ihrer Entstehung nie. Beide
+sind jetzt lokal definiert.
+
+**② Der 'effect'-Sammelklang lässt nur EINEN durch.**
+`playSFXForZoneAnim` stempelt jede Schicht ohne eigene Angabe auf
+`category: 'effect'`, und die Kategorie lässt pro Rahmen genau einen
+Klang passieren — richtig für gleichzeitige Treffer (Bauregel 7 der
+SFX-Familie), falsch für einen **geschichteten** Klang. Ein
+mehrschichtiger Cue setzt deshalb an JEDER Schicht
+`category: null` plus ein `dedupe`, damit eine Serie trotzdem nicht
+matscht. Muster: `ddg_manifest`, `buff`, `elem_wind` — und jetzt
+`tempeluna_infuse` (elem_holy + reveal + elem_water).
+
+**Faustregel:** wer eine Animation baut, die nur manchmal zusammen mit
+einer anderen läuft, testet sie AUCH allein. Sieht man dann nichts,
+steht der Keyframe am falschen Ort.
+
+
+## ★★ TEMPORÄRE KONTROLLE — `_charm-shared.js` (v1196)
+
+„Take control of a Hero your opponent controls for the rest of the
+turn" gibt es dreimal: **Charme Lv3**, **Love Shot**, **Golden Apple**.
+Das Verfahren ist identisch, nur der Schutz unterscheidet sich — seit
+v1196 steht es an einer Stelle:
+
+```js
+const { temporaereKontrolle, uebernehmbareHelden } = require('./_charm-shared');
+
+await temporaereKontrolle(engine, {
+  controllerPi, ownerPi, heroIdx,
+  sourceName: 'Golden Apple',
+  marker: 'onlyFromController',   // oder '_loveShot' oder null
+  supportZonesLocked: false,      // nur, wenn der Kartentext sie nennt
+});
+```
+
+**Die drei Riegel, die man beim Nachbauen übersieht** — alle im Modul:
+
+1. **Erst-Zug-Schutz** (`gs.firstTurnProtectedPlayer`).
+2. **`beforeHeroEffect` mit `effectType: 'charm'`** — ohne das läuft die
+   Übernahme an „Resistance" vorbei und der Held bleibt *halb*
+   verzaubert: `charmedBy` gesetzt, Status wieder entfernt.
+3. **`hasEffectImmunity`** — `charmed` ist kein Katalogstatus und läuft
+   nicht durch `addHeroStatus`, der Riegel steht von Hand.
+
+Die **Rücknahme** am Zugende ist generisch (die Engine räumt
+`charmedBy` im Zugwechsel) — eine Karte tut dafür nichts.
+
+### Der Schutz hat drei Ausprägungen — `_charmBlocksFrom`
+
+`statuses.charmed` trägt die Marke, `engine._charmBlocksFrom(target,
+quellenSeite, opts)` beantwortet sie an **allen** Toren:
+
+| Karte | Marke | Wirkung |
+|---|---|---|
+| Charme Lv3 | — | alles prallt ab (Grundform) |
+| Love Shot | `_loveShot` | nur Kontrolle, **kein** Schadensschutz (Als Streichung 15.9.) |
+| Golden Apple | `onlyFromController` | nur die Karten des **Kontrolleurs** prallen ab |
+
+Der Unterschied steckt im Kartentext und ist leicht zu überlesen:
+Charme sagt „unaffected by **other** cards and effects", Golden Apple
+„unaffected by **your** other cards and effects". Bei Golden Apple
+kommt also durch, was der ursprüngliche Besitzer auf seinen eigenen
+(gerade entliehenen) Helden wirkt.
+
+Ebenso: Charme nennt „It **and its Support Zones**", Golden Apple nur
+den Helden — deshalb `supportZonesLocked` als Schalter statt als
+Automatik.
+
+### ★ Der Status-Riegel fehlte auf dem Hauptweg (v1196)
+
+Gefunden beim Bau von Golden Apple: die Charm-Immunität gegen negative
+Status stand **nur** in `actionAddStatus` (dem ctx-Weg).
+`addHeroStatus` — der Hauptweg für Heldenstatus — hatte sie nicht. Ein
+verzauberter Held war darüber die ganze Zeit vergiftbar, einfrierbar
+und betäubbar, obwohl sein Abzeichen „immune to all effects"
+verspricht. Betrifft **Charme Lv3 genauso**, nicht nur die neue Karte.
+
+**Lehre:** Wer einen Schutz baut, sucht ALLE Wege, die ihn umgehen
+könnten — `grep` auf den Statusnamen reicht nicht, weil die Tore an
+verschiedenen Funktionen hängen. Für Schaden sind es
+`_actionDealDamageImpl` und der AoE-Trichter, für Status
+`addHeroStatus` **und** `actionAddStatus`.
+
+### ★★ KREATUREN GEHEN NICHT MIT DEM HELDEN MIT (v1197, Als Ruling 18.9.)
+
+> „Creatures gelten, anders als Attachments, Equips usw., als
+> eigenständige Akteure und gehen also nicht einfach mit dem Hero mit."
+
+Wer einen Helden für einen Zug übernimmt, bekommt seine **Ausrüstung,
+Anhängsel und Abilities** — aber **nicht die Kreaturen** in seinen
+Support Zones. Gilt für die gesamte temporäre Kontrolle: Charme Lv3,
+Love Shot, Golden Apple.
+
+Die **dauerhafte** Übernahme (`permaControlBy`) ist davon ausgenommen:
+sie ist ein Besitzwechsel, und „ein übernommener Held zählt wie ein
+eigener" (Als Ruling 4.9.) — dort wandert alles mit.
+
+**Drei Stellen tragen das**, und wer eine ähnliche Regel baut, muss
+alle drei kennen:
+
+1. **`_createContext`** — der zentrale Umschalter. Eine Karte in
+   `support` / `ability` / `hero` eines verzauberten Helden bekommt
+   sonst automatisch den Verzauberer als `cardOwner` / `cardController`.
+   Kreaturen sind seit v1197 ausgenommen (`_istKreaturenInstanz`, die
+   auch `_effectOverride` berücksichtigt).
+2. **`getActivatableCreatures`** — der Scan der verzauberten Gegenseite
+   ist ersatzlos entfallen. Was der Client nicht angeboten bekommt,
+   klickt niemand.
+3. **`doActivateCreatureEffect` (server.js)** — das Tor dort lässt den
+   Charme ausdrücklich durch, ein direkter Klick wäre also trotzdem
+   durchgekommen. Zweiter Riegel: nur `stolenBy` oder der eigene
+   `controller` darf aktivieren.
+
+**Der Weg für geliehene Kreaturen bleibt unangetastet**: Deepsea
+Succubus, Cute Conversion und Treacherous Crystal leihen sich die
+KREATUR selbst (`inst.stolenBy` + geflippter `controller`) — das ist
+ein anderer Vertrag als die Mitnahme über den Helden und wird weiterhin
+eingesammelt.
+
+### ★★ BESCHWÖREN MIT EINEM GELIEHENEN HELDEN (v1198, Als Ruling 18.9.)
+
+**Der Kreaturenweg kannte `charmedOwner` nicht.** Der Spell-Weg reicht
+ihn seit jeher durch (`doPlaySpell`), `doPlayCreature` nahm ihn gar
+nicht erst entgegen und der Client sendete ihn bei `play_creature`
+nicht mit. Ohne ihn gilt in `validateActionPlay` `heroOwner = pi` — der
+`heroIdx` wird also gegen die **eigene** Heldenreihe aufgelöst.
+Nachgemessen: ein Zug auf den geliehenen `P1H0` landete auf `P0H0`.
+Weil `getHeroPlayableCards` Kreaturen für verzauberte Helden
+ausdrücklich anbietet, leuchtete der Client und der Server schickte die
+Beschwörung woanders hin.
+
+**Das Ruling:** Die Kreatur landet in der Support Zone des geliehenen
+Helden — also auf der **gegnerischen Brettseite** — und gehört
+**dauerhaft dem Beschwörer**, auch nachdem der Held zurückfällt.
+
+Die Engine hat dafür längst die Trennung `inst.owner` (Brettseite)
+gegen `inst.controller` (wem sie gehört); genutzt hat sie bisher nur
+der Leih-Weg `stolenBy`. Seit v1198 nimmt `safePlaceInSupport` —
+und damit `summonCreature` — ein `opts.controller`:
+
+```js
+engine.summonCreature(cardName, heroOwner, heroIdx, zoneSlot, { controller: pi });
+```
+
+Ist `controller` gesetzt und verschieden von der Brettseite, bekommt
+die Instanz zusätzlich `counters.crossSideControlled = <pi>`. Die Marke
+hängt an der **Instanz**, nicht am Charme — sie überlebt das Zugende,
+und darauf hängt das Abzeichen ⚑ „Foreign Ground" (Als Vorgabe:
+„großer Marker, der das zu jeder Zeit signalisiert").
+
+**Wer einen ähnlichen Weg baut, achtet auf die Seitentrennung:** alles,
+was die ZONE betrifft (`supportZones`, `isSupportZoneLocked`,
+`isCreatureSummonable`), fragt den **Heldenbesitzer**; alles, was die
+AKTION betrifft (Kosten, Aktionsökonomie, Summon-Sperre, Kontrolle),
+fragt den **Spieler**. In `doPlayCreature` heißen die beiden seit v1198
+`heroOwner` und `pi`.
+
+### ★ Seitenlose Indizes im Drag-Highlight (v1200)
+
+`playDrag.targetHero` / `targetSlot` sind **blosse Indizes ohne Seite**.
+Welche Brettseite gemeint ist, entscheidet eine eigene Bedingung —
+`_zoneSideOk`, und die fiel ohne `targetAttachOwner` pauschal auf
+`!isOpp` zurück. Beim Beschwören in die Zone eines geliehenen Helden
+leuchtete deshalb die **eigene** Zone mit demselben Index als „hier
+landet sie". Seit v1200 zählt `playDrag.charmedOwner` als dritte
+Seitenangabe.
+
+**Faustregel:** wo ein Drag ein Ziel auf der Gegenseite haben kann,
+braucht jede Highlight-Bedingung eine ausdrückliche Seitenangabe.
+Es gibt inzwischen drei: `targetAttachOwner` (Cross-Side-Attachments),
+`isCrossSideEquip` / `isFreeSideEquip` (Ausrüstung) und `charmedOwner`
+(geliehener Held).
+
+### Dauerhafte Hervorhebung „Foreign Ground"
+
+Zusätzlich zum Abzeichen ⚑ trägt eine Kreatur mit
+`counters.crossSideControlled` seit v1200 einen kräftigen Ring in der
+Farbe ihres Besitzers plus ruhiges Pulsen
+(`@keyframes pp-crossside-pulse` in `public/style.css`). Er wird den
+Zustandsfiltern **hinzugefügt**, nicht an ihre Stelle gesetzt — an
+einer versteinerten oder sporifizierten Kreatur bleibt er sichtbar.
+
+### ★★ ZÄHLER WERDEN NACH DER BRETTSEITE GESCHLÜSSELT (v1201)
+
+`creatureCounters` (server.js, zweimal — Spieler- und Zuschauersicht)
+legt die Counter einer Kreatur unter `${physicalSide}-${heroIdx}-${zoneSlot}`
+ab. **Physisch heißt: in wessen `supportZones`-Array die Karte liegt**,
+nicht wer sie kontrolliert:
+
+```js
+const physicalSide = (inst.stolenBy != null
+    || inst.counters?.crossSideControlled != null)
+  ? inst.owner
+  : (inst.controller ?? inst.owner);
+```
+
+Eine mit geliehenem Helden beschworene Kreatur liegt im Array des
+**Brett**besitzers und hat einen fremden `controller` — ohne den
+zweiten Zweig landeten ihre Zähler unter der Seite des Kontrolleurs.
+Der Client sucht sie dort, wo die Karte liegt, fand nichts und zeigte
+**weder Abzeichen noch Ring**. Der Ring war also nicht zu blass, es gab
+ihn gar nicht.
+
+**Faustregel:** wer `inst.controller` von `inst.owner` abweichen lässt,
+muss entscheiden, ob die Karte dabei UMZIEHT (dann schlüsselt der
+Controller, Muster Chilly Wizard) oder LIEGEN BLEIBT (dann der Owner,
+Muster `stolenBy` und `crossSideControlled`). Beides gibt es, und die
+Wahl steht an genau dieser Stelle.
+
+### Beschwörungsbilder gehören auf die Zielseite
+
+`summon_effect` (goldener Schein) und `broadcastHandToBoard` (Flug aus
+der Hand) liefen in `doPlayCreature` über `pi`, also den **Wirker** —
+beim geliehenen Helden erschienen sie damit auf dem eigenen Brett,
+während die Kreatur auf dem gegnerischen landete. Der Flug kennt dafür
+seit jeher `destOwner` im Payload (Cross-Side-Muster); `summon_effect`
+braucht schlicht die Brettseite. Beide nehmen jetzt `heroOwner`.

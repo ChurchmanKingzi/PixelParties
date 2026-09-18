@@ -3,7 +3,7 @@
 //  DeckBuilder component and helpers
 // ═══════════════════════════════════════════
 const { useState, useEffect, useRef, useCallback, useMemo, useContext, useLayoutEffect } = React;
-const { api, socket, AppContext, CardMini, FoilOverlay, useFoilBands, cardImageUrl, skinImageUrl,
+const { api, socket, AppContext, CardMini, cardImageUrl, skinImageUrl,
         isDeckLegal, countInDeck, hasNicolasHero, canAddCard, trimOverLimitCopies, typeColor, typeClass,
         sortDeckCards, shuffleArray, isCubeDeck, CUBE_SIZE } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, CARD_TYPES, SUBTYPES,

@@ -51,6 +51,13 @@ function zielzahl(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'shark_bite' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
 
   /**
@@ -116,6 +123,14 @@ module.exports = {
     }
     await engine._delay(410);
 
+    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster — „bis zu 1/2/3
+    // Ziele, 100 Schaden auf jedes" ist ein Schlag auf mehrere Ziele.
+    await engine.beginAoeStrike(targets.length, {
+      creatures: targets.filter(t => t.type !== 'hero').map(t => t.cardInstance).filter(Boolean),
+      source: { name: CARD_NAME, owner: pi, heroIdx },
+      amount: DAMAGE, type: 'creature', sourceOwner: pi,
+    });
+    try {
     for (const target of targets) {
       if (target.type === 'hero') {
         const tgtHero = gs.players[target.owner]?.heroes?.[target.heroIdx];
@@ -127,6 +142,9 @@ module.exports = {
           { sourceOwner: pi, canBeNegated: true },
         );
       }
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     engine.log('land_sharks_bite', {

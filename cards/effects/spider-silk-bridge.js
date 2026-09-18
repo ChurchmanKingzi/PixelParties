@@ -62,6 +62,12 @@ async function discardFaceUp(engine, inst, reason) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'gold_sparkle' }, impactMs: 260 },
+
   isSurprise: true,
   // Active in 'surprise' zone so the face-up `onTurnStart` / damage
   // listeners fire from the Surprise Zone. The face-down phase doesn't

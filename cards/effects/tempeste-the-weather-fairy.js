@@ -33,7 +33,17 @@
 const CARD_NAME = 'Tempeste, the Weather Fairy';
 const REDUKTION = 100;
 
+const { checkTempelunaAscension } = require('./_fairy-shared');
+
 module.exports = {
+  // ★★ v1187 (Als Befund 18.9.: „kann Tempeluna nicht ascenden"):
+  // Die BEREITSCHAFT pflegt immer der Basis-Held. Ohne sie bietet der
+  // Client den Aufstieg gar nicht erst an — `ascensionCondition` auf
+  // der Ascended-Karte ist der zweite Riegel, nicht der erste.
+  refreshAscensionReadiness(engine, pi, hi) {
+    checkTempelunaAscension(engine, pi, hi);
+  },
+
   activeIn: ['hero'],
 
   // Zielseitige Unangreifbarkeit — die Engine gated Leben und

@@ -15,6 +15,13 @@ const { hasCardType } = require('./_hooks');
 const HOPT_KEY = 'rain-of-arrows';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'arrow_rain' }, impactMs: 260,
+  },
+
   /**
    * Hand-dim + cast gate. The engine reads this both when computing
    * "blocked from hand" (greys the card if false) and when

@@ -107,7 +107,14 @@ async function schiessen(ctx) {
   // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
   // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
   // Einzeltreffer und der Schutz greift korrekt nicht.
-  engine.beginMultiHit(ids.length);
+  // ★★ v1185: Klammer meldet die Kreaturen an das Anti-AoE-Fenster
+  // (Deepsea Idol) — die Bazooka trifft ausschliesslich Creatures.
+  await engine.beginAoeStrike(ids.length, {
+    creatures: ids
+      .map(id => kandidaten.find(t => t.id === id)?.cardInstance)
+      .filter(Boolean),
+    source: quelle, amount: DAMAGE, type: 'artifact', sourceOwner: pi,
+  });
   try {
     for (const id of ids) {
       const ziel = kandidaten.find(t => t.id === id);

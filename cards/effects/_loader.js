@@ -205,11 +205,25 @@ function detectSummonOnly(sourceText) {
 // klammern sich bewusst nicht und werden hier korrekt nicht erfasst.
 // `neverMultiTarget` (Basketskull-Vertrag) schliesst aus: diese Karten
 // koennen per Kartentext nie mehr als ein Ziel treffen.
-const MULTI_HIT_PATTERNS = ['aoeHit(', 'beginMultiHit('];
+// ★★ v1185: `beginAoeStrike(` gehoert dazu — es IST die Flaechenklammer
+// (es ruft `beginMultiHit` intern). Ohne das Muster waeren genau die
+// Karten unsichtbar geblieben, die in v1185 neu geklammert wurden.
+// ★★ v1187 (gefunden beim Tempeluna-Bau): die Liste war
+// GROSS-/KLEINSCHREIBUNGSEMPFINDLICH und traf deshalb nur den
+// ctx-Weg `ctx.aoeHit(`. Wer den Engine-Weg `engine.actionAoeHit(`
+// nimmt — Corpse Explosion, Golden Exploding Skull, MOE Bomb,
+// Realmniversal Emperor —, war fuer Loader und CPU-Pilot KEINE
+// AoE-Karte, obwohl er den kanonischen Flaechentrichter benutzt.
+// Vier Karten, seit v1049 still danebengelaufen. Jetzt entscheidet
+// der Token `aoeHit(` unabhaengig vom Praefix.
+// Kein `\b` vor `aoeHit`: in `actionAoeHit(` steht zwischen `n` und
+// `A` KEINE Wortgrenze (beides Wortzeichen) — mit Grenze traf das
+// Muster genau die vier Karten nicht, um die es hier geht.
+const MULTI_HIT_PATTERNS = [/aoeHit\(/i, /\bbeginMultiHit\(/, /\bbeginAoeStrike\(/];
 function detectMultiHit(sourceText) {
   sourceText = stripComments(sourceText);
   if (!sourceText) return false;
-  return MULTI_HIT_PATTERNS.some(p => sourceText.includes(p));
+  return MULTI_HIT_PATTERNS.some(r => r.test(sourceText));
 }
 
 

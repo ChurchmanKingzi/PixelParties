@@ -250,9 +250,14 @@ function aufstiegsbereitschaftPruefen(engine, pi, heroIdx) {
 
 /** Alle als Gestalt angelegten Helden dieses Slots. */
 function angelegteGestalten(engine, pi, heroIdx) {
+  // ★★ v1167 (Tester-Meldung 17.9.): NICHT auf die urspruengliche Zone
+  // festnageln. „Slippery Fridge" & Co. verschieben die angelegte Karte
+  // zu einem anderen Helden — vorher fand die Ruecknahme sie dort nicht
+  // mehr, und die geliehene Gestalt blieb fuer immer im Support liegen.
+  // Die MARKE ist der Anker; sie ueberlebt den Umzug.
+  void heroIdx;
   return engine.cardInstances.filter(c =>
-    c.owner === pi && c.zone === 'support' && c.heroIdx === heroIdx
-    && c.counters?._shapeshiftEquip);
+    c.owner === pi && c.zone === 'support' && c.counters?._shapeshiftEquip);
 }
 
 // ─── MODULE EXPORTS ──────────────────────
@@ -380,9 +385,19 @@ module.exports = {
       // Ausruestung ist KEINE eigenstaendige Effektquelle.
       eqInst.counters._suppressEquipHooks = true;
     }
+    // ★★ v1190: Zielfelder korrigiert. Der Flug-Handler liest
+    // `toHeroIdx`/`toSlotIdx`; mit `heroIdx`/`zoneSlot` fand er das
+    // Zielelement nicht und brach still ab — die angelegte Gestalt
+    // erschien ohne Bewegung. Dieselbe Falle wie bei Tempeluna
+    // (Als Befund 18.9.), hier gleich mitgezogen.
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: gestaltName, from: quelle, to: 'support',
-      heroIdx, zoneSlot: slot,
+      toHeroIdx: heroIdx, toSlotIdx: slot,
+      // KEIN `fromHandIdx`: die Karte ist hier bereits aus ihrer Quelle
+      // entnommen, der alte Handplatz existiert nicht mehr. Ohne Index
+      // nimmt der Handler den Handbereich als Ganzes — richtig fuer
+      // alle drei Quellen (Hand, Deck, Ablage).
+      sfx: 'placement',
     });
 
     // ── Verwandeln (Ascension-Muster) ─────────────────────────────

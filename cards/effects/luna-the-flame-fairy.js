@@ -18,7 +18,17 @@
 const CARD_NAME = 'Luna, the Flame Fairy';
 const FIREWALL = 'Firewall';
 
+const { checkTempelunaAscension } = require('./_fairy-shared');
+
 module.exports = {
+  // ★★ v1187 (Als Befund 18.9.: „kann Tempeluna nicht ascenden"):
+  // Die BEREITSCHAFT pflegt immer der Basis-Held. Ohne sie bietet der
+  // Client den Aufstieg gar nicht erst an — `ascensionCondition` auf
+  // der Ascended-Karte ist der zweite Riegel, nicht der erste.
+  refreshAscensionReadiness(engine, pi, hi) {
+    checkTempelunaAscension(engine, pi, hi);
+  },
+
   activeIn: ['hero'],
 
   canBypassLevelReqForCard(gs, playerIdx, heroIdx, cardData) {

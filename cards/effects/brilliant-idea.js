@@ -8,6 +8,13 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'thought_bubbles' }, impactMs: 260,
+  },
+
   // ★ v1070 (Als Ruling 14.9.): die Suche ist der GANZE Ertrag
   // dieser Karte (Choose a card from your deck … add it to your hand.)
   // — unter der Such-Sperre waere sie wirkungslos und ist deshalb gar nicht

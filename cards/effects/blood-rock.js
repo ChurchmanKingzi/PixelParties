@@ -38,6 +38,13 @@ const { heroHasDiverHelmet } = require('./_diver-helmet-shared');
 const CARD_NAME = 'Blood Rock';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'blood_moon_pulse' }, impactMs: 260,
+  },
+
   // 'hand' for the self-cast onPlay; 'area' for the passive turn hook.
   activeIn: ['hand', 'area'],
 

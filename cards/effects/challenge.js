@@ -72,6 +72,13 @@ function getEligibleRedirectHeroes(gs, pi, selected, validTargets) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'anger_mark' }, impactMs: 260,
+  },
+
   // Mark as a target redirect card for the engine's redirect scanner
   isTargetRedirect: true,
 

@@ -118,7 +118,16 @@ module.exports = {
       // Ziel, ist aber EINE Quelle, die mehrere Ziele trifft — genau
       // der Fall, gegen den die Ability schuetzt (Als Beispiel 12.9.).
       // Die Klammer umschliesst die ganze Kette.
-      engine.beginMultiHit(selectedTargets.length);
+      // ★★ v1185: Die Klammer meldet zusaetzlich die Kreaturen der Kette
+      // an das Anti-AoE-Fenster (Deepsea Idol). Der Blitz teilt seinen
+      // Schaden weiter nacheinander aus — die Optik der Kette bleibt.
+      await engine.beginAoeStrike(selectedTargets.length, {
+        creatures: selectedTargets
+          .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
+          .filter(k => k.inst),
+        source: { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
+        type: 'destruction_spell', sourceOwner: pi,
+      });
       try {
       // Chain lightning animation + damage
       let prevOwner = selectedTargets[0].owner;

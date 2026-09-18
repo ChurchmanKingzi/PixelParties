@@ -61,6 +61,13 @@
 const CARD_NAME = 'Last Resort';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'last_resort_blast' }, impactMs: 260,
+  },
+
   // ★ „This Spell's level can never be reduced." (v1104)
   //
   // ★ WISDOM UND DIVINITY BLEIBEN MOEGLICH (Al 15.9.). Sie senken die

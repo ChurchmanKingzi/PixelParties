@@ -47,6 +47,13 @@ const CARD_NAME = 'Grave Worm';
 const HOPT_KEY = 'grave-worm-revive';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'grave_worm_burrow' }, impactMs: 260,
+  },
+
   // Broad activeIn — same rationale as Rebelliokai Backup Bakus.
   // Different discard paths in the engine don't all keep `inst.zone`
   // synchronised when a card lands in the discard pile (the damage-

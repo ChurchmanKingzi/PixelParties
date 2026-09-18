@@ -60,6 +60,12 @@ function heroHasEquipment(ps, heroIdx, cardDB, engine) {
 // ─── MODULE EXPORTS ──────────────────────
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'dumbbell_pump' }, impactMs: 260 },
+
   /**
    * Global play condition:
    * - At least 1 "Fighting" in the deck

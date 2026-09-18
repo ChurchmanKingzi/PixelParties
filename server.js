@@ -52,6 +52,9 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
+// ★ v1186: „This Hero gains the effects of X" — dieselbe Aufloesung wie
+// in der Engine, ohne Engine-Referenz (siehe _gained-effects-shared).
+const { heroScriptOf } = require('./cards/effects/_gained-effects-shared');
 const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool } = require('./cards/effects/_hooks');
 const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
@@ -2150,7 +2153,7 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
     const potions = JSON.parse(d.potion_deck || '[]');
     const pc = potions.length;
     const mainOk = main.length === 60;
-    const heroOk = heroes.length === 3;
+    const heroOk = heldenzahlOk(heroes);   // v1167: Zhigao-Aufstellung hat zwei
     const potionOk = pc === 0 || (pc >= 5 && pc <= 15);
     const legal = mainOk && heroOk && potionOk;
     if (legal) legalCount++;
@@ -2170,7 +2173,8 @@ app.get('/api/profile/deck-stats', authMiddleware, async (req, res) => {
 app.post('/api/game/result', authMiddleware, async (req, res) => {
   const { won, heroes, opponentId } = req.body;
   if (typeof won !== 'boolean') return res.status(400).json({ error: 'won must be boolean' });
-  if (!Array.isArray(heroes) || heroes.length !== 3) return res.status(400).json({ error: 'heroes must be array of 3 names' });
+  // v1167: Zhigao-Aufstellungen melden zwei Helden.
+  if (!Array.isArray(heroes) || !heldenzahlOk(heroes)) return res.status(400).json({ error: 'heroes must list your starting Heroes (3, or 2 with Zhigao)' });
 
   const userId = req.user.userId;
 
@@ -2474,7 +2478,7 @@ function loadCampaignDeck(slug) {
 function campaignDeckLegal(deck) {
   if (!deck) return false;
   if ((deck.mainDeck || []).length !== 60) return false;
-  if ((deck.heroes || []).filter(h => h && h.hero).length !== 3) return false;
+  if (!heldenzahlOk(deck.heroes)) return false;   // v1167
   return true;
 }
 
@@ -2675,6 +2679,24 @@ app.post('/api/decks/:id/set-default', authMiddleware, async (req, res) => {
  * already lives inline at `/api/profile/deck-stats` — keeping them in
  * sync is the maintenance note.
  */
+// ★★ v1167 (Tester-Meldung 17.9.: „legales Zhigao-Deck gilt im Menue als
+// incomplete"): „Zhigao, the Heavenly Emperor" — „If this is one of your
+// starting Heroes, you may only bring 1 other starting Hero to the game."
+// Der Client rechnet das laengst (`requiredHeroCount` in app-shared.jsx);
+// der Server verlangte ueberall stur DREI. Ein Zhigao-Deck war damit
+// serverseitig illegal — das Deck-Regal zeigte „incomplete", und als
+// Standarddeck liess es sich nicht setzen.
+const ZHIGAO_HELD = 'Zhigao, the Heavenly Emperor';
+function benoetigteHeldenzahl(heroes) {
+  const namen = (heroes || []).map(h => (typeof h === 'string' ? h : h?.hero) || '');
+  // Kopien-Familie: „Zhigao, the Heavenly Emperor (2)" & Co. zaehlen mit.
+  return namen.some(n => n === ZHIGAO_HELD || n.startsWith(ZHIGAO_HELD + ' (')) ? 2 : 3;
+}
+function heldenzahlOk(heroes) {
+  const echte = (heroes || []).filter(h => h && (typeof h === 'string' ? h : h.hero));
+  return echte.length === benoetigteHeldenzahl(echte);
+}
+
 function isCustomDeckRowLegal(row) {
   if (!row) return false;
   try {
@@ -2682,7 +2704,7 @@ function isCustomDeckRowLegal(row) {
     const heroes = JSON.parse(row.heroes || '[]').filter(h => h && h.hero);
     const potions = JSON.parse(row.potion_deck || '[]');
     const pc = potions.length;
-    return main.length === 60 && heroes.length === 3 && (pc === 0 || (pc >= 5 && pc <= 15));
+    return main.length === 60 && heldenzahlOk(heroes) && (pc === 0 || (pc >= 5 && pc <= 15));   // v1167
   } catch { return false; }
 }
 
@@ -4059,7 +4081,7 @@ function checkPotionLock(ps, gs, pi) {
   // Check own heroes
   for (const hero of (ps.heroes || [])) {
     if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
-    const heroScript = loadCardEffect(hero.name);
+    const heroScript = heroScriptOf(hero);
     if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
       ps.potionLocked = true;
       return;
@@ -4071,7 +4093,7 @@ function checkPotionLock(ps, gs, pi) {
     for (const hero of (gs.players[oi]?.heroes || [])) {
       if (!hero?.name || hero.hp <= 0 || hero.statuses?.negated) continue;
       if (hero.charmedBy !== pi) continue;
-      const heroScript = loadCardEffect(hero.name);
+      const heroScript = heroScriptOf(hero);
       if (heroScript?.potionLockAfterN && ps.potionsUsedThisTurn >= heroScript.potionLockAfterN) {
         ps.potionLocked = true;
         return;
@@ -4878,7 +4900,17 @@ function sendGameState(room, playerIdx, extra) {
         // never changes (it tracks the card's true owner for discard /
         // deck routing); `_stolenBy` still surfaces the stealer so the
         // client paints the colored border on the un-moved cases.
-        const physicalSide = (inst.stolenBy != null)
+        // ★★ v1201 (Als Befund 18.9.: „die Markierung fehlt voellig"):
+        // `crossSideControlled` gehoert in DIESELBE Gruppe wie
+        // `stolenBy`. Eine Kreatur, die mit einem geliehenen Helden in
+        // dessen Zone beschworen wurde, liegt im `supportZones`-Array
+        // des BRETTbesitzers, hat aber einen fremden `controller` — ohne
+        // diese Zeile wurden ihre Zaehler unter der Seite des
+        // KONTROLLEURS abgelegt. Der Client sucht sie unter der Seite,
+        // auf der die Karte liegt, fand nichts, und zeigte deshalb weder
+        // Abzeichen noch Ring.
+        const physicalSide = (inst.stolenBy != null
+            || inst.counters?.crossSideControlled != null)
           ? inst.owner
           : (inst.controller ?? inst.owner);
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
@@ -5209,7 +5241,7 @@ function sendGameState(room, playerIdx, extra) {
         const hero = ps2.heroes[hi];
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) continue;
-        const heroScript = loadCardEffect(hero.name);
+        const heroScript = heroScriptOf(hero);
         if (!heroScript?.isBakhmHero) continue;
         const freeSlots = [];
         for (let si = 0; si < 3; si++) {
@@ -5530,7 +5562,17 @@ function sendSpectatorGameState(room) {
         // never changes (it tracks the card's true owner for discard /
         // deck routing); `_stolenBy` still surfaces the stealer so the
         // client paints the colored border on the un-moved cases.
-        const physicalSide = (inst.stolenBy != null)
+        // ★★ v1201 (Als Befund 18.9.: „die Markierung fehlt voellig"):
+        // `crossSideControlled` gehoert in DIESELBE Gruppe wie
+        // `stolenBy`. Eine Kreatur, die mit einem geliehenen Helden in
+        // dessen Zone beschworen wurde, liegt im `supportZones`-Array
+        // des BRETTbesitzers, hat aber einen fremden `controller` — ohne
+        // diese Zeile wurden ihre Zaehler unter der Seite des
+        // KONTROLLEURS abgelegt. Der Client sucht sie unter der Seite,
+        // auf der die Karte liegt, fand nichts, und zeigte deshalb weder
+        // Abzeichen noch Ring.
+        const physicalSide = (inst.stolenBy != null
+            || inst.counters?.crossSideControlled != null)
           ? inst.owner
           : (inst.controller ?? inst.owner);
         const key = `${physicalSide}-${inst.heroIdx}-${inst.zoneSlot}`;
@@ -5656,6 +5698,13 @@ async function endGame(room, winnerIdx, reason) {
   };
   gs.rematchRequests = [];
   if (setOver) room.status = 'finished';
+  // ★★ v1167: einen noch offenen Fortschritts-Timer des vorigen Spiels
+  // abraeumen — sonst startet er nach einem vorzeitigen Satzende (Aufgabe,
+  // Verbindungsabbruch) ein ungewolltes neues Spiel.
+  if (room._setAdvanceTimer) {
+    clearTimeout(room._setAdvanceTimer);
+    delete room._setAdvanceTimer;
+  }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   io.emit('rooms', getRoomList());
 
@@ -5812,6 +5861,16 @@ function countCombinedPotions(cardDB, deck) {
 }
 
 async function advanceToNextGame(room, loserIdx) {
+  // ★★ v1167 (Tester-Bericht 17.9.: „ohne unser Zutun in ein Rematch
+  // geworfen"): Der Fortschritts-Timer aus dem VORIGEN Spiel lief noch,
+  // als der Satz schon entschieden war — etwa weil in den zwei Sekunden
+  // dazwischen jemand aufgab oder die Verbindung verlor. Dann startete
+  // diese Funktion ein frisches Spiel, ohne dass jemand geklickt hatte.
+  // Zwei Riegel: der Timer wird in `endGame` geloescht (unten), und hier
+  // bricht ein entschiedener Satz ab.
+  if (room?.status === 'finished') return;
+  if (room?.gameState?.result?.setOver) return;
+  if (room && room.winsNeeded && Math.max(...(room.setScore || [0, 0])) >= room.winsNeeded) return;
   await setupGameState(room);
   // Notify clients that side-deck phase is over
   for (let i = 0; i < 2; i++) {
@@ -8043,6 +8102,14 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
   if (charmedOwner != null
       && hero.charmedBy !== pi && hero.controlledBy !== pi
       && inst.stolenBy !== pi) return false;
+  // ★★ v1197 (Als Ruling 18.9.): eine Kreatur geht NICHT mit dem
+  // uebernommenen Helden mit. Wer den Helden verzaubert hat, darf ihre
+  // Effekte nicht aktivieren — nur wer sich die KREATUR selbst geliehen
+  // hat (`stolenBy`, Deepsea Succubus / Cute Conversion). Ohne diesen
+  // Riegel kaeme der Klick trotz der gestrichenen Angebotsliste durch,
+  // weil das Tor darueber den Charme ausdruecklich durchlaesst.
+  if (charmedOwner != null && inst.stolenBy !== pi
+      && (inst.controller ?? inst.owner) !== pi) return false;
   // Cardinal Beast immunity — Cardinals + Golden-Wings wearers
   // resist Treacherous Crystal's lend. Check by counter AND name:
   // the counter is set in Cardinal Beasts' onPlay hook, which
@@ -8270,6 +8337,18 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     // v347: Karten-Auftritt links — generelle Regel fuer JEDEN aktiven
     // Effekt (siehe engine.announceActiveEffect).
     room.engine.armEffectAnnounce(inst.name, pi, 'board');
+    // ★★ v1167 (Tester-Meldung 17.9.): WER HAT DEN ZAUBER GEWIRKT?
+    // Wirkt eine Kreatur waehrend ihres aktiven Effekts einen Zauber
+    // (Chaorc Friendly Fireballer → Fireball, Demon's Gate & Co.), muss
+    // sie selbst die QUELLE sein — sonst friert „Frost Rune" den
+    // Wirt-Helden ein statt der Kreatur, und dasselbe gilt fuer jede
+    // andere Reaktion, die ihre Quelle trifft (Booby Trap, Fireshield …).
+    // Bisher stellte jede castende Kreatur diese Marke selbst (nur drei
+    // taten es); hier haengt sie an JEDEM Kreatureffekt.
+    // `_rewriteSourceForCreatureCaster` wirkt ohnehin nur dort, wo die
+    // Quelle noch nicht die Kreatur selbst ist.
+    const _vorigerCasterCreature = gs._spellCasterCreature;
+    gs._spellCasterCreature = inst;
     let resolved;
     try {
       resolved = await script.onCreatureEffect(ctx);
@@ -8277,6 +8356,8 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
       // ausgeloest; alle anderen bekommen ihn hier, nach dem Effekt.
       if (resolved !== false) room.engine.announceActiveEffect();
     } finally {
+      if (_vorigerCasterCreature === undefined) delete gs._spellCasterCreature;
+      else gs._spellCasterCreature = _vorigerCasterCreature;
       room.engine.clearEffectAnnounce();
       room.engine._promptCardStack.pop();
       room.engine._currentEffectSource = prevSrc;
@@ -8720,7 +8801,7 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
   return true;
 }
 
-async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider, viaDragDrop, fromCreation }) {
+async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot, additionalActionProvider, viaDragDrop, fromCreation, charmedOwner }) {
   // ── ABLEHNUNGS-TELEMETRIE (30.7.) ──────────────────────────────────
   // Die CPU sah bisher nur `false` und konnte "server-nein" nicht weiter
   // aufschlüsseln. Genau daran hing die Diagnose der ungeklärten Karten
@@ -8742,7 +8823,15 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   const gs = room.gameState;
   try { room.engine._playRefusal = null; } catch { }
 
-  const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot, fromCreation });
+  // ★★ v1198 (Als Befund 18.9.): DER KREATURENWEG KANNTE `charmedOwner`
+  // NICHT. Der Spell-Weg reicht ihn seit jeher durch, hier fehlte er —
+  // `validateActionPlay` loeste `heroIdx` deshalb gegen die EIGENE
+  // Heldenreihe auf. Nachgemessen: ein Zug auf den geliehenen `P1H0`
+  // landete auf `P0H0`. Da `getHeroPlayableCards` Kreaturen fuer
+  // verzauberte Helden ausdruecklich anbietet, leuchtete der Client und
+  // der Server schickte die Beschwoerung woanders hin.
+  const heroOwner = charmedOwner != null ? charmedOwner : pi;
+  const v = room.engine.validateActionPlay(pi, cardName, handIndex, heroIdx, ['Creature'], { zoneSlot, fromCreation, charmedOwner });
   if (!v) return _no('validate-nein');
   const { ps, cardData, hero, script, isActionPhase, isMainPhase, isInherentAction } = v;
 
@@ -8766,7 +8855,8 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // when ONE Hero is occupied but another is free. Re-run the per-
   // Hero check against the specific destination so e.g. Chimera /
   // Pteranos / Spinor refuse a Hero that already hosts a Gigantisaur.
-  if (!room.engine.isCreatureSummonable(cardName, pi, heroIdx)) return _no('cansummon-nein');
+  // Per-Held-Regeln gelten fuer die Seite, auf der die Kreatur LANDET.
+  if (!room.engine.isCreatureSummonable(cardName, heroOwner, heroIdx)) return _no('cansummon-nein');
   const creatureHero = ps.heroes?.[heroIdx];
   if (creatureHero?.statuses?.charmed) return _no('held-charmed');
 
@@ -8791,12 +8881,15 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       + (additionalTypeId ? '+grant-da' : '+kein-grant'));
   }
 
-  if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
-  const totalZones = ps.supportZones[heroIdx].length;
+  // Zonen gehoeren der Seite, auf der die Kreatur LANDET — bei
+  // geliehenem Helden also der Gegenseite (v1198).
+  const zonenPs = gs.players[heroOwner];
+  if (!zonenPs.supportZones[heroIdx]) zonenPs.supportZones[heroIdx] = [[], [], []];
+  const totalZones = zonenPs.supportZones[heroIdx].length;
   if (zoneSlot < 0 || zoneSlot >= totalZones) return _no('slot-ungueltig');
   // v704 (Puppets): Tri Fecta / Tri Ad — „No cards can be placed into
   // this Hero's Support Zones" (Skript-Vertrag `supportZonesLocked`).
-  if (room.engine.isSupportZoneLocked(pi, heroIdx, { source: 'summon', cardName, via: 'summon' })) return _no('zonen-gesperrt');
+  if (room.engine.isSupportZoneLocked(heroOwner, heroIdx, { source: 'summon', cardName, via: 'summon' })) return _no('zonen-gesperrt');
   // Intent flags are PER-PLAY: whichever branch below sets its flag also
   // clears the sibling. Without this, a stale flag from an earlier play
   // (Deepsea Castle / DDG have no tryBouncePlace consumer; the negated /
@@ -8807,7 +8900,7 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // (Als Bugreport: swap targeting an occupied slot summoned into a
   // free Support Zone whenever a Primordium grant round had extra
   // plays in flight).
-  if ((ps.supportZones[heroIdx][zoneSlot] || []).length > 0) {
+  if ((zonenPs.supportZones[heroIdx][zoneSlot] || []).length > 0) {
     const occCardScript = loadCardEffect(cardName);
     let allowOccupied = false;
     if (typeof occCardScript?.canPlaceOnOccupiedSlot === 'function') {
@@ -9069,7 +9162,9 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
       commitHandRemoval();
     } else {
       commitHandRemoval();
-      const placeResult = room.engine.summonCreature(cardName, pi, heroIdx, zoneSlot);
+      // ★ Brettseite = Heldenbesitzer, KONTROLLE = Beschwoerer (v1198).
+      const placeResult = room.engine.summonCreature(cardName, heroOwner, heroIdx, zoneSlot,
+        charmedOwner != null ? { controller: pi } : {});
       if (!placeResult) {
         // Place fizzled (full zone, etc.) — refund Hero pre-action cost.
         await room.engine.refundHeroActionCost(pi, heroIdx);
@@ -9120,12 +9215,21 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
         inst.originalOwner = placedOriginOwner;
       }
 
-      broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: actualZoneSlot });
+      // ★★ v1201 (Als Befund 18.9.): BEIDE BILDER GEHOEREN AUF DIE
+      // ZIELSEITE. Der Flug und der goldene Beschwoerungsschein liefen
+      // ueber `pi` — beim geliehenen Helden also auf MEIN Brett, waehrend
+      // die Kreatur auf dem gegnerischen landete. `destOwner` kennt der
+      // Client-Handler laengst (Cross-Side-Flug); `summon_effect`
+      // braucht schlicht die Brettseite statt des Wirkers.
+      broadcastHandToBoard(room, pi, {
+        cardName, handIndex, zoneType: 'support', heroIdx, slotIdx: actualZoneSlot,
+        destOwner: heroOwner,
+      });
       for (let i = 0; i < 2; i++) {
         const sid = gs.players[i]?.socketId;
-        if (sid) io.to(sid).emit('summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+        if (sid) io.to(sid).emit('summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
       }
-      sendToSpectators(room, 'summon_effect', { owner: pi, heroIdx, zoneSlot: actualZoneSlot, cardName });
+      sendToSpectators(room, 'summon_effect', { owner: heroOwner, heroIdx, zoneSlot: actualZoneSlot, cardName });
     }
 
     // Creature is on the board — commit the Hero pre-action cost.
@@ -9658,7 +9762,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
   const availableEffects = [];
   const hasMummyToken = (ps.supportZones[heroIdx] || []).some(slot => (slot || []).includes('Mummy Token'));
   const mummyScript = hasMummyToken ? loadCardEffect('Mummy Token') : null;
-  const ownScript = loadCardEffect(hero.name);
+  const ownScript = heroScriptOf(hero);
 
   if (hasMummyToken && mummyScript?.heroEffect && mummyScript?.onHeroEffect) {
     const mummyInst = room.engine.cardInstances.find(c =>
@@ -10515,7 +10619,7 @@ async function doPlaySurprise(room, pi, { cardName, handIndex, heroIdx, bakhmSlo
   // Support Zones instead of the Surprise Zone.
   if (bakhmSlot != null && bakhmSlot >= 0) {
     if (hero.statuses?.frozen || (hero.statuses?.stunned || hero.statuses?.webbed) || hero.statuses?.negated || hero.statuses?.bound) return false;
-    const heroScript = loadCardEffect(hero.name);
+    const heroScript = heroScriptOf(hero);
     if (!heroScript?.isBakhmHero) return false;
     if (cardData.cardType !== 'Creature') return false;
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];

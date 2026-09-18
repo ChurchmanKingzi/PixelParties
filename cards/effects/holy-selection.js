@@ -100,6 +100,13 @@ function _collectTargets(engine, gs) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'sun_beam' }, impactMs: 260,
+  },
+
   /**
    * Greys out in hand when no Hero on either side has a Necromancy
    * ability AND no on-board Creature carries the
@@ -292,7 +299,18 @@ module.exports = {
       // post-target windows already ran above.
       // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
       // gezaehlt wird die ECHTE Zielmenge (verschonte zaehlen nicht).
-      engine.beginMultiHit(heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length + creatureTargets.filter(t => t.inst.zone === 'support').length);
+      // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+      // Anti-AoE-Fenster (Deepsea Idol).
+      {
+        const lebendeKreaturen = creatureTargets.filter(t => t.inst.zone === 'support');
+        await engine.beginAoeStrike(
+          heroTargets.filter(t => (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length
+          + lebendeKreaturen.length,
+          {
+            creatures: lebendeKreaturen.map(t => t.inst),
+            source, amount: DAMAGE, type: 'destruction_spell', sourceOwner: pi,
+          });
+      }
       try {
       for (const t of heroTargets) {
         const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];

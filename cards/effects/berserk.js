@@ -63,6 +63,12 @@ function _countBerserksOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 const { candidateHosts, attachToHero } = require('./_attachment-shared');
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'dark_swarm' }, impactMs: 260 },
+
   // ★ v1112 (Als Vorgabe 15.9.): „Wird im Puzzle Mode einem Hero
   // [ein Anhaengsel] in die Support Zone getan, soll er automatisch
   // das Puzzle [mit dem Effekt] beginnen. Dasselbe gilt fuer ALLE

@@ -34,6 +34,13 @@ function oppHasFrozenHero(oppPs) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'freeze' }, impactMs: 260,
+  },
+
   // CPU: confirm this card's beneficial "you may" prompt — the default brain
   // declines cancellable confirms raised outside a card-cast (trigger hook),
   // which would otherwise make this freeze a no-op for the CPU. (The prompt

@@ -87,7 +87,12 @@ function isImmuneToAll(target, statusKeys, engine) {
 }
 
 /** Get all board targets eligible for receiving the removed statuses */
-function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks) {
+function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks, anhaengselStatus = []) {
+  // ★★ v1168 (Als allgemeine Regel 17.9.): Wird ein Status uebertragen,
+  // den ein ANHAENGSEL zugefuegt hat (Decisive Defeat → `negated`), zieht
+  // die Karte mit in die Support Zone des neuen Traegers. Wer dort keinen
+  // freien Platz hat, kommt als neuer Traeger nicht in Frage.
+  const brauchtPlatz = anhaengselStatus.length > 0;
   const targets = [];
   for (let pi = 0; pi < 2; pi++) {
     // Heroes
@@ -101,6 +106,7 @@ function getSecondTargets(gs, engine, firstTarget, removedStatuses, poisonStacks
           if (otherStatuses.length === 0 || isImmuneToAll(t, otherStatuses, engine)) continue;
         }
       } else if (isImmuneToAll(t, removedStatuses, engine)) continue;
+      if (brauchtPlatz && !engine.hatFreienSupportPlatz(pi, t.heroIdx)) continue;   // v1168
       targets.push(t);
     }
 
@@ -200,6 +206,30 @@ module.exports = {
     // the ones that actually got removed. Statuses that couldn't be healed
     // stay on the first target AND don't transfer to a second target; from
     // Tea's perspective they were never selected at all.
+    // ★★ v1168 (Als allgemeine Regel 17.9.): Anhaengsel-Status ziehen mit
+    // um. Die Karten VOR dem Heilen merken und markieren — sonst wuerfe
+    // ihr eigener Status-Hook sie schon beim Heilen in die Ablage.
+    const anhaengsel = [];     // [{ key, inst }]
+    if (firstTarget.type === 'hero') {
+      for (const k of removedStatuses) {
+        const inst = engine.anhaengselFuerStatus?.(firstTarget.owner, firstTarget.heroIdx, k);
+        if (!inst) continue;
+        inst.counters = inst.counters || {};
+        inst.counters._anhaengselZiehtUm = true;
+        anhaengsel.push({ key: k, inst });
+      }
+    }
+    const anhaengselFreigeben = async (umgezogen) => {
+      for (const { inst } of anhaengsel) {
+        delete inst.counters._anhaengselZiehtUm;
+        // Kein Umzug → die Regel fuer geheilte Anhaengsel-Status greift:
+        // Ablage des urspruenglichen Besitzers, mit Flug.
+        if (!umgezogen && inst.zone === 'support') {
+          await engine.sendBoardCardToDiscard(inst, { source: { name: 'Tea' } });
+        }
+      }
+    };
+
     let actuallyRemoved = [];
     if (firstTarget.type === 'hero') {
       const hero = engine.gs.players[firstTarget.owner]?.heroes?.[firstTarget.heroIdx];
@@ -217,7 +247,7 @@ module.exports = {
     }
 
     removedStatuses = actuallyRemoved;
-    if (removedStatuses.length === 0) return; // Everything selected was unhealable/locked — full fizzle
+    if (removedStatuses.length === 0) { await anhaengselFreigeben(false); return; }
     if (!removedStatuses.includes('poisoned')) poisonStacks = 0;
 
     // Play tea steam on first target (the cure already applied above)
@@ -231,18 +261,28 @@ module.exports = {
     // globally `cleansable:false`) is CURED off the first target but
     // NOT transferred: re-applying it would create a permanent,
     // uncleansable creature negation via applyCreatureStatus.
+    // ★★ v1169 (Al 17.9.): PASSIVE Status (`sourceBound` — eine Karte
+    // haelt sie aufrecht: Bishop of Kings [B], Water Golem, Weakening
+    // Crystal) lassen sich NICHT uebertragen. Tea heilt sie nur; ihre
+    // Quelle legt sie zum naechsten Rundenbeginn ohnehin neu an.
+    const passivGeheilt = (statuses || [])
+      .filter(s0 => s0?.statusData?.sourceBound)
+      .map(s0 => s0.key);
     const transferStatuses = removedStatuses.filter(
-      k => STATUS_EFFECTS[k]?.cleansable !== false);
+      k => STATUS_EFFECTS[k]?.cleansable !== false && !passivGeheilt.includes(k));
     if (!transferStatuses.includes('poisoned')) poisonStacks = 0;
     if (transferStatuses.length === 0) {
       engine.log('tea_cure_no_transfer', { removedStatuses });
-      return; // Pure cure (e.g. only an Unwanted Audience negation) — nothing to pass on
+      await anhaengselFreigeben(false);
+      return; // Pure cure — nothing to pass on
     }
 
     // Step 3: Find eligible second targets
-    const secondTargets = getSecondTargets(engine.gs, engine, firstTarget, transferStatuses, poisonStacks);
+    const anhaengselKeys = anhaengsel.filter(a => transferStatuses.includes(a.key)).map(a => a.key);
+    const secondTargets = getSecondTargets(engine.gs, engine, firstTarget, transferStatuses, poisonStacks, anhaengselKeys);
     if (secondTargets.length === 0) {
       engine.log('tea_no_second_target', { removedStatuses: transferStatuses });
+      await anhaengselFreigeben(false);
       return; // No eligible targets — effect is done
     }
 
@@ -258,9 +298,9 @@ module.exports = {
       maxPerType: { hero: 1, equip: 1 },
     });
 
-    if (!picked || picked.length === 0) return;
+    if (!picked || picked.length === 0) { await anhaengselFreigeben(false); return; }
     const secondTarget = secondTargets.find(t => t.id === picked[0]);
-    if (!secondTarget) return;
+    if (!secondTarget) { await anhaengselFreigeben(false); return; }
 
     // Step 5: Apply statuses to second target (as many as possible)
     // Build lookup for captured status properties (duration, _baihuPetrify, etc.)
@@ -296,6 +336,26 @@ module.exports = {
             source: 'Tea',
           });
         }
+      }
+    }
+
+    // ★★ v1168: Die Anhaengsel ziehen zum neuen Traeger um (nur Helden
+    // koennen sie tragen). Klappt ein Umzug nicht, gilt wieder die
+    // Heil-Regel: Ablage des urspruenglichen Besitzers.
+    for (const { key, inst } of anhaengsel) {
+      delete inst.counters._anhaengselZiehtUm;
+      const umziehen = transferStatuses.includes(key)
+        && secondTarget.type === 'hero'
+        && inst.zone === 'support';
+      const ok = umziehen
+        ? await engine.anhaengselUmziehen(inst, secondTarget.owner, secondTarget.heroIdx)
+        : false;
+      if (!ok && inst.zone === 'support') {
+        await engine.sendBoardCardToDiscard(inst, { source: { name: 'Tea' } });
+      } else if (ok) {
+        // Der Status am neuen Traeger gehoert jetzt dieser Karte.
+        const neuHero = engine.gs.players[secondTarget.owner]?.heroes?.[secondTarget.heroIdx];
+        if (neuHero?.statuses?.[key]) neuHero.statuses[key]._fromAttachment = inst.name;
       }
     }
 

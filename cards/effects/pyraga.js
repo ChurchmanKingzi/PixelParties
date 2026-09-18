@@ -78,6 +78,15 @@ function buchhaltung(engine, ich) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { emoji: '🔥', baseAngle: 90, duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'flame_strike' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
 
   // Der „you may"-Confirm ist abbrechbar; ohne Antwort bricht die

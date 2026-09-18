@@ -261,7 +261,12 @@ const STATUS_EFFECTS = {
   // `negated` is applied by effects like Dark Gear / Diplomacy / Necromancy
   // that take control of or silence a creature. It's NOT cleanseable —
   // Juice / Beer / Cure etc. should not undo the opponent's negation.
-  negated: { negative: true, cleansable: false, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
+  // ★★ v1168 (Al 17.9.: „Nulls Negiert-Effekt ist nicht cleansebar und
+  // nicht per Tea uebertragbar"): `negated` ist jetzt ein Status wie jeder
+  // andere — heilbar und uebertragbar. Wer haerter binden will, setzt
+  // `unhealable: true` an der EINZELNEN Anwendung (der Riegel, den
+  // `removeHeroStatus` und `cleanseHeroStatuses` ohnehin lesen).
+  negated: { negative: true, cleansable: true, label: 'Negated', icon: '⚡', immuneKey: 'negate_immune' },
   burned:  { negative: true, cleansable: true,  label: 'Burned',  icon: '🔥', immuneKey: 'burn_immune', dealsTickDamage: true, damageSourceName: 'Burn' },
   poisoned:{ negative: true, cleansable: true,  label: 'Poisoned', icon: '☠️', immuneKey: 'poison_immune', dealsTickDamage: true, damageSourceName: 'Poison' },
   // `bleeding` (v712, Als Regel 3./4.9.): boolescher Status wie Burn, „for the

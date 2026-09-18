@@ -22,6 +22,15 @@ const CARD_NAME = 'Basketskull';
 const DAMAGE_PER_COUNTER = 70;
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
+  // Negation spielt die Engine diese Bilder, damit der abgewehrte
+  // Zauber sichtbar bleibt.
+  spellVisual: {
+    projectile: { emoji: '💀', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   requiresTarget: true,
 
   // Bartas & Co. duerfen dieser Karte KEIN zweites Ziel geben.

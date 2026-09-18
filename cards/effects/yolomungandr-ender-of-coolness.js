@@ -126,12 +126,21 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   // SCHADENSTYP `creature` seit v520 (vorher `destruction_spell`) —
   // dieselbe Fehlzuweisung wie bei Phatnir, samt derselben Folge:
   // Dark Ocean blockt den Schaden jetzt. Von Al so entschieden.
+  // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Beide Modi
+  // treffen eine ganze Seite in EINEM Schlag. Das Anti-AoE-Fenster
+  // (Deepsea Idol) oeffnet der Kreaturen-Batch selbst.
   if (target === 'heroes') {
-    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-      const h = oppPs.heroes[hi];
-      if (h?.name && h.hp > 0) {
-        await ctx.dealDamage(h, damage, 'creature');
+    const lebende = (oppPs.heroes || []).filter(h => h?.name && h.hp > 0);
+    engine.beginMultiHit(lebende.length);
+    try {
+      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+        const h = oppPs.heroes[hi];
+        if (h?.name && h.hp > 0) {
+          await ctx.dealDamage(h, damage, 'creature');
+        }
       }
+    } finally {
+      engine.endMultiHit();
     }
   } else {
     const entries = [];
@@ -146,6 +155,13 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
     // `processCreatureDamageBatch` is the engine's batch-damage entry
     // point — `dealCreatureDamage` doesn't exist (the previous call
     // was a no-op) and would silently drop the AoE.
-    if (entries.length > 0) await engine.processCreatureDamageBatch(entries);
+    if (entries.length > 0) {
+      engine.beginMultiHit(entries.length);
+      try {
+        await engine.processCreatureDamageBatch(entries);
+      } finally {
+        engine.endMultiHit();
+      }
+    }
   }
 }

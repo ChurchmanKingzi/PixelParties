@@ -134,6 +134,13 @@ function nutzerHatAndereWaehlbare(engine, nutzer) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'gold_sparkle' }, impactMs: 260,
+  },
+
   // ★ v1112: dieselbe Luecke wie bei den status-setzenden Anhaengseln
   // (Als Vorgabe 15.9.) — im Puzzle laeuft kein `onPlay`, der Buff
   // wuerde fehlen. `attachmentBuff` sagt dem Puzzle-Aufbau, was

@@ -76,6 +76,13 @@ function findThebinxan(engine) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'electric_strike' }, impactMs: 260,
+  },
+
   /**
    * ── CPU-Ansage ──
    * Gefragt wird der GEGNER des Thebinxan-Spielers; `cpuResponse` bekommt
@@ -222,9 +229,15 @@ module.exports = {
     const _lebendeHelden = (opp.heroes || []).filter(h => h?.name && h.hp > 0).length;
     const _oppKreaturen = (engine.cardInstances || []).filter(
       (i) => i && i.zone === 'support' && (i.controller ?? i.owner) === oppIdx,
-    ).length;
+    );
     let oppCreatures = [];
-    engine.beginMultiHit(_lebendeHelden + _oppKreaturen);
+    // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+    // Anti-AoE-Fenster (Deepsea Idol).
+    await engine.beginAoeStrike(_lebendeHelden + _oppKreaturen.length, {
+      creatures: _oppKreaturen,
+      source: { name: CARD_NAME, owner: pi, heroIdx: inst.heroIdx },
+      amount: DAMAGE, type: 'creature', sourceOwner: pi,
+    });
     try {
     for (let hi = 0; hi < (opp.heroes || []).length; hi++) {
       const hero = opp.heroes[hi];

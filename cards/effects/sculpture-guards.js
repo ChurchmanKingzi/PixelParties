@@ -74,6 +74,13 @@
 const CARD_NAME = 'Sculpture Guards';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'shield_block' }, impactMs: 260,
+  },
+
   // Cards.json subtype 'Reaction' + engine validateActionPlay's
   // reaction-subtype filter block proactive Main-Phase casts.
   canActivate: () => false,

@@ -412,10 +412,41 @@ select optgroup {
 /* Type indicators */
 /* Type classes kept for JS reference but no visual border */
 
-/* ===== FOIL SHINE EFFECT ===== */
-@keyframes foilSweepOnce {
-  0% { transform: translateX(var(--band-from)) rotate(22deg); }
-  100% { transform: translateX(var(--band-to)) rotate(22deg); }
+/* ═══════════════════════════════════════════════════════════════════
+   FOIL — v1204 (Als Vorgabe 18.9.: „schöner/beeindruckender,
+   sichtbare Textur, bessere Shine-Effekte, beeindruckendere Particles")
+
+   VIER LAGEN, von unten nach oben:
+     1. TEXTUR   — die physische Prägung der Folie. Immer da, fast
+                   unsichtbar; erst das Licht bringt sie hervor.
+     2. SCHIMMER — die farbige Interferenz der ganzen Karte (Bestand).
+     3. BÄNDER   — wandernde Lichtstreifen. Jedes Band trägt die
+                   Prägung als Rillen IN seinem Licht (::after,
+                   multiply) und einen heißen weißen Kern (::before).
+                   Genau das macht Folie physisch: die Textur ist nicht
+                   aufgemalt, sie wird beleuchtet.
+     4. FUNKEN + STAUB — Glanzpunkte mit langen Spitzen und Bloom,
+                   dazu langsam aufsteigende Staubkörner im Licht.
+
+   ★ MECHANIKWECHSEL (v1204): Die Bänder liefen bis v1203 über einen
+   JS-Zeitgeber, der pro Karte alle 150–850 ms ein Band in den React-
+   Zustand schob — bei 20 Foil-Karten auf dem Schirm sind das Dutzende
+   Re-Renders je Sekunde, nur für Deko. Jetzt sind es fünf feste Bänder
+   je Karte mit teilerfremden Laufzeiten, die per CSS endlos laufen und
+   zwischen zwei Durchgängen unsichtbar warten. Optisch dieselbe
+   unregelmäßige Dichte, aber NULL React-Arbeit nach dem ersten Render
+   (zählt auf Als Handy-Baustelle ein).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Ein Durchgang belegt nur die ersten 40 % des Taktes — der Rest ist
+   Pause. Vier Bänder mit unterschiedlicher Laufzeit ergeben daraus ein
+   Muster, das sich nicht sichtbar wiederholt. */
+@keyframes foilSweepLoop {
+  0%   { transform: translateX(var(--band-from)) rotate(var(--band-rot, 22deg)); opacity: 0; }
+  3%   { opacity: var(--band-o, .45); }
+  34%  { opacity: var(--band-o, .45); }
+  40%  { transform: translateX(var(--band-to)) rotate(var(--band-rot, 22deg)); opacity: 0; }
+  100% { transform: translateX(var(--band-to)) rotate(var(--band-rot, 22deg)); opacity: 0; }
 }
 @keyframes foilShimmer {
   0%, 100% { opacity: .10; background-position: 0% 0%; }
@@ -428,18 +459,30 @@ select optgroup {
   33% { border-color: rgba(255,120,255,.5); box-shadow: 0 0 8px rgba(255,120,255,.25); }
   66% { border-color: rgba(100,200,255,.5); box-shadow: 0 0 8px rgba(100,200,255,.25); }
 }
+/* Funken: aufblitzen, drehen, vergehen. Die Spitzen wachsen dabei
+   stärker als der Kern — dadurch liest sich der Blitz als Lichtstern
+   und nicht als wachsender Punkt. */
 @keyframes sparkle {
-  0% { transform: scale(0) rotate(0deg); opacity: 0; }
-  15% { transform: scale(1.2) rotate(90deg); opacity: 1; }
-  30% { transform: scale(0.8) rotate(180deg); opacity: .7; }
-  45% { transform: scale(1) rotate(270deg); opacity: .9; }
-  60% { transform: scale(0) rotate(360deg); opacity: 0; }
+  0%   { transform: scale(0) rotate(0deg); opacity: 0; }
+  12%  { transform: scale(1.35) rotate(70deg); opacity: 1; }
+  26%  { transform: scale(.75) rotate(150deg); opacity: .65; }
+  42%  { transform: scale(1.05) rotate(250deg); opacity: .95; }
+  58%  { transform: scale(0) rotate(360deg); opacity: 0; }
   100% { transform: scale(0) rotate(360deg); opacity: 0; }
 }
 @keyframes sparkleGlow {
-  0%, 60%, 100% { box-shadow: none; }
-  20% { box-shadow: 0 0 6px 2px currentColor; }
+  0%, 58%, 100% { filter: none; }
+  16% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 9px currentColor); }
+  42% { filter: drop-shadow(0 0 3px currentColor); }
 }
+/* Staub im Lichtkegel: steigt langsam, dreht sich leicht, verlischt. */
+@keyframes foilMote {
+  0%   { transform: translate3d(0,0,0) scale(.6); opacity: 0; }
+  15%  { opacity: var(--mote-o, .8); }
+  70%  { opacity: var(--mote-o, .8); }
+  100% { transform: translate3d(var(--mote-dx, 4px), var(--mote-dy, -26px), 0) scale(1.1); opacity: 0; }
+}
+
 .foil-secret-rare {
   animation: foilBorderPulse 4s ease-in-out infinite !important;
 }
@@ -450,51 +493,101 @@ select optgroup {
 
 /* ===== DIAMOND RARE FOIL ===== */
 @keyframes foilDiamondBorderPulse {
-  0%, 100% { border-color: rgba(120,200,255,.6); box-shadow: 0 0 8px rgba(120,200,255,.3); }
-  25% { border-color: rgba(200,230,255,.7); box-shadow: 0 0 10px rgba(200,230,255,.35); }
-  50% { border-color: rgba(255,255,255,.6); box-shadow: 0 0 12px rgba(255,255,255,.3); }
-  75% { border-color: rgba(160,220,255,.7); box-shadow: 0 0 10px rgba(160,220,255,.35); }
+  0%, 100% { border-color: rgba(64,224,208,.65); box-shadow: 0 0 8px rgba(64,224,208,.35); }
+  25% { border-color: rgba(140,245,230,.75); box-shadow: 0 0 10px rgba(140,245,230,.4); }
+  50% { border-color: rgba(235,255,255,.65); box-shadow: 0 0 12px rgba(190,250,255,.35); }
+  75% { border-color: rgba(70,190,235,.75); box-shadow: 0 0 10px rgba(70,190,235,.4); }
 }
 @keyframes foilDiamondShimmer {
-  0%, 100% { opacity: .12; background-position: 0% 0%; }
-  25% { opacity: .30; background-position: 100% 100%; }
-  50% { opacity: .15; background-position: 50% 0%; }
-  75% { opacity: .35; background-position: 0% 100%; }
+  0%, 100% { opacity: .30; background-position: 0% 0%; }
+  25% { opacity: .55; background-position: 100% 100%; }
+  50% { opacity: .34; background-position: 50% 0%; }
+  75% { opacity: .62; background-position: 0% 100%; }
 }
 .foil-diamond-rare {
   animation: foilDiamondBorderPulse 3s ease-in-out infinite !important;
 }
 .foil-diamond-rare:hover {
-  border-color: rgba(180,230,255,.95) !important;
-  box-shadow: 0 0 20px rgba(120,200,255,.6), 0 0 40px rgba(200,240,255,.3), 0 4px 12px rgba(0,0,0,.5) !important;
+  border-color: rgba(150,250,235,.95) !important;
+  box-shadow: 0 0 20px rgba(64,224,208,.65), 0 0 40px rgba(120,235,255,.35), 0 4px 12px rgba(0,0,0,.5) !important;
 }
+/* ★ v1205 (Als Vorgabe 18.9.: „tuerkis-blaues Theming"): Der Verlauf
+   laeuft jetzt von Tuerkis ueber Aqua nach Tiefblau und zurueck, mit
+   weissen Glanzkanten dazwischen. Vorher war er blass-blau und damit
+   kaum von einer normalen Karte zu unterscheiden. */
 .foil-iridescent-diamond {
   position: absolute; inset: 0;
   background: linear-gradient(135deg,
-    rgba(120,200,255,.12) 0%, rgba(200,240,255,.1) 15%,
-    rgba(255,255,255,.14) 30%, rgba(160,220,255,.1) 45%,
-    rgba(200,230,255,.12) 60%, rgba(140,200,255,.1) 75%,
-    rgba(255,255,255,.12) 90%
+    rgba(64,224,208,.30) 0%, rgba(140,250,235,.24) 14%,
+    rgba(255,255,255,.22) 27%, rgba(50,195,235,.28) 40%,
+    rgba(35,140,225,.28) 54%, rgba(120,235,245,.24) 68%,
+    rgba(255,255,255,.20) 82%, rgba(64,224,208,.28) 95%
   );
   background-size: 300% 300%;
   animation: foilDiamondShimmer 4s ease-in-out infinite;
   animation-delay: var(--shimmer-offset, 0s);
   mix-blend-mode: screen;
+  /* Grundwert = Mitte des Takts, siehe .foil-sparkle: ohne Animation
+     laege hier sonst die volle Deckkraft ueber der Karte. */
+  opacity: .4;
 }
 .foil-shine-overlay {
   position: absolute; inset: 0; overflow: hidden;
   pointer-events: none; z-index: 2; border-radius: 1px;
+  /* ★ v1205: Die Schicht misst sich selbst. `container-type` macht sie
+     zum Bezugsrahmen fuer die Abfrage unten — damit weiss die Textur,
+     wie gross die Karte gerade WIRKLICH gezeichnet wird, ohne dass eine
+     Aufrufstelle das durchreichen muesste. */
+  container-type: inline-size;
 }
-/* JS-spawned shine band — plays once then removed */
-.foil-band {
-  position: absolute;
-  top: -90%; left: 0;
-  width: var(--band-w, 30%);
-  height: 280%;
-  opacity: var(--band-o, .4);
-  animation: foilSweepOnce var(--band-dur, 1.5s) linear forwards;
-  will-change: transform;
+
+/* ★ v1205 (Als Befund 18.9.): „Die gestreifte Textur sieht speziell in
+   der Closeup-Ansicht nicht gut aus." Stimmt — die Rillen haben eine
+   feste Breite, also werden sie auf einer gross gezeichneten Karte zu
+   gemalten Balken statt zu Korn. Ab 120 px Kartenbreite faellt die
+   Lage deshalb weg.
+
+   Bewusst als Groessenregel und nicht als Liste von Stellen: damit
+   greift sie automatisch im grossen Tooltip (360-400 px), in den
+   Helden-Plaetzen des Deck-Editors, im Karten-Auftritt (260 px) und in
+   allem, was spaeter dazukommt. Brett, Hand und Galerien liegen mit
+   64-100 px darunter und behalten die Praegung. */
+@container (min-width: 120px) {
+  .foil-texture { display: none; }
+  /* Die Rillen IM Band sind dieselbe Praegung, nur beleuchtet — und
+     werden im Closeup genauso zu groben Balken. Ohne sie bleibt der
+     reine Lichtstreifen mit seinem heissen Kern stehen, und genau der
+     traegt die grosse Ansicht. */
+  .foil-band::after { display: none; }
 }
+
+/* ── 1) TEXTUR ────────────────────────────────────────────────────
+   Feine Schrägrillen, zwei Winkel übereinander, dazu ein ganz leichtes
+   Rautennetz. Für sich genommen kaum zu sehen (das soll sie auch,
+   sonst wirkt die Karte schmutzig) — ihre Aufgabe ist, dem Licht der
+   Bänder eine Oberfläche zu geben. `overlay` hellt auf hellen Stellen
+   auf und dunkelt auf dunklen: die Prägung folgt dem Kartenbild,
+   statt als Gitter darüberzuliegen. */
+.foil-texture {
+  position: absolute; inset: 0;
+  background-image:
+    repeating-linear-gradient(112deg, rgba(255,255,255,.55) 0 1px, transparent 1px 6px);
+  mix-blend-mode: overlay;
+  opacity: .2;
+}
+/* Diamond: Facettennetz statt Rillen — 45°-Rauten, kühler. */
+/* Diamond: keine Rillen, sondern FACETTEN — breite 45°-Flächen, die
+   sich in Helligkeit minimal unterscheiden. Ein feines Gitter würde
+   sich mit dem Pixelraster der Karten beißen; Flächen lesen sich als
+   geschliffener Kristall und lassen die Kunst in Ruhe. */
+.foil-shine-diamond .foil-texture {
+  background-image:
+    repeating-linear-gradient(45deg,
+      rgba(210,255,250,.18) 0 7px, rgba(45,175,205,.12) 7px 14px);
+  opacity: .38;
+}
+
+/* ── 2) SCHIMMER (Bestand) ──────────────────────────────────────── */
 .foil-iridescent {
   position: absolute; inset: 0;
   background: linear-gradient(135deg,
@@ -507,35 +600,380 @@ select optgroup {
   animation: foilShimmer 5s ease-in-out infinite;
   animation-delay: var(--shimmer-offset, 0s);
   mix-blend-mode: screen;
+  /* Grundwert = Mitte des Takts, siehe .foil-sparkle: ohne Animation
+     laege hier sonst die volle Deckkraft ueber der Karte. */
+  opacity: .18;
 }
+
+/* ── 3) BÄNDER ──────────────────────────────────────────────────── */
+.foil-band {
+  position: absolute;
+  top: -90%; left: 0;
+  width: var(--band-w, 30%);
+  height: 280%;
+  /* `screen` statt roher Deckkraft: das Band ADDIERT Licht, statt die
+     Karte zu übermalen. Dunkle Bildstellen bleiben dunkel, helle
+     blühen auf — der Unterschied zwischen „Folie" und „Farbschleier". */
+  mix-blend-mode: screen;
+  animation: foilSweepLoop var(--band-dur, 4s) linear infinite;
+  animation-delay: var(--band-delay, 0s);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+/* Heißer Kern: ein schmaler, überstrahlter Streifen mitten im Band. */
+.foil-band::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to right,
+    transparent 34%, rgba(255,255,255,.55) 46%, rgba(255,255,255,.95) 50%,
+    rgba(255,255,255,.55) 54%, transparent 66%);
+  filter: blur(.6px);
+}
+/* Die Prägung IM Licht: `multiply` schneidet Rillen in das Band,
+   deckungsgleich mit der Texturlage darunter. Dadurch sieht man die
+   Struktur genau dann, wenn Licht über sie läuft. */
+.foil-band::after {
+  content: ''; position: absolute; inset: -50%;
+  background: repeating-linear-gradient(112deg,
+    rgba(0,0,0,.6) 0 1px, transparent 1px 7px);
+  transform: rotate(calc(-1 * var(--band-rot, 22deg)));
+  mix-blend-mode: multiply;
+}
+/* Diamond: die Facettenkanten schneiden das Licht, nicht Rillen. */
+.foil-shine-diamond .foil-band::after {
+  background: repeating-linear-gradient(45deg,
+    rgba(0,0,0,.45) 0 1px, transparent 1px 14px);
+}
+/* Kuehler Kern: nicht reines Weiss, sondern ein Hauch Aqua darin —
+   sonst wirkt der Streifen wie der goldene der Secret Rares. */
+.foil-shine-diamond .foil-band::before {
+  background: linear-gradient(to right,
+    transparent 32%, rgba(190,255,250,.5) 44%, rgba(255,255,255,.95) 50%,
+    rgba(190,255,250,.5) 56%, transparent 68%);
+}
+
+/* ── 4) FUNKEN + STAUB ──────────────────────────────────────────── */
 .foil-sparkle {
-  position: absolute; width: 4px; height: 4px; border-radius: 50%;
+  position: absolute;
+  width: var(--sp-size, 5px); height: var(--sp-size, 5px);
+  border-radius: 50%;
+  /* ★ Grundzustand unsichtbar. Wichtig fuer „Play Animations: aus" und
+     den Lite-Modus: dort killt eine globale Regel `animation`, und ohne
+     diese Zeile staende auf jeder Foil-Karte ein Dutzend starrer
+     Lichtkreuze mit langen Spitzen. Die laufende Animation ueber-
+     schreibt den Wert ohnehin. */
+  opacity: 0;
+  background: radial-gradient(circle, #ffffff 0%, currentColor 40%, transparent 72%);
   animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite,
              sparkleGlow var(--sp-dur, 2.5s) ease-in-out infinite;
   animation-delay: var(--sp-delay, 0s);
 }
+/* Lange, nadeldünne Spitzen mit weichem Auslauf — ein Lichtkreuz
+   statt zweier Balken. */
 .foil-sparkle::before, .foil-sparkle::after {
-  content: ''; position: absolute; background: currentColor;
+  content: ''; position: absolute;
 }
 .foil-sparkle::before {
-  left: 50%; top: -40%; width: 1px; height: 180%;
+  left: 50%; top: -170%; width: 1px; height: 440%;
   transform: translateX(-50%);
+  background: linear-gradient(to bottom, transparent 0%, currentColor 32%,
+    #ffffff 50%, currentColor 68%, transparent 100%);
 }
 .foil-sparkle::after {
-  top: 50%; left: -40%; height: 1px; width: 180%;
+  top: 50%; left: -170%; height: 1px; width: 440%;
   transform: translateY(-50%);
+  background: linear-gradient(to right, transparent 0%, currentColor 32%,
+    #ffffff 50%, currentColor 68%, transparent 100%);
 }
-/* Diamond sparkles: bigger, brighter */
-.foil-shine-diamond .foil-sparkle {
-  width: 5px; height: 5px;
+/* Diamond: größer und kälter. */
+.foil-shine-diamond .foil-sparkle { width: calc(var(--sp-size, 5px) + 1px); height: calc(var(--sp-size, 5px) + 1px); }
+.foil-shine-diamond .foil-sparkle::before { width: 1.4px; height: 520%; top: -210%; }
+.foil-shine-diamond .foil-sparkle::after  { height: 1.4px; width: 520%; left: -210%; }
+
+.foil-mote {
+  position: absolute;
+  width: var(--mote-size, 2px); height: var(--mote-size, 2px);
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 4px currentColor;
+  opacity: 0;
+  animation: foilMote var(--mote-dur, 6s) linear infinite;
+  animation-delay: var(--mote-delay, 0s);
 }
-.foil-shine-diamond .foil-sparkle::before {
-  width: 1.5px; height: 220%;
-  top: -60%;
+
+/* ── Sparmodus: Telefone (Lite-Modus) und „Play Animations: aus" ──
+   Die Prägung bleibt (sie kostet nichts, ist ein statischer Verlauf),
+   Staub und die Hälfte der Funken fallen weg. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .foil-mote { display: none; }
+  .foil-sparkle:nth-child(2n) { display: none; }
+  .foil-band::after { display: none; }
 }
-.foil-shine-diamond .foil-sparkle::after {
-  height: 1.5px; width: 220%;
-  left: -60%;
+
+/* ═══════════════════════════════════════════════════════════════════
+   ZONEN-EINSCHLAG — v1206 (Als Vorgabe 18.9.)
+
+   Wird eine Karte in einer Zone platziert, schlaegt sie dort sichtbar
+   ein: ein kurzer Lichtschein, ein aufgehender Ring in der Form der
+   Zone und ein paar Funken nach aussen. Drei Teile, alle rein per CSS —
+   das JS haengt die Knoten nur ein (`spawnZoneLandFx`, app-shared).
+
+   Die Farbe kommt vom Aufrufer als `color` und wird ueber
+   `currentColor` in alle drei Teile vererbt: Creatures gruen, Heroes
+   violett, Abilities blau, Artefakte gold — dasselbe Vokabular wie
+   `typeColor`. Der Blick weiss dadurch schon an der Farbe, WAS da
+   gelandet ist.
+
+   `--zfx-w/--zfx-h` sind die gemessenen Zonenmasse: der Ring uebernimmt
+   sie, damit er auf einer breiten Heldenzone nicht rund und auf einer
+   schmalen Ability-Zone nicht oval wirkt.
+   ═══════════════════════════════════════════════════════════════════ */
+.zone-land-fx {
+  position: absolute;
+  width: 0; height: 0;          /* reiner Ankerpunkt: Mitte der Zone */
+  pointer-events: none;
+}
+.zone-land-fx > i { position: absolute; display: block; }
+
+/* Lichtschein: geht sofort auf und faellt weich ab. */
+.zone-land-glow {
+  left: calc(var(--zfx-w) * -0.8); top: calc(var(--zfx-h) * -0.8);
+  width: calc(var(--zfx-w) * 1.6); height: calc(var(--zfx-h) * 1.6);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, currentColor 0%, transparent 70%);
+  opacity: 0;
+  animation: zoneLandGlow 620ms ease-out forwards;
+}
+/* Ring in Zonenform — der eigentliche „Einschlag". */
+.zone-land-ring {
+  left: calc(var(--zfx-w) * -0.5); top: calc(var(--zfx-h) * -0.5);
+  width: var(--zfx-w); height: var(--zfx-h);
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  box-shadow: 0 0 12px currentColor, inset 0 0 10px currentColor;
+  opacity: 0;
+  animation: zoneLandRing 680ms cubic-bezier(.2,.7,.3,1) forwards;
+}
+/* Funke: der Aussenknoten fliegt, der Innenknoten ist der gezogene
+   Strich. Zwei Knoten, weil `transform` sonst doppelt belegt waere —
+   Flug UND Ausrichtung passen nicht in dieselbe Eigenschaft. */
+.zone-land-spark {
+  left: 0; top: 0; width: 0; height: 0;
+  opacity: 0;
+  animation: zoneLandSpark var(--zdur, 700ms) cubic-bezier(.12,.75,.3,1) var(--zdelay, 0ms) forwards;
+}
+.zone-land-spark > b {
+  position: absolute;
+  left: calc(var(--zlen) * -0.5); top: calc(var(--zdick) * -0.5);
+  width: var(--zlen); height: var(--zdick);
+  border-radius: var(--zdick);
+  transform: rotate(var(--zang, 0deg));
+  /* Weisser Kern, farbiger Schweif nach hinten. */
+  background: linear-gradient(to right, transparent 0%, currentColor 35%, #ffffff 100%);
+  box-shadow: 0 0 7px currentColor, 0 0 13px currentColor;
+}
+@keyframes zoneLandGlow {
+  0%   { opacity: 0; transform: scale(.35); }
+  18%  { opacity: .55; }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+@keyframes zoneLandRing {
+  0%   { opacity: 0; transform: scale(.55); }
+  22%  { opacity: .95; }
+  100% { opacity: 0; transform: scale(1.28); }
+}
+@keyframes zoneLandSpark {
+  0%   { opacity: 0; transform: translate(0,0) scale(.35); }
+  12%  { opacity: 1; transform: translate(calc(var(--zdx) * .22), calc(var(--zdy) * .22)) scale(1); }
+  70%  { opacity: .9; }
+  100% { opacity: 0; transform: translate(var(--zdx), var(--zdy)) scale(.55); }
+}
+
+/* ── BESCHWÖRUNG: die Creature-Variante (v1207, Als Vorgabe 18.9.) ──
+   „Ändere für spezifisch Creatures den Effekt zu etwas, das mehr nach
+   Beschwörungsmagie aussieht."
+
+   Der Einschlag oben ist ein Aufprall — hier soll etwas HERAUFKOMMEN.
+   Drei Teile:
+     • zwei gegenläufige Runenringe am FUSS der Zone, stark flach
+       gedrückt (Höhe ≈ 34 % der Breite). Das Spielfeld ist gekippt;
+       eine flache Ellipse dort unten liest sich als Kreis, der auf dem
+       Boden LIEGT, ein voller Kreis als Reifen, der davor schwebt.
+       Der äußere ist gestrichelt — das sind die „Runen" —, dreht sich
+       und geht dabei auf; der innere dreht gegenläufig.
+     • eine Lichtsäule, die aus dem Kreis nach oben durch die Karte
+       schießt und oben ausfranst.
+     • Irrlichter, die aus dem Kreis aufsteigen und verlöschen.
+
+   Alles in der Kartentypfarbe (`currentColor`, bei Creatures grün).
+   Deutlich länger als der Einschlag: Beschwörung ist ein Vorgang. */
+/* ── Ringe: STAUCHUNG und DREHUNG auf getrennten Knoten ────────────
+   ★ v1208/v1209: Die Ringmitte liegt bei 0,50 der Kartenhoehe unter der
+   Zonenmitte — also knapp UNTER der Kartenunterkante. Weil die ganze
+   Beschwoerung hinter den Karten liegt (siehe `spawnZoneLandFx`),
+   verschwindet die hintere Haelfte der Ellipse hinter der Karte und
+   die vordere liegt davor auf dem Boden: die Karte STEHT im Kreis.
+   Bei 0,50 ueberlappt zu viel, bei 0,62 haengt der Kreis losgeloest
+   unter der Karte — beides durchprobiert.
+   Erster Versuch drehte die bereits flachgedrueckte Ellipse — dabei
+   dreht sich die Form MIT und wird zum schraegen Klecks statt zum
+   Kreis, der am Boden liegt. Also: der aeussere Knoten drueckt flach
+   (`scaleY`) und geht auf, der innere ist ein echter Kreis und dreht
+   sich darin. Die Drehung passiert damit IN der Bodenebene. */
+.zone-summon-ring {
+  left: calc(var(--zfx-w) * -0.62);
+  top: calc(var(--zfx-h) * 0.50 - var(--zfx-w) * 0.62);
+  width: calc(var(--zfx-w) * 1.24);
+  height: calc(var(--zfx-w) * 1.24);
+  opacity: 0;
+  transform: scaleY(.34) scale(.35);
+}
+.zone-summon-ring > b {
+  position: absolute; inset: 0;
+  display: block;
+  border-radius: 50%;
+}
+.zone-summon-ring-aussen {
+  animation: zoneSummonRingAuf 1100ms cubic-bezier(.16,.8,.3,1) forwards;
+}
+.zone-summon-ring-aussen > b {
+  border: 2px dashed currentColor;
+  box-shadow: 0 0 14px currentColor;
+  animation: zoneSummonDreh 1100ms linear forwards;
+}
+.zone-summon-ring-innen {
+  left: calc(var(--zfx-w) * -0.40);
+  top: calc(var(--zfx-h) * 0.50 - var(--zfx-w) * 0.40);
+  width: calc(var(--zfx-w) * 0.80);
+  height: calc(var(--zfx-w) * 0.80);
+  animation: zoneSummonRingAuf 1100ms cubic-bezier(.16,.8,.3,1) 60ms forwards;
+}
+.zone-summon-ring-innen > b {
+  border: 1px solid currentColor;
+  box-shadow: 0 0 10px currentColor, inset 0 0 12px currentColor;
+  animation: zoneSummonDrehGegen 1100ms linear 60ms forwards;
+}
+/* Lichtsaeule: unten hart, oben ausgefranst (mask), damit sie nicht wie
+   ein Balken endet. */
+.zone-summon-beam {
+  left: calc(var(--zfx-w) * -0.30);
+  top: calc(var(--zfx-h) * -0.78);
+  width: calc(var(--zfx-w) * 0.60);
+  height: calc(var(--zfx-h) * 1.30);
+  background: linear-gradient(to top, currentColor 0%, transparent 88%);
+  /* ★ v1209: Die Maske war nur senkrecht — die Saeule endete seitlich
+     an einer harten Kante und las sich als gruener Kasten ueber der
+     Karte. Eine Ellipse, die am Fuss der Saeule sitzt, blendet oben
+     UND an beiden Seiten aus: aus dem Balken wird ein Lichtkegel. */
+  -webkit-mask-image: radial-gradient(ellipse 58% 82% at 50% 94%, #000 0%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 82% at 50% 94%, #000 0%, #000 30%, transparent 100%);
+  mix-blend-mode: screen;
+  filter: blur(4px);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  animation: zoneSummonBeam 900ms ease-out forwards;
+}
+.zone-summon-wisp {
+  left: var(--wx, 0px);
+  top: calc(var(--zfx-h) * 0.58);
+  width: var(--wsize, 3px); height: var(--wsize, 3px);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, currentColor 55%, transparent 75%);
+  box-shadow: 0 0 8px currentColor;
+  opacity: 0;
+  animation: zoneSummonWisp var(--wdur, 900ms) ease-out var(--wdelay, 0ms) forwards;
+}
+@keyframes zoneSummonRingAuf {
+  0%   { opacity: 0; transform: scaleY(.34) scale(.35); }
+  18%  { opacity: 1; }
+  72%  { opacity: .8; }
+  100% { opacity: 0; transform: scaleY(.34) scale(1.12); }
+}
+@keyframes zoneSummonDreh      { to { transform: rotate(150deg); } }
+@keyframes zoneSummonDrehGegen { to { transform: rotate(-120deg); } }
+@keyframes zoneSummonBeam {
+  0%   { opacity: 0; transform: scaleY(.15) scaleX(.7); }
+  25%  { opacity: .7; transform: scaleY(1) scaleX(1); }
+  100% { opacity: 0; transform: scaleY(1.05) scaleX(.8); }
+}
+@keyframes zoneSummonWisp {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+  20%  { opacity: 1; transform: translate(calc(var(--wdx) * .3), calc(var(--wdy) * .2)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--wdx), var(--wdy)) scale(.5); }
+}
+/* Der Schein der Beschwoerung sitzt tiefer (auf dem Kreis), ist
+   schwaecher als beim Einschlag — die Ringe tragen den Effekt — und
+   haelt dafuer laenger. */
+/* ★ v1209 (Als Befund 18.9.: „zu klein, weil sie nicht die ganze Karte
+   highlightet"): Der Schein sitzt jetzt MITTIG auf der Karte statt
+   unten am Kreis und ist kraeftiger — zusammen mit dem Glanzstreifen
+   darunter leuchtet die ganze Karte auf, nicht nur ihr Fuss. */
+.zone-land-summon .zone-land-glow {
+  top: calc(var(--zfx-h) * -0.8);
+  opacity: 0;
+  animation: zoneSummonGlow 950ms ease-out forwards;
+}
+@keyframes zoneSummonGlow {
+  0%   { opacity: 0; transform: scale(.35); }
+  22%  { opacity: .5; }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
+/* Glanzstreifen: ein Lichtband, das EINMAL diagonal ueber die Karte
+   faehrt. Der Kasten ist exakt die Karte und schneidet ab (`overflow`),
+   damit der Streifen an der Kartenkante endet und nicht im Nichts
+   haengt — derselbe Gedanke wie beim Foil-Band, nur einmalig. */
+.zone-summon-shine {
+  left: calc(var(--zfx-w) * -0.5);
+  top: calc(var(--zfx-h) * -0.5);
+  width: var(--zfx-w); height: var(--zfx-h);
+  overflow: hidden;
+  border-radius: 4px;
+  mix-blend-mode: screen;
+}
+.zone-summon-shine > b {
+  position: absolute;
+  top: -60%; left: 0;
+  width: 34%; height: 220%;
+  display: block;
+  background: linear-gradient(to right,
+    transparent 0%, currentColor 30%, #ffffff 50%, currentColor 70%, transparent 100%);
+  filter: blur(1px);
+  opacity: 0;
+  animation: zoneSummonShine 620ms ease-out 120ms forwards;
+}
+@keyframes zoneSummonShine {
+  0%   { opacity: 0; transform: translateX(-160%) rotate(20deg); }
+  20%  { opacity: .6; }
+  80%  { opacity: .42; }
+  100% { opacity: 0; transform: translateX(340%) rotate(20deg); }
+}
+
+/* ── HANDKARTEN NEIGEN SICH VOM ZEIGER WEG (v1210, Als Vorgabe 18.9.) ──
+   Den Winkel setzt `applyHandTilt` (app-shared) waehrend eines Zuges
+   als `--hand-tilt` je Karte; hier steht nur, wie er aussieht.
+
+   ZWEI verschiedene Drehpunkte, mit Absicht:
+     • Im Kampf sitzt die Neigung auf der KARTE im Handplatz. Gemessen
+       wird der Platz (nie gedreht), gedreht die Karte — ohne
+       Rueckkopplung. Der Drehpunkt darf deshalb unten liegen
+       (`50% 85%`), was sich wie aufgefaechertes Halten liest.
+     • Im Puzzle-Editor IST die Handkarte der Platz; ihr Rahmen wird
+       also mitgedreht und damit auch die Messung. Bei einem Drehpunkt
+       in der MITTE bleibt die Kartenmitte unter der Drehung fest, die
+       Messung also stabil — deshalb dort `50% 50%`.
+
+   `transition` statt Animation: die Karte soll der Maus folgen, nicht
+   einen Ablauf abspielen. `will-change` bleibt bewusst weg — es gaebe
+   je Handkarte eine eigene Ebene, und die Hand hat bis zu zwoelf. */
+.game-hand-me .hand-slot > .board-card,
+.game-hand-me .creation-slot > .board-card {
+  transform: rotate(var(--hand-tilt, 0deg));
+  transform-origin: 50% 85%;
+  transition: transform .16s ease-out;
+}
+.pz-hand-card {
+  transform: rotate(var(--hand-tilt, 0deg));
+  transform-origin: 50% 50%;
 }
 
 /* ===== TOOLTIP (full gallery column) ===== */
@@ -10190,8 +10628,15 @@ body:has(.game-hand-me) .board-tooltip {
   100% { transform: translate(var(--fw-x), var(--fw-y)) scale(0); opacity: 0; }
 }
 
+/* ★★ v1167 (Tester-Bericht 17.9.: „Set-Victory zeigt nur den unteren Teil
+   des Spielfelds und eine grosse schwarze Flaeche"): HIER stand
+   `position: relative` und ueberschrieb damit das `position: fixed` von
+   `.modal-overlay` — der Abschlussbildschirm war kein Vollbild-Layer
+   mehr, sondern ein Block IM Seitenfluss unter dem Brett. Das `fixed`
+   spannt auch fuer die absolut gesetzten Feuerwerks-Partikel den
+   Bezugsrahmen auf, ein eigenes `relative` braucht es dafuer nicht. */
 .set-complete-overlay {
-  position: relative;
+  position: fixed;
 }
 
 /* SC icon tooltip */
@@ -12127,6 +12572,11 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   padding: 8px 2px;
 }
 .pz-hand-card {
+  /* ★ v1203: Bezugsrahmen fuer die Foil-Schicht (`<CardFoil>`, absolut
+     mit inset: 0). Ohne das haengt sie sich an den naechsten
+     positionierten Vorfahren — das waere die ganze Handleiste. Das
+     Gegenstueck `.pz-search-card` hat es laengst. */
+  position: relative;
   /* v6 (Al): battle-sized hand cards — same --card-w/--card-h the
      in-battle hand uses (86×120 × --board-scale) instead of the old
      fixed 48×67 thumbnails. The bars (.pz-hand) have min-height only,
@@ -12146,7 +12596,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   flex: 0 1 calc(var(--card-w) + 4px);
   min-width: calc(18px * var(--board-scale));
   cursor: grab;
-  transition: border-color .15s, transform .1s;
+  transition: border-color .15s, transform .16s ease-out;
 }
 .pz-hand-card:hover {
   border-color: var(--accent);
@@ -16508,48 +16958,111 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   100% { opacity: 0; transform: translateY(-160px) scale(1); }
 }
 
-/* ── „Cleansing of the Land": Feuerwalze (v1088) ────────────────────
+/* ── „Cleansing of the Land": FEUERWAND (v1088, neu ab v1170) ───────
    Laeuft auf der ATMOSPHAEREN-Ebene (.board-plane-clip), also UNTER
    allen Zonen und Karten — Als Vorgabe. Nur `opacity` und `transform`
-   animiert (Projektregel). */
+   animiert (Projektregel): die Wand wandert als Ganzes, ihre Flammen
+   flackern an Ort und Stelle mit. */
 .fire-sweep-layer {
   position: absolute; inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
 }
-.fire-sweep-layer .fire-sweep-front {
-  position: absolute; top: 0; bottom: 0; left: 0;
-  width: 46%;
-  background: linear-gradient(90deg,
-    rgba(255, 60, 0, 0) 0%,
-    rgba(255, 110, 20, .30) 45%,
-    rgba(255, 200, 90, .55) 78%,
-    rgba(255, 245, 210, .70) 96%,
-    rgba(255, 255, 255, 0) 100%);
-  animation: fireSweepRoll 1.9s ease-in-out forwards;
+/* Die wandernde Wand — Buendel aus Kern, Zungen, Funken und Rauch. */
+.fire-sweep-layer .fw-wand {
+  position: absolute; top: -12%; bottom: -12%; left: 0;
+  width: 30%;
+  transform: translateX(-140%);
+  animation: fwZug 2.1s cubic-bezier(.35,.05,.6,1) forwards;
+  will-change: transform;
 }
-.fire-sweep-layer .fire-sweep-tongue {
-  position: absolute; bottom: 0;
-  border-radius: 50% 50% 30% 30%;
-  background: linear-gradient(180deg, rgba(255,235,160,.9), rgba(255,90,10,.15));
+.fire-sweep-layer .fw-kern {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    rgba(60, 10, 0, 0) 0%,
+    rgba(180, 40, 0, .45) 28%,
+    rgba(255, 110, 15, .78) 58%,
+    rgba(255, 205, 95, .92) 84%,
+    rgba(255, 248, 220, .75) 96%,
+    rgba(255, 255, 255, 0) 100%);
+  filter: blur(2px);
+}
+.fire-sweep-layer .fw-hitze {
+  position: absolute; left: 70%; right: -30%; top: 0; bottom: 0;
+  background: linear-gradient(90deg, rgba(255,170,60,.35), rgba(255,170,60,0));
+  filter: blur(7px);
+}
+.fire-sweep-layer .fw-zunge {
+  position: absolute;
+  margin-left: -8px; margin-top: -40px;
+  border-radius: 52% 48% 34% 36% / 68% 64% 34% 32%;
+  background: radial-gradient(ellipse at 50% 78%,
+    rgba(255,246,206,.95) 0%, rgba(255,196,60,.9) 26%,
+    rgba(255,110,12,.75) 58%, rgba(190,40,0,.25) 82%, rgba(120,20,0,0) 100%);
+  filter: blur(1px);
+  transform-origin: 50% 100%;
+  animation-name: fwZunge;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.fire-sweep-layer .fw-zunge.hell {
+  background: radial-gradient(ellipse at 50% 80%,
+    #fffdf0 0%, rgba(255,226,130,.95) 30%, rgba(255,140,20,.7) 65%, rgba(160,30,0,0) 100%);
+}
+.fire-sweep-layer .fw-funke {
+  position: absolute; border-radius: 50%;
+  background: #ffd27a; box-shadow: 0 0 6px 2px rgba(255,150,40,.8);
   opacity: 0;
-  animation: fireSweepTongue 1.5s ease-out forwards;
+  animation-name: fwFunke;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+}
+.fire-sweep-layer .fw-rauch {
+  position: absolute; bottom: 8%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(52,38,32,.5) 0%, rgba(30,20,16,.28) 55%, rgba(16,10,8,0) 78%);
+  filter: blur(4px); opacity: 0;
+  animation-name: fwRauch;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+/* Verkohlte Spur: waechst hinter der Wand mit und verglimmt. */
+.fire-sweep-layer .fw-narbe {
+  position: absolute; inset: 0;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, rgba(24,10,4,.42) 0%, rgba(40,16,6,.30) 70%, rgba(60,24,8,0) 100%);
+  animation: fwNarbe 2.6s ease-out forwards;
 }
 .fire-sweep-layer .fire-sweep-scorch {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 60%, rgba(40,14,4,.34) 0%, rgba(20,8,2,0) 70%);
+  background: radial-gradient(ellipse at 50% 60%, rgba(255,120,30,.20) 0%, rgba(20,8,2,0) 72%);
   opacity: 0;
-  animation: fireSweepScorch 2.2s ease-out forwards;
+  animation: fireSweepScorch 2.4s ease-out forwards;
 }
-@keyframes fireSweepRoll {
-  0%   { transform: translateX(-110%); }
-  100% { transform: translateX(240%); }
+@keyframes fwZug {
+  0%   { transform: translateX(-140%); }
+  100% { transform: translateX(440%); }
 }
-@keyframes fireSweepTongue {
-  0%   { opacity: 0; transform: translateY(20px) scaleY(.4); }
-  35%  { opacity: .85; }
-  100% { opacity: 0; transform: translateY(-14px) scaleY(1.15); }
+@keyframes fwZunge {
+  0%, 100% { opacity: .82; transform: scale(1, 1) translateY(0); }
+  30%      { opacity: 1;   transform: scale(.86, 1.18) translateY(-6px); }
+  60%      { opacity: .7;  transform: scale(1.1, .9) translateY(3px); }
+}
+@keyframes fwFunke {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.7); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--fdrift, 0), -90px) scale(1); }
+}
+@keyframes fwRauch {
+  0%   { opacity: 0; transform: translateY(0) scale(.6); }
+  22%  { opacity: .6; }
+  100% { opacity: 0; transform: translateY(-150px) scale(1.5); }
+}
+@keyframes fwNarbe {
+  0%   { transform: scaleX(0); opacity: .9; }
+  70%  { transform: scaleX(1); opacity: .8; }
+  100% { transform: scaleX(1); opacity: 0; }
 }
 @keyframes fireSweepScorch {
   0%   { opacity: 0; }
@@ -16557,52 +17070,94 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   100% { opacity: 0; }
 }
 
-/* ── „Alluring Light": Anlock-Leuchten (v1089) ──────────────────────
-   Drei versetzt pulsende Ringe plus ein Kern — rhythmisch, damit der
-   Blick auf dem Ziel bleibt, bevor der angelockte Held hineinrammt.
-   Nur `opacity` und `transform`. */
+/* ── „Alluring Light": Anlock-Leuchten (v1089, neu ab v1173) ────────
+   ★ Sitzt `position: fixed` am Rechteck des ZIELS — die Komponente
+   liefert `left`/`top`; vorher stand hier `left: 50%; top: 50%`, also
+   die Mitte der Animationsebene. Groesser, mit Lichtstrahlen und
+   laengerem Nachleuchten. Nur `opacity` und `transform` animiert. */
 .lure-beacon {
-  position: absolute; left: 50%; top: 50%;
+  position: fixed;
   width: 0; height: 0;
   pointer-events: none;
   z-index: 10050;
 }
-.lure-beacon .lure-ring {
-  position: absolute; left: -34px; top: -34px;
-  width: 68px; height: 68px;
+.lure-beacon > span { position: absolute; left: 0; top: 0; display: block; }
+.lure-beacon .lure-halo {
+  margin-left: -50%; margin-top: -50%;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 2px solid rgba(255, 228, 140, .9);
-  box-shadow: 0 0 14px 3px rgba(255, 210, 90, .55);
+  background: radial-gradient(circle, rgba(255,246,205,.55) 0%, rgba(255,214,110,.28) 42%, rgba(255,180,50,0) 72%);
+  filter: blur(3px);
+  animation: lureHalo 2.4s ease-in-out forwards;
+}
+.lure-beacon .lure-strahl {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,240,180,0) 0%, rgba(255,232,150,.75) 45%, rgba(255,240,190,.95) 50%, rgba(255,232,150,.75) 55%, rgba(255,240,180,0) 100%);
   opacity: 0;
-  animation: lurePulse 1.35s ease-out infinite;
+  animation: lureStrahl 2.4s ease-in-out infinite;
+}
+.lure-beacon .lure-ring {
+  border-radius: 50%;
+  border: 3px solid rgba(255, 232, 150, .95);
+  box-shadow: 0 0 22px 6px rgba(255, 205, 80, .6), inset 0 0 18px rgba(255, 220, 120, .45);
+  opacity: 0;
+  animation: lurePulse 1.9s ease-out infinite;
 }
 .lure-beacon .lure-core {
-  position: absolute; left: -11px; top: -11px;
-  width: 22px; height: 22px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,250,215,.95) 0%, rgba(255,200,80,.5) 60%, rgba(255,170,40,0) 100%);
-  animation: lureCoreBlink .45s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(255,253,235,.98) 0%, rgba(255,214,110,.6) 55%, rgba(255,180,50,0) 100%);
+  box-shadow: 0 0 34px 10px rgba(255, 210, 90, .55);
+  animation: lureCoreBlink .55s ease-in-out infinite alternate;
+}
+@keyframes lureHalo {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  18%  { opacity: 1; }
+  70%  { opacity: .85; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+}
+@keyframes lureStrahl {
+  0%   { opacity: 0; }
+  25%  { opacity: .9; }
+  60%  { opacity: .35; }
+  100% { opacity: 0; }
 }
 @keyframes lurePulse {
-  0%   { opacity: 0;   transform: scale(.35); }
-  25%  { opacity: .95; }
-  100% { opacity: 0;   transform: scale(1.45); }
+  0%   { opacity: 0;   transform: scale(.3); }
+  22%  { opacity: .95; }
+  100% { opacity: 0;   transform: scale(1.6); }
 }
 @keyframes lureCoreBlink {
-  from { opacity: .45; transform: scale(.8); }
-  to   { opacity: 1;   transform: scale(1.15); }
+  from { opacity: .5; transform: scale(.82); }
+  to   { opacity: 1;  transform: scale(1.18); }
 }
+
 
 /* ── „Memory Blast": skalierende Dunkelmagie (v1091) ────────────────
    `--mb-scale` kommt aus der Schadenshoehe. Animiert werden nur
    `opacity` und `transform`; die Groesse steckt in der Variablen, die
    VOR dem Start feststeht — kein Nachjustieren je Frame. */
+/* ★ v1175: sitzt `position: fixed` am Rechteck des ZIELS (die Komponente
+   liefert `left`/`top`) — vorher stand hier `left: 50%; top: 50%`, also
+   die Mitte der Animationsebene. */
 .dark-blast {
-  position: absolute; left: 50%; top: 50%;
+  position: fixed;
   width: 0; height: 0;
   pointer-events: none;
   z-index: 10090;
   transform: scale(var(--mb-scale, 1));
+}
+.dark-blast .dark-blast-schatten {
+  position: absolute; left: -70px; top: -70px;
+  width: 140px; height: 140px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(18,2,30,.85) 0%, rgba(40,8,70,.45) 45%, rgba(60,10,110,0) 75%);
+  filter: blur(4px); opacity: 0;
+  animation: darkBlastSchatten .85s ease-out forwards;
+}
+.dark-blast .dark-blast-ring3 { animation-delay: .3s; }
+@keyframes darkBlastSchatten {
+  0%   { opacity: 0; transform: scale(.4); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.25); }
 }
 .dark-blast .dark-blast-core {
   position: absolute; left: -26px; top: -26px;
@@ -17208,4 +17763,169 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   0%   { opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
   12%  { opacity: 1; }
   100% { opacity: 0; transform: translate(calc(-50% + var(--bx)), calc(-50% + var(--by))) rotate(var(--bdreh)); }
+}
+
+
+/* ★★ v1175 — „Memory Blast": Stoss aus negativer Energie vom Wirker zum
+   Ziel. Der Flug bewegt nur `transform`; Kopf, Schweif und Ranken
+   flackern an Ort und Stelle mit. */
+.dunkel-blast { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 10095; }
+.db-flug {
+  position: fixed; width: 0; height: 0;
+  animation-name: dbFlug; animation-timing-function: cubic-bezier(.3,.05,.5,1);
+  animation-fill-mode: forwards;
+  will-change: transform;
+}
+.db-koerper { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.db-koerper > span { position: absolute; display: block; }
+.db-schweif {
+  left: 0; top: 50%;
+  transform: translate(-100%, -50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    rgba(70,10,120,0) 0%, rgba(96,26,150,.45) 35%,
+    rgba(150,60,220,.75) 72%, rgba(214,160,255,.9) 100%);
+  filter: blur(3px);
+  animation: dbPuls .28s ease-in-out infinite alternate;
+}
+.db-kopf {
+  left: 0; top: 0; transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 42%,
+    #f0dcff 0%, #b46bff 24%, #6a1bb0 55%, rgba(30,4,50,.9) 80%, rgba(20,2,36,0) 100%);
+  box-shadow: 0 0 28px 10px rgba(150,60,230,.7), inset 0 0 18px rgba(20,0,40,.85);
+  animation: dbKopf .32s ease-in-out infinite alternate;
+}
+.db-wirbel {
+  left: 0; top: 0; transform: translate(-50%, -50%) rotate(0deg);
+  border-radius: 50%;
+  border: 2px solid rgba(196,130,255,.75);
+  border-right-color: transparent; border-bottom-color: transparent;
+  box-shadow: 0 0 16px rgba(140,50,220,.6);
+  animation: dbWirbel .7s linear infinite;
+}
+.db-ranke {
+  top: 0; border-radius: 999px; transform-origin: 100% 50%;
+  background: linear-gradient(90deg, rgba(120,40,200,0), rgba(190,120,255,.8));
+  filter: blur(1px); opacity: .85;
+  animation: dbRanke .45s ease-in-out infinite alternate;
+}
+.db-funke {
+  border-radius: 50%; background: #e7ccff;
+  box-shadow: 0 0 8px 2px rgba(170,90,255,.85);
+  animation: dbFunke .5s ease-out infinite;
+}
+.db-spur {
+  position: fixed; transform-origin: 0 50%; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(120,40,200,.05), rgba(150,70,230,.35), rgba(200,150,255,.1));
+  filter: blur(4px); opacity: 0;
+  animation-name: dbSpur; animation-timing-function: ease-out; animation-fill-mode: forwards;
+}
+@keyframes dbFlug {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(var(--ddx, 0), var(--ddy, 0)); }
+}
+@keyframes dbKopf { from { transform: translate(-50%, -50%) scale(.94); } to { transform: translate(-50%, -50%) scale(1.08); } }
+@keyframes dbPuls { from { opacity: .8; } to { opacity: 1; } }
+@keyframes dbWirbel { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes dbRanke { from { opacity: .45; transform: translateY(var(--dy, 0)) scaleX(.8); } to { opacity: .9; } }
+@keyframes dbFunke { 0% { opacity: 0; transform: scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes dbSpur { 0% { opacity: 0; } 30% { opacity: .9; } 100% { opacity: 0; } }
+
+
+/* ★★ v1177 — „MOE Shield": pinkes Herz auf jedem geschuetzten Ziel.
+   Sitzt `position: fixed` am Rechteck des Ziels; dehnt sich und wird
+   ueber eine Sekunde durchsichtig. Nur `opacity` und `transform`. */
+.moe-heart { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10092; }
+.moe-heart > * { position: absolute; left: 0; top: 0; display: block; }
+.moe-heart-main {
+  transform: translate(-50%, -50%) scale(.55);
+  opacity: 0;
+  filter: drop-shadow(0 0 16px rgba(255, 95, 180, .85));
+  animation: moeHeart 1s cubic-bezier(.2,.7,.35,1) forwards;
+}
+.moe-heart-funke {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff0f8 0%, #ff77c2 60%, rgba(216,27,120,0) 100%);
+  box-shadow: 0 0 10px 3px rgba(255, 120, 195, .8);
+  transform: translate(-50%, -50%) scale(.5); opacity: 0;
+  animation: moeHeartFunke 1s ease-out forwards;
+}
+@keyframes moeHeart {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) scale(.55); }
+  16%  { opacity: .95; transform: translate(-50%, -50%) scale(1.02); }
+  32%  { opacity: .9;  transform: translate(-50%, -50%) scale(.94); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(1.75); }
+}
+@keyframes moeHeartFunke {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--mx)), calc(-50% + var(--my))) scale(.9); }
+}
+
+
+/* ★★ v1178 — „MOE Shield": das Herz als SCHILD. Es haelt zuerst still
+   vor dem Ziel (Schutzring dreht sich), faengt den Zauber ab und dehnt
+   sich dann aus wie die kurze Fassung. */
+.moe-heart-shield .moe-heart-main {
+  animation: moeHeartShield 1.9s cubic-bezier(.2,.7,.35,1) forwards;
+}
+.moe-heart-shield .moe-heart-funke { animation-delay: .8s; }
+.moe-heart .moe-heart-ring {
+  border-radius: 50%;
+  border: 3px dashed rgba(255, 150, 210, .8);
+  box-shadow: 0 0 20px rgba(255, 110, 190, .6), inset 0 0 20px rgba(255, 140, 205, .35);
+  transform: translate(-50%, -50%) rotate(0deg) scale(.6);
+  opacity: 0;
+  animation: moeHeartRing 1.9s ease-out forwards;
+}
+@keyframes moeHeartShield {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) scale(.5); }
+  10%  { opacity: .95; transform: translate(-50%, -50%) scale(1.05); }
+  18%  { opacity: .95; transform: translate(-50%, -50%) scale(.98); }
+  55%  { opacity: .95; transform: translate(-50%, -50%) scale(1); }
+  62%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.12); }  /* Aufprall */
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(1.8); }
+}
+@keyframes moeHeartRing {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) rotate(0deg) scale(.6); }
+  12%  { opacity: .9;  transform: translate(-50%, -50%) rotate(40deg) scale(1); }
+  60%  { opacity: .9;  transform: translate(-50%, -50%) rotate(200deg) scale(1.03); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) rotate(300deg) scale(1.5); }
+}
+
+
+/* ★★ v1178 — der abgewehrte Zauber zerschellt am Herz-Schild. */
+.negate-shatter { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10094; }
+.negate-shatter > span { position: absolute; left: 0; top: 0; display: block; }
+.ns-blitz {
+  transform: translate(-50%, -50%) scale(.5); border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.9) 0%, rgba(255,190,235,.5) 40%, rgba(255,120,200,0) 72%);
+  opacity: 0; animation: nsBlitz .5s ease-out forwards;
+}
+.ns-ring {
+  transform: translate(-50%, -50%) scale(.4); border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.9);
+  box-shadow: 0 0 18px rgba(255,150,215,.8);
+  opacity: 0; animation: nsRing .7s ease-out forwards;
+}
+.ns-scherbe {
+  transform: translate(-50%, -50%) rotate(0deg); border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,140,210,.2));
+  opacity: 0; animation: nsScherbe .8s cubic-bezier(.25,.6,.5,1) forwards;
+}
+@keyframes nsBlitz { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); } }
+@keyframes nsRing { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } }
+@keyframes nsScherbe {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--nx)), calc(-50% + var(--ny))) rotate(var(--ndreh)); }
+}
+
+/* ★★ v1200: Kreatur auf fremder Brettseite, die dauerhaft mir gehoert
+   („Foreign Ground"). Ruhiges Pulsen, damit der Ring auffaellt, ohne
+   das Brett unruhig zu machen. */
+@keyframes pp-crossside-pulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.22); }
 }

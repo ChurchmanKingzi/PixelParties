@@ -82,6 +82,13 @@ async function sleepCreature(engine, inst, ownerPi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'unwanted_audience_zzz' }, impactMs: 260,
+  },
+
   // CPU: confirm Unwanted Audience's "play it?" prompt — the default brain
   // declines cancellable confirms outside a card-cast (onTurnStart trigger),
   // so without this the CPU never plays this disruption. (Title == card name.)

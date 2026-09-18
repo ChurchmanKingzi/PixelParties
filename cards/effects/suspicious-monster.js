@@ -66,6 +66,13 @@ function sacrificeableSlots(engine, pi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'knife_sacrifice' }, impactMs: 260,
+  },
+
   creatureEffect: true,
   requiresTarget: true, // Part 2 picks a damage target (Blinded gating).
 
@@ -82,6 +89,12 @@ module.exports = {
   // sacrificeable Creature (the destination slot is the sacrificed
   // Creature's, so the host is this same Hero) — and `sacrificeableSlots`
   // already excludes Heroes that can't summon Suspicious Monster.
+  // ★ v1167: Die Ersetzung KOSTET ein Opfer — das ist eine Handlung des
+  // Helden. Ein eingefrorener, betaeubter oder negierter Held darf sie
+  // deshalb NICHT ausfuehren (der Zonen-Bypass allein waere sonst ein
+  // Freibrief, siehe `heroParalyzed` in der Engine).
+  requiresActiveCaster: true,
+
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
     return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx);
   },

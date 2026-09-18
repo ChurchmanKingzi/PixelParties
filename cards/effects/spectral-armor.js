@@ -48,6 +48,13 @@
 const CARD_NAME = 'Spectral Armor';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'spectral_armor' }, impactMs: 260,
+  },
+
   // Cards.json subtype 'Reaction' + engine validateActionPlay's
   // reaction-subtype filter block proactive Main-Phase casts.
   canActivate: () => false,

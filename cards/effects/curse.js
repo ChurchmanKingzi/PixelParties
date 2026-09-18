@@ -127,6 +127,13 @@ function _countCursesOnHero(engine, ownerIdx, heroIdx, excludeInstId = null) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'dark_swarm' }, impactMs: 260,
+  },
+
   // ★ v1112 (Als Vorgabe 15.9.): „Wird im Puzzle Mode einem Hero
   // [ein Anhaengsel] in die Support Zone getan, soll er automatisch
   // das Puzzle [mit dem Effekt] beginnen. Dasselbe gilt fuer ALLE

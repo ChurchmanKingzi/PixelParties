@@ -104,6 +104,12 @@ function collectRemovableAbilities(engine, playerIdx) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'forgetting_question_mark' }, impactMs: 260 },
+
   // KEIN `inherentAction` (Als Befund 12.9.): der Kartentext nennt keine
   // Zusatzaktion, also kostet der Spell die Aktion des Zuges wie jeder
   // andere (Regelwerk: Attacks/Spells/Creatures kosten die eine Aktion).

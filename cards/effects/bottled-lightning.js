@@ -59,6 +59,19 @@ module.exports = {
       selectedTargets,
     );
 
+    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. Die Potion-Fassung
+    // von Chain Lightning hatte beides nicht — EINE Quelle ueber die
+    // ganze Kette ist aber genau der geschuetzte Fall (Als Beispiel
+    // 12.9.). Die Kette springt weiter nacheinander.
+    await engine.beginAoeStrike(selectedTargets.length, {
+      creatures: selectedTargets
+        .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
+        .filter(k => k.inst),
+      source: { name: 'Bottled Lightning', owner: pi },
+      type: 'potion', sourceOwner: pi,
+    });
+    try {
+
     // Chain lightning animation + damage
     let prevOwner = selectedTargets[0].owner;
     let prevHeroIdx = selectedTargets[0].heroIdx;
@@ -100,6 +113,9 @@ module.exports = {
       prevOwner = tgt.owner;
       prevHeroIdx = tgt.heroIdx;
       prevZoneSlot = tgtZoneSlot;
+    }
+    } finally {
+      engine.endMultiHit();
     }
 
     return true;

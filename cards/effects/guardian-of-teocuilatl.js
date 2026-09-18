@@ -65,6 +65,12 @@ module.exports = {
   // Playable on a full-zoned Hero while THAT Hero owns a sacrificeable
   // Creature — the destination slot is the sacrificed Creature's own, so
   // the sacrifice frees exactly the room Guardian needs.
+  // ★ v1167: Die Ersetzung KOSTET ein Opfer — das ist eine Handlung des
+  // Helden. Ein eingefrorener, betaeubter oder negierter Held darf sie
+  // deshalb NICHT ausfuehren (der Zonen-Bypass allein waere sonst ein
+  // Freibrief, siehe `heroParalyzed` in der Engine).
+  requiresActiveCaster: true,
+
   canBypassFreeZoneRequirement(gs, pi, heroIdx, cardData, engine) {
     return sacrificeableSlots(engine, pi).some(s => s.heroIdx === heroIdx);
   },

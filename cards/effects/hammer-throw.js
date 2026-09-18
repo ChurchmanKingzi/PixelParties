@@ -14,6 +14,15 @@
 // ═══════════════════════════════════════════
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (siehe CARD_API): bei einer
+  // Negation spielt die Engine diese Bilder, damit der abgewehrte
+  // Zauber sichtbar bleibt.
+  spellVisual: {
+    projectile: { emoji: '🔨', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'quick_slash' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   hooks: {

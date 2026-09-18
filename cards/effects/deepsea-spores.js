@@ -32,6 +32,13 @@ const CARD_NAME = 'Deepsea Spores';
 const TURN_START_EVENT = 'The turn has just started';
 
 module.exports = {
+  // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
+  // Autoerkennung des Loaders haengt an der Schadensklammer —
+  // diese Karte teilt keinen Schaden aus (behandelt ALLE Kreaturen des Bretts als „Deepsea“), waere
+  // also fuer Engine und CPU-Pilot keine AoE-Karte gewesen.
+  // Deshalb von Hand deklariert (Waechter `check-aoe-text`).
+  hitsMultipleTargets: true,
+
   isReaction: true,
   proactivePlay: true,
   inherentAction: true,

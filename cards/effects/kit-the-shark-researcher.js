@@ -372,7 +372,15 @@ async function _runModeB(engine, pi, oppPi, kitHeroIdx) {
   // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
   // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
   // Einzeltreffer und der Schutz greift korrekt nicht.
-  engine.beginMultiHit(picked.length);
+  // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+  // Anti-AoE-Fenster (Deepsea Idol).
+  await engine.beginAoeStrike(picked.length, {
+    creatures: picked
+      .map(id => tgts.find(x => x.id === id))
+      .filter(t => t && t.type !== 'hero')
+      .map(t => t.cardInstance).filter(Boolean),
+    source, amount: MODE_B_DAMAGE, type: 'other', sourceOwner: pi,
+  });
   try {
     for (const id of picked) {
       const t = tgts.find(x => x.id === id);

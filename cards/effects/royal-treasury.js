@@ -29,6 +29,13 @@ const MAX_USES_PER_TURN = 3;
 const BONUS = { 1: 4, 2: 6, 3: 8 };
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'gold_sparkle' }, impactMs: 260,
+  },
+
   activeIn: ['hand', 'support'],
   chargesPerTurn: MAX_USES_PER_TURN,
   chargeKey: USE_KEY,

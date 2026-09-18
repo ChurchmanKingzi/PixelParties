@@ -30,6 +30,13 @@ const EXPLOSION_DAMAGE = 100;
 const MAX_TARGETS = 3;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   hooks: {
     onPlay: async (ctx) => {
       const engine = ctx._engine;
@@ -87,6 +94,21 @@ module.exports = {
       // ── 100 damage per target ──
       // Reaction / surprise windows already ran inside
       // promptMultiTarget, so skip them here.
+      // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. Beides fehlte —
+      // „bis zu 3 Ziele, 100 Schaden auf jedes" ist ein Schlag auf
+      // mehrere Ziele, also sowohl „Interference"- als auch
+      // „Deepsea Idol"-Gebiet. Die Ziele stehen schon fest, deshalb
+      // wird die Instanzliste hier einmal aufgeloest und danach
+      // wiederverwendet.
+      const aufloesen = (t) => t.cardInstance
+        || engine.cardInstances.find(c =>
+          (c.owner === t.owner || c.controller === t.owner)
+          && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+      await engine.beginAoeStrike(targets.length, {
+        creatures: targets.filter(t => t.type !== 'hero').map(aufloesen).filter(Boolean),
+        source, amount: EXPLOSION_DAMAGE, type: 'destruction_spell', sourceOwner: pi,
+      });
+      try {
       for (const t of targets) {
         if (t.type === 'hero') {
           const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
@@ -95,15 +117,15 @@ module.exports = {
             _skipReactionCheck: true,
           });
         } else {
-          const inst = t.cardInstance
-            || engine.cardInstances.find(c =>
-              (c.owner === t.owner || c.controller === t.owner)
-              && c.zone === 'support' && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx);
+          const inst = aufloesen(t);
           if (!inst) continue;
           await engine.actionDealCreatureDamage(source, inst, EXPLOSION_DAMAGE, 'destruction_spell', {
             sourceOwner: pi, _skipReactionCheck: true,
           });
         }
+      }
+      } finally {
+        engine.endMultiHit();
       }
 
       engine.log('explosion', {

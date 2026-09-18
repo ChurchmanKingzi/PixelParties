@@ -23,6 +23,13 @@ const CARD_NAME = 'Guardian Beast Hou';
 const DAMAGE_PER_HIT = 50;
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'explosion' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Tagged for Blinded gating — see cards/effects/_hooks.js (blinded status).
   activeIn: ['support'],
@@ -115,7 +122,15 @@ module.exports = {
     // Ziele — das ist ein Flaechenschlag. Die Klammer nimmt die ECHTE
     // gewaehlte Zielmenge; bei einem einzigen Ziel bleibt es ein
     // Einzeltreffer und der Schutz greift korrekt nicht.
-    engine.beginMultiHit(tgtIds.length);
+    // ★★ v1185: Klammer meldet zusaetzlich die Kreaturen an das
+    // Anti-AoE-Fenster (Deepsea Idol).
+    await engine.beginAoeStrike(tgtIds.length, {
+      creatures: tgtIds
+        .map(id => refreshedTargets.find(t => t.id === id))
+        .filter(t => t && t.type !== 'hero')
+        .map(t => t.cardInstance).filter(Boolean),
+      source, amount: DAMAGE_PER_HIT, type: 'creature', sourceOwner: pi,
+    });
     try {
       for (const id of tgtIds) {
         const tgt = refreshedTargets.find(t => t.id === id);

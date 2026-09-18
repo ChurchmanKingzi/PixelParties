@@ -47,6 +47,12 @@ function hostOpts(gs, pi) {
 }
 
 module.exports = {
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'silence_seal' }, impactMs: 260 },
+
   requiresTarget: true,
   activeIn: ['hand', 'support'],
 
@@ -87,7 +93,10 @@ module.exports = {
     // ist die lauschende) — verliess irgendeine Karte irgendeine Zone,
     // nahm Decisive Defeat die Negierung zurueck. Heilen raeumt die Karte
     // weiterhin ueber ihren `attach:`-Eintrag ab (`countsAsNegativeStatus`).
-    ...anhaengselStatusHooks(CARD_NAME, 'negated'),
+    // ★ v1168: Wird die Negierung GEHEILT, faellt die Karte in die Ablage
+    // ihres urspruenglichen Besitzers (mit Flug) — Als allgemeine Regel
+    // fuer anhaengsel-zugefuegte Status.
+    ...anhaengselStatusHooks(CARD_NAME, 'negated', { heilenWirftAb: true }),
 
     onPlay: async (ctx) => {
       if (ctx.cardZone !== 'hand') return;

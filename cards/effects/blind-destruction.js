@@ -74,6 +74,13 @@ function betroffeneHelden(engine, casterPi, casterHeroIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'flame_jet' }, impactMs: 260,
+  },
+
   cpuMeta: {
     dealsDamage: true,
     // Trifft auch die EIGENEN Helden — der Pilot soll das einpreisen.
@@ -161,6 +168,12 @@ module.exports = {
       // alle, ohne Pause dazwischen.
       await engine._delay(420);
 
+      // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Der Zauber
+      // ist ausdruecklich EIN Schlag (siehe Kommentar oben), traf aber
+      // ohne Klammer — der Schutz griff nie. Kreaturen trifft er nicht,
+      // das Anti-AoE-Fenster bleibt deshalb aussen vor.
+      engine.beginMultiHit(treffer.length);
+      try {
       for (const eintrag of treffer) {
         const hero = gs.players[eintrag.pi]?.heroes?.[eintrag.heroIdx];
         if (!hero?.name || hero.hp <= 0) continue;
@@ -168,6 +181,9 @@ module.exports = {
           { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx, controller: pi },
           hero, DAMAGE_JE_ARTEFAKT * eintrag.gefallen, 'destruction_spell',
         );
+      }
+      } finally {
+        engine.endMultiHit();
       }
       await engine._delay(240);
 

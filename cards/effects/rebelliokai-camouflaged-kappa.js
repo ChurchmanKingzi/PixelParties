@@ -43,6 +43,13 @@ const { DISCARD_SOURCE_TAG } = require('./_rebelliokai-shared');
 const CARD_NAME = 'Rebelliokai Camouflaged Kappa';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'knife_sacrifice' }, impactMs: 260,
+  },
+
   selfDeleteOnExternalDiscard: true,
   activeIn: ['support'],
   creatureEffect: true,

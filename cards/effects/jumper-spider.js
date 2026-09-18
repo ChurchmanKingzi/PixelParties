@@ -59,6 +59,13 @@ function getFreeSupportZones(gs, pi) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'gold_sparkle' }, impactMs: 260,
+  },
+
   isSurprise: true,
   // Active in 'surprise' for the trigger pre-flip and in 'support'
   // after the auto-placement. The onTurnStart hook needs to fire

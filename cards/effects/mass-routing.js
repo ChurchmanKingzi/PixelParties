@@ -113,6 +113,19 @@ async function insDeck(engine, inst, maxLevel) {
 }
 
 module.exports = {
+  // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
+  // Autoerkennung des Loaders haengt an der Schadensklammer —
+  // diese Karte teilt keinen Schaden aus (mischt ALLE passenden Kreaturen zurueck), waere
+  // also fuer Engine und CPU-Pilot keine AoE-Karte gewesen.
+  // Deshalb von Hand deklariert (Waechter `check-aoe-text`).
+  hitsMultipleTargets: true,
+
+  // ★★ v1181 — ENTKOPPELTE ZAUBERBILDER (Al 17.9.): Wird der Zauber
+  // NEGIERT, laeuft sein Effekt-Rumpf nie — die Engine spielt dann diese
+  // Bilder, damit der abgewehrte Zauber trotzdem zu sehen ist. Im
+  // normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: { impact: { type: 'deep_sea_bubbles' }, impactMs: 260 },
+
   requiresTarget: false,
 
   hooks: {

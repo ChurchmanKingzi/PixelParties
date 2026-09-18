@@ -73,6 +73,19 @@ function alleKreaturen(engine) {
 }
 
 module.exports = {
+  // ★★ v1187: AoE OHNE SCHADEN — die Karte ZERSTOERT alle Kreaturen,
+  // sie teilt keinen Flaechenschaden aus. Die Autoerkennung haengt an
+  // der Schadensklammer und haette sie nicht gesehen; die
+  // Zerstoerungsklammer `beginDestroyScope` ist ein anderer Vertrag.
+  hitsMultipleTargets: true,
+
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'skull_detonation' }, impactMs: 260,
+  },
+
   activeIn: ['support'],
 
   // ── „You may once per turn defeat this Creature." ────────────────

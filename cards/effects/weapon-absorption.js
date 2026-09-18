@@ -166,6 +166,13 @@ function targetsFor(engine, pi, heroIdx) {
 }
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'weapon_absorption' }, impactMs: 260,
+  },
+
   // Reaction-Subtype: nie proaktiv in der Main Phase spielbar.
   canActivate: () => false,
   neverPlayable: true,

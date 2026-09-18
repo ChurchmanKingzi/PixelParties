@@ -43,6 +43,15 @@
 const CARD_NAME = 'Trunk Sand';
 
 module.exports = {
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    projectile: { projectileShape: 'sand', duration: 520 },
+    stagger: 110, flightMs: 330,
+    impact: { type: 'sand_burst' }, impactMs: 260,
+  },
+
   requiresTarget: true,
   // ^ Fuer das Blinded-Gate — siehe cards/effects/_hooks.js.
 

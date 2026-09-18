@@ -58,6 +58,20 @@ function zieleDesGegners(engine, oi) {
 }
 
 module.exports = {
+  // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
+  // Autoerkennung des Loaders haengt an der Schadensklammer —
+  // diese Karte teilt keinen Schaden aus (Freeze auf ALLE gegnerischen Ziele), waere
+  // also fuer Engine und CPU-Pilot keine AoE-Karte gewesen.
+  // Deshalb von Hand deklariert (Waechter `check-aoe-text`).
+  hitsMultipleTargets: true,
+
+  // ★★ v1182 — ENTKOPPELTE BILDER (CARD_API): wird die Karte NEGIERT,
+  // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
+  // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
+  spellVisual: {
+    impact: { type: 'ice_encase' }, impactMs: 260,
+  },
+
   requiresTarget: false,
 
   // Die CPU nimmt die starke Fassung, wenn sie sie wirken kann — zwei
