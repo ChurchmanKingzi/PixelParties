@@ -168,6 +168,18 @@ window.ppLayoutXY = ppLayoutXY;
 // Touch-Ursprung unterscheiden muessen, ohne sich auf `pointerType` zu
 // verlassen (Safari liefert `contextmenu` ohne).
 window._touchActive = false;
+// ★ v1257 — DIE Telefon-Erkennung, an EINER Stelle. Dieselbe Schwelle
+// wie der Lite-Modus und der Vorlader-Stopp (grober Zeiger + flaches
+// Querformat). JS-Verbraucher: Mobile-Kamera, Suchfeld-Verzicht in den
+// Galerien, Drossel der Brett-Messschleife, Overlay-Leisten-Messung.
+// (Der Massstab-Floor in app-board.jsx nutzt bewusst die breitere alte
+// Schwelle des Zonen-Minimums: coarse + max-width 1024.)
+window.ppIsPhone = () => {
+  try {
+    return !!(window.matchMedia
+      && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches);
+  } catch { return false; }
+};
 let _touchStartPt = null;
 // Capture-Phase, also VOR Reacts Handlern: damit gilt `_isTouchDevice`
 // schon bei der allerersten Beruehrung (der alte Fenster-Listener kam
@@ -281,6 +293,11 @@ function _getSfxCtx() {
   try { _sfxCtx = new AC(); } catch { return null; }
   return _sfxCtx;
 }
+// ★ v1257: auch dem BGM-Looper in app-main zugaenglich — Browser
+// deckeln die Zahl der AudioContexte je Seite, darum teilen sich
+// SFX und Musik denselben. Querbezuege laufen hier ueber window.*
+// (Konvention, siehe build.js-Kopf), nicht ueber nackte Globals.
+window._ppSfxCtxHolen = _getSfxCtx;
 
 // Fetch the bytes now; decoding is deferred until the AudioContext exists
 // (first user gesture), so no browsers emit the "AudioContext was not
@@ -3039,6 +3056,11 @@ function spawnZoneLandFx(el, opts) {
   }
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return;                       // nicht gezeichnet
+  // ★ v1257: Mobile-Kamera VOR dem Off-Screen-Abbruch — genau der Fall
+  // „Gegner trifft eine Zone ausserhalb des Ausschnitts" soll die Sicht
+  // ja dorthin holen. Der Funken dieses einen Einschlags entfaellt dann
+  // zwar (Abbruch unten), aber die Zone steht fuer alles Weitere im Bild.
+  if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
   if (r.bottom < 0 || r.right < 0
       || r.top > window.innerHeight || r.left > window.innerWidth) return;   // ausserhalb des Bildes
 

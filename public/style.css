@@ -14156,9 +14156,17 @@ body:has(.textbox-overlay) .tooltip {
   .screen-full, .screen-center { display: none !important; }
 }
 
-/* Touch-friendly: ensure minimum tap targets at small scales */
+/* Touch-friendly: ensure minimum tap targets at small scales.
+   ★ v1257: Das Zonen-Mindestmass (40x56) ist RAUS. Es liess die Zonen
+   wachsen, waehrend die Karten darin stur 64x90 x --board-scale blieben
+   (Floor 0.45 → ~29x41) — Als Befund 19.9.: „Karten deutlich kleiner
+   als die Zonen". Dieselbe Trefferflaeche liefert jetzt der Massstab-
+   Floor in updateScale (app-board.jsx): auf groben Zeigern 0.59 statt
+   0.45, denn 68 x 0.59 = 40 und 95 x 0.59 = 56 — exakt das alte Minimum,
+   nur dass Karten, Zonen, Extra-Zonen und Abstaende GEMEINSAM wachsen.
+   Das Brett wird dadurch groesser als der Schirm und scrollt — gewollt,
+   siehe Kamera-Modul und Overlay-Leisten. */
 @media (max-width: 1024px) and (pointer: coarse) {
-  .board-zone { min-width: 40px; min-height: 56px; }
   .board-phase-item { min-height: 28px; min-width: 44px; }
   .phase-btn { min-height: 32px; }
 }
@@ -14885,10 +14893,12 @@ body:has(.textbox-overlay) .tooltip {
 
 /* ═══ Battle board mobile ═══ */
 @media (max-height: 500px) {
-  /* ★ v1234: Auf dem Telefon bleibt die Hand im alten, kompakten Maß.
-     Die Vergrößerung ist ein Ausgleich zur perspektivischen Lupe des
-     Bretts — und genau die schaltet dieser Block gleich mit ab. */
-  :root { --hand-card-scale: 1; }
+  /* ★ v1234 setzte die Hand hier auf Mass 1 (Ausgleich zur abgeschalteten
+     3D-Lupe). ★ v1257 (Als Vorgabe 19.9.): „Handkarten getrost 60%
+     groesser". Bezugsgroesse war 64px x 0.45 (alter Floor) x 1 ≈ 29px;
+     Ziel also ≈ 46px. Der Massstab-Floor steigt in derselben Welle auf
+     0.59, darum reicht hier 1.22: 64 x 0.59 x 1.22 ≈ 46px. */
+  :root { --hand-card-scale: 1.22; }
   /* Compact opponent hand */
   .game-hand-opp {
     min-height: 40px !important;
@@ -14928,20 +14938,88 @@ body:has(.textbox-overlay) .tooltip {
   }
   .game-hand-me .orbit-font { font-size: 11px !important; }
 
-  /* Make BOARD-CENTER scroll, not the whole game-board — sidebars stay fixed */
+  /* Make BOARD-CENTER scroll, not the whole game-board — sidebars stay fixed.
+     ★ v1257: `overflow-x` von hidden auf auto — mit dem Massstab-Floor
+     0.59 ist das Feld breiter als der Schirm, waagerechtes Wischen (und
+     die Kamera) brauchen die Achse. */
   .game-board {
     overflow: hidden !important;
   }
   .board-center {
     min-height: 0 !important;
     overflow-y: auto !important;
-    overflow-x: hidden !important;
+    overflow-x: auto !important;
+    /* ★ v1257 — OVERLAY-LEISTEN (Als Vorgabe 19.9.): Kopfzeile und beide
+       Handzeilen liegen jetzt HALBTRANSPARENT UEBER dem Feld (unten).
+       Dieses Polster ist der Ausgleich: der Feldinhalt kann vollstaendig
+       unter den Leisten hervorgescrollt werden, nichts ist abgeschnitten.
+       Die --mob-*-Hoehen misst app-board.jsx zur Laufzeit (ResizeObserver
+       auf den drei Leisten), die Fallbacks decken den ersten Frame. */
+    padding-top: calc(var(--mob-topbar-h, 22px) + var(--mob-opphand-h, 44px) + 4px) !important;
+    padding-bottom: calc(var(--mob-mehand-h, 64px) + 4px) !important;
   }
   /* Player sides: natural height so board-center scrolls */
   .board-player-side {
     flex: none !important;
     min-height: auto !important;
     justify-content: flex-start !important;
+  }
+  /* ★ v1257: Auch Ebene und Huelle auf Inhaltshoehe — sonst blieben sie
+     als flex:1-Kinder auf Viewporthoehe stehen, und alles, was mit
+     Prozenten an der Huelle haengt (Atmosphaeren-Overlays inset:0, die
+     Permanents-Spalten bei top/bottom 52%), waere am sichtbaren
+     Ausschnitt verankert statt am FELD. Genau das war der Grund, warum
+     das eigene Elixir of Immortality beim Scrollen auf der Gegnerseite
+     lag. Die Spalten selbst sind dafuer in app-board.jsx in die Huelle
+     (`.board-plane-clip`) umgezogen. */
+  .board-plane-clip { flex: 0 0 auto !important; min-height: auto !important; }
+  .board-plane { flex: 0 0 auto !important; will-change: auto; }
+
+  /* ★ v1257 — DIE LEISTEN ALS HALBTRANSPARENTE OVERLAYS ──────────────
+     Kopfzeile und Handzeilen verlassen den Fluss und legen sich ueber
+     das Feld; ihre Flaechen werden durchscheinend, damit darunter so
+     viel Spielfeld wie moeglich erkennbar bleibt. Das Feld selbst
+     bekommt die volle Hoehe (`.game-board` inset 0) plus das
+     Scroll-Polster oben. */
+  .screen-full:has(> .game-layout) { position: relative; }
+  .screen-full:has(> .game-layout) > .top-bar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 460;
+    background: rgba(12, 12, 20, .55) !important;
+  }
+  .game-layout { position: relative; }
+  .game-board { position: absolute !important; inset: 0 !important; }
+  .game-hand-opp {
+    position: absolute; top: var(--mob-topbar-h, 22px); left: 0; right: 0;
+    z-index: 450;
+    background: rgba(12, 12, 20, .55) !important;
+  }
+  .game-hand-me {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(12, 12, 20, .55) !important;
+  }
+  /* Der Bloom der Handzeilen (Screen-Blending) leuchtet auf der jetzt
+     durchsichtigen Flaeche zu stark — leiser drehen, Puls aus. */
+  .game-hand .hand-bloom { opacity: .3; animation: none; }
+
+  /* ★ v1257 — LOG/CHAT-SPALTE ALS OVERLAY (Als Vorgabe 19.9.):
+     ausgeklappt volle Schirmhoehe und UEBER allem anderen; eingeklappt
+     nur eine schmale Lasche am rechten Rand in der Mitte, damit die
+     Stapel-Spalte darunter bedienbar bleibt. Absolut = raus aus dem
+     Flex-Fluss, das Brett bekommt die volle Breite. */
+  .chat-log-column {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    z-index: 10500;
+    width: min(340px, 60vw);
+    background: rgba(8, 8, 14, .97);
+  }
+  .chat-log-column.chat-log-collapsed {
+    top: 50%; bottom: auto;
+    transform: translateY(-50%);
+    height: 132px;
+    width: 26px !important; min-width: 26px;
+    z-index: 455;
+    background: rgba(8, 8, 14, .8);
+    border-radius: 6px 0 0 6px;
   }
 
   /* Separate player halves */
@@ -14961,7 +15039,12 @@ body:has(.textbox-overlay) .tooltip {
   .board-area-zones-center .board-zone {
     position: absolute !important;
     top: 0 !important;
-    transform: translateY(-50%) translateX(calc(var(--spacer-w) * 1.15)) !important;
+    /* ★ v1257: das zusaetzliche `translateX(--spacer-w * 1.15)` ist RAUS.
+       Es stammt aus der Zeit vor v1238/v1239 — seitdem rechnet die
+       JS-Messung die Position in Layout-Koordinaten inkl. Versatz, und
+       der Extra-Schub verdoppelte ihn: die Zonen sassen auf Mobile um
+       mehr als eine Zonenbreite zu weit rechts (Als Befund 19.9.). */
+    transform: translateY(-50%) !important;
     pointer-events: auto !important;
   }
 
@@ -15071,9 +15154,16 @@ body:has(.textbox-overlay) .tooltip {
   .board-tooltip {
     width: 240px !important;
     font-size: 11px !important;
+    /* ★ v1257: unterhalb der Overlay-Kopfzeile beginnen, nicht darunter
+       verschwinden. Scrollbar ist der Tooltip ohnehin (overflow-y: auto
+       + pointer-events: auto auf groben Zeigern). */
+    top: var(--mob-topbar-h, 22px) !important;
   }
-  /* Hide text info under card image — image only */
-  .board-tooltip > div:last-child { display: none !important; }
+  /* ★ v1257 (Als Vorgabe 19.9.): die Textinfo — aktuelle Stats und
+     Effekttext — wird NICHT mehr ausgeblendet. Der On-Klick-Tooltip
+     zeigt damit dasselbe wie der On-Hover-Tooltip am Desktop; wird der
+     Inhalt hoeher als der Schirm, scrollt der Tooltip. (Die alte Regel
+     `.board-tooltip > div:last-child { display: none }` ist RAUS.) */
   .board-tooltip img { max-width: 100%; }
   .board-tooltip-token { display: none !important; }
 
@@ -15376,12 +15466,21 @@ body:has(.textbox-overlay) .tooltip {
    erst ab drei Flying Islands; davor schnitt er den linken Rand des
    Bretts ab. */
 
-/* ── Mobile: collapse chat-log-column by default (JS-controlled) ── */
-@media (max-width: 900px) {
-  .board-player-side, .board-mid-row { transform: none !important; }
-  .game-hand-me .game-hand-info { position: static; transform: none; }
-  .game-hand-cards { margin-left: 0 !important; }
-}
+/* ── ENTFERNT (v1257): der alte „Mobile"-Block von vor der Telefon-Welle ──
+   Hier standen drei Regeln fuer `max-width: 900px`, alle drei falsch
+   geworden:
+   1. `.game-hand-cards { margin-left: 0 !important }` — nahm der Hand
+      NUR den linken 180px-Symmetrierand, der rechte blieb. Beide Haende
+      sassen dadurch deutlich links der Mitte (Als Befund 19.9.).
+   2. `.game-hand-me .game-hand-info { position: static }` — holte die
+      Spielerinfo zurueck in den Fluss und schob die Karten zusaetzlich.
+   3. `.board-player-side, .board-mid-row { transform: none !important }`
+      — schaltete die `--center-offset`-Transforms ab, WAEHREND die
+      Korrekturschleife in app-board.jsx weiter misst und nachlegt.
+      Ohne sichtbare Bewegung konvergiert sie nie: der Offset wuchs auf
+      Telefonen mit jedem Render weiter und zog die per JS positionierten
+      Area-Zonen (die den Offset addieren) immer weiter nach rechts.
+   Telefone benutzen jetzt dieselbe Zentrierung wie der Desktop. */
 
 /* ── Sidebar collapsed state ── */
 .chat-log-column.chat-log-collapsed {
@@ -17641,6 +17740,23 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .menu-daily-btn.is-available { animation: none; box-shadow: 0 0 10px rgba(255,215,0,.6); border-color: #ffd700; }
   /* Knopf-Glimmen im Hauptmenue nicht pulsieren lassen */
   .menu-buttons .btn { transition: none; }
+
+  /* ── BATTLE-LITE (v1257) ─────────────────────────────────────────
+     Dauerlaeufer im Kampf, die auf dem Telefon Bildrate kosten:
+     1. `box-shadow`-Pulse — box-shadow kann der Compositor nicht,
+        jeder Frame ist ein Neuzeichnen (dieselbe Lehre wie beim
+        DAILY-Glimmen oben). Die Klassen tragen ihren Schein statisch,
+        nur die Puls-ANIMATION faellt weg.
+     2. Die Partikelwolken der Handzeilen (2 x 80 Motes) und des Bretts
+        laufen mit je zwei animierten Eigenschaften plus Leuchtschatten
+        — gedeckelt wie die Menue-Partikel. */
+  .board-permanent-slot, .board-coolness-slot { animation: none; }
+  .board-coolness-slot.coolness-playable { animation: none !important; }
+  .zone-permanent-activatable { animation: none !important; }
+  .perm-tohand-badge { animation: none; }
+  .hand-mote { box-shadow: none; }
+  .hand-mote:nth-child(n+17) { display: none; }
+  .board-mote:nth-child(n+25) { display: none; }
 }
 
 /* ── Alliance (v870) ────────────────────────────────────────────────

@@ -1875,10 +1875,225 @@ function _bgmEndungsKaskade(el, rest) {
     try { el.load(); } catch {}
   };
 }
+// ═══ GAPLESS-LOOPER (v1257, Als Befund 19.9.) ═══════════════════════
+// „Die Musik loopt nicht richtig — bei jedem Loop ist eine merkliche
+// kleine Pause." Ursache ist die Abspieltechnik, nicht die Dateien:
+// HTMLAudioElement mit `loop = true` loopt in Browsern grundsaetzlich
+// NICHT luecken­los (bei MP3 kommt Encoder-Padding dazu), auf Mobile
+// noch auffaelliger. Sample-genau loopt nur Web Audio: der Track wird
+// als AudioBuffer dekodiert und von einem AudioBufferSourceNode mit
+// `loop = true` gespielt — der Uebergang Ende→Anfang ist dann exakt
+// ein Sample lang.
+//
+// BAUFORM: eine FASSADE, die die Teilmenge der Element-API nachbildet,
+// die MusicManager, Ducking, Lautstaerkeregler, Battle-Theme-Resolver
+// und Endungs-Kaskade tatsaechlich benutzen (play/pause/paused/volume/
+// currentTime/src/load/onerror/loop/preload). Dadurch bleibt der GANZE
+// bestehende Abspielcode unangetastet — nur `_mkBgm` liefert statt
+// eines <audio>-Elements diese Klasse. Ohne AudioContext (uralte
+// Browser) faellt `_mkBgm` aufs Element zurueck, Verhalten wie bisher.
+//
+// NEBENGEWINNE:
+//   • Lautstaerke laeuft ueber einen GainNode — funktioniert damit auch
+//     auf iOS (Safari ignoriert `audio.volume`; offener Punkt vom 9.9.).
+//   • KEIN `preload='auto'` mehr: vorher luden 13 Audio-Elemente beim
+//     Seitenaufruf; jetzt wird ein Track erst bei seinem ersten play()
+//     geholt und dekodiert (Bandbreite! Render-Limit!). Die ~0,2-0,8 s
+//     bis zum ersten Ton verdeckt die ohnehin laufende Einblendung.
+//
+// SPEICHER: dekodiertes PCM ist gross (~350 kB je Sekunde Stereo).
+// Deshalb behaelt jede Instanz nur IHREN aktuellen Buffer, und beim
+// Start eines Tracks werden die Buffer aller PAUSIERTEN Geschwister
+// freigegeben (die URL bleibt; ein spaeterer play() holt die Datei aus
+// dem HTTP-Cache und dekodiert neu). Es leben also hoechstens die zwei,
+// drei Buffer einer laufenden Ueberblendung gleichzeitig.
+let _bgmEigenerCtx = null;
+function _bgmCtxHolen() {
+  // Bevorzugt den SFX-Kontext aus app-shared (window-API, dort
+  // freigegeben) — Browser deckeln die Zahl der AudioContexte je Seite.
+  try {
+    if (typeof window._ppSfxCtxHolen === 'function') {
+      const c = window._ppSfxCtxHolen();
+      if (c) return c;
+    }
+  } catch {}
+  if (_bgmEigenerCtx) return _bgmEigenerCtx;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try { _bgmEigenerCtx = new AC(); } catch { return null; }
+  return _bgmEigenerCtx;
+}
+class GaplessBgm {
+  constructor(url) {
+    this._url = url || '';
+    this.loop = true;
+    this.preload = 'none';   // rein dekorativ — geladen wird bei play()/load()
+    this.onerror = null;
+    this._vol = 0.4;
+    this._gain = null;
+    this._buf = null;        // dekodierter AudioBuffer der AKTUELLEN src
+    this._bufUrl = null;     // fuer welche URL _buf/_loadP gelten
+    this._loadP = null;      // laufender Fetch+Decode
+    this._node = null;       // spielender AudioBufferSourceNode
+    this._nodeBuf = null;    // welcher Buffer gerade im Node liegt
+    this._paused = true;
+    this._offset = 0;        // Abspielposition in Sekunden (bei Pause eingefroren)
+    this._startedAt = 0;     // ctx.currentTime des letzten Starts
+    this._seq = 0;           // Ueberhol-Riegel fuer play()/pause()-Ketten
+    GaplessBgm._alle.push(this);
+  }
+  get src() { return this._url; }
+  set src(u) {
+    if (u === this._url) return;
+    this._url = u;
+    // Wie beim Element: src-Wechsel stoppt die Wiedergabe; der Aufrufer
+    // ruft danach load()/play() (Battle-Resolver, Endungs-Kaskade).
+    this._seq++;
+    this._stopNode();
+    this._buf = null; this._bufUrl = null; this._loadP = null;
+    this._offset = 0;
+    this._paused = true;
+  }
+  get paused() { return this._paused; }
+  get volume() { return this._vol; }
+  set volume(v) {
+    this._vol = Math.max(0, Math.min(1, Number(v) || 0));
+    if (this._gain) this._gain.gain.value = this._vol;
+  }
+  get currentTime() {
+    if (this._paused || !this._node) return this._offset;
+    const c = _bgmCtxHolen();
+    if (!c || !this._nodeBuf) return this._offset;
+    let t = this._offset + (c.currentTime - this._startedAt);
+    const d = this._nodeBuf.duration;
+    if (this.loop && d > 0) t = t % d;
+    return t;
+  }
+  set currentTime(t) {
+    this._offset = Math.max(0, Number(t) || 0);
+    if (!this._paused && this._buf) this._startNode(this._buf);
+  }
+  // EIN ctx.resume() entsperrt Web Audio komplett — der Entsperr-
+  // Durchlauf des MusicManagers ruft das statt play()+pause() je
+  // Element (das wuerde 13 Fetch+Decodes anstossen).
+  unlock() {
+    const c = _bgmCtxHolen();
+    if (c && c.state === 'suspended') { try { c.resume(); } catch {} }
+  }
+  load() {
+    const url = this._url;
+    this._ensureBuffer().then((buf) => {
+      // Traegt eine Abspiel-Absicht (play() lief schon, Datei kam erst
+      // jetzt — z.B. nach einem Kaskaden-src-Wechsel), dann jetzt starten.
+      if (!this._paused && this._bufUrl === url && buf) this._startNode(buf);
+    }).catch(() => {});
+  }
+  play() {
+    this._paused = false;
+    const seq = ++this._seq;
+    const c = _bgmCtxHolen();
+    if (!c) return Promise.reject(new Error('AudioContext fehlt'));
+    let resume = null;
+    if (c.state === 'suspended') { try { resume = c.resume(); } catch {} }
+    return Promise.resolve(resume).then(() => this._ensureBuffer()).then((buf) => {
+      if (seq !== this._seq || this._paused || !buf) return;
+      this._startNode(buf);
+    });
+  }
+  pause() {
+    if (!this._paused) this._offset = this.currentTime;
+    this._paused = true;
+    this._seq++;
+    this._stopNode();
+  }
+  _ensureBuffer() {
+    const url = this._url;
+    if (this._bufUrl === url) {
+      if (this._buf) return Promise.resolve(this._buf);
+      if (this._loadP) return this._loadP;
+    }
+    this._bufUrl = url;
+    this._buf = null;
+    const p = fetch(url)
+      .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .then((ab) => {
+        const c = _bgmCtxHolen();
+        if (!c) throw new Error('AudioContext fehlt');
+        // Callback-Form fuer alte WebKit-Signaturen mit abgedeckt.
+        return new Promise((res, rej) => {
+          const d = c.decodeAudioData(ab, res, rej);
+          if (d && d.then) d.then(res, rej);
+        });
+      })
+      .then((buf) => {
+        if (this._bufUrl !== url) return null;   // src hat gewechselt
+        this._buf = buf; this._loadP = null;
+        return buf;
+      })
+      .catch((err) => {
+        if (this._bufUrl === url) {
+          this._loadP = null;
+          // Asynchron wie beim Element — die Aufrufer (Endungs-Kaskade,
+          // Battle-Fallback) haengen daran ihren naechsten Kandidaten.
+          const h = this.onerror;
+          if (h) setTimeout(() => { try { h(); } catch {} }, 0);
+        }
+        throw err;
+      });
+    this._loadP = p;
+    return p;
+  }
+  _startNode(buf) {
+    const c = _bgmCtxHolen();
+    if (!c) return;
+    // Laeuft dieser Buffer schon? Dann nicht neu anwerfen (play() und
+    // load() koennen sich ueberschneiden) — ausser der Aufrufer hat per
+    // currentTime-Setter neu positioniert, dann kam er ueber _stopNode.
+    if (this._node && this._nodeBuf === buf) return;
+    this._stopNode();
+    if (!this._gain) { this._gain = c.createGain(); this._gain.connect(c.destination); }
+    this._gain.gain.value = this._vol;
+    const s = c.createBufferSource();
+    s.buffer = buf;
+    s.loop = !!this.loop;
+    s.connect(this._gain);
+    const off = buf.duration > 0 ? (this._offset % buf.duration) : 0;
+    try { s.start(0, off); } catch { return; }
+    this._offset = off;
+    this._startedAt = c.currentTime;
+    this._node = s;
+    this._nodeBuf = buf;
+    if (!s.loop) {
+      s.onended = () => {
+        if (this._node === s) { this._node = null; this._nodeBuf = null; this._paused = true; this._offset = 0; }
+      };
+    }
+    // Speicherdeckel: pausierten Geschwistern den dekodierten Buffer
+    // nehmen — die URL bleibt, der naechste play() laedt neu (HTTP-Cache).
+    for (const g of GaplessBgm._alle) {
+      if (g !== this && g._paused && g._buf) { g._buf = null; g._loadP = null; }
+    }
+  }
+  _stopNode() {
+    const s = this._node;
+    this._node = null; this._nodeBuf = null;
+    if (s) {
+      try { s.onended = null; } catch {}
+      try { s.stop(); } catch {}
+      try { s.disconnect(); } catch {}
+    }
+  }
+}
+GaplessBgm._alle = [];
+
 const _mkBgm = (url) => {
-  if (typeof Audio === 'undefined') return null;
+  if (typeof Audio === 'undefined' && !(window.AudioContext || window.webkitAudioContext)) return null;
   const kandidaten = Array.isArray(url) ? url.slice() : [url];
-  const el = new Audio(kandidaten.shift());
+  // ★ v1257: Web Audio, wenn verfuegbar — sample-genauer Loop (s.o.).
+  // Fallback bleibt das alte <audio>-Element mit identischem Verhalten.
+  const el = (window.AudioContext || window.webkitAudioContext)
+    ? new GaplessBgm(kandidaten.shift())
+    : new Audio(kandidaten.shift());
   if (kandidaten.length) _bgmEndungsKaskade(el, kandidaten);
   return el;
 };
@@ -2279,6 +2494,12 @@ function MusicManager({ bgmMode }) {
       const touchAndUnlock = async () => {
         for (const audio of Object.values(_bgmTracks)) {
           if (!audio) continue;
+          // ★ v1257: Der Web-Audio-Looper braucht keinen Play/Pause-
+          // Tastendruck je Element — EIN ctx.resume() entsperrt den
+          // Kontext fuer alle. (audio.play() wuerde hier ausserdem
+          // 13 Fetch+Decodes anstossen — genau das soll die
+          // Lazy-Ladung ja vermeiden.)
+          if (typeof audio.unlock === 'function') { audio.unlock(); continue; }
           try {
             audio.volume = 0;
             await audio.play();

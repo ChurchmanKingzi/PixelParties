@@ -495,6 +495,9 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
   useEffect(() => {
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
+      // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
+      // und im eigenen Zug — siehe ppBattleCamFocus).
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
       setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
     }
@@ -518,6 +521,9 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
   useEffect(() => {
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
+      // ★ v1257: Mobile-Kamera auf die getroffene Zone (no-op am Desktop
+      // und im eigenen Zug — siehe ppBattleCamFocus).
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
       setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
     }
@@ -545,6 +551,8 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
   useEffect(() => {
     const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
     if (el) {
+      // ★ v1257: Mobile-Kamera auf die getroffene Zone.
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
       setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
     }
@@ -565,6 +573,8 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
   useEffect(() => {
     const el = document.querySelector(`[data-support-zone="1"][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
     if (el) {
+      // ★ v1257: Mobile-Kamera auf die getroffene Zone.
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
       setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
     }
@@ -1352,6 +1362,86 @@ function makeFlightTiltLayer(card, opts, doc) {
 // ═══════════════════════════════════════════
 
 // Draggable floating panel — used for targeting dialogs, first-choice, etc.
+// ═══ MOBILE-KAMERA (v1257, Als Vorgabe 19.9.) ═══════════════════════
+// „Wenn der Gegner eine Aktion taetigt, soll die Kamera so scrollen,
+// dass man gut sieht, was er tut — Ziel-Zonen moeglichst zentral,
+// schnell, aber nicht instantan."
+//
+// Bauform: EIN Einstiegspunkt `window.ppBattleCamFocus(el)`, den die
+// ohnehin vorhandenen Ziel-Aufloeser aufrufen (Schadens-/Heilzahlen,
+// Kartenfluege, Zonen-Einschlagfunken in app-shared). Er tut nur auf
+// Telefonen etwas, nur waehrend der Gegner handelt (`_ppOppActing`,
+// gesetzt vom GameBoard; fuer Zuschauer immer an) und nie gegen einen
+// aktiven Finger (`_touchActive` gewinnt IMMER — die Kamera reisst dem
+// Spieler nie den Wisch aus der Hand).
+//
+// Mehrere Ziele derselben Aktion treffen als einzelne Aufrufe ein —
+// ein 120-ms-Sammelfenster vereinigt ihre Rechtecke, gescrollt wird
+// EINMAL auf die Mitte der Vereinigung. Die Fahrt selbst ist ein
+// eigenes rAF (~300 ms, ease-out) statt scroll-behavior:smooth, weil
+// die Messschleife (check) den Scrollstand pro Durchlauf sichert und
+// zuruecksetzt — ein natives Smooth-Scroll wuerde dabei abgebrochen,
+// das rAF schreibt im naechsten Frame einfach weiter.
+const _ppCam = { pend: [], timer: 0, raf: 0 };
+function _ppCamVarPx(name) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+function _ppCamFahre(sc, zielX, zielY) {
+  if (_ppCam.raf) cancelAnimationFrame(_ppCam.raf);
+  const vonX = sc.scrollLeft, vonY = sc.scrollTop;
+  if (Math.abs(zielX - vonX) < 8 && Math.abs(zielY - vonY) < 8) return;
+  const start = performance.now();
+  const DAUER = 300;
+  const ease = (p) => 1 - Math.pow(1 - p, 3);
+  const schritt = (jetzt) => {
+    // Finger auf dem Schirm → sofort loslassen, der Spieler scrollt selbst.
+    if (window._touchActive) { _ppCam.raf = 0; return; }
+    const p = Math.min(1, (jetzt - start) / DAUER);
+    const e = ease(p);
+    sc.scrollLeft = vonX + (zielX - vonX) * e;
+    sc.scrollTop = vonY + (zielY - vonY) * e;
+    _ppCam.raf = p < 1 ? requestAnimationFrame(schritt) : 0;
+  };
+  _ppCam.raf = requestAnimationFrame(schritt);
+}
+function ppBattleCamFocus(el) {
+  try {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return;
+    if (!window._ppOppActing) return;
+    if (window._touchActive) return;
+    if (!el || !el.getBoundingClientRect) return;
+    const sc = document.querySelector('.board-center');
+    if (!sc || !sc.contains(el)) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    _ppCam.pend.push(r);
+    if (_ppCam.timer) return;
+    _ppCam.timer = setTimeout(() => {
+      _ppCam.timer = 0;
+      const rects = _ppCam.pend.splice(0);
+      if (!rects.length) return;
+      let l = Infinity, t = Infinity, rr = -Infinity, b = -Infinity;
+      for (const x of rects) { l = Math.min(l, x.left); t = Math.min(t, x.top); rr = Math.max(rr, x.right); b = Math.max(b, x.bottom); }
+      const scr = sc.getBoundingClientRect();
+      // Zielmitte in INHALTS-Koordinaten (Scrollstand herausrechnen).
+      const cx = (l + rr) / 2 - scr.left + sc.scrollLeft;
+      const cy = (t + b) / 2 - scr.top + sc.scrollTop;
+      // Sichtbares Band = Ausschnitt minus Overlay-Leisten: die Zonen
+      // sollen zwischen den halbtransparenten Leisten zentriert stehen,
+      // nicht in der geometrischen Mitte hinter einer davon.
+      const oben = _ppCamVarPx('--mob-topbar-h') + _ppCamVarPx('--mob-opphand-h');
+      const unten = _ppCamVarPx('--mob-mehand-h');
+      const bandMitteY = oben + Math.max(40, sc.clientHeight - oben - unten) / 2;
+      const zielX = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, cx - sc.clientWidth / 2));
+      const zielY = Math.max(0, Math.min(sc.scrollHeight - sc.clientHeight, cy - bandMitteY));
+      _ppCamFahre(sc, zielX, zielY);
+    }, 120);
+  } catch {}
+}
+window.ppBattleCamFocus = ppBattleCamFocus;
+
 function DraggablePanel({ children, className, style }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -1359,6 +1449,14 @@ function DraggablePanel({ children, className, style }) {
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
   const onDown = (e) => {
+    // ★ v1257 (Als Vorgabe 19.9.): Auf Touch ist das Panel UNBEWEGLICH.
+    // Vorher startete jeder Fingerkontakt sofort einen Fenster-Drag mit
+    // preventDefault() — damit gewann „Galerie verschieben" gegen
+    // „durch die Galerie scrollen", und genau das Scrollen ist auf dem
+    // Handy das Einzige, was gebraucht wird. Frueh raus, KEIN
+    // preventDefault: der Browser behaelt den Wisch fuers native
+    // Scrollen des Inhalts. Maus-Drag am Desktop bleibt unveraendert.
+    if (e.touches) return;
     // Don't start a drag when the pointer-down lands on an interactive
     // form control. `preventDefault()` below would otherwise swallow the
     // native mousedown that opens a <select> dropdown, focuses an <input>,
@@ -23321,7 +23419,10 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
           </span>
           <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onClose}>✕ CLOSE</button>
         </div>
-        <input
+        {/* ★ v1257 (Als Vorgabe 19.9.): auf Telefonen KEIN Suchfeld —
+            unhandlich, und sein autoFocus klappte beim Oeffnen sofort
+            die Bildschirmtastatur auf. Gescrollt wird stattdessen. */}
+        {!(window.ppIsPhone && window.ppIsPhone()) && <input
           type="text"
           value={filter}
           onChange={e => setFilter(e.target.value)}
@@ -23339,7 +23440,7 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
             flexShrink: 0,
             boxSizing: 'border-box',
           }}
-        />
+        />}
         {filtered.length > 0 ? (
           <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <div className="deck-viewer-grid">
@@ -23662,7 +23763,8 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
             </span>
           )}
         </div>
-        {ep.searchable && (
+        {/* ★ v1257: auf Telefonen kein Suchfeld (Als Vorgabe 19.9.). */}
+        {ep.searchable && !(window.ppIsPhone && window.ppIsPhone()) && (
           <div style={{ marginBottom: 10, flexShrink: 0 }}>
             <input
               type="text"
@@ -24629,8 +24731,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     //   Höhe:   die Spielfläche selbst ist maßstabsfrei, also direkt
     //            s = Höhe / (Reihen + beide Leisten, je bei Maßstab 1).
     const REIHEN_H = 640;    // was die Brettreihen bei Maßstab 1 brauchen (gemessen)
-    const MIN_SCALE = 0.45;  // never go smaller than this (touch target safety)
+    // ★ v1257: Der Floor ist geräteabhängig. Auf groben Zeigern galt
+    // bisher zusätzlich ein CSS-Mindestmaß NUR für die Zonen (40x56),
+    // während die Karten beim Floor 0.45 blieben — „Karten deutlich
+    // kleiner als die Zonen" (Al, 19.9.). Jetzt liefert der Floor selbst
+    // die Trefferfläche: 0.59, denn 68 x 0.59 = 40 und 95 x 0.59 = 56 —
+    // exakt das alte Zonen-Minimum, nur wachsen Karten, Zonen und
+    // Extra-Zonen gemeinsam. Das Brett wird dadurch größer als der
+    // Schirm und scrollt (Overlay-Leisten + Kamera fangen das auf).
+    // Dieselbe Bedingung wie der alte CSS-Block (coarse + ≤1024px),
+    // damit kein Gerät die Trefferfläche verliert, das sie hatte.
+    const MIN_SCALE_DESKTOP = 0.45;  // never go smaller than this
+    const MIN_SCALE_TOUCH = 0.59;    // touch target safety (68px-Zone → 40px)
     const updateScale = () => {
+      const grobKlein = !!(window.matchMedia
+        && window.matchMedia('(max-width: 1024px) and (pointer: coarse)').matches);
+      const MIN_SCALE = grobKlein ? MIN_SCALE_TOUCH : MIN_SCALE_DESKTOP;
       const wurzel = getComputedStyle(document.documentElement);
       const sJetzt = parseFloat(wurzel.getPropertyValue('--board-scale')) || 1;
       const handMass = parseFloat(wurzel.getPropertyValue('--hand-card-scale')) || 1;
@@ -24685,6 +24801,48 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       document.documentElement.style.setProperty('--board-scale-live', '1');
     };
   }, []);
+
+  // ★ v1257 — LEISTENHOEHEN FUER DIE OVERLAY-LEISTEN (nur Telefon).
+  // Kopfzeile und beide Handzeilen liegen mobil halbtransparent UEBER
+  // dem Feld (style.css, Block „TELEFON QUER"); .board-center polstert
+  // sich mit genau diesen Hoehen, damit der Inhalt vollstaendig unter
+  // den Leisten hervorgescrollt werden kann. Die Hoehen sind
+  // inhaltsabhaengig (Handmass, Umbrueche) — deshalb gemessen statt
+  // geraten, per ResizeObserver auf den drei Leisten. Die Kamera liest
+  // dieselben Variablen fuer ihr sichtbares Band.
+  useEffect(() => {
+    if (!(window.ppIsPhone && window.ppIsPhone())) return;
+    const root = document.documentElement;
+    const messen = () => {
+      const tb = document.querySelector('.screen-full > .top-bar');
+      const ho = document.querySelector('.game-hand-opp');
+      const hm = document.querySelector('.game-hand-me');
+      if (tb) root.style.setProperty('--mob-topbar-h', tb.offsetHeight + 'px');
+      if (ho) root.style.setProperty('--mob-opphand-h', ho.offsetHeight + 'px');
+      if (hm) root.style.setProperty('--mob-mehand-h', hm.offsetHeight + 'px');
+    };
+    messen();
+    const ro = new ResizeObserver(messen);
+    for (const sel of ['.screen-full > .top-bar', '.game-hand-opp', '.game-hand-me']) {
+      const el = document.querySelector(sel);
+      if (el) ro.observe(el);
+    }
+    window.addEventListener('resize', messen);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', messen);
+      for (const v of ['--mob-topbar-h', '--mob-opphand-h', '--mob-mehand-h']) root.style.removeProperty(v);
+    };
+  }, []);
+
+  // ★ v1257 — „DER GEGNER HANDELT"-FLAG fuer die Mobile-Kamera: sie
+  // folgt Ziel-Zonen nur, waehrend der Gegner am Zug ist (der eigene
+  // Zug wuerde einem sonst die Sicht unterm Finger wegziehen);
+  // Zuschauer sehen alles als fremde Aktion und werden immer gefuehrt.
+  useEffect(() => {
+    window._ppOppActing = isSpectator || (!isMyTurn && !result);
+    return () => { window._ppOppActing = false; };
+  }, [isMyTurn, result, isSpectator]);
 
   // Local hand state for reordering
   const [hand, setHand] = useState(me.hand || []);
@@ -30116,6 +30274,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           || document.querySelector(`[data-hero-zone][data-hero-owner="${destLabel}"][data-hero-idx="1"]`);
       }
       if (!sourceEl || !destEl) return;
+      // ★ v1257: Mobile-Kamera folgt dem Landeplatz (no-op am Desktop
+      // und im eigenen Zug, siehe ppBattleCamFocus).
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(destEl);
       const sr = sourceEl.getBoundingClientRect();
       const dr = destEl.getBoundingClientRect();
       const fly = document.createElement('div');
@@ -30194,6 +30355,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             `[data-support-zone][data-support-owner="${destLabel}"][data-support-hero="${destHeroIdx}"][data-support-slot="${destZoneSlot}"]`
           );
       if (!sourceEl || !destEl) return;
+      // ★ v1257: Mobile-Kamera folgt dem Landeplatz (no-op am Desktop
+      // und im eigenen Zug, siehe ppBattleCamFocus).
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(destEl);
       const sr = sourceEl.getBoundingClientRect();
       const dr = destEl.getBoundingClientRect();
       const fly = document.createElement('div');
@@ -37205,11 +37369,39 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Messung aus. Der Zustand, den `check()` liest, kann sich innerhalb
     // eines Rahmens ohnehin nicht mehrfach aendern.
     let checkRaf = 0;
+    // ★ v1257 — DROSSEL AUF TELEFONEN: check() erzwingt pro Durchlauf
+    // zwei synchrone Layouts (board-flat-measure an/aus plus dutzende
+    // Rect-Reads) und laeuft nach JEDEM Render — der Zug-Timer allein
+    // rendert sekuendlich, waehrend Animationen deutlich oefter. Auf
+    // einem alten Handy sind das genau die langen Frames, in denen
+    // Tipper verloren gehen. Telefone messen deshalb hoechstens alle
+    // 300 ms, mit Trailing-Nachlauf (der LETZTE Anlass wird nie
+    // verschluckt, nur verzoegert). Die Brettgeometrie aendert sich in
+    // 300 ms nicht schneller, als die Konvergenzschleife ohnehin
+    // nachzieht. Zustand liegt am ELEMENT, damit er die Effekt-Neustarts
+    // (kein Dependency-Array!) ueberlebt.
+    const CHECK_MIN_ABSTAND_MS = 300;
+    const checkGedrosselt = () => {
+      if (!(window.ppIsPhone && window.ppIsPhone())) { check(); return; }
+      const jetzt = performance.now();
+      const seit = jetzt - (el._ppCheckZuletzt || 0);
+      if (seit >= CHECK_MIN_ABSTAND_MS) {
+        el._ppCheckZuletzt = jetzt;
+        check();
+        return;
+      }
+      if (el._ppCheckTimer) return;
+      el._ppCheckTimer = setTimeout(() => {
+        el._ppCheckTimer = 0;
+        el._ppCheckZuletzt = performance.now();
+        check();
+      }, CHECK_MIN_ABSTAND_MS - seit);
+    };
     const checkBald = () => {
       if (checkRaf) return;
-      checkRaf = requestAnimationFrame(() => { checkRaf = 0; check(); });
+      checkRaf = requestAnimationFrame(() => { checkRaf = 0; checkGedrosselt(); });
     };
-    check();
+    checkGedrosselt();
     const obs = new ResizeObserver(checkBald);
     obs.observe(el);
     window.addEventListener('resize', checkBald);
@@ -37217,6 +37409,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       obs.disconnect();
       window.removeEventListener('resize', checkBald);
       if (checkRaf) cancelAnimationFrame(checkRaf);
+      // ★ v1257: Trailing-Timer der Telefon-Drossel mit abraeumen. Der
+      // Effekt laeuft nach jedem Render neu — der Timer haengt deshalb
+      // am Element (ueberlebt Neustarts) und wird hier zentral geleert.
+      if (el._ppCheckTimer) { clearTimeout(el._ppCheckTimer); el._ppCheckTimer = 0; }
     };
   });
 
@@ -37229,6 +37425,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (window._playAnimations === false) return;
     const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
     if (!el) return;
+    // ★ v1257: Mobile-Kamera — Zonen-Animationen des Gegnerzugs holen
+    // ihr Ziel ins Bild (no-op am Desktop, siehe ppBattleCamFocus).
+    if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
     const r = el.getBoundingClientRect();
     const id = Date.now() + Math.random();
     const dur = options.duration || 800;
@@ -42069,7 +42268,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             </div>
             <div className="board-player-side board-side-me">{renderPlayerSide(me, false)}</div>
             </div>{/* /board-plane */}
-            </div>{/* /board-plane-clip */}
+            {/* ★ v1257: Die Permanents-Spalten (Extra-Zonen: Elixir of
+                Immortality & Co. + Coolness Stack) sind von .board-center in
+                DIESE Huelle (.board-plane-clip) umgezogen — derselbe Umzug,
+                den die Atmosphaeren-Ebenen laengst hinter sich haben, aus
+                demselben Grund: absolute Kinder eines SCROLL-Containers
+                haengen an dessen sichtbarem Ausschnitt (Padding-Box), nicht
+                am Inhalt. Auf dem Telefon scrollt .board-center senkrecht —
+                die Spalten klebten am Viewport, das eigene Elixir lag beim
+                Scrollen scheinbar auf der Gegnerseite (Als Befund 19.9.).
+                Die Huelle ist in-flow und (mobil per flex:none, im
+                Scrollmodus per min-content) so gross wie das FELD, also
+                sitzen top/bottom 52% jetzt fest an der Faltlinie. Desktop
+                ohne Scrollen: Huelle = alter Kasten, pixelgleich. */}
             {/* Permanent zones + Coolness Stack — positioned absolutely to avoid layout interference. */}
             {/* The Stack is rendered as a child of the permanents column so it tracks with the */}
             {/* permanent block's position when the column grows (Flying Island, extra permanents). */}
@@ -42241,6 +42452,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })()}
               </div>
             )}
+            </div>{/* /board-plane-clip */}
           </div>
 
           <div className={'chat-log-column' + (sidebarCollapsed ? ' chat-log-collapsed' : '')}>
@@ -44107,7 +44319,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   Feld ueber vier Karten ist nur Rand. Gefiltert wird nach
                   Name UND Marke (`label`), damit „opp" gleich die
                   gegnerische Ablage einsammelt. */}
-              {cards.length >= 8 && (
+              {/* ★ v1257: auf Telefonen kein Suchfeld (Als Vorgabe 19.9.,
+                  siehe PileSearchModal) — der autoFocus riss sonst beim
+                  Oeffnen jeder Such-Galerie die Tastatur hoch. */}
+              {cards.length >= 8 && !(window.ppIsPhone && window.ppIsPhone()) && (
                 <input type="text" value={galerieFilter} autoFocus
                   onChange={e => setGalerieFilter(e.target.value)}
                   placeholder="🔍 Filter by name..."
