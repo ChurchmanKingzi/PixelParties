@@ -126,6 +126,11 @@ module.exports = {
       });
 
       ps.hand.splice(handIdx, 1);
+      // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+      // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+      // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+      // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+      engine.sync();
       // Untrack the listener's own hand instance so summoning a fresh
       // tracked instance below doesn't leave an orphan in the hand zone
       // (Cute Bunny pattern).

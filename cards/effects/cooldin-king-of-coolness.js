@@ -134,6 +134,10 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   });
   ps.hand.splice(handIndex, 1);
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
+  // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
+  // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
+  // Befund 18.9. zu „Dive Down").
+  engine.sync();
 
   // _immediateActionContext lets downstream hooks know this was driven
   // by a hero effect rather than a normal action, mirroring what

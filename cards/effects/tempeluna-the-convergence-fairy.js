@@ -355,6 +355,13 @@ module.exports = {
 
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
     ps.supportZones[heroIdx][slot] = [feeName];
+    // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
+    // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als
+    // Befund 18.9. zu „Dive Down").
+    // Hier NACH dem Belegen der Zone, nicht direkt nach dem Splice:
+    // die Karte zieht von der Hand in die Support Zone, und ein
+    // Abgleich dazwischen zeigte sie fuer einen Takt nirgends.
+    engine.sync();
     const feeInst = engine._trackCard(feeName, pi, 'support', heroIdx, slot);
     feeInst.counters = feeInst.counters || {};
     // `treatAsEquip` macht die Karte fuer die ganze Engine zur

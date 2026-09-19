@@ -705,7 +705,14 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
       const targetSlot = document.querySelector(`.game-hand-me .hand-slot[data-hand-idx="${origIdx}"]`);
       if (targetSlot) {
         const r = targetSlot.getBoundingClientRect();
-        setEndPos({ x: r.left, y: r.top });
+        // ★ v1233: Der Platz traegt den Faecher-Bogen, ist aber nie
+        // gedreht — `r` ist also weiterhin der echte Landepunkt. Den
+        // WINKEL holt die fliegende Karte sich hier ab und dreht sich
+        // waehrend des Flugs hinein, sonst sprang sie beim Ankommen.
+        setEndPos({
+          x: r.left, y: r.top,
+          rot: targetSlot.style.getPropertyValue('--fan-rot') || '0deg',
+        });
       }
     });
   }, [origIdx]);
@@ -718,7 +725,7 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
 
   return (
     <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px', '--fan-rot': endPos.rot || '0deg' }}>
       <BoardCard cardName={cardName} />
     </div>
   );
@@ -1041,12 +1048,18 @@ function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs,
   );
 }
 
-function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl }) {
+function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl, fanRot }) {
   const dx = endX - startX;
   const dy = endY - startY;
   return (
     <div className="draw-anim-card"
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px' }}>
+      style={{
+        left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px',
+        // ★ v1233: Landewinkel des Faechers. Der Drehpunkt liegt hier
+        // in der MITTE, weil die Karten dieser Reihen keine Platz-
+        // Huelle haben und selbst um ihre Mitte drehen (style.css).
+        '--fan-rot': fanRot || '0deg', '--fan-origin': '50% 50%',
+      }}>
       {cardName ? (
         <BoardCard cardName={cardName} noTooltip />
       ) : (
@@ -1101,7 +1114,7 @@ function ppJetzt() {
   return (typeof performance !== 'undefined' ? performance.now() : Date.now());
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0 }) {
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand }) {
   const dx = endX - startX;
   const dy = endY - startY;
   // ★★ v1131 — DER FLUG DARF NICHT VON VORN BEGINNEN (Als Befund 15.9.:
@@ -1141,7 +1154,12 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
   // simply sits at its board slot (start position) and then flies —
   // exactly the "wait your turn, then go" cascade we want.
   return (
-    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')}
+    <div className={'discard-anim-card' + (isDeleted ? ' discard-anim-deleted' : '') + (isDeckReturn ? ' discard-anim-deck-return' : '')
+        /* ★ v1235: Kommt die Karte aus der HAND, startet sie im
+           Handkartenmass — Hand und Stapel sind seit heute gleich gross,
+           die Karte wird auf dem ganzen Weg also nicht mehr skaliert.
+           Brettquellen behalten ihr Zonenmass. */
+        + (ausHand ? ' discard-anim-hand' : '')}
       style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px',
         animationDelay: versatz ? versatz + 'ms' : undefined }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
@@ -1152,6 +1170,53 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
     </div>
   );
 }
+
+// ══ MASSE FLIEGENDER KARTEN (v1254) ══════════════════════════
+//
+// Als Befund 19.9.: „die Karten waehrend ihrer Flug-Animation sind
+// immer noch klein — es sind nicht die Handkarten selbst, die sich
+// bewegen, sondern dedizierte Animationen mit Ghost-Karten.“ Genau so
+// ist es: ein halbes Dutzend Fluege baut seine Geisterkarte per
+// `document.createElement` und schreibt `width:64px; height:88px`
+// hinein — fest verdrahtet, ohne Brettmassstab und erst recht ohne die
+// eigenen Masse von Hand und Stapel.
+//
+// `flugMass(ort)` liefert das Mass des Ortes, an dem die Karte
+// tatsaechlich liegt. Gelesen wird es aus denselben CSS-Variablen, die
+// die ruhenden Karten benutzen — eine Quelle, kein zweiter Satz
+// Zahlen.
+function flugMass(ort) {
+  const w = getComputedStyle(document.documentElement);
+  const zahl = (name, rueck) => {
+    const v = parseFloat(w.getPropertyValue(name));
+    return Number.isFinite(v) && v > 0 ? v : rueck;
+  };
+  // ★★★ v1256 (Als Befund 19.9.: „Hand → Discard und Hand → Deleted
+  // haben immer noch zu kleine Karten"). DAS war der Grund, und er
+  // gilt fuer JEDE Stelle, die ein Kartenmass aus dem Stylesheet holt:
+  //
+  //   getComputedStyle(root).getPropertyValue('--hand-card-w')
+  //     → "calc(64px * 0.875 * 1.92)"      — ein TEXT, kein Wert
+  //     → parseFloat(…) === NaN            — also der Rueckfall 64
+  //
+  // Eigene Eigenschaften werden nicht ausgerechnet; der berechnete Wert
+  // ist der Ausdruck selbst. Jeder Flug, der sein Mass so gelesen hat,
+  // ist deshalb in Brettgroesse geflogen — unabhaengig davon, wie oft
+  // ich die Variablen korrigiert habe. Gerechnet wird jetzt aus den
+  // reinen ZAHLEN (`--board-scale`, `--hand-card-scale`,
+  // `--pile-card-scale`), die parseFloat sehr wohl lesen kann, mit
+  // denselben Grundmassen wie style.css: 64 × 90.
+  const brett = zahl('--board-scale', 1);
+  if (ort === 'hand') {
+    const m = brett * zahl('--hand-card-scale', 1);
+    return { b: 64 * m, h: 90 * m };
+  }
+  if (ort === 'brett') return { b: 64 * brett, h: 90 * brett };
+  // Deck, Potion, Ablage, Geloescht, Area — alle im Stapelmass.
+  const m = brett * zahl('--pile-card-scale', 1);
+  return { b: 64 * m, h: 90 * m };
+}
+if (typeof window !== 'undefined') window.flugMass = flugMass;
 
 // ═══════════════════════════════════════════
 //  NEIGUNG FLIEGENDER KARTEN
@@ -4405,19 +4470,19 @@ function GatheringStormOverlay() {
               position: 'absolute', left: -65, top: -18,
               width: 130, height: 36, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(105,12,18,0.92) 0%, rgba(75,8,14,0.7) 55%, rgba(30,2,6,0) 95%)',
-              filter: 'blur(3px)',
+              filter: 'blur(2px)',
             }} />
             <div style={{
               position: 'absolute', left: -32, top: -32,
               width: 78, height: 36, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(125,18,24,0.88) 0%, rgba(85,10,16,0.6) 60%, rgba(30,2,6,0) 95%)',
-              filter: 'blur(3px)',
+              filter: 'blur(2px)',
             }} />
             <div style={{
               position: 'absolute', left: 5, top: -26,
               width: 65, height: 30, borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(95,10,16,0.85) 0%, rgba(60,6,12,0.55) 60%, rgba(20,1,4,0) 95%)',
-              filter: 'blur(3px)',
+              filter: 'blur(2px)',
             }} />
             {/* A crimson "underbelly" smear hints at active rain inside
                 the cloud. */}
@@ -14247,47 +14312,203 @@ const ANIM_REGISTRY = {
     };
   })(),
   flame_avalanche: (() => {
-    // Massive, screen-shaking fire effect for Flame Avalanche
-    return function FlameAvalancheEffect({ x, y }) {
-      const flames = useMemo(() => Array.from({ length: 40 }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 80 + Math.random() * 100;
-        return {
-          startX: Math.cos(angle) * dist,
-          startY: Math.sin(angle) * dist,
-          size: 16 + Math.random() * 24,
-          delay: Math.random() * 400,
-          dur: 400 + Math.random() * 400,
-          char: ['🔥','🔥','🔥','🔥','💥','✦','☄️'][Math.floor(Math.random() * 7)],
-        };
-      }), []);
-      const sparks = useMemo(() => Array.from({ length: 30 }, () => {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 30 + Math.random() * 60;
-        return {
-          dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed,
-          size: 4 + Math.random() * 8,
-          color: ['#ff2200','#ff4400','#ff8800','#ffcc00','#ffaa00','#ff0000','#ff6600'][Math.floor(Math.random() * 7)],
-          delay: Math.random() * 300,
-          dur: 500 + Math.random() * 400,
-        };
-      }), []);
+    // ═══════════════════════════════════════════════════════════════
+    //  ★★ v1215 — „Flame Avalanche" (Als Vorgabe 18.9., zweiter Anlauf)
+    //
+    //  „Etliche Flammen pro Ziel sollen auf dem Caster beginnen und dann
+    //  auf die verschiedenen Ziele schiessen wie unzaehlige Projektile —
+    //  wie man z.B. einen Flammenwerfer animieren wuerde, nur in sehr
+    //  viel breiter, wie eine Lawine!"
+    //
+    //  Der erste Anlauf (v1213) war eine WAND, die ueber das Brett rollt.
+    //  Das ist nicht dasselbe: eine Wand kommt von nirgendwo, ein
+    //  Flammenwerfer hat eine QUELLE und ein ZIEL. Jetzt laeuft je Ziel
+    //  ein eigener Strom aus 16 Geschossen, alle aus demselben Punkt beim
+    //  Wirker, faecherfoermig gestreut und versetzt losgeschickt. Viele
+    //  Ziele gleichzeitig ergeben die Breite, die Al meint: aus dem
+    //  einzelnen Strahl wird eine Lawine.
+    //
+    //  Aufbau je Geschoss:
+    //    • Kopf     — heller Flammenklumpen, auf die Flugbahn gedreht
+    //    • Schweif  — laenglicher Glutstreifen dahinter
+    //    • Bogen    — die Bahn haengt leicht durch (`--fa-bx/--fa-by`
+    //                 als Mittelpunkt), sonst sieht ein Faecher aus
+    //                 lauter Geraden nach Speichenrad aus
+    //    • Einschlag — kleiner Feuerball am Ziel, wenn das Geschoss ankommt
+    //
+    //  Ohne Zielliste (alte Aufrufe, Negations-Bilder) faellt die
+    //  Komponente auf einen breiten Faecher nach vorn zurueck.
+    // ═══════════════════════════════════════════════════════════════
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    // ★ v1216 (Als Vorgabe): „mache sie noch breiter — mehr Feuerbaelle
+    // pro Ziel, die leicht gespreadet sind." 26 statt 16, und die
+    // Streuung um gut die Haelfte weiter. Eine Obergrenze fuer die
+    // GESAMTZAHL bleibt: bei acht Zielen waeren es sonst ueber 200
+    // Geschosse mit je drei Knoten, und die Animation wuerde das Brett
+    // fuer eine Sekunde ausbremsen. Bis sechs Ziele greift sie nicht.
+    const GESCHOSSE_JE_ZIEL = 26;
+    const GESCHOSSE_GESAMT_MAX = 170;
+    return function FlameAvalancheEffect({ x, y, w, h, ox, oy, duration, targetPoints }) {
+      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
+      const links = x - W / 2, oben = y - H / 2;
+      const oX = (typeof ox === 'number' ? ox : x) - links;
+      const oY = (typeof oy === 'number' ? oy : y + H * 0.35) - oben;
+      const dauer = duration || 1600;
+      const flug = 520;                       // Flugzeit eines Geschosses
+
+      const bahnen = useMemo(() => {
+        const r = zufall(Math.round(W * 11 + H * 7 + oX * 3 + oY));
+        // Ziele in Kastenkoordinaten. Fehlt die Liste, faechert der Strom
+        // nach vorn (weg von der eigenen Bretthaelfte).
+        let ziele = Array.isArray(targetPoints) && targetPoints.length
+          ? targetPoints.map(p => ({ zx: p.x - links, zy: p.y - oben }))
+          : null;
+        if (!ziele) {
+          const vor = oY > H / 2 ? -1 : 1;
+          ziele = Array.from({ length: 5 }, (_, i) => ({
+            zx: W * (0.15 + i * 0.175), zy: oY + vor * H * 0.55,
+          }));
+        }
+        const aus = [];
+        const jeZiel = Math.max(10, Math.min(GESCHOSSE_JE_ZIEL,
+          Math.floor(GESCHOSSE_GESAMT_MAX / ziele.length)));
+        // Die Streuung waechst mit der Strecke: nah am Ziel eng, weit weg
+        // breit — sonst sammelt sich alles auf einem Punkt.
+        ziele.forEach((z, zi) => {
+          const spanne = Math.hypot(z.zx - oX, z.zy - oY);
+          for (let i = 0; i < jeZiel; i++) {
+            const streuX = (r() - 0.5) * Math.max(48, spanne * 0.26);
+            const streuY = (r() - 0.5) * Math.max(34, spanne * 0.17);
+            const zx = z.zx + streuX, zy = z.zy + streuY;
+            // Bogenmitte seitlich versetzt — die Seite wechselt mit dem
+            // Geschoss, damit sich der Strom aufblaettert.
+            const mx = (oX + zx) / 2 + (r() - 0.5) * spanne * 0.22;
+            const my = (oY + zy) / 2 + (r() - 0.5) * spanne * 0.18 - spanne * 0.06;
+            aus.push({
+              zx, zy, mx, my,
+              winkel: Math.atan2(zy - oY, zx - oX) * 180 / Math.PI,
+              groesse: 13 + r() * 20,
+              verzug: Math.round(zi * 20 + i * (r() * 22 + 9)),
+              laenge: Math.round(flug * (0.75 + r() * 0.55)),
+            });
+          }
+        });
+        return aus;
+      }, [W, H, oX, oY, links, oben, targetPoints, flug]);
+
       return (
-        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-flame-flash" style={{ width: 200, height: 200, marginLeft: -100, marginTop: -100, background: 'radial-gradient(circle, rgba(255,100,0,.9) 0%, rgba(255,60,0,.6) 30%, rgba(255,0,0,.2) 60%, transparent 80%)' }} />
-          <div className="anim-flame-flash" style={{ width: 140, height: 140, marginLeft: -70, marginTop: -70, animationDelay: '100ms', background: 'radial-gradient(circle, rgba(255,255,200,.8) 0%, rgba(255,180,0,.4) 40%, transparent 70%)' }} />
-          {flames.map((f, i) => (
-            <div key={'fa'+i} className="anim-flame-shard" style={{
-              '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
-              animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-            }}>{f.char}</div>
+        <div aria-hidden="true" style={{
+          position: 'fixed', left: links, top: oben, width: W, height: H,
+          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden',
+          animation: `faBeben ${Math.round(dauer * 0.5)}ms linear 60ms both`,
+        }}>
+          {/* Muendungsfeuer beim Wirker: hier setzt der Strom an. */}
+          <div style={{
+            position: 'absolute', left: oX - 80, top: oY - 80, width: 160, height: 160,
+            borderRadius: '50%', mixBlendMode: 'screen',
+            background: 'radial-gradient(circle, rgba(255,245,205,.95) 0%, rgba(255,150,30,.75) 34%, rgba(200,40,0,.35) 66%, transparent 80%)',
+            animation: `faMuendung ${Math.round(dauer * 0.8)}ms ease-out forwards`,
+          }} />
+          {bahnen.map((b, i) => (
+            <div key={'fap' + i} style={{
+              position: 'absolute', left: oX, top: oY, width: 0, height: 0,
+              '--fa-mx': (b.mx - oX).toFixed(1) + 'px', '--fa-my': (b.my - oY).toFixed(1) + 'px',
+              '--fa-zx': (b.zx - oX).toFixed(1) + 'px', '--fa-zy': (b.zy - oY).toFixed(1) + 'px',
+              animation: `faFlug ${b.laenge}ms cubic-bezier(.30,.55,.55,1) ${b.verzug}ms both`,
+            }}>
+              {/* Schweif — laeuft der Flugrichtung hinterher */}
+              <div style={{
+                position: 'absolute', left: -b.groesse * 2.4, top: -b.groesse * 0.34,
+                width: b.groesse * 2.6, height: b.groesse * 0.68,
+                transformOrigin: '100% 50%', transform: `rotate(${b.winkel}deg)`,
+                borderRadius: '50%', mixBlendMode: 'screen', filter: 'blur(2px)',
+                background: `linear-gradient(to right, transparent 0%, rgba(255,90,0,.5) 55%, rgba(255,190,90,.85) 100%)`,
+              }} />
+              {/* Kopf */}
+              <div style={{
+                position: 'absolute', left: -b.groesse / 2, top: -b.groesse / 2,
+                width: b.groesse, height: b.groesse * 0.82,
+                borderRadius: '48% 52% 56% 44% / 54% 46% 54% 46%',
+                background: 'radial-gradient(circle at 42% 38%, #fff6d2 0%, #ffc44a 30%, #ff5a00 62%, #8e1a00 100%)',
+                boxShadow: '0 0 14px rgba(255,130,25,.95)', mixBlendMode: 'screen',
+              }} />
+            </div>
           ))}
-          {sparks.map((s, i) => (
-            <div key={'fas'+i} className="anim-explosion-particle" style={{
-              '--dx': s.dx + 'px', '--dy': s.dy + 'px', '--size': s.size + 'px',
-              '--color': s.color, animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+          {/* Einschlaege: ein Feuerball je Geschoss, sobald es ankommt */}
+          {bahnen.map((b, i) => (
+            <div key={'fae' + i} style={{
+              position: 'absolute', left: b.zx - b.groesse, top: b.zy - b.groesse,
+              width: b.groesse * 2, height: b.groesse * 2, borderRadius: '50%',
+              mixBlendMode: 'screen', opacity: 0,
+              background: 'radial-gradient(circle, rgba(255,250,220,.95) 0%, rgba(255,150,30,.7) 40%, transparent 72%)',
+              animation: `faTreffer ${Math.round(320 + b.groesse * 6)}ms ease-out ${b.verzug + b.laenge}ms forwards`,
             }} />
           ))}
+          <style>{`
+            @keyframes faFlug {
+              0%   { transform: translate(0, 0) scale(.45); opacity: 0; }
+              12%  { opacity: 1; }
+              50%  { transform: translate(var(--fa-mx), var(--fa-my)) scale(1); }
+              88%  { opacity: 1; }
+              100% { transform: translate(var(--fa-zx), var(--fa-zy)) scale(.85); opacity: 0; }
+            }
+            @keyframes faTreffer {
+              0%   { opacity: 0; transform: scale(.35); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.5); }
+            }
+            @keyframes faMuendung {
+              0%   { opacity: 0; transform: scale(.35); }
+              14%  { opacity: 1; transform: scale(1.05); }
+              70%  { opacity: .7; transform: scale(.95); }
+              100% { opacity: 0; transform: scale(1.2); }
+            }
+            @keyframes faBeben {
+              0%, 100% { transform: translate(0, 0); }
+              14% { transform: translate(-3px, 2px); }
+              32% { transform: translate(4px, -2px); }
+              54% { transform: translate(-2px, -3px); }
+              76% { transform: translate(3px, 2px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  pink_sky_puff: (() => {
+    // ★★ v1223: Der kleine Bruder von „Pink Sky" — ein rosa Woelkchen
+    // auf einer Zone. Zwei Verwendungen: die von der Ausnahme
+    // VERSCHONTEN „Cute"-Kreaturen (sonst saehe es aus, als haette die
+    // Karte sie uebersehen) und das Ersatzbild, wenn die Karte selbst
+    // negiert wird (`spellVisual`).
+    return function PinkSkyPuffEffect({ x, y }) {
+      const flocken = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+        dx: Math.cos((i / 7) * Math.PI * 2) * (16 + Math.random() * 18),
+        dy: Math.sin((i / 7) * Math.PI * 2) * (10 + Math.random() * 14) - 8,
+        g: 12 + Math.random() * 16,
+        verzug: Math.round(Math.random() * 160),
+      })), []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          {flocken.map((f, i) => (
+            <div key={'psp' + i} style={{
+              position: 'absolute', left: -f.g / 2, top: -f.g / 2,
+              width: f.g, height: f.g * 0.72, borderRadius: '50%',
+              background: 'radial-gradient(circle at 42% 38%, #ffffff 0%, #ffd9ec 55%, rgba(255,150,200,0) 78%)',
+              '--psp-dx': f.dx.toFixed(0) + 'px', '--psp-dy': f.dy.toFixed(0) + 'px',
+              animation: `pinkSkyPuff 760ms ease-out ${f.verzug}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes pinkSkyPuff {
+              0%   { opacity: 0; transform: translate(0,0) scale(.4); }
+              22%  { opacity: 1; transform: translate(calc(var(--psp-dx) * .35), calc(var(--psp-dy) * .35)) scale(1); }
+              100% { opacity: 0; transform: translate(var(--psp-dx), var(--psp-dy)) scale(1.25); }
+            }
+          `}</style>
         </div>
       );
     };
@@ -18383,7 +18604,7 @@ const ANIM_REGISTRY = {
               width: p.size, height: p.size,
               borderRadius: '50%',
               background: `radial-gradient(circle at 35% 35%, ${p.hue}, transparent 75%)`,
-              filter: 'blur(3px)',
+              filter: 'blur(2px)',
               mixBlendMode: 'screen',
               opacity: 0,
               animation: `toxicFumesPuff ${p.dur}ms ease-out ${p.delay}ms forwards`,
@@ -22230,7 +22451,7 @@ const ANIM_REGISTRY = {
               marginLeft: -p.size / 2, marginTop: -p.size / 2,
               borderRadius: '50%',
               background: `radial-gradient(circle, rgba(${p.shade},${p.shade},${p.shade + 5},0.85) 0%, rgba(${p.shade - 15},${p.shade - 15},${p.shade - 10},0.55) 50%, rgba(30,30,35,0) 78%)`,
-              filter: 'blur(3px)',
+              filter: 'blur(2px)',
               opacity: 0,
               transform: 'scale(0.5)',
               animation: `smokeVialPuff ${p.dur}ms ease-out ${p.delay}ms forwards`,
@@ -24305,14 +24526,50 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Find all hero zones from the "me" side (bottom) for stable measurement
       const myHeroes = container.querySelectorAll('[data-hero-owner="me"][data-hero-zone]');
       if (myHeroes.length < 3) return;
-      const containerRect = container.getBoundingClientRect();
-      const rects = Array.from(myHeroes).sort((a, b) => +a.dataset.heroIdx - +b.dataset.heroIdx).map(el => el.getBoundingClientRect());
-      // Half-zone offset: use actual rendered zone width (scales with --board-scale)
-      const halfZone = (myHeroes[0]?.offsetWidth || 68) / 2;
-      // Midpoint between hero 0 right edge and hero 1 left edge
-      const mid01 = ((rects[0].left + rects[0].right) / 2 + (rects[1].left + rects[1].right) / 2) / 2 - containerRect.left - halfZone;
-      // Midpoint between hero 1 right edge and hero 2 left edge
-      const mid12 = ((rects[1].left + rects[1].right) / 2 + (rects[2].left + rects[2].right) / 2) / 2 - containerRect.left - halfZone;
+      // ★★ v1238 — GEMESSEN UND GESETZT WIRD IM SELBEN RAUM
+      // (Als Befund 19.9.: „die linke Area-Zone sollte weiter in die
+      // Mitte — ihr Abstand zum linken Hero soll so gross sein wie der
+      // der gegnerischen Area zum mittleren Hero.")
+      //
+      // Die Rechnung mass die Heldenzonen mit `getBoundingClientRect`,
+      // also im PROJIZIERTEN Raum des gekippten Bretts, zog davon eine
+      // LAYOUT-Breite ab und schrieb das Ergebnis als `left` — wieder
+      // ein Layoutwert. Drei Raeume in einer Zeile. Weil die Projektion
+      // um den mittleren Helden herum arbeitet, verzog das die beiden
+      // Zonen ungleich: nachgemessen lag die eigene Area 11 px naeher
+      // an ihrem linken Nachbarn als die gegnerische an ihrem.
+      //
+      // Jetzt laeuft alles in LAYOUT-Koordinaten: `offsetLeft` bis zur
+      // Brettebene aufsummiert (vom Transform unberuehrt, genau der
+      // Raum, in dem `left` gilt). Dazu kommt `--center-offset`, denn
+      // den tragen die Heldenzeilen als Transform, der Area-Kasten
+      // aber nicht — ohne ihn saessen die Zonen um diesen Betrag
+      // daneben. Nachgemessen stehen alle vier Abstaende danach
+      // gleich (±0,8 px).
+      const ebene = container.querySelector('.board-plane') || container;
+      const layoutX = (el) => {
+        let x = 0;
+        for (let n = el; n && n !== ebene; n = n.offsetParent) x += n.offsetLeft;
+        return x;
+      };
+      const heroes = Array.from(myHeroes).sort((a, b) => +a.dataset.heroIdx - +b.dataset.heroIdx);
+      const mitten = heroes.map(el => layoutX(el) + el.offsetWidth / 2);
+      // Die Area ist breiter als eine Heldenzone (Stapelmass seit
+      // v1237) — zentriert wird sie mit IHRER halben Breite.
+      const areaEl = container.querySelector('[data-area-zone]');
+      const halfZone = ((areaEl && areaEl.offsetWidth) || heroes[0]?.offsetWidth || 68) / 2;
+      const mittenVersatz = parseFloat(
+        getComputedStyle(container).getPropertyValue('--center-offset')) || 0;
+      // ★ v1239 (Als Vorgabe 19.9.: „bewege sie beide noch um eine
+      // halbe Hero-Zonen-Breite nach rechts"). Der Mittelpunkt zwischen
+      // zwei Heldenzonen ist nicht die Mitte der Luecke, die sie
+      // umgeben: eine Heldengruppe traegt rechts ihre Surprise-Zone,
+      // links nur den Vorlauf-Platzhalter. Beide Zonen wandern deshalb
+      // um eine halbe Heldenbreite nach rechts — gemessen, nicht
+      // gesetzt, damit es bei jedem Massstab stimmt.
+      const versatzRechts = (heroes[0]?.offsetWidth || 68) / 2;
+      const mid01 = (mitten[0] + mitten[1]) / 2 - halfZone + mittenVersatz + versatzRechts;
+      const mid12 = (mitten[1] + mitten[2]) / 2 - halfZone + mittenVersatz + versatzRechts;
       setAreaPositions([mid01, mid12]);
     };
     // Defer the initial measure one frame so the board auto-scaling
@@ -24346,11 +24603,64 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   useEffect(() => {
     const container = boardCenterRef.current;
     if (!container) return;
-    const IDEAL_WIDTH = 1100; // px at scale 1.0 — matches full-size reference layout
+    // px at scale 1.0 — matches full-size reference layout.
+    // ★ v1237: Die beiden Standplaetze der Area-Zonen zwischen den
+    // Heldengruppen (`.board-area-spacer`) sind mit der Area auf
+    // Stapelmass gewachsen. Der Bezugswert waechst um denselben Betrag
+    // mit, sonst faende der Massstab ein Brett vor, das breiter ist als
+    // sein eigener Bezug — und die Bildlaufleiste kaeme zu frueh.
+    const IDEAL_WIDTH = 1100;
+    // ★★ v1235 — DER MASSSTAB HÄNGT JETZT AUCH AN DER HÖHE, UND AN DEN
+    // SEITENSPALTEN. Beides kommt vom selben Schritt: Handkarten und
+    // Stapel liegen seit heute im Feldmaßstab, die Handleisten wachsen
+    // also mit der Karte und die Seitenspalten mit den Stapeln.
+    //
+    // Rein nach Breite gerechnet würde das Brett auf flachen Fenstern
+    // oben und unten beschnitten — `.board-center` blendet Überhang aus.
+    //
+    // BEIDE Rechnungen lösen ihren Maßstab in EINEM Schritt auf, statt
+    // sich über mehrere Bilder einzupendeln. Das ist kein Feinschliff:
+    // Spaltenbreite und Leistenhöhe hängen selbst am Maßstab, ein
+    // „messen → setzen → neu messen" wäre eine Rückkopplung, und
+    // genau daran hat das Brett schon einmal geflattert (v16, Battle-UI).
+    //   Breite:  die gemessene Spaltenbreite auf Maßstab 1 zurückrechnen,
+    //            zur Mitte addieren → die maßstabsfreie Gesamtbreite,
+    //            dann s = gesamt / (1100 + Spalten bei 1).
+    //   Höhe:   die Spielfläche selbst ist maßstabsfrei, also direkt
+    //            s = Höhe / (Reihen + beide Leisten, je bei Maßstab 1).
+    const REIHEN_H = 640;    // was die Brettreihen bei Maßstab 1 brauchen (gemessen)
     const MIN_SCALE = 0.45;  // never go smaller than this (touch target safety)
     const updateScale = () => {
-      const available = container.clientWidth;
-      const scale = Math.max(MIN_SCALE, Math.min(1, available / IDEAL_WIDTH));
+      const wurzel = getComputedStyle(document.documentElement);
+      const sJetzt = parseFloat(wurzel.getPropertyValue('--board-scale')) || 1;
+      const handMass = parseFloat(wurzel.getPropertyValue('--hand-card-scale')) || 1;
+
+      // ── Breite ──
+      let spalten = 0;
+      for (const el of document.querySelectorAll('.board-util')) spalten += el.offsetWidth;
+      const spalten1 = sJetzt > 0 ? spalten / sJetzt : spalten;
+      const gesamt = container.clientWidth + spalten;
+      // Zuschlag fuer die zwei gewachsenen Area-Standplaetze (s.o.).
+      // ★ v1251: Die Area hängt am STAPEL-Maßstab, nicht mehr am Handmaß.
+      const stapelMass = parseFloat(wurzel.getPropertyValue('--pile-card-scale')) || 1;
+      const areaZuschlag = 2 * Math.max(0, (64 * stapelMass + 4) - 68);
+      const scaleW = gesamt / (IDEAL_WIDTH + areaZuschlag + spalten1);
+
+      // ── Höhe ──
+      const flaeche = container.closest('.game-layout')
+        || document.querySelector('.game-layout');
+      // Beide Handleisten bei Maßstab 1. Die EIGENE ist seit v1247 um
+      // `--hand-senk-anteil` kürzer als ihre Karte — sie hängt unten
+      // heraus, und genau dieser Teil darf dem Brett nicht angerechnet
+      // werden, sonst verschenkte der Maßstab die Vergrößerung wieder.
+      const senkung = parseFloat(wurzel.getPropertyValue('--hand-senk-anteil')) || 0;
+      const leisten1 = (90 * handMass + 12)
+        + (90 * handMass * (1 - senkung) + 12);
+      const scaleH = flaeche && flaeche.clientHeight > 0
+        ? flaeche.clientHeight / (REIHEN_H + leisten1)
+        : 1;
+
+      const scale = Math.max(MIN_SCALE, Math.min(1, scaleW, scaleH));
       document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
       // Zweite, gleich grosse Variable (v805). Sie existiert nur, damit
       // Teilbereiche des Bretts ihren eigenen Massstab bilden koennen:
@@ -24362,6 +24672,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     const ro = new ResizeObserver(updateScale);
     ro.observe(container);
+    // ★ v1235: reine HÖHENänderungen des Fensters lassen die Breite des
+    // Brettkastens unverändert — ohne diesen zweiten Beobachter bliebe
+    // der (jetzt höhenabhängige) Maßstab dabei stehen.
+    const flaecheRO = container.closest('.game-layout')
+      || document.querySelector('.game-layout');
+    if (flaecheRO) ro.observe(flaecheRO);
     updateScale();
     return () => {
       ro.disconnect();
@@ -24439,13 +24755,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const newAnims = [];
             for (let i = 0; i < newCount - prevCount; i++) {
               const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
-              const targetRect = targetCard?.getBoundingClientRect();
+              // ★ v1233: gleiche Lage wie in der Gegnerhand — die
+              // Zuschauer-Hand hat keine Platz-Hülle, die Karte dreht
+              // selbst. Echten Kasten und Winkel über den Helfer.
+              const targetRect = window.handFanCardBox?.(targetCard)
+                || targetCard?.getBoundingClientRect();
               if (!targetRect) continue;
               newAnims.push({
                 id: Date.now() + Math.random() + i,
                 startX: deckRect.left + deckRect.width / 2 - 32,
                 startY: deckRect.top + deckRect.height / 2 - 45,
                 endX: targetRect.left, endY: targetRect.top,
+                fanRot: (targetRect.rot || 0) + 'deg',
               });
             }
             if (newAnims.length > 0) {
@@ -24804,24 +25125,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (let i = 0; i < newCount - prevCount; i++) {
             // Target the last card(s) in the hand — new cards appear at the end
             const targetCard = handCards[handCards.length - 1 - (newCount - prevCount - 1 - i)];
-            const targetRect = targetCard?.getBoundingClientRect();
+            // ★ v1233: Die Gegnerhand ist gefächert und ihre Karten
+            // tragen die Drehung SELBST — `getBoundingClientRect`
+            // lieferte hier also den achsenparallelen Hüllkasten, und
+            // der ist breiter als die Karte und sitzt links oben
+            // daneben. `handFanCardBox` (app-shared) rechnet daraus den
+            // echten Kasten zurück und gibt den Landewinkel mit.
+            const targetRect = window.handFanCardBox?.(targetCard)
+              || targetCard?.getBoundingClientRect();
             if (!targetRect) continue;
             const sx = deckRect.left + deckRect.width / 2 - 32;
             const sy = deckRect.top + deckRect.height / 2 - 45;
+            const fanRot = (targetRect.rot || 0) + 'deg';
             // If this is a deck-searched card, show face-up in the normal draw animation
             if (deckSearchPending.length > 0) {
               const searchCardName = deckSearchPending.shift();
               newAnims.push({
                 id: Date.now() + Math.random() + i,
                 startX: sx, startY: sy,
-                endX: targetRect.left, endY: targetRect.top,
+                endX: targetRect.left, endY: targetRect.top, fanRot,
                 cardName: searchCardName, // Face-up
               });
             } else {
               newAnims.push({
                 id: Date.now() + Math.random() + i,
                 startX: sx, startY: sy,
-                endX: targetRect.left, endY: targetRect.top,
+                endX: targetRect.left, endY: targetRect.top, fanRot,
               });
             }
           }
@@ -24910,6 +25239,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [discardAnims, setDiscardAnims] = useState([]);
   // v1138: fliegende Geschenke zwischen den Goldanzeigen.
   const [goldGifts, setGoldGifts] = useState([]);
+  // ★★ v1227 (Als Vorgabe): Suchfeld der Kartengalerie. Der Zustand
+  // liegt HIER und nicht im Galerie-Rumpf — der ist eine sofort
+  // ausgefuehrte Funktion in JSX, dort sind Haken nicht erlaubt.
+  const [galerieFilter, setGalerieFilter] = useState('');
   const [myDiscardHidden, setMyDiscardHidden] = useState(0);
   const [oppDiscardHidden, setOppDiscardHidden] = useState(0);
   const [myDeletedHidden, setMyDeletedHidden] = useState(0);
@@ -25314,7 +25647,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (!sr) continue;
             const cardName = newDiscardEntries.shift();
             const t = getPileCenter('[data-my-discard]');
-            if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+            if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'discard' });
           }
           const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - handDiscardCount), newDeletedEntries.length);
           for (let i = 0; i < handDeletedCount; i++) {
@@ -25322,7 +25655,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (!sr) continue;
             const cardName = newDeletedEntries.shift();
             const t = getPileCenter('[data-my-deleted]');
-            if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+            if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'deleted' });
           }
         }
 
@@ -25370,7 +25703,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           for (let i = 0; i < prevCount - newCount; i++) {
             const sr = storedRects[Math.max(0, prevCount - 1 - i)];
             if (!sr) continue;
-            returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+            returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, ausHand: true, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
           }
           if (returnAnims.length > 0) {
             setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
@@ -25477,14 +25810,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (idx >= 0) {
             newDiscardEntries.splice(idx, 1);
             const t = getPileCenter('[data-my-discard]');
-            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'discard' });
             continue;
           }
           idx = newDeletedEntries.indexOf(r.cardName);
           if (idx >= 0) {
             newDeletedEntries.splice(idx, 1);
             const t = getPileCenter('[data-my-deleted]');
-            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+            if (t) newAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'deleted' });
           }
         }
       }
@@ -25597,7 +25930,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const target = isToOpp ? (oppDeckTarget || deckTarget)
           : (isPotion && potionTarget) ? potionTarget : deckTarget;
         if (!target) continue;
-        returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest: isToOpp ? 'opp-deck' : isPotion ? 'potion' : 'deck' });
+        returnAnims.push({ id: Date.now() + Math.random(), cardName: r.cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: target.x, endY: target.y, dest: isToOpp ? 'opp-deck' : isPotion ? 'potion' : 'deck' });
       }
       if (returnAnims.length > 0) {
         setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
@@ -25730,7 +26063,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!sr) continue;
           _handDiscardsGeflogen++;
           const t = getPileCenter('[data-opp-discard]');
-          if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'discard' });
+          if (t) newAnims.push({ id: Date.now() + Math.random() + i, cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'discard' });
         }
         const handDeletedCount = Math.min(Math.max(0, (prevCount - newCount) - _handDiscardsGeflogen), newDeletedEntries.length);
         for (let i = 0; i < handDeletedCount; i++) {
@@ -25739,7 +26072,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const sr = storedRects[Math.max(0, Math.min(handSlotCursor--, storedRects.length - 1))];
           if (!sr) continue;
           const t = getPileCenter('[data-opp-deleted]');
-          if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, endX: t.x, endY: t.y, dest: 'deleted' });
+          if (t) newAnims.push({ id: Date.now() + Math.random() + 0.5 + i, cardName, startX: sr.left, startY: sr.top, ausHand: true, endX: t.x, endY: t.y, dest: 'deleted' });
         }
       }
 
@@ -25797,7 +26130,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         for (let i = 0; i < returnedCount; i++) {
           const sr = storedRects[Math.max(0, prevCount - 1 - i)];
           if (!sr) continue;
-          returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
+          returnAnims.push({ id: Date.now() + Math.random() + i, cardName: '', startX: sr.left, startY: sr.top, ausHand: true, endX: deckTarget.x, endY: deckTarget.y, dest: 'deck' });
         }
         if (returnAnims.length > 0) {
           setDiscardAnims(prev => [...prev, ...returnAnims.map(a => (a.t0 == null ? { ...a, t0: ppJetzt() } : a))]);
@@ -26524,6 +26857,45 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // target selection. Play the open cue once when that state appears for me.
   const targetingActive = !!(gameState.potionTargeting && gameState.potionTargeting.ownerIdx === myIdx);
   const effectPromptActive = !!(gameState.effectPrompt && gameState.effectPrompt.ownerIdx === myIdx);
+  // ★★ v1228 (Als Befund 18.9.: „gegen Ende der Fluganimation blitzt
+  // kurz eine weiter unten gelegene Karte des Stapels auf").
+  //
+  // Die Verdeckung des Stapelkopfs lief auf einer Uhr. Kam der Abgleich
+  // FRUEHER als sie, war der Stapel schon kuerzer UND es wurde weiter
+  // eine Karte verdeckt — sichtbar wurde dann die Karte DARUNTER, bis
+  // die Uhr ablief. Genau das Aufblitzen.
+  //
+  // Jetzt wacht die Stapellaenge: wird ein Stapel kuerzer, ist sein
+  // Kopf ohnehin weg und jede Verdeckung hat sich erledigt. Nur beim
+  // SCHRUMPFEN, nicht beim Wachsen — eine Karte, die IN den Stapel
+  // fliegt, muss weiter verdeckt bleiben, bis sie landet.
+  const stapelLaengeRef = useRef(null);
+  // ★★ v1229 (Als Befund: „kann nach wie vor zu einem deutlich
+  // kuerzeren Aufblitzen kommen, allerdings auch nicht immer").
+  // `useEffect` laeuft NACH dem Zeichnen — genau ein Bild lang stand
+  // damit der gekuerzte Stapel MIT der alten Verdeckung im Bild, und
+  // man sah die Karte darunter. `useLayoutEffect` laeuft vor dem
+  // Zeichnen: der Betrachter bekommt diesen Zwischenstand nie zu
+  // sehen. Dass es „nicht immer" auftrat, passt dazu — es haengt
+  // daran, ob Abgleich und Bild im selben Takt zusammenfallen.
+  useLayoutEffect(() => {
+    const jetzt = {
+      meD: me?.discardPile?.length || 0, oppD: opp?.discardPile?.length || 0,
+      meX: me?.deletedPile?.length || 0, oppX: opp?.deletedPile?.length || 0,
+    };
+    const vorher = stapelLaengeRef.current;
+    stapelLaengeRef.current = jetzt;
+    if (!vorher) return;
+    if (jetzt.meD  < vorher.meD)  setMyDiscardHidden(0);
+    if (jetzt.oppD < vorher.oppD) setOppDiscardHidden(0);
+    if (jetzt.meX  < vorher.meX)  setMyDeletedHidden(0);
+    if (jetzt.oppX < vorher.oppX) setOppDeletedHidden(0);
+  }, [me?.discardPile?.length, opp?.discardPile?.length,
+      me?.deletedPile?.length, opp?.deletedPile?.length]);
+
+  // ★ v1227: Ein neuer Dialog startet mit leerem Suchfeld.
+  useEffect(() => { setGalerieFilter(''); },
+    [gameState.effectPrompt?.type, gameState.effectPrompt?.title, effectPromptActive]);
   useEffect(() => { if (targetingActive && window.playSFX) window.playSFX('ui_prompt_open'); }, [targetingActive]);
   useEffect(() => { if (effectPromptActive && window.playSFX) window.playSFX('ui_prompt_open'); }, [effectPromptActive]);
 
@@ -27233,6 +27605,38 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       && (me.heroes || []).some((h, hi) => heroCanAscendTo(h, hi, cardName, idx));
     const _startPt = window.getPointerXY(e);
     const startX = _startPt.x, startY = _startPt.y;
+    // ★★ v1225 (Als Befund 18.9.: „die Kopie der Karte haelt man
+    // ploetzlich an ihrem unteren Drittel fest; bei Diamond-Karten liegt
+    // sie deutlich UEBER dem Cursor").
+    //
+    // Der Geisterkarte lag ein FESTER Versatz von 32/45 zugrunde — die
+    // halbe Karte bei Massstab 1. Damit haengt sie erstens immer an
+    // ihrer Mitte statt am Griffpunkt, und zweitens stimmt selbst die
+    // Mitte nicht, sobald `--board-scale` oder der Kartenrahmen davon
+    // abweichen (Foil-Rahmen). Jetzt wird der Griff EINMAL beim
+    // Druecken am echten Kartenkasten gemessen und mitgefuehrt.
+    // ★★ v1226 (Als Befund, zweiter Anlauf): v1225 mass den Kasten der
+    // KARTE — und der ist im Moment des Druckens HERVORGEHOBEN. Die
+    // Karte unter dem Zeiger steht auf 1,42-facher Groesse und 18 px
+    // angehoben (Hover-Highlight seit v1214), der gemessene Kasten also
+    // 127x179 statt 90x126 und um 63 px nach oben verschoben. Gegriffen
+    // im oberen Fuenftel kam so ein Griff von (64, 88) heraus — fast
+    // die volle Kartenhoehe. Genau das „ich halte sie am unteren
+    // Drittel fest".
+    //
+    // Gemessen wird deshalb der PLATZ (`.hand-slot` / `.creation-slot`,
+    // nie transformiert) fuer die Lage und `offsetWidth/offsetHeight`
+    // der Karte fuer die Groesse — beide vom `transform` unberuehrt.
+    // Dieselbe Trennung wie bei der Handneigung seit v1210.
+    const _griffPlatz = e.currentTarget?.closest?.('.hand-slot, .creation-slot') || null;
+    const _griffEl = _griffPlatz?.querySelector?.(':scope > .board-card')
+      || e.currentTarget?.closest?.('.board-card') || null;
+    const _griffR = _griffPlatz ? _griffPlatz.getBoundingClientRect() : null;
+    const _kb = _griffEl ? _griffEl.offsetWidth : 64;
+    const _kh = _griffEl ? _griffEl.offsetHeight : 90;
+    const _spanne = (wert, max) => Math.max(0, Math.min(max, wert));
+    const griffX = _griffR ? _spanne(startX - _griffR.left, _kb) : _kb / 2;
+    const griffY = _griffR ? _spanne(startY - _griffR.top, _kh) : _kh / 2;
     let dragging = false;
 
     // Helper: check if cursor is inside the hand zone
@@ -27244,7 +27648,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
      * Handsortierung mit einem Vorrats-Index (Als Befund 28.8.:
      * „erzeugt einen temporaeren Klon in der Haupt-Hand").
      */
-    const zoneRect = (sel) => handRef.current?.querySelector(sel)?.getBoundingClientRect();
+    /**
+     * ★★ v1256 (Als Befund 19.9.: „die Drop-Zone fuer die eigene Hand
+     * ist deutlich zu hoch, die Support Zones sind vollstaendig davon
+     * bedeckt"). Die Reihe traegt oben gut eine Kartenhoehe Polster
+     * (Faecherbogen und Hover-Vergroesserung, v1243) — ihr
+     * Begrenzungsrechteck reicht damit weit ins Feld hinauf. Gemessen
+     * wird deshalb der INHALTSKASTEN: Polster abgezogen, und die Hand
+     * beansprucht wieder genau die Flaeche, auf der ihre Karten liegen.
+     * (Die Polsterwerte sind echte Laengen und lassen sich — anders
+     * als die Kartenmass-Variablen — direkt lesen.)
+     */
+    const zoneRect = (sel) => {
+      const el = handRef.current?.querySelector(sel);
+      if (!el) return undefined;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const z = (v) => parseFloat(v) || 0;
+      return {
+        left: r.left + z(cs.paddingLeft), right: r.right - z(cs.paddingRight),
+        top: r.top + z(cs.paddingTop), bottom: r.bottom - z(cs.paddingBottom),
+      };
+    };
     const isInsideHandZone = (mx, my) => {
       const r = zoneRect('.game-hand-cards');
       return !!r && mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom;
@@ -27258,10 +27683,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!dragging) {
         if (Math.abs(mx - startX) + Math.abs(my - startY) < 5) return;
         dragging = true;
-        // ★ v1210: Die Karte hebt ab (Als Vorgabe 18.9.). Erst HIER,
-        // nicht schon beim Druecken — sonst klickt jeder Klick auf eine
-        // Handkarte mit, auch der, der nur ein Menue oeffnet.
-        window.playCardDragSFX?.('pickup');
+        // ★★ v1215 (Als Befund 18.9.: „beim Drag/Drop wird manchmal eine
+        // ANDERE Handkarte gross gehighlightet"). Der Riegel hing bisher
+        // nur am React-Effekt — der laeuft erst nach dem naechsten
+        // Render, und genau in diesem Fenster kann der Zeiger schon
+        // ueber der Nachbarkarte stehen und sie aufpoppen lassen. Also
+        // SOFORT hier, in derselben Ereignisschleife, in der das Ziehen
+        // beginnt. Der Effekt setzt danach denselben Wert nochmal —
+        // harmlos, aber der Ausschalter darf nicht auf React warten.
+        window.setHandDragFlag?.(true);
+        // ★ v1213: KEIN Klang beim Aufheben (Als Befund 18.9.: „der
+        // irritiert beim laufenden Spiel"). Waehrend einer Partie hebt
+        // man staendig Karten an, um zu vergleichen oder Ziele zu
+        // pruefen — ein Ton bei jedem dieser Griffe meldet ein Ereignis,
+        // das keines ist. Die Klaenge bleiben da, wo wirklich etwas
+        // passiert: Ablegen und Umsortieren.
       }
 
       // ★ Jede Haelfte sortiert nur SICH SELBST (Als Regel 28.8.:
@@ -27275,7 +27711,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (inHand || inCreation) {
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation, griffX, griffY });
         return;
       }
 
@@ -27320,7 +27756,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         setAbilityDrag(null);
         setPlayDrag({
-          idx, cardName, card, mouseX: mx, mouseY: my,
+          idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY,
           targetHero, targetSlot,
           pickHandCardDrag: true,
           // Im Hero-Modus ist `targetSlot` immer -1 — der Abwurf-Riegel
@@ -27419,7 +27855,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // VORRATS-Index gegen die HAND, findet einen anderen Namen und
         // lehnt ab; die Karte springt zurueck. Dieselbe Herkunft wie
         // in den anderen drei Ziehzustaenden.
-        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetZone, targetSupportZone, fromCreation });
+        setAbilityDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetZone, targetSupportZone, fromCreation });
       } else if (isPlayable && card.cardType === 'Creature') {
         // Play-mode drag — find valid drop target
         let targetHero = -1, targetSlot = -1;
@@ -27649,7 +28085,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost, charmedOwner: dropCharmedOwner, fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot, targetBakhmSlot, isSurprise: surpriseTarget, crossSideHost, charmedOwner: dropCharmedOwner, fromCreation });
       } else if (isEquipPlayable) {
         // Equip artifact drag — can drop on support zones OR heroes.
         // Cross-side artifacts (Powder Keg etc., server-published in
@@ -27721,7 +28157,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         setPlayDrag({
-          idx, cardName, card, mouseX: mx, mouseY: my,
+          idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY,
           targetHero, targetSlot, isEquip: true,
           // `targetOwner` is forwarded to the server as the chosen
           // host side. Cross-side (Powder Keg) and free-side equips
@@ -27783,7 +28219,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetBakhmSlot, isSurprise: true , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetBakhmSlot, isSurprise: true , fromCreation });
       } else if (isPlayable && (card.cardType === 'Spell' || card.cardType === 'Attack')) {
         // Spell/Attack drag — target hero zones (hero must have required spell schools)
         let targetHero = -1;
@@ -27984,7 +28420,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
         }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, targetSlot: targetSlot, targetAttachOwner, creatureCasterSlot, creatureCasterInstId, isSpell: !surpriseTarget, isSurprise: surpriseTarget, charmedOwner: surpriseTarget ? undefined : targetCharmedOwner , fromCreation });
       } else if (isAscensionPlayable) {
         // Ascended Hero drag — target hero zones with eligible base heroes
         let targetHero = -1;
@@ -28001,12 +28437,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }
           }
         }
-        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, targetHero, isAscension: true , fromCreation });
+        setPlayDrag({ idx, cardName, card, mouseX: mx, mouseY: my, griffX, griffY, targetHero, isAscension: true , fromCreation });
       } else {
         // Non-playable card outside hand zone — show floating card (no reorder gap)
         setPlayDrag(null);
         setAbilityDrag(null);
-        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation });
+        setHandDrag({ idx, cardName, mouseX: mx, mouseY: my, fromCreation, griffX, griffY });
       }
     };
 
@@ -28017,6 +28453,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // losgelassen heisst Umsortieren (Kartenrutscher), sonst ein
       // leiser Tick; landet die Karte wirklich, spielt die Engine ihren
       // `placement`-Klang ohnehin gleich hinterher.
+      // ★★ v1215: Riegel sofort loesen — auch wenn der Zug irgendwo in
+      // den vielen Zweigen darunter ohne Zustandswechsel endet.
+      window.setHandDragFlag?.(false);
       if (dragging) {
         const imEigenen = fromCreation
           ? isInsideCreationZone(upX, upY)
@@ -28553,13 +28992,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Build an indexMap (newIdx → oldIdx) so the server can remap any
         // per-index state (Luna Kiai's reveal marker, etc.) — without it,
         // revealed copies "lose" their state when their position changes.
-        const newHand = [...hand];
-        newHand.splice(idx, 1);
-        const dropIdx = calcDropIdx(upX, idx);
-        newHand.splice(dropIdx, 0, cardName);
-        const indexMap = hand.map((_, i) => i);
-        const [movedOldIdx] = indexMap.splice(idx, 1);
-        indexMap.splice(dropIdx, 0, movedOldIdx);
+        // ★★ v1218: dieselbe Bewegung auf ZWEI gleichlaufenden Listen —
+        // der Hand und der Index-Karte fuer den Server. `handMove`
+        // (app-shared) macht beide, damit sie nicht auseinanderlaufen.
+        const dropIdx = calcDropIdx(upX);
+        const newHand = window.handMove(hand, idx, dropIdx);
+        const indexMap = window.handMove(hand.map((_, i) => i), idx, dropIdx);
         setHand(newHand);
         socket.emit('reorder_hand', { roomId: gameState.roomId, hand: newHand, indexMap });
         setHandDrag(null); setPlayDrag(null); setAbilityDrag(null);
@@ -28810,33 +29248,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     window.addDragListeners(onMove, onUp);
   };
 
-  const calcDropIdx = (mouseX, excludeIdx) => {
-    if (!handRef.current) return 0;
-    // ★ Nur die Handplaetze. Der Vorrat traegt seit heute eine eigene
-    // Klasse (`creation-slot`), damit er hier nicht mitgezaehlt wird.
-    const slots = handRef.current.querySelectorAll('.game-hand-cards .hand-slot:not(.hand-dragging)');
-    let targetIdx = slots.length;
-    for (let i = 0; i < slots.length; i++) {
-      const r = slots[i].getBoundingClientRect();
-      if (mouseX < r.left + r.width / 2) { targetIdx = i; break; }
-    }
-    // Adjust for the removed card
-    if (excludeIdx <= targetIdx) return targetIdx;
-    return targetIdx;
-  };
+  // ★★ v1218: Die Rechnung steht in app-shared (`handDropIndex`) und
+  // wird vom Puzzle-Editor MITBENUTZT — bis heute lag sie zweimal im
+  // Code. `excludeIdx` ist dabei entfallen: beide Zweige gaben
+  // denselben Wert zurueck, der Parameter tat also seit jeher nichts.
+  // Nur die Handplaetze; der Vorrat traegt eine eigene Klasse
+  // (`creation-slot`), damit er hier nicht mitgezaehlt wird.
+  const calcDropIdx = (mouseX) => window.handDropIndex?.(handRef.current, mouseX, {
+    slots: '.game-hand-cards .hand-slot', skip: '.hand-dragging',
+  }) ?? 0;
 
   /** Tropfindex im Vorrat — gleiche Rechnung wie `calcDropIdx`, nur
    *  ueber die Vorratsplaetze. */
-  const calcCreationDropIdx = (mouseX, excludeIdx) => {
-    if (!handRef.current) return 0;
-    const slots = handRef.current.querySelectorAll('.creation-slot:not(.hand-dragging)');
-    let targetIdx = slots.length;
-    for (let i = 0; i < slots.length; i++) {
-      const r = slots[i].getBoundingClientRect();
-      if (mouseX < r.left + r.width / 2) { targetIdx = i; break; }
-    }
-    return targetIdx;
-  };
+  const calcCreationDropIdx = (mouseX) => window.handDropIndex?.(handRef.current, mouseX, {
+    slots: '.creation-slot', skip: '.hand-dragging',
+  }) ?? 0;
 
   /**
    * Anzeige des Vorrats mit Zieh-Luecke — dasselbe Muster wie
@@ -28898,18 +29324,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // 28.8.: eine Vorratskarte ist keine Handkarte) — beide zugleich zu
   // kippen behauptet einen Zusammenhang, den es nicht gibt.
   const handZieh = handDrag || playDrag || abilityDrag || null;
-  useEffect(() => {
-    const alle = document.querySelectorAll(
-      '.game-hand-me .game-hand-cards .hand-slot, .game-hand-me .game-hand-creation-cards .creation-slot');
-    const reihe = handZieh?.fromCreation
-      ? '.game-hand-me .game-hand-creation-cards .creation-slot'
-      : '.game-hand-me .game-hand-cards .hand-slot';
-    window.clearHandTilt?.(alle, { inner: ':scope > .board-card' });
-    if (handZieh && handZieh.mouseX != null) {
-      window.applyHandTilt?.(document.querySelectorAll(reihe), handZieh.mouseX,
-        { inner: ':scope > .board-card' });
-    }
-  }, [handZieh]);
 
   // ★ v999: „Ist das eine der gerade erschienenen Karten?" — die
   // letzten `handFxPending` Plaetze der AKTUELLEN Hand. Neue Karten
@@ -28925,14 +29339,58 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const items = hand.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
     // Only show gap for reorder drag, not play drag
     if (handDragEigen) {
-      const dropIdx = calcDropIdx(handDragEigen.mouseX, handDragEigen.idx);
-      // Adjust for drag source still being in the array
-      let insertAt = dropIdx;
-      if (insertAt >= handDragEigen.idx) insertAt++;
-      items.splice(insertAt, 0, { card: null, origIdx: -1, isGap: true });
+      // ★★ v1218: Luecke ueber `handItemsWithGap` (app-shared) — die
+      // `+1`-Regel der Index-Raeume steht damit an EINER Stelle.
+      return window.handItemsWithGap(hand, handDragEigen.idx,
+        calcDropIdx(handDragEigen.mouseX));
     }
     return items;
   }, [hand, handDrag, playDrag, abilityDrag]);
+
+  // ★★ v1217, ZUR PLATZIERUNG: dieser Block steht hinter `displayHand`,
+  // weil er es LIEST. Weiter oben waere es beim Rendern `undefined` —
+  // `transform-block-scoping` macht aus dem `const` ein hochgezogenes
+  // `var`, und `undefined.findIndex` wirft sofort. Dieselbe Falle wie
+  // bei der Abhaengigkeitsliste in v1210, nur eine Stufe haerter.
+  // ★★ v1217: Die LUECKE treibt die Neigung, nicht die Maus.
+  // `displayHand` traegt sie bereits an der Stelle, an der die Karte
+  // beim Loslassen landen wuerde — das ist die Zeigerposition in
+  // Karten ausgedrueckt. Damit faellt nicht nur die Messung weg,
+  // sondern auch der Grund fuer das Zittern (siehe applyHandTilt).
+  const handGapIdx = useMemo(() => displayHand.findIndex(it => it.isGap), [displayHand]);
+  // Takt des Effekts: beim Umsortieren aendert er sich nur, wenn die
+  // Luecke SPRINGT — statt sechzigmal je Sekunde. Fuer die uebrigen
+  // Zuege (Vorrat, Ausspielen, Ability) gibt es keine Luecke; dort
+  // genuegt ein grobes Raster von 30 px, die Hand steht dabei still.
+  const ziehTakt = !handZieh ? null
+    : (handGapIdx >= 0 && !handZieh.fromCreation)
+      ? 'g' + handGapIdx
+      : 'm' + Math.round((handZieh.mouseX || 0) / 30);
+  useEffect(() => {
+    const alle = document.querySelectorAll(
+      '.game-hand-me .game-hand-cards .hand-slot, .game-hand-me .game-hand-creation-cards .creation-slot');
+    const reihe = handZieh?.fromCreation
+      ? '.game-hand-me .game-hand-creation-cards .creation-slot'
+      : '.game-hand-me .game-hand-cards .hand-slot';
+    // ★ v1214: Waehrend eines Zuges hebt keine Karte beim Hovern ab
+    // (siehe style.css). Die Klasse haengt hier mit dran, weil dieser
+    // Effekt ohnehin genau die Zieh-Zustaende beobachtet.
+    // ★ v1219: `handDrag` ist genau dann gesetzt, wenn der Zeiger IN
+    // der eigenen Hand bzw. im Vorrat steht (onMove schaltet dort auf
+    // Umsortier-Modus um). Damit weiss die Ablagezone ohne eine einzige
+    // zusaetzliche Messung, dass sie aufleuchten soll.
+    window.setHandDragFlag?.(!!handZieh, !handDrag ? null
+      : handDrag.fromCreation
+        ? '.game-hand-me .game-hand-creation-cards'
+        : '.game-hand-me .game-hand-cards');
+    if (!handZieh) { window.clearHandTilt?.(alle, { inner: ':scope > .board-card' }); return; }
+    if (handZieh.mouseX == null) return;
+    window.applyHandTilt?.(document.querySelectorAll(reihe), handZieh.mouseX, {
+      inner: ':scope > .board-card',
+      // Nur beim Umsortieren IN der Hand gibt es eine Luecke.
+      gapIndex: (handGapIdx >= 0 && !handZieh.fromCreation) ? handGapIdx : undefined,
+    });
+  }, [ziehTakt]);
 
   // Per-copy revealed hand indices (Luna Kiai). Server stamps the
   // specific clicked index and returns the list here — the client just
@@ -29314,6 +29772,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Rueckfall hier aufgeloest statt in einen Selektor-String
       // gepresst (`querySelector` mit Komma liefert die erste Stelle im
       // Dokument, nicht die bevorzugte).
+      // ★★ v1223 — `layer: 'overAreas'`: eine brettweite Lage ZWISCHEN
+      // Area-Hintergrund und Karten (Als Vorgabe zu „Pink Sky": „auf
+      // dem Background-Layer, UEBER Area-Backgrounds").
+      //
+      // `layer: 'background'` reicht dafuer nicht: die Animationen
+      // werden im Baum des Spielbretts gerendert, die Area-Hintergruende
+      // liegen dagegen IN `.board-plane-clip`. Wer zwischen beide will,
+      // muss dorthin — genau wie der Beschwoerungskreis seit v1208.
+      // Eingehaengt wird direkt vor der Ebene: nach den Hintergruenden,
+      // vor den Karten.
+      //
+      // Der Knoten ist bewusst nackt (Wurzel + drei freie Lagen) — was
+      // er zeigt, steht in style.css unter `.pp-bg-anim-<typ>`. Damit
+      // kann jede weitere Karte denselben Weg nehmen, ohne dass hier
+      // etwas dazukommt.
+      if (zoneType === 'board' && rest.layer === 'overAreas') {
+        const clip = document.querySelector('.board-plane-clip');
+        const ebene = clip && clip.querySelector(':scope > .board-plane');
+        if (!clip || !ebene) return;
+        const dauer = rest.duration || 3000;
+        const el = document.createElement('div');
+        el.className = 'pp-bg-anim pp-bg-anim-' + String(type).replace(/_/g, '-');
+        el.style.setProperty('--pp-bg-dauer', dauer + 'ms');
+        el.setAttribute('aria-hidden', 'true');
+        el.innerHTML = '<i></i><i></i><i></i>';
+        clip.insertBefore(el, ebene);
+        setTimeout(() => el.remove(), dauer + 120);
+        return;
+      }
       if (zoneType === 'board') {
         // ★ v1088 („Cleansing of the Land", Als Vorgabe 14.9.: „aber auf
         // Hintergrund-Layer!"). `zoneType: 'board'` traf bisher immer
@@ -29345,6 +29832,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               extra.ox = q.left + q.width / 2;
               extra.oy = q.top + q.height / 2;
             }
+          }
+          // ★★ v1215: ZIELE einer Brett-Animation. „Flame Avalanche"
+          // schiesst Flammen vom Wirker auf JEDES Ziel — dafuer braucht
+          // die Komponente deren Bildschirmpunkte. Der Server schickt
+          // sie als `targets: [{owner, heroIdx, zoneSlot}]`; aufgeloest
+          // wird hier, weil nur der Client `myIdx` und das DOM kennt.
+          // Nicht gefundene Ziele (ausserhalb des Bildes, schon tot)
+          // fallen still heraus — die Animation laeuft mit dem Rest.
+          if (Array.isArray(rest.targets) && rest.targets.length) {
+            const punkte = [];
+            for (const t of rest.targets) {
+              const lbl2 = t.owner === myIdx ? 'me' : 'opp';
+              const sel2 = (t.zoneSlot == null || t.zoneSlot < 0)
+                ? `[data-hero-zone][data-hero-owner="${lbl2}"][data-hero-idx="${t.heroIdx}"]`
+                : `[data-support-zone][data-support-owner="${lbl2}"][data-support-hero="${t.heroIdx}"][data-support-slot="${t.zoneSlot}"]`;
+              const el2 = document.querySelector(sel2);
+              if (!el2) continue;
+              const q2 = el2.getBoundingClientRect();
+              if (!q2.width) continue;
+              punkte.push({ x: q2.left + q2.width / 2, y: q2.top + q2.height / 2 });
+            }
+            if (punkte.length) extra.targetPoints = punkte;
           }
           playAnimation(type, brett, { duration: 2000, ...rest, ...extra });
         }, window.ZONE_ANIM_MOUNT_DELAY_MS ?? 100);
@@ -29880,12 +30389,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           }
           const slots = document.querySelectorAll(`${basis} .hand-slot, ${basis} [data-hand-idx]`);
           if (slots.length > 0) {
-            const lr = slots[slots.length - 1].getBoundingClientRect();
+            // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
+            // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
+            // Hüllkasten ist also breiter als die Karte — und genau
+            // diese Breite dient hier als ABSTAND von Platz zu Platz.
+            // Der Helfer gibt den echten Kasten zurück (und beim
+            // Handplatz ohnehin unverändert den seinen).
+            const lr = window.handFanCardBox?.(slots[slots.length - 1])
+              || slots[slots.length - 1].getBoundingClientRect();
             const breit = lr.width, alt = slots.length;
             const endzahl = finalHandSize
               ? Math.max(finalHandSize, handIdx + 1)
               : Math.max(handIdx + 1, alt + 1);
-            const C = lr.right - (alt * breit) / 2;
+            const C = (lr.left + lr.width) - (alt * breit) / 2;
             const links = C - (endzahl * breit) / 2 + handIdx * breit;
             return { x: links + breit / 2, y: lr.top + lr.height / 2, w: breit, h: lr.height };
           }
@@ -30759,13 +31275,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Mask the real slot render for the whole flight.
       setPusherFlungHidden(prev => { const n = new Set(prev); n.add(hideKey); return n; });
 
+      // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+      const gm = flugMass('brett');
       const card = document.createElement('div');
       card.className = 'card-flight';
       const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
       card.style.cssText = [
         'position:fixed',
-        `left:${r.left + r.width / 2 - 32}px`, `top:${r.top + r.height / 2 - 44}px`,
-        'width:64px', 'height:88px', 'z-index:10210', 'pointer-events:none',
+        `left:${r.left + r.width / 2 - gm.b / 2}px`, `top:${r.top + r.height / 2 - gm.h / 2}px`,
+        `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10210', 'pointer-events:none',
         'border-radius:4px', 'overflow:hidden',
         'box-shadow:0 0 14px rgba(255,150,60,0.8),0 0 5px rgba(255,90,30,0.6)',
         `--pfUp:${up}px`,
@@ -33648,13 +34166,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       for (let i = 0; i < cardNames.length; i++) {
+        // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+        const gm = flugMass('stapel');
         const card = document.createElement('div');
         card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 200;
         card.style.cssText = `
-          position:fixed; left:${srcX - 32}px; top:${srcY - 44}px;
-          width:64px; height:88px; z-index:10200; pointer-events:none;
+          position:fixed; left:${srcX - gm.b / 2}px; top:${srcY - gm.h / 2}px;
+          width:${gm.b}px; height:${gm.h}px; z-index:10200; pointer-events:none;
           border-radius:4px; overflow:hidden;
           box-shadow: 0 0 12px rgba(100,255,150,0.7), 0 0 4px rgba(50,200,100,0.5);
           --dtdDx:${dx}px; --dtdDy:${dy}px;
@@ -33723,7 +34243,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Also hier zurueckgeben. `dedupe` faengt den Fall ab, dass ein
         // Weg doch beide Pfade ausloest; die Verzoegerung legt ihn auf
         // die Landung statt auf den Abflug.
-        if (from === 'deck' && window.playSFX) {
+        // ★★ v1228 (Als Vorgabe 18.9.): „Der Kartenflug Discard → Hand
+        // hat noch keinen Sound. Der sollte allgemein immer, egal durch
+        // welchen Effekt, denselben Sound in derselben Lautstaerke
+        // machen wie ein Draw." Also nicht mehr nur `from === 'deck'`:
+        // eine Karte, die auf der Hand LANDET, klingt wie ein Zug —
+        // gleich, aus welchem Stapel sie kommt. Hat der Aufrufer einen
+        // eigenen Klang mitgeschickt (`sfx`), bleibt es bei dem, sonst
+        // gaebe es zwei.
+        if (!sfx && window.playSFX) {
           setTimeout(() => window.playSFX('draw', { dedupe: 120 }), 260);
         }
       }
@@ -33859,7 +34387,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // reproduces the exact single-add projection.
             const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
             if (slots.length > 0) {
-              const lastRect = slots[slots.length - 1].getBoundingClientRect();
+              // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
+              // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
+              // Hüllkasten ist also breiter als die Karte — und genau
+              // diese Breite dient hier als ABSTAND von Platz zu Platz.
+              // Der Helfer gibt den echten Kasten zurück (und beim
+              // Handplatz ohnehin unverändert den seinen).
+              const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
+                || slots[slots.length - 1].getBoundingClientRect();
               const cardW = lastRect.width;
               const oldCount = slots.length;
               // v891 (Als Befund zu Shooting Star): Der Boden `oldCount + 1`
@@ -33878,7 +34413,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               // Old hand spans [C - oldCount*cardW/2, C + oldCount*cardW/2];
               // the old last slot's right edge gives the centre C. The
               // final slot `handIdx` then sits at the centred offset.
-              const C = lastRect.right - (oldCount * cardW) / 2;
+              const C = (lastRect.left + lastRect.width) - (oldCount * cardW) / 2;
               const projLeft = C - (finalCount * cardW) / 2 + extras.handIdx * cardW;
               const projected = {
                 left:  projLeft,
@@ -33895,6 +34430,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
         return null;
       };
+      // ★★ v1227 (Als Befund 18.9.: „waehlt man die OBERSTE Karte eines
+      // Discards, bleibt sie sichtbar, waehrend eine Kopie zur Hand
+      // fliegt"). Fuer den umgekehrten Weg — Karte fliegt IN die Ablage
+      // — gibt es die Verdeckung des Stapelkopfs laengst
+      // (`setMyDiscardHidden` & Co.); fuer den Abflug fehlte sie.
+      // Verdeckt wird nur, wenn die fliegende Karte WIRKLICH obenauf
+      // liegt; sonst ist am Stapel nichts zu sehen, was verschwinden
+      // muesste.
+      if ((from === 'discard' || from === 'deleted') && cardName) {
+        const qs = gameState.players?.[srcOwner];
+        const stapel = from === 'discard' ? (qs?.discardPile || []) : (qs?.deletedPile || []);
+        if (stapel.length && stapel[stapel.length - 1] === cardName) {
+          const setzen = from === 'discard'
+            ? (srcIsMe ? setMyDiscardHidden : setOppDiscardHidden)
+            : (srcIsMe ? setMyDeletedHidden : setOppDeletedHidden);
+          setzen(p => p + 1);
+          // Notnagel: faellt der Abgleich aus, wird spaetestens hier
+          // wieder aufgedeckt. Der Regelfall ist die Laengenwache
+          // weiter unten — sie loest die Verdeckung in dem Moment, in
+          // dem der Stapel wirklich kuerzer wird.
+          setTimeout(() => setzen(p => Math.max(0, p - 1)), 1200);
+        }
+      }
       const srcEl = elementFor(from, srcIsMe, { heroIdx: fromHeroIdx, slotIdx: fromSlotIdx, handIdx: fromHandIdx, permId: fromPermId });
       const tgtEl = elementFor(to,   tgtIsMe, { handIdx: toHandIdx, finalHandSize, heroIdx: toHeroIdx, slotIdx: toSlotIdx });
       if (!srcEl || !tgtEl) return;
@@ -34002,12 +34560,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           || document.querySelectorAll(`${_reihe} .hand-card`).length;
         const handHideKey = `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
         setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
+        // ★★ v1221 (Als Befund 18.9. zu „Dive Down\": die Karte erscheint
+        // nach ihrem Flug kurz wieder in der Hand).
+        //
+        // Die Verdeckung faellt EIGENTLICH von selbst weg, sobald die
+        // Hand schrumpft — der Schluessel traegt die Handgroesse. Der
+        // Zeitgeber ist nur der Notnagel fuer Fluege, nach denen die
+        // Hand gar nicht kleiner wird.
+        //
+        // Mit 700 ms war er aber kein Notnagel, sondern die Regel:
+        // Reaktionen schicken den Flug los und oeffnen danach erst ihr
+        // Kettenfenster; bis der naechste `sync` die Hand kuerzt,
+        // vergeht laenger. Der Zeitgeber hob die Verdeckung auf,
+        // waehrend die Karte im Zustand noch in der Hand lag — und da
+        // stand sie dann wieder. Im Puzzle-Modus faellt es am meisten
+        // auf, weil dort die Gegnerhand offen liegt.
+        //
+        // 4 s decken auch lange Ketten ab. Laenger verdeckt bleibt ein
+        // Platz dadurch nicht: der Schluessel passt nicht mehr, sobald
+        // die Hand kuerzer wird.
         setTimeout(() => {
           setBounceReturnHidden(prev => {
             if (!prev.has(handHideKey)) return prev;
             const n = new Set(prev); n.delete(handHideKey); return n;
           });
-        }, 700);
+        }, 4000);
       }
 
       if (from === 'support' && fromHeroIdx != null && fromSlotIdx != null) {
@@ -34041,15 +34618,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // `pileTransferWindstorm` would never be defined — the card
       // would just snap to opacity:0 with no motion.
       // `-v3`: dieselbe Ueberlegung fuer `cardFlightTilt`.
-      if (!document.getElementById('pile-transfer-keyframes-v3')) {
+      if (!document.getElementById('pile-transfer-keyframes-v4')) {
         const style = document.createElement('style');
-        style.id = 'pile-transfer-keyframes-v3';
+        style.id = 'pile-transfer-keyframes-v4';
         style.textContent = `
           @keyframes pileTransfer {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
             20%  { transform: translate(0, -16px) scale(1.08); opacity: 1; }
-            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(0.92); opacity: 1; }
-            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(0.7); opacity: 0; }
+            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(calc(var(--ptScale, 1) * 0.92)); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(calc(var(--ptScale, 1) * 0.7)); opacity: 0; }
           }
           /* Hand-landing variant: no fade/shrink at the end. The card
              arrives solidly so the reveal of the hidden hand slot
@@ -34057,8 +34634,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           @keyframes pileTransferToHand {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
             20%  { transform: translate(0, -16px) scale(1.08); opacity: 1; }
-            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(0.98); opacity: 1; }
-            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(1); opacity: 1; }
+            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(calc(var(--ptScale, 1) * 0.98)); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(var(--ptScale, 1)); opacity: 1; }
           }
           /* Windstorm variant: card is buffeted along its journey by
              gusts of wind. Lateral push/pull on every keyframe stop,
@@ -34221,13 +34798,46 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Kartenkunst dann bei jedem Frame neu zwischen Pixeln
       // interpoliert werden, was als Flimmern sichtbar wird. Das Ziel
       // verschiebt sich dadurch um höchstens einen halben Pixel.
+      // ★★ v1235 — DIE FLIEGENDE KOPIE HAT DAS MASS IHRER QUELLE UND
+      // WÄCHST ODER SCHRUMPFT AUF DAS MASS IHRES ZIELS.
+      //
+      // Hand, Deck, Potion-Deck, Ablage und Gelöscht-Stapel tragen seit
+      // v1235 dieselbe Kartengröße; Brettzonen sind bei 64×90
+      // geblieben. Ein Flug zwischen zwei Stapeln wird damit gar nicht
+      // mehr skaliert (Als Vorgabe), und die verbleibenden Wechsel
+      // Brett↔Stapel laufen als weiche Fahrt statt als Sprung beim
+      // Ankommen: die Kopie startet in der Größe der Quelle, und
+      // `--ptScale` fährt sie auf das Ziel (die Flugbahn ist Mitte zu
+      // Mitte, ein Skalieren um die Mitte landet also weiterhin genau).
+      //
+      // Das Handmaß kommt aus derselben Quelle wie die Karten selbst:
+      // die Variablen stehen an `documentElement`, wo auch
+      // `--board-scale` liegt, der Wert ist also schon im richtigen
+      // Maßstab.
+      // ★ v1251: DREI Formate statt zwei. Die Stapel haben seit heute
+      // ihren eigenen Maßstab (`--pile-card-*`, siehe style.css), sind
+      // also weder Hand- noch Brettgröße. Der Flug nimmt weiterhin das
+      // Maß seiner Quelle und fährt per `--ptScale` auf das des Ziels —
+      // dass eine Karte zwischen Hand und Stapel dabei ihre Größe
+      // ändert, ist Als Entscheidung und genau diese Fahrt macht es
+      // sichtbar statt sprunghaft.
+      // ★ v1256: EIN Helfer fuer alle Flugmasse (siehe `flugMass`) —
+      // die eigene Rechnung hier las dieselben calc()-Texte und fiel
+      // deshalb still auf Brettgroesse zurueck.
+      const STAPEL_ORTE = { deck: 1, potionDeck: 1, discard: 1, deleted: 1, area: 1 };
+      const massFuer = (ort) => flugMass(ort === 'hand' ? 'hand'
+        : STAPEL_ORTE[ort] ? 'stapel' : 'brett');
+      const mQuelle = massFuer(from), mZiel = massFuer(to);
+      const flugB = mQuelle.b, flugH = mQuelle.h;
+      const ptScale = mQuelle.b > 0 ? (mZiel.b / mQuelle.b) : 1;
       card.style.cssText = [
         'position:fixed',
-        `left:${Math.round(srcX - 32)}px`, `top:${Math.round(srcY - 44)}px`,
-        'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+        `left:${Math.round(srcX - flugB / 2)}px`, `top:${Math.round(srcY - flugH / 2)}px`,
+        `width:${flugB}px`, `height:${flugH}px`, 'z-index:10200', 'pointer-events:none',
         'border-radius:4px', 'overflow:hidden',
         glow,
         `--ptDx:${Math.round(dx)}px`, `--ptDy:${Math.round(dy)}px`,
+        `--ptScale:${ptScale.toFixed(3)}`,
         `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
@@ -34335,8 +34945,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           : '.game-hand-opp .game-hand-cards .hand-card';
         const slots = document.querySelectorAll(slotSel);
         if (slots.length > 0) {
-          const lastRect = slots[slots.length - 1].getBoundingClientRect();
-          ex = lastRect.right;
+          // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
+          // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
+          // Hüllkasten ist also breiter als die Karte — und genau
+          // diese Breite dient hier als ABSTAND von Platz zu Platz.
+          // Der Helfer gibt den echten Kasten zurück (und beim
+          // Handplatz ohnehin unverändert den seinen).
+          const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
+            || slots[slots.length - 1].getBoundingClientRect();
+          ex = lastRect.left + lastRect.width;
           ey = lastRect.top;
         } else {
           // Empty hand — fall back to the hand row container center.
@@ -34496,11 +35113,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const base = isMe ? '.game-hand-me' : '.game-hand-opp';
         const slots = document.querySelectorAll(`${base} .hand-slot, ${base} [data-hand-idx]`);
         if (slots.length > 0) {
-          const lastRect = slots[slots.length - 1].getBoundingClientRect();
+          // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
+          // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
+          // Hüllkasten ist also breiter als die Karte — und genau
+          // diese Breite dient hier als ABSTAND von Platz zu Platz.
+          // Der Helfer gibt den echten Kasten zurück (und beim
+          // Handplatz ohnehin unverändert den seinen).
+          const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
+            || slots[slots.length - 1].getBoundingClientRect();
           const cardW = lastRect.width;
           const oldCount = slots.length;
           const finalCount = oldCount + 1;
-          const C = lastRect.right - (oldCount * cardW) / 2;
+          const C = (lastRect.left + lastRect.width) - (oldCount * cardW) / 2;
           ex = C - (finalCount * cardW) / 2 + oldCount * cardW;
           ey = lastRect.top;
         } else {
@@ -34852,12 +35476,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // doesn't exist yet — state sync hasn't fired); we offset by
           // (toHandIdx − last-existing-index) × slot-width so multiple
           // cards landing in the same hand spread out correctly.
-          const lastRect = slots[slots.length - 1].getBoundingClientRect();
+          // ★ v1233: über `handFanCardBox` messen, nicht roh. In der
+          // Gegnerhand trägt die Karte den Fächerwinkel selbst, ihr
+          // Hüllkasten ist also breiter als die Karte — und genau
+          // diese Breite dient hier als ABSTAND von Platz zu Platz.
+          // Der Helfer gibt den echten Kasten zurück (und beim
+          // Handplatz ohnehin unverändert den seinen).
+          const lastRect = window.handFanCardBox?.(slots[slots.length - 1])
+            || slots[slots.length - 1].getBoundingClientRect();
           const slotW = lastRect.width;
           const slotsBeyondLast = Math.max(0, f.toHandIdx - (slots.length - 1));
           // -55 ≈ half the reveal-card width (110px). Centres the flying
           // card on the destination slot's right-edge anchor.
-          toX = lastRect.right - 55 + slotsBeyondLast * slotW;
+          toX = (lastRect.left + lastRect.width) - 55 + slotsBeyondLast * slotW;
           toY = lastRect.top - 32;
         } else {
           // Empty hand — fall back to the hand row container centre.
@@ -35269,6 +35900,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       for (let i = 0; i < cardNames.length; i++) {
+        // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+        const gm = flugMass('stapel');
         const card    = document.createElement('div');
         card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl  = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
@@ -35303,8 +35936,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
         card.style.cssText = [
           'position:fixed',
-          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
-          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
+          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           'box-shadow:0 0 12px rgba(180,80,255,0.7),0 0 4px rgba(120,40,200,0.5)',
           `--dtdsDx:${dx}px`, `--dtdsDy:${dy}px`,
@@ -35377,14 +36010,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       const travelMs = 700;
       for (let i = 0; i < cardNames.length; i++) {
+        // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+        const gm = flugMass('stapel');
         const card = document.createElement('div');
         card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 160; // stagger so a 5-card delete reads as a wave
         card.style.cssText = [
           'position:fixed',
-          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
-          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
+          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           // Subtle red-purple glow to differentiate from the deck→
           // discard purple flight — makes "going to deleted" feel
@@ -35458,14 +36093,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       const travelMs = 700;
       for (let i = 0; i < cardNames.length; i++) {
+        // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+        const gm = flugMass('stapel');
         const card = document.createElement('div');
         card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardNames[i]) : null;
         const delay = i * 160;
         card.style.cssText = [
           'position:fixed',
-          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
-          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
+          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           // Green-cyan glow — "rescued from oblivion" read, distinct
           // from the red-purple flight when cards are deleted.
@@ -35530,14 +36167,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
 
       for (let i = 0; i < count; i++) {
+        // ★ v1254: Mass des Ortes statt fester 64×88 — siehe `flugMass`.
+        const gm = flugMass(source === 'hand' ? 'hand' : 'stapel');
         const card   = document.createElement('div');
         card.className = 'card-flight'; // exempt from no-animations kill rule
         const imgUrl = window.cardImageUrl ? window.cardImageUrl(cardName) : null;
         const delay  = i * 300;
         card.style.cssText = [
           'position:fixed',
-          `left:${srcX - 32}px`, `top:${srcY - 44}px`,
-          'width:64px', 'height:88px', 'z-index:10200', 'pointer-events:none',
+          `left:${srcX - gm.b / 2}px`, `top:${srcY - gm.h / 2}px`,
+          `width:${gm.b}px`, `height:${gm.h}px`, 'z-index:10200', 'pointer-events:none',
           'border-radius:4px', 'overflow:hidden',
           'box-shadow:0 0 12px rgba(255,200,50,0.8),0 0 4px rgba(200,150,0,0.6)',
           `--dtaDx:${dx}px`, `--dtaDy:${dy}px`,
@@ -35795,13 +36434,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ? `.game-hand-me .hand-slot[data-hand-idx="${idx}"]`
             : `.game-hand-opp [data-hand-idx="${idx}"]`;
           const el = document.querySelector(sel);
-          sourceRects.push(el ? el.getBoundingClientRect() : null);
+          // ★ v1233: der echte Kartenkasten — die geklonte Flugkarte
+          // uebernimmt Breite und Hoehe von hier, und ein Hüllkasten
+          // hätte sie größer starten lassen als die Karte darunter.
+          sourceRects.push(el ? (window.handFanCardBox?.(el) || el.getBoundingClientRect()) : null);
         });
 
         // Find target position: just right of last visible card in destination hand
         const toHandCards = document.querySelectorAll(`.game-hand-${toLabel} .game-hand-cards > *`);
         const lastCard = toHandCards.length > 0 ? toHandCards[toHandCards.length - 1] : null;
-        const lastRect = lastCard?.getBoundingClientRect();
+        // ★ v1233: echter Kartenkasten statt Hüllkasten — in der
+        // Gegnerhand dreht die Karte selbst (siehe `handFanCardBox`).
+        const lastRect = lastCard
+          ? (window.handFanCardBox?.(lastCard) || lastCard.getBoundingClientRect())
+          : null;
         const toHandEl = document.querySelector(`.game-hand-${toLabel} .game-hand-cards`);
         const toRect = toHandEl?.getBoundingClientRect();
         const cardW = lastRect?.width || 64;
@@ -35818,7 +36464,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (!sr) return;
           const name = names[i] || '';
           const targetX = lastRect
-            ? (lastRect.right + i * (cardW * 0.6))
+            ? ((lastRect.left + lastRect.width) + i * (cardW * 0.6))
             : (zielBasis ? (zielBasis.left + zielBasis.width / 2 - cardW / 2 + i * (cardW * 0.6)) : sr.left);
           const targetY = lastRect
             ? lastRect.top
@@ -40840,7 +41486,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
           <div className={"game-hand-cards"
             + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')
-            + (gameState.effectPrompt?.type === 'pickFromOppHand' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
+            + (gameState.effectPrompt?.type === 'pickFromOppHand' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}
+            style={{ '--hand-max-lift': window.handFanMaxLift?.(opp.handCount || 0, { seite: 'opp' }) ?? 0 }}>
             {Array.from({ length: opp.handCount || 0 }).map((_, i) => {
               const isBlindPick = gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx;
               const isSelected = isBlindPick && blindPickSelected.has(i);
@@ -40913,8 +41560,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     + (isFull ? ' hand-card-dimmed' : '')
                     + (pickEligible ? ' blind-pick-eligible' : '')
                     + (isPickFromOppHand && !pickEligible ? ' hand-card-dimmed' : '')}
-                  data-hand-idx={i} style={(oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
-                  || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : undefined)}
+                  data-hand-idx={i} style={{
+                    // ★ v1233: Hier gibt es keine Platz-Huelle — Bogen
+                    // UND Winkel sitzen auf der Karte, gespiegelt zur
+                    // eigenen Hand (sie haengt oben am Bild).
+                    ...(window.handFanStyle?.(i, opp.handCount || 0, { seite: 'opp' })),
+                    ...((oppDrawHidden.has(i) || (stealHiddenOpp.has(i) && (opp.handCount || 0) === stealExpectedOppCountRef.current) || bounceReturnHidden.has(`${oppIdx}-${i}`)
+                    || bounceReturnHidden.has(`${oppIdx}-${i}#${opp.handCount || 0}`)) ? { visibility: 'hidden' } : ((isBlindPick || pickEligible || isTreacherousClickable) ? { cursor: 'pointer' } : null)),
+                  }}
                   onClick={isBlindPick ? () => {
                     // Compute the NEXT selection set outside the
                     // setState updater. React may double-invoke state
@@ -41701,15 +42354,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             {meDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
           {isSpectator ? (
-            <div className="game-hand-cards">
+            <div className="game-hand-cards"
+              style={{ '--hand-max-lift': window.handFanMaxLift?.(me.handCount || 0) ?? 0 }}>
               {Array.from({ length: me.handCount || 0 }).map((_, i) => (
-                <div key={i} className="board-card face-down hand-card" data-hand-idx={i} style={specMeDrawHidden.has(i) ? { visibility: 'hidden' } : undefined}>
+                <div key={i} className="board-card face-down hand-card" data-hand-idx={i} style={{
+                  // ★ v1233: Zuschauer sehen die untere Hand verdeckt und
+                  // OHNE Platz-Huelle — gleiche Bauart wie die Gegnerhand,
+                  // nur mit der Richtung der eigenen Seite.
+                  ...(window.handFanStyle?.(i, me.handCount || 0, { seite: 'me' })),
+                  ...(specMeDrawHidden.has(i) ? { visibility: 'hidden' } : null),
+                }}>
                   <img src={me.cardback || "/cardback.png"} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
                 </div>
               ))}
             </div>
           ) : (
-            <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '') + (gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}>
+            <div className={"game-hand-cards" + (stealHighlightMe.size > 0 ? ' hand-steal-highlight-active' : '') + (gameState.effectPrompt?.type === 'handPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}
+              /* ★ v1241: wie hoch der Faecher dieser Handgroesse steigt —
+                 style.css senkt die Reihe um ein Drittel dessen ab, was
+                 damit oben aus der Leiste ausbricht. */
+              style={{ '--hand-max-lift': window.handFanMaxLift?.(displayHand.length) ?? 0 }}>
               {displayHand.map((item, i) => {
                 if (item.isGap) return <div key="gap" className="hand-drop-gap" />;
                 // ★ 28.8., Als Befund: „wird immer in der Main-Hand
@@ -41905,12 +42569,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 return (
                   <div key={'h-' + item.origIdx} data-hand-idx={item.origIdx} data-card-name={item.card} data-card-type={CARDS_BY_NAME[item.card]?.cardType || ''} data-touch-drag="1"
                     className={'hand-slot' + (isBeingDragged ? ' hand-dragging' : '') + (dimmed ? ' hand-card-dimmed' : '') + (isAnyDiscard && isForceDiscardEligible ? ' hand-discard-target' : '') + (isAnyDiscard && !isForceDiscardEligible ? ' hand-card-dimmed' : '') + (isAttachEligible ? ' hand-card-attach-eligible' : '') + (isAbilityAttach && !isAttachEligible ? ' hand-card-attach-dimmed' : '') + (isHandPickSelected ? ' hand-pick-selected' : '') + (isHandPickEligible && !isHandPickSelected && !isHandPickTypeFull && !isHandPickMaxed && !isHandPickNameLocked ? ' hand-pick-eligible' : '') + ((isHandPickTypeFull || isHandPickMaxed || isHandPickNameLocked) ? ' hand-card-dimmed' : '') + (isPickHandCardEligible ? ' hand-pick-eligible' : '') + (isPickHandCardUrgent ? ' hand-pick-eligible-urgent' : '') + (isPickHandCardDimmed ? ' hand-card-dimmed' : '') + (isZonePickHandHighlight ? ' hand-pick-eligible-urgent' : '') + (isZonePickHandQueued ? ' hand-pick-eligible' : '') + (isZonePickHandDimmed ? ' hand-card-dimmed' : '') + (isPotionHandTargetSelected ? ' hand-pick-selected' : (isPotionHandTarget ? ' hand-pick-eligible' : '')) + (isStNicolasEscrowed ? ' hand-card-st-nicolas-escrowed' : '') + ((isStealMarked || isStealHighlighted) ? ' blind-pick-selected' : '') + (isRevealed ? ' hand-card-revealed' : '') + (istFrischErschienen(item.origIdx) ? ' hand-card-materializing' : '')}
-                    style={(isDrawAnim || isPendingPlay || isStealHidden
-                      || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)
-                      // v1063: abfliegende Handkarte — nur solange die Hand
-                      // noch so gross ist wie beim Abflug (siehe onPileTransfer).
-                      || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}`)
-                    ) ? { visibility: 'hidden' } : undefined}
+                    style={{
+                      // ★ v1233: Der Faecher haengt am PLATZ, nicht an
+                      // der Karte — siehe „HANDFAECHER" in style.css.
+                      // `displayHand.length` zaehlt die Zieh-Luecke mit,
+                      // und das ist richtig so: sie ist waehrend des
+                      // Zuges ein sichtbarer Platz in der Reihe.
+                      ...(window.handFanStyle?.(i, displayHand.length, { seite: 'me' })),
+                      ...((isDrawAnim || isPendingPlay || isStealHidden
+                        || bounceReturnHidden.has(`${myIdx}-${item.origIdx}`)
+                        // v1063: abfliegende Handkarte — nur solange die Hand
+                        // noch so gross ist wie beim Abflug (siehe onPileTransfer).
+                        || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}`)
+                      ) ? { visibility: 'hidden' } : null),
+                    }}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
                     onTouchStart={(e) => onHandMouseDown(e, item.origIdx)}
                     onMouseEnter={() => isAnyDiscard && setHoveredPileCard(item.card)}
@@ -42059,7 +42731,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       ))}
       {oppDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
-          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} cardbackUrl={opp.cardback} />
+          endX={anim.endX} endY={anim.endY} cardName={anim.cardName} cardbackUrl={opp.cardback}
+          fanRot={anim.fanRot} />
       ))}
       {kassaranFlips.map(anim => (
         <KassaranFlipCard key={anim.id}
@@ -42108,7 +42781,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Spectator: bottom player draw animations (face-down, like opponent) */}
       {isSpectator && specMeDrawAnims.map(anim => (
         <OppDrawAnimCard key={anim.id} startX={anim.startX} startY={anim.startY}
-          endX={anim.endX} endY={anim.endY} cardbackUrl={me.cardback} />
+          endX={anim.endX} endY={anim.endY} cardbackUrl={me.cardback}
+          fanRot={anim.fanRot} />
       ))}
 
       {/* Floating discard animation cards */}
@@ -42128,22 +42802,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {discardAnims.map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
-          delay={anim.delay} t0={anim.t0} />
+          delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
       {handDrag && (
-        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${handDrag.mouseX - 32}px, ${handDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${handDrag.mouseX - (handDrag.griffX ?? 32)}px, ${handDrag.mouseY - (handDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={handDrag.cardName} />
         </div>
       )}
       {playDrag && (
-        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - 32}px, ${playDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${playDrag.mouseX - (playDrag.griffX ?? 32)}px, ${playDrag.mouseY - (playDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={playDrag.cardName} />
         </div>
       )}
       {abilityDrag && (
-        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${abilityDrag.mouseX - 32}px, ${abilityDrag.mouseY - 45}px, 0) rotate(3deg)` }}>
+        <div className="hand-floating-card" style={{ left: 0, top: 0, transform: `translate3d(${abilityDrag.mouseX - (abilityDrag.griffX ?? 32)}px, ${abilityDrag.mouseY - (abilityDrag.griffY ?? 45)}px, 0) rotate(3deg)` }}>
           <BoardCard cardName={abilityDrag.cardName} />
         </div>
       )}
@@ -43428,8 +44102,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div style={{ fontSize: 11, color: 'var(--text2)' }}>Reacting to <b style={{ color: 'var(--text)' }}>{ep.showCard}</b></div>
                 </div>
               )}
+              {/* ★★ v1227 (Als Vorgabe): Suchfeld. Erst ab acht Eintraegen —
+                  darunter sieht man ohnehin alles auf einen Blick, und ein
+                  Feld ueber vier Karten ist nur Rand. Gefiltert wird nach
+                  Name UND Marke (`label`), damit „opp" gleich die
+                  gegnerische Ablage einsammelt. */}
+              {cards.length >= 8 && (
+                <input type="text" value={galerieFilter} autoFocus
+                  onChange={e => setGalerieFilter(e.target.value)}
+                  placeholder="🔍 Filter by name..."
+                  style={{
+                    width: '100%', padding: '6px 10px', marginBottom: 10, fontSize: 12,
+                    background: 'var(--bg2)', border: '1px solid var(--bg4)', borderRadius: 6,
+                    color: 'var(--text1)', outline: 'none', boxSizing: 'border-box',
+                  }} />
+              )}
               <div className="deck-viewer-grid">
-                {cards.map((entry, i) => {
+                {cards.filter(entry => {
+                  const f = galerieFilter.trim().toLowerCase();
+                  if (!f) return true;
+                  return (entry.name || '').toLowerCase().includes(f)
+                    || (entry.label || '').toLowerCase().includes(f);
+                }).map((entry, i) => {
                   const card = CARDS_BY_NAME[entry.name];
                   if (!card) return null;
                   const stamp = stampForEntry(entry, card);
@@ -43511,7 +44205,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // Karten, und das Abzeichen soll den PLATZ
                         // nennen, nicht „DECK" (der bisherige
                         // Rueckfall fuer alles Unbekannte).
-                        background: entry.label ? 'rgba(120,120,140,.85)'
+                        // ★★ v1228 (Als Vorgabe): Marken in den
+                        // Spielerfarben. `entry.labelSide` sagt, WESSEN
+                        // Seite gemeint ist — die Farben kennt nur der
+                        // Client, die Karte schickt deshalb nur die
+                        // Seite.
+                        background: entry.labelSide === 'me' ? (me.color || 'var(--player-color)')
+                          : entry.labelSide === 'opp' ? (opp.color || '#ff7a4a')
+                          : entry.label ? 'rgba(120,120,140,.85)'
                           : entry.source === 'hand' ? 'rgba(80,200,120,.85)'
                           : entry.source === 'discard' ? 'rgba(180,80,200,.85)'
                           : entry.source === 'stack' ? 'rgba(120,220,255,.9)'

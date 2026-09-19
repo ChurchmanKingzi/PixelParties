@@ -147,14 +147,50 @@ async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
   // the pull below just prefers your own pile.
   const entries = [];
   const seen = new Set();
+  // ★★ v1225 (Als Befund 18.9.: „die Karte fliegt visuell vom EIGENEN
+  // Discard statt dem gegnerischen in meine Hand"). Der Eintrag merkt
+  // sich jetzt, aus welcher Ablage er stammt; vorher wurde die Quelle
+  // beim Ziehen ueber den NAMEN neu geraten und dabei die eigene Ablage
+  // bevorzugt — bei gleichnamigen Karten also falsch.
+  const herkunft = new Map();
   const addPile = (ownerIdx) => {
     const pile = gs.players[ownerIdx]?.discardPile || [];
     for (const name of pile) {
       if (seen.has(name)) continue;
       seen.add(name);
-      entries.push({ name, source: 'discard' });
+      if (!herkunft.has(name)) herkunft.set(name, ownerIdx);
+      // ★★ v1227 (Als Vorgabe): Marker, aus WESSEN Ablage die Karte
+      // kommt. Die Galerie zeigt `entry.label` anstelle des
+      // Quellen-Abzeichens (v862) — der Platz ist also da, er wurde
+      // hier nur nie benutzt. Wichtig ist die Herkunft als ANZEIGE und
+      // nicht nur intern: bei einer Karte, die in beiden Ablagen liegt,
+      // sieht man sonst nicht, welche man leert.
+      entries.push({
+        name, source: 'discard',
+        // Kurz halten: das Abzeichen ist ein schmaler Streifen unter der
+        // Karte, „YOUR DISCARD" liefe darueber hinaus. Dass es um
+        // Ablagen geht, sagt die Galerie ohnehin.
+        label: herkunft.get(name) === pi ? 'YOURS' : 'OPPONENT',
+        // ★★ v1228 (Als Vorgabe): die Marke traegt die Spielerfarbe.
+        // Welche das ist, weiss nur der Client — hier steht deshalb nur
+        // die SEITE.
+        labelSide: herkunft.get(name) === pi ? 'me' : 'opp',
+      });
     }
   };
+  // ★★ v1226 (Als Befund, zweiter Anlauf: „die Animation beginnt nach
+  // wie vor im eigenen Discard"). Die ANZEIGE bleibt eigene Ablage
+  // zuerst — die HERKUNFT wird aber zuerst vom Gegner gesetzt. Liegt
+  // eine Karte in BEIDEN Ablagen, zaehlte bisher die eigene, und der
+  // Flug startete dort. Regeltechnisch sind beide Kopien dieselbe
+  // Karte („either is correct", Kommentar seit Einfuehrung); dem
+  // Spieler nuetzt die gegnerische mehr, weil sie dem Gegner die
+  // Ressource nimmt — und sie ist das, was man sehen will.
+  if (!engine.borisHidesOpponentSide?.(pi)) {
+    for (const name of (gs.players[oppIdx]?.discardPile || [])) {
+      if (!herkunft.has(name)) herkunft.set(name, oppIdx);
+    }
+  }
   addPile(pi);
   // BORIS-EINSCHRAENKUNG (Als Praezisierung 5.8.): hat der Gegner einen
   // wirksamen Boris, faellt SEINE Ablage als Quelle weg — die eigene
@@ -163,18 +199,37 @@ async function bonusGrabFromAnyDiscard(ctx, engine, pi) {
   if (!engine.borisHidesOpponentSide?.(pi)) addPile(oppIdx);
   if (entries.length === 0) return;
 
+  // ★★ v1227 (Als Befund, zweiter Anlauf: „waehrend des Delays ist er
+  // unsichtbar"). Der Daemon steht zu diesem Zeitpunkt zwar schon im
+  // Zustand, aber der Client hat ihn noch nicht gesehen: die
+  // Platzierung laeuft in `summonCreatureWithHooks`, und der naechste
+  // Abgleich kam frueher erst NACH diesem Bonus. Gewartet wurde also
+  // vor einer leeren Zone.
+  //
+  // Erst abgleichen — dann steht er da und seine Beschwoerungsanimation
+  // laeuft —, danach die Luft lassen, und erst dann die Galerie. Nur
+  // der EFFEKT ist verzoegert, nicht sein Erscheinen (Als Vorgabe).
+  engine.sync();
+  await engine._delay(900);
+
   const selected = await ctx.promptCardGallery(entries, {
-        searchToHand: true, searchPile: 'deck',   // v1120
+        // ★ v1225: Die Karte nimmt aus der ABLAGE — `searchPile` stand
+        // auf 'deck' und meldete der Such-Sperre damit die falsche
+        // Quelle (v1120-Vertrag).
+        searchToHand: true, searchPile: 'discard',
     title: 'Herbithorn Demon',
     description: 'Choose a card from any discard pile and add it to your hand.',
     cancellable: true,
   });
   if (!selected) return;
 
-  // Pull from your OWN pile first; fall back to the opponent's. (If a
-  // name exists in both piles it's the same card — either is correct.)
-  let fromIdx = pi;
-  if (!(gs.players[pi]?.discardPile || []).includes(selected.cardName)) fromIdx = oppIdx;
+  // Aus der Ablage, die den Eintrag angeboten hat (siehe `herkunft`).
+  // Der Rueckfall deckt nur den Fall ab, dass sich der Stapel zwischen
+  // Anzeige und Antwort geaendert hat.
+  let fromIdx = herkunft.has(selected.cardName) ? herkunft.get(selected.cardName) : pi;
+  if (!(gs.players[fromIdx]?.discardPile || []).includes(selected.cardName)) {
+    fromIdx = (gs.players[pi]?.discardPile || []).includes(selected.cardName) ? pi : oppIdx;
+  }
 
   // Explicit discard→hand flight, anchored to the SOURCE discard pile
   // (own or opponent's). `addCardFromDiscardToHand` emits no animation of
@@ -378,7 +433,22 @@ function buildDemonHooks(cardName) {
         // successor's onPlay even on a dead host; `_summonedByDemon`
         // is the provenance the successor's onPlay reads to fire its
         // own on-summon bonus.
-        if (!(await engine.takeFromPile(ps, 'deck', deckIdx2, { source: cardName }))) return;   // v820: Stapel-Schicht
+        // ★★ v1225 (Als Vorgabe 18.9.): „Wird einer der Cycling Demons
+        // vom Deck beschworen, sollte dieser auch visuell vom Deck aufs
+        // Board fliegen und dann dort die Beschwoerungsanimation zeigen,
+        // sowie die Shuffle-Animation des Decks."
+        //
+        // Reihenfolge wie ueberall: Flug VOR der Entnahme (Als Regel
+        // 17.8.), damit der Deckstapel als Startpunkt noch steht. Die
+        // Zielzone ist der frei gewordene Platz des Vorgaengers.
+        engine._broadcastEvent('play_pile_transfer', {
+          owner: pi, cardName: successor,
+          from: 'deck', to: 'support',
+          toHeroIdx: death.heroIdx, toSlotIdx: death.zoneSlot,
+          sfx: 'placement',
+        });
+        await engine._delay(520);                 // Flug ankommen lassen
+        if (!(await engine.takeFromPile(ps, 'deck', deckIdx2, { source: cardName, shuffle: true }))) return;   // v820: Stapel-Schicht
         const placed = await engine.summonCreatureWithHooks(
           successor, pi, death.heroIdx, death.zoneSlot,
           {

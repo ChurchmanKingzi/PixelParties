@@ -169,6 +169,11 @@ module.exports = {
       await engine._delay(AME_FLUG_MS);
 
       ps.hand.splice(handIdx, 1);
+      // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+      // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+      // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+      // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+      engine.sync();
 
       const promptCtxShim = {
         promptZonePick: (zs, cfg) => engine.promptGeneric(pi, {

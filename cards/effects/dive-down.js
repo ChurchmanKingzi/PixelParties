@@ -228,6 +228,12 @@ module.exports = {
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
         if (inst) engine._untrackCard(inst.id);
+        // ★★ v1221 (Als Befund 18.9.): SOFORT abgleichen. Der Client
+        // verdeckt den Startplatz nur, solange die Hand noch so gross
+        // ist wie beim Abflug — kommt der naechste `sync` erst nach dem
+        // Kettenfenster, steht die Karte in der Zwischenzeit wieder da.
+        // Ohne diese Zeile haengt das Bild an einer Wartezeit.
+        engine.sync();
 
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME, playerIdx: pi });
         await engine._delay(120);

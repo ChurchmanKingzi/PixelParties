@@ -185,6 +185,11 @@ async function tryTimeRescue(engine, pi, ps, names) {
     });
     ps.hand.splice(ti, 1);
     ps.discardPile.push(CARD_NAME);
+    // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+    // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+    // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+    // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+    engine.sync();
     const timeInst = engine.cardInstances.find(c =>
       c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME
     );

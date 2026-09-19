@@ -33,9 +33,84 @@
   --zone-h: calc(95px * var(--board-scale));
   --zone-gap: calc(24px * var(--board-scale));
   --spacer-w: calc(68px * var(--board-scale));
-  --sidebar-w: calc(76px * var(--board-scale));
+  --sidebar-w: calc(var(--pile-zone-w) + 8px * var(--board-scale));
   --board-font: calc(9px * var(--board-scale));
-  --hand-min-h: calc(102px * var(--board-scale));
+  /* ── Handkarten (v1234, Als Vorgabe 19.9.) ──────────────────────
+     „Mache die Handkarten etwas größer, sodass ihr Scale der von
+     Karten auf dem Feld entspricht."
+
+     Gemessen im Prüfstand mit echtem Blatt: die Brettebene ist
+     gekippt (`rotateX(29deg)`) und um `--board-plane-zoom: 1.26`
+     vergrößert, ihre Karten erscheinen dadurch je nach Reihe
+     zwischen 0.90× (gegnerische Stützzone, am weitesten weg) und
+     1.44× (eigene Stützzone, am nächsten). Die eigene HELDENREIHE —
+     der Bezug, den man beim Blick auf die eigene Hand hat — liegt
+     bei 1.17×, die Fähigkeitenreihe bei 1.25×.
+
+     1.2 setzt die Hand also genau zwischen die beiden eigenen
+     vorderen Reihen. Höher ginge optisch auch, kostet aber Höhe:
+     die Leiste muss die Karte fassen (siehe --hand-min-h), und mit
+     zwei Leisten geht das doppelt vom Brett ab. */
+  --hand-card-scale: 1.92;
+  --hand-card-w: calc(64px * var(--board-scale) * var(--hand-card-scale));
+  --hand-card-h: calc(90px * var(--board-scale) * var(--hand-card-scale));
+  /* Abstand von Platz zu Platz. Wächst mit der Karte, damit die
+     Überlappung des Fächers ihr Verhältnis behält (Karte − Abstand =
+     6 px bei Maßstab 1). MUSS gleich der Platzbreite bleiben, siehe
+     CARD_API „Die Hand ist gefächert". */
+  --fan-pitch: calc(58px * var(--hand-card-scale));
+  /* Wie viel ein Handplatz beim Zusammenschieben mindestens behält —
+     der Rest ist Überdeckung durch den Nachbarn. 0.34 = höchstens
+     66 % verdeckt (Als Vorgabe 19.9., nach 25 % im ersten Anlauf).
+     EIN Wert für Duell und Editor; darunter scrollt die Reihe. */
+  --hand-min-anteil: 0.34;
+  /* Höhe der Handleiste: die Karte plus etwas Luft — abgeleitet statt
+     fest, damit sie jeder Änderung an `--hand-card-scale` von selbst
+     folgt. Bei Maßstab 1 steht hier wieder exakt der alte Wert
+     (90 + 12 = 102), der Telefon-Block weiter unten bekommt seine
+     kompakte Leiste also geschenkt. Nachgemessen: bei 1.2 und einem
+     900 px hohen Layout bleiben dem Brett noch 46 px Luft über dem,
+     was seine Reihen brauchen. */
+  --hand-min-h: calc(var(--hand-card-h) + 12px * var(--board-scale));
+  /* ── DIE EIGENE HAND SITZT TIEFER (v1247, Als Vorgabe 19.9.) ────
+     „Handkarten nochmal 33 % größer, dafür die ganze Spieler-Hand ein
+     Stück weiter runter."
+
+     Beides hängt zusammen: eine größere Karte macht ihre Leiste höher,
+     und zwei höhere Leisten nehmen dem Brett Platz — der Maßstab fällt,
+     und ein Teil der Vergrößerung wäre gleich wieder weg. Die eigene
+     Leiste ist deshalb um diesen Anteil KÜRZER als ihre Karte; die
+     Karten ragen unten heraus, zum Bildrand hin, wo ohnehin nichts
+     liegt. Der Anteil steht als reine Zahl da, weil der Brett-Maßstab
+     ihn in `updateScale` nachrechnen muss. */
+  --hand-senk-anteil: 0.18;
+  --hand-senkung: calc(var(--hand-card-h) * var(--hand-senk-anteil));
+  /* ── Stapel im Handmaß (v1235, Als Vorgabe 19.9.) ───────────────
+     „Skaliere Decks, Potion-Decks, Discards und Deleted Piles mit,
+     damit diese alle gleich groß sind und die Karten beim Bewegen
+     von und in die Hand nicht skaliert werden müssen."
+
+     Also EIN Maß für Hand und alle vier Stapel. Die Zone bekommt
+     denselben Zuschlag über die Karte wie bisher (68/95 zu 64/90),
+     die Seitenspalte denselben über die Zone (76 zu 68) — beides
+     bleibt damit proportional, egal wie `--hand-card-scale` steht.
+     Die Spalten werden dadurch breiter und das Kampffeld an den
+     Seiten schmaler; das ist der gewollte Tausch. */
+  /* ★★ v1251 (Als Vorgabe 19.9.: „die Decks und Piles sind mit dem
+     letzten Hochskalieren der Handkarten zu groß geworden — bringe sie
+     auf die vorige Größe zurück").
+
+     Sie hingen seit v1235 am Handmaß, weil eine Karte zwischen Hand
+     und Stapel dann nicht skaliert werden muss. Mit dem Sprung der
+     Handkarten auf 1.92 sind sie mitgewachsen und nehmen zu viel Rand
+     ein. Also ein EIGENER Maßstab, der auf dem alten Wert stehen
+     bleibt; dass eine Karte auf dem Weg zwischen Hand und Stapel jetzt
+     ihre Größe ändert, ist Als ausdrückliche Entscheidung. */
+  --pile-card-scale: 1.44;
+  --pile-card-w: calc(64px * var(--board-scale) * var(--pile-card-scale));
+  --pile-card-h: calc(90px * var(--board-scale) * var(--pile-card-scale));
+  --pile-zone-w: calc(var(--pile-card-w) + 4px * var(--board-scale));
+  --pile-zone-h: calc(var(--pile-card-h) + 5px * var(--board-scale));
   --chat-col-w: 324px;
   /* ── Typography (pixel-art UI) ──
      One place to retune the whole interface. Pixel Intv is a readable
@@ -454,10 +529,18 @@ select optgroup {
   50% { opacity: .12; background-position: 50% 0%; }
   75% { opacity: .28; background-position: 0% 100%; }
 }
+/* ★★ v1248 (Als Befund 19.9.: „Foil-Karten haben anscheinend gar
+   keinen Schlagschatten"). Sie hatten keinen, weil DIESE Animation auf
+   derselben Eigenschaft läuft: eine Animation übernimmt `box-shadow`
+   vollständig, der Schatten aus der Grundregel war damit überschrieben
+   — dieselbe Falle wie bei den Materialize-Bildern (v1233).
+   Jede Stufe hängt ihn deshalb an. Außerhalb der Hand ist die Variable
+   nicht gesetzt; der Rückfall ist ein unsichtbarer Schatten, Foil auf
+   dem Brett bleibt also wie es war. */
 @keyframes foilBorderPulse {
-  0%, 100% { border-color: rgba(255,215,0,.5); box-shadow: 0 0 8px rgba(255,215,0,.25); }
-  33% { border-color: rgba(255,120,255,.5); box-shadow: 0 0 8px rgba(255,120,255,.25); }
-  66% { border-color: rgba(100,200,255,.5); box-shadow: 0 0 8px rgba(100,200,255,.25); }
+  0%, 100% { border-color: rgba(255,215,0,.5); box-shadow: 0 0 8px rgba(255,215,0,.25), var(--karten-schatten, 0 0 0 transparent); }
+  33% { border-color: rgba(255,120,255,.5); box-shadow: 0 0 8px rgba(255,120,255,.25), var(--karten-schatten, 0 0 0 transparent); }
+  66% { border-color: rgba(100,200,255,.5); box-shadow: 0 0 8px rgba(100,200,255,.25), var(--karten-schatten, 0 0 0 transparent); }
 }
 /* Funken: aufblitzen, drehen, vergehen. Die Spitzen wachsen dabei
    stärker als der Kern — dadurch liest sich der Blitz als Lichtstern
@@ -493,10 +576,10 @@ select optgroup {
 
 /* ===== DIAMOND RARE FOIL ===== */
 @keyframes foilDiamondBorderPulse {
-  0%, 100% { border-color: rgba(64,224,208,.65); box-shadow: 0 0 8px rgba(64,224,208,.35); }
-  25% { border-color: rgba(140,245,230,.75); box-shadow: 0 0 10px rgba(140,245,230,.4); }
-  50% { border-color: rgba(235,255,255,.65); box-shadow: 0 0 12px rgba(190,250,255,.35); }
-  75% { border-color: rgba(70,190,235,.75); box-shadow: 0 0 10px rgba(70,190,235,.4); }
+  0%, 100% { border-color: rgba(64,224,208,.65); box-shadow: 0 0 8px rgba(64,224,208,.35), var(--karten-schatten, 0 0 0 transparent); }
+  25% { border-color: rgba(140,245,230,.75); box-shadow: 0 0 10px rgba(140,245,230,.4), var(--karten-schatten, 0 0 0 transparent); }
+  50% { border-color: rgba(235,255,255,.65); box-shadow: 0 0 12px rgba(190,250,255,.35), var(--karten-schatten, 0 0 0 transparent); }
+  75% { border-color: rgba(70,190,235,.75); box-shadow: 0 0 10px rgba(70,190,235,.4), var(--karten-schatten, 0 0 0 transparent); }
 }
 @keyframes foilDiamondShimmer {
   0%, 100% { opacity: .30; background-position: 0% 0%; }
@@ -971,9 +1054,527 @@ select optgroup {
   transform-origin: 50% 85%;
   transition: transform .16s ease-out;
 }
-.pz-hand-card {
+
+/* ── DAS HANDFÄCHER (v1233, Als Vorgabe 19.9.) ─────────────────────
+   „Die Karten in den Händen beider Spieler, im laufenden Duell und im
+   Puzzle-Editor, sollen leicht aufgefächert dargestellt sein … Karten
+   dürfen dabei über die Boundary des Hand-Containers hinausragen."
+
+   Die Zahlen rechnet `handFanGeometry` (app-shared) und hängt sie als
+   `--fan-rot` / `--fan-lift` an die Reihe. Hier steht nur, WO sie
+   wirken — und diese Aufteilung ist der eigentliche Entwurf:
+
+     • Der WINKEL sitzt auf der Karte. Er steht in `rotate`, die
+       Zieh-Neigung aus v1210 bleibt in `transform` — beide werden
+       nacheinander angewandt und addieren sich damit von selbst.
+     • Der BOGEN sitzt im Duell auf dem PLATZ (`.hand-slot`), nicht
+       auf der Karte. Ein knappes Dutzend Flüge misst diesen Platz,
+       um ihren Landepunkt zu bestimmen; verschiebt man ihn mit,
+       landen sie ohne eine einzige Änderung weiterhin genau dort,
+       wo die Karte wirklich liegt. Gedreht wird der Platz NIE — ein
+       gedrehter Kasten liefert nur noch seinen achsenparallelen
+       Hüllkasten, und damit wären alle diese Messungen falsch.
+     • Wo die Karte selbst der Platz ist (Gegnerhand, Zuschauer,
+       Editor), trägt sie beides — und dreht deshalb um ihre MITTE:
+       unter einer Drehung um die Mitte bleibt die Mitte des
+       Hüllkastens die Kartenmitte, und genau mit der rechnen die
+       Messungen auf diesen Seiten.
+
+   `--fan-lift` ist einheitenlos und wird hier mit `--board-scale`
+   multipliziert, damit der Bogen bei jedem Zoom gleich tief bleibt. */
+/* ★★ DER FÄCHER LÄUFT ÜBER `translate` UND `rotate`, NICHT ÜBER
+   `transform` — und das ist keine Geschmacksfrage. Ein knappes Dutzend
+   Zustände im Bestand schreibt `transform` auf denselben Knoten:
+   `.hand-pick-selected` hebt den Platz um 6 px, `.blind-pick-selected`
+   um 8, `.hand-pick-eligible-urgent .board-card` um 4, das Abwurf-Ziel
+   staucht beim Hovern auf 0.96, und `hand-card-materialize` animiert
+   ihn. Stünde der Fächer auch in `transform`, gewänne je nach
+   Spezifität mal er, mal der Zustand — jede dieser Stellen hätte den
+   Bogen einweben müssen, und die nächste neue Hervorhebung wieder.
+
+   Die eigenständigen Eigenschaften `translate` und `rotate` werden
+   dagegen VOR `transform` angewandt und komponieren mit allem, was
+   dort steht. Kein Bestandszustand muss angefasst werden, und ein
+   künftiger erbt den Fächer automatisch. `transform-origin` gilt für
+   beide Wege gleichermaßen, die Drehpunkte von v1210 bleiben also
+   gültig. */
+.game-hand-me .hand-slot,
+.game-hand-opp .game-hand-cards > .board-card.hand-card,
+.game-hand-me .game-hand-cards > .board-card.hand-card,
+.pz-hand-cards > .pz-hand-card {
+  /* ★ v1240: der Hub ist ein ANTEIL DER KARTENHOEHE, nicht mehr eine
+     feste Pixelzahl — so wächst der Bogen mit jeder Größenänderung mit
+     (siehe `FAECHER.bogenAnteil` in app-shared). `--hand-card-h` trägt
+     `--board-scale` bereits in sich. */
+  --fan-shift: calc(var(--fan-lift, 0) * var(--hand-card-h));
+}
+
+/* Der Platz im Duell: NUR verschoben, nie gedreht. */
+.game-hand-me .hand-slot {
+  translate: 0 var(--fan-shift, 0px);
+  transition: transform .15s, translate .15s ease-out;
+}
+/* Der Winkel sitzt auf der Karte im Platz — mit dem Drehpunkt der
+   Neigung (unten), was sich wie aufgefächertes Halten liest. */
+.game-hand-me .hand-slot > .board-card {
+  rotate: var(--fan-rot, 0deg);
+  transition: transform .16s ease-out, rotate .16s ease-out;
+  /* ★ v1241: „immer die linke Karte über der rechts neben ihr."
+     Von allein gilt das Gegenteil (später im DOM = später gezeichnet),
+     deshalb eine absteigende Ebene je Platz (`--fan-z`, gesetzt von
+     `handFanStyle`). Die Ebene sitzt auf der KARTE, nicht auf dem
+     Platz: der Platz darf keinen Stapelkontext aufmachen, sonst wäre
+     die gehoverte Karte mit ihrer 60 darin eingesperrt (v1216). */
+  z-index: var(--fan-z, auto);
+}
+
+/* Handreihen OHNE Platz-Hülle: Bogen und Winkel auf derselben Karte,
+   Drehpunkt deshalb die Mitte (siehe Kopf des Abschnitts). */
+/* ★ v1242: im Editor trägt die INNERE Karte die Verwandlung — der
+   Platz darum bleibt ungedreht und ungeschoben, wie der Handplatz im
+   Duell. Die Variablen erbt sie von ihm. */
+.game-hand-opp .game-hand-cards > .board-card.hand-card,
+.game-hand-me .game-hand-cards > .board-card.hand-card,
+.pz-hand-cards > .pz-hand-card > .pz-hand-card-inner {
+  translate: 0 var(--fan-shift, 0px);
+  rotate: var(--fan-rot, 0deg);
+  transform-origin: 50% 50%;
+  transition: transform .16s ease-out, rotate .16s ease-out, translate .16s ease-out;
+  z-index: var(--fan-z, auto);
+}
+/* ── VERDECKTE GEGNERKARTEN STEHEN AUF DEM KOPF (v1238/v1240) ──────
+   „Die Karten in der Gegner-Hand sollen um 180° gedreht sein, sodass
+   sie vom Gegner aus betrachtet richtig herum wären" — und, als
+   Nachtrag (19.9.): „OFFENE Gegner-Karten sollen richtig herum
+   dargestellt werden, also in Richtung des Spielers. Nur
+   Facedown-Handkarten sollen Richtung Gegner gucken."
+
+   Die Regel hängt deshalb an `.face-down`: der Kartenrücken darf
+   verkehrt herum liegen, das Kartenbild nicht. Aufgedeckte Karten
+   (Letter of Misinformations, Crystals, Puzzle-Modus) tragen
+   `revealed-hand-card` statt `face-down` und bleiben damit lesbar.
+
+   Die halbe Drehung kommt ZUM Fächerwinkel dazu, sie ersetzt ihn
+   nicht. Am Fächer ändert sie nichts Sichtbares: eine Karte ist
+   rechteckig und damit 180°-symmetrisch, die Neigung liest sich nach
+   der Drehung genauso — nur das Bild steht auf dem Kopf. */
+.game-hand-opp .game-hand-cards > .board-card.hand-card.face-down {
+  rotate: calc(180deg + var(--fan-rot, 0deg));
+}
+/* ★ v1250: Der negative Rand von v1234 ist weg. Er stammt aus der
+   Zeit, als die Karte selbst das Flex-Element war und die Überlappung
+   nicht aus dem Layout kommen konnte; seit der Platz schrumpft
+   (v1242) addierte er sich zur Schrumpfung und trieb die Überdeckung
+   auf über 80 % — weit über die vereinbarten 66 %. Der Abstand kommt
+   jetzt wie im Duell allein aus der Flex-Basis. */
+/* ★ v1242: Der LETZTE Platz behält die volle Kartenbreite (und seinen
+   rechten Rand) — nur dann kennt das Flex-Layout die wahre Breite der
+   Reihe, und die Bildlaufleiste erscheint erst, wenn wirklich nichts
+   mehr geht. Dieselbe Regel wie im Duell. */
+.pz-hand-cards > .pz-hand-card:last-child {
+  flex: 0 0 var(--hand-card-w);
+  margin-right: 0;
+}
+/* Die Zieh-Neigung der Editor-Karten (v1210) — unverändert in
+   `transform`, sie komponiert mit dem Fächer-`rotate` darüber. Seit
+   v1242 auf der inneren Karte: der Platz bleibt ungedreht, und
+   `applyHandTilt` misst damit einen Kasten, den es nicht selbst
+   bewegt. */
+.pz-hand-card-inner {
   transform: rotate(var(--hand-tilt, 0deg));
   transform-origin: 50% 50%;
+}
+/* ── SCHLAGSCHATTEN UNTER DEN HANDKARTEN (v1245, Als Wunsch 19.9.) ─
+   Ein knapper, harter Schatten nach unten — kein weiches Leuchten.
+   Weil die linke Karte über der rechten liegt (`--fan-z`), fällt ihr
+   Schatten auf die Nachbarin: die Hand bekommt dadurch Tiefe statt
+   nur Versatz.
+
+   `box-shadow` und nicht `filter: drop-shadow`: der Schatten hängt am
+   Kartenkasten, der ohnehin rechteckig ist, und wandert mit dem
+   Transform im Compositor mit. Ein Filter würde die Karte bei jeder
+   Bewegung neu rastern (dieselbe Überlegung wie v1229).
+
+   Maße in Kartenhöhen, damit er bei jeder Größe gleich wirkt. Die
+   gehoverte Karte bringt ihren eigenen Schein mit und überschreibt
+   das hier. */
+.game-hand-me .hand-slot > .board-card,
+.game-hand-me .creation-slot > .board-card,
+.game-hand-opp .game-hand-cards > .board-card.hand-card,
+.game-hand-me .game-hand-cards > .board-card.hand-card,
+.pz-hand-cards > .pz-hand-card > .pz-hand-card-inner {
+  /* ★ v1248: als VARIABLE, nicht als fester Wert — die Foil-Rahmen
+     laufen als Animation auf derselben Eigenschaft und müssen ihn
+     mitnehmen (siehe `foilBorderPulse`). Und deutlich kräftiger, Als
+     Vorgabe 19.9. */
+  --karten-schatten:
+    calc(var(--hand-card-h) * 0.05) calc(var(--hand-card-h) * 0.1)
+    calc(var(--hand-card-h) * 0.17) rgba(0, 0, 0, 0.8);
+  box-shadow: var(--karten-schatten);
+}
+
+/* ── GRÖSSE DER HANDKARTEN (v1234) ────────────────────────────────
+   Eine Handkarte ist `--hand-card-w/h` groß, nicht 64×90 wie eine
+   Brettkarte: die Brettebene vergrößert ihre Karten perspektivisch,
+   eine ungetrimmte Handkarte wirkte daneben kleiner (Als Befund
+   19.9.). Der Vorrat (Crestina) liegt in derselben Leiste und zieht
+   mit; die Zieh-Lücke und die anfliegende Karte ebenso, sonst
+   springt die Größe beim Ablegen bzw. beim Landen. */
+.game-hand .hand-slot > .board-card,
+.game-hand .creation-slot > .board-card,
+.game-hand-opp .game-hand-cards > .board-card.hand-card,
+.game-hand-me .game-hand-cards > .board-card.hand-card {
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+}
+/* Die Gegnerhand liegt oben am Bild und taucht mit dem Bogen ins
+   Kampffeld — ohne eigene Ebene zeichnete `.game-board` (später im
+   DOM) darüber. Absichtlich an der KARTE statt an der Handleiste: ein
+   `z-index` auf der Leiste würde einen Stapelkontext aufmachen und die
+   gehoverte Karte (z 60) darin einsperren. */
+/* Der Fächer-Stapelwert ist auf dieser Seite immer ≥ 1, hebt die
+   Karten also zugleich über das Brett (der Rückfall gilt nur, falls
+   keine Reihenfolge gesetzt ist). */
+.game-hand-opp .game-hand-cards > .board-card.hand-card { z-index: var(--fan-z, 1); }
+/* Die Gegnerhand bricht nach UNTEN aus (ihr Bogen ist gespiegelt) —
+   sie wird um dasselbe Drittel angehoben. Dazu ein fester Hub nach
+   oben (v1245, Als Vorgabe): sie darf oben aus ihrer Leiste
+   herausragen, das Kampffeld beginnt ohnehin erst darunter. */
+.game-hand-opp .game-hand-cards {
+  --opp-hand-hebung: calc(var(--hand-card-h) * 0.15);
+  translate: 0 calc(var(--hand-ueberstand) / -3 - var(--opp-hand-hebung));
+}
+
+/* ── HANDKARTE UNTER DEM ZEIGER (v1214, Als Vorgabe 18.9.) ─────────
+   „Das muss noch deutlicher werden — die entsprechende Karte soll ein
+   gutes Stueck groesser und in der Farbe des Spielers sowie leicht
+   erhoeht dargestellt werden. Sie darf dabei andere Handkarten leicht
+   ueberdecken und aus der Hand-Zone ausbrechen."
+
+   Umgesetzt fuer ALLE Kartenreihen, die eine Hand sind: im Kampf die
+   eigene Hand und der Vorrat sowie die AUFGEDECKTEN Gegnerkarten, im
+   Editor alle vier Reihen.
+
+   RICHTUNG: eigene Reihen liegen unten am Bild und heben sich nach
+   OBEN; Gegnerreihen liegen oben und schieben nach UNTEN (Als Vorgabe:
+   „dort mit Shift nach UNTEN statt nach oben"). Waere es andersherum,
+   liefe die vergroesserte Karte aus dem Fenster.
+
+   `outline` statt `border`: der Rahmen der Karte traegt schon
+   Zustaende (Foil, gesperrt, waehlbar), und eine Umrandung ausserhalb
+   des Kastens veraendert das Layout nicht.
+
+   Die Neigung aus v1210 bleibt Teil der Transformation — sonst
+   richtete sich die Karte beim Hovern mitten im Ziehen wieder auf.
+   Reihenfolge: erst heben und vergroessern, dann kippen, damit das
+   Heben senkrecht im Bild bleibt und nicht der gekippten Achse folgt. */
+:root {
+  --hand-hover-scale: 1.42;
+  --hand-hover-lift: 18px;
+}
+/* ★★ v1229 (Als Befund: „wenn ich sehr schnell zwischen Karten
+   hin- und herhovere, fuehlt sich das laggy an").
+   Mitbewegt wurde auch `box-shadow` — und dessen Schein hat 42 px
+   Unschaerfe. Ein weicher Schatten laesst sich nicht im Compositor
+   verschieben, er muss JEDES BILD neu gezeichnet werden, und beim
+   schnellen Wechsel laufen mehrere solcher Uebergaenge gleichzeitig.
+   Jetzt wandert nur noch `transform` weich; Rand und Schein springen
+   an und aus. Das sieht man nicht, es spart aber die Zeichenarbeit. */
+.game-hand-me .hand-slot > .board-card,
+.game-hand-me .creation-slot > .board-card,
+.game-hand-opp .board-card.hand-card,
+.pz-hand-card-inner {
+  transition: transform .16s ease-out;
+}
+/* Der Riegel: waehrend eines Kartenzuges hebt NICHTS ab. Sonst poppt
+   die Nachbarkarte auf, ueber die der Zeiger beim Umsortieren gerade
+   hinwegfaehrt. Die Wurzelklasse setzen dieselben Effekte, die auch die
+   Neigung schreiben (app-board / app-puzzle). */
+.game-hand-me .game-hand-cards:not([data-pp-dragging]) .hand-slot > .board-card:hover,
+.game-hand-me .game-hand-creation-cards:not([data-pp-dragging]) .creation-slot > .board-card:hover,
+.pz-hand-cards[data-pz-hand="hand"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner,
+.pz-hand-cards[data-pz-hand="creationZone"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner {
+  /* ★ v1244 (Als Vorgabe 19.9.: „wird eine Handkarte beim Hover größer
+     und gehighlightet, sollte auch die größere Version ihre Rotation
+     beibehalten"). Die Regel richtete die Karte bis v1243 auf
+     (`rotate: 0deg`); jetzt steht hier nichts mehr dazu, damit der
+     Fächerwinkel aus der Grundregel stehen bleibt. Bogen und Neigung
+     waren davon ohnehin nie betroffen. */
+  transform: translateY(calc(-1 * var(--hand-hover-lift)))
+             scale(var(--hand-hover-scale))
+             rotate(var(--hand-tilt, 0deg));
+  outline: 2px solid var(--player-color);
+  outline-offset: -1px;
+  box-shadow: 0 0 16px var(--player-color),
+              0 0 30px color-mix(in srgb, var(--player-color) 50%, transparent),
+              0 5px 12px rgba(0,0,0,.45);
+  z-index: 60;
+}
+/* Gegnerseite: gleiche Groesse, Versatz nach unten. */
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card.revealed-hand-card:hover,
+.pz-hand-cards[data-pz-hand="oppHand"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner,
+.pz-hand-cards[data-pz-hand="oppCreationZone"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner {
+  /* ★ v1244: auch hier keine Aufrichtung mehr — der Fächerwinkel (und
+     bei verdeckten Gegnerkarten die halbe Drehung) bleibt stehen. */
+  transform: translateY(var(--hand-hover-lift))
+             scale(var(--hand-hover-scale))
+             rotate(var(--hand-tilt, 0deg));
+  outline: 2px solid var(--player-color);
+  outline-offset: -1px;
+  box-shadow: 0 0 16px var(--player-color),
+              0 0 30px color-mix(in srgb, var(--player-color) 50%, transparent),
+              0 -5px 12px rgba(0,0,0,.45);
+  z-index: 60;
+}
+/* Ueberdecken duerfen sie: der PLATZ der gehoverten Karte kommt nach
+   vorn, sonst schoebe sich die naechste Karte ueber die vergroesserte
+   (spaeter im DOM = spaeter gezeichnet). */
+/* ★★ v1216: die beiden `:has()`-Regeln sind RAUS (Als Befund: laggy).
+   `:has()` zwingt die Stil-Engine, bei jeder Aenderung an einer Karte
+   auch deren Vorfahren neu zu bewerten — und waehrend eines Zuges
+   aendert sich an den Karten laufend etwas. Gebraucht wird die Regel
+   ohnehin nicht: `.hand-slot` ist zwar `position: relative`, aber ohne
+   eigenes `z-index` KEIN Stapelkontext. Das `z-index: 60` der
+   gehoverten Karte gilt damit direkt in der Handreihe und hebt sie
+   ueber ihre Nachbarn. Nachgemessen. */
+
+/* ★★ v1215 — ZWEITER GURT GEGEN DAS AUFPOPPEN IM ZUG (Als Befund 18.9.)
+   Die Regeln oben haengen an `:hover`, und `:hover` ist waehrend eines
+   Zuges nicht verlaesslich: der Platz der gezogenen Karte faellt auf
+   Breite 0 zusammen, das DOM unter dem Zeiger wechselt mitten in der
+   Bewegung, und der Browser laesst den Zustand dann an einem Knoten
+   haengen, ueber dem der Zeiger laengst nicht mehr steht. Genau das
+   Muster, gegen das es im Code schon `useStickyHoverFlag` gibt.
+   Deshalb nimmt hier waehrend des Zuges gar keine Handkarte mehr den
+   Zeiger an — dann kann `:hover` schon nicht mehr entstehen. Die
+   Ablage-Erkennung stoert das nicht: sie rechnet mit Koordinaten und
+   Kastenmassen, nicht mit Treffern im DOM. */
+.game-hand-me .game-hand-cards[data-pp-dragging] .hand-slot > .board-card,
+.game-hand-me .game-hand-creation-cards[data-pp-dragging] .creation-slot > .board-card,
+.game-hand-opp[data-pp-dragging] .board-card.hand-card {
+  pointer-events: none;
+}
+/* ★★ v1216 — NICHT im Puzzle-Editor (Als Befund 18.9.: „im Puzzle
+   Editor kann ich GAR NICHT MEHR drag/droppen").
+   Der Editor zieht ueber HTML5-Drag&Drop, und dort ist die gezogene
+   Karte SELBST das Quellelement. Nimmt man ihr im `dragstart` den
+   Zeiger, bricht der Browser den Zug sofort wieder ab — es gab also
+   gar keinen Zug mehr. Im Kampf ist das ungefaehrlich: dort haengen
+   Bewegung und Loslassen am Fenster, nicht an der Karte.
+   Der Riegel gegen das Aufpoppen bleibt im Editor trotzdem wirksam —
+   er haengt an `:not([data-pp-dragging])` in den Hover-Regeln selbst.
+
+   ★★ v1217: Die Klasse sitzt seit heute an der HANDREIHE statt am
+   Wurzelelement. Auf `<html>` zwang jeder Wechsel den Browser, das
+   ganze Dokument gegen ein 690-KB-Blatt neu abzugleichen — einmal beim
+   Greifen, einmal beim Loslassen. Das war der spuerbare Ruckler beim
+   Aufnehmen einer Karte (Als Befund 18.9.). */
+
+/* ── ABLAGEZONE LEUCHTET AUF (v1219, Als Vorgabe) ─────────────────
+   „Im Puzzle-Editor wird die dedizierte Hand-Zone gehighlightet, wenn
+   man eine Karte drag/dropped (was ich schoen finde), im laufenden
+   Spiel nicht."
+
+   Das Aussehen stand bis heute als Inline-Stil an zwei Stellen im
+   Editor. Jetzt einmal hier, und beide Oberflaechen setzen dieselbe
+   Klasse. KOSTENLOS im Sinne der Frage: die Klasse wechselt zweimal je
+   Zug (Zeiger betritt/verlaesst die Zone), waehrend der Bewegung wird
+   nichts gerechnet und nichts gemessen. */
+.pp-drop-aktiv,
+[data-pp-drop] {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--player-color) 45%, transparent) inset;
+  transition: box-shadow .12s ease-out;
+}
+/* ★★ v1256 (Als Befund 19.9.: „die Drop-Zone der eigenen Hand ist
+   deutlich zu hoch, die Support Zones sind vollständig davon
+   bedeckt"). Die Handreihe ist durch ihr Polster gut eine Kartenhöhe
+   höher als die Karten darin; ein Schein auf ihrem ganzen Kasten malt
+   entsprechend weit ins Feld hinauf. Deshalb hier ein Streifen genau
+   über den Karten statt eines Scheins auf der ganzen Reihe. Die
+   Trefferprüfung rechnet seit v1256 ebenso mit dem Inhaltskasten
+   (siehe `zoneRect` in app-board). */
+.game-hand-cards.pp-drop-aktiv { box-shadow: none; }
+.game-hand-cards.pp-drop-aktiv::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  bottom: var(--fan-pad-unten, 0px);
+  height: var(--hand-card-h);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--player-color) 45%, transparent) inset;
+  pointer-events: none;
+}
+
+/* ── ZONE AUF DEM BRETT UNTER DEM ZEIGER (v1219, v1220) ───────────
+   „Ein aehnlicher Vergroessern-und-Highlighten-Filter wie fuer
+   Handkarten, allerdings mit kleinerem Zoom-Faktor."
+
+   ★★ v1220 — ES WAECHST DIE ZONE, NICHT DIE KARTE (Als Befund: keine
+   Wirkung bei Abilities und Areas; tote Helden verlieren beim Hovern
+   ihre Ausgrauung).
+   Alle drei hatten dieselbe Ursache. Die Regel griff auf
+   `.board-zone > .board-card` — aber der Ability-STAPEL und die Area
+   zeichnen ihre Karten ueber eigene Bauteile, nicht als direktes Kind.
+   Und der tote Held wird von `.board-zone-dead::before` verschleiert,
+   einer Lage INNERHALB der Zone: die vergroesserte Karte ragte darunter
+   hervor, und mein `z-index` auf der Karte hob sie zusaetzlich ueber
+   den Schleier.
+   Waechst dagegen die ZONE, waechst alles darin mit — Karte,
+   Schleier, Versteinerung, Zaehler, Abzeichen, Stapel, Area-Kunst —
+   und die Schichtung bleibt unangetastet. Der Zustand der Basiskarte
+   wird damit nicht kopiert, sondern ist schlicht derselbe.
+   `zone-has-card` haelt leere Zonen heraus.
+
+   ★★ Gezoomt wird ueber die EIGENSTAENDIGE `scale`-Eigenschaft, nicht
+   ueber `transform`. Area-Zonen tragen bereits ein
+   `transform: translateY(-50%)` (teils mit `!important`) — ein
+   Hover-`transform` haette das weggeworfen und die Zone verspringen
+   lassen. `scale` legt sich davor, ohne es anzufassen. */
+:root { --board-hover-scale: 1.14; }
+/* ★ v1255 (Als Befund 19.9.: „im Puzzle-Creator fehlt das
+   Hover-Highlight ALLEN Board-Karten"). Die Regel hing allein an
+   `.board-plane` — der Editor nennt seine Ebene `.pz-board-plane` und
+   war damit nie gemeint. */
+/* ★★ v1256: Der Editor setzt `zone-has-card` NICHT — die Klasse kommt
+   aus `BoardZone` im Duell, seine Zonen baut er selbst. Deshalb dort
+   die Bedingung „enthält eine Karte" direkt: `:has(.board-card)`. Der
+   Wächter gegen `:has()` in heißen Pfaden greift hier nicht — die
+   Regel wertet nur beim Hovern aus, und die Nachbarregeln für leere
+   Zonen (`:has(.board-zone-empty)`) arbeiten seit jeher genauso. */
+.board-plane .board-zone.zone-has-card,
+.pz-board-plane .board-zone:has(.board-card) {
+  transition: scale .14s ease-out, outline-color .14s ease-out, box-shadow .14s ease-out;
+}
+.board-plane:not([data-pp-dragging]) .board-zone.zone-has-card:hover,
+.pz-board-plane:not([data-pp-dragging]) .board-zone:has(.board-card):hover {
+  scale: var(--board-hover-scale);
+  outline: 2px solid var(--player-color);
+  outline-offset: 1px;
+  box-shadow: 0 0 14px var(--player-color),
+              0 0 30px color-mix(in srgb, var(--player-color) 45%, transparent),
+              0 6px 14px rgba(0,0,0,.55);
+  z-index: 40;
+}
+
+/* ── BRETTWEITE LAGE ZWISCHEN AREA UND KARTEN (v1223) ─────────────
+   Eingehaengt von `onZoneAnim` bei `layer: 'overAreas'`: Wurzel plus
+   drei freie Lagen (`i`), die jede Karte nach Belieben benutzt. Die
+   Laufzeit kommt als `--pp-bg-dauer` aus dem Broadcast. */
+.pp-bg-anim {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pp-bg-anim > i { position: absolute; display: block; }
+
+/* ── „Pink Sky" (v1223, Als Vorgabe) ──────────────────────────────
+   „Ein pinkfarbener Himmel mit weissen Wattewolken, der fuer ein paar
+   Sekunden langsam scrollt und ausfadet."
+
+   Die Wolken sind KEINE Einzelknoten, sondern zwei endlos wiederholte
+   Baender aus Radialverlaeufen. Das laeuft als reine
+   `background-position`-Animation, braucht also weder Knoten je Wolke
+   noch Layout — und weil die Baender waagerecht kacheln, gibt es beim
+   Durchlauf keine Naht. Zwei Baender mit verschiedener Groesse und
+   Geschwindigkeit ergeben die Tiefe (das hintere zieht langsamer). */
+/* ★★ v1225 (Als Befund 18.9.: „ziemlich laggy, und sie dauert zu
+   lang"). Zwei Ursachen, beide behoben:
+
+   1. `filter: blur()` lag auf zwei bildschirmgrossen Lagen, die sich
+      zugleich bewegten — der Browser muss jedes Bild neu weichzeichnen.
+      Die Weichheit steckt jetzt in den Verlaeufen selbst (sie laufen
+      ohnehin bis ~82 % aus), der Filter ist raus.
+   2. Die Baender liefen ueber `background-position`. Das faellt NICHT
+      in den Compositor, sondern zeichnet die Lage jedes Bild neu. Jetzt
+      wandert stattdessen die LAGE selbst per `transform` (doppelt so
+      breit, damit der Umbruch nahtlos bleibt) — das laeuft auf der GPU.
+
+   Die Laufzeit kommt weiter vom Aufrufer; die Karte gibt jetzt 2600 ms
+   statt 4200 vor. */
+.pp-bg-anim-pink-sky {
+  opacity: 0;
+  animation: pinkSkyBlende var(--pp-bg-dauer, 2000ms) ease-in-out forwards;
+}
+.pp-bg-anim-pink-sky::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    #f0509f 0%, #ff74b8 26%, #ff9ccb 52%, #ffc2d9 76%, #ffe3e9 100%);
+}
+/* ★★ v1226 (Als Befund, zweiter Anlauf: „immer noch etwas hakelig").
+   Die Baender sind bildschirmbreit und mussten mit je ACHT
+   Radialverlaeufen einmal gerastert werden — das ist der Ruck zu
+   Beginn. Jetzt vier Verlaeufe je Band (eine Wolke aus drei Ballen plus
+   Sockel) auf einer schmaleren Kachel: dieselbe Dichte im Bild, halb so
+   viel Arbeit beim Aufbau. Bewegt wird weiter die LAGE per `transform`,
+   nicht die Hintergrundposition.
+
+   Wolken aus BALLEN, nicht aus einzelnen Ellipsen: mehrere
+   ueberlappende Verlaeufe auf gemeinsamer Grundlinie, dazu ein flacher
+   Sockel, der sie zusammenzieht. Weiche Kanten (der Verlauf laeuft bis
+   ~80 % aus) machen daraus Watte statt Aufkleber. */
+.pp-bg-anim-pink-sky > i:nth-child(1) {
+  left: 0; top: 6%; height: 40%;
+  width: 200%;
+  background-image:
+    radial-gradient(30px 20px at 46px 70%, rgba(255,255,255,.85) 0 42%, rgba(255,255,255,.5) 66%, transparent 78%),
+    radial-gradient(42px 28px at 84px 64%, rgba(255,255,255,.88) 0 44%, rgba(255,255,255,.5) 68%, transparent 80%),
+    radial-gradient(26px 18px at 120px 70%, rgba(255,255,255,.8) 0 42%, rgba(255,255,255,.45) 66%, transparent 78%),
+    radial-gradient(92px 14px at 84px 74%, rgba(255,255,255,.72) 0 40%, transparent 76%);
+  background-size: 240px 100%;
+  background-repeat: repeat-x;
+  opacity: .62;
+  will-change: transform;
+  animation: pinkSkyZug 34s linear infinite;
+}
+.pp-bg-anim-pink-sky > i:nth-child(2) {
+  left: 0; top: 32%; height: 58%;
+  width: 200%;
+  background-image:
+    radial-gradient(52px 34px at 78px 64%, #ffffff 0 46%, rgba(255,255,255,.62) 70%, transparent 82%),
+    radial-gradient(74px 48px at 146px 56%, #ffffff 0 48%, rgba(255,255,255,.64) 72%, transparent 84%),
+    radial-gradient(46px 30px at 212px 64%, #ffffff 0 46%, rgba(255,255,255,.6) 70%, transparent 82%),
+    radial-gradient(176px 20px at 146px 70%, rgba(255,255,255,.9) 0 44%, transparent 80%);
+  background-size: 330px 100%;
+  background-repeat: repeat-x;
+  opacity: .95;
+  will-change: transform;
+  animation: pinkSkyZug 20s linear infinite;
+}
+/* Warmer Schleier ueber allem — nimmt der Flaeche das Plakathafte. */
+.pp-bg-anim-pink-sky > i:nth-child(3) {
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 18%,
+    rgba(255,255,255,.35) 0%, rgba(255,190,220,.18) 45%, rgba(255,120,180,0) 78%);
+}
+@keyframes pinkSkyBlende {
+  0%   { opacity: 0; }
+  14%  { opacity: 1; }
+  68%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Die Lage ist doppelt so breit wie das Bild und faehrt um genau ihre
+   halbe Breite — weil die Kacheln waagerecht wiederholen, ist der
+   Umbruch damit nahtlos, egal wie breit das Brett gerade ist. */
+@keyframes pinkSkyZug {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ── GESPERRTE KARTE UNTER DEM ZEIGER (v1229) ─────────────────────
+   Eine nicht spielbare Handkarte traegt einen Schleier
+   (`rgba(12,12,20,.7)`, `.hand-card-dimmed .board-card::before`). Unter
+   dem Zeiger wird sie 1,42-fach vergroessert — der Schleier waechst mit
+   und legt sich dabei ueber die Nachbarn. Beim schnellen Hin- und
+   Herfahren wandert so ein dunkler Block durch die Hand, und es sieht
+   aus, als wuerden einzelne Karten kurz „sehr dunkel ausgegraut"
+   (Als Befund).
+
+   Unter dem Zeiger wird der Schleier deshalb deutlich duenner. Das
+   loest nicht nur den Eindruck auf — man will die Karte, die man
+   gerade anschaut, ja auch lesen koennen, auch wenn man sie nicht
+   spielen kann. */
+.game-hand-me .hand-slot.hand-card-dimmed > .board-card:hover::before,
+.game-hand-me .creation-slot.hand-card-dimmed > .board-card:hover::before {
+  background: rgba(12, 12, 20, 0.28);
 }
 
 /* ===== TOOLTIP (full gallery column) ===== */
@@ -2332,7 +2933,28 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* ★★ v1246 (Als Befund 19.9.: „die Gegner-Handkarten werden an der
+     oberen Kante des Containers abgeschnitten, statt über ihn
+     hinauszuragen").
+
+     Nicht die Handleiste hat geschnitten, sondern DIESER Kasten: die
+     Gegnerhand sitzt ganz oben im Spielbereich, und seit sie angehoben
+     ist, liegt ihre Oberkante 17 px über dessen Rand — `overflow:
+     hidden` hat genau dort abgeschnitten.
+
+     `clip` statt `hidden` (schneidet genauso, macht aber keinen
+     Scrollbereich) plus `overflow-clip-margin`: der Schnitt rückt um
+     eine Drittel-Kartenhöhe nach außen, die Hand darf also
+     hinausragen, während alles andere weiterhin gehalten wird. Das
+     Brett kommt dabei nicht heraus — `.game-board` hat sein eigenes
+     `overflow: hidden`. */
+  overflow: clip;
+  /* Feste Zahl, kein `calc(var(…))`: Chromium löst eine Variable in
+     dieser Eigenschaft nicht auf und fällt still auf 0 zurück
+     (nachgemessen). 64 px reichen für den angehobenen Fächer bei
+     jedem Maßstab; mehr Spielraum kostet nichts, weil außer der Hand
+     ohnehin nichts über den Rand hinausreicht. */
+  overflow-clip-margin: 64px;
   min-height: 0;
 }
 .game-hand {
@@ -2355,7 +2977,19 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   z-index: 2;
 }
 .game-hand-opp .game-gold-display { z-index: 2; }
-.game-hand-me { border-top: 1px solid var(--bg4); position: relative; z-index: 10000; }
+.game-hand-me {
+  border-top: 1px solid var(--bg4);
+  position: relative;
+  z-index: 10000;
+  /* ★ v1247: kürzer als ihre Karte — der Rest hängt unten heraus. */
+  min-height: calc(var(--hand-min-h) - var(--hand-senkung));
+}
+/* Der negative Rand nimmt die Absenkung aus dem LAYOUT heraus: die
+   Reihe zählt für die Leiste entsprechend weniger hoch, ihre Karten
+   bleiben aber vollständig gezeichnet und stehen unten über. */
+.game-hand-me .game-hand-cards {
+  margin-bottom: calc(var(--fan-pad-unten) * -1 - var(--hand-senkung));
+}
 .hand-slot {
   cursor: grab;
   transition: transform .15s;
@@ -2379,8 +3013,8 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   min-width: 0 !important;
 }
 .hand-drop-gap {
-  width: calc(64px * var(--board-scale));
-  height: calc(90px * var(--board-scale));
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
   flex-shrink: 0;
   border: 2px dashed var(--accent);
   border-radius: 4px;
@@ -2391,21 +3025,53 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   position: fixed;
   z-index: 10050;
   pointer-events: none;
-  width: calc(64px * var(--board-scale));
-  height: calc(90px * var(--board-scale));
+  /* ★ v1234: Maß der HANDKARTE, nicht der Brettkarte — sie landet in
+     der Hand, und eine kleinere Kopie spränge beim Ankommen. */
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+  --dfStart: calc(var(--pile-card-scale, 1) / var(--hand-card-scale, 1));
   animation: cardDrawFly .4s ease-out forwards;
 }
+/* ★★★ v1255 (Als Befund 19.9.: „die fliegenden Karten sind nach wie vor
+   klein, egal von wo nach wo"). DAS war es — und meine bisherigen
+   Korrekturen gingen daran vorbei: die HÜLLE hatte längst Handmaß, die
+   Karte DARIN nicht. `DrawAnimCard` und `OppDrawAnimCard` setzen ein
+   `<BoardCard>` hinein, und das bringt seine eigene Größe mit
+   (Brettmaß). Nachgemessen: Hülle 105×148, Karte darin 55×77 — sichtbar
+   war also nur die kleine Karte, die Hülle ist unsichtbar.
+   Die Regel gilt für beide Ziehflüge, eigener wie gegnerischer. */
+.draw-anim-card > .board-card {
+  width: 100%;
+  height: 100%;
+  /* ★ v1233: Drehpunkt wie beim Landeplatz. Im Duell hält die eigene
+     Hand ihre Karten unten (`50% 85%`, seit v1210); Reihen ohne
+     Platz-Hülle drehen um die Mitte und setzen `--fan-origin`. */
+  transform-origin: var(--fan-origin, 50% 85%);
+}
 @keyframes cardDrawFly {
-  0% { transform: translate(0, 0) scale(0.7); opacity: .8; filter: brightness(1.6); }
+  /* ★ v1253: Startgröße = DECK, Zielgröße = Hand. Vorher pauschale
+     70 %, was seit den eigenen Maßen für Hand und Stapel nicht mehr
+     zusammenpasste. */
+  0% { transform: translate(0, 0) scale(var(--dfStart, 0.7)); opacity: .8; filter: brightness(1.6); }
   60% { opacity: 1; filter: brightness(1.2); }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; filter: brightness(1); }
+  /* Der Landewinkel des Fächers — die Karte dreht sich im Flug hinein,
+     statt beim Ankommen zu springen. */
+  100% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--fan-rot, 0deg)); opacity: 1; filter: brightness(1); }
 }
 .discard-anim-card {
   position: fixed;
   z-index: 10050;
   pointer-events: none;
-  width: calc(64px * var(--board-scale));
-  height: calc(90px * var(--board-scale));
+  /* ★ v1255: Grundmaß ist das STAPELMASS, nicht das Brettmaß. Jeder
+     dieser Flüge endet auf einem Stapel; eine Karte, die dort in
+     Stapelgröße liegen wird, soll nicht in Brettgröße losfliegen und
+     unterwegs wachsen. Brettquellen starten damit etwas größer als
+     ihre Zone — das fällt weit weniger auf als eine zu kleine Karte,
+     die im Stapel plötzlich größer ist. */
+  width: var(--pile-card-w);
+  height: var(--pile-card-h);
+  /* `.discard-anim-hand` (siehe DiscardAnimCard) — aus der Hand
+     startet der Flug im Handmaß. */
   /* ★ ALS BEFUND 18.8.: „hovert … kurz auf der Stelle, was seltsam
      aussieht." Ursache: Fluege werden in einer Warteschlange gestaffelt
      (`takePileFlightLane`), und weil die Keyframes kein
@@ -2419,6 +3085,18 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   /* Perspektive fuer die Neigung unten. */
   perspective: 900px;
   animation: cardDiscardFly .4s ease-in forwards;
+  /* ★★ v1253 (Als Befund 19.9.: „die sich bewegenden Karten sind immer
+     noch so klein wie zu Beginn der Session — sie müssen mit dem
+     Zielort skalieren").
+
+     Der Flug endete auf pauschalen 60 % seiner Startgröße. Das war
+     stimmig, solange die Stapel Brettmaß hatten; seit sie ihr eigenes
+     tragen, kam die Karte deutlich zu klein an. `--dfScale` ist das
+     Verhältnis ZIEL zu QUELLE — und weil beide Maße aus reinen Zahlen
+     abgeleitet sind, lässt es sich in CSS rechnen (Längen durch Längen
+     ginge nicht). Von einer Brettzone aus ist das Ziel schlicht um den
+     Stapel-Maßstab größer. */
+  --dfScale: 1;
 }
 /* ★ ALS BEFUND 18.8.: „noch nicht korrekt angewinkelt … noch komplett
    flach top-down, während sie zum Deleted-Pile fliegen."
@@ -2428,6 +3106,12 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
    Brettkarte und richtet sich auf dem Weg auf — die Ablagestapel sind
    Bedienoberflaeche und liegen flach, das Aufrichten ist also der
    korrekte Uebergang und kein Kunstgriff. */
+.discard-anim-card.discard-anim-hand {
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+  /* Aus der Hand: Ziel ist der Stapel, Quelle die Handkarte. */
+  --dfScale: calc(var(--pile-card-scale, 1) / var(--hand-card-scale, 1));
+}
 @keyframes cardDiscardFly {
   0% {
     transform: rotateX(var(--board-tilt, 29deg)) translate(0, 0) scale(1);
@@ -2435,7 +3119,7 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   }
   40% { filter: brightness(1.3); }
   100% {
-    transform: rotateX(0deg) translate(var(--dx), var(--dy)) scale(0.6);
+    transform: rotateX(0deg) translate(var(--dx), var(--dy)) scale(var(--dfScale, 0.6));
     opacity: .5; filter: brightness(0.7);
   }
 }
@@ -2488,6 +3172,18 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   transition: opacity .2s ease, filter .2s ease;
 }
 
+/* ★ v1236 (Als Befund 19.9.: „die Karten sollen auch, während sie
+   gedraggt werden, noch scaled-up sein"). Die schwebende Karte rendert
+   ein nacktes `<BoardCard>` und lag damit auf dem BRETTMASS — sie
+   schrumpfte im Moment des Greifens und wuchs beim Ablegen in der Hand
+   wieder. Alle drei Ziehwege (Umsortieren, Ausspielen, Ability
+   anlegen) starten in der Hand bzw. im Vorrat, also gilt für sie das
+   Handmaß. Der Griffpunkt misst ohnehin die Quellkarte und stimmt
+   damit von selbst mit. */
+.hand-floating-card > .board-card {
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+}
 .hand-floating-card {
   position: fixed;
   z-index: 10000;
@@ -2528,8 +3224,13 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   border: 1px solid var(--bg4);
 }
 .game-hand-avatar-big {
-  /* Almost the full height of the hand container (--hand-min-h), kept square. */
-  width: calc(var(--hand-min-h) * 0.86); height: calc(var(--hand-min-h) * 0.86);
+  /* ★ v1234: feste 88 px statt `--hand-min-h * 0.86`. Das war bis
+     v1233 derselbe Wert (102 × 0.86 ≈ 88); seit die Leiste für die
+     größeren Handkarten gewachsen ist, wäre der Avatar unbeabsichtigt
+     mitgewachsen — und beim Ausschnitt unten ginge es nicht nur um
+     Geschmack: dessen inneres Bild ist 135 px breit und damit rund
+     90 px hoch, das Quadrat darf es nicht überschreiten. */
+  width: calc(88px * var(--board-scale)); height: calc(88px * var(--board-scale));
   object-fit: cover;
   border: 2px solid var(--bg4);
 }
@@ -2548,8 +3249,8 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
      fixed width (135px in app-board.jsx) whose cropped height (135*398/594 ≈
      90px) is >= this square at every --board-scale (capped at 1.0), so it
      always fills the frame with no gaps; excess is center-clipped. */
-  width: calc(var(--hand-min-h) * 0.86);
-  height: calc(var(--hand-min-h) * 0.86);
+  width: calc(88px * var(--board-scale));
+  height: calc(88px * var(--board-scale));
   border: 2px solid var(--bg4);
   line-height: 0;
   overflow: hidden;
@@ -4530,7 +5231,26 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
    steht. Ohne ihn greift ihr eigenes `flex: 1` und sie füllt alles. */
 .game-hand-cards:has(~ .game-hand-creation) { flex: 2; }
 
+/* ── DIE HAND SINKT, WENN DER BOGEN AUSBRICHT (v1241) ──────────────
+   „Sobald Handkarten anfangen, oben aus dem Hand-Container
+   auszubrechen, sollte die komplette Hand um ein Drittel der Pixel,
+   die über den Container hinaus gebraucht werden, abgesenkt werden."
+
+   Gerechnet statt gemessen: der höchste Hub einer Hand dieser Größe
+   steht als `--hand-max-lift` an der Reihe (in Kartenhöhen, von
+   `handFanMaxLift`), die Luft über einer mittig liegenden Karte ist
+   das Polster der Leiste. Was darüber hinausgeht, ist der Überstand —
+   ein Drittel davon geht als Absenkung zurück. Die Gegnerhand bricht
+   nach unten aus und wird entsprechend angehoben.
+
+   `translate` statt `transform`: die Karten darin benutzen `transform`
+   für Hover und Zustände, und das soll sich hier nicht begegnen. */
 .game-hand-cards {
+  position: relative;   /* ★ v1256: Bezug für den Ablage-Streifen (::before) */
+  --hand-frei-oben: calc(6px * var(--board-scale));
+  --hand-ueberstand: max(0px,
+    calc(var(--hand-max-lift, 0) * var(--hand-card-h) - var(--hand-frei-oben)));
+  translate: 0 calc(var(--hand-ueberstand) / 3);
   display: flex;
   flex: 1;
   justify-content: center;
@@ -4541,23 +5261,99 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
      already handled by the per-slot `flex-shrink: 1` + `min-width`
      below, so the previous `overflow: hidden` blanket clip was
      overzealous — it cut off legitimate visual feedback. */
-  overflow: visible;
-  padding: 2px 0;
-  margin-left: calc(180px * var(--board-scale)); /* Match right margin for symmetric centering */
-  margin-right: calc(180px * var(--board-scale)); /* Reserve space for gold display + sort/shuffle buttons */
+  /* ── DIE REIHE SCROLLT, WENN SELBST DAS ZUSAMMENSCHIEBEN NICHT
+        MEHR REICHT (v1241, Als Vorgabe 19.9.) ────────────────────
+     „Die Scrollbar erscheint erst, wenn trotz des maximalen
+     Zusammenschiebens die Breite des Hand-Containers gesprengt wird."
+
+     Genau das leistet `overflow-x: auto` zusammen mit der Untergrenze
+     von 75 % oben: solange die Plätze noch schrumpfen können, gibt es
+     nichts zu scrollen und die Leiste bleibt unverändert; erst danach
+     erscheint die Leiste von selbst. Kein Messen, kein Umschalten.
+
+     `safe center` statt `center`: zentrierter Inhalt, der überläuft,
+     wird an BEIDEN Rändern abgeschnitten — der Anfang wäre nicht mehr
+     erreichbar (genau Als „die äußersten Karten sind unerreichbar").
+     `safe` zentriert nur, solange es passt, und rückt sonst an den
+     Anfang.
+
+     DAS POLSTER OBEN ist der Preis dafür: `overflow-x: auto` macht
+     auch die senkrechte Achse zu einem Scrollbereich, und Fächerbogen
+     wie Hover-Vergrößerung ragen nach oben hinaus — ohne Polster
+     würden sie abgeschnitten. Es wird mit einem negativen Rand wieder
+     eingezogen, die Leiste behält also ihre Höhe, und weil unten kein
+     Polster liegt, sitzt die waagerechte Bildlaufleiste direkt unter
+     den Karten statt außerhalb des Bildes. */
+  overflow-x: auto;
+  /* ★★ v1243 (Als Befund 19.9.: „die Hand hat eine vertikale Scrollbar
+     bekommen — die muss weg, ruhig alles anzeigen").
+
+     Sie kam aus einer Eigenheit der Achsen: `overflow-x: auto` macht
+     aus `overflow-y: visible` automatisch `auto`, die Reihe war also
+     AUCH senkrecht ein Scrollbereich. Und ein Scrollbereich zählt
+     TRANSFORMIERTE Kästen mit: eine um 9° gekippte Karte ist 142 px
+     hoch statt 130 und ragte damit gut 6 px unter die Reihe — genau
+     die Scrollleiste.
+
+     `overflow-y: hidden` macht senkrechtes Scrollen unmöglich.
+     Abgeschnitten wird dadurch nichts, weil das Polster ringsum alles
+     fasst, was über die Karten hinausgeht: oben Bogen und
+     Hover-Vergrößerung, unten und seitlich den Drehüberhang plus die
+     seitliche Hover-Vergrößerung. Die negativen Ränder nehmen das
+     Polster fürs Layout wieder zurück — die Leiste behält ihre Höhe,
+     die Karten ihren Platz. */
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  --fan-pad-x: calc(var(--hand-card-w) * 0.45);
+  --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
+  padding: calc(var(--hand-card-h) * 0.8 + 20px) var(--fan-pad-x) var(--fan-pad-unten);
+  margin-top: calc(var(--hand-card-h) * -0.8 - 20px);
+  margin-bottom: calc(var(--fan-pad-unten) * -1);
+  margin-left: calc(180px * var(--board-scale) - var(--fan-pad-x)); /* Match right margin for symmetric centering */
+  margin-right: calc(180px * var(--board-scale) - var(--fan-pad-x)); /* Reserve space for gold display + sort/shuffle buttons */
+}
+.game-hand-cards { justify-content: safe center; }
+/* Die Gegnerhand spiegelt das Polster: ihr Bogen und ihre
+   Hover-Vergrößerung gehen nach unten. */
+.game-hand-opp .game-hand-cards {
+  padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
+  margin-top: calc(var(--fan-pad-unten) * -1);
+  margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
 }
 /* Hand cards compress (overlap) when there are too many */
 .game-hand-cards .hand-slot {
-  flex: 0 1 calc(68px * var(--board-scale)); /* 64px card + 4px spacing, shrinks when needed */
-  min-width: calc(18px * var(--board-scale));
+  /* ★ v1233: 58 statt 68 — die Karte ist 64 breit, die Plätze liegen
+     also um 6 px übereinander und die Hand liest sich als gehaltenes
+     Blatt statt als Reihe. Wichtig dabei: der Abstand von Platz zu
+     Platz MUSS gleich der Platzbreite bleiben (`.game-hand-cards` hat
+     kein `gap`, deshalb über die Basis und nicht über negative
+     Ränder). Drei Flüge projizieren den Landepunkt einer noch nicht
+     existierenden Karte mit genau dieser Gleichsetzung — „die Hand
+     ist zentriert, eine Karte mehr rückt die Reihe" —, und negative
+     Ränder hätten sie stillschweigend verstimmt. */
+  flex: 0 1 calc(var(--fan-pitch, 58px) * var(--board-scale));
+  /* ★★ v1241/v1242 (Als Vorgabe 19.9.): Karten dürfen einander
+     verdecken — erst zuletzt wird gescrollt. Vorher durfte ein Platz
+     auf 18 px zusammenfallen, also auf 80 % Überdeckung, und die
+     äußersten Karten ragten weit über die Reihe hinaus, wo sie unter
+     Goldanzeige und Knöpfen unerreichbar waren. Wie weit es gehen
+     darf, steht als EIN Wert in `--hand-min-anteil`. */
+  min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
 .game-hand-cards .hand-slot:last-child {
-  flex: 0 0 auto; /* Last card never compressed — always fully visible */
+  /* Last card never compressed — always fully visible.
+     ★ v1241: und zwar in KARTENbreite, nicht in Platzbreite. Die
+     Karten ragen beim Zusammenschieben über ihren Platz hinaus; nur
+     wenn der letzte Platz so breit ist wie seine Karte, kennt das
+     Flex-Layout die wahre Breite der Reihe — und die Bildlaufleiste
+     erscheint genau dann, wenn sie wirklich nicht mehr passt, statt
+     schon ein paar Karten früher. */
+  flex: 0 0 var(--hand-card-w);
 }
 /* Opponent face-down cards also compress */
 .game-hand-cards > .board-card.hand-card {
   flex-shrink: 1;
-  min-width: calc(18px * var(--board-scale));
+  min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
 }
 .game-hand-cards > .board-card.hand-card:last-child {
   flex-shrink: 0;
@@ -4641,7 +5437,12 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
-  gap: 3px;
+  /* ★ v1244 (Als Vorgabe 19.9.): etwas mehr Luft zwischen Ablage und
+     Gelöscht-Stapel. Seit die Stapel im Handmaß liegen, füllen sie
+     ihre Spalte fast aus und standen mit 3 px praktisch aneinander.
+     Der flexible Abstandhalter (`.board-util-spacer`) gibt den Platz
+     dafür ab. */
+  gap: calc(8px * var(--board-scale));
   min-height: 0;
 }
 .board-util-mid {
@@ -8073,6 +8874,48 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 .board-zone-deleted { border-color: rgba(100,60,60,.4); background: rgba(100,40,40,.08); }
 .board-zone-deck { border-color: rgba(100,80,50,.5); background: rgba(100,80,50,.08); }
 .board-zone-potion { border-color: rgba(80,140,100,.5); background: rgba(80,140,100,.08); }
+
+/* ── STAPEL IM HANDMASS (v1235, Als Vorgabe 19.9.) ─────────────────
+   Deck, Potion-Deck, Ablage und Gelöscht-Stapel tragen dieselbe
+   Kartengröße wie die Hand. Eine Karte, die zwischen diesen Orten
+   unterwegs ist, muss auf dem Weg also nicht mehr skaliert werden —
+   sie ist an beiden Enden gleich groß. Nur die BRETTZONEN (Held,
+   Support, Ability, Surprise, Area) bleiben bei 64×90: dort
+   vergrößert die Perspektive selbst.
+
+   `.board-stack` ist der gestapelte Aufbau der Ablage (mehrere
+   Karten übereinander) und muss mitziehen, sonst säße der Stapel
+   als kleines Rechteck in einer großen Zone. */
+.board-zone-deck,
+.board-zone-potion,
+.board-zone-discard,
+.board-zone-deleted,
+/* ★ v1237 (Als Vorgabe 19.9.: „auch die Area Zones, für die genug
+   Platz vorhanden ist"): die Area liegt auf der Faltlinie zwischen den
+   Feldhälften und hat dort Luft nach oben wie nach unten. Sie zieht
+   deshalb mit — im Duell (`board-zone-area`) wie im Editor
+   (`pz-area-zone`, eigene Klasse seit v1051). */
+.board-zone-area,
+.pz-area-zone {
+  width: var(--pile-zone-w);
+  height: var(--pile-zone-h);
+}
+/* Der reservierte Platz ZWISCHEN den Heldengruppen ist der Standplatz
+   der Area — er muss mitwachsen, sonst ragte die breitere Zone in die
+   Nachbarspalten. (`.board-zone-spacer` bleibt beim Zonenmaß: der
+   repliziert die Heldenspalten selbst.) */
+.board-area-spacer { width: var(--pile-zone-w); }
+.board-zone-deck .board-card,
+.board-zone-potion .board-card,
+.board-zone-discard .board-card,
+.board-zone-deleted .board-card,
+.board-zone-area .board-card,
+.pz-area-zone .board-card,
+.board-zone-discard .board-stack,
+.board-zone-deleted .board-stack {
+  width: var(--pile-card-w);
+  height: var(--pile-card-h);
+}
 .board-zone-empty {
   font-size: calc(8px * var(--board-scale));
   color: var(--text2);
@@ -8467,10 +9310,14 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   cursor: pointer !important;
   animation: blindPickPulse 1.2s ease-in-out infinite;
 }
-.hand-steal-highlight-active {
-  overflow: visible !important;
-  padding-top: 12px;
-}
+/* ★ v1241: `.hand-steal-highlight-active` hat der Handreihe früher Luft
+   nach oben verschafft (`overflow: visible !important; padding-top`),
+   damit die Diebstahl-Hervorhebung nicht abgeschnitten wird. Seit die
+   Reihe ein dauerhaftes Polster für Bogen und Hover trägt (siehe
+   `.game-hand-cards`), ist das erledigt — und das `!important` würde
+   hier die Bildlaufleiste einer übervollen Hand ausschalten. Die Regel
+   ist deshalb ersatzlos entfallen; die Klasse bleibt im Markup, weil
+   sie den Zustand benennt. */
 .blind-pick-selected {
   outline: 3px solid rgba(255,150,50,.95) !important;
   outline-offset: 2px;
@@ -10511,7 +11358,7 @@ body:has(.game-hand-me) .board-tooltip {
 @keyframes cardReturnToDeck {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; filter: brightness(1); }
   50%  { filter: brightness(1.4); }
-  100% { transform: translate(var(--dx), var(--dy)) scale(.7); opacity: .6; filter: brightness(1.6); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(var(--dfScale, .7)); opacity: .6; filter: brightness(1.6); }
 }
 
 /* ===== SKIN GALLERY ===== */
@@ -12493,7 +13340,33 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 
 /* ── Hand area ── */
+/* ★★ v1240 (Als Befund 19.9.: „im Puzzle-Editor scheinen die
+   Handkarten kleiner zu sein als im Duell"). Sie waren es: das
+   Kartenmaß hängt an `--board-scale`, und den drückt der Editor
+   deutlich weiter herunter als das Duell — er muss neben dem Brett
+   noch die 580 px breite Galerie unterbringen.
+
+   Die Handleisten des Editors nehmen deshalb das Maß OHNE den
+   Brettmaßstab, also die volle Duellgröße. Nebeneffekt, und ein
+   erwünschter: die Leisten hängen damit nicht mehr am Maßstab, den
+   der Editor-Scaler selbst berechnet — eine Rückkopplungsschleife
+   weniger in seinem Fixpunkt. */
 .pz-hand {
+  --hand-card-w: calc(64px * var(--hand-card-scale));
+  --hand-card-h: calc(90px * var(--hand-card-scale));
+  /* ★★ v1249 (Als Befund 19.9.: „die eigenen Handkarten im
+     Puzzle-Editor sind noch immer nicht weit genug unten").
+     Zwei Gründe, beide hier behoben:
+     ① `--hand-senkung` wird in `:root` aus der DORTIGEN Kartenhöhe
+        gerechnet — und die trägt den Brettmaßstab, den der Editor
+        deutlich kleiner hält als das Duell. Die Absenkung kam damit
+        bei rund 13 % der Editor-Karte heraus statt bei 18 %. Neu
+        gerechnet mit dem LOKALEN Maß stimmt das Verhältnis.
+     ② Und etwas mehr darf es sein: 0.26 statt 0.18. Die Leiste des
+        Editors liegt ganz unten am Fenster, der abgeschnittene Teil
+        fällt also aus dem Bild, nicht auf etwas drauf. */
+  --hand-senk-anteil: 0.26;
+  --hand-senkung: calc(var(--hand-card-h) * var(--hand-senk-anteil));
   display: flex;
   align-items: center;
   gap: 10px;
@@ -12509,11 +13382,134 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   letter-spacing: 2px;
   white-space: nowrap;
 }
+
+/* ── SCHMALE NEBENSPALTE DER HANDLEISTE (v1249) ────────────────────
+   Gold und Debuffs übereinander statt nebeneinander, auf den Inhalt
+   zugeschnitten: drei Ziffern (Gold ist auf ±999 begrenzt) und eine
+   Zahl. Vorher zusammen rund 260 px, jetzt 64 — die rund 200 px
+   Unterschied gehen an die Handkarten, weil deren Reihe `flex: 1`
+   ist und den freien Platz von selbst nimmt. */
+/* ★★ v1252 (Als Befund 19.9.: „der Container für Gold und Debuffs
+   scheint ÜBER den Handkarten zu liegen — dort werden sie
+   abgeschnitten"). Genau das war es: die Spalte steht im Markup NACH
+   der Kartenreihe und wurde deshalb über sie gezeichnet; die Reihe
+   ragt seit v1250 mit ihrem Polster unter sie. Eine eigene Ebene für
+   die Reihe dreht die Reihenfolge um — die Karten liegen jetzt vorn,
+   die Spalte dahinter. */
+.pz-hand-cards { position: relative; z-index: 2; }
+
+/* ★★★ v1255 (Als Befund 19.9.: „Karten in meinen eigenen Support Zones
+   lassen sich nicht highlighten").
+
+   Die Handreihe trägt oben ein Polster von gut einer Kartenhöhe — es
+   fängt Fächerbogen und Hover-Vergrößerung auf, damit der Scrollbereich
+   sie nicht abschneidet (v1243). Unsichtbar ist es, für die Maus aber
+   nicht: es liegt genau über der Support-Zeile, der äußersten Zeile
+   meiner Feldhälfte, und hat deren Hover verschluckt. Im Editor
+   dasselbe eine Zeile höher.
+
+   Das Polster ist jetzt für die Maus durchlässig, die Karten darin
+   nicht. Im Editor bleibt zusätzlich der Streifen, in dem die Karten
+   liegen, ein Ablageziel — sonst ließe sich in eine leere Hand nichts
+   mehr ziehen. */
+.game-hand-cards,
+.pz-hand-cards { pointer-events: none; }
+.game-hand-cards > *,
+.pz-hand-cards > * { pointer-events: auto; }
+.pz-hand-cards::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: calc(var(--hand-card-h) + var(--fan-pad-unten, 0px));
+  pointer-events: auto;
+  z-index: -1;
+}
+.pz-hand-cards[data-pz-hand="hand"]::after { bottom: 0; }
+.pz-hand-cards[data-pz-hand="oppHand"]::after { top: 0; }
+.pz-hand-extras {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 96px;   /* ★ v1251: breiter (Als Vorgabe, dritter Anlauf) */
+  flex-shrink: 0;
+  align-self: stretch;
+  margin-left: 8px;
+  padding: 4px 5px;
+  border-left: 1px solid rgba(255, 215, 0, .2);
+  background: rgba(255, 215, 0, .04);
+}
+/* ★ v1252 (Als Vorgabe): der Debuff-Knopf reagiert auf den Zeiger.
+   `!important`, weil seine Grundfarben als Inline-Stil kommen — sie
+   hängen an der Seite (blau für den Spieler, orange für den Gegner). */
+.pz-debuff-btn { transition: background .12s, border-color .12s, filter .12s; }
+.pz-debuff-btn:hover {
+  background: rgba(255, 255, 255, .14) !important;
+  border-color: currentColor !important;
+  filter: brightness(1.25);
+}
+.pz-gold-feld {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: text;
+}
+.pz-gold-feld > span { font-size: 14px; line-height: 1; flex-shrink: 0; }
+.pz-gold-feld input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 3px;
+  font-size: 15px;
+  text-align: center;
+  border-color: rgba(255, 215, 0, .4);
+  color: #ffd700;
+  font-weight: 700;
+  /* Die Pfeilchen eines Zahlenfelds fressen rund 16 px — in einer
+     64-px-Spalte ist das ein Viertel. Getippt wird ohnehin. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.pz-gold-feld input::-webkit-outer-spin-button,
+.pz-gold-feld input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 /* ── Crestinas Vorrat im Puzzle-Editor ─────────────────────────────
    Zweite Hälfte der Handzone, sichtbar solange „True Fairy Crestina"
    auf der eigenen Heldenreihe steht (Als Vorgabe 28.8.). Dieselbe
    66/33-Aufteilung wie im Spiel, hier über `flex` an den beiden
    Kästen — die Editor-Handzone hat eigene Klassen. */
+/* ★★ v1252 (Als Vorgabe 19.9.: „auch im Puzzle-Editor sollten die
+   Decks und Piles etwas größer sein"). Der Editor bekommt seinen
+   eigenen Stapel-Maßstab — die vier abgeleiteten Maße müssen dafür neu
+   deklariert werden: in `:root` sind sie schon mit dem dortigen Wert
+   ausgerechnet und würden eine spätere Änderung der Variablen nicht
+   mehr sehen. Die Area-Zonen hängen an denselben Maßen und ziehen mit. */
+.pz-board-wrap {
+  /* 1.55 und nicht mehr: zwei Stapel plus Abstand müssen zwischen die
+     äußere Kante der Feldhälfte und den Korridor in der Mitte passen
+     (291 px Halbhöhe + 12 px Korridor bei Maßstab 1). Bei 1.75 wären
+     es 341 px gewesen — die Spalten beider Spieler hätten sich in der
+     Mitte um über 150 px überlappt, nachgemessen. */
+  --pile-card-scale: 1.55;
+  --pile-card-w: calc(64px * var(--board-scale) * var(--pile-card-scale));
+  --pile-card-h: calc(90px * var(--board-scale) * var(--pile-card-scale));
+  --pile-zone-w: calc(var(--pile-card-w) + 4px * var(--board-scale));
+  --pile-zone-h: calc(var(--pile-card-h) + 5px * var(--board-scale));
+}
+
+/* ★★ v1252: Das Kampffeld rückt ein Stück nach links, damit rechts
+   Platz für die Deckspalte entsteht — die Zeilen sind zentriert, ein
+   rechtes Polster verschiebt ihren Inhalt also um die Hälfte davon.
+   Zusammen mit der weiter nach links gerückten Ablagespalte stehen
+   Ablagen, Kampffeld und Decks damit mit sichtbaren Lücken
+   nebeneinander (Als Vorgabe). */
+.pz-board-plane .board-row {
+  padding-right: calc(170px * var(--board-scale));   /* ★ v1253: mehr (Als Vorgabe) */
+}
+
 /* ── Umsortieren im Puzzle-Editor (Als Vorgabe 28.8.) ──────────────
    Dieselbe Optik wie im Spiel: die gezogene Karte kollabiert spurlos,
    und an der Zielstelle steht eine gestrichelte Lücke. */
@@ -12527,12 +13523,12 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   margin: 0 !important;
 }
 .pz-hand-gap {
-  /* Maße der Editor-Karten (`--card-w`/`--card-h`), nicht die alten
-     48x67-Miniaturen — sonst passt die Lücke nur bei einem Zoom.
+  /* Maße der Handkarten (★ v1236: `--hand-card-w/h`, wie die Karten
+     daneben) — sonst passt die Lücke nur bei einem Zoom.
      `flex-shrink: 0` wie `.hand-drop-gap` im Spiel: die Lücke selbst
      darf nicht zusammengedrückt werden, nur die Karten daneben. */
-  width: var(--card-w);
-  height: var(--card-h);
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
   flex-shrink: 0;
   border: 2px dashed var(--accent);
   border-radius: 4px;
@@ -12555,9 +13551,57 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 /* Die Hand nimmt zwei Drittel — nur wenn der Vorrat daneben steht. */
 .pz-hand:has(.pz-hand-creation) > .pz-hand-cards { flex: 2; }
 
+/* ★ v1241: Dieselbe Mechanik wie im Duell — Absenken um ein Drittel
+   des Überstands, Zusammenschieben bis 25 %, danach Bildlaufleiste.
+   Das Polster liegt auf der Seite, zu der der Bogen ausbricht (eigene
+   Hand nach oben, Gegnerhand nach unten) und wird mit einem negativen
+   Rand wieder eingezogen. Der Vorrat hat keinen Fächer und bleibt
+   deshalb außen vor. */
+.pz-hand-cards[data-pz-hand="hand"],
+.pz-hand-cards[data-pz-hand="oppHand"] {
+  --hand-frei-oben: 8px;
+  /* ★★ v1250 (Als Befund 19.9.: „die Editor-Hand nutzt ihren vollen
+     Platz nicht aus"). Das seitliche Polster liegt INNERHALB der
+     Reihe — im Duell wird es von den 180-px-Rändern wieder abgezogen,
+     im Editor gab es nichts abzuziehen, und so fehlten links und
+     rechts zusammen über 100 px nutzbare Breite. Jetzt nimmt ein
+     negativer Rand es ebenso zurück: der sichtbare Bereich ist die
+     volle Leistenbreite, das Polster fängt Drehüberhang und
+     Hover-Vergrößerung weiterhin ab. Etwas schmaler darf es auch
+     sein — der Editor fächert mit kleinerem Winkel. */
+  --fan-pad-x: calc(var(--hand-card-w) * 0.3);
+  --fan-pad-unten: calc(var(--hand-card-h) * 0.14);
+  margin-inline: calc(var(--fan-pad-x) * -1);
+  --hand-ueberstand: max(0px,
+    calc(var(--hand-max-lift, 0) * var(--hand-card-h) - var(--hand-frei-oben)));
+  overflow-x: auto;
+  overflow-y: hidden;   /* ★ v1243, Begründung bei `.game-hand-cards` */
+  scrollbar-width: thin;
+  justify-content: safe center;
+}
+.pz-hand-cards[data-pz-hand="hand"] {
+  translate: 0 calc(var(--hand-ueberstand) / 3);
+  padding: calc(var(--hand-card-h) * 0.8 + 20px) var(--fan-pad-x) var(--fan-pad-unten);
+  margin-top: calc(var(--hand-card-h) * -0.8 - 20px);
+  /* ★ v1248 (Als Vorgabe 19.9.: „auch die im Puzzle-Editor sollen
+     abgesenkt werden"): derselbe negative Rand wie im Duell — die
+     Leiste zählt um die Absenkung weniger hoch, die Karten hängen
+     unten heraus. Die Editor-Leiste hat nur eine Mindesthöhe und
+     folgt ihrem Inhalt, es braucht hier also nichts weiter. */
+  margin-bottom: calc(8px - var(--fan-pad-unten) - var(--hand-senkung));
+}
+.pz-hand-cards[data-pz-hand="oppHand"] {
+  translate: 0 calc(var(--hand-ueberstand) / -3);
+  padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
+  margin-top: calc(8px - var(--fan-pad-unten));
+  margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
+}
 .pz-hand-cards {
   display: flex;
-  gap: 4px;
+  /* ★ v1250: kein Spalt mehr — die Überdeckung steckt in der
+     Flex-Basis der Plätze, ein zusätzlicher Abstand würde sie
+     verfälschen und die Reihe unnötig breit machen. */
+  gap: 0;
   /* ★ 28.8. (Als Vorgabe: „nimm exakt dieselbe Mechanik wie im Spiel"):
      Der Kasten verhält sich jetzt wie `.game-hand-cards`.
      `overflow-x: auto` war die halbe Ursache des Flackerns — die
@@ -12571,21 +13615,36 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   min-height: 44px;
   padding: 8px 2px;
 }
+/* ══ EDITOR-HANDKARTE: PLATZ AUSSEN, KARTE INNEN (v1242) ═══════════
+   Als Befund 19.9. (zum zweiten Mal): „im Puzzle-Editor sind die
+   Karten wieder an den Seiten abgeschnitten."
+
+   Die Ursache ist dieselbe wie beim ersten Mal, nur an einer anderen
+   Schraube. Im Duell ist der PLATZ das Flex-Element und die Karte
+   liegt darin: schrumpft die Reihe, schrumpft der Platz, und die
+   Karte ragt über ihn hinaus — genau das ist die Überdeckung. Im
+   Editor war die KARTE das Flex-Element; schrumpfen hieß hier also,
+   den Kartenkasten schmaler zu machen, während seine Höhe blieb — und
+   `object-fit: cover` schneidet dann die Seiten weg.
+
+   Die Überdeckung über einen negativen Rand zu machen (v1234) hat das
+   umgangen, aber nur für einen FESTEN Betrag; eine Reihe, die sich je
+   nach Kartenzahl unterschiedlich weit zusammenschiebt, geht so nicht.
+   Deshalb jetzt dieselbe Zweiteilung wie im Duell: `.pz-hand-card` ist
+   der Platz (schrumpfbar, trägt Griffe und Messung),
+   `.pz-hand-card-inner` ist die Karte (feste Maße, Rahmen, Bild,
+   Foil-Schicht, Fächer-Transformation). */
 .pz-hand-card {
-  /* ★ v1203: Bezugsrahmen fuer die Foil-Schicht (`<CardFoil>`, absolut
-     mit inset: 0). Ohne das haengt sie sich an den naechsten
-     positionierten Vorfahren — das waere die ganze Handleiste. Das
-     Gegenstueck `.pz-search-card` hat es laengst. */
   position: relative;
-  /* v6 (Al): battle-sized hand cards — same --card-w/--card-h the
-     in-battle hand uses (86×120 × --board-scale) instead of the old
-     fixed 48×67 thumbnails. The bars (.pz-hand) have min-height only,
-     so they grow with the cards automatically. */
-  width: var(--card-w);
-  height: var(--card-h);
-  border: 1px solid var(--bg4);
-  border-radius: 3px;
-  overflow: hidden;
+  /* v6 (Al): battle-sized hand cards statt der alten 48×67-Miniaturen.
+     Die Leisten (.pz-hand) haben nur eine Mindesthöhe, sie wachsen
+     also mit den Karten.
+     ★ v1236: und zwar wörtlich „battle-sized" — seit die Handkarten
+     im Duell ihr eigenes Maß haben (`--hand-card-w/h`), nimmt der
+     Editor dasselbe. Sonst wären seine Handkarten kleiner als seine
+     eigenen Stapel, die seit v1235 am Handmaß hängen — und beim
+     Ziehen zwischen beiden würde wieder skaliert. */
+  height: var(--hand-card-h);
   /* ★ 28.8.: DIE eigentliche Ursache des Flackerns. Starre Plätze
      (`flex-shrink: 0`) werden von der Zieh-Lücke VERSCHOBEN — bei
      zentriertem Inhalt wandert dann alles, der Zeiger steht über
@@ -12593,15 +13652,41 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      Plätze stattdessen (`.game-hand-cards .hand-slot`: `flex: 0 1 …`
      plus `min-width`), die Lücke DRÜCKT die Reihe zusammen und nichts
      wandert. Exakt dieselbe Regel, nur mit den Maßen des Editors. */
-  flex: 0 1 calc(var(--card-w) + 4px);
-  min-width: calc(18px * var(--board-scale));
+  /* ★★ v1234 (Als Befund: „im Puzzle-Editor sind die Handkarten in der
+     Breite abgeschnitten"). Die Überlappung von v1233 lief hier über
+     die FLEX-BASIS — und im Editor ist die Karte selbst das
+     Flex-Element. Die Basis hat damit nicht den Abstand verkleinert,
+     sondern die KARTE: ihr Kasten wurde 12 px schmaler als ihre
+     Kunst, und `object-fit: cover` schneidet die Seiten weg.
+     (Im Duell passiert das nicht — dort ist der PLATZ das
+     Flex-Element und die Karte darin behält ihre Breite.)
+
+     Seit v1242 schrumpft wieder der PLATZ (oben), die Karte darin
+     behält ihre Breite. */
+  /* Abstand von Platz zu Platz wie im Duell: dort steht eine 64er
+     Karte in einem 58er Platz, also mit gut 9 % Grundüberdeckung. */
+  flex: 0 1 calc(var(--hand-card-w) * 0.906);
+  min-width: calc(var(--hand-card-w) * var(--hand-min-anteil));
   cursor: grab;
   transition: border-color .15s, transform .16s ease-out;
 }
-.pz-hand-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-3px);
+/* Die Karte selbst: feste Maße, alles Sichtbare. */
+.pz-hand-card-inner {
+  /* Bezugsrahmen für die Foil-Schicht (`<CardFoil>`, absolut mit
+     inset: 0) — ohne das hinge sie am nächsten positionierten
+     Vorfahren, und das wäre die ganze Handleiste (v1203). */
+  position: relative;
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
+  border: 1px solid var(--bg4);
+  border-radius: 3px;
+  overflow: hidden;
+  transition: border-color .15s;
 }
+/* ★ v1214: ersetzt durch das gemeinsame Hover-Highlight weiter unten
+   („HANDKARTE UNTER DEM ZEIGER"). Hier bleibt nur die Randfarbe fuer
+   Beruehrungsgeraete ohne echten Hover. */
+.pz-hand-card:hover > .pz-hand-card-inner { border-color: var(--accent); }
 .pz-hand-card:active { cursor: grabbing; }
 .pz-hand-card-img {
   width: 100%;
@@ -12624,7 +13709,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 
 /* ── Puzzle Creator: mobile tap-to-select highlight ── */
-.pz-hand-card-selected {
+.pz-hand-card-selected > .pz-hand-card-inner {
   border-color: var(--accent) !important;
   box-shadow: 0 0 12px rgba(0,240,255,.7), inset 0 0 8px rgba(0,240,255,.2);
 }
@@ -12657,8 +13742,16 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 /* ── Puzzle Creator: touch drag ghost ── */
 .pz-touch-drag-ghost {
   position: fixed;
-  width: 60px;
-  height: 84px;
+  /* ★ v1236: im Maß der Handkarten statt fester 60×84 — beim Ziehen
+     bleibt die Karte so groß, wie sie in der Hand lag (Als Vorgabe
+     19.9.). Der Griffpunkt in `touchDragMove` misst das Bild selbst.
+     ★ v1240: ohne `--board-scale`, wie die Editor-Handkarten selbst —
+     das Ziehbild hängt an `<body>` und bekäme sonst wieder den
+     Brettmaßstab. */
+  /* ★ v1256: drei Viertel — wie das Maus-Ziehbild (siehe
+     `setDragGhost`), damit die Vorschau zu den Brettzonen passt. */
+  width: calc(64px * var(--hand-card-scale) * 0.75);
+  height: calc(90px * var(--hand-card-scale) * 0.75);
   z-index: 99999;
   pointer-events: none;
   border: 2px solid var(--accent);
@@ -12708,12 +13801,12 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
     min-height: 44px;
     gap: 6px;
   }
-  .pz-gold-input {
-    padding: 2px 6px !important;
-    margin-left: 4px !important;
+  .pz-hand-extras {
+    width: 68px;
+    padding: 2px 4px;
+    margin-left: 4px;
   }
-  .pz-gold-input span { font-size: 14px !important; }
-  .pz-gold-input input { width: 50px !important; font-size: 13px !important; }
+  .pz-gold-feld input { font-size: 12px; }
   .pz-side-label { font-size: 7px !important; letter-spacing: 1px !important; }
   .pz-board-wrap { justify-content: flex-start; }
 }
@@ -13792,6 +14885,10 @@ body:has(.textbox-overlay) .tooltip {
 
 /* ═══ Battle board mobile ═══ */
 @media (max-height: 500px) {
+  /* ★ v1234: Auf dem Telefon bleibt die Hand im alten, kompakten Maß.
+     Die Vergrößerung ist ein Ausgleich zur perspektivischen Lupe des
+     Bretts — und genau die schaltet dieser Block gleich mit ab. */
+  :root { --hand-card-scale: 1; }
   /* Compact opponent hand */
   .game-hand-opp {
     min-height: 40px !important;
@@ -16673,6 +17770,8 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .hand-slot.hand-card-materializing {
   animation: hand-card-materialize 760ms ease-out;
 }
+/* ★ v1233: bleibt unverändert — der Fächer-Bogen liegt in `translate`
+   und wird von dieser `transform`-Animation gar nicht angefasst. */
 @keyframes hand-card-materialize {
   0%   { opacity: 0; transform: scale(.86); }
   35%  { opacity: .55; }
@@ -16687,8 +17786,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    Eck des Platzes — also wird sie gerechnet, nicht gemessen. */
 .hand-slot .hand-materialize-fx {
   position: absolute;
-  left: calc(32px * var(--board-scale));
-  top: calc(45px * var(--board-scale));
+  /* ★ v1234: die Kartenmitte folgt dem Handkartenmaß. */
+  left: calc(var(--hand-card-w) / 2);
+  top: calc(var(--hand-card-h) / 2);
   width: 0;
   height: 0;
   pointer-events: none;
@@ -16754,6 +17854,40 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    diese Zeile wuerde der Stapel am Zonenrand abgeschnitten und die
    unteren Areas waeren weder zu sehen noch zu treffen. */
 .pz-area-zone { overflow: visible; }
+
+/* ── STAPELSPALTEN IM PUZZLE-EDITOR (v1237, Als Befund 19.9.) ───────
+   „Deleted- und Discard-Piles sind deutlich zu nah zusammen und
+   überlappen, dasselbe mit Main- und Potion-Decks."
+
+   Ursache war die Aufhängung: jeder Stapel hing an einer eigenen
+   BRETTZEILE (`top: 0` seiner Gruppe). Solange ein Stapel 95 px hoch
+   war, passte er in die 95 px hohe Zeile; seit v1235 ist er 135 px
+   hoch und ragte damit 40 px in die Zeile darunter — genau auf den
+   Stapel, der dort hing.
+
+   Jetzt hängen sie nicht mehr an Zeilen, sondern stehen als SPALTE
+   neben dem Feld, mittig zur Fähigkeitenzeile. Die Spalte bringt
+   ihren eigenen Abstand mit und kann damit nicht mehr kollidieren,
+   egal wie groß die Karten noch werden. */
+.pz-pile-column {
+  display: flex;
+  /* ★★ v1252 (Als Befund 19.9.: „auf der Gegnerseite oben noch nicht
+     bündig mit den Support-Zones").
+
+     Der Abstand zwischen den beiden Stapeln lag als `margin-top` auf
+     dem zweiten Kind — und auf der Gegnerseite läuft die Spalte
+     `column-reverse`: dort ist das zweite Kind das OBERE, sein oberer
+     Rand schob also die ganze Spalte um genau diesen Betrag nach
+     unten. Auf der eigenen Seite fiel es nicht auf, weil der Rand dort
+     zwischen den Karten liegt und die Unterkante nicht berührt.
+     `gap` kennt diesen Unterschied nicht: er steht nur ZWISCHEN den
+     Kindern, nie außen. */
+  gap: calc(10px * var(--board-scale));
+}
+/* Zwei Stapel je Spalte: zusammen bleiben sie innerhalb der
+   Feldhälfte. Käme ein dritter dazu, passte die Spalte nicht mehr;
+   deshalb liegt das Side Deck bei den Permanents (Als Vorgabe 19.9.).
+   Den Abstand macht `gap` oben — nicht ein Rand am Kind, siehe dort. */
 
 /* ── „Trunk Sand" / Pocket Sand (v1058) ─────────────────────────────
    Sandschweif hinter dem geworfenen Haufen. Warme, koernige Toene statt

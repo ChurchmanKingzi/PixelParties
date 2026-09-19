@@ -16249,7 +16249,7 @@
     "level": null,
     "hp": null,
     "atk": null,
-    "cost": 5,
+    "cost": 4,
     "effect": "Negate the effects of all Creatures both players currently control until the end of your opponent's next turn, except \"Cute\" Creatures. \nThis counts as a negative status effect.",
     "archetype": "Cute",
     "setID": "PP MOE",

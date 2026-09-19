@@ -685,6 +685,44 @@ Richtung hängt davon ab, auf welcher Seite des Zeigers die Karte liegt.
 `applyHandTilt` (app-shared) schreibt den Wert als `--hand-tilt` an die
 Knoten, das Aussehen steht in style.css, `clearHandTilt` stellt zurück.
 
+**★ v1217 — DIE LÜCKE STATT DER MESSUNG.** Im Kampf zitterten die
+Karten weiter, und die Ursache sitzt tiefer als jede Messtechnik:
+`calcDropIdx` bestimmt die Einfügestelle, indem es die Kartenplätze
+MISST — und die eingefügte Lücke verschiebt genau diese Plätze um eine
+Kartenbreite. Steht der Zeiger nahe einer Grenze, wandert die Karte
+unter ihm hin und her, und mit ihr die Seite, auf der sie liegt. Gegen
+einen Sprung von Kartenbreite hilft keine Hysterese auf Pixelebene.
+
+Beim Umsortieren in der Hand ist die Lücke aber bereits **die
+Zeigerposition, in Karten ausgedrückt**. Also wird für die Neigung gar
+nicht mehr gemessen: `applyHandTilt(…, { gapIndex })` kippt alles vor
+der Lücke nach links, alles dahinter nach rechts. Gemessen: **0
+Layout-Zwänge** (vorher 12 je Mausbewegung) und 0 Schreibvorgänge,
+solange die Lücke steht. Der Effekt läuft entsprechend nur noch, wenn
+die Lücke SPRINGT, nicht sechzigmal je Sekunde.
+
+Der Vorrat und die Zuege aufs Brett haben keine Lücke; dort bleibt der
+Messweg, aber mit grobem 30-px-Raster im Effekt-Takt.
+
+**★ v1217 — DER ZIEH-SCHALTER SITZT AN DEN HANDREIHEN**, nicht mehr an
+`<html>` (Als Befund: „es fühlt sich spürbar ruckelig an, wenn man
+initial eine Karte greift"). Eine Klasse am Wurzelelement zwingt den
+Browser bei jedem Wechsel, das ganze Dokument gegen ein 690-KB-Blatt
+neu abzugleichen — einmal beim Greifen, einmal beim Loslassen.
+`setHandDragFlag` (app-shared) setzt `.pp-dragging` stattdessen auf die
+vier Handreihen; die Ungültigkeit bleibt in deren Teilbäumen.
+
+**★ v1216 — ERST MESSEN, DANN SCHREIBEN** (Als Befund: „die Rotation
+buggt leicht und es fühlt sich laggy an, als würde da permanent irgendwas
+neuberechnet"). Genau das tat es: die Schleife las einen Kasten, schrieb
+einen Wert, las den nächsten … Jede Schreiboperation macht den Stil
+ungültig, jede folgende Messung erzwingt ein neues Layout — zwölf
+erzwungene Layouts JE MAUSBEWEGUNG. Jetzt zwei getrennte Durchgänge,
+dazu zwei Sparbremsen: gleicher Winkel wie zuletzt wird gar nicht erst
+geschrieben (gemessen: 0 statt 8 Schreibvorgänge bei zehn Bewegungen
+innerhalb derselben Karte), und eine Hysterese von 10 px verhindert das
+Flackern direkt an der Kartenmitte.
+
 Zwei Korrekturen aus Als Tests, beide mit Anlass:
 
 * **Pauschal statt abgestuft** (v1211). Der erste Anlauf ließ die
@@ -718,8 +756,11 @@ Zwei Fallen, die dabei schon zugeschnappt sind:
   ausgewertet — der Effekt liefe genau einmal und die Neigung stünde
   still. Steht als Warnung auch in `scripts/build.js`.
 
-**Klänge.** `playCardDragSFX(art)` mit `pickup` | `reorder` | `release` |
-`cancel` — eine Tabelle in app-shared, damit Kampf, Puzzle-Editor und
+**Klänge.** `playCardDragSFX(art)` mit `reorder` | `release` | `cancel`
+(★ v1213: `pickup` **entfällt** — Als Befund: „der irritiert beim
+laufenden Spiel". Während einer Partie hebt man ständig Karten an, um
+zu vergleichen oder Ziele zu prüfen; ein Ton bei jedem dieser Griffe
+meldet ein Ereignis, das keines ist.) — eine Tabelle in app-shared, damit Kampf, Puzzle-Editor und
 Deck-Bauer nicht drei Handschriften bekommen. Ausgewählt nach dem
 gemessenen Charakter der Dateien, nicht nach ihrem Namen: `ui_click`
 ist kurz und hell (0,25 s, 95 % der Energie im ersten Fünftel) —
@@ -741,6 +782,770 @@ Der Loslass-Klang sitzt an EINER Stelle ganz oben in `onUp` und nicht in
 den Zweigen: `onUp` hat über ein Dutzend davon, und jeder neue wäre
 wieder einer, der ihn vergisst. Im eigenen Bereich losgelassen heißt
 Umsortieren, sonst Loslassen.
+
+## ★ `waveAnimation`: EINE WELLE VOM WIRKER STATT BILDER JE ZIEL (v1213)
+
+Anlass „Flame Avalanche" (Als Vorgabe 18.9.): „zeigt aktuell einfach
+nur Flammen auf ihren Zielen an — sollte aber eine Lawine aus Flammen
+zeigen, die vom Caster ausgehen und alle Ziele überwalzen."
+
+`ctx.aoeHit({ …, animationType: null, waveAnimation: { type, duration,
+delay } })`. Die Engine sendet daraufhin EINE brettweite Animation
+(`zoneType: 'board'`) mit dem wirkenden Helden als
+`originOwner`/`originHeroIdx` **und der Zielliste** (`targets:
+[{owner, heroIdx, zoneSlot}]`, `zoneSlot: -1` = Held). `delay` hält den
+Ablauf an, bis die Geschosse bei den Zielen sind — ohne das fällt der
+Schaden, bevor die Animation ankommt.
+
+Aufgelöst werden Ursprung und Ziele erst im Client (`onZoneAnim`,
+Zweig `zoneType: 'board'`): nur der kennt `myIdx` und das DOM. Nicht
+gefundene Ziele (außerhalb des Bildes, inzwischen tot) fallen still
+heraus. Die Komponente bekommt fertige Bildschirmpunkte als `ox`/`oy`
+und `targetPoints`.
+
+★ v1215/v1216, zweiter Anlauf bei „Flame Avalanche": der erste war eine
+WAND, die über das Brett rollt — Als Urteil: nicht gut. Eine Wand kommt
+von nirgendwo, ein Flammenwerfer hat Quelle UND Ziel. Jetzt läuft je
+Ziel ein Strom aus **26** Geschossen (v1216, „noch breiter"; Obergrenze
+170 gesamt, damit acht Ziele das Brett nicht ausbremsen), alle aus demselben Punkt beim Wirker,
+fächerförmig gestreut, auf leicht durchhängenden Bahnen (lauter Geraden
+sehen aus wie ein Speichenrad) und mit einem Einschlag am Ziel. Viele
+Ziele gleichzeitig ergeben die Breite: aus dem Strahl wird die Lawine.
+
+**Warum in der Engine und nicht im Kartenrumpf:** die Welle muss NACH
+der Zielwahl losrollen. Sendet die Karte sie selbst, startet sie, während
+Idas Einzelziel-Frage noch offen steht. `_spieleWellenAnimation` wird
+deshalb in BEIDEN Zweigen von `actionAoeHit` gerufen — Einzelziel nach
+dem Prompt, Fläche nach allen Abwehr-Fenstern, damit ein negierter
+Zauber sie gar nicht erst zeigt.
+
+Die Einzeltreffer-Animation fällt dabei weg (`animationType: null`) —
+die Welle IST das Bild. Schadenszahlen laufen unverändert. Für den
+NEGIERTEN Guss zeigt `spellVisual` weiter etwas Kleines auf den Zielen
+(Flame Avalanche: `flame_strike`): eine Lawine, die über alles
+hinwegrollt und dann nichts tut, wäre das falsche Bild.
+
+## ★ HANDKARTE UNTER DEM ZEIGER (v1214 — Als Vorgabe 18.9.)
+
+Die gehoverte Handkarte wird **1,42× größer**, bekommt eine Umrandung
+plus Schein in `--player-color` und verschiebt sich 18 px. Sie überdeckt
+dabei ihre Nachbarn (`z-index: 60` auf Karte UND Platz) und bricht aus
+der Handleiste aus — beide Leisten stehen dafür schon auf
+`overflow: visible`.
+
+* **Richtung nach Seite:** eigene Reihen (Hand, Vorrat) heben sich nach
+  OBEN, Gegnerreihen schieben nach UNTEN. Andersherum liefe die
+  vergrößerte Karte aus dem Fenster. Im Kampf gilt es für aufgedeckte
+  Gegnerkarten (`.revealed-hand-card`) — verdeckte poppen nicht.
+* **`outline` statt `border`:** der Rahmen trägt schon Zustände (Foil,
+  gesperrt, wählbar), und eine Umrandung außerhalb des Kastens ändert
+  das Layout nicht.
+* **Die Neigung bleibt Teil der Transformation** (`rotate(var(--hand-tilt))`
+  als LETZTER Schritt), sonst richtete sich die Karte beim Hovern mitten
+  im Ziehen wieder auf — und das Heben bliebe nicht senkrecht im Bild.
+* **Riegel `html.pp-card-dragging`:** während eines Kartenzuges hebt
+  nichts ab. Sonst poppt die Nachbarkarte auf, über die der Zeiger beim
+  Umsortieren gerade hinwegfährt.
+  **★ v1215 — ZWEI GURTE, nachdem einer nicht reichte** (Als Befund:
+  „manchmal wird eine andere Handkarte groß gehighlightet"):
+  1. Die Klasse wird **synchron in den Ziehstellen** gesetzt
+     (`onMove`, sobald das Ziehen beginnt; `onDragStart` im Editor) und
+     ganz oben in `onUp` / `onDragEnd` wieder gelöst — nicht mehr nur
+     über den React-Effekt. Der läuft erst nach dem nächsten Render,
+     und genau in diesem Fenster steht der Zeiger schon über der
+     Nachbarkarte.
+  2. Solange die Klasse steht, nehmen Handkarten im KAMPF **gar keinen
+     Zeiger** mehr an (`pointer-events: none`).
+     **★ v1216 — im Puzzle-Editor NICHT** (Als Befund: „im Puzzle
+     Editor kann ich GAR NICHT MEHR drag/droppen"). Dort läuft der Zug
+     über HTML5-Drag&Drop, und die gezogene Karte ist selbst das
+     Quellelement; nimmt man ihr im `dragstart` den Zeiger, bricht der
+     Browser den Zug sofort ab. Im Kampf ist es ungefährlich, weil
+     Bewegung und Loslassen am Fenster hängen. Der Riegel gegen das
+     Aufpoppen wirkt im Editor trotzdem — er hängt an
+     `html:not(.pp-card-dragging)` in den Hover-Regeln selbst.
+     **★ v1216 — die beiden `:has()`-Regeln sind raus.** `:has()`
+     zwingt die Stil-Engine, bei jeder Änderung an einer Karte deren
+     Vorfahren neu zu bewerten, und während eines Zuges ändert sich
+     laufend etwas. Gebraucht werden sie nicht: `.hand-slot` ist zwar
+     `position: relative`, aber ohne eigenes `z-index` kein
+     Stapelkontext — das `z-index: 60` der Karte gilt direkt in der
+     Handreihe. Nachgemessen mit `elementFromPoint` im Überlappbereich. `:hover` ist während eines Zuges
+     nicht verlässlich: der Platz der gezogenen Karte fällt auf Breite 0
+     zusammen, das DOM unter dem Zeiger wechselt mitten in der Bewegung,
+     und der Zustand bleibt an einem Knoten hängen, über dem der Zeiger
+     längst nicht mehr steht — dasselbe Muster, gegen das es
+     `useStickyHoverFlag` gibt. Die Ablage-Erkennung stört das nicht:
+     sie rechnet mit Koordinaten, nicht mit Treffern im DOM.
+
+## ★ HERVORHEBUNGEN BEIM ZIEHEN UND HOVERN (v1219)
+
+**Ablagezone.** Die Reihe, über der der Zeiger steht, leuchtet während
+eines Zuges auf (`.pp-drop-aktiv`, inset-Schein in `--player-color`).
+Der Editor machte das schon lange — als Inline-Stil an zwei Stellen;
+jetzt liegt das Aussehen einmal in style.css und **beide Oberflächen**
+setzen dieselbe Klasse über `setHandDragFlag(an, zielSelektor)`.
+
+Im Duell kostet das **nichts**: `handDrag` ist genau dann gesetzt, wenn
+der Zeiger in der eigenen Hand bzw. im Vorrat steht (`onMove` schaltet
+dort auf Umsortier-Modus um). Die Zone weiß es also ohne eine einzige
+zusätzliche Messung; die Klasse wechselt zweimal je Zug.
+
+**Zone auf dem Brett unter dem Zeiger.** Wie in der Hand, nur
+**1,14 statt 1,42** — auf dem Brett stehen die Karten dicht an dicht und
+tragen Zähler, Abzeichen und Statusringe; alles darüber verdeckt mehr,
+als es zeigt.
+
+**★ v1220 — ES WÄCHST DIE ZONE, NICHT DIE KARTE** (Als Befund: keine
+Wirkung bei Abilities und Areas, und tote Helden verlieren beim Hovern
+ihre Ausgrauung). Alle drei hatten dieselbe Ursache: die Regel griff auf
+`.board-zone > .board-card`, aber der Ability-STAPEL und die Area
+zeichnen ihre Karten über eigene Bauteile statt als direktes Kind — und
+der tote Held wird von `.board-zone-dead::before` verschleiert, einer
+Lage INNERHALB der Zone. Die vergrößerte Karte ragte darunter hervor,
+und das `z-index` auf der Karte hob sie zusätzlich über den Schleier.
+
+Wächst die **Zone**, wächst alles darin mit — Karte, Schleier,
+Versteinerung, Zähler, Abzeichen, Stapel, Area-Kunst — und die
+Schichtung bleibt unangetastet. Der Zustand der Basiskarte wird damit
+nicht kopiert, sondern ist schlicht derselbe. `BoardZone` vergibt
+`board-zone` + `zone-has-card` für ALLE Arten (Held, Ability, Support,
+Surprise, Area), eine Regel genügt also; `zone-has-card` hält leere
+Zonen heraus.
+
+**★ Gezoomt wird über die eigenständige `scale`-Eigenschaft, nicht über
+`transform`.** Area-Zonen tragen bereits ein `transform:
+translateY(-50%)` (teils mit `!important`); ein Hover-`transform` hätte
+das weggeworfen und die Zone verspringen lassen. `scale` legt sich davor,
+ohne es anzufassen — und ganz nebenbei entfällt damit die Sonderregel
+für umgedrehte Karten (`.flipped`, 180°), weil deren `transform`
+unberührt bleibt.
+
+Beides ruht während eines Zuges (`.pp-dragging`, jetzt auch auf
+`.board-plane`) — sonst poppt auf, worüber die gezogene Karte gerade
+hinwegfährt.
+
+## ★ EIN HANDSYSTEM FÜR BEIDE OBERFLÄCHEN (v1218)
+
+Als Frage (18.9.): „Warum sind Puzzle-Mode-Drag/Drop und
+Duell-Drag/Drop überhaupt verschieden?"
+
+**Verschieden ist nur der EINGABEWEG.** Das Duell zieht mit eigenen
+Maus-Ereignissen am Fenster — es braucht Touch-Verfolgung und
+Ablageziele im 3D-gekippten Brett. Der Editor nutzt HTML5-Drag&Drop.
+Die Logik darunter war dagegen zweimal dasselbe, zweimal getippt: der
+Kommentar an `tropfIndex` verwies wörtlich auf `calcDropIdx`, und beide
+Kopien wurden an verschiedenen Tagen gegen DENSELBEN Fehler
+nachgebessert (Index-Räume 28.8., Lücken-Flackern 18.9.).
+
+Seit v1218 liegt die Logik in app-shared und wird von beiden benutzt:
+
+| Funktion | ersetzt |
+|---|---|
+| `handDropIndex(kasten, mouseX, {slots, skip})` | `calcDropIdx`, `calcCreationDropIdx`, `tropfIndex` |
+| `handMove(liste, von, nach)` | die Splice-Blöcke in `onUp` und `sortiereUm` |
+| `handItemsWithGap(liste, dragIdx, dropIdx)` | die Lücken-Konstruktion in `displayHand` |
+
+Dazu, schon seit v1210–v1217 gemeinsam: `applyHandTilt` /
+`clearHandTilt`, `setHandDragFlag`, `playCardDragSFX` und die
+Hover-Regeln in style.css.
+
+**Die Index-Räume stehen damit an EINER Stelle** — die Falle, in die
+beide Oberflächen schon einmal getappt sind: `handDropIndex` zählt
+OHNE die gezogene Karte (0..n), `handMove` rechnet deshalb nichts ab,
+und `handItemsWithGap` addiert die `+1` für die Anzeige, in der die
+Karte noch drinsteht (ihr DOM-Knoten wird für die Touch-Verfolgung
+gebraucht). Abgesichert durch `node test-hand.js`-artige Prüfungen der
+Invariante „Vorschau = Ergebnis" über alle Kombinationen.
+
+**Was BEWUSST nicht vereinheitlicht wurde:** der Eingabeweg. Das Duell
+schreibt bei jeder Mausbewegung Zustand und rendert damit das ganze
+Brett neu; den Editor auf dieselbe Mechanik zu heben hieße, genau diese
+Schwäche in die Oberfläche zu tragen, die heute sauber läuft — und der
+Editor zieht mehr als Hände (Galerie → Brett, Zone → Zone), er bekäme
+also zwei Mechaniken statt einer.
+
+## ★ NACH DEM HAND-FLUG SOFORT ABGLEICHEN (v1221)
+
+Als Befund (18.9.): „Wenn man Dive Down benutzt, erscheint die Karte
+nach ihrer Move-from-hand-to-discard-Animation für einen Moment wieder
+in der Hand."
+
+Der Client verdeckt den Startplatz einer abfliegenden Handkarte, aber
+**nur solange die Hand noch so groß ist wie beim Abflug** — der
+Schlüssel trägt die Handgröße (v1063), die Verdeckung fällt also von
+selbst weg, sobald der nächste `sync` die Hand kürzt. Ein Zeitgeber ist
+nur der Notnagel für Flüge, nach denen die Hand gar nicht schrumpft.
+
+Mit 700 ms war dieser Notnagel aber die Regel statt die Ausnahme:
+Reaktionen schicken den Flug los und öffnen **danach** erst ihr
+Kettenfenster. Bis der nächste `sync` kommt, vergeht länger — der
+Zeitgeber hob die Verdeckung auf, während die Karte im Zustand noch in
+der Hand lag, und da stand sie dann wieder. Im Puzzle-Modus fällt es am
+meisten auf, weil dort die Gegnerhand offen liegt.
+
+Zwei Hebel, beide gezogen:
+* **Client:** Notnagel auf 4 s. Länger verdeckt bleibt dadurch nichts —
+  der Schlüssel passt nicht mehr, sobald die Hand kürzer wird.
+* **Kartenskripte:** nach `hand.splice(…)` **`engine.sync()`** rufen.
+  Das Bild soll nicht an einer Wartezeit hängen. Der Flug geht weiterhin
+  VOR dem Splice raus (Startplatz muss noch existieren, siehe
+  „FLUG-ZIELFELDER"), der Abgleich direkt danach.
+
+**★ v1222 — GRÜNDLICH NACHGEZOGEN** (Als Vorgabe: „zieh die noch nach,
+ich möchte das gründlich gefixt haben"). Alle Hand-Abgänge mit Flug
+sind durchgegangen — **31 Stellen** in Engine und Kartenskripten:
+
+* **20 hatten schon einen Abgleich**, er lag nur außerhalb meines
+  ersten 14-Zeilen-Suchfensters. An 9 Stellen hatte ich deshalb
+  zunächst einen doppelten eingesetzt und wieder entfernt: wo der
+  vorhandene `sync()` auf demselben Weg und derselben Ebene folgt,
+  braucht es keinen zweiten. Behalten habe ich ihn dort, wo ein
+  bedingter Ausstieg dazwischenliegt und der spätere Abgleich also
+  übersprungen werden kann.
+* **11 Stellen** bekamen einen — und zwar an der jeweils richtigen
+  Stelle, nicht stumpf hinter dem Splice:
+  * Wo direkt danach ins Ablage-Routing geschrieben wird, steht der
+    Abgleich **dahinter**. Sonst sähe der Client zwei Schritte statt
+    einem und startete einen zweiten Flug vom Brett — das ist der
+    Vertrag, der dort im Kommentar steht.
+  * Bei „Tempeluna" (Hand → Support Zone) **nach** dem Belegen der
+    Zone; ein Abgleich dazwischen zeigte die Karte für einen Takt
+    nirgends.
+* **Zentral in der Stapel-Schicht:** `_takeFromPileCore` gleicht
+  Hand-Abgänge jetzt selbst ab (`if (pile === 'hand') this.sync()`).
+  Damit ist jede Karte abgedeckt, die über `takeFromPile` & Co. geht —
+  bewusst nur die Hand: Deck, Ablage und Gelöscht-Stapel haben keine
+  solche Verdeckung, und ein Abgleich je gezogener Karte würde Such-
+  und Mahl-Schleifen ohne Gegenwert vervielfachen.
+
+**Wächter `scripts/check-hand-flight-sync.js`** hält das fest: wer
+`play_pile_transfer` mit `from: 'hand'` sendet und danach aus `hand`
+splict, braucht innerhalb von 30 Zeilen ein `sync()`. Wer die
+Stapel-Schicht benutzt, ist ohnehin versorgt.
+
+## ★ ATTACHMENTS ÖFFNEN KEINEN STATISTIK-DIALOG (Puzzle-Editor, v1221)
+
+Als Befund (18.9.): „Man kann auf Attachments klicken wie auf Creatures,
+aber es gibt keinerlei Buffs oder andere Parameter für Attachments,
+dieses Menü ist also leer und unnötig."
+
+Der Dialog blendet für Attachments HP, Statuseffekte UND Buffs aus — es
+bleibt nichts übrig. Der Klick öffnet ihn deshalb gar nicht mehr, genau
+wie bei Abilities in Support Zones (v771).
+
+**Der SUBTYPE entscheidet, nicht der Kartentyp.** „Overheal Shock" ist
+ein Spell, „Divine Gift of Coolness" ein *Attack* — beide mit Subtype
+Attachment. Die Abschnitte im Dialog prüfen bis heute
+`cardType === 'Spell'` und ließen die Attack-Variante durchrutschen.
+
+Ausnahmen stehen in `PZ_ATTACHMENT_MIT_WERTEN` (app-puzzle): Attachments
+mit einem EIGENEN Schalter — derzeit nur „Anti Magic" (Stufe 1–3).
+„Alliance" braucht keinen Eintrag, es biegt vorher in seine eigene
+Verbindungswahl ab. Von 37 Attachments öffnen damit 35 nichts mehr.
+
+## ★ `layer: 'overAreas'` — BRETTWEITE LAGE ZWISCHEN AREA UND KARTEN (v1223)
+
+Anlass „Pink Sky" (Als Vorgabe): „ein pinkfarbener Himmel mit weißen
+Wattewolken auf dem Background-Layer (**ÜBER Area-Backgrounds**), der
+für ein paar Sekunden langsam scrollt und ausfadet."
+
+`layer: 'background'` (v1088, „Cleansing of the Land") reicht dafür
+NICHT: die Animationen werden im Baum des Spielbretts gerendert, die
+Area-Hintergründe liegen dagegen IN `.board-plane-clip`. Wer zwischen
+beide will, muss dorthin — genauso wie der Beschwörungskreis seit v1208.
+
+```js
+engine._broadcastEvent('play_zone_animation', {
+  type: 'pink_sky', zoneType: 'board', layer: 'overAreas',
+  duration: 4200, owner: pi, heroIdx: -1, zoneSlot: -1,
+});
+```
+
+`onZoneAnim` hängt daraufhin einen **nackten** Knoten in
+`.board-plane-clip`, direkt vor `.board-plane` — also nach den
+Hintergründen, vor den Karten — und räumt ihn nach `duration` wieder ab.
+Der Knoten besteht aus Wurzel plus **drei freien Lagen** (`i`); was er
+zeigt, steht in style.css unter `.pp-bg-anim-<typ>` (Unterstriche werden
+zu Bindestrichen). Die Laufzeit kommt als `--pp-bg-dauer` mit. Jede
+weitere Karte nimmt denselben Weg, ohne dass am Verteiler etwas
+dazukommt.
+
+## ★ NEUE KARTE: „Pink Sky" (v1223)
+
+Artifact · Cute · PP MOE · **Kosten 4** (von 5 heruntergesetzt, Als
+Vorgabe). „Negate the effects of all Creatures both players currently
+control until the end of your opponent's next turn, except 'Cute'
+Creatures."
+
+* **★ v1224 — ARTEFAKTE HABEN EINEN EIGENEN VERTRAG.** Erst gebaut mit
+  `hooks.onPlay` wie ein Zauber — Als Befund: „in der Hand nicht
+  ausgegraut, aber auf Klick und Drag passiert nichts". Genau das ist
+  das Bild: der Haken wird auf dem Artefakt-Weg **nie gerufen**. Ein
+  Artefakt exportiert `isTargetingArtifact`, `canActivate(gs, pi,
+  engine)` und `async resolve(engine, pi, selectedIds, validTargets)`
+  (Muster „Blueprints" für den zielfreien Fall, „Angry Cheese" für den
+  zielenden). `resolve` gibt `{ ok: true }` bzw. `{ cancelled: true }`
+  zurück.
+* `canActivate` verlangt mindestens EINE Kreatur, die die Karte treffen
+  kann. Stehen nur „Cute"-Kreaturen (oder gar keine) auf dem Brett,
+  wären die 4 Gold verloren.
+* **Schablone „Anti Magic Zone"** — gleiche Dauer-Rechnung
+  (`expiresAtTurn = gs.turn + 2`, `expiresForPlayer = Wirker`; aufgeräumt
+  wird zu Beginn des übernächsten eigenen Zuges, und das IST das Ende
+  des gegnerischen nächsten Zuges) und `actionNegateCreature` je Kreatur
+  statt eines eigenen Status, damit Cardinal-Immunität, Ablauf-Sweeps
+  und der `clearCountersOnExpire`-Vertrag von der Engine kommen.
+  `selfInflicted: true`, weil die Karte ein globaler Effekt ist und
+  „Defending the Gate" deshalb nicht auslösen soll.
+* **„except 'Cute' Creatures"** läuft über `isCuteCreatureInst`
+  (_cute-shared), nicht über den gedruckten Archetyp allein: eine
+  Kreatur im Support einer Heldin mit „Cute Wings" ZÄHLT als Cute und
+  bleibt ebenfalls verschont. Die Anführungszeichen im Kartentext sind
+  genau die Schreibweise für „zählt als".
+* **„This counts as a negative status effect"** braucht keine eigene
+  Zeile — `negated` steht in STATUS_EFFECTS als negativ, damit greifen
+  Immunitäten und Gegenmittel von selbst.
+* Die verschonten Cute-Kreaturen bekommen ein eigenes kleines Wölkchen
+  (`pink_sky_puff`) — sonst sähe es aus, als hätte die Karte sie
+  übersehen statt sie auszunehmen. Dasselbe Bild dient als
+  `spellVisual`, wenn die Karte selbst negiert wird.
+
+## ★ GESTOHLENE KARTEN GEHEN IN DIE ABLAGE IHRES BESITZERS (v1224)
+
+Als Befund (18.9.): „Eine durch Herbithorn Demon gestohlene und dann
+gespielte Karte landet im Discard Pile (oder Deleted Pile) des Diebs
+statt dem des ursprünglichen Besitzers."
+
+Die Maschinerie dafür war vollständig — nur das Etikett fehlte:
+`CardInstance.originalOwner` („never changes — for discard pile
+routing"), `_consumeHandCardOrigin` liest es beim Spielen und Abwerfen,
+und der Server routet an acht Stellen danach. Gesetzt wurde es aber nie,
+wenn eine Karte aus einer FREMDEN Ablage auf die Hand kam.
+
+Der Riegel sitzt jetzt in `addCardFromDiscardToHand` — dem einen Tor für
+„aus der Ablage auf die Hand" (v1068), durch das jeder Ablagen-Griff
+läuft:
+
+```js
+if (inst && fromOwnerIdx !== toPlayerIdx) inst.originalOwner = fromOwnerIdx;
+```
+
+Zentral und nicht in Herbithorn Demon, damit auch jede andere Karte
+versorgt ist, die in eine fremde Ablage greift (neun Aufrufstellen
+außerhalb der Engine). Passt zum Ruling vom 14.9. für Anhängsel: „die
+Karte geht zum Discard ihres ursprünglichen Besitzers."
+
+## ★ FLUG UND LANDUNG MÜSSEN DENSELBEN STAPEL MEINEN (v1225)
+
+Als Befund (18.9.): „Visuell fliegt die Karte zu MEINEM Discard statt
+dem des ursprünglichen Besitzers, landet dann aber immerhin dort."
+
+Seit v1224 wählt die Landung den richtigen Stapel — der Flug nicht:
+
+* Der **Artefakt-/Potion-Weg** schickte `owner: pi` und meinte damit
+  BEIDE Enden. Jetzt `fromOwner: pi, toOwner: pileOwner`; die Herkunft
+  wird vor dem Flug gelesen statt danach.
+* Der **Zauber-Weg** schickte **gar keinen** Flug — der Client leitete
+  ihn aus dem Zustandsunterschied ab und nahm dabei den eigenen
+  Ablagestapel an. Jetzt gibt es dort einen ausdrücklichen Flug, VOR der
+  Entnahme (Als Regel 17.8.) und mit beiden Enden.
+
+Ebenso bei der **Aufnahme aus einer fremden Ablage** (Herbithorn Demon):
+der Eintrag in der Galerie merkt sich jetzt, aus welcher Ablage er
+stammt. **★ v1226:** Liegt eine Karte in BEIDEN Ablagen, gewinnt seit
+heute die des GEGNERS — vorher zählte die eigene, weil sie zuerst
+eingelesen wird, und der Flug startete dort. Regeltechnisch sind beide
+Kopien dieselbe Karte („either is correct"); dem Spieler nützt die
+gegnerische mehr, weil sie dem Gegner die Ressource nimmt, und sie ist
+das, was man sehen will. Die ANZEIGE bleibt eigene Ablage zuerst. Vorher wurde die Quelle beim Ziehen über den NAMEN neu geraten
+und dabei die eigene Ablage bevorzugt — bei gleichnamigen Karten also
+falsch. Nebenbei stand dort `searchPile: 'deck'`, obwohl die Karte aus
+der ABLAGE nimmt; die Such-Sperre bekam damit die falsche Quelle
+gemeldet.
+
+**Merksatz:** Wer einen Stapel per `_consumeHandCardOrigin` wählt, nennt
+denselben Wert auch im Flug. Sonst zeigt die Animation eine andere
+Geschichte als der Zustand.
+
+## ★ CYCLING DEMONS: VOM DECK SICHTBAR AUFS BRETT (v1225)
+
+Als Vorgabe (18.9.). Der Nachfolger wurde bis dahin still aus dem Deck
+gezogen und stand plötzlich in der Zone. Jetzt: Flug `deck → support`
+auf den frei gewordenen Platz (VOR der Entnahme, damit der Deckstapel
+als Startpunkt noch steht), 520 ms Flugzeit, dann die normale
+Beschwörungsanimation aus `summonCreatureWithHooks` — und `takeFromPile`
+mit `shuffle: true`, was die Misch-Animation des Decks auslöst.
+
+## ★ DIE GEISTERKARTE HÄNGT AM GRIFFPUNKT (v1225)
+
+Als Befund (18.9.): „Wenn ich im oberen Drittel geklickt habe, halte ich
+die Kopie plötzlich an ihrem unteren Drittel fest; bei Diamond-Karten
+liegt sie deutlich ÜBER dem Cursor."
+
+Der Geisterkarte lag ein FESTER Versatz von 32/45 zugrunde — die halbe
+Karte bei Maßstab 1. Damit hängt sie erstens immer an ihrer Mitte statt
+am Griff, und zweitens stimmt selbst die Mitte nicht, sobald
+`--board-scale` oder der Kartenrahmen davon abweichen. Der Griff wird
+jetzt EINMAL beim Drücken gemessen (`griffX`/`griffY`) und über alle
+drei Ziehzustände mitgeführt.
+
+**★ v1226 — GEMESSEN WIRD DER PLATZ, NICHT DIE KARTE.** Der erste
+Anlauf maß den Kasten der KARTE — und der ist im Moment des Drückens
+**hervorgehoben**: 1,42-fach und 18 px angehoben (Hover-Highlight seit
+v1214). Gemessen: Kasten 127×179 statt 90×126 und um 63 px nach oben
+verschoben, ein Griff im oberen Fünftel kam damit als (64, 88) heraus —
+fast die volle Kartenhöhe, also „ich halte sie am unteren Drittel fest".
+Jetzt liefert der PLATZ (`.hand-slot` / `.creation-slot`, nie
+transformiert) die Lage und `offsetWidth/offsetHeight` der Karte die
+Größe; beide sind vom `transform` unberührt. Dieselbe Trennung wie bei
+der Handneigung seit v1210. Nachgemessen: Zeiger auf 20 % Kartenhöhe →
+Griff (45, 25) auf 90×126.
+
+## ★ VERZÖGERTER EFFEKT ≠ VERZÖGERTES ERSCHEINEN (v1227)
+
+Als Befund (18.9.): „Während des Delays zwischen Bewegungsanimation und
+Galerie ist er unsichtbar. Er sollte sichtbar sein, und seine
+Beschwörungsanimation sollte auch schon spielen — NUR die Galerie
+sollte delayed sein."
+
+Der Dämon stand zu dem Zeitpunkt längst im Zustand, aber der Client
+hatte ihn noch nicht gesehen: die Platzierung läuft in
+`summonCreatureWithHooks`, und der nächste Abgleich kam erst NACH dem
+Bonus. Gewartet wurde also vor einer leeren Zone.
+
+**Merksatz: erst `engine.sync()`, dann `_delay`, dann der Dialog.** Wer
+eine Pause vor einem Prompt einlegt, gleicht vorher ab — sonst wartet
+der Spieler vor einem Zustand, den er nicht sieht, und die
+Beschwörungsanimation läuft ins Leere.
+
+## ★ DER STAPELKOPF VERSCHWINDET BEIM ABFLUG (v1227)
+
+Als Befund: „Wählt man die OBERSTE Karte eines Discards, bleibt sie
+sichtbar, während eine Kopie zur Hand fliegt."
+
+Für den umgekehrten Weg — Karte fliegt IN die Ablage — gibt es die
+Verdeckung des Stapelkopfs längst (`setMyDiscardHidden` & Co.); für den
+Abflug fehlte sie. `onPileTransfer` verdeckt jetzt auch dort, aber nur
+wenn die fliegende Karte WIRKLICH obenauf liegt — sonst ist am Stapel
+nichts zu sehen, was verschwinden müsste. Gilt für `discard` und
+`deleted`, beide Seiten.
+
+## ★ KARTENGALERIE: SUCHFELD UND HERKUNFTS-MARKE (v1227)
+
+* **Suchfeld** ab acht Einträgen (darunter sieht man alles auf einen
+  Blick, und ein Feld über vier Karten ist nur Rand). Gefiltert wird
+  nach Name UND `label`, „opp" sammelt also gleich die gegnerische
+  Ablage ein. Der Zustand liegt in `GameBoard`, nicht im Galerie-Rumpf —
+  der ist eine sofort ausgeführte Funktion in JSX, dort sind Haken nicht
+  erlaubt. Ein neuer Dialog startet mit leerem Feld.
+* **Herkunft:** `entry.label` ersetzt das Quellen-Abzeichen (v862) — der
+  Platz war da, wurde aber nie benutzt. Herbithorn setzt jetzt `YOURS`
+  bzw. `OPPONENT`. Kurz halten: das Abzeichen ist ein schmaler Streifen
+  unter der Karte.
+* **★ v1228 — `entry.labelSide: 'me' | 'opp'`** färbt die Marke in der
+  jeweiligen Spielerfarbe (`me.color` / `opp.color`). Die Karte schickt
+  nur die SEITE — welche Farbe das ist, weiß nur der Client.
+
+## ★ JEDE KARTE, DIE AUF DER HAND LANDET, KLINGT WIE EIN ZUG (v1228)
+
+Als Vorgabe (18.9.): „Der Kartenflug Discard → Hand hat noch keinen
+Sound. Der sollte allgemein immer, egal durch welchen Effekt, denselben
+Sound in derselben Lautstärke machen wie ein Draw."
+
+`onPileTransfer` spielte den Zug-Klang nur bei `from === 'deck'`. Jetzt
+bei jedem Flug auf die Hand — außer der Aufrufer hat mit `sfx` einen
+eigenen Klang mitgeschickt, sonst gäbe es zwei. Gleiche Lautstärke und
+dieselbe Entprellung wie beim echten Zug.
+
+## ★ VERDECKUNG ENDET AM ZUSTAND, NICHT AN DER UHR (v1228)
+
+Als Befund: „Gegen Ende der Fluganimation blitzt kurz eine weiter unten
+gelegene Karte des Discard Pile auf, als wäre sie nach oben gerutscht."
+
+Die Verdeckung des Stapelkopfs (v1227) lief auf einer Uhr. Kam der
+Abgleich FRÜHER als sie, war der Stapel schon kürzer UND es wurde
+weiterhin eine Karte verdeckt — sichtbar wurde die Karte DARUNTER, bis
+die Uhr ablief. Jetzt wacht die Stapellänge: wird ein Stapel kürzer, ist
+sein Kopf ohnehin weg und jede Verdeckung hat sich erledigt. Nur beim
+SCHRUMPFEN — eine Karte, die IN den Stapel fliegt, muss verdeckt
+bleiben, bis sie landet. Die Uhr bleibt als Notnagel (1,2 s).
+
+**Das Muster ist dasselbe wie beim Hand-Flug (v1221/v1222):** eine
+Verdeckung endet am Zustand, der sie überflüssig macht — eine Frist ist
+nur der Notnagel für den Fall, dass dieser Zustand nie eintritt.
+
+## ★ IM EDITOR ZIEHT JEDE KARTE MIT GEBAUTEM ZIEHBILD (v1228)
+
+Als Befund: „Spezifisch im Puzzle-Editor und spezifisch NUR
+Diamond-Rare-Karten werden beim Drag/Drop deutlich ÜBER dem Cursor
+angezeigt."
+
+Die Handreihen riefen `setDragGhost` gar nicht — der Browser baute sein
+Ziehbild dann selbst aus dem Quellelement. Für eine normale Karte passt
+das ungefähr; eine Diamond Rare trägt aber einen pulsierenden Schein
+(`box-shadow` bis 12 px, im Hover 20/40 px), und der gehört zum gemalten
+Umfang. Das Abbild wurde dadurch deutlich höher als die Karte, der
+Zeiger saß entsprechend weit unten darin. Secret Rares traf es
+schwächer, deshalb fiel es nur bei Diamond auf.
+
+Jetzt bekommt jeder Zug dasselbe gebaute Bild (60×84, ohne Schein) —
+und den Griffpunkt gleich mit, gemessen über den Layout-Kasten
+(`offsetLeft/Top/Width/Height`), der von Hover-Vergrößerung und Neigung
+unberührt bleibt. Gleiche Trennung wie im Duell seit v1226.
+
+## ★ ZUSTANDSWACHEN GEHÖREN VOR DAS ZEICHNEN (v1229)
+
+Als Befund: „Es kann nach wie vor zu einem — deutlich kürzeren —
+Aufblitzen kommen, allerdings auch nicht immer."
+
+Die Längenwache aus v1228 hing an `useEffect`, und der läuft **nach**
+dem Zeichnen. Genau ein Bild lang stand damit der gekürzte Stapel MIT
+der alten Verdeckung im Bild, und man sah die Karte darunter. Dass es
+„nicht immer" auftrat, passt: es hängt daran, ob Abgleich und Bild im
+selben Takt zusammenfallen.
+
+**Regel: Wer eine Verdeckung, Maske oder Position aus dem Zustand
+NACHFÜHRT, nimmt `useLayoutEffect`.** `useEffect` ist für Arbeit, die
+der Betrachter nicht sieht (Klänge, Netzwerk, Protokoll).
+
+## ★ WAS BEIM HOVERN WEICH WANDERN DARF (v1229)
+
+Als Befund: „Wenn ich sehr schnell zwischen Karten hin- und herhovere,
+fühlt es sich laggy an, und einzelne Karten werden kurz sehr dunkel."
+
+Zwei getrennte Ursachen:
+
+* **Der Übergang war zu breit.** Mitbewegt wurde auch `box-shadow` —
+  dessen Schein hat 42 px Unschärfe. Ein weicher Schatten lässt sich
+  nicht im Compositor verschieben, er muss JEDES BILD neu gezeichnet
+  werden, und beim schnellen Wechsel laufen mehrere solcher Übergänge
+  gleichzeitig. Jetzt wandert nur noch `transform` weich; Rand und
+  Schein springen an und aus — das sieht man nicht, spart aber die
+  Zeichenarbeit. Der schwarze Schlagschatten ist zusätzlich von 22 px /
+  65 % auf 12 px / 45 % zurück.
+* **Das Dunkle war der Schleier gesperrter Karten.** Eine nicht
+  spielbare Handkarte trägt `rgba(12,12,20,.7)`; unter dem Zeiger wird
+  sie 1,42-fach vergrößert, der Schleier wächst mit und legt sich über
+  die Nachbarn. Beim schnellen Hin- und Herfahren wandert so ein
+  dunkler Block durch die Hand. Unter dem Zeiger ist der Schleier jetzt
+  deutlich dünner (0,28) — das löst den Eindruck auf, und man kann die
+  Karte, die man gerade anschaut, auch lesen, wenn man sie nicht
+  spielen kann.
+
+## ★ DER ZIEH-RIEGEL FÄLLT ERST MIT DER NÄCHSTEN MAUSBEWEGUNG (v1230)
+
+Als Befund (18.9.): „Ändert man per Drag/Drop die Reihenfolge der Karten
+in der Hand im Puzzle-Editor, wird nach dem Drop die Karte an dem Index,
+den zuvor die bewegte Karte hatte, kurz größer."
+
+Das ist **eingefrorenes `:hover`**. Während eines HTML5-Zuges schickt
+der Browser keine Mausbewegungen — der Hover-Zustand bleibt auf dem
+Knoten stehen, über dem der Zeiger beim Aufnehmen stand, also auf dem
+Platz der GEZOGENEN Karte. Nach dem Ablegen sitzt dort eine andere Karte
+(die Plätze sind positionsgebunden), und im selben Augenblick fiel der
+Zieh-Riegel `.pp-dragging` — die falsche Karte poppte auf.
+
+**Im Duell tritt es nicht auf**, und das ist die Bestätigung der
+Diagnose: der eigene Maus-Zug schickt laufend Bewegungen, der
+Hover-Zustand ist dort also aktuell. Genau derselbe Unterschied wie bei
+der Geisterkarte (v1226/v1228) — zwei Eingabewege, eine gemeinsame
+Logik.
+
+Der Riegel wird deshalb erst mit der nächsten echten Mausbewegung
+gelöst (`mousemove` / `touchstart`, einmalig), dann hat der Browser den
+Hover neu bewertet.
+
+**★ v1231 — ES DARF NUR EINE STELLE LÖSEN.** v1230 allein half nicht,
+und der Grund war nicht die Diagnose, sondern eine zweite Stelle: im
+Rumpf des Zieh-Effekts stand `setHandDragFlag(dragCardName != null)` —
+also auch das Lösen. Endet ein Zug, läuft erst die Aufräumfunktion (die
+verzögert lösen will) und unmittelbar danach dieser Rumpf mit `false`.
+Die Verzögerung war damit wirkungslos. Der Rumpf **setzt** jetzt nur
+noch; gelöst wird ausschließlich über `ziehRiegelLoesen`.
+
+**Und ohne Uhr.** Eine Frist löst den Riegel irgendwann von selbst — und
+wenn der Zeiger bis dahin stillsteht, ist der Hover immer noch
+eingefroren, die falsche Karte poppt also nur später auf. Bleibt der
+Zeiger liegen, bleibt der Riegel eben stehen: sichtbar ist das nicht,
+denn ohne Bewegung gibt es auch nichts hervorzuheben. Das ist der
+Unterschied zu den Verdeckungen (v1228/v1229), wo die Uhr als Notnagel
+sinnvoll ist: dort beseitigt ein ZUSTAND den Grund, hier eine
+BEWEGUNG — und auf die kann man beliebig lange warten.
+
+## ★ VON AUSSEN GESETZTE ZUSTÄNDE GEHÖREN NICHT IN `className` (v1232)
+
+Als Befund, dritter Anlauf zum „Aufploppen nach dem Drop": „Auch das hat
+es noch nicht gefixt."
+
+Die eigentliche Ursache lag unter beiden vorherigen Anläufen. Der
+Zieh-Riegel war eine **Klasse** an den Handreihen (`.pp-dragging`,
+gesetzt von `setHandDragFlag`) — und `className` gehört React. Im
+Editor steht dort:
+
+```jsx
+className={'pz-hand-cards' + (dragOverZone === 'hand' ? ' pp-drop-aktiv' : '')}
+```
+
+Der Wert **ändert sich während des Zuges** (`dragOverZone` wechselt bei
+jedem Überfahren), React schreibt das Attribut also neu — und wischt
+dabei jede von außen gesetzte Klasse weg. Der Riegel war damit die
+meiste Zeit gar nicht da; meine Arbeit an Zeitpunkten (v1230) und an der
+doppelten Löse-Stelle (v1231) war richtig, lief aber ins Leere.
+
+**Im Duell steht dort ein fester String** (`className="game-hand-cards"`).
+React fasst das Attribut nach dem Einhängen nie wieder an, die Klasse
+überlebte — genau deshalb trat der Fehler NUR im Editor auf, und das
+war die ganze Zeit der entscheidende Hinweis.
+
+Gemessen, drei React-Renders während eines Zuges:
+
+| Träger | nach den Renders noch da? | Karte |
+|---|---|---|
+| Klasse `.pp-dragging` | **nein** | 128 px (poppt) |
+| `data-pp-dragging` | ja | 90 px |
+
+**Regel: Was von außen an ein von React gerendertes Element gehängt
+wird, gehört in ein Datenattribut, das in keinem JSX steht.** React
+verwaltet nur, was es selbst schreibt — `className` und `style` also
+nicht anfassen, `data-*` dagegen bleibt unberührt. Gilt für
+`data-pp-dragging` und `data-pp-drop`; der Editor setzt seine
+Ablagezonen-Markierung weiter über React (`.pp-drop-aktiv`), die
+CSS-Regel akzeptiert beide Schreibweisen.
+
+## ★ DIE HAND IST GEFÄCHERT — WER SIE MISST, MISST ÜBER `handFanCardBox` (v1233)
+
+Seit v1233 stehen alle vier Handreihen (Duell eigen/gegnerisch, Editor
+eigen/gegnerisch) leicht aufgefächert: jede Karte trägt einen Winkel,
+die Reihe einen flachen Bogen. Gerechnet wird das an einer Stelle —
+`handFanGeometry` / `handFanStyle` in `app-shared.jsx` —, angewandt in
+style.css („DAS HANDFÄCHER").
+
+Drei Dinge daran sind Vertrag, nicht Geschmack:
+
+**1. Der Handplatz (`.hand-slot`) wird NIE gedreht.** Er trägt nur den
+Bogen (`translate`). Ein gedrehter Kasten liefert
+`getBoundingClientRect` nur noch seinen achsenparallelen Hüllkasten —
+breiter und höher als die Karte, linke obere Ecke daneben. Rund ein
+Dutzend Flüge im Kampfbrett bestimmt seinen Landepunkt genau so.
+
+**2. Wer eine Handkarte misst, nimmt `window.handFanCardBox(el)`, nicht
+`getBoundingClientRect()`.** In Gegner-, Zuschauer- und Editorhand gibt
+es keine Platz-Hülle, dort dreht die Karte selbst — und ihr Hüllkasten
+ist bei 9° rund 6 px zu breit und 8 px zu hoch. Der Helfer rechnet den
+echten Kasten zurück (Mitte bleibt unter einer Drehung um die Mitte
+erhalten, Breite/Höhe über das Gleichungspaar des Hüllkastens) und gibt
+den Winkel als `rot` mit — fliegende Karten drehen sich damit im Flug
+in ihre Landelage, statt beim Ankommen zu springen. Bei einem Handplatz
+gibt er unverändert dessen Kasten zurück, der Aufrufer muss die Seiten
+also nicht unterscheiden.
+
+**3. Der Abstand von Platz zu Platz ist gleich der Platzbreite.**
+`.game-hand-cards` hat kein `gap`; die Überlappung kommt aus der
+Flex-Basis (`--fan-pitch`, 58 px bei 64 px Karte). Drei Flüge
+projizieren den Platz einer noch nicht existierenden Karte mit genau
+dieser Gleichsetzung („die Hand ist zentriert, eine Karte mehr rückt
+die Reihe"). Wer den Abstand künftig über negative Ränder oder `gap`
+ändert, verstimmt diese Projektionen still.
+
+**Hand UND Stapel sind größer als Brettzonen (v1234/v1235).** Nicht
+64×90, sondern `--hand-card-w` / `--hand-card-h` (64×90 ×
+`--hand-card-scale`, derzeit 1.44). Grund: die Brettebene ist gekippt
+und um 1.26 gezoomt, ihre Karten erscheinen dadurch zwischen 0.90× und
+1.44× — eine ungetrimmte Handkarte wirkte daneben kleiner.
+
+**Ab v1251 haben die Stapel ihren EIGENEN Maßstab**
+(`--pile-card-scale`, derzeit 1.44) und sind damit kleiner als die
+Hand: die Handkarten sind seither zweimal gewachsen, die Ränder
+sollten es nicht. Eine Karte zwischen Hand und Stapel ändert dabei
+ihre Größe — bewusst so, `--ptScale` fährt es weich.
+
+Zuvor (v1235–v1250) trugen dasselbe Maß auch **Deck, Potion-Deck,
+Ablage und Gelöscht-Stapel** (`--pile-zone-w/h` für die Zone, `--sidebar-w` für
+die Spalte — beide aus dem Kartenmaß abgeleitet). Damit gilt: **eine
+Karte, die zwischen Hand und einem dieser Stapel unterwegs ist, wird
+auf dem Weg nicht mehr skaliert.** Nur Brettzonen (Held, Support,
+Ability, Surprise, Area) bleiben bei 64×90.
+
+Und die AREA-ZONEN (v1237): sie liegen auf der Faltlinie zwischen den
+Feldhälften und haben dort Luft, also tragen sie dasselbe Maß. Ihr
+Standplatz zwischen den Heldengruppen (`.board-area-spacer`) wächst
+mit, sonst ragte die breitere Zone in die Nachbarspalten — und der
+Maßstab rechnet diesen Zuwachs in seinen Bezugswert ein.
+
+Dasselbe Maß tragen die HANDREIHEN UND STAPEL DES PUZZLE-EDITORS
+(v1236) — dort sind Hand und Stapel dieselben Orte, also auch dieselbe
+Größe — und jede Zieh-Darstellung: die schwebende Karte im Duell
+(`.hand-floating-card > .board-card`), das HTML5-Ziehbild des Editors
+(nimmt die Größe seiner Quellkarte) und das Touch-Ziehbild. Eine Karte
+ändert ihre Größe beim Greifen also nicht mehr.
+
+Wer einen Flug baut, nimmt deshalb das Maß seiner QUELLE und lässt
+`--ptScale` (Ziel ÷ Quelle) den Rest machen — so macht es der
+`play_pile_transfer`-Handler; Zieh-Animation, Zieh-Lücke und der
+Abwurfflug aus der Hand (`.discard-anim-hand`) hängen ebenfalls am
+Handmaß. `--hand-min-h` leitet sich davon ab, die Leiste wächst also
+mit, und der Brett-Maßstab rechnet Leistenhöhe wie Spaltenbreite in
+EINEM Schritt ein (`updateScale`, app-board.jsx) statt sich
+einzupendeln.
+
+**VERDECKTE Gegnerkarten stehen auf dem Kopf (v1238/v1240).** Sie
+tragen `180deg` ZUSÄTZLICH zum Fächerwinkel, damit sie vom Gegner aus
+richtig herum stünden. Am Fächer ändert das nichts Sichtbares (eine
+Karte ist 180°-symmetrisch), am Bild alles. Die Regel hängt an
+`.face-down`: AUFGEDECKTE Karten (`revealed-hand-card`) bleiben
+aufrecht und damit lesbar. Der Puzzle-Editor bleibt ganz aufrecht —
+dort wird gebaut, nicht gespielt, und seine Handkarten tragen das volle
+Duellmaß ohne `--board-scale` (v1240).
+
+**Wie die Hand mit Enge umgeht (v1241/v1242).** In dieser Reihenfolge:
+erst schieben sich die PLÄTZE zusammen (`flex-shrink` bis
+`--hand-min-anteil`, derzeit 0.34 — höchstens 66 % Überdeckung), dann
+erst scrollt die Reihe. Entscheidend ist, dass der Platz schrumpft und
+die KARTE darin ihre Maße behält: schrumpft der Kartenkasten selbst,
+schneidet `object-fit: cover` die Seiten weg. Im Editor ist die Karte
+deshalb seit v1242 in `.pz-hand-card-inner` verpackt — außen der Platz,
+innen die Karte, genau wie `.hand-slot` und `.board-card` im Duell (`overflow-x: auto` +
+`justify-content: safe center`, damit der Anfang erreichbar bleibt).
+Damit das Flex-Layout die wahre Breite kennt, ist der LETZTE Platz so
+breit wie seine Karte, nicht wie der Abstand. Die linke Karte liegt
+über der rechten (`--fan-z`, absteigend; auf der Gegnerseite
+gespiegelt). Und die Reihe sinkt um ein Drittel dessen ab, was der
+Bogen oben aus der Leiste hinausschiebt (`--hand-max-lift` →
+`--hand-ueberstand`).
+
+**Die Gegnerhand fächert nur zu einem Drittel (v1244,
+`FAECHER.gegnerAnteil`)** — Winkel wie Bogen. Ihre Karten sind
+Information, keine Bedienfläche, und ein voller Fächer wirkte dort zu
+laut. Wer den Höchsthub abfragt (`handFanMaxLift`), muss die Seite
+mitgeben, sonst senkt sich die Reihe um einen Überstand, den sie gar
+nicht hat.
+
+**Der Bogen des Fächers ist ein ANTEIL DER KARTENHÖHE, keine
+Pixelzahl (v1240), und seine Form hat einen Exponenten (v1246:
+`bogenSchaerfe`, oben flacher, zu den Rändern steiler).** `--fan-lift` kommt einheitenlos aus
+`handFanGeometry` und wird in style.css mit `--hand-card-h`
+multipliziert. Die feste Zahl davor war bei zwei Größenänderungen
+zurückgeblieben — 10 px sind auf einer 90er-Karte ein Bogen, auf einer
+130er eine schiefe Treppe.
+
+**Und eine Lehre aus derselben Runde, die über Karten hinausgeht:
+gemessen und gesetzt wird im SELBEN Raum.** Die Position der
+Area-Zonen kam aus `getBoundingClientRect` (projizierter Raum des
+gekippten Bretts), minus einer Layout-Breite, geschrieben als `left`
+(wieder Layout). Drei Räume in einer Zeile — und weil die Projektion um
+den mittleren Helden arbeitet, verzog sie die beiden Zonen ungleich
+(11 px). Jetzt läuft die Rechnung in Layout-Koordinaten
+(`offsetLeft`-Kette bis zur Brettebene) plus `--center-offset`, den die
+Heldenzeilen als Transform tragen und der Area-Kasten nicht.
+
+**Und: der Fächer liegt in `translate` / `rotate`, nicht in
+`transform`.** Zustände wie `.hand-pick-selected` (+6 px),
+`.blind-pick-selected` (+8 px) oder die Materialize-Animation schreiben
+`transform` auf denselben Knoten. Die eigenständigen Eigenschaften
+werden davor angewandt und komponieren mit allem, was dort steht —
+ein neuer Zustand erbt den Fächer damit automatisch, statt ihn
+überschreiben zu müssen.
 
 ## ★ AKTIVE EFFEKTE KOSTEN NUR DANN EINE AKTION, WENN SIE ES SAGEN (Als Regel 7.9. — MANDATORY)
 

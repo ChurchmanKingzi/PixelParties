@@ -101,6 +101,11 @@ module.exports = {
           fromHandIdx: handIdx,
         });
         ps.hand.splice(handIdx, 1);
+        // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+        // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+        // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+        // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+        engine.sync();
         if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
         ps.discardPile.push('Divine Gift of the Guardian');
       }

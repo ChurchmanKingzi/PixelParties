@@ -2549,6 +2549,20 @@ class GameEngine {
     toPs.hand.push(cardName);
 
     const inst = this._trackCard(cardName, toPlayerIdx, 'hand');
+    // ★★ v1224 (Als Befund 18.9.: „eine durch Herbithorn Demon
+    // gestohlene und dann gespielte Karte landet im Discard des DIEBS").
+    //
+    // Aus einer FREMDEN Ablage geholt heisst: die Karte gehoert weiter
+    // dem, aus dessen Stapel sie kam. `originalOwner` ist genau dafuer
+    // da (Als Ruling 14.9.: „die Karte geht zum Discard ihres
+    // urspruenglichen Besitzers"), und `_consumeHandCardOrigin` liest
+    // es beim Spielen und Abwerfen aus — getaggt wurde hier aber nie.
+    //
+    // Zentral an dieser Stelle und nicht in Herbithorn: das ist DAS Tor
+    // fuer „aus der Ablage auf die Hand" (v1068), durch das jeder
+    // Ablagen-Griff laeuft. Damit sind auch alle anderen Karten
+    // versorgt, die in eine fremde Ablage greifen.
+    if (inst && fromOwnerIdx !== toPlayerIdx) inst.originalOwner = fromOwnerIdx;
 
     this.log('card_added_from_discard_to_hand', {
       card: cardName,
@@ -16272,6 +16286,15 @@ this._deathWatch = (this._deathWatchStack || []).length
 
   _takeFromPileCore(pi, ps, arr, pile, idx, name, opts) {
     arr.splice(idx, 1);
+    // ★★ v1222: Verlaesst eine Karte die HAND, wird sofort abgeglichen.
+    // Der Client verdeckt den Startplatz einer abfliegenden Handkarte
+    // nur, solange die Hand noch so gross ist wie beim Abflug; bleibt
+    // der `sync` aus, taucht sie nach dem Flug wieder auf (Als Befund
+    // 18.9. zu „Dive Down"). Bewusst NUR fuer die Hand: Deck, Ablage
+    // und Geloescht-Stapel haben keine solche Verdeckung, und ein
+    // Abgleich je gezogener Karte wuerde Such- und Mahl-Schleifen ohne
+    // Gegenwert vervielfachen.
+    if (pile === 'hand') this.sync();
     if (pile === 'deck' && idx === 0 && ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
     if (pile === 'discard' || pile === 'deleted') {
       const orphan = this.cardInstances.find(c => c.owner === pi && c.zone === pile && c.name === name);
@@ -22051,6 +22074,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         _handFlug = true;
       }
       ps.hand.splice(idx, 1);
+      // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+      // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+      // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+      // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+      this.sync();
     } else if (source === 'discard') {
       // Discard-out lock — same gate as actionRecycleCards /
       // addCardFromDiscardToHand. Block placements that yank the
@@ -29093,6 +29121,13 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Stapel, der sie noch nicht enthaelt.
         if (script?.deleteOnUse) ps.deletedPile.push(cardName);
         else ps.discardPile.push(cardName);
+        // ★★ v1222: Abgleich nach dem Hand-Abgang UND dem Ablage-Routing.
+        // Beides in EINEM Abgleich, sonst sieht der Client zwei Schritte
+        // und startet einen zweiten Flug (Vertrag der Zeilen darunter).
+        // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+        // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+        // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+        this.sync();
         await this._rxPay(ps, cost);
         if (this.gs._scTracking && pi >= 0 && pi < 2) {
           this.gs._scTracking[pi].cardsPlayedFromHand++;
@@ -30339,6 +30374,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Activate: remove from hand, route to destination pile,
         // deduct gold.
         ps.hand.splice(consumeIdx, 1);
+        // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+        // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+        // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+        // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+        this.sync();
         // The for-loop will re-increment `hi`; we want the NEXT iteration
         // to re-examine the same hand position (which now holds what was
         // previously at hi+1 or at consumeIdx+1). When the splice was at
@@ -38469,6 +38509,32 @@ this._deathWatch = (this._deathWatchStack || []).length
     return targets;
   }
 
+  /**
+   * ★★ v1213 — Brettweite Welle einer Flaechenkarte.
+   *
+   * `config.waveAnimation = { type, duration, delay }`. Der Ursprung
+   * ist IMMER der wirkende Held: die Animation bekommt ihn als
+   * `originOwner`/`originHeroIdx` und rechnet daraus ihre Richtung.
+   * `delay` haelt den Ablauf so lange an, bis die Front bei den Zielen
+   * ist — ohne das faellt der Schaden, bevor die Welle ankommt.
+   */
+  async _spieleWellenAnimation(config, cardInst, pi, heroIdx, ziele) {
+    const welle = config && config.waveAnimation;
+    if (!welle || !welle.type) return;
+    this._broadcastEvent('play_zone_animation', {
+      type: welle.type,
+      duration: welle.duration,
+      // ★★ v1215: Die Welle kennt ihre ZIELE. „Flame Avalanche" schiesst
+      // von der Quelle auf jedes einzelne — ohne diese Liste koennte die
+      // Animation nur pauschal ueber das Brett rollen.
+      targets: Array.isArray(ziele) ? ziele : undefined,
+      zoneType: 'board', owner: pi, heroIdx: -1, zoneSlot: -1,
+      originOwner: (cardInst && cardInst.heroOwner != null) ? cardInst.heroOwner : pi,
+      originHeroIdx: heroIdx,
+    });
+    await this._delay(welle.delay != null ? welle.delay : 380);
+  }
+
   async actionAoeHit(cardInst, config = {}) {
     const gs = this.gs;
     const pi = cardInst.controller;
@@ -38522,6 +38588,19 @@ this._deathWatch = (this._deathWatchStack || []).length
       });
 
       if (!target) return { heroes: [], creatures: [], wasSingleTarget: true, cancelled: true };
+
+      // ★★ v1213 — WELLE VOM WIRKER (`config.waveAnimation`)
+      // Generischer Vertrag statt Karten-Sonderweg: eine Flaechenkarte
+      // kann eine brettweite Animation ansagen, die BEIM WIRKER
+      // losbricht und ueber das Brett laeuft, bevor der Schaden faellt
+      // („Flame Avalanche": eine Lawine, die alle Ziele ueberwalzt).
+      // Bewusst HIER und nicht im Kartenrumpf: die Welle muss NACH der
+      // Zielwahl kommen — sonst rollt sie los, waehrend Idas
+      // Einzelziel-Frage noch offen steht.
+      await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [{
+        owner: target.owner, heroIdx: target.heroIdx,
+        zoneSlot: target.type === 'hero' ? -1 : target.slotIdx,
+      }]);
 
       // Animation on single target
       if (animationType) {
@@ -38640,6 +38719,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // so AoE animations always flash first and the negation prompt only
       // appears right before damage actually lands on each enchanted hero.
     }
+
+    // ★★ v1213: dieselbe Welle im Flaechenweg — nach allen Abwehr-
+    // Fenstern, damit ein negierter Zauber sie gar nicht erst zeigt.
+    await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [
+      ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),
+      ...creatureEntries.map(e => ({
+        owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+      })),
+    ]);
 
     // Play animations on ALL targets simultaneously (even shielded)
     if (animationType) {

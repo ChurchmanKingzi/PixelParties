@@ -7745,6 +7745,23 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
 
     const resolveHi = getResolvingHandIndex(ps);
     ps._resolvingCard = null;
+    // ★★ v1225: AUSDRUECKLICHER FLUG auch auf dem Zauber-Weg.
+    // Bisher gab es hier keinen — der Client leitete ihn aus dem
+    // Zustandsunterschied ab und nahm dabei den EIGENEN Ablagestapel
+    // an. Bei einer gestohlenen Karte flog sie damit sichtbar zum
+    // falschen Stapel und landete am richtigen. Jetzt steht die
+    // Herkunft vor dem Splice fest und der Flug nennt beide Enden.
+    // (Reihenfolge wie im Artefakt-Weg: Flug VOR der Entnahme, Als
+    // Regel 17.8.)
+    const spellPileOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+    if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand) {
+      room.engine._broadcastEvent('play_pile_transfer', {
+        fromOwner: pi, toOwner: spellPileOwner, cardName,
+        from: fromCreation ? 'creation' : 'hand',
+        to: (script && script.deleteOnUse) ? 'deleted' : 'discard',
+        fromHandIdx: resolveHi,
+      });
+    }
     if (resolveHi >= 0) { (fromCreation ? ps.creationZone : ps.hand).splice(resolveHi, 1); room.engine.notePlayedFromHand(pi); }
     if (gs._spellPlacedOnBoard) {
       delete gs._spellPlacedOnBoard;
@@ -7754,17 +7771,15 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // tracking is consumed so a re-play routes its piles correctly.
       delete gs._spellReturnToHand;
       if (resolveHi >= 0) {
-        room.engine._consumeHandCardOrigin(pi, cardName);
-        ps.hand.push(cardName);
+        ps.hand.push(cardName);   // Herkunft oben bereits verbraucht
       }
       room.engine._untrackCard(inst.id);
     } else {
       if (resolveHi >= 0) {
-        // Foreign-origin cards (Magic Lamp etc.) discard to their
-        // ORIGINAL owner's pile. `_consumeHandCardOrigin` returns `pi`
-        // for normally-owned cards, so the local case is unchanged.
-        const discardOwner = room.engine._consumeHandCardOrigin(pi, cardName);
-        gs.players[discardOwner].discardPile.push(cardName);
+        // Fremde Herkunft (gestohlen, Magic Lamp) → Ablage des
+        // URSPRUENGLICHEN Besitzers. Oben vor dem Flug ermittelt, damit
+        // Flug und Landung denselben Stapel meinen.
+        gs.players[spellPileOwner].discardPile.push(cardName);
       }
       // ★ INSTANZ IN DER ABLAGE WEITERLEBEN LASSEN (v808, Als Befund 6.9.).
       // Ein Spell, dessen Wirkung an seiner INSTANZ haengt (Weapon
@@ -10498,8 +10513,16 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     // man die Karte gleichzeitig zur Ablage UND in die fremde Hand
     // fliegen (Als Befund 1.9.).
     const _gestohlen = chainResult.negated && Number.isInteger(chainResult.negatedToHandOf);
+    // ★★ v1225 (Als Befund 18.9.: „visuell fliegt die Karte zu MEINEM
+    // Discard statt dem des urspruenglichen Besitzers, landet dann aber
+    // immerhin dort"). Der Stapel wurde seit v1224 richtig gewaehlt,
+    // der Flug nicht: er trug EINEN `owner` fuer beide Enden. Jetzt
+    // wird die Herkunft VOR dem Flug gelesen und der Flug endet dort,
+    // wo die Karte auch landet.
+    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName);
+    const pilePs = gs.players[pileOwner];
     if (!_gestohlen) room.engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName: potionName,
+      fromOwner: pi, toOwner: pileOwner, cardName: potionName,
       // ★ 28.8.: Fluganker folgt der HERKUNFT. Ohne das startete der
       // Flug einer Vorratskarte am gleichnamigen Platz der HAND.
       from: fromCreation ? 'creation' : 'hand',
@@ -10508,11 +10531,7 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     });
     (fromCreation ? ps.creationZone : ps.hand).splice(hi, 1);
     room.engine.notePlayedFromHand(pi);
-    // Foreign-origin cards (Magic Lamp gifts etc.) discard / delete
-    // to the ORIGINAL owner's pile. `_consumeHandCardOrigin` returns
-    // `pi` for normally-owned cards.
-    const pileOwner = room.engine._consumeHandCardOrigin(pi, potionName);
-    const pilePs = gs.players[pileOwner];
+    // (Herkunft + Zielstapel stehen oben, vor dem Flug.)
     if (chainResult.negated) {
       // `hi` = Handplatz vor der Entnahme — der Diebstahl-Flug startet dort.
       await room.engine.routeNegatedInitialCard(pileOwner, potionName, chainResult, hi);

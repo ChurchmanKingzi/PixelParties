@@ -3198,6 +3198,27 @@ function spawnZoneLandFx(el, opts) {
 // Karten uebereinander und die Hand war nicht mehr zu lesen.
 const HAND_TILT_GRAD = 5;
 
+// ★★ v1216 — ERST MESSEN, DANN SCHREIBEN (Als Befund 18.9.:
+// „die Rotation buggt leicht und es fuehlt sich laggy an, als wuerde
+// da permanent irgendwas neuberechnet").
+//
+// Genau das tat es: die Schleife las einen Kasten, schrieb einen Wert,
+// las den naechsten Kasten … Jede Schreiboperation macht den Stil
+// ungueltig, jede folgende Messung erzwingt daraufhin ein neues Layout
+// — zwoelf erzwungene Layouts JE MAUSBEWEGUNG. In einem Blatt mit
+// `:has()`-Regeln kostet jede dieser Ungueltigkeiten zusaetzlich.
+//
+// Jetzt zwei getrennte Durchgaenge: alle Kaesten lesen, danach
+// schreiben. Ein Layout je Bewegung statt zwoelf.
+//
+// Dazu zwei Sparbremsen:
+//   • Gleicher Winkel wie zuletzt → gar nicht schreiben. Der Winkel
+//     aendert sich nur, wenn der Zeiger eine Kartenmitte KREUZT.
+//   • Hysterese: die Seite wechselt erst 10 px hinter der Mitte. Ohne
+//     das flackert die Karte direkt unter dem Zeiger zwischen +5 und
+//     -5 Grad — Als „die Rotation buggt leicht".
+const HAND_TILT_TOTZONE = 10;
+
 function applyHandTilt(slots, mouseX, opts) {
   opts = opts || {};
   const els = slots ? Array.from(slots) : [];
@@ -3205,17 +3226,191 @@ function applyHandTilt(slots, mouseX, opts) {
   if (window._playAnimations === false) return;
   const innen = opts.inner || null;
   const grad = opts.grad != null ? opts.grad : HAND_TILT_GRAD;
+
+  // ★★ v1217 — DIE LUECKE STATT DER MESSUNG (Als Befund 18.9.: „hier
+  // zittern die anderen Handkarten immer noch beim Rotieren").
+  //
+  // Ursache war eine RUECKKOPPLUNG, die tiefer sitzt als meine
+  // Messung: `calcDropIdx` bestimmt die Einfuegestelle, indem es die
+  // Kartenplaetze MISST — und die Luecke verschiebt genau diese
+  // Plaetze um eine Kartenbreite. Steht der Zeiger nahe einer Grenze,
+  // wandert die Karte unter ihm hin und her, und mit ihr die Seite,
+  // auf der sie liegt. Keine Hysterese auf Pixelebene hilft dagegen:
+  // der Sprung ist so breit wie eine Karte.
+  //
+  // Beim Umsortieren in der Hand ist die Luecke aber bereits DIE
+  // Zeigerposition, ausgedrueckt in Karten. Also wird gar nicht mehr
+  // gemessen: was vor der Luecke steht, kippt nach links, was dahinter
+  // steht, nach rechts. Unerschuetterlich, weil kein Layoutwert mehr
+  // eingeht — und ganz nebenbei ohne einen einzigen Layout-Zwang.
+  if (opts.gapIndex != null && opts.gapIndex >= 0) {
+    const g = opts.gapIndex;
+    els.forEach((el, i) => {
+      const ziel = innen ? el.querySelector(innen) : el;
+      if (!ziel) return;
+      const neuerGrad = i < g ? -grad : grad;
+      if (ziel._ppHandTilt === neuerGrad) return;
+      ziel._ppHandTilt = neuerGrad;
+      ziel.style.setProperty('--hand-tilt', neuerGrad + 'deg');
+    });
+    return;
+  }
+
+  // ── Durchgang 1: nur lesen ──
+  const posten = [];
   for (const el of els) {
     const ziel = innen ? el.querySelector(innen) : el;
     if (!ziel) continue;
     const r = el.getBoundingClientRect();
     if (!r.width) continue;                       // gezogene Karte ist 0 breit
-    // Nur die SEITE entscheidet. Gemessen wird trotzdem der Platz und
-    // nicht die Karte: deren Rahmen dreht sich mit, und eine Messung,
-    // die ihr eigenes Ergebnis beeinflusst, kippt an der Grenze hin und
-    // her.
-    const mitte = r.left + (innen ? ziel.offsetWidth : r.width) / 2;
-    ziel.style.setProperty('--hand-tilt', (mitte < mouseX ? -grad : grad) + 'deg');
+    // Gemessen wird der PLATZ, nicht die Karte: deren Rahmen dreht sich
+    // mit, und eine Messung, die ihr eigenes Ergebnis beeinflusst,
+    // kippt an der Grenze hin und her.
+    posten.push({ ziel, mitte: r.left + (innen ? ziel.offsetWidth : r.width) / 2 });
+  }
+
+  // ── Durchgang 2: nur schreiben, und nur was sich aendert ──
+  for (const { ziel, mitte } of posten) {
+    const vorher = ziel._ppHandTilt;
+    let neuerGrad;
+    if (Math.abs(mitte - mouseX) < HAND_TILT_TOTZONE && vorher != null) {
+      neuerGrad = vorher;                         // in der Totzone bleibt es
+    } else {
+      neuerGrad = mitte < mouseX ? -grad : grad;
+    }
+    if (vorher === neuerGrad) continue;
+    ziel._ppHandTilt = neuerGrad;
+    ziel.style.setProperty('--hand-tilt', neuerGrad + 'deg');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★★ v1218 — EIN HANDSYSTEM FUER BEIDE OBERFLAECHEN
+//
+//  Als Frage (18.9.): „Warum sind Puzzle-Mode-Drag/Drop und
+//  Duell-Drag/Drop ueberhaupt verschieden?"
+//
+//  Verschieden ist nur der EINGABEWEG: das Duell zieht mit eigenen
+//  Maus-Ereignissen am Fenster (es braucht Touch und Ablageziele im
+//  gekippten Brett), der Editor mit HTML5-Drag&Drop. Die LOGIK
+//  darunter war dagegen zweimal dasselbe, zweimal getippt — der
+//  Kommentar an `tropfIndex` verwies woertlich auf `calcDropIdx`, und
+//  beide wurden an verschiedenen Tagen gegen DENSELBEN Fehler
+//  nachgebessert (Index-Raeume 28.8., Luecken-Flackern 18.9.). Genau
+//  diese Sorte Doppelung driftet auseinander.
+//
+//  Also liegt die Logik jetzt hier: Tropfstelle, Umsortieren,
+//  Anzeigeliste mit Luecke. Der Eingabeweg bleibt, wo er ist — eine
+//  Vereinheitlichung DORT wuerde die Schwaeche des Duells (Zustand je
+//  Mausbewegung) in den Editor tragen, der heute sauber laeuft.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Tropfstelle einer Handreihe: der Index, an dem die gezogene Karte
+ * beim Loslassen landet. Gezaehlt wird OHNE die gezogene Karte (der
+ * Selektor schliesst sie aus) — Ergebnis also 0..n.
+ *
+ * `kasten` darf ein Element oder ein Selektor sein.
+ */
+function handDropIndex(kasten, mouseX, opts) {
+  opts = opts || {};
+  const wurzel = (typeof kasten === 'string') ? document.querySelector(kasten) : kasten;
+  if (!wurzel) return 0;
+  const sel = (opts.slots || '*') + (opts.skip ? `:not(${opts.skip})` : '');
+  const plaetze = wurzel.querySelectorAll(sel);
+  for (let i = 0; i < plaetze.length; i++) {
+    const r = plaetze[i].getBoundingClientRect();
+    if (mouseX < r.left + r.width / 2) return i;
+  }
+  return plaetze.length;
+}
+
+/**
+ * Karte innerhalb einer Liste verschieben. Beide Indizes zaehlen im
+ * SELBEN Raum: `nachIdx` kommt von `handDropIndex` und ist bereits
+ * ohne die gezogene Karte gerechnet, hier wird also NICHT zusaetzlich
+ * abgezogen. (Genau diese Vermischung war Als Befund vom 28.8.: „ganz
+ * nach rechts geht nicht" — die letzte Position war unerreichbar.)
+ */
+function handMove(liste, vonIdx, nachIdx) {
+  const neu = [...liste];
+  const [k] = neu.splice(vonIdx, 1);
+  neu.splice(nachIdx, 0, k);
+  return neu;
+}
+
+/**
+ * Anzeigeliste einer Hand mit der Zieh-Luecke.
+ *
+ * Die gezogene Karte BLEIBT in der Liste (ihr DOM-Knoten muss fuer die
+ * Touch-Verfolgung bestehen; sichtbar versteckt sie die Render-Seite).
+ * Deshalb hier das `+1`: die Luecke wird in einem Raum eingesetzt, in
+ * dem die Karte noch drinsteht, `dropIdx` aber ohne sie gezaehlt hat.
+ */
+function handItemsWithGap(liste, dragIdx, dropIdx) {
+  const items = liste.map((c, i) => ({ card: c, origIdx: i, isGap: false }));
+  if (dragIdx == null || dropIdx == null) return items;
+  let einfuegen = dropIdx;
+  if (einfuegen >= dragIdx) einfuegen++;
+  items.splice(einfuegen, 0, { card: null, origIdx: -1, isGap: true });
+  return items;
+}
+
+// ★★ v1217 — DER ZIEH-SCHALTER SITZT AN DEN HANDREIHEN, NICHT AN
+// `<html>` (Als Befund 18.9.: „es fuehlt sich spuerbar ruckelig an,
+// wenn man initial eine Karte greift").
+//
+// Die Klasse lag bis v1216 auf dem Wurzelelement, und die Hover-Regeln
+// begannen mit `html:not(.pp-card-dragging)`. Jeder Wechsel dieser
+// Klasse zwingt den Browser damit, das GANZE Dokument gegen ein
+// 690-KB-Blatt neu abzugleichen — einmal beim Greifen, einmal beim
+// Loslassen. Genau der Ruckler.
+//
+// Jetzt traegt jede Handreihe die Klasse selbst; die Ungueltigkeit
+// bleibt in diesen Teilbaeumen. Dieselbe Funktion bedient Kampf und
+// Editor, damit es nur EINE Liste der Reihen gibt.
+const HAND_REIHEN_SELEKTOR = [
+  '.game-hand-cards',
+  '.game-hand-me .game-hand-creation-cards',
+  '.game-hand-opp',
+  '.pz-hand-cards',
+  // ★ v1219: das Brett zaehlt mit — auch dort hebt sich beim Hovern
+  // eine Karte, und auch dort soll das waehrend eines Zuges ruhen.
+  '.board-plane',
+].join(', ');
+
+/**
+ * Zieh-Flagge auf allen Bereichen, die Hover-Hervorhebungen tragen.
+ *
+ * `ziel` (optional) ist der Selektor der Reihe, ueber der der Zeiger
+ * gerade steht — sie bekommt zusaetzlich `pp-drop-aktiv` und leuchtet
+ * damit als Ablageziel auf. ★ v1219 (Als Vorgabe): Der Puzzle-Editor
+ * macht das schon lange (dort hing es als Inline-Stil an zwei
+ * Stellen); jetzt liegt das Aussehen einmal in style.css und beide
+ * Oberflaechen benutzen es. Kosten: zwei Klassenwechsel je Zug, kein
+ * Rechenaufwand waehrend der Bewegung.
+ */
+function setHandDragFlag(an, ziel) {
+  // ★★ v1232 (Als Befund, dritter Anlauf: „auch das hat es nicht
+  // gefixt"). Die Flagge lag als KLASSE an den Handreihen — und React
+  // besitzt deren `className`. Im Editor steht dort
+  // `'pz-hand-cards' + (dragOverZone === … ? ' pp-drop-aktiv' : '')`:
+  // der Wert AENDERT sich waehrend des Zuges, React schreibt das
+  // Attribut also neu und wischt dabei jede von aussen gesetzte Klasse
+  // weg. Der Riegel war damit die meiste Zeit gar nicht da.
+  //
+  // Im Duell steht dort ein fester String — React fasst das Attribut
+  // nach dem Einhaengen nie wieder an, die Klasse ueberlebte. Genau
+  // deshalb trat es NUR im Editor auf.
+  //
+  // Deshalb jetzt ein DATENATTRIBUT: `data-pp-dragging` steht in keinem
+  // JSX, React verwaltet es nicht und laesst es in Ruhe.
+  for (const el of document.querySelectorAll(HAND_REIHEN_SELEKTOR)) {
+    if (an) el.dataset.ppDragging = '1'; else delete el.dataset.ppDragging;
+    delete el.dataset.ppDrop;
+  }
+  if (an && ziel) {
+    for (const el of document.querySelectorAll(ziel)) el.dataset.ppDrop = '1';
   }
 }
 
@@ -3223,8 +3418,212 @@ function clearHandTilt(slots, opts) {
   opts = opts || {};
   for (const el of (slots ? Array.from(slots) : [])) {
     const ziel = opts.inner ? el.querySelector(opts.inner) : el;
-    if (ziel) ziel.style.removeProperty('--hand-tilt');
+    if (!ziel) continue;
+    ziel._ppHandTilt = undefined;                 // Merker mit zuruecksetzen
+    ziel.style.removeProperty('--hand-tilt');
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ★★ v1233 — DAS HANDFAECHER (Als Vorgabe 19.9.)
+//
+//  „Die Karten in den Haenden beider Spieler, im laufenden Duell und
+//  im Puzzle-Editor, sollen leicht aufgefaechert dargestellt sein."
+//
+//  EINE Geometrie fuer alle vier Haende (Duell eigen/gegnerisch,
+//  Editor eigen/gegnerisch) — aus demselben Grund, aus dem seit v1218
+//  auch Tropfstelle und Umsortieren hier liegen: zwei Fassungen
+//  desselben Faechers driften auseinander, sobald eine davon einmal
+//  nachgebessert wird.
+//
+//  ZWEI BESTANDTEILE, und die Trennung ist der ganze Trick:
+//    • `--fan-rot`  — der Winkel. Er sitzt IMMER auf der Karte.
+//    • `--fan-lift` — der Bogen. Er sitzt dort, wo die Fluege messen:
+//      im Duell auf dem HANDPLATZ (`.hand-slot`), sonst auf der Karte
+//      selbst, weil es dort keinen Platz gibt.
+//
+//  Warum das so sein MUSS: rund ein Dutzend Stellen im Kampfbrett
+//  bestimmen ihren Landepunkt ueber `getBoundingClientRect` einer
+//  Handkarte oder ihres Platzes. Ein gedrehter Kasten liefert dort den
+//  ACHSENPARALLELEN Huellkasten — breiter und hoeher als die Karte,
+//  linke obere Ecke daneben. Deshalb:
+//    – Der Platz wird nie gedreht (nur verschoben) → alle Messungen,
+//      die den Platz nehmen, sehen die Karte weiterhin dort, wo sie
+//      wirklich liegt, MITSAMT Bogen. Kein einziger Flug musste dafuer
+//      angefasst werden.
+//    – Wo die Karte selbst der Platz ist, dreht sie um ihre MITTE
+//      (`transform-origin: 50% 50%`). Unter einer Drehung um die Mitte
+//      ist die Mitte des Huellkastens gleich der Kartenmitte — und die
+//      Messungen dort rechnen ohnehin mit der Mitte.
+//  Genau dieselbe Ueberlegung steht seit v1210 hinter den zwei
+//  Drehpunkten der Neigung; das Faecher benutzt sie weiter.
+//
+//  DER BOGEN HAENGT AM AUSSENRAND, nicht an der Mitte: die aeusserste
+//  Karte behaelt Hub 0, die mittlere steigt. Das ist kein
+//  Schoenheitsentscheid — drei Fluege projizieren den Landeplatz einer
+//  noch nicht existierenden Karte aus dem LETZTEN Platz („die Hand ist
+//  zentriert, eine Karte mehr rueckt die Reihe"). Haengt der Bogen
+//  aussen, bleibt diese Projektion ohne Umrechnung richtig.
+// ═══════════════════════════════════════════════════════════════
+
+// Die Stellschrauben des Faechers, alle an einem Ort.
+const FAECHER = {
+  schrittGrad: 3.0,   // Winkel je Karte ab der Mitte
+  maxGrad: 9,         // Halbspanne, gedeckelt — sonst kippt eine
+                      // volle Hand uebereinander
+  // ★★ v1240 (Als Befund 19.9.: „die Karten formen noch keinen
+  // richtigen Bogen, weil ihre Hoehe nicht skaliert … eher eine
+  // schiefe Treppe"). Der Hub stand als feste Pixelzahl da und ist
+  // seit v1234/v1235 nicht mitgewachsen: 10 px waren auf einer
+  // 90-px-Karte 11 %, auf der heutigen 130-px-Karte nur noch 7,7 % —
+  // sichtbar blieb fast nur die Drehung, und die allein liest sich
+  // als Treppe. Jetzt ist der Hub ein ANTEIL DER KARTENHOEHE; er
+  // waechst damit automatisch mit jeder weiteren Massaenderung.
+  bogenAnteil: 0.28,  // Hub der mittleren Karte, in Kartenhoehen
+  // ★★ v1246 (Als Befund 19.9.: „die aeussersten Handkarten stehen zu
+  // hoch — der vertikale Abfall je Karte ist zu klein"). Er hat recht,
+  // und die reine Parabel ist daran schuld: sie faellt zu den Raendern
+  // hin zwar am staerksten, aber der Schritt von der aeussersten zur
+  // zweiten Karte blieb trotzdem klein (bei 16 Karten 6 px). Der
+  // Exponent zieht die Kurve nach oben: oben flacher, zu den Raendern
+  // hin steiler. Bei 16 Karten faellt die aeusserste damit 13 px unter
+  // ihre Nachbarin statt 6 — die Reihe liest sich als Bogen, nicht
+  // als fast gerade Linie mit haengenden Enden.
+  bogenSchaerfe: 0.7,
+  vollAb: 5,          // ab so vielen Karten der volle Bogen
+  // ★ v1244 (Als Vorgabe 19.9.: „beim Gegner ist der Faechereffekt
+  // deutlich zu ausgepraegt, schraube ihn um zwei Drittel herunter").
+  // Gilt fuer BEIDES — Winkel wie Bogen —, sonst bliebe die
+  // Gegnerhand gedreht und nur flach, was wie ein Fehler aussaehe.
+  gegnerAnteil: 1 / 3,
+};
+
+/**
+ * Winkel und Hub einer Handkarte.
+ *
+ * @param {number} index  Platz in der Reihe, 0-basiert
+ * @param {number} anzahl Karten in der Reihe
+ * @param {object} opts   { seite: 'me' | 'opp' }
+ * @returns {{rot: number, lift: number}} Grad und Kartenhoehen
+ *          (lift negativ = nach oben)
+ */
+function handFanGeometry(index, anzahl, opts) {
+  const seite = (opts && opts.seite) === 'opp' ? -1 : 1;
+  const halb = (anzahl - 1) / 2;
+  if (!(halb > 0) || !(index >= 0)) return { rot: 0, lift: 0 };
+  const s = index - halb;                      // -halb … +halb
+  const t = s / halb;                          // -1 … +1
+  // Gedeckelte Spanne: bei wenigen Karten der volle Schritt, bei
+  // vielen so viel, dass die aeusserste `maxGrad` nicht ueberschreitet.
+  const schritt = Math.min(FAECHER.schrittGrad, FAECHER.maxGrad / halb);
+  // Flache Haende bekommen einen flacheren Bogen — zwei Karten sollen
+  // nicht wirken, als haelte man ein Blatt von zehn.
+  const tiefe = Math.min(1, (anzahl - 1) / (FAECHER.vollAb - 1));
+  // Die Gegnerhand faechert flacher — ihre Karten sind Information,
+  // keine Bedienflaeche (v1244).
+  const staerke = seite < 0 ? FAECHER.gegnerAnteil : 1;
+  return {
+    rot:  seite * staerke * s * schritt,
+    // Einheitenlos und in KARTENHOEHEN: die Umrechnung in Bildpunkte
+    // macht style.css mit `--hand-card-h`.
+    lift: seite * staerke * -FAECHER.bogenAnteil * tiefe
+      * Math.pow(1 - t * t, FAECHER.bogenSchaerfe),
+  };
+}
+
+// Die Stilobjekte werden gemerkt: React vergleicht `style` Schluessel
+// fuer Schluessel, und eine Hand rendert bei jeder Mausbewegung neu.
+// Gleiche Eingabe → gleiches Objekt → React fasst das Attribut nicht an.
+const _faecherCache = new Map();
+
+/**
+ * Das `style`-Objekt fuer einen Handplatz (bzw. eine Handkarte, wo es
+ * keinen Platz gibt). Enthaelt NUR die beiden Variablen; wie sie
+ * wirken, steht in style.css („HANDFAECHER").
+ *
+ * `--fan-lift` ist bewusst EINHEITENLOS und in KARTENHOEHEN gerechnet:
+ * die Umrechnung in Bildpunkte multipliziert in CSS mit
+ * `--hand-card-h`. Eine px-Zahl von hier wuerde bei der naechsten
+ * Massaenderung wieder zurueckbleiben (v1240).
+ */
+function handFanStyle(index, anzahl, opts) {
+  const seite = (opts && opts.seite) === 'opp' ? 'opp' : 'me';
+  const schluessel = `${seite}|${index}|${anzahl}`;
+  let stil = _faecherCache.get(schluessel);
+  if (stil) return stil;
+  const g = handFanGeometry(index, anzahl, { seite });
+  stil = {
+    '--fan-rot': g.rot.toFixed(2) + 'deg',
+    '--fan-lift': g.lift.toFixed(4),
+    // ★★ v1241 (Als Vorgabe 19.9.): „immer die linke Karte ueber der
+    // rechts neben ihr". Von allein gilt das Gegenteil — spaeter im
+    // DOM heisst spaeter gezeichnet, also laege die RECHTE oben.
+    // Deshalb eine absteigende Ebene je Platz. Auf der Gegnerseite
+    // aufsteigend: ihre Hand ist gespiegelt, „links" ist dort von
+    // unserer Seite aus rechts.
+    // Bleibt klein (Handgroesse), damit die gehoverte Karte mit ihrer
+    // 60 weiterhin ueber allem liegt.
+    '--fan-z': String(seite === 'opp' ? index + 1 : Math.max(1, anzahl - index)),
+  };
+  // Der Cache deckt jede Handgroesse mal jeden Platz mal zwei Seiten
+  // ab — ein paar hundert Eintraege. Der Riegel ist nur dagegen, dass
+  // ein Fehlaufruf ihn unbegrenzt fuellt.
+  if (_faecherCache.size < 2000) _faecherCache.set(schluessel, stil);
+  return stil;
+}
+
+/**
+ * Der groesste Hub, den eine Hand dieser Groesse erreicht — in
+ * Kartenhoehen, also dieselbe Einheit wie `lift`. Die Handreihe haengt
+ * ihn als `--hand-max-lift` an sich; style.css rechnet daraus aus, wie
+ * weit die Hand oben aus ihrer Leiste ausbricht, und senkt sie um ein
+ * Drittel davon ab (Als Vorgabe 19.9.).
+ */
+function handFanMaxLift(anzahl, opts) {
+  if (!(anzahl > 1)) return 0;
+  const tiefe = Math.min(1, (anzahl - 1) / (FAECHER.vollAb - 1));
+  // Dieselbe Daempfung wie in der Geometrie, sonst senkte sich die
+  // Gegnerhand um einen Ueberstand, den sie gar nicht mehr hat.
+  const staerke = (opts && opts.seite) === 'opp' ? FAECHER.gegnerAnteil : 1;
+  return FAECHER.bogenAnteil * tiefe * staerke;
+}
+
+/**
+ * Der ECHTE Kasten einer Handkarte, also der ungedrehte — plus ihr
+ * Faecherwinkel. Fuer jeden Flug, der eine gefaecherte Karte messen
+ * muss, statt `getBoundingClientRect` direkt.
+ *
+ * Rechenweg ohne Einheitenmischung: der Huellkasten einer um θ
+ * gedrehten w×h-Karte ist W = w·|cos| + h·|sin|, H = w·|sin| + h·|cos|.
+ * Zwei Gleichungen, zwei Unbekannte — nach w und h aufgeloest. Die
+ * MITTE bleibt unter einer Drehung um die Mitte ohnehin liegen, also
+ * genuegt sie als Anker. (Bewusst nicht `offsetWidth`: das ist eine
+ * Layout-Groesse, `getBoundingClientRect` liefert unter `zoom` etwas
+ * anderes — beides zu mischen ginge nur zufaellig gut.)
+ */
+function handFanCardBox(el) {
+  if (!el) return null;
+  // Der PLATZ wird nie gedreht (style.css) — sein Kasten ist schon der
+  // echte, und die Karte darin liegt genau darauf. Wer die Karte
+  // uebergibt, meint denselben Kasten; deshalb hier beide Faelle auf
+  // den Platz zurueckfuehren, sobald es einen gibt. Zurueckgedreht
+  // werden muss nur dort, wo die Karte SELBST der Platz ist.
+  const platz = el.closest ? el.closest('.hand-slot') : null;
+  const knoten = platz || el;
+  const r = knoten.getBoundingClientRect();
+  const mx = r.left + r.width / 2;
+  const my = r.top + r.height / 2;
+  const rot = parseFloat(knoten.style && knoten.style.getPropertyValue
+    ? knoten.style.getPropertyValue('--fan-rot') : '') || 0;
+  if (!rot || platz) {
+    return { left: r.left, top: r.top, width: r.width, height: r.height, cx: mx, cy: my, rot };
+  }
+  const bog = Math.abs(rot) * Math.PI / 180;
+  const c = Math.cos(bog), s = Math.sin(bog);
+  const det = c * c - s * s;                    // > 0 solange |θ| < 45°
+  const w = det > 0.05 ? (r.width * c - r.height * s) / det : r.width;
+  const h = det > 0.05 ? (r.height * c - r.width * s) / det : r.height;
+  return { left: mx - w / 2, top: my - h / 2, width: w, height: h, cx: mx, cy: my, rot };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3252,7 +3651,9 @@ function clearHandTilt(slots, opts) {
 //  Hoehe mit `placement` (1 x 1 x 0,33 = 0,33), dem Klang, gegen den
 //  sie sich behaupten muessen.
 const CARD_DRAG_SFX = {
-  pickup:  { name: 'ui_click',  opts: { volume: 2.2, rate: 0.90, dedupe: 60 } },  // → .363
+  // ★ v1213: `pickup` ENTFAELLT (Als Befund 18.9.) — siehe onMove
+  // im Kampfbrett. Kein toter Eintrag hier, damit ihn niemand
+  // versehentlich wieder anschliesst.
   reorder: { name: 'draw',      opts: { volume: 1.1, rate: 1.12, dedupe: 50 } },  // → .363
   release: { name: 'ui_click',  opts: { volume: 1.6, rate: 1.30, dedupe: 50 } },  // → .264
   cancel:  { name: 'ui_cancel', opts: { volume: 1.0, dedupe: 60 } },              // → .330
@@ -5404,7 +5805,17 @@ window.spawnZoneLandFx = spawnZoneLandFx;
 window.spawnZoneLandFxAt = spawnZoneLandFxAt;
 window.spawnZoneLandFxBatch = spawnZoneLandFxBatch;
 window.applyHandTilt = applyHandTilt;
+window.setHandDragFlag = setHandDragFlag;
+window.handDropIndex = handDropIndex;
+window.handMove = handMove;
+window.handItemsWithGap = handItemsWithGap;
 window.clearHandTilt = clearHandTilt;
+// ★ v1233: EIN Faecher fuer Duell und Editor — Geometrie, Stilobjekt
+// und der Messhelfer fuer Fluege, die eine gedrehte Karte anpeilen.
+window.handFanGeometry = handFanGeometry;
+window.handFanStyle = handFanStyle;
+window.handFanMaxLift = handFanMaxLift;
+window.handFanCardBox = handFanCardBox;
 window.playCardDragSFX = playCardDragSFX;
 window.zoneLandStyle = zoneLandStyle;
 window.VolumeControl = VolumeControl;

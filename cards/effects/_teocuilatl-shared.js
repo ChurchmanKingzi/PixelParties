@@ -212,6 +212,11 @@ async function sacrificeSelf(engine, inst, pi) {
     ps.discardPile.push(inst.name);
     inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
     engine._untrackCard(inst.id);
+    // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
+    // Startplatz der abfliegenden Karte nur, solange die Hand noch so
+    // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
+    // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
+    engine.sync();
   } else {
     await engine.actionDestroyCard(
       { name: inst.name, owner: pi, heroIdx: inst.heroIdx }, inst,

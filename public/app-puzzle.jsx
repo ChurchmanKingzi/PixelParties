@@ -70,6 +70,14 @@ const { GameBoard, CardFoil } = window;
 // auseinander).
 const PZ_BG_KEY = 'pz-creator-backgrounds';
 
+// ★★ v1221: Attachments oeffnen keinen Statistik-Dialog — ausser diesen
+// hier, die einen eigenen Schalter mitbringen. „Alliance" steht nicht
+// dabei, weil es schon vorher in seine eigene Verbindungswahl abbiegt.
+// Waechst die Liste, waechst sie genau hier.
+const PZ_ATTACHMENT_MIT_WERTEN = new Set([
+  'Anti Magic',        // Stufe 1-3 (editAntiMagicLevel)
+]);
+
 // ★ v1212: Ziehquelle → Kartenreihe, die sich neigt. Modulweit, nicht
 // im Bauteil: die Tabelle ist konstant, und der Creator rendert
 // waehrend eines Zuges bei jeder Mausbewegung neu.
@@ -184,7 +192,7 @@ const PLAYER_DEBUFF_REGISTRY = [
 // viewport, so its dropdown opens UPWARD (bottom: calc(100% + 4px))
 // to avoid landing below the visible area. The `opp` side sits near
 // the top of the board, so its dropdown opens DOWNWARD.
-function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose }) {
+function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose, kompakt }) {
   const isOpp = side === 'opp';
   const accent = isOpp ? '#ff8844' : '#88ccff';
   const containerRef = useRef(null);
@@ -216,17 +224,22 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose })
     <div ref={containerRef} style={{ position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
       <button
         type="button"
+        className="pz-debuff-btn"
         onClick={onToggle}
         style={{
-          padding: '6px 10px', fontSize: 11, fontWeight: 700,
+          padding: kompakt ? '3px 2px' : '6px 10px',
+          fontSize: kompakt ? 10 : 11, fontWeight: 700,
           background: isOpen ? `rgba(${isOpp ? '255,136,68' : '136,204,255'},.18)` : 'rgba(0,0,0,.25)',
           border: `1px solid ${accent}55`,
           color: accent,
           borderRadius: 4, cursor: 'pointer',
-          marginLeft: 8, whiteSpace: 'nowrap',
+          marginLeft: kompakt ? 0 : 8, whiteSpace: 'nowrap',
+          width: kompakt ? '100%' : undefined,
         }}
         title={`${isOpp ? 'Opponent' : 'Player'}'s starting debuffs`}>
-        ⚠️ Debuffs ({selected.length})
+        {/* ★ v1249: in der schmalen Spalte nur Zeichen und Zahl — das
+            Wort stand ohnehin im Tooltip. */}
+        {kompakt ? `⚠️ ${selected.length}` : `⚠️ Debuffs (${selected.length})`}
       </button>
       {isOpen && (
         <div style={{
@@ -267,6 +280,44 @@ function DebuffSelector({ side, selected, onChange, isOpen, onToggle, onClose })
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * ── SCHMALE NEBENSPALTE DER HANDLEISTE (v1249, Als Vorgabe 19.9.) ───
+ * „Debuffs und Goldanzeige sind separate, viel zu grosse Container
+ *  dafuer, wie wenig Inhalt sie haben. Fasse sie in einer Spalte
+ *  zusammen und mache diese deutlich schmaler."
+ *
+ * Vorher zwei nebeneinanderliegende Kaesten mit zusammen rund 260 px:
+ * ein Goldfeld mit 64-px-Eingabe, 24-px-Muenze und einem gleich
+ * breiten Platzhalter „zum Zentrieren", daneben ein Knopf mit dem
+ * Wort „Debuffs". Inhalt sind drei Ziffern und eine Zahl.
+ *
+ * Jetzt eine Spalte von 64 px: Gold oben, Debuffs darunter. Die rund
+ * 200 px, die das freimacht, gehen an die Handkarten — die Reihe ist
+ * `flex: 1` und nimmt sie sich von selbst.
+ */
+function HandNebenspalte({ si, seite, gold, onGold, ...debuffProps }) {
+  return (
+    <div className="pz-hand-extras">
+      <label className="pz-gold-feld" title="Starting Gold (−999 … 999)">
+        <span aria-hidden="true">💰</span>
+        {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
+            gueltiger Zustand und muss auch im Puzzle einstellbar sein
+            (Als Vorgabe 16.8.). Untergrenze −999, Obergrenze 999, und
+            die Zahl wird rot, sobald sie unter 0 faellt — dieselbe
+            Lesart wie im Spiel.
+            ★ v1249: die rote Faerbung war seit jeher tot — der Knoten
+            trug ZWEI `style`-Attribute, und das zweite hat das erste
+            still ueberschrieben. Jetzt steht alles in einem. */}
+        <input className="input" type="number" min="-999" max="999"
+          value={gold ?? 0}
+          onChange={(e) => onGold(Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)))}
+          style={{ color: (gold ?? 0) < 0 ? '#ff5c5c' : undefined }} />
+      </label>
+      <DebuffSelector side={seite} kompakt {...debuffProps} />
     </div>
   );
 }
@@ -776,8 +827,10 @@ function PuzzleCreator() {
     }
     if (td.dragging) {
       e.preventDefault(); // prevent scroll while dragging
-      td.ghost.style.left = (t.clientX - 30) + 'px';
-      td.ghost.style.top = (t.clientY - 42) + 'px';
+      // ★ v1236: mittig unter dem Finger — gemessen statt fest (30/42
+      // stammte aus der Zeit, als das Ziehbild 60x84 gross war).
+      td.ghost.style.left = (t.clientX - td.ghost.offsetWidth / 2) + 'px';
+      td.ghost.style.top = (t.clientY - td.ghost.offsetHeight / 2) + 'px';
       // Highlight zone under finger
       td.ghost.style.display = 'none';
       const el = document.elementFromPoint(t.clientX, t.clientY);
@@ -859,6 +912,49 @@ function PuzzleCreator() {
     window.spawnZoneLandFxBatch?.(einschlaege);
   }, [players, areaZones]);
 
+  // ★ ZUR PLATZIERUNG: steht VOR dem Zieh-Effekt, weil dessen
+  // Abhaengigkeitsliste ihn nennt. Weiter unten waere sie beim Rendern
+  // `undefined` — `transform-block-scoping` macht aus dem `const` ein
+  // hochgezogenes `var` (dieselbe Falle wie in v1210 und v1217).
+  // ★★ v1230 (Als Befund 18.9.: „nach dem Drop wird die Karte an dem
+  // Index, den zuvor die bewegte Karte hatte, kurz groesser").
+  //
+  // Das ist eingefrorenes `:hover`. Waehrend eines HTML5-Zuges schickt
+  // der Browser KEINE Mausbewegungen — der Hover-Zustand bleibt auf dem
+  // Knoten stehen, ueber dem der Zeiger beim Aufnehmen stand, also auf
+  // dem Platz der GEZOGENEN Karte. Nach dem Ablegen sitzt dort eine
+  // andere Karte (die Plaetze sind positionsgebunden), und im selben
+  // Augenblick faellt der Zieh-Riegel — die falsche Karte poppt auf.
+  // Im Duell tritt es nicht auf: der eigene Maus-Zug schickt laufend
+  // Bewegungen, der Hover-Zustand ist dort also aktuell.
+  //
+  // Deshalb wird der Riegel erst mit der NAECHSTEN echten Mausbewegung
+  // geloest — dann hat der Browser den Hover neu bewertet. Die Frist
+  // ist nur der Notnagel fuer den Fall, dass der Zeiger stehen bleibt.
+  const riegelLoeser = useRef(null);
+  const ziehRiegelLoesen = useCallback(() => {
+    if (riegelLoeser.current) riegelLoeser.current();
+    let erledigt = false;
+    const aus = () => {
+      if (erledigt) return;
+      erledigt = true;
+      document.removeEventListener('mousemove', aus);
+      document.removeEventListener('touchstart', aus);
+      riegelLoeser.current = null;
+      window.setHandDragFlag?.(false);
+    };
+    // ★★ v1231: KEINE Uhr mehr. Eine Frist loest den Riegel irgendwann
+    // von selbst — und wenn der Zeiger bis dahin stillsteht, ist der
+    // Hover immer noch auf dem alten Platz eingefroren, die falsche
+    // Karte poppt also nur spaeter auf. Bleibt der Zeiger liegen,
+    // bleibt der Riegel eben stehen: sichtbar ist das nicht, denn ohne
+    // Bewegung gibt es auch nichts hervorzuheben. Die naechste
+    // Bewegung loest beides zugleich.
+    document.addEventListener('mousemove', aus);
+    document.addEventListener('touchstart', aus);
+    riegelLoeser.current = aus;
+  }, []);
+
   // ★ v1211: NEIGUNG WAEHREND JEDES ZUGES (Als Vorgabe 18.9.). Der
   // Zeiger wandert beim Ziehen ueber das ganze Fenster — ein Horcher
   // am Dokument bekommt das mit, egal ueber welchem Ziel er gerade
@@ -872,6 +968,22 @@ function PuzzleCreator() {
   useEffect(() => {
     const alle = () => document.querySelectorAll('.pz-hand-card');
     const reihe = PZ_HAND_REIHEN[dragHandSource];
+    // ★ v1214: Klasse fuer den Hover-Riegel (siehe style.css). Sie
+    // haengt am ZUG, nicht an der Reihe — auch wer aus der Galerie
+    // zieht, soll die Hand nicht aufpoppen lassen.
+    //
+    // ★★ v1231 (Als Befund, zweiter Anlauf: „hat es leider nicht
+    // gefixt"). Hier stand vorher `setHandDragFlag(dragCardName !=
+    // null)` — also auch das LOESEN. Endet ein Zug, laeuft erst die
+    // Aufraeumfunktion (die den Riegel verzoegert loesen will) und
+    // unmittelbar danach dieser Rumpf mit `false`. Meine Verzoegerung
+    // aus v1230 war damit wirkungslos: der Riegel fiel wie zuvor im
+    // selben Augenblick, in dem der Hover noch auf dem Platz der
+    // gezogenen Karte eingefroren war.
+    //
+    // Gesetzt wird hier deshalb nur noch — geloest ausschliesslich
+    // ueber `ziehRiegelLoesen`.
+    if (dragCardName != null) window.setHandDragFlag?.(true);
     if (dragCardName == null || !reihe) { window.clearHandTilt?.(alle()); return undefined; }
     const auf = (e) => {
       const x = e.clientX != null ? e.clientX
@@ -883,9 +995,11 @@ function PuzzleCreator() {
     return () => {
       document.removeEventListener('dragover', auf);
       document.removeEventListener('touchmove', auf);
+      // ★ v1230: nicht sofort — siehe `ziehRiegelLoesen`.
+      ziehRiegelLoesen();
       window.clearHandTilt?.(alle());
     };
-  }, [dragCardName, dragHandSource]);
+  }, [dragCardName, dragHandSource, ziehRiegelLoesen]);
 
   // ── Auto-save state to localStorage on every change ──
   useEffect(() => {
@@ -1341,9 +1455,34 @@ function PuzzleCreator() {
   // covers the RO blind spot described above (island zones, area
   // cards, hand bars all reshaping content without resizing any
   // observed box).
+  //
+  // ★★ v1250 (Als Befund 19.9.: „das komplette Spielfeld verschiebt
+  // sich stueckweise nach rechts, wenn ich eine Goldanzeige
+  // editiere").
+  //
+  // Der Ausloeser hing an `players` — und da steht ALLES drin, was der
+  // Editor ueber eine Seite weiss: Gold, Debuffs, HP-Werte, Zaehler.
+  // Jeder Tastendruck im Goldfeld hat damit einen vollen Fit-Pass
+  // gestartet, obwohl sich am Layout nichts aendert. Und dieser Pass
+  // ist im Bildlauf-Modus nicht vollstaendig idempotent: er korrigiert
+  // das seitliche Polster (`--pz-overhang-l/r`) ueber den GEMESSENEN
+  // Spalt, was sich pro Durchlauf um ein paar Pixel nachjustiert —
+  // sichtbar als schrittweises Wandern.
+  //
+  // Jetzt haengt der Ausloeser an einer FORMSIGNATUR: nur die Dinge,
+  // die Breite und Aufbau des Bretts wirklich veraendern. Gold und
+  // Debuffs stehen nicht drin, ihr Editieren laesst das Brett in Ruhe.
+  const brettForm = useMemo(() => players.map(p => [
+    (p.islandZoneCount || []).join(','),
+    (p.permanents || []).length,
+    (p.coolnessStack || []).length > 0 ? 1 : 0,
+    (p.creationZone || []).length > 0 ? 1 : 0,
+    (p.sideDeck || []).length > 0 ? 1 : 0,
+    (p.heroes || []).map(h => (h ? h.name : '-')).join('|'),
+  ].join('~')).join('//'), [players]);
   useEffect(() => {
     if (scaleKickRef.current) scaleKickRef.current();
-  }, [players, areaZones, hand, oppHand]);
+  }, [brettForm, areaZones, hand.length, oppHand.length]);
 
   const invalidate = useCallback(() => setValidated(false), []);
   // Invalidate whenever hands change (covers add, remove, reorder, drag-drop)
@@ -1691,8 +1830,9 @@ function PuzzleCreator() {
 
   // ── Drag ──
   const onDragStart = useCallback((e, cardName, handIdx, source, handSource) => {
-    // ★ v1210: derselbe Anhebe-Klang wie im Kampf (Als Vorgabe 18.9.).
-    window.playCardDragSFX?.('pickup');
+    // ★★ v1215: Hover-Riegel sofort, nicht erst ueber den Effekt
+    // (siehe app-board, derselbe Befund).
+    window.setHandDragFlag?.(true);
     setDragCardName(cardName); setDragHandIdx(handIdx); setDragSource(source || null); setDragHandSource(handSource || null);
     // Erst im naechsten Tick verstecken — siehe `ziehLaeuft`.
     setZiehLaeuft(false);
@@ -1716,8 +1856,56 @@ function PuzzleCreator() {
    */
   const setDragGhost = useCallback((e, cardName) => {
     if (!e?.dataTransfer?.setDragImage) return;
+    // ★★ v1228 (Als Befund 18.9.: „spezifisch im Puzzle-Editor und
+    // spezifisch NUR Diamond-Rare-Karten werden beim Drag/Drop deutlich
+    // UEBER dem Cursor angezeigt").
+    //
+    // Die Handreihen riefen diesen Helfer gar nicht — der Browser baute
+    // sein Ziehbild dann selbst aus dem Quellelement. Fuer eine normale
+    // Karte passt das ungefaehr; eine Diamond Rare traegt aber einen
+    // pulsierenden Schein (`box-shadow` bis 12 px, im Hover 20/40 px),
+    // und der gehoert zum gemalten Umfang. Das Abbild wurde dadurch
+    // deutlich hoeher als die Karte, der Zeiger sass entsprechend weit
+    // unten darin — die Karte stand ueber ihm. Secret Rares traf es
+    // schwaecher, deshalb fiel es nur bei Diamond auf.
+    //
+    // Jetzt bekommt JEDER Zug dasselbe gebaute Bild (ohne Schein) — und
+    // den Griffpunkt gleich mit: gemessen ueber den Layout-Kasten
+    // (`offsetLeft/Top/Width/Height`), der von Hover-Vergroesserung und
+    // Neigung unberuehrt bleibt.
+    //
+    // ★ v1236 (Als Befund 19.9.: „die Karten sollen auch, waehrend sie
+    // gedraggt werden, noch scaled-up sein"): das Bild war auf feste
+    // 60x84 geschnuert und damit deutlich kleiner als die Karte, die
+    // man gerade greift. Es nimmt jetzt die GROESSE DER QUELLKARTE
+    // (`offsetWidth/Height`, vom Transform unberuehrt) — Galerie, Hand,
+    // Vorrat und Brettzonen bringen damit jeweils ihr eigenes Mass mit,
+    // und kuenftige Aenderungen am Kartenmass wirken hier von selbst.
+    const q = e.currentTarget;
+    // ★ v1242: die sichtbare Karte, nicht der Platz — im Editor ist der
+    // Platz seit heute schrumpfbar (Ueberdeckung), die Karte darin
+    // behaelt ihre Breite.
+    const sicht = (q && q.querySelector && q.querySelector('.pz-hand-card-inner')) || q;
+    // ★ v1256 (Als Vorgabe 19.9.: „beim Drag/Drop ist die Karte zu gross
+    // fuer die deutlich kleineren Board-Zonen — mach sie ~25 % kleiner").
+    // Das Ziehbild ist eine VORSCHAU auf das Ablegen, nicht auf die
+    // Quelle; drei Viertel der Quellgroesse liegen zwischen Handmass und
+    // Zonenmass und passen an beiden Enden.
+    const ZIEH_ANTEIL = 0.75;
+    const gb = (sicht && sicht.offsetWidth > 0) ? Math.round(sicht.offsetWidth * ZIEH_ANTEIL) : 60;
+    const gh = (sicht && sicht.offsetHeight > 0) ? Math.round(sicht.offsetHeight * ZIEH_ANTEIL) : 84;
+    let hx = gb / 2, hy = gh / 2;
+    if (q && q.offsetParent) {
+      const er = q.offsetParent.getBoundingClientRect();
+      const links = er.left + q.offsetLeft - (q.offsetParent.scrollLeft || 0);
+      const oben  = er.top  + q.offsetTop  - (q.offsetParent.scrollTop  || 0);
+      if (q.offsetWidth > 0 && q.offsetHeight > 0) {
+        hx = Math.max(0, Math.min(gb, ((e.clientX - links) / q.offsetWidth) * gb));
+        hy = Math.max(0, Math.min(gh, ((e.clientY - oben) / q.offsetHeight) * gh));
+      }
+    }
     const ghost = document.createElement('div');
-    ghost.style.cssText = 'position:absolute;top:-1000px;left:-1000px;width:60px;height:84px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;';
+    ghost.style.cssText = `position:absolute;top:-1000px;left:-1000px;width:${gb}px;height:${gh}px;border:2px solid var(--accent,#0ff);border-radius:4px;background:var(--bg3,#222);overflow:hidden;`;
     const url = cardImageUrl(cardName);
     if (url) {
       const img = document.createElement('img');
@@ -1732,15 +1920,15 @@ function PuzzleCreator() {
       ghost.style.padding = '4px';
     }
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 30, 42);
+    e.dataTransfer.setDragImage(ghost, hx, hy);
     setTimeout(() => { try { document.body.removeChild(ghost); } catch {} }, 0);
   }, []);
-  const onDragEnd = useCallback(() => { setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
+  const onDragEnd = useCallback(() => { ziehRiegelLoesen(); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); setDropGap(null); setZiehLaeuft(false); dragEntityData.current = null;
     // ★ v1210: Neigung zuruecknehmen. Am Ziehende UND nicht erst beim
     // Ablegen — ein abgebrochener Zug (Escape, Ablegen ins Leere) laeuft
     // nur hier durch, und die Hand bliebe sonst schief stehen.
     window.clearHandTilt?.(document.querySelectorAll('.pz-hand-card'));
-  }, []);
+  }, [ziehRiegelLoesen]);
   // Silently clear a zone (no return to hand — used when moving between zones)
   const clearZone = useCallback((zt, si, hi, slot) => {
     if (zt === 'hero') updatePlayer(si, (p) => { p.heroes[hi] = null; p.abilityZones[hi] = [[], [], []]; p.supportZones[hi] = [[], [], []]; p.surpriseZones[hi] = []; if (p.islandZoneCount) p.islandZoneCount[hi] = 0; return p; });
@@ -1871,14 +2059,11 @@ function PuzzleCreator() {
     // Styling (starre Plaetze + `overflow-x: auto`), und seit die
     // Plaetze wie im Spiel schrumpfen, verschiebt die Luecke nichts
     // mehr. Eine Rueckkopplung kann so gar nicht erst entstehen.
-    const kasten = document.querySelector(sel);
-    if (!kasten) return 0;
-    const plaetze = kasten.querySelectorAll('.pz-hand-card:not(.pz-hand-card-dragging)');
-    for (let i = 0; i < plaetze.length; i++) {
-      const r = plaetze[i].getBoundingClientRect();
-      if (mouseX < r.left + r.width / 2) return i;
-    }
-    return plaetze.length;
+    // ★★ v1218: Die Rechnung liegt jetzt in app-shared und wird vom
+    // Duell MITBENUTZT — vorher stand sie hier ein zweites Mal.
+    return window.handDropIndex?.(sel, mouseX, {
+      slots: '.pz-hand-card', skip: '.pz-hand-card-dragging',
+    }) ?? 0;
   }, []);
 
   /**
@@ -1897,12 +2082,9 @@ function PuzzleCreator() {
    */
   const sortiereUm = useCallback((zone, vonIdx, nachIdx) => {
     if (vonIdx == null || nachIdx == null) return;
-    const misch = (arr) => {
-      const neu = [...arr];
-      const [k] = neu.splice(vonIdx, 1);
-      neu.splice(nachIdx, 0, k);
-      return neu;
-    };
+    // ★★ v1218: gemeinsame Bewegung (app-shared), gleiche Index-Raeume
+    // wie im Duell.
+    const misch = (arr) => window.handMove(arr, vonIdx, nachIdx);
     // Vier Haelften: eigene Hand/Vorrat und dieselben beim Gegner.
     if (zone === 'hand') setHand(prev => misch(prev));
     else if (zone === 'oppHand') setOppHand(prev => misch(prev));
@@ -2342,6 +2524,22 @@ function PuzzleCreator() {
       // Klick soll deshalb NICHTS oeffnen statt einen leeren Dialog
       // (Als Befund 5.9.).
       if (c?.cardType === 'Ability') return;
+      // ★★ v1221 (Als Befund 18.9.): DASSELBE FUER ATTACHMENTS. „Es gibt
+      // keinerlei Buffs oder andere Parameter fuer Attachments, dieses
+      // Menue ist also leer und unnoetig." Stimmt — der Dialog blendet
+      // fuer sie HP, Statuseffekte UND Buffs aus (siehe die drei
+      // `isAttachment`-Abfragen weiter unten), es bleibt nichts uebrig.
+      // Ausnahmen sind die wenigen Attachments mit einem EIGENEN
+      // Schalter; ohne die Liste naehme dieser Riegel ihnen ihre
+      // Einstellung mit weg.
+      // Der SUBTYPE entscheidet, nicht der Kartentyp: „Divine Gift of
+      // Coolness" ist ein Attack mit Subtype Attachment, „Overheal
+      // Shock" ein Spell — beide liegen als Anhaengsel in der Support
+      // Zone und haben nichts einzustellen. (Die Abschnitte im Dialog
+      // pruefen bis heute `cardType === 'Spell'` und liessen die
+      // Attack-Variante deshalb durchrutschen.)
+      if ((c?.subtype || '').toLowerCase() === 'attachment'
+          && !PZ_ATTACHMENT_MIT_WERTEN.has(cards[0])) return;
       // Alliance: kein Statistik-Dialog, sondern die Verbindungswahl.
       // Eine bestehende Verbindung wird dabei ueberschrieben.
       if (cards[0] === 'Alliance') {
@@ -3039,6 +3237,111 @@ function PuzzleCreator() {
   const renderSide = (si, isOpp) => {
     const p = players[si];
 
+    // ══ STAPEL: EINE BAUART, ZWEI SPALTEN (v1237) ══════════════════
+    // Vorher stand jeder der fuenf Stapel als eigener, fast gleicher
+    // Block im Markup — und zwar an einer BRETTZEILE aufgehaengt
+    // (`top: 0` seiner Gruppe). Das ging, solange ein Stapel so hoch
+    // war wie eine Zeile; seit die Stapel im Handmass liegen (v1235)
+    // ragte jeder 40 px in die Zeile darunter und landete auf dem
+    // Stapel, der dort hing (Als Befund 19.9.).
+    //
+    // Jetzt gibt es EINE Zonenbauart und zwei Spalten daneben. Die
+    // Spalte bringt ihren Abstand selbst mit, eine Ueberlappung kann
+    // also gar nicht mehr entstehen — auch nicht bei einer weiteren
+    // Groessenaenderung.
+    const STAPEL = {
+      deletedPile: { typ: 'deleted', stil: 'delete',  marke: 'deleted', text: 'Deleted',   verdeckt: false },
+      discardPile: { typ: 'discard', stil: 'discard', marke: 'discard', text: 'Discard',   verdeckt: false },
+      mainDeck:    { typ: 'deck',    stil: 'deck',    marke: 'deck',    text: 'Deck',      verdeckt: true  },
+      potionDeck:  { typ: 'potion',  stil: 'potion',  marke: 'potion',  text: 'Potion',    verdeckt: true  },
+      // Nur im Editor: das Spielbrett hat keinen Platz dafuer. Karten
+      // wie „Divine Gift of Edge" greifen im Test direkt auf
+      // `ps.sideDeck` zu, das der Server aus dieser Liste baut.
+      sideDeck:    { typ: 'deck',    stil: 'deck',    marke: 'side',    text: 'Side Deck', verdeckt: true, nurEditor: true },
+    };
+    // ★ v1238: Wo die schmalen Zusatzspalten rechts der letzten
+    // Heldengruppe beginnen — und wie breit sie zusammen werden. Steht
+    // „Wowhalla" in der Area, schiebt sich der Coolness Stack davor.
+    // Die Stapelspalte muss HINTER allem beginnen, was hier liegt:
+    // seit das Side Deck bei den Permanents steht, ist das eine volle
+    // Stapelbreite und nicht mehr die 50 px eines Permanent-Platzes.
+    const hatWowhalla = (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool');
+    const permsVersatz = hatWowhalla
+      ? 'calc((50px + 16px) * var(--board-scale))'
+      : 'calc(8px * var(--board-scale))';
+    // ★ v1253 (Als Befund 19.9.: „der Abstand zwischen Board und Decks
+    // ist immer noch viel zu klein"): die Deckspalte beginnt nicht mehr
+    // knapp hinter den Permanents, sondern mit sichtbarer Luecke.
+    const aussenVersatz = `calc(${permsVersatz} + var(--pile-zone-w) + 60px * var(--board-scale))`;
+    // ★★ v1240 (Als Befund 19.9.: „die Perm- und Creation-Zonen des
+    // Gegners sind falsch platziert — platziere sie relativ zum Gegner
+    // genauso wie die des Spielers").
+    //
+    // Sie hingen an der Heldenzeile mit `top: 0` und wuchsen von dort
+    // nach unten. Beim Spieler ist die Heldenzeile die OBERSTE seiner
+    // drei Zeilen, „nach unten" zeigt also ins eigene Feld; beim
+    // Gegner laufen die Zeilen gespiegelt, seine Heldenzeile ist die
+    // UNTERSTE — dieselbe Angabe zeigte dort aus dem Feld heraus zur
+    // Bildmitte. Der Spiegel dreht die Aufhaengung; die Abstaende
+    // bleiben dieselben Zahlen.
+    const spiegelOben = (wert) => (isOpp ? { bottom: wert } : { top: wert });
+
+    const stapelZone = (key) => {
+      const d = STAPEL[key];
+      const inhalt = p[key] || [];
+      return (
+        <div key={key} className={'board-zone board-zone-' + d.typ}
+          style={{ ...zs(d.stil), cursor: inhalt.length ? 'pointer' : undefined,
+            ...(dragOverZone === d.marke + '-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
+          onClick={() => inhalt.length > 0
+            && (d.nurEditor ? setViewPile({ si, key }) : oeffneStapel({ si, key }))}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone(d.marke + '-' + si); }}
+          onDragLeave={() => setDragOverZone(null)}
+          onDrop={(e) => handlePileDrop(e, si, key)}
+          title={d.nurEditor ? 'Side Deck (editor only — not visible during play)' : undefined}>
+          {inhalt.length > 0 ? <>
+            {d.verdeckt
+              ? <img src={user?.cardback || '/cardback.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+              : <BoardCard cardName={inhalt[inhalt.length - 1]} />}
+            <div className="board-card-label">{inhalt.length}</div>
+          </> : <div className="board-zone-empty">{d.text}</div>}
+        </div>
+      );
+    };
+    /**
+     * Eine Stapelspalte neben dem Feld, mittig zur Faehigkeitenzeile.
+     * `column-reverse` auf der Gegnerseite: dort laufen die Zeilen
+     * gespiegelt, also auch die Reihenfolge der Stapel.
+     */
+    const stapelSpalte = (seite, keys) => (
+      <div className="pz-pile-column"
+        style={{
+          position: 'absolute',
+          // ★ v1239 (Als Vorgabe 19.9.): BUENDIG mit der Support-Zeile.
+          // Die Spalte haengt deshalb an dieser Zeile und wird an ihrer
+          // AEUSSEREN Kante ausgerichtet — beim Spieler unten, beim
+          // Gegner oben. Der aeusserste Stapel (Deck bzw. Discard)
+          // schliesst damit auf derselben Linie ab wie die Support
+          // Zones, und die Spalte waechst nach innen ins Feld.
+          ...(isOpp ? { top: 0 } : { bottom: 0 }),
+          flexDirection: isOpp ? 'column-reverse' : 'column',
+          ...(seite === 'links'
+            // ★ v1252 (Als Vorgabe 19.9.): deutlich weiter nach links —
+            // zwischen Ablagen und Kampffeld soll eine sichtbare Lücke
+            // stehen, nicht nur ein Spalt.
+            ? { right: '100%', marginRight: 'calc(76px * var(--board-scale))' }
+            // ★ Rechts stehen im Heldenzeilen-Bereich schon der
+            // Coolness Stack, Crestinas Vorrat und die Permanents samt
+            // Side Deck. Die Stapelspalte beginnt HINTER dieser Spalte,
+            // damit sie die Permanents nicht ueberdeckt (Als Vorgabe
+            // 19.9.) — gerechnet aus derselben Quelle wie deren eigener
+            // Versatz, damit beide nicht auseinanderlaufen.
+            : { left: '100%', marginLeft: aussenVersatz }),
+        }}>
+        {keys.map(stapelZone)}
+      </div>
+    );
+
     // Hero row — all children are DIRECT elements (no wrapper divs), matching existing board
     const heroRow = (
       <div className="board-row board-hero-row">
@@ -3047,7 +3350,8 @@ function PuzzleCreator() {
           const isDead = hero && hero.hp <= 0;
           const { maxLeft, maxRight } = columnLayout[hi];
           const heroGroup = (
-            <div key={hi} className="board-hero-group" style={hi === 2 ? { position: 'relative' } : undefined}>
+            <div key={hi} className="board-hero-group" style={(hi === 0 || hi === 2) ? { position: 'relative' } : undefined}>
+
               {maxLeft > 0 && Array.from({ length: maxLeft }).map((_, s) => <div key={'lp'+s} className="board-zone-spacer" />)}
               <div className="board-zone-spacer" />
               <div className={'board-zone board-zone-hero' + (isDead ? ' board-zone-dead' : '')}
@@ -3106,7 +3410,7 @@ function PuzzleCreator() {
               {/* can drag the first card onto it). Extracted from the */}
               {/* Permanents column so it doesn't push the permanents down. */}
               {hi === 2 && (areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') && (
-                <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))' }}>
+                <div style={{ position: 'absolute', left: '100%', ...spiegelOben(0), marginLeft: 'calc(8px * var(--board-scale))' }}>
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(120,210,255,.6)', background: 'rgba(120,210,255,.08)', cursor: (p.coolnessStack || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'coolness-' + si ? { boxShadow: '0 0 14px rgba(120,210,255,.7)' } : {}) }}
                     onClick={() => (p.coolnessStack || []).length > 0 && oeffneStapel({ si, key: 'coolnessStack' })}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('coolness-' + si); }}
@@ -3127,7 +3431,7 @@ function PuzzleCreator() {
               {/* Crestina aufsetzen, um genau den Fall zu testen, in dem  */}
               {/* sie das Feld verlassen hat (Als Ruling 4).               */}
               {hi === 2 && (
-                <div style={{ position: 'absolute', left: '100%', top: 'calc(78px * var(--board-scale))', marginLeft: 'calc(8px * var(--board-scale))' }}>
+                <div style={{ position: 'absolute', left: '100%', ...spiegelOben('calc(78px * var(--board-scale))'), marginLeft: 'calc(8px * var(--board-scale))' }}>
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'creation-' + si ? { boxShadow: '0 0 14px rgba(230,190,90,.7)' } : {}) }}
                     onClick={() => (p.creationZone || []).length > 0 && oeffneStapel({ si, key: 'creationZone' })}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('creation-' + si); }}
@@ -3143,8 +3447,13 @@ function PuzzleCreator() {
               {/* Permanents — inside last hero group, positioned to the */}
               {/* right of the Coolness Stack column (or the surprise zone */}
               {/* if no Stack is present). */}
+              {/* ★ v1239: Das Side Deck steht in DIESER Spalte (gleicher
+                  Versatz), haengt aber an der Support-Zeile — nur so
+                  liegt es mit dem Main Deck auf einer Linie. Die
+                  Permanents selbst bleiben an der Heldenzeile und
+                  wachsen von dort nach innen. */}
               {hi === 2 && (
-                <div style={{ position: 'absolute', left: '100%', top: 0, marginLeft: ((areaZones[si] || []).includes('Wowhalla, the Hall of the Cool') ? 'calc((50px + 16px) * var(--board-scale))' : 'calc(8px * var(--board-scale))'), display: 'flex', flexDirection: 'column', gap: 'calc(3px * var(--board-scale))' }}>
+                <div style={{ position: 'absolute', left: '100%', ...spiegelOben(0), marginLeft: permsVersatz, display: 'flex', flexDirection: isOpp ? 'column-reverse' : 'column', gap: 'calc(3px * var(--board-scale))' }}>
                   {p.permanents.map((pm, i) => (
                     // ★ v1206: eigenes Attribut statt `data-pz-zone` — Letzteres
                     // wird vom Drag/Drop-Finder ausgewertet und wuerde hier
@@ -3189,32 +3498,6 @@ function PuzzleCreator() {
                 </div>
               ))}
               {maxRight > 0 && Array.from({ length: maxRight }).map((_, s) => <div key={'rp'+s} className="board-zone-spacer" />)}
-              {/* Deleted pile — inside first group, positioned to its left */}
-              {hi === 0 && (
-                <div className="board-zone board-zone-deleted" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('delete'), cursor: p.deletedPile.length ? 'pointer' : undefined, ...(dragOverZone === 'deleted-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.deletedPile.length > 0 && oeffneStapel({ si, key: 'deletedPile' })}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('deleted-' + si); }}
-                  onDragLeave={() => setDragOverZone(null)}
-                  onDrop={(e) => handlePileDrop(e, si, 'deletedPile')}>
-                  {p.deletedPile.length > 0 ? <>
-                    <BoardCard cardName={p.deletedPile[p.deletedPile.length - 1]} />
-                    <div className="board-card-label">{p.deletedPile.length}</div>
-                  </> : <div className="board-zone-empty">Deleted</div>}
-                </div>
-              )}
-              {/* Potion Deck — inside last group, positioned to its right */}
-              {hi === 2 && (
-                <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))', ...zs('potion'), cursor: p.potionDeck.length ? 'pointer' : undefined, ...(dragOverZone === 'potion-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.potionDeck.length > 0 && oeffneStapel({ si, key: 'potionDeck' })}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('potion-' + si); }}
-                  onDragLeave={() => setDragOverZone(null)}
-                  onDrop={(e) => handlePileDrop(e, si, 'potionDeck')}>
-                  {p.potionDeck.length > 0 ? <>
-                    <img src={user?.cardback || '/cardback.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
-                    <div className="board-card-label">{p.potionDeck.length}</div>
-                  </> : <div className="board-zone-empty">Potion</div>}
-                </div>
-              )}
             </div>
           );
           if (hi < 2) return [group, <div key={'sp' + hi} className="board-area-spacer" />];
@@ -3319,48 +3602,26 @@ function PuzzleCreator() {
                   </div>
                 );
               })}
-              {/* Discard pile — inside first group, positioned to its left */}
-              {hi === 0 && (
-                <div className="board-zone" style={{ position: 'absolute', right: '100%', top: 0, marginRight: 'calc(8px * var(--board-scale))', ...zs('discard'), cursor: p.discardPile.length ? 'pointer' : undefined, ...(dragOverZone === 'discard-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.discardPile.length > 0 && oeffneStapel({ si, key: 'discardPile' })}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('discard-' + si); }}
-                  onDragLeave={() => setDragOverZone(null)}
-                  onDrop={(e) => handlePileDrop(e, si, 'discardPile')}>
-                  {p.discardPile.length > 0 ? <>
-                    <BoardCard cardName={p.discardPile[p.discardPile.length - 1]} />
-                    <div className="board-card-label">{p.discardPile.length}</div>
-                  </> : <div className="board-zone-empty">Discard</div>}
-                </div>
-              )}
-              {/* Deck — inside last group, positioned to its right */}
+              {/* ── Die Stapelspalten (v1237, buendig ab v1239) ─────────
+                  Sie haengen an der SUPPORT-ZEILE, also der aeusseren
+                  Zeile der Feldhaelfte, und richten sich an deren
+                  aeusserer Kante aus: der aeusserste Stapel schliesst
+                  damit auf derselben Linie ab wie die Support Zones
+                  (Als Vorgabe 19.9.). Links die Ablagen, rechts die
+                  Decks; das Side Deck steht bei den Permanents und wird
+                  dort auf dieselbe Linie gesetzt. */}
+              {hi === 0 && stapelSpalte('links', ['deletedPile', 'discardPile'])}
+              {hi === 2 && stapelSpalte('rechts', ['potionDeck', 'mainDeck'])}
+              {/* Side Deck: eigene Aufhaengung, damit es mit dem Main
+                  Deck auf einer Linie liegt — in der Spalte der
+                  Permanents (deren Versatz), aber an der Support-Zeile
+                  ausgerichtet statt an der Heldenzeile. */}
               {hi === 2 && (
-                <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(8px * var(--board-scale))', ...zs('deck'), cursor: p.mainDeck.length ? 'pointer' : undefined, ...(dragOverZone === 'deck-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => p.mainDeck.length > 0 && oeffneStapel({ si, key: 'mainDeck' })}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('deck-' + si); }}
-                  onDragLeave={() => setDragOverZone(null)}
-                  onDrop={(e) => handlePileDrop(e, si, 'mainDeck')}>
-                  {p.mainDeck.length > 0 ? <>
-                    <img src={user?.cardback || '/cardback.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
-                    <div className="board-card-label">{p.mainDeck.length}</div>
-                  </> : <div className="board-zone-empty">Deck</div>}
-                </div>
-              )}
-              {/* Side Deck — editor-only zone right of the Deck. The
-                  in-game board has no Side Deck slot in its layout, so
-                  this stays hidden during test play; cards like Divine
-                  Gift of Edge access `ps.sideDeck` directly via the
-                  player state the server builds from this list. */}
-              {hi === 2 && (
-                <div className="board-zone" style={{ position: 'absolute', left: '100%', top: 0, marginLeft: 'calc(var(--zone-w) + 16px * var(--board-scale))', ...zs('deck'), cursor: p.sideDeck?.length ? 'pointer' : undefined, ...(dragOverZone === 'side-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
-                  onClick={() => (p.sideDeck?.length || 0) > 0 && setViewPile({ si, key: 'sideDeck' })}
-                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('side-' + si); }}
-                  onDragLeave={() => setDragOverZone(null)}
-                  onDrop={(e) => handlePileDrop(e, si, 'sideDeck')}
-                  title="Side Deck (editor only — not visible during play)">
-                  {(p.sideDeck?.length || 0) > 0 ? <>
-                    <img src={user?.cardback || '/cardback.png'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
-                    <div className="board-card-label">{p.sideDeck.length}</div>
-                  </> : <div className="board-zone-empty">Side Deck</div>}
+                <div style={{
+                  position: 'absolute', left: '100%', marginLeft: permsVersatz,
+                  ...(isOpp ? { top: 0 } : { bottom: 0 }),
+                }}>
+                  {stapelZone('sideDeck')}
                 </div>
               )}
             </div>
@@ -3641,7 +3902,8 @@ function PuzzleCreator() {
             onDrop={handleOppHandDrop}>
             <PzAmbiance variant="hand" />
             <span className="pz-hand-label orbit-font">OPP HAND ({oppHand.length})</span>
-            <div className="pz-hand-cards" data-pz-hand="oppHand" style={dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
+            <div className={'pz-hand-cards' + ((dragOverZone === 'oppHand' || dragOverZone === 'hand:oppHand') ? ' pp-drop-aktiv' : '')} data-pz-hand="oppHand"
+              style={{ '--hand-max-lift': window.handFanMaxLift?.(oppHand.length, { seite: 'opp' }) ?? 0 }}>
               {oppHand.map((cardName, i) => {
                 const img = cardImageUrl(cardName);
                 // Gespiegelt zur eigenen Hand (Als Befund 28.8.).
@@ -3654,9 +3916,9 @@ function PuzzleCreator() {
                 return (
                   <React.Fragment key={'oh' + i}>{lueckeOh}
                   <div className={'pz-hand-card' + (gezogenOh ? ' pz-hand-card-dragging' : '') + (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
-                    
+                    style={window.handFanStyle?.(i, oppHand.length, { seite: 'opp' })}
                     draggable={!isTouchDevice}
-                    onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppHand')} onDragEnd={onDragEnd}
+                    onDragStart={(e) => { setDragGhost(e, cardName); onDragStart(e, cardName, i, null, 'oppHand'); }} onDragEnd={onDragEnd}
                     onClick={!isTouchDevice ? () => {
                       if (mobileSelected?.handSource === 'oppHand' && mobileSelected?.handIdx === i) setMobileSelected(null);
                       else setMobileSelected({ cardName, handIdx: i, handSource: 'oppHand' });
@@ -3668,10 +3930,12 @@ function PuzzleCreator() {
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}
                     >
-                    {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
-                      <div className="pz-hand-card-text"><span>{cardName}</span></div>
-                    )}
-                    <CardFoil card={getCard(cardName)} />
+                    <div className="pz-hand-card-inner">
+                      {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                        <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                      )}
+                      <CardFoil card={getCard(cardName)} />
+                    </div>
                   </div>
                   </React.Fragment>
                 );
@@ -3714,14 +3978,16 @@ function PuzzleCreator() {
                       <React.Fragment key={'oc' + i}>{luecke}
                       <div className={'pz-hand-card pz-creation-card' + (gezogen ? ' pz-hand-card-dragging' : '')}
                         draggable={!isTouchDevice}
-                        onDragStart={(e) => onDragStart(e, cardName, i, null, 'oppCreation')} onDragEnd={onDragEnd}
+                        onDragStart={(e) => { setDragGhost(e, cardName); onDragStart(e, cardName, i, null, 'oppCreation'); }} onDragEnd={onDragEnd}
                         onContextMenu={(e) => { e.preventDefault(); removeFromOppCreation(i); if (window.playSFX) window.playSFX('discard'); }}
                         onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'right'); }}
                         onMouseLeave={hideTooltip}>
-                        {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
-                          <div className="pz-hand-card-text"><span>{cardName}</span></div>
-                        )}
-                        <CardFoil card={getCard(cardName)} />
+                        <div className="pz-hand-card-inner">
+                          {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                            <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                          )}
+                          <CardFoil card={getCard(cardName)} />
+                        </div>
                       </div>
                       </React.Fragment>
                     );
@@ -3736,22 +4002,10 @@ function PuzzleCreator() {
                 </div>
               </div>
             )}
-            <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
-              <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
-              {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
-                  gueltiger Zustand und muss auch im Puzzle einstellbar
-                  sein (Als Vorgabe 16.8.). Untergrenze −999, und die
-                  Zahl wird rot, sobald sie unter 0 faellt — dieselbe
-                  Lesart wie im Spiel. */}
-              <input className="input" type="number" min="-999" max="999" value={players[1].gold ?? 0}
-                style={{ color: (players[1].gold ?? 0) < 0 ? '#ff5c5c' : undefined }}
-                onChange={(e) => { const v = Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)); updatePlayer(1, p => { p.gold = v; return p; }); }}
-                style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
-              {/* Right spacer mirrors the bag icon's width so the field sits centered */}
-              <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
-            </div>
-            <DebuffSelector
-              side="opp"
+            <HandNebenspalte
+              si={1} seite="opp"
+              gold={players[1].gold}
+              onGold={(v) => updatePlayer(1, p => { p.gold = v; return p; })}
               selected={oppDebuffs}
               onChange={(next) => { setOppDebuffs(next); setValidated(false); }}
               isOpen={debuffMenuOpen === 'opp'}
@@ -3929,7 +4183,8 @@ function PuzzleCreator() {
         onDrop={handleHandDrop}>
         <PzAmbiance variant="hand" />
         <span className="pz-hand-label orbit-font">HAND ({hand.length})</span>
-        <div className="pz-hand-cards" data-pz-hand="hand" style={dragOverZone === 'hand' || dragOverZone === 'hand:hand' ? { boxShadow: '0 0 14px rgba(0,240,255,.4) inset' } : undefined}>
+        <div className={'pz-hand-cards' + ((dragOverZone === 'hand' || dragOverZone === 'hand:hand') ? ' pp-drop-aktiv' : '')} data-pz-hand="hand"
+          style={{ '--hand-max-lift': window.handFanMaxLift?.(hand.length) ?? 0 }}>
           {hand.map((cardName, i) => {
             const img = cardImageUrl(cardName);
             // Zieh-Luecke VOR diesem Platz, wenn der Zeiger hier steht.
@@ -3946,9 +4201,9 @@ function PuzzleCreator() {
             return (
               <React.Fragment key={i}>{luecke}
               <div className={'pz-hand-card' + (gezogen ? ' pz-hand-card-dragging' : '') + (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i ? ' pz-hand-card-selected' : '')}
-                
+                style={window.handFanStyle?.(i, hand.length, { seite: 'me' })}
                 draggable={!isTouchDevice}
-                onDragStart={(e) => onDragStart(e, cardName, i, null, 'hand')} onDragEnd={onDragEnd}
+                onDragStart={(e) => { setDragGhost(e, cardName); onDragStart(e, cardName, i, null, 'hand'); }} onDragEnd={onDragEnd}
                 onClick={!isTouchDevice ? () => {
                   if (mobileSelected?.handSource === 'hand' && mobileSelected?.handIdx === i) setMobileSelected(null);
                   else setMobileSelected({ cardName, handIdx: i, handSource: 'hand' });
@@ -3960,10 +4215,12 @@ function PuzzleCreator() {
                 onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                 onMouseLeave={hideTooltip}
                 >
-                {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
-                  <div className="pz-hand-card-text"><span>{cardName}</span></div>
-                )}
-                <CardFoil card={getCard(cardName)} />
+                <div className="pz-hand-card-inner">
+                  {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                    <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                  )}
+                  <CardFoil card={getCard(cardName)} />
+                </div>
               </div>
               </React.Fragment>
             );
@@ -4022,14 +4279,16 @@ function PuzzleCreator() {
                   <React.Fragment key={'cz' + i}>{luecke}
                   <div className={'pz-hand-card pz-creation-card' + (gezogen ? ' pz-hand-card-dragging' : '')}
                     draggable={!isTouchDevice}
-                    onDragStart={(e) => onDragStart(e, cardName, i, null, 'creation')} onDragEnd={onDragEnd}
+                    onDragStart={(e) => { setDragGhost(e, cardName); onDragStart(e, cardName, i, null, 'creation'); }} onDragEnd={onDragEnd}
                     onContextMenu={(e) => { e.preventDefault(); removeFromCreation(i); if (window.playSFX) window.playSFX('discard'); }}
                     onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
                     onMouseLeave={hideTooltip}>
-                    {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
-                      <div className="pz-hand-card-text"><span>{cardName}</span></div>
-                    )}
-                    <CardFoil card={getCard(cardName)} />
+                    <div className="pz-hand-card-inner">
+                      {img ? <img src={img} className="pz-hand-card-img" draggable={false} /> : (
+                        <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                      )}
+                      <CardFoil card={getCard(cardName)} />
+                    </div>
                   </div>
                   </React.Fragment>
                 );
@@ -4046,22 +4305,10 @@ function PuzzleCreator() {
             </div>
           </div>
         )}
-        <div className="pz-gold-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginLeft: 8, flexShrink: 0, alignSelf: 'stretch', padding: '4px 10px', borderLeft: '1px solid rgba(255,215,0,.2)', background: 'rgba(255,215,0,.04)' }}>
-          <span style={{ fontSize: 18, color: '#ffd700', width: 24, textAlign: 'center', flexShrink: 0 }}>💰</span>
-          {/* Negatives Gold ist seit dem Debt-O-Tron-Archetyp ein
-              gueltiger Zustand und muss auch im Puzzle einstellbar
-              sein (Als Vorgabe 16.8.). Untergrenze −999, und die
-              Zahl wird rot, sobald sie unter 0 faellt — dieselbe
-              Lesart wie im Spiel. */}
-          <input className="input" type="number" min="-999" max="999" value={players[0].gold ?? 0}
-            style={{ color: (players[0].gold ?? 0) < 0 ? '#ff5c5c' : undefined }}
-            onChange={(e) => { const v = Math.min(999, Math.max(-999, parseInt(e.target.value) || 0)); updatePlayer(0, p => { p.gold = v; return p; }); }}
-            style={{ width: 64, padding: '6px 6px', fontSize: 16, textAlign: 'center', borderColor: 'rgba(255,215,0,.4)', color: '#ffd700', fontWeight: 700 }} />
-          {/* Right spacer mirrors the bag icon's width so the field sits centered */}
-          <span aria-hidden="true" style={{ width: 24, flexShrink: 0 }} />
-        </div>
-        <DebuffSelector
-          side="me"
+        <HandNebenspalte
+          si={0} seite="me"
+          gold={players[0].gold}
+          onGold={(v) => updatePlayer(0, p => { p.gold = v; return p; })}
           selected={meDebuffs}
           onChange={(next) => { setMeDebuffs(next); setValidated(false); }}
           isOpen={debuffMenuOpen === 'me'}

@@ -60,7 +60,17 @@ for (const c of KARTEN) {
   if (!fs.existsSync(p)) { ohneSkript.push(c.name); continue; }
 
   const src = fs.readFileSync(p, 'utf8');
-  const legtStatus = /addHeroStatus\(|applyCreatureStatus\(|actionAddStatus\(/.test(src);
+  // ★ v1238 (Als Befund 19.9. zu „Pink Sky": „sie funktioniert in der
+  // Praxis exakt so, wie sie soll"). Stimmt — der Wächter kannte nur
+  // die drei Standardwege und hat den VIERTEN übersehen:
+  // `actionNegateCreature` legt den Status `negated` selbst an (samt
+  // ON_STATUS_APPLIED-Hook, `cleansable`-Behandlung und Ablauf-Sweep),
+  // er steht in STATUS_EFFECTS als negativ und cleansbar. Eine Karte,
+  // die dort hineingeht, behauptet also nichts Leeres.
+  // Anti Magic Zone fiel nur deshalb nicht auf, weil sie NEBENBEI noch
+  // einen Heldenstatus setzt; Pink Sky negiert ausschließlich Kreaturen
+  // und hatte damit keinen der bekannten Marker.
+  const legtStatus = /addHeroStatus\(|applyCreatureStatus\(|actionAddStatus\(|actionNegateCreature\(/.test(src);
   const traegtFlag = /countsAsNegativeStatus/.test(src);
   // (c) Die Karte legt ihren Status nicht SELBST an, sondern der Motor
   // tut es für sie — „Weakening Crystal" liegt in der HAND und hat gar
