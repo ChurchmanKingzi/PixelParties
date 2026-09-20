@@ -499,7 +499,8 @@ function DamageNumber({ amount, ownerLabel, heroIdx }) {
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
@@ -525,7 +526,8 @@ function HealNumber({ amount, ownerLabel, heroIdx }) {
       // und im eigenen Zug — siehe ppBattleCamFocus).
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx]);
 
@@ -554,7 +556,8 @@ function CreatureHealNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
@@ -576,7 +579,8 @@ function CreatureDamageNumber({ amount, ownerLabel, heroIdx, zoneSlot }) {
       // ★ v1257: Mobile-Kamera auf die getroffene Zone.
       if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top + r.height * 0.3 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height * 0.3 + _wo.dy });
     }
   }, [ownerLabel, heroIdx, zoneSlot]);
 
@@ -653,7 +657,8 @@ function LevelChangeNumber({ delta, owner, heroIdx, zoneSlot, myIdx }) {
     const el = document.querySelector(`[data-support-zone][data-support-owner="${ownerLabel}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top + _wo.dy });
     }
   }, [owner, heroIdx, zoneSlot]);
 
@@ -673,7 +678,8 @@ function ToughnessHpNumber({ amount, owner, heroIdx, myIdx }) {
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top - 10 + _wo.dy });
     }
   }, [owner, heroIdx]);
 
@@ -693,7 +699,8 @@ function FightingAtkNumber({ amount, owner, heroIdx, myIdx }) {
     const el = document.querySelector(`[data-hero-zone][data-hero-owner="${ownerLabel}"][data-hero-idx="${heroIdx}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
-      setPos({ x: r.left + r.width / 2, y: r.top - 10 });
+      const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };  // ★ v1258 Weltverankerung
+      setPos({ x: r.left + r.width / 2 + _wo.dx, y: r.top - 10 + _wo.dy });
     }
   }, [owner, heroIdx]);
 
@@ -843,7 +850,7 @@ function HandMaterializeFxInline() {
 
 /** Die Funken/Leuchten selbst — von beiden Varianten benutzt. */
 function HandFxParticles() {
-  const funken = useMemo(() => Array.from({ length: 16 }, () => ({
+  const funken = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
     dx: (Math.random() - 0.5) * 150,
     dy: -30 - Math.random() * 80,
     groesse: 3 + Math.random() * 5,
@@ -1431,7 +1438,7 @@ function ppBattleCamFocus(el) {
       // Sichtbares Band = Ausschnitt minus Overlay-Leisten: die Zonen
       // sollen zwischen den halbtransparenten Leisten zentriert stehen,
       // nicht in der geometrischen Mitte hinter einer davon.
-      const oben = _ppCamVarPx('--mob-topbar-h') + _ppCamVarPx('--mob-opphand-h');
+      const oben = _ppCamVarPx('--mob-opphand-h');
       const unten = _ppCamVarPx('--mob-mehand-h');
       const bandMitteY = oben + Math.max(40, sc.clientHeight - oben - unten) / 2;
       const zielX = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, cx - sc.clientWidth / 2));
@@ -1442,6 +1449,32 @@ function ppBattleCamFocus(el) {
 }
 window.ppBattleCamFocus = ppBattleCamFocus;
 
+// ★ v1258 — HAT DIESES PANEL SCROLLBAREN INHALT? (Als Befund 19.9.:
+// „Panels ohne Scrolling, z.B. ‚Mulligan? Yes/No', sollten definitiv
+// noch dragbar sein, damit man sie aus dem Weg schieben kann.")
+//
+// v1257 hatte Touch pauschal abgelehnt, weil der Fenster-Drag sonst
+// gegen das Scrollen der Galerie gewann. Der Konflikt besteht aber nur
+// dort, wo es ueberhaupt etwas zu scrollen GIBT. Die Pruefung laeuft
+// deshalb ueber den echten Ueberlauf und nicht ueber eine Liste von
+// Klassennamen: ein Kasten zaehlt nur, wenn er mehr Inhalt hat als
+// Platz UND sein `overflow` das Scrollen auch zulaesst. `.modal` traegt
+// zwar immer `overflow-y: auto`, laeuft bei zwei Knoepfen aber nicht
+// ueber — der Mulligan-Kasten ist damit beweglich, die Kartengalerie
+// nicht. Die 2px Spielraum fangen Rundungen auf (Zoom, Geraete-DPR).
+function _ppPanelHatScrollbaresKind(wurzel) {
+  if (!wurzel) return false;
+  const pruefe = (el) => {
+    if (!el) return false;
+    if (el.scrollHeight <= el.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 2) return false;
+    const st = getComputedStyle(el);
+    return /(auto|scroll)/.test(st.overflowY) || /(auto|scroll)/.test(st.overflowX);
+  };
+  if (pruefe(wurzel)) return true;
+  for (const el of wurzel.querySelectorAll('*')) if (pruefe(el)) return true;
+  return false;
+}
+
 function DraggablePanel({ children, className, style }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -1449,14 +1482,15 @@ function DraggablePanel({ children, className, style }) {
   const panelRef = useRef(null);
   const cleanupRef = useRef(null);
   const onDown = (e) => {
-    // ★ v1257 (Als Vorgabe 19.9.): Auf Touch ist das Panel UNBEWEGLICH.
-    // Vorher startete jeder Fingerkontakt sofort einen Fenster-Drag mit
-    // preventDefault() — damit gewann „Galerie verschieben" gegen
-    // „durch die Galerie scrollen", und genau das Scrollen ist auf dem
-    // Handy das Einzige, was gebraucht wird. Frueh raus, KEIN
+    // ★ v1258: Auf Touch ist nur noch das Panel unbeweglich, das
+    // scrollbaren Inhalt hat (Kartengalerie, lange Listen) — dort gewann
+    // der Fenster-Drag sonst gegen das Scrollen, und das Scrollen ist
+    // auf dem Handy das Einzige, was dort gebraucht wird. Kleine
+    // Entscheidungs-Panels („Mulligan? Yes/No") bleiben verschiebbar,
+    // damit man sie vom Spielfeld wegziehen kann. Frueh raus, KEIN
     // preventDefault: der Browser behaelt den Wisch fuers native
-    // Scrollen des Inhalts. Maus-Drag am Desktop bleibt unveraendert.
-    if (e.touches) return;
+    // Scrollen. Maus-Drag am Desktop war nie betroffen.
+    if (e.touches && _ppPanelHatScrollbaresKind(panelRef.current)) return;
     // Don't start a drag when the pointer-down lands on an interactive
     // form control. `preventDefault()` below would otherwise swallow the
     // native mousedown that opens a <select> dropdown, focuses an <input>,
@@ -1496,7 +1530,7 @@ function DraggablePanel({ children, className, style }) {
 
 // Frozen overlay with animated snowflake particles
 function FrozenOverlay() {
-  const particles = useMemo(() => Array.from({ length: 14 }, () => ({
+  const particles = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     x: 5 + Math.random() * 90,
     y: 5 + Math.random() * 90,
     size: 5 + Math.random() * 7,
@@ -1568,7 +1602,7 @@ function CardRevealEntry({ cardName, onDone }) {
 }
 
 function ExplosionEffect({ x, y, opacity }) {
-  const particles = useMemo(() => Array.from({ length: 24 }, () => {
+  const particles = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 25 + Math.random() * 55;
     return {
@@ -1600,14 +1634,14 @@ function ExplosionEffect({ x, y, opacity }) {
 
 function FreezeEffect({ x, y, w, h }) {
   // Snowballs from right side + ice crystal burst
-  const snowballs = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+  const snowballs = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
     startX: 120 + Math.random() * 40,
     startY: -40 + Math.random() * 40,
     delay: i * 60 + Math.random() * 40,
     dur: 250 + Math.random() * 150,
     size: 6 + Math.random() * 6,
   })), []);
-  const crystals = useMemo(() => Array.from({ length: 16 }, () => {
+  const crystals = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 15 + Math.random() * 35;
     return {
@@ -1642,7 +1676,7 @@ function FreezeEffect({ x, y, w, h }) {
 }
 
 function ThawEffect({ x, y }) {
-  const drips = useMemo(() => Array.from({ length: 12 }, () => ({
+  const drips = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
     xOff: -20 + Math.random() * 40,
     speed: 30 + Math.random() * 50,
     size: 3 + Math.random() * 5,
@@ -1727,7 +1761,7 @@ function MoniaJetTrail({ r }) {
     return liste;
   }, []);
 
-  const glut = useMemo(() => Array.from({ length: 14 }, () => {
+  const glut = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
     const t = 0.08 + Math.random() * 0.9;
     return {
       t, seit: (Math.random() * 2 - 1) * 22,
@@ -1788,7 +1822,7 @@ function MoniaJetTrail({ r }) {
 }
 
 function ElectricStrikeEffect({ x, y }) {
-  const bolts = useMemo(() => Array.from({ length: 16 }, () => {
+  const bolts = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const dist = 55 + Math.random() * 45;
     return {
@@ -1800,7 +1834,7 @@ function ElectricStrikeEffect({ x, y }) {
       rotation: (angle * 180 / Math.PI) + 180, // Point toward center
     };
   }), []);
-  const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+  const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 12 + Math.random() * 30;
     return {
@@ -1839,7 +1873,7 @@ function ElectricStrikeEffect({ x, y }) {
 // Jetzt: gedaempfte Siegelzeichen, die langsam auf- und abblenden,
 // in demselben Violett wie `silence_seal`. Kein Gezucke.
 function NegatedOverlay() {
-  const zeichen = useMemo(() => Array.from({ length: 7 }, () => ({
+  const zeichen = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
     x: 10 + Math.random() * 80,
     y: 10 + Math.random() * 80,
     size: 8 + Math.random() * 7,
@@ -1984,13 +2018,13 @@ function DemonFirePillarEffect({ x, y, w = 80, h = 110, intensity = 1 }) {
 // HELDENkarte; der Schaden an seinen Support-Zonen folgt ueber aoeHit.
 function CavalryChargeEffect({ x, y, w = 80, h = 110 }) {
   const span = Math.max(260, w * 3.2);
-  const riders = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+  const riders = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
     yOff: -h * 0.35 + (i % 3) * (h * 0.32) + (Math.random() - 0.5) * 8,
     delay: i * 55 + Math.random() * 40,
     dur: 520 + Math.random() * 120,
     size: 22 + Math.random() * 8,
   })), []);
-  const dust = useMemo(() => Array.from({ length: 22 }, () => ({
+  const dust = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
     xOff: -span * 0.5 + Math.random() * span,
     yOff: h * 0.15 + Math.random() * h * 0.35,
     size: 6 + Math.random() * 12,
@@ -2061,7 +2095,7 @@ function PoisonSkullsEffect({ x, y, w = 80, h = 110 }) {
 // eigener `elem_lightning` (leicht variierte Tonhoehe) — deshalb kein
 // Eintrag in ZONE_ANIM_SFX, die Klaenge kommen aus der Komponente.
 function LightningRainEffect({ x, y, w = 80, h = 110 }) {
-  const bolts = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+  const bolts = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => {
     const ox = (Math.random() - 0.5) * w * 0.9;
     const oy = (Math.random() - 0.5) * h * 0.7;
     // Zackenpfad von oben (y = -H) bis zum Einschlag (0,0), 6 Segmente
@@ -2103,7 +2137,7 @@ function LightningRainEffect({ x, y, w = 80, h = 110 }) {
 // Weisse Nebelschwaden quellen um die Karte auf, waehrend sie (per
 // `play_cloak_vanish`) verblasst. Klang `elem_wind` tief.
 function MistVeilEffect({ x, y, w = 80, h = 110 }) {
-  const wisps = useMemo(() => Array.from({ length: 14 }, () => ({
+  const wisps = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     xOff: (Math.random() - 0.5) * w * 1.4,
     yOff: (Math.random() - 0.5) * h * 1.2,
     size: 30 + Math.random() * 40,
@@ -2185,7 +2219,7 @@ function MeteorCrashEffect({ x, y, w = 80, intensity = 1 }) {
 }
 
 function FlameStrikeEffect({ x, y }) {
-  const flames = useMemo(() => Array.from({ length: 18 }, () => {
+  const flames = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const dist = 55 + Math.random() * 45;
     return {
@@ -2197,7 +2231,7 @@ function FlameStrikeEffect({ x, y }) {
       char: ['🔥','🔥','🔥','✦','·'][Math.floor(Math.random() * 5)],
     };
   }), []);
-  const sparks = useMemo(() => Array.from({ length: 12 }, () => {
+  const sparks = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 15 + Math.random() * 30;
     return {
@@ -2349,7 +2383,7 @@ function BoardAmbiance({ colorMe, colorOpp }) {
 //
 // Both layers are pointer-events: none so they never steal clicks.
 function DeepseaCastleOverlay() {
-  const beams = useMemo(() => Array.from({ length: 9 }, () => ({
+  const beams = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
     left: Math.random() * 100,
     width: 10 + Math.random() * 26,
     skew: -8 + Math.random() * 16,
@@ -2357,7 +2391,7 @@ function DeepseaCastleOverlay() {
     dur: 6 + Math.random() * 4,
     opacityPeak: 0.22 + Math.random() * 0.22,
   })), []);
-  const motes = useMemo(() => Array.from({ length: 20 }, () => ({
+  const motes = useMemo(() => Array.from({ length: ppFxN(20) }, () => ({
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: 2 + Math.random() * 2.5,
@@ -2427,7 +2461,7 @@ function DeepseaCastleOverlay() {
 // cards layer so they peek through gaps between zones rather than
 // glittering on top of artwork.
 function SlipperyIceOverlay() {
-  const sparkles = useMemo(() => Array.from({ length: 48 }, () => ({
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(48) }, () => ({
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: 1.5 + Math.random() * 3,
@@ -2438,7 +2472,7 @@ function SlipperyIceOverlay() {
     // catching a facet" vs "tiny snow dust".
     star: Math.random() < 0.3,
   })), []);
-  const cracks = useMemo(() => Array.from({ length: 8 }, () => ({
+  const cracks = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
     x: Math.random() * 100,
     y: 10 + Math.random() * 80,
     len: 30 + Math.random() * 60,
@@ -2515,7 +2549,7 @@ function SlipperyIceOverlay() {
 // multiplied every white star against the background and made the
 // twinkle lattice vanish entirely.)
 function CosmicDepthsOverlay() {
-  const stars = useMemo(() => Array.from({ length: 140 }, () => ({
+  const stars = useMemo(() => Array.from({ length: ppFxN(140) }, () => ({
     x: Math.random() * 100,
     y: Math.random() * 100,
     // Mostly tiny specks; a few bigger to add depth.
@@ -2592,7 +2626,7 @@ function CosmicDepthsOverlay() {
 // jedem Render neu springen.
 function ParaseedGreenhouseOverlay() {
   const NEON = ['#ff2fd0', '#c9ff2f', '#ff8a00', '#00ffc8', '#b026ff', '#ffe600', '#ff0044'];
-  const blumen = useMemo(() => Array.from({ length: 46 }, () => ({
+  const blumen = useMemo(() => Array.from({ length: ppFxN(46) }, () => ({
     x: Math.random() * 100,
     y: 24 + Math.random() * 74,
     scale: 0.55 + Math.random() * 1.5,
@@ -2604,7 +2638,7 @@ function ParaseedGreenhouseOverlay() {
     delay: -Math.random() * 5,
     dur: 3 + Math.random() * 3.5,
   })), []);
-  const sporen = useMemo(() => Array.from({ length: 26 }, () => ({
+  const sporen = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: 3 + Math.random() * 7,
@@ -2706,7 +2740,7 @@ function ParaseedGreenhouseOverlay() {
 // a pulsing red light. Random positions / sizes / tilts are seeded once
 // per mount via useMemo so the layout doesn't reshuffle on every render.
 function GraveyardOfLimitedPowerOverlay() {
-  const tombstones = useMemo(() => Array.from({ length: 24 }, () => ({
+  const tombstones = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
     x: Math.random() * 100,
     y: 32 + Math.random() * 62,
     scale: 0.7 + Math.random() * 0.85,
@@ -2780,7 +2814,7 @@ function GraveyardOfLimitedPowerOverlay() {
 // the card's identity is "everything here is dust" rather than
 // anything dramatic.
 function FirstCircleOfHellOverlay() {
-  const rubble = useMemo(() => Array.from({ length: 22 }, () => ({
+  const rubble = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
     x: Math.random() * 100,
     y: 56 + Math.random() * 38,
     scale: 0.6 + Math.random() * 1.2,
@@ -2791,7 +2825,7 @@ function FirstCircleOfHellOverlay() {
     shape: Math.floor(Math.random() * 3),
     shade: 16 + Math.floor(Math.random() * 18),
   })), []);
-  const ashes = useMemo(() => Array.from({ length: 18 }, () => ({
+  const ashes = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
     x: Math.random() * 100,
     delay: -Math.random() * 14,
     dur: 10 + Math.random() * 14,
@@ -2886,7 +2920,7 @@ function FirstCircleOfHellOverlay() {
 const PangaiaOverlay = React.memo(function PangaiaOverlay() {
   // Zufallsdaten EINMALIG einfrieren — sonst springt bei jedem
   // Re-Render die ganze Szene neu (Muster aller Area-Overlays).
-  const clouds = useMemo(() => Array.from({ length: 7 }, () => ({
+  const clouds = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
     top: 3 + Math.random() * 20,
     left: -30 + Math.random() * 120,
     w: 140 + Math.random() * 230,
@@ -3077,7 +3111,7 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
     delay: -Math.random() * 70,
   })), []);
   // Wasser blitzt in den Ritzen zwischen den Bohlen auf.
-  const glints = useMemo(() => Array.from({ length: 14 }, () => ({
+  const glints = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     left: Math.random() * 100,
     top: Math.random() * 100,
     w: 10 + Math.random() * 26,
@@ -3288,7 +3322,7 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         <circle cx="100" cy="190" r="40" fill="url(#bgwFace)" />
         <circle cx="100" cy="190" r="40" fill="none" stroke="#2e2a22" strokeWidth="6" />
         <circle cx="100" cy="190" r="33" fill="none" stroke="#8d7132" strokeWidth="1.5" opacity=".8" />
-        {Array.from({ length: 12 }, (_, i) => (
+        {Array.from({ length: ppFxN(12) }, (_, i) => (
           <rect key={'bgt' + i} x="99" y="156" width="2" height={i % 3 === 0 ? 9 : 5}
             fill="#3a3327" transform={`rotate(${i * 30} 100 190)`} />
         ))}
@@ -3372,7 +3406,7 @@ const sandZufall = (start) => {
 };
 const SAND_KOERNER = (() => {
   const r = sandZufall(1059);
-  return Array.from({ length: 90 }, (_, i) => {
+  return Array.from({ length: ppFxN(90) }, (_, i) => {
     const winkel = i * 2.399 + r() * 0.5;               // goldener Winkel + Rauschen
     const radius = Math.sqrt(r()) * 20;                 // dichter Kern, lockerer Rand
     return {
@@ -3486,7 +3520,7 @@ function SandStrahl({ p }) {
   const teile = useMemo(() => {
     const r = sandZufall(Math.round(p.srcX * 7 + p.tgtY * 13));
     const gauss = () => (r() + r() + r()) / 3 - 0.5;   // Glocke um 0
-    const koerner = Array.from({ length: 280 }, () => {
+    const koerner = Array.from({ length: ppFxN(280) }, () => {
       const start = gauss() * 10, ende = gauss() * 64;
       const flug = Math.round(240 + r() * 150);
       return {
@@ -3497,7 +3531,7 @@ function SandStrahl({ p }) {
         verzug: Math.round(r() * strom), flug,
       };
     });
-    const schlieren = Array.from({ length: 34 }, () => {
+    const schlieren = Array.from({ length: ppFxN(34) }, () => {
       const start = gauss() * 8, ende = gauss() * 44;
       return {
         x: p.srcX + nx * start, y: p.srcY + ny * start,
@@ -3636,7 +3670,7 @@ function AreaBackgrounds({ areaZones, myIdx, oppIdx }) {
 function BoardOfKingsOverlay() {
   const pieces = useMemo(() => {
     const glyphs = ['♟', '♞', '♝', '♜', '♛', '♚'];
-    return Array.from({ length: 14 }, (_, i) => ({
+    return Array.from({ length: ppFxN(14) }, (_, i) => ({
       glyph: glyphs[i % glyphs.length],
       x: 3 + Math.random() * 94,
       delay: -Math.random() * 18,
@@ -3801,7 +3835,7 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
 function SpiderHiveOverlay() {
   // Stable per-mount randomization for the spiders so they don't
   // re-randomize every render.
-  const spiders = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+  const spiders = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => {
     // Each spider gets a unique path along an ellipse-ish curve so
     // they wander independently rather than marching in lockstep.
     const dur = 9 + Math.random() * 7; // seconds for a full loop
@@ -4121,7 +4155,7 @@ function BloodRockOverlay() {
     return out;
   }, []);
   // Large soft blood pools that sink into the masonry (multiply blend).
-  const pools = useMemo(() => Array.from({ length: 6 }, () => ({
+  const pools = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
     x: 8 + Math.random() * 84,
     y: 24 + Math.random() * 68,
     r: 70 + Math.random() * 130,
@@ -4129,7 +4163,7 @@ function BloodRockOverlay() {
   })), []);
   // Irregular splatter blotches — jagged clip-path shapes, bright at
   // the core fading to dark, each with a ring of droplet specks.
-  const splatters = useMemo(() => Array.from({ length: 13 }, (_, i) => ({
+  const splatters = useMemo(() => Array.from({ length: ppFxN(13) }, (_, i) => ({
     x: Math.random() * 100,
     y: 18 + Math.random() * 78,
     s: 26 + Math.random() * 60,
@@ -4474,7 +4508,7 @@ function GatheringStormOverlay() {
   // ripping clouds across the battlefield. The slight reverse-flow
   // current (~25% of clouds going against the prevailing wind) adds
   // chaos without breaking the "wind direction" feel.
-  const clouds = useMemo(() => Array.from({ length: 22 }, () => ({
+  const clouds = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
     y:        -8 + Math.random() * 116,             // Wider vertical spread
     scale:    1.4 + Math.random() * 1.5,            // Much bigger (was 0.7–1.7)
     delay:    -Math.random() * 14,                  // Spread starts across the cycle
@@ -4489,7 +4523,7 @@ function GatheringStormOverlay() {
   // index makes one slot "hot" at a time, restarting its CSS animation
   // by toggling a `key`. This keeps the lightning visually unpredictable
   // without re-mounting the whole overlay.
-  const bolts = useMemo(() => Array.from({ length: 6 }, () => {
+  const bolts = useMemo(() => Array.from({ length: ppFxN(6) }, () => {
     // Bolts typically jag from one cloud strata down to another (not
     // floor-to-ceiling). x1/x2 are within the central battlefield band;
     // y1/y2 keep the bolt within the cloud strata.
@@ -4773,13 +4807,13 @@ function WowhallaGearsOverlay() {
         </radialGradient>
       </defs>
       <g>
-        ${Array.from({ length: 12 }).map((_, i) => {
+        ${Array.from({ length: ppFxN(12) }).map((_, i) => {
           const a = (i * 360 / 12);
           return `<rect x='-9' y='-95' width='18' height='22' rx='3' fill='url(#gg)' transform='rotate(${a})'/>`;
         }).join('')}
         <circle cx='0' cy='0' r='78' fill='url(#gg)' stroke='#5b4118' stroke-width='4'/>
         <circle cx='0' cy='0' r='52' fill='none' stroke='#5b4118' stroke-width='3'/>
-        ${Array.from({ length: 8 }).map((_, i) => {
+        ${Array.from({ length: ppFxN(8) }).map((_, i) => {
           const a = (i * 360 / 8) * Math.PI / 180;
           const x = Math.cos(a) * 65, y = Math.sin(a) * 65;
           return `<circle cx='${x.toFixed(1)}' cy='${y.toFixed(1)}' r='7' fill='#5b4118'/>`;
@@ -4830,7 +4864,7 @@ function WowhallaGearsOverlay() {
 // than Acid Rain since Tempeste isn't supposed to be a hostile area
 // effect — it's the host's chosen burden, ambient and ominous.
 function TempesteRainOverlay() {
-  const drops = useMemo(() => Array.from({ length: 130 }, () => ({
+  const drops = useMemo(() => Array.from({ length: ppFxN(130) }, () => ({
     left: Math.random() * 100,
     delay: -Math.random() * 1.4,
     dur: 0.45 + Math.random() * 0.55,
@@ -4838,7 +4872,7 @@ function TempesteRainOverlay() {
     h: 16 + Math.random() * 26,
     opacity: 0.4 + Math.random() * 0.5,
   })), []);
-  const splashes = useMemo(() => Array.from({ length: 18 }, () => ({
+  const splashes = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
     left: Math.random() * 100,
     top: 60 + Math.random() * 36,
     delay: -Math.random() * 1.4,
@@ -4928,7 +4962,7 @@ function TempesteRainOverlay() {
 // aufsteigende Glut. Animiert werden nur `opacity` und `transform`
 // (Projektregel).
 function RiotingVillageOverlay() {
-  const FUNKEN = React.useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+  const FUNKEN = React.useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => ({
     left: 3 + (i * 3.9) % 94,
     dauer: 2.2 + (i % 5) * 0.5,
     verzug: (i % 9) * 0.35,
@@ -4941,7 +4975,7 @@ function RiotingVillageOverlay() {
     { left: 74, unten: 19, breite: 20, hoehe: 36, dauer: 1.5, verzug: .45 },
     { left: 89, unten: 15, breite: 16, hoehe: 28, dauer: 1.3, verzug: .6 },
   ], []);
-  const RAUCH = React.useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+  const RAUCH = React.useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
     left: 12 + i * 13, groesse: 60 + (i % 3) * 34,
     dauer: 9 + (i % 4) * 2.5, verzug: -(i * 2.2),
   })), []);
@@ -5001,7 +5035,7 @@ function RiotingVillageOverlay() {
 function AcidRainOverlay() {
   // Spawn a large pool of drops with staggered delays / durations so the
   // rain reads as "continuous" without any visible reset point.
-  const drops = useMemo(() => Array.from({ length: 110 }, () => ({
+  const drops = useMemo(() => Array.from({ length: ppFxN(110) }, () => ({
     left: Math.random() * 100,
     delay: -Math.random() * 1.6,
     dur: 0.55 + Math.random() * 0.55,
@@ -5009,7 +5043,7 @@ function AcidRainOverlay() {
     h: 14 + Math.random() * 28,
     opacity: 0.45 + Math.random() * 0.45,
   })), []);
-  const splashes = useMemo(() => Array.from({ length: 14 }, () => ({
+  const splashes = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     left: Math.random() * 100,
     top: 55 + Math.random() * 40,
     delay: -Math.random() * 1.5,
@@ -5166,7 +5200,7 @@ function AreaStack({ cards, entries, onActivate, effectLocked, charge, targeting
 }
 
 const SpatialCreviceOverlay = React.memo(function SpatialCreviceOverlay() {
-  const risse = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+  const risse = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => {
     // Grob diagonal verteilt, damit sich die Risse nicht haeufen.
     const x = 8 + (i * 13) + Math.random() * 8;
     const y = 12 + Math.random() * 70;
@@ -5214,7 +5248,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   // Bone scatter — fully random rotations + wide size range so the
   // pile reads as chaotic. Position is independent x/y random so
   // bones land in zone gaps as well as empty corners.
-  const bones = useMemo(() => Array.from({ length: 40 }, () => ({
+  const bones = useMemo(() => Array.from({ length: ppFxN(40) }, () => ({
     left: Math.random() * 100,
     top:  Math.random() * 100,
     size: 22 + Math.random() * 32,
@@ -5223,7 +5257,7 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   })), []);
   // Skulls are slightly bigger on average — rarer and more
   // attention-grabbing — and stay close to upright (±25°).
-  const skulls = useMemo(() => Array.from({ length: 14 }, () => ({
+  const skulls = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     left: Math.random() * 100,
     top:  Math.random() * 100,
     size: 26 + Math.random() * 24,
@@ -5381,7 +5415,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
     return out;
   }, []);
 
-  const motes = useMemo(() => Array.from({ length: 30 }, () => ({
+  const motes = useMemo(() => Array.from({ length: ppFxN(30) }, () => ({
     left: 4 + Math.random() * 92,
     top: 12 + Math.random() * 80,
     size: 2 + Math.random() * 3.5,
@@ -5488,7 +5522,7 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
 
 const CottageOverlay = React.memo(function CottageOverlay() {
   // Ferner Saum: schmales Band oben, klein und blass -> Tiefe.
-  const farTrees = useMemo(() => Array.from({ length: 34 }, (_, i) => ({
+  const farTrees = useMemo(() => Array.from({ length: ppFxN(34) }, (_, i) => ({
     left: (i / 34) * 104 - 2 + (Math.random() * 3 - 1.5),
     top: 4 + Math.random() * 12,
     size: 16 + Math.random() * 12,
@@ -5496,7 +5530,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
   })), []);
 
   // Naher Wald: an den Flanken, damit die Mitte des Bretts frei bleibt.
-  const nearTrees = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+  const nearTrees = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
     const leftSide = i % 2 === 0;
     return {
       left: leftSide ? Math.random() * 22 : 78 + Math.random() * 22,
@@ -5510,7 +5544,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
     };
   }), []);
 
-  const fireflies = useMemo(() => Array.from({ length: 26 }, () => ({
+  const fireflies = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
     left: 8 + Math.random() * 84,
     top: 30 + Math.random() * 62,
     size: 2.5 + Math.random() * 3.5,
@@ -5519,7 +5553,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
     drift: (Math.random() * 26 - 13).toFixed(1),
   })), []);
 
-  const leaves = useMemo(() => Array.from({ length: 9 }, () => ({
+  const leaves = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
     left: Math.random() * 100,
     size: 11 + Math.random() * 9,
     dur: 13 + Math.random() * 10,
@@ -5668,7 +5702,7 @@ const CottageOverlay = React.memo(function CottageOverlay() {
 //  Strich". Stunden- und Minutenzeiger laufen dagegen weich.
 const DoomClockOverlay = React.memo(function DoomClockOverlay() {
   // Zwoelf Stundenmarken auf dem Zifferblatt.
-  const marks = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+  const marks = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
     const winkel = (i * 30 - 90) * Math.PI / 180;
     return {
       x: 50 + Math.cos(winkel) * 38,
@@ -5677,7 +5711,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay() {
     };
   }), []);
   // Aufsteigende Ascheflocken, damit der Hintergrund nicht totstill ist.
-  const embers = useMemo(() => Array.from({ length: 18 }, () => ({
+  const embers = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
     left: Math.random() * 100,
     top: 55 + Math.random() * 45,
     size: 1 + Math.random() * 2.5,
@@ -5736,7 +5770,7 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay() {
           <circle cx="50" cy="50" r="41" fill="rgba(10,6,8,.35)"
                   stroke="rgba(110,30,30,.30)" strokeWidth=".8" />
           {/* Minutenstriche */}
-          {Array.from({ length: 60 }, (_, i) => {
+          {Array.from({ length: ppFxN(60) }, (_, i) => {
             if (i % 5 === 0) return null;
             const a = (i * 6 - 90) * Math.PI / 180;
             return (
@@ -5821,7 +5855,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
   ]), []);
   // Schaumkronen sitzen AUF den Wellenkaemmen und sind kleine Boegen,
   // keine Striche — leicht gedreht, damit sie der Welle folgen.
-  const foam = useMemo(() => Array.from({ length: 16 }, () => ({
+  const foam = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
     left: Math.random() * 100,
     top: 34 + Math.random() * 54,
     w: 18 + Math.random() * 34,
@@ -5831,7 +5865,7 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
     delay: -Math.random() * 9,
     op: .18 + Math.random() * .22,
   })), []);
-  const spray = useMemo(() => Array.from({ length: 16 }, () => ({
+  const spray = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
     left: Math.random() * 100,
     top: 34 + Math.random() * 56,
     size: 1 + Math.random() * 2,
@@ -5948,7 +5982,7 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
   // inline to keep the table easy to read.
   GEM_VARIANTS[0].glow = '90, 170, 255';
 
-  const gems = useMemo(() => Array.from({ length: 48 }, () => ({
+  const gems = useMemo(() => Array.from({ length: ppFxN(48) }, () => ({
     variant: GEM_VARIANTS[(Math.random() * GEM_VARIANTS.length) | 0],
     left: Math.random() * 100,
     top:  Math.random() * 100,
@@ -6020,7 +6054,7 @@ function StinkyStablesOverlay() {
     }))
   ), [piles]);
   // A handful of free flies meander across the battlefield air.
-  const freeFlies = useMemo(() => Array.from({ length: 8 }, () => ({
+  const freeFlies = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
     left: 3 + Math.random() * 94,
     top: 8 + Math.random() * 80,
     delay: -Math.random() * 3.5,
@@ -6170,7 +6204,7 @@ function StinkyStablesOverlay() {
 
 // Burned overlay — persistent small flame particles on the hero
 function BurnedOverlay({ ticking }) {
-  const flames = useMemo(() => Array.from({ length: 10 }, () => ({
+  const flames = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
     x: 8 + Math.random() * 84,
     y: 15 + Math.random() * 70,
     size: 8 + Math.random() * 6,
@@ -6192,7 +6226,7 @@ function BurnedOverlay({ ticking }) {
 // Bleeding overlay (v712) — persistent red drips running down the card;
 // `ticking` pulses when Bleed damage lands (like burn-ticking).
 function BleedingOverlay({ ticking }) {
-  const drips = useMemo(() => Array.from({ length: 7 }, () => ({
+  const drips = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
     x: 6 + Math.random() * 88,
     y: Math.random() * 40,
     len: 10 + Math.random() * 18,
@@ -6212,7 +6246,7 @@ function BleedingOverlay({ ticking }) {
 }
 
 function PoisonedOverlay({ stacks }) {
-  const bubbles = useMemo(() => Array.from({ length: 8 }, () => ({
+  const bubbles = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
     x: 10 + Math.random() * 80,
     y: 20 + Math.random() * 60,
     size: 6 + Math.random() * 5,
@@ -6241,14 +6275,14 @@ function PoisonedOverlay({ stacks }) {
 // status's lifetime is entirely controller-driven (no auto-expiry),
 // so the overlay must keep going until the status is cleansed.
 function BerserkedOverlay() {
-  const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+  const sparks = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
     x: 8 + Math.random() * 84,
     y: 30 + Math.random() * 60,
     size: 5 + Math.random() * 5,
     delay: Math.random() * 2.5,
     dur: 1.0 + Math.random() * 0.8,
   })), []);
-  const smoke = useMemo(() => Array.from({ length: 6 }, () => ({
+  const smoke = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
     x: 15 + Math.random() * 70,
     size: 12 + Math.random() * 8,
     delay: Math.random() * 2.5,
@@ -6273,7 +6307,7 @@ function BerserkedOverlay() {
 }
 
 function HealReversedOverlay() {
-  const particles = useMemo(() => Array.from({ length: 10 }, () => ({
+  const particles = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
     x: 10 + Math.random() * 80,
     y: 20 + Math.random() * 60,
     size: 5 + Math.random() * 4,
@@ -6321,7 +6355,7 @@ const HeroArtCrop = window.HeroArtCrop;
 
 // Wind swirl — gentle wind particles spiraling around target
 function WindEffect({ x, y }) {
-  const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+  const particles = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
     const angle = (i / 14) * Math.PI * 2;
     const radius = 20 + Math.random() * 30;
     return {
@@ -6348,7 +6382,7 @@ function WindEffect({ x, y }) {
 
 // Shadow summon effect — dark tendrils rising from below
 function ShadowSummonEffect({ x, y }) {
-  const tendrils = useMemo(() => Array.from({ length: 16 }, () => {
+  const tendrils = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
     const xOff = -30 + Math.random() * 60;
     return {
       xOff,
@@ -6358,7 +6392,7 @@ function ShadowSummonEffect({ x, y }) {
       char: ['▓','░','▒','◆','●'][Math.floor(Math.random() * 5)],
     };
   }), []);
-  const wisps = useMemo(() => Array.from({ length: 10 }, () => {
+  const wisps = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 10 + Math.random() * 25;
     return {
@@ -6390,7 +6424,7 @@ function ShadowSummonEffect({ x, y }) {
 
 // Gold sparkle — particles burst from the gold counter
 function GoldSparkleEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: 12 }, () => {
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 12 + Math.random() * 25;
     return {
@@ -6424,7 +6458,7 @@ function GoldSparkleEffect({ x, y }) {
 // `play_zone_animation` plumbing.
 function SpiderSummonEffect({ x, y }) {
   // Eight spiders bursting outward in a fan.
-  const spiders = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+  const spiders = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => {
     const angle = (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
     const dist = 36 + Math.random() * 28;
     return {
@@ -6437,7 +6471,7 @@ function SpiderSummonEffect({ x, y }) {
     };
   }), []);
   // Vertical silk strands draping from above the slot.
-  const strands = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+  const strands = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
     xOff: -36 + i * 12 + (Math.random() - 0.5) * 4,
     len: 50 + Math.random() * 30,
     delay: Math.random() * 200,
@@ -6451,7 +6485,7 @@ function SpiderSummonEffect({ x, y }) {
         animation: 'spiderSummonWebBurst 1.1s ease-out forwards',
       }}>
         {/* Radial spokes */}
-        {Array.from({ length: 12 }).map((_, i) => {
+        {Array.from({ length: ppFxN(12) }).map((_, i) => {
           const a = (i / 12) * Math.PI * 2;
           return (
             <line key={'sp' + i}
@@ -6550,7 +6584,7 @@ function SpiderSummonEffect({ x, y }) {
 // Shares the same shrapnel particle class as the gold sparkle; only
 // the palette + flash overlay differ.
 function DiamondSparkleEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: 14 }, () => {
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 14 + Math.random() * 26;
     return {
@@ -6576,7 +6610,7 @@ function DiamondSparkleEffect({ x, y }) {
 
 // Beer bubbles — yellow bubbles and foam rising upward
 function BeerBubblesEffect({ x, y }) {
-  const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+  const bubbles = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
     xOff: -25 + Math.random() * 50,
     size: 4 + Math.random() * 8,
     delay: Math.random() * 300,
@@ -6599,7 +6633,7 @@ function BeerBubblesEffect({ x, y }) {
 
 function CreatureDeathEffect({ x, y }) {
   // Rising soul particles + flash + falling sparkles
-  const souls = useMemo(() => Array.from({ length: 14 }, () => ({
+  const souls = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     dx: -20 + Math.random() * 40,
     dy: -(40 + Math.random() * 60),
     size: 4 + Math.random() * 6,
@@ -6607,7 +6641,7 @@ function CreatureDeathEffect({ x, y }) {
     delay: Math.random() * 200,
     dur: 600 + Math.random() * 500,
   })), []);
-  const sparks = useMemo(() => Array.from({ length: 18 }, () => {
+  const sparks = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 15 + Math.random() * 40;
     return {
@@ -6640,7 +6674,7 @@ function CreatureDeathEffect({ x, y }) {
 
 // Spider Avalanche — torrential downpour of tiny spiders
 function SpiderAvalancheEffect({ x, y, w, h }) {
-  const spiders = useMemo(() => Array.from({ length: 80 }, () => ({
+  const spiders = useMemo(() => Array.from({ length: ppFxN(80) }, () => ({
     startX: -60 + Math.random() * 120,
     delay: Math.random() * 600,
     dur: 300 + Math.random() * 400,
@@ -6663,7 +6697,7 @@ function SpiderAvalancheEffect({ x, y, w, h }) {
 }
 
 function VenomFogEffect({ x, y, w, h }) {
-  const particles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+  const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
     dx: -30 + Math.random() * 60,
     dy: -20 + Math.random() * 40,
     size: 30 + Math.random() * 40,
@@ -6684,13 +6718,13 @@ function VenomFogEffect({ x, y, w, h }) {
 }
 
 function PoisonedWellEffect({ x, y, w, h }) {
-  const bubbles = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+  const bubbles = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
     dx: -25 + Math.random() * 50,
     size: 8 + Math.random() * 16,
     delay: i * 50 + Math.random() * 100,
     dur: 600 + Math.random() * 500,
   })), []);
-  const steam = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+  const steam = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
     dx: -20 + Math.random() * 40,
     size: 20 + Math.random() * 30,
     delay: 200 + i * 60 + Math.random() * 100,
@@ -6721,7 +6755,7 @@ function PoisonedWellEffect({ x, y, w, h }) {
 // fire/ice colour families so it reads as "pulled from the depths of
 // space" rather than any existing elemental strike.
 function CosmicSummonEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: 18 }, () => {
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
     const angle = Math.random() * Math.PI * 2;
     // Start somewhere between 70–130px from centre; each sparkle
     // converges all the way to the middle at peak.
@@ -6734,7 +6768,7 @@ function CosmicSummonEffect({ x, y }) {
       dur: 420 + Math.random() * 260,
     };
   }), []);
-  const dust = useMemo(() => Array.from({ length: 12 }, () => {
+  const dust = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 20 + Math.random() * 50;
     return {
@@ -6844,7 +6878,7 @@ function CosmicSummonEffect({ x, y }) {
 //    Sharp single burst; yellow/black wasp-stripe palette;
 //    tight cluster of shrapnel with a bright central flash.
 function BomblebeeBlastEffect({ x, y }) {
-  const particles = useMemo(() => Array.from({ length: 26 }, () => {
+  const particles = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 30 + Math.random() * 60;
     return {
@@ -6899,7 +6933,7 @@ function BomblebeeBlastEffect({ x, y }) {
 //    as a strafing run because of the staggered start.
 function BomblebeeCarpetEffect({ x, y, w, h }) {
   const cw = w || 110;
-  const bursts = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+  const bursts = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
     offsetX: -cw * 0.45 + (i / 6) * cw * 0.9 + (Math.random() - 0.5) * 8,
     offsetY: -20 + Math.random() * 40,
     size: 14 + Math.random() * 12,
@@ -6907,7 +6941,7 @@ function BomblebeeCarpetEffect({ x, y, w, h }) {
     dur: 380 + Math.random() * 200,
     hue: 18 + Math.random() * 22, // Orange band
   })), [cw]);
-  const smoke = useMemo(() => Array.from({ length: 10 }, () => ({
+  const smoke = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
     offsetX: -cw * 0.35 + Math.random() * cw * 0.7,
     offsetY: -10 + Math.random() * 30,
     size: 18 + Math.random() * 14,
@@ -6962,7 +6996,7 @@ function BomblebeeCarpetEffect({ x, y, w, h }) {
 //    impact poof at the target zone. White / pale-blue palette so it
 //    reads distinct from the orange explosions.
 function BomblebeeDiveEffect({ x, y }) {
-  const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+  const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
     const angle = Math.PI * (0.7 + Math.random() * 0.6); // bottom-left arc
     const speed = 18 + Math.random() * 32;
     return {
@@ -7035,7 +7069,7 @@ function BomblebeeDiveEffect({ x, y }) {
 //    UNDER-stated so it doesn't read as a damage event. Yellow-orange
 //    pulse, no shrapnel.
 function BomblebeeTickEffect({ x, y }) {
-  const sparks = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+  const sparks = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
     angle: (i / 6) * Math.PI * 2,
     delay: i * 70 + Math.random() * 40,
   })), []);
@@ -7084,7 +7118,7 @@ function BomblebeeTickEffect({ x, y }) {
 //    bright white core. The biggest of the bunch — reads as the
 //    "stored energy unleashed" payoff visual.
 function BomblebeeDetonateEffect({ x, y }) {
-  const particles = useMemo(() => Array.from({ length: 38 }, () => {
+  const particles = useMemo(() => Array.from({ length: ppFxN(38) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 35 + Math.random() * 75;
     return {
@@ -7177,7 +7211,7 @@ function BomblebeeClusterEffect({ x, y }) {
         }} />
       ))}
       {/* Trailing wasp-stripe specks */}
-      {Array.from({ length: 14 }).map((_, i) => {
+      {Array.from({ length: ppFxN(14) }).map((_, i) => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 25 + Math.random() * 35;
         const dx = Math.cos(angle) * dist;
@@ -7217,7 +7251,7 @@ function BomblebeeClusterEffect({ x, y }) {
 //    the precursor visual to the Bomblebees re-firing right after.
 function BomblebeeFuseEffect({ x, y, w }) {
   const cw = w || 110;
-  const sparkles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
     leftPct: (i / 17) * 100,
     delay: i * 18 + Math.random() * 30,
     dur: 320 + Math.random() * 180,
@@ -7301,7 +7335,7 @@ function BomblebeeFuseEffect({ x, y, w }) {
 // drops that arc and drip. Used ON TOP of whatever attack animation
 // already played (Devlin's hits) and as the Bleed-damage pulse.
 function BloodSplatterEffect({ x, y }) {
-  const drops = useMemo(() => Array.from({ length: 26 }, () => {
+  const drops = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 22 + Math.random() * 54;
     return {
@@ -7344,13 +7378,13 @@ function BloodSplatterEffect({ x, y }) {
 // dark wound line, wet red inner edge, tissue flaps, then heavy drips
 // running off the lower lip. Doctor Fester / Ghoul Guard.
 function BloodyCutEffect({ x, y }) {
-  const drips = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+  const drips = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
     ox: -34 + i * 14 + (Math.random() - 0.5) * 8,
     len: 14 + Math.random() * 22,
     delay: 260 + Math.random() * 260,
     dur: 520 + Math.random() * 300,
   })), []);
-  const spurts = useMemo(() => Array.from({ length: 10 }, () => {
+  const spurts = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
     const speed = 18 + Math.random() * 30;
     return { dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, size: 3 + Math.random() * 5,
@@ -7399,7 +7433,7 @@ function ShieldBubbleEffect({ x, y }) {
 // flash, two giant zigzag bolts crashing down vertically, a halo
 // of inward-converging arc bolts, and a burst of crackling sparks.
 function StunStrikeEffect({ x, y }) {
-  const bolts = useMemo(() => Array.from({ length: 22 }, () => {
+  const bolts = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const dist = 70 + Math.random() * 60;
     return {
@@ -7411,7 +7445,7 @@ function StunStrikeEffect({ x, y }) {
       rotation: (angle * 180 / Math.PI) + 180,
     };
   }), []);
-  const sparks = useMemo(() => Array.from({ length: 22 }, () => {
+  const sparks = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 18 + Math.random() * 38;
     return {
@@ -7450,7 +7484,7 @@ function StunStrikeEffect({ x, y }) {
 // they spiral out. Tuned to feel like a buff "landing" rather than
 // an attack — warm, celebratory, ~700ms total.
 function NiuPowerUpEffect({ x, y }) {
-  const sparkles = useMemo(() => Array.from({ length: 18 }, () => {
+  const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 22 + Math.random() * 38;
     return {
@@ -7461,7 +7495,7 @@ function NiuPowerUpEffect({ x, y }) {
       dur: 400 + Math.random() * 350,
     };
   }), []);
-  const stars = useMemo(() => Array.from({ length: 8 }, (_, i) => {
+  const stars = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => {
     const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
     const dist = 40 + Math.random() * 25;
     return {
@@ -7503,14 +7537,14 @@ function NiuPowerUpEffect({ x, y }) {
 // at impact + a few venom drip particles sell the "envenomation"
 // read.
 function SnakeBiteEffect({ x, y }) {
-  const drips = useMemo(() => Array.from({ length: 8 }, () => ({
+  const drips = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
     dx: -22 + Math.random() * 44,
     fall: 22 + Math.random() * 26,
     size: 4 + Math.random() * 4,
     delay: 350 + Math.random() * 150,
     dur: 350 + Math.random() * 200,
   })), []);
-  const splat = useMemo(() => Array.from({ length: 14 }, () => {
+  const splat = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 14 + Math.random() * 26;
     return {
@@ -7558,10 +7592,10 @@ function SharkBiteEffect({ x, y }) {
   // Zaehne: oben und unten je 7, leicht unterschiedlich hoch, damit die
   // Reihe nicht wie ein Kamm aussieht.
   const zaehne = useMemo(() => ({
-    oben: Array.from({ length: 7 }, (_, i) => ({ i, h: 13 + Math.random() * 7 })),
-    unten: Array.from({ length: 7 }, (_, i) => ({ i, h: 11 + Math.random() * 7 })),
+    oben: Array.from({ length: ppFxN(7) }, (_, i) => ({ i, h: 13 + Math.random() * 7 })),
+    unten: Array.from({ length: ppFxN(7) }, (_, i) => ({ i, h: 11 + Math.random() * 7 })),
   }), []);
-  const gischt = useMemo(() => Array.from({ length: 16 }, () => {
+  const gischt = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 16 + Math.random() * 30;
     return {
@@ -7605,7 +7639,7 @@ function SharkBiteEffect({ x, y }) {
 // Tuned to ~900ms total so the heal numbers can land just after the
 // animation peaks.
 function CannibalismChompEffect({ x, y }) {
-  const particles = useMemo(() => Array.from({ length: 16 }, () => {
+  const particles = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
     const xOff = -52 + Math.random() * 104;
     return {
       xOff,
@@ -7739,6 +7773,31 @@ function nukeLayout(w, h) {
   };
 }
 
+// ★★ v1258 — PARTIKEL-DECKEL AUF DEM TELEFON (Als Befund 19.9.:
+// „manche Animationen, etwa ‚Divine Gift of Fire', sind EXTREM laggy!
+//  Auf Mobile ist hier definitiv die Anzahl Particles ein Problem!")
+//
+// Jede Animation im Registry baut ihre Funken als
+// `Array.from({ length: N }, …)` mit fester Zahl — zusammen oft 100+
+// gleichzeitig animierte Knoten, jeder mit eigener Bewegung. Auf einem
+// Telefon-GPU ist das der Unterschied zwischen fluessig und Diashow.
+//
+// Der Deckel sitzt an EINER Stelle statt in 239 Animationen: jede
+// Laengenangabe laeuft durch `ppFxN`, das auf Telefonen auf 40 %
+// herunterrechnet (mindestens 2, damit keine Animation leer bleibt).
+// Am Desktop gibt die Funktion die Zahl unveraendert zurueck — dort
+// aendert sich also kein einziges Bild.
+//
+// Wichtig fuer die `useMemo`-Abhaengigkeiten in den Animationen: die
+// Funktion ist konstant und liest nur `window.ppIsPhone`, der Wert ist
+// also fuer die Lebensdauer einer Animation stabil.
+function ppFxN(n) {
+  try {
+    if (window.ppIsPhone && window.ppIsPhone()) return Math.max(2, Math.round(n * 0.4));
+  } catch {}
+  return n;
+}
+
 const ANIM_REGISTRY = {
   // ── Kernschlag ueber dem ganzen Brett (Doomsday Bomb, v580) ───────
   // [Als Vorgabe 22.8.: „Eine zentrale, gewaltige Explosion in der
@@ -7756,7 +7815,7 @@ const ANIM_REGISTRY = {
   nuke_blast: (function () {
     return function NukeBlastEffect({ x, y, w, h }) {
       const L = nukeLayout(w, h);
-      const funken = useMemo(() => Array.from({ length: 26 }, () => {
+      const funken = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
         const winkel = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.5;
         const weite = 0.35 + Math.random() * 0.75;
         return {
@@ -8184,7 +8243,7 @@ const ANIM_REGISTRY = {
   // the card plays NO per-target animations.
   corpse_explosion: (function () {
     return function CorpseExplosionEffect({ x, y }) {
-      const embers = useMemo(() => Array.from({ length: 20 }, () => {
+      const embers = useMemo(() => Array.from({ length: ppFxN(20) }, () => {
         const ang = Math.random() * Math.PI * 2;
         const dist = 130 + Math.random() * 560;
         return {
@@ -8268,11 +8327,11 @@ const ANIM_REGISTRY = {
   // gold sparkles drifting outward.
   johanna_cleanse: (function () {
     return function JohannaCleanseEffect({ x, y }) {
-      const beams = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const beams = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         angle: (i / 12) * 360,
         delay: Math.random() * 80,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         angle: (i / 18) * Math.PI * 2 + Math.random() * 0.4,
         dist: 40 + Math.random() * 30,
         size: 3 + Math.random() * 4,
@@ -8347,7 +8406,7 @@ const ANIM_REGISTRY = {
     return function PressedSkillRainEffect({ x, y, w, h }) {
       const W = w || 72;
       const H = h || 100;
-      const drops = useMemo(() => Array.from({ length: 30 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(30) }, () => ({
         lx:    (Math.random() - 0.5) * (W * 1.1),
         startY: -(H / 2) - 26 - Math.random() * 40,
         fall:  H + 70 + Math.random() * 36,
@@ -8357,7 +8416,7 @@ const ANIM_REGISTRY = {
         dur:   620 + Math.random() * 280,
         sway:  (Math.random() - 0.5) * 14,
       })), [W, H]);
-      const glints = useMemo(() => Array.from({ length: 12 }, () => ({
+      const glints = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         lx:    (Math.random() - 0.5) * (W * 1.05),
         startY: -(H / 2) - 14 - Math.random() * 36,
         fall:  H + 50 + Math.random() * 30,
@@ -8442,7 +8501,7 @@ const ANIM_REGISTRY = {
       const H = h || 100;
       // 6 Z's = two staggered trios. Within a trio the Z's grow
       // (small → big) and trail; the second trio is a delayed echo.
-      const zs = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+      const zs = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => {
         const k = i % 3;            // 0,1,2 within a trio
         const wave = Math.floor(i / 3); // 0 or 1
         return {
@@ -8493,7 +8552,7 @@ const ANIM_REGISTRY = {
   // the flash/rings are self-contained with locally-scoped keyframes.
   disruption_impact: (function () {
     return function DisruptionImpactEffect({ x, y, opacity }) {
-      const particles = useMemo(() => Array.from({ length: 22 }, () => {
+      const particles = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 22 + Math.random() * 52;
         return {
@@ -8560,7 +8619,7 @@ const ANIM_REGISTRY = {
       // Hearts are scattered in a tight ring around the slot center,
       // each rising on its own delay so the cluster reads as a brief
       // floating burst rather than a single explosion.
-      const hearts = useMemo(() => Array.from({ length: 12 }, () => {
+      const hearts = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const startDist = 14 + Math.random() * 22;
         return {
@@ -8614,7 +8673,7 @@ const ANIM_REGISTRY = {
       // Six trumpets evenly spaced around the slot center, blasting
       // outward. Each starts at center, scales up as it travels, and
       // fades past the slot's edge.
-      const trumpets = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+      const trumpets = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => {
         const angle = (i / 6) * Math.PI * 2 - Math.PI / 2; // top, then clockwise
         const dist = 42;
         return {
@@ -8628,7 +8687,7 @@ const ANIM_REGISTRY = {
       // celebratory "stuff thrown in the air" rather than a flat ring.
       const cheers = useMemo(() => {
         const glyphs = ['🎉', '🎊', '✨', '⭐'];
-        return Array.from({ length: 16 }, () => {
+        return Array.from({ length: ppFxN(16) }, () => {
           const angle = Math.random() * Math.PI * 2;
           const dist = 26 + Math.random() * 22;
           return {
@@ -8690,7 +8749,7 @@ const ANIM_REGISTRY = {
     return function GraveWormBurrowEffect({ x, y }) {
       // Soil chunks burst upward and outward, gravity-pulled back down
       // partway through their lifespan.
-      const chunks = useMemo(() => Array.from({ length: 22 }, () => {
+      const chunks = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.9; // mostly upward, ±80°
         const speed = 35 + Math.random() * 70;
         return {
@@ -8703,7 +8762,7 @@ const ANIM_REGISTRY = {
         };
       }), []);
       // Slow-drifting black smoke wisps for atmosphere.
-      const wisps = useMemo(() => Array.from({ length: 8 }, () => ({
+      const wisps = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
         startX: -28 + Math.random() * 56,
         rise: 50 + Math.random() * 70,
         size: 14 + Math.random() * 18,
@@ -8761,11 +8820,11 @@ const ANIM_REGISTRY = {
   // summon so the player sees "this Creature came from the Stack".
   coolness_summon: (function () {
     return function CoolnessSummonEffect({ x, y }) {
-      const beams = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+      const beams = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
         angle: (i / 14) * 360,
         delay: Math.random() * 100,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         angle: (i / 22) * Math.PI * 2 + Math.random() * 0.3,
         dist: 50 + Math.random() * 45,
         size: 3 + Math.random() * 5,
@@ -8901,7 +8960,7 @@ const ANIM_REGISTRY = {
   // ── Cosmic Depths archetype ────────────────────────────────────────
   cosmic_counter_add: (function () {
     return function CosmicCounterAddEffect({ x, y }) {
-      const sparks = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         angle: (i / 10) * Math.PI * 2,
         size: 4 + Math.random() * 3,
         delay: Math.random() * 80,
@@ -8947,7 +9006,7 @@ const ANIM_REGISTRY = {
   cosmic_counter_remove: (function () {
     return function CosmicCounterRemoveEffect({ x, y }) {
       // Inverse — particles converge inward, then a tiny implosion flash.
-      const sparks = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         angle: (i / 10) * Math.PI * 2,
         size: 4 + Math.random() * 3,
         delay: Math.random() * 60,
@@ -9304,7 +9363,7 @@ const ANIM_REGISTRY = {
     return function PiranhaBitesEffect({ x, y, w, h }) {
       const cw = w || 110;
       const ch = h || 140;
-      const bites = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const bites = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         offsetX: -cw * 0.42 + Math.random() * cw * 0.84,
         offsetY: -ch * 0.42 + Math.random() * ch * 0.84,
         size: 5 + Math.random() * 5,
@@ -9365,7 +9424,7 @@ const ANIM_REGISTRY = {
       // Reads as "wall of water rising to deflect" — appropriate for a
       // Deepsea-themed protective negate.
       const rings = [0, 100, 200];
-      const sparkles = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         angle: (i / 12) * Math.PI * 2,
         size: 4 + Math.random() * 4,
         delay: 200 + Math.random() * 220,
@@ -9482,7 +9541,7 @@ const ANIM_REGISTRY = {
       const ch = h || 140;
       // Falling oil drops — distributed across the width, falling from
       // above the card down to its lower third where they "land".
-      const drops = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         startX: -cw * 0.5 + Math.random() * cw,
         delay: i * 18 + Math.random() * 60,
         dur: 320 + Math.random() * 180,
@@ -9490,7 +9549,7 @@ const ANIM_REGISTRY = {
         color: ['#cc1100', '#ff2200', '#dd3300', '#aa0000', '#ee4400', '#b81022'][Math.floor(Math.random() * 6)],
       })), [cw]);
       // Splat marks — viscous oil pooling at impact points.
-      const splats = useMemo(() => Array.from({ length: 9 }, () => ({
+      const splats = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
         x: -cw * 0.4 + Math.random() * cw * 0.8,
         y: ch * 0.15 + Math.random() * ch * 0.25,
         rx: 6 + Math.random() * 9,
@@ -9499,7 +9558,7 @@ const ANIM_REGISTRY = {
         dur: 500 + Math.random() * 350,
       })), [cw, ch]);
       // Steam wisps rising off the hot splats.
-      const steams = useMemo(() => Array.from({ length: 7 }, () => ({
+      const steams = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
         x: -cw * 0.35 + Math.random() * cw * 0.7,
         y: ch * 0.18 + Math.random() * ch * 0.15,
         size: 6 + Math.random() * 5,
@@ -9578,7 +9637,7 @@ const ANIM_REGISTRY = {
       const ch = h || 140;
       // Vertical flame jet — particles erupting upward from the bottom.
       // Slight horizontal sway suggests heat-shimmer column movement.
-      const jet = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+      const jet = useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => ({
         startX: -cw * 0.18 + Math.random() * cw * 0.36,
         delay: i * 18 + Math.random() * 60,
         dur: 420 + Math.random() * 240,
@@ -9588,7 +9647,7 @@ const ANIM_REGISTRY = {
         rise: ch * 1.0 + Math.random() * ch * 0.6,
       })), [cw, ch]);
       // Embers spraying outward at the top of the pillar.
-      const embers = useMemo(() => Array.from({ length: 14 }, () => {
+      const embers = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
         const speed = 38 + Math.random() * 60;
         return {
@@ -9679,7 +9738,7 @@ const ANIM_REGISTRY = {
       // Initial splat — a wide, luminous radial flash that fades fast.
       // ── Droplets: fly outward from impact in a 360° spray with a
       //    slight downward bias (gravity), in a range of purple tints.
-      const drops = useMemo(() => Array.from({ length: 18 }, (_, i) => {
+      const drops = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => {
         // Bias the spray downward so the goo "falls". Angle range:
         // -30° to 210° (mostly the lower hemisphere), measured from
         // the right horizontal in standard math convention.
@@ -9700,7 +9759,7 @@ const ANIM_REGISTRY = {
       }), []);
       // ── Splats: oozing patches that LAND on the target and stick.
       //    Lower count, larger, persist longer than droplets.
-      const splats = useMemo(() => Array.from({ length: 7 }, () => ({
+      const splats = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
         x: -cw * 0.32 + Math.random() * cw * 0.64,
         y: -ch * 0.28 + Math.random() * ch * 0.56,
         rx: 8 + Math.random() * 10, // ellipse radii
@@ -9710,7 +9769,7 @@ const ANIM_REGISTRY = {
         dur: 600 + Math.random() * 500,
       })), [cw, ch]);
       // ── Bubbles: small fizzy pops, paler, suggest toxicity.
-      const bubbles = useMemo(() => Array.from({ length: 10 }, () => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
         x: -cw * 0.3 + Math.random() * cw * 0.6,
         y: -ch * 0.3 + Math.random() * ch * 0.6,
         size: 4 + Math.random() * 4,
@@ -9807,7 +9866,7 @@ const ANIM_REGISTRY = {
     return function SlimyHealGooEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const drops = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+      const drops = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
         const angle = (-Math.PI / 6) + Math.random() * (Math.PI * 7 / 6);
         const speed = 30 + Math.random() * 50;
         return {
@@ -9820,7 +9879,7 @@ const ANIM_REGISTRY = {
                   '#38b000', '#a3e635', '#b7e4c7', '#2d6a4f'][Math.floor(Math.random() * 8)],
         };
       }), []);
-      const splats = useMemo(() => Array.from({ length: 6 }, () => ({
+      const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
         x: -cw * 0.32 + Math.random() * cw * 0.64,
         y: -ch * 0.28 + Math.random() * ch * 0.56,
         rx: 8 + Math.random() * 10,
@@ -9829,7 +9888,7 @@ const ANIM_REGISTRY = {
         delay: 80 + Math.random() * 220,
         dur: 600 + Math.random() * 500,
       })), [cw, ch]);
-      const hearts = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+      const hearts = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
         xOff: -36 + Math.random() * 72,
         startY: 10 + Math.random() * 30,
         delay: 160 + i * 40 + Math.random() * 120,
@@ -9931,7 +9990,7 @@ const ANIM_REGISTRY = {
   golden_apple_burst: (() => {
     return function GoldenAppleBurstEffect({ x, y, duration }) {
       const laufzeit = Math.max(700, Number(duration) || 1500);
-      const funken = useMemo(() => Array.from({ length: 34 }, (_, i) => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(34) }, (_, i) => ({
         dx: -46 + Math.random() * 92,
         dy: -(14 + Math.random() * 86),
         size: 4 + Math.random() * 6,
@@ -9939,7 +9998,7 @@ const ANIM_REGISTRY = {
         dur: 520 + Math.random() * 380,
         farbe: ['#ffe680', '#ffc23d', '#fff3c4'][i % 3],
       })), [laufzeit]);
-      const flitter = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const flitter = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         x: -40 + Math.random() * 80,
         dy: 40 + Math.random() * 46,
         w: 5 + Math.random() * 6,
@@ -10019,7 +10078,7 @@ const ANIM_REGISTRY = {
   tempeluna_infuse: (() => {
     return function TempelunaInfuseEffect({ x, y, duration }) {
       const laufzeit = Math.max(600, Number(duration) || 1100);
-      const schwaden = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+      const schwaden = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
         startX: -28 + Math.random() * 56,
         startY: 24 + Math.random() * 16,
         dx: -18 + Math.random() * 36,
@@ -10030,7 +10089,7 @@ const ANIM_REGISTRY = {
         opacity: 0.30 + Math.random() * 0.3,
         shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
       })), [laufzeit]);
-      const funken = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         dx: -40 + Math.random() * 80,
         dy: -(8 + Math.random() * 70),
         size: 4 + Math.random() * 5,
@@ -10038,7 +10097,7 @@ const ANIM_REGISTRY = {
         dur: 460 + Math.random() * 280,
         farbe: ['#fff6c8', '#bde9ff', '#ffd9f2'][i % 3],
       })), [laufzeit]);
-      const sterne = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+      const sterne = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
         x: -36 + Math.random() * 72,
         y: -40 + Math.random() * 84,
         size: 16 + Math.random() * 14,
@@ -10116,7 +10175,7 @@ const ANIM_REGISTRY = {
       const laufzeit = Math.max(700, Number(duration) || 1400);
       const breite = Math.max(60, Number(w) || 90);
       const hoehe = Math.max(80, Number(h) || 126);
-      const blasen = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const blasen = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         dx: -breite * 0.35 + Math.random() * breite * 0.7,
         size: 4 + Math.random() * 9,
         delay: (i / 18) * (laufzeit * 0.75) + Math.random() * 120,
@@ -10192,7 +10251,7 @@ const ANIM_REGISTRY = {
   tempeluna_steam: (() => {
     return function TempelunaSteamEffect({ x, y, duration }) {
       const laufzeit = Math.max(900, Number(duration) || 2200);
-      const schwaden = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+      const schwaden = useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => ({
         startX: -34 + Math.random() * 68,
         startY: 30 + Math.random() * 22,
         dx: -22 + Math.random() * 44,
@@ -10205,7 +10264,7 @@ const ANIM_REGISTRY = {
         shade: Math.random() < 0.5 ? '#f2f4f8' : '#d7dde6',
       })), [laufzeit]);
       // Ein paar warme Funken, weil Lunas Flamme darin steckt.
-      const funken = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
         dx: -20 + Math.random() * 40,
         dy: -(20 + Math.random() * 45),
         size: 2 + Math.random() * 3,
@@ -10256,7 +10315,7 @@ const ANIM_REGISTRY = {
   })(),
   steam_puff: (() => {
     return function SteamPuffEffect({ x, y }) {
-      const puffs = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const puffs = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         startX: -25 + Math.random() * 50,
         startY: 15 + Math.random() * 15,
         dx: -10 + Math.random() * 20,
@@ -10325,7 +10384,7 @@ const ANIM_REGISTRY = {
       const cw = w || 100;
       const ch = h || 140;
       // Jet particles — fast-moving, stretched, coming in from the left
-      const jet = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+      const jet = useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => ({
         endX: -cw * 0.2 + Math.random() * cw * 1.4,
         endY: -ch * 0.15 + Math.random() * ch * 0.3,
         size: 14 + Math.random() * 16,
@@ -10335,7 +10394,7 @@ const ANIM_REGISTRY = {
         tilt: -15 + Math.random() * 30,
       })), [cw, ch]);
       // Lingering flames that stick around on the target after the jet hits
-      const lingering = useMemo(() => Array.from({ length: 16 }, () => ({
+      const lingering = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         x: -cw * 0.35 + Math.random() * cw * 0.7,
         y: -ch * 0.35 + Math.random() * ch * 0.7,
         size: 10 + Math.random() * 14,
@@ -10343,7 +10402,7 @@ const ANIM_REGISTRY = {
         dur: 400 + Math.random() * 300,
       })), [cw, ch]);
       // Embers drifting off after the strike
-      const embers = useMemo(() => Array.from({ length: 14 }, () => {
+      const embers = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
         const speed = 30 + Math.random() * 50;
         return {
@@ -10447,7 +10506,7 @@ const ANIM_REGISTRY = {
         maxSize: 140 + i * 40,
       })), []);
       // Radial fire shards blasting out from the impact
-      const shards = useMemo(() => Array.from({ length: 22 }, () => {
+      const shards = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 40 + Math.random() * 60;
         return {
@@ -10460,7 +10519,7 @@ const ANIM_REGISTRY = {
         };
       }), []);
       // Smoke clouds rising from the impact site
-      const smoke = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+      const smoke = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         dx: -25 + Math.random() * 50,
         dy: -(20 + Math.random() * 35),
         size: 20 + Math.random() * 20,
@@ -10578,7 +10637,7 @@ const ANIM_REGISTRY = {
   })(),
   plague_smoke: (() => {
     return function PlagueSmokeEffect({ x, y }) {
-      const clouds = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const clouds = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         dx: -30 + Math.random() * 60,
         dy: -15 + Math.random() * 30,
         size: 25 + Math.random() * 35,
@@ -10600,7 +10659,7 @@ const ANIM_REGISTRY = {
   })(),
   biomancy_bloom: (() => {
     return function BiomancyBloomEffect({ x, y }) {
-      const flowers = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+      const flowers = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
         const angle = (i / 16) * Math.PI * 2;
         return {
           dx: Math.cos(angle) * (15 + Math.random() * 25),
@@ -10632,7 +10691,7 @@ const ANIM_REGISTRY = {
   // bewachsen. Klang: `elem_biomancy` (ZONE_ANIM_SFX).
   thicket_cover: (() => {
     return function ThicketCoverEffect({ x, y }) {
-      const teile = useMemo(() => Array.from({ length: 34 }, (_, i) => {
+      const teile = useMemo(() => Array.from({ length: ppFxN(34) }, (_, i) => {
         // Aus dem Rand nach innen: Startpunkt auf einer Ellipse, Ziel
         // nahe der Mitte, damit sich das Blattwerk schliesst.
         const winkel = (i / 34) * Math.PI * 2 + Math.random() * 0.35;
@@ -10667,7 +10726,7 @@ const ANIM_REGISTRY = {
   })(),
   biomancy_vines: (() => {
     return function BiomancyVinesEffect({ x, y }) {
-      const vines = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+      const vines = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
         const angle = (i / 12) * Math.PI * 2;
         return {
           dx: Math.cos(angle) * 30,
@@ -10697,7 +10756,7 @@ const ANIM_REGISTRY = {
       // picks a random angle (not evenly spaced, so the burst feels chaotic
       // rather than geometric) and a random distance. Rotation spins during
       // flight for the "wind-blown" feel.
-      const leaves = useMemo(() => Array.from({ length: 36 }, (_, i) => {
+      const leaves = useMemo(() => Array.from({ length: ppFxN(36) }, (_, i) => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 70 + Math.random() * 90;
         const spin = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 540);
@@ -10771,7 +10830,7 @@ const ANIM_REGISTRY = {
   // Aufruf ueber `addHeroStatus` → `animationType`).
   sand_burst: (() => {
     const r = sandZufall(1058);
-    const SPRUEH = Array.from({ length: 110 }, () => {
+    const SPRUEH = Array.from({ length: ppFxN(110) }, () => {
       const winkel = -Math.PI * (0.05 + r() * 0.9) + (r() < 0.25 ? Math.PI * r() : 0);
       const weite = 18 + Math.pow(r(), 0.7) * 62;
       return {
@@ -10781,7 +10840,7 @@ const ANIM_REGISTRY = {
         verzug: Math.round(r() * 120), dauer: Math.round(550 + r() * 250),
       };
     });
-    const DUSCHE = Array.from({ length: 70 }, () => ({
+    const DUSCHE = Array.from({ length: ppFxN(70) }, () => ({
       x: (r() - 0.5) * 96, von: -(60 + r() * 50), bis: 10 + r() * 40,
       g: 1 + Math.round(r() * 15) / 10,
       farbe: SAND_FARBEN[Math.floor(r() * SAND_FARBEN.length)],
@@ -10842,7 +10901,7 @@ const ANIM_REGISTRY = {
   // laeuft zu JEDEM Rundenbeginn, solange die Karte auf der Hand liegt.
   // Eine auffaellige Animation waere nach drei Runden eine Zumutung.
   crystal_drain: (() => {
-    const SPLITTER = Array.from({ length: 7 }, (_, i) => ({
+    const SPLITTER = Array.from({ length: ppFxN(7) }, (_, i) => ({
       left: 12 + i * 12.5,
       verzug: i * 90,
       hoehe: 16 + (i % 3) * 9,
@@ -10880,7 +10939,7 @@ const ANIM_REGISTRY = {
       return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
     };
     const r = zufall(7331);
-    const TROPFEN = Array.from({ length: 80 }, (_, i) => {
+    const TROPFEN = Array.from({ length: ppFxN(80) }, (_, i) => {
       const stoss = i % 3;                                  // drei Pulse
       return {
         ax: (r() - 0.5) * 0.9,                              // Anteil der Breite entlang des Schnitts
@@ -10893,12 +10952,12 @@ const ANIM_REGISTRY = {
         hell: r() < 0.35,
       };
     });
-    const FLECKEN = Array.from({ length: 12 }, () => ({
+    const FLECKEN = Array.from({ length: ppFxN(12) }, () => ({
       x: (r() - 0.5) * 1.5, y: (r() - 0.3) * 1.2, g: 0.12 + r() * 0.22,
       form: `${40 + r() * 30}% ${50 + r() * 20}% ${45 + r() * 25}% ${55 + r() * 20}% / ${45 + r() * 25}% ${50 + r() * 25}% ${40 + r() * 30}% ${55 + r() * 20}%`,
       verzug: 260 + Math.round(r() * 520), dreh: Math.round(r() * 360),
     }));
-    const RINNSALE = Array.from({ length: 9 }, () => ({
+    const RINNSALE = Array.from({ length: ppFxN(9) }, () => ({
       ax: (r() - 0.5) * 0.8, laenge: 0.25 + r() * 0.45, breite: 2 + r() * 3,
       verzug: 380 + Math.round(r() * 500),
     }));
@@ -10941,7 +11000,7 @@ const ANIM_REGISTRY = {
   // offen gelegte Karte. Liest `x`/`y`/`w`/`h` und sitzt damit genau auf
   // ihr (Lehre aus v1154).
   portal_warp: (() => {
-    const FUNKEN = Array.from({ length: 18 }, (_, i) => {
+    const FUNKEN = Array.from({ length: ppFxN(18) }, (_, i) => {
       const winkel = (i / 18) * Math.PI * 2 + (i % 3) * 0.3;
       return {
         winkel, radius: 0.45 + (i % 5) * 0.12,
@@ -10982,7 +11041,7 @@ const ANIM_REGISTRY = {
   // ★★ v1178 — der abgewehrte Zauber ZERSCHELLT am Schild: ein heller
   // Aufprallring und Scherben, die nach aussen stieben.
   negate_shatter: (() => {
-    const SCHERBEN = Array.from({ length: 14 }, (_, i) => {
+    const SCHERBEN = Array.from({ length: ppFxN(14) }, (_, i) => {
       const winkel = (i / 14) * Math.PI * 2 + (i % 3) * 0.2;
       return {
         dx: Math.cos(winkel), dy: Math.sin(winkel),
@@ -11011,7 +11070,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   moe_heart: (() => {
-    const FUNKEN = Array.from({ length: 10 }, (_, i) => {
+    const FUNKEN = Array.from({ length: ppFxN(10) }, (_, i) => {
       const winkel = (i / 10) * Math.PI * 2 + (i % 3) * 0.25;
       return {
         dx: Math.cos(winkel), dy: Math.sin(winkel),
@@ -11051,7 +11110,7 @@ const ANIM_REGISTRY = {
     };
   })(),
   dark_blast: (() => {
-    const SPLITTER = Array.from({ length: 30 }, (_, i) => ({
+    const SPLITTER = Array.from({ length: ppFxN(30) }, (_, i) => ({
       winkel: (i / 30) * Math.PI * 2 + (i % 3) * 0.2,
       laenge: 34 + (i % 7) * 16,
       breite: 3 + (i % 4) * 2,
@@ -11206,7 +11265,7 @@ const ANIM_REGISTRY = {
   // vier Ringen, acht Lichtstrahlen und laengerem Nachleuchten.
   lure_beacon: (() => {
     const RINGE = [0, 240, 480, 720];
-    const STRAHLEN = Array.from({ length: 8 }, (_, i) => i * 45);
+    const STRAHLEN = Array.from({ length: ppFxN(8) }, (_, i) => i * 45);
     return function LureBeaconEffect({ x, y, w, h }) {
       const R = Math.max(Math.max(w || 90, h || 120) * 1.15, 90);
       return (
@@ -11246,7 +11305,7 @@ const ANIM_REGISTRY = {
       return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
     };
     const r = zufall(8801);
-    const ZUNGEN = Array.from({ length: 34 }, () => ({
+    const ZUNGEN = Array.from({ length: ppFxN(34) }, () => ({
       x: r() * 100,                        // Anteil der WANDBREITE
       y: r() * 100,                        // Anteil der Hoehe
       b: 26 + r() * 46,
@@ -11255,13 +11314,13 @@ const ANIM_REGISTRY = {
       verzug: r() * 700,
       hell: r() < 0.4,
     }));
-    const FUNKEN = Array.from({ length: 26 }, () => ({
+    const FUNKEN = Array.from({ length: ppFxN(26) }, () => ({
       x: r() * 100, y: 40 + r() * 60,
       g: 2 + r() * 3,
       dauer: 700 + r() * 700, verzug: r() * 1400,
       drift: (r() - 0.5) * 60,
     }));
-    const RAUCH = Array.from({ length: 8 }, () => ({
+    const RAUCH = Array.from({ length: ppFxN(8) }, () => ({
       x: r() * 100, g: 60 + r() * 70,
       dauer: 1500 + r() * 900, verzug: r() * 900,
     }));
@@ -11300,7 +11359,7 @@ const ANIM_REGISTRY = {
   })(),
   gift_shower: (() => {
     const FARBEN = ['#e4484f', '#3fa34d', '#f0b429', '#4a7fd4', '#b05fc9'];
-    const PAKETE = Array.from({ length: 9 }, (_, i) => ({
+    const PAKETE = Array.from({ length: ppFxN(9) }, (_, i) => ({
       x: -46 + i * 11 + (i % 3) * 4,
       groesse: 13 + (i % 4) * 4,
       farbe: FARBEN[i % FARBEN.length],
@@ -11409,7 +11468,7 @@ const ANIM_REGISTRY = {
         }
         return `polygon(${oben.join(', ')}, ${unten.join(', ')})`;
       }, []);
-      const splitter = useMemo(() => Array.from({ length: 18 }, () => ({
+      const splitter = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
         links: Math.random() * 100,
         hoch: Math.random() < 0.5,
         weite: 60 + Math.random() * 150,
@@ -11502,7 +11561,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 80, 80);
       // Zufall EINMAL einfrieren, sonst zucken die Blitze bei jedem
       // Re-Render neu (Muster aller Animationen).
-      const blitze = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+      const blitze = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => {
         const zacken = [];
         let px = 0;
         for (let seg = 0; seg <= 6; seg++) {
@@ -11610,7 +11669,7 @@ const ANIM_REGISTRY = {
       }, []);
 
       // Zufall EINMAL einfrieren (Muster aller Animationen).
-      const sterne = useMemo(() => Array.from({ length: 22 }, () => {
+      const sterne = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = ww * (0.55 + Math.random() * 0.75);
         return {
@@ -11732,7 +11791,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 120, 120);
 
       // Zufall EINMAL einfrieren (Muster aller Animationen).
-      const blasen = useMemo(() => Array.from({ length: 16 }, () => ({
+      const blasen = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         links: (Math.random() - 0.5) * ww * 0.92,
         drift: (Math.random() - 0.5) * ww * 0.3,
         groesse: 4 + Math.random() * 9,
@@ -11891,7 +11950,7 @@ const ANIM_REGISTRY = {
         { anteil: 0.28, dur: 780, richtung: 1, strich: '3px dashed rgba(255,255,255,.9)' },
       ];
 
-      const gischt = useMemo(() => Array.from({ length: 22 }, () => {
+      const gischt = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = durch * (0.45 + Math.random() * 0.35);
         return {
@@ -12006,7 +12065,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 90, 90);
       const hh = Math.max(h || 120, 120);
 
-      const flammen = useMemo(() => Array.from({ length: 14 }, () => ({
+      const flammen = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         links: (Math.random() - 0.5) * ww * 0.95,
         groesse: 8 + Math.random() * 16,
         hoehe: hh * (0.5 + Math.random() * 0.5),
@@ -12218,7 +12277,7 @@ const ANIM_REGISTRY = {
     return function GoldenExplosionEffect({ x, y, w }) {
       const ww = Math.max(w || 80, 80);
 
-      const funken = useMemo(() => Array.from({ length: 24 }, () => {
+      const funken = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = ww * (0.5 + Math.random() * 0.8);
         return {
@@ -12232,7 +12291,7 @@ const ANIM_REGISTRY = {
       }), [ww]);
 
       // Muenzen fliegen auf und fallen wieder — der Ertrag der Karte.
-      const muenzen = useMemo(() => Array.from({ length: 7 }, () => ({
+      const muenzen = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
         dx: (Math.random() - 0.5) * ww * 1.3,
         hoch: -(ww * (0.45 + Math.random() * 0.5)),
         groesse: 12 + Math.random() * 12,
@@ -12462,7 +12521,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 110, 110);
       const radius = Math.max(ww, hh) * 0.95;
 
-      const blitze = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+      const blitze = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
         const winkel = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
         const laenge = radius * (0.75 + Math.random() * 0.45);
         return {
@@ -12478,7 +12537,7 @@ const ANIM_REGISTRY = {
         };
       }), [radius]);
 
-      const funken = useMemo(() => Array.from({ length: 12 }, () => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         links: (Math.random() - 0.5) * ww * 0.9,
         oben: (Math.random() - 0.5) * hh * 0.9,
         groesse: 2 + Math.random() * 4,
@@ -12572,7 +12631,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 120, 120);
       const hoehe = hh * 2.3;                          // von weit oberhalb
 
-      const staub = useMemo(() => Array.from({ length: 16 }, () => ({
+      const staub = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         links: (Math.random() - 0.5) * ww * 0.82,
         start: Math.random() * hoehe * 0.75,
         groesse: 2 + Math.random() * 4,
@@ -12682,7 +12741,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 110, 110);
       const groesse = ww * 0.74;
 
-      const geroell = useMemo(() => Array.from({ length: 9 }, () => {
+      const geroell = useMemo(() => Array.from({ length: ppFxN(9) }, () => {
         const winkel = -Math.PI * (0.1 + Math.random() * 0.8);   // nach oben/aussen
         const weite = ww * (0.35 + Math.random() * 0.5);
         return {
@@ -12786,7 +12845,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 80, 80);
       const hh = Math.max(h || 110, 110);
 
-      const funken = useMemo(() => Array.from({ length: 26 }, () => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
         links: (Math.random() - 0.5) * ww * 0.95,
         start: hh * (0.1 + Math.random() * 0.35),
         groesse: 3 + Math.random() * 5,
@@ -12907,7 +12966,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 80, 80);
       const hh = Math.max(h || 110, 110);
 
-      const scherben = useMemo(() => Array.from({ length: 22 }, () => {
+      const scherben = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = ww * (0.35 + Math.random() * 0.85);
         return {
@@ -12999,7 +13058,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 80, 60);
       const hh = Math.max(h || 110, 80);
 
-      const herzen = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+      const herzen = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         dx: (Math.random() - 0.5) * ww * 0.8,
         dy: (Math.random() - 0.5) * hh * 0.5,
         groesse: 14 + Math.random() * 20,
@@ -13072,7 +13131,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 110, 110);
       const R = Math.max(ww, hh) * 3.1;          // Reichweite des Feuerballs
 
-      const splitter = useMemo(() => Array.from({ length: 26 }, () => {
+      const splitter = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = R * (0.3 + Math.random() * 0.55);
         return {
@@ -13086,7 +13145,7 @@ const ANIM_REGISTRY = {
         };
       }), [R, hh]);
 
-      const funken = useMemo(() => Array.from({ length: 14 }, () => {
+      const funken = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = R * (0.45 + Math.random() * 0.6);
         return {
@@ -13193,7 +13252,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 110, 80);
       const R = Math.max(ww, hh) * 1.25;
 
-      const zeichen = useMemo(() => Array.from({ length: 6 }, (_, i) => {
+      const zeichen = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => {
         const winkel = (i / 6) * Math.PI * 2 + Math.random() * 0.4;
         return {
           dx: Math.cos(winkel) * R * 0.75,
@@ -13271,7 +13330,7 @@ const ANIM_REGISTRY = {
       const ww = Math.max(w || 80, 80);
       const hh = Math.max(h || 110, 110);
       const len = Math.hypot(ww, hh) * 2.1;
-      const sparks = useMemo(() => Array.from({ length: 24 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
         angle: Math.random() * 360,
         dist: 50 + Math.random() * 120,
         delay: 120 + Math.random() * 180,
@@ -13361,7 +13420,7 @@ const ANIM_REGISTRY = {
     return function OrbitalLaserRedEffect({ x, y }) {
       // Beam travels from the viewport's top edge down to the target.
       const beamHeight = Math.max(y + 40, 180);
-      const sparks = useMemo(() => Array.from({ length: 14 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         angle: Math.random() * 360,
         dist: 40 + Math.random() * 80,
         delay: 260 + Math.random() * 140,
@@ -13434,7 +13493,7 @@ const ANIM_REGISTRY = {
   // being re-triggered so the link between them reads instantly.
   blood_moon_pulse: (() => {
     return function BloodMoonPulseEffect({ x, y, w, h }) {
-      const drops = useMemo(() => Array.from({ length: 14 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         xOff: -30 + Math.random() * 60,
         startY: -30 + Math.random() * 10,
         endY: 70 + Math.random() * 30,
@@ -13442,7 +13501,7 @@ const ANIM_REGISTRY = {
         dur: 650 + Math.random() * 300,
         size: 3 + Math.random() * 4,
       })), []);
-      const rays = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+      const rays = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         angle: -45 + i * 15 + (Math.random() * 6 - 3),
         len: 70 + Math.random() * 30,
         delay: Math.random() * 150,
@@ -13506,7 +13565,7 @@ const ANIM_REGISTRY = {
   // transforms/opacity) — only the colour strings differ.
   lunar_eclipse_pulse: (() => {
     return function LunarEclipsePulseEffect({ x, y, w, h }) {
-      const drops = useMemo(() => Array.from({ length: 14 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         xOff: -30 + Math.random() * 60,
         startY: -30 + Math.random() * 10,
         endY: 70 + Math.random() * 30,
@@ -13514,7 +13573,7 @@ const ANIM_REGISTRY = {
         dur: 650 + Math.random() * 300,
         size: 3 + Math.random() * 4,
       })), []);
-      const rays = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+      const rays = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         angle: -45 + i * 15 + (Math.random() * 6 - 3),
         len: 70 + Math.random() * 30,
         delay: Math.random() * 150,
@@ -13579,7 +13638,7 @@ const ANIM_REGISTRY = {
       const W = Math.max(w || window.innerWidth, 480);
       const H = Math.max(h || window.innerHeight, 320);
       const palette = ['#fff066', '#ffd428', '#ffe88a', '#f5b800', '#fff7b2'];
-      const spores = useMemo(() => Array.from({ length: 200 }, () => ({
+      const spores = useMemo(() => Array.from({ length: ppFxN(200) }, () => ({
         xStart: Math.random() * W - W / 2,
         yStart: -H / 2 - 40,
         xEnd:   (-50 + Math.random() * 100),
@@ -13628,7 +13687,7 @@ const ANIM_REGISTRY = {
       const W = Math.max(w || window.innerWidth, 480);
       const H = Math.max(h || window.innerHeight, 320);
       const palette = ['#6adbc4', '#3a86d9', '#1a3ea8', '#c42842', '#6a0e1c'];
-      const spores = useMemo(() => Array.from({ length: 180 }, () => ({
+      const spores = useMemo(() => Array.from({ length: ppFxN(180) }, () => ({
         xStart: Math.random() * W - W / 2,
         yStart: -H / 2 - 40,
         xEnd:   (-60 + Math.random() * 120),
@@ -13674,7 +13733,7 @@ const ANIM_REGISTRY = {
   // via `playAnimation('deepsea_spores_growth', supportSlotSelector)`.
   deepsea_spores_growth: (() => {
     return function DeepseaSporesGrowthEffect({ x, y }) {
-      const tendrils = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+      const tendrils = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
         angle: -70 + (i * 20) + (Math.random() * 10 - 5),
         len:   28 + Math.random() * 18,
         delay: Math.random() * 200,
@@ -13730,7 +13789,7 @@ const ANIM_REGISTRY = {
 
   deep_sea_bubbles: (() => {
     return function DeepSeaBubblesEffect({ x, y }) {
-      const bubbles = useMemo(() => Array.from({ length: 20 }, () => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(20) }, () => ({
         xOff: -40 + Math.random() * 80,
         startY: 25 + Math.random() * 30,
         endY: -80 - Math.random() * 60,
@@ -13777,7 +13836,7 @@ const ANIM_REGISTRY = {
         { offY:   6, delay:  30, scale: 1.05, thick: 3.5 },
         { offY:  18, delay:  90, scale: 0.95, thick: 2.5 },
       ], []);
-      const gore = useMemo(() => Array.from({ length: 16 }, () => ({
+      const gore = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         dx: -30 + Math.random() * 60,
         dy: 8 + Math.random() * 55,
         delay: 180 + Math.random() * 220,
@@ -13855,7 +13914,7 @@ const ANIM_REGISTRY = {
       // Embers fly outward in a fan, biased toward the slash axis so
       // the cluster reads as "sparked off the blade" rather than a
       // generic radial pop.
-      const embers = useMemo(() => Array.from({ length: 16 }, () => {
+      const embers = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
         // Skew angles toward ±42° (the blade axis) by sampling around
         // those two directions with a wide jitter.
         const axis = Math.random() < 0.5 ? -42 : 138; // degrees, the two slash directions
@@ -13872,7 +13931,7 @@ const ANIM_REGISTRY = {
       // Flame tongues sit along the blade path, rising and fading
       // shortly after the streak passes — they make the slash feel
       // ENGULFED rather than steel-clean.
-      const flames = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+      const flames = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
         startX: (-ww * 0.42) + (ww * 0.84) * (i / 7),
         delay: 240 + i * 30 + Math.random() * 70,
         dur: 420 + Math.random() * 220,
@@ -13958,7 +14017,7 @@ const ANIM_REGISTRY = {
       const hh = Math.max(h || 110, 110);
       // Diagonal cut: upper-right to lower-left.
       const len = Math.hypot(ww, hh) * 1.6;
-      const drops = useMemo(() => Array.from({ length: 10 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
         dx: -18 + Math.random() * 36,
         dy: 10 + Math.random() * 40,
         delay: 220 + Math.random() * 150,
@@ -14118,7 +14177,7 @@ const ANIM_REGISTRY = {
   // has time to "haunt" the artifact before destruction fires.
   spooky_ghost: (() => {
     return function SpookyGhostEffect({ x, y }) {
-      const wisps = useMemo(() => Array.from({ length: 10 }, () => ({
+      const wisps = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
         xOff: -35 + Math.random() * 70,
         startY: 20 + Math.random() * 20,
         endY: -70 - Math.random() * 50,
@@ -14177,7 +14236,7 @@ const ANIM_REGISTRY = {
   // sitzt auf einer Heldenkarte, nicht über dem ganzen Brett.
   ...(function () {
     function ShapeshiftEffect({ x, y, herein }) {
-      const teilchen = useMemo(() => Array.from({ length: 18 }, () => {
+      const teilchen = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = 38 + Math.random() * 46;
         return {
@@ -14245,7 +14304,7 @@ const ANIM_REGISTRY = {
   // Auftakt (dedupe 0, ohne Kategorie — siehe CARD_API 'effect').
   concert_revival: (() => {
     return function ConcertRevivalEffect({ x, y, w = 80, h = 110 }) {
-      const notes = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+      const notes = useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => ({
         glyph: ['♪', '♫', '♩', '♬', '♭', '♯'][Math.floor(Math.random() * 6)],
         xOff: (Math.random() - 0.5) * w * 2.2,
         rise: 70 + Math.random() * 160,
@@ -14310,14 +14369,14 @@ const ANIM_REGISTRY = {
   holy_revival: (() => {
     // Golden-white holy light rising upward — revival/resurrection effect
     return function HolyRevivalEffect({ x, y }) {
-      const rays = useMemo(() => Array.from({ length: 16 }, () => ({
+      const rays = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         angle: Math.random() * 360,
         len: 60 + Math.random() * 80,
         width: 2 + Math.random() * 3,
         delay: Math.random() * 400,
         dur: 600 + Math.random() * 400,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 24 }, () => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
         xOff: -50 + Math.random() * 100,
         startY: 20 + Math.random() * 30,
         endY: -60 - Math.random() * 80,
@@ -14363,7 +14422,7 @@ const ANIM_REGISTRY = {
   arrow_rain: (() => {
     // Sharp arrow projectiles raining down from above — Rain of Arrows
     return function ArrowRainEffect({ x, y }) {
-      const arrows = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+      const arrows = useMemo(() => Array.from({ length: ppFxN(28) }, (_, i) => ({
         xOff: -70 + Math.random() * 140,
         startY: -150 - Math.random() * 100,
         delay: Math.random() * 600,
@@ -14371,7 +14430,7 @@ const ANIM_REGISTRY = {
         rot: 170 + Math.random() * 20,
         len: 18 + Math.random() * 14,
       })), []);
-      const impacts = useMemo(() => Array.from({ length: 16 }, () => ({
+      const impacts = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         xOff: -50 + Math.random() * 100,
         delay: 250 + Math.random() * 500,
         dur: 300 + Math.random() * 200,
@@ -14583,7 +14642,7 @@ const ANIM_REGISTRY = {
     // Karte sie uebersehen) und das Ersatzbild, wenn die Karte selbst
     // negiert wird (`spellVisual`).
     return function PinkSkyPuffEffect({ x, y }) {
-      const flocken = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+      const flocken = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         dx: Math.cos((i / 7) * Math.PI * 2) * (16 + Math.random() * 18),
         dy: Math.sin((i / 7) * Math.PI * 2) * (10 + Math.random() * 14) - 8,
         g: 12 + Math.random() * 16,
@@ -14856,7 +14915,7 @@ const ANIM_REGISTRY = {
   juice_bubbles: (() => {
     // Orange juice bubbles — same as beer but orange palette
     return function JuiceBubblesEffect({ x, y }) {
-      const bubbles = useMemo(() => Array.from({ length: 18 }, () => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
         xOff: -25 + Math.random() * 50,
         size: 4 + Math.random() * 8,
         delay: Math.random() * 300,
@@ -14879,7 +14938,7 @@ const ANIM_REGISTRY = {
   })(),
   poison_tick: (() => {
     return function PoisonTickEffect({ x, y }) {
-      const bubbles = useMemo(() => Array.from({ length: 14 }, () => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         xOff: -25 + Math.random() * 50,
         size: 4 + Math.random() * 7,
         delay: Math.random() * 250,
@@ -14902,7 +14961,7 @@ const ANIM_REGISTRY = {
   })(),
   poison_vial: (() => {
     return function PoisonVialEffect({ x, y }) {
-      const ooze = useMemo(() => Array.from({ length: 12 }, () => ({
+      const ooze = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         xOff: -30 + Math.random() * 60,
         size: 6 + Math.random() * 10,
         delay: Math.random() * 200,
@@ -14937,7 +14996,7 @@ const ANIM_REGISTRY = {
   })(),
   tea_steam: (() => {
     return function TeaSteamEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         xOff: -20 + Math.random() * 40,
         size: 5 + Math.random() * 7,
         delay: Math.random() * 300,
@@ -14962,7 +15021,7 @@ const ANIM_REGISTRY = {
   })(),
   coffee_steam: (() => {
     return function CoffeeSteamEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 16 }, () => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         xOff: -22 + Math.random() * 44,
         size: 5 + Math.random() * 7,
         delay: Math.random() * 300,
@@ -14992,7 +15051,7 @@ const ANIM_REGISTRY = {
       const hammerW = 55;
       const hammerH = 80;
       // Impact sparks
-      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI * 0.15 + Math.random() * Math.PI * 1.3; // mostly sideways/upward
         const speed = 20 + Math.random() * 50;
         return {
@@ -15054,7 +15113,7 @@ const ANIM_REGISTRY = {
     return function ShatteringStrikeEffect({ x, y, w, h }) {
       const targetH = h || 90;
       const hammerW = 38, hammerH = 56;
-      const clods = useMemo(() => Array.from({ length: 18 }, () => {
+      const clods = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2; // Kegel nach oben-aussen
         const speed = 26 + Math.random() * 46;
         return {
@@ -15064,7 +15123,7 @@ const ANIM_REGISTRY = {
           delay: 300 + Math.random() * 70, dur: 420 + Math.random() * 260,
         };
       }), []);
-      const dust = useMemo(() => Array.from({ length: 12 }, () => {
+      const dust = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 18 + Math.random() * 30;
         return {
@@ -15126,7 +15185,7 @@ const ANIM_REGISTRY = {
       const clubW = 46;
       const clubH = 132;
       // Holzsplitter + Staubbrocken, die beim Aufprall wegfliegen.
-      const debris = useMemo(() => Array.from({ length: 16 }, () => {
+      const debris = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
         const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2;
         const speed = 25 + Math.random() * 60;
         return {
@@ -15205,7 +15264,7 @@ const ANIM_REGISTRY = {
       const legW = 120;
       const legH = 250;
       // Brown dust chunks bursting sideways/up from the impact.
-      const dust = useMemo(() => Array.from({ length: 22 }, () => {
+      const dust = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = -Math.PI * 0.12 + Math.random() * Math.PI * 1.24; // mostly sideways
         const speed = 28 + Math.random() * 75;
         return {
@@ -15269,7 +15328,7 @@ const ANIM_REGISTRY = {
       const legW = 130;
       const legH = 260;
       // Brown dust chunks plus loose hair tufts flying outward.
-      const dust = useMemo(() => Array.from({ length: 24 }, () => {
+      const dust = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
         const angle = -Math.PI * 0.12 + Math.random() * Math.PI * 1.24;
         const speed = 28 + Math.random() * 75;
         return {
@@ -15360,7 +15419,7 @@ const ANIM_REGISTRY = {
       const pal = palette || {};
       const SHARDS = pal.shards || ['#ffb3de', '#ff8ccf', '#ffd6ec', '#f574bd', '#ffc2e6'];
       const DUST = pal.dust || ['#fff0f8', '#ffc8e8', '#ff9ad6'];
-      const shards = useMemo(() => Array.from({ length: 22 }, () => {
+      const shards = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 34 + Math.random() * 78;
         return {
@@ -15372,7 +15431,7 @@ const ANIM_REGISTRY = {
           delay: 220 + Math.random() * 60, dur: 420 + Math.random() * 260,
         };
       }), []);
-      const dust = useMemo(() => Array.from({ length: 16 }, () => {
+      const dust = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 20 + Math.random() * 50;
         return {
@@ -15411,7 +15470,7 @@ const ANIM_REGISTRY = {
   ice_block_crash: (() => {
     return function IceBlockCrashEffect({ x, y }) {
       // Icy shard burst on impact.
-      const shards = useMemo(() => Array.from({ length: 18 }, () => {
+      const shards = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 30 + Math.random() * 70;
         return {
@@ -15456,7 +15515,7 @@ const ANIM_REGISTRY = {
       const clubSize      = 130;
 
       // Bone-spike chips + dust bursting from the impact.
-      const chips = useMemo(() => Array.from({ length: 26 }, () => {
+      const chips = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
         const angle = -Math.PI * 0.20 + Math.random() * Math.PI * 1.40;
         const speed = 36 + Math.random() * 90;
         return {
@@ -15555,7 +15614,7 @@ const ANIM_REGISTRY = {
   })(),
   cloud_gather: (() => {
     return function CloudGatherEffect({ x, y }) {
-      const puffs = useMemo(() => Array.from({ length: 16 }, () => {
+      const puffs = useMemo(() => Array.from({ length: ppFxN(16) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 60 + Math.random() * 50;
         return {
@@ -15647,7 +15706,7 @@ const ANIM_REGISTRY = {
       }, []);
 
       // Sparkle dust around the armor as it materialises.
-      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.4;
         const dist = 35 + Math.random() * 35;
         return {
@@ -15732,7 +15791,7 @@ const ANIM_REGISTRY = {
   })(),
   cloud_disperse: (() => {
     return function CloudDisperseEffect({ x, y }) {
-      const puffs = useMemo(() => Array.from({ length: 18 }, () => {
+      const puffs = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 50 + Math.random() * 60;
         return {
@@ -15768,7 +15827,7 @@ const ANIM_REGISTRY = {
   })(),
   healing_hearts: (() => {
     return function HealingHeartsEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 20 }, () => {
+      const particles = useMemo(() => Array.from({ length: ppFxN(20) }, () => {
         const isHeart = Math.random() > 0.4;
         return {
           char: isHeart ? (Math.random() > 0.5 ? '❤️' : '💚') : '✚',
@@ -15798,7 +15857,7 @@ const ANIM_REGISTRY = {
   heart_burst: (() => {
     const HEARTS = ['❤️','💖','💗','💕','💘','💝','💓','🩷'];
     return function HeartBurstEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 18 }, () => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
         char:  HEARTS[Math.floor(Math.random() * HEARTS.length)],
         xOff:  -50 + Math.random() * 100,
         delay: Math.random() * 300,
@@ -15881,7 +15940,7 @@ const ANIM_REGISTRY = {
   loyalty_birds: (() => {
     const VOEGEL = ['🕊️', '🐦'];
     return function LoyaltyBirdsEffect({ x, y }) {
-      const teile = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+      const teile = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
         const istVogel = i % 3 !== 2;   // zwei Voegel je Herzchen
         return {
           char: istVogel
@@ -15917,7 +15976,7 @@ const ANIM_REGISTRY = {
   // Handkarte, verankert an genau dieser Karte (`handIdx`).
   knowledge_sparkle: (() => {
     return function KnowledgeSparkleEffect({ x, y }) {
-      const teile = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+      const teile = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
         const istHerz = i % 4 === 0;
         const ang = (i / 16) * Math.PI * 2 + (Math.random() * 0.5 - 0.25);
         const rad = 18 + Math.random() * 22;
@@ -15962,7 +16021,7 @@ const ANIM_REGISTRY = {
   // be recoloured to true blood-red). Self-contained keyframes.
   blood_hearts: (() => {
     return function BloodHeartsEffect({ x, y }) {
-      const hearts = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+      const hearts = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
         const ang = (i / 12) * Math.PI * 2 + (Math.random() * 0.4 - 0.2);
         const rad = 30 + Math.random() * 16;
         return {
@@ -16011,7 +16070,7 @@ const ANIM_REGISTRY = {
 
   golden_ankh_revival: (() => {
     return function GoldenAnkhRevivalEffect({ x, y }) {
-      const ankhs = useMemo(() => Array.from({ length: 12 }, () => ({
+      const ankhs = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         xOff: -45 + Math.random() * 90,
         startY: 20 + Math.random() * 30,
         endY: -70 - Math.random() * 80,
@@ -16020,7 +16079,7 @@ const ANIM_REGISTRY = {
         size: 14 + Math.random() * 16,
         rot: -20 + Math.random() * 40,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(20) }, () => ({
         xOff: -50 + Math.random() * 100,
         startY: 10 + Math.random() * 40,
         endY: -50 - Math.random() * 70,
@@ -16062,7 +16121,7 @@ const ANIM_REGISTRY = {
   thaw: ThawEffect,
   music_notes: (() => {
     return function MusicNotesEffect({ x, y }) {
-      const notes = useMemo(() => Array.from({ length: 32 }, () => {
+      const notes = useMemo(() => Array.from({ length: ppFxN(32) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 20 + Math.random() * 60;
         return {
@@ -16078,7 +16137,7 @@ const ANIM_REGISTRY = {
           opacity: 0.7 + Math.random() * 0.3,
         };
       }), []);
-      const sparkles = useMemo(() => Array.from({ length: 16 }, () => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         xOff: -40 + Math.random() * 80,
         startY: 10 + Math.random() * 20,
         endY: -50 - Math.random() * 60,
@@ -16118,7 +16177,7 @@ const ANIM_REGISTRY = {
   })(),
   necromancy_summon: (() => {
     return function NecromancySummonEffect({ x, y }) {
-      const skulls = useMemo(() => Array.from({ length: 12 }, () => {
+      const skulls = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 30 + Math.random() * 50;
         return {
@@ -16133,7 +16192,7 @@ const ANIM_REGISTRY = {
           rot: -20 + Math.random() * 40,
         };
       }), []);
-      const particles = useMemo(() => Array.from({ length: 28 }, () => {
+      const particles = useMemo(() => Array.from({ length: ppFxN(28) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 20 + Math.random() * 50;
         return {
@@ -16144,7 +16203,7 @@ const ANIM_REGISTRY = {
           dur: 400 + Math.random() * 400,
         };
       }), []);
-      const wisps = useMemo(() => Array.from({ length: 8 }, () => ({
+      const wisps = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
         xOff: -30 + Math.random() * 60,
         startY: 20 + Math.random() * 20,
         endY: -50 - Math.random() * 50,
@@ -16191,7 +16250,7 @@ const ANIM_REGISTRY = {
   dumbbell_pump: (() => {
     // Dumbbell pumps up and down twice — Muscle Training
     return function DumbbellPumpEffect({ x, y }) {
-      const sparks1 = useMemo(() => Array.from({ length: 10 }, () => {
+      const sparks1 = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = Math.random() * Math.PI;
         const speed = 15 + Math.random() * 30;
         return {
@@ -16203,7 +16262,7 @@ const ANIM_REGISTRY = {
           dur: 300 + Math.random() * 200,
         };
       }), []);
-      const sparks2 = useMemo(() => Array.from({ length: 10 }, () => {
+      const sparks2 = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = Math.random() * Math.PI;
         const speed = 15 + Math.random() * 30;
         return {
@@ -16261,7 +16320,7 @@ const ANIM_REGISTRY = {
     return function DarkWaveEngulfEffect({ x, y, w, h }) {
       const cw = w || 110;
       const ch = h || 140;
-      const drops = useMemo(() => Array.from({ length: 14 }, () => {
+      const drops = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI * 0.15 + Math.random() * Math.PI * 1.3;
         const speed = 30 + Math.random() * 50;
         return {
@@ -16338,7 +16397,7 @@ const ANIM_REGISTRY = {
   water_splash: (() => {
     // Water splash — hero dives into water (Jump in the River)
     return function WaterSplashEffect({ x, y }) {
-      const drops = useMemo(() => Array.from({ length: 24 }, () => {
+      const drops = useMemo(() => Array.from({ length: ppFxN(24) }, () => {
         const angle = -Math.PI * 0.1 + Math.random() * Math.PI * 1.2;
         const speed = 25 + Math.random() * 55;
         return {
@@ -16380,7 +16439,7 @@ const ANIM_REGISTRY = {
   sunglasses_drop: (() => {
     // Sunglasses slowly descend onto the Hero — Divine Gift of Coolness
     return function SunglassesDropEffect({ x, y }) {
-      const sparkles = useMemo(() => Array.from({ length: 12 }, () => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         xOff: -30 + Math.random() * 60,
         startY: -5 + Math.random() * 15,
         endY: -40 - Math.random() * 50,
@@ -16417,7 +16476,7 @@ const ANIM_REGISTRY = {
     // big radial spark explosion, rising dust, and a delayed 💥 echo.
     // Used by Rebelliokai Oblivious Oni's 150-dmg AoE.
     return function ClubBashEffect({ x, y }) {
-      const sparks = useMemo(() => Array.from({ length: 28 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(28) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 60 + Math.random() * 90;
         return {
@@ -16429,7 +16488,7 @@ const ANIM_REGISTRY = {
           color: ['#2a1808', '#4a2c12', '#7a4f24', '#c08440', '#ffd070', '#fff5b0'][Math.floor(Math.random() * 6)],
         };
       }), []);
-      const debrisChunks = useMemo(() => Array.from({ length: 10 }, () => {
+      const debrisChunks = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = -Math.PI + Math.random() * Math.PI; // -180° to 0° → upward arc
         const speed = 50 + Math.random() * 70;
         return {
@@ -16442,7 +16501,7 @@ const ANIM_REGISTRY = {
           glyph: ['🪨', '◤', '◢', '◣'][Math.floor(Math.random() * 4)],
         };
       }), []);
-      const dustMotes = useMemo(() => Array.from({ length: 22 }, () => ({
+      const dustMotes = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
         xOff: -56 + Math.random() * 112,
         startY: 4 + Math.random() * 12,
         riseY: -(28 + Math.random() * 44),
@@ -16676,7 +16735,7 @@ const ANIM_REGISTRY = {
   })(),
   heal_sparkle: (() => {
     return function HealSparkleEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 36 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(36) }, (_, i) => ({
         id: i,
         x: -40 + Math.random() * 80,
         y: -40 + Math.random() * 80,
@@ -16714,7 +16773,7 @@ const ANIM_REGISTRY = {
   // are inline so the effect is self-contained.
   love_burst: (() => {
     return function LoveBurstEffect({ x, y }) {
-      const hearts = useMemo(() => Array.from({ length: 22 }, (_, i) => {
+      const hearts = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => {
         const angle = Math.random() * Math.PI * 2;
         const dist  = 24 + Math.random() * 70;
         // Bias toward light-pink hearts; a few sparkles for texture.
@@ -16766,7 +16825,7 @@ const ANIM_REGISTRY = {
     // radiating outward. Keyframes live inside the component so the
     // animation is self-contained.
     return function SuperSaiyanAuraEffect({ x, y }) {
-      const streaks = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const streaks = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         id: i,
         x: -55 + Math.random() * 110,
         delay: Math.random() * 0.35,
@@ -16774,7 +16833,7 @@ const ANIM_REGISTRY = {
         height: 60 + Math.random() * 80,
         width: 4 + Math.random() * 6,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 30 + Math.random() * 60,
@@ -16862,7 +16921,7 @@ const ANIM_REGISTRY = {
   })(),
   overheal_shock_equip: (() => {
     return function OverhealShockEquipEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(28) }, (_, i) => ({
         id: i,
         x: -40 + Math.random() * 80,
         y: -40 + Math.random() * 80,
@@ -16897,7 +16956,7 @@ const ANIM_REGISTRY = {
   })(),
   death_skulls: (() => {
     return function DeathSkullsEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
         id: i,
         x: -35 + Math.random() * 70,
         y: -35 + Math.random() * 70,
@@ -16931,7 +16990,7 @@ const ANIM_REGISTRY = {
   })(),
   acid_splash: (() => {
     return function AcidSplashEffect({ x, y }) {
-      const drops = useMemo(() => Array.from({ length: 22 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
         xOff: -50 + Math.random() * 100,
         size: 8 + Math.random() * 16,
         delay: Math.random() * 120,
@@ -16939,7 +16998,7 @@ const ANIM_REGISTRY = {
         wobble: -20 + Math.random() * 40,
         color: ['#cc1111','#ee3322','#ff4433','#dd2200','#aa0000','#ff6644','#ff2200','#cc0000'][Math.floor(Math.random() * 8)],
       })), []);
-      const splats = useMemo(() => Array.from({ length: 6 }, () => ({
+      const splats = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
         xOff: -25 + Math.random() * 50,
         yOff: -15 + Math.random() * 30,
         delay: 50 + Math.random() * 200,
@@ -16968,14 +17027,14 @@ const ANIM_REGISTRY = {
   })(),
   laser_burst: (() => {
     return function LaserBurstEffect({ x, y }) {
-      const beams = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const beams = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         angle: (i * 30) + Math.random() * 10 - 5,
         length: 40 + Math.random() * 30,
         delay: Math.random() * 150,
         dur: 400 + Math.random() * 300,
         width: 2 + Math.random() * 2,
       })), []);
-      const sparks = useMemo(() => Array.from({ length: 8 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
         angle: Math.random() * 360,
         dist: 20 + Math.random() * 25,
         size: 3 + Math.random() * 4,
@@ -17086,7 +17145,7 @@ const ANIM_REGISTRY = {
       const tOut = Math.round(lenOut / speed);
       const gradIn = Math.round(lenIn / (Math.PI * D) * 360);
       const gradOut = Math.round(lenOut / (Math.PI * D) * 360);
-      const staub = useMemo(() => Array.from({ length: 14 }, () => {
+      const staub = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const w = Math.PI + Math.random() * Math.PI;      // nach oben faechern
         const weite = 40 + Math.random() * 70;
         return {
@@ -17096,7 +17155,7 @@ const ANIM_REGISTRY = {
           dur: 400 + Math.random() * 300,
         };
       }), []);
-      const splitter = useMemo(() => Array.from({ length: 10 }, () => {
+      const splitter = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const w = Math.random() * Math.PI * 2;
         const weite = 50 + Math.random() * 60;
         return { dx: Math.cos(w) * weite, dy: Math.sin(w) * weite - 30, size: 4 + Math.random() * 6, delay: 370 + Math.random() * 40, dur: 300 + Math.random() * 220 };
@@ -17197,7 +17256,7 @@ const ANIM_REGISTRY = {
   // getroffener Creature (animType am Schadens-Batch-Eintrag).
   aquatic_arrow_rain: (() => {
     return function AquaticArrowRainEffect({ x, y }) {
-      const arrows = useMemo(() => Array.from({ length: 26 }, () => ({
+      const arrows = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
         xOff: -60 + Math.random() * 120,
         startY: -150 - Math.random() * 100,
         delay: Math.random() * 550,
@@ -17205,7 +17264,7 @@ const ANIM_REGISTRY = {
         rot: 172 + Math.random() * 16,
         len: 18 + Math.random() * 14,
       })), []);
-      const drops = useMemo(() => Array.from({ length: 16 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         xOff: -46 + Math.random() * 92,
         delay: 240 + Math.random() * 480,
         dur: 320 + Math.random() * 220,
@@ -17250,7 +17309,7 @@ const ANIM_REGISTRY = {
   // die Broadcasts liefen still ins Leere (Als Befund v700).
   shield_block: (() => {
     return function ShieldBlockEffect({ x, y }) {
-      const funken = useMemo(() => Array.from({ length: 10 }, () => {
+      const funken = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const winkel = Math.random() * Math.PI * 2;
         const weite = 26 + Math.random() * 30;
         return {
@@ -17343,7 +17402,7 @@ const ANIM_REGISTRY = {
       // ist exakt der Winkel des Flugvektors: Start (+70, −190) →
       // atan(70/190) ≈ 20° aus der Senkrechten, nach links unten.
       const WINKEL = 20;
-      const scherben = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+      const scherben = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         angle: 200 + (i / 10) * 140 + Math.random() * 12,
         dist: 30 + Math.random() * 45,
         size: 4 + Math.random() * 6,
@@ -17466,14 +17525,14 @@ const ANIM_REGISTRY = {
   })(),
   whirlpool: (() => {
     return function WhirlpoolEffect({ x, y }) {
-      const rings = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+      const rings = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => ({
         radius: 20 + i * 16,
         delay: i * 60,
         dur: 900 - i * 40,
         opacity: 1 - i * 0.08,
         width: 4 - i * 0.25,
       })), []);
-      const drops = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(24) }, (_, i) => ({
         angle: (i / 24) * 360 + Math.random() * 15,
         dist: 35 + Math.random() * 55,
         delay: Math.random() * 300,
@@ -17544,7 +17603,7 @@ const ANIM_REGISTRY = {
     // the target zone. Lifespan ~1700ms; the broadcast MUST pass a
     // matching `duration` so the component stays mounted to the end.
     return function HandOfDeathStrikeEffect({ x, y }) {
-      const bones = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const bones = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 50 + Math.random() * 85,
@@ -17554,7 +17613,7 @@ const ANIM_REGISTRY = {
         rot: -180 + Math.random() * 360,
         char: ['🦴', '🦴', '☠'][Math.floor(Math.random() * 3)],
       })), []);
-      const skulls = useMemo(() => Array.from({ length: 10 }, (_, i) => ({
+      const skulls = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 65 + Math.random() * 55,
@@ -17562,7 +17621,7 @@ const ANIM_REGISTRY = {
         delay: 760 + Math.random() * 220,
         dur: 800 + Math.random() * 400,
       })), []);
-      const sparks = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(28) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 55 + Math.random() * 75,
@@ -17729,7 +17788,7 @@ const ANIM_REGISTRY = {
     // a burst of snowflakes + ice fragments + cyan sparks scatters.
     // Lifespan ~1700ms; broadcast MUST pass matching `duration`.
     return function IcyGraveStrikeEffect({ x, y }) {
-      const flakes = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const flakes = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 55 + Math.random() * 85,
@@ -17739,7 +17798,7 @@ const ANIM_REGISTRY = {
         rot: -180 + Math.random() * 360,
         char: ['❄', '❄', '❅', '❆', '✦'][Math.floor(Math.random() * 5)],
       })), []);
-      const shards = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+      const shards = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 70 + Math.random() * 55,
@@ -17747,7 +17806,7 @@ const ANIM_REGISTRY = {
         delay: 760 + Math.random() * 220,
         dur: 800 + Math.random() * 400,
       })), []);
-      const sparks = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(28) }, (_, i) => ({
         id: i,
         angle: Math.random() * Math.PI * 2,
         dist: 55 + Math.random() * 75,
@@ -17921,7 +17980,7 @@ const ANIM_REGISTRY = {
     return function FloodingEffect() {
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
       const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
-      const bubbles = useMemo(() => Array.from({ length: 32 }, (_, i) => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(32) }, (_, i) => ({
         id: i,
         x: Math.random() * vw,
         size: 8 + Math.random() * 24,
@@ -17929,7 +17988,7 @@ const ANIM_REGISTRY = {
         dur: 1200 + Math.random() * 900,
         drift: -60 + Math.random() * 120,
       })), [vw]);
-      const splashes = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const splashes = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         id: i,
         x: Math.random() * vw,
         delay: 450 + Math.random() * 500,
@@ -18018,7 +18077,7 @@ const ANIM_REGISTRY = {
             filter: 'drop-shadow(0 0 10px rgba(80,180,255,0.8)) drop-shadow(0 0 20px rgba(60,140,220,0.5))',
             animation: 'gateShieldPop 900ms ease-out forwards',
           }}>🛡️</span>
-          {Array.from({ length: 8 }).map((_, i) => {
+          {Array.from({ length: ppFxN(8) }).map((_, i) => {
             const angle = (i / 8) * 360;
             const rad = (angle * Math.PI) / 180;
             return (
@@ -18053,7 +18112,7 @@ const ANIM_REGISTRY = {
   })(),
   sand_twister: (() => {
     return function SandTwisterEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(24) }, (_, i) => ({
         angle: (i / 24) * 360 * 2 + Math.random() * 30,
         radius: 4 + (i / 24) * 18,
         size: 3 + Math.random() * 4,
@@ -18097,7 +18156,7 @@ const ANIM_REGISTRY = {
   })(),
   mummy_wrap: (() => {
     return function MummyWrapEffect({ x, y }) {
-      const strips = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+      const strips = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => ({
         angle: (i / 12) * 360 + Math.random() * 30,
         width: 12 + Math.random() * 16,
         height: 3 + Math.random() * 2,
@@ -18151,12 +18210,12 @@ const ANIM_REGISTRY = {
   fan_blow: (() => {
     return function FanBlowEffect({ x, y }) {
       const particles = useMemo(() => [
-        ...Array.from({ length: 6 }, (_, i) => ({
+        ...Array.from({ length: ppFxN(6) }, (_, i) => ({
           type: 'fan', x: -12 + Math.random() * 24, y: -5 + Math.random() * 10,
           delay: i * 40, dur: 500 + Math.random() * 200,
           size: 14 + Math.random() * 6,
         })),
-        ...Array.from({ length: 14 }, (_, i) => ({
+        ...Array.from({ length: ppFxN(14) }, (_, i) => ({
           type: 'wind', x: -8 + Math.random() * 16, y: -10 + Math.random() * 20,
           delay: 50 + Math.random() * 200, dur: 400 + Math.random() * 300,
           size: 8 + Math.random() * 16,
@@ -18200,7 +18259,7 @@ const ANIM_REGISTRY = {
   })(),
   cactus_burst: (() => {
     return function CactusBurstEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => ({
         angle: (i / 16) * 360 + Math.random() * 22,
         dist: 12 + Math.random() * 22,
         size: 6 + Math.random() * 8,
@@ -18247,7 +18306,7 @@ const ANIM_REGISTRY = {
   })(),
   mushroom_spore: (() => {
     return function MushroomSporeEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(20) }, (_, i) => ({
         angle: Math.random() * 360,
         dist: 8 + Math.random() * 28,
         size: 5 + Math.random() * 8,
@@ -18294,7 +18353,7 @@ const ANIM_REGISTRY = {
   })(),
   dark_swarm: (() => {
     return function DarkSwarmEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         angle: Math.random() * 360,
         dist: 5 + Math.random() * 25,
         size: 4 + Math.random() * 6,
@@ -18337,7 +18396,7 @@ const ANIM_REGISTRY = {
   })(),
   sand_reset: (() => {
     return function SandResetEffect({ x, y }) {
-      const particles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const particles = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         angle: (i / 18) * 360 + Math.random() * 20,
         dist: 10 + Math.random() * 30,
         size: 3 + Math.random() * 5,
@@ -18375,7 +18434,7 @@ const ANIM_REGISTRY = {
   })(),
   quick_slash: (() => {
     return function QuickSlashEffect({ x, y }) {
-      const sparks = useMemo(() => Array.from({ length: 10 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
         angle: -60 + Math.random() * 120,
         dist: 15 + Math.random() * 30,
         size: 2 + Math.random() * 4,
@@ -18465,7 +18524,7 @@ const ANIM_REGISTRY = {
         start: i * 58 + Math.random() * 22,         // gestaffelt
         dauer: 150 + Math.random() * 90,
       })), []);
-      const tropfen = useMemo(() => Array.from({ length: 26 }, () => ({
+      const tropfen = useMemo(() => Array.from({ length: ppFxN(26) }, () => ({
         winkel: -150 + Math.random() * 120,
         weite: 18 + Math.random() * 46,
         groesse: 2 + Math.random() * 4.5,
@@ -18538,7 +18597,7 @@ const ANIM_REGISTRY = {
   // 3D-Perspektive und alle Karten-Transformationen mitverbiegen.
   night_howl: (() => {
     return function NightHowlEffect() {
-      const augen = useMemo(() => Array.from({ length: 7 }, () => ({
+      const augen = useMemo(() => Array.from({ length: ppFxN(7) }, () => ({
         x: 8 + Math.random() * 84,
         y: 12 + Math.random() * 70,
         start: 120 + Math.random() * 420,
@@ -18600,7 +18659,7 @@ const ANIM_REGISTRY = {
   })(),
   poison_pollen_rain: (() => {
     return function PoisonPollenRainEffect({ x, y }) {
-      const spores = useMemo(() => Array.from({ length: 24 }, () => ({
+      const spores = useMemo(() => Array.from({ length: ppFxN(24) }, () => ({
         xOff: -35 + Math.random() * 70,
         size: 4 + Math.random() * 7,
         delay: Math.random() * 300,
@@ -18662,7 +18721,7 @@ const ANIM_REGISTRY = {
     return function ToxicFumesGasEffect({ x, y, w, h }) {
       const cw = w || 90;
       const ch = h || 120;
-      const puffs = useMemo(() => Array.from({ length: 10 }, () => ({
+      const puffs = useMemo(() => Array.from({ length: ppFxN(10) }, () => ({
         xOff: -cw / 2 + Math.random() * cw,
         yOff: -ch / 2 + Math.random() * ch,
         size: 32 + Math.random() * 26,
@@ -18748,7 +18807,7 @@ const ANIM_REGISTRY = {
   })(),
   snake_devour: (() => {
     return function SnakeDevourEffect({ x, y }) {
-      const coils = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+      const coils = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
         angle: i * 60 + Math.random() * 20,
         dist: 20 + Math.random() * 15,
         delay: i * 60,
@@ -18863,7 +18922,7 @@ const ANIM_REGISTRY = {
   })(),
   poison_ooze: (() => {
     return function PoisonOozeEffect({ x, y }) {
-      const drips = useMemo(() => Array.from({ length: 14 }, () => ({
+      const drips = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         dx: -30 + Math.random() * 60,
         delay: Math.random() * 400,
         dur: 600 + Math.random() * 500,
@@ -18987,7 +19046,7 @@ const ANIM_REGISTRY = {
   //  rise from the hit point.
   sun_beam: (() => {
     return function SunBeamEffect({ x, y, w, h }) {
-      const sparks = useMemo(() => Array.from({ length: 18 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.8;
         const dist = 30 + Math.random() * 60;
         return {
@@ -19092,7 +19151,7 @@ const ANIM_REGISTRY = {
     return function PollutionEvaporateEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const wisps = useMemo(() => Array.from({ length: 8 }, () => {
+      const wisps = useMemo(() => Array.from({ length: ppFxN(8) }, () => {
         const offX = (Math.random() - 0.5) * 40;
         return {
           dx: offX + (Math.random() - 0.5) * 30,
@@ -19104,7 +19163,7 @@ const ANIM_REGISTRY = {
           startX: offX,
         };
       }), []);
-      const sparks = useMemo(() => Array.from({ length: 10 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.3;
         const dist = 22 + Math.random() * 42;
         return {
@@ -19185,7 +19244,7 @@ const ANIM_REGISTRY = {
     return function PollutionPlaceEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const drips = useMemo(() => Array.from({ length: 10 }, () => {
+      const drips = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 18 + Math.random() * 40;
         return {
@@ -19197,7 +19256,7 @@ const ANIM_REGISTRY = {
           spin: (Math.random() - 0.5) * 260,
         };
       }), []);
-      const sparks = useMemo(() => Array.from({ length: 14 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 15 + Math.random() * 45;
         return {
@@ -19309,7 +19368,7 @@ const ANIM_REGISTRY = {
     return function GoldifyTransmuteEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const coins = useMemo(() => Array.from({ length: 14 }, () => {
+      const coins = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 45 + Math.random() * 50;
         return {
@@ -19321,7 +19380,7 @@ const ANIM_REGISTRY = {
           rot: -180 + Math.random() * 360,
         };
       }), []);
-      const sparkles = useMemo(() => Array.from({ length: 20 }, () => {
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(20) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 30 + Math.random() * 45;
         return {
@@ -19414,7 +19473,7 @@ const ANIM_REGISTRY = {
     return function ColdCoffinEncaseEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const snowflakes = useMemo(() => Array.from({ length: 14 }, () => ({
+      const snowflakes = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         x: -cw / 2 + Math.random() * cw,
         startY: -ch / 2 - 20,
         endY: ch / 2 + Math.random() * 20,
@@ -19533,7 +19592,7 @@ const ANIM_REGISTRY = {
   golden_feathers: (() => {
     return function GoldenFeathersEffect({ x, y, w, h }) {
       const cw = w || 100;
-      const feathers = useMemo(() => Array.from({ length: 18 }, (_, i) => {
+      const feathers = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => {
         const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.5;
         const dist = 45 + Math.random() * 95;
         return {
@@ -19597,7 +19656,7 @@ const ANIM_REGISTRY = {
     return function BattleAxeCleaveEffect({ x, y, w, h }) {
       // Gesamthoehe der Axt; 84 % davon liegen auf der Zielmitte.
       const AX_H = Math.max(h || 120, 120) * 1.6;
-      const sparks = useMemo(() => Array.from({ length: 16 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         angle: -20 + Math.random() * 220,
         dist: 40 + Math.random() * 90,
         size: 3 + Math.random() * 5,
@@ -19707,7 +19766,7 @@ const ANIM_REGISTRY = {
     return function WaterWaveEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const drops = useMemo(() => Array.from({ length: 22 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
         dx: -cw * 0.9 + Math.random() * cw * 2.2,
         dy: -ch * (0.5 + Math.random() * 0.9),
         size: 4 + Math.random() * 9,
@@ -19800,7 +19859,7 @@ const ANIM_REGISTRY = {
       const reach = Math.max(cw, ch);
       // Zwölf Zungen gleichmäßig auf dem Kreis, leicht versetzt,
       // damit die Anordnung nicht mechanisch wirkt.
-      const jets = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+      const jets = useMemo(() => Array.from({ length: ppFxN(12) }, (_, i) => {
         const angle = (Math.PI * 2 * i) / 12 + (i % 2 ? 0.12 : -0.12);
         const dist = reach * 2.0;
         return {
@@ -19813,7 +19872,7 @@ const ANIM_REGISTRY = {
           delay: 18 * i,
         };
       }), [cw, ch, reach]);
-      const embers = useMemo(() => Array.from({ length: 18 }, () => {
+      const embers = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const a = Math.random() * Math.PI * 2;
         const d = 30 + Math.random() * reach * 0.9;
         return {
@@ -19931,7 +19990,7 @@ const ANIM_REGISTRY = {
         { w: cw * 0.4, h: ch * 1.2,   sx: -cw * 0.45, sy:  ch * 2.4, ex: -cw * 0.45, ey:  ch * 0.05, delay: 280, rot: 0,   key: 'spikeSL' },
         { w: cw * 0.4, h: ch * 1.2,   sx:  cw * 0.45, sy:  ch * 2.4, ex:  cw * 0.45, ey:  ch * 0.05, delay: 310, rot: 0,   key: 'spikeSR' },
       ];
-      const snowflakes = useMemo(() => Array.from({ length: 30 }, () => ({
+      const snowflakes = useMemo(() => Array.from({ length: ppFxN(30) }, () => ({
         x: -cw * 1.4 + Math.random() * cw * 2.8,
         startY: -ch * 1.6 - 20,
         endY: ch * 1.6 + Math.random() * 40,
@@ -19941,7 +20000,7 @@ const ANIM_REGISTRY = {
         char: ['❄','❅','❆','✦','✧'][Math.floor(Math.random() * 5)],
         rot: -120 + Math.random() * 240,
       })), [cw, ch]);
-      const shards = useMemo(() => Array.from({ length: 18 }, () => {
+      const shards = useMemo(() => Array.from({ length: ppFxN(18) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 60 + Math.random() * cw * 1.2;
         return {
@@ -20154,7 +20213,7 @@ const ANIM_REGISTRY = {
     return function DeepseaSummonWhirlpoolEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const rings = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+      const rings = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
         radius: 90 - i * 10,
         delay: i * 70,
         dur: 1300 - i * 60,
@@ -20162,7 +20221,7 @@ const ANIM_REGISTRY = {
         width: 5 - i * 0.4,
       })), []);
       // Inky orbiting drops — spiral inward as the whirlpool tightens.
-      const drops = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(28) }, (_, i) => ({
         angle: (i / 28) * 360 + Math.random() * 12,
         startDist: 95 + Math.random() * 25,
         delay: Math.random() * 380,
@@ -20170,7 +20229,7 @@ const ANIM_REGISTRY = {
         size: 6 + Math.random() * 9,
       })), []);
       // Bubbles — rise from BELOW the target up past it.
-      const bubbles = useMemo(() => Array.from({ length: 16 }, () => ({
+      const bubbles = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         startX: -cw / 2 + Math.random() * cw,
         startY: ch * 0.6 + Math.random() * 30,
         endY: -ch * 1.2 - Math.random() * 60,
@@ -20294,7 +20353,7 @@ const ANIM_REGISTRY = {
         dur: 1500 + Math.random() * 300,
       })), []);
       // Star + sparkle confetti bursting outward
-      const sparkles = useMemo(() => Array.from({ length: 32 }, () => {
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(32) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 75 + Math.random() * 90;
         return {
@@ -20309,7 +20368,7 @@ const ANIM_REGISTRY = {
         };
       }), []);
       // Rising aura motes — golden sparks lifting up from the bottom of the card
-      const aura = useMemo(() => Array.from({ length: 14 }, () => ({
+      const aura = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         startX: -cw / 2 + Math.random() * cw,
         riseY: -ch * 1.0 - Math.random() * 30,
         size: 6 + Math.random() * 10,
@@ -20463,7 +20522,7 @@ const ANIM_REGISTRY = {
   stone_break: (() => {
     return function StoneBreakEffect({ x, y, w, h }) {
       const W = w || 100, H = h || 140;
-      const brocken = useMemo(() => Array.from({ length: 16 }, (_, i) => {
+      const brocken = useMemo(() => Array.from({ length: ppFxN(16) }, (_, i) => {
         const winkel = (i / 16) * Math.PI * 2 + (i % 3) * 0.2;
         const weite = 30 + (i % 5) * 16;
         return {
@@ -20495,7 +20554,7 @@ const ANIM_REGISTRY = {
     return function PetrifyEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const chips = useMemo(() => Array.from({ length: 10 }, () => {
+      const chips = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = Math.PI / 2 + (Math.random() - 0.5) * 1.6; // mostly downward
         const speed = 12 + Math.random() * 22;
         return {
@@ -20510,7 +20569,7 @@ const ANIM_REGISTRY = {
         };
       }), [cw, ch]);
       // Speckle positions pre-computed once for stability
-      const specks = useMemo(() => Array.from({ length: 22 }, () => ({
+      const specks = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
         left: -cw / 2 + Math.random() * cw,
         top: -ch / 2 + Math.random() * ch,
         size: 1 + Math.random() * 2.5,
@@ -20592,7 +20651,7 @@ const ANIM_REGISTRY = {
   //  Reincarnation revives a Hero or restores a Creature.
   angel_revival: (() => {
     return function AngelRevivalEffect({ x, y }) {
-      const angels = useMemo(() => Array.from({ length: 12 }, () => ({
+      const angels = useMemo(() => Array.from({ length: ppFxN(12) }, () => ({
         xOff: -45 + Math.random() * 90,
         startY: 20 + Math.random() * 30,
         endY: -70 - Math.random() * 80,
@@ -20601,7 +20660,7 @@ const ANIM_REGISTRY = {
         size: 18 + Math.random() * 14,
         rot: -15 + Math.random() * 30,
       })), []);
-      const sparkles = useMemo(() => Array.from({ length: 20 }, () => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(20) }, () => ({
         xOff: -50 + Math.random() * 100,
         startY: 10 + Math.random() * 40,
         endY: -50 - Math.random() * 70,
@@ -20650,7 +20709,7 @@ const ANIM_REGISTRY = {
   rain_of_death: (() => {
     return function RainOfDeathEffect({ x, y, w, h }) {
       const cw = w || 100;
-      const drops = useMemo(() => Array.from({ length: 22 }, () => ({
+      const drops = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
         xOff: -cw * 0.7 + Math.random() * cw * 1.4,
         startY: -160 - Math.random() * 120,
         delay: Math.random() * 800,
@@ -20659,7 +20718,7 @@ const ANIM_REGISTRY = {
         char: Math.random() < 0.3 ? '💀' : (Math.random() < 0.5 ? '🩸' : '·'),
         rot: -10 + Math.random() * 20,
       })), [cw]);
-      const impacts = useMemo(() => Array.from({ length: 18 }, () => ({
+      const impacts = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
         xOff: -cw * 0.5 + Math.random() * cw,
         dy: -5 - Math.random() * 12,
         size: 3 + Math.random() * 5,
@@ -20735,7 +20794,7 @@ const ANIM_REGISTRY = {
     return function GoldenWingsEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const sparkles = useMemo(() => Array.from({ length: 14 }, () => {
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 35 + Math.random() * 40;
         return {
@@ -20838,14 +20897,14 @@ const ANIM_REGISTRY = {
     return function NullZoneSpiralEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const rings = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+      const rings = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
         radius: 18 + i * 14,
         delay: i * 55,
         dur: 1000 - i * 40,
         opacity: 1 - i * 0.08,
         width: 3 - i * 0.22,
       })), []);
-      const stars = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
+      const stars = useMemo(() => Array.from({ length: ppFxN(22) }, (_, i) => ({
         angle: (i / 22) * 360 + Math.random() * 20,
         dist: 40 + Math.random() * 55,
         delay: 80 + Math.random() * 400,
@@ -20942,7 +21001,7 @@ const ANIM_REGISTRY = {
     return function VictoricaHolyCleanseEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const motes = useMemo(() => Array.from({ length: 14 }, () => {
+      const motes = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
         const dist = 20 + Math.random() * 55;
         return {
@@ -21039,7 +21098,7 @@ const ANIM_REGISTRY = {
     return function PiranhaBiteEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const splats = useMemo(() => Array.from({ length: 8 }, () => {
+      const splats = useMemo(() => Array.from({ length: ppFxN(8) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 18 + Math.random() * 40;
         return {
@@ -21051,7 +21110,7 @@ const ANIM_REGISTRY = {
         };
       }), []);
       // 6 teeth per row, top & bottom
-      const teeth = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
+      const teeth = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
         x: -38 + i * 15 + (Math.random() - 0.5) * 2,
         sizeW: 11 + Math.random() * 2,
         sizeH: 16 + Math.random() * 5,
@@ -21154,7 +21213,7 @@ const ANIM_REGISTRY = {
       const ch = h || 140;
       // Twelve vertical flame columns spanning the width, each rising
       // upward with an independent stagger.
-      const cols = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+      const cols = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
         offsetX: -cw * 0.55 + (cw * 1.1 / 13) * i + (-6 + Math.random() * 12),
         size:    34 + Math.random() * 20,
         delay:   Math.random() * 220,
@@ -21162,7 +21221,7 @@ const ANIM_REGISTRY = {
         char:    ['🔥','🔥','🔥','🔥','💥','✦'][Math.floor(Math.random() * 6)],
       })), [cw]);
       // Embers shooting upward around the wall.
-      const embers = useMemo(() => Array.from({ length: 28 }, () => ({
+      const embers = useMemo(() => Array.from({ length: ppFxN(28) }, () => ({
         offsetX: -cw * 0.55 + Math.random() * cw * 1.1,
         riseY:   -(ch * 0.7 + Math.random() * ch * 1.2),
         size:    4 + Math.random() * 7,
@@ -21250,7 +21309,7 @@ const ANIM_REGISTRY = {
       // aligned to the path.)
       const travelDeg = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
       const ROCK = 150, ROCK_R = ROCK / 2, TAIL_LEN = 460, TAIL_H = 64;
-      const sparks = useMemo(() => Array.from({ length: 40 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(40) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const speed = 80 + Math.random() * 200;
         return {
@@ -21261,7 +21320,7 @@ const ANIM_REGISTRY = {
           dur: 600 + Math.random() * 500,
         };
       }), []);
-      const flames = useMemo(() => Array.from({ length: 32 }, () => {
+      const flames = useMemo(() => Array.from({ length: ppFxN(32) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 60 + Math.random() * 280;
         return {
@@ -21476,7 +21535,7 @@ const ANIM_REGISTRY = {
         { rot: -38, delay: 0,   laenge: 118, dicke: 13 },
         { rot: 26,  delay: 130, laenge: 96,  dicke: 9 },
       ]), []);
-      const glut = useMemo(() => Array.from({ length: 18 }, () => ({
+      const glut = useMemo(() => Array.from({ length: ppFxN(18) }, () => ({
         dx: -40 + Math.random() * 80,
         dy: -10 - Math.random() * 46,
         size: 3 + Math.random() * 5,
@@ -21543,7 +21602,7 @@ const ANIM_REGISTRY = {
   })(),
   flame_jet: (() => {
     return function FlameJetEffect({ x, y }) {
-      const zungen = useMemo(() => Array.from({ length: 26 }, (_, i) => {
+      const zungen = useMemo(() => Array.from({ length: ppFxN(26) }, (_, i) => {
         const mitte = (i / 25 - 0.5);                 // -0.5 … +0.5
         // Aussen kuerzer, innen am hoechsten — Stichflammen-Silhouette.
         const hoehe = (1 - Math.abs(mitte) * 1.35) * (110 + Math.random() * 70);
@@ -21556,7 +21615,7 @@ const ANIM_REGISTRY = {
           farbe: ['#ffd23f', '#ff9d1c', '#ff6a00', '#ff3b00', '#fff1a8'][Math.floor(Math.random() * 5)],
         };
       }), []);
-      const funken = useMemo(() => Array.from({ length: 16 }, () => ({
+      const funken = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         dx: -26 + Math.random() * 52,
         dy: -(60 + Math.random() * 90),
         size: 3 + Math.random() * 4,
@@ -21682,7 +21741,7 @@ const ANIM_REGISTRY = {
       // links = SPITZE + 180. Zeichnet eine andere Schrift das Messer
       // anders, reicht es, diesen Wert zu aendern.
       const SPITZE = 315;
-      const spritzer = useMemo(() => Array.from({ length: 26 }, () => {
+      const spritzer = useMemo(() => Array.from({ length: ppFxN(26) }, () => {
         // Faecher entgegen der Flugrichtung, leicht nach oben gestreut.
         const basis = vonLinks ? Math.PI : 0;
         const winkel = basis + (Math.random() - 0.5) * 1.9;
@@ -21696,7 +21755,7 @@ const ANIM_REGISTRY = {
           color: ['#a01010', '#c01818', '#7f0808', '#d62a2a', '#8b0000'][Math.floor(Math.random() * 5)],
         };
       }), [vonLinks]);
-      const flecken = useMemo(() => Array.from({ length: 8 }, () => ({
+      const flecken = useMemo(() => Array.from({ length: ppFxN(8) }, () => ({
         fx: -26 + Math.random() * 52,
         fy: 4 + Math.random() * 24,
         size: 7 + Math.random() * 12,
@@ -21815,7 +21874,7 @@ const ANIM_REGISTRY = {
       // Blut spritzen lassen"): aus 14 zaghaften Tropfen werden 30 in
       // breiterem Bogen, groesser und schneller — plus die Spritzer
       // unten, die als Flecken liegenbleiben und langsam verblassen.
-      const droplets = useMemo(() => Array.from({ length: 30 }, () => {
+      const droplets = useMemo(() => Array.from({ length: ppFxN(30) }, () => {
         const angle = -Math.PI + Math.random() * Math.PI; // -180° bis 0°: nach aussen und oben
         const speed = 38 + Math.random() * 58;
         return {
@@ -21839,7 +21898,7 @@ const ANIM_REGISTRY = {
       // wieder nur diese eine Zahl.
       const SPITZE_UNTEN = 315;
       // Liegenbleibende Flecken um die Einschlagstelle.
-      const flecken = useMemo(() => Array.from({ length: 9 }, () => ({
+      const flecken = useMemo(() => Array.from({ length: ppFxN(9) }, () => ({
         fx: -30 + Math.random() * 60,
         fy: 2 + Math.random() * 26,
         size: 7 + Math.random() * 13,
@@ -21945,7 +22004,7 @@ const ANIM_REGISTRY = {
   // hellish rather than ordinary fire.
   hell_fox_death: (() => {
     return function HellFoxDeathEffect({ x, y }) {
-      const flames = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+      const flames = useMemo(() => Array.from({ length: ppFxN(18) }, (_, i) => ({
         startX: -22 + Math.random() * 44,
         riseY:  -(60 + Math.random() * 70),
         scale:  0.7 + Math.random() * 0.7,
@@ -21953,7 +22012,7 @@ const ANIM_REGISTRY = {
         dur:    520 + Math.random() * 320,
         glyph:  ['🔥', '🔥', '🜲', '∆'][Math.floor(Math.random() * 4)],
       })), []);
-      const sparks = useMemo(() => Array.from({ length: 22 }, () => {
+      const sparks = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
         const angle = -Math.PI + Math.random() * Math.PI;
         const speed = 26 + Math.random() * 36;
         return {
@@ -22034,7 +22093,7 @@ const ANIM_REGISTRY = {
   // without re-tuning timing.
   dog_bite: (() => {
     return function DogBiteEffect({ x, y }) {
-      const drops = useMemo(() => Array.from({ length: 10 }, () => {
+      const drops = useMemo(() => Array.from({ length: ppFxN(10) }, () => {
         const angle = -Math.PI + Math.random() * Math.PI; // upward arc
         const speed = 24 + Math.random() * 28;
         return {
@@ -22045,7 +22104,7 @@ const ANIM_REGISTRY = {
           dur: 320 + Math.random() * 200,
         };
       }), []);
-      const shockLines = useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+      const shockLines = useMemo(() => Array.from({ length: ppFxN(8) }, (_, i) => ({
         rot: -90 + i * 22.5 + (Math.random() * 14 - 7),
         len: 22 + Math.random() * 14,
         delay: 200 + Math.random() * 80,
@@ -22146,7 +22205,7 @@ const ANIM_REGISTRY = {
   // sparks — "this Hero now carries a borrowed action".
   soul_shard_dark_grant: (() => {
     return function SoulShardDarkGrantEffect({ x, y }) {
-      const motes = useMemo(() => Array.from({ length: 14 }, () => {
+      const motes = useMemo(() => Array.from({ length: ppFxN(14) }, () => {
         const xOff = -22 + Math.random() * 44;
         return {
           xOff,
@@ -22158,7 +22217,7 @@ const ANIM_REGISTRY = {
           opacity: 0.55 + Math.random() * 0.35,
         };
       }), []);
-      const runes = useMemo(() => Array.from({ length: 7 }, () => {
+      const runes = useMemo(() => Array.from({ length: ppFxN(7) }, () => {
         const angle = Math.random() * Math.PI * 2;
         const dist = 32 + Math.random() * 18;
         return {
@@ -22351,7 +22410,7 @@ const ANIM_REGISTRY = {
     return function ColdStrikeApplyEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const flakes = useMemo(() => Array.from({ length: 14 }, () => ({
+      const flakes = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
         startAngle: Math.random() * Math.PI * 2,
         startDist: 30 + Math.random() * 25,
         rise: -(20 + Math.random() * 50),
@@ -22425,7 +22484,7 @@ const ANIM_REGISTRY = {
     return function EmpoweredStrikeApplyEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const sparks = useMemo(() => Array.from({ length: 16 }, () => ({
+      const sparks = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
         startAngle: Math.random() * Math.PI * 2,
         startDist: 22 + Math.random() * 30,
         rise: -(28 + Math.random() * 55),
@@ -22514,7 +22573,7 @@ const ANIM_REGISTRY = {
     return function SmokeVialEffect({ x, y, w, h }) {
       const cw = w || 100;
       const ch = h || 140;
-      const puffs = useMemo(() => Array.from({ length: 9 }, (_, i) => {
+      const puffs = useMemo(() => Array.from({ length: ppFxN(9) }, (_, i) => {
         // First two puffs centered for instant coverage; the rest drift.
         const centered = i < 2;
         return {
@@ -22720,13 +22779,13 @@ const ANIM_REGISTRY = {
   // branch (the Surprise treats the impact as a "snipe" hit).
   arrow_impact: (function () {
     return function ArrowImpactEffect({ x, y }) {
-      const sparkles = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+      const sparkles = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => ({
         angle: (i / 14) * Math.PI * 2 + Math.random() * 0.3,
         dist: 22 + Math.random() * 18,
         size: 2 + Math.random() * 3,
         delay: Math.random() * 90,
       })), []);
-      const blood = useMemo(() => Array.from({ length: 6 }, () => ({
+      const blood = useMemo(() => Array.from({ length: ppFxN(6) }, () => ({
         angle: Math.random() * Math.PI * 2,
         dist: 14 + Math.random() * 22,
         size: 4 + Math.random() * 4,
@@ -22808,7 +22867,7 @@ ANIM_REGISTRY.puppet_swap_pavi = ANIM_REGISTRY.mini_hearts;
 
 function IceEncaseEffect({ x, y }) {
   // Ice shards from ALL sides converging on target
-  const shards = useMemo(() => Array.from({ length: 20 }, () => {
+  const shards = useMemo(() => Array.from({ length: ppFxN(20) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const dist = 60 + Math.random() * 40;
     return {
@@ -22820,7 +22879,7 @@ function IceEncaseEffect({ x, y }) {
       char: ['❄','❅','❆','✦','·'][Math.floor(Math.random() * 5)],
     };
   }), []);
-  const burstCrystals = useMemo(() => Array.from({ length: 12 }, () => {
+  const burstCrystals = useMemo(() => Array.from({ length: ppFxN(12) }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 10 + Math.random() * 25;
     return {
@@ -22886,7 +22945,11 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
           : document.querySelector(`[data-support-zone][data-support-owner="${lbl}"][data-support-hero="${m.heroIdx}"][data-support-slot="${m.slotIdx}"]`);
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        out[k] = { x: r.left, y: r.top, w: r.width, h: r.height };
+        // ★ v1258: Feld-Koordinaten — die Ebene ist eine Welt-Huelle
+        // (siehe Render), die Marken bleiben damit waehrend einer
+        // Kamerafahrt auf ihrer Zone statt erst beim naechsten Messtakt.
+        const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { dx: 0, dy: 0 };
+        out[k] = { x: r.left + _wo.dx, y: r.top + _wo.dy, w: r.width, h: r.height };
       }
       setRects(prev => (JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
     };
@@ -22915,7 +22978,7 @@ function ZielMarkenEbene({ marken, blitze, myIdx }) {
   for (const m of marken) (abzeichen[schluessel(m)] = abzeichen[schluessel(m)] || []).push(m.label);
 
   return (
-    <div className="ziel-ebene" aria-hidden="true">
+    <div className="ziel-ebene fx-welt-lock" aria-hidden="true">
       <svg className="ziel-pfad" width="100%" height="100%">
         <defs>
           <marker id="zielPfadSpitze" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -24803,27 +24866,27 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, []);
 
   // ★ v1257 — LEISTENHOEHEN FUER DIE OVERLAY-LEISTEN (nur Telefon).
-  // Kopfzeile und beide Handzeilen liegen mobil halbtransparent UEBER
-  // dem Feld (style.css, Block „TELEFON QUER"); .board-center polstert
-  // sich mit genau diesen Hoehen, damit der Inhalt vollstaendig unter
-  // den Leisten hervorgescrollt werden kann. Die Hoehen sind
+  // Beide Handzeilen liegen mobil halbtransparent UEBER dem Feld
+  // (style.css, Block „TELEFON QUER"); .board-center polstert sich mit
+  // genau diesen Hoehen, damit der Inhalt vollstaendig unter den
+  // Leisten hervorgescrollt werden kann. Die Hoehen sind
   // inhaltsabhaengig (Handmass, Umbrueche) — deshalb gemessen statt
-  // geraten, per ResizeObserver auf den drei Leisten. Die Kamera liest
+  // geraten, per ResizeObserver auf den Leisten. Die Kamera liest
   // dieselben Variablen fuer ihr sichtbares Band.
+  // ★ v1258: Die Kopfzeile ist im Kampf gestrichen (Merge), also wird
+  // sie auch nicht mehr gemessen — `--mob-topbar-h` gibt es nicht mehr.
   useEffect(() => {
     if (!(window.ppIsPhone && window.ppIsPhone())) return;
     const root = document.documentElement;
     const messen = () => {
-      const tb = document.querySelector('.screen-full > .top-bar');
       const ho = document.querySelector('.game-hand-opp');
       const hm = document.querySelector('.game-hand-me');
-      if (tb) root.style.setProperty('--mob-topbar-h', tb.offsetHeight + 'px');
       if (ho) root.style.setProperty('--mob-opphand-h', ho.offsetHeight + 'px');
       if (hm) root.style.setProperty('--mob-mehand-h', hm.offsetHeight + 'px');
     };
     messen();
     const ro = new ResizeObserver(messen);
-    for (const sel of ['.screen-full > .top-bar', '.game-hand-opp', '.game-hand-me']) {
+    for (const sel of ['.game-hand-opp', '.game-hand-me']) {
       const el = document.querySelector(sel);
       if (el) ro.observe(el);
     }
@@ -24831,7 +24894,51 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', messen);
-      for (const v of ['--mob-topbar-h', '--mob-opphand-h', '--mob-mehand-h']) root.style.removeProperty(v);
+      for (const v of ['--mob-opphand-h', '--mob-mehand-h']) root.style.removeProperty(v);
+    };
+  }, []);
+
+  // ★★ v1258 — WELTVERANKERUNG: SCROLL-SYNC DER EFFEKT-HUELLEN.
+  // Jede `.fx-welt-lock`-Huelle (React-Huellen unten im Render, die
+  // body-Schicht aus app-shared) nimmt per `transform` den Scrollstand
+  // des Feldes zurueck. Der Stand wird hier bei JEDEM scroll-Ereignis
+  // in zwei Wurzelvariablen geschrieben — die Kamera-rAF loest pro
+  // Bild eines aus, ein Fingerwisch ebenso. Die Messschleife (check)
+  // stellt den Stand innerhalb eines Aufrufs wieder her; der Browser
+  // meldet danach genau EIN Ereignis mit dem Endwert. Am Desktop ohne
+  // Scrollen bleibt der Stand 0 — dann ist alles pixelgleich wie vor
+  // v1258.
+  //
+  // ★ Fenstergroesse (Als Hinweis 20.9.): Vollbild-Wechsel, Zoom und
+  // Resize aendern Layout UND Scrollstand — der Browser klemmt
+  // `scrollLeft`/`scrollTop`, wenn der Inhalt schrumpft, und meldet das
+  // nicht ueberall als scroll-Ereignis. Deshalb synchronisieren
+  // zusaetzlich `resize` und ein ResizeObserver auf dem Scroller; der
+  // Observer faengt auch den Massstabswechsel von updateScale (der die
+  // Feldgroesse aendert, ohne dass das Fenster sich bewegt).
+  // Laufende Effekte (Lebensdauer < 2 s) bleiben dabei an ihrem
+  // Startpunkt in Feld-Koordinaten — genau wie Fenster-Effekte vor
+  // v1258 an ihrem Fensterpunkt blieben; die Zielmarken-Ebene misst
+  // ohnehin alle 150 ms neu.
+  useEffect(() => {
+    const sc = boardCenterRef.current;
+    if (!sc) return;
+    const root = document.documentElement;
+    const sync = () => {
+      root.style.setProperty('--fx-dx', (-sc.scrollLeft) + 'px');
+      root.style.setProperty('--fx-dy', (-sc.scrollTop) + 'px');
+    };
+    sync();
+    sc.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    const ro = new ResizeObserver(sync);
+    ro.observe(sc);
+    return () => {
+      sc.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+      ro.disconnect();
+      root.style.removeProperty('--fx-dx');
+      root.style.removeProperty('--fx-dy');
     };
   }, []);
 
@@ -25535,9 +25642,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       }
       if (!positions || positions.length === 0) continue;
       const sr = positions.shift();
+      // ★ v1258: Start liegt schon in Feld-Koordinaten (captureBoardRects);
+      // das Stapel-Ende bekommt den Scrollstand von JETZT — der Flug ist
+      // damit als Ganzes Welt (siehe app-shared, Abschnitt Weltverankerung).
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       anims.push({
-        id: Date.now() + Math.random(), cardName,
-        startX: sr.left, startY: sr.top, endX: target.x, endY: target.y, dest,
+        id: Date.now() + Math.random(), cardName, welt: true,
+        startX: sr.left, startY: sr.top, endX: target.x + _fo.dx, endY: target.y + _fo.dy, dest,
         // anims.length BEFORE this push == this card's index in the
         // batch → 0, 130ms, 260ms, … Single-card batches stay at 0.
         delay: anims.length * PILE_FLIGHT_STAGGER_MS,
@@ -25717,21 +25828,32 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Helper: capture board card positions into boardCardRectsRef
   const captureBoardRects = () => {
     const br = { me: {}, opp: {} };
+    // ★ v1258 — Weltverankerung: die Rechtecke werden hier in
+    // FELD-Koordinaten abgelegt (Fensterkoordinate + Scrollstand des
+    // Feldes ZUM ZEITPUNKT DER AUFNAHME). Die Ablagefluege, die daraus
+    // starten, sind damit an ihre Zone gebunden — auch wenn zwischen
+    // Aufnahme und Start die Kamera gefahren ist. Alle Zonen hier liegen
+    // im Feld, der Offset gilt also ohne Anker-Pruefung.
+    const _off = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+    const feld = (el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left + _off.dx, top: r.top + _off.dy, width: r.width, height: r.height };
+    };
     for (const ow of ['me', 'opp']) {
       const pi = ow === 'me' ? myIdx : oppIdx;
       const p = gameState.players[pi];
       if (!p) continue;
       document.querySelectorAll(`[data-support-zone][data-support-owner="${ow}"]`).forEach(el => {
         const cards = p.supportZones?.[el.dataset.supportHero]?.[el.dataset.supportSlot] || [];
-        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+        if (cards.length > 0) { const r = feld(el); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
       });
       document.querySelectorAll(`[data-ability-zone][data-ability-owner="${ow}"]`).forEach(el => {
         const cards = p.abilityZones?.[el.dataset.abilityHero]?.[el.dataset.abilitySlot] || [];
-        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+        if (cards.length > 0) { const r = feld(el); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
       });
       document.querySelectorAll(`[data-surprise-zone][data-surprise-owner="${ow}"]`).forEach(el => {
         const cards = p.surpriseZones?.[el.dataset.surpriseHero] || [];
-        if (cards.length > 0) { const r = el.getBoundingClientRect(); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
+        if (cards.length > 0) { const r = feld(el); for (const cn of cards) (br[ow][cn] = br[ow][cn] || []).push(r); }
       });
     }
     boardCardRectsRef.current = br;
@@ -25842,7 +25964,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // begins its flight, not all at once up front.
             const _deathDelay = a.delay || 0;
             setTimeout(() => {
-              setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+              setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
               setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
             }, _deathDelay);
           }
@@ -26045,7 +26167,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // begins its flight, not all at once up front.
           const _deathDelay = a.delay || 0;
           setTimeout(() => {
-            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
             setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
           }, _deathDelay);
         }
@@ -26261,7 +26383,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // begins its flight, not all at once up front.
           const _deathDelay = a.delay || 0;
           setTimeout(() => {
-            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45 }]);
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
             setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
           }, _deathDelay);
         }
@@ -30150,8 +30272,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const srcEl = srcOverride || srcEl0;
       const tgtEl = tgtOverride || tgtEl0;
       if (!srcEl || !tgtEl) return;
-      const sr = srcEl.getBoundingClientRect();
-      const tr = tgtEl.getBoundingClientRect();
+      // ★ v1258 (Als Befund 19.9.: „Als eine CPU-Creature auf ein Ziel
+      // geschossen hat, ist die Kamera NICHT auf das Ziel gefahren,
+      // sondern nur auf die schiessende Kreatur"). Der Strahl hatte
+      // bisher gar keinen Kamera-Aufruf — ins Bild kam der Schuetze nur
+      // ueber die Zahl-Anzeigen am Ende. Beide Enden zaehlen: das
+      // 120-ms-Sammelfenster vereinigt ihre Rechtecke und faehrt EINMAL
+      // auf die Mitte, der ganze Schuss ist also im Bild.
+      if (window.ppBattleCamFocus) {
+        window.ppBattleCamFocus(srcEl);
+        window.ppBattleCamFocus(tgtEl);
+      }
+      const sr0 = srcEl.getBoundingClientRect();
+      const tr0 = tgtEl.getBoundingClientRect();
+      // ★ v1258 — Weltverankerung: die Strahl-Schicht ist als Ganzes
+      // Welt (`.fx-welt-lock`), also bekommen BEIDE Enden den Scrollstand
+      // von jetzt. Ein Ende in der Seitenspalte (Stapel) driftet damit
+      // nur waehrend einer laufenden Kamerafahrt um deren Delta; das
+      // Feld-Ende sitzt immer. `miss` und `offset` rechnen unten mit
+      // diesen Rechtecken weiter — sie sind dadurch mit verschoben.
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      const sr = { left: sr0.left + _fo.dx, top: sr0.top + _fo.dy, width: sr0.width, height: sr0.height };
+      const tr = { left: tr0.left + _fo.dx, top: tr0.top + _fo.dy, width: tr0.width, height: tr0.height };
       const id = Date.now() + Math.random();
       const dur = duration || 1500;
       // Miss mode (Laser Volley dodge) — the beam lands next to the
@@ -30164,7 +30306,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       let endY = tr.top + tr.height / 2;
       if (miss) {
         const cardCx = tr.left + tr.width / 2;
-        const lean = cardCx < window.innerWidth / 2 ? 1 : -1; // away from the nearer edge
+        // (v1258: Fensterseite anhand der FENSTER-Koordinate bestimmen)
+        const lean = (tr0.left + tr0.width / 2) < window.innerWidth / 2 ? 1 : -1; // away from the nearer edge
         endX = cardCx + lean * (tr.width * 0.85 + 18);
         endY = tr.top + tr.height * (0.35 + Math.random() * 0.35);
       }
@@ -30288,8 +30431,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : `<img src="${cardback}" style="width:100%;height:100%;object-fit:cover" draggable="false" />`;
       const dx = (dr.left + dr.width / 2) - (sr.left + sr.width / 2);
       const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
-      fly.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,200,80,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
-      document.body.appendChild(fly);
+      // ★ v1258 — Weltverankerung: liegt ein Ende im Feld, startet der
+      // Flug in Feld-Koordinaten und haengt in der Welt-Schicht. `dx`/`dy`
+      // sind DIFFERENZEN und damit vom Scrollstand unabhaengig — nur die
+      // Startecke braucht den Offset.
+      const _wa = window.ppFxWeltAnker ? window.ppFxWeltAnker(destEl) : { welt: false, dx: 0, dy: 0 };
+      const _ws = (!_wa.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(sourceEl) : _wa;
+      const _w = _wa.welt ? _wa : _ws;
+      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 20px rgba(255,200,80,.6);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       // Next frame: kick off the transform so the transition plays.
       requestAnimationFrame(() => {
         fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
@@ -30370,8 +30520,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const dy = (dr.top + dr.height / 2) - (sr.top + sr.height / 2);
       // Slightly tighter shadow + faster transition than the regular
       // hand-to-board fly so chained attaches don't feel sluggish.
-      fly.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(255,180,80,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
-      document.body.appendChild(fly);
+      // ★ v1258 — Weltverankerung, wie beim hand_to_board_fly darueber.
+      const _wa = window.ppFxWeltAnker ? window.ppFxWeltAnker(destEl) : { welt: false, dx: 0, dy: 0 };
+      const _ws = (!_wa.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(sourceEl) : _wa;
+      const _w = _wa.welt ? _wa : _ws;
+      fly.style.cssText = `position:fixed;left:${sr.left + _w.dx}px;top:${sr.top + _w.dy}px;width:${sr.width}px;height:${sr.height}px;z-index:10150;pointer-events:none;border-radius:4px;overflow:hidden;box-shadow:0 0 24px rgba(255,180,80,.7);transition:transform 600ms cubic-bezier(.22,.8,.3,1),opacity 600ms ease-out;`;
+      (_w.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(fly);
       requestAnimationFrame(() => {
         fly.style.transform = `translate(${dx}px, ${dy}px) scale(${dr.width / sr.width})`;
         fly.style.opacity = '0.3';
@@ -32939,15 +33093,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           return;
         }
         const id = Date.now() + Math.random();
+        // ★ v1258: Der Coolness-Stapel liegt IM FELD (`.board-plane-clip`),
+        // jeder Flug von oder zu ihm ist damit Welt — Feld-Koordinaten an
+        // beiden Enden (siehe app-shared, Abschnitt Weltverankerung).
+        const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
         const entry = {
           // ★★ v1131: Startzeit des Fluges. Siehe `DiscardAnimCard` —
           // sie macht den Flug gegen einen Neustart der Animation
           // unempfindlich.
           t0: ppJetzt(),
-          id, cardName,
-          startX: srcRect.left + srcRect.width / 2 - 32,
-          startY: srcRect.top + srcRect.height / 2 - 45,
-          endX: dstRect.x, endY: dstRect.y,
+          id, cardName, welt: true,
+          startX: srcRect.left + srcRect.width / 2 - 32 + _fo.dx,
+          startY: srcRect.top + srcRect.height / 2 - 45 + _fo.dy,
+          endX: dstRect.x + _fo.dx, endY: dstRect.y + _fo.dy,
           dest: animDest,
         };
         setDiscardAnims(prev => [...prev, (entry.t0 == null ? { ...entry, t0: ppJetzt() } : entry)]);
@@ -33031,6 +33189,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           if (Array.isArray(cards)) setDelHidden(p => Math.max(0, p - cards.length));
           return;
         }
+        // ★ v1258: Scrollstand ZUM MESSZEITPUNKT der Rechtecke — nicht erst
+        // im gestaffelten Timeout, sonst laege zwischen Messung und Start
+        // eine Kamerafahrt.
+        const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
         cards.forEach((cardName, i) => {
           // Note: hidden counter for the deleted pile was already bumped
           // by N up front; each individual flight's setTimeout drops it
@@ -33038,10 +33200,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           const id = Date.now() + Math.random() + i;
           setTimeout(() => {
             const entry = {
-              id, cardName,
-              startX: srcRect.left + srcRect.width / 2 - 32,
-              startY: srcRect.top + srcRect.height / 2 - 45,
-              endX: dstRect.x, endY: dstRect.y,
+              id, cardName, welt: true,
+              startX: srcRect.left + srcRect.width / 2 - 32 + _fo.dx,
+              startY: srcRect.top + srcRect.height / 2 - 45 + _fo.dy,
+              endX: dstRect.x + _fo.dx, endY: dstRect.y + _fo.dy,
               dest: 'deleted',
             };
             setDiscardAnims(prev => [...prev, (entry.t0 == null ? { ...entry, t0: ppJetzt() } : entry)]);
@@ -33141,6 +33303,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         tgtEl = document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
       }
       if (!srcEl || !tgtEl) return;
+      // ★ v1258: wie beim Strahl — die Kamera nimmt Angreifer UND Ziel
+      // in ihr Sammelfenster, sonst faehrt sie bei einem Rammangriff
+      // quer ueber das Feld nur zum Ausgangspunkt.
+      if (window.ppBattleCamFocus) {
+        window.ppBattleCamFocus(srcEl);
+        window.ppBattleCamFocus(tgtEl);
+      }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const dx = tr.left + tr.width / 2 - (sr.left + sr.width / 2);
@@ -33149,10 +33318,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
       const id = Date.now() + Math.random();
       const dur = duration || 1600;
+      // ★ v1258 — Weltverankerung: Angreifer und Ziel sind Zonen, die
+      // Rammkarte laeuft in der Welt-Huelle; beide Punkte in Feld-Koordinaten.
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       setRamAnims(prev => [...prev, {
         id, cardName,
-        srcX: sr.left + sr.width / 2, srcY: sr.top + sr.height / 2,
-        tgtX: tr.left + tr.width / 2, tgtY: tr.top + tr.height / 2,
+        srcX: sr.left + sr.width / 2 + _fo.dx, srcY: sr.top + sr.height / 2 + _fo.dy,
+        tgtX: tr.left + tr.width / 2 + _fo.dx, tgtY: tr.top + tr.height / 2 + _fo.dy,
         srcOwner: sourceOwner, srcHeroIdx: sourceHeroIdx,
         // Preserve the source zone slot so the hero-hide check
         // (isRamming) can distinguish a hero-originated ram (slot < 0)
@@ -33184,14 +33356,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         ? document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`)
         : document.querySelector(`[data-hero-zone][data-hero-owner="${tgtLabel}"][data-hero-idx="${targetHeroIdx}"]`);
       if (!srcEl || !tgtEl) return;
+      // ★ v1258: Kamera auf Angreifer UND Ziel (wie Strahl/Ramm),
+      // Koordinaten als Welt — das Pferd rollt in der Welt-Huelle.
+      if (window.ppBattleCamFocus) { window.ppBattleCamFocus(srcEl); window.ppBattleCamFocus(tgtEl); }
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       const id = Date.now() + Math.random();
       const dur = duration || 1100;
-      const srcX = sr.left + sr.width / 2;
-      const srcY = sr.top + sr.height / 2;
-      const tgtX = tr.left + tr.width / 2;
-      const tgtY = tr.top + tr.height / 2;
+      const srcX = sr.left + sr.width / 2 + _fo.dx;
+      const srcY = sr.top + sr.height / 2 + _fo.dy;
+      const tgtX = tr.left + tr.width / 2 + _fo.dx;
+      const tgtY = tr.top + tr.height / 2 + _fo.dy;
       // Mirror the horse if charging right-to-left so it always faces
       // the direction of travel.
       const facingRight = tgtX >= srcX;
@@ -37431,7 +37607,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const r = el.getBoundingClientRect();
     const id = Date.now() + Math.random();
     const dur = options.duration || 800;
-    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, ...options }]);
+    // ★ v1258 — Weltverankerung: liegt der Anker im Feld, bekommt die
+    // Animation Feld-Koordinaten und das `welt`-Flag; der Renderer
+    // (unten) haengt sie damit in die verschiebbare Welt-Huelle.
+    // Anker ausserhalb (Goldanzeige, Hand) bleiben Fenster-Effekte.
+    const _wo = window.ppFxWeltAnker ? window.ppFxWeltAnker(el) : { welt: false, dx: 0, dy: 0 };
+    setGameAnims(prev => [...prev, { id, type, x: r.left + r.width / 2 + _wo.dx, y: r.top + r.height / 2 + _wo.dy, w: r.width, h: r.height, welt: _wo.welt, ...options }]);
     setTimeout(() => setGameAnims(prev => prev.filter(a => a.id !== id)), dur);
   };
 
@@ -41617,34 +41798,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
   return (
     <div className="screen-full no-crt ui-noscale" style={{ background: '#0c0c14' }}>
-      <div className="top-bar" style={{ justifyContent: 'space-between', position: 'relative' }}>
-        {isSpectator ? (
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={handleLeave}>
-            ✕ LEAVE
-          </button>
-        ) : cubeMatchInfo && !result ? (
-          // Cube tournament match — surrender ends the WHOLE match (Bo-set
-          // included), not just the current game. Player keeps parent-room
-          // membership and becomes a spectator like other eliminated players.
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }}
-            onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
-            🏳 SURRENDER MATCH
-          </button>
-        ) : (
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-            {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
-          </button>
-        )}
-        <h2 className="orbit-font" style={{ fontSize: 14, color: isSpectator ? 'var(--text2)' : 'var(--accent)', position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-          {isSpectator ? '👁 SPECTATING' : 'PIXEL PARTIES'}
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="badge" style={{ background: lobby?.type === 'ranked' ? 'rgba(255,170,0,.12)' : 'rgba(0,240,255,.12)', color: lobby?.type === 'ranked' ? 'var(--accent4)' : 'var(--accent)' }}>
-            {lobby?.type?.toUpperCase() || 'GAME'}
-          </span>
-          <VolumeControl />
-        </div>
-      </div>
+      {/* ★ v1258 (Als Vorgabe 19.9.): Die Kampf-Kopfzeile ist WEG — sie
+          und die Gegnerhand-Zeile sind zu EINER Zeile verschmolzen.
+          Der Surrender-/Exit-Knopf (doppelt so gross wie vorher) und der
+          Gegner-Avatar sitzen links in der Handzeile, rechts stehen nur
+          noch Lautstaerkeregler und Gold uebereinander. Der Schriftzug
+          „PIXEL PARTIES" und das „GAME"/„RANKED"-Abzeichen sind
+          ersatzlos gestrichen; fuer Zuschauer bleibt ein kleines
+          👁-Zeichen am Knopf. Gilt fuer Desktop UND Mobile. */}
 
       <div className="game-layout">
         {showEndBubbles && bubbleAnchors && (
@@ -41659,6 +41820,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650, cpuBark.fading, !!opp?.barkBounce)}
         {/* Opponent hand */}
         <div className="game-hand game-hand-opp">
+          {/* ★ v1258 — DER LINKE CLUSTER DER VERSCHMOLZENEN ZEILE.
+              Aufgabe und Avatar stehen nebeneinander; der Knopf traegt
+              das doppelte Mass der alten Kopfzeile (8/16 statt 4/12,
+              Schrift 13 statt 10). Die Huelle ist absolut gesetzt
+              (siehe `.game-hand-topleft` in style.css), damit die
+              Kartenreihe weiter auf der ZEILE zentriert bleibt und
+              nicht auf dem Rest neben dem Cluster. */}
+          <div className="game-hand-topleft">
+            {isSpectator ? (
+              <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
+                👁 ✕ LEAVE
+              </button>
+            ) : cubeMatchInfo && !result ? (
+              // Cube tournament match — surrender ends the WHOLE match (Bo-set
+              // included), not just the current game. Player keeps parent-room
+              // membership and becomes a spectator like other eliminated players.
+              <button className="btn btn-danger game-hand-quit"
+                onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
+                🏳 SURRENDER MATCH
+              </button>
+            ) : (
+              <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
+                {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
+              </button>
+            )}
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
             {opp.avatar
               /* `result ? '' : …` statt `!result && …`: der &&-Ausdruck liefert bei gesetztem Ergebnis das BOOLEAN false, und `'…-big' + false` haengt woertlich "false" an den Klassennamen. Aus `game-hand-avatar-crop` wurde `game-hand-avatar-cropfalse` — der quadratische Rahmen fiel weg und der HeroArtCrop lief auf seine volle 135px-Breite aus, der Avatar wurde also im End-Screen ploetzlich breiter. */
@@ -41683,6 +41869,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             }</span>
             {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
           </div>
+          </div>{/* /game-hand-topleft (v1258) */}
           <div className={"game-hand-cards"
             + (gameState.effectPrompt?.type === 'blindHandPick' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')
             + (gameState.effectPrompt?.type === 'pickFromOppHand' && gameState.effectPrompt?.ownerIdx === myIdx ? ' blind-pick-active' : '')}
@@ -41831,9 +42018,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             </div>
           )}
-          <div className="game-gold-display">
-            <span className="game-gold-icon">🪙</span>
-            <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+          {/* ★ v1258 — DER RECHTE CLUSTER: Lautstaerkeregler ueber der
+              Goldanzeige, beides in einer Spalte (Als Vorgabe 19.9.).
+              Der Regler kommt aus der gestrichenen Kopfzeile hierher;
+              die Goldanzeige gibt dafuer ihre eigene absolute Lage auf
+              (siehe `.game-hand-topright` in style.css). Das
+              `data-gold-player`-Merkmal bleibt, weil die aufsteigenden
+              Goldzahlen es als Anker messen. */}
+          <div className="game-hand-topright">
+            <VolumeControl />
+            <div className="game-gold-display">
+              <span className="game-gold-icon">🪙</span>
+              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[oppIdx] : opp.gold) ? ' gold-negative' : '')} data-gold-player={oppIdx}>{formatGold(goldCrash ? goldCrash[oppIdx] : opp.gold)}</span>
+            </div>
           </div>
         </div>
         {/* Board */}
@@ -43011,7 +43208,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       ))}
 
-      {discardAnims.map(anim => (
+      {/* ★ v1258 — Weltverankerung: Fluege mit `welt` (Start oder Ziel
+          im Feld) laufen in einer Huelle, die den Scrollstand zuruecknimmt;
+          Hand-/Deck-Fluege bleiben Fenster-Effekte wie bisher. */}
+      <div className="fx-welt-lock" style={{ zIndex: 10050 }}>
+        {discardAnims.filter(a => a.welt).map(anim => (
+          <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
+            startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
+            delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand} />
+        ))}
+      </div>
+      {discardAnims.filter(a => !a.welt).map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
           delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand} />
@@ -43034,6 +43241,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
       )}
 
+      {/* ★ v1258 — Weltverankerung: alle Zahlen, die an ZONEN haengen,
+          laufen in einer Huelle, die den Scrollstand des Feldes
+          zuruecknimmt (die Komponenten rechnen ihren Anker in
+          Feld-Koordinaten um). Die Gold-Zahlen haengen an der Handzeile
+          und bleiben draussen. Ebene 10200 = die der Schadenszahlen. */}
+      <div className="fx-welt-lock" style={{ zIndex: 10200 }}>
       {/* Damage numbers */}
       {damageNumbers.map(d => (
         <DamageNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} />
@@ -43047,6 +43260,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {creatureHealNumbers.map(d => (
         <CreatureHealNumber key={d.id} amount={d.amount} ownerLabel={d.ownerLabel} heroIdx={d.heroIdx} zoneSlot={d.zoneSlot} />
       ))}
+      </div>
 
       {/* Gold gain numbers */}
       {goldGains.map(g => (
@@ -43058,6 +43272,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <GoldLossNumber key={g.id} amount={g.amount} playerIdx={g.playerIdx} isMe={g.playerIdx === myIdx} />
       ))}
 
+      {/* ★ v1258 — Weltverankerung: Zonen-Zahlen (Level/Toughness/ATK),
+          Zonen-Animationen mit `welt`, Strahlen und Rammkarten in EINER
+          Huelle (Ebene 10200 wie die Strahlen). Animationen OHNE `welt`
+          — Goldfunken an der Handzeile, bildschirmfuellender Regen —
+          bleiben darunter als Fenster-Effekte stehen. */}
+      <div className="fx-welt-lock" style={{ zIndex: 10200 }}>
       {/* Level change numbers */}
       {levelChanges.map(lc => (
         <LevelChangeNumber key={lc.id} delta={lc.delta} owner={lc.owner} heroIdx={lc.heroIdx} zoneSlot={lc.zoneSlot} myIdx={myIdx} />
@@ -43073,19 +43293,26 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         <FightingAtkNumber key={fa.id} amount={fa.amount} owner={fa.owner} heroIdx={fa.heroIdx} myIdx={myIdx} />
       ))}
 
-      {/* v1151: Zielmarken, vorhergesagter Zielpfad, Wahl-Blitze */}
+      {/* Modular game animations (explosions, etc.) — Welt-Anteil */}
+      {gameAnims.filter(a => a.welt).map(a => (
+        <GameAnimationRenderer key={a.id} {...a} />
+      ))}
+      </div>
+
+      {/* v1151: Zielmarken, vorhergesagter Zielpfad, Wahl-Blitze
+          (die Ebene ist seit v1258 selbst eine Welt-Huelle) */}
       {((gameState.zielMarken || []).length > 0 || zielBlitz.length > 0) && (
         <ZielMarkenEbene marken={gameState.zielMarken || []} blitze={zielBlitz} myIdx={myIdx} />
       )}
 
-      {/* Modular game animations (explosions, etc.) */}
-      {gameAnims.map(a => (
+      {/* Modular game animations — Fenster-Anteil (kein `welt`) */}
+      {gameAnims.filter(a => !a.welt).map(a => (
         <GameAnimationRenderer key={a.id} {...a} />
       ))}
 
-      {/* Beam animations (laser beams, etc.) */}
+      {/* Beam animations (laser beams, etc.) — Welt-Huelle (v1258) */}
       {beamAnims.length > 0 && (
-        <div className="beam-animation-container">
+        <div className="beam-animation-container fx-welt-lock">
           <svg>
             {beamAnims.map(b => {
               // Base widths from CSS: outer=24, glow=12, core=3.
@@ -43153,6 +43380,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       )}
 
       {/* Ram animations (hero charges to target and back) */}
+      {/* v1258: Rammkarten in Welt-Huelle (Ebene 10120 = die der Karte) */}
+      <div className="fx-welt-lock" style={{ zIndex: 10120 }}>
       {ramAnims.map(r => (
         <React.Fragment key={r.id}>
           {/* v672: Der Schweif darf NICHT im Kartenelement liegen — dort
@@ -43186,6 +43415,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </React.Fragment>
       ))}
+      </div>
 
       {/* Tharxian (Trojan) Horse charges — a large wooden horse on
           wheels rolls out of the activator's flipped Surprise Zone
@@ -43195,6 +43425,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           travel. A massive impact burst (shockwave ring, white
           flash, splinters, debris chunks) detonates at the target
           right when the horse lands. */}
+      <div className="fx-welt-lock" style={{ zIndex: 10130 }}>{/* v1258 Welt-Huelle (Ebene des Pferds) */}
       {tharxianHorseAnims.map(h => (
         <React.Fragment key={h.id}>
           {/* The horse + dust trail (translates from src to tgt) */}
@@ -43296,7 +43527,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               animationDelay: (h.dur * 0.78) + 'ms',
             }} />
             {/* Wood splinters — 12 radial chunks of debris */}
-            {Array.from({ length: 12 }).map((_, i) => {
+            {Array.from({ length: ppFxN(12) }).map((_, i) => {
               const angle = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
               const dist = 90 + Math.random() * 50;
               return (
@@ -43309,7 +43540,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               );
             })}
             {/* Heavier debris chunks (square wood blocks) */}
-            {Array.from({ length: 6 }).map((_, i) => {
+            {Array.from({ length: ppFxN(6) }).map((_, i) => {
               const angle = (i / 6) * Math.PI * 2 + Math.PI / 12;
               const dist = 60 + Math.random() * 30;
               return (
@@ -43328,6 +43559,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           </div>
         </React.Fragment>
       ))}
+      </div>
 
       {/* Card transfer animations (Dark Gear creature steal, etc.) */}
       {claimHolds.map(h => (
@@ -45290,7 +45522,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {result && !showFirstChoice && result.setOver && result.format > 1 && (
         <div className="modal-overlay set-complete-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.8)' }}>
           <div className="set-fireworks">
-            {Array.from({ length: 24 }).map((_, i) => (
+            {Array.from({ length: ppFxN(24) }).map((_, i) => (
               <div key={i} className="firework-particle" style={{
                 '--fw-x': (Math.random() * 200 - 100) + 'px',
                 '--fw-y': (Math.random() * -200 - 40) + 'px',
@@ -45394,7 +45626,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           style={{ background: 'rgba(0,0,0,.85)' }}>
           {finalTutorialCleared && (
             <div className="set-fireworks">
-              {Array.from({ length: 60 }).map((_, i) => (
+              {Array.from({ length: ppFxN(60) }).map((_, i) => (
                 <div key={i} className="firework-particle firework-big" style={{
                   '--fw-x': (Math.random() * 400 - 200) + 'px',
                   '--fw-y': (Math.random() * -400 - 80) + 'px',

@@ -3025,6 +3025,66 @@ const ZONE_FX_SUMMON_MS = 1300;  // Beschwoerung laeuft laenger
 const ZONE_FX_DEDUPE_MS = 260;   // derselbe Platz feuert nicht zweimal
 const _zoneFxLetzte = new Map();
 
+// ═══════════════════════════════════════════════════════════════
+//  ★★ v1258 — WELTVERANKERUNG DER EFFEKTE (Als Befund 19.9.)
+//  „Eine Animation beginnt, die Kamera faehrt waehrenddessen, die
+//   Animation ist relativ zum SCREEN und nicht relativ zu
+//   Weltkoordinaten, also spielt sie am Ende der Kamerafahrt an einer
+//   voellig falschen Position!"
+//
+//  Alle Effekt-Schichten (Schadenszahlen, Zonen-Animationen, Strahlen,
+//  Rammkarten, Kartenfluege, Zonen-Funken) liegen als `position: fixed`
+//  ueber dem Fenster und messen ihre Position einmal beim Start. Rollt
+//  das Feld danach (Kamera oder Finger), bleibt der Effekt am
+//  Bildschirm kleben, waehrend seine Zone unter ihm wegzieht.
+//
+//  BAUFORM: Der Effekt bekommt beim Start FELD-Koordinaten (Fenster-
+//  Koordinate + Scrollstand des Feldes) und wird in eine Welt-Schicht
+//  gehaengt, die per `transform` den aktuellen Scrollstand zurueck-
+//  nimmt (`--fx-dx`/`--fx-dy`, gesetzt vom GameBoard bei jedem
+//  Scroll-Ereignis). Fixed-Kinder eines transformierten Vorfahren
+//  beziehen sich auf DIESEN — die Schicht ist fenstergross, ihre Kinder
+//  rechnen also weiter mit Fensterkoordinaten, nur die Schicht als
+//  Ganzes faehrt mit dem Feld mit. Am Desktop ohne Scrollen ist der
+//  Stand 0 und alles pixelgleich wie vorher.
+//
+//  Nur Anker IM FELD (`.board-center`) sind „Welt". Handkarten,
+//  Stapel in den Seitenspalten und die Goldanzeige liegen in Leisten,
+//  die nicht scrollen — deren Effekte bleiben Fenster-Effekte.
+//  Effekte mit EINEM Ende im Feld (Stapel → Zone) werden ganz zur
+//  Welt: das Feld-Ende sitzt dann immer richtig, das Leisten-Ende
+//  driftet waehrend einer laufenden Kamerafahrt hoechstens um deren
+//  Delta — der bessere Kompromiss, denn die Zone ist der Blickfang.
+function _ppFxScroller() { return document.querySelector('.board-center'); }
+function ppFxWeltAnker(el) {
+  const sc = _ppFxScroller();
+  if (sc && el && sc.contains(el)) return { welt: true, dx: sc.scrollLeft, dy: sc.scrollTop };
+  return { welt: false, dx: 0, dy: 0 };
+}
+// Scrollstand des Feldes, ohne Anker-Pruefung — fuer Schichten, die
+// grundsaetzlich Welt sind (Zonen-Zahlen, Strahlen).
+function ppFxScrollOffset() {
+  const sc = _ppFxScroller();
+  return sc ? { dx: sc.scrollLeft, dy: sc.scrollTop } : { dx: 0, dy: 0 };
+}
+function _ppFxWeltSchicht() {
+  let l = document.getElementById('pp-fx-welt-layer');
+  if (!l) {
+    l = document.createElement('div');
+    l.id = 'pp-fx-welt-layer';
+    l.className = 'fx-welt-lock';
+    // Auf Hoehe der Kartenfluege (10150); die Kinder tragen ihre eigene
+    // Ebene innerhalb der Schicht. KEIN overflow:hidden — die Schicht
+    // wird verschoben, ein Clip wuerde ihre Kinder am Rand abschneiden.
+    l.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:10150';
+    document.body.appendChild(l);
+  }
+  return l;
+}
+window.ppFxWeltAnker = ppFxWeltAnker;
+window.ppFxScrollOffset = ppFxScrollOffset;
+window.ppFxWeltSchicht = _ppFxWeltSchicht;
+
 function _zoneFxSchicht() {
   let l = document.getElementById('pp-zone-fx-layer');
   if (!l) {
@@ -3097,7 +3157,12 @@ function spawnZoneLandFx(el, opts) {
     return out;
   };
 
-  const mitte = `left:${(r.left + r.width / 2).toFixed(1)}px;top:${(r.top + r.height / 2).toFixed(1)}px;`;
+  // ★ v1258: Feld-Zonen bekommen Feld-Koordinaten und landen in der
+  // Welt-Schicht (siehe Kopf des Abschnitts) — die Funken bleiben damit
+  // auch waehrend einer Kamerafahrt auf ihrer Zone.
+  const anker = ppFxWeltAnker(el);
+  const mitte = `left:${(r.left + r.width / 2 + anker.dx).toFixed(1)}px;top:${(r.top + r.height / 2 + anker.dy).toFixed(1)}px;`;
+  const schicht = () => (anker.welt ? _ppFxWeltSchicht() : _zoneFxSchicht());
   const masse = `--zfx-w:${r.width.toFixed(1)}px;--zfx-h:${r.height.toFixed(1)}px;color:${farbe}`;
 
   // ★ v1209 (Als Vorgabe 18.9.): DIE BESCHWOERUNG LIEGT IN ZWEI EBENEN.
@@ -3167,7 +3232,7 @@ function spawnZoneLandFx(el, opts) {
     }
     teileS.push(...funkenHtml(n));
     oben.innerHTML = teileS.join('');
-    _zoneFxSchicht().appendChild(oben);
+    schicht().appendChild(oben);
     setTimeout(() => oben.remove(), ZONE_FX_SUMMON_MS + 150);
     return;
   }
@@ -3178,7 +3243,7 @@ function spawnZoneLandFx(el, opts) {
 
   const teile = ['<i class="zone-land-glow"></i>', '<i class="zone-land-ring"></i>', ...funkenHtml(n)];
   box.innerHTML = teile.join('');
-  _zoneFxSchicht().appendChild(box);
+  schicht().appendChild(box);
   setTimeout(() => box.remove(), ZONE_FX_MS + 150);
 }
 

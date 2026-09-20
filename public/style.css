@@ -1237,11 +1237,16 @@ select optgroup {
    keine Reihenfolge gesetzt ist). */
 .game-hand-opp .game-hand-cards > .board-card.hand-card { z-index: var(--fan-z, 1); }
 /* Die Gegnerhand bricht nach UNTEN aus (ihr Bogen ist gespiegelt) —
-   sie wird um dasselbe Drittel angehoben. Dazu ein fester Hub nach
-   oben (v1245, Als Vorgabe): sie darf oben aus ihrer Leiste
-   herausragen, das Kampffeld beginnt ohnehin erst darunter. */
+   sie wird um dasselbe Drittel angehoben.
+   ★ v1258: Der feste Hub nach oben (v1245, 15 % der Kartenhoehe) ist
+   RAUS. Er schob die Karten unter die Kopfzeile — „sie darf oben aus
+   ihrer Leiste herausragen, das Kampffeld beginnt ohnehin erst
+   darunter". Seit die Kopfzeile in die Handzeile verschmolzen ist,
+   liegt ueber der Leiste nur noch der Bildschirmrand, und der schnitt
+   die Karten um genau diese 15 % ab (im Harness gemessen: −15 px am
+   Desktop, −7 px am Telefon). */
 .game-hand-opp .game-hand-cards {
-  --opp-hand-hebung: calc(var(--hand-card-h) * 0.15);
+  --opp-hand-hebung: 0px;
   translate: 0 calc(var(--hand-ueberstand) / -3 - var(--opp-hand-hebung));
 }
 
@@ -1311,6 +1316,14 @@ select optgroup {
   z-index: 60;
 }
 /* Gegnerseite: gleiche Groesse, Versatz nach unten. */
+/* ★ v1258 (Als Befund 19.9.: „Gegner-Handkarten erhalten, wenn sie
+   face-down sind, on-hover noch kein Highlight und werden nicht
+   groesser"). Der Selektor hing bis hier an `.revealed-hand-card` —
+   die verdeckten Karten waren schlicht nie mitgemeint. Sie brauchen
+   nichts weiter: `rotate` traegt bei ihnen die halbe Drehung, und das
+   komponiert seit v1244 mit dem `transform` dieser Regel, die
+   Rueckseite bleibt also auch vergroessert auf dem Kopf stehen. */
+.game-hand-opp:not([data-pp-dragging]) .board-card.hand-card.face-down:hover,
 .game-hand-opp:not([data-pp-dragging]) .board-card.hand-card.revealed-hand-card:hover,
 .pz-hand-cards[data-pz-hand="oppHand"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner,
 .pz-hand-cards[data-pz-hand="oppCreationZone"]:not([data-pp-dragging]) .pz-hand-card:hover > .pz-hand-card-inner {
@@ -2968,7 +2981,18 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   position: relative;
   min-height: var(--hand-min-h);
 }
-.game-hand-opp { border-bottom: 1px solid var(--bg4); padding: calc(6px * var(--board-scale)) calc(16px * var(--board-scale)); }
+.game-hand-opp {
+  border-bottom: 1px solid var(--bg4);
+  padding: calc(6px * var(--board-scale)) calc(16px * var(--board-scale));
+  /* ★ v1258 (Als Befund 19.9.: „Gegner-Handkarten werden UNTER dem
+     Board gerendert — eine offene Karte expandiert unter die Support
+     Zones"). Die Zeile steht VOR dem Brett im DOM, und beide sind
+     `position: relative` ohne eigene Ebene — also gewann das spaeter
+     gezeichnete Brett. Die eigene Hand hatte ihre 10000 laengst, die
+     Gegnerhand nie eine. 400 reicht: ueber Brett und Zonen, unter
+     Kartenfluegen (10150), Hinweisfahnen (9999) und der eigenen Hand. */
+  z-index: 400;
+}
 .game-hand-opp .game-hand-info {
   position: absolute;
   left: 12px;
@@ -2977,6 +3001,67 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   z-index: 2;
 }
 .game-hand-opp .game-gold-display { z-index: 2; }
+
+/* ── ★ v1258 — DIE VERSCHMOLZENE KOPF-/HANDZEILE ───────────────────
+   Die Kampf-Kopfzeile ist gestrichen; ihre beiden nutzbaren Teile
+   sitzen jetzt in der Gegnerhand-Zeile: links Aufgabe-Knopf + Avatar,
+   rechts Lautstaerke ueber Gold.
+
+   Beide Cluster sind ABSOLUT gesetzt und damit aus dem Flexfluss
+   heraus — sonst zentrierte sich die Kartenreihe auf dem Rest, der
+   neben ihnen uebrig bleibt, und die Hand saesse sichtbar
+   ausserhalb der Mitte. Den Platz reservieren stattdessen die
+   Seitenraender von `.game-hand-opp .game-hand-cards` (weiter unten),
+   genau wie es die eigene Hand seit jeher haelt. */
+.game-hand-topleft {
+  position: absolute;
+  left: calc(12px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(10px * var(--board-scale));
+  z-index: 3;
+}
+/* Der Avatar gibt seine eigene absolute Lage im Cluster auf — er ist
+   hier ein gewoehnliches Flex-Element neben dem Knopf. */
+.game-hand-topleft .game-hand-info {
+  position: static;
+  transform: none;
+  left: auto;
+  top: auto;
+}
+/* „der dabei auch gut doppelt so groß werden soll wie bisher"
+   (Al, 19.9.) — die alte Kopfzeile hatte 4/12 px Polster bei
+   Schriftgrad 10. */
+.game-hand-quit {
+  /* `max()`: der alte Knopf skalierte NICHT mit dem Brett (fest 10 px /
+     4 px 12 px, rund 18 px hoch). Das Doppelte davon ist die Untergrenze,
+     darueber waechst er mit dem Massstab mit — sonst waere er am Telefon
+     (Floor 0.59) kleiner als vorher. */
+  padding: max(8px, calc(10px * var(--board-scale))) max(16px, calc(22px * var(--board-scale)));
+  font-size: max(13px, calc(16px * var(--board-scale)));
+  white-space: nowrap;
+}
+.game-hand-topright {
+  position: absolute;
+  right: calc(12px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(4px * var(--board-scale));
+  z-index: 3;
+}
+/* Dasselbe fuer die Goldanzeige: im Cluster steht sie in der Spalte,
+   nicht mehr am rechten Rand der Zeile. */
+.game-hand-topright .game-gold-display {
+  position: static;
+  transform: none;
+  right: auto;
+  top: auto;
+}
 .game-hand-me {
   border-top: 1px solid var(--bg4);
   position: relative;
@@ -3914,6 +3999,23 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
 }
 
 /* Laser beam animation */
+/* ── ★ v1258 — WELT-SCHICHT FUER EFFEKTE ──────────────────────────
+   Effekt-Kinder (fixed) in einer transformierten Huelle beziehen sich
+   auf die Huelle; die ist fenstergross, ihre Kinder rechnen also
+   weiter in Fensterkoordinaten. Die Huelle selbst faehrt um den
+   negativen Scrollstand des Feldes mit (`--fx-dx`/`--fx-dy`, vom
+   GameBoard bei jedem scroll-Ereignis gesetzt) — was beim Start
+   Feld-Koordinaten bekam, bleibt damit auf seiner Zone, auch waehrend
+   die Mobile-Kamera faehrt. Am Desktop ohne Scrollen: 0, pixelgleich.
+   Kein overflow: die Huelle wird verschoben, ein Clip schnitte Kinder
+   am Fensterrand ab. Die Ebene setzt jede Huelle selbst (inline). */
+.fx-welt-lock {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  transform: translate3d(var(--fx-dx, 0px), var(--fx-dy, 0px), 0);
+}
+
 .beam-animation-container {
   position: fixed;
   inset: 0;
@@ -5319,6 +5421,13 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
   margin-top: calc(var(--fan-pad-unten) * -1);
   margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
+  /* ★ v1258: Links steht jetzt Aufgabe-Knopf UND Avatar, rechts
+     Lautstaerke ueber Gold — beide Cluster sind absolut gesetzt und
+     brauchen deshalb reservierten Platz aus den Raendern. 240 statt
+     der 180 der eigenen Hand; beide Seiten gleich, sonst verliert die
+     Kartenreihe ihre Mitte. */
+  margin-left: calc(240px * var(--board-scale) - var(--fan-pad-x));
+  margin-right: calc(240px * var(--board-scale) - var(--fan-pad-x));
 }
 /* Hand cards compress (overlap) when there are too many */
 .game-hand-cards .hand-slot {
@@ -14908,9 +15017,13 @@ body:has(.textbox-overlay) .tooltip {
     width: 28px !important; height: 28px !important;
   }
   .game-hand-opp .orbit-font { font-size: 11px !important; }
-  .game-hand-opp .game-hand-cards .board-card {
-    height: 36px !important;
-  }
+  /* ★ v1258: Die alte Zwangshoehe von 36px ist RAUS. Die Karte behielt
+     ihre volle Breite (`--hand-card-w`, rund 46px bei Floor 0.59 und
+     Handmass 1.22), bekam aber nur 36px Hoehe — `object-fit: cover`
+     schnitt daraufhin die obere Kartenhaelfte weg. Das war der zweite
+     Teil von Als Befund „die obere Haelfte der Hand fehlt". Karten,
+     Zonen und Stapel haengen seit v1233 gemeinsam am Massstab; eine
+     Sonderhoehe fuer eine Reihe gehoert da nicht mehr hin. */
   .game-hand-opp .game-gold-icon { font-size: 18px !important; }
   .game-hand-opp .game-gold-value { font-size: 16px !important; }
 
@@ -14955,7 +15068,7 @@ body:has(.textbox-overlay) .tooltip {
        unter den Leisten hervorgescrollt werden, nichts ist abgeschnitten.
        Die --mob-*-Hoehen misst app-board.jsx zur Laufzeit (ResizeObserver
        auf den drei Leisten), die Fallbacks decken den ersten Frame. */
-    padding-top: calc(var(--mob-topbar-h, 22px) + var(--mob-opphand-h, 44px) + 4px) !important;
+    padding-top: calc(var(--mob-opphand-h, 44px) + 4px) !important;
     padding-bottom: calc(var(--mob-mehand-h, 64px) + 4px) !important;
   }
   /* Player sides: natural height so board-center scrolls */
@@ -14982,14 +15095,16 @@ body:has(.textbox-overlay) .tooltip {
      bekommt die volle Hoehe (`.game-board` inset 0) plus das
      Scroll-Polster oben. */
   .screen-full:has(> .game-layout) { position: relative; }
-  .screen-full:has(> .game-layout) > .top-bar {
-    position: absolute; top: 0; left: 0; right: 0; z-index: 460;
-    background: rgba(12, 12, 20, .55) !important;
-  }
   .game-layout { position: relative; }
   .game-board { position: absolute !important; inset: 0 !important; }
+  /* ★ v1258: Die Kopfzeile gibt es im Kampf nicht mehr (Merge, siehe
+     `.game-hand-topleft`) — die Gegnerhand sitzt jetzt selbst ganz
+     oben. Der alte Versatz um `--mob-topbar-h` ist damit hinfaellig;
+     er war es auch, der die Zeile um die Kopfzeilenhoehe nach unten
+     schob, waehrend ihr Inhalt schon oben stand: genau die halb
+     fehlende Gegnerhand aus Als Bericht. */
   .game-hand-opp {
-    position: absolute; top: var(--mob-topbar-h, 22px); left: 0; right: 0;
+    position: absolute; top: 0; left: 0; right: 0;
     z-index: 450;
     background: rgba(12, 12, 20, .55) !important;
   }
@@ -15154,10 +15269,10 @@ body:has(.textbox-overlay) .tooltip {
   .board-tooltip {
     width: 240px !important;
     font-size: 11px !important;
-    /* ★ v1257: unterhalb der Overlay-Kopfzeile beginnen, nicht darunter
-       verschwinden. Scrollbar ist der Tooltip ohnehin (overflow-y: auto
-       + pointer-events: auto auf groben Zeigern). */
-    top: var(--mob-topbar-h, 22px) !important;
+    /* ★ v1258: unterhalb der Gegnerhand-Zeile beginnen (die Kopfzeile
+       gibt es nicht mehr). Scrollbar ist der Tooltip ohnehin
+       (overflow-y: auto + pointer-events: auto auf groben Zeigern). */
+    top: var(--mob-opphand-h, 44px) !important;
   }
   /* ★ v1257 (Als Vorgabe 19.9.): die Textinfo — aktuelle Stats und
      Effekttext — wird NICHT mehr ausgeblendet. Der On-Klick-Tooltip
@@ -15900,6 +16015,32 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* 6 ── Modals: square, hard drop shadow, darker dim */
 .modal { border-radius: 0; box-shadow: 6px 6px 0 rgba(0,0,0,.6); }
 .modal-overlay { background: rgba(4,4,10,.8); }
+
+/* ── ★ v1258 — SUBMENUES IM KAMPF SIND HALBTRANSPARENT ─────────────
+   (Als Vorgabe 19.9.: „Solche Submenüs sollten generell — nicht nur
+   auf Mobile — halbtransparent sein!") Gemeint sind die Kasten, die
+   waehrend eines Zuges aufgehen und dabei das Feld verdecken:
+   Mulligan-Frage, Wahl-Dialoge, Bestaetigungen. Nur DORT, also unter
+   `.screen-full:has(> .game-layout)` — Shop, Deckbau und Menue
+   behalten ihre deckenden Kasten, dort gibt es nichts durchzusehen.
+
+   Der Verdunkler wird ebenfalls schwaecher: bei 80 % Schwarz haette
+   ein durchscheinendes Panel nichts zu zeigen ausser Dunkelheit.
+   `backdrop-filter` haelt die Schrift trotzdem lesbar — auf Telefonen
+   nimmt der Lite-Modus ihn wieder heraus (zu teuer pro Bild), dort
+   traegt die etwas hoehere Deckkraft des Grundtons. */
+.screen-full:has(> .game-layout) .modal-overlay {
+  background: rgba(0, 0, 0, .3);
+}
+.screen-full:has(> .game-layout) .modal,
+.first-choice-panel {
+  background: rgba(12, 12, 20, .72) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+/* `.first-choice-panel` steht als `position: fixed` NEBEN dem
+   `.game-layout` im Baum und wird von der `:has()`-Regel darueber
+   deshalb nicht erfasst — es gibt sie aber ohnehin nur im Kampf. */
 
 /* 7 ── Badges: square with a crisp 3px frame */
 .badge { border-radius: 0; border: 3px solid currentColor; }
@@ -17757,6 +17898,38 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .hand-mote { box-shadow: none; }
   .hand-mote:nth-child(n+17) { display: none; }
   .board-mote:nth-child(n+25) { display: none; }
+
+  /* ── BATTLE-LITE, ZWEITE RUNDE (v1258, Als Befunde 19.9.) ────────
+     a) „Das Scrollen durch die Deck-Galerie ist immer noch etwas
+        laggy." Die Galerie zeichnet bis zu 40 Karten samt Schein und
+        Uebergang; beim Wischen wird jede davon neu bewertet.
+        `content-visibility: auto` laesst den Browser alles ueberspringen,
+        was gerade ausserhalb des Ausschnitts liegt — die
+        `contain-intrinsic-size` haelt dabei die Bildlaufleiste ruhig
+        (Kartenmass im Raster, 5 Spalten). Schein und Uebergang fallen
+        weg: beides kann der Compositor nicht, und beides laeuft hier
+        bei jeder Bewegung neu. */
+  .deck-viewer-grid > * {
+    content-visibility: auto;
+    contain-intrinsic-size: 92px 129px;
+  }
+  .deck-viewer-modal .board-card,
+  .deck-viewer-grid .board-card {
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  /* b) „Auch das Einblenden des You Win!-Screens ist sehr laggy."
+     Das Overlay blendet bildschirmfuellend ueber `opacity` ein und
+     traegt dabei 60 Feuerwerkspartikel samt Endlos-Bob der
+     Ruf-Buchstaben — auf dem Telefon drei teure Dinge gleichzeitig,
+     genau im Moment des Zustandswechsels. Der Kasten erscheint jetzt
+     sofort statt zu blenden, das Feuerwerk ist auf 24 Partikel
+     gedeckelt, der Buchstabentanz steht still. */
+  .result-overlay-fade,
+  .result-overlay-fading { animation: none !important; }
+  .firework-particle:nth-child(n+25) { display: none; }
+  .cpu-shout-letter { animation: none; }
 }
 
 /* ── Alliance (v870) ────────────────────────────────────────────────
