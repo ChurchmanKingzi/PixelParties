@@ -3659,17 +3659,19 @@ function PuzzleCreator() {
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
-        <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
+        {/* v1260 (Al 20.9.): die ganze Kopfzeile skaliert mit dem Back-Knopf —
+            Titel 26, Eingaben 14, Schalter 13, Aktionsknoepfe im Basismass. */}
+        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
+        <h2 className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
         <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
-          placeholder="Puzzle name..." style={{ width: 180, padding: '4px 10px', fontSize: 11, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
+          placeholder="Puzzle name..." style={{ width: 240, padding: '9px 14px', fontSize: 14, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
         {/* Doom Clock: Startzaehler je Seite. Erscheint nur, wenn
             ueberhaupt eine Uhr in einer Area-Zone liegt (Als Vorgabe
             5.8.). Max 19 — 20 waere sofortige Niederlage und als
             AUFBAU sinnlos. */}
         {[0, 1].map((si) => (
           (areaZones[si] || []).includes('Doom Clock') ? (
-            <label key={'dcin' + si} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#ff8f8f' }}>
+            <label key={'dcin' + si} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ff8f8f' }}>
               ☠️ {si === 0 ? 'Me' : 'Opp'}
               <input className="input" type="number" min="0" max="19"
                 value={doomCounters[si] ?? 0}
@@ -3678,7 +3680,7 @@ function PuzzleCreator() {
                   setDoomCounters(prev => { const n = [...prev]; n[si] = v; return n; });
                   setValidated(false);
                 }}
-                style={{ width: 54, padding: '4px 6px', fontSize: 11, borderColor: 'rgba(220,70,70,.5)', color: '#ff8f8f' }} />
+                style={{ width: 64, padding: '8px 8px', fontSize: 14, borderColor: 'rgba(220,70,70,.5)', color: '#ff8f8f' }} />
             </label>
           ) : null
         ))}
@@ -3689,17 +3691,17 @@ function PuzzleCreator() {
             mit der letzten wieder verschwindet, waere im Aufbau nicht
             auffindbar. Aendert NICHTS am Puzzle, nur an der Ansicht. */}
         <label title="Show each Area's background on the creator board, exactly as it looks in battle."
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0, fontSize: 10, letterSpacing: 1, cursor: 'pointer', userSelect: 'none', color: showAreaBgs ? 'var(--player-color)' : 'var(--text2)' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, fontSize: 13, letterSpacing: 1, cursor: 'pointer', userSelect: 'none', color: showAreaBgs ? 'var(--player-color)' : 'var(--text2)' }}>
           <input type="checkbox" checked={showAreaBgs}
             onChange={(e) => setShowAreaBgs(e.target.checked)}
             style={{ accentColor: 'var(--player-color)', cursor: 'pointer', flexShrink: 0 }} />
           🖼️ BACKGROUNDS
         </label>
-        <button className="btn btn-danger" onClick={handleReset} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>↺ RESET</button>
-        <button className="btn" onClick={handleVerify} style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
+        <button className="btn btn-danger" onClick={handleReset} style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center' }}>↺ RESET</button>
+        <button className="btn" onClick={handleVerify} style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center', borderColor: 'var(--success)', color: 'var(--success)' }}>⚔️ TEST PUZZLE</button>
         <button className="btn" onClick={handleExport} disabled={!validated}
-          style={{ padding: '0 14px', height: 28, display: 'inline-flex', alignItems: 'center', fontSize: 10, borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
-        {validated && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)', fontSize: 9, padding: '2px 8px' }}>VALIDATED</span>}
+          style={{ padding: '10px 20px', display: 'inline-flex', alignItems: 'center', borderColor: validated ? '#ff8800' : 'var(--bg4)', color: validated ? '#ff8800' : 'var(--text2)', opacity: validated ? 1 : 0.4 }}>↓ EXPORT</button>
+        {validated && <span className="badge" style={{ background: 'rgba(51,255,136,.12)', color: 'var(--success)', fontSize: 12, padding: '4px 10px' }}>VALIDATED</span>}
         <VolumeControl />
       </div>
 

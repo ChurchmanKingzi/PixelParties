@@ -13681,7 +13681,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const target = targets.find(t => t.id === selected[0]);
     if (!target) return;
 
-    const animType = enhanced ? 'flame_avalanche' : 'flame_strike';
+    const animType = enhanced ? 'flame_engulf' : 'flame_strike';
     const zoneSlot = target.type === 'equip' ? target.slotIdx : -1;
     this._broadcastEvent('play_zone_animation', {
       type: animType, owner: target.owner, heroIdx: target.heroIdx, zoneSlot,
@@ -13750,15 +13750,40 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Karten ueberhaupt in Frage kommen.
    * @returns {number} Spielerindex des urspruenglichen Besitzers
    */
-  handCardDeckOwner(holderIdx, cardName) {
-    let inst = this.cardInstances.find(c =>
+  /**
+   * ★★ v1261 — DIE HAND-INSTANZ ZU EINER GEHALTENEN KARTE (Als Befund
+   * 21.9.: „die per Leadership weggemischte Resuscitation Potion wurde
+   * ins GEGNERISCHE Potion-Deck geschickt").
+   *
+   * Gewoehnliche Handkarten haben KEINE Instanz — nur besondere
+   * Herkuenfte (gestohlen, aus fremder Ablage, Trankziehung, …) werden
+   * gefuehrt. Der alte Ersatzgriff „irgendeine Hand-Instanz gleichen
+   * Namens bei einem ANDEREN Spieler" sollte Instanzen finden, die
+   * unter dem Urbesitzer laufen, waehrend der Halter sie hat (Loot the
+   * Leftovers). Er griff aber auch dann, wenn der Gegner schlicht
+   * DIESELBE Karte in der Hand hatte: Kingzis (nicht gefuehrte)
+   * Resuscitation Potion aus dem Hauptdeck traf die gefuehrte
+   * Trankziehung der CPU, deren `originalOwner` 1 ist — und wanderte
+   * deshalb in das Trankdeck der CPU; die Instanz der CPU wurde dazu
+   * geloescht. Kein Anzeigefehler, ein Zustandsfehler.
+   *
+   * Regel jetzt: der Ersatzgriff gilt nur, wenn der Instanz-Besitzer
+   * die Karte NICHT selbst in der Hand hat — dann ist die Instanz
+   * herrenlos und gehoert zum Halter. Haelt er sie, ist es seine.
+   */
+  _handInstanzFuer(holderIdx, cardName) {
+    const eigene = this.cardInstances.find(c =>
       c.owner === holderIdx && c.zone === 'hand' && c.name === cardName,
     );
-    if (!inst) {
-      inst = this.cardInstances.find(c =>
-        c.zone === 'hand' && c.name === cardName && c.owner !== holderIdx,
-      );
-    }
+    if (eigene) return eigene;
+    return this.cardInstances.find(c =>
+      c.zone === 'hand' && c.name === cardName && c.owner !== holderIdx
+      && !(this.gs.players[c.owner]?.hand || []).includes(cardName),
+    ) || null;
+  }
+
+  handCardDeckOwner(holderIdx, cardName) {
+    const inst = this._handInstanzFuer(holderIdx, cardName);
     return inst?.originalOwner ?? holderIdx;
   }
 
@@ -13814,17 +13839,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     const handIdx = ps.hand.indexOf(cardName);
     if (handIdx < 0) return null;
 
-    // Find tracked instance to determine original owner
-    // Primary: instance owned by holder
-    let inst = this.cardInstances.find(c =>
-      c.owner === holderIdx && c.zone === 'hand' && c.name === cardName
-    );
-    // Fallback: stolen card — instance owner differs from holder (e.g. Loot the Leftovers)
-    if (!inst) {
-      inst = this.cardInstances.find(c =>
-        c.zone === 'hand' && c.name === cardName && c.owner !== holderIdx
-      );
-    }
+    // Find tracked instance to determine original owner — v1261: siehe
+    // `_handInstanzFuer`; der alte Ersatzgriff traf die Instanz des
+    // GEGNERS, wenn der dieselbe Karte hielt.
+    const inst = this._handInstanzFuer(holderIdx, cardName);
     const originalOwner = inst?.originalOwner ?? holderIdx;
     const ownerPs = this.gs.players[originalOwner];
     if (!ownerPs) return null;

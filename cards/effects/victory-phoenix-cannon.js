@@ -78,7 +78,7 @@ module.exports = {
       await engine._delay(400);
 
       // Impact explosion on target
-      engine._broadcastEvent('play_zone_animation', { type: 'flame_avalanche', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: tgtZoneSlot !== undefined ? tgtZoneSlot : -1 });
+      engine._broadcastEvent('play_zone_animation', { type: 'flame_engulf', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: tgtZoneSlot !== undefined ? tgtZoneSlot : -1 });
       await engine._delay(200);
 
       // Deal 200 damage

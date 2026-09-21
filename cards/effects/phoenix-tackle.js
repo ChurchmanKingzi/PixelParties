@@ -82,9 +82,9 @@ module.exports = {
 
       // Fire impact on target at moment of contact
       if (target.type === 'hero') {
-        engine._broadcastEvent('play_zone_animation', { type: 'flame_avalanche', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: -1 });
+        engine._broadcastEvent('play_zone_animation', { type: 'flame_engulf', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: -1 });
       } else {
-        engine._broadcastEvent('play_zone_animation', { type: 'flame_avalanche', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx });
+        engine._broadcastEvent('play_zone_animation', { type: 'flame_engulf', owner: tgtOwner, heroIdx: tgtHeroIdx, zoneSlot: target.slotIdx });
       }
       await engine._delay(200);
 

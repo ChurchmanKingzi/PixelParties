@@ -69,7 +69,10 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          {/* v1260 (Als Vorgabe 20.9.): Kopfzeilen-Knoepfe (LEAVE/BACK/CLOSE ROOM)
+              im Basismass von `.btn` — gleiche Hoehe wie „+ CREATE GAME"; die
+              alte Verkleinerung (4/12 px, Schrift 10) ist in allen Menues raus. */}
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
           <VolumeControl />
         </div>
@@ -83,7 +86,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT — SPECTATING</h2>
           <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>Pack {draft.round + 1}/{draft.totalRounds} · Pick {draft.pickInRound + 1}/{draft.totalPicks}</span>
           <VolumeControl />
@@ -150,7 +153,7 @@ function CubeDraftScreen({ lobby, draft, leaveRoom, notify }) {
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%)' }}>
       {/* TOP BAR */}
       <div className="top-bar">
-        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT</h2>
         <div style={{ flex: 1 }} />
         <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff', fontSize: 13, padding: '5px 14px', fontWeight: 700 }}>
@@ -530,7 +533,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
           <VolumeControl />
         </div>
@@ -542,7 +545,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 DRAFT — DECK BUILDING</h2>
           <VolumeControl />
         </div>
@@ -561,7 +564,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
           <VolumeControl />
         </div>
@@ -584,7 +587,7 @@ function CubeDraftBuildScreen({ lobby, build, leaveRoom, notify, user }) {
   return (
     <div className="screen-full">
       <div className="top-bar">
-        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 BUILD YOUR DECK</h2>
         <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{build.cubeName}</span>
         <input className="input" placeholder="Deck name…" value={deckName} onChange={e => setDeckName(e.target.value)}
@@ -771,7 +774,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+          <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
           <VolumeControl />
         </div>
@@ -792,7 +795,7 @@ function CubeDraftTournamentScreen({ lobby, tournament, gameState, leaveRoom, no
   return (
     <div className="screen-full">
       <div className="top-bar">
-        <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>LEAVE</button>
+        <button className="btn btn-danger" onClick={leaveRoom}>LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE TOURNAMENT</h2>
         <span className="badge" style={{ background: 'rgba(154,216,255,.14)', color: '#9ad8ff' }}>{tournament.cubeName}</span>
         <span className="badge" style={{ background: 'rgba(255,255,255,.06)', color: 'var(--text)' }}>
@@ -931,7 +934,7 @@ function CubeDraftFinalStandings({ lobby, tournament, leaveRoom }) {
   return (
     <div className="screen-full" style={{ background: 'radial-gradient(ellipse at center, rgba(255,215,0,.12) 0%, var(--bg) 70%)' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>← LEAVE</button>
+        <button className="btn" onClick={leaveRoom}>← LEAVE</button>
         <h2 className="orbit-font" style={{ fontSize: 14, color: '#ffd700' }}>🏆 TOURNAMENT COMPLETE</h2>
         <VolumeControl />
       </div>
@@ -1313,7 +1316,7 @@ function PlayScreen() {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>
+          <button className="btn btn-danger" onClick={leaveRoom}>
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 14, color: 'var(--accent)' }}>🧊 CUBE DRAFT LOBBY</h2>
@@ -1425,7 +1428,7 @@ function PlayScreen() {
     return (
       <div className="screen-full">
         <div className="top-bar">
-          <button className="btn btn-danger" style={{ padding: '4px 12px', fontSize: 10 }} onClick={leaveRoom}>
+          <button className="btn btn-danger" onClick={leaveRoom}>
             {isHost ? 'CLOSE ROOM' : 'LEAVE'}
           </button>
           <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>GAME LOBBY</h2>
@@ -1518,7 +1521,7 @@ function PlayScreen() {
   return (
     <div className="screen-full">
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>ONLINE LOBBY</h2>
         <div style={{ flex: 1 }} />
         <label style={{ fontSize: 12, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>

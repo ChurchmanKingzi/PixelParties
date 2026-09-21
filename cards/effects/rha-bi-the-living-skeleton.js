@@ -226,7 +226,20 @@ module.exports = {
 
     // Kosten erst zahlen, wenn die Karte wirklich da ist.
     const lebend = rhabi(engine, pi, heroIdx);
+    // ★ v1260 (Als Befund 20.9.): „sein Effekt hat nicht immer 100
+    // Schaden an ihm selbst verursacht — immer der erste Einsatz jede
+    // Runde war frei". Genau Als Vermutung: `decreaseMaxHp` senkt nur
+    // das MAXIMUM und stutzt die aktuellen HP bloss darauf — wer schon
+    // 100 unter dem Maximum lag, zahlte nichts. Der Kartentext verlangt
+    // BEIDES („current and max HP by 100"): also die aktuellen HP
+    // vorher festhalten und nach der Senkung auf hp−100 setzen, nie
+    // unter 1 (bezahlbar() verlangt ohnehin > 100). Kein Doppelabzug:
+    // wer voll war, landet bei (max−100)/(max−100). Die Schadenszahl am
+    // Helden kommt vom HP-Delta-Waechter des Clients von selbst.
+    const hpZiel = Math.max(1, (lebend.hp || 0) - KOSTEN);
     engine.decreaseMaxHp(lebend, KOSTEN);
+    lebend.hp = Math.max(1, Math.min(lebend.hp, hpZiel));
+    engine.log('rhabi_cost', { hero: CARD_NAME, hp: lebend.hp, maxHp: lebend.maxHp });
 
     // Die Instanz: Zonenspiegel gehoert der GEGNERSEITE, Stapel-Routing
     // dem Leger. Bewusst OHNE Beschwoerungs-Hooks — eine verdeckte

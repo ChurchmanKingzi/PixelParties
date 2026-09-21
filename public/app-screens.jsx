@@ -2324,7 +2324,7 @@ function ProfileScreen() {
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>PLAYER PROFILE</h2>
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 10, color: 'var(--text2)' }}>Member since {memberSince}</div>
@@ -3458,7 +3458,7 @@ function ShopScreen() {
         </div>
       )}
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={() => setScreen('menu')}>← BACK</button>
+        <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>SHOP</h2>
         <div style={{ flex: 1 }} />
         <div className="badge" style={{ background: 'rgba(255,215,0,.12)', color: '#ffd700', display: 'flex', alignItems: 'center', gap: 6, fontSize: 18, padding: '6px 14px' }}>
@@ -3603,7 +3603,7 @@ function RulesScreen({ onBack }) {
   return (
     <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #10101d 40%, #0a0a12 100%)' }}>
       <div className="top-bar">
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={goBack}>← BACK</button>
+        <button className="btn" onClick={goBack}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>RULES</h2>
         <div style={{ flex: 1 }} />
         <VolumeControl />
@@ -4392,7 +4392,7 @@ function SingleplayerScreen() {
           also mittig. Der eigene Hintergrund (`--bg2`) ist schon gesetzt,
           sodass Inhalt sauber darunter durchlaeuft. */}
       <div className="top-bar" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
-        <button className="btn" style={{ padding: '4px 12px', fontSize: 10 }} onClick={onBack}>← BACK</button>
+        <button className="btn" onClick={onBack}>← BACK</button>
         {user?.isGuest && (
           <button className="btn" style={{ padding: '5px 16px', fontSize: 13 }} onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}

@@ -14,7 +14,7 @@ module.exports = {
   // laeuft ihr Effekt-Rumpf nie — die Engine spielt dann diese Bilder.
   // Im normalen Weg bleibt es bei den Broadcasts im Effekt selbst.
   spellVisual: {
-    impact: { type: 'flame_avalanche' }, impactMs: 260,
+    impact: { type: 'flame_engulf' }, impactMs: 260,
   },
 
   inherentAction: true,
@@ -53,7 +53,7 @@ module.exports = {
           types: ['hero', 'creature'],
           damage: 0,
           sourceName: 'Divine Gift of Fire',
-          animationType: 'flame_avalanche',
+          animationType: 'flame_engulf',
           animDelay: 600,
           singleTargetPrompt: {
             title: 'Divine Gift of Fire',
@@ -112,7 +112,7 @@ module.exports = {
         types: ['hero', 'creature'],
         damage: 0,
         sourceName: 'Divine Gift of Fire',
-        animationType: 'flame_avalanche',
+        animationType: 'flame_engulf',
         animDelay: 600,
       });
 

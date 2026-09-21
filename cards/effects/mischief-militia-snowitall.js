@@ -182,6 +182,23 @@ module.exports = {
     const savedPlayLog = engine.gs._pendingPlayLog;
     delete engine.gs._pendingPlayLog;
 
+    // ★★ v1259 — SCHLEIFENSCHUTZ (Barker-Bauform, v384). Der Tester-Fall
+    // vom 19.9. („SnowItAll + Chilly Dog frieren das Spiel ein"): waehrend
+    // der CPU-Rollouts wird auch die MENSCHEN-Seite simuliert, und dort
+    // beantwortet der Rollout jede abbrechbare Frage mit `null`. Mit
+    // genau EINER Lv≤1-Kreatur in der Hand (Chilly Dog) faellt Schritt 1
+    // automatisch, Schritt 2 liest `null` als „zurueck", springt zu
+    // Schritt 1, der wieder automatisch faellt — endlos, ohne Riegel.
+    // Regel wie bei Barker: ein AUTOMAT (CPU, Rollout, Fast-Mode) nimmt
+    // bei `null` die erste freie Zone; ein Mensch behaelt Escape = eine
+    // Stufe zurueck, aber nur, wenn es eine Stufe GIBT — bei einer
+    // einzigen waehlbaren Kreatur heisst Escape „ganz abbrechen".
+    // MAX_RUECKSPRUENGE als letzte Linie fuer jeden weiteren Pfad.
+    const automatAntwortet = () =>
+      engine.isCpuPlayer(pi) || engine._inMctsSim || engine._fastMode;
+    const MAX_RUECKSPRUENGE = 20;
+    let rueckspruenge = 0;
+
     let chosenName = null;
     let dest = null;
     while (!dest) {
@@ -193,7 +210,8 @@ module.exports = {
       const eligibleIndices = _getSummonableHandIndices(engine, pi);
       if (eligibleIndices.length === 0) return false;
       let chosenIdx;
-      if (eligibleIndices.length === 1) {
+      const kartenwahlAutomatisch = eligibleIndices.length === 1;
+      if (kartenwahlAutomatisch) {
         chosenIdx = eligibleIndices[0];
         chosenName = ps.hand[chosenIdx];
       } else {
@@ -228,19 +246,29 @@ module.exports = {
       // `{ cancelled: true }`, which loops back to the Creature pick.
       const pick = await ctx.promptZonePick(freeSlots, {
         title: CARD_NAME,
-        description: `Place ${chosenName} into a free Support Zone. Cancel to pick a different Creature.`,
+        description: kartenwahlAutomatisch
+          ? `Place ${chosenName} into a free Support Zone.`
+          : `Place ${chosenName} into a free Support Zone. Cancel to pick a different Creature.`,
         cancellable: true,
       });
       if (!pick || pick.cancelled) {
-        // Back-button / Escape: clear the chosen Creature and loop
-        // back to the hand picker. If only 1 eligible Creature was
-        // in hand, the next iteration will auto-pick it again — that's
-        // fine, the player still gets the zone picker re-opened.
+        rueckspruenge++;
+        // Automat oder Notbremse: erste freie Zone statt Rueckschleife.
+        if (automatAntwortet() || rueckspruenge > MAX_RUECKSPRUENGE) {
+          dest = freeSlots[0];
+          break;
+        }
+        // Mensch: gab es keine Kartenwahl, gibt es auch kein „zurueck" —
+        // Escape bricht den Effekt ab (kostet nichts, HOPT bleibt frei).
+        if (kartenwahlAutomatisch) return false;
+        // Sonst: zurueck zum Kartenpicker.
         chosenName = null;
         continue;
       }
       dest = freeSlots.find(z => z.heroIdx === pick.heroIdx && z.slotIdx === pick.slotIdx) || null;
       if (!dest) {
+        rueckspruenge++;
+        if (automatAntwortet() || rueckspruenge > MAX_RUECKSPRUENGE) { dest = freeSlots[0]; break; }
         chosenName = null;
         continue;
       }

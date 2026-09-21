@@ -360,28 +360,54 @@ window._ppPersistedVolume = _ppPersistedVolume;
 // jetzt ein EIGENER, pro Geraet gespeicherter Regler (Faktor 0,5–2,5
 // auf die alte Rechnung), mit Vorgabe 1,0 an der Maus und 1,7 am
 // Finger. Sichtbar als zweiter Schieber im Lautstaerke-Fenster.
-const SFX_GAIN_KEY = 'pp_sfx_gain';
-function _ppDefaultSfxGain() {
-  try { return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1.7 : 1.0; } catch { return 1.0; }
+// ★★ v1259 (Als Befund 20.9.): „Der Musik-Regler beeinflusst AUCH
+// Sounds — die Sound-Lautstaerke setzt sich aus beidem zusammen, obwohl
+// NUR der Sound-Regler verantwortlich sein sollte." Der v842-Regler war
+// als FAKTOR auf die Musiklautstaerke gebaut (0,5–2,5); jetzt ist er ein
+// eigener ABSOLUTER Pegel 0–1 wie der Musikregler. Stummschaltung
+// (Rechtsklick) und ein verstecktes Tab gelten weiterhin fuer beide.
+// Migration: ein alter Faktor wird einmalig in einen absoluten Wert
+// umgerechnet (alte Musiklautstaerke × Faktor), damit niemand nach dem
+// Update ploetzlich andere Pegel hat.
+const SFX_VOLUME_KEY = 'pp_sfx_volume';
+const SFX_GAIN_KEY_ALT = 'pp_sfx_gain';   // v842–v1258, nur noch fuer die Migration
+function _ppDefaultSfxVolume() {
+  // Telefonlautsprecher nehmen kurzen, tiefen Klaengen die Wucht
+  // (Al 9.9.) — deshalb am Finger eine hoehere Vorgabe.
+  try { return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 0.34 : 0.2; } catch { return 0.2; }
 }
-function _ppPersistedSfxGain() {
+function _ppPersistedSfxVolume() {
   try {
-    const v = parseFloat(localStorage.getItem(SFX_GAIN_KEY));
-    return Number.isFinite(v) ? Math.max(0.5, Math.min(2.5, v)) : _ppDefaultSfxGain();
-  } catch { return _ppDefaultSfxGain(); }
+    const v = parseFloat(localStorage.getItem(SFX_VOLUME_KEY));
+    if (Number.isFinite(v)) return Math.max(0, Math.min(1, v));
+    const altFaktor = parseFloat(localStorage.getItem(SFX_GAIN_KEY_ALT));
+    if (Number.isFinite(altFaktor)) {
+      const musik = parseFloat(localStorage.getItem('pp_volume'));
+      const basis = Number.isFinite(musik) ? musik : DEFAULT_VOLUME;
+      const migriert = Math.max(0, Math.min(1, basis * altFaktor));
+      localStorage.setItem(SFX_VOLUME_KEY, String(migriert));
+      localStorage.removeItem(SFX_GAIN_KEY_ALT);
+      return migriert;
+    }
+    return _ppDefaultSfxVolume();
+  } catch { return _ppDefaultSfxVolume(); }
 }
-window._ppSfxGain = _ppPersistedSfxGain();
-window._ppSetSfxGain = (g) => {
-  window._ppSfxGain = Math.max(0.5, Math.min(2.5, g));
-  try { localStorage.setItem(SFX_GAIN_KEY, String(window._ppSfxGain)); } catch {}
+window._ppSfxVolume = _ppPersistedSfxVolume();
+window._ppSetSfxVolume = (v) => {
+  window._ppSfxVolume = Math.max(0, Math.min(1, v));
+  try { localStorage.setItem(SFX_VOLUME_KEY, String(window._ppSfxVolume)); } catch {}
 };
 
 function _sfxVolume() {
-  const v = window._ppGetVolume ? window._ppGetVolume() : _ppPersistedVolume();
-  const basis = Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.4));
-  // Deckel bei 1: der Web-Audio-Gain darf ueber 1, aber die Musik kann
-  // nicht mitziehen — mehr als Vollpegel bringt nur Uebersteuerung.
-  return Math.min(1, basis * (window._ppSfxGain || 1));
+  // Nur der Effektregler — plus Stummschaltung/verstecktes Tab, die
+  // <VolumeControl> ueber _ppGetSfxVolume einrechnet. Vor dem Mount
+  // gilt der gespeicherte Wert (bei gespeicherter Stummschaltung 0).
+  let v;
+  if (window._ppGetSfxVolume) v = window._ppGetSfxVolume();
+  else {
+    try { v = localStorage.getItem('pp_muted') === '1' ? 0 : window._ppSfxVolume; } catch { v = window._ppSfxVolume; }
+  }
+  return Math.max(0, Math.min(1, typeof v === 'number' ? v : 0.2));
 }
 
 // Per-sound intrinsic volume. Applied on top of master + per-call volume.
@@ -656,6 +682,11 @@ function playSFXForLog(entry) {
     // Debt-O-Tron-Kosten (Als Report 16.8.), betrifft aber jeden
     // `actionPromptForceDiscard(..., deleteMode: true)`.
     case 'forced_delete':
+    // v1261 (Als Befund 21.9.): das Handlimit (Pollution: loeschen,
+    // sonst: abwerfen) loggt `hand_limit_deleted` / `hand_limit_discard`
+    // — beide klingen wie ein Abwurf.
+    case 'hand_limit_deleted':
+    case 'hand_limit_discard':
     case 'rebelliokai_discard_delete':
     case 'cybug_fuel_delete':
     case 'vacarn_delete_redirect':
@@ -4002,7 +4033,7 @@ function VolumeControl() {
     return saved != null ? parseFloat(saved) : DEFAULT_VOLUME;
   });
   const [muted, setMuted] = useState(() => localStorage.getItem('pp_muted') === '1');
-  const [sfxGain, setSfxGain] = useState(() => window._ppSfxGain || 1);
+  const [sfxVol, setSfxVol] = useState(() => (typeof window._ppSfxVolume === 'number' ? window._ppSfxVolume : 0.2));
   const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
   const ref = useRef(null);
 
@@ -4022,6 +4053,12 @@ function VolumeControl() {
   useEffect(() => {
     window._ppGetVolume = () => effectiveVol;
   }, [effectiveVol]);
+  // ★ v1259: eigener Effektpegel, Stummschaltung und verstecktes Tab
+  // gelten fuer beide Regler (siehe _ppSetSfxVolume oben).
+  useEffect(() => {
+    const eff = (muted || tabHidden) ? 0 : sfxVol;
+    window._ppGetSfxVolume = () => eff;
+  }, [sfxVol, muted, tabHidden]);
 
   // Auto-mute while the tab is in the background — when the user
   // switches to another tab in the same browser, document.hidden
@@ -4058,13 +4095,13 @@ function VolumeControl() {
               className="volume-slider"
               onChange={e => { setVolume(parseFloat(e.target.value)); if (muted) setMuted(false); }} />
           </label>
-          {/* v842: Effektpegel relativ zur Musik, pro Geraet gespeichert —
-              siehe `_ppSfxGain` oben. Beim Loslassen ein Probeklang. */}
+          {/* v1259: Effektpegel ABSOLUT (0–1), unabhaengig von der Musik —
+              siehe `_ppSetSfxVolume` oben. Beim Loslassen ein Probeklang. */}
           <label className="volume-row">
             <span className="volume-row-label">SFX</span>
-            <input type="range" min="0.5" max="2.5" step="0.05" value={sfxGain}
+            <input type="range" min="0" max="1" step="0.01" value={muted ? 0 : sfxVol}
               className="volume-slider"
-              onChange={e => { const g = parseFloat(e.target.value); setSfxGain(g); window._ppSetSfxGain(g); }}
+              onChange={e => { const v = parseFloat(e.target.value); setSfxVol(v); window._ppSetSfxVolume(v); if (muted) setMuted(false); }}
               onPointerUp={() => { if (window.playSFX) window.playSFX('draw', { dedupe: 150 }); }} />
           </label>
         </div>

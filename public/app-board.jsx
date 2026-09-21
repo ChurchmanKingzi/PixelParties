@@ -737,12 +737,23 @@ function DrawAnimCard({ cardName, origIdx, startX, startY, dimmed }) {
   // Before we know the end position, render at deck position (hidden)
   if (!endPos) return null;
 
-  const dx = endPos.x - startX;
-  const dy = endPos.y - startY;
+  // ★ v1260 (Als Befund 20.9.: „draw (either deck) → Hand hat dasselbe
+  // Problem wie Hand → Deck — die Karte beginnt beim Deck nicht
+  // mittig"). Gleiche Ursache wie bei DiscardAnimCard (v1259): der
+  // Startpunkt ist „Stapelmitte − 32/45", also die Ecke einer 64×90-
+  // Karte, die Huelle hat aber Handmass und schrumpft am Start um ihre
+  // eigene Mitte — die lag um (Breite/2 − 32, Hoehe/2 − 45) neben dem
+  // Stapel. Jetzt: Huelle MITTIG auf den Stapel setzen, der Weg zum
+  // Handplatz rechnet die halbe Handkarte wieder heraus.
+  const cx = startX + 32, cy = startY + 45;
+  const left = `calc(${cx}px - var(--hand-card-w) / 2)`;
+  const top = `calc(${cy}px - var(--hand-card-h) / 2)`;
+  const dx = `calc(${endPos.x - cx}px + var(--hand-card-w) / 2)`;
+  const dy = `calc(${endPos.y - cy}px + var(--hand-card-h) / 2)`;
 
   return (
     <div className={'draw-anim-card' + (dimmed ? ' hand-card-dimmed' : '')}
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px', '--fan-rot': endPos.rot || '0deg' }}>
+      style={{ left, top, '--dx': dx, '--dy': dy, '--fan-rot': endPos.rot || '0deg' }}>
       <BoardCard cardName={cardName} />
     </div>
   );
@@ -788,6 +799,22 @@ function ColoredSnowRevealCard({ startX, startY, centerX, centerY, endX, endY, e
 function KassaranFlipCard({ startX, startY, centerX, centerY, endX, endY, cardName, cardbackUrl, durationMs }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
+  // ★ v1259 (Als Befund 20.9.): die Deck-oben-Umdreh-Animation (Chaos
+  // Magic, Kassaran, Muehlen-Aufdeckung) war STUMM. Drei Klaenge, an den
+  // Keyframes von `kassaran-flight`/`kassaran-flip` festgemacht:
+  //   0 %   Karte loest sich vom Deck        → 'draw'
+  //   25 %  Karte dreht sich in der Mitte    → 'reveal'
+  //   75 %  Karte fliegt weiter zum Ziel     → 'discard'
+  // Prozentwerte skalieren mit `durationMs`, damit auch die schnelle
+  // Muehlen-Variante auf ihren Bildern sitzt.
+  useEffect(() => {
+    const dur = durationMs || 2000;
+    const sfx = (name) => { if (window.playSFX) window.playSFX(name, { dedupe: 60, category: 'effect' }); };
+    sfx('draw');
+    const t1 = setTimeout(() => sfx('reveal'), dur * 0.25);
+    const t2 = setTimeout(() => sfx('discard'), dur * 0.75);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
   return (
     <div className="kassaran-flip-card"
       style={{
@@ -957,7 +984,9 @@ function DeckPeekReveal({ state, interactive, onPick, onDone, title }) {
               ...(chosen === eintrag.name && takeTo
                 ? { '--ex': takeTo.x + 'px', '--ey': takeTo.y + 'px' } : {}),
             }}
-            onClick={waehlbar ? () => { if (window.playSFX) window.playSFX('ui_click'); onPick(eintrag.name); } : undefined}>
+            onClick={waehlbar ? () => { if (window.playSFX) window.playSFX('ui_click'); onPick(eintrag.name); } : undefined}
+            onMouseEnter={() => { if (card && window._boardTooltipSetter && !window.activeDragData) window._boardTooltipSetter(card); }}
+            onMouseLeave={() => { if (window._boardTooltipSetter) window._boardTooltipSetter(null); }}>{/* v1259: Tooltip wie bei Zi/Birthday Present */}
             {card ? <img src={cardImageUrl(card.name)} alt={card.name} draggable={false} />
               : <div style={{ width: '100%', height: '100%', background: 'var(--bg3)', color: 'var(--text)', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 4 }}>{eintrag.name}</div>}
           </div>
@@ -995,10 +1024,23 @@ function BirthdayPresentReveal({ state, interactive, onPick }) {
         // never sets it, so its path is unchanged.
         if (isChosen) cls.push(castMode ? 'tk-casting' : 'chosen');
         if (flight) cls.push('flying-out');
+        // v1260: Klang beim Waehlen (Al: „Beim Anklicken einer Karte aus
+        // Zis Galerie fehlt noch ein Sound") — gilt fuer Birthday Present mit.
         const handleClick = (interactive && !chosen && onPick)
-          ? () => onPick(cardName) : undefined;
+          ? () => { if (window.playSFX) window.playSFX('ui_click'); onPick(cardName); } : undefined;
+        // ★ v1259 (Als Befund 20.9.): „Hovert man ueber einer der Karten,
+        // die Zi zur Auswahl gibt, erscheint kein Tooltip." Die drei
+        // Aufdeck-Karten (Birthday Present, Zi) sind reine <img>-Kaesten
+        // ohne Anbindung an den geteilten Brett-Tooltip — anders als
+        // CardMini/BoardCard. Hier dieselbe Anbindung: Zeiger drueber →
+        // Tooltip, Zeiger weg → zu. Am Finger uebernimmt der Tap das
+        // Anklicken; ein langer Druck ist hier nicht noetig, weil die
+        // Karten gross in der Mitte stehen.
+        const tooltipRein = () => { if (card && window._boardTooltipSetter && !window.activeDragData) window._boardTooltipSetter(card); };
+        const tooltipRaus = () => { if (window._boardTooltipSetter) window._boardTooltipSetter(null); };
         return (
           <div key={`bday-${i}-${cardName}`} className={cls.join(' ')}
+            onMouseEnter={tooltipRein} onMouseLeave={tooltipRaus}
             style={{
               '--idx': slotIdx,
               '--delay': (i * 250) + 'ms',
@@ -1066,12 +1108,16 @@ function BrackleCatapultCard({ sx, sy, mx, my, ex, ey, dx, dy, cardName, loadMs,
 }
 
 function OppDrawAnimCard({ id, startX, startY, endX, endY, cardName, cardbackUrl, fanRot }) {
-  const dx = endX - startX;
-  const dy = endY - startY;
+  // v1260: Start mittig auf dem Stapel — siehe DrawAnimCard.
+  const cx = startX + 32, cy = startY + 45;
+  const left = `calc(${cx}px - var(--hand-card-w) / 2)`;
+  const top = `calc(${cy}px - var(--hand-card-h) / 2)`;
+  const dx = `calc(${endX - cx}px + var(--hand-card-w) / 2)`;
+  const dy = `calc(${endY - cy}px + var(--hand-card-h) / 2)`;
   return (
     <div className="draw-anim-card"
       style={{
-        left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px',
+        left, top, '--dx': dx, '--dy': dy,
         // ★ v1233: Landewinkel des Faechers. Der Drehpunkt liegt hier
         // in der MITTE, weil die Karten dieser Reihen keine Platz-
         // Huelle haben und selbst um ihre Mitte drehen (style.css).
@@ -1132,8 +1178,22 @@ function ppJetzt() {
 }
 
 function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand }) {
-  const dx = endX - startX;
-  const dy = endY - startY;
+  // ★ v1259 (Als Befund 20.9.: „beim Zurueckmischen von Handkarten ins
+  // Potion- UND Main-Deck liegen die Karten zu weit unten/rechts — als
+  // wuerde ueber der oberen linken Ecke statt der Mitte zentriert").
+  //
+  // Alle Zielpunkte im Projekt (getPileCenter, deckTarget, Stack) sind
+  // „Stapelmitte minus 32/45" — die OBERE LINKE ECKE einer 64×90-Karte.
+  // Die fliegende Karte hat aber Hand- bzw. Stapelmass (mit Massstab),
+  // und `scale()` am Ende dreht um ihre eigene Mitte: die landet damit
+  // um (Breite/2 − 32, Hoehe/2 − 45) neben der Stapelmitte — am Desktop
+  // rund 20/35 px nach rechts unten, aus der Hand am deutlichsten, weil
+  // dort die groesste Karte fliegt. Deshalb wird der Weg jetzt von
+  // MITTE zu MITTE gerechnet, und weil die eigene Groesse nur das CSS
+  // kennt (`--flug-w/--flug-h`, gesetzt in `.discard-anim-card` und
+  // `.discard-anim-hand`), zieht `calc()` die halbe Kartengroesse ab.
+  const dx = `calc(${endX + 32 - startX}px - var(--flug-w, 64px) / 2)`;
+  const dy = `calc(${endY + 45 - startY}px - var(--flug-h, 90px) / 2)`;
   // ★★ v1131 — DER FLUG DARF NICHT VON VORN BEGINNEN (Als Befund 15.9.:
   // „der Skull erscheint noch mal in seiner Support Zone").
   //
@@ -1177,7 +1237,7 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
            die Karte wird auf dem ganzen Weg also nicht mehr skaliert.
            Brettquellen behalten ihr Zonenmass. */
         + (ausHand ? ' discard-anim-hand' : '')}
-      style={{ left: startX, top: startY, '--dx': dx + 'px', '--dy': dy + 'px',
+      style={{ left: startX, top: startY, '--dx': dx, '--dy': dy,
         animationDelay: versatz ? versatz + 'ms' : undefined }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
@@ -8940,6 +9000,18 @@ const ANIM_REGISTRY = {
   spider_avalanche: SpiderAvalancheEffect,
   electric_strike: ElectricStrikeEffect,
   flame_strike: FlameStrikeEffect,
+  // ★ v1261 (Als Befund 21.9.): die v1215-Salve (`flame_avalanche`,
+  // Geschosse vom Caster zu den Zielen) gehoert NUR der Karte Flame
+  // Avalanche. Alle anderen Nutzer (Phoenix Tackle, Victory Phoenix
+  // Cannon, Divine Gift of Fire, der verstaerkte Feuerschlag der Engine)
+  // bekommen wieder „Flammen auf dem Ziel selbst": der Flammenschlag,
+  // um 1,4 vergroessert. Die Huelle ist fixed am Zielpunkt und skaliert
+  // um genau diesen Punkt; der Schlag darin sitzt bei 0/0.
+  flame_engulf: ({ x, y }) => (
+    <div style={{ position: 'fixed', left: x, top: y, width: 0, height: 0, transform: 'scale(1.4)', pointerEvents: 'none', zIndex: 10100 }}>
+      <FlameStrikeEffect x={0} y={0} />
+    </div>
+  ),
   black_flame_strike: BlackFlameStrikeEffect,
   demon_fire_pillar: DemonFirePillarEffect,
   cavalry_charge: CavalryChargeEffect,
@@ -26030,6 +26102,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
       }
     }
+    // ★ v1261 (Als Befund 21.9.): „Wird durch das Handlimit von Pollution
+    // eine Handkarte geloescht, wird kein Sound abgespielt — sollte exakt
+    // derselbe wie beim Discard sein." Der Loeschstapel hatte keinen
+    // Wachstums-Klang; derselbe Griff wie beim Ablagestapel darueber,
+    // gleiche Unterdrueckung fuer Karten, deren Flug schon vertont ist.
+    if (deletedGrew && window.playSFX) {
+      let addedCount = newDeletedLen - prevDeletedLen;
+      const vorgemerkt = Math.min(addedCount, pileSoundSuppressRef.current.deleted || 0);
+      pileSoundSuppressRef.current.deleted = (pileSoundSuppressRef.current.deleted || 0) - vorgemerkt;
+      addedCount -= vorgemerkt;
+      for (let k = 0; k < addedCount; k++) {
+        setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
+      }
+    }
 
     // Build the hand-removed list FIRST (independent of pile growth)
     // so we can suppress entries already covered by an explicit
@@ -26245,6 +26331,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // Discard cue for opponent-side discard pile growth (mirrors own-side).
     if (discardGrew && window.playSFX) {
       const addedCount = newDiscardLen - prevDiscardLen;
+      for (let k = 0; k < addedCount; k++) {
+        setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
+      }
+    }
+    // v1261: dasselbe fuer den gegnerischen Loeschstapel (Pollution & Co.).
+    if (deletedGrew && window.playSFX) {
+      const addedCount = newDeletedLen - prevDeletedLen;
       for (let k = 0; k < addedCount; k++) {
         setTimeout(() => window.playSFX('discard', { dedupe: 80 }), k * 80);
       }
@@ -26785,7 +26878,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Generic speech-bubble renderer (end-game win/loss lines AND mid-game CPU
   // barks). `tkey` forces a fresh TypewriterText mount so the type-out
   // restarts even when the same text is shown twice in a row.
-  const renderBubbleAt = (msg, color, dir, anchor, tkey, z = 1100, fading = false, bounce = false) => {
+  // ★ v1259 (Als Befund 20.9.): „Die Texte der Gegner am Ende des Spiels
+  // sollten UEBER dem End-Screen-Interface liegen." Die Blasen standen
+  // bei 1100, das Ergebnis-Overlay (`.modal-overlay`) im Kampf seit
+  // v1259 bei 10085 — und die eigene Hand ohnehin bei 10000, unter der
+  // die Zwischenrufe der CPU bisher ebenfalls verschwanden. 10090 =
+  // ueber allem Kampf-Interface, unter Kartenfluegen (10150); die Blasen
+  // sind ohne Zeiger-Ereignisse, sie verdecken also keinen Knopf.
+  const renderBubbleAt = (msg, color, dir, anchor, tkey, z = 10090, fading = false, bounce = false) => {
     if (!msg || !anchor) return null;
     const isUp = dir === 'up'; // tail points up → bubble sits below the avatar
     // Avatars sit at the screen's left edge, so a bubble centered on the
@@ -41819,7 +41919,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             first-choice panel (z 9600) instead of being occluded by them. */}
         {!showEndBubbles && cpuBark && renderBubbleAt(cpuBark.text, '#ffcc44', cpuBark.dir, cpuBark.anchor, cpuBark.id, 9650, cpuBark.fading, !!opp?.barkBounce)}
         {/* Opponent hand */}
-        <div className="game-hand game-hand-opp">
+        <div className="game-hand game-hand-opp" style={{ '--hand-accent': opp.color || '#ff5577' }}>
           {/* ★ v1258 — DER LINKE CLUSTER DER VERSCHMOLZENEN ZEILE.
               Aufgabe und Avatar stehen nebeneinander; der Knopf traegt
               das doppelte Mass der alten Kopfzeile (8/16 statt 4/12,

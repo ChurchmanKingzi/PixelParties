@@ -3013,14 +3013,20 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
    ausserhalb der Mitte. Den Platz reservieren stattdessen die
    Seitenraender von `.game-hand-opp .game-hand-cards` (weiter unten),
    genau wie es die eigene Hand seit jeher haelt. */
+/* ★ v1259 (Al 20.9.): Knopf und Avatar UNTEREINANDER, nicht nebeneinander. */
+/* ★ v1260 (Al 20.9.): Beide Cluster haengen jetzt an der OBERKANTE
+   der Zeile statt mittig — der Knopf rueckt hoch (die Luecke zum
+   oberen Rand war deutlich groesser als die zum Avatar), der Avatar
+   ueber die groessere Luecke ein Stueck runter, und der
+   Lautstaerkeregler rechts schliesst oben mit der Knopf-Oberkante ab. */
 .game-hand-topleft {
   position: absolute;
   left: calc(12px * var(--board-scale));
-  top: 50%;
-  transform: translateY(-50%);
+  top: calc(10px * var(--board-scale));
   display: flex;
-  align-items: center;
-  gap: calc(10px * var(--board-scale));
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(16px * var(--board-scale));
   z-index: 3;
 }
 /* Der Avatar gibt seine eigene absolute Lage im Cluster auf — er ist
@@ -3046,12 +3052,11 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
 .game-hand-topright {
   position: absolute;
   right: calc(12px * var(--board-scale));
-  top: 50%;
-  transform: translateY(-50%);
+  top: calc(10px * var(--board-scale));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: calc(4px * var(--board-scale));
+  gap: calc(8px * var(--board-scale));
   z-index: 3;
 }
 /* Dasselbe fuer die Goldanzeige: im Cluster steht sie in der Spalte,
@@ -3155,6 +3160,10 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
      die im Stapel plötzlich größer ist. */
   width: var(--pile-card-w);
   height: var(--pile-card-h);
+  /* v1259: eigene Groesse fuer die Mitte-zu-Mitte-Rechnung in
+     DiscardAnimCard (siehe dort). */
+  --flug-w: var(--pile-card-w);
+  --flug-h: var(--pile-card-h);
   /* `.discard-anim-hand` (siehe DiscardAnimCard) — aus der Hand
      startet der Flug im Handmaß. */
   /* ★ ALS BEFUND 18.8.: „hovert … kurz auf der Stelle, was seltsam
@@ -3194,6 +3203,8 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
 .discard-anim-card.discard-anim-hand {
   width: var(--hand-card-w);
   height: var(--hand-card-h);
+  --flug-w: var(--hand-card-w);
+  --flug-h: var(--hand-card-h);
   /* Aus der Hand: Ziel ist der Stapel, Quelle die Handkarte. */
   --dfScale: calc(var(--pile-card-scale, 1) / var(--hand-card-scale, 1));
 }
@@ -5411,8 +5422,13 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   padding: calc(var(--hand-card-h) * 0.8 + 20px) var(--fan-pad-x) var(--fan-pad-unten);
   margin-top: calc(var(--hand-card-h) * -0.8 - 20px);
   margin-bottom: calc(var(--fan-pad-unten) * -1);
-  margin-left: calc(180px * var(--board-scale) - var(--fan-pad-x)); /* Match right margin for symmetric centering */
-  margin-right: calc(180px * var(--board-scale) - var(--fan-pad-x)); /* Reserve space for gold display + sort/shuffle buttons */
+  /* ★ v1261 (Al 21.9.): 180 → 260 fuer BEIDE Haende. Rechts brauchen
+     Gold (dreistellig, seit v1260 gross) und Sort/Shuffle mehr Platz,
+     links Knopf + Avatar; die Handzone wird dafuer etwas schmaler.
+     Beide Zeilen teilen dasselbe Mass, damit die farbigen Striche
+     (`.game-hand-me/-opp::before/::after`) exakt uebereinander stehen. */
+  margin-left: calc(260px * var(--board-scale) - var(--fan-pad-x));
+  margin-right: calc(260px * var(--board-scale) - var(--fan-pad-x));
 }
 .game-hand-cards { justify-content: safe center; }
 /* Die Gegnerhand spiegelt das Polster: ihr Bogen und ihre
@@ -5421,13 +5437,8 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
   margin-top: calc(var(--fan-pad-unten) * -1);
   margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
-  /* ★ v1258: Links steht jetzt Aufgabe-Knopf UND Avatar, rechts
-     Lautstaerke ueber Gold — beide Cluster sind absolut gesetzt und
-     brauchen deshalb reservierten Platz aus den Raendern. 240 statt
-     der 180 der eigenen Hand; beide Seiten gleich, sonst verliert die
-     Kartenreihe ihre Mitte. */
-  margin-left: calc(240px * var(--board-scale) - var(--fan-pad-x));
-  margin-right: calc(240px * var(--board-scale) - var(--fan-pad-x));
+  /* (v1261: die 260-px-Raender stehen jetzt fuer beide Haende in der
+     Basisregel `.game-hand-cards`.) */
 }
 /* Hand cards compress (overlap) when there are too many */
 .game-hand-cards .hand-slot {
@@ -5862,9 +5873,15 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   gap: 3px;
   z-index: 10002;
 }
-.game-gold-icon { font-size: calc(32px * var(--board-scale)); }
+/* ★ v1260 (Al 20.9.): „Die Goldanzeigen beider Spieler haben jetzt
+   deutlich mehr Platz, sollen also deutlich groesser sein." 32/30 →
+   52/48 (×1.6). Die eigene Hand traegt seit v1257 keine Kopfzeile mehr
+   ueber sich, die Gegnerzeile hat ihre rechte Spalte — beide haben den
+   Platz. Die Goldzahlen (GoldGainNumber) messen `[data-gold-player]`
+   und folgen von selbst. */
+.game-gold-icon { font-size: calc(46px * var(--board-scale)); }
 .game-gold-value {
-  font-size: calc(30px * var(--board-scale));
+  font-size: calc(40px * var(--board-scale));
   font-weight: 800;
   color: #ffd700;
   text-shadow: 0 0 10px rgba(255,215,0,.5);
@@ -5922,7 +5939,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 /* Hand action buttons (Sort / Shuffle) — fixed position, left of gold */
 .hand-actions {
   position: absolute;
-  right: calc(116px * var(--board-scale));
+  /* v1261: war 116 — die dreistellige Goldzahl (v1260) ragte darueber.
+     Gold (rechts, bis ~120 px breit) und Knoepfe teilen sich die
+     260-px-Zone; der Strich steht bei 246. */
+  right: calc(150px * var(--board-scale));
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -5938,21 +5958,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   transition: opacity .15s;
 }
 .hand-action-btn:hover { opacity: 1; }
-/* Vertical divider separating the hand cards from the Sort/Shuffle column. */
-.hand-actions::before {
-  content: '';
-  position: absolute;
-  left: calc(-12px * var(--board-scale));
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: calc(var(--hand-min-h) * 0.78);
-  background: linear-gradient(to bottom,
-    transparent 0%,
-    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 16%,
-    color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 84%,
-    transparent 100%);
-}
+/* (v1261: der Trennstrich zwischen Karten und Sort/Shuffle ist jetzt
+   `.game-hand-me::after` — feste Lage, siehe dort.) */
 
 /* Card dimming — uses overlay, not opacity, so tooltip is unaffected */
 .hand-card-dimmed .board-card::before {
@@ -6170,7 +6177,12 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   height: 154px;
   z-index: 10100;
   perspective: 1000px;
-  pointer-events: none;
+  /* ★ v1259: Zeiger-Ereignisse AN, damit auch der Aktivierende beim
+     Hovern den Tooltip bekommt (Als Befund zu Zi, 20.9.); geklickt wird
+     nur mit `.clickable` (onClick ist sonst nicht gesetzt). Abfliegende
+     und ausblendende Karten bleiben durchlaessig — sie sollen nichts
+     darunter verdecken. */
+  pointer-events: auto;
   /* `--idx` is -1 / 0 / 1 — horizontal slot around viewport centre.
      `--delay` staggers each card's slide-in. The CSS variables `--ex`
      / `--ey` are populated by the server's `pick_resolved` event when
@@ -6185,6 +6197,8 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   pointer-events: auto;
   cursor: pointer;
 }
+.bday-present-reveal-card.flying-out,
+.bday-present-reveal-card.tk-casting { pointer-events: none; }
 /* Hover affordance for the opponent's pick. MUST NOT touch
    `.bday-present-reveal-inner` — it is `transform-style: preserve-3d`
    and applying `filter`/`transform` there flattens the 3D flip,
@@ -9323,18 +9337,40 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
   100% { transform: translateY(0) scale(2); opacity: 0; }
 }
 
+/* ★ v1260 (Al 20.9.): Gegnerische Stapel (Main- und Potion-Deck) um
+   180° gedreht — „sonst sieht es seltsam aus, wenn Karten vom Gegner
+   gezogen werden und sich in der Hand ploetzlich umdrehen". Gedreht
+   wird nur die Rueckseite (das <img>), damit Zaehler und Leerlabel
+   lesbar bleiben. Der gegnerische Ziehflug (`OppDrawAnimCard`, eine
+   `.face-down`-Karte) dreht seine Rueckseite genauso — die Karte kommt
+   damit gedreht vom Stapel, fliegt gedreht und liegt gedreht in der
+   Hand (dort traegt `.face-down` seit jeher 180° + Faecherwinkel). */
+[data-opp-deck] > img,
+[data-opp-potion-deck] > img,
+.draw-anim-card > .board-card.face-down > img { rotate: 180deg; }
+
 /* Hand Pick selection (Shard of Chaos) */
-.hand-pick-eligible {
+/* ★ v1259 (Als Befund 20.9., Staff of the Teleporter): „Die Highlights
+   sind nicht den Karten entsprechend geneigt." Die Klassen sitzen auf
+   dem SLOT, der Faecherwinkel (`rotate: var(--fan-rot)`) aber auf der
+   KARTE darin — die Umrandung stand also gerade, waehrend die Karte
+   gekippt war. Alles, was einen RAHMEN zeichnet (outline, filter),
+   gehoert deshalb auf `> .board-card`; Zeiger und Hub bleiben am Slot.
+   Gleiche Korrektur weiter unten fuer die Diebstahl- und
+   St.-Nicolas-Markierungen. */
+.hand-pick-eligible { cursor: pointer !important; }
+.hand-pick-eligible > .board-card {
   outline: 2px dashed rgba(200,100,255,.5);
   outline-offset: 2px;
-  cursor: pointer !important;
 }
 .hand-pick-selected {
+  transform: translateY(-6px);
+  transition: transform .15s, filter .15s;
+}
+.hand-pick-selected > .board-card {
   outline: 3px solid rgba(200,100,255,.9) !important;
   outline-offset: 2px;
   filter: brightness(1.3) drop-shadow(0 0 8px rgba(200,100,255,.6));
-  transform: translateY(-6px);
-  transition: transform .15s, filter .15s;
 }
 
 /* Urgent pick variant — Saint Nicolas's mandatory Potion-give pick
@@ -9344,10 +9380,12 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    Composes ON TOP of `.hand-pick-eligible` (both classes are on the
    same slot), so this rule's box-shadow + animation win on cascade. */
 .hand-pick-eligible-urgent {
-  outline: 3px solid rgba(80, 220, 130, .95) !important;
-  outline-offset: 2px;
   cursor: pointer !important;
   animation: stNicolasPickPulse 1.05s ease-in-out infinite;
+}
+.hand-pick-eligible-urgent > .board-card {
+  outline: 3px solid rgba(80, 220, 130, .95) !important;
+  outline-offset: 2px;
 }
 .hand-pick-eligible-urgent .board-card {
   box-shadow: 0 0 14px rgba(80,220,130,.85), 0 0 26px rgba(40,180,90,.55) !important;
@@ -9369,7 +9407,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    Different palette from the urgent-pick pulse above (which is
    short-lived during the prompt) — escrow is the "committed,
    waiting" state, so the visual is calm but unmistakable. */
-.hand-card-st-nicolas-escrowed {
+.hand-card-st-nicolas-escrowed > .board-card {
   outline: 3px solid rgba(255, 200, 80, .95);
   outline-offset: 2px;
 }
@@ -9427,10 +9465,15 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    hier die Bildlaufleiste einer übervollen Hand ausschalten. Die Regel
    ist deshalb ersatzlos entfallen; die Klasse bleibt im Markup, weil
    sie den Zustand benennt. */
-.blind-pick-selected {
+/* Auf der eigenen Hand sitzt die Klasse am Slot (Rahmen auf die Karte
+   darin, v1259), an der Gegnerhand direkt an der Karte. */
+.blind-pick-selected > .board-card,
+.board-card.blind-pick-selected {
   outline: 3px solid rgba(255,150,50,.95) !important;
   outline-offset: 2px;
   filter: brightness(1.4) drop-shadow(0 0 10px rgba(255,150,50,.7));
+}
+.blind-pick-selected {
   transform: translateY(-8px);
   transition: transform .15s, filter .15s;
   z-index: 5;
@@ -11624,16 +11667,21 @@ body:has(.game-hand-me) .board-tooltip {
 
 /* ===== SHOP SCREEN ===== */
 
+/* ★ v1260 (Al 20.9.): „Im Shop sollte die Leiste mit Structure Decks,
+   Sleeves, Skins usw. deutlich groesser und auf der X-Achse zentriert
+   sein." Schrift 11 → 17, Polster 8/18 → 14/28, Reiter mittig. */
 .shop-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 16px 0;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px 0;
   border-bottom: 1px solid var(--bg4);
 }
 .shop-tab {
-  padding: 8px 18px;
+  padding: 14px 28px;
   font-family: var(--font-display), sans-serif;
-  font-size: 11px;
+  font-size: 17px;
   background: transparent;
   border: none;
   color: var(--text2);
@@ -11650,9 +11698,9 @@ body:has(.game-hand-me) .board-tooltip {
   border-bottom-color: #ffd700;
 }
 .shop-tab-count {
-  font-size: 9px;
+  font-size: 13px;
   background: var(--bg4);
-  padding: 1px 6px;
+  padding: 2px 9px;
   border-radius: 8px;
   color: var(--text2);
 }
@@ -12442,9 +12490,13 @@ body:has(.game-hand-me) .board-tooltip {
 .volume-btn {
   background: none;
   border: 1px solid transparent;
-  font-size: 18px;
+  /* v1260 (Al 20.9.): „der Lautsprecher-Button sollte gut doppelt so
+     gross sein" — 18 → 34 px, Polster mit. In der 70-px-Handzeile des
+     Telefons nimmt der Kampf-Block ihn wieder auf 22 zurueck. */
+  font-size: 34px;
+  line-height: 1;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px 10px;
   border-radius: 4px;
   opacity: 0.7;
   transition: opacity .15s, border-color .15s;
@@ -14346,6 +14398,11 @@ body:has(.textbox-overlay) .tooltip {
 /* ── Scaled inline overrides for game hand ── */
 .game-hand .orbit-font { font-size: calc(18px * var(--board-scale)) !important; }
 .game-hand-me .orbit-font { font-size: calc(16px * var(--board-scale)) !important; }
+/* v1260: die Goldzahl traegt `.orbit-font` und lief damit in die beiden
+   Regeln darueber (18/16 px × Massstab) — das eigentliche 30-px-Mass in
+   `.game-gold-value` kam nie an. Jetzt ausdruecklich groesser, beide
+   Seiten (Als Vorgabe 20.9.). */
+.game-hand .game-gold-value.orbit-font { font-size: calc(40px * var(--board-scale)) !important; }
 
 /* ═══ General responsive ═══ */
 
@@ -15024,8 +15081,11 @@ body:has(.textbox-overlay) .tooltip {
      Teil von Als Befund „die obere Haelfte der Hand fehlt". Karten,
      Zonen und Stapel haengen seit v1233 gemeinsam am Massstab; eine
      Sonderhoehe fuer eine Reihe gehoert da nicht mehr hin. */
-  .game-hand-opp .game-gold-icon { font-size: 18px !important; }
-  .game-hand-opp .game-gold-value { font-size: 16px !important; }
+  /* v1260: Gold am Telefon ebenfalls groesser (war 18/16) — die
+     rechte Spalte der 70-px-Zeile traegt Regler + Gold, mehr als 26/24
+     passt dort nicht. */
+  .game-hand-opp .game-gold-icon { font-size: 26px !important; }
+  .game-hand-opp .game-gold-value { font-size: 24px !important; }
 
   /* Compact player hand. The container is small (54px) but the cards
      inside remain full-size and interactive. Anchor cards to the
@@ -15108,6 +15168,26 @@ body:has(.textbox-overlay) .tooltip {
     z-index: 450;
     background: rgba(12, 12, 20, .55) !important;
   }
+  /* v1259: Knopf ueber dem Avatar — in der ~70-px-Zeile des Telefons
+     etwas kleiner (Als Freigabe: „kannst du den Button auch etwas
+     kleiner machen, bis es passt"). */
+  .game-hand-quit { padding: 4px 10px; font-size: 10px; }
+  /* v1261: Am Telefon (Floor 0.59) passen Gold (~100 px) und Sort/Shuffle
+     nicht in die 260er-Zone — Zone auf 320, Striche auf 306, Knoepfe
+     kleiner und weiter innen. Beide Zeilen gleich, die Striche bleiben
+     uebereinander. */
+  .game-hand-cards {
+    margin-left: calc(320px * var(--board-scale) - var(--fan-pad-x)) !important;
+    margin-right: calc(320px * var(--board-scale) - var(--fan-pad-x)) !important;
+  }
+  .game-hand-me::before, .game-hand-opp::before { left: calc(306px * var(--board-scale)); }
+  .game-hand-me::after,  .game-hand-opp::after  { right: calc(306px * var(--board-scale)); }
+  .hand-actions { right: calc(200px * var(--board-scale)); gap: 3px; }
+  .hand-action-btn { font-size: 9px !important; padding: 3px 7px !important; min-height: 0 !important; }
+  .game-hand-topleft, .game-hand-topright { top: 2px; }
+  .game-hand-topright .volume-btn { font-size: 22px; padding: 2px 6px; }
+  .game-hand-topleft { gap: 3px; }
+  .game-hand-topright { gap: 2px; }
   .game-hand-me {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: rgba(12, 12, 20, .55) !important;
@@ -15914,11 +15994,18 @@ body:has(.textbox-overlay) .tooltip {
   /* Push the player name further from the avatar. */
   gap: calc(22px * var(--board-scale));
 }
-/* Vertical divider separating the avatar/name cluster from the hand cards. */
-.game-hand-me .game-hand-info::after {
+/* ★ v1261 (Al 21.9.): „Die vertikalen Linien in den Farben der
+   Kontrahenten (BEIDE) sollen eine fixe Position haben und direkt
+   uebereinander stehen." Vorher hingen sie an den Clustern (Avatar,
+   Sort/Shuffle, Knopf, Lautstaerke) und wanderten mit deren Breite —
+   ein langer Spielername verschob den Strich. Jetzt sitzen sie auf
+   der ZEILE selbst, in beiden Haenden an derselben x-Position: am
+   Innenrand der 260-px-Cluster-Zonen (`.game-hand-cards`-Raender).
+   Farbe: `--hand-accent` (eigene Hand v1256, Gegner seit v1260). */
+.game-hand-me::before, .game-hand-me::after,
+.game-hand-opp::before, .game-hand-opp::after {
   content: '';
   position: absolute;
-  right: calc(-14px * var(--board-scale));
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
@@ -15928,7 +16015,13 @@ body:has(.textbox-overlay) .tooltip {
     color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 16%,
     color-mix(in srgb, var(--hand-accent, #00f0ff) 60%, transparent) 84%,
     transparent 100%);
+  pointer-events: none;
+  z-index: 3;
 }
+.game-hand-me::before, .game-hand-opp::before { left: calc(246px * var(--board-scale)); }
+.game-hand-me::after,  .game-hand-opp::after  { right: calc(246px * var(--board-scale)); }
+
+/* (v1261: der Trennstrich neben dem Avatar ist jetzt `.game-hand-me::before`.) */
 
 /* ── Rules Screen Responsive ── */
 @media (max-width: 850px) {
@@ -16031,6 +16124,12 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    traegt die etwas hoehere Deckkraft des Grundtons. */
 .screen-full:has(> .game-layout) .modal-overlay {
   background: rgba(0, 0, 0, .3);
+  /* ★ v1259 (Als Befund 20.9.): „Submenues sind unter den eigenen
+     Handkarten gelayert — eine Handkarte kommt dem Bestaetigen-Knopf in
+     die Quere." Der Verdunkler lag bei 1000, die eigene Hand bei 10000.
+     Jetzt ueber Hand und Wahl-Panels (10080), unter den Ergebnis-
+     Overlays und Kartenfluegen. */
+  z-index: 10085;
 }
 .screen-full:has(> .game-layout) .modal,
 .first-choice-panel {
@@ -17978,7 +18077,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   left: var(--tx);
   top: var(--ty);
   z-index: 10100;
-  pointer-events: none;
+  pointer-events: auto;   /* v1259: Tooltip beim Hovern, Klick nur mit .pickable */
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 6px 18px rgba(0,0,0,.6);
@@ -17991,6 +18090,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 .deck-peek-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .deck-peek-card.dimmed { opacity: .4; filter: grayscale(.8); }
+.deck-peek-card.taken, .deck-peek-card.leaving { pointer-events: none; }
 .deck-peek-card.pickable {
   pointer-events: auto;
   cursor: pointer;

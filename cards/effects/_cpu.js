@@ -6549,9 +6549,23 @@ function installCpuBrain(engine) {
     // — otherwise non-CPU reaction-window prompts would hang forever since
     // there's no socket to resolve them. Cancellable → decline, mandatory
     // → CPU brain's default pick.
+    // ★★ v1259 — DER MENSCHEN-ZWEIG HATTE KEINEN SCHLEIFENRIEGEL.
+    // `noteRepeat` (v326) und `noteCycle` (v384) sitzen nur im CPU-Zweig
+    // darunter; dieser Zweig kehrte VOR ihnen zurueck. Eine Karte des
+    // Menschen, die im Rollout `null` als „zurueck" liest und die Frage
+    // neu stellt (SnowItAll: `while (!dest) … continue`), drehte damit
+    // unbegrenzt — der Hook-Timeout laesst die Koroutine als Zombie
+    // weiterlaufen (Barker-Lehre), die Partie stand. Als Tester-Fall
+    // 19.9.: SnowItAll auf dem Feld, Chilly Dog als einzige Lv≤1-Kreatur
+    // in der Hand, zwei freie Zonen → Kartenwahl automatisch, Zonenwahl
+    // `null`, endlos. Die Karte ist eigens gehaertet (Barker-Bauform);
+    // dieser Riegel schuetzt zusaetzlich JEDE andere Karte mit demselben
+    // Muster auf der Menschenseite.
     if (engine._fastMode && !engine.isCpuPlayer(playerIdx)) {
-      if (promptData.cancellable) return null;
-      return engine._getCpuGenericResponse(promptData, playerIdx);
+      const antwort = promptData.cancellable ? null : engine._getCpuGenericResponse(promptData, playerIdx);
+      noteRepeat(engine, promptData.type, promptData.title,
+        (promptData.cards || promptData.options || promptData.zones || []).length, antwort, playerIdx);
+      return antwort;
     }
     if (engine.isCpuPlayer(playerIdx)) {
       if (!engine._fastMode) await engine._delay(CPU_PROMPT_DELAY);
@@ -6613,8 +6627,12 @@ function installCpuBrain(engine) {
     // card opts in just by passing `baseDamage` through its prompt.
     if (engine._fastMode && !engine.isCpuPlayer(playerIdx)) {
       const isDamageOpportunity = (config.baseDamage || 0) > 0;
-      if (config.cancellable && !isDamageOpportunity) return [];
-      return engine._getCpuTargetResponse(validTargets, config, playerIdx);
+      // ★ v1259: Schleifenriegel auch hier (siehe promptGeneric oben).
+      const antwort = (config.cancellable && !isDamageOpportunity)
+        ? []
+        : engine._getCpuTargetResponse(validTargets, config, playerIdx);
+      noteRepeat(engine, 'target', config.title, (validTargets || []).length, antwort, playerIdx);
+      return antwort;
     }
 
     if (engine.isCpuPlayer(playerIdx)) {
