@@ -11790,6 +11790,11 @@ class GameEngine {
         name: cardInstance.name,
         owner: cardInstance.owner,
         originalOwner: cardInstance.originalOwner,
+        // ★ v1267: Kontrolleur zum Todeszeitpunkt — wie im Schadenspfad
+        // (`processCreatureDamageBatch`). Bisher trug nur DER die Angabe;
+        // Tode ueber Zerstoerung/Opfer kamen ohne sie an, und Karten mit
+        // „during your turn" (Dragoneggs) muessten raten.
+        controller: cardInstance.controller ?? cardInstance.owner,
         heroIdx: fromHeroIdx,
         zoneSlot: cardInstance.zoneSlot,
         instId: cardInstance.id,
@@ -16627,16 +16632,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Canonical user: Mischief Militia - Chilly Dog.
    */
   _isChillyDogActiveFor(playerIdx) {
-    for (const inst of this.cardInstances) {
-      if (inst.zone !== 'support') continue;
-      if (inst.faceDown) continue;
-      const script = loadCardEffect(inst.name);
-      if (!script?.liftsFrozenSilenceForOwnSide) continue;
-      if ((inst.controller ?? inst.owner) !== playerIdx) continue;
-      if (!this.isCardEffectActive(inst)) continue;
-      return true;
+    // ★★ v1263 — STACK OVERFLOW BEI EINGEFRORENEM CHILLY DOG (Als Befund
+    // 21.9.: „laesst das Spiel komplett crashen"). Die Kette war:
+    // _isChillyDogActiveFor → isCardEffectActive(Chilly Dog)
+    // → isCreatureEffectSuppressed → `frozen && !_isChillyDogActiveFor`
+    // → … ohne Ende, sobald der Hund SELBST eingefroren ist. Der
+    // Wiedereintrittsriegel laesst den inneren Aufruf `false` liefern:
+    // ein eingefrorener Chilly Dog hebt die Frost-Stille also NICHT auf —
+    // auch nicht seine eigene. Er muss aktiv sein, um zu wirken.
+    if (this._chillyDogPruefung) return false;
+    this._chillyDogPruefung = true;
+    try {
+      for (const inst of this.cardInstances) {
+        if (inst.zone !== 'support') continue;
+        if (inst.faceDown) continue;
+        const script = loadCardEffect(inst.name);
+        if (!script?.liftsFrozenSilenceForOwnSide) continue;
+        if ((inst.controller ?? inst.owner) !== playerIdx) continue;
+        if (!this.isCardEffectActive(inst)) continue;
+        return true;
+      }
+      return false;
+    } finally {
+      this._chillyDogPruefung = false;
     }
-    return false;
   }
 
   /**
@@ -18557,7 +18576,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       pool.splice(poolIndex, 1);
     }
     if (fromZone === 'deck') {
-      this._broadcastEvent('deck_search_add', { cardName, playerIdx });
+      // v1263: `castOnly` — die Karte landet NICHT in der Hand; der Client
+      // darf sie nicht fuer einen offenen Ziehflug vormerken.
+      this._broadcastEvent('deck_search_add', { cardName, playerIdx, castOnly: true });
       this.log('spell_cast_from_deck', { player: ps.username, card: cardName, by: opts.by || null });
     }
     const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);

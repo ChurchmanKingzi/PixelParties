@@ -1205,6 +1205,23 @@ function PuzzleCreator() {
       // end of the pass.
       const prevSL = container.scrollLeft;
       const prevST = container.scrollTop;
+      // ★★ v1264 (Al 22.9.: „die Handzone ueberdeckt die Support Zones").
+      // EINHEITEN UNTER `zoom`. Der Editor liegt in einem `.screen-full`,
+      // und der traegt `zoom: var(--ui-scale)` (v803). Unter `zoom`
+      // liefert `getBoundingClientRect` GEZEICHNETE Pixel, `offsetHeight`,
+      // `clientHeight` und `scrollWidth` aber LAYOUT-Pixel. Dieser Pass hat
+      // beides gemischt — richtig war er nur bei `--ui-scale` = 1, also
+      // genau bei 1600×900. Darunter (Laptop, 1366×768: Faktor .85) kam
+      // der Ueberhang der gekippten Ebene als 0 heraus, die Ebene ragte
+      // unreserviert in die Handleiste; darueber (1920×1080: 1.2, 2560:
+      // 1.6) wurde er ueberschaetzt und das Brett unnoetig klein.
+      // Jede Laenge, die aus einem Rechteck stammt, geht deshalb durch
+      // `L()` — Umrechnung auf Layout-Pixel, gemessen am Container selbst
+      // (nicht aus `--ui-scale` gelesen: so stimmt es auch, falls je ein
+      // weiterer Vorfahr zoomt).
+      const _zr = container.getBoundingClientRect();
+      const zoomFaktor = (container.offsetWidth > 0 && _zr.width > 0) ? _zr.width / container.offsetWidth : 1;
+      const L = (v) => v / zoomFaktor;
       const widthScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, container.clientWidth / IDEAL_WIDTH));
       let scale = widthScale;
       // ── Legit-hscroll detection (v9, rev v13) ──
@@ -1230,7 +1247,7 @@ function PuzzleCreator() {
       container.querySelectorAll('.pz-board-plane .board-row').forEach(row => {
         const k = row.children;
         if (!k.length) return;
-        const w = k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left;
+        const w = L(k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left);
         if (w > layoutW) layoutW = w;
       });
       // Belt: union of every zone rect — structure-independent floor.
@@ -1243,7 +1260,7 @@ function PuzzleCreator() {
         if (r.left < zMinL) zMinL = r.left;
         if (r.right > zMaxR) zMaxR = r.right;
       });
-      if (zMaxR > zMinL && (zMaxR - zMinL) > layoutW) layoutW = zMaxR - zMinL;
+      if (zMaxR > zMinL && L(zMaxR - zMinL) > layoutW) layoutW = L(zMaxR - zMinL);
       container.classList.remove('pz-flat-measure');
       // Hysteresis (v16): a single +4 threshold flaps when the layout
       // width sits right at the edge (exactly 3 Flying Islands) —
@@ -1304,8 +1321,8 @@ function PuzzleCreator() {
           const padL = parseFloat(cs.paddingLeft) || 0;
           const padR = parseFloat(cs.paddingRight) || 0;
           const contentW = Math.max(1, plane.offsetWidth - padL - padR);
-          const newL = Math.min(contentW, Math.max(0, padL + (cr.left - pL)));
-          const newR = Math.min(contentW, Math.max(0, padR + (pR - cr.right)));
+          const newL = Math.min(contentW, Math.max(0, padL + L(cr.left - pL)));
+          const newR = Math.min(contentW, Math.max(0, padR + L(pR - cr.right)));
           const prevL = parseFloat(container.style.getPropertyValue('--pz-overhang-l')) || 0;
           const prevR = parseFloat(container.style.getPropertyValue('--pz-overhang-r')) || 0;
           if (Math.abs(newL - prevL) > 0.5) container.style.setProperty('--pz-overhang-l', newL.toFixed(1) + 'px');
@@ -1318,6 +1335,7 @@ function PuzzleCreator() {
       if (plane) {
         const cur = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--board-scale')) || 1;
         const planeRect = plane.getBoundingClientRect(); // transformed extent (flat in hscroll mode)
+        const planeH = L(planeRect.height);   // ★ v1264: Layout-Pixel, siehe oben
         if (planeRect.height > 0) {
           // Visual overhang of the tilted plane past its layout box.
           // With margin-bottom set to exactly this value, the plane's
@@ -1325,7 +1343,7 @@ function PuzzleCreator() {
           // overhang = rect height) — so `needed` below can use the
           // rect height directly without double counting. Only write on
           // meaningful change to avoid layout churn.
-          const overhang = Math.max(0, planeRect.height - plane.offsetHeight);
+          const overhang = Math.max(0, planeH - plane.offsetHeight);
           const prevOverhang = parseFloat(container.style.getPropertyValue('--pz-overhang')) || 0;
           if (Math.abs(overhang - prevOverhang) > 0.5) {
             container.style.setProperty('--pz-overhang', overhang.toFixed(1) + 'px');
@@ -1343,7 +1361,7 @@ function PuzzleCreator() {
           const cs = getComputedStyle(container);
           const chrome = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
             + (parseFloat(cs.rowGap) || 0) * Math.max(0, container.children.length - 1);
-          const needed = planeRect.height + othersH + chrome;
+          const needed = planeH + othersH + chrome;
           // Fixed point: ALWAYS steer toward the height fit (grow when
           // there is room, shrink when overflowing), capped by the
           // width fit — never "reset to width and re-shrink". The 6px
@@ -1365,7 +1383,7 @@ function PuzzleCreator() {
             plane.querySelectorAll('.board-row').forEach(row => {
               const k = row.children;
               if (!k.length) return;
-              const w = k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left;
+              const w = L(k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left);
               if (w > maxContentW) maxContentW = w;
             });
             if (maxContentW > 0) {
@@ -1394,7 +1412,7 @@ function PuzzleCreator() {
         // Flat measurement = CONTENT coordinates; the origins consume
         // BOX coordinates — add the live padding-left (v19 lesson).
         const padLLive = parseFloat(container.style.getPropertyValue('--pz-overhang-l')) || 0;
-        const anchorX = (hz[1].left + hz[1].right) / 2 - plFlat.left + padLLive;
+        const anchorX = L((hz[1].left + hz[1].right) / 2 - plFlat.left) + padLLive;
         const prevAnchor = parseFloat(container.style.getPropertyValue('--pz-anchor-x')) || -1;
         if (Math.abs(anchorX - prevAnchor) > 0.5) {
           container.style.setProperty('--pz-anchor-x', anchorX.toFixed(1) + 'px');
@@ -3290,7 +3308,13 @@ function PuzzleCreator() {
       const d = STAPEL[key];
       const inhalt = p[key] || [];
       return (
-        <div key={key} className={'board-zone board-zone-' + d.typ}
+        // ★ v1264 (Al 22.9.): verdeckte Stapel des GEGNERS tragen
+        // `pz-stapel-gegner` — dieselbe 180°-Regel wie im Duell
+        // (style.css, v1260), damit der Editor zeigt, was der Test zeigt.
+        // Bewusst eine eigene Klasse statt `data-opp-deck`: die
+        // Datenanker des Duells suchen Fluege per `querySelector`, und
+        // der Editor soll dort nie ein Ziel sein.
+        <div key={key} className={'board-zone board-zone-' + d.typ + (isOpp && d.verdeckt ? ' pz-stapel-gegner' : '')}
           style={{ ...zs(d.stil), cursor: inhalt.length ? 'pointer' : undefined,
             ...(dragOverZone === d.marke + '-' + si ? { boxShadow: '0 0 14px rgba(0,240,255,.5)' } : {}) }}
           onClick={() => inhalt.length > 0

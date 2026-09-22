@@ -116,7 +116,14 @@ async function runDiscardChain(engine, potionOwner, potionName) {
       }
       engine.log('bottled_discard', { player: ps.username, card: cardName, by: potionName });
       engine.sync();
-      await engine._delay(300);
+      // ★ v1263 (Als Befund 21.9.: „Bottled Flame hat den Benutzer als
+      // erstes aufgefordert, abzuwerfen"). Die Reihenfolge stimmt —
+      // `currentPlayer` beginnt beim Gegner —, aber die CPU wirft in
+      // 0 ms ab, und nach 300 ms stand schon der eigene Kasten da: der
+      // Abwurf des Gegners war nie zu sehen. Nach einem CPU-Abwurf
+      // deshalb eine Lesepause, damit der Flug in die Ablage und die
+      // Log-Zeile ankommen, bevor man selbst dran ist.
+      await engine._delay(engine.isCpuPlayer?.(currentPlayer) ? 1000 : 300);
     }
 
     // Switch to other player

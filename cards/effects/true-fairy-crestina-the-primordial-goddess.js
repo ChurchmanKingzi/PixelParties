@@ -65,6 +65,21 @@ module.exports = {
     return hatAwakening(engine, pi, heroIdx);
   },
 
+  /**
+   * Ascension Bonus: „Wisdom 3" (cards.json, `startingAbility1`).
+   *
+   * ★ v1264 (Als Befund 22.9.): der Bonus fehlte komplett. Die Engine
+   * vergibt ihn nur ueber diesen Hook (`performAscension`) — Crestina
+   * war das einzige fertige Ascended mit „X 3"-Bonus, das ihn nicht
+   * hatte. Bauform wie Riffel/Arthor: bis zu drei Kopien aus Deck, dann
+   * Hand, in denselben bzw. den ersten freien Ability-Slot, je Ability
+   * mit Ja/Nein-Abfrage. Seitdem prueft `scripts/check-ascension-bonus.js`
+   * diesen Vertrag fuer alle Ascended Heroes.
+   */
+  async onAscensionBonus(engine, pi, heroIdx) {
+    await engine.performAscensionBonus(pi, heroIdx, ['Wisdom']);
+  },
+
   hooks: {
     /**
      * ② „During your Resource Phase, you may skip drawing your card for

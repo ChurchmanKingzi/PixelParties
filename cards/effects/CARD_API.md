@@ -247,6 +247,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-flight-targets` | Flüge ins Brett ohne `toHeroIdx`/`toSlotIdx` |
 | `check-anim-keyframes` | Animationen, deren Keyframes nirgends stehen |
 | `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
+| `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
 | `check-damage-types` · `check-no-splice` · `check-areas` · … | siehe die jeweiligen Kopfkommentare |
 
 **Vor jeder Auslieferung laufen alle**, nicht nur die passenden:
@@ -16527,3 +16528,208 @@ beim geliehenen Helden erschienen sie damit auf dem eigenen Brett,
 während die Kreatur auf dem gegnerischen landete. Der Flug kennt dafür
 seit jeher `destOwner` im Payload (Cross-Side-Muster); `summon_effect`
 braucht schlicht die Brettseite. Beide nehmen jetzt `heroOwner`.
+
+## ★★ v1264 — Ascension Bonus, Editor-Massstab unter `zoom`, Bundles nach Inhalt
+
+### Der Ascension Bonus kommt NUR ueber `onAscensionBonus`
+
+`performAscension` vergibt den Bonus ausschliesslich ueber den Hook der
+Ascended-Karte. Es gibt keinen Rueckfall auf `cards.json` — fehlt der
+Hook, steigt der Held still ohne Bonus auf. Genau so fehlte bei „True
+Fairy Crestina" monatelang „Wisdom 3" (Als Befund 22.9.).
+
+```js
+async onAscensionBonus(engine, pi, heroIdx) {
+  await engine.performAscensionBonus(pi, heroIdx, ['Wisdom']);
+},
+```
+
+Bei Ascended Heroes beschreiben `startingAbility1/2` den BONUS, nicht
+Starting Abilities. **Wächter:** `node scripts/check-ascension-bonus.js`
+— jeder Bonus braucht den Hook, jeder „<Ability> N"-Bonus die Ability
+als Zeichenkette im Code (Konstante genügt, siehe Cecilia).
+
+### Messungen unter `zoom` (Puzzle-Editor-Scaler)
+
+Menüs und Editor liegen in `.screen-full`, das `zoom: var(--ui-scale)`
+trägt. Unter `zoom` liefert `getBoundingClientRect` **gezeichnete**
+Pixel, `offsetHeight`/`clientHeight`/`scrollWidth` aber **Layout**-Pixel.
+Wer beides mischt, rechnet nur bei `--ui-scale` = 1 (1600×900) richtig.
+Der Editor-Scaler tat das: auf kleinen Fenstern kam der Überhang der
+gekippten Ebene als 0 heraus (Brett ragte in die Handleiste), auf
+großen wurde das Brett unnötig klein.
+
+**Regel:** jede Länge aus einem Rechteck vor dem Vergleich mit Layout-
+Maßen durch den Zoomfaktor teilen, gemessen am Element selbst:
+`zoomFaktor = rect.width / el.offsetWidth` (Helfer `L()` im Scaler).
+Das Kampffeld trägt `ui-noscale` und ist nicht betroffen.
+
+### `pointer-events` und gleiche Spezifität
+
+`.pz-hand > * { pointer-events: auto }` (v1263) hob
+`.pz-hand-cards { pointer-events: none }` (v1255) wieder auf — gleiche
+Spezifität, spätere Regel gewinnt. Das unsichtbare Fächerpolster fing
+danach alle Klicks und Drops über den Support Zones beider Seiten.
+Jetzt `.pz-hand > :not(.pz-hand-cards)`. **Faustregel:** eine
+Sammelregel für Kinder schließt die Kinder, die eine eigene
+Zeigerregel haben, ausdrücklich aus.
+
+Die Editor-Handleisten umschließen seit v1264 ihren Fächerbogen
+(`--hand-faecher-rand`: Hub minus das abgesenkte Drittel, plus 4 px),
+damit der Scaler ihn mitzählt.
+
+### Gemeinsame Oberflächen-Bausteine (v1264)
+
+| Baustein | Wo | Zweck |
+|---|---|---|
+| `<GlanzBand klasse? />` | app-shared | Foil-Lichtstreifen (`foilSweepLoop`, `screen`) über einem Wirt mit `position: relative`. Variante `pp-glanz--logo` maskiert auf `logo.png`. Stellschrauben `--glanz-breite/-dauer/-verzug/-von/-bis/-staerke` |
+| `<LotsenGlanz />` + Klasse `pp-lotse` | app-shared + style.css | Hervorhebung „hier entlang": pulsierender Schein (Deckkraft eines festen Schattens) plus Glanzband. Farbe `--lotse-farbe` (Vorgabe `#ff44cc`). Nutzer: Gast-Knopf im Login, Tutorial Raccoon |
+| Klasse `pp-eckzier` | style.css | die gestuften Pixel-Ecken der Menükästen, gemeinsame Definition mit `.ornate-frame::after`. `--eck-farbe/-arm/-dicke/-abstand` |
+| `PixelParticles radial farben` | app-screens | Partikelquelle statt Schwarm (SC-Glitzer `ScGlitzer`) |
+| Klasse `pz-stapel-gegner` | app-puzzle | verdeckte Gegnerstapel im Editor, dieselbe 180°-Regel wie `[data-opp-deck]` |
+
+### Bundles werden nach Inhalt gebaut
+
+Das v1263-Paket enthielt ein veraltetes `dist/app-board.js` (sechs
+Client-Fixes fehlten — dieselbe Klasse wie v495). Das Netz beim
+Serverstart (`buildAll()`) griff nicht, weil es nach Zeitstempel
+entschied und das Bundle jünger als seine Quelle war. Seit v1264 trägt
+jedes Bundle in Zeile 1 `/* pp-quelle sha1:… */`; `needsBuild` vergleicht
+diesen Hash mit der Quelle. `BUILD_FORMAT` in `scripts/build.js`
+hochzählen, wenn sich die Transformation ändert.
+
+### ★ v1265 — Menue-Masse, Ecken, Login-Leistung
+
+**`UiScaler` misst VOR den Bildschirmen.** Er setzt `--ui-scale` seit
+v1264 per `useLayoutEffect`. Mit `useEffect` lief das Setzen nach dem
+`useLayoutEffect` des Hauptmenues (gleicher Commit) — das Menue mass
+seine Lage ohne Zoom, die Kaesten lagen je nach Fenster bei 84, 150 oder
+240 px. Zusaetzlich rechnet das Menue Rechtecke ueber
+`menuZoomFaktor(el)` in Layout-Pixel um (Regel aus dem Abschnitt
+„Messungen unter `zoom`"). **Faustregel:** wer in einem Layout-Effekt
+misst, verlaesst sich darauf, dass `--ui-scale` schon steht — neue
+Mess-Stellen nicht in `useEffect` vor den UiScaler ziehen.
+
+**Kopfzeile des Hauptmenues:** Masse als Variablen auf
+`.main-menu-screen` (`--kopf-oben/-zeile/-abstand/-discord-h`). Rechts
+ein Raster (LOGOUT + Lautsprecher, darunter Discord in LOGOUT-Breite),
+links Elo/SC mittig auf Discord-Hoehe — beide Seiten rechnen aus
+denselben Variablen.
+
+**Ecken-Zier als Maske.** Jede Ecke ist EINE 4×4-Rasterform (SVG-Maske
+auf einer Farbflaeche), nicht mehr drei einzeln positionierte
+Hintergrundflaechen — die rundete der Browser unter `zoom` einzeln, das
+Stufenquadrat verrutschte. Dicke = Armlaenge / 4 (`--eck-dicke` entfaellt).
+
+**Login-Kulisse: zugeschnittene Ebenen.** `animEbene(file, extra,
+{versatzX})` (app-screens.jsx) ersetzt die Vollbild-Ebenen: jede Figur ist
+nur so gross wie ihr Alpha-Rahmen (`ANIM_SPRITE_RAHMEN`, Buehnenpixel
+1920×1080); `background-size/-position` und `transform-origin` werden so
+umgerechnet, dass das Bild gleich bleibt (Pixelvergleich: nur
+Subpixel-Kanten). Wer ein Ebenenbild austauscht, traegt den neuen Rahmen
+ein; ohne Eintrag faellt die Ebene auf Vollbild zurueck. Dazu: Bloom ohne
+`filter: blur`, `screen` auf den Blitzen statt auf ihrer Huelle,
+Hintergrund-Partikel hinter der deckenden Kulisse abgeschaltet.
+Gemessen ohne GPU-Beschleunigung: 5 → 17 Bilder/s. Groesster
+verbliebener Posten: die 150 Logo-Partikel (je eigene Ebene mit zwei
+Leuchtschatten).
+
+### ★ v1266 — Login als Karte, Lotsen-Ring
+
+**Login-Kasten** (style.css, Block „LOGIN ALS KARTE"): oben das
+Kunstfenster `.auth-header` mit gemaltem Glutkern hinter dem Logo, darunter
+der deckende Textkasten `.auth-rumpf` (ruhige Flaeche, 4-%-Raster, keine
+Pixel-Umrisse um Text). Eigene Farbvariablen `--auth-*` nur fuer diesen
+Kasten; Pink nur fuer den Gast-Einstieg, `--accent` nur fuer Anmelden,
+aktiven Reiter und Fokus. Rahmen + `pp-eckzier` in Violett. Der
+Explosionskern liegt wieder in der Kulisse (`.anim-explosion`, Ebene 2),
+nicht mehr als `.auth-panel-explosion` im Kasten ueber dessen Flaeche.
+
+**Gleiche Hoehe beider Reiter durch Bauart:** Anmelden fuellt die
+fehlende dritte Zeile mit `.auth-zeile-hilfe` (Passwort-Link, so hoch wie
+ein Eingabefeld dank eines unsichtbaren Felds darin). Hoehenausgleich am
+Kastenende und `.auth-footer` sind entfallen; der Code-Hinweis beim
+Registrieren steht im Platzhalter des E-Mail-Felds. Autofill-Fuellung
+wird per Innenschatten auf `--auth-feld` gehalten.
+
+**Lotse:** `.pp-lotse-schein::after` ist ein Sonar-Ring (waechst ueber
+`inset` 0 → −16 px und verblasst, Takt 2.4 s wie der Puls). Untergrenze
+des Pulses `--lotse-min` (Vorgabe .3) — nicht zu hoch setzen, sonst ist
+der Puls neben Kartenkunst nicht zu sehen (Lehre aus v1265, .65).
+
+## ★ v1267 — Dragonegg-Familie, Archetyp „Drago", Kontrolleur beim Tod
+
+**`_dragonegg-shared.js`** ist die einzige Auslegungsstelle der beiden
+gleich gewordeten Ei-Klauseln (Icy, Flaming): `eiInherentAction`
+(„If you control no Creatures …"), `eiTodesEffekt(ctx, name, status)`
+(„When this Creature is defeated during your turn …"), `eiCpuResponse`.
+Ein weiteres Ei = ein Eintrag in `EI_STATUS` + eine Kartendatei mit
+drei Zeilen. **Als Ruling 22.9.:** nur ein Tod in der Runde des
+KONTROLLEURS loest aus; massgeblich ist die Runde, nicht der Verursacher.
+
+**`deathInfo.controller`** steht seit v1267 in BEIDEN Todespfaden
+(vorher nur im Schadens-Batch; der Zerstoerungsweg `actionDestroyCard`
+lieferte ihn nicht). Alle Leser nutzen `controller ?? owner` — Folge nur
+bei gestohlenen/gecharmten Kreaturen, die per Zerstoerung sterben: sie
+zaehlen jetzt fuer den Kontrolleur, wie beim Schadenstod schon immer.
+
+**Archetyp „Drago"** tragen ab v1267 alle Karten mit „Drago" im Namen,
+die noch keinen Archetyp hatten (Blue-Ice Dragon, Dragolfin, Sorbereus,
+Red/Green Dragoneer, Rubin, Icy/Flaming Dragonegg). Kartentexte, die
+„\"Drago\" Creature" sagen, lesen weiter den NAMEN (`_drago-shared.js`),
+nicht den Archetyp — Green Dragoneers CPU-Kettenwert tut das seit v1267
+ebenfalls (vorher `/Drago/i` auf dem Archetyp, tot).
+
+**Ein Archetyp je Karte:** `archetype` ist ein einzelner String, rund 35
+Stellen pruefen `cd.archetype === '…'`, Deckbau- und Kampagnenfilter
+ebenso. Zwei Archetypen fuer eine Karte gibt es derzeit nicht.
+
+## ★ v1268 — Ausruesten durch Effekte: `_equip-shared.js`
+
+Karten, die eine Ausruestung per EFFEKT aus einem Stapel an einen Helden
+legen (nicht aus der Hand spielen), nutzen EINEN Weg:
+
+| Helfer | Zweck |
+|---|---|
+| `istAusruestTraeger(engine, pi, hi, name)` | Traegerregel wie der Handweg: lebendig, nicht Frozen, nicht Charmed, freie Basis-Support-Zone, `canEquipCardToHero` |
+| `ausruestTraeger(engine, pi, name)` | alle legalen Traeger — fuer Kandidatenfilter (Als Regel 19.8.: ohne Traeger keine legale Wahl) |
+| `waehleAusruestPlatz(engine, pi, name, cfg)` | Held-oder-Zone-Wahl (`{heroIdx, slot}` oder null); `cfg.nurHelden` schraenkt ein |
+| `ruesteAusStapelAus(engine, pi, stapel, name, hi, slot, {source})` | `takeFromPile` → Zone → Instanz → Flug → **`onPlay`** → **`onCardEnterZone`** |
+
+**Beide Hooks sind Pflicht.** Ausruestungen vergeben ihre Dauerwirkung in
+`onPlay` (Blade of the Frostbringer: ATK nur dort); `onCardEnterZone`
+oeffnet das Surprise-Fenster beim Ausruesten. Riffel feuerte bis v1267
+nur letzteres und das mit `_skipReactionCheck` — ueber ihn angelegte
+Ausruestung bekam ihre Dauerwirkung nicht. Nutzer: Weapon Collecting
+Wight (Ablage), Future Tech Gunslinger Riffel (Deck), Treasure Hunter's
+Backpack (Deck; nimmt nur die Wahl, legt mit eigener Animation an).
+
+**Kreatur-Effekte und Knight of Kings [B]:** `blockedByPileLock` greift
+NICHT bei aktiven Kreatur- und Helden-Effekten (nur Handspiel, Abilities,
+Artefakte, Potions). Eine Kreatur, deren aktiver Effekt nur eine
+Stapel-Bewegung ist, prueft `engine.isPileLockedFor(pi)` selbst in
+`canActivateCreatureEffect` (Muster Weapon Collecting Wight) — die
+Loader-Erkennung sieht Bewegungen in geteilten Helfern nicht.
+
+## ★ v1269/v1270 — Kampf-Oberflaeche: Tooltip und Schleier, Goldgruppe
+
+**Tooltip ueber dem Dialog-Schleier (v1269):** `body:has(.modal-overlay)
+.board-tooltip, .tooltip { z-index: 10086 }` — knapp ueber dem Schleier
+(10085, seit v1259). Ohne Dialog bleibt die Hand (10000) ueber dem
+Tooltip (9999).
+
+**Hovern durch den Schleier (v1270):** `useHoverDurchSchleier()` im
+GameBoard reicht NUR das Hovern weiter — Klicks bleiben beim Schleier
+(Abbruch abbrechbarer Dialoge, keine Brett-Aktionen waehrend eines
+Dialogs). Mechanik: je Wechsel EIN `mouseout` vom alten zum neuen
+Element; React leitet `onMouseEnter`/`onMouseLeave` daraus ab. Ein
+`mouseover` mit React-Element als Herkunft ignoriert React — nicht
+verwenden. Neue Brettzonen brauchen dafuer nichts: jede Zone mit
+Hover-Tooltip funktioniert automatisch.
+
+**Goldgruppe der eigenen Hand (v1270):** Sort/Shuffle + Gold stehen in
+`.hand-rechts` (Flex, fester Abstand, waechst nach links) statt einzeln
+absolut. Seitenzonen beider Haende ueber `--hand-zone` / `--hand-strich`
+auf `.game-hand` (300/286 × Massstab, Telefon 320/306) — die Variablen
+stehen VOR dem Telefon-Block, damit dessen Werte gewinnen.
+

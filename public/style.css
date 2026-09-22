@@ -1939,7 +1939,10 @@ select optgroup {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: radial-gradient(circle, rgba(255,228,150,.4), rgba(255,152,72,.12) 22%, rgba(255,96,74,.03) 40%, transparent 56%);
-  filter: blur(9px);
+  /* v1265 (Ruckeln im Login): `filter: blur(9px)` entfernt. Der Verlauf
+     ist ohnehin weich (Rand bei 56 % transparent); der Filter lag aber auf
+     einer 860-px-Flaeche, die ununterbrochen skaliert — der Weichzeichner
+     wurde damit in jedem Frame neu gerechnet. */
   mix-blend-mode: screen;
   pointer-events: none;
   animation: ab-glowpulse 10s ease-in-out infinite;
@@ -1969,8 +1972,13 @@ select optgroup {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  mix-blend-mode: screen;
 }
+/* v1265: `screen` sitzt auf den Blitzen selbst statt auf der Huelle. Als
+   Mischgruppe war die Huelle eine staendige Vollbild-Flaeche, auch in
+   den ~95 % der Zeit ohne Blitz; die Blitze einzeln sind bei Deckkraft 0
+   gar nicht erst zu zeichnen. Ergebnis gleich: beide mischen gegen
+   dieselbe Kulisse darunter. */
+.anim-lightning > * { mix-blend-mode: screen; }
 .anim-lflash {
   position: absolute;
   inset: 0;
@@ -2307,6 +2315,10 @@ body:has(.ui-noscale) .pp-bg-particles { display: none; }
    Schicht laege dort ohnehin hinter der deckenden Kartenwand und wuerde
    nur Bildrate kosten. */
 body:has(.menu-card-bg) .pp-bg-particles { display: none; }
+/* v1265: im Login ebenso — die deckende Kulisse (`.anim-backdrop`,
+   Hintergrundplatte) liegt vollstaendig darueber, die 160 Teilchen waren
+   dort unsichtbar und liefen trotzdem mit. */
+body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 
 /* Partikel IM Hauptmenue: absolut im Bildschirm statt fest im Fenster,
    damit sie zwischen die Kartenwand (z-Ebene 0, davor im Baum) und den
@@ -5079,6 +5091,17 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
   grid-template-columns: repeat(5, 1fr);
   gap: 4px;
 }
+/* ★ v1263 (Tester-Report 21.9.: „???, the Shapeshifter hat spuerbar
+   gelaggt, bevor er seine Galerie geoeffnet hat"). Die Galerie legt
+   beim Aufgehen ALLE Kacheln (dutzende Heldenkarten mit Bild, Rahmen
+   und Foil-Schicht) auf einmal an; mit `content-visibility: auto`
+   zeichnet der Browser nur die im Ausschnitt — bisher galt das nur im
+   Telefon-Lite. `auto` bei der Groesse merkt sich das echte Mass nach
+   dem ersten Zeichnen, die Bildlaufleiste bleibt ruhig. */
+.deck-viewer-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 92px auto 129px;
+}
 
 /* First-choice floating panel */
 .game-board-dimmed {
@@ -5427,10 +5450,23 @@ body:has(.menu-card-bg) .pp-bg-particles { display: none; }
      links Knopf + Avatar; die Handzone wird dafuer etwas schmaler.
      Beide Zeilen teilen dasselbe Mass, damit die farbigen Striche
      (`.game-hand-me/-opp::before/::after`) exakt uebereinander stehen. */
-  margin-left: calc(260px * var(--board-scale) - var(--fan-pad-x));
-  margin-right: calc(260px * var(--board-scale) - var(--fan-pad-x));
+  /* ★ v1270: 260 → 300 (Al 22.9.: Gold-Bereich zu gequetscht, „auch wenn
+     der Handbereich dadurch etwas kleiner wird"). Masse jetzt EINMAL als
+     Variablen auf der Zeile (`.game-hand`, siehe dort) statt viermal als
+     Zahl (Raender, Striche, Telefon je zweimal). */
+  margin-left: calc(var(--hand-zone) - var(--fan-pad-x));
+  margin-right: calc(var(--hand-zone) - var(--fan-pad-x));
 }
 .game-hand-cards { justify-content: safe center; }
+/* ★ v1270: die beiden Masse der Seitenzonen, fuer BEIDE Haende gleich
+   (die Striche stehen exakt uebereinander). `--hand-zone`: Breite der
+   Zone links und rechts neben den Karten; `--hand-strich`: Lage des
+   farbigen Trennstrichs, 14 Einheiten innerhalb der Zone. Steht VOR dem Telefon-Block,
+   damit dessen Werte (320/306) gewinnen. */
+.game-hand {
+  --hand-zone: calc(300px * var(--board-scale));
+  --hand-strich: calc(286px * var(--board-scale));
+}
 /* Die Gegnerhand spiegelt das Polster: ihr Bogen und ihre
    Hover-Vergrößerung gehen nach unten. */
 .game-hand-opp .game-hand-cards {
@@ -5879,9 +5915,10 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    ueber sich, die Gegnerzeile hat ihre rechte Spalte — beide haben den
    Platz. Die Goldzahlen (GoldGainNumber) messen `[data-gold-player]`
    und folgen von selbst. */
-.game-gold-icon { font-size: calc(46px * var(--board-scale)); }
+/* v1270 (Al 22.9.: „etwas kleiner"): 46/40 → 40/34, beide Seiten. */
+.game-gold-icon { font-size: calc(40px * var(--board-scale)); }
 .game-gold-value {
-  font-size: calc(40px * var(--board-scale));
+  font-size: calc(34px * var(--board-scale));
   font-weight: 800;
   color: #ffd700;
   text-shadow: 0 0 10px rgba(255,215,0,.5);
@@ -5934,6 +5971,30 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
 @keyframes goldRecoverPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: .8; transform: scale(1.06); }
+}
+
+/* ★ v1270: Sort/Shuffle + Gold der eigenen Hand als EINE Gruppe am
+   rechten Rand (`.hand-rechts`, app-board.jsx). Fester Zwischenraum,
+   die Gruppe waechst nach links; ihre Kinder sind darin nicht mehr
+   einzeln positioniert. Die Regeln fuer `.hand-actions` und
+   `.game-gold-display` darunter gelten weiter fuer die Gegnerseite und
+   fuer Zuschauer. */
+.hand-rechts {
+  position: absolute;
+  right: calc(16px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(18px * var(--board-scale));
+  z-index: 10002;
+}
+.hand-rechts > .hand-actions,
+.hand-rechts > .game-gold-display {
+  position: static;
+  transform: none;
+  right: auto;
+  top: auto;
 }
 
 /* Hand action buttons (Sort / Shuffle) — fixed position, left of gold */
@@ -9347,6 +9408,9 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    Hand (dort traegt `.face-down` seit jeher 180° + Faecherwinkel). */
 [data-opp-deck] > img,
 [data-opp-potion-deck] > img,
+/* ★ v1264 (Al 22.9.): auch im Puzzle-Editor — Main-, Potion- und Side
+   Deck des Gegners (Klasse aus `stapelZone`, app-puzzle.jsx). */
+.pz-stapel-gegner > img,
 .draw-anim-card > .board-card.face-down > img { rotate: 180deg; }
 
 /* Hand Pick selection (Shard of Chaos) */
@@ -9711,6 +9775,21 @@ body:has(.reaction-chain-overlay) .board-tooltip {
    is naturally scoped via `body:has`. */
 body:has(.game-hand-me) .board-tooltip {
   bottom: var(--hand-min-h);
+}
+
+/* ★ v1269 (Al 22.9.: „waehrend Overlays wie dem der Weapon Collecting
+   Wight liegt ein leichter, groesstenteils transparenter Schleier ueber
+   dem Hover-Tooltip — der Tooltip gehoert UEBER den Schleier, der das
+   Spielfeld dimmt"). Seit v1259 steht der Dialog-Schleier im Kampf auf
+   10085 (damit Dialoge ueber der eigenen Hand bei 10000 liegen), der
+   Tooltip aber weiter auf 9999 — er rutschte darunter. Solange ein
+   Schleier offen ist, steigt der Tooltip knapp darueber; ohne Dialog
+   bleibt alles wie bisher (Hand ueber Tooltip, siehe oben). Beide
+   Tooltip-Arten: der Brett-Tooltip und der von `CardMini` (Galerien).
+   Vorbild: dieselbe Regel fuer das Textfenster (`.textbox-overlay`). */
+body:has(.modal-overlay) .board-tooltip,
+body:has(.modal-overlay) .tooltip {
+  z-index: 10086;
 }
 
 /* ===== NOTIFICATION ===== */
@@ -13587,6 +13666,49 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 .pz-hand-cards[data-pz-hand="hand"]::after { bottom: 0; }
 .pz-hand-cards[data-pz-hand="oppHand"]::after { top: 0; }
+/* ★ v1263 (Al 21.9.): „Die Handzone im Puzzle-Editor ist deutlich zu
+   hoch — die Karten in meinen Support Zones kann ich nicht anklicken."
+   Die Leiste waechst mit der vollen Kartenhoehe (v6) und traegt
+   `zIndex: 10000` samt Hintergrund — sie lag ueber der untersten
+   Feldzeile. Zwei Dinge: ① die eigene Kartenreihe haengt um 45 % ihrer
+   Hoehe unten aus der Leiste heraus (im Editor faellt der abgeschnittene
+   Teil aus dem Bild, Als Regel v1249), die Leiste wird also um so viel
+   niedriger; ② die Leiste selbst laesst den Zeiger durch — nur ihre
+   Kinder (Karten, Griffe, Extras) fangen ihn. */
+.pz-hand { pointer-events: none; }
+/* ★★ v1264 (Al 22.9.: „mit Karten in Support Zones kann man nicht
+   interagieren"). Die Regel oben hiess bis v1263 `.pz-hand > *` — und
+   hob damit die v1255-Regel `.pz-hand-cards { pointer-events: none }`
+   wieder auf: gleiche Spezifitaet, spaeter in der Datei, gewinnt. Das
+   unsichtbare Polster der Kartenreihe (0,8 Kartenhoehen + 20 px, per
+   negativem Rand ueber das Brett gezogen) fing damit wieder JEDEN
+   Klick und jeden Drop ueber den Support Zones — auf der eigenen
+   Seite UND auf der Gegnerseite (dort 45 von 45 Messpunkten). Die
+   Kartenreihe ist deshalb ausdruecklich ausgenommen; ihre Karten und
+   ihr Ablagestreifen (`::after`) fangen den Zeiger weiterhin selbst. */
+.pz-hand > :not(.pz-hand-cards) { pointer-events: auto; }
+/* ★★ v1264: DIE LEISTE UMSCHLIESST DEN FAECHER. Der Faecherbogen hob
+   die mittleren Karten bisher ueber die Oberkante der Leiste hinaus
+   (bei 7 Karten rund ein Fuenftel Kartenhoehe) — sie ragten in die
+   unterste Zone der eigenen Feldhaelfte. Der Scaler zaehlt aber nur,
+   was die Leiste im Layout belegt, und reservierte dafuer nichts.
+   Jetzt waechst die Leiste genau um diesen Bogen (`--hand-faecher-rand`,
+   aus denselben Groessen wie die Faechergeometrie: Hub minus das
+   Drittel, um das die Reihe wieder abgesenkt wird, plus 4 px fuer die
+   gedrehten Ecken). Der Scaler sieht die groessere Leiste und passt
+   das Brett so ein, dass ihre Oberkante knapp UNTER den Support Zones
+   liegt (Als Vorgabe). Die Gegnerhand spiegelt das nach unten. */
+.pz-hand-cards[data-pz-hand="hand"],
+.pz-hand-cards[data-pz-hand="oppHand"] {
+  --hand-faecher-rand: calc(var(--hand-max-lift, 0) * var(--hand-card-h) - var(--hand-ueberstand) / 3 + 4px);
+}
+.pz-hand .pz-hand-cards[data-pz-hand="hand"] {
+  margin-top: calc(var(--hand-card-h) * -0.8 - 20px + var(--hand-faecher-rand));
+  margin-bottom: calc(var(--hand-card-h) * -0.45);
+}
+.pz-hand .pz-hand-cards[data-pz-hand="oppHand"] {
+  margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px + var(--hand-faecher-rand));
+}
 .pz-hand-extras {
   position: relative;
   z-index: 1;
@@ -14402,7 +14524,7 @@ body:has(.textbox-overlay) .tooltip {
    Regeln darueber (18/16 px × Massstab) — das eigentliche 30-px-Mass in
    `.game-gold-value` kam nie an. Jetzt ausdruecklich groesser, beide
    Seiten (Als Vorgabe 20.9.). */
-.game-hand .game-gold-value.orbit-font { font-size: calc(40px * var(--board-scale)) !important; }
+.game-hand .game-gold-value.orbit-font { font-size: calc(34px * var(--board-scale)) !important; }   /* v1270: 40 → 34 */
 
 /* ═══ General responsive ═══ */
 
@@ -14564,32 +14686,48 @@ body:has(.textbox-overlay) .tooltip {
    or glow, to match the 16-bit panel theme. Kept inside the padding box
    (inset > 0) because the side panels clip overflow. The chunky sizes are
    multiples of the panel dither's 8px grid (8 / 4) so they sit "on grid". */
-.ornate-frame::after {
+.pp-eckzier { position: relative; }
+/* ★ v1264 (Al 22.9.: „die Boxen fuer Elo und SC sollten die gleichen
+   inneren Ecken als Zier haben wie die grossen Menue-Boxen"). EINE
+   Definition der gestuften Pixel-Ecken fuer beide: `.ornate-frame`
+   (grosse Kaesten) und die Klasse `.pp-eckzier`, die jeder Kasten
+   tragen kann. Masse und Farbe kommen ueber vier Variablen mit den
+   bisherigen Werten als Vorgabe — die grossen Kaesten bleiben
+   pixelgleich:
+     --eck-farbe   (Spielerfarbe)   --eck-arm     (16px; Dicke = Arm / 4)
+     --eck-abstand (4px, vom Innenrand) */
+.ornate-frame::after,
+.pp-eckzier::after {
   content: '';
   position: absolute;
-  inset: 4px;
+  inset: var(--eck-abstand, 4px);
   z-index: 2;
   pointer-events: none;
-  --bk: var(--player-color, #00f0ff);
-  --bl: 16px; /* bracket arm length */
-  --bt: 4px;  /* bracket arm thickness (also the stair-step square size) */
-  background:
-    /* top-left: h-arm, v-arm, stair square */
-    linear-gradient(var(--bk), var(--bk)) left top / var(--bl) var(--bt) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) left top / var(--bt) var(--bl) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) left var(--bt) top var(--bt) / var(--bt) var(--bt) no-repeat,
-    /* top-right */
-    linear-gradient(var(--bk), var(--bk)) right top / var(--bl) var(--bt) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) right top / var(--bt) var(--bl) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) right var(--bt) top var(--bt) / var(--bt) var(--bt) no-repeat,
-    /* bottom-left */
-    linear-gradient(var(--bk), var(--bk)) left bottom / var(--bl) var(--bt) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) left bottom / var(--bt) var(--bl) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) left var(--bt) bottom var(--bt) / var(--bt) var(--bt) no-repeat,
-    /* bottom-right */
-    linear-gradient(var(--bk), var(--bk)) right bottom / var(--bl) var(--bt) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) right bottom / var(--bt) var(--bl) no-repeat,
-    linear-gradient(var(--bk), var(--bk)) right var(--bt) bottom var(--bt) / var(--bt) var(--bt) no-repeat;
+  /* ★★ v1265 (Al 22.9., Screenshot: „die linken inneren Ecken der
+     Elo-Box sind leicht versetzt"). Bis hier bestand jede Ecke aus DREI
+     Hintergrundflaechen (waagerechter Arm, senkrechter Arm, Stufen-
+     quadrat), jede fuer sich positioniert. Unter `zoom` (--ui-scale
+     ≠ 1) rundet der Browser jede Flaeche einzeln auf Geraetepixel — das
+     Quadrat sass damit mal buendig, mal einen Pixel daneben, je Ecke
+     verschieden (nachgestellt bei 1920×1080, 1760×990, 1366×768).
+     Jetzt ist jede Ecke EINE Form (ein 4×4-Raster: Arm 4 Felder, Dicke
+     und Stufe je 1 Feld) und wird als Ganzes skaliert. Sie liegt als
+     Maske auf einer Farbflaeche, damit die Farbe weiter aus
+     `--eck-farbe` kommt. Die Dicke ist damit fest ein Viertel der
+     Armlaenge — genau das Verhaeltnis der grossen Kaesten (16/4). */
+  --bk: var(--eck-farbe, var(--player-color, #00f0ff));
+  --bl: var(--eck-arm, 16px);   /* Armlaenge; Dicke = Armlaenge / 4 */
+  background: var(--bk);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H4V1H1V4H0ZM1 1H2V2H1Z'/%3E%3C/svg%3E") left top / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H4V4H3V1H0ZM2 1H3V2H2Z'/%3E%3C/svg%3E") right top / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H1V3H4V4H0ZM1 2H2V3H1Z'/%3E%3C/svg%3E") left bottom / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0H4V4H0V3H3ZM2 2H3V3H2Z'/%3E%3C/svg%3E") right bottom / var(--bl) var(--bl) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H4V1H1V4H0ZM1 1H2V2H1Z'/%3E%3C/svg%3E") left top / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H4V4H3V1H0ZM2 1H3V2H2Z'/%3E%3C/svg%3E") right top / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0H1V3H4V4H0ZM1 2H2V3H1Z'/%3E%3C/svg%3E") left bottom / var(--bl) var(--bl) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0H4V4H0V3H3ZM2 2H3V3H2Z'/%3E%3C/svg%3E") right bottom / var(--bl) var(--bl) no-repeat;
 }
 
 /* ═══ Main Menu hub side panels ═══ */
@@ -14839,23 +14977,117 @@ body:has(.textbox-overlay) .tooltip {
    Bis v835 Inline-Styles im JSX; hier, damit das Telefon-Layout sie
    umstellen kann. Desktop pixelgleich. */
 .menu-topleft { display: contents; }
+/* ★ v1265 (Al 22.9.): KOPFZEILEN-MASSE AN EINER STELLE. Rechts steht
+   LOGOUT (+ Lautsprecher), darunter Discord; links stehen Elo und SC
+   jetzt auf Hoehe des Discord-Knopfs („in einer Reihe mit Discord statt
+   LOGOUT"). Beide Seiten rechnen aus denselben Variablen, damit sie nie
+   auseinanderlaufen. Platzbedarf rechts: oben + Zeile + Abstand +
+   Discord = 14 + 52 + 12 + 60 = 138 px; die Seitenkaesten beginnen bei
+   16:9 und breiter bei rund 150 px (nachgemessen), bei hoeheren
+   Fenstern tiefer. */
+.main-menu-screen {
+  --kopf-oben: 14px;
+  --kopf-zeile: 52px;        /* gemessene Hoehe von LOGOUT und Plaketten */
+  --kopf-abstand: 12px;
+  --kopf-discord-h: 60px;
+}
 .menu-stats {
-  position: absolute; top: 14px; left: 16px; z-index: 5;
+  position: absolute; left: 16px; z-index: 5;
+  /* v1266 (Al 22.9.): auf der y-Achse ZWISCHEN LOGOUT und Discord —
+     die Mitte der Plaketten liegt auf halbem Weg zwischen den Mitten
+     beider Knoepfe. */
+  top: calc(var(--kopf-oben)
+            + (var(--kopf-zeile) / 2 + var(--kopf-abstand) + var(--kopf-discord-h) / 2) / 2);
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
 }
 .menu-stats-row { display: flex; align-items: center; gap: 12px; }
+/* ★ v1263 (Al 21.9.): „Elo- und SC-Anzeigen aufhuebschen." Plakette
+   statt flacher Marke: 2-px-Rahmen in der eigenen Farbe, harter
+   Pixel-Schlagschatten, innerer Glanz oben / Schatten unten, kleine
+   Beschriftung vor der grossen Zahl, leichter Schein auf der Zahl. Die
+   Hoehe bleibt 46 px — daran haengt der LOGOUT-Knopf. */
 .menu-stat-badge {
-  display: flex; align-items: center; gap: 8px;
-  line-height: 26px; font-size: 20px; padding: 10px 20px;
+  display: flex; align-items: center; gap: 10px;
+  line-height: 26px; font-size: 20px; padding: 10px 18px 10px 14px;
+  font-family: var(--font-display), sans-serif;
+  border: 2px solid currentColor;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.55),
+              inset 0 2px 0 rgba(255,255,255,.10),
+              inset 0 -3px 0 rgba(0,0,0,.28);
+  position: relative;
 }
-.menu-stat-coin { width: 26px; height: 26px; image-rendering: pixelated; }
+.menu-stat-badge::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E");
+}
+.menu-stat-label { font-size: 11px; letter-spacing: 2px; opacity: .8; }
+.menu-stat-value { font-size: 22px; font-weight: 800; text-shadow: 0 0 10px currentColor; }
+.menu-stat-coin { width: 26px; height: 26px; image-rendering: pixelated; filter: drop-shadow(0 0 4px rgba(255,215,0,.6)); }
+/* ★ v1264: Ecken der Plaketten — dieselbe Form wie die grossen Kaesten,
+   auf die 46-px-Plakette verkleinert (Arm 12, Dicke 3 statt 16/4), in
+   der Farbe der Plakette (Spielerfarbe bzw. Gold). */
+.menu-stat-badge.pp-eckzier { --eck-farbe: currentColor; --eck-arm: 12px; --eck-abstand: 3px; }
+/* ★ v1264: die Muenze als Glitzerquelle. Die Schicht liegt ueber der
+   Muenze und ragt ein Stueck darueber hinaus; die Funken starten auf
+   ihr und fliegen rundum davon (`ScGlitzer`, app-screens.jsx). */
+.menu-stat-coin-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.pp-sc-glitzer { position: absolute; inset: -4px; pointer-events: none; z-index: 1; }
+.pp-sc-glitzer-teil {
+  position: absolute;
+  width: var(--p-size, 4px);
+  height: var(--p-size, 4px);
+  margin: calc(var(--p-size, 4px) / -2) 0 0 calc(var(--p-size, 4px) / -2);
+  /* Pixel-Kreuz statt Quadrat: zwei Balken, ein Drittel breit — liest
+     sich als Funkeln, nicht als Staub. */
+  background:
+    linear-gradient(var(--p-color, #ffd700), var(--p-color, #ffd700)) center / 100% 34% no-repeat,
+    linear-gradient(var(--p-color, #ffd700), var(--p-color, #ffd700)) center / 34% 100% no-repeat;
+  filter: drop-shadow(0 0 3px var(--p-color, #ffd700)) drop-shadow(0 0 1px #fff);
+  image-rendering: pixelated;
+  opacity: 0;
+  animation: pp-glitzer-flug var(--p-dur, 1.8s) ease-out var(--p-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+@keyframes pp-glitzer-flug {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.3) rotate(0deg); }
+  15%  { opacity: var(--p-max, .9); transform: translate(calc(var(--p-dx, 0px) * .25), calc(var(--p-dy, 0px) * .25)) scale(1.2) rotate(45deg); }
+  60%  { opacity: var(--p-max, .9); }
+  100% { opacity: 0; transform: translate(var(--p-dx, 0px), var(--p-dy, 0px)) scale(.4) rotate(90deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-sc-glitzer-teil { animation: none; opacity: 0; }
+}
+/* LOGOUT: gleiche Hoehe wie die Plaketten (10 px Polster + 26 px Zeile). */
+.menu-logout-btn--gross { padding: 10px 26px !important; font-size: 20px !important; line-height: 26px !important; }
 .menu-player-name { font-weight: 800; font-size: 22px; white-space: nowrap; }
 .menu-profile-avatar-fallback { font-size: 56px; opacity: .5; }
 .menu-corner {
-  position: absolute; top: 14px; right: 12px; z-index: 5;
-  display: flex; flex-direction: column; align-items: stretch; gap: 20px;
+  position: absolute; top: var(--kopf-oben); right: 12px; z-index: 5;
+  /* ★ v1265: Raster statt Spalte — LOGOUT und Discord teilen sich die
+     erste Spalte, Discord ist damit genau so breit wie LOGOUT (Als
+     Vorgabe) und reicht nicht mehr unter den Lautsprecher bis zum Rand.
+     Die Zeile selbst loest sich dafuer auf (`display: contents`). */
+  display: grid; grid-template-columns: auto auto; align-items: center;
+  column-gap: 10px; row-gap: var(--kopf-abstand);
 }
-.menu-corner-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.menu-corner-row { display: contents; }
+/* ★ v1264 (Al 22.9.: „das Discord-Logo ist deutlich zu gross und ragt in
+   eine Menuebox hinein"). Die Block-Variante skaliert ihr Logo mit der
+   BREITE (67 %) — in der Ecke also mit der Breite von LOGOUT +
+   Lautsprecher, und das ergab rund 130 px Hoehe, bis in den rechten
+   Kasten hinein. Im Hauptmenue haengt die Hoehe jetzt an der Zeile
+   darueber: 46 px wie Plaketten und LOGOUT, das Logo fuellt die Hoehe
+   und die Breite folgt. Die Block-Variante bleibt fuer den Login
+   unveraendert (dort hat die Ecke Platz). */
+.menu-corner .discord-btn--block {
+  /* v1265, zweiter Anlauf (Al: „jetzt zu flach"): eigene Hoehe
+     `--kopf-discord-h`, Breite = LOGOUT (Rasterspalte, siehe oben). */
+  height: var(--kopf-discord-h);
+  box-sizing: border-box;
+  padding: 11px 14px;
+}
+.menu-corner .discord-btn--block svg { width: auto; height: 100%; }
 .menu-buttons { display: flex; flex-direction: column; gap: 12px; width: 340px; }
 
 /* Title + subtitle get their own backdrop plaque (they sit above the
@@ -14970,9 +15202,12 @@ body:has(.textbox-overlay) .tooltip {
   .menu-stat-badge { font-size: 14px; padding: 6px 12px; line-height: 20px; gap: 6px; }
   .menu-stat-coin { width: 18px; height: 18px; }
   /* Kopfzeile rechts: eine Zeile, Discord als Pille */
-  .menu-corner { flex-direction: row; align-items: center; gap: 10px; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
-  .menu-corner .discord-btn--block { width: auto; padding: 7px 12px; }
-  .menu-corner .discord-btn--block svg { width: 22px; }
+  .menu-corner { display: flex; flex-direction: row; align-items: center; gap: 10px; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
+  .menu-corner-row { display: flex; align-items: center; gap: 10px; }
+  /* v1264: die Desktop-Hoehe (46 px, Logo fuellt die Hoehe) gilt hier nicht —
+     im Telefon-Layout steht Discord einzeilig neben LOGOUT. */
+  .menu-corner .discord-btn--block { width: auto; padding: 7px 12px; height: auto; margin-top: 0; }
+  .menu-corner .discord-btn--block svg { width: 22px; height: auto; }
   /* Knopfstreifen: zwei Spalten */
   /* Der Streifen reicht wie die Seitenkaesten bis 12px vor den unteren
      Rand (84 oben + 12 unten), die Knoepfe sitzen darin mittig. */
@@ -15176,13 +15411,13 @@ body:has(.textbox-overlay) .tooltip {
      nicht in die 260er-Zone — Zone auf 320, Striche auf 306, Knoepfe
      kleiner und weiter innen. Beide Zeilen gleich, die Striche bleiben
      uebereinander. */
-  .game-hand-cards {
-    margin-left: calc(320px * var(--board-scale) - var(--fan-pad-x)) !important;
-    margin-right: calc(320px * var(--board-scale) - var(--fan-pad-x)) !important;
+  /* v1270: dieselben Variablen, am Telefon unveraendert 320/306. */
+  .game-hand {
+    --hand-zone: calc(320px * var(--board-scale));
+    --hand-strich: calc(306px * var(--board-scale));
   }
-  .game-hand-me::before, .game-hand-opp::before { left: calc(306px * var(--board-scale)); }
-  .game-hand-me::after,  .game-hand-opp::after  { right: calc(306px * var(--board-scale)); }
-  .hand-actions { right: calc(200px * var(--board-scale)); gap: 3px; }
+  .hand-rechts { gap: calc(10px * var(--board-scale)); }
+  .hand-actions { gap: 3px; }
   .hand-action-btn { font-size: 9px !important; padding: 3px 7px !important; min-height: 0 !important; }
   .game-hand-topleft, .game-hand-topright { top: 2px; }
   .game-hand-topright .volume-btn { font-size: 22px; padding: 2px 6px; }
@@ -16018,8 +16253,8 @@ body:has(.textbox-overlay) .tooltip {
   pointer-events: none;
   z-index: 3;
 }
-.game-hand-me::before, .game-hand-opp::before { left: calc(246px * var(--board-scale)); }
-.game-hand-me::after,  .game-hand-opp::after  { right: calc(246px * var(--board-scale)); }
+.game-hand-me::before, .game-hand-opp::before { left: var(--hand-strich); }
+.game-hand-me::after,  .game-hand-opp::after  { right: var(--hand-strich); }
 
 /* (v1261: der Trennstrich neben dem Avatar ist jetzt `.game-hand-me::before`.) */
 
@@ -16259,7 +16494,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* Login screen reuses the main-menu wordmark logo. .pp-logo-img is sized for
    the full-width menu header (831×105 art at 92px tall ≈ 728px wide), so here
    we centre the stack and fit the image to the panel width instead. */
-.auth-logo { display: block; margin: 0 auto 10px; transform: scale(1.06); transform-origin: center bottom; }
+.auth-logo { display: block; width: 86%; margin: 0 auto 10px; transform: scale(1.06); transform-origin: center bottom; }
 .auth-logo .pp-logo-img { width: 100%; height: auto; max-height: none; }
 
 /* ═══ AUFBAU DES LOGIN-FORMULARS (v835) ═══════════════════════════════
@@ -16269,7 +16504,11 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    unerreichbar — das Telefon-Layout weiter unten (`TELEFON QUER`) muss
    genau diese Werte umstellen koennen. Auf dem Desktop ist alles hier
    pixelgleich mit dem alten Inline-Stand. */
-.auth-screen .auth-panel { width: 460px; text-align: center; }
+/* ★ v1265 (Al 22.9.: „die Login-Box ist etwas schmal — fast keine Luft
+   zwischen Schriftzug und Rand"). 460 → 520 px; das Logo behaelt seine
+   bisherige Groesse (86 % der nun breiteren Inhaltsspalte ≈ die alten
+   100 %) und hat damit gut 30 px Luft zu jeder Seite. */
+.auth-screen .auth-panel { width: 520px; text-align: center; }
 .auth-screen .auth-subtitle { font-size: 13px; color: #3d3d54; margin-bottom: 24px; letter-spacing: 2px; }
 /* Formular und seine beiden Spalten: auf dem Desktop schlicht EINE Spalte
    (Hauptteil, darunter die Alternativen), Abstand 12 wie zuvor. */
@@ -16280,7 +16519,6 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 /* Beide Fusszeilen teilen sich EIN Fach fester Mindesthoehe (Anmelden:
    Passwort-Link, Registrieren: zweizeiliger Hinweis) — sonst huepft der
    Kasten beim Reiterwechsel. 34px = zwei Zeilen à 11.5px bei 1.5. */
-.auth-footer { min-height: 34px; display: flex; align-items: flex-start; }
 .auth-or { text-align: center; color: var(--text2); font-size: 11px; margin: 2px 0; }
 /* Ablage oben rechts: Login-Knopf + Regler in einer Zeile, darunter
    Discord als Block — dieselbe Bauform wie im Hauptmenue (Als Vorgabe
@@ -16291,32 +16529,10 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 }
 .auth-corner-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 
-/* Explosion overlay. The wrapper is a viewport-sized box centred on the panel
-   — and .screen-center centres the panel in the viewport, so it lines up flush
-   with the backdrop scene. The inner core reproduces the backdrop's explosion
-   layer verbatim (inset:0 + center/100% 100% + ab-coreTether), so the blast
-   sits in EXACTLY the same place it did in the scene; only its layer changed
-   (now above the box, below the controls). It rides the auth-panel-shake clock,
-   staying in sync with the scene's shake. .auth-screen's overflow:hidden clips
-   the viewport-sized box, so no scrollbars. z-index:1 keeps it above the box. */
-.auth-panel-explosion {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 100vw;
-  height: 100vh;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  pointer-events: none;
-}
-.auth-panel-explosion__core {
-  position: absolute;
-  inset: 0;
-  background: url('/data/animated_screen/layers2/explosion.png') center / 100% 100% no-repeat;
-  transform-origin: 52% 42%;
-  animation: ab-coreTether 4.8s ease-in-out infinite;
-  image-rendering: pixelated;
-}
+/* v1266: die Explosion liegt wieder in der Kulisse (`.anim-explosion`,
+   AnimatedTitleBackdrop) — die Kasten-Ebene `.auth-panel-explosion` ist
+   entfallen. */
+.anim-explosion { image-rendering: pixelated; }
 
 /* ═══ TELEFON QUER — Login-Bildschirm (v835) ═══════════════════════════
    Al, 8.9.: „auf dem Login-Screen sehe ich nur die Eingabefelder fuer
@@ -16388,7 +16604,6 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .auth-screen .tab { padding: 7px 16px; min-width: 100px; font-size: 13px; }
   .auth-tabs { margin-bottom: 10px; }
   .auth-screen .btn-big { padding: 11px 20px; }
-  .auth-footer { min-height: 0; }
   /* Ablage oben rechts: EINE Zeile statt Spalte, Discord als Pille statt
      Banner — sonst haengt sie 120 Pixel tief in den Kasten hinein. */
   .auth-corner { flex-direction: row; align-items: center; gap: 10px; top: 10px; right: max(12px, env(safe-area-inset-right, 0px)); }
@@ -19451,4 +19666,445 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 @keyframes pp-crossside-pulse {
   0%, 100% { filter: brightness(1); }
   50%      { filter: brightness(1.22); }
+}
+
+/* ═══ ★★ v1262 — RESULT CEREMONY (Sieg/Niederlage, Als Vorgabe 21.9.) ═══
+   Opaker Vollbild-Hintergrund in der Ergebnisfarbe, Titel mit
+   Buchstaben-Drop, Rewards einzeln mit Pop + Funkenburst, Zaehler,
+   zum Schluss die Knoepfe. Ebene 10080 wie die frueheren Ergebnis-
+   Overlays; die End-Sprechblasen (10090) bleiben darueber. */
+.pp-cer {
+  position: fixed; inset: 0; z-index: 10080;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  animation: ppCerAuf .55s ease-out both;
+  cursor: pointer;
+}
+/* v1263 (Al 21.9.): nicht ganz opak — „dahinter noch ein bisschen was
+   vom Spielfeld zu sehen, waere cool". Alpha .9 innen, .96 am Rand. */
+.pp-cer-win  { background: radial-gradient(ellipse at 50% 35%, rgba(58,42,6,.88) 0%, rgba(26,18,4,.93) 45%, rgba(7,5,8,.97) 100%); }
+.pp-cer-lose { background: radial-gradient(ellipse at 50% 35%, rgba(58,10,26,.88) 0%, rgba(24,5,16,.93) 45%, rgba(5,4,8,.97) 100%); }
+.pp-cer-klone { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.pp-cer-klone .game-hand-info { position: fixed !important; }
+@keyframes ppCerAuf { from { opacity: 0; } to { opacity: 1; } }
+.pp-cer-streifen {
+  position: absolute; inset: -50%;
+  background: repeating-linear-gradient(115deg, transparent 0 34px, rgba(255,255,255,.035) 34px 40px);
+  animation: ppCerStreifen 14s linear infinite;
+  pointer-events: none;
+}
+.pp-cer-lose .pp-cer-streifen { animation-duration: 28s; opacity: .6; }
+@keyframes ppCerStreifen { from { transform: translateX(0); } to { transform: translateX(120px); } }
+.pp-cer-vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.75) 100%);
+}
+.pp-cer-sterne { position: absolute; inset: 0; pointer-events: none; }
+.pp-cer-sterne i {
+  position: absolute; width: 4px; height: 4px; background: #ffe9a0;
+  box-shadow: 0 0 8px #ffd700; opacity: 0;
+  animation: ppCerStern 3s ease-in-out infinite;
+}
+@keyframes ppCerStern { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .9; transform: scale(1.2); } }
+.pp-cer-inhalt {
+  position: relative; z-index: 2; text-align: center; cursor: default;
+  max-width: min(92vw, 640px); max-height: 100dvh; overflow-y: auto; padding: 18px 12px;
+}
+.pp-cer-titel {
+  font-size: clamp(34px, 8vw, 72px); letter-spacing: 4px; margin-bottom: 10px;
+  text-shadow: 0 0 30px currentColor, 0 6px 0 rgba(0,0,0,.6);
+  white-space: nowrap;
+}
+.pp-cer-buchstabe { display: inline-block; animation: ppCerBuchstabe .55s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes ppCerBuchstabe {
+  0%   { transform: translateY(-80px) scale(1.6); opacity: 0; }
+  60%  { transform: translateY(8px) scale(.96); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.pp-cer-unter { font-size: 15px; color: var(--text2); margin-bottom: 18px; animation: ppCerFade .6s .5s both; }
+.pp-cer-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 6px 0 12px; }
+.pp-cer-reward {
+  position: relative; width: 168px; min-height: 84px; padding: 10px 12px 12px;
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,215,0,.55);
+  box-shadow: 4px 4px 0 rgba(0,0,0,.5), inset 0 0 18px rgba(255,215,0,.08);
+  opacity: 0; transform: scale(.4); pointer-events: none;
+}
+.pp-cer-lose .pp-cer-reward { border-color: rgba(255,120,150,.5); }
+.pp-cer-reward-da { animation: ppCerPop .5s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes ppCerPop {
+  0%   { opacity: 0; transform: scale(.4) rotate(-6deg); }
+  70%  { opacity: 1; transform: scale(1.08) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.pp-cer-reward-titel { font-family: var(--font-display), sans-serif; font-size: 13px; color: #ffd700; letter-spacing: 1px; margin-bottom: 4px; }
+.pp-cer-reward-text { font-size: 11px; color: var(--text2); line-height: 1.35; min-height: 28px; }
+.pp-cer-reward-betrag {
+  margin-top: 6px; font-family: var(--font-display), sans-serif; font-size: 18px; color: #ffd700;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.pp-cer-reward-betrag img, .pp-cer-summe img { width: 18px; height: 18px; image-rendering: pixelated; }
+.pp-cer-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.pp-cer-burst i {
+  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: #ffd700;
+  box-shadow: 0 0 6px #ffd700; transform: rotate(var(--bw)) translateY(0);
+  animation: ppCerFunke .7s ease-out forwards;
+}
+@keyframes ppCerFunke {
+  0%   { transform: rotate(var(--bw)) translateY(0) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--bw)) translateY(-90px) scale(.2); opacity: 0; }
+}
+.pp-cer-summe {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 4px 0 14px; color: #ffd700; font-family: var(--font-display), sans-serif; font-size: 22px;
+  text-shadow: 0 0 14px rgba(255,215,0,.6);
+}
+.pp-cer-summe-zahl { font-size: 34px; min-width: 2ch; text-align: right; }
+.pp-cer-summe-text { font-size: 13px; color: var(--text2); }
+.pp-cer-elo { margin: 4px 0 14px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.pp-cer-fade { animation: ppCerFade .5s ease-out both; }
+@keyframes ppCerFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.pp-cer-hinweis { margin-top: 14px; font-size: 11px; color: rgba(255,255,255,.35); letter-spacing: 2px; animation: ppCerStern 2.4s ease-in-out infinite; }
+/* Telefon quer: kompakter, keine Streifenanimation (Lite) */
+@media (pointer: coarse) and (max-height: 600px) {
+  .pp-cer-streifen { animation: none; }
+  .pp-cer-titel { font-size: clamp(26px, 7vw, 44px); margin-bottom: 4px; }
+  .pp-cer-reward { width: 140px; min-height: 70px; padding: 6px 8px 8px; }
+  .pp-cer-reward-text { display: none; }
+  .pp-cer-inhalt { padding: 8px 10px; }
+}
+
+/* ═══ GLANZBAND + LOTSE (v1264) ════════════════════════════════════════
+   Bausteine `GlanzBand` / `LotsenGlanz` (app-shared.jsx). Der Streifen
+   ist das Glanzband der Foil-Karten: dieselben Keyframes
+   (`foilSweepLoop`: 40 % des Takts Durchlauf, 60 % Pause), derselbe
+   heisse Kern, `screen`-Mischung — das Band ADDIERT Licht, dunkle
+   Stellen bleiben dunkel. Nur `transform`/`opacity` animiert.
+
+   Stellschrauben am Wirt oder an der Variante:
+     --glanz-breite (34 %)   --glanz-dauer (4.5 s)   --glanz-verzug (.6 s)
+     --glanz-von / --glanz-bis (Weg in Bandbreiten; bis = 100/Breite + 1)
+     --glanz-staerke (.85) */
+.pp-glanz {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+.pp-glanz-band {
+  position: absolute;
+  top: -70%; left: 0;
+  width: var(--glanz-breite, 34%);
+  height: 240%;
+  --band-from: var(--glanz-von, -150%);
+  --band-to: var(--glanz-bis, 400%);
+  --band-rot: 22deg;
+  --band-o: var(--glanz-staerke, .85);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: foilSweepLoop var(--glanz-dauer, 4.5s) linear infinite;
+  animation-delay: var(--glanz-verzug, .6s);
+  will-change: transform, opacity;
+}
+.pp-glanz-band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right,
+    transparent 30%, rgba(255,255,255,.45) 44%, rgba(255,255,255,.95) 50%,
+    rgba(255,255,255,.45) 56%, transparent 70%);
+}
+/* Schriftzug im Hauptmenue: auf die Buchstaben maskiert (Alpha von
+   logo.png — dieselbe Datei, dieselbe Streckung wie das Bild, also
+   deckungsgleich). Schmaler, langsamer, laengere Pause: ein Glanz, der
+   ab und zu ueber das Schild laeuft, kein Blinklicht. */
+.pp-glanz--logo {
+  -webkit-mask: url(/data/logo.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo.png) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  border-radius: 0;
+  --glanz-breite: 16%;
+  --glanz-von: -160%;
+  --glanz-bis: 740%;
+  --glanz-dauer: 7s;
+  --glanz-verzug: 1.2s;
+  --glanz-staerke: .9;
+}
+
+/* Lotse: pulsierender Schein aussen um den Wirt. Fester Schatten, es
+   pulsiert nur seine Deckkraft (Compositor statt Neuzeichnen). */
+.pp-lotse { --lotse-farbe: #ff44cc; position: relative; }
+.pp-lotse-schein {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    0 0 16px 2px var(--lotse-farbe),
+    0 0 40px 10px color-mix(in srgb, var(--lotse-farbe) 50%, transparent);
+  opacity: .45;
+  animation: pp-lotse-puls 2.4s ease-in-out infinite;
+}
+@keyframes pp-lotse-puls {
+  0%, 100% { opacity: var(--lotse-min, .3); }
+  50%      { opacity: 1; }
+}
+/* ★ v1266 (Al 22.9.: „der Glow beim Tutorial-Raccoon leuchtet/pulsiert
+   noch nicht"). Er pulsierte — aber nur zwischen 65 % und 100 %
+   Deckkraft (meine v1265-Anhebung der Untergrenze hat den Puls
+   verflacht), und neben echter Kartenkunst ist das kaum zu sehen. Jetzt
+   zwei Signale: der Schein atmet wieder weit (30 → 100 %), und im selben
+   Takt laeuft ein Sonar-Ring vom Rand nach aussen und verblasst — das
+   klassische „hier klicken"-Zeichen. Der Ring waechst ueber `inset`
+   (feste Pixel ringsum, bei breiten wie hohen Wirten gleich) — ein
+   einzelner kleiner Kasten, das kostet nichts Nennenswertes. */
+.pp-lotse-schein::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--lotse-farbe);
+  border-radius: inherit;
+  opacity: 0;
+  animation: pp-lotse-ping 2.4s ease-out infinite;
+}
+@keyframes pp-lotse-ping {
+  0%   { inset: 0;     opacity: .95; }
+  70%  { inset: -16px; opacity: 0; }
+  100% { inset: -16px; opacity: 0; }
+}
+/* ★ v1265, zweiter Anlauf (Al 22.9.: „die Glow-Umrandung des Tutorial-
+   Raccoons sollte noch deutlicher sein"). Die Kachel ist gross und steht
+   zwischen vielen gleichartigen — sie bekommt einen harten Ring in der
+   Lotsenfarbe, einen breiteren Schein und faellt im Puls nie unter 65 %. */
+.vscpu-raccoon { --lotse-min: .35; }
+.vscpu-raccoon > .pp-lotse-schein {
+  box-shadow:
+    0 0 0 3px var(--lotse-farbe),
+    0 0 22px 6px var(--lotse-farbe),
+    0 0 60px 20px color-mix(in srgb, var(--lotse-farbe) 55%, transparent);
+}
+.pp-lotse:disabled > .pp-lotse-schein,
+.pp-lotse:disabled > .pp-glanz { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pp-glanz-band { animation: none; opacity: 0; }
+  .pp-lotse-schein { animation: none; opacity: .7; }
+  .pp-lotse-schein::after { display: none; }
+}
+/* Telefone im Sparmodus: Schein ruhig, Glanz bleibt (ein Band je Wirt
+   kostet nichts Nennenswertes). Dieselbe Schwelle wie der Lite-Block. */
+@media (pointer: coarse) and (max-height: 600px) {
+  .pp-lotse-schein { animation: none; opacity: .75; }
+  .pp-sc-glitzer-teil { filter: none; }
+  .pp-sc-glitzer-teil:nth-child(n+11) { display: none; }
+}
+
+/* ── GAST-EINSTIEG IM LOGIN (v1264) ───────────────────────────────────
+   Als Vorgabe 22.9.: hoch und deutlich prominenter, darf leuchten und
+   einen Foil-artigen Sheen tragen. Volle Breite, eigene Farbe
+   (`--lotse-farbe`, dasselbe Pink wie die Raccoon-Kachel im
+   Gastmodus), groessere Schrift. `!important` beim Hintergrund, weil
+   `.auth-screen .btn` ihn fuer alle Login-Knoepfe so setzt. */
+.auth-gast { display: flex; flex-direction: column; gap: 8px; }
+.auth-screen .auth-gast-btn {
+  width: 100%;
+  padding: 18px 20px;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: #fff;
+  border-color: var(--lotse-farbe);
+  background: color-mix(in srgb, var(--lotse-farbe) 24%, var(--menu-surface)) !important;
+}
+.auth-screen .auth-gast-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lotse-farbe) 36%, var(--menu-surface)) !important;
+}
+/* Beschriftung UEBER dem Glanzband — der Streifen laeuft hinter den
+   Buchstaben durch, die Schrift bleibt jederzeit lesbar. */
+.auth-gast-titel { position: relative; z-index: 2; }
+.auth-gast-hinweis { text-align: center; }
+.auth-or--konto { margin: 14px 0 12px; }
+/* Ohne Google-Anmeldung bleibt die rechte Spalte leer — dann ganz weg,
+   sonst stuende im Telefon-Layout eine leere Haelfte mit Trennlinie. */
+.auth-form-alt:empty { display: none; }
+@media (max-height: 600px) {
+  .auth-gast { gap: 4px; }
+  .auth-screen .auth-gast-btn { padding: 11px 16px; font-size: 15px; }
+  .auth-gast-hinweis { display: none; }
+  .auth-or--konto { margin: 6px 0 6px; }
+}
+
+/* ═══ LOGIN ALS KARTE (v1266) ══════════════════════════════════════════
+   Al, 22.9.: „das Login-Menue ist aktuell einfach nicht schoen — kann
+   man den zentralen Bereich eleganter und ansprechender designen?\"
+   (Aussenbereiche tabu, dort sitzen die Figuren.)
+
+   Leitidee: der Kasten ist eine KARTE. Oben ein Kunstfenster, durch das
+   der Explosionskern der Kulisse hinter dem Logo leuchtet (`.auth-header`,
+   halbtransparent mit dunklem Rand, damit Figurenteile an den Kanten
+   zuruecktreten). Darunter ein deckender Textkasten mit dem Formular
+   (`.auth-rumpf`) — ruhig, gut lesbar, ohne Pixel-Umrisse um jede Zeile.
+   Rahmen und Eck-Zier sprechen dieselbe Sprache wie die Menuekaesten
+   (`pp-eckzier`), in Violett statt Spielerfarbe (es gibt noch keinen
+   Spieler). Ringsum ein warmer Gegenschein: der Kasten steht IN der
+   Explosion, nicht vor einem Loch darin.
+
+   Farben (nur hier):
+     --auth-tinte / -2   Flaeche des Textkastens (Verlauf nach unten)
+     --auth-feld         Eingabefelder und Reiter-Schiene
+     --auth-linie        Feldrahmen, Trennlinien
+     --auth-leise        Nebentext, Platzhalter
+     --auth-rahmen(-hell) Kastenrahmen und Ecken
+   Akzente bleiben, wo sie Bedeutung tragen: Pink nur fuer den Gast-
+   Einstieg, Cyan (`--accent`) nur fuer Anmelden, aktiven Reiter, Fokus. */
+.auth-screen .auth-panel {
+  --auth-tinte: #0d0b1a;
+  --auth-tinte-2: #130f28;
+  --auth-feld: #07060e;
+  --auth-linie: #3a3360;
+  --auth-leise: #8d88ad;
+  --auth-rahmen: #8b6dff;
+  --auth-rahmen-hell: #cbb9ff;
+  padding: 0;
+  background: transparent !important;
+  background-image: none !important;   /* Raster der `.panel`-Regel */
+  border: 3px solid var(--auth-rahmen);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, .65),
+    6px 6px 0 rgba(0, 0, 0, .55),
+    0 0 80px rgba(255, 150, 70, .24);
+  --eck-farbe: var(--auth-rahmen-hell);
+  --eck-arm: 16px;
+  --eck-abstand: 3px;
+}
+/* Kunstfenster: ein eigener, gemalter Glutkern hinter dem Logo auf
+   dunklem Grund. Erster Versuch war ein Durchblick auf die Kulisse — dort
+   lagen aber vor allem Figurenteile (Hammer, Fluegel), der Kern selbst
+   sitzt tiefer, hinter dem Formular. Die Glut in den Farben des Kerns
+   haelt das Fenster ruhig und unabhaengig davon, was die Szene zeigt. */
+.auth-screen .auth-header {
+  padding: 22px 16px 16px;
+  background:
+    radial-gradient(ellipse 50% 70% at 50% 50%,
+      rgba(255, 214, 120, .62), rgba(255, 128, 64, .34) 40%, rgba(255, 70, 60, .12) 68%, transparent 100%),
+    linear-gradient(180deg, #120d22, #0d0a1b);
+}
+.auth-screen .auth-logo { width: 80%; }
+.auth-screen .auth-subtitle { margin-bottom: 4px; }
+
+/* Textkasten */
+.auth-rumpf {
+  padding: 16px 18px 18px;
+  text-shadow: none;
+  text-align: left;
+  border-top: 2px solid var(--auth-rahmen);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E") 0 0 / 8px 8px repeat,
+    linear-gradient(180deg, var(--auth-tinte), var(--auth-tinte-2));
+  image-rendering: pixelated;
+}
+.auth-rumpf .auth-link:hover { text-shadow: 0 0 8px var(--accent); }
+
+/* Gast-Einstieg: Hinweis leise und einzeilig */
+.auth-rumpf .auth-gast-hinweis { color: var(--auth-leise); font-size: 11px; }
+
+/* Trenner: feine Linie mit Wort in der Mitte */
+.auth-rumpf .auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--auth-leise);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.auth-rumpf .auth-or::before,
+.auth-rumpf .auth-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--auth-linie);
+}
+.auth-rumpf .auth-or--konto { margin: 16px 0 14px; }
+
+/* Reiter als Segmentschalter ueber die volle Breite. Die Deutlichkeit
+   aus Als Vorgabe (17.8.: groessere Schrift, inaktiv nicht ausgegraut,
+   kraeftige Markierung) bleibt — der aktive Reiter ist jetzt eine volle
+   Flaeche statt eines Unterstrichs. */
+.auth-screen .auth-rumpf .auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: var(--auth-feld);
+  border: 2px solid var(--auth-linie);
+}
+.auth-screen .auth-rumpf .auth-tabs .tab {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 9px 0;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  text-align: center;
+  color: var(--text);
+  opacity: .62;
+  background: transparent;
+  text-shadow: none;
+}
+.auth-screen .auth-rumpf .auth-tabs .tab:hover { opacity: .9; background: rgba(255, 255, 255, .05); }
+.auth-screen .auth-rumpf .auth-tabs .tab.active {
+  opacity: 1;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--auth-feld));
+  box-shadow: inset 0 -3px 0 var(--accent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* Eingabefelder: dunkel und einheitlich. Der Autofill-Block haelt
+   Chromes hellblaue Fuellung fern (dein Screenshot: „Kingzi\" auf
+   hellblauem Grund) — der riesige Innenschatten uebermalt sie, der
+   Uebergang verzoegert ihr Wiederauftauchen. */
+.auth-rumpf .input {
+  background: var(--auth-feld);
+  border: 2px solid var(--auth-linie);
+  color: var(--text);
+  padding: 11px 12px;
+}
+.auth-rumpf .input::placeholder { color: var(--auth-leise); opacity: 1; }
+.auth-rumpf .input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.auth-rumpf .input:-webkit-autofill,
+.auth-rumpf .input:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-feld) inset;
+  box-shadow: 0 0 0 1000px var(--auth-feld) inset;
+  transition: background-color 99999s ease-out;
+}
+.auth-rumpf .input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-feld) inset, 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 1000px var(--auth-feld) inset, 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  transition: background-color 99999s ease-out;
+}
+
+/* Hilfezeile unter dem Passwort: so hoch wie ein Feld (unsichtbares
+   Feld darin), der Link oben rechts. */
+.auth-zeile-hilfe { display: grid; }
+.auth-zeile-hilfe > * { grid-area: 1 / 1; }
+.auth-zeile-hilfe > .input { visibility: hidden; pointer-events: none; }
+.auth-zeile-hilfe > .auth-link { justify-self: end; align-self: center; font-size: 12px; }
+
+/* Telefon quer: engere Polster, sonst wie oben. */
+@media (max-height: 600px) {
+  .auth-screen .auth-header { padding: 8px 12px 6px; }
+  .auth-rumpf { padding: 10px 14px 12px; }
+  .auth-screen .auth-rumpf .auth-tabs { margin-bottom: 8px; }
+  .auth-screen .auth-rumpf .auth-tabs .tab { padding: 6px 0; }
+  .auth-rumpf .auth-or--konto { margin: 6px 0 6px; }
 }

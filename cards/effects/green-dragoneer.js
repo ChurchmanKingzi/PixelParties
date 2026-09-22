@@ -69,7 +69,7 @@
 //  damit Gate und Bezahlung nie auseinanderlaufen.
 // ═══════════════════════════════════════════
 
-const { isDragoDeath } = require('./_drago-shared');
+const { isDragoDeath, isDragoCreatureName } = require('./_drago-shared');
 const { canHeroSummon } = require('./_summon-eligibility');
 
 const CARD_NAME = 'Green Dragoneer';
@@ -130,10 +130,13 @@ module.exports = {
         // eines Dragos SEINER Seite.
         if ((tributeInst.controller ?? tributeInst.owner)
             !== (sourceInst.controller ?? sourceInst.owner)) return false;
+        // ★ v1267: ueber die EINE Auslegungsstelle (`_drago-shared`,
+        // Teilstring im ganzen Namen, Gross-/Kleinschreibung zaehlt).
+        // Vorher `/Drago/i` auf dem ARCHETYP — das war tot, solange keine
+        // Karte den Archetyp trug, und haette ab v1267 Dragsparov und den
+        // Dragon Pilot uebersehen, die „Drago" nur im Namen tragen.
         try {
-          const db = engine?._getCardDB ? engine._getCardDB() : {};
-          const cd = db[tributeInst.name];
-          return !!cd && /Drago/i.test(cd.archetype || '');
+          return isDragoCreatureName(engine, tributeInst.name);
         } catch { return false; }
       },
       valuePerTrigger: 12,

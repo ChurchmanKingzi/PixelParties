@@ -1284,7 +1284,15 @@ function PlayScreen() {
   }, [lobby, gameState, creating, joinTarget]);
 
   // === GAME BOARD VIEW ===
-  if (gameState) {
+  // ★ v1263 (Als Befund 21.9., Rematch im Online-PvP: „can't access
+  // property deckSkins, opp is undefined"): Beim Rematch kommt fuer einen
+  // Moment ein Spielzustand mit nur EINEM Spieler an (der Raum wird neu
+  // aufgesetzt, die zweite Seite haengt noch nicht drin). GameBoard
+  // greift in seinen Hooks fest auf beide Spieler zu — es darf erst
+  // rendern, wenn beide da sind; solange bleibt die Lobby stehen.
+  const spielbereit = !!(gameState && Array.isArray(gameState.players)
+    && gameState.players.length >= 2 && gameState.players[0] && gameState.players[1]);
+  if (gameState && spielbereit) {
     return <GameBoard gameState={gameState} lobby={lobby} onLeave={leaveRoom} decks={decks} sampleDecks={sampleDecks} selectedDeck={selectedDeck} setSelectedDeck={setSelectedDeck} cubeMatchInfo={cubeMatchInfo} />;
   }
 
@@ -2307,7 +2315,16 @@ function _bgmResolveTrack(target) {
  * bei 1280x720 dann 0.80.
  */
 function UiScaler() {
-  React.useEffect(() => {
+  // ★★ v1265: `useLayoutEffect` statt `useEffect`. UiScaler haengt erst
+  // nach dem Laden im Baum — im SELBEN Commit wie das Hauptmenue. Mit
+  // `useEffect` lief das Setzen von `--ui-scale` NACH dem
+  // `useLayoutEffect` des Menues, das seine Lage deshalb ohne Zoom mass:
+  // die Oberkante der Menuekaesten lag bei gleichem Layout je nach Fenster
+  // bei 84 (1366×768), 150 (1600×900) oder 240 px (1920×1080), bei kleinen
+  // Fenstern ragte die Kopfzeile hinein. Layout-Effekte laufen in
+  // Baumreihenfolge, UiScaler steht vor den Bildschirmen — so ist der Zoom
+  // gesetzt, bevor irgendein Bildschirm misst.
+  React.useLayoutEffect(() => {
     const BEZUG_B = 1600, BEZUG_H = 900;
     const MIN = 0.70, MAX = 1.60;
     const setzen = () => {

@@ -856,12 +856,17 @@ function playSFXForLog(entry) {
       // generic spell_cast would otherwise win the 'effect' dedupe slot
       // and suppress the specific potion cue.
       if (ct === 'Artifact') { playSFX('placement'); return; }
+      // ★ v1263 (Als Befund 21.9.: „Elixir of Immortality spielt beim
+      // Ausspielen keinen Sound"). Permanents hatten keinen eigenen
+      // Klang — Potions verlassen sich auf ihre Zonen-Animation, ein
+      // Permanent hat keine. `placement` wie beim Artefakt.
+      if (ct === 'Permanent') { playSFX('placement'); return; }
       return;
     }
     case 'immediate_action': {
       const ct = entry.cardType;
       if (ct === 'Spell') { playSFX('spell_cast', { category: 'effect' }); return; }
-      if (ct === 'Artifact') { playSFX('placement'); return; }
+      if (ct === 'Artifact' || ct === 'Permanent') { playSFX('placement'); return; }
       return; // Creature handled by 'creature_summoned'; Potions rely on zone-anim sound
     }
 
@@ -3032,6 +3037,51 @@ function CardFoil({ card, foilType }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  GLANZBAND + LOTSE (v1264)
+//
+//  Al, 22.9.: der Schriftzug im Hauptmenue soll „einen Sheen haben, der
+//  darueber wandert, wie der Foil-Effekt mancher Karten"; der Gast-
+//  Knopf im Login und der Tutorial Raccoon im Gastmodus sollen leuchten
+//  und denselben Sheen tragen, um neue Spieler dorthin zu lotsen.
+//
+//  EIN Baustein fuer alle drei Stellen, damit Laufzeit, Winkel und Kern
+//  des Lichtstreifens nicht dreimal auseinanderlaufen. Der Streifen ist
+//  derselbe wie das Glanzband der Foil-Karten: gleiche Keyframes
+//  (`foilSweepLoop`), gleicher heisser Kern, `screen`-Mischung. Er
+//  animiert nur `transform` und `opacity` — das uebernimmt der
+//  Compositor (Lehre aus der Ruckel-Episode v470, siehe `.btn`).
+//
+//  Der Wirt braucht `position: relative` (oder absolute). Form und
+//  Maske kommen ueber `klasse` (`pp-glanz--logo` maskiert auf die
+//  Buchstaben des Schriftzugs).
+// ═══════════════════════════════════════════════════════════════════
+function GlanzBand({ klasse }) {
+  return (
+    <span className={'pp-glanz' + (klasse ? ' ' + klasse : '')} aria-hidden="true">
+      <span className="pp-glanz-band" />
+    </span>
+  );
+}
+
+/**
+ * Lotsen-Hervorhebung: pulsierender Schein AUSSEN um den Wirt plus das
+ * Glanzband darueber. Der Wirt traegt die Klasse `pp-lotse` (setzt
+ * `position: relative` und die Farbe `--lotse-farbe`); dieser Baustein
+ * liefert nur die beiden Schichten. Der Schein pulsiert ueber
+ * `opacity` eines festen Schattens — nicht ueber `box-shadow` selbst,
+ * das muesste jeden Frame neu gezeichnet werden.
+ */
+function LotsenGlanz() {
+  return (
+    <>
+      <span className="pp-lotse-schein" aria-hidden="true" />
+      <GlanzBand />
+    </>
+  );
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 //  ★ v1206 — ZONEN-EINSCHLAG (Als Vorgabe 18.9.)
 //
@@ -4599,7 +4649,13 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
     const bl = s.blinded || c.blinded;
     badges.push({
       key: 'blinded', icon: '👁️', className: 'status-blinded',
-      tooltip: BLIND_TEXT + dur(bl, 'blinded'),
+      // ★ v1262 (Als Befund 21.9.): Smoke Vial blendet bis zum Ende des
+      // NAECHSTEN ZUGS DES WERFERS (`expiresAtTurn: turn + 3`, geprueft
+      // zu Beginn des Gegnerzugs danach) — der allgemeine Text
+      // „…its owner's turn" behauptete das Gegenteil.
+      tooltip: BLIND_TEXT + (bl && bl.source === 'Smoke Vial'
+        ? " Wears off at the end of the next turn of the player who threw the vial."
+        : dur(bl, 'blinded')),
       duration: (() => { const r = restrundenFuer('blinded', bl); return r > 1 ? r : null; })(),   // v1163
     });
   }
@@ -5923,6 +5979,8 @@ window.FoilOverlay = FoilOverlay;
 // `scripts/check-foil.js` haelt das fest. `useFoilBands` ist mit v1204
 // entfallen: die Baender laufen jetzt per CSS, es gibt keinen Hook mehr.
 window.CardFoil = CardFoil;
+window.GlanzBand = GlanzBand;      // v1264
+window.LotsenGlanz = LotsenGlanz;  // v1264
 // ★ v1206: Zonen-Einschlag. Kampfbrett und Puzzle-Editor rufen
 // dieselbe Funktion — es gibt nur EINE Stelle, die den Effekt kennt.
 window.spawnZoneLandFx = spawnZoneLandFx;

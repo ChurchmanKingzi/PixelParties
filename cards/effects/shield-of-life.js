@@ -66,6 +66,11 @@ module.exports = {
       const target = ctx.target;
       const source = ctx.source;
       const dmgType = ctx.type;
+      // ★ v1263 (Als Vorgabe 21.9.): NICHT bei 0 eingehendem Schaden
+      // ausloesen — „takes damage" heisst mindestens 1 (Monami-Bauform:
+      // `realDealt` ist der tatsaechlich verbuchte Betrag, `amount` der
+      // Ruf; beide muessen ≥ 1 sein).
+      if (!(((ctx.realDealt ?? ctx.amount) || 0) >= 1)) return;
 
       if (!target || target.hp === undefined) return;
 

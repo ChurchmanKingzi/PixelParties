@@ -38,9 +38,12 @@ const MAX_X = 3;
 const MAX_CREATURE_LEVEL = 3;
 
 /** Fragt X ab und legt es auf der Instanz ab. */
-async function frageX(engine, inst) {
+async function frageX(engine, inst, festesX = null) {
   const pi = inst.controller ?? inst.owner;
-  const wahl = await engine.promptGeneric(pi, {
+  // ★ v1263 (Als Vorgabe 21.9.): wird die Karte durch einen EFFEKT
+  // angelegt (Bill, Treasure Hunter's Backpack — Placement/Verschiebung
+  // statt Ausspielen), gibt es keine Wahl: X = 1, also Kosten 10.
+  const wahl = festesX != null ? { optionId: String(festesX) } : await engine.promptGeneric(pi, {
     type: 'optionPicker',
     title: CARD_NAME,
     showCard: CARD_NAME,
@@ -83,7 +86,8 @@ module.exports = {
       // Schon gesetzt (Rueckkehr aufs Brett, Puzzle-Vorgabe)? Dann nicht
       // erneut fragen — X gehoert zur Karte, nicht zum Eintritt.
       if (inst.counters?.levelGapCoverage) return;
-      await frageX(ctx._engine, inst);
+      // v1263: per Effekt angelegt → X = 1 ohne Frage (siehe frageX).
+      await frageX(ctx._engine, inst, (ctx._isPlacement || ctx._isMove) ? 1 : null);
     },
   },
 

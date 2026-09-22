@@ -28,7 +28,30 @@
 // ════════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const Babel = require('./vendor/babel.min.js');
+
+// ★★ v1264 — NEU BAUEN NACH INHALT, NICHT NACH UHRZEIT.
+// Anlass (22.9.): im hochgeladenen Build war `dist/app-board.js` VERALTET
+// — sechs v1263-Fixes aus `app-board.jsx` fehlten im ausgelieferten
+// Bundle (dieselbe Fehlerklasse wie v495, 18.8.). Das Sicherheitsnetz
+// dagegen, `buildAll()` beim Serverstart, griff nicht: es entschied nach
+// Aenderungszeit, und das Bundle war 9 s JUENGER als seine Quelle
+// (Entpacken setzt Zeitstempel in Archivreihenfolge). Ein veraltetes
+// Bundle mit frischem Zeitstempel ueberlebte damit jeden Neustart.
+//
+// Jetzt traegt jedes Bundle in Zeile 1 den Hash seiner Quelle
+// (`/* pp-quelle sha1:… */`, fuer den Browser ein Kommentar). Gebaut
+// wird, wenn das Bundle fehlt oder der Hash nicht zur Quelle passt —
+// egal, welche Datei die juengere ist. Bundles ohne Kopfzeile (alles vor
+// v1264) werden beim ersten Start einmal neu gebaut.
+// `BUILD_FORMAT` hochzaehlen, wenn sich die Transformation aendert
+// (Presets, Plugins, Optionen) — dann baut alles einmal neu.
+const BUILD_FORMAT = 1;
+function quellHash(src) {
+  return crypto.createHash('sha1').update('fmt' + BUILD_FORMAT + '\n').update(src).digest('hex');
+}
+function kopfzeile(src) { return `/* pp-quelle sha1:${quellHash(src)} */\n`; }
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const DIST_DIR = path.join(PUBLIC_DIR, 'dist');
@@ -74,16 +97,26 @@ function compileOne(name) {
   // way the old concatenated <script> realm did. block-scoping keeps every
   // declaration a hoisted `var`, so redeclarations across files are legal
   // and bare-global cross-file references resolve.
-  const wrapped = `${code}\n`;
+  const wrapped = kopfzeile(src) + `${code}\n`;
   fs.writeFileSync(outPath(name), wrapped);
   return wrapped.length;
 }
 
-// Only recompile when the source is newer than its built output.
+// Recompile when the output is missing or was built from other source
+// (v1264: content hash in line 1 instead of mtime — see top of file).
 function needsBuild(name) {
   const o = outPath(name);
   if (!fs.existsSync(o)) return true;
-  return fs.statSync(srcPath(name)).mtimeMs > fs.statSync(o).mtimeMs;
+  let erste = '';
+  try {
+    const fd = fs.openSync(o, 'r');
+    const buf = Buffer.alloc(128);
+    const n = fs.readSync(fd, buf, 0, 128, 0);
+    fs.closeSync(fd);
+    erste = buf.slice(0, n).toString('utf8').split('\n')[0];
+  } catch (_) { return true; }
+  const src = fs.readFileSync(srcPath(name), 'utf8');
+  return erste !== kopfzeile(src).trimEnd();
 }
 
 function buildAll({ force = false, quiet = false } = {}) {

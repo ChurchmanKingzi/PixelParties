@@ -40,6 +40,7 @@
 const { hasCardType } = require('./_hooks');
 const { waehleAusNamen } = require('./_future-tech-shared');
 const { ASCENSION_ITEMS, hasEquipped, checkRiffelAscension } = require('./_riffel-shared');
+const { istAusruestTraeger, freieBasisZonen, ruesteAusStapelAus } = require('./_equip-shared');
 
 const CARD_NAME = 'Future Tech Gunslinger Riffel';
 
@@ -78,6 +79,10 @@ function kandidaten(gs, pi, heroIdx, engine) {
     if ((cd.subtype || '') !== 'Equipment') continue;   // „equippable"
     if (!imDeck.has(name)) continue;                    // Kopie im Deck noetig
     if (schonAngelegt(ps, heroIdx, name)) continue;
+    // v1268: kartenseitige Ausruest-Beschraenkung (Crusader's & Co.) —
+    // ohne diese Pruefung waere die Wahl erlaubt, das Anlegen danach aber
+    // nicht (`_equip-shared`).
+    if (!istAusruestTraeger(engine, pi, heroIdx, name)) continue;
     out.add(name);
   }
   return [...out];
@@ -149,32 +154,20 @@ module.exports = {
     if (!name) return false;                       // Abbruch kostet nichts
 
     // Die Kopie kommt aus dem DECK, nicht aus der Ablage.
-    const deckIdx = (ps.mainDeck || []).indexOf(name);
-    if (deckIdx < 0) return false;                 // zwischenzeitlich weg
-    const slots = freieSlots(ps, heroIdx);
-    if (slots.length === 0) return false;
-    const slot = slots[0];
+    if (!(ps.mainDeck || []).includes(name)) return false;   // zwischenzeitlich weg
+    const slot = freieBasisZonen(ps, heroIdx)[0];
+    if (slot == null) return false;
 
-    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
-    ps.supportZones[heroIdx][slot] = [name];
-    const inst = engine._trackCard(name, pi, 'support', heroIdx, slot);
-
-    // Sichtbarer Weg Deck → Support (Als Regel: jede Bewegung zwischen
-    // Stapeln wird animiert). Bauform aus `_idej-shared.js`.
-    engine._broadcastEvent('play_pile_transfer', {
-      owner: pi, cardName: name,
-      from: 'deck', to: 'support',
-      toHeroIdx: heroIdx, toSlotIdx: slot,
-    });
-    engine.sync();
-    await engine._delay(520);
+    // ★ v1268: ueber den gemeinsamen Ausruestweg (`_equip-shared`). Neu
+    // dadurch: das `onPlay` der Ausruestung feuert (ihre Dauerwirkung —
+    // Blade of the Frostbringers ATK-Bonus steht NUR dort und fehlte bei
+    // Riffel bisher), und das Surprise-Fenster beim Ausruesten oeffnet
+    // wie beim Handweg (vorher `_skipReactionCheck`). Flug Deck → Zone
+    // wie bisher.
+    const inst = await ruesteAusStapelAus(engine, pi, 'deck', name, heroIdx, slot, { source: CARD_NAME });
+    if (!inst) return false;
 
     engine.shuffleDeck(pi, 'main');                // „Search your deck"
-
-    await engine.runHooks('onCardEnterZone', {
-      enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx,
-      _skipReactionCheck: true,
-    });
 
     engine.log('ft_gunslinger_riffel', {
       player: ps.username, card: name, heroIdx, slot,

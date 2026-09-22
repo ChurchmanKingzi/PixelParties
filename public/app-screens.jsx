@@ -7,6 +7,7 @@ const { api, socket, AppContext, CardMini, cardImageUrl,
         typeColor, skinImageUrl, CardTooltipContent, isDeckLegal } = window;
 const { ALL_CARDS, CARDS_BY_NAME, AVAILABLE_CARDS, AVAILABLE_MAP, SKINS_DB } = window;
 const { useAntoniaPresent, setAntoniaPresent, tutorialStartsWithAntonia } = window;
+const { GlanzBand, LotsenGlanz } = window;   // v1264: Glanzband + Lotsen-Schein
 
 // Eye / eye-off glyphs for the password show/hide toggle.
 const EyeIcon = () => (
@@ -224,6 +225,80 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
 //  the auth panel and is pointer-events:none.
 // ═══════════════════════════════════════════
 const ANIM_LAYERS_DIR = '/data/animated_screen/layers2/';
+
+// ── ZUSCHNITT DER KULISSEN-EBENEN (v1265, Al 22.9.: „der Login-Screen
+// ruckelt") ─────────────────────────────────────────────────────────────
+// Jede Figur liegt als eigenes 1920×1080-Bild vor, fast ganz transparent,
+// und wurde bisher als VOLLBILD-Ebene (`inset: 0`) animiert. Zehn davon
+// plus die Explosion bewegen sich staendig — der Compositor musste also
+// in jedem Frame elf volle Bildschirmflaechen verrechnen, von denen je
+// nur 1–38 % etwas zeigen. Ohne Grafikbeschleunigung (Als Opera zeigte
+// im August „Software only") ist genau das der Hauptposten.
+//
+// Jetzt ist jede Ebene nur so gross wie ihr sichtbarer Inhalt (Rahmen
+// unten, in Buehnenpixeln). Bild, Lage und Drehpunkt werden so
+// umgerechnet, dass das Ergebnis PIXELGLEICH bleibt: `background-size`
+// streckt das ganze Bild wieder auf Buehnengroesse, `background-position`
+// schiebt den Ausschnitt an seinen Platz, `transform-origin` wird von
+// Buehnen- in Rahmenprozent uebersetzt. Die Verzerrung auf Fenstern, die
+// nicht 16:9 sind (`100% 100%`), bleibt ebenfalls erhalten.
+//
+// ★ Wer ein Ebenenbild austauscht, traegt hier den neuen Rahmen ein
+// (Alpha-Huellkasten, z.B. `PIL.Image.open(f).split()[-1].getbbox()`).
+// Fehlt ein Eintrag, faellt die Ebene auf das alte Vollbild zurueck —
+// richtig, nur teurer.
+const ANIM_BUEHNE_B = 1920, ANIM_BUEHNE_H = 1080;
+const ANIM_SPRITE_RAHMEN = {
+  'angel.png':      [0, 0, 788, 603],
+  'blonde.png':     [92, 283, 689, 1080],
+  'cat_bottom.png': [0, 428, 172, 536],
+  'cat_mid.png':    [582, 215, 832, 373],
+  'cat_top.png':    [353, 0, 544, 96],
+  'explosion.png':  [609, 18, 1484, 806],
+  'golem.png':      [1138, 74, 1920, 1080],
+  'hammer.png':     [1135, 0, 1920, 577],
+  'horned.png':     [1157, 390, 1920, 1080],
+  'ninja.png':      [0, 303, 828, 1033],
+  'rabbit.png':     [403, 479, 752, 803],
+};
+/**
+ * Stil einer Kulissen-Ebene: auf den sichtbaren Rahmen zugeschnitten,
+ * sonst identisch zur alten Vollbild-Ebene. `extra` wie bisher (Animation,
+ * Bewegungsvariablen, `transformOrigin` in BUEHNEN-Prozent); `versatzX`
+ * verschiebt die ganze Ebene waagerecht (vorher per `inset`).
+ */
+function animEbene(file, extra = {}, { versatzX } = {}) {
+  const url = "url('" + ANIM_LAYERS_DIR + file + "')";
+  const r = ANIM_SPRITE_RAHMEN[file];
+  const { transformOrigin, ...rest } = extra;
+  if (!r) {
+    return { position: 'absolute', inset: 0, willChange: 'transform',
+      background: url + ' center / 100% 100% no-repeat',
+      ...(transformOrigin ? { transformOrigin } : {}), ...rest,
+      ...(versatzX ? { left: versatzX, right: `calc(-1 * ${versatzX})` } : {}) };
+  }
+  const RAND = 2;   // Buehnenpixel Luft um den Alpha-Kasten (Kantenglaettung)
+  const x0 = Math.max(0, r[0] - RAND), y0 = Math.max(0, r[1] - RAND);
+  const x1 = Math.min(ANIM_BUEHNE_B, r[2] + RAND), y1 = Math.min(ANIM_BUEHNE_H, r[3] + RAND);
+  const l = x0 / ANIM_BUEHNE_B, t = y0 / ANIM_BUEHNE_H;
+  const w = (x1 - x0) / ANIM_BUEHNE_B, h = (y1 - y0) / ANIM_BUEHNE_H;
+  const pct = (v) => (v * 100).toFixed(4) + '%';
+  const [ox, oy] = (transformOrigin || '50% 50%').split(/\s+/).map(v => parseFloat(v) / 100);
+  return {
+    position: 'absolute',
+    left: versatzX ? `calc(${pct(l)} + ${versatzX})` : pct(l),
+    top: pct(t), width: pct(w), height: pct(h),
+    willChange: 'transform',
+    backgroundImage: url,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: `${pct(1 / w)} ${pct(1 / h)}`,
+    // Prozent-Position: Punkt p des Bildes liegt auf Punkt p des Kastens —
+    // fuer den Versatz −l·Buehne gilt p = l / (1 − w).
+    backgroundPosition: `${w < 1 ? pct(l / (1 - w)) : '0%'} ${h < 1 ? pct(t / (1 - h)) : '0%'}`,
+    transformOrigin: `${pct((ox - l) / w)} ${pct((oy - t) / h)}`,
+    ...rest,
+  };
+}
 function AnimatedTitleBackdrop() {
   // 46 randomized rising embers, generated once (see README §7).
   const embers = useMemo(() => {
@@ -241,15 +316,10 @@ function AnimatedTitleBackdrop() {
       };
     });
   }, []);
-  // Helper: a full-frame art layer stretched to fill the viewport exactly
-  // (size 100% 100%). Unlike `cover` this never crops — on a short (non-16:9)
-  // windowed viewport it squashes vertically so every sprite stays fully
-  // visible; at true 16:9 (fullscreen) there's no distortion.
-  const layer = (file, extra) => ({
-    position: 'absolute', inset: 0, willChange: 'transform',
-    background: "url('" + ANIM_LAYERS_DIR + file + "') center / 100% 100% no-repeat",
-    ...extra,
-  });
+  // Ebenen: `animEbene` (oben) — zugeschnitten, sonst wie die alten
+  // Vollbild-Ebenen (Streckung `100% 100%`, auf Nicht-16:9-Fenstern
+  // gestaucht statt beschnitten).
+  const layer = animEbene;
   return (
     <div className="anim-backdrop" aria-hidden="true">
       <div className="anim-shake">
@@ -275,9 +345,14 @@ function AnimatedTitleBackdrop() {
         <div className="anim-vignette" />
         {/* 1 — hammer girl */}
         <div style={layer('hammer.png', { transformOrigin: '72% 28%', '--mx': '0.469vw', '--my': '-1.389vh', '--mr': '2deg', animation: 'ab-floaty 4.2s ease-in-out -0.6s infinite' })} />
-        {/* 2 — explosion core moved OUT of the backdrop: it now renders inside
-            the auth panel (above the box's dithered surface, below the form
-            controls). See `.auth-panel-explosion` in AuthScreen / style.css. */}
+        {/* 2 — Explosionskern. ★ v1266 (Al 22.9.: „das Login-Menue ist
+            nicht schoen"): wieder HIER, in der Kulisse, statt im Kasten ueber
+            dessen Flaeche. Dort lag der gelb-rote Kern direkt hinter den
+            Eingabefeldern und zwang jeden Text in Pixel-Umrisse. Jetzt liegt
+            der Kasten davor; sichtbar bleibt der Kern im Kunstfenster oben
+            (hinter dem Logo) und seitlich um den Kasten herum. Ebene,
+            Drehpunkt und Takt wie zuvor. */}
+        <div className="anim-explosion" style={layer('explosion.png', { transformOrigin: '52% 42%', animation: 'ab-coreTether 4.8s ease-in-out infinite' })} />
         {/* 3 — central bloom */}
         <div className="anim-bloom" />
         {/* 4 — Broghan (right shooter), nudged flush to the right edge */}
@@ -344,11 +419,7 @@ function AnimatedTitleBackdrop() {
 const KATZE_LINKS = '8vw';
 
 function AnimatedTitleCatsOverlay() {
-  const layer = (file, extra) => ({
-    position: 'absolute', inset: 0, willChange: 'transform',
-    background: "url('" + ANIM_LAYERS_DIR + file + "') center / 100% 100% no-repeat",
-    ...extra,
-  });
+  const layer = animEbene;   // v1265: zugeschnittene Ebenen, siehe oben
   return (
     <div className="anim-cats-front" aria-hidden="true">
       <div className="anim-shake">
@@ -358,6 +429,7 @@ function AnimatedTitleCatsOverlay() {
             darueber — seit dem groesseren Zoom (v466) zu dominant.
             Al: „muss weiter links platziert werden."
 
+            (v1265: jetzt `versatzX` in `animEbene` — ueber `left`.)
             Verschoben ueber `inset` statt ueber `transform`: die Ebene
             traegt eine laufende `ab-floaty`-Animation, und die
             ueberschreibt jedes inline gesetzte `transform`. `inset` ist
@@ -368,7 +440,7 @@ function AnimatedTitleCatsOverlay() {
 
             KATZE_LINKS ist die einzige Stellschraube: groesser =
             weiter weg vom Kasten. */}
-        <div style={layer('cat_mid.png', { inset: `0 ${KATZE_LINKS} 0 -${KATZE_LINKS}`, transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' })} />
+        <div style={layer('cat_mid.png', { transformOrigin: '37% 30%', '--mx': '-0.573vw', '--my': '0.833vh', '--mr': '-3deg', animation: 'ab-floaty 2.9s ease-in-out -0.8s infinite' }, { versatzX: `-${KATZE_LINKS}` })} />
         <div style={layer('cat_bottom.png', { transformOrigin: '5% 48%', '--mx': '0.833vw', '--my': '-1.111vh', '--mr': '4deg', animation: 'ab-floaty 3.0s ease-in-out -1.7s infinite' })} />
       </div>
     </div>
@@ -655,6 +727,21 @@ function AuthScreen() {
   if (mode === 'login' || mode === 'signup') {
     body = (
       <>
+        {/* ★★ v1264 (Al 22.9.): „Der ‚Try as Guest'-Button sollte
+            hochwandern und deutlich prominenter sein, um potentielle neue
+            Spieler direkt dorthin zu fuehren." Er steht jetzt als ERSTES
+            unter dem Logo, ueber die volle Breite, mit Lotsen-Schein und
+            Foil-Glanz (`pp-lotse` + `LotsenGlanz`, dieselbe Hervorhebung
+            wie der Tutorial Raccoon danach im Gastmodus — der Weg ist
+            durchgehend markiert). Anmelden/Registrieren folgt darunter. */}
+        <div className="auth-gast">
+          <button className="btn btn-big pp-lotse auth-gast-btn" onClick={submitGuest} disabled={loading}>
+            <LotsenGlanz />
+            <span className="auth-gast-titel">▶ TRY AS GUEST · vs CPU</span>
+          </button>
+          <div className="auth-fine auth-gast-hinweis">No account needed — you play with a starter deck.</div>
+        </div>
+        <div className="auth-or auth-or--konto">or</div>
         {/* Reiterbalken VOR dem Formular ueber die volle Kastenbreite
             (v836, Als Rueckmeldung: im Telefon-Layout sass er in der linken
             Spalte und damit nicht mehr mittig unter dem Logo). marginBottom
@@ -669,55 +756,47 @@ function AuthScreen() {
             <>
               <input className="input" placeholder="Username or Email" value={identifier} autoComplete="username"
                 onChange={e => setIdentifier(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} />
-              {/* PLATZHALTER statt fester Pixelhoehe (Als Befund 17.8.:
-                  „wechselt man zwischen den Reitern, wechselt die Hoehe des
-                  kompletten Menue-Interfaces"). Anmelden hat eine Eingabe
-                  weniger als Registrieren — hier steht deshalb eine echte,
-                  unsichtbare Eingabe. Sie ist exakt so hoch wie die fehlende
-                  Zeile, ohne dass irgendwo eine Zahl hinterlegt werden muss:
-                  `.input` hat keine feste Hoehe, sie ergibt sich aus
-                  Schriftgroesse und Innenabstand. Ein hartkodierter Wert waere
-                  bei jeder Schrift- oder Zoomaenderung wieder falsch.
-                  `aria-hidden` + `tabIndex={-1}`: unsichtbar heisst hier auch
-                  fuer Tastatur und Screenreader nicht vorhanden. */}
-              <div aria-hidden="true" style={{ visibility: 'hidden', pointerEvents: 'none' }}>
-                <input className="input" tabIndex={-1} readOnly value="" onChange={() => {}} />
-              </div>
             </>
           ) : (
             <>
               <input className="input" placeholder="Username" value={username} autoComplete="username" maxLength={10}
                 onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
-              <input className="input" type="email" placeholder="Email" value={email} autoComplete="email"
+              {/* v1266: der Hinweis auf den Bestaetigungscode steht im
+                  Platzhalter (vorher eine eigene, zweizeilige Fusszeile);
+                  der naechste Schritt sagt ohnehin, wohin der Code ging. */}
+              <input className="input" type="email" placeholder="Email — we'll send you a code" value={email} autoComplete="email"
                 onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitSignup()} />
             </>
           )}
           <PasswordInput value={password} onChange={setPassword} placeholder="Password"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             onEnter={mode === 'login' ? submitLogin : submitSignup} />
+          {/* ★ v1266: GLEICHE HOEHE DURCH BAUART. Anmelden hat ein Feld
+              weniger als Registrieren; die fehlende Zeile belegt jetzt der
+              Passwort-Link, rechtsbuendig unter dem Passwort — dort, wo man
+              ihn sucht. Die Zeile ist so hoch wie ein Eingabefeld, weil
+              darin ein unsichtbares steht (Begruendung vom 17.8.: keine
+              feste Pixelzahl, `.input` ergibt sich aus Schrift und
+              Innenabstand). Damit entfallen der Hoehenausgleich am
+              Kastenende und die Fusszeile — beide Reiter sind gleich hoch,
+              ohne leere Flaeche. */}
+          {mode === 'login' && (
+            <div className="auth-zeile-hilfe">
+              <input className="input" aria-hidden="true" tabIndex={-1} readOnly value="" onChange={() => {}} />
+              <span className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
+                Forgot your password?
+              </span>
+            </div>
+          )}
           {Msgs}
           <button className="btn btn-big" onClick={mode === 'login' ? submitLogin : submitSignup} disabled={loading}>
             {loading ? '...' : mode === 'login' ? 'LOG IN' : 'SIGN UP'}
           </button>
-          {/* Beide Fusszeilen teilen sich EIN Fach fester Mindesthoehe.
-              Sonst bliebe ein Resthuepfer: der Hinweis beim Registrieren
-              kann zweizeilig umbrechen, der Passwort-Link ist immer
-              einzeilig. 34px entsprechen zwei Zeilen à 11.5px bei
-              Zeilenhoehe 1.5. */}
-          <div className="auth-footer">
-            {mode === 'login' ? (
-              <div className="auth-link" onClick={() => { setEmail(identifier.includes('@') ? identifier : ''); setMode('forgot'); }}>
-                Forgot your password?
-              </div>
-            ) : (
-              <div className="auth-fine">We'll email you a 6-digit code to confirm your address.</div>
-            )}
-          </div>
         </div>
         <div className="auth-form-alt">
           {window.GOOGLE_CLIENT_ID && (
             <>
-              <div className="auth-or">— or —</div>
+              <div className="auth-or">or</div>
               {isDesktop ? (
                 <div style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }}>
                   <button
@@ -743,11 +822,6 @@ function AuthScreen() {
               )}
             </>
           )}
-          <div className="auth-or">— or —</div>
-          <button className="btn btn-big" onClick={submitGuest} disabled={loading}>
-            ▶ TRY AS GUEST · vs CPU
-          </button>
-          <div className="auth-fine" style={{ textAlign: 'center' }}>Jump into a match with a Starter Deck — no account needed.</div>
         </div>
       </div>
       </>
@@ -840,20 +914,16 @@ function AuthScreen() {
           (same 10s clock). Kept separate from the panel so its .animate-in
           entrance transform isn't clobbered by the shake transform. */}
       <div className="auth-panel-shake" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="panel animate-in auth-panel">
-          {/* Explosion — a full-viewport, scene-aligned layer that renders ABOVE
-              the box's dithered surface but BELOW the form controls. It stays a
-              child of the panel (overflow:visible) so it rides the same
-              auth-panel-shake clock as the backdrop and stays in sync with the
-              scene; the wrapper handles viewport-centering while the inner core
-              reproduces the backdrop layer (inset:0 + ab-coreTether) exactly. */}
-          <div className="auth-panel-explosion" aria-hidden="true">
-            <div className="auth-panel-explosion__core" />
-          </div>
-          {/* Form controls sit above the explosion (z-index:2). */}
+        {/* ★ v1266: der Kasten als KARTE — oben ein Kunstfenster (Logo vor
+            dem Explosionskern der Kulisse, `.auth-header`), darunter ein
+            deckender Textkasten mit dem Formular (`.auth-rumpf`). Rahmen
+            und Eck-Zier wie die Menuekaesten (`pp-eckzier`). */}
+        <div className="panel animate-in auth-panel pp-eckzier">
           <div className="auth-panel-content">
             {Header}
-            {body}
+            <div className="auth-rumpf">
+              {body}
+            </div>
           </div>
         </div>
       </div>
@@ -1232,22 +1302,42 @@ function PixelParticles({
   driftY = 40,
   dauerMin = 1.8,
   dauerSpanne = 3.4,
+  // ★ v1264 (SC-Glitzer): `radial` — Start nahe der MITTE der Schicht,
+  // Flugrichtung rundum statt nach oben (eine Quelle, die Funken
+  // „ausstoesst"). `farben` — eigene Palette statt Spielerfarbe/Weiss.
+  // Ohne beide Angaben verhaelt sich die Komponente exakt wie bisher.
+  radial = false,
+  farben = null,
 }) {
   const particles = useMemo(() => {
     const arr = [];
     for (let i = 0; i < anzahl; i++) {
       const dur = dauerMin + Math.random() * dauerSpanne;
+      let top, left, dx, dy;
+      if (radial) {
+        const winkel = Math.random() * Math.PI * 2;
+        const weite = 0.45 + Math.random() * 0.55;
+        top = 50 + (Math.random() * 2 - 1) * 12;
+        left = 50 + (Math.random() * 2 - 1) * 12;
+        dx = Math.cos(winkel) * driftX * weite;
+        dy = Math.sin(winkel) * driftY * weite;
+      } else {
+        top = Math.random() * 100;
+        left = Math.random() * 100;
+        dx = (Math.random() * 2 - 1) * driftX;
+        dy = -(14 + Math.random() * driftY);
+      }
       arr.push({
-        top:   Math.random() * 100,
-        left:  Math.random() * 100,
+        top, left,
         size:  minGroesse + Math.floor(Math.random() * (maxGroesse - minGroesse)),
         dur,
         delay: -Math.random() * dur,                     // negativ → mitten im Zyklus starten
-        dx:    (Math.random() * 2 - 1) * driftX,
-        dy:    -(14 + Math.random() * driftY),
+        dx, dy,
         max:   0.7 + Math.random() * 0.3,
         // Ueberwiegend Spielerfarbe, ein Drittel weiss fuer den Funkeleffekt.
-        color: Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)',
+        color: farben
+          ? farben[Math.floor(Math.random() * farben.length)]
+          : (Math.random() < 0.34 ? '#ffffff' : 'var(--player-color, #00f0ff)'),
       });
     }
     return arr;
@@ -1284,6 +1374,31 @@ function LogoParticles() {
 }
 
 /**
+ * ★ v1264 (Al 22.9.): „das SC-Icon sollte Glitzer-Particles ausstossen."
+ * Dieselbe Partikel-Mechanik wie um den Schriftzug, aber als Quelle:
+ * die Funken starten auf der Muenze und fliegen rundum davon. Gold- und
+ * Weisstoene statt Spielerfarbe — es ist Geld, kein Spielerabzeichen.
+ * Die Form (Pixel-Kreuz) und der Takt stehen in style.css
+ * (`.pp-sc-glitzer-teil`).
+ */
+const SC_GLITZER_FARBEN = ['#fff6b0', '#ffd700', '#ffe766', '#ffffff'];
+function ScGlitzer() {
+  return <PixelParticles
+    anzahl={22}
+    klasse="pp-sc-glitzer"
+    teilchenKlasse="pp-sc-glitzer-teil"
+    radial
+    farben={SC_GLITZER_FARBEN}
+    minGroesse={4}
+    maxGroesse={10}
+    driftX={36}
+    driftY={30}
+    dauerMin={1.1}
+    dauerSpanne={1.2}
+  />;
+}
+
+/**
  * Hinter dem gesamten Menue: weiter gestreut, groessere Teilchen,
  * laengere Wege — sonst wirkt dieselbe Dichte auf Bildschirmgroesse wie
  * Rauschen. Die Schicht liegt fest im Fenster und wird abgeschaltet,
@@ -1301,6 +1416,18 @@ function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
     dauerMin={5}
     dauerSpanne={9}
   />;
+}
+
+/**
+ * v1265: Zoomfaktor eines Elements — gezeichnete Breite durch Layout-
+ * Breite. Unter `zoom` (--ui-scale) sind Rechtecke gezeichnete Pixel,
+ * Stilwerte Layout-Pixel; wer misst und dann setzt, teilt durch diesen
+ * Faktor. Am Element selbst gemessen, damit auch verschachtelte Zooms
+ * stimmen.
+ */
+function menuZoomFaktor(el, rect) {
+  const r = rect || el.getBoundingClientRect();
+  return (el.offsetWidth > 0 && r.width > 0) ? r.width / el.offsetWidth : 1;
 }
 
 // ═══════════════════════════════════════════
@@ -1381,7 +1508,15 @@ function MainMenu() {
     // natural centered position, so there's a generous gap under the top
     // row; the slack is taken from the bottom margin.
     const MENU_VERTICAL_DROP = 40;
-    setMenuTopPad(Math.max(0, childRect.top - screenRect.top) + MENU_VERTICAL_DROP);
+    // ★★ v1265: EINHEITEN UNTER `zoom` (dieselbe Falle wie der
+    // Editor-Scaler, siehe CARD_API). `.screen-center` traegt
+    // `zoom: var(--ui-scale)`; Rechtecke liefern GEZEICHNETE Pixel, das
+    // Polster hier ist aber ein CSS-Wert in LAYOUT-Pixeln. Ungeteilt lag
+    // die Oberkante der Kaesten bei gleichem Layout je nach Fenster bei
+    // 84 (1366×768), 150 (1600×900) oder 240 px (1920×1080) — bei
+    // kleinen Fenstern ragte die Kopfzeile in die Kaesten.
+    const z = menuZoomFaktor(screenEl, screenRect);
+    setMenuTopPad(Math.max(0, (childRect.top - screenRect.top) / z) + MENU_VERTICAL_DROP);
   }, [menuTopPad]);
   // Once the menu's vertical anchor is locked in, measure where the
   // button strip (menu-body) begins and how tall it is, so the side
@@ -1392,8 +1527,11 @@ function MainMenu() {
     if (menuTopPad === null || !screenRef.current || !menuBodyRef.current) return;
     const screenRect = screenRef.current.getBoundingClientRect();
     const bodyRect = menuBodyRef.current.getBoundingClientRect();
-    setPanelTop(Math.max(0, bodyRect.top - screenRect.top));
-    setPanelHeight(Math.round(bodyRect.height));
+    // v1265: in Layout-Pixel umrechnen — `top`/`height` der Seitenkaesten
+    // und der Logo-Huelle sind CSS-Werte (siehe oben).
+    const z = menuZoomFaktor(screenRef.current, screenRect);
+    setPanelTop(Math.max(0, (bodyRect.top - screenRect.top) / z));
+    setPanelHeight(Math.round(bodyRect.height / z));
   }, [menuTopPad]);
   // Reset the anchor on viewport resize so a window-size change still
   // looks centered when collapsed. The next layout effect re-measures
@@ -1765,6 +1903,10 @@ function MainMenu() {
           <LogoParticles />
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
           <div className="pp-logo-tint" aria-hidden="true"></div>
+          {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
+              Schriftzug, auf die Buchstaben maskiert (style.css,
+              `.pp-glanz--logo`). */}
+          <GlanzBand klasse="pp-glanz--logo" />
         </div>
       </div>
       {/* ── OBEN LINKS (v836): Statistik-Plaketten und Name/Avatar in EINER
@@ -1781,9 +1923,15 @@ function MainMenu() {
       <div className="menu-stats">
         <div className="menu-stats-row">
           {/* ELO + SC stats (the name now lives above the avatar below). */}
-          <span className="badge menu-stat-badge" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)' }}>ELO {user.elo}</span>
-          <span className="badge menu-stat-badge menu-stat-badge--sc" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700' }}>
-            <img src="/data/sc.png" className="menu-stat-coin" /> {user.sc || 0}
+          {/* v1263 (Al 21.9.): Elo/SC „aufgehuebscht" — Plakettenform mit
+              Beschriftung, Glanz und Schlagschatten (CSS .menu-stat-badge). */}
+          {/* v1264 (Al 22.9.): dieselben inneren Pixel-Ecken wie die grossen
+              Menuekaesten (`pp-eckzier`, eine Definition fuer beide). */}
+          <span className="badge menu-stat-badge pp-eckzier" style={{ background: 'color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface))', color: 'var(--player-color, #00f0ff)' }}>
+            <span className="menu-stat-label">⚔ ELO</span><span className="menu-stat-value">{user.elo}</span>
+          </span>
+          <span className="badge menu-stat-badge menu-stat-badge--sc pp-eckzier" style={{ background: 'color-mix(in srgb, #ffd700 12%, var(--menu-surface))', color: '#ffd700' }}>
+            <span className="menu-stat-coin-wrap"><img src="/data/sc.png" className="menu-stat-coin" /><ScGlitzer /></span><span className="menu-stat-label">SC</span><span className="menu-stat-value">{user.sc || 0}</span>
           </span>
         </div>
       </div>
@@ -1808,7 +1956,8 @@ function MainMenu() {
       <div className="menu-corner">
         <div className="menu-corner-row">
           <div className="menu-logout-confirm-wrap" style={{ position: 'relative' }}>
-            <button className="btn menu-logout-btn" style={{ padding: '7px 22px', fontSize: 13 }} onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
+            {/* v1263 (Al 21.9.): so hoch wie Elo/SC-Plakette (46 px), Breite skaliert mit — Masse in .menu-logout-btn--gross */}
+            <button className="btn menu-logout-btn menu-logout-btn--gross" onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
             {logoutConfirm && (
               /* Eine Nummer groesser (Als Vorgabe 17.8.): Rahmen 2px,
                  mehr Innenabstand, Text 15 statt 12, Knoepfe 13 statt 11.
@@ -4394,7 +4543,9 @@ function SingleplayerScreen() {
       <div className="top-bar" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
         <button className="btn" onClick={onBack}>← BACK</button>
         {user?.isGuest && (
-          <button className="btn" style={{ padding: '5px 16px', fontSize: 13 }} onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
+          // v1265 (Al 22.9.): so hoch wie BACK — die Inline-Verkleinerung
+          // (5/16 px) ist raus, beide nehmen das `.btn`-Grundmass (v1260).
+          <button className="btn" onClick={() => setShowRegister(true)}>★ REGISTER NOW!</button>
         )}
         <h2 className="orbit-font" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)' }}>CHOOSE OPPONENT!</h2>
         <div style={{ flex: 1 }} />
@@ -4470,6 +4621,11 @@ function SingleplayerScreen() {
             {showRaccoon && (
               <button
                 key="__tutorial_raccoon"
+                // ★ v1264 (Al 22.9.): im Gastmodus genauso hervorgehoben
+                // wie der Gast-Knopf im Login — Schein + Foil-Glanz, damit
+                // der neue Spieler vom ersten Klick an derselben Spur folgt.
+                // Die Kachel ist ohnehin nur fuer Gaeste sichtbar.
+                className="pp-lotse vscpu-raccoon"
                 disabled={starting}
                 onClick={() => setTutorialBrowserOpen(true)}
                 title="Tutorial Raccoon — learn how to play"
@@ -4490,6 +4646,7 @@ function SingleplayerScreen() {
                 onMouseEnter={e => { if (!starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + racColor + '88'; } }}
                 onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + racColor + '44'; }}
               >
+                <LotsenGlanz />
                 <HeroArtCrop heroName="Smug Mastermind Antonia" width={240} />
                 <div className="orbit-font" style={{ fontSize: 16, color: racColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   Tutorial Raccoon

@@ -24176,7 +24176,203 @@ function schedulePlaySideDeckAppear(selector, slotBaseIdx, count) {
   setTimeout(() => requestAnimationFrame(tryFire), 0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  ★★ v1262 — RESULT CEREMONY (Als Vorgabe 21.9.)
+//  „Ein Sieg soll sich GROSS anfuehlen, wie bei einem Gacha-Game."
+//
+//  Ablauf (Staffelung ueber `stufe`):
+//    0  Hintergrund faehrt auf, Titel faellt Buchstabe fuer Buchstabe
+//    1… je ein Reward-Kasten: Pop, Funkenburst, `gold_gain`, Zaehler
+//    E  Elo-Aenderungen (falls vorhanden), dann Deck-Auswahl + Knoepfe
+//  Ein Klick auf den Hintergrund springt sofort ans Ende. Spielt der
+//  Zuschauer oder ein Gast, gibt es keine eigenen Rewards — dann laeuft
+//  nur Titel → Ende (und `extra` zeigt die alte Zusammenfassung).
+// ═══════════════════════════════════════════════════════════════
+function ResultCeremony({ won, spectator, title, subtitle, rewards, total, eloChanges, myName, extra, children }) {
+  const n = rewards.length;
+  const ENDE = n + 1;
+  const [stufe, setStufe] = useState(0);
+  const [zaehler, setZaehler] = useState(0);
+  const fertig = stufe >= ENDE;
+  const phone = !!(window.ppIsPhone && window.ppIsPhone());
+  // Staffelung
+  useEffect(() => {
+    if (fertig) return;
+    const wartezeit = stufe === 0 ? 1400 : 720;
+    const t = setTimeout(() => setStufe(s => s + 1), wartezeit);
+    return () => clearTimeout(t);
+  }, [stufe, fertig]);
+  // Klang + Zaehler pro Reward
+  useEffect(() => {
+    if (stufe < 1 || stufe > n) return;
+    if (window.playSFX) window.playSFX('gold_gain', { dedupe: 40 });
+    const ziel = rewards.slice(0, stufe).reduce((a, r) => a + (r.amount || 0), 0);
+    let lauf = zaehler;
+    const iv = setInterval(() => {
+      lauf += 1;
+      if (lauf >= ziel) { lauf = ziel; clearInterval(iv); }
+      setZaehler(lauf);
+    }, 45);
+    return () => clearInterval(iv);
+  }, [stufe]);
+  useEffect(() => {
+    if (fertig && n > 0) {
+      setZaehler(total);
+      if (window.playSFX) window.playSFX('shop_purchase', { dedupe: 300 });
+    }
+  }, [fertig]);
+  const ueberspringen = () => { if (!fertig) setStufe(ENDE); };
+  const farbe = spectator ? '#ffd700' : (won ? '#ffd700' : '#ff5577');
+  // ★ v1263 (Al 21.9.): „Player-Namen und Avatare UEBER dem Background,
+  // genau wie die Sprechblasen." Die echten Cluster sitzen in den
+  // Handzeilen (Ebenen 400 / 10000) und koennen ihre Stapelkontexte nicht
+  // verlassen — deshalb werden sie beim Aufgehen der Zeremonie geklont
+  // und an exakt derselben Fensterposition ueber den Hintergrund gelegt.
+  // Die End-Sprechblasen (10090) ankern an denselben Rechtecken.
+  const klonRef = useRef(null);
+  useEffect(() => {
+    const wirt = klonRef.current;
+    if (!wirt) return;
+    wirt.innerHTML = '';
+    for (const sel of ['.game-hand-opp .game-hand-info', '.game-hand-me .game-hand-info']) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const klon = el.cloneNode(true);
+      klon.removeAttribute('id');
+      klon.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;transform:none;margin:0;pointer-events:none;display:flex;align-items:center;`;
+      wirt.appendChild(klon);
+    }
+  }, []);
+  const buchstaben = String(title).split('');
+  return (
+    <div className={'pp-cer' + (won ? ' pp-cer-win' : ' pp-cer-lose')} onClick={ueberspringen}>
+      <div className="pp-cer-streifen" />
+      <div className="pp-cer-vignette" />
+      <div className="pp-cer-klone" ref={klonRef} aria-hidden="true" />
+      {won && !phone && (
+        <div className="pp-cer-sterne">
+          {Array.from({ length: ppFxN(28) }).map((_, i) => (
+            <i key={i} style={{ left: (Math.random() * 100) + '%', top: (Math.random() * 100) + '%',
+              animationDelay: (Math.random() * 4) + 's', animationDuration: (2.5 + Math.random() * 3) + 's' }} />
+          ))}
+        </div>
+      )}
+      <div className="pp-cer-inhalt" onClick={e => e.stopPropagation()}>
+        <div className="pp-cer-titel pixel-font" style={{ color: farbe }}>
+          {buchstaben.map((b, i) => (
+            <span key={i} className="pp-cer-buchstabe" style={{ animationDelay: (i * 55) + 'ms' }}>{b === ' ' ? '\u00a0' : b}</span>
+          ))}
+        </div>
+        {subtitle && <div className="pp-cer-unter">{subtitle}</div>}
+        {n > 0 && (
+          <div className="pp-cer-rewards">
+            {rewards.map((r, i) => (
+              <div key={r.id || i} className={'pp-cer-reward' + (stufe > i ? ' pp-cer-reward-da' : '')}>
+                {stufe > i && !phone && (
+                  <div className="pp-cer-burst" aria-hidden="true">
+                    {Array.from({ length: ppFxN(12) }).map((_, k) => (
+                      <i key={k} style={{ '--bw': (k * 30) + 'deg' }} />
+                    ))}
+                  </div>
+                )}
+                <div className="pp-cer-reward-titel">{r.title}</div>
+                <div className="pp-cer-reward-text">{r.description || ''}</div>
+                <div className="pp-cer-reward-betrag">+{r.amount} <img src="/data/sc.png" alt="SC" /></div>
+              </div>
+            ))}
+          </div>
+        )}
+        {n > 0 && stufe >= 1 && (
+          <div className="pp-cer-summe">
+            <span className="pp-cer-summe-zahl">{zaehler}</span>
+            <img src="/data/sc.png" alt="SC" />
+            <span className="pp-cer-summe-text">earned</span>
+          </div>
+        )}
+        {extra}
+        {fertig && eloChanges && (
+          <div className="pp-cer-elo pp-cer-fade">
+            {eloChanges.map(ec => (
+              <div key={ec.username} style={{ color: ec.username === myName ? 'var(--text)' : 'var(--text2)' }}>
+                {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
+                {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
+              </div>
+            ))}
+          </div>
+        )}
+        {fertig && <div className="pp-cer-fade">{children}</div>}
+        {!fertig && <div className="pp-cer-hinweis">click to skip</div>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  HOVERN DURCH DEN DIALOG-SCHLEIER (v1270)
+//
+//  Al, 22.9. (nice-to-have): Karten auf dem Brett sollen auch „durch den
+//  Schleier hindurch" gehovert werden koennen und ihren Tooltip zeigen.
+//
+//  Den Schleier einfach durchlaessig zu machen (`pointer-events: none`)
+//  ginge nicht: dann liefen KLICKS aufs Brett — Ziehvorgaenge, Aktivie-
+//  rungen — waehrend ein Dialog offen ist, und der Klick auf den Schleier
+//  wuerde abbrechbare Dialoge nicht mehr abbrechen. Weitergereicht wird
+//  deshalb NUR das Hovern: bewegt sich die Maus ueber dem Schleier selbst
+//  (nicht ueber dem Dialogkasten), sucht dieser Hook das Element darunter
+//  im Kampffeld und schickt ihm `mouseover`/`mouseout` — dieselben
+//  Ereignisse wie ein echter Hover. React leitet daraus `onMouseEnter`/
+//  `onMouseLeave` ab; die vorhandene Tooltip-Logik aller Brettkarten
+//  greift also unveraendert, ohne dass eine Zone davon wissen muss.
+//  Gilt fuer JEDEN `.modal-overlay` im Kampf (Galerien, Bestaetigungen,
+//  Wahl-Dialoge …). CSS-`:hover`-Effekte bleiben aus — die setzt nur der
+//  echte Zeiger; hier geht es um die Tooltips.
+// ═══════════════════════════════════════════════════════════════════
+function useHoverDurchSchleier() {
+  useEffect(() => {
+    let durch = null;   // Element unter dem Schleier, das gerade „gehovert" ist
+    const unterSchleier = (x, y, schleier) => {
+      for (const el of document.elementsFromPoint(x, y)) {
+        if (el === schleier || schleier.contains(el)) continue;
+        // Nur das Kampffeld (Brett und Haende) — kein anderer Dialog,
+        // keine Leisten ausserhalb.
+        return el.closest('.game-layout') ? el : null;
+      }
+      return null;
+    };
+    const sende = (el, typ, bezug, e) => {
+      try {
+        el.dispatchEvent(new MouseEvent(typ, {
+          bubbles: true, cancelable: true, view: window,
+          relatedTarget: bezug || null, clientX: e.clientX, clientY: e.clientY,
+        }));
+      } catch { /* ein fehlender Knoten darf den Zeiger nicht kippen */ }
+    };
+    // Jeder Wechsel ist EIN `mouseout` vom alten zum neuen Element. React
+    // leitet Betreten UND Verlassen aus `mouseout` + `relatedTarget` ab;
+    // ein `mouseover`, dessen Herkunft ein React-Element ist, wertet es
+    // bewusst gar nicht aus (im Test: verschluckter Wiedereintritt).
+    // Ohne vorheriges Element ist der Schleier selbst die Herkunft.
+    const onMove = (e) => {
+      const t = e.target;
+      const schleier = t?.classList?.contains('modal-overlay') ? t : null;
+      const neu = schleier ? unterSchleier(e.clientX, e.clientY, schleier) : null;
+      if (neu === durch) return;
+      const von = (durch && durch.isConnected) ? durch : t;
+      const zu = neu || t;
+      if (von !== zu) sende(von, 'mouseout', zu, e);
+      durch = neu;
+    };
+    document.addEventListener('mousemove', onMove, true);
+    return () => {
+      document.removeEventListener('mousemove', onMove, true);
+      durch = null;
+    };
+  }, []);
+}
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
+  useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
   const isSpectator = gameState.isSpectator || false;
   const myIdx = gameState.myIndex;
@@ -25458,6 +25654,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const deckRect = deckEl?.getBoundingClientRect();
         if (deckRect && handCards.length > 0) {
           const newAnims = [];
+          // v1263: abgelaufene Eintraege (> 2,5 s) verwerfen — siehe onDeckSearchAdd.
+          const _jetzt = Date.now();
+          deckSearchPendingRef.current = deckSearchPendingRef.current
+            .filter(e => (typeof e === 'string') || (_jetzt - (e.t || 0)) < 2500);
           const deckSearchPending = deckSearchPendingRef.current;
           for (let i = 0; i < newCount - prevCount; i++) {
             // Target the last card(s) in the hand — new cards appear at the end
@@ -25476,7 +25676,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             const fanRot = (targetRect.rot || 0) + 'deg';
             // If this is a deck-searched card, show face-up in the normal draw animation
             if (deckSearchPending.length > 0) {
-              const searchCardName = deckSearchPending.shift();
+              const _e = deckSearchPending.shift();
+              const searchCardName = typeof _e === 'string' ? _e : _e.cardName;
               newAnims.push({
                 id: Date.now() + Math.random() + i,
                 startX: sx, startY: sy,
@@ -30028,10 +30229,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // ein Held, der in die Kette greift (Key), loest die Karte ab, auf
     // die er reagiert, statt sich daneben zu stellen.
     const onReveal = ({ cardName, sfx, replace }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName }]); };
-    const onDeckSearchAdd = ({ cardName, playerIdx }) => {
+    const onDeckSearchAdd = ({ cardName, playerIdx, castOnly }) => {
       // If the OPPONENT searched, prepare face-up draw animation
-      if (playerIdx !== myIdx) {
-        deckSearchPendingRef.current = [...deckSearchPendingRef.current, cardName];
+      if (playerIdx !== myIdx && !castOnly) {
+        // ★ v1263 (Als Befund 21.9.: „eine gezogene Karte nimmt das
+        // Aussehen der zuvor gespielten Karte an — bei Kazena wie bei
+        // anderen Zieh-Effekten"). Die Warteschlange fuer offene
+        // Ziehfluege wurde von JEDEM `deck_search_add` gefuellt, aber nur
+        // beim naechsten Wachsen der Gegnerhand geleert. Ging die Karte
+        // NICHT in die Hand (aus dem Deck gewirkt, z. B. Sacrifice to
+        // Divinity → Divinity), blieb ihr Name liegen und der naechste
+        // gewoehnliche Zug bekam ihr Gesicht. Eintraege tragen jetzt
+        // einen Zeitstempel und verfallen nach 2,5 s (siehe Verbraucher).
+        deckSearchPendingRef.current = [...deckSearchPendingRef.current, { cardName, t: Date.now() }];
       }
     };
     // Reaction chain events
@@ -33018,8 +33228,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('tempeste_rain_stop', onTempesteRainStop);
     // Tempeste single-strike redirect line — same SFX as Gathering
     // Storm's distant rumble so the redirect reads as a thunderclap.
-    const onTempesteRedirectStrike = () => {
-      if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 120, category: 'effect' });
+    // ★ v1263 (Als Befund 21.9.): „Prophecy of Tempeste spielt nur einen
+    // Sound, zeigt aber keine Animation, an der man die Umleitung
+    // nachvollziehen koennte." Jetzt ein Blitzstrahl vom urspruenglichen
+    // Ziel zum Traeger (Zonen beider Helden), plus die Kamera; der
+    // Strahl-Handler spielt den Blitzklang selbst (`bolt`).
+    const onTempesteRedirectStrike = ({ fromOwner, fromHeroIdx, toOwner, toHeroIdx } = {}) => {
+      if (fromOwner == null || toOwner == null || fromHeroIdx == null || toHeroIdx == null || fromHeroIdx < 0) {
+        if (window.playSFX) window.playSFX('elem_lightning', { dedupe: 120, category: 'effect' });
+        return;
+      }
+      onBeamAnimation({
+        sourceOwner: fromOwner, sourceHeroIdx: fromHeroIdx,
+        targetOwner: toOwner, targetHeroIdx: toHeroIdx,
+        color: '#7fd4ff', duration: 900, thickness: 4, bolt: true, glow: true,
+      });
     };
     socket.on('tempeste_redirect_strike', onTempesteRedirectStrike);
     // ── Creature damage absorbed-to-zero floater ──
@@ -33074,7 +33297,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('surprise_reset', onSurpriseReset);
     const onPermanentAnim = ({ owner, permId, type }) => {
-      if (window.playSFX) window.playSFX('ability_activate');
+      // ★ v1263 (Als Befund 21.9.: Elixir of Immortality beim Ausspielen
+      // stumm/zu leise): Permanent-Animationen spielten immer nur das
+      // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
+      // `revive`) galt nur fuer Zonen-Animationen. Jetzt derselbe Klang
+      // wie in der Zone, der leise Auftakt bleibt als Fallback.
+      if (window.playSFX) window.playSFX(type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
       const ownerLabel = owner === myIdx ? 'me' : 'opp';
       const el = document.querySelector(`[data-perm-id="${permId}"][data-perm-owner="${ownerLabel}"]`);
       if (el) playAnimation(type || 'holy_revival', el, { duration: 1200 });
@@ -34998,7 +35226,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const _reihe = srcIsMe ? '.game-hand-me' : '.game-hand-opp';
         const _handJetzt = document.querySelectorAll(`${_reihe} .hand-slot`).length
           || document.querySelectorAll(`${_reihe} .hand-card`).length;
-        const handHideKey = `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
+        // ★ v1262 (Als Befund 21.9., Elixir of Quickness: „eine Handkarte
+        // mit demselben Index wurde kurz unsichtbar"). Der Schluessel
+        // trug bisher nur Platz und Handgroesse — kamen die drei
+        // gezogenen Karten vor diesem Ereignis an, zeigte derselbe Platz
+        // auf eine NEUE Karte, die dann verdeckt wurde. Fuer die eigene
+        // Hand haengt jetzt zusaetzlich der Kartenname am Schluessel; der
+        // Renderer verdeckt nur, wenn auf dem Platz noch DIESE Karte liegt.
+        const handHideKey = srcIsMe
+          ? `${srcOwner}-${fromHandIdx}#${_handJetzt}@${cardName || ''}`
+          : `${srcOwner}-${fromHandIdx}#${_handJetzt}`;
         setBounceReturnHidden(prev => { const n = new Set(prev); n.add(handHideKey); return n; });
         // ★★ v1221 (Als Befund 18.9. zu „Dive Down\": die Karte erscheint
         // nach ihrem Flug kurz wieder in der Hand).
@@ -35046,10 +35283,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
 
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
-      const srcX = sr.left + sr.width  / 2;
-      const srcY = sr.top  + sr.height / 2;
-      const dx = (tr.left + tr.width  / 2) - srcX;
-      const dy = (tr.top  + tr.height / 2) - srcY;
+      // ★ v1262 — Weltverankerung auch fuer DIESEN Flug (v1258 hatte nur
+      // hand_to_board_fly und seine Schwester erfasst): liegt ein Ende im
+      // Feld, startet die Kopie in Feld-Koordinaten und haengt in der
+      // Welt-Schicht. dx/dy sind Differenzen und bleiben.
+      const _wA = window.ppFxWeltAnker ? window.ppFxWeltAnker(tgtEl) : { welt: false, dx: 0, dy: 0 };
+      const _wB = (!_wA.welt && window.ppFxWeltAnker) ? window.ppFxWeltAnker(srcEl) : _wA;
+      const _welt = _wA.welt ? _wA : _wB;
+      const srcX = sr.left + sr.width  / 2 + _welt.dx;
+      const srcY = sr.top  + sr.height / 2 + _welt.dy;
+      const dx = (tr.left + tr.width  / 2) - (sr.left + sr.width / 2);
+      const dy = (tr.top  + tr.height / 2) - (sr.top + sr.height / 2);
 
       // Bumped id (`-v2`) when adding the windstorm keyframe so existing
       // sessions with the old stylesheet (which only had `pileTransfer`
@@ -35327,7 +35571,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Befund „hovert kurz auf der Stelle". Zwei Quellen, zwei
       // richtige Antworten.
       const spawnFlight = () => {
-        document.body.appendChild(card);
+        (_welt.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
         setTimeout(() => card.remove(), durationMs + 100);
       };
       if (laneDelay > 0) {
@@ -38117,6 +38361,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const onPing = ({ ping, color }) => {
       const selector = buildPingSelector(ping);
       const id = Date.now() + Math.random();
+      // ★ v1263 (Als Befund 21.9.: „Die Ping-Highlights sind nicht
+      // angewinkelt wie die Karten"). Das Overlay lag als fixed-Kasten
+      // ueber dem ACHSENPARALLELEN Umriss der perspektivisch gekippten
+      // Karte. Jetzt haengt der Rahmen als Kind IN der Karte selbst und
+      // erbt deren Neigung und Drehung. Faellt das Ziel weg (kein
+      // Element), bleibt der alte fixed-Kasten als Rueckfall.
+      const ziel = document.querySelector(selector);
+      if (ziel) {
+        const rahmen = document.createElement('div');
+        rahmen.className = 'ping-flash ping-flash-inner';
+        rahmen.style.cssText = `position:absolute;inset:-3px;border-color:${color};box-shadow:0 0 16px ${color},0 0 32px ${color},inset 0 0 12px ${color};pointer-events:none;z-index:60;`;
+        const pos = getComputedStyle(ziel).position;
+        if (pos === 'static') ziel.style.position = 'relative';
+        ziel.appendChild(rahmen);
+        setTimeout(() => rahmen.remove(), 1200);
+        return;
+      }
       setPingAnims(prev => [...prev, { id, selector, color }]);
       setTimeout(() => setPingAnims(prev => prev.filter(p => p.id !== id)), 1200);
     };
@@ -39015,6 +39276,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // damit von Anfang an die volle Breite; wer mitlesen will, klappt
   // die Spalte auf.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  // ★ v1262 (Al 21.9.): „Wenn ich den Action Log ausklappe, soll er
+  // immer automatisch auf der untersten Nachricht stehen." Beim
+  // Aufklappen der Spalte (und des Log-Kastens) sofort ans Ende — ohne
+  // Weichzeichnung, damit nichts „hochrollt". Der Autoscroll beim
+  // Eintreffen neuer Zeilen (onActionLog) bleibt daneben bestehen.
+  useEffect(() => {
+    if (sidebarCollapsed || logCollapsed) return;
+    const el = actionLogRef.current;
+    if (!el) return;
+    const runter = () => { el.scrollTop = el.scrollHeight; };
+    runter();
+    const t = setTimeout(runter, 60);   // nach dem Aufklapp-Layout nochmal
+    return () => clearTimeout(t);
+  }, [sidebarCollapsed, logCollapsed]);
   const toggleLogCollapse = () => { setLogCollapsed(v => !v); if (chatCollapsed) setChatCollapsed(false); };
   const toggleChatCollapse = () => { setChatCollapsed(v => !v); if (logCollapsed) setLogCollapsed(false); };
 
@@ -39145,6 +39420,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'gate_activated') { const p = playerByName(entry.player); return <span>🛡️ {pName(p.name, p.color)} activated {cName(entry.card)}! Support Zones protected!</span>; }
       if (t === 'token_placed') { const p = playerByName(entry.player); return <span>{cName(entry.card)} placed on {pName(p.name, p.color)}'s {entry.hero}.</span>; }
       if (t === 'damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {entry.target}!</span>; }
+      // v1263 (Als Befund 21.9.): die Umleitung stand nie im Log — nur die
+      // Ankuendigung des urspruenglichen Ziels. Jetzt eine eigene Zeile.
+      if (t === 'prophecy_of_tempeste_redirect') { return <span className="log-damage">🌧️ {cName('Prophecy of Tempeste')} redirected <span className="log-amount">{entry.original}</span> damage from {entry.from} to {entry.to}{entry.applied !== entry.original ? <> (capped to <span className="log-amount">{entry.applied}</span>)</> : null}!</span>; }
       if (t === 'creature_damage') { return <span className="log-damage">{cName(entry.source)} dealt <span className="log-amount">{entry.amount}</span> to {cName(entry.target)}!</span>; }
       if (t === 'recoil') { return <span className="log-damage">{entry.hero} takes <span className="log-amount">{entry.amount}</span> recoil from {cName(entry.by)}!</span>; }
       if (t === 'creature_destroyed') { return <span className="log-damage">{cName(entry.card)} was defeated!</span>; }
@@ -43090,6 +43368,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         // v1063: abfliegende Handkarte — nur solange die Hand
                         // noch so gross ist wie beim Abflug (siehe onPileTransfer).
                         || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}`)
+                        // v1262: namensgebundene Verdeckung (siehe onPileTransfer)
+                        || bounceReturnHidden.has(`${myIdx}-${item.origIdx}#${hand.length}@${item.card || ''}`)
                       ) ? { visibility: 'hidden' } : null),
                     }}
                     onMouseDown={(e) => onHandMouseDown(e, item.origIdx)}
@@ -43218,15 +43498,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               </div>
             </div>
           )}
-          {!isSpectator && (
-            <div className="hand-actions">
-              <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
-              <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
+          {/* ★ v1270 (Al 22.9.: „das Gold-Interface ist zu gequetscht"):
+              Sort/Shuffle und Gold sind EINE rechtsbuendige Gruppe mit
+              festem Zwischenraum (`.hand-rechts`). Vorher standen beide
+              einzeln absolut mit festen Abstaenden — wurde das Gold
+              breiter (dreistellig, Schulden mit Minus), lief es in die
+              Knoepfe. Jetzt schiebt eine breitere Zahl die Knoepfe einfach
+              weiter nach links. */}
+          <div className="hand-rechts">
+            {!isSpectator && (
+              <div className="hand-actions">
+                <button className="btn hand-action-btn" onClick={sortHand} title="Sort hand by type, then name">Sort</button>
+                <button className="btn hand-action-btn" onClick={shuffleHand} title="Shuffle hand randomly">Shuffle</button>
+              </div>
+            )}
+            <div className="game-gold-display">
+              <span className="game-gold-icon">🪙</span>
+              <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
             </div>
-          )}
-          <div className="game-gold-display">
-            <span className="game-gold-icon">🪙</span>
-            <span className={'game-gold-value orbit-font' + (goldCrash ? (goldCrashTone === 'recover' ? ' gold-recovering' : ' gold-crashing') : '') + (goldIsNegative(goldCrash ? goldCrash[myIdx] : me.gold) ? ' gold-negative' : '')} data-gold-player={myIdx}>{formatGold(goldCrash ? goldCrash[myIdx] : me.gold)}</span>
           </div>
         </div>
 
@@ -45792,40 +46081,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         );
       })()}
 
-      {/* Win/Loss overlay — Bo1 or fallback */}
+      {/* ★★ v1262 — DIE SIEGES-/NIEDERLAGEN-ZEREMONIE (Als Vorgabe 21.9.:
+          „ein Sieg soll sich GROSS anfuehlen, wie bei einem Gacha-Game").
+          Opaker, farbiger Vollbild-Hintergrund, Titel mit Buchstaben-Drop,
+          die SC-Rewards einzeln mit Pop, Funkenburst und Klang, ein
+          hochzaehlender SC-Zaehler, zum Schluss die Knoepfe. Ein Klick auf
+          den Hintergrund ueberspringt die Staffelung. Deck-Auswahl und
+          Knoepfe sind unveraendert die bisherigen. */}
       {result && !result.isPuzzle && !showFirstChoice && (result.setOver || !result.format || result.format === 1) && !(result.format > 1) && (
-        <div className="modal-overlay" style={{ zIndex: 10080, background: 'rgba(0,0,0,.75)' }}>
-          <div className="animate-in" style={{ textAlign: 'center' }}>
-            <div className="pixel-font" style={{
-              fontSize: 36, marginBottom: 16,
-              color: isSpectator ? '#ffd700' : (iWon ? 'var(--success)' : 'var(--danger)'),
-              textShadow: isSpectator ? '0 0 40px rgba(255,215,0,.5)' : (iWon ? '0 0 40px rgba(51,255,136,.5)' : '0 0 40px rgba(255,51,102,.5)'),
-            }}>
-              {isSpectator ? `🏆 ${result.winnerName} WINS!` : (iWon ? 'YOU WIN!' : 'YOU LOSE')}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8 }}>
-              {isSpectator ? (
-                result.reason === 'disconnect_timeout' ? `${result.loserName} timed out` :
-                result.reason === 'surrender' ? `${result.loserName} surrendered` :
-                result.reason === 'all_heroes_dead' ? `All of ${result.loserName}'s heroes defeated!` : ''
-              ) : (
-                result.reason === 'disconnect_timeout' ? 'Opponent timed out' :
-                result.reason === 'opponent_left' ? 'Opponent left the game' :
-                result.reason === 'surrender' ? (iWon ? 'Opponent surrendered' : 'You surrendered') :
-                result.reason === 'all_heroes_dead' ? (iWon ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''
-              )}
-            </div>
-            {result.eloChanges && (
-              <div style={{ marginBottom: 20 }}>
-                {result.eloChanges.map(ec => (
-                  <div key={ec.username} style={{ fontSize: 12, color: ec.username === user.username ? 'var(--text)' : 'var(--text2)' }}>
-                    {ec.username}: {ec.oldElo} → <span style={{ color: ec.newElo > ec.oldElo ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{ec.newElo}</span>
-                    {' '}({ec.newElo > ec.oldElo ? '+' : ''}{ec.newElo - ec.oldElo})
-                  </div>
-                ))}
-              </div>
-            )}
-            {renderSCEarned()}
+        <ResultCeremony
+          won={!!iWon} spectator={!!isSpectator}
+          title={isSpectator ? `${result.winnerName} WINS!` : (iWon ? 'VICTORY' : 'DEFEAT')}
+          subtitle={(() => { const r = result; const w = iWon; return (
+            isSpectator ? (
+              r.reason === 'disconnect_timeout' ? `${r.loserName} timed out` :
+              r.reason === 'surrender' ? `${r.loserName} surrendered` :
+              r.reason === 'all_heroes_dead' ? `All of ${r.loserName}'s heroes defeated!` : ''
+            ) : (
+              r.reason === 'disconnect_timeout' ? 'Opponent timed out' :
+              r.reason === 'opponent_left' ? 'Opponent left the game' :
+              r.reason === 'surrender' ? (w ? 'Opponent surrendered' : 'You surrendered') :
+              r.reason === 'all_heroes_dead' ? (w ? 'All enemy heroes defeated!' : 'All your heroes were defeated') : ''
+            )); })()}
+          rewards={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.rewards || []) : []}
+          total={(!isSpectator && scEarned && !user?.isGuest) ? (scEarned.total || 0) : 0}
+          eloChanges={result.eloChanges || null}
+          myName={user?.username}
+          extra={(isSpectator || user?.isGuest) ? renderSCEarned() : null}>
             {!isSpectator && ((decks && decks.length > 0) || (sampleDecks || []).some(d => isDeckLegal(d).legal)) && (
               <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 <label style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>🃏 Deck:</label>
@@ -45868,10 +46150,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 <button className="btn btn-danger" style={{ padding: '12px 32px', fontSize: 14 }} onClick={handleLeave}>LEAVE</button>
               )}
             </div>
-          </div>
-        </div>
+        </ResultCeremony>
       )}
-
       {/* ── GROSSER KARTEN-AUFTRITT (1.8.) ──────────────────────────
           Terror beendet den Zug — die Karte erscheint einmal mittig,
           wächst über zwei Sekunden und blendet dabei aus. Rein

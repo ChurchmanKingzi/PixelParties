@@ -153,6 +153,14 @@ async function doJumpCascade(engine, pi) {
       fromHandIdx: removeIdx, asPlay: 'sole',
     });
     ps.hand.splice(removeIdx, 1);
+    // ★ v1262 (Als Befund 21.9.: „als der Gegner Jump in the River
+    // spielte, wurde die Karte nicht links neben dem Feld gezeigt").
+    // Die Karte laeuft ueber ihren Hand-Hook, nicht ueber die
+    // Spielpipeline — den Gegner-Reveal (`card_reveal`, links neben
+    // dem Feld) setzt aber nur die Pipeline. Hier von Hand nachgeholt:
+    // vormerken und sofort feuern, wie jede gespielte Karte.
+    engine.gs._pendingCardReveal = { cardName: 'Jump in the River', ownerIdx: pi };
+    engine._firePendingCardReveal();
     // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
     // Startplatz der abfliegenden Karte nur, solange die Hand noch so
     // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie

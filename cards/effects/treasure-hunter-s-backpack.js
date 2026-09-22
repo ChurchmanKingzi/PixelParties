@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════
 
 const { getCardDB: _getCardDB } = require('./_card-db');
+const { waehleAusruestPlatz, ausruestTraeger } = require('./_equip-shared');
 
 const CARD_NAME = "Treasure Hunter's Backpack";
 const MAX_EQUIP_COST = 50;
@@ -48,8 +49,10 @@ function buildEligibleGallery(gs, pi, engine) {
     // insgesamt nicht aktivierbar (siehe `canActivate` unten).
     // Ohne Engine (aeltere Aufrufer) bleibt es bei der alten,
     // ungefilterten Liste statt faelschlich alles zu sperren.
-    if (engine?.hasLegalEquipHero
-        && !engine.hasLegalEquipHero(cardName, pi, { requireFreeZone: true })) continue;
+    // v1268: dieselbe Traegerpruefung wie die Wahl danach
+    // (`_equip-shared`), sonst stuende eine Ausruestung zur Wahl, fuer
+    // die es dann keinen Helden gibt (gefroren / gecharmt).
+    if (engine && ausruestTraeger(engine, pi, cardName).length === 0) continue;
     seen.add(cardName);
     out.push({
       name: cardName, source: 'deck', cost,
@@ -121,65 +124,18 @@ module.exports = {
     if (deckIdx < 0) return { aborted: true };
 
     // ── Step 2: pick destination Hero / Support Zone ──
-    // ★ Ausruest-Beschraenkungen gelten auch hier (Al 19.8.): ein
-    // „Crusader's"-Artefakt darf nur an eine Cecilia, und nur eins je
-    // Held. Zentral ueber `engine.canEquipCardToHero`.
-    const destTargets = [];
-    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-      const hero = ps.heroes[hi];
-      if (!hero?.name || hero.hp <= 0) continue;
-      if (hero.statuses?.frozen) continue;
-      if (!engine.canEquipCardToHero(equipName, pi, hi)) continue;
-      let hasFree = false;
-      for (let si = 0; si < 3; si++) {
-        if (((ps.supportZones[hi] || [])[si] || []).length === 0) {
-          hasFree = true;
-          destTargets.push({
-            id: `equip-${pi}-${hi}-${si}`,
-            type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: '',
-          });
-        }
-      }
-      if (hasFree) {
-        destTargets.push({
-          id: `hero-${pi}-${hi}`, type: 'hero',
-          owner: pi, heroIdx: hi, cardName: hero.name,
-        });
-      }
-    }
-    if (destTargets.length === 0) return { aborted: true };
-
-    const destIds = await engine.promptEffectTarget(pi, destTargets, {
-      maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
+    // ★ v1268: Traegerregeln und Wahl kommen aus `_equip-shared.js` —
+    // derselben Stelle wie bei Riffel und der Weapon Collecting Wight.
+    // Inhaltlich wie bisher (lebendig, nicht Frozen, freie Zone,
+    // `canEquipCardToHero`), NEU: auch nicht Charmed — wie im Handweg.
+    const platz = await waehleAusruestPlatz(engine, pi, equipName, {
       title: `${CARD_NAME} — Equip ${equipName}`,
       description: `Select a Support Zone to equip ${equipName} to. The chosen Hero cannot perform an Action this turn.`,
       confirmLabel: '🎒 Equip!',
-      confirmClass: 'btn-info',
-      cancellable: true,
-      greenSelect: true,
-      exclusiveTypes: false,
-      maxPerType: { hero: 1, equip: 1 },
     });
-    if (!destIds || destIds.length === 0) return { aborted: true };
-
-    const dest = destTargets.find(t => t.id === destIds[0]);
-    if (!dest) return { aborted: true };
-
-    let destHeroIdx, destSlot;
-    if (dest.type === 'equip') {
-      destHeroIdx = dest.heroIdx;
-      destSlot    = dest.slotIdx;
-    } else {
-      destHeroIdx = dest.heroIdx;
-      // Auto-pick first free base zone for hero clicks
-      for (let si = 0; si < 3; si++) {
-        if (((ps.supportZones[destHeroIdx] || [])[si] || []).length === 0) {
-          destSlot = si;
-          break;
-        }
-      }
-      if (destSlot === undefined) return { aborted: true };
-    }
+    if (!platz) return { aborted: true };
+    const destHeroIdx = platz.heroIdx;
+    const destSlot = platz.slot;
 
     // Final validation: slot still free + deck still contains the equip
     if (((ps.supportZones[destHeroIdx] || [])[destSlot] || []).length > 0) return { aborted: true };

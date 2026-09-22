@@ -3774,6 +3774,10 @@ async function evaluateSCRewards(room, winnerIdx, reason) {
 
   for (let pi = 0; pi < 2; pi++) {
     const ps = gs.players[pi];
+    // ★ v1262: Die Auswertung laeuft jetzt auch fuer CPU-Partien (Als
+    // Vorgabe 21.9.). Die CPU hat kein Konto — sie ueberspringen, sonst
+    // schriebe die Buchung unten mit `user_id` undefined ins Log.
+    if (!ps?.userId) continue;
     const opp = gs.players[pi === 0 ? 1 : 0];
     const isWinner = pi === winnerIdx;
     const oppIp = pi === 0 ? ip1 : ip0;
@@ -4134,6 +4138,15 @@ function sendGameState(room, playerIdx, extra) {
   // Kette war also noch minutenlang am Aufloesen und hat in dieser
   // Zeit weiter Spielzustaende verschickt.
   if (room.engine?._aborted) return;
+  // ★ v1263 (Tester-Report 21.9.: „when i click play online after
+  // finishing a match, it puts me back in the match, but at the very
+  // start again"). Wer nach dem Ergebnis den Raum verlaesst, bleibt mit
+  // `left: true` im Spielzustand — sein socketId auch. Bat der Gegner
+  // dann um ein Rematch, setzte `request_rematch` den Raum neu auf und
+  // schickte den frischen Anfangszustand an BEIDE socketIds: der
+  // laengst gegangene Spieler bekam die neue Partie aufgedrueckt.
+  // Verlassene Spieler bekommen keinen Spielzustand mehr.
+  if (room.gameState?.players?.[playerIdx]?.left && room.gameState?.result == null) return;
   const p = room.players[playerIdx];
   if (!p?.socketId) return;
   const gs = room.gameState;
@@ -6088,17 +6101,36 @@ function endCpuBattle(room, winnerIdx, reason) {
     (gs.turn || 0) >= CPU_WIN_MIN_TURN &&
     humanPlayed >= CPU_WIN_MIN_CARDS;
 
-  if (eligible && winner?.userId) {
-    const userId = winner.userId;
-    const sid = winner.socketId;
-    gs.result.scAwarded = CPU_WIN_SC;
+  // ★★ v1262 (Als Vorgabe 21.9.): „Die SC-Rewards, die fuer CPU-Spieler
+  // fast komplett ausgeklammert sind, wieder vollstaendig zulassen." Bis
+  // hier gab es gegen die CPU genau EINE Pauschale (1 SC). Jetzt laeuft
+  // dieselbe Auswertung wie im PvP (`evaluateSCRewards` mit allen
+  // Schutzriegeln: Mindestdauer, Mindestzuege, Mindestkarten beider
+  // Seiten, Tageslimits) — die CPU zaehlt dabei ueber ihre fehlende IP
+  // als EIN Gegner pro Tag (Tageskappe 15 SC), was das Farmen deckelt.
+  // Die Pauschale bleibt als eigener Eintrag obendrauf, sie ist Teil
+  // des bisherigen Versprechens. Der Mensch sitzt in Einzelspieler-
+  // Partien immer auf Platz 0.
+  const humanUser = gs.players[0];
+  if (humanUser?.userId) {
+    const userId = humanUser.userId;
+    const sid = humanUser.socketId;
     (async () => {
       try {
-        await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [CPU_WIN_SC, userId]);
-        if (sid) io.to(sid).emit('sc_earned', {
-          rewards: [{ id: 'cpu_win', title: 'CPU Battle Victory', amount: CPU_WIN_SC }],
-          total: CPU_WIN_SC,
-        });
+        let entry = { rewards: [], total: 0 };
+        try {
+          const scResults = await evaluateSCRewards(room, winnerIdx, reason);
+          if (scResults[0]) entry = scResults[0];
+        } catch (err) {
+          console.error('[CPU battle] SC evaluation error:', err.message);
+        }
+        if (eligible) {
+          await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [CPU_WIN_SC, userId]);
+          entry.rewards.push({ id: 'cpu_win', title: 'CPU Battle Victory', amount: CPU_WIN_SC, description: 'Won a battle against the CPU.' });
+          entry.total += CPU_WIN_SC;
+        }
+        gs.result.scAwarded = entry.total;
+        if (entry.total > 0 && sid) io.to(sid).emit('sc_earned', entry);
         const updated = await db.get('SELECT wins, losses, elo, elo_cube, sc FROM users WHERE id = ?', [userId]);
         if (updated && sid) io.to(sid).emit('user_stats_updated', updated);
       } catch (err) {
@@ -14442,6 +14474,8 @@ io.on('connection', (socket) => {
     if (!room?.gameState?.result) return;
     if (!room.gameState.rematchRequests.includes(currentUser.userId))
       room.gameState.rematchRequests.push(currentUser.userId);
+    // v1263: nur ein Rematch, wenn BEIDE noch da sind (siehe sendGameState).
+    if (room.gameState.players.some(ps => ps.left)) { for (let i=0;i<2;i++) sendGameState(room, i); return; }
     if (room.gameState.rematchRequests.length >= 2) {
       const loserIdx = room.gameState.result.winnerIdx === 0 ? 1 : 0;
       // Set up fresh game state FIRST so both players see their new hands
