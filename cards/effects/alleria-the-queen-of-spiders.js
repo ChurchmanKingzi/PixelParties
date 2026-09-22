@@ -9,6 +9,7 @@
 //     cannot be reduced except by Surprises.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 module.exports = {
   activeIn: ['hero'],
   heroEffect: true,
@@ -48,7 +49,7 @@ module.exports = {
    */
   canHeroRedirect(gs, ownerIdx, heroIdx, selected, validTargets, config, engine, sourceCard) {
     // HOPT check
-    const hoptKey = `alleria_redirect:${ownerIdx}:${heroIdx}`;
+    const hoptKey = heldenSperreKey('alleria_redirect', ownerIdx);
     if (gs.hoptUsed?.[hoptKey] === gs.turn) return false;
     // v637: „for an Attack, Spell or Creature effect" — Helden-, Artefakt-,
     // Potion- und Ability-Effekte werden NICHT umgeleitet (Als Befund:
@@ -121,7 +122,7 @@ module.exports = {
 
     // Claim HOPT
     if (!gs.hoptUsed) gs.hoptUsed = {};
-    const hoptKey = `alleria_redirect:${ownerIdx}:${heroIdx}`;
+    const hoptKey = heldenSperreKey('alleria_redirect', ownerIdx);
     gs.hoptUsed[hoptKey] = gs.turn;
 
     // Spider animation: thread from original target to new target

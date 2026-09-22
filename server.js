@@ -7446,6 +7446,11 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   };
 
   try {
+    // ★ v1277: `_spellFreeAction` gehoert zu GENAU EINER Aufloesung — jeder
+    // Setzer ist das `onPlay` des Zaubers selbst. Ein Rest aus einem
+    // frueheren Weg (Befund: Bartas-Zweitguss von Fire Bolts) darf diesen
+    // Zauber nicht zur Freiaktion machen.
+    delete gs._spellFreeAction;
     const inst = room.engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
     if (charmedOwner != null) inst.heroOwner = charmedOwner;
 
@@ -7770,6 +7775,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     delete gs._spellExcludeTargets;
     delete gs._bartasSecondCast;
     delete gs._spellNegatedByEffect;
+    // v1277: beide Aktions-Flags sind oben ausgewertet — was danach noch
+    // steht (gesetzt in `afterSpellResolved`, Zweitguesse …), ist ein Rest.
+    delete gs._spellFreeAction;
+    delete gs._spellForcesActionConsume;
     delete gs._surpriseCheckedHeroes;
     delete gs._deferredRecoil;
     delete gs._ameShieldedHeroes;
@@ -9827,7 +9836,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       if (ok) availableEffects.push({ name: 'Mummy Token', script: mummyScript, inst: mummyInst, hoptKey });
     }
   } else if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
-    const hoptKey = `hero-effect:${hero.name}:${pi}:${heroIdx}`;
+    const hoptKey = room.engine.heroHoptKey(hero.name, pi);
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
       const inst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
       // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
@@ -9849,7 +9858,7 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
     if (ci.counters?._suppressEquipHooks) continue;
     const eqScript = loadCardEffect(ci.name);
     if (!eqScript?.heroEffect || !eqScript?.onHeroEffect) continue;
-    const hoptKey = `hero-effect:${ci.name}:${pi}:${heroIdx}`;
+    const hoptKey = room.engine.heroHoptKey(ci.name, pi);
     if (gs.hoptUsed?.[hoptKey] === gs.turn) continue;
     // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
     let ok = !room.engine.isHeroEffectBlockedByGraceShield(eqScript, pi);
@@ -11185,10 +11194,14 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   // Hand, findet nichts, und die Vorratskarte bliebe liegen.
   beginHandResolve(ps, cardName, handIndex, fromCreation);
 
-  // Hand-to-board fly animation for non-equipment, non-creature, non-targeting
-  // Artifacts (Normal / Reaction-with-proactivePlay). The destination is the
-  // permanents zone (or the board area if none renders yet).
-  broadcastHandToBoard(room, pi, { cardName, handIndex, zoneType: 'permanent' });
+  // ★ v1276 (Als Befund 22.9.: „ein nicht-zielendes Artifact wie Treasure
+  // Chest fliegt visuell erst zum mittleren Hero, ehe es resolved").
+  // Hier stand ein Hand→Brett-Flug mit Ziel „Permanents-Zone" fuer JEDES
+  // gewoehnliche Artefakt. Kein Artefakt wird aber zum Permanent (das tun
+  // nur vier Zauber/Traenke, per eigenem `permanents.push`) — und ohne
+  // gerenderte Permanents-Zeile fiel der Client auf den MITTLEREN HELDEN
+  // zurueck. Ein gewoehnliches Artefakt verhaelt sich jetzt wie ein Zauber:
+  // aufdecken (`_pendingCardReveal` unten), aufloesen, in die Ablage.
 
   try {
     if (!script.deferBroadcast) {
@@ -14745,8 +14758,18 @@ io.on('connection', (socket) => {
     // Pre-placed creatures should behave as if summoned last turn (no summoning sickness,
     // count for Alice's damage, etc.). init() sets turnPlayed = current turn (1), so
     // backdate all support zone instances to turn 0.
+    //
+    // ★ v1272 (Als Befund 22.9.: ein im Puzzle vorgesetztes „Skull Carpet
+    // Bombing" traf zum Zugende BEIDE Seiten, als waere es in diesem Zug
+    // gesetzt worden). Die Rueckdatierung galt nur fuer Support Zones —
+    // Surprises, Areas und Permanents behielten den Startzug und galten
+    // damit als „diesen Zug gelegt". Jetzt gilt die Regel „lag schon vor
+    // Spielbeginn" fuer ALLE Brettzonen, die zu Beginn eines normalen
+    // Spiels leer sind. Helden und Abilities bleiben unberuehrt — die
+    // gibt es auch im normalen Spiel ab dem Startzug.
+    const VOR_SPIELBEGINN = new Set(['support', 'surprise', 'area', 'permanent']);
     for (const inst of room.engine.cardInstances) {
-      if (inst.zone === 'support') inst.turnPlayed = 0;
+      if (VOR_SPIELBEGINN.has(inst.zone)) inst.turnPlayed = 0;
     }
 
     // ── ★ ANHAENGSEL-EFFEKTE HERSTELLEN (v1112, Als Vorgabe 15.9.) ──

@@ -53,6 +53,7 @@
 
 'use strict';
 
+const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const {
   tokenStatsForLevel, biomancyLevelOf, freeSupportSlots,
   isPotionCardName, placeBiomancyToken,
@@ -72,13 +73,15 @@ const MAX_PICKS = 3;
  * Muster `steam-dwarf-dragon-pilot.js`). Der Stempel raeumt sich selbst
  * auf, indem er mit der aktuellen Rundenzahl verglichen wird.
  */
+// ★ v1275 (Als Ruling 22.9.): Sperre pro SPIELER statt an der Instanz —
+// zwei Traeger desselben Effekts teilen sich den Ausloeser.
 function alreadyUsedThisTurn(engine, inst) {
-  return (inst?.counters?._kyliTurn ?? -1) === (engine.gs?.turn ?? 0);
+  if (!inst) return false;
+  return !heldenSperreFrei(engine.gs, 'kyli-sapling', inst.controller ?? inst.owner);
 }
 function markUsedThisTurn(engine, inst) {
   if (!inst) return;
-  if (!inst.counters) inst.counters = {};
-  inst.counters._kyliTurn = engine.gs?.turn ?? 0;
+  heldenSperreSetzen(engine.gs, 'kyli-sapling', inst.controller ?? inst.owner);
 }
 
 /** Geloeschte Potions des Spielers, als Galerie-Eintraege mit Pile-Index. */

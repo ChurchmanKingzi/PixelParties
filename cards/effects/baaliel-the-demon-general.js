@@ -48,6 +48,7 @@
 //  Beschwoerung.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 const {
   isHornedDemonName, hornedDemonsOnBoard, placeDemonCounters,
@@ -57,7 +58,7 @@ const CARD_NAME = 'Baaliel, the Demon General';
 
 /** HOPT-Schluessel der Gratis-Beschwoerung — je Baaliel-Instanz (Seite + Slot). */
 function freeSummonKey(pi, heroIdx) {
-  return `baaliel-free-summon:${pi}:${heroIdx}`;
+  return heldenSperreKey('baaliel-free-summon', pi);   // v1275: pro Spieler (Ruling 22.9.)
 }
 function freeSummonUsed(gs, pi, heroIdx) {
   return gs.hoptUsed?.[freeSummonKey(pi, heroIdx)] === gs.turn;

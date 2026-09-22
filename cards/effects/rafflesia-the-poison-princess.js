@@ -28,6 +28,7 @@
 //  resurface on turn N+1.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const CARD_NAME = 'Rafflesia, the Poison Princess';
 const HOPT_KEY  = 'rafflesia_chain';
 
@@ -51,6 +52,7 @@ function chainTypeId(playerIdx, heroIdx, otherSchool) {
   const tag = otherSchool === 'Decay Magic' ? 'decay' : 'support';
   return `rafflesia_chain_${tag}_${playerIdx}_${heroIdx}`;
 }
+
 
 module.exports = {
   // ── CPU-Sonderregeln (Plague-Court-Pilotierung) ───────────────────
@@ -111,7 +113,7 @@ module.exports = {
       if (ctx.casterIdx !== pi || ctx.heroIdx !== heroIdx) return;
       if (gs.currentPhase !== 3) return; // Action Phase only
 
-      const hoptKey = `${HOPT_KEY}:${pi}:${heroIdx}`;
+      const hoptKey = heldenSperreKey(HOPT_KEY, pi);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       const spellData = ctx.spellCardData;

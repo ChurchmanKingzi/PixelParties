@@ -21,6 +21,7 @@
 //  quick succession. Not re-targeted per hit.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const W = require('./_waflav-shared');
 
 const CARD_NAME = 'Deep-Drowned Waflav';
@@ -29,7 +30,7 @@ const DESCEND_GAIN = 2;
 const MAX_SURGE = 3;
 const SURGE_DAMAGE = 100;
 
-const surgeKey = (pi, hi) => `waflav-surge:${CARD_NAME}:${pi}:${hi}`;
+const surgeKey = (pi, hi) => heldenSperreKey(`waflav-surge:${CARD_NAME}`, pi);   // v1275: pro Spieler (Ruling 22.9.)
 
 function surgeAvailable(engine, pi, heroIdx) {
   const gs = engine.gs;

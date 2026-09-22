@@ -95,7 +95,23 @@ module.exports = {
     // nicht kreisen.
     if (!borisActive(engine, pi)) return false;
     const ps = engine.gs.players[pi];
-    if (!ps || !(ps.hand || []).length) return false;
+    if (!ps) return false;
+
+    // ★ v1279 (Als Befund 22.9.): sind die Kosten gar nicht bezahlbar
+    // (zu wenige Handkarten), wird NICHT gefragt — Boris verzichtet von
+    // selbst. Sonst waere ein Effekt mit Abwurfkosten trotz Boris nicht
+    // nutzbar, obwohl seine Kosten ohnehin entfallen. Gilt auch fuer die
+    // leere Hand (vorher stieg die Funktion dort aus und der Abwurf lief
+    // regulaer weiter ins Leere).
+    if ((ps.hand || []).length < count) {
+      engine.log('boris_discard_skipped', {
+        player: ps.username, skipped: count,
+        source: opts.sourceName || opts.source || undefined,
+        reason: 'unpayable',
+      });
+      engine.sync();
+      return true;
+    }
 
     const wieViele = Math.min(count, ps.hand.length);
     const quelle = opts.sourceName || opts.source;
@@ -132,6 +148,15 @@ module.exports = {
     if (promptData?.type !== 'confirm') return undefined;
     return { confirmed: true };
   },
+
+  /**
+   * v1279: „(including as costs)" — verzichtet dieser Spieler gerade auf
+   * ABWURFKOSTEN? Die EINZIGE Stelle, an der Engine und Client das
+   * fragen (`engine.discardCostWaived(pi)`): Spielbarkeits-Listen duerfen
+   * einen Effekt mit Abwurfkosten dann nicht mehr an der Handgroesse
+   * scheitern lassen.
+   */
+  waivesDiscardCosts: (engine, pi) => borisActive(engine, pi),
 
   // Vertrag fuer Engine und Client (Klauseln 1 + 2 sowie das
   // Hervorheben beim Hovern).

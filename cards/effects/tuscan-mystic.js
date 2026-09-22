@@ -44,7 +44,7 @@
 // ═══════════════════════════════════════════
 
 
-const { loesePotionAus } = require('./_potion-shared');
+const { loesePotionAus, potionBleibtLiegen } = require('./_potion-shared');
 
 const CARD_NAME = 'Tuscan Mystic';
 const AUFDECKEN = 2;
@@ -131,8 +131,13 @@ module.exports = {
       }
 
       // Beide geloescht — auch die aufgeloeste, auch eine gefizzelte.
+      // ★ v1279: AUSSER einer Potion, die sich selbst aufs Brett gelegt
+      // hat (Elixir of Immortality → Permanent) — sie liegt dort und darf
+      // nicht als Geisterkarte in der Loesch-Ablage doppelt auftauchen.
+      const bleibt = potionBleibtLiegen(hatGewirkt) ? gewaehlt : null;
       if (!ps.deletedPile) ps.deletedPile = [];
       for (const name of oben) {
+        if (name === bleibt) continue;
         engine._broadcastEvent('play_pile_transfer', {
           owner: pi, cardName: name, from: 'potionDeck', to: 'deleted',
         });

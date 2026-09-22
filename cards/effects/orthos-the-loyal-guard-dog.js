@@ -21,6 +21,7 @@
 //  get their own once-per-turn slot.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { isLoyalCreature, getLoyalsInHand } = require('./_loyal-shared');
 
 const CARD_NAME = 'Orthos, the Loyal Guard Dog';
@@ -67,7 +68,7 @@ module.exports = {
       if (!ps || !orthos?.name || orthos.hp <= 0) return;
 
       // Once per turn, scoped per Orthos instance.
-      const hoptKey = `orthos_chain:${pi}:${ctx.cardHeroIdx}`;
+      const hoptKey = heldenSperreKey('orthos_chain', pi);
       if (!engine.claimHOPT?.(hoptKey, pi)) return;
 
       // Eligibility: Loyal in hand AND a free Support Zone on Orthos.

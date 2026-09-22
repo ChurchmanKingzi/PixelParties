@@ -45,6 +45,7 @@
 //  Zug.
 // ═══════════════════════════════════════════
 
+const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 const { loadCardEffect } = require('./_loader');
 
@@ -247,7 +248,7 @@ module.exports = {
       // Halbzug hoch, „einmal je Zug" gilt damit in beiden Zügen.
       const counters = ctx.card?.counters || (ctx.card ? (ctx.card.counters = {}) : null);
       if (!counters) return;
-      if (counters._rubinTurn === gs.turn) return;
+      if (!heldenSperreFrei(gs, 'rubin-dragoneer', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 
       const eligible = eligibleHandIndices(engine, pi, heroIdx);
       if (eligible.length === 0) return;
@@ -271,7 +272,7 @@ module.exports = {
       const live = eligibleHandIndices(engine, pi, heroIdx);
       if (!live.some(i => gs.players[pi].hand[i] === pickedName)) return;
 
-      counters._rubinTurn = gs.turn;
+      heldenSperreSetzen(gs, 'rubin-dragoneer', pi);
       await performSpell(engine, pi, heroIdx, pickedName);
     },
   },

@@ -52,10 +52,11 @@ module.exports = {
      */
     onTurnStart: (ctx) => {
       if (ctx.activePlayer !== ctx.cardOriginalOwner) return;
-      const inst = ctx.card;
-      if (inst?.counters?._maryNegateUsed) {
-        delete inst.counters._maryNegateUsed;
-      }
+      // v1275 (Als Ruling 22.9.): Merker am SPIELER statt an der Instanz —
+      // alle Traeger dieses Effekts auf einer Seite teilen ihn. Die
+      // bisherige Eigenheit bleibt: frei wird er zu Beginn des eigenen Zuges.
+      const ps = ctx._engine.gs.players[ctx.cardOriginalOwner];
+      if (ps?._maryNegateUsed) delete ps._maryNegateUsed;
     },
 
     /**
@@ -98,7 +99,7 @@ module.exports = {
     beforeDamage: async (ctx) => {
       const inst = ctx.card;
       if (!inst) return;
-      if (inst.counters?._maryNegateUsed) return;
+      if (ctx._engine.gs.players[ctx.cardOwner]?._maryNegateUsed) return;   // v1275: pro Spieler
 
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
@@ -178,8 +179,7 @@ module.exports = {
       if (!ok) return;
 
       // Cost paid — claim Mary's HOPT and cancel the damage.
-      if (!inst.counters) inst.counters = {};
-      inst.counters._maryNegateUsed = true;
+      engine.gs.players[pi]._maryNegateUsed = true;   // v1275: pro Spieler
       ctx.cancel();
       engine.log('mary_crestmas_negate', {
         player: engine.gs.players[pi]?.username,

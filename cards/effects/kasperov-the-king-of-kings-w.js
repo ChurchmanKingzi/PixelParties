@@ -15,13 +15,14 @@
 //  Auftritt beim Ja (v818-Grundregel). Die Todes-Zone ist beim Hook
 //  bereits frei und steht mit zur Wahl.
 // ═══════════════════════════════════════════
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const {
   PAWN, isOfKingsName, collectHandAndDeck, pickFromHandOrDeck, summonFromHandOrDeck,
   summonZonesFor, pickZone, ofKingsCpuAnswer,
 } = require('./_of-kings-shared');
 
 const CARD_NAME = 'Kasperov, the King of Kings [W]';
-const key = (pi, hi) => `kasperov-w:${pi}:${hi}`;
+const key = (pi, hi) => heldenSperreKey('kasperov-w', pi);   // v1275: pro Spieler (Ruling 22.9.)
 const isPawn = (cd) => !!cd && String(cd.name).startsWith(PAWN);
 
 module.exports = {

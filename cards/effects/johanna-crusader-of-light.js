@@ -43,6 +43,7 @@
 //      but possible via Mary's Lv-bypass etc.).
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { getCleansableStatuses } = require('./_hooks');
 
 const CARD_NAME = 'Johanna, Crusader of Light';
@@ -173,7 +174,7 @@ module.exports = {
       // Target must be one of Johanna's sibling Heroes.
       if (!(ownerPs.heroes || []).includes(target)) return;
 
-      const hoptKey = `johanna_redirect:${ownerIdx}:${johannaInst.heroIdx}`;
+      const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       const redirected = Math.ceil(ctx.amount / 2);
@@ -231,7 +232,7 @@ module.exports = {
       const johannaHero = ownerPs.heroes?.[johannaInst.heroIdx];
       if (!_johannaActive(johannaHero)) return;
 
-      const hoptKey = `johanna_redirect:${ownerIdx}:${johannaInst.heroIdx}`;
+      const hoptKey = heldenSperreKey('johanna_redirect', ownerIdx);
       if (gs.hoptUsed?.[hoptKey] === gs.turn) return;
 
       const entries = ctx.entries || [];

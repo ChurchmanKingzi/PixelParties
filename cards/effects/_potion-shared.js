@@ -12,6 +12,14 @@
 //  nicht wirken (gesperrt, eigenes Gate zu, keine legalen Ziele). Was
 //  danach mit der Karte geschieht, entscheidet der Aufrufer — Tuscan
 //  Mystic loescht sie, der Potion Launcher legt sie in die Ablage.
+//
+//  ★ v1279: hat die Potion sich SELBST aufs Brett gelegt, meldet ihre
+//  `resolve` das mit `{ placed: true }` (Elixir of Immortality). Dann
+//  darf der Aufrufer die Karte NICHT zusaetzlich entsorgen — sonst liegt
+//  neben dem echten Permanent eine Geisterkarte in der Loesch-Ablage
+//  (Als Befund 22.9.). `loesePotionAus` liefert dafuer bei Erfolg
+//  `{ gewirkt: true, placed }` — weiterhin truthy, `false` bleibt
+//  „gefizzelt"; `potionBleibtLiegen(ergebnis)` beantwortet die Frage.
 // ═══════════════════════════════════════════════════════════════════
 
 const { loadCardEffect } = require('./_loader');
@@ -35,8 +43,8 @@ async function loesePotionAus(engine, pi, potionName) {
 
   // Zielwahlfreie Potion — direkt aufloesen, wie im Serverzweig.
   if (!script.getValidTargets || !script.targetingConfig) {
-    await script.resolve(engine, pi, [], []);
-    return true;
+    const ergebnis = await script.resolve(engine, pi, [], []);
+    return { gewirkt: true, placed: !!ergebnis?.placed };
   }
 
   // Mit Zielwahl: Ziele holen. Keine legalen Ziele ⇒ fizzelt (Als
@@ -64,8 +72,13 @@ async function loesePotionAus(engine, pi, potionName) {
   if (typeof script.validateSelection === 'function'
       && !script.validateSelection(gewaehlt, ziele)) return false;
 
-  await script.resolve(engine, pi, gewaehlt, ziele);
-  return true;
+  const ergebnis = await script.resolve(engine, pi, gewaehlt, ziele);
+  return { gewirkt: true, placed: !!ergebnis?.placed };
+}
+
+/** Bleibt die Potion nach `loesePotionAus` auf dem Brett liegen? */
+function potionBleibtLiegen(ergebnis) {
+  return !!(ergebnis && ergebnis.placed);
 }
 
 /**
@@ -99,4 +112,4 @@ async function verbrauchePotion(engine, pi, name, opts = {}) {
   return true;
 }
 
-module.exports = { loesePotionAus, verbrauchePotion };
+module.exports = { loesePotionAus, verbrauchePotion, potionBleibtLiegen };

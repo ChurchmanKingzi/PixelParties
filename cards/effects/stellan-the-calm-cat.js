@@ -38,6 +38,7 @@
 //  creatures-summoned-this-turn counter.
 // ═══════════════════════════════════════════
 
+const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType, STATUS_EFFECTS } = require('./_hooks');
 
 const CARD_NAME   = 'Stellan, the Calm Cat';
@@ -45,15 +46,18 @@ const HOPT_KEY    = 'stellanTriggeredThisTurn';
 const MAX_FROM_HAND = 3;
 
 /** The once-per-turn gate lives on Stellan's card-instance counters. */
-function alreadyTriggered(card) {
-  return !!(card?.counters && card.counters[HOPT_KEY]);
+// ★ v1275 (Als Ruling 22.9.): die Einmal-Sperre haengt am SPIELER, nicht
+// an der Karteninstanz — so teilen sich zwei Traeger desselben Effekts
+// (Pseudonia + wiederbelebtes Original) den einen Ausloeser. Zugstempel
+// statt Zuruecksetzen zu Zugbeginn (`_hero-hopt-shared.js`).
+function alreadyTriggered(ctx) {
+  return !heldenSperreFrei(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
-function markTriggered(card) {
-  if (!card.counters) card.counters = {};
-  card.counters[HOPT_KEY] = true;
+function markTriggered(ctx) {
+  heldenSperreSetzen(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
-function refundTrigger(card) {
-  if (card?.counters) delete card.counters[HOPT_KEY];
+function refundTrigger(ctx) {
+  heldenSperreFreigeben(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
 
 /** Free Support Zone indices on Stellan's hero slot. */
@@ -254,7 +258,7 @@ async function runStellanEffect(ctx) {
  * Stellan's side get picked up.
  */
 function tryFire(ctx, opts = {}) {
-  if (alreadyTriggered(ctx.card)) return;
+  if (alreadyTriggered(ctx)) return;
   const hero = ctx.attachedHero;
   if (!hero?.name) return;
   // ★ ALS RULING (18.8.): „Stellan sollte auch noch auslösen, wenn er
@@ -273,7 +277,7 @@ function tryFire(ctx, opts = {}) {
   //     ausloesen (Statuseffekte toeten ihn ja nicht)
   if (!opts.allowDead && hero.hp <= 0) return;
 
-  markTriggered(ctx.card);
+  markTriggered(ctx);
   const card = ctx.card;
   ctx._engine._deferredReactionSummons.push(async () => {
     // Re-validate: Stellan may have died between the trigger and the
@@ -286,7 +290,7 @@ function tryFire(ctx, opts = {}) {
     // `|| heroNow.hp <= 0` — damit verfiel genau der Fall, den die
     // Karte interessant macht.
     if (!heroNow?.name) {
-      refundTrigger(card);
+      refundTrigger(ctx);
       return;
     }
     let placed = false;
@@ -295,7 +299,7 @@ function tryFire(ctx, opts = {}) {
     } catch (err) {
       console.error('[Stellan] effect threw:', err.message);
     }
-    if (!placed) refundTrigger(card);
+    if (!placed) refundTrigger(ctx);
   });
 }
 
@@ -328,9 +332,8 @@ module.exports = {
   },
 
   hooks: {
-    onTurnStart: (ctx) => {
-      refundTrigger(ctx.card);
-    },
+    // (v1275: kein Zuruecksetzen mehr noetig — die Sperre ist ein
+    //  Zugstempel am Spieler, siehe `alreadyTriggered`.)
 
     afterDamage: async (ctx) => {
       const target = ctx.target;

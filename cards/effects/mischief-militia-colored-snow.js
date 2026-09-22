@@ -134,7 +134,7 @@ async function _resolveTopPotion(engine, pi) {
             engine.log('colored_snow_fizzle', { potion: cardName, reason: 'aborted' });
             outcome = 'fizzle';
           } else {
-            await _runAfterPotionUsedRouting(engine, pi, cardName);
+            await _runAfterPotionUsedRouting(engine, pi, cardName, result);   // v1279
           }
         } catch (err) {
           console.error('[Colored Snow] potion resolve threw:', err.message);
@@ -146,8 +146,8 @@ async function _resolveTopPotion(engine, pi) {
   } else {
     // Non-targeted Potion path.
     try {
-      if (script.resolve) await script.resolve(engine, pi, [], []);
-      await _runAfterPotionUsedRouting(engine, pi, cardName);
+      const ergebnis = script.resolve ? await script.resolve(engine, pi, [], []) : null;
+      await _runAfterPotionUsedRouting(engine, pi, cardName, ergebnis);
     } catch (err) {
       console.error('[Colored Snow] potion resolve threw:', err.message);
       ps.deletedPile.push(cardName);
@@ -215,11 +215,18 @@ function _detectPotionDestination(engine, pi, cardName, preSnap) {
 
 /** Fire afterPotionUsed and route to deleted by default (mirrors server.js
  *  doUsePotion's post-resolve block). */
-async function _runAfterPotionUsedRouting(engine, pi, cardName) {
+async function _runAfterPotionUsedRouting(engine, pi, cardName, ergebnis = null) {
   const ps = engine.gs.players[pi];
+  // ★ v1279 (Als Befund 22.9.: „wird Elixir of Immortality direkt
+  // aktiviert, landet eine Kopie im Deleted Pile, obwohl sie auf dem
+  // Board bleiben sollte"). Eine Potion, die sich SELBST aufs Brett legt,
+  // meldet das ueber `{ placed: true }` aus ihrer `resolve` — der normale
+  // Weg (`doUsePotion`) liest den Rueckgabewert, dieser Weg verwarf ihn.
+  // Die Potion wurde dadurch zusaetzlich in die Loesch-Ablage geschrieben:
+  // eine Geisterkarte neben dem echten Permanent.
   const hookCtx = {
     potionName: cardName, potionOwner: pi,
-    placed: false, _skipReactionCheck: true,
+    placed: !!ergebnis?.placed, _skipReactionCheck: true,
   };
   try {
     await engine.runHooks('afterPotionUsed', hookCtx);

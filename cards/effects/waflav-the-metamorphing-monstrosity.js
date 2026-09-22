@@ -31,6 +31,7 @@
 //  from `onHeroEffect` (see `finishSelfManagedHeroEffect`).
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const W = require('./_waflav-shared');
 
 const CARD_NAME = 'Waflav, the Metamorphing Monstrosity';
@@ -43,7 +44,7 @@ const EFFECTS = [
   { id: 'hand',      label: '✋ Attach up to 3 Abilities from your hand' },
 ];
 
-const effKey = (id, pi, hi) => `waflav-effect:${id}:${pi}:${hi}`;
+const effKey = (id, pi, hi) => heldenSperreKey(`waflav-effect:${id}`, pi);   // v1275: pro Spieler (Ruling 22.9.)
 
 /**
  * Ein Effekt steht zur Wahl, wenn (a) sein Once-per-turn frei ist UND

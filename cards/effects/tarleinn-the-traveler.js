@@ -22,6 +22,7 @@
 //  at the target prompt OR no legal targets exist.
 // ═══════════════════════════════════════════
 
+const { heldenSperreFrei, heldenSperreFreigeben, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Tarleinn the Traveler';
@@ -65,15 +66,18 @@ function distinctSchoolsOnHero(_engine, ps, heroIdx) {
   return schools;
 }
 
-function alreadyTriggered(card) {
-  return !!(card?.counters && card.counters[HOPT_KEY]);
+// ★ v1275 (Als Ruling 22.9.): die Einmal-Sperre haengt am SPIELER, nicht
+// an der Karteninstanz — so teilen sich zwei Traeger desselben Effekts
+// (Pseudonia + wiederbelebtes Original) den einen Ausloeser. Zugstempel
+// statt Zuruecksetzen zu Zugbeginn (`_hero-hopt-shared.js`).
+function alreadyTriggered(ctx) {
+  return !heldenSperreFrei(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
-function markTriggered(card) {
-  if (!card.counters) card.counters = {};
-  card.counters[HOPT_KEY] = true;
+function markTriggered(ctx) {
+  heldenSperreSetzen(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
-function refundTrigger(card) {
-  if (card?.counters) delete card.counters[HOPT_KEY];
+function refundTrigger(ctx) {
+  heldenSperreFreigeben(ctx._engine.gs, HOPT_KEY, ctx.cardOwner);
 }
 
 module.exports = {
@@ -82,9 +86,8 @@ module.exports = {
   activeIn: ['hero'],
 
   hooks: {
-    onTurnStart: (ctx) => {
-      refundTrigger(ctx.card);
-    },
+    // (v1275: kein Zuruecksetzen mehr noetig — die Sperre ist ein
+    //  Zugstempel am Spieler, siehe `alreadyTriggered`.)
 
     /**
      * Fires after every spell/attack resolves. Filter to:
@@ -102,7 +105,7 @@ module.exports = {
       const tarl = ctx.attachedHero;
       if (!tarl?.name || tarl.hp <= 0) return;
       if (tarl.statuses?.frozen || tarl.statuses?.stunned || tarl.statuses?.negated) return;
-      if (alreadyTriggered(ctx.card)) return;
+      if (alreadyTriggered(ctx)) return;
 
       // Caster gate — must be Tarleinn's controller's side.
       if (ctx.casterIdx !== pi) return;
@@ -147,7 +150,7 @@ module.exports = {
 
       // Reserve the once-per-turn slot up front so concurrent reaction
       // chains can't double-fire (refunded below if the player cancels).
-      markTriggered(ctx.card);
+      markTriggered(ctx);
 
       const picked = await engine.promptEffectTarget(pi, targets, {
         maxTotal: 1,   // Einfachauswahl: ein Klick TAUSCHT das Ziel
@@ -161,12 +164,12 @@ module.exports = {
         maxPerType: { hero: 1, equip: 1 },
       });
       if (!picked || picked.length === 0) {
-        refundTrigger(ctx.card);
+        refundTrigger(ctx);
         return;
       }
       const target = targets.find(t => t.id === picked[0]);
       if (!target) {
-        refundTrigger(ctx.card);
+        refundTrigger(ctx);
         return;
       }
 
@@ -174,7 +177,7 @@ module.exports = {
 
       if (target.type === 'hero') {
         const hero = gs.players[pi]?.heroes?.[target.heroIdx];
-        if (!hero?.name || hero.hp <= 0) { refundTrigger(ctx.card); return; }
+        if (!hero?.name || hero.hp <= 0) { refundTrigger(ctx); return; }
         engine._broadcastEvent('play_zone_animation', {
           type: 'heal_sparkle', owner: pi, heroIdx: target.heroIdx, zoneSlot: -1,
         });
@@ -184,7 +187,7 @@ module.exports = {
         const inst = target.cardInstance || engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'support' && c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
         );
-        if (!inst) { refundTrigger(ctx.card); return; }
+        if (!inst) { refundTrigger(ctx); return; }
         engine._broadcastEvent('play_zone_animation', {
           type: 'heal_sparkle', owner: pi, heroIdx: target.heroIdx, zoneSlot: target.slotIdx,
         });

@@ -8437,6 +8437,12 @@ class GameEngine {
 
     // Track: this player dealt damage to opponent's targets this turn
     if (actualAmount > 0 && srcOwner >= 0) {
+      // ★ v1271: …und zu IRGENDEINEM Ziel, eigene eingeschlossen
+      // („Skull Carpet Bombing": „if you have dealt no damage to any
+      // target during your turn"). Gleiche Regel wie das Gegner-Flag:
+      // nur echter Schaden > 0 und nur mit Verursacher — Status-Ticks
+      // (Burn/Poison, ohne Besitzer) zaehlen nicht (Als Ruling 1.9.).
+      if (this.gs.players[srcOwner]) this.gs.players[srcOwner].dealtDamageAnyTarget = true;
       for (let pi = 0; pi < 2; pi++) {
         if (pi !== srcOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
           this.gs.players[srcOwner].dealtDamageToOpponent = true;
@@ -8588,6 +8594,7 @@ class GameEngine {
 
       // Track dealt-damage for SC / opponent tracking (mirrors actionDealDamage).
       if (dealt > 0 && sourceOwner >= 0) {
+        if (this.gs.players[sourceOwner]) this.gs.players[sourceOwner].dealtDamageAnyTarget = true;   // v1271
         for (let pi = 0; pi < 2; pi++) {
           if (pi !== sourceOwner && (this.gs.players[pi]?.heroes || []).includes(target)) {
             this.gs.players[sourceOwner].dealtDamageToOpponent = true;
@@ -16140,8 +16147,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (!inst) return true;
     if (inst.faceDown) return true;
     const c = inst.counters || {};
-    const hasCC = !!(c.negated || c.nulled || c.stunned || c.magic_silenced
-      || (c.frozen && !this._isChillyDogActiveFor(inst.controller ?? inst.owner)));
+    // ★ v1280: `ignoriereFrozen` — NUR fuer die Wirksamkeitspruefung des
+    // Chilly Dog selbst („including this one"): sein eigener Frost darf
+    // ihn nicht stillegen, und ohne diese Option braeuchte die Pruefung
+    // ihre eigene Antwort (die Endlosschleife von v1263). Alles andere
+    // (Negated, Stunned, Nulled, Magic Silenced) legt ihn weiter still.
+    const frostStillt = c.frozen && !opts.ignoriereFrozen
+      && !this._isChillyDogActiveFor(inst.controller ?? inst.owner);
+    const hasCC = !!(c.negated || c.nulled || c.stunned || c.magic_silenced || frostStillt);
     if (!hasCC) return false;
     if (opts.honorNegStatusImmune !== false && this._creatureNegStatusImmune(inst)) return false;
     if (this._creatureNegationProof(inst)) return false;
@@ -16637,9 +16650,16 @@ this._deathWatch = (this._deathWatchStack || []).length
     // _isChillyDogActiveFor → isCardEffectActive(Chilly Dog)
     // → isCreatureEffectSuppressed → `frozen && !_isChillyDogActiveFor`
     // → … ohne Ende, sobald der Hund SELBST eingefroren ist. Der
-    // Wiedereintrittsriegel laesst den inneren Aufruf `false` liefern:
-    // ein eingefrorener Chilly Dog hebt die Frost-Stille also NICHT auf —
-    // auch nicht seine eigene. Er muss aktiv sein, um zu wirken.
+    // Wiedereintrittsriegel bleibt als Netz.
+    //
+    // ★★ v1280 (Als Kartentext-Aenderung 22.9.: „The effects and
+    // Abilities of Frozen targets you control (INCLUDING THIS ONE) are
+    // not negated"): ein eingefrorener Chilly Dog wirkt jetzt weiter —
+    // auch fuer sich selbst. Die Pruefung fragt deshalb NICHT mehr
+    // `isCardEffectActive` (das wuerde den Frost mitzaehlen und die
+    // Rekursion ausloesen), sondern die Stille-Pruefung mit
+    // `ignoriereFrozen: true`. Negated, Stunned & Co. legen ihn weiter
+    // still — nur der Frost nicht.
     if (this._chillyDogPruefung) return false;
     this._chillyDogPruefung = true;
     try {
@@ -16649,7 +16669,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         const script = loadCardEffect(inst.name);
         if (!script?.liftsFrozenSilenceForOwnSide) continue;
         if ((inst.controller ?? inst.owner) !== playerIdx) continue;
-        if (!this.isCardEffectActive(inst)) continue;
+        if (inst.zone !== 'support') continue;
+        if (this.isCreatureEffectSuppressed(inst, { ignoriereFrozen: true, honorNegStatusImmune: false })) continue;
         return true;
       }
       return false;
@@ -16794,7 +16815,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       // is in hand and would leave on cast, so subtract 1).
       if (cd.cardType === 'Spell') {
         const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cd);
-        if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost) continue;
+        // v1279: Boris & Co. erlassen die Abwurfkosten — dann darf die
+        // Handgroesse nicht sperren (Als Befund 22.9.).
+        if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;
       }
       // Creatures need a free support zone
       if (hasCardType(cd, 'Creature')) {
@@ -17155,7 +17178,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Wisdom hand-size check: player must have enough cards to pay the discard cost
         if (cd.cardType === 'Spell') {
           const wisdomCost = this.getWisdomDiscardCost(playerIdx, hi, cd);
-          if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost) continue;
+          if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost && !this.discardCostWaived(playerIdx)) continue;   // v1279
         }
         // Hero script card restriction (e.g. Ghuanjun duplicate attack ban)
         if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, playerIdx, hi, cd, this)) continue;
@@ -17341,7 +17364,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // Wisdom hand-size check: acting player (ps) must have enough cards to pay
           if (cd.cardType === 'Spell') {
             const wisdomCost = this.getWisdomDiscardCost(oppIdx, hi, cd);
-            if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost) continue;
+            if (wisdomCost > 0 && (ps.hand.length - 1) < wisdomCost && !this.discardCostWaived(oppIdx)) continue;   // v1279
           }
           if (heroScript?.canPlayCard && !heroScript.canPlayCard(gs, oppIdx, hi, cd, this)) continue;
           let equipBlocked = false;
@@ -18333,7 +18356,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           name: eintrag.effectName,
           script,
           inst,
-          hoptKey: `hero-effect:${eintrag.effectName}:${playerIdx}:${heroIdx}`,
+          hoptKey: this.heroHoptKey(eintrag.effectName, playerIdx),
         }, {
           // Die Aktion WURDE bezahlt (vom gewaehrenden Effekt), also
           // feuert `onAnyActionResolved` — aber als Zusatzaktion, und
@@ -18508,6 +18531,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     } else {
       // v646: der eigentliche Guss steht in `_castSpellImmediately` — Call
       // for Help giesst damit auch direkt aus dem DECK.
+      // v1277: kein Rest aus einem frueheren Weg darf diesen Guss zur
+      // Freiaktion machen (siehe doPlaySpell).
+      delete this.gs._spellFreeAction;
       const r = await this._castSpellImmediately(playerIdx, heroIdx, cardName, {
         fromZone: 'hand', pool: quelle, poolIndex: handIndex, by: config.title, excludeTargets: config.excludeTargets,
       });
@@ -19041,6 +19067,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         ps.damageLocked = false;
         ps.goldLocked = false;
         ps.dealtDamageToOpponent = false;
+        ps.dealtDamageAnyTarget = false;   // v1271
         ps.potionLocked = false;
         ps.supportSpellLocked = false;
         ps.oppHandLocked = false; // Slow — cannot interact with opponent's hand this turn
@@ -20780,7 +20807,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const hero = ps?.heroes?.[armed.heroIdx];
     if (hero?.name) {
       if (!this.gs.hoptUsed) this.gs.hoptUsed = {};
-      this.gs.hoptUsed[`hero-effect:${hero.name}:${playerIdx}:${armed.heroIdx}`] = this.gs.turn;
+      this.gs.hoptUsed[this.heroHoptKey(hero.name, playerIdx)] = this.gs.turn;
     }
     delete ps._freeArtifactArmed;
     this.log('free_artifact_used', {
@@ -25217,6 +25244,52 @@ this._deathWatch = (this._deathWatchStack || []).length
   //  damit fuer jede normale Partie ein No-op.
   // ════════════════════════════════════════════════════════════════
 
+  /**
+   * ★★ v1275 — EINMAL-PRO-ZUG-SPERRE VON HELDENEFFEKTEN.
+   *
+   * Als Ruling 22.9. (Pseudonia): „Hero-Effekte, die once per turn sind,
+   * sind generell IMMER hard once per turn" — und zwar, sofern nicht
+   * anders angegeben, pro SPIELER. Der Schluessel haengt deshalb am
+   * KARTENNAMEN und am Spieler, nicht mehr am Heldenplatz: hat Pseudonia
+   * den Effekt eines Helden gewonnen, der spaeter wiederbelebt wird,
+   * teilen sich beide den einen Ausloeser. Im normalen Spiel steht nie
+   * ein Name zweimal auf einer Seite — dort aendert sich nichts.
+   * Passive Heldeneffekte nutzen dieselbe Form ueber
+   * `_hero-hopt-shared.js`.
+   */
+  heroHoptKey(cardName, pi) {
+    return `hero-effect:${cardName}:${pi}`;
+  }
+
+  /**
+   * ★★ v1275 — WESSEN EFFEKT TRAEGT DIESER HELD „EIGENTLICH"?
+   *
+   * Fuer Effekte, die den Effekt eines BESIEGTEN Helden uebernehmen
+   * (Pseudonia): der gedruckte Grundeffekt, nicht eine geliehene
+   * Gestalt. Als Rulings 22.9.:
+   *   • ein verwandelter „???, the Shapeshifter" gibt SEINEN Effekt,
+   *     nicht den des Helden, in den er verwandelt war (`_shapeshiftBase`);
+   *   • ein „???, the Throne Robber", der per eigenem Effekt in eine
+   *     andere Ascended Form gestiegen ist, gibt den Throne-Robber-Effekt
+   *     (`_identityCleanupCard` an der Heldeninstanz — nur, wenn dort
+   *     ein HELD steht; Open Invitation traegt dort den Zauber).
+   * Alles andere, auch regulaer aufgestiegene Ascended Heroes, gibt den
+   * Effekt der Karte, die es gerade ist.
+   */
+  heroEffectIdentity(pi, heroIdx) {
+    const hero = this.gs?.players?.[pi]?.heroes?.[heroIdx];
+    if (!hero?.name) return null;
+    if (hero._shapeshiftBase) return hero._shapeshiftBase;
+    const inst = this.cardInstances.find(c => c.zone === ZONES.HERO
+      && c.owner === pi && c.heroIdx === heroIdx);
+    const geliehenVon = inst?.counters?._identityCleanupCard;
+    if (geliehenVon && geliehenVon !== hero.name) {
+      const cd = this._getCardDB()[geliehenVon];
+      if (cd && (cd.cardType === 'Hero' || cd.cardType === 'Ascended Hero')) return geliehenVon;
+    }
+    return hero.name;
+  }
+
   /** Die Namen, deren Effekte dieser Held gerade hat (Gewinnreihenfolge). */
   gainedEffectNames(pi, heroIdx) {
     return gainedNames(this.gs?.players?.[pi]?.heroes?.[heroIdx]);
@@ -27097,6 +27170,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       endingPlayer: endingPlayerIdx,
       turn: this.gs.turn,
       dealtDamageToOpponent: !!this.gs.players[endingPlayerIdx]?.dealtDamageToOpponent,
+      // v1271: Schaden an irgendeinem Ziel (auch eigenen) in diesem Zug.
+      dealtDamageAnyTarget: !!this.gs.players[endingPlayerIdx]?.dealtDamageAnyTarget,
     };
     const endingName = this.gs.players[endingPlayerIdx]?.username || 'Opponent';
     // Scan BOTH players — a Surprise may want to fire on either side's
@@ -27198,7 +27273,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Pre-damage hand reaction check. Runs once per damage instance — gives
    * cards in the target's hand whose script declares
    *   isPreDamageReaction: true,
-   *   preDamageCondition(gs, pi, engine, target, heroIdx, source, amount, type) → bool,
+   *   preDamageCondition(gs, pi, engine, target, heroIdx, source, amount, type, { cannotBeNegated, cannotBeReduced }) → bool,
    *   preDamageResolve(engine, pi, target, heroIdx, source, amount, type) →
    *     { negated?: bool, amountOverride?: number }
    * a chance to react. The first one accepted resolves; the resolver may:
@@ -27333,7 +27408,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       if (script.preDamageCondition &&
-          !script.preDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type)) continue;
+          // v1278: neunter Parameter — ist der Schaden durchschlagend? Eine
+          // Karte, die nur AUFHEBT (Homerun!), bietet sich dann gar nicht
+          // erst an, statt bezahlt und hinterher verworfen zu werden.
+          !script.preDamageCondition(this.gs, targetOwner, this, target, targetHeroIdx, source, amount, type,
+            { cannotBeNegated: !!opts.cannotBeNegated, cannotBeReduced: !!opts.cannotBeReduced })) continue;
 
       // Prompt
       const srcName = source?.name || 'An effect';
@@ -35024,7 +35103,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       // HOPT per hero instance (soft — each copy is independent)
-      const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
+      const hoptKey = this.heroHoptKey(hero.name, playerIdx);
       if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
       // ★ v1030: Einmal-pro-Spiel-Effekte verschwinden nach Gebrauch.
       if (this.oncePerGameEffectUsed(playerIdx, script, hero.name)) continue;
@@ -35083,7 +35162,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // Equipped Artifacts are explicitly NOT blocked by Blinded —
         // the artifact does the targeting independently of its host.
 
-        const hoptKey = `hero-effect:${inst.name}:${playerIdx}:${hi}`;
+        const hoptKey = this.heroHoptKey(inst.name, playerIdx);
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
 
         if (equipScript.canActivateHeroEffect) {
@@ -35120,7 +35199,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
-        const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
+        const hoptKey = this.heroHoptKey(hero.name, playerIdx);
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
 
         if (script.canActivateHeroEffect) {
@@ -35156,7 +35235,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (BLIND_STATUSES.some(n => hero.statuses?.[n]) && script.requiresTarget === true) continue;
         if (this.isHeroEffectBlockedByGraceShield(script, playerIdx)) continue;
 
-        const hoptKey = `hero-effect:${hero.name}:${playerIdx}:${hi}`;
+        const hoptKey = this.heroHoptKey(hero.name, playerIdx);
         if (this.gs.hoptUsed?.[hoptKey] === this.gs.turn) continue;
 
         if (script.canActivateHeroEffect) {
@@ -37624,6 +37703,26 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @param {object} cardData - Card data from cards.json
    * @returns {number}
    */
+  /**
+   * ★ v1279 — Verzichtet dieser Spieler gerade auf ABWURFKOSTEN?
+   * Heute nur Boris („You may ignore any effects that would force you to
+   * discard cards from your hand (including as costs)"); die Frage geht
+   * ueber den Kartenvertrag `waivesDiscardCosts`, damit eine kuenftige
+   * Karte mit derselben Klausel nur ihn exportieren muss.
+   * Spielbarkeits-Listen duerfen einen Effekt mit Abwurfkosten dann nicht
+   * an der Handgroesse scheitern lassen — die Kosten entfallen ja.
+   */
+  discardCostWaived(playerIdx) {
+    const heroes = this.gs?.players?.[playerIdx]?.heroes || [];
+    for (const h of heroes) {
+      if (!h?.name) continue;
+      const script = this.heroScript(playerIdx, heroes.indexOf(h));
+      if (typeof script?.waivesDiscardCosts !== 'function') continue;
+      try { if (script.waivesDiscardCosts(this, playerIdx)) return true; } catch { /* eine Karte darf die Liste nicht kippen */ }
+    }
+    return false;
+  }
+
   getWisdomDiscardCost(playerIdx, heroIdx, cardData) {
     if (cardData.cardType !== 'Spell') return 0;
     const ps = this.gs.players[playerIdx];
@@ -38773,15 +38872,17 @@ this._deathWatch = (this._deathWatchStack || []).length
       for (const { heroIdx: hi, owner } of allHeroes) {
         this._broadcastEvent('play_zone_animation', { type: animationType, owner, heroIdx: hi, zoneSlot: -1 });
       }
-      // Creature animations are handled by processCreatureDamageBatch's animType,
-      // but if damage is 0 we play them manually
-      if (damage === 0) {
-        for (const e of creatureEntries) {
-          this._broadcastEvent('play_zone_animation', {
-            type: animationType, owner: e.inst.owner,
-            heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
-          });
-        }
+      // ★★ v1272 (Als Regel 22.9.): die Kreaturen bekommen ihr Bild HIER,
+      // im selben Augenblick wie die Helden — nicht erst im Batch, der
+      // nach dem Heldenschaden laeuft (dort kamen sie danach und bis
+      // v1271 zudem einzeln). Die Eintraege tragen deshalb `_bildGelaufen`,
+      // damit der Batch das Bild nicht ein zweites Mal zeigt.
+      for (const e of creatureEntries) {
+        this._broadcastEvent('play_zone_animation', {
+          type: animationType, owner: this.physicalSide(e.inst),
+          heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
+        });
+        e._bildGelaufen = true;
       }
       if (allHeroes.length > 0 || creatureEntries.length > 0) {
         await this._delay(animDelay);
@@ -39433,6 +39534,26 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★★ v1272 (Als Regel 22.9.: „Die Animationen auf ALLEN Zielen sollen
+    // gleichzeitig abspielen.") ALLE Bilder des Batches starten JETZT
+    // gemeinsam, danach EINE Wartezeit. Bis v1271 lief das Bild je Eintrag
+    // in der Schleife unten, jeweils mit 300 ms Pause — bei fuenf
+    // Kreaturen anderthalb Sekunden „eins nach dem anderen". Die Stelle
+    // ist sicher: alle Umleitungs-, Reaktions- und Surprise-Fenster liegen
+    // in den Durchgaengen DARUEBER, die Ziele stehen hier fest. Abgewehrte
+    // Eintraege bekommen ihr Bild weiterhin (v1185). Ein Eintrag mit
+    // einem Batch hat genau das alte Verhalten (ein Bild, 300 ms).
+    {
+      let bilder = 0;
+      for (const e of entries) {
+        if (!e.animType || !e.inst || e._bildGelaufen) continue;
+        this._broadcastEvent('play_zone_animation', { type: e.animType, owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
+        e._bildGelaufen = true;
+        bilder++;
+      }
+      if (bilder > 0) await this._delay(300);
+    }
+
     // Apply damage to non-cancelled entries
     for (const e of entries) {
       // ── WIEDEREINTRITTS-RIEGEL (5.8., Powder-Keg-Overload) ──────────
@@ -39474,11 +39595,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       // nichts. Jetzt laeuft das Bild IMMER, und erst danach entscheidet
       // sich, ob Schaden faellt — genau wie bei der Immunitaet eine
       // Handvoll Zeilen weiter unten.
-      if (e.animType) {
+      // v1272: das Bild ist oben schon fuer alle Eintraege gleichzeitig
+      // gelaufen (`_bildGelaufen`). Hier nur noch fuer Eintraege, die erst
+      // WAEHREND der Schleife hinzukamen.
+      if (e.animType && !e._bildGelaufen) {
         // Owner = physical side so the animation lands on the slot the
         // player sees (cross-side-placed Creatures live on the
         // controller's board).
         this._broadcastEvent('play_zone_animation', { type: e.animType, owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot });
+        e._bildGelaufen = true;
         await this._delay(300);
       }
 
@@ -39578,6 +39703,8 @@ this._deathWatch = (this._deathWatchStack || []).length
         continue;
       }
 
+      // v1271: Schaden an IRGENDEINER Kreatur (auch einer eigenen).
+      if (e.sourceOwner >= 0 && this.gs.players[e.sourceOwner]) this.gs.players[e.sourceOwner].dealtDamageAnyTarget = true;
       // Track: source player dealt damage to opponent's creature.
       // Controller-aware: a cross-side-placed Creature is the opp's
       // creature even though you originally owned it.
@@ -40298,6 +40425,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       const destroyableInstances = this.cardInstances.filter(c => {
         if (c.owner !== pi || c.zone !== 'support' || c.heroIdx !== hi) return false;
         if (c.counters?.immovable) return false; // Immovable cards stay even on dead heroes
+        // ★ v1275: die UNSICHTBARE Traegerinstanz eines gewonnenen
+        // Heldeneffekts (`grantHeroEffect`, Zone support ohne Platz) ist
+        // keine Karte — sie wurde hier bisher wie eine Ausruestung
+        // abgeraeumt: der HELDENNAME landete in der Ablage (Geisterkarte),
+        // und der Effekt verlor seine Hooks, waehrend `gainedEffectNames`
+        // blieb. Als Ruling 22.9. (Pseudonia): gewonnene Effekte bleiben
+        // ueber Tod und Wiederbelebung erhalten. Weg sind sie erst, wenn
+        // der Held das Brett verlaesst (`deleteHero`) oder der Effekt
+        // ausdruecklich widerrufen wird.
+        if (c.counters?._gainedEffectOnly) return false;
         const cd = this.getEffectiveCardData(c) || cardDB[c.name];
         if (cd && (hasCardType(cd, 'Creature') || hasCardType(cd, 'Token'))) return false;
         // v770: ABILITIES, die in einer Support Zone liegen (Xal,

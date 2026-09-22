@@ -31,6 +31,7 @@
 //  Anzeige und Server-Pruefung gemeinsam lesen.
 // ═══════════════════════════════════════════
 
+const { heldenSperreFrei, heldenSperreSetzen } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { eligibleCreationIndices } = require('./_hand-resolve');
 
 const CARD_NAME = 'True Fairy Crestina, the Primordial Goddess';
@@ -205,7 +206,7 @@ module.exports = {
       // Einmal pro Zug.
       const hero = ps.heroes?.[ctx.cardHeroIdx];
       if (!hero) return;
-      if (hero._crestinaNegateTurn === gs.turn) return;
+      if (!heldenSperreFrei(gs, 'crestina-negate', pi)) return;   // v1275: pro Spieler (Ruling 22.9.)
 
       // Crestina selbst muss handlungsfaehig sein — und der Vorrat
       // benutzbar. Dieselbe eine Wahrheit wie ueberall.
@@ -282,7 +283,7 @@ module.exports = {
         c.owner === pi && c.zone === 'creationZone' && c.name === name);
       if (weg) engine._untrackCard(weg.id);
 
-      hero._crestinaNegateTurn = gs.turn;
+      heldenSperreSetzen(gs, 'crestina-negate', pi);
       ctx.cancelled = true;
       engine._broadcastEvent('play_zone_animation', {
         type: 'guardian_shield', owner: pi, heroIdx: (ps.heroes || []).indexOf(ziel),

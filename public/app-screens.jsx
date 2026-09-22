@@ -1532,6 +1532,15 @@ function MainMenu() {
     const z = menuZoomFaktor(screenRef.current, screenRect);
     setPanelTop(Math.max(0, (bodyRect.top - screenRect.top) / z));
     setPanelHeight(Math.round(bodyRect.height / z));
+    // ★★ v1281 (Als Befund 22.9.: „im Vollbildmodus ist der Avatar falsch
+    // platziert, das Layout laesst keinen Platz dafuer"). Die Breiten der
+    // Seitenkaesten und der linken Gasse mischten `%` (vom GEZOOMTEN
+    // Menue) mit `vw` (vom UNGEZOOMTEN Fenster). Unter Zoom laufen beide
+    // auseinander: bei 1920x1080 (Zoom 1.2) wurde der Kasten 564 statt
+    // 470 px breit, die Gasse schrumpfte auf 89 px — und der 192 px
+    // breite Avatar ragte links heraus. `--menu-vw` ist 1 vw in
+    // LAYOUT-Pixeln; alle Menuebreiten rechnen seit v1281 damit.
+    screenRef.current.style.setProperty('--menu-vw', (window.innerWidth / z / 100) + 'px');
   }, [menuTopPad]);
   // Reset the anchor on viewport resize so a window-size change still
   // looks centered when collapsed. The next layout effect re-measures

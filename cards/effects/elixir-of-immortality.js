@@ -20,6 +20,31 @@
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * ★ v1282 — EIN Helfer fuer alle Ausloesepunkte.
+ *
+ * Gesammelte Tode (`_pendingHeroes` / `_pendingCreatures`) werden an
+ * mehreren Stellen eingeloest. Bis v1281 waren das drei: nach dem
+ * Status-Schaden, nach einem Zauber und am Phasenende. Als Befund 22.9.:
+ * toetete ein KREATUR-EFFEKT (gestohlener „Bear Rider") eine eigene
+ * Creature, geschah erst einmal gar nichts — die Wiederbelebung kam
+ * verspaetet, sobald der naechste Angriff traf und `afterSpellResolved`
+ * lief. Dazu kommen deshalb `afterCreatureEffect` (nach JEDEM
+ * abgeschlossenen aktiven Kreatureffekt, auch einem geliehenen) und
+ * `onAnyActionResolved` (Sammelpunkt aller uebrigen Aktionswege).
+ */
+async function loeseAusstehende(ctx) {
+  if (ctx.card?.zone !== 'permanent') return;
+  const engine = ctx._engine;
+  const pi = ctx.cardOwner;
+  const ps = engine.gs.players[pi];
+  const permId = ctx.card.counters?.permId;
+  const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
+  if (!perm || perm._triggered) return;
+  if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
+  await resolveElixirPending(engine, pi, perm);
+}
+
 module.exports = {
   isPotion: true,
   deferBroadcast: true,
@@ -76,6 +101,19 @@ module.exports = {
 
     engine.log('permanent_placed', { card: 'Elixir of Immortality', player: ps.username });
     engine.sync();
+
+    // ★ v1279 (Als Befund 22.9.: „Immortality spielt on-activation noch
+    // immer keinen Sound ab"). Das Bild beim AUSLOESEN (Wiederbelebung)
+    // hat seinen Klang seit v1263 — beim Ablegen sendete die Karte aber
+    // gar nichts, also blieb es dort still, egal ueber welchen Weg sie
+    // kam (Hand, Colored Snow, Potion Launcher, Tuscan Mystic). Erst
+    // nach `sync`, damit der Client das Permanent schon gerendert hat;
+    // der Klang laeuft ohnehin unabhaengig vom Element.
+    await engine._delay(60);
+    engine._broadcastEvent('play_permanent_animation', {
+      owner: pi, permId, type: 'holy_revival',
+    });
+    await engine._delay(240);
 
     return { placed: true };
   },
@@ -182,47 +220,33 @@ module.exports = {
 
     /** After all status damage: resolve pending hero deaths from burn/poison. */
     afterAllStatusDamage: async (ctx) => {
-      if (ctx.card?.zone !== 'permanent') return;
-      const engine = ctx._engine;
-      const pi = ctx.cardOwner;
-      const ps = engine.gs.players[pi];
-      const permId = ctx.card.counters?.permId;
-
-      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
-      if (!perm || perm._triggered) return;
-      if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
-
-      await resolveElixirPending(engine, pi, perm);
+      await loeseAusstehende(ctx);
     },
 
     /** After a spell resolves: resolve pending hero deaths from AoE. */
     afterSpellResolved: async (ctx) => {
-      if (ctx.card?.zone !== 'permanent') return;
-      const engine = ctx._engine;
-      const pi = ctx.cardOwner;
-      const ps = engine.gs.players[pi];
-      const permId = ctx.card.counters?.permId;
+      await loeseAusstehende(ctx);
+    },
 
-      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
-      if (!perm || perm._triggered) return;
-      if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
+    /**
+     * ★ v1282: nach einem aktiven KREATUR-Effekt (auch einem geliehenen) —
+     * der Weg, auf dem der Befund vom 22.9. lag.
+     */
+    afterCreatureEffect: async (ctx) => {
+      await loeseAusstehende(ctx);
+    },
 
-      await resolveElixirPending(engine, pi, perm);
+    /**
+     * ★ v1282: Sammelpunkt aller uebrigen Aktionswege (Helden-Effekte,
+     * Beschwoerungen, Ability- und Artefakt-Aktivierungen, Traenke).
+     */
+    onAnyActionResolved: async (ctx) => {
+      await loeseAusstehende(ctx);
     },
 
     /** Phase end: catch-all for deaths from combat, attacks, or other sources. */
     onPhaseEnd: async (ctx) => {
-      if (ctx.card?.zone !== 'permanent') return;
-      const engine = ctx._engine;
-      const pi = ctx.cardOwner;
-      const ps = engine.gs.players[pi];
-      const permId = ctx.card.counters?.permId;
-
-      const perm = (ps.permanents || []).find(p => p.id === permId || (!permId && p.name === 'Elixir of Immortality'));
-      if (!perm || perm._triggered) return;
-      if (!(perm._pendingHeroes?.length > 0 || perm._pendingCreatures?.length > 0)) return;
-
-      await resolveElixirPending(engine, pi, perm);
+      await loeseAusstehende(ctx);
     },
   },
 };

@@ -119,6 +119,20 @@ module.exports = {
       // Create a temporary card instance for the second cast
       const tempInst = engine._trackCard(ctx.spellName, pi, 'hand', heroIdx, -1);
 
+      // ★ v1277 (Als Befund 22.9.): der Zweitguss ist KEIN neues Ausspielen
+      // der Karte — er darf die Aktionsoekonomie nicht veraendern. Fire Bolts
+      // hielt sich im Zweitguss wieder fuer den „ersten Destruction-Zauber"
+      // (die Karte liegt dann noch auf dem Stapel der laufenden Zauber und
+      // wird bewusst uebersprungen), verstaerkte sich automatisch und setzte
+      // `_spellFreeAction` erneut. Der Server hatte das Flag da schon
+      // ausgewertet — es blieb liegen, und der NAECHSTE Zauber (Phoenix
+      // Tackle in der Action Phase) wurde zur Freiaktion. Beide Aktions-
+      // Flags werden VOR diesem Hook ausgewertet; was der Zweitguss an
+      // ihnen aendert, wird deshalb auf den Stand davor zurueckgesetzt.
+      const AKTIONS_FLAGS = ['_spellFreeAction', '_spellForcesActionConsume'];
+      const flagsVorher = {};
+      for (const k of AKTIONS_FLAGS) flagsVorher[k] = gs[k];
+
       try {
         await engine.runHooks('onPlay', {
           _onlyCard: tempInst, playedCard: tempInst,
@@ -127,6 +141,11 @@ module.exports = {
         });
       } catch (err) {
         console.error(`[Engine] Bartas second cast error for "${ctx.spellName}":`, err.message);
+      } finally {
+        for (const k of AKTIONS_FLAGS) {
+          if (flagsVorher[k] === undefined) delete gs[k];
+          else gs[k] = flagsVorher[k];
+        }
       }
 
       // Clean up temp instance

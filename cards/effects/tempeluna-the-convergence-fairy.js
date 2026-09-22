@@ -43,6 +43,7 @@
 //  angelegte Feen traegt ihre eigene Karte in der Support Zone.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { loadCardEffect } = require('./_loader');
 const { gainedNames } = require('./_gained-effects-shared');
 // ★ v1187: Namensbezug, Bedingung und Bereitschaft liegen in EINEM
@@ -264,13 +265,17 @@ module.exports = {
     // Tempelunas eigener Effekt plus jeder gewonnene Aktiveffekt. Die
     // Engine kennt je Held nur EINEN `heroEffect`; ohne dieses Menue
     // waere Jennys Effekt unter Tempeluna tot.
-    const eigenerHopt = `hero-effect:tempeluna-attach:${pi}:${heroIdx}`;
+    // v1275: pro Spieler (Ruling 22.9.), siehe `_hero-hopt-shared.js`.
+    const eigenerHopt = heldenSperreKey('hero-effect:tempeluna-attach', pi);
     const eigenOffen = gs.hoptUsed?.[eigenerHopt] !== gs.turn
       && freieZonen(ps, heroIdx).length > 0
       && anlegbareFeen(engine, pi, heroIdx).length > 0;
 
     const fremde = gewonneneAktiveffekte(engine, pi, heroIdx).filter(({ name, script }) => {
-      if (gs.hoptUsed?.[`hero-effect:gained:${name}:${pi}:${heroIdx}`] === gs.turn) return false;
+      // v1275: derselbe Schluessel wie der Aktiveffekt der Fee selbst —
+      // eine gewonnene Fee und eine echte auf derselben Seite teilen sich
+      // die Sperre (Ruling 22.9.).
+      if (gs.hoptUsed?.[engine.heroHoptKey(name, pi)] === gs.turn) return false;
       if (typeof script.canActivateHeroEffect === 'function') {
         try { return !!script.canActivateHeroEffect(ctx); } catch { return false; }
       }
@@ -310,7 +315,7 @@ module.exports = {
       // Jennys Einsatz Tempelunas Anlegen (die Engine stempelt sonst
       // EINEN gemeinsamen Schluessel je Held).
       if (!gs.hoptUsed) gs.hoptUsed = {};
-      gs.hoptUsed[`hero-effect:gained:${wahl}:${pi}:${heroIdx}`] = gs.turn;
+      gs.hoptUsed[engine.heroHoptKey(wahl, pi)] = gs.turn;   // v1275
       engine.sync();
       return false;   // eigener Schluessel gesetzt → Engine-Stempel unterdruecken
     }

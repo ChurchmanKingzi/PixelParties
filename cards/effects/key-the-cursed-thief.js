@@ -36,10 +36,11 @@
 //    und zaehlen mit (Tool-Freezer-Lesart). ← LESART.
 // ═══════════════════════════════════════════
 
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 const { hasCardType } = require('./_hooks');
 
 const CARD_NAME = 'Key, the Cursed Thief';
-const hoptKey = (pi, hi) => `key-thief:${pi}-${hi}`;
+const hoptKey = (pi, hi) => heldenSperreKey('key-thief', pi);   // v1275: pro Spieler (Ruling 22.9.)
 
 /** Juengstes, nicht negiertes gegnerisches Artefakt in der Kette. */
 function zielArtefakt(chain, pi) {

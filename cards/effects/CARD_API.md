@@ -248,6 +248,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-anim-keyframes` | Animationen, deren Keyframes nirgends stehen |
 | `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
 | `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
+| `check-hero-hopt` | Heldenskript mit „once per turn", das seine Sperre an Heldenplatz oder Instanz bindet statt pro Spieler (v1275) |
 | `check-damage-types` · `check-no-splice` · `check-areas` · … | siehe die jeweiligen Kopfkommentare |
 
 **Vor jeder Auslieferung laufen alle**, nicht nur die passenden:
@@ -16732,4 +16733,264 @@ Hover-Tooltip funktioniert automatisch.
 absolut. Seitenzonen beider Haende ueber `--hand-zone` / `--hand-strich`
 auf `.game-hand` (300/286 × Massstab, Telefon 320/306) — die Variablen
 stehen VOR dem Telefon-Block, damit dessen Werte gewinnen.
+
+## ★ v1271 — „Schaden an irgendeinem Ziel", Skull Carpet Bombing
+
+**`ps.dealtDamageAnyTarget`** (Engine): wird gesetzt, sobald ein Effekt
+dieses Spielers echten Schaden > 0 an IRGENDEIN Ziel verursacht — eigene
+eingeschlossen. Dieselben drei Stellen wie `dealtDamageToOpponent`
+(zwei Heldenpfade, Kreaturen-Batch), zurueckgesetzt zu JEDEM Zugbeginn
+fuer beide Spieler; am Zugende gibt es also genau den Schaden dieses
+Zuges wieder. Das Zugende-Fenster reicht es als
+`info.dealtDamageAnyTarget` an `surpriseTurnEndTrigger` durch.
+**Als Rulings 22.9. (bindend):** Status-Ticks ohne Verursacher zaehlen
+nicht; auf 0 reduzierter Schaden zaehlt nicht als „dealt".
+
+Voraussetzung ist der Verursacher im Aufruf: Kreaturschaden ueber
+`actionDealCreatureDamage` braucht `opts.sourceOwner` (159 von 160
+Aufrufen geben ihn an; die Ausnahme ist ein bewusst besitzerloser
+Burn-Tick). Wer eine neue Schadensquelle baut, reicht ihn IMMER mit.
+
+**„placed this card into your Surprise Zone this turn"** = `turnPlayed`
+der Surprise-Instanz ist der aktuelle Zug — Setzen aus der Hand UND
+Platzieren per Effekt (Als Ruling 22.9.).
+
+**Skull Carpet Bombing:** Zugende-Surprise am EIGENEN Zug, harte
+Einmal-Sperre `gs.hoptUsed['skull_carpet_bombing:<pi>']`, zwei getrennte
+`ctx.aoeHit` (Gegner, dann ggf. eigene Seite). Animation
+`skull_carpet_bombing` bleibt unter 1000 ms, weil `aoeHit` ohne eigene
+Dauer sendet (der Dispatcher raeumt Zonen-Animationen sonst nach 1 s ab).
+
+**Test-Harness-Lehre:** die Engine kuerzt Instanz-IDs auf 12 Zeichen
+(`uuidv4().substring(0, 12)`). Ein `uuid`-Ersatz fuer Offline-Tests muss
+sich VORNE unterscheiden, sonst kollidieren alle IDs und `_untrackCard`
+raeumt gleichnamige Karten gemeinsam ab.
+
+## ★ v1272 — Bilder aller Ziele gleichzeitig, Puzzle-Vorbelegung
+
+**Als Regel 22.9.: die Animationen auf ALLEN Zielen laufen gleichzeitig.**
+- `processCreatureDamageBatch` startet die Bilder (`animType`) ALLER
+  Eintraege gemeinsam direkt vor der Anwendungsschleife und wartet EINMAL
+  300 ms (vorher je Eintrag 300 ms nacheinander). Sicher an dieser
+  Stelle, weil alle Umleitungs-, Reaktions- und Surprise-Fenster in den
+  Durchgaengen darueber liegen. Markierung `e._bildGelaufen` verhindert
+  Doppelbilder; Eintraege, die erst waehrend der Schleife hinzukommen,
+  bekommen ihr Bild wie bisher einzeln.
+- `actionAoeHit` sendet die Kreaturbilder im selben Augenblick wie die
+  Heldenbilder (vorher erst im Batch NACH dem Heldenschaden).
+- Die Schadenszahlen bleiben getaktet (Helden 150 ms, Kreaturen 200 ms).
+
+**Puzzle-Vorbelegung:** der Loader datiert ALLE Brettzonen, die zu Beginn
+eines normalen Spiels leer sind (Support, Surprise, Area, Permanent), auf
+`turnPlayed = 0` zurueck — „lag schon vor Spielbeginn". Vorher nur
+Support; vorgesetzte Surprises galten als „diesen Zug gesetzt" (Befund an
+Skull Carpet Bombing). Helden und Abilities bleiben beim Startzug wie im
+normalen Spiel.
+
+## ★ v1273 — Skull Carpet Bombing: beide Seiten gleichzeitig, Unentschieden
+
+- Trifft die Karte beide Seiten, dann in EINEM Flaechentreffer
+  (`side: 'both'`) — Bilder und Schaden fuer beide Seiten im selben
+  Durchgang (Als Vorgabe 22.9.), nicht mehr erst Gegner, dann eigene.
+- **Als Vorgabe 22.9.: faellt dabei jeder Held beider Seiten, gewinnt der
+  Nutzer.** Vertrag wie Bunny Bombs / Armageddon: `_deferGameOverCheck`
+  um den Schlag, danach EINE Auswertung mit `_drawLoserIdx` = Gegner.
+  Gilt auch ohne Eigenschaden (Rueckstoss kann die eigene Seite leeren).
+- Faustregel fuer jede Karte, die beide Seiten trifft: ohne Aufschub
+  entscheidet der erste toedliche Treffer, also die Reihenfolge der
+  Ziele — und ohne Hinweis verliert im Unentschieden stillschweigend
+  Spieler 0.
+
+## ★ v1275 — Pseudonia, Heldensperren pro Spieler, gewonnene Effekte ueberleben den Tod
+
+**Als Rulings 22.9. (bindend):**
+- Heldeneffekte mit „once per turn" sind IMMER hard once per turn, und
+  zwar — sofern nicht anders angegeben — pro SPIELER. Zwei Traeger
+  desselben Effekts auf einer Seite (Pseudonia + wiederbelebtes
+  Original) teilen sich den Ausloeser; spielerübergreifend nicht.
+- Pseudonia nimmt bis zu drei Heldeneffekte auf, je Held einmal pro
+  Partie, dauerhaft (auch ueber Tod und Wiederbelebung). Sie muss beim
+  Tod des anderen Helden leben und darf nicht stummgeschaltet sein;
+  faellt sie im selben Flaechentreffer, nimmt sie nichts auf.
+- Ein verwandelter ??? gibt nur SEINEN Effekt, ein per eigenem Effekt
+  aufgestiegener Throne Robber nur den Throne-Robber-Effekt; regulaer
+  aufgestiegene Ascended Heroes geben den Effekt ihrer Form.
+- ??? als Pseudonia verliert das Aufgenommene mit der Gestalt.
+
+**Sperren:** aktive Heldeneffekte ueber `engine.heroHoptKey(name, pi)`
+(vorher `…:<pi>:<heroIdx>`; Engine 6 Stellen, Server 2). Passive ueber
+`_hero-hopt-shared.js` (`heldenSperreKey/-Frei/-Setzen/-Freigeben`),
+Zugstempel am Spieler statt Merker an Instanz oder Held. Umgestellt:
+Alleria, Baaliel, Cool Rescuer Monia, Deep-Drowned Waflav, Diamond,
+Johanna, Kasperov [W], Key, Kyli, Orthos, Rafflesia, Rubin, Stellan,
+Tarleinn, Tempeluna (gewonnene Feen nutzen jetzt den Schluessel der Fee
+selbst), True Fairy Crestina, Waflav. Mary Crestmas behaelt ihre
+Rueckstellung zu Beginn des eigenen Zuges, der Merker liegt jetzt am
+Spieler. Waechter: `scripts/check-hero-hopt.js`.
+
+**`engine.heroEffectIdentity(pi, hi)`:** der Name, dessen Effekt ein
+Held „eigentlich" traegt — `_shapeshiftBase`, sonst eine geliehene
+HELDEN-Identitaet aus `_identityCleanupCard`, sonst `hero.name`.
+
+**Heldentod:** `handleHeroDeathCleanup` raeumt die unsichtbaren Traeger
+gewonnener Effekte (`_gainedEffectOnly`) nicht mehr ab. Vorher landete
+der Heldenname als Geisterkarte in der Ablage und der Effekt verlor
+seine Hooks, waehrend `gainedEffectNames` blieb.
+
+**Vormerken im Flaechentreffer:** eine Reaktion, die „gleichzeitig
+gestorben" ausschliessen muss, merkt waehrend `engine._multiHitScope`
+nur vor und entscheidet an einem Nachlauf-Hook (Muster Pseudonia).
+
+## v1276 — Artefakt-Flug, Lautstaerke in Kopfzeilen
+
+- Gewoehnliche Artefakte (`doUseArtifactEffect`) fliegen nicht mehr in die
+  „Permanents-Zone": kein Artefakt wird zum Permanent, und ohne gerenderte
+  Zeile landete der Flug beim MITTLEREN HELDEN (Befund Treasure Chest).
+  Sie verhalten sich wie Zauber: aufdecken, aufloesen, Ablage. Der Client
+  faellt bei `zoneType: 'permanent'` nicht mehr auf den mittleren Helden
+  zurueck — ohne Zeile kein Flug.
+- `.top-bar > .volume-control:last-child { margin-left: auto }`: die
+  Lautstaerkeregelung als letztes Element einer Kopfzeile sitzt immer am
+  rechten Rand (Befund: PvP-Raum „GAME LOBBY" hatte keinen Abstandhalter).
+
+## v1277 — `_spellFreeAction` gehoert zu GENAU EINER Aufloesung
+
+Befund (Al 22.9.): Fire Bolts (verstaerkt, Main 1) mit Bartas-Zweitguss,
+danach Phoenix Tackle in der Action Phase → die Phase blieb stehen, als
+gaebe es noch eine freie Aktion. Ursache: der Server wertet
+`_spellFreeAction` VOR `afterSpellResolved` aus; Bartas' Zweitguss laeuft
+darin, Fire Bolts hielt sich dort wieder fuer den ersten Destruction-
+Zauber (die Karte ist dann noch „in flight" und wird bewusst
+uebersprungen), verstaerkte sich und setzte das Flag erneut — der
+naechste Zauber verbrauchte es.
+
+- Bartas klammert den Zweitguss: `_spellFreeAction` und
+  `_spellForcesActionConsume` stehen danach wieder auf dem Stand davor.
+  Ein Zweitguss ist kein neues Ausspielen.
+- Sicherheitsnetz: `doPlaySpell` loescht `_spellFreeAction` zu Beginn
+  der Aufloesung und beide Flags im Aufraeumblock am Ende; der
+  Direktguss-Weg der Engine loescht es vor dem Guss.
+- Zweite Quelle desselben Lecks: Bifab und String of Fine setzen das
+  Flag beim Spielen vom Coolness Stack, der nie eine Aktion kostet und
+  es nie auswertet — es machte den NAECHSTEN Zauber zur Freiaktion.
+  Jetzt vom Sicherheitsnetz verworfen.
+- Regel fuer neue Karten: `_spellFreeAction` / `_spellForcesActionConsume`
+  nur im `onPlay` des Zaubers selbst setzen; Wirkung auf einen SPAETEREN
+  Zauber ueber diese Flags ist nicht vorgesehen.
+
+## v1278 — Homerun! nur noch bei Schaden ≥ max HP
+
+Befund (Al 22.9.): Homerun! wurde KONSTANT angeboten. Ursache: ein
+lockerer Einstieg im Nach-Zielwahl-Fenster (`isPostTargetReaction`) —
+dort ist der Betrag unbekannt, also bot er sich an, sobald ein eigener
+Held Ziel eines Schadenseffekts war. Entfernt, samt der Marken.
+
+Es bleibt das Vor-Schaden-Fenster (`isPreDamageReaction`) mit dem
+ENDGUELTIGEN Betrag: Angebot nur bei Betrag ≥ max HP; `negated: true`
+hebt den Treffer samt On-Hit-Effekten auf.
+
+**Vertrag erweitert:** `preDamageCondition(gs, pi, engine, target, heroIdx,
+source, amount, type, { cannotBeNegated, cannotBeReduced })` — der neunte
+Parameter ist optional. Reaktionen, die nur AUFHEBEN, bieten sich bei
+durchschlagendem Schaden damit gar nicht erst an (statt bezahlt und dann
+von der Engine verworfen zu werden).
+
+**Faustregel:** eine Reaktion mit Betragsschwelle („damage equal to or
+greater than …") gehoert ins Vor-Schaden-Fenster, nie ins Nach-Zielwahl-
+Fenster — dort kennt niemand den Betrag.
+
+## v1279 — Abwurfkosten unter Boris, Potions, die liegen bleiben
+
+**Abwurfkosten (Als Befund 22.9.):** Effekte mit Abwurfkosten waren bei zu
+kleiner Hand nicht aktivierbar — auch dann nicht, wenn Boris die Kosten
+ohnehin erlaesst. Neu:
+- `engine.discardCostWaived(pi)` — fragt die Helden ueber den Vertrag
+  `waivesDiscardCosts(engine, pi)` (heute nur Boris). Die
+  Spielbarkeits-Listen (`getHeroEligibleActionCards`,
+  `getHeroPlayableCards`, beide Seiten) lassen einen Wisdom-Abwurf dann
+  nicht mehr an der Handgroesse scheitern.
+- Boris verzichtet ohne Rueckfrage, sobald die Hand die Kosten nicht
+  tragen kann (auch bei leerer Hand — dort stieg er vorher ganz aus).
+  Ist der Abwurf bezahlbar, fragt er wie bisher: „You MAY ignore".
+
+**Potions, die sich selbst aufs Brett legen** (`resolve` liefert
+`{ placed: true }`, Elixir of Immortality): der normale Weg
+(`doUsePotion`) liest den Rueckgabewert, die DIREKTEN Wege verwarfen ihn
+und schrieben die Karte zusaetzlich in die Loesch-Ablage — eine
+Geisterkarte neben dem echten Permanent. Umgestellt:
+- `_potion-shared.js`: `loesePotionAus` liefert bei Erfolg
+  `{ gewirkt: true, placed }`; `potionBleibtLiegen(ergebnis)` ist die
+  Frage fuer den Aufrufer (Tuscan Mystic, Future Tech Potion Launcher).
+- Mischief Militia - Colored Snow reicht den Rueckgabewert in beide
+  Zweige seiner Weiterleitung durch.
+- Jede neue Karte, die eine Potion direkt aufloest, MUSS den
+  Rueckgabewert auswerten, statt pauschal zu entsorgen.
+
+**Elixir of Immortality** sendet beim Ablegen jetzt
+`play_permanent_animation` (`holy_revival` → Klang `revive`) — vorher
+sendete es dort gar nichts und blieb auf JEDEM Weg stumm; der Klang beim
+Ausloesen (v1263) war davon unberuehrt.
+
+## v1280 — Chilly Dog auch eingefroren, Prophecy-Deckel, Tooltip durch den Schleier
+
+**Mischief Militia - Chilly Dog** (Textaenderung 22.9.: „(including this
+one)"): ein EINGEFRORENER Chilly Dog wirkt jetzt weiter — auch fuer sich
+selbst. Die Wirksamkeitspruefung `_isChillyDogActiveFor` fragt dafuer
+`isCreatureEffectSuppressed(inst, { ignoriereFrozen: true })` statt
+`isCardEffectActive`; die neue Option ist der einzige Weg, den eigenen
+Frost auszublenden, ohne die Rekursion von v1263 (Stack Overflow)
+zurueckzuholen. Negated, Stunned, Nulled, Magic Silenced legen ihn
+weiterhin stumm.
+
+**Prophecy of Tempeste:** „Damage this Hero would take cannot exceed 100"
+galt nur fuer den UMGELEITETEN Treffer. Jetzt deckelt die Karte JEDEN
+Treffer gegen ihren Traeger (`beforeDamage` → `ctx.setAmount(100)`).
+`setAmount` ist der absolute Weg und beachtet `cannotBeReduced` — echter
+Durchschlag-Schaden (Ida, Monia-Bot) bleibt wie ueberall unbeschnitten.
+
+**Tooltips beim Hovern DURCH einen Dialog-Schleier (v1270):** der
+Tooltip hat eine Sicherung, die alle 300 ms prueft, ob noch ein Element
+per CSS `:hover` unter dem Zeiger liegt. Beim Durchreichen liegt der
+echte `:hover` auf dem SCHLEIER — jeder so gezeigte Tooltip verschwand
+darum sofort wieder (Befund: Infiltration-Overlay). Das durchgereichte
+Element traegt jetzt die Marke `pp-hover-durch`, `useCardTooltip` zaehlt
+sie mit. Wer eine eigene Hover-Sicherung baut, nimmt die Marke auf.
+
+## v1281 — Menuebreiten unter `zoom`: `--menu-vw`
+
+Befund (Al 22.9.): im Vollbild sass der Avatar im Hauptmenue falsch —
+er ragte ueber den linken Bildrand und ueberlappte den Top-Players-
+Kasten. Ursache: die Breiten mischten `%` (vom GEZOOMTEN Menue) mit `vw`
+(vom UNGEZOOMTEN Fenster). Gemessen bei 1920×1080 (Zoom 1.2): Kasten 564
+statt 470 px, Gasse nur 89 px, Avatar 192 px → Ueberstand 52 px nach
+links; bei 2560×1440 (Zoom 1.6) noch mehr.
+
+`--menu-vw` ist 1 vw in LAYOUT-Pixeln (Fensterbreite / Zoomfaktor),
+gesetzt im Messlauf des Hauptmenues (app-screens.jsx, neben `panelTop`).
+Daraus leiten sich `--menu-seite` (Breite der Seitenkaesten) und
+`--menu-gasse` (linke Gasse) ab; der Avatar misst
+`clamp(56px, var(--menu-gasse) - 48px, 160px)`. Ohne gemessenen Wert
+faellt alles auf `1vw` zurueck (Verhalten bei Zoom 1).
+
+**Faustregel (dieselbe wie beim Editor-Scaler und beim UiScaler):** unter
+`zoom` sind `vw`/`vh` GEZEICHNETE Pixel, `%` und `px` LAYOUT-Pixel — in
+einer Rechnung nie mischen.
+
+## v1282 — Elixir of Immortality: verspaetete Wiederbelebung
+
+Befund (Al 22.9.): ein gestohlener „Bear Rider" toetete per KREATUR-EFFEKT
+eine eigene Creature — das Elixir tat nichts. Es loeste erst aus, als der
+Gegner danach mit einer Attack einen Helden traf.
+
+Das Elixir SAMMELT Tode (`afterCreatureDamageBatch`, `onHeroKO`) und
+loest sie an Nachlauf-Punkten ein. Die waren: `afterAllStatusDamage`,
+`afterSpellResolved`, `onPhaseEnd` — ein aktiver Kreatureffekt ist
+keiner davon. Neu dabei: `afterCreatureEffect` (nach JEDEM
+abgeschlossenen aktiven Kreatureffekt, auch einem geliehenen) und
+`onAnyActionResolved` (Sammelpunkt aller uebrigen Aktionswege). Alle
+fuenf Punkte laufen ueber EINEN Helfer (`loeseAusstehende`).
+
+**Faustregel fuer jede Karte, die Tode sammelt und spaeter einloest:**
+die Einloesepunkte muessen ALLE Aktionswege abdecken, nicht nur Zauber —
+sonst haengt die Wirkung an der naechsten fremden Aktion.
 

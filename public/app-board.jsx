@@ -12468,6 +12468,69 @@ const ANIM_REGISTRY = {
   // auf 0,0), zieht einen Schweif aus Funken hinter sich her und
   // detoniert bei der Ankunft. Die Einschlaege sind gestaffelt, damit
   // es nach Bombardement klingt und nicht nach einem Schlag.
+  // ★ v1271 — „Skull Carpet Bombing": Pixel-Schaedel stuerzen gestaffelt
+  // auf jedes Ziel, je mit Rauchspur, Einschlag und Splittern. Der ganze
+  // Ablauf bleibt UNTER 1000 ms: `aoeHit` sendet ohne eigene Dauer, und
+  // der Dispatcher raeumt Zonen-Animationen dann nach einer Sekunde ab.
+  // Gestalt und Keyframes (`skb*`) stehen in style.css; hier nur die
+  // Zufallsverteilung. Klang: `ZONE_ANIM_SFX.skull_carpet_bombing`.
+  skull_carpet_bombing: (() => {
+    return function SkullCarpetBombingEffect({ x, y, w }) {
+      const ww = Math.max(w || 90, 90);
+      const schaedel = useMemo(() => Array.from({ length: ppFxN(3) }, (_, i) => {
+        const start = 30 + i * 150 + Math.random() * 30;
+        const fall = 240;
+        return {
+          dx: (i - 1) * ww * 0.2 + (Math.random() - 0.5) * ww * 0.1,
+          dy: (Math.random() - 0.5) * ww * 0.16,
+          hoehe: 240 + Math.random() * 120,
+          groesse: ww * (0.38 + Math.random() * 0.1),
+          dreh: (Math.random() - 0.5) * 80,
+          start, fall, einschlag: start + fall,
+          splitter: Array.from({ length: ppFxN(6) }, () => {
+            const wi = Math.random() * Math.PI * 2;
+            const r = ww * (0.22 + Math.random() * 0.3);
+            return {
+              sx: Math.cos(wi) * r, sy: Math.sin(wi) * r * 0.8 - ww * 0.08,
+              g: 3 + Math.random() * 4,
+              farbe: ['#efe6d2', '#ffb347', '#ff5a2a', '#7a1f2e'][Math.floor(Math.random() * 4)],
+            };
+          }),
+        };
+      }), [ww]);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10155 }}>
+          {schaedel.map((s, i) => (
+            <React.Fragment key={'skb' + i}>
+              <div className="skb-spur" style={{
+                left: s.dx, top: s.dy - s.hoehe, height: s.hoehe,
+                animation: `skbSpur ${s.fall + 180}ms ease-in ${s.start}ms forwards`,
+              }} />
+              <div className="skb-schaedel" style={{
+                left: s.dx, top: s.dy, width: s.groesse, height: s.groesse,
+                marginLeft: -s.groesse / 2, marginTop: -s.groesse / 2,
+                '--skb-h': s.hoehe + 'px', '--skb-dreh': s.dreh + 'deg',
+                animation: `skbFall ${s.fall}ms cubic-bezier(.5,0,1,1) ${s.start}ms forwards, skbWeg 60ms linear ${s.einschlag}ms forwards`,
+              }} />
+              <div className="skb-blitz" style={{
+                left: s.dx, top: s.dy, width: ww * 0.72, height: ww * 0.72,
+                marginLeft: -ww * 0.36, marginTop: -ww * 0.36,
+                animation: `skbBoom 360ms ease-out ${s.einschlag}ms forwards`,
+              }} />
+              {s.splitter.map((p, k) => (
+                <div key={'skbs' + i + '_' + k} className="skb-splitter" style={{
+                  left: s.dx, top: s.dy, width: p.g, height: p.g,
+                  marginLeft: -p.g / 2, marginTop: -p.g / 2, background: p.farbe,
+                  '--sx': p.sx + 'px', '--sy': p.sy + 'px',
+                  animation: `skbSplitter 380ms ease-out ${s.einschlag}ms forwards`,
+                }} />
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    };
+  })(),
   phoenix_bombardment: (() => {
     return function PhoenixBombardmentEffect({ x, y, w }) {
       const ww = Math.max(w || 90, 90);
@@ -24353,6 +24416,18 @@ function useHoverDurchSchleier() {
     // ein `mouseover`, dessen Herkunft ein React-Element ist, wertet es
     // bewusst gar nicht aus (im Test: verschluckter Wiedereintritt).
     // Ohne vorheriges Element ist der Schleier selbst die Herkunft.
+    // ★ v1280 (Als Befund 22.9.: „im Infiltration-Overlay sehe ich die
+    // Tooltips der Board-Karten, sie werden aber sofort ausgeblendet").
+    // Der Tooltip hat eine Sicherung, die alle 300 ms prueft, ob noch
+    // irgendein Element per CSS `:hover` unter dem Zeiger liegt —
+    // beim Hovern DURCH den Schleier liegt der echte `:hover` aber auf
+    // dem Schleier, nie auf der Karte (synthetische Ereignisse setzen
+    // keinen `:hover`). Die Sicherung raeumte den Tooltip deshalb sofort
+    // wieder ab. Das durchgereichte Element traegt jetzt die Marke
+    // `pp-hover-durch`, und `useCardTooltip` zaehlt sie mit.
+    const marke = (el, an) => {
+      try { el?.classList?.[an ? 'add' : 'remove']('pp-hover-durch'); } catch { /* egal */ }
+    };
     const onMove = (e) => {
       const t = e.target;
       const schleier = t?.classList?.contains('modal-overlay') ? t : null;
@@ -24361,11 +24436,14 @@ function useHoverDurchSchleier() {
       const von = (durch && durch.isConnected) ? durch : t;
       const zu = neu || t;
       if (von !== zu) sende(von, 'mouseout', zu, e);
+      marke(durch, false);
+      marke(neu, true);
       durch = neu;
     };
     document.addEventListener('mousemove', onMove, true);
     return () => {
       document.removeEventListener('mousemove', onMove, true);
+      marke(durch, false);
       durch = null;
     };
   }, []);
@@ -30723,8 +30801,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       } else if (zoneType === 'permanent') {
         // Permanent Artifacts: land on the owner's permanents row if rendered,
         // otherwise default to the center of their hero row.
-        destEl = document.querySelector(destIsMe ? '.board-permanents-me' : '.board-permanents-opp')
-          || document.querySelector(`[data-hero-zone][data-hero-owner="${destLabel}"][data-hero-idx="1"]`);
+        destEl = document.querySelector(destIsMe ? '.board-permanents-me' : '.board-permanents-opp');
+        // v1276: KEIN Rueckfall mehr auf den mittleren Helden — fehlt die
+        // Permanents-Zeile, gibt es keinen Flug statt eines falschen
+        // (Befund: Treasure Chest flog zum mittleren Helden).
       }
       if (!sourceEl || !destEl) return;
       // ★ v1257: Mobile-Kamera folgt dem Landeplatz (no-op am Desktop
@@ -39694,6 +39774,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         : <span className="log-info">{pName(p.name, p.color)} offered a Creature to the Gods — <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.gold}</span> Gold.</span>; }
       if (t === 'boulder_placed') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} dropped {cName('Boulder in a Bottle')} onto {entry.opponent}'s {entry.hero} — it blocks every free Support Zone there.</span>; }
       if (t === 'boulder_zones_claimed') { const p = playerByName(entry.player); return <span className="log-info">{cName('Boulder in a Bottle')} fills the free Support Zones of {pName(p.name, p.color)}'s Hero.</span>; }
+      if (t === 'pseudonia_devour') { const p = playerByName(entry.player); return <span className="log-heal">{pName(p.name, p.color)}'s Pseudonia devoured the effects of <b>{entry.from}</b> ({entry.count}/{entry.max}).</span>; }   {/* v1275 */}
+      if (t === 'skull_carpet_bombing') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s Skull Carpet Bombing rained skulls — <span className="log-amount">{entry.damage}</span> damage to every target {entry.selfHit ? 'on both sides' : 'the opponent controls'}!</span>; }   {/* v1271 */}
       if (t === 'phoenix_bombardment') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} bombarded {entry.target} down to <span className="log-amount">1</span> HP — <span className="log-amount">{entry.reduced}</span> HP burned off, the same amount recoils.</span>; }
       if (t === 'difficulty_lever') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)} pulled {cName('Difficulty Lever')} — {entry.hero} casts {cName(entry.spell)} regardless of its level.</span>; }
       if (t === 'dangerous_knowledge') { const p = playerByName(entry.player); return <span className="log-status">{pName(p.name, p.color)}'s {entry.hero} learned the effect of {cName(entry.learned)} — permanently, in addition to its own.</span>; }
@@ -40551,6 +40633,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseLeave={hideGameTooltip}
                   >
                     ☥{hero._divinityCounters}
+                  </div>
+                )}
+                {/* ── Devour-Zaehler (Pseudonia, the Skill Devourer, v1275) ──
+                    Als Vorgabe 22.9.: oben in der Ecke wie die anderen
+                    Heldenzaehler. Zeigt, wie viele der drei Aufnahmen
+                    verbraucht sind; der Tooltip nennt die Helden. Auch fuer
+                    einen Helden, der Pseudonias Effekt gewonnen hat. */}
+                {hero?.name && (hero.name === 'Pseudonia, the Skill Devourer' || Array.isArray(hero._pseudoniaAbsorbiert)) && (
+                  <div
+                    className="pseudonia-counter-badge"
+                    onMouseEnter={e => showGameTooltip(e, (() => {
+                      const liste = hero._pseudoniaAbsorbiert || [];
+                      return `Devoured Hero effects: ${liste.length}/3.` + (liste.length ? ` ${liste.join(' · ')}` : ' Pseudonia may devour the effects of up to three defeated Heroes.');
+                    })())}
+                    onMouseLeave={hideGameTooltip}
+                  >
+                    🦷{(hero._pseudoniaAbsorbiert || []).length}/3
                   </div>
                 )}
                 {/* ── Evolution Counters (Waflav) ── */}

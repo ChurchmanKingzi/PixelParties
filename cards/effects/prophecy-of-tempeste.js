@@ -27,10 +27,13 @@
 //    Tempeste instance (`tempeste_redirect:
 //    <instId>`). Each Tempeste fires once per
 //    turn independently.
-//  • Damage cap (100): applied locally by
-//    Tempeste before re-firing. Internal — the
-//    "cannot be reduced" rule doesn't apply to
-//    Tempeste's own caps.
+//  • Damage cap (100): gilt seit v1280 fuer JEDEN
+//    Treffer gegen den Traeger (`beforeDamage`,
+//    `setAmount`), nicht nur fuer den umgeleiteten
+//    — der wird wie bisher schon vor dem
+//    Nachschlag gedeckelt. Intern — die „cannot be
+//    reduced"-Regel gilt nicht fuer Tempestes
+//    eigene Deckel.
 //  • "Cannot be reduced or negated": passes
 //    `cannotBeNegated: true` to the redirect's
 //    actionDealDamage, which the engine reads to
@@ -200,6 +203,24 @@ module.exports = {
       const host = ctx.attachedHero;
       if (!host?.name || host.hp <= 0) return;
       if (host.statuses?.frozen || host.statuses?.stunned || host.statuses?.negated) return;
+
+      // ★ v1280 (Als Befund 22.9.: „Prophecy of Tempeste cappt eingehenden
+      // Schaden gegen den Hero noch nicht bei 100 — sollte ALLER Schaden an
+      // jenem Hero sein"). „Damage this Hero would take cannot exceed 100"
+      // galt bisher nur fuer den UMGELEITETEN Treffer (Deckel vor dem
+      // Nachschlag weiter unten). Jetzt deckelt die Karte JEDEN Treffer
+      // gegen ihren Traeger — auch Schaden, der nie umgeleitet wurde.
+      // `setAmount` ist der absolute Weg (Deckel statt Abzug) und beachtet
+      // eine gesetzte `cannotBeReduced`-Klammer; echter Durchschlag-Schaden
+      // (Ida, Monia-Bot) bleibt damit wie ueberall unbeschnitten.
+      if (ctx.target === host && (ctx.amount || 0) > DAMAGE_CAP) {
+        engine.log('prophecy_of_tempeste_cap', {
+          player: ps.username, hero: host.name,
+          original: ctx.amount, capped: DAMAGE_CAP,
+          source: ctx.source?.name || undefined,
+        });
+        ctx.setAmount(DAMAGE_CAP);
+      }
 
       // Target must be a hero on the SAME side, NOT the host itself.
       const target = ctx.target;

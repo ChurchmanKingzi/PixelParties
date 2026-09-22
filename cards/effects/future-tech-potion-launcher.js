@@ -37,7 +37,7 @@
 // ═══════════════════════════════════════════
 
 const { zaehleInAblage, waehleAusNamen } = require('./_future-tech-shared');
-const { loesePotionAus, verbrauchePotion } = require('./_potion-shared');
+const { loesePotionAus, verbrauchePotion, potionBleibtLiegen } = require('./_potion-shared');
 
 const CARD_NAME = 'Future Tech Potion Launcher';
 
@@ -115,13 +115,19 @@ module.exports = {
     //   21.8.) — samt sichtbarem Weg Trankstapel → Geloeschtes. Beides
     //   macht der gemeinsame Helfer, damit kuenftige Karten dieser
     //   Bauart es nicht je einzeln nachbauen muessen.
-    await verbrauchePotion(engine, pi, name, { von: 'potionDeck' });
+    // ★ v1279: eine Potion, die sich SELBST aufs Brett gelegt hat
+    // (Elixir of Immortality → Permanent), wird NICHT zusaetzlich
+    // entsorgt — sonst liegt neben dem echten Permanent eine
+    // Geisterkarte in der Loesch-Ablage (Als Befund 22.9.).
+    if (!potionBleibtLiegen(gewirkt)) {
+      await verbrauchePotion(engine, pi, name, { von: 'potionDeck' });
+    }
 
     // „Shuffle the remaining cards back into your Potion Deck."
     engine.shuffleDeck(pi, 'potion');
 
     engine.log('ft_potion_launcher', {
-      player: ps.username, potion: name, looked: oben.length, resolved: gewirkt,
+      player: ps.username, potion: name, looked: oben.length, resolved: !!gewirkt,
     });
     engine.sync();
     return true;

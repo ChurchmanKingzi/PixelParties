@@ -20,6 +20,8 @@
 //  the creature damage is NOT prevented.
 // ═══════════════════════════════════════════
 
+
+const { heldenSperreKey } = require('./_hero-hopt-shared');   // v1275: Heldensperre pro Spieler (Ruling 22.9.)
 module.exports = {
   // CPU: confirm Diamond's "protect your Creatures?" prompt — the default
   // brain declines cancellable confirms outside a card-cast (damage trigger),
@@ -77,7 +79,7 @@ module.exports = {
       if (opponentEntries.length === 0) return;
 
       // HOPT check (soft, per hero instance)
-      const hoptKey = `diamond-protect:${pi}:${heroIdx}`;
+      const hoptKey = heldenSperreKey('diamond-protect', pi);
       if (engine.gs.hoptUsed?.[hoptKey] === engine.gs.turn) return;
 
       // Build prompt message

@@ -1057,6 +1057,19 @@ const ZONE_ANIM_SFX = {
   // Einbau-Versatz). Beide Schlaege ohne Kategorie — sonst schluckt
   // sie die erste Lage — und mit eigenem Dedupe-Fenster, damit sie
   // sich nicht gegenseitig verschlucken.
+  // ★ v1271 — Skull Carpet Bombing: dunkles Anschwellen, das Pfeifen der
+  // fallenden Schaedel, zwei Einschlaege, am Ende das Feuer. Die Lagen ab
+  // der zweiten ohne Kategorie und mit kurzem Namens-Dedupe (120 ms): die
+  // beiden Einschlaege liegen 150 ms auseinander und bleiben getrennt,
+  // die GLEICHE Lage mehrerer Ziele (gleichzeitig gesendet) verschmilzt
+  // dagegen — sonst droehnt ein Flaechentreffer n-fach.
+  skull_carpet_bombing: [
+    { name: 'elem_dark',    opts: { rate: 0.85, volume: 0.8 } },
+    { name: 'projectile',   opts: { rate: 0.7,  volume: 0.7,  delay: 40,  category: null, dedupe: 120 } },
+    { name: 'heavy_impact', opts: { rate: 0.95, volume: 0.9,  delay: 270, category: null, dedupe: 120 } },
+    { name: 'heavy_impact', opts: { rate: 0.8,  volume: 0.95, delay: 420, category: null, dedupe: 120 } },
+    { name: 'elem_fire',    opts: { rate: 0.9,  volume: 0.8,  delay: 570, category: null, dedupe: 120 } },
+  ],
   phoenix_bombardment: [
     { name: 'elem_fire',    opts: { rate: 1.05, volume: 1.0 } },
     { name: 'heavy_impact', opts: { rate: 1.25, volume: 0.85, delay: 160, category: null, dedupe: 0 } },
@@ -5138,10 +5151,17 @@ function useCardTooltip(opts) {
   }, []);
 
   // Safety: clear tooltip when the hover source element disappears
+  //
+  // ★ v1280: `.pp-hover-durch` zaehlt mit. Beim Hovern DURCH einen
+  // Dialog-Schleier (v1270) liegt der echte CSS-`:hover` auf dem
+  // Schleier, nie auf der Karte — ohne diese Marke raeumte die Sicherung
+  // jeden so gezeigten Tooltip nach spaetestens 300 ms wieder ab
+  // (Befund: Infiltration-Overlay). Die Marke setzt und entfernt der
+  // Hook `useHoverDurchSchleier` in app-board.jsx.
   useEffect(() => {
     if (!tooltipCard || window._isTouchDevice) return;
     const check = () => {
-      if (!document.querySelector(hoverSelectors)) setTooltipCard(null);
+      if (!document.querySelector(`${hoverSelectors}, .pp-hover-durch`)) setTooltipCard(null);
     };
     const id = setInterval(check, 300);
     return () => clearInterval(id);

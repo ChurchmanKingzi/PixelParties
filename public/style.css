@@ -12521,6 +12521,15 @@ body:has(.modal-overlay) .tooltip {
   position: relative;
   flex-shrink: 0;
 }
+/* ★ v1276 (Als Befund 22.9.: „im PvP-Battle-Setup ist das Lautstaerke-Icon
+   LINKS statt rechts am Rand"). In der Kopfzeile ist der Titel absolut
+   zentriert, der Rest reiht sich von links auf; andere Bildschirme schieben
+   die Regelung mit einem Abstandhalter nach rechts, der Spielraum
+   („GAME LOBBY") hatte keinen. Als letztes Element einer Kopfzeile rueckt
+   die Regelung jetzt IMMER an den rechten Rand. Wo schon ein Abstandhalter
+   mit `flex: 1` steht, bleibt kein freier Platz fuer den Rand — dort
+   aendert sich nichts. */
+.top-bar > .volume-control:last-child { margin-left: auto; }
 /* Discord invite button — brand-coloured pill, used on the title/login
    screen (fixed top-right) and the main menu (below the Logout button). */
 .discord-btn {
@@ -14731,11 +14740,23 @@ body:has(.textbox-overlay) .tooltip {
 }
 
 /* ═══ Main Menu hub side panels ═══ */
+/* ★ v1281: EIN Breitenmass fuer Kasten, Gasse und Avatar. `--menu-vw`
+   ist 1 vw in LAYOUT-Pixeln (gesetzt beim Messlauf in app-screens.jsx,
+   Fensterbreite / Zoomfaktor). Vorher stand hier `26vw` — unter dem
+   Menue-Zoom sind `vw` GEZEICHNETE Pixel, `%` aber Layout-Pixel; die
+   Kaesten wurden dadurch breiter als gedacht und die linke Gasse
+   verschwand (Befund Vollbild: Avatar ragte ueber den Bildrand hinaus).
+   Ohne gemessenen Wert faellt alles auf `1vw` zurueck — das entspricht
+   dem Verhalten bei Zoom 1. */
+.main-menu-screen {
+  --menu-seite: clamp(300px, calc(26 * var(--menu-vw, 1vw)), 470px);
+  --menu-gasse: max(0px, calc(50 * var(--menu-vw, 1vw) - 256px - var(--menu-seite)));
+}
 .menu-side {
   position: absolute;
   top: 78px;
   z-index: 2;
-  width: clamp(300px, 26vw, 470px);
+  width: var(--menu-seite);
   max-height: calc(100 * var(--vh) - 104px);
   display: flex;
 }
@@ -14750,7 +14771,7 @@ body:has(.textbox-overlay) .tooltip {
   position: absolute;
   top: 78px; /* fallback before panelTop is measured; matches .menu-side */
   left: 0;
-  width: calc(50% - 256px - clamp(300px, 26vw, 470px));
+  width: var(--menu-gasse);   /* v1281: dasselbe Mass wie die Kaesten */
   display: flex;
   flex-direction: column;   /* name stacked above the avatar */
   align-items: center;
@@ -14760,7 +14781,9 @@ body:has(.textbox-overlay) .tooltip {
 .menu-profile-avatar {
   /* Scale with the gutter, leaving room for the equal side gaps, but stay
      within sensible bounds. */
-  width: clamp(72px, calc(50vw - 256px - clamp(300px, 26vw, 470px) - 64px), 160px);
+  /* v1281: passt sich der gemessenen Gasse an und laesst links und
+     rechts gleich viel Luft. */
+  width: clamp(56px, calc(var(--menu-gasse) - 48px), 160px);
   aspect-ratio: 1;
   border-radius: 0;            /* angular, matching the menu boxes */
   overflow: hidden;
@@ -20107,4 +20130,78 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   .auth-screen .auth-rumpf .auth-tabs { margin-bottom: 8px; }
   .auth-screen .auth-rumpf .auth-tabs .tab { padding: 6px 0; }
   .auth-rumpf .auth-or--konto { margin: 6px 0 6px; }
+}
+
+/* ═══ SKULL CARPET BOMBING (v1271) ═════════════════════════════════════
+   Zonen-Animation `skull_carpet_bombing` (app-board.jsx): je Ziel drei
+   Pixel-Schaedel (7×7-Raster, knochenweiss, dunkelrote Augenhoehlen), die
+   gestaffelt mit Rauchspur einschlagen. Nur `transform`/`opacity`
+   animiert. Gesamtdauer < 1 s (siehe Kommentar an der Komponente). */
+.skb-schaedel, .skb-spur, .skb-blitz, .skb-splitter {
+  position: absolute;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.skb-schaedel {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23efe6d2' d='M1 0h5v1H1zM0 1h7v1H0zM0 2h1v2H0zM3 2h1v2H3zM6 2h1v2H6zM0 4h3v1H0zM4 4h3v1H4zM1 5h5v1H1zM1 6h1v1H1zM3 6h1v1H3zM5 6h1v1H5z'/%3E%3Cpath fill='%235a0f1e' d='M1 2h2v2H1zM4 2h2v2H4zM3 4h1v1H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 5px rgba(255, 70, 70, .85));
+}
+@keyframes skbFall {
+  0%   { opacity: 0; transform: translateY(calc(var(--skb-h) * -1)) rotate(var(--skb-dreh)) scale(.75); }
+  15%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+@keyframes skbWeg { to { opacity: 0; } }
+.skb-spur {
+  width: 4px;
+  margin-left: -2px;
+  transform-origin: top center;
+  background: linear-gradient(to bottom, rgba(120, 110, 140, 0), rgba(170, 160, 190, .55) 70%, rgba(255, 160, 90, .7));
+}
+@keyframes skbSpur {
+  0%   { opacity: .9; transform: scaleY(0); }
+  70%  { opacity: .75; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+.skb-blitz {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7e0 0%, #ffd27a 20%, #ff6a2a 46%, rgba(122, 31, 46, .6) 70%, transparent 88%);
+  box-shadow: 0 0 22px rgba(255, 90, 40, .85);
+}
+@keyframes skbBoom {
+  0%   { opacity: 1; transform: scale(.2); }
+  55%  { opacity: .95; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+.skb-splitter { border-radius: 1px; }
+@keyframes skbSplitter {
+  0%   { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; transform: translate(var(--sx), var(--sy)); }
+}
+
+/* ═══ DEVOUR-ZAEHLER (Pseudonia, v1275) ═══════════════════════════════
+   Oben rechts auf der Heldenkarte, Form wie die anderen Heldenzaehler
+   (Divinity, Evolution). Violett nach Pseudonias Strahl. */
+.pseudonia-counter-badge {
+  position: absolute;
+  top: 6%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  gap: calc(1px * var(--board-scale));
+  padding: 0 calc(4px * var(--board-scale));
+  height: calc(18px * var(--board-scale));
+  border-radius: calc(9px * var(--board-scale));
+  background: radial-gradient(circle at 30% 30%, #e6c7ff, #6a1fb0);
+  border: calc(1.5px * var(--board-scale)) solid #2c0b4d;
+  color: #fbf4ff;
+  font-family: 'Pixel Intv', monospace;
+  font-size: calc(9px * var(--board-scale));
+  font-weight: bold;
+  line-height: 1;
+  box-shadow: 0 0 calc(6px * var(--board-scale)) #b066ff, inset 0 0 calc(2px * var(--board-scale)) #f3e3ff;
+  z-index: 6;
+  pointer-events: auto;
+  cursor: help;
 }
