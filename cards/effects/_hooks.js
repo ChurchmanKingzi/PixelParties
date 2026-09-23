@@ -80,6 +80,7 @@ const HOOKS = {
   AFTER_DAMAGE:      'afterDamage',
   ON_HERO_KO:        'onHeroKO',
   ON_HERO_REVIVE:    'onHeroRevive',
+  BEFORE_HERO_REVIVE: 'beforeHeroRevive',   // v1288: unmittelbar vor jeder Wiederbelebung, Held noch tot
   ON_CREATURE_DEATH: 'onCreatureDeath',
   // Fires specifically when a Creature is SACRIFICED — i.e. removed
   // from the board as a deliberate cost (resolveSacrificeCost), not
@@ -98,6 +99,10 @@ const HOOKS = {
   // sterbende Instanz; der Tod selbst laeuft danach voellig normal
   // weiter, inklusive aller on-death-Effekte.
   ON_CREATURE_DEATH_CLAIM: 'onCreatureDeathClaim',
+  // v1301: EIN Aufruf je abgeschlossenem Vorgang (Schadens-Durchgang,
+  // Zerstoerung) mit ALLEN Opfern — `ctx.defeated`. Fuer passive Effekte
+  // auf „one or more … are defeated" (Junshi). Siehe `_liefereNiederlagen`.
+  ON_CREATURES_DEFEATED: 'onCreaturesDefeated',
 
   // ── Resources ──
   ON_RESOURCE_GAIN:  'onResourceGain',
@@ -936,7 +941,32 @@ function cardVariantTag(name) {
  */
 const BLIND_STATUSES = ['blinded', 'blinded_hit'];
 
+/**
+ * ★ v1293 — SELBSTSENKUNG ZAEHLT EINMAL („This card's level is reduced
+ * by …"). `_applyCardLevelReductions` fragt JEDE aktive Instanz nach
+ * `reduceCardLevel` — liegen zwei Kopien auf der Hand (oder eine auf
+ * der Hand, eine auf dem Brett), senkte jede die gepruefte Karte, die
+ * Senkung zaehlte doppelt. Nur die Kopie mit der kleinsten Id darf
+ * beitragen. Das war die „Ruin-Mourner-Bauform", bisher in drei Karten
+ * einzeln abgeschrieben und in sieben anderen vergessen.
+ */
+function selbstsenkungZaehlt(engine, inst, cardName, ownerIdx, opts = {}) {
+  if (!inst || !engine) return false;
+  // `opts.zone`: gilt die Senkung nur in EINER Zone („in your hand"),
+  // zaehlen auch nur Kopien dort — sonst gewinnt eine Brettkopie, die
+  // selbst 0 liefert, und die Handkarte bekaeme gar nichts.
+  const kopien = (engine.cardInstances || []).filter(c =>
+    c.name === cardName
+    && (!opts.zone || c.zone === opts.zone)
+    && (c.controller ?? c.owner) === ownerIdx
+    && !c.faceDown
+    && (typeof c.isActiveIn !== 'function' || c.isActiveIn()));
+  if (kopien.length === 0) return false;
+  return kopien.map(c => c.id).sort()[0] === inst.id;
+}
+
 module.exports = {
+  selbstsenkungZaehlt,
   BLIND_STATUSES,
   baseCardName, sameCardName, cardVariantTag,
   SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES,

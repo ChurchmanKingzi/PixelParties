@@ -963,6 +963,16 @@ const ZONE_ANIM_SFX = {
   // Bewusst ein eigener Eintrag statt `necromancy_summon`: der Klang
   // haengt am Typ, und die Ability soll weiter nur ihren Schaedelknall
   // haben.
+  // „Midnight Assault" (v1293): drei Lagen fuer drei Momente — die
+  // Nacht faellt (`elem_dark`, hoch und leise), der Schnitt selbst
+  // (`slash`, hell gestimmt, bei 280 ms mit dem Bild) und der Nachhall
+  // des Treffers (`critical_strike`, tiefer). Spaetere Lagen ohne
+  // Kategorie, sonst schluckt sie die erste (CARD_API ⑤).
+  assassination_cut: [
+    { name: 'elem_dark',       opts: { rate: 1.35, volume: 0.55 } },
+    { name: 'slash',           opts: { rate: 1.3,  volume: 1.0, delay: 280, category: null, dedupe: 300 } },
+    { name: 'critical_strike', opts: { rate: 0.85, volume: 0.7, delay: 330, category: null, dedupe: 300 } },
+  ],
   undead_revival: [
     { name: 'elem_dark', opts: { rate: 0.8, volume: 1.0 } },
     { name: 'summon',    opts: { rate: 0.85, volume: 0.9, delay: 660, category: null, dedupe: 700 } },
@@ -2943,11 +2953,11 @@ function makeFoilMotes(isDiamond) {
 }
 
 /** Reiner Zeichner — bekommt alles Gewuerfelte von CardFoil gereicht. */
-function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType }) {
+function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType, klein }) {
   const isDiamond = foilType === 'diamond_rare';
   const posn = isDiamond ? DIAMOND_SPARKLE_POSITIONS : SPARKLE_POSITIONS;
   return (
-    <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '')}>
+    <div className={'foil-shine-overlay' + (isDiamond ? ' foil-shine-diamond' : '') + (klein ? ' foil-klein' : '')}>
       {/* 1) Die Praegung der Folie. Fuer sich genommen kaum zu sehen —
              sie ist die Oberflaeche, auf der das Licht der Baender
              etwas zu tun hat. */}
@@ -2972,6 +2982,7 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType }) {
       ))}
       {/* 4) Glanzpunkte und Staub. */}
       {posn.map((sp, i) => {
+        if (klein && i % FOIL_KLEIN_FUNKEN_JEDER !== 0) return null;   // v1298
         const f = (sparkles && sparkles[i]) || null;
         return (
           <div key={'s' + i} className="foil-sparkle"
@@ -3018,9 +3029,61 @@ function FoilOverlay({ bands, motes, sparkles, shimmerOffset, foilType }) {
 //  alles Gewuerfelte entsteht EINMAL je Karte, danach laeuft die
 //  Schicht allein per CSS.
 // ═══════════════════════════════════════════════════════════════
+// ★ v1298 — KLEINANSICHT (Als Befund 23.9.: „grosse Piles ruckeln, wenn
+// viele Foil-Karten darin sind"). Gemessen mit 120 Foil-Karten in einer
+// Pile-Ansicht: 3600 DOM-Knoten, rund 25 animierte Schichten je Karte,
+// davon die teuersten jeden Frame neu GEMALT statt nur verschoben
+// (`background-position`, `filter: drop-shadow`, `box-shadow` am Rahmen,
+// Mischmodi auf jeder Lage). Wer Karten in Masse zeigt (Pile-Ansicht,
+// Galerien), stellt `FoilKleinContext` auf `true`; die Karten zeichnen
+// dann eine leichte Foil-Schicht: 2 Baender (Diamond 1), ein Drittel der
+// Funken, kein Staub, und nur Animationen, die der Compositor allein
+// schafft (transform/opacity). Die grosse Ansicht (Tooltip) bleibt voll.
+const FoilKleinContext = React.createContext(false);
+window.FoilKleinContext = FoilKleinContext;
+const FOIL_KLEIN_BAENDER = { secret: 2, diamond: 1 };
+
+/**
+ * Das Kartenraster der Pile-Ansicht und der Galerien (`.deck-viewer-grid`)
+ * — EIN Baustein, der zugleich die leichte Foil-Schicht einschaltet.
+ * So kann ein neues Raster die Kleinansicht nicht vergessen.
+ */
+function PileGrid({ children }) {
+  return (
+    <FoilKleinContext.Provider value={true}>
+      <div className="deck-viewer-grid">{children}</div>
+    </FoilKleinContext.Provider>
+  );
+}
+window.PileGrid = PileGrid;
+
+/**
+ * ★ v1299 — HINTERGRUND ANHALTEN, solange ein grosser Karten-Dialog offen
+ * ist (Pile-Ansichten). Das Brett darunter lief sonst mit allen Foil-
+ * Schichten, Partikeln und Leuchtrahmen weiter, obwohl es zu 80 %
+ * verdeckt ist — der Browser zeichnete beides je Frame. Die Endlos-
+ * Animationen AUSSERHALB des Dialogs pausieren (`animation-play-state`,
+ * style.css `body.pp-dialog-offen`), im Dialog laeuft alles normal.
+ * Zaehlend, damit zwei offene Dialoge sich nicht gegenseitig freigeben.
+ */
+function HintergrundPause() {
+  useEffect(() => {
+    window._ppDialogPausen = (window._ppDialogPausen || 0) + 1;
+    document.body.classList.add('pp-dialog-offen');
+    return () => {
+      window._ppDialogPausen = Math.max(0, (window._ppDialogPausen || 1) - 1);
+      if (window._ppDialogPausen === 0) document.body.classList.remove('pp-dialog-offen');
+    };
+  }, []);
+  return null;
+}
+window.HintergrundPause = HintergrundPause;
+const FOIL_KLEIN_FUNKEN_JEDER = 3;   // jeder dritte Funke bleibt
+
 function CardFoil({ card, foilType }) {
   const type = foilType || card?.foil || null;
   const isFoil = type === 'secret_rare' || type === 'diamond_rare';
+  const klein = useContext(FoilKleinContext);
   // Je Karte EINMAL gewuerfelt: Baender, Staub, Schimmerphase und der
   // Versatz der Funken. `card?.name` im Schluessel, damit ein Tooltip
   // beim Wechsel auf die naechste Karte nicht deren Takt uebernimmt —
@@ -3039,14 +3102,14 @@ function CardFoil({ card, foilType }) {
         delay: sp.delay + Math.random() * 2,
         size: 3 + Math.random() * 4,
       })),
-      bands: makeFoilBands(isDiamond),
-      motes: makeFoilMotes(isDiamond),
+      bands: makeFoilBands(isDiamond).slice(0, klein ? FOIL_KLEIN_BAENDER[isDiamond ? 'diamond' : 'secret'] : undefined),
+      motes: klein ? [] : makeFoilMotes(isDiamond),
     };
-  }, [type, isFoil, card?.name]);
+  }, [type, isFoil, card?.name, klein]);
   if (!isFoil || !meta) return null;
   return (
     <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-      sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} />
+      sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} />
   );
 }
 
@@ -3908,7 +3971,11 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
   useEffect(() => () => clearTimeout(tapRef.current.timer), []);
   const imgUrl = cardImageUrl(card.name, skins);
   const foilType = card.foil; // 'secret_rare' | 'diamond_rare' | null
-  const foilClass = foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '';
+  // v1299: in Kleinansichten (FoilKleinContext) leuchtet der Rahmen fest,
+  // statt jeden Frame einen neuen `box-shadow` zu malen.
+  const foilKlein = useContext(FoilKleinContext);
+  const foilClass = (foilType === 'diamond_rare' ? 'foil-diamond-rare' : foilType === 'secret_rare' ? 'foil-secret-rare' : '')
+    + (foilType && foilKlein ? ' foil-ruhig' : '');
 
   // Use shared board tooltip if available (game context), otherwise inline tooltip
   const useSharedTooltip = !!window._boardTooltipSetter;
@@ -3990,7 +4057,6 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
     setTT(false);
   };
   const onDragEnd = () => { window.activeDragData = null; };
-  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
   return (
     <>
       <div className={'card-mini ' + typeClass(card.cardType) + (dimmed ? ' dimmed' : '') + (foilClass ? ' ' + foilClass : '') + (isCover ? ' card-mini-cover' : '')}
@@ -4031,56 +4097,84 @@ function CardMini({ card, onClick, onRightClick, count, maxCount, dimmed, style,
           </div>
         )}
       </div>
-      {tt && !useSharedTooltip && (
-        <div className={'tooltip card-tooltip' + (inGallery ? ' card-tooltip-gallery' : '')} style={{
-          right: inGallery ? GALLERY_W : 0, top: TOP_BAR_H, width: GALLERY_W,
-          height: 'calc(100vh - ' + TOP_BAR_H + 'px)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        }}>
-          {imgUrl && (
-            <div className="card-tooltip-img" style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-              <img src={imgUrl} alt="" style={{
-                width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
-                border: ttBorderColor
-              }} />
-              <CardFoil card={card} />
-            </div>
-          )}
-          <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-            <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
-            <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
-              {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}{card.level != null ? ' · Lv ' + card.level : ''}
-            </div>
-            {(card.startingAbility1 || card.startingAbility2) && (() => {
-              const order = [], counts = new Map();
-              for (const a of [card.startingAbility1, card.startingAbility2]) {
-                if (!a) continue;
-                if (!counts.has(a)) order.push(a);
-                counts.set(a, (counts.get(a) || 0) + 1);
-              }
-              return (
-                <div style={{ marginBottom: 8 }}>
-                  {order.map(name => (
-                    <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
-                  ))}
-                </div>
-              );
-            })()}
-            {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
-              <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
-            <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
-              {card.hp != null && <span>HP: {card.hp}</span>}
-              {card.atk != null && <span>ATK: {card.atk}</span>}
-              {card.cost != null && <span>Cost: {card.cost}</span>}
-            </div>
-            {card.effect &&
-              <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
-          </div>
-        </div>
-      )}
+      {tt && !useSharedTooltip && <CardSideTooltip card={card} imgUrl={imgUrl} inGallery={inGallery} />}
     </>
   );
 }
+
+/**
+ * ★ v1291 — Der Karten-Tooltip der Menues (Daily, Deck-Ansichten, Galerie …)
+ * als eigener Baustein. Vorher stand er nur inline in CardMini; jetzt nutzt
+ * ihn auch das Spielerprofil-Popup (Als Vorgabe 23.9.: „dieselbe Position
+ * und Groesse wie im Daily-Modus"). Rechte bildschirmhohe Leiste, Breite
+ * GALLERY_W; die Mobil-Regeln (`.card-tooltip` in style.css) und das
+ * Mausrad-Scrollen (`.card-tooltip-info`, App-weiter Wheel-Handler in
+ * app-main) greifen damit automatisch fuer beide.
+ */
+function CardSideTooltip({ card, imgUrl, inGallery }) {
+  if (!card) return null;
+  const foilType = card.foil;
+  const ttBorderColor = foilType === 'diamond_rare' ? '2px solid rgba(120,200,255,.6)' : foilType === 'secret_rare' ? '2px solid rgba(255,215,0,.5)' : '1px solid var(--bg4)';
+  // v1298: der grosse Tooltip zeigt IMMER die volle Foil-Schicht, auch
+  // wenn er aus einer Kleinansicht (PileGrid) heraus aufgeht.
+  return (
+    <FoilKleinContext.Provider value={false}>
+    <div className={'tooltip card-tooltip' + (inGallery ? ' card-tooltip-gallery' : '')} style={{
+      right: inGallery ? GALLERY_W : 0, top: TOP_BAR_H, width: GALLERY_W,
+      // ★ v1291 (Als Befund 23.9.: „man kann nicht scrollen, wenn der
+      // Tooltip hoeher ist als der Screen"): `100vh` misst das ECHTE
+      // Fenster, der Tooltip liegt aber in den gezoomten Bildschirmen
+      // (`--ui-scale`) — ab Massstab > 1 ragte er unten aus dem Fenster,
+      // und das Ende des Kartentexts war auch per Mausrad nie erreichbar.
+      // `--vh` nimmt den Massstab heraus (style.css, `.screen-full`);
+      // ausserhalb gezoomter Bereiche faellt es auf `1vh` zurueck.
+      height: 'calc(100 * var(--vh, 1vh) - ' + TOP_BAR_H + 'px)',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      {imgUrl && (
+        <div className="card-tooltip-img" style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
+          <img src={imgUrl} alt="" style={{
+            width: '100%', aspectRatio: '750/1050', objectFit: 'cover', display: 'block',
+            border: ttBorderColor
+          }} />
+          <CardFoil card={card} />
+        </div>
+      )}
+      <div className="card-tooltip-info" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+        <div style={{ fontWeight: 700, marginBottom: 5, color: typeColor(card.cardType), fontSize: 18 }}>{card.name}</div>
+        <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 4 }}>
+          {[card.cardType, card.subtype, card.archetype].filter(Boolean).join(' · ')}{card.level != null ? ' · Lv ' + card.level : ''}
+        </div>
+        {(card.startingAbility1 || card.startingAbility2) && (() => {
+          const order = [], counts = new Map();
+          for (const a of [card.startingAbility1, card.startingAbility2]) {
+            if (!a) continue;
+            if (!counts.has(a)) order.push(a);
+            counts.set(a, (counts.get(a) || 0) + 1);
+          }
+          return (
+            <div style={{ marginBottom: 8 }}>
+              {order.map(name => (
+                <div key={name} style={{ fontSize: 14, color: typeColor('Ability') }}>{name} {counts.get(name)}</div>
+              ))}
+            </div>
+          );
+        })()}
+        {card.cardType !== 'Creature' && (card.spellSchool1 || card.spellSchool2) &&
+          <div style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 8 }}>{[card.spellSchool1, card.spellSchool2].filter(Boolean).join(' · ')}</div>}
+        <div style={{ display: 'flex', gap: 12, fontSize: 15, marginBottom: 8 }}>
+          {card.hp != null && <span>HP: {card.hp}</span>}
+          {card.atk != null && <span>ATK: {card.atk}</span>}
+          {card.cost != null && <span>Cost: {card.cost}</span>}
+        </div>
+        {card.effect &&
+          <div style={{ fontSize: 14, marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{card.effect}</div>}
+      </div>
+    </div>
+    </FoilKleinContext.Provider>
+  );
+}
+window.CardSideTooltip = CardSideTooltip;
 
 // ═══════════════════════════════════════════
 //  AUTH SCREEN

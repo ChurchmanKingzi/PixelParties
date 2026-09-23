@@ -149,6 +149,14 @@ function setzeSchutzschirm(engine, inst) {
 module.exports = {
   activeIn: ['hand', 'support'],
 
+  // ★ v1292: Wiederbelebung OHNE Hooks (Zombified Assault, Extra Life,
+  // Loyal Bone Dog) — `onCardEnterZone` laeuft dort nicht, die frische
+  // Instanz haette keinen Schirm. Die Engine ruft `onRevive` nur fuer die
+  // wiederbelebte Karte selbst auf.
+  onRevive(ctx) {
+    setzeSchutzschirm(ctx._engine, ctx.card);
+  },
+
   // CPU: beide Prompts sind fuer sie immer gut — der Wachposten kostet
   // keine Aktion, schirmt ihre Creatures ab und ist ohnehin nur diesen
   // einen Zug da. Ohne diesen Eintrag lehnt der generische Responder
@@ -194,7 +202,7 @@ module.exports = {
 
     // ── Schutzschirm nach Wiederbelebung / Umzug neu setzen ──────────
     // Kommt der Wachposten ueber einen fremden Effekt aufs Brett
-    // (Elixir of Immortality, Zombified Assault), traegt die frische
+    // (Beschwoerung mit Hooks), traegt die frische
     // Instanz die Zaehler nicht. Der Schirm gehoert zur Karte, nicht zur
     // Beschwoerungsart — also hier nachziehen.
     onCardEnterZone: async (ctx) => {

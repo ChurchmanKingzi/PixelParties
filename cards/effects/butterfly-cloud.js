@@ -55,17 +55,11 @@ module.exports = {
       });
       await engine._delay(1400);
 
-      // ── AoE 50 damage to all enemy targets ──
-      await ctx.aoeHit({
-        damage: 50,
-        damageType: 'other',
-        side: 'enemy',
-        types: ['hero', 'creature'],
-        animationType: 'none',
-        _skipSurpriseCheck: false,
-      });
-
       // ── Apply Untargetable buff to casting hero ──
+      // ★ v1304 (Als Ruling 23.9.): VOR dem Schaden. Loest der Flaechen-
+      // schlag einen zielenden On-Death-Effekt aus (Flaming Dragonegg),
+      // darf der Wirker dafuer schon nicht mehr waehlbar sein — vorher
+      // griff der Schutz erst nach dem Schaden und damit zu spaet.
       // Direct-assignment shortcut bypasses `addHeroStatus`, so the
       // engine's centralized Anti-Magic gate (in addHeroStatus) doesn't
       // fire here. Apply the same gate locally so a self-Anti-Magic'd
@@ -82,6 +76,16 @@ module.exports = {
         }
         engine.sync();
       }
+
+      // ── AoE 50 damage to all enemy targets ──
+      await ctx.aoeHit({
+        damage: 50,
+        damageType: 'other',
+        side: 'enemy',
+        types: ['hero', 'creature'],
+        animationType: 'none',
+        _skipSurpriseCheck: false,
+      });
 
       // ── Set cooldown flag (blocks next turn, not this turn) ──
       ps._butterflyCloudUsedThisTurn = true;

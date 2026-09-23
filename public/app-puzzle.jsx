@@ -3831,7 +3831,8 @@ function PuzzleCreator() {
           )}
           {/* ── Gallery column (scrollable card grid; name search lives in
                 the sidebar's Name filter input). ── */}
-          <div className="pz-gallery-column">
+          {/* v1299: Kleinansicht — leichte Foil-Schicht (FoilKleinContext, app-shared). */}
+          <FoilKleinContext.Provider value={true}><div className="pz-gallery-column">
           {/* Collapse toggle — hides the filter sidebar so the grid widens
               from 3 to 5 cards per row (see pz-search-results inline grid). */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -3899,7 +3900,7 @@ function PuzzleCreator() {
             </div>
           )}
           </div>
-          </div>
+          </div></FoilKleinContext.Provider>
         </div>
 
         {/* ── Board ── */}
@@ -4390,7 +4391,10 @@ function PuzzleCreator() {
         if (pile.length === 0) { setViewPile(null); return null; }
         return (
           <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewPile(null); }}>
-            <div className="modal" style={{ maxWidth: 600, padding: 20, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            {/* v1300: dieselbe Dialogbreite wie die Stapelansicht im Spiel
+                (`deck-viewer-modal`) — ohne sie schrumpfte der Kasten auf
+                seinen Inhalt und das Raster wurde schmal. */}
+            <div className="modal deck-viewer-modal" style={{ maxWidth: 600, padding: 20, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)' }}>{sideLabel} — {labels[viewPile.key] || viewPile.key} ({(() => {
                   const q = pileSuche.trim().toLowerCase();
@@ -4412,37 +4416,51 @@ function PuzzleCreator() {
                 onChange={(e) => setPileSuche(e.target.value)}
                 style={{ marginBottom: 10, width: '100%' }}
               />
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 'calc(6px * var(--board-scale))', padding: 4, alignContent: 'flex-start' }}>
-                {pile
-                  .map((cardName, idx) => ({ cardName, idx }))
-                  .filter(({ cardName }) => !pileSuche.trim()
-                    || cardName.toLowerCase().includes(pileSuche.trim().toLowerCase()))
-                  .map(({ cardName, idx }) => {
-                  const img = cardImageUrl(cardName);
-                  return (
-                    <div key={idx} className="pz-hand-card" draggable
-                      style={{ width: 'calc(60px * var(--board-scale))', height: 'calc(84px * var(--board-scale))' }}
-                      onDragStart={(e) => {
-                        e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx));
-                        e.currentTarget.dataset.pileIdx = idx;
-                      }}
-                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                      onDrop={(e) => {
-                        e.preventDefault(); e.stopPropagation();
-                        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                        if (!isNaN(fromIdx) && fromIdx !== idx) movePileCard(viewPile.si, viewPile.key, fromIdx, idx);
-                      }}
-                      onContextMenu={(e) => { e.preventDefault(); removePileCard(viewPile.si, viewPile.key, idx); }}
-                      onMouseEnter={() => { const c = getCard(cardName); if (c) showTooltip(c, 'left'); }}
-                      onMouseLeave={hideTooltip}
-                      >
-                      {img ? <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 2 }} draggable={false} /> : (
-                        <div className="pz-hand-card-text"><span>{cardName}</span></div>
-                      )}
-                      <CardFoil card={getCard(cardName)} />
-                    </div>
-                  );
-                })}
+              <HintergrundPause />
+              {/* ★ v1300 (Als Befund 23.9.: „die Karten werden sehr unschoen
+                  uebereinander dargestellt … im echten Spiel sieht das Deck
+                  deutlich besser aus"). Die Stapelansicht lieh sich bisher die
+                  Klasse der HANDkarten (`pz-hand-card`) — deren Flex-Basis und
+                  Mindestbreite kommen aus dem Handmass und ueberstimmen die
+                  Kachelgroesse: die Karten wurden breiter als 5:7 und von
+                  `object-fit: cover` oben und unten beschnitten. Jetzt dasselbe
+                  Raster und dieselbe Karte wie im Spiel (`PileGrid` + `CardMini`,
+                  inkl. leichter Foil-Schicht). Der Tooltip kommt ueber den
+                  gemeinsamen Setter (`_boardTooltipSetter`), den der Editor
+                  selbst stellt — wie bisher links. Ziehen zum Umsortieren und
+                  Rechtsklick zum Entfernen bleiben an der Huelle. */}
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: 4 }}>
+                <PileGrid>
+                  {pile
+                    .map((cardName, idx) => ({ cardName, idx }))
+                    .filter(({ cardName }) => !pileSuche.trim()
+                      || cardName.toLowerCase().includes(pileSuche.trim().toLowerCase()))
+                    .map(({ cardName, idx }) => {
+                    const card = getCard(cardName);
+                    return (
+                      <div key={idx} className="pz-pile-card" draggable
+                        style={{ position: 'relative', width: '100%', height: 120 }}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(idx));
+                          e.currentTarget.dataset.pileIdx = idx;
+                        }}
+                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                        onDrop={(e) => {
+                          e.preventDefault(); e.stopPropagation();
+                          const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                          if (!isNaN(fromIdx) && fromIdx !== idx) movePileCard(viewPile.si, viewPile.key, fromIdx, idx);
+                        }}
+                        onContextMenu={(e) => { e.preventDefault(); removePileCard(viewPile.si, viewPile.key, idx); }}
+                        >
+                        {card ? (
+                          <CardMini card={card} onClick={() => {}} style={{ width: '100%', height: '100%' }} />
+                        ) : (
+                          <div className="pz-hand-card-text"><span>{cardName}</span></div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </PileGrid>
               </div>
             </div>
           </div>

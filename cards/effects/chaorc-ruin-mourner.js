@@ -58,14 +58,8 @@ module.exports = {
     // for those evaluations (e.g. Ladder to the Sky's deck search), so
     // bail and report the printed level there.
     if (evalOpts?.pileSide) return 0;
-    const owned = engine.cardInstances.filter(c =>
-      c.name === CARD_NAME
-      && (c.controller ?? c.owner) === ownerIdx
-      && !c.faceDown
-      && c.isActiveIn());
-    if (owned.length === 0) return 0;
-    const lowestId = owned.map(c => c.id).sort()[0];
-    if (inst?.id !== lowestId) return 0;
+    // Nur eine Kopie zaehlt — gemeinsamer Helfer (v1293).
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;
     return Math.max(0, engine.gs.players[ownerIdx]?._creaturesSacrificedThisTurn || 0);
   },
 

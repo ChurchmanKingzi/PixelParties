@@ -98,8 +98,9 @@ module.exports = {
    * hand. Only reduces THIS Crystal Well's level (filter by name) so
    * other cards in the same hand aren't accidentally rebated.
    */
-  reduceCardLevel(cardData, engine, ownerIdx) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (cardData?.name !== CARD_NAME) return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;   // v1293
     return countRevealedHandCards(engine, ownerIdx);
   },
 

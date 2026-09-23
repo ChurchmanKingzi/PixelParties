@@ -43,6 +43,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, heroIdx) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
     if (!inst || inst.zone !== 'hand') return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     if (typeof heroIdx !== 'number' || heroIdx < 0) return 0;
     const ps = engine.gs.players[ownerIdx];
     return engine.countAbilitiesForSchool('Singing', ps?.abilityZones?.[heroIdx] || []);

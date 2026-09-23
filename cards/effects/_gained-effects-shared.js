@@ -62,6 +62,49 @@ function gainedNames(hero) {
   return liste.filter(n => n && n !== hero.name);
 }
 
+/**
+ * ★ v1285 — WESSEN gedruckter Effekt liefert den AKTIVEN Heldeneffekt?
+ *
+ * Als Befund 22.9.: „hat Pseudonia einen Effekt geerbt, soll ein Klick
+ * auf sie NICHT ‚Pseudonia' als aktivierbaren Effekt anzeigen — sie hat
+ * selbst keinen aktiven Effekt." Engine und Server fragten dafuer das
+ * VERSCHMOLZENE Skript (`heroScriptOf`) und schrieben den HELDENNAMEN in
+ * den Eintrag. Traegt der Held einen gewonnenen Aktiveffekt, stand er
+ * damit unter dem falschen Namen im Menue.
+ *
+ * Liefert `{ name, script }` der Karte, die `onHeroEffect` stellt —
+ * eigenes Skript zuerst, danach die gewonnenen in Gewinnreihenfolge —
+ * oder `null`, wenn es gar keinen aktiven Effekt gibt. Der Name ist
+ * zugleich der HOPT-Schluessel (v1275: pro Spieler und Kartenname), ein
+ * gewonnener Effekt teilt seine Sperre also mit dem Original.
+ */
+function heroEffectSource(hero) {
+  if (!hero?.name) return null;
+  const eigen = loadCardEffect(hero.name);
+  if (eigen?.heroEffect && typeof eigen.onHeroEffect === 'function') return { name: hero.name, script: eigen };
+  for (const name of gainedNames(hero)) {
+    const sc = loadCardEffect(name);
+    if (sc?.heroEffect && typeof sc.onHeroEffect === 'function') return { name, script: sc };
+  }
+  return null;
+}
+
+/**
+ * ★ v1286 — NUR der gedruckte Aktiveffekt des Helden selbst.
+ *
+ * Fuer Menue-Zweige, die ausdruecklich den eigenen Effekt meinen:
+ * gewonnene Aktiveffekte stehen ueber ihre Traegerinstanzen schon im
+ * Menue, ein zweiter Eintrag hier waere ein Doppel (Als Befund 22.9.:
+ * Pseudonia bot einen gefressenen Effekt zweimal an). Ein Held ohne
+ * eigenen aktiven Effekt liefert `null` und taucht damit gar nicht auf.
+ */
+function eigenesHeldenSkript(hero) {
+  if (!hero?.name) return null;
+  const eigen = loadCardEffect(hero.name);
+  if (eigen?.heroEffect && typeof eigen.onHeroEffect === 'function') return { name: hero.name, script: eigen };
+  return null;
+}
+
 /** Alle Skripte, deren Vertraege fuer diesen Helden gelten — eigenes zuerst. */
 function heroScriptsOf(hero) {
   if (!hero?.name) return [];
@@ -133,6 +176,8 @@ function gainedEffectTexts(hero, cardDB) {
 module.exports = {
   GAINED_EFFECT_DENYLIST,
   gainedNames,
+  heroEffectSource,
+  eigenesHeldenSkript,
   heroScriptsOf,
   heroScriptOf,
   gainedEffectTexts,

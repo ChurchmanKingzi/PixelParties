@@ -93,6 +93,9 @@ async function _resolveTopPotion(engine, pi) {
       i.name === cardName && i.zone === 'support'
       && (i.controller ?? i.owner) === pi
     ).length,
+    // v1283: Potions, die sich selbst aufs Brett legen (Elixir of
+    // Immortality → Permanent), aendern keinen der Stapel oben.
+    permanentCount: (ps.permanents || []).filter(p => p.name === cardName).length,
   };
 
   // canActivate / resolve / routing. Each branch ends by computing
@@ -204,6 +207,16 @@ function _detectPotionDestination(engine, pi, cardName, preSnap) {
     // Pick any of the new ones — order isn't meaningful here.
     const inst = supportInsts[supportInsts.length - 1];
     return { kind: 'support', owner: pi, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot };
+  }
+  // ★ v1283 (Als Befund 22.9.: „Immortality sollte von der umgedrehten
+  // Position NICHT zum Deleted-Pile fliegen, sondern zu seiner neuen
+  // Position auf dem Board"). Eine Potion, die sich selbst als PERMANENT
+  // ablegt, aendert keinen der gezaehlten Stapel — die Erkennung fiel
+  // deshalb auf „Loesch-Ablage" zurueck und der Flug ging dorthin.
+  const permsJetzt = (ps?.permanents || []).filter(p => p.name === cardName);
+  if (permsJetzt.length > (preSnap?.permanentCount || 0)) {
+    const neu = permsJetzt[permsJetzt.length - 1];
+    return { kind: 'permanent', owner: pi, permId: neu?.id };
   }
   const discardNow = (ps?.discardPile || []).filter(c => c === cardName).length;
   if (discardNow > (preSnap?.discardCount || 0)) {

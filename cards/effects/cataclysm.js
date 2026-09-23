@@ -40,8 +40,9 @@ module.exports = {
    * tracked instance the controller owns and sums their hooks, so we
    * only return the rebate when the cardData passed in is THIS card.
    */
-  reduceCardLevel(cardData, engine /*, ownerIdx */) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (cardData?.name !== CARD_NAME) return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;   // v1293
     const gs = engine?.gs;
     const hasArea = !!(
       (gs?.areaZones?.[0] || []).length > 0 ||

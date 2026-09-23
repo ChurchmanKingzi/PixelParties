@@ -161,7 +161,14 @@ module.exports = {
       // and there's no batching to wait for — without this immediate path
       // the death would only get revived at onPhaseEnd (turn-end), which
       // breaks the card's "immediate revive" promise.
-      if ((engine.gs._spellResolutionDepth || 0) === 0) {
+      // ★ v1288: auch waehrend einer FLAECHENKLAMMER sammeln
+      // (`engine._multiHitScope`, z.B. Book of Doom — ein Artefakt, das
+      // keine Zaubertiefe zaehlt). Sonst loeste das Elixir schon beim
+      // ersten Toten eines Schlags aus, und wer mehrere Ziele zugleich
+      // verlor, konnte nicht waehlen, welches zurueckkommt. Eingeloest
+      // wird am Nachlauf-Punkt (`onAnyActionResolved` gibt es seit
+      // v1284/v1285 in allen Aktionswegen).
+      if ((engine.gs._spellResolutionDepth || 0) === 0 && !engine._multiHitScope) {
         await resolveElixirPending(engine, pi, perm);
       }
     },

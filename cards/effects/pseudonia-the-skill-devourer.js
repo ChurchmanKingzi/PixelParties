@@ -44,11 +44,27 @@
 const CARD_NAME = 'Pseudonia, the Skill Devourer';
 const MAX_AUFNAHMEN = 3;
 
-/** Spalte und Platz eines Heldenobjekts suchen. */
+/**
+ * Spalte und Platz eines Heldenobjekts suchen.
+ *
+ * ★ v1286: mit Rueckfall auf `gs._heroKOContext` (die Engine setzt ihn
+ * um den ON_HERO_KO-Hook herum und nennt darin `heroOwner`). Wird der
+ * Held waehrend der Todeskette ersetzt oder aus der Reihe genommen —
+ * etwa durch eine sofortige Wiederbelebung (Elixir of Immortality) —,
+ * findet die Objektsuche ihn nicht mehr und die Aufnahme verpuffte
+ * lautlos. Der Name kommt dann aus dem Kontext, die Lage aus dem
+ * Besitzer plus Namensvergleich.
+ */
 function lageVon(gs, hero) {
   for (let pi = 0; pi < 2; pi++) {
     const hi = (gs.players[pi]?.heroes || []).indexOf(hero);
     if (hi >= 0) return { pi, hi };
+  }
+  const ctxTod = gs._heroKOContext;
+  if (ctxTod?.hero === hero && ctxTod.heroOwner >= 0) {
+    const reihe = gs.players[ctxTod.heroOwner]?.heroes || [];
+    const hi = reihe.findIndex(h => h && h.name === hero?.name);
+    if (hi >= 0) return { pi: ctxTod.heroOwner, hi };
   }
   return null;
 }
@@ -121,9 +137,12 @@ async function verschlinge(engine, spalte, hi, fragender, eintrag) {
 }
 
 /** Vorgemerkte Aufnahmen nach einem Flaechentreffer abarbeiten. */
-async function arbeiteVormerkungenAb(ctx) {
+async function arbeiteVormerkungenAb(ctx, opts = {}) {
   const engine = ctx._engine;
-  if (engine._multiHitScope) return;                 // Schlag laeuft noch
+  // Waehrend eines Schlags wird normalerweise gewartet (sie selbst koennte
+  // im selben Schlag fallen). Ausnahme v1288: eine Wiederbelebung steht
+  // unmittelbar bevor — dann muss jetzt entschieden werden.
+  if (engine._multiHitScope && !opts.auchImSchlag) return;
   const spalte = ctx.cardOriginalOwner;
   const hi = ctx.cardHeroIdx;
   const selbst = engine.gs.players[spalte]?.heroes?.[hi];
@@ -137,6 +156,20 @@ async function arbeiteVormerkungenAb(ctx) {
 
 module.exports = {
   activeIn: ['hero'],
+
+  /**
+   * ★ v1288 (Als Vorgabe 22.9.: „Pseudonias Effekt soll vor JEDEM
+   * Revival-Effekt passieren"). Im Todesfenster und in allen Fenstern,
+   * in denen sie Vormerkungen einloest, laeuft sie VOR den anderen
+   * Zuhoerern — auch vor einem Elixir, das im selben Fenster
+   * wiederbelebt. Fuer Wiederbelebungen, die ausserhalb dieser Fenster
+   * kommen, gibt es `beforeHeroRevive` (unten).
+   */
+  hookPriority: {
+    onHeroKO: 100, beforeHeroRevive: 100,
+    afterSpellResolved: 100, onAnyActionResolved: 100, afterCreatureEffect: 100,
+    afterAllStatusDamage: 100, onPhaseEnd: 100, onTurnEnd: 100, onTurnStart: 100,
+  },
 
   hooks: {
     onHeroKO: async (ctx) => {
@@ -173,6 +206,19 @@ module.exports = {
     afterCreatureEffect: arbeiteVormerkungenAb,
     onTurnEnd: arbeiteVormerkungenAb,
     onTurnStart: arbeiteVormerkungenAb,
+    // v1288: dieselben Einloesepunkte, an denen das Elixir wiederbelebt —
+    // mit der Prioritaet oben ist sie dort immer zuerst dran.
+    afterAllStatusDamage: arbeiteVormerkungenAb,
+    onPhaseEnd: arbeiteVormerkungenAb,
+    /**
+     * ★ v1288: unmittelbar vor JEDER Wiederbelebung (Held noch tot).
+     * Steht fuer den Helden eine Vormerkung aus, wird sie JETZT
+     * entschieden — sonst kaeme die Wiederbelebung zuerst. Auch mitten
+     * in einem Schlag: wer jetzt zurueckgeholt wird, war besiegt.
+     */
+    beforeHeroRevive: async (ctx) => {
+      await arbeiteVormerkungenAb(ctx, { auchImSchlag: true });
+    },
 
     // ??? (the Shapeshifter) legt die Pseudonia-Gestalt ab: alles, was er
     // in ihr aufgenommen hat, geht mit (Ruling 22.9.). Die echte Pseudonia

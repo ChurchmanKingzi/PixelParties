@@ -54,13 +54,16 @@ const { GameEngine } = require('./cards/effects/_engine');
 const { loadCardEffect } = require('./cards/effects/_loader');
 // ★ v1186: „This Hero gains the effects of X" — dieselbe Aufloesung wie
 // in der Engine, ohne Engine-Referenz (siehe _gained-effects-shared).
-const { heroScriptOf } = require('./cards/effects/_gained-effects-shared');
+const { heroScriptOf, eigenesHeldenSkript } = require('./cards/effects/_gained-effects-shared');   // v1286
 const { BUFF_EFFECTS, heroCanBeEquipped, hasSpellSchool } = require('./cards/effects/_hooks');
 const { biomancyTokenCounters } = require('./cards/effects/_biomancy-shared');
 const { containsProfanity, MESSAGE_MAX_LEN } = require('./public/profanity.js');
 
 
 const { sendMail } = require('./mailer');
+// v1289: oeffentliches Spielerprofil (Top-Players-Popup) — Schema, Deck-
+// Identitaet in game_history und die Route leben komplett in diesem Modul.
+const playerProfile = require('./player-profile');
 
 /**
  * Enrich a puzzle-authored buffs object so each entry carries the
@@ -1018,6 +1021,8 @@ async function initDatabase() {
 
   await db.execute('CREATE INDEX IF NOT EXISTS idx_hero_stats_user ON hero_stats(user_id)');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id)');
+  // v1289: deck_id/deck_name fuer die Top-Decks im Spielerprofil.
+  await playerProfile.ensurePlayerProfileSchema(db);
 
   // Per-opponent win/loss for singleplayer CPU battles. Keyed by the
   // deckId the player faced — sample decks (`sample-<filename>`) and
@@ -4075,6 +4080,25 @@ app.get('/api/stats/live', (req, res) => {
   });
 });
 
+// ===== PLAYER PROFILE (v1289) =====
+// Oeffentliches Profil fuer das Top-Players-Popup — Logik in
+// player-profile.js. Hier nur die Anbindung an Laufzeitdaten des
+// Servers (Sitzungen, laufende Partien), deshalb neben `activeGames`.
+playerProfile.registerPlayerProfileRoutes(app, {
+  db,
+  loadSampleDecks,
+  // „Spielt gerade": eingetragen UND die Partie laeuft noch (activeGames
+  // bleibt bis zum Verlassen des Raums stehen, auch nach Spielende).
+  isInGame: (userId) => {
+    const room = rooms.get(activeGames.get(userId));
+    return !!(room && room.status === 'playing' && room.gameState && !room.gameState.result);
+  },
+  viewerIdOf: (req) => {
+    const token = req.cookies?.pp_token || req.headers['x-auth-token'];
+    return (token && sessions.get(token)?.userId) || null;
+  },
+});
+
 /**
  * After a potion resolves, check if any hero on the player's side
  * has a potionLockAfterN flag and the threshold has been met.
@@ -5701,7 +5725,9 @@ async function endGame(room, winnerIdx, reason) {
     for (const h of ps.heroes) {
       if (h.name) await db.run('INSERT INTO hero_stats (user_id, hero_name, wins, losses) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, hero_name) DO UPDATE SET wins = wins + excluded.wins, losses = losses + excluded.losses', [ps.userId, h.name, won ? 1 : 0, won ? 0 : 1]);
     }
-    await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [uuidv4(), ps.userId, ps.heroes[0]?.name||null, ps.heroes[1]?.name||null, ps.heroes[2]?.name||null, won?1:0, (won?loser:winner).userId]);
+    // v1289: Deck-Identitaet mitschreiben (Spielerprofil → Top-Decks).
+    const deckCols = playerProfile.historyDeckColumns(room._deckIdentity?.[won ? winnerIdx : loserIdx]);
+    await db.run('INSERT INTO game_history (id, user_id, hero1, hero2, hero3, won, opponent_id, deck_id, deck_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [uuidv4(), ps.userId, ps.heroes[0]?.name||null, ps.heroes[1]?.name||null, ps.heroes[2]?.name||null, won?1:0, (won?loser:winner).userId, ...deckCols]);
   }
 
   gs.result = {
@@ -7923,12 +7949,18 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // BEFORE the auto-MAIN2 advance below so we skip the transient
     // MAIN2 state when the spell was cast in Action Phase.
     if (gs._spellEndsTurn) {
+      // ★ v1296: `'baseMechanic'` — der Zug endet nicht durch den Spell,
+      // sondern durch einen AUFSTIEG, den er ausgeloest hat (Ultimate
+      // Weapon Experiment). Das ist Grundmechanik (Als Ruling 16.8.):
+      // Zug-Ende-Immunitaet (Tuscan Prisoner) greift dann nicht, genau
+      // wie beim normalen Aufstieg ueber `ascend_hero`.
+      const grundmechanik = gs._spellEndsTurn === 'baseMechanic';
       delete gs._spellEndsTurn;
       if (!gs.result) {
         const cur = gs.currentPhase;
         // Legal transitions to END are MAIN1 / ACTION / MAIN2 → END.
         if (cur === 2 || cur === 3 || cur === 4) {
-          await room.engine.advanceToPhase(pi, 5);
+          await room.engine.advanceToPhase(pi, 5, grundmechanik ? { baseMechanic: true } : undefined);
         }
       }
     }
@@ -9835,18 +9867,27 @@ async function doActivateHeroEffect(room, pi, { heroIdx, charmedOwner, chosenEff
       if (ok && room.engine.oncePerGameEffectUsed(pi, mummyScript, 'Mummy Token')) ok = false;   // ★ v1030
       if (ok) availableEffects.push({ name: 'Mummy Token', script: mummyScript, inst: mummyInst, hoptKey });
     }
-  } else if (ownScript?.heroEffect && ownScript?.onHeroEffect) {
-    const hoptKey = room.engine.heroHoptKey(hero.name, pi);
+  } else if (eigenesHeldenSkript(hero)) {
+    // ★ v1286 (Als Befund 22.9.: „sie bietet einen ihrer gefressenen
+    // Effekte doppelt an"). Dieser Zweig ist NUR fuer den gedruckten
+    // Effekt des Helden selbst. Gewonnene Aktiveffekte stehen ohnehin
+    // ueber ihre Traegerinstanzen im Menue (Zweig darunter) — v1285 liess
+    // den ersten von ihnen zusaetzlich hier einlaufen. Pseudonia hat
+    // keinen eigenen aktiven Effekt und steht damit weiterhin nicht im
+    // Menue, was der Sinn der v1285-Aenderung war.
+    const quelle = eigenesHeldenSkript(hero);
+    const effektSkript = quelle.script;
+    const hoptKey = room.engine.heroHoptKey(quelle.name, pi);
     if (gs.hoptUsed?.[hoptKey] !== gs.turn) {
       const inst = room.engine.cardInstances.find(c => c.owner === heroOwner && c.zone === 'hero' && c.heroIdx === heroIdx);
       // Spielstart-Schutz: rein schaedliche Helden-Effekte sind gesperrt.
-      let ok = !!inst && !room.engine.isHeroEffectBlockedByGraceShield(ownScript, pi);
-      if (ok && ownScript.canActivateHeroEffect) {
+      let ok = !!inst && !room.engine.isHeroEffectBlockedByGraceShield(effektSkript, pi);
+      if (ok && effektSkript.canActivateHeroEffect) {
         const ctx = room.engine._createContext(inst, { event: 'canHeroEffectCheck' });
-        ok = ownScript.canActivateHeroEffect(ctx);
+        ok = effektSkript.canActivateHeroEffect(ctx);
       }
-      if (ok && room.engine.oncePerGameEffectUsed(pi, ownScript, hero.name)) ok = false;        // ★ v1030
-      if (ok) availableEffects.push({ name: hero.name, script: ownScript, inst, hoptKey });
+      if (ok && room.engine.oncePerGameEffectUsed(pi, effektSkript, quelle.name)) ok = false;   // ★ v1030
+      if (ok) availableEffects.push({ name: quelle.name, script: effektSkript, inst, hoptKey });
     }
   }
 
@@ -10638,6 +10679,17 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
   // start of the wrapped resolve (see the broadcast block before
   // executeCardWithChain), so it lands simultaneously with the
   // resolve's first visible effects rather than after them.
+  // ★ v1285 (Als Befund 22.9.: „Kills via Book of Doom triggern Pseudonia
+  // weiterhin nicht"). ZIELENDE Artefakte und Traenke loesen HIER auf —
+  // nicht in `doUseArtifactEffect`, wo v1284 den Sammelpunkt ergaenzt
+  // hat. Ohne ihn warten Karten, die Ereignisse waehrend eines
+  // Flaechentreffers vormerken (Pseudonia, Elixir of Immortality), bis
+  // zum naechsten Zauber oder Zugende.
+  await room.engine.runHooks('onAnyActionResolved', {
+    actionType: (cardType || 'artifact').toLowerCase(), playerIdx: pi,
+    cardName: potionName, playedCardName: potionName, heroIdx: -1,
+    _skipReactionCheck: true,
+  });
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
@@ -10998,6 +11050,17 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
   } catch (err) {
     console.error('[Engine] doUsePotion error:', err.message);
   }
+
+  // ★ v1284 (Als Befund 22.9.: Pseudonia reagierte nicht auf einen Helden,
+  // den „Book of Doom" getoetet hat). `onAnyActionResolved` ist der
+  // Sammelpunkt ALLER Aktionswege — er fehlte im Trank-Weg. Karten, die
+  // Ereignisse waehrend eines Flaechentreffers nur vormerken und danach
+  // einloesen (Pseudonia, Elixir of Immortality), warteten deshalb bis
+  // zum naechsten Zauber oder Zugende.
+  await room.engine.runHooks('onAnyActionResolved', {
+    actionType: 'potion', playerIdx: pi, cardName, playedCardName: cardName, heroIdx: -1,
+    _skipReactionCheck: true,
+  });
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
 }
@@ -11351,6 +11414,17 @@ async function doUseArtifactEffect(room, pi, { cardName, handIndex, fromCreation
   // Kein `baseMechanic`: hier endet ein KARTENEFFEKT den Zug, gegen den
   // Tuscan Prisoner ausdruecklich schuetzt. (Der Aufstieg selbst ist
   // Grundmechanik — der findet auf diesem Weg aber gar nicht statt.)
+
+  // ★ v1284 (Als Befund 22.9.: Pseudonia reagierte nicht auf einen Helden,
+  // den „Book of Doom" getoetet hat). `onAnyActionResolved` ist der
+  // Sammelpunkt ALLER Aktionswege — er fehlte im Artefakt-Weg. Karten, die
+  // Ereignisse waehrend eines Flaechentreffers nur vormerken und danach
+  // einloesen (Pseudonia, Elixir of Immortality), warteten deshalb bis
+  // zum naechsten Zauber oder Zugende.
+  await room.engine.runHooks('onAnyActionResolved', {
+    actionType: 'artifact', playerIdx: pi, cardName, playedCardName: cardName, heroIdx: -1,
+    _skipReactionCheck: true,
+  });
   if (gs._spellEndsTurn) {
     delete gs._spellEndsTurn;
     if (!gs.result) {
@@ -12616,6 +12690,12 @@ async function setupGameState(room) {
       }));
       if (!room._currentDecks) room._currentDecks = [null, null];
       room._currentDecks[idx] = JSON.parse(JSON.stringify(room._originalDecks[idx]));
+      // v1289: welches Deck spielt dieser Spieler (fuer game_history →
+      // Top-Decks im Spielerprofil). Wird genau dann neu gesetzt, wenn
+      // auch `_originalDecks[idx]` neu aufgebaut wird — ein Deckwechsel
+      // im Raum setzt beide zurueck, Seitendeck-Runden behalten beide.
+      if (!room._deckIdentity) room._deckIdentity = [null, null];
+      room._deckIdentity[idx] = playerProfile.deckIdentityOf(deck);
     }
 
     const usr = await db.get('SELECT * FROM users WHERE id = ?', [p.userId]);

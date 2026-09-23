@@ -99,6 +99,7 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
     if (!inst || inst.zone !== 'hand') return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;   // v1293
     return singingOnBoard(engine);
   },
 

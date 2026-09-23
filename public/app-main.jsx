@@ -1654,7 +1654,9 @@ function PlayScreen() {
                 p.color || '#00f0ff';
               const crown = tier === 'gold' ? '👑' : tier === 'silver' ? '🥈' : tier === 'bronze' ? '🥉' : null;
               return (
-                <div key={p.username} className={'leaderboard-row leaderboard-row-' + (tier || 'normal')}>
+                // v1289: Klick/Enter oeffnet das Spielerprofil (app-player-profile.jsx).
+                <div key={p.username} {...playerProfileTriggerProps(p)}
+                  className={'leaderboard-row ppf-trigger leaderboard-row-' + (tier || 'normal')}>
                   <span className="leaderboard-rank">#{p.rank}</span>
                   {crown && (
                     <span className={'leaderboard-crown leaderboard-crown-' + tier}>{crown}</span>
@@ -2971,6 +2973,8 @@ function App() {
       <MusicManager bgmMode={user ? bgmMode : 'login'} />
       <TextBox />
       <OpponentUnlockPopup />
+      {/* v1289: Spielerprofil-Popup (Top-Spieler-Listen), app-player-profile.jsx */}
+      <PlayerProfilePopupHost />
       {notif && <Notification key={notif.id} message={notif.message} type={notif.type} onClose={() => setNotif(null)} />}
       <UiScaler />
       {/* Pixel-Partikel hinter dem gesamten Menue (v808). Liegt fest im

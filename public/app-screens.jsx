@@ -1127,7 +1127,9 @@ function MenuLeaderboardPanel({ top, height }) {
           ) : (
             <ol className="menu-lb-list">
               {players.map(p => (
-                <li key={p.rank} className={'menu-lb-row'
+                // v1289: Klick/Enter oeffnet das Spielerprofil (app-player-profile.jsx).
+                <li key={p.rank} {...playerProfileTriggerProps(p)}
+                    className={'menu-lb-row ppf-trigger'
                     + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
                     + (p.username === user.username ? ' is-me' : '')}>
                   <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
@@ -1382,6 +1384,8 @@ function LogoParticles() {
  * (`.pp-sc-glitzer-teil`).
  */
 const SC_GLITZER_FARBEN = ['#fff6b0', '#ffd700', '#ffe766', '#ffffff'];
+// v1289: auch die SC-Plakette im Spielerprofil-Popup glitzert.
+window.ScGlitzer = ScGlitzer;
 function ScGlitzer() {
   return <PixelParticles
     anzahl={22}

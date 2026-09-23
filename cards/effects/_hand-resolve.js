@@ -170,7 +170,26 @@ function eligibleIndicesWithoutResolving(ps) {
   };
 }
 
+/**
+ * ★ v1288 — Handgroesse OHNE die gerade aufloesende Karte.
+ *
+ * Eine aufloesende Karte liegt waehrend ihres Effekts noch in der Hand —
+ * ausser sie wird aus der CREATION ZONE gewirkt (`fromCreation`) oder ist
+ * waehrend der Aufloesung verschwunden. Zaehlungen wie „draw until you
+ * have 7" oder das Handlimit zogen bisher pauschal 1 ab, sobald
+ * irgendeine Karte aufloeste. Bei einem Wirken aus der Creation Zone
+ * (True Fairy Crestina legt ihre Karte dorthin) war das eins zu viel:
+ * Supply Chain zog bis 8 (Befund 22.9.).
+ */
+function handSizeWithoutResolving(ps) {
+  const hand = ps?.hand || [];
+  const rc = ps?._resolvingCard;
+  if (!rc || rc.fromCreation) return hand.length;
+  return hand.length - (getResolvingHandIndex(ps) >= 0 ? 1 : 0);
+}
+
 module.exports = {
+  handSizeWithoutResolving,
   eligibleCreationIndices,
   beginHandResolve,
   getResolvingHandIndex,

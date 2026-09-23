@@ -87,12 +87,8 @@ module.exports = {
   reduceCardLevel(cardData, engine, ownerIdx, inst, _heroIdx, evalOpts) {
     if (!cardData || cardData.name !== CARD_NAME) return 0;
     if (evalOpts?.pileSide) return 0;
-    const eigene = (engine.cardInstances || []).filter(c =>
-      c.name === CARD_NAME && c.zone === 'hand'
-      && (c.controller ?? c.owner) === ownerIdx && !c.faceDown);
-    if (eigene.length === 0) return 0;
-    const kleinste = eigene.map(c => c.id).sort()[0];
-    if (inst?.id !== kleinste) return 0;
+    // Nur eine Handkopie zaehlt — gemeinsamer Helfer (v1293).
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx, { zone: 'hand' })) return 0;
     return cuteKreaturen(engine, ownerIdx);
   },
 

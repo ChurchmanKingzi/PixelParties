@@ -45,6 +45,9 @@ function shoutFlags(text) {
   return flags;
 }
 
+// v1289: auch das Spielerprofil-Popup (app-player-profile.jsx) tippt
+// das Motto so ab — Export ueber window, siehe Konvention in build.js.
+window.TypewriterText = TypewriterText;
 function TypewriterText({ text, speed = 26, bounce = false }) {
   const segs = useMemo(() => parseBubbleMarkup(text || ''), [text]);
   const total = useMemo(() => segs.reduce((n, s) => n + s.text.length, 0), [segs]);
@@ -7773,6 +7776,7 @@ const REAKTIONS_ANLAESSE = {
   opp_creature_pre_damage_reaction: 'a Creature was about to be hit',
   creature_pre_defeat_reaction:   'a Creature was about to be defeated',
   creature_defeated_reaction:     'a Creature was defeated',
+  creatures_defeated_reaction:    'Creatures were defeated',   // v1292 Sammel-Fenster
   after_damage_reaction:          'damage had landed',
   after_creature_damage_reaction: 'a Creature had taken damage',
   creature_damage_batch_reaction: 'Creatures had taken damage',
@@ -13958,6 +13962,70 @@ const ANIM_REGISTRY = {
   // gashes rake across the target in a tight cluster, each with its
   // own crimson wound trailing behind; a burst of red-black gore
   // splatter drops beneath the cuts.
+  // ── „Midnight Assault" (v1293, Als Vorgabe: „ein brandneuer
+  // Assassination-Schnitt") ──────────────────────────────────────────
+  // Ein Moment, drei Schlaege: Dunkelheit faellt ueber das Ziel und eine
+  // Mondsichel blitzt auf (0–280 ms) · EIN duenner Silberschnitt reisst
+  // quer ueber die Karte, von einem Ende zum anderen (280 ms) · der
+  // Schnitt klafft kurz auf, zwei Nachbilder driften auseinander,
+  // Silber-/Violett-Splitter fliegen entlang der Schnittlinie, dann ist
+  // alles still (bis ~1000 ms). Die Karte besiegt bei 440 ms.
+  // Keyframes in style.css (`assassin*`), Klang in ZONE_ANIM_SFX.
+  assassination_cut: (() => {
+    return function AssassinationCutEffect({ x, y, w, h }) {
+      const ww = Math.max(w || 80, 80);
+      const hh = Math.max(h || 110, 110);
+      const winkel = -38;                                  // Schnittlinie
+      const laenge = Math.hypot(ww, hh) * 1.35;
+      const rad = winkel * Math.PI / 180;
+      const splitter = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
+        const richtung = i % 2 === 0 ? 1 : -1;             // beide Enden der Linie
+        const streu = (Math.random() - 0.5) * 0.5;         // Radiant, um die Linie
+        const weite = 40 + Math.random() * 70;
+        return {
+          dx: Math.cos(rad + streu) * weite * richtung,
+          dy: Math.sin(rad + streu) * weite * richtung,
+          groesse: 4 + Math.random() * 4,
+          farbe: Math.random() < 0.6 ? '#e8ecff' : '#b48cff',
+          delay: 300 + Math.random() * 120,
+          dur: 420 + Math.random() * 260,
+        };
+      }), []);
+      const schleier = Math.max(ww, hh) * 2.3;
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10110 }}>
+          {/* Die Nacht faellt: dunkler Kreis um das Ziel */}
+          <div className="anim-assassin-veil" style={{
+            width: schleier, height: schleier, marginLeft: -schleier / 2, marginTop: -schleier / 2,
+          }} />
+          {/* Mondsichel, oben rechts am Ziel */}
+          <div className="anim-assassin-moon" style={{ left: ww * 0.32, top: -hh * 0.52 }} />
+          {/* Weisser Blitz im Moment des Schnitts */}
+          <div className="anim-assassin-flash" style={{ width: ww * 0.9, height: ww * 0.9, marginLeft: -ww * 0.45, marginTop: -ww * 0.45 }} />
+          {/* Die Schnittlinie: aeusseres Element traegt die Drehung,
+              die inneren wachsen von einem Ende her (transform-origin links) */}
+          <div style={{
+            position: 'absolute', left: -laenge / 2, top: 0, width: laenge, height: 0,
+            transform: `rotate(${winkel}deg)`, transformOrigin: 'center center',
+          }}>
+            <div className="anim-assassin-after" style={{ '--aoff': '-7px' }} />
+            <div className="anim-assassin-after" style={{ '--aoff': '7px' }} />
+            <div className="anim-assassin-cut" />
+          </div>
+          {/* Splitter entlang der Linie */}
+          {splitter.map((s, i) => (
+            <div key={'as' + i} className="anim-assassin-spark" style={{
+              width: s.groesse, height: s.groesse, marginLeft: -s.groesse / 2, marginTop: -s.groesse / 2,
+              background: s.farbe, boxShadow: `0 0 6px ${s.farbe}, 0 0 2px #fff`,
+              '--dx': s.dx + 'px', '--dy': s.dy + 'px',
+              animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
+            }} />
+          ))}
+        </div>
+      );
+    };
+  })(),
+
   claw_maul: (() => {
     return function ClawMaulEffect({ x, y, w, h }) {
       const ww = Math.max(w || 80, 80);
@@ -23607,6 +23675,7 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
 
   return (
     <div className="modal-overlay" onClick={onClose}>
+      <HintergrundPause />{/* v1299: Brett darunter anhalten */}
       <DraggablePanel
         className="modal animate-in deck-viewer-modal"
         style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
@@ -23641,7 +23710,7 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
         />}
         {filtered.length > 0 ? (
           <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-            <div className="deck-viewer-grid">
+            <PileGrid>
               {filtered.map(({ name, idx }, i) => {
                 const card = CARDS_BY_NAME[name];
                 if (!card) return null;
@@ -23707,7 +23776,7 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                   </div>
                 );
               })}
-            </div>
+            </PileGrid>
           </div>
         ) : (
           <div style={{ textAlign: 'center', color: 'var(--text2)', padding: 20 }}>
@@ -23985,7 +24054,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
           </div>
         )}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          <div className="deck-viewer-grid">
+          <PileGrid>
             {cards.map((entry, i) => {
               const card = CARDS_BY_NAME[entry.name];
               if (!card) return null;
@@ -24039,7 +24108,7 @@ function CardGalleryMultiPrompt({ ep, onRespond }) {
                 </div>
               );
             })}
-          </div>
+          </PileGrid>
         </div>
         <div style={{ textAlign: 'center', marginTop: 12, flexShrink: 0 }}>
           <button className={'btn ' + (ep.confirmClass || '')} style={{ padding: '8px 24px', fontSize: 12 }}
@@ -24520,6 +24589,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // Beim ERSTEN Lauf und nach einem Partiewechsel wird nur die
   // Grundlinie gesetzt — sonst detoniert beim Betreten eines laufenden
   // Spiels (oder als Zuschauer) das halbe Brett auf einmal.
+  // Colored-Snow-Enthuellung (v1284-v1287): Spiegel des Verdeckt-Zustands
+  // fuer Socket-Handler und Effekte (die sehen sonst den Stand ihres
+  // Renders) plus Bilder und Platz-Einschlaege, die auf ihre Karte
+  // warten. Hier oben, weil der Einschlag-Effekt direkt darunter sie liest.
+  const csVerdecktRef = useRef(new Set());
+  const csWartendeBilderRef = useRef([]);
+  const csWartendeEinschlaegeRef = useRef([]);
   const belegungRef = useRef(null);
   const belegungRaumRef = useRef(null);
   useEffect(() => {
@@ -24537,7 +24613,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (!sel) continue;
       const name = String(wert).includes('|') ? String(wert).split('|').slice(1).join('|') : wert;
       const stil = window.zoneLandStyle?.(name) || {};
-      einschlaege.push({ selector: sel, key: schluessel, color: stil.color, variant: stil.variant });
+      const einschlag = { selector: sel, key: schluessel, color: stil.color, variant: stil.variant };
+      // ★ v1287 (Als Befund 22.9.: „die Zone, in der Elixir of Immortality
+      // landen soll, wird direkt zum Resolve-Zeitpunkt gehighlightet").
+      // Ein Permanent, das waehrend einer Colored-Snow-Enthuellung
+      // entsteht, steht schon im Spielstand, waehrend die Karte noch
+      // fliegt. Sein Einschlag wartet wie Bild und Klang (v1285/v1286)
+      // auf die Landung und wird dort nachgeholt.
+      if (schluessel.startsWith('p:')) {
+        const besitzer = schluessel.split(':')[1];
+        if ([...(csVerdecktRef.current || [])].some(k => k.startsWith(`${besitzer}-`))) {
+          csWartendeEinschlaegeRef.current.push(einschlag);
+          continue;
+        }
+      }
+      einschlaege.push(einschlag);
     }
     window.spawnZoneLandFxBatch?.(einschlaege);
   }, [gameState, myIdx]);
@@ -25646,6 +25736,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // floating card and a second hand-grow auto-anim, on top of the
   // reveal's own fly-out.
   const coloredSnowInFlightRef = useRef(new Set());
+  // ★ v1284 (Als Befund 22.9.: „die Immortality-Potion erscheint bereits,
+  // waehrend der Flug von der Bildmitte dorthin gerade beginnt"). Legt
+  // sich eine Potion waehrend der Enthuellung selbst als PERMANENT ab,
+  // steht sie im Spielstand, sobald ihr Effekt aufloest — also schon,
+  // waehrend die Karte noch in der Bildmitte liegt. Ihr Platz bleibt
+  // deshalb verdeckt, bis der Flug dorthin angekommen ist. Schluessel
+  // `${owner}-${cardName}` wie beim In-Flight-Merker darueber.
+  const [csVerdeckt, setCsVerdeckt] = useState(new Set());
   // Deck-top tooltip — set on hover over a deck pile whose top card is
   // publicly known (Premonition stash, Kassaran miss reveal, Enigma
   // restack). Carries the cardName + the deck pile's bounding rect so
@@ -33377,6 +33475,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('surprise_reset', onSurpriseReset);
     const onPermanentAnim = ({ owner, permId, type }) => {
+      // ★ v1285 (Als Befund 22.9.: „der Particle-Effekt, den Immortality
+      // beim Ins-Spiel-Kommen spielt, muss ebenfalls verzoegert werden").
+      // Liegt der Platz des Permanents noch unter der Colored-Snow-
+      // Enthuellung verdeckt (v1284), wartet das Bild, bis die Karte
+      // sichtbar ist — sonst zuendet es auf einer unsichtbaren Zone.
+      // ★ v1286: die Pruefung haengt NICHT mehr an der Permanents-Liste.
+      // Der Handler sieht den Stand seines Renders — das neue Permanent
+      // steht dort oft noch gar nicht, und das Bild lief dann doch sofort
+      // (Als Befund 22.9.: „spielt nach wie vor bereits zu Beginn der
+      // Bewegung ab"). Jetzt reicht: fuer diese Seite ist gerade eine
+      // Enthuellung unterwegs → das Bild wartet, bis sie gelandet ist.
+      if ([...csVerdecktRef.current].some(k => k.startsWith(`${owner}-`))) {
+        csWartendeBilderRef.current.push({
+          owner, permId, type, ownerLabel: owner === myIdx ? 'me' : 'opp',
+        });
+        return;
+      }
       // ★ v1263 (Als Befund 21.9.: Elixir of Immortality beim Ausspielen
       // stumm/zu leise): Permanent-Animationen spielten immer nur das
       // leise `ability_activate`; die Zonen-Klangtabelle (holy_revival →
@@ -34001,6 +34116,22 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }
       }
       if (tgtPositions.length === 0) return;
+
+      // ★ v1302 (Als Befund 23.9.: „Butterfly Cloud hat noch keinen
+      // Sound"). Eigenes Socket-Ereignis, keine Zonen-Animation — der
+      // Klang steht deshalb hier und nicht in ZONE_ANIM_SFX. Drei Momente
+      // wie im Bild: der Schwarm hebt ab (heller Luftzug), einzelne Falter
+      // glitzern im Flug (hoch gestimmte Glocken), bei 900 ms der goldene
+      // Aufprall. Alle Lagen ohne Sammelkategorie (CARD_API ⑤) und mit
+      // eigenem Dedupe, damit eine zweite Wolke im selben Zug nicht
+      // doppelt klingt.
+      if (window.playSFX) {
+        window.playSFX('elem_wind', { rate: 1.35, volume: 0.7, category: null, dedupe: 300 });
+        [60, 220, 420].forEach((ms, i) => window.playSFX('ping', {
+          rate: [1.9, 2.25, 2.0][i], volume: 0.35, delay: ms, category: null, dedupe: 0,
+        }));
+        window.playSFX('buff', { rate: 1.15, volume: 0.8, delay: 900, category: null, dedupe: 300 });
+      }
 
       // Inject keyframes once
       if (!document.getElementById('butterfly-cloud-keyframes')) {
@@ -36467,7 +36598,18 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const cx = window.innerWidth / 2 - 32;
       const cy = window.innerHeight / 2 - 45;
       const cardbackUrl = isMe ? me.cardback : opp.cardback;
+      // ★ v1283 (Als Befund 22.9.: „der Effekt von Colored Snow hat noch
+      // keine Sounds, wenn die Potion auf den Screen gezogen und
+      // umgedreht wird"). Die Klaenge liegen auf den Zeitpunkten der
+      // Animation (`colored-snow-reveal-in`, 1500 ms): Start beim
+      // Herausziehen, Ankunft in der Mitte bei 40 % (600 ms), die
+      // Drehung laeuft zwischen 60 und 80 % (900–1200 ms).
+      if (window.playSFX) {
+        window.playSFX('projectile', { rate: 0.85, volume: 0.8, category: 'effect' });
+        window.playSFX('reveal', { rate: 1.0, volume: 0.95, delay: 900, category: null, dedupe: 0 });
+      }
       coloredSnowInFlightRef.current.add(`${owner}-${cardName}`);
+      setCsVerdeckt(prev => { const n = new Set(prev).add(`${owner}-${cardName}`); csVerdecktRef.current = n; return n; });   // v1284
       setColoredSnowReveals(prev => [...prev, {
         id: `cs-${owner}-${cardName}`,
         owner, cardName,
@@ -36506,6 +36648,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           );
           break;
         }
+        case 'permanent': {
+          // v1283: die Potion bleibt als Permanent auf dem Brett liegen —
+          // der Flug geht zu ihrem Platz dort, nicht in die Loesch-Ablage.
+          const permLabel = destination.owner === myIdx ? 'me' : 'opp';
+          destEl = (destination.permId
+            ? document.querySelector(`[data-perm-id="${destination.permId}"][data-perm-owner="${permLabel}"]`)
+            : null)
+            || document.querySelector(permLabel === 'me' ? '.board-permanents-me' : '.board-permanents-opp');
+          break;
+        }
         case 'discard': {
           destEl = document.querySelector(destination.owner === myIdx ? '[data-my-discard]' : '[data-opp-discard]');
           break;
@@ -36521,6 +36673,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         const r = destEl.getBoundingClientRect();
         ex = r.left + r.width / 2 - 32;
         ey = r.top + r.height / 2 - 45;
+      }
+      // v1283: Landung hoerbar machen — derselbe Klang wie beim Ablegen
+      // einer Karte aufs Brett. Beim `handoff` uebernimmt der andere Flug
+      // (Saint Nicolas) Bild UND Klang.
+      if (!handoff && window.playSFX) {
+        window.playSFX('placement', { rate: 0.95, volume: 0.85, delay: 380, category: null, dedupe: 0 });
       }
       setColoredSnowReveals(prev => prev.map(r => {
         if (r.id !== `cs-${owner}-${cardName}`) return r;
@@ -36540,6 +36698,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       setTimeout(() => {
         setColoredSnowReveals(prev => prev.filter(r => r.id !== `cs-${owner}-${cardName}`));
         coloredSnowInFlightRef.current.delete(`${owner}-${cardName}`);
+        // v1284: erst jetzt ist der Flug am Platz angekommen.
+        setCsVerdeckt(prev => { const n = new Set(prev); n.delete(`${owner}-${cardName}`); csVerdecktRef.current = n; return n; });
+        // v1287: zurueckgestellte Platz-Einschlaege — die Karte ist da.
+        const einschlaegeJetzt = csWartendeEinschlaegeRef.current;
+        csWartendeEinschlaegeRef.current = [];
+        if (einschlaegeJetzt.length) window.spawnZoneLandFxBatch?.(einschlaegeJetzt);
+        // v1285: zurueckgestellte Bilder jetzt nachholen — die Karte ist da.
+        const wartend = csWartendeBilderRef.current;
+        csWartendeBilderRef.current = [];
+        for (const b of wartend) {
+          if (window.playSFX) window.playSFX(b.type === 'holy_revival' ? 'revive' : 'ability_activate', { category: 'effect' });
+          const el = document.querySelector(`[data-perm-id="${b.permId}"][data-perm-owner="${b.ownerLabel}"]`);
+          if (el) playAnimation(b.type || 'holy_revival', el, { duration: 1200 });
+        }
       }, removalDelay);
     };
     socket.on('colored_snow_reveal_end', onColoredSnowRevealEnd);
@@ -39678,6 +39850,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'foresta_hp_cost') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} paid the summoning cost — HP halved from <span className="log-amount">{entry.from}</span> to <span className="log-amount">{entry.to}</span>.</span>; }
       // Angler Angel: sichtbar machen, WARUM ein Treffer haerter war.
       if (t === 'angler_boost') { return <span className="log-damage">{cName('Angler Angel')} increased {cName(entry.source)}'s damage by <span className="log-amount">+{entry.bonus}</span> to <span className="log-amount">{entry.newAmount}</span>.</span>; }
+      // ★ v1292 — „Zombified Assault" und die hooklose Wiederbelebung.
+      if (t === 'pocket_catapult') { const p = playerByName(entry.player); return <span className="log-damage">🪨 {pName(p.name, p.color)}'s {cName('Pocket Catapult')} hit {entry.target ? cName(entry.target) : 'a target'} for <span className="log-amount">{entry.amount}</span>.</span>; }
+      if (t === 'junshi_counter') { const p = playerByName(entry.player); return <span className="log-status">🧠 {pName(p.name, p.color)}'s {cName('Junshi, the Tactical Genius')} {entry.played ? <>countered with {cName(entry.card)}</> : 'passed on the counter'}.</span>; }
+      if (t === 'midnight_assault') { const p = playerByName(entry.player); return <span className="log-damage">🌙 {pName(p.name, p.color)}'s {cName('Midnight Assault')} {entry.defeated ? 'defeated' : 'struck at'} {entry.target}{entry.defeated ? '' : ', but it survived'}.</span>; }
+      if (t === 'defeat_unstoppable') { return <span className="log-info">{entry.hero} could not be saved — {entry.source} ignores every protection.</span>; }
+      if (t === 'zombified_assault') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {cName('Zombified Assault')} revived {cName(entry.card)}{entry.target ? <> and dealt <span className="log-amount">{entry.damage}</span> damage to {entry.target}</> : ''}!</span>; }
+      if (t === 'zombified_assault_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{pName(p.name, p.color)}'s {cName('Zombified Assault')} fizzled{entry.reason === 'no_zone' ? ' — no free Support Zone' : ''}.</span>; }
       // Hand-Reaktionen: EIN Fall fuer die ganze Familie, siehe
       // REAKTIONS_ANLAESSE oben.
       if (REAKTIONS_ANLAESSE[t]) {
@@ -42975,7 +43154,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="opp"
                       onClick={handlePermClick}
-                      style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
+                      style={{
+                        ...((isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : {}),
+                        // v1284: verdeckt, solange die Enthuellung noch fliegt.
+                        ...(csVerdeckt.has(`${oppIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
+                      }}>
                       <BoardCard cardName={perm.name} />
                       {perm.teleportalUntil != null && (
                         <div className="perm-tohand-badge"
@@ -43048,7 +43231,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       className={'board-permanent-slot' + (isValidPermTarget ? ' potion-target-valid' : '') + (isSelectedPermTarget ? ' potion-target-selected' : '') + (isActivatable ? ' zone-permanent-activatable' : '')}
                       data-perm-id={perm.id} data-perm-owner="me"
                       onClick={handlePermClick}
-                      style={(isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : undefined}>
+                      style={{
+                        ...((isValidPermTarget || isActivatable) ? { cursor: 'pointer' } : {}),
+                        // v1284: verdeckt, solange die Enthuellung noch fliegt.
+                        ...(csVerdeckt.has(`${myIdx}-${perm.name}`) ? { visibility: 'hidden' } : {}),
+                      }}>
                       <BoardCard cardName={perm.name} />
                       {/* ★ v1084 („Teleportal", Als Vorgabe 14.9.): das
                           offene Permanent ist hier nur ZWISCHENSTATION —
@@ -45052,7 +45239,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     color: 'var(--text1)', outline: 'none', boxSizing: 'border-box',
                   }} />
               )}
-              <div className="deck-viewer-grid">
+              <PileGrid>
                 {cards.filter(entry => {
                   const f = galerieFilter.trim().toLowerCase();
                   if (!f) return true;
@@ -45164,7 +45351,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     </div>
                   );
                 })}
-              </div>
+              </PileGrid>
               {ep.footer && (
                 <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text2)', textAlign: 'center', fontStyle: 'italic' }}>
                   {ep.footer}

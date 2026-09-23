@@ -25,8 +25,9 @@ module.exports = {
    * gate-checks (hand level filter and board summon checks). Returns
    * a positive number — the engine subtracts it from the base level.
    */
-  reduceCardLevel(cardData, engine, ownerIdx /* , inst */) {
+  reduceCardLevel(cardData, engine, ownerIdx, inst) {
     if (cardData?.name !== CARD_NAME) return 0;
+    if (!require('./_hooks').selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx)) return 0;   // v1293
     const size = engine.gs.players[ownerIdx]?.coolnessStack?.length || 0;
     return size;
   },

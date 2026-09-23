@@ -7483,6 +7483,12 @@ function cpuGenericChoice(engine, promptData, promptedPlayerIdx) {
   // prompts fired during the opponent's turn answer from their OWN side.
   const cpuIdx = promptedPlayerIdx != null ? promptedPlayerIdx : engine._cpuPlayerIdx;
 
+  // ★ v1302: geschenkte Zusatzaktionen (Coffee, Chalice, Junshi …) —
+  // die Wahl steht EINMAL in der Engine (`_cpuWaehleSofortaktion`).
+  if (type === 'heroAction' && !promptData._gerryRewritten) {
+    return engine._cpuWaehleSofortaktion(promptData, cpuIdx);
+  }
+
   // ── Gerrymander redirect handling ──
   // When `_gerryRewritten` is set, the prompt was redirected from opp
   // to us (the Gerrymander owner). We're picking FOR opp — invert the

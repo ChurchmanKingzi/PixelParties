@@ -1847,7 +1847,8 @@ function DeckBuilder() {
           )}
           {/* Card grid */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-            <div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+            {/* v1299: Kleinansicht — leichte Foil-Schicht (FoilKleinContext, app-shared). */}
+            <FoilKleinContext.Provider value={true}><div className="db-card-grid" ref={gridRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
               {pageCards.map((card, i) => {
                 const canMain = canAddCard(currentDeck || {}, card.name, 'main');
                 const canHero = canAddCard(currentDeck || {}, card.name, 'hero');
@@ -1864,7 +1865,7 @@ function DeckBuilder() {
                     style={{ width: '100%', height: 120 }} />
                 );
               })}
-            </div>
+            </div></FoilKleinContext.Provider>
             {filteredCards.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text2)', fontSize: 12, padding: 20 }}>No cards match filters</div>}
           </div>
           {pageCount > 1 && (

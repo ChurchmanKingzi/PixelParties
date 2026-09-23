@@ -62,6 +62,7 @@ const DIST_DIR = path.join(PUBLIC_DIR, 'dist');
 const ENTRIES = [
   'app-shared',
   'app-screens',
+  'app-player-profile',   // v1289: Spielerprofil-Popup
   'app-puzzle',
   'app-deckbuilder',
   'app-board',

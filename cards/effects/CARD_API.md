@@ -249,6 +249,7 @@ Alle unter `node scripts/<name>.js`, alle Exit 1 bei Verstoß:
 | `check-search-template` | Such-Galerien ohne `searchToHand`-Kennzeichnung |
 | `check-ascension-bonus` | Ascended Hero mit Bonus in `cards.json`, aber ohne `onAscensionBonus` bzw. ohne die Ability im Code (v1264) |
 | `check-hero-hopt` | Heldenskript mit „once per turn", das seine Sperre an Heldenplatz oder Instanz bindet statt pro Spieler (v1275) |
+| `check-action-hook` | Ein Server-Aktionsweg feuert `onAnyActionResolved` nicht (v1284) |
 | `check-damage-types` · `check-no-splice` · `check-areas` · … | siehe die jeweiligen Kopfkommentare |
 
 **Vor jeder Auslieferung laufen alle**, nicht nur die passenden:
@@ -267,6 +268,52 @@ for w in scripts/check-*.js; do node $w || echo "ROT: $w"; done
    auch allein? Fliegt die Karte? Öffnet sich die Galerie mit Inhalt?
    Greift der Schutz auch gegen Flächenschaden?
 5. Ist die Karte fertig, liegt sie im ZIP — mit `data/cards.json`.
+
+## ★ ZIELENDE KARTEN SIND IMMER ABBRECHBAR — UND ZEIGEN SICH ERST BEIM AUFLÖSEN (Als Regel 23.9. — MANDATORY)
+
+> Al 23.9.: „Zielende Attacks/Spells/Creature Effects sollten immer
+> abbrechbar sein. Und natürlich soll das Bild der benutzten Karte nur
+> zum Gegner gestreamt werden, wenn sie auch wirklich resolved."
+
+**1. Jede Zielwahl hat einen Cancel-Button** — Ziel-Prompt, Galerie,
+Zonenwahl, jede Stufe einer mehrstufigen Auswahl: `cancellable: true`.
+Ausnahme ist nur, was nach dem Zusagepunkt kommt (die Karte ist schon
+verbraucht, z.B. der Bonus einer Ascension) oder eine Pflichtwahl, die
+der Kartentext erzwingt — dann steht der Grund als Kommentar daneben.
+Anlass: Midnight Assault (v1295) hatte keinen.
+
+**2. Abbruch heißt: nichts ist passiert.** Die Karte bleibt auf der
+Hand, die Aktion wird erstattet, der Gegner hat nichts gesehen.
+
+| Weg | Abbruch melden |
+|---|---|
+| Spell / Attack aus der Hand | `gs._spellCancelled = true` (Wächter `check-spell-cancel`) |
+| Creature Effect | `onCreatureEffect` gibt `false` zurück |
+| Ability / Hero Effect | `false` zurück (siehe „Cancelling out of an additional Action") |
+
+Die ctx-Helfer `promptDamageTarget` / `promptMultiTarget` setzen das
+Spell-Flag selbst; wer `engine.promptEffectTarget` / `promptGeneric` roh
+benutzt, setzt es von Hand — auf JEDEM Abbruchweg, auch bei „Zustand hat
+sich zwischen Angebot und Antwort verschoben".
+
+**3. Das Kartenbild geht erst beim Auflösen zum Gegner.** Der Server hält
+den Reveal zurück (`gs._pendingCardReveal`) und feuert ihn bei der
+ersten bestätigten Antwort bzw. nach der Auflösung; im Abbruchzweig wirft
+er ihn weg. Bei **mehrstufiger** Auswahl reicht das nicht — die erste
+Antwort ist noch kein Auflösen. Dann `gs._holdCardReveal = true` bis zum
+Zusagepunkt, dort `engine._firePendingCardReveal()`, und im `finally`
+die Sperre löschen (Muster weiter unten unter „Der Reveal feuert beim
+ERSTEN Klick"). Vorbild: Ultimate Weapon Experiment (Galerie → Held).
+Dasselbe gilt für ALLES Sichtbare vor dem Zusagepunkt: kein Flug, keine
+Animation, kein Klang (v1122, Brainstorming).
+
+**4. Nicht wählbare Ziele werden ausgegraut, nicht verschwiegen**
+(Als Regel 21.8., für die zentrale Zielwahl nachgezogen in v1294):
+`t.ineligible = true` statt aus der Liste nehmen. Der Server lässt
+ausgegraute Ziele nie zu, auch nicht für die CPU.
+
+**Prüfung im Repro (Pflicht):** Abbruch an jeder Stufe → `_spellCancelled`
+bzw. `false`, Karte in der Hand, KEIN `card_reveal`, keine Animation.
 
 ## ★ JEDE **NEUE** ANIMATION BRAUCHT EINEN KLANG (Als Regel 19.8.)
 
@@ -2945,6 +2992,92 @@ Wenn ein Auftritt seinen Klang **zuverlaessig** und/oder **mehrfach**
 **keinen** `ZONE_ANIM_SFX`-Eintrag (sonst doppelt). Vorbilder:
 `LightningRainEffect`, `MeteorCrashEffect`. Das Kategorie-Fenster
 selbst bleibt fuers Erste unangetastet (Als Entscheidung 29.8.).
+
+### „One or more of your Creatures are defeated" — Sammel-Fenster (v1292)
+
+Das Einzel-Fenster `isCreatureDefeatedReaction` (Pawn Chain, Troop
+Annihilation) feuert je Tod — bei einem Flächenschlag also schon beim
+ersten Opfer. Für „choose one of THOSE Creatures" gibt es das
+**Sammel-Fenster**: die beiden Todeswege (`processCreatureDamageBatch`,
+`actionDestroyCard`) öffnen einen Sammler (`_mitNiederlagenSammler`,
+verschachtelt zählt nur der äußerste), jeder `onCreatureDeath` trägt
+sich ein, und beim Schließen öffnet sich das Fenster EINMAL mit allen
+Opfern — am fertigen Zustand (Ablage, Anspruch, Extra Life erledigt).
+Besiegen ohne Schaden zählt mit (Als Ruling 23.9.).
+
+```js
+isCreaturesDefeatedReaction: true,
+creaturesDefeatedCondition(gs, pi, engine, defeated) → bool,
+async creaturesDefeatedResolve(engine, pi, defeated, { casterIdx }),
+// defeated = [{ name, owner, originalOwner, controller, heroIdx,
+//               zoneSlot, instId, source, type }]  — nur Seite pi
+```
+
+Caster, Kosten, Flug in die Ablage, Auftritt und Log macht die Engine
+(`_rxHandkarteEinsetzen`, gemeinsam mit dem Einzel-Fenster). Log-Typ
+`creatures_defeated_reaction`. Vorbild: Zombified Assault.
+
+**Brett-Seite (v1301):** Derselbe Vorgang liefert danach den Hook
+`onCreaturesDefeated` (`HOOKS.ON_CREATURES_DEFEATED`) mit `ctx.defeated`
+— EIN Aufruf je Vorgang, beide Seiten in der Liste. Für passive Effekte
+auf „when a Creature you control is defeated", die nur einmal je
+Flächenschlag feuern sollen. Vorbild: Junshi, the Tactical Genius
+(Gegenschlag per `performImmediateAction` mit `cardNameFilter`).
+
+### Aufstieg aus dem Deck — `performAscension(… { fromDeck, skipChain })` (v1296)
+
+`opts.fromDeck: true` nimmt den Ascended Hero aus dem DECK statt aus der
+Hand: Entnahme über die Stapel-Schicht (Sperren, Deckkopf, danach
+gemischt), Flug Deck → Held; der `handIndex` wird ignoriert. Kein Umweg
+über die Hand (Throne-Robber-Trick) — ein Zustandsversand dazwischen hätte
+die Karte dort kurz gezeigt.
+
+`opts.skipChain: true` lässt das eigene Kettenfenster des Aufstiegs weg,
+wenn die auslösende Karte ihre Kette schon hatte. Anders als
+`notAnAscension` zählt der Aufstieg VOLL: Bedingung, Kosten
+(`payAscensionCost`), `ON_ASCENSION`, Bonus, Aufstiegs-Reaktionen.
+
+Das Zugende des Aufstiegs gibt eine Spell-Karte über
+`gs._spellEndsTurn = 'baseMechanic'` weiter: es feuert NACH der
+Auflösung der Karte und ist Grundmechanik — Zug-Ende-Immunität (Tuscan
+Prisoner) greift nicht (Als Ruling 16.8.). Formen mit
+`blockEndPhaseOnAscend` liefern `skipEndPhase: false`, dann passiert
+nichts. Vorbild: Ultimate Weapon Experiment.
+
+### Reaktionssperre und unaufhaltsames Besiegen (v1293)
+
+`await engine.ohneGegnerReaktion(pi, fn)` — solange `fn` läuft, kann der
+Gegner von `pi` auf nichts reagieren (Hand, Surprise, Kette,
+Brett-Reaktionen). Für das Kettenfenster der Karte SELBST zusätzlich das
+Skript-Flag `opponentCannotReact: true`. Vorbild: Midnight Assault.
+
+`opts.unaufhaltsam` an `actionDestroyCard` / `actionDefeatHero`:
+„ignores any effect that would prevent the target from being defeated".
+Überspringt Unzerstörbarkeit, Immunitäten, Wächter, Rettungsfenster und
+Hooks, die den Tod verhindern. Die Erstrunden-Schonung bleibt (Regel,
+kein Effekt).
+
+### Eigene Levelsenkung zählt einmal — `selbstsenkungZaehlt` (v1293)
+
+„This card's level is reduced by …": die Engine fragt JEDE aktive
+Instanz. Zwei Kopien auf der Hand senkten doppelt. Pflicht in jedem
+`reduceCardLevel`, der die EIGENE Karte senkt:
+`if (!selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx[, { zone: 'hand' }])) return 0;`
+(`_hooks.js`; `zone` nur, wenn die Senkung laut Text nur in einer Zone gilt).
+
+### Wiederbeleben ohne Beschwörung — `reviveCreatureFromDiscard` + `onRevive` (v1292)
+
+`await engine.reviveCreatureFromDiscard(pi, pileOwner, name, heroIdx, slot, { source, animType, animMs })`
+holt eine Kreatur aus einer Ablage zurück: Flug Ablage → Zone, frische
+Instanz mit vollen HP, **keine** On-Summon-Hooks, kein
+`creature_summoned`. Rückgabe Instanz oder `null` (Karte liegt dann
+wieder in der Ablage).
+
+Weil dabei `onCardEnterZone` nicht läuft, bekommt die wiederbelebte
+Karte — und NUR sie — ihren eigenen `onRevive(ctx)` (Modulebene, nicht
+in `hooks`). Dorthin gehört, was eine Kreatur sonst beim Betreten der
+Zone an sich selbst setzt (Doomed Town Guards Schirm). Derselbe Aufruf
+läuft auch im hooklosen Extra-Life-/Bone-Dog-Weg.
 
 ### „Vom Brett per Effekt in die Ablage" — `onBoardSentToDiscard` (v697)
 
@@ -16993,4 +17126,121 @@ fuenf Punkte laufen ueber EINEN Helfer (`loeseAusstehende`).
 **Faustregel fuer jede Karte, die Tode sammelt und spaeter einloest:**
 die Einloesepunkte muessen ALLE Aktionswege abdecken, nicht nur Zauber —
 sonst haengt die Wirkung an der naechsten fremden Aktion.
+
+## v1283 — Colored Snow: Klaenge und Ziel der Enthuellung
+
+- **Klaenge** (Als Befund 22.9.: „der Effekt hat noch keine Sounds, wenn
+  die Potion auf den Screen gezogen und umgedreht wird"): sie liegen auf
+  den Zeitpunkten der Animation `colored-snow-reveal-in` (1500 ms) —
+  `projectile` beim Herausziehen, `reveal` bei 900 ms (die Drehung laeuft
+  von 60 bis 80 %), `placement` beim Landen (entfaellt im `handoff`, dort
+  gehoert Bild UND Klang dem anderen Flug).
+- **Ziel `permanent`** (Als Befund 22.9.): eine Potion, die sich selbst
+  als Permanent ablegt (Elixir of Immortality), aendert keinen der
+  Stapel, die `_detectPotionDestination` zaehlt — der Flug ging deshalb
+  in die Loesch-Ablage. Die Erkennung zaehlt jetzt auch `ps.permanents`
+  und meldet `{ kind: 'permanent', owner, permId }`; der Client fliegt
+  zum Platz des Permanents (`[data-perm-id]`), ersatzweise zur
+  Permanents-Zeile.
+
+## v1284 — `onAnyActionResolved` in JEDEM Aktionsweg, Pseudonia 550 HP
+
+Befund (Al 22.9.): „Book of Doom" toetete einen eigenen Helden, Pseudonia
+reagierte nicht. Book of Doom klammert seine Ziele als Flaechentreffer —
+Pseudonia merkt eine Aufnahme dort nur VOR und loest sie an einem
+Nachlauf-Punkt ein. Der Sammelpunkt `onAnyActionResolved` fehlte aber im
+ARTEFAKT-Weg (und im Trank-Weg), obwohl die Engine ihn als „alle
+Action-Pfade" beschreibt. Beide feuern ihn jetzt; Waechter:
+`scripts/check-action-hook.js` (prueft doPlaySpell, doPlayCreature,
+doActivateAbility, doUseArtifactEffect, doUsePotion).
+
+**Pseudonia** hat 550 statt 400 HP (Balancing 22.9.).
+
+**Colored Snow:** legt sich die enthuellte Potion selbst als Permanent ab,
+steht sie im Spielstand, sobald ihr Effekt aufloest — also waehrend die
+Karte noch in der Bildmitte liegt. Ihr Platz bleibt deshalb verdeckt
+(`csVerdeckt`, Schluessel `${owner}-${cardName}`), bis der Flug dorthin
+angekommen ist.
+
+## v1285 — Zielwahl-Weg, Partikel nach dem Flug, Menue gewonnener Effekte
+
+- **`onAnyActionResolved` im Zielwahl-Weg:** ZIELENDE Artefakte und
+  Traenke (Book of Doom) loesen in `doConfirmPotion` auf, nicht in
+  `doUseArtifactEffect` — dort fehlte der Sammelpunkt noch (Befund:
+  Pseudonia reagierte nicht auf einen so getoeteten Helden). Der
+  Waechter `check-action-hook` deckt jetzt sechs Wege ab.
+- **Bild und Klang nach dem Flug:** ein `play_permanent_animation` fuer
+  ein Permanent, dessen Platz noch unter der Colored-Snow-Enthuellung
+  verdeckt ist (v1284), wird zurueckgestellt und laeuft erst, wenn die
+  Karte sichtbar wird.
+- **Menue der Heldeneffekte:** `heroEffectSource(hero)`
+  (`_gained-effects-shared.js`) nennt die Karte, die den AKTIVEN Effekt
+  stellt — eigenes Skript zuerst, danach die gewonnenen. Engine und
+  Server fragten dafuer das VERSCHMOLZENE Skript und schrieben den
+  Heldennamen in den Eintrag; Pseudonia stand damit selbst im Menue,
+  obwohl sie keinen aktiven Effekt hat. Sperre und Einmal-pro-Spiel
+  laufen ueber denselben Namen — ein gewonnener Effekt teilt sie mit
+  dem Original (v1275).
+
+## v1286 — Todeslage robust, Permanent-Bild wartet zuverlaessig
+
+- **Pseudonia** sucht den toten Helden nicht mehr nur ueber die
+  Objektidentitaet in der Heldenreihe, sondern faellt auf
+  `gs._heroKOContext` zurueck (die Engine setzt ihn um den
+  ON_HERO_KO-Hook). Wird der Held waehrend der Todeskette ersetzt oder
+  aus der Reihe genommen — etwa durch eine sofortige Wiederbelebung —,
+  verpuffte die Aufnahme vorher lautlos. Faustregel: ein Todes-Hook darf
+  sich nie allein auf die Objektidentitaet des Opfers verlassen.
+- **`play_permanent_animation`** wird zurueckgestellt, sobald fuer diese
+  Seite eine Colored-Snow-Enthuellung unterwegs ist. Die alte Pruefung
+  suchte das Permanent in der Liste des Handlers — die zeigt den Stand
+  seines Renders, in dem das neue Permanent oft noch fehlt, und das Bild
+  lief dann doch sofort.
+
+## v1287 — Menue ohne Doppel, Platz-Einschlag nach der Landung
+
+- **Menue der Heldeneffekte:** der EIGENE Zweig (Server
+  `availableEffects`, Engine `getActiveHeroEffects`) nimmt nur noch den
+  GEDRUCKTEN Aktiveffekt des Helden (`eigenesHeldenSkript(hero)` in
+  `_gained-effects-shared.js`). Gewonnene Aktiveffekte stehen ueber ihre
+  Traegerinstanzen (`treatAsEquip`) ohnehin im Menue — v1285 liess den
+  ersten zusaetzlich im eigenen Zweig einlaufen, er stand doppelt da
+  (Befund Pseudonia). Ein Held ohne eigenen Aktiveffekt erscheint gar
+  nicht. `heroEffectSource` bleibt fuer Fragen „wer stellt den Effekt".
+  Hinweis: Traeger-Eintraege nennen ihre Karte in `equippedCard`, nicht
+  in `effectName`.
+- **Einschlag beim Platzieren (v1206):** ein neuer Permanent-Platz
+  (`p:`-Schluessel der Belegungskarte) wartet, solange fuer diese Seite
+  eine Colored-Snow-Enthuellung unterwegs ist, und wird bei der Landung
+  nachgeholt — zusammen mit Bild und Klang (v1285/v1286).
+
+## v1288 — Hook-Prioritaet, Fenster vor der Wiederbelebung, Handzaehlung
+
+- **`hookPriority`** (Kartenvertrag, `{ [hookName]: Zahl }`): hoehere Zahl
+  laeuft in `runHooks` ZUERST, noch vor „Spieler am Zug zuerst". Ohne
+  Angabe 0 — fuer alle anderen Karten bleibt die Reihenfolge gleich.
+- **`beforeHeroRevive`** (`HOOKS.BEFORE_HERO_REVIVE`): feuert in
+  `actionReviveHero` unmittelbar vor der Wiederbelebung, der Held ist
+  noch tot. ALLE echten Wiederbelebungen laufen ueber diese Funktion;
+  Todes-VERHINDERER (Guardian Angel: „would be defeated → heal instead")
+  nicht — dort stirbt niemand.
+- **Pseudonia** (Als Vorgabe 22.9.: „vor JEDEM Revival-Effekt"): Prioritaet
+  100 im Todesfenster und in allen Einloesefenstern, dazu
+  `beforeHeroRevive` — eine vorgemerkte Aufnahme wird dort sofort
+  entschieden, auch mitten im Schlag.
+- **Elixir of Immortality** sammelt jetzt auch waehrend einer
+  Flaechenklammer (`engine._multiHitScope`), nicht nur bei Zaubertiefe > 0.
+  Vorher loeste es bei einem Artefakt-Flaechentreffer (Book of Doom) schon
+  beim ersten Toten aus — wer mehrere Ziele zugleich verlor, konnte nicht
+  waehlen.
+- **`handSizeWithoutResolving(ps)`** (`_hand-resolve.js`, Engine-Methode
+  gleichen Namens): Handgroesse ohne die aufloesende Karte — aber nur,
+  wenn sie wirklich IN DER HAND liegt. Aus der Creation Zone gewirkt
+  (True Fairy Crestina) liegt sie dort nicht. Supply Chain zog deshalb bis
+  8 (Befund 22.9.); Handlimit und Pollution rechnen jetzt ebenso.
+- **`engine.handFodderFor(pi, cardName)`**: Abwurfmaterial fuer
+  Wisdom-Kosten. Reine Handkarte −1, liegt sie (auch) in der Creation Zone,
+  steht die ganze Hand bereit. Die drei Spielbarkeits-Listen zogen
+  pauschal 1 ab. Beim Spielen auf einen GEGNERISCHEN Helden zahlt der
+  HANDELNDE Spieler — v1279 fragte dort faelschlich Boris des Gegners.
 
