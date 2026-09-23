@@ -17,11 +17,9 @@
   "grave-worm.js": "onCreatureDeath",
   "green-dragoneer.js": "onCreatureDeath",
   "hell-fox.js": "onCreatureDeath",
-  "icy-dragonegg.js": "onCreatureDeath",
   "loyal-shepherd.js": "onCreatureDeath",
   "loyal-terrier.js": "onCreatureDeath",
   "luna-pele-the-flame-dancer.js": "onStatusApplied",
-  "lunatic-cycle-crescent-moon.js": "onAnyActionResolved",
   "mischief-militia-chilly-wizard.js": "onStatusApplied",
   "mischief-militia-colored-snow.js": "onStatusApplied",
   "mischief-militia-heli-troopers.js": "onCreatureDeath",
@@ -35,5 +33,6 @@
   "the-golden-abomination.js": "onResourceGain",
   "the-nornstellar-foretellers-of-coolness.js": "onCreatureDeath",
   "the-sun-sword.js": "afterDamage",
+  "tobi-the-average-student.js": "onAnyActionResolved",
   "wanted-poster.js": "onHeroKO"
 }

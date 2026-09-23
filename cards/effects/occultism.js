@@ -225,6 +225,7 @@ module.exports = {
       engine._untrackCard(sacInst.id);
       engine.sync();
     } else {
+      delete engine.gs._opferFizzle;   // v1313: nur DIESES Opfer zaehlt
       await engine.actionDestroyCard(
         { name: CARD_NAME, owner: pi, heroIdx },
         sacInst,
@@ -233,6 +234,14 @@ module.exports = {
         // Nutzen schon eingestrichen wurde (Als Ruling vom 1.8.).
         { isSacrifice: true },
       );
+      // ★ v1313 (Als Vorgabe 23.9.): Wurde das Opfer gerettet (Barrier of
+      // Undying), ist der Preis nicht bezahlt — der Effekt fizzelt. Die
+      // Marke bleibt fuer den Aufrufer-Weg stehen (Einsatz verbraucht).
+      if (engine.gs._opferFizzle) {
+        engine.log('sacrifice_fizzle', { card: CARD_NAME, player: engine.gs.players[pi]?.username, reason: 'saved' });
+        engine.sync();
+        return true;
+      }
     }
 
     // ── Damage: beam from the ACTIVATED OCCULTISM to the target. ──

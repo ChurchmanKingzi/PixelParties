@@ -71,37 +71,32 @@ module.exports = {
         gewaehlt = wahl.cardName;
       }
 
+      // ★ v1312 (Als Vorgabe 23.9.) — Bauform wie Crums Tausch:
+      //  ⓪ gewaehlte Karte aus der Ablage nehmen (Sperren);
+      //  ① ihren Anflug ansagen, solange der Client sie noch oben sieht;
+      //  ② Zustand: Ablage wird kuerzer → Verdeckung dort aufgehoben;
+      //  ③ Shooting Star verlaesst JETZT die Hand in die Ablage — Flug,
+      //    Entnahme, Zustand (`aufloesenderSpellInDieAblage`); der Server
+      //    wiederholt das nach der Aufloesung nicht mehr. Die Nachbarn
+      //    ruecken sofort auf, beide Karten fliegen zugleich;
+      //  ④ nach der Flugzeit landet die gewaehlte Karte in der Hand.
+      // Vorher flog Shooting Star hier UND ein zweites Mal im Server
+      // (seit v1225 sendet der Zauber-Weg seinen Abflug selbst).
       const genommen = await engine.takeFromPile(ps, 'discard', gewaehlt, { source: CARD_NAME, toHand: true });
       if (!genommen) return;
-
-      // ── BEIDE FLUEGE GLEICHZEITIG (v893, Als Vorgabe) ─────────────
-      // Shooting Star geht zur Ablage, die gewaehlte Karte kommt von
-      // dort — die beiden sollen sich unterwegs kreuzen. Also erst
-      // BEIDE Fluege losschicken, dann EINMAL warten, dann umbuchen.
-      //
-      // Der Zielplatz braucht Sorgfalt: Shooting Star liegt noch in der
-      // Hand und raeumt ihren Platz gerade. Die Hand ist hinterher also
-      // genauso gross wie jetzt (`finalHandSize`), und die neue Karte
-      // haengt sich hinten an — nach dem Abgang ist das der LETZTE
-      // Platz. Dass der Client den Landeplatz waehrenddessen ausblendet,
-      // ist hier genau richtig: dort liegt Shooting Star, und die
-      // fliegt in diesem Moment selbst als Karte heraus.
       const eigenerIdx = (ps.hand || []).indexOf(CARD_NAME);
-      const endGroesse = ps.hand.length;            // Abgang + Zugang = gleich
-      const zielIdx = Math.max(0, endGroesse - 1);  // hinten angehaengt
-
-      engine._broadcastEvent('play_pile_transfer', {
-        owner: pi, cardName: CARD_NAME,
-        from: 'hand', to: 'discard', asPlay: 'sole',
-        fromHandIdx: eigenerIdx >= 0 ? eigenerIdx : 0,
-      });
+      const bleibtInHand = eigenerIdx >= 0 && !ps._resolvingCard?.fromCreation;
+      const endGroesse = bleibtInHand ? ps.hand.length : ps.hand.length + 1;
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: gewaehlt, from: 'discard', to: 'hand',
-        toHandIdx: zielIdx, finalHandSize: endGroesse,
+        toHandIdx: endGroesse - 1, finalHandSize: endGroesse,
       });
+      engine.sync();
+      await engine.aufloesenderSpellInDieAblage(pi);
       await engine._delay(650);
 
       ps.hand.push(gewaehlt);
+      engine._trackCard(gewaehlt, pi, 'hand');
       engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
       await engine.runHooks('onCardAddedFromDiscardToHand', {
         playerIdx: pi, cardName: gewaehlt,

@@ -770,6 +770,11 @@ class GameEngine {
     // und kein Merker am Namen: Als Ruling 31.8., der Erlass gilt fuer
     // DIESE eine gesuchte Karte, nicht fuer Kopien von ihr.
     this.registerHandIndexedField('_handAscensionGrants', { kind: 'value' });
+    // v1307 (Crum, the Class Pet): „delete it at the end of the turn if it
+    // is still in your hand …" — Marke je PHYSISCHER Kopie, folgt ihr durch
+    // Hand-Splices und faellt mit ihr aus der Hand. Wert = { turn, source }.
+    // Eingeloest in `_zugendeLoeschungenAusfuehren` (switchTurn).
+    this.registerHandIndexedField('_handLoeschenAmZugende', { kind: 'value' });
     // Transient sibling of `_handLevelOffsets`. Same lookup semantics
     // (negative numbers reduce level), but DELIBERATELY no
     // `onCardSummonedFromHand` callback — the offset is purely an
@@ -10004,6 +10009,10 @@ class GameEngine {
       // induced draws. Other opts pass-through is intentional.
       await this.runHooks(HOOKS.ON_DRAW, {
         playerIdx, card: inst, cardName,
+        // v1307: `card`/`cardName` ueberschreibt `_createContext` mit der
+        // LAUSCHENDEN Karte — die gezogene steht deshalb (wie beim
+        // Ablage-Hook `addedCard`) zusaetzlich unter eigenem Namen.
+        drawnCard: inst, drawnCardName: cardName,
         _isResourceDraw: !!opts._isResourceDraw,
         // v815: Ziehvorgang-Kennung — ONE Ziehvorgang („draws 1 or more
         // cards") feuert ON_DRAW je KARTE; Reaktionen, die je Vorgang
@@ -10051,7 +10060,7 @@ class GameEngine {
         drawn.push(extraInst);
         this.log('draw', { player: ps.username, card: extraCard, ...quelle });
         this._broadcastEvent('nomu_draw', { playerIdx, cardName: extraCard });
-        await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: extraInst, cardName: extraCard });
+        await this.runHooks(HOOKS.ON_DRAW, { playerIdx, card: extraInst, cardName: extraCard, drawnCard: extraInst, drawnCardName: extraCard });
 
         // Find Nomu hero for logging
         const nomuHero = (ps.heroes || []).find(h => h?.name && h.hp > 0 && this.heroScript(h)?.isNomuHero);
@@ -10540,7 +10549,7 @@ class GameEngine {
       // Potion draws are always effect-induced (no resource-phase
       // auto-draw), so `_isResourceDraw` stays false.
       await this.runHooks(HOOKS.ON_DRAW, {
-        playerIdx, card: inst, cardName,
+        playerIdx, card: inst, cardName, drawnCard: inst, drawnCardName: cardName,
         _isResourceDraw: false,
         _isPotionDraw: true,
       });
@@ -11052,6 +11061,25 @@ class GameEngine {
           this.log('destroy_blocked', { card: targetCard.name, reason: 'creature protection' });
           return;
         }
+      }
+    }
+    // ★ v1313 — „WOULD BE DEFEATED" AUCH OHNE SCHADEN (Barrier of Undying,
+    // Als Vorgabe 23.9.): Zerstoerung (The Yeeting …) und Opfer oeffnen
+    // dasselbe Rettungsfenster wie ein toedlicher Treffer — beide Seiten,
+    // nur fuer Karten mit `preDefeatOnDestroy`. AUSNAHME Beschwoerungs-
+    // opfer (Foresta, Blue-Ice Dragon …): waehrend `beforeSummon` laeuft,
+    // gibt es kein Fenster. Wird ein EFFEKT-Opfer gerettet, fizzelt der
+    // Effekt: `gs._opferFizzle` (s. `resolveSacrificeCost`, `nimmOpferFizzle`).
+    if (isCreatureTarget && !_u && !opts._keinRettungsfenster
+        && !(opts.isSacrifice && (this._beschwoerungsOpferTiefe || 0) > 0)) {
+      const gerettet = await this._checkCreaturePreDefeatHandReactions(
+        targetCard, source, targetCard.counters?.currentHp ?? 0, 'destroy',
+        { isSacrifice: !!opts.isSacrifice, istZerstoerung: true });
+      if (gerettet) {
+        if (opts.isSacrifice) this.gs._opferFizzle = true;
+        this.log('destroy_blocked', { card: targetCard.name, reason: 'pre-defeat-reaction' });
+        this.sync();
+        return;
       }
     }
     this.log('destroy', { source: source?.name, target: targetCard.name });
@@ -13186,6 +13214,10 @@ this._deathWatch = (this._deathWatchStack || []).length
   async _runBeforeSummon(cardName, playerIdx, heroIdx, hookExtras = {}, reservedSlot = -1) {
     const script = loadCardEffect(cardName);
     if (!script?.beforeSummon) return true;
+    // v1313: Opfer, die eine BESCHWOERUNG kostet, oeffnen kein Rettungs-
+    // fenster (Als Vorgabe 23.9.) — Zaehler statt Flag, falls verschachtelt.
+    this._beschwoerungsOpferTiefe = (this._beschwoerungsOpferTiefe || 0) + 1;
+    try {
     // Zielplatz fuer die Dauer der Kostenzahlung reservieren (s.o.).
     // Vorgaenger sichern, damit verschachtelte Beschwoerungen sich nicht
     // gegenseitig die Reservierung loeschen.
@@ -13226,6 +13258,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     } finally {
       this._reservedSummonSlot = _prevReservation;
       this._beforeSummonInFlight = _prevBeforeSummon;
+    }
+    } finally {
+      this._beschwoerungsOpferTiefe = Math.max(0, (this._beschwoerungsOpferTiefe || 1) - 1);
     }
   }
 
@@ -16508,7 +16543,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const inst = this._trackCard(taken.name, pi, ZONES.HAND);
     this._pileFlight(pi, taken.name, pile, 'hand', { toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length });
     this._autoRevealOnEnterHand(pi, ps.hand.length - 1, taken.name);
-    await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, { playerIdx: pi, card: inst, cardName: taken.name });
+    await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, { playerIdx: pi, card: inst, cardName: taken.name, addedCard: inst, addedCardName: taken.name });
     this.sync();
     return true;
   }
@@ -18348,7 +18383,13 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   _zusageAuftrittVormerken(cardName, pi) {
     if (!cardName) return null;
-    const eintrag = { cardName, pi, id: Symbol('zusage') };
+    // v1306: statt eines Namens darf auch eine FUNKTION kommen — dann ruft
+    // der Zusagepunkt sie auf, statt einen Auftritt zu zeigen. So gibt eine
+    // Artefakt-Karte (Sticky Wand) ihren eigenen, zurueckgehaltenen
+    // Karten-Reveal genau dann frei.
+    const eintrag = typeof cardName === 'function'
+      ? { fn: cardName, pi, id: Symbol('zusage') }
+      : { cardName, pi, id: Symbol('zusage') };
     (this._zusageAuftritte || (this._zusageAuftritte = [])).push(eintrag);
     return eintrag;
   }
@@ -18362,6 +18403,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const jetzt = nurEintrag ? liste.filter(e => e === nurEintrag) : liste.slice();
     this._zusageAuftritte = liste.filter(e => !jetzt.includes(e));
     for (const e of jetzt) {
+      if (e.fn) { try { e.fn(); } catch (err) { console.error('[zusageAuftritt]', err.message); } continue; }
       Promise.resolve(this.showTriggeredEffect(e.cardName, { playerIdx: e.pi })).catch(() => {});
     }
   }
@@ -18789,21 +18831,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     const inst = this._trackCard(cardName, playerIdx, 'hand', heroIdx, -1);
     const _cancelVorher = this.gs._spellCancelled;
     this.gs._spellCancelled = false;
-    if (cardData.cardType === 'Spell') {
-      const wisdomCost = this.getWisdomDiscardCost(playerIdx, heroIdx, cardData);
-      if (wisdomCost > 0) {
-        // ★ Die Karte liegt seit v979 waehrend der Aufloesung noch in
-        // der Hand — fuer die Wisdom-Abfrage muss sie raus, sonst
-        // koennte der Spieler ausgerechnet den Zauber abwerfen, den er
-        // gerade wirkt. Danach kommt sie auf ihren Platz zurueck.
-        const _wIdx = fromZone === 'deck' ? -1 : pool.indexOf(cardName);
-        if (_wIdx >= 0) pool.splice(_wIdx, 1);
-        await this.actionPromptForceDiscard(playerIdx, wisdomCost, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
-        if (_wIdx >= 0) pool.splice(Math.min(_wIdx, pool.length), 0, cardName);
-      }
-    }
+    // ★ v1316 (Als Befund 23.9., Yukana): die Wisdom-Kosten werden jetzt
+    // wie im regulaeren Zauber-Weg ERST NACH der Aufloesung bezahlt (unten).
+    // Vorher lagen sie VOR `onPlay`: die Karte musste dafuer kurz aus der
+    // Hand (damit man sie nicht selbst abwirft) und tauchte danach wieder
+    // auf — und wer anschliessend in der Zielwahl abbrach, hatte die
+    // Abwuerfe umsonst bezahlt. Die Hoehe steht beim Wirken fest.
+    const _wisdomKosten = cardData.cardType === 'Spell'
+      ? this.getWisdomDiscardCost(playerIdx, heroIdx, cardData) : 0;
     this.gs._immediateActionContext = true;
     const hadPriorLog = this.gs._spellDamageLog !== undefined;
     if (!hadPriorLog) this.gs._spellDamageLog = [];
@@ -18905,7 +18940,31 @@ this._deathWatch = (this._deathWatchStack || []).length
     }
     this._untrackCard(inst.id);
     this.log('immediate_action', { hero: hero.name, card: cardName, cardType: cardData.cardType, by: opts.by || null, from: fromZone });
+    // v1316: Wisdom jetzt — der Zauber liegt schon in der Ablage und kann
+    // nicht versehentlich mit abgeworfen werden.
+    if (_wisdomKosten > 0 && !this.gs.result) {
+      await this.actionPromptForceDiscard(playerIdx, _wisdomKosten, {
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+      });
+    }
     return { cancelled: false };
+  }
+
+  /**
+   * ★ v1316 — RAMMEN BIS ZUM KONTAKT (Als Vorgabe 23.9.: „der Schaden soll
+   * in dem Moment passieren, in dem sich Retter und urspruengliches Ziel
+   * beruehren, NICHT erst nach dem Rueckflug").
+   *
+   * Sendet `play_ram_animation` und wartet nur bis zum Aufprall — der
+   * Rueckflug laeuft im Client weiter, waehrend der Aufrufer schon den
+   * Schaden austeilt. Aufprall-Anteile aus den Keyframes: `ramCharge`
+   * 12 %, Jetpack (`trailType: 'fire'`) 45 %.
+   */
+  async rammeBisKontakt(ev) {
+    const dauer = ev.duration || 1600;
+    this._broadcastEvent('play_ram_animation', { ...ev, duration: dauer });
+    const anteil = ev.trailType === 'fire' ? 0.45 : 0.12;
+    await this._delay(Math.round(dauer * anteil) + 30);
   }
   /**
    * Perform an immediate action with ANY hero. Shows the heroAction UI
@@ -20114,6 +20173,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // setting the flag. Types WITHOUT the flag keep their existing
     // self-managed lifetimes (legendary sword, second-action tiers).
     this._expireTurnEndAdditionalActions();
+    await this._zugendeLoeschungenAusfuehren();   // v1307 (Crum)
 
     // Geliehene Identitaeten fallen ab (Future Tech Copy Device).
     // Aus demselben Grund hier und nicht in einem Karten-Hook: der
@@ -21479,7 +21539,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // routing it through the canonical helper makes the hook reliable
     // for every script that uses this path.
     await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, {
-      playerIdx: pi, card: inst, cardName,
+      playerIdx: pi, card: inst, cardName, addedCard: inst, addedCardName: cardName,   // v1307
     });
 
     // ── TUTOR-STRICHLISTE (v734, Koperniko) ──────────────────────────
@@ -22856,6 +22916,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Animation, Batch-Hooks) nachzubauen.
    */
   async resolveSacrificeCost(ctx, spec) {
+    delete this.gs._opferFizzle;   // v1313: nur Rettungen DIESES Opfers zaehlen
     const pi = ctx.cardOwner;
     const selfId = ctx.card?.id;
     const candidates = this._collectSacrificeCandidates(pi, spec, selfId);
@@ -23168,6 +23229,16 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // ★ v1313: wurde ein Opfer GERETTET (Barrier of Undying), ist der
+    // Preis nicht bezahlt — der Effekt fizzelt (Als Vorgabe 23.9.).
+    // `false` wie beim Abbruch, aber `gs._opferFizzle` bleibt stehen: die
+    // Aufrufer-Wege (Spell, Creature-/Helden-Effekt …) lesen es ueber
+    // `nimmOpferFizzle()` und werten den Einsatz als VERBRAUCHT statt als
+    // abgebrochen.
+    if (this.gs._opferFizzle) {
+      this.log('sacrifice_fizzle', { card: ctx.cardName, player: this.gs.players[pi]?.username, reason: 'saved' });
+      return false;
+    }
     this.log('sacrifice_paid', {
       card: ctx.cardName, player: this.gs.players[pi]?.username,
       victims: picked.map(t => t.cardName), count: picked.length,
@@ -28274,7 +28345,7 @@ this._deathWatch = (this._deathWatchStack || []).length
    * @returns {Promise<boolean>} true iff the creature should be saved
    *   (caller skips the HP subtraction + death cleanup for this entry).
    */
-  async _checkCreaturePreDefeatHandReactions(creatureInst, source, amount, type) {
+  async _checkCreaturePreDefeatHandReactions(creatureInst, source, amount, type, info = {}) {
     // Dark Ocean: kein Reagieren auf Effekte gegnerischer Creatures.
     // Jedes Hand-Reaktionsfenster ist ein EIGENER Weg — die Sperre
     // muss deshalb an jedem einzeln haengen (Als Ruling 5.8.).
@@ -28284,14 +28355,21 @@ this._deathWatch = (this._deathWatchStack || []).length
 
     // Demon's Gate-style creature-caster annotation.
     source = this._rewriteSourceForCreatureCaster(source);
-
-    const ownerIdx = creatureInst.controller ?? creatureInst.owner;
-    const ps = this.gs.players[ownerIdx];
-    if (!ps) return false;
-
+    const herr = creatureInst.controller ?? creatureInst.owner;
     // First-turn-protected players can't activate hand reactions —
     // matches the hero pre-damage gate.
-    if (this.gs.firstTurnProtectedPlayer === ownerIdx) return false;
+    if (this.gs.firstTurnProtectedPlayer === herr) return false;
+    // ★ v1313 (Barrier of Undying): „when A Creature would be defeated" —
+    // nach dem Kontrolleur darf auch der GEGNER, aber nur mit Karten, die
+    // das ausdruecklich erlauben (`preDefeatAnySide`). `info` traegt die
+    // Todesart (`isSacrifice`, `istZerstoerung`) an Bedingung/Aufloesung.
+    if (await this._preDefeatFensterSeite(herr, false, creatureInst, source, amount, type, info)) return true;
+    return this._preDefeatFensterSeite(herr === 0 ? 1 : 0, true, creatureInst, source, amount, type, info);
+  }
+
+  async _preDefeatFensterSeite(ownerIdx, nurAnySide, creatureInst, source, amount, type, info = {}) {
+    const ps = this.gs.players[ownerIdx];
+    if (!ps) return false;
 
     const allCards = this._getCardDB();
     const seen = new Set();
@@ -28303,6 +28381,11 @@ this._deathWatch = (this._deathWatchStack || []).length
 
       const script = loadCardEffect(cardName);
       if (!script?.isCreaturePreDefeatReaction) continue;
+      if (nurAnySide && !script.preDefeatAnySide) continue;
+      // Nicht-Schadens-Tode (Zerstoerung, Opfer) nur fuer Karten, die sie
+      // ausdruecklich abfangen (`preDefeatOnDestroy`) — die bisherigen
+      // Retter sind reine Schadens-Reaktionen.
+      if (type === 'destroy' && !script.preDefeatOnDestroy) continue;
 
       const cardData = allCards[cardName];
       const cost = cardData?.cost || 0;
@@ -28320,7 +28403,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
 
       if (script.creaturePreDefeatCondition &&
-          !script.creaturePreDefeatCondition(this.gs, ownerIdx, this, creatureInst, source, amount, type)) continue;
+          !script.creaturePreDefeatCondition(this.gs, ownerIdx, this, creatureInst, source, amount, type, info)) continue;
 
       const srcName  = source?.name || 'An effect';
       const tgtName  = creatureInst.name || 'Creature';
@@ -28359,7 +28442,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       this._inCreaturePreDefeatReaction = true;
       try {
         if (script.creaturePreDefeatResolve) {
-          const result = await script.creaturePreDefeatResolve(this, ownerIdx, creatureInst, source, amount, type);
+          const result = await script.creaturePreDefeatResolve(this, ownerIdx, creatureInst, source, amount, type, info);
           saved = !!result?.saved;
         }
       } catch (err) {
@@ -33723,6 +33806,183 @@ this._deathWatch = (this._deathWatchStack || []).length
    * instances, which would let a grant leak exactly when its provider
    * is incapacitated at turn end.
    */
+  /**
+   * ★ v1307 — LEVELZUSCHLAG FUER EINE LAUFENDE AKTION.
+   *
+   * „… as an additional Action …, but if you do, its level is increased
+   * by 1" (Ellie, the Class President). Waehrend der Zusatzaktion steht
+   * ein Eintrag in `_levelZuschlaege`; `heroMeetsLevelReq` und
+   * `effectiveCardLevel` rechnen ihn auf die Stufe — NACH den Senkungen,
+   * wie Mana Absorbing Crystal. Iceages „+1 beim Wirken" prueft ueber
+   * dieselbe Funktion und bekommt den Zuschlag damit automatisch dazu.
+   * Aufrufer setzen den Eintrag mit `mitLevelZuschlag` (raeumt selbst ab).
+   */
+  _levelZuschlag(pi, heroIdx, cardData) {
+    const liste = this._levelZuschlaege;
+    if (!liste || liste.length === 0 || !cardData) return 0;
+    let summe = 0;
+    for (const z of liste) {
+      if (z.pi !== pi) continue;
+      if (z.heroIdx != null && heroIdx != null && z.heroIdx !== heroIdx) continue;
+      try { if (z.filter && !z.filter(cardData)) continue; } catch { continue; }
+      summe += z.amount || 0;
+    }
+    return summe;
+  }
+  async mitLevelZuschlag(eintrag, fn) {
+    if (!this._levelZuschlaege) this._levelZuschlaege = [];
+    this._levelZuschlaege.push(eintrag);
+    try { return await fn(); }
+    finally { this._levelZuschlaege = this._levelZuschlaege.filter(z => z !== eintrag); }
+  }
+
+  /**
+   * ★ v1307 — EINE HANDKARTE DEM GEGNER ZEIGEN („reveal it").
+   * Dasselbe Bild wie der Reveal gespielter Karten, nur fuer den Gegner
+   * und die Zuschauer; dazu Logzeile und das Kartengedaechtnis der CPU.
+   */
+  revealToOpponent(pi, cardName, opts = {}) {
+    if (!cardName) return;
+    const oi = pi === 0 ? 1 : 0;
+    // ★ v1308 (Als Vorgabe 23.9.): das Zeigen ist fuer BEIDE sichtbar —
+    // die Karte hebt sich aus der Hand, wird in der Mitte praesentiert
+    // (beim Gegner umgedreht) und kehrt zurueck (`hand_card_present`).
+    const handIdx = typeof opts.handIdx === 'number' ? opts.handIdx : (this.gs.players[pi]?.hand || []).indexOf(cardName);
+    this._broadcastEvent('hand_card_present', { ownerIdx: pi, handIdx, cardName });
+    if (typeof this.noteKnownCard === 'function') this.noteKnownCard(oi, cardName, 'hand');
+    this.log('hand_card_revealed', { player: this.gs.players[pi]?.username, card: cardName, by: opts.source || null });
+  }
+
+  /**
+   * ★ v1307 — „delete it at the end of the turn if it is still in your
+   * hand or discard pile" (Crum). Merkt die Handkopie (Handfeld, folgt
+   * Splices) und den Ablage-Stand dieses Namens. Am Zugende: liegt die
+   * gemerkte Kopie noch auf der Hand → loeschen; sonst, wenn die Ablage
+   * jetzt MEHR Kopien des Namens hat als beim Merken → eine davon loeschen
+   * (die Kopie ist dorthin gewandert, z.B. nach dem Wirken).
+   */
+  /**
+   * ★ v1308 — „You can only control 1 X": steht die Klausel im Kartentext
+   * einer Creature und liegt schon eine eigene offene Kopie auf dem Brett?
+   * Speist das Ausgrauen der Handkopien (server.js, cardGateBlockedCards).
+   */
+  nurEinerSchonKontrolliert(pi, cardName) {
+    const cd = this._getCardDB()[cardName];
+    if (!cd || cd.cardType !== 'Creature') return false;
+    if (!(cd.effect || '').includes(`You can only control 1 "${cardName}"`)) return false;
+    return this.cardInstances.some(c => c.name === cardName && c.zone === 'support' && !c.faceDown
+      && (c.controller ?? c.owner) === pi);
+  }
+
+  /**
+   * ★ v1312 — DER AUFLOESENDE SPELL GEHT JETZT SCHON IN DIE ABLAGE.
+   *
+   * Fuer Tausch-Karten, deren eigener Abgang Teil der Wirkung ist und
+   * GLEICHZEITIG mit einer anderen Bewegung laufen soll (Shooting Star:
+   * sie fliegt in die Ablage, waehrend die gewaehlte Karte heraus-
+   * fliegt). Macht genau, was `doPlaySpell` sonst nach der Aufloesung
+   * tut — Flug, Entnahme aus der Hand, Ablage des (urspruenglichen)
+   * Besitzers, Hand-Zaehler — und loest `ps._resolvingCard`, damit der
+   * Server danach NICHTS davon wiederholt (er findet keinen Handplatz
+   * mehr und ueberspringt Flug, Entnahme und Ablage).
+   * Nur fuer die Hand; aus Crestinas Vorrat bleibt es beim Normalweg.
+   * @returns {Promise<{ idx, name }|null>}
+   */
+  async aufloesenderSpellInDieAblage(pi) {
+    const ps = this.gs.players[pi];
+    const rc = ps?._resolvingCard;
+    if (!rc || rc.fromCreation) return null;
+    const { getResolvingHandIndex } = require('./_hand-resolve');
+    const idx = getResolvingHandIndex(ps);
+    if (idx < 0) return null;
+    const name = ps.hand[idx];
+    const ziel = this._consumeHandCardOrigin(pi, name);
+    this._broadcastEvent('play_pile_transfer', {
+      fromOwner: pi, toOwner: ziel, cardName: name, from: 'hand', to: 'discard', fromHandIdx: idx,
+    });
+    const weg = await this.takeFromPile(pi, 'hand', idx, { source: name });
+    if (!weg) return null;
+    ps._resolvingCard = null;
+    this.notePlayedFromHand(pi);
+    const zielPs = this.gs.players[ziel] || ps;
+    if (!zielPs.discardPile) zielPs.discardPile = [];
+    zielPs.discardPile.push(weg.name);
+    this._trackCard(weg.name, ziel, 'discard');
+    this.sync();
+    return { idx, name: weg.name };
+  }
+
+  /**
+   * ★ v1313 — Wurde im laufenden Effekt ein Opfer gerettet? Liest UND
+   * loescht die Marke. Die Aufrufer-Wege (server.js) rufen das nach dem
+   * Effekt: `true` heisst „fizzelt, aber verbraucht" — kein Abbruch, kein
+   * Rueckgeben der Karte, die Einmal-pro-Zug-Sperre bleibt.
+   */
+  nimmOpferFizzle() {
+    const f = !!this.gs._opferFizzle;
+    delete this.gs._opferFizzle;
+    return f;
+  }
+
+  /**
+   * ★ v1313 — Board-Instanz am Ende eines BESTIMMTEN Zuges loeschen, wenn
+   * sie dann noch liegt (Barrier of Undying: „At the end of its owner's
+   * next turn, if it is still on the board, delete it"). Eingeloest in
+   * `_zugendeLoeschungenAusfuehren`, auch wenn die Quelle laengst weg ist.
+   */
+  markiereBrettLoeschung(inst, amZug, source) {
+    if (!inst) return;
+    if (!this.gs._zugendeLoeschungen) this.gs._zugendeLoeschungen = [];
+    this.gs._zugendeLoeschungen.push({ instId: inst.id, cardName: inst.name, amZug, source: source || null });
+  }
+
+  markiereZugendeLoeschung(pi, handIdx, cardName, source) {
+    const ps = this.gs.players[pi];
+    if (!ps || handIdx < 0 || ps.hand?.[handIdx] !== cardName) return;
+    if (!ps._handLoeschenAmZugende) ps._handLoeschenAmZugende = {};
+    const marke = { turn: this.gs.turn, source: source || null, id: `${this.gs.turn}:${Math.random()}` };
+    ps._handLoeschenAmZugende[handIdx] = marke;
+    if (!this.gs._zugendeLoeschungen) this.gs._zugendeLoeschungen = [];
+    this.gs._zugendeLoeschungen.push({
+      pi, cardName, id: marke.id, source: marke.source,
+      ablageBasis: (ps.discardPile || []).filter(n => n === cardName).length,
+    });
+  }
+  async _zugendeLoeschungenAusfuehren() {
+    const liste = this.gs._zugendeLoeschungen;
+    if (!liste || liste.length === 0) return;
+    this.gs._zugendeLoeschungen = [];
+    for (const e of liste) {
+      // v1313: Brett-Instanz zu einem bestimmten Zug (Barrier of Undying)
+      if (e.instId != null) {
+        if ((e.amZug ?? this.gs.turn) > this.gs.turn) { this.gs._zugendeLoeschungen.push(e); continue; }
+        const inst = this.cardInstances.find(c => c.id === e.instId && c.zone === 'support');
+        if (inst) {
+          this._broadcastEvent('play_pile_transfer', {
+            owner: inst.owner, cardName: inst.name, from: 'support', to: 'deleted',
+            fromHeroIdx: inst.heroIdx, fromSlotIdx: inst.zoneSlot,
+          });
+          await this.actionMoveCard(inst, ZONES.DELETED, -1, -1, { source: e.source });
+          this.log('card_deleted', { player: this.gs.players[inst.owner]?.username, card: e.cardName, from: 'board', by: e.source });
+        }
+        continue;
+      }
+      const ps = this.gs.players[e.pi];
+      if (!ps) continue;
+      const marken = ps._handLoeschenAmZugende || {};
+      const key = Object.keys(marken).find(k => marken[k]?.id === e.id);
+      if (key != null && ps.hand?.[+key] === e.cardName) {
+        delete marken[key];
+        await this.deleteFromPile(e.pi, 'hand', +key, { source: e.source });
+        continue;
+      }
+      if (key != null) delete marken[key];
+      const jetzt = (ps.discardPile || []).filter(n => n === e.cardName).length;
+      if (jetzt > e.ablageBasis) await this.deleteFromPile(e.pi, 'discard', e.cardName, { source: e.source });
+    }
+    this.sync();
+  }
+
   _expireTurnEndAdditionalActions() {
     let expiredAny = false;
     for (const inst of this.cardInstances) {
@@ -35237,7 +35497,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ctx = this._createContext(chosen.inst, {});
     this.armEffectAnnounce(chosen.name, pi, 'board');   // v349
     let gerryVeto = false;
-    const resolved = await chosen.script.onHeroEffect(ctx);
+    let resolved = await chosen.script.onHeroEffect(ctx);
+    if (this.nimmOpferFizzle()) resolved = true;   // v1313: gerettetes Opfer → fizzelt, aber verbraucht
     if (resolved !== false) this.announceActiveEffect();
     this.clearEffectAnnounce();
     await this._flushSurpriseDrawChecks();
@@ -37454,6 +37715,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cardData.cardType === 'Spell' && ps_lvr) {
       rawLevel += require('./_crystals-shared').manaAbsorbingHandSpellLevelOffset(this, lvlPi);
     }
+    // v1307: Zuschlag fuer eine laufende Aktion (Ellie: „its level is
+    // increased by 1") — s. `_levelZuschlag`.
+    rawLevel += this._levelZuschlag(lvlPi, heroIdx, cardData);
     // Lethe per-pile stamp — bumps the effective level for Creature
     // revivals out of discard/deleted (callers iterating those piles
     // pass `opts.pileSide`). Stacks across the standard gap-coverage
@@ -37851,6 +38115,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (cardData.cardType === 'Spell' && ps) {
       raw += require('./_crystals-shared').manaAbsorbingHandSpellLevelOffset(this, playerIdx);
     }
+    raw += this._levelZuschlag(playerIdx, heroIdx, cardData);   // v1307
 
     // (4) Lethe per-pile stamp — pile-only opt-in (callers pass any
     // truthy `opts.pileSide` from their discard/deleted iterators).

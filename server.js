@@ -4611,6 +4611,13 @@ function sendGameState(room, playerIdx, extra) {
       // Karte nur, wenn sie bei KEINEM spielbar waere.
       cardGateBlockedCards: pi === playerIdx ? (() => {
         const raus = new Set();
+        // ★ v1308 (Als Vorgabe 23.9.): „You can only control 1 X" — liegt
+        // schon eine eigene Kopie offen auf dem Brett, sind die Kopien in
+        // der Hand ausgegraut. Aus dem Kartentext, gilt fuer ALLE solchen
+        // Creatures (die Sperre selbst sitzt weiter in `beforeSummon`).
+        for (const cn of new Set(ps.hand || [])) {
+          if (room.engine?.nurEinerSchonKontrolliert?.(pi, cn)) raus.add(cn);
+        }
         for (const cn of new Set(ps.hand || [])) {
           let sc = null;
           try { sc = loadCardEffect(cn); } catch { continue; }
@@ -7332,6 +7339,13 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // reach; non-proactive Reactions go through the chain-reaction
   // window and never touch this counter.
   const isReactionSubtype = (cardData.subtype || '').toLowerCase() === 'reaction';
+  // ★ v1308 (Als Befund 23.9., Skull Carpet Bombing): Surprises kommen
+  // NUR in den Main Phases ins Spiel (verdeckt gesetzt). Der Client graut
+  // sie in der Action Phase jetzt aus; dieser Riegel haelt den Server
+  // dazu synchron, auch fuer die CPU.
+  if ((cardData.subtype || '').toLowerCase() === 'surprise' && gs.currentPhase === 3) {
+    return _bail('Surprise in der Action Phase');
+  }
   // Wolflesia-style Creature spell-cast: force-consume the bypass
   // additional action regardless of phase, so the play never counts
   // as the host hero's main action even when they had a free slot.
@@ -7441,6 +7455,16 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
   // merkt sich die HERKUNFT (Hand oder Crestinas Vorrat), damit die
   // spaetere Entnahme in derselben Liste sucht. Handgezaehlt waere die
   // Herkunft verloren gegangen und die Karte laege doppelt.
+  // ★ v1308: die STUFE DIESER KOPIE vor der Entnahme merken — sie haengt
+  // an Hand-Offsets (Tobi −1), am Wirker (Mithuru −2) und an laufenden
+  // Zuschlaegen (Ellie +1). Nach der Entnahme ist der Hand-Offset weg;
+  // Karten, die ihr Level im Text nennen (Iceage), lesen es hier.
+  try {
+    gs._gewirkteStufe = {
+      cardName, turn: gs.turn,
+      level: room.engine.effectiveCardLevel(cardData, pi, { heroIdx, handIdx: fromCreation ? undefined : handIndex }),
+    };
+  } catch { delete gs._gewirkteStufe; }
   beginHandResolve(ps, cardName, handIndex, fromCreation);
 
   // Spell-in-flight counter — gates advancePhase so the turn can't end
@@ -7626,6 +7650,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       }
     }
     await room.engine._flushSurpriseDrawChecks();
+
+    // v1313: gerettetes Opfer (Barrier of Undying) → der Spell fizzelt,
+    // ist aber GESPIELT — kein Abbruch, keine Rueckgabe auf die Hand.
+    if (room.engine.nimmOpferFizzle()) delete gs._spellCancelled;
 
     if (gs._spellCancelled && !gs._spellNegatedByEffect) {
       // Player aborted the spell mid-resolve (target cancel, etc.) —
@@ -7820,7 +7848,10 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // Herkunft vor dem Splice fest und der Flug nennt beide Enden.
     // (Reihenfolge wie im Artefakt-Weg: Flug VOR der Entnahme, Als
     // Regel 17.8.)
-    const spellPileOwner = room.engine._consumeHandCardOrigin(pi, cardName);
+    // v1312: hat der Spell die Hand schon selbst verlassen
+    // (`aufloesenderSpellInDieAblage`, Shooting Star), ist auch seine
+    // Herkunft schon verbraucht — nicht ein zweites Mal ziehen.
+    const spellPileOwner = resolveHi >= 0 ? room.engine._consumeHandCardOrigin(pi, cardName) : pi;
     if (resolveHi >= 0 && !gs._spellPlacedOnBoard && !gs._spellReturnToHand) {
       room.engine._broadcastEvent('play_pile_transfer', {
         fromOwner: pi, toOwner: spellPileOwner, cardName,
@@ -8133,6 +8164,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // delete unconditionally so a subsequent cast computes its own.
     delete gs._spellWasInherent;
     delete gs._spellConsumedMainAction;
+    delete gs._gewirkteStufe;   // v1308
   }
   for (let i = 0; i < 2; i++) sendGameState(room, i); sendSpectatorGameState(room);
   return true;
@@ -8440,6 +8472,7 @@ async function doActivateCreatureEffect(room, pi, { heroIdx, zoneSlot, charmedOw
     let resolved;
     try {
       resolved = await script.onCreatureEffect(ctx);
+      if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
       // Karten mit eigener Zielwahl haben den Auftritt schon selbst
       // ausgeloest; alle anderen bekommen ihn hier, nach dem Effekt.
       if (resolved !== false) room.engine.announceActiveEffect();
@@ -9680,7 +9713,8 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
     // (no-op for humans / PvP / MCTS sim; idempotent below).
     room.engine.maybeFireCpuRevealEarly();
     const ctx = room.engine._createContext(inst, {});
-    const result = await script.onActivate(ctx, level);
+    let result = await script.onActivate(ctx, level);
+    if (room.engine.nimmOpferFizzle()) result = true;   // v1313: fizzelt, aber verbraucht
     // Auftritt NACH dem Handler (siehe doActivateFreeAbility) — eine
     // abgebrochene Aktivierung darf keine Karte einblenden.
     if (result !== false) room.engine.announceActiveEffect();
@@ -10271,7 +10305,8 @@ async function doActivateEquipEffect(room, pi, { heroIdx, zoneSlot }) {
     // (`'board'`), NICHT in der Hand. Angemeldet vor dem Handler,
     // ausgeloest erst danach.
     room.engine.armEffectAnnounce(cardName, pi, 'board');
-    const resolved = await script.onEquipEffect(ctx);
+    let resolved = await script.onEquipEffect(ctx);
+    if (room.engine.nimmOpferFizzle()) resolved = true;   // v1313: fizzelt, aber verbraucht
     if (resolved !== false) room.engine.announceActiveEffect();
     room.engine.clearEffectAnnounce();
     if (resolved !== false) {
@@ -10482,6 +10517,10 @@ async function doConfirmPotion(room, pi, { selectedIds }) {
     await room.engine._payCardCost(pi, goldCost, { cardName: potionName });
   }
 
+  // v1313: gerettetes Opfer → das Artefakt fizzelt, ist aber GESPIELT.
+  if (room.engine.nimmOpferFizzle() && chainResult.resolveResult) {
+    delete chainResult.resolveResult.aborted; delete chainResult.resolveResult.cancelled;
+  }
   if (chainResult.resolveResult?.aborted) {
     // Gold zurück. `aborted` öffnet die Targeting-Session gleich WIEDER,
     // und beim nächsten Confirm zieht der Block oben die Kosten erneut
@@ -10987,6 +11026,7 @@ async function doUsePotion(room, pi, { cardName, handIndex, fromCreation }) {
     }
     await room.engine._delay(100);
 
+    if (room.engine.nimmOpferFizzle() && chainResult.resolveResult) delete chainResult.resolveResult.cancelled;   // v1313
     if (chainResult.resolveResult?.cancelled) {
       ps._resolvingCard = null;
       delete gs._pendingPlayLog;

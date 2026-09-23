@@ -6057,17 +6057,25 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    sees the copy they spent semi-transparent so it's clear which card
    already triggered its activation this turn. Opponent sees the reveal
    through the normal face-up `revealedHandCards` flow. */
-.hand-slot.hand-card-revealed .board-card {
-  opacity: 0.55;
-  filter: saturate(0.75);
-}
-.hand-slot.hand-card-revealed::after {
-  content: '';
+/* ★ v1308 (Als Vorgabe 23.9.): statt gestricheltem Rahmen und halber
+   Deckkraft ein AUGEN-Abzeichen oben rechts IN der Karte — es sitzt am
+   `.board-card` und neigt sich deshalb mit der Handkarte. Gilt fuer jede
+   aufgedeckte Handkarte (Luna Kiai, Tobi, Bamboo Shield …); die Karte
+   bleibt voll sichtbar, sie ist ja weiter spielbar. */
+.hand-slot.hand-card-revealed .board-card::after,
+.board-card.hand-card.hand-card-perma-revealed::after {
+  content: '👁';
   position: absolute;
-  inset: 0;
-  border: 2px dashed rgba(255, 215, 70, .85);
-  border-radius: 4px;
+  top: 2px; right: 2px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1;
+  background: rgba(10, 10, 18, .82);
+  border: 1px solid rgba(255, 215, 70, .9);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 215, 70, .55);
   pointer-events: none;
+  z-index: 6;
 }
 
 /* Permanently revealed hand card — opp-side cards mechanically
@@ -6078,11 +6086,7 @@ body.pp-dragging-card.pp-dragging-card.pp-dragging-card * {
    this golden glow is the surviving distinguisher. Server tags
    eligible slots with `permanent: true` on the revealedHandCards
    entry; the client paints this class on top of `revealed-hand-card`. */
-.board-card.hand-card.hand-card-perma-revealed {
-  box-shadow: 0 0 10px rgba(255, 215, 70, .8), 0 0 18px rgba(255, 180, 30, .4);
-  border: 2px solid rgba(255, 215, 70, .9);
-  border-radius: 6px;
-}
+/* v1308: Markierung jetzt als Augen-Abzeichen, s. `.hand-card-revealed` oben. */
 
 /* Treacherous Crystal click affordance — paints the Crystal as
    clickable while it's the active player's turn AND at least one
@@ -13485,7 +13489,11 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      wrap caps at the available column width and genuine overflow
      becomes measurable + scrollable. */
   min-width: 0;
-  overflow-y: auto;
+  /* ★ v1322 (Als Vorgabe 23.9.): senkrecht wird NICHT mehr gescrollt —
+     wie im Duell schneidet der Rand die unten heraushaengenden Handkarten
+     ab, statt eine Scrollbar zu oeffnen. Das Brett selbst passt der
+     Scaler ohnehin in die Hoehe ein. */
+  overflow-y: hidden;
   /* overflow-x: clip (was auto) — the tilted plane's near rows project
      wider than the layout box, which used to surface a phantom
      horizontal scroll range on EVERY board. Legitimate horizontal
@@ -13603,6 +13611,7 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 .pz-hand {
   --hand-card-w: calc(64px * var(--hand-card-scale));
   --hand-card-h: calc(90px * var(--hand-card-scale));
+  --hand-editor-faktor: 1;
   /* ★★ v1249 (Als Befund 19.9.: „die eigenen Handkarten im
      Puzzle-Editor sind noch immer nicht weit genug unten").
      Zwei Gründe, beide hier behoben:
@@ -13614,7 +13623,11 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      ② Und etwas mehr darf es sein: 0.26 statt 0.18. Die Leiste des
         Editors liegt ganz unten am Fenster, der abgeschnittene Teil
         fällt also aus dem Bild, nicht auf etwas drauf. */
-  --hand-senk-anteil: 0.26;
+  /* ★ v1320 (Als Vorgabe 23.9.: „im laufenden Spiel ist ihre
+     Positionierung korrekt — im Editor genauso"): derselbe Anteil wie im
+     Duell (0.18, `:root`). Die 0.26 aus v1249 senkten die Karten tiefer
+     als im Spiel. */
+  --hand-senk-anteil: 0.18;
   --hand-senkung: calc(var(--hand-card-h) * var(--hand-senk-anteil));
   display: flex;
   align-items: center;
@@ -13675,6 +13688,33 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
 }
 .pz-hand-cards[data-pz-hand="hand"]::after { bottom: 0; }
 .pz-hand-cards[data-pz-hand="oppHand"]::after { top: 0; }
+/* ★ v1319 (Als Befund 23.9., Screenshot: „eine Karte in der gegnerischen
+   Support Zone laesst sich nicht ziehen — der Hand-Container ragt ueber
+   die Zones"). Der Ablagestreifen hatte die FESTE Hoehe einer Karte,
+   gemessen vom Reihenrand. Bei LEERER Hand ist der Inhalt der Reihe aber
+   nur eine Textzeile hoch — der Streifen reichte dann durch das
+   unsichtbare Faecherpolster weit uebers Brett und fing dort jeden
+   Klick und Zug (gemessen: 56 von 120 Punkten auf den gegnerischen
+   Zonen). Jetzt deckt er genau den INHALT der Reihe ab (zwischen den
+   beiden Polstern), und eine leere Hand ist so hoch wie eine volle —
+   der Ablagebereich bleibt kartengross, die Leiste springt beim ersten
+   Karteneinwurf nicht mehr. */
+.pz-hand-cards[data-pz-hand="hand"]::after,
+.pz-hand-cards[data-pz-hand="oppHand"]::after { height: auto; }
+.pz-hand-cards[data-pz-hand="hand"]::after {
+  top: calc(var(--hand-card-h) * 0.8 + 20px);
+  bottom: var(--fan-pad-unten, 0px);
+}
+.pz-hand-cards[data-pz-hand="oppHand"]::after {
+  top: var(--fan-pad-unten, 0px);
+  bottom: calc(var(--hand-card-h) * 0.8 + 20px);
+}
+.pz-hand-cards[data-pz-hand="hand"] > span:only-child,
+.pz-hand-cards[data-pz-hand="oppHand"] > span:only-child {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hand-card-h);
+}
 /* ★ v1263 (Al 21.9.): „Die Handzone im Puzzle-Editor ist deutlich zu
    hoch — die Karten in meinen Support Zones kann ich nicht anklicken."
    Die Leiste waechst mit der vollen Kartenhoehe (v6) und traegt
@@ -13712,11 +13752,26 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
   --hand-faecher-rand: calc(var(--hand-max-lift, 0) * var(--hand-card-h) - var(--hand-ueberstand) / 3 + 4px);
 }
 .pz-hand .pz-hand-cards[data-pz-hand="hand"] {
-  margin-top: calc(var(--hand-card-h) * -0.8 - 20px + var(--hand-faecher-rand));
-  margin-bottom: calc(var(--hand-card-h) * -0.45);
+  /* v1322: wie im Duell — der Faecherbogen ragt nach oben aus der Leiste
+     in die „YOU"-Zeile. Nur was DARUEBER hinaus in die unterste Zone
+     reichen wuerde (Als Befund v1270), bekommt die Leiste als Platz dazu
+     — sonst deckten die mittleren Karten den Zonenrand ab. */
+  margin-top: calc(var(--hand-card-h) * -0.8 - 20px + max(0px, var(--hand-faecher-rand) - 22px));
+  /* ★ v1322 (Als Vorgabe 23.9.: „das Layout der Spielerhand aus dem Duell
+     uebertragen; Karten duerfen unten abgeschnitten werden"): exakt die
+     Regel von `.game-hand-me .game-hand-cards` — die Reihe haengt um
+     Polster + Absenkung unten aus der Leiste, die Karten werden am Rand
+     abgeschnitten. Dass dieser Ueberhang keine Scrollbar mehr erzeugt,
+     regelt `.pz-board-wrap` (senkrecht kein Scrollen, wie das Duell). */
+  margin-bottom: calc(var(--fan-pad-unten) * -1 - var(--hand-senkung));
 }
 .pz-hand .pz-hand-cards[data-pz-hand="oppHand"] {
   margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px + var(--hand-faecher-rand));
+}
+.pz-hand:not(.pz-hand-opp) {
+  /* v1322: wie `.game-hand-me` — kuerzer als ihre Karte, der Rest haengt
+     unten heraus. */
+  min-height: calc(var(--hand-card-h) + 12px * var(--board-scale, 1) - var(--hand-senkung));
 }
 .pz-hand-extras {
   position: relative;
@@ -13880,12 +13935,23 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
      Leiste zählt um die Absenkung weniger hoch, die Karten hängen
      unten heraus. Die Editor-Leiste hat nur eine Mindesthöhe und
      folgt ihrem Inhalt, es braucht hier also nichts weiter. */
-  margin-bottom: calc(8px - var(--fan-pad-unten) - var(--hand-senkung));
+  /* v1320: exakt wie im Duell (`.game-hand-me .game-hand-cards`) — ohne
+     die 8 px Zugabe, die die Karten um genau so viel hoeher stellte. */
+  margin-bottom: calc(var(--fan-pad-unten) * -1 - var(--hand-senkung));
 }
+/* ★ v1318 (Als Befund 23.9.: „die Gegner-Hand ist zu hoch — sie ragt
+   ueber die Gegner-Support-Zones"). Die eigene Hand wird um
+   `--hand-senkung` nach UNTEN aus dem Bild gesenkt; die Gegnerhand hatte
+   das Spiegelbild nicht und war damit um genau diesen Betrag zu hoch.
+   Jetzt hebt sie sich ebenso weit nach OBEN aus dem Bild, die Leiste
+   wird entsprechend flacher, und die Support-Zones darunter bleiben frei. */
 .pz-hand-cards[data-pz-hand="oppHand"] {
   translate: 0 calc(var(--hand-ueberstand) / -3);
   padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
-  margin-top: calc(8px - var(--fan-pad-unten));
+  /* v1320: KEINE Hebung — im Duell sitzt die Gegnerhand voll im Bild
+     (`--opp-hand-hebung: 0px`). Die Hebung aus v1318 war eine falsche
+     Spur; das eigentliche Problem loeste v1319 (Ablagestreifen). */
+  margin-top: calc(var(--fan-pad-unten) * -1);
   margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
 }
 .pz-hand-cards {
@@ -20567,4 +20633,36 @@ body.pp-dialog-offen .foil-shine-overlay:not(.modal-overlay .foil-shine-overlay)
 body.pp-dialog-offen .foil-secret-rare:not(.modal-overlay *),
 body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   animation-play-state: paused !important;
+}
+
+/* v1308 — Handkarte wird gezeigt (`hand_card_present`) */
+.hand-present-fly {
+  position: fixed; z-index: 10160; pointer-events: none;
+  border-radius: 5px; overflow: visible;
+  box-shadow: 0 0 22px rgba(255, 215, 70, .75);
+  transition: transform 460ms cubic-bezier(.22,.8,.3,1), opacity 460ms ease-out;
+  transform-origin: center center;
+}
+.hand-present-fly img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; display: block; }
+.hand-present-fly.flip img { animation: handPresentFlip 280ms ease-in-out; }
+@keyframes handPresentFlip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+.hand-present-fly .hand-present-eye {
+  position: absolute; top: -9px; right: -9px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+  background: rgba(10,10,18,.9); border: 1px solid rgba(255,215,70,.95);
+  opacity: 0; transform: scale(.4); transition: opacity 200ms, transform 240ms cubic-bezier(.3,1.6,.5,1);
+}
+.hand-present-fly.eye-on .hand-present-eye { opacity: 1; transform: scale(1); }
+.hand-present-fly.back { opacity: 0; }
+
+/* ★ v1321 (Als Vorgabe 23.9.): die GEGNERhand im Puzzle-Creator in 0,8-facher
+   Groesse — sie muss dort nicht voll gross sein, und der gewonnene Platz
+   geht an Brett und eigene Hand. Alle Masse der Leiste haengen an
+   `--hand-card-w/-h`, der Faktor wirkt also auf Karten, Faecher, Polster
+   und Ablagestreifen zugleich. */
+.pz-hand.pz-hand-opp {
+  --hand-editor-faktor: 0.8;
+  --hand-card-w: calc(64px * var(--hand-card-scale) * var(--hand-editor-faktor));
+  --hand-card-h: calc(90px * var(--hand-card-scale) * var(--hand-editor-faktor));
 }

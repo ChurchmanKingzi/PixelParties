@@ -120,14 +120,14 @@ module.exports = {
 
     // Angriffsstoss des Helden auf die Zone (Ralzish-Bauart), dann
     // der Treffer.
-    engine._broadcastEvent('play_ram_animation', {
+    // v1316: Treffer im Moment des Aufpralls, nicht danach.
+    await engine.rammeBisKontakt({
       sourceOwner: pi, sourceHeroIdx: heroIdx,
       targetOwner: inst.controller ?? inst.owner,
       targetHeroIdx: inst.heroIdx >= 0 ? inst.heroIdx : 0,
       targetZoneSlot: inst.zoneSlot,
       cardName: hero.name, duration: 900,
     });
-    await engine._delay(300);
 
     const source = { name: CARD_NAME, owner: pi, heroIdx };
     await engine.actionDealCreatureDamage(source, inst, betrag, 'attack',

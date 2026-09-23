@@ -25495,6 +25495,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     if (newKey !== handKeyRef.current) {
       const newHand = me.hand || [];
       const prevLen = prevHandLenRef.current;
+      // v1311: alte Hand fuer den Ankunfts-Abgleich unten (s. dort).
+      let prevHandArr = [];
+      try { prevHandArr = JSON.parse(handKeyRef.current || '[]') || []; } catch { prevHandArr = []; }
       handKeyRef.current = newKey;
       setHand(newHand);
       // Clear tooltip in case a hovered card was removed from hand
@@ -25565,8 +25568,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // delta > 0), but we still have to burn the credit so the NEXT
       // genuine hand-grew event (e.g. Deepsea Witch's on-summon tutor)
       // isn't wrongly muted by the handshake block above.
+      // ★ v1311 (Als Befund 23.9., Crum): NUR verbrauchen, wenn in diesem
+      // Schritt wirklich eine Karte ANGEKOMMEN ist. Ein reines Schrumpfen
+      // (Karte fliegt raus, die angekuendigte ist noch unterwegs) hat die
+      // Anmeldung bisher mit verbraucht — Socket-Ereignisse zaehlen den
+      // Zaehler sofort hoch, der Diff hier laeuft aber erst nach dem
+      // Rendern. Die ankommende Karte war danach „unangemeldet" und flog
+      // ein zweites Mal herein (Rueckfallweg: von der Gegnerseite).
       if (delta <= 0 && pileTransferToHandPendingMeRef.current > 0) {
-        pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - 1);
+        const vorher = {};
+        for (const n of prevHandArr) vorher[n] = (vorher[n] || 0) + 1;
+        let angekommen = 0;
+        for (const n of newHand) { if (vorher[n] > 0) vorher[n]--; else angekommen++; }
+        if (angekommen > 0) {
+          pileTransferToHandPendingMeRef.current = Math.max(0, pileTransferToHandPendingMeRef.current - angekommen);
+        }
       }
       // Hand-steal handshake: `play_hand_steal` already animated the
       // stolen cards as flying clones from opp's hand. Burn ONE
@@ -27196,6 +27212,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     } else if (currentPhase === 3) {
       // Action Phase: gray out non-action types, and check playability
       if (!isActionType) return true;
+      // ★ v1308 (Als Befund 23.9., Skull Carpet Bombing): Surprises werden
+      // NUR in den Main Phases verdeckt gesetzt — in der Action Phase nie
+      // spielbar, egal was die Wirker-Pruefung sagt. Der Server riegelt
+      // denselben Fall in `doPlaySpell` ab.
+      if (isSurprise) return true;
       if (card.cardType === 'Creature' && (gameState.summonBlocked || []).includes(cardName)) return true;
       if (card.cardType === 'Creature' && me.summonLocked) return true;
       if ((gameState.blockedSpells || []).includes(cardName)) return true;
@@ -30937,6 +30958,43 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('hand_to_board_fly', onHandToBoard);
 
+    // ★ v1308 — EINE HANDKARTE WIRD GEZEIGT (`hand_card_present`, Engine
+    // `revealToOpponent`: Tobi, Albrecht …). Als Vorgabe 23.9.: „eine
+    // kleine Animation, so aehnlich wie das Praesentieren bei Zi". Die
+    // Karte hebt sich aus der Hand, steht gross in der Mitte — beim
+    // Gegner dreht sie sich dabei um —, dazu ein Augen-Abzeichen, dann
+    // sinkt sie zurueck. Klang: `reveal`.
+    const onHandCardPresent = ({ ownerIdx, handIdx, cardName }) => {
+      if (!cardName) return;
+      const ownerIsMe = ownerIdx === myIdx;
+      const src = document.querySelector(ownerIsMe
+        ? `.game-hand-me [data-hand-idx="${handIdx}"]`
+        : `.game-hand-opp [data-hand-idx="${handIdx}"]`)
+        || document.querySelector(ownerIsMe ? '.game-hand-me' : '.game-hand-opp');
+      if (!src) return;
+      if (window.playSFX) window.playSFX('reveal', { dedupe: 200, category: 'effect' });
+      const sr = src.getBoundingClientRect();
+      const w = Math.max(40, Math.min(sr.width, 90)), h = w * 1.4;
+      const sx = sr.left + sr.width / 2 - w / 2, sy = sr.top + sr.height / 2 - h / 2;
+      const zx = window.innerWidth / 2 - w / 2, zy = window.innerHeight * 0.42 - h / 2;
+      const face = cardImageUrl(cardName);
+      const back = ownerIsMe ? (me.cardback || '/cardback.png') : (opp.cardback || '/cardback.png');
+      const el = document.createElement('div');
+      el.className = 'hand-present-fly';
+      el.innerHTML = `<img src="${ownerIsMe ? face : back}" draggable="false" /><span class="hand-present-eye">👁</span>`;
+      el.style.cssText = `left:${sx}px;top:${sy}px;width:${w}px;height:${h}px;`;
+      document.body.appendChild(el);
+      const img = el.querySelector('img');
+      requestAnimationFrame(() => {
+        el.style.transform = `translate(${zx - sx}px, ${zy - sy}px) scale(2.1)`;
+      });
+      if (!ownerIsMe) setTimeout(() => { el.classList.add('flip'); setTimeout(() => { if (img) img.src = face; }, 140); }, 300);
+      setTimeout(() => el.classList.add('eye-on'), 480);
+      setTimeout(() => { el.style.transform = 'translate(0,0) scale(1)'; el.classList.add('back'); }, 1500);
+      setTimeout(() => el.remove(), 2050);
+    };
+    socket.on('hand_card_present', onHandCardPresent);
+
     // Generic "attach Hero to Creature" flight — used by Goff/Gon and
     // any future attach-style mechanic. Unlike hand_to_board_fly, this
     // ALWAYS renders for both sides (the owner doesn't trigger this via
@@ -34444,6 +34502,99 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
     socket.on('iceage_blizzard', onIceageBlizzard);
 
+    // ★ v1318 — COLD-HEARTED YUKI-ONNA: eisige Winde ueber dem GEGNER-Feld
+    // (Als Vorgabe 23.9.: „ein Blizzard, der das Gegner-Feld einhuellt und
+    // an Heftigkeit mit der Anzahl Hearts of Ice skaliert"). Stufe 1–4:
+    //   • mehr und schnellere Schneestreifen, flacherer Windwinkel,
+    //   • Boeen (breite weisse Windbaender) ab Stufe 2, mehr je Stufe,
+    //   • dichterer Schleier und Reif von den Raendern,
+    //   • ab Stufe 3 ruettelt das Feld, ab 4 ein Kaelteblitz.
+    // Eingegrenzt auf die Bretthaelfte des Ziels: das Rechteck um dessen
+    // Helden-, Support-, Ability- und Surprise-Zonen (+ Rand).
+    const onYukiBlizzard = ({ targetIdx, intensity }) => {
+      if (window._playAnimations === false) return;
+      const stufe = Math.max(1, Math.min(4, intensity || 1));
+      const seite = targetIdx === myIdx ? 'me' : 'opp';
+      const els = document.querySelectorAll(
+        `[data-hero-owner="${seite}"], [data-support-owner="${seite}"], [data-ability-owner="${seite}"], [data-surprise-owner="${seite}"]`);
+      let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+      els.forEach(el => { const q = el.getBoundingClientRect(); if (!q.width) return; l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); });
+      if (!isFinite(l)) { l = 0; r = window.innerWidth; t = seite === 'opp' ? 0 : window.innerHeight / 2; b = seite === 'opp' ? window.innerHeight / 2 : window.innerHeight; }
+      const rand = 40;
+      l -= rand; t -= rand; r += rand; b += rand;
+      const dauer = 1700 + 450 * stufe;
+      if (!document.getElementById('yuki-blizzard-keyframes')) {
+        const st = document.createElement('style');
+        st.id = 'yuki-blizzard-keyframes';
+        st.textContent = `
+          @keyframes yukiStreak { 0% { transform: translate(0,0) rotate(var(--w)); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--w)); opacity: 0; } }
+          @keyframes yukiFlake { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .95; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+          @keyframes yukiGust { 0% { transform: translateX(-60%) skewX(-18deg); opacity: 0; } 20% { opacity: var(--o); } 80% { opacity: var(--o); } 100% { transform: translateX(160%) skewX(-18deg); opacity: 0; } }
+          @keyframes yukiVeil { 0% { opacity: 0; } 20% { opacity: var(--o); } 75% { opacity: calc(var(--o) * .8); } 100% { opacity: 0; } }
+          @keyframes yukiShake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-3px,1px); } 40% { transform: translate(3px,-2px); } 60% { transform: translate(-2px,2px); } 80% { transform: translate(2px,-1px); } }
+          @keyframes yukiFlash { 0% { opacity: 0; } 8% { opacity: .6; } 25% { opacity: 0; } 100% { opacity: 0; } }
+        `;
+        document.head.appendChild(st);
+      }
+      const box = document.createElement('div');
+      box.className = 'yuki-blizzard';
+      box.style.cssText = `position:fixed;left:${l}px;top:${t}px;width:${r - l}px;height:${b - t}px;z-index:9600;pointer-events:none;overflow:hidden;border-radius:18px;`
+        + (stufe >= 3 ? `animation:yukiShake ${160 - stufe * 20}ms linear ${Math.round(dauer * 0.15)}ms ${Math.round(dauer * 0.5 / (160 - stufe * 20))};` : '');
+      const w = r - l, h = b - t;
+      // Schleier + Reif von den Raendern
+      const veil = document.createElement('div');
+      veil.style.cssText = `position:absolute;inset:0;--o:${0.25 + stufe * 0.14};`
+        + `background:radial-gradient(ellipse at 50% 50%, rgba(170,215,245,.35) 0%, rgba(200,235,255,.55) 60%, rgba(235,250,255,.85) 100%);`
+        + `animation:yukiVeil ${dauer}ms ease-out forwards;`;
+      box.appendChild(veil);
+      // Schneestreifen: Wind von links, flacher und schneller je Stufe
+      const winkel = 40 + stufe * 9;           // Grad gegen die Senkrechte — je heftiger, desto waagerechter
+      const rad = winkel * Math.PI / 180;
+      const weg = Math.max(w, h) * 1.5;
+      for (let i = 0; i < 70 + stufe * 55; i++) {
+        const f = document.createElement('div');
+        const dur = (0.75 - stufe * 0.11) + Math.random() * 0.35;
+        const len = 14 + Math.random() * (16 + stufe * 10);
+        const br = 1 + Math.random() * 2;
+        f.style.cssText = `position:absolute;left:${Math.random() * 130 - 45}%;top:${Math.random() * 110 - 25}%;width:${br}px;height:${len}px;border-radius:${br}px;`
+          + `background:linear-gradient(to bottom, rgba(255,255,255,0), rgba(245,252,255,${0.4 + Math.random() * 0.5}));`
+          + `--w:${-winkel}deg;--dx:${Math.round(Math.sin(rad) * weg)}px;--dy:${Math.round(Math.cos(rad) * weg)}px;`
+          + `animation:yukiStreak ${dur}s linear ${Math.random() * dauer * 0.6 / 1000}s ${Math.ceil(dauer / 1000 / dur)};opacity:0;`;
+        box.appendChild(f);
+      }
+      // Wirbelnde Flocken
+      for (let i = 0; i < 20 + stufe * 18; i++) {
+        const s = 2 + Math.random() * 4;
+        const f = document.createElement('div');
+        f.style.cssText = `position:absolute;left:${Math.random() * 100 - 10}%;top:${Math.random() * 100}%;width:${s}px;height:${s}px;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 0 4px rgba(210,240,255,.9);`
+          + `--dx:${Math.round(w * (0.35 + stufe * 0.15) * (0.6 + Math.random()))}px;--dy:${Math.round((Math.random() - 0.3) * h * 0.5)}px;`
+          + `animation:yukiFlake ${1.1 - stufe * 0.12 + Math.random() * 0.5}s ease-in ${Math.random() * dauer * 0.55 / 1000}s 2;opacity:0;`;
+        box.appendChild(f);
+      }
+      // Boeen
+      for (let i = 0; i < (stufe - 1) * 2; i++) {
+        const g = document.createElement('div');
+        g.style.cssText = `position:absolute;left:0;top:${8 + Math.random() * 78}%;width:60%;height:${10 + Math.random() * 18}%;`
+          + `background:linear-gradient(90deg, rgba(255,255,255,0), rgba(235,248,255,.55), rgba(255,255,255,0));filter:blur(6px);--o:${0.45 + stufe * 0.1};`
+          + `animation:yukiGust ${900 - stufe * 90}ms ease-in-out ${Math.round(150 + Math.random() * dauer * 0.55)}ms 1 both;`;
+        box.appendChild(g);
+      }
+      if (stufe >= 4) {
+        const flash = document.createElement('div');
+        flash.style.cssText = `position:absolute;inset:0;background:rgba(240,252,255,.95);animation:yukiFlash ${dauer}ms ease-out forwards;`;
+        box.appendChild(flash);
+      }
+      document.body.appendChild(box);
+      if (window.playSFX) {
+        window.playSFX('elem_wind', { rate: 0.8 + stufe * 0.05, volume: 0.45 + stufe * 0.12, category: null, dedupe: 0 });
+        if (stufe >= 2) window.playSFX('elem_wind', { rate: 1.15, volume: 0.35 + stufe * 0.08, delay: 280, category: null, dedupe: 0 });
+        if (stufe >= 3) window.playSFX('elem_wind', { rate: 0.65, volume: 0.5, delay: 620, category: null, dedupe: 0 });
+        window.playSFX('elem_ice', { rate: 1.1 - stufe * 0.05, volume: 0.5 + stufe * 0.1, delay: 380, category: null, dedupe: 0 });
+      }
+      setTimeout(() => box.remove(), dauer + 200);
+    };
+    socket.on('yuki_blizzard', onYukiBlizzard);
+
     socket.on('divine_rain_start', onDivineRainStart);
     // Stop = fade the overlay out and remove it. Fired by the engine's
     // turn-end broadcast flush (queueTurnEndBroadcast) at the end of
@@ -37860,6 +38011,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('butterfly_cloud_animation', onButterflyCloud);
       socket.off('smug_coin_save', onSmugCoinSave);
       socket.off('iceage_blizzard', onIceageBlizzard);
+      socket.off('yuki_blizzard', onYukiBlizzard);
       socket.off('divine_rain_start', onDivineRainStart);
       socket.off('divine_rain_stop', onDivineRainStop);
       // Hard cleanup: the rain overlay lives on document.body, OUTSIDE
@@ -37871,6 +38023,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('divine_time_rewind', onDivineTimeRewind);
       socket.off('discard_to_deck_animation', onDiscardToDeck);
       socket.off('play_pile_transfer', onPileTransfer);
+      socket.off('hand_card_present', onHandCardPresent);
       socket.off('kassaran_reveal_flip', onKassaranFlip);
       socket.off('chaos_magic_reveal', onChaosMagicReveal);
       socket.off('mill_center_reveal', onMillCenterReveal);
@@ -39851,6 +40004,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Angler Angel: sichtbar machen, WARUM ein Treffer haerter war.
       if (t === 'angler_boost') { return <span className="log-damage">{cName('Angler Angel')} increased {cName(entry.source)}'s damage by <span className="log-amount">+{entry.bonus}</span> to <span className="log-amount">{entry.newAmount}</span>.</span>; }
       // ★ v1292 — „Zombified Assault" und die hooklose Wiederbelebung.
+      if (t === 'heart_of_ice') { const p = playerByName(entry.player); return <span className="log-status">❄️ {pName(p.name, p.color)}'s {cName('Heart of Ice')} froze {cName(entry.target)}.</span>; }
+      if (t === 'yuki_onna') { const p = playerByName(entry.player); return <span className="log-status">❄️ {pName(p.name, p.color)}'s {cName('Cold-Hearted Yuki-Onna')} shattered {entry.hearts} {cName('Heart of Ice')}{entry.hearts === 1 ? '' : 's'}.</span>; }
+      if (t === 'yuki_onna_extend') { const p = playerByName(entry.player); return <span className="log-status">❄️ {cName('Cold-Hearted Yuki-Onna')}: {entry.targets} Frozen target{entry.targets === 1 ? '' : 's'} stay Frozen for 2 more turns.</span>; }
+      if (t === 'yukana_free_spell') { const p = playerByName(entry.player); return <span className="log-status">📚 {pName(p.name, p.color)}'s {cName('Yukana, the Scholar on the Run')} performed {cName(entry.card)} as an additional Action.</span>; }
+      if (t === 'barrier_of_undying') { const p = playerByName(entry.player); return <span className="log-heal">🛡️ {pName(p.name, p.color)}'s {cName('Barrier of Undying')} kept {cName(entry.target)} at 1 HP{entry.sacrifice ? ' — the sacrifice fizzles' : ''} (deleted at the end of its owner's next turn).</span>; }
+      if (t === 'double_class') { const p = playerByName(entry.player); return <span className="log-status">🎓 {pName(p.name, p.color)}'s {cName(entry.card)}: {entry.text}.</span>; }
+      if (t === 'hand_card_revealed') { const p = playerByName(entry.player); return <span className="log-status">👀 {pName(p.name, p.color)} revealed {cName(entry.card)}{entry.by ? <> ({cName(entry.by)})</> : null}.</span>; }
+      if (t === 'sticky_wand') { const p = playerByName(entry.player); return <span className="log-status">🪄 {pName(p.name, p.color)}'s {cName('Sticky Wand')}: {cName(entry.hero)} attached {entry.card ? cName(entry.card) : 'a card'}.</span>; }
       if (t === 'pocket_catapult') { const p = playerByName(entry.player); return <span className="log-damage">🪨 {pName(p.name, p.color)}'s {cName('Pocket Catapult')} hit {entry.target ? cName(entry.target) : 'a target'} for <span className="log-amount">{entry.amount}</span>.</span>; }
       if (t === 'junshi_counter') { const p = playerByName(entry.player); return <span className="log-status">🧠 {pName(p.name, p.color)}'s {cName('Junshi, the Tactical Genius')} {entry.played ? <>countered with {cName(entry.card)}</> : 'passed on the counter'}.</span>; }
       if (t === 'midnight_assault') { const p = playerByName(entry.player); return <span className="log-damage">🌙 {pName(p.name, p.color)}'s {cName('Midnight Assault')} {entry.defeated ? 'defeated' : 'struck at'} {entry.target}{entry.defeated ? '' : ', but it survived'}.</span>; }

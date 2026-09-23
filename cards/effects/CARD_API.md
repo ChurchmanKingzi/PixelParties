@@ -3024,6 +3024,32 @@ auf „when a Creature you control is defeated", die nur einmal je
 Flächenschlag feuern sollen. Vorbild: Junshi, the Tactical Genius
 (Gegenschlag per `performImmediateAction` mit `cardNameFilter`).
 
+### Klassenzimmer-Bausteine (v1307)
+
+- **Double Spell / Double Creature** = beide Schulfelder belegt:
+  `istDoppelSpell(cd)` / `istDoppelKreatur(cd)` aus `_double-shared.js`,
+  dort auch `kontrolliert(engine, pi, name)` („only control 1") und
+  `sofortAusHandBeschwoeren(engine, pi, name, { source })` („summon this
+  Creature from your hand as an additional Action" — normale
+  Beschwoerung mit Caster-Pruefung und Zonenwahl, Stapel-Schicht).
+- **Welche Karte wurde gezogen / aufgenommen?** `ctx.cardName` ist im
+  Hook immer die LAUSCHENDE Karte. Die gezogene steht unter
+  `ctx.drawnCardName` / `ctx.drawnCard` (`onDraw`), die aufgenommene unter
+  `ctx.addedCardName` / `ctx.addedCard` (`onCardAddedToHand`,
+  `onCardAddedFromDiscardToHand`).
+- **„reveal it"**: `engine.revealToOpponent(pi, cardName, { source })` —
+  Bild beim Gegner, Logzeile, CPU-Kartengedaechtnis.
+- **„its level is increased by N"** fuer eine laufende Aktion:
+  `await engine.mitLevelZuschlag({ pi, heroIdx, amount, filter }, fn)` —
+  wirkt in `heroMeetsLevelReq` und `effectiveCardLevel` NACH den Senkungen
+  und raeumt sich selbst ab. Vorbild: Ellie. Karten, die ihr Level beim
+  Wirken ERHOEHEN (Iceage), pruefen `level + N` ueber
+  `heroMeetsLevelReq`, damit Senkungen und Zuschlaege weiterwirken.
+- **„delete it at the end of the turn if it is still in your hand or
+  discard pile"**: `engine.markiereZugendeLoeschung(pi, handIdx, name,
+  source)` — folgt der Handkopie, faengt sie auch in der Ablage; laeuft in
+  `switchTurn`, unabhaengig davon, ob die Quelle noch liegt. Vorbild: Crum.
+
 ### Aufstieg aus dem Deck — `performAscension(… { fromDeck, skipChain })` (v1296)
 
 `opts.fromDeck: true` nimmt den Ascended Hero aus dem DECK statt aus der
@@ -5838,6 +5864,30 @@ Ein `{ negated: true }` aus `preDamageResolve` bricht die Niederlage
 ab; die Karte darf die HP dabei selbst setzen (Paraseed Zombie: „that
 Hero's HP drop to 1 instead"). Ein Selbstopfer (`opts.isSacrifice`)
 oeffnet kein Fenster.
+
+## Creature-Rettung bei JEDER Niederlage — `preDefeatOnDestroy` / `preDefeatAnySide` (v1313)
+
+Das Vor-Niederlage-Fenster fuer Creatures (`isCreaturePreDefeatReaction`)
+oeffnet jetzt auch bei Zerstoerung und Opfer (`actionDestroyCard`), mit
+`type: 'destroy'` und `info = { isSacrifice, istZerstoerung }` an
+Bedingung und Aufloesung. Angeboten wird dort nur, was
+`preDefeatOnDestroy: true` traegt; die bisherigen Retter bleiben reine
+Schadens-Reaktionen. `preDefeatAnySide: true` laesst nach dem Kontrolleur
+auch den GEGNER reagieren („when A Creature would be defeated").
+
+* **Beschwoerungsopfer** (alles, was waehrend `beforeSummon` geopfert
+  wird — Foresta, Blue-Ice Dragon …) oeffnen KEIN Fenster.
+* **Gerettetes Effekt-Opfer → der Effekt fizzelt, ist aber verbraucht.**
+  `resolveSacrificeCost` gibt dann `false` zurueck und laesst
+  `gs._opferFizzle` stehen; Spell-, Creature-, Ability-, Equip-, Helden-
+  und Artefakt-Weg lesen es mit `engine.nimmOpferFizzle()` und werten den
+  Einsatz als verbraucht statt als Abbruch. Wer DIREKT mit
+  `actionDestroyCard(…, { isSacrifice: true })` opfert, loescht die Marke
+  vorher und prueft sie danach selbst (Vorbild: Occultism).
+* „delete it at the end of its owner's next turn":
+  `engine.markiereBrettLoeschung(inst, amZug, source)`.
+
+Vorbild: Barrier of Undying.
 
 ## Zustandsgebundene Status — `noAbsorb` (v718)
 

@@ -36,26 +36,15 @@
 const CARD_NAME = 'Iceage';
 const DAUER_NORMAL = 1;
 const DAUER_STARK  = 2;
-const STARKE_STUFE = 4;
+// ★ v1307 (Als Vorgabe 23.9.): die starke Stufe ist die GEDRUCKTE Stufe
+// + 1, nicht fest 4 — geprueft ueber `heroMeetsLevelReq`, damit Senkungen
+// (Lord Mithuru) und Zuschlaege (Ellie) auf diese +1 weiterwirken.
+const STUFEN_PLUS = 1;
 
-/** Alle Ziele des Gegners: lebende Helden + Kreaturen. */
-function zieleDesGegners(engine, oi) {
-  const gs = engine.gs;
-  const out = [];
-  const helden = gs.players[oi]?.heroes || [];
-  for (let hi = 0; hi < helden.length; hi++) {
-    const h = helden[hi];
-    if (h?.name && h.hp > 0) out.push({ type: 'hero', heroIdx: hi, name: h.name });
-  }
-  for (const inst of engine.cardInstances) {
-    if (inst.owner !== oi || inst.zone !== 'support') continue;
-    if (engine.isEquipInZone(inst.name, inst)) continue;
-    const cd = engine.getEffectiveCardData(inst);
-    if (!cd || cd.cardType !== 'Creature') continue;
-    out.push({ type: 'creature', inst, heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot, name: inst.name });
-  }
-  return out;
-}
+// v1317: Zielsammlung und Einfrieren liegen jetzt geteilt in
+// `_frost-shared.js` (auch Yuki-Onna, Heart of Ice).
+const { gegnerZiele, einfrieren } = require('./_frost-shared');
+const zieleDesGegners = (engine, oi) => gegnerZiele(engine, oi);
 
 module.exports = {
   // ★★ v1186 (Als Regel 18.9.): AoE OHNE SCHADEN. Die
@@ -99,17 +88,23 @@ module.exports = {
       let starkMoeglich = false;
       try {
         starkMoeglich = !!basis
-          && engine.heroMeetsLevelReq(pi, heroIdx, { ...basis, level: STARKE_STUFE });
+          && engine.heroMeetsLevelReq(pi, heroIdx, { ...basis, level: (basis.level || 0) + STUFEN_PLUS });
       } catch { starkMoeglich = false; }
 
+      // v1308: das AKTUELLE Level dieser Kopie (Tobi, Mithuru, Ellie …),
+      // nicht das gedruckte — gemerkt vom Server vor der Entnahme.
+      const gemerkt = gs._gewirkteStufe;
+      const aktuell = (gemerkt && gemerkt.cardName === CARD_NAME && gemerkt.turn === gs.turn)
+        ? gemerkt.level
+        : engine.effectiveCardLevel(basis, pi, { heroIdx });
       if (starkMoeglich) {
         const ja = await engine.promptGeneric(pi, {
           type: 'confirm',
           title: CARD_NAME,
-          message: `Treat this Spell's level as ${STARKE_STUFE} to Freeze for ${DAUER_STARK} turns instead of ${DAUER_NORMAL}?`,
+          message: `Increase this Spell's level by ${STUFEN_PLUS} to Freeze for ${DAUER_STARK} turns instead of ${DAUER_NORMAL}?`,
           showCard: CARD_NAME,
-          confirmLabel: `❄️ Level ${STARKE_STUFE}`,
-          cancelLabel: `Level ${basis.level}`,
+          confirmLabel: `❄️ Level ${aktuell + STUFEN_PLUS}`,
+          cancelLabel: `Level ${aktuell}`,
           cancellable: true,
         });
         const bestaetigt = typeof engine._confirmSaidYes === 'function'
@@ -129,16 +124,7 @@ module.exports = {
           type: 'ice_encase', owner: oi,
           heroIdx: z.heroIdx, zoneSlot: z.type === 'hero' ? -1 : z.slotIdx,
         });
-        if (z.type === 'hero') {
-          const h = gs.players[oi]?.heroes?.[z.heroIdx];
-          if (!h?.name || h.hp <= 0) continue;
-          await engine.addHeroStatus(oi, z.heroIdx, 'frozen', { duration: dauer, appliedBy: pi });
-        } else {
-          if (!z.inst || z.inst.zone !== 'support') continue;
-          await engine.applyCreatureStatus(z.inst, 'frozen', {
-            sourceOwner: pi, duration: dauer, source: CARD_NAME,
-          });
-        }
+        await einfrieren(engine, z, { dauer, appliedBy: pi, source: CARD_NAME });
         getroffen++;
         await engine._delay(120);
       }

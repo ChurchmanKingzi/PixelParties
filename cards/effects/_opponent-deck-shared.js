@@ -96,7 +96,7 @@ async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   // Kennung, damit ein Vorgang genau EINE Antwort ausloest.
   if (opts.asDraw) {
     await engine.runHooks('onDraw', {
-      playerIdx: pi, card: null, cardName,
+      playerIdx: pi, card: null, cardName, drawnCard: null, drawnCardName: cardName,   // v1307
       _isResourceDraw: false,
       _drawBatch: `oppdeck-${Date.now()}-${Math.random()}`,
       _drawCount: 1, _drawIndex: 0,

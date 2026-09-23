@@ -150,20 +150,21 @@ module.exports = {
     const originalHeroIdx = selected.heroIdx;
     const originalZoneSlot = selected.type === 'hero' ? undefined : selected.slotIdx;
 
-    engine._broadcastEvent('play_ram_animation', {
+    // v1316 (Als Vorgabe 23.9.): nur bis zum AUFPRALL warten — die
+    // umgeleitete Wirkung setzt im Moment der Beruehrung ein, der
+    // Rueckflug laeuft im Client weiter.
+    await engine.rammeBisKontakt({
       sourceOwner: pi, sourceHeroIdx: selectedHeroIdx,
       targetOwner: originalOwner, targetHeroIdx: originalHeroIdx,
       targetZoneSlot: originalZoneSlot,
       cardName: martyrHero.name, duration: 1200,
     });
-    await engine._delay(300);
 
     // Heal sparkle on the protected target
     engine._broadcastEvent('play_zone_animation', {
       type: 'heal_sparkle', owner: originalOwner, heroIdx: originalHeroIdx,
       zoneSlot: selected.type === 'hero' ? -1 : selected.slotIdx,
     });
-    await engine._delay(900);
 
     // ── Build the redirect target ──
     const redirectTarget = validTargets.find(t =>

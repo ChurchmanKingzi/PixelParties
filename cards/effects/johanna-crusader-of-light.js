@@ -66,6 +66,27 @@ function _johannaActive(johannaHero) {
  * removed. Called when Johanna transitions back to "active" (frozen/
  * stunned/negated removed, or healed from 0 HP).
  */
+/**
+ * ★ v1315 (Als Vorgabe 23.9.): Johanna springt dazwischen — derselbe
+ * Ramm-Dash wie bei Martyry, von ihrer Heldenzone auf das urspruengliche
+ * Ziel, mit Lichtschimmer dort. Erst danach trifft sie die umgeleitete
+ * Haelfte.
+ */
+async function _dashZumZiel(engine, ownerIdx, johannaIdx, zielHeroIdx, zielSlot) {
+  const johanna = engine.gs.players[ownerIdx]?.heroes?.[johannaIdx];
+  // v1316: nur bis zum AUFPRALL warten — der Schaden faellt im Moment der
+  // Beruehrung, Johannas Rueckflug laeuft dabei weiter.
+  await engine.rammeBisKontakt({
+    sourceOwner: ownerIdx, sourceHeroIdx: johannaIdx,
+    targetOwner: ownerIdx, targetHeroIdx: zielHeroIdx,
+    targetZoneSlot: zielSlot == null ? undefined : zielSlot,
+    cardName: johanna?.name || CARD_NAME, duration: 1200,
+  });
+  engine._broadcastEvent('play_zone_animation', {
+    type: 'heal_sparkle', owner: ownerIdx, heroIdx: zielHeroIdx, zoneSlot: zielSlot == null ? -1 : zielSlot,
+  });
+}
+
 async function _cleanseAllies(engine, ownerIdx, johannaIdx) {
   const ps = engine.gs.players[ownerIdx];
   if (!ps) return;
@@ -205,6 +226,7 @@ module.exports = {
       // mutated the local copy, so the original target still took
       // full damage AND Johanna ate the redirected half on top.
       ctx.modifyAmount(-redirected);
+      await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, ownerPs.heroes.indexOf(target), null);
 
       // Deal the redirected half to Johanna. The recursive damage call
       // re-enters this hook, but target === johannaHero short-circuits
@@ -261,6 +283,7 @@ module.exports = {
         if (!gs.hoptUsed) gs.hoptUsed = {};
         gs.hoptUsed[hoptKey] = gs.turn;
         e.amount -= redirected;
+        await _dashZumZiel(engine, ownerIdx, johannaInst.heroIdx, e.inst.heroIdx, e.inst.zoneSlot);
 
         await engine.actionDealDamage(e.source, johannaHero, redirected, e.type || 'normal');
         break;
