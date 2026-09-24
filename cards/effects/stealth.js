@@ -21,6 +21,8 @@
 //    alle uebrigen Helden ebenfalls unwaehlbar, faellt der Schutz von
 //    ALLEN Stealth-Helden ab (zwei Stealth-Helden sehen einander als
 //    geschuetzt → beide werden waehlbar).
+//  · Nur WAEHLEN, nicht TREFFEN (v1327): im Schadenspfad (`info.hit`)
+//    greift Stealth nicht — Flaechenschaden trifft den Helden.
 //  · Kein Status, kein Zaehler: der Client leitet das Abzeichen direkt
 //    aus der Ability-Zone ab — nichts, was der Puzzle-Editor getrennt
 //    vergeben koennte.
@@ -64,6 +66,12 @@ module.exports = {
 
   blocksTargeting(gs, engine, info) {
     if (info._truthSeeingEye || info.ignoreUntargetable) return false;
+    // ★ v1327: „cannot be CHOSEN" — kein „or hit". Seit v1193 fragt auch
+    // der Schadenspfad diesen Vertrag, und Stealth liess seitdem
+    // Flaechenschaden abprallen (entgegen Kartentext und der v634-
+    // Absicht „blockt dort bewusst nicht"). Der Treffer traegt jetzt
+    // `info.hit`.
+    if (info.hit) return false;
     const lvl = stealthLevel(engine, info.heroOwner, info.heroIdx);
     if (!coveredBy(engine, lvl, info)) return false;
     return otherChoosableHero(engine, info);

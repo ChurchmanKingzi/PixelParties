@@ -99,6 +99,7 @@ module.exports = {
       // Schule prueft er nicht — „regardless of its level".
       const result = await engine._castSpellImmediately(pi, heroIdx, name, {
         fromZone: source, pool, poolIndex, by: CARD_NAME,
+        alsZusatzaktion: true,   // v1352
       });
       if (!result.cancelled) {
         if (!gs.hoptUsed) gs.hoptUsed = {};

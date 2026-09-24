@@ -31,6 +31,7 @@ const { isLoyalCreature, getLoyalsInDeck } = require('./_loyal-shared');
 
 // v876: Namensvergleiche ueber den BASISNAMEN (siehe CARD_API).
 const { baseCardName } = require('./_hooks');
+const { canHeroSummon } = require('./_summon-eligibility');
 const CARD_NAME = 'Loyal Shepherd';
 
 module.exports = {
@@ -115,8 +116,16 @@ module.exports = {
       const hoptKey = `loyal_shepherd_revive:${ctx.card.id}`;
       if (!engine.claimHOPT?.(hoptKey, pi)) return;
 
-      // ── Eligibility: deck has a different-name Loyal ──
-      const deckLoyals = getLoyalsInDeck(ps, engine, { exclude: death.name });
+      // ★ v1360 (Audit „same Support Zone"): der Platz muss frei sein, und
+      // der Held DIESES Platzes muss beschwoeren duerfen — „summon it …
+      // as an additional Action" ist eine echte Beschwoerung (vorher lief
+      // sie als Platzierung: ohne Helden-Pruefung, ohne Aktionsmeldung, mit
+      // Ausweichplatz). Sonst: kein Angebot (Leerlauf).
+      const _db = engine._getCardDB();
+      const deckLoyals = engine.supportSlotBelegt(death.owner, death.heroIdx, death.zoneSlot) ? []
+        : getLoyalsInDeck(ps, engine, { exclude: death.name })
+          .filter(l => canHeroSummon(engine, pi, death.heroIdx, _db[l.name], { alsAktion: true })
+            && engine.isCreatureSummonable(l.name, pi, death.heroIdx));
       if (deckLoyals.length === 0) {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
@@ -174,21 +183,29 @@ module.exports = {
       // The slot is empty already (engine cleared it before firing
       // ON_CREATURE_DEATH). Use the same hero+slot the dying Loyal
       // occupied. summonCreatureWithHooks fires the full lifecycle.
-      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
+      // v1360: der Platz kann waehrend der Wahl belegt worden sein.
+      if (engine.supportSlotBelegt(death.owner, death.heroIdx, death.zoneSlot)) {
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+        return;
+      }
+      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
+        return;
+      }
 
       const placed = await engine.summonCreatureWithHooks(
         replacementName, pi, death.heroIdx, death.zoneSlot,
         {
           source: CARD_NAME,
-          isPlacement: true,
+          alsZusatzaktion: true,   // v1360: „summon … as an additional Action"
           hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
         },
       );
       if (!placed) {
-        // Couldn't place — refund.
+        // Couldn't summon — refund the card, the trigger fizzles visibly.
         ps.mainDeck.push(replacementName);
         engine.shuffleDeck(pi, 'main');
-        if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }
 

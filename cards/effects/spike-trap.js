@@ -95,7 +95,7 @@ module.exports = {
               cancellable: false,
             });
             if (!result || result.cardName == null) break;
-            const ok = await engine.actionDiscardHandCard(
+            const ok = /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ (await engine.borisVerzicht(oppPi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(
               oppPi, result.cardName, result.handIndex,
               { source: CARD_NAME },
             );

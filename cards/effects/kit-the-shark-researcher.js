@@ -121,6 +121,9 @@ module.exports = {
       // attaches, and game-setup `_trackCard` placements all bypass
       // this hook by definition.
       if (ctx.toZone !== 'ability') return;
+      // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
+      // Guillotine) ist KEIN Anlegen.
+      if (ctx._verwahrungRueckkehr) return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
       const entering = ctx.enteringCard;
       if (!entering || entering.owner !== ctx.cardOwner) return;
@@ -418,6 +421,8 @@ async function _runModeC(engine, pi, oppPi) {
     return;
   }
 
+  // v1324: Boris darf den erzwungenen Abwurf ignorieren.
+  if (await engine.borisVerzicht(oppPi, 1, { source: 'Kit, the Shark Researcher', sourceOwner: 1 - oppPi })) return;
   const randomIdx = Math.floor(Math.random() * ops.hand.length);
   const discardedName = ops.hand[randomIdx];
   await engine.actionDiscardHandCard(oppPi, discardedName, randomIdx, {

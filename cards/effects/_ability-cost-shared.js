@@ -77,6 +77,7 @@ function targetsFor(engine, pi, heroIdx, kinds) {
  * @param opts.amount       anstehender Schaden fuer den Lernkanal (0 = keiner)
  * @param opts.confirmLabel Button-Text
  * @param opts.describe     (sent, abilitiesSent, remaining) → Beschreibung
+ * @param opts.sourceOwner  Verursacher, falls nicht der Waehlende (v1335)
  * @returns {{sent, abilitiesSent, equipsSent, aborted}}
  */
 async function sendCardsLoop(engine, pi, heroIdx, opts) {
@@ -133,10 +134,12 @@ async function sendCardsLoop(engine, pi, heroIdx, opts) {
     if (!ziel?._send) continue;
     let weg = false;
     if (ziel._send.kind === 'ability') {
-      weg = await engine.discardAbilityTopCopy(ziel._send.entry, { source: opts.cardName, sourceOwner: pi });
+      // v1335: `opts.sourceOwner` — wenn ein FREMDER Effekt den Spieler zum
+      // Ablegen zwingt (Memory Wipe), ist der Verursacher dessen Besitzer.
+      weg = await engine.discardAbilityTopCopy(ziel._send.entry, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) abilitiesSent++;
     } else {
-      weg = await engine.sendBoardCardToDiscard(ziel._send.inst, { source: opts.cardName, sourceOwner: pi });
+      weg = await engine.sendBoardCardToDiscard(ziel._send.inst, { source: opts.cardName, sourceOwner: opts.sourceOwner ?? pi });
       if (weg) equipsSent++;
     }
     if (!weg) continue;

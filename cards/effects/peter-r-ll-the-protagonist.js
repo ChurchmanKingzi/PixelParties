@@ -27,7 +27,12 @@ const { loadCardEffect } = require('./_loader');
 const CARD_NAME = 'Peter Röll, the Protagonist';
 
 /** Pick the zone slot the tutored ability will land in. Mirrors Alex's helper. */
-function findTargetZone(abZones, cardName) {
+function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = null, wunsch = -1) {
+  // ★★ v1349: mit Engine-Kontext entscheidet die EINE Stelle
+  // (`engine.abilityZielZone`, verwahrte Abilities / Madame Guillotine).
+  if (engine && pi != null && heroIdx != null) {
+    return engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: wunsch });
+  }
   const script = loadCardEffect(cardName);
   if (script?.customPlacement) {
     for (let z = 0; z < 3; z++) {
@@ -132,7 +137,7 @@ async function offerAttach(ctx) {
 
     const abZones = ps.abilityZones[heroIdx] || [[], [], []];
     ps.abilityZones[heroIdx] = abZones;
-    const targetZone = findTargetZone(abZones, chosenAbility);
+    const targetZone = findTargetZone(abZones, chosenAbility, engine, pi, heroIdx);
     if (targetZone < 0) {
       // Race: zone filled between the gate check and now. Restore.
       ps.mainDeck.push(chosenAbility);

@@ -221,7 +221,15 @@ module.exports = {
 
   canActivateCreatureEffect(ctx) {
     const ps = ctx.players[ctx.cardOwner];
-    return (ps?.hand || []).includes(ABILITY_NAME);
+    if (!(ps?.hand || []).includes(ABILITY_NAME)) return false;
+    // v1356: nur, wenn ein Held sein Anlegen noch frei hat und eine
+    // passende Ability im Deck liegt — sonst waere Performance umsonst weg.
+    const engine = ctx._engine;
+    const pi = ctx.cardOwner;
+    const db = engine._getCardDB();
+    return (ps.heroes || []).some((h, hi) => h?.name && h.hp > 0
+      && engine.kannAbilityAnlegen(pi, hi)
+      && (ps.mainDeck || []).some(cn => db[cn] && hasCardType(db[cn], 'Ability') && engine.canAttachAbilityToHero(pi, cn, hi)));
   },
 
   async onCreatureEffect(ctx) {
@@ -247,6 +255,10 @@ module.exports = {
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       const h = ps.heroes[hi];
       if (!h?.name || h.hp <= 0) continue;
+      // v1356 (Als Befund): Ska legt NICHT „additionally" an — das Anlegen
+      // kostet das eine Anlegen des Ziel-Helden fuer diesen Zug. Ein Held,
+      // der es schon verbraucht hat (und keinen Bonus-Platz hat), ist kein Ziel.
+      if (!engine.kannAbilityAnlegen(pi, hi)) continue;
 
       // Check there is at least one attachable ability in deck for this hero
       const hasDeckAbility = (ps.mainDeck || []).some(cn => {
@@ -319,9 +331,8 @@ module.exports = {
       reveal: true,
     });
 
-    const attachResult = await engine.attachAbilityFromHand(pi, chosenAbility, targetHeroIdx, {
-      skipAbilityGivenCheck: true,
-    });
+    // v1356: KEIN `skipAbilityGivenCheck` — verbraucht das Anlegen des Helden.
+    const attachResult = await engine.attachAbilityFromHand(pi, chosenAbility, targetHeroIdx, {});
 
     if (!attachResult?.success) {
       // Attachment failed — card stays in hand (player keeps it).

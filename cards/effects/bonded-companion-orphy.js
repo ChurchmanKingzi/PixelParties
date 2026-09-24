@@ -23,6 +23,9 @@ module.exports = companion({
   eigeneHooks: {
     onCardEnterZone: async (ctx) => {
       if (ctx.toZone !== 'ability') return;
+      // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
+      // Guillotine) ist KEIN Anlegen.
+      if (ctx._verwahrungRueckkehr) return;
       if (ctx.toHeroIdx !== ctx.cardHeroIdx) return;
       // „when YOU attach" — nur die eigene Seite.
       const leger = ctx.enteringCard?.owner ?? ctx.enteringCard?.controller;

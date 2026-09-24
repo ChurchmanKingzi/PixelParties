@@ -250,6 +250,7 @@ module.exports = {
       try {
         cast = await engine._castSpellImmediately(pi, held.heroIdx, zauber, {
           fromZone: 'hand', pool: ps.hand, poolIndex: handIdx, by: CARD_NAME,
+          alsZusatzaktion: true,   // v1352
         });
       } finally {
         delete engine._promptCancelLabel;

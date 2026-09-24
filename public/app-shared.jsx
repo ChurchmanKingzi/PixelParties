@@ -1215,6 +1215,43 @@ const ZONE_ANIM_SFX = {
   // Fire
   fireball:                { name: 'elem_fire' },
   flame_avalanche:         { name: 'elem_fire' },
+  // ★★ v1346 — „Hole in the Sky": der Himmel reisst auf (tief und
+  // dunkel), das Loch saugt (Wind, tief gestimmt), und der Schlag, mit
+  // dem es zuschnappt (1900 ms — genau dann faellt der Schaden). Spaetere
+  // Lagen ohne Kategorie und mit eigenem Dedupe, sonst schluckt die erste
+  // Lage sie (CARD_API ⑤).
+  hole_in_the_sky: [
+    { name: 'elem_dark',    opts: { rate: 0.45, volume: 1.0 } },
+    { name: 'heavy_impact', opts: { rate: 0.4,  volume: 0.9, delay: 180, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.6,  volume: 0.7, delay: 560, category: null, dedupe: 0 } },
+  ],
+  hole_in_the_sky_pull: [
+    { name: 'elem_wind',    opts: { rate: 0.5,  volume: 1.0 } },
+    { name: 'elem_wind',    opts: { rate: 0.7,  volume: 0.8, delay: 520,  category: null, dedupe: 0 } },
+    { name: 'elem_wind',    opts: { rate: 0.9,  volume: 0.7, delay: 1150, category: null, dedupe: 0 } },
+    // v1347: Zuschnappen bei 1900 ms (die Karten kreisen jetzt laenger)
+    { name: 'heavy_impact', opts: { rate: 0.5,  volume: 1.0, delay: 1880, category: null, dedupe: 0 } },
+    { name: 'elem_dark',    opts: { rate: 0.55, volume: 0.8, delay: 1910, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1357 — „The Egg of God": heller, goldener Schimmer (heiliger
+  // Klang, hoch gestimmt) mit einem leisen Funkeln hinterher.
+  egg_of_god_glow: [
+    { name: 'elem_holy', opts: { rate: 1.15, volume: 0.85 } },
+    { name: 'reveal',    opts: { rate: 1.35, volume: 0.5, delay: 260, category: null, dedupe: 0 } },
+  ],
+  // ★★ v1349 — „Madame Guillotine": das Fallbeil (Pfeifen, Aufschlag,
+  // dumpfer Nachschlag) — dieselben Bausteine wie `decapitation`, eigener
+  // Typ, damit der Klang nur hier klingt (CARD_API: Klang haengt am Typ).
+  guillotine_drop: [
+    { name: 'slash',           opts: { rate: 0.6,  volume: 0.9 } },
+    { name: 'critical_strike', opts: { rate: 0.85, volume: 1.0, delay: 470, category: null, dedupe: 0 } },
+    { name: 'heavy_impact',    opts: { rate: 0.55, volume: 0.9, delay: 500, category: null, dedupe: 0 } },
+  ],
+  // Negierter Guss: nur ein kurzer Riss.
+  sky_crack: [
+    { name: 'elem_dark',    opts: { rate: 0.75, volume: 0.8 } },
+    { name: 'heavy_impact', opts: { rate: 0.65, volume: 0.6, delay: 90, category: null, dedupe: 0 } },
+  ],
   flamethrower_douse:      { name: 'elem_fire' },
   firewall:                { name: 'elem_fire' },
   cataclysm:               { name: 'elem_fire' },
@@ -3215,7 +3252,16 @@ const _zoneFxLetzte = new Map();
 function _ppFxScroller() { return document.querySelector('.board-center'); }
 function ppFxWeltAnker(el) {
   const sc = _ppFxScroller();
-  if (sc && el && sc.contains(el)) return { welt: true, dx: sc.scrollLeft, dy: sc.scrollTop };
+  // ★★ v1348 (Als Befund zu „Hole in the Sky": die Kreaturen „erscheinen
+  // einfach" in der Ablage). Flugenden sind nicht immer echte Knoten:
+  // der Flughandler baut fuer die Brettmitte (`boardCenter`) und fuer
+  // noch nicht gerenderte Handplaetze Ersatzobjekte, die nur
+  // `getBoundingClientRect` haben. `Node.contains()` WIRFT bei so einem
+  // Objekt (TypeError) — der Handler brach damit still ab, BEVOR er die
+  // Flugkarte anlegte. Ein Ersatzobjekt ist nie Teil des Feldes.
+  if (sc && el && typeof Node !== 'undefined' && el instanceof Node && sc.contains(el)) {
+    return { welt: true, dx: sc.scrollLeft, dy: sc.scrollTop };
+  }
   return { welt: false, dx: 0, dy: 0 };
 }
 // Scrollstand des Feldes, ohne Anker-Pruefung — fuer Schichten, die
@@ -4471,6 +4517,13 @@ const TARGET_BLOCKER_BADGES = {
       + 'Spells or Creature effects while you control other targets that can be '
       + 'chosen or hit. Until the end of the turn.',
   },
+  // v1327
+  'Stealthy Pursuit': {
+    icon: '🌫️',
+    tooltip: 'Stealthy Pursuit: Cannot be chosen by the opponent\'s cards or effects '
+      + 'while its controller has another Hero that can be chosen by them. Can still be hit '
+      + 'by effects that do not choose. Until the end of its controller\'s next turn.',
+  },
 };
 
 // ★★ v1198 (Als Vorgabe 18.9.): „Sie muss einen GROSSEN Marker tragen."
@@ -4588,6 +4641,12 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
       });
     }
   }
+  // ★ v1323 (Tester-Wunsch 23.9.): Divine Gift of Skill sperrt den
+  // gewaehlten HELDEN fuer den Rest des Zuges — als Debuff direkt am
+  // Helden, wie Stunned oder Negated (nicht als Spieler-Debuff: die
+  // anderen Helden duerfen weiter handeln).
+  if (isHero && b.blessed_skill?.locked) badges.push({ key: 'skill_locked', icon: '🚫',
+    tooltip: 'Action-locked (Divine Gift of Skill): This Hero cannot perform any more Actions this turn, including additional Actions — unless it has at least Magic Arts 1.' });
   if (c._baihuStunned) badges.push({ key: 'petrified', icon: '🪨', tooltip: `Petrified: Stunned and immune to all damage. Lasts for ${c._baihuStunned.duration || 1} of its owner's turns.` });
   if (s.burned || c.burned) badges.push({ key: 'burned', icon: '🔥', tooltip: 'Burned: Takes 60 damage at the start of each of its owner\'s turns.' });
   if (s.bleeding || c.bleeding) badges.push({ key: 'bleeding', icon: '🩸', tooltip: 'Bleeding: takes 50 damage after each of its own actions or active effects. Permanent until cleansed.' });
@@ -4719,6 +4778,14 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   }
   // ★★ v1143 („Forbidden Curse of Aging"): eigener Status, eigenes
   // Abzeichen — nach dem Muster von Cursed und Decisive Defeats Negated.
+  // ★ v1330 („Soul Transmigration Ritual"): unentfernbarer Debuff.
+  if (s.soul_transmitted) {
+    badges.push({
+      key: 'soul_transmitted', icon: '🕯️',
+      tooltip: 'Soul Transmitted: The next time this Hero is defeated, it is deleted together with '
+        + 'all cards in its Ability and Support Zones, except Creatures. Cannot be removed.',
+    });
+  }
   if (s.aged) {
     badges.push({
       key: 'aged', icon: '⏳',
@@ -4775,8 +4842,9 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   // ★★ v1143: Helden zeigen Immune/Shielded ueber ihr eigenes Schild
   // (`ImmuneIcon`). Seit die Badge-Zeile nicht mehr hinter einer
   // Handliste steht, wuerde das Schild sonst doppelt erscheinen.
-  if (s.immune && !isHero) badges.push({ key: 'immune', icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + durStart(s.immune) });
-  if (s.shielded && !isHero) badges.push({ key: 'shielded', icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + durStart(s.shielded) });
+  // ★ v1343 (Als Vorgabe 24.9.): Immune und Shielded zaehlen als BUFF —
+  // sie stehen in der rechten Spalte (`BuffColumn`, Prop `statuses`),
+  // nicht mehr hier in der Status-Spalte.
   if (c.crossSideControlled != null) {
     badges.push({ key: 'crossSide', icon: CROSS_SIDE_BADGE.icon, tooltip: CROSS_SIDE_BADGE.tooltip, big: true });
   }
@@ -4911,8 +4979,16 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   );
 }
 
-function BuffColumn({ buffs, cardName }) {
-  if (!buffs || Object.keys(buffs).length === 0) return null;
+function BuffColumn({ buffs, cardName, statuses }) {
+  // ★ v1343: Immune/Shielded (Als Vorgabe: Buffs, keine Status) kommen als
+  // `statuses` mit und werden VOR den uebrigen Buffs einsortiert.
+  const st = statuses || {};
+  const statusBuffs = [];
+  const _abStart = ' Wears off at the start of its owner\'s turn.';
+  if (st.shielded) statusBuffs.push(['shielded', { icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + _abStart }]);
+  else if (st.immune) statusBuffs.push(['immune', { icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + _abStart }]);
+  if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
+  buffs = buffs || {};
   // Tooltip values may be a string OR a function (data) → string. Function
   // form is for buffs whose tooltip needs to read the buff's per-instance
   // data — Guardian Beast Niu's stacking damage bonus is the first user.
@@ -4986,16 +5062,28 @@ function BuffColumn({ buffs, cardName }) {
       .filter(Boolean)
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
       .join('-');
+  // ★ v1342 (Als Vorgabe 24.9.): Buffs gebuendelt OBEN, Debuffs darunter.
+  // Debuffs sind die Eintraege, die dem Traeger schaden oder ihn sperren;
+  // unbekannte „…_negated"/„…_locked"-Schluessel zaehlen automatisch mit.
+  const BUFF_NEGATIV = new Set([
+    'dark_gear_negated', 'diplomacy_negated', 'necromancy_negated', 'mao_negated',
+    'combo_locked', 'disrupted', 'charmed',
+  ]);
+  const istDebuff = (k) => BUFF_NEGATIV.has(k) || /_negated$|_locked$/.test(k);
+  const eintraege = Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key));
+  eintraege.sort((a, b) => (istDebuff(a[0]) ? 1 : 0) - (istDebuff(b[0]) ? 1 : 0));
+  const statusDefs = Object.fromEntries(statusBuffs);
+  eintraege.unshift(...statusBuffs.map(([k]) => [k, null]));
   return (
     <div className="buff-column">
-      {Object.entries(buffs).filter(([key]) => !BUFF_HIDDEN.has(key)).map(([key, data]) => {
-        const def = BUFF_ICONS[key] || { icon: '✦', tooltip: humanizeBuffKey(key) };
+      {eintraege.map(([key, data]) => {
+        const def = statusDefs[key] || BUFF_ICONS[key] || { icon: '✦', tooltip: humanizeBuffKey(key) };
         // Function-form tooltips read the buff's per-instance data so
         // dynamic content (Niu's accumulated bonus damage etc.) renders
         // the live value at hover time.
         const tooltipText = typeof def.tooltip === 'function' ? def.tooltip(data) : def.tooltip;
         return (
-          <div key={key} className="buff-icon"
+          <div key={key} className={'buff-icon ' + (istDebuff(key) ? 'badge-debuff buff-icon-debuff' : 'badge-buff')}
             onMouseEnter={e => { showGameTooltip(e, tooltipText); showBoardTip(); }}
             onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
             {def.icon}

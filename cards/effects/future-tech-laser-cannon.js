@@ -80,5 +80,26 @@ module.exports = {
   hooks: {
     onPlay: (ctx) => zuschlagNachrechnen(ctx),
     onGameStart: (ctx) => zuschlagNachrechnen(ctx),
+
+    // ★ v1330: den Zuschlag beim VERLASSEN der Zone zuruecknehmen. Fehlte
+    // bisher ganz — der Held behielt +100 Attack, auch nachdem die Kanone
+    // abgelegt, zerstoert oder beim Heldentod abgeraeumt war (gefunden
+    // beim Abgleich aller Ausruestungen im Todesablauf).
+    onCardLeaveZone: (ctx) => {
+      const inst = ctx.card;
+      if (!inst || ctx.leavingCard?.id !== inst.id) return;
+      if (ctx.fromZone !== 'support') return;
+      const bisher = inst.counters?.atkGranted || 0;
+      if (!bisher) return;
+      const engine = ctx._engine;
+      const owner = ctx.fromOwner ?? inst.owner;
+      const heroIdx = ctx.fromHeroIdx ?? inst.heroIdx;
+      const hero = engine.gs.players[owner]?.heroes?.[heroIdx];
+      inst.counters.atkGranted = 0;
+      if (!hero?.name) return;
+      engine._applyHeroAtkDelta(hero, owner, heroIdx, -bisher);
+      engine.log('ft_laser_cannon_atk', { hero: hero.name, bonus: 0, delta: -bisher });
+      engine.sync();
+    },
   },
 };

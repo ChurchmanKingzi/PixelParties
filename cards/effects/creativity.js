@@ -31,6 +31,9 @@ module.exports = {
     onCardEnterZone: async (ctx) => {
       const entering = ctx.enteringCard;
       if (!entering) return;
+      // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
+      // Guillotine) ist KEIN Anlegen.
+      if (ctx._verwahrungRueckkehr) return;
 
       // Only care about abilities entering THIS hero's zone (same player + same hero)
       if (ctx.toZone !== 'ability') return;

@@ -150,13 +150,15 @@ async function performSpell(engine, pi, heroIdx, cardName) {
     cardName, owner: pi, heroIdx, cardType: cd.cardType, goldCost: 0,
   });
 
-  if (chainResult.negated) {
+  // ★ v1328: gefizzelt (Wirker waehrend der Kette handlungsunfaehig) —
+  // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
+  if (chainResult.negated || chainResult.fizzled) {
     const i = findInHand();
     if (i >= 0) ps.hand.splice(i, 1);
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);
-    await payWisdom();
-    engine.log('rubin_spell_negated', { player: ps.username, spell: cardName });
+    // v1323: negierte Aktivierung → keine Wisdom-Kosten.
+    if (chainResult.negated) engine.log('rubin_spell_negated', { player: ps.username, spell: cardName });
     engine.sync();
     return true;
   }
@@ -167,11 +169,13 @@ async function performSpell(engine, pi, heroIdx, cardName) {
   if (!hadPriorLog) gs._spellDamageLog = [];
 
   try {
-    await engine.runHooks('onPlay', {
+    // v1323: waehrend des Zusatz-Gusses zaehlt diese Karte nicht zur Hand
+    // (`handSizeWithoutResolving` — Supply Chain & Co.).
+    await require('./_hand-resolve').mitZusatzAufloesung(gs.players[pi], cardName, () => engine.runHooks('onPlay', {
       _onlyCard: handInst, playedCard: handInst,
       cardName, zone: 'hand', heroIdx,
       _skipReactionCheck: true,
-    });
+    }));
 
     if (!gs._spellNegatedByEffect) {
       const uniqueTargets = [];

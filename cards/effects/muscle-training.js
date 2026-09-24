@@ -135,25 +135,8 @@ module.exports = {
       // ── Find target ability zone ──
       const abZones = ps.abilityZones[heroIdx] || [[], [], []];
       ps.abilityZones[heroIdx] = abZones;
-      let targetZone = -1;
-
-      // Prefer stacking onto existing Fighting slot (< Lv3)
-      for (let z = 0; z < 3; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === 'Fighting' && slot.length < 3) {
-          targetZone = z;
-          break;
-        }
-      }
-      // Otherwise use a free zone
-      if (targetZone < 0) {
-        for (let z = 0; z < 3; z++) {
-          if ((abZones[z] || []).length === 0) {
-            targetZone = z;
-            break;
-          }
-        }
-      }
+      // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine).
+      const targetZone = engine.abilityZielZone(pi, heroIdx, 'Fighting');
 
       if (targetZone < 0) return; // Shouldn't happen (spellPlayCondition guards this)
 

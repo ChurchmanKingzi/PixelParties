@@ -116,7 +116,7 @@ module.exports = {
     });
     if (!pick || pick.handIndex == null) return false;
     const discName = pick.cardName || ps.hand[pick.handIndex];
-    const ok = await engine.actionDiscardHandCard(pi, discName, pick.handIndex, { source: CARD_NAME, _noGlow: true });
+    const ok = /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, discName, pick.handIndex, { source: CARD_NAME, _noGlow: true });
     if (!ok) return false;
 
     // ── 3 Nicht-Helden-Karten mit verschiedenen Namen ──

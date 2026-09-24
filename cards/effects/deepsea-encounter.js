@@ -134,6 +134,12 @@ module.exports = {
     // Bounce the target.
     await returnSupportCreatureToHand(engine, bouncedInst, CARD_NAME);
 
+    // v1360 (Audit „same Support Zone"): Austritts-Listener (Rider Warg →
+    // „als geopfert" → Corpse Cannibal) koennen den Platz sofort fuellen.
+    if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+      return null;
+    }
     // Prompt replacement.
     const picked = await promptCtx.promptCardGallery(replacements, {
       title: CARD_NAME,
@@ -146,6 +152,11 @@ module.exports = {
     if (handIdx < 0) return null;
     ps.hand.splice(handIdx, 1);
 
+    if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
+      ps.hand.push(newName);
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+      return null;
+    }
     const result = await engine.actionPlaceCreature(newName, pi, bouncedHeroIdx, bouncedSlotIdx, {
       source: 'external',
       sourceName: CARD_NAME,

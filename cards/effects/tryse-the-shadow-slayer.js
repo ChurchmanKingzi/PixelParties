@@ -120,7 +120,10 @@ async function schattenschlag(ctx, opferName) {
   // „2 random cards" — so viele, wie die Hand hergibt. Der Index wird
   // je Runde neu gezogen, weil die Hand zwischendurch schrumpft.
   const abgeworfen = [];
-  for (let i = 0; i < DISCARD_COUNT; i++) {
+  // v1324: Boris darf den erzwungenen Abwurf ignorieren.
+  const _boris = (oppPs.hand || []).length > 0
+    && await engine.borisVerzicht(oppIdx, Math.min(DISCARD_COUNT, oppPs.hand.length), { source: CARD_NAME, sourceOwner: 1 - oppIdx });
+  for (let i = 0; i < (_boris ? 0 : DISCARD_COUNT); i++) {
     const hand = oppPs.hand || [];
     if (hand.length === 0) break;
     const idx = Math.floor(Math.random() * hand.length);

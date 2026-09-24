@@ -1572,6 +1572,94 @@ select optgroup {
   to   { transform: translateX(-50%); }
 }
 
+/* ── „Hole in the Sky" (v1346, Kartenbild als Vorlage) ─────────────
+   Der Himmel ueber dem Brett faerbt sich blutrot, ein pixeliges
+   Rissnetz reisst von der Mitte aus auf, in der Mitte glueht das Loch.
+   Lage 'overAreas' (ueber den Area-Hintergruenden, unter den Karten);
+   die Karte sendet sie als `waveAnimation.backdrop`, also erst NACH
+   allen Abwehr-Fenstern. Das Hineinsaugen der Kreaturen ist die Welle
+   `hole_in_the_sky_pull` (app-board.jsx), die UEBER den Karten laeuft.
+
+   Das Rissnetz ist ein einziges SVG (ein Pfad, dreimal ueber <use>
+   gezeichnet: Schatten, Riss, heller Grat) mit `crispEdges` und
+   Treppenstufen — so bleibt es auch gestreckt pixelig. Bewegt werden
+   nur `transform` und `opacity`. */
+.pp-bg-anim-hole-in-the-sky {
+  opacity: 0;
+  animation: holeSkyBlende var(--pp-bg-dauer, 3800ms) ease-in-out forwards;
+}
+.pp-bg-anim-hole-in-the-sky::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 62% 58% at 50% 50%,
+    #8e1510 0%, #4d080a 36%, #250306 70%, #120103 100%);
+}
+/* ① das Rissnetz — reisst von der Mitte aus auf */
+.pp-bg-anim-hole-in-the-sky > i:nth-child(1) {
+  inset: -4%;
+  background: url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" preserveAspectRatio="none" shape-rendering="crispEdges"%3E%3Cdefs%3E%3Cpath id="r" d="M443 175 445 175 445 182 445 193 449 193 449 202 456 202 461 202 461 208 461 214 462 214 473 214 473 219 482 219 482 228M449 174 449 180 455 180 465 180 465 189 471 189 471 193 477 193 477 205 477 212 478 212 478 219 479 219M271 152 278 152 278 157 278 159 286 159 291 159 291 162 297 162 297 166 297 167 310 167 310 173 318 173 328 173 328 172 328 174 334 174 340 174 340 177 340 179 348 179 348 184 357 184 357 181 370 181 370 180 379 180 392 180 392 176 401 176 401 174 401 172 415 172 426 172 426 177 426 176 434 176 434 175 443 175 449 175 449 174 459 174 459 175M401 277 390 277 390 284 390 291 384 291 384 297 380 297 380 304 372 304M371 197 377 197 377 208 377 213 383 213 383 223 382 223 382 231 390 231 390 231 390 240 390 254 393 254 395 254 395 265 398 265 398 272 398 277 401 277 401 284 407 284M265 159 269 159 269 166 277 166 277 167 277 174 282 174 282 174 291 174 291 175 303 175 303 180 313 180 313 185 317 185 326 185 326 186 326 190 334 190 334 193 347 193 347 195 357 195 371 195 371 197 383 197 383 198 383 208 390 208 399 208 399 211 399 216 406 216 406 220 410 220 410 220 417 220 417 227 428 227 435 227 435 231 435 242 442 242 452 242 452 243 457 243 457 250M305 251 305 262 299 262 295 262 295 271 295 279 290 279 290 285 286 285M322 228 319 228 319 234 313 234 313 244 313 251 305 251 305 257 302 257 302 267 300 267 300 276 293 276 293 276 293 290 293 299 293 299 288 299 288 304 288 316 289 316M261 168 261 175 267 175 267 182 273 182 278 182 278 186 278 193 281 193 281 203 287 203 287 208 296 208 296 213 307 213 307 217 312 217 312 223 318 223 318 228 322 228 324 228 324 236 327 236 327 246 327 249 334 249 334 255 337 255 337 264 339 264 339 273 350 273 350 280 356 280 356 286 363 286 365 286 365 292 365 296 373 296 382 296 382 301 384 301 384 311M256 190 258 190 258 197 262 197 262 205 262 214 260 214 260 225 256 225M314 215 314 224 314 224 314 233 316 233 316 239 322 239 322 243 328 243 328 253 331 253M321 221 321 218 332 218 332 213 339 213 339 215 346 215M249 186 256 186 256 190 264 190 264 199 264 201 272 201 272 204 285 204 296 204 296 206 296 211 308 211 314 211 314 215 321 215 321 221 326 221 326 224 326 234 330 234 335 234 335 245M272 313 270 313 270 323M245 167 245 178 248 178 248 186 249 186 254 186 254 195 252 195 252 204 252 216 251 216 249 216 249 224 248 224 248 232 248 239 248 239 248 239 248 249 247 249 247 262 247 268 251 268 258 268 258 277 259 277 259 289 263 289 263 302 263 313 272 313M169 188 164 188 164 194 164 201 164 201 160 201 160 209 160 213 156 213 156 219 148 219M220 179 220 181 206 181 206 187 195 187 195 190 188 190 188 187 179 187 179 188 169 188 163 188 163 189 152 189 152 192 138 192 138 191 130 191 130 197 120 197 120 196 120 198 110 198M190 219 190 230 194 230 194 236 195 236 200 236 200 248 200 254 203 254 207 254 207 258 208 258 208 272 208 285 211 285 214 285 214 290 221 290 221 302 226 302 226 311M160 289 160 297 149 297 149 297 138 297 134 297 134 302 134 303 128 303 117 303 117 311M154 320 154 331 145 331M150 308 154 308 154 320M231 163 231 168 226 168 226 179 220 179 212 179 212 186 211 186 211 192 209 192 209 198 201 198 201 204 197 204 197 208 190 208 190 219 180 219 180 227 180 236 180 236 180 246 178 246 178 257 170 257 169 257 169 267 161 267 161 276 160 276 160 289 158 289 158 298 158 308 150 308 144 308 144 315M107 298 96 298 96 299 90 299 90 297 79 297 79 290 67 290 67 289 67 289 57 289 50 289 50 284 50 282 44 282 33 282 33 279 33 276 20 276 11 276 11 275 -1 275 -1 274M225 161 225 173 220 173 212 173 212 185 205 185 205 195 200 195 200 205 200 215 195 215 195 229 191 229 191 238 181 238 171 238 171 244 171 253 168 253 168 259 166 259 158 259 158 263 147 263 147 272 140 272 140 279 131 279 131 282 122 282 122 291 122 294 117 294 117 298 107 298 107 307 104 307 104 315 100 315M139 121 128 121 128 120 117 120 117 127 103 127 103 130M192 152 192 149 183 149 173 149 173 142 161 142 161 135 155 135 155 131 144 131 144 126 139 126 139 121 133 121 133 114M132 144 132 140 125 140 125 145 112 145 112 142 104 142M139 148 139 144 132 144 132 141 123 141 123 139 116 139 116 132 112 132 106 132 106 127 100 127 100 119 93 119 93 112 93 105 89 105 81 105 81 100 81 94 75 94M218 154 211 154 211 154 205 154 205 156 192 156 192 152 192 152 178 152 178 152 166 152 166 148 153 148 145 148 145 146 145 148 139 148 131 148 131 147 124 147 124 146 124 147 111 147 111 152 104 152 104 157 98 157 98 165 88 165 74 165 74 167 69 167 69 171 69 169 58 169 58 172 44 172M171 144 165 144 165 140 154 140 154 134 154 133 145 133M137 158 137 164 132 164 135 164 135 177 135 184 136 184M204 131 204 135 193 135 187 135 187 136 181 136 181 138 181 144 171 144 171 146 163 146 152 146 152 147 143 147 143 152 137 152 137 158 130 158 130 161M134 149 134 152 120 152 120 152 112 152 112 148 100 148M118 162 116 162 116 168 117 168 117 180 117 191 119 191 117 191 117 205M162 119 162 132 156 132 150 132 150 141 150 144 137 144 134 144 134 149 134 157 128 157 118 157 118 162 118 171 107 171 107 178 103 178 103 181 94 181M124 98 124 106 119 106 107 106 107 110 99 110 99 113 97 113 97 118 88 118 88 127 88 138 79 138 79 143 76 143 69 143 69 150M105 92 105 88 93 88 85 88 85 86M118 92 105 92 105 92 95 92 95 94 95 98 84 98 84 95 71 95 61 95 61 97M218 144 218 137 212 137 204 137 204 131 204 132 193 132 193 133 179 133 171 133 171 127 162 127 162 119 157 119 157 114 157 115 150 115 150 106 140 106 135 106 135 100 124 100 124 98 124 92 118 92 112 92 112 87 112 85 106 85 96 85 96 82 96 80 87 80 87 79 78 79 78 75 67 75 67 74 60 74 48 74 48 71 48 65 43 65 36 65 36 59 29 59 29 54M215 111 215 101 225 101 233 101 233 91 242 91 242 81M222 88 222 85 233 85 245 85 245 81 245 79 252 79M211 124 212 124 212 117 212 111 215 111 222 111 222 100 222 88 222 88 224 88 224 77 224 63 223 63 223 58 226 58 226 45 225 45 234 45 234 35M177 -2 177 -14 180 -14M163 56 162 56 162 49 170 49 170 37 173 37 173 30 175 30 175 17 175 4 176 4 177 4 177 -2 184 -2 184 -14M138 18 138 9 134 9 134 -2 132 -2 128 -2 128 -8 130 -8 130 -15M228 139 228 131 223 131 218 131 218 128 218 124 211 124 211 114 208 114 201 114 201 104 201 100 193 100 193 89 190 89 184 89 184 87 184 77 180 77 180 71 171 71 168 71 168 66 168 56 163 56 160 56 160 51 154 51 154 48 149 48 149 42 149 29 147 29 147 24 143 24 138 24 138 18 138 13 132 13 132 9 127 9 127 0 119 0 119 -6 110 -6 110 -15 109 -15M209 9 209 5 198 5 198 -2 186 -2 186 -3 172 -3 159 -3 159 -3 159 -11 147 -11M199 -5 208 -5 208 -9 208 -14 218 -14M232 137 232 131 232 131 231 131 231 121 229 121 229 107 229 96 228 96 228 82 230 82 221 82 221 74 221 66 222 66 222 58 219 58 219 53 216 53 211 53 211 42 209 42 209 30 210 30 210 17 209 17 209 9 204 9 204 -1 199 -1 199 -5 196 -5 196 -14M283 37 283 39 292 39 292 38 298 38 309 38 309 36M308 19 308 19 308 8 308 0 316 0M269 50 269 49 275 49 283 49 283 37 283 33 295 33 301 33 301 26 301 19 308 19 308 14 313 14M242 129 246 129 246 116 250 116 250 105 250 92 253 92 255 92 255 82 255 75 258 75 263 75 263 62 269 62 269 50 273 50 273 43 275 43 275 37 275 31 276 31 276 22 279 22 278 22 278 16 278 11 281 11 281 -3 284 -3 284 -13 291 -13M365 81 360 81 360 70 356 70 356 59 356 52 357 52 357 43 361 43 359 43 359 29M257 117 257 111 261 111 261 105 274 105 281 105 281 102 295 102 295 100 305 100 305 97 305 91 315 91 323 91 323 89 329 89 329 85 342 85 342 85 353 85 353 81 365 81 365 81M280 -3 285 -3 285 -16M287 74 287 62 285 62 285 51 288 51 288 39 294 39 289 39 289 26 284 26 284 18 284 9 287 9 287 -3 280 -3 278 -3 278 -15M312 45 310 45 310 31 314 31 314 18 316 18 316 8 316 -1 310 -1 310 -9 306 -9 309 -9 309 -23M255 129 255 117 257 117 257 113 263 113 266 113 266 108 270 108 270 100 279 100 279 93 279 88 282 88 282 80 285 80 287 80 287 74 295 74 295 65 295 58 302 58 302 53 306 53 312 53 312 45 312 36 321 36 323 36 323 26 323 15 322 15 322 5 331 5 336 5 336 -3 336 -12 335 -12M385 141 394 141 394 139 399 139 399 133 410 133 410 132M350 115 350 124 359 124 366 124 366 125 366 136 374 136 374 141 385 141 392 141 392 146 400 146 400 145 400 155 407 155M260 146 268 146 268 144 268 142 275 142 275 143 282 143 289 143 289 136 289 131 298 131 298 129 305 129 312 129 312 126 318 126 318 121 318 118 327 118 327 118 341 118 350 118 350 115 359 115 359 105 371 105 371 106 385 106 385 108 385 106 391 106 404 106 404 106 412 106 412 100 423 100 423 98 436 98 436 97 436 91 443 91 457 91 457 91 457 93 469 93 469 89 478 89 483 89 483 84 483 85 493 85M153 148 141 148 129 148 117 148 105 148 105 157 93 157 81 157 74 157 74 166M295 262 283 262 271 262 271 253 271 249 259 249 247 249M356 52 368 52 368 61 368 70 368 79 368 88 368 97 380 97 392 97 404 97 412 97M154 320 154 315 142 315 130 315 118 315 106 315 100 315M316 -1 316 8 316 17 316 26 304 26 295 26 295 35 295 44 295 53 295 58M118 171 118 162 118 153 118 144 106 144 94 144 94 135 94 126 94 117 94 112M178 257 178 266 178 275 166 275 154 275 154 284 144 284 144 293 144 302 144 311 144 315M398 272 398 263 406 263 406 254 406 245 406 236 406 227 406 218M473 219 461 219 449 219 437 219 425 219 413 219 406 219M284 18 284 27 295 27 295 36 295 45 295 54 295 58M150 106 154 106 154 97 154 88 154 79 154 70 154 61 154 52M175 17 180 17 180 26 180 35 180 44 180 53 180 62 180 71 180 77M184 -2 172 -2 172 7 172 16 172 25 172 34 172 43 172 52 172 61 172 70M33 279 33 288 45 288 57 288 57 297 57 306 57 315 69 315 81 315 93 315 104 315M124 146 124 155 112 155 100 155 100 164 88 164M67 289 67 280 67 272 79 272 91 272 103 272 115 272 127 272 139 272" fill="none" stroke-linejoin="miter"/%3E%3C/defs%3E%3Cuse href="%23r" stroke="%233a0105" stroke-width="6"/%3E%3Cuse href="%23r" stroke="%23c8141d" stroke-width="3"/%3E%3Cuse href="%23r" stroke="%23ff4a3a" stroke-width="1" opacity=".7"/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  animation: holeSkyRisse var(--pp-bg-dauer, 3800ms) cubic-bezier(.2,.7,.3,1) forwards;
+}
+/* ② zweites, gedrehtes Netz — laeuft verzoegert nach, macht es dichter */
+.pp-bg-anim-hole-in-the-sky > i:nth-child(2) {
+  inset: -4%;
+  background: url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" preserveAspectRatio="none" shape-rendering="crispEdges"%3E%3Cdefs%3E%3Cpath id="r" d="M443 175 445 175 445 182 445 193 449 193 449 202 456 202 461 202 461 208 461 214 462 214 473 214 473 219 482 219 482 228M449 174 449 180 455 180 465 180 465 189 471 189 471 193 477 193 477 205 477 212 478 212 478 219 479 219M271 152 278 152 278 157 278 159 286 159 291 159 291 162 297 162 297 166 297 167 310 167 310 173 318 173 328 173 328 172 328 174 334 174 340 174 340 177 340 179 348 179 348 184 357 184 357 181 370 181 370 180 379 180 392 180 392 176 401 176 401 174 401 172 415 172 426 172 426 177 426 176 434 176 434 175 443 175 449 175 449 174 459 174 459 175M401 277 390 277 390 284 390 291 384 291 384 297 380 297 380 304 372 304M371 197 377 197 377 208 377 213 383 213 383 223 382 223 382 231 390 231 390 231 390 240 390 254 393 254 395 254 395 265 398 265 398 272 398 277 401 277 401 284 407 284M265 159 269 159 269 166 277 166 277 167 277 174 282 174 282 174 291 174 291 175 303 175 303 180 313 180 313 185 317 185 326 185 326 186 326 190 334 190 334 193 347 193 347 195 357 195 371 195 371 197 383 197 383 198 383 208 390 208 399 208 399 211 399 216 406 216 406 220 410 220 410 220 417 220 417 227 428 227 435 227 435 231 435 242 442 242 452 242 452 243 457 243 457 250M305 251 305 262 299 262 295 262 295 271 295 279 290 279 290 285 286 285M322 228 319 228 319 234 313 234 313 244 313 251 305 251 305 257 302 257 302 267 300 267 300 276 293 276 293 276 293 290 293 299 293 299 288 299 288 304 288 316 289 316M261 168 261 175 267 175 267 182 273 182 278 182 278 186 278 193 281 193 281 203 287 203 287 208 296 208 296 213 307 213 307 217 312 217 312 223 318 223 318 228 322 228 324 228 324 236 327 236 327 246 327 249 334 249 334 255 337 255 337 264 339 264 339 273 350 273 350 280 356 280 356 286 363 286 365 286 365 292 365 296 373 296 382 296 382 301 384 301 384 311M256 190 258 190 258 197 262 197 262 205 262 214 260 214 260 225 256 225M314 215 314 224 314 224 314 233 316 233 316 239 322 239 322 243 328 243 328 253 331 253M321 221 321 218 332 218 332 213 339 213 339 215 346 215M249 186 256 186 256 190 264 190 264 199 264 201 272 201 272 204 285 204 296 204 296 206 296 211 308 211 314 211 314 215 321 215 321 221 326 221 326 224 326 234 330 234 335 234 335 245M272 313 270 313 270 323M245 167 245 178 248 178 248 186 249 186 254 186 254 195 252 195 252 204 252 216 251 216 249 216 249 224 248 224 248 232 248 239 248 239 248 239 248 249 247 249 247 262 247 268 251 268 258 268 258 277 259 277 259 289 263 289 263 302 263 313 272 313M169 188 164 188 164 194 164 201 164 201 160 201 160 209 160 213 156 213 156 219 148 219M220 179 220 181 206 181 206 187 195 187 195 190 188 190 188 187 179 187 179 188 169 188 163 188 163 189 152 189 152 192 138 192 138 191 130 191 130 197 120 197 120 196 120 198 110 198M190 219 190 230 194 230 194 236 195 236 200 236 200 248 200 254 203 254 207 254 207 258 208 258 208 272 208 285 211 285 214 285 214 290 221 290 221 302 226 302 226 311M160 289 160 297 149 297 149 297 138 297 134 297 134 302 134 303 128 303 117 303 117 311M154 320 154 331 145 331M150 308 154 308 154 320M231 163 231 168 226 168 226 179 220 179 212 179 212 186 211 186 211 192 209 192 209 198 201 198 201 204 197 204 197 208 190 208 190 219 180 219 180 227 180 236 180 236 180 246 178 246 178 257 170 257 169 257 169 267 161 267 161 276 160 276 160 289 158 289 158 298 158 308 150 308 144 308 144 315M107 298 96 298 96 299 90 299 90 297 79 297 79 290 67 290 67 289 67 289 57 289 50 289 50 284 50 282 44 282 33 282 33 279 33 276 20 276 11 276 11 275 -1 275 -1 274M225 161 225 173 220 173 212 173 212 185 205 185 205 195 200 195 200 205 200 215 195 215 195 229 191 229 191 238 181 238 171 238 171 244 171 253 168 253 168 259 166 259 158 259 158 263 147 263 147 272 140 272 140 279 131 279 131 282 122 282 122 291 122 294 117 294 117 298 107 298 107 307 104 307 104 315 100 315M139 121 128 121 128 120 117 120 117 127 103 127 103 130M192 152 192 149 183 149 173 149 173 142 161 142 161 135 155 135 155 131 144 131 144 126 139 126 139 121 133 121 133 114M132 144 132 140 125 140 125 145 112 145 112 142 104 142M139 148 139 144 132 144 132 141 123 141 123 139 116 139 116 132 112 132 106 132 106 127 100 127 100 119 93 119 93 112 93 105 89 105 81 105 81 100 81 94 75 94M218 154 211 154 211 154 205 154 205 156 192 156 192 152 192 152 178 152 178 152 166 152 166 148 153 148 145 148 145 146 145 148 139 148 131 148 131 147 124 147 124 146 124 147 111 147 111 152 104 152 104 157 98 157 98 165 88 165 74 165 74 167 69 167 69 171 69 169 58 169 58 172 44 172M171 144 165 144 165 140 154 140 154 134 154 133 145 133M137 158 137 164 132 164 135 164 135 177 135 184 136 184M204 131 204 135 193 135 187 135 187 136 181 136 181 138 181 144 171 144 171 146 163 146 152 146 152 147 143 147 143 152 137 152 137 158 130 158 130 161M134 149 134 152 120 152 120 152 112 152 112 148 100 148M118 162 116 162 116 168 117 168 117 180 117 191 119 191 117 191 117 205M162 119 162 132 156 132 150 132 150 141 150 144 137 144 134 144 134 149 134 157 128 157 118 157 118 162 118 171 107 171 107 178 103 178 103 181 94 181M124 98 124 106 119 106 107 106 107 110 99 110 99 113 97 113 97 118 88 118 88 127 88 138 79 138 79 143 76 143 69 143 69 150M105 92 105 88 93 88 85 88 85 86M118 92 105 92 105 92 95 92 95 94 95 98 84 98 84 95 71 95 61 95 61 97M218 144 218 137 212 137 204 137 204 131 204 132 193 132 193 133 179 133 171 133 171 127 162 127 162 119 157 119 157 114 157 115 150 115 150 106 140 106 135 106 135 100 124 100 124 98 124 92 118 92 112 92 112 87 112 85 106 85 96 85 96 82 96 80 87 80 87 79 78 79 78 75 67 75 67 74 60 74 48 74 48 71 48 65 43 65 36 65 36 59 29 59 29 54M215 111 215 101 225 101 233 101 233 91 242 91 242 81M222 88 222 85 233 85 245 85 245 81 245 79 252 79M211 124 212 124 212 117 212 111 215 111 222 111 222 100 222 88 222 88 224 88 224 77 224 63 223 63 223 58 226 58 226 45 225 45 234 45 234 35M177 -2 177 -14 180 -14M163 56 162 56 162 49 170 49 170 37 173 37 173 30 175 30 175 17 175 4 176 4 177 4 177 -2 184 -2 184 -14M138 18 138 9 134 9 134 -2 132 -2 128 -2 128 -8 130 -8 130 -15M228 139 228 131 223 131 218 131 218 128 218 124 211 124 211 114 208 114 201 114 201 104 201 100 193 100 193 89 190 89 184 89 184 87 184 77 180 77 180 71 171 71 168 71 168 66 168 56 163 56 160 56 160 51 154 51 154 48 149 48 149 42 149 29 147 29 147 24 143 24 138 24 138 18 138 13 132 13 132 9 127 9 127 0 119 0 119 -6 110 -6 110 -15 109 -15M209 9 209 5 198 5 198 -2 186 -2 186 -3 172 -3 159 -3 159 -3 159 -11 147 -11M199 -5 208 -5 208 -9 208 -14 218 -14M232 137 232 131 232 131 231 131 231 121 229 121 229 107 229 96 228 96 228 82 230 82 221 82 221 74 221 66 222 66 222 58 219 58 219 53 216 53 211 53 211 42 209 42 209 30 210 30 210 17 209 17 209 9 204 9 204 -1 199 -1 199 -5 196 -5 196 -14M283 37 283 39 292 39 292 38 298 38 309 38 309 36M308 19 308 19 308 8 308 0 316 0M269 50 269 49 275 49 283 49 283 37 283 33 295 33 301 33 301 26 301 19 308 19 308 14 313 14M242 129 246 129 246 116 250 116 250 105 250 92 253 92 255 92 255 82 255 75 258 75 263 75 263 62 269 62 269 50 273 50 273 43 275 43 275 37 275 31 276 31 276 22 279 22 278 22 278 16 278 11 281 11 281 -3 284 -3 284 -13 291 -13M365 81 360 81 360 70 356 70 356 59 356 52 357 52 357 43 361 43 359 43 359 29M257 117 257 111 261 111 261 105 274 105 281 105 281 102 295 102 295 100 305 100 305 97 305 91 315 91 323 91 323 89 329 89 329 85 342 85 342 85 353 85 353 81 365 81 365 81M280 -3 285 -3 285 -16M287 74 287 62 285 62 285 51 288 51 288 39 294 39 289 39 289 26 284 26 284 18 284 9 287 9 287 -3 280 -3 278 -3 278 -15M312 45 310 45 310 31 314 31 314 18 316 18 316 8 316 -1 310 -1 310 -9 306 -9 309 -9 309 -23M255 129 255 117 257 117 257 113 263 113 266 113 266 108 270 108 270 100 279 100 279 93 279 88 282 88 282 80 285 80 287 80 287 74 295 74 295 65 295 58 302 58 302 53 306 53 312 53 312 45 312 36 321 36 323 36 323 26 323 15 322 15 322 5 331 5 336 5 336 -3 336 -12 335 -12M385 141 394 141 394 139 399 139 399 133 410 133 410 132M350 115 350 124 359 124 366 124 366 125 366 136 374 136 374 141 385 141 392 141 392 146 400 146 400 145 400 155 407 155M260 146 268 146 268 144 268 142 275 142 275 143 282 143 289 143 289 136 289 131 298 131 298 129 305 129 312 129 312 126 318 126 318 121 318 118 327 118 327 118 341 118 350 118 350 115 359 115 359 105 371 105 371 106 385 106 385 108 385 106 391 106 404 106 404 106 412 106 412 100 423 100 423 98 436 98 436 97 436 91 443 91 457 91 457 91 457 93 469 93 469 89 478 89 483 89 483 84 483 85 493 85M153 148 141 148 129 148 117 148 105 148 105 157 93 157 81 157 74 157 74 166M295 262 283 262 271 262 271 253 271 249 259 249 247 249M356 52 368 52 368 61 368 70 368 79 368 88 368 97 380 97 392 97 404 97 412 97M154 320 154 315 142 315 130 315 118 315 106 315 100 315M316 -1 316 8 316 17 316 26 304 26 295 26 295 35 295 44 295 53 295 58M118 171 118 162 118 153 118 144 106 144 94 144 94 135 94 126 94 117 94 112M178 257 178 266 178 275 166 275 154 275 154 284 144 284 144 293 144 302 144 311 144 315M398 272 398 263 406 263 406 254 406 245 406 236 406 227 406 218M473 219 461 219 449 219 437 219 425 219 413 219 406 219M284 18 284 27 295 27 295 36 295 45 295 54 295 58M150 106 154 106 154 97 154 88 154 79 154 70 154 61 154 52M175 17 180 17 180 26 180 35 180 44 180 53 180 62 180 71 180 77M184 -2 172 -2 172 7 172 16 172 25 172 34 172 43 172 52 172 61 172 70M33 279 33 288 45 288 57 288 57 297 57 306 57 315 69 315 81 315 93 315 104 315M124 146 124 155 112 155 100 155 100 164 88 164M67 289 67 280 67 272 79 272 91 272 103 272 115 272 127 272 139 272" fill="none" stroke-linejoin="miter"/%3E%3C/defs%3E%3Cuse href="%23r" stroke="%233a0105" stroke-width="6"/%3E%3Cuse href="%23r" stroke="%23c8141d" stroke-width="3"/%3E%3Cuse href="%23r" stroke="%23ff4a3a" stroke-width="1" opacity=".7"/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  animation: holeSkyRisse2 var(--pp-bg-dauer, 3800ms) cubic-bezier(.2,.7,.3,1) forwards;
+}
+/* ③ das gluehende Loch in der Mitte */
+.pp-bg-anim-hole-in-the-sky > i:nth-child(3) {
+  left: 27%; top: 20%; width: 46%; height: 60%;   /* mittig, ohne transform */
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(255,70,40,.75) 0%, rgba(200,24,18,.55) 26%, rgba(120,8,10,.3) 52%, rgba(60,0,0,0) 72%);
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  animation: holeSkyGlut var(--pp-bg-dauer, 3800ms) ease-in-out forwards;
+}
+/* ★★ v1347 — „Einsaugen": waehrend eine Kreatur als Kopie ins Loch
+   kreist, ist ihre Zone leer. Gesetzt wird ein DATENATTRIBUT (nicht
+   `className`, das gehoert React — CARD_API v1232); die Zone selbst bleibt
+   stehen, nur ihr Inhalt wird unsichtbar. Freigegeben vom Flughandler
+   (Tod: sofort, Rueckkehr: bei der Landung) bzw. dem Notnagel der Welle. */
+[data-pp-im-sog] > * { visibility: hidden !important; }
+
+@keyframes holeSkyBlende {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes holeSkyRisse {
+  0%   { opacity: 0;   transform: scale(.06); }
+  6%   { opacity: 1;   transform: scale(.22); }
+  22%  { opacity: 1;   transform: scale(1.04); }
+  27%  { opacity: .8;  transform: scale(1); }
+  40%  { opacity: 1;   transform: scale(1); }
+  55%  { opacity: .75; transform: scale(1.01); }
+  70%  { opacity: 1;   transform: scale(1); }
+  100% { opacity: 1;   transform: scale(1); }
+}
+@keyframes holeSkyRisse2 {
+  0%, 10% { opacity: 0;   transform: rotate(180deg) scale(.06); }
+  32%     { opacity: .55; transform: rotate(180deg) scale(1.03); }
+  60%     { opacity: .4;  transform: rotate(180deg) scale(1); }
+  100%    { opacity: .5;  transform: rotate(180deg) scale(1); }
+}
+@keyframes holeSkyGlut {
+  0%   { opacity: 0;   transform: scale(.3); }
+  18%  { opacity: 1;   transform: scale(1); }
+  34%  { opacity: .75; transform: scale(.92); }
+  48%  { opacity: 1;   transform: scale(1.12); }
+  58%  { opacity: 1;   transform: scale(.7); }
+  66%  { opacity: 1;   transform: scale(1.35); }
+  100% { opacity: .4;  transform: scale(1.05); }
+}
+
 /* ── GESPERRTE KARTE UNTER DEM ZEIGER (v1229) ─────────────────────
    Eine nicht spielbare Handkarte traegt einen Schleier
    (`rgba(12,12,20,.7)`, `.hand-card-dimmed .board-card::before`). Unter
@@ -3530,7 +3618,8 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    Immune-Icons plus Rahmen und wirkten deutlich groesser. */
 .status-action-blocked-icon,
 .status-stealth-icon,
-.status-damage-proof-icon {
+.status-damage-proof-icon,
+.status-cheat-chair-icon {
   width: calc(18px * var(--board-scale));
   height: calc(18px * var(--board-scale));
   font-size: calc(10px * var(--board-scale));
@@ -3560,6 +3649,13 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   background: #2b2b3f; color: #fff;
   border: 1px solid #9a9ac0; border-radius: 6px;
   padding: 0 3px; line-height: 11px;
+}
+.status-cheat-chair-icon {
+  /* ★ v1341 — eigenes Abzeichen fuer Cheat Chairs Schutz (golden). */
+  top: calc(2px + 60px * var(--board-scale));
+  background: linear-gradient(135deg, #7a5a10, #d8a820);
+  border-color: #ffe79a;
+  box-shadow: 0 0 6px rgba(255,210,70,.9);
 }
 .status-damage-proof-icon {
   top: calc(2px + 40px * var(--board-scale));
@@ -4038,6 +4134,183 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
   pointer-events: none;
   transform: translate3d(var(--fx-dx, 0px), var(--fx-dy, 0px), 0);
 }
+
+/* ★ v1336 — Wutausbruch (Furious Anger). */
+.anim-fa-zeichen { transform-origin: 50% 50%; animation: faZeichen 1200ms ease-out forwards; }
+.anim-fa-glut {
+  position: absolute; border-radius: 18%;
+  background: radial-gradient(ellipse at 50% 60%, rgba(255,60,30,.55) 0%, rgba(255,120,40,.25) 45%, transparent 70%);
+  opacity: 0; animation: faGlut 1100ms ease-out forwards;
+}
+.anim-fa-flamme {
+  position: absolute; border-radius: 50% 50% 35% 35% / 70% 70% 30% 30%;
+  background: linear-gradient(to top, #d81e0e 0%, #ff7a1a 45%, #ffd23a 80%, rgba(255,240,160,0) 100%);
+  transform-origin: 50% 100%; opacity: 0;
+  animation: faFlamme 900ms ease-out forwards;
+}
+.anim-fa-dampf {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.85) 0%, rgba(230,230,230,.4) 55%, transparent 72%);
+  opacity: 0; animation: faDampf 800ms ease-out forwards;
+}
+@keyframes faZeichen {
+  0% { opacity: 0; transform: scale(.2) rotate(-12deg); }
+  18% { opacity: 1; transform: scale(1.18) rotate(6deg); }
+  28% { transform: scale(.94) rotate(-4deg); }
+  36% { transform: scale(1.04) rotate(3deg) translate(2px, 0); }
+  44% { transform: scale(1) rotate(-3deg) translate(-2px, 0); }
+  52% { transform: scale(1.02) rotate(2deg) translate(2px, -1px); }
+  60% { transform: scale(1) rotate(-2deg) translate(-2px, 1px); }
+  85% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(1.1) translate(0, -8px); }
+}
+@keyframes faGlut { 0% { opacity: 0; } 25% { opacity: 1; } 70% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes faFlamme { 0% { opacity: 0; transform: scaleY(.2); } 30% { opacity: .95; transform: scaleY(1.1); } 60% { opacity: .8; transform: scaleY(.85); } 100% { opacity: 0; transform: scaleY(.3); } }
+@keyframes faDampf { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(0, -34px) scale(1.4); } }
+
+/* ★ v1335 — Gedaechtnisloeschung (Memory Wipe). */
+.anim-mw-rune { animation: mwRune 1100ms ease-out forwards; }
+.anim-mw-ring {
+  fill: none; stroke: #8a4dff; stroke-width: 3;
+  filter: drop-shadow(0 0 4px #b98cff) drop-shadow(0 0 10px #6a2cff);
+}
+.anim-mw-ring-innen { stroke: #b98cff; stroke-width: 2; stroke-dasharray: 6 5; }
+.anim-mw-strich {
+  stroke: #9b66ff; stroke-width: 3; stroke-linecap: square;
+  filter: drop-shadow(0 0 4px #b98cff);
+}
+.anim-mw-funke {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #9ff3ff 35%, rgba(90,209,255,.4) 60%, transparent 72%);
+  opacity: 0; animation: mwFunke 900ms ease-out 120ms forwards;
+}
+.anim-mw-splitter {
+  position: absolute; opacity: 0;
+  animation: mwSplitter 900ms ease-out forwards;
+}
+@keyframes mwRune {
+  0% { opacity: 0; transform: rotate(-120deg) scale(1.6); }
+  30% { opacity: 1; transform: rotate(0deg) scale(1); }
+  70% { opacity: 1; transform: rotate(30deg) scale(.85); }
+  100% { opacity: 0; transform: rotate(60deg) scale(.45); }
+}
+@keyframes mwFunke { 0% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; transform: scale(1.1); } 50% { opacity: .8; transform: scale(.8); } 70% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(.2); } }
+@keyframes mwSplitter { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--mdx), var(--mdy)) scale(.5); } }
+
+/* ★ v1334 — Kernexplosion (Core Explosion) und Bildschirmwackeln. */
+.anim-core-kern {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, #1a0a3a 0%, #2b0f5c 45%, #b3122e 70%, transparent 72%);
+  box-shadow: 0 0 24px #5ad1ff, 0 0 48px #7a2cff;
+  animation: coreKern 700ms ease-out forwards;
+}
+.anim-core-blitz {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(143,244,255,.8) 30%, rgba(90,209,255,.35) 55%, transparent 70%);
+  opacity: 0; animation: coreBlitz 900ms ease-out 180ms forwards;
+}
+.anim-core-welle {
+  position: absolute; border-radius: 50%;
+  border: 5px solid #8ff4ff; box-shadow: 0 0 18px #5ad1ff, inset 0 0 14px #ff6fd8;
+  opacity: 0; transform: scale(.2);
+  animation: coreWelle 850ms ease-out 200ms forwards;
+}
+.anim-core-welle-2 { border-color: #ff6fd8; animation-delay: 340ms; }
+.anim-core-bogen {
+  fill: none; stroke: #bff8ff; stroke-width: 3; stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px #5ad1ff) drop-shadow(0 0 10px #5ad1ff);
+  opacity: 0; animation: coreBogen 420ms linear forwards;
+}
+.anim-core-funke {
+  position: absolute; border-radius: 1px; opacity: 0;
+  animation: coreFunke 800ms ease-out forwards;
+}
+@keyframes coreKern { 0% { transform: scale(.4); opacity: 1; } 30% { transform: scale(1.25); opacity: 1; } 55% { transform: scale(.9); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes coreBlitz { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.2); } }
+@keyframes coreWelle { 0% { opacity: .95; transform: scale(.2); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes coreBogen { 0% { opacity: 0; } 15% { opacity: 1; } 60% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes coreFunke { 0% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--fdx), var(--fdy)) scale(.4); } }
+
+.pp-wackeln { animation: ppWackeln 420ms ease-in-out; }
+.pp-wackeln-stark { animation: ppWackelnStark 680ms ease-in-out; }
+@keyframes ppWackeln {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 3px); } 40% { transform: translate(5px, -3px); }
+  60% { transform: translate(-3px, -2px); } 80% { transform: translate(3px, 2px); }
+}
+@keyframes ppWackelnStark {
+  0%, 100% { transform: translate(0, 0); }
+  12% { transform: translate(-10px, 6px); } 25% { transform: translate(9px, -7px); }
+  38% { transform: translate(-8px, -5px); } 50% { transform: translate(7px, 5px); }
+  65% { transform: translate(-5px, 3px); } 80% { transform: translate(3px, -2px); }
+}
+
+/* ★ v1331 — Magische Faeden (`play_tether_animation`, Soul Transmigration
+   Ritual). Keyframes hier global (Regel ④): die Ebene ist nicht immer
+   gemountet. Ablauf ueber --tDur: Faden waechst von der Quelle zum Ziel
+   (0–35 %), pulsiert, verblasst ab 80 %. */
+.tether-animation-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10195;
+}
+.tether-animation-container svg { width: 100%; height: 100%; overflow: visible; }
+.tether-schleier, .tether-kern, .tether-fluss { fill: none; stroke-linecap: round; }
+.tether-schleier {
+  stroke: var(--tGlow, rgba(90,20,160,.85));
+  stroke-width: 16;
+  opacity: .55;
+  filter: blur(4px);
+  stroke-dasharray: calc(var(--tLen) * 1px);
+  stroke-dashoffset: calc(var(--tLen) * 1px);
+  animation: tetherWachsen var(--tDur, 1400ms) ease-out forwards, tetherVerblassen var(--tDur, 1400ms) linear forwards;
+}
+.tether-kern {
+  stroke: var(--tFarbe, #b56cff);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px var(--tFarbe, #b56cff)) drop-shadow(0 0 14px var(--tGlow, rgba(90,20,160,.85)));
+  stroke-dasharray: calc(var(--tLen) * 1px);
+  stroke-dashoffset: calc(var(--tLen) * 1px);
+  animation: tetherWachsen var(--tDur, 1400ms) ease-out forwards, tetherPuls calc(var(--tDur, 1400ms) / 5) ease-in-out infinite alternate, tetherVerblassen var(--tDur, 1400ms) linear forwards;
+}
+.tether-fluss {
+  stroke: #e7ccff;
+  stroke-width: 2;
+  stroke-dasharray: 6 18;
+  opacity: 0;
+  animation: tetherFliessen calc(var(--tDur, 1400ms) / 3) linear infinite, tetherFlussEin var(--tDur, 1400ms) linear forwards;
+}
+.tether-quelle {
+  fill: var(--tFarbe, #b56cff);
+  filter: drop-shadow(0 0 10px var(--tGlow, rgba(90,20,160,.85)));
+  opacity: 0;
+  animation: tetherQuelle var(--tDur, 1400ms) ease-out forwards;
+}
+.tether-funke {
+  fill: #f1ddff;
+  filter: drop-shadow(0 0 6px var(--tFarbe, #b56cff));
+  opacity: 0;
+  animation: tetherFunke var(--tDur, 1400ms) linear forwards;
+}
+.tether-ziel {
+  fill: none;
+  stroke: var(--tFarbe, #b56cff);
+  stroke-width: 5;
+  filter: drop-shadow(0 0 12px var(--tGlow, rgba(90,20,160,.85)));
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tetherZiel var(--tDur, 1400ms) ease-out forwards;
+}
+@keyframes tetherWachsen { 0% { stroke-dashoffset: calc(var(--tLen) * 1px); } 35%, 100% { stroke-dashoffset: 0; } }
+@keyframes tetherPuls { from { stroke-width: 3; } to { stroke-width: 6; } }
+@keyframes tetherVerblassen { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tetherFliessen { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes tetherFlussEin { 0%, 30% { opacity: 0; } 40%, 80% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes tetherQuelle { 0% { opacity: 0; r: 2px; } 20% { opacity: 1; r: 9px; } 80% { opacity: .9; r: 7px; } 100% { opacity: 0; r: 3px; } }
+@keyframes tetherFunke { 0%, 20% { opacity: 0; } 25%, 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tetherZiel { 0%, 30% { opacity: 0; transform: scale(.4); } 55% { opacity: 1; transform: scale(1); } 85% { opacity: .8; transform: scale(1.25); } 100% { opacity: 0; transform: scale(1.5); } }
 
 .beam-animation-container {
   position: fixed;
@@ -10903,11 +11176,12 @@ body:has(.modal-overlay) .tooltip {
 }
 
 /* ═══ STATUS BADGES ═══ */
+/* ★ v1342 (Als Vorgabe 24.9.): Status IMMER links in einer Spalte, von
+   OBEN nach unten — vorher mittig um die Kartenmitte zentriert. */
 .status-badges-row {
   position: absolute;
   left: -2px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 3px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -11449,6 +11723,48 @@ body:has(.modal-overlay) .tooltip {
   0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.3) rotate(0deg); }
   25%  { opacity: 1; transform: translate(calc(-50% + var(--wp-x) * 0.3), calc(-50% + var(--wp-y) * 0.2)) scale(1.2) rotate(30deg); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--wp-x)), calc(-50% + var(--wp-y))) scale(0.5) rotate(120deg); }
+}
+
+/* ★ v1342/v1343 — RECHTE SPALTE der Helden (Als Vorgabe 24.9.): Zaehler
+   ganz oben, darunter Buffs, darunter Debuffs — in EINER Spalte, ab der oberen
+   Ecke (gibt es nur Debuffs, stehen sie trotzdem oben). Die Kinder
+   verlieren ihre Einzelpositionen (`!important` schlaegt auch die
+   Inline-Stile der Zaehler); die Reihenfolge kommt aus `order`. Die
+   Buff-Spalte darin loest sich per `display: contents` auf, damit ihre
+   Symbole mit einsortiert werden. */
+.badge-spalte-rechts {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  z-index: 8;
+  pointer-events: none;
+}
+.badge-spalte-rechts > *,
+.badge-spalte-rechts .buff-column > * {
+  position: relative !important;
+  top: auto !important; right: auto !important;
+  left: auto !important; bottom: auto !important;
+  margin: 0 !important;
+  pointer-events: auto;
+}
+.badge-spalte-rechts .buff-column { display: contents; }
+.badge-zaehler { order: -1; }
+.badge-buff    { order: 0; }
+.badge-debuff  { order: 1; }
+.buff-icon.buff-icon-debuff {
+  background: rgba(200,40,40,.28);
+  border-color: rgba(255,120,120,.65);
+  box-shadow: 0 0 6px rgba(255,80,80,.35);
+  animation: none;
+}
+.status-badge.status-positiv {
+  background: rgba(40,110,60,.88);
+  border-color: rgba(140,255,160,.75);
+  filter: drop-shadow(0 0 3px rgba(80,220,120,.5));
 }
 
 .buff-column {
@@ -20665,4 +20981,55 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   --hand-editor-faktor: 0.8;
   --hand-card-w: calc(64px * var(--hand-card-scale) * var(--hand-editor-faktor));
   --hand-card-h: calc(90px * var(--hand-card-scale) * var(--hand-editor-faktor));
+}
+
+/* ── ★★ v1349 — VERSIEGELTE ZONE (Madame Guillotine) ──────────────
+   Eine Zone, deren letzte Ability bis zum Zugende verwahrt ist, ist
+   „eigentlich noch voll": rot durchgekreuzt, nichts darf hinein
+   (Als Vorgabe 24.9.). Gesetzt wird ein Datenattribut aus dem
+   Spielstand (`verwahrteZonen`), also kein von aussen geklebter Zustand. */
+[data-versiegelt="1"] {
+  background-image:
+    linear-gradient(45deg, transparent calc(50% - 3px), rgba(220, 24, 24, .9) calc(50% - 3px),
+      rgba(220, 24, 24, .9) calc(50% + 3px), transparent calc(50% + 3px)),
+    linear-gradient(-45deg, transparent calc(50% - 3px), rgba(220, 24, 24, .9) calc(50% - 3px),
+      rgba(220, 24, 24, .9) calc(50% + 3px), transparent calc(50% + 3px)) !important;
+  box-shadow: inset 0 0 0 2px rgba(220, 24, 24, .85), inset 0 0 14px rgba(160, 0, 0, .45) !important;
+}
+
+/* ★ v1359 — Aufdeck-Anzeige eines fizzelnden Effekts (engine.zeigeFizzle):
+   dasselbe Bild wie ein negiertes Kettenglied, plus Schriftzug. */
+.card-reveal-card.card-reveal-fizzled { position: relative; }
+.card-reveal-card.card-reveal-fizzled > img,
+.card-reveal-card.card-reveal-fizzled > div:last-child {
+  animation: chainGlitch .15s linear 6, chainShake .1s linear 9;
+  filter: saturate(0.3) brightness(0.7);
+}
+.card-reveal-card.card-reveal-fizzled .chain-negate-symbol { z-index: 2; pointer-events: none; }
+.card-reveal-fizzle-label {
+  position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%) rotate(-8deg);
+  z-index: 3; pointer-events: none;
+  padding: 3px 10px; border-radius: 4px;
+  background: rgba(40, 0, 0, .78); border: 2px solid var(--danger, #e04848);
+  color: #ffdede; font-size: 15px; font-weight: 700; letter-spacing: 2px;
+  text-shadow: 0 0 6px rgba(255, 60, 60, .8);
+  animation: fizzleStempel .35s cubic-bezier(.2, 1.6, .5, 1) both;
+}
+@keyframes fizzleStempel {
+  0%   { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(1.8); }
+  100% { opacity: 1; transform: translateX(-50%) rotate(-8deg) scale(1); }
+}
+
+/* ★ v1360 — Fizzeln ist eine kurze Meldung: eigener, kurzer Ablauf statt
+   der 3,5 s der normalen Aufdeck-Anzeige (Als Befund: „das graue
+   Fizzled-Frame bleibt zu lange bestehen"). Die Dauer kommt aus
+   `FIZZLE_ANZEIGE_MS` (app-board.jsx) ueber `--fizzle-ms`. */
+.card-reveal-entry.card-reveal-fizzled-weg {
+  animation: cardRevealFizzleAnim var(--fizzle-ms, 1400ms) ease-in-out forwards;
+}
+@keyframes cardRevealFizzleAnim {
+  0%   { transform: scale(0.8); opacity: 0; }
+  12%  { transform: scale(1); opacity: 1; }
+  72%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0; }
 }

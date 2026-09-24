@@ -59,6 +59,7 @@ module.exports = {
         cancellable: false,
       });
       if (pick && pick.handIndex != null) {
+        if (!(await engine.borisVerzicht(pi, 1, { source: CARD_NAME }))) /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ 
         await engine.actionDiscardHandCard(pi, pick.cardName || ps.hand[pick.handIndex], pick.handIndex, { source: CARD_NAME, _noGlow: true });
       }
     }

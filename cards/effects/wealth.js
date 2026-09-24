@@ -26,6 +26,10 @@ module.exports = {
     onResourceGain: (ctx) => {
       // Only boost during Resource Phase
       if (ctx.phaseIndex !== 1) return;
+      // v1344: NUR das Rundeneinkommen erhoehen (`_isResourceGain`), nicht
+      // jeden Gewinn in der Resource Phase. Seit Golden Ladybug gibt es dort
+      // auch Effekt-Gold — der Bonus haette sich sonst je Gewinn wiederholt.
+      if (!ctx._isResourceGain) return;
       if (ctx.playerIdx !== ctx.cardOwner) return;
       ctx.modifyAmount(4);
     },

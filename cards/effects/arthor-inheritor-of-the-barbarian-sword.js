@@ -121,7 +121,8 @@ module.exports = {
 
     // Negated by a Surprise / counter-reaction → still spend the HOPT
     // (engine handles), but skip damage-side cleanup.
-    if (attackResult?.negated) {
+    // ★ v1328: auch gefizzelt (Arthor waehrend der Kette handlungsunfaehig).
+    if (attackResult?.negated || attackResult?.fizzled) {
       delete gs._spellDamageLog;
       clearArmedArrows(engine, pi);
       return true;

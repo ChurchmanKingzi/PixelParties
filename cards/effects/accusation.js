@@ -92,7 +92,10 @@ module.exports = {
       // the canonical discard helper so onDiscard listeners (Cute
       // Hydra, Rebelliokai Kind Kitsune, etc.) fire per card.
       let discarded = 0;
-      while (true) {
+      // v1324: Boris darf den erzwungenen Abwurf ignorieren.
+      const _anzahl = (ops.hand || []).filter(trifft).length;
+      const _boris = _anzahl > 0 && await engine.borisVerzicht(oi, _anzahl, { source: CARD_NAME, sourceOwner: pi });
+      while (!_boris) {
         // v875: ueber den BASISNAMEN suchen — „Pawn of Kings [B]" und
         // „[W]" heissen beide „Pawn of Kings", ein erklaerter Name
         // trifft also beide. Abgeworfen wird die Karte unter ihrem

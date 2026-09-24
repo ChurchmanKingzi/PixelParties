@@ -161,6 +161,13 @@ const HOOKS = {
   // ── Surprise system ──
   ON_HERO_TARGETED:      'onHeroTargeted',        // Fires after a hero is confirmed as a target (surprise window)
   ON_SURPRISE_ACTIVATED: 'onSurpriseActivated',   // Fires when a surprise card is flipped face-up
+  // ★★ v1349: „uses the active effect of a Hero or Ability" (Madame
+  // Guillotine). EIN Aufruf je genutztem Aktiveffekt — mit oder ohne
+  // Aktionskosten. Kontext: { kind: 'hero'|'ability', playerIdx, heroIdx,
+  // cardName, isActionCost }. Kostet der Effekt eine Aktion, feuert
+  // ZUSAETZLICH `onAnyActionResolved`; wer beides hoert, zaehlt den
+  // Vorgang einmal (Als Ruling 24.9.: Adventurousness = EIN Ausloeser).
+  ON_ACTIVE_EFFECT_USED: 'onActiveEffectUsed',
 
   // ── Actions ──
   ON_ACTION_USED:            'onActionUsed',            // Fires when any action is consumed (spell, creature, ability activation, etc.)
@@ -369,10 +376,28 @@ const STATUS_EFFECTS = {
   // ihres urspruenglichen Besitzers. Die Sperre der uebrigen Status
   // nimmt ihn selbst aus („its OTHER status effects").
   aged:      { negative: true, cleansable: true, label: 'Aged',      icon: '⏳', immuneKey: 'aged_immune' },
+  // `soul_transmitted` (v1330, „Soul Transmigration Ritual"): Debuff am
+  // wiederbelebten Helden. NICHT ENTFERNBAR (`unremovable` — gilt fuer
+  // jede Entfernung, auch fuer Eintraege ohne `unhealable`, etwa aus dem
+  // Puzzle-Editor) und nicht heil- oder uebertragbar. Seine Wirkung ist
+  // der Loesch-Ersatz beim naechsten Besiegen (`deletesHeroOnDefeat`,
+  // gelesen von `_runHeroDefeatSequence`): Held, Ability-Zonen und alle
+  // Nicht-Creatures der Support Zones werden geloescht.
+  soul_transmitted: { negative: true, cleansable: false, unremovable: true, label: 'Soul Transmitted', icon: '🕯️',
+    deletesHeroOnDefeat: { supportPile: 'deleted' },
+    // Karte fuer den Auftritt, wenn die Anwendung keine `source` traegt
+    // (Puzzle-Editor).
+    defaultSource: 'Soul Transmigration Ritual' },
   immune:  { negative: false, label: 'Immune',  icon: '🛡️' },
   shielded:{ negative: false, label: 'Shielded', icon: '✨' },
   // Storm Piano (v628): verhindert jeden normalen Schaden bis zum Ende des naechsten eigenen Zuges.
-  damage_proof: { negative: false, label: 'Damage-proof', icon: '🛡️' },
+  // ★ v1341: `blocksDamage` — der Schadenspfad fragt das Flag, nicht mehr den Namen.
+  damage_proof: { negative: false, label: 'Damage-proof', icon: '🛡️', blocksDamage: true },
+  // Cheat Chair (v1341): „any damage that Hero would take for the rest of
+  // the turn becomes 0" — eigener Status mit eigenem Abzeichen (Als
+  // Vorgabe 24.9.). `endsAtTurnEnd`: endet am Ende GENAU des Zuges, in
+  // dem er entstand (`armedTurn`), egal wessen Zug das ist.
+  cheat_chair_guard: { negative: false, label: 'Cheat Chair', icon: '🪑', blocksDamage: true, endsAtTurnEnd: true },
 };
 
 function getNegativeStatuses() {

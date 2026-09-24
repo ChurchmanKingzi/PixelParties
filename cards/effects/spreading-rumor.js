@@ -141,7 +141,10 @@ module.exports = {
       // batch — multi-copy reveals (Glass of Marbles, Skull Necklace,
       // etc.) all resolve their on-discard reactors AFTER every copy
       // has hit the pile, matching the engine-wide ordering.
-      const discarded = await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
+      // v1324: Boris darf den erzwungenen Abwurf ignorieren.
+      const _anzahl = (ops.hand || []).filter(trifft).length;
+      const _boris = _anzahl > 0 && await engine.borisVerzicht(oi, _anzahl, { source: CARD_NAME, sourceOwner: 1 - oi });
+      const discarded = _boris ? 0 : await engine.withDiscardBatch(oi, { source: CARD_NAME }, async () => {
         let n = 0;
         while (true) {
           // v875: Basisname (siehe Accusation) — abgeworfen wird unter

@@ -543,7 +543,9 @@ module.exports = {
       }
       // Creativity-mirror draw when an ability lands on Lizbeth's own
       // slot (the handler does its own gate).
-      if (ctx.toZone === 'ability') {
+      // v1352: die Rueckkehr einer verwahrten Ability ist kein Anlegen —
+      // die Neuberechnungen oben laufen, der Creativity-Zug nicht.
+      if (ctx.toZone === 'ability' && !ctx._verwahrungRueckkehr) {
         return handleCreativityMirror(ctx);
       }
     },

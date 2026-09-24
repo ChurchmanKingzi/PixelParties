@@ -249,7 +249,7 @@ module.exports = {
 
         const res = await engine.summonCreatureWithHooks(
           CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
-          { source: `${CARD_NAME} trigger` },
+          { source: `${CARD_NAME} trigger`, alsZusatzaktion: true },   // v1349: ist eine Aktion
         );
         if (!res) {
           ps.hand.push(CARD_NAME);

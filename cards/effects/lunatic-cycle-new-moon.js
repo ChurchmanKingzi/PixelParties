@@ -91,7 +91,7 @@ module.exports = {
     });
     if (!pick || pick.cancelled || pick.cardName == null) return false;
     // Flug vom Hand-Slot zur Ablage kommt seit v696 aus dem Helfer.
-    const ok = await engine.actionDiscardHandCard(pi, pick.cardName, pick.handIndex, {
+    const ok = /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, pick.cardName, pick.handIndex, {
       source: CARD_NAME,
     });
     if (!ok) return false;

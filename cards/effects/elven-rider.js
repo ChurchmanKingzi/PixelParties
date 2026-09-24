@@ -235,6 +235,7 @@ module.exports = {
       const slot = ps.supportZones?.[death.heroIdx]?.[death.zoneSlot];
       if (slot && slot.length > 0) {
         engine.log('elven_rider_fizzle', { player: ps.username, reason: 'slot_occupied' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
         return;
       }
 
@@ -265,6 +266,7 @@ module.exports = {
           // Extremely unlikely (no free slot after all). Put back.
           ps.hand.push(CARD_NAME);
           engine.log('elven_rider_fizzle', { player: ps.username, reason: 'place_refused' });
+          await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
           return;
         }
 

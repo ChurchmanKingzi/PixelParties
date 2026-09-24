@@ -109,11 +109,16 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // discarded — Cooldin's hero effect still counts as "used".
   const chainResult = await engine.executeCardWithChain({
     cardName, owner: pi, heroIdx, cardType: areaCardType, goldCost: 0,
+    // v1323: aus dem DECK gespielt ist kein Spiel „from their hand" —
+    // The Master's Plan darf dann nicht negieren.
+    fromBoard: !!fromDeck,
   });
-  if (chainResult.negated) {
+  // ★ v1328: gefizzelt (Cooldin waehrend der Kette handlungsunfaehig) —
+  // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
+  if (chainResult.negated || chainResult.fizzled) {
     ps.hand.splice(handIndex, 1);
     ps.discardPile.push(cardName);
-    engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
+    if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
   }
 

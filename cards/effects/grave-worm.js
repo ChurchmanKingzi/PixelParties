@@ -227,7 +227,10 @@ module.exports = {
       const dpIdx = (ps.discardPile || []).indexOf(CARD_NAME);
       if (dpIdx < 0) return;
       const sup2 = ps.supportZones?.[death.heroIdx] || [];
-      if ((sup2[death.zoneSlot] || []).length !== 0) return;
+      if ((sup2[death.zoneSlot] || []).length !== 0) {
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+        return;
+      }
 
       // Claim the per-turn lock now that the player has committed.
       if (!engine.claimHOPT(HOPT_KEY, pi)) return;
@@ -259,6 +262,7 @@ module.exports = {
         // Roll back if the placement failed for any defensive reason.
         if (gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`];
         ps.discardPile.push(CARD_NAME);
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }
 

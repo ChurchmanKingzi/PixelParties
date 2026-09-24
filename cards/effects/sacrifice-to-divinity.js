@@ -179,29 +179,9 @@ module.exports = {
       // length < 3) or the first empty slot.
       const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
       ps.abilityZones[targetHeroIdx] = abZones;
-      let targetZone = -1;
-      const isLegalZone = (z) => {
-        const slot = abZones[z] || [];
-        if (slot.length === 0) return true;
-        if (slot[0] === DIVINITY && slot.length < 3) return true;
-        return false;
-      };
-      if (explicitZone >= 0 && explicitZone < 3 && isLegalZone(explicitZone)) {
-        targetZone = explicitZone;
-      } else {
-        // Prefer stacking on an existing Divinity slot, then fall back
-        // to the first empty slot (matches the standard ability-attach
-        // tie-breaker).
-        for (let z = 0; z < 3; z++) {
-          const slot = abZones[z] || [];
-          if (slot.length > 0 && slot[0] === DIVINITY && slot.length < 3) { targetZone = z; break; }
-        }
-        if (targetZone < 0) {
-          for (let z = 0; z < 3; z++) {
-            if ((abZones[z] || []).length === 0) { targetZone = z; break; }
-          }
-        }
-      }
+      // v1349: gewuenschter Platz und Rueckfall an EINER Stelle
+      // (`engine.abilityZielZone` — verwahrte Abilities, Madame Guillotine).
+      const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
       if (targetZone < 0) {
         // Race: zones filled between check and now. Refund Divinity
         // back to its source so it isn't silently lost.

@@ -198,26 +198,9 @@ module.exports = {
     // ability-attach path uses.
     const abZones = ps.abilityZones[targetHeroIdx] || [[], [], []];
     ps.abilityZones[targetHeroIdx] = abZones;
-    const isLegalZone = (z) => {
-      const slot = abZones[z] || [];
-      if (slot.length === 0) return true;
-      if (slot[0] === DIVINITY && slot.length < 3) return true;
-      return false;
-    };
-    let targetZone = -1;
-    if (explicitZone >= 0 && explicitZone < 3 && isLegalZone(explicitZone)) {
-      targetZone = explicitZone;
-    } else {
-      for (let z = 0; z < 3; z++) {
-        const slot = abZones[z] || [];
-        if (slot.length > 0 && slot[0] === DIVINITY && slot.length < 3) { targetZone = z; break; }
-      }
-      if (targetZone < 0) {
-        for (let z = 0; z < 3; z++) {
-          if ((abZones[z] || []).length === 0) { targetZone = z; break; }
-        }
-      }
-    }
+    // v1349: gewuenschter Platz und Rueckfall an EINER Stelle
+    // (`engine.abilityZielZone` — verwahrte Abilities, Madame Guillotine).
+    const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY, { wunschZone: explicitZone });
     if (targetZone < 0) {
       // Race: zones filled between the canAttach check and the splice.
       // Refund the Divinity back to its source pile so it isn't lost.

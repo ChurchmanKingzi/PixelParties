@@ -1180,7 +1180,12 @@ function ppJetzt() {
   return (typeof performance !== 'undefined' ? performance.now() : Date.now());
 }
 
-function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand }) {
+function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0, ausHand, startW, startH, endW }) {
+  // ★ v1331: Brettquellen bringen ihr Bildschirmmass mit (`startW/H`, aus
+  // `kartenMassAmBildschirm`) und das des Zielstapels (`endW`). Die Karte
+  // startet dann exakt so gross wie auf dem Brett und endet in
+  // Stapelgroesse — nie kleiner als das Kleinere von beiden (Als Regel).
+  const mitMass = startW > 0 && startH > 0 && endW > 0;
   // ★ v1259 (Als Befund 20.9.: „beim Zurueckmischen von Handkarten ins
   // Potion- UND Main-Deck liegen die Karten zu weit unten/rechts — als
   // wuerde ueber der oberen linken Ecke statt der Mitte zentriert").
@@ -1241,6 +1246,11 @@ function DiscardAnimCard({ cardName, startX, startY, endX, endY, dest, delay, t0
            Brettquellen behalten ihr Zonenmass. */
         + (ausHand ? ' discard-anim-hand' : '')}
       style={{ left: startX, top: startY, '--dx': dx, '--dy': dy,
+        ...(mitMass ? {
+          width: startW + 'px', height: startH + 'px',
+          '--flug-w': startW + 'px', '--flug-h': startH + 'px',
+          '--dfScale': (endW / startW).toFixed(4),
+        } : {}),
         animationDelay: versatz ? versatz + 'ms' : undefined }}>
       <div className="board-card" style={{ width: '100%', height: '100%' }}>
         {imgUrl ? <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
@@ -1297,6 +1307,49 @@ function flugMass(ort) {
   return { b: 64 * m, h: 90 * m };
 }
 if (typeof window !== 'undefined') window.flugMass = flugMass;
+
+// ★ v1331 (Als Regel 24.9.): „Karten sollten beim Bewegen von Board zu
+// Pile nie kleiner werden als sie auf dem Board waren ODER kleiner als
+// der Ziel-Pile (was kleiner ist)."
+//
+// `flugMass` kennt nur die Stylesheet-Masse. Was der Spieler SIEHT, ist
+// groesser: Kamera-Zoom und die Perspektive der geneigten Brettebene
+// vergroessern die Brettkarten. Eine Geisterkarte im Stylesheet-Mass
+// war deshalb beim Abheben sichtbar kleiner als ihr Vorbild — sie
+// „schrumpfte", bevor die Bewegung begann. Hier wird das Mass am
+// Bildschirm abgenommen: die Karte IN der Zone (`.board-card`), sonst
+// die Zone selbst. Die Hoehe folgt aus der Breite (die Neigung staucht
+// nur die Hoehe des Umrisses, die Flugkarte neigt sich selbst).
+function kartenMassAmBildschirm(el, ort) {
+  const basis = flugMass(ort);
+  if (!el || typeof el.getBoundingClientRect !== 'function') return basis;
+  const karte = (typeof el.querySelector === 'function' && el.querySelector('.board-card')) || el;
+  const r = karte.getBoundingClientRect();
+  if (!(r.width > 4)) return basis;
+  return { b: r.width, h: r.width * (basis.h / basis.b) };
+}
+if (typeof window !== 'undefined') window.kartenMassAmBildschirm = kartenMassAmBildschirm;
+
+// ★★ v1355 (Als Befund zu „Lone Survivor": „die Creature ist beim Flug
+// Discard → Zone etwas kleiner, als sie am Ende in der Zone angezeigt
+// wird"). Ein Flug INS Brett endete im Stylesheet-Mass (`flugMass('brett')`)
+// — ohne Kamera-Zoom und Perspektive, also kleiner als die Karte, die dann
+// dort liegt. Das Ziel wird jetzt am Bildschirm gemessen, genau wie eine
+// Brett-QUELLE seit v1331. Liegt in der Zielzone noch keine Karte (der
+// Normalfall: sie kommt ja erst an), misst die Zone selbst — die ist um
+// den Rahmen breiter als die Karte in ihr (`--zone-w` 68 zu 64 je
+// `--board-scale`), deshalb der Abzug.
+const ZONE_ZU_KARTE = 64 / 68;
+function kartenMassInZone(el) {
+  if (!el || typeof el.getBoundingClientRect !== 'function') return flugMass('brett');
+  const karte = typeof el.querySelector === 'function' && el.querySelector('.board-card');
+  if (karte && karte.getBoundingClientRect().width > 4) return kartenMassAmBildschirm(el, 'brett');
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 4)) return flugMass('brett');
+  const b = r.width * ZONE_ZU_KARTE;
+  return { b, h: b * (90 / 64) };
+}
+if (typeof window !== 'undefined') window.kartenMassInZone = kartenMassInZone;
 
 // ═══════════════════════════════════════════
 //  NEIGUNG FLIEGENDER KARTEN
@@ -1630,25 +1683,36 @@ function CardRevealOverlay({ reveals, onRemove }) {
   return (
     <div className="card-reveal-stack">
       {reveals.map((rev, idx) => (
-        <CardRevealEntry key={rev.id} cardName={rev.cardName} onDone={() => onRemove(rev.id)} />
+        <CardRevealEntry key={rev.id} cardName={rev.cardName} fizzled={rev.fizzled} onDone={() => onRemove(rev.id)} />
       ))}
     </div>
   );
 }
 
-function CardRevealEntry({ cardName, onDone }) {
+// ★ v1359 — `fizzled`: dieselbe Bildsprache wie ein negiertes Kettenglied
+// (Glitch, entsaettigt, 🚫) plus das Wort „FIZZLED" — der Effekt wurde
+// ausgeloest, konnte aber nichts mehr tun (`engine.zeigeFizzle`).
+const FIZZLE_ANZEIGE_MS = 1400;
+function CardRevealEntry({ cardName, onDone, fizzled }) {
   const card = CARDS_BY_NAME[cardName];
   const imgUrl = card ? cardImageUrl(card.name) : null;
   const foilType = card?.foil || null;
+  // v1360 (Als Befund: „die gefizzelte Karte bleibt deutlich zu lange
+  // sichtbar"): ein Fizzeln ist eine kurze Meldung — 1,4 s statt 3,5 s,
+  // die letzten 300 ms blendet es aus (`.card-reveal-fizzled-weg`).
+  const lebensdauer = fizzled ? FIZZLE_ANZEIGE_MS : 3500;
   useEffect(() => {
-    const t = setTimeout(onDone, 3500);
+    const t = setTimeout(onDone, lebensdauer);
     return () => { clearTimeout(t); setBoardTooltip(null); }; // Clear tooltip on unmount
   }, []);
   if (!card) return null;
   return (
-    <div className="card-reveal-entry"
+    <div className={'card-reveal-entry' + (fizzled ? ' card-reveal-fizzled-weg' : '')}
+      style={fizzled ? { '--fizzle-ms': FIZZLE_ANZEIGE_MS + 'ms' } : undefined}
       onMouseEnter={() => setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}>
-      <div className="card-reveal-card">
+      <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
+        {fizzled && <div className="chain-negate-symbol">🚫</div>}
+        {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
         {imgUrl ? (
           <img src={imgUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6,
             border: foilType === 'diamond_rare' ? '3px solid rgba(120,200,255,.7)' : foilType === 'secret_rare' ? '3px solid rgba(255,215,0,.6)' : '2px solid var(--bg4)' }} draggable={false} />
@@ -2199,6 +2263,365 @@ function LightningRainEffect({ x, y, w = 80, h = 110 }) {
 // ── Nebelschleier (Chasing the Legend, v618) ───────────────────────
 // Weisse Nebelschwaden quellen um die Karte auf, waehrend sie (per
 // `play_cloak_vanish`) verblasst. Klang `elem_wind` tief.
+// ── Kernexplosion (Core Explosion, v1334) ──────────────────────────
+// Der Kern der gefallenen Creature platzt: dunkler Kern mit roten
+// Rissen schwillt an, weiss-tuerkiser Blitz, zwei Druckwellen, zackige
+// Entladungsbogen nach allen Seiten und Funken (Kartenbild als Vorlage).
+// Klang aus der Komponente, zwei Schichten ohne Kategorie (Regel ⑤):
+// schwerer Einschlag + Elektrizitaet. Keyframes in style.css (Regel ④).
+function CoreExplosionEffect({ x, y, w = 80 }) {
+  const r = Math.max(70, w * 1.5);
+  const boegen = useMemo(() => Array.from({ length: ppFxN(10) }, (_, i) => {
+    const winkel = (i / 10) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const laenge = r * (0.9 + Math.random() * 0.8);
+    const punkte = [];
+    const N = 6;
+    for (let k = 0; k <= N; k++) {
+      const t = k / N;
+      const quer = (Math.random() - 0.5) * 22 * Math.sin(Math.PI * t);
+      punkte.push(`${Math.cos(winkel) * laenge * t - Math.sin(winkel) * quer},${Math.sin(winkel) * laenge * t + Math.cos(winkel) * quer}`);
+    }
+    return { punkte: punkte.join(' '), verzug: 60 + Math.random() * 160 };
+  }), [r]);
+  const funken = useMemo(() => Array.from({ length: ppFxN(22) }, () => {
+    const winkel = Math.random() * Math.PI * 2;
+    const weite = r * (0.6 + Math.random() * 0.9);
+    return {
+      dx: Math.cos(winkel) * weite, dy: Math.sin(winkel) * weite,
+      groesse: 4 + Math.random() * 6,
+      farbe: ['#8ff4ff', '#ffffff', '#ff6fd8', '#5ad1ff'][Math.floor(Math.random() * 4)],
+      verzug: 80 + Math.random() * 200,
+    };
+  }), [r]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('heavy_impact', { rate: 0.7, volume: 1 }, 60);
+    spiel('elem_lightning', { rate: 0.9, volume: 0.9 }, 0);
+  }, []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10205 }}>
+      <div className="anim-core-kern" style={{ width: r * 0.7, height: r * 0.7, left: -r * 0.35, top: -r * 0.35 }} />
+      <div className="anim-core-blitz" style={{ width: r * 2.2, height: r * 2.2, left: -r * 1.1, top: -r * 1.1 }} />
+      <div className="anim-core-welle" style={{ width: r * 2, height: r * 2, left: -r, top: -r }} />
+      <div className="anim-core-welle anim-core-welle-2" style={{ width: r * 2, height: r * 2, left: -r, top: -r }} />
+      <svg className="anim-core-boegen" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }} width="1" height="1">
+        {boegen.map((b, i) => (
+          <polyline key={i} points={b.punkte} className="anim-core-bogen" style={{ animationDelay: b.verzug + 'ms' }} />
+        ))}
+      </svg>
+      {funken.map((f, i) => (
+        <div key={i} className="anim-core-funke" style={{
+          width: f.groesse, height: f.groesse, left: -f.groesse / 2, top: -f.groesse / 2,
+          background: f.farbe, boxShadow: `0 0 10px ${f.farbe}, 0 0 20px ${f.farbe}`,
+          '--fdx': f.dx + 'px', '--fdy': f.dy + 'px', animationDelay: f.verzug + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Gedaechtnisloeschung (Memory Wipe, v1335) ─────────────────────
+// Kartenbild als Vorlage: ein violetter Runenkreis mit Fadenkreuz legt
+// sich ueber den Helden und zieht sich zusammen, in der Mitte pulsiert
+// ein tuerkis-weisser Funke — dann loesen sich Erinnerungsfragmente
+// (kleine Pixel-Splitter) und steigen verblassend auf. Klang aus der
+// Komponente, zwei Schichten ohne Kategorie (Regel ⑤). Keyframes in
+// style.css (Regel ④).
+function MemoryWipeEffect({ x, y, w = 80 }) {
+  const r = Math.max(46, w * 0.75);
+  const splitter = useMemo(() => Array.from({ length: ppFxN(16) }, () => ({
+    dx: (Math.random() - 0.5) * r * 1.6,
+    dy: -(r * 0.6 + Math.random() * r * 1.1),
+    sx: (Math.random() - 0.5) * r * 1.1,
+    sy: (Math.random() - 0.5) * r * 0.9,
+    groesse: 3 + Math.random() * 4,
+    farbe: ['#b98cff', '#8a5cff', '#9ff3ff', '#ffffff'][Math.floor(Math.random() * 4)],
+    verzug: 380 + Math.random() * 380,
+  })), [r]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('elem_dark', { rate: 1.1, volume: 0.9 }, 0);
+    spiel('reveal', { rate: 0.7, volume: 0.8 }, 380);
+  }, []);
+  const striche = [0, 90, 180, 270];
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10205 }}>
+      <svg className="anim-mw-rune" width={r * 2} height={r * 2} viewBox={`${-r} ${-r} ${r * 2} ${r * 2}`}
+        style={{ position: 'absolute', left: -r, top: -r, overflow: 'visible' }}>
+        <circle r={r * 0.82} className="anim-mw-ring" />
+        <circle r={r * 0.5} className="anim-mw-ring anim-mw-ring-innen" />
+        {striche.map(g => {
+          const a = g * Math.PI / 180;
+          return <line key={g} className="anim-mw-strich"
+            x1={Math.cos(a) * r * 0.58} y1={Math.sin(a) * r * 0.58}
+            x2={Math.cos(a) * r * 1.02} y2={Math.sin(a) * r * 1.02} />;
+        })}
+      </svg>
+      <div className="anim-mw-funke" style={{ width: r * 0.5, height: r * 0.5, left: -r * 0.25, top: -r * 0.25 }} />
+      {splitter.map((s, i) => (
+        <div key={i} className="anim-mw-splitter" style={{
+          width: s.groesse, height: s.groesse, left: s.sx - s.groesse / 2, top: s.sy - s.groesse / 2,
+          background: s.farbe, boxShadow: `0 0 6px ${s.farbe}`,
+          '--mdx': s.dx + 'px', '--mdy': s.dy + 'px', animationDelay: s.verzug + 'ms',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Wutausbruch (Furious Anger, v1336) ──────────────────────────────
+// Kartenbild als Vorlage: das Manga-Wutzeichen — ein weisser, schwarz
+// umrandeter Zackenstern mit zwei roten „!" — ploppt ueber dem Helden
+// auf, federt und zittert; der Held selbst glueht rot, Dampfwoelkchen
+// steigen auf. Das Feuer der Karte ist nur Stimmung: ein paar Flammen-
+// zungen am Kartenfuss. Klang aus der Komponente, zwei Schichten ohne
+// Kategorie (Regel ⑤). Keyframes in style.css (Regel ④).
+function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
+  const s = Math.max(40, w * 0.62);
+  const zacken = useMemo(() => {
+    const n = 11, pts = [];
+    for (let i = 0; i < n * 2; i++) {
+      const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 === 0 ? s : s * (0.52 + Math.random() * 0.12);
+      pts.push(`${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`);
+    }
+    return pts.join(' ');
+  }, [s]);
+  const dampf = useMemo(() => Array.from({ length: ppFxN(6) }, (_, i) => ({
+    dx: (i % 2 === 0 ? -1 : 1) * (w * 0.25 + Math.random() * w * 0.2),
+    verzug: 250 + i * 110, groesse: 12 + Math.random() * 10,
+  })), [w]);
+  const flammen = useMemo(() => Array.from({ length: ppFxN(7) }, (_, i) => ({
+    dx: (i / 6 - 0.5) * w * 1.1, hoehe: h * (0.25 + Math.random() * 0.25), verzug: Math.random() * 300,
+  })), [w, h]);
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('critical_strike', { rate: 1.2, volume: 0.9 }, 0);
+    spiel('elem_fire', { rate: 0.8, volume: 0.7 }, 120);
+  }, []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10205 }}>
+      <div className="anim-fa-glut" style={{ width: w * 1.3, height: h * 1.2, left: -w * 0.65, top: -h * 0.6 }} />
+      {flammen.map((f, i) => (
+        <div key={'f' + i} className="anim-fa-flamme" style={{
+          left: f.dx - 7, top: h * 0.5 - f.hoehe, width: 14, height: f.hoehe, animationDelay: f.verzug + 'ms',
+        }} />
+      ))}
+      {dampf.map((d, i) => (
+        <div key={'d' + i} className="anim-fa-dampf" style={{
+          left: d.dx - d.groesse / 2, top: -h * 0.35, width: d.groesse, height: d.groesse, animationDelay: d.verzug + 'ms',
+        }} />
+      ))}
+      <svg className="anim-fa-zeichen" width={s * 2.4} height={s * 2.4} viewBox={`${-s * 1.2} ${-s * 1.2} ${s * 2.4} ${s * 2.4}`}
+        style={{ position: 'absolute', left: -s * 1.2 + w * 0.15, top: -h * 0.55 - s * 1.2, overflow: 'visible' }}>
+        <polygon points={zacken} fill="#ffffff" stroke="#111" strokeWidth="3" strokeLinejoin="miter" />
+        <rect x={-s * 0.28} y={-s * 0.42} width={s * 0.16} height={s * 0.55} fill="#8b0d0d" />
+        <rect x={-s * 0.28} y={s * 0.2} width={s * 0.16} height={s * 0.16} fill="#8b0d0d" />
+        <rect x={s * 0.1} y={-s * 0.42} width={s * 0.16} height={s * 0.55} fill="#8b0d0d" />
+        <rect x={s * 0.1} y={s * 0.2} width={s * 0.16} height={s * 0.16} fill="#8b0d0d" />
+      </svg>
+    </div>
+  );
+}
+
+// ── Goldene Aura (Cheat Chair, v1341 — neu gebaut) ─────────────────
+// Als Vorgabe: „eine goldene Aura, die den Hero umhuellt, wie bei einem
+// Super-Saiyajin". Die CSS-Fassung aus v1340 war zu steif — und wurde
+// obendrein nach 1 s abgeschnitten (Zonen-Animationen leben ohne
+// `duration` nur 1000 ms). Jetzt ein kleines Partikelsystem auf einer
+// Leinwand mit additiver Mischung:
+//   • Flammenpartikel steigen rund um den Kartenrand auf und werden beim
+//     Steigen zur Mitte gezogen — die typische, nach oben spitz
+//     zulaufende Aura-Silhouette, die ueber der Karte zusammenschlaegt;
+//   • weiches goldenes Gluehen hinter allem, das pulsiert, und ein
+//     leuchtender Kartenrand;
+//   • Auftakt: Lichtblitz und Druckring; zwischendurch blau-weisse
+//     Entladungen am Kartenrand (Super-Saiyajin 2).
+// Dauer 2,2 s (der Server gibt sie mit), Handy: weniger Partikel.
+// Klang aus der Komponente, drei Schichten ohne Kategorie (Regel ⑤).
+const SUPER_AURA_MS = 2200;
+function SuperAuraEffect({ x, y, w = 80, h = 110 }) {
+  const ref = useRef(null);
+  const W = Math.round(w * 2.8), H = Math.round(h * 2.9);
+  const cx = W / 2, cy = H * 0.6;
+  useEffect(() => {
+    const spiel = (name, opts, at) => setTimeout(() => { if (window.playSFX) window.playSFX(name, { ...opts, dedupe: 0 }); }, at);
+    spiel('ascension', { rate: 1.0, volume: 1 }, 0);
+    spiel('elem_wind', { rate: 0.65, volume: 0.55 }, 90);
+    spiel('elem_lightning', { rate: 1.35, volume: 0.45 }, 520);
+
+    const cv = ref.current;
+    if (!cv) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = W * dpr; cv.height = H * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const k = h / 110;                                   // Massstab zur Kartengroesse
+    const hw = w / 2, hh = h / 2;
+
+    // Vorgerenderte Leuchtpunkte (weich, additiv) — drei Farbstufen.
+    const sprite = (stops) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      stops.forEach(([o, col]) => gr.addColorStop(o, col));
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      return c;
+    };
+    const SP_KERN = sprite([[0, 'rgba(255,255,235,1)'], [0.35, 'rgba(255,240,150,.8)'], [1, 'rgba(255,200,40,0)']]);
+    const SP_GOLD = sprite([[0, 'rgba(255,230,110,.95)'], [0.45, 'rgba(255,190,30,.55)'], [1, 'rgba(255,150,0,0)']]);
+    const SP_ROT  = sprite([[0, 'rgba(255,190,60,.7)'], [0.5, 'rgba(255,120,10,.35)'], [1, 'rgba(255,80,0,0)']]);
+
+    // Punkt auf dem (leicht vergroesserten) Kartenrand; Seiten und Boden
+    // bekommen mehr Flammen als die Oberkante (dort schlaegt die Aura zusammen).
+    const randPunkt = () => {
+      const pad = 5 * k;
+      const r = Math.random();
+      if (r < 0.36) return { x: cx - hw - pad, y: cy - hh + Math.random() * h };
+      if (r < 0.72) return { x: cx + hw + pad, y: cy - hh + Math.random() * h };
+      if (r < 0.9)  return { x: cx - hw + Math.random() * w, y: cy + hh + pad };
+      return { x: cx - hw + Math.random() * w, y: cy - hh - pad };
+    };
+
+    const teile = [];
+    const rate = ppFxN(300);                             // Partikel je Sekunde
+    let rest = 0;
+    const entladungen = [];
+    let naechsteEntladung = 380;
+    const t0 = performance.now();
+    let letzte = t0, raf = 0;
+
+    const huelle = (t) => {
+      if (t < 260) { const q = t / 260; return 1 - (1 - q) * (1 - q); }
+      if (t < 1650) return 0.88 + 0.12 * Math.sin(t / 70);
+      return Math.max(0, 1 - (t - 1650) / (SUPER_AURA_MS - 1650));
+    };
+
+    const schritt = (jetzt) => {
+      const t = jetzt - t0;
+      const dt = Math.min(0.05, (jetzt - letzte) / 1000);
+      letzte = jetzt;
+      const env = huelle(t);
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Gluehen hinter allem (pulsierend, oben etwas hoeher gezogen).
+      if (env > 0) {
+        ctx.save();
+        ctx.translate(cx, cy - hh * 0.25);
+        ctx.scale(1, 1.45);
+        const R = Math.max(w, h) * 0.95;
+        const g = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R);
+        g.addColorStop(0, `rgba(255,225,90,${0.42 * env})`);
+        g.addColorStop(0.55, `rgba(255,180,20,${0.22 * env})`);
+        g.addColorStop(1, 'rgba(255,140,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // Auftakt: Blitz + Druckring.
+      if (t < 520) {
+        const q = t / 520;
+        const R = Math.max(w, h) * (0.4 + q * 1.1);
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+        g.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - q)})`);
+        g.addColorStop(0.5, `rgba(255,240,160,${0.5 * (1 - q)})`);
+        g.addColorStop(1, 'rgba(255,210,60,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(255,236,150,${0.85 * (1 - q)})`;
+        ctx.lineWidth = 4 * k * (1 - q) + 1;
+        ctx.beginPath(); ctx.ellipse(cx, cy, hw * (1 + q * 1.6), hh * (1 + q * 1.2), 0, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // Neue Flammenpartikel.
+      if (t < 1720) {
+        rest += rate * dt * (0.4 + 0.6 * env);
+        while (rest >= 1) {
+          rest -= 1;
+          const p = randPunkt();
+          const leben = 0.42 + Math.random() * 0.4;
+          teile.push({
+            x: p.x, y: p.y,
+            vx: (p.x - cx) / hw * 18 * k + (Math.random() - 0.5) * 20 * k,
+            vy: -(150 + Math.random() * 160) * k,
+            r: (8 + Math.random() * 12) * k,
+            leben, alter: 0,
+            phase: Math.random() * Math.PI * 2,
+            art: Math.random(),
+          });
+        }
+      }
+
+      // Partikel bewegen und zeichnen: zur Mitte gezogen, je hoeher, desto staerker.
+      for (let i = teile.length - 1; i >= 0; i--) {
+        const q = teile[i];
+        q.alter += dt;
+        const f = q.alter / q.leben;
+        if (f >= 1) { teile.splice(i, 1); continue; }
+        const ueber = Math.max(0, (cy - hh) - q.y);          // Hoehe ueber der Oberkante
+        q.vx += (-(q.x - cx) * (2.2 + ueber / (h * 0.25))) * dt;
+        q.vy -= 60 * k * dt;
+        q.x += (q.vx + Math.sin(q.phase + q.alter * 14) * 22 * k) * dt;
+        q.y += q.vy * dt;
+        const r = q.r * (1 - f * 0.75);
+        const a = (f < 0.15 ? f / 0.15 : 1 - (f - 0.15) / 0.85) * env;
+        const bild = f < 0.3 && q.art > 0.45 ? SP_KERN : (f < 0.7 ? SP_GOLD : SP_ROT);
+        ctx.globalAlpha = Math.max(0, Math.min(1, a));
+        ctx.drawImage(bild, q.x - r, q.y - r * 1.25, r * 2, r * 2.5);   // leicht in die Hoehe gezogen
+      }
+      ctx.globalAlpha = 1;
+
+      // Leuchtender Kartenrand.
+      if (env > 0) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(255,215,60,1)';
+        ctx.shadowBlur = 14 * k;
+        ctx.strokeStyle = `rgba(255,236,140,${0.75 * env})`;
+        ctx.lineWidth = 2.5 * k;
+        const rr = 6 * k;
+        ctx.beginPath();
+        ctx.moveTo(cx - hw + rr, cy - hh); ctx.lineTo(cx + hw - rr, cy - hh);
+        ctx.quadraticCurveTo(cx + hw, cy - hh, cx + hw, cy - hh + rr); ctx.lineTo(cx + hw, cy + hh - rr);
+        ctx.quadraticCurveTo(cx + hw, cy + hh, cx + hw - rr, cy + hh); ctx.lineTo(cx - hw + rr, cy + hh);
+        ctx.quadraticCurveTo(cx - hw, cy + hh, cx - hw, cy + hh - rr); ctx.lineTo(cx - hw, cy - hh + rr);
+        ctx.quadraticCurveTo(cx - hw, cy - hh, cx - hw + rr, cy - hh);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Blau-weisse Entladungen am Rand.
+      if (t >= naechsteEntladung && t < 1600) {
+        naechsteEntladung = t + 170 + Math.random() * 230;
+        const seite = Math.random() < 0.5 ? -1 : 1;
+        let px = cx + seite * (hw + 4 * k), py = cy - hh + Math.random() * h * 0.7;
+        const pts = [[px, py]];
+        for (let j = 0; j < 5; j++) { px += seite * (Math.random() * 10 - 2) * k; py += (6 + Math.random() * 12) * k; pts.push([px + (Math.random() - 0.5) * 10 * k, py]); }
+        entladungen.push({ pts, bis: t + 110 });
+      }
+      for (let i = entladungen.length - 1; i >= 0; i--) {
+        const e = entladungen[i];
+        if (t > e.bis) { entladungen.splice(i, 1); continue; }
+        ctx.save();
+        ctx.shadowColor = '#7fdcff'; ctx.shadowBlur = 10 * k;
+        ctx.strokeStyle = 'rgba(235,250,255,.95)'; ctx.lineWidth = 1.8 * k; ctx.lineJoin = 'round';
+        ctx.beginPath(); e.pts.forEach(([a, b], j) => (j ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); ctx.stroke();
+        ctx.restore();
+      }
+
+      if (t < SUPER_AURA_MS) raf = requestAnimationFrame(schritt);
+      else ctx.clearRect(0, 0, W, H);
+    };
+    raf = requestAnimationFrame(schritt);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10205 }}>
+      <canvas ref={ref} style={{ position: 'absolute', left: -cx, top: -cy, width: W, height: H }} />
+    </div>
+  );
+}
+
 function MistVeilEffect({ x, y, w = 80, h = 110 }) {
   const wisps = useMemo(() => Array.from({ length: ppFxN(14) }, () => ({
     xOff: (Math.random() - 0.5) * w * 1.4,
@@ -7777,6 +8200,8 @@ const REAKTIONS_ANLAESSE = {
   creature_pre_defeat_reaction:   'a Creature was about to be defeated',
   creature_defeated_reaction:     'a Creature was defeated',
   creatures_defeated_reaction:    'Creatures were defeated',   // v1292 Sammel-Fenster
+  board_discard_reaction:         'their card was sent to the discard pile',   // v1336 Furious Anger
+  hero_defeated_reaction:         'their Hero was defeated',   // v1340 Cheat Chair
   after_damage_reaction:          'damage had landed',
   after_creature_damage_reaction: 'a Creature had taken damage',
   creature_damage_batch_reaction: 'Creatures had taken damage',
@@ -7855,6 +8280,37 @@ function nukeLayout(w, h) {
 // Wichtig fuer die `useMemo`-Abhaengigkeiten in den Animationen: die
 // Funktion ist konstant und liest nur `window.ppIsPhone`, der Wert ist
 // also fuer die Lebensdauer einer Animation stabil.
+// ★★ v1349 — VERWAHRTE ABILITIES (Madame Guillotine), Spiegel der
+// Engine-Regeln aus `_ability-verwahrung-shared.js` fuer die Anzeige und
+// das Ablegen per Maus. Der Server bleibt massgeblich; hier geht es nur
+// darum, dass der Client nichts anbietet, was der Server ablehnt.
+//   ppVerwahrung(spieler, hi, kind, z) → { anzahl, name, versiegelt }
+//   ppAbilityZoneOk(spieler, hi, z, name, kind) → darf die Kopie HIERHIN?
+function ppVerwahrung(spieler, hi, kind, z) {
+  const e = (spieler?.verwahrteZonen || []).find(v => v.heroIdx === hi && v.zoneKind === kind && v.slotIdx === z);
+  return e ? { anzahl: e.anzahl || 0, name: e.name, basis: e.basis || e.name, versiegelt: !!e.versiegelt } : { anzahl: 0, name: null, basis: null, versiegelt: false };
+}
+function ppVerwahrterStapel(spieler, hi, name) {
+  return (spieler?.verwahrteZonen || []).find(v => v.heroIdx === hi && v.name === name) || null;
+}
+function ppAbilityZoneOk(spieler, hi, z, name, kind = 'ability') {
+  const zonen = kind === 'support' ? spieler?.supportZones : spieler?.abilityZones;
+  const slot = (zonen?.[hi] || [])[z] || [];
+  const v = ppVerwahrung(spieler, hi, kind, z);
+  const stapel = ppVerwahrterStapel(spieler, hi, name);
+  if (stapel && !(stapel.zoneKind === kind && stapel.slotIdx === z)) return false;   // nur EIN Stapel
+  if (v.anzahl > 0) {
+    if (v.name !== name && v.basis !== name) return false;   // v1352: auch die Basis (Performance)
+    return (slot.length === 0 || slot[0] === name) && slot.length + v.anzahl + 1 <= 3;
+  }
+  if (slot.length === 0) return true;
+  return slot[0] === name && slot.length < 3;
+}
+
+// ★★ v1347: Flugdauer AUS DEM SOG (Brettmitte → Stapel/Zone), geteilt
+// zwischen Flughandler und Zonenfreigabe.
+const SOG_FLUG_MS = 820;
+
 function ppFxN(n) {
   try {
     if (window.ppIsPhone && window.ppIsPhone()) return Math.max(2, Math.round(n * 0.4));
@@ -9022,6 +9478,10 @@ const ANIM_REGISTRY = {
   poison_skulls: PoisonSkullsEffect,
   lightning_rain: LightningRainEffect,
   mist_veil: MistVeilEffect,
+  core_explosion: CoreExplosionEffect,   // v1334
+  memory_wipe: MemoryWipeEffect,         // v1335
+  furious_anger: FuriousAngerEffect,     // v1336
+  super_aura: SuperAuraEffect,           // v1340 Cheat Chair
   meteor_crash: MeteorCrashEffect,
   venom_fog: VenomFogEffect,
   poisoned_well: PoisonedWellEffect,
@@ -14832,6 +15292,454 @@ const ANIM_REGISTRY = {
               32% { transform: translate(4px, -2px); }
               54% { transform: translate(-2px, -3px); }
               76% { transform: translate(3px, 2px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  hole_in_the_sky_pull: (() => {
+    // ═══════════════════════════════════════════════════════════════
+    //  ★★ v1346/v1347 — „Hole in the Sky": das Loch saugt ALLE
+    //  Zielkreaturen gleichzeitig hinein (Kartenbild als Vorlage:
+    //  tiefrot, pixelige Risse, dunkler Kern). Laeuft als
+    //  `waveAnimation` UEBER den Karten; der rote Himmel mit dem Rissnetz
+    //  ist die Kulisse darunter (`.pp-bg-anim-hole-in-the-sky`).
+    //
+    //  ★ v1347 (Als Vorgabe): DIE KARTEN SELBST werden eingesogen. Jede
+    //  Kreatur verlaesst sichtbar ihre Zone (die Zone wird per
+    //  `data-pp-im-sog` verborgen — Datenattribut, nicht `className`,
+    //  siehe CARD_API v1232), dreht sich um sich selbst, zieht eine
+    //  Spirale um das Loch und wird kleiner, je naeher sie kommt. Die
+    //  Rueckreise macht die ENGINE: Tote fliegen von der Brettmitte zu
+    //  ihrem Stapel, Ueberlebende zurueck in ihre Zone (`boardCenter` im
+    //  Flughandler) und wachsen dabei wieder auf ihre Groesse.
+    //
+    //  Bauform der Spirale: drei verschachtelte Ebenen, nur `transform`.
+    //    aussen  — sitzt im Loch, dreht sich (die Umlaufbahn)
+    //    mitte   — schiebt die Karte um den Radius nach aussen; der Radius
+    //              schrumpft auf 0 (aus dem Kreis wird eine Spirale)
+    //    innen   — die Karte: gleicht beim Start die Bahnrotation aus
+    //              (steht also genau wie in ihrer Zone), dreht sich dann
+    //              selbst und schrumpft.
+    //
+    //  Zeitplan (Dauer 2400 ms): Loch oeffnet sich → Karten heben ab und
+    //  kreisen ein → um 1900 ms (ZUSCHNAPP_MS, = `delay` der Karte) sind
+    //  alle drin, das Loch schnappt zu, der Schaden faellt.
+    // ═══════════════════════════════════════════════════════════════
+    const zufall = (start) => {
+      let t = start >>> 0;
+      return () => { t = (t * 1664525 + 1013904223) >>> 0; return t / 4294967296; };
+    };
+    const FARBEN = ['#ff3a2a', '#c8141d', '#ff7a5a', '#8e0c10', '#ffd0c0'];
+    const SPLITTER_GESAMT_MAX = 90;
+    const ZUSCHNAPP_MS = 1900;
+    const UMLAUF_GRAD = 560;           // wie weit die Bahn um das Loch dreht
+    const EIGENDREHUNG_GRAD = 900;     // wie oft sich die Karte selbst dreht
+    return function HoleInTheSkyPullEffect({ x, y, w, h, duration, targetPoints }) {
+      const W = Math.max(w || 900, 320), H = Math.max(h || 560, 240);
+      const links = x - W / 2, oben = y - H / 2;
+      const mx = W / 2, my = H / 2;                       // das Loch: Brettmitte
+      const dauer = duration || 2400;
+      const kern = Math.round(Math.min(W, H) * 0.26);
+      const anteil = (ms) => (ms / dauer * 100).toFixed(1) + '%';
+
+      const ziele = useMemo(() => (Array.isArray(targetPoints) ? targetPoints : [])
+        .map(p => ({ ...p, zx: p.x - links, zy: p.y - oben })), [targetPoints, links, oben]);
+
+      // Die eingesogenen Karten. Nur Kreaturen (Support-Platz + Name);
+      // Helden bleiben stehen. Die Zone wird SOFORT verborgen, damit nie
+      // beide Bilder zugleich zu sehen sind; der Notnagel gibt sie frei,
+      // falls die Rueckreise (Engine) aus irgendeinem Grund ausbleibt —
+      // bewusst ein freier Zeitgeber, der das Ende der Komponente
+      // ueberlebt, denn die Rueckreise beginnt erst danach.
+      // Die Kreaturen liegen auf der GENEIGTEN Brettebene, die Kopien
+      // nicht — ohne Ausgleich klappten sie im ersten Bild flach um (Als
+      // Befund 19.8. bei Trial of Dominance). Sie starten also mit der
+      // Brettneigung und richten sich beim Abheben auf.
+      const kippen = useMemo(() => {
+        try { return readBoardTiltDeg(document) || 0; } catch { return 0; }
+      }, []);
+      const karten = useMemo(() => {
+        const r = zufall(Math.round(W * 7 + H * 3 + ziele.length * 31));
+        const aus = [];
+        ziele.forEach((z, i) => {
+          if (!z.cardName || !z.el || z.zoneSlot == null || z.zoneSlot < 0) return;
+          const url = window.cardImageUrl ? window.cardImageUrl(z.cardName) : null;
+          if (!url) return;
+          try {
+            z.el.setAttribute('data-pp-im-sog', '1');
+            const el = z.el;
+            setTimeout(() => el.removeAttribute('data-pp-im-sog'), dauer + 3600);
+          } catch {}
+          const mass = (typeof kartenMassAmBildschirm === 'function')
+            ? kartenMassAmBildschirm(z.el, 'brett') : null;
+          const b = Math.round(mass?.b || Math.min(z.w || 64, 90));
+          const hh = Math.round(mass?.h || b * 1.4);
+          const dx = z.zx - mx, dy = z.zy - my;
+          const verzug = Math.round(i * 55 + r() * 60);
+          aus.push({
+            url, b, h: hh,
+            radius: Math.hypot(dx, dy),
+            winkel: Math.atan2(dy, dx) * 180 / Math.PI,
+            verzug, flug: ZUSCHNAPP_MS - 60 - verzug,
+          });
+        });
+        return aus;
+      }, [ziele, W, H, mx, my, dauer]);
+
+      const splitter = useMemo(() => {
+        if (!ziele.length) return [];
+        const r = zufall(Math.round(W * 13 + H * 5 + ziele.length * 97));
+        const jeZiel = Math.max(5, Math.min(ppFxN(12), Math.floor(SPLITTER_GESAMT_MAX / ziele.length)));
+        const aus = [];
+        ziele.forEach((z, zi) => {
+          for (let i = 0; i < jeZiel; i++) {
+            const sx = z.zx + (r() - 0.5) * 60, sy = z.zy + (r() - 0.5) * 78;
+            const dx = mx - sx, dy = my - sy;
+            const lang = Math.hypot(dx, dy) || 1;
+            // Strudel: die Bahnmitte weicht quer zur Flugrichtung aus,
+            // immer zur selben Seite — so dreht alles gemeinsam ein.
+            const quer = lang * (0.22 + r() * 0.12);
+            const kx = sx + dx * 0.5 + (-dy / lang) * quer;
+            const ky = sy + dy * 0.5 + (dx / lang) * quer;
+            const flug = Math.round(680 + r() * 320);
+            const verzug = Math.max(120, Math.min(ZUSCHNAPP_MS - flug - 40, Math.round(160 + zi * 25 + r() * 520)));
+            aus.push({
+              sx, sy, kx: kx - sx, ky: ky - sy, ex: mx - sx, ey: my - sy,
+              g: Math.round(5 + r() * 6), farbe: FARBEN[Math.floor(r() * FARBEN.length)],
+              verzug, flug,
+            });
+          }
+        });
+        return aus;
+      }, [ziele, W, H, mx, my]);
+
+      return (
+        <div aria-hidden="true" style={{
+          position: 'fixed', left: links, top: oben, width: W, height: H,
+          pointerEvents: 'none', zIndex: 10100, overflow: 'hidden',
+          animation: `hitsBeben 420ms linear ${ZUSCHNAPP_MS - 40}ms both`,
+        }}>
+          {/* Das Gepackt-Werden: ein roter Pixelrahmen um jede Zone */}
+          {ziele.map((z, i) => (
+            <div key={'hsg' + i} style={{
+              position: 'absolute', left: z.zx - 40, top: z.zy - 54, width: 80, height: 108,
+              border: '4px solid #ff3a2a', boxShadow: '0 0 16px rgba(255,40,30,.9), inset 0 0 14px rgba(200,20,29,.7)',
+              opacity: 0,
+              animation: `hitsGepackt 760ms ease-out 20ms forwards`,
+            }} />
+          ))}
+          {/* Das Loch: drehender Pixelkranz um einen dunklen Kern */}
+          <div style={{
+            position: 'absolute', left: mx - kern * 0.8, top: my - kern * 0.8,
+            width: kern * 1.6, height: kern * 1.6, borderRadius: '50%',
+            background: 'repeating-conic-gradient(from 0deg, rgba(255,58,42,.9) 0deg 7deg, rgba(0,0,0,0) 7deg 22deg)',
+            WebkitMaskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
+            maskImage: 'radial-gradient(circle, transparent 38%, #000 41%, #000 60%, transparent 64%)',
+            opacity: 0,
+            animation: `hitsKranz ${dauer}ms linear forwards`,
+          }} />
+          <div style={{
+            position: 'absolute', left: mx - kern / 2, top: my - kern / 2, width: kern, height: kern,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, #050000 0%, #1a0003 44%, #6e080b 60%, rgba(255,60,40,.9) 68%, rgba(255,60,40,0) 78%)',
+            boxShadow: '0 0 40px rgba(255,30,20,.7)', opacity: 0,
+            animation: `hitsKern ${dauer}ms ease-in-out forwards`,
+          }} />
+          {/* Pixelsplitter, die ins Loch strudeln */}
+          {splitter.map((s, i) => (
+            <div key={'hss' + i} style={{
+              position: 'absolute', left: s.sx - s.g / 2, top: s.sy - s.g / 2, width: s.g, height: s.g,
+              background: s.farbe, boxShadow: `0 0 6px ${s.farbe}`, opacity: 0,
+              '--hs-kx': s.kx.toFixed(1) + 'px', '--hs-ky': s.ky.toFixed(1) + 'px',
+              '--hs-ex': s.ex.toFixed(1) + 'px', '--hs-ey': s.ey.toFixed(1) + 'px',
+              animation: `hitsSog ${s.flug}ms cubic-bezier(.55,.05,.75,.5) ${s.verzug}ms forwards`,
+            }} />
+          ))}
+          {/* Die Kreaturen selbst: Spirale ins Loch */}
+          {karten.map((k, i) => (
+            <div key={'hsk' + i} style={{
+              position: 'absolute', left: mx, top: my, width: 0, height: 0,
+              '--hs-w0': k.winkel.toFixed(1) + 'deg',
+              '--hs-w1': (k.winkel - UMLAUF_GRAD).toFixed(1) + 'deg',
+              transform: 'rotate(var(--hs-w0))',
+              animation: `hitsUmlauf ${k.flug}ms cubic-bezier(.45,0,.8,.6) ${k.verzug}ms forwards`,
+            }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, width: 0, height: 0,
+                '--hs-r0': k.radius.toFixed(1) + 'px',
+                transform: 'translateX(var(--hs-r0))',
+                animation: `hitsRadius ${k.flug}ms cubic-bezier(.5,0,.85,.7) ${k.verzug}ms forwards`,
+              }}>
+                <div style={{
+                  position: 'absolute', left: -k.b / 2, top: -k.h / 2, width: k.b, height: k.h,
+                  perspective: (typeof FLIGHT_TILT_PERSPECTIVE_PX === 'number' ? FLIGHT_TILT_PERSPECTIVE_PX : 900) + 'px',
+                  '--hs-g0': (-k.winkel).toFixed(1) + 'deg',
+                  '--hs-g1': (-k.winkel - EIGENDREHUNG_GRAD).toFixed(1) + 'deg',
+                  transform: 'rotate(var(--hs-g0)) scale(1)',
+                  animation: `hitsKarte ${k.flug}ms cubic-bezier(.5,0,.85,.7) ${k.verzug}ms forwards`,
+                }}>
+                  {/* Neigungsebene (perspective sitzt auf dem Eltern) */}
+                  <div style={{
+                    width: '100%', height: '100%', borderRadius: 4, overflow: 'hidden',
+                    backgroundImage: `url("${k.url}")`, backgroundSize: '100% 100%',
+                    boxShadow: '0 0 14px rgba(255,40,30,.9), 0 0 4px rgba(120,0,0,.8)',
+                    '--hs-kipp': kippen.toFixed(1) + 'deg',
+                    transform: 'rotateX(var(--hs-kipp))',
+                    animation: `hitsAufrichten ${Math.round(k.flug * 0.35)}ms ease-out ${k.verzug}ms forwards`,
+                  }} />
+                </div>
+              </div>
+            </div>
+          ))}
+          {/* Zuschnappen: der Blitz, wenn sich das Loch schliesst */}
+          <div style={{
+            position: 'absolute', left: mx - kern, top: my - kern, width: kern * 2, height: kern * 2,
+            borderRadius: '50%', mixBlendMode: 'screen', opacity: 0,
+            background: 'radial-gradient(circle, rgba(255,240,230,.95) 0%, rgba(255,70,40,.8) 30%, rgba(160,10,10,.35) 58%, transparent 74%)',
+            animation: `hitsBlitz 560ms ease-out ${ZUSCHNAPP_MS - 30}ms forwards`,
+          }} />
+          <style>{`
+            @keyframes hitsKern {
+              0%   { opacity: 0; transform: scale(.1); }
+              9%   { opacity: 1; transform: scale(1); }
+              45%  { opacity: 1; transform: scale(.92); }
+              ${anteil(ZUSCHNAPP_MS - 150)} { opacity: 1; transform: scale(1.16); }
+              ${anteil(ZUSCHNAPP_MS - 20)}  { opacity: 1; transform: scale(1.22); }
+              ${anteil(ZUSCHNAPP_MS + 90)}  { opacity: 1; transform: scale(.08); }
+              100% { opacity: 0; transform: scale(0); }
+            }
+            @keyframes hitsKranz {
+              0%   { opacity: 0; transform: rotate(0deg) scale(.2); }
+              9%   { opacity: .95; transform: rotate(-160deg) scale(1); }
+              ${anteil(ZUSCHNAPP_MS - 20)} { opacity: 1; transform: rotate(-820deg) scale(1.1); }
+              ${anteil(ZUSCHNAPP_MS + 90)} { opacity: 1; transform: rotate(-940deg) scale(.1); }
+              100% { opacity: 0; transform: rotate(-980deg) scale(0); }
+            }
+            @keyframes hitsAufrichten {
+              from { transform: rotateX(var(--hs-kipp)); }
+              to   { transform: rotateX(0deg); }
+            }
+            @keyframes hitsUmlauf {
+              from { transform: rotate(var(--hs-w0)); }
+              to   { transform: rotate(var(--hs-w1)); }
+            }
+            @keyframes hitsRadius {
+              0%   { transform: translateX(var(--hs-r0)); }
+              12%  { transform: translateX(calc(var(--hs-r0) * 1.04)); }
+              55%  { transform: translateX(calc(var(--hs-r0) * .62)); }
+              85%  { transform: translateX(calc(var(--hs-r0) * .22)); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes hitsKarte {
+              0%   { opacity: 1; transform: rotate(var(--hs-g0)) scale(1); }
+              12%  { opacity: 1; transform: rotate(calc(var(--hs-g0) - 40deg)) scale(1.06); }
+              55%  { opacity: 1; transform: rotate(calc((var(--hs-g0) + var(--hs-g1)) / 2)) scale(.55); }
+              85%  { opacity: 1; transform: rotate(calc(var(--hs-g1) + 90deg)) scale(.22); }
+              96%  { opacity: 1; transform: rotate(var(--hs-g1)) scale(.08); }
+              100% { opacity: 0; transform: rotate(var(--hs-g1)) scale(.04); }
+            }
+            @keyframes hitsSog {
+              0%   { opacity: 0; transform: translate(0, 0) scale(1.3); }
+              10%  { opacity: 1; }
+              50%  { transform: translate(var(--hs-kx), var(--hs-ky)) scale(1); }
+              92%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--hs-ex), var(--hs-ey)) scale(.2); }
+            }
+            @keyframes hitsGepackt {
+              0%   { opacity: 0; transform: scale(1.3); }
+              25%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(.8); }
+            }
+            @keyframes hitsBlitz {
+              0%   { opacity: 0; transform: scale(.15); }
+              24%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.9); }
+            }
+            @keyframes hitsBeben {
+              0%, 100% { transform: translate(0, 0); }
+              16% { transform: translate(-5px, 3px); }
+              34% { transform: translate(5px, -3px); }
+              56% { transform: translate(-3px, -4px); }
+              78% { transform: translate(3px, 3px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  guillotine_drop: (() => {
+    // ★★ v1349 — „Madame Guillotine": ein Fallbeil saust auf die Zone der
+    // gewaehlten Ability. Zwei Pfosten mit Querbalken rahmen die Zone, das
+    // schraege Stahlblatt faellt, beim Einschlag ein roter Schnitt und
+    // ein kurzes Beben. Der Flug der Kopie in den Deleted Pile kommt
+    // danach von der Engine (play_pile_transfer).
+    return function GuillotineDropEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, animation: 'gtBeben 260ms linear 300ms both' }}>
+            {/* Rahmen: zwei Pfosten + Querbalken */}
+            <div style={{ position: 'absolute', left: -44, top: -86, width: 8, height: 130,
+              background: 'linear-gradient(90deg, #5a3418, #8a5428 50%, #4a2a12)', opacity: 0,
+              animation: 'gtRahmen 900ms ease-out forwards' }} />
+            <div style={{ position: 'absolute', left: 36, top: -86, width: 8, height: 130,
+              background: 'linear-gradient(90deg, #5a3418, #8a5428 50%, #4a2a12)', opacity: 0,
+              animation: 'gtRahmen 900ms ease-out forwards' }} />
+            <div style={{ position: 'absolute', left: -48, top: -92, width: 96, height: 10,
+              background: 'linear-gradient(180deg, #8a5428, #4a2a12)', opacity: 0,
+              animation: 'gtRahmen 900ms ease-out forwards' }} />
+            {/* Das Fallbeil: schraege Unterkante per clip-path */}
+            <div style={{ position: 'absolute', left: -36, top: -82, width: 72, height: 46,
+              background: 'linear-gradient(180deg, #6f7680 0%, #c9d2dc 45%, #f4f8fb 70%, #9aa3ad 100%)',
+              clipPath: 'polygon(0 0, 100% 0, 100% 62%, 0 100%)',
+              boxShadow: '0 0 10px rgba(220,235,255,.55)', opacity: 0,
+              animation: 'gtBeil 420ms cubic-bezier(.55,0,.9,.35) 120ms forwards' }} />
+            {/* Einschlag: roter Schnitt quer ueber die Zone */}
+            <div style={{ position: 'absolute', left: -52, top: 6, width: 104, height: 6,
+              background: 'linear-gradient(90deg, transparent, #ff2a2a 20%, #ffd0c8 50%, #ff2a2a 80%, transparent)',
+              boxShadow: '0 0 12px rgba(255,40,40,.9)', opacity: 0, transform: 'rotate(-12deg)',
+              animation: 'gtSchnitt 520ms ease-out 480ms forwards' }} />
+            <div style={{ position: 'absolute', left: -46, top: -40, width: 92, height: 92, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,60,50,.65) 0%, rgba(140,0,0,.3) 50%, transparent 72%)',
+              opacity: 0, animation: 'gtGlut 560ms ease-out 480ms forwards' }} />
+          </div>
+          <style>{`
+            @keyframes gtRahmen {
+              0%   { opacity: 0; transform: translateY(-10px); }
+              18%  { opacity: 1; transform: translateY(0); }
+              78%  { opacity: 1; }
+              100% { opacity: 0; }
+            }
+            @keyframes gtBeil {
+              0%   { opacity: 1; transform: translateY(0); }
+              100% { opacity: 1; transform: translateY(96px); }
+            }
+            @keyframes gtSchnitt {
+              0%   { opacity: 0; transform: rotate(-12deg) scaleX(.2); }
+              30%  { opacity: 1; transform: rotate(-12deg) scaleX(1.05); }
+              100% { opacity: 0; transform: rotate(-12deg) scaleX(1); }
+            }
+            @keyframes gtGlut {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.3); }
+            }
+            @keyframes gtBeben {
+              0%, 100% { transform: translate(0, 0); }
+              25% { transform: translate(-3px, 2px); }
+              50% { transform: translate(3px, -2px); }
+              75% { transform: translate(-2px, -1px); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  egg_of_god_glow: (() => {
+    // ★★ v1357 — „The Egg of God" (Als Vorgabe): goldene Partikel auf der
+    // Karte — beim Erscheinen und beim Ausloesen ihres Effekts. Ein warmer
+    // Goldschimmer um die Zone, darin aufsteigende Funken und kleine
+    // vierzackige Sterne, die aufblitzen. Nur transform/opacity.
+    return function EggOfGodGlowEffect({ x, y }) {
+      const teile = useMemo(() => {
+        const n = ppFxN(22);
+        return Array.from({ length: n }, (_, i) => {
+          const stern = i % 3 === 0;
+          return {
+            stern,
+            dx: (Math.random() - 0.5) * 70,
+            dy: 20 + Math.random() * 40,
+            steig: 40 + Math.random() * 55,
+            drift: (Math.random() - 0.5) * 22,
+            g: stern ? 6 + Math.random() * 6 : 3 + Math.random() * 4,
+            farbe: ['#fff6c8', '#ffe066', '#ffd23f', '#ffffff', '#ffc21a'][i % 5],
+            verzug: Math.round(Math.random() * 520),
+            dauer: Math.round(760 + Math.random() * 520),
+          };
+        });
+      }, []);
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -58, top: -72, width: 116, height: 144, borderRadius: '46%',
+            background: 'radial-gradient(ellipse at 50% 55%, rgba(255,235,150,.55) 0%, rgba(255,205,60,.3) 42%, rgba(255,190,40,0) 72%)',
+            mixBlendMode: 'screen', opacity: 0,
+            animation: 'eggGlanzHof 1500ms ease-out forwards',
+          }} />
+          {teile.map((t, i) => (
+            <div key={'egp' + i} style={{
+              position: 'absolute', left: t.dx - t.g / 2, top: t.dy - t.g / 2, width: t.g, height: t.g,
+              background: t.farbe,
+              borderRadius: t.stern ? 0 : '50%',
+              clipPath: t.stern ? 'polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)' : undefined,
+              boxShadow: t.stern ? undefined : `0 0 6px ${t.farbe}`,
+              filter: t.stern ? `drop-shadow(0 0 4px ${t.farbe})` : undefined,
+              '--eg-steig': `-${t.steig.toFixed(0)}px`, '--eg-drift': `${t.drift.toFixed(0)}px`,
+              opacity: 0,
+              animation: `${t.stern ? 'eggGlanzStern' : 'eggGlanzFunke'} ${t.dauer}ms ease-out ${t.verzug}ms forwards`,
+            }} />
+          ))}
+          <style>{`
+            @keyframes eggGlanzHof {
+              0%   { opacity: 0; transform: scale(.7); }
+              25%  { opacity: 1; transform: scale(1.05); }
+              60%  { opacity: .8; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.12); }
+            }
+            @keyframes eggGlanzFunke {
+              0%   { opacity: 0; transform: translate(0, 0) scale(.6); }
+              15%  { opacity: 1; }
+              100% { opacity: 0; transform: translate(var(--eg-drift), var(--eg-steig)) scale(.3); }
+            }
+            @keyframes eggGlanzStern {
+              0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(.2); }
+              35%  { opacity: 1; transform: translate(calc(var(--eg-drift) * .4), calc(var(--eg-steig) * .4)) rotate(45deg) scale(1.2); }
+              100% { opacity: 0; transform: translate(var(--eg-drift), var(--eg-steig)) rotate(90deg) scale(.4); }
+            }
+          `}</style>
+        </div>
+      );
+    };
+  })(),
+  sky_crack: (() => {
+    // ★★ v1346 — „Hole in the Sky", NEGIERTER Guss (`spellVisual`): statt
+    // des ganzen Himmels nur ein kleiner roter Riss, der auf dem Ziel
+    // aufreisst und wieder vergeht.
+    const RISSE = [
+      'M0 0 L10 0 L10 -8 L22 -8 L22 -16 L34 -16',
+      'M0 0 L-8 0 L-8 10 L-20 10 L-20 18 L-30 18 L-30 28',
+      'M0 0 L0 -12 L-10 -12 L-10 -24 L-18 -24',
+      'M0 0 L12 0 L12 10 L20 10 L20 22 L32 22',
+      'M0 0 L-12 0 L-12 -6 L-26 -6',
+    ].join(' ');
+    return function SkyCrackEffect({ x, y }) {
+      return (
+        <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
+          <div style={{
+            position: 'absolute', left: -48, top: -48, width: 96, height: 96, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(200,20,29,.75) 0%, rgba(80,4,8,.45) 50%, transparent 72%)',
+            opacity: 0, animation: 'hitsRissGlut 720ms ease-out forwards',
+          }} />
+          <svg width="80" height="80" viewBox="-40 -40 80 80" shapeRendering="crispEdges" style={{
+            position: 'absolute', left: -40, top: -40, overflow: 'visible', opacity: 0,
+            animation: 'hitsRiss 720ms ease-out forwards',
+          }}>
+            <path d={RISSE} fill="none" stroke="#3a0105" strokeWidth="6" />
+            <path d={RISSE} fill="none" stroke="#e0202a" strokeWidth="3" />
+            <path d={RISSE} fill="none" stroke="#ff8a70" strokeWidth="1" />
+          </svg>
+          <style>{`
+            @keyframes hitsRiss {
+              0%   { opacity: 0; transform: scale(.15); }
+              25%  { opacity: 1; transform: scale(1.08); }
+              60%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1); }
+            }
+            @keyframes hitsRissGlut {
+              0%   { opacity: 0; transform: scale(.4); }
+              30%  { opacity: 1; transform: scale(1); }
+              100% { opacity: 0; transform: scale(1.3); }
             }
           `}</style>
         </div>
@@ -23432,9 +24340,7 @@ function SharedZoneInstanceList({ instances, onPick, canActivateFor, onActivate 
                   buffs={inst.counters?.buffs}
                   cardName={inst.name}
                 />
-                {inst.counters?.buffs
-                  ? <BuffColumn buffs={inst.counters.buffs} cardName={inst.name} />
-                  : null}
+                <BuffColumn buffs={inst.counters?.buffs} statuses={inst.statuses} cardName={inst.name} />
                 {inst.summonedThisTurn && (
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 8,
@@ -25780,6 +26686,35 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // bounceReturnHidden to achieve the visual crossing of Deepsea/Castle
   // swaps — old creature flies out while new creature flies in.
   const [bounceOutgoingHidden, setBounceOutgoingHidden] = useState(new Set());
+  // ★ v1337 (Als Befund 24.9., Puzzle: Gegner spielt Furious Anger →
+  // Haste → zieht). Die Abflug-Verdeckung einer Handkarte traegt Platz
+  // und Handgroesse (`${owner}-${idx}#${groesse}`), damit sie wegfaellt,
+  // sobald die Hand schrumpft. Sie fiel aber nur SOLANGE weg, wie die
+  // Groesse abwich: der Schluessel lebte 4 s weiter. Zogen danach Karten
+  // die Hand auf genau diese Groesse zurueck, PASSTE er wieder — und
+  // verdeckte eine ganz andere Karte (zwei Abfluege hintereinander, dann
+  // Nachziehen: jede Zwischengroesse wird noch einmal durchlaufen).
+  // Jetzt ist der Schluessel VERBRAUCHT, sobald die Hand ihre Groesse
+  // einmal geaendert hat — die abfliegende Karte ist dann weg.
+  const _meineHandGroesse = (me?.hand || []).length;
+  const _gegnerHandGroesse = opp?.handCount || 0;
+  useLayoutEffect(() => {
+    setBounceReturnHidden(prev => {
+      let geaendert = false;
+      const n = new Set();
+      for (const k of prev) {
+        const m = /^(\d+)-(\d+)#(\d+)/.exec(k);
+        if (m) {
+          const besitzer = Number(m[1]);
+          const groesse = Number(m[3]);
+          const jetzt = besitzer === myIdx ? _meineHandGroesse : (besitzer === oppIdx ? _gegnerHandGroesse : groesse);
+          if (jetzt !== groesse) { geaendert = true; continue; }
+        }
+        n.add(k);
+      }
+      return geaendert ? n : prev;
+    });
+  }, [_meineHandGroesse, _gegnerHandGroesse]);
   const prevOppHandCountRef = useRef(opp.handCount || 0);
   if (roomJustChanged) prevOppHandCountRef.current = opp.handCount || 0;
   // ★ v816 (Als Befund 6.9.): `useLayoutEffect` statt `useEffect`. Der
@@ -25914,6 +26849,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // ─── Discard/Delete animation tracking (hand-to-pile + board-to-pile, both players) ───
   const [gameAnims, setGameAnims] = useState([]); // Active particle animations (moved up for creature death access)
   const [beamAnims, setBeamAnims] = useState([]); // Beam animations (laser, etc.)
+  const [tetherAnims, setTetherAnims] = useState([]); // v1331: magische Faeden (Soul Transmigration Ritual)
   const [ramAnims, setRamAnims] = useState([]); // Ram animations (hero charges to target and back)
   const [tharxianHorseAnims, setTharxianHorseAnims] = useState([]); // Trojan Horse charges from Surprise Zone → attacker
 
@@ -26111,9 +27047,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // das Stapel-Ende bekommt den Scrollstand von JETZT — der Flug ist
       // damit als Ganzes Welt (siehe app-shared, Abschnitt Weltverankerung).
       const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      // ★ v1331: Start in Bildschirmgroesse, um die Zonenmitte zentriert.
+      const _mass = (sr.kb > 0 && sr.kh > 0)
+        ? { startW: sr.kb, startH: sr.kh, endW: kartenMassAmBildschirm(document.querySelector(destSelector), 'stapel').b }
+        : null;
       anims.push({
         id: Date.now() + Math.random(), cardName, welt: true,
-        startX: sr.left, startY: sr.top, endX: target.x + _fo.dx, endY: target.y + _fo.dy, dest,
+        startX: _mass ? sr.left + sr.width / 2 - _mass.startW / 2 : sr.left,
+        startY: _mass ? sr.top + sr.height / 2 - _mass.startH / 2 : sr.top,
+        ...(_mass || {}),
+        endX: target.x + _fo.dx, endY: target.y + _fo.dy, dest,
         // anims.length BEFORE this push == this card's index in the
         // batch → 0, 130ms, 260ms, … Single-card batches stay at 0.
         delay: anims.length * PILE_FLIGHT_STAGGER_MS,
@@ -26302,7 +27245,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     const _off = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
     const feld = (el) => {
       const r = el.getBoundingClientRect();
-      return { left: r.left + _off.dx, top: r.top + _off.dy, width: r.width, height: r.height };
+      // v1331: dazu das Mass der Karte, wie der Spieler sie gerade sieht.
+      const km = kartenMassAmBildschirm(el, 'brett');
+      return { left: r.left + _off.dx, top: r.top + _off.dy, width: r.width, height: r.height, kb: km.b, kh: km.h };
     };
     for (const ow of ['me', 'opp']) {
       const pi = ow === 'me' ? myIdx : oppIdx;
@@ -26429,7 +27374,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             // begins its flight, not all at once up front.
             const _deathDelay = a.delay || 0;
             setTimeout(() => {
-              setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
+              setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + (a.startW || 64) / 2, y: a.startY + (a.startH || 90) / 2, welt: !!a.welt }]);
               setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
             }, _deathDelay);
           }
@@ -26646,7 +27591,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // begins its flight, not all at once up front.
           const _deathDelay = a.delay || 0;
           setTimeout(() => {
-            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + (a.startW || 64) / 2, y: a.startY + (a.startH || 90) / 2, welt: !!a.welt }]);
             setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
           }, _deathDelay);
         }
@@ -26869,7 +27814,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           // begins its flight, not all at once up front.
           const _deathDelay = a.delay || 0;
           setTimeout(() => {
-            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + 32, y: a.startY + 45, welt: !!a.welt }]);
+            setGameAnims(prev => [...prev, { id, type: 'creature_death', x: a.startX + (a.startW || 64) / 2, y: a.startY + (a.startH || 90) / 2, welt: !!a.welt }]);
             setTimeout(() => setGameAnims(prev => prev.filter(g => g.id !== id)), 1200);
           }, _deathDelay);
         }
@@ -27715,21 +28660,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       return abZones.some(slot => (slot || []).length > 0 && (slot || []).length < 3);
     }
 
+    // v1349: verwahrter Stapel (Madame Guillotine) — die Kopie gehoert dorthin.
+    const _vs = ppVerwahrterStapel(playerData, heroIdx, abilityName);
+    if (_vs) return ppAbilityZoneOk(playerData, heroIdx, _vs.slotIdx, abilityName, _vs.zoneKind);
     // Standard: check if hero already has this ability
-    for (const slot of abZones) {
+    for (let _z = 0; _z < abZones.length; _z++) {
+      const slot = abZones[_z];
       if ((slot || []).length > 0 && slot[0] === abilityName) {
-        return slot.length < 3;
+        return ppAbilityZoneOk(playerData, heroIdx, _z, abilityName);
       }
     }
-    // Doesn't have it — needs a free zone
-    if (abZones.some(slot => (slot || []).length === 0)) return true;
+    // Doesn't have it — needs a free zone (versiegelte zaehlen nicht)
+    if (abZones.some((slot, _z) => (slot || []).length === 0 && ppAbilityZoneOk(playerData, heroIdx, _z, abilityName))) return true;
     // v768: Xal / Xalibur — eine freie (oder gleichnamige) SUPPORT Zone
     // zaehlt genauso. Ohne das blieb die Handkarte grau, sobald die drei
     // echten Zonen voll waren.
     if ((gameState.abilitySupportHeroes || []).includes(heroIdx)) {
       const supZones = playerData.supportZones?.[heroIdx] || [];
-      return supZones.some(slot => (slot || []).length === 0
-        || ((slot || [])[0] === abilityName && slot.length < 3));
+      return supZones.some((slot, _z) => ppAbilityZoneOk(playerData, heroIdx, _z, abilityName, 'support'));
     }
     return false;
   };
@@ -28591,8 +29539,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             if (!held?.name || held.hp <= 0) continue;
             if ((me.abilityGivenThisTurn || [])[hi]
                 && !((held?.buffs?.blessed_skill?.remaining) || 0)) continue;
-            const slot = (me.supportZones[hi] || [])[zi] || [];
-            const passt = slot.length === 0 || (slot[0] === cardName && slot.length < 3);
+            const passt = ppAbilityZoneOk(me, hi, zi, cardName, 'support');   // v1349
             if (!passt) continue;
             targetHero = hi; targetZone = -1; targetSupportZone = zi;
           }
@@ -28615,12 +29562,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     if (abSlot.length > 0 && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
                   } else {
                     // Standard: only matching or empty zones
+                    // v1349: dieselben Regeln wie der Server (verwahrte Abilities).
                     const existingZone = ((me.abilityZones[hi] || []).findIndex(s => (s||[]).length > 0 && s[0] === cardName));
-                    if (existingZone >= 0) {
-                      if (zi === existingZone && abSlot.length < 3) { targetHero = hi; targetZone = zi; }
-                    } else {
-                      if (abSlot.length === 0) { targetHero = hi; targetZone = zi; }
-                    }
+                    if (existingZone >= 0 && zi !== existingZone) { /* nur der eigene Stapel */ }
+                    else if (ppAbilityZoneOk(me, hi, zi, cardName)) { targetHero = hi; targetZone = zi; }
                   }
                 }
               }
@@ -30425,7 +31370,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // `replace` (v694): raeumt den Stapel und zeigt NUR diese Karte —
     // ein Held, der in die Kette greift (Key), loest die Karte ab, auf
     // die er reagiert, statt sich daneben zu stellen.
-    const onReveal = ({ cardName, sfx, replace }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName }]); };
+    const onReveal = ({ cardName, sfx, replace, fizzled }) => { if (window.playSFX) window.playSFX(sfx || 'reveal', sfx ? { dedupe: 200, category: 'effect' } : undefined); setCardReveals(prev => [...(replace ? [] : prev), { id: Date.now() + Math.random(), cardName, fizzled: !!fizzled }]); };
     const onDeckSearchAdd = ({ cardName, playerIdx, castOnly }) => {
       // If the OPPONENT searched, prepare face-up draw animation
       if (playerIdx !== myIdx && !castOnly) {
@@ -30638,7 +31583,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               if (!el2) continue;
               const q2 = el2.getBoundingClientRect();
               if (!q2.width) continue;
-              punkte.push({ x: q2.left + q2.width / 2, y: q2.top + q2.height / 2 });
+              // ★★ v1347: zusaetzlich Mass, Kartenname und Element — fuer
+              // Wellen, die die Karte SELBST bewegen (`einsaugen`). Alte
+              // Komponenten lesen nur x/y und merken davon nichts.
+              punkte.push({
+                x: q2.left + q2.width / 2, y: q2.top + q2.height / 2,
+                w: q2.width, h: q2.height, cardName: t.cardName || null,
+                zoneSlot: t.zoneSlot, el: el2,
+              });
             }
             if (punkte.length) extra.targetPoints = punkte;
           }
@@ -30746,6 +31698,63 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     // dreilagige Linie, nur entlang eines gezackten Pfades statt gerade
     // — und mit `elem_lightning` statt `laser`. Ohne das Feld aendert
     // sich fuer alle bisherigen Aufrufer nichts.
+    // ★ v1331 — MAGISCHE FAEDEN VON MEHREREN QUELLEN ZU EINEM ZIEL
+    // („play_tether_animation", zuerst Soul Transmigration Ritual: dunkle
+    // Faeden von den drei Opfern zum gefallenen Helden). Allgemein gebaut:
+    // `sources` = Brettplaetze {owner, heroIdx, zoneSlot} (zoneSlot < 0 =
+    // Heldenzone), Ziel ebenso. ALLE Faeden laufen gleichzeitig (Als Regel
+    // 22.9.). Farbe ueber `color`/`glow`, Klang `elem_dark`.
+    // ★ v1334 — BILDSCHIRMWACKELN. Die Engine sendet `play_screen_shake`
+    // seit der Doomsday Bomb (`intensity: 'heavy'`), aber NIEMAND hoerte
+    // zu — das Ereignis verpuffte still. Jetzt wackelt die Spielflaeche
+    // (`.game-layout`) kurz; die Klasse wird per Reflow neu gestartet.
+    const onScreenShake = ({ intensity }) => {
+      const el = document.querySelector('.game-layout');
+      if (!el) return;
+      const klasse = intensity === 'heavy' ? 'pp-wackeln-stark' : 'pp-wackeln';
+      el.classList.remove('pp-wackeln', 'pp-wackeln-stark');
+      void el.offsetWidth;
+      el.classList.add(klasse);
+      setTimeout(() => el.classList.remove(klasse), intensity === 'heavy' ? 700 : 450);
+    };
+    const onTetherAnimation = ({ sources, targetOwner, targetHeroIdx, targetZoneSlot, duration, color, glow, sfx }) => {
+      const zoneEl = (owner, heroIdx, zoneSlot) => {
+        const lab = owner === myIdx ? 'me' : 'opp';
+        return (zoneSlot != null && zoneSlot >= 0)
+          ? document.querySelector(`[data-support-zone][data-support-owner="${lab}"][data-support-hero="${heroIdx}"][data-support-slot="${zoneSlot}"]`)
+          : document.querySelector(`[data-hero-zone][data-hero-owner="${lab}"][data-hero-idx="${heroIdx}"]`);
+      };
+      const tgtEl = zoneEl(targetOwner, targetHeroIdx, targetZoneSlot);
+      if (!tgtEl || !Array.isArray(sources) || sources.length === 0) return;
+      const _fo = window.ppFxScrollOffset ? window.ppFxScrollOffset() : { dx: 0, dy: 0 };
+      const mitte = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2 + _fo.dx, y: r.top + r.height / 2 + _fo.dy }; };
+      const ziel = mitte(tgtEl);
+      const faeden = [];
+      sources.forEach((q, i) => {
+        const el = zoneEl(q.owner, q.heroIdx, q.zoneSlot);
+        if (!el) return;
+        const start = mitte(el);
+        const dx = ziel.x - start.x, dy = ziel.y - start.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        // Bogen je Faden leicht verschieden — sonst liegen sie deckungsgleich.
+        const bogen = (i % 2 === 0 ? 1 : -1) * Math.min(60, len * 0.18) * (0.7 + 0.3 * ((i * 37) % 10) / 10);
+        const cx = (start.x + ziel.x) / 2 + nx * bogen;
+        const cy = (start.y + ziel.y) / 2 + ny * bogen;
+        faeden.push({ d: `M ${start.x} ${start.y} Q ${cx} ${cy} ${ziel.x} ${ziel.y}`, len: len * 1.15, sx: start.x, sy: start.y });
+        if (window.ppBattleCamFocus) window.ppBattleCamFocus(el);
+      });
+      if (faeden.length === 0) return;
+      if (window.ppBattleCamFocus) window.ppBattleCamFocus(tgtEl);
+      if (window.playSFX) window.playSFX(sfx || 'elem_dark', { dedupe: 80 });
+      const id = Date.now() + Math.random();
+      const dur = duration || 1400;
+      setTetherAnims(prev => [...prev, {
+        id, dur, faeden, ziel,
+        color: color || '#b56cff', glow: glow || 'rgba(90,20,160,0.85)',
+      }]);
+      setTimeout(() => setTetherAnims(prev => prev.filter(a => a.id !== id)), dur + 60);
+    };
     const onBeamAnimation = ({ sourceOwner, sourceHeroIdx, sourceZoneSlot, sourceZoneType, targetOwner, targetHeroIdx, targetZoneSlot, color, duration, thickness, miss, impactOpacity, glow, impactAnim, bolt, sourceSelector, targetSelector, offset }) => {
       if (window.playSFX) {
         // Volle Lautstaerke — 0.7 war zu leise (Als Rueckmeldung 21.8.).
@@ -31448,6 +32457,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     socket.on('level_change', onLevelChange);
     socket.on('ability_activated', onAbilityActivated);
     socket.on('play_beam_animation', onBeamAnimation);
+    socket.on('play_tether_animation', onTetherAnimation);   // v1331
+    socket.on('play_screen_shake', onScreenShake);            // v1334
     // White flash on the ability zone whose hook just absorbed an
     // effect (Resistance, etc.). Same payload shape as ability_activated
     // — owner / heroIdx / zoneIdx pinpoint the slot.
@@ -35296,7 +36307,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // are captured by `captureBoardRects` too, so they need the
       // same suppression — Wall Breaker General Ralzish emits an
       // explicit zone-anchored broadcast for those.)
-      if ((from === 'hand' || from === 'support' || from === 'ability' || from === 'surprise')
+      if ((from === 'hand' || from === 'support' || from === 'ability' || from === 'surprise' || from === 'boardCenter')
           && (to === 'discard' || to === 'deleted') && cardName) {
         const ref = srcIsMe ? handToPilePendingMeRef : handToPilePendingOppRef;
         const bucket = ref.current[to];
@@ -35345,6 +36356,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // next React render).
       const elementFor = (pile, isMe, extras = {}) => {
         const ownerLabel = isMe ? 'me' : 'opp';
+        // ★★ v1347 — BRETTMITTE als Flugquelle (`einsaugen`, „Hole in the
+        // Sky"): die Kreatur wurde ins Loch gezogen und kommt von dort.
+        // Dasselbe Element, auf das die Welle ihre Mitte legt.
+        if (pile === 'boardCenter') {
+          const b = document.querySelector('.board-center') || document.querySelector('.game-board');
+          if (!b) return null;
+          const q = b.getBoundingClientRect();
+          const mx = q.left + q.width / 2, my = q.top + q.height / 2;
+          const punkt = { left: mx, top: my, width: 0, height: 0, right: mx, bottom: my };
+          return { getBoundingClientRect: () => punkt };
+        }
         if (pile === 'discard') return document.querySelector(isMe ? '[data-my-discard]' : '[data-opp-discard]');
         if (pile === 'deleted') return document.querySelector(isMe ? '[data-my-deleted]' : '[data-opp-deleted]');
         if (pile === 'deck')    return document.querySelector(isMe ? '[data-my-deck]'    : '[data-opp-deck]');
@@ -35643,6 +36665,17 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         }, 720);
       }
 
+      // ★★ v1347: die eingesogene Kreatur hat ihre Zone verborgen
+      // (`data-pp-im-sog`). Stirbt sie, ist die Zone jetzt leer → sofort
+      // freigeben; fliegt sie zurueck, erst bei der Landung.
+      if (from === 'boardCenter' && fromHeroIdx != null && fromSlotIdx != null) {
+        const _lbl = srcIsMe ? 'me' : 'opp';
+        const _zone = document.querySelector(`[data-support-zone][data-support-owner="${_lbl}"][data-support-hero="${fromHeroIdx}"][data-support-slot="${fromSlotIdx}"]`);
+        if (_zone) {
+          const _frei = () => _zone.removeAttribute('data-pp-im-sog');
+          if (to === 'support') setTimeout(_frei, SOG_FLUG_MS); else _frei();
+        }
+      }
       const sr = srcEl.getBoundingClientRect();
       const tr = tgtEl.getBoundingClientRect();
       // ★ v1262 — Weltverankerung auch fuer DIESEN Flug (v1258 hatte nur
@@ -35664,15 +36697,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // `pileTransferWindstorm` would never be defined — the card
       // would just snap to opacity:0 with no motion.
       // `-v3`: dieselbe Ueberlegung fuer `cardFlightTilt`.
-      if (!document.getElementById('pile-transfer-keyframes-v4')) {
+      // ★ v1331: v5 — Endgroesse = Zielgroesse, nie darunter (Als Regel
+      // 24.9.). Vorher endete der Flug auf 0,7 × Ziel und stand bei 80 %
+      // schon auf 0,92 × Ziel; der Windsturm schrumpfte auf 0,45.
+      // `--ptMin` = das Kleinere von Start (1) und Ziel (`--ptScale`) —
+      // darunter geht keine Stufe.
+      if (!document.getElementById('pile-transfer-keyframes-v7')) {
         const style = document.createElement('style');
-        style.id = 'pile-transfer-keyframes-v4';
+        style.id = 'pile-transfer-keyframes-v7';
         style.textContent = `
           @keyframes pileTransfer {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
             20%  { transform: translate(0, -16px) scale(1.08); opacity: 1; }
-            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(calc(var(--ptScale, 1) * 0.92)); opacity: 1; }
-            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(calc(var(--ptScale, 1) * 0.7)); opacity: 0; }
+            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(var(--ptScale, 1)); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) scale(var(--ptScale, 1)); opacity: 0; }
           }
           /* Hand-landing variant: no fade/shrink at the end. The card
              arrives solidly so the reveal of the hidden hand slot
@@ -35680,7 +36718,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           @keyframes pileTransferToHand {
             0%   { transform: translate(0,0) scale(1); opacity: 1; }
             20%  { transform: translate(0, -16px) scale(1.08); opacity: 1; }
-            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(calc(var(--ptScale, 1) * 0.98)); opacity: 1; }
+            80%  { transform: translate(var(--ptDx), calc(var(--ptDy) - 10px)) scale(max(var(--ptMin, 1), calc(var(--ptScale, 1) * 0.98))); opacity: 1; }
             100% { transform: translate(var(--ptDx), var(--ptDy)) scale(var(--ptScale, 1)); opacity: 1; }
           }
           /* Windstorm variant: card is buffeted along its journey by
@@ -35693,12 +36731,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             8%   { transform: translate(calc(var(--ptDx) * 0.04 + 55px), calc(var(--ptDy) * 0.08 - 40px)) rotate(-30deg) scale(1.12); opacity: 1; }
             18%  { transform: translate(calc(var(--ptDx) * 0.18 - 70px), calc(var(--ptDy) * 0.16 + 50px)) rotate(45deg) scale(1.05); opacity: 1; }
             30%  { transform: translate(calc(var(--ptDx) * 0.30 + 80px), calc(var(--ptDy) * 0.28 - 60px)) rotate(-55deg) scale(1.0); opacity: 1; }
-            42%  { transform: translate(calc(var(--ptDx) * 0.42 - 85px), calc(var(--ptDy) * 0.42 + 65px)) rotate(75deg) scale(0.95); opacity: 1; }
-            55%  { transform: translate(calc(var(--ptDx) * 0.55 + 70px), calc(var(--ptDy) * 0.55 - 55px)) rotate(-65deg) scale(0.9); opacity: 1; }
-            68%  { transform: translate(calc(var(--ptDx) * 0.70 - 50px), calc(var(--ptDy) * 0.70 + 40px)) rotate(55deg) scale(0.85); opacity: 1; }
-            80%  { transform: translate(calc(var(--ptDx) * 0.82 + 35px), calc(var(--ptDy) * 0.82 - 28px)) rotate(-40deg) scale(0.78); opacity: 0.95; }
-            90%  { transform: translate(calc(var(--ptDx) * 0.92 - 18px), calc(var(--ptDy) * 0.92 + 14px)) rotate(180deg) scale(0.7); opacity: 0.85; }
-            100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(720deg) scale(0.45); opacity: 0; }
+            42%  { transform: translate(calc(var(--ptDx) * 0.42 - 85px), calc(var(--ptDy) * 0.42 + 65px)) rotate(75deg) scale(max(var(--ptMin, 1), 0.95)); opacity: 1; }
+            55%  { transform: translate(calc(var(--ptDx) * 0.55 + 70px), calc(var(--ptDy) * 0.55 - 55px)) rotate(-65deg) scale(max(var(--ptMin, 1), 0.9)); opacity: 1; }
+            68%  { transform: translate(calc(var(--ptDx) * 0.70 - 50px), calc(var(--ptDy) * 0.70 + 40px)) rotate(55deg) scale(max(var(--ptMin, 1), 0.85)); opacity: 1; }
+            80%  { transform: translate(calc(var(--ptDx) * 0.82 + 35px), calc(var(--ptDy) * 0.82 - 28px)) rotate(-40deg) scale(max(var(--ptMin, 1), 0.78)); opacity: 0.95; }
+            90%  { transform: translate(calc(var(--ptDx) * 0.92 - 18px), calc(var(--ptDy) * 0.92 + 14px)) rotate(180deg) scale(max(var(--ptMin, 1), 0.7)); opacity: 0.85; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(720deg) scale(max(var(--ptMin, 1), 0.45)); opacity: 0; }
           }
           /* Neigung der Flugkarte — laeuft auf einer EIGENEN Ebene
              INNERHALB der Flugkarte, damit die Flugbahn oben
@@ -35708,6 +36746,31 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           @keyframes cardFlightTilt {
             from { transform: rotateX(var(--ftFrom, 0deg)); }
             to   { transform: rotateX(var(--ftTo, 0deg)); }
+          }
+          /* v1347 — AUS DEM SOG (Brettmitte -> Stapel/Zone). Die Karte
+             startet winzig und noch drehend im Loch und waechst ueber den
+             GANZEN Flug auf ihre Zielgroesse (Als Vorgabe). Stapelziel:
+             bei 80 % gelandet, dann ausblenden wie pileTransfer. */
+          @keyframes pileTransferAusDemSog {
+            0%   { transform: translate(0,0) rotate(540deg) scale(.06); opacity: 1; }
+            80%  { transform: translate(var(--ptDx), var(--ptDy)) rotate(0deg) scale(var(--ptScale, 1)); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(0deg) scale(var(--ptScale, 1)); opacity: 0; }
+          }
+          /* v1353 — GLITZER-FLUG (Relic in the Sky): Funkeln AUF der
+             Karte (fliegt mit) und eine Spur, die hinter ihr zurueckbleibt. */
+          @keyframes ptGlitzerFunkeln {
+            0%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
+            45%      { opacity: 1; transform: scale(1.15) rotate(45deg); }
+            70%      { opacity: .6; transform: scale(.8) rotate(80deg); }
+          }
+          @keyframes ptGlitzerSpur {
+            0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--gsx), var(--gsy)) scale(.2); }
+          }
+          /* Zonenziel (Ueberlebende): landet und bleibt sichtbar. */
+          @keyframes pileTransferAusDemSogLand {
+            0%   { transform: translate(0,0) rotate(540deg) scale(.06); opacity: 1; }
+            100% { transform: translate(var(--ptDx), var(--ptDy)) rotate(0deg) scale(var(--ptScale, 1)); opacity: 1; }
           }
         `;
         document.head.appendChild(style);
@@ -35732,7 +36795,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // Gestaffelt wird bei Dominance ohnehin schon serverseitig (ein
       // `await actionDestroyCard` je Kreatur).
       const _vomBrett = (from === 'support' || from === 'ability'
-        || from === 'surprise' || from === 'permanent');
+        || from === 'surprise' || from === 'permanent' || from === 'boardCenter');
+      const _ausDemSog = from === 'boardCenter';
       const usesPileLane = (to === 'discard' || to === 'deleted') && !_vomBrett;
       // ★ ALS BEFUND 18.8. (dritte Runde): „Jetzt bewegt Trial of
       // Dominance alle Creatures *gleichzeitig* zum Deleted Pile. Es
@@ -35793,11 +36857,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       //   • windstorm runs 1200ms (longer, so the chaos reads).
       //   • hand/support uses solid-land variant @ 700ms.
       //   • default uses the standard fade variant @ 700ms.
-      const anim = isWindstorm
-        ? 'pileTransferWindstorm'
-        : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
-      const durationMs = isWindstorm ? 1200 : 700;
-      const easing = isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out';
+      const anim = _ausDemSog
+        ? (isToHand || isToSupport ? 'pileTransferAusDemSogLand' : 'pileTransferAusDemSog')
+        : isWindstorm
+          ? 'pileTransferWindstorm'
+          : (isToHand || isToSupport ? 'pileTransferToHand' : 'pileTransfer');
+      const durationMs = _ausDemSog ? SOG_FLUG_MS : (isWindstorm ? 1200 : 700);
+      const easing = _ausDemSog ? 'cubic-bezier(.25,.6,.35,1)'
+        : (isWindstorm ? 'cubic-bezier(.45,.05,.55,.95)' : 'ease-in-out');
 
       // ── ★ KEINE Quellmaske fuer den Coolness Stack ──
       // Ein Versuch mit Maske fuehrte zu DOPPELTER Buchhaltung: der
@@ -35873,9 +36940,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       const STAPEL_ORTE = { deck: 1, potionDeck: 1, discard: 1, deleted: 1, area: 1 };
       const massFuer = (ort) => flugMass(ort === 'hand' ? 'hand'
         : STAPEL_ORTE[ort] ? 'stapel' : 'brett');
-      const mQuelle = massFuer(from), mZiel = massFuer(to);
+      // ★ v1331: Brett- und Heldenquellen sowie Stapelziele im Mass, das
+      // der Spieler SIEHT (Kamera-Zoom, Perspektive) — sonst hob die
+      // Geisterkarte kleiner ab, als die Karte auf dem Brett war.
+      // Die Brettmitte ist kein Kartenplatz — ihr Mass ist das Brettmass
+      // (die Kopie startet ohnehin winzig, siehe pileTransferAusDemSog).
+      const _brettQuelle = (_vomBrett && !_ausDemSog) || from === 'hero';
+      const mQuelle = _brettQuelle ? kartenMassAmBildschirm(srcEl, 'brett') : massFuer(from);
+      // v1355: Brett-ZIELE im Mass, das der Spieler sieht (siehe `kartenMassInZone`).
+      const BRETT_ZIELE = { support: 1, ability: 1, surprise: 1, permanent: 1 };
+      const mZiel = STAPEL_ORTE[to] ? kartenMassAmBildschirm(tgtEl, 'stapel')
+        : BRETT_ZIELE[to] ? kartenMassInZone(tgtEl)
+        : massFuer(to);
       const flugB = mQuelle.b, flugH = mQuelle.h;
       const ptScale = mQuelle.b > 0 ? (mZiel.b / mQuelle.b) : 1;
+      const ptMin = Math.min(1, ptScale);
       card.style.cssText = [
         'position:fixed',
         `left:${Math.round(srcX - flugB / 2)}px`, `top:${Math.round(srcY - flugH / 2)}px`,
@@ -35883,7 +36962,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         'border-radius:4px', 'overflow:hidden',
         glow,
         `--ptDx:${Math.round(dx)}px`, `--ptDy:${Math.round(dy)}px`,
-        `--ptScale:${ptScale.toFixed(3)}`,
+        `--ptScale:${ptScale.toFixed(3)}`, `--ptMin:${ptMin.toFixed(3)}`,
         `animation:${anim} ${durationMs}ms ${easing} forwards`,
         'opacity:0',
       ].join(';');
@@ -35932,6 +37011,58 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       // auf ihrer alten Handposition ruht, war genau Als frueherer
       // Befund „hovert kurz auf der Stelle". Zwei Quellen, zwei
       // richtige Antworten.
+      // ★★ v1353 — `flightStyle: 'glitzer'` (Relic in the Sky, Als Vorgabe:
+      // „die zurueckkehrende Karte soll mit Particles glitzern"). Zwei
+      // Schichten: Funkeln AUF der Karte (Kinder der Flugkarte, fliegen mit)
+      // und eine Spur aus Sternchen, die an der jeweils aktuellen Position
+      // der Karte entsteht und zurueckbleibt. Nur `transform`/`opacity`.
+      if (flightStyle === 'glitzer') {
+        card.style.boxShadow = '0 0 16px rgba(255,236,150,.95), 0 0 34px rgba(255,210,90,.55)';
+        card.style.overflow = 'visible';
+        const FARBEN = ['#fff8d6', '#ffe27a', '#ffffff', '#ffd14a', '#fff2b0'];
+        const funkelZahl = ppFxN(14);
+        for (let i = 0; i < funkelZahl; i++) {
+          const f = document.createElement('i');
+          const g = 4 + Math.random() * 6;
+          const farbe = FARBEN[i % FARBEN.length];
+          f.style.cssText = [
+            'position:absolute', 'display:block', 'pointer-events:none', 'z-index:2',
+            `left:${(Math.random() * 110 - 5).toFixed(1)}%`, `top:${(Math.random() * 110 - 5).toFixed(1)}%`,
+            `width:${g.toFixed(1)}px`, `height:${g.toFixed(1)}px`, `margin:-${(g / 2).toFixed(1)}px 0 0 -${(g / 2).toFixed(1)}px`,
+            `background:${farbe}`, 'clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)',
+            `filter:drop-shadow(0 0 3px ${farbe})`, 'opacity:0',
+            `animation:ptGlitzerFunkeln ${Math.round(380 + Math.random() * 320)}ms ease-in-out ${Math.round(Math.random() * 300) + (laneDelay || 0)}ms infinite`,
+          ].join(';');
+          card.appendChild(f);
+        }
+        // Spur: alle 45 ms ein Sternchen an der aktuellen Kartenposition.
+        const spurStart = (laneDelay || 0);
+        const spurEnde = spurStart + Math.round(durationMs * 0.85);
+        const t0 = Date.now();
+        const spurTakt = setInterval(() => {
+          const t = Date.now() - t0;
+          if (t < spurStart) return;
+          if (t > spurEnde || !card.isConnected) { clearInterval(spurTakt); return; }
+          const r = card.getBoundingClientRect();
+          if (!r.width) return;
+          for (let k = 0; k < 2; k++) {
+            const s = document.createElement('i');
+            const g = 3 + Math.random() * 5;
+            const farbe = FARBEN[Math.floor(Math.random() * FARBEN.length)];
+            s.style.cssText = [
+              'position:fixed', 'display:block', 'pointer-events:none', 'z-index:10199',
+              `left:${(r.left + Math.random() * r.width).toFixed(1)}px`, `top:${(r.top + Math.random() * r.height).toFixed(1)}px`,
+              `width:${g.toFixed(1)}px`, `height:${g.toFixed(1)}px`,
+              `background:${farbe}`, 'clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)',
+              `filter:drop-shadow(0 0 3px ${farbe})`,
+              `--gsx:${((Math.random() - 0.5) * 26).toFixed(1)}px`, `--gsy:${(Math.random() * 18 + 6).toFixed(1)}px`,
+              `animation:ptGlitzerSpur ${Math.round(420 + Math.random() * 260)}ms ease-out forwards`,
+            ].join(';');
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 760);
+          }
+        }, 45);
+      }
       const spawnFlight = () => {
         (_welt.welt && window.ppFxWeltSchicht ? window.ppFxWeltSchicht() : document.body).appendChild(card);
         setTimeout(() => card.remove(), durationMs + 100);
@@ -37959,7 +39090,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       socket.off('deepsea_spores_activated', onDeepseaSporesActivated);
       socket.off('rain_of_spores_activated', onRainOfSporesActivated);
       socket.off('nomu_draw', onNomuDraw);
-      socket.off('ability_activated', onAbilityActivated); socket.off('ability_block_flash', onAbilityBlockFlash); socket.off('play_beam_animation', onBeamAnimation);
+      socket.off('ability_activated', onAbilityActivated); socket.off('ability_block_flash', onAbilityBlockFlash); socket.off('play_beam_animation', onBeamAnimation); socket.off('play_tether_animation', onTetherAnimation); socket.off('play_screen_shake', onScreenShake);
       socket.off('hero_form_preview', onHeroFormPreview);
       clearTimeout(onHeroFormPreview._t);
       socket.off('hero_ascension', onHeroAscension);
@@ -39836,6 +40967,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'heal_creature') { return <span className="log-heal">{cName(entry.target)} healed <span className="log-amount">{entry.amount}</span> HP!</span>; }
       if (t === 'draw_batch') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew {entry.count} card{entry.count>1?'s':''}{entry.source ? <> through {cName(entry.source)}</> : null}.</span>; }
       if (t === 'potion_draw') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} drew a card from Potion Deck!</span>; }
+      // v1326: EIN Formatierer fuer alle „once per turn, when … performs …,
+      // draw a card from your Potion Deck"-Karten (`_potion-draw-trigger-shared.js`:
+      // Bonded Companion Mellvy, The Brewer's Blade).
+      if (t === 'potion_trigger_draw') { const p = playerByName(entry.player); return entry.drawn > 0
+        ? <span className="log-status">🧪 {cName(entry.card)} triggered — {pName(p.name, p.color)}'s {entry.hero || 'Hero'} performed an {entry.anlass || 'Action'}, so a card is drawn from the Potion Deck.</span>
+        : <span className="log-info">🧪 {cName(entry.card)} triggered for {pName(p.name, p.color)}, but the Potion Deck draw was prevented.</span>; }
       if (t === 'status_add') {
         const s = entry.status || '';
         if (s.toLowerCase() === 'shielded') return null;
@@ -39858,9 +40995,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         return <span className="log-info">{target} lost {styledStatus(entry.buff)}.</span>;
       }
       if (t === 'card_negated') { return <span className="log-info">{cName(entry.card)} was {styledStatus('negated')}!</span>; }
+      if (t === 'effect_fizzled') { return <span className="log-info">{cName(entry.card)} fizzled!</span>; }
       if (t === 'effect_negated') { return <span className="log-info">{cName(entry.card)} was {styledStatus('negated')}!</span>; }
       if (t === 'creature_negated') { return <span className="log-info">{cName(entry.creature)}'s effects were {styledStatus('negated')}!</span>; }
       if (t === 'hero_revived') { return <span className="log-heal">{entry.hero} was revived with {entry.hp} HP!</span>; }
+      // v1329/v1330: Soul Transmigration Ritual — und die bisher unsichtbare Loeschzeile.
+      if (t === 'soul_transmigration') { const p = playerByName(entry.player); return <span className="log-status">🕯️ {cName('Soul Transmigration Ritual')} — {pName(p.name, p.color)}'s {entry.hero} returns with full HP — now Soul Transmitted.</span>; }
+      if (t === 'soul_transmigration_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{cName('Soul Transmigration Ritual')} fizzled — {pName(p.name, p.color)}'s chosen Hero could not be revived.</span>; }
+      if (t === 'hero_defeat_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🕯️ {entry.hero} was defeated — {cName(entry.by)} deletes it and its cards, except Creatures.</span>; }
+      if (t === 'hero_deleted') { const p = playerByName(entry.player); return <span className="log-hero-defeated">🗑️ {pName(p.name, p.color)}'s {entry.hero} was deleted by {cName(entry.by)}.</span>; }
       if (t === 'gold_gain') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} gained <span className="log-amount" style={{color:'#ffcc44'}}>+{entry.amount}</span> Gold.</span>; }
       if (t === 'gold_spend') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} spent <span className="log-amount" style={{color:'#cc8844'}}>{entry.amount}</span> Gold.</span>; }
       if (t === 'forced_discard') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} discarded {cName(entry.card)}.</span>; }
@@ -39876,6 +41019,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'destroy') { return <span className="log-damage">{cName(entry.target)} was destroyed!</span>; }
       if (t === 'all_heroes_dead') { return <span className="log-damage" style={{fontWeight:700}}>All heroes defeated!</span>; }
       if (t === 'reaction_activated') { return <span className="log-status">{cName(entry.card)} activated as a Reaction!</span>; }
+      // v1328: Wirker waehrend der Kette handlungsunfaehig → Attack/Spell fizzelt.
+      if (t === 'chain_link_fizzled') { const p = playerByName(entry.player); const warum = { defeated: 'was defeated', frozen: 'is Frozen', stunned: 'is Stunned', negated: 'is Negated' }[entry.reason] || 'can no longer act'; return <span className="log-info">💨 {cName(entry.card)} fizzled — {pName(p.name, p.color)}'s {entry.hero || 'Hero'} {warum}.</span>; }
+      // v1327: Stealthy Pursuit — und die bisher unsichtbaren Dive-Down-Zeilen.
+      if (t === 'stealthy_pursuit') { const p = playerByName(entry.player); return <span className="log-status">🌫️ {cName('Stealthy Pursuit')} — {pName(p.name, p.color)}'s {entry.hero} slips out of sight until the end of their next turn.</span>; }
+      if (t === 'stealthy_pursuit_fizzle') { const p = playerByName(entry.player); return <span className="log-info">{cName('Stealthy Pursuit')} fizzled — {pName(p.name, p.color)}'s Hero is no longer there to hide.</span>; }
+      if (t === 'dive_down') { const p = playerByName(entry.player); return <span className="log-status">🫧 {cName('Dive Down')} — {pName(p.name, p.color)}'s {entry.hero} dives out of reach for this turn.</span>; }
+      if (t === 'dive_down_negated') { const p = playerByName(entry.player); return <span className="log-info">{cName('Dive Down')} was negated — {pName(p.name, p.color)}'s {entry.hero} stays in reach.</span>; }
       // v846: `amount` ist der TATSAECHLICH angekommene Schaden (Tempeste,
       // Cloud Pillow, Negationen). 0 wird als „took no … damage" gezeigt.
       if (t === 'burn_damage') { return entry.amount > 0
@@ -39887,6 +41037,19 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'level_change') { return <span className="log-info">{cName(entry.card)} is now Lv{entry.newLevel}.</span>; }
       if (t === 'deck_out') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)} decked out!</span>; }
       if (t === 'target_redirect') { return <span className="log-info">Target redirected to {entry.newTarget}!</span>; }
+      // v1340: Cheat Chair
+      if (t === 'cheat_chair') { const p = playerByName(entry.player); return <span className="log-heal">✨ {cName('Cheat Chair')} — {pName(p.name, p.color)}'s {entry.hero} rises again at <span className="log-amount">{entry.hp}</span> HP and takes no damage for the rest of the turn!</span>; }
+      // v1336: Furious Anger
+      if (t === 'furious_anger') { const p = playerByName(entry.player); return entry.spell
+        ? <span className="log-status">💢 {cName('Furious Anger')} — {pName(p.name, p.color)}'s {entry.hero} lashes out over {cName(entry.lost)} with {cName(entry.spell)}.</span>
+        : <span className="log-info">💢 {cName('Furious Anger')} — {pName(p.name, p.color)}'s {entry.hero} fumes over {cName(entry.lost)}, but casts nothing.</span>; }
+      // v1335: Memory Wipe
+      if (t === 'memory_wipe') { const p = playerByName(entry.player); return <span className="log-status">🌀 {cName('Memory Wipe')} — {pName(p.name, p.color)} wiped {entry.hero}'s memory: <span className="log-amount">{entry.sent}</span> Abilit{entry.sent === 1 ? 'y' : 'ies'} discarded.</span>; }
+      // v1334: Core Explosion
+      if (t === 'core_explosion') { const p = playerByName(entry.player); return <span className="log-damage">💥 {cName('Core Explosion')} — {pName(p.name, p.color)}'s {cName(entry.creature)} (level {entry.level}) bursts for <span className="log-amount">{entry.damage}</span> damage to every opposing target.</span>; }
+      // v1332: Empty Armor
+      if (t === 'empty_armor_redirect') { const p = playerByName(entry.player); return <span className="log-status">🛡️ {cName('Empty Armor')} steps in front of {pName(p.name, p.color)}'s {entry.hero}{entry.source ? <> — {cName(entry.source)} is redirected to it</> : null}.</span>; }
+      if (t === 'empty_armor_summon') { const p = playerByName(entry.player); return <span className="log-damage">{pName(p.name, p.color)}'s {entry.hero} takes <span className="log-amount">{entry.damage}</span> damage to summon {cName('Empty Armor')} as an additional Action.</span>; }
       if (t === 'move') { return <span className="log-info">{cName(entry.card)} was moved.</span>; }
       if (t === 'card_played') { const p = playerByName(entry.player); return <span>{pName(p.name, p.color)} used {cName(entry.card)}{entry.cost ? ` (${entry.cost}G)` : ''}!</span>; }
       if (t === 'placement') { return <span>{cName(entry.card)} was summoned by {cName(entry.by)}!</span>; }
@@ -40009,6 +41172,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'yuki_onna_extend') { const p = playerByName(entry.player); return <span className="log-status">❄️ {cName('Cold-Hearted Yuki-Onna')}: {entry.targets} Frozen target{entry.targets === 1 ? '' : 's'} stay Frozen for 2 more turns.</span>; }
       if (t === 'yukana_free_spell') { const p = playerByName(entry.player); return <span className="log-status">📚 {pName(p.name, p.color)}'s {cName('Yukana, the Scholar on the Run')} performed {cName(entry.card)} as an additional Action.</span>; }
       if (t === 'barrier_of_undying') { const p = playerByName(entry.player); return <span className="log-heal">🛡️ {pName(p.name, p.color)}'s {cName('Barrier of Undying')} kept {cName(entry.target)} at 1 HP{entry.sacrifice ? ' — the sacrifice fizzles' : ''} (deleted at the end of its owner's next turn).</span>; }
+      if (t === 'philosophers_stone') { const p = playerByName(entry.player); return <span>💎 {pName(p.name, p.color)}'s {cName(entry.card)} took {cName(entry.target)} from their Potion Deck instead of drawing.</span>; }
+      if (t === 'potion_draw_reaction') { const p = playerByName(entry.player); return <span>✨ {pName(p.name, p.color)} activated {cName(entry.card)}!</span>; }
+      if (t === 'call_of_the_deepsea') { const p = playerByName(entry.player); return <span>🌊 {pName(p.name, p.color)}'s {cName(entry.card)} deleted {cName(entry.deleted)} and summoned {cName(entry.target)} from their {entry.from === 'discard' ? 'discard pile' : 'hand'}{entry.hero ? ` with ${entry.hero}` : ''}!</span>; }
+      if (t === 'call_of_the_deepsea_attached') { const p = playerByName(entry.player); return <span>🌊 {pName(p.name, p.color)} attached Call of the Deepsea{entry.hero ? ` to ${entry.hero}` : ''}.</span>; }
+      if (t === 'call_of_the_deepsea_fizzle') { const p = playerByName(entry.player); return <span>🌊 {pName(p.name, p.color)}'s Call of the Deepsea could not summon {cName(entry.card)}.</span>; }
+      if (t === 'egg_of_god_hatch') { const p = playerByName(entry.player); return <span>🐣 {pName(p.name, p.color)}'s {cName(entry.card)} hatched into {cName(entry.target)}{entry.hero ? ` with ${entry.hero}` : ''}!</span>; }
+      if (t === 'egg_of_god_fizzle') { const p = playerByName(entry.player); return <span>🥚 {pName(p.name, p.color)}'s The Egg of God fizzled ({entry.reason === 'sacrifice_prevented' ? 'the sacrifice was prevented' : entry.reason === 'zone_taken' ? 'its Support Zone was taken' : entry.reason === 'no_target' ? 'no Creature left to search for' : 'the Creature could not be placed'}).</span>; }
+      if (t === 'lone_survivor') { const p = playerByName(entry.player); return <span>🕯️ {pName(p.name, p.color)}'s {cName(entry.card)} placed {cName(entry.target)} from the discard pile{entry.hero ? ` with ${entry.hero}` : ''}. No more Creatures can be summoned this turn.</span>; }
+      if (t === 'lone_survivor_fizzle') { const p = playerByName(entry.player); return <span>🕯️ {pName(p.name, p.color)}'s Lone Survivor could not place {cName(entry.card)}.</span>; }
+      if (t === 'relic_in_the_sky') { const p = playerByName(entry.player); return <span>✨ {pName(p.name, p.color)}'s {cName(entry.card)} returned {cName(entry.target)} from the bottom of the discard pile to their hand.</span>; }
+      if (t === 'guillotine_delete') { const p = playerByName(entry.player); return <span className="log-status">⚔️ {pName(p.name, p.color)}'s {cName(entry.card)} deleted {cName(entry.target)}{entry.hero ? ` from ${entry.hero}` : ''} until the end of the turn.</span>; }
+      if (t === 'verwahrung_zurueck') { const p = playerByName(entry.player); return <span className="log-status">↩️ {cName(entry.card)} returned to {pName(p.name, p.color)}'s {entry.hero}.</span>; }
+      if (t === 'verwahrung_kehrt_nicht_zurueck') { return <span className="log-status">✖️ {cName(entry.card)} could not return ({entry.reason === 'hero_zone_empty' ? 'its Hero Zone is empty' : 'its zone is occupied'}).</span>; }
+      if (t === 'golden_ladybug_bonus') { const p = playerByName(entry.player); return <span className="log-status">🐞 {pName(p.name, p.color)}'s {cName(entry.card)}: {entry.choice === 'gold' ? `+${entry.amount} Gold` : `draws ${entry.amount} additional card${entry.amount === 1 ? '' : 's'}`}.</span>; }
       if (t === 'double_class') { const p = playerByName(entry.player); return <span className="log-status">🎓 {pName(p.name, p.color)}'s {cName(entry.card)}: {entry.text}.</span>; }
       if (t === 'hand_card_revealed') { const p = playerByName(entry.player); return <span className="log-status">👀 {pName(p.name, p.color)} revealed {cName(entry.card)}{entry.by ? <> ({cName(entry.by)})</> : null}.</span>; }
       if (t === 'sticky_wand') { const p = playerByName(entry.player); return <span className="log-status">🪄 {pName(p.name, p.color)}'s {cName('Sticky Wand')}: {cName(entry.hero)} attached {entry.card ? cName(entry.card) : 'a card'}.</span>; }
@@ -40797,11 +41974,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     jeder neue Status verfehlen konnte (v1142: „Aged"; nie in
                     ihr standen auch Bleeding und Charmed). */}
                 {hero?.name && <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife, _extraLifeStack: hero._extraLifeStack, _oneShotDmgShields: hero._oneShotDmgShields, _targetBlockers: hero._targetBlockers }} buffs={hero.buffs} isHero={true} player={p} cardName={hero.name} isOpponentSide={isOpp} />}
-                {hero?.name && isShielded && <ImmuneIcon heroName={hero.name} statusType="shielded" />}
-                {hero?.name && isImmune && !isShielded && <ImmuneIcon heroName={hero.name} statusType="immune" />}
+                {/* ★ v1342: Immune/Shielded sind STATUS — sie stehen jetzt auch beim
+                    Helden in der linken Status-Spalte (wie bei Kreaturen), nicht
+                    mehr als eigenes Schild oben rechts. */}
+                {/* ★ v1342/v1343 — RECHTE SPALTE (Als Vorgabe 24.9.): Zaehler,
+                    Buffs und Debuffs eines Helden stehen in EINER Spalte oben
+                    rechts — Zaehler ganz oben, darunter Buffs (mit Immune und
+                    Shielded), darunter Debuffs.
+                    Die Reihenfolge macht CSS (`order` ueber badge-buff /
+                    badge-debuff / badge-zaehler), nicht die Stelle im Code;
+                    die Einzelpositionen der Abzeichen hebt die Spalte auf.
+                    Status-Abzeichen stehen in der LINKEN Spalte (StatusBadges). */}
+                <div className="badge-spalte-rechts">
                 {/* v704 (Puppets, Lucky Puppet Laki): Luck Counter auf dem Helden */}
                 {hero?.name && hero._luckCounter > 0 && (
-                  <div className="status-immune-icon puppet-counter-badge"
+                  <div className="status-immune-icon puppet-counter-badge badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it to another target you control.')}
                     onMouseLeave={hideGameTooltip}
                   >🍀{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
@@ -40812,7 +41999,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     wessen Vena hier zielt, und beide Seiten koennen je eine
                     spielen, ohne sich zu stoeren. */}
                 {hero?.name && typeof hero._bountyBy === 'number' && (
-                  <div className="status-immune-icon vena-bounty-badge"
+                  <div className="status-immune-icon vena-bounty-badge badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, hero._bountyBy === myIdx
                       ? 'Bounty: your Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.'
                       : "Bounty: your opponent's Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.")}
@@ -40821,7 +42008,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {/* Aktionssperre (v642, Plant Golem u.a.): vom Server abgeleitet, kein Status */}
                 {hero?.name && p.actionBlockedHeroes?.[i] && !isFrozen && !isStunned && (
-                  <div className="status-immune-icon status-action-blocked-icon"
+                  <div className="status-immune-icon status-action-blocked-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, 'This Hero cannot perform Actions (blocked by a card in its zones or its own effect).')}
                     onMouseLeave={hideGameTooltip}
                   >⛔</div>
@@ -40832,7 +42019,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   const lvl = (p.abilityZones?.[i] || []).reduce((n, slot) => n + (Array.isArray(slot) ? slot.filter(a => a === 'Stealth').length : 0), 0);
                   if (lvl <= 0) return null;
                   return (
-                    <div className="status-immune-icon status-stealth-icon"
+                    <div className="status-immune-icon status-stealth-icon badge-buff"
                       onMouseEnter={e => showGameTooltip(e, `Stealth ${lvl}: cannot be chosen by the opponent's level ${lvl} or lower Attacks/Spells while you control other Heroes that can be chosen.`)}
                       onMouseLeave={hideGameTooltip}
                     >🥷<span className="status-stealth-lvl">{lvl}</span></div>
@@ -40847,7 +42034,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     l.ally.owner === (isOpp ? oppIdx : myIdx) && l.ally.heroIdx === i);
                   if (!partner) return null;
                   return (
-                    <div className="status-immune-icon status-alliance-icon"
+                    <div className="status-immune-icon status-alliance-icon badge-debuff"
                       onMouseEnter={e => showGameTooltip(e, `Allied with ${partner.userName}: these two Heroes cannot choose each other with Attacks or non-Support Spells while other targets exist.`)}
                       onMouseLeave={hideGameTooltip}
                     >🤝</div>
@@ -40855,13 +42042,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 })()}
                 {/* damage_proof (Storm Piano, v628): Schadensschutz bis zum Ende des naechsten eigenen Zuges */}
                 {hero?.name && hero?.statuses?.damage_proof && !isShielded && (
-                  <div className="status-immune-icon status-damage-proof-icon"
+                  <div className="status-immune-icon status-damage-proof-icon badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Damage-proof (Storm Piano): this Hero takes no damage until the end of its controller\'s next turn. Damage that cannot be negated still hits.')}
                     onMouseLeave={hideGameTooltip}
                   >🎹</div>
                 )}
+                {/* ★ v1341 — Cheat Chair: eigener Schutz fuer den Rest des Zuges (eigenes Abzeichen, Als Vorgabe) */}
+                {hero?.name && hero?.statuses?.cheat_chair_guard && !isShielded && (
+                  <div className="status-immune-icon status-cheat-chair-icon badge-buff"
+                    onMouseEnter={e => showGameTooltip(e, 'Cheat Chair: any damage this Hero would take for the rest of this turn becomes 0. Damage that cannot be reduced or negated still hits.')}
+                    onMouseLeave={hideGameTooltip}
+                  >🪑</div>
+                )}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
-                  <div className="mummified-icon"
+                  <div className="mummified-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, "This Hero's effect has been replaced by a Mummy Token's.")}
                     onMouseLeave={hideGameTooltip}
                   >🧟</div>
@@ -40869,7 +42063,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {/* ── Lethe self-lock badge (cannot perform Actions) ── */}
                 {hero?.name && hero.hp > 0 && hero._letheActionLocked === gameState.turn && (
                   <div
-                    className="lethe-actionlock-badge"
+                    className="lethe-actionlock-badge badge-debuff"
                     style={{
                       position: 'absolute', left: 'calc(2px * var(--board-scale))',
                       bottom: 'calc(2px * var(--board-scale))',
@@ -40893,11 +42087,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     🚫
                   </div>
                 )}
-                {hero?.name && hero.buffs && <BuffColumn buffs={hero.buffs} cardName={hero.name} />}
+                {hero?.name && <BuffColumn buffs={hero.buffs} statuses={hero.statuses} cardName={hero.name} />}
                 {/* ── Deepsea Counter badge (Siphem) ── */}
                 {hero?.name && (hero.deepseaCounters || 0) > 0 && (
                   <div
-                    className="deepsea-counter-badge"
+                    className="deepsea-counter-badge badge-zaehler"
                     style={{
                       position: 'absolute', top: '6%', right: '6%',
                       minWidth: 'calc(18px * var(--board-scale))',
@@ -40924,7 +42118,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {/* ── Time Counter badge (Carris, the Time Keeper) ── */}
                 {hero?.name && (hero._timeCounters || 0) > 0 && (
                   <div
-                    className="time-counter-badge"
+                    className="time-counter-badge badge-zaehler"
                     style={{
                       position: 'absolute', top: '6%', right: '6%',
                       minWidth: 'calc(18px * var(--board-scale))',
@@ -40951,7 +42145,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 {/* ── Divinity Counter badge (Pharaoh, the Lone Living Being) ── */}
                 {hero?.name && (hero._divinityCounters || 0) > 0 && (
                   <div
-                    className="divinity-counter-badge"
+                    className="divinity-counter-badge badge-zaehler"
                     style={{
                       position: 'absolute', top: '6%', right: '6%',
                       minWidth: 'calc(18px * var(--board-scale))',
@@ -40982,7 +42176,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     einen Helden, der Pseudonias Effekt gewonnen hat. */}
                 {hero?.name && (hero.name === 'Pseudonia, the Skill Devourer' || Array.isArray(hero._pseudoniaAbsorbiert)) && (
                   <div
-                    className="pseudonia-counter-badge"
+                    className="pseudonia-counter-badge badge-zaehler"
                     onMouseEnter={e => showGameTooltip(e, (() => {
                       const liste = hero._pseudoniaAbsorbiert || [];
                       return `Devoured Hero effects: ${liste.length}/3.` + (liste.length ? ` ${liste.join(' · ')}` : ' Pseudonia may devour the effects of up to three defeated Heroes.');
@@ -40994,7 +42188,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {/* ── Evolution Counters (Waflav) ── */}
                 {hero?.name && hero._evolutionCounters > 0 && (
-                  <div
+                  <div className="badge-zaehler"
                     onMouseEnter={e => showGameTooltip(e, `Evolution Counters: ${hero._evolutionCounters}. Waflav spends them to Ascend into its forms; Descending places them back.`)}
                     onMouseLeave={hideGameTooltip}
                     style={{
@@ -41013,7 +42207,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {/* ── Invest Counters (Logan, the Investment Monkee) ── */}
                 {hero?.name && hero._investCounters > 0 && (
-                  <div
+                  <div className="badge-zaehler"
                     onMouseEnter={e => showGameTooltip(e, `Invest Counters: ${hero._investCounters}. At the end of your turn Logan can cash them in for ${hero._investCounters} Gold or ${hero._investCounters * 5} damage. Drop to 0 Gold and they are all lost.`)}
                     onMouseLeave={hideGameTooltip}
                     style={{
@@ -41037,7 +42231,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                 )}
                 {/* ── Change Counters (Cosmic Depths) ── */}
                 {hero?.name && hero._changeCounters > 0 && (
-                  <div
+                  <div className="badge-zaehler"
                     onMouseEnter={e => showGameTooltip(e, `Change Counters: ${hero._changeCounters}. Cosmic Depths counters used by Argos and the Cosmic Depths archetype.`)}
                     onMouseLeave={hideGameTooltip}
                     style={{
@@ -41059,6 +42253,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <span style={{ fontWeight: 'bold' }}>×{hero._changeCounters}</span>
                   </div>
                 )}
+                </div>{/* Ende .badge-spalte-rechts */}
                 {/* ── Ascension Orbs ── */}
                 {hero?.name && hero.ascensionOrbs && (
                   <div className="ascension-orbs-container"
@@ -41443,6 +42638,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div key={z}
                     className={'board-zone board-zone-ability' + (cards.length > 0 ? ' zone-has-card' : '') + (heroIneligible || isDead || isFrozenOrStunned ? ' board-zone-dead' : '') + (isAbTarget || attachPickZoneValid ? ' board-zone-play-target' : '') + (attachPickZoneValid ? ' attach-pick-target' : '') + (isValidPotionTarget ? ' potion-target-valid' : '') + (isValidPotionTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isSelectedPotionTarget ? ' potion-target-selected' : '') + (isExploding ? ' zone-exploding' : '') + (oppTargetHighlight.includes(abTargetId) ? ' opp-target-highlight' : '') + (canActivate && !isFreeActivatable ? ' zone-ability-activatable' : '') + (isFreeActivatable ? ' zone-ability-free-activatable' : '') + (isFriendshipActive ? ' zone-friendship-active' : '') + (isFlashing ? ' zone-ability-activated' : '') + (isBlocking ? ' zone-ability-blocked' : '') + (isBorisBlockedAbility ? ' zone-ability-boris-blocked' : '') + (isPengueSrc && !isPengueDestActive ? ' zone-pengue-src' : '') + (isPengueSrcSelected ? ' zone-pengue-selected' : '') + (isPengueDestActive ? ' zone-pengue-dest' : '')}
                     data-ability-zone="1" data-ability-hero={i} data-ability-slot={z} data-ability-owner={ownerLabel} data-card-name={cards[0] || ''}
+                    data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'ability', z).versiegelt ? '1' : undefined}
                     data-bounce-hiding={bounceOutgoingHidden.has(`ab-${pi}-${i}-${z}`) ? 'true' : undefined}
                     onClick={onAbilityClick}
                     onMouseEnter={() => {
@@ -41935,6 +43131,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               return (
                 <div key={z} className={'board-zone board-zone-support' + (cards.length > 0 ? ' zone-has-card' : '') + (isIsland ? ' board-zone-island' : '') + ((isPlayTarget || isAutoTarget) ? ' board-zone-play-target' : '') + (isValidEquipTarget ? ' potion-target-valid' : '') + (isValidEquipTarget && equipTargetIds.some(id => accentGreenTargetIds.has(id)) ? ' potion-target-accent-green' : '') + (isValidEquipTarget && pt?.config?.autoConfirm ? ' borrow-pick-target' : '') + (isIneligibleEquipTarget ? ' potion-target-ineligible' : '') + (isSelectedEquipTarget ? ' potion-target-selected' : '') + (isEquipExploding ? ' zone-exploding' : '') + (isSummonGlow ? ' zone-summon-glow' : '') + (equipTargetIds.some(id => oppTargetHighlight.includes(id)) ? ' opp-target-highlight' : '') + (isZonePickTarget ? ' zone-pick-target' : '') + (isAbilitySupportTarget ? ' board-zone-play-target' : '') + (supportAbilityEntry ? ' zone-ability-activatable' : '') + (abilityFlash && abilityFlash.zoneKind === 'support' && abilityFlash.owner === (isOpp ? oppIdx : myIdx) && abilityFlash.heroIdx === i && abilityFlash.zoneIdx === z ? ' zone-ability-activated' : '') + (istSupportAbility && (isDead || isFrozenOrStunnedSup) ? ' board-zone-dead' : '') + ((isDragValidZoneAny || isCsppEmptySlot) ? ' zone-drag-valid' : '') + (isDragInvalidZone ? (cards.length > 0 ? ' board-zone-dead' : ' zone-drag-invalid') : '') + ((isBouncePlaceTarget || isPendingBounceTarget) ? ' zone-bounce-place-target' : '') + (isProviderZone ? ' zone-provider-highlight' : '') + (isProviderSelectionActive && !isProviderZone ? ' zone-provider-dimmed' : '') + (isHeroActionZoneDimmed ? ' zone-drag-invalid' : '') + (isCreatureActivatable ? ' zone-creature-activatable' : '') + (isCreatureActivatable && istArtefaktKreatur ? ' zone-artifact-creature' : '') + (isEquipActivatable ? ' zone-equip-activatable' : '') + (isEquipActivatable && equipEffectEntry?.crossSide ? ' zone-equip-crossside' : '') + (isBakhmSurpriseActive ? ' surprise-drop-active' : isBakhmSurpriseTarget ? ' surprise-drop-eligible' : '') + (isSkatesCreature ? ' zone-skates-creature' : '') + (isSkatesCreatureSelected ? ' zone-skates-selected' : '') + (isSkatesDest ? ' zone-skates-dest' : '') + (isSlipperyCreature ? ' zone-slippery-creature' : '') + (isSlipperyCreatureSelected ? ' zone-slippery-selected' : '') + (isSlipperyDest ? ' zone-slippery-dest' : '') + (isSlipperySwap ? ' zone-slippery-dest' : '') + (isChainPickCreatureValid ? ' chain-pick-valid' : '') + (isChainPickCreatureSelected ? ' chain-pick-selected' : '') + (isStolen ? ' hero-charmed' : '')}
                   data-support-zone="1" data-support-hero={i} data-support-slot={z} data-support-owner={ownerLabel} data-support-island={isIsland ? 'true' : 'false'} data-card-name={cards[0] || ''}
+                  data-versiegelt={ppVerwahrung(gameState.players?.[pi], i, 'support', z).versiegelt ? '1' : undefined}
                   onClick={supportAbilityEntry ? () => {
                     // v769: Aktivierbare Ability in einer Support Zone
                     // (Xal). Derselbe Kanal wie in einer echten
@@ -42238,7 +43435,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                             onMouseLeave={hideGameTooltip}
                           >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                         ) : null}
-                        {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
+                        {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                         {cc?.balance > 0 ? (
                           <div className="head-counter-badge"
                             onMouseEnter={e => showGameTooltip(e, `Balance Counters: ${cc.balance}. Charm of Balance lets you draw this many cards once per turn.`)}
@@ -42582,7 +43779,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onMouseLeave={hideGameTooltip}
                       >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                     ) : null}
-                    {cc?.buffs ? <BuffColumn buffs={cc.buffs} cardName={cards[cards.length-1]} /> : null}
+                    {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                     {ladung ? (
                       <div className={'zone-charge-badge' + (ladung.remaining === 0 ? ' zone-charge-empty' : '')}
                         onMouseEnter={e => showGameTooltip(e, ladung.max != null
@@ -44051,13 +45248,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         {discardAnims.filter(a => a.welt).map(anim => (
           <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
             startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
-            delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand} />
+            delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
+            startW={anim.startW} startH={anim.startH} endW={anim.endW} />
         ))}
       </div>
       {discardAnims.filter(a => !a.welt).map(anim => (
         <DiscardAnimCard key={anim.id} cardName={anim.cardName} dest={anim.dest}
           startX={anim.startX} startY={anim.startY} endX={anim.endX} endY={anim.endY}
-          delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand} />
+          delay={anim.delay} t0={anim.t0} ausHand={anim.ausHand}
+          startW={anim.startW} startH={anim.startH} endW={anim.endW} />
       ))}
 
       {/* Floating drag card (outside game-layout to avoid overflow clip) */}
@@ -44145,6 +45344,33 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {gameAnims.filter(a => !a.welt).map(a => (
         <GameAnimationRenderer key={a.id} {...a} />
       ))}
+
+      {/* v1331: Magische Faeden (mehrere Quellen → ein Ziel) — Welt-Huelle */}
+      {tetherAnims.length > 0 && (
+        <div className="tether-animation-container fx-welt-lock">
+          <svg>
+            {tetherAnims.map(t => (
+              <g key={t.id} className="tether-gruppe" style={{ '--tDur': t.dur + 'ms', '--tFarbe': t.color, '--tGlow': t.glow }}>
+                {t.faeden.map((f, i) => (
+                  <g key={i}>
+                    <path d={f.d} className="tether-schleier" style={{ '--tLen': f.len, animationDelay: (i * 40) + 'ms' }} />
+                    <path d={f.d} className="tether-kern" style={{ '--tLen': f.len, animationDelay: (i * 40) + 'ms' }} />
+                    <path d={f.d} className="tether-fluss" style={{ animationDelay: (i * 40) + 'ms' }} />
+                    <circle r="7" className="tether-quelle" cx={f.sx} cy={f.sy} />
+                    {[0, 1, 2].map(k => (
+                      <circle key={k} r={k === 0 ? 4.5 : 3.2} className="tether-funke">
+                        <animateMotion dur={Math.round(t.dur * 0.45) + 'ms'} begin={(Math.round(t.dur * 0.22) + k * Math.round(t.dur * 0.12) + i * 40) + 'ms'}
+                          repeatCount="2" path={f.d} fill="freeze" />
+                      </circle>
+                    ))}
+                  </g>
+                ))}
+                <circle r="26" className="tether-ziel" cx={t.ziel.x} cy={t.ziel.y} />
+              </g>
+            ))}
+          </svg>
+        </div>
+      )}
 
       {/* Beam animations (laser beams, etc.) — Welt-Huelle (v1258) */}
       {beamAnims.length > 0 && (

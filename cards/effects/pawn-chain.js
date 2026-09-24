@@ -49,15 +49,22 @@ module.exports = {
     const gs = engine.gs;
     if (!gs.hoptUsed) gs.hoptUsed = {};
     gs.hoptUsed[key(pi)] = gs.turn;
+    // v1360: schon beim Aufloesen belegt (ein frueherer Listener desselben
+    // Todes) → sichtbar fizzeln statt einer Auswahl, die ins Leere laeuft.
+    if (!zoneFree(engine, pi, deathInfo.heroIdx, deathInfo.zoneSlot)) {
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+      return;
+    }
     const entries = collectHandAndDeck(engine, pi, isPawn);
     const pick = await pickFromHandOrDeck(engine, pi, entries, {
       title: CARD_NAME, auto: true, cancellable: false,
       description: `Choose a "Pawn of Kings" from your hand or deck to place into ${deathInfo.name}'s Support Zone.`,
       confirmLabel: '♟ Place!',
     });
-    if (!pick) return;
-    if (!zoneFree(engine, pi, deathInfo.heroIdx, deathInfo.zoneSlot)) return;
+    if (!pick) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' }); return; }   // v1360
+    if (!zoneFree(engine, pi, deathInfo.heroIdx, deathInfo.zoneSlot)) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' }); return; }   // v1360
     const inst = await placeFromHandOrDeck(engine, pi, pick, deathInfo.heroIdx, deathInfo.zoneSlot, CARD_NAME);
+    if (!inst) await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
     engine.log('pawn_chain', { player: gs.players[pi]?.username, placed: pick.name, from: pick.source, ok: !!inst });
     engine.sync();
   },

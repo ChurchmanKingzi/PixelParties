@@ -266,6 +266,9 @@ module.exports = {
         ps.deletedPile.push(CARD_NAME);
         if (kette?.negated) {
           engine.log('dive_down_negated', { player: ps.username, hero: hero.name });
+        } else if (kette?.fizzled) {
+          // ★ v1328: Held waehrend der Kette handlungsunfaehig — die
+          // Engine loggt `chain_link_fizzled`, der Schutz kam nie an.
         } else {
           engine.log('dive_down', { player: ps.username, hero: hero.name });
         }

@@ -64,8 +64,15 @@ module.exports = {
     );
     if (!paid || !zone) return false;
 
+    // v1360: vor der Auswahl pruefen — Opfer gerettet oder Platz von einem
+    // Todes-Listener gefuellt → sichtbar fizzeln, keine Galerie.
+    const _z0 = ps.supportZones?.[zone.heroIdx]?.[zone.slotIdx];
+    if (Array.isArray(_z0) && _z0.length > 0) {
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+      return;
+    }
     const entries = collectHandAndDeck(engine, pi, isOfKingsCreatureData);
-    if (entries.length === 0) return;
+    if (entries.length === 0) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' }); return; }   // v1360
     const pick = await pickFromHandOrDeck(engine, pi, entries, {
       title: CARD_NAME, auto: true, cancellable: false,
       description: `Choose an "of Kings" Creature from your hand or deck to place into ${zone.name}'s Support Zone.`,
@@ -73,8 +80,9 @@ module.exports = {
     });
     if (!pick) return;
     const z = ps.supportZones?.[zone.heroIdx]?.[zone.slotIdx];
-    if (Array.isArray(z) && z.length > 0) return;
+    if (Array.isArray(z) && z.length > 0) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' }); return; }   // v1360
     const inst = await placeFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME);
+    if (!inst) await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
     engine.log('kasperov_place', { player: ps.username, sacrificed: zone.name, placed: pick.name, from: pick.source, ok: !!inst });
     engine.sync();
   },

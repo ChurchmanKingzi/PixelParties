@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════
 
 const { hasCardType } = require('./_hooks');
+const { kettenblitz } = require('./_kettenblitz-shared');   // v1333
 
 module.exports = {
   requiresTarget: true,
@@ -72,26 +73,12 @@ module.exports = {
 
         const tgt = targets.find(t => t.id === selected[0]);
         if (!tgt) return;
-
-        const tgtZoneSlot = tgt.type === 'hero' ? -1 : tgt.slotIdx;
-        engine._broadcastEvent('qinglong_lightning', {
-          srcOwner: pi, srcHeroIdx: heroIdx, srcZoneSlot: -1,
-          tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step: 0,
+        // v1333: auch der Einzelblitz gilt als Wahl dieses Ziels (Umleitung).
+        await kettenblitz(engine, {
+          quelle: { name: 'Chain Lightning', owner: pi, heroIdx }, zone: 'hand',
+          ziele: [tgt], alleZiele: targets, schaden: [200], typ: 'destruction_spell',
+          start: { owner: pi, heroIdx, zoneSlot: -1 },
         });
-        await engine._delay(400);
-
-        if (tgt.type === 'hero') {
-          const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
-          if (hero && hero.hp > 0) {
-            await engine.actionDealDamage({ name: 'Chain Lightning', owner: pi, heroIdx }, hero, 200, 'destruction_spell');
-          }
-        } else if (tgt.cardInstance) {
-          await engine.actionDealCreatureDamage(
-            { name: 'Chain Lightning', owner: pi, heroIdx },
-            tgt.cardInstance, 200, 'destruction_spell',
-            { sourceOwner: pi, canBeNegated: true },
-          );
-        }
         engine.sync();
         return;
       }
@@ -114,67 +101,15 @@ module.exports = {
       );
       if (_negR?.effectNegated) return;
 
-      // ★ v1042 („Interference"): Der Blitz springt zwar von Ziel zu
-      // Ziel, ist aber EINE Quelle, die mehrere Ziele trifft — genau
-      // der Fall, gegen den die Ability schuetzt (Als Beispiel 12.9.).
-      // Die Klammer umschliesst die ganze Kette.
-      // ★★ v1185: Die Klammer meldet zusaetzlich die Kreaturen der Kette
-      // an das Anti-AoE-Fenster (Deepsea Idol). Der Blitz teilt seinen
-      // Schaden weiter nacheinander aus — die Optik der Kette bleibt.
-      await engine.beginAoeStrike(selectedTargets.length, {
-        creatures: selectedTargets
-          .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
-          .filter(k => k.inst),
-        source: { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
-        type: 'destruction_spell', sourceOwner: pi,
+      // ★ v1333: Trefferschleife im geteilten Modul (`_kettenblitz-shared`):
+      // Flaechenklammer (Interference, Deepsea Idol), Abbruch bei Negation
+      // (Frost Rune, v1324/v1325) — und NEU: jeder einzelne Blitz gilt als
+      // Wahl seines Ziels, Umleiter (Empty Armor & Co.) sehen ihn.
+      await kettenblitz(engine, {
+        quelle: { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx }, zone: 'hand',
+        ziele: selectedTargets, alleZiele: targets, schaden: damages, typ: 'destruction_spell',
+        start: { owner: pi, heroIdx: ctx.cardHeroIdx, zoneSlot: -1 },
       });
-      try {
-      // Chain lightning animation + damage
-      let prevOwner = selectedTargets[0].owner;
-      let prevHeroIdx = selectedTargets[0].heroIdx;
-      let prevZoneSlot = selectedTargets[0].type === 'hero' ? -1 : selectedTargets[0].slotIdx;
-
-      for (let step = 0; step < selectedTargets.length; step++) {
-        const tgt = selectedTargets[step];
-        const dmg = damages[step];
-        const tgtZoneSlot = tgt.type === 'hero' ? -1 : tgt.slotIdx;
-
-        if (step > 0) {
-          engine._broadcastEvent('qinglong_lightning', {
-            srcOwner: prevOwner, srcHeroIdx: prevHeroIdx, srcZoneSlot: prevZoneSlot,
-            tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step,
-          });
-        } else {
-          // First bolt originates from the spellcaster
-          engine._broadcastEvent('qinglong_lightning', {
-            srcOwner: pi, srcHeroIdx: ctx.cardHeroIdx, srcZoneSlot: -1,
-            tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step: 0,
-          });
-        }
-        await engine._delay(400);
-
-        if (tgt.type === 'hero') {
-          const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
-          if (hero && hero.hp > 0) {
-            await engine.actionDealDamage({ name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx }, hero, dmg, 'destruction_spell');
-          }
-        } else if (tgt.cardInstance) {
-          await engine.actionDealCreatureDamage(
-            { name: 'Chain Lightning', owner: pi, heroIdx: ctx.cardHeroIdx },
-            tgt.cardInstance, dmg, 'destruction_spell',
-            { sourceOwner: pi, canBeNegated: true },
-          );
-        }
-        engine.sync();
-        await engine._delay(10);
-
-        prevOwner = tgt.owner;
-        prevHeroIdx = tgt.heroIdx;
-        prevZoneSlot = tgtZoneSlot;
-      }
-      } finally {
-        engine.endMultiHit();
-      }
     },
   },
 };

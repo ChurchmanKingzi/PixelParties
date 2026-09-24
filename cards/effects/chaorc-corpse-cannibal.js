@@ -110,8 +110,11 @@ module.exports = {
 
       // Re-validate post-prompt (board can shift across the await).
       if (!(ps.hand || []).includes(CARD_NAME)) return;
-      if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) return;
-      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) return;
+      if (((ps.supportZones?.[heroIdx] || [])[slot] || []).length !== 0) {
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+        return;
+      }
+      if (!engine._canHeroActivateSurprise(pi, heroIdx, CARD_NAME)) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' }); return; }   // v1360
 
       // ── Hand→board summon flight + landing shine. ──
       // Broadcast the flight BEFORE mutating state: the client captures

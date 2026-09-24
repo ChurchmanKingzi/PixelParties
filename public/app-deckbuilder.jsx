@@ -131,7 +131,14 @@ function DeckBuilder() {
   const [ctxMenu, setCtxMenu] = useState(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [historyTick, setHistoryTick] = useState(0);
-  const [deckDropdownOpen, setDeckDropdownOpen] = useState(false);
+  // ★ v1323 (Tester-Wunsch 23.9.): die Deckliste ist die STANDARD-Ansicht
+  // beim Oeffnen des Editors.
+  const [deckDropdownOpen, setDeckDropdownOpen] = useState(true);
+  // Ein Weg fuer beide „New Deck"-Knoepfe (Liste und Werkzeugleiste).
+  const neuesDeck = async () => {
+    try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); setSampleActive(-1); }
+    catch (e) { notify(e.message, 'error'); }
+  };
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   // Highlights the first 6 main-deck cards as a simulated starting hand (toggled by Shuffle/Sort)
   const [handHighlight, setHandHighlight] = useState(false);
@@ -1474,9 +1481,7 @@ function DeckBuilder() {
             <div style={{ flex: 1 }} />
 
             {/* New Deck / New Cube */}
-            <button className="btn" style={{ margin: '8px 8px 4px', padding: 6, fontSize: 10 }} onClick={async () => {
-              try { const data = await api('/decks', { method: 'POST', body: JSON.stringify({ name: 'Deck ' + (decks.length + 1) }) }); setDecks([...decks, data.deck]); setActiveIdx(decks.length); } catch (e) { notify(e.message, 'error'); }
-            }}>+ NEW DECK</button>
+            <button className="btn" style={{ margin: '8px 8px 4px', padding: 6, fontSize: 10 }} onClick={neuesDeck}>+ NEW DECK</button>
             <button className="btn" style={{ margin: '0 8px 8px', padding: 6, fontSize: 10 }} onClick={async () => {
               try {
                 const cubeNumber = decks.filter(d => isCubeDeck(d)).length + 1;
@@ -1491,6 +1496,9 @@ function DeckBuilder() {
             {deckDropdownOpen && (
               <div className="deck-dropdown-list" style={{ position: 'absolute', inset: 0, background: 'var(--bg2)', overflowY: 'auto', zIndex: 200, boxShadow: '0 6px 16px rgba(0,0,0,.5)' }}>
                 <div className="orbit-font" style={{ padding: 8, fontSize: 10, color: 'var(--text2)', fontWeight: 700 }}>YOUR DECKS</div>
+                {/* v1323 (Tester-Wunsch): „New Deck" auch direkt in der Liste */}
+                <button className="btn" style={{ margin: '0 8px 6px', padding: 6, fontSize: 10, width: 'calc(100% - 16px)' }}
+                  onClick={async () => { await neuesDeck(); setDeckDropdownOpen(false); }}>+ NEW DECK</button>
                 {decks.map((d, i) => {
                   if (isCubeDeck(d)) return null;
                   if (d.mode === 'drafted') return null;

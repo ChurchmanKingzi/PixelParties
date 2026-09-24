@@ -88,6 +88,7 @@ module.exports = {
 
     const r = await engine._castSpellImmediately(pi, hi, name, {
       fromZone: 'hand', pool: ps.hand, poolIndex: idx, by: CARD_NAME,
+      alsZusatzaktion: true,   // v1352: „as an additional Action"
     });
     if (!r || r.cancelled) return false;   // Zielwahl abgebrochen → nichts verbraucht
     heldenSperreSetzen(gs, SPERRE, pi);

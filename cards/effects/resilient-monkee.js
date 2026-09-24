@@ -147,6 +147,8 @@ module.exports = {
             fireHooks: true, _summonedFromDiscard: true,
           },
         );
+        // v1349: „as an additional Action" — als ausgefuehrte Aktion melden.
+        if (res?.inst) await engine.meldeBeschwoerungAlsAktion(pi, ziel.heroIdx, CARD_NAME, res.inst);
         // `source: 'discard'` heisst: die Primitive nimmt die Karte SELBST
         // aus dem Ablagestapel. Vorher haendisch zu spleissen liess sie
         // dort nicht mehr finden und die Platzierung scheiterte still.

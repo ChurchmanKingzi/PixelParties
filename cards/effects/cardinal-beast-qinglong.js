@@ -5,6 +5,7 @@
 //  targets. 120/80/40 chain lightning damage.
 // ═══════════════════════════════════════════
 
+const { kettenblitz } = require('./_kettenblitz-shared');   // v1333
 const { _checkCardinalWin, _setCardinalImmune } = require('./_cardinal-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -69,57 +70,14 @@ module.exports = {
       selectedTargets,
     );
 
-    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. Die Kette ist EINE
-    // Quelle ueber alle drei Ziele — derselbe Fall wie Chain Lightning
-    // (Als Beispiel 12.9.); beides fehlte hier.
-    await engine.beginAoeStrike(selectedTargets.length, {
-      creatures: selectedTargets
-        .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
-        .filter(k => k.inst),
-      source: { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
-      type: 'creature', sourceOwner: pi,
+    // ★ v1333: Trefferschleife im geteilten Modul (`_kettenblitz-shared`)
+    // — Flaechenklammer (v1185), und jeder einzelne Blitz gilt als Wahl
+    // seines Ziels durch diesen Creature-Effekt (Umleiter sehen ihn).
+    await kettenblitz(engine, {
+      quelle: { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx }, zone: 'support',
+      ziele: selectedTargets, alleZiele: targets, schaden: damages, typ: 'creature',
+      start: { owner: pi, heroIdx, zoneSlot },
     });
-    try {
-
-    // Chain lightning from Qinglong → target 1 → target 2 → target 3
-    let prevOwner = pi, prevHeroIdx = heroIdx, prevZoneSlot = zoneSlot;
-
-    for (let step = 0; step < selectedTargets.length; step++) {
-      const tgt = selectedTargets[step];
-      const dmg = damages[step];
-      const tgtZoneSlot = tgt.type === 'hero' ? -1 : tgt.slotIdx;
-
-      engine._broadcastEvent('qinglong_lightning', {
-        srcOwner: prevOwner, srcHeroIdx: prevHeroIdx, srcZoneSlot: prevZoneSlot,
-        tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step,
-      });
-      await engine._delay(400);
-
-      if (tgt.type === 'hero') {
-        const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
-        if (hero && hero.hp > 0) {
-          await engine.actionDealDamage(
-            { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
-            hero, dmg, 'creature'
-          );
-        }
-      } else if (tgt.cardInstance) {
-        await engine.actionDealCreatureDamage(
-          { name: 'Cardinal Beast Qinglong', owner: pi, heroIdx },
-          tgt.cardInstance, dmg, 'creature',
-          { sourceOwner: pi, canBeNegated: true },
-        );
-      }
-      engine.sync();
-      await engine._delay(10);
-
-      prevOwner = tgt.owner;
-      prevHeroIdx = tgt.heroIdx;
-      prevZoneSlot = tgtZoneSlot;
-    }
-    } finally {
-      engine.endMultiHit();
-    }
 
     return true;
   },

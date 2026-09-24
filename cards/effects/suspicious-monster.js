@@ -225,7 +225,10 @@ module.exports = {
     await engine.runHooks('onCreatureDeath', {
       creature: {
         name: occName, owner: occ.owner, originalOwner: occ.originalOwner,
-        heroIdx: slotIdx, zoneSlot: slotIdx, instId: occ.id,
+        // v1360: stand hier `heroIdx: slotIdx` — Todes-Listener, die den
+        // Platz lesen (Call of the Deepsea, Grave Worm …), sahen den falschen Helden.
+        heroIdx, zoneSlot: slotIdx, instId: occ.id,
+        controller: occ.controller ?? occ.owner,
       },
       source: { name: CARD_NAME, owner: pi, heroIdx },
       _skipReactionCheck: true,

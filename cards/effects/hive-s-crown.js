@@ -264,12 +264,23 @@ module.exports = {
       sacInst,
     );
 
+    // ★ v1360 (Audit „same Support Zone"): ab hier ist das Opfer BEZAHLT.
+    // Geht danach etwas schief, bleibt Hive's Crown gespielt (keine
+    // Rueckgabe per `cancelled`) und fizzelt sichtbar. Zuerst: blieb das
+    // Opfer liegen (gerettet) oder hat ein Todes-Listener den Platz gefuellt?
+    if (sacInst.zone === 'support' || engine.supportSlotBelegt(pi, sacHeroIdx, sacZoneSlot)) {
+      engine.log('hives_crown_fizzle', { player: ps.username, reason: 'zone_taken' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
+      return true;
+    }
+
     // ── Step 3: pull the Queen from the chosen pile. ──
     if (queenSource === 'hand') {
       const handIdx = (ps.hand || []).indexOf(QUEEN_NAME);
       if (handIdx < 0) {
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'queen_left_hand' });
-        return { cancelled: true };
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_hand' });   // v1360
+        return true;
       }
       ps.hand.splice(handIdx, 1);
       // Untrack the matching hand instance so the support track is clean
@@ -282,11 +293,13 @@ module.exports = {
       const deckIdx = (ps.mainDeck || []).indexOf(QUEEN_NAME);
       if (deckIdx < 0) {
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'queen_left_deck' });
-        return { cancelled: true };
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_deck' });   // v1360
+        return true;
       }
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Hive\'s Crown' }))) {   // v820: Stapel-Schicht
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'deck_locked' });
-        return { cancelled: true };
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
+        return true;
       }
       // Reveal to opponent — standard deck-search reveal etiquette.
       const oi = pi === 0 ? 1 : 0;
@@ -323,7 +336,8 @@ module.exports = {
     }
     if (!placeRes?.inst) {
       engine.log('hives_crown_fizzle', { player: ps.username, reason: 'placement_failed' });
-      return { cancelled: true };
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'placement_failed' });   // v1360
+      return true;
     }
 
     // ── Step 5: stamp the inherited gift on the Queen. ──

@@ -6,6 +6,7 @@
 //  lightning damage.
 // ═══════════════════════════════════════════
 
+const { kettenblitz } = require('./_kettenblitz-shared');   // v1333
 const { runDiscardChain } = require('./_bottled-shared');
 const { hasCardType } = require('./_hooks');
 
@@ -59,64 +60,13 @@ module.exports = {
       selectedTargets,
     );
 
-    // ★★ v1185: Flaechenklammer + Anti-AoE-Fenster. Die Potion-Fassung
-    // von Chain Lightning hatte beides nicht — EINE Quelle ueber die
-    // ganze Kette ist aber genau der geschuetzte Fall (Als Beispiel
-    // 12.9.). Die Kette springt weiter nacheinander.
-    await engine.beginAoeStrike(selectedTargets.length, {
-      creatures: selectedTargets
-        .map((t, i) => ({ inst: t.cardInstance, amount: damages[i] }))
-        .filter(k => k.inst),
-      source: { name: 'Bottled Lightning', owner: pi },
-      type: 'potion', sourceOwner: pi,
+    // ★ v1333: Trefferschleife im geteilten Modul (`_kettenblitz-shared`)
+    // — Flaechenklammer (v1185), jeder Blitz gilt als Wahl seines Ziels.
+    // Der erste Blitz entsteht am ersten Ziel selbst (kein Wirker).
+    await kettenblitz(engine, {
+      quelle: { name: 'Bottled Lightning', owner: pi }, zone: 'hand',
+      ziele: selectedTargets, alleZiele: targets, schaden: damages, typ: 'potion',
     });
-    try {
-
-    // Chain lightning animation + damage
-    let prevOwner = selectedTargets[0].owner;
-    let prevHeroIdx = selectedTargets[0].heroIdx;
-    let prevZoneSlot = selectedTargets[0].type === 'hero' ? -1 : selectedTargets[0].slotIdx;
-
-    for (let step = 0; step < selectedTargets.length; step++) {
-      const tgt = selectedTargets[step];
-      const dmg = damages[step];
-      const tgtZoneSlot = tgt.type === 'hero' ? -1 : tgt.slotIdx;
-
-      if (step > 0) {
-        engine._broadcastEvent('qinglong_lightning', {
-          srcOwner: prevOwner, srcHeroIdx: prevHeroIdx, srcZoneSlot: prevZoneSlot,
-          tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step,
-        });
-      } else {
-        engine._broadcastEvent('qinglong_lightning', {
-          srcOwner: tgt.owner, srcHeroIdx: tgt.heroIdx, srcZoneSlot: tgtZoneSlot,
-          tgtOwner: tgt.owner, tgtHeroIdx: tgt.heroIdx, tgtZoneSlot, step: 0,
-        });
-      }
-      await engine._delay(400);
-
-      if (tgt.type === 'hero') {
-        const hero = gs.players[tgt.owner]?.heroes?.[tgt.heroIdx];
-        if (hero && hero.hp > 0) {
-          await engine.actionDealDamage({ name: 'Bottled Lightning', owner: pi }, hero, dmg, 'potion');
-        }
-      } else if (tgt.cardInstance) {
-        await engine.actionDealCreatureDamage(
-          { name: 'Bottled Lightning', owner: pi },
-          tgt.cardInstance, dmg, 'potion',
-          { sourceOwner: pi, canBeNegated: true },
-        );
-      }
-      engine.sync();
-      await engine._delay(10);
-
-      prevOwner = tgt.owner;
-      prevHeroIdx = tgt.heroIdx;
-      prevZoneSlot = tgtZoneSlot;
-    }
-    } finally {
-      engine.endMultiHit();
-    }
 
     return true;
   },

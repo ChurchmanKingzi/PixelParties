@@ -205,6 +205,7 @@ module.exports = {
       engine.log('aurora_perform', { player: ps.username, card: gewirkt });
       await engine._castSpellImmediately(pi, heroIdx, gewirkt, {
         fromZone: 'hand', pool: ps.hand, poolIndex: handIdx, by: CARD_NAME,
+        alsZusatzaktion: true,   // v1352
       });
       engine.sync();
     },

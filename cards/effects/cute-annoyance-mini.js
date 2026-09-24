@@ -230,7 +230,7 @@ module.exports = {
       engine.sync();
       return true;
     }
-    const ok = await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
+    const ok = /* v1324: Boris darf auch Abwurf-KOSTEN ignorieren — der Effekt laeuft dann ohne Abwurf */ (await engine.borisVerzicht(pi, 1, { source: CARD_NAME })) || await engine.actionDiscardHandCard(pi, result.cardName, result.handIndex, {
       source: CARD_NAME,
     });
     if (!ok || ps.hand.length >= handBefore2) {

@@ -4254,6 +4254,8 @@ function sendGameState(room, playerIdx, extra) {
       // Alices Tod.
       sharesSupportZones: !!ps._aliceShareActive,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
+      // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
+      verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, pi),
       // v642: Helden, denen eine Support-Karte (Plant Golem) oder ihr
       // Skript jede Aktion verbietet — der Client zeigt dafuer ein
       // Abzeichen. Abgeleitet, nie gespeichert (kein Puzzle-Editor-Feld).
@@ -5393,6 +5395,8 @@ function sendSpectatorGameState(room) {
       // Alices Tod.
       sharesSupportZones: !!ps._aliceShareActive,
       heroes: ps.heroes, abilityZones: ps.abilityZones,
+      // v1349: verwahrte/versiegelte Zonen (Madame Guillotine) — rotes Kreuz, Anlegen gesperrt.
+      verwahrteZonen: require('./cards/effects/_ability-verwahrung-shared').zonenFuerAnzeige(gs, spi),
       surpriseZones: ps.surpriseZones.map((sz, hi) => (sz || []).map(cn => {
         const inst = room.engine?.cardInstances.find(c => c.owner === spi && c.zone === 'surprise' && c.heroIdx === hi && c.name === cn);
         if (inst && !inst.faceDown) return cn;
@@ -6419,19 +6423,36 @@ function broadcastHandToBoard(room, ownerIdx, payload, forceOwnerAnim = false) {
  * echten Ability-Zone: gleicher Name, hoechstens 3.
  * `wunsch` ist der vom Client gezogene Slot, sofern brauchbar.
  */
-function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch) {
+function findAbilitySupportSlot(ps, heroIdx, cardName, wunsch, gs = null, pi = null) {
   const zonen = ps.supportZones?.[heroIdx] || [];
   const anzahl = Math.max(3, zonen.length);
+  // ★★ v1349: verwahrte Abilities (Madame Guillotine) — dieselben Regeln
+  // wie in `engine.abilityZielZone`: ein verwahrter Stapel nimmt die neue
+  // Kopie (gesamt ≤ 3), versiegelte Plaetze sind belegt.
+  const V = require('./cards/effects/_ability-verwahrung-shared');
+  const mitVerwahrung = gs && pi != null;
+  const nimmt = (z) => !mitVerwahrung || V.nimmtAuf(gs, pi, heroIdx, 'support', z, cardName);
+  const frei = (z) => (zonen[z] || []).length === 0
+    && !(mitVerwahrung && V.versiegelt(gs, pi, heroIdx, 'support', z));
+  if (mitVerwahrung) {
+    const verwahrt = V.verwahrterStapel(gs, pi, heroIdx, cardName);
+    if (verwahrt) {
+      if (verwahrt.zoneKind !== 'support') return -1;
+      const slot = zonen[verwahrt.slotIdx] || [];
+      if (slot.length > 0 && slot[0] !== cardName) return -1;
+      return nimmt(verwahrt.slotIdx) ? verwahrt.slotIdx : -1;
+    }
+  }
   // 1. Auf einen bestehenden gleichnamigen Stapel legen.
   for (let z = 0; z < anzahl; z++) {
     const slot = zonen[z] || [];
-    if (slot.length > 0 && slot[0] === cardName && slot.length < 3) return z;
+    if (slot.length > 0 && slot[0] === cardName) return (slot.length < 3 && nimmt(z)) ? z : -1;
   }
   // 2. Der gewuenschte Platz, wenn frei.
-  if (wunsch >= 0 && wunsch < anzahl && (zonen[wunsch] || []).length === 0) return wunsch;
+  if (wunsch >= 0 && wunsch < anzahl && frei(wunsch)) return wunsch;
   // 3. Sonst der erste freie.
   for (let z = 0; z < anzahl; z++) {
-    if ((zonen[z] || []).length === 0) return z;
+    if (frei(z)) return z;
   }
   return -1;
 }
@@ -6496,6 +6517,8 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     const vorhanden = room.engine.heroAbilityStackOf(pi, heroIdx, cardName);
     if (vorhanden && vorhanden.zoneKind === 'ability') {
       if (vorhanden.level >= 3) return false;
+      // v1349: verwahrte Kopien zaehlen mit (Madame Guillotine).
+      if (room.engine.abilityZielZone(pi, heroIdx, cardName) !== vorhanden.slotIdx) return false;
       abZones[vorhanden.slotIdx].push(cardName);
       ps.abilityZones[heroIdx] = abZones;
       (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
@@ -6509,7 +6532,7 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
       return true;
     }
     if (vorhanden && vorhanden.zoneKind === 'support' && vorhanden.level >= 3) return false;
-    const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot);
+    const ziel = findAbilitySupportSlot(ps, heroIdx, cardName, supportSlot, gs, pi);
     if (ziel < 0) return false;
     if (!ps.supportZones[heroIdx][ziel]) ps.supportZones[heroIdx][ziel] = [];
     ps.supportZones[heroIdx][ziel].push(cardName);
@@ -6525,61 +6548,44 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
     return true;
   }
 
+  // ★★ v1349: Zonenwahl an EINER Stelle (`engine.abilityZielZone`) —
+  // verwahrte Abilities (Madame Guillotine) und versiegelte Zonen.
   if (script?.customPlacement) {
     if (zoneSlot < 0 || zoneSlot >= 3) return false;
-    const zone = abZones[zoneSlot] || [];
-    if (!script.customPlacement.canPlace(zone)) return false;
+    if (room.engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: zoneSlot }) !== zoneSlot) return false;
     abZones[zoneSlot].push(cardName);
+  } else if (room.engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: zoneSlot }) >= 0) {
+    const _ziel = room.engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: zoneSlot });
+    if (!abZones[_ziel]) abZones[_ziel] = [];
+    abZones[_ziel].push(cardName);
+  } else if (require('./cards/effects/_ability-verwahrung-shared').verwahrterStapel(gs, pi, heroIdx, cardName)) {
+    // Verwahrter Stapel voll (bzw. in einer Support Zone): kein zweiter.
+    return false;
   } else {
-    // Standard placement: stack onto existing same-name zone, or take a free zone
-    let existingZoneIdx = -1;
-    let existingCount = 0;
-    for (let z = 0; z < 3; z++) {
-      if ((abZones[z] || []).length > 0 && abZones[z][0] === cardName) {
-        existingZoneIdx = z;
-        existingCount = abZones[z].length;
-        break;
-      }
-    }
-    if (existingZoneIdx >= 0) {
-      if (existingCount >= 3) return false;
-      abZones[existingZoneIdx].push(cardName);
-    } else {
-      if (zoneSlot >= 0 && zoneSlot < 3 && (abZones[zoneSlot] || []).length === 0) {
-        abZones[zoneSlot] = [cardName];
-      } else {
-        let freeZ = -1;
-        for (let z = 0; z < 3; z++) {
-          if ((abZones[z] || []).length === 0) { freeZ = z; break; }
-        }
-        if (freeZ < 0) {
-          // ── v767: Support Zones als Ability Zones (Xal, Xalibur) ────
-          // Sind alle drei Ability-Zonen belegt, darf ein Held mit
-          // dieser Eigenschaft die Ability in eine freie SUPPORT Zone
-          // legen — sie zaehlt dort voll, stapelt wie ueblich und
-          // belegt den Platz (dann keine Creature daneben).
-          const supIdx = room.engine.heroAcceptsAbilitiesInSupport(pi, heroIdx)
-            ? findAbilitySupportSlot(ps, heroIdx, cardName, zoneSlot)
-            : -1;
-          if (supIdx < 0) return false;
-          if (!ps.supportZones[heroIdx][supIdx]) ps.supportZones[heroIdx][supIdx] = [];
-          ps.supportZones[heroIdx][supIdx].push(cardName);
-          room.engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
-          ps.abilityZones[heroIdx] = abZones;
-          (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
-          room.engine.notePlayedFromHand(pi);
-          if (!ps.abilityGivenThisTurn) ps.abilityGivenThisTurn = [];
-          ps.abilityGivenThisTurn[heroIdx] = true;
-          room.engine.log('ability_attached', {
-            player: ps.username, card: cardName,
-            hero: hero.name, zone: 'support',
-          });
-          room.engine.sync();
-          return true;
-        }
-        abZones[freeZ] = [cardName];
-      }
-    }
+    // `abilityZielZone` fand keine Ability-Zone: der Stapel ist voll ODER
+    // alle Zonen sind belegt/versiegelt. Einziger Rest: Xal / Xalibur
+    // (v767) — Support Zones als Ability Zones, und nur, wenn der Held
+    // die Ability nicht schon in einer echten Zone fuehrt.
+    const _hatStapel = abZones.some(z => (z || []).length > 0 && z[0] === cardName);
+    if (_hatStapel) return false;
+    const supIdx = room.engine.heroAcceptsAbilitiesInSupport(pi, heroIdx)
+      ? findAbilitySupportSlot(ps, heroIdx, cardName, zoneSlot, gs, pi)
+      : -1;
+    if (supIdx < 0) return false;
+    if (!ps.supportZones[heroIdx][supIdx]) ps.supportZones[heroIdx][supIdx] = [];
+    ps.supportZones[heroIdx][supIdx].push(cardName);
+    room.engine._trackCard(cardName, pi, 'support', heroIdx, supIdx);
+    ps.abilityZones[heroIdx] = abZones;
+    (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
+    room.engine.notePlayedFromHand(pi);
+    if (!ps.abilityGivenThisTurn) ps.abilityGivenThisTurn = [];
+    ps.abilityGivenThisTurn[heroIdx] = true;
+    room.engine.log('ability_attached', {
+      player: ps.username, card: cardName,
+      hero: hero.name, zone: 'support',
+    });
+    room.engine.sync();
+    return true;
   }
 
   ps.abilityZones[heroIdx] = abZones;
@@ -6588,25 +6594,11 @@ async function doPlayAbility(room, pi, { cardName, handIndex, heroIdx, zoneSlot,
   // Consume the standard slot first; if it's already used, spend a bonus
   // attachment from Divine Gift of Skill instead. Track which slot was
   // consumed so a negation refund can return it cleanly.
-  let _consumedBonusSlot = false;
-  if (!ps.abilityGivenThisTurn[heroIdx]) {
-    ps.abilityGivenThisTurn[heroIdx] = true;
-  } else if ((ps._bonusAbilityAttachments?.[heroIdx] || 0) > 0) {
-    ps._bonusAbilityAttachments[heroIdx]--;
-    _consumedBonusSlot = true;
-  }
-
-  // Sync the visible Blessed buff: decrement remaining when a bonus slot
-  // was just used and recompute the lock flag (a freshly-attached Magic
-  // Arts ability bumps the hero past the Skill threshold and clears the
-  // lock — the tooltip should reflect that immediately). Drop the buff
-  // when no bonus slots remain.
-  if (hero.buffs?.blessed_skill) {
-    const blessed = hero.buffs.blessed_skill;
-    if (_consumedBonusSlot) blessed.remaining = Math.max(0, blessed.remaining - 1);
-    blessed.locked = room.engine.isHeroSkillLocked(pi, heroIdx);
-    if (blessed.remaining <= 0) delete hero.buffs.blessed_skill;
-  }
+  // v1356: Verbrauch (Standard zuerst, sonst Bonus-Platz) und Blessed-Buff
+  // an EINER Stelle — derselbe Helfer wie im Engine-Anlegeweg.
+  const _hatteStandard = !ps.abilityGivenThisTurn[heroIdx];
+  room.engine.verbraucheAbilityAnlegen(pi, heroIdx);
+  const _consumedBonusSlot = !_hatteStandard;
 
   const finalZone = abZones.findIndex(z => (z || []).includes(cardName));
   const inst = room.engine._trackCard(cardName, pi, 'ability', heroIdx, Math.max(0, finalZone));
@@ -6860,12 +6852,12 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     let finalSlot = zoneSlot;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
-        if ((placementPs.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
+        if (!room.engine.supportSlotBelegt(placementOwner, heroIdx, z)) { finalSlot = z; break; }   // v1349: versiegelt = belegt
       }
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
+    if (room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
 
     (fromCreation ? ps.creationZone : ps.hand).splice(handIndex, 1);
     room.engine.notePlayedFromHand(pi);
@@ -6971,12 +6963,12 @@ async function doPlayArtifact(room, pi, { cardName, handIndex, heroIdx, zoneSlot
     let finalSlot = zoneSlot;
     if (finalSlot < 0) {
       for (let z = 0; z < 3; z++) {
-        if ((placementPs.supportZones[heroIdx][z] || []).length === 0) { finalSlot = z; break; }
+        if (!room.engine.supportSlotBelegt(placementOwner, heroIdx, z)) { finalSlot = z; break; }   // v1349: versiegelt = belegt
       }
       if (finalSlot < 0) return false;
     }
     if (finalSlot < 0 || finalSlot >= 3) return false;
-    if ((placementPs.supportZones[heroIdx][finalSlot] || []).length > 0) return false;
+    if (room.engine.supportSlotBelegt(placementOwner, heroIdx, finalSlot)) return false;   // v1349: versiegelt = belegt
 
     // ── ENTNAHME AUFGESCHOBEN (Als Report 16.8., v414) ──────────────
     // Vorher wurde die Karte HIER aus der Hand genommen — also VOR dem
@@ -7526,7 +7518,20 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     const chainResult = await room.engine.executeCardWithChain({
       cardName, owner: pi, cardType: cardData.cardType, goldCost: 0, heroIdx,
       resolve: null,
+      // ★ v1328: Wirker-Seite (bezauberter Held) fuer die Handlungs-
+      // faehigkeitspruefung beim Aufloesen; ein von einer Creature
+      // gewirkter Spell hat keinen Helden-Wirker.
+      casterOwner: heroOwner,
+      casterCheck: !viaCreatureInstId,
     });
+    // ★ v1328 (Als Befund 24.9.): Der Wirker wurde WAEHREND der Kette
+    // handlungsunfaehig (eingefroren, besiegt, gestunnt, negiert). Der
+    // Zauber ist GESPIELT — Aktion verbraucht, Karte in die Ablage, alle
+    // Aktions-Hooks laufen —, aber sein Effekt fizzelt: kein `onPlay`,
+    // kein `afterSpellResolved`, und keine Wisdom-Kosten (die fallen nur
+    // an, wenn der Zauber wirklich aufgeloest hat, Als Vorgabe 23.9.).
+    const _gefizzelt = !chainResult.negated && !!chainResult.fizzled;
+    if (_gefizzelt) gs._spellNegatedByEffect = true;
 
     if (chainResult.negated) {
       // Refund the Hero pre-action cost — the spell never actually
@@ -7546,15 +7551,9 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
       // splice yet, so the slot still renders → flight starts there.
       await room.engine.routeNegatedInitialCard(discardOwner, cardName, chainResult, hi);
       room.engine._untrackCard(inst.id);
-      // Wisdom cost is paid IMMEDIATELY after the spell leaves hand,
-      // BEFORE any phase-advance / turn-end mechanics can interrupt.
-      // Otherwise a Flashbanged / Terror turn-end fired by the
-      // action-used hooks would walk past this discard prompt.
-      if (wisdomDiscardCost > 0) {
-        await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
-          title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-        });
-      }
+      // ★ v1323 (Tester-Befund 23.9.): die AKTIVIERUNG wurde negiert (The
+      // Master's Plan …) — der Zauber hat nie gewirkt, also fallen auch
+      // KEINE Wisdom-Kosten an. (Vorher wurden sie hier trotzdem gezahlt.)
       if (additionalConsumed && consumedInst) {
         room.engine.restoreAdditionalAction(consumedInst);
       }
@@ -7607,7 +7606,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // resolves (no-op for humans / PvP / MCTS sim). Idempotent — the
     // post-resolution _firePendingCardReveal below then no-ops.
     room.engine.maybeFireCpuRevealEarly();
-    await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
+    if (!_gefizzelt) await room.engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'hand', heroIdx, _skipReactionCheck: true });
     delete gs._attachmentZoneSlot;
     delete gs._attachmentHeroIdx;
     delete gs._attachmentOwner;
@@ -7775,6 +7774,21 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
         }
       }
     }
+    // ★ v1323 (Tester-Befund 23.9.): Wisdom JETZT zahlen — direkt nach
+    // dem Ende DIESES Zaubers, noch bevor `afterSpellResolved` einen
+    // Zweitguss ausloest (Learning, Saya …). Vorher kam die Zahlung erst
+    // ganz am Ende, nach dem Zweitguss, und beide Kosten fielen gebuendelt
+    // an. Der Zauber liegt hier noch in der Hand — er ist vom Abwurf
+    // ausgenommen (`eligibleIndices`).
+    let _wisdomBezahlt = false;
+    if (wisdomDiscardCost > 0 && !_gefizzelt) {
+      const _rIdx = getResolvingHandIndex(ps);
+      const _pool = fromCreation ? ps.hand.map((_, i) => i) : ps.hand.map((_, i) => i).filter(i => i !== _rIdx);
+      await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true, eligibleIndices: _pool,
+      });
+      _wisdomBezahlt = true;
+    }
     if (!gs._spellNegatedByEffect) {
       // Per-player, whole-game record of Spell names whose effect has
       // successfully resolved (negated Spells are excluded — we're
@@ -7907,7 +7921,7 @@ async function doPlaySpell(room, pi, { cardName, handIndex, heroIdx, charmedOwne
     // either fires too late or gets eaten by stale state. Paying
     // costs upfront matches Wisdom's "always paid even if the spell
     // is negated, interrupted, or fizzles" contract.
-    if (wisdomDiscardCost > 0) {
+    if (wisdomDiscardCost > 0 && !_wisdomBezahlt && !_gefizzelt) {   // v1323: sonst schon oben bezahlt; v1328: nicht beim Fizzeln
       await room.engine.actionPromptForceDiscard(pi, wisdomDiscardCost, {
         title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
       });
@@ -8865,6 +8879,10 @@ async function doActivateFreeAbility(room, pi, { heroIdx, zoneIdx, zoneKind, cha
     if (resolved !== false) {
       // Reservation becomes the final consumption — nothing to do.
       hoptReserved = false;
+      // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
+      await room.engine.meldeAktivEffekt({
+        kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: false,
+      });
       // Gefeuert — auch wenn die Karte den Schlüssel danach wieder
       // freigibt, weil sie mehrere Nutzungen pro Runde hat (Lethes
       // Necromancy, 3×). Die CPU liest das statt die Sperre zu prüfen.
@@ -9021,6 +9039,11 @@ async function doPlayCreature(room, pi, { cardName, handIndex, heroIdx, zoneSlot
   // (Als Bugreport: swap targeting an occupied slot summoned into a
   // free Support Zone whenever a Primordium grant round had extra
   // plays in flight).
+  // ★★ v1349: ein versiegelter Platz (Madame Guillotine) nimmt nichts auf.
+  if ((zonenPs.supportZones[heroIdx][zoneSlot] || []).length === 0
+      && require('./cards/effects/_ability-verwahrung-shared').versiegelt(gs, heroOwner, heroIdx, 'support', zoneSlot)) {
+    return _no('slot-versiegelt');
+  }
   if ((zonenPs.supportZones[heroIdx][zoneSlot] || []).length > 0) {
     const occCardScript = loadCardEffect(cardName);
     let allowOccupied = false;
@@ -9795,6 +9818,10 @@ async function doActivateAbility(room, pi, { heroIdx, zoneIdx, zoneKind, charmed
       });
     }
     // Universal action-resolved hook (see doPlaySpell for rationale).
+    // ★★ v1349: Aktiveffekt genutzt (Madame Guillotine & Co.).
+    await room.engine.meldeAktivEffekt({
+      kind: 'ability', playerIdx: pi, heroIdx, cardName: abilityName, zoneIdx, isActionCost: true,
+    });
     await room.engine.runHooks('onAnyActionResolved', {
       actionType: 'ability_activation', playerIdx: pi, abilityName, heroIdx,
       isAdditional: !!usingAdditional, isInherent: false, isFree: false,

@@ -262,7 +262,7 @@ module.exports = {
       // Caster fest: der Held dieser Zone. Ist er tot, gesperrt oder
       // erfuellt er die Levelanforderung nicht, findet nichts statt.
       const cd = engine._getCardDB()[CARD_NAME];
-      if (!canHeroSummon(engine, pi, heroIdx, cd)) {
+      if (!canHeroSummon(engine, pi, heroIdx, cd, { alsAktion: true })) {
         engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'no_eligible_caster' });
         return;
       }
@@ -293,7 +293,7 @@ module.exports = {
 
         const res = await engine.summonCreatureWithHooks(
           CARD_NAME, pi, heroIdx, slot,
-          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false },
+          { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, alsZusatzaktion: true },   // v1349
         );
         if (!res) {
           ps.hand.push(CARD_NAME);                   // zurueck auf die Hand

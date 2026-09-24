@@ -180,6 +180,7 @@ async function _playEquip(engine, pi, cardName, cd, cost) {
 
   let placedInst = null;
   const chainResult = await engine.executeCardWithChain({
+    fromBoard: true,   // v1323: aus dem DECK gespielt — kein Hand-Spiel (The Master's Plan)
     cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
     resolve: async () => {
       if (cost > 0) {
@@ -225,6 +226,7 @@ async function _runArtifactResolve(engine, pi, cardName, cost, resolveFn) {
   if (!ps) return false;
 
   const chainResult = await engine.executeCardWithChain({
+    fromBoard: true,   // v1323: aus dem DECK gespielt — kein Hand-Spiel (The Master's Plan)
     cardName, owner: pi, cardType: 'Artifact', goldCost: cost,
     resolve: resolveFn,
   });

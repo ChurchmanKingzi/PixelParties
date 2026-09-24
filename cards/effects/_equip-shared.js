@@ -36,11 +36,17 @@
 //       etwas bezahlt.
 // ═══════════════════════════════════════════
 
-/** Freie Basis-Support-Zonen (0–2) dieses Helden. */
-function freieBasisZonen(ps, heroIdx) {
+/**
+ * Freie Basis-Support-Zonen (0–2) dieses Helden.
+ * ★★ v1349: mit `engine` + `pi` zaehlen versiegelte Plaetze (Madame
+ * Guillotine) als belegt — `engine.supportSlotBelegt` ist die EINE Frage.
+ */
+function freieBasisZonen(ps, heroIdx, engine = null, pi = null) {
   const out = [];
   for (let z = 0; z < 3; z++) {
-    if (((ps?.supportZones?.[heroIdx] || [])[z] || []).length === 0) out.push(z);
+    if (engine && pi != null) {
+      if (!engine.supportSlotBelegt(pi, heroIdx, z)) out.push(z);
+    } else if (((ps?.supportZones?.[heroIdx] || [])[z] || []).length === 0) out.push(z);
   }
   return out;
 }
@@ -51,7 +57,7 @@ function istAusruestTraeger(engine, pi, heroIdx, cardName) {
   const hero = ps?.heroes?.[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.charmed) return false;
-  if (freieBasisZonen(ps, heroIdx).length === 0) return false;
+  if (freieBasisZonen(ps, heroIdx, engine, pi).length === 0) return false;
   return engine.canEquipCardToHero(cardName, pi, heroIdx);
 }
 
@@ -79,7 +85,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
 
   const ziele = [];
   for (const hi of helden) {
-    for (const si of freieBasisZonen(ps, hi)) {
+    for (const si of freieBasisZonen(ps, hi, engine, pi)) {
       ziele.push({ id: `equip-${pi}-${hi}-${si}`, type: 'equip', owner: pi, heroIdx: hi, slotIdx: si, cardName: '' });
     }
     ziele.push({ id: `hero-${pi}-${hi}`, type: 'hero', owner: pi, heroIdx: hi, cardName: ps.heroes[hi].name });
@@ -99,7 +105,7 @@ async function waehleAusruestPlatz(engine, pi, cardName, cfg = {}) {
   if (!ids || ids.length === 0) return null;
   const ziel = ziele.find(t => t.id === ids[0]);
   if (!ziel) return null;
-  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(ps, ziel.heroIdx)[0];
+  const slot = ziel.type === 'equip' ? ziel.slotIdx : freieBasisZonen(ps, ziel.heroIdx, engine, pi)[0];
   if (slot == null) return null;
   return { heroIdx: ziel.heroIdx, slot };
 }

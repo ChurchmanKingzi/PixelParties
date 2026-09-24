@@ -184,11 +184,41 @@ function eligibleIndicesWithoutResolving(ps) {
 function handSizeWithoutResolving(ps) {
   const hand = ps?.hand || [];
   const rc = ps?._resolvingCard;
-  if (!rc || rc.fromCreation) return hand.length;
-  return hand.length - (getResolvingHandIndex(ps) >= 0 ? 1 : 0);
+  let n = hand.length;
+  if (rc && !rc.fromCreation && getResolvingHandIndex(ps) >= 0) n--;
+  // ★ v1323 (Tester-Befund 23.9.: Yukana + Supply Chain zog nur bis 6):
+  // Zusatz-Guesse, die WAEHREND eines anderen Zaubers laufen (Learning,
+  // Rubin, Yukana, Junshi, Ellie …), liegen ebenfalls noch in der Hand.
+  // Sie stehen auf einem eigenen Stapel und zaehlen genauso wenig mit —
+  // jede Kopie einmal, solange sie wirklich noch in der Hand ist.
+  const rest = hand.slice();
+  if (rc && !rc.fromCreation) { const i = getResolvingHandIndex(ps); if (i >= 0) rest[i] = undefined; }
+  for (const name of (ps?._zusatzAufloesend || [])) {
+    const j = rest.indexOf(name);
+    if (j >= 0) { rest[j] = undefined; n--; }
+  }
+  return n;
+}
+
+/**
+ * v1323 — ein Zusatz-Guss aus der Hand laeuft: seine Karte zaehlt fuer
+ * `handSizeWithoutResolving` nicht mit, bis `fn` fertig ist. Verschachtelt
+ * ist erlaubt (Stapel).
+ */
+async function mitZusatzAufloesung(ps, name, fn) {
+  if (!ps) return fn();
+  if (!ps._zusatzAufloesend) ps._zusatzAufloesend = [];
+  ps._zusatzAufloesend.push(name);
+  try { return await fn(); }
+  finally {
+    const i = ps._zusatzAufloesend.lastIndexOf(name);
+    if (i >= 0) ps._zusatzAufloesend.splice(i, 1);
+    if (ps._zusatzAufloesend.length === 0) delete ps._zusatzAufloesend;
+  }
 }
 
 module.exports = {
+  mitZusatzAufloesung,
   handSizeWithoutResolving,
   eligibleCreationIndices,
   beginHandResolve,

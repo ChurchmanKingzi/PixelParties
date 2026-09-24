@@ -102,17 +102,6 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   // it lands deterministically — same contract as the regular
   // doPlaySpell flow ("Wisdom is always paid even if the spell is
   // negated, interrupted, or fizzles").
-  const wisdomCost = engine.getWisdomDiscardCost(ctx.cardOwner, ctx.cardHeroIdx, boostedCd);
-  if (wisdomCost > 0) {
-    gs._archibaldCasting = true;
-    try {
-      await engine.actionPromptForceDiscard(ctx.cardOwner, wisdomCost, {
-        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-      });
-    } finally {
-      delete gs._archibaldCasting;
-    }
-  }
 
   // Temporary per-card level override so any nested level check
   // mid-cast sees the boosted value.
@@ -129,6 +118,8 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
   const hadPriorLog = gs._spellDamageLog !== undefined;
   if (!hadPriorLog) gs._spellDamageLog = [];
+  // v1339: der Guss aus der Ablage wird dem Gegner gezeigt (Engine-Helfer).
+  const _auftritt = engine.gussAuftrittBeginnen(cardName, ctx.cardOwner);
 
   try {
     await engine.runHooks('onPlay', {
@@ -163,8 +154,23 @@ async function castSpellAsArchibald(engine, ctx, hero, cardName, evalResult) {
     if (prevOverride === undefined) delete hero.levelOverrideCards[cardName];
     else hero.levelOverrideCards[cardName] = prevOverride;
     engine._untrackCard(synthInst.id);
+    engine.gussAuftrittBeenden(_auftritt, { abgebrochen: !!gs._spellCancelled });
   }
 
+  // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — wie im
+  // regulaeren Zauber-Weg; ein abgebrochener Guss kostet nichts. Die Hoehe
+  // richtet sich weiter nach dem GEHOBENEN Level.
+  const wisdomCost = engine.getWisdomDiscardCost(ctx.cardOwner, ctx.cardHeroIdx, boostedCd);
+  if (wisdomCost > 0 && !gs.result && !gs._spellCancelled) {
+    gs._archibaldCasting = true;
+    try {
+      await engine.actionPromptForceDiscard(ctx.cardOwner, wisdomCost, {
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+      });
+    } finally {
+      delete gs._archibaldCasting;
+    }
+  }
   engine.log('archibald_cast', {
     player: gs.players[ctx.cardOwner]?.username,
     spell: cardName,

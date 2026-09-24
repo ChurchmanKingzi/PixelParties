@@ -92,9 +92,12 @@ module.exports = {
       inst.counters._rookTriggerTurn = gs.turn;
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi, source: victim });
 
+      // v1360: vor der Auswahl pruefen (Opfer gerettet / Platz gefuellt).
+      const _z0 = ps.supportZones?.[secondVictim.heroIdx]?.[secondVictim.zoneSlot];
+      if (Array.isArray(_z0) && _z0.length > 0) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' }); return; }   // v1360
       const fam = familyName(secondVictim.name);
       const entries = collectHandAndDeck(engine, pi, cd => isOfKingsCreatureData(cd) && familyName(cd.name) !== fam);
-      if (entries.length === 0) return;
+      if (entries.length === 0) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' }); return; }   // v1360
       const pick = await pickFromHandOrDeck(engine, pi, entries, {
         title: CARD_NAME, auto: true, cancellable: false,
         description: `Choose an "of Kings" Creature (not "${fam}") from your hand or deck to place into ${secondVictim.name}'s Support Zone.`,
@@ -102,8 +105,9 @@ module.exports = {
       });
       if (!pick) return;
       const zone = ps.supportZones?.[secondVictim.heroIdx]?.[secondVictim.zoneSlot];
-      if (Array.isArray(zone) && zone.length > 0) return;   // Zone belegt (Reaktion dazwischen)
+      if (Array.isArray(zone) && zone.length > 0) { await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' }); return; }   // Zone belegt (Reaktion dazwischen)   // v1360
       const placed = await placeFromHandOrDeck(engine, pi, pick, secondVictim.heroIdx, secondVictim.zoneSlot, CARD_NAME);
+      if (!placed) await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
       engine.log('rook_of_kings_replace', { player: ps.username, sacrificed: secondVictim.name, placed: pick.name, from: pick.source, ok: !!placed });
       engine.sync();
     },

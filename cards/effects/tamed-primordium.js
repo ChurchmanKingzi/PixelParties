@@ -39,7 +39,7 @@ function eligibleHand(engine, pi) {
     const cd = cardDB[n];
     if (!cd || !(cd.cardType === 'Creature' || String(cd.cardType || '').split('/').includes('Creature'))) continue;
     if (engine.effectiveCardLevel(cd, pi) > MAX_LEVEL) continue;
-    if (summonZonesFor(engine, pi, cd).length === 0) continue;
+    if (summonZonesFor(engine, pi, cd, { alsAktion: true }).length === 0) continue;
     out.push(n);
   }
   return out;
@@ -96,7 +96,7 @@ module.exports = {
         });
         if (!res || res.cancelled || !res.cardName) break;
         const cd = engine._getCardDB()[res.cardName];
-        const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, cd), CARD_NAME, `Summon ${res.cardName} with which Hero?`);
+        const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, cd, { alsAktion: true }), CARD_NAME, `Summon ${res.cardName} with which Hero?`);
         if (!zone) break;
         const out = await engine.summonFromPile(pi, 'hand', res.cardName, zone.heroIdx, zone.slotIdx, {
           source: CARD_NAME, sourceOwner: pi, hookExtras: { _summonedByTamedPrimordium: true },

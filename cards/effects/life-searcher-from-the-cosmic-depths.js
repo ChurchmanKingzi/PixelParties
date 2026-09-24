@@ -246,16 +246,19 @@ module.exports = {
     const occupied = ((ps.supportZones?.[sameHero] || [])[sameSlot] || []).length > 0;
     if (occupied) {
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'slot_occupied' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
       return true;
     }
 
     const upIdx = (ps.mainDeck || []).indexOf(chosen);
     if (upIdx < 0) {
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'no_upgrade_post_shuffle' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
       return true;
     }
     if (!(await engine.takeFromPile(ps, 'deck', upIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'deck_locked' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
       return true;
     }
 

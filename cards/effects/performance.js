@@ -70,7 +70,10 @@ module.exports = {
   hooks: {
     onPlay: async (ctx) => {
       // Deal 50 damage to the hero this was attached to
-      const hero = ctx.attachedHero;
+      // v1352 (Als Ruling): kehrt Performance aus der Verwahrung zurueck
+      // (Madame Guillotine), ist das KEIN Anlegen — kein Schaden. Die
+      // Kopie-Wirkung darunter (Fighting-ATK usw.) laeuft trotzdem.
+      const hero = ctx._verwahrungRueckkehr ? null : ctx.attachedHero;
       if (hero) {
         await ctx.dealDamage(hero, 50);
       }

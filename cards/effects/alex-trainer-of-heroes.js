@@ -43,7 +43,12 @@ const { loadCardEffect } = require('./_loader');
 const CARD_NAME = 'Alex, Trainer of Heroes';
 
 /** Pick the zone slot the tutored ability will land in on `targetHeroIdx`. */
-function findTargetZone(abZones, cardName) {
+function findTargetZone(abZones, cardName, engine = null, pi = null, heroIdx = null, wunsch = -1) {
+  // ★★ v1349: mit Engine-Kontext entscheidet die EINE Stelle
+  // (`engine.abilityZielZone`, verwahrte Abilities / Madame Guillotine).
+  if (engine && pi != null && heroIdx != null) {
+    return engine.abilityZielZone(pi, heroIdx, cardName, { wunschZone: wunsch });
+  }
   const script = loadCardEffect(cardName);
   if (script?.customPlacement) {
     for (let z = 0; z < 3; z++) {
@@ -150,7 +155,7 @@ module.exports = {
         // Resolve the destination zone (stack onto existing, then first free).
         const abZones = psp.abilityZones[opt.heroIdx] || [[], [], []];
         psp.abilityZones[opt.heroIdx] = abZones;
-        const zone = findTargetZone(abZones, opt.cardName);
+        const zone = findTargetZone(abZones, opt.cardName, eng, cpuIdx, opt.heroIdx);
         if (zone < 0) return false;
         if (!abZones[zone]) abZones[zone] = [];
         abZones[zone].push(opt.cardName);
@@ -180,7 +185,7 @@ module.exports = {
       // Stash the chosen hero (and the deterministic zone) for the
       // follow-up abilityAttachTarget prompt.
       const abZones = ps.abilityZones[best.heroIdx] || [[], [], []];
-      const zone = findTargetZone(abZones, best.cardName);
+      const zone = findTargetZone(abZones, best.cardName, engine, cpuIdx, best.heroIdx);
       engine._alexCpuPick = {
         cardName: best.cardName,
         heroIdx: best.heroIdx,
@@ -264,7 +269,7 @@ module.exports = {
       if (eligibleHeroes.length === 1) {
         const onlyHero = eligibleHeroes[0];
         const abZonesCheck = ps.abilityZones[onlyHero] || [[], [], []];
-        const zone = findTargetZone(abZonesCheck, chosenAbility);
+        const zone = findTargetZone(abZonesCheck, chosenAbility, engine, pi, onlyHero);
         // Single hero + the placement is deterministic (stack slot or only
         // free slot) → no need to bother the player with a prompt.
         const ambiguous = zone < 0 ? false : abZonesCheck.filter((s, z) => {
@@ -307,19 +312,8 @@ module.exports = {
       ps.abilityZones[targetHeroIdx] = abZones;
       // If the player clicked a specific zone, respect it (after re-validating
       // legality). Otherwise fall back to the auto-picker.
-      let targetZone = -1;
-      if (explicitZone >= 0 && explicitZone < 3) {
-        const slot = abZones[explicitZone] || [];
-        const script = loadCardEffect(chosenAbility);
-        if (script?.customPlacement) {
-          if (script.customPlacement.canPlace(slot)) targetZone = explicitZone;
-        } else if (slot.length === 0) {
-          targetZone = explicitZone;
-        } else if (slot.length > 0 && slot[0] === chosenAbility && slot.length < 3) {
-          targetZone = explicitZone;
-        }
-      }
-      if (targetZone < 0) targetZone = findTargetZone(abZones, chosenAbility);
+      // v1349: gewuenschter Platz und Rueckfall an EINER Stelle.
+      const targetZone = findTargetZone(abZones, chosenAbility, engine, pi, targetHeroIdx, explicitZone);
       if (targetZone < 0) {
         // Race: the target zone filled between canAttach check and now.
         ps.mainDeck.push(chosenAbility);

@@ -148,6 +148,9 @@ module.exports = {
     onCardEnterZone: async (ctx) => {
       const entering = ctx.enteringCard;
       if (!entering) return;
+      // v1352 (Als Ruling): die Rueckkehr einer verwahrten Ability (Madame
+      // Guillotine) ist kein Ausspielen.
+      if (ctx._verwahrungRueckkehr) return;
       await module.exports.hooks._triggerLuck(ctx, entering.name, entering.owner);
     },
 

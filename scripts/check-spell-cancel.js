@@ -53,6 +53,7 @@ const GEPRUEFT = {
   'Alliance':                 'Prompt im Brett-Hook der bereits angelegten Karte',
   'Anti Magic Enchantment':   'Prompt im Brett-Hook des Anhaengsels',
   'Bifab, Bridge to Coolness': 'laeuft ueber die Coolness-Stack-Aufloesung, nicht ueber den Handweg',
+  'Call of the Deepsea':      'Prompt im Todes-Hook des Anhaengsels (v1358); der Handweg bricht ueber `attachToHero` ab, das das Flag selbst setzt',
   'Idej Projection':          'kein onPlay — der Prompt gehoert dem angelegten Anhaengsel',
   'Intrude':                  'Prompt im Reaktions-Hook des Anhaengsels',
   'Laser Volley':             'fragt den GEGNER, Folgeentscheidung nach der Aufloesung',

@@ -177,6 +177,13 @@ module.exports = {
         return;
       }
 
+      // v1360 (Audit „same Support Zone"): Austritts-Listener koennen den
+      // Platz sofort fuellen → sichtbar fizzeln, keine Galerie.
+      if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlot)) {
+        engine.log('deepsea_no_replacement', { player: ps.username, reason: 'zone_taken' });
+        await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'zone_taken' });
+        return;
+      }
       // ── Step 3: pick replacement Creature from deck or hand.
       // Excludes the bounced Creature's name — copies of the same
       // Creature can't return to the same slot. ──
@@ -185,7 +192,7 @@ module.exports = {
         // Defensive — `getValidBounceTargets` should have filtered this
         // case out. Bounce already committed, fizzle silently.
         engine.log('deepsea_no_replacement', { player: ps.username });
-        engine.sync();
+        await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'no_target' });   // v1360
         return;
       }
 
@@ -230,6 +237,12 @@ module.exports = {
       }
 
       // ── Step 4: place into the bounced creature's slot ──
+      if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlot)) {   // v1360
+        ps.hand.push(repName);
+        engine._trackCard(repName, pi, 'hand');
+        await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'zone_taken' });
+        return;
+      }
       const summonRes = await engine.summonCreatureWithHooks(
         repName, pi, bouncedHeroIdx, bouncedSlot,
         { source: 'Divine Gift of the Deepsea', isPlacement: true }
@@ -238,7 +251,7 @@ module.exports = {
         // Placement fizzled (beforeSummon refused etc.) — refund the card to hand.
         ps.hand.push(repName);
         engine._trackCard(repName, pi, 'hand');
-        engine.sync();
+        await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }
 

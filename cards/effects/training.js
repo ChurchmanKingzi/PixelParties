@@ -219,25 +219,10 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
   ps.abilityZones[heroIdx] = abZones;
   const cardName = picked.cardName;
   const script = loadCardEffect(cardName);
-  let targetZone = -1;
-
-  if (script?.customPlacement) {
-    for (let z = 0; z < 3; z++) {
-      if (script.customPlacement.canPlace(abZones[z] || [])) { targetZone = z; break; }
-    }
-  } else {
-    // Stack onto existing or find free zone
-    for (let z = 0; z < 3; z++) {
-      if ((abZones[z] || []).length > 0 && abZones[z][0] === cardName && abZones[z].length < 3) {
-        targetZone = z; break;
-      }
-    }
-    if (targetZone < 0) {
-      for (let z = 0; z < 3; z++) {
-        if ((abZones[z] || []).length === 0) { targetZone = z; break; }
-      }
-    }
-  }
+  void script;
+  // v1349: Zonenwahl an EINER Stelle (`engine.abilityZielZone` — auch
+  // customPlacement; verwahrte Abilities, Madame Guillotine).
+  const targetZone = engine.abilityZielZone(playerIdx, heroIdx, cardName);
 
   if (targetZone < 0) return false; // No valid zone — shouldn't happen if canAttach was checked
 

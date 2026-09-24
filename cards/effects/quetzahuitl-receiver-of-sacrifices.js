@@ -285,7 +285,9 @@ async function performDescent(engine, pi, dyingHero, handInst) {
     if (!pulledFrom) break;
 
     const abZones = ps.abilityZones[targetHeroIdx];
-    const targetZone = pickDivinityZone(abZones);
+    void abZones;
+    // v1349: Zonenwahl an EINER Stelle (verwahrte Abilities, Madame Guillotine).
+    const targetZone = engine.abilityZielZone(pi, targetHeroIdx, DIVINITY);
     if (targetZone < 0) {
       // Out of room — refund the pulled copy back to where it came from.
       refundDivinity(engine, pi, pulledFrom);
@@ -348,19 +350,6 @@ function refundDivinity(engine, pi, source) {
   else if (source === 'discard') ps.discardPile.push(DIVINITY);
 }
 
-function pickDivinityZone(abZones) {
-  // Stack onto an existing Divinity slot first (max 3 deep), else
-  // use the first empty slot. Mirrors sacrifice-to-divinity.js's
-  // auto-placement tie-breaker.
-  for (let z = 0; z < 3; z++) {
-    const slot = abZones[z] || [];
-    if (slot.length > 0 && slot[0] === DIVINITY && slot.length < 3) return z;
-  }
-  for (let z = 0; z < 3; z++) {
-    if ((abZones[z] || []).length === 0) return z;
-  }
-  return -1;
-}
 
 // ═══════════════════════════════════════════
 //  HERO-ZONE LISTENER — loss on defeat

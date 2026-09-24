@@ -50,7 +50,7 @@ module.exports = {
       const entries = collectHandAndDeck(engine, pi, isPawn);
       if (entries.length === 0) return;
       const cd = engine._getCardDB()[entries[0].name];
-      const zones = summonZonesFor(engine, pi, cd);
+      const zones = summonZonesFor(engine, pi, cd, { alsAktion: true });
       if (zones.length === 0) return;
 
       const yes = await engine.promptGeneric(pi, {
@@ -69,10 +69,10 @@ module.exports = {
         description: 'Choose which "Pawn of Kings" to summon.', confirmLabel: '♟ Summon!',
       });
       if (!pick) return;
-      const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, engine._getCardDB()[pick.name]),
+      const zone = await pickZone(engine, pi, summonZonesFor(engine, pi, engine._getCardDB()[pick.name], { alsAktion: true }),
         CARD_NAME, `Summon ${pick.name} with which Hero?`);
       if (!zone) return;
-      const inst = await summonFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME);
+      const inst = await summonFromHandOrDeck(engine, pi, pick, zone.heroIdx, zone.slotIdx, CARD_NAME, {}, { alsZusatzaktion: true });
       engine.log('kasperov_w_summon', { player: gs.players[pi]?.username, summoned: pick.name, from: pick.source, ok: !!inst });
       if (inst) {
         await engine.runHooks('onAnyActionResolved', {

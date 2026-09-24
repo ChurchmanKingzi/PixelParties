@@ -135,6 +135,9 @@ module.exports = {
       // ── Hand copies → discard (zone-anchored flight before the
       //    splice + the hook-firing discard helper). ──
       let guard = 0;
+      // v1324: Boris darf den erzwungenen Abwurf aus der Hand ignorieren.
+      const _anzahl = (oppPs.hand || []).filter(n => n === name).length;
+      if (_anzahl > 0 && await engine.borisVerzicht(oppIdx, _anzahl, { source: CARD_NAME, sourceOwner: 1 - oppIdx })) guard = 99;
       while (guard++ < 40) {
         const idx = (oppPs.hand || []).indexOf(name);
         if (idx < 0) break;

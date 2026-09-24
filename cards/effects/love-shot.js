@@ -380,14 +380,6 @@ module.exports = {
         const inst = engine._trackCard(chosenName, pi, 'hand', sel.heroIdx, -1);
         inst.heroOwner = oi;
 
-        if (chosenCd.cardType === 'Spell') {
-          const wisdomCost = engine.getWisdomDiscardCost(oi, sel.heroIdx, chosenCd);
-          if (wisdomCost > 0) {
-            await engine.actionPromptForceDiscard(pi, wisdomCost, {
-              title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-            });
-          }
-        }
 
         gs._immediateActionContext = true;
         gs._spellCancelled = false;
@@ -397,6 +389,9 @@ module.exports = {
         if (chosenCd.cardType === 'Spell') engine._pushResolvingSpell(chosenName);
 
         let innerCancelled = false;
+        // v1339: der innere Spell/Attack wird dem Gegner gezeigt wie beim
+        // normalen Spielen (gemeinsamer Engine-Helfer).
+        const _auftritt = engine.gussAuftrittBeginnen(chosenName, pi);
         try {
           await engine.runHooks('onPlay', {
             _onlyCard: inst, playedCard: inst,
@@ -430,8 +425,20 @@ module.exports = {
         } finally {
           gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
           if (chosenCd.cardType === 'Spell') engine._popResolvingSpell();
+          engine.gussAuftrittBeenden(_auftritt, { abgebrochen: innerCancelled });
         }
 
+        // ★ v1323 (Tester-Befund 23.9.): Wisdom erst NACH dem Guss und nur,
+        // wenn er nicht abgebrochen wurde — vorher zahlte man vor der
+        // Zielwahl und verlor die Abwuerfe bei einem Abbruch.
+        if (!innerCancelled && chosenCd.cardType === 'Spell' && !gs.result) {
+          const wisdomCost = engine.getWisdomDiscardCost(oi, sel.heroIdx, chosenCd);
+          if (wisdomCost > 0) {
+            await engine.actionPromptForceDiscard(pi, wisdomCost, {
+              title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+            });
+          }
+        }
         if (innerCancelled) {
           const _retIdx = ps.hand.length;
           engine._broadcastEvent('play_pile_transfer', {

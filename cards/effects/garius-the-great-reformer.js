@@ -318,11 +318,17 @@ module.exports = {
       // contract. Bail cleanly: HOPT stays refunded, deck untouched.
       const slotArr = ps.supportZones?.[sacHeroIdx]?.[sacZoneSlot] || [];
       if (slotArr.length > 0) {
+        // v1360: Opfer blieb liegen (immun) → wie bisher, Sperre zurueck.
+        // Liegt dort aber eine ANDERE Karte (ein Todes-Listener hat den
+        // frei gewordenen Platz gefuellt), ist das Opfer bezahlt: sichtbar
+        // fizzeln, Einmal-pro-Zug verbraucht.
+        const opferLiegt = sacInst.zone === 'support' && sacInst.heroIdx === sacHeroIdx && sacInst.zoneSlot === sacZoneSlot;
         engine.log('garius_reform_blocked', {
-          player: ps.username, reason: 'sacrifice immune', card: sacName,
+          player: ps.username, reason: opferLiegt ? 'sacrifice immune' : 'zone_taken', card: sacName,
         });
-        engine.sync();
-        return false;
+        if (opferLiegt) { engine.sync(); return false; }
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+        return true;
       }
 
       // (2) Pop the chosen card from the deck and reshuffle.
@@ -330,13 +336,13 @@ module.exports = {
       if (deckIdx < 0) {
         // Sacrifice already committed; deck shifted unexpectedly. Bail
         // cleanly — HOPT stays consumed (we did pay the sacrifice).
-        engine.sync();
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
         return true;
       }
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
         // Sacrifice already committed; deck locked. Bail cleanly —
         // HOPT stays consumed (we did pay the sacrifice).
-        engine.sync();
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
         return true;
       }
 
@@ -357,7 +363,7 @@ module.exports = {
         // deck card so the player isn't out a card AND a HOPT.
         ps.mainDeck.push(repName);
         engine.shuffleDeck(pi);
-        engine.sync();
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return true;
       }
 

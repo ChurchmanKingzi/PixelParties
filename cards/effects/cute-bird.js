@@ -78,6 +78,8 @@ module.exports = {
       // anchor to a corpse's column.
       const hostHero = ps.heroes?.[heroIdx];
       if (!hostHero?.name || hostHero.hp <= 0) return;
+      // v1360: „into the same Support Zone" — schon belegt → nichts anbieten.
+      if (engine.supportSlotBelegt(pi, heroIdx, zoneSlot)) return;
 
       const confirmed = await engine.promptGeneric(pi, {
         type: 'confirm',
@@ -98,17 +100,25 @@ module.exports = {
         selfInflicted: true,
       });
 
+      // v1360: der Platz kann waehrend der Kosten belegt worden sein.
+      if (engine.supportSlotBelegt(pi, heroIdx, zoneSlot)) {
+        engine.log('cute_bird_fizzle', { player: ps.username, reason: 'zone_taken' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+        return;
+      }
       // Re-verify Phoenix is still in deck (a discard hook MIGHT have
-      // moved it — defensive). If gone, fizzle silently; cost is paid.
+      // moved it — defensive). If gone, fizzle; cost is paid.
       const deckIdx = (ps.mainDeck || []).indexOf(TUTOR_TARGET);
       if (deckIdx < 0) {
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'no_phoenix_in_deck' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
         return;
       }
 
       // Pull Phoenix out, shuffle deck, broadcast deck-search reveal.
       if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'deck_locked' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
         return;
       }
       engine._broadcastEvent('deck_search_add', { cardName: TUTOR_TARGET, playerIdx: pi });
@@ -133,6 +143,7 @@ module.exports = {
         ps.mainDeck.push(TUTOR_TARGET);
         engine.shuffleDeck(pi, 'main');
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'canSummon_or_noSlot' });
+        await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }
 

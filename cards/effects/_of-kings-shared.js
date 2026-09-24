@@ -224,9 +224,9 @@ function summonedThisTurn(engine, inst) {
 }
 
 function freeZonesOfHero(engine, pi, heroIdx) {
-  const zones = engine.gs.players[pi]?.supportZones?.[heroIdx] || [[], [], []];
   const out = [];
-  for (let z = 0; z < 3; z++) if ((zones[z] || []).length === 0) out.push(z);
+  // v1349: versiegelte Plaetze (Madame Guillotine) zaehlen als belegt.
+  for (let z = 0; z < 3; z++) if (!engine.supportSlotBelegt(pi, heroIdx, z)) out.push(z);
   return out;
 }
 
@@ -307,19 +307,24 @@ async function placeFromHandOrDeck(engine, pi, entry, heroIdx, slotIdx, sourceNa
  * Kreatur aus Hand oder Deck BESCHWOEREN (echte Beschwoerung; Held +
  * Zone hat der Aufrufer geprueft) — Stapel-Schicht `engine.summonFromPile`.
  */
-async function summonFromHandOrDeck(engine, pi, entry, heroIdx, slotIdx, sourceName, hookExtras = {}) {
+async function summonFromHandOrDeck(engine, pi, entry, heroIdx, slotIdx, sourceName, hookExtras = {}, extra = {}) {
   return engine.summonFromPile(pi, entry.source, entry.name, heroIdx, slotIdx, {
     source: sourceName, sourceOwner: pi, hookExtras: { _ofKingsSummon: true, ...hookExtras },
+    alsZusatzaktion: !!extra.alsZusatzaktion,   // v1349
   });
 }
 
-/** Helden, mit denen `cd` regulaer beschworen werden koennte, samt freier Zonen. */
-function summonZonesFor(engine, pi, cd) {
+/**
+ * Helden, mit denen `cd` regulaer beschworen werden koennte, samt freier Zonen.
+ * `opts.alsAktion` (v1344): die Beschwoerung ist eine (Zusatz-)Aktion —
+ * dann greifen auch die Aktionssperren (Kasperov [W], Tamed Primordium).
+ */
+function summonZonesFor(engine, pi, cd, opts = {}) {
   const { canHeroSummon } = require('./_summon-eligibility');
   const out = [];
   const heroes = engine.gs.players[pi]?.heroes || [];
   for (let hi = 0; hi < heroes.length; hi++) {
-    if (!canHeroSummon(engine, pi, hi, cd)) continue;
+    if (!canHeroSummon(engine, pi, hi, cd, opts)) continue;
     for (const z of freeZonesOfHero(engine, pi, hi)) out.push({ heroIdx: hi, slotIdx: z });
   }
   return out;

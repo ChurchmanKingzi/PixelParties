@@ -3068,6 +3068,11 @@ function PuzzleCreator() {
       // der Karte — immer aktiv, Vorgabe 1, abschalten gibt es nicht.
       scope: 'equipSummoningInstructions', stacks: true, stackMin: 1, stackMax: 3, alwaysOn: true,
       tooltip: 'X of Summoning Instructions (1-3): the equipped Hero may summon Creatures up to X levels above its Summoning Magic level (level 3 Creatures at most).' },
+    // v1330: Soul Transmigration Ritual. Der Statustyp ist in der Engine
+    // unentfernbar (`unremovable`) — der Editor speichert ihn wie jeden
+    // anderen Heldenstatus, kein Sonderweg im Loader.
+    { key: 'soul_transmitted', label: '🕯️ Soul Transmitted', color: '#9a7ad0', scope: 'hero',
+      tooltip: 'Soul Transmitted: the next time this Hero is defeated, it is deleted with all cards in its Ability and Support Zones, except Creatures. Cannot be removed.' },
     { key: 'frightened', label: '😱 Frightened', color: '#8866cc', scope: 'hero',
       tooltip: 'Frightened: cannot use Spells. Attacks, Creatures, Abilities and Hero effects are unaffected.' },
     { key: 'shielded', label: '🛡️ Shielded', color: '#44ddff',
@@ -3396,7 +3401,7 @@ function PuzzleCreator() {
                   <CounterBadges source={hero} defs={PUZZLE_HERO_COUNTER_BADGES} />
                   {/* v1143: ohne Handliste — StatusBadges liefert selbst null */}
                   <StatusBadges statuses={{ ...(hero.statuses || {}), _extraLife: hero._extraLife }} isHero={true} />
-                  {hero.buffs && <BuffColumn buffs={hero.buffs} />}
+                  <BuffColumn buffs={hero.buffs} statuses={hero.statuses} />
                   {/* Alliance (v872): Abzeichen am VERBUENDETEN Helden —
                       dieselbe Auskunft wie am Spielbrett, damit im
                       Editor sichtbar ist, dass die Verbindung steht. */}
@@ -3618,7 +3623,7 @@ function PuzzleCreator() {
                           const zusatz = (cards[0] === 'Summoning Instructions')
                             ? { summoningInstructionsX: { level: x || 1 } } : null;
                           const alle = zusatz ? { ...(cs.buffs || {}), ...zusatz } : cs.buffs;
-                          return alle ? <BuffColumn buffs={alle} /> : null;
+                          return <BuffColumn buffs={alle} statuses={cs} />;
                         })()}
                         <CounterBadges source={cs} defs={PUZZLE_COUNTER_BADGES} />
                       </>;

@@ -155,7 +155,7 @@ module.exports = {
 
     // Die Kopie kommt aus dem DECK, nicht aus der Ablage.
     if (!(ps.mainDeck || []).includes(name)) return false;   // zwischenzeitlich weg
-    const slot = freieBasisZonen(ps, heroIdx)[0];
+    const slot = freieBasisZonen(ps, heroIdx, engine, pi)[0];
     if (slot == null) return false;
 
     // ★ v1268: ueber den gemeinsamen Ausruestweg (`_equip-shared`). Neu

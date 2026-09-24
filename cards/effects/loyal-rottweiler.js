@@ -94,6 +94,7 @@ module.exports = {
     // ON_CREATURE_SACRIFICED listeners can react with the live
     // instance, mirroring resolveSacrificeCost's contract.
     const sacrificed = ctx.card;
+    const _seite = sacrificed.owner;   // v1360: Seite des Platzes
     await engine.runHooks('onCreatureSacrificed', {
       creature: sacrificed,
       cardName: sacrificed.name,
@@ -121,17 +122,25 @@ module.exports = {
       sacrificed,
     );
 
+    // ★ v1360 (Audit „same Support Zone"): Opfer gerettet oder Platz von
+    // einem Todes-Listener gefuellt → sichtbar fizzeln. Vorher sprang
+    // `safePlaceInSupport` in einen ANDEREN Platz — gegen den Kartentext.
+    if (sacrificed.zone === 'support' || engine.supportSlotBelegt(_seite, ownHeroIdx, ownZoneSlot)) {
+      engine.log('loyal_rottweiler_fizzle', { player: ps.username, reason: 'zone_taken' });
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });   // v1360
+      return true;
+    }
     // ── Step 3: pull the Loyal from deck and place into the
     // vacated slot ──
     const stillDeckIdx = ps.mainDeck.indexOf(loyalName);
     if (stillDeckIdx < 0) {
       // Pulled out from under us by some other effect — fizzle.
-      engine.sync();
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
       return true;
     }
     if (!(await engine.takeFromPile(ps, 'deck', stillDeckIdx, { source: 'Loyal Rottweiler' }))) {   // v820: Stapel-Schicht
       // Deck locked — fizzle.
-      engine.sync();
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
       return true;
     }
 
@@ -145,7 +154,7 @@ module.exports = {
       // No free zone left at all — return the card to deck top so it
       // isn't silently lost.
       engine.returnToPile(ps, 'deck', loyalName, stillDeckIdx);   // v820: Stapel-Schicht
-      engine.sync();
+      await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
       return true;
     }
     const { inst: placedInst, actualSlot } = placeResult;

@@ -261,20 +261,14 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
 
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
 
-  // Wisdom cost (Spells only — Attacks don't carry one).
-  if (cardData.cardType === 'Spell') {
-    const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cardData);
-    if (wisdomCost > 0) {
-      await engine.actionPromptForceDiscard(pi, wisdomCost, {
-        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
-      });
-    }
-  }
 
   gs._immediateActionContext = true;
   const hadPriorLog = gs._spellDamageLog !== undefined;
   if (!hadPriorLog) gs._spellDamageLog = [];
   gs._spellResolutionDepth = (gs._spellResolutionDepth || 0) + 1;
+  // v1339: aus der HAND gewirkt → dem Gegner zeigen wie beim normalen
+  // Spielen. Der Deck-Weg hat die Karte schon per `deckSearchReveal` gezeigt.
+  const _auftritt = picked.source === 'hand' ? engine.gussAuftrittBeginnen(cardName, pi) : null;
 
   try {
     await engine.runHooks('onPlay', {
@@ -303,9 +297,21 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
     delete gs._spellNegatedByEffect;
   } finally {
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
+    engine.gussAuftrittBeenden(_auftritt, { abgebrochen: !!gs._spellCancelled && !gs._spellNegatedByEffect });
   }
 
   ps.discardPile.push(cardName);
+  // ★ v1323 (Tester-Befund 23.9.): Wisdom NACH dem Guss — der Zauber
+  // liegt dann schon in der Ablage (kein Selbst-Abwurf), und ein Abbruch
+  // kostet nichts.
+  if (cardData.cardType === 'Spell' && !gs.result && !gs._spellCancelled) {
+    const wisdomCost = engine.getWisdomDiscardCost(pi, heroIdx, cardData);
+    if (wisdomCost > 0) {
+      await engine.actionPromptForceDiscard(pi, wisdomCost, {
+        title: 'Wisdom Cost', source: 'Wisdom', selfInflicted: true,
+      });
+    }
+  }
   engine._untrackCard(inst.id);
   engine.log('taio_mountains_heart_followup', {
     player: ps.username, card: cardName, source: picked.source,

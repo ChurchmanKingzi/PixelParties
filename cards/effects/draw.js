@@ -49,8 +49,8 @@ const BEAT_MS = 260;
  * `countByPlayer`) so per-card reactors resolve AFTER the whole dump.
  * Returns `{ my, opp }` counts.
  */
-async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt) {
-  const me = engine.gs.players[pi];
+async function dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichUnberuehrt = false) {
+  const me = ichUnberuehrt ? null : engine.gs.players[pi];
   const op = gegnerUnberuehrt ? null : engine.gs.players[oppIdx];
   let my = 0;
   let opp = 0;
@@ -121,7 +121,15 @@ module.exports = {
       // wuerde den Abwurf ohnehin abfangen; hier steht er, damit die
       // Karte den Gegner gar nicht erst anfasst (kein Flug, kein Takt,
       // kein Zug aus seinem Deck).
-      const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx;
+      // ★ v1324 (Tester-Befund 23.9.): Boris darf das Abwerfen der Hand
+      // ignorieren — fuer den Wirker wie fuer den Gegner, VOR dem Abwurf
+      // gefragt. Wer verzichtet, behaelt seine Hand (und zieht trotzdem).
+      const _meineHand = (gs.players[pi]?.hand || []).length - 1;   // Draw selbst liegt noch drin
+      const ichBoris = _meineHand > 0 && await engine.borisVerzicht(pi, _meineHand, { source: CARD_NAME, sourceOwner: pi });
+      const _gegnerHand = (gs.players[oppIdx]?.hand || []).length;
+      const gegnerBoris = gs.firstTurnProtectedPlayer !== oppIdx && _gegnerHand > 0
+        && await engine.borisVerzicht(oppIdx, _gegnerHand, { source: CARD_NAME, sourceOwner: pi });
+      const gegnerUnberuehrt = gs.firstTurnProtectedPlayer === oppIdx || gegnerBoris;
 
       // ── Both players discard their entire hands, card by card, in
       //    lockstep (one card each per beat). The caster's hand
@@ -129,20 +137,22 @@ module.exports = {
       //    self-discard path (getResolvingHandIndex → -1) handles
       //    that without a double-discard.
       const { my: myDiscarded, opp: oppDiscarded } =
-        await dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt);
+        await dumpHandsTogether(engine, pi, oppIdx, gegnerUnberuehrt, ichBoris);
       engine.sync();
       await engine._delay(200);
 
       // ── Then draw ──
       await engine.actionDrawCardsAnimated(pi, youDraw);
-      if (!gegnerUnberuehrt) await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
+      // Boris verzichtet nur aufs ABWERFEN — gezogen wird trotzdem.
+      const _gegnerGeschuetzt = gs.firstTurnProtectedPlayer === oppIdx;
+      if (!_gegnerGeschuetzt) await engine.actionDrawCardsAnimated(oppIdx, oppDraw);
 
       engine.log('draw_card', {
         player: gs.players[pi]?.username,
         decayLevel: dm,
         myDiscarded, oppDiscarded,
-        youDraw, oppDraw: gegnerUnberuehrt ? 0 : oppDraw,
-        ...(gegnerUnberuehrt ? { oppShielded: true } : {}),
+        youDraw, oppDraw: _gegnerGeschuetzt ? 0 : oppDraw,
+        ...(_gegnerGeschuetzt ? { oppShielded: true } : {}),
       });
       engine.sync();
     },
