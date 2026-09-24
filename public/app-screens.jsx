@@ -3233,7 +3233,7 @@ function ShopScreen() {
   const buyStructureDeck = async (structureId, e) => {
     if (e) e.stopPropagation();
     if (buying || !structureCatalog) return;
-    if ((user.sc || 0) < structureCatalog.price) { notify('Not enough 🪙!', 'error'); return; }
+    if (!((user.sc || 0) >= structureCatalog.price)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -3247,7 +3247,7 @@ function ShopScreen() {
 
   const buyRandomStructureDeck = async (e) => {
     if (buying || !structureCatalog) return;
-    if ((user.sc || 0) < structureCatalog.randomPrice) { notify('Not enough 🪙!', 'error'); return; }
+    if (!((user.sc || 0) >= structureCatalog.randomPrice)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -3320,7 +3320,7 @@ function ShopScreen() {
   const buyItem = async (itemType, itemId, price, e) => {
     if (e) e.stopPropagation();
     if (buying) return;
-    if ((user.sc || 0) < price) { notify('Not enough 🪙!', 'error'); return; }
+    if (!((user.sc || 0) >= price)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -3334,8 +3334,8 @@ function ShopScreen() {
 
   const buyRandomSkin = async (e) => {
     if (buying) return;
-    const rp = catalog?.randomPrices?.skin || 5;
-    if ((user.sc || 0) < rp) { notify('Not enough 🪙!', 'error'); return; }
+    const rp = catalog?.randomPrices?.skin;
+    if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -3354,8 +3354,8 @@ function ShopScreen() {
 
   const buyRandom = async (itemType, e) => {
     if (buying) return;
-    const rp = catalog?.randomPrices?.[itemType] || 5;
-    if ((user.sc || 0) < rp) { notify('Not enough 🪙!', 'error'); return; }
+    const rp = catalog?.randomPrices?.[itemType];
+    if (!((user.sc || 0) >= rp)) { notify('Not enough 🪙!', 'error'); return; }
     const pos = e ? getItemCenter(e) : { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
     setBuying(true);
     try {
@@ -3377,8 +3377,12 @@ function ShopScreen() {
     return <div className="screen-center"><div className="pixel-font" style={{ color: 'var(--accent)', animation: 'pulse 1.5s infinite' }}>Loading shop...</div></div>;
   }
 
-  const prices = catalog.prices || { avatar: 10, sleeve: 10, board: 10, skin: 10 };
-  const randomPrices = catalog.randomPrices || { skin: 5, avatar: 5, sleeve: 5 };
+  // Preise kommen AUSSCHLIESSLICH vom Server (SHOP_PRICES / RANDOM_PRICES
+  // in server.js). Bis v1383 standen hier Rueckfallwerte, die bei jeder
+  // Preisaenderung mitgezogen werden mussten. Fehlt ein Preis, ist der
+  // Knopf gesperrt (`!(sc >= undefined)` ist wahr).
+  const prices = catalog.prices || {};
+  const randomPrices = catalog.randomPrices || {};
   const ownedSet = {
     avatar: new Set(owned.avatar),
     sleeve: new Set(owned.sleeve),
@@ -3402,9 +3406,9 @@ function ShopScreen() {
       <React.Fragment>
         {hasRandom && (
           <div className="shop-random-wrap">
-            <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || (user.sc || 0) < (randomPrices[type] || 5)}
+            <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices[type])}
               onClick={(e) => buyRandom(type, e)}>
-              🎲 Random {type === 'avatar' ? 'Avatar' : 'Sleeve'} — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices[type] || 5}
+              🎲 Random {type === 'avatar' ? 'Avatar' : 'Sleeve'} — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices[type] ?? '?'}
             </button>
             <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
           </div>
@@ -3423,7 +3427,7 @@ function ShopScreen() {
                     : isOwned ? <div className="shop-owned-badge">OWNED</div> : null}
                 </div>
                 {!isOwned && (
-                  <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices[type]}
+                  <button className="btn shop-buy-btn" disabled={buying || !((user.sc || 0) >= prices[type])}
                     onClick={(e) => buyItem(type, item.id, prices[type], e)}>
                     <img src="/data/sc.png" className="shop-sc-icon" /> {prices[type]}
                   </button>
@@ -3444,9 +3448,9 @@ function ShopScreen() {
       <React.Fragment>
         {/* Random Skin Button */}
         <div className="shop-random-wrap">
-          <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || (user.sc || 0) < (randomPrices.skin || 5)}
+          <button className="btn shop-random-btn" disabled={buying || unownedCount === 0 || !((user.sc || 0) >= randomPrices.skin)}
             onClick={(e) => buyRandomSkin(e)}>
-            🎲 Random Skin — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices.skin || 5}
+            🎲 Random Skin — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrices.skin ?? '?'}
           </button>
           <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' skin' + (unownedCount !== 1 ? 's' : '') + ' left to collect' : 'All collected!'}</span>
         </div>
@@ -3481,7 +3485,7 @@ function ShopScreen() {
                   {showHero ? 'Show Skin' : 'Show Hero'}
                 </button>
                 {!isOwned && (
-                  <button className="btn shop-buy-btn" disabled={buying || (user.sc || 0) < prices.skin}
+                  <button className="btn shop-buy-btn" disabled={buying || !((user.sc || 0) >= prices.skin)}
                     onClick={(e) => buyItem('skin', skin.id, prices.skin, e)}>
                     <img src="/data/sc.png" className="shop-sc-icon" /> {prices.skin}
                   </button>
@@ -3496,8 +3500,8 @@ function ShopScreen() {
 
   const renderStructureDecks = () => {
     const decks = structureCatalog?.decks || [];
-    const price = structureCatalog?.price ?? 10;
-    const randomPrice = structureCatalog?.randomPrice ?? 5;
+    const price = structureCatalog?.price;              // nur Serverwerte (s. oben)
+    const randomPrice = structureCatalog?.randomPrice;
     const unownedCount = decks.filter(d => !d.owned).length;
     const allOwned = decks.length > 0 && unownedCount === 0;
     return (
@@ -3505,9 +3509,9 @@ function ShopScreen() {
         {/* Random Structure Deck Button — matches the Skin / Avatar / Sleeve
             random-button layout so the shop feels consistent. */}
         <div className="shop-random-wrap">
-          <button className="btn shop-random-btn" disabled={buying || allOwned || (user.sc || 0) < randomPrice}
+          <button className="btn shop-random-btn" disabled={buying || allOwned || !((user.sc || 0) >= randomPrice)}
             onClick={buyRandomStructureDeck}>
-            🎲 Random Structure Deck — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrice}
+            🎲 Random Structure Deck — <img src="/data/sc.png" className="shop-sc-icon" /> {randomPrice ?? '?'}
           </button>
           <span className="shop-random-hint">{unownedCount > 0 ? unownedCount + ' left to collect' : 'All collected!'}</span>
         </div>
@@ -3559,7 +3563,7 @@ function ShopScreen() {
                   <button className="btn" disabled={buying || !canAfford}
                     onClick={(e) => buyStructureDeck(d.structureId, e)}
                     style={{ padding: '4px 10px', fontSize: 11, marginTop: 4, borderColor: '#ffd700', color: canAfford ? '#ffd700' : 'var(--text2)' }}>
-                    🔒 {price} <CoinIcon size={13} />
+                    🔒 {price ?? '?'} <CoinIcon size={13} />
                   </button>
                 )}
               </div>

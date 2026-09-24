@@ -9,8 +9,12 @@
 //  Does NOT cleanse healReversed (Overheal Shock)
 //  since it's not a registered negative status.
 //
-//  Reaction — can be activated in response to
-//  any event. Never requires an Action.
+//  ★ v1379 (Als Errata): „You may play this card between phases of your
+//  opponent's turn." — als Reaktion NUR noch im Phasenwechsel-Fenster des
+//  Gegnerzugs (dasselbe Fenster wie Juice: `eventDesc === 'The phase has
+//  ended'`), nicht mehr auf jedes Ereignis. Im eigenen Zug wie bisher
+//  normal spielbar. „except the user" gilt jetzt auch im Reaktionsweg
+//  (vorher nur beim normalen Spielen).
 //
 //  Animation: green healing sparkle on target.
 // ═══════════════════════════════════════════
@@ -143,17 +147,18 @@ module.exports = {
   inherentAction: true,
   includesHealing: true,
 
-  reactionCondition: (gs, pi, engine) => {
-    if (getValidTargets(gs, engine).length === 0) return false;
-    // At least 1 hero must be able to cast this (Support Magic Lv1)
-    if (engine) {
-      const ps = gs.players[pi];
-      for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (engine._canHeroActivateSurprise(pi, hi, 'Cure')) return true;
-      }
-      return false;
+  reactionCondition: (gs, pi, engine, chainCtx) => {
+    // v1379: nur zwischen den Phasen des GEGNERZUGS (Juice-Fenster).
+    if (gs.activePlayer === pi) return false;
+    if (chainCtx?.eventDesc !== 'The phase has ended') return false;
+    if (!engine) return false;
+    // Ein Held muss wirken koennen UND es muss ein Ziel ausser ihm geben.
+    const ps = gs.players[pi];
+    for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
+      if (!engine._canHeroActivateSurprise(pi, hi, 'Cure')) continue;
+      if (getValidTargets(gs, engine, `${pi}-${hi}`).length > 0) return true;
     }
-    return true;
+    return false;
   },
 
   spellPlayCondition(gs, pi) {
@@ -225,7 +230,10 @@ module.exports = {
    * Reaction path (activated from chain).
    */
   resolve: async (engine, pi, selectedIds, validTargets, chain, chainIdx) => {
-    const targets = getValidTargets(engine.gs, engine);
+    // v1379: „except the user" auch hier — der Wirker ist der im
+    // Reaktionsfenster gewaehlte Held.
+    const _wirker = chain?.[chainIdx]?.casterHeroIdx;
+    const targets = getValidTargets(engine.gs, engine, (_wirker != null && _wirker >= 0) ? `${pi}-${_wirker}` : null);
     if (targets.length === 0) {
       engine.log('reaction_fizzle', { card: 'Cure', reason: 'no valid targets' });
       return false;

@@ -562,7 +562,7 @@ async function tryBouncePlace(ctx) {
     if (handRemoveIdx >= 0) {
       newCardFromHandIdx = handRemoveIdx;
       ps.hand.splice(handRemoveIdx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      engine.notePlayedFromHand(pi);
     }
     ps._resolvingCard = null;
   }

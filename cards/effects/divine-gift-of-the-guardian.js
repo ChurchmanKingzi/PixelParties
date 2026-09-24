@@ -106,7 +106,7 @@ module.exports = {
         // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         engine.sync();
-        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        engine.notePlayedFromHand(pi);
         ps.discardPile.push('Divine Gift of the Guardian');
       }
 

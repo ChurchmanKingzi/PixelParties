@@ -139,7 +139,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   //     so the server skips its own placement.
   if (fromHandIdx >= 0) {
     ps.hand.splice(fromHandIdx, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    engine.notePlayedFromHand(pi);
   }
   ps._resolvingCard = null;
   ps._placementConsumedByCard = CARD_NAME_ARG;

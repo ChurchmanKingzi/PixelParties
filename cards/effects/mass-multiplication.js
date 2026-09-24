@@ -171,7 +171,7 @@ module.exports = {
       const selfIdx = ps.hand.indexOf(ctx.cardName);
       if (selfIdx >= 0) {
         ps.hand.splice(selfIdx, 1);
-        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        engine.notePlayedFromHand(pi);
         ps.discardPile.push(ctx.cardName);
         engine._untrackCard(ctx.card.id);
       }

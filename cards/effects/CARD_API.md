@@ -2839,7 +2839,7 @@ Defined in `_hooks.js`. Use with `ctx.addBuff()` / `ctx.removeBuff()`.
 | Name | Icon | Effect |
 |------|------|--------|
 | `cloudy` | ☁️ | Takes half damage from all sources |
-| `submerged` | 🌊 | Untargetable while other targets exist |
+| `submerged` | 🌊 | Unaffected (damage / statuses bounce off) while the owner controls other targets — own Heroes OR Creatures. Can still be TARGETED. One rule: `engine.isSubmergedProtected` (v1385) |
 | `negative_status_immune` | 😎 | Immune to all negative status effects |
 
 ---
@@ -4739,9 +4739,10 @@ check itself before swapping the target.
   multi-target Spell) — those still resolve. The Eye governs which
   targets can be *chosen* and that the cast can't be *redirected*,
   nothing else.
-- `submerged` is a damage / status immunity, not a target-list filter
-  — leave it alone (the Eye doesn't make submerged targets take
-  damage).
+- `submerged` is a damage / status immunity, NOT a target-list filter
+  (Als Ruling 24.9.: targeting is allowed, only the effect is
+  prevented) — leave it alone (the Eye doesn't make submerged targets
+  take damage).
 
 Reference implementations: the helper + picker injection + filter gates
 in `_engine.js`; the passive equip script `truth-seeing-eye.js`; the
@@ -18125,3 +18126,44 @@ ausdrückliche Quelle gilt die laufende Effektquelle, sonst die aktivierende
 Karte, sonst der Zugspieler. `_gateQuelleVon(quelle, opts)` liest den Besitzer
 aus Quellobjekten. Vorher blockte ein aktiver Schild auch eigene Effekte auf
 die eigenen Support Zones.
+
+## ★ v1378 — Reaktionen: Stufenprüfung zentral; Spectral-Armor-Merker
+
+Als Befund (Thalia + Friendship 2): Martyry und Spectral Armor waren auf der
+Hand Lv0, Martyry wurde gegen Andras trotzdem nicht angeboten, Spectral Armor
+nicht angekettet und nie gegen Recoil.
+
+* **Martyry, Challenge, Jump in the River** zählten hartkodiert Abilities
+  („Support Magic"/„Fighting" ≥ Stufe) — Stufensenkungen (Thalia), Overrides,
+  Sperren kannten sie nicht. Jetzt `engine._canHeroActivateSurprise(pi, hi,
+  name, { spellInHand: true })`, dieselbe Prüfung wie jede Handreaktion.
+  **Regel:** Reaktionskarten prüfen nie selbst Schulen/Stufen.
+* **Spectral Armor:** der Doppel-Frage-Merker galt je SPIELER und wurde nur
+  bei `onChainResolve` abgeräumt — lief keine Reaktionskette, blieb er stehen
+  und die Karte wurde für den Rest der Partie nicht mehr angeboten. Jetzt je
+  Zug + Held + Quelle (`_dedupKey`), abgeräumt nach jeder Aktion, jedem
+  Zauber und zu Zugbeginn.
+* Offen: Spectral Armor deckt weiterhin nur HELDEN ab („a target you control"
+  umfasst auch Creatures) — dafür fehlt ein Kreatur-Pfad im Schadens-Batch.
+
+## ★ v1379 — Cure-Errata
+
+Neuer Text: „You may play this card between phases of your opponent's turn. …"
+Als Reaktion nur noch im Phasenwechsel-Fenster des Gegnerzugs (Juice-Fenster,
+`chainCtx.eventDesc === 'The phase has ended'`, `activePlayer !== pi`); im
+eigenen Zug wie bisher normal spielbar. „except the user" gilt jetzt auch im
+Reaktionsweg (Wirker = `chain[i].casterHeroIdx`); angeboten wird nur, wenn ein
+wirkfähiger Held ein Ziel AUSSER sich selbst hat.
+
+## ★ v1380 — Verwahrte Abilities: Rückkehr nur in eine JETZT legale Zone
+
+Als Befund: Madame löscht eine Ability aus einer Support Zone, die dank
+Xalibur Abilities aufnahm; danach wird Xalibur entfernt — die Ability kehrte
+trotzdem dorthin zurück. `zoneLegal(gs, eintrag)` (_ability-verwahrung-shared):
+Ability Zones immer; Equips, die nur als Ability zählen (Cloak of Edge), immer;
+echte Abilities in Support Zones nur, solange der Held selbst (Xal) oder
+eine Karte in seinen Support Zones (Xalibur) `abilitiesInSupportZones` hat.
+Unzulässige Einträge RUHEN: keine Versiegelung, keine Anzeige, kein Stapel für
+neue Kopien, keine Rückkehr (Log `verwahrung_kehrt_nicht_zurueck`,
+`reason: 'zone_not_legal'`) — die Karte bleibt im Deleted Pile. Wird die Zone
+bis Zugende wieder legal (neues Xalibur), kehrt sie normal zurück.

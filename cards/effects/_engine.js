@@ -10,6 +10,7 @@ const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
 const { loadCardEffect } = require('./_loader');
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
 const { charges: ladungenLesen } = require('./_charges');
+const ScTracking = require('./_sc-tracking');   // v1381
 
 // Aufstiegs-Erlasse (Perilous Journey): `true` weitete das Fenster zum
 // Testen auf „ab sofort" aus (31.8., zurueckgebaut am selben Tag).
@@ -2107,11 +2108,12 @@ class GameEngine {
     this.cardInstances = [];
 
     // ── SC reward tracking (per player) ──
+    // v1381: Zustands-Kategorien (Super-/Over-Skilled, Spammer) werden
+    // am SPIELENDE aus dem Brett gelesen (Als Ruling 24.9.) — hier stehen
+    // nur noch Groessen, die man am Ende nicht mehr sehen kann.
     if (!this.gs._scTracking) {
-      this.gs._scTracking = [
-        { totalGoldEarned: 0, maxDamageInstance: 0, cardsPlayedFromHand: 0, creatureOverkill: false, heroEverBelow50: false, allAbilitiesFilled: false, allAbilitiesLevel3: false, allSupportFull: false, wasFirstToOneHero: false, totalHpLost: 0 },
-        { totalGoldEarned: 0, maxDamageInstance: 0, cardsPlayedFromHand: 0, creatureOverkill: false, heroEverBelow50: false, allAbilitiesFilled: false, allAbilitiesLevel3: false, allSupportFull: false, wasFirstToOneHero: false, totalHpLost: 0 },
-      ];
+      this.gs._scTracking = [ScTracking.neu(), ScTracking.neu()];
+      ScTracking.startHp(this.gs._scTracking, this.gs.players);   // v1383: Overhealed
     }
 
     for (let pi = 0; pi < 2; pi++) {
@@ -2770,6 +2772,19 @@ class GameEngine {
           if (tps) tps._defeatedOppTargetTurn = this.gs.turn;
         }
       }
+    }
+    // ── SC-Zaehler (v1382): Spells je Schule, Surprises, Traenke,
+    // besiegte Kreaturen — hier, weil JEDES dieser Ereignisse (auch aus
+    // Kartenmodulen gefeuert) durch diese Stelle laeuft. Logik in
+    // `_sc-tracking.js`.
+    if (ScTracking.HOOKS_MIT_ZAEHLER.has(hookName) && this.gs._scTracking) {
+      ScTracking.beiHook(this.gs._scTracking, hookName, hookCtx, {
+        cardDB: this._getCardDB(),
+        phase: this.gs.currentPhase, actionPhase: PHASES.ACTION,
+        turn: this.gs.turn || 0, activePlayer: this.gs.activePlayer,
+        // „Echte" Aktion — dieselbe Abgrenzung wie beim Bleed-Schaden.
+        istAktion: (info) => this._bleedTriggersForAction(info),
+      });
     }
     const result = await this._runHooksImpl(hookName, hookCtx);
     // v712 (Bleed): nach JEDER aufgeloesten Handlung eines Helden — ein
@@ -7307,6 +7322,10 @@ class GameEngine {
    * (`pi >= 0 && pi < 2`) jedes Mal neu da. Jetzt EINE Stelle.
    *
    * @param {number} playerIdx
+   * v1381: die letzten 16 Engine-Kopien und 8 Kartenmodule rufen jetzt
+   * ebenfalls hierher; eine direkte `…cardsPlayedFromHand++`-Zeile gibt
+   * es nicht mehr.
+   *
    * @param {number} [delta=1] `-1` fuer die Ruecknahme eines
    *   abgebrochenen Plays (server.js ~8449).
    */
@@ -7318,6 +7337,94 @@ class GameEngine {
     // und genau das ist das Kriterium.
     const t = this.gs._scTracking?.[playerIdx];
     if (t) t.cardsPlayedFromHand = Math.max(0, (t.cardsPlayedFromHand || 0) + delta);
+  }
+
+  /**
+   * Field Medic (v1382): zurueckgewonnene HP gutschreiben — dem Spieler,
+   * dem die Heilquelle gehoert; ohne Besitzer-Angabe dem Besitzer des
+   * geheilten Ziels.
+   */
+  _scNoteHeal(source, amount, zielSeite) {
+    if (!(amount > 0) || !this.gs._scTracking) return;
+    const q = source?.owner ?? source?.controller;
+    const wer = (q === 0 || q === 1) ? q : zielSeite;
+    ScTracking.heilung(this.gs._scTracking[wer], amount);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  SC-TRACKING (v1381) — EINE Zaehlstelle je Messgroesse
+  // ═══════════════════════════════════════════════════════════════
+  // Bis v1380 stand das SC-Tracking als Inline-Block NUR im normalen
+  // Heldenschadenspfad. True Damage (Rockfall, Piercer of Heavens …),
+  // Niederlagen ohne Schaden (Insta-Kill, Opfer) und der Golden-Ankh-
+  // Force-Kill liefen daran vorbei — Flawless gab es trotz besiegtem
+  // Helden, Comeback und Good Game zaehlten zu wenig. Jetzt rufen alle
+  // Pfade dieselben zwei Helfer.
+
+  /**
+   * Ein einzelner Treffer (Brutal). JEDES Ziel zaehlt, Kreaturen
+   * eingeschlossen (Als Ruling 24.9.).
+   * @param {number} sourceOwner  Spieler, dem die Quelle gehoert (-1 = keiner)
+   * @param {number} amount       Schaden dieses einen Treffers
+   */
+  _scNoteHit(sourceOwner, amount) {
+    const t = this.gs._scTracking?.[sourceOwner];
+    if (t && amount > 0) ScTracking.treffer(t, amount);
+  }
+
+  /**
+   * Ein Held hat HP verloren — durch Schaden jeder Art oder durch eine
+   * Niederlage ohne Schaden (dann `amount` = seine HP davor). Fuehrt
+   * Flawless, Good Game und Comeback.
+   */
+  _scNoteHeroHpLoss(hero, amount, opts = {}) {
+    if (!hero || hero.hp === undefined) return;
+    const owner = this._findHeroOwner(hero);
+    if (owner !== 0 && owner !== 1 || !this.gs._scTracking) return;
+    ScTracking.heldVerlor(this.gs._scTracking, owner, hero, amount,
+      this.gs.players[owner]?.heroes || [], opts);
+  }
+
+  /**
+   * Only Spells / Creature Tamer (v1383): Art des Schadens buchen — aus
+   * allen drei Schadenspfaden, jedes Ziel.
+   */
+  _scNoteDamageKind(source, amount, opferSeite, ziel, istStatus) {
+    if (!(amount > 0) || !this.gs._scTracking) return;
+    ScTracking.schaden(this.gs._scTracking, {
+      source, amount, opferSeite, ziel, istStatus, cardDB: this._getCardDB(),
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  SUBMERGED (Jump in the River) — EINE Stelle fuer die Regel (v1385)
+  // ═══════════════════════════════════════════════════════════════
+  // Kartentext: „unaffected by all cards and effects while you control
+  // other targets that can be affected by them."
+  //
+  // Submerged verhindert NICHT das Zielen, nur die WIRKUNG (Als Ruling
+  // 24.9.): der Held darf gewaehlt werden, Schaden und Status prallen ab.
+  //
+  // Bis v1384 stand an fuenf Stellen (Schaden, Status, CPU, Bubbles …)
+  // eine Kopie von „solange der Besitzer andere lebende, nicht getauchte
+  // HELDEN hat". Luecke (Als Befund 24.9., Rap Harpyformer): Creatures
+  // zaehlten nicht als „andere Ziele" — stand neben dem getauchten Helden
+  // nur noch eine Creature, kam Gift trotzdem an. „Andere Ziele" sind
+  // deshalb eigene Helden UND Creatures.
+
+  /** Ist `hero` (Besitzer `owner`) gerade durch Submerged geschuetzt? */
+  isSubmergedProtected(owner, hero) {
+    if (!hero?.buffs?.submerged || !hero.name || !(hero.hp > 0)) return false;
+    const ps = this.gs.players[owner];
+    if (!ps) return false;
+    if ((ps.heroes || []).some(h => h && h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged)) return true;
+    const cardDB = this._getCardDB();
+    return this.cardInstances.some(inst => {
+      if (inst.zone !== 'support' || inst.faceDown || inst.counters?.treatAsEquip) return false;
+      if ((inst.controller ?? inst.owner) !== owner) return false;
+      if ((inst.counters?.currentHp ?? 1) <= 0) return false;
+      return hasCardType(this.getEffectiveCardData(inst) || cardDB[inst.name], 'Creature');
+    });
   }
 
   heroBlocksTargeting(heroOwner, heroIdx, info = {}) {
@@ -8189,16 +8296,12 @@ class GameEngine {
       return { dealt: 0, cancelled: true };
     }
 
-    // Submerged heroes: immune to all damage while owner has other alive non-submerged heroes
+    // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
     if (target?.buffs?.submerged && target.hp !== undefined) {
       const ownerIdx = this._findHeroOwner(target);
-      if (ownerIdx >= 0) {
-        const ps = this.gs.players[ownerIdx];
-        const otherAlive = (ps.heroes || []).some(h => h !== target && h.name && h.hp > 0 && !h.buffs?.submerged);
-        if (otherAlive) {
-          this.log('damage_blocked', { target: this._heroLabel(target), reason: 'submerged' });
-          return { dealt: 0, cancelled: true };
-        }
+      if (ownerIdx >= 0 && this.isSubmergedProtected(ownerIdx, target)) {
+        this.log('damage_blocked', { target: this._heroLabel(target), reason: 'submerged' });
+        return { dealt: 0, cancelled: true };
       }
     }
 
@@ -8485,37 +8588,12 @@ class GameEngine {
       );
     }
 
-    // ── SC tracking ──
-    if (actualAmount > 0 && this.gs._scTracking) {
-      const srcOwner2 = source?.owner ?? source?.controller ?? -1;
-      if (srcOwner2 >= 0 && srcOwner2 < 2) {
-        const t = this.gs._scTracking[srcOwner2];
-        if (actualAmount > t.maxDamageInstance) t.maxDamageInstance = actualAmount;
-      }
-      // Check creature overkill (damage >= 2x creature max HP)
-      if (target && target.zone === 'support') {
-        // target is a card instance — check counters for HP tracking
-        // Not applicable here — creatures don't have hp on the target object in this path
-      }
-      // Track hero HP dropping below 50%
-      if (target && target.hp !== undefined && target.maxHp) {
-        const targetOwner = this._findHeroOwner(target);
-        if (targetOwner >= 0 && targetOwner < 2) {
-          if (target.hp < target.maxHp * 0.5) {
-            this.gs._scTracking[targetOwner].heroEverBelow50 = true;
-          }
-          // Track total HP lost by this player's heroes
-          this.gs._scTracking[targetOwner].totalHpLost += actualAmount;
-        }
-      }
-      // Track first player to be down to 1 hero
-      for (let pi = 0; pi < 2; pi++) {
-        const ps = this.gs.players[pi];
-        const alive = (ps.heroes || []).filter(h => h.name && h.hp > 0).length;
-        if (alive <= 1 && !this.gs._scTracking[0].wasFirstToOneHero && !this.gs._scTracking[1].wasFirstToOneHero) {
-          this.gs._scTracking[pi].wasFirstToOneHero = true;
-        }
-      }
+    // ── SC-Tracking (v1381: zentrale Helfer, siehe `_scNoteHit`) ──
+    if (actualAmount > 0) {
+      this._scNoteHit(source?.owner ?? source?.controller ?? -1, actualAmount);
+      this._scNoteHeroHpLoss(target, actualAmount, { exakt: actualAmount === hpBefore });
+      this._scNoteDamageKind(source, actualAmount, this._findHeroOwner(target), target,
+        !!(opts?.isStatusDamage || _isStatusTickSource));
     }
 
     // Track: this player dealt damage to opponent's targets this turn
@@ -8631,6 +8709,12 @@ class GameEngine {
       const dealt = hpBefore - target.hp;
       if (dealt > 0) this._noteDamageTaken(target, dealt);
       if (dealt > 0) this._noteDamageDealt(source, dealt);
+      // v1381: True Damage lief bisher am SC-Tracking vorbei.
+      if (dealt > 0) {
+        this._scNoteHit(sourceOwner, dealt);
+        this._scNoteHeroHpLoss(target, dealt, { exakt: amount === hpBefore });
+        this._scNoteDamageKind(source, dealt, this._findHeroOwner(target), target, false);
+      }
 
       this.log('damage', {
         source: source?.name, target: this._heroLabel(target),
@@ -8814,6 +8898,11 @@ class GameEngine {
    */
   async _runHeroDefeatSequence(target, source, ownerIdx, opts = {}) {
     if (!target || target.hp > 0) return false;
+    // SC (v1382, Double/Triple Kill): jeder Heldentod laeuft genau einmal
+    // hier durch — `_koProcessed` verhindert Doppelzaehlung.
+    if (!target._koProcessed && this.gs._scTracking) {
+      ScTracking.heldBesiegt(this.gs._scTracking, source, ownerIdx, this.gs.turn || 0);
+    }
 
     // ★ v1329/v1330 — LOESCH-ERSATZ BEIM BESIEGEN (Soul Transmigration
     // Ritual). Traegt der Held einen Status, dessen Typ
@@ -9088,6 +9177,7 @@ class GameEngine {
       if (target.hp <= 0) return { defeated: false };
     }
 
+    const _scHpVorher = target.hp;   // v1381: Niederlage ohne Schaden → SC-Tracking
     target.hp = 0;
     target.diedOnTurn = this.gs.turn;
     this.log('hero_ko', { hero: this._heroLabel(target), source: source?.name || opts.reason || 'defeat' });
@@ -9113,6 +9203,9 @@ class GameEngine {
     // Ansonsten: voller Todesablauf. Kommt er per Extra-Leben zurueck,
     // bleibt `defeated: true` — er WURDE besiegt (Als Ruling 17.8.),
     // Karten wie „defeat your own Hero to …" bekommen also ihren Lohn.
+    // SC (v1381): Insta-Kill und Opfer zaehlen wie Schaden in Hoehe der
+    // restlichen HP — ein eigenes Opfer ist „50%+ damage" (Als Ruling 24.9.).
+    this._scNoteHeroHpLoss(target, _scHpVorher);
     await this._runHeroDefeatSequence(target, source, targetOwner);
     return { defeated: true };
   }
@@ -9328,6 +9421,7 @@ class GameEngine {
 
     // Fire afterHeal hook (Lifeforce Howitzer, etc.)
     const actualHealed = target.hp - hpBefore;
+    this._scNoteHeal(source, actualHealed, targetPi);   // v1382: Field Medic
     if (actualHealed > 0 && targetPi >= 0 && targetHi >= 0) {
       await this.runHooks('afterHeal', {
         target, healedAmount: actualHealed, source,
@@ -9405,6 +9499,8 @@ class GameEngine {
       target.counters.currentHp = Math.min(baseHp, currentHp + amount);
       this.log('heal_creature', { source: source?.name, target: target.name, amount: healed });
     }
+    // v1382: Field Medic — tatsaechlicher Zuwachs, Ueberheilung eingeschlossen.
+    this._scNoteHeal(source, target.counters.currentHp - currentHp, target.controller ?? target.owner);
   }
 
   /**
@@ -20331,7 +20427,9 @@ this._deathWatch = (this._deathWatchStack || []).length
         if (!hero?.name || hero.hp <= 0) continue;
         if (hero._forceKillAtTurnEnd !== this.gs.turn) continue;
         // Un-negatable kill — set HP to 0, run cleanup
+        const _scHpVorher = hero.hp;
         hero.hp = 0;
+        this._scNoteHeroHpLoss(hero, _scHpVorher);   // v1381
         const forceSource = hero._forceKillSource || 'Golden Ankh';
         delete hero._forceKillAtTurnEnd;
         delete hero._forceKillSource;
@@ -28750,7 +28848,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && targetOwner >= 0 && targetOwner < 2) this.gs._scTracking[targetOwner].cardsPlayedFromHand++;
+      this.notePlayedFromHand(targetOwner);
 
       if (script.oncePerGame || script.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -28928,7 +29026,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+      this.notePlayedFromHand(pi);
 
       if (script.oncePerGame || script.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -29087,7 +29185,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+      this.notePlayedFromHand(ownerIdx);
 
       if (script.oncePerGame || script.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -29238,7 +29336,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+      this.notePlayedFromHand(pi);
 
       if (script.oncePerGame || script.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -29382,7 +29480,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       ps.hand.splice(actualIdx, 1);
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+      this.notePlayedFromHand(ownerIdx);
 
       if (script.oncePerGame || script.oncePerGameKey) {
         if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -29659,7 +29757,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     else ps.discardPile.push(cardName);
     await this._rxPay(ps, cost);
     await this._rxPayWisdom(ps, rxCast);
-    if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+    this.notePlayedFromHand(ownerIdx);
     if (script?.oncePerGame || script?.oncePerGameKey) {
       if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
       ps._oncePerGameUsed.add(script.oncePerGameKey || cardName);
@@ -29942,7 +30040,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         }
         await this._rxPay(ps, cost);
         await this._rxPayWisdom(ps, rxCast);   // v1155: wie in den uebrigen Hand-Reaktionen
-        if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
+        this.notePlayedFromHand(reactorIdx);
 
         // Push state NOW so the hand and pile both re-render in one
         // diff cycle while the pile-transfer flight is still in the air.
@@ -30144,7 +30242,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         else ps.discardPile.push(cardName);
         await this._rxPay(ps, cost);
         await this._rxPayWisdom(ps, rxCast);
-        if (this.gs._scTracking && ownerIdx >= 0 && ownerIdx < 2) this.gs._scTracking[ownerIdx].cardsPlayedFromHand++;
+        this.notePlayedFromHand(ownerIdx);
 
         if (script.oncePerGame || script.oncePerGameKey) {
           if (!ps._oncePerGameUsed) ps._oncePerGameUsed = new Set();
@@ -30327,9 +30425,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
       await this._rxPay(ps, cost);
       await this._rxPayWisdom(ps, rxCast);
-      if (this.gs._scTracking && playerIdx >= 0 && playerIdx < 2) {
-        this.gs._scTracking[playerIdx].cardsPlayedFromHand++;
-      }
+      this.notePlayedFromHand(playerIdx);
 
       // Push state NOW so the hand and pile both re-render in one
       // diff cycle while the pile-transfer flight is still in the air.
@@ -30525,9 +30621,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
       await this._rxPay(ps, cost);
-      if (this.gs._scTracking && summoningPi >= 0 && summoningPi < 2) {
-        this.gs._scTracking[summoningPi].cardsPlayedFromHand++;
-      }
+      this.notePlayedFromHand(summoningPi);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: summoningPi });
       await this._delay(300);
@@ -30756,9 +30850,7 @@ this._deathWatch = (this._deathWatchStack || []).length
         // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
         this.sync();
         await this._rxPay(ps, cost);
-        if (this.gs._scTracking && pi >= 0 && pi < 2) {
-          this.gs._scTracking[pi].cardsPlayedFromHand++;
-        }
+        this.notePlayedFromHand(pi);
 
         this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
         await this._delay(300);
@@ -30881,9 +30973,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
       await this._rxPay(ps, cost);
-      if (this.gs._scTracking && victimOwner >= 0 && victimOwner < 2) {
-        this.gs._scTracking[victimOwner].cardsPlayedFromHand++;
-      }
+      this.notePlayedFromHand(victimOwner);
 
       // Play-Signal + Handkarten-Flug. Dieses Fenster spliced die Karte
       // bislang NUR aus der Hand und broadcastete `card_reveal` — es
@@ -31034,9 +31124,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       if (actualIdx < 0) continue;
       ps.hand.splice(actualIdx, 1);
       await this._rxPay(ps, cost);
-      if (this.gs._scTracking && reactorIdx >= 0 && reactorIdx < 2) {
-        this.gs._scTracking[reactorIdx].cardsPlayedFromHand++;
-      }
+      this.notePlayedFromHand(reactorIdx);
 
       this._broadcastEvent('card_reveal', { cardName, playerIdx: reactorIdx });
       await this._delay(300);
@@ -32049,7 +32137,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           ps.discardPile.push(cardName);
         }
         await this._rxPay(ps, cost);
-        if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+        this.notePlayedFromHand(pi);
 
         // Push state to the client NOW so the hand re-renders without
         // the consumed card and the destination pile grows by one
@@ -32285,7 +32373,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Consume from hand + pay gold
       ps.hand.splice(hi, 1);
       await this._rxPay(ps, cost);
-      if (this.gs._scTracking && pi >= 0 && pi < 2) this.gs._scTracking[pi].cardsPlayedFromHand++;
+      this.notePlayedFromHand(pi);
 
       // Reveal the card to the opponent + spectators
       this._broadcastEvent('card_reveal', { cardName, playerIdx: pi });
@@ -34085,6 +34173,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     this.gs._chainResolvingLock = true;
     try {
     this._broadcastEvent('reaction_chain_resolving_start', {});
+    // SC (v1382, Chain Reaction): Laenge der Kette, die jetzt aufloest.
+    if (this.gs._scTracking) ScTracking.kette(this.gs._scTracking, chain);
     await this._delay(500);
 
     for (let i = chain.length - 1; i >= 0; i--) {
@@ -39915,11 +40005,9 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    // Submerged heroes: immune to all status effects while owner has other alive non-submerged heroes
+    // Submerged (Jump in the River) — Regel zentral in `isSubmergedProtected`.
     if (hero.buffs?.submerged) {
-      const ps = this.gs.players[playerIdx];
-      const otherAlive = (ps.heroes || []).some(h => h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged);
-      if (otherAlive) {
+      if (this.isSubmergedProtected(playerIdx, hero)) {
         this.log('status_blocked', { target: hero.name, status: statusName, reason: 'submerged' });
         playBlockedAnim();
         return;
@@ -41914,7 +42002,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         );
       }
 
-      // ── SC tracking: creature overkill ──
+      // ── SC tracking: Brutal (v1381: auch Kreaturtreffer) + Overkill ──
+      if (actualAmount > 0) {
+        this._scNoteHit(e.sourceOwner, actualAmount);
+        this._scNoteDamageKind(e.source, actualAmount, e.inst.controller ?? e.inst.owner, e.inst, !!e.isStatusDamage);
+      }
       if (this.gs._scTracking && e.sourceOwner >= 0 && e.sourceOwner < 2) {
         const cd = cardDB[e.inst.name];
         const creatureMaxHp = e.inst.counters.maxHp ?? cd?.hp ?? 0;
@@ -43632,39 +43724,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Crystal in hand can't fire passives that the live game wouldn't
     // allow either.
     this._refreshWeakeningCrystalNegation();
-    if (this._fastMode) return; // Skip state-broadcast + SC-tracking during simulations.
-    // ── SC tracking: check ability/support zone states ──
-    if (this.gs._scTracking) {
-      for (let pi = 0; pi < 2; pi++) {
-        const ps = this.gs.players[pi];
-        const t = this.gs._scTracking[pi];
-        const aliveHeroes = (ps.heroes || []).filter(h => h.name && h.hp > 0);
-        if (aliveHeroes.length > 0) {
-          // Check all ability zones filled (all living heroes, all 3 slots non-empty)
-          let allAbFilled = true, allAbLevel3 = true;
-          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            const hero = ps.heroes[hi];
-            if (!hero?.name || hero.hp <= 0) continue;
-            const abZ = ps.abilityZones?.[hi] || [];
-            for (let z = 0; z < 3; z++) {
-              const slot = abZ[z] || [];
-              if (slot.length === 0) { allAbFilled = false; allAbLevel3 = false; }
-              else if (slot.length < 3) { allAbLevel3 = false; }
-            }
-          }
-          if (allAbFilled) t.allAbilitiesFilled = true;
-          if (allAbLevel3) t.allAbilitiesLevel3 = true;
-          // Check all 9 support zones full (3 heroes × 3 base slots)
-          let fullSupports = 0;
-          for (let hi = 0; hi < 3; hi++) {
-            for (let z = 0; z < 3; z++) {
-              if (((ps.supportZones?.[hi] || [])[z] || []).length > 0) fullSupports++;
-            }
-          }
-          if (fullSupports >= 9) t.allSupportFull = true;
-        }
-      }
-    }
+    if (this._fastMode) return; // Skip state-broadcast during simulations.
+    // (v1381: der fruehere SC-Block fuer Ability-/Support-Zonen ist weg —
+    // diese Kategorien werden am Spielende vom Brett gelesen, Als Ruling 24.9.)
     // Same teardown-safety guard as _broadcastEvent — sendGameState
     // and sendSpectatorGameState both deref `room.players` /
     // `room.spectators` and would crash post-teardown.
@@ -43922,7 +43984,7 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(700);
     }
     quelle.splice(handIndex, 1);
-    if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+    this.notePlayedFromHand(pi);
     }
 
     // Pay the card-supplied cost now that the play is committed. The
@@ -44122,6 +44184,11 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // SC (v1382, Ascended): ein echter Aufstieg — keine nur gelegte Form.
+    if (!opts.notAnAscension) {
+      const t = this.gs._scTracking?.[pi];
+      if (t) t.ascended = true;
+    }
     return { success: true, skipEndPhase };
   }
 

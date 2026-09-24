@@ -14,30 +14,21 @@
 
 // ─── HELPERS ─────────────────────────────
 
-function heroCanUseMartyry(ps, heroIdx) {
-  const hero = ps.heroes[heroIdx];
-  if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
-
-  // Spell school check: needs Support Magic Lv1
-  const abZones = ps.abilityZones[heroIdx] || [];
-  let smCount = 0;
-  for (const slot of abZones) {
-    if (!slot || slot.length === 0) continue;
-    const baseAbility = slot[0];
-    for (const abName of slot) {
-      if (abName === 'Support Magic') smCount++;
-      else if (abName === 'Performance' && baseAbility === 'Support Magic') smCount++;
-    }
-  }
-  return smCount >= 1;
+// ★ v1378 (Als Befund, Thalia + Friendship 2): die Pruefung zaehlte
+// hartkodiert „Support Magic"-Abilities (Stufe 1) — Stufensenkungen
+// (Thalia), Stufen-Overrides, Wisdom und Co. kannte sie nicht. Jetzt die
+// allgemeine Engine-Pruefung fuer Reaktionen aus der Hand, dieselbe wie
+// bei jeder anderen Handreaktion.
+function heroCanUseMartyry(engine, pi, heroIdx) {
+  if (!engine?._canHeroActivateSurprise) return false;
+  return engine._canHeroActivateSurprise(pi, heroIdx, 'Martyry', { spellInHand: true });
 }
 
-function getEligibleRedirectHeroes(gs, pi, selected, validTargets) {
+function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
   const ps = gs.players[pi];
   const eligible = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!heroCanUseMartyry(ps, hi)) continue;
+    if (!heroCanUseMartyry(engine, pi, hi)) continue;
     if (selected.type === 'hero' && selected.owner === pi && selected.heroIdx === hi) continue;
     const isValidTarget = validTargets.some(t =>
       t.type === 'hero' && t.owner === pi && t.heroIdx === hi
@@ -71,13 +62,13 @@ module.exports = {
     const kind = engine?.sourceEffectKind ? engine.sourceEffectKind(sourceCard) : null;
     if (kind !== 'attack' && kind !== 'spell' && kind !== 'creature') return false;
     if (selected.owner !== pi) return false;
-    return getEligibleRedirectHeroes(gs, pi, selected, validTargets).length > 0;
+    return getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine).length > 0;
   },
 
   onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets);
+    const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
     // ── Select Hero to take the hit ──

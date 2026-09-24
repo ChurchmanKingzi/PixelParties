@@ -49,11 +49,43 @@ function _passt(e, seite, heroIdx, zoneKind, slotIdx) {
     && e.zoneKind === zoneKind && e.slotIdx === slotIdx;
 }
 
+/**
+ * ★★ v1380 (Als Befund): IST DIE ZIELZONE JETZT GERADE LEGAL FUER
+ * ABILITIES? Ability Zones immer. Eine SUPPORT Zone nur, solange ihr Held
+ * Abilities dort aufnehmen kann — der Held selbst (Xal) oder eine Karte in
+ * seinen Support Zones (Xalibur) mit `abilitiesInSupportZones`. Wurde
+ * Xalibur entfernt, waehrend Madame die Ability verwahrte, ist die Zone
+ * keine Ability-Zone mehr: der Eintrag ruht (keine Versiegelung, keine
+ * Anzeige, keine Rueckkehr), und wird er bis Zugende nicht wieder legal,
+ * bleibt die Karte im Deleted Pile.
+ * Bewusst nur ueber den Spielstand (Namen), damit alle Aufrufer ohne
+ * Engine-Referenz dieselbe Antwort bekommen.
+ */
+function zoneLegal(gs, e) {
+  if (!e || e.zoneKind !== 'support') return true;
+  const ps = gs?.players?.[e.seite];
+  const hero = ps?.heroes?.[e.heroIdx];
+  if (!hero?.name) return false;
+  const { loadCardEffect } = require('./_loader');
+  // Karten, deren EIGENER Platz die Support Zone ist und die nur als
+  // Ability ZAEHLEN (Cloak of Edge, ein Equip): immer legal.
+  const eigen = loadCardEffect(e.name);
+  if (eigen?.countsAsAbilityInZone || eigen?.isEquip) return true;
+  if (loadCardEffect(hero.name)?.abilitiesInSupportZones) return true;
+  for (const slot of (ps.supportZones?.[e.heroIdx] || [])) {
+    for (const n of (slot || [])) {
+      if (n && loadCardEffect(n)?.abilitiesInSupportZones) return true;
+    }
+  }
+  return false;
+}
+
 /** Ausstehende Kopien EINER Zone: `{ anzahl, name }` (name null, wenn keine). */
 function ausstehend(gs, seite, heroIdx, zoneKind, slotIdx) {
   let anzahl = 0, name = null, basis = null;
   for (const e of (gs?._verwahrteAbilities || [])) {
     if (!_passt(e, seite, heroIdx, zoneKind, slotIdx)) continue;
+    if (!zoneLegal(gs, e)) continue;   // v1380: ruhender Eintrag
     anzahl++; name = e.name; basis = e.basis || e.name;
   }
   return { anzahl, name, basis };
@@ -97,6 +129,7 @@ function nimmtAuf(gs, seite, heroIdx, zoneKind, slotIdx, cardName) {
 function verwahrterStapel(gs, seite, heroIdx, cardName) {
   for (const e of (gs?._verwahrteAbilities || [])) {
     if (e.seite === seite && e.heroIdx === heroIdx && e.name === cardName) {
+      if (!zoneLegal(gs, e)) continue;   // v1380
       return { zoneKind: e.zoneKind, slotIdx: e.slotIdx };
     }
   }
@@ -131,6 +164,7 @@ function zonenFuerAnzeige(gs, seite) {
   const gesehen = new Set();
   for (const e of (gs?._verwahrteAbilities || [])) {
     if (e.seite !== seite) continue;
+    if (!zoneLegal(gs, e)) continue;   // v1380: ruhende Zone nicht anzeigen
     const key = `${e.heroIdx}|${e.zoneKind}|${e.slotIdx}`;
     if (gesehen.has(key)) continue;
     gesehen.add(key);
@@ -254,6 +288,11 @@ function _abflug(engine, e) {
   }
   const stapel = gs.players[e.stapelBesitzer]?.deletedPile || [];
   if (stapel.lastIndexOf(e.name) < 0) return null;   // sollte nicht vorkommen (Sperre)
+  // v1380: Zielzone nimmt JETZT keine Abilities mehr auf (Xalibur weg).
+  if (!zoneLegal(gs, e)) {
+    engine.log('verwahrung_kehrt_nicht_zurueck', { card: e.name, reason: 'zone_not_legal' });
+    return null;
+  }
 
   // Zielzone: die ursprüngliche. Liegt dort inzwischen eine ANDERE Karte
   // (Verschiebe-Effekt), der Stapel derselben Ability bzw. eine freie Zone.
@@ -290,6 +329,10 @@ async function _landung(engine, e, slotIdx) {
   // Aus dem Deleted Pile über die Stapel-Schicht (löst auch die dort
   // getrackte Instanz). Die Freigabe ist nur Formsache — die Liste ist
   // zu diesem Zeitpunkt bereits geleert.
+  if (!zoneLegal(gs, e)) {   // v1380: zwischen Abflug und Landung unzulaessig geworden
+    engine.log('verwahrung_kehrt_nicht_zurueck', { card: e.name, reason: 'zone_not_legal' });
+    return;
+  }
   const genommen = engine.takeFromPileSync(e.stapelBesitzer, 'deleted', e.name, {
     last: true, _verwahrungFreigabe: true, source: e.quelle || 'Madame Guillotine',
   });
@@ -315,6 +358,7 @@ async function _landung(engine, e, slotIdx) {
 }
 
 module.exports = {
+  zoneLegal,
   liste, ausstehend, versiegelt, nimmtAuf, verwahrterStapel,
   gebundenImGeloescht, darfGeloeschtVerlassen, zonenFuerAnzeige,
   verwahren, alleZurueckgeben,

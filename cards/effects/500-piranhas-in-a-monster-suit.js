@@ -215,9 +215,7 @@ module.exports = {
     const handIdx = (ps.hand || []).indexOf(FULL_NAME);
     if (handIdx >= 0) {
       ps.hand.splice(handIdx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) {
-        gs._scTracking[pi].cardsPlayedFromHand++;
-      }
+      engine.notePlayedFromHand(pi);
     }
 
     // Visual: many bites on the host hero zone.

@@ -191,7 +191,7 @@ module.exports = {
       }
       if (fromHandIdx >= 0) {
         ps.hand.splice(fromHandIdx, 1);
-        if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+        engine.notePlayedFromHand(pi);
       }
       ps._resolvingCard = null;
     }

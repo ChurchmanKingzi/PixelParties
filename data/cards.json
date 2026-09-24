@@ -4511,7 +4511,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Choose any target on the board, except the user, and heal it from all negative status effects. Additionally, heal that target's HP by 100 for every effect removed that way.",
+    "effect": "You may play this card between phases of your opponent's turn. Choose any target on the board, except the user, and heal it from all negative status effects. Additionally, heal that target's HP by 100 for every effect removed that way.",
     "archetype": "",
     "setID": "PP SET01",
     "banned": "",

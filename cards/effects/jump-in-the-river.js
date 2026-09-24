@@ -21,9 +21,13 @@
 //     eligible Hero → go back to step 1
 //
 //  Submerged buff:
-//  - Immune to ALL damage and status effects
-//    while the owner has other alive non-
-//    submerged Heroes (generic engine handler).
+//  - „Unaffected by all cards and effects while
+//    you control other targets that can be
+//    affected by them." Seit v1385 EINE Regel in
+//    `engine.isSubmergedProtected`. Zielen ist
+//    erlaubt, nur die Wirkung prallt ab (Schaden,
+//    Status). „Andere Ziele" = eigene Helden UND
+//    Creatures (Als Ruling 24.9.).
 //  - Expires at start of owner's next turn.
 //
 //  Per-Hero cooldown:
@@ -41,7 +45,7 @@
  * (Performance on Fighting counts), and not on
  * per-hero cooldown.
  */
-function heroCanUseJump(gs, ps, heroIdx) {
+function heroCanUseJump(gs, ps, heroIdx, engine) {
   const hero = ps.heroes[heroIdx];
   if (!hero?.name || hero.hp <= 0) return false;
   if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
@@ -50,7 +54,14 @@ function heroCanUseJump(gs, ps, heroIdx) {
   // Opponent turns are 2 game-turns apart (A→B→A→B…).
   if (hero._jumpLastUsedTurn != null && (gs.turn - hero._jumpLastUsedTurn) <= 2) return false;
 
-  // Spell school check: needs Fighting Lv2 (Performance on Fighting counts)
+  // ★ v1378 (Befund an Martyry, gleiches Muster): allgemeine Engine-
+  // Pruefung fuer Handreaktionen statt hartkodierter „Fighting ≥ 2"-
+  // Zaehlung — Stufensenkungen, Overrides, Sperren gelten so auch hier.
+  if (engine?._canHeroActivateSurprise) {
+    const pi = gs.players.indexOf(ps);
+    return engine._canHeroActivateSurprise(pi, heroIdx, 'Jump in the River', { spellInHand: true });
+  }
+  // Rueckfall ohne Engine-Bezug (sollte nicht vorkommen): alte Zaehlung.
   const abZones = ps.abilityZones[heroIdx] || [];
   let fightingCount = 0;
   for (const slot of abZones) {
@@ -78,7 +89,7 @@ async function doJumpCascade(engine, pi) {
     const eligible = [];
     for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
       if (usedThisCascade.has(hi)) continue;
-      if (heroCanUseJump(gs, ps, hi)) eligible.push(hi);
+      if (heroCanUseJump(gs, ps, hi, engine)) eligible.push(hi);
     }
     if (eligible.length === 0) break;
 
@@ -289,7 +300,7 @@ module.exports = {
       const ps = gs.players[pi];
       let anyEligible = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-        if (heroCanUseJump(gs, ps, hi)) { anyEligible = true; break; }
+        if (heroCanUseJump(gs, ps, hi, engine)) { anyEligible = true; break; }
       }
       if (!anyEligible) return; // No eligible heroes — skip silently
 

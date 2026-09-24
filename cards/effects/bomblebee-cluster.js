@@ -141,7 +141,7 @@ module.exports = {
       // host's `summonLocked` flag isn't set yet (we apply it after the
       // loop), so the engine doesn't reject these summons.
       ps.hand.splice(handIdx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      engine.notePlayedFromHand(pi);
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
       engine._broadcastEvent('card_reveal', { cardName: chosenName, playerIdx: pi });

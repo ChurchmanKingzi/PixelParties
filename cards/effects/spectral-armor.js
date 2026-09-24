@@ -73,20 +73,20 @@ module.exports = {
     // non-damage targeting (Disruption Ray, Icy Slime, …); bail there
     // so it never chains to a Spell/effect that deals no damage.
     if (opts && opts.dealsDamage === false) return false;
-    if (_alreadyPrompted(gs, pi)) return false;
-    const eligible = _collectOwnedHeroTargets(gs, pi, targetedTargets).length > 0;
-    if (eligible) {
-      // Side effect — covers decline path. Once the prompt is offered
-      // (accept or decline), no further SA prompts for this source.
-      _markPrompted(gs, pi);
-    }
-    return eligible;
+    // v1378: je HELD und QUELLE, nicht mehr je Spieler (s. `_dedupKey`).
+    const offen = _collectOwnedHeroTargets(gs, pi, targetedTargets)
+      .filter(t => !_alreadyPrompted(gs, _dedupKey(gs, pi, t.heroIdx, sourceCard)));
+    if (offen.length === 0) return false;
+    // Side effect — covers decline path. Once the prompt is offered
+    // (accept or decline), the pre-damage fallback stays quiet for
+    // exactly these Heroes and THIS source.
+    for (const t of offen) _markPrompted(gs, _dedupKey(gs, pi, t.heroIdx, sourceCard));
+    return true;
   },
 
   async postTargetResolve(engine, pi, targetedTargets /*, sourceCard, opts */) {
     const candidates = _collectOwnedHeroTargets(engine.gs, pi, targetedTargets);
     if (candidates.length === 0) return { effectNegated: false };
-    _markPrompted(engine.gs, pi);
 
     let picked;
     if (candidates.length === 1) {
@@ -119,15 +119,15 @@ module.exports = {
   // ── Per-hero fallback (direct hero damage paths) ─────────────────
   isPreDamageReaction: true,
 
-  preDamageCondition(gs, ownerIdx, _engine, _target, _heroIdx, _source, amount /*, type */) {
-    if (_alreadyPrompted(gs, ownerIdx)) return false;
+  preDamageCondition(gs, ownerIdx, _engine, _target, heroIdx, source, amount /*, type */) {
     if (!(amount > 0)) return false;
-    _markPrompted(gs, ownerIdx);
+    const key = _dedupKey(gs, ownerIdx, heroIdx, source);
+    if (_alreadyPrompted(gs, key)) return false;
+    _markPrompted(gs, key);
     return true;
   },
 
   async preDamageResolve(engine, ownerIdx, target, heroIdx, _source, amount, _type) {
-    _markPrompted(engine.gs, ownerIdx);
     const halved = Math.ceil(amount / 2);
     engine._broadcastEvent('play_zone_animation', {
       type: 'spectral_armor', owner: ownerIdx, heroIdx, zoneSlot: -1,
@@ -255,17 +255,45 @@ module.exports = {
       if (gs._saMarks) delete gs._saMarks;
       if (gs._saPromptedFor) delete gs._saPromptedFor;
     },
+    // v1378: der Merker lebt NUR fuer eine Aufloesung. Vorher raeumte ihn
+    // allein `onChainResolve` ab — lief danach keine Reaktionskette, blieb
+    // er stehen, und Spectral Armor wurde fuer den Rest der Partie nicht
+    // mehr angeboten (Als Befund: „nicht gegen Andras", „nie gegen
+    // Recoil"). Jetzt zusaetzlich am Ende jeder Aktion und jedes Zauberwirkens.
+    onAnyActionResolved: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._saPromptedFor) delete gs._saPromptedFor;
+    },
+    afterSpellResolved: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._saPromptedFor) delete gs._saPromptedFor;
+    },
+    onTurnStart: (ctx) => {
+      const gs = ctx._engine.gs;
+      if (gs._saPromptedFor) delete gs._saPromptedFor;
+      if (gs._saMarks) delete gs._saMarks;
+    },
   },
 };
 
 // ─── Per-player prompt dedup ───────────────────────────────────────
 
-function _alreadyPrompted(gs, pi) {
-  return !!gs._saPromptedFor?.[pi];
+// ★ v1378: der Schluessel ist HELD + QUELLE (+ Zug), nicht mehr der
+// Spieler. Vorher sperrte EIN Angebot jede weitere Spectral Armor dieses
+// Spielers — auch gegen einen ganz anderen Treffer (Recoil nach einem
+// Angriff). Der Merker trennt nur noch das Post-Target-Angebot und den
+// Pre-Damage-Rueckfall DESSELBEN Treffers.
+function _dedupKey(gs, pi, heroIdx, source) {
+  const s = source || {};
+  const quelle = `${s.controller ?? s.owner ?? '?'}:${s.name || s.cardName || '?'}`;
+  return `${gs.turn || 0}|${pi}|${heroIdx}|${quelle}`;
 }
-function _markPrompted(gs, pi) {
+function _alreadyPrompted(gs, key) {
+  return !!gs._saPromptedFor?.[key];
+}
+function _markPrompted(gs, key) {
   if (!gs._saPromptedFor) gs._saPromptedFor = {};
-  gs._saPromptedFor[pi] = true;
+  gs._saPromptedFor[key] = true;
 }
 
 // ─── Per-target halve-mark set + one-shot consume ──────────────────

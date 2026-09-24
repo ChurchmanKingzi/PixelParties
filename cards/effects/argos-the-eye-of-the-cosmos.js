@@ -285,7 +285,7 @@ module.exports = {
       const idx = (ps.hand || []).indexOf(chosenName);
       if (idx < 0) return false;
       ps.hand.splice(idx, 1);
-      if (gs._scTracking && pi >= 0 && pi < 2) gs._scTracking[pi].cardsPlayedFromHand++;
+      engine.notePlayedFromHand(pi);
     } else {
       const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_idx) return false;

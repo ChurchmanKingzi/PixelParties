@@ -1023,6 +1023,7 @@ async function initDatabase() {
   await db.execute('CREATE INDEX IF NOT EXISTS idx_game_history_user ON game_history(user_id)');
   // v1289: deck_id/deck_name fuer die Top-Decks im Spielerprofil.
   await playerProfile.ensurePlayerProfileSchema(db);
+  await scRewardsModul.ensureScSchema(db);   // v1382: Hot-Streak-Tabelle
 
   // Per-opponent win/loss for singleplayer CPU battles. Keyed by the
   // deckId the player faced — sample decks (`sample-<filename>`) and
@@ -3419,10 +3420,14 @@ try { SKINS_DATA = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'skin
 app.get('/api/skins', (req, res) => res.json({ skins: SKINS_DATA }));
 
 // ===== SHOP SYSTEM =====
-const SHOP_PRICES = { avatar: 10, sleeve: 10, board: 10, skin: 10 };
-const RANDOM_PRICES = { skin: 5, avatar: 5, sleeve: 5 };
-const STRUCTURE_DECK_PRICE = 10;
-const STRUCTURE_DECK_RANDOM_PRICE = 5;
+// ★ v1384 (Als Vorgabe 24.9.): alle Shop-Preise auf das FUENFFACHE —
+// Gegenstueck zum Wegfall der SC-Tageskappe und den vielen neuen
+// Belohnungen (auch gegen CPUs). Vorher 10 / 5 / 10 / 5. Der Client liest
+// die Preise nur noch hier ab (keine Rueckfallwerte mehr im Shop-Screen).
+const SHOP_PRICES = { avatar: 50, sleeve: 50, board: 50, skin: 50 };
+const RANDOM_PRICES = { skin: 25, avatar: 25, sleeve: 25 };
+const STRUCTURE_DECK_PRICE = 50;
+const STRUCTURE_DECK_RANDOM_PRICE = 25;
 
 // Scan a shop directory and return available items
 function scanShopDir(subdir) {
@@ -3766,324 +3771,18 @@ function parseDeck(row) {
 }
 
 // ===== SMUG COINS (SC) SYSTEM =====
-const SC_REWARDS = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'sc-rewards.json'), 'utf-8'));
-const SC_DAILY_CAP_PER_OPPONENT = 15;
-const SC_MIN_GAME_DURATION_MS = 3 * 60 * 1000; // 3 minutes
-const SC_MIN_TURNS = 4; // at least turn 4 (each player took 2 turns)
-const SC_MIN_CARDS_PLAYED = 3; // each player must play at least 3 cards
+// ★ v1381: komplett nach `sc-rewards.js` ausgelagert (Katalog-Bedingungen
+// als Registry, Limits, Anti-Farm-Riegel, Daily-Challenge-Bonus). Hier
+// bleibt nur die Verdrahtung. Neue Kategorie = Eintrag in
+// data/sc-rewards.json (+ ggf. eine Bedingung in sc-rewards.js).
+const scRewardsModul = require('./sc-rewards');
+const { createScRewards, isCpuUserId, cpuOpponentKey } = scRewardsModul;
+const scRewards = createScRewards({ db, uuidv4, getActiveDaily, getCardDB });
 
 function getSocketIP(socket) {
   return socket?.handshake?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
     || socket?.handshake?.address
     || 'unknown';
-}
-
-async function evaluateSCRewards(room, winnerIdx, reason) {
-  const gs = room.gameState;
-  if (!gs) return {};
-  const loserIdx = winnerIdx === 0 ? 1 : 0;
-  const tracking = gs._scTracking || [{}, {}];
-  const startTime = gs._gameStartTime || Date.now();
-  const gameDuration = Date.now() - startTime;
-  const turn = gs.turn || 0;
-  const isRanked = room.type === 'ranked';
-
-  // ── Safeguard checks ──
-  // Same IP → no SC for anyone
-  const ip0 = gs._playerIPs?.[0] || 'unknown';
-  const ip1 = gs._playerIPs?.[1] || 'unknown';
-  if (ip0 !== 'unknown' && ip0 === ip1) return {};
-
-  // Min game duration
-  if (gameDuration < SC_MIN_GAME_DURATION_MS) return {};
-
-  // Min turns
-  if (turn < SC_MIN_TURNS) return {};
-
-  // Min cards played from hand
-  if ((tracking[0].cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return {};
-  if ((tracking[1].cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return {};
-
-  // Surrender before any hero takes damage → no SC
-  if (reason === 'surrender') {
-    const anyDamage = gs.players.some(ps =>
-      (ps.heroes || []).some(h => h.name && h.hp < h.maxHp)
-    );
-    if (!anyDamage) return {};
-  }
-
-  // Disconnect wins only get "Player" reward
-  const isDisconnectWin = reason === 'disconnect_timeout';
-
-  const todayStart = Math.floor(Date.now() / 1000) - (Math.floor(Date.now() / 1000) % 86400);
-  const results = {}; // { [playerIdx]: { rewards: [{id,title,amount}], total: N } }
-
-  for (let pi = 0; pi < 2; pi++) {
-    const ps = gs.players[pi];
-    // ★ v1262: Die Auswertung laeuft jetzt auch fuer CPU-Partien (Als
-    // Vorgabe 21.9.). Die CPU hat kein Konto — sie ueberspringen, sonst
-    // schriebe die Buchung unten mit `user_id` undefined ins Log.
-    if (!ps?.userId) continue;
-    const opp = gs.players[pi === 0 ? 1 : 0];
-    const isWinner = pi === winnerIdx;
-    const oppIp = pi === 0 ? ip1 : ip0;
-    const t = tracking[pi] || {};
-    const earned = [];
-
-    for (const reward of SC_REWARDS) {
-      // Disconnect winners only get "player" reward
-      if (isDisconnectWin && reward.id !== 'player') continue;
-
-      // Check if this reward's condition is met
-      let met = false;
-      switch (reward.requires) {
-        case 'play':
-          met = true; // Playing a game
-          break;
-        case 'win':
-          met = isWinner;
-          break;
-        case 'win_ranked':
-          met = isWinner && isRanked;
-          break;
-        case 'win_all_heroes_alive':
-          if (isWinner && (ps.heroes || []).filter(h => h.name).every(h => h.hp > 0)) {
-            if (reason === 'surrender') {
-              // Only eligible on surrender if opponent lost ≥1 hero AND turn ≥5
-              const oppHeroes = opp.heroes || [];
-              const oppDead = oppHeroes.filter(h => h.name && h.hp <= 0).length;
-              met = oppDead >= 1 && turn >= 5;
-            } else {
-              met = true;
-            }
-          }
-          break;
-        case 'win_last_hero_low':
-          if (isWinner) {
-            const alive = (ps.heroes || []).filter(h => h.name && h.hp > 0);
-            met = alive.length === 1 && alive[0].hp < alive[0].maxHp * 0.5;
-          }
-          break;
-        case 'win_deck_out':
-          met = isWinner && reason === 'deck_out';
-          break;
-        case 'win_support_full':
-          met = isWinner && t.allSupportFull;
-          break;
-        case 'damage_instance_400':
-          met = (t.maxDamageInstance || 0) >= 400;
-          break;
-        case 'gold_earned_99':
-          met = (t.totalGoldEarned || 0) >= 99;
-          break;
-        case 'win_comeback':
-          met = isWinner && t.wasFirstToOneHero;
-          break;
-        case 'win_flawless':
-          met = isWinner && !t.heroEverBelow50;
-          break;
-        case 'creature_overkill':
-          met = t.creatureOverkill;
-          break;
-        case 'all_abilities_filled': {
-          // Check ALL heroes (alive AND dead) have all 3 ability slots filled
-          let filled = true;
-          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            if (!ps.heroes[hi]?.name) continue; // Skip empty hero slots
-            const abZ = ps.abilityZones?.[hi] || [];
-            for (let z = 0; z < 3; z++) {
-              if ((abZ[z] || []).length === 0) { filled = false; break; }
-            }
-            if (!filled) break;
-          }
-          met = filled && (ps.heroes || []).some(h => h.name);
-          break;
-        }
-        case 'all_abilities_level3': {
-          // Check ALL heroes (alive AND dead) have all 3 ability slots at level 3
-          let maxed = true;
-          for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-            if (!ps.heroes[hi]?.name) continue;
-            const abZ = ps.abilityZones?.[hi] || [];
-            for (let z = 0; z < 3; z++) {
-              if ((abZ[z] || []).length < 3) { maxed = false; break; }
-            }
-            if (!maxed) break;
-          }
-          met = maxed && (ps.heroes || []).some(h => h.name);
-          break;
-        }
-        case 'win_turn_30':
-          met = isWinner && turn >= 30;
-          break;
-        case 'win_speedrun':
-          met = isWinner && turn <= 6 && reason !== 'surrender';
-          break;
-        case 'unique_opponents_5': {
-          // Count unique opponent IPs today (including this game)
-          const uniqueToday = await db.get(
-            `SELECT COUNT(DISTINCT opponent_ip) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND created_at >= ?`,
-            [ps.userId, todayStart]
-          );
-          // +1 for current game if this is a new IP
-          const prevPlayed = await db.get(
-            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'player' AND opponent_ip = ? AND created_at >= ?`,
-            [ps.userId, oppIp, todayStart]
-          );
-          const totalUnique = (uniqueToday?.cnt || 0) + (prevPlayed?.cnt === 0 ? 1 : 0);
-          met = totalUnique >= 5;
-          break;
-        }
-        case 'first_win':
-          if (isWinner) {
-            const prevWins = await db.get(
-              `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = 'first_blood'`,
-              [ps.userId]
-            );
-            met = (prevWins?.cnt || 0) === 0;
-          }
-          break;
-        case 'good_game':
-          met = turn >= 7
-            && gameDuration >= 5 * 60 * 1000
-            && (tracking[0].totalHpLost || 0) >= 400
-            && (tracking[1].totalHpLost || 0) >= 400;
-          break;
-        default:
-          break;
-      }
-
-      if (!met) continue;
-
-      // Check limit
-      let allowed = true;
-      switch (reward.limit) {
-        case 'daily_per_opponent_ip': {
-          const prev = await db.get(
-            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ? AND opponent_ip = ? AND created_at >= ?`,
-            [ps.userId, reward.id, oppIp, todayStart]
-          );
-          allowed = (prev?.cnt || 0) === 0;
-          break;
-        }
-        case 'daily': {
-          const prev = await db.get(
-            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ? AND created_at >= ?`,
-            [ps.userId, reward.id, todayStart]
-          );
-          allowed = (prev?.cnt || 0) === 0;
-          break;
-        }
-        case 'once': {
-          const prev = await db.get(
-            `SELECT COUNT(*) as cnt FROM sc_log WHERE user_id = ? AND reward_id = ?`,
-            [ps.userId, reward.id]
-          );
-          allowed = (prev?.cnt || 0) === 0;
-          break;
-        }
-        case 'unlimited':
-          allowed = true;
-          break;
-      }
-
-      if (!allowed) continue;
-
-      // Check daily cap per opponent
-      if (reward.limit !== 'once') {
-        const dailyFromOpp = await db.get(
-          `SELECT COALESCE(SUM(amount), 0) as total FROM sc_log WHERE user_id = ? AND opponent_ip = ? AND created_at >= ?`,
-          [ps.userId, oppIp, todayStart]
-        );
-        const alreadyEarned = dailyFromOpp?.total || 0;
-        if (alreadyEarned >= SC_DAILY_CAP_PER_OPPONENT) continue;
-      }
-
-      earned.push({ id: reward.id, title: reward.title, amount: reward.amount, description: reward.description });
-    }
-
-    // Record SC earnings
-    if (earned.length > 0) {
-      let total = 0;
-      for (const r of earned) {
-        await db.run(
-          'INSERT INTO sc_log (id, user_id, reward_id, opponent_id, opponent_ip, amount) VALUES (?, ?, ?, ?, ?, ?)',
-          [uuidv4(), ps.userId, r.id, opp.userId, oppIp, r.amount]
-        );
-        total += r.amount;
-      }
-      await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [total, ps.userId]);
-      results[pi] = { rewards: earned, total };
-    }
-  }
-
-  return results;
-}
-
-// ===== DAILY CHALLENGE BONUS (PvP wins) =====
-// Awards bonus SC to a winner whose deck contains 2+ of their active daily
-// challenge Heroes. Big bonus (10 SC for 2, 20 SC for 3) pays out once per
-// challenge; subsequent qualifying wins during the same challenge pay 1 SC.
-// Applies the same anti-farm gates as evaluateSCRewards.
-async function awardDailyChallengeBonus(room, winnerIdx, reason) {
-  const gs = room?.gameState;
-  if (!gs) return null;
-  const winner = gs.players?.[winnerIdx];
-  if (!winner?.userId) return null;
-  // Both sides must be human (skip CPU / bot games).
-  if (!gs.players?.[winnerIdx === 0 ? 1 : 0]?.userId) return null;
-
-  // Anti-farm gates mirroring evaluateSCRewards.
-  const ip0 = gs._playerIPs?.[0] || 'unknown';
-  const ip1 = gs._playerIPs?.[1] || 'unknown';
-  if (ip0 !== 'unknown' && ip0 === ip1) return null;
-  if (reason === 'disconnect_timeout') return null;
-
-  const tracking = gs._scTracking || { 0: {}, 1: {} };
-  const startTime = gs._gameStartTime || Date.now();
-  if (Date.now() - startTime < SC_MIN_GAME_DURATION_MS) return null;
-  if ((gs.turn || 0) < SC_MIN_TURNS) return null;
-  if ((tracking[0]?.cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return null;
-  if ((tracking[1]?.cardsPlayedFromHand || 0) < SC_MIN_CARDS_PLAYED) return null;
-  if (reason === 'surrender') {
-    const anyDamage = gs.players.some(ps => (ps.heroes || []).some(h => h.name && h.hp < h.maxHp));
-    if (!anyDamage) return null;
-  }
-
-  const userRow = await db.get(
-    'SELECT daily_heroes, daily_start_ts, daily_claimed_big FROM users WHERE id = ?',
-    [winner.userId]
-  );
-  const active = getActiveDaily(userRow);
-  if (!active) return null;
-
-  const winnerHeroNames = new Set((winner.heroes || []).filter(h => h?.name).map(h => h.name));
-  const matched = active.heroes.filter(n => winnerHeroNames.has(n)).length;
-  if (matched < 2) return null;
-
-  let amount = 0;
-  let newClaimed = active.claimedBig;
-  if (active.claimedBig === 0) {
-    amount = matched >= 3 ? 20 : 10;
-    newClaimed = amount;
-  } else {
-    amount = 1;
-  }
-
-  await db.run(
-    'UPDATE users SET sc = sc + ?, daily_claimed_big = ? WHERE id = ?',
-    [amount, newClaimed, winner.userId]
-  );
-
-  return {
-    matched,
-    amount,
-    claimedBig: newClaimed,
-    title: matched >= 3
-      ? 'Daily Challenge — 3/3 Heroes!'
-      : (active.claimedBig === 0 ? 'Daily Challenge — 2 Heroes' : 'Daily Challenge — repeat win'),
-    description: `${matched} of your 3 daily Heroes`,
-  };
 }
 
 // ===== GAME ROOMS (Socket.io) =====
@@ -5746,6 +5445,7 @@ async function endGame(room, winnerIdx, reason) {
   const loser = gs.players[loserIdx];
 
   // Update set score
+  scRewardsModul.noteSetGame(room, winnerIdx);   // v1382: Satzverlauf (Clean/Reverse Sweep)
   room.setScore[winnerIdx]++;
   const setOver = room.setScore[winnerIdx] >= room.winsNeeded;
 
@@ -5811,25 +5511,9 @@ async function endGame(room, winnerIdx, reason) {
 
   // ── SC reward evaluation ──
   try {
-    const scResults = await evaluateSCRewards(room, winnerIdx, reason);
-    // Daily challenge bonus for the winner (merged into the standard payout
-    // so the client shows one combined sc_earned toast).
-    try {
-      const dailyBonus = await awardDailyChallengeBonus(room, winnerIdx, reason);
-      if (dailyBonus) {
-        const entry = scResults[winnerIdx] || { rewards: [], total: 0 };
-        entry.rewards.push({
-          id: 'daily_challenge',
-          title: dailyBonus.title,
-          amount: dailyBonus.amount,
-          description: dailyBonus.description,
-        });
-        entry.total += dailyBonus.amount;
-        scResults[winnerIdx] = entry;
-      }
-    } catch (err) {
-      console.error('[Daily] bonus error:', err.message);
-    }
+    // Katalog + Daily-Challenge-Bonus als ein Paket je Spieler (ein
+    // kombinierter sc_earned-Toast) — Logik in sc-rewards.js.
+    const scResults = await scRewards.evaluateWithDailyBonus(room, winnerIdx, reason);
     for (let pi = 0; pi < 2; pi++) {
       if (scResults[pi] && scResults[pi].total > 0) {
         const sid = gs.players[pi]?.socketId;
@@ -6076,9 +5760,6 @@ async function puzzleEndGame(room, winnerIdx, reason) {
 // Singleplayer CPU battle end — no Elo/ranked/hero stats writes, mirrors puzzleEndGame's
 // minimal pattern. The human earns a small SC reward on a non-surrender win, gated by
 // light anti-farm guards (min turns + min cards played).
-const CPU_WIN_SC = 1;
-const CPU_WIN_MIN_TURN = 3;
-const CPU_WIN_MIN_CARDS = 3;
 function endCpuBattle(room, winnerIdx, reason) {
   const gs = room.gameState;
   if (!gs || gs.result) return;
@@ -6115,6 +5796,14 @@ function endCpuBattle(room, winnerIdx, reason) {
   const humanUserId = room.players?.[0]?.userId;
   const humanSid = room.players?.[0]?.socketId || null;
   const opponentDeckId = room.players?.[1]?.deckId;
+  // v1382 (First Conquest!): bisherige Siege gegen diese CPU EINMAL lesen,
+  // bevor irgendwer npc_stats hochzaehlt. Die Freischalt-Logik unten und
+  // die SC-Auswertung (sc-rewards.js) warten beide auf dasselbe Ergebnis —
+  // sonst haengt die Antwort davon ab, wer zuerst an der Datenbank ist.
+  room._scCpuVorSiege = (humanUserId && opponentDeckId)
+    ? db.get('SELECT wins FROM npc_stats WHERE user_id = ? AND opponent_deck_id = ?', [humanUserId, opponentDeckId])
+        .then(r => Number(r?.wins || 0)).catch(() => null)
+    : Promise.resolve(null);
   if (humanUserId && opponentDeckId) {
     const humanWon = winnerIdx === 0 ? 1 : 0;
     const humanLost = winnerIdx === 0 ? 0 : 1;
@@ -6122,11 +5811,7 @@ function endCpuBattle(room, winnerIdx, reason) {
       try {
         // Read the pre-update win count so we can detect milestone
         // crossings (each happens exactly once since wins climb by 1).
-        const prior = await db.get(
-          'SELECT wins FROM npc_stats WHERE user_id = ? AND opponent_deck_id = ?',
-          [humanUserId, opponentDeckId]
-        );
-        const preWins = prior?.wins || 0;
+        const preWins = (await room._scCpuVorSiege) || 0;
 
         await db.run(`
           INSERT INTO npc_stats (user_id, opponent_deck_id, wins, losses)
@@ -6170,25 +5855,13 @@ function endCpuBattle(room, winnerIdx, reason) {
     })();
   }
 
-  // SC reward: only the human (idx 0), only on an actual victory (no surrender
-  // wins), and only if the game reached a real play state.
-  const humanPlayed = gs._scTracking?.[0]?.cardsPlayedFromHand || 0;
-  const eligible =
-    winnerIdx === 0 &&
-    reason !== 'surrender' &&
-    (gs.turn || 0) >= CPU_WIN_MIN_TURN &&
-    humanPlayed >= CPU_WIN_MIN_CARDS;
-
-  // ★★ v1262 (Als Vorgabe 21.9.): „Die SC-Rewards, die fuer CPU-Spieler
-  // fast komplett ausgeklammert sind, wieder vollstaendig zulassen." Bis
-  // hier gab es gegen die CPU genau EINE Pauschale (1 SC). Jetzt laeuft
-  // dieselbe Auswertung wie im PvP (`evaluateSCRewards` mit allen
-  // Schutzriegeln: Mindestdauer, Mindestzuege, Mindestkarten beider
-  // Seiten, Tageslimits) — die CPU zaehlt dabei ueber ihre fehlende IP
-  // als EIN Gegner pro Tag (Tageskappe 15 SC), was das Farmen deckelt.
-  // Die Pauschale bleibt als eigener Eintrag obendrauf, sie ist Teil
-  // des bisherigen Versprechens. Der Mensch sitzt in Einzelspieler-
-  // Partien immer auf Platz 0.
+  // ★★ SC (v1381, Als Vorgabe 24.9.): CPU-Partien sind offen fuer ALLE
+  // Belohnungen ausser Ranked — derselbe Katalog wie im PvP plus Daily-
+  // Challenge-Bonus, mit denselben Schutzriegeln. Jede CPU zaehlt als
+  // eigener Gegner (`cpu:<Deck-ID>`, gesetzt in setupGameState). Die
+  // fruehere 1-SC-Pauschale „CPU Battle Victory" ist dadurch ersetzt.
+  // Die CPU selbst wird nie ausgewertet (kein Konto). Der Mensch sitzt in
+  // Einzelspieler-Partien immer auf Platz 0.
   const humanUser = gs.players[0];
   if (humanUser?.userId) {
     const userId = humanUser.userId;
@@ -6197,15 +5870,10 @@ function endCpuBattle(room, winnerIdx, reason) {
       try {
         let entry = { rewards: [], total: 0 };
         try {
-          const scResults = await evaluateSCRewards(room, winnerIdx, reason);
+          const scResults = await scRewards.evaluateWithDailyBonus(room, winnerIdx, reason);
           if (scResults[0]) entry = scResults[0];
         } catch (err) {
           console.error('[CPU battle] SC evaluation error:', err.message);
-        }
-        if (eligible) {
-          await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [CPU_WIN_SC, userId]);
-          entry.rewards.push({ id: 'cpu_win', title: 'CPU Battle Victory', amount: CPU_WIN_SC, description: 'Won a battle against the CPU.' });
-          entry.total += CPU_WIN_SC;
         }
         gs.result.scAwarded = entry.total;
         if (entry.total > 0 && sid) io.to(sid).emit('sc_earned', entry);
@@ -12858,7 +12526,12 @@ async function setupGameState(room) {
   }
   room.gameState = { players:playerStates, areaZones:[[],[]], turn:0, activePlayer:0, currentPhase:0, result:null, rematchRequests:[], awaitingFirstChoice:true,
     _gameStartTime: Date.now(),
+    // Gegner-Schluessel fuer die SC-Limits (sc-rewards.js). v1381: eine CPU
+    // hat keinen Socket und landete bisher als 'unknown' im selben Topf wie
+    // jeder PvP-Gegner mit unaufloesbarer IP. Jetzt ist jede CPU ein eigener
+    // Gegner: `cpu:<Deck-ID>` (Als Vorgabe 24.9.).
     _playerIPs: room.players.map(p => {
+      if (isCpuUserId(p.userId)) return cpuOpponentKey(p.deckId);
       const sock = io.sockets.sockets.get(p.socketId);
       return sock ? getSocketIP(sock) : 'unknown';
     }),

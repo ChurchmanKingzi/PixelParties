@@ -4,15 +4,16 @@
     "title": "Player",
     "description": "Play a game",
     "amount": 1,
-    "limit": "daily_per_opponent_ip",
-    "requires": "play"
+    "limit": "daily_per_opponent",
+    "requires": "play",
+    "onDisconnectWin": true
   },
   {
     "id": "winner",
     "title": "Winner",
     "description": "Win a game",
     "amount": 1,
-    "limit": "daily_per_opponent_ip",
+    "limit": "daily_per_opponent",
     "requires": "win"
   },
   {
@@ -20,7 +21,7 @@
     "title": "Pro",
     "description": "Win a ranked game",
     "amount": 2,
-    "limit": "daily_per_opponent_ip",
+    "limit": "daily_per_opponent",
     "requires": "win_ranked"
   },
   {
@@ -150,5 +151,189 @@
     "amount": 1,
     "limit": "unlimited",
     "requires": "good_game"
+  },
+  {
+    "id": "double_kill",
+    "title": "Double Kill",
+    "description": "Defeat 2 enemy Heroes in a single turn",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "hero_kills_turn_2"
+  },
+  {
+    "id": "triple_kill",
+    "title": "Triple Kill",
+    "description": "Defeat all 3 enemy Heroes in a single turn",
+    "amount": 3,
+    "limit": "daily",
+    "requires": "hero_kills_turn_3"
+  },
+  {
+    "id": "ascended",
+    "title": "Ascended",
+    "description": "Win after Ascending a Hero",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_after_ascension"
+  },
+  {
+    "id": "scholar",
+    "title": "Scholar",
+    "description": "Cast Spells from all 5 Spell Schools in one game",
+    "amount": 2,
+    "limit": "unlimited",
+    "requires": "spell_schools_5"
+  },
+  {
+    "id": "surprise_party",
+    "title": "Surprise Party",
+    "description": "Activate 3+ Surprises in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "surprises_3"
+  },
+  {
+    "id": "chain_reaction",
+    "title": "Chain Reaction",
+    "description": "Resolve a chain with 4+ links",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "chain_4"
+  },
+  {
+    "id": "field_medic",
+    "title": "Field Medic",
+    "description": "Restore 1000+ HP in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "hp_restored_1000"
+  },
+  {
+    "id": "exterminator",
+    "title": "Exterminator",
+    "description": "Defeat 10+ enemy Creatures in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "creatures_defeated_10"
+  },
+  {
+    "id": "alchemist",
+    "title": "Alchemist",
+    "description": "Use 5+ Potions in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "potions_5"
+  },
+  {
+    "id": "resourceful",
+    "title": "Resourceful",
+    "description": "Win while playing 12 or fewer cards from your hand",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_resourceful"
+  },
+  {
+    "id": "clean_sweep",
+    "title": "Clean Sweep",
+    "description": "Win a Best-of-3 set 2–0",
+    "amount": 2,
+    "limit": "daily_per_opponent",
+    "requires": "set_clean_sweep"
+  },
+  {
+    "id": "reverse_sweep",
+    "title": "Reverse Sweep",
+    "description": "Win a Best-of-3 set after losing the first game",
+    "amount": 3,
+    "limit": "daily",
+    "requires": "set_reverse_sweep"
+  },
+  {
+    "id": "giant_slayer",
+    "title": "Giant Slayer",
+    "description": "Win a ranked game against an opponent with 100+ more Elo",
+    "amount": 2,
+    "limit": "daily",
+    "requires": "win_ranked_underdog"
+  },
+  {
+    "id": "first_conquest",
+    "title": "First Conquest!",
+    "description": "Defeat a CPU opponent for the first time",
+    "amount": 1,
+    "limit": "once_per_opponent",
+    "requires": "first_cpu_win"
+  },
+  {
+    "id": "hot_streak",
+    "title": "Hot Streak",
+    "description": "Win 3 games in a row today",
+    "amount": 2,
+    "limit": "daily",
+    "requires": "win_streak_3"
+  },
+  {
+    "id": "back_to_basics",
+    "title": "Back to Basics",
+    "description": "Play a game without using any additional Actions",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "no_additional_actions"
+  },
+  {
+    "id": "right_on_target",
+    "title": "Right on Target",
+    "description": "Defeat the last enemy Hero with damage exactly equal to its remaining HP",
+    "amount": 2,
+    "limit": "unlimited",
+    "requires": "win_exact_final_kill"
+  },
+  {
+    "id": "only_spells",
+    "title": "Only Spells",
+    "description": "Win having dealt damage only with Spells",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_only_spell_damage"
+  },
+  {
+    "id": "creature_tamer",
+    "title": "Creature Tamer",
+    "description": "Win having dealt damage only with Creatures",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_only_creature_damage"
+  },
+  {
+    "id": "on_fire",
+    "title": "On Fire",
+    "description": "+1 SC for every 10 wins in a row (max +5)",
+    "amount": 1,
+    "limit": "daily_per_opponent",
+    "requires": "win_streak_bonus"
+  },
+  {
+    "id": "archetypal",
+    "title": "Archetypal",
+    "description": "Win with 31+ Main Deck cards from the same archetype",
+    "amount": 2,
+    "limit": "daily",
+    "requires": "win_archetype_31"
+  },
+  {
+    "id": "close_call",
+    "title": "Close Call",
+    "description": "Win with fewer than 10 cards left in your deck",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_low_deck"
+  },
+  {
+    "id": "overhealed",
+    "title": "Overhealed",
+    "description": "End the game with more total Hero HP than you started with",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "hp_above_start"
   }
 ]

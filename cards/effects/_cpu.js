@@ -8607,11 +8607,8 @@ function isTargetImmune(engine, target) {
     // Helden, SOLANGE der Besitzer noch einen anderen lebenden,
     // nicht-getauchten Helden hat — exakt diese Bedingung hier
     // gespiegelt, damit die CPU keine Effekte an submerged verschwendet.
-    if (hero.buffs?.submerged) {
-      const otherAlive = (gs.players[target.owner]?.heroes || [])
-        .some(h => h && h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged);
-      if (otherAlive) return true;
-    }
+    // v1385: Regel zentral in der Engine (auch Creatures sind „andere Ziele").
+    if (hero.buffs?.submerged && engine.isSubmergedProtected?.(target.owner, hero)) return true;
     return false;
   }
 

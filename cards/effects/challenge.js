@@ -23,37 +23,24 @@
 // ─── HELPERS ─────────────────────────────
 
 /**
- * Check if a hero can use Challenge.
- * Requires: alive, not incapacitated, Fighting Lv1.
+ * ★ v1378 (Befund an Martyry, gleiches Muster): allgemeine Engine-Pruefung
+ * fuer Reaktionen aus der Hand statt hartkodierter „Fighting"-Zaehlung —
+ * so gelten Stufensenkungen, Overrides, Statussperren und Co. auch hier.
  */
-function heroCanUseChallenge(ps, heroIdx) {
-  const hero = ps.heroes[heroIdx];
-  if (!hero?.name || hero.hp <= 0) return false;
-  if (hero.statuses?.frozen || hero.statuses?.stunned || hero.statuses?.negated) return false;
-
-  // Spell school check: needs Fighting Lv1 (Performance on Fighting counts)
-  const abZones = ps.abilityZones[heroIdx] || [];
-  let fightingCount = 0;
-  for (const slot of abZones) {
-    if (!slot || slot.length === 0) continue;
-    const baseAbility = slot[0];
-    for (const abName of slot) {
-      if (abName === 'Fighting') fightingCount++;
-      else if (abName === 'Performance' && baseAbility === 'Fighting') fightingCount++;
-    }
-  }
-  return fightingCount >= 1;
+function heroCanUseChallenge(engine, pi, heroIdx) {
+  if (!engine?._canHeroActivateSurprise) return false;
+  return engine._canHeroActivateSurprise(pi, heroIdx, 'Challenge', { spellInHand: true });
 }
 
 /**
  * Find heroes that can use Challenge AND are valid targets for the effect.
  * Excludes the currently selected target (no point redirecting to same target).
  */
-function getEligibleRedirectHeroes(gs, pi, selected, validTargets) {
+function getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine) {
   const ps = gs.players[pi];
   const eligible = [];
   for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
-    if (!heroCanUseChallenge(ps, hi)) continue;
+    if (!heroCanUseChallenge(engine, pi, hi)) continue;
 
     // Must NOT be the already-selected target
     if (selected.type === 'hero' && selected.owner === pi && selected.heroIdx === hi) continue;
@@ -109,7 +96,7 @@ module.exports = {
     if (selected.owner !== pi) return false;
 
     // Must have at least one eligible redirect hero
-    return getEligibleRedirectHeroes(gs, pi, selected, validTargets).length > 0;
+    return getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine).length > 0;
   },
 
   /**
@@ -119,7 +106,7 @@ module.exports = {
   onRedirect: async (engine, pi, selected, validTargets, config, sourceCard) => {
     const gs = engine.gs;
     const ps = gs.players[pi];
-    const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets);
+    const eligible = getEligibleRedirectHeroes(gs, pi, selected, validTargets, engine);
     if (eligible.length === 0) return null;
 
     // ── Select Hero to take the hit ──

@@ -116,11 +116,8 @@ function predictedDamage(engine, hero, pi, entry, piercing) {
 
   if (hero.statuses?.charmed) return 0;
   if (hero.statuses?.stunned?._baihuPetrify) return 0;
-  if (hero.buffs?.submerged) {
-    const andereLeben = (gs.players[pi]?.heroes || [])
-      .some(h => h !== hero && h.name && h.hp > 0 && !h.buffs?.submerged);
-    if (andereLeben) return 0;
-  }
+  // v1385: Submerged-Regel zentral in der Engine.
+  if (hero.buffs?.submerged && engine.isSubmergedProtected(pi, hero)) return 0;
   if (!piercing.cannotBeNegated && hero.buffs?.magic_immune && entry.source?.name) {
     const cd = engine._getCardDB()[entry.source.name];
     if (cd?.cardType === 'Spell') {

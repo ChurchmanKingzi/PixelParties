@@ -99,12 +99,8 @@ module.exports = {
         _skipReactionCheck: true,
       });
 
-      // SC tracking — specific to Acid Vial's context, not part of the
-      // generic true-damage helper.
-      if (dealt > 0 && gs._scTracking && pi >= 0 && pi < 2) {
-        const t = gs._scTracking[pi];
-        if (dealt > t.maxDamageInstance) t.maxDamageInstance = dealt;
-      }
+      // SC-Tracking (Brutal) macht seit v1381 `actionDealTrueDamage`
+      // selbst — der fruehere Sonderblock hier ist entfallen.
 
     } else if (target.type === 'equip') {
       // Creature damage — dealTrueDamage wraps the batch internally, so
