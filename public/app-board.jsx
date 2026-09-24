@@ -1701,15 +1701,21 @@ function CardRevealEntry({ cardName, onDone, fizzled }) {
   // sichtbar"): ein Fizzeln ist eine kurze Meldung — 1,4 s statt 3,5 s,
   // die letzten 300 ms blendet es aus (`.card-reveal-fizzled-weg`).
   const lebensdauer = fizzled ? FIZZLE_ANZEIGE_MS : 3500;
+  // v1373 (Als Befund): beim Verschwinden nur den EIGENEN Tooltip abraeumen.
+  // Vorher loeschte jede ablaufende Aufdeck-Anzeige den Tooltip — auch den
+  // einer Karte, die der Spieler gerade ganz woanders las (im PvP kommen
+  // Aufdeckungen samt Reaktionsfenster laufend herein).
+  const gehovert = useRef(false);
   useEffect(() => {
     const t = setTimeout(onDone, lebensdauer);
-    return () => { clearTimeout(t); setBoardTooltip(null); }; // Clear tooltip on unmount
+    return () => { clearTimeout(t); if (gehovert.current) setBoardTooltip(null); };
   }, []);
   if (!card) return null;
   return (
     <div className={'card-reveal-entry' + (fizzled ? ' card-reveal-fizzled-weg' : '')}
       style={fizzled ? { '--fizzle-ms': FIZZLE_ANZEIGE_MS + 'ms' } : undefined}
-      onMouseEnter={() => setBoardTooltip(card)} onMouseLeave={() => setBoardTooltip(null)}>
+      onMouseEnter={() => { gehovert.current = true; setBoardTooltip(card); }}
+      onMouseLeave={() => { gehovert.current = false; setBoardTooltip(null); }}>
       <div className={'card-reveal-card' + (fizzled ? ' card-reveal-fizzled' : '')}>
         {fizzled && <div className="chain-negate-symbol">🚫</div>}
         {fizzled && <div className="card-reveal-fizzle-label orbit-font">FIZZLED</div>}
@@ -25424,6 +25430,143 @@ function useHoverDurchSchleier() {
   }, []);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  ★★ v1374 — CHAT ALS EIGENE KOMPONENTE (Als Befund: „Ingame-Chat mit
+//  zwei Zuschauern → miese Performance"). Vorher lagen Eingabetext,
+//  Nachrichten, DMs und Ansicht als Zustand direkt in `GameBoard`: JEDER
+//  Tastendruck und jede Nachricht baute das komplette Brett neu. Jetzt
+//  besitzt das Panel seinen Zustand und seine Socket-Zuhoerer selbst;
+//  `React.memo` mit eigenem Vergleich laesst es bei Brett-Updates in Ruhe,
+//  solange sich Raum, Teilnehmer und Einklappzustand nicht aendern.
+// ═══════════════════════════════════════════════════════════════════
+const AKTIONSLOG_MAX = 1500;
+function _teilnehmerSchluessel(t) {
+  if (!t) return '';
+  const z = (l) => (l || []).map(p => (p?.username || '') + '|' + (p?.color || '') + '|' + (p?.avatar || '')).join(';');
+  return z(t.players) + '#' + z(t.spectators);
+}
+const ChatPanel = React.memo(function ChatPanel({ roomId, participants: participantsProp, myUsername, collapsed, logCollapsed, onToggleCollapse }) {
+  const [chatMessages, setChatMessages] = useState([]);
+  const [privateChats, setPrivateChats] = useState({}); // { pairKey: [msgs] }
+  const [chatView, setChatView] = useState('main');     // 'main' | 'players' | 'private:username'
+  const [chatInput, setChatInput] = useState('');
+  const [pingFlash, setPingFlash] = useState(null);     // { color }
+  const chatBodyRef = useRef(null);
+
+  useEffect(() => {
+    const onChatMsg = (entry) => {
+      setChatMessages(prev => [...prev, entry]);
+      setTimeout(() => chatBodyRef.current?.scrollTo({ top: chatBodyRef.current.scrollHeight, behavior: 'smooth' }), 50);
+    };
+    const onChatPrivate = (entry) => {
+      const pairKey = [entry.from, entry.to].sort().join('::');
+      setPrivateChats(prev => ({ ...prev, [pairKey]: [...(prev[pairKey] || []), entry] }));
+    };
+    const onChatPing = ({ color }) => {
+      if (window.playSFX) window.playSFX('ping');
+      setPingFlash({ color });
+      setTimeout(() => setPingFlash(null), 900);
+    };
+    const onChatHistory = ({ main, private: priv }) => {
+      if (main) setChatMessages(main);
+      if (priv) setPrivateChats(priv);
+    };
+    socket.on('chat_message', onChatMsg);
+    socket.on('chat_private', onChatPrivate);
+    socket.on('chat_ping', onChatPing);
+    socket.on('chat_history', onChatHistory);
+    // Verlauf beim Einhaengen (Wiederverbinden) anfordern.
+    if (roomId) socket.emit('request_chat_history', { roomId });
+    return () => {
+      socket.off('chat_message', onChatMsg);
+      socket.off('chat_private', onChatPrivate);
+      socket.off('chat_ping', onChatPing);
+      socket.off('chat_history', onChatHistory);
+    };
+  }, [roomId]);
+
+  const sendChat = () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    if (chatView.startsWith('private:')) {
+      socket.emit('chat_private', { roomId, targetUsername: chatView.slice(8), text });
+    } else {
+      socket.emit('chat_message', { roomId, text });
+    }
+    setChatInput('');
+  };
+
+    const participants = participantsProp || { players: [], spectators: [] };
+    const isPrivate = chatView.startsWith('private:');
+    const privateTarget = isPrivate ? chatView.slice(8) : null;
+    const pairKey = privateTarget ? [myUsername, privateTarget].sort().join('::') : null;
+    const privateMsgs = pairKey ? (privateChats[pairKey] || []) : [];
+
+    return (
+      <div className="chat-panel" style={collapsed ? { flex: '0 0 28px' } : logCollapsed ? { flex: 1 } : { position: 'relative' }}>
+        {!collapsed && pingFlash && <div className="chat-ping-flash" style={{ color: pingFlash.color, background: pingFlash.color }} />}
+        <div className="chat-header" style={{ cursor: 'pointer' }} onClick={onToggleCollapse}>
+          {!collapsed && isPrivate && <span className="chat-header-back" onClick={(e) => { e.stopPropagation(); setChatView('main'); }}>◀</span>}
+          <span style={{ flex: 1 }}>{isPrivate && !collapsed ? `DM: ${privateTarget}` : '💬 Chat'}</span>
+          <span style={{ fontSize: 10, opacity: .6 }}>{collapsed ? '▸' : '▾'}</span>
+        </div>
+        {!collapsed && (<>
+        {!isPrivate && (
+          <div className="chat-tabs">
+            <div className={'chat-tab' + (chatView === 'main' ? ' active' : '')} onClick={() => setChatView('main')}>Chat</div>
+            <div className={'chat-tab' + (chatView === 'players' ? ' active' : '')} onClick={() => setChatView('players')}>Players</div>
+          </div>
+        )}
+        {chatView === 'players' ? (
+          <div className="chat-body">
+            {participants.players.map(p => (
+              <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
+                {p.avatar && <img className="player-list-avatar" src={p.avatar} alt="" />}
+                <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-badge">PLAYER</span>
+              </div>
+            ))}
+            {participants.spectators.map(s => (
+              <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
+                {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
+                <span className="player-list-name" style={{ color: '#888' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
+                <span className="player-list-badge">SPECTATOR</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="chat-body" ref={chatBodyRef}>
+            {(isPrivate ? privateMsgs : chatMessages).map(msg => (
+              <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
+                {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
+                <span className="chat-msg-name"
+                  style={{ color: msg.isSpectator ? '#888' : (msg.color || '#fff') }}
+                  onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
+                >{msg.from || msg.username}</span>
+                <span className="chat-msg-text">: {msg.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="chat-input-row">
+          <input
+            className="chat-input"
+            placeholder={isPrivate ? `Message ${privateTarget}...` : 'Type a message...'}
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } }}
+            maxLength={500}
+          />
+          <button className="chat-send-btn" onClick={sendChat}>►</button>
+        </div>
+        </>)}
+      </div>
+    );
+}, (a, b) => a.roomId === b.roomId && a.myUsername === b.myUsername
+  && a.collapsed === b.collapsed && a.logCollapsed === b.logCollapsed
+  && a.onToggleCollapse === b.onToggleCollapse
+  && _teilnehmerSchluessel(a.participants) === _teilnehmerSchluessel(b.participants));
+
 function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck, setSelectedDeck, cubeMatchInfo }) {
   useHoverDurchSchleier();   // v1270: Tooltips durch den Dialog-Schleier
   const { user, setUser, notify, setBgmMode } = useContext(AppContext);
@@ -26869,10 +27012,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   const [tharxianHorseAnims, setTharxianHorseAnims] = useState([]); // Trojan Horse charges from Surprise Zone → attacker
 
   // ── Chat & Action Log state ──
-  const [chatMessages, setChatMessages] = useState([]);
-  const [privateChats, setPrivateChats] = useState({}); // { pairKey: [msgs] }
-  const [chatView, setChatView] = useState('main'); // 'main' | 'players' | 'private:username'
-  const [chatInput, setChatInput] = useState('');
   const [actionLog, setActionLog] = useState([]);
   // Clear action log when a new game starts (rematch) to prevent ID collisions
   const prevMulliganRef = useRef(false);
@@ -26899,8 +27038,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     }
     prevRoomIdLogRef.current = gameState.roomId;
   }, [gameState.roomId]);
-  const [pingFlash, setPingFlash] = useState(null); // { color }
-  const chatBodyRef = useRef(null);
   const actionLogRef = useRef(null);
   const [transferAnims, setTransferAnims] = useState([]); // Card transfer animations (Dark Gear, etc.)
   // Kadaver-Halter (v686): eine beanspruchte Creature (Hunting) ist im
@@ -39235,44 +39372,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
     };
   }, []);
 
-  // ── Chat & Action Log socket listeners ──
+  // ── Action Log socket listener (Chat: v1374 in `ChatPanel`) ──
   useEffect(() => {
-    const onChatMsg = (entry) => {
-      setChatMessages(prev => [...prev, entry]);
-      setTimeout(() => chatBodyRef.current?.scrollTo({ top: chatBodyRef.current.scrollHeight, behavior: 'smooth' }), 50);
-    };
-    const onChatPrivate = (entry) => {
-      const pairKey = [entry.from, entry.to].sort().join('::');
-      setPrivateChats(prev => ({ ...prev, [pairKey]: [...(prev[pairKey] || []), entry] }));
-    };
-    const onChatPing = ({ from, color }) => {
-      if (window.playSFX) window.playSFX('ping');
-      setPingFlash({ color });
-      setTimeout(() => setPingFlash(null), 900);
-    };
     const onActionLog = (entry) => {
-      setActionLog(prev => [...prev, entry]);
+      // v1374: begrenzt — das Log wuchs ueber eine ganze Partie ungebremst.
+      setActionLog(prev => (prev.length >= AKTIONSLOG_MAX ? prev.slice(-(AKTIONSLOG_MAX - 1)) : prev).concat(entry));
       setTimeout(() => actionLogRef.current?.scrollTo({ top: actionLogRef.current.scrollHeight, behavior: 'smooth' }), 50);
       if (window.playSFXForLog) window.playSFXForLog(entry);
     };
-    const onChatHistory = ({ main, private: priv }) => {
-      if (main) setChatMessages(main);
-      if (priv) setPrivateChats(priv);
-    };
-    socket.on('chat_message', onChatMsg);
-    socket.on('chat_private', onChatPrivate);
-    socket.on('chat_ping', onChatPing);
     socket.on('action_log', onActionLog);
-    socket.on('chat_history', onChatHistory);
-    // Request chat history on mount (for reconnects)
-    if (gameState?.roomId) socket.emit('request_chat_history', { roomId: gameState.roomId });
-    return () => {
-      socket.off('chat_message', onChatMsg);
-      socket.off('chat_private', onChatPrivate);
-      socket.off('chat_ping', onChatPing);
-      socket.off('action_log', onActionLog);
-      socket.off('chat_history', onChatHistory);
-    };
+    return () => { socket.off('action_log', onActionLog); };
   }, []);
 
   // ── Scrollable battlefield detection + centering offset ──
@@ -41413,6 +41522,16 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [actionLog]);
 
   // ── Render Action Log ──
+  // ★ v1374: die Log-Zeilen werden nur neu gebaut, wenn das Log oder die
+  // Spielernamen/-farben sich aendern — vorher bei JEDEM Zustand fuer ALLE
+  // Eintraege der Partie (Als Befund: Performance).
+  const _logSpielerKey = (gameState.players || []).map(p => (p?.username || '') + '|' + (p?.color || '')).join(';');
+  const logElemente = useMemo(() => processedLog.map((entry, i) => {
+    const formatted = formatLogEntry(entry);
+    if (!formatted) return null;
+    return <div key={entry.id || i} className="action-log-entry">{formatted}</div>;
+  }), [processedLog, _logSpielerKey, myIdx]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   const renderActionLog = () => {
     return (
       <div className="action-log-panel" style={logCollapsed ? { flex: '0 0 28px' } : chatCollapsed ? { flex: 1 } : undefined}>
@@ -41422,100 +41541,29 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         </div>
         {!logCollapsed && (
           <div className="action-log-body" ref={actionLogRef}>
-            {processedLog.map((entry, i) => {
-              const formatted = formatLogEntry(entry);
-              if (!formatted) return null;
-              return <div key={entry.id || i} className="action-log-entry">{formatted}</div>;
-            })}
+            {logElemente}
           </div>
         )}
       </div>
     );
   };
 
-  // ── Chat send handler ──
-  const sendChat = () => {
-    const text = chatInput.trim();
-    if (!text) return;
-    if (chatView.startsWith('private:')) {
-      const target = chatView.slice(8);
-      socket.emit('chat_private', { roomId: gameState.roomId, targetUsername: target, text });
-    } else {
-      socket.emit('chat_message', { roomId: gameState.roomId, text });
-    }
-    setChatInput('');
-  };
-
-  // ── Render Chat Panel ──
-  const renderChatPanel = () => {
-    const participants = gameState.roomParticipants || { players: [], spectators: [] };
-    const isPrivate = chatView.startsWith('private:');
-    const privateTarget = isPrivate ? chatView.slice(8) : null;
-    const myUsername = gameState.players[gameState.myIndex]?.username || '';
-    const pairKey = privateTarget ? [myUsername, privateTarget].sort().join('::') : null;
-    const privateMsgs = pairKey ? (privateChats[pairKey] || []) : [];
-
-    return (
-      <div className="chat-panel" style={chatCollapsed ? { flex: '0 0 28px' } : logCollapsed ? { flex: 1 } : { position: 'relative' }}>
-        {!chatCollapsed && pingFlash && <div className="chat-ping-flash" style={{ color: pingFlash.color, background: pingFlash.color }} />}
-        <div className="chat-header" style={{ cursor: 'pointer' }} onClick={toggleChatCollapse}>
-          {!chatCollapsed && isPrivate && <span className="chat-header-back" onClick={(e) => { e.stopPropagation(); setChatView('main'); }}>◀</span>}
-          <span style={{ flex: 1 }}>{isPrivate && !chatCollapsed ? `DM: ${privateTarget}` : '💬 Chat'}</span>
-          <span style={{ fontSize: 10, opacity: .6 }}>{chatCollapsed ? '▸' : '▾'}</span>
-        </div>
-        {!chatCollapsed && (<>
-        {!isPrivate && (
-          <div className="chat-tabs">
-            <div className={'chat-tab' + (chatView === 'main' ? ' active' : '')} onClick={() => setChatView('main')}>Chat</div>
-            <div className={'chat-tab' + (chatView === 'players' ? ' active' : '')} onClick={() => setChatView('players')}>Players</div>
-          </div>
-        )}
-        {chatView === 'players' ? (
-          <div className="chat-body">
-            {participants.players.map(p => (
-              <div key={p.username} className="player-list-entry" onClick={() => p.username !== myUsername && setChatView('private:' + p.username)}>
-                {p.avatar && <img className="player-list-avatar" src={p.avatar} alt="" />}
-                <span className="player-list-name" style={{ color: p.color }}>{p.username}{p.username === myUsername ? ' (you)' : ''}</span>
-                <span className="player-list-badge">PLAYER</span>
-              </div>
-            ))}
-            {participants.spectators.map(s => (
-              <div key={s.username} className="player-list-entry" onClick={() => s.username !== myUsername && setChatView('private:' + s.username)}>
-                {s.avatar && <img className="player-list-avatar" src={s.avatar} alt="" />}
-                <span className="player-list-name" style={{ color: '#888' }}>{s.username}{s.username === myUsername ? ' (you)' : ''}</span>
-                <span className="player-list-badge">SPECTATOR</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="chat-body" ref={chatBodyRef}>
-            {(isPrivate ? privateMsgs : chatMessages).map(msg => (
-              <div key={msg.id} className={'chat-msg' + (msg.isSpectator ? ' spectator-msg' : '')}>
-                {msg.avatar && <img className="chat-msg-avatar" src={msg.avatar} alt="" />}
-                <span className="chat-msg-name"
-                  style={{ color: msg.isSpectator ? '#888' : (msg.color || '#fff') }}
-                  onClick={() => (msg.from || msg.username) !== myUsername && setChatView('private:' + (msg.from || msg.username))}
-                >{msg.from || msg.username}</span>
-                <span className="chat-msg-text">: {msg.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="chat-input-row">
-          <input
-            className="chat-input"
-            placeholder={isPrivate ? `Message ${privateTarget}...` : 'Type a message...'}
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendChat(); } }}
-            maxLength={500}
-          />
-          <button className="chat-send-btn" onClick={sendChat}>►</button>
-        </div>
-        </>)}
-      </div>
-    );
-  };
+  // ★ v1374: Chat-Panel ist eine EIGENE Komponente (`ChatPanel`, oben in
+  // dieser Datei) — Tippen und neue Nachrichten zeichnen nur noch das Panel
+  // neu, nicht das ganze Brett (Als Befund: miese Performance mit Chat).
+  const toggleChatRef = useRef(null);
+  toggleChatRef.current = toggleChatCollapse;
+  const toggleChatStabil = useCallback(() => toggleChatRef.current?.(), []);
+  const renderChatPanel = () => (
+    <ChatPanel
+      roomId={gameState.roomId}
+      participants={gameState.roomParticipants}
+      myUsername={gameState.players?.[gameState.myIndex]?.username || ''}
+      collapsed={chatCollapsed}
+      logCollapsed={logCollapsed}
+      onToggleCollapse={toggleChatStabil}
+    />
+  );
 
   const renderPlayerSide = (p, isOpp) => {
     const heroes = p.heroes || [];
@@ -47118,6 +47166,28 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
              ep.type === 'deckSearchReveal' ? 'Waiting for opponent to dismiss search result...' :
              ep.type === 'cardNamePicker' ? 'Waiting for opponent to declare a card name...' :
              'Waiting for opponent...'}
+          </div>
+        </DraggablePanel>
+      )}
+
+      {/* ── ★ v1372 (Als Befund, Madame Guillotine): der Gegner waehlt ein
+          ZIEL, waehrend ICH am Zug bin. Die Zielwahl laeuft ueber
+          `potionTargeting`, nicht ueber `effectPrompt` — und das Warte-
+          Panel darueber schliesst `potionTargeting` ausdruecklich aus. Wer
+          am Zug ist, sass deshalb vor einem blockierten Brett ohne
+          Hinweis. Im Zug des Gegners bleibt es wie bisher still (dort
+          wartet ohnehin niemand auf ihn). ── */}
+      {!isSpectator && !result && gameState.potionTargeting
+        && gameState.potionTargeting.ownerIdx !== myIdx
+        && gameState.activePlayer === myIdx && (
+        <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', minWidth: 260 }}>
+          <div className="orbit-font" style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>
+            🎯 Opponent is choosing...
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text2)' }}>
+            {gameState.potionTargeting.potionName
+              ? `Waiting for opponent to choose a target for ${gameState.potionTargeting.potionName}...`
+              : 'Waiting for opponent to choose a target...'}
           </div>
         </DraggablePanel>
       )}

@@ -185,10 +185,9 @@ async function runGuess(engine, pi, doqHeroIdx) {
 }
 
 module.exports = {
-  // BORIS-SPERRE (Klausel 1): holt Karten des Gegners auf die eigene Seite
-  // Solange der Gegner einen wirksamen Boris hat, ist diese Karte
-  // gar nicht erst aktivierbar. Siehe engine.borisBlockIdx.
-  stealsOpponentCards: true,
+  // v1376 (Boris-Errata): Klausel 1 sperrt nur noch das Hinzufuegen zur
+  // HAND — diese Karte bringt keine gegnerische Karte auf die Hand und
+  // ist deshalb nicht mehr gesperrt (vorher `stealsOpponentCards`).
 
   activeIn: ['hero'],
 

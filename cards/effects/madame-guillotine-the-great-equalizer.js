@@ -72,7 +72,11 @@ async function fallbeil(ctx, anlass) {
   const pi = ctx.cardOwner;
   const opp = pi === 0 ? 1 : 0;
   if (gs.result) return;
-  const ziele = engine.getAbilityTargets(opp);
+  // v1375: Abilities eines temporaer gesteuerten Helden sind unberuehrbar
+  // (Love-Shot-Errata) — sie stehen gar nicht erst zur Wahl.
+  const ziele = engine.getAbilityTargets(opp).filter(t =>
+    !(t.zoneKind === 'ability' || t.type === 'ability')
+    || !engine.istTemporaerGesteuert(gs.players[t.owner]?.heroes?.[t.heroIdx]));
   if (ziele.length === 0) return;                 // Leerlauf: kein Auftritt
 
   const ids = await engine.promptEffectTarget(pi, ziele, {

@@ -4669,6 +4669,55 @@ function SingleplayerScreen() {
                 </div>
               </button>
             )}
+            {/* ★ v1370 (Als Wunsch): ZUFALLS-GEGNER als erste Kachel (oben
+                links). Zieht aus ALLEN freigeschalteten Gegnern — die Galerie
+                liefert nur freigeschaltete, und die Suche filtert hier bewusst
+                nicht mit. Nicht im Gastmodus (dort steht der Tutorial Raccoon
+                an erster Stelle). */}
+            {!user?.isGuest && Array.isArray(opponents) && opponents.length > 0 && (() => {
+              const randColor = '#ffcc33';
+              const aktiv = hasAnyLegal && !starting;
+              return (
+                <button
+                  key="__random_opponent"
+                  className="vscpu-random"
+                  disabled={!aktiv}
+                  onClick={() => {
+                    const op = opponents[Math.floor(Math.random() * opponents.length)];
+                    if (op) startBattle(op.id);
+                  }}
+                  title="Challenge a random unlocked opponent"
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 6, padding: 8,
+                    background: 'color-mix(in srgb, ' + randColor + ' 8%, var(--bg2))',
+                    border: '2px solid ' + randColor,
+                    borderRadius: 6,
+                    boxShadow: '0 0 10px ' + randColor + '44',
+                    cursor: aktiv ? 'pointer' : 'not-allowed',
+                    opacity: aktiv ? 1 : 0.55,
+                    transition: 'transform .15s ease, box-shadow .15s ease',
+                    fontFamily: 'inherit', color: 'inherit',
+                  }}
+                  onMouseEnter={e => { if (aktiv) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + randColor + '88'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + randColor + '44'; }}
+                >
+                  {/* Platzhalter im Format der Heldenbilder (594:398), damit
+                      die Kachel genau so hoch ist wie ihre Nachbarn. */}
+                  <div style={{
+                    width: 240, height: 240 * (398 / 594), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'radial-gradient(ellipse at 50% 45%, ' + randColor + '33 0%, transparent 70%)',
+                    borderRadius: 4, fontSize: 84, lineHeight: 1,
+                  }}>🎲</div>
+                  <div className="orbit-font" style={{ fontSize: 16, color: randColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    Random Opponent
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: randColor, fontWeight: 700 }}>
+                    {opponents.length} unlocked
+                  </div>
+                </button>
+              );
+            })()}
             {oppTiles.map(op => {
               const imgWidth = 240;
               const total = (op.wins || 0) + (op.losses || 0);

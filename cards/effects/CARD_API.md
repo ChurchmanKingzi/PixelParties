@@ -18037,3 +18037,91 @@ ging eine UNTERE Kopie, zog sie ihren kleineren Bonus ab.
 `_stufenbonus-shared.js` → `abgangsBetrag(engine, abgehend, schluessel)`: die
 abgehende Kopie tauscht ihren gemerkten Wert mit der obersten und zieht deren
 Betrag ab. Gilt für jeden Abgang (Madame, Zerstören, Zurücknehmen …).
+
+## ★ v1371 — Effekt-Glanz trifft bei mehreren Kopien die richtige
+
+Als Befund (Grunge Harpyformer): mit zwei Kopien auf dem Brett leuchtete die
+linke, obwohl die rechte ihren Effekt nutzte. `effectSourceGlow` sendete
+Koordinaten nur bei GENAU einer Brett-Instanz, sonst den Namen. Jetzt wählt
+er bei mehreren Kopien die laufende: `_activeCreatureEffect.instId`, die
+wirkende Kreatur (`gs._spellCasterCreature`) oder die Karte, deren Hook
+gerade läuft (`_currentEffectSource.instId`, neu in runHooks).
+
+## ★ v1374 — Performance: Chat, Aktionslog, Bilder im Datenstrom
+
+Als Befund: Ingame-Chat mit zwei Zuschauern → miese Performance.
+
+* **Chat ist eine eigene Komponente** (`ChatPanel`, app-board.jsx, `React.memo`
+  mit Vergleich über Raum, eigenen Namen, Einklappzustand und Teilnehmer).
+  Eingabetext, Nachrichten, DMs, Ansicht, Ping und die Chat-Socket-Zuhörer
+  wohnen dort. Vorher: JEDER Tastendruck und jede Nachricht baute das ganze
+  Brett neu.
+* **Aktionslog:** Zeilen per `useMemo` (nur neu bei neuem Eintrag oder
+  geänderten Spielernamen/-farben) statt bei jedem Zustand für ALLE Einträge
+  der Partie; gespeichert werden höchstens `AKTIONSLOG_MAX` (1500) Einträge.
+* **Bilder raus aus dem Datenstrom** (server.js `bildRef`): hochgeladene
+  Avatare/Cardbacks/Boards (data-URLs bis 2 MB) reisten in jedem `game_state`
+  (Spielerzeilen + Teilnehmerliste mit allen Zuschauern) und in jeder
+  Chat-Nachricht. Jetzt steht dort `/api/img/<hash>` (inhaltsadressiert,
+  `immutable` gecacht, ohne Anmeldung abrufbar); Pfade wie `/avatars/…`
+  bleiben unverändert.
+
+## ★ v1375 — Love-Shot-Errata: Ability Zones temporär gesteuerter Helden sind unberührbar
+
+Neuer Text (Al): „… Cards in that Hero's Ability Zones are unaffected by all
+effects while it is controlled by you." Gilt für ALLE temporären
+Stehl-Effekte (Charme 3, Love Shot, Golden Apple …).
+
+* `engine.istTemporaerGesteuert(hero)` — `charmedBy`/`controlledBy` ohne
+  `permaControlBy`. `engine.abilityZoneGeschuetzt(inst)` — Karte in der Ability
+  Zone eines solchen Helden.
+* Tore: `promptEffectTarget` graut solche Ziele aus; `actionMoveCard` und
+  `actionDestroyCard` lassen sie liegen (Log `ability_protected_by_control`;
+  Ausweg für engine-interne Umbuchungen: `opts._ignoreCharmSchutz`).
+* Madame Guillotine bietet sie gar nicht erst an.
+* **Neue Karten**, die Ability-Zonen direkt anfassen (ohne diese Tore),
+  fragen `engine.abilityZoneGeschuetzt(inst)`.
+
+**★ Reparatur einer v1365-Panne:** der Umbau von `actionDestroyCard` zur Hülle
+(für `nachAbgang`) hatte die bestehende Hülle `_mitNiederlagenSammler`
+versehentlich in einen zweiten `_actionDestroyCardKern` umbenannt — der
+gleichnamige echte Kern überschrieb sie, der Niederlagen-Sammler lief bei
+Zerstörungen seit v1365 nicht mehr. Jetzt wieder: Sammler → Kern → Nach-Abgang.
+
+## ★ v1376 — Boris-Errata
+
+Neuer Text: „Your opponent cannot add any cards originally owned by you to
+their hand and cannot activate effects that would take control of any targets
+you control. You may once per turn ignore any effect that would force you to
+discard cards from your hand (including as a cost)."
+
+* **Klausel 3 einmal pro Zug** (pro Spieler, HOPT `boris-discard`):
+  `offerDiscardSkip` fragt nur, solange frei, und verbraucht erst beim
+  tatsächlichen Verzicht (auch beim automatischen Verzicht auf unbezahlbare
+  Kosten). `waivesDiscardCosts` → nur solange frei (Spielbarkeitslisten).
+* **Klausel 1 nur noch HAND:** `stealsOpponentCards` heißt jetzt „bringt
+  gegnerische Karten auf die eigene Hand". Great Detective Doq und Dive
+  Bomblebee (keine Karte auf die Hand) tragen das Flag nicht mehr.
+
+## ★ v1377 — Defending the Gate schützt nur vor dem GEGNER
+
+Als Befund: der Schild blockte auch Effekte des eigenen Besitzers (und die
+Prüfung fragte ihn sogar bei eigenen Effekten). `_triggerGateCheck(…,
+quelleBesitzer)` und `_isGateShielded(…, quelleBesitzer)` prüfen jetzt die
+Quelle: `_gateQuelleIstGegner` — mitgegebener Besitzer, sonst laufende
+Effektquelle, sonst aktivierende Karte, sonst Zugspieler. Alle Engine-Stellen
+(Zerstören, Bewegen, Status, Schaden-Batch …) reichen ihre Quelle mit
+(`_gateQuelleVon`); Kartenskripte ohne Quelle fallen auf die Ableitung zurück.
+
+## ★ v1377 — Defending the Gate: nur gegen den Gegner (Text + Engine)
+
+Neuer Text (Al): „Activate this Surprise when 1 or more cards in one of your
+Support Zones would be affected by an **opponent's** card or effect. …"
+
+Engine: `_triggerGateCheck(ziel, name, quelleBesitzer)` und
+`_isGateShielded(ziel, quelleBesitzer)` prüfen die Quelle
+(`_gateQuelleIstGegner`): eigener Effekt → keine Frage, kein Schild. Ohne
+ausdrückliche Quelle gilt die laufende Effektquelle, sonst die aktivierende
+Karte, sonst der Zugspieler. `_gateQuelleVon(quelle, opts)` liest den Besitzer
+aus Quellobjekten. Vorher blockte ein aktiver Schild auch eigene Effekte auf
+die eigenen Support Zones.

@@ -4,12 +4,16 @@
 //  Startabilities: Fighting + Wealth
 //
 //  "Your opponent cannot add any cards originally
-//   owned by you to their hand, deck or discard pile
-//   and cannot activate effects that would take
-//   control of any targets you control.
-//   You may ignore any effects that would force you
-//   to discard cards from your hand (including as
-//   costs)."
+//   owned by you to their hand and cannot activate
+//   effects that would take control of any targets
+//   you control. You may once per turn ignore any
+//   effect that would force you to discard cards
+//   from your hand (including as a cost)."
+//
+//  ★ v1376 (Als Errata 24.9.): Klausel 1 nur noch HAND (nicht mehr Deck
+//  und Ablage), Klausel 3 nur noch EINMAL PRO ZUG (pro Spieler,
+//  `boris-discard`). Verbraucht wird sie nur, wenn wirklich verzichtet
+//  wird — auch beim automatischen Verzicht auf unbezahlbare Kosten.
 //
 //  Reiner Passiv-Held — kein aktiver Effekt, keine
 //  Aktivierung. Alle drei Klauseln laufen ueber
@@ -38,6 +42,12 @@
 // ═══════════════════════════════════════════
 
 const CARD_NAME = 'Boris, the Guardian of Blackport';
+const HOPT = 'boris-discard';
+
+/** Hat `pi` den Einmal-pro-Zug-Verzicht in diesem Zug schon benutzt? */
+function verzichtVerbraucht(engine, pi) {
+  return engine?.gs?.hoptUsed?.[`${HOPT}:${pi}`] === engine?.gs?.turn;
+}
 
 /**
  * Kontrolliert `pi` einen WIRKSAMEN Boris?
@@ -94,6 +104,7 @@ module.exports = {
     // Zwangsabwurf trifft immer nur EINEN Spieler und kann deshalb
     // nicht kreisen.
     if (!borisActive(engine, pi)) return false;
+    if (verzichtVerbraucht(engine, pi)) return false;   // v1376: einmal pro Zug
     const ps = engine.gs.players[pi];
     if (!ps) return false;
 
@@ -104,6 +115,7 @@ module.exports = {
     // leere Hand (vorher stieg die Funktion dort aus und der Abwurf lief
     // regulaer weiter ins Leere).
     if ((ps.hand || []).length < count) {
+      engine.claimHOPT(HOPT, pi);   // v1376
       engine.log('boris_discard_skipped', {
         player: ps.username, skipped: count,
         source: opts.sourceName || opts.source || undefined,
@@ -125,8 +137,9 @@ module.exports = {
       cancelLabel: 'Discard normally',
       cancellable: true,
     });
-    if (!skipped) return false;
+    if (!skipped || skipped.cancelled || skipped.confirmed === false) return false;
 
+    engine.claimHOPT(HOPT, pi);   // v1376: einmal pro Zug
     engine.log('boris_discard_skipped', {
       player: ps.username,
       skipped: wieViele,
@@ -156,11 +169,12 @@ module.exports = {
    * einen Effekt mit Abwurfkosten dann nicht mehr an der Handgroesse
    * scheitern lassen.
    */
-  waivesDiscardCosts: (engine, pi) => borisActive(engine, pi),
+  waivesDiscardCosts: (engine, pi) => borisActive(engine, pi) && !verzichtVerbraucht(engine, pi),   // v1376
 
   // Vertrag fuer Engine und Client (Klauseln 1 + 2 sowie das
   // Hervorheben beim Hovern).
   borisActive,
   borisHeroIdx,
+  verzichtVerbraucht,
   CARD_NAME,
 };

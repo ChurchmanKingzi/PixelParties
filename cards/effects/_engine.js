@@ -3214,6 +3214,7 @@ class GameEngine {
         cardName: card.name,
         owner: card.controller ?? card.owner,
         cardType: this._getCardDB()[card.name]?.cardType || 'Unknown',
+        instId: card.id,   // v1371: welche Instanz (Glanz bei mehreren Kopien)
       };
       try {
         if (this._fastMode) {
@@ -10482,6 +10483,24 @@ class GameEngine {
         && (c.controller ?? c.owner) === ownerIdx
         && (c.zone === ZONES.SUPPORT || c.zone === ZONES.HERO) && !c.faceDown);
       if (cands.length === 1 && origin !== 'hand') inst = cands[0];
+      // ★ v1371 (Als Befund, Grunge Harpyformer): liegen MEHRERE Kopien
+      // auf dem Brett, fiel der Glanz auf den Namen zurueck — der Client
+      // zuendete dann die linke Kopie an, nicht die, die ihren Effekt
+      // nutzt. Die laufende Aktivierung weiss, welche Instanz es ist:
+      // der aktive Kreatureffekt (server doActivateCreatureEffect), die
+      // wirkende Kreatur eines Zaubers, oder die Karte, deren Hook gerade
+      // laeuft (`_currentEffectSource.instId`, runHooks).
+      if (!inst && cands.length > 1 && origin !== 'hand') {
+        const ids = [
+          this._activeCreatureEffect?.cardName === sourceName ? this._activeCreatureEffect.instId : null,
+          this.gs?._spellCasterCreature?.name === sourceName ? this.gs._spellCasterCreature.id : null,
+          this._currentEffectSource?.cardName === sourceName ? this._currentEffectSource.instId : null,
+        ].filter(id => id != null);
+        for (const id of ids) {
+          const hit = cands.find(c => c.id === id);
+          if (hit) { inst = hit; break; }
+        }
+      }
     }
     if (inst && !origin) origin = 'board';
     try {
@@ -11089,6 +11108,26 @@ class GameEngine {
    * wirklich verlassen hat: am Ende von actionMoveCard/actionDestroyCard
    * und — fuer eigene Entfern-Wege — beim naechsten Hook.
    */
+  /**
+   * ★★ v1375 — ABILITY ZONES EINES TEMPORAER GESTEUERTEN HELDEN (Als Errata
+   * Love Shot + Regel fuer alle temporaeren Stehl-Effekte wie Charme 3):
+   * „Cards in that Hero's Ability Zones are unaffected by all effects while
+   * it is controlled by you." Temporaer = `charmedBy`/`controlledBy` ohne
+   * dauerhafte Uebernahme (`permaControlBy`).
+   */
+  istTemporaerGesteuert(hero) {
+    if (!hero?.name) return false;
+    if (hero.permaControlBy != null) return false;
+    return hero.charmedBy != null || hero.controlledBy != null;
+  }
+
+  /** Ist diese Karte durch den Schutz oben unberuehrbar? */
+  abilityZoneGeschuetzt(inst) {
+    if (!inst || inst.zone !== ZONES.ABILITY) return false;
+    const hero = this.gs.players[inst.owner]?.heroes?.[inst.heroIdx];
+    return this.istTemporaerGesteuert(hero);
+  }
+
   nachAbgang(inst, fn) {
     if (!inst || typeof fn !== 'function') return;
     if (!this._nachAbgang) this._nachAbgang = [];
@@ -11111,17 +11150,23 @@ class GameEngine {
   }
 
   async actionDestroyCard(source, targetCard, opts = {}) {
-    const r = await this._actionDestroyCardKern(source, targetCard, opts);
+    // ★ v1375: Reparatur einer v1365-Panne — der Umbau hatte die bestehende
+    // Huelle `_mitNiederlagenSammler` versehentlich in einen zweiten
+    // `_actionDestroyCardKern` umbenannt; der spaetere gleichnamige Kern
+    // ueberschrieb sie, der Niederlagen-Sammler lief bei Zerstoerungen nicht
+    // mehr. Jetzt wieder: Sammler → Kern, danach die Nach-Abgang-Arbeit.
+    const r = await this._mitNiederlagenSammler(() => this._actionDestroyCardKern(source, targetCard, opts));
     await this._nachAbgangAbarbeiten();   // v1365
     return r;
   }
 
   async _actionDestroyCardKern(source, targetCard, opts = {}) {
-    return this._mitNiederlagenSammler(() => this._actionDestroyCardKern(source, targetCard, opts));
-  }
-
-  async _actionDestroyCardKern(source, targetCard, opts = {}) {
     if (!targetCard) return;
+    // v1375: Ability Zone eines temporaer gesteuerten Helden — unberuehrbar.
+    if (!opts._ignoreCharmSchutz && this.abilityZoneGeschuetzt(targetCard)) {
+      this.log('ability_protected_by_control', { card: targetCard.name, by: source?.name || null });
+      return;
+    }
     // ★ v1293 — `opts.unaufhaltsam`: „ignores any effect that would …
     // prevent the target from being defeated" (Midnight Assault). Ueber-
     // springt JEDEN Schutz-/Rettungsweg unten (Unzerstoerbarkeit,
@@ -11171,8 +11216,9 @@ class GameEngine {
     }
     // Defending the Gate: protect support zone cards
     if (!opts.ignoreGateShield && !_u && targetCard.zone === 'support') {
-      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner, source?.name || opts.sourceName || null);
-      if (this._isGateShielded(targetCard.controller ?? targetCard.owner)) {
+      const _gq = this._gateQuelleVon(source, opts);   // v1377
+      await this._triggerGateCheck(targetCard.controller ?? targetCard.owner, source?.name || opts.sourceName || null, _gq);
+      if (this._isGateShielded(targetCard.controller ?? targetCard.owner, _gq)) {
         this.log('destroy_blocked', { card: targetCard.name, reason: 'Defending the Gate' });
         return;
       }
@@ -11794,6 +11840,11 @@ class GameEngine {
   }
 
   async _actionMoveCardKern(cardInstance, toZone, toHeroIdx, toSlot, opts = {}) {
+    // v1375: Ability Zone eines temporaer gesteuerten Helden — unberuehrbar.
+    if (!opts._ignoreCharmSchutz && this.abilityZoneGeschuetzt(cardInstance)) {
+      this.log('ability_protected_by_control', { card: cardInstance.name, by: opts.source?.name || opts.sourceName || null });
+      return;
+    }
     // v1293: `opts.unaufhaltsam` kommt nur aus `actionDestroyCard`
     // (Midnight Assault) — dieselben Schutzmarken wie dort gelten nicht.
     const _u = !!opts.unaufhaltsam;
@@ -11849,13 +11900,14 @@ class GameEngine {
     const fromHeroIdx = cardInstance.heroIdx;
 
     // Defending the Gate: protect support zone cards
-    if (!opts.ignoreGateShield && !_u && fromZone === 'support' && this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) {
+    const _gqM = this._gateQuelleVon(opts.deathSource || opts.source, opts);   // v1377
+    if (!opts.ignoreGateShield && !_u && fromZone === 'support' && this._isGateShielded(cardInstance.controller ?? cardInstance.owner, _gqM)) {
       return;
     }
     if (!opts.ignoreGateShield && !_u && fromZone === 'support' && toZone !== 'support') {
       await this._triggerGateCheck(cardInstance.controller ?? cardInstance.owner,
-        opts.deathSource?.name || opts.source?.name || opts.sourceName || null);
-      if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner)) return;
+        opts.deathSource?.name || opts.source?.name || opts.sourceName || null, _gqM);
+      if (this._isGateShielded(cardInstance.controller ?? cardInstance.owner, _gqM)) return;
     }
 
     // Cosmic-Malfunction-Fenster für EFFEKT-Bewegungen (Als Ruling:
@@ -15551,7 +15603,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // — we just need to surface the trigger here so the gate offers a
     // prompt instead of silently letting the status land.
     if (!opts.ignoreGateShield && inst.zone === ZONES.SUPPORT) {
-      await this._triggerGateCheck(inst.controller ?? inst.owner, sourceObj?.name || null);
+      await this._triggerGateCheck(inst.controller ?? inst.owner, sourceObj?.name || null, this._gateQuelleVon(sourceObj, opts));   // v1377
     }
     const canApply = this.canApplyCreatureStatus(inst, statusName, sourceObj);
     // Play the source's intended animation BEFORE the immunity bail,
@@ -15813,8 +15865,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // must reach an Attendant-protected Queen normally) from opp-applied
     // negative buffs. Lenient default keeps own-side buffs working.
     if (!opts.ignoreGateShield) {
-      await this._triggerGateCheck(inst.controller ?? inst.owner, opts.source?.name || opts.sourceName || null);
-      if (this._isGateShielded(inst.controller ?? inst.owner)) return false;
+      const _gqS = this._gateQuelleVon(opts.source, opts);   // v1377
+      await this._triggerGateCheck(inst.controller ?? inst.owner, opts.source?.name || opts.sourceName || null, _gqS);
+      if (this._isGateShielded(inst.controller ?? inst.owner, _gqS)) return false;
     }
     if (!inst.counters.buffs) inst.counters.buffs = {};
     const buffDef = BUFF_EFFECTS[buffName] || {};
@@ -16072,8 +16125,9 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Loyal Shepherd / Cosmic Depths), so the gate doesn't apply.
     if (!opts.ignoreGateShield && !opts.selfInflicted && inst.zone === 'support') {
       const srcName = typeof source === 'string' ? source : (source?.name || null);
-      await this._triggerGateCheck(inst.controller ?? inst.owner, srcName);
-      if (this._isGateShielded(inst.controller ?? inst.owner)) return; // Defending the Gate
+      const _gqD = this._gateQuelleVon(source, opts);   // v1377
+      await this._triggerGateCheck(inst.controller ?? inst.owner, srcName, _gqD);
+      if (this._isGateShielded(inst.controller ?? inst.owner, _gqD)) return; // Defending the Gate
     }
     // Cardinal Beasts (and anything else picking up `_cardinalImmune`)
     // are immune to ALL negation paths — Forbidden Zone, Dark Gear,
@@ -16428,7 +16482,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   canApplyCreatureStatus(inst, statusName, source, opts = {}) {
     if (!inst) return false;
     if (inst.faceDown) return false; // Face-down surprises cannot receive statuses
-    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner)) return false; // Defending the Gate
+    if (!opts.ignoreGateShield && inst.zone === 'support' && this._isGateShielded(inst.controller ?? inst.owner, this._gateQuelleVon(source, opts))) return false; // Defending the Gate
     // Generic absolute-immunity gate: omni-immune creatures (Cardinal
     // Beasts, Golden Wings, future creatures opting in via
     // `_omniImmune`) block every status application AT APPLY TIME.
@@ -24624,6 +24678,18 @@ this._deathWatch = (this._deathWatchStack || []).length
     if (this._aborted) return null;
     if (!validTargets || validTargets.length === 0) return [];
 
+    // ★ v1375: Karten in den Ability Zones eines TEMPORAER gesteuerten
+    // Helden sind von allen Effekten unberuehrt (Love-Shot-Errata, Charme 3
+    // & Co.) — als Ziel ausgegraut.
+    for (const t of validTargets) {
+      if (!t || t.ineligible) continue;
+      const istAbilityZiel = t.type === 'ability' || t.zoneKind === 'ability'
+        || t.cardInstance?.zone === 'ability';
+      if (!istAbilityZiel) continue;
+      const hero = this.gs.players[t.cardInstance?.owner ?? t.owner]?.heroes?.[t.cardInstance?.heroIdx ?? t.heroIdx];
+      if (this.istTemporaerGesteuert(hero)) t.ineligible = true;
+    }
+
     // ★★ v1174 (Al 17.9.: „das erste Ziel wird beim Klick auf ein zweites
     // nicht abgewaehlt"): Der Client tauscht die Auswahl nur aus, wenn er
     // eine OBERGRENZE kennt — und die liest er aus `maxTotal`. Karten, die
@@ -27154,7 +27220,8 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Namensliste, damit kuenftige Karten automatisch mitgefangen
    * werden:
    *   • `stealsOpponentCards`   — holt Karten des Gegners auf die
-   *                               eigene Hand / ins Deck / in die Ablage
+   *                               eigene HAND (v1376, Boris-Errata: Deck
+   *                               und Ablage zaehlen nicht mehr)
    *   • `takesControlOfTargets` — uebernimmt die Kontrolle ueber ein
    *                               Ziel des Gegners
    *
@@ -27490,7 +27557,30 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Returns true if shield is active (existing or newly activated).
    * Call this from async contexts before opponent effects modify support zones.
    */
-  async _triggerGateCheck(targetOwnerIdx, sourceName = null) {
+  /**
+   * ★ v1377 (Als Befund): Defending the Gate schuetzt NUR vor Karten und
+   * Effekten des GEGNERS. Vorher fragte die Pruefung nie nach der Quelle —
+   * ein aktivierter Schild blockte auch eigene Effekte (Opfer, Bewegen,
+   * eigene Statuseffekte …) auf die eigenen Support Zones. Quelle: der
+   * mitgegebene Besitzer, sonst die laufende Effektquelle, sonst die
+   * aktivierende Karte, sonst der Zugspieler (Regel wie pileOutAllowed).
+   */
+  _gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer) {
+    const q = (typeof quelleBesitzer === 'number' && quelleBesitzer >= 0) ? quelleBesitzer
+      : (this._currentEffectSource?.owner ?? this._activationSource?.owner ?? this.gs.activePlayer);
+    return q !== targetOwnerIdx;
+  }
+
+  /** Besitzer aus einem Quellobjekt (Karte/Instanz/Schlicht-Objekt), sonst undefined. */
+  _gateQuelleVon(quelle, opts = {}) {
+    if (typeof opts.sourceOwner === 'number') return opts.sourceOwner;
+    const q = (quelle && typeof quelle === 'object') ? quelle : null;
+    if (q) return q.controller ?? q.owner;
+    return undefined;
+  }
+
+  async _triggerGateCheck(targetOwnerIdx, sourceName = null, quelleBesitzer = undefined) {
+    if (!this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer)) return false;   // v1377
     // ── v386: Zaehler fuer das Gate-Korrelat ────────────────────────
     // Die Abbruchrate folgte in den A/B-Laeufen der Zahl der
     // `Defending the Gate`-Kopien im Deck (4x → 7/10, 2x → 3/10,
@@ -27586,8 +27676,9 @@ this._deathWatch = (this._deathWatchStack || []).length
   /**
    * Sync check: is this player's support zone currently shielded by Defending the Gate?
    */
-  _isGateShielded(targetOwnerIdx) {
-    return this.gs._gateShieldActive === targetOwnerIdx;
+  _isGateShielded(targetOwnerIdx, quelleBesitzer = undefined) {
+    if (this.gs._gateShieldActive !== targetOwnerIdx) return false;
+    return this._gateQuelleIstGegner(targetOwnerIdx, quelleBesitzer);   // v1377
   }
 
   async _checkSurpriseOnEquip(equipOwnerIdx, equipHeroIdx, equipCard) {
@@ -41415,14 +41506,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       const controllerIdx = e.inst.controller ?? e.inst.owner;
       if (gateCheckedPlayers.has(controllerIdx)) continue;
       gateCheckedPlayers.add(controllerIdx);
-      await this._triggerGateCheck(controllerIdx, e.source?.name || null);
+      await this._triggerGateCheck(controllerIdx, e.source?.name || null, this._gateQuelleVon(e.source));   // v1377
     }
     // Cancel entries for gate-shielded players
     for (const e of entries) {
       if (e.cancelled) continue;
       if (e.canBeNegated === false) continue; // Un-negatable damage pierces gate shield
       const controllerIdx = e.inst.controller ?? e.inst.owner;
-      if (this._isGateShielded(controllerIdx)) {
+      if (this._isGateShielded(controllerIdx, this._gateQuelleVon(e.source))) {   // v1377
         e.cancelled = true;
         e._gateBlocked = true;
       }

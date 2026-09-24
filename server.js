@@ -1971,6 +1971,47 @@ app.post('/api/profile/email/confirm', authMiddleware, async (req, res) => {
   res.json({ ok: true, user: sanitizeUser(user) });
 });
 
+// ★★ v1374 — BILDER AUS DEM DATENSTROM (Als Befund: Chat mit Zuschauern
+// = miese Performance). Hochgeladene Avatare/Cardbacks/Boards liegen als
+// Base64-data-URL (bis 2 MB) in der DB und reisten in JEDEM game_state mit —
+// Spielerzeilen, Teilnehmerliste (Spieler + alle Zuschauer), jede Chat-
+// Nachricht. `bildRef` ersetzt eine data-URL durch eine kurze,
+// inhaltsadressierte Adresse `/api/img/<hash>`; der Browser laedt das Bild
+// EINMAL und haelt es (immutable). Pfade (Standard-Avatare) bleiben wie sie
+// sind. Ohne Anmeldung abrufbar — ein <img> kann keinen Header senden, und
+// die Bilder sieht der Gegner ohnehin.
+const _bildHash = new Map();    // data-URL → hash
+const _bildDaten = new Map();   // hash → { mime, buf }
+const BILD_CACHE_MAX = 800;
+function bildRef(v) {
+  if (typeof v !== 'string' || !v.startsWith('data:')) return v;
+  let h = _bildHash.get(v);
+  if (!h) {
+    const m = /^data:([^;,]+)(;base64)?,([\s\S]*)$/.exec(v);
+    if (!m) return v;
+    let buf;
+    try { buf = m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3])); }
+    catch { return v; }
+    h = crypto.createHash('sha1').update(v).digest('hex').slice(0, 24);
+    _bildHash.set(v, h);
+    _bildDaten.set(h, { mime: m[1] || 'application/octet-stream', buf });
+    if (_bildHash.size > BILD_CACHE_MAX) {
+      const alt = _bildHash.keys().next().value;
+      const altH = _bildHash.get(alt);
+      _bildHash.delete(alt);
+      if (![..._bildHash.values()].includes(altH)) _bildDaten.delete(altH);
+    }
+  }
+  return '/api/img/' + h;
+}
+app.get('/api/img/:h', (req, res) => {
+  const d = _bildDaten.get(String(req.params.h || ''));
+  if (!d) return res.status(404).end();
+  res.set('Content-Type', d.mime);
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.send(d.buf);
+});
+
 // Avatar upload — accepts base64 data URL in JSON body
 app.post('/api/profile/avatar', authMiddleware, async (req, res) => {
   const { avatar } = req.body;
@@ -4241,7 +4282,7 @@ function sendGameState(room, playerIdx, extra) {
   const state = {
     myIndex: playerIdx, roomId: room.id,
     players: gs.players.map((ps, pi) => ({
-      username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
+      username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -5334,8 +5375,8 @@ function sendGameState(room, playerIdx, extra) {
       return result;
     })() : [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
-      spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
     ...extra,
     // ★★ v1135 — LAUFENDE NUMMER JE ZUSTAND (Als Befund 15.9.: „Skull
@@ -5382,7 +5423,7 @@ function sendSpectatorGameState(room) {
     myIndex: 0, // Player 0 at bottom, Player 1 at top (host = bottom)
     roomId: room.id,
     players: gs.players.map((ps, spi) => ({
-      username: ps.username, color: ps.color, avatar: ps.avatar, cardback: ps.cardback || null, board: ps.board || null,
+      username: ps.username, color: ps.color, avatar: bildRef(ps.avatar), cardback: bildRef(ps.cardback) || null, board: bildRef(ps.board) || null,   // v1374
       victoryMsg: ps.victoryMsg || '', defeatMsg: ps.defeatMsg || '',
       // ★ Teilt dieser Spieler seine Support-Zonen („Alice, the Transfer
       // Student")? Gehoert HIERHER, in den pro-Spieler-Block neben
@@ -5686,8 +5727,8 @@ function sendSpectatorGameState(room) {
     bakhmSurpriseSlots: [],
     ushabtiSummonable: [],
     roomParticipants: {
-      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: ps.avatar })),
-      spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: s.avatar || null })),
+      players: gs.players.map(ps => ({ username: ps.username, color: ps.color, avatar: bildRef(ps.avatar) })),   // v1374
+      spectators: (room.spectators || []).map(s => ({ username: s.username, color: s.color || '#888', avatar: bildRef(s.avatar) || null })),
     },
   };
 
@@ -14215,7 +14256,7 @@ io.on('connection', (socket) => {
       id: Date.now() + Math.random(),
       username: currentUser.username,
       color: isSpec ? '#888' : playerColor,
-      avatar: gsPlayer?.avatar || currentUser.avatar || null,
+      avatar: bildRef(gsPlayer?.avatar || currentUser.avatar) || null,   // v1374
       isSpectator: isSpec,
       text: msg,
       timestamp: Date.now(),
@@ -14261,7 +14302,7 @@ io.on('connection', (socket) => {
       from: currentUser.username,
       to: targetUsername,
       color: currentUser.color || '#00f0ff',
-      avatar: currentUser.avatar || null,
+      avatar: bildRef(currentUser.avatar) || null,   // v1374
       isSpectator: room.spectators.some(s => s.userId === currentUser.userId),
       text: msg,
       timestamp: Date.now(),

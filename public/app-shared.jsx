@@ -5311,6 +5311,12 @@ function useStickyHoverFlag(ref) {
   return [hovered, hoverProps, setHovered];
 }
 
+// v1373: letzte Mausposition fuer die Tooltip-Sicherung (useCardTooltip).
+if (typeof window !== 'undefined' && !window._ppLetzteMausAn) {
+  window._ppLetzteMausAn = true;
+  window.addEventListener('mousemove', (e) => { window._ppLetzteMaus = { x: e.clientX, y: e.clientY }; }, { passive: true });
+}
+
 function useCardTooltip(opts) {
   const defaultSide = (opts && opts.defaultSide) || 'right';
   // Include .status-badge:hover and .buff-icon:hover so the 300ms safety-
@@ -5348,8 +5354,24 @@ function useCardTooltip(opts) {
   // Hook `useHoverDurchSchleier` in app-board.jsx.
   useEffect(() => {
     if (!tooltipCard || window._isTouchDevice) return;
+    // ★ v1373 (Als Befund: „ein aufploppendes Reaction-Window entfernt den
+    // Hover-Tooltip und unterbricht das Lesen"). Taucht ein Fenster auf,
+    // rendert React Teile des Bretts neu — der Browser setzt `:hover` erst
+    // bei der naechsten Mausbewegung wieder, und die Sicherung raeumte den
+    // Tooltip nach 300 ms ab, obwohl der Zeiger noch auf der Karte stand.
+    // Zweiter Blick deshalb ueber die letzte Mausposition: liegt dort
+    // (auch unter einem Fenster) noch eine hoverbare Karte, bleibt er.
+    const basisSelektor = hoverSelectors.replace(/:hover/g, '');
     const check = () => {
-      if (!document.querySelector(`${hoverSelectors}, .pp-hover-durch`)) setTooltipCard(null);
+      if (document.querySelector(`${hoverSelectors}, .pp-hover-durch`)) return;
+      const pos = window._ppLetzteMaus;
+      if (pos) {
+        try {
+          const unterZeiger = document.elementsFromPoint(pos.x, pos.y) || [];
+          if (unterZeiger.some(el => el.matches?.(basisSelektor) || el.closest?.(basisSelektor))) return;
+        } catch { /* weiter: abraeumen */ }
+      }
+      setTooltipCard(null);
     };
     const id = setInterval(check, 300);
     return () => clearInterval(id);
