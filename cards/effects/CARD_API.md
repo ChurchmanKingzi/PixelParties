@@ -17926,3 +17926,114 @@ Such-Sperre greift; Flug Potion Deck → Hand glitzernd.
 **★ Lücke:** `beforeDrawBatch` für Potion-Züge lief in der Resource Phase nie
 (Tuscan Mystic u. a. schwiegen dort). Ein Potion-Zug ist nie Rundeneinkommen —
 das Fenster läuft jetzt immer (wie v1344 für das Hauptdeck).
+
+## ★ v1363 — „Bluff"; wer entfernt? verdeckte Karten mit Hooks
+
+**Neue Karte „Bluff"** (Attack Surprise, Fighting Lv0; Text von Al: „Draw 3").
+Auslöser wie Flooding (Attack/Spell-KARTE wählt den Wirt, keine volle AoE),
+ohne Negieren. „Removed from the board by an opponent's card or effect" →
+4 Karten, nur wenn der Bewegende der Gegner ist.
+
+* **`onCardLeaveZone` trägt `entferntVon`** (runHooks, vor der Zuhörer-Runde):
+  ausdrückliche Quelle (`source`/`sourceOwner`), sonst die laufende
+  Effektquelle, sonst die aktivierende Karte, sonst der Zugspieler — dieselbe
+  Regel wie `pileOutAllowed`. `actionMoveCard` reicht seine Quelle mit.
+* **Kartenvertrag `hooksWhileFaceDown: [hookName…]`** — verdeckte Karten
+  hören sonst auf keinen Hook.
+
+## ★ v1364 — Sammel-Fix nach Tester-Befunden
+
+* **Sofort-Guss + Attachment** (Sticky Wand + Call of the Deepsea):
+  `_castSpellImmediately` wertet den Brett-Stempel `_spellPlacedOnBoard` für
+  DIESEN Guss aus (Karte verlässt die Hand ohne Ablage) und stellt den des
+  äußeren Wegs wieder her. Vorher: Kopie auf Brett UND Ablage, die Wand
+  verschwand. `pickAttachmentHost`: `preferCaster` gilt nicht im Sofort-Guss
+  (`_immediateActionContext`) — dort gibt es keinen Drop, also Wirtwahl.
+* **Galerie mit Hand + Ablage:** die Quelle kommt aus der WAHL (`wahl.source`
+  bzw. `selectedIndices`), nie aus einem Namens-Lookup — Monster in a Bottle,
+  Army of the Cute.
+* **`engine.meldeGussAlsAktion(pi, hi, name, extra)`** — EINE Stelle für
+  „Guss als Zusatzaktion" (`onAnyActionResolved`). Victory Phoenix Cannon
+  läuft jetzt über `_castSpellImmediately` (`alsZusatzaktion`); Love Shot,
+  Nieht, Taio, Chaorc Friendly Fireballer melden ihren nachgebauten Folgeguss.
+* **Geliehener Held** (Love Shot, Charme): Attack-/Spell-Skripte holen den
+  Anwender über `ctx.attachedHero` (physische Seite, `heroOwner`) — 33 Skripte
+  umgestellt. Neue Skripte: `const hero = ctx.attachedHero || ps.heroes[heroIdx]`.
+* **Flashbang:** in Runde 1 gesperrt, solange der Gegner den Erst-Runden-Schutz
+  hat (Wirkung zündet erst in seinem Zug, war aber trotzdem ein Umgehen).
+* **Illusionen zurück ins Deck** (Create Illusion, Staff of Illusions):
+  `engine._illusionenZurueck()` in `switchTurn` nach ON_TURN_END; fällig am
+  Ende des ersten Gegnerzugs nach `eintrag.turn`. Vorher ein Hook von Staff
+  of Illusions — ohne Staff-Instanz blieb die Illusion für immer, mit Staff
+  eine Runde zu lang.
+* **Untargetable (Butterfly Cloud)** steht als Buff in der rechten Spalte;
+  im Puzzle-Editor unter Buffs für Helden vergebbar (`alsStatus`: schaltet
+  `statuses.untargetable`).
+
+## ★ v1365 — `engine.nachAbgang(inst, fn)`; Yeeting-Dash; Untargetable-Badge
+
+* **`engine.nachAbgang(inst, fn)`**: Arbeit, die ein `onCardLeaveZone`-Zuhörer
+  erst tun darf, wenn die Karte die Zone WIRKLICH verlassen hat (Auftritt,
+  Ziehen). Leave-Hooks laufen VOR dem Umbuchen — Bluff stand sonst während
+  Auftritt und Zug noch in der Surprise Zone. Abgearbeitet am Ende von
+  `actionMoveCard` / `actionDestroyCard` (jetzt Hüllen um `_…Kern`) und für
+  eigene Entfern-Wege beim nächsten `runHooks`.
+* **The Yeeting** rammt in die Surprise Zone (`targetZoneType: 'surprise'`,
+  Client-Selektor `[data-surprise-zone]`), Explosion ebenda — vorher lief der
+  Dash zum Helden.
+* **Untargetable-Badge** prüft truthy: der Puzzle-Start normalisiert `true`
+  zu `{ appliedTurn: 0 }`. Editor-Beschriftung schlicht „Untargetable".
+
+## ★ v1366 — Surprise Zone während des Abflugs verborgen
+
+Als Befund (Bluff): die Engine schickt den Flug Surprise → Ablage, bevor die
+Karte umgebucht ist; die Zone zeigte die Karte bis zum nächsten Zustand
+weiter und leerte sich mitten in der Animation. Der Client verbirgt jetzt —
+wie seit jeher bei Support-Quellen — die Surprise Zone mit dem Schlüssel
+`sp-<owner>-<hero>` (`data-bounce-hiding`), bis der Zustand sie geleert hat
+(Effekt auf `gameState`), höchstens 4 s.
+
+## ★ v1367 — Surprise-Abflug verbirgt nur die KARTE
+
+Nachtrag zu v1366 (Als Befund: „die Surprise Zone selbst verschwindet kurz").
+`[data-bounce-hiding="true"] > *` verbirgt alle KINDER des markierten
+Elements; markiert war der äußere Rahmen, dessen Kind die ganze Zone ist.
+Jetzt trägt die Zone selbst die Marke (`BoardZone dataAttrs`) — verborgen wird
+nur die Karte, Rahmen und Hintergrund bleiben.
+
+## ★ v1368 — Dream Landers komplett: Dream Dust, Dream World Switcheroo, Dream World Portal
+
+**`_dream-lander-shared.js`**: `traeger(engine, pi)`, `zielVon(inst)`,
+`istTraegerZiel`, `portalKandidaten`, `istAttackOderSpell`.
+
+* **Dream World Portal** (Spell Lv1, Magic Arts, Zusatzaktion): eigene
+  Creature mit `attachableHeroes`, noch ohne Helden, passender Held in Hand
+  oder Deck → `actionAttachHeroToCreature` (Flug, `onAttachHero`-Boni).
+* **Dream Dust** (Reaction Lv1): Post-Target-Reaktion auf eine gewählte
+  Trägerkreatur (Quelle = Gegner, keine volle AoE) → negiert. War die Quelle
+  die Aktion des Gegners (gerade aus der Hand gespielt, keine Reaktion, kein
+  `inherentAction`), bekommt er NACH der Auflösung eine Ersatzaktion
+  (`queuePostChainAction` + `performImmediateActionAnyHero`, wie Lunar Eclipse).
+* **Dream World Switcheroo** (Reaction Lv1): eigener Held von einer Attack-/
+  Spell-KARTE gewählt → Umlenkung auf eine eigene Trägerkreatur
+  (`{ newTargets: [{ …ziel, _ersetzt: <alte ID> }] }`).
+
+**Engine:**
+* **Post-Target-Hub gibt Umlenkungen zurück** (`{ newTargets }`, gesammelt
+  über alle Reaktionen). Vorher verwarf er sie — auch Deepsea Encounters
+  `newTargets` kam nie an. Mehrzielweg ersetzt nach `_ersetzt` (sonst ID).
+* **Allgemeine Zielwahl (`_zielwahlAbschliessen`) reicht gewählte KREATUREN
+  an den Hub** (Option `ausZielwahl`) — aber nur an Reaktionen mit
+  `postTargetKreaturWahl: true`; alle anderen sehen dort weiter nur Helden.
+  Umlenkungen tauschen die gewählte ID aus und tragen das neue Ziel in
+  `validTargets` ein.
+
+## ★ v1369 — Gestapelte Stufenboni: der Stapel verliert die OBERSTE Stufe
+
+Als Befund (Madame Guillotine): Toughness Lv3 abgenommen → nur −100 max HP
+statt −200, beim Zurückkehren aber +200. Toughness (+100/+100/+200) und
+Fighting (+10/+10/+20) merkten den Bonus an der Instanz, die ihn brachte;
+ging eine UNTERE Kopie, zog sie ihren kleineren Bonus ab.
+`_stufenbonus-shared.js` → `abgangsBetrag(engine, abgehend, schluessel)`: die
+abgehende Kopie tauscht ihren gemerkten Wert mit der obersten und zieht deren
+Betrag ab. Gilt für jeden Abgang (Madame, Zerstören, Zurücknehmen …).

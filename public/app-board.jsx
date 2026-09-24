@@ -26686,6 +26686,21 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   // bounceReturnHidden to achieve the visual crossing of Deepsea/Castle
   // swaps — old creature flies out while new creature flies in.
   const [bounceOutgoingHidden, setBounceOutgoingHidden] = useState(new Set());
+  // ★ v1366: Surprise-Abflug-Schluessel (`sp-<owner>-<hero>`) fallen weg,
+  // sobald der Zustand die Zone geleert hat — eine danach neu gesetzte
+  // Surprise darf nicht mitverborgen werden.
+  useEffect(() => {
+    setBounceOutgoingHidden(prev => {
+      let next = null;
+      for (const k of prev) {
+        if (!k.startsWith('sp-')) continue;
+        const [, o, h] = k.split('-');
+        const zone = gameState?.players?.[Number(o)]?.surpriseZones?.[Number(h)] || [];
+        if (zone.length === 0) { if (!next) next = new Set(prev); next.delete(k); }
+      }
+      return next || prev;
+    });
+  }, [gameState]);
   // ★ v1337 (Als Befund 24.9., Puzzle: Gegner spielt Furious Anger →
   // Haste → zieht). Die Abflug-Verdeckung einer Handkarte traegt Platz
   // und Handgroesse (`${owner}-${idx}#${groesse}`), damit sie wegfaellt,
@@ -34889,6 +34904,10 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // Coolness Stack pile is owner-scoped only; data attribute uses
         // `my` / `opp` (not the `me` / `opp` label flavor).
         tgtEl = document.querySelector(targetOwner === myIdx ? '[data-my-coolness]' : '[data-opp-coolness]');
+      } else if (targetZoneType === 'surprise') {
+        // v1365 (Als Befund, The Yeeting): Rammen in eine Surprise Zone —
+        // vorher fiel das auf den Helden zurueck.
+        tgtEl = document.querySelector(`[data-surprise-zone][data-surprise-owner="${tgtLabel}"][data-surprise-hero="${targetHeroIdx}"]`);
       } else if (targetZoneSlot !== undefined && targetZoneSlot >= 0) {
         tgtEl = document.querySelector(`[data-support-zone][data-support-owner="${tgtLabel}"][data-support-hero="${targetHeroIdx}"][data-support-slot="${targetZoneSlot}"]`);
       } else {
@@ -36644,6 +36663,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           setBounceReturnHidden(prev => {
             if (!prev.has(handHideKey)) return prev;
             const n = new Set(prev); n.delete(handHideKey); return n;
+          });
+        }, 4000);
+      }
+
+      // ★ v1366 (Als Befund, Bluff): dasselbe fuer die SURPRISE ZONE. Die
+      // Engine schickt den Flug, bevor die Karte umgebucht ist — ohne
+      // Verbergen stand sie waehrend des Fluges noch sichtbar in ihrer
+      // Zone und verschwand erst mitten in der Animation. Anders als bei
+      // der Support Zone bleibt der Schluessel stehen, bis der Zustand die
+      // Zone geleert hat (Nach-Abgang-Arbeit wie Bluffs Ziehen laeuft
+      // vorher), hoechstens aber 4 s — der Renderer prueft zusaetzlich,
+      // dass die Zone noch DIESE Karte zeigt.
+      if (from === 'surprise' && fromHeroIdx != null && fromHeroIdx >= 0) {
+        const hideKey = `sp-${srcOwner}-${fromHeroIdx}`;
+        setBounceOutgoingHidden(prev => { const next = new Set(prev); next.add(hideKey); return next; });
+        setTimeout(() => {
+          setBounceOutgoingHidden(prev => {
+            if (!prev.has(hideKey)) return prev;
+            const next = new Set(prev); next.delete(hideKey); return next;
           });
         }, 4000);
       }
@@ -41172,6 +41210,11 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       if (t === 'yuki_onna_extend') { const p = playerByName(entry.player); return <span className="log-status">❄️ {cName('Cold-Hearted Yuki-Onna')}: {entry.targets} Frozen target{entry.targets === 1 ? '' : 's'} stay Frozen for 2 more turns.</span>; }
       if (t === 'yukana_free_spell') { const p = playerByName(entry.player); return <span className="log-status">📚 {pName(p.name, p.color)}'s {cName('Yukana, the Scholar on the Run')} performed {cName(entry.card)} as an additional Action.</span>; }
       if (t === 'barrier_of_undying') { const p = playerByName(entry.player); return <span className="log-heal">🛡️ {pName(p.name, p.color)}'s {cName('Barrier of Undying')} kept {cName(entry.target)} at 1 HP{entry.sacrifice ? ' — the sacrifice fizzles' : ''} (deleted at the end of its owner's next turn).</span>; }
+      if (t === 'dream_dust') { const p = playerByName(entry.player); return <span>✨ {pName(p.name, p.color)}'s {cName(entry.card)} negated {cName(entry.negated)}!</span>; }
+      if (t === 'dream_world_switcheroo') { const p = playerByName(entry.player); return <span>🌙 {pName(p.name, p.color)}'s {cName(entry.card)} redirected {cName(entry.source)} from {entry.from} to {cName(entry.to)}!</span>; }
+      if (t === 'dream_world_portal') { const p = playerByName(entry.player); return <span>🌀 {pName(p.name, p.color)}'s {cName(entry.card)} attached {cName(entry.hero)} to {cName(entry.creature)}.</span>; }
+      if (t === 'bluff_draw') { const p = playerByName(entry.player); return <span>🃏 {pName(p.name, p.color)}'s {cName(entry.card)}: drew {entry.count} cards.</span>; }
+      if (t === 'bluff_removed_draw') { const p = playerByName(entry.player); return <span>🃏 {pName(p.name, p.color)}'s {cName(entry.card)} was removed by the opponent: drew {entry.count} cards!</span>; }
       if (t === 'philosophers_stone') { const p = playerByName(entry.player); return <span>💎 {pName(p.name, p.color)}'s {cName(entry.card)} took {cName(entry.target)} from their Potion Deck instead of drawing.</span>; }
       if (t === 'potion_draw_reaction') { const p = playerByName(entry.player); return <span>✨ {pName(p.name, p.color)} activated {cName(entry.card)}!</span>; }
       if (t === 'call_of_the_deepsea') { const p = playerByName(entry.player); return <span>🌊 {pName(p.name, p.color)}'s {cName(entry.card)} deleted {cName(entry.deleted)} and summoned {cName(entry.target)} from their {entry.from === 'discard' ? 'discard pile' : 'hand'}{entry.hero ? ` with ${entry.hero}` : ''}!</span>; }
@@ -42389,7 +42432,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   if (ushabtiEntry && !isEffectLocked) return { ...base, cursor: 'pointer' };
                   return base;
                 })()}>
-                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={isOpp && !(p.surpriseKnown || [])[i] && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')} />
+                {/* v1367 (Als Befund): das Abflug-Verbergen sitzt an der ZONE
+                    selbst, nicht an ihrem Rahmen — sonst verschwand die
+                    ganze Surprise Zone kurz mit (die Regel verbirgt alle
+                    Kinder des markierten Elements). */}
+                <BoardZone type="surprise" cards={surZones[i] || []} faceDown={isOpp && !(p.surpriseKnown || [])[i] && (surZones[i] || []).every(c => c === '?')} label="Surprise" style={zs('surprise')}
+                  dataAttrs={(bounceOutgoingHidden.has(`sp-${pi}-${i}`) && (surZones[i] || []).length > 0) ? { 'data-bounce-hiding': 'true' } : undefined} />
                 {/* Reduced-level badge — only when the server-computed
                     effective Surprise level differs from the printed
                     level (Spider Hive et al). Shows the EFFECTIVE

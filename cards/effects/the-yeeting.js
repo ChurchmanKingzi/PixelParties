@@ -213,6 +213,10 @@ module.exports = {
       // frontend selector keys on `[data-area-zone][data-area-owner]` —
       // see play_ram_animation handler.
       ramEvent.targetZoneType = 'area';
+    } else if (tgtZoneType === 'surprise') {
+      // v1365 (Als Befund): Surprise Zone als eigenes Ziel — der Dash lief
+      // sonst (zoneSlot -1) zum Helden.
+      ramEvent.targetZoneType = 'surprise';
     } else if (tgtZoneSlot >= 0) {
       ramEvent.targetZoneSlot = tgtZoneSlot;
     }
@@ -234,6 +238,10 @@ module.exports = {
       explEvent.heroIdx = -1;
       explEvent.zoneSlot = -1;
       explEvent.zoneType = 'area';
+    } else if (tgtZoneType === 'surprise') {   // v1365
+      explEvent.heroIdx = tgtHeroIdx;
+      explEvent.zoneSlot = -1;
+      explEvent.zoneType = 'surprise';
     } else if (tgtHeroIdx >= 0) {
       explEvent.heroIdx = tgtHeroIdx;
       explEvent.zoneSlot = tgtZoneSlot >= 0 ? tgtZoneSlot : -1;

@@ -46,7 +46,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || gs.players[pi]?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero || hero.hp <= 0) return;
 
       // 1) Heilen — und den ECHTEN Zuwachs messen.

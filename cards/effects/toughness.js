@@ -7,6 +7,7 @@
 //  Works for starting abilities (onGameStart).
 // ═══════════════════════════════════════════
 
+const { abgangsBetrag } = require('./_stufenbonus-shared');
 const HP_PER_LEVEL = [100, 100, 200]; // Index 0 = 1st copy, etc.
 
 /** Apply HP bonus to a hero using the generic max HP system. */
@@ -81,7 +82,10 @@ module.exports = {
       // instance ids prevents this hero from losing maxHp every time
       // some OTHER ability left the board.
       if (ctx.leavingCard && ctx.leavingCard.id !== ctx.card?.id) return;
-      const hpGranted = ctx.card.counters.hpGranted || 0;
+      if ((ctx.card.counters.hpGranted || 0) <= 0) return;
+      // v1369: der Stapel verliert die OBERSTE Stufe, egal welche Kopie geht.
+      const hpGranted = abgangsBetrag(ctx._engine, ctx.card, 'hpGranted');
+      ctx.card.counters.hpGranted = 0;
       if (hpGranted <= 0) return;
 
       const hero = ctx.players[ctx.cardOwner]?.heroes?.[ctx.cardHeroIdx];

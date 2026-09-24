@@ -422,6 +422,10 @@ module.exports = {
           }
           if (!hadPriorLog) delete gs._spellDamageLog;
           delete gs._spellNegatedByEffect;
+          // v1364: „counts as an additional Action" — als Aktion melden.
+          if (!innerCancelled && !gs._spellCancelled) {
+            await engine.meldeGussAlsAktion(pi, sel.heroIdx, chosenName, { heroOwner: oi });
+          }
         } finally {
           gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);
           if (chosenCd.cardType === 'Spell') engine._popResolvingSpell();

@@ -208,6 +208,8 @@ module.exports = {
           damageTargets: uniqueTargets, isSecondCast: true,
           _skipReactionCheck: true,
         });
+        // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
+        if (!gs._spellCancelled) await engine.meldeGussAlsAktion(pi, heroIdx, bonusName);
       } catch (err) {
         console.error(`[Engine] Nieht bonus Attack error for "${bonusName}":`, err.message);
       }

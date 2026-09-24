@@ -219,108 +219,15 @@ module.exports = {
       heroIdx:        destHeroIdx,
       slotIdx:        destSlot,
       oppTurnPending: true,         // Waiting for opponent's turn to start
+      turn:           gs.turn || 0, // v1364: die Engine gibt zurueck (`_illusionenZurueck`)
+      quelle:         CARD_NAME,
     });
 
     engine.sync();
     return {};
   },
 
-  hooks: {
-    /**
-     * Return-trigger: fires at the end of every turn.
-     * The Staff instance may be in hand, discard, etc. — activeIn covers them.
-     * We track illusions via gs._staffIllusions (not per-card-instance) to avoid
-     * relying on a specific Staff instance surviving in a trackable zone.
-     */
-    onTurnEnd: async (ctx) => {
-      const gs     = ctx._engine.gs;
-      const engine = ctx._engine;
-
-      if (!gs._staffIllusions || gs._staffIllusions.length === 0) return;
-
-      const remaining = [];
-
-      for (const entry of gs._staffIllusions) {
-        // Mark that the opponent's turn has started
-        if (entry.oppTurnPending && ctx.activePlayer === entry.opponent) {
-          entry.oppTurnPending = false;
-          remaining.push(entry);
-          continue;
-        }
-
-        // ── Zurueckmisch-Sperre (v430, Hatusbal) ──────────────────
-        // Kontrolliert der Gegner Hatusbal, the Leader of Tusca, darf
-        // hier nichts ins eigene Deck zurueck. Der Eintrag bleibt in
-        // `remaining`, die geliehene Creature bleibt also auf dem Brett
-        // und wird PERMANENT.
-        //
-        // ★ DAS IST ALS GEWOLLTE FOLGE (Ruling 16.8.), kein Bug —
-        // nicht "reparieren". Und es ist NICHT der Distracting-Crystal-
-        // Fall: der sperrt nur Hand und Ablage, eine Brettquelle laeuft
-        // an ihm vorbei. Deshalb hier OHNE `fromHandOrDiscard`.
-        if (!entry.oppTurnPending && ctx.activePlayer === entry.opponent
-            && engine.shuffleBackIntoOwnDeckBlocked(entry.owner)) {
-          engine.log('staff_illusion_return_blocked', {
-            player: gs.players[entry.owner]?.username,
-            creature: entry.creatureName,
-          });
-          remaining.push(entry);
-          continue;
-        }
-
-        // Return condition: it's the end of the opponent's (non-pending) turn
-        if (!entry.oppTurnPending && ctx.activePlayer === entry.opponent) {
-          // Find the creature instance
-          const inst = engine.cardInstances.find(c =>
-            c.id === entry.instId && c.zone === 'support',
-          );
-
-          if (inst) {
-            const ps = gs.players[entry.owner];
-
-            // Fire onCardLeaveZone before removing
-            await engine.runHooks('onCardLeaveZone', {
-              card: inst, fromZone: 'support',
-              fromHeroIdx: inst.heroIdx,
-              fromZoneSlot: inst.zoneSlot,
-              toZone: 'deck',
-            });
-
-            // Remove from support zone
-            if (ps.supportZones?.[inst.heroIdx]?.[inst.zoneSlot]) {
-              ps.supportZones[inst.heroIdx][inst.zoneSlot] = [];
-            }
-
-            // Return to deck and shuffle
-            ps.mainDeck.push(entry.creatureName);
-            engine.shuffleDeck(entry.owner);
-            // Eine einzelne Karte — loest Hatusbals 2er-Schwelle nie
-            // aus, wird aber der Vollstaendigkeit halber gemeldet.
-            await engine.noteShuffledBack(entry.owner, 1, CARD_NAME);
-            engine._untrackCard(inst.id);
-
-            engine.log('staff_illusion_return', {
-              player: ps.username, creature: entry.creatureName,
-            });
-
-            // Opponent draw on return (Create Illusion)
-            if (entry.oppDrawCount > 0) {
-              await engine.actionDrawCards(entry.opponent, entry.oppDrawCount, {});
-              engine.log('illusion_opp_draw', {
-                player: gs.players[entry.opponent]?.username,
-                amount: entry.oppDrawCount,
-              });
-            }
-          }
-          // Don't push to remaining — entry is done
-          continue;
-        }
-
-        remaining.push(entry);
-      }
-
-      gs._staffIllusions = remaining.length ? remaining : undefined;
-      engine.sync();
-    },
-  },
+  // ★ v1364: die Rueckkehr erledigt die Engine (`_illusionenZurueck`,
+  // switchTurn) — fuer Staff of Illusions UND Create Illusion, unabhaengig
+  // davon, ob eine Staff-Instanz irgendwo lauscht.
 };

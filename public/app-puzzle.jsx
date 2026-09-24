@@ -3081,7 +3081,7 @@ function PuzzleCreator() {
       tooltip: 'Immune: cannot have CC statuses (Frozen / Stunned / Negated / Bound) re-applied. Wears off at the start of its owner\'s next turn.' },
     { key: 'healReversed', label: '💔 Heal Reversed', color: '#ff4488',
       tooltip: 'Heal Reversed: any healing this target would receive deals damage instead.' },
-    { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc',
+    { key: 'untargetable', label: '👻 Untargetable', color: '#aaaacc', scope: 'creature',
       tooltip: 'Untargetable: cannot be chosen as a target by Attacks, Spells, or Creature effects.' },
     // v723: kein echter Status, sondern eine Herkunftsangabe — die
     // Kreatur gehoert urspruenglich der Gegenseite (`originalOwner`),
@@ -3092,6 +3092,11 @@ function PuzzleCreator() {
       tooltip: 'Stolen: this Creature is originally owned by the OTHER player (as if taken with Dark Gear). No badge — it only sets the original owner at puzzle start.' },
   ];
   const BUFF_LIST = [
+    // ★ v1364 (Als Wunsch): Butterfly Clouds Schutz fuer Helden. Liegt im
+    // Spiel als `statuses.untargetable` — deshalb `alsStatus`: der Knopf
+    // schaltet den Status, nicht `buffs`.
+    { key: 'untargetable', label: '🦋 Untargetable', color: '#c9a2ff', scope: 'hero', alsStatus: true,
+      tooltip: 'Untargetable: the opponent can\'t choose this Hero with Attacks, Spells or Creature effects while its controller has other Heroes that can be chosen.' },
     { key: 'cloudy', label: '☁️ Cloudy', color: '#88bbdd',
       tooltip: 'Cloudy: takes half damage from all sources.' },
     { key: 'freeze_immune', label: '🔥 Freeze Immune', color: '#ff8844',
@@ -5169,6 +5174,7 @@ function PuzzleCreator() {
                   // Everything else: hide equip-scoped buffs and apply normal scoping.
                   if (bf.scope === 'equip') return false;
                   if (!bf.scope) return true;
+                  if (bf.scope === 'hero') return editTarget.zt === 'hero';   // v1364
                   if (bf.scope === 'oppHero') return editTarget.zt === 'hero' && editTarget.si === 1;
                   // v849-Nachtrag: kreaturgebundene Buffs (Guarding) nur
                   // anbieten, wenn in dieser Zone wirklich eine Creature
@@ -5182,7 +5188,7 @@ function PuzzleCreator() {
                   }
                   return true;
                 }).map(bf => {
-                  const active = !!editBuffs[bf.key];
+                  const active = bf.alsStatus ? !!editStatuses[bf.key] : !!editBuffs[bf.key];
                   // Same cursor-anchored hover tooltip as the status
                   // toggles above — explains what each buff actually
                   // does so the author doesn't have to remember.
@@ -5197,7 +5203,8 @@ function PuzzleCreator() {
                       borderColor: active ? bf.color : 'var(--bg4)',
                       color: active ? bf.color : 'var(--text2)',
                       background: active ? bf.color + '18' : 'transparent',
-                    }} {...tipHandlers} onClick={() => setEditBuffs(prev => {
+                    }} {...tipHandlers} onClick={() => (bf.alsStatus ? setEditStatuses : setEditBuffs)(prev => {
+                      // v1364: `alsStatus` schaltet den Status (Butterfly Cloud).
                       const next = { ...prev };
                       if (active) delete next[bf.key]; else next[bf.key] = true;
                       return next;

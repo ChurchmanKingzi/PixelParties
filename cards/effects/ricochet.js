@@ -102,7 +102,7 @@ module.exports = {
       const gs = engine.gs;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = gs.players[pi]?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || gs.players[pi]?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
       const atk = hero.atk || 0;

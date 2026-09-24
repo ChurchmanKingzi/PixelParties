@@ -4848,7 +4848,9 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
   if (c.crossSideControlled != null) {
     badges.push({ key: 'crossSide', icon: CROSS_SIDE_BADGE.icon, tooltip: CROSS_SIDE_BADGE.tooltip, big: true });
   }
-  if (s.untargetable) badges.push({ key: 'untargetable', icon: '🦋', tooltip: 'Untargetable: Cannot be chosen by the opponent with Attacks, Spells or Creature effects while other Heroes can be chosen.' });
+  // ★ v1364 (Als Vorgabe): Untargetable (Butterfly Cloud) ist ein BUFF —
+  // er steht in der rechten Spalte (`BuffColumn`), nicht mehr hier.
+  // (Kreaturen ebenso: `BuffColumn` bekommt ihre Status als `statuses`.)
   // ★★ v1192: ZIELSPERREN EINER KARTE, DIE NICHT MEHR LIEGT.
   // `hero._targetBlockers` (Engine v1191) traegt Regeln von Karten, die
   // sich beim Aufloesen selbst geloescht haben — ohne Abzeichen waere
@@ -4987,6 +4989,10 @@ function BuffColumn({ buffs, cardName, statuses }) {
   const _abStart = ' Wears off at the start of its owner\'s turn.';
   if (st.shielded) statusBuffs.push(['shielded', { icon: '✨', tooltip: 'Shielded: Cannot be affected by anything during its first turn.' + _abStart }]);
   else if (st.immune) statusBuffs.push(['immune', { icon: '🛡️', tooltip: 'Immune: Cannot be affected by Crowd Control effects.' + _abStart }]);
+  // v1364: Butterfly Clouds Schutz — ein Buff, keine Status.
+  // Truthy statt `=== true`: der Puzzle-Start normalisiert `true` zu
+  // `{ appliedTurn: 0 }` (Als Befund v1365: Badge fehlte zu Puzzle-Beginn).
+  if (st.untargetable) statusBuffs.push(['untargetable', { icon: '🦋', tooltip: 'Untargetable: Your opponent can\'t choose this Hero with Attacks, Spells or Creature effects while you control other Heroes that can be chosen. Wears off at the start of its owner\'s turn.' }]);
   if ((!buffs || Object.keys(buffs).length === 0) && statusBuffs.length === 0) return null;
   buffs = buffs || {};
   // Tooltip values may be a string OR a function (data) → string. Function

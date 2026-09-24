@@ -294,6 +294,8 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
       });
     }
     if (!hadPriorLog) delete gs._spellDamageLog;
+    // v1364: „as an additional Action" — als ausgefuehrte Aktion melden.
+    if (!(gs._spellCancelled && !gs._spellNegatedByEffect)) await engine.meldeGussAlsAktion(pi, heroIdx, cardName);
     delete gs._spellNegatedByEffect;
   } finally {
     gs._spellResolutionDepth = Math.max(0, (gs._spellResolutionDepth || 1) - 1);

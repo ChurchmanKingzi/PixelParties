@@ -19,7 +19,7 @@ module.exports = {
       const engine = ctx._engine;
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
-      const hero = ctx.players[pi]?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ctx.players[pi]?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       if (!hero?.name || hero.hp <= 0) return;
 
       // Generic attack: prompt target, play animation, deal ATK damage

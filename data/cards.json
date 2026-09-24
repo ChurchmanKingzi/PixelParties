@@ -1969,7 +1969,7 @@
     "hp": null,
     "atk": null,
     "cost": null,
-    "effect": "Activate this Surprise when the user is chosen by an Attack or Spell. Draw 2 cards. When this card is removed from the board by an opponent's card or effect, draw 4 cards.",
+    "effect": "Activate this Surprise when the user is chosen by an Attack or Spell. Draw 3 cards. When this card is removed from the board by an opponent's card or effect, draw 4 cards.",
     "archetype": "",
     "setID": "PP SOD",
     "banned": "",

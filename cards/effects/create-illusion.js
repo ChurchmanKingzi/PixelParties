@@ -197,6 +197,8 @@ module.exports = {
         slotIdx:        destSlot,
         oppTurnPending: true,
         oppDrawCount:   level, // Create Illusion: opponent draws = creature's level
+        turn:           gs.turn || 0,        // v1364: faellig am Ende des naechsten Gegnerzugs
+        quelle:         CARD_NAME,
       });
 
       engine.sync();

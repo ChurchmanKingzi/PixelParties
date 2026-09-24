@@ -164,57 +164,20 @@ module.exports = {
       const bonusScript = loadCardEffect(bonusSpellName);
       if (!bonusScript?.hooks?.onPlay) return;
 
-      // Remove bonus spell from hand
+      // ★★ v1364 (Als Befund: VPC + Phoenix Tackle loeste Madame Guillotine
+      // nur EINMAL aus). Der Folgezauber lief bisher ueber einen eigenen
+      // Nachbau (Hand-Splice, eigenes onPlay, eigenes Ablegen) — ohne
+      // Aktionsmeldung, ohne Flug, ohne gemeinsame Guss-Bruecke. Jetzt ueber
+      // `_castSpellImmediately` mit `alsZusatzaktion`: Auftritt, Flug in die
+      // Ablage, afterSpellResolved und die Meldung als ausgefuehrte Aktion
+      // (Madame, Bleeding …) kommen von dort.
       const handIdx = ps.hand.indexOf(bonusSpellName);
       if (handIdx < 0) return;
-      ps.hand.splice(handIdx, 1);
-
-      // Broadcast bonus spell to opponent
-      const oi = pi === 0 ? 1 : 0;
-      const oppSid = gs.players[oi]?.socketId;
-      if (oppSid && engine.io) {
-        engine.io.to(oppSid).emit('card_reveal', { cardName: bonusSpellName });
-      }
-      await engine._delay(100);
-
-      // Set up spell tracking for Bartas
-      gs._spellDamageLog = [];
-      gs._spellExcludeTargets = [];
-
-      // Create temp instance and cast the bonus spell
-      const bonusInst = engine._trackCard(bonusSpellName, pi, 'hand', heroIdx, -1);
-
-      try {
-        await engine.runHooks('onPlay', {
-          _onlyCard: bonusInst, playedCard: bonusInst,
-          cardName: bonusSpellName, zone: 'hand', heroIdx,
-          _skipReactionCheck: true,
-        });
-
-        // Fire afterSpellResolved for Bartas second-cast
-        const bonusCardData = cardDB[bonusSpellName];
-        const uniqueTargets = [];
-        const seenIds = new Set();
-        for (const t of (gs._spellDamageLog || [])) {
-          if (!seenIds.has(t.id)) { seenIds.add(t.id); uniqueTargets.push(t); }
-        }
-        await engine.runHooks('afterSpellResolved', {
-          spellName: bonusSpellName, spellCardData: bonusCardData, heroIdx, casterIdx: pi,
-          damageTargets: uniqueTargets, isSecondCast: false,
-          _skipReactionCheck: true,
-        });
-      } catch (err) {
-        console.error(`[Engine] Victory Phoenix Cannon bonus spell error:`, err.message);
-      }
-
-      // Clean up tracking
-      delete gs._spellDamageLog;
-      delete gs._spellExcludeTargets;
-      delete gs._bartasSecondCast;
-
-      // Clean up temp instance
-      engine._untrackCard(bonusInst.id);
-      ps.discardPile.push(bonusSpellName);
+      const bonusRes = await engine._castSpellImmediately(pi, heroIdx, bonusSpellName, {
+        fromZone: 'hand', pool: ps.hand, poolIndex: handIdx,
+        by: 'Victory Phoenix Cannon', alsZusatzaktion: true,
+      });
+      if (!bonusRes || bonusRes.cancelled) return;   // abgebrochen → kein Rueckstoss
 
       engine.sync();
       await engine._delay(300);

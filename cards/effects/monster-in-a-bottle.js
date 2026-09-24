@@ -186,7 +186,13 @@ module.exports = {
       if (!selected) return { cancelled: true };
 
       const creatureName = selected.cardName;
-      const creatureSource = eligible.find(e => e.name === creatureName)?.source || 'hand';
+      // ★ v1364 (Als Befund): die Quelle kommt aus der WAHL — liegt dieselbe
+      // Creature in Hand UND Ablage, nahm der Namens-Lookup immer den ersten
+      // Eintrag (die Hand), auch wenn der Spieler die Ablage-Kopie waehlte.
+      const creatureSource = (selected.source === 'hand' || selected.source === 'discard')
+        && eligible.some(e => e.name === creatureName && e.source === selected.source)
+        ? selected.source
+        : (eligible.find(e => e.name === creatureName)?.source || 'hand');
       const cd = cardDB[creatureName];
       if (!cd) return { cancelled: true };
 

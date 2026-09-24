@@ -119,8 +119,12 @@ async function pickAttachmentHost(ctx, CARD_NAME, opts = {}) {
     const beimCaster = hosts.find(h => h.side === pi && h.heroIdx === ctx.cardHeroIdx && h.slotIdx === wanted);
     if (beimCaster) return { owner: beimCaster.side, heroIdx: beimCaster.heroIdx, slotIdx: beimCaster.slotIdx };
   }
-  // 2) Caster-Held als Standard, wenn gewuenscht und moeglich
-  if (opts.preferCaster) {
+  // 2) Caster-Held als Standard, wenn gewuenscht und moeglich.
+  // ★ v1364 (Als Befund Sticky Wand): NICHT im Sofort-Guss
+  // (`_immediateActionContext` — Sticky Wand, Yukana, Coffee …). Dort gibt
+  // es keinen Drop, der den Wirt ausdrueckt; der Caster als stiller
+  // Standard nahm dem Spieler die Wahl. Dann fragt Schritt 4.
+  if (opts.preferCaster && !gs._immediateActionContext) {
     const hit = hosts.find(h => h.side === pi && h.heroIdx === ctx.cardHeroIdx);
     if (hit) return { owner: hit.side, heroIdx: hit.heroIdx, slotIdx: hit.slotIdx };
   }

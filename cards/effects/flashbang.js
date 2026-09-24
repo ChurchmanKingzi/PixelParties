@@ -77,12 +77,22 @@ module.exports = {
   // Hooks must keep firing while sitting in the deleted pile.
   activeIn: ['deleted'],
 
+  // ★ v1364 (Als Befund): Erst-Runden-Schutz. Der Gegner des Startspielers
+  // ist in Runde 1 gegen ALLES geschuetzt — auch gegen eine Wirkung, die
+  // erst in seinem naechsten Zug zuendet. Vorher war Flashbang in Runde 1
+  // spielbar und umging den Schutz.
+  canActivate(gs, pi) {
+    const oppIdx = pi === 0 ? 1 : 0;
+    return gs.firstTurnProtectedPlayer !== oppIdx;
+  },
+
   resolve: async (engine, pi) => {
     const gs = engine.gs;
     const oppIdx = pi === 0 ? 1 : 0;
     const oppPs = gs.players[oppIdx];
     const ps    = gs.players[pi];
     if (!oppPs || !ps) return;
+    if (gs.firstTurnProtectedPlayer === oppIdx) return { cancelled: true };   // v1364
 
     // Track a Flashbang instance directly in the deleted pile so the
     // hooks below fire for it. We DON'T add the card name to ps.deletedPile

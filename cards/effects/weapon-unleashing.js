@@ -73,7 +73,7 @@ module.exports = {
       const pi = ctx.cardOwner;
       const heroIdx = ctx.cardHeroIdx;
       const ps = gs.players[pi];
-      const hero = ps?.heroes?.[heroIdx];
+      const hero = ctx.attachedHero || ps?.heroes?.[heroIdx];   // v1364: geliehener Held (Love Shot, Charme) — physische Seite
       const inst = ctx.card;
       if (!hero?.name || hero.hp <= 0 || !inst) { gs._spellCancelled = true; return; }
       const stacks = stacksOf(engine, pi, heroIdx);

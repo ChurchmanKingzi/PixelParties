@@ -169,9 +169,12 @@ module.exports = {
       // reducer hooks + Lethe pile stamps via `engine.effectiveCardLevel`)
       // so the cap check matches what the picker enforced. `selectedIndices`
       // disambiguates duplicate-name entries across hand vs discard.
-      const chosen = result.selectedCards.filter(n =>
-        typeof n === 'string' && isArmyPick(engine, cardDB[n], pi, heroIdx));
       const selectedIndices = Array.isArray(result.selectedIndices) ? result.selectedIndices : null;
+      // v1364: Name und gewaehlte Quelle bleiben paarweise zusammen.
+      const _paare = result.selectedCards
+        .map((n, i) => ({ n, q: selectedIndices ? (gallery[selectedIndices[i]]?.source || null) : null }))
+        .filter(p => typeof p.n === 'string' && isArmyPick(engine, cardDB[p.n], pi, heroIdx));
+      const chosen = _paare.map(p => p.n);
       const totalLvl = selectedIndices
         ? selectedIndices.reduce((s, i) => s + (gallery[i]?.level || 0), 0)
         : chosen.reduce((s, n) => s + (engine.effectiveCardLevel(cardDB[n], pi) || 0), 0);
@@ -201,15 +204,24 @@ module.exports = {
       // mover and summonCreatureWithHooks's default.
       const STAGGER_MS = 300;
       let placed = 0;
+      // ★ v1364 (Befund Monster in a Bottle, gleiches Muster): die Quelle
+      // jeder Wahl kommt aus dem gewaehlten Galerie-Eintrag
+      // (`selectedIndices` → `gallery[i].source`). Vorher: immer zuerst
+      // die Hand, auch wenn der Spieler die Ablage-Kopie gewaehlt hatte.
+      const gewollteQuellen = _paare.map(p => p.q);
       for (let ci = 0; ci < chosen.length; ci++) {
         const name = chosen[ci];
         const slots = freeSlots(ps, heroIdx);
         if (slots.length === 0) break; // ran out of zones (defensive)
         const slot = slots[0];
 
-        let src = 'hand';
-        let idx = ps.hand.indexOf(name);
-        if (idx < 0) { src = 'discard'; idx = (ps.discardPile || []).indexOf(name); }
+        const wunsch = gewollteQuellen[ci];
+        let src = wunsch === 'discard' ? 'discard' : 'hand';
+        let idx = src === 'hand' ? ps.hand.indexOf(name) : (ps.discardPile || []).indexOf(name);
+        if (idx < 0 && !wunsch) {   // ohne Indizes: alte Reihenfolge Hand → Ablage
+          src = src === 'hand' ? 'discard' : 'hand';
+          idx = src === 'hand' ? ps.hand.indexOf(name) : (ps.discardPile || []).indexOf(name);
+        }
         if (idx < 0) continue; // copy gone (race) — skip
         if (src === 'hand') ps.hand.splice(idx, 1);
         else if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) continue;   // v820: Stapel-Schicht
