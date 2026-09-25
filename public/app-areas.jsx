@@ -1136,19 +1136,58 @@ const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
   );
 });
 
-// ── DOOM CLOCK ───────────────────────────────────────────────────────
-//  Karte: grosse dunkelrote Uhr mit Spirale und Totenschaedeln an den
-//  Viertelmarken. Als Vorgabe (5.8.): „aehnlich Big Gwen, aber
+// ═══════════════════════════════════════════════════════════════════
+//  DOOM CLOCK — die Uhr, die bis Mitternacht zählt
+//  (v1415 Kartenstil, v1420 Doom Counter; Überarbeitung v1441 (Al 25.9.))
+//
+//  Karte: große dunkelrote Uhr mit Spirale und Totenschädeln an den
+//  Viertelmarken. Als Vorgabe (5.8.): „ähnlich Big Gwen, aber
 //  bedrohlicher", Sekunden TICKEN (60 harte Schritte, echte Uhrzeit).
-//  v1420 (Al 25.9.): Himmel in dunklem, GEFAEHRLICHEM Rot. Stunden- und
+//  v1420 (Al 25.9.): Himmel in dunklem, GEFÄHRLICHEM Rot. Stunden- und
 //  Minutenzeiger zeigen die DOOM COUNTER: 0 = 11 Uhr, 20 = 12 Uhr,
-//  dazwischen fliessend (Minutenzeiger eine Umdrehung, Stundenzeiger
-//  von der 11 zur 12). Liegen zwei Doom Clocks, zaehlt die, die dem
-//  Ende naeher ist. Je naeher Mitternacht, desto schneller und heller
+//  dazwischen fließend (Minutenzeiger eine Umdrehung, Stundenzeiger
+//  von der 11 zur 12). Liegen zwei Doom Clocks, zählt die, die dem
+//  Ende näher ist. Je näher Mitternacht, desto schneller und heller
 //  pocht der rote Schein hinter der Uhr.
+//
+//  Überarbeitung v1441: dieselbe Szene, neu gemalt. Die Uhr hängt an
+//  einer Kette mit geriffelter Krone wie eine riesige Taschenuhr über
+//  einem Wolkenmeer: gewölbter Eisenrand mit Rille, Nieten, gehämmerten
+//  Dellen und Rost, darin der weinrote Zifferring mit Minutenstrichen,
+//  Stundennieten und vier Schädeln (rote Augen), das Zifferblatt mit
+//  schrägen Pinselschlieren wie auf der Karte und einem Riss. Die
+//  Spirale ist eine eigene Ebene und zieht langsam nach innen in den
+//  schwarzen Abgrund unter der Achse — je näher Mitternacht, desto
+//  schneller. Ringsum statt Verlauf ein gemalter Himmel: dunkles Rot mit
+//  schrägen Schlieren und violetten Strähnen, oben hängende Rauchbänke,
+//  hinten ferne Gewittertürme vor dem glühenden Horizont (dort zucken
+//  Blitze), vorn ein Wolkenmeer mit glühenden Kanten und vor dem unteren
+//  Uhrrand dünne Schwaden.
+//
+//  Ebenen (Kunsthöhe 100; Generator gen/doom-clock.py, nicht im
+//  Projekt): sky.png, smoke.png, clouds-far.png, clouds-near.png,
+//  wisps.png (Kacheln 128), clock.png (Versatzstück 91), spiral.png
+//  (14 Bilder 61×61 übereinander), hand-hour/-min/-sec.png, cap.png
+//  (Achsschädel), gear.png / gear-s.png (je 3 Bilder, Zahnrad dreht
+//  sich), crow.png (2 Bilder 7×4), bolt.png (3 Blitze 11×30).
+//
+//  Animiert: Zeiger (Doom Counter, gleiten bei Änderung hinüber),
+//  Sekundenzeiger tickt, Spirale zieht nach innen, roter Schein pocht,
+//  Schädelaugen glühen, Blitze in der Ferne, Wolken und Rauch ziehen
+//  (je Ebene eigenes Tempo), Zahnräder schweben und drehen sich,
+//  Krähen ziehen vorbei, Asche und Glut steigen. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const DCL = '/areas/doom-clock/';
 const DC_MITTE_Y = 49.5;
 const DC_MAX = 20;
+// Schädel an den Viertelmarken (Kunstpixel neben der Uhrmitte)
+const DC_SCHAEDEL = [[0, -33], [33, 0], [0, 33], [-33, 0]];
+// Zeigerbilder: Breite, Höhe, Drehpunkt (Pixel im Bild)
+const DC_ZEIGER = { std: [9, 28, 4, 22], min: [7, 37, 3, 31], sek: [5, 44, 2, 34] };
+// Schwebende Zahnräder (x neben der Mitte, y, groß?) — nur neben der Uhr
+const DC_RAEDER = [[-60, 22, 0], [-86, 44, 1], [-140, 30, 0], [62, 30, 1], [96, 14, 0], [138, 46, 1]];
+// Blitze in der Ferne (x neben der Mitte)
+const DC_BLITZE = [-138, -96, -62, 66, 104, 146];
 const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], spielstand = {} }) {
   const zaehler = Math.max(0, ...besitzer.map(i => spielstand.doomCounters?.[i] || 0));
   const t = Math.min(1, zaehler / DC_MAX);
@@ -1158,39 +1197,69 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
   const asche = useMemo(() => ppZufall(ppFxN(18), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, glut: Math.random() < .5,
   })), []);
-  const zeiger = (cls, L, w, stil) => (
-    <i className={'dc-zeiger ' + cls} style={{
-      left: `calc(50% - ${(w + 2) / 2} * var(--px))`, top: ppArt(DC_MITTE_Y - L + 1),
-      width: ppArt(w + 2), height: ppArt(L), ...stil,
-    }} />
-  );
+  const raeder = useMemo(() => DC_RAEDER.slice(0, ppFxN(6)).map(([x, y, gross], i) => ({
+    x, y, gross, dreh: (gross ? 1.8 : 1.1) + Math.random() * .8, bob: 3 + Math.random() * 2.5,
+    delay: -Math.random() * 6, rueck: i % 2 === 1,
+  })), []);
+  const blitze = useMemo(() => DC_BLITZE.slice(0, ppFxN(6)).map((x, i) => ({
+    x, y: 18 + Math.random() * 8, bild: i % 3, dur: 7 + Math.random() * 9, delay: -Math.random() * 16,
+  })), []);
+  const kraehen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 6 + Math.random() * 26, dur: 22 + Math.random() * 16, delay: -Math.random() * 30, rtl: i % 2 === 0,
+  })), []);
+  const zeiger = (cls, stil) => {
+    const [bw, bh, zx, zy] = DC_ZEIGER[cls];
+    return (
+      <i className={'dc-zeiger ' + cls} style={{
+        left: ppArtX(-(zx + .5), 0), top: ppArt(DC_MITTE_Y - zy - .5), width: ppArt(bw), height: ppArt(bh),
+        transformOrigin: `${ppArt(zx + .5)} ${ppArt(zy + .5)}`, ...stil,
+      }} />
+    );
+  };
   return (
-    <PixelScene artH={100} bg="radial-gradient(ellipse 70% 85% at 50% 52%, #7a0c10 0%, #520709 32%, #2c0405 62%, #140102 100%)" className="doom-clock-overlay">
-      <div className="pp-pixel-layer dc-rauch" />
-      <div className="pp-pixel-layer dc-wolken" />
-      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
-      <PixelPiece src={DCL + 'clock.png'} w={90} style={{ top: ppArt(5), bottom: 'auto', height: ppArt(90) }} />
-      {[[0, -30], [30, 0], [0, 30], [-30, 0]].map(([dx, dy], i) => (
-        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4), animationDelay: (-i * .7) + 's' }} />
+    <PixelScene artH={100} bg="#1a0409" className="doom-clock-overlay">
+      <PixelBand src={DCL + 'sky.png'} />
+      {blitze.map((b, i) => (
+        <React.Fragment key={'b' + i}>
+          <i className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
+          <i className="pp-area-dyn dc-blitz" style={{ left: ppArtX(b.x - 5.5, 0), top: ppArt(b.y), backgroundPosition: `${b.bild * 50}% 0`, animation: `dcBlitz ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
+        </React.Fragment>
       ))}
-      {zeiger('std', 19, 3, { rotate: winkelStd + 'deg' })}
-      {zeiger('min', 28, 3, { rotate: winkelMin + 'deg' })}
-      {zeiger('sek', 33, 1, { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
+      <PixelBand src={DCL + 'clouds-far.png'} className="dc-ferne" />
+      {kraehen.map((k, i) => (
+        <div key={'k' + i} className="pp-area-dyn pp-quer" style={ppQuer(k.y, k.dur, k.delay, k.rtl)}>
+          <i className="dc-kraehe" style={{ '--bob': ppArt(2), animation: 'ppSprite2 .3s steps(1) infinite, ppBob 1.7s ease-in-out infinite alternate', scale: k.rtl ? '-1 1' : undefined }} />
+        </div>
+      ))}
+      {raeder.map((r, i) => (
+        <i key={'r' + i} className={'pp-area-dyn dc-rad' + (r.gross ? ' gross' : '')} style={{
+          left: ppArtX(r.x - (r.gross ? 6.5 : 4.5), 0), top: ppArt(r.y), '--bob': ppArt(3),
+          animation: `ppSprite3 ${r.dreh.toFixed(2)}s steps(1) infinite ${r.rueck ? 'reverse' : ''}, ppBob ${r.bob.toFixed(2)}s steps(3) ${r.delay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      <PixelBand src={DCL + 'clouds-near.png'} className="dc-nah" />
+      <PixelBand src={DCL + 'smoke.png'} className="dc-rauch" />
+      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
+      <PixelPiece src={DCL + 'clock.png'} w={91} />
+      <i className="dc-spirale" style={{ animationDuration: (7 - 5 * t).toFixed(2) + 's' }} />
+      {DC_SCHAEDEL.map(([dx, dy], i) => (
+        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
+      ))}
+      {zeiger('std', { rotate: winkelStd + 'deg' })}
+      {zeiger('min', { rotate: winkelMin + 'deg' })}
+      {zeiger('sek', { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
       <i className="dc-kappe" style={{ left: ppArtX(-3.5, 0), top: ppArt(DC_MITTE_Y - 3.5) }} />
+      <PixelBand src={DCL + 'wisps.png'} className="dc-schwaden" />
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn dc-asche' + (a.glut ? ' glut' : '')} style={{ left: a.x + '%', animation: `dcAsche ${a.dur}s linear ${a.delay}s infinite` }} />
       ))}
-      <div className="dc-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        .dc-rauch {
-          position: absolute; left: 0; right: 0; top: 0; height: calc(40 * var(--px));
-          background: url(${DCL}smoke.png) 0 0 / auto 100% repeat-x; animation: dcWolken 110s linear infinite reverse;
-        }
-        .dc-wolken {
-          position: absolute; left: 0; right: 0; top: calc(64 * var(--px)); height: calc(30 * var(--px));
-          background: url(${DCL}clouds.png) 0 0 / auto 100% repeat-x; animation: dcWolken 80s linear infinite;
-        }
         @keyframes dcWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+        .dc-ferne { animation: dcWolken 300s steps(128) infinite; }
+        .dc-nah { animation: dcWolken 170s steps(128) infinite; }
+        .dc-rauch { animation: dcWolken 210s steps(128) infinite reverse; }
+        .dc-schwaden { animation: dcWolken 75s steps(128) infinite; }
         .dc-puls {
           position: absolute; left: calc(50% - 60 * var(--px)); top: calc(${DC_MITTE_Y} * var(--px) - 60 * var(--px));
           width: calc(120 * var(--px)); height: calc(120 * var(--px)); border-radius: 50%;
@@ -1203,7 +1272,14 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           30% { opacity: calc(.3 + .45 * var(--dc-t)); transform: scale(.98); }
           42% { opacity: calc(.4 + .55 * var(--dc-t)); transform: scale(1.02); }
         }
-        .dc-zeiger { position: absolute; transform-origin: 50% 100%; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
+        .dc-spirale {
+          position: absolute; left: calc(50% - 30.5 * var(--px)); top: calc(${DC_MITTE_Y - 30.5} * var(--px));
+          width: calc(61 * var(--px)); height: calc(61 * var(--px));
+          background: url(${DCL}spiral.png) 0 0 / calc(61 * var(--px)) calc(854 * var(--px)) no-repeat;
+          animation: dcSpirale 7s steps(14) infinite;
+        }
+        @keyframes dcSpirale { from { background-position: 0 0; } to { background-position: 0 calc(-854 * var(--px)); } }
+        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
         .dc-zeiger.std { background-image: url(${DCL}hand-hour.png); }
         .dc-zeiger.min { background-image: url(${DCL}hand-min.png); }
         .dc-zeiger.sek { background-image: url(${DCL}hand-sec.png); transition: none; }
@@ -1214,10 +1290,18 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           animation: dcGlut 2.8s ease-in-out infinite alternate;
         }
         @keyframes dcGlut { from { opacity: .25; } to { opacity: 1; } }
+        .dc-blitz { position: absolute; width: calc(11 * var(--px)); height: calc(30 * var(--px)); background: url(${DCL}bolt.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        .dc-blitzschein {
+          position: absolute; width: calc(40 * var(--px)); height: calc(40 * var(--px)); opacity: 0;
+          background: radial-gradient(circle, rgba(255,120,80,.35) 0%, rgba(255,60,40,.12) 45%, rgba(255,40,20,0) 70%);
+        }
+        @keyframes dcBlitz { 0%, 90% { opacity: 0; } 91% { opacity: 1; } 92% { opacity: .15; } 93.5% { opacity: 1; } 96%, 100% { opacity: 0; } }
+        .dc-rad { position: absolute; width: calc(9 * var(--px)); height: calc(9 * var(--px)); background: url(${DCL}gear-s.png) 0 0 / 300% 100% no-repeat; }
+        .dc-rad.gross { width: calc(13 * var(--px)); height: calc(13 * var(--px)); background-image: url(${DCL}gear.png); }
+        .dc-kraehe { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DCL}crow.png) 0 0 / 200% 100% no-repeat; }
         .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0a0a; opacity: 0; }
         .dc-asche.glut { background: #ff5a2a; }
         @keyframes dcAsche { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translate(calc(4 * var(--px)), calc(-64 * var(--px))); opacity: 0; } }
-        .dc-dim { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 50%, rgba(0,0,0,.45) 100%); }
       `}</style>
     </PixelScene>
   );
