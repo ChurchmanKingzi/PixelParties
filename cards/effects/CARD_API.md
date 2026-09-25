@@ -563,6 +563,11 @@ JEDEM Objekt jeder Szene. Vorher das
 Motiv auf sein natives Raster zurückrechnen (Blockgröße ≈ 7,8 px im
 vergrößerten Ausschnitt) und die Palette daraus nehmen.
 
+Seit v1440 sind ALLE 26 Area-Hintergründe Pixelart-Szenen und `opaque`
+(die letzten elf: Spatial Crevice, Spider Hive, Stinky Stables, Tarleinn's
+Floating Island, Temple of Sacrifice, The Bonegrinder, The Cosmic Depths,
+The First Circle of Hell, Big Gwen, War Council Gathering Place, Wowhalla).
+
 Bausteine in app-areas.jsx:
 
 - `<PixelScene artH={100} bg="…">` — Wurzel. Größen-Container, ein
@@ -11575,10 +11580,14 @@ Spieler am Zug, ganz gleich wem Crevice gehoert — Al 14.9. ausdruecklich:
 steht deshalb `gs.activePlayer`, KEIN `cardOwner`-Filter. Wer so etwas
 nachbaut: der `isMyTurn`-Reflex aus `onTurnStart` waere hier falsch.
 
-**④ Der Hintergrund ist bewusst `tier: 'partial'`.** Spatial Crevice ist
-die Karte, die zwei WEITERE Areas ueberhaupt erst erlaubt; ein deckender
-Hintergrund wuerde genau die Hintergruende verdraengen, fuer die sie
-Platz schafft.
+**④ Der Hintergrund war bis v1439 bewusst `tier: 'partial'`.** Spatial
+Crevice ist die Karte, die zwei WEITERE Areas ueberhaupt erst erlaubt;
+ein deckender Hintergrund wuerde genau die Hintergruende verdraengen, fuer
+die sie Platz schafft. Seit v1440 (Pixelart-Umbau, Tiefsee mit Riss zur
+Hoelle) ist sie trotzdem `opaque` — und verdraengt eben NICHTS: je Seite
+zaehlt die ZULETZT gelegte opaque-Area, und die Crevice liegt in aller
+Regel zuerst. Als `partial` laege die jetzt deckende Szene dagegen OBEN
+auf allen anderen.
 
 
 ## ★ Area-Zone: der STAPEL (v1050, Als Vorgabe 14.9.)
