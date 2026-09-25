@@ -2397,8 +2397,14 @@ select optgroup {
 }
 
 /* ===== PIXEL PARTIES brand logo (main menu) =====
-   Uses data/logo.png (a pixel-art wordmark). Pixelated scaling keeps the chunky
-   pixels crisp; the drop-shadow lifts it off the scrolling card-wall behind. */
+   ★ Neu gezeichnet: data/logo.png entsteht mit `node scripts/mklogo.js`
+   (Raster 194×38, Datei 4-fach). Bonbon-Blockschrift auf einem Bogen, mit
+   3D-Kante, dunkler Doppelkontur, Lichtkante, Glanzstrichen und zwei
+   Funkelsternen. Die
+   Buchstabenflaechen sind GRAUSTUFEN — die Spielerfarbe kommt ueber
+   `.pp-logo-tint` (Multiplizieren) dazu, siehe unten.
+   Pixelated scaling keeps the chunky pixels crisp; the drop-shadow lifts it
+   off the scrolling card-wall behind. */
 .pp-logo-stack {
   position: relative;
   display: inline-block;
@@ -2413,27 +2419,32 @@ select optgroup {
 }
 .pp-logo-img {
   display: block;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,.7));
-  height: 92px;
+  filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent));
+  /* 3 Bildschirmpixel je Rasterpixel (38 Rasterzeilen) — ganzzahlig,
+     damit die Bloecke gleich breit bleiben. */
+  height: 114px;
   width: auto;
   /* Shrink to fit short windows; width re-derives to keep the aspect ratio. */
   max-height: calc(24dvh / var(--ui-scale, 1));
   image-rendering: pixelated;
 }
-/* Player-colour gradient applied ONLY to the white outline of the wordmark.
-   data/logo-mask-white.png is a derived mask (only the logo's near-white pixels
-   are opaque), so the gradient lands solely on the letter border — the gray
-   letter faces and dark pixels keep their original colour. */
+/* Spielerfarbe auf dem Schriftzug. data/logo-tint-mask.png deckt genau die
+   graustufigen Flaechen und die 3D-Kante ab (nicht Kontur, Lichtkante,
+   Glanz und Sterne). Multipliziert ergibt Weiss die volle Spielerfarbe,
+   die helleren/dunkleren Graustufen deren Licht- und Schattentoene — die
+   Schattierung des Bildes bleibt also erhalten. Der Verlauf hellt die
+   linke obere Seite leicht auf, als faellt dort Licht hin. */
 .pp-logo-tint {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(120deg,
-    color-mix(in srgb, var(--player-color, #00f0ff) 35%, #ffffff) 0%,
-    var(--player-color, #00f0ff) 50%,
-    color-mix(in srgb, var(--player-color, #00f0ff) 55%, #000000) 100%);
-  -webkit-mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
-  mask: url(/data/logo-mask-white.png) center / 100% 100% no-repeat;
+  mix-blend-mode: multiply;
+  background: linear-gradient(115deg,
+    color-mix(in srgb, var(--player-color, #00f0ff) 62%, #ffffff) 0%,
+    var(--player-color, #00f0ff) 55%,
+    color-mix(in srgb, var(--player-color, #00f0ff) 88%, #000000) 100%);
+  -webkit-mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
 }
 /* ── PIXEL-PARTIKEL HINTER DEM MENUE (v808) ──────────────────────────
    Al: „Solche moechte ich ueberall im Hintergrund haben (hinter dem
@@ -2536,7 +2547,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 
 @media (max-width: 900px) {
-  .pp-logo-img { height: 46px; }
+  .pp-logo-img { height: 57px; }
   .pp-logo-particles { inset: -34px -50px; }
 }
 
@@ -15667,7 +15678,7 @@ body:has(.textbox-overlay) .tooltip {
        unteren Rand statt exakt so hoch wie der Streifen zu sein. */
 @media (max-height: 600px) {
   .main-menu-screen { justify-content: flex-start !important; padding-top: 84px !important; gap: 0 !important; }
-  .main-menu-screen .pp-logo-img { height: 48px; }
+  .main-menu-screen .pp-logo-img { height: 57px; }
   /* Kopfzeile links */
   .menu-topleft {
     display: flex; align-items: center; gap: 12px;
@@ -21363,4 +21374,418 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   24%  { transform: translateY(0) scale(1); }
   70%  { opacity: 1; transform: translateY(-16px) scale(1); }
   100% { opacity: 0; transform: translateY(-30px) scale(.95); }
+}
+
+/* ═══ HAUPTMENUE-AUFHUEBSCHUNG ═════════════════════════════════════════
+   Kaesten, Knoepfe und Kacheln des Hauptmenues in einem Guss: harte
+   schwarze Pixelkontur um alles, was „anfassbar" ist, Lichtkante oben,
+   Schattenfuss unten und bei den Knoepfen eine sichtbare Tiefe (der
+   Knopf sitzt wie eine Taste auf seinem Sockel, hebt sich beim
+   Ueberfahren und sinkt beim Klick ein). Alles in der Spielerfarbe.
+
+   Bewusst am ENDE der Datei und unter `.main-menu-screen`: die aelteren
+   Schichten (Abschnitte 3, 9, 12, 13 des 16-Bit-Blocks) setzen
+   Hintergruende mit `!important`; hier gewinnt die hoehere Spezifitaet.
+   Nur `transform`/`opacity` werden dauerhaft animiert (Icons, Pfeil) —
+   die Schatten wechseln einmalig beim Ueberfahren, das kostet nichts. */
+.main-menu-screen {
+  --pp-kontur: #05040a;
+}
+
+/* ── Kaesten (Knopfstreifen + Seitenkaesten) ───────────────────────── */
+/* Der Rahmen in Schichten, von aussen nach innen:
+     schwarze Aussenkontur · schmaler Farbring · dunkles Band ·
+     schwarze Kontur · 4-px-Hauptrahmen mit Lichtkante (oben/links heller,
+     unten/rechts dunkler) · schwarze Innenkontur · feine Zierlinie
+     (::before) · Pixel-Ornamente an Ecken und Kantenmitten (::after). */
+.main-menu-screen .ornate-frame {
+  border-color:
+    color-mix(in srgb, var(--player-color, #00f0ff) 68%, #fff)
+    color-mix(in srgb, var(--player-color, #00f0ff) 76%, #000)
+    color-mix(in srgb, var(--player-color, #00f0ff) 70%, #000)
+    color-mix(in srgb, var(--player-color, #00f0ff) 80%, #fff);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--player-color, #00f0ff) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--player-color, #00f0ff) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    inset 0 0 0 2px var(--pp-kontur),
+    inset 0 0 30px color-mix(in srgb, var(--player-color, #00f0ff) 14%, transparent),
+    0 0 40px color-mix(in srgb, var(--player-color, #00f0ff) 28%, transparent),
+    0 18px 44px rgba(0, 0, 0, .6);
+}
+/* Feine Zierlinie innen: 2 px, genau auf dem inneren Winkel der
+   Eck-Ornamente (::after bei 4 px + zwei Einheiten = 12 px), damit Linie
+   und Schnoerkel ineinander uebergehen statt sich zu kreuzen. */
+.main-menu-screen .ornate-frame::before {
+  inset: 12px;
+  border: 2px solid color-mix(in srgb, var(--player-color, #00f0ff) 32%, transparent);
+  border-radius: 0;
+}
+/* Ornamente: gestufte Eck-Schnoerkel (8×8 Raster) mit Innenwinkel, ein
+   Zierstueck oben und unten in der Mitte (Spitze zeigt
+   ins Innere) und je ein Keil links und rechts. Eine Maske, eine Farbe —
+   die Spielerfarbe, aufgehellt, damit die Zier auf dem Rahmen leuchtet.
+   Einheit 4 px (--eck-e), passend zum 8-px-Dither-Raster. Gilt nur hier;
+   die kleinen Plaketten (.pp-eckzier) behalten ihre schlichten Ecken. */
+.main-menu-screen .ornate-frame::after {
+  --eck-e: 4px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  inset: 4px;
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 72%, #fff);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h13v1h-13zM1 1h2v1h-2zM4 1h5v1h-5zM10 1h2v1h-2zM5 2h3v1h-3zM6 3h1v1h-1z'/%3E%3C/svg%3E") center top / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M6 0h1v1h-1zM5 1h3v1h-3zM1 2h2v1h-2zM4 2h5v1h-5zM10 2h2v1h-2zM0 3h13v1h-13z'/%3E%3C/svg%3E") center bottom / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h13v1h-13zM1 1h2v1h-2zM4 1h5v1h-5zM10 1h2v1h-2zM5 2h3v1h-3zM6 3h1v1h-1z'/%3E%3C/svg%3E") center top / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M6 0h1v1h-1zM5 1h3v1h-3zM1 2h2v1h-2zM4 2h5v1h-5zM10 2h2v1h-2zM0 3h13v1h-13z'/%3E%3C/svg%3E") center bottom / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}
+@media (max-height: 600px) {
+  .main-menu-screen .ornate-frame::after { --eck-e: 3px; }
+  .main-menu-screen .ornate-frame::before { inset: 10px; }
+}
+/* Dither wie bisher, darunter ein Lichtschein in der Spielerfarbe von oben
+   und ein Schattenfuss unten — der Kasten bekommt Tiefe statt einer
+   flachen Flaeche. */
+.main-menu-screen .menu-body,
+.main-menu-screen .menu-side-panel {
+  background-color: rgba(8, 10, 18, .93);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E"),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--player-color, #00f0ff) 13%, transparent) 0%,
+      transparent 32%,
+      transparent 70%,
+      rgba(0, 0, 0, .32) 100%) !important;
+  background-size: 8px 8px, 100% 100% !important;
+  background-repeat: repeat, no-repeat !important;
+}
+
+/* ── Ueberschriften der Seitenkaesten ───────────────────────────────── */
+.main-menu-screen .menu-side-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--player-color, #00f0ff);
+  text-shadow: 2px 2px 0 #000;
+  border-bottom: none;
+  padding-bottom: 12px;
+}
+/* Pixel-Linie statt Haarlinie: ein voller Block, eine Luecke, dann ein
+   Strich, der nach rechts ausblendet. */
+.main-menu-screen .menu-side-title::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background:
+    linear-gradient(90deg,
+      var(--player-color, #00f0ff) 0 12px,
+      transparent 12px 18px,
+      color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent) 18px,
+      transparent 100%);
+}
+.menu-side-title-icon {
+  height: 22px;
+  width: 22px;
+  flex-shrink: 0;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .85));
+}
+
+/* ── Knoepfe des Hauptstreifens ─────────────────────────────────────── */
+.main-menu-screen .menu-buttons .menu-nav-btn {
+  --knopf: var(--player-color, #00f0ff);
+  --knopf-tiefe: 5px;
+  color: var(--knopf);
+  border: 3px solid var(--knopf);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 22%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--knopf) 10%, var(--menu-surface)) 52%,
+      color-mix(in srgb, var(--knopf) 5%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    inset 0 3px 0 color-mix(in srgb, var(--knopf) 32%, transparent),
+    inset 0 -4px 0 rgba(0, 0, 0, .42),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 58%, var(--pp-kontur));
+  text-shadow: 2px 2px 0 #000;
+  letter-spacing: 2px;
+  filter: none;
+  transform: none;
+  padding-left: 40px;
+  padding-right: 40px;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease, background .12s ease;
+}
+/* Der allgemeine Knopf-Verlauf (.btn::before) lag doppelt auf dem neuen
+   Verlauf — hier nur noch ein Hauch Glanz auf der oberen Haelfte. */
+.main-menu-screen .menu-buttons .menu-nav-btn::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07) 0%, transparent 48%);
+}
+.main-menu-screen .menu-buttons .menu-nav-btn:hover {
+  --knopf-tiefe: 8px;
+  color: #fff;
+  filter: none;
+  transform: translateY(-3px);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 46%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--knopf) 26%, var(--menu-surface)) 55%,
+      color-mix(in srgb, var(--knopf) 16%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    inset 0 3px 0 color-mix(in srgb, var(--knopf) 55%, #fff),
+    inset 0 -4px 0 rgba(0, 0, 0, .42),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
+    0 0 26px color-mix(in srgb, var(--knopf) 55%, transparent);
+  text-shadow: 2px 2px 0 #000, 0 0 12px var(--knopf);
+  /* Der aeltere Hover-Rahmen (weisser Umriss beim Ueberfahren) wuerde
+     die schwarze Pixelkontur ueberdecken. */
+  outline: none;
+}
+.main-menu-screen .menu-buttons .menu-nav-btn:active {
+  --knopf-tiefe: 1px;
+  transform: translateY(4px);
+  transition-duration: .04s;
+}
+.main-menu-screen .menu-buttons .menu-nav-btn:focus-visible {
+  outline: 3px dashed #fff;
+  outline-offset: 5px;
+}
+
+/* Pfeil rechts, der beim Ueberfahren hineingleitet und wippt. (Die
+   Knoepfe tragen bewusst KEINE Icons.) */
+.menu-nav-pfeil {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  width: 11px;
+  height: 14px;
+  margin-top: -7px;
+  color: currentColor;
+  opacity: 0;
+  transform: translateX(-8px);
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .85));
+  transition: opacity .14s ease, transform .14s ease;
+  pointer-events: none;
+}
+.menu-nav-btn:hover .menu-nav-pfeil {
+  opacity: 1;
+  transform: translateX(0);
+  animation: menu-pfeil-wippen .6s steps(2, jump-none) .14s infinite alternate;
+}
+@keyframes menu-pfeil-wippen {
+  from { transform: translateX(0); }
+  to   { transform: translateX(3px); }
+}
+
+/* PLAY ONLINE — der Hauptknopf: voll in der Spielerfarbe gefuellt,
+   weisse Schrift mit schwarzer Pixelkontur (liest sich auf jeder
+   Spielerfarbe), wandernder Glanz. */
+.main-menu-screen .menu-buttons .menu-nav-btn--primary {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--knopf) 55%, #fff);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 62%, #fff) 0%,
+      var(--knopf) 38%,
+      color-mix(in srgb, var(--knopf) 72%, #000) 100%) !important;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, .5),
+    inset 0 -4px 0 rgba(0, 0, 0, .3),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
+    0 0 24px color-mix(in srgb, var(--knopf) 45%, transparent);
+  text-shadow:
+    2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
+}
+.main-menu-screen .menu-buttons .menu-nav-btn--primary:hover {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 45%, #fff) 0%,
+      color-mix(in srgb, var(--knopf) 85%, #fff) 38%,
+      color-mix(in srgb, var(--knopf) 82%, #000) 100%) !important;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, .6),
+    inset 0 -4px 0 rgba(0, 0, 0, .3),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
+    0 0 34px color-mix(in srgb, var(--knopf) 70%, transparent);
+  text-shadow:
+    2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
+}
+.menu-nav-btn--primary .menu-nav-pfeil { color: #fff; }
+/* Glanzband ueber dem Hauptknopf: breit und gemaechlich. */
+.pp-glanz--knopf {
+  --glanz-breite: 22%;
+  --glanz-von: -140%;
+  --glanz-bis: 560%;
+  --glanz-dauer: 5.5s;
+  --glanz-verzug: 1.5s;
+  --glanz-staerke: .55;
+  border-radius: 0;
+}
+
+/* NEW-Schild am DAILY-Knopf (heute noch nicht gestartet). */
+.menu-nav-badge {
+  position: absolute;
+  top: -11px;
+  right: -10px;
+  z-index: 3;
+  padding: 3px 7px 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 1px;
+  color: #1a1000;
+  text-shadow: none;
+  background: linear-gradient(180deg, #fff3a0 0%, #ffd700 55%, #e0a800 100%);
+  border: 2px solid var(--pp-kontur, #05040a);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .6), 0 0 12px rgba(255, 215, 0, .55);
+  transform: rotate(8deg);
+  animation: menu-badge-wippen 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes menu-badge-wippen {
+  0%, 100% { transform: rotate(8deg) translateY(0); }
+  50%      { transform: rotate(4deg) translateY(-3px); }
+}
+
+/* Halbe Knoepfe (Puzzle-Paar): ohne Icon, also normales Polster, und
+   engere Laufweite, damit die Beschriftung einzeilig bleibt. */
+.main-menu-screen .menu-buttons .menu-nav-btn--half {
+  padding-left: 10px;
+  padding-right: 10px;
+  letter-spacing: 0;
+}
+
+/* LOGOUT im selben Tasten-Stil, mit weniger Tiefe. */
+.main-menu-screen .menu-logout-btn {
+  --knopf: var(--player-color, #00f0ff);
+  color: var(--knopf);
+  border: 3px solid var(--knopf);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 20%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--knopf) 6%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--knopf) 32%, transparent),
+    inset 0 -3px 0 rgba(0, 0, 0, .42),
+    0 0 0 2px var(--pp-kontur),
+    0 4px 0 2px color-mix(in srgb, var(--knopf) 58%, var(--pp-kontur));
+  text-shadow: 2px 2px 0 #000;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
+}
+.main-menu-screen .menu-logout-btn:hover {
+  color: #fff;
+  transform: translateY(-2px);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--knopf) 42%, var(--menu-surface)) 0%,
+      color-mix(in srgb, var(--knopf) 18%, var(--menu-surface)) 100%) !important;
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--knopf) 55%, #fff),
+    inset 0 -3px 0 rgba(0, 0, 0, .42),
+    0 0 0 2px var(--pp-kontur),
+    0 6px 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
+    0 0 20px color-mix(in srgb, var(--knopf) 50%, transparent);
+}
+.main-menu-screen .menu-logout-btn:active { transform: translateY(3px); box-shadow: 0 0 0 2px var(--pp-kontur); }
+
+/* ELO/SC-Plaketten: dieselbe harte Aussenkontur wie Kaesten und Knoepfe. */
+.main-menu-screen .menu-stat-badge {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    5px 5px 0 2px rgba(0, 0, 0, .5),
+    inset 0 2px 0 rgba(255, 255, 255, .12),
+    inset 0 -3px 0 rgba(0, 0, 0, .3);
+}
+.main-menu-screen .menu-stat-value { text-shadow: 2px 2px 0 #000, 0 0 10px currentColor; }
+
+/* Name + Avatar */
+.main-menu-screen .menu-player-name { text-shadow: 2px 2px 0 #000; }
+.main-menu-screen .menu-player-name:hover { text-shadow: 2px 2px 0 #000, 0 0 12px currentColor; }
+.main-menu-screen .menu-profile-avatar { outline: 3px solid var(--pp-kontur); }
+
+/* ── Kacheln in den Seitenkaesten ───────────────────────────────────── */
+/* Bilanz: je Zelle eine Farbkappe oben (Sieg gruen, Niederlage rot,
+   Quote Spielerfarbe), Schattenfuss unten, Zahl mit Pixelschatten. */
+.main-menu-screen .menu-record-cell {
+  --zelle: var(--player-color, #00f0ff);
+  border: 2px solid color-mix(in srgb, var(--zelle) 45%, transparent);
+  border-top: 4px solid var(--zelle);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--zelle) 14%, var(--menu-surface)) 0%,
+    var(--menu-surface) 100%) !important;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 0 -3px 0 rgba(0, 0, 0, .35);
+}
+.main-menu-screen .menu-record-cell.is-win  { --zelle: var(--success, #33ff88); }
+.main-menu-screen .menu-record-cell.is-loss { --zelle: var(--danger, #ff3366); }
+.main-menu-screen .menu-record-cell b { text-shadow: 2px 2px 0 #000, 0 0 12px currentColor; }
+.main-menu-screen .menu-record-cell span { letter-spacing: 1.5px; }
+
+/* Deck-Kacheln: Spielerfarbe statt des festen Cyan-Tons beim Ueberfahren;
+   das aktive Deck traegt einen dicken Farbbalken links. */
+.main-menu-screen .menu-deck-card {
+  border: 2px solid color-mix(in srgb, var(--player-color, #00f0ff) 40%, transparent);
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 0 2px 0 rgba(255, 255, 255, .05), inset 0 -3px 0 rgba(0, 0, 0, .35);
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.main-menu-screen .menu-deck-card:hover {
+  border-color: var(--player-color, #00f0ff);
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 12%, var(--menu-surface)) !important;
+  transform: translateX(3px);
+}
+.main-menu-screen .menu-deck-card.is-active {
+  border-color: var(--player-color, #00f0ff);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--player-color, #00f0ff) 22%, var(--menu-surface)) 0%,
+    color-mix(in srgb, var(--player-color, #00f0ff) 8%, var(--menu-surface)) 100%) !important;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #00f0ff), inset 0 -3px 0 rgba(0, 0, 0, .35);
+  transform: none;
+}
+.main-menu-screen .menu-deck-card.is-editable:hover {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--player-color, #00f0ff) 32%, var(--menu-surface)) 0%,
+    color-mix(in srgb, var(--player-color, #00f0ff) 12%, var(--menu-surface)) 100%) !important;
+  box-shadow: 0 0 0 2px var(--pp-kontur), inset 6px 0 0 var(--player-color, #00f0ff), 0 0 18px color-mix(in srgb, var(--player-color, #00f0ff) 35%, transparent);
+}
+.main-menu-screen .menu-deck-card.is-illegal:hover {
+  border-color: rgba(255, 51, 102, .5);
+  background: color-mix(in srgb, var(--danger) 10%, var(--menu-surface)) !important;
+  transform: none;
+}
+.main-menu-screen .menu-deck-flag { text-shadow: 1px 1px 0 #000; color: var(--player-color, #00f0ff); }
+
+/* Bestenliste: Zeile hebt sich beim Ueberfahren (sie oeffnet das Profil). */
+.main-menu-screen .menu-lb-row { transition: transform .12s ease, border-color .12s ease; }
+.main-menu-screen .menu-lb-row:hover {
+  transform: translateX(3px);
+  border-color: color-mix(in srgb, var(--player-color, #00f0ff) 60%, transparent);
+}
+.main-menu-screen .menu-lb-row.is-me {
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 14%, var(--menu-surface)) !important;
+  outline-color: color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent);
+}
+
+/* ── Telefon quer: Pfeil aus (zwei schmale Knopfspalten) ──────────────── */
+@media (max-height: 600px) {
+  .main-menu-screen .menu-buttons .menu-nav-btn { padding-left: 12px; padding-right: 12px; letter-spacing: 1px; }
+  .menu-nav-pfeil { display: none; }
+  .menu-side-title-icon { width: 16px; height: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-nav-btn:hover .menu-nav-pfeil,
+  .menu-nav-badge { animation: none; }
 }

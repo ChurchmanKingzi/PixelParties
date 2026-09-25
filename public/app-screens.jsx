@@ -1118,7 +1118,7 @@ function MenuLeaderboardPanel({ top, height }) {
             ? <span>{live.playersOnline} online · {live.gamesLive} game{live.gamesLive === 1 ? '' : 's'} live</span>
             : <span style={{ color: 'var(--text2)' }}>connecting…</span>}
         </div>
-        <h3 className="menu-side-title">★ TOP PLAYERS</h3>
+        <h3 className="menu-side-title"><PixelIcon name="pokal" className="menu-side-title-icon" />TOP PLAYERS</h3>
         <div className="menu-side-scroll">
           {players === null ? (
             <div className="menu-side-empty">Loading…</div>
@@ -1215,14 +1215,14 @@ function MenuPlayerPanel({ top, height }) {
   return (
     <aside className="menu-side menu-side-right" style={style}>
       <div className="menu-side-panel ornate-frame">
-        <h3 className="menu-side-title">⚔ YOUR RECORD</h3>
+        <h3 className="menu-side-title"><PixelIcon name="schwerter" className="menu-side-title-icon" />YOUR RECORD</h3>
         <div className="menu-record">
-          <div className="menu-record-cell"><b style={{ color: 'var(--success)' }}>{wins}</b><span>WINS</span></div>
-          <div className="menu-record-cell"><b style={{ color: 'var(--danger)' }}>{losses}</b><span>LOSSES</span></div>
-          <div className="menu-record-cell"><b style={{ color: 'var(--accent)' }}>{winRate}%</b><span>WIN RATE</span></div>
+          <div className="menu-record-cell is-win"><b style={{ color: 'var(--success)' }}>{wins}</b><span>WINS</span></div>
+          <div className="menu-record-cell is-loss"><b style={{ color: 'var(--danger)' }}>{losses}</b><span>LOSSES</span></div>
+          <div className="menu-record-cell is-rate"><b style={{ color: 'var(--player-color, var(--accent))' }}>{winRate}%</b><span>WIN RATE</span></div>
         </div>
 
-        <h3 className="menu-side-title">✦ ACTIVE DECK</h3>
+        <h3 className="menu-side-title"><PixelIcon name="stern" className="menu-side-title-icon" />ACTIVE DECK</h3>
         {allDecks === null ? (
           <div className="menu-side-empty">Loading…</div>
         ) : !activeDeck ? (
@@ -1243,7 +1243,7 @@ function MenuPlayerPanel({ top, height }) {
           </button>
         )}
 
-        <h3 className="menu-side-title">🃏 YOUR DECKS</h3>
+        <h3 className="menu-side-title"><PixelIcon name="karten" className="menu-side-title-icon" />YOUR DECKS</h3>
         <div className="menu-side-scroll">
           {allDecks === null ? (
             <div className="menu-side-empty">Loading…</div>
@@ -1432,6 +1432,115 @@ function MenuBackgroundParticles({ klasse = 'pp-bg-particles' }) {
 function menuZoomFaktor(el, rect) {
   const r = rect || el.getBoundingClientRect();
   return (el.offsetWidth > 0 && r.width > 0) ? r.width / el.offsetWidth : 1;
+}
+
+// ── PIXEL-ICONS DES HAUPTMENUES ─────────────────────────────────────────
+// Kleine handgesetzte Sinnbilder (13×13 Raster) fuer die Ueberschriften der
+// Seitenkaesten, dazu der Hover-Pfeil der Menueknoepfe (die Knoepfe selbst
+// tragen bewusst keine Icons). '#' = Hauptfarbe (currentColor,
+// also die Spielerfarbe des Knopfes), '+' = Glanz (weiss), 'o' = dunkel.
+// Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
+// je Farbe EIN Pfad aus Zeilenlaeufen.
+const PIXEL_ICONS = {
+  schwerter: [
+    '++.........++',
+    '+##.......##+',
+    '.###.....###.',
+    '..###...###..',
+    '...###.###...',
+    '....#####....',
+    '.....###.....',
+    '....#####....',
+    '.++.##.##.++.',
+    '..++.....++..',
+    '..#++...++#..',
+    '.##.......##.',
+    '+#.........#+',
+  ],
+  karten: [
+    '.....#######.',
+    '.....#ooooo#.',
+    '.....#ooooo#.',
+    '.#######ooo#.',
+    '.#oo+oo#ooo#.',
+    '.#o+++o#ooo#.',
+    '.#+++++#ooo#.',
+    '.#o+++o#####.',
+    '.#oo+oo#.....',
+    '.#ooooo#.....',
+    '.#######.....',
+    '.............',
+    '.............',
+  ],
+  pokal: [
+    '..#########..',
+    '###+#######o#',
+    '#.#+#######.#',
+    '#.#+#######.#',
+    '.##+######o#.',
+    '...#+####o...',
+    '....#####....',
+    '.....###.....',
+    '.....###.....',
+    '....#####....',
+    '...#######...',
+    '...#######...',
+    '.............',
+  ],
+  stern: [
+    '......#......',
+    '.....###.....',
+    '.....+##.....',
+    '....#+###....',
+    '#############',
+    '.##+########.',
+    '..#########..',
+    '...#######...',
+    '...#######...',
+    '..####.####..',
+    '..###...###..',
+    '.###.....###.',
+    '.#.........#.',
+  ],
+  pfeil: [
+    '##.....',
+    '###....',
+    '.###...',
+    '..###..',
+    '...###.',
+    '..###..',
+    '.###...',
+    '###....',
+    '##.....',
+  ],
+};
+const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#0b0712' };
+const PIXEL_ICON_PFADE = {};
+function pixelIconPfade(rows) {
+  const pfade = {};
+  rows.forEach((r, y) => {
+    for (let x = 0; x < r.length;) {
+      const c = r[x];
+      if (c === '.') { x++; continue; }
+      let e = x;
+      while (e < r.length && r[e] === c) e++;
+      pfade[c] = (pfade[c] || '') + 'M' + x + ' ' + y + 'h' + (e - x) + 'v1h' + (x - e) + 'z';
+      x = e;
+    }
+  });
+  return pfade;
+}
+function PixelIcon({ name, className }) {
+  const rows = PIXEL_ICONS[name];
+  if (!rows) return null;
+  const pfade = PIXEL_ICON_PFADE[name] || (PIXEL_ICON_PFADE[name] = pixelIconPfade(rows));
+  return (
+    <svg className={'pp-pixel-icon' + (className ? ' ' + className : '')}
+      viewBox={'0 0 ' + rows[0].length + ' ' + rows.length}
+      shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      {Object.keys(pfade).map(c => <path key={c} d={pfade[c]} fill={PIXEL_ICON_FARBEN[c]} />)}
+    </svg>
+  );
 }
 
 // ═══════════════════════════════════════════
@@ -1992,12 +2101,24 @@ function MainMenu() {
       </div>
       <div ref={menuBodyRef} className="menu-body ornate-frame" style={{ position: 'relative', zIndex: 1 }}>
         <div className="animate-in menu-buttons">
-          <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('play')}>
-            <span className="menu-nav-label">PLAY ONLINE</span></button>
+          {/* Bewusst OHNE Icons: Beschriftung mittig, ein Pfeil rechts, der
+              beim Ueberfahren hineingleitet (style.css,
+              „HAUPTMENUE-AUFHUEBSCHUNG"). PLAY ONLINE ist der
+              Hauptknopf: gefuellt in der Spielerfarbe, mit Glanzband. */}
+          <button className="btn btn-big menu-nav-btn menu-nav-btn--primary" onClick={() => setScreen('play')}>
+            <span className="menu-nav-label">PLAY ONLINE</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" />
+            <GlanzBand klasse="pp-glanz--knopf" />
+          </button>
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('singleplayer')}>
-            <span className="menu-nav-label">VS CPU</span></button>
+            <span className="menu-nav-label">VS CPU</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
           <button className="btn btn-big menu-nav-btn" onClick={openDaily} title="Daily Challenge">
-            <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span></button>
+            <span className="menu-nav-label">DAILY{daily?.active && daily?.claimedBig ? ' ✓' : ''}</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" />
+            {/* Heute noch nicht gestartet → kleines NEW-Schild an der Ecke. */}
+            {daily?.available && <span className="menu-nav-badge">NEW</span>}
+          </button>
           {/* Puzzle pair: two half-width buttons sharing one row. */}
           <div className="menu-nav-row">
             <button className="btn btn-big menu-nav-btn menu-nav-btn--half" onClick={() => setScreen('puzzle-create')}>
@@ -2006,15 +2127,19 @@ function MainMenu() {
               <span className="menu-nav-label">ATTEMPT PUZZLE</span></button>
           </div>
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('deckbuilder')}>
-            <span className="menu-nav-label">DECK EDITOR</span></button>
+            <span className="menu-nav-label">DECK EDITOR</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('shop')}>
-            <span className="menu-nav-label">SHOP</span></button>
+            <span className="menu-nav-label">SHOP</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
           <button className="btn btn-big menu-nav-btn" onClick={() => setScreen('profile')}>
-            <span className="menu-nav-label">PROFILE</span></button>
+            <span className="menu-nav-label">PROFILE</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
           {/* How to Play replaces the old Tutorial + Rules buttons; it opens
               the tutorial browser, which now always offers View Rules. */}
           <button className="btn btn-big menu-nav-btn" onClick={() => setTutorialBrowserOpen(true)}>
-            <span className="menu-nav-label">HOW TO PLAY</span></button>
+            <span className="menu-nav-label">HOW TO PLAY</span>
+            <PixelIcon name="pfeil" className="menu-nav-pfeil" /></button>
         </div>
       </div>
 
