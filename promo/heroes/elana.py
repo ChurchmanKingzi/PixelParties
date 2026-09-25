@@ -1,9 +1,10 @@
 """
 Elana, the Rocky Rebel — High-Res-Pixelart-Hero für das Promo-Motiv.
 
-Native Auflösung: 128×128 px pro Frame (Szene später 640×360, ×3 → 1920×1080).
-Aufbau und Animation sind rein prozedural; build(t) liefert einen Frame für
-die Animationsphase t ∈ [0, 1).
+Maßstab: Szene nativ 960×540, Export ×2 → 1920×1080.
+Hero-Frame nativ 224×224 px (Figur ≈ 190 px inkl. Iro).
+Aufbau und Animation sind prozedural (Skelett + IK), Gesicht und Hände
+handgepixelt. build(t) liefert einen Frame für die Animationsphase t ∈ [0, 1).
 """
 import math
 import os
@@ -11,12 +12,16 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pixelkit import (Sprite, pillow_shade, sphere_shade, shift, dilate,  # noqa: E402
-                      ascii_mask, place, stamp, erode, rim_light)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from pixelkit import (Sprite, pillow_shade, shift, dilate, erode,  # noqa: E402
+                      ascii_mask, place, stamp, rim_light, tube_shade,
+                      ellipsoid_shade, ik)
 
-W, H = 128, 128
+W, H = 224, 224
+GROUND = 216
 
+
+# ─────────────────────────────── Vektorhilfen ───────────────────────────────
 
 def rot(v, deg):
     a = math.radians(deg)
@@ -28,6 +33,10 @@ def add(p, v, k=1.0):
     return (p[0] + v[0] * k, p[1] + v[1] * k)
 
 
+def sub(a, b):
+    return (a[0] - b[0], a[1] - b[1])
+
+
 def norm(v):
     L = math.hypot(*v) or 1e-9
     return (v[0] / L, v[1] / L)
@@ -37,312 +46,563 @@ def perp(v):
     return (-v[1], v[0])
 
 
+def lerp(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
+# ──────────────────────────────── Farbrampen ────────────────────────────────
+
 def make_ramps(sp):
     R = {}
-    R['hair'] = sp.add_ramp([(10, 48, 20), (18, 84, 22), (26, 124, 28), (40, 164, 38),
-                             (86, 204, 58), (170, 240, 110)], (6, 28, 12), mid=3)
-    R['skin'] = sp.add_ramp([(150, 92, 110), (208, 150, 150), (238, 196, 180),
-                             (252, 226, 208), (255, 244, 232)], (74, 30, 50), mid=3)
-    R['leather'] = sp.add_ramp([(12, 12, 18), (24, 24, 34), (40, 40, 54), (64, 64, 84),
-                                (104, 104, 128), (160, 160, 184)], (6, 6, 10), mid=2)
-    R['denim'] = sp.add_ramp([(16, 12, 24), (28, 22, 40), (44, 36, 62), (66, 56, 90)],
-                             (6, 4, 10), mid=1)
-    R['tank'] = sp.add_ramp([(120, 116, 150), (178, 180, 204), (222, 226, 240), (250, 252, 255)],
-                            (48, 44, 70), mid=2)
-    R['red'] = sp.add_ramp([(88, 0, 16), (140, 4, 18), (196, 24, 32), (232, 52, 48),
-                            (252, 110, 90), (255, 190, 170)], (48, 0, 12), mid=2)
-    R['metal'] = sp.add_ramp([(70, 72, 86), (128, 134, 148), (186, 192, 204), (236, 240, 246),
-                              (255, 255, 255)], (30, 30, 40), mid=2)
-    R['glove'] = sp.add_ramp([(52, 26, 10), (88, 44, 12), (132, 76, 30), (184, 124, 64),
-                              (236, 180, 112)], (30, 14, 4), mid=2)
-    R['pink'] = sp.add_ramp([(120, 10, 120), (196, 28, 200), (236, 70, 236), (255, 140, 250),
-                             (255, 214, 255)], (70, 0, 70), mid=2)
-    R['fret'] = sp.add_ramp([(20, 16, 18), (36, 30, 30), (58, 50, 48)], (10, 6, 8), mid=1)
-    R['check'] = sp.add_ramp([(170, 164, 160), (222, 216, 208), (250, 246, 240)], (10, 6, 8), mid=1)
-    R['boot'] = sp.add_ramp([(12, 10, 14), (26, 22, 28), (44, 38, 46), (72, 64, 74), (116, 108, 118)],
-                            (6, 4, 8), mid=2)
-    R['sole'] = sp.add_ramp([(40, 36, 44), (70, 64, 74), (100, 94, 104)], (10, 8, 12), mid=1)
-    R['lace'] = sp.add_ramp([(140, 4, 18), (210, 30, 34), (250, 90, 80)], (48, 0, 12), mid=1)
-    R['mouth'] = sp.add_ramp([(20, 6, 20), (44, 14, 40), (80, 30, 70)], (20, 6, 20), mid=1)
-    R['eye'] = sp.add_ramp([(14, 10, 20), (40, 30, 60), (255, 255, 255)], (14, 10, 20), mid=0)
+    R['hair'] = sp.add_ramp([(8, 38, 24), (12, 66, 30), (18, 98, 34), (28, 132, 38), (46, 168, 44),
+                             (92, 204, 62), (168, 238, 110)], (6, 24, 16), mid=3)
+    R['paint'] = sp.add_ramp([(92, 84, 122), (136, 130, 166), (182, 180, 208), (220, 220, 236),
+                              (242, 242, 250), (255, 255, 255)], (46, 34, 62), mid=4)
+    R['skin'] = sp.add_ramp([(112, 56, 70), (160, 92, 96), (206, 134, 122), (234, 170, 146),
+                             (248, 202, 176), (255, 228, 206)], (70, 28, 40), mid=3)
+    R['leather'] = sp.add_ramp([(10, 10, 16), (20, 20, 30), (34, 34, 48), (52, 52, 70), (78, 78, 104),
+                                (118, 118, 150), (176, 176, 206)], (6, 6, 12), mid=2)
+    R['denim'] = sp.add_ramp([(14, 10, 22), (24, 18, 36), (38, 30, 56), (56, 46, 80), (80, 68, 110),
+                              (112, 98, 144)], (6, 4, 12), mid=2)
+    R['tank'] = sp.add_ramp([(106, 100, 136), (156, 156, 188), (204, 206, 228), (234, 236, 248),
+                             (255, 255, 255)], (48, 40, 70), mid=3)
+    R['red'] = sp.add_ramp([(66, 0, 14), (108, 2, 18), (152, 10, 24), (196, 26, 34), (230, 54, 50),
+                            (250, 104, 86), (255, 176, 156)], (38, 0, 10), mid=3)
+    R['metal'] = sp.add_ramp([(54, 56, 72), (96, 100, 118), (146, 152, 168), (196, 202, 216),
+                              (236, 240, 248), (255, 255, 255)], (24, 24, 34), mid=2)
+    R['glove'] = sp.add_ramp([(36, 18, 8), (64, 32, 12), (98, 54, 22), (136, 84, 40), (180, 124, 70),
+                              (222, 168, 110)], (22, 10, 4), mid=2)
+    R['pink'] = sp.add_ramp([(96, 6, 100), (156, 20, 164), (212, 40, 214), (244, 98, 244),
+                             (255, 166, 250), (255, 222, 255)], (58, 0, 62), mid=2)
+    R['fret'] = sp.add_ramp([(18, 14, 16), (32, 26, 28), (52, 44, 44), (74, 64, 62)], (8, 6, 8), mid=1)
+    R['check'] = sp.add_ramp([(160, 154, 152), (214, 208, 202), (244, 240, 234), (255, 255, 250)],
+                             (8, 6, 8), mid=2)
+    R['boot'] = sp.add_ramp([(10, 8, 12), (22, 18, 24), (38, 32, 42), (58, 50, 64), (88, 80, 96),
+                             (132, 124, 142)], (6, 4, 8), mid=2)
+    R['sole'] = sp.add_ramp([(34, 30, 38), (58, 54, 64), (86, 82, 94), (116, 112, 124)], (10, 8, 12), mid=1)
+    R['lace'] = sp.add_ramp([(120, 4, 20), (190, 24, 34), (244, 80, 70)], (40, 0, 10), mid=1)
+    R['mouth'] = sp.add_ramp([(14, 4, 16), (34, 10, 34), (62, 24, 58), (96, 50, 90)], (14, 4, 16), mid=1)
+    R['eye'] = sp.add_ramp([(10, 8, 16), (34, 26, 52), (70, 50, 100), (255, 255, 255)], (10, 8, 16), mid=0)
     return R
 
 
-# Stern-Make-up (13×13), Mittelpunkt (6, 6) = Auge
-STAR = [
-    "......#......",
-    "......#......",
-    ".....###.....",
-    ".....###.....",
-    "#############",
-    ".###########.",
-    "..#########..",
-    "...#######...",
-    "...#######...",
-    "..#########..",
-    "..###...###..",
-    ".##.......##.",
-    ".#.........#.",
-]
+# ─────────────────────────────────── Pose ───────────────────────────────────
 
-# Auge, Braue, Nase und Mund — gleiche Verankerung wie STAR
-EYE = [
-    ".............",
-    ".............",
-    "....hhhhh....",
-    "...h.....hh..",
-    "..........k..",
-    "..kkkkkkkk...",
-    "..kwwwKgKk...",
-    "...WwwKKKk...",
-    "....aaaaa....",
-    ".............",
-    "..........nn.",
-    "...........n.",
-    ".............",
-    ".........m...",
-    "..mmmmmmm....",
-    "...lLLLl.....",
-    "......i......",
-]
+def pose(t):
+    """Skelett für Phase t. Füße bleiben stehen, der Rest federt/bangt."""
+    ph = 2 * math.pi * t
+    beat = 0.5 - 0.5 * math.cos(ph * 2)            # 0 → 1 → 0, zwei Beats pro Loop
+    bang = 0.5 - 0.5 * math.cos(ph * 2 - 0.8)       # Kopf leicht verzögert
+    j = {}
+    j['beat'], j['bang'] = beat, bang
+    j['sway'] = math.sin(ph * 2 - 1.6)              # Haare schwingen nach
+    j['lag'] = math.sin(ph * 2 - 2.4)
+    j['strum'] = math.sin(ph * 4)
 
+    dy = 3.0 * beat                                  # Knie beugen
+    dx = -1.0 * beat
+    j['pelvis'] = (106 + dx, 131 + dy)
+    j['hip_b'] = (95 + dx, 132 + dy)
+    j['hip_f'] = (116 + dx, 130 + dy)
+    j['ankle_b'] = (50, 201)
+    j['ankle_f'] = (153, 200)
+    j['knee_b'] = ik(j['hip_b'], j['ankle_b'], 45, 45, bend=1)
+    j['knee_f'] = ik(j['hip_f'], j['ankle_f'], 44, 44, bend=-1)
+
+    lean = 6.0 + 1.5 * beat                          # Rücklage, wippt mit dem Beat
+    j['chest'] = (98 + dx - lean * 0.6, 98 + dy)
+    j['neck'] = (96 + dx - lean, 79 + dy)
+    j['sh_b'] = (80 + dx - lean, 85 + dy)
+    j['sh_f'] = (114 + dx - lean, 80 + dy)
+    j['head'] = (93 + dx - lean * 1.3 + 3.5 * bang, 60 + dy + 4.0 * bang)
+    j['head_tilt'] = bang
+    return j
+
+
+# ───────────────────────────────── Zeichnen ─────────────────────────────────
 
 def build(t=0.0):
-    """Ein Frame der Idle-Animation (Headbang + Anschlag), t ∈ [0, 1)."""
     sp = Sprite(W, H)
     S = sp.S
     R = make_ramps(sp)
-    ps = pillow_shade
+    j = pose(t)
 
-    ph = 2 * math.pi * t
-    bob = round(1.0 - 1.0 * math.cos(ph * 2))          # Körper federt 2× pro Loop
-    hbob = round(1.5 - 1.5 * math.cos(ph * 2 - 0.7))    # Kopf nickt leicht verzögert
-    sway = math.sin(ph * 2 - 1.4)                       # Haare schwingen nach
-    strum = math.sin(ph * 4)                            # Schlaghand
-    lag = 1.6 * math.sin(ph * 2 - 2.2)                  # Haarspitzen hängen hinterher
-
-    hip_y = 88 + bob
-    sh_y = 63 + bob
-    hx, hy = 57, 44 + hbob          # Kopfmitte
-
-    # ── Haare hinten: einzelne Stachel-Strähnen ──────────────────
-    hc = (hx - 1, hy - 1)
-    spikes = [  # (Winkel°, Länge, Breite, Krümmung) — von hinten nach vorn
-        (-100, 36, 13, 1), (-78, 35, 13, 3), (-122, 34, 13, -2), (-56, 32, 13, 4),
-        (-143, 32, 13, -3), (-35, 28, 12, 5), (-162, 29, 12, -4), (-14, 23, 11, 5),
-        (178, 27, 12, -3), (8, 19, 10, 4), (160, 28, 12, -2), (142, 26, 11, -1),
-        (124, 22, 10, 0),
-    ]
-    blob = S.ellipse(hc[0], hc[1] - 2, 17, 16)
-    sp.fill(blob, R['hair'], 'hair_core', shade=ps(blob, sigma=2.5, gain=2.0) - 1)
-    for i, (ang, ln, wd, bend) in enumerate(spikes):
-        a = math.radians(ang)
-        amp = 1.2 if -150 < ang < -30 else 2.2
-        tip = (hc[0] + math.cos(a) * ln + sway * amp, hc[1] + math.sin(a) * ln - lag * (0.5 - math.sin(a) * 0.5))
-        base = (hc[0] + math.cos(a) * 6, hc[1] + math.sin(a) * 6)
-        m = S.spike(base, tip, wd, bend)
-        sp.fill(m, R['hair'], f'spike{i}', shade=ps(m, sigma=1.1, gain=2.6) - (1 if i < 6 else 0))
-        # Glanzlinie auf der Lichtseite der Strähne
-        v = norm((tip[0] - base[0], tip[1] - base[1]))
-        side = perp(v)
-        if side[0] * -0.55 + side[1] * -0.7 < 0:
-            side = (-side[0], -side[1])
-        g0 = add(add(base, v, ln * 0.35), side, wd * 0.12)
-        g1 = add(add(base, v, ln * 0.72), side, wd * 0.05 + bend * 0.25)
-        sp.detail(S.capsule(g0, g1, 0.55) & m, R['hair'], 4 + (1 if i < 3 else 0))
-
-    # ── Beine ─────────────────────────────────────────────────────
-    lk, rk = (42, 102), (68, 101)
-    leg_l = S.chain([(50, hip_y - 1), lk, (37, 111)], [5.4, 4.3, 4.0])
-    leg_r = S.chain([(62, hip_y - 1), rk, (73, 111)], [5.4, 4.3, 4.0])
-    for nm, m in (('leg_r', leg_r), ('leg_l', leg_l)):
-        sp.fill(m, R['denim'], nm, shade=ps(m, sigma=1.2, gain=1.8))
-    for kx, ky in (lk, rk):
-        tear = S.ellipse(kx + 0.5, ky, 2.4, 1.3)
-        sp.detail(tear & (leg_l | leg_r), R['skin'], 2)
-        sp.px([(kx - 1, ky - 1), (kx + 1, ky + 1), (kx + 2, ky - 1)], R['denim'], 0)
-
-    # ── Stiefel ───────────────────────────────────────────────────
-    boot_l = S.poly([(32, 106), (42, 106), (42, 119), (26, 119), (25, 116), (31, 113)])
-    boot_r = S.poly([(68, 106), (78, 106), (79, 113), (85, 116), (84, 119), (68, 119)])
-    sole_l = S.poly([(24, 118), (43, 118), (43, 122), (25, 122)])
-    sole_r = S.poly([(67, 118), (86, 118), (85, 122), (67, 122)])
-    for nm, b, so in (('boot_l', boot_l, sole_l), ('boot_r', boot_r, sole_r)):
-        sp.fill(b, R['boot'], nm, shade=ps(b, sigma=1.2, gain=2.0))
-        sp.fill(so, R['sole'], nm + 's', shade=ps(so, sigma=0.7, gain=1.0))
-    for bx in (36, 72):
-        for i, yy in enumerate(range(107, 116, 2)):
-            sp.px([(bx, yy), (bx + 1, yy), (bx + (i % 2) * 1, yy + 1)], R['lace'], 1)
-        sp.fill(S.rect(bx - 4, 108, bx + 6, 109), R['metal'], 'buckle', idx=1)
-    sp.px([(28, 115), (29, 114), (30, 114), (82, 115), (81, 114), (80, 114)], R['boot'], 4)
-    for x in range(26, 43, 3):
-        sp.px([(x, 121)], R['sole'], 0)
-    for x in range(69, 86, 3):
-        sp.px([(x, 121)], R['sole'], 0)
-
-    # ── Torso / Lederjacke ────────────────────────────────────────
-    torso = S.poly([(43, sh_y), (71, sh_y), (68, hip_y - 1), (47, hip_y - 1)])
-    torso |= S.ellipse(44, sh_y + 3, 5, 4) | S.ellipse(70, sh_y + 3, 5, 4)
-    sp.fill(torso, R['leather'], 'torso', shade=ps(torso, sigma=2.2, gain=2.4))
-    for g0, g1 in (((45, sh_y + 6), (47, sh_y + 17)), ((66, sh_y + 5), (64, sh_y + 14))):
-        sp.detail(S.capsule(g0, g1, 0.6) & torso, R['leather'], 4)
-    tank = S.poly([(52, sh_y), (62, sh_y), (60, hip_y - 3), (55, hip_y - 3)])
-    sp.fill(tank, R['tank'], 'tank', shade=ps(tank, sigma=1.2, gain=1.4))
-    sp.detail(S.star(57.5, sh_y + 11, 4.6, 2.0) & tank, R['pink'], 1)
-    sp.detail(S.star(57.3, sh_y + 10.7, 3.0, 1.3) & tank, R['pink'], 2)
-    # hochgestellter Kragen + Revers
-    col_l = S.poly([(44, sh_y - 5), (52, sh_y - 1), (55, sh_y + 13), (48, sh_y + 3)])
-    col_r = S.poly([(70, sh_y - 5), (62, sh_y - 1), (60, sh_y + 13), (66, sh_y + 3)])
-    for nm, m in (('col_l', col_l), ('col_r', col_r)):
-        sp.fill(m, R['leather'], nm, shade=ps(m, sigma=0.9, gain=1.8) + 1)
-    # Reißverschluss-Kante
-    sp.detail(S.capsule((52.5, sh_y + 13), (54.5, hip_y - 3), 0.5) & torso & ~tank, R['metal'], 1)
-    # Schulter-Nieten
-    for sx, sy in ((39, sh_y + 2), (43, sh_y - 0.5), (71, sh_y - 0.5), (75, sh_y + 2)):
-        stud = S.poly([(sx - 1.6, sy + 1.6), (sx + 1.6, sy + 1.6), (sx, sy - 3.0)])
-        sp.fill(stud, R['metal'], 'studs', shade=ps(stud, sigma=0.6, gain=1.5) + 1)
-    belt = S.rect(47, hip_y - 4, 68, hip_y - 1)
-    sp.fill(belt, R['boot'], 'belt', idx=1)
-    for x in range(48, 68, 3):
-        sp.px([(x, hip_y - 3)], R['metal'], 3)
-
-    # ── Hals + Kopf ───────────────────────────────────────────────
-    neck = S.capsule((57, hy + 9), (57, sh_y + 1), 3.2)
-    sp.fill(neck, R['skin'], 'neck', idx=1)
-    choker = S.rect(53, hy + 13, 62, hy + 15) & dilate(neck, 1)
-    sp.fill(choker, R['leather'], 'choker', idx=1)
-    sp.px([(55, hy + 13), (58, hy + 13), (61, hy + 13)], R['metal'], 3)
-
-    face = S.ellipse(hx, hy - 1, 12.0, 12.0)
-    face |= S.poly([(46.5, hy + 1), (68.5, hy - 1), (68, hy + 5), (65, hy + 10), (61, hy + 13),
-                    (56, hy + 12), (49, hy + 7)])
-    face |= S.rect(hx + 11, hy + 4, hx + 13, hy + 6)          # Nasenspitze im Profil
-    sp.fill(face, R['skin'], 'face', shade=sphere_shade(S, hx - 1, hy - 4, 17, gain=1.6, bias=0.4))
-
-    # Auge mit pinkem Stern-Make-up (handgepixelt)
-    ex, ey = hx + 5, hy + 1           # Augenmitte
-    ox, oy = ex - 6, ey - 6
-    star = place(sp, ascii_mask(STAR), ox, oy) & face
-    st_sh = pillow_shade(star, sigma=0.7, gain=2.0)
-    sp.detail(star, R['pink'], np.clip(2 + st_sh, 1, 4))
-    edge = star & ~(shift(star, 1, 0) & shift(star, -1, 0) & shift(star, 0, 1) & shift(star, 0, -1))
-    sp.shade_offset(edge & ~shift(star, 1, 1), -1)
-    stamp(sp, EYE, ox, oy, {
-        'k': (R['eye'], 0), 'K': (R['eye'], 1), 'g': (R['eye'], 2),
-        'w': (R['tank'], 3), 'W': (R['tank'], 2), 'a': (R['pink'], 0),
-        'h': (R['hair'], 0), 'm': (R['mouth'], 0), 'l': (R['mouth'], 1), 'L': (R['mouth'], 2),
-        'z': (R['tank'], 3), 'i': (R['metal'], 4), 'n': (R['skin'], 1), 'x': (R['skin'], 4),
-    }, clip=face)
-
-    # ── Pony (verdeckt das linke Auge) ───────────────────────────
-    bang = S.poly([(43, hy - 12), (63, hy - 15), (64, hy - 9), (57, hy - 6),
-                   (53, hy - 1), (51, hy + 6), (47, hy + 12), (44, hy + 7), (42, hy + 15), (40, hy)])
-    bang |= S.spike((62, hy - 11), (68 + sway, hy - 4), 6, 1)
-    bang |= S.spike((58, hy - 10), (60 + sway, hy - 1), 6, 1)
-    bang |= S.spike((51, hy - 8), (51 + sway, hy + 9), 7, -1)
-    bang |= S.spike((45, hy - 6), (41 + sway, hy + 17), 8, -2)
-    sp.fill(bang, R['hair'], 'bangs', shade=ps(bang, sigma=1.3, gain=2.6))
-    for g0, g1 in (((46, hy - 9), (44, hy + 6)), ((52, hy - 10), (51, hy + 2)), ((58, hy - 12), (61, hy - 6))):
-        sp.detail(S.capsule(g0, g1, 0.55) & bang, R['hair'], 5)
-
-    # ── Gitarre (Flying V) ────────────────────────────────────────
-    A = (64, 82 + bob)
-    u = norm((1.0, -0.95))
-    w_ = (-u[0], -u[1])
-    n_ = perp(u)                      # zeigt nach rechts unten
-    d1, d2 = rot(w_, 28), rot(w_, -28)
-    T1, T2 = add(A, d1, 38), add(A, d2, 35)
-    p1, p2 = perp(d1), perp(d2)
-    N = add(A, w_, 17)
-    vbody = S.poly([add(A, u, 5), add(A, n_, -7.5), add(T1, p1, 5.0), add(T1, p1, -5.0), N,
-                    add(T2, p2, 5.0), add(T2, p2, -5.0), add(A, n_, 7.5)])
-    sp.fill(vbody, R['red'], 'guitar', shade=ps(vbody, sigma=1.8, gain=2.6))
-    # weiße Einfassung (Binding) als zweite Kante innen
-    binding = erode(vbody, 1) & ~erode(vbody, 2)
-    lit = ps(vbody, sigma=2.0, gain=4.0)
-    sp.detail(binding & (lit > 0), R['tank'], 3)
-    sp.detail(binding & (lit < 0), R['red'], 1)
-    # Schlagbrett
-    pg = S.poly([add(A, n_, -4), add(A, n_, 4), add(add(A, w_, 12), n_, 3), add(add(A, w_, 12), n_, -3)]) & vbody
-    sp.fill(pg, R['tank'], 'pickguard', shade=ps(pg, sigma=0.8, gain=1.2))
-    for k in (2.5, 8.5):
-        c = add(A, w_, k)
-        pu = S.capsule(add(c, n_, -3.0), add(c, n_, 3.0), 1.4)
-        sp.fill(pu, R['fret'], 'pickups', idx=1)
-        sp.detail(S.capsule(add(c, n_, -2.4), add(c, n_, 2.4), 0.35) & pu, R['metal'], 1)
-    br = add(A, w_, 14)
-    sp.fill(S.capsule(add(br, n_, -3), add(br, n_, 3), 0.9), R['metal'], 'bridge', idx=2)
-    for k in (20, 25, 30):   # Regler auf dem unteren Flügel
-        kc = add(add(A, d2, k), p2, -1.8)
-        kn = S.ellipse(kc[0], kc[1], 1.1, 1.1)
-        sp.fill(kn, R['metal'], 'knobs', idx=1)
-        sp.px([(int(kc[0]) - 1, int(kc[1]) - 1)], R['metal'], 3)
-    # Saiten über dem Korpus
-    for o in (-1.2, 1.2):
-        sp.detail(S.capsule(add(A, n_, o), add(br, n_, o), 0.3) & (pg | vbody), R['metal'], 3)
-
-    # Hals mit Karo-Griffbrett
-    nut = add(A, u, 50)
-    neck_m = S.capsule(add(A, u, 2), nut, 2.7)
-    sp.fill(neck_m, R['fret'], 'neck', shade=ps(neck_m, sigma=0.8, gain=1.2))
-    d, tt = S.seg_dist(add(A, u, 3), nut)
-    along = (tt * 47).astype(int) // 3
-    side = ((S.xx - A[0]) * n_[0] + (S.yy - A[1]) * n_[1]) > 0
-    chk = neck_m & (d <= 2.0) & (((along % 2) == 0) ^ side)
-    sp.detail(chk, R['check'], 1)
-    # Kopfplatte
-    hs_tip = add(nut, u, 16)
-    head_m = S.poly([add(nut, n_, 3.2), add(nut, n_, -3.2), add(add(nut, u, 7), n_, -6.0),
-                     hs_tip, add(add(nut, u, 11), n_, 5.5)])
-    sp.fill(head_m, R['red'], 'headstock', shade=ps(head_m, sigma=1.0, gain=2.0))
-    for k in (3, 6, 9):
-        pc = add(add(nut, u, k), n_, -5.0)
-        sp.fill(S.ellipse(pc[0], pc[1], 1.1, 1.1), R['metal'], 'pegs', idx=3)
-        pc2 = add(add(nut, u, k + 1), n_, 4.6)
-        sp.fill(S.ellipse(pc2[0], pc2[1], 1.1, 1.1), R['metal'], 'pegs', idx=3)
-
-    # ── Greifarm (rechts im Bild) ─────────────────────────────────
-    fret_hand = add(A, u, 27)
-    elbow_r = (79, 77 + bob)
-    arm_r = S.chain([(69, sh_y + 4), elbow_r, fret_hand], [5.0, 4.0, 3.2])
-    sp.fill(arm_r, R['leather'], 'arm_r', shade=ps(arm_r, sigma=1.4, gain=2.2))
-    fd = norm((fret_hand[0] - elbow_r[0], fret_hand[1] - elbow_r[1]))
-    sp.fill(S.capsule(add(elbow_r, fd, 7), add(elbow_r, fd, 9), 3.7), R['boot'], 'cuff_r', idx=1)
-    hand_r = S.ellipse(fret_hand[0] + 0.5, fret_hand[1] + 0.5, 3.6, 3.2, angle=-0.8)
-    sp.fill(hand_r, R['glove'], 'hand_r', shade=ps(hand_r, sigma=0.9, gain=1.8))
-    for k in (-2.4, 0, 2.4):
-        fp = add(add(fret_hand, u, k), n_, -3.2)
-        sp.fill(S.ellipse(fp[0], fp[1], 1.2, 1.2), R['skin'], 'fingers_r', idx=2)
-
-    # ── Schlagarm (links im Bild) ─────────────────────────────────
-    strum_hand = add(add(A, w_, 5.5), n_, -1 + 2.4 * strum)
-    elbow_l = (38, 80 + bob)
-    arm_l = S.chain([(45, sh_y + 4), elbow_l, strum_hand], [5.0, 4.2, 3.4])
-    sp.fill(arm_l, R['leather'], 'arm_l', shade=ps(arm_l, sigma=1.4, gain=2.2))
-    dirv = norm((strum_hand[0] - elbow_l[0], strum_hand[1] - elbow_l[1]))
-    cuff = S.capsule(add(elbow_l, dirv, 11), add(elbow_l, dirv, 14), 3.9)
-    sp.fill(cuff, R['boot'], 'cuff_l', idx=1)
-    for k in (11.5, 13.5):
-        c = add(add(elbow_l, dirv, k), perp(dirv), -3.6)
-        stud = S.poly([add(c, perp(dirv), 1.2), add(add(c, dirv, -1.1), perp(dirv), -0.2),
-                       add(add(c, dirv, 1.1), perp(dirv), -0.2), add(c, perp(dirv), -2.4)])
-        sp.fill(stud, R['metal'], 'cuffstud', idx=3)
-    hand_l = S.ellipse(strum_hand[0], strum_hand[1], 3.7, 3.3)
-    sp.fill(hand_l, R['glove'], 'hand_l', shade=ps(hand_l, sigma=0.9, gain=1.8))
-    sp.px([(int(strum_hand[0]) + 1, int(strum_hand[1]) - 2), (int(strum_hand[0]) + 2, int(strum_hand[1]) - 1)], R['skin'], 3)
-    pk = add(strum_hand, (0.8, 1.0), 3.2)
-    sp.fill(S.poly([add(pk, (-1.4, -1.2)), add(pk, (1.8, -0.8)), add(pk, (0.4, 2.2))]), R['pink'], 'pick', idx=3)
+    draw_hair_back(sp, S, R, j)
+    draw_legs(sp, S, R, j)
+    draw_torso(sp, S, R, j)
+    draw_head(sp, S, R, j)
+    draw_hair_front(sp, S, R, j)
+    g = draw_guitar(sp, S, R, j)
+    draw_fret_arm(sp, S, R, j, g)
+    draw_strum_arm(sp, S, R, j, g)
 
     img = sp.render()
-    # Randlicht: warm von rechts (Flammensäulen), kühl-violett von links (Bühne)
-    img = rim_light(img, (255, 176, 72), 0.5, dx=1, dy=0, outline=sp.outline_mask)
-    img = rim_light(img, (160, 130, 255), 0.25, dx=-1, dy=0, outline=sp.outline_mask)
+    img = rim_light(img, (255, 172, 70), 0.5, dx=1, dy=0, outline=sp.outline_mask)
+    img = rim_light(img, (160, 130, 255), 0.22, dx=-1, dy=0, outline=sp.outline_mask)
     return img
 
 
+# Iro: (Winkel°, Länge, Breite, Krümmung) — Winkel 0 = rechts, -90 = oben.
+# Die Mähne weht nach hinten (links), weil Elana sich zurücklehnt.
+SPIKES = [
+    (-96, 46, 18, -6), (-74, 42, 17, -2), (-118, 48, 18, -8), (-52, 34, 15, 2),
+    (-140, 50, 18, -9), (-160, 50, 17, -8), (-178, 46, 16, -6), (-30, 26, 13, 3),
+    (164, 42, 15, -4), (146, 36, 14, -2), (-106, 30, 12, -5), (-84, 28, 12, -3),
+    (-128, 34, 13, -6), (-150, 36, 13, -6), (-64, 24, 11, -1), (130, 28, 12, 0),
+]
+
+
+def draw_hair_back(sp, S, R, j):
+    hx, hy = j['head']
+    hc = (hx - 3, hy - 4)
+    core = S.ellipse(hc[0], hc[1], 20, 18)
+    sp.fill(core, R['hair'], 'hair_core', shade=ellipsoid_shade(S, hc[0], hc[1] - 4, 22, 20, gain=2.4) - 1)
+    for i, (ang, ln, wd, bend) in enumerate(SPIKES):
+        a = math.radians(ang)
+        amp = 1.0 + 1.6 * max(0.0, -math.cos(a))     # hintere Strähnen schwingen stärker
+        tip = (hc[0] + math.cos(a) * ln + j['sway'] * amp * 1.5,
+               hc[1] + math.sin(a) * ln + j['lag'] * amp * 1.2)
+        base = (hc[0] + math.cos(a) * 8, hc[1] + math.sin(a) * 8)
+        m = S.spike(base, tip, wd, bend)
+        mid = lerp(base, tip, 0.4)
+        sh = tube_shade(S, [base, mid, tip], [wd * 0.5, wd * 0.33, 0.8], gain=3.0)
+        front = i >= 10
+        sp.fill(m, R['hair'], f'spike{i}', shade=sh - (0 if front else 1))
+        # Glanzsträhne auf der Lichtseite
+        v = norm(sub(tip, base))
+        side = perp(v)
+        if side[0] * -0.5 + side[1] * -0.75 < 0:
+            side = (-side[0], -side[1])
+        g0 = add(add(base, v, ln * 0.30), side, wd * 0.14)
+        g1 = add(add(base, v, ln * 0.75), side, wd * 0.04 + bend * 0.3)
+        sp.detail(S.capsule(g0, g1, 0.6) & m, R['hair'], 5 if front else 4)
+        # dunkle Trennlinie auf der Schattenseite
+        s0 = add(add(base, v, ln * 0.25), side, -wd * 0.22)
+        s1 = add(add(base, v, ln * 0.65), side, -wd * 0.08)
+        sp.detail(S.capsule(s0, s1, 0.55) & m, R['hair'], 1)
+
+
+def draw_legs(sp, S, R, j):
+    for side in ('b', 'f'):
+        hip, knee, ank = j['hip_' + side], j['knee_' + side], j['ankle_' + side]
+        pts = [hip, knee, ank]
+        rad = [11.0, 7.4, 5.8]
+        leg = S.chain(pts, rad)
+        # Oberschenkel etwas voller
+        leg |= S.capsule(lerp(hip, knee, 0.1), lerp(hip, knee, 0.55), 10.0, 8.5)
+        sh = tube_shade(S, pts, rad, gain=3.4) - (1 if side == 'b' else 0)
+        sp.fill(leg, R['denim'], 'leg_' + side, shade=sh)
+        # Falten an Knie und Hüfte
+        kv = norm(sub(ank, knee))
+        kp = perp(kv)
+        for k in (-4, 0, 4):
+            c = add(knee, kv, k * 0.6 - 2)
+            sp.detail(S.capsule(add(c, kp, -4), add(add(c, kp, 3), kv, 2), 0.5) & leg, R['denim'], 1)
+        # Riss am Knie: Haut blitzt durch, Fäden quer
+        tear = S.ellipse(knee[0], knee[1] - 1, 4.2, 2.6, angle=math.atan2(kv[1], kv[0]) + math.pi / 2)
+        sp.detail(tear & leg, R['skin'], 3)
+        sp.detail(S.ellipse(knee[0] - 1, knee[1] - 2, 2.0, 1.0) & tear, R['skin'], 4)
+        for k in (-1.5, 1.5):
+            c = add(knee, kv, k)
+            sp.detail(S.capsule(add(c, kp, -3.5), add(c, kp, 3.5), 0.4) & tear, R['denim'], 3)
+        draw_boot(sp, S, R, j, side, knee, ank)
+
+
+def draw_boot(sp, S, R, j, side, knee, ank):
+    ps = pillow_shade
+    fwd = -1 if side == 'b' else 1                  # Fußspitze zeigt nach außen
+    top = lerp(knee, ank, 0.45)
+    shaft = S.chain([top, ank], [7.0, 6.4])
+    toe = (ank[0] + fwd * 15, GROUND - 7)
+    heel = (ank[0] - fwd * 6, GROUND - 6)
+    foot = S.poly([add(ank, (-7, -2)), add(ank, (7, -2)), (toe[0] + fwd * 3, toe[1] - 1),
+                   (toe[0] + fwd * 4, GROUND - 3), (heel[0] - fwd * 2, GROUND - 3), (heel[0] - fwd * 2, ank[1])])
+    foot |= S.ellipse(toe[0], toe[1] + 0.5, 8.0, 5.6)
+    boot = shaft | foot
+    sp.fill(boot, R['boot'], 'boot_' + side, shade=ps(boot, sigma=2.4, gain=2.6))
+    sole = S.rect(min(heel[0], toe[0]) - 8, GROUND - 5, max(heel[0], toe[0]) + 8, GROUND + 1) & dilate(boot, 3)
+    sp.fill(sole, R['sole'], 'sole_' + side, shade=ps(sole, sigma=1.0, gain=1.4))
+    for x in range(int(min(heel[0], toe[0])) - 6, int(max(heel[0], toe[0])) + 8, 3):
+        sp.px([(x, GROUND)], R['sole'], 0)
+    # Stulpe oben umgeschlagen
+    cuff = S.capsule(add(top, (0, -1)), add(top, (0, 2)), 7.6)
+    sp.fill(cuff, R['boot'], 'bootcuff_' + side, shade=ps(cuff, sigma=1.2, gain=2.0) + 1)
+    # Schnürung
+    v = norm(sub(ank, top))
+    L = math.hypot(*sub(ank, top))
+    for k in range(4, int(L) + 2, 3):
+        c = add(top, v, k)
+        sp.px([(int(c[0]) - 2, int(c[1])), (int(c[0]) - 1, int(c[1]) + 1), (int(c[0]), int(c[1]) + 1),
+               (int(c[0]) + 1, int(c[1]))], R['lace'], 1)
+    # Schnallen
+    for k in (0.35, 0.7):
+        c = lerp(top, ank, k)
+        sp.fill(S.rect(c[0] - 7, c[1], c[0] + 7, c[1] + 1.5) & dilate(shaft, 1), R['leather'], 'strap_' + side, idx=1)
+        sp.fill(S.rect(c[0] + 2 * fwd - 1.5, c[1] - 1, c[0] + 2 * fwd + 1.5, c[1] + 2.5), R['metal'], 'buckle_' + side, idx=3)
+    # Stahlkappe
+    sp.detail(S.ellipse(toe[0] + fwd, toe[1] - 2, 3.0, 1.3) & foot, R['boot'], 5)
+
+
+def draw_torso(sp, S, R, j):
+    ps = pillow_shade
+    sb, sf = j['sh_b'], j['sh_f']
+    hb, hf = add(j['hip_b'], (-2, 2)), add(j['hip_f'], (3, 1))
+    waist_b = lerp(sb, hb, 0.62)
+    waist_f = lerp(sf, hf, 0.62)
+    waist_b = (waist_b[0] + 3, waist_b[1])
+    waist_f = (waist_f[0] - 3, waist_f[1])
+    torso = S.poly([add(sb, (-2, -2)), add(sf, (2, -3)), add(sf, (5, 4)), waist_f, hf, add(hf, (-2, 6)),
+                    add(hb, (2, 7)), hb, waist_b, add(sb, (-6, 5))])
+    cx, cy = j['chest']
+    sp.fill(torso, R['leather'], 'torso', shade=ellipsoid_shade(S, cx + 2, cy + 6, 22, 34, gain=3.0))
+
+    # Tanktop im offenen Reißverschluss
+    n = j['neck']
+    tank = S.poly([add(n, (-7, 3)), add(n, (8, 2)), add(lerp(sf, hf, 0.6), (-10, 0)),
+                   add(lerp(hf, hb, 0.35), (0, 2)), add(lerp(hf, hb, 0.62), (0, 3)), add(lerp(sb, hb, 0.6), (9, 0))])
+    sp.fill(tank, R['tank'], 'tank', shade=ellipsoid_shade(S, cx + 2, cy, 16, 26, gain=2.6))
+    sc = add(j['chest'], (3, 4))
+    for r_o, r_i, idx in ((8.5, 3.6, 1), (6.6, 2.8, 2), (3.8, 1.6, 3)):
+        sp.detail(S.star(sc[0], sc[1], r_o, r_i) & tank, R['pink'], idx)
+    # Falten im Top
+    for a0, a1 in (((cx - 4, cy + 14), (cx + 6, cy + 18)), ((cx - 2, cy + 20), (cx + 8, cy + 23))):
+        sp.detail(S.capsule(a0, a1, 0.5) & tank, R['tank'], 1)
+
+    # Revers + hochgestellter Kragen
+    col_b = S.poly([add(n, (-16, -5)), add(n, (-6, 1)), add(n, (-2, 20)), add(n, (-11, 8))])
+    col_f = S.poly([add(n, (15, -7)), add(n, (8, 0)), add(n, (8, 22)), add(n, (14, 8))])
+    for nm, m in (('col_b', col_b), ('col_f', col_f)):
+        sp.fill(m, R['leather'], nm, shade=ps(m, sigma=1.2, gain=2.4) + 1)
+    # Reißverschlusskanten
+    zb = S.capsule(add(n, (-2, 20)), add(lerp(sb, hb, 0.6), (9, 0)), 0.6) & torso
+    zf = S.capsule(add(n, (8, 22)), add(lerp(sf, hf, 0.6), (-10, 0)), 0.6) & torso
+    sp.detail((zb | zf) & ~tank, R['metal'], 2)
+    # Leder-Glanz
+    for g0, g1 in ((add(sb, (-2, 8)), add(sb, (0, 26))), (add(sf, (3, 8)), add(sf, (0, 22)))):
+        sp.detail(S.capsule(g0, g1, 0.7) & torso, R['leather'], 5)
+    # Schulter-Nieten (Pyramiden)
+    for base in (sb, sf):
+        for k in range(3):
+            c = add(base, (-6 + k * 5, -2 - (1 if k == 1 else 0)))
+            stud = S.poly([(c[0] - 2.2, c[1] + 2), (c[0] + 2.2, c[1] + 2), (c[0], c[1] - 3.5)])
+            sp.fill(stud, R['metal'], 'studs', shade=ps(stud, sigma=0.7, gain=2.0) + 1)
+
+    # Nietengürtel + Kette
+    bl, br = add(j['hip_b'], (-4, -4)), add(j['hip_f'], (6, -5))
+    belt = S.capsule(bl, br, 3.0) & dilate(torso, 2)
+    sp.fill(belt, R['boot'], 'belt', shade=ps(belt, sigma=1.0, gain=1.6))
+    for k in range(1, 8):
+        c = lerp(bl, br, k / 8)
+        sp.fill(S.ellipse(c[0], c[1], 1.2, 1.2), R['metal'], 'beltstud', idx=3)
+    chain = S.empty()
+    for k in range(9):
+        tt = k / 8
+        c = (bl[0] + 6 + tt * 16, bl[1] + 5 + math.sin(tt * math.pi) * 9 + 2 * j['beat'] * math.sin(tt * math.pi))
+        chain |= S.ellipse(c[0], c[1], 1.3, 1.0)
+    sp.fill(chain, R['metal'], 'chain', shade=ps(chain, sigma=0.6, gain=1.6) + 1)
+
+
+def draw_head(sp, S, R, j):
+    ps = pillow_shade
+    hx, hy = j['head']
+    # Hals + Choker
+    neck = S.capsule((hx + 3, hy + 12), j['neck'], 5.2)
+    sp.fill(neck, R['paint'], 'neck', shade=ps(neck, sigma=1.4, gain=2.0) - 1)
+    cy_ = hy + 17
+    ch = S.capsule((hx - 3, cy_), (hx + 9, cy_ - 1), 1.8) & dilate(neck, 1)
+    sp.fill(ch, R['leather'], 'choker', idx=1)
+    for k in (-4, 0, 4):
+        sp.fill(S.poly([(hx + 3 + k - 1.2, cy_), (hx + 3 + k + 1.2, cy_), (hx + 3 + k, cy_ + 3)]),
+                R['metal'], 'chokerstud', idx=3)
+    # Kopf: Schädel + Kiefer, 3/4 nach rechts, leicht in den Nacken gelegt
+    skull = S.ellipse(hx, hy - 1, 13.0, 13.5, angle=-0.2)
+    jaw = S.poly([(hx - 12, hy + 2), (hx + 13, hy - 3), (hx + 14, hy + 4), (hx + 12, hy + 10),
+                  (hx + 7, hy + 15), (hx + 4, hy + 17), (hx - 1, hy + 15), (hx - 7, hy + 10)])
+    face = skull | jaw | S.rect(hx + 13, hy + 2, hx + 15, hy + 5)   # Nase im Profil
+    sp.fill(face, R['paint'], 'face', shade=ellipsoid_shade(S, hx - 2, hy - 3, 16, 17, gain=2.2, bias=0.2))
+    ox, oy = int(round(hx)) - 14, int(round(hy)) - 14
+    rows = FACE_OPEN if j['bang'] > 0.55 else FACE
+    stamp(sp, rows, ox, oy, face_legend(R), clip=face)
+    # Stern-Make-up um das rechte Auge (weich schattiert), Auge bleibt frei
+    star = place(sp, ascii_mask(STAR), ox + STAR_AT[0], oy + STAR_AT[1]) & face
+    eye_keep = place(sp, ascii_mask(rows, chars='kKigwWa'), ox, oy)
+    st = star & ~eye_keep
+    sp.detail(st, R['pink'], np.clip(2 + ps(star, sigma=0.9, gain=2.2), 1, 4))
+    sp.shade_offset(st & ~shift(star, 1, 1), -1)
+
+
+def face_legend(R):
+    return {
+        'k': (R['eye'], 0), 'K': (R['eye'], 1), 'i': (R['eye'], 2), 'g': (R['eye'], 3),
+        'w': (R['tank'], 4), 'W': (R['tank'], 2), 'a': (R['pink'], 0),
+        'h': (R['hair'], 1), 'm': (R['mouth'], 0), 'l': (R['mouth'], 1), 'L': (R['mouth'], 2),
+        'M': (R['mouth'], 3), 'z': (R['tank'], 4), 'Z': (R['tank'], 2),
+        's': (R['paint'], 2), 'S': (R['paint'], 1), 'x': (R['paint'], 5), 'o': (R['metal'], 4),
+        'r': (R['red'], 2),
+    }
+
+
+# Gesicht 30×32, Ursprung = Kopfmitte − (14, 14). Legende siehe face_legend().
+FACE = [
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "...hhhh............hhhh.......",
+    "......hhhhh......hh....h......",
+    "..............................",
+    ".....kkkkkk......kkkkk........",
+    "...kkwwwwKKkk...kwwKKkk.......",
+    "....kwwwKKgKk...kwKgKk........",
+    "....kwwWKKKKk....WKKKk........",
+    ".....WWWKKKk......SSS.........",
+    "......SSSSS...................",
+    "..............................",
+    ".........................SS...",
+    "........................SS....",
+    "..............................",
+    "..............................",
+    ".....................m........",
+    "............mmmmmmmmm.........",
+    ".............lLLMMLl..........",
+    "..............llll............",
+    ".................o............",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+]
+
+# Beim Headbang: Mund offen (Schrei), Augen zusammengekniffen
+FACE_OPEN = [
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "..............................",
+    "....hhhh...........hhhh.......",
+    "........hh.......hh...........",
+    "..............................",
+    "...kkkkkkkkk.....kkkkkkk......",
+    "....kkkkKKkk......kkkKk.......",
+    "......WwwK.........wWK........",
+    "..............................",
+    "..............................",
+    "..............................",
+    ".........................SS...",
+    "........................SS....",
+    "..............................",
+    "............mmmmmmmmm.........",
+    "...........mzzzzzzzzm.........",
+    "...........mmmmmmmmmm.........",
+    "...........mmmMMMMmm..........",
+    "............mlLLLLlm..........",
+    ".............llll.............",
+    "................o.............",
+    "..............................",
+    "..............................",
+    "..............................",
+]
+
+STAR_AT = (13, 8)     # Stern relativ zum Gesichtsursprung (um das rechte Auge)
+STAR = [
+    ".......#.......",
+    ".......#.......",
+    "......###......",
+    "......###......",
+    ".....#####.....",
+    "###############",
+    ".#############.",
+    "..###########..",
+    "...#########...",
+    "...#########...",
+    "..###########..",
+    "..####...####..",
+    ".####.....####.",
+    ".###.......###.",
+    ".##.........##.",
+    ".#...........#.",
+]
+
+
+def draw_hair_front(sp, S, R, j):
+    hx, hy = j['head']
+    sw = j['sway']
+    # Pony: fransig über der Stirn, eine lange Strähne fällt links an der Wange herab
+    m = S.poly([(hx - 15, hy - 8), (hx - 8, hy - 16), (hx + 2, hy - 19), (hx + 12, hy - 16),
+                (hx + 15, hy - 11), (hx + 11, hy - 10), (hx + 6, hy - 11), (hx + 1, hy - 9),
+                (hx - 5, hy - 10), (hx - 10, hy - 7)])
+    for base, tip, wd, bend in (((hx + 10, hy - 13), (hx + 19 + sw, hy - 8), 7, 2),
+                                ((hx + 4, hy - 13), (hx + 8 + sw, hy - 7), 6, 1),
+                                ((hx - 2, hy - 13), (hx + 1 + sw, hy - 6), 6, 0),
+                                ((hx - 8, hy - 12), (hx - 9 + sw, hy - 4), 7, -1),
+                                ((hx - 11, hy - 8), (hx - 16 + sw, hy + 19), 8, -3)):
+        m = m | S.spike(base, tip, wd, bend)
+    sp.fill(m, R['hair'], 'bangs', shade=pillow_shade(m, sigma=1.8, gain=3.0))
+    for g0, g1 in (((hx - 10, hy - 8), (hx - 14, hy + 8)), ((hx - 4, hy - 14), (hx - 6, hy - 7)),
+                   ((hx + 4, hy - 15), (hx + 11, hy - 10))):
+        sp.detail(S.capsule(g0, g1, 0.6) & m, R['hair'], 5)
+
+
+def draw_guitar(sp, S, R, j):
+    ps = pillow_shade
+    A = add(j['pelvis'], (14, -13))                   # Halsansatz am Korpus
+    u = rot(norm((0.62, -1.0)), -5.0 * j['beat'])   # Hals reißt im Beat hoch
+    w_ = (-u[0], -u[1])
+    n_ = perp(u)                                     # zeigt nach rechts unten
+    d1, d2 = rot(w_, 27), rot(w_, -27)
+    T1, T2 = add(A, d1, 60), add(A, d2, 55)
+    p1, p2 = perp(d1), perp(d2)
+    N = add(A, w_, 27)
+    vbody = S.poly([add(A, u, 7), add(A, n_, -12), add(T1, p1, 7.5), add(T1, p1, -7.0), N,
+                    add(T2, p2, 7.0), add(T2, p2, -7.5), add(A, n_, 12)])
+    sp.fill(vbody, R['red'], 'guitar', shade=ps(vbody, sigma=2.6, gain=3.2))
+    # Lack-Glanz entlang der Flügel
+    for dd, pp, sgn in ((d1, p1, 1), (d2, p2, -1)):
+        g0 = add(add(A, dd, 14), pp, 3.5 * sgn)
+        g1 = add(add(A, dd, 46), pp, 3.0 * sgn)
+        sp.detail(S.capsule(g0, g1, 0.7) & vbody, R['red'], 5)
+        sp.detail(S.capsule(lerp(g0, g1, 0.2), lerp(g0, g1, 0.45), 0.5) & vbody, R['red'], 6)
+    binding = erode(vbody, 1) & ~erode(vbody, 2)
+    lit = ps(vbody, sigma=2.4, gain=4.0)
+    sp.detail(binding & (lit > 0), R['tank'], 4)
+    sp.detail(binding & (lit < 0), R['red'], 1)
+    # Schlagbrett
+    pg = S.poly([add(A, n_, -6), add(A, n_, 6), add(add(A, w_, 20), n_, 5), add(add(A, w_, 20), n_, -5)]) & erode(vbody, 2)
+    sp.fill(pg, R['tank'], 'pickguard', shade=ps(pg, sigma=1.0, gain=1.6) - 1)
+    for k in (4.0, 13.0):
+        c = add(A, w_, k)
+        pu = S.capsule(add(c, n_, -4.6), add(c, n_, 4.6), 2.2)
+        sp.fill(pu, R['fret'], 'pickups', shade=ps(pu, sigma=0.8, gain=1.4))
+        for o in (-3, -1, 1, 3):
+            q = add(c, n_, o)
+            sp.px([(int(q[0]), int(q[1]))], R['metal'], 3)
+    br = add(A, w_, 21)
+    sp.fill(S.capsule(add(br, n_, -4.5), add(br, n_, 4.5), 1.3), R['metal'], 'bridge', idx=2)
+    for k in (34, 41, 48):
+        kc = add(add(A, d2, k), p2, -3)
+        kn = S.ellipse(kc[0], kc[1], 1.8, 1.8)
+        sp.fill(kn, R['metal'], 'knobs', shade=ps(kn, sigma=0.6, gain=1.6))
+    # Saiten über dem Korpus
+    for o in (-2.4, -0.8, 0.8, 2.4):
+        sp.detail(S.capsule(add(add(A, u, 3), n_, o * 0.8), add(br, n_, o), 0.3) & (vbody | pg), R['metal'], 3)
+
+    # Hals mit Karo-Griffbrett
+    nut = add(A, u, 74)
+    neck = S.capsule(add(A, u, 3), nut, 3.6)
+    sp.fill(neck, R['fret'], 'neck', shade=ps(neck, sigma=1.0, gain=1.4))
+    d, tt = S.seg_dist(add(A, u, 4), nut)
+    along = (tt * 70).astype(int) // 4
+    side = ((S.xx - A[0]) * n_[0] + (S.yy - A[1]) * n_[1]) > 0
+    chk = neck & (d <= 2.9) & (((along % 2) == 0) ^ side)
+    sp.detail(chk, R['check'], 2)
+    for k in range(4, 71, 4):
+        c = add(A, u, k)
+        sp.detail(S.capsule(add(c, n_, -2.8), add(c, n_, 2.8), 0.35) & neck, R['metal'], 2)
+    # Kopfplatte (spitz) mit Mechaniken
+    hs_tip = add(nut, u, 24)
+    head = S.poly([add(nut, n_, 4.2), add(nut, n_, -4.2), add(add(nut, u, 10), n_, -8.5),
+                   hs_tip, add(add(nut, u, 15), n_, 8.0)])
+    sp.fill(head, R['red'], 'headstock', shade=ps(head, sigma=1.4, gain=2.6))
+    sp.detail(S.capsule(add(nut, u, 3), add(nut, u, 18), 0.6) & head, R['red'], 5)
+    for k in (4, 9, 14):
+        for pc in (add(add(nut, u, k), n_, -7.0 + k * 0.1), add(add(nut, u, k + 2), n_, 6.6 - k * 0.2)):
+            peg = S.ellipse(pc[0], pc[1], 1.6, 1.6)
+            sp.fill(peg, R['metal'], 'pegs', shade=ps(peg, sigma=0.5, gain=1.5) + 1)
+    return {'A': A, 'u': u, 'w': w_, 'n': n_, 'nut': nut}
+
+
+def draw_arm(sp, S, R, name, sh, hand, l1, l2, bend):
+    ps = pillow_shade
+    el = ik(sh, hand, l1, l2, bend=bend)
+    pts = [sh, el, hand]
+    rad = [7.0, 5.4, 4.2]
+    arm = S.chain(pts, rad)
+    tsh = tube_shade(S, pts, rad, gain=3.4)
+    sp.fill(arm, R['leather'], 'arm_' + name, shade=tsh)
+    # Ärmelfalten am Ellbogen
+    v1, v2 = norm(sub(el, sh)), norm(sub(hand, el))
+    for k in (-3, 0, 3):
+        c = add(el, v2, k)
+        sp.detail(S.capsule(add(c, perp(v2), -3), add(c, perp(v2), 2), 0.45) & arm, R['leather'], 1)
+    sp.detail(S.capsule(add(sh, v1, 6), add(sh, v1, 18), 0.6) & arm & (tsh > 0), R['leather'], 5)
+    # Nieten-Armband
+    c0, c1 = add(hand, v2, -9), add(hand, v2, -4)
+    cuff = S.capsule(c0, c1, 5.0)
+    sp.fill(cuff, R['boot'], 'cuff_' + name, shade=ps(cuff, sigma=1.0, gain=2.0))
+    for k in (0.2, 0.8):
+        c = lerp(c0, c1, k)
+        for o in (-3, 0, 3):
+            q = add(c, perp(v2), o)
+            sp.fill(S.ellipse(q[0], q[1], 1.1, 1.1), R['metal'], 'cuffstud_' + name, idx=3)
+    return el, v2
+
+
+def draw_fret_arm(sp, S, R, j, g):
+    ps = pillow_shade
+    A, u, n_ = g['A'], g['u'], g['n']
+    hand = add(A, u, 50)
+    draw_arm(sp, S, R, 'f', j['sh_f'], add(hand, n_, 3), 31, 30, bend=1)
+    # Handfläche (fingerloser Handschuh) unter dem Hals, Finger krümmen sich übers Griffbrett
+    pc = add(hand, n_, 4.5)
+    palm = S.ellipse(pc[0], pc[1], 6.0, 4.4, angle=math.atan2(u[1], u[0]))
+    sp.fill(palm, R['glove'], 'palm_f', shade=ps(palm, sigma=1.2, gain=2.4))
+    sp.detail(S.capsule(add(pc, u, -4), add(pc, u, 4), 0.5) & palm & shift(palm, 0, 2), R['glove'], 4)
+    for i, k in enumerate((-4.8, -1.6, 1.6, 4.8)):
+        f0 = add(add(hand, u, k), n_, 2.5)
+        f1 = add(add(hand, u, k * 0.8 + 0.8), n_, -3.4)
+        fm = S.capsule(f0, f1, 1.5)
+        sp.fill(fm, R['skin'], f'finger_f{i}', shade=ps(fm, sigma=0.6, gain=1.8))
+        sp.fill(S.capsule(f0, lerp(f0, f1, 0.3), 1.6), R['glove'], f'fglove_f{i}', idx=2)
+    for k in (-3.2, 0.0, 3.2):                         # Fugen zwischen den Fingern
+        g0 = add(add(hand, u, k), n_, 1.5)
+        g1 = add(add(hand, u, k * 0.8 + 0.8), n_, -4.2)
+        sp.detail(S.capsule(g0, g1, 0.45) & sp.occupied(), R['skin'], 0)
+
+
+def draw_strum_arm(sp, S, R, j, g):
+    ps = pillow_shade
+    A, w_, n_ = g['A'], g['w'], g['n']
+    hand = add(add(A, w_, 9), n_, -2 + 4.0 * j['strum'])
+    draw_arm(sp, S, R, 'b', j['sh_b'], hand, 33, 31, bend=1)
+    fist = S.ellipse(hand[0] + 1, hand[1], 6.0, 5.2, angle=0.3)
+    sp.fill(fist, R['glove'], 'fist', shade=ellipsoid_shade(S, hand[0], hand[1] - 1, 7, 6, gain=2.6))
+    # Knöchel + Finger (Fingerspitzen aus dem Handschuh)
+    for k in range(4):
+        c = (hand[0] + 4.5 - k * 0.6, hand[1] - 3 + k * 2.2)
+        sp.fill(S.ellipse(c[0], c[1], 1.8, 1.3), R['skin'], 'knuckle', idx=3 if k < 2 else 2)
+    thumb = S.capsule((hand[0] - 1, hand[1] - 4), (hand[0] + 4, hand[1] - 6), 1.7)
+    sp.fill(thumb, R['skin'], 'thumb_b', shade=ps(thumb, sigma=0.6, gain=1.6))
+    pk = (hand[0] + 6.5, hand[1] - 6.5)
+    pick = S.poly([(pk[0] - 2, pk[1] - 1), (pk[0] + 2.5, pk[1] - 2), (pk[0] + 1, pk[1] + 3)])
+    sp.fill(pick, R['pink'], 'pick', idx=3)
+
+
+# ────────────────────────────────── Export ──────────────────────────────────
+
 FRAMES = 8          # Idle-Loop
 FRAME_MS = 90
-SCALE = 3           # Promo-Skalierung (640×360 → 1920×1080)
+SCALE = 2           # Szene 960×540 → 1920×1080
+
+
+def preview_bg():
+    """Dunkelvioletter Hintergrund mit Bodenschatten (wie in der Referenz)."""
+    bg = np.zeros((H, W, 4), np.uint8)
+    bg[...] = (76, 44, 70, 255)
+    yy, xx = np.mgrid[0:H, 0:W]
+    shadow = ((xx - 104) / 70.0) ** 2 + ((yy - GROUND) / 7.0) ** 2 <= 1
+    bg[shadow] = (56, 30, 54, 255)
+    return bg
 
 
 def export(out_dir):
@@ -351,18 +611,12 @@ def export(out_dir):
     os.makedirs(out_dir, exist_ok=True)
     frames = [build(i / FRAMES) for i in range(FRAMES)]
 
-    # Spritesheet (nativ + ×3, transparent)
     sheet = np.concatenate(frames, axis=1)
     Image.fromarray(sheet).save(os.path.join(out_dir, 'elana_idle_sheet.png'))
-    Image.fromarray(upscale(sheet, SCALE)).save(os.path.join(out_dir, 'elana_idle_sheet_x3.png'))
-    Image.fromarray(upscale(frames[0], SCALE)).save(os.path.join(out_dir, 'elana_x3.png'))
+    Image.fromarray(upscale(sheet, SCALE)).save(os.path.join(out_dir, 'elana_idle_sheet_x2.png'))
+    Image.fromarray(upscale(frames[0], SCALE)).save(os.path.join(out_dir, 'elana_x2.png'))
 
-    # Vorschau-GIF auf dunklem Bühnenverlauf
-    bg = np.zeros_like(frames[0])
-    for y in range(H):
-        k = y / (H - 1)
-        bg[y] = (int(22 + 26 * k), int(16 + 12 * k), int(34 + 30 * k), 255)
-    bg[123:] = (20, 14, 28, 255)
+    bg = preview_bg()
     gif = [upscale(over(bg, f), SCALE) for f in frames]
     save_gif(gif, os.path.join(out_dir, 'elana_idle.gif'), FRAME_MS)
     return frames

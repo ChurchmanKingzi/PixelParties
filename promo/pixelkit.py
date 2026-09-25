@@ -389,3 +389,45 @@ def rim_light(rgba, color, strength=0.55, dx=1, dy=0, depth=1, outline=None):
     rgb[edge] = rgb[edge] * (1 - strength) + c * strength
     out[..., :3] = np.clip(rgb, 0, 255).round().astype(np.uint8)
     return out
+
+
+def _light_from_offset(ox, oy, gain, bias, light):
+    q = np.clip(ox * ox + oy * oy, 0, 1)
+    oz = np.sqrt(1 - q)
+    d = ox * light[0] + oy * light[1] + oz * light[2]
+    return np.round((d - light[2]) * gain + bias).astype(int)
+
+
+def tube_shade(shapes, pts, radii, gain=3.0, bias=0.0, light=LIGHT):
+    """Zylinder-Schattierung entlang einer Gliederkette (Arm, Bein, Strähne)."""
+    best = np.full(shapes.xx.shape, np.inf)
+    ox = np.zeros_like(best)
+    oy = np.zeros_like(best)
+    for i in range(len(pts) - 1):
+        (x0, y0), (x1, y1) = pts[i], pts[i + 1]
+        d, t = shapes.seg_dist(pts[i], pts[i + 1])
+        r = radii[i] + (radii[i + 1] - radii[i]) * t
+        rel = d / np.maximum(r, 1e-6)
+        cx = x0 + t * (x1 - x0)
+        cy = y0 + t * (y1 - y0)
+        m = rel < best
+        best[m] = rel[m]
+        ox[m] = ((shapes.xx - cx) / r)[m]
+        oy[m] = ((shapes.yy - cy) / r)[m]
+    return _light_from_offset(ox, oy, gain, bias, light)
+
+
+def ellipsoid_shade(shapes, cx, cy, rx, ry, gain=3.0, bias=0.0, light=LIGHT):
+    return _light_from_offset((shapes.xx - cx) / rx, (shapes.yy - cy) / ry, gain, bias, light)
+
+
+def ik(root, end, l1, l2, bend=1):
+    """Zwei-Knochen-IK: liefert das Mittelgelenk (Knie/Ellbogen). bend = ±1 wählt die Seite."""
+    dx, dy = end[0] - root[0], end[1] - root[1]
+    d = min(math.hypot(dx, dy), l1 + l2 - 1e-3)
+    d = max(d, abs(l1 - l2) + 1e-3)
+    a = (l1 * l1 - l2 * l2 + d * d) / (2 * d)
+    h = math.sqrt(max(l1 * l1 - a * a, 0))
+    L = math.hypot(dx, dy) or 1e-9
+    ux, uy = dx / L, dy / L
+    return (root[0] + ux * a - uy * h * bend, root[1] + uy * a + ux * h * bend)

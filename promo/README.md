@@ -5,10 +5,12 @@ kämpfen gegeneinander. Aufbau Schritt für Schritt, Hero für Hero.
 
 ## Maßstab
 
-| Ebene            | Nativ        | Export (×3)    |
+| Ebene            | Nativ        | Export (×2)    |
 |------------------|--------------|----------------|
-| Gesamtszene      | 640 × 360 px | 1920 × 1080 px |
-| Hero-Frame       | 128 × 128 px | 384 × 384 px   |
+| Gesamtszene      | 960 × 540 px | 1920 × 1080 px |
+| Hero-Frame       | 224 × 224 px | 448 × 448 px   |
+
+Ein Hero ist nativ ca. 190 px groß (inkl. Frisur), im fertigen Bild also ~380 px.
 
 Alles wird nativ gepixelt und nur ganzzahlig (Nearest Neighbor) hochskaliert,
 damit jedes Pixel scharf bleibt.
@@ -29,8 +31,9 @@ python promo/heroes/elana.py
 
 ## Fortschritt
 
-- [x] **Elana, the Rocky Rebel**: Idle-Loop (8 Frames, 90 ms): Headbang,
-      schwingender Iro, Anschlag auf dem Flying V
+- [x] **Elana, the Rocky Rebel**: weiß geschminkt, Power-Stance mit Rücklage;
+      Idle-Loop (8 Frames, 90 ms): Headbang mit Schrei, wehender Iro,
+      Anschlag, Gitarrenhals wippt im Beat
 - [ ] Hero 2
 - [ ] Hero 3
 - [ ] Hero 4
