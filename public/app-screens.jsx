@@ -702,6 +702,7 @@ function AuthScreen() {
         <LogoParticles />
         <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
         <div className="pp-logo-tint" aria-hidden="true"></div>
+        <div className="pp-logo-licht" aria-hidden="true"></div>
       </div>
       <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
@@ -1807,6 +1808,20 @@ function MainMenu() {
     return () => { window.removeEventListener('mousedown', onDown, true); window.removeEventListener('keydown', onKey, true); };
   }, [logoutConfirm]);
 
+  // ── KEIN FOKUSRAHMEN NACH ESCAPE ────────────────────────────────────
+  // Der geklickte Menueknopf behielt beim Oeffnen eines Unterfensters
+  // (Daily, Puzzle-Bibliothek, How to Play, Abmeldefrage) den Fokus.
+  // Schliesst man das Fenster dann per Escape, gilt die letzte Eingabe als
+  // Tastatur — der Browser wertet den Fokus als `:focus-visible` und
+  // zeichnet den (gestrichelten) Fokusrahmen um den Knopf. Deshalb gibt
+  // der Knopf den Fokus ab, sobald eines der Fenster aufgeht.
+  useEffect(() => {
+    if (!(dailyOpen || puzzleBrowserOpen || tutorialBrowserOpen || logoutConfirm)) return;
+    const el = document.activeElement;
+    if (el && el.tagName === 'BUTTON' && screenRef.current?.contains(el)
+        && !el.closest('.menu-logout-confirm-wrap > div')) el.blur();
+  }, [dailyOpen, puzzleBrowserOpen, tutorialBrowserOpen, logoutConfirm]);
+
   // Fetch puzzle list when browser opens
   useEffect(() => {
     if (!puzzleBrowserOpen) return;
@@ -2019,12 +2034,13 @@ function MainMenu() {
       {/* Brand logo (data/logo.png) — decoupled from the top row and centered
           vertically in the gap between the top of the screen and the menu boxes
           (the wrapper spans top:0 → panelTop, which is the top of .menu-body).
-          The pp-logo-tint overlay paints a player-colour gradient onto it. */}
+          The pp-logo-tint/-licht overlays paint the player colour onto it. */}
       <div className="pp-logo-wrap" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: panelTop != null ? panelTop : 160, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, pointerEvents: 'none' }}>
         <div className="pp-logo-stack">
           <LogoParticles />
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
           <div className="pp-logo-tint" aria-hidden="true"></div>
+          <div className="pp-logo-licht" aria-hidden="true"></div>
           {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
               Schriftzug, auf die Buchstaben maskiert (style.css,
               `.pp-glanz--logo`). */}

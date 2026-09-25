@@ -2397,12 +2397,14 @@ select optgroup {
 }
 
 /* ===== PIXEL PARTIES brand logo (main menu) =====
-   ★ Neu gezeichnet: data/logo.png entsteht mit `node scripts/mklogo.js`
-   (Raster 194×38, Datei 4-fach). Bonbon-Blockschrift auf einem Bogen, mit
-   3D-Kante, dunkler Doppelkontur, Lichtkante, Glanzstrichen und zwei
-   Funkelsternen. Die
-   Buchstabenflaechen sind GRAUSTUFEN — die Spielerfarbe kommt ueber
-   `.pp-logo-tint` (Multiplizieren) dazu, siehe unten.
+   ★ Im Stil der Kartengrafiken: data/logo.png entsteht mit
+   `node scripts/mklogo.js` (Raster 339×61, Datei 4-fach). Ein gebogenes
+   Titelband wie die Titelplatte einer Karte — schwarze Aussenkante, Rand
+   in dunkler Spielerfarbe, Lichtkante, gedithertes Licht oben und Fuss
+   unten, gefaltete Bandenden — darauf „Pixel Parties" in der
+   Kartentitel-Schrift (Pixel Intv), weiss mit dunkler Kontur.
+   Die Flaechen sind GRAUSTUFEN; die Spielerfarbe kommt ueber zwei
+   Schichten dazu (`.pp-logo-tint`, `.pp-logo-licht`), siehe unten.
    Pixelated scaling keeps the chunky pixels crisp; the drop-shadow lifts it
    off the scrolling card-wall behind. */
 .pp-logo-stack {
@@ -2420,31 +2422,37 @@ select optgroup {
 .pp-logo-img {
   display: block;
   filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent));
-  /* 3 Bildschirmpixel je Rasterpixel (38 Rasterzeilen) — ganzzahlig,
+  /* 2 Bildschirmpixel je Rasterpixel (61 Rasterzeilen) — ganzzahlig,
      damit die Bloecke gleich breit bleiben. */
-  height: 114px;
+  height: 122px;
   width: auto;
   /* Shrink to fit short windows; width re-derives to keep the aspect ratio. */
   max-height: calc(24dvh / var(--ui-scale, 1));
   image-rendering: pixelated;
 }
-/* Spielerfarbe auf dem Schriftzug. data/logo-tint-mask.png deckt genau die
-   graustufigen Flaechen und die 3D-Kante ab (nicht Kontur, Lichtkante,
-   Glanz und Sterne). Multipliziert ergibt Weiss die volle Spielerfarbe,
-   die helleren/dunkleren Graustufen deren Licht- und Schattentoene — die
-   Schattierung des Bildes bleibt also erhalten. Der Verlauf hellt die
-   linke obere Seite leicht auf, als faellt dort Licht hin. */
+/* Spielerfarbe, Schicht 1: data/logo-tint-mask.png deckt alle graustufigen
+   Stellen ab (Bandflaeche, Rand, Enden, Schriftkontur). Multipliziert
+   ergibt Weiss die volle Spielerfarbe, Grau deren dunklere Toene — die
+   Schattierung des Bildes bleibt erhalten. Flach, ohne Verlauf: die
+   Karten arbeiten mit flachen Flaechen und Dithering. */
 .pp-logo-tint {
   position: absolute;
   inset: 0;
   pointer-events: none;
   mix-blend-mode: multiply;
-  background: linear-gradient(115deg,
-    color-mix(in srgb, var(--player-color, #00f0ff) 62%, #ffffff) 0%,
-    var(--player-color, #00f0ff) 55%,
-    color-mix(in srgb, var(--player-color, #00f0ff) 88%, #000000) 100%);
+  background: var(--player-color, #00f0ff);
   -webkit-mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-tint-mask.png) center / 100% 100% no-repeat;
+}
+/* Spielerfarbe, Schicht 2: die Lichtkanten (data/logo-licht-mask.png) in
+   einer aufgehellten Spielerfarbe — Multiplizieren kann nicht aufhellen. */
+.pp-logo-licht {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 45%, #ffffff);
+  -webkit-mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
 }
 /* ── PIXEL-PARTIKEL HINTER DEM MENUE (v808) ──────────────────────────
    Al: „Solche moechte ich ueberall im Hintergrund haben (hinter dem
@@ -2547,7 +2555,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 
 @media (max-width: 900px) {
-  .pp-logo-img { height: 57px; }
+  .pp-logo-img { height: 61px; }
   .pp-logo-particles { inset: -34px -50px; }
 }
 
@@ -15678,7 +15686,7 @@ body:has(.textbox-overlay) .tooltip {
        unteren Rand statt exakt so hoch wie der Streifen zu sein. */
 @media (max-height: 600px) {
   .main-menu-screen { justify-content: flex-start !important; padding-top: 84px !important; gap: 0 !important; }
-  .main-menu-screen .pp-logo-img { height: 57px; }
+  .main-menu-screen .pp-logo-img { height: 61px; }
   /* Kopfzeile links */
   .menu-topleft {
     display: flex; align-items: center; gap: 12px;
@@ -21388,30 +21396,35 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    Hintergruende mit `!important`; hier gewinnt die hoehere Spezifitaet.
    Nur `transform`/`opacity` werden dauerhaft animiert (Icons, Pfeil) —
    die Schatten wechseln einmalig beim Ueberfahren, das kostet nichts. */
-.main-menu-screen {
-  --pp-kontur: #05040a;
-}
+:root { --pp-kontur: #05040a; }
+/* Zierfarbe der grossen Rahmen: im Menue die Spielerfarbe, im Login das
+   Violett des Login-Kastens (dort gibt es noch keinen Spieler). */
+.main-menu-screen { --zier: var(--player-color, #00f0ff); }
+.auth-screen .auth-panel { --zier: var(--auth-rahmen, #8b6dff); }
 
-/* ── Kaesten (Knopfstreifen + Seitenkaesten) ───────────────────────── */
+/* ── Kaesten (Knopfstreifen, Seitenkaesten, Login-Kasten) ──────────── */
 /* Der Rahmen in Schichten, von aussen nach innen:
      schwarze Aussenkontur · schmaler Farbring · dunkles Band ·
      schwarze Kontur · 4-px-Hauptrahmen mit Lichtkante (oben/links heller,
      unten/rechts dunkler) · schwarze Innenkontur · feine Zierlinie
      (::before) · Pixel-Ornamente an Ecken und Kantenmitten (::after). */
-.main-menu-screen .ornate-frame {
+.main-menu-screen .ornate-frame,
+.auth-screen .auth-panel {
+  border-width: 4px;
+  border-style: solid;
   border-color:
-    color-mix(in srgb, var(--player-color, #00f0ff) 68%, #fff)
-    color-mix(in srgb, var(--player-color, #00f0ff) 76%, #000)
-    color-mix(in srgb, var(--player-color, #00f0ff) 70%, #000)
-    color-mix(in srgb, var(--player-color, #00f0ff) 80%, #fff);
+    color-mix(in srgb, var(--zier) 68%, #fff)
+    color-mix(in srgb, var(--zier) 76%, #000)
+    color-mix(in srgb, var(--zier) 70%, #000)
+    color-mix(in srgb, var(--zier) 80%, #fff);
   box-shadow:
     0 0 0 2px var(--pp-kontur),
-    0 0 0 5px color-mix(in srgb, var(--player-color, #00f0ff) 22%, var(--pp-kontur)),
-    0 0 0 7px color-mix(in srgb, var(--player-color, #00f0ff) 75%, #000),
+    0 0 0 5px color-mix(in srgb, var(--zier) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--zier) 75%, #000),
     0 0 0 9px var(--pp-kontur),
     inset 0 0 0 2px var(--pp-kontur),
-    inset 0 0 30px color-mix(in srgb, var(--player-color, #00f0ff) 14%, transparent),
-    0 0 40px color-mix(in srgb, var(--player-color, #00f0ff) 28%, transparent),
+    inset 0 0 30px color-mix(in srgb, var(--zier) 14%, transparent),
+    0 0 40px color-mix(in srgb, var(--zier) 28%, transparent),
     0 18px 44px rgba(0, 0, 0, .6);
 }
 /* Feine Zierlinie innen: 2 px, genau auf dem inneren Winkel der
@@ -21419,20 +21432,22 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    und Schnoerkel ineinander uebergehen statt sich zu kreuzen. */
 .main-menu-screen .ornate-frame::before {
   inset: 12px;
-  border: 2px solid color-mix(in srgb, var(--player-color, #00f0ff) 32%, transparent);
+  border: 2px solid color-mix(in srgb, var(--zier) 32%, transparent);
   border-radius: 0;
 }
 /* Ornamente: gestufte Eck-Schnoerkel (8×8 Raster) mit Innenwinkel, ein
    Zierstueck oben und unten in der Mitte (Spitze zeigt
    ins Innere) und je ein Keil links und rechts. Eine Maske, eine Farbe —
-   die Spielerfarbe, aufgehellt, damit die Zier auf dem Rahmen leuchtet.
-   Einheit 4 px (--eck-e), passend zum 8-px-Dither-Raster. Gilt nur hier;
-   die kleinen Plaketten (.pp-eckzier) behalten ihre schlichten Ecken. */
-.main-menu-screen .ornate-frame::after {
+   die Zierfarbe, aufgehellt, damit die Zier auf dem Rahmen leuchtet.
+   Einheit 4 px (--eck-e), passend zum 8-px-Dither-Raster. Gilt nur fuer
+   die grossen Kaesten; die kleinen Plaketten (.pp-eckzier) behalten ihre
+   schlichten Ecken. */
+.main-menu-screen .ornate-frame::after,
+.auth-screen .auth-panel.pp-eckzier::after {
   --eck-e: 4px;
   --eck-gr: calc(var(--eck-e) * 8);
   inset: 4px;
-  background: color-mix(in srgb, var(--player-color, #00f0ff) 72%, #fff);
+  background: color-mix(in srgb, var(--zier) 72%, #fff);
   -webkit-mask:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
@@ -21452,8 +21467,23 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
 }
+/* Login-Kasten: Ornamente eine Stufe kleiner (der Textkasten hat weniger
+   Innenabstand als die Menuekaesten), dazu der warme Gegenschein der
+   Explosion dahinter. */
+.auth-screen .auth-panel.pp-eckzier::after { --eck-e: 3px; }
+.auth-screen .auth-panel {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--zier) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--zier) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    inset 0 0 0 2px var(--pp-kontur),
+    12px 14px 0 rgba(0, 0, 0, .45),
+    0 0 80px rgba(255, 150, 70, .24);
+}
 @media (max-height: 600px) {
-  .main-menu-screen .ornate-frame::after { --eck-e: 3px; }
+  .main-menu-screen .ornate-frame::after,
+  .auth-screen .auth-panel.pp-eckzier::after { --eck-e: 3px; }
   .main-menu-screen .ornate-frame::before { inset: 10px; }
 }
 /* Dither wie bisher, darunter ein Lichtschein in der Spielerfarbe von oben
@@ -21505,65 +21535,122 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .85));
 }
 
-/* ── Knoepfe des Hauptstreifens ─────────────────────────────────────── */
-.main-menu-screen .menu-buttons .menu-nav-btn {
+/* ── KNOPFRAHMEN IM KARTENSTIL ──────────────────────────────────────
+   Gilt fuer die Menueknoepfe, LOGOUT und die Login-Knoepfe. Aufbau wie
+   die Titelplatte einer Karte, von aussen nach innen:
+     schwarze Kontur · 3-px-Rahmen in der Knopffarbe mit EINGEKERBTEN
+     Pixel-Ecken (::after malt die Eckpixel in Konturfarbe) · Lichtkante
+     oben/links, Schattenkante unten/rechts · Flaeche in drei Toenen —
+     helles Kopfband, Mitte, dunkler Fuss — mit Schachbrett-Dithering an
+     den Uebergaengen (keine weichen Verlaeufe) · je eine helle Niete in
+     den vier Innenecken.
+   Darunter der Sockel (die Tiefe der Taste). Die Toene haengen an
+   Variablen (--kf-oben/-mitte/-fuss), Hover und die gefuellte
+   Hauptvariante setzen nur die Variablen um. */
+.main-menu-screen .menu-buttons .menu-nav-btn,
+.main-menu-screen .menu-logout-btn,
+.auth-screen .auth-rumpf .btn-big,
+.auth-screen .auth-gast .auth-gast-btn,
+.auth-screen .auth-corner .menu-logout-btn {
   --knopf: var(--player-color, #00f0ff);
   --knopf-tiefe: 5px;
+  --knopf-licht: color-mix(in srgb, var(--knopf) 55%, #fff);
+  --kf-oben: color-mix(in srgb, var(--knopf) 30%, var(--menu-surface));
+  --kf-mitte: color-mix(in srgb, var(--knopf) 12%, var(--menu-surface));
+  --kf-fuss: color-mix(in srgb, var(--knopf) 4%, var(--menu-surface));
+  --kf-kante: color-mix(in srgb, var(--knopf) 42%, transparent);
+  --kf-schein: 0 0 0 transparent;
   color: var(--knopf);
   border: 3px solid var(--knopf);
   background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.24'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.24'/%3E%3C/svg%3E") 0 5px / 4px 4px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.38'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.38'/%3E%3C/svg%3E") 0 calc(100% - 10px) / 4px 4px repeat-x,
     linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 22%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--knopf) 10%, var(--menu-surface)) 52%,
-      color-mix(in srgb, var(--knopf) 5%, var(--menu-surface)) 100%) !important;
+      var(--kf-oben) 0 5px,
+      var(--kf-mitte) 5px calc(100% - 6px),
+      var(--kf-fuss) calc(100% - 6px)) !important;
   box-shadow:
-    inset 0 3px 0 color-mix(in srgb, var(--knopf) 32%, transparent),
-    inset 0 -4px 0 rgba(0, 0, 0, .42),
+    inset 2px 2px 0 var(--kf-kante),
+    inset -2px -2px 0 rgba(0, 0, 0, .5),
     0 0 0 2px var(--pp-kontur),
-    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 58%, var(--pp-kontur));
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 58%, var(--pp-kontur)),
+    var(--kf-schein);
   text-shadow: 2px 2px 0 #000;
-  letter-spacing: 2px;
   filter: none;
   transform: none;
-  padding-left: 40px;
-  padding-right: 40px;
-  transition: transform .12s ease, box-shadow .12s ease, color .12s ease, background .12s ease;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
 }
-/* Der allgemeine Knopf-Verlauf (.btn::before) lag doppelt auf dem neuen
-   Verlauf — hier nur noch ein Hauch Glanz auf der oberen Haelfte. */
-.main-menu-screen .menu-buttons .menu-nav-btn::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .07) 0%, transparent 48%);
+/* Der alte Glanzverlauf (.btn::before) entfaellt — die Flaeche hat ihre
+   eigenen Baender. */
+.main-menu-screen .menu-buttons .menu-nav-btn::before,
+.main-menu-screen .menu-logout-btn::before,
+.auth-screen .auth-rumpf .btn-big::before,
+.auth-screen .auth-gast .auth-gast-btn::before,
+.auth-screen .auth-corner .menu-logout-btn::before { background: none !important; }
+/* Eingekerbte Ecken + Nieten. Ueberdeckt den Rahmen (inset -3px). */
+.main-menu-screen .menu-buttons .menu-nav-btn::after,
+.main-menu-screen .menu-logout-btn::after,
+.auth-screen .auth-rumpf .btn-big::after,
+.auth-screen .auth-gast .auth-gast-btn::after,
+.auth-screen .auth-corner .menu-logout-btn::after {
+  inset: -3px;
+  opacity: 1;
+  transition: none;
+  background:
+    linear-gradient(var(--pp-kontur) 0 0) left top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) left bottom / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right bottom / 3px 3px no-repeat,
+    linear-gradient(var(--knopf-licht) 0 0) 7px 7px / 2px 2px no-repeat,
+    linear-gradient(var(--knopf-licht) 0 0) calc(100% - 7px) 7px / 2px 2px no-repeat,
+    linear-gradient(var(--knopf-licht) 0 0) 7px calc(100% - 7px) / 2px 2px no-repeat,
+    linear-gradient(var(--knopf-licht) 0 0) calc(100% - 7px) calc(100% - 7px) / 2px 2px no-repeat;
 }
-.main-menu-screen .menu-buttons .menu-nav-btn:hover {
+.main-menu-screen .menu-buttons .menu-nav-btn:hover:not(:disabled),
+.main-menu-screen .menu-logout-btn:hover:not(:disabled),
+.auth-screen .auth-rumpf .btn-big:hover:not(:disabled),
+.auth-screen .auth-gast .auth-gast-btn:hover:not(:disabled),
+.auth-screen .auth-corner .menu-logout-btn:hover:not(:disabled) {
   --knopf-tiefe: 8px;
+  --kf-oben: color-mix(in srgb, var(--knopf) 52%, var(--menu-surface));
+  --kf-mitte: color-mix(in srgb, var(--knopf) 27%, var(--menu-surface));
+  --kf-fuss: color-mix(in srgb, var(--knopf) 13%, var(--menu-surface));
+  --kf-kante: color-mix(in srgb, var(--knopf) 60%, #fff);
+  --kf-schein: 0 0 26px color-mix(in srgb, var(--knopf) 55%, transparent);
   color: #fff;
   filter: none;
   transform: translateY(-3px);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 46%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--knopf) 26%, var(--menu-surface)) 55%,
-      color-mix(in srgb, var(--knopf) 16%, var(--menu-surface)) 100%) !important;
-  box-shadow:
-    inset 0 3px 0 color-mix(in srgb, var(--knopf) 55%, #fff),
-    inset 0 -4px 0 rgba(0, 0, 0, .42),
-    0 0 0 2px var(--pp-kontur),
-    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
-    0 0 26px color-mix(in srgb, var(--knopf) 55%, transparent);
   text-shadow: 2px 2px 0 #000, 0 0 12px var(--knopf);
-  /* Der aeltere Hover-Rahmen (weisser Umriss beim Ueberfahren) wuerde
-     die schwarze Pixelkontur ueberdecken. */
+  /* Der aeltere Hover-Rahmen (weisser Umriss) wuerde die Kontur ueberdecken. */
   outline: none;
 }
-.main-menu-screen .menu-buttons .menu-nav-btn:active {
+.main-menu-screen .menu-buttons .menu-nav-btn:active:not(:disabled),
+.main-menu-screen .menu-logout-btn:active:not(:disabled),
+.auth-screen .auth-rumpf .btn-big:active:not(:disabled),
+.auth-screen .auth-gast .auth-gast-btn:active:not(:disabled),
+.auth-screen .auth-corner .menu-logout-btn:active:not(:disabled) {
   --knopf-tiefe: 1px;
   transform: translateY(4px);
   transition-duration: .04s;
+}
+.main-menu-screen .menu-buttons .menu-nav-btn {
+  letter-spacing: 2px;
+  padding-left: 40px;
+  padding-right: 40px;
 }
 .main-menu-screen .menu-buttons .menu-nav-btn:focus-visible {
   outline: 3px dashed #fff;
   outline-offset: 5px;
 }
+/* Kleinere Knoepfe (LOGOUT): weniger Tiefe. */
+.main-menu-screen .menu-logout-btn,
+.auth-screen .auth-corner .menu-logout-btn { --knopf-tiefe: 4px; }
+.main-menu-screen .menu-logout-btn:hover:not(:disabled),
+.auth-screen .auth-corner .menu-logout-btn:hover:not(:disabled) { --knopf-tiefe: 6px; transform: translateY(-2px); }
+/* Farben im Login (dort gibt es keine Spielerfarbe). */
+.auth-screen .auth-rumpf .btn-big,
+.auth-screen .auth-corner .menu-logout-btn { --knopf: var(--accent, #00f0ff); }
+.auth-screen .auth-gast .auth-gast-btn { --knopf: var(--lotse-farbe, #ff44cc); }
 
 /* Pfeil rechts, der beim Ueberfahren hineingleitet und wippt. (Die
    Knoepfe tragen bewusst KEINE Icons.) */
@@ -21591,38 +21678,28 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   to   { transform: translateX(3px); }
 }
 
-/* PLAY ONLINE — der Hauptknopf: voll in der Spielerfarbe gefuellt,
-   weisse Schrift mit schwarzer Pixelkontur (liest sich auf jeder
-   Spielerfarbe), wandernder Glanz. */
-.main-menu-screen .menu-buttons .menu-nav-btn--primary {
+/* Hauptknoepfe — PLAY ONLINE und der Gast-Einstieg im Login: voll in der
+   Knopffarbe gefuellt (dieselben drei Baender, nur hell), weisse Schrift
+   mit schwarzer Pixelkontur (liest sich auf jeder Farbe), Glanzband. */
+.main-menu-screen .menu-buttons .menu-nav-btn--primary,
+.auth-screen .auth-gast .auth-gast-btn {
+  --kf-oben: color-mix(in srgb, var(--knopf) 55%, #fff);
+  --kf-mitte: var(--knopf);
+  --kf-fuss: color-mix(in srgb, var(--knopf) 68%, #000);
+  --kf-kante: rgba(255, 255, 255, .5);
+  --kf-schein: 0 0 24px color-mix(in srgb, var(--knopf) 45%, transparent);
   color: #fff;
   border-color: color-mix(in srgb, var(--knopf) 55%, #fff);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 62%, #fff) 0%,
-      var(--knopf) 38%,
-      color-mix(in srgb, var(--knopf) 72%, #000) 100%) !important;
-  box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, .5),
-    inset 0 -4px 0 rgba(0, 0, 0, .3),
-    0 0 0 2px var(--pp-kontur),
-    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
-    0 0 24px color-mix(in srgb, var(--knopf) 45%, transparent);
   text-shadow:
     2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
 }
-.main-menu-screen .menu-buttons .menu-nav-btn--primary:hover {
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 45%, #fff) 0%,
-      color-mix(in srgb, var(--knopf) 85%, #fff) 38%,
-      color-mix(in srgb, var(--knopf) 82%, #000) 100%) !important;
-  box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, .6),
-    inset 0 -4px 0 rgba(0, 0, 0, .3),
-    0 0 0 2px var(--pp-kontur),
-    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
-    0 0 34px color-mix(in srgb, var(--knopf) 70%, transparent);
+.main-menu-screen .menu-buttons .menu-nav-btn--primary:hover,
+.auth-screen .auth-gast .auth-gast-btn:hover:not(:disabled) {
+  --kf-oben: color-mix(in srgb, var(--knopf) 40%, #fff);
+  --kf-mitte: color-mix(in srgb, var(--knopf) 85%, #fff);
+  --kf-fuss: color-mix(in srgb, var(--knopf) 80%, #000);
+  --kf-kante: rgba(255, 255, 255, .65);
+  --kf-schein: 0 0 34px color-mix(in srgb, var(--knopf) 70%, transparent);
   text-shadow:
     2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
 }
@@ -21669,39 +21746,6 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   padding-right: 10px;
   letter-spacing: 0;
 }
-
-/* LOGOUT im selben Tasten-Stil, mit weniger Tiefe. */
-.main-menu-screen .menu-logout-btn {
-  --knopf: var(--player-color, #00f0ff);
-  color: var(--knopf);
-  border: 3px solid var(--knopf);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 20%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--knopf) 6%, var(--menu-surface)) 100%) !important;
-  box-shadow:
-    inset 0 2px 0 color-mix(in srgb, var(--knopf) 32%, transparent),
-    inset 0 -3px 0 rgba(0, 0, 0, .42),
-    0 0 0 2px var(--pp-kontur),
-    0 4px 0 2px color-mix(in srgb, var(--knopf) 58%, var(--pp-kontur));
-  text-shadow: 2px 2px 0 #000;
-  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
-}
-.main-menu-screen .menu-logout-btn:hover {
-  color: #fff;
-  transform: translateY(-2px);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--knopf) 42%, var(--menu-surface)) 0%,
-      color-mix(in srgb, var(--knopf) 18%, var(--menu-surface)) 100%) !important;
-  box-shadow:
-    inset 0 2px 0 color-mix(in srgb, var(--knopf) 55%, #fff),
-    inset 0 -3px 0 rgba(0, 0, 0, .42),
-    0 0 0 2px var(--pp-kontur),
-    0 6px 0 2px color-mix(in srgb, var(--knopf) 62%, var(--pp-kontur)),
-    0 0 20px color-mix(in srgb, var(--knopf) 50%, transparent);
-}
-.main-menu-screen .menu-logout-btn:active { transform: translateY(3px); box-shadow: 0 0 0 2px var(--pp-kontur); }
 
 /* ELO/SC-Plaketten: dieselbe harte Aussenkontur wie Kaesten und Knoepfe. */
 .main-menu-screen .menu-stat-badge {
@@ -21788,4 +21832,56 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 @media (prefers-reduced-motion: reduce) {
   .menu-nav-btn:hover .menu-nav-pfeil,
   .menu-nav-badge { animation: none; }
+}
+
+/* ═══ LOGIN-KASTEN IM KARTENSTIL ════════════════════════════════════════
+   Ergaenzt „LOGIN ALS KARTE (v1266)": Rahmen und Ornamente kommen aus dem
+   gemeinsamen Rahmen-Abschnitt oben (`--zier` = Violett), hier nur das
+   Innenleben — alles mit harten Pixelkanten statt Haarlinien. */
+
+/* Textkasten: an der Oberkante ein Trennband wie zwischen Bild- und
+   Textfenster einer Karte — Kontur, Violett, dann eine geditherte Kante. */
+.auth-screen .auth-rumpf {
+  border-top: 3px solid var(--auth-rahmen);
+  box-shadow: 0 -2px 0 var(--pp-kontur), inset 0 2px 0 var(--pp-kontur);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%238b6dff' fill-opacity='0.45'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%238b6dff' fill-opacity='0.45'/%3E%3C/svg%3E") 0 2px / 4px 4px repeat-x,
+    linear-gradient(180deg, color-mix(in srgb, var(--auth-rahmen) 22%, var(--auth-tinte)) 0 2px, transparent 2px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E") 0 0 / 8px 8px repeat,
+    linear-gradient(180deg, var(--auth-tinte), var(--auth-tinte-2));
+}
+
+/* Eingabefelder: versenkt (Schatten innen oben/links), schwarze Kontur. */
+.auth-screen .auth-rumpf .input {
+  border: 2px solid var(--auth-linie);
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .55), 0 0 0 2px var(--pp-kontur);
+}
+.auth-screen .auth-rumpf .input:focus {
+  border-color: var(--accent);
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .55), 0 0 0 2px var(--pp-kontur),
+              0 0 0 5px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* Reiter: die Schiene versenkt, der aktive Reiter als erhabene Platte mit
+   Lichtkante und geditherter Kopfzone. */
+.auth-screen .auth-rumpf .auth-tabs {
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .55), 0 0 0 2px var(--pp-kontur);
+}
+.auth-screen .auth-rumpf .auth-tabs .tab.active {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3C/svg%3E") 0 4px / 4px 4px repeat-x,
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 34%, var(--auth-feld)) 0 4px,
+      color-mix(in srgb, var(--accent) 18%, var(--auth-feld)) 4px);
+  box-shadow:
+    inset 2px 2px 0 color-mix(in srgb, var(--accent) 55%, transparent),
+    inset -2px 0 0 rgba(0, 0, 0, .45),
+    inset 0 -3px 0 var(--accent);
+}
+
+/* Trenner „or": gestrichelte Pixel-Linie statt Haarlinie. */
+.auth-screen .auth-rumpf .auth-or::before,
+.auth-screen .auth-rumpf .auth-or::after {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--auth-linie) 0 4px, transparent 4px 8px);
 }
