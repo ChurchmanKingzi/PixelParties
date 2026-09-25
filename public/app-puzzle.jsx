@@ -3812,7 +3812,7 @@ function PuzzleCreator() {
         <button className="btn" onClick={() => setScreen('menu')}>← BACK</button>
         <h2 className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
         <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
-          placeholder="Puzzle name..." style={{ width: 240, padding: '9px 14px', fontSize: 14, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
+          placeholder="Puzzle name..." style={{ width: 240, padding: '9px 14px', fontSize: 14, borderColor: 'color-mix(in srgb, var(--player-color) 45%, transparent)', color: 'var(--player-color)' }} />
         {/* Der Doom-Clock-Startzaehler wird NUR per Klick auf die Karte
             selbst eingestellt (Area-Editor, `oeffneAreaEditor`) — die
             fruehere Eingabe hier in der Kopfzeile war doppelt. */}
