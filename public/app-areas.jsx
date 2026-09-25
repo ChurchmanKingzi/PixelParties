@@ -689,142 +689,249 @@ const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  SHARED BLOOD TANKS — Blutkeller der Festung (v1411, Kartenstil v1413)
+//  SHARED BLOOD TANKS — Blutkeller der Festung (v1411, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
 //  Al 25.9.: „ein dunkler Kellerraum derselben Festung mit grossen Tanks
 //  voller Blut und Knochen/Schaedeln darin."
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  „Shared" sichtbar: alle Tanks haengen an EINEM Rohrnetz, in der Mitte
-//  steht das Pumpwerk. Der Blutspiegel steigt und faellt in ALLEN Tanks
-//  und im Sichtglas der Pumpe gleichzeitig; Blutpulse laufen im Pumptakt
-//  von der Pumpe nach aussen.
+//  „Shared" sichtbar: alle Tanks hängen an EINEM Rohrnetz, in der Mitte
+//  steht das Pumpwerk. Der Blutspiegel steigt und fällt in ALLEN Tanks
+//  und im Schauglas der Pumpe gleichzeitig; Blutpulse laufen im Pumptakt
+//  von der Pumpe nach außen.
 //
-//  Ebenen (Kunsthoehe 100): tile.png (Kachel 64: Ziegelwand, Tank mit
-//  Glas, Eisenpfeiler mit rot-weisser Manschette, Sockel, Boden),
-//  tile-front.png (Glanzlichter), blood.png (3 Wellenbilder, Schaedel)
-//  hinter mask-tank.png, flow.png hinter mask-tube.png, pump.png (48,
-//  mittig) + wheel/piston/stream.png.
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  dieselbe Szene, aber mit Tiefe und Material. Unter der Gewölbedecke
+//  läuft ein Sammelrohr mit Schellen, Flanschen und Messing-Schaugläsern
+//  (darin laufen die Pulse), von dem je ein Fallrohr mit Handrad in die
+//  genietete Eisenhaube jedes Tanks führt. Tanks: Glaszylinder mit Rand-
+//  schatten, Glanzstreifen, Messskala und Blutfilm unter der Haube,
+//  Bodenring mit Ablasshahn, heller Steinsockel mit übergelaufenem Blut.
+//  Zwischen den Tanks schmale Eisensäulen mit Laternen; das Verbindungs-
+//  rohr mit den rot-weißen Manschetten (Kartenmotiv) läuft durch ein
+//  Ventil mit rotem Hebel. Im Blut Schädel, Knochen, ein Brustkorb, eine
+//  Hand — je tiefer, desto trüber; oben treiben ein Schädel und ein
+//  Knochen. Das Pumpwerk: genieteter Kessel mit großem Schauglas, Mano-
+//  meter, Kolben, Schwungrad, Feuerrost, Sicherheitsventil, Steigrohr ins
+//  Sammelrohr. Boden aus Steinplatten mit Blutlachen, Abflussgittern,
+//  Knochen und einem Eimer unter dem tropfenden Ventil.
 //
-//  Tier `opaque` (vorher `partial`): die Szene ist ein ganzer Raum.
+//  Ebenen (Kunsthöhe 100; Generator gen/shared-blood-tanks.py im
+//  Scratchpad): tile.png — Kachel 128 (zwei verschiedene Tanks, zwei
+//  Säulen); blood.png (3 Wellenbilder, Kachel 128×300) hinter
+//  mask-tank.png; flow.png (16×100) hinter mask-flow.png (Schaugläser);
+//  tile-front.png (Glas vor dem Blut); tile-glow.png (Laternenschein);
+//  pump.png (72, mittig); sight.png (Blutsäule im Schauglas);
+//  flywheel.png (3 Bilder 17×17), piston.png (3×9), gauge.png (4 Bilder
+//  5×5), fire.png (3 Bilder 13×5), flame.png (3 Bilder 3×3), steam.png
+//  (3 Bilder 7×7), rat.png (2 Bilder 9×4), ripple.png (3 Bilder 5×2).
+//
+//  Animiert: Blutspiegel (alle Tanks + Schauglas, ganzzahlig im Sinus-
+//  takt), Wellen, aufsteigende Blasen, Pulse im Sammelrohr (von der Mitte
+//  nach außen, im Kolbentakt), Kolben, Schwungrad, Manometerzeiger,
+//  Glut im Feuerrost, Dampf aus dem Sicherheitsventil, flackernde
+//  Laternen, Tropfen aus den Ventilen mit Aufschlag, Tropfen vom
+//  Sammelrohr, gelegentlich eine Ratte.
+//  Tier `opaque`: die Szene ist ein ganzer Raum. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const SBT = '/areas/shared-blood-tanks/';
-const SBT_PUMP_W = 48;
-const SBT_LEVEL_S = 7.5;          // ein Heben/Senken des Blutspiegels
-const SBT_PULS_S = 1.1;           // Pumptakt (Kolben + Rohrpulse)
+const SBT_PUMP_W = 72;
+const SBT_LEVEL_S = 8;            // ein Heben und Senken des Blutspiegels
+const SBT_PULS_S = 1.2;           // Pumptakt (Kolben + Rohrpulse)
+const SBT_SPIEGEL = 3;            // Hub des Blutspiegels (Kunstpixel, ±)
+// Blutspiegel als ganzzahlige Stufen einer Sinuskurve (langsam an den Wenden)
+const SBT_SPIEGEL_KF = Array.from({ length: 25 }, (_, i) =>
+  `${(i / 24 * 100).toFixed(2)}% { transform: translateY(calc(${Math.round(-SBT_SPIEGEL * Math.cos(i / 24 * 2 * Math.PI))} * var(--px))); }`).join(' ');
 
 const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
-  // Blasen: je Tank (Tankmitte bei k·64 − 2 Kunstpixeln neben der Brettmitte)
-  const bubbles = useMemo(() => {
-    const out = [];
-    for (const k of [-2, -1, 1, 2]) {            // k = 0 steht hinter der Pumpe
-      for (let j = 0; j < ppFxN(3); j++) {
-        out.push({ x: k * 64 - 2 - 17 + Math.random() * 34, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 5 });
-      }
-    }
-    return out;
+  // Blasen: Tanks bei 64·k neben der Brettmitte (k = 0 steht hinter der Pumpe)
+  const blasen = useMemo(() => {
+    const tanks = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
+    return ppZufall(ppFxN(24), (i) => ({
+      x: tanks[i % tanks.length] * 64 - 17 + Math.floor(Math.random() * 35),
+      dur: 3 + Math.random() * 3, delay: -Math.random() * 6, gross: Math.random() < .3,
+    }));
   }, []);
-  // Tropfen aus den beiden Ventilmanschetten neben der Pumpe
-  const drips = [{ x: 26, dur: 3.4, delay: -1 }, { x: -38, dur: 4.1, delay: -2.6 }];
+  // Tropfen aus den Ventilen an den Säulen (Säulen bei 32 + 64·k) und vom Sammelrohr
+  const tropfen = useMemo(() => [
+    { x: 32, y0: 47, y1: 86, dur: 3.6 }, { x: -32, y0: 47, y1: 85, dur: 4.3 },
+    { x: 96, y0: 47, y1: 86, dur: 5.1 }, { x: -96, y0: 47, y1: 85, dur: 3.9 },
+    { x: 160, y0: 47, y1: 86, dur: 4.7 }, { x: -160, y0: 47, y1: 85, dur: 5.5 },
+    { x: -37, y0: 10, y1: 37, dur: 6.2 }, { x: 37, y0: 10, y1: 37, dur: 5.8 }, { x: 91, y0: 10, y1: 37, dur: 6.8 },
+  ].slice(0, ppFxN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
+  const laternen = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    x: 32 + 64 * (i - 6), dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
+  })), []);
+  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 94 + i * 3, dur: 26 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1,
+  })), []);
+  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
   return (
-    <PixelScene artH={100} bg="#101010" className="shared-blood-tanks-overlay">
+    <PixelScene artH={100} bg="#120d0d" className="shared-blood-tanks-overlay">
       <PixelBand src={SBT + 'tile.png'} />
+      {/* Blut in den Tanks: Maske = Glasinneres, darin hebt/senkt sich die Blutebene */}
       <div className="pp-pixel-layer" style={{ position: 'absolute', inset: 0, ...ppMaske(SBT + 'mask-tank.png', true) }}>
-        <div className="sbt-blut" style={{ backgroundImage: `url(${SBT}blood.png)` }} />
-        {bubbles.map((b, i) => (
-          <i key={'bl' + i} className="pp-area-dyn sbt-blase" style={{
-            left: ppArtX(b.x, 0), top: ppArt(62),
-            animation: `sbtBlase ${b.dur}s linear ${b.delay}s infinite`,
+        <div className="sbt-spiegel">
+          <PixelBand src={SBT + 'blood.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 .9s steps(1) infinite' }} />
+        </div>
+        {blasen.map((b, i) => (
+          <i key={'b' + i} className={'pp-area-dyn sbt-blase' + (b.gross ? ' gross' : '')} style={{
+            left: ppArtX(b.x, 0), top: ppArt(59),
+            animation: `sbtBlase ${b.dur.toFixed(2)}s steps(22) ${b.delay.toFixed(2)}s infinite`,
           }} />
         ))}
       </div>
-      <div className="pp-pixel-layer sbt-fluss links" style={{ ...ppMaske(SBT + 'mask-tube.png', true), backgroundImage: `url(${SBT}flow.png)` }} />
-      <div className="pp-pixel-layer sbt-fluss rechts" style={{ ...ppMaske(SBT + 'mask-tube.png', true), backgroundImage: `url(${SBT}flow.png)` }} />
+      {/* Pulse im Sammelrohr: links nach links, rechts nach rechts */}
+      <div className="pp-pixel-layer sbt-puls links" style={ppMaske(SBT + 'mask-flow.png', true)} />
+      <div className="pp-pixel-layer sbt-puls rechts" style={ppMaske(SBT + 'mask-flow.png', true)} />
       <PixelBand src={SBT + 'tile-front.png'} />
+      {/* hinter dem Pumpwerk: Kolbenstange und Glut */}
+      <i className="sbt-kolben" style={{ left: ppArtX(19, SBT_PUMP_W), top: ppArt(4) }} />
+      <i className="sbt-glut" style={{ left: ppArtX(30, SBT_PUMP_W), top: ppArt(52) }} />
       <PixelPiece src={SBT + 'pump.png'} w={SBT_PUMP_W} />
-      <div className="sbt-sicht" style={{ left: ppArtX(21, SBT_PUMP_W), top: ppArt(37) }}>
+      <div className="sbt-sicht" style={{ left: ppArtX(32, SBT_PUMP_W), top: ppArt(26) }}>
         <i className="sbt-sicht-blut" />
       </div>
-      <i className="sbt-strahl" style={{ left: ppArtX(23, SBT_PUMP_W), top: ppArt(10) }} />
-      <i className="sbt-zeiger" style={{ left: ppArtX(14, SBT_PUMP_W), top: ppArt(37) }} />
-      <i className="sbt-rad" style={{ left: ppArtX(30, SBT_PUMP_W), top: ppArt(38) }} />
-      <i className="sbt-kolben" style={{ left: ppArtX(32, SBT_PUMP_W), top: ppArt(14) }} />
-      {drips.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
-          left: ppArtX(d.x, 0), top: ppArt(48), '--fall': ppArt(30),
-          '--tropfen': '#88070a', '--tropfen-dunkel': '#5f0706',
-          animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay}s infinite`,
+      <i className="sbt-mano" style={{ left: ppArtX(47, SBT_PUMP_W), top: ppArt(27) }} />
+      <i className="sbt-rad" style={{ left: ppArtX(0, SBT_PUMP_W), top: ppArt(46) }} />
+      {dampf.map((d, i) => (
+        <i key={'s' + i} className="pp-area-dyn sbt-dampf" style={{
+          left: ppArtX(46, SBT_PUMP_W), top: ppArt(3),
+          animation: `sbtDampf ${d.dur}s steps(12) ${d.delay.toFixed(2)}s infinite, sbtDampfBild ${d.dur}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="sbt-dim" />
+      {laternen.map((l, i) => (
+        <i key={'l' + i} className="sbt-flamme" style={{
+          left: ppArtX(l.x - 1, 0), top: ppArt(22),
+          animation: `ppSprite3 ${(l.dur / 3).toFixed(2)}s steps(1) ${l.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <PixelBand src={SBT + 'tile-glow.png'} className="sbt-schein" />
+      {tropfen.map((d, i) => (
+        <React.Fragment key={'d' + i}>
+          <i className="pp-area-dyn pp-px-tropfen" style={{
+            left: ppArtX(d.x, 0), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
+            '--tropfen': '#9a1614', '--tropfen-dunkel': '#4a0607',
+            animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay.toFixed(2)}s infinite`,
+          }} />
+          <i className="pp-area-dyn sbt-kraeusel" style={{
+            left: ppArtX(d.x - 2, 0), top: ppArt(d.y1 + 1),
+            animation: `sbtKraeusel ${d.dur}s steps(1) ${d.delay.toFixed(2)}s infinite`,
+          }} />
+        </React.Fragment>
+      ))}
+      {ratten.map((r, i) => (
+        <div key={'r' + i} className="pp-area-dyn sbt-ratte-bahn" style={{
+          top: ppArt(r.y), animation: `${r.rtl ? 'sbtRatteRtl' : 'sbtRatteLtr'} ${r.dur.toFixed(1)}s linear ${r.delay.toFixed(1)}s infinite`,
+        }}>
+          <i className="sbt-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <div className="pp-rand-dim" />
       <style>{`
-        .sbt-blut {
-          position: absolute; left: 0; right: 0; top: 0; height: 100%;
-          background-repeat: repeat-x; background-size: auto 300%; background-position: 50% 0%;
-          animation: sbtWelle .6s steps(1) infinite, sbtSpiegel ${SBT_LEVEL_S}s ease-in-out infinite alternate;
-        }
-        @keyframes sbtWelle {
-          0% { background-position: 50% 0%; } 33.3% { background-position: 50% 50%; } 66.6% { background-position: 50% 100%; }
-        }
-        @keyframes sbtSpiegel { from { transform: translateY(calc(-2 * var(--px))); } to { transform: translateY(calc(2 * var(--px))); } }
-        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #c4686a; opacity: 0; }
+        .sbt-spiegel { position: absolute; inset: 0; animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite; }
+        @keyframes sbtSpiegel { ${SBT_SPIEGEL_KF} }
+        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #d0564a; opacity: 0; }
+        .sbt-blase.gross { box-shadow: var(--px) 0 0 #a8302a, 0 var(--px) 0 #a8302a, var(--px) var(--px) 0 #7c1a18; background: #e27a6c; }
         @keyframes sbtBlase {
           0% { transform: translate(0, 0); opacity: 0; }
-          10% { opacity: .9; }
-          50% { transform: translate(var(--px), calc(-11 * var(--px))); }
-          88% { opacity: .9; }
-          100% { transform: translate(0, calc(-22 * var(--px))); opacity: 0; }
+          8% { opacity: .9; }
+          40% { transform: translate(var(--px), calc(-9 * var(--px))); }
+          70% { transform: translate(0, calc(-16 * var(--px))); opacity: .9; }
+          100% { transform: translate(var(--px), calc(-22 * var(--px))); opacity: 0; }
         }
-        .sbt-fluss {
-          position: absolute; inset: 0; background-repeat: repeat-x; background-size: auto 100%;
-          animation: sbtFlussL ${SBT_PULS_S}s steps(8) infinite;
+        .sbt-puls {
+          position: absolute; inset: 0;
+          background: url(${SBT}flow.png) 0 0 / calc(16 * var(--px)) 100% repeat-x;
+          animation: sbtPulsL ${SBT_PULS_S}s steps(16) infinite;
         }
-        .sbt-fluss.links { clip-path: inset(0 50% 0 0); }
-        .sbt-fluss.rechts { clip-path: inset(0 0 0 50%); animation-name: sbtFlussR; }
-        @keyframes sbtFlussL { from { background-position: 0 0; } to { background-position: calc(-8 * var(--px)) 0; } }
-        @keyframes sbtFlussR { from { background-position: 0 0; } to { background-position: calc(8 * var(--px)) 0; } }
-        .sbt-sicht { position: absolute; width: calc(6 * var(--px)); height: calc(26 * var(--px)); overflow: hidden; }
-        .sbt-sicht-blut {
-          position: absolute; left: 0; right: 0; top: calc(9 * var(--px)); height: calc(30 * var(--px));
-          background: linear-gradient(180deg, #aa4c4e 0, #aa4c4e var(--px), #85292c var(--px), #85292c calc(12 * var(--px)), #5f0706 calc(12 * var(--px)));
-          animation: sbtSpiegel ${SBT_LEVEL_S}s ease-in-out infinite alternate;
-        }
-        .sbt-strahl {
-          position: absolute; width: calc(2 * var(--px)); height: calc(13 * var(--px));
-          background: url(${SBT}stream.png) 0 0 / 100% calc(8 * var(--px)) repeat-y;
-          animation: sbtStrahl .5s steps(8) infinite;
-        }
-        @keyframes sbtStrahl { from { background-position: 0 0; } to { background-position: 0 calc(8 * var(--px)); } }
-        .sbt-zeiger {
-          position: absolute; width: var(--px); height: calc(3 * var(--px)); background: #b01e18;
-          transform-origin: 50% 100%; animation: sbtZeiger 2.3s steps(1) infinite;
-        }
-        @keyframes sbtZeiger {
-          0% { rotate: 30deg; } 12% { rotate: 40deg; } 20% { rotate: 25deg; } 41% { rotate: 50deg; }
-          47% { rotate: 58deg; } 55% { rotate: 42deg; } 74% { rotate: 34deg; } 88% { rotate: 52deg; }
-        }
-        .sbt-rad {
-          position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px));
-          background: url(${SBT}wheel.png) 0 0 / 200% 100% no-repeat;
-          animation: sbtRad 1.6s steps(1) infinite;
-        }
-        @keyframes sbtRad { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        /* rechte Hälfte = gespiegelte linke (die Schaugläser liegen symmetrisch zur Mitte) */
+        .sbt-puls { clip-path: inset(0 50% 0 0); }
+        .sbt-puls.rechts { transform: scaleX(-1); }
+        @keyframes sbtPulsL { from { background-position: 0 0; } to { background-position: calc(-16 * var(--px)) 0; } }
         .sbt-kolben {
-          position: absolute; width: calc(2 * var(--px)); height: calc(14 * var(--px));
+          position: absolute; width: calc(3 * var(--px)); height: calc(9 * var(--px));
           background: url(${SBT}piston.png) 0 0 / 100% 100% no-repeat;
           animation: sbtKolben ${SBT_PULS_S}s steps(1) infinite;
         }
         @keyframes sbtKolben {
-          0% { transform: translateY(0); } 25% { transform: translateY(calc(-2 * var(--px))); }
-          50% { transform: translateY(calc(-4 * var(--px))); } 75% { transform: translateY(calc(-2 * var(--px))); }
+          0% { transform: translateY(0); } 20% { transform: translateY(calc(-1 * var(--px))); }
+          35% { transform: translateY(calc(-2 * var(--px))); } 50% { transform: translateY(calc(-3 * var(--px))); }
+          65% { transform: translateY(calc(-2 * var(--px))); } 80% { transform: translateY(calc(-1 * var(--px))); }
         }
-        .sbt-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        .sbt-glut {
+          position: absolute; width: calc(13 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SBT}fire.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 .5s steps(1) infinite;
+        }
+        .sbt-sicht { position: absolute; width: calc(9 * var(--px)); height: calc(21 * var(--px)); overflow: hidden; }
+        .sbt-sicht-blut {
+          position: absolute; left: 0; top: calc(3 * var(--px)); width: 100%; height: calc(44 * var(--px));
+          background: url(${SBT}sight.png) 0 0 / 100% 100% no-repeat;
+          animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite;
+        }
+        .sbt-mano {
+          position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SBT}gauge.png) 0 0 / 400% 100% no-repeat;
+          animation: sbtMano 2.4s steps(1) infinite;
+        }
+        @keyframes sbtMano {
+          0% { background-position: 33.33% 0; } 18% { background-position: 66.67% 0; } 26% { background-position: 33.33% 0; }
+          45% { background-position: 66.67% 0; } 52% { background-position: 100% 0; } 58% { background-position: 66.67% 0; }
+          77% { background-position: 0 0; } 86% { background-position: 33.33% 0; }
+        }
+        .sbt-rad {
+          position: absolute; width: calc(17 * var(--px)); height: calc(17 * var(--px));
+          background: url(${SBT}flywheel.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 ${(SBT_PULS_S / 3).toFixed(2)}s steps(1) infinite;
+        }
+        .sbt-dampf {
+          position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${SBT}steam.png) 0 0 / 300% 100% no-repeat;
+        }
+        @keyframes sbtDampf {
+          0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .75; } 60% { opacity: .5; }
+          100% { transform: translate(calc(4 * var(--px)), calc(-12 * var(--px))); opacity: 0; }
+        }
+        @keyframes sbtDampfBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 65% { background-position: 100% 0; } }
+        .sbt-flamme {
+          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background: url(${SBT}flame.png) 0 0 / 300% 100% no-repeat;
+        }
+        .sbt-schein { animation: sbtFlackern 3.1s steps(1) infinite; }
+        @keyframes sbtFlackern {
+          0% { opacity: .9; } 11% { opacity: .75; } 17% { opacity: 1; } 34% { opacity: .82; } 41% { opacity: .95; }
+          58% { opacity: .7; } 63% { opacity: .9; } 79% { opacity: 1; } 88% { opacity: .8; }
+        }
+        .sbt-kraeusel {
+          position: absolute; width: calc(5 * var(--px)); height: calc(2 * var(--px));
+          background: url(${SBT}ripple.png) 0 0 / 300% 100% no-repeat; opacity: 0;
+        }
+        @keyframes sbtKraeusel {
+          0%, 89% { opacity: 0; background-position: 0 0; }
+          90% { opacity: 1; background-position: 0 0; } 94% { background-position: 50% 0; } 97% { background-position: 100% 0; }
+          100% { opacity: 0; }
+        }
+        .sbt-ratte-bahn { position: absolute; left: 0; }
+        .sbt-ratte {
+          display: block; width: calc(9 * var(--px)); height: calc(4 * var(--px));
+          background: url(${SBT}rat.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .18s steps(1) infinite;
+        }
+        @keyframes sbtRatteLtr {
+          0% { transform: translateX(calc(-20 * var(--px))); }
+          30% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          30.01%, 100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+        }
+        @keyframes sbtRatteRtl {
+          0% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          30% { transform: translateX(calc(-20 * var(--px))); }
+          30.01%, 100% { transform: translateX(calc(-20 * var(--px))); }
         }
       `}</style>
     </PixelScene>
@@ -833,115 +940,211 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACID RAIN — Burghof im Saeureregen (v1412, Kartenstil v1413)
+//  ACID RAIN — Burghof im Säureregen (v1412, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
-//  Vorlage: das Kartenmotiv (warme Ziegelmauer, gemeisselte Steinbloecke,
-//  blauer Wassergraben, Pflasterplatz, dunkelroter Regen). „Saeure wird
-//  in diesem Spiel als dunkelrot dargestellt" (Al 25.9.).
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  Vorlage: das Kartenmotiv (warme Ziegelmauer, gemeißelte Steinblöcke,
+//  blauer Wassergraben, Pflasterplatz, dunkelroter Regen). „Säure wird
+//  in diesem Spiel als DUNKELROT dargestellt" (Al 25.9.) — Regen,
+//  Pfützen, Laufspuren und Strahlen sind dunkelrot, nichts davon leuchtet.
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  Ebenen (Kunsthoehe 100): tile.png (Kachel 64: Ziegelmauer mit
-//  Waechterblock, Graben), plaza.png (200, mittig, Pfuetzen), gate.png
-//  (44, mittig), haze.png (roter Dunst), rain-far/-near.png (Kacheln
-//  32×32), splash.png (4 Bilder), steam.png (3 Bilder), bolt.png.
+//  Die Szene: hinter den Zinnen ein dunkler Gewitterhimmel; eine warme
+//  Ziegelmauer mit Wehrgang-Gesims, Schießscharten, Wasserspeiern (aus
+//  deren Mäulern die Säure in den Graben schießt), toten Ranken, Moos und
+//  dunkelroten Säure-Laufspuren; ein Steinsockel mit Algen an der
+//  Wasserlinie. Im blauen Graben stehen gemeißelte Steinblöcke mit
+//  Relieffiguren in einer Rundbogennische (sitzender König mit Krone und
+//  Zepter, Ritter mit gesenktem Schwert), mit Säurespuren, Rissen und
+//  Moos, gespiegelt im Wasser; dazu Steine, tote Binsen, Treibholz. In
+//  der Mitte das Torhaus aus Quadern (eigene Zinnen, Wappenschild mit
+//  Goldkrone, Rundbogen mit Schlussstein, halb hochgezogenes Fallgitter
+//  vor dem beschlagenen Eichentor, zwei Wandlaternen, zerfressene blaue
+//  Banner), davor Stufen und der gepflasterte Hof mit Randsteinen,
+//  Säurepfützen, Gully, Fässern, Kisten, umgekipptem Eimer, rostigem
+//  Helm, Speer, Schutt und Unkraut.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt):
+//  sky.png — Gewitterhimmel (Kachel 128×12, zieht); tile.png — Kachel
+//  128 (Mauer, Graben, Steinblöcke); court.png — Torhaus + Hof, Stück
+//  224, mittig; glint.png — Lichtkräusel auf dem Wasser (3 Bilder
+//  übereinander); mist.png — Säuredunst über dem Graben; rain-far/
+//  -near.png — Regen-Kacheln 64×100 (nahtlos in x und y); bolt.png (2,
+//  Querblitz 28×8 im Himmelsstreifen),
+//  banner.png (3), spout.png (3), foam.png (3), splash.png (4),
+//  ring.png (4), bubble.png (4), steam.png (4).
+//
+//  Animiert: Regen in zwei Tiefen, Aufschläge auf dem Pflaster, Ringe
+//  auf dem Wasser, Säurestrahlen aus den Wasserspeiern mit Gischt,
+//  Pfützen blubbern und dampfen, Wolken ziehen, Blitze hinter den Zinnen
+//  mit Aufhellung, Banner wehen, Laternen flackern, Wasser kräuselt,
+//  Dunst treibt über den Graben.
 //
 //  Tier `opaque` (vorher `partial`): Al 25.9., die Area soll ein
-//  kompletter Hintergrund werden.
+//  kompletter Hintergrund werden. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const AR = '/areas/acid-rain/';
-const AR_PLAZA_W = 200;
-// Saeurepfuetzen auf dem Platz (Platz-Koordinaten, aus dem Generator) — dort dampft es
-const AR_PFUETZEN = [[95, 64], [112, 76], [76, 86], [130, 92], [100, 95]];
+const AR_W = 224;                                   // Hofstück; Stück-x 112 = Brettmitte
+// Wasserspeier (Kunstpixel neben der Brettmitte; Kachel 128 → alle 64 im Wechsel,
+// die inneren ±32 verdeckt das Torhaus). Mund bei y 42, Wasser bei y 54.
+const AR_SPEIER = [-224, -160, -96, 96, 160, 224];
+// Säurepfützen auf dem Hof (x neben der Mitte, y, halbe Breite) — aus dem Generator
+const AR_PFUETZEN = [[-18, 66, 4], [22, 72, 6], [-44, 84, 7], [48, 88, 8], [-4, 94, 6], [-80, 95, 7], [78, 95, 7]];
+const AR_LATERNEN = [93.5, 132.5];                  // Glasmitte (Stück-x), y 34
+const AR_BANNER = [81, 135];                        // linke Kante (Stück-x), hängt ab y 8
+// halbe Hofbreite je Zeile (wie im Generator)
+const arHofHalb = (y) => 36 + (y - 56) * (72 / 44);
 
 const AcidRainOverlay = React.memo(function AcidRainOverlay() {
-  const splashes = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
-    x: Math.random() * 100,                        // % der Brettbreite
-    y: 54 + Math.random() * 44,                    // Kunstpixel (Graben/Platz)
-    dur: 0.9 + Math.random() * 1.4,
-    delay: -Math.random() * 2.3,
+  const spritzer = useMemo(() => ppZufall(ppFxN(16), () => {
+    const y = 60 + Math.random() * 38;
+    const hw = arHofHalb(y) - 4;
+    return { x: (Math.random() * 2 - 1) * hw, y, dur: 0.8 + Math.random() * 1.3, delay: -Math.random() * 2 };
+  }), []);
+  const ringe = useMemo(() => ppZufall(ppFxN(16), () => {
+    const y = 57 + Math.random() * 41;
+    const rand = arHofHalb(y) + 5;
+    const x = (Math.random() < 0.5 ? -1 : 1) * (rand + Math.random() * (200 - rand));
+    return { x, y, dur: 1.1 + Math.random() * 1.4, delay: -Math.random() * 2.5 };
+  }), []);
+  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+    x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 2.6 + Math.random() * 1.8, delay: -Math.random() * 4,
   })), []);
-  const steams = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(5)).map(([x, y]) => ({
-    x, y, dur: 2.4 + Math.random() * 1.8, delay: -Math.random() * 4,
+  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+    x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 1.2 + Math.random() * 1.2, delay: -Math.random() * 2,
+  })), []);
+  const speier = useMemo(() => AR_SPEIER.slice(0, ppFxN(AR_SPEIER.length)).map(() => ({
+    dur: 0.3 + Math.random() * 0.12,
   })), []);
   return (
-    <PixelScene artH={100} bg="#2a1414" className="acid-rain-overlay">
+    <PixelScene artH={100} bg="#1e0e12" className="acid-rain-overlay">
+      <div className="pp-pixel-layer ar-wolken" />
+      <div className="pp-area-dyn ar-himmelblitz" />
+      <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(-74, 0), top: 0, animation: 'arBlitz 13s steps(1) -4s infinite, arBlitzForm 13s steps(1) -4s infinite' }} />
+      <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(58, 0), top: 0, animation: 'arBlitzFern 17s steps(1) -11s infinite', backgroundPosition: '100% 0' }} />
       <PixelBand src={AR + 'tile.png'} />
-      <PixelPiece src={AR + 'plaza.png'} w={AR_PLAZA_W} />
-      <PixelPiece src={AR + 'gate.png'} w={44} />
-      {steams.map((d, i) => (
-        <i key={'st' + i} className="pp-area-dyn ar-dampf" style={{
-          left: ppArtX(d.x - 2, AR_PLAZA_W), top: ppArt(d.y - 6),
-          animation: `arDampfBild .45s steps(1) infinite, arDampf ${d.dur}s ease-out ${d.delay}s infinite`,
+      <PixelBand src={AR + 'glint.png'} className="ar-glitzer" style={{ backgroundSize: 'auto 300%' }} />
+      {AR_SPEIER.slice(0, speier.length).map((x, i) => (
+        <React.Fragment key={'s' + i}>
+          <i className="pp-area-dyn ar-strahl" style={{ left: ppArtX(x - 1, 0), top: ppArt(43), animationDuration: `${speier[i].dur.toFixed(2)}s` }} />
+          <i className="pp-area-dyn ar-gischt" style={{ left: ppArtX(x - 3, 0), top: ppArt(54), animationDuration: `${(speier[i].dur * 1.3).toFixed(2)}s` }} />
+        </React.Fragment>
+      ))}
+      <div className="pp-pixel-layer ar-dunst" style={{ top: ppArt(47) }} />
+      <PixelPiece src={AR + 'court.png'} w={AR_W} />
+      {AR_LATERNEN.map((x, i) => (
+        <i key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
+      ))}
+      {AR_BANNER.map((x, i) => (
+        <i key={'b' + i} className="ar-banner" style={{ left: ppArtX(x, AR_W), top: ppArt(8), animationDuration: `${1.1 + i * .17}s` }} />
+      ))}
+      {blasen.map((b, i) => (
+        <i key={'bl' + i} className="pp-area-dyn ar-blase" style={{
+          left: ppArtX(b.x - 1, 0), top: ppArt(b.y - 2),
+          animation: `arBlase ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer ar-dunst" />
-      <div className="pp-pixel-layer ar-regen fern" />
-      {splashes.map((s, i) => (
+      {dampf.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn ar-dampf" style={{
+          left: ppArtX(d.x - 2, 0), top: ppArt(d.y - 8),
+          animation: `ppSprite2 .5s steps(1) infinite, arDampf ${d.dur.toFixed(2)}s steps(6) ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn ar-regen fern" />
+      {spritzer.map((s, i) => (
         <i key={'sp' + i} className="pp-area-dyn ar-spritzer" style={{
-          left: s.x + '%', top: ppArt(s.y - 2),
-          animation: `arSpritzer ${s.dur}s steps(1) ${s.delay}s infinite`,
+          left: ppArtX(s.x - 2, 0), top: ppArt(s.y - 2),
+          animation: `arTreffer ${s.dur.toFixed(2)}s steps(1) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer ar-regen nah" />
-      <i className="pp-area-dyn ar-blitz" style={{ left: '27%', top: 0 }} />
+      {ringe.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn ar-ring" style={{
+          left: ppArtX(r.x - 3, 0), top: ppArt(r.y - 1),
+          animation: `arTreffer ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn ar-regen nah" />
       <div className="pp-area-dyn ar-blitzlicht" />
-      <div className="ar-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        .ar-dunst {
-          position: absolute; left: 0; right: 0; top: calc(30 * var(--px)); height: calc(20 * var(--px));
-          background: url(${AR}haze.png) 0 0 / auto 100% repeat-x; opacity: .8;
-          animation: arDunst 60s linear infinite;
+        .ar-wolken {
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px));
+          background: url(${AR}sky.png) 50% 0 / calc(128 * var(--px)) 100% repeat-x;
+          animation: arWolken 90s steps(128) infinite;
         }
-        @keyframes arDunst { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) 0; } }
-        .ar-regen {
-          position: absolute; inset: 0;
-          background-size: calc(32 * var(--px)) calc(32 * var(--px)); background-repeat: repeat;
-        }
-        .ar-regen.fern { background-image: url(${AR}rain-far.png); animation: arRegen .6s linear infinite; }
-        .ar-regen.nah  { background-image: url(${AR}rain-near.png); animation: arRegen .34s linear infinite; }
-        @keyframes arRegen { from { background-position: 0 0; } to { background-position: 0 calc(32 * var(--px)); } }
-        .ar-spritzer {
-          position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px));
-          background: url(${AR}splash.png) 0 0 / 400% 100% no-repeat; opacity: 0;
-        }
-        @keyframes arSpritzer {
-          0%   { opacity: 1; background-position: 0 0; }
-          8%   { background-position: 33.33% 0; }
-          16%  { background-position: 66.66% 0; }
-          26%  { background-position: 100% 0; }
-          36%, 100% { opacity: 0; }
-        }
-        .ar-dampf {
-          position: absolute; width: calc(4 * var(--px)); height: calc(6 * var(--px));
-          background: url(${AR}steam.png) 0 0 / 300% 100% no-repeat; opacity: 0;
-        }
-        @keyframes arDampfBild { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
-        @keyframes arDampf {
-          0% { opacity: 0; transform: translateY(0); }
-          20% { opacity: .9; }
-          100% { opacity: 0; transform: translateY(calc(-5 * var(--px))); }
+        @keyframes arWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
+        /* Blitze zucken hinter den Zinnen: der Himmelsstreifen hellt auf, die Zinnen stehen als Scherenschnitt davor */
+        .ar-himmelblitz {
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9c3a34; opacity: 0;
+          animation: arBlitzLicht 13s steps(1) -4s infinite;
         }
         .ar-blitz {
-          position: absolute; width: calc(9 * var(--px)); height: calc(18 * var(--px));
-          background: url(${AR}bolt.png) 0 0 / 100% 100% no-repeat; opacity: 0;
-          animation: arBlitz 13s steps(1) infinite;
+          position: absolute; width: calc(28 * var(--px)); height: calc(8 * var(--px));
+          background: url(${AR}bolt.png) 0 0 / 200% 100% no-repeat; opacity: 0;
         }
+        @keyframes arBlitz {
+          0%, 91% { opacity: 0; } 92% { opacity: 1; } 93% { opacity: 0; } 94.5% { opacity: 1; } 95.5%, 100% { opacity: 0; }
+        }
+        @keyframes arBlitzForm { 0%, 94% { background-position: 0 0; } 94.2%, 100% { background-position: 100% 0; } }
+        @keyframes arBlitzFern { 0%, 95% { opacity: 0; } 95.6% { opacity: .75; } 96.4%, 100% { opacity: 0; } }
         .ar-blitzlicht {
-          position: absolute; inset: 0; background: #ff5a4a; mix-blend-mode: soft-light; opacity: 0;
-          animation: arBlitz 13s steps(1) infinite;
+          position: absolute; inset: 0; background: #ff6a54; mix-blend-mode: soft-light; opacity: 0;
+          animation: arBlitzLicht 13s steps(1) -4s infinite;
+        }
+        @keyframes arBlitzLicht {
+          0%, 91% { opacity: 0; } 92% { opacity: .5; } 93% { opacity: .1; } 94.5% { opacity: .4; } 95.5% { opacity: .12; } 96.5%, 100% { opacity: 0; }
         }
         /* Telefon-Lite: das bildschirmweite Mischebenen-Licht kostet dort Bildrate */
         @media (pointer: coarse) and (max-height: 600px) { .ar-blitzlicht { display: none; } }
-        @keyframes arBlitz {
-          0%, 91% { opacity: 0; } 92% { opacity: .55; } 93% { opacity: 0; } 94.5% { opacity: .4; } 95.5%, 100% { opacity: 0; }
+        .ar-glitzer { animation: ppBand3 1.6s steps(1) infinite; }
+        .ar-dunst {
+          position: absolute; left: 0; right: 0; height: calc(16 * var(--px));
+          background: url(${AR}mist.png) 0 0 / calc(128 * var(--px)) 100% repeat-x; opacity: .7;
+          animation: arDunst 64s steps(128) infinite;
         }
-        .ar-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        @keyframes arDunst { from { background-position: 0 0; } to { background-position: calc(-128 * var(--px)) 0; } }
+        .ar-regen { position: absolute; inset: 0; background-size: calc(64 * var(--px)) calc(100 * var(--px)); background-repeat: repeat; }
+        .ar-regen.fern { background-image: url(${AR}rain-far.png); animation: arRegenFern .8s steps(100) infinite; }
+        .ar-regen.nah { background-image: url(${AR}rain-near.png); animation: arRegenNah 1.1s steps(200) infinite; }
+        @keyframes arRegenFern { from { background-position: 0 0; } to { background-position: 0 calc(100 * var(--px)); } }
+        @keyframes arRegenNah { from { background-position: 0 0; } to { background-position: 0 calc(200 * var(--px)); } }
+        .ar-strahl {
+          position: absolute; width: calc(3 * var(--px)); height: calc(12 * var(--px));
+          background: url(${AR}spout.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .33s steps(1) infinite;
+        }
+        .ar-gischt {
+          position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px));
+          background: url(${AR}foam.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .42s steps(1) infinite;
+        }
+        .ar-schein {
+          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); border-radius: 50%;
+          background: radial-gradient(circle, rgba(255,190,90,.34) 0%, rgba(255,150,60,.14) 45%, rgba(255,150,60,0) 70%);
+          animation: arSchein 1.7s steps(1) infinite;
+        }
+        @keyframes arSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .7; } 52% { opacity: .95; } 71% { opacity: .78; } 86% { opacity: 1; } }
+        .ar-banner {
+          position: absolute; width: calc(8 * var(--px)); height: calc(17 * var(--px));
+          background: url(${AR}banner.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.2s steps(1) infinite;
+        }
+        .ar-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}bubble.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes arBlase {
+          0%, 55% { background-position: 0 0; opacity: 0; } 56% { opacity: 1; background-position: 0 0; }
+          68% { background-position: 33.33% 0; } 80% { background-position: 66.66% 0; } 90% { background-position: 100% 0; } 97%, 100% { opacity: 0; }
+        }
+        .ar-dampf { position: absolute; width: calc(5 * var(--px)); height: calc(8 * var(--px)); background: url(${AR}steam.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes arDampf {
+          0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 60% { opacity: .6; }
+          100% { transform: translateY(calc(-6 * var(--px))); opacity: 0; }
+        }
+        .ar-spritzer { position: absolute; width: calc(5 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}splash.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        .ar-ring { position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}ring.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes arTreffer {
+          0% { opacity: 1; background-position: 0 0; } 9% { background-position: 33.33% 0; }
+          18% { background-position: 66.66% 0; } 28% { background-position: 100% 0; } 38%, 100% { opacity: 0; }
         }
       `}</style>
     </PixelScene>
@@ -1358,59 +1561,174 @@ const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
   );
 });
 
-// ── DEEPSEA CASTLE ───────────────────────────────────────────────────
-//  Karte: tuerkisfarbene Burg mit violetten Spitzdaechern unter einem
+// ═══════════════════════════════════════════════════════════════════
+//  DEEPSEA CASTLE — versunkene Burg (v1419, Überarbeitung v1441, Al 25.9.)
+//
+//  Karte: türkisfarbene Burg mit violetten Spitzdächern unter einem
 //  fahlen Lichtstrahl, lavendelfarbenes Wasser. Tiefsee: Blasen steigen,
 //  Schwebeteilchen sinken, Fische ziehen vorbei, Seegras wiegt.
-//  Neubau v1419 (Al 25.9.: „mehr Detail und mehr Shading"): Tuerme als
-//  schattierte Zylinder mit Ziegelreihen, Kegeldaecher mit Schindeln und
+//  Neubau v1419 (Al 25.9.: „mehr Detail und mehr Shading"): Türme als
+//  schattierte Zylinder mit Ziegelreihen, Kegeldächer mit Schindeln und
 //  Spitzkugel, Spitzbogenfenster mit hellem Rahmen, Gesimse und Zinnen,
 //  Algen, Korallen, Seepocken. Licht IMMER von oben rechts. Die Fenster
-//  glimmen unten tuerkis (eigene Ebene, atmet).
+//  glimmen unten türkis (eigene Ebene, atmet).
+//
+//  Überarbeitung v1441 (Al 25.9.): gleiche Burg, gleiche Palette, aber
+//  neu gemalt und mit Tiefe. Burg (Stück 176): sieben Türme wie bisher,
+//  jetzt vollständig (die äußeren kleinen Türme waren abgeschnitten),
+//  Quader in versetzten Reihen mit Lichtkante, Kragsteinfriese unter den
+//  Traufen, Gesimse mit Schlagschatten, Schindeldächer mit Glanzstreifen,
+//  gestufter Bergfried mit violett gedeckten Zinnen, Rundfenster über
+//  dem Spitzbogentor (Keilsteine, Bohlen, Eisenbänder, Ringe), Stufen und
+//  Plattenweg. Bewuchs: Algenflecken (unten dichter), hängende Tangfäden,
+//  Seepocken, Risse, Seesterne an der Mauer; am Fuß Sandverwehungen,
+//  Felsbrocken, Ast-, Hirn- und Fächerkorallen, Röhrenschwämme, Anemonen,
+//  eine versunkene Schatztruhe und eine Amphore.
+//  Hintergrund in drei Tiefen statt der blassen Säulen: ganz fern eine
+//  versunkene Stadt im Dunst (Türme mit Spitzdächern, Kuppelhalle,
+//  Brückenbogen, gebrochener Turm), davor ein Felsgrat mit Säulen und
+//  Tangstängeln, vorne ein Riff (facettierte Felsen, Korallen, Säulen-
+//  ruine) und Sandboden mit Rippeln, Kieseln, Muscheln, Seesternen und
+//  Seeigeln.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt): back.png —
+//  Kachel 128 (Wasser als Pixelrauschen, ferne Stadt, Felsgrat);
+//  rays.png — schräge Lichtfahnen (Kachel); kelp.png — hoher Tang hinter
+//  der Burg (4 Bilder übereinander); tile.png — Riff und Meeresboden
+//  (Kachel); caustics.png — Lichtnetz auf dem Sand (3 Bilder); beam.png —
+//  der Lichtstrahl der Karte (48); castle.png / castle-glow.png — Burg und
+//  Glimmen (176); weed.png — Seegras vorne (4 Bilder); fish.png (2 Arten
+//  × 2 Bilder), school.png (Schwarm, 2), whale.png (Wal, 2), jelly.png (4),
+//  crab.png (2), pennant.png (Wimpel, 3).
+//
+//  Animiert: Lichtfahnen wandern langsam und atmen, der Strahl pulsiert,
+//  Kaustik flimmert auf dem Sand, Tang und Seegras wiegen, Fenster, Ro-
+//  sette und Anemonen glimmen, Wimpel flattern in der Strömung, Glanz-
+//  punkte an Turmspitzen und Truhe, ein Wal zieht fern vorbei, ein
+//  Fischschwarm, einzelne Fische (vor und hinter der Burg), Quallen
+//  steigen pulsierend auf, eine Krabbe läuft über den Sand, Blasen
+//  steigen (auch aus der Truhe), Schwebeteilchen sinken.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const DSC = '/areas/deepsea-castle/';
+const DSC_W = 176;                                   // Burgstück; Stück-x 88 = Brettmitte
+const DSC_WIMPEL = [[53, 19], [123, 19]];            // Mastspitzen (Stück-x, y); wehen zur Mitte
+const DSC_GLANZ = [[87, 1], [36, 1], [138, 1], [20, 35], [154, 35], [69, 89], [73, 89]];
+const DSC_TRUHE = [70, 88];                          // Blasen aus dem Truhenspalt
 const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
-  const blasen = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, dur: 5 + Math.random() * 5, delay: -Math.random() * 10, gross: Math.random() < .3,
+  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+    x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
   })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(16), () => ({
-    x: Math.random() * 100, dur: 14 + Math.random() * 10, delay: -Math.random() * 24,
+  const truhe = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
+  const schnee = useMemo(() => ppZufall(ppFxN(18), () => ({
+    x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, hell: Math.random() < .4,
   })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    y: 30 + Math.random() * 45, dur: 20 + Math.random() * 14, delay: -Math.random() * 30, rtl: i % 2 === 0,
+  const fische = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: 34 + Math.random() * 40, dur: 22 + Math.random() * 16, delay: -Math.random() * 36, rtl: i % 2 === 0,
+    art: i % 2, vorne: i >= 2,
+  })), []);
+  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    x: [14, 81, 58][i] + Math.random() * 8, dur: 46 + Math.random() * 20, delay: -Math.random() * 60, puls: 1.5 + Math.random() * .5,
+  })), []);
+  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppFxN(DSC_GLANZ.length)).map(() => ({
+    dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
   return (
-    <PixelScene artH={100} bg="linear-gradient(180deg, #e3cefd 0%, #c1b3e5 30%, #9e9dc7 62%, #74739f 100%)" className="deepsea-castle-overlay">
+    <PixelScene artH={100} bg="#bdb4e1" className="deepsea-castle-overlay">
+      <PixelBand src={DSC + 'back.png'} />
+      <div className="pp-area-dyn pp-quer" style={ppQuer(14, 120, -50, true)}><i className="dsc-wal" /></div>
+      <div className="pp-area-dyn pp-quer" style={ppQuer(40, 52, -12, false)}><i className="dsc-schwarm" /></div>
+      <PixelBand src={DSC + 'rays.png'} className="dsc-fahnen" />
+      <PixelBand src={DSC + 'kelp.png'} className="dsc-wiegen" style={{ backgroundSize: 'auto 400%', animationDuration: '3.8s' }} />
       <PixelBand src={DSC + 'tile.png'} />
-      <PixelPiece src={DSC + 'beam.png'} w={40} className="dsc-strahl" />
-      {fische.map((f, i) => (
-        <div key={'fi' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+      <PixelBand src={DSC + 'caustics.png'} className="dsc-kaustik" style={{ backgroundSize: 'auto 300%' }} />
+      {fische.filter(f => !f.vorne).map((f, i) => (
+        <div key={'fh' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined, backgroundPositionY: f.art ? '100%' : '0%' }} />
         </div>
       ))}
-      <PixelPiece src={DSC + 'castle.png'} w={128} />
-      <PixelPiece src={DSC + 'castle-glow.png'} w={128} className="dsc-fenster" />
-      <PixelBand src={DSC + 'seaweed.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 1.4s steps(1) infinite' }} />
+      <PixelPiece src={DSC + 'castle.png'} w={DSC_W} />
+      <PixelPiece src={DSC + 'castle-glow.png'} w={DSC_W} className="dsc-fenster" />
+      <PixelPiece src={DSC + 'beam.png'} w={48} className="dsc-strahl" />
+      {DSC_WIMPEL.map(([x, y], i) => (
+        <i key={'w' + i} className="dsc-wimpel" style={{
+          left: ppArtX(i ? x - 13 : x + 1, DSC_W), top: ppArt(y),
+          transform: i ? 'scaleX(-1)' : undefined, animationDuration: `${1.1 + i * .17}s`,
+        }} />
+      ))}
+      {glanz.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{
+          left: ppArtX(DSC_GLANZ[i][0] - 1, DSC_W), top: ppArt(DSC_GLANZ[i][1] - 1),
+          animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {quallen.map((q, i) => (
+        <div key={'q' + i} className="pp-area-dyn dsc-qualle-weg" style={{ left: q.x + '%', animation: `dscAufsteigen ${q.dur.toFixed(1)}s steps(${Math.round(q.dur * 4)}) ${q.delay.toFixed(1)}s infinite` }}>
+          <i className="dsc-qualle" style={{ animationDuration: `${q.puls.toFixed(2)}s` }} />
+        </div>
+      ))}
+      {fische.filter(f => f.vorne).map((f, i) => (
+        <div key={'fv' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y + 8, f.dur * .8, f.delay, f.rtl)}>
+          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined, backgroundPositionY: f.art ? '100%' : '0%' }} />
+        </div>
+      ))}
+      <div className="pp-area-dyn pp-quer" style={ppQuer(90, 84, -20, false)}><i className="dsc-krabbe" /></div>
+      <PixelBand src={DSC + 'weed.png'} className="dsc-wiegen" style={{ backgroundSize: 'auto 400%', animationDuration: '2.9s' }} />
       {schnee.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn dsc-schnee" style={{ left: s.x + '%', animation: `dscSinken ${s.dur}s linear ${s.delay}s infinite` }} />
+        <i key={'s' + i} className={'pp-area-dyn dsc-schnee' + (s.hell ? ' hell' : '')} style={{ left: s.x + '%', animation: `dscSinken ${s.dur.toFixed(1)}s steps(100) ${s.delay.toFixed(1)}s infinite` }} />
       ))}
       {blasen.map((b, i) => (
-        <i key={'b' + i} className={'pp-area-dyn dsc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `dscSteigen ${b.dur}s linear ${b.delay}s infinite` }} />
+        <i key={'b' + i} className={'pp-area-dyn dsc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `dscSteigen ${b.dur.toFixed(1)}s steps(98) ${b.delay.toFixed(1)}s infinite` }} />
+      ))}
+      {truhe.map((b, i) => (
+        <i key={'t' + i} className={'pp-area-dyn dsc-blase' + (i === 1 ? ' gross' : '')} style={{
+          left: ppArtX(DSC_TRUHE[0], DSC_W), top: ppArt(DSC_TRUHE[1]),
+          animation: `dscTruhe ${b.dur.toFixed(1)}s steps(88) ${b.delay.toFixed(1)}s infinite`,
+        }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        .dsc-fahnen { animation: dscFahnen 96s steps(128) infinite, dscAtmen 7s ease-in-out infinite alternate; }
+        @keyframes dscFahnen { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
+        @keyframes dscAtmen { from { opacity: .55; } to { opacity: 1; } }
+        .dsc-wiegen { animation: dscWiegen 3.4s steps(1) infinite; }
+        @keyframes dscWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; } 50% { background-position: 50% 66.667%; } 75% { background-position: 50% 100%; } }
+        .dsc-kaustik { opacity: .8; animation: ppBand3 2.4s steps(1) infinite; }
         .dsc-strahl { animation: dscStrahl 4.2s ease-in-out infinite alternate; }
-        @keyframes dscStrahl { from { opacity: .65; } to { opacity: 1; } }
+        @keyframes dscStrahl { from { opacity: .6; } to { opacity: 1; } }
         .dsc-fenster { animation: dscFenster 3.6s ease-in-out infinite alternate; }
         @keyframes dscFenster { from { opacity: .45; } to { opacity: 1; } }
-        .dsc-fisch { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DSC}fish.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; }
-        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .7; }
+        .dsc-wimpel { position: absolute; width: calc(11 * var(--px)); height: calc(7 * var(--px)); background: url(${DSC}pennant.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.1s steps(1) infinite; }
+        .dsc-fisch { display: block; width: calc(8 * var(--px)); height: calc(5 * var(--px)); background: url(${DSC}fish.png) 0 0 / 200% 200% no-repeat; animation: dscFlosse .5s steps(1) infinite; }
+        @keyframes dscFlosse { 0% { background-position-x: 0%; } 50% { background-position-x: 100%; } }
+        .dsc-schwarm { display: block; width: calc(24 * var(--px)); height: calc(10 * var(--px)); opacity: .7; background: url(${DSC}school.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .6s steps(1) infinite, ppBob 3.2s steps(3) infinite alternate; --bob: calc(3 * var(--px)); }
+        .dsc-wal { display: block; width: calc(40 * var(--px)); height: calc(13 * var(--px)); opacity: .42; transform: scaleX(-1); background: url(${DSC}whale.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 3.4s steps(1) infinite, ppBob 6.8s steps(3) infinite alternate; --bob: calc(3 * var(--px)); }
+        @keyframes dscVier { 0% { background-position: 0 0; } 25% { background-position: 33.333% 0; } 50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; } }
+        .dsc-qualle-weg { position: absolute; top: 0; width: calc(7 * var(--px)); height: calc(11 * var(--px)); }
+        .dsc-qualle { display: block; width: 100%; height: 100%; opacity: .85; background: url(${DSC}jelly.png) 0 0 / 400% 100% no-repeat; animation: dscVier 1.6s steps(1) infinite; }
+        @keyframes dscAufsteigen {
+          0% { transform: translate(0, calc(104 * var(--px))); }
+          25% { transform: translate(calc(3 * var(--px)), calc(76 * var(--px))); }
+          50% { transform: translate(0, calc(48 * var(--px))); }
+          75% { transform: translate(calc(-3 * var(--px)), calc(20 * var(--px))); }
+          100% { transform: translate(0, calc(-12 * var(--px))); }
+        }
+        .dsc-krabbe { display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px)); background: url(${DSC}crab.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .34s steps(1) infinite; }
+        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .55; }
+        .dsc-schnee.hell { opacity: .85; }
         @keyframes dscSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); border: 0; background: #f4eeff; opacity: 0; }
+        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f4eeff; opacity: 0; }
         .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f4eeff; }
         @keyframes dscSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .9; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
           100% { transform: translate(0, calc(-98 * var(--px))); opacity: .2; }
+        }
+        @keyframes dscTruhe {
+          0% { transform: translate(0, 0); opacity: 0; } 6% { opacity: .95; }
+          30% { transform: translate(calc(-1 * var(--px)), calc(-26 * var(--px))); }
+          60% { transform: translate(calc(1 * var(--px)), calc(-53 * var(--px))); }
+          100% { transform: translate(0, calc(-90 * var(--px))); opacity: .15; }
         }
       `}</style>
     </PixelScene>
