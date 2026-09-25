@@ -169,7 +169,7 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="menu-popup-dither pp-fenster" style={{ '--zier': 'var(--player-color, #ff44cc)', background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
         <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -2058,7 +2058,7 @@ function MainMenu() {
       {dailyOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeDaily(); }}>
-          <div className="menu-popup-dither pp-fenster" style={{ '--zier': '#ffd700', background: 'var(--bg2)', width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>DAILY CHALLENGE</h3>
               <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -2080,9 +2080,9 @@ function MainMenu() {
                         <div key={name} style={{ width: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                           {card ? (
                             <CardMini card={card} onClick={() => {}}
-                              style={{ width: 150, height: 210, cursor: 'default', borderColor: '#ffd700', boxShadow: '0 0 12px rgba(255,215,0,.25)' }} />
+                              style={{ width: 150, height: 210, cursor: 'default', borderColor: 'var(--player-color)', boxShadow: '0 0 12px color-mix(in srgb, var(--player-color) 30%, transparent)' }} />
                           ) : (
-                            <div style={{ width: 150, height: 210, borderRadius: 6, border: '1px solid #ffd700', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: 8 }}>{name}</div>
+                            <div style={{ width: 150, height: 210, borderRadius: 6, border: '1px solid var(--player-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', fontSize: 11, textAlign: 'center', padding: 8 }}>{name}</div>
                           )}
                           <div style={{ fontSize: 11, color: 'var(--text2)', textAlign: 'center' }}>{name}</div>
                         </div>
@@ -2136,7 +2136,7 @@ function MainMenu() {
       {puzzleBrowserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
-          <div className="menu-popup-dither pp-fenster" style={{ '--zier': '#ff8800', background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div className="menu-popup-dither pp-fenster" style={{ background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>PUZZLE LIBRARY</h3>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
@@ -4681,7 +4681,7 @@ function SingleplayerScreen() {
   };
 
   return (
-    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'auto' }}>
+    <div className="screen-full" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #12101f 40%, #0a0a12 100%)', overflow: 'hidden' }}>
       {showRegister && <GuestRegisterModal starterDeckId={selectedDeck} onClose={() => setShowRegister(false)} />}
       {tutorialBrowserOpen && (
         <TutorialBrowserModal
@@ -4754,7 +4754,12 @@ function SingleplayerScreen() {
         </label>
         <VolumeControl />
       </div>
-      <div className="vscpu-content" style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%', maxWidth: 1500, alignSelf: 'center' }}>
+      {/* Gerahmter Kasten wie im Hauptmenue (`ornate-frame pp-menuekasten`).
+          Er fuellt den Platz unter der Kopfzeile mit Abstand ringsum und
+          scrollt INNEN (`.vscpu-content`) — vorher scrollte die ganze
+          Seite und der Kasten lief ohne Abschluss unten aus dem Bild. */}
+      <div className="vscpu-rahmen ornate-frame pp-menuekasten">
+      <div className="vscpu-content" style={{ padding: '20px 40px 40px', boxSizing: 'border-box', width: '100%' }}>
         {!hasAnyLegal && (
           <div style={{ color: '#ff7777', textAlign: 'center', padding: '12px 16px', marginBottom: 20, border: '1px solid #ff7777', borderRadius: 4, background: 'rgba(255,119,119,.08)', fontSize: 12 }}>
             You need at least one legal deck to play. Edit a deck or pick a starter deck first.
@@ -4866,6 +4871,7 @@ function SingleplayerScreen() {
           </>
           );
         })()}
+      </div>
       </div>
     </div>
   );

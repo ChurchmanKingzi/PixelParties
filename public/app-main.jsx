@@ -1565,7 +1565,7 @@ function PlayScreen() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
         {/* Open Games */}
-        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
             OPEN GAMES ({openRooms.length})
           </div>
@@ -1601,7 +1601,7 @@ function PlayScreen() {
         </div>
 
         {/* In Progress */}
-        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--player-color)' }}>
             IN PROGRESS ({activeRooms.length})
           </div>
@@ -1631,7 +1631,7 @@ function PlayScreen() {
             the list). 1st = gold crown + gold name, 2nd = smaller silver
             crown + silver name, 3rd = bronze name, 4–10 use each
             player's own profile color. */}
-        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="lobby-spalte ornate-frame pp-menuekasten" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent4)' }}>
             LEADERBOARD ({leaderboard.length})
           </div>

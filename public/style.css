@@ -21488,8 +21488,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 
 /* ── Pop-up-Fenster des Hauptmenues (Daily, How to Play, Puzzle-
-   Bibliothek): dieselbe Rahmen-Sprache wie die Menuekaesten, in ihrer
-   eigenen Zierfarbe (`--zier`, inline: Gold, Spielerfarbe, Orange) —
+   Bibliothek): dieselbe Rahmen-Sprache wie die Menuekaesten, in der
+   Spielerfarbe (`--zier`) —
    Lichtkante, Doppelring, Eck-Schnoerkel und Seitenkeile (oben/unten
    keine Mittelstuecke, dort sitzen Titel und Knoepfe). */
 .pp-fenster {
@@ -21574,12 +21574,12 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .modal:where(:not(.ui-noscale .modal)) { position: relative; }
 
 /* ── Kaesten der Bildschirme ───────────────────────────────────────── */
-/* Deck-Sektionen, Profil-Sektionen, Puzzle-Handleisten, Lobby-Spalten:
+/* Deck-Sektionen, Profil-Sektionen, Puzzle-Handleisten:
    gerahmt wie kleine Menuekaesten — Kontur, Rand in gedaempfter
    Spielerfarbe mit Lichtkante, Relief, harter Schatten, Lichtschein
    von oben. Ruhiger als die Menuekaesten (keine Ornamente), weil hier
    viele davon nebeneinander stehen. */
-:where(.deck-section, .profile-section, .profile-identity-panel, .pz-hand, .lobby-spalte):where(:not(.ui-noscale *)) {
+:where(.deck-section, .profile-section, .profile-identity-panel, .pz-hand):where(:not(.ui-noscale *)) {
   --kasten: var(--player-color, var(--accent));
   border-style: solid !important;
   border-width: 3px !important;
@@ -21605,9 +21605,32 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E") 0 calc(100% - 4px) / 4px 4px repeat-x,
     linear-gradient(180deg, color-mix(in srgb, var(--player-color, var(--accent)) 12%, transparent), transparent);
 }
-/* Lobby: drei Kaesten mit Luft statt dreier Spalten mit Haarlinien. */
-.lobby-content { gap: 16px; padding: 14px 16px 16px; }
-.lobby-spalte { min-width: 0; overflow: hidden; }
+/* Lobby: drei Menuekaesten (`ornate-frame pp-menuekasten`) mit Luft
+   fuer Ringe und Schatten. Die Liste scrollt innen, die Ornamente liegen
+   darueber (pointer-events: none). */
+.lobby-content { gap: 34px; padding: 22px 30px 34px; }
+.lobby-spalte { min-width: 0; overflow: hidden; padding: 20px 20px 20px; box-sizing: border-box; }
+/* Spaltentitel wie die Ueberschriften der Menue-Seitenkaesten: groesser,
+   Pixelschatten, darunter eine Pixel-Linie statt eines Bands. */
+.lobby-spalte .lobby-spalten-titel {
+  position: relative;
+  padding: 2px 4px 12px !important;
+  margin-bottom: 8px;
+  font-size: 15px !important;
+  letter-spacing: 1.5px;
+  background: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+.lobby-spalte .lobby-spalten-titel::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    currentColor 0 12px, transparent 12px 18px,
+    color-mix(in srgb, currentColor 60%, transparent) 18px, transparent 100%);
+}
 /* Seitenleisten (Deck-Editor, Puzzle-Creator): kraeftige Innenkante in
    gedaempfter Spielerfarbe mit Konturlinie statt 1-px-Haarlinie. */
 .db-panel-left:where(:not(.ui-noscale *)) {
@@ -21658,11 +21681,27 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   box-shadow: 0 2px 0 var(--pp-kontur);
 }
 
-/* ── VS CPU: das Gitter der Gegner als Kasten ─────────────────────── */
-.vscpu-content {
-  border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 30%, #1a1a2e);
-  box-shadow: 0 0 0 2px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .35);
-  margin-top: 14px;
+/* ── VS CPU: das Gitter der Gegner im Menuekasten ─────────────────── */
+/* Der Rahmen fuellt den Platz unter der Kopfzeile (mit Luft fuer Ringe
+   und Schatten), gescrollt wird innen. */
+.vscpu-rahmen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  width: calc(100% - 60px);
+  max-width: 1500px;
+  margin: 22px auto 34px;
+  box-sizing: border-box;
+}
+.vscpu-rahmen > .vscpu-content {
+  flex: 1;
+  overflow-y: auto;
+  background: none !important;
+}
+@media (max-height: 600px) {
+  .vscpu-rahmen { width: calc(100% - 32px); margin: 14px auto 20px; }
+  .vscpu-rahmen > .vscpu-content { padding: 12px 16px 16px !important; }
+  .lobby-content { gap: 22px; padding: 14px 16px 20px; }
 }
 
 /* ═══ HAUPTMENUE-AUFHUEBSCHUNG ═════════════════════════════════════════
@@ -21680,7 +21719,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 :root { --pp-kontur: #05040a; }
 /* Zierfarbe der grossen Rahmen: im Menue die Spielerfarbe, im Login das
    Violett des Login-Kastens (dort gibt es noch keinen Spieler). */
-.main-menu-screen { --zier: var(--player-color, #00f0ff); }
+.main-menu-screen,
+.pp-menuekasten { --zier: var(--player-color, #00f0ff); }
 .auth-screen .auth-panel { --zier: var(--auth-rahmen, #8b6dff); }
 
 /* ── Kaesten (Knopfstreifen, Seitenkaesten, Login-Kasten) ──────────── */
@@ -21690,6 +21730,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
      unten/rechts dunkler) · schwarze Innenkontur · feine Zierlinie
      (::before) · Pixel-Ornamente an Ecken und Kantenmitten (::after). */
 .main-menu-screen .ornate-frame,
+.pp-menuekasten.ornate-frame,
 .auth-screen .auth-panel {
   border-width: 4px;
   border-style: solid;
@@ -21711,7 +21752,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 /* Feine Zierlinie innen: 2 px, genau auf dem inneren Winkel der
    Eck-Ornamente (::after bei 4 px + zwei Einheiten = 12 px), damit Linie
    und Schnoerkel ineinander uebergehen statt sich zu kreuzen. */
-.main-menu-screen .ornate-frame::before {
+.main-menu-screen .ornate-frame::before,
+.pp-menuekasten.ornate-frame::before {
   inset: 12px;
   border: 2px solid color-mix(in srgb, var(--zier) 32%, transparent);
   border-radius: 0;
@@ -21724,6 +21766,7 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    die grossen Kaesten; die kleinen Plaketten (.pp-eckzier) behalten ihre
    schlichten Ecken. */
 .main-menu-screen .ornate-frame::after,
+.pp-menuekasten.ornate-frame::after,
 .auth-screen .auth-panel.pp-eckzier::after {
   --eck-e: 4px;
   --eck-gr: calc(var(--eck-e) * 8);
@@ -21764,14 +21807,17 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 @media (max-height: 600px) {
   .main-menu-screen .ornate-frame::after,
+  .pp-menuekasten.ornate-frame::after,
   .auth-screen .auth-panel.pp-eckzier::after { --eck-e: 3px; }
-  .main-menu-screen .ornate-frame::before { inset: 10px; }
+  .main-menu-screen .ornate-frame::before,
+  .pp-menuekasten.ornate-frame::before { inset: 10px; }
 }
 /* Dither wie bisher, darunter ein Lichtschein in der Spielerfarbe von oben
    und ein Schattenfuss unten — der Kasten bekommt Tiefe statt einer
    flachen Flaeche. */
 .main-menu-screen .menu-body,
-.main-menu-screen .menu-side-panel {
+.main-menu-screen .menu-side-panel,
+.pp-menuekasten.ornate-frame {
   background-color: rgba(8, 10, 18, .93);
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E"),
@@ -22456,3 +22502,121 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .menu-logout-frage-knoepfe { display: flex; gap: 16px; justify-content: center; }
 .main-menu-screen .menu-logout-frage .btn { padding: 8px 26px; font-size: 14px; }
 .main-menu-screen .menu-logout-frage .menu-logout-ja { --knopf: var(--danger, #ff3366); }
+
+/* ═══ SHOP-KACHELN IM PIXELSTIL ═════════════════════════════════════════
+   Jede Kachel ist ein kleines Pixelfenster: eckig, schwarze Kontur,
+   Relief (Licht oben/links, Schatten unten/rechts), harter Schatten,
+   geditherte Flaeche mit Lichtschein oben. Die Zustaende behalten ihre
+   Farbe — Regenbogen-Rahmen (nicht gekauft), Gold (besitzt/gewaehlt),
+   Gruen (aktives Structure Deck) — nur alles eckig, und die pulsierenden
+   Schimmer tragen die Kontur mit. */
+.shop-item {
+  border-radius: 0;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 8px 8px,
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--player-color, var(--accent)) 12%, var(--bg2)) 0%,
+      var(--bg2) 38%,
+      color-mix(in srgb, #000 30%, var(--bg2)) 100%);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 255, 255, .07),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    6px 7px 0 rgba(0, 0, 0, .4);
+}
+.shop-item:hover {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 255, 255, .1),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    6px 7px 0 rgba(0, 0, 0, .4),
+    0 0 20px color-mix(in srgb, var(--player-color, var(--accent)) 35%, transparent);
+}
+.shop-item::before { border-radius: 0 !important; }
+/* Bild im Fenster: eigener dunkler Rahmen wie das Kunstfenster einer Karte. */
+.shop-item-img-wrap {
+  box-shadow: inset 0 0 0 2px var(--pp-kontur), 0 2px 0 rgba(255, 255, 255, .06);
+}
+.shop-item-name { text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 2px 0 #000; }
+
+/* Besitzt: Goldrahmen, Schimmer und Funke eckig. */
+.shop-item.shop-owned {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 240, 160, .25),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    6px 7px 0 rgba(0, 0, 0, .4),
+    0 0 14px rgba(255, 215, 0, .35);
+}
+.shop-item.shop-owned:hover {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 240, 160, .3),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    6px 7px 0 rgba(0, 0, 0, .4),
+    0 0 26px rgba(255, 215, 0, .55);
+}
+.shop-item.shop-owned::after { border-radius: 0; width: 6px; height: 6px; }
+.shop-item.shop-selected {
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 240, 160, .3),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    6px 7px 0 rgba(0, 0, 0, .4),
+    0 0 22px rgba(255, 215, 0, .5) !important;
+}
+/* Nicht gekauft: Regenbogenrahmen, der Puls laeuft mit Kontur und Schatten. */
+@keyframes shop-unowned-glow {
+  0%, 100% { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 8px rgba(0,240,255,.25), 0 0 14px rgba(196,75,255,.12); }
+  50%      { box-shadow: 0 0 0 5px var(--pp-kontur), 6px 7px 0 3px rgba(0, 0, 0, .4), 0 0 20px rgba(0,240,255,.55), 0 0 32px rgba(255,73,176,.35); }
+}
+@keyframes structure-deck-equipped-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 16px rgba(51,255,136,.6); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 6px 7px 0 rgba(0,0,0,.4), 0 0 28px rgba(80,255,160,.85); }
+}
+
+/* ═══ TITEL MIT PIXEL-SHADING ═══════════════════════════════════════════
+   Bildschirmtitel („SHOP", „ONLINE LOBBY" …) und die Titel der Pop-up-
+   Fenster (Daily, How to Play, Puzzle-Bibliothek). Wie die Titelschrift
+   einer Karte gebaut:
+     • Fuellung in drei Baendern aus der eigenen Textfarbe — helles
+       Kopfband, Grundfarbe, dunkler Fuss — getrennt durch je eine Reihe
+       Schachbrett-Dithering (Hintergrund mit `background-clip: text`).
+     • Schwarze Pixelkontur.
+     • Harte Extrusion nach unten in dunkler Textfarbe, darunter ein
+       schwarzer Versatzschatten — als `drop-shadow`-Filter, weil
+       Textschatten bei durchsichtiger Fuellung durch die Buchstaben
+       schimmern wuerden. Der Filter nimmt die Unterstreichung mit, sie
+       bekommt dieselbe Tiefe. */
+.top-bar:where(:not(.ui-noscale .top-bar)) > h2,
+.pp-fenster-kopf > .title-outline {
+  --titel-hell: color-mix(in srgb, currentColor 45%, #fff);
+  --titel-dunkel: color-mix(in srgb, currentColor 62%, #000);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.55'/%3E%3C/svg%3E") 0 34% / 4px 2px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.4'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.4'/%3E%3C/svg%3E") 0 66% / 4px 2px repeat-x,
+    linear-gradient(180deg,
+      var(--titel-hell) 0 36%,
+      currentColor 36% 64%,
+      var(--titel-dunkel) 64%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* Die Kontur kommt hier aus dem Filter statt aus `-webkit-text-stroke`:
+     bei durchsichtiger Fuellung laege der Strich sonst quer ueber den
+     schmalen Pixelstaemmen. Vier 2-px-Versaetze ergeben eine geschlossene
+     Pixelkontur, danach Extrusion und Schlagschatten. */
+  -webkit-text-stroke: 0;
+  filter:
+    drop-shadow(2px 0 0 #000)
+    drop-shadow(-2px 0 0 #000)
+    drop-shadow(0 2px 0 #000)
+    drop-shadow(0 -2px 0 #000)
+    drop-shadow(0 3px 0 var(--titel-dunkel))
+    drop-shadow(3px 3px 0 rgba(0, 0, 0, .8));
+}
+/* Die Unterstreichung (border-bottom) liegt ausserhalb der Glyphen und
+   bliebe mit `background-clip: text` unsichtbar — sie ist ein Rahmen,
+   kein Hintergrund, also bleibt sie sichtbar; hier nur etwas kraeftiger. */
+.top-bar:where(:not(.ui-noscale .top-bar)) > h2,
+.pp-fenster-kopf > .title-outline { border-bottom-width: 4px; }
