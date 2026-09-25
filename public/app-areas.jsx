@@ -503,70 +503,180 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
 });
 
 
-// ── PANGAIA, THE DINO DOMAIN ─────────────────────────────────────────
-//  v1439 (Al 25.9.) nach dem Kartenmotiv: eine ganze Insel aus der
-//  Vogelperspektive — dichter Dschungel aus schattierten Baumkronen,
-//  Lichtungen, Erdflecken, Felsbrocken, Strand und Flachwasser an der
-//  Kueste, ein Fluss vom Vulkanfuss zur Bucht, ein See, der Vulkan mit
-//  Lavasee und Lavastrom. Darauf kleine (eigentlich riesige) Dinosaurier:
-//  eine Brachiosaurus-Herde grast, ein T-Rex streift umher, Raptoren
-//  flitzen, Flugsaurier ziehen mit Schatten ueber alles hinweg. Wasser
-//  glitzert, Lava glueht, der Vulkan raucht. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
+//  PANGAIA, THE DINO DOMAIN — die Dino-Insel (v1439, Al 25.9.)
+//  Überarbeitung v1441 (Al 25.9.)
+//
+//  Nach dem Kartenmotiv: eine ganze Insel aus der Vogelperspektive —
+//  dichter Dschungel aus schattierten Baumkronen, Lichtungen, Erdflecken,
+//  Felsbrocken, Strand und Flachwasser an der Küste, ein Fluss vom
+//  Vulkanfuß zur Bucht, ein See, der Vulkan mit Lavasee und Lavastrom.
+//  Darauf kleine (eigentlich riesige) Dinosaurier: eine Brachiosaurus-
+//  Herde grast, ein T-Rex streift umher, Raptoren flitzen, Flugsaurier
+//  ziehen mit Schatten über alles hinweg. Wasser glitzert, Lava glüht,
+//  der Vulkan raucht. Licht IMMER oben rechts.
+//
+//  v1441: jede Baumkrone einzeln aus kleinen Blattballen gemalt (Licht-
+//  sichel oben rechts, dunkle Fuge unten links, Schlagschatten aus einem
+//  Höhenpuffer), mehrere Baumarten (Laub in drei Grüntönen, blühende
+//  Kronen, Nadelbäume, Palmen am Strandsaum, Farne); der Vulkan als
+//  Höhenfeld mit Rinnen, Kraterwand und Lavasee, der Lavastrom läuft den
+//  Hang hinab und dampfend in die rechte Bucht; Fluss mit Schlammufern,
+//  See mit Flachwasser, Bach zur Küste, Lichtungen mit Trampelpfaden,
+//  Felsbrocken, Nest mit Eiern, Skelett, umgestürztem Stamm und Fuß-
+//  spuren im Sand; draußen Hochsee mit Felsinselchen und Riff.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): sea.png — Kachel 128 (Hochsee); island.png — die Insel (260,
+//  mittig; fernes Meer durchsichtig, dort liegt die Kachel); surf.png —
+//  Brandung (2 Bilder übereinander); mask-water.png / mask-river.png /
+//  mask-lava.png — Formen, durch die glitter.png (Glitzern, 32×96),
+//  flow-river.png (16×8) und flow-lava.png (8×8) laufen; lava-glow.png —
+//  gestufte Glut; brachio.png, trex.png, raptor.png, plesio.png (je 8
+//  Bilder: rechts 2× Laufen, 2× Pause, links dasselbe — Licht bleibt oben
+//  rechts); ptero.png + ptero-shadow.png (6 Bilder: R/L × 3 Flügel-
+//  schläge); smoke.png (4), steam.png (3), bubble.png (3), ripple.png (3).
+//
+//  Animiert: das Meer, der See und der Fluss glitzern, die Brandung
+//  schlägt an Strand und Seeufer, der Fluss strömt zur Bucht, die Lava
+//  fließt und glüht, im Lavasee platzen Blasen, der Vulkan raucht, wo
+//  die Lava ins Meer läuft, zischt Dampf. Die Brachiosaurier schreiten
+//  pixelweise über ihre Lichtung und grasen, der T-Rex patrouilliert und
+//  brüllt, ein Raptorenrudel rennt, hält schnuppernd an und rennt zurück,
+//  in der unteren Bucht taucht ein Plesiosaurier auf und ab, im See
+//  kräuselt es, Flugsaurier ziehen mit Schatten übers Brett.
+// ═══════════════════════════════════════════════════════════════════
 const PGN = '/areas/pangaia/';
-const PGN_W = 250;
-const PGN_VULKAN = { x: 150 - 125, y: 26 };
+const PGN_W = 260;
+const pgnX = (x) => x - PGN_W / 2;              // Insel-x → Kunstpixel neben der Brettmitte
+const PGN_KRATER = [[153, 22], [158, 24], [155, 26], [159, 21], [152, 25]];
+const PGN_DAMPF = [208, 40];                    // Lava trifft das Meer
+const PGN_SEE = [[181, 64], [192, 67], [186, 70], [196, 64]];
+// Dinos: Blatt, Größe, Start (Insel-Pixel, oben links), Plan, Takt (s).
+// Plan: ['w', n, dx, dy] = n Schritte laufen (je 1 Kunstpixel), ['g', n] = n Takte Pause.
 const PGN_DINOS = [
-  // Art, Breite, Hoehe, Start (neben der Mitte), Weg, Dauer
-  { art: 'brachio', w: 14, h: 7, x: -84, y: 44, weg: 18, dur: 16 },
-  { art: 'brachio', w: 14, h: 7, x: -70, y: 53, weg: 16, dur: 19 },
-  { art: 'trex', w: 9, h: 6, x: 56, y: 66, weg: 16, dur: 11 },
-  { art: 'raptor', w: 5, h: 3, x: -26, y: 74, weg: 24, dur: 5 },
-  { art: 'raptor', w: 5, h: 3, x: -20, y: 78, weg: 22, dur: 5.6 },
+  { art: 'brachio', w: 24, h: 14, x: 48, y: 40, takt: .34, plan: [['w', 10, 1, 0], ['g', 16], ['w', 10, -1, 0], ['g', 12]] },
+  { art: 'brachio', w: 24, h: 14, x: 72, y: 50, takt: .38, plan: [['g', 14], ['w', 9, -1, 0], ['g', 18], ['w', 9, 1, 0]] },
+  { art: 'trex', w: 19, h: 12, x: 174, y: 78, takt: .2, plan: [['w', 24, 1, 0], ['g', 10], ['w', 24, -1, 0], ['g', 14]] },
+  { art: 'raptor', w: 12, h: 7, x: 110, y: 74, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]] },
+  { art: 'raptor', w: 12, h: 7, x: 105, y: 77, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]], verz: -.5 },
+  { art: 'raptor', w: 12, h: 7, x: 102, y: 72, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]], verz: -1.1 },
+  { art: 'plesio', w: 15, h: 9, x: 116, y: 90, takt: .55, plan: [['w', 10, 1, 0], ['g', 10], ['w', 10, -1, 0], ['g', 8]] },
 ];
+// Plan → Keyframes (steps(1): jeder Takt ein ganzer Kunstpixel bzw. ein Bild)
+function pgnGang(name, plan) {
+  const takte = [];
+  let x = 0, y = 0, dir = 1;
+  for (const [art, n, dx = 0, dy = 0] of plan) {
+    for (let i = 0; i < n; i++) {
+      if (art === 'w') { if (dx) dir = Math.sign(dx); x += dx; y += dy; }
+      const bild = (dir > 0 ? 0 : 4) + (art === 'w' ? i % 2 : 2 + (Math.floor(i / 3) % 2));
+      takte.push([x, y, bild]);
+    }
+  }
+  const N = takte.length;
+  const kf = (p, [x, y, b]) => `${p}% { transform: translate(calc(${x} * var(--px)), calc(${y} * var(--px))); background-position: ${(b / 7 * 100).toFixed(3)}% 0; }`;
+  return { css: `@keyframes ${name} { ${takte.map((t, i) => kf((i / N * 100).toFixed(3), t)).join(' ')} ${kf(100, takte[N - 1])} }`, n: N };
+}
+
 const PangaiaOverlay = React.memo(function PangaiaOverlay() {
-  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(3, ppFxN(PGN_DINOS.length))).map(d => ({
-    ...d, delay: -Math.random() * d.dur,
+  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppFxN(PGN_DINOS.length))).map((d, i) => {
+    const g = pgnGang('pgnGang' + i, d.plan);
+    const dur = g.n * d.takt;
+    return { ...d, css: g.css, name: 'pgnGang' + i, dur, delay: d.verz !== undefined ? d.verz : -Math.random() * dur };
+  }), []);
+  const flieger = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: [6, 52, 30][i] + Math.random() * 8, dur: 20 + Math.random() * 10, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(2), (i) => ({
-    y: 14 + i * 38 + Math.random() * 8, dur: 18 + Math.random() * 8, delay: -Math.random() * 20, rtl: i % 2 === 1,
-  })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(5), () => ({ dur: 4 + Math.random() * 2, delay: -Math.random() * 6 })), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
+  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
+  const blasen = useMemo(() => PGN_KRATER.slice(0, ppFxN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
+  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppFxN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
+  const mitte = { left: `calc(50% - ${PGN_W / 2} * var(--px))`, width: ppArt(PGN_W), right: 'auto' };
   return (
     <PixelScene artH={100} bg="#123a96" className="pangaia-overlay">
-      <PixelBand src={PGN + 'sea.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.8s steps(1) infinite' }} />
-      <PixelPiece src={PGN + 'island.png'} w={PGN_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.4s steps(1) infinite' }} />
-      <PixelPiece src={PGN + 'lava-glow.png'} w={PGN_W} className="pgn-lava" />
+      <PixelBand src={PGN + 'sea.png'} />
+      <PixelPiece src={PGN + 'island.png'} w={PGN_W} />
+      <div className="pp-pixel-layer pgn-glitzer" />
+      <PixelPiece src={PGN + 'surf.png'} w={PGN_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3.4s steps(1) infinite' }} />
+      <div className="pp-pixel-layer pgn-fluss" style={{ ...mitte, ...ppMaske(PGN + 'mask-river.png', false) }} />
+      <PixelPiece src={PGN + 'lava-glow.png'} w={PGN_W} className="pgn-glut" />
+      <div className="pp-pixel-layer pgn-lava" style={{ ...mitte, ...ppMaske(PGN + 'mask-lava.png', false) }} />
+      {blasen.map((b, i) => (
+        <i key={'b' + i} className="pp-area-dyn pgn-blase" style={{ left: ppArtX(pgnX(b.x) - 1, 0), top: ppArt(b.y - 1), animation: `pgnBlubb ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {kraeusel.map((k, i) => (
+        <i key={'k' + i} className="pp-area-dyn pgn-kraeusel" style={{ left: ppArtX(pgnX(k.x) - 3, 0), top: ppArt(k.y - 1), animation: `pgnKraeusel ${k.dur.toFixed(2)}s steps(1) ${k.delay.toFixed(2)}s infinite` }} />
+      ))}
       {dinos.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pgn-dino" style={{
-          left: ppArtX(d.x, 0), top: ppArt(d.y), width: ppArt(d.w), height: ppArt(d.h), '--weg': ppArt(d.weg),
+        <i key={'d' + i} className={'pp-area-dyn pgn-dino'} style={{
+          left: ppArtX(pgnX(d.x), 0), top: ppArt(d.y), width: ppArt(d.w), height: ppArt(d.h),
           backgroundImage: `url(${PGN}${d.art}.png)`,
-          animation: `pgnWandern ${d.dur}s linear ${d.delay.toFixed(2)}s infinite, ppSprite2 ${d.art === 'raptor' ? .25 : .6}s steps(1) infinite`,
+          animation: `${d.name} ${d.dur.toFixed(2)}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
+      {dampf.map((r, i) => (
+        <i key={'s' + i} className="pp-area-dyn pgn-dampf" style={{ left: ppArtX(pgnX(PGN_DAMPF[0]) - 3 + r.dx, 0), top: ppArt(PGN_DAMPF[1] - 6), animation: `pgnDampf ${r.dur.toFixed(2)}s steps(10) ${r.delay.toFixed(2)}s infinite, pgnDampfBild ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
+      ))}
       {rauch.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn pgn-rauch" style={{ left: ppArtX(PGN_VULKAN.x - 3, 0), top: ppArt(PGN_VULKAN.y - 4), animation: `pgnRauch ${r.dur.toFixed(2)}s ease-out ${r.delay.toFixed(2)}s infinite` }} />
+        <i key={'r' + i} className="pp-area-dyn pgn-rauch" style={{ left: ppArtX(pgnX(156) - 6 + r.dx, 0), top: ppArt(24 - 10), animation: `pgnRauch ${r.dur.toFixed(2)}s steps(30) ${r.delay.toFixed(2)}s infinite, pgnRauchBild ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
       ))}
       {flieger.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <div style={{ position: 'relative', transform: f.rtl ? 'scaleX(-1)' : undefined }}>
-            <i className="pgn-schatten" />
-            <i className="pgn-ptero" />
+          <div style={{ position: 'relative' }}>
+            <i className={'pgn-ptero-schatten' + (f.rtl ? ' l' : '')} />
+            <i className={'pgn-ptero' + (f.rtl ? ' l' : '')} />
           </div>
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .pgn-lava { animation: pgnLava 2.2s ease-in-out infinite alternate; }
-        @keyframes pgnLava { from { opacity: .45; } to { opacity: 1; } }
-        .pgn-dino { position: absolute; background-size: 200% 100%; background-repeat: no-repeat; }
-        @keyframes pgnWandern {
-          0% { transform: translateX(0) scaleX(1); } 49.99% { transform: translateX(var(--weg)) scaleX(1); }
-          50% { transform: translateX(var(--weg)) scaleX(-1); } 100% { transform: translateX(0) scaleX(-1); }
+        ${dinos.map(d => d.css).join('\n')}
+        .pgn-dino { position: absolute; background-size: 800% 100%; background-repeat: no-repeat; }
+        /* Glitzern auf allem Wasser: Maske = Wasser der Insel + alles außerhalb des Versatzstücks */
+        .pgn-glitzer {
+          position: absolute; inset: 0;
+          background: url(${PGN}glitter.png) 0 0 / calc(32 * var(--px)) calc(96 * var(--px)) repeat;
+          -webkit-mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
+          mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
+          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%; mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%;
+          -webkit-mask-position: 50% 0, 0 0; mask-position: 50% 0, 0 0;
+          -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+          animation: pgnGlitzer 2.7s steps(1) infinite;
         }
-        .pgn-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); border-radius: 50%; background: rgba(70, 64, 60, .75); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(40, 36, 34, .6); opacity: 0; }
-        @keyframes pgnRauch { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 15% { opacity: .85; } 100% { transform: translate(calc(8 * var(--px)), calc(-24 * var(--px))) scale(1.8); opacity: 0; } }
-        .pgn-ptero { display: block; width: calc(10 * var(--px)); height: calc(9 * var(--px)); background: url(${PGN}ptero.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; }
-        .pgn-schatten { position: absolute; left: calc(1 * var(--px)); top: calc(16 * var(--px)); width: calc(7 * var(--px)); height: calc(6 * var(--px)); border-radius: 50%; background: rgba(0, 20, 0, .35); }
+        @keyframes pgnGlitzer { 0% { background-position: 0 0; } 33.3% { background-position: calc(-11 * var(--px)) calc(32 * var(--px)); } 66.6% { background-position: calc(-5 * var(--px)) calc(64 * var(--px)); } }
+        .pgn-fluss {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${PGN}flow-river.png) 0 0 / calc(16 * var(--px)) calc(8 * var(--px)) repeat;
+          animation: pgnFluss 2.4s steps(16) infinite;
+        }
+        @keyframes pgnFluss { from { background-position: 0 0; } to { background-position: calc(-16 * var(--px)) 0; } }
+        .pgn-lava {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${PGN}flow-lava.png) 0 0 / calc(8 * var(--px)) calc(8 * var(--px)) repeat;
+          animation: pgnLavaFluss 2.2s steps(8) infinite;
+        }
+        @keyframes pgnLavaFluss { from { background-position: 0 0; } to { background-position: calc(8 * var(--px)) calc(8 * var(--px)); } }
+        .pgn-glut { animation: pgnGlut 2.6s ease-in-out infinite alternate; }
+        @keyframes pgnGlut { from { opacity: .5; } to { opacity: 1; } }
+        .pgn-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${PGN}bubble.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnBlubb { 0%, 70% { opacity: 0; background-position: 0 0; } 72% { opacity: 1; background-position: 0 0; } 80% { background-position: 50% 0; } 88% { background-position: 100% 0; } 94%, 100% { opacity: 0; background-position: 100% 0; } }
+        .pgn-kraeusel { position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px)); background: url(${PGN}ripple.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnKraeusel { 0%, 76% { opacity: 0; background-position: 0 0; } 78% { opacity: 1; background-position: 0 0; } 85% { background-position: 50% 0; } 92% { background-position: 100% 0; } 98%, 100% { opacity: 0; background-position: 100% 0; } }
+        .pgn-rauch { position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px)); background: url(${PGN}smoke.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes pgnRauch {
+          0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .95; } 55% { opacity: .8; }
+          100% { transform: translate(calc(30 * var(--px)), calc(-22 * var(--px))); opacity: 0; }
+        }
+        @keyframes pgnRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 45% { background-position: 66.67% 0; } 75% { background-position: 100% 0; } }
+        .pgn-dampf { position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${PGN}steam.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnDampf { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .85; } 100% { transform: translate(calc(3 * var(--px)), calc(-10 * var(--px))); opacity: 0; } }
+        @keyframes pgnDampfBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 65% { background-position: 100% 0; } }
+        .pgn-ptero { position: absolute; left: 0; top: 0; width: calc(13 * var(--px)); height: calc(15 * var(--px)); background: url(${PGN}ptero.png) 0 0 / 600% 100% no-repeat; animation: pgnFlapR .66s steps(1) infinite; }
+        .pgn-ptero-schatten { position: absolute; left: calc(-7 * var(--px)); top: calc(14 * var(--px)); width: calc(13 * var(--px)); height: calc(15 * var(--px)); background: url(${PGN}ptero-shadow.png) 0 0 / 600% 100% no-repeat; animation: pgnFlapR .66s steps(1) infinite; }
+        .pgn-ptero.l, .pgn-ptero-schatten.l { animation-name: pgnFlapL; }
+        @keyframes pgnFlapR { 0% { background-position: 0 0; } 33.3% { background-position: 20% 0; } 66.6% { background-position: 40% 0; } }
+        @keyframes pgnFlapL { 0% { background-position: 60% 0; } 33.3% { background-position: 80% 0; } 66.6% { background-position: 100% 0; } }
       `}</style>
     </PixelScene>
   );
