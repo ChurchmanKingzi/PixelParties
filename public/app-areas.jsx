@@ -1766,102 +1766,240 @@ const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPow
   );
 });
 
-// ── PARASEED GREENHOUSE ──────────────────────────────────────────────
-//  Karte: Gewaechshaus mit grauen, diagonal gestreiften Glasscheiben, ein
-//  Pflanztrog voll wucherndem Fleisch mit grellbunten Blueten. Als
-//  frueherer Wunsch (5.9.): „grellbunte Blumen, die ungesund und abartig
+// ═══════════════════════════════════════════════════════════════════
+//  PARASEED GREENHOUSE — Gewächshaus mit Fleischbeet (v1415, Kartenstil)
+//  Überarbeitung v1441 (Al 25.9.)
+//
+//  Karte: Gewächshaus mit grauen, diagonal gestreiften Glasscheiben, ein
+//  Pflanztrog voll wucherndem Fleisch mit grellbunten Blüten. Als
+//  früherer Wunsch (5.9.): „grellbunte Blumen, die ungesund und abartig
 //  wirken".
-//  v1428 (Al 25.9.): Schattengestalten raus, dafuer mehr Detail: Stahl-
-//  rahmen mit Nieten und Dachrinne, Scheiben mit trueben Pflanzen
+//  v1428 (Al 25.9.): Schattengestalten raus, dafür mehr Detail: Stahl-
+//  rahmen mit Nieten und Dachrinne, Scheiben mit trüben Pflanzen
 //  dahinter, Kondenstropfen und einem Sprung, Kletterranken mit
-//  Saugnaepfen, Fleischerde mit Adern, pochenden Pusteln und Knochen-
+//  Saugnäpfen, Fleischerde mit Adern, pochenden Pusteln und Knochen-
 //  splittern, Trogfront mit Rippen, Rost und Schildchen.
 //  v1429 (Al 25.9.: „die Pflanze mit dem Auge passt gar nicht", Pflanzen
-//  brauchen mehr Detail): grosse Bluetenkoepfe mit einzelnen Blaettern
-//  (Tulpe, Glocke mit Staubgefaessen, Stachelbluete mit Samenkern), breite
-//  Blaetter mit Mittelrippe, Stiele mit Knoten und Dornen. In der Mitte
-//  statt der Augenbluete ein wucherndes Samengewaechs: klumpige, geaederte
-//  Fleischkapsel, aufgeplatzt, Samen gluehen giftgruen durch, Ranken an
-//  der Spitze, Schleim tropft. Licht IMMER oben rechts. Animiert: Blueten
-//  wiegen einzeln und versetzt (8 Bilder, v1430), Pusteln pochen, Samen gluehen, Schleim tropft, Tropfen laufen
-//  am Glas herab, Sporen steigen.
+//  brauchen mehr Detail): große Blütenköpfe mit einzelnen Blättern
+//  (Tulpe, Glocke mit Staubgefäßen, Stachelblüte mit Samenkern), breite
+//  Blätter mit Mittelrippe, Stiele mit Knoten und Dornen. In der Mitte
+//  statt der Augenblüte ein wucherndes Samengewächs: klumpige, geäderte
+//  Fleischkapsel, aufgeplatzt, Samen glühen giftgrün durch, Ranken an
+//  der Spitze, Schleim tropft.
+//  v1430 (Al 25.9.: „die Pflanzen bewegen sich alle perfekt im Takt",
+//  mehr als zwei Bilder): jede Blume ist ein EIGENES Element mit eigenem
+//  Bildband (8 Bilder: Mitte → rechts → Mitte → links, Stiel biegt sich
+//  von unten nach oben) und eigener, zufälliger Dauer und Phase.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  dieselbe Szene, neu gemalt und mit Tiefe. Kachel 128 statt 64 (vier
+//  verschiedene Scheibenspalten statt einer), das Fleisch in zwei Reihen
+//  schattierter, nasser Wülste mit Blutergüssen, Adern, Pusteln,
+//  Knochensplittern, Maden und einer Zahnreihe; die Blumen wurzeln
+//  ZWISCHEN den Reihen und stehen nicht mehr im Raster, sondern werden je
+//  Spiel verstreut (zehn Sorten: Tulpen, Glocken mit Staubgefäßen,
+//  Stachelblüten mit Samenkern, Fleischtrauben mit Schlitzen, Schlund-
+//  blüten mit Zähnen — grellbunt, fleckig). Die Kapsel ist größer, atmet
+//  und hat Wurzeln, die übers Beet kriechen.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128: Dachscheiben, Traufbalken mit Nieten
+//  und Rinne, Bewässerungsrohr mit Düsen und Handrad, Glaswand (trübe
+//  Pflanzen dahinter, Streifen, Kondensat, Laufspuren, Schmutz und Moos
+//  unten, Sprung mit Loch, Klebeband, gekippte Lüftungsklappe), Stahl-
+//  rahmen mit Knotenblechen und Rost, Kletterranken mit Saugnäpfen,
+//  hinterer Trogrand, hintere Fleischwülste mit Knospen; shafts.png —
+//  Sonnenstrahlen durchs Glas; bloom.png — Blumen (8 Bilder × 10 Sorten,
+//  Zelle 26×46); front.png — vordere Wülste, über den Rand hängendes
+//  Fleisch und Schleimfäden, Trogrand mit Nieten, Rippenblech mit Laschen,
+//  Rost, zwei Schildchen und einem Riss, durch den Fleisch quillt,
+//  Fliesenboden mit Blut- und Schleimlache; tile-glow/front-glow.png —
+//  Pusteln; pod.png — Samengewächs 64 breit (3 Bilder übereinander);
+//  pod-glow.png — Samen; haze.png — fauliger Dunst (Kachel 128×26);
+//  drop.png, fly.png, slug.png.
+//
+//  Animiert: Blumen wiegen einzeln (8 Bilder, eigene Dauer/Phase), die
+//  Kapsel atmet, Samen glühen, Schleim tropft aus dem Riss, Pusteln
+//  pochen, Wasser tropft aus den Düsen, Kondenstropfen laufen am Glas
+//  herab, Sonnenstrahlen wandern (Wolken), fauliger Dunst zieht übers
+//  Beet, Fleischfliegen schwirren
+//  übers Beet, eine Nacktschnecke kriecht am Glas, Sporen steigen.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const PSG = '/areas/paraseed-greenhouse/';
-// Scheiben der Kachel (x-Bereiche), in denen Tropfen laufen duerfen.
-const PSG_SCHEIBEN = [[3, 29], [35, 61]];
-// v1430 (Al 25.9.: „die Pflanzen bewegen sich alle perfekt im Takt",
-// mehr als zwei Bilder): jede Blume ist ein EIGENES Element mit eigenem
-// Bildband (8 Bilder: Mitte → rechts → Mitte → links, Stiel biegt sich
-// von unten nach oben) und eigener, zufaelliger Dauer und Phase.
-// Plaetze je 64er-Kachel wie im Generator; Fuss bei Kunst-y 69.
-const PSG_PFLANZEN_X = [8, 24, 40, 55];
-const PSG_PFLANZE = { w: 28, h: 34, fussX: 13, top: 37, bilder: 8 };
+const PSG_KACHEL = 128;
+// Scheiben der Kachel (x-Bereiche, Kachel-x) und Scheibenreihen (y-Bereiche).
+const PSG_SCHEIBEN = [[3, 29], [35, 61], [67, 93], [99, 125]];
+const PSG_REIHEN = [[11, 24], [32, 43], [51, 62]];
+// Düsen des Bewässerungsrohrs (Kachel-x), Wasser fällt bis ins Beet.
+const PSG_DUESEN = [44, 108];
+// Blumen: Zelle 26×46, Fuß bei (12, 45), 8 Bilder, 10 Sorten (Zeilen).
+const PSG_BLUME = { w: 26, h: 46, fussX: 12, fussY: 45, bilder: 8, sorten: 10 };
+const PSG_POD_W = 64;
 const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay() {
-  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 10, farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
-  })), []);
-  const pflanzen = useMemo(() => {
+  // Blumen verstreut (nicht im Raster), die Kapsel in der Mitte frei lassen
+  const blumen = useMemo(() => {
     const out = [];
-    for (let k = -4; k <= 4; k++) {
-      PSG_PFLANZEN_X.forEach((px, art) => out.push({
-        x: px - 32 + k * 64, art,
-        dur: 2.2 + Math.random() * 1.6, delay: -Math.random() * 4,
-      }));
+    let letzte = -1;
+    for (let x = -262 + Math.random() * 6; x < 262; x += 10 + Math.random() * 8) {
+      if (Math.abs(x) < 19) continue;
+      let sorte;
+      do { sorte = Math.floor(Math.random() * PSG_BLUME.sorten); } while (sorte === letzte);
+      letzte = sorte;
+      out.push({
+        x: Math.round(x), fuss: 76 + Math.floor(Math.random() * 5), sorte,
+        dur: 2.4 + Math.random() * 1.8, delay: -Math.random() * 4,
+      });
     }
     return out;
   }, []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(6), () => {
-    const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 2)];
-    const k = Math.floor(Math.random() * 7) - 3;
-    return { x: a + Math.random() * (e - a) - 32 + k * 64, y: 5 + Math.random() * 20, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
+  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => {
+    const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 4)];
+    const [r0, r1] = PSG_REIHEN[Math.floor(Math.random() * 3)];
+    const k = Math.floor(Math.random() * 5) - 2;
+    const y = r0 + Math.random() * (r1 - r0 - 5);
+    return {
+      x: Math.round(a + 1 + Math.random() * (e - a - 3)) - PSG_KACHEL / 2 + k * PSG_KACHEL, y: Math.round(y),
+      fall: Math.max(3, Math.round(r1 - y - 2)), dur: 6 + Math.random() * 7, delay: -Math.random() * 13,
+    };
   }), []);
+  const duesen = useMemo(() => {
+    const out = [];
+    for (let k = -2; k <= 2; k++) PSG_DUESEN.forEach((x) => out.push({ x: x - PSG_KACHEL / 2 + k * PSG_KACHEL, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 4 }));
+    return out.slice(0, ppFxN(out.length));
+  }, []);
+  const fliegen = useMemo(() => ppZufall(ppFxN(4), () => ({
+    x: Math.round((Math.random() - .5) * 220), y: 58 + Math.round(Math.random() * 10),
+    dur: 3.5 + Math.random() * 3, delay: -Math.random() * 6, rtl: Math.random() < .5,
+  })), []);
+  const schnecke = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+    y: 55 + Math.floor(Math.random() * 4), dur: 260 + Math.random() * 80, delay: -Math.random() * 260,
+  })), []);
+  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.random() * 100, y: 66 + Math.round(Math.random() * 8), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
+    farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
+  })), []);
+  const B = PSG_BLUME;
   return (
     <PixelScene artH={100} bg="#7c807a" className="paraseed-greenhouse-overlay">
       <PixelBand src={PSG + 'tile.png'} />
       <PixelBand src={PSG + 'tile-glow.png'} className="psg-pochen" />
-      <PixelBand src={PSG + 'glass.png'} />
+      <PixelBand src={PSG + 'shafts.png'} className="psg-strahlen" />
       {tropfen.map((t, i) => (
-        <i key={'t' + i} className="pp-area-dyn psg-tropfen" style={{ left: ppArtX(t.x, 0), top: ppArt(t.y), animation: `psgTropfen ${t.dur}s ease-in ${t.delay}s infinite` }} />
-      ))}
-      {pflanzen.map((p, i) => (
-        <i key={'p' + i} className="psg-pflanze" style={{
-          left: ppArtX(p.x - PSG_PFLANZE.fussX, 0), top: ppArt(PSG_PFLANZE.top),
-          backgroundImage: `url(${PSG}plant-${p.art}.png)`,
-          animation: `psgWiegen ${p.dur.toFixed(2)}s steps(${PSG_PFLANZE.bilder}) ${p.delay.toFixed(2)}s infinite`,
+        <i key={'t' + i} className="pp-area-dyn psg-tropfen" style={{
+          left: ppArtX(t.x, 0), top: ppArt(t.y), '--fall': ppArt(t.fall),
+          animation: `psgTropfen ${t.dur.toFixed(2)}s steps(${t.fall * 2}) ${t.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <PixelPiece src={PSG + 'pod.png'} w={40} />
-      <PixelPiece src={PSG + 'pod-glow.png'} w={40} className="psg-samen" />
+      {schnecke.map((s, i) => (
+        <div key={'n' + i} className="pp-area-dyn pp-quer" style={{ top: ppArt(s.y), animation: `ppQuerRtl ${s.dur.toFixed(0)}s linear ${s.delay.toFixed(0)}s infinite` }}>
+          <i className="psg-schnecke" />
+        </div>
+      ))}
+      {duesen.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
+          left: ppArtX(d.x, 0), top: ppArt(18), '--fall': ppArt(42),
+          '--tropfen': '#c4d0cc', '--tropfen-dunkel': '#7e8a86',
+          animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {blumen.map((b, i) => (
+        <i key={'b' + i} className="psg-blume" style={{
+          left: ppArtX(b.x - B.fussX, 0), top: ppArt(b.fuss - B.fussY),
+          backgroundPositionY: `${(b.sorte / (B.sorten - 1)) * 100}%`,
+          animation: `psgWiegen ${b.dur.toFixed(2)}s steps(${B.bilder}) ${b.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer psg-dunst" style={{ top: ppArt(52) }} />
+      <PixelBand src={PSG + 'front.png'} />
+      <PixelBand src={PSG + 'front-glow.png'} className="psg-pochen b" />
+      <PixelPiece src={PSG + 'pod.png'} w={PSG_POD_W} className="psg-atmen" style={{ backgroundSize: '100% 300%' }} />
+      <PixelPiece src={PSG + 'pod-glow.png'} w={PSG_POD_W} className="psg-samen" />
       <i className="pp-area-dyn pp-px-tropfen" style={{
-        left: ppArtX(3, 0), top: ppArt(38), '--fall': ppArt(25),
+        left: ppArtX(-1, 0), top: ppArt(56), '--fall': ppArt(18),
         '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
         animation: 'ppPxTropfen 4.6s ease-in -1.2s infinite',
       }} />
+      <i className="pp-area-dyn pp-px-tropfen" style={{
+        left: ppArtX(1, 0), top: ppArt(51), '--fall': ppArt(22),
+        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        animation: 'ppPxTropfen 6.1s ease-in -3.9s infinite',
+      }} />
+      <div className="pp-pixel-layer psg-dunst b" style={{ top: ppArt(64) }} />
+      {fliegen.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn psg-fliege" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), transform: f.rtl ? 'scaleX(-1)' : undefined,
+          animation: `ppSprite2 .12s steps(1) infinite, ${f.rtl ? 'psgSchwirrenB' : 'psgSchwirren'} ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
       {sporen.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn psg-spore" style={{ left: s.x + '%', background: s.farbe, animation: `psgSpore ${s.dur}s linear ${s.delay}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn psg-spore" style={{
+          left: s.x + '%', top: ppArt(s.y), background: s.farbe,
+          animation: `psgSpore ${s.dur.toFixed(2)}s steps(40) ${s.delay.toFixed(2)}s infinite`,
+        }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .psg-pflanze {
-          position: absolute; width: calc(${PSG_PFLANZE.w} * var(--px)); height: calc(${PSG_PFLANZE.h} * var(--px));
-          background-size: ${PSG_PFLANZE.bilder * 100}% 100%; background-repeat: no-repeat; background-position: 0 0;
+        .psg-blume {
+          position: absolute; width: calc(${B.w} * var(--px)); height: calc(${B.h} * var(--px));
+          background: url(${PSG}bloom.png) 0 0 / ${B.bilder * 100}% ${B.sorten * 100}% no-repeat;
         }
-        @keyframes psgWiegen { from { background-position: 0 0; } to { background-position: calc(-${PSG_PFLANZE.w * PSG_PFLANZE.bilder} * var(--px)) 0; } }
+        @keyframes psgWiegen { from { background-position-x: 0; } to { background-position-x: calc(-${B.w * B.bilder} * var(--px)); } }
         .psg-pochen { animation: psgPochen 1.9s ease-in-out infinite; }
-        @keyframes psgPochen { 0%, 100% { opacity: .35; } 18% { opacity: 1; } 32% { opacity: .55; } 44% { opacity: .9; } }
+        .psg-pochen.b { animation-delay: -.7s; animation-duration: 2.3s; }
+        @keyframes psgPochen { 0%, 100% { opacity: .3; } 18% { opacity: 1; } 32% { opacity: .5; } 44% { opacity: .9; } }
+        .psg-strahlen { animation: psgStrahlen 17s ease-in-out infinite; }
+        @keyframes psgStrahlen { 0%, 100% { opacity: .9; } 30% { opacity: .35; } 45% { opacity: .15; } 60% { opacity: .6; } 80% { opacity: 1; } }
+        .psg-atmen { animation: psgAtmen 3.8s steps(1) infinite; }
+        @keyframes psgAtmen {
+          0% { background-position: 0 0%; } 30% { background-position: 0 50%; } 45% { background-position: 0 100%; }
+          70% { background-position: 0 50%; } 85% { background-position: 0 0%; }
+        }
+        .psg-samen { animation: psgSamen 2.6s ease-in-out infinite alternate; }
+        @keyframes psgSamen { from { opacity: .3; } to { opacity: 1; } }
         .psg-tropfen {
           position: absolute; width: calc(2 * var(--px)); height: calc(3 * var(--px));
           background: url(${PSG}drop.png) 0 0 / 100% 100% no-repeat; opacity: 0;
         }
         @keyframes psgTropfen {
-          0% { transform: translateY(0); opacity: 0; } 8% { opacity: 1; }
-          40% { transform: translateY(calc(6 * var(--px))); }
-          55% { transform: translateY(calc(8 * var(--px))); }
-          92% { opacity: 1; } 100% { transform: translateY(calc(34 * var(--px))); opacity: 0; }
+          0% { transform: translateY(0); opacity: 0; } 6% { opacity: 1; }
+          45% { transform: translateY(calc(var(--fall) * .15)); }
+          60% { transform: translateY(calc(var(--fall) * .25)); }
+          94% { opacity: 1; } 100% { transform: translateY(var(--fall)); opacity: 0; }
         }
-        .psg-samen { animation: psgSamen 2.6s ease-in-out infinite alternate; }
-        @keyframes psgSamen { from { opacity: .35; } to { opacity: 1; } }
-        .psg-spore { position: absolute; top: calc(66 * var(--px)); width: var(--px); height: var(--px); opacity: 0; }
-        @keyframes psgSpore { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 50% { transform: translate(calc(3 * var(--px)), calc(-30 * var(--px))); } 100% { transform: translate(calc(-2 * var(--px)), calc(-62 * var(--px))); opacity: 0; } }
+        .psg-schnecke {
+          display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px));
+          background: url(${PSG}slug.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 1.6s steps(1) infinite;
+        }
+        .psg-fliege {
+          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background: url(${PSG}fly.png) 0 0 / 200% 100% no-repeat;
+        }
+        @keyframes psgSchwirren {
+          0% { translate: 0 0; } 10% { translate: calc(3 * var(--px)) calc(-2 * var(--px)); } 20% { translate: calc(6 * var(--px)) calc(-1 * var(--px)); }
+          30% { translate: calc(8 * var(--px)) calc(-4 * var(--px)); } 40% { translate: calc(5 * var(--px)) calc(-6 * var(--px)); }
+          50% { translate: calc(2 * var(--px)) calc(-5 * var(--px)); } 60% { translate: calc(-2 * var(--px)) calc(-3 * var(--px)); }
+          70% { translate: calc(-5 * var(--px)) calc(-4 * var(--px)); } 80% { translate: calc(-4 * var(--px)) calc(-1 * var(--px)); }
+          90% { translate: calc(-1 * var(--px)) calc(1 * var(--px)); } 100% { translate: 0 0; }
+        }
+        @keyframes psgSchwirrenB {
+          0% { translate: 0 0; } 12% { translate: calc(-2 * var(--px)) calc(-3 * var(--px)); } 25% { translate: calc(2 * var(--px)) calc(-6 * var(--px)); }
+          37% { translate: calc(6 * var(--px)) calc(-5 * var(--px)); } 50% { translate: calc(7 * var(--px)) calc(-2 * var(--px)); }
+          62% { translate: calc(4 * var(--px)) 0; } 75% { translate: calc(1 * var(--px)) calc(-2 * var(--px)); }
+          87% { translate: calc(-3 * var(--px)) calc(-1 * var(--px)); } 100% { translate: 0 0; }
+        }
+        .psg-dunst {
+          position: absolute; left: 0; right: 0; height: calc(26 * var(--px));
+          background: url(${PSG}haze.png) 0 0 / auto 100% repeat-x; opacity: .8; animation: psgDunst 70s steps(128) infinite;
+        }
+        .psg-dunst.b { opacity: .55; animation-duration: 95s; animation-direction: reverse; }
+        @keyframes psgDunst { from { background-position: 0 0; } to { background-position: calc(${PSG_KACHEL} * var(--px)) 0; } }
+        .psg-spore { position: absolute; width: var(--px); height: var(--px); opacity: 0; }
+        @keyframes psgSpore {
+          0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .9; }
+          50% { transform: translate(calc(3 * var(--px)), calc(-28 * var(--px))); }
+          100% { transform: translate(calc(-2 * var(--px)), calc(-58 * var(--px))); opacity: 0; }
+        }
       `}</style>
     </PixelScene>
   );
@@ -1996,88 +2134,162 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
 });
 
 // ── SLIPPERY ICE ─────────────────────────────────────────────────────
-//  Karte: lavendelweisse Eisflaeche mit diagonalen Glanzstreifen, blaues
+//  Karte: lavendelweiße Eisfläche mit diagonalen Glanzstreifen, blaues
 //  Wasser mit Wellenzeichen, Pinguine rutschen auf dem Bauch.
-//  v1433 (Al 25.9.): Wasser aufgehuebscht — treppige Eiskante wie auf der
+//  v1433 (Al 25.9.): Wasser aufgehübscht — treppige Eiskante wie auf der
 //  Karte mit sichtbarer Eisdicke, Schaum an der Kante, Tiefe nach unten,
-//  Wellenzeichen und Lichtreflexe, die ueber drei Bilder wandern, dazu
+//  Wellenzeichen und Lichtreflexe, die über drei Bilder wandern, dazu
 //  treibende Schollen. Pinguine detaillierter (Gesicht mit roter Wange,
-//  Glanz auf dem Ruecken, schlagende Flossen) mit dem Bewegungsschleier
+//  Glanz auf dem Rücken, schlagende Flossen) mit dem Bewegungsschleier
 //  der Karte. Statt des Schilds ein STACHELIGER EISBLOCK, der ebenfalls
 //  herumrutscht. Eis mit Rissen und Schneewehen. Licht IMMER oben rechts.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level" — auf
+//  das Niveau der v1440-Szenen gebracht). Dieselbe Szene, neu gemalt:
+//  tile.png — Kachel 128: Eis als unregelmäßiges Pixelrauschen mit den
+//  diagonalen Glanzstreifen der Karte (/, Rillen mit Glanzkante, breite
+//  weiche Glanzbahnen), klare dunkle Eisfenster, gerade Eisrisse mit
+//  heller Bruchfläche, eingeschlossene Luftblasen, Kratzspuren entlang
+//  der Rutschbahnen, flache Schneewehen (Schweif nach links, oben rechts
+//  beleuchtet, Schlagschatten unten links); treppige Eiskante mit heller
+//  Lippe, Schneewülsten, 5 Pixel Eisdicke (Schichtlinie, Glanzstriche,
+//  Tropfnasen) und dunkler Wasserlinie. water.png — 3 Bilder: Rauschen,
+//  Dünung, untergetauchter Eissockel unter der Kante, Wellenzeichen der
+//  Karte in versetzten Reihen, wandernde Glanzlichter. foam.png — Schaum
+//  an der Wasserlinie (3 Bilder). center.png — Mittelstück 256, damit die
+//  Kachel nicht sichtbar wiederholt: links eine treppige Eiszunge mit
+//  einem unter klarem Eis eingefrorenen Fisch und Eisbrocken, rechts eine
+//  große treibende Scholle mit Schneewehe, oben ein Rissnetz;
+//  center-foam.png — deren Schaum (3 Bilder). drift.png — Schneefahnen.
+//  Sprites: penguin.png (3 Bilder mit Schleier + Eissplittern),
+//  spikeblock.png (2 Bilder, Deckfläche/Seite/Stirn, Schatten, eingefro-
+//  rener Fisch, wandernder Glanz), floe.png (3 Schollen), swimmer.png
+//  (schwimmender Pinguin mit Bugwelle), fish.png (springender Fisch).
+//  Animiert: Wasser und Schaum, Schneetreiben zieht nach links (Wind von
+//  rechts), Pinguine rutschen und schlagen mit den Flossen, der Eisblock
+//  ruckt an und rutscht, Schollen treiben, ein Pinguin schwimmt, Fische
+//  springen, Eis funkelt. Licht IMMER oben rechts.
 const SLI = '/areas/slippery-ice/';
-// v1434 (Al 25.9.: „zu viele Akteure, sie ueberlappen sich staendig —
-// pro Hoehenebene nur einen"): feste Bahnen, jede mit genau EINEM
-// Akteur. Die Bahnen ueberschneiden sich nicht (Pinguin 8 hoch, Eisblock
-// 30 hoch), und die unterste endet ueber der hoechsten Stufe der
-// Eiskante (y 60) — so rutscht nie etwas auf etwas anderem oder im Wasser.
+const SLI_MITTE = 256;              // Mittelstück; Stück-x 128 = Brettmitte
+// v1434 (Al 25.9.: „zu viele Akteure, sie überlappen sich ständig —
+// pro Höhenebene nur einen"): feste Bahnen, jede mit genau EINEM
+// Akteur. Die Bahnen überschneiden sich nicht (Pinguin 10 hoch, Eisblock
+// 30 hoch), und die unterste endet über der höchsten Stufe der
+// Eiskante (Lippe y 61) — so rutscht nie etwas auf etwas anderem oder im Wasser.
 const SLI_BAHNEN = [
-  { art: 'pinguin', y: 1 },
+  { art: 'pinguin', y: 0 },
   { art: 'block', y: 11 },
-  { art: 'pinguin', y: 42 },
+  { art: 'pinguin', y: 41 },
   { art: 'pinguin', y: 51 },
 ];
+// Schollen treiben nur dort, wo das Mittelstück (Eiszunge links, große
+// Scholle rechts) frei lässt.
+const SLI_SCHOLLEN = [-170, -40, 5, 105, 160];
+const SLI_FISCHE = [[-150, 90], [-30, 93], [100, 89], [175, 92]];   // Sprungstellen (x neben der Mitte, y)
 const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
   const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppFxN(SLI_BAHNEN.length))), []);
   // v1435 (Al 25.9.): Richtungen fest — der zweite Pinguin rutscht nach
   // links, die anderen nach rechts; der Block startet nach links.
   const pinguine = useMemo(() => bahnen.filter(b => b.art === 'pinguin').map((b, i) => ({
-    y: b.y, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, rtl: i === 1,
-    bob: 1.1 + Math.random() * .8,
+    y: b.y, dur: 7 + Math.random() * 6, delay: -Math.random() * 12, rtl: i === 1,
+    bob: 1.1 + Math.random() * .8, flosse: .38 + Math.random() * .14,
   })), [bahnen]);
   const bloecke = useMemo(() => bahnen.filter(b => b.art === 'block').map(b => ({
     y: b.y, von: 50 + Math.random() * 60, bis: -120 + Math.random() * 40,
     dur: 7 + Math.random() * 5, delay: 0,
   })), [bahnen]);
-  const schollen = useMemo(() => ppZufall(ppFxN(4), () => ({
-    x: (Math.random() - .5) * 220, y: 78 + Math.random() * 14, dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
+  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppFxN(SLI_SCHOLLEN.length)).map((x, i) => ({
+    x: x + (Math.random() - .5) * 10, y: 86 + Math.random() * 8, v: i % 3,
+    dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
+  })), []);
+  const schwimmer = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 92 + Math.random() * 2, dur: 55 + Math.random() * 20, delay: -Math.random() * 50, rtl: Math.random() < .5,
+  })), []);
+  const fische = useMemo(() => SLI_FISCHE.slice(0, ppFxN(SLI_FISCHE.length)).map(() => ({
+    dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
   const funken = useMemo(() => ppZufall(ppFxN(10), () => ({
-    x: Math.random() * 100, y: 4 + Math.random() * 52, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
+    x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#dad9f7" className="slippery-ice-overlay">
-      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.5s steps(1) infinite' }} />
+    <PixelScene artH={100} bg="#d2d1f7" className="slippery-ice-overlay">
+      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
       {schollen.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `sliTreiben ${s.dur.toFixed(2)}s ease-in-out ${s.delay.toFixed(2)}s infinite alternate` }} />
+        <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{
+          left: ppArtX(s.x, 0), top: ppArt(s.y), backgroundPosition: `${s.v * 50}% 0`,
+          animation: `sliTreiben ${s.dur.toFixed(2)}s steps(8) ${s.delay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      {schwimmer.map((s, i) => (
+        <div key={'w' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(s.y), animation: `${s.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${s.dur.toFixed(1)}s linear ${s.delay.toFixed(1)}s infinite` }}>
+          <i className="sli-schwimmer" style={{ transform: s.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {fische.map((f, i) => (
+        <i key={'h' + i} className="pp-area-dyn sli-fisch" style={{
+          left: ppArtX(SLI_FISCHE[i][0] - 6, 0), top: ppArt(SLI_FISCHE[i][1] - 11),
+          animationDuration: f.dur.toFixed(2) + 's', animationDelay: f.delay.toFixed(2) + 's',
+        }} />
       ))}
       <PixelBand src={SLI + 'tile.png'} />
+      <PixelBand src={SLI + 'foam.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
+      <PixelPiece src={SLI + 'center.png'} w={SLI_MITTE} />
+      <PixelPiece src={SLI + 'center-foam.png'} w={SLI_MITTE} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
+      <div className="pp-pixel-layer pp-area-dyn sli-wind" />
       {funken.map((f, i) => (
-        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: f.x + '%', top: ppArt(f.y), animation: `ppFunkeln ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: f.x + '%', top: ppArt(f.y), animation: `ppFunkeln ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite` }} />
       ))}
       {bloecke.map((b, i) => (
         <i key={'b' + i} className="sli-block" style={{
-          left: ppArtX(-17, 0), top: ppArt(b.y), '--von': ppArt(b.von), '--bis': ppArt(b.bis),
-          animation: `sliBlock ${b.dur.toFixed(2)}s cubic-bezier(.35,0,.25,1) ${b.delay.toFixed(2)}s infinite alternate`,
+          left: ppArtX(-18, 0), top: ppArt(b.y), '--von': ppArt(b.von), '--bis': ppArt(b.bis),
+          animation: `sliBlock ${b.dur.toFixed(2)}s cubic-bezier(.35,0,.25,1) ${b.delay.toFixed(2)}s infinite alternate, sliGlanz 3.2s steps(1) infinite`,
         }} />
       ))}
       {pinguine.map((p, i) => (
-        <div key={'p' + i} className="pp-area-dyn pp-quer" style={ppQuer(p.y, p.dur, p.delay, p.rtl)}>
+        <div key={'p' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(p.y), animation: `${p.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${p.dur.toFixed(2)}s linear ${p.delay.toFixed(2)}s infinite` }}>
           <div className="sli-rutscher" style={{ transform: p.rtl ? 'scaleX(-1)' : undefined, animationDuration: p.bob.toFixed(2) + 's' }}>
-            <i className="sli-spur" /><i className="sli-pinguin" />
+            <i className="sli-pinguin" style={{ animationDuration: p.flosse.toFixed(2) + 's' }} />
           </div>
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .sli-rutscher { display: flex; align-items: flex-start; animation: sliRuckeln 1.4s steps(2) infinite; }
+        .sli-quer { position: absolute; left: 0; }
+        @keyframes sliQuerLtr { from { transform: translateX(calc(-60 * var(--px))); } to { transform: translateX(calc(100cqw + 4 * var(--px))); } }
+        @keyframes sliQuerRtl { from { transform: translateX(calc(100cqw + 4 * var(--px))); } to { transform: translateX(calc(-60 * var(--px))); } }
+        .sli-rutscher { animation: sliRuckeln 1.4s steps(2) infinite; }
         @keyframes sliRuckeln { 0% { translate: 0 0; } 50% { translate: 0 calc(-1 * var(--px)); } }
-        .sli-spur { display: block; width: calc(26 * var(--px)); height: calc(8 * var(--px)); background: url(${SLI}trail.png) 0 0 / 100% 100% no-repeat; margin-right: calc(-2 * var(--px)); }
-        .sli-pinguin { display: block; width: calc(22 * var(--px)); height: calc(8 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .45s steps(1) infinite; }
+        .sli-pinguin { display: block; width: calc(56 * var(--px)); height: calc(10 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .45s steps(1) infinite; }
         .sli-block {
-          position: absolute; width: calc(34 * var(--px)); height: calc(30 * var(--px));
-          background: url(${SLI}spikeblock.png) 0 0 / 100% 100% no-repeat;
+          position: absolute; width: calc(36 * var(--px)); height: calc(30 * var(--px));
+          background: url(${SLI}spikeblock.png) 0 0 / 200% 100% no-repeat;
         }
         @keyframes sliBlock {
           0% { transform: translateX(var(--von)); } 8% { transform: translateX(var(--von)) translateY(calc(-1 * var(--px))); }
           12% { transform: translateX(var(--von)); } 100% { transform: translateX(var(--bis)); }
         }
-        .sli-scholle { position: absolute; width: calc(9 * var(--px)); height: calc(4 * var(--px)); background: url(${SLI}floe.png) 0 0 / 100% 100% no-repeat; }
+        @keyframes sliGlanz { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        .sli-scholle { position: absolute; width: calc(12 * var(--px)); height: calc(6 * var(--px)); background: url(${SLI}floe.png) 0 0 / 300% 100% no-repeat; }
         @keyframes sliTreiben {
           0% { transform: translate(0, 0); } 25% { transform: translate(calc(2 * var(--px)), var(--px)); }
           50% { transform: translate(calc(4 * var(--px)), 0); } 75% { transform: translate(calc(6 * var(--px)), var(--px)); }
           100% { transform: translate(calc(8 * var(--px)), 0); }
         }
+        .sli-schwimmer { display: block; width: calc(20 * var(--px)); height: calc(7 * var(--px)); background: url(${SLI}swimmer.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .7s steps(1) infinite; }
+        .sli-fisch {
+          position: absolute; width: calc(12 * var(--px)); height: calc(12 * var(--px));
+          background: url(${SLI}fish.png) 0 0 / 800% 100% no-repeat; animation-name: sliFisch; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes sliFisch {
+          0% { background-position: 0 0; } 1.6% { background-position: calc(100% / 7) 0; } 3.2% { background-position: calc(200% / 7) 0; }
+          4.8% { background-position: calc(300% / 7) 0; } 6.4% { background-position: calc(400% / 7) 0; } 8% { background-position: calc(500% / 7) 0; }
+          9.6% { background-position: calc(600% / 7) 0; } 11.2%, 100% { background-position: 0 0; }
+        }
+        .sli-wind {
+          position: absolute; inset: 0; background: url(${SLI}drift.png) 50% 0 / auto 100% repeat-x; opacity: .7;
+          animation: sliWind 16s steps(128) infinite;
+        }
+        @keyframes sliWind { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
       `}</style>
     </PixelScene>
   );
