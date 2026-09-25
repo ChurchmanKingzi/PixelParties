@@ -1195,6 +1195,36 @@ function PuzzleCreator() {
     const MIN_SCALE = 0.5;
     const MAX_SCALE = 1.1;
     let raf = 0, passes = 0;
+    // ★★ v1442 (Als Befund 25.9.: „das Spielfeld atmet" — Puzzle-Editor
+    // mit Wowhalla neu geladen, live reproduzierbar, lokal nicht).
+    // Drei Fehler griffen ineinander:
+    //  (1) Der Riegel konnte sich nie loesen. Im Bildlauf-Modus ist der
+    //      Wrap `overflow-x: auto`, und `scrollWidth` ist dort nie kleiner
+    //      als `clientWidth` — `layoutW` startete also bei `clientWidth`
+    //      und lag damit IMMER ueber der Loese-Schwelle `clientWidth − 36`.
+    //      Einmal eingerastet (beim Neuladen genuegt ein frueher Pass, in
+    //      dem die Coolness-Stack-Spalte von Wowhalla schon misst, das
+    //      Brett aber noch nicht eingepasst ist), blieb der Modus fuer
+    //      immer an, auch wenn der Inhalt laengst passte.
+    //  (2) Im eingerasteten Modus kam und ging der WAAGERECHTE Scroll-
+    //      balken mit dem Ueberhang-Polster (`--pz-overhang-l/r`), das
+    //      selbst vom Massstab abhaengt. Mit Balken ~17 px weniger Hoehe →
+    //      Hoehen-Fit schrumpft → Polster schrumpft → Balken weg → Fit
+    //      waechst → Balken wieder da. Headless-Chromium blendet Scroll-
+    //      balken aus, deshalb war das in Tests unsichtbar.
+    //  (3) Jede dieser Groessenaenderungen weckte den ResizeObserver, und
+    //      der setzte `passes = 0` — die Obergrenze von 5 Durchgaengen
+    //      griff nie, die Schleife lief endlos (5 Passes je Sekunde).
+    // Fixes: (1) `scrollWidth` zaehlt nur noch, wenn es WIRKLICH ueber
+    // `clientWidth` liegt, und die Loese-Schwelle waechst mit der Breite
+    // (gemeinsamer Riegel `ppHScrollRiegel`, app-shared — das Kampfbrett
+    // hatte denselben Fehler); (2) im eingerasteten Modus reserviert der
+    // Hoehen-Fit die Balkenstaerke fest, statt `clientHeight` zu lesen —
+    // die verfuegbare Hoehe haengt nicht mehr vom Ueberhang ab; (3) nur eine Groessenaenderung des WRAPS selbst setzt
+    // den Zaehler zurueck, und ueber der Obergrenze wird kein neuer
+    // Massstab mehr geschrieben (Schwingungsbremse).
+    const MAX_PASSES = 5;
+    let balkenH = 0;   // gemessene Staerke des waagerechten Balkens (v1442)
     const updateScale = () => {
       // Detached or collapsed container (mode switch, hidden tab):
       // never write a scale derived from a 0×0 measurement.
@@ -1246,7 +1276,10 @@ function PuzzleCreator() {
       // still folded in via max() — in hscroll mode (overflow auto)
       // it's authoritative and also covers non-row content.
       container.classList.add('pz-flat-measure');
-      let layoutW = container.scrollWidth;
+      // v1442 (1): `scrollWidth` hat im Bildlauf-Modus `clientWidth` als
+      // Boden — nur ein echter Ueberstand zaehlt, sonst entscheidet der
+      // gemessene Inhalt (Reihen + Zonen) allein.
+      let layoutW = window.ppEchterUeberstand(container);
       container.querySelectorAll('.pz-board-plane .board-row').forEach(row => {
         const k = row.children;
         if (!k.length) return;
@@ -1273,7 +1306,9 @@ function PuzzleCreator() {
       // (the constant interface jitter). Once latched, stay latched
       // until the content is CLEARLY under the line.
       const wasLatched = container.classList.contains('pz-can-hscroll');
-      const needsHScroll = layoutW > container.clientWidth + (wasLatched ? -36 : 4);
+      // v1442 (1): gemeinsamer Riegel mit dem Kampfbrett (app-shared) —
+      // mitwachsende Loese-Schwelle, siehe dort.
+      const needsHScroll = window.ppHScrollRiegel(layoutW, container.clientWidth, wasLatched);
       // Diagnostics valve: run `window.PP_HSCROLL_DEBUG = true` in the
       // console to trace why the scrollbar does / doesn't latch.
       if (window.PP_HSCROLL_DEBUG) {
@@ -1372,7 +1407,21 @@ function PuzzleCreator() {
           // overflow threshold: subpixel rounding of the fit otherwise
           // leaves a 1–3px scrollHeight excess that surfaces as a
           // near-immobile vertical scrollbar.
-          const heightFit = cur * ((container.clientHeight - 6) / Math.max(1, needed));
+          // v1442 (2): verfuegbare Hoehe UNABHAENGIG davon, ob der
+          // waagerechte Balken gerade sichtbar ist. `clientHeight` zieht
+          // ihn ab, sobald er erscheint — und ob er erscheint, haengt am
+          // massstababhaengigen Ueberhang-Polster. Das war die Pendel-
+          // Quelle. Jetzt: Innenhoehe ohne Balken, im Bildlauf-Modus
+          // IMMER abzueglich der (einmal gemessenen) Balkenstaerke.
+          // Overlay-Balken (macOS, Telefone) haben Staerke 0 → nichts
+          // wird reserviert.
+          const csH = getComputedStyle(container);
+          const innenH = container.offsetHeight
+            - (parseFloat(csH.borderTopWidth) || 0) - (parseFloat(csH.borderBottomWidth) || 0);
+          const balkenJetzt = innenH - container.clientHeight;
+          if (balkenJetzt > 0.5) balkenH = balkenJetzt;
+          const verfuegbarH = needsHScroll ? innenH - balkenH : innenH;
+          const heightFit = cur * ((verfuegbarH - 6) / Math.max(1, needed));
           scale = Math.max(MIN_SCALE, Math.min(widthScale, heightFit));
           // ── Visual width fit (v9, responsive) ──
           // overflow-x is `clip` outside hscroll mode, so the PROJECTED
@@ -1424,7 +1473,7 @@ function PuzzleCreator() {
       container.classList.remove('pz-flat-measure');
       // Latch-state change = frame change: force one settle pass so all
       // measurements re-run against the frame the browser applied.
-      if (wasLatched !== needsHScroll && passes < 5) {
+      if (wasLatched !== needsHScroll && passes < MAX_PASSES) {
         passes++;
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(updateScale);
@@ -1443,10 +1492,17 @@ function PuzzleCreator() {
         if (container.scrollTop !== tST) container.scrollTop = tST;
       }
       if (Math.abs(prev - scale) > 0.003) {
+        // v1442 (3): Schwingungsbremse. Ueber der Obergrenze schreibt der
+        // Pass keinen neuen Massstab mehr — erst eine echte Groessen-
+        // aenderung des Wraps oder eine Zustandsaenderung (scaleKick)
+        // gibt wieder frei. Vorher wurde hier trotzdem geschrieben, nur
+        // der naechste RAF entfiel, und der ResizeObserver fing die
+        // Schleife wieder auf.
+        if (passes >= MAX_PASSES) return;
         document.documentElement.style.setProperty('--board-scale', scale.toFixed(4));
         // Re-measure after the new scale lands (non-linear parts:
         // labels, min-heights, the projection itself) — bounded.
-        if (passes < 5) {
+        if (passes < MAX_PASSES) {
           passes++;
           raf = requestAnimationFrame(updateScale);
         }
@@ -1454,7 +1510,18 @@ function PuzzleCreator() {
         passes = 0;
       }
     };
-    const ro = new ResizeObserver(() => { passes = 0; updateScale(); });
+    // v1442 (3): nur eine Groessenaenderung des WRAPS setzt den Zaehler
+    // zurueck. Die Kinder aendern ihre Groesse als Folge jedes Massstab-
+    // Schreibens — setzten sie ihn zurueck, waere die Obergrenze wirkungslos.
+    let wrapGroesse = '';
+    const ro = new ResizeObserver((eintraege) => {
+      for (const e of eintraege) {
+        if (e.target !== container) continue;
+        const g = Math.round(e.contentRect.width) + 'x' + Math.round(e.contentRect.height);
+        if (g !== wrapGroesse) { wrapGroesse = g; passes = 0; }
+      }
+      updateScale();
+    });
     ro.observe(container);
     // The wrap's own size doesn't change when its CONTENT grows (hand
     // bars filling up, rows changing) — observe the column children too

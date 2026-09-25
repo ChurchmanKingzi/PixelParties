@@ -191,6 +191,30 @@ function ppFxN(n) {
   return n;
 }
 window.ppFxN = ppFxN;
+
+// ★ v1442 — DER WAAGERECHTE BILDLAUF-RIEGEL, an EINER Stelle.
+// Kampfbrett (`.board-center.can-scroll`, app-board.jsx) und Puzzle-
+// Editor (`.pz-board-wrap.pz-can-hscroll`, app-puzzle.jsx) entscheiden
+// beide, ob ihr Brett breiter ist als der Platz und seitlich scrollen
+// muss. Beide hatten denselben Fehler: gemessen wurde `scrollWidth`
+// eines Kastens mit `overflow-x: auto` — und das ist dort nie kleiner
+// als `clientWidth`. Die Loese-Schwelle (`clientWidth − 36`) lag damit
+// immer darunter; einmal eingerastet, blieb der Modus fuer immer an.
+//
+// `inhaltW` ist deshalb die GEMESSENE Inhaltsbreite (Reihen/Zonen,
+// flach gemessen) — `scrollWidth` geht nur ein, wenn es wirklich ueber
+// `clientWidth` liegt (`ppEchterUeberstand`). Hysterese: einrasten ab
+// +4 px, loesen erst unter −max(36 px, 5 %), weil das Einrasten selbst
+// (Balken, Polster) den Massstab und damit die Breite etwas verschiebt.
+function ppEchterUeberstand(el) {
+  return el.scrollWidth > el.clientWidth + 1 ? el.scrollWidth : 0;
+}
+function ppHScrollRiegel(inhaltW, clientWidth, eingerastet) {
+  const luecke = Math.max(36, clientWidth * 0.05);
+  return inhaltW > clientWidth + (eingerastet ? -luecke : 4);
+}
+window.ppEchterUeberstand = ppEchterUeberstand;
+window.ppHScrollRiegel = ppHScrollRiegel;
 let _touchStartPt = null;
 // Capture-Phase, also VOR Reacts Handlern: damit gilt `_isTouchDevice`
 // schon bei der allerersten Beruehrung (der alte Fenster-Listener kam

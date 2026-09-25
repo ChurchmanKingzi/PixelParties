@@ -36274,7 +36274,25 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       el.style.setProperty('--center-offset', offset + 'px');
       // Now check if natural content overflows (ignoring transform)
       // Use scrollWidth which reflects content width before transform
-      if (el.scrollWidth > el.clientWidth + (wasScrollMode ? -36 : 4)) {
+      // ★ v1442: Riegel ueber den gemeinsamen Helfer (app-shared). Im
+      // Messfenster ist der Kasten `overflow-x: auto`, `scrollWidth` also
+      // nie kleiner als `clientWidth` — vorher lag er damit IMMER ueber
+      // der Loese-Schwelle (−36), einmal eingerastet blieb der Scroll-
+      // modus fuer den Rest der Partie an (z.B. nachdem Flying Islands
+      // wieder verschwunden waren). Passt der Inhalt, entscheidet jetzt
+      // seine gemessene Breite: erste bis letzte Zone jeder Reihe, flach.
+      let inhaltW = window.ppEchterUeberstand(el);
+      if (!inhaltW) {
+        const _er = el.getBoundingClientRect();
+        const _zf = (el.offsetWidth > 0 && _er.width > 0) ? _er.width / el.offsetWidth : 1;
+        el.querySelectorAll('.board-plane .board-row').forEach(row => {
+          const k = row.children;
+          if (!k.length) return;
+          const w = (k[k.length - 1].getBoundingClientRect().right - k[0].getBoundingClientRect().left) / _zf;
+          if (w > inhaltW) inhaltW = w;
+        });
+      }
+      if (window.ppHScrollRiegel(inhaltW, el.clientWidth, wasScrollMode)) {
         el.classList.add('can-scroll');
         // In scroll mode, disable centering transform to avoid layout confusion
         el.style.setProperty('--center-offset', '0px');

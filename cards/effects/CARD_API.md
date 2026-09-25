@@ -18382,3 +18382,13 @@ Unzulässige Einträge RUHEN: keine Versiegelung, keine Anzeige, kein Stapel fü
 neue Kopien, keine Rückkehr (Log `verwahrung_kehrt_nicht_zurueck`,
 `reason: 'zone_not_legal'`) — die Karte bleibt im Deleted Pile. Wird die Zone
 bis Zugende wieder legal (neues Xalibur), kehrt sie normal zurück.
+
+## ★ v1442 — Brett-Einpassen: der waagerechte Bildlauf-Riegel und die Schwingungsbremse
+
+Anlass (Al 25.9.): Puzzle-Editor mit Wowhalla neu geladen → das Spielfeld „atmet“ (Maßstab pendelt endlos). Nur live sichtbar, weil `localStorage` je Herkunft getrennt ist (anderes gespeichertes Brett) und Headless-Chromium Scrollbalken ausblendet.
+
+- **Riegel an EINER Stelle:** `window.ppHScrollRiegel(inhaltW, clientWidth, eingerastet)` (app-shared). Einrasten ab +4 px, lösen erst unter −max(36 px, 5 %). Kampfbrett (`.board-center.can-scroll`) und Editor (`.pz-can-hscroll`) nutzen ihn beide.
+- **`scrollWidth` hat unter `overflow-x: auto` den Boden `clientWidth`.** Wer damit den Riegel lösen will, löst ihn NIE. Deshalb `window.ppEchterUeberstand(el)`: liefert `scrollWidth` nur bei echtem Überstand, sonst 0 — dann entscheidet die flach gemessene Inhaltsbreite (erste bis letzte Zone je Reihe).
+- **Höhe nie aus `clientHeight` eines Kastens, dessen waagerechter Balken kommen und gehen kann.** Der Editor rechnet mit der Innenhöhe ohne Balken und reserviert im Bildlauf-Modus die einmal gemessene Balkenstärke fest.
+- **ResizeObserver-Zähler:** nur eine Größenänderung des Wraps SELBST setzt `passes` zurück — die Kinder ändern sich als Folge jedes Maßstab-Schreibens. Über `MAX_PASSES` wird kein neuer Maßstab mehr geschrieben (vorher entfiel nur der nächste RAF, geschrieben wurde trotzdem).
+- Diagnose: `window.PP_HSCROLL_DEBUG = true` in der Konsole protokolliert jeden Editor-Pass. Mehr als eine Handvoll Zeilen im Ruhezustand = Schleife.
