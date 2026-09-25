@@ -1384,70 +1384,171 @@ const ppQuer = (y, dur, delay, rtl) => ({
 });
 const ppZufall = (n, f) => Array.from({ length: n }, (_, i) => f(i));
 
-// ── COTTAGE AT THE FOREST'S EDGE ────────────────────────────────────
-//  Karte: Blockhuette mit Tuer, Fenstern, Efeu, Pfad, Wegweiser, Zaun.
-//  Ruhig (Als frueherer Wunsch): wiegende Efeublaetter, Schmetterlinge,
-//  einzelne fallende Blaetter.
-//  v1437 (Al 25.9.: „Detailgrad deutlich zu klein"): Kachel 128 breit.
-//  Dachtraufe mit Naegeln, Blockbohlen unterschiedlich lang mit Licht-
-//  kante, Maserung und Aesten, zwei Fenster mit Sprossen, Vorhaengen und
-//  warmem Innenlicht (eines mit Blumenkasten, eines mit gruenen Laeden),
-//  Kraeuterbuendel, Hufeisen, Steinsockel, Wiese mit Bueschen, Wildblumen,
-//  Steinen, Pilzen und Farnen, Efeuranken mit groesseren Blaettern. Mitte:
-//  Tuer mit Beschlaegen, Guckfenster und Sturz, Stufe, Fussmatte,
-//  Laterne, Schild mit Schnitzzeilen, Holzstapel, Hackklotz mit Axt,
-//  Zaun, Pfad mit Trittsteinen. Animiert zusaetzlich: Gras im Wind,
-//  Laterne und Fensterlicht flackern, ein Rotkehlchen auf dem Schild.
+// ═══════════════════════════════════════════════════════════════════
+//  COTTAGE AT THE FOREST'S EDGE (v1415, Kartenstil; Überarbeitung v1441
+//  (Al 25.9.))
+//
+//  Karte: Blockhütte mit Tür, Fenstern, Efeu, Pfad, Wegweiser, Zaun.
+//  Ruhig (Als früherer Wunsch): wiegende Efeublätter, Schmetterlinge,
+//  einzelne fallende Blätter.
+//  v1437 (Al 25.9.: „Detailgrad deutlich zu klein"): Dachtraufe mit
+//  Nägeln, Blockbohlen mit Lichtkante, Maserung und Ästen, zwei Fenster
+//  mit Sprossen, Vorhängen und warmem Innenlicht (eines mit Blumenkasten,
+//  eines mit grünen Läden), Kräuterbündel, Hufeisen, Steinsockel, Wiese
+//  mit Wildblumen, Steinen, Pilzen und Farnen, Efeu mit größeren
+//  Blättern; Tür mit Beschlägen und Sturz, Stufe, Fußmatte, Laterne,
+//  Schild mit Schnitzzeilen (keine Schrift), Holzstapel, Hackklotz mit
+//  Axt, Zaun, Pfad mit Trittsteinen, Rotkehlchen auf dem Schild.
+//
+//  Überarbeitung v1441 (Al 25.9.): auf das Niveau der v1440-Szenen. Die
+//  Hütte ist jetzt EIN Versatzstück (184 breit) mit Tiefe statt einer
+//  endlosen Wand: bemoostes Schindeldach mit First und Ortgang, Stein-
+//  schornstein, runde Blockbohlen mit Eckköpfen (Stirnholz mit Jahres-
+//  ringen und Rissen), Feldsteinsockel. An den Seiten und hinter dem
+//  Dach der WALDRAND in drei Tiefen (ferne dunstige Baumreihen im
+//  Abendlicht, mittlere Stämme, nahe Bäume mit Borke, Wurzeln und Moos),
+//  Unterholz mit Farnen, ein Staketenzaun an der Hauskante, davor die
+//  Wiese. Abendstimmung: warmes Fenster- und Laternenlicht, schräge
+//  Lichtbahnen durchs Laub. Schatten von Schild, Tonne, Traufe und Haus
+//  fallen nach links unten.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt): far.png —
+//  Kachel 96 (Abendhimmel, ferne Baumreihen, Bodendunst); tile.png —
+//  Kachel 128 (Bäume, Unterholz, Zaun, Wiese mit Blumen, Steinen,
+//  Pilzen, Klee); canopy.png — Laubkronen, 3 Bilder; shafts.png —
+//  Lichtbahnen; grass.png — hohe Vordergrund-Halme mit Blüten, 3 Bilder;
+//  cottage.png — die Hütte (Stück 184): Tür mit Füllungen, Beschlägen,
+//  Knauf und Sturz, Stufe mit Matte, Hufeisen, zwei Fenster mit Kerze/
+//  Krug und roten Vorhängen (links grüne Läden mit Herz, rechts Blumen-
+//  kasten), Kräuterbündel, Laterne, Topfgeranie, Holzstapel, Regentonne,
+//  Wegweiser, Hackklotz mit Axt, Pfad mit Trittsteinen; ivy.png — Efeu,
+//  3 Bilder; glow.png / lantern-glow.png — Lichtschein; Sprites:
+//  smoke.png (5), cat.png (4), robin.png (4), rabbit.png (4),
+//  butterfly.png (2), leaf.png (3).
+//
+//  Animiert: Laub und Efeu wiegen, hohe Halme im Wind, Lichtbahnen
+//  atmen, Rauch aus dem Schornstein zieht nach links, Fenster- und
+//  Laternenlicht flackern, eine Katze auf der Fensterbank (Schwanz,
+//  Blinzeln, Ohr), das Rotkehlchen auf dem Wegweiser, ein Hase in der
+//  Wiese, Glühwürmchen am Waldrand, Schmetterlinge, fallende Blätter.
 //  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const COT = '/areas/cottage/';
+const COT_W = 184;                         // Hüttenstück; Stück-x 92 = Brettmitte
+const COT_KAMIN = [143, 6];                // Schornsteinmündung (Stück-x, y)
 const CottageOverlay = React.memo(function CottageOverlay() {
   const falter = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    y: 34 + Math.random() * 50, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
-    bob: 2 + Math.random() * 3, rtl: i % 2 === 1,
+    y: 40 + Math.random() * 46, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
+    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(5), () => ({
-    x: Math.random() * 100, dur: 8 + Math.random() * 6, delay: -Math.random() * 12,
+  const blaetter = useMemo(() => ppZufall(ppFxN(6), () => ({
+    x: Math.random() * 100, dur: 9 + Math.random() * 7, delay: -Math.random() * 14,
   })), []);
+  // Glühwürmchen am Waldrand links und rechts der Hütte (und ein paar vorn in der Wiese)
+  const gluehw = useMemo(() => ppZufall(ppFxN(14), (i) => {
+    const seite = i % 2 ? 1 : -1;
+    const vorn = i >= 10;
+    return {
+      x: vorn ? (Math.random() - .5) * 170 : seite * (96 + Math.random() * 90),
+      y: vorn ? 74 + Math.random() * 20 : 34 + Math.random() * 36,
+      dur: 2.4 + Math.random() * 2.6, delay: -Math.random() * 5,
+      wdur: 6 + Math.random() * 6, wdelay: -Math.random() * 10,
+    };
+  }), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(4), (i) => ({ delay: -i * 1.6 })), []);
   return (
-    <PixelScene artH={100} bg="#3a2a14" className="cottage-overlay">
+    <PixelScene artH={100} bg="#2e3c24" className="cottage-overlay">
+      <PixelBand src={COT + 'far.png'} />
       <PixelBand src={COT + 'tile.png'} />
-      <PixelBand src={COT + 'window-glow.png'} className="cot-licht" />
-      <PixelBand src={COT + 'grass-wind.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
-      <PixelBand src={COT + 'leaves.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
-      <PixelPiece src={COT + 'front.png'} w={140} />
-      <PixelPiece src={COT + 'lantern-glow.png'} w={140} className="cot-laterne" />
-      <i className="cot-vogel" style={{ left: ppArtX(26, 0), top: ppArt(33) }} />
+      <PixelBand src={COT + 'shafts.png'} className="cot-strahlen" />
+      <PixelBand src={COT + 'canopy.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 3.3s steps(1) infinite' }} />
+      {gluehw.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn cot-gluehw" style={{
+          left: ppArtX(g.x, 0), top: ppArt(g.y),
+          animation: `cotGlueh ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite, cotSchweb ${g.wdur.toFixed(2)}s steps(6) ${g.wdelay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      <PixelBand src={COT + 'grass.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn cot-rauch" style={{
+          left: ppArtX(COT_KAMIN[0] - 3.5, COT_W), top: ppArt(COT_KAMIN[1] - 6), animationDelay: `${r.delay}s`,
+        }} />
+      ))}
+      <PixelPiece src={COT + 'cottage.png'} w={COT_W} />
+      <PixelPiece src={COT + 'ivy.png'} w={COT_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
+      <PixelPiece src={COT + 'glow.png'} w={COT_W} className="cot-licht" />
+      <PixelPiece src={COT + 'lantern-glow.png'} w={COT_W} className="cot-laterne" />
+      <i className="cot-katze" style={{ left: ppArtX(37, COT_W), top: ppArt(46) }} />
+      <i className="cot-vogel" style={{ left: ppArtX(108, COT_W), top: ppArt(33) }} />
+      <i className="cot-hase" style={{ left: ppArtX(30, COT_W), top: ppArt(80) }} />
       {blaetter.map((b, i) => (
-        <i key={'l' + i} className="pp-area-dyn cot-blatt" style={{ left: b.x + '%', animation: `cotFall ${b.dur}s linear ${b.delay}s infinite, ppSprite3 .9s steps(1) infinite` }} />
+        <i key={'l' + i} className="pp-area-dyn cot-blatt" style={{ left: b.x + '%', animation: `cotFall ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite, ppSprite3 .9s steps(1) infinite` }} />
       ))}
       {falter.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined, filter: f.farbe }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .cot-licht { animation: cotLicht 3.1s ease-in-out infinite alternate; }
-        @keyframes cotLicht { from { opacity: .6; } to { opacity: 1; } }
+        .cot-strahlen { animation: cotStrahl 7s steps(1) infinite; }
+        @keyframes cotStrahl { 0% { opacity: .7; } 20% { opacity: .85; } 40% { opacity: 1; } 60% { opacity: .9; } 80% { opacity: .75; } }
+        .cot-licht { animation: cotLicht 3.1s steps(1) infinite; }
+        @keyframes cotLicht { 0% { opacity: .85; } 18% { opacity: 1; } 36% { opacity: .78; } 44% { opacity: .95; } 70% { opacity: .82; } 84% { opacity: 1; } }
         .cot-laterne { animation: cotLaterne 1.7s steps(1) infinite; }
         @keyframes cotLaterne { 0% { opacity: 1; } 23% { opacity: .75; } 27% { opacity: 1; } 61% { opacity: .85; } 64% { opacity: .65; } 68% { opacity: 1; } }
-        .cot-vogel { position: absolute; width: calc(7 * var(--px)); height: calc(6 * var(--px)); background: url(${COT}bird.png) 0 0 / 300% 100% no-repeat; animation: cotVogel 4.2s steps(1) infinite; }
-        @keyframes cotVogel { 0%, 50% { background-position: 0 0; } 54%, 58% { background-position: 50% 0; } 62%, 66% { background-position: 0 0; } 70%, 74% { background-position: 50% 0; } 78%, 90% { background-position: 100% 0; } 94%, 100% { background-position: 0 0; } }
+        .cot-rauch {
+          position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${COT}smoke.png) 0 0 / 500% 100% no-repeat;
+          animation: cotRauch 6.4s steps(1) infinite, cotRauchZug 6.4s steps(26) infinite;
+        }
+        @keyframes cotRauch {
+          0% { background-position: 0 0; opacity: .95; } 20% { background-position: 25% 0; }
+          40% { background-position: 50% 0; opacity: .85; } 60% { background-position: 75% 0; opacity: .7; }
+          80% { background-position: 100% 0; opacity: .45; } 100% { background-position: 100% 0; opacity: 0; }
+        }
+        @keyframes cotRauchZug { from { transform: translate(0, 0); } to { transform: translate(calc(-26 * var(--px)), calc(-7 * var(--px))); } }
+        .cot-gluehw {
+          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(220, 255, 120, .55);
+        }
+        @keyframes cotGlueh { 0%, 45% { opacity: 0; } 50% { opacity: .6; } 56%, 74% { opacity: 1; } 80% { opacity: .5; } 85%, 100% { opacity: 0; } }
+        @keyframes cotSchweb { from { translate: 0 0; } to { translate: calc(4 * var(--px)) calc(-3 * var(--px)); } }
+        .cot-katze { position: absolute; width: calc(9 * var(--px)); height: calc(10 * var(--px)); background: url(${COT}cat.png) 0 0 / 400% 100% no-repeat; animation: cotKatze 7.3s steps(1) infinite; }
+        @keyframes cotKatze {
+          0% { background-position: 0 0; } 18% { background-position: 33.33% 0; } 24% { background-position: 0 0; }
+          30% { background-position: 33.33% 0; } 36% { background-position: 0 0; } 55% { background-position: 66.67% 0; }
+          57% { background-position: 0 0; } 78% { background-position: 100% 0; } 82% { background-position: 0 0; }
+          90% { background-position: 66.67% 0; } 92%, 100% { background-position: 0 0; }
+        }
+        .cot-vogel { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${COT}robin.png) 0 0 / 400% 100% no-repeat; animation: cotVogel 4.6s steps(1) infinite; }
+        @keyframes cotVogel {
+          0%, 30% { background-position: 0 0; } 34%, 44% { background-position: 33.33% 0; } 48% { background-position: 0 0; }
+          56% { background-position: 100% 0; } 60% { background-position: 0 0; } 64% { background-position: 100% 0; }
+          68% { background-position: 0 0; } 80%, 88% { background-position: 66.67% 0; } 92%, 100% { background-position: 0 0; }
+        }
+        .cot-hase { position: absolute; width: calc(11 * var(--px)); height: calc(10 * var(--px)); background: url(${COT}rabbit.png) 0 0 / 400% 100% no-repeat; animation: cotHase 5.9s steps(1) infinite; }
+        @keyframes cotHase {
+          0% { background-position: 0 0; } 14% { background-position: 100% 0; } 16% { background-position: 0 0; }
+          18% { background-position: 100% 0; } 20% { background-position: 0 0; } 40% { background-position: 33.33% 0; }
+          46% { background-position: 0 0; } 60%, 72% { background-position: 66.67% 0; } 74% { background-position: 0 0; }
+          76%, 86% { background-position: 66.67% 0; } 88%, 100% { background-position: 0 0; }
+        }
         .cot-falter {
           display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px));
           background: url(${COT}butterfly.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 .26s steps(1) infinite, ppBob 1.3s ease-in-out infinite alternate;
         }
         .cot-blatt {
-          position: absolute; top: 0; width: calc(2 * var(--px)); height: calc(2 * var(--px));
+          position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(3 * var(--px));
           background: url(${COT}leaf.png) 0 0 / 300% 100% no-repeat; opacity: 0;
         }
         @keyframes cotFall {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: 1; }
-          25% { transform: translate(calc(4 * var(--px)), calc(18 * var(--px))); }
-          50% { transform: translate(calc(-2 * var(--px)), calc(40 * var(--px))); }
-          75% { transform: translate(calc(3 * var(--px)), calc(62 * var(--px))); }
-          92% { opacity: 1; } 100% { transform: translate(0, calc(80 * var(--px))); opacity: 0; }
+          25% { transform: translate(calc(4 * var(--px)), calc(20 * var(--px))); }
+          50% { transform: translate(calc(-2 * var(--px)), calc(44 * var(--px))); }
+          75% { transform: translate(calc(3 * var(--px)), calc(68 * var(--px))); }
+          92% { opacity: 1; } 100% { transform: translate(0, calc(90 * var(--px))); opacity: 0; }
         }
       `}</style>
     </PixelScene>

@@ -567,6 +567,14 @@ Seit v1440 sind ALLE 26 Area-Hintergründe Pixelart-Szenen und `opaque`
 (die letzten elf: Spatial Crevice, Spider Hive, Stinky Stables, Tarleinn's
 Floating Island, Temple of Sacrifice, The Bonegrinder, The Cosmic Depths,
 The First Circle of Hell, Big Gwen, War Council Gathering Place, Wowhalla).
+Mit v1441 wurden die 15 älteren Szenen auf dasselbe Niveau gehoben
+(Motiv, Palette und Als Vorgaben aus den Kommentarblöcken unverändert).
+Als Korrekturen vom 25.9.: The Cosmic Depths — die Erde ist ein WÜRFEL,
+Argos hat einen schwarzen Schattenkörper; The First Circle of Hell — die
+Vorhölle, eine endlose, graue, karge Ebene; War Council Gathering Place —
+eine BRÜCKE, kein Innenraum; Wowhalla — Steampunk mit Bronze-Zahnrädern;
+Big Gwen — das Bunte sind Blumen; The Bonegrinder — Skelett-Heiler mit
+rotem Kreuz und Skelett-Hund.
 
 Bausteine in app-areas.jsx:
 
