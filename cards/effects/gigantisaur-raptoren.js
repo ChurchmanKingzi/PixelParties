@@ -233,7 +233,7 @@ module.exports = {
         // Capture the post-splice hand index AS-WAS so the hand→board
         // flight animation below targets the correct source slot.
         const realIdx = ps.hand.indexOf(chosenName);
-        if (realIdx >= 0) ps.hand.splice(realIdx, 1);
+        if (realIdx >= 0) engine.takeFromPileSync(ps, 'hand', realIdx);
         const handInst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === chosenName,
         );

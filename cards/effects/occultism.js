@@ -219,7 +219,7 @@ module.exports = {
         from: 'hand', to: 'discard',
         fromHandIdx: hi >= 0 ? hi : 0,
       });
-      if (hi >= 0) subPs.hand.splice(hi, 1);
+      if (hi >= 0) engine.takeFromPileSync(subPs, 'hand', hi);
       if (subPs) subPs.discardPile.push(sacName);
       sacInst.zone = 'discard'; sacInst.heroIdx = -1; sacInst.zoneSlot = -1;
       engine._untrackCard(sacInst.id);

@@ -269,33 +269,11 @@ module.exports = {
           }
         }
 
-        // Splice from discard. Untrack any stale discard-zone listener
-        // for this name (the pile-listener safety net might have
-        // tracked one; we want the new support-zone summon to be the
-        // canonical inst from here on).
-        if (!(await engine.takeFromPile(ps, 'discard', dIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
-        const stale = engine.cardInstances.find(c =>
-          c.owner === pi && c.name === name && c.zone === 'discard',
-        );
-        if (stale) engine._untrackCard(stale.id);
-
-        // Visual: card flies from discard into the support slot. The
-        // pile-transfer broadcast also pre-registers via the receiving
-        // hand-pending counter when destination is hand; for support
-        // destinations the auto-detector doesn't apply, so this is
-        // purely cosmetic.
-        engine._broadcastEvent('play_pile_transfer', {
-          owner:       pi,
-          cardName:    name,
-          from:        'discard',
-          to:          'support',
-          toHeroIdx:   dest.heroIdx,
-          toSlotIdx:   dest.slotIdx,
-        });
-        await engine._delay(200);
-
-        const placed = await engine.summonCreatureWithHooks(name, pi, dest.heroIdx, dest.slotIdx, {
-          source: CARD_NAME,
+        // v1389: Ablage → Feld über die EINE Stelle (summonFromDiscard:
+        // Entnahme samt Abräumen der verwaisten Ablage-Instanz, Flug mit
+        // 200 ms Landezeit, Signal, Rückgabe bei Fehlschlag).
+        const placed = await engine.summonFromDiscard(pi, pi, dIdx, dest.heroIdx, dest.slotIdx, {
+          source: CARD_NAME, flug: 200,
         });
         if (placed) summonsLanded++;
         engine.sync();

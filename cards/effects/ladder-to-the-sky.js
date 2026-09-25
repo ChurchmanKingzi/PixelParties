@@ -132,15 +132,15 @@ async function doLadderSearch(engine, pi, sacLevel) {
     dest = { heroIdx: zr.heroIdx, slotIdx: zr.slotIdx };
   }
 
-  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+  const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return;
 
   const res = await engine.summonCreatureWithHooks(
     chosenName, pi, dest.heroIdx, dest.slotIdx,
-    { source: CARD_NAME, isPlacement: true },
+    { source: CARD_NAME, isPlacement: true, hookExtras: engine.deckHookExtras() },   // v1393
   );
   if (!res?.inst) {
-    ps.mainDeck.push(chosenName);
+    engine.returnToPile(ps, 'deck', chosenName);
     engine.shuffleDeck(pi);
     return;
   }

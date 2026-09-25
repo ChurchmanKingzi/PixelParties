@@ -239,29 +239,18 @@ module.exports = {
       // ONLY the listener that fired this prompt — sibling Grave
       // Worm trackers (other copies still in discard) keep their
       // listeners so future deaths can still trigger them.
-      if (!(await engine.takeFromPile(ps, 'discard', dpIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
-      if (ctx.card?.id != null) engine._untrackCard(ctx.card.id);
-
-      // SUMMON (not placement) at the dying creature's slot —
-      // honours the host Hero's normal summon gates (already
-      // verified above). `summonCreatureWithHooks` creates a fresh
-      // inst, fires onPlay (which fires the burrow animation +
-      // draw 1), and runs onCardEnterZone.
-      const placed = await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, death.heroIdx, death.zoneSlot,
-        {
-          source: CARD_NAME,
-          hookExtras: {
-            _summonedBy: CARD_NAME,
-            _summonedFromDiscard: true,
-            _summonedAsAdditional: true,
-          },
-        },
-      );
+      // SUMMON (not placement) at the dying creature's slot — v1389 über
+      // die EINE Ablage-Stelle (`summonFromDiscard`: Signal, Lethe,
+      // Rückgabe bei Fehlschlag). Der Listener-Klon wird danach abgeräumt.
+      const listenerId = ctx.card?.id;
+      const placed = await engine.summonFromDiscard(pi, pi, dpIdx, death.heroIdx, death.zoneSlot, {
+        source: CARD_NAME, flug: false,
+        hookExtras: { _summonedBy: CARD_NAME, _summonedAsAdditional: true },
+      });
+      if (listenerId != null && engine.cardInstances.some(c => c.id === listenerId)) engine._untrackCard(listenerId);
       if (!placed) {
         // Roll back if the placement failed for any defensive reason.
         if (gs.hoptUsed) delete gs.hoptUsed[`${HOPT_KEY}:${pi}`];
-        ps.discardPile.push(CARD_NAME);
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }

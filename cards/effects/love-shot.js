@@ -301,6 +301,7 @@ module.exports = {
       targetHero.charmedHeroIdx = sel.heroIdx;
       if (!targetHero.statuses) targetHero.statuses = {};
       targetHero.statuses.charmed = { controller: pi, appliedTurn: gs.turn, _loveShot: true };
+      engine._heldenStatusVerursacher(targetHero.statuses.charmed, { appliedBy: pi, source: ctx.card });   // v1399
       engine.sync();
 
       try {
@@ -376,7 +377,7 @@ module.exports = {
         // onPlay + afterSpellResolved with _skipReactionCheck (we
         // are inside Love Shot's resolution — its own reaction
         // window already fired).
-        ps.hand.splice(handIndex, 1);
+        engine.takeFromPileSync(ps, 'hand', handIndex);
         const inst = engine._trackCard(chosenName, pi, 'hand', sel.heroIdx, -1);
         inst.heroOwner = oi;
 
@@ -449,7 +450,7 @@ module.exports = {
             owner: pi, cardName: chosenName, from: 'hand', to: 'hand',
             fromHandIdx: _retIdx, toHandIdx: _retIdx,
           });
-          ps.hand.push(chosenName);
+          engine.handZugangSync(ps, chosenName, { source: CARD_NAME, ohneInstanz: true });
           engine._untrackCard(inst.id);
         } else {
           ps.discardPile.push(chosenName);

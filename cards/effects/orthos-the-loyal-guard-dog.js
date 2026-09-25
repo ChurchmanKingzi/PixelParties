@@ -154,14 +154,14 @@ module.exports = {
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       const placed = await engine.summonCreatureWithHooks(
         pickedLoyal, pi, ctx.cardHeroIdx, destSlot,
         { source: CARD_NAME },
       );
       if (!placed) {
-        ps.hand.push(pickedLoyal);
+        engine.handZugangSync(ps, pickedLoyal, { source: CARD_NAME, ohneInstanz: true });
         if (gs.hoptUsed) delete gs.hoptUsed[hoptKey];
         return;
       }

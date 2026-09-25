@@ -117,15 +117,24 @@ module.exports = {
 
     await engine._delay(3100);
 
-    // Perform immediate action: Attack/Spell only, exclude protected target
-    await engine.performImmediateAction(oppIdx, oppHeroIdx, {
-      title: 'Invisibility Cloak',
-      description: `Use an Attack or Spell with ${oppHero.name}. ${protectedTarget.cardName} cannot be targeted.`,
-      allowedCardTypes: ['Attack', 'Spell'],
-      skipAbilities: true,
-      excludeTargets: [protectedId],
+    // ★ v1405 (Al Testbefund 25.9., Bartas + Phoenix Tackle): Die Ersatz-
+    // Aktion kommt NACH der vollständigen Abwicklung des negierten Spells
+    // (`queuePostChainAction`, wie Lunar Eclipse). Bis v1404 lief sie
+    // mitten in dessen Auflösung: Der negierte Spell lag noch auf der
+    // Hand und ließ sich ein zweites Mal wählen, und das noch gesetzte
+    // Negations-Flag des äußeren Spells verhinderte Bartas' Zweitziel.
+    engine.queuePostChainAction(async () => {
+      const held = gs.players[oppIdx]?.heroes?.[oppHeroIdx];
+      if (!held?.name || held.hp <= 0) return;
+      await engine.performImmediateAction(oppIdx, oppHeroIdx, {
+        title: 'Invisibility Cloak',
+        description: `Use an Attack or Spell with ${held.name}. ${protectedTarget.cardName} cannot be targeted.`,
+        allowedCardTypes: ['Attack', 'Spell'],
+        skipAbilities: true,
+        excludeTargets: [protectedId],
+      });
+      engine.sync();
     });
-
     engine.sync();
 
     return { effectNegated: true };

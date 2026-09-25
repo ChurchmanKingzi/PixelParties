@@ -129,39 +129,24 @@ async function fireGroupChoice(ctx, damage, postPromptReveal = false) {
   // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Beide Modi
   // treffen eine ganze Seite in EINEM Schlag. Das Anti-AoE-Fenster
   // (Deepsea Idol) oeffnet der Kreaturen-Batch selbst.
+  // ★ v1392: beide Varianten über die EINE Stelle für Mehrfachtreffer.
+  const ziele = [];
   if (target === 'heroes') {
-    const lebende = (oppPs.heroes || []).filter(h => h?.name && h.hp > 0);
-    engine.beginMultiHit(lebende.length);
-    try {
-      for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
-        const h = oppPs.heroes[hi];
-        if (h?.name && h.hp > 0) {
-          await ctx.dealDamage(h, damage, 'creature');
-        }
-      }
-    } finally {
-      engine.endMultiHit();
+    for (let hi = 0; hi < (oppPs.heroes || []).length; hi++) {
+      const h = oppPs.heroes[hi];
+      if (h?.name && h.hp > 0) ziele.push({ type: 'hero', owner: oppIdx, heroIdx: hi });
     }
   } else {
-    const entries = [];
     for (const inst of engine.cardInstances) {
       if (inst.owner === oppIdx && inst.zone === 'support') {
         const cd = engine._getCardDB()[inst.name];
-        if (cd && hasCardType(cd, 'Creature')) {
-          entries.push({ inst, amount: damage, source: ctx.card, type: 'creature' });
-        }
+        if (cd && hasCardType(cd, 'Creature')) ziele.push({ type: 'creature', inst });
       }
     }
-    // `processCreatureDamageBatch` is the engine's batch-damage entry
-    // point — `dealCreatureDamage` doesn't exist (the previous call
-    // was a no-op) and would silently drop the AoE.
-    if (entries.length > 0) {
-      engine.beginMultiHit(entries.length);
-      try {
-        await engine.processCreatureDamageBatch(entries);
-      } finally {
-        engine.endMultiHit();
-      }
-    }
+  }
+  if (ziele.length > 0) {
+    await ctx.dealDamageToTargets(ziele, {
+      damage, damageType: 'creature', hitDelay: 0, surpriseCheck: false, postTargetCheck: false,
+    });
   }
 }

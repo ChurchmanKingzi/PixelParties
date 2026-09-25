@@ -89,87 +89,25 @@ module.exports = {
     const targets = selectedIds.map(id => validTargets.find(t => t.id === id)).filter(Boolean);
     if (targets.length === 0) return;
 
-    // Pre-damage post-target hand-reaction window. Book of Doom's
-    // custom targeting bypasses `promptDamageTarget` and
-    // `actionDealAoeDamage`, so the engine's normal post-target
-    // invocation never fires. We invoke it here ONCE with the full
-    // (mixed hero + creature) target list so Sculpture Guards (and
-    // any other `isPostTargetReaction` card) gets one consolidated
-    // prompt covering every Frozen target the activator controls in
-    // this source. The per-target pre-damage hooks downstream check
-    // `gs._sgPromptedThisDamageFlow` and skip after this resolves.
-    const postTargetList = targets.map(t => {
-      if (t.type === 'hero') {
-        return { type: 'hero', owner: t.owner, heroIdx: t.heroIdx, cardName: t.cardName };
-      }
-      return {
-        type: 'creature',
-        owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx,
-        cardName: t.cardName,
-      };
-    });
-    const synthSource = { name: CARD_NAME, owner: pi, heroIdx: -1 };
-    await engine._checkPostTargetHandReactions(postTargetList, synthSource, {});
-
-    // Fire explosion animations on all targets simultaneously
-    for (const target of targets) {
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'explosion', owner: target.owner,
-        heroIdx: target.heroIdx,
-        zoneSlot: target.type === 'equip' ? target.slotIdx : -1,
-      });
-    }
-
-    await engine._delay(400);
-
-    // ★ v1060 („Interference", Als Befund 14.9.: „funktioniert noch
-    // nicht gegen Book of Doom"). Bei ZWEI ODER MEHR gewaehlten Zielen
-    // ist das ein Flaechenschlag — EINE Quelle, mehrere Ziele —, und
-    // genau dagegen schuetzt „Interference". Die Klammer fehlte, weil
-    // die Karte ihren Schaden selbst austeilt statt ueber `aoeHit`;
-    // der v1043-Durchgang hatte nur Karten mit eigenem SCHADENSWEG
-    // erfasst, nicht die mit eigener ZIELWAHL.
-    //
-    // ★ ES ZAEHLT DIE ECHTE ZIELMENGE: `targets` ist bereits das, was
-    // der Spieler gewaehlt hat — bei einem einzigen Ziel bleibt es ein
-    // Einzeltreffer und der Schutz greift korrekt nicht.
-    //
-    // Die Klammer umschliesst BEIDE Wege (Helden einzeln, Kreaturen im
-    // Stapel), weil auch die Kreaturen zur Zielzahl gehoeren: „hits
-    // other targets in addition to it" ist egal welcher Art.
-    engine.beginMultiHit(targets.length);
-    try {
-    // Deal damage — heroes individually, creatures batched
-    const creatureBatch = [];
-    for (const target of targets) {
-      if (target.type === 'hero') {
-        const hero = engine.gs.players[target.owner]?.heroes?.[target.heroIdx];
-        if (hero && hero.hp > 0) {
-          const dummySource = engine._trackCard(CARD_NAME, pi, 'hand', -1, -1);
-          await engine.actionDealDamage(dummySource, hero, DAMAGE_PER_TARGET, 'other');
-          engine._untrackCard(dummySource.id);
-        }
-      } else if (target.type === 'equip') {
-        const inst = target.cardInstance || engine.cardInstances.find(c =>
-          c.owner === target.owner && c.zone === 'support' &&
-          c.heroIdx === target.heroIdx && c.zoneSlot === target.slotIdx
-        );
-        if (inst) {
-          creatureBatch.push({
-            inst, amount: DAMAGE_PER_TARGET, type: 'other',
-            source: { name: CARD_NAME, owner: pi, heroIdx: -1 },
-            sourceOwner: pi, canBeNegated: true,
-            isStatusDamage: false, animType: null,
-          });
-        }
-      }
-    }
-
-    // Process all creature damage as a single batch
-    if (creatureBatch.length > 0) {
-      await engine.processCreatureDamageBatch(creatureBatch);
-    }
-    } finally { engine.endMultiHit(); }
+    // ★ v1392: Schaden über die EINE Stelle für Mehrfachtreffer
+    // (`engine.dealDamageToTargets`). Bis v1391 baute Book of Doom
+    // Post-Target-Reaktionen, Interference-Klammer, Heldentreffer mit
+    // Attrappen-Quelle und den Kreatur-Stapel selbst — und das Idol-
+    // Fenster (Deepsea Idol) sowie die Brett-Wächter (Puppets) fehlten
+    // ganz. Jetzt sieht jede Anti-AoE-Karte Book wie jede andere
+    // Flächenquelle, sobald 2+ Ziele gewählt sind. Surprise-Fenster wie
+    // bisher aus (Book ist ein Artifact, kein Attack/Spell).
+    await engine.dealDamageToTargets(
+      { name: CARD_NAME, owner: pi, heroIdx: -1 },
+      targets.map(t => t.type === 'hero'
+        ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx }
+        : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }),
+      {
+        damage: DAMAGE_PER_TARGET, damageType: 'other', sourceName: CARD_NAME,
+        animationType: 'explosion', animDelay: 400, hitDelay: 0,
+        surpriseCheck: false, attrappenQuelle: true,
+      },
+    );
 
     engine.sync();
     await engine._delay(400);

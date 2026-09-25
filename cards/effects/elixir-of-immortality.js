@@ -204,7 +204,9 @@ module.exports = {
           const pile = ps.discardPile.includes(e.inst.name) ? 'discard'
                      : ps.deletedPile.includes(e.inst.name) ? 'deleted'
                      : null;
-          if (pile) {
+          // v1389: „cannot be revived by any effects" (Gigantisaur) —
+          // dann löst das Elixir gar nicht erst aus und bleibt liegen.
+          if (pile && engine.darfAusAblageAufsFeld(e.inst.name)) {
             if (!perm._pendingCreatures) perm._pendingCreatures = [];
             if (!perm._pendingCreatures.some(pc => pc.name === e.inst.name && pc.heroIdx === e.inst.heroIdx && pc.zoneSlot === e.inst.zoneSlot)) {
               perm._pendingCreatures.push({
@@ -383,7 +385,16 @@ async function reviveCreature(engine, pi, chosen) {
     return;
   }
 
-  if (!(await engine.takeFromPile(ps, pile, discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
+  // v1389: aus der ABLAGE über die EINE Stelle (Sperre „cannot be
+  // revived", Lethe, Signal, SC); der Deleted Pile bleibt direkt.
+  let ab = null;
+  if (pile === 'discard') {
+    ab = await engine.ablageEntnahme(pi, pi, discIdx, { source: 'Elixir of Immortality' });
+    if (!ab) {
+      engine.log('elixir_fizzle', { reason: 'discard_locked_or_unrevivable', creature: chosen.name });
+      return;
+    }
+  } else if (!(await engine.takeFromPile(ps, pile, discIdx, { source: 'Elixir of Immortality' }))) {   // v820: Stapel-Schicht
     engine.log('elixir_fizzle', { reason: 'discard_locked', creature: chosen.name });
     return;
   }
@@ -414,6 +425,7 @@ async function reviveCreature(engine, pi, chosen) {
   }
   newInst.counters.currentHp = reviveHp;
   newInst.counters.isPlacement = 1;
+  const ablageExtras = ab ? engine.ablageLandung(newInst, ab, 'place') : {};
 
   engine.log('creature_revived', { card: chosen.name, player: ps.username, hp: reviveHp, heroIdx: targetHi, zoneSlot: targetSi, by: 'Elixir of Immortality' });
 
@@ -422,8 +434,8 @@ async function reviveCreature(engine, pi, chosen) {
   engine.sync();
   await engine._delay(800);
 
-  await engine.runHooks('onPlay', { _onlyCard: newInst, playedCard: newInst, cardName: chosen.name, zone: 'support', heroIdx: targetHi, zoneSlot: targetSi });
-  await engine.runHooks('onCardEnterZone', { enteringCard: newInst, toZone: 'support', toHeroIdx: targetHi });
+  await engine.runHooks('onPlay', { _onlyCard: newInst, playedCard: newInst, cardName: chosen.name, zone: 'support', heroIdx: targetHi, zoneSlot: targetSi, ...ablageExtras });
+  await engine.runHooks('onCardEnterZone', { enteringCard: newInst, toZone: 'support', toHeroIdx: targetHi, ...ablageExtras });
 }
 
 async function removeElixir(engine, pi, perm) {

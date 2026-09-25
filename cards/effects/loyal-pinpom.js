@@ -173,7 +173,7 @@ module.exports = {
       // ── Step 4: pull from hand + summon ──
       const handIdx = ps.hand.indexOf(pickedLoyal);
       if (handIdx < 0) return;
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       // `_isNormalSummon: true` mirrors the doPlayCreature hand-summon
       // flag. The chained Loyal lands at a hero the player picked
@@ -188,7 +188,7 @@ module.exports = {
       if (!placed) {
         // Refund the hand card if placement aborted (extremely unlikely
         // — the dest slot we picked is guaranteed free above).
-        ps.hand.push(pickedLoyal);
+        engine.handZugangSync(ps, pickedLoyal, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
         return;
       }
 

@@ -170,8 +170,7 @@ async function bergen(engine, pi, ctx) {
       if (!ok) break;                       // Discard-Sperre (Eye of Ren)
     } else {
       if (!(await engine.takeFromPile(ps, 'deleted', idx, { source: CARD_NAME }))) break;   // v820: Stapel-Schicht
-      ps.hand.push(wahl.cardName);
-      engine._trackCard(wahl.cardName, pi, 'hand');
+      engine.handZugangSync(ps, wahl.cardName, { von: 'geloescht', source: CARD_NAME });
       engine._broadcastEvent('play_pile_transfer', {
         owner: pi, cardName: wahl.cardName,
         from: 'deleted', to: 'hand',

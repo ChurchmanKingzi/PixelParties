@@ -311,25 +311,23 @@ async function runStellinEffect(ctx) {
   if (!dest) return false;
   const { heroIdx, slotIdx: slot } = dest;
 
-  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+  const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
   // Race: slot could have been filled between prompt and now (engine
   // has been doing other work during the prompt's network round-trip).
   const supZones = ps.supportZones?.[heroIdx] || [];
   if ((supZones[slot] || []).length !== 0) {
-    ps.mainDeck.push(chosenName);
-    engine.shuffleDeck(pi, 'main');
+    engine.returnToPile(ps, 'deck', chosenName);   // v1393 (mischt)
     return false;
   }
   const summonRes = await engine.summonCreatureWithHooks(chosenName, pi, heroIdx, slot, {
     source: CARD_NAME,
     countAsSummon: false,
-    hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+    hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
   });
   if (!summonRes) {
-    ps.mainDeck.push(chosenName);
-    engine.shuffleDeck(pi, 'main');
+    engine.returnToPile(ps, 'deck', chosenName);   // v1393 (mischt)
     return false;
   }
 

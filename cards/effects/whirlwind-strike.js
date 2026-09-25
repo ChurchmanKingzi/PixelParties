@@ -133,7 +133,11 @@ module.exports = {
       // ihre Kreaturen. Die Klammer macht das fuer den Schadensweg
       // sichtbar; ohne sie waere Whirlwind fuer „Interference" ein
       // Haufen Einzeltreffer gewesen.
-      engine.beginMultiHit(heroDamageTargets.length + allCreatureEntries.length);
+      // ★ v1392: sanktionierte Nacheinander-Form (`beginAoeStrike`) statt
+      // roher Klammer — öffnet auch das Idol-Fenster für die Kreaturen.
+      await engine.beginAoeStrike(heroDamageTargets.length + allCreatureEntries.length, {
+        creatures: allCreatureEntries, source: attackSource, type: 'attack', sourceOwner: ctx.cardOwner,
+      });
       try {
       // ── RAM + DAMAGE per hero target ──
       for (let ti = 0; ti < heroDamageTargets.length; ti++) {

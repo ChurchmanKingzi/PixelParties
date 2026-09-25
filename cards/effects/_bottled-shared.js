@@ -101,7 +101,7 @@ async function runDiscardChain(engine, potionOwner, potionName) {
 
 
     if (handIndex >= 0 && handIndex < hand.length && hand[handIndex] === cardName) {
-      hand.splice(handIndex, 1);
+      engine.takeFromPileSync(currentPlayer, 'hand', handIndex);   // v1394: Stapel-Schicht
       ps.discardPile.push(cardName);
       const inst = engine.findCards({ owner: currentPlayer, zone: 'hand', name: cardName })[0];
       if (inst) {

@@ -130,8 +130,7 @@ module.exports = {
         engine.log('tri_ad_return_failed', { player: ps.username, heroIdx: hi });
         return false;
       }
-      ps.hand.push(TRI_AD);
-      engine._trackCard(TRI_AD, pi, 'hand');
+      engine.handZugangSync(ps, TRI_AD, {  });
       stampTriAdHopt(gs, pi);
       engine.log('tri_ad_returned_to_hand', { player: ps.username, heroIdx: hi, nowHero: ps.heroes[hi]?.name });
       engine.sync();

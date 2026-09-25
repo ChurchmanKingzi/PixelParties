@@ -112,7 +112,7 @@ module.exports = attachSteamEngine({
 
     // Remove chosen card from deck first — prevents any recursive
     // summon path from double-using it.
-    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
 
     // Sacrifice the Engineer — actionDestroyCard fires the proper
     // onCreatureDeath hooks and clears the zone.
@@ -135,7 +135,7 @@ module.exports = attachSteamEngine({
         hookExtras: {
           _steamEngineerSummon: true,
           _summonedBy: CARD_NAME,
-          _summonedFromDeck: true,
+          ...engine.deckHookExtras(),
         },
       },
     );

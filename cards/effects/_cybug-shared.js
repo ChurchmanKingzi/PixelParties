@@ -49,7 +49,7 @@ async function deleteCybugFuel(engine, pi, fuelCardName) {
       from: 'hand', to: 'deleted',
       fromHandIdx: handIdx,
     });
-    ps.hand.splice(handIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
     // Untrack the hand inst so its tracked id doesn't leak into a
     // future state read. Find any matching hand inst for `pi` —
     // engine guarantees one inst per hand slot, so the first match
@@ -124,10 +124,9 @@ async function recoverCybugFuel(engine, pi, fuelCardName, sourceName) {
     toHandIdx,
     finalHandSize: toHandIdx + 1,
   });
-  if (!(await engine.takeFromPile(ps, 'discard', idx, { source: 'Cybug' }))) return;   // v820: Stapel-Schicht
+  if (!(await engine.takeFromPile(ps, 'discard', idx, { source: 'Cybug', toHand: true }))) return;   // v820: Stapel-Schicht
   if (!ps.hand) ps.hand = [];
-  ps.hand.push(fuelCardName);
-  engine._trackCard(fuelCardName, pi, ZONES.HAND);
+  await engine.handZugang(ps, fuelCardName, { von: 'ablage' });
   engine.log('cybug_recover', {
     player: ps.username, card: fuelCardName, by: sourceName,
   });

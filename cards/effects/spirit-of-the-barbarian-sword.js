@@ -90,24 +90,13 @@ async function feuerschlag(engine, pi, inst) {
   await engine._delay(300);          // Klinge sichtbar, dann trifft sie
 
   // Erst die Kreaturen (ein Stapel — gleichzeitig), dann die Helden.
-  const kreaturen = ziele.filter(z => z.type === 'creature');
-  if (kreaturen.length > 0) {
-    await engine.processCreatureDamageBatch(kreaturen.map(z => ({
-      inst: z.inst, amount: DAMAGE, type: 'creature',
-      source: inst, sourceOwner: pi, animType: 'none',
-    })));
-  }
-  // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
-  // gezaehlt wird, was WIRKLICH getroffen wird.
-  engine.beginMultiHit(ziele.length);
-  try {
-  for (const z of ziele.filter(x => x.type === 'hero')) {
-    if (z.hero.hp <= 0) continue;
-    await engine.actionDealDamage(inst, z.hero, DAMAGE, 'creature');
-  }
-  } finally {
-    engine.endMultiHit();
-  }
+  // ★ v1392: über die EINE Stelle für Mehrfachtreffer. Bis v1391 lief
+  // der Kreatur-Stapel VOR der Interference-Klammer.
+  await engine.dealDamageToTargets(inst, ziele.map(z => z.type === 'hero'
+    ? { type: 'hero', owner: z.owner, heroIdx: z.heroIdx }
+    : { type: 'creature', inst: z.inst }), {
+    damage: DAMAGE, damageType: 'creature', hitDelay: 0,
+  });
   engine.sync();
 }
 

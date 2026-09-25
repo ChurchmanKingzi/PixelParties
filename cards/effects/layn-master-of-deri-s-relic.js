@@ -138,6 +138,7 @@ module.exports = {
     // glance how many copies a rally would cap at (max 3 regardless).
     const counts = {};
     for (const cn of (ps.discardPile || [])) {
+      if (!engine.darfAusAblageAufsFeld(cn)) continue;   // v1389
       const cd = cardDB[cn];
       if (!cd || !isPileCreature(cd) || (cd.level ?? 0) !== TARGET_LEVEL) continue;
       counts[cn] = (counts[cn] || 0) + 1;
@@ -195,14 +196,16 @@ module.exports = {
       const destHeroIdx = zonePick.heroIdx;
       const destSlot    = zonePick.slotIdx;
 
-      const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_discardIdx) break;
+      // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
+      const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: CARD_NAME });
+      if (!ab) break;
 
       if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
       ps.supportZones[destHeroIdx][destSlot] = [chosenName];
 
       const inst = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
       inst.turnPlayed = gs.turn; // Summoning sickness — placed this turn
+      const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
@@ -219,7 +222,7 @@ module.exports = {
       // on revived bodies.
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, ...ablageExtras,
       });
 
       placedCount++;

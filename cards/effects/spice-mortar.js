@@ -132,7 +132,7 @@ module.exports = {
 
     if (gewaehlt) {
       if (await engine.takeFromPile(ops, 'deck', gewaehlt, { source: CARD_NAME })) {
-        ps.hand.push(gewaehlt);
+        await engine.handZugang(ps, gewaehlt, { von: 'deck', source: CARD_NAME });   // v1395: jetzt MIT Hand-Instanz (fehlte)
         engine._tagHandCardOrigin(pi, gewaehlt, oi);
         engine.log('spice_mortar_take', {
           player: ps.username, card: gewaehlt, opponent: ops.username,

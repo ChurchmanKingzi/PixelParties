@@ -134,7 +134,7 @@ const PILE_PATTERNS = [
 const NON_PILE_PATTERNS = [
   'actionDrawCards', 'drawCards', 'actionDrawFromPotionDeck',   // echte Draws bleiben erlaubt
   ...NON_DRAW_PATTERNS.filter(p => !['actionMillCards', 'millCards', 'actionRevive'].includes(p)),
-  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'actionDealDamage',
+  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'dealDamageToTargets', 'actionDealDamage',
   'actionGainGold', 'gainGold', 'actionSpendGold', 'actionSetHp',
   'applyCreatureStatus', 'actionNegateCreature', 'grantEffectImmunity', 'grantCreatureEffectImmunity',
   'attachToHero', 'summonCreatureWithHooks', 'placeArea', 'equipEffect',
@@ -171,7 +171,7 @@ const NON_SUMMON_PATTERNS = [
   'addFromPileToHand', 'actionAddCardFromDeckToHand', 'addCardFromDiscardToHand', 'deleteFromPile',
   'actionMillCards', 'millCards', 'actionRecycleCards', 'takeTop',
   ...NON_DRAW_PATTERNS.filter(p => !['placeCreature', 'actionPlaceCreature', 'actionMillCards', 'millCards', 'actionRevive'].includes(p)),
-  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'actionDealDamage',
+  'promptDamageTarget', 'promptMultiTarget', 'aoeHit', 'dealDamageToTargets', 'actionDealDamage',
   'actionGainGold', 'gainGold', 'actionSpendGold', 'actionSetHp',
   'applyCreatureStatus', 'actionNegateCreature', 'grantEffectImmunity', 'grantCreatureEffectImmunity',
   'attachToHero', 'placeArea', 'equipEffect', 'addBuff', 'applyBuff', 'actionChangeLevel', 'actionChangeAtk', 'modifyAtk',
@@ -219,7 +219,8 @@ function detectSummonOnly(sourceText) {
 // Kein `\b` vor `aoeHit`: in `actionAoeHit(` steht zwischen `n` und
 // `A` KEINE Wortgrenze (beides Wortzeichen) — mit Grenze traf das
 // Muster genau die vier Karten nicht, um die es hier geht.
-const MULTI_HIT_PATTERNS = [/aoeHit\(/i, /\bbeginMultiHit\(/, /\bbeginAoeStrike\(/];
+// ★ v1392: `dealDamageToTargets(` ist die EINE Stelle fuer Mehrfachtreffer.
+const MULTI_HIT_PATTERNS = [/aoeHit\(/i, /\bbeginMultiHit\(/, /\bbeginAoeStrike\(/, /\bdealDamageToTargets\(/];
 function detectMultiHit(sourceText) {
   sourceText = stripComments(sourceText);
   if (!sourceText) return false;
@@ -526,4 +527,5 @@ function listEffects() {
   } catch { return []; }
 }
 
-module.exports = { loadCardEffect, hasCardEffect, clearCache, listEffects, nameToFile };
+// v1392: Muster als EINE Quelle auch fuer die Waechter (check-aoe-text).
+module.exports = { loadCardEffect, hasCardEffect, clearCache, listEffects, nameToFile, MULTI_HIT_PATTERNS };

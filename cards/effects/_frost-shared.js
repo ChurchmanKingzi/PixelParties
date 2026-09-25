@@ -57,7 +57,10 @@ function frostVerlaengern(engine, ziel, plus) {
     const fr = engine.gs.players[ziel.owner]?.heroes?.[ziel.heroIdx]?.statuses?.frozen;
     if (!fr) return false;
     if (typeof fr === 'object') fr.duration = (fr.duration || 1) + plus;
-    else engine.gs.players[ziel.owner].heroes[ziel.heroIdx].statuses.frozen = { duration: 1 + plus };
+    else {
+      const neu = engine.gs.players[ziel.owner].heroes[ziel.heroIdx].statuses.frozen = { duration: 1 + plus };
+      engine._heldenStatusVerursacher(neu, {});   // v1399: laufende Effektquelle
+    }
     return true;
   }
   const c = ziel.inst?.counters;

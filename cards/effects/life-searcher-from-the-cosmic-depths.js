@@ -114,10 +114,9 @@ module.exports = {
       });
       if (!pick?.cardName) return;
       const chosen = pick.cardName;
-      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosen, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (!_taken_idx) return;
-      ps.hand.push(chosen);
-      const inst = engine._trackCard(chosen, pi, 'hand');
+      const inst = await engine.handZugang(ps, chosen, { von: 'deck', source: CARD_NAME });
 
       engine._broadcastEvent('deck_search_add', { cardName: chosen, playerIdx: pi });
       engine.log('life_searcher_search', { player: ps.username, card: chosen });
@@ -234,7 +233,7 @@ module.exports = {
     });
 
     engine._untrackCard(inst.id);
-    ps.mainDeck.push(CARD_NAME);
+    engine.returnToPile(ps, 'deck', CARD_NAME);
     engine.shuffleDeck(pi);
 
     engine.log('life_searcher_shuffle', { player: ps.username });
@@ -256,7 +255,7 @@ module.exports = {
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
       return true;
     }
-    if (!(await engine.takeFromPile(ps, 'deck', upIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  upIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
       engine.log('life_searcher_fizzle', { player: ps.username, reason: 'deck_locked' });
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
       return true;
@@ -281,7 +280,7 @@ module.exports = {
       hookExtras: {
         _summonedBy: CARD_NAME,
         _summonedByCosmic: true,
-        _summonedFromDeck: true,
+        ...engine.deckHookExtras(),
       },
     });
 

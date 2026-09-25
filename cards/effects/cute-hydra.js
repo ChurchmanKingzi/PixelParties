@@ -242,10 +242,16 @@ module.exports = {
 
     // Summon a fresh Hydra. summonCreatureWithHooks → onPlay → effect
     // #2 (head counter setup with a fresh discard prompt).
-    await engine.summonCreatureWithHooks(
+    // v1389: Aus der ABLAGE gerettet → Beschwörung aus der Ablage
+    // (Signal, SC; Als Ruling 25.9.). Andere Herkunft bleibt eine
+    // normale Beschwörung.
+    const ausAblage = ctx.fromZone === 'discard';
+    const ab = ausAblage ? (ctx.ablage || { name: CARD_NAME, pileOwner: pi, pi, lethe: 0, idx: null }) : null;
+    const res = await engine.summonCreatureWithHooks(
       CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx,
-      { source: CARD_NAME }
+      { source: CARD_NAME, ...(ausAblage ? { hookExtras: engine.ablageHookExtras() } : {}) }
     );
+    if (ab && res?.inst) engine.ablageLandung(res.inst, ab, 'summon');
 
     // Stamp the rescue flag — engine reads this to skip the actual
     // pile push.
@@ -356,8 +362,21 @@ module.exports = {
       const ownerPs = engine.gs.players[death.originalOwner ?? death.owner];
       if (!ownerPs) return;
 
-      const _taken_dIdx = await engine.takeFromPile(ownerPs, 'discard', CARD_NAME, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
-      if (!_taken_dIdx) return; // Already routed elsewhere.
+      // v1389: Entnahme über die EINE Ablage-Stelle — und das Löschen
+      // läuft jetzt durch die Rettung („would be deleted from anywhere").
+      // Bis v1388 schob dieser Weg direkt in den Deleted Pile, die eigene
+      // Rettung beim Tod griff also nie. Gerettet = aus der Ablage
+      // beschworen (Als Ruling 25.9.).
+      const ownerIdx = death.originalOwner ?? death.owner;
+      const ab = await engine.ablageEntnahme(ctx.cardOwner, ownerIdx, CARD_NAME, { source: CARD_NAME, last: true });
+      if (!ab) return; // Already routed elsewhere.
+      const gerettet = await engine._tryBeforeDelete(CARD_NAME, ownerIdx, {
+        fromZone: 'discard', source: CARD_NAME, ablage: ab,
+      });
+      if (gerettet) {
+        engine.log('delete_rescued', { card: CARD_NAME, from: 'discard', source: CARD_NAME });
+        return;
+      }
       ownerPs.deletedPile.push(CARD_NAME);
 
       engine.log('cute_hydra_self_delete', {

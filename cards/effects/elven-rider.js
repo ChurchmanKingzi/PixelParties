@@ -247,7 +247,7 @@ module.exports = {
       try {
         // Consume the hand copy NOW — before summonCreatureWithHooks
         // can fire hooks that might inspect the hand.
-        ps.hand.splice(handIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', handIdx);
 
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
@@ -264,7 +264,7 @@ module.exports = {
         );
         if (!res) {
           // Extremely unlikely (no free slot after all). Put back.
-          ps.hand.push(CARD_NAME);
+          engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
           engine.log('elven_rider_fizzle', { player: ps.username, reason: 'place_refused' });
           await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
           return;

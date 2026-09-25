@@ -168,7 +168,7 @@ module.exports = {
       // `living-illusion.js` es tut, und melden die Decksuche an den
       // Client.
       if (source === 'deck') {
-        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
+        const _taken_deckIdx = await engine.deckEntnahme(ps,  CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
         if (!_taken_deckIdx) return;
         engine._broadcastEvent('deck_search_add', { cardName: CARD_NAME, playerIdx: pi });
       }
@@ -180,6 +180,7 @@ module.exports = {
         source,
         sourceName: CARD_NAME,
         selfPlacement: true,
+        ...(source === 'deck' ? { hookExtras: engine.deckHookExtras() } : {}),   // v1393
       });
       const inst = placed?.inst || null;
       if (!inst) return;

@@ -100,18 +100,10 @@ async function maybeKeepGemInHand(engine, pi, gemName) {
   // Splice the chosen card and push to discard. The handIndex from the
   // prompt is authoritative when it points at the requested card name;
   // fall back to indexOf if the indices have shifted.
-  if (handIndex != null && ps.hand[handIndex] === cardName) {
-    ps.hand.splice(handIndex, 1);
-  } else {
-    const fi = ps.hand.indexOf(cardName);
-    if (fi < 0) return { keepInHand: false };
-    ps.hand.splice(fi, 1);
+  // v1394: Abwurf über die zentrale Funktion.
+  if (!(await engine.actionDiscardHandCard(pi, cardName, handIndex, { source: gemName, _noGlow: true }))) {
+    return { keepInHand: false };
   }
-  ps.discardPile.push(cardName);
-  await engine.runHooks('onDiscard', {
-    playerIdx: pi, cardName, discardedCardName: cardName,
-    _fromHand: true, _skipReactionCheck: true,
-  });
 
   engine.log('magic_gem_kept', { player: ps.username, gem: gemName, discarded: cardName });
   engine.sync();

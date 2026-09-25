@@ -214,7 +214,7 @@ module.exports = {
     // which copy is the in-flight one.
     const handIdx = (ps.hand || []).indexOf(FULL_NAME);
     if (handIdx >= 0) {
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       engine.notePlayedFromHand(pi);
     }
 

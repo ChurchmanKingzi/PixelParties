@@ -214,8 +214,7 @@ module.exports = {
       // und Funken an der Hand und verbraucht die Gutschrift.
       engine._broadcastEvent('card_reveal', { cardName: oppChoice });
       engine._broadcastEvent('hand_card_materialize', { cardName: oppChoice, playerIdx: pi, count: 1 });
-      ps.hand.push(oppChoice);
-      engine._trackCard(oppChoice, pi, 'hand');
+      engine.handZugangSync(ps, oppChoice, { source: CARD_NAME });
 
       const removed = chosenNames.filter(n => n !== oppChoice);
       engine.log('crestina_creation_pick', {

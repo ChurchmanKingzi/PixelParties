@@ -192,6 +192,7 @@ module.exports = {
         appliedTurn: gs.turn || 0, permanent: true, unhealable: true,
         source: CARD_NAME, appliedBy: pi,
       };
+      engine._heldenStatusVerursacher(held.statuses[STATUS], { appliedBy: pi, source: ctx.card });   // v1399
       engine._broadcastEvent('play_zone_animation', {
         type: 'soul_shard_dark_grant', owner: pi, heroIdx: ziel.heroIdx, zoneSlot: -1,
       });

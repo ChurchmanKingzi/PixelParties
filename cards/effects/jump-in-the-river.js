@@ -163,7 +163,7 @@ async function doJumpCascade(engine, pi) {
       from: 'hand', to: 'discard',
       fromHandIdx: removeIdx, asPlay: 'sole',
     });
-    ps.hand.splice(removeIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', removeIdx);
     // ★ v1262 (Als Befund 21.9.: „als der Gegner Jump in the River
     // spielte, wurde die Karte nicht links neben dem Feld gezeigt").
     // Die Karte laeuft ueber ihren Hand-Hook, nicht ueber die

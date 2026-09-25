@@ -351,39 +351,16 @@ module.exports = {
         chosen = zones.find(z => z.heroIdx === picked.heroIdx && z.slotIdx === picked.slotIdx) || zones[0];
       }
 
-      // ── Pop one copy from discard pile ──
-      const _taken_dpIdx = await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_dpIdx) return; // Got moved between prompt and now (rare).
-
-      // Untrack the orphaned instance (this listener's own card).
-      // Without this, the dead instance lingers in cardInstances at
-      // zone='discard' but absent from the pile array.
+      // ── v1389: Ablage → Feld über die EINE Stelle ──
+      // (`engine.summonFromDiscard`: Sperre, Signal, Flug mit 650 ms
+      // Landezeit wie zuvor, Rückgabe bei Fehlschlag.)
       const oldInst = ctx.card;
-      if (oldInst && oldInst.zone === 'discard') {
-        engine._untrackCard(oldInst.id);
-      }
-
-      // Discard → Support-Zone-Flug (Idej-Muster, `_idej-shared`):
-      // Broadcast VOR dem Sync, damit die fliegende Karte spawnt,
-      // während die Pile noch den alten Stand rendert; der Transfer-
-      // Handler blendet den Ziel-Slot ~720 ms aus, sodass der Summon-
-      // Sync die Karte nicht vor der Landung "poppen" lässt. Der
-      // Delay lässt den Flug größtenteils ankommen, bevor der
-      // `summon_effect`-Glow von summonCreatureWithHooks am Slot
-      // zündet — Glow landet dann zeitgleich mit der Karte.
-      engine._broadcastEvent('play_pile_transfer', {
-        owner: pi, cardName: CARD_NAME,
-        from: 'discard', to: 'support',
-        toHeroIdx: chosen.heroIdx, toSlotIdx: chosen.slotIdx,
+      const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
+        source: CARD_NAME, flug: 650,
       });
-      engine.sync();
-      await engine._delay(650);
-
-      // ── Summon with full hooks ──
-      await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx,
-        { source: CARD_NAME }
-      );
+      // Den Listener-Klon in der Ablage abräumen (sonst verwaist er).
+      if (oldInst && oldInst.zone === 'discard') engine._untrackCard(oldInst.id);
+      if (!res) return;
 
       engine.log('cute_dog_discard_summon', {
         player: ps.username,

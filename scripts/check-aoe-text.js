@@ -41,6 +41,7 @@
 // ════════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
+const { MULTI_HIT_PATTERNS } = require('../cards/effects/_loader');
 
 const ROOT = path.join(__dirname, '..');
 const EFFEKTE = path.join(ROOT, 'cards', 'effects');
@@ -103,7 +104,8 @@ for (const c of karten) {
     .replace(/^[ \t]*\/\/.*$/gm, '');
   // Die Schadensklammern erkennt der Loader selbst — dann ist die
   // Karte bereits AoE und braucht keine Handdeklaration.
-  if (/aoeHit\(/i.test(src) || /\bbeginMultiHit\(|\bbeginAoeStrike\(/.test(src)) continue;
+  // v1392: dieselben Muster wie der Loader (EINE Quelle, inkl. dealDamageToTargets).
+  if (MULTI_HIT_PATTERNS.some(re => re.test(src))) continue;
   offen.push(name);
 }
 offen.sort();

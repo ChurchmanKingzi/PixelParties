@@ -284,10 +284,10 @@ module.exports = {
     if (source === 'hand') {
       const idx = (ps.hand || []).indexOf(chosenName);
       if (idx < 0) return false;
-      ps.hand.splice(idx, 1);
+      engine.takeFromPileSync(ps, 'hand', idx);
       engine.notePlayedFromHand(pi);
     } else {
-      const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_idx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_idx) return false;
       // Reveal to opp on a deck-search.
       engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
@@ -310,7 +310,7 @@ module.exports = {
       isPlacement: true,
       hookExtras: {
         _summonedBy: CARD_NAME,
-        _summonedFromDeck: source === 'deck',
+        ...(source === 'deck' ? engine.deckHookExtras() : {}),   // v1393
       },
     });
     if (!placeRes) return false;

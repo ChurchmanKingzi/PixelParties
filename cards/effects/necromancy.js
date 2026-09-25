@@ -63,6 +63,7 @@ function getEligibleCreatures(engine, pi, heroIdx, necromancyLevel) {
   const seen = new Set();
   const result = [];
   for (const cardName of (ps.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(cardName)) continue;   // v1389: Gigantisaur, Ifrit
     if (seen.has(cardName)) continue;
     const cd = cardDB[cardName];
     // Strict `cardType === 'Creature'` — Necromancy summons from the
@@ -172,6 +173,7 @@ module.exports = {
       // pick up Lethe per-pile stamps via the pileSide opt-in.
       let summonable = 0;
       for (const name of (ps.discardPile || [])) {
+        if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;
         if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > necroLevel) continue;
@@ -279,14 +281,10 @@ module.exports = {
     });
     await engine._delay(800);
 
-    // Remove creature from discard pile
-    const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', creatureName, { source: 'necromancy' });   // v820: Stapel-Schicht
-    if (!_taken_discardIdx) return false; // Safety — card no longer in discard
-    // Capture the highest Lethe pile-stamp for this name BEFORE the
-    // reconcile that the next stamp read would trigger, so the bonus
-    // follows the Creature onto the board instead of being silently
-    // dropped from the per-name occurrence array.
-    const _letheBonus = engine.consumeLetheStamp(pi, creatureName);
+    // v1389: Entnahme über die EINE Ablage-Stelle (Sperre für
+    // Gigantisaur/Ifrit, Lethe-Stempel) — die Inszenierung bleibt hier.
+    const ab = await engine.ablageEntnahme(pi, pi, creatureName, { source: 'necromancy' });
+    if (!ab) return false; // Safety — card no longer in discard / nicht belebbar
 
     // Place into support zone
     const hi = chosenZone.heroIdx;
@@ -294,12 +292,9 @@ module.exports = {
     if (!ps.supportZones[hi]) ps.supportZones[hi] = [[], [], []];
     ps.supportZones[hi][si] = [creatureName];
 
-    // Track card instance
+    // Track card instance — Landung meldet Lethe, Heimkehr, SC, Signal.
     const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
-    if (_letheBonus > 0) {
-      inst.counters = inst.counters || {};
-      inst.counters._letheLevelBonus = _letheBonus;
-    }
+    const ablageExtras = engine.ablageLandung(inst, ab, 'summon');
 
     // Permanently stamp this instance as "summoned by Necromancy" so
     // Holy Selection (and any future card that gates on this) can
@@ -384,7 +379,7 @@ module.exports = {
     // still get filtered out by the runHooks zone-status check, but
     // Soul Shards skip the negation above so their hooks run.
     const summonExtras = {
-      _summonedFromDiscard: true,
+      ...ablageExtras,
       _summonedByNecromancy: true,
       _necromancyLevel: level,
     };

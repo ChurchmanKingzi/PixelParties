@@ -84,14 +84,14 @@ module.exports = {
       const hand = tgtPs.hand;
       if (hand.length === 0) return;
       const randomIdx  = Math.floor(Math.random() * hand.length);
-      const discarded  = hand.splice(randomIdx, 1)[0];
-      tgtPs.discardPile.push(discarded);
-
-      // Update card instance zone if tracked
-      const inst = engine.cardInstances.find(c =>
-        c.owner === tgtOwner && c.zone === 'hand' && c.name === discarded,
-      );
-      if (inst) inst.zone = 'discard';
+      const discarded  = hand[randomIdx];
+      // v1394: fremder Abwurf über die zentrale Funktion — damit greifen
+      // Erstrunden-Schutz, Hand-Interaktions-Fenster und onDiscard (bis
+      // v1393 alle drei übersprungen).
+      if (!(await engine.actionDiscardHandCard(tgtOwner, discarded, randomIdx, { source: CARD_NAME, sourceOwner: pi }))) {
+        engine.sync();
+        return;
+      }
 
       engine.log('white_eye_discard', {
         player: gs.players[pi].username,

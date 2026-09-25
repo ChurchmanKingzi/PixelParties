@@ -115,8 +115,7 @@ module.exports = {
     engine.sync();
     await engine._delay(650);
 
-    ps.hand.push(spell);
-    const spellInst = engine._trackCard(spell, pi, 'hand');
+    const spellInst = engine.handZugangSync(ps, spell, { source: CARD_NAME });
     const spellIdx = ps.hand.length - 1;
     // Marke VOR den Hooks setzen — ein Hook (z.B. ein Abwurf) koennte die
     // Hand umbauen; das Handfeld folgt der Kopie ab hier von selbst.

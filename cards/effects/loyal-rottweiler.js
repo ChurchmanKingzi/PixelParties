@@ -138,7 +138,7 @@ module.exports = {
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
       return true;
     }
-    if (!(await engine.takeFromPile(ps, 'deck', stillDeckIdx, { source: 'Loyal Rottweiler' }))) {   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  stillDeckIdx, { source: 'Loyal Rottweiler' }))) {   // v820: Stapel-Schicht
       // Deck locked — fizzle.
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
       return true;
@@ -177,11 +177,11 @@ module.exports = {
     await engine.runHooks('onPlay', {
       _onlyCard: placedInst, playedCard: placedInst, cardName: loyalName,
       zone: 'support', heroIdx: ownHeroIdx, zoneSlot: actualSlot,
-      _skipReactionCheck: true,
+      _skipReactionCheck: true, ...engine.deckHookExtras(),   // v1393
     });
     await engine.runHooks('onCardEnterZone', {
       enteringCard: placedInst, toZone: 'support', toHeroIdx: ownHeroIdx,
-      _skipReactionCheck: true,
+      _skipReactionCheck: true, ...engine.deckHookExtras(),
     });
 
     // Reveal modal to opponent (standard deck-search etiquette).

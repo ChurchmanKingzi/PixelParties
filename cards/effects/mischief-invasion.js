@@ -403,7 +403,7 @@ module.exports = {
         // the canonical hand→board flight animation so the visual
         // matches a normal-summon drag-and-drop.
         const realIdx = ps.hand.indexOf(c.name);
-        if (realIdx >= 0) ps.hand.splice(realIdx, 1);
+        if (realIdx >= 0) engine.takeFromPileSync(ps, 'hand', realIdx);
         const handInst = engine.cardInstances.find(ci =>
           ci.owner === pi && ci.zone === 'hand' && ci.name === c.name,
         );

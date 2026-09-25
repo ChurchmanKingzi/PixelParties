@@ -170,7 +170,7 @@ module.exports = {
       if (!gs.hoptUsed) gs.hoptUsed = {};
       gs.hoptUsed[`${HOPT_KEY}:${pi}`] = gs.turn;
 
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       // Reveal the bonus Attack to the opponent.
       const oppSid = gs.players[oppIdx]?.socketId;

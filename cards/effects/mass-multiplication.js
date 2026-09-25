@@ -170,7 +170,7 @@ module.exports = {
       // fallback `_untrackCard` in that block is idempotent with ours.
       const selfIdx = ps.hand.indexOf(ctx.cardName);
       if (selfIdx >= 0) {
-        ps.hand.splice(selfIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', selfIdx);
         engine.notePlayedFromHand(pi);
         ps.discardPile.push(ctx.cardName);
         engine._untrackCard(ctx.card.id);
@@ -191,7 +191,7 @@ module.exports = {
         await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Mass Multiplication' });   // v820: Stapel-Schicht
       } else {
         const idx = ps.hand.indexOf(chosenName);
-        if (idx >= 0) ps.hand.splice(idx, 1);
+        if (idx >= 0) engine.takeFromPileSync(ps, 'hand', idx);
       }
       if (!ps.deletedPile) ps.deletedPile = [];
       ps.deletedPile.push(chosenName);
@@ -221,7 +221,7 @@ module.exports = {
         if (copyIdx < 0) break;
 
         deck.splice(copyIdx, 1);
-        ps.hand.push(chosenName);
+        engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
         added++;
 
         // Deck-search reveal animation for THIS copy, then yield so each

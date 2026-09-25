@@ -92,7 +92,7 @@ module.exports = {
     if (fund.from === 'deck') {
       // Aus dem Deck: selbst ausbuchen und den Weg sichtbar machen —
       // `actionPlaceCreature` kennt nur 'hand' und 'discard'.
-      const _taken_idx = await engine.takeFromPile(ps, 'deck', fund.name, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_idx = await engine.deckEntnahme(ps,  fund.name, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_idx) return null;
       engine._broadcastEvent('play_pile_transfer', {
         owner: ownerIdx, cardName: fund.name,
@@ -107,6 +107,7 @@ module.exports = {
       source: fund.from === 'hand' ? 'hand' : 'deck',
       sourceName: CARD_NAME,
       animationType: 'poison_splash',
+      ...(fund.from === 'deck' ? { hookExtras: engine.deckHookExtras() } : {}),   // v1393
     });
     if (fund.from === 'deck') engine.shuffleDeck(ownerIdx, 'main');
 

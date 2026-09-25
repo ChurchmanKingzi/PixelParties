@@ -574,6 +574,59 @@ select optgroup {
   box-shadow: 0 0 20px rgba(255,215,0,.5), 0 0 40px rgba(255,120,255,.25), 0 4px 12px rgba(0,0,0,.5) !important;
 }
 
+/* ★ v1403 — RAHMEN OHNE NEUZEICHNEN (Al 25.9.: Loyal-Deck ruckelt).
+   Der Puls des Kartenrahmens animierte `border-color` und `box-shadow` —
+   gemessen die Haelfte der Malarbeit einer Foil-Karte, JEDEN Frame. Jetzt:
+   je Farbstation ein fester Ring (Rand + Schein), und die Ringe blenden
+   nur per Deckkraft ineinander. Gleiche Farben, gleicher Takt, der
+   Compositor erledigt es allein. Die Ringe sitzen ueber dem Kartenrand;
+   damit ihr Schein nicht am `overflow: hidden` der Karte endet, clippt
+   eine Foil-Karte mit Ring per `overflow: clip` + Rand-Zugabe.
+   Browser ohne `overflow-clip-margin` behalten den alten Puls. */
+.foil-rahmen { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.foil-rahmen i {
+  position: absolute; inset: calc(-1 * var(--foil-rand, 0px));
+  border: var(--foil-rand, 0px) solid transparent;
+  opacity: 0; will-change: opacity;
+  animation: var(--rahmen-name) var(--rahmen-dur) linear infinite;
+}
+.card-mini { --foil-rand: 2px; }
+.foil-rahmen-diamond { --rahmen-name: foilRahmen4; --rahmen-dur: 3s; }
+.foil-rahmen-diamond i:nth-child(1) { border-color: rgba(64,224,208,.65);  box-shadow: 0 0 8px rgba(64,224,208,.35);  animation-delay: 0s; }
+.foil-rahmen-diamond i:nth-child(2) { border-color: rgba(140,245,230,.75); box-shadow: 0 0 10px rgba(140,245,230,.4); animation-delay: -2.25s; }
+.foil-rahmen-diamond i:nth-child(3) { border-color: rgba(235,255,255,.65); box-shadow: 0 0 12px rgba(190,250,255,.35); animation-delay: -1.5s; }
+.foil-rahmen-diamond i:nth-child(4) { border-color: rgba(70,190,235,.75);  box-shadow: 0 0 10px rgba(70,190,235,.4);  animation-delay: -.75s; }
+.foil-rahmen-secret { --rahmen-name: foilRahmen3; --rahmen-dur: 4s; }
+.foil-rahmen-secret i:nth-child(1) { border-color: rgba(255,215,0,.5);   box-shadow: 0 0 8px rgba(255,215,0,.25);   animation-delay: 0s; }
+.foil-rahmen-secret i:nth-child(2) { border-color: rgba(255,120,255,.5); box-shadow: 0 0 8px rgba(255,120,255,.25); animation-delay: -2.667s; }
+.foil-rahmen-secret i:nth-child(3) { border-color: rgba(100,200,255,.5); box-shadow: 0 0 8px rgba(100,200,255,.25); animation-delay: -1.333s; }
+.foil-rahmen-secret i:nth-child(4) { display: none; }
+/* Schultern bei der halben Strecke (.75 statt .5): zwei halb durch-
+   sichtige Ringe uebereinander ergeben so etwa die Mischfarbe, die der
+   fruehere Farbverlauf an dieser Stelle hatte, statt eines dunklen Lochs. */
+@keyframes foilRahmen4 { 0%, 100% { opacity: 1; } 12.5% { opacity: .75; } 25% { opacity: 0; } 75% { opacity: 0; } 87.5% { opacity: .75; } }
+@keyframes foilRahmen3 { 0%, 100% { opacity: 1; } 16.667% { opacity: .75; } 33.333% { opacity: 0; } 66.667% { opacity: 0; } 83.333% { opacity: .75; } }
+@supports (overflow-clip-margin: 1px) and selector(:has(> *)) {
+  .foil-diamond-rare:has(> .foil-rahmen), .foil-secret-rare:has(> .foil-rahmen) {
+    animation: none !important;
+    overflow: clip; overflow-clip-margin: 16px;
+    box-shadow: var(--karten-schatten, 0 0 0 transparent) !important;
+  }
+  /* Der eigene Rand bleibt durchsichtig — die Ringe malen ihn. */
+  .foil-diamond-rare:has(> .foil-rahmen), .foil-secret-rare:has(> .foil-rahmen) { border-color: transparent !important; }
+  .foil-diamond-rare > .foil-rahmen, .foil-secret-rare > .foil-rahmen { display: block; }
+  /* Hover wie bisher: kraeftiger Schein am Rahmen selbst, Ringe weg. */
+  .foil-diamond-rare:has(> .foil-rahmen):hover {
+    border-color: rgba(150,250,235,.95) !important;
+    box-shadow: 0 0 20px rgba(64,224,208,.65), 0 0 40px rgba(120,235,255,.35), 0 4px 12px rgba(0,0,0,.5) !important;
+  }
+  .foil-secret-rare:has(> .foil-rahmen):hover {
+    border-color: rgba(255,215,0,.9) !important;
+    box-shadow: 0 0 20px rgba(255,215,0,.5), 0 0 40px rgba(255,120,255,.25), 0 4px 12px rgba(0,0,0,.5) !important;
+  }
+  .foil-diamond-rare:hover > .foil-rahmen, .foil-secret-rare:hover > .foil-rahmen { display: none; }
+}
+
 /* ===== DIAMOND RARE FOIL ===== */
 @keyframes foilDiamondBorderPulse {
   0%, 100% { border-color: rgba(64,224,208,.65); box-shadow: 0 0 8px rgba(64,224,208,.35), var(--karten-schatten, 0 0 0 transparent); }
@@ -598,16 +651,13 @@ select optgroup {
    laeuft jetzt von Tuerkis ueber Aqua nach Tiefblau und zurueck, mit
    weissen Glanzkanten dazwischen. Vorher war er blass-blau und damit
    kaum von einer normalen Karte zu unterscheiden. */
+/* ★ v1403 (Al 25.9., Ruckeln mit Foil-Decks): Der Verlauf liegt auf einer
+   300 % grossen Pseudo-Ebene, die per `transform` wandert — dasselbe Bild
+   wie das fruehere `background-position`, aber ohne Neuzeichnen je Frame.
+   Die Ebene selbst pulsiert nur noch in der Deckkraft. */
 .foil-iridescent-diamond {
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg,
-    rgba(64,224,208,.30) 0%, rgba(140,250,235,.24) 14%,
-    rgba(255,255,255,.22) 27%, rgba(50,195,235,.28) 40%,
-    rgba(35,140,225,.28) 54%, rgba(120,235,245,.24) 68%,
-    rgba(255,255,255,.20) 82%, rgba(64,224,208,.28) 95%
-  );
-  background-size: 300% 300%;
-  animation: foilDiamondShimmer 4s ease-in-out infinite;
+  position: absolute; inset: 0; overflow: hidden;
+  animation: foilDiamondShimmerKlein 4s ease-in-out infinite;
   animation-delay: var(--shimmer-offset, 0s);
   mix-blend-mode: screen;
   /* Grundwert = Mitte des Takts, siehe .foil-sparkle: ohne Animation
@@ -644,6 +694,34 @@ select optgroup {
   .foil-band::after { display: none; }
 }
 
+.foil-iridescent::before, .foil-iridescent-diamond::before {
+  content: ''; position: absolute; left: 0; top: 0; width: 300%; height: 300%;
+  animation: foilSchimmerWeg var(--schimmer-dur, 4s) ease-in-out infinite;
+  animation-delay: var(--shimmer-offset, 0s);
+  will-change: transform;
+}
+.foil-iridescent { --schimmer-dur: 5s; }
+.foil-iridescent::before {
+  background: linear-gradient(135deg,
+    rgba(255,160,60,.1) 0%, rgba(255,60,200,.09) 15%,
+    rgba(60,160,255,.12) 30%, rgba(160,255,60,.09) 45%,
+    rgba(255,60,160,.1) 60%, rgba(60,255,255,.09) 75%,
+    rgba(255,200,60,.1) 90%);
+}
+.foil-iridescent-diamond::before {
+  background: linear-gradient(135deg,
+    rgba(64,224,208,.30) 0%, rgba(140,250,235,.24) 14%,
+    rgba(255,255,255,.22) 27%, rgba(50,195,235,.28) 40%,
+    rgba(35,140,225,.28) 54%, rgba(120,235,245,.24) 68%,
+    rgba(255,255,255,.20) 82%, rgba(64,224,208,.28) 95%);
+}
+@keyframes foilSchimmerWeg {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(-66.667%, -66.667%); }
+  50%      { transform: translate(-33.333%, 0); }
+  75%      { transform: translate(0, -66.667%); }
+}
+
 /* ── 1) TEXTUR ────────────────────────────────────────────────────
    Feine Schrägrillen, zwei Winkel übereinander, dazu ein ganz leichtes
    Rautennetz. Für sich genommen kaum zu sehen (das soll sie auch,
@@ -670,17 +748,10 @@ select optgroup {
   opacity: .38;
 }
 
-/* ── 2) SCHIMMER (Bestand) ──────────────────────────────────────── */
+/* ── 2) SCHIMMER (Bestand; v1403 wie Diamond: Ebene wandert) ─────── */
 .foil-iridescent {
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg,
-    rgba(255,160,60,.1) 0%, rgba(255,60,200,.09) 15%,
-    rgba(60,160,255,.12) 30%, rgba(160,255,60,.09) 45%,
-    rgba(255,60,160,.1) 60%, rgba(60,255,255,.09) 75%,
-    rgba(255,200,60,.1) 90%
-  );
-  background-size: 300% 300%;
-  animation: foilShimmer 5s ease-in-out infinite;
+  position: absolute; inset: 0; overflow: hidden;
+  animation: foilShimmerKlein 5s ease-in-out infinite;
   animation-delay: var(--shimmer-offset, 0s);
   mix-blend-mode: screen;
   /* Grundwert = Mitte des Takts, siehe .foil-sparkle: ohne Animation
@@ -746,9 +817,14 @@ select optgroup {
      schreibt den Wert ohnehin. */
   opacity: 0;
   background: radial-gradient(circle, #ffffff 0%, currentColor 40%, transparent 72%);
-  animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite,
-             sparkleGlow var(--sp-dur, 2.5s) ease-in-out infinite;
+  /* ★ v1403: Das Leuchten ist ein FESTER Schein (vorher ein animiertes
+     `filter: drop-shadow` — die teuerste Schicht, jeden Frame neu
+     gemalt). Er wird mit dem Funken skaliert und ein-/ausgeblendet, das
+     macht der Compositor allein; der Funke blitzt dadurch gleich auf. */
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 7px currentColor);
+  animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite;
   animation-delay: var(--sp-delay, 0s);
+  will-change: transform, opacity;
 }
 /* Lange, nadeldünne Spitzen mit weichem Auslauf — ein Lichtkreuz
    statt zweier Balken. */
@@ -781,6 +857,7 @@ select optgroup {
   opacity: 0;
   animation: foilMote var(--mote-dur, 6s) linear infinite;
   animation-delay: var(--mote-delay, 0s);
+  will-change: transform, opacity;   /* v1403: Schein einmal gerastert */
 }
 
 /* ── Sparmodus: Telefone (Lite-Modus) und „Play Animations: aus" ──
@@ -20148,6 +20225,75 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   display: flex; align-items: center; justify-content: center; gap: 5px;
 }
 .pp-cer-reward-betrag img, .pp-cer-summe img { width: 18px; height: 18px; image-rendering: pixelated; }
+/* ── v1400: begrenzte Boni (Al 25.9.) — Farbe + schräges Band ── */
+.pp-cer .pp-cer-reward-daily {
+  border-color: rgba(90,220,255,.85);
+  box-shadow: 4px 4px 0 rgba(0,0,0,.5), inset 0 0 20px rgba(90,220,255,.16);
+}
+.pp-cer .pp-cer-reward-daily .pp-cer-reward-titel { color: #7fe6ff; }
+.pp-cer .pp-cer-reward-once {
+  border-color: rgba(214,140,255,.9);
+  box-shadow: 4px 4px 0 rgba(0,0,0,.5), inset 0 0 22px rgba(214,140,255,.2);
+}
+.pp-cer .pp-cer-reward-once .pp-cer-reward-titel { color: #e2a8ff; }
+.pp-cer-band {
+  position: absolute; top: -11px; left: -12px; z-index: 1;
+  padding: 2px 10px 3px; transform: rotate(-11deg);
+  font-family: var(--font-display), sans-serif; font-size: 11px; letter-spacing: 1px;
+  color: #10131c; box-shadow: 2px 2px 0 rgba(0,0,0,.55);
+  pointer-events: none; white-space: nowrap;
+}
+.pp-cer-reward-daily .pp-cer-band { background: linear-gradient(180deg, #a6f0ff, #45c8f0); }
+.pp-cer-reward-once .pp-cer-band { background: linear-gradient(180deg, #f1c9ff, #b76cf0); }
+.pp-cer-reward-da .pp-cer-band { animation: ppCerBand .45s .15s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes ppCerBand {
+  0%   { transform: rotate(-11deg) scale(0); }
+  100% { transform: rotate(-11deg) scale(1); }
+}
+
+/* ── v1400: Münzregen im Sieg-Bildschirm (Al 25.9.) ── */
+/* Die Karten decken den Regen ab — sonst schimmern Münzen durch die
+   fast durchsichtigen Belohnungskarten. */
+.pp-cer-win .pp-cer-reward { background: rgba(22,26,40,.92); }
+.pp-cer-regen { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.pp-cer-regen i {
+  position: absolute; top: -60px; display: block;
+  animation: ppCerRegen 6s linear infinite; opacity: 0;
+}
+.pp-cer-regen b {
+  position: absolute; inset: 0; display: block;
+  background: url(/data/sc.png) center / contain no-repeat; image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px rgba(255,215,0,.55));
+  animation: ppCerDreh 1s ease-in-out infinite;
+}
+/* Glanz: ein kleiner Vierstern, der kurz aufblitzt */
+.pp-cer-regen u {
+  position: absolute; left: 60%; top: 10%; width: 12px; height: 12px; display: block;
+  background:
+    linear-gradient(90deg, transparent 42%, #fff 50%, transparent 58%),
+    linear-gradient(0deg, transparent 42%, #fff 50%, transparent 58%);
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 8px #ffd700);
+  opacity: 0; transform: scale(.2) rotate(0deg);
+  animation: ppCerGlanz 2.6s ease-out infinite;
+}
+@keyframes ppCerRegen {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  8%   { opacity: .8; }
+  88%  { opacity: .8; }
+  100% { transform: translate(var(--drift, 0px), calc(100dvh + 120px)); opacity: 0; }
+}
+@keyframes ppCerDreh {
+  0%, 100% { transform: scaleX(1); }
+  50%      { transform: scaleX(.12); filter: drop-shadow(0 0 10px rgba(255,240,170,.9)) brightness(1.35); }
+}
+@keyframes ppCerGlanz {
+  0%, 62%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
+  72%           { opacity: 1; transform: scale(1.15) rotate(45deg); }
+  84%           { opacity: 0; transform: scale(.4) rotate(90deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-cer-regen { display: none; }
+}
 .pp-cer-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
 .pp-cer-burst i {
   position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: #ffd700;
@@ -20923,7 +21069,9 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
 .foil-klein .foil-band { will-change: auto; }
 .foil-klein .foil-band::after { display: none; }
 .foil-klein .foil-band::before { filter: none; }
-.foil-klein .foil-sparkle { animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); }
+.foil-klein .foil-sparkle { animation: sparkle var(--sp-dur, 2.5s) ease-in-out infinite; animation-delay: var(--sp-delay, 0s); filter: none; }
+/* v1403: die Kleinansicht wandert weiterhin nicht, sie pulsiert nur. */
+.foil-klein .foil-iridescent::before, .foil-klein .foil-iridescent-diamond::before { animation: none; will-change: auto; }
 /* Rahmen: fester Schein statt pulsierendem `box-shadow` (Malarbeit je
    Karte und Frame). Farbe bleibt die der Seltenheit. */
 .card-mini.foil-ruhig.foil-secret-rare {
@@ -20946,6 +21094,7 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    app-shared), stehen die Endlos-Animationen DAHINTER still — Foil-
    Schichten, Leuchtrahmen, Zonen-Glanz. Im Dialog selbst laeuft alles. */
 body.pp-dialog-offen .foil-shine-overlay:not(.modal-overlay .foil-shine-overlay) *,
+body.pp-dialog-offen .foil-rahmen:not(.modal-overlay .foil-rahmen) *,
 body.pp-dialog-offen .foil-secret-rare:not(.modal-overlay *),
 body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   animation-play-state: paused !important;
@@ -21032,4 +21181,186 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   12%  { transform: scale(1); opacity: 1; }
   72%  { transform: scale(1); opacity: 1; }
   100% { transform: scale(0.95); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ★ v1404 (Al 25.9.) — KACHELN DER CPU-AUSWAHL
+   Doppelkante (dunkle Innenfuge + getoente Innenlinie), Eckwinkel,
+   eingerahmtes Portrait mit Vignette und gelegentlichem Glanzband,
+   Pixel-Schlagschatten. Farbe kommt aus `--kachel-farbe`.
+   ═══════════════════════════════════════════════════════════════ */
+.vscpu-kachel {
+  --k: var(--kachel-farbe, #ff4444);
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 10px 10px 9px;
+  font-family: inherit; color: inherit; cursor: pointer;
+  border-radius: 3px;
+  border: 2px solid color-mix(in srgb, var(--k) 88%, #000);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--k) 16%, var(--bg2)) 0%,
+      color-mix(in srgb, var(--k) 6%, var(--bg2)) 55%,
+      var(--bg2) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,.45),
+    inset 0 0 0 3px color-mix(in srgb, var(--k) 32%, transparent),
+    0 0 12px color-mix(in srgb, var(--k) 22%, transparent),
+    4px 4px 0 rgba(0,0,0,.5);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.vscpu-kachel:not(:disabled):hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,.45),
+    inset 0 0 0 3px color-mix(in srgb, var(--k) 55%, transparent),
+    0 0 22px color-mix(in srgb, var(--k) 45%, transparent),
+    4px 7px 0 rgba(0,0,0,.5);
+}
+.vscpu-kachel:not(:disabled):active { transform: translateY(0); }
+.vscpu-kachel:disabled { cursor: not-allowed; opacity: .55; filter: saturate(.6); }
+
+/* Eckwinkel — rücken beim Hover ein Stück nach außen. */
+.vscpu-ecken { position: absolute; inset: 0; pointer-events: none; }
+.vscpu-ecken i {
+  position: absolute; width: 12px; height: 12px;
+  border: 0 solid var(--k);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--k) 70%, transparent));
+  transition: transform .18s ease;
+}
+.vscpu-ecken i:nth-child(1) { left: -5px;  top: -5px;    border-top-width: 3px;    border-left-width: 3px; }
+.vscpu-ecken i:nth-child(2) { right: -5px; top: -5px;    border-top-width: 3px;    border-right-width: 3px; }
+.vscpu-ecken i:nth-child(3) { left: -5px;  bottom: -5px; border-bottom-width: 3px; border-left-width: 3px; }
+.vscpu-ecken i:nth-child(4) { right: -5px; bottom: -5px; border-bottom-width: 3px; border-right-width: 3px; }
+.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(1) { transform: translate(-3px, -3px); }
+.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(2) { transform: translate(3px, -3px); }
+.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(3) { transform: translate(-3px, 3px); }
+.vscpu-kachel:not(:disabled):hover .vscpu-ecken i:nth-child(4) { transform: translate(3px, 3px); }
+
+/* Portrait im eigenen Rahmen */
+.vscpu-bild {
+  position: relative; line-height: 0;
+  border: 2px solid rgba(0,0,0,.75);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--k) 65%, transparent);
+  overflow: hidden;
+}
+.vscpu-bild-vignette {
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background:
+    radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0,0,0,.45) 100%),
+    linear-gradient(180deg, transparent 65%, color-mix(in srgb, var(--k) 22%, transparent) 100%);
+}
+.vscpu-glanz { z-index: 2; --glanz-dauer: 6.5s; --glanz-staerke: .5; --glanz-breite: 26%; }
+.vscpu-kachel:disabled .vscpu-glanz { display: none; }
+
+.vscpu-name {
+  font-size: 16px; font-weight: 700; line-height: 1.2; text-align: center;
+  min-height: 2.4em; display: flex; align-items: center; justify-content: center;
+  color: var(--k);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--k) 55%, transparent), 2px 2px 0 rgba(0,0,0,.7);
+}
+.vscpu-fuss { display: flex; gap: 8px; margin-top: auto; }
+.vscpu-chip {
+  font-size: 12px; font-weight: 700; letter-spacing: .5px;
+  padding: 2px 8px; color: var(--k);
+  background: rgba(0,0,0,.35);
+  border: 1px solid color-mix(in srgb, var(--k) 55%, transparent);
+  box-shadow: 2px 2px 0 rgba(0,0,0,.45);
+}
+.vscpu-chip--leise { opacity: .75; font-weight: 600; }
+
+/* ── Zufalls-Kachel: Spielautomat durch die Gegner ── */
+.vscpu-zufall { position: relative; overflow: hidden; background: #0a0a12; }
+.vscpu-zufall-portrait {
+  position: absolute; inset: 0;
+  filter: brightness(.42) saturate(.55) blur(1.2px);
+  animation: vscpuWalze .28s ease-out both;
+}
+.vscpu-zufall--schnell .vscpu-zufall-portrait { animation-duration: .1s; filter: brightness(.5) saturate(.7) blur(2px); }
+@keyframes vscpuWalze {
+  0%   { transform: translateY(-18%); opacity: .2; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.vscpu-zufall-frage {
+  position: absolute; left: 50%; top: 50%; z-index: 1;
+  font-size: 58px; line-height: 1; color: #ffd84a;
+  text-shadow: 0 0 14px rgba(255,200,40,.85), 0 0 30px rgba(255,170,0,.45), 4px 4px 0 rgba(0,0,0,.8);
+  transform: translate(-50%, -50%);
+  animation: vscpuFrage 2.4s ease-in-out infinite;
+}
+@keyframes vscpuFrage {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50%      { transform: translate(-50%, -56%) scale(1.06); }
+}
+/* ── v1408: echter 3D-Würfel (Al 25.9.) ── */
+.vscpu-wuerfel-buehne {
+  --w: 30px;
+  position: absolute; right: 12px; top: 10px; z-index: 1;
+  width: var(--w); height: var(--w);
+  perspective: 240px;
+  filter: drop-shadow(2px 3px 0 rgba(0,0,0,.6));
+}
+/* feste Schräglage, damit man immer drei Seiten sieht */
+.vscpu-wuerfel-sprung {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transform: rotateX(-22deg) rotateY(28deg);
+}
+/* jeder Wurf: hochspringen, aufschlagen, nachfedern */
+.vscpu-wuerfel-sprung--an { animation: vscpuSprung .34s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes vscpuSprung {
+  0%   { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
+  30%  { transform: translateY(-16px) rotateX(-22deg) rotateY(28deg) scale(1.12); }
+  62%  { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1.05, .92); }
+  78%  { transform: translateY(-4px)  rotateX(-22deg) rotateY(28deg) scale(1.02); }
+  100% { transform: translateY(0)     rotateX(-22deg) rotateY(28deg) scale(1); }
+}
+.vscpu-wuerfel {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transition: transform .3s cubic-bezier(.2,.75,.25,1);   /* v1409: passend zum 0,4-s-Takt */
+}
+.vscpu-wuerfel-seite {
+  position: absolute; inset: 0;
+  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 4px; gap: 1px;
+  background: linear-gradient(145deg, #fffdf6, #e4dfd2);
+  border: 2px solid #2a2a33; border-radius: 5px;
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,.12), inset 2px 2px 0 rgba(255,255,255,.7);
+  backface-visibility: hidden;
+}
+.vscpu-wuerfel-seite i { display: block; border-radius: 50%; }
+.vscpu-wuerfel-seite i.an { background: #1d1d26; margin: 1px; }
+.vscpu-wuerfel-vorn i.an { background: #d8262b; }   /* die Eins in Rot, wie beim echten Würfel */
+.vscpu-wuerfel-vorn   { transform: translateZ(calc(var(--w) / 2)); }
+.vscpu-wuerfel-hinten { transform: rotateY(180deg) translateZ(calc(var(--w) / 2)); }
+.vscpu-wuerfel-rechts { transform: rotateY(90deg) translateZ(calc(var(--w) / 2)); }
+.vscpu-wuerfel-links  { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2)); }
+.vscpu-wuerfel-oben   { transform: rotateX(90deg) translateZ(calc(var(--w) / 2)); }
+.vscpu-wuerfel-unten  { transform: rotateX(-90deg) translateZ(calc(var(--w) / 2)); }
+@media (prefers-reduced-motion: reduce) {
+  .vscpu-wuerfel-sprung--an { animation: none; }
+  .vscpu-wuerfel { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vscpu-zufall-portrait, .vscpu-zufall-frage { animation: none; }
+}
+
+
+/* ═══ DOOM COUNTER (v1421, Als Vorgabe 25.9.) ═══════════════════════════
+   Totenschaedel + „+1" ueber der Doom Clock: springt hoch, pocht einmal,
+   steigt und verblasst (1,5 s). */
+.anim-doom-counter { transform: translate(-50%, -100%); }
+.anim-doom-counter-inhalt {
+  display: flex; align-items: center; gap: 6px;
+  animation: doomCounterSteigen 1.5s cubic-bezier(.2, .8, .3, 1) forwards;
+}
+.anim-doom-counter-plus {
+  font-family: 'Pixel Intv', monospace; font-size: 26px; font-weight: 700; color: #ff3a2a;
+  text-shadow: 2px 0 0 #2a0404, -2px 0 0 #2a0404, 0 2px 0 #2a0404, 0 -2px 0 #2a0404, 0 0 8px rgba(255, 40, 20, .7);
+}
+@keyframes doomCounterSteigen {
+  0%   { opacity: 0; transform: translateY(14px) scale(.5); }
+  14%  { opacity: 1; transform: translateY(-2px) scale(1.18); }
+  24%  { transform: translateY(0) scale(1); }
+  70%  { opacity: 1; transform: translateY(-16px) scale(1); }
+  100% { opacity: 0; transform: translateY(-30px) scale(.95); }
 }

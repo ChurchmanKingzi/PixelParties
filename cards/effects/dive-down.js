@@ -224,7 +224,7 @@ module.exports = {
           fromHandIdx: handIdx, asPlay: 'sole',
           sfx: 'discard',
         });
-        ps.hand.splice(handIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', handIdx);
         const inst = engine.cardInstances.find(c =>
           c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME);
         if (inst) engine._untrackCard(inst.id);

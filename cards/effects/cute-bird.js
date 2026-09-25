@@ -116,7 +116,7 @@ module.exports = {
       }
 
       // Pull Phoenix out, shuffle deck, broadcast deck-search reveal.
-      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
+      if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'deck_locked' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
         return;
@@ -132,7 +132,7 @@ module.exports = {
         {
           source: CARD_NAME,
           isPlacement: true,
-          hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+          hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
         }
       );
 
@@ -140,7 +140,7 @@ module.exports = {
         // canSummon refused (already control 1 Phoenix) or no free slot.
         // Return Phoenix to deck so the player doesn't lose the copy
         // outright; the discard cost is still paid.
-        ps.mainDeck.push(TUTOR_TARGET);
+        engine.returnToPile(ps, 'deck', TUTOR_TARGET);
         engine.shuffleDeck(pi, 'main');
         engine.log('cute_bird_fizzle', { player: ps.username, reason: 'canSummon_or_noSlot' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360

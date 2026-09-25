@@ -172,19 +172,14 @@ module.exports = {
       // ist ausdruecklich EIN Schlag (siehe Kommentar oben), traf aber
       // ohne Klammer — der Schutz griff nie. Kreaturen trifft er nicht,
       // das Anti-AoE-Fenster bleibt deshalb aussen vor.
-      engine.beginMultiHit(treffer.length);
-      try {
-      for (const eintrag of treffer) {
-        const hero = gs.players[eintrag.pi]?.heroes?.[eintrag.heroIdx];
-        if (!hero?.name || hero.hp <= 0) continue;
-        await engine.actionDealDamage(
-          { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx, controller: pi },
-          hero, DAMAGE_JE_ARTEFAKT * eintrag.gefallen, 'destruction_spell',
-        );
-      }
-      } finally {
-        engine.endMultiHit();
-      }
+      // ★ v1392: über die EINE Stelle für Mehrfachtreffer; Schaden je
+      // Ziel abgestuft (`amount`). Reaktionsfenster wie bisher aus.
+      await engine.dealDamageToTargets(
+        { name: CARD_NAME, owner: pi, heroIdx: casterHeroIdx, controller: pi },
+        treffer.map(e => ({ type: 'hero', owner: e.pi, heroIdx: e.heroIdx, amount: DAMAGE_JE_ARTEFAKT * e.gefallen })),
+        { damageType: 'destruction_spell', sourceName: CARD_NAME, hitDelay: 0,
+          surpriseCheck: false, postTargetCheck: false },
+      );
       await engine._delay(240);
 
       engine.sync();

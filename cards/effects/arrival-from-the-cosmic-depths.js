@@ -291,7 +291,7 @@ module.exports = {
 
       // Splice the chosen copy out of the deck. Match by exact name —
       // any copy is equivalent for placement purposes.
-      const _taken_firstDeckIdx = await engine.takeFromPile(ps, 'deck', firstName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_firstDeckIdx = await engine.deckEntnahme(ps,  firstName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_firstDeckIdx) return; // Shouldn't happen post-prompt
 
       engine._broadcastEvent('play_zone_animation', {
@@ -315,7 +315,7 @@ module.exports = {
         hookExtras: {
           _summonedBy: CARD_NAME,
           _summonedByCosmic: true,
-          _summonedFromDeck: true,
+          ...engine.deckHookExtras(),
           _summonedByPlayer: pi,
         },
       });
@@ -394,7 +394,7 @@ module.exports = {
       });
       if (!ownPick) return;
 
-      if (!(await engine.takeFromPile(ps, 'deck', secondDeckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
+      if (!(await engine.deckEntnahme(ps,  secondDeckIdx, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
 
       engine._broadcastEvent('play_zone_animation', {
         type: ANIM_PORTAL,
@@ -409,7 +409,7 @@ module.exports = {
         hookExtras: {
           _summonedByCosmic: true,
           _summonedBy: CARD_NAME,
-          _summonedFromDeck: true,
+          ...engine.deckHookExtras(),
         },
       });
 

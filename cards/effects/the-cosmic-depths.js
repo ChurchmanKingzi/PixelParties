@@ -203,8 +203,8 @@ module.exports = {
     if (handIdx < 0) return false;
 
     // ── Step 2: shuffle it in ────────────────────────────────────────
-    ps.hand.splice(handIdx, 1);
-    ps.mainDeck.push(shuffledName);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
+    engine.returnToPile(ps, 'deck', shuffledName);
     engine.shuffleDeck(activator, 'main');
     engine.log('cosmic_depths_shuffle', { player: ps.username, card: shuffledName });
     engine.sync();
@@ -296,7 +296,7 @@ module.exports = {
     const beforeOk = await engine._runBeforeSummon(chosenName, activator, heroPick.heroIdx, {
       _summonedByCosmic: true,
       _summonedBy: CARD_NAME,
-      _summonedFromDeck: true,
+      ...engine.deckHookExtras(),
     });
     let inst = null;
     if (!beforeOk) {
@@ -326,7 +326,7 @@ module.exports = {
     //            negate ────────────────────────────────────────────────
     if (!inst) {
       // Standard path (no self-place inside beforeSummon).
-      const _taken_stillIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_stillIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_stillIdx) return true; // shifted out from under us
       engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: activator });
       engine.sync();
@@ -365,7 +365,7 @@ module.exports = {
     // react — the negated creature's own hooks are filtered out
     // automatically by the engine's negation guard.
     //
-    // `_summonedFromDeck: true` lets Cosmic Manipulation's post-summon
+    // `...engine.deckHookExtras()` lets Cosmic Manipulation's post-summon
     // reaction trigger fire (it gates on direct-from-deck summons).
     // `_summonedByCosmic: true` + `_summonedBy` keep the summoning-
     // source identity available for Life-Searcher / Invader gates,
@@ -375,7 +375,7 @@ module.exports = {
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: heroPick.heroIdx,
       _skipReactionCheck: true,
-      _summonedFromDeck: true,
+      ...engine.deckHookExtras(),
       _summonedByCosmic: true,
       _summonedBy: CARD_NAME,
     });

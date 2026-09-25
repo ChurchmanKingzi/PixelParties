@@ -48,6 +48,7 @@ function kandidaten(engine, pi) {
   const db = engine._getCardDB();
   const zaehler = new Map();
   for (const n of (ps?.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(n)) continue;   // v1389: Gigantisaur, Ifrit
     const cd = db[n];
     if (!cd || !isPileCreature(cd)) continue;
     if (engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) > MAX_LEVEL) continue;

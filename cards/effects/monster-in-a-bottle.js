@@ -86,6 +86,7 @@ function getEligibleCreatures(gs, pi, engine = null) {
       if (!cd || !isPileCreature(cd)) continue;
       if (effLvl(cd, source) > 3) continue;
       if (summonBlocked.includes(name)) continue;
+      if (source === 'discard' && engine && !engine.darfAusAblageAufsFeld(name)) continue;   // v1389
       // Check if ANY living hero with free zones can summon this
       let canSummon = false;
       for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
@@ -156,6 +157,7 @@ module.exports = {
           if (!cd || !isPileCreature(cd)) continue;
           if (effLvl(cd, source) > 3) continue;
           if (summonBlocked.includes(name)) continue;
+          if (source === 'discard' && !engine.darfAusAblageAufsFeld(name)) continue;   // v1389
           let canSummon = false;
           for (let hi = 0; hi < (ps.heroes || []).length; hi++) {
             if (!canHeroSummon(engine, ps, pi, hi, cd, source)) continue;
@@ -230,15 +232,15 @@ module.exports = {
       await engine._delay(100);
 
       // Execute: remove from source, place into support zone
-      let _letheBonus = 0;
+      // v1389: der Ablage-Zweig läuft über die EINE Stelle (Sperre, Lethe).
+      let ab = null;
       if (creatureSource === 'hand') {
         const idx = ps.hand.indexOf(creatureName);
         if (idx < 0) return { cancelled: true };
-        ps.hand.splice(idx, 1);
+        engine.takeFromPileSync(ps, 'hand', idx);
       } else {
-        const _taken_idx = await engine.takeFromPile(ps, 'discard', creatureName, { source: 'monster-in-a-bottle' });   // v820: Stapel-Schicht
-        if (!_taken_idx) return { cancelled: true };
-        _letheBonus = engine.consumeLetheStamp(pi, creatureName);
+        ab = await engine.ablageEntnahme(pi, pi, creatureName, { source: 'monster-in-a-bottle' });
+        if (!ab) return { cancelled: true };
       }
 
       const hi = zone.heroIdx;
@@ -249,7 +251,7 @@ module.exports = {
       // Track card instance
       const inst = engine._trackCard(creatureName, pi, 'support', hi, si);
       inst.counters.isPlacement = 1;
-      if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
+      const ablageExtras = ab ? engine.ablageLandung(inst, ab, 'summon') : {};   // Lethe, SC, Signal
 
       engine.log('placement', { card: creatureName, by: 'Monster in a Bottle', from: creatureSource, heroIdx: hi, zoneSlot: si });
 
@@ -258,8 +260,8 @@ module.exports = {
       engine._broadcastEvent('play_zone_animation', { type: 'deep_sea_bubbles', owner: pi, heroIdx: hi, zoneSlot: si });
 
       // Fire on-summon hooks
-      await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: creatureName, zone: 'support', heroIdx: hi, zoneSlot: si });
-      await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: hi });
+      await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: creatureName, zone: 'support', heroIdx: hi, zoneSlot: si, ...ablageExtras });
+      await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: hi, ...ablageExtras });
 
       engine.sync();
       break;

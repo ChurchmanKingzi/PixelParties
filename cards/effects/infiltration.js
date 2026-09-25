@@ -146,7 +146,7 @@ async function _activateLv2or3(engine, gs, pi, oi, ps, ops, level) {
   }
 
   // Add the picked card to our hand.
-  ps.hand.push(pickedName);
+  await engine.handZugang(ps, pickedName, { von: 'fremdesDeck', source: CARD_NAME });   // v1396: aus dem GEGNERISCHEN Deck — keine Suche, nicht „from your deck“ (Als Ruling 25.9.)
   engine._tagHandCardOrigin(pi, pickedName, oi);   // v693: kehrt zum Besitzer zurueck
   engine.log('infiltration_take', { player: ps.username, card: pickedName, level });
 

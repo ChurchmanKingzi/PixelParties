@@ -172,19 +172,19 @@ module.exports = {
     }
     if (slot < 0) return;
 
-    const genommen = await engine.takeFromPile(ps, 'deck', gewaehlt, { source: CARD_NAME, shuffle: true });
+    const genommen = await engine.deckEntnahme(ps,  gewaehlt, { source: CARD_NAME, shuffle: true });
     if (!genommen) return;
 
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
     await engine._delay(350);
 
     const res = await engine.summonCreatureWithHooks(gewaehlt, pi, heroIdx, slot, {
-      source: CARD_NAME,
+      source: CARD_NAME, hookExtras: engine.deckHookExtras(),   // v1393
     });
     if (!res?.inst) {
       // Beschwoerung abgelehnt: die Karte gehoert zurueck ins Deck,
       // nicht in die Ablage — sie hat das Deck nie wirklich verlassen.
-      ps.mainDeck.unshift(gewaehlt);
+      engine.deckRueckgabe(genommen);   // v1393
       engine.sync();
       return;
     }

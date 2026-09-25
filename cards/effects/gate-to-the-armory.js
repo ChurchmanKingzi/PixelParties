@@ -195,10 +195,9 @@ module.exports = {
       }
 
       // Add the tutored Artifact to the caster's hand.
-      ps.hand.push(pickedName);
+      engine.handZugangSync(ps, pickedName, { source: CARD_NAME });
       // Track the new hand instance so subsequent hooks have an
       // instance to fire on (some Artifacts listen from hand).
-      engine._trackCard(pickedName, pi, 'hand');
 
       // v734: Diese Karte bucht ihren Zugriff historisch von Hand.
       // Damit Verdoppler (Koperniko) sie sehen, wird die Strichliste
@@ -269,7 +268,7 @@ module.exports = {
             // instance so it doesn't double-track once we place it in
             // support).
             const handIdx = ps.hand.lastIndexOf(pickedName);
-            if (handIdx >= 0) ps.hand.splice(handIdx, 1);
+            if (handIdx >= 0) engine.takeFromPileSync(ps, 'hand', handIdx);
             const handInst = engine.cardInstances.find(c =>
               c.owner === pi && c.zone === 'hand' && c.name === pickedName,
             );

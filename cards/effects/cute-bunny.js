@@ -162,7 +162,7 @@ module.exports = {
       // a fresh tracked instance into support.
       const handIdx = ps.hand.indexOf(CARD_NAME);
       if (handIdx < 0) return;
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       const oldInst = ctx.card;
       if (oldInst && oldInst.zone === 'hand') {

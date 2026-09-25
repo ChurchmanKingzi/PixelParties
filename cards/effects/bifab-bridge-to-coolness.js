@@ -103,8 +103,7 @@ module.exports = {
     // Move chosen card from deck to hand.
     const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', choice.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
-      ps.hand.push(choice.cardName);
-      engine._trackCard(choice.cardName, pi, 'hand');
+      await engine.handZugang(ps, choice.cardName, { von: 'deck', source: CARD_NAME });
       // Shuffle the remaining deck.
       for (let i = ps.mainDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));

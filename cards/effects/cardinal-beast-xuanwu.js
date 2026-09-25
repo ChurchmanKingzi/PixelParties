@@ -35,6 +35,7 @@ module.exports = {
     // so Whoolmoth-style reducers / Phatnir's Cool-Stack rebate count;
     // `pileSide: 'discard'` picks up Lethe's per-pile +1 stamps too).
     const hasEligible = (ps.discardPile || []).some(cn => {
+      if (!engine.darfAusAblageAufsFeld(cn)) return false;   // v1389
       const cd = cardDB[cn];
       return cd && cd.cardType === 'Creature'
           && engine.effectiveCardLevel(cd, pi, { pileSide: 'discard' }) <= 3;
@@ -65,6 +66,7 @@ module.exports = {
     const seen = new Set();
     const galleryCards = [];
     for (const cn of (ps.discardPile || [])) {
+      if (!engine.darfAusAblageAufsFeld(cn)) continue;   // v1389: Gigantisaur, Ifrit
       if (seen.has(cn)) continue;
       const cd = cardDB[cn];
       if (!cd || cd.cardType !== 'Creature') continue;
@@ -127,8 +129,9 @@ module.exports = {
     if (destHeroIdx == null || destSlot == null) return false;
 
     // Place the creature
-    if (!(await engine.takeFromPile(ps, 'discard', chosenName, { source: 'Cardinal Beast Xuanwu' }))) return false;   // v820: Stapel-Schicht
-    const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
+    // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
+    const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: 'Cardinal Beast Xuanwu' });
+    if (!ab) return false;
     if (!ps.supportZones[destHeroIdx]) ps.supportZones[destHeroIdx] = [[], [], []];
     ps.supportZones[destHeroIdx][destSlot] = [chosenName];
     const inst = engine._trackCard(chosenName, pi, 'support', destHeroIdx, destSlot);
@@ -137,7 +140,7 @@ module.exports = {
     inst.counters.currentHp = 1;
     inst.counters.maxHp = 1;
     inst.counters._xuanwuRevived = true; // Visual indicator (blue tint)
-    if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
+    const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
     // Track creature summon
     ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
@@ -147,7 +150,7 @@ module.exports = {
 
     await engine.runHooks('onCardEnterZone', {
       enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
-      _skipReactionCheck: true,
+      _skipReactionCheck: true, ...ablageExtras,
     });
 
     engine.sync();

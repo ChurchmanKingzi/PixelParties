@@ -356,7 +356,7 @@ module.exports = {
       fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
       sfx: 'placement',
     });
-    ps.hand.splice(handIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
 
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
     ps.supportZones[heroIdx][slot] = [feeName];

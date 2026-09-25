@@ -132,13 +132,8 @@ module.exports = {
           // Name drifted between prompt and commit — be conservative and skip.
           continue;
         }
-        ps.hand.splice(handIndex, 1);
-        ps.discardPile.push(actualName);
-        await engine.runHooks('onDiscard', {
-          playerIdx: pi, cardName: actualName, discardedCardName: actualName,
-          _fromHand: true, _skipReactionCheck: true,
-        });
-        engine.log('mana_beacon_discard', { player: ps.username, card: actualName });
+        // v1394: Abwurf über die zentrale Funktion.
+        await engine.actionDiscardHandCard(pi, actualName, handIndex, { source: 'Mana Beacon', _noGlow: true });
       }
       const discardedCount = selected.length;
       engine.sync();

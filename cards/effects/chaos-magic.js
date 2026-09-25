@@ -112,8 +112,8 @@ module.exports = {
         await engine._delay(REVEAL_MS);
 
         // Move the revealed card from the deck to the deleted pile.
-        ps.mainDeck.shift();
-        if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
+        // v1397: Entnahme über die Stapel-Schicht (Deckkopf-Sicht inklusive).
+        engine.takeFromPileSync(ps, 'deck', 0, { source: 'Chaos Magic' });
         if (!ps.deletedPile) ps.deletedPile = [];
         ps.deletedPile.push(name);
         revealedCount++;

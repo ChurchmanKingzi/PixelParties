@@ -164,11 +164,11 @@ module.exports = {
       const idx = _taken_idx.idx;
       engine._broadcastEvent('deck_search_add', { cardName: abilityName, playerIdx: pi });
       engine.shuffleDeck(pi, 'main');
-      ps.hand.push(abilityName);
+      engine.handZugangSync(ps, abilityName, { von: 'transit', source: CARD_NAME });   // v1395: Durchgang zur Anlage, keine Suche
     } else if (source === 'discard') {
       const _taken_idx = await engine.takeFromPile(ps, 'discard', abilityName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_idx) return { cancelled: true };
-      ps.hand.push(abilityName);
+      engine.handZugangSync(ps, abilityName, { von: 'transit', source: CARD_NAME });   // v1395: Durchgang zur Anlage, keine Suche
     } else { // hand
       if (ps.hand.indexOf(abilityName) < 0) return { cancelled: true };
       // Already in hand — attachAbilityFromHand consumes it from there.

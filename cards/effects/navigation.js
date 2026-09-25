@@ -92,8 +92,7 @@ module.exports = {
         const fallbackIdx = eligibleIndices[0];
         const fallbackName = ps.hand[fallbackIdx];
         if (!chosenCardName) chosenCardName = fallbackName;
-        ps.hand.splice(fallbackIdx, 1);
-        ps.discardPile.push(fallbackName);
+        await engine.actionDiscardHandCard(pi, fallbackName, fallbackIdx, { source: 'Navigation', _noGlow: true });   // v1394
       } else {
         if (!chosenCardName) chosenCardName = result.cardName;
 
@@ -102,18 +101,9 @@ module.exports = {
           : ps.hand.indexOf(result.cardName);
         if (handIdx < 0) return false;
 
-        ps.hand.splice(handIdx, 1);
-        ps.discardPile.push(result.cardName);
+        await engine.actionDiscardHandCard(pi, result.cardName, handIdx, { source: 'Navigation', _noGlow: true });   // v1394
       }
-
-      // Untrack hand instance
-      const inst = engine.findCards({ owner: pi, zone: 'hand', name: chosenCardName })[0];
-      if (inst) {
-        inst.zone = 'discard';
-        await engine.runHooks('onDiscard', {
-          playerIdx: pi, card: inst, cardName: chosenCardName, _skipReactionCheck: true,
-        });
-      }
+      // (v1394: Instanz, onDiscard, Flug und Log macht actionDiscardHandCard.)
 
       engine.log('navigation_discard', { player: ps.username, card: chosenCardName });
       engine.sync();

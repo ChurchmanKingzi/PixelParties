@@ -16,7 +16,8 @@
 // ═══════════════════════════════════════════════════════════════
 'use strict';
 
-const { hasCardType, SPELL_SCHOOL_ABILITIES } = require('./_hooks');
+const { hasCardType, SPELL_SCHOOL_ABILITIES, STATUS_EFFECTS, BUFF_EFFECTS } = require('./_hooks');
+const { handSizeWithoutResolving } = require('./_hand-resolve');
 
 /** Frischer Zähler für einen Spieler. */
 function neu() {
@@ -47,16 +48,74 @@ function neu() {
     dmgOther: 0,              //   … jeder andere Schaden (auch Status) bricht beide
     lastKillExact: false,     // Right on Target — gilt für den LETZTEN Heldentod
     startHpSumme: null,       // Overhealed — Summe der Helden-HP bei Spielbeginn
+    // ── v1388 ──
+    startHelden: null,        // Mirror Match — Heldennamen bei Spielbeginn
+    heroRevived: false,       // Back from the Dead
+    goldTurn: -1,             // Big Spender: Zug der laufenden Summe
+    goldSpentTurn: 0,         //   … in diesem Zug ausgegeben
+    maxGoldSpentTurn: 0,      //   … Bestwert
+    maxEnemyAfflictions: 0,   // Plague Spreader — gleichzeitig an EINEM Gegnerhelden
+    maxHandSize: 0,           // Full Hand
+    discardSummons: 0,        // Graverobber — beschworene Instanzen aus der Ablage
+    // ── v1399 (Verlierer-Boni) ──
+    gegnerFastBesiegt: false, // So Close! — Gegner hatte nur noch 1 Helden mit ≤ 100 HP
+    ersterVerlust: false,     // Almost a Comeback — den ersten Heldentod der Partie erlitten
+    gegnerTodeNachErstem: 0,  //   … danach gefallene gegnerische Helden (jede Ursache)
+    schadenGesamt: 0,         // Went Down Swinging — aller verursachte Schaden
+    mitgenommen: false,       // Took One With Me — Gegnerheld fiel, während man selbst nur 1 hatte
   };
 }
 
-/** Overhealed: HP-Summe aller eigenen Helden bei Spielbeginn festhalten. */
+/** Spielbeginn: HP-Summe (Overhealed) und Heldennamen (Mirror Match). */
 function startHp(tracking, players) {
   for (let pi = 0; pi < 2; pi++) {
     const t = tracking?.[pi];
-    if (!t || t.startHpSumme != null) continue;
-    t.startHpSumme = hpSumme(players?.[pi]);
+    if (!t) continue;
+    if (t.startHpSumme == null) t.startHpSumme = hpSumme(players?.[pi]);
+    if (t.startHelden == null) t.startHelden = (players?.[pi]?.heroes || []).map(h => h?.name).filter(Boolean);
   }
+}
+
+/**
+ * Plague Spreader: verschiedene negative Status plus Debuffs (Buffs mit
+ * `debuff: true`) an EINEM Helden.
+ */
+function plagenAnHeld(hero) {
+  if (!hero?.name) return 0;
+  let n = 0;
+  for (const [k, v] of Object.entries(hero.statuses || {})) if (v && STATUS_EFFECTS[k]?.negative) n++;
+  for (const [k, v] of Object.entries(hero.buffs || {})) if (v && BUFF_EFFECTS[k]?.debuff) n++;
+  return n;
+}
+
+/**
+ * Zustands-Beobachter, aus `sync()` (nur Live-Partie): Plague Spreader
+ * (gezählt für den GEGNER des geplagten Helden) und Full Hand.
+ */
+function zustand(tracking, players) {
+  for (let pi = 0; pi < 2; pi++) {
+    const t = tracking?.[pi];
+    const ps = players?.[pi];
+    if (!t || !ps) continue;
+    const hand = handSizeWithoutResolving(ps);
+    if (hand > (t.maxHandSize || 0)) t.maxHandSize = hand;
+    fastBesiegtPruefen(tracking, players, pi);   // v1399
+    const gegner = tracking[pi === 0 ? 1 : 0];
+    if (!gegner) continue;
+    for (const h of (ps.heroes || [])) {
+      const n = plagenAnHeld(h);
+      if (n > (gegner.maxEnemyAfflictions || 0)) gegner.maxEnemyAfflictions = n;
+    }
+  }
+}
+
+/**
+ * Graverobber (v1389): eine Creature ist aus der Ablage aufs Feld gekommen
+ * — gemeldet von `engine.ablageLandung`, der EINEN Stelle dafür. Jede
+ * Instanz zählt, auch dieselbe Karte wieder und wieder.
+ */
+function ablageBeschwoerung(t) {
+  if (t) t.discardSummons = (t.discardSummons || 0) + 1;
 }
 /** Summe der HP aller benannten Helden eines Spielers (besiegte = 0). */
 function hpSumme(ps) {
@@ -73,15 +132,17 @@ const STATUS_SCHLUESSEL = { Burn: 'burned', Poison: 'poisoned', Bleed: 'bleeding
  * Status-Schaden zählt als „andere Art" und bricht beide Kategorien —
  * zugerechnet dem, der den Status gesetzt hat, sonst dem Gegner des Opfers.
  */
-function schaden(tracking, { source, amount, opferSeite, ziel, istStatus, cardDB }) {
+function schaden(tracking, { source, amount, opferSeite, ziel, istStatus, cardDB, statusLeser }) {
   if (!tracking || !(amount > 0)) return;
   if (istStatus) {
     const k = STATUS_SCHLUESSEL[source?.name];
-    const von = k ? (ziel?.statuses?.[k]?.appliedBy ?? ziel?.counters?.[k]?.appliedBy) : undefined;
+    // v1399: Verursacher über den zentralen Leser der Engine (Held UND
+    // Creature; bis v1398 las diese Stelle bei Creatures den falschen Schlüssel).
+    const von = (k && statusLeser) ? statusLeser(ziel, k)?.spieler : undefined;
     const wer = (von === 0 || von === 1) ? von
       : (opferSeite === 0 || opferSeite === 1) ? 1 - opferSeite : null;
     const t = wer == null ? null : tracking[wer];
-    if (t) t.dmgOther = (t.dmgOther || 0) + amount;
+    if (t) { t.dmgOther = (t.dmgOther || 0) + amount; t.schadenGesamt = (t.schadenGesamt || 0) + amount; }
     return;
   }
   const wer = source?.owner ?? source?.controller;
@@ -93,6 +154,7 @@ function schaden(tracking, { source, amount, opferSeite, ziel, istStatus, cardDB
   if (istSpell) t.dmgSpell = (t.dmgSpell || 0) + amount;
   if (istKreatur) t.dmgCreature = (t.dmgCreature || 0) + amount;
   if (!istSpell && !istKreatur) t.dmgOther = (t.dmgOther || 0) + amount;
+  t.schadenGesamt = (t.schadenGesamt || 0) + amount;   // v1399: Went Down Swinging
 }
 
 /**
@@ -127,6 +189,30 @@ function taeterVon(source, opferSeite) {
   if (taeter !== 0 && taeter !== 1) return null;
   if (taeter === opferSeite) return null;
   return taeter;
+}
+
+const lebendeHelden = (ps) => (ps?.heroes || []).filter(h => h?.name && h.hp > 0);
+
+/** So Close!: steht `seite` bei genau einem Helden mit ≤ 100 HP? */
+function fastBesiegtPruefen(tracking, players, seite) {
+  const lebend = lebendeHelden(players?.[seite]);
+  const g = tracking?.[seite === 0 ? 1 : 0];
+  if (g && lebend.length === 1 && lebend[0].hp <= 100) g.gegnerFastBesiegt = true;
+}
+
+/**
+ * Jeder Heldentod (Almost a Comeback, Took One With Me) — jede Ursache
+ * zählt (Als Ruling 25.9.). Aufgerufen aus der Heldentod-Sequenz, genau
+ * einmal je Tod.
+ */
+function heldTod(tracking, opferSeite, players) {
+  if (!tracking) return;
+  const eigen = tracking[opferSeite];
+  const g = tracking[opferSeite === 0 ? 1 : 0];
+  if (!eigen || !g) return;
+  if (!tracking.some(t => t?.ersterVerlust)) eigen.ersterVerlust = true;
+  else if (g.ersterVerlust) g.gegnerTodeNachErstem = (g.gegnerTodeNachErstem || 0) + 1;
+  if (lebendeHelden(players?.[opferSeite === 0 ? 1 : 0]).length === 1) g.mitgenommen = true;
 }
 
 /** Double/Triple Kill — ein gegnerischer Held wurde besiegt. */
@@ -169,6 +255,19 @@ function beiHook(tracking, hookName, ctx, env = {}) {
     case 'onAnyActionResolved':
       aktion(tracking, ctx, env);
       return;
+    case 'onHeroRevive': {
+      const t = tracking[ctx.playerIdx];
+      if (t) t.heroRevived = true;
+      return;
+    }
+    case 'afterResourceSpend': {
+      const t = tracking[ctx.playerIdx];
+      if (!t || !(ctx.amount > 0)) return;
+      if (t.goldTurn !== env.turn) { t.goldTurn = env.turn; t.goldSpentTurn = 0; }
+      t.goldSpentTurn += ctx.amount;
+      if (t.goldSpentTurn > (t.maxGoldSpentTurn || 0)) t.maxGoldSpentTurn = t.goldSpentTurn;
+      return;
+    }
     case 'afterSpellResolved': {
       // Scholar: nur Karten vom Typ Spell (Attacks laufen durch denselben
       // Hook). Double Spells decken beide Schulen ab.
@@ -242,6 +341,12 @@ function heldVerlor(tracking, owner, hero, amount, heroes, opts = {}) {
   // sich die Gegenseite, ob der Treffer exakt war. Ein späterer letzter
   // Tod (nach Wiederbelebung) überschreibt das; Niederlagen ohne Schaden
   // sind nie exakt.
+  // So Close! (v1399): nur noch ein Held mit ≤ 100 HP — irgendwann reicht.
+  if (lebend === 1) {
+    const rest = heroes.find(h => h?.name && h.hp > 0);
+    const g0 = tracking[owner === 0 ? 1 : 0];
+    if (g0 && rest && rest.hp <= 100) g0.gegnerFastBesiegt = true;
+  }
   if (hero.hp <= 0 && lebend === 0) {
     const g = tracking[owner === 0 ? 1 : 0];
     if (g) g.lastKillExact = !!opts.exakt;
@@ -249,6 +354,6 @@ function heldVerlor(tracking, owner, hero, amount, heroes, opts = {}) {
 }
 
 /** Hook-Namen, die `beiHook` auswertet — Vorfilter für `runHooks`. */
-const HOOKS_MIT_ZAEHLER = new Set(['onAnyActionResolved', 'afterSpellResolved', 'onSurpriseActivated', 'afterPotionUsed', 'onCreatureDeath']);
+const HOOKS_MIT_ZAEHLER = new Set(['onAnyActionResolved', 'onHeroRevive', 'afterResourceSpend', 'afterSpellResolved', 'onSurpriseActivated', 'afterPotionUsed', 'onCreatureDeath']);
 
-module.exports = { HOOKS_MIT_ZAEHLER, neu, startHp, hpSumme, schaden, aktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };
+module.exports = { HOOKS_MIT_ZAEHLER, heldTod, fastBesiegtPruefen, neu, startHp, zustand, plagenAnHeld, ablageBeschwoerung, hpSumme, schaden, aktion, treffer, heldVerlor, heldBesiegt, heilung, kette, beiHook, taeterVon };

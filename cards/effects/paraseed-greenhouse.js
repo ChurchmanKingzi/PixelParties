@@ -138,7 +138,7 @@ async function pflanzen(engine, pi) {
         previewCardName: gewaehlt, cancellable: false,
       })) || ziele[0];
 
-  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', gewaehlt, { source: CARD_NAME });   // v820: Stapel-Schicht
+  const _taken_deckIdx = await engine.deckEntnahme(ps,  gewaehlt, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return true;
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: gewaehlt,
@@ -150,6 +150,7 @@ async function pflanzen(engine, pi) {
 
   await engine.actionPlaceCreature(gewaehlt, pi, zone.heroIdx, zone.slotIdx, {
     source: 'deck', sourceName: CARD_NAME, animationType: 'poison_splash',
+    hookExtras: engine.deckHookExtras(),   // v1393
   });
   engine.shuffleDeck(pi, 'main');
   await syncParaseedPoison(engine, pi, zone.heroIdx);

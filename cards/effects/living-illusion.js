@@ -180,7 +180,7 @@ module.exports = {
       }
 
       // ── Remove one copy from the deck and shuffle ──
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', creatureName, { source: 'living-illusion' });   // v820: Stapel-Schicht
+      const _taken_deckIdx = await engine.deckEntnahme(ps,  creatureName, { source: 'living-illusion' });   // v820: Stapel-Schicht
       if (_taken_deckIdx) {
       }
 
@@ -198,7 +198,7 @@ module.exports = {
         {
           source: 'Living Illusion', skipReactionCheck: false,
           isPlacement: true,
-          hookExtras: { _summonedBy: 'Living Illusion', _summonedFromDeck: true },
+          hookExtras: { _summonedBy: 'Living Illusion', ...engine.deckHookExtras() },
         },
       );
       // Apply the shared blue illusion tint to the summoned creature —

@@ -122,7 +122,7 @@ module.exports = {
       if (gallery.length === 0) return;
 
       const picked = await engine.promptGeneric(pi, {
-        type: 'cardGallery',
+        type: 'cardGallery', searchToHand: true, searchPile: 'deck',   // v1395: Such-Template
         cards: gallery,
         title: CARD_NAME,
         description: 'Choose a Creature from your deck or discard pile to reveal and add to your hand.',
@@ -137,7 +137,7 @@ module.exports = {
       // hold the same name in both — prefer deck (then shuffle), fall
       // back to discard. Matches the standard tutor convention.
       let removedFromDeck = false;
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (_taken_deckIdx) {
         removedFromDeck = true;
       } else {
@@ -149,7 +149,7 @@ module.exports = {
       if (removedFromDeck) engine.shuffleDeck(pi);
 
       // Add to hand + auto-reveal if applicable (Crystals etc.).
-      ps.hand.push(chosenName);
+      await engine.handZugang(ps, chosenName, { von: 'deck', source: CARD_NAME });   // v1395: jetzt MIT Hand-Instanz (fehlte)
       const handIdx = ps.hand.length - 1;
       try { engine._autoRevealOnEnterHand?.(pi, handIdx, chosenName); } catch {}
       try { engine._trackCard?.(chosenName, pi, 'hand'); } catch {}

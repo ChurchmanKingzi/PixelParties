@@ -114,6 +114,7 @@ function beschwoerbareAusAblage(engine, pi, heroIdx, frisch) {
   for (const name of (ps.discardPile || [])) inAblage.set(name, (inAblage.get(name) || 0) + 1);
 
   for (const name of (ps.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
     if (gesehen.has(name)) continue;
     const cd = cardDB[name];
     if (!cd || cd.cardType !== 'Creature') continue;      // strikt: keine Artifact-Creatures

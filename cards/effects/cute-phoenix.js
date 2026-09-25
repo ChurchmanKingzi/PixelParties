@@ -270,6 +270,9 @@ module.exports = {
         heroIdx: ctx.card.heroIdx,
         zoneSlot: ctx.card.zoneSlot,
         by: CARD_NAME,
+        // „revive it and place it into the same Support Zone" — gilt als
+        // Beschwoerung aus der Ablage (Als Ruling 25.9.): Signal + SC.
+        alsAblageBeschwoerung: true,
       };
 
       engine.log('cute_phoenix_revive', {

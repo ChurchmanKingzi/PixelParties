@@ -62,7 +62,7 @@ module.exports = {
         from: 'hand', to: 'deleted',
         fromHandIdx: handIdx,
       });
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       // Untrack the hand inst so post-splice scans don't re-find it.
       const inst = engine.cardInstances.find(c =>
         c.owner === pi && c.zone === 'hand' && c.name === CARD_NAME

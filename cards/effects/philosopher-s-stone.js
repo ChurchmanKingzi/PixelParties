@@ -85,8 +85,7 @@ module.exports = {
     });
     engine.sync();
     await engine._delay(650);
-    ps.hand.push(gewaehlt);
-    const inst = engine._trackCard(gewaehlt, pi, 'hand');
+    const inst = engine.handZugangSync(ps, gewaehlt, { source: CARD_NAME });
     // „reveal it": beiden zeigen, der Gegner bekommt die Such-Aufdeckung.
     engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
     const oi = pi === 0 ? 1 : 0;

@@ -168,10 +168,9 @@ module.exports = {
       for (const idx of pickedIndices) {
         const cardName = ops.hand[idx];
         if (!cardName) continue;
-        ops.hand.splice(idx, 1);
-        ps.hand.push(cardName);
+        engine.takeFromPileSync(ops, 'hand', idx);
+        const inst = engine.handZugangSync(ps, cardName, { source: CARD_NAME });
         const newHandIdx = ps.hand.length - 1;
-        const inst = engine._trackCard(cardName, pi, 'hand');
         const existing = engine.cardInstances.find(c =>
           c.owner === oi && c.zone === 'hand' && c.name === cardName && c.id !== inst.id,
         );

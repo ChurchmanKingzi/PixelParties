@@ -140,7 +140,7 @@ module.exports = {
       for (const i of idxs) {
         if (i < 0 || i >= ps.hand.length) continue;
         const name = ps.hand[i];
-        ps.hand.splice(i, 1);
+        engine.takeFromPileSync(ps, 'hand', i);
         ps.mainDeck.push(name);
         shuffled++;
       }

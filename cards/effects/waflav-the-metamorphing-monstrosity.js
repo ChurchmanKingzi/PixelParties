@@ -123,15 +123,14 @@ async function doDeckAttach(engine, pi, heroIdx) {
   // Route through the hand-attach helper so placement, level caps and
   // customPlacement all behave exactly as a normal attachment — the
   // card only lifts the once-per-turn limit ("additional").
-  ps.hand.push(picked);
-  engine._trackCard(picked, pi, 'hand');
+  engine.handZugangSync(ps, picked, { von: 'transit', source: CARD_NAME });
   const res = await engine.attachAbilityFromHand(pi, picked, heroIdx, {
     skipAbilityGivenCheck: true,
   });
   if (!res?.success) {
     // No legal slot — put it back rather than eating the card.
     const hi = ps.hand.indexOf(picked);
-    if (hi >= 0) ps.hand.splice(hi, 1);
+    if (hi >= 0) engine.takeFromPileSync(ps, 'hand', hi);
     ps.mainDeck.push(picked);
     engine.shuffleDeck?.(pi);
     return false;

@@ -36,6 +36,7 @@ const {
   promptAndDeleteFromBothDiscards,
   multiplesOfK,
 } = require('./_guardian-beasts-shared');
+const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
 const CARD_NAME = 'Guardian Beast Shu';
 
 module.exports = {
@@ -48,6 +49,8 @@ module.exports = {
   inherentAction: (gs, pi) => inherentActionForFirstSummon(gs, pi),
 
   canActivateCreatureEffect(ctx) {
+    // v1398 (Als Ruling 25.9.): Löschkosten aus der Ablage unter Knight-[B]-Lockdown → nicht aktivierbar.
+    if (!ablageLoeschKostenMoeglich(ctx)) return false;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
@@ -141,9 +144,9 @@ module.exports = {
         });
         if (!ok) break;
       } else {
-        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', targetName, { source: CARD_NAME });   // v820: Stapel-Schicht
+        const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', targetName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
         if (!_taken_deckIdx) break;
-        ps.hand.push(targetName);
+        await engine.handZugang(ps, targetName, { von: 'deck', source: CARD_NAME });   // v1395: jetzt MIT Hand-Instanz (fehlte)
       }
       pulled++;
     }

@@ -365,8 +365,7 @@ async function stealBoardCardToHand(engine, pi, targetInst, sourceName) {
   // Untrack the original board instance, then re-track in hand under pi
   // with originalOwner pinned to the source side.
   engine._untrackCard(targetInst.id);
-  ps.hand.push(cardName);
-  const newInst = engine._trackCard(cardName, pi, 'hand');
+  const newInst = engine.handZugangSync(ps, cardName, { von: 'brett' });
   newInst.originalOwner = owner;
 
   // Authoritative flight animation — start at the EXACT board slot the

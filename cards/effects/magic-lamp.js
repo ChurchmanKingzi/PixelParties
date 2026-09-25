@@ -153,12 +153,11 @@ module.exports = {
       engine.sync();
       return;
     }
-    oppPs.hand.push(oppChoice);
+    const oppInst = engine.handZugangSync(oppPs, oppChoice, {  });
     // Track the gifted card with a foreign-origin tag so when the
     // opponent plays it, the discard / deleted pile routes back to
     // the Magic Lamp activator (the card came out of THEIR deck).
     // The play handlers consume this tag via `_consumeHandCardOrigin`.
-    const oppInst = engine._trackCard(oppChoice, oppIdx, 'hand');
     oppInst.originalOwner = pi;
     // Menü-Kanal (Als Auftrag): Angebots-Trio + was der Gegner nahm.
     engine.log('magic_lamp_result', {
@@ -173,10 +172,9 @@ module.exports = {
     // Add remaining 2 to player's hand one at a time (face-up to both players)
     for (const name of playerCards) {
       engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
-      ps.hand.push(name);
+      engine.handZugangSync(ps, name, {  });
       // Self-routed cards: track for parity. originalOwner defaults to
       // pi (the holder), so no override needed.
-      engine._trackCard(name, pi, 'hand');
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: 'Magic Lamp' });
       engine.sync();
       await engine._delay(500);

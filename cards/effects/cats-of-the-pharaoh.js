@@ -134,24 +134,14 @@ module.exports = {
 
       // Stapel-Schicht (v820): die Karte ueber `takeFromPile` entnehmen,
       // nie per splice.
-      const genommen = await engine.takeFromPile(pi, 'discard', CARD_NAME, { source: CARD_NAME });
-      if (!genommen) return;
-
-      const res = await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
-        {
-          source: CARD_NAME,
-          isPlacement: true,
-          hookExtras: { _summonedFromDiscard: true, _isNormalSummon: false },
-        },
-      );
-      if (!res) {
-        // Ein Gatter hat abgelehnt — die Karte zurueck in die Ablage,
-        // damit der Spieler nicht still eine Karte verliert (Thep-Muster).
-        ps.discardPile.push(CARD_NAME);
-        engine.sync();
-        return;
-      }
+      // v1389: über die EINE Ablage-Stelle (summonFromDiscard); lehnt ein
+      // Gatter ab, liegt die Karte danach wieder in der Ablage.
+      const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, ziel.heroIdx, ziel.slotIdx, {
+        source: CARD_NAME, flug: false,
+        summonOpts: { isPlacement: true },
+        hookExtras: { _isNormalSummon: false },
+      });
+      if (!res) return;
 
       // ★ „but if you do" — der Preis faellt NUR bei geglueckter
       // Beschwoerung an. Deshalb steht er hier unten und nicht oben

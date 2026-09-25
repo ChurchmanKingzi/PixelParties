@@ -1,5 +1,6 @@
 === PIXEL PARTIES DECK ===
 Name: Structure Deck: Null and Void
+Cover: Stranglehold
 
 == HEROES ==
 Luna Pele, the Flame Dancer

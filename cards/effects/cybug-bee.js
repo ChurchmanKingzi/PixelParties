@@ -124,8 +124,7 @@ module.exports = {
     // inst as an in-hand card on the controller's side.
     if (!(await engine.takeFromPile(oppPs, 'deck', deckIdx, { source: CARD_NAME, sourceOwner: pi }))) return;   // v820: Stapel-Schicht
     if (!ps.hand) ps.hand = [];
-    ps.hand.push(searchedCard);
-    engine._trackCard(searchedCard, pi, ZONES.HAND);
+    await engine.handZugang(ps, searchedCard, { von: 'fremdesDeck', source: CARD_NAME });   // v1396: aus dem GEGNERISCHEN Deck — keine Suche, nicht „from your deck“ (Als Ruling 25.9.)
 
     // Shuffle opp's deck post-search (standard search ritual).
     engine.shuffleDeck(oppIdx, 'main');

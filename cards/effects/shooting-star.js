@@ -95,8 +95,7 @@ module.exports = {
       await engine.aufloesenderSpellInDieAblage(pi);
       await engine._delay(650);
 
-      ps.hand.push(gewaehlt);
-      engine._trackCard(gewaehlt, pi, 'hand');
+      await engine.handZugang(ps, gewaehlt, { von: 'ablage', source: CARD_NAME });
       engine._broadcastEvent('card_reveal', { cardName: gewaehlt, playerIdx: pi });
       await engine.runHooks('onCardAddedFromDiscardToHand', {
         playerIdx: pi, cardName: gewaehlt,

@@ -252,7 +252,7 @@ module.exports = {
       }
 
       if (deletedIdx >= 0 && deletedName) {
-        ps.hand.splice(deletedIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', deletedIdx);
         if (!ps.deletedPile) ps.deletedPile = [];
         ps.deletedPile.push(deletedName);
         engine.log('pollution_piranha_delete', {

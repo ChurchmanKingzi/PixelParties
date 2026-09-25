@@ -116,33 +116,13 @@ module.exports = {
       controller: pi, cardInstance: ctx.card,
     };
 
-    const stapel = [];
-    // ★ v1043 („Interference"): ein Schlag auf alle Ziele.
-    engine.beginMultiHit(ziele.length);
-    try {
-    for (const t of ziele) {
-      if (t.type === 'hero') {
-        const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (hero && hero.hp > 0) {
-          await engine.actionDealDamage(quelle, hero, DAMAGE, 'creature');
-        }
-      } else if (t.cardInstance) {
-        stapel.push({
-          inst: t.cardInstance,
-          amount: DAMAGE,
-          type: 'creature',
-          source: quelle,
-          sourceOwner: pi,
-          canBeNegated: true,
-          isStatusDamage: false,
-          animType: null,
-        });
-      }
-    }
-    } finally {
-      engine.endMultiHit();
-    }
-    if (stapel.length > 0) await engine.processCreatureDamageBatch(stapel);
+    // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer. Bis
+    // v1391 lief der Kreatur-Stapel hier NACH der Interference-Klammer.
+    await engine.dealDamageToTargets(quelle, ziele.map(t => t.type === 'hero'
+      ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx }
+      : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }), {
+      damage: DAMAGE, damageType: 'creature', sourceName: CARD_NAME, hitDelay: 0,
+    });
 
     engine.log('gangster_barrage', {
       player: gs.players[pi]?.username, damage: DAMAGE, targets: ziele.length,
@@ -198,7 +178,7 @@ module.exports = {
 
       const handIdx = (ps.hand || []).indexOf(PARTNER);
       if (handIdx < 0) return;                       // Rennen: Karte ist weg
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       const ergebnis = await engine.summonCreatureWithHooks(
         PARTNER, pi, ziel.heroIdx, ziel.slotIdx, { source: CARD_NAME },
@@ -206,7 +186,7 @@ module.exports = {
       if (!ergebnis?.inst) {
         // Abgebrochen (z.B. durch eine Kosten-Abfrage der Zielkarte):
         // Handkarte zurueck, und der Zug bleibt offen.
-        ps.hand.splice(handIdx, 0, PARTNER);
+        engine.returnToPile(ps, 'hand', PARTNER, handIdx);   // v1394
         engine.log('gangster_partner_failed', {
           player: ps.username, partner: PARTNER,
         });

@@ -155,63 +155,15 @@ module.exports = {
       // the damage numbers fly out.
       // ★ v1043 („Interference"): ein Schlag auf alle Ziele —
       // Helden UND Kreaturen, gezaehlt wird die echte Zielmenge.
-      engine.beginMultiHit(targets.length);
-      try {
-      for (const t of targets) {
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'explosion',
-          owner: t.owner,
-          heroIdx: t.heroIdx,
-          zoneSlot: t.type === 'equip' ? t.slotIdx : -1,
+      // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer.
+      await engine.dealDamageToTargets({
+        name: CARD_NAME, owner: pi, heroIdx: death.heroIdx, cardInstance: ctx.card,
+      }, targets.map(t => t.type === 'hero'
+        ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx }
+        : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }), {
+        damage: DAMAGE, damageType: 'creature', sourceName: CARD_NAME,
+        animationType: 'explosion', animDelay: 400, hitDelay: 0,
         });
-      }
-      await engine._delay(400);
-
-      const source = {
-        name: CARD_NAME,
-        owner: pi,
-        heroIdx: death.heroIdx,
-        cardInstance: ctx.card,
-      };
-
-      // Heroes one at a time, Creatures batched — same pattern as
-      // Book of Doom. Batching the Creatures means every
-      // beforeCreatureDamageBatch listener (Diamond, Great Wall,
-      // Sculpture Guards, …) sees the full sweep at once and can
-      // make a single coherent decision over the whole batch.
-      const creatureBatch = [];
-      for (const t of targets) {
-        if (t.type === 'hero') {
-          const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
-          if (hero && hero.hp > 0) {
-            await engine.actionDealDamage(source, hero, DAMAGE, 'creature');
-          }
-        } else if (t.type === 'equip') {
-          const inst = t.cardInstance || engine.cardInstances.find(c =>
-            c.owner === t.owner && c.zone === 'support'
-            && c.heroIdx === t.heroIdx && c.zoneSlot === t.slotIdx,
-          );
-          if (inst) {
-            creatureBatch.push({
-              inst,
-              amount: DAMAGE,
-              type: 'creature',
-              source,
-              sourceOwner: pi,
-              canBeNegated: true,
-              isStatusDamage: false,
-              animType: null,
-            });
-          }
-        }
-      }
-
-      if (creatureBatch.length > 0) {
-        await engine.processCreatureDamageBatch(creatureBatch);
-      }
-      } finally {
-        engine.endMultiHit();
-      }
 
       engine.log('exploding_skull_blast', {
         player: gs.players[pi]?.username,

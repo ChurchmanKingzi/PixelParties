@@ -197,7 +197,7 @@ async function zugEndeKreislauf(ctx, selbstName) {
   } else {
     const hi = (ps.hand || []).indexOf(gewaehlt.name);
     if (hi < 0) return;
-    ps.hand.splice(hi, 1);
+    engine.takeFromPileSync(ps, 'hand', hi);
   }
 
   engine._broadcastEvent('card_reveal', { cardName: gewaehlt.name });

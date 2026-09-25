@@ -61,6 +61,7 @@ const DIST_DIR = path.join(PUBLIC_DIR, 'dist');
 // <script> order in index.html.
 const ENTRIES = [
   'app-shared',
+  'app-areas',            // v1410: Area-Hintergruende (Registry + Szenen)
   'app-screens',
   'app-player-profile',   // v1289: Spielerprofil-Popup
   'app-puzzle',

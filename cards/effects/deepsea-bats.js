@@ -56,6 +56,7 @@ module.exports = {
       const seen = new Set();
       const eligible = [];
       for (const name of (ps.discardPile || [])) {
+        if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
         if (seen.has(name)) continue;
         const cd = cardDB[name];
         if (!cd || cd.cardType !== 'Creature') continue;

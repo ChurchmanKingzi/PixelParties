@@ -157,10 +157,9 @@ module.exports = {
     const cardDB = engine._getCardDB();
     const chosenCd = cardDB[chosenName];
     if (!chosenCd) return false;
-    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
     if (!_taken_deckIdx) return false;
-    ps.hand.push(chosenName);
-    const newInst = engine._trackCard(chosenName, pi, 'hand');
+    const newInst = await engine.handZugang(ps, chosenName, { von: 'deck', source: CARD_NAME });
     engine.shuffleDeck?.(pi, 'main');
     engine._broadcastEvent('deck_search_add', { cardName: chosenName, playerIdx: pi });
     engine.log('mini_tutor', { player: ps.username, card: chosenName });
@@ -246,7 +245,7 @@ module.exports = {
       return true;
     }
     // Splice the tutored card out of hand for the summon.
-    ps.hand.splice(summonHandIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', summonHandIdx);
     if (newInst) engine._untrackCard(newInst.id);
 
     // Pick the slot — auto-resolve when only one is free; otherwise
@@ -281,7 +280,7 @@ module.exports = {
     );
     if (!placed) {
       // Roll back hand if summon failed.
-      ps.hand.splice(summonHandIdx, 0, chosenName);
+      engine.returnToPile(ps, 'hand', chosenName, summonHandIdx);   // v1394
       engine._trackCard(chosenName, pi, 'hand');
       engine.sync();
       return true;

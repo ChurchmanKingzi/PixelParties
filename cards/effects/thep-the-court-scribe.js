@@ -154,27 +154,14 @@ module.exports = {
     // discard hooks fire (Ka searches deck, Khet revives, etc.).
     // `_summonedFromDiscard: true` is the discard-trigger flag every
     // Shard reads in its onPlay gate.
-    const _taken_idx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
-    if (!_taken_idx) return false;
-
-    const placeRes = await engine.summonCreatureWithHooks(
-      chosenName, pi, heroIdx, chosenSlot,
-      {
-        source: CARD_NAME,
-        isPlacement: true,
-        hookExtras: {
-          _summonedFromDiscard: true,
-          _isNormalSummon: false,
-        },
-      },
-    );
-    if (!placeRes) {
-      // beforeSummon refused (e.g. canSummonSoulShard tripped despite
-      // our pre-filter, or some other gate). Refund the discard copy
-      // so the player isn't silently down a card.
-      ps.discardPile.push(chosenName);
-      return false;
-    }
+    // v1389: über die EINE Ablage-Stelle — Platzieren gilt als
+    // „summoned from discard" (Als Ruling 25.9.), die Soul Shards lösen aus.
+    const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, heroIdx, chosenSlot, {
+      source: CARD_NAME, flug: false,
+      summonOpts: { isPlacement: true },
+      hookExtras: { _isNormalSummon: false },
+    });
+    if (!placeRes) return false;
 
     // Standard summon glow on the placement zone.
     engine._broadcastEvent('summon_effect', {

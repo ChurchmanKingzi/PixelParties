@@ -174,14 +174,12 @@ module.exports = {
       // through any helper that gates on `handLocked`. Hooks that
       // matter (ON_CARD_ADDED_TO_HAND for tutor-reactive cards) are
       // fired manually below.
-      ps.mainDeck.shift();
-      if (ps.deckTopVisible && ps.deckTopVisible.length > 0) ps.deckTopVisible.shift();
-      ps.hand.push(topCard);
-      const inst = engine._trackCard(topCard, pi, 'hand');
+      // v1397: Entnahme über die Stapel-Schicht (Deckkopf-Sicht inklusive),
+      // Zugang über die Hand-Stelle — die feuert onCardAddedToHand und
+      // die Tutor-Notiz selbst.
+      engine.takeFromPileSync(ps, 'deck', 0, { source: CARD_NAME, _bypassPileLock: true });   // Als Ruling 25.9.: Kassaran läuft IMMER, egal welche Sperren
+      await engine.handZugang(ps, topCard, { von: 'deck', source: CARD_NAME });
       engine.log('kassaran_match', { player: ps.username, card: topCard });
-      await engine.runHooks('onCardAddedToHand', {
-        playerIdx: pi, card: inst, cardName: topCard,
-      });
     } else {
       // ── Miss: card stays on deck, becomes publicly known ──
       // Push the revealed name into deckTopVisible (Premonition's

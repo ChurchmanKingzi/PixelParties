@@ -199,8 +199,7 @@ module.exports = {
       if (slot.length === 0) ps.abilityZones[plan.heroIdx][plan.slotIdx] = [];
       // Push each copy into hand and track a fresh hand inst per copy.
       for (const name of recallNames) {
-        ps.hand.push(name);
-        engine._trackCard(name, pi, 'hand');
+        engine.handZugangSync(ps, name, { von: 'brett', source: CARD_NAME });
         totalRecalled++;
       }
       recallLog.push({ heroIdx: plan.heroIdx, slotIdx: plan.slotIdx, ability: plan.ability, count: recallNames.length });

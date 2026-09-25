@@ -107,18 +107,9 @@ module.exports = {
 
     const { cardName: discardName, handIndex } = discardResult;
     if (discardName === undefined || handIndex === undefined) return false;
-    if (ps.hand[handIndex] !== discardName) {
-      const fi = ps.hand.indexOf(discardName);
-      if (fi < 0) return false;
-      ps.hand.splice(fi, 1);
-    } else {
-      ps.hand.splice(handIndex, 1);
-    }
-    ps.discardPile.push(discardName);
-    await engine.runHooks('onDiscard', {
-      playerIdx: pi, cardName: discardName, _skipReactionCheck: true,
-    });
-    engine.sync();
+    // v1394: Abwurf über die zentrale Funktion (Flug, Log, onDiscard,
+    // Instanz, Stapel-Besitzer) statt Splice + Hand-Hook.
+    if (!(await engine.actionDiscardHandCard(pi, discardName, handIndex, { source: 'Inventing', _noGlow: true }))) return false;
 
     // Build gallery: deck cards whose name differs from the discarded card
     const cardDB = engine._getCardDB();

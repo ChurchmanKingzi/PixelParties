@@ -148,7 +148,7 @@ module.exports = {
 
       // ── Step 3: remove from deck, reveal, place ──────────────────────
 
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) { gs._spellCancelled = true; return; };
 
       // Reveal to opponent
@@ -179,7 +179,7 @@ module.exports = {
       // Fire enter-zone hooks (Ingo, Maya, Layn, Summoning Circle, etc.)
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: destHeroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, ...engine.deckLandung(inst, _taken_deckIdx),   // v1393
       });
 
       // Lock summoning for rest of turn

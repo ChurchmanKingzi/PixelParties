@@ -84,7 +84,7 @@ async function bieteRueckholungAn(ctx, quelle) {
   if (kandidaten.length === 0) return;
 
   const wahl = await engine.promptGeneric(pi, {
-    type: 'cardGallery',
+    type: 'cardGallery', searchToHand: true, searchPile: 'discard',   // v1395: Such-Template
     cards: kandidaten,
     title: CARD_NAME,
     description: 'Choose a card from your discard pile that is not an Attack and add it to your hand.',
@@ -101,7 +101,7 @@ async function bieteRueckholungAn(ctx, quelle) {
 
   const idx = (ps.discardPile || []).indexOf(wahl.cardName);
   if (idx < 0) return;
-  if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) return;
+  if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME, toHand: true }))) return;
 
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: wahl.cardName, from: 'discard', to: 'hand',
@@ -109,8 +109,7 @@ async function bieteRueckholungAn(ctx, quelle) {
   });
   await engine._delay(560);
 
-  ps.hand.push(wahl.cardName);
-  engine._trackCard(wahl.cardName, pi, 'hand');
+  await engine.handZugang(ps, wahl.cardName, { von: 'ablage', source: CARD_NAME });
   engine.log('gwen_hands_recover', {
     player: ps.username, card: wahl.cardName,
   });

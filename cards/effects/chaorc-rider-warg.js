@@ -111,12 +111,12 @@ module.exports = {
       }
 
       const handIdx = ps.hand.indexOf(CARD_NAME);
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, pi, dest.heroIdx, dest.slotIdx, // `fromHandIdx`: Flug von der Hand in die Zone (v933)
         { source: CARD_NAME, fromHandIdx: handIdx },
       );
-      if (!res?.inst) { ps.hand.push(CARD_NAME); return; }
+      if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
       // "That Creature is treated as having been sacrificed." Synthesise
       // a sacrifice event for the (already-dead) Creature so the Chaorc

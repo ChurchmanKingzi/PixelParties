@@ -346,9 +346,10 @@ module.exports = {
     const handIdx = handPick.handIndex != null
       ? handPick.handIndex
       : ps.hand.indexOf(discardName);
+    // v1394: Abwurf über die zentrale Funktion — bis v1393 lief dieser
+    // Kosten-Abwurf ohne onDiscard (Cute Dog, Cute Familiar & Co. sahen ihn nicht).
     if (handIdx >= 0 && ps.hand[handIdx] === discardName) {
-      ps.hand.splice(handIdx, 1);
-      ps.discardPile.push(discardName);
+      await engine.actionDiscardHandCard(pi, discardName, handIdx, { source: CARD_NAME, _noGlow: true });
       engine.log('invader_discard', { player: ps.username, discarded: discardName, lvl });
     }
 

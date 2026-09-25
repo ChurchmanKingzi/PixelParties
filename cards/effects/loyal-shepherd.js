@@ -188,7 +188,7 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
-      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
+      if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME }))) {   // v820: Stapel-Schicht
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
         return;
       }
@@ -198,12 +198,12 @@ module.exports = {
         {
           source: CARD_NAME,
           alsZusatzaktion: true,   // v1360: „summon … as an additional Action"
-          hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+          hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
         },
       );
       if (!placed) {
         // Couldn't summon — refund the card, the trigger fizzles visibly.
-        ps.mainDeck.push(replacementName);
+        engine.returnToPile(ps, 'deck', replacementName);
         engine.shuffleDeck(pi, 'main');
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;

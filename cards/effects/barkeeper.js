@@ -85,8 +85,7 @@ module.exports = {
       while ((ps.hand || []).length < ZIEL_HANDGROESSE) {
         engine._broadcastEvent('card_reveal', { cardName: NACHSCHUB });
         engine._broadcastEvent('hand_card_materialize', { cardName: NACHSCHUB, playerIdx: pi, count: 1 });
-        ps.hand.push(NACHSCHUB);
-        engine._trackCard(NACHSCHUB, pi, 'hand');
+        engine.handZugangSync(ps, NACHSCHUB, { source: CARD_NAME });
         gezapft++;
         engine.sync();
         await engine._delay(220);

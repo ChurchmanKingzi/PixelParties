@@ -271,7 +271,7 @@ module.exports = {
         // Direktaufruf oben feuert diesen Hook aber gerade NICHT.
         asPlay: 'sole',
       });
-      ps.hand.splice(finalIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', finalIdx);
       ps.discardPile.push(spellName);
     }
 

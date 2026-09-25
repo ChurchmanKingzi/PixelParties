@@ -541,8 +541,7 @@ async function tutorAscendedHeroes(engine, pi, cardName, { from, max = 1 } = {})
     const idx = pile.indexOf(picked);
     if (idx < 0) break;
     pile.splice(idx, 1);
-    ps.hand.push(picked);
-    engine._trackCard(picked, pi, 'hand');
+    engine.handZugangSync(ps, picked, {  });
     taken++;
     engine.log('waflav_tutor', { player: ps.username, hero: cardName, card: picked, from });
     engine.sync();

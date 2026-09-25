@@ -115,6 +115,7 @@ function eligibleDiscardCreatures(engine, pi) {
   const seen = new Set();
   const out = [];
   for (const name of (ps.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
     if (seen.has(name)) continue;
     const cd = cardDB[name];
     // Strict cardType === 'Creature' — discard-revive design rule
@@ -324,7 +325,12 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
   // Pay any beforeSummon cost FIRST so a cancelled / unpayable cost
   // doesn't strand us with a half-spliced discard. Cosmic Depths uses
   // the same explicit ordering for the same reason.
-  const hookExtras = { _summonedFromDiscard: true, _summonedBy: CARD_NAME };
+  // v1389: zentrale Sperre VOR der Kostenzahlung (Gigantisaur, Ifrit).
+  if (!engine.darfAusAblageAufsFeld(chosenName)) {
+    engine.log('tharxian_horse_revive_blocked', { creature: chosenName });
+    return;
+  }
+  const hookExtras = { ...engine.ablageHookExtras(), _summonedBy: CARD_NAME };
   const beforeOk = await engine._runBeforeSummon(chosenName, pi, chosenDest.heroIdx, hookExtras);
   const placementConsumed = ps._placementConsumedByCard === chosenName;
   if (placementConsumed) delete ps._placementConsumedByCard;
@@ -335,7 +341,9 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
 
   // Splice the discard entry + untrack the orphan inst before the
   // engine creates a fresh on-board instance.
-  await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME, last: true });   // v820: Stapel-Schicht
+  // v1389: Entnahme über die EINE Ablage-Stelle (Lethe, Beleg für Rückgabe).
+  const ab = await engine.ablageEntnahme(pi, pi, chosenName, { source: CARD_NAME, last: true });
+  if (!ab) return;
   const discardInst = engine.cardInstances.find(c =>
     c.owner === pi && c.zone === 'discard' && c.name === chosenName
   );
@@ -358,16 +366,17 @@ async function reviveFromDiscard(engine, ctx, pi, chosenName) {
     if (!summonRes) {
       // safePlaceInSupport rejected (no free zone after all). Restore
       // the discard entry — the player lost nothing.
-      ps.discardPile.push(chosenName);
+      engine.ablageRueckgabe(ab);
       engine.log('tharxian_horse_revive_no_slot', { creature: chosenName });
       return;
     }
     inst = summonRes.inst;
   }
   if (!inst) {
-    ps.discardPile.push(chosenName);
+    engine.ablageRueckgabe(ab);
     return;
   }
+  engine.ablageLandung(inst, ab, 'summon');   // Lethe, Heimkehr, SC, Signal-Stempel
 
   engine._broadcastEvent('summon_effect', {
     owner: pi, heroIdx: inst.heroIdx, zoneSlot: inst.zoneSlot,

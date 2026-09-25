@@ -190,7 +190,7 @@ module.exports = {
         if (ps.hand[i] === name) { seen++; if (seen === nth) { fromHandIdx = i; break; } }
       }
       if (fromHandIdx >= 0) {
-        ps.hand.splice(fromHandIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', fromHandIdx);
         engine.notePlayedFromHand(pi);
       }
       ps._resolvingCard = null;

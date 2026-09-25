@@ -156,7 +156,7 @@ module.exports = {
         // paths (actionPromptForceDiscard, enforceHandLimit) do it in
         // this order: the card leaves the hand either way (it WAS
         // performed), a rescue only cancels the deleted-pile landing.
-        ps.hand.splice(finalHandIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', finalHandIdx);
 
         const rescued = await engine._tryBeforeDelete(FIREBALL, pi, {
           fromZone: 'hand', fromInstance: subInst, source: CARD_NAME,
@@ -254,7 +254,7 @@ module.exports = {
       if (from === 'deck') {
         // Deck search reveal — the card flies in from the deck pile.
         pile.splice(idx, 1);
-        ps.hand.push(FIREBALL);
+        engine.handZugangSync(ps, FIREBALL, { source: CARD_NAME, ohneInstanz: true });
         engine.shuffleDeck(pi);
         engine._broadcastEvent('deck_search_add', { cardName: FIREBALL, playerIdx: pi });
       } else {
@@ -269,7 +269,7 @@ module.exports = {
           toHandIdx, finalHandSize: toHandIdx + 1,
         });
         pile.splice(idx, 1);
-        ps.hand.push(FIREBALL);
+        engine.handZugangSync(ps, FIREBALL, { source: CARD_NAME, ohneInstanz: true });
       }
       engine.log('friendly_fireballer_tutor', { player: ps.username, from });
       engine.sync();

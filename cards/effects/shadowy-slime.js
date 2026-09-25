@@ -126,8 +126,9 @@ module.exports = {
 
         // Execute placement — remove from discard pile
         const cardName = selected.cardName;
-        const _taken_idx = await ctx._engine.takeFromPile(ps, 'discard', cardName, { source: 'shadowy-slime' });   // v820: Stapel-Schicht
-        if (!_taken_idx) return;
+        // v1389: Entnahme über die EINE Ablage-Stelle (Sperre, Lethe).
+        const ab = await engine.ablageEntnahme(pi, pi, cardName, { source: 'shadowy-slime' });
+        if (!ab) return;
 
         // Place into support zone
         const si = zone.slotIdx;
@@ -137,6 +138,7 @@ module.exports = {
         // Track card instance with placement flag
         const inst = engine._trackCard(cardName, pi, 'support', heroIdx, si);
         inst.counters.isPlacement = 1;
+        const ablageExtras = engine.ablageLandung(inst, ab, 'place');   // Lethe, SC, Signal
 
         engine.log('placement', { card: cardName, by: 'Shadowy Slime', from: 'discard', heroIdx, zoneSlot: si });
 
@@ -152,8 +154,8 @@ module.exports = {
         engine._broadcastEvent('play_zone_animation', { type: 'shadow_summon', owner: pi, heroIdx, zoneSlot: si });
 
         // Fire on-summon hooks
-        await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: si });
-        await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+        await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: si, ...ablageExtras });
+        await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, ...ablageExtras });
 
         engine.sync();
         break;

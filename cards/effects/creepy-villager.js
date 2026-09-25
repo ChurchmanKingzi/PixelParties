@@ -96,7 +96,7 @@ module.exports = {
     // ── ② Der Gott steigt aus SEINER Zone auf ───────────────────
     const idxJetzt = (ps.hand || []).indexOf(GOTT);
     if (idxJetzt < 0) return false;
-    ps.hand.splice(idxJetzt, 1);
+    engine.takeFromPileSync(ps, 'hand', idxJetzt);
     engine.notePlayedFromHand(pi);
 
     engine._broadcastEvent('dark_deepsea_god_manifest', { owner: pi });

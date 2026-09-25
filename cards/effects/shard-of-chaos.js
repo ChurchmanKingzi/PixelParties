@@ -115,7 +115,7 @@ module.exports = {
       const nt = normalizeType(cd.cardType);
       typeNeeds[nt] = (typeNeeds[nt] || 0) + 1;
       deletedNames.push(cn);
-      ps.hand.splice(idx, 1);
+      engine.takeFromPileSync(ps, 'hand', idx);
       ps.deletedPile.push(cn);
     }
 

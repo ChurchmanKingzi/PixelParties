@@ -189,7 +189,7 @@ module.exports = {
         const dealt = Math.min(t.hp, halved);
         t.hp -= dealt;
         const hIdx = (ps.hand || []).indexOf(CARD_NAME);
-        if (hIdx >= 0) ps.hand.splice(hIdx, 1);
+        if (hIdx >= 0) eng.takeFromPileSync(ps, 'hand', hIdx);   // Rollout: SIMULIERTE Engine
       } else {
         const dealt = Math.min(t.hp, amount);
         t.hp -= dealt;

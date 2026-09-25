@@ -206,14 +206,14 @@ async function runStellanEffect(ctx) {
   });
   if (!picked || picked.cancelled || !picked.cardName) return false;
   const chosenName = picked.cardName;
-  const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+  const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (!_taken_deckIdx) return false;
 
   const slot = freeStellanSlots(ps, heroIdx)[0];
   if (slot == null) {
     // Race: all slots filled between the free-slot check and here. Refund
     // the deck card so we don't silently eat it.
-    ps.mainDeck.push(chosenName);
+    engine.returnToPile(ps, 'deck', chosenName);
     engine.shuffleDeck(pi, 'main');
     return false;
   }
@@ -221,11 +221,11 @@ async function runStellanEffect(ctx) {
     source: CARD_NAME,
     countAsSummon: false,
     isPlacement: true,
-    hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+    hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
   });
   if (!summonRes) {
     // beforeSummon refused — put card back, shuffle, fizzle.
-    ps.mainDeck.push(chosenName);
+    engine.returnToPile(ps, 'deck', chosenName);
     engine.shuffleDeck(pi, 'main');
     return false;
   }

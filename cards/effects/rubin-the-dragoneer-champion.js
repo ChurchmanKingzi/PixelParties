@@ -154,7 +154,7 @@ async function performSpell(engine, pi, heroIdx, cardName) {
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
     const i = findInHand();
-    if (i >= 0) ps.hand.splice(i, 1);
+    if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
@@ -203,7 +203,7 @@ async function performSpell(engine, pi, heroIdx, cardName) {
   delete gs._spellPlacedOnBoard;
 
   const i = findInHand();
-  if (i >= 0) ps.hand.splice(i, 1);
+  if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
   if (!placedOnBoard) {
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);

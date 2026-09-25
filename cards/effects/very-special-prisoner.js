@@ -204,7 +204,7 @@ module.exports = {
     if (targetZone < 0) {
       // Race: zones filled between the canAttach check and the splice.
       // Refund the Divinity back to its source pile so it isn't lost.
-      if (pickedSource === 'hand') ps.hand.push(DIVINITY);
+      if (pickedSource === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
       if (pickedSource === 'deck') { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
       engine.log('very_special_prisoner_attach_failed', {
         player: ps.username, reason: 'no_target_zone',

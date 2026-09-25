@@ -28,6 +28,7 @@ const {
   rangeValidCounts,
   buildAllBoardTargets,
 } = require('./_guardian-beasts-shared');
+const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
 
 const CARD_NAME = 'Guardian Beast She';
 const MAX_DELETE = 3;
@@ -49,6 +50,8 @@ module.exports = {
   inherentAction: (gs, pi) => inherentActionForFirstSummon(gs, pi),
 
   canActivateCreatureEffect(ctx) {
+    // v1398 (Als Ruling 25.9.): Löschkosten aus der Ablage unter Knight-[B]-Lockdown → nicht aktivierbar.
+    if (!ablageLoeschKostenMoeglich(ctx)) return false;
     const engine = ctx._engine;
     const total = (engine.gs.players[0]?.discardPile?.length || 0)
       + (engine.gs.players[1]?.discardPile?.length || 0);

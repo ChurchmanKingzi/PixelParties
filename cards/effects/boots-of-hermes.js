@@ -145,7 +145,7 @@ module.exports = {
       // spent-Surprise / spent-Spell consumption — Boots is played &
       // spent, not discarded. Untrack the hand instance so no orphan
       // listener lingers in the hand zone.
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       ps.discardPile.push(CARD_NAME);
       if (bootsInst.id != null) engine._untrackCard(bootsInst.id);
 

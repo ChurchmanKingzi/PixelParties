@@ -339,7 +339,7 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'no_target' });   // v1360
         return true;
       }
-      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
+      if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME, shuffle: true }))) {   // v820: Stapel-Schicht
         // Sacrifice already committed; deck locked. Bail cleanly —
         // HOPT stays consumed (we did pay the sacrifice).
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
@@ -356,12 +356,12 @@ module.exports = {
       // DIESEM Effekt, nicht in den Kosten der beschworenen Karte.
       const summonRes = await engine.summonCreatureWithHooks(
         repName, pi, sacHeroIdx, sacZoneSlot,
-        { source: CARD_NAME, isPlacement: true, hookExtras: { _tributePaid: true } },
+        { source: CARD_NAME, isPlacement: true, hookExtras: engine.deckHookExtras({ _tributePaid: true }) },
       );
       if (!summonRes?.inst) {
         // Placement fizzled (beforeSummon refused etc.). Refund the
         // deck card so the player isn't out a card AND a HOPT.
-        ps.mainDeck.push(repName);
+        engine.returnToPile(ps, 'deck', repName);
         engine.shuffleDeck(pi);
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'place_refused' });   // v1360
         return true;

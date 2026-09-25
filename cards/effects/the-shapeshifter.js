@@ -342,7 +342,7 @@ module.exports = {
     let entnommen = false;
     if (quelle === 'hand') {
       const i = ps.hand.indexOf(gestaltName);
-      if (i >= 0) { ps.hand.splice(i, 1); entnommen = true; }
+      if (i >= 0) { engine.takeFromPileSync(ps, 'hand', i); entnommen = true; }
     } else if (quelle === 'deck') {
       const _taken_i = await engine.takeFromPile(ps, 'deck', gestaltName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (_taken_i) {

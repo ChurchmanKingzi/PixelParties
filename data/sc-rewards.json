@@ -3,24 +3,43 @@
     "id": "player",
     "title": "Player",
     "description": "Play a game",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily_per_opponent",
     "requires": "play",
     "onDisconnectWin": true
   },
   {
+    "id": "player_repeat",
+    "title": "Player",
+    "description": "Play a game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "play",
+    "onDisconnectWin": true,
+    "exclusiveWith": "player"
+  },
+  {
     "id": "winner",
     "title": "Winner",
     "description": "Win a game",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily_per_opponent",
     "requires": "win"
+  },
+  {
+    "id": "winner_repeat",
+    "title": "Winner",
+    "description": "Win a game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win",
+    "exclusiveWith": "winner"
   },
   {
     "id": "pro",
     "title": "Pro",
     "description": "Win a ranked game",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily_per_opponent",
     "requires": "win_ranked"
   },
@@ -28,7 +47,7 @@
     "id": "untouched",
     "title": "Untouched",
     "description": "Win with all 3 Heroes still alive",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily",
     "requires": "win_all_heroes_alive"
   },
@@ -36,7 +55,7 @@
     "id": "survivor",
     "title": "Survivor",
     "description": "Win with only 1 Hero alive and under 50% HP",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily",
     "requires": "win_last_hero_low"
   },
@@ -44,7 +63,7 @@
     "id": "millstone",
     "title": "Millstone",
     "description": "Win by decking out the opponent",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily",
     "requires": "win_deck_out"
   },
@@ -92,7 +111,7 @@
     "id": "overkill",
     "title": "Overkill",
     "description": "Deal damage to a Creature equal to 2x its max HP in one hit",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily",
     "requires": "creature_overkill"
   },
@@ -124,7 +143,7 @@
     "id": "speedrun",
     "title": "Speedrun",
     "description": "Win by turn 6 without a surrender",
-    "amount": 1,
+    "amount": 5,
     "limit": "daily",
     "requires": "win_speedrun"
   },
@@ -132,7 +151,7 @@
     "id": "socialite",
     "title": "Socialite",
     "description": "Play vs 5 unique opponents in one day",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily",
     "requires": "unique_opponents_5"
   },
@@ -140,7 +159,7 @@
     "id": "first_blood",
     "title": "First Blood",
     "description": "Achieve your first ever victory",
-    "amount": 10,
+    "amount": 50,
     "limit": "once",
     "requires": "first_win"
   },
@@ -164,7 +183,7 @@
     "id": "triple_kill",
     "title": "Triple Kill",
     "description": "Defeat all 3 enemy Heroes in a single turn",
-    "amount": 3,
+    "amount": 15,
     "limit": "daily",
     "requires": "hero_kills_turn_3"
   },
@@ -236,7 +255,7 @@
     "id": "clean_sweep",
     "title": "Clean Sweep",
     "description": "Win a Best-of-3 set 2–0",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily_per_opponent",
     "requires": "set_clean_sweep"
   },
@@ -244,7 +263,7 @@
     "id": "reverse_sweep",
     "title": "Reverse Sweep",
     "description": "Win a Best-of-3 set after losing the first game",
-    "amount": 3,
+    "amount": 15,
     "limit": "daily",
     "requires": "set_reverse_sweep"
   },
@@ -252,23 +271,26 @@
     "id": "giant_slayer",
     "title": "Giant Slayer",
     "description": "Win a ranked game against an opponent with 100+ more Elo",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily",
     "requires": "win_ranked_underdog"
   },
   {
     "id": "first_conquest",
     "title": "First Conquest!",
-    "description": "Defeat a CPU opponent for the first time",
-    "amount": 1,
+    "description": "Defeat {opponent} for the first time",
+    "amount": 5,
     "limit": "once_per_opponent",
-    "requires": "first_cpu_win"
+    "requires": "first_cpu_win",
+    "defaults": {
+      "opponent": "a CPU opponent"
+    }
   },
   {
     "id": "hot_streak",
     "title": "Hot Streak",
     "description": "Win 3 games in a row today",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily",
     "requires": "win_streak_3"
   },
@@ -307,8 +329,8 @@
   {
     "id": "on_fire",
     "title": "On Fire",
-    "description": "+1 SC for every 10 wins in a row (max +5)",
-    "amount": 1,
+    "description": "+5 SC for every 10 wins in a row (max +25)",
+    "amount": 5,
     "limit": "daily_per_opponent",
     "requires": "win_streak_bonus"
   },
@@ -316,7 +338,7 @@
     "id": "archetypal",
     "title": "Archetypal",
     "description": "Win with 31+ Main Deck cards from the same archetype",
-    "amount": 2,
+    "amount": 10,
     "limit": "daily",
     "requires": "win_archetype_31"
   },
@@ -335,5 +357,168 @@
     "amount": 1,
     "limit": "unlimited",
     "requires": "hp_above_start"
+  },
+  {
+    "id": "back_from_the_dead",
+    "title": "Back from the Dead",
+    "description": "Win after one of your Heroes was revived",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_after_revive"
+  },
+  {
+    "id": "big_spender",
+    "title": "Big Spender",
+    "description": "Spend 30+ Gold in a single turn",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "gold_spent_turn_30"
+  },
+  {
+    "id": "plague_spreader",
+    "title": "Plague Spreader",
+    "description": "Have an enemy Hero suffer 5+ different negative statuses and/or debuffs at once",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "enemy_afflictions_5"
+  },
+  {
+    "id": "full_hand",
+    "title": "Full Hand",
+    "description": "Hold 10+ cards in your hand at once",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "hand_size_10"
+  },
+  {
+    "id": "graverobber",
+    "title": "Graverobber",
+    "description": "Summon 5+ Creatures from your discard pile in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "discard_summons_5"
+  },
+  {
+    "id": "scrooge",
+    "title": "Scrooge",
+    "description": "Win with 50+ unspent Gold",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_gold_50"
+  },
+  {
+    "id": "all_in",
+    "title": "All In",
+    "description": "Win with no cards left in your hand",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_empty_hand"
+  },
+  {
+    "id": "hanging_by_a_thread",
+    "title": "Hanging by a Thread",
+    "description": "Win with your last Hero at 50 HP or less",
+    "amount": 2,
+    "limit": "unlimited",
+    "requires": "win_last_hero_50hp"
+  },
+  {
+    "id": "mirror_match",
+    "title": "Mirror Match",
+    "description": "Win against a deck with the same 3 Heroes as yours",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "win_mirror_match"
+  },
+  {
+    "id": "daily_grind",
+    "title": "Daily Grind",
+    "description": "Win 5 games today",
+    "amount": 10,
+    "limit": "daily",
+    "requires": "win_5_today"
+  },
+  {
+    "id": "payback",
+    "title": "Payback",
+    "description": "Defeat an opponent you lost to earlier today",
+    "amount": 5,
+    "limit": "daily_per_opponent",
+    "requires": "win_after_loss_today"
+  },
+  {
+    "id": "collector",
+    "title": "Collector",
+    "description": "Defeat 10 different CPU opponents",
+    "amount": 25,
+    "limit": "once",
+    "requires": "cpus_defeated_10"
+  },
+  {
+    "id": "so_close",
+    "title": "So Close!",
+    "description": "Lose after bringing your opponent down to their last Hero at 100 HP or less",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "lose_opp_nearly_dead"
+  },
+  {
+    "id": "almost_a_comeback",
+    "title": "Almost a Comeback",
+    "description": "Lose after losing the first Hero of the game, then defeating 2 enemy Heroes",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "lose_almost_comeback"
+  },
+  {
+    "id": "went_down_swinging",
+    "title": "Went Down Swinging",
+    "description": "Lose after dealing 1000+ damage in one game",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "lose_damage_1000"
+  },
+  {
+    "id": "honorable_defeat",
+    "title": "Honorable Defeat",
+    "description": "Lose a game that lasted 15+ turns without surrendering",
+    "amount": 3,
+    "limit": "unlimited",
+    "requires": "lose_long_no_surrender"
+  },
+  {
+    "id": "took_one_with_me",
+    "title": "Took One With Me",
+    "description": "Lose after defeating an enemy Hero with your last Hero still standing",
+    "amount": 1,
+    "limit": "unlimited",
+    "requires": "lose_took_one"
+  },
+  {
+    "id": "learning_experience",
+    "title": "Learning Experience",
+    "description": "Lose to {opponent} for the first time",
+    "amount": 5,
+    "limit": "once_per_opponent",
+    "requires": "first_cpu_loss",
+    "defaults": {
+      "opponent": "a CPU opponent"
+    }
+  },
+  {
+    "id": "rough_day",
+    "title": "Rough Day",
+    "description": "Lose 3 games today",
+    "amount": 10,
+    "limit": "daily",
+    "requires": "lose_3_today"
+  },
+  {
+    "id": "underdog_spirit",
+    "title": "Underdog Spirit",
+    "description": "Lose a ranked game against an opponent with 100+ more Elo",
+    "amount": 5,
+    "limit": "daily",
+    "requires": "lose_ranked_underdog"
   }
 ]

@@ -471,7 +471,10 @@ const BUFF_EFFECTS = {
   // damage (≥1 multipliers apply even through a `cannotBeReduced`
   // lock). True damage (`actionDealTrueDamage`) bypasses the
   // multiplier pass by design, same as Cloudy / Damage Immune.
-  disrupted: { label: 'Disrupted', icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.', damageMultiplier: 2 },
+  // `debuff: true` (v1388): schaedlicher Buff-Eintrag — zaehlt fuer „Plague
+  // Spreader" (SC) neben den negativen Status. Neue schaedliche Buffs hier
+  // ebenso markieren.
+  disrupted: { label: 'Disrupted', icon: '☢️', tooltip: 'Disrupted: Takes double damage from all sources.', damageMultiplier: 2, debuff: true },
   // Anti Magic — the equipped Hero cannot be targeted by other Spells
   // up to and including the buff's `level` (per-instance data set at
   // attach time, sourced from the caster's Support Magic level when

@@ -30,6 +30,7 @@ const {
   promptAndDeleteFromBothDiscards,
   isGuardianBeastCreature,
 } = require('./_guardian-beasts-shared');
+const { ablageLoeschKostenMoeglich } = require('./_guardian-beasts-shared');   // v1398
 
 const CARD_NAME = 'Mao, the Vengeful Guardian';
 const DELETE_COST = 5;
@@ -77,6 +78,8 @@ module.exports = {
   heroEffect: true,
 
   canActivateHeroEffect(ctx) {
+    // v1398 (Als Ruling 25.9.): Löschkosten aus der Ablage unter Knight-[B]-Lockdown → nicht aktivierbar.
+    if (!ablageLoeschKostenMoeglich(ctx)) return false;
     const engine = ctx._engine;
     const pi = ctx.cardOwner;
     const ps = engine.gs.players[pi];

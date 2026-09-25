@@ -96,7 +96,7 @@ module.exports = {
       for (let i = 0; i < potionCount; i++) {
         if ((ps.potionDeck || []).length === 0) break;
         const potionCard = ps.potionDeck.shift();
-        ps.hand.push(potionCard);
+        engine.handZugangSync(ps, potionCard, { von: 'rueckgabe', ohneInstanz: true });
         engine.sync();
         await engine._delay(200);
       }

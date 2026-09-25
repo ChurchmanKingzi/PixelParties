@@ -516,6 +516,9 @@ function PuzzleCreator() {
   const galleryLeft = puzzleFiltersCollapsed ? 0 : PZ_FILTER_W;
   const [validated, setValidated] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  // ★ v1421 (Als Befund 25.9.): Doom Clock per Linksklick einstellbar —
+  // wie jede Counter-Karte. `doomEdit` = { si, wert } (Entwurf bis SAVE).
+  const [doomEdit, setDoomEdit] = useState(null);
   // Alliance (v871, Als Vorgabe): Klick auf eine liegende Alliance
   // startet die VERBINDUNGSWAHL statt des Statistik-Dialogs. Der
   // Zustand haelt die Karte, die gerade verbunden wird; Klick auf einen
@@ -1562,6 +1565,21 @@ function PuzzleCreator() {
   const removeFromHand = useCallback((idx) => { setHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
   const addToOppHand = useCallback((card) => { setOppHand(prev => [...prev, card.name]); invalidate(); }, [invalidate]);
   const removeFromOppHand = useCallback((idx) => { setOppHand(prev => prev.filter((_, i) => i !== idx)); invalidate(); }, [invalidate]);
+  // ★ v1427 (Als Befund 25.9.: Karten aus der Creation Zone liessen sich
+  // per Ziehen nicht wegbewegen). Jede Ablage raeumte ihre Quelle mit
+  // „oppHand → Gegnerhand, SONST eigene Hand" — ein Zug aus Crestinas
+  // Vorrat nahm deshalb eine falsche HANDKARTE weg und liess die gezogene
+  // Karte im Vorrat liegen. Jetzt raeumt EINE Stelle jede Handquelle.
+  const entferneAusHandquelle = useCallback((quelle, idx) => {
+    if (idx == null) return;
+    if (quelle === 'oppHand') removeFromOppHand(idx);
+    else if (quelle === 'creation' || quelle === 'oppCreation') {
+      updatePlayer(quelle === 'creation' ? 0 : 1, pp => {
+        pp.creationZone = (pp.creationZone || []).filter((_, i) => i !== idx);
+        return pp;
+      });
+    } else removeFromHand(idx);
+  }, [removeFromHand, removeFromOppHand, updatePlayer]);
 
   // ── Placement ──
   const placeHero = useCallback((cardName, si, hi) => {
@@ -1986,7 +2004,7 @@ function PuzzleCreator() {
     const entityData = dragEntityData.current;
     // Remove from source first (board zone or hand)
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
-    if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); }
+    entferneAusHandquelle(dragHandSource, dragHandIdx);
     // Place in target
     if (zt === 'hero') placeHero(dragCardName, si, hi);
     else if (zt === 'ability') placeAbility(dragCardName, si, hi, slot);
@@ -2027,7 +2045,7 @@ function PuzzleCreator() {
       }
     }
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); setDragOverZone(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, updatePlayer]);
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, canDrop, clearZone, placeHero, placeAbility, placeSupport, placeSurprise, placeArea, placePermanent, removeFromHand, removeFromOppHand, entferneAusHandquelle, updatePlayer]);
 
   // Drop onto player hand zone
   /**
@@ -2302,7 +2320,7 @@ function PuzzleCreator() {
     e.preventDefault(); setDragOverZone(null);
     if (dragCardName == null) return;
     if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot);
-    if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); }
+    entferneAusHandquelle(dragHandSource, dragHandIdx);
     updatePlayer(si, pp => { pp[key].push(dragCardName); return pp; });
     // Klangliche Rueckmeldung beim Ablegen (Als Vorgabe 16.8.): der
     // Editor war beim Ziehen komplett stumm. `placement` ist der
@@ -2313,7 +2331,7 @@ function PuzzleCreator() {
       window.playSFX(abwurf ? 'discard' : 'placement', { dedupe: 40 });
     }
     setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null;
-  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, removeFromOppHand, updatePlayer]);
+  }, [dragCardName, dragHandIdx, dragHandSource, dragSource, clearZone, removeFromHand, removeFromOppHand, entferneAusHandquelle, updatePlayer]);
 
   const removePileCard = useCallback((si, key, idx) => {
     // Klang beim Entfernen per Rechtsklick (Als Befund 21.8.: in der
@@ -2938,13 +2956,14 @@ function PuzzleCreator() {
       if (removePopupPos)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setRemovePopupPos(null);      return; }
       if (mobileSelected)     { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setMobileSelected(null);      return; }
       if (editTarget)         { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setEditTarget(null);          return; }
+      if (doomEdit)           { e.preventDefault(); e.stopImmediatePropagation(); if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 }); setDoomEdit(null);            return; }
       // No open overlay — actually leave the creator.
       e.stopImmediatePropagation();
       if (window.playSFX) window.playSFX('ui_cancel', { volume: 0.4 });
       setScreen('menu');
     };
     window.addEventListener('keydown', h, true); return () => window.removeEventListener('keydown', h, true);
-  }, [editTarget, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected, allianceLink]);
+  }, [editTarget, doomEdit, puzzleGameState, viewPile, debuffMenuOpen, removePopupPos, mobileSelected, allianceLink]);
 
   // ── Surprise eligibility: can the host Hero actually cast this
   //    Surprise (a Spell)? Mirrors the main board's canHeroPlayCard
@@ -3138,6 +3157,24 @@ function PuzzleCreator() {
     return { maxLeft: Math.max(counts[0].left, counts[1].left), maxRight: Math.max(counts[0].right, counts[1].right) };
   }), [players]);
 
+  // ── Area-Editor (v1421): nur Areas mit etwas Einstellbarem oeffnen
+  //    einen Dialog — aktuell die Doom Clock mit ihren Startzaehlern.
+  //    Alle anderen Areas reagieren auf den Linksklick nicht (kein
+  //    leerer Dialog, dieselbe Regel wie bei Attachments, v1221).
+  const oeffneAreaEditor = (si, slot) => {
+    if (areaZones[si]?.[slot] !== 'Doom Clock') return;
+    if (window.playSFX) window.playSFX('ui_prompt_open', { volume: 0.5 });
+    setEditTarget(null);
+    setDoomEdit({ si, wert: doomCounters[si] ?? 0 });
+  };
+  const speichereDoom = () => {
+    if (!doomEdit) return;
+    const v = Math.max(0, Math.min(19, doomEdit.wert | 0));
+    setDoomCounters(prev => { const n = [...prev]; n[doomEdit.si] = v; return n; });
+    setValidated(false);
+    setDoomEdit(null);
+  };
+
   // ── Zone drag/drop/click handlers applied directly on board-zone elements (no wrapper divs) ──
   const zh = (zt, si, hi, slot) => {
     const p = players[si];
@@ -3203,7 +3240,7 @@ function PuzzleCreator() {
         if (mobileSelected && canDrop(mobileSelected.cardName, zt, si, hi, slot)) {
           const sel = mobileSelected;
           // Remove from source hand
-          if (sel.handIdx != null) { if (sel.handSource === 'oppHand') removeFromOppHand(sel.handIdx); else removeFromHand(sel.handIdx); }
+          entferneAusHandquelle(sel.handSource, sel.handIdx);
           // Place in target
           if (zt === 'hero') placeHero(sel.cardName, si, hi);
           else if (zt === 'ability') placeAbility(sel.cardName, si, hi, slot);
@@ -3229,6 +3266,7 @@ function PuzzleCreator() {
         if (!isTouchDevice) {
           if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
           else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+          else if (zt === 'area' && areaZones[si]?.[slot]) oeffneAreaEditor(si, slot);
         }
       },
       // Touch drag for board cards (mobile)
@@ -3250,6 +3288,7 @@ function PuzzleCreator() {
             if (window._ppDoubleTapSeq !== seq) return;
             if (zt === 'hero' && p.heroes[hi]) openStatEditor(si, zt, hi, 0);
             else if (zt === 'support' && (p.supportZones[hi]?.[slot]||[]).length) openStatEditor(si, zt, hi, slot);
+            else if (zt === 'area' && areaZones[si]?.[slot]) oeffneAreaEditor(si, slot);
           }, window.DOUBLE_TAP_MS || 320);
         }
       } : undefined,
@@ -3468,6 +3507,14 @@ function PuzzleCreator() {
                 <div style={{ position: 'absolute', left: '100%', ...spiegelOben('calc(78px * var(--board-scale))'), marginLeft: 'calc(8px * var(--board-scale))' }}>
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderColor: 'rgba(230,190,90,.6)', background: 'rgba(230,190,90,.08)', cursor: (p.creationZone || []).length > 0 ? 'pointer' : undefined, position: 'relative', ...(dragOverZone === 'creation-' + si ? { boxShadow: '0 0 14px rgba(230,190,90,.7)' } : {}) }}
                     onClick={() => (p.creationZone || []).length > 0 && oeffneStapel({ si, key: 'creationZone' })}
+                    // ★ v1427: Rechtsklick entfernt die oberste Karte — wie
+                    // in der Vorrats-Reihe der Handleiste. Fuer alle weiteren
+                    // Karten oeffnet der Linksklick die Stapelansicht.
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      const n = (p.creationZone || []).length;
+                      if (n > 0) removePileCard(si, 'creationZone', n - 1);
+                    }}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverZone('creation-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
                     onDrop={(e) => handlePileDrop(e, si, 'creationZone')}>
@@ -3502,7 +3549,7 @@ function PuzzleCreator() {
                   <div className="board-zone" style={{ width: 'calc(50px * var(--board-scale))', height: 'calc(70px * var(--board-scale))', borderStyle: 'dashed', borderColor: 'rgba(255,215,0,.3)' }}
                     onDragOver={(e) => { e.preventDefault(); if (dragCardName) setDragOverZone('perm-' + si); }}
                     onDragLeave={() => setDragOverZone(null)}
-                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); if (dragHandIdx != null) { if (dragHandSource === 'oppHand') removeFromOppHand(dragHandIdx); else removeFromHand(dragHandIdx); } setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
+                    onDrop={(e) => { e.preventDefault(); setDragOverZone(null); if (dragCardName != null) { if (dragSource) clearZone(dragSource.zt, dragSource.si, dragSource.hi, dragSource.slot); placePermanent(dragCardName, si); entferneAusHandquelle(dragHandSource, dragHandIdx); setDragCardName(null); setDragHandIdx(null); setDragSource(null); setDragHandSource(null); dragEntityData.current = null; } }}>
                     <div className="board-zone-empty" style={{ fontSize: 'calc(8px * var(--board-scale))' }}>Perm</div>
                   </div>
                 </div>
@@ -4075,7 +4122,7 @@ function PuzzleCreator() {
               Liegt eine Area in einer der beiden Zonen, zeichnet der
               Editor jetzt genau den Hintergrund, den das laufende Spiel
               auch zeigen wuerde — gleiche Komponente, gleiche Registry
-              (`AreaBackgrounds` / `AREA_OVERLAYS` aus app-board.jsx,
+              (`AreaBackgrounds` / `AREA_OVERLAYS` aus app-areas.jsx,
               ueber `window` exportiert). KEINE Kopie der Overlays hier:
               eine neue Area traegt sich in die Registry ein und
               erscheint damit automatisch auch im Creator.
@@ -4097,7 +4144,7 @@ function PuzzleCreator() {
               Der Schalter in der Kopfleiste haengt die Schicht ganz aus
               (Als Vorgabe 18.9.) — die Overlays animieren dauerhaft, und
               beim Bauen soll man sie abschalten koennen. */}
-          {showAreaBgs && <AreaBackgrounds areaZones={areaZones} myIdx={0} oppIdx={1} />}
+          {showAreaBgs && <AreaBackgrounds areaZones={areaZones} myIdx={0} oppIdx={1} spielstand={{ doomCounters }} />}
           <div className="pz-board-plane">
           {renderSide(1, true)}
 
@@ -4160,12 +4207,27 @@ function PuzzleCreator() {
                           const g = zh('area', si, 0, ai);
                           return (
                             <div key={nm + ':' + ai} className="board-area-stack-card"
-                              style={{ top: `calc(var(--area-stack-offset) * ${ai})` }}
+                              style={{ top: `calc(var(--area-stack-offset) * ${ai})`, cursor: nm === 'Doom Clock' ? 'pointer' : undefined }}
                               data-pz-zone={g['data-pz-zone']}
                               draggable={g.draggable}
                               onDragStart={g.onDragStart}
                               onDragEnd={g.onDragEnd}
-                              onContextMenu={g.onContextMenu}>
+                              onContextMenu={g.onContextMenu}
+                              // ★ v1422 (Als Befund 25.9.): der Linksklick
+                              // lief bisher nur ueber die Zonen-Huelle, und
+                              // die zeigt auf den LEEREN Platz am Stapelende
+                              // (Ablegen haengt an) — die Doom Clock war so
+                              // nie anklickbar. Die Karte oeffnet ihren
+                              // Editor jetzt selbst; laeuft gerade ein
+                              // Platzieren (Tippen am Telefon) oder die
+                              // Alliance-Wahl, geht der Klick wie bisher an
+                              // die Zone weiter.
+                              onClick={(e) => {
+                                if (mobileSelected || allianceLink) return;
+                                if (nm !== 'Doom Clock') return;
+                                e.stopPropagation();
+                                oeffneAreaEditor(si, ai);
+                              }}>
                               <BoardCard cardName={nm} />
                             </div>
                           );
@@ -5224,6 +5286,43 @@ function PuzzleCreator() {
         </div>
         );
       })()}
+      {doomEdit && (
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDoomEdit(null); }}>
+          <div className="modal" style={{ maxWidth: 360, padding: 20 }}>
+            <h3 className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 14 }}>
+              EDIT DOOM CLOCK ({doomEdit.si === 0 ? 'YOU' : 'OPPONENT'})
+            </h3>
+            <div style={{ marginBottom: 14 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                ☠️ Doom Counters
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <button className="btn" style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                  disabled={doomEdit.wert <= 0}
+                  onClick={() => setDoomEdit(d => ({ ...d, wert: Math.max(0, d.wert - 1) }))}>−</button>
+                <input className="input" type="number" min={0} max={19} autoFocus
+                  value={doomEdit.wert}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    setDoomEdit(d => ({ ...d, wert: Number.isFinite(n) ? Math.max(0, Math.min(19, n)) : 0 }));
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && speichereDoom()}
+                  style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#ff8f8f' }} />
+                <button className="btn" style={{ padding: '6px 12px', fontSize: 12, minWidth: 36 }}
+                  disabled={doomEdit.wert >= 19}
+                  onClick={() => setDoomEdit(d => ({ ...d, wert: Math.min(19, d.wert + 1) }))}>+</button>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text2)', opacity: 0.7, marginTop: 4 }}>
+                The puzzle starts with this many Doom Counters on this clock (max 19 — the 20th loses the game).
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-success" style={{ flex: 1, padding: '8px 0' }} onClick={speichereDoom}>SAVE</button>
+              <button className="btn" style={{ flex: 1, padding: '8px 0' }} onClick={() => setDoomEdit(null)}>CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
       <GameTooltip />
 
       {/* ── Remove card popup (fixed, above everything) ── */}

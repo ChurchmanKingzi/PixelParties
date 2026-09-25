@@ -314,7 +314,7 @@ module.exports = {
       if (tgtPs.handLocked) return;
 
       const handIdx = tgtPs.hand.length;
-      tgtPs.hand.push(ctx.potionName);
+      engine.handZugangSync(tgtPs, ctx.potionName, { source: CARD_NAME, ohneInstanz: true });
       try { engine._autoRevealOnEnterHand?.(tgtPi, handIdx, ctx.potionName); } catch {}
       try {
         const fresh = engine._trackCard?.(ctx.potionName, tgtPi, 'hand');

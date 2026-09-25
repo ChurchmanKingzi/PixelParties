@@ -223,14 +223,17 @@ module.exports = {
           idx = src === 'hand' ? ps.hand.indexOf(name) : (ps.discardPile || []).indexOf(name);
         }
         if (idx < 0) continue; // copy gone (race) — skip
-        if (src === 'hand') ps.hand.splice(idx, 1);
-        else if (!(await engine.takeFromPile(ps, 'discard', idx, { source: CARD_NAME }))) continue;   // v820: Stapel-Schicht
+        // v1389: Ablage über die EINE Stelle (Sperre, Lethe, Signal).
+        let ab = null;
+        if (src === 'hand') engine.takeFromPileSync(ps, 'hand', idx);
+        else if (!(ab = await engine.ablageEntnahme(pi, pi, idx, { source: CARD_NAME }))) continue;
 
         if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
         if (!ps.supportZones[heroIdx][slot]) ps.supportZones[heroIdx][slot] = [];
         ps.supportZones[heroIdx][slot].push(name);
 
         const inst = engine._trackCard(name, pi, 'support', heroIdx, slot);
+        const ablageExtras = ab ? engine.ablageLandung(inst, ab, 'place') : {};
         ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 
         engine._broadcastEvent('summon_effect', {
@@ -244,7 +247,7 @@ module.exports = {
         });
         engine.sync(); // this Creature pops in now (one-by-one)
 
-        const extras = { _summonedFromArmyOfTheCute: true, _skipReactionCheck: true };
+        const extras = { _summonedFromArmyOfTheCute: true, _skipReactionCheck: true, ...ablageExtras };
         await engine.runHooks('onPlay', {
           _onlyCard: inst, playedCard: inst, cardName: name,
           zone: 'support', heroIdx, zoneSlot: slot, ...extras,

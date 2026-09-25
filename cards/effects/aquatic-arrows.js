@@ -132,16 +132,11 @@ module.exports = {
     // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Das
     // Anti-AoE-Fenster (Deepsea Idol) oeffnet der Batch selbst —
     // alle Kreaturen liegen in EINEM Aufruf.
-    engine.beginMultiHit(ziele.length);
-    try {
-      await engine.processCreatureDamageBatch(ziele.map(inst => ({
-        inst, amount: AOE_DAMAGE, type: 'destruction_spell',
-        source, sourceOwner: pi,
-        animType: 'aquatic_arrow_rain',
-      })));
-    } finally {
-      engine.endMultiHit();
-    }
+    // ★ v1392: über die EINE Stelle für Mehrfachtreffer.
+    await engine.dealDamageToTargets(source, ziele.map(inst => ({ type: 'creature', inst })), {
+      damage: AOE_DAMAGE, damageType: 'destruction_spell', sourceName: CARD_NAME,
+      animationType: 'aquatic_arrow_rain', animDelay: 0, hitDelay: 0,
+          });
 
     engine.log('aquatic_arrows_volley', {
       player: engine.gs.players[pi]?.username,

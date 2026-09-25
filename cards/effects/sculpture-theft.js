@@ -168,7 +168,7 @@ module.exports = {
     // originally owned the Creature — per updated card text the Theft
     // always adds the Creature to the user's hand.
     if (casterPs) {
-      casterPs.hand.push(inst.name);
+      engine.handZugangSync(casterPs, inst.name, { source: CARD_NAME, ohneInstanz: true });
     }
     engine._untrackCard(inst.id);
     engine.log('sculpture_theft', {

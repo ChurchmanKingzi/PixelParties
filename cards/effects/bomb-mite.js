@@ -63,21 +63,12 @@ async function explodiere(engine, quelle, seite, betrag) {
   // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
   // gezaehlt wird, was WIRKLICH getroffen wird.
   let getroffen = 0;
-  engine.beginMultiHit(ziele.length);
-  try {
-  for (const z of ziele) {
-    const h = engine.gs.players[seite]?.heroes?.[z.heroIdx];
-    if (!h?.name || h.hp <= 0) continue;
-    // `'creature'` ist der Normalfall fuer Kreatureffekte (so macht es
-    // auch Exploding Skull); den Waechter `check-damage-types` hat
-    // mein erster Anlauf mit einem erfundenen `'effect'` zu Recht rot
-    // gemeldet.
-    await engine.actionDealDamage(quelle, h, betrag, 'creature');
-    getroffen++;
-  }
-  } finally {
-    engine.endMultiHit();
-  }
+  // ★ v1392: über die EINE Stelle für Mehrfachtreffer.
+  const lebend = ziele.filter(z => { const h = engine.gs.players[seite]?.heroes?.[z.heroIdx]; return h?.name && h.hp > 0; });
+  await engine.dealDamageToTargets(quelle, lebend.map(z => ({ type: 'hero', owner: seite, heroIdx: z.heroIdx })), {
+    damage: betrag, damageType: 'creature', hitDelay: 0, surpriseCheck: false, postTargetCheck: false,
+  });
+  getroffen = lebend.length;
   engine.sync();
   return getroffen;
 }

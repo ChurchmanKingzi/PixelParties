@@ -212,15 +212,13 @@ module.exports = {
       engine.sync();
       return;
     }
-    oppPs.hand.push(oppChoice);
-    const oppInst = engine._trackCard(oppChoice, oppIdx, 'hand');
+    const oppInst = engine.handZugangSync(oppPs, oppChoice, { source: CARD_NAME });
     oppInst.originalOwner = pi;
     engine.log('card_added_to_hand', { card: oppChoice, player: oppPs.username, by: CARD_NAME });
 
     for (const name of playerCards) {
-      ps.hand.push(name);
+      engine.handZugangSync(ps, name, { source: CARD_NAME });
       // originalOwner defaults to pi (own deck → own hand) — no override.
-      engine._trackCard(name, pi, 'hand');
       engine.log('card_added_to_hand', { card: name, player: ps.username, by: CARD_NAME });
     }
 

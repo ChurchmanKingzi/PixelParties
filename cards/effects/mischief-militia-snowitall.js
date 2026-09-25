@@ -286,7 +286,7 @@ module.exports = {
 
     const handIdx = ps.hand.indexOf(chosenName);
     if (handIdx < 0) return false;
-    ps.hand.splice(handIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
 
     const summonResult = await engine.summonCreatureWithHooks(
       chosenName, pi, dest.heroIdx, dest.slotIdx,
@@ -294,7 +294,7 @@ module.exports = {
     );
     if (!summonResult?.inst) {
       // Race / cancelled by a beforeSummon cost — refund the hand card.
-      ps.hand.splice(handIdx, 0, chosenName);
+      engine.returnToPile(ps, 'hand', chosenName, handIdx);   // v1394
       return false;
     }
 

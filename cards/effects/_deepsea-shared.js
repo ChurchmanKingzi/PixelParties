@@ -306,7 +306,7 @@ async function returnSupportCreatureToHand(engine, inst, sourceName, opts = {}) 
 
   // Add to hand.
   if (!ps.hand) ps.hand = [];
-  ps.hand.push(cardName);
+  engine.handZugangSync(ps, cardName, { ohneInstanz: true });
 
   engine.log('deepsea_return_to_hand', {
     player: ps.username, card: cardName, by: sourceName,
@@ -561,7 +561,7 @@ async function tryBouncePlace(ctx) {
     }
     if (handRemoveIdx >= 0) {
       newCardFromHandIdx = handRemoveIdx;
-      ps.hand.splice(handRemoveIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handRemoveIdx);
       engine.notePlayedFromHand(pi);
     }
     ps._resolvingCard = null;
@@ -570,7 +570,7 @@ async function tryBouncePlace(ctx) {
   // (D) Push the bounced Creature's NAME onto the hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  ps.hand.push(bouncedName);
+  engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });
 
   // (E) Broadcast BOTH pile-transfer animations BEFORE the first sync
   //     so the client sees the "flying cards" events and the new state
@@ -954,12 +954,12 @@ async function atomicSwap(engine, pi, bouncedInst, newCardName, sourceName) {
   //     BEFORE splicing so the hand→support flying-card animation
   //     anchors at the card's original hand slot.
   const newCardFromHandIdx = (ps.hand || []).indexOf(newCardName);
-  if (newCardFromHandIdx >= 0) ps.hand.splice(newCardFromHandIdx, 1);
+  if (newCardFromHandIdx >= 0) engine.takeFromPileSync(ps, 'hand', newCardFromHandIdx);
 
   // (D) Push the bounced creature to hand.
   if (!ps.hand) ps.hand = [];
   const toHandIdx = ps.hand.length;
-  ps.hand.push(bouncedName);
+  engine.handZugangSync(ps, bouncedName, { von: 'brett', ohneInstanz: true });
 
   // (E) Broadcast BOTH pile-transfers so the two creatures visually
   //     cross mid-flight — bounced support→hand, new hand→support.

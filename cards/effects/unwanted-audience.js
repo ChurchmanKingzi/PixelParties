@@ -163,7 +163,7 @@ module.exports = {
         asPlay: 'sole',
       });
 
-      ps.hand.splice(removeIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', removeIdx);
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie

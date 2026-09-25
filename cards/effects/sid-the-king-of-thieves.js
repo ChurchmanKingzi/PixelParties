@@ -184,10 +184,9 @@ module.exports = {
         for (const name of chosen) {
           const _taken_deckIdx = await engine.takeFromPile(ops, 'deck', name, { source: CARD_NAME });   // v820: Stapel-Schicht
           if (!_taken_deckIdx) continue;
-          ps.hand.push(name);
+          const newInst = await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
           const newHandIdx = ps.hand.length - 1;
 
-          const newInst = engine._trackCard(name, pi, 'hand');
           newInst.originalOwner = oi;
 
           // Per-card level rebate — Lv1/2/3 Attacks, Spells, and

@@ -116,7 +116,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
   // ★ v1328: gefizzelt (Cooldin waehrend der Kette handlungsunfaehig) —
   // derselbe Ausgang wie eine Negation; die Logzeile schreibt die Engine.
   if (chainResult.negated || chainResult.fizzled) {
-    ps.hand.splice(handIndex, 1);
+    engine.takeFromPileSync(ps, 'hand', handIndex);
     ps.discardPile.push(cardName);
     if (chainResult.negated) engine.log('cooldin_area_negated', { player: ps.username, card: cardName });
     return true;
@@ -137,7 +137,7 @@ async function playCooldinArea(engine, pi, heroIdx, cardName, fromDeck) {
     owner: pi, cardName, from: 'hand', to: 'area',
     asPlay: 'sole', fromHandIdx: handIndex,
   });
-  ps.hand.splice(handIndex, 1);
+  engine.takeFromPileSync(ps, 'hand', handIndex);
   const inst = engine._trackCard(cardName, pi, 'hand', heroIdx, -1);
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang — sonst taucht die
   // abgeflogene Karte nach dem Flug wieder in der Hand auf (Als

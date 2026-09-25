@@ -79,8 +79,7 @@ async function doSideDeckPick(engine, pi, { cancellable }) {
   engine._broadcastEvent('side_deck_appear', { cardName: chosen, playerIdx: pi });
 
   // Add to hand and track.
-  ps.hand.push(chosen);
-  engine._trackCard(chosen, pi, 'hand');
+  engine.handZugangSync(ps, chosen, { source: CARD_NAME });
 
   // Mark Divine Gift as used. Idempotent — the proactive play path's
   // engine-side `oncePerGame` consumption may also fire, but we set

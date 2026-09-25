@@ -67,8 +67,7 @@ module.exports = {
     await engine._delay(650);
 
     // ④
-    ps.hand.push(karte);
-    engine._trackCard(karte, pi, 'hand');
+    engine.handZugangSync(ps, karte, { source: CARD_NAME });
     engine._broadcastEvent('card_reveal', { cardName: karte, playerIdx: pi });
     await engine.runHooks('onCardAddedFromDiscardToHand', {
       playerIdx: pi, cardName: karte, addedCardName: karte, _skipReactionCheck: true,

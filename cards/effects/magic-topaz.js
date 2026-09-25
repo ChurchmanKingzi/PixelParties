@@ -60,7 +60,7 @@ module.exports = {
     const ps = engine.gs.players[pi];
     if (!ps) return;
     if (keepInHand) {
-      ps.hand.push(CARD_NAME);
+      engine.handZugangSync(ps, CARD_NAME, { source: CARD_NAME, ohneInstanz: true });
       engine.log('magic_topaz_kept_in_hand', { player: ps.username });
     } else {
       ps.discardPile.push(CARD_NAME);

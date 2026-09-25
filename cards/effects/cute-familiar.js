@@ -275,18 +275,15 @@ module.exports = {
 
       // Pop one copy out of the discard pile array & untrack the
       // listener instance to avoid an orphan tracked in 'discard'.
-      const _taken_dpIdx = await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_dpIdx) return;
-
+      // v1389: Ablage → Feld über die EINE Stelle (summonFromDiscard).
       const oldInst = ctx.card;
+      const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, chosen.heroIdx, chosen.slotIdx, {
+        source: CARD_NAME, flug: false,
+      });
       if (oldInst && oldInst.zone === 'discard') {
         engine._untrackCard(oldInst.id);
       }
-
-      await engine.summonCreatureWithHooks(
-        CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx,
-        { source: CARD_NAME }
-      );
+      if (!res) return;
       engine.log('cute_familiar_discard_summon', {
         player: ps.username, heroIdx: chosen.heroIdx,
       });
@@ -376,15 +373,18 @@ module.exports = {
 
       // Pop from discard pile array (the dead Familiar) and untrack
       // the parker before placing.
-      await engine.takeFromPile(ps, 'discard', CARD_NAME, { source: CARD_NAME });   // v820: Stapel-Schicht
+      // v1389: Bausteine der EINEN Ablage-Stelle (eigene Inszenierung).
+      const ab = await engine.ablageEntnahme(pi, pi, CARD_NAME, { source: CARD_NAME });
       engine._untrackCard(ctx.card.id);
+      if (!ab) return;
 
       // Use safePlaceInSupport + manual on-play hooks (Necromancy's
       // pattern) — placements bypass the regular summon path so we
       // don't increment _creaturesSummonedThisTurn at end-of-turn.
       const placeRes = engine.safePlaceInSupport(CARD_NAME, pi, chosen.heroIdx, chosen.slotIdx);
-      if (!placeRes) return;
+      if (!placeRes) { engine.ablageRueckgabe(ab); return; }
       const { inst, actualSlot } = placeRes;
+      const ablageExtras = engine.ablageLandung(inst, ab, 'place');
 
       engine._broadcastEvent('summon_effect', {
         owner: pi, heroIdx: chosen.heroIdx, zoneSlot: actualSlot, cardName: CARD_NAME,
@@ -393,11 +393,11 @@ module.exports = {
       await engine.runHooks('onPlay', {
         _onlyCard: inst, playedCard: inst, cardName: CARD_NAME,
         zone: 'support', heroIdx: chosen.heroIdx, zoneSlot: actualSlot,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, ...ablageExtras,
       });
       await engine.runHooks('onCardEnterZone', {
         enteringCard: inst, toZone: 'support', toHeroIdx: chosen.heroIdx,
-        _skipReactionCheck: true,
+        _skipReactionCheck: true, ...ablageExtras,
       });
 
       engine.log('cute_familiar_eot_revive', {

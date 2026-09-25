@@ -396,6 +396,19 @@ function multiplesOfK(k, maxN) {
  * deletion order. Stops early if the pile runs out before reaching
  * the requested count.
  */
+/**
+ * v1398 (Als Ruling 25.9.): Solange der Lockdown von Knight of Kings [B]
+ * die eigene Ablage sperrt, können Effekte, die als KOSTEN Karten aus der
+ * Ablage löschen, gar nicht erst aktiviert werden. Jede Guardian-Beast-
+ * Aktivierung mit Löschkosten fragt das als erstes.
+ */
+function ablageLoeschKostenMoeglich(ctx) {
+  const engine = ctx?._engine;
+  const pi = ctx?.cardOwner;
+  if (!engine || pi == null) return true;
+  return engine.pileOutAllowed(pi, 'discard', { sourceOwner: pi });
+}
+
 async function deleteTopOfOwnDiscard(engine, pi, count, sourceName) {
   const ps = engine.gs?.players?.[pi];
   if (!ps?.discardPile) return [];
@@ -418,10 +431,12 @@ async function deleteTopOfOwnDiscard(engine, pi, count, sourceName) {
       // the pile alone and continue with the next slot's name.
       // Most rescue paths splice the card out of the pile themselves;
       // re-check the pile length so we don't loop on the same name.
-      if (ps.discardPile[0] === cardName) ps.discardPile.shift();
+      // v1398: über die Stapel-Schicht; die Kosten sind bezahlt, die
+      // Aktivierungssperre (ablageLoeschKostenMoeglich) lag davor.
+      if (ps.discardPile[0] === cardName) engine.takeFromPileSync(ps, 'discard', 0, { source: sourceName || ARCHETYPE, _bypassPileLock: true });
       continue;
     }
-    ps.discardPile.shift();
+    if (!engine.takeFromPileSync(ps, 'discard', 0, { source: sourceName || ARCHETYPE, _bypassPileLock: true })) break;   // v1398
     ps.deletedPile = ps.deletedPile || [];
     ps.deletedPile.push(cardName);
     engine.log('card_deleted', {
@@ -481,6 +496,7 @@ function buildAllBoardTargets(engine, opts = {}) {
 }
 
 module.exports = {
+  ablageLoeschKostenMoeglich,
   ARCHETYPE,
   GUARDIAN_BEAST_CREATURES,
   PER_TURN_FLAG,

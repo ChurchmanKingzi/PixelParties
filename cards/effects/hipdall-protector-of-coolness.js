@@ -90,7 +90,7 @@ module.exports = {
       // Pull the card back out of the destination pile/hand if it landed.
       let recovered = false;
       if (toZone === 'discard') {
-        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
+        if (await engine.takeFromPile(ps, 'discard', cardName, { source: CARD_NAME, last: true, toHand: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'deleted') {
         if (await engine.takeFromPile(ps, 'deleted', cardName, { source: CARD_NAME, last: true })) recovered = true;   // v820: Stapel-Schicht
       } else if (toZone === 'hand') {
@@ -100,7 +100,7 @@ module.exports = {
       if (!recovered) return;
 
       if (toZone !== 'hand') {
-        ps.hand.push(cardName);
+        await engine.handZugang(ps, cardName, { von: 'ablage', source: CARD_NAME, ohneInstanz: true });
         // Move the leaving inst back to hand. ctx.card on a leave-zone
         // hook is the LISTENING inst (Hipdall itself); the leaving
         // inst is exposed differently — we lookup by name+toZone.

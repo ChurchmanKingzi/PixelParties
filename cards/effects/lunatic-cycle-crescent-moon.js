@@ -104,7 +104,7 @@ module.exports = {
         await engine.actionDrawCards(pi, totalReturned - potionCount);
         for (let i = 0; i < potionCount; i++) {
           if ((ps.potionDeck || []).length === 0) break;
-          ps.hand.push(ps.potionDeck.shift());
+          engine.handZugangSync(ps, ps.potionDeck.shift(), { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
           engine.sync();
           await engine._delay(200);
         }

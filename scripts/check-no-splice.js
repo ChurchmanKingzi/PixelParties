@@ -2,7 +2,7 @@
 // ════════════════════════════════════════════════════════════════
 //  PIXEL PARTIES — SPLICE-WÄCHTER (v820, Als Regel 7.9.)
 //
-//  Kartenskripte splicen NIE selbst an Deck, Ablage oder Gelöscht-
+//  Kartenskripte splicen NIE selbst an Hand, Deck, Ablage oder Gelöscht-
 //  Stapel — dafür gibt es die Stapel-Schicht der Engine
 //  (`takeFromPile`, `summonFromPile`, `placeFromPile`,
 //  `addFromPileToHand`, `deleteFromPile`, `takeTop`, `reorderDeck`;
@@ -28,7 +28,11 @@ const DIR = path.join(ROOT, 'cards', 'effects');
 const BASELINE = path.join(__dirname, 'no-splice-baseline.json');
 // Die Engine ist die Stapel-Schicht selbst.
 const ALLOW = new Set(['_engine.js']);
-const RE = /\b(mainDeck|discardPile|deletedPile)\.splice\(/g;
+// v1394: auch die HAND (Als Auftrag 25.9.) — Abwürfe über
+// `actionDiscardHandCard`, alles andere über `takeFromPile(Sync)(…, 'hand', …)`.
+// v1397: auch shift()/pop() — dieselbe Lücke (Chaos Magic, Kassaran,
+// Surprise Party, der Fremd-Deck-Helfer nahmen so am Stapel vorbei).
+const RE = /\b(mainDeck|discardPile|deletedPile|hand)\.(?:splice|shift|pop)\(/g;
 
 const args = process.argv.slice(2);
 const showAll = args.includes('--all');

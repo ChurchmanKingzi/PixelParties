@@ -516,8 +516,8 @@ async function _activateLv2(engine, gs, pi, heroIdx, hero, oi, ops) {
 
     // Now apply the state mutation — clone has landed; the sync
     // that follows just swaps the clone for the real card.
-    ops.hand.splice(stealHandIdx, 1);
-    gs.players[pi].hand.push(cardName);
+    engine.takeFromPileSync(ops, 'hand', stealHandIdx);
+    engine.handZugangSync(gs.players[pi], cardName, { ohneInstanz: true });
     // Instanz mitziehen (siehe _moveHandInstanceOwner): `owner` folgt
     // dem physischen Besitz, `originalOwner` bleibt — damit geht die
     // Karte beim Abwerfen/Löschen zurück in die richtige Ablage.

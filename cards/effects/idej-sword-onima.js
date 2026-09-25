@@ -122,7 +122,7 @@ module.exports = {
           });
           engine.cardInstances = engine.cardInstances.filter(c => c.id !== inst.id);
         }
-        oppPs.hand.push(t.cardName);
+        engine.handZugangSync(oppPs, t.cardName, { source: CARD_NAME, ohneInstanz: true });
         // Authoritative flight — the Ability travels from the exact
         // Ability Zone slot it sat in to its new spot in hand. Emitted
         // before the final sync, so it starts from the still-visible

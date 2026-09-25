@@ -363,7 +363,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   // Die Logzeile schreibt dann die Engine (`chain_link_fizzled`).
   if (chainResult.negated || chainResult.fizzled) {
     const i = findChosenInHand();
-    if (i >= 0) ps.hand.splice(i, 1);
+    if (i >= 0) engine.takeFromPileSync(ps, 'hand', i);
     ps.discardPile.push(cardName);
     if (handInst) engine._untrackCard(handInst.id);
     // v1323: negierte Aktivierung → keine Wisdom-Kosten.
@@ -424,7 +424,7 @@ async function castLearningSpell(engine, pi, heroIdx, hero, cardName, abilityZon
   delete gs._spellPlacedOnBoard;
 
   const ix = findChosenInHand();
-  if (ix >= 0) ps.hand.splice(ix, 1);
+  if (ix >= 0) engine.takeFromPileSync(ps, 'hand', ix);
 
   if (placed) {
     // Spell placed itself (Areas, Forbidden Zone, …). Whatever zone it

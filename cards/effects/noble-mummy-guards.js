@@ -198,7 +198,7 @@ module.exports = {
     const originalOwner = bouncedInst?.originalOwner ?? attachOwner;
     const returnPs = gs.players[originalOwner];
     if (returnPs) {
-      returnPs.hand.push(bouncedCardName);
+      engine.handZugangSync(returnPs, bouncedCardName, { von: 'brett', ohneInstanz: true });
     }
 
     const heroName = attachPs.heroes?.[attachHeroIdx]?.name || 'Hero';

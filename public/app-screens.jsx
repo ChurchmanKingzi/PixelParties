@@ -2034,8 +2034,8 @@ function MainMenu() {
                 <>
                   <div style={{ color: 'var(--text1)', fontSize: 13, lineHeight: 1.55, marginBottom: 14, textAlign: 'center' }}>
                     Win a game today with <b style={{ color: 'var(--player-color)' }}>2 of these Heroes</b> in your deck to earn{' '}
-                    <b style={{ color: 'var(--player-color)' }}>10 bonus <CoinIcon size={14} /></b>,<br />
-                    or <b style={{ color: 'var(--player-color)' }}>all 3 for 20 bonus <CoinIcon size={14} /></b>!
+                    <b style={{ color: 'var(--player-color)' }}>{daily?.betraege?.zweiHelden ?? 50} bonus <CoinIcon size={14} /></b>,<br />
+                    or <b style={{ color: 'var(--player-color)' }}>all 3 for {daily?.betraege?.dreiHelden ?? 100} bonus <CoinIcon size={14} /></b>!
                   </div>
                   <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
                     {daily.heroes.map((name) => {
@@ -2076,7 +2076,7 @@ function MainMenu() {
                       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text2)' }}>
                         {daily.claimedBig ? (
                           <div style={{ color: '#33ff88', marginBottom: 6 }}>
-                            ✓ Big bonus claimed (+{daily.claimedBig} <CoinIcon size={12} />) — extra wins with 2+ Heroes now give <b>+1 <CoinIcon size={12} /></b> each.
+                            ✓ Big bonus claimed (+{daily.claimedBig} <CoinIcon size={12} />) — extra wins with 2+ Heroes now give <b>+{daily?.betraege?.wiederholung ?? 5} <CoinIcon size={12} /></b> each.
                           </div>
                         ) : (
                           <div style={{ marginBottom: 6 }}>Big bonus still available.</div>
@@ -2121,7 +2121,8 @@ function MainMenu() {
                   const puzzles = puzzleList.filter(p => p.difficulty === diff);
                   if (puzzles.length === 0) return null;
                   const diffColors = { easy: '#33ff88', medium: '#ffaa00', hard: '#ff4444' };
-                  const scReward = { easy: 3, medium: 6, hard: 10 };
+                  // v1402: Betrag kommt vom Server (Anzeige = Auszahlung).
+                  const scReward = { [diff]: puzzles[0]?.scBetrag ?? 0 };
                   return (
                     <div key={diff} style={{ marginBottom: 16 }}>
                       <div className="orbit-font" style={{ fontSize: 14, fontWeight: 800, color: diffColors[diff], letterSpacing: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4162,6 +4163,111 @@ function RulesScreen({ onBack }) {
 // distorting the aspect ratio. Image source routes through cardImageUrl
 // so we get the hero's default card file (/cards/<filename>) rather than
 // a non-existent /cards/skins/<name>.png.
+// ═══════════════════════════════════════════════════════════════
+//  ★ v1404 (Al 25.9.): KACHELN DER CPU-AUSWAHL — ein Baustein
+//  Rahmen mit Doppelkante, Eckwinkeln, Bildrahmen mit Vignette und
+//  gelegentlichem Glanzband; Farbe per `--kachel-farbe`. Die Zufalls-
+//  Kachel nutzt denselben Baustein mit Goldton und einem Bild, das wie
+//  ein Spielautomat durch die freigeschalteten Gegner laeuft.
+// ═══════════════════════════════════════════════════════════════
+function VsCpuKachel({ farbe, zufall, disabled, onClick, bild, name, fuss }) {
+  const [hover, setHover] = useState(false);
+  // Jede Kachel glaenzt zu ihrer eigenen Zeit, nicht alle im Gleichschritt.
+  const verzug = useMemo(() => (0.4 + Math.random() * 5).toFixed(2) + 's', []);
+  return (
+    <button className={'vscpu-kachel' + (zufall ? ' vscpu-kachel--zufall' : '')}
+      disabled={disabled} onClick={onClick}
+      style={{ '--kachel-farbe': farbe }}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <span className="vscpu-ecken" aria-hidden="true"><i /><i /><i /><i /></span>
+      <div className="vscpu-bild" style={{ '--glanz-verzug': verzug }}>
+        {bild(hover && !disabled)}
+        <span className="vscpu-bild-vignette" aria-hidden="true" />
+        <GlanzBand klasse="vscpu-glanz" />
+      </div>
+      <div className="vscpu-name orbit-font">{name}</div>
+      <div className="vscpu-fuss">{fuss}</div>
+    </button>
+  );
+}
+
+// ★ v1408 (Al 25.9.): ein ECHTER Würfel — 3D-Würfel aus sechs Seiten mit
+// Augen. Beim Hover wird immer wieder geworfen: Er hüpft hoch, über-
+// schlägt sich mehrfach und landet auf einer zufälligen Zahl, liegt kurz
+// still und wird erneut geworfen. Ohne Hover ruht er schräg auf seiner
+// letzten Zahl.
+const WUERFEL_AUGEN = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+// Seite → Drehung des Würfels, die sie nach vorn bringt (Grad, x/y).
+const WUERFEL_LAGE = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 5: [-90, 0], 2: [90, 0] };
+const WUERFEL_SEITEN = [
+  ['vorn', 1], ['hinten', 6], ['rechts', 3], ['links', 4], ['oben', 5], ['unten', 2],
+];
+function RollenderWuerfel({ rollt }) {
+  const ruhig = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const [wurf, setWurf] = useState({ x: 0, y: 0, n: 0, zahl: 5 });
+  useEffect(() => {
+    if (!rollt || ruhig) return;
+    const werfen = () => setWurf(w => {
+      let zahl = 1 + Math.floor(Math.random() * 6);
+      if (zahl === w.zahl) zahl = (zahl % 6) + 1;      // jedes Mal eine andere Zahl
+      const [zx, zy] = WUERFEL_LAGE[zahl];
+      // Immer vorwärts drehen: zur nächsten vollen Umdrehung aufrunden,
+      // ein bis zwei Extra-Überschläge je Achse, dann die Ziellage.
+      const weiter = (alt, ziel, extra) => Math.ceil(alt / 360) * 360 + extra * 360 + ziel;
+      return {
+        x: weiter(w.x, zx, 1 + Math.floor(Math.random() * 2)),
+        y: weiter(w.y, zy, 1 + Math.floor(Math.random() * 2)),
+        n: w.n + 1, zahl,
+      };
+    });
+    werfen();
+    // v1409 (Al 25.9.): drastisch schneller — ein Wurf alle 0,4 s; Flug-
+    // und Sprungdauer in style.css (.vscpu-wuerfel / vscpuSprung) passen dazu.
+    const iv = setInterval(werfen, 400);
+    return () => clearInterval(iv);
+  }, [rollt, ruhig]);
+  return (
+    <span className="vscpu-wuerfel-buehne" aria-hidden="true">
+      <span key={wurf.n} className={'vscpu-wuerfel-sprung' + (wurf.n > 0 ? ' vscpu-wuerfel-sprung--an' : '')}>
+        <span className="vscpu-wuerfel" style={{ transform: `rotateX(${wurf.x}deg) rotateY(${wurf.y}deg)` }}>
+          {WUERFEL_SEITEN.map(([seite, zahl]) => (
+            <span key={seite} className={'vscpu-wuerfel-seite vscpu-wuerfel-' + seite}>
+              {Array.from({ length: 9 }, (_, i) => (
+                <i key={i} className={WUERFEL_AUGEN[zahl].includes(i) ? 'an' : ''} />
+              ))}
+            </span>
+          ))}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** Zufalls-Kachel: laeuft durch die Gegner-Portraits, schneller bei Hover. */
+function ZufallsGegnerBild({ gegner, schnell, width = 240 }) {
+  const liste = Array.isArray(gegner) ? gegner.filter(g => g?.middleHero) : [];
+  const [idx, setIdx] = useState(() => (liste.length ? Math.floor(Math.random() * liste.length) : 0));
+  const ruhig = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  useEffect(() => {
+    if (ruhig || liste.length < 2) return;
+    const iv = setInterval(() => setIdx(i => (i + 1 + Math.floor(Math.random() * (liste.length - 1))) % liste.length),
+      schnell ? 120 : 900);
+    return () => clearInterval(iv);
+  }, [schnell, liste.length, ruhig]);
+  const aktuell = liste[idx % Math.max(1, liste.length)];
+  return (
+    <div className={'vscpu-zufall' + (schnell ? ' vscpu-zufall--schnell' : '')} style={{ width, height: width * (398 / 594) }}>
+      <div key={idx} className="vscpu-zufall-portrait">
+        {aktuell && <HeroArtCrop heroName={aktuell.middleHero} width={width} />}
+      </div>
+      <span className="vscpu-zufall-frage pixel-font" aria-hidden="true">?</span>
+      <RollenderWuerfel rollt={schnell} />
+    </div>
+  );
+}
+
 function HeroArtCrop({ heroName, width = 160 }) {
   const src = heroName ? cardImageUrl(heroName) : null;
   if (!src) {
@@ -4645,7 +4751,6 @@ function SingleplayerScreen() {
                 className="pp-lotse vscpu-raccoon"
                 disabled={starting}
                 onClick={() => setTutorialBrowserOpen(true)}
-                title="Tutorial Raccoon — learn how to play"
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   gap: 6, padding: 8,
@@ -4679,95 +4784,37 @@ function SingleplayerScreen() {
                 nicht mit. Nicht im Gastmodus (dort steht der Tutorial Raccoon
                 an erster Stelle). */}
             {!user?.isGuest && Array.isArray(opponents) && opponents.length > 0 && (() => {
-              const randColor = '#ffcc33';
               const aktiv = hasAnyLegal && !starting;
               return (
-                <button
-                  key="__random_opponent"
-                  className="vscpu-random"
+                <VsCpuKachel key="__random_opponent" farbe="#ffcc33" zufall
                   disabled={!aktiv}
                   onClick={() => {
                     const op = opponents[Math.floor(Math.random() * opponents.length)];
                     if (op) startBattle(op.id);
                   }}
-                  title="Challenge a random unlocked opponent"
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    gap: 6, padding: 8,
-                    background: 'color-mix(in srgb, ' + randColor + ' 8%, var(--bg2))',
-                    border: '2px solid ' + randColor,
-                    borderRadius: 6,
-                    boxShadow: '0 0 10px ' + randColor + '44',
-                    cursor: aktiv ? 'pointer' : 'not-allowed',
-                    opacity: aktiv ? 1 : 0.55,
-                    transition: 'transform .15s ease, box-shadow .15s ease',
-                    fontFamily: 'inherit', color: 'inherit',
-                  }}
-                  onMouseEnter={e => { if (aktiv) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + randColor + '88'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + randColor + '44'; }}
-                >
-                  {/* Platzhalter im Format der Heldenbilder (594:398), damit
-                      die Kachel genau so hoch ist wie ihre Nachbarn. */}
-                  <div style={{
-                    width: 240, height: 240 * (398 / 594), display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'radial-gradient(ellipse at 50% 45%, ' + randColor + '33 0%, transparent 70%)',
-                    borderRadius: 4, fontSize: 84, lineHeight: 1,
-                  }}>🎲</div>
-                  <div className="orbit-font" style={{ fontSize: 16, color: randColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    Random Opponent
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, fontSize: 13, marginTop: 'auto', color: randColor, fontWeight: 700 }}>
-                    {opponents.length} unlocked
-                  </div>
-                </button>
+                  bild={(schnell) => <ZufallsGegnerBild gegner={opponents} schnell={schnell} width={240} />}
+                  name="Random Opponent"
+                  fuss={<span className="vscpu-chip">{opponents.length} unlocked</span>}
+                />
               );
             })()}
             {oppTiles.map(op => {
-              const imgWidth = 240;
               const total = (op.wins || 0) + (op.losses || 0);
-              const frameColor = '#ff4444';
               return (
-                <button
-                  key={op.id}
+                <VsCpuKachel key={op.id} farbe="#ff4444"
                   disabled={!hasAnyLegal || starting}
                   onClick={() => startBattle(op.id)}
-                  title={op.name}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    gap: 6, padding: 8,
-                    // Opaque (tint mixed into --bg2) so the dithered content
-                    // behind the tile doesn't show through it.
-                    background: 'color-mix(in srgb, ' + frameColor + ' 7%, var(--bg2))',
-                    border: '2px solid ' + frameColor,
-                    borderRadius: 6,
-                    boxShadow: '0 0 10px ' + frameColor + '33',
-                    cursor: hasAnyLegal && !starting ? 'pointer' : 'not-allowed',
-                    opacity: hasAnyLegal && !starting ? 1 : 0.55,
-                    transition: 'transform .15s ease, box-shadow .15s ease',
-                    fontFamily: 'inherit', color: 'inherit',
-                  }}
-                  onMouseEnter={e => { if (hasAnyLegal && !starting) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 0 18px ' + frameColor + '66'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 0 10px ' + frameColor + '33'; }}
-                >
-                  <HeroArtCrop heroName={op.middleHero} width={imgWidth} />
-                  {/* Fixed 2-line height on the name so the W/L row below
-                      lines up across cards regardless of whether the name
-                      wraps to one or two lines. 1-line names are
-                      vertically centered in the reserved space. */}
-                  <div className="orbit-font" style={{ fontSize: 16, color: frameColor, textAlign: 'center', fontWeight: 700, lineHeight: 1.2, minHeight: '2.4em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {op.middleHero || op.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: 14, fontSize: 14, marginTop: 'auto' }}>
-                    {total > 0 ? (
-                      <>
-                        <span style={{ color: frameColor }}>W {op.wins || 0}</span>
-                        <span style={{ color: frameColor }}>L {op.losses || 0}</span>
-                      </>
-                    ) : (
-                      <span style={{ color: frameColor, opacity: 0.7 }}>No matches yet</span>
-                    )}
-                  </div>
-                </button>
+                  bild={() => <HeroArtCrop heroName={op.middleHero} width={240} />}
+                  name={op.middleHero || op.name}
+                  fuss={total > 0 ? (
+                    <>
+                      <span className="vscpu-chip">W {op.wins || 0}</span>
+                      <span className="vscpu-chip">L {op.losses || 0}</span>
+                    </>
+                  ) : (
+                    <span className="vscpu-chip vscpu-chip--leise">No matches yet</span>
+                  )}
+                />
               );
             })}
           </div>

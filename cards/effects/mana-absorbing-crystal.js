@@ -126,7 +126,7 @@ module.exports = {
     let idx = handIndex;
     if (ps.hand[idx] !== CARD_NAME) idx = ps.hand.indexOf(CARD_NAME);
     if (idx >= 0) {
-      ps.hand.splice(idx, 1);
+      engine.takeFromPileSync(ps, 'hand', idx);
       ps.deletedPile.push(CARD_NAME);
       // Untrack the hand inst so the engine state stays clean.
       const inst = engine.cardInstances.find(c =>

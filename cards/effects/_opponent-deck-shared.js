@@ -49,6 +49,9 @@ async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   const ops = gs.players[oi];
   if (!ps || !ops) return null;
   if ((ops.mainDeck || []).length === 0) return null;
+  // v1396 (Als Ruling 25.9.): keine Suche, nicht „from your deck" — aber
+  // „add to hand": unter einer Hand-Sperre geht es nicht.
+  if (engine.handZugangGesperrt(pi)) return null;
 
   const cardName = ops.mainDeck[0];
 
@@ -60,11 +63,10 @@ async function takeTopFromOpponentDeck(engine, pi, opts = {}) {
   await engine._delay(opts.delay ?? 700);
 
   // ② Zustand.
-  ops.mainDeck.shift();
-  ps.hand.push(cardName);
-
-  // ③ Herkunft merken.
-  engine._tagHandCardOrigin(pi, cardName, oi);
+  // v1396: Entnahme über die Stapel-Schicht (Deckkopf-Sicht, Log), Zugang
+  // über die Hand-Stelle — mit Instanz und Herkunfts-Merker.
+  if (!engine.takeFromPileSync(ops, 'deck', 0, { source: opts.source || null, sourceOwner: pi })) return null;
+  engine.handZugangSync(ps, cardName, { von: 'fremdesDeck', source: opts.source || null, originalOwner: oi });
   engine.log('take_from_opp_deck', {
     player: ps.username, card: cardName, source: opts.source || null,
   });

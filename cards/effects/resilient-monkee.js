@@ -136,17 +136,13 @@ module.exports = {
         }
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
-        // `_summonedFromDiscard` ist das kanonische Signal fuer
-        // Wiederbelebungs-Auren (Skullmael, Vacarn) — Vorbild
-        // `raise-the-minions.js`.
-        const res = await engine.actionPlaceCreature(
-          CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
-          {
-            source: 'discard', sourceName: CARD_NAME,
-            countAsSummon: true, animationType: 'summon',
-            fireHooks: true, _summonedFromDiscard: true,
-          },
-        );
+        // v1389: über die EINE Ablage-Stelle (summonFromDiscard, mode
+        // 'place' → actionPlaceCreature 'discard'). Das Signal
+        // `_summonedFromDiscard` für Skullmael/Vacarn setzt die Engine.
+        const res = await engine.summonFromDiscard(pi, pi, CARD_NAME, ziel.heroIdx, ziel.slotIdx, {
+          mode: 'place', source: CARD_NAME,
+          placeOpts: { countAsSummon: true, animationType: 'summon', fireHooks: true },
+        });
         // v1349: „as an additional Action" — als ausgefuehrte Aktion melden.
         if (res?.inst) await engine.meldeBeschwoerungAlsAktion(pi, ziel.heroIdx, CARD_NAME, res.inst);
         // `source: 'discard'` heisst: die Primitive nimmt die Karte SELBST

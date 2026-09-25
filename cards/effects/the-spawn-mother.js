@@ -224,48 +224,15 @@ module.exports = {
       // covering the full hero + creature target list. The per-player
       // `_sgPromptedFor` dedup flag prevents double-prompting when the
       // inner `processCreatureDamageBatch` re-fires the same window.
-      {
-        const allTargets = [
-          ...heroHits.map(ht => ({
-            type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx,
-            cardName: gs.players[ht.owner]?.heroes?.[ht.heroIdx]?.name,
-          })),
-          ...creatureHits.map(inst => ({
-            type: 'creature', owner: inst.controller ?? inst.owner,
-            heroIdx: inst.heroIdx, slotIdx: inst.zoneSlot,
-            cardName: inst.name,
-          })),
-        ];
-        await engine.preDamageMultiTargetWindow(source, allTargets);
-      }
-
-      // Hero damage — one actionDealDamage per hero (the engine's hero
-      // damage path is per-target). Each fires its own afterDamage so
-      // listeners (Vinepire-style trackers) see each hit.
-      // ★ v1043 („Interference"): ein Schlag auf Helden UND Kreaturen.
-      // Gezaehlt wird, was WIRKLICH getroffen wird.
-      engine.beginMultiHit(heroHits.filter(x => x.hero?.hp > 0).length + creatureHits.length);
-      try {
-      for (const { hero } of heroHits) {
-        if (hero.hp <= 0) continue; // May have died from a previous hit this loop
-        await engine.actionDealDamage(source, hero, AOE_DAMAGE, 'creature');
-        engine.sync();
-      }
-
-      // Creature damage — one batched call so all hits resolve under a
-      // single beforeCreatureDamageBatch / afterCreatureDamageBatch
-      // window. Excludes Spawn Mother's own instance. animType is left
-      // null because the dark_wave_engulf burst already played above.
-      if (creatureHits.length > 0) {
-        const entries = creatureHits.map(inst => ({
-          inst, amount: AOE_DAMAGE, type: 'creature',
-          source, sourceOwner: pi, canBeNegated: true,
-        }));
-        await engine.processCreatureDamageBatch(entries);
-      }
-      } finally {
-        engine.endMultiHit();
-      }
+      // ★ v1392: über die EINE Stelle für Mehrfachtreffer (Hand-Reaktionen
+      // wie bisher per preDamageMultiTargetWindow, jetzt im Zentrum).
+      await engine.dealDamageToTargets(source, [
+        ...heroHits.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
+        ...creatureHits.map(inst => ({ type: 'creature', inst })),
+      ], {
+        damage: AOE_DAMAGE, damageType: 'creature', sourceName: CARD_NAME, hitDelay: 0,
+        surpriseCheck: false,
+      });
 
       // Restore the AoE flag we set above. Defensive: only delete if
       // we set it (some future caller might have stacked the flag).

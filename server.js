@@ -2323,6 +2323,7 @@ app.get('/api/daily', authMiddleware, async (req, res) => {
       startTs: active ? active.startTs : 0,
       expiresTs: active ? active.expiresTs : 0,
       claimedBig: active ? active.claimedBig : 0,
+      betraege: scRewardsModul.DAILY_BETRAG,   // v1401
       lastResetTs,
       nextResetTs,
       nowTs: nowSec,
@@ -2356,6 +2357,7 @@ app.post('/api/daily/start', authMiddleware, async (req, res) => {
       startTs: nowSec,
       expiresTs: Math.min(nowSec + DAILY_CHALLENGE_DURATION_SEC, nextResetTs),
       claimedBig: 0,
+      betraege: scRewardsModul.DAILY_BETRAG,   // v1401
       lastResetTs: mostRecentNoonCETSec(nowSec),
       nextResetTs,
       nowTs: nowSec,
@@ -5702,8 +5704,8 @@ async function puzzleEndGame(room, winnerIdx, reason) {
   // result view in that window, the SC notification text was
   // generated from the stale zero.
   if (puzzleSuccess && gs._puzzleAttemptId && gs._puzzleDifficulty) {
-    const SC_BY_DIFFICULTY = { easy: 3, medium: 6, hard: 10 };
-    const scAmount = SC_BY_DIFFICULTY[gs._puzzleDifficulty] || 0;
+    // v1402: Beträge an EINER Stelle (sc-rewards.js), ×5.
+    const scAmount = scRewardsModul.PUZZLE_BETRAG[gs._puzzleDifficulty] || 0;
     const userId = winner?.userId;
     const puzzleId = gs._puzzleAttemptId;
 
@@ -5800,9 +5802,10 @@ function endCpuBattle(room, winnerIdx, reason) {
   // bevor irgendwer npc_stats hochzaehlt. Die Freischalt-Logik unten und
   // die SC-Auswertung (sc-rewards.js) warten beide auf dasselbe Ergebnis —
   // sonst haengt die Antwort davon ab, wer zuerst an der Datenbank ist.
-  room._scCpuVorSiege = (humanUserId && opponentDeckId)
-    ? db.get('SELECT wins FROM npc_stats WHERE user_id = ? AND opponent_deck_id = ?', [humanUserId, opponentDeckId])
-        .then(r => Number(r?.wins || 0)).catch(() => null)
+  // v1399: Siege UND Niederlagen (First Conquest! / Learning Experience).
+  room._scCpuVorStand = (humanUserId && opponentDeckId)
+    ? db.get('SELECT wins, losses FROM npc_stats WHERE user_id = ? AND opponent_deck_id = ?', [humanUserId, opponentDeckId])
+        .then(r => ({ wins: Number(r?.wins || 0), losses: Number(r?.losses || 0) })).catch(() => null)
     : Promise.resolve(null);
   if (humanUserId && opponentDeckId) {
     const humanWon = winnerIdx === 0 ? 1 : 0;
@@ -5811,7 +5814,7 @@ function endCpuBattle(room, winnerIdx, reason) {
       try {
         // Read the pre-update win count so we can detect milestone
         // crossings (each happens exactly once since wins climb by 1).
-        const preWins = (await room._scCpuVorSiege) || 0;
+        const preWins = (await room._scCpuVorStand)?.wins || 0;
 
         await db.run(`
           INSERT INTO npc_stats (user_id, opponent_deck_id, wins, losses)
@@ -12226,8 +12229,9 @@ async function cubeFinalizeTournament(room, io) {
   for (const s of standings) {
     const player = room.players[s.seat];
     let scAward = 0;
-    if (s.placement === 1) scAward = 5 * humanCount;
-    else if (s.placement === 2 && humanCount >= 3) scAward = 2 * humanCount;
+    // v1402: Beträge an EINER Stelle (sc-rewards.js), ×5.
+    if (s.placement === 1) scAward = scRewardsModul.CUBE_BETRAG.ersterJeMensch * humanCount;
+    else if (s.placement === 2 && humanCount >= 3) scAward = scRewardsModul.CUBE_BETRAG.zweiterJeMensch * humanCount;
     if (scAward > 0) {
       try {
         await db.run('UPDATE users SET sc = sc + ? WHERE id = ?', [scAward, player.userId]);
@@ -15285,6 +15289,7 @@ io.on('connection', (socket) => {
       socket.emit('puzzle_list', puzzles.map(p => ({
         ...p,
         completed: completedSet.has(p.puzzleId),
+        scBetrag: scRewardsModul.PUZZLE_BETRAG[p.difficulty] || 0,   // v1402: Anzeige = Auszahlung
       })));
     } catch (err) {
       console.error('[Puzzle] get_puzzles error:', err.message);

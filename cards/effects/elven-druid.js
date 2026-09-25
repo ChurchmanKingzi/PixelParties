@@ -131,7 +131,7 @@ module.exports = {
     const chosenName = picked.cardName;
 
     // ── Remove from deck, shuffle ──
-    const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+    const _taken_idx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
     if (!_taken_idx) return false; // Deck changed between prompt and confirm; fizzle
 
     // Reveal to opponent via the standard deck-search gallery
@@ -144,7 +144,7 @@ module.exports = {
       // Hero's support zone filled up between the pre-check and now
       // (highly unlikely mid-HOPT, but safest to handle). Return the
       // card to deck and fizzle.
-      ps.mainDeck.push(chosenName);
+      engine.returnToPile(ps, 'deck', chosenName);
       engine.shuffleDeck(pi, 'main');
       engine.log('elven_druid_fizzle', { player: ps.username, reason: 'no_free_slot' });
       return false;
@@ -158,13 +158,13 @@ module.exports = {
       chosenName, pi, heroIdx, freeSlot,
       {
         source: CARD_NAME,
-        hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+        hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
       }
     );
     if (!summonRes) {
       // beforeSummon refused (unlikely for an Elven) — put card back
       // and fizzle so the player doesn't lose the deck copy.
-      ps.mainDeck.push(chosenName);
+      engine.returnToPile(ps, 'deck', chosenName);
       engine.shuffleDeck(pi, 'main');
       engine.log('elven_druid_fizzle', { player: ps.username, reason: 'beforeSummon_refused' });
       return false;

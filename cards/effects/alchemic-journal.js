@@ -92,7 +92,7 @@ module.exports = {
       const idx = ps.potionDeck.indexOf(chosenName);
       if (idx < 0) return;
       ps.potionDeck.splice(idx, 1);
-      ps.hand.push(chosenName);
+      engine.handZugangSync(ps, chosenName, { ohneInstanz: true });
 
       // Lock chosen potion name for the turn
       if (!ps._creationLockedNames) ps._creationLockedNames = new Set();

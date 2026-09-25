@@ -77,7 +77,7 @@ module.exports = {
         try { scoreDiscard = evalState(pi); } catch {}
         ps.discardPile.pop();
         // Project add-to-hand
-        ps.hand.push(name);
+        ps.hand.push(name);   // Was-wäre-wenn (sofort per pop() zurückgesetzt) — bewusst roh, keine Engine-Logik
         let scoreHand = -Infinity;
         try { scoreHand = evalState(pi); } catch {}
         ps.hand.pop();
@@ -104,7 +104,7 @@ module.exports = {
       let scoreDiscard = -Infinity;
       try { scoreDiscard = evalState(pi); } catch {}
       ps.discardPile.pop();
-      ps.hand.push(name);
+      ps.hand.push(name);   // Was-wäre-wenn (sofort per pop() zurückgesetzt) — bewusst roh, keine Engine-Logik
       let scoreHand = -Infinity;
       try { scoreHand = evalState(pi); } catch {}
       ps.hand.pop();

@@ -142,7 +142,7 @@ module.exports = {
         const cardName = selected.cardName;
         const idx = ps.hand.indexOf(cardName);
         if (idx < 0) return; // Card no longer in hand
-        ps.hand.splice(idx, 1);
+        engine.takeFromPileSync(ps, 'hand', idx);
 
         // Place into support zone
         const hi = zone.heroIdx;

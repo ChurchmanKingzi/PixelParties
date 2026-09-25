@@ -124,7 +124,7 @@ module.exports = {
       let found = false;
       if (chosenSource === 'hand') {
         const idx = (ps.hand || []).indexOf(chosenName);
-        if (idx >= 0) { ps.hand.splice(idx, 1); found = true; }
+        if (idx >= 0) { engine.takeFromPileSync(ps, 'hand', idx); found = true; }
       }
       if (!found) {
         const _taken_idx = await engine.takeFromPile(ps, 'deck', chosenName, { source: 'reality-crack' });   // v820: Stapel-Schicht

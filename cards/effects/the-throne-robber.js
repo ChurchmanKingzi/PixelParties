@@ -207,7 +207,7 @@ module.exports = {
 
     const name = gewaehlt.cardName || gewaehlt.name;
     if (!name || !cardDB[name]) return;
-    ps.hand.push(name);
+    engine.handZugangSync(ps, name, { source: CARD_NAME, ohneInstanz: true });
     engine._broadcastEvent('play_pile_transfer', {
       owner: pi, cardName: name, from: 'outside', to: 'hand',
       toHandIdx: ps.hand.length - 1, finalHandSize: ps.hand.length,
@@ -271,7 +271,7 @@ module.exports = {
     } else {
       const _taken_di = await engine.takeFromPile(ps, 'deck', zielName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_di) return false;
-      ps.hand.push(zielName);
+      engine.handZugangSync(ps, zielName, { von: 'transit', source: CARD_NAME });   // v1395: Durchgang zur Anlage, keine Suche
       handIndex = ps.hand.length - 1;
     }
 
@@ -295,7 +295,7 @@ module.exports = {
       if (quelle === 'deck') {
         const hi = ps.hand.lastIndexOf(zielName);
         if (hi >= 0) {
-          ps.hand.splice(hi, 1);
+          engine.takeFromPileSync(ps, 'hand', hi);
           ps.mainDeck.push(zielName);
           if (typeof engine.shuffleDeck === 'function') engine.shuffleDeck(pi);
         }

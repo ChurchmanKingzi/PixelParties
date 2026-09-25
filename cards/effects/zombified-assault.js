@@ -25,7 +25,7 @@
 //  ist eine Attack-/Spell-Karte (Zerstoerungen tragen keinen Typ).
 //  Status-Ticks zaehlen nicht, auch wenn ein Spell den Status gesetzt hat.
 //
-//  Wiederbelebung: `engine.reviveCreatureFromDiscard` — keine
+//  Wiederbelebung: `engine.summonFromDiscard({ mode: 'revive' })` — keine
 //  On-Summon-Hooks, kein „summoned"-Log, volle HP (frische Instanz).
 //  Der Schaden ist Decay-Magic-Schaden des Wirkers; hat eine Creature
 //  den Spell gewirkt (Demon's Gate), trifft er sie — dieselbe Routung
@@ -57,7 +57,8 @@ function durchGegnerAttackOderSpell(engine, pi, d) {
 function belebbar(engine, name) {
   const cd = engine._getCardDB()[name];
   if (!cd || !hasCardType(cd, 'Creature') || isArtifactCreature(cd)) return false;
-  if (loadCardEffect(name)?.summonOnlyFromHand) return false;   // Ifrit & Co.
+  // v1389: zentrale Sperre (Ifrit, Gigantisaur „cannot be revived").
+  if (!engine.darfAusAblageAufsFeld(name)) return false;
   return true;
 }
 
@@ -191,9 +192,9 @@ module.exports = {
       engine.sync();
       return;
     }
-    const inst = await engine.reviveCreatureFromDiscard(pi, d.pileOwner, d.name, zone.heroIdx, zone.slotIdx, {
-      source: CARD_NAME, animType: 'undead_revival', animMs: 760,
-    });
+    const inst = (await engine.summonFromDiscard(pi, d.pileOwner, d.name, zone.heroIdx, zone.slotIdx, {
+      mode: 'revive', source: CARD_NAME, vorAnim: { type: 'undead_revival', ms: 760 }, last: true,
+    }))?.inst || null;
     if (!inst) {
       engine.log('zombified_assault_fizzle', { player: ps?.username, reason: 'revive_failed', card: d.name });
       engine.sync();

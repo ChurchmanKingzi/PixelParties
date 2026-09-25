@@ -256,6 +256,7 @@ function setzeAnhaengselStatus(engine, owner, heroIdx, CARD_NAME, STATUS_NAME) {
     appliedTurn: engine.gs.turn || 0,
     _fromAttachment: CARD_NAME,
   };
+  engine._heldenStatusVerursacher(wirt.statuses[STATUS_NAME], { source: CARD_NAME });   // v1399
   return true;
 }
 

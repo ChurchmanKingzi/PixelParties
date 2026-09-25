@@ -121,17 +121,17 @@ module.exports = {
         const psp = eng.gs.players[cpuIdx];
         if (opt.source === 'hand') {
           const idx = psp.hand.indexOf(opt.name);
-          if (idx >= 0) psp.hand.splice(idx, 1);
+          if (idx >= 0) eng.takeFromPileSync(psp, 'hand', idx);   // Rollout: SIMULIERTE Engine
         } else {
-          await eng.takeFromPile(psp, 'deck', opt.name, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
+          await eng.deckEntnahme(psp,  opt.name, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
         }
         if (!psp.supportZones[heroIdx]) psp.supportZones[heroIdx] = [[], [], []];
         psp.supportZones[heroIdx][slot] = [opt.name];
         const inst = eng._trackCard(opt.name, cpuIdx, 'support', heroIdx, slot);
         inst.counters.isPlacement = 1;
         psp._creaturesSummonedThisTurn = (psp._creaturesSummonedThisTurn || 0) + 1;
-        await eng.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName: opt.name, zone: 'support', heroIdx, zoneSlot: slot, _skipReactionCheck: true });
-        await eng.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
+        await eng.runHooks('onPlay', { ...(opt.source === 'hand' ? {} : eng.deckHookExtras()), _onlyCard: inst, playedCard: inst, cardName: opt.name, zone: 'support', heroIdx, zoneSlot: slot, _skipReactionCheck: true });
+        await eng.runHooks('onCardEnterZone', { ...(opt.source === 'hand' ? {} : eng.deckHookExtras()), enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx, _skipReactionCheck: true });
         return true;
       };
       try {
@@ -293,9 +293,9 @@ module.exports = {
         const cardName = selected.cardName;
         if (selected.source === 'hand') {
           const idx = ps.hand.indexOf(cardName);
-          if (idx >= 0) ps.hand.splice(idx, 1);
+          if (idx >= 0) engine.takeFromPileSync(ps, 'hand', idx);
         } else {
-          await engine.takeFromPile(ps, 'deck', cardName, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
+          await engine.deckEntnahme(ps,  cardName, { source: 'barker-the-monster-tamer' });   // v820: Stapel-Schicht
         }
 
         // Place into support zone
@@ -317,8 +317,8 @@ module.exports = {
 
         engine._broadcastEvent('summon_effect', { owner: pi, heroIdx, zoneSlot: zielZone.slotIdx, cardName });
 
-        await engine.runHooks('onPlay', { _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zielZone.slotIdx });
-        await engine.runHooks('onCardEnterZone', { enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
+        await engine.runHooks('onPlay', { ...(selected.source === 'hand' ? {} : engine.deckHookExtras()), _onlyCard: inst, playedCard: inst, cardName, zone: 'support', heroIdx, zoneSlot: zielZone.slotIdx });
+        await engine.runHooks('onCardEnterZone', { ...(selected.source === 'hand' ? {} : engine.deckHookExtras()), enteringCard: inst, toZone: 'support', toHeroIdx: heroIdx });
 
         engine.sync();
         break;

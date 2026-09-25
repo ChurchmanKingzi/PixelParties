@@ -122,7 +122,7 @@ module.exports = {
       // Von hinten nach vorn aus dem Deck nehmen, damit die noch
       // ausstehenden `deckIndex` gueltig bleiben.
       for (const k of geholt.slice().sort((a, b) => b.deckIndex - a.deckIndex)) {
-        if (!(await engine.takeFromPile(ps, 'deck', k.deckIndex, { source: CARD_NAME }))) return;   // v820: Stapel-Schicht
+        if (!(await engine.takeFromPile(ps, 'deck', k.deckIndex, { source: CARD_NAME, toHand: true }))) return;   // v820: Stapel-Schicht
       }
       // EINE NACH DER ANDEREN auf die Hand fliegen lassen (Als Vorgabe
       // 16.8., Vorbild Magic Lamp): Flug melden, Karte anlegen, syncen,
@@ -132,8 +132,7 @@ module.exports = {
       for (let i = 0; i < geholt.length; i++) {
         const k = geholt[i];
         engine._broadcastEvent('deck_search_add', { cardName: k.name, playerIdx: pi });
-        ps.hand.push(k.name);
-        engine._trackCard(k.name, pi, 'hand');
+        await engine.handZugang(ps, k.name, { von: 'deck', source: CARD_NAME });
         engine.sync();
         if (i < geholt.length - 1) await engine._delay(HAND_FLUG_MS);
       }

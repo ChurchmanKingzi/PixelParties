@@ -109,14 +109,14 @@ async function reagiereAufTod(ctx, opferName) {
   });
 
   const handIdx = ps.hand.indexOf(CARD_NAME);
-  ps.hand.splice(handIdx, 1);
+  engine.takeFromPileSync(ps, 'hand', handIdx);
   const res = await engine.summonCreatureWithHooks(
     CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
     // `fromHandIdx` laesst die Karte sichtbar von der Hand in die Zone
     // fliegen — ohne das erscheint sie dort einfach (v933).
     { source: CARD_NAME, fromHandIdx: handIdx },
   );
-  if (!res?.inst) { ps.hand.push(CARD_NAME); return; }
+  if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
   engine.log('explosive_drone_summon', { player: ps.username, defeated: opferName });
   engine.sync();

@@ -58,8 +58,7 @@ function bounceSkeletonToHand(engine, targetInst) {
   const supportSlot = ownerPs.supportZones?.[targetInst.heroIdx]?.[targetInst.zoneSlot] || [];
   const slotIdx = supportSlot.indexOf(targetInst.name);
   if (slotIdx >= 0) supportSlot.splice(slotIdx, 1);
-  ownerPs.hand.push(targetInst.name);
-  const handInst = engine._trackCard(targetInst.name, ownerIdx, 'hand');
+  const handInst = engine.handZugangSync(ownerPs, targetInst.name, { von: 'brett', source: CARD_NAME });
   handInst.originalOwner = targetInst.originalOwner;
   engine._broadcastEvent('play_pile_transfer', {
     fromOwner: ownerIdx,

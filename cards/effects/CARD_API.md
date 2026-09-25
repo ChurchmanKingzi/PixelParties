@@ -510,14 +510,15 @@ Overlay im Client, das genau so lange gezeigt wird, wie die Area in
 einer der beiden Area-Zonen liegt (beide Seiten, wie die Regel-Prüfung
 `areaZones` es auch tut):
 
-1. `public/app-board.jsx`: eine Komponente `<NameOverlay />` neben
-   `StinkyStablesOverlay` / `FirstCircleOfHellOverlay` / `BoardOfKingsOverlay`
-   — `position: absolute; inset: 0; pointer-events: none; overflow:
-   hidden`, KEIN zIndex (liegt damit unter der Karten-Ebene), Layer aus
-   Gradients/SVG/Emoji-Glyphen, Animationen per eingebettetem `<style>`.
-   Was sich bewegt, braucht keinen Klang (Ambiente, kein Ereignis).
-2. In die Registry `AREA_OVERLAYS` (app-board.jsx, direkt über
-   `BoardOfKingsOverlay`) eintragen — mit `tier` (v824, Als
+1. `public/app-areas.jsx` (eigenes Modul seit v1410 — dort und NUR dort
+   leben Registry, Schichtsystem und alle Szenen): eine Komponente
+   `<NameOverlay />` — `position: absolute; inset: 0; pointer-events:
+   none; overflow: hidden`, KEIN zIndex (liegt damit unter der
+   Karten-Ebene), Animationen per eingebettetem `<style>`. Was sich
+   bewegt, braucht keinen Klang (Ambiente, kein Ereignis).
+   **Neue Hintergründe sind PIXELART (Als Vorgabe 25.9., Vorbild Blood
+   Rock v1410)** — siehe den Abschnitt „Pixelart-Szenen" weiter unten.
+2. In die Registry `AREA_OVERLAYS` (app-areas.jsx) eintragen — mit `tier` (v824, Als
    Schichtsystem 7.9.):
    - `opaque`: füllt den Hintergrund vollständig (Schachbrett, Dark
      Ocean, Doom Clock …) → immer ZUUNTERST. Zwei verschiedene opaque-
@@ -530,7 +531,7 @@ einer der beiden Area-Zonen liegt (beide Seiten, wie die Regel-Prüfung
 
 **Ein Eintrag genügt — der Puzzle Creator hängt mit dran (v1202).** Die
 Schicht ist die Komponente `<AreaBackgrounds areaZones myIdx oppIdx />`
-(app-board.jsx, per `window.AreaBackgrounds` exportiert); der Creator
+(app-areas.jsx, per `window.AreaBackgrounds` exportiert); der Creator
 rendert dieselbe Komponente in `.pz-plane-clip` (app-puzzle.jsx), mit
 `myIdx: 0` (YOU, unten) und `oppIdx: 1` (OPPONENT, oben). Eine neue Area
 erscheint damit automatisch AUCH im Editor — keine zweite Registry, kein
@@ -538,6 +539,58 @@ Nachziehen. Der Schalter „🖼️ BACKGROUNDS" in der Creator-Kopfleiste
 blendet die ganze Schicht aus; er ist reine Ansicht (eigener
 localStorage-Schlüssel `pz-creator-backgrounds`, überlebt RESET) und hat
 auf Puzzle-Daten, Export und den Testkampf keinen Einfluss.
+
+### Pixelart-Szenen (v1410, Als Vorgabe 25.9.)
+
+Area-Hintergründe werden als echte Pixelart gebaut, passend zu den
+Karten: in niedriger Auflösung gemalte Ebenen, scharf hochskaliert
+(`image-rendering: pixelated`), Farben und Motiv aus dem Kartenbild der
+Area (Al liefert es mit).
+
+**STIL = ALS KARTENSTIL (Als Vorgabe 25.9., v1413).** Die ersten drei
+Szenen (Kunsthöhe 200, fein, düster, geordnetes Dithering) bissen sich
+mit Als Motiven und wurden umgebaut. Verbindlich seitdem: Kunsthöhe
+**100** (grobe Pixel wie auf den Karten — ein Motiv hat dort ca. 76×51
+Kunstpixel), Flächen als **unregelmäßiges Pixelrauschen** aus 3–5 nahen
+Tönen statt Schachbrett-Dithering, Ziegel als Rechtecke mit **schwarzer
+Fuge**, Versatzstücke mit **schwarzer 1-px-Kontur**, **satte, helle
+Farben** aus dem Kartenmotiv, Leuchten als **weiche, gebänderte
+Lichtflecken**, Glas/Eis mit harten weißen Glanzstreifen, Funkeln als
+weiße Kreuze. Abdunklung nur noch leicht an den Rändern.
+**Licht kommt IMMER von oben rechts** (Als Regel 25.9.): Glanzkanten,
+helle Flanken und Glanzpunkte rechts/oben, Schatten links/unten — bei
+JEDEM Objekt jeder Szene. Vorher das
+Motiv auf sein natives Raster zurückrechnen (Blockgröße ≈ 7,8 px im
+vergrößerten Ausschnitt) und die Palette daraus nehmen.
+
+Bausteine in app-areas.jsx:
+
+- `<PixelScene artH={100} bg="…">` — Wurzel. Größen-Container, ein
+  Kunstpixel ist `--px = 100cqh / artH`: die Szene füllt die Brett-HÖHE
+  exakt, auf jeder Brettgröße.
+- `<PixelBand src>` — Kachel mit voller Kunsthöhe, nach links/rechts
+  WIEDERHOLT, Kachelmitte auf der Brettmitte. Das Brett ist breiter als
+  16:9 und wächst mit Flying Islands weiter — deshalb nie EIN gestrecktes
+  Bild.
+- `<PixelPiece src w x>` — einmaliges Versatzstück, mittig verankert
+  (`x` = Versatz in Kunstpixeln). Für alles, was nicht kacheln darf
+  (Torbau, Boden in Fluchtperspektive).
+- `ppArt(n)` / `ppArtX(x, bezugsbreite)` — Längen/Positionen in
+  Kunstpixeln für bewegte Pixel-Elemente, damit sie exakt auf den Pixeln
+  des Bildes sitzen.
+
+Dateien liegen unter `public/areas/<area-slug>/` und werden nur geladen,
+wenn die Area liegt. `scripts/check-areas.js` prüft, dass jede im Code
+angesprochene Datei existiert (Präfix-Konstante `const XY =
+'/areas/…/'` plus `XY + 'datei.png'` bzw. `${XY}datei.png`).
+
+Regeln: Animationen NUR per CSS-Keyframes (dann friert „Play
+Animations: aus" sie ein); bewegte Einzelelemente tragen zusätzlich
+`pp-area-dyn` und verschwinden dort ganz; Anzahl bewegter Elemente über
+`ppFxN` (Telefon-Deckel, jetzt in app-shared.jsx). Lichtschein
+halbtransparent malen (Alpha-Farben in der Leuchtebene), nicht deckend —
+sonst löscht er die Steinstruktur darunter. Zum Schluss eine
+Abdunkel-Schicht, damit die Karten das Hellste bleiben.
 
 **4. Und die Karte muss sich SELBST in die Zone legen.** Areas landen
 nicht von allein im Slot. Ohne das greift in JEDEM Spielpfad die
@@ -1625,7 +1678,22 @@ Aktion verlangt, wo der Text keine nennt, baut die Karte falsch.
 > Summon-Effekte nutzen vorhandene Funktionen."
 
 `ps.mainDeck.splice(…)`, `ps.discardPile.splice(…)`, `ps.deletedPile.splice`
-gehören NICHT in ein Kartenskript. Die Stapel sind Engine-Zustand mit
+und (seit v1394) `ps.hand.splice(…)` gehören NICHT in ein Kartenskript.
+Handkarten ABWERFEN: `engine.actionDiscardHandCard(pi, name, idx, { source, sourceOwner })`
+(Flug, Log, onDiscard, Erstrunden-Schutz, Hand-Interaktions-Fenster);
+alles andere, was eine Karte aus der Hand nimmt (spielen, verbrauchen,
+aufs Brett, löschen): `engine.takeFromPile(Sync)(pi, 'hand', idx | name)`;
+zurück an eine Stelle: `engine.returnToPile(pi, 'hand', name, idx)`.
+
+**IN die Hand (v1395):** nie `ps.hand.push(…)`. Suche im Deck / aus der
+Ablage: Entnahme mit `takeFromPile(…, { toHand: true })` (Such-Sperre,
+Hand-Sperre), dann `await engine.handZugang(pi, name, { von: 'deck' | 'ablage', source })`
+— legt Hand-Instanz an, deckt automatisch auf, loggt und feuert
+ON_CARD_ADDED_TO_HAND bzw. ON_CARD_ADDED_FROM_DISCARD_TO_HAND. Rückgaben,
+Bounces, erzeugte Karten: `engine.handZugangSync(pi, name, { von, source, idx })`
+(ohne Such-Hooks, auch aus nicht-async Kontext). Komplett in einem
+Schritt: `engine.addFromPileToHand(pi, pile, name, opts)`.
+Wächter: `node scripts/check-hand-push.js`. Die Stapel sind Engine-Zustand mit
 Sperren (Knight of Kings [B] `pileOutAllowed`, Stab-Sperre
 `_discardOutAllowed`), Deckkopf-Sichtbarkeit, Lethe-Stempeln, Tracking,
 Flug-Animationen und Log — ein direkter Splice umgeht alles davon.
@@ -1651,6 +1719,8 @@ Wächter: `node scripts/check-no-splice.js` (Ratchet gegen
 | Handkarte abwerfen | `engine.actionDiscardHandCard(pi, name, handIdx, opts)` |
 | Spell sofort gießen (Hand/Deck) | `engine._castSpellImmediately(pi, heroIdx, name, { fromZone, pool, poolIndex })` |
 | Hand ODER Deck wählen → platzieren/beschwören | `_of-kings-shared`: `collectHandAndDeck` → `pickFromHandOrDeck` → `placeFromHandOrDeck` / `summonFromHandOrDeck` |
+
+| Kreatur aus einer ABLAGE aufs Feld (beschwören / platzieren / wiederbeleben) | `await engine.summonFromDiscard(pi, pileOwner, name \| index, heroIdx, slot, { mode, … })` — siehe ★ „AUS DER ABLAGE AUFS FELD" |
 
 Komposita legen die Karte bei Fehlschlag ZURÜCK und geben null/false;
 `takeFromPile` sendet keinen Flug — das Ziel entscheidet (`play_pile_
@@ -3185,10 +3255,87 @@ Instanz. Zwei Kopien auf der Hand senkten doppelt. Pflicht in jedem
 `if (!selbstsenkungZaehlt(engine, inst, CARD_NAME, ownerIdx[, { zone: 'hand' }])) return 0;`
 (`_hooks.js`; `zone` nur, wenn die Senkung laut Text nur in einer Zone gilt).
 
-### Wiederbeleben ohne Beschwörung — `reviveCreatureFromDiscard` + `onRevive` (v1292)
+## ★ AUS DEM DECK AUFS FELD — EINE Stelle (v1393, Als Auftrag 25.9. — MANDATORY)
 
-`await engine.reviveCreatureFromDiscard(pi, pileOwner, name, heroIdx, slot, { source, animType, animMs })`
-holt eine Kreatur aus einer Ablage zurück: Flug Ablage → Zone, frische
+Gegenstück zur Ablage-Stelle. Jede Creature, die das Deck Richtung Brett
+verlässt, läuft über die Engine: Deck-Sperren (`pileOutAllowed`),
+Deckkopf-Sicht, Mischen, Flug und das Signal `_summonedFromDeck` (Cosmic
+Manipulation: „when you summon a Creature directly from your deck").
+Wie bei der Ablage gilt auch PLATZIEREN aus dem Deck als Beschwörung
+aus dem Deck.
+
+`await engine.summonFromDeck(pi, name | index, heroIdx, slot, { mode: 'summon' | 'place', source, hookExtras, summonOpts, placeOpts, vorAnim, flug, shuffle })` → `{ inst, actualSlot }` | null
+
+`summonFromPile(…'deck'…)` und `placeFromPile(…'deck'…)` laufen
+automatisch hierüber. Eigene Inszenierung: `engine.deckEntnahme(pi,
+what, { source, shuffle })` → eigene Platzierung → Hook-Extras
+`engine.deckHookExtras()` bzw. `engine.deckLandung(inst, ab)`; bei
+Fehlschlag `engine.deckRueckgabe(ab)` (nie `mainDeck.push`).
+Wächter: `node scripts/check-deck-summon.js`.
+
+## ★ AUS DER ABLAGE AUFS FELD — EINE Stelle (v1389, Als Vorgabe 25.9. — MANDATORY)
+
+Jede Creature, die eine Ablage Richtung Brett verlässt, läuft über die
+Engine. Dort — und nur dort — passieren:
+
+- **Sperre** `engine.darfAusAblageAufsFeld(name)`: nein bei
+  `cannotBeRevived: true` im Kartenskript (Gigantisaur Brachion:
+  „cannot be revived by any effects") und bei `summonOnlyFromHand`
+  (Ifrit). Kandidatenlisten in Galerien filtern mit derselben Funktion.
+- **Signal** `_summonedFromDiscard: true` in den Hook-Extras (onPlay /
+  onCardEnterZone) und `inst.counters._summonedFromDiscard`. Als Ruling
+  25.9.: auch PLATZIEREN aus der Ablage ist „summoned from the discard
+  pile" (Thep ist für die Soul Shards gebaut). Nie von Hand setzen.
+- **Lethe-Stempel**, **Heimkehr-Besitzer** (fremde Ablage →
+  `originalOwner`), **SC-Zählung** (Graverobber).
+
+**Der eine Aufruf:**
+
+`await engine.summonFromDiscard(pi, pileOwner, name | index, heroIdx, slot, opts)` → `{ inst, actualSlot }` | null
+
+| `opts` | Bedeutung |
+|---|---|
+| `mode` | `'summon'` (Standard; volle On-Summon-Hooks), `'place'` (`actionPlaceCreature`; `placeOpts` durchgereicht), `'revive'` (keine Hooks, KEIN Beschwörungs-Signal — Zombified Assault „not as it being summoned again"; gesperrt wird trotzdem) |
+| `source` | Kartenname (Log, Sperren) |
+| `hookExtras`, `summonOpts` | an `summonCreatureWithHooks` (z.B. `isPlacement`, `_isNormalSummon`) |
+| `vorAnim` | `{ type, ms }` Zonen-Animation vor dem Flug |
+| `flug` | `false` = kein Ablage→Zone-Flug; Zahl = Landezeit in ms |
+| `last` | bei Namenssuche die letzte Kopie nehmen |
+
+Scheitert die Beschwörung, liegt die Karte wieder an ihrem Platz.
+`summonFromPile(…'discard'…)`, `placeFromPile(…'discard'…)` und
+`actionPlaceCreature({ source: 'discard' })` laufen automatisch hierüber.
+Die **Wiederbelebung nach dem Tod** (`_reviveAfterDeath`: Loyal Bone Dog,
+Trial of Coolness, Cute Phoenix, Extra Life auf Creatures) nimmt die
+Karte ebenfalls über `ablageEntnahme` zurück und prüft die Sperre —
+sie gilt aber NICHT als Beschwörung aus der Ablage (kein Signal, keine
+SC-Zählung) — außer die Karte setzt `alsAblageBeschwoerung: true` im
+`_reviveAfterDeath`-Stempel (Cute Phoenix: „revive it and place it",
+Als Ruling 25.9.).
+
+Die **Löschrettung** (`beforeDelete`, Cute Hydra) bekommt bei Löschen aus
+der Ablage den Entnahme-Beleg als `ctx.ablage`; eine Rettung von dort ist
+eine Beschwörung aus der Ablage (`ablageLandung`).
+
+**Eigene Inszenierung** (Necromancy, Army of the Cute, Xuanwu …):
+
+```js
+const ab = await engine.ablageEntnahme(pi, pileOwner, name, { source: CARD_NAME });
+if (!ab) return;                                   // gesperrt / nicht mehr da
+// … eigene Platzierung, eigenes _trackCard …
+if (!inst) { engine.ablageRueckgabe(ab); return; }
+const extras = engine.ablageLandung(inst, ab, 'summon' | 'place' | 'revive');
+await engine.runHooks('onPlay', { …, ...extras });
+```
+
+Wächter: `node scripts/check-discard-summon.js` (meldet eigene
+`takeFromPile(…'discard'…)` neben Brett-Platzierungen und jedes
+handgesetzte `_summonedFromDiscard: true`).
+
+### Wiederbeleben ohne Beschwörung — `summonFromDiscard({ mode: 'revive' })` + `onRevive` (v1292, seit v1389 Teil der Ablage-Stelle)
+
+`await engine.summonFromDiscard(pi, pileOwner, name, heroIdx, slot, { mode: 'revive', source, vorAnim: { type, ms } })`
+holt eine Kreatur aus einer Ablage zurück (früher `reviveCreatureFromDiscard`): Flug Ablage → Zone, frische
 Instanz mit vollen HP, **keine** On-Summon-Hooks, kein
 `creature_summoned`. Rückgabe Instanz oder `null` (Karte liegt dann
 wieder in der Ablage).
@@ -7127,7 +7274,7 @@ Puzzle-Autor.
 
 Vollzähligkeitsprüfung 12.9.: drei implementierte Areas hatten kein
 Overlay und verletzten damit die ★-Regel vom 7.9. Nachgeliefert in
-app-board.jsx, Registry jetzt 23/23 — jede implementierte Area-Karte
+app-board.jsx (seit v1410: app-areas.jsx), Registry jetzt 23/23 — jede implementierte Area-Karte
 hat einen Hintergrund:
 
 | Area | tier | Bild |
@@ -16075,6 +16222,57 @@ Karten mit Ablaufzug wenigstens eine umgerechnete Zahl zeigen; die
 `<status>Duration`-Ablage war bis v1013 eine Sonderbehandlung nur für
 den Frost und gilt nun generisch.
 
+
+## ★ STATUS-VERURSACHER (v1399, Als Auftrag 25.9.)
+
+Jeder Status merkt sich, wer ihn gesetzt hat — Spieler, Held (Index)
+bzw. Creature (Instanz-Id) und Karte. Bei Gift (Stapel) gilt der ERSTE
+Stapel. Gesetzt wird zentral in `addHeroStatus`, `actionAddStatus` und
+`applyCreatureStatus` aus `opts.appliedBy`/`sourceOwner`/`source` (bzw.
+der laufenden Effektquelle). Lesen:
+
+- `engine.statusVerursacher(ziel, statusName)` → `{ spieler, held, instId, karte }` | null
+- `engine.statusVomGegner(ziel, statusName, besitzer)` → bool
+
+Wer einen Status-Eintrag ausnahmsweise selbst schreibt, ruft danach
+`engine._heldenStatusVerursacher(eintrag, { appliedBy, source })`.
+
+## ★ SCHADEN AN MEHREREN ZIELEN — EINE Stelle (v1392, Als Auftrag 25.9. — MANDATORY)
+
+„Eine Quelle trifft mehrere Ziele in EINEM Schlag" — egal ob die Ziele
+nach Seite eingesammelt („all targets your opponent controls") oder
+gewählt wurden (Book of Doom, Fireball, Pyroblast):
+
+```js
+await engine.dealDamageToTargets(quelle, ziele, {
+  damage, damageType, sourceName,
+  animationType, animDelay, hitDelay, waveAnimation,   // wie aoeHit
+  surpriseCheck, postTargetCheck, boardGuards,         // Standard: an
+  trefferOpts,         // an jeden Einzeltreffer (z.B. { _skipReactionCheck: true })
+  attrappenQuelle,     // Karten ohne eigene Instanz (Ziel-Artefakte)
+});
+// Kurzform im Kartenkontext: await ctx.dealDamageToTargets(ziele, opts)
+```
+
+`quelle`: CardInstance oder `{ name, owner, heroIdx, controller?, cardInstance? }`.
+`ziele`: `{ type: 'hero', owner, heroIdx }` bzw. `{ type: 'creature', inst }`
+(Prompt-Form mit `cardInstance`/`slotIdx` geht auch); `amount` je Ziel für
+abgestuften Schaden.
+
+Die Stelle erledigt Helden/Kreaturen-Aufteilung (Shielded: nur Bild),
+Brett-Wächter (Puppets & Co.), Surprise-Fenster, Post-Target-Hand-
+Reaktionen, Welle/Einsaugen/Zonen-Bild, Interference-Klammer UND
+Idol-Fenster (`beginAoeStrike`) und schickt alle Kreaturen in EINEN
+Stapel. Flächenschlag ist, was als solcher gewirkt wird (`aoeHit`), oder
+2+ echte Ziele — ein einzelnes gewähltes Ziel bleibt Einzeltreffer.
+Karten, deren Zielwahl schon im Prompt die Fenster öffnet
+(`promptMultiTarget`), schalten `surpriseCheck`/`postTargetCheck` ab.
+
+`ctx.aoeHit` sammelt nur noch ein und ruft diese Stelle. Wer Treffer
+sichtbar NACHEINANDER austeilt (Chain Lightning, Flame Pillars),
+klammert mit `beginAoeStrike` — rohes `beginMultiHit` ist in
+Kartenskripten verboten.
+Wächter: `node scripts/check-aoe-central.js`.
 
 ## ★★ ANTI-AoE MUSS REAGIEREN KÖNNEN (v1185, Als Auftrag 18.9.) — PFLICHT
 

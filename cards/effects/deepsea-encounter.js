@@ -150,10 +150,10 @@ module.exports = {
     const newName = picked.cardName;
     const handIdx = ps.hand.indexOf(newName);
     if (handIdx < 0) return null;
-    ps.hand.splice(handIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
 
     if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlotIdx)) {   // v1360
-      ps.hand.push(newName);
+      engine.handZugangSync(ps, newName, { von: 'brett', source: CARD_NAME, ohneInstanz: true });
       await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'zone_taken' });
       return null;
     }

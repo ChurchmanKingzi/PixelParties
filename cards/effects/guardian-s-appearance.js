@@ -106,7 +106,7 @@ module.exports = {
       // own onPlay (per-turn flag stamp) and any board reactions land.
       const handIdx = ps.hand.indexOf(beastName);
       if (handIdx < 0) return;
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
 
       engine._broadcastEvent('play_zone_animation', {
         type: 'summoning_glow',
@@ -130,7 +130,7 @@ module.exports = {
       if (!placeRes) {
         // Fizzle — push the beast back to hand to avoid a permanent
         // loss on a placement we couldn't do.
-        ps.hand.push(beastName);
+        engine.handZugangSync(ps, beastName, { source: CARD_NAME, ohneInstanz: true });
         engine.log('guardians_appearance_fizzle', { player: ps.username, beast: beastName });
         return;
       }

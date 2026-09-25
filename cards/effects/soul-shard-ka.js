@@ -176,7 +176,7 @@ module.exports = {
       }
 
       // Splice from deck and summon via the canonical helper.
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
+      const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) return;
 
       const placeRes = await engine.summonCreatureWithHooks(
@@ -185,14 +185,14 @@ module.exports = {
           source: CARD_NAME,
           isPlacement: true,
           hookExtras: {
-            _summonedFromDeck: true,
+            ...engine.deckHookExtras(),
             _summonedBySoulShard: true,
             _isNormalSummon: false,
           },
         },
       );
       if (!placeRes) {
-        ps.mainDeck.push(chosenName);
+        engine.returnToPile(ps, 'deck', chosenName);
         engine.shuffleDeck(pi, 'main');
         return;
       }

@@ -88,24 +88,12 @@ module.exports = {
     // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele.
     // Gezaehlt wird, was WIRKLICH getroffen wird — bei nur einem
     // lebenden Ziel greift der Schutz nicht (Als Vorgabe 12.9.).
-    engine.beginMultiHit(ziele.filter(t => t.type !== 'hero' || (gs.players[t.owner]?.heroes?.[t.heroIdx]?.hp || 0) > 0).length);
-    try {
-    const stapel = [];
-    for (const t of ziele) {
-      if (t.type === 'hero') {
-        const held = gs.players[t.owner]?.heroes?.[t.heroIdx];
-        if (held && held.hp > 0) await engine.actionDealDamage(quelle, held, schaden, 'other');
-      } else if (t.cardInstance) {
-        stapel.push({
-          inst: t.cardInstance, amount: schaden, type: 'other', source: quelle,
-          sourceOwner: pi, canBeNegated: true, isStatusDamage: false, animType: null,
-        });
-      }
-    }
-    if (stapel.length > 0) await engine.processCreatureDamageBatch(stapel);
-    } finally {
-      engine.endMultiHit();
-    }
+    // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer.
+    await engine.dealDamageToTargets(quelle, ziele.map(t => t.type === 'hero'
+      ? { type: 'hero', owner: t.owner, heroIdx: t.heroIdx }
+      : { type: 'creature', inst: t.cardInstance, owner: t.owner, heroIdx: t.heroIdx, slotIdx: t.slotIdx }), {
+      damage: schaden, damageType: 'other', sourceName: CARD_NAME, hitDelay: 0,
+    });
     engine.sync();
   },
 };

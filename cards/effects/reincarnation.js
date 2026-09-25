@@ -66,6 +66,7 @@ function getReviveTargets(gs, pi) {
 function getRestoreCandidates(ps, cardDB, engine, pi) {
   const counts = {};
   for (const name of (ps?.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
     const cd = cardDB[name];
     if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
     // Effective level (Whoolmoth-style reducers etc. + Lethe's
@@ -269,25 +270,12 @@ module.exports = {
                  || placementZones[0];
       }
 
-      // Remove one copy of the chosen creature from the discard pile.
-      await engine.takeFromPile(ps, 'discard', creatureName, { source: 'reincarnation' });   // v820: Stapel-Schicht
-      const _letheBonus = engine.consumeLetheStamp(pi, creatureName);
-
-      // Revival animation on the placement site.
-      engine._broadcastEvent('play_zone_animation', {
-        type: 'angel_revival', owner: pi, heroIdx: destZone.heroIdx, zoneSlot: destZone.slotIdx,
+      // v1389: Ablage → Feld über die EINE Stelle (summonFromDiscard:
+      // Sperre, Lethe-Stempel, Signal „summoned from discard"). Die
+      // Engel-Animation vor der Landung bleibt.
+      await engine.summonFromDiscard(pi, pi, creatureName, destZone.heroIdx, destZone.slotIdx, {
+        source: 'Reincarnation', flug: false, vorAnim: { type: 'angel_revival', ms: 700 },
       });
-      await engine._delay(700);
-
-      // Summon with full lifecycle so ETB hooks fire; level/school gate is
-      // naturally bypassed because this path doesn't go through normal play.
-      const summonRes = await engine.summonCreatureWithHooks(creatureName, pi, destZone.heroIdx, destZone.slotIdx, {
-        source: 'Reincarnation',
-      });
-      if (summonRes?.inst && _letheBonus > 0) {
-        summonRes.inst.counters = summonRes.inst.counters || {};
-        summonRes.inst.counters._letheLevelBonus = _letheBonus;
-      }
 
       // Now pay the Pollution cost into the remaining free zones.
       await placePollutionTokens(engine, pi, 2, 'Reincarnation', { promptCtx: ctx });

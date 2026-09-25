@@ -448,13 +448,13 @@ function buildDemonHooks(cardName) {
           sfx: 'placement',
         });
         await engine._delay(520);                 // Flug ankommen lassen
-        if (!(await engine.takeFromPile(ps, 'deck', deckIdx2, { source: cardName, shuffle: true }))) return;   // v820: Stapel-Schicht
+        if (!(await engine.deckEntnahme(ps, deckIdx2, { source: cardName, shuffle: true }))) return;   // v1393   // v820: Stapel-Schicht
         const placed = await engine.summonCreatureWithHooks(
           successor, pi, death.heroIdx, death.zoneSlot,
           {
             source: cardName,
             isPlacement: true,
-            hookExtras: { _summonedByDemon: cardName, _placedByCyclingDemon: true },
+            hookExtras: engine.deckHookExtras({ _summonedByDemon: cardName, _placedByCyclingDemon: true }),   // v1393
           },
         );
         if (!placed) {

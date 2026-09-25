@@ -125,7 +125,7 @@ module.exports = {
     const heroIdx = inst.heroIdx;
     const zoneSlot = inst.zoneSlot;
 
-    if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
+    if (!(await engine.deckEntnahme(ps,  deckIdx, { source: CARD_NAME }))) return false;   // v820: Stapel-Schicht
 
     // ── SICHTBARE WANDERUNG VOM DECK IN DIE ZONE (v776) ─────────────
     // Als Vorgabe 5.9.: die Kreatur soll vom Deckstapel in die Support
@@ -148,8 +148,7 @@ module.exports = {
     // Das Nest sinkt LOGISCH unter die Karte, die gleich kommt — sein
     // Name bleibt dabei im Platz stehen (siehe `_nest-shared.sink`).
     if (nest.sink(engine, inst) < 0) {
-      ps.mainDeck.push(chosen);
-      engine.shuffleDeck(pi, 'main');
+      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
       return false;
     }
 
@@ -157,7 +156,7 @@ module.exports = {
       source: CARD_NAME,
       // Ueberbaut die verdeckte Karte, statt den Platz zu ueberschreiben.
       coverNested: true,
-      hookExtras: { _summonedBy: CARD_NAME, _summonedFromDeck: true },
+      hookExtras: { _summonedBy: CARD_NAME, ...engine.deckHookExtras() },
     });
 
     if (!res?.inst) {
@@ -165,8 +164,7 @@ module.exports = {
       // gesperrte Zone …) — vollstaendig zuruecknehmen: Karte zurueck
       // ins Deck, Nest wieder hoch. Der Effekt gilt als nicht benutzt.
       nest.surface(engine, inst, { by: 'summon_failed' });
-      ps.mainDeck.push(chosen);
-      engine.shuffleDeck(pi, 'main');
+      engine.returnToPile(ps, 'deck', chosen);   // v1393 (mischt)
       engine.sync();
       return false;
     }

@@ -86,6 +86,7 @@ module.exports = {
       const seen = new Set();
       const gallery = [];
       for (const name of ps.discardPile) {
+        if (!engine.darfAusAblageAufsFeld(name)) continue;   // v1389: Gigantisaur, Ifrit
         if (seen.has(name)) continue;
         const cd = cardDB[name];
         if (!cd || !isOwnSideSummonableCreature(cd, name)) continue;
@@ -134,26 +135,13 @@ module.exports = {
       // the placed Creature gets full on-play / entering-zone hooks.
       // Pass `_summonedFromDiscard: true` so a chained Soul Shard
       // correctly fires its own discard-trigger.
-      const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', chosenName, { source: CARD_NAME });   // v820: Stapel-Schicht
-      if (!_taken_discardIdx) return;
-
-      const placeRes = await engine.summonCreatureWithHooks(
-        chosenName, pi, chosenHost.heroIdx, chosenHost.slotIdx,
-        {
-          source: CARD_NAME,
-          isPlacement: true,
-          hookExtras: {
-            _summonedFromDiscard: true,
-            _summonedBySoulShard: true,
-            _isNormalSummon: false,
-          },
-        },
-      );
-      if (!placeRes) {
-        // Refund — beforeSummon refused, etc.
-        ps.discardPile.push(chosenName);
-        return;
-      }
+      // v1389: über die EINE Ablage-Stelle (Signal, Sperre, Rückgabe).
+      const placeRes = await engine.summonFromDiscard(pi, pi, chosenName, chosenHost.heroIdx, chosenHost.slotIdx, {
+        source: CARD_NAME, flug: false,
+        summonOpts: { isPlacement: true },
+        hookExtras: { _summonedBySoulShard: true, _isNormalSummon: false },
+      });
+      if (!placeRes) return;
 
       engine._broadcastEvent('summon_effect', {
         owner: pi, heroIdx: chosenHost.heroIdx,

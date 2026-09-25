@@ -140,7 +140,7 @@ module.exports = {
       // chosen Bomblebee gets its onPlay / onCardEnterZone hooks. The
       // host's `summonLocked` flag isn't set yet (we apply it after the
       // loop), so the engine doesn't reject these summons.
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       engine.notePlayedFromHand(pi);
       ps._creaturesSummonedThisTurn = (ps._creaturesSummonedThisTurn || 0) + 1;
 

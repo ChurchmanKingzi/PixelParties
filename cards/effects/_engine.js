@@ -4480,6 +4480,14 @@ class GameEngine {
         return engine.actionAoeHit(cardInstance, config);
       },
 
+      /**
+       * v1392 — Schaden an MEHREREN gewaehlten Zielen in einem Schlag
+       * (die EINE Stelle, siehe engine.dealDamageToTargets).
+       */
+      async dealDamageToTargets(targets, config = {}) {
+        return engine.dealDamageToTargets(cardInstance, targets, config);
+      },
+
       // ── Queries ──
       getCards(filter) {
         return engine.findCards(typeof filter === 'string' ? engine._parseFilterShorthand(filter, cardInstance) : filter);
@@ -7393,6 +7401,7 @@ class GameEngine {
     if (!(amount > 0) || !this.gs._scTracking) return;
     ScTracking.schaden(this.gs._scTracking, {
       source, amount, opferSeite, ziel, istStatus, cardDB: this._getCardDB(),
+      statusLeser: (z, name) => this.statusVerursacher(z, name),   // v1399
     });
   }
 
@@ -8902,6 +8911,7 @@ class GameEngine {
     // hier durch — `_koProcessed` verhindert Doppelzaehlung.
     if (!target._koProcessed && this.gs._scTracking) {
       ScTracking.heldBesiegt(this.gs._scTracking, source, ownerIdx, this.gs.turn || 0);
+      ScTracking.heldTod(this.gs._scTracking, ownerIdx, this.gs.players);   // v1399: Verlierer-Boni
     }
 
     // ★ v1329/v1330 — LOESCH-ERSATZ BEIM BESIEGEN (Soul Transmigration
@@ -10828,6 +10838,75 @@ class GameEngine {
       await this._delay(lastCardLandingDelay);
     }
     return drawn;
+  }
+
+  /**
+   * ★ v1395 — EINE Stelle fuer „eine Karte kommt in die Hand" (Als
+   * Auftrag 25.9.). Bis v1394 schoben rund 80 Kartenmodule selbst per
+   * `hand.push` in die Hand — ohne Instanz, ohne Auto-Aufdecken, ohne
+   * die Hooks, an denen Albrecht, Analyzer & Co. haengen, und (bei
+   * Suchen ohne `toHand`) an der Such-Sperre vorbei.
+   *
+   * Die ENTNAHME (mit Sperren) macht der Aufrufer ueber die Stapel-
+   * Schicht (`takeFromPile(…, { toHand: true })`); hier landet die Karte:
+   *   • Hand + Instanz (+ Herkunfts-Merker bei fremden Karten),
+   *   • Auto-Aufdecken, Log, Abgleich,
+   *   • `von: 'deck'`   → ON_CARD_ADDED_TO_HAND + Tutor-Notiz (CPU),
+   *     `von: 'ablage'` → ON_CARD_ADDED_FROM_DISCARD_TO_HAND,
+   *     sonst (Rueckgabe, Bounce, Erzeugung, `fremdesDeck`) keine
+   *     Such-Hooks. `fremdesDeck` (v1396, Als Ruling 25.9.): Karten aus
+   *     dem GEGNERISCHEN Deck (Enigma, Infiltration, Cybug Bee) sind
+   *     weder Suche noch „from your deck", aber sehr wohl „add to hand" —
+   *     die Hand-Sperre prueft der Aufrufer (`handZugangGesperrt`).
+   * @returns {CardInstance|null}
+   */
+  /**
+   * v1396 — Darf `pi` gerade Karten auf die Hand nehmen? Nein unter einer
+   * Hand-Sperre („cannot draw or add cards to your hand"). Die Such-Sperre
+   * ist davon getrennt (`_isSearchBlocked`) und gilt nur fuer Suchen.
+   */
+  handZugangGesperrt(pi) {
+    pi = this._resolvePi(pi);
+    return !!this.gs.players[pi]?.handLocked;
+  }
+
+  async handZugang(pi, cardName, opts = {}) {
+    pi = this._resolvePi(pi);
+    const inst = this.handZugangSync(pi, cardName, opts);
+    if (inst === false) return null;
+    if (opts.von === 'deck') {
+      await this.runHooks(HOOKS.ON_CARD_ADDED_TO_HAND, {
+        playerIdx: pi, card: inst, cardName, addedCard: inst, addedCardName: cardName,
+      });
+      this.noteDeckTutor(pi, cardName, opts.source || null, opts.searchSpec || null);
+    } else if (opts.von === 'ablage') {
+      await this.runHooks(HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, {
+        playerIdx: pi, fromOwnerIdx: opts.fromOwnerIdx ?? pi,
+        addedCard: inst, addedCardName: cardName,
+        source: opts.source || null, _skipReactionCheck: true,
+      });
+    }
+    return inst;
+  }
+
+  /**
+   * Synchroner Kern von `handZugang` — fuer Rueckgaben, Bounces und
+   * Erzeugungen, die keine Such-Hooks ausloesen (auch aus nicht-async
+   * Kontexten nutzbar). `false` = kein Spieler/Name.
+   */
+  handZugangSync(pi, cardName, opts = {}) {
+    pi = this._resolvePi(pi);
+    const ps = this.gs.players[pi];
+    if (!ps || !cardName) return false;
+    if (!ps.hand) ps.hand = [];
+    const idx = (opts.idx != null && opts.idx >= 0 && opts.idx <= ps.hand.length) ? opts.idx : ps.hand.length;
+    ps.hand.splice(idx, 0, cardName);
+    const inst = opts.ohneInstanz ? null : this._trackCard(cardName, pi, ZONES.HAND);
+    if (opts.originalOwner != null && opts.originalOwner !== pi) this._tagHandCardOrigin(pi, cardName, opts.originalOwner);
+    this._autoRevealOnEnterHand(pi, idx, cardName);
+    this.log('card_added_to_hand', { player: ps.username, card: cardName, by: opts.source || null, from: opts.von || null });
+    this.sync();
+    return inst;
   }
 
   /**
@@ -13858,6 +13937,10 @@ this._deathWatch = (this._deathWatchStack || []).length
       fromZone: opts.fromZone || null,
       fromInstance: opts.fromInstance || null,
       source: opts.source || null,
+      // v1389: kommt die Karte aus der Ablage, der Entnahme-Beleg
+      // (`ablageEntnahme`) — die Rettung ist dann eine Beschwoerung aus
+      // der Ablage (`ablageLandung`). Fehlt er, baut der Retter ihn sich.
+      ablage: opts.ablage || null,
       rescued: false,
     };
     try {
@@ -15390,7 +15473,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
+    // v1399: ein bestehendes Gift behaelt den Verursacher des ERSTEN Stapels.
+    const _vorher = target.statuses[statusName];
     target.statuses[statusName] = { ...opts, appliedTurn: this.gs.turn };
+    if (statusName === 'poisoned' && _vorher && typeof _vorher === 'object' && _vorher.appliedByCard !== undefined) {
+      for (const k of ['appliedBy', 'appliedByHero', 'appliedByInst', 'appliedByCard']) target.statuses[statusName][k] = _vorher[k];
+    } else {
+      this._heldenStatusVerursacher(target.statuses[statusName], opts);
+    }
     this.log('status_add', { target: target.name || this._heroLabel(target), status: statusName, source: opts.source || opts.by || null });
     // Beide Feldnamen senden. Historisch schickte dieser Pfad nur
     // `status`, `addHeroStatus` nur `statusName` und `applyCreatureStatus`
@@ -15672,6 +15762,75 @@ this._deathWatch = (this._deathWatchStack || []).length
    *   }
    * @returns {Promise<boolean>} — true iff the status actually changed.
    */
+  // ═══════════════════════════════════════════════════════════════
+  //  STATUS-VERURSACHER — EINE Stelle (v1399, Als Auftrag 25.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Jeder Status merkt sich, WER ihn gesetzt hat: Spieler, Held (Index)
+  // bzw. Creature (Instanz-Id) und Karte. Bei Gift (Stapel) gilt der
+  // ERSTE Stapel (Als Vorgabe 25.9.) — spaetere Stapel ueberschreiben
+  // den Verursacher nicht. Bis v1398 kannten Helden-Status nur den
+  // Spieler (oft -1), Creature-Status nur `sourceOwner`, und ein zweiter
+  // Gift-Stapel ueberschrieb den ersten.
+  //
+  //   _statusVerursacherErmitteln(opts)  → { spieler, held, instId, karte }
+  //   statusVerursacher(ziel, statusName) → dasselbe, gelesen (Held oder
+  //                                          Creature), sonst null
+  //   statusVomGegner(ziel, statusName, besitzer) → true/false
+
+  /** Verursacher aus den Status-Optionen (oder der laufenden Effektquelle). */
+  _statusVerursacherErmitteln(opts = {}) {
+    const q = (typeof opts.source === 'object' && opts.source) ? opts.source
+      : (opts.sourceCard && typeof opts.sourceCard === 'object') ? opts.sourceCard : null;
+    const lauf = this._currentEffectSource || null;
+    let spieler = opts.appliedBy ?? opts.sourceOwner ?? q?.controller ?? q?.owner ?? lauf?.owner;
+    if (spieler !== 0 && spieler !== 1) spieler = -1;
+    const qInst = q?.cardInstance || (q && q.id != null ? q : null);
+    const instLebt = qInst && this.cardInstances.includes(qInst) && qInst.zone === ZONES.SUPPORT;
+    const instId = instLebt ? qInst.id : (opts.appliedByInst ?? (q ? null : lauf?.instId ?? null));
+    let held = opts.appliedByHero ?? (instLebt ? -1 : (q?.heroIdx ?? -1));
+    if (typeof held !== 'number') held = -1;
+    const karte = opts.appliedByCard
+      ?? (typeof opts.source === 'string' ? opts.source : null)
+      ?? q?.name ?? lauf?.cardName ?? null;
+    return { spieler, held, instId: instId ?? null, karte };
+  }
+
+  /** Verursacher eines bestehenden Status lesen (Held oder Creature). */
+  statusVerursacher(ziel, statusName) {
+    if (!ziel || !statusName) return null;
+    const e = ziel.statuses?.[statusName];
+    if (e && typeof e === 'object') {
+      return { spieler: e.appliedBy ?? -1, held: e.appliedByHero ?? -1, instId: e.appliedByInst ?? null, karte: e.appliedByCard ?? null };
+    }
+    const c = ziel.counters;
+    if (c && c[statusName]) {
+      const alt = statusName === 'poisoned' ? c.poisonAppliedBy : statusName === 'burned' ? c.burnAppliedBy : undefined;
+      return {
+        spieler: c[statusName + 'AppliedBy'] ?? alt ?? -1,
+        held: c[statusName + 'AppliedByHero'] ?? -1,
+        instId: c[statusName + 'AppliedByInst'] ?? null,
+        karte: c[statusName + 'AppliedByCard'] ?? null,
+      };
+    }
+    return null;
+  }
+
+  /** Kam dieser Status vom Gegner des Besitzers? */
+  statusVomGegner(ziel, statusName, besitzer) {
+    const v = this.statusVerursacher(ziel, statusName);
+    return !!v && (v.spieler === 0 || v.spieler === 1) && v.spieler !== besitzer;
+  }
+
+  /** Verursacher in einen Helden-Statuseintrag schreiben. */
+  _heldenStatusVerursacher(eintrag, opts) {
+    const v = this._statusVerursacherErmitteln(opts);
+    eintrag.appliedBy = v.spieler;
+    eintrag.appliedByHero = v.held;
+    eintrag.appliedByInst = v.instId;
+    eintrag.appliedByCard = v.karte;
+    return eintrag;
+  }
+
   async applyCreatureStatus(inst, statusName, opts = {}) {
     if (!inst) return false;
     const already = inst.counters?.[statusName];
@@ -15742,14 +15901,17 @@ this._deathWatch = (this._deathWatchStack || []).length
     // Begleitzaehler nach derselben Konvention wie `…Duration` /
     // `…AppliedBy` daneben.
     if (opts.untilDamaged) inst.counters[statusName + 'UntilDamaged'] = 1;
-    if (opts.sourceOwner != null) {
-      // Conventional name mapping: `<status>AppliedBy` — except poison
-      // and burn whose engine readers expect `poisonAppliedBy` /
-      // `burnAppliedBy` (no 'ed' / 'n' tail). Keep both forms in sync
-      // so old call sites that read the legacy key still work.
-      inst.counters[statusName + 'AppliedBy'] = opts.sourceOwner;
-      if (statusName === 'poisoned') inst.counters.poisonAppliedBy = opts.sourceOwner;
-      if (statusName === 'burned') inst.counters.burnAppliedBy = opts.sourceOwner;
+    // v1399: Verursacher (Spieler, Held, Creature, Karte) an EINER Stelle.
+    // Ein weiterer Gift-Stapel ueberschreibt den ERSTEN nicht.
+    if (!already) {
+      const v = this._statusVerursacherErmitteln(opts);
+      inst.counters[statusName + 'AppliedBy'] = v.spieler;
+      inst.counters[statusName + 'AppliedByHero'] = v.held;
+      inst.counters[statusName + 'AppliedByInst'] = v.instId;
+      inst.counters[statusName + 'AppliedByCard'] = v.karte;
+      // Alte Schluessel, die Engine-Leser noch erwarten.
+      if (statusName === 'poisoned') inst.counters.poisonAppliedBy = v.spieler;
+      if (statusName === 'burned') inst.counters.burnAppliedBy = v.spieler;
     }
 
     if (opts.animationType && opts.animationType !== 'none') {
@@ -17074,6 +17236,22 @@ this._deathWatch = (this._deathWatchStack || []).length
    */
   async summonFromPile(pi, pile, cardName, heroIdx, slotIdx, opts = {}) {
     pi = this._resolvePi(pi);
+    // v1393: Deck laeuft ueber die EINE Stelle (summonFromDeck).
+    if (pile === 'deck') {
+      const res = await this.summonFromDeck(pi, cardName, heroIdx, slotIdx, {
+        source: opts.source || 'summonFromPile', hookExtras: opts.hookExtras,
+        summonOpts: { alsZusatzaktion: !!opts.alsZusatzaktion, ...(opts.summonOpts || {}) },
+      });
+      return res?.inst || null;
+    }
+    // v1389: Ablage laeuft ueber die EINE Stelle (summonFromDiscard).
+    if (pile === 'discard') {
+      const res = await this.summonFromDiscard(pi, pi, cardName, heroIdx, slotIdx, {
+        source: opts.source || 'summonFromPile', hookExtras: opts.hookExtras,
+        summonOpts: { alsZusatzaktion: !!opts.alsZusatzaktion, ...(opts.summonOpts || {}) },
+      });
+      return res?.inst || null;
+    }
     const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
     if (!taken) return null;
     const flight = { toHeroIdx: heroIdx, toSlotIdx: slotIdx };
@@ -17100,6 +17278,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const placeOpts = { sourceName: opts.source || opts.sourceName || 'Placement', ...(opts.placeOpts || {}) };
     if (pile === 'hand' || pile === 'discard') {
       return this.actionPlaceCreature(cardName, pi, heroIdx, slotIdx, { ...placeOpts, source: pile });
+    }
+    // v1393: Deck ueber die EINE Stelle (summonFromDeck, mode 'place').
+    if (pile === 'deck') {
+      const res = await this.summonFromDeck(pi, cardName, heroIdx, slotIdx, {
+        mode: 'place', source: opts.source || placeOpts.sourceName, placeOpts,
+      });
+      return res?.inst || null;
     }
     const taken = await this.takeFromPile(pi, pile, cardName, { ...opts, shuffle: pile === 'deck' });
     if (!taken) return null;
@@ -17476,6 +17661,24 @@ this._deathWatch = (this._deathWatchStack || []).length
    * Get all action cards (Attack/Spell/Creature) a specific hero could play from hand.
    * Checks spell school, level, free zones, summon lock.
    */
+  /**
+   * v1405: Ist `idx` (Hand bzw. mit `ausVorrat` Crestinas Vorrat) die
+   * Karte, die gerade aufgelöst wird? Kopien gleichen Namens sind nicht
+   * unterscheidbar (siehe _hand-resolve) — gesperrt ist genau EINE.
+   */
+  _istAufloesendeHandkarte(ps, idx, ausVorrat = false) {
+    const rc = ps?._resolvingCard;
+    if (!rc || !!rc.fromCreation !== !!ausVorrat) return false;
+    const { getResolvingHandIndex } = require('./_hand-resolve');
+    return getResolvingHandIndex(ps) === idx;
+  }
+
+  /** v1405: Hand bzw. Vorrat ohne die gerade auflösende Karte (Namensliste). */
+  _handOhneAufloesendeKarte(ps, ausVorrat = false) {
+    const liste = (ausVorrat ? ps?.creationZone : ps?.hand) || [];
+    return liste.filter((_, i) => !this._istAufloesendeHandkarte(ps, i, ausVorrat));
+  }
+
   getHeroEligibleActionCards(playerIdx, heroIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return [];
@@ -17502,8 +17705,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ★ 28.8.: Crestinas Vorrat zaehlt hier mit — „playable as if they
     // were part of your hand". Dahintergehaengt, damit jede Karte
     // dieselben Pruefungen durchlaeuft wie eine Handkarte.
-    const vorrat = this.isCreationZoneUsable(playerIdx) ? (ps.creationZone || []) : [];
-    for (const cardName of [...(ps.hand || []), ...vorrat]) {
+    const vorrat = this.isCreationZoneUsable(playerIdx) ? this._handOhneAufloesendeKarte(ps, true) : [];
+    // ★ v1405: Die GERADE AUFLÖSENDE Karte liegt bis zum Ende ihrer
+    // Auflösung noch in der Hand. Eine Zusatzaktion mitten darin (Furious
+    // Anger, Outbreak …) darf sie nicht ein zweites Mal spielen — eine
+    // weitere Kopie desselben Namens schon.
+    const handOhneAufloesende = this._handOhneAufloesendeKarte(ps);
+    for (const cardName of [...handOhneAufloesende, ...vorrat]) {
       if (seen.has(cardName)) continue;
       const cd = cardDB[cardName];
       if (!cd || !ACTION_TYPES.includes(cd.cardType)) continue;
@@ -19268,6 +19476,13 @@ this._deathWatch = (this._deathWatchStack || []).length
     const quelle = this.handSourceList(playerIdx, fromCreation);
     if (!quelle) return { retry: true };
     if (handIndex < 0 || handIndex >= quelle.length || quelle[handIndex] !== cardName) return { retry: true };
+    // ★ v1405: nie die gerade auflösende Karte selbst — auf eine andere
+    // Kopie umlenken, sonst neu wählen lassen.
+    if (this._istAufloesendeHandkarte(ps, handIndex, !!fromCreation)) {
+      const andere = quelle.findIndex((c, i) => c === cardName && !this._istAufloesendeHandkarte(ps, i, !!fromCreation));
+      if (andere < 0) return { retry: true };
+      return this._resolveImmediateActionPick(playerIdx, heroIdx, hero, { ...actionResult, handIndex: andere }, config, angebot);
+    }
 
     const ACTION_TYPES = ['Attack', 'Spell', 'Creature'];
     if (!ACTION_TYPES.includes(cardData.cardType)) return { retry: true };
@@ -23105,6 +23320,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     const sourceName = opts.sourceName || 'Placement';
 
     let _handFlug = false;
+    let _ablage = null;   // v1389: Entnahme-Beleg bei source 'discard'
     if (source === 'hand') {
       const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.hand || []).indexOf(cardName);
       if (idx < 0) return null;
@@ -23134,17 +23350,23 @@ this._deathWatch = (this._deathWatchStack || []).length
       // nach dem Flug wieder auf (Als Befund 18.9. zu „Dive Down").
       this.sync();
     } else if (source === 'discard') {
-      // Discard-out lock — same gate as actionRecycleCards /
-      // addCardFromDiscardToHand. Block placements that yank the
-      // creature out of the locked player's own discard pile.
-      if (!(await this._discardOutAllowed(playerIdx, opts))) {
+      // ★ v1389: Entnahme ueber die EINE Stelle (`ablageEntnahme`: Sperre
+      // fuer Gigantisaur/Ifrit, Ablage-Riegel, Lethe). Vorher splicte
+      // dieser Zweig selbst. `opts.pileOwner` = fremde Ablage.
+      const _pileOwner = opts.pileOwner ?? playerIdx;
+      const _pile = gs.players[_pileOwner]?.discardPile || [];
+      const idx = opts.sourceIdx != null ? opts.sourceIdx : _pile.indexOf(cardName);
+      if (idx < 0 || _pile[idx] !== cardName) return null;
+      if (!this.darfAusAblageAufsFeld(cardName)) {
+        this.log('revive_blocked', { card: cardName, by: opts.sourceName || 'Placement' });
+        return null;
+      }
+      if (!(await this._discardOutAllowed(_pileOwner, opts))) {
         this.log('placement_blocked', {
           card: cardName, by: opts.sourceName || 'Placement', reason: 'discard_locked',
         });
         return null;
       }
-      const idx = opts.sourceIdx != null ? opts.sourceIdx : (ps.discardPile || []).indexOf(cardName);
-      if (idx < 0) return null;
       // ★★ v1354 (gefunden bei „Lone Survivor"): der Ablage-Zweig hatte —
       // anders als der Hand-Zweig darueber — KEINEN Flug. Eine aus der
       // Ablage platzierte Creature erschien einfach in ihrer Zone
@@ -23153,21 +23375,18 @@ this._deathWatch = (this._deathWatchStack || []).length
       // Hooks warten auf die Landung (`_handFlug`).
       if (!opts.skipPileTransfer && !this._fastMode && !this._inMctsSim) {
         this._broadcastEvent('play_pile_transfer', {
-          owner: playerIdx, cardName,
+          fromOwner: _pileOwner, toOwner: playerIdx, owner: playerIdx, cardName,
           from: 'discard', to: 'support',
           toHeroIdx: heroIdx, toSlotIdx: slotIdx,
         });
         _handFlug = true;
       }
-      ps.discardPile.splice(idx, 1);
+      _ablage = await this.ablageEntnahme(playerIdx, _pileOwner, idx, { source: opts.sourceName || 'Placement' });
+      if (!_ablage) return null;
     }
-    // Lethe per-pile stamp carries onto the new board instance — only
-    // for `source === 'discard'` (or future `'deleted'`) placements
-    // hand placements never carry stamps. Consume here so the bonus
-    // doesn't get dropped by the next stamp reconciliation.
-    const _letheBonus = (source === 'discard' || source === 'deleted')
-      ? this.consumeLetheStamp(playerIdx, cardName)
-      : 0;
+    // Lethe per-pile stamp: bei der Ablage traegt ihn `_ablage` (v1389);
+    // der Deleted-Zweig bleibt wie gehabt.
+    const _letheBonus = source === 'deleted' ? this.consumeLetheStamp(playerIdx, cardName) : 0;
 
     if (!ps.supportZones[heroIdx]) ps.supportZones[heroIdx] = [[], [], []];
     // ── Geteilte Zone (Alice, the Transfer Student) ──────────────────
@@ -23192,6 +23411,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     inst.counters.isPlacement = 1;
     inst.turnPlayed = gs.turn || 0;
     if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
+    // v1389: aus der Ablage → Lethe, Heimkehr, SC, Signal (EINE Stelle).
+    const _ablageExtras = _ablage ? this.ablageLandung(inst, _ablage, 'place') : {};
 
     if (opts.negateEffects) {
       inst.counters.negated = 1;
@@ -23250,7 +23471,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // bypasses this path entirely and fires hooks directly with the
     // same flags — keeping these names aligned means both paths drive
     // the same listeners.
-    const discardSummonExtras = {};
+    const discardSummonExtras = { ...(opts.hookExtras || {}), ..._ablageExtras };
     if (opts._summonedFromDiscard) discardSummonExtras._summonedFromDiscard = true;
     if (opts._summonedByNecromancy) discardSummonExtras._summonedByNecromancy = true;
     if (opts._necromancyLevel != null) discardSummonExtras._necromancyLevel = opts._necromancyLevel;
@@ -23698,6 +23919,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       this.log('creature_revive_fizzle', { target: reviveAfterDeath.name, by: reviveAfterDeath.by || null, reason: 'zone_taken' });
       await this.zeigeFizzle(reviveAfterDeath.by || reviveAfterDeath.name, { playerIdx: reviveAfterDeath.owner, grund: 'zone_taken' });
       return false;
+    } else if (!this.darfAusAblageAufsFeld(reviveAfterDeath.name)) {
+      // ★ v1389: „cannot be revived by any effects" gilt auch hier (Loyal
+      // Bone Dog, Trial of Coolness, Cute Phoenix, Extra Life). Bis v1388
+      // lief dieser Weg mit `skipBeforeSummon` an Gigantisaurs eigener
+      // Weigerung vorbei.
+      this.log('creature_revive_fizzle', { target: reviveAfterDeath.name, by: reviveAfterDeath.by || null, reason: 'cannot_be_revived' });
+      await this.zeigeFizzle(reviveAfterDeath.by || reviveAfterDeath.name, { playerIdx: reviveAfterDeath.owner, grund: 'cannot_be_revived' });
+      return false;
     } else {
       this._broadcastEvent('play_zone_animation', {
         type: 'holy_revival',
@@ -23708,10 +23937,15 @@ this._deathWatch = (this._deathWatchStack || []).length
       await this._delay(620);
       // Pop the just-discarded card from its original owner's
       // discard pile so the revived instance isn't a duplicate.
-      const origPs = this.gs.players[reviveAfterDeath.originalOwner ?? reviveAfterDeath.owner];
+      // ★ v1389: ueber die EINE Ablage-Stelle (Lethe, Heimkehr-Besitzer).
+      // Liegt die Karte nicht in der Ablage (Token → Deleted), wird wie
+      // bisher trotzdem zurueckgeholt.
+      const _pileOwner = reviveAfterDeath.originalOwner ?? reviveAfterDeath.owner;
+      const origPs = this.gs.players[_pileOwner];
+      let _ablage = null;
       if (origPs) {
         const dIdx = origPs.discardPile.lastIndexOf(reviveAfterDeath.name);
-        if (dIdx >= 0) origPs.discardPile.splice(dIdx, 1);
+        if (dIdx >= 0) _ablage = await this.ablageEntnahme(reviveAfterDeath.owner, _pileOwner, dIdx, { source: reviveAfterDeath.by });
       }
       // Re-summon. Default (Bone Dog etc.) is hooks-suppressed: the
       // revived creature is the same one that just died, so on-summon
@@ -23727,7 +23961,11 @@ this._deathWatch = (this._deathWatchStack || []).length
         reviveAfterDeath.owner,
         reviveAfterDeath.heroIdx,
         reviveAfterDeath.zoneSlot,
-        { skipHooks: !fireHooks, skipBeforeSummon: true, source: reviveAfterDeath.by },
+        { skipHooks: !fireHooks, skipBeforeSummon: true, source: reviveAfterDeath.by,
+          // v1389: zaehlt die Wiederbelebung als Beschwoerung aus der
+          // Ablage (Cute Phoenix, Als Ruling 25.9.), tragen auch die
+          // Hooks das Signal.
+          ...(reviveAfterDeath.alsAblageBeschwoerung && _ablage ? { hookExtras: this.ablageHookExtras() } : {}) },
       );
       // Optional summoning-sickness bypass on the revived copy.
       // Trial of Coolness sets this so the revived Creature can act
@@ -23739,6 +23977,14 @@ this._deathWatch = (this._deathWatchStack || []).length
       // this flag unset, preserving the standard sickness behavior.
       // v1292: ohne Hooks wiederbelebt → die Karte richtet sich
       // selbst wieder ein (`onRevive`, z.B. Doomed Town Guards Schirm).
+      // Wiederbelebung nach dem Tod ist grundsaetzlich KEINE Beschwoerung
+      // aus der Ablage (kein Signal, keine SC-Zaehlung) — ausser die
+      // Karte sagt es: `alsAblageBeschwoerung` (Cute Phoenix: „revive it
+      // and place it", Als Ruling 25.9.).
+      if (_ablage) {
+        if (reviveResult?.inst) this.ablageLandung(reviveResult.inst, _ablage, reviveAfterDeath.alsAblageBeschwoerung ? 'place' : 'revive');
+        else this.ablageRueckgabe(_ablage);
+      }
       if (reviveResult?.inst && !fireHooks) await this._runReviveHook(reviveResult.inst);
       if (reviveResult?.inst && reviveAfterDeath.bypassSummoningSickness) {
         if (!reviveResult.inst.counters) reviveResult.inst.counters = {};
@@ -26798,12 +27044,29 @@ this._deathWatch = (this._deathWatchStack || []).length
     return 'deck';
   }
 
+  /** v1404: Surprise-Aktivierungsfrage → Bild der Surprise links (siehe promptGeneric). */
+  _surpriseBildLinks(promptData) {
+    if (!promptData || promptData.type !== 'confirm' || promptData.showCardLeft) return promptData;
+    if (typeof promptData.title !== 'string' || promptData.showCard === promptData.title) return promptData;
+    const cd = this._getCardDB()[promptData.title];
+    if (!cd || !(cd.subtype === 'Surprise' || hasCardType(cd, 'Surprise'))) return promptData;
+    return { ...promptData, showCardLeft: promptData.title };
+  }
+
   async promptGeneric(playerIdx, promptData) {
     // Stillgelegte Engine (Puzzle-Reset): keine Abfragen mehr an
     // den Client — der sitzt inzwischen in einem anderen Spiel.
     // Sofort mit "abgebrochen" zurueck, damit die alte Kette schnell
     // auslaeuft statt auf eine Antwort zu warten, die nie kommt.
     if (this._aborted) return null;
+
+    // ★ v1404 (Al 25.9.): Jede Surprise-Aktivierungsfrage zeigt das Bild
+    // der Surprise klein LINKS neben dem Dialog (Vorbild: Abfragen, die
+    // schon links UND rechts eine Karte zeigen). An EINER Stelle statt je
+    // Aufrufer: eine Ja/Nein-Frage, deren Titel eine Surprise-Karte ist,
+    // ist die Frage „diese Surprise aktivieren?". Wer selbst ein linkes
+    // Bild setzt, behaelt es.
+    promptData = this._surpriseBildLinks(promptData);
 
     // ══ SUCH-SPERRE GREIFT VOR DER ABFRAGE (v1117, Als Testbefund 15.9.)
     //
@@ -29768,45 +30031,243 @@ this._deathWatch = (this._deathWatchStack || []).length
     return true;
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  AUS DER ABLAGE AUFS FELD — EINE Stelle (v1389, Als Vorgabe 25.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Bis v1388 holten rund 20 Karten Creatures jeweils auf eigene Faust
+  // aus der Ablage (takeFromPile + summonCreatureWithHooks / _trackCard /
+  // actionPlaceCreature mit Sentinel). Nur ein Drittel setzte das Signal
+  // `_summonedFromDiscard` — Gigantisaur liess sich ueber Reincarnation &
+  // Co. wiederbeleben, Soul Shards und Skullmael loesten dort nicht aus.
+  //
+  // Jetzt:
+  //   • `summonFromDiscard(...)` — der EINE Aufruf fuer die Standardfaelle
+  //     (mode 'summon' | 'place' | 'revive').
+  //   • `ablageEntnahme` / `ablageLandung` / `ablageRueckgabe` — dieselben
+  //     Bausteine fuer Karten, die ihre Platzierung selbst inszenieren
+  //     (Necromancy, Army of the Cute, Xuanwu …).
+  // Beide Wege teilen: Sperre (`darfAusAblageAufsFeld`), Lethe-Stempel,
+  // das Signal `_summonedFromDiscard`, Heimkehr-Besitzer und SC-Zaehlung.
+  //
+  // Als Ruling 25.9.: Auch PLATZIEREN aus der Ablage gilt als „summoned
+  // from the discard pile" (Thep ist fuer die Soul Shards gebaut).
+  // `revive` (Zombified Assault: „not as it being summoned again") ist
+  // die einzige Form OHNE Beschwoerungs-Signal — gesperrt wird sie aber
+  // genauso („cannot be revived by any effects").
+  //
+  // Waechter: scripts/check-discard-summon.js.
+
+  // ═══════════════════════════════════════════════════════════════
+  //  AUS DEM DECK AUFS FELD — EINE Stelle (v1393, Als Auftrag 25.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Gegenstueck zur Ablage-Stelle. Bis v1392 holten rund 30 Karten
+  // Creatures selbst aus dem Deck und setzten sie von Hand aufs Brett;
+  // nur ein Teil setzte `_summonedFromDeck` — das Signal, an dem Cosmic
+  // Manipulation („when you summon a Creature directly from your deck")
+  // haengt. Mischen, Flug und Rueckgabe liefen je Karte verschieden.
+  // Analog zum Ablage-Ruling 25.9. gilt auch PLATZIEREN aus dem Deck als
+  // Beschwoerung aus dem Deck.
+  // Waechter: scripts/check-deck-summon.js.
+
+  /** Hook-Extras jeder Beschwoerung/Platzierung aus dem Deck. */
+  deckHookExtras(extra = {}) {
+    return { _summonedFromDeck: true, _summonedFromPile: 'deck', ...extra };
+  }
+
   /**
-   * ★ v1292 — Kreatur aus einer Ablage WIEDERBELEBEN, ohne dass sie als
-   * beschworen gilt (keine On-Summon-Hooks, kein `creature_summoned`).
-   * Die frische Instanz hat volle HP. Danach bekommt NUR die
-   * wiederbelebte Karte ihren eigenen `onRevive(ctx)` — fuer Werte, die
-   * sie sonst beim Betreten der Zone setzt (Doomed Town Guards Schirm).
-   *
-   * @param {number} pi         wer belebt (bekommt die Kreatur)
-   * @param {number} pileOwner  in wessen Ablage die Karte liegt
-   * @param {object} opts       { source, animType, animMs }
-   * @returns {CardInstance|null}
+   * Baustein 1: Karte fuer das Brett aus dem Deck nehmen (Deck-Sperren,
+   * Deckkopf-Sicht, danach gemischt).
+   * @returns {{name, idx, pi}|null}
    */
-  async reviveCreatureFromDiscard(pi, pileOwner, cardName, heroIdx, slotIdx, opts = {}) {
-    const taken = await this.takeFromPile(pileOwner, 'discard', cardName, {
-      source: opts.source, sourceOwner: pi, last: true,
+  async deckEntnahme(pi, what, opts = {}) {
+    pi = this._resolvePi(pi);
+    // Gemischt wird nur auf Wunsch (Karten mischen teils selbst, nach
+    // mehreren Entnahmen); `summonFromDeck` mischt standardmaessig.
+    const taken = await this.takeFromPile(pi, 'deck', what, {
+      ...opts, sourceOwner: opts.sourceOwner ?? pi, shuffle: !!opts.shuffle,
     });
     if (!taken) return null;
-    if (opts.animType) {
-      this._broadcastEvent('play_zone_animation', {
-        type: opts.animType, owner: pi, heroIdx, zoneSlot: slotIdx,
-      });
-      await this._delay(opts.animMs ?? 700);
-    }
-    this._broadcastEvent('play_pile_transfer', {
-      fromOwner: pileOwner, toOwner: pi, owner: pi, cardName: taken.name,
-      from: 'discard', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slotIdx,
-    });
-    const res = await this.summonCreatureWithHooks(taken.name, pi, heroIdx, slotIdx, {
-      skipHooks: true, skipBeforeSummon: true, playSummonAnim: false, skipLog: true,
-      source: opts.source || 'revive',
-    });
-    if (!res?.inst) { this.returnToPile(pileOwner, 'discard', taken.name, taken.idx); this.sync(); return null; }
-    if (pileOwner !== pi) res.inst.originalOwner = pileOwner;   // stirbt sie wieder, geht sie heim
-    await this._runReviveHook(res.inst);
-    this.log('creature_revived', {
-      player: this.gs.players[pi]?.username, card: taken.name, by: opts.source || null,
-    });
+    return { name: taken.name, idx: taken.idx, pi };
+  }
+
+  /** Baustein 2: Landung — Signal-Stempel, liefert die Hook-Extras. */
+  deckLandung(inst, ab) {
+    if (!inst || !ab) return {};
+    inst.counters = inst.counters || {};
+    inst.counters._summonedFromDeck = 1;
+    return this.deckHookExtras();
+  }
+
+  /** Baustein 3: gescheitert — zurueck ins Deck (gemischt). */
+  deckRueckgabe(ab) {
+    if (!ab) return;
+    this.returnToPile(ab.pi, 'deck', ab.name);
     this.sync();
-    return res.inst;
+  }
+
+  /**
+   * Der EINE Aufruf: Creature aus dem eigenen Deck aufs Feld.
+   * opts: mode ('summon' | 'place'), source, hookExtras, summonOpts,
+   *       placeOpts, vorAnim { type, ms }, flug (false | Landezeit ms)
+   * @returns {{inst, actualSlot}|null}
+   */
+  async summonFromDeck(pi, what, heroIdx, slotIdx, opts = {}) {
+    const mode = opts.mode || 'summon';
+    const ab = await this.deckEntnahme(pi, what, { source: opts.source, shuffle: opts.shuffle !== false });
+    if (!ab) return null;
+    if (opts.vorAnim?.type) {
+      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: pi, heroIdx, zoneSlot: slotIdx });
+      await this._delay(opts.vorAnim.ms ?? 700);
+    }
+    if (opts.flug !== false) {
+      this._pileFlight(pi, ab.name, 'deck', 'support', { toHeroIdx: heroIdx, toSlotIdx: slotIdx });
+      if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
+    }
+    let res;
+    if (mode === 'place') {
+      res = await this.actionPlaceCreature(ab.name, pi, heroIdx, slotIdx, {
+        sourceName: opts.source || 'Placement', ...(opts.placeOpts || {}),
+        source: 'deck', skipPileTransfer: true,
+        hookExtras: this.deckHookExtras(opts.hookExtras || {}),
+      });
+    } else {
+      res = await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+        source: opts.source || 'summonFromDeck',
+        ...(opts.summonOpts || {}),
+        hookExtras: this.deckHookExtras(opts.hookExtras || {}),
+      });
+    }
+    if (!res?.inst) { this.deckRueckgabe(ab); return null; }
+    this.deckLandung(res.inst, ab);
+    this.sync();
+    return res;
+  }
+
+  /**
+   * Darf diese Karte die Ablage Richtung Brett verlassen? Nein bei
+   * `cannotBeRevived` (Gigantisaur Brachion) und `summonOnlyFromHand`
+   * (Ifrit: „cannot be summoned from anywhere, except your hand").
+   */
+  darfAusAblageAufsFeld(cardName) {
+    const script = loadCardEffect(cardName);
+    return !(script?.cannotBeRevived || script?.summonOnlyFromHand);
+  }
+
+  /** Hook-Extras jeder Beschwoerung/Platzierung aus der Ablage. */
+  ablageHookExtras(extra = {}) {
+    return { _summonedFromDiscard: true, _summonedFromPile: 'discard', ...extra };
+  }
+
+  /**
+   * Baustein 1: Karte fuer das Brett aus der Ablage nehmen.
+   * @param {number} pi         wer sie aufs Feld bringt
+   * @param {number} pileOwner  in wessen Ablage sie liegt
+   * @param {string|number} what Name oder Index in der Ablage
+   * @returns {{name, idx, pileOwner, pi, lethe}|null}
+   */
+  async ablageEntnahme(pi, pileOwner, what, opts = {}) {
+    const pile = this.gs.players[pileOwner]?.discardPile || [];
+    const name = typeof what === 'number' ? pile[what] : what;
+    if (!name) return null;
+    if (!this.darfAusAblageAufsFeld(name)) {
+      this.log('revive_blocked', { card: name, by: opts.source || null });
+      return null;
+    }
+    const taken = await this.takeFromPile(pileOwner, 'discard', what, {
+      source: opts.source, sourceOwner: pi, last: opts.last,
+    });
+    if (!taken) return null;
+    const lethe = this.consumeLetheStamp(pileOwner, taken.name);
+    return { name: taken.name, idx: taken.idx, pileOwner, pi, lethe };
+  }
+
+  /**
+   * Baustein 2: die aus der Ablage gekommene Instanz ist gelandet.
+   * Setzt Lethe-Bonus und Heimkehr-Besitzer, zaehlt fuer SC (Graverobber)
+   * und liefert die Hook-Extras fuer eigene onPlay/onCardEnterZone-Aufrufe.
+   * @param {'summon'|'place'|'revive'} mode
+   */
+  ablageLandung(inst, ab, mode = 'summon') {
+    if (!inst || !ab) return {};
+    inst.counters = inst.counters || {};
+    if (ab.lethe > 0) inst.counters._letheLevelBonus = ab.lethe;
+    if (ab.pileOwner !== (inst.controller ?? inst.owner)) inst.originalOwner = ab.pileOwner;
+    if (mode === 'revive') return {};
+    inst.counters._summonedFromDiscard = 1;
+    const t = this.gs._scTracking?.[inst.controller ?? inst.owner];
+    if (t) ScTracking.ablageBeschwoerung(t);
+    return this.ablageHookExtras();
+  }
+
+  /** Baustein 3: Beschwoerung gescheitert — Karte zurueck an ihren Platz. */
+  ablageRueckgabe(ab) {
+    if (!ab) return;
+    this.returnToPile(ab.pileOwner, 'discard', ab.name, ab.idx);
+    this.sync();
+  }
+
+  /**
+   * Der EINE Aufruf: Creature aus einer Ablage aufs Feld.
+   *
+   * @param {number} pi         wer beschwoert (bekommt die Kreatur)
+   * @param {number} pileOwner  in wessen Ablage die Karte liegt
+   * @param {string|number} what Name oder Index in der Ablage
+   * @param {object} opts
+   *   mode        'summon' (Standard, volle On-Summon-Hooks) | 'place'
+   *               (actionPlaceCreature) | 'revive' (keine Hooks, kein
+   *               Beschwoerungs-Signal — Zombified Assault)
+   *   source      Kartenname fuer Log/Sperren
+   *   hookExtras  zusaetzliche Hook-Extras (summon)
+   *   summonOpts  weitere Optionen fuer summonCreatureWithHooks (summon)
+   *   placeOpts   Optionen fuer actionPlaceCreature (place)
+   *   vorAnim     { type, ms } Zonen-Animation vor dem Flug
+   *   flug        false = kein Ablage→Zone-Flug; Zahl = Wartezeit danach
+   *   last        bei Namenssuche die letzte Kopie nehmen
+   * @returns {{inst, actualSlot}|null}
+   */
+  async summonFromDiscard(pi, pileOwner, what, heroIdx, slotIdx, opts = {}) {
+    const mode = opts.mode || 'summon';
+    if (mode === 'place') {
+      return this.actionPlaceCreature(
+        typeof what === 'number' ? this.gs.players[pileOwner]?.discardPile?.[what] : what,
+        pi, heroIdx, slotIdx,
+        { sourceName: opts.source, ...(opts.placeOpts || {}), source: 'discard',
+          pileOwner, sourceIdx: typeof what === 'number' ? what : undefined },
+      );
+    }
+    const ab = await this.ablageEntnahme(pi, pileOwner, what, opts);
+    if (!ab) return null;
+    if (opts.vorAnim?.type) {
+      this._broadcastEvent('play_zone_animation', { type: opts.vorAnim.type, owner: pi, heroIdx, zoneSlot: slotIdx });
+      await this._delay(opts.vorAnim.ms ?? 700);
+    }
+    if (opts.flug !== false) {
+      this._broadcastEvent('play_pile_transfer', {
+        fromOwner: pileOwner, toOwner: pi, owner: pi, cardName: ab.name,
+        from: 'discard', to: 'support', toHeroIdx: heroIdx, toSlotIdx: slotIdx,
+      });
+      if (typeof opts.flug === 'number' && opts.flug > 0) { this.sync(); await this._delay(opts.flug); }
+    }
+    const res = mode === 'revive'
+      ? await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+          skipHooks: true, skipBeforeSummon: true, playSummonAnim: false, skipLog: true,
+          source: opts.source || 'revive',
+        })
+      : await this.summonCreatureWithHooks(ab.name, pi, heroIdx, slotIdx, {
+          source: opts.source || 'summonFromDiscard',
+          ...(opts.summonOpts || {}),
+          hookExtras: this.ablageHookExtras(opts.hookExtras || {}),
+        });
+    if (!res?.inst) { this.ablageRueckgabe(ab); return null; }
+    this.ablageLandung(res.inst, ab, mode);
+    if (mode === 'revive') {
+      await this._runReviveHook(res.inst);
+      this.log('creature_revived', {
+        player: this.gs.players[pi]?.username, card: ab.name, by: opts.source || null,
+      });
+    }
+    this.sync();
+    return res;
   }
 
   /** ★ v1292 — `onRevive` NUR der wiederbelebten Karte (s.o.). */
@@ -40091,7 +40552,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       return;
     }
 
-    const statusOpts = { appliedTurn: this.gs.turn, appliedBy: opts.appliedBy ?? -1, ...opts };
+    const statusOpts = { appliedTurn: this.gs.turn, ...opts };
+    this._heldenStatusVerursacher(statusOpts, opts);   // v1399
     delete statusOpts._skipReactionCheck; // Internal flag, not stored on hero
     if (statusName === 'poisoned') {
       statusOpts.stacks = opts.addStacks || opts.stacks || 1;
@@ -40875,57 +41337,142 @@ this._deathWatch = (this._deathWatchStack || []).length
     // ── AoE mode (normal) ──
 
     // Collect heroes
-    const allHeroes = [];       // for animation (includes shielded)
-    const hitHeroes = [];       // for damage (excludes shielded)
+    // ★ v1392: die Treffer selbst laufen ueber die EINE Stelle fuer
+    // Schaden an mehreren Zielen (`dealDamageToTargets`). Hier bleibt nur
+    // das Einsammeln nach Seite.
+    const ziele = [];
     if (types.includes('hero')) {
-      for (const eintrag of this.collectAoeHeroTargets(targetPlayers, config)) {
-        allHeroes.push(eintrag);
-        if (!eintrag.hero.statuses?.shielded) hitHeroes.push(eintrag);
+      for (const e of this.collectAoeHeroTargets(targetPlayers, config)) {
+        ziele.push({ type: 'hero', owner: e.owner, heroIdx: e.heroIdx });
       }
     }
-
-    // Collect creatures (only Creature/Token card types)
-    const creatureEntries = [];
     if (types.includes('creature')) {
       for (const { inst } of this.collectAoeCreatureTargets(targetPlayers, config, types)) {
+        ziele.push({ type: 'creature', inst });
+      }
+    }
+    const res = await this.dealDamageToTargets(cardInst, ziele, {
+      ...config, damage, damageType, sourceName, animationType, animDelay, hitDelay,
+      surpriseCheck: !config._skipSurpriseCheck,
+      postTargetCheck: !config._skipSurpriseCheck,
+      boardGuards: !config._skipRedirectCheck,
+      istFlaeche: true,
+    });
+    return { ...res, wasSingleTarget: false };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  SCHADEN AN MEHREREN ZIELEN — EINE Stelle (v1392, Als Auftrag 25.9.)
+  // ═══════════════════════════════════════════════════════════════
+  // Bis v1391 gab es fuenf Bauformen nebeneinander (aoeHit, beginAoeStrike
+  // von Hand, beginMultiHit von Hand, eigene Kreatur-Stapel, Modul-Flag).
+  // Karten mit eigener Zielwahl (Book of Doom, Fireball, Powder Keg …)
+  // bauten Interference-Klammer, Idol-Fenster, Hand-Reaktionen und die
+  // Helden/Kreaturen-Aufteilung jeweils selbst — und jede neue Karte, die
+  // auf Mehrfachtreffer reagiert, lief an einer davon vorbei.
+  //
+  // `dealDamageToTargets` ist der eine Weg fuer „dieselbe Quelle trifft
+  // mehrere Ziele in EINEM Schlag", egal ob die Ziele nach Seite
+  // eingesammelt (aoeHit) oder gewaehlt wurden. Sie erledigt:
+  //   • Helden/Kreaturen-Aufteilung (Shielded-Helden: nur Animation),
+  //   • Anti-AoE-Guards auf dem Brett (`_applyBoardAoeGuards`),
+  //   • Surprise-Fenster und Post-Target-Hand-Reaktionen (abschaltbar,
+  //     damit umgestellte Karten ihr bisheriges Verhalten behalten),
+  //   • Welle / Einsaugen / Zonen-Animation,
+  //   • Interference-Klammer UND Idol-Fenster (`beginAoeStrike`) ab zwei
+  //     Zielen, Kreaturen in EINEM Stapel.
+  // Waechter: scripts/check-aoe-central.js.
+
+  /**
+   * @param {object} quelle  CardInstance der wirkenden Karte ODER
+   *   `{ name, owner, heroIdx }` (Karten ohne eigene Instanz, z.B.
+   *   Ziel-Artefakte wie Book of Doom).
+   * @param {Array} targets  `{ type: 'hero', owner, heroIdx }` |
+   *   `{ type: 'creature'|'equip', inst|cardInstance }`; optional
+   *   `amount` je Ziel (abgestufter Schaden).
+   * @param {object} opts
+   *   damage, damageType, sourceName, animationType, animDelay, hitDelay,
+   *   waveAnimation & Co. (wie aoeHit), surpriseCheck (true),
+   *   postTargetCheck (true), boardGuards (true), canBeNegated (true),
+   *   istFlaeche (false; aoeHit setzt es — sonst gilt: 2+ Ziele),
+   *   trefferOpts ({}; an jeden Einzeltreffer, z.B. `_skipReactionCheck`),
+   *   attrappenQuelle (false; Held wird von einer kurzlebigen Instanz
+   *   getroffen — Book of Doom)
+   * @returns {{ heroes, creatures, cancelled }}
+   */
+  async dealDamageToTargets(quelle, targets, opts = {}) {
+    const gs = this.gs;
+    const config = opts;
+    const pi = quelle?.controller ?? quelle?.owner ?? 0;
+    const heroIdx = quelle?.heroIdx ?? -1;
+    const damage = opts.damage || 0;
+    const damageType = opts.damageType || 'other';
+    const sourceName = opts.sourceName || quelle?.name;
+    const animationType = opts.animationType;
+    const animDelay = opts.animDelay ?? 300;
+    const hitDelay = opts.hitDelay ?? 150;
+    const quellObjekt = { name: sourceName, owner: pi, heroIdx };
+    // Karten mit echter Instanz treffen Helden mit ihr als Quelle (wie
+    // bisher aoeHit); ein Quell-OBJEKT (Fireball & Co.) wird so
+    // weitergereicht; `attrappenQuelle` baut die kurzlebige Instanz, die
+    // Book of Doom bisher von Hand anlegte.
+    const hatInstanz = !!(quelle && quelle.id != null && this.cardInstances.includes(quelle));
+    const kreaturQuelle = hatInstanz ? quellObjekt : (quelle || quellObjekt);
+    const trefferOpts = opts.trefferOpts || {};
+    // Fuer Reaktionsfenster die echte Karte, wo es eine gibt.
+    const reaktionsQuelle = hatInstanz ? quelle : (quelle?.cardInstance || quelle || quellObjekt);
+
+    const allHeroes = [];       // for animation (includes shielded)
+    const hitHeroes = [];       // for damage (excludes shielded)
+    const creatureEntries = [];
+    for (const t of (targets || [])) {
+      if (!t) continue;
+      if (t.type === 'hero') {
+        const hero = gs.players[t.owner]?.heroes?.[t.heroIdx];
+        if (!hero?.name || hero.hp <= 0) continue;
+        const e = { hero, heroIdx: t.heroIdx, owner: t.owner, amount: t.amount ?? damage };
+        allHeroes.push(e);
+        if (!hero.statuses?.shielded) hitHeroes.push(e);
+      } else {
+        const inst = t.inst || t.cardInstance || this.cardInstances.find(c =>
+          c.zone === 'support' && this.physicalSide(c) === t.owner
+          && c.heroIdx === t.heroIdx && c.zoneSlot === (t.slotIdx ?? t.zoneSlot));
+        if (!inst || inst.zone !== 'support') continue;
         creatureEntries.push({
-          inst, amount: damage, type: damageType,
-          source: { name: sourceName, owner: pi, heroIdx },
-          sourceOwner: pi, canBeNegated: true,
+          inst, amount: t.amount ?? damage, type: damageType,
+          source: kreaturQuelle, sourceOwner: pi,
+          canBeNegated: opts.canBeNegated !== false,
           isStatusDamage: false,
           animType: animationType,
+          ...trefferOpts,
         });
       }
     }
 
-    // v704 (Puppets, Vinny): Brett-Waechter fuer AoE — `boardAoeGuard`
-    // darf gegnerische AoE-Eintraege auf geschuetzten Creatures fallen
-    // lassen (Vertrag siehe _applyBoardAoeGuards).
-    if (creatureEntries.length > 0 && !config._skipRedirectCheck) {
-      const kept = await this._applyBoardAoeGuards(creatureEntries, pi, cardInst || { name: sourceName, owner: pi, heroIdx });
+    // Flaechenschlag = als solcher gewirkt (aoeHit) ODER 2+ echte Ziele
+    // (Als Ruling 12.9.: es zaehlt die echte Zielmenge). Ein einzelnes
+    // gewaehltes Ziel bleibt ein Einzeltreffer.
+    const flaeche = !!opts.istFlaeche || (hitHeroes.length + creatureEntries.length) >= 2;
+    if (flaeche && creatureEntries.length > 0 && opts.boardGuards !== false) {
+      const kept = await this._applyBoardAoeGuards(creatureEntries, pi, quelle || quellObjekt);
       creatureEntries.length = 0;
       for (const e of kept) creatureEntries.push(e);
     }
 
-    // ── Surprise window check (AoE) ──
-    if (!config._skipSurpriseCheck && hitHeroes.length > 0) {
+    if (opts.surpriseCheck !== false && hitHeroes.length > 0) {
       const aoeTargets = hitHeroes.map(h => ({
         type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
       }));
-      // Mark as AoE so surprises like Jumpscare can distinguish from single-target
-      if (cardInst) cardInst._isAoeCheck = true;
-      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, cardInst, { damageType });
-      if (cardInst) delete cardInst._isAoeCheck;
+      if (hatInstanz) quelle._isAoeCheck = true;
+      const surpriseResult = await this._checkSurpriseWindow(aoeTargets, reaktionsQuelle, { damageType });
+      if (hatInstanz) delete quelle._isAoeCheck;
       if (surpriseResult?.effectNegated) {
-        // ★★ v1182: auch der FLAECHEN-Weg zeigt die Bilder des
-        // abgewehrten Zaubers (Flame Avalanche & Co. laufen hier).
-        await this.negationsBilder(cardInst, aoeTargets, surpriseResult);
-        return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };
+        await this.negationsBilder(reaktionsQuelle, aoeTargets, surpriseResult);
+        return { heroes: [], creatures: [], cancelled: true };
       }
     }
 
-    // ── Post-target hand reaction check (Anti Magic Shield, Divine Gift of Rain, etc.) ──
-    if (!config._skipSurpriseCheck && (hitHeroes.length > 0 || creatureEntries.length > 0)) {
+    if (opts.postTargetCheck !== false && (hitHeroes.length > 0 || creatureEntries.length > 0)) {
       const aoeTargets2 = [
         ...hitHeroes.map(h => ({
           type: 'hero', owner: h.owner, heroIdx: h.heroIdx, cardName: h.hero.name,
@@ -40935,19 +41482,14 @@ this._deathWatch = (this._deathWatchStack || []).length
           slotIdx: e.inst.zoneSlot, cardName: e.inst.name,
         })),
       ];
-      const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, cardInst, { damageType });
+      const ptResult = await this._checkPostTargetHandReactions(aoeTargets2, reaktionsQuelle, { damageType });
       if (ptResult?.effectNegated) {
-        await this.negationsBilder(cardInst, aoeTargets2, ptResult);   // v1182
-        return { heroes: [], creatures: [], wasSingleTarget: false, cancelled: true };
+        await this.negationsBilder(reaktionsQuelle, aoeTargets2, ptResult);   // v1182
+        return { heroes: [], creatures: [], cancelled: true };
       }
-      // Anti Magic Enchantment is handled per-target inside actionDealDamage
-      // so AoE animations always flash first and the negation prompt only
-      // appears right before damage actually lands on each enchanted hero.
     }
 
-    // ★★ v1213: dieselbe Welle im Flaechenweg — nach allen Abwehr-
-    // Fenstern, damit ein negierter Zauber sie gar nicht erst zeigt.
-    await this._spieleWellenAnimation(config, cardInst, pi, heroIdx, [
+    await this._spieleWellenAnimation(config, quelle || quellObjekt, pi, heroIdx, [
       ...allHeroes.map(e => ({ owner: e.owner, heroIdx: e.heroIdx, zoneSlot: -1 })),
       ...creatureEntries.map(e => ({
         owner: this.physicalSide(e.inst), heroIdx: e.inst.heroIdx, zoneSlot: e.inst.zoneSlot,
@@ -40956,16 +41498,10 @@ this._deathWatch = (this._deathWatchStack || []).length
     ]);
     const _sog = this._sogBeginnen(config, creatureEntries.map(e => e.inst));
 
-    // Play animations on ALL targets simultaneously (even shielded)
     if (animationType) {
       for (const { heroIdx: hi, owner } of allHeroes) {
         this._broadcastEvent('play_zone_animation', { type: animationType, owner, heroIdx: hi, zoneSlot: -1 });
       }
-      // ★★ v1272 (Als Regel 22.9.): die Kreaturen bekommen ihr Bild HIER,
-      // im selben Augenblick wie die Helden — nicht erst im Batch, der
-      // nach dem Heldenschaden laeuft (dort kamen sie danach und bis
-      // v1271 zudem einzeln). Die Eintraege tragen deshalb `_bildGelaufen`,
-      // damit der Batch das Bild nicht ein zweites Mal zeigt.
       for (const e of creatureEntries) {
         this._broadcastEvent('play_zone_animation', {
           type: animationType, owner: this.physicalSide(e.inst),
@@ -40978,26 +41514,30 @@ this._deathWatch = (this._deathWatchStack || []).length
       }
     }
 
-    // Deal damage to heroes
-    if (damage > 0) {
-      const ctx = this._createContext(cardInst, {});
-      // ★ v1042: EIN Schlag, mehrere Ziele — das ist genau die Lage,
-      // gegen die „Interference" schuetzt. Die Zahl zaehlt Helden UND
-      // Kreaturen: „hits other targets in addition to it" ist ab zwei
-      // erfuellt, egal welcher Art das zweite Ziel ist.
-      this.beginMultiHit(hitHeroes.length + creatureEntries.length);
+    const hatSchaden = hitHeroes.some(h => h.amount > 0) || creatureEntries.some(e => e.amount > 0);
+    if (hatSchaden) {
+      // Interference-Klammer UND Idol-Fenster in einem (beginAoeStrike);
+      // die Kreaturen gehen danach in EINEM Stapel.
+      await this.beginAoeStrike(hitHeroes.length + creatureEntries.length, {
+        creatures: creatureEntries.map(e => ({ inst: e.inst, amount: e.amount, type: e.type })),
+        source: quellObjekt, amount: damage, type: damageType, sourceOwner: pi,
+        canBeNegated: opts.canBeNegated !== false,
+      });
       try {
-        for (const { hero } of hitHeroes) {
-          if (hero.hp <= 0) continue; // May have died from a previous hit this loop
-          await ctx.dealDamage(hero, damage, damageType);
+        for (const { hero, amount } of hitHeroes) {
+          if (hero.hp <= 0 || !(amount > 0)) continue; // May have died from a previous hit this loop
+          if (hatInstanz || !opts.attrappenQuelle) {
+            await this.actionDealDamage(quelle || quellObjekt, hero, amount, damageType, trefferOpts);
+          } else {
+            const tmp = this._trackCard(sourceName, pi, 'hand', -1, -1);
+            try { await this.actionDealDamage(tmp, hero, amount, damageType, trefferOpts); }
+            finally { this._untrackCard(tmp.id); }
+          }
           this.sync();
           if (hitDelay > 0) await this._delay(hitDelay);
         }
-
-        // Deal damage to creatures via batch
-        if (creatureEntries.length > 0) {
-          await this.processCreatureDamageBatch(creatureEntries);
-        }
+        const mitSchaden = creatureEntries.filter(e => e.amount > 0);
+        if (mitSchaden.length > 0) await this.processCreatureDamageBatch(mitSchaden);
       } finally {
         this.endMultiHit();
       }
@@ -41008,7 +41548,6 @@ this._deathWatch = (this._deathWatchStack || []).length
     return {
       heroes: allHeroes,
       creatures: creatureEntries.map(e => ({ inst: e.inst })),
-      wasSingleTarget: false,
       cancelled: false,
     };
   }
@@ -43725,6 +44264,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // allow either.
     this._refreshWeakeningCrystalNegation();
     if (this._fastMode) return; // Skip state-broadcast during simulations.
+    // SC-Zustandsbeobachter (v1388): Plague Spreader, Full Hand.
+    if (this.gs._scTracking) ScTracking.zustand(this.gs._scTracking, this.gs.players);
     // (v1381: der fruehere SC-Block fuer Ability-/Support-Zonen ist weg —
     // diese Kategorien werden am Spielende vom Brett gelesen, Als Ruling 24.9.)
     // Same teardown-safety guard as _broadcastEvent — sendGameState

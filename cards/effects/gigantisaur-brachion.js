@@ -58,6 +58,11 @@ module.exports = {
    * Standard archetype gate PLUS Brachion-specific "only 1 controlled
    * at a time" rule. Layered on top of the shared helper.
    */
+  // v1389: „cannot be revived by any effects" — die zentrale Sperre fuer
+  // JEDEN Weg aus der Ablage (`engine.darfAusAblageAufsFeld`). Bis v1388
+  // griff die Sperre nur bei Pfaden, die `_summonedFromDiscard` setzten.
+  cannotBeRevived: true,
+
   canSummon(ctx) {
     if (!gigantisaursCanSummon(ctx)) return false;
     const engine = ctx._engine;

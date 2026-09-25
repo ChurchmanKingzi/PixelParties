@@ -19,9 +19,14 @@
 //       Spielen gar nicht erst. Genau hier lag Pangaias zweiter
 //       Defekt: `activeIn: ['area']`.
 //
-//    3. HINTERGRUND — Eintrag in `AREA_OVERLAYS` (app-board.jsx),
-//       ★-Regel vom 7.9.: jede Area definiert einen Hintergrund,
-//       solange sie liegt.
+//    3. HINTERGRUND — Eintrag in `AREA_OVERLAYS` (seit v1410 im
+//       eigenen Modul public/app-areas.jsx), ★-Regel vom 7.9.: jede
+//       Area definiert einen Hintergrund, solange sie liegt.
+//
+//    4. PIXELART-DATEIEN (v1410) — jede Datei unter `/areas/…`, die
+//       app-areas.jsx anspricht, muss in public/areas/ liegen. Ein
+//       Tippfehler im Pfad faellt sonst erst auf, wenn die Area liegt
+//       und der Hintergrund leer bleibt.
 //
 //  Aufruf:  node scripts/check-areas.js
 //  Rückgabe 0 = sauber, 1 = mindestens eine Area unvollständig.
@@ -33,7 +38,7 @@ const path = require('path');
 const WURZEL = path.join(__dirname, '..');
 const EFFEKTE = path.join(WURZEL, 'cards', 'effects');
 const KARTEN = path.join(WURZEL, 'data', 'cards.json');
-const BOARD = path.join(WURZEL, 'public', 'app-board.jsx');
+const BOARD = path.join(WURZEL, 'public', 'app-areas.jsx');
 
 /** Kartenname → Dateiname, identisch zu `nameToFile` im Loader. */
 function nameZuDatei(name) {
@@ -48,7 +53,7 @@ function ohneKommentare(src) {
     .replace(/([^:'"`])\/\/.*$/gm, '$1');
 }
 
-/** Die Schlüssel aus der AREA_OVERLAYS-Registry in app-board.jsx. */
+/** Die Schlüssel aus der AREA_OVERLAYS-Registry in app-areas.jsx. */
 function registrierteHintergruende() {
   const src = fs.readFileSync(BOARD, 'utf8');
   const start = src.indexOf('const AREA_OVERLAYS');
@@ -64,7 +69,7 @@ function registrierteHintergruende() {
 const karten = JSON.parse(fs.readFileSync(KARTEN, 'utf8'));
 const hintergruende = registrierteHintergruende();
 if (!hintergruende) {
-  console.error('[check-areas] AREA_OVERLAYS in app-board.jsx nicht gefunden.');
+  console.error('[check-areas] AREA_OVERLAYS in app-areas.jsx nicht gefunden.');
   process.exit(1);
 }
 
@@ -96,10 +101,31 @@ for (const karte of karten) {
 
   // 3. Hintergrund
   if (!hintergruende.has(karte.name)) {
-    fehlt.push('kein Eintrag in AREA_OVERLAYS (app-board.jsx) — die Area zeigt keinen Hintergrund');
+    fehlt.push('kein Eintrag in AREA_OVERLAYS (app-areas.jsx) — die Area zeigt keinen Hintergrund');
   }
 
   if (fehlt.length) maengel.push({ name: karte.name, fehlt });
+}
+
+// 4. Pixelart-Dateien. Pfade entstehen im Code aus einem Praefix
+//    (`const BR = '/areas/blood-rock/'`) plus Dateiname (`BR + 'tile.png'`
+//    bzw. `${BR}bat.png`) — beides wird hier aufgeloest.
+{
+  const src = fs.readFileSync(BOARD, 'utf8');
+  const praefixe = {};
+  const reP = /const\s+([A-Z_][A-Z0-9_]*)\s*=\s*'(\/areas\/[^']+\/)'/g;
+  let m;
+  while ((m = reP.exec(src)) !== null) praefixe[m[1]] = m[2];
+  const pfade = new Set();
+  const reA = /(['"`])(\/areas\/[^'"`$]+\.png)\1/g;
+  while ((m = reA.exec(src)) !== null) pfade.add(m[2]);
+  for (const [name, pre] of Object.entries(praefixe)) {
+    const reB = new RegExp(`\\b${name}\\s*\\+\\s*'([^']+\\.png)'|\\$\\{${name}\\}([\\w.-]+\\.png)`, 'g');
+    while ((m = reB.exec(src)) !== null) pfade.add(pre + (m[1] || m[2]));
+  }
+  const fehlend = [...pfade].filter(p => !fs.existsSync(path.join(WURZEL, 'public', p)));
+  if (fehlend.length) maengel.push({ name: 'Pixelart-Dateien', fehlt: fehlend.map(p => `public${p} fehlt`) });
+  else if (pfade.size) console.log(`[check-areas] ${pfade.size} Pixelart-Datei(en) vorhanden.`);
 }
 
 if (maengel.length === 0) {

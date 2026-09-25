@@ -135,6 +135,7 @@ function refreshWeakeningCrystalNegation(engine, opts = {}) {
           sourceBound: true,
           appliedTurn: engine.gs?.turn ?? 0,
         };
+        engine._heldenStatusVerursacher(hero.statuses.negated, { appliedBy: pi, source: 'Weakening Crystal' });   // v1399: eigene Hand → selbst verursacht
         neuAngelegt++;
       } else if (hero.statuses?.negated?._byWeakeningCrystal === true) {
         // ★ Die Karte ist weg → der Status faellt SOFORT, nicht erst

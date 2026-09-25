@@ -102,8 +102,8 @@ module.exports = {
 
         // Erst aus dem Deck nehmen, dann zeigen: waehrend des Fluges
         // soll der Deckzaehler schon stimmen.
-        ps.mainDeck.shift();
-        if (ps.deckTopVisible?.length > 0) ps.deckTopVisible.shift();
+        // v1397: Entnahme über die Stapel-Schicht (Deckkopf-Sicht inklusive).
+        engine.takeFromPileSync(ps, 'deck', 0, { source: 'Surprise Party' });
         engine.sync();
 
         if (!passt) {

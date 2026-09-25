@@ -73,7 +73,7 @@ module.exports = {
       const ps = engine.gs.players[pi];
       const _taken_idx = await engine.takeFromPile(ps, 'discard', picked.cardName, { source: CARD_NAME, toHand: true });   // v820: Stapel-Schicht
       if (_taken_idx) {
-        ps.hand.push(picked.cardName);
+        await engine.handZugang(ps, picked.cardName, { von: 'ablage', source: CARD_NAME });   // v1395: jetzt MIT Hand-Instanz (fehlte)
         engine._broadcastEvent('card_reveal', { cardName: picked.cardName, playerIdx: pi });
         await engine.runHooks('onCardAddedFromDiscardToHand', {
           playerIdx: pi, cardName: picked.cardName,

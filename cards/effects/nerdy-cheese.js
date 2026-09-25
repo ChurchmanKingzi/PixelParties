@@ -115,9 +115,8 @@ module.exports = {
       return;
     }
 
-    if (!(await engine.takeFromPile(ps, 'deck', tutorIdx, { source: 'Nerdy Cheese' }))) return;   // v820: Stapel-Schicht
-    ps.hand.push(result.cardName);
-    const tutorInst = engine._trackCard(result.cardName, pi, 'hand');
+    if (!(await engine.takeFromPile(ps, 'deck', tutorIdx, { source: 'Nerdy Cheese', toHand: true }))) return;   // v820: Stapel-Schicht
+    const tutorInst = await engine.handZugang(ps, result.cardName, { von: 'deck' });
     engine._broadcastEvent('deck_search_add', { cardName: result.cardName, playerIdx: pi });
     engine.log('deck_search', {
       player: ps.username, card: result.cardName, by: 'Nerdy Cheese',

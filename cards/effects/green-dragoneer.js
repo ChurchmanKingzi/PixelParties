@@ -288,7 +288,7 @@ module.exports = {
       try {
         // Handkarte VOR dem Summon abbuchen, damit spaetere Hooks keine
         // Geisterkopie in der Hand sehen.
-        ps.hand.splice(handIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', handIdx);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(
@@ -296,7 +296,7 @@ module.exports = {
           { source: `${CARD_NAME} reaction`, skipBeforeSummon: false, alsZusatzaktion: true },   // v1349
         );
         if (!res) {
-          ps.hand.push(CARD_NAME);                   // zurueck auf die Hand
+          engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });                   // zurueck auf die Hand
           engine.log('green_dragoneer_fizzle', { player: ps.username, reason: 'place_refused' });
           return;
         }

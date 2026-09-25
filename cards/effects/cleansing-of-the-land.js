@@ -194,7 +194,7 @@ module.exports = {
         fromHandIdx: handIdx,
         finalHandSize: Math.max(0, (ps.hand || []).length - 1),
       });
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       engine.sync();
       await engine._delay(420);
 

@@ -162,10 +162,9 @@ module.exports = {
       if (gefunden) {
         const name = ops.mainDeck[idx];
         engine._broadcastEvent('card_reveal', { cardName: name });
-        if (await engine.takeFromPile(ops, 'deck', idx, { source: CARD_NAME, shuffle: true })) {
+        if (await engine.takeFromPile(ops, 'deck', idx, { source: CARD_NAME, shuffle: true, toHand: true })) {
           engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: oi });
-          ops.hand.push(name);
-          engine._trackCard(name, oi, 'hand');
+          await engine.handZugang(ops, name, { von: 'deck', source: CARD_NAME });
           engine.sync();
           await engine._delay(500);
         }

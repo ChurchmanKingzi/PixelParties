@@ -219,7 +219,7 @@ module.exports = {
 
     // Oberste Deckkarte ueber die Stapel-Schicht entnehmen (★-Regel:
     // kein direktes Splicen an Deck und Ablage).
-    const genommen = await engine.takeFromPile(pi, 'deck', 0, {
+    const genommen = await engine.deckEntnahme(pi,  0, {
       source: CARD_NAME, sourceOwner: pi,
     });
     if (!genommen?.name) return false;

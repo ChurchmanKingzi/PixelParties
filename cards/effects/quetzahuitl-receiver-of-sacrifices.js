@@ -151,7 +151,7 @@ async function performDescent(engine, pi, dyingHero, handInst) {
     fromHandIdx: handIdx, toHeroIdx: targetHeroIdx,
     asPlay: 'sole',
   });
-  ps.hand.splice(handIdx, 1);
+  engine.takeFromPileSync(ps, 'hand', handIdx);
   // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
   // Startplatz der abfliegenden Karte nur, solange die Hand noch so
   // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -330,7 +330,7 @@ function pullDivinityFromAnySource(ps, engine) {
   // to minimize information leakage. Switch to deck-first if the
   // user wants strict left-to-right text ordering.
   const fromHand = ps.hand.indexOf(DIVINITY);
-  if (fromHand >= 0) { ps.hand.splice(fromHand, 1); return 'hand'; }
+  if (fromHand >= 0) { engine.takeFromPileSync(ps, 'hand', fromHand); return 'hand'; }
   const _taken_fromDeck = engine.takeFromPileSync(ps, 'deck', DIVINITY, { source: CARD_NAME });   // v820: Stapel-Schicht
   if (_taken_fromDeck) {
     return 'deck';
@@ -345,7 +345,7 @@ function pullDivinityFromAnySource(ps, engine) {
 function refundDivinity(engine, pi, source) {
   const ps = engine.gs.players[pi];
   if (!ps) return;
-  if (source === 'hand') ps.hand.push(DIVINITY);
+  if (source === 'hand') engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
   else if (source === 'deck') { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
   else if (source === 'discard') ps.discardPile.push(DIVINITY);
 }

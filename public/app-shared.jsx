@@ -180,6 +180,17 @@ window.ppIsPhone = () => {
       && window.matchMedia('(pointer: coarse) and (max-height: 600px)').matches);
   } catch { return false; }
 };
+// ★ v1410: Partikel-Deckel fuer Telefone — hierher aus app-board.jsx
+// verlegt, weil ihn jetzt zwei Bundles brauchen (Kampfbrett-Animationen
+// und die Area-Hintergruende in app-areas.jsx). Auf dem Telefon 40 %
+// der Anzahl, mindestens 2.
+function ppFxN(n) {
+  try {
+    if (window.ppIsPhone && window.ppIsPhone()) return Math.max(2, Math.round(n * 0.4));
+  } catch {}
+  return n;
+}
+window.ppFxN = ppFxN;
 let _touchStartPt = null;
 // Capture-Phase, also VOR Reacts Handlern: damit gilt `_isTouchDevice`
 // schon bei der allerersten Beruehrung (der alte Fenster-Listener kam
@@ -276,6 +287,7 @@ const SFX_NAMES = [
   'shop_purchase', 'shuffle', 'slash', 'spell_cast', 'status_remove',
   'summon', 'sunglasses_drop', 'turn_start', 'ui_cancel', 'ui_click',
   'ui_error', 'ui_prompt_open', 'victory',
+  'doom_tick',   // v1421: Uhrzeiger-Tick der Doom Clock (synthetisiert)
 ];
 
 let _sfxCtx = null;
@@ -885,6 +897,8 @@ window.playSFXForStatus = playSFXForStatus;
 // the right sound, so we only map the ones that are animation-only or need
 // a distinctive layer (e.g. orbital laser pitched down).
 const ZONE_ANIM_SFX = {
+  // v1421: Doom Counter auf die Doom Clock — schwerer Uhrzeiger-Tick.
+  doom_counter:            { name: 'doom_tick', opts: { volume: 1.5 } },
   // Land Sharks (v785): das Zuschnappen des Gebisses. Einen eigenen
   // Biss-Klang gibt es im 52er-Katalog nicht; `slash` ist der einzige
   // schneidende Anschlag und wird hier TIEFER gefahren, damit er nach
@@ -1647,6 +1661,12 @@ const ZONE_ANIM_NONEFFECT = new Set([
   // belegt und der Thud fiel komplett aus; der erste Klang NACH dem
   // sichtbaren Aufprall war dann der `damage`-Cue bei ~900ms.
   'magic_hammer',
+  // v1422 (Als Befund 25.9.: „den Sound hoere ich im Spiel nicht"): der
+  // Doom-Tick kommt fast immer im selben Augenblick wie andere Effekt-
+  // Klaenge (Rundenende, Besiegung) und wurde von der 'effect'-Sperre
+  // (400 ms, ein Klang pro Wirkung) verschluckt. Er ist eine eigene
+  // Rueckmeldung und darf sich darueberlegen.
+  'doom_counter',
 ]);
 
 // Vorlauf zwischen dem `play_zone_animation`-Ereignis und dem Start der
@@ -3144,9 +3164,21 @@ function CardFoil({ card, foilType }) {
     };
   }, [type, isFoil, card?.name, klein]);
   if (!isFoil || !meta) return null;
+  // ★ v1403: Rahmen-Ringe (Kreuzblende per Deckkraft statt animiertem
+  // box-shadow). Sie greifen nur, wo die Karte selbst die Foil-Klasse
+  // traegt (CSS `.foil-…-rare > .foil-rahmen`) — im Tooltip-Bild, das
+  // keinen pulsierenden Rahmen hat, bleiben sie unsichtbar. Die
+  // Kleinansicht hat einen festen Rahmen (`foil-ruhig`) und keine Ringe.
   return (
-    <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
-      sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} />
+    <>
+      {!klein && (
+        <div className={'foil-rahmen ' + (type === 'diamond_rare' ? 'foil-rahmen-diamond' : 'foil-rahmen-secret')} aria-hidden="true">
+          <i /><i /><i /><i />
+        </div>
+      )}
+      <FoilOverlay foilType={type} bands={meta.bands} motes={meta.motes}
+        sparkles={meta.sparkles} shimmerOffset={meta.shimmerOffset} klein={klein} />
+    </>
   );
 }
 

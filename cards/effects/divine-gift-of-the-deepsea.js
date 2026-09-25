@@ -224,7 +224,7 @@ module.exports = {
 
       // Pop the chosen card from its source pile.
       // Deck zuerst (Stapel-Schicht, mischt), sonst Hand.
-      const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', repName, { source: 'Divine Gift of the Deepsea', shuffle: true });   // v820: Stapel-Schicht
+      const _taken_deckIdx = await engine.deckEntnahme(ps,  repName, { source: 'Divine Gift of the Deepsea', shuffle: true });   // v820: Stapel-Schicht
       if (!_taken_deckIdx) {
         const handIdx = (ps.hand || []).indexOf(repName);
         if (handIdx < 0) { engine.sync(); return; }
@@ -233,24 +233,30 @@ module.exports = {
           c.owner === pi && c.zone === 'hand' && c.name === repName
         );
         if (handInst) engine._untrackCard(handInst.id);
-        ps.hand.splice(handIdx, 1);
+        engine.takeFromPileSync(ps, 'hand', handIdx);
       }
 
       // ── Step 4: place into the bounced creature's slot ──
+      // v1393: Rückbuchung dorthin, wo die Karte herkam — bis v1392 ging
+      // eine Deck-Karte bei Fehlschlag auf die HAND (Kartenvorteil).
+      const ausDeck = !!_taken_deckIdx;
+      const zurueck = () => {
+        if (ausDeck) { engine.deckRueckgabe(_taken_deckIdx); return; }
+        engine.handZugangSync(ps, repName, { von: 'rueckgabe' });
+      };
       if (engine.supportSlotBelegt(pi, bouncedHeroIdx, bouncedSlot)) {   // v1360
-        ps.hand.push(repName);
-        engine._trackCard(repName, pi, 'hand');
+        zurueck();
         await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'zone_taken' });
         return;
       }
       const summonRes = await engine.summonCreatureWithHooks(
         repName, pi, bouncedHeroIdx, bouncedSlot,
-        { source: 'Divine Gift of the Deepsea', isPlacement: true }
+        { source: 'Divine Gift of the Deepsea', isPlacement: true,
+          ...(ausDeck ? { hookExtras: engine.deckHookExtras() } : {}) }
       );
       if (!summonRes?.inst) {
         // Placement fizzled (beforeSummon refused etc.) — refund the card to hand.
-        ps.hand.push(repName);
-        engine._trackCard(repName, pi, 'hand');
+        zurueck();
         await engine.zeigeFizzle('Divine Gift of the Deepsea', { playerIdx: pi, grund: 'place_refused' });   // v1360
         return;
       }

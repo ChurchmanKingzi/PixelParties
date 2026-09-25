@@ -86,8 +86,12 @@ async function placeCounter(engine, clock, byPi, opts = {}) {
     source: opts.sourceName || undefined,
     clockOwner: engine.gs.players[clock.owner]?.username,
   });
+  // ★ v1421 (Als Vorgabe 25.9.): Totenschaedel + „+1" ueber der Uhr in
+  // der Area-Zone, dazu ein Uhrzeiger-Tick (SFX `doom_tick`, ueber
+  // ZONE_ANIM_SFX an den Animationstyp gebunden).
   engine._broadcastEvent('play_zone_animation', {
-    type: 'gold_sparkle', owner: clock.owner, heroIdx: -1, zoneSlot: -1,
+    type: 'doom_counter', owner: clock.owner, zoneType: 'area', heroIdx: -1, zoneSlot: -1,
+    count: clock.counters.doom, duration: 1500,
   });
   engine.sync();
 

@@ -157,11 +157,11 @@ module.exports = {
     // ── Step 3: remove from source, deduct gold, place ──────────────────
 
     // Remove from deck or hand
-    const _taken_deckIdx = await engine.takeFromPile(ps, 'deck', chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
+    const _taken_deckIdx = await engine.deckEntnahme(ps,  chosenName, { source: CARD_NAME, shuffle: true });   // v820: Stapel-Schicht
     if (_taken_deckIdx) {
     } else {
       const handIdx = ps.hand.indexOf(chosenName);
-      if (handIdx >= 0) ps.hand.splice(handIdx, 1);
+      if (handIdx >= 0) engine.takeFromPileSync(ps, 'hand', handIdx);
     }
 
     // Deduct gold
@@ -200,6 +200,7 @@ module.exports = {
       _skipReactionCheck: true,
       _bypassDeadHeroFilter: true,
       _isPlacement: true,
+      ...(_taken_deckIdx ? engine.deckLandung(inst, _taken_deckIdx) : {}),   // v1393
     });
 
     // Lock summoning for the rest of the turn

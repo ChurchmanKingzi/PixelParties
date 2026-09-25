@@ -185,7 +185,7 @@ module.exports = {
       if (targetZone < 0) {
         // Race: zones filled between check and now. Refund Divinity
         // back to its source so it isn't silently lost.
-        if (pickedSource === 'hand')    ps.hand.push(DIVINITY);
+        if (pickedSource === 'hand')    engine.handZugangSync(ps, DIVINITY, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });
         if (pickedSource === 'deck')  { ps.mainDeck.push(DIVINITY); engine.shuffleDeck(pi, 'main'); }
         if (pickedSource === 'discard') ps.discardPile.push(DIVINITY);
         engine.log('sacrifice_to_divinity_attach_failed', { player: ps.username, reason: 'no_target_zone' });

@@ -122,7 +122,7 @@ module.exports = {
         }
         const i = (ps.hand || []).indexOf(CARD_NAME);
         if (i < 0) return;
-        ps.hand.splice(i, 1);
+        engine.takeFromPileSync(ps, 'hand', i);
         engine._broadcastEvent('card_reveal', { cardName: CARD_NAME });
 
         const res = await engine.summonCreatureWithHooks(
@@ -130,7 +130,7 @@ module.exports = {
           { source: `${CARD_NAME} trigger`, alsZusatzaktion: true },   // v1349: ist eine Aktion
         );
         if (!res) {
-          ps.hand.push(CARD_NAME);                // zurueck auf die Hand
+          engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true });                // zurueck auf die Hand
           engine.log('nimble_monkee_fizzle', { player: ps.username, reason: 'place_refused' });
           return;
         }

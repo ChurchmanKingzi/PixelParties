@@ -240,7 +240,7 @@ async function _castAsAdditionalAction(engine, pi, heroIdx, picked) {
   if (picked.source === 'hand') {
     const idx = ps.hand.indexOf(cardName);
     if (idx < 0) return;                   // raced — bail
-    ps.hand.splice(idx, 1);
+    engine.takeFromPileSync(ps, 'hand', idx);
   } else {
     const _taken_idx = await engine.takeFromPile(ps, 'deck', cardName, { source: CARD_NAME });   // v820: Stapel-Schicht
     if (!_taken_idx) return;

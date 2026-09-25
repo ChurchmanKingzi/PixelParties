@@ -143,7 +143,7 @@ module.exports = {
     if (idxJetzt < 0) return false;
     if (((ps.supportZones?.[ziel.heroIdx] || [])[ziel.slotIdx] || []).length > 0) return false;
 
-    ps.hand.splice(idxJetzt, 1);
+    engine.takeFromPileSync(ps, 'hand', idxJetzt);
     const res = await engine.summonCreatureWithHooks(
       IFRIT, pi, ziel.heroIdx, ziel.slotIdx,
       {
@@ -151,7 +151,7 @@ module.exports = {
         hookExtras: { _isNormalSummon: false },
       },
     );
-    if (!res?.inst) { ps.hand.push(IFRIT); return false; }
+    if (!res?.inst) { engine.handZugangSync(ps, IFRIT, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
 
     engine._broadcastEvent('summon_effect', {
       owner: pi, heroIdx: ziel.heroIdx, zoneSlot: ziel.slotIdx,

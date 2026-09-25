@@ -390,24 +390,10 @@ module.exports = {
         cardInstance: ctx.card,
       };
 
-      const batch = victims.map(inst => ({
-        inst,
-        amount: DEATH_DAMAGE,
-        type: 'artifact',
-        source,
-        sourceOwner: source.owner,
-        canBeNegated: true,
-        isStatusDamage: false,
-        animType: null,
-      }));
-      // ★★ v1185: Flaechenklammer ergaenzt („Interference"). Das
-      // Anti-AoE-Fenster (Deepsea Idol) oeffnet der Batch selbst.
-      engine.beginMultiHit(batch.length);
-      try {
-        await engine.processCreatureDamageBatch(batch);
-      } finally {
-        engine.endMultiHit();
-      }
+      // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer.
+      await engine.dealDamageToTargets(source, victims.map(inst => ({ type: 'creature', inst })), {
+        damage: DEATH_DAMAGE, damageType: 'artifact', sourceName: CARD_NAME, hitDelay: 0,
+        });
 
       engine.log('powder_keg_blast', {
         damage: DEATH_DAMAGE,

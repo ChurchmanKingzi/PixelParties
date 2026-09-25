@@ -133,7 +133,7 @@ module.exports = {
       // opp's deck — duplicates within the peeked window are
       // interchangeable (cards are name-only in mainDeck).
       await engine.takeFromPile(ops, 'deck', pickedName, { source: CARD_NAME });   // v820: Stapel-Schicht
-      ps.hand.push(pickedName);
+      await engine.handZugang(ps, pickedName, { von: 'fremdesDeck', source: CARD_NAME });   // v1396: aus dem GEGNERISCHEN Deck — keine Suche, nicht „from your deck“ (Als Ruling 25.9.)
       // v693: getrackt MIT Herkunft (ersetzt das nackte _trackCard) —
       // die Karte kehrt in Ablage/Deck des Besitzers zurueck.
       engine._tagHandCardOrigin(pi, pickedName, oi);

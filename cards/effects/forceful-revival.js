@@ -44,6 +44,7 @@ function _eligibleCreatureNames(engine, ps, maxLevel, pi) {
   const seen = new Set();
   const out = [];
   for (const cn of (ps.discardPile || [])) {
+    if (!engine.darfAusAblageAufsFeld(cn)) continue;   // v1389: Gigantisaur, Ifrit
     if (seen.has(cn)) continue;
     const cd = cardDB[cn];
     if (!cd || !isOwnSideSummonableCreature(cd, cn)) continue;
@@ -146,18 +147,12 @@ module.exports = {
       if (!_userHasFreeSupportSlot(ps, heroIdx)) { gs._spellCancelled = true; return; }
 
       // ── Pop from discard and summon onto the user hero ───────────
-      if (!(await engine.takeFromPile(ps, 'discard', dpIdx, { source: CARD_NAME }))) { gs._spellCancelled = true; return; }   // v820: Stapel-Schicht
-      // Lethe pile-stamp carries over onto the revived instance.
-      const _letheBonus = engine.consumeLetheStamp(pi, chosenName);
-
-      const summonRes = await engine.summonCreatureWithHooks(
-        chosenName, pi, heroIdx, -1,
-        { source: CARD_NAME, hookExtras: { _isForcefulRevival: true } }
-      );
+      // v1389: Ablage → Feld über die EINE Stelle (Sperre, Lethe-Stempel,
+      // Signal, Rückgabe bei Fehlschlag — alles in summonFromDiscard).
+      const summonRes = await engine.summonFromDiscard(pi, pi, dpIdx, heroIdx, -1, {
+        source: CARD_NAME, flug: false, hookExtras: { _isForcefulRevival: true },
+      });
       if (!summonRes?.inst) {
-        // Summon fizzled (rare — beforeSummon refused, etc.). Refund the
-        // discarded copy so the user isn't out a card AND a spell.
-        ps.discardPile.push(chosenName);
         gs._spellCancelled = true;
         return;
       }
@@ -175,7 +170,6 @@ module.exports = {
       // fresh summon.
       if (!inst.counters) inst.counters = {};
       inst.counters._hasHaste = true;
-      if (_letheBonus > 0) inst.counters._letheLevelBonus = _letheBonus;
 
       engine._broadcastEvent('summon_effect', {
         owner: pi, heroIdx, zoneSlot: actualSlot, cardName: chosenName,

@@ -112,27 +112,17 @@ module.exports = {
       engine.sync();
       return true; // cost was paid; activation counts.
     }
-    if (!(await engine.takeFromPile(ps, 'discard', discardIdx, { source: CARD_NAME }))) { engine.sync(); return true; }   // v820: Stapel-Schicht
-
-    // Step 5: place. Use actionPlaceCreature with source 'deck' as a
-    // sentinel that bypasses the helper's own splice — we already
-    // pulled from discard ourselves. fireHooks runs onPlay /
-    // onCardEnterZone for the placed Skeleton, which is what enables
-    // chain triggers (Soul Shards etc.) and what Skullmael's aura
-    // detects via `_summonedFromDiscard`.
-    const placeRes = await engine.actionPlaceCreature(chosenName, pi, chosenZone.heroIdx, chosenZone.slotIdx, {
-      source: 'deck', // sentinel: no auto-splice (we did it manually).
-      sourceName: CARD_NAME,
-      countAsSummon: true,
-      animationType: 'summon',
-      fireHooks: true,
-      _summonedFromDiscard: true,
+    // Step 5 (v1389): Platzieren aus der Ablage über die EINE Stelle
+    // (summonFromDiscard → actionPlaceCreature 'discard': Sperre, Lethe,
+    // Flug, Signal `_summonedFromDiscard` für Skullmael/Soul Shards).
+    // Früher: eigene Entnahme + Sentinel `source: 'deck'` + Rückbuchung.
+    const placeRes = await engine.summonFromDiscard(pi, pi, discardIdx, chosenZone.heroIdx, chosenZone.slotIdx, {
+      mode: 'place', source: CARD_NAME,
+      placeOpts: { countAsSummon: true, animationType: 'summon', fireHooks: true },
     });
     if (!placeRes?.inst) {
-      // Refund Skeleton on placement failure (race).
-      ps.discardPile.push(chosenName);
       engine.sync();
-      return true;
+      return true; // Kosten bezahlt, Aktivierung zählt; Karte bleibt in der Ablage.
     }
 
     engine.log('skeleton_necromancer', {

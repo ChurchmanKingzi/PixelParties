@@ -178,25 +178,15 @@ module.exports = {
         });
         await engine._delay(800);
 
-        // Splice from discard.
-        const _taken_discardIdx = await engine.takeFromPile(ps, 'discard', name, { source: CARD_NAME });   // v820: Stapel-Schicht
-        if (!_taken_discardIdx) continue;
-
-        // Place. `source: 'deck'` is a sentinel that bypasses the
-        // helper's hand/discard splice — we already pulled from discard.
-        const placeRes = await engine.actionPlaceCreature(name, pi, zone.heroIdx, zone.slotIdx, {
-          source: 'deck',
-          sourceName: CARD_NAME,
-          countAsSummon: true,
-          animationType: 'summon',
-          fireHooks: true,
-          _summonedFromDiscard: true,
+        // v1389: Platzieren aus der Ablage über die EINE Stelle
+        // (summonFromDiscard → actionPlaceCreature 'discard': Sperre,
+        // Lethe-Stempel, Flug, Signal). Früher: eigene Entnahme plus
+        // Sentinel `source: 'deck'` und Rückbuchung von Hand.
+        const placeRes = await engine.summonFromDiscard(pi, pi, name, zone.heroIdx, zone.slotIdx, {
+          mode: 'place', source: CARD_NAME,
+          placeOpts: { countAsSummon: true, animationType: 'summon', fireHooks: true },
         });
-        if (!placeRes?.inst) {
-          // Race: zone occupied between picks. Refund.
-          ps.discardPile.push(name);
-          continue;
-        }
+        if (!placeRes?.inst) continue;   // Zone belegt / nicht belebbar — Karte bleibt in der Ablage
         engine.log('raise_the_minions', {
           player: ps.username, placed: name,
           heroIdx: zone.heroIdx, zoneSlot: zone.slotIdx,

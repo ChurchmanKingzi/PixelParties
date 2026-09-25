@@ -179,10 +179,8 @@ async function doDeckSearch(engine, playerIdx, heroIdx, level, trainingZoneIdx) 
     if (discardName === undefined || handIndex === undefined) return false;
     if (handIndex < 0 || handIndex >= ps.hand.length || ps.hand[handIndex] !== discardName) return false;
 
-    ps.hand.splice(handIndex, 1);
-    ps.discardPile.push(discardName);
-    engine.log('discard', { player: ps.username, card: discardName, by: 'Training' });
-    await engine.runHooks('onDiscard', { playerIdx, cardName: discardName, _skipReactionCheck: true });
+    // v1394: Abwurf über die zentrale Funktion.
+    if (!(await engine.actionDiscardHandCard(playerIdx, discardName, handIndex, { source: 'Training', _noGlow: true }))) return false;
 
     // Lv2: Training resolves when discard cost is paid → flash Training zone now
     engine._broadcastEvent('ability_activated', {

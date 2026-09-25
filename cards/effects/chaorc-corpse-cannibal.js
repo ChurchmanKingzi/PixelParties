@@ -128,7 +128,7 @@ module.exports = {
         fromHandIdx: handIdx, toHeroIdx: heroIdx, toSlotIdx: slot,
       });
 
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       // ★★ v1222: Abgleich SOFORT nach dem Hand-Abgang. Der Client verdeckt den
       // Startplatz der abfliegenden Karte nur, solange die Hand noch so
       // gross ist wie beim Abflug — bleibt der `sync` aus, taucht sie
@@ -145,7 +145,7 @@ module.exports = {
         CARD_NAME, pi, heroIdx, slot, { source: CARD_NAME },
       );
       if (!res?.inst) {
-        ps.hand.push(CARD_NAME); // placement fizzled — refund
+        engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', source: CARD_NAME, ohneInstanz: true }); // placement fizzled — refund
         return;
       }
       engine.log('corpse_cannibal_resummon', {

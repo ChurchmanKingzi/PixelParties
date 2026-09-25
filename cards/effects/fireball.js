@@ -123,30 +123,17 @@ module.exports = {
         }
       }
 
-      engine.beginMultiHit(heldenZiele.length + kreaturZiele.length);
-      try {
-      for (const { t, hero } of heldenZiele) {
-        if (!hero || hero.hp <= 0) continue;
-        engine._broadcastEvent('play_zone_animation', {
-          type: 'flame_strike', owner: t.owner, heroIdx: t.heroIdx, zoneSlot: -1,
-        });
-        await engine.actionDealDamage(source, hero, FIREBALL_DAMAGE, 'destruction_spell', {
-          _skipReactionCheck: true,
-        });
-      }
-
-      if (kreaturZiele.length > 0) {
-        // `animType` am Eintrag statt eigener Broadcasts — derselbe Weg
-        // wie bei Aquatic Arrows; der Batch spielt die Bilder selbst.
-        await engine.processCreatureDamageBatch(kreaturZiele.map(inst => ({
-          inst, amount: FIREBALL_DAMAGE, type: 'destruction_spell',
-          source, sourceOwner: pi, animType: 'flame_strike',
-          _skipReactionCheck: true,
-        })));
-      }
-      } finally {
-        engine.endMultiHit();
-      }
+      // ★ v1392: Treffer über die EINE Stelle für Mehrfachtreffer
+      // (Interference, Idol-Fenster, Brett-Wächter, EIN Kreatur-Stapel).
+      await engine.dealDamageToTargets(source, [
+        ...heldenZiele.map(({ t }) => ({ type: 'hero', owner: t.owner, heroIdx: t.heroIdx })),
+        ...kreaturZiele.map(inst => ({ type: 'creature', inst })),
+      ], {
+        damage: FIREBALL_DAMAGE, damageType: 'destruction_spell', sourceName: 'Fireball',
+        animationType: 'flame_strike', animDelay: 0, hitDelay: 0,
+        surpriseCheck: false, postTargetCheck: false,
+        trefferOpts: { _skipReactionCheck: true },
+      });
 
       engine.log('fireball', {
         player: ps.username,

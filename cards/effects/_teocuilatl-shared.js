@@ -138,7 +138,7 @@ async function sacrificeSummonIntoSlot(engine, pi, req, CARD_NAME_ARG) {
   //     commitHandRemoval is a no-op, and set `_placementConsumedByCard`
   //     so the server skips its own placement.
   if (fromHandIdx >= 0) {
-    ps.hand.splice(fromHandIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', fromHandIdx);
     engine.notePlayedFromHand(pi);
   }
   ps._resolvingCard = null;
@@ -208,7 +208,7 @@ async function sacrificeSelf(engine, inst, pi) {
       owner: inst.owner, cardName: inst.name,
       from: 'hand', to: 'discard', fromHandIdx: hi >= 0 ? hi : 0,
     });
-    if (hi >= 0) ps.hand.splice(hi, 1);
+    if (hi >= 0) engine.takeFromPileSync(ps, 'hand', hi);
     ps.discardPile.push(inst.name);
     inst.zone = 'discard'; inst.heroIdx = -1; inst.zoneSlot = -1;
     engine._untrackCard(inst.id);

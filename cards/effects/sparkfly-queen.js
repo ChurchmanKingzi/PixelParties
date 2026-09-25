@@ -435,10 +435,9 @@ async function runMainEffect(ctx, engine, gs, pi, oi, inst) {
     const srcIdx = sourceArr.indexOf(name);
     if (srcIdx < 0) continue; // race — already gone
     sourceArr.splice(srcIdx, 1);
-    ps.hand.push(name);
+    const newInst = engine.handZugangSync(ps, name, { source: CARD_NAME });
     const newHandIdx = ps.hand.length - 1;
 
-    const newInst = engine._trackCard(name, pi, 'hand');
     newInst.originalOwner = oi;
 
     // -3 transient level offset on Attack / Spell / Creature (per

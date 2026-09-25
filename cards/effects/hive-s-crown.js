@@ -282,7 +282,7 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_hand' });   // v1360
         return true;
       }
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       // Untrack the matching hand instance so the support track is clean
       // (mirrors divine-gift-of-the-deepsea's hand-pull pattern).
       const handInst = engine.cardInstances.find(c =>
@@ -296,7 +296,7 @@ module.exports = {
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'queen_left_deck' });   // v1360
         return true;
       }
-      if (!(await engine.takeFromPile(ps, 'deck', deckIdx, { source: 'Hive\'s Crown' }))) {   // v820: Stapel-Schicht
+      if (!(await engine.deckEntnahme(ps,  deckIdx, { source: 'Hive\'s Crown' }))) {   // v820: Stapel-Schicht
         engine.log('hives_crown_fizzle', { player: ps.username, reason: 'deck_locked' });
         await engine.zeigeFizzle(CARD_NAME, { playerIdx: pi, grund: 'deck_locked' });   // v1360
         return true;
@@ -330,6 +330,7 @@ module.exports = {
         countAsSummon: true,
         animationType: 'summon',
         fireHooks: true,
+        hookExtras: engine.deckHookExtras(),   // v1393
       });
     } finally {
       delete gs._hivesCrownActive;

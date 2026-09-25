@@ -143,12 +143,12 @@ module.exports = {
     });
 
     const handIdx = ps.hand.indexOf(CARD_NAME);
-    ps.hand.splice(handIdx, 1);
+    engine.takeFromPileSync(ps, 'hand', handIdx);
     const res = await engine.summonCreatureWithHooks(
       CARD_NAME, pi, dest.heroIdx, dest.slotIdx,
       { source: CARD_NAME, fromHandIdx: handIdx },
     );
-    if (!res?.inst) { ps.hand.push(CARD_NAME); return false; }
+    if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return false; }   // v1395
 
     // „Negate that card or effect." Die kanonische Marke; der
     // Zerstoerungs-Trichter kehrt ohnehin sofort zurueck.

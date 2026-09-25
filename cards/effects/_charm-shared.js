@@ -91,6 +91,7 @@ async function temporaereKontrolle(engine, {
   hero.charmedHeroIdx = heroIdx;
   if (!hero.statuses) hero.statuses = {};
   hero.statuses.charmed = { controller: controllerPi, appliedTurn: gs.turn };
+  engine._heldenStatusVerursacher(hero.statuses.charmed, { appliedBy: controllerPi });   // v1399
   if (marker) hero.statuses.charmed[marker] = true;
 
   // ⑤ Support-Zonen nur auf Ansage

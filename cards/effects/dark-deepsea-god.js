@@ -143,33 +143,17 @@ async function _fireAoEAsSource(engine, pi, sourceInst, isCopy) {
       source: sourceInst, sourceOwner: pi, canBeNegated: true,
     });
   }
-  await engine.preDamageMultiTargetWindow(sourceInst, [
-    ...heroTargetsList,
-    ...creatureEntries.map(e => ({
-      type: 'creature', owner: e.inst.controller ?? e.inst.owner,
-      heroIdx: e.inst.heroIdx, slotIdx: e.inst.zoneSlot,
-      cardName: e.inst.name,
-    })),
-  ]);
-
-  // ★ v1043 („Interference"): EIN Schlag auf mehrere Ziele —
-  // gezaehlt wird, was WIRKLICH getroffen wird.
-  engine.beginMultiHit(heroTargetsList.filter(ht => (ops.heroes?.[ht.heroIdx]?.hp || 0) > 0).length);
-  try {
-  for (const ht of heroTargetsList) {
-    const h = ops.heroes?.[ht.heroIdx];
-    if (!h?.name || h.hp <= 0) continue;
-    await engine.actionDealDamage(sourceInst, h, DAMAGE, 'creature', {
-      sourceOwner: pi, canBeNegated: true,
-    });
-  }
-  } finally {
-    engine.endMultiHit();
-  }
-
-  if (creatureEntries.length > 0) {
-    await engine.processCreatureDamageBatch(creatureEntries);
-  }
+  // ★ v1392: über die EINE Stelle für Mehrfachtreffer (Hand-Reaktionen,
+  // Interference + Idol-Fenster, Brett-Wächter). Bis v1391 lief der
+  // Kreatur-Stapel hier NACH der Interference-Klammer.
+  await engine.dealDamageToTargets(sourceInst, [
+    ...heroTargetsList.map(ht => ({ type: 'hero', owner: ht.owner, heroIdx: ht.heroIdx })),
+    ...creatureEntries.map(e => ({ type: 'creature', inst: e.inst })),
+  ], {
+    damage: DAMAGE, damageType: 'creature', sourceName: 'Dark Deepsea God', hitDelay: 0,
+    surpriseCheck: false,
+    trefferOpts: { sourceOwner: pi, canBeNegated: true },
+  });
 
   engine.log('dark_deepsea_god_awakened', {
     player: ps?.username, damage: DAMAGE,

@@ -143,7 +143,7 @@ module.exports = {
       }
 
       const handIdx = ps.hand.indexOf(CARD_NAME);
-      ps.hand.splice(handIdx, 1);
+      engine.takeFromPileSync(ps, 'hand', handIdx);
       const res = await engine.summonCreatureWithHooks(
         CARD_NAME, pi, ziel.heroIdx, ziel.slotIdx,
         {
@@ -151,7 +151,7 @@ module.exports = {
           hookExtras: { _isNormalSummon: false },
         },
       );
-      if (!res?.inst) { ps.hand.push(CARD_NAME); return; }
+      if (!res?.inst) { engine.handZugangSync(ps, CARD_NAME, { von: 'rueckgabe', ohneInstanz: true }); return; }   // v1395
 
       engine.log('ethan_prodigy_summon', {
         player: ps.username, trigger: ctx.spellName || null, level: cd.level,

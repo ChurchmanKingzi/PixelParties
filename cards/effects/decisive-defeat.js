@@ -122,6 +122,7 @@ module.exports = {
           appliedTurn: gs.turn,
           _fromAttachment: CARD_NAME,
         };
+        engine._heldenStatusVerursacher(wirt.statuses.negated, { appliedBy: ctx.cardOwner, source: ctx.card });   // v1399
       }
 
       engine._broadcastEvent('play_zone_animation', {

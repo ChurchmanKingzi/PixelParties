@@ -68,7 +68,7 @@ function istArtefaktKreatur(cd) {
 module.exports = {
   requiresTarget: false,
 
-  spellPlayCondition: (gs, pi) => (gs.players[pi]?.mainDeck || []).length > 0,
+  spellPlayCondition: (gs, pi) => (gs.players[pi]?.mainDeck || []).length > 0 && !gs.players[pi]?.handLocked,   // v1396: „add to hand“
 
   hooks: {
     onPlay: async (ctx) => {
@@ -78,6 +78,10 @@ module.exports = {
       const ps = gs.players[pi];
       if (!ps) { gs._spellCancelled = true; return; }
       if ((ps.mainDeck || []).length === 0) { gs._spellCancelled = true; return; }
+      // v1396 (Als Ruling 25.9.): aufgedeckte Karten auf die Hand zu nehmen
+      // IST „add to hand" — unter einer Hand-Sperre geht das nicht.
+      // Keine Such-Sperre: das Aufdecken ist keine Suche.
+      if (engine.handZugangGesperrt(pi)) { gs._spellCancelled = true; return; }
 
       await engine.showTriggeredEffect(CARD_NAME, { playerIdx: pi });
 
@@ -104,8 +108,7 @@ module.exports = {
         // versteckt ihren Handplatz, bis der Flug ankommt. Waere sie
         // erst am Flugende im Zustand, gaebe es den Platz beim Anflug
         // noch gar nicht.
-        ps.hand.push(name);
-        engine._trackCard(name, pi, 'hand');
+        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
         gezeigt.push(name);
         engine.sync();
         await engine._delay(VERSATZ_MS);
@@ -193,7 +196,7 @@ module.exports = {
           if (!platz) continue;
           const idx = (ps.hand || []).indexOf(name);
           if (idx < 0) continue;
-          ps.hand.splice(idx, 1);
+          engine.takeFromPileSync(ps, 'hand', idx);
           engine.notePlayedFromHand(pi);
           await engine.actionPlaceCreature(name, pi, platz.heroIdx, platz.slotIdx, {
             source: 'external', sourceName: CARD_NAME, fireHooks: true,

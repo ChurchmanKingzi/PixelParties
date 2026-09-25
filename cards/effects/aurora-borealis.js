@@ -69,7 +69,7 @@ async function loescheAusHand(engine, pi, name) {
   engine._broadcastEvent('play_pile_transfer', {
     owner: pi, cardName: name, from: 'hand', to: 'deleted', fromHandIdx: idx,
   });
-  ps.hand.splice(idx, 1);
+  engine.takeFromPileSync(ps, 'hand', idx);
   const inst = engine.cardInstances.find(c => c.owner === pi && c.zone === 'hand' && c.name === name);
   if (inst) engine._untrackCard(inst.id);
   await engine._delay(650);
@@ -147,8 +147,7 @@ module.exports = {
         if (!(await engine.takeFromPile(ps, 'deck', idx, { source: CARD_NAME, shuffle: true, toHand: true }))) continue;
         engine._broadcastEvent('card_reveal', { cardName: name });
         engine._broadcastEvent('deck_search_add', { cardName: name, playerIdx: pi });
-        ps.hand.push(name);
-        engine._trackCard(name, pi, 'hand');
+        await engine.handZugang(ps, name, { von: 'deck', source: CARD_NAME });
         geholt.push(name);
         engine.sync();
         await engine._delay(320);
