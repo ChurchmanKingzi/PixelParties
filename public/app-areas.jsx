@@ -2082,11 +2082,12 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
 //  Fluss + Wasserfall (3 Bilder übereinander); sway.png — Blumen und
 //  Grasbüschel (2 Bilder); mist.png — Gischt am Fuß des Falls (3 Bilder);
 //  clouds-front.png — Kachel 256, Schwaden vorn, zieht schneller;
-//  bird.png (3 Bilder 7×5), butterfly.png (2 Bilder 5×4).
+//  bird.png (Schwalbe im Profil, 4 Bilder 11×7), butterfly.png (2 Bilder 5×4).
 //
 //  Animiert: Fluss und Wasserfall fließen, Gischt wallt und steigt,
 //  die große Insel und die kleinen schweben auf und ab (ganze
-//  Kunstpixel), Wolken ziehen in zwei Ebenen, Schwalben fliegen,
+//  Kunstpixel), Wolken ziehen in zwei Ebenen, Schwalben fliegen im Profil
+//  (Kopf in Flugrichtung, Rückflüge gespiegelt),
 //  Blumen und Gras wiegen, Schmetterlinge flattern über der Wiese,
 //  Erdkrümel rieseln von den Zacken, Wasser glitzert.
 //  Licht IMMER oben rechts.
@@ -2179,7 +2180,7 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
       <PixelBand src={FI + 'clouds-front.png'} className="fi-wolken-vorn" />
       {voegel.map((v, i) => (
         <div key={'v' + i} className="pp-area-dyn pp-quer" style={ppQuer(v.y, v.dur, v.delay, v.rtl)}>
-          <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 1.9s` }} />
+          <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 2.3s` }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
@@ -2212,11 +2213,14 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           80% { transform: translate(calc(-2 * var(--px)), calc(2 * var(--px))); } 100% { transform: translate(0, 0); }
         }
         .fi-falter { display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px)); background: url(${FI}butterfly.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .24s steps(1) infinite; }
+        /* Schwalbe im Profil, Bild schaut nach rechts (= ppQuerLtr); Rückflüge
+           (ppQuerRtl) werden gespiegelt. Flügelschlag 4 Bilder, kaum Auf und Ab. */
         .fi-vogel {
-          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
-          background: url(${FI}bird.png) 0 0 / 300% 100% no-repeat;
-          animation: ppSprite3 .5s steps(1) infinite, ppBob 1.9s ease-in-out infinite alternate; --bob: calc(2 * var(--px));
+          display: block; width: calc(11 * var(--px)); height: calc(7 * var(--px));
+          background: url(${FI}bird.png) 0 0 / 400% 100% no-repeat;
+          animation: fiFluegel .5s steps(4) infinite, ppBob 2.3s steps(2) infinite alternate; --bob: var(--px);
         }
+        @keyframes fiFluegel { from { background-position: 0 0; } to { background-position: calc(-44 * var(--px)) 0; } }
       `}</style>
     </PixelScene>
   );
@@ -2397,9 +2401,12 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
 //
 //  Karte: ein Zauber rund um „Skeleton"-Kreaturen — im Kerker steht ein
 //  eisernes Gerüst mit Kettenrahmen, darin zermahlen gezahnte Walzen
-//  Knochen; links ein Skelett mit rotem Helmbusch und grünem Umhang,
-//  rechts ein zweites. Oben verrauschter Bruchstein, darunter Mauerwerk
-//  aus dunkelbraun-grauen und sandfarbenen Ziegeln.
+//  Knochen; links der Skeleton Healer, rechts der Loyal Bone Dog. Oben
+//  verrauschter Bruchstein, darunter Mauerwerk aus dunkelbraun-grauen
+//  und sandfarbenen Ziegeln.
+//  Korrektur (Al 25.9.): der Linke trägt keinen Helmbusch, sondern einen
+//  Helm mit ROTEM KREUZ — der Healer (grüne Handschuhe und Stiefel,
+//  Sanitätstasche); rechts steht kein Skelett, sondern ein Knochenhund.
 //
 //  Ebenen (Kunsthöhe 100): tile.png (Kachel 128: Bruchstein-Gewölbe mit
 //  Moos und Rinnspuren, Ziegelwand mit Abplatzern, Wandfackel im Halter
@@ -2410,14 +2417,15 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
 //  Eisengerüst, Trichter voller Knochen, Mahlgehäuse mit Fenster, Rutsche,
 //  Wanne mit Knochenmehl, Knochenhaufen, Mehlsäcke, Schaufel),
 //  mill-rollers.png / mill-wheels.png (je 3 Bilder: Mahlwalzen, Schwung-
-//  rad, Zahnrad), skel-a.png / skel-b.png (je 3 Bilder), bone.png,
+//  rad, Zahnrad), healer.png (3 Bilder), dog.png (4 Bilder), bone.png,
 //  flame.png, meal.png, rat.png.
 //
 //  Animiert: die Walzen drehen gegenläufig und ziehen einen Knochen ein,
 //  Schwungrad und Zahnrad laufen mit, Knochen fallen aus dem Deckenschacht
 //  in den Trichter, Knochenmehl rieselt aus der Rutsche und staubt auf dem
-//  Haufen, die Ketten pendeln, Fackeln flackern mit warmem Schein, die
-//  Skelette klappern mit dem Kiefer, wippen und heben Speer bzw. Keule,
+//  Haufen, die Ketten pendeln, Fackeln flackern mit warmem Schein, der
+//  Healer klappert mit dem Kiefer, wippt und winkt mit dem grünen
+//  Handschuh; der Hund wedelt, schnüffelt am Boden und bellt (Kiefer),
 //  Staub schwebt, ab und zu huscht eine Ratte über den Boden.
 //  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
@@ -2425,10 +2433,8 @@ const BGR = '/areas/bonegrinder/';
 const BGR_MUEHLE_W = 100;
 const BGR_KACHEL = 128;
 const BGR_FACKEL_Y = 36;          // Oberkante Pechkopf; Fackeln bei u = 0 der Kachel
-const BGR_SKELETTE = [
-  { bild: 'skel-a', x: -60, dur: 7.4, delay: -1.2 },
-  { bild: 'skel-b', x: 60, dur: 6.1, delay: -4.3 },
-];
+const BGR_HEILER_X = -60;         // Skeleton Healer links (Füße bei y 91)
+const BGR_HUND_X = 63;            // Loyal Bone Dog rechts
 
 const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   // Fackeln: Kachel-u 0 liegt bei x = -64 + k·128 neben der Brettmitte
@@ -2480,12 +2486,8 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           animation: `bgStauben ${s.dur.toFixed(2)}s steps(6) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      {BGR_SKELETTE.map((s, i) => (
-        <i key={'s' + i} className="bg-skelett" style={{
-          left: ppArtX(s.x - 10.5, 0), top: ppArt(60), backgroundImage: `url(${BGR}${s.bild}.png)`,
-          animation: `bgKlappern ${s.dur}s steps(1) ${s.delay}s infinite`,
-        }} />
-      ))}
+      <i className="bg-heiler" style={{ left: ppArtX(BGR_HEILER_X - 10.5, 0), top: ppArt(60) }} />
+      <i className="bg-hund" style={{ left: ppArtX(BGR_HUND_X - 12.5, 0), top: ppArt(75) }} />
       <div className="pp-area-dyn pp-quer" style={ppQuer(92, ratte.dur, ratte.delay, ratte.rtl)}>
         <i className="bg-ratte" style={{ transform: ratte.rtl ? undefined : 'scaleX(-1)' }} />
       </div>
@@ -2534,9 +2536,10 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-7 * var(--px))); opacity: 0; }
         }
-        .bg-skelett {
+        .bg-heiler {
           position: absolute; width: calc(21 * var(--px)); height: calc(32 * var(--px));
-          background-size: 300% 100%; background-repeat: no-repeat; background-position: 0 0;
+          background: url(${BGR}healer.png) 0 0 / 300% 100% no-repeat;
+          animation: bgKlappern 7.4s steps(1) -1.2s infinite;
         }
         @keyframes bgKlappern {
           0%, 38% { background-position: 0 0; }
@@ -2544,6 +2547,23 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           44% { background-position: 50% 0; } 46% { background-position: 0 0; }
           48% { background-position: 50% 0; } 50% { background-position: 0 0; }
           74% { background-position: 100% 0; } 90% { background-position: 0 0; }
+        }
+        /* Knochenhund: 4 Bilder — Ruhe, Schwanz, Schnüffeln, Bellen */
+        .bg-hund {
+          position: absolute; width: calc(25 * var(--px)); height: calc(17 * var(--px));
+          background: url(${BGR}dog.png) 0 0 / 400% 100% no-repeat;
+          animation: bgHund 6.8s steps(1) -2.5s infinite;
+        }
+        @keyframes bgHund {
+          0% { background-position: 0 0; } 4% { background-position: 33.333% 0; } 8% { background-position: 0 0; }
+          12% { background-position: 33.333% 0; } 16% { background-position: 0 0; } 20% { background-position: 33.333% 0; }
+          24% { background-position: 0 0; }
+          36% { background-position: 66.667% 0; } 54% { background-position: 0 0; }
+          62% { background-position: 100% 0; } 64% { background-position: 0 0; }
+          66% { background-position: 100% 0; } 68% { background-position: 0 0; }
+          70% { background-position: 100% 0; } 72% { background-position: 0 0; }
+          80% { background-position: 33.333% 0; } 84% { background-position: 0 0; }
+          88% { background-position: 33.333% 0; } 92% { background-position: 0 0; }
         }
         .bg-ratte {
           display: block; width: calc(9 * var(--px)); height: calc(4 * var(--px));
@@ -2564,39 +2584,42 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
 //  THE COSMIC DEPTHS — der tiefe Weltraum (v1440, Al 25.9.)
 //
 //  Nach dem Kartenmotiv: tiefes Nachtblau voller Sterne, oben ein blass
-//  grün-grauer Mond, rechts ein blau-weißer, erdähnlicher Planet mit
-//  Wolken, links der rote, längliche Kristall-Riss (das „Auge", aus dem
-//  die Wesen der Cosmic Depths kommen), schwache Nebelschleier.
+//  grün-grauer Mond, rechts „die Erde" — in Pixel Parties ausdrücklich
+//  ein WÜRFEL (Al; wie auf The Cosmic Depths und Arrival from the Cosmic
+//  Depths), links ARGOS, das rote Auge des Kosmos, in seinem schwarzen,
+//  schattenhaften Körper (Al: kein lila Nebel). Kein Ringplanet (Al).
 //
 //  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
 //  liegt): tile.png — Kachel 128 (Nachtblau als Pixelrauschen, violette
 //  und blaue Nebel, dunkle Staubbahnen, Sterne in Größen und Farben,
-//  ferne Galaxien, Sternhaufen);
-//  twinkle.png — 3 Bilder der hellen Sterne (funkeln); nebula.png —
-//  durchsichtige Schleier, die langsam wandern und atmen; center.png —
-//  Versatzstück 200, mittig: Mond mit Kratern und Maria, Planet mit
-//  Ozeanen, Kontinenten, Wüsten, Polkappe, Meeresglanz, Atmosphären-
-//  saum und Halo, dazu ein ferner Ringplanet mit Eismond (oben links).
-//  Die WOLKEN des Planeten liegen getrennt (clouds.png, 3 Lichtstufen)
-//  und ziehen durch drei Masken (cmask-0/1/2.png = Tag, Dämmerung,
-//  Nacht), so bleibt die Schattierung auf den wandernden Wolken richtig.
-//  rift.png (3 Bilder, atmet) + rift-glow.png (pulsiert); Sprites:
-//  saucer.png (Invader-Untertasse, Lichter blinken), analyzer-r/l.png
-//  (Analyzer-Drohnen im Dreierschwarm, je Richtung eigens beleuchtet),
-//  asteroid-s/l.png (4 Drehbilder, Licht bleibt oben rechts), comet.png,
+//  ferne Galaxien, Sternhaufen); twinkle.png — 3 Bilder der hellen
+//  Sterne (funkeln); nebula.png — durchsichtige Schleier, die langsam
+//  wandern und atmen; center.png — Versatzstück 200, mittig: Mond mit
+//  Kratern und Maria, der Erd-Würfel (orthografisch gedreht, drei
+//  Flächen: oben am hellsten, rechts im Licht, links im Schatten; Ozeane,
+//  Kontinente, Wüsten, Eis, Küstensäume, Atmosphärensaum an den Kanten,
+//  Halo). cube-clouds.png — 32 Bilder NUR mit den Wolken des Würfels, je
+//  Fläche schattiert; darin ziehen die Wolken um die Hochachse.
+//  argos-body.png (3 Bilder, wabert: tiefschwarz, Rand sehr dunkles Blau/
+//  Rot, Rauchsaum, Tentakelfetzen), rift.png (Argos' Auge, 3 Bilder: der
+//  Spalt öffnet sich) + rift-glow.png (pulsiert). Sprites: saucer.png
+//  (Invader-Untertasse, Lichter blinken), analyzer-r/l.png (Analyzer-
+//  Drohnen im Dreierschwarm, je Richtung eigens beleuchtet), asteroid-
+//  s/l.png (4 Drehbilder, Licht bleibt oben rechts), comet.png,
 //  shoot.png (Sternschnuppe).
 //
 //  Animiert: Sterne funkeln (Kachelbilder + Funkelkreuze), Wolken ziehen
-//  über den Planeten, der Riss atmet und glüht, rote Funken werden in
-//  ihn hineingesogen, Nebel wabert, Sternschnuppen, ab und zu ein Komet,
-//  treibende Asteroiden und eine ferne Untertasse (beide ziehen HINTER
-//  Mond und Planet vorbei), ein Analyzer-Schwarm. Licht IMMER oben rechts.
+//  über den Erd-Würfel, Argos' Schatten wabert, sein Auge atmet und
+//  glüht, rote Funken werden hineingesogen, Nebel wabert, Sternschnuppen,
+//  ab und zu ein Komet, treibende Asteroiden und eine ferne Untertasse
+//  (beide ziehen HINTER Mond und Würfel vorbei), ein Analyzer-Schwarm.
+//  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const CD = '/areas/cosmic-depths/';
 const CD_W = 200;
-const CD_PLANET = { x: 150, y: 50, r: 24 };        // im Versatzstück
-const CD_RISS = { x: 38, y: 60, w: 19, h: 37 };    // Mitte des Risses
-const CD_WOLKEN_W = 96;                            // Breite der Wolkentextur
+const CD_WUERFEL_WOLKEN = { x: 126, y: 24, w: 48, h: 52, n: 32 };   // Wolkenbilder über dem Erd-Würfel (im Versatzstück)
+const CD_AUGE = { x: 40, y: 58, w: 23, h: 45 };                      // Mitte von Argos' Auge
+const CD_KOERPER = { w: 76, h: 98 };                                 // Schattenkörper, um das Auge zentriert
 
 const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
   const funkeln = useMemo(() => ppZufall(ppFxN(10), () => ({
@@ -2616,7 +2639,6 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
     const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 14;
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 1.3, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4.4 };
   }), []);
-  const P = CD_PLANET, D = 2 * P.r + 1;
   return (
     <PixelScene artH={100} bg="#01021f" className="cosmic-depths-overlay">
       <PixelBand src={CD + 'tile.png'} />
@@ -2640,17 +2662,16 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
         </div>
       ))}
       <PixelPiece src={CD + 'center.png'} w={CD_W} />
-      {[0, 1, 2].map(z => (
-        <div key={'w' + z} className="cd-wolken" style={{
-          left: ppArtX(P.x - P.r, CD_W), top: ppArt(P.y - P.r), width: ppArt(D), height: ppArt(D),
-          backgroundPositionY: `${z * 50}%`, ...ppMaske(CD + `cmask-${z}.png`, false),
-        }} />
-      ))}
-      <i className="cd-riss-schein" style={{ left: ppArtX(CD_RISS.x - 32, CD_W), top: ppArt(CD_RISS.y - 36) }} />
-      <i className="cd-riss" style={{ left: ppArtX(CD_RISS.x - Math.floor(CD_RISS.w / 2), CD_W), top: ppArt(CD_RISS.y - Math.floor(CD_RISS.h / 2)) }} />
+      <i className="cd-wuerfel-wolken" style={{
+        left: ppArtX(CD_WUERFEL_WOLKEN.x, CD_W), top: ppArt(CD_WUERFEL_WOLKEN.y),
+        width: ppArt(CD_WUERFEL_WOLKEN.w), height: ppArt(CD_WUERFEL_WOLKEN.h),
+      }} />
+      <i className="cd-koerper" style={{ left: ppArtX(CD_AUGE.x - CD_KOERPER.w / 2, CD_W), top: ppArt(CD_AUGE.y - CD_KOERPER.h / 2) }} />
+      <i className="cd-riss-schein" style={{ left: ppArtX(CD_AUGE.x - 22, CD_W), top: ppArt(CD_AUGE.y - 32) }} />
+      <i className="cd-riss" style={{ left: ppArtX(CD_AUGE.x - Math.floor(CD_AUGE.w / 2), CD_W), top: ppArt(CD_AUGE.y - Math.floor(CD_AUGE.h / 2)) }} />
       {funken.map((f, i) => (
         <i key={'k' + i} className="pp-area-dyn cd-funke" style={{
-          left: ppArtX(CD_RISS.x, CD_W), top: ppArt(CD_RISS.y), '--dx': ppArt(f.dx.toFixed(1)), '--dy': ppArt(f.dy.toFixed(1)),
+          left: ppArtX(CD_AUGE.x, CD_W), top: ppArt(CD_AUGE.y), '--dx': ppArt(f.dx.toFixed(1)), '--dy': ppArt(f.dy.toFixed(1)),
           animation: `cdSog ${f.dur.toFixed(2)}s ease-in ${f.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -2676,21 +2697,28 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
         }
         @keyframes cdNebelZug { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         @keyframes cdNebelAtmen { from { opacity: .45; } to { opacity: .9; } }
-        .cd-wolken {
+        /* Wolken des Erd-Würfels: fertig gezeichnete Bilder (je Fläche richtig
+           schattiert), die Wolken ziehen darin um die Hochachse. */
+        .cd-wuerfel-wolken {
           position: absolute;
-          background-image: url(${CD}clouds.png); background-repeat: repeat-x;
-          background-size: calc(${CD_WOLKEN_W} * var(--px)) 300%;
-          animation: cdWolken 110s steps(${CD_WOLKEN_W}) infinite;
+          background: url(${CD}cube-clouds.png) 0 0 / ${CD_WUERFEL_WOLKEN.n * 100}% 100% no-repeat;
+          animation: cdWuerfelWolken 40s steps(${CD_WUERFEL_WOLKEN.n}, jump-none) infinite;
         }
-        @keyframes cdWolken { from { background-position-x: 0; } to { background-position-x: calc(${CD_WOLKEN_W} * var(--px)); } }
+        @keyframes cdWuerfelWolken { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+        /* Argos' Schattenkörper wabert (3 Bilder, hin und zurück) */
+        .cd-koerper {
+          position: absolute; width: calc(${CD_KOERPER.w} * var(--px)); height: calc(${CD_KOERPER.h} * var(--px));
+          background: url(${CD}argos-body.png) 0 0 / 300% 100% no-repeat;
+          animation: cdRiss 6.4s steps(1) infinite;
+        }
         .cd-riss-schein {
-          position: absolute; width: calc(64 * var(--px)); height: calc(72 * var(--px));
+          position: absolute; width: calc(44 * var(--px)); height: calc(64 * var(--px));
           background: url(${CD}rift-glow.png) 0 0 / 100% 100% no-repeat;
           animation: cdSchein 2.8s ease-in-out infinite alternate;
         }
         @keyframes cdSchein { from { opacity: .45; } to { opacity: 1; } }
         .cd-riss {
-          position: absolute; width: calc(${CD_RISS.w} * var(--px)); height: calc(${CD_RISS.h} * var(--px));
+          position: absolute; width: calc(${CD_AUGE.w} * var(--px)); height: calc(${CD_AUGE.h} * var(--px));
           background: url(${CD}rift.png) 0 0 / 300% 100% no-repeat;
           animation: cdRiss 2.8s steps(1) infinite;
         }
@@ -2746,144 +2774,141 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  THE FIRST CIRCLE OF HELL — der Limbus (v1440, Al 25.9.)
+//  THE FIRST CIRCLE OF HELL — die Vorhoelle (v1440, Al 25.9.)
 //
-//  Karte: grauer, verrauschter Steinboden, blasse, kahle, verlorene
-//  Seelen in grauen Lumpen stehen verwirrt herum, eine mit „?" ueber
-//  dem Kopf. Leitmotiv der frueheren Szene: „hier ist alles Staub".
-//  Szene: eine riesige graue Hoehle — Felswand aus Bloecken mit dunklen
-//  Spalten, Deckenueberhang mit Stalaktiten, Nischen mit Knochen,
-//  verdorrte Baeume, Stalagmiten und Geroell am Wandfuss, ein staubiger
-//  Boden mit Kieseln, Felsbrocken, Aschehaufen, Knochen, Baumstuempfen
-//  und Rissen, aus denen schwach rotes Glimmen der tieferen Kreise
-//  dringt. Mittig ein verfallenes Steintor (Keilsteinbogen mit Schaedel-
-//  Schlussstein, Quaderpfeiler, Spinnweben, herabgestuerzte Steine), in
-//  dem eine Treppe hinab in die Tiefe fuehrt — unten glueht es rot.
-//  Farbarm, grau in grau. Licht IMMER oben rechts.
+//  Karte: grauer, verrauschter Boden in mehreren nahen Grautoenen,
+//  blasse, kahle, verlorene Seelen in grauen Lumpen stehen verwirrt
+//  herum, eine mit „?" ueber dem Kopf.
+//  Al 25.9.: „die ‚Vorhoelle': eine graue, triste, ENDLOSE Landschaft an
+//  Kargheit, KEINEN felsigen Untergrund" — also keine Hoehle, kein Tor.
+//  Szene: eine flache, endlose graue Ebene bis zum Horizont, darueber
+//  ein trueber, konturloser Dunsthimmel, der am Horizont in den Boden
+//  uebergeht. Tiefe durch Perspektive: nah grobe, kontrastreiche
+//  Pixelklumpen, zur Ferne hin feiner, heller, dunstiger. Karg: nur
+//  flache Rillen, flache Staubverwehungen, vereinzelte kleine Steine und
+//  Fussspurketten, die ziellos im Kreis laufen. Licht IMMER oben rechts.
 //
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 128; tile-glow.png — Glimmen der Risse;
-//  gate.png / gate-glow.png — Tor 120, mittig; dust.png — Staub-
-//  schwaden (Kachel 128×24); soul.png — Seelen (6 Bilder 7×11: stehen,
+//  liegt): tile.png — Kachel 128 (Himmel + Ebene); haze.png — Dunst-
+//  schwaden am Horizont (128×40); dust.png — Staub-/Ascheschleier ueber
+//  dem Boden (128×24); soul.png — nahe Seelen (6 Bilder 9×14: stehen,
 //  Schritt, Schritt, dasselbe nach links; 3 Varianten untereinander);
-//  ask.png — das „?" (6×8).
-//  Animiert: Seelen schlurfen ziellos hin und her (ganze Kunstpixel),
-//  bleiben stehen, sehen sich um, ab und zu erscheint ein „?"; zwei
-//  stehen nur herum und drehen den Kopf. Asche rieselt, Staub rinnt von
-//  den Stalaktiten, Staubschwaden ziehen ueber den Boden, die Risse und
-//  die Tiefe hinter dem Tor glimmen und pulsieren, Glutfunken steigen
-//  die Treppe herauf.
+//  soul-mid.png — weiter entfernte Seelen (6 Bilder 6×10, 2 Varianten,
+//  etwas dunstiger); soul-far.png — ferne blasse Silhouetten (2 Bilder
+//  3×5); ask.png — das „?" (6×8).
+//  Animiert: nahe und mittlere Seelen schlurfen ziellos hin und her
+//  (ganze Kunstpixel), bleiben stehen, sehen sich um, ab und zu erscheint
+//  ein „?"; zwei stehen nur herum und drehen den Kopf. Ferne Silhouetten
+//  tauchen im Dunst auf, wanken und verschwinden wieder. Dunst wabert am
+//  Horizont, Staubschleier ziehen ueber den Boden, Asche treibt langsam.
 // ═══════════════════════════════════════════════════════════════════
 const FC = '/areas/first-circle-of-hell/';
-const FC_TOR_W = 120;
-const FC_TIEFE = { x: 0, y: 37 };                 // Fluchtpunkt der Treppe (neben der Mitte)
-// Stalaktitenspitzen der Kachel (neben der Mitte, wiederholen sich alle 128)
-const FC_SPITZEN = [[-56, 22], [-24, 18], [30, 23], [52, 20], [14, 15]];
+const FC_HORIZONT = 35;
 // Steher: bleiben an ihrem Platz und sehen sich nur um (auch ohne Animation sichtbar)
-const FC_STEHER = [{ x: -70, y: 70, v: 1, dur: 7 }, { x: 96, y: 84, v: 0, dur: 9, links: true }];
+const FC_STEHER = [{ x: -62, y: 74, v: 1, dur: 7 }, { x: 88, y: 86, v: 0, dur: 9, links: true }];
 const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() {
   const seelen = useMemo(() => {
     const plaetze = FC_STEHER.map(s => [s.x, s.y]);
-    return ppZufall(ppFxN(9), (i) => {
-      // die Haelfte nahe der Mitte (auch schmale Bretter sehen genug Seelen), der Rest weit verstreut
+    return ppZufall(ppFxN(10), (i) => {
+      // ein Drittel weiter hinten (klein), die Haelfte nahe der Mitte, der Rest weit verstreut
+      const mitte = i % 3 === 2;
       let x, y, n = 0;
       do {
         x = (Math.random() - .5) * (i % 2 ? 340 : 170);
-        y = 60 + Math.random() * 34;
-      } while (n++ < 40 && ((Math.abs(x) < 46 && y < 66) || plaetze.some(([px, py]) => Math.abs(px - x) < 14 && Math.abs(py - y) < 9)));
+        y = mitte ? 46 + Math.random() * 14 : 64 + Math.random() * 32;
+      } while (n++ < 40 && plaetze.some(([px, py]) => Math.abs(px - x) < (mitte ? 11 : 16) && Math.abs(py - y) < 11));
       plaetze.push([x, y]);
       const dur = 14 + Math.random() * 10;
       return {
-        x: Math.round(x), y: Math.round(y), v: i % 3, dur, delay: -Math.random() * dur,
-        weg: 4 + Math.floor(Math.random() * 7), links: Math.random() < .5,
+        x: Math.round(x), y: Math.round(y), mitte, v: mitte ? i % 2 : i % 3, dur, delay: -Math.random() * dur,
+        weg: (mitte ? 3 : 4) + Math.floor(Math.random() * (mitte ? 4 : 7)), links: Math.random() < .5,
         frage: Math.random() < .5, runde: Math.floor(Math.random() * 2),
       };
     });
   }, []);
-  const asche = useMemo(() => ppZufall(ppFxN(22), () => ({
-    x: Math.random() * 100, dur: 12 + Math.random() * 12, delay: -Math.random() * 24,
-    art: Math.random() < .25 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
+  const ferne = useMemo(() => ppZufall(ppFxN(9), () => ({
+    x: (Math.random() - .5) * 360, y: FC_HORIZONT + 1 + Math.random() * 6,
+    dur: 18 + Math.random() * 18, delay: -Math.random() * 36, weg: 3 + Math.floor(Math.random() * 5),
+    links: Math.random() < .5,
   })), []);
-  const riesel = useMemo(() => {
-    const alle = [];
-    for (let k = -2; k <= 2; k++) {
-      for (const [x, y] of FC_SPITZEN) {
-        const xx = x + k * 128;
-        if (Math.abs(xx) > 44 && Math.abs(xx) < 190) alle.push([xx, y]);
-      }
-    }
-    return alle.sort(() => Math.random() - .5).slice(0, ppFxN(6)).map(([x, y]) => ({
-      x, y, fall: 44 + Math.random() * 8 - y, dur: 6 + Math.random() * 7, delay: -Math.random() * 12,
-    }));
-  }, []);
-  const glut = useMemo(() => ppZufall(ppFxN(4), () => ({
-    x: (Math.random() - .5) * 8, dur: 3 + Math.random() * 2.5, delay: -Math.random() * 5,
+  const asche = useMemo(() => ppZufall(ppFxN(16), () => ({
+    y: Math.random() * 90, dur: 30 + Math.random() * 30, delay: -Math.random() * 60,
+    art: Math.random() < .3 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
   })), []);
-  const seele = (s, key, dyn) => (
-    <div key={key} className={(dyn ? 'pp-area-dyn ' : '') + 'fc-seele'} style={{
-      left: ppArtX(s.x - 3.5, 0), top: ppArt(s.y - 10), zIndex: s.y,
-      '--weg': ppArt(s.links ? -s.weg : s.weg),
-      animation: dyn ? `fcWandern ${s.dur}s steps(${s.weg}) ${s.delay}s infinite` : undefined,
-    }}>
-      <i className="fc-leib" style={{
-        backgroundPositionY: `${s.v * 50}%`, transform: s.links ? 'scaleX(-1)' : undefined,
-        animation: `${dyn ? 'fcSchritte' : 'fcUmsehen'} ${s.dur}s steps(1) ${s.delay || 0}s infinite`,
-      }} />
-      {s.frage && (
-        <i className="pp-area-dyn fc-frage" style={{
-          animation: `fcFrage ${2 * s.dur}s steps(1) ${(s.delay || 0) - s.runde * s.dur}s infinite`,
+  const seele = (s, key, dyn) => {
+    const w = s.mitte ? 6 : 9, h = s.mitte ? 10 : 14;
+    return (
+      <div key={key} className={(dyn ? 'pp-area-dyn ' : '') + 'fc-seele'} style={{
+        left: ppArtX(s.x - w / 2, 0), top: ppArt(s.y - h + 1), width: ppArt(w), height: ppArt(h), zIndex: s.y,
+        '--weg': ppArt(s.links ? -s.weg : s.weg),
+        animation: dyn ? `fcWandern ${s.dur}s steps(${s.weg}) ${s.delay}s infinite` : undefined,
+      }}>
+        <i className="fc-leib" style={{
+          backgroundImage: `url(${FC}${s.mitte ? 'soul-mid' : 'soul'}.png)`,
+          backgroundSize: s.mitte ? '600% 200%' : '600% 300%',
+          backgroundPositionY: s.mitte ? `${s.v * 100}%` : `${s.v * 50}%`,
+          transform: s.links ? 'scaleX(-1)' : undefined,
+          animation: `${dyn ? 'fcSchritte' : 'fcUmsehen'} ${s.dur}s steps(1) ${s.delay || 0}s infinite`,
         }} />
-      )}
-    </div>
-  );
+        {s.frage && (
+          <i className="pp-area-dyn fc-frage" style={{
+            left: ppArt(w / 2 - 3), animation: `fcFrage ${2 * s.dur}s steps(1) ${(s.delay || 0) - s.runde * s.dur}s infinite`,
+          }} />
+        )}
+      </div>
+    );
+  };
   return (
-    <PixelScene artH={100} bg="#2a2725" className="first-circle-overlay">
+    <PixelScene artH={100} bg="#4f4e4b" className="first-circle-overlay">
       <PixelBand src={FC + 'tile.png'} />
-      <PixelBand src={FC + 'tile-glow.png'} className="fc-glimmen" />
-      <div className="pp-pixel-layer fc-staub hinten" style={{ top: ppArt(40) }} />
-      <PixelPiece src={FC + 'gate.png'} w={FC_TOR_W} />
-      <PixelPiece src={FC + 'gate-glow.png'} w={FC_TOR_W} className="fc-tiefe" />
-      {glut.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn fc-glut" style={{
-          left: ppArtX(FC_TIEFE.x + g.x, 0), top: ppArt(FC_TIEFE.y - 1),
-          animation: `fcGlut ${g.dur}s steps(12) ${g.delay}s infinite`,
-        }} />
+      {ferne.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn fc-fern" style={{
+          left: ppArtX(f.x - 1.5, 0), top: ppArt(f.y - 4), '--weg': ppArt(f.links ? -f.weg : f.weg),
+          animation: `fcFern ${f.dur}s steps(${f.weg * 2}) ${f.delay}s infinite`,
+        }}><i style={{ transform: f.links ? 'scaleX(-1)' : undefined }} /></div>
       ))}
-      {riesel.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn fc-riesel" style={{
-          left: ppArtX(r.x - .5, 0), top: ppArt(r.y), '--fall': ppArt(r.fall),
-          animation: `fcRieseln ${r.dur}s linear ${r.delay}s infinite`,
-        }} />
-      ))}
+      <div className="pp-pixel-layer fc-dunst" style={{ top: ppArt(FC_HORIZONT - 17) }} />
+      <div className="pp-pixel-layer fc-dunst b" style={{ top: ppArt(FC_HORIZONT - 21) }} />
+      <div className="pp-pixel-layer fc-staub hinten" style={{ top: ppArt(44) }} />
       <div className="fc-volk">
         {FC_STEHER.map((s, i) => seele({ ...s, frage: i === 0, runde: 0, delay: -i * 2.3 }, 'st' + i, false))}
         {seelen.map((s, i) => seele(s, 's' + i, true))}
       </div>
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn fc-asche' + a.art} style={{
-          left: a.x + '%', animation: `fcAsche ${a.dur}s linear ${a.delay}s infinite`,
+          top: ppArt(a.y), animation: `fcAsche ${a.dur}s linear ${a.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(78) }} />
+      <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(74) }} />
       <div className="pp-rand-dim" />
       <style>{`
-        .fc-glimmen { animation: fcPuls 3.4s ease-in-out infinite alternate; }
-        .fc-tiefe { animation: fcPuls 2.6s ease-in-out -1s infinite alternate; }
-        @keyframes fcPuls { from { opacity: .35; } to { opacity: 1; } }
+        .fc-dunst {
+          position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
+          background: url(${FC}haze.png) 0 0 / auto 100% repeat-x; opacity: .7;
+          animation: fcZiehen 140s steps(128) infinite, fcWabern 9s ease-in-out infinite alternate;
+        }
+        .fc-dunst.b { opacity: .45; animation-duration: 200s, 13s; animation-direction: reverse, alternate; }
+        @keyframes fcWabern { from { opacity: .35; } to { opacity: .75; } }
         .fc-staub {
           position: absolute; left: 0; right: 0; height: calc(24 * var(--px));
           background: url(${FC}dust.png) 0 0 / auto 100% repeat-x;
           animation: fcZiehen 90s steps(128) infinite;
         }
-        .fc-staub.hinten { opacity: .45; animation-duration: 130s; animation-direction: reverse; }
-        .fc-staub.vorn { opacity: .6; }
+        .fc-staub.hinten { opacity: .45; height: calc(12 * var(--px)); animation-duration: 130s; animation-direction: reverse; }
+        .fc-staub.vorn { opacity: .55; }
         @keyframes fcZiehen { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
-        .fc-volk { position: absolute; inset: 0; }
-        .fc-seele { position: absolute; width: calc(7 * var(--px)); height: calc(11 * var(--px)); }
-        .fc-leib {
-          position: absolute; inset: 0;
-          background: url(${FC}soul.png) 0 0 / 600% 300% no-repeat;
+        .fc-fern { position: absolute; width: calc(3 * var(--px)); height: calc(5 * var(--px)); opacity: 0; }
+        .fc-fern i {
+          position: absolute; inset: 0; background: url(${FC}soul-far.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 1.4s steps(1) infinite;
         }
+        @keyframes fcFern {
+          0% { opacity: 0; transform: translateX(0); } 20% { opacity: .9; }
+          80% { opacity: .9; } 100% { opacity: 0; transform: translateX(var(--weg)); }
+        }
+        .fc-volk { position: absolute; inset: 0; }
+        .fc-seele { position: absolute; }
+        .fc-leib { position: absolute; inset: 0; background-repeat: no-repeat; background-position-x: 0; }
         /* Bilder: 0 stehen, 1/2 Schritt (rechts), 3 stehen, 4/5 Schritt (links) */
         @keyframes fcWandern {
           0% { transform: translateX(0); } 40%, 55% { transform: translateX(var(--weg)); } 95%, 100% { transform: translateX(0); }
@@ -2903,7 +2928,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           80% { background-position-x: 60%; } 84% { background-position-x: 0%; }
         }
         .fc-frage {
-          position: absolute; left: calc(.5 * var(--px)); top: calc(-9 * var(--px));
+          position: absolute; top: calc(-9 * var(--px));
           width: calc(6 * var(--px)); height: calc(8 * var(--px));
           background: url(${FC}ask.png) 0 0 / 100% 100% no-repeat; opacity: 0;
         }
@@ -2914,28 +2939,15 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           26.9% { opacity: 1; transform: translateY(0); }
           27%, 100% { opacity: 0; transform: translateY(0); }
         }
-        .fc-glut { position: absolute; width: var(--px); height: var(--px); background: #e0582a; opacity: 0; }
-        @keyframes fcGlut {
-          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .9; }
-          100% { transform: translate(calc(2 * var(--px)), calc(-12 * var(--px))); opacity: 0; }
-        }
-        .fc-riesel {
-          position: absolute; width: var(--px); height: calc(3 * var(--px)); opacity: 0;
-          background: linear-gradient(#9a9284 0 33%, #7a7368 33% 66%, #5a544c 66%);
-        }
-        @keyframes fcRieseln {
-          0%, 70% { transform: translateY(0); opacity: 0; } 72% { opacity: .9; }
-          96% { transform: translateY(var(--fall)); opacity: .9; } 97%, 100% { transform: translateY(var(--fall)); opacity: 0; }
-        }
-        .fc-asche { position: absolute; top: calc(-2 * var(--px)); width: var(--px); height: var(--px); background: #8e877c; opacity: .75; }
-        .fc-asche.dunkel { background: #4e4943; }
-        .fc-asche.gross { width: calc(2 * var(--px)); background: #a39b8e; }
+        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #9a978f; opacity: .6; }
+        .fc-asche.dunkel { background: #4a4946; }
+        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a59d; }
         @keyframes fcAsche {
-          0% { transform: translate(0, 0); }
-          25% { transform: translate(calc(5 * var(--px)), calc(26 * var(--px))); }
-          50% { transform: translate(calc(1 * var(--px)), calc(52 * var(--px))); }
-          75% { transform: translate(calc(6 * var(--px)), calc(78 * var(--px))); }
-          100% { transform: translate(calc(2 * var(--px)), calc(104 * var(--px))); }
+          0% { transform: translate(calc(-10 * var(--px)), 0); }
+          25% { transform: translate(calc(25cqw), calc(3 * var(--px))); }
+          50% { transform: translate(calc(50cqw), calc(-1 * var(--px))); }
+          75% { transform: translate(calc(75cqw), calc(4 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 10 * var(--px)), calc(8 * var(--px))); }
         }
       `}</style>
     </PixelScene>
@@ -2952,8 +2964,9 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  Hinten Fabriken mit Sägezahndach, Schlote mit roten Warnlichtern und
 //  ein Gasometer, davor eine Häuserzeile (Ziegel und Putz, Gauben,
 //  Schornsteine, Läden mit Markisen), ein blauer Park mit runden
-//  violetten Bäumen, Laternen und einer bunten Lichterkette (die bunten
-//  Lichter der Karte), vorn Kopfsteinpflaster. Mittig der Turm über
+//  violetten Bäumen, Laternen und Blumenrabatten vor den Bäumen — das
+//  Bunte der Karte sind BLUMEN (Al 25.9.): rosa, gelbe, orange, weiße
+//  und hellblaue Blüten auf dunklem Blaugrün —, vorn Kopfsteinpflaster. Mittig der Turm über
 //  fast die ganze Höhe: Sockel mit Portal, Schaft mit Lisenen und
 //  Lanzettfenstern, Maßwerk-Galerie, Uhrenstube mit Ecktürmchen,
 //  Glockenstube, Spitzhelm mit Fialen, Krabben und Turmknauf.
@@ -2962,7 +2975,8 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  liegt): sky.png (Kachel 128, Himmel mit Smogschlieren), moon.png,
 //  city.png (Kachel 128, Stadt + Park, Himmel durchsichtig),
 //  lights-a/b/c.png (erleuchtete Fenster), beacons.png, lamp-glow.png,
-//  bulbs.png (3 Ebenen übereinander), smog.png (Kachel), tower.png und
+//  flowers.png (Rabatten, 3 Ebenen übereinander: gerade, rechts, links
+//  geneigt), smog.png (Kachel), tower.png und
 //  tower-glow.png (Versatzstück 64), hand-min.png / hand-hour.png (je
 //  60 Bilder 23×23 — die Zeiger sind für jeden Winkel pixelgenau
 //  gerastert, also KEINE Browser-Rotation), daw.png (2 Bilder 7×4),
@@ -2974,7 +2988,8 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  kreisen um die Turmspitze (hinter dem Helm verschwinden sie) und
 //  ziehen übers Brett, Rauch steigt aus Schloten und Schornsteinen,
 //  Fenster gehen an und aus, Warnlichter blinken, Smog treibt, Laternen
-//  flackern, die Lichterkette funkelt. Licht IMMER oben rechts.
+//  flackern, die Blumen wiegen sich im Wind, Glühwürmchen tanzen über
+//  den Beeten. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const GW = '/areas/big-gwen/';
 const GW_TURM_W = 64;
@@ -3009,6 +3024,10 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       ...r, dur: (r.gross ? 5 : 3.6) + Math.random() * 2.5, delay: -Math.random() * 7,
     }));
   }, []);
+  const gluehen = useMemo(() => ppZufall(ppFxN(12), () => ({
+    x: (Math.random() - .5) * 300, y: 70 + Math.random() * 9,
+    dur: 5 + Math.random() * 4, delay: -Math.random() * 9, blink: 1.6 + Math.random() * 1.8,
+  })), []);
   const dohlen = useMemo(() => ppZufall(ppFxN(4), () => ({
     rx: 12 + Math.random() * 16, ry: 2 + Math.random() * 4, cy: 7 + Math.random() * 12,
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 12, flap: .22 + Math.random() * .12,
@@ -3032,8 +3051,14 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       <PixelBand src={GW + 'lights-b.png'} className="gw-licht-b" />
       <PixelBand src={GW + 'lights-c.png'} className="gw-licht-c" />
       <PixelBand src={GW + 'beacons.png'} className="gw-warnlicht" />
-      <PixelBand src={GW + 'bulbs.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
+      <PixelBand src={GW + 'flowers.png'} style={{ backgroundSize: 'auto 300%', animation: 'gwWiegen 3.2s steps(1) infinite' }} />
       <PixelBand src={GW + 'lamp-glow.png'} className="gw-laterne" />
+      {gluehen.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn gw-gluehwurm" style={{
+          left: ppArtX(g.x, 0), top: ppArt(g.y),
+          animation: `gwSchwirren ${g.dur.toFixed(2)}s ease-in-out ${g.delay.toFixed(2)}s infinite, gwLeuchten ${g.blink.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
       {rauch.map((r, i) => (
         <i key={'r' + i} className={'pp-area-dyn gw-rauch' + (r.gross ? ' gross' : '')} style={{
           left: ppArtX(r.x - (r.gross ? 4.5 : 3), 0), top: ppArt(r.y - (r.gross ? 6 : 4)),
@@ -3081,6 +3106,17 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         @keyframes gwBlink { 0% { opacity: 1; } 45% { opacity: .12; } }
         .gw-laterne { animation: gwLaterne 1.9s steps(1) infinite; }
         @keyframes gwLaterne { 0% { opacity: 1; } 21% { opacity: .8; } 25% { opacity: 1; } 58% { opacity: .88; } 62% { opacity: .7; } 66% { opacity: 1; } }
+        /* Blumen wiegen: gerade – rechts – gerade – links */
+        @keyframes gwWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
+        .gw-gluehwurm {
+          position: absolute; width: var(--px); height: var(--px); background: #e4f47a; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(210, 240, 110, .45);
+        }
+        @keyframes gwSchwirren {
+          0%, 100% { transform: translate(0, 0); } 25% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
+          50% { transform: translate(calc(7 * var(--px)), calc(-1 * var(--px))); } 75% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
+        }
+        @keyframes gwLeuchten { 0% { opacity: 0; } 30% { opacity: .5; } 40% { opacity: 1; } 70% { opacity: .5; } 80%, 100% { opacity: 0; } }
         .gw-schein { animation: gwSchein 5.5s ease-in-out infinite alternate; }
         @keyframes gwSchein { from { opacity: .55; } to { opacity: 1; } }
         .gw-zeiger {
@@ -3110,142 +3146,145 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  WAR COUNCIL GATHERING PLACE — Kriegsrats-Halle der Festung (v1440, Al 25.9.)
+//  WAR COUNCIL GATHERING PLACE — Kriegsrat auf der Festungsbruecke (v1440, Al 25.9.)
 //
-//  Nach dem Kartenmotiv: violettgraue Quadermauer einer Burghalle,
-//  grauer, unregelmaessiger Steinboden, Krieger mit roten Helmbueschen.
-//  Die Figuren selbst bleiben WEG (darauf liegen die Karten) — gezeigt
-//  wird der Ort, an dem sie sich versammeln.
+//  Al 25.9.: „Gathering Place soll eine BRUECKE darstellen, keinen
+//  Innenraum!" Nach dem Kartenmotiv: die violettgraue Quadermauer ist die
+//  Bruestung der Bruecke, der graue unregelmaessige Steinboden ihr Deck,
+//  auf dem sich die Krieger mit den roten Helmbueschen versammeln. Die
+//  Figuren selbst bleiben WEG (darauf liegen die Karten) — gezeigt wird
+//  der Ort. Blick schraeg von oben auf das breite Steindeck.
 //
-//  Kachel 128 (tile.png): Holzdecke mit Steingesims und Zahnschnitt,
-//  Quadermauer mit Lichtkanten, Rissen und Abplatzern, Halbsaeulen mit
-//  Kapitell und Basis, daran Fackeln in Eisenhaltern (Russ darueber),
-//  in der einen Bucht eine Trophaee (Bronzeschild vor gekreuzten
-//  Speeren) ueber einem Speerstaender mit Helm und rotem Schild, in der
-//  anderen eine Bank unter einem langen roten Banner (banner.png, drei
-//  Bilder: weht). Boden aus Flagsteinen mit Perspektive, Stroh, Kiesel,
-//  Risse. Mitte 144 (hall.png): Kamin mit vorspringendem Aufsatz, grosser
-//  Bronzehelm mit rotem Busch vor gekreuzten Schwertern, Sims mit Kerzen,
-//  Feuerboecke und Scheite, Herdplatte; davor vier hohe Lehnstuehle, der
-//  schwere Kriegstisch mit ausgebreiteter Karte (Kueste, Fluss, Waelder,
-//  Berge, Grenze, rote und blaue Steine, ein Dolch steckt darin), Helm,
-//  Kerzen, Schriftrolle; darunter ein roter Teppich mit Goldborte.
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): sky.png — Kachel 128, Himmel mit fernen Bergketten (Schnee
+//  im Licht) und Waldtal; castle.png — ferne Burg auf einem Felsgrat
+//  (40, links der Mitte); river.png — Kachel, die Tiefe unter der
+//  Bruecke (Felsen, Fluss mit Schaum); tile.png — Kachel 128: hintere
+//  Bruestung mit Zinnen und Schiessscharten, Pfeiler mit Zinnenkrone,
+//  Fahnenstange und Laterne, Feuerschale und Wasserfass, Speerstaender
+//  mit Rundschilden und Helm, Flagsteindeck (Moos in den Fugen, Gras,
+//  Flechten, Laub, eine Pfuetze mit Himmelsspiegel), vorn Bordstein,
+//  Stirnwand und Konsolen, darunter der Blick in die Tiefe; flags.png —
+//  4 Bilder, rote Fahnen mit goldenem Helm; council.png — Mitte 144:
+//  Rundplatz ueber dem Mittelpfeiler (das Deck buchtet vorn aus), darauf
+//  der Kriegstisch mit Karte (Kueste, Fluss, Waelder, Berge, Grenze,
+//  rote und blaue Steine, ein Dolch steckt darin), Helm, Tischlaterne,
+//  Schriftrolle, vier Lehnstuehle, zwei Feuerschalen; glow.png /
+//  council-glow.png — Laternen- und Feuerschein.
 //
-//  Animiert: Fackeln (torch.png, 4 Bilder) und Kerzen (candle.png, 3
-//  Bilder) flackern, das Kaminfeuer lodert (fire.png, 4 Bilder), die
-//  Leuchtflecken (glow.png, hall-glow.png) pulsieren, das Banner weht,
-//  Funken steigen im Kamin, Rauchfaeden ueber den Kerzen, Staubkoerner
-//  treiben im Licht, ab und zu huscht eine Maus (mouse.png) die Wand
-//  entlang. Licht IMMER oben rechts.
+//  Animiert: Fahnen wehen kraeftig im Wind (nach rechts), Feuer in den
+//  Schalen flackern (fire.png, 4 Bilder) mit Funken und Rauch, die der
+//  Wind nach rechts treibt, der Schein pulsiert, Wolken ziehen, Voegel
+//  kreisen vorbei, der Fluss tief unten fliesst, Laub weht ueber das
+//  Deck. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const WC = '/areas/war-council/';
 const WC_W = 144;
 const WC_KACHEL = 128;
-const WC_FACKELN = [32 - 64, 96 - 64];          // Saeulen (neben der Kachelmitte)
-const WC_FACKEL_Y = 11;
-// Kerzen: Docht (x neben der Mitte, y)
-const WC_KERZEN = [[-40, 60], [-37, 63], [-43, 64], [-23, 28], [22, 28]];
+const WC_KACHEL_SCHALE = { x: 32 - 64, fuss: 47 };     // Feuerschale der Kachel (neben der Kachelmitte)
+const WC_MITTE_SCHALEN = [-54, 54];                     // Feuerschalen auf dem Rundplatz
+const WC_MITTE_FUSS = 64;
 
 const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
-  const fackeln = useMemo(() => {
-    const out = [];
+  const schalen = useMemo(() => {
+    const out = WC_MITTE_SCHALEN.map(x => ({ x, fuss: WC_MITTE_FUSS }));
     for (let k = -3; k <= 3; k++) {
-      for (const x of WC_FACKELN) out.push({ x: x + k * WC_KACHEL, dur: .5 + Math.random() * .25, delay: -Math.random() });
+      const x = WC_KACHEL_SCHALE.x + k * WC_KACHEL;
+      if (Math.abs(x) > WC_W / 2 - 4) out.push({ x, fuss: WC_KACHEL_SCHALE.fuss });
     }
-    return out;
+    return out.map(s => ({ ...s, dur: .5 + Math.random() * .25, delay: -Math.random() }));
   }, []);
-  const kerzen = useMemo(() => WC_KERZEN.map(([x, y]) => ({ x, y, dur: .45 + Math.random() * .3, delay: -Math.random() })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), () => ({
-    x: (Math.random() - .5) * 18, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, drift: Math.round((Math.random() - .5) * 6),
+  const funken = useMemo(() => ppZufall(ppFxN(10), (i) => {
+    const s = schalen[i % schalen.length];
+    return { x: s.x + Math.round((Math.random() - .5) * 4), y: s.fuss - 16, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3 };
+  }), [schalen]);
+  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => {
+    const s = schalen[i % schalen.length];
+    return { x: s.x, y: s.fuss - 22, dur: 4 + Math.random() * 2, delay: -Math.random() * 6 };
+  }), [schalen]);
+  const wolken = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: -1 + Math.random() * 9, dur: 70 + Math.random() * 50, delay: -Math.random() * 120, art: i % 2,
   })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(5), (i) => ({
-    k: i % WC_KERZEN.length, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
+  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 3 + Math.random() * 10, dur: 26 + Math.random() * 14, delay: -Math.random() * 40, bob: 1 + Math.random() * 2, rtl: i === 2,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, y: 12 + Math.random() * 70, dur: 9 + Math.random() * 8, delay: -Math.random() * 16,
+  const laub = useMemo(() => ppZufall(ppFxN(6), () => ({
+    y: 44 + Math.random() * 36, dur: 9 + Math.random() * 7, delay: -Math.random() * 16, bob: 2 + Math.random() * 3,
   })), []);
-  const maus = useMemo(() => ppZufall(ppFxN(1), () => ({ dur: 34 + Math.random() * 12, delay: -Math.random() * 30, rtl: Math.random() < .5 })), []);
   return (
-    <PixelScene artH={100} bg="#2f2a35" className="war-council-overlay">
-      <PixelBand src={WC + 'tile.png'} />
-      <PixelBand src={WC + 'banner.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
-      <PixelBand src={WC + 'glow.png'} className="wc-schein" />
-      {maus.map((m, i) => (
-        <div key={'m' + i} className="pp-area-dyn wc-maus-bahn" style={{ animation: `${m.rtl ? 'wcMausRtl' : 'wcMausLtr'} ${m.dur.toFixed(1)}s linear ${m.delay.toFixed(1)}s infinite` }}>
-          <i className="wc-maus" style={{ transform: m.rtl ? 'scaleX(-1)' : undefined }} />
+    <PixelScene artH={100} bg="#4a66a2" className="war-council-overlay">
+      <PixelBand src={WC + 'sky.png'} />
+      {wolken.map((w, i) => (
+        <div key={'w' + i} className="pp-area-dyn pp-quer" style={ppQuer(w.y, w.dur.toFixed(1), w.delay.toFixed(1), false)}>
+          <i className="wc-wolke" style={{ backgroundPosition: w.art ? '100% 0' : '0 0' }} />
         </div>
       ))}
-      <PixelPiece src={WC + 'hall.png'} w={WC_W} />
-      <i className="wc-feuer" style={{ left: ppArtX(-12, 0), top: ppArt(38) }} />
-      <PixelPiece src={WC + 'hall-glow.png'} w={WC_W} className="wc-kaminschein" />
-      {fackeln.map((f, i) => (
-        <i key={'f' + i} className="wc-fackel" style={{ left: ppArtX(f.x - 3, 0), top: ppArt(WC_FACKEL_Y), animation: `wcFackel ${f.dur.toFixed(2)}s steps(4) ${f.delay.toFixed(2)}s infinite` }} />
+      <PixelPiece src={WC + 'castle.png'} w={40} x={-28} />
+      {voegel.map((v, i) => (
+        <div key={'v' + i} className="pp-area-dyn pp-quer" style={ppQuer(v.y, v.dur.toFixed(1), v.delay.toFixed(1), v.rtl)}>
+          <i className="wc-vogel" style={{ '--bob': ppArt(v.bob), transform: v.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
       ))}
-      {kerzen.map((k, i) => (
-        <i key={'k' + i} className="wc-kerze" style={{ left: ppArtX(k.x - 1, 0), top: ppArt(k.y - 3), animation: `wcKerze ${k.dur.toFixed(2)}s steps(3) ${k.delay.toFixed(2)}s infinite` }} />
+      <PixelBand src={WC + 'river.png'} className="wc-fluss" />
+      <PixelBand src={WC + 'tile.png'} />
+      <PixelBand src={WC + 'flags.png'} style={{ backgroundSize: 'auto 400%', animation: 'wcFahnen .84s steps(1) infinite' }} />
+      <PixelBand src={WC + 'glow.png'} className="wc-schein" />
+      <PixelPiece src={WC + 'council.png'} w={WC_W} />
+      <PixelPiece src={WC + 'council-glow.png'} w={WC_W} className="wc-schein b" />
+      {schalen.map((s, i) => (
+        <i key={'f' + i} className="wc-feuer" style={{ left: ppArtX(s.x - 4, 0), top: ppArt(s.fuss - 19), animation: `wcFeuer ${s.dur.toFixed(2)}s steps(4) ${s.delay.toFixed(2)}s infinite` }} />
       ))}
       {funken.map((f, i) => (
-        <i key={'s' + i} className="pp-area-dyn wc-funke" style={{ left: ppArtX(Math.round(f.x), 0), top: ppArt(50), '--drift': ppArt(f.drift), animation: `wcFunke ${f.dur.toFixed(2)}s steps(12) ${f.delay.toFixed(2)}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn wc-funke" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `wcFunke ${f.dur.toFixed(2)}s steps(14) ${f.delay.toFixed(2)}s infinite` }} />
       ))}
-      {rauch.map((r, i) => {
-        const [x, y] = WC_KERZEN[r.k];
-        return <i key={'r' + i} className="pp-area-dyn wc-rauch" style={{ left: ppArtX(x, 0), top: ppArt(y - 5), animation: `wcRauch ${r.dur.toFixed(2)}s steps(10) ${r.delay.toFixed(2)}s infinite` }} />;
-      })}
-      {staub.map((s, i) => (
-        <i key={'d' + i} className="pp-area-dyn wc-staub" style={{ left: s.x + '%', top: ppArt(s.y), animation: `wcStaub ${s.dur.toFixed(1)}s steps(24) ${s.delay.toFixed(1)}s infinite` }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn wc-rauch" style={{ left: ppArtX(r.x - 2, 0), top: ppArt(r.y), animation: `wcRauch ${r.dur.toFixed(2)}s steps(16) ${r.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {laub.map((l, i) => (
+        <div key={'l' + i} className="pp-area-dyn pp-quer" style={ppQuer(l.y, l.dur.toFixed(1), l.delay.toFixed(1), false)}>
+          <i className="wc-blatt" style={{ '--bob': ppArt(l.bob) }} />
+        </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        @keyframes wcFahnen {
+          0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; }
+          50% { background-position: 50% 66.667%; } 75% { background-position: 50% 100%; }
+        }
+        .wc-fluss { animation: wcFluss 16s steps(128) infinite; }
+        @keyframes wcFluss { from { background-position: 50% 0; } to { background-position: calc(50% + 128 * var(--px)) 0; } }
         .wc-schein { animation: wcSchein 1.3s steps(1) infinite; }
-        .wc-kaminschein { animation: wcSchein 1.7s steps(1) -.4s infinite; }
+        .wc-schein.b { animation-duration: 1.7s; animation-delay: -.4s; }
         @keyframes wcSchein { 0% { opacity: .85; } 18% { opacity: 1; } 34% { opacity: .72; } 52% { opacity: .95; } 70% { opacity: .8; } 86% { opacity: 1; } }
-        .wc-fackel {
-          position: absolute; width: calc(5 * var(--px)); height: calc(8 * var(--px));
-          background: url(${WC}torch.png) 0 0 / 400% 100% no-repeat;
-        }
-        @keyframes wcFackel { from { background-position: 0 0; } to { background-position: calc(-20 * var(--px)) 0; } }
-        .wc-kerze {
-          position: absolute; width: calc(3 * var(--px)); height: calc(4 * var(--px));
-          background: url(${WC}candle.png) 0 0 / 300% 100% no-repeat;
-        }
-        @keyframes wcKerze { from { background-position: 0 0; } to { background-position: calc(-9 * var(--px)) 0; } }
         .wc-feuer {
-          position: absolute; width: calc(24 * var(--px)); height: calc(15 * var(--px));
+          position: absolute; width: calc(9 * var(--px)); height: calc(10 * var(--px));
           background: url(${WC}fire.png) 0 0 / 400% 100% no-repeat;
-          animation: wcFeuer .6s steps(4) infinite;
         }
-        @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-96 * var(--px)) 0; } }
+        @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-36 * var(--px)) 0; } }
         .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
         @keyframes wcFunke {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; }
-          100% { transform: translate(var(--drift), calc(-12 * var(--px))); opacity: 0; }
+          60% { transform: translate(calc(5 * var(--px)), calc(-9 * var(--px))); }
+          100% { transform: translate(calc(12 * var(--px)), calc(-15 * var(--px))); opacity: 0; }
         }
-        .wc-rauch { position: absolute; width: var(--px); height: calc(2 * var(--px)); background: rgba(190, 180, 200, .5); opacity: 0; }
+        .wc-rauch {
+          position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
+          background: rgba(96, 90, 112, .55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(60, 54, 74, .5);
+        }
         @keyframes wcRauch {
-          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .7; }
-          35% { transform: translate(var(--px), calc(-3 * var(--px))); }
-          60% { transform: translate(calc(-1 * var(--px)), calc(-6 * var(--px))); opacity: .45; }
-          100% { transform: translate(var(--px), calc(-11 * var(--px))); opacity: 0; }
+          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .75; }
+          100% { transform: translate(calc(18 * var(--px)), calc(-14 * var(--px))); opacity: 0; }
         }
-        .wc-staub { position: absolute; width: var(--px); height: var(--px); background: #f2dcb0; opacity: 0; }
-        @keyframes wcStaub {
-          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .45; }
-          50% { transform: translate(calc(4 * var(--px)), calc(-5 * var(--px))); opacity: .3; }
-          80% { opacity: .45; }
-          100% { transform: translate(calc(-2 * var(--px)), calc(-10 * var(--px))); opacity: 0; }
+        .wc-wolke { display: block; width: calc(24 * var(--px)); height: calc(8 * var(--px)); background-image: url(${WC}cloud.png); background-size: 200% 100%; background-repeat: no-repeat; }
+        .wc-vogel {
+          display: block; width: calc(5 * var(--px)); height: calc(3 * var(--px));
+          background: url(${WC}bird.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .42s steps(1) infinite, ppBob 1.6s ease-in-out infinite alternate;
         }
-        .wc-maus-bahn { position: absolute; left: 0; top: calc(60 * var(--px)); }
-        .wc-maus {
-          display: block; width: calc(6 * var(--px)); height: calc(3 * var(--px));
-          background: url(${WC}mouse.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .16s steps(1) infinite;
-        }
-        @keyframes wcMausLtr {
-          0%, 70% { transform: translateX(calc(-10 * var(--px))); }
-          100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
-        }
-        @keyframes wcMausRtl {
-          0%, 70% { transform: translateX(calc(100cqw + 10 * var(--px))); }
-          100% { transform: translateX(calc(-10 * var(--px))); }
+        .wc-blatt {
+          display: block; width: calc(2 * var(--px)); height: calc(2 * var(--px));
+          background: url(${WC}leaf.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 .5s steps(1) infinite, ppBob .9s ease-in-out infinite alternate;
         }
       `}</style>
     </PixelScene>
@@ -3255,84 +3294,88 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
 // ═══════════════════════════════════════════════════════════════════
 //  WOWHALLA, THE HALL OF THE COOL (v1440, Al 25.9.)
 //
-//  Karte: eine verschneite Hallenanlage mit steilen, dunkel türkis-
-//  schiefergrauen Spitzdächern und Türmen, sandfarbene Mauern mit
-//  rötlichen Flecken, kalter hellblauer Himmel, Schnee am Boden, rechts
-//  steigt eine große dunkle Rauchsäule auf. Das Walhalla der Coolness.
+//  Karte (Als große Fassung): eine STEAMPUNK-Hallenstadt auf dem Eis —
+//  Bauten aus goldbraunen, vernieteten Blechplatten mit schmalen dunklen
+//  Schlitzfenstern und Rundbögen, dunkelgrüne, geschwungene Pagodendächer
+//  mit hornartig hochgebogenen Spitzen und Dachreitern, GROSSE Zahnräder
+//  aus Bronze (und graue aus Stahl), teils halb hinter den Bauten, teils
+//  an den Wänden; Stahl-Gitterstelzen, ein schwarzer Schornstein auf
+//  einem Gitterturm mit riesiger dunkler Rauchsäule. Türkiser Himmel mit
+//  Pixelwolken, Boden aus diagonal gestreiftem Eis, ein Pfad aus Eis-
+//  schollen zum Tor, dunkle wurzelartige Eisrisse am Gebäudefuß.
+//  Al 25.9.: „Es soll einen STEAMPUNK-Vibe haben!" — kein Fachwerk.
 //
 //  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 128 (kalter Himmel, ferne und nahe
-//  Schneeberge, Hügel mit Nadelwald und zwei kleinen Holzhäusern, ver-
-//  schneiter Vordergrund mit Wehen, Grasbüscheln und Steinen);
-//  clouds.png — Pixelwolken (Kachel 128); hall.png — die Halle, Stück
-//  170: Giebelhalle mit gekreuzten Drachenkopf-Balken, Fachwerk auf
-//  Sandsteinputz mit abgeplatzten Ziegelstellen, Tor mit Steinbogen und
-//  Eisenbändern, Schildreihe, zwei Flügel mit Walmdächern und grünen
-//  Läden, zwei Türme mit steilen Schieferhelmen, Esse, Feuerschalen,
-//  Schneewehen, Stufen und Trampelpfad; hall-glow.png — warmes Fenster-
-//  licht; smoke.png — Rauchsäule (8 Bilder); flag.png (3), fire.png (4),
-//  raven.png (2), drift.png (6, Pulverschnee vom First); snow-far.png /
-//  snow-near.png — Schneefall-Kacheln 64×100, nahtlos in x und y.
+//  liegt): tile.png — Kachel 128 (Himmel, ferne Dampf-Stadt im Dunst mit
+//  Türmen, Zahnrädern, Gittermasten und einer Rohrleitung auf Stelzen,
+//  Eisfläche mit Brocken, Rissen und Wehen); clouds.png — Wolken (Kachel
+//  128); hall.png — die Hallen, Stück WH_W breit, OHNE die drehenden
+//  Zahnräder; gears.png — Atlas: je Zahnrad eine Zeile mit 4 Bildern (=
+//  eine Zahnteilung); smoke.png — Rauchsäule (8 Bilder); steam.png —
+//  Dampfstoß (6 Bilder); snow-far.png / snow-near.png — Schneefall-
+//  Kacheln 64×100, nahtlos in x und y.
 //
-//  Animiert: Schneefall in zwei Tiefen (der ferne fällt HINTER der
-//  Halle), die Rauchsäule quillt und steigt, Wimpel wehen, Feuerschalen
-//  am Tor lodern, Fensterlicht flackert warm, Pulverschnee weht von
-//  Firsten und Turmspitzen, Eiszapfen glitzern, Wolken ziehen, Raben
-//  fliegen hinter den Türmen vorbei. Wind von rechts nach links.
+//  Animiert: die Zahnräder DREHEN sich in Pixelbildern (kein weiches
+//  Rotieren) — alle mit demselben Takt je Zahnteilung, also gleicher
+//  Umfangsgeschwindigkeit; wo sie sich berühren, greifen sie gegenläufig
+//  ineinander (Phase vom Generator). Die Rauchsäule quillt und steigt,
+//  Dampf zischt aus Rohrenden, Schnee fällt in zwei Tiefen (der ferne
+//  hinter den Hallen), Eisschollen und Eis glitzern, Wolken ziehen.
 //  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const WH = '/areas/wowhalla/';
-const WH_W = 170;                                   // Hallenstück; Stück-x 85 = Brettmitte
-const WH_FAHNEN = [[130, 0], [34, 4]];              // Mastspitzen (Stück-x, y)
-const WH_SCHALEN = [65, 106];                       // Feuerschalen (Mitte), Rand bei y 71
-const WH_RAUCH = { x: 133, w: 48, h: 40, n: 8 };    // Rauchbild, linke Kante im Stück
-const WH_FIRSTE = [[130, 7], [34, 11], [31, 41], [48, 41], [138, 43], [156, 43], [85, 12]];
-const WH_ZAPFEN = [                                // Spitzen der langen Eiszapfen (vom Generator)
-  [117, 31], [132, 31], [137, 30], [23, 35], [29, 35], [42, 35], [3, 60], [7, 59], [15, 60], [18, 59],
-  [31, 59], [35, 60], [39, 60], [46, 59], [53, 60], [56, 59], [109, 61], [118, 62], [120, 62], [135, 61],
-  [139, 61], [143, 62], [146, 61], [149, 61], [167, 62], [169, 62], [59, 54], [113, 53],
+// <gen> (vom Generator geschrieben — nicht von Hand ändern)
+const WH_W = 176;                                   // Hallenstück; Stück-x 88 = Brettmitte
+const WH_ATLAS = [128, 248];                        // gears.png (Kunstpixel)
+// Zahnräder: Mitte (Stück-x, y), Größe S, Zeile im Atlas, hinten = hinter den Hallen
+const WH_ZAHNRAEDER = [
+  { x: 65, y: 36, s: 32, zeile: 0, hinten: true },   // b1: 14 Zähne, bronze
+  { x: 113, y: 31, s: 22, zeile: 32, hinten: true },   // b2: 9 Zähne, steel
+  { x: 16, y: 33, s: 22, zeile: 54, hinten: true },   // b3: 9 Zähne, steel
+  { x: 118, y: 50, s: 22, zeile: 76, hinten: true },   // b4: 8 Zähne, bronze
+  { x: 176, y: 64, s: 24, zeile: 98, hinten: true },   // b5: 10 Zähne, bronze
+  { x: 38, y: 57, s: 22, zeile: 122, hinten: false },   // l1: 8 Zähne, bronze
+  { x: 25, y: 52, s: 20, zeile: 144, hinten: false },   // l2: 7 Zähne, bronze
+  { x: 36, y: 70, s: 20, zeile: 164, hinten: false },   // l3: 7 Zähne, bronze
+  { x: 57, y: 70, s: 22, zeile: 184, hinten: false },   // m1: 8 Zähne, bronze
+  { x: 111, y: 72, s: 22, zeile: 206, hinten: false },   // r1: 8 Zähne, bronze
+  { x: 101, y: 63, s: 20, zeile: 228, hinten: false },   // r2: 7 Zähne, bronze
 ];
+const WH_RAUCH = { x: 112, w: 48, h: 33, n: 8 };    // Rauchbild, linke Kante im Stück
+const WH_DAMPF = [[110, 29], [54, 43], [150, 38]];   // offene Rohrenden
+const WH_GLITZER = [[98, 99], [87, 93], [91, 96], [89, 96], [80, 92], [98, 93]];   // Eisschollen
+// </gen>
+const WH_TAKT = 0.9;                 // Sekunden je Zahnteilung (für ALLE Räder gleich)
 const WowhallaOverlay = React.memo(function WowhallaOverlay() {
-  const raben = useMemo(() => ppZufall(ppFxN(2), (i) => ({
-    y: [5, 16][i] + Math.random() * 4, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i === 0,
-    schlag: .32 + Math.random() * .12,
+  const dampf = useMemo(() => WH_DAMPF.slice(0, ppFxN(WH_DAMPF.length)).map(() => ({
+    dur: 3.2 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const wehen = useMemo(() => WH_FIRSTE.slice(0, ppFxN(WH_FIRSTE.length)).map(() => ({
-    dur: 5 + Math.random() * 6, delay: -Math.random() * 10,
-  })), []);
-  const glitzer = useMemo(() => [...WH_ZAPFEN].sort(() => Math.random() - .5).slice(0, ppFxN(9)).map(([x, y]) => ({
-    x, y, dur: 2.2 + Math.random() * 2.5, delay: -Math.random() * 4,
-  })), []);
+  const glitzer = useMemo(() => ppZufall(ppFxN(12), (i) => i < WH_GLITZER.length
+    ? { x: WH_GLITZER[i][0] - WH_W / 2, y: WH_GLITZER[i][1], dur: 2 + Math.random() * 2.5, delay: -Math.random() * 4 }
+    : { x: (Math.random() - .5) * 340, y: 74 + Math.random() * 24, dur: 2.4 + Math.random() * 2.5, delay: -Math.random() * 5 }), []);
+  const rad = (g, i) => (
+    <i key={'z' + i} className="wh-rad" style={{
+      left: ppArtX(g.x - g.s / 2, WH_W), top: ppArt(g.y - g.s / 2), width: ppArt(g.s), height: ppArt(g.s),
+      '--s': ppArt(g.s), backgroundPositionY: `calc(${-g.zeile} * var(--px))`,
+    }} />
+  );
   return (
-    <PixelScene artH={100} bg="#8cc6e2" className="wowhalla-overlay">
+    <PixelScene artH={100} bg="#8fd6dc" className="wowhalla-overlay">
       <PixelBand src={WH + 'tile.png'} />
       <PixelBand src={WH + 'clouds.png'} className="wh-wolken" />
       <div className="pp-pixel-layer pp-area-dyn wh-schnee fern" />
-      {raben.map((r, i) => (
-        <div key={'r' + i} className="pp-area-dyn pp-quer" style={ppQuer(r.y, r.dur, r.delay, r.rtl)}>
-          <i className="wh-rabe" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${r.schlag.toFixed(2)}s, 1.9s` }} />
-        </div>
-      ))}
+      {WH_ZAHNRAEDER.map((g, i) => g.hinten ? rad(g, i) : null)}
       <PixelPiece src={WH + 'hall.png'} w={WH_W} />
-      <PixelPiece src={WH + 'hall-glow.png'} w={WH_W} className="wh-licht" />
-      {WH_SCHALEN.map((x, i) => (
-        <React.Fragment key={'f' + i}>
-          <i className="wh-schein" style={{ left: ppArtX(x - 9, WH_W), top: ppArt(58), animationDelay: `${-i * .7}s` }} />
-          <i className="wh-feuer" style={{ left: ppArtX(x - 3, WH_W), top: ppArt(63), animationDuration: `${.5 + i * .08}s` }} />
-        </React.Fragment>
-      ))}
-      {WH_FAHNEN.map(([x, y], i) => (
-        <i key={'w' + i} className="wh-fahne" style={{ left: ppArtX(x - 10, WH_W), top: ppArt(y), animationDuration: `${.75 + i * .13}s` }} />
-      ))}
+      {WH_ZAHNRAEDER.map((g, i) => g.hinten ? null : rad(g, i))}
       <i className="wh-rauch" style={{ left: ppArtX(WH_RAUCH.x, WH_W), top: 0 }} />
-      {wehen.map((w, i) => (
-        <i key={'d' + i} className="pp-area-dyn wh-pulver" style={{
-          left: ppArtX(WH_FIRSTE[i][0] - 12, WH_W), top: ppArt(WH_FIRSTE[i][1] - 4),
-          animation: `whPulver ${w.dur.toFixed(2)}s steps(1) ${w.delay.toFixed(2)}s infinite`,
+      {dampf.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn wh-dampf" style={{
+          left: ppArtX(WH_DAMPF[i][0] - 3, WH_W), top: ppArt(WH_DAMPF[i][1] - 8),
+          animation: `whDampf ${d.dur.toFixed(2)}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
       {glitzer.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, WH_W), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-pixel-layer pp-area-dyn wh-schnee nah" />
       <div className="pp-rand-dim" />
@@ -3340,37 +3383,27 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
         .wh-wolken { animation: whWolken 140s steps(128) infinite; }
         @keyframes whWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         .wh-schnee { position: absolute; inset: 0; background-size: calc(64 * var(--px)) calc(100 * var(--px)); background-repeat: repeat; }
-        .wh-schnee.fern { background-image: url(${WH}snow-far.png); opacity: .75; animation: whFallFern 24s steps(200) infinite; }
+        .wh-schnee.fern { background-image: url(${WH}snow-far.png); opacity: .7; animation: whFallFern 24s steps(200) infinite; }
         .wh-schnee.nah { background-image: url(${WH}snow-near.png); animation: whFallNah 11s steps(300) infinite; }
         @keyframes whFallFern { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) calc(200 * var(--px)); } }
         @keyframes whFallNah { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) calc(300 * var(--px)); } }
-        .wh-licht { animation: whLicht 2.6s steps(1) infinite; }
-        @keyframes whLicht { 0% { opacity: .9; } 14% { opacity: .7; } 22% { opacity: 1; } 47% { opacity: .82; } 55% { opacity: .95; } 78% { opacity: .75; } 86% { opacity: 1; } }
-        .wh-feuer { position: absolute; width: calc(7 * var(--px)); height: calc(8 * var(--px)); background: url(${WH}fire.png) 0 0 / 400% 100% no-repeat; animation: whFeuer .5s steps(4) infinite; }
-        @keyframes whFeuer { from { background-position: 0 0; } to { background-position: calc(-28 * var(--px)) 0; } }
-        .wh-schein {
-          position: absolute; width: calc(18 * var(--px)); height: calc(16 * var(--px)); border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,170,70,.42) 0%, rgba(255,130,40,.16) 45%, rgba(255,130,40,0) 70%);
-          animation: whSchein 1.3s steps(1) infinite;
+        .wh-rad {
+          position: absolute; background-image: url(${WH}gears.png); background-repeat: no-repeat;
+          background-size: calc(${WH_ATLAS[0]} * var(--px)) calc(${WH_ATLAS[1]} * var(--px));
+          background-position-x: 0; animation: whRad ${WH_TAKT}s steps(4) infinite;
         }
-        @keyframes whSchein { 0% { opacity: .8; } 25% { opacity: 1; } 45% { opacity: .7; } 70% { opacity: .95; } }
-        .wh-fahne { position: absolute; width: calc(11 * var(--px)); height: calc(6 * var(--px)); background: url(${WH}flag.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .8s steps(1) infinite; }
+        @keyframes whRad { from { background-position-x: 0; } to { background-position-x: calc(-4 * var(--s)); } }
         .wh-rauch {
           position: absolute; width: calc(${WH_RAUCH.w} * var(--px)); height: calc(${WH_RAUCH.h} * var(--px));
           background: url(${WH}smoke.png) 0 0 / ${WH_RAUCH.n * 100}% 100% no-repeat;
           animation: whRauch 1.9s steps(${WH_RAUCH.n}) infinite;
         }
         @keyframes whRauch { from { background-position: 0 0; } to { background-position: calc(${-WH_RAUCH.n * WH_RAUCH.w} * var(--px)) 0; } }
-        .wh-pulver { position: absolute; width: calc(14 * var(--px)); height: calc(6 * var(--px)); background: url(${WH}drift.png) 0 0 / 600% 100% no-repeat; }
-        @keyframes whPulver {
-          0% { background-position: 0 0; } 5% { background-position: 20% 0; } 10% { background-position: 40% 0; }
-          15% { background-position: 60% 0; } 20% { background-position: 80% 0; } 25% { background-position: 100% 0; }
-          30%, 100% { background-position: 0 0; }
-        }
-        .wh-rabe {
-          display: block; width: calc(11 * var(--px)); height: calc(5 * var(--px));
-          background: url(${WH}raven.png) 0 0 / 200% 100% no-repeat;
-          animation: ppSprite2 .36s steps(1) infinite, ppBob 1.9s ease-in-out infinite alternate; --bob: calc(2 * var(--px));
+        .wh-dampf { position: absolute; width: calc(8 * var(--px)); height: calc(9 * var(--px)); background: url(${WH}steam.png) 0 0 / 600% 100% no-repeat; }
+        @keyframes whDampf {
+          0% { background-position: 0 0; } 4% { background-position: 20% 0; } 8% { background-position: 40% 0; }
+          12% { background-position: 60% 0; } 16% { background-position: 80% 0; } 20% { background-position: 100% 0; }
+          24%, 100% { background-position: 0 0; }
         }
       `}</style>
     </PixelScene>
