@@ -254,141 +254,248 @@ function PixelPiece({ src, w, x = 0, style, className }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  BLOOD ROCK — Festungsgefaengnis im Blutfels (v1410, Kartenstil v1413)
+//  BLOOD ROCK — Festungsgefängnis im Blutfels (v1410, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
-//  Al 25.9.: „eine alte Festung, die als Gefaengnis fungiert und wo
+//  Al 25.9.: „eine alte Festung, die als Gefängnis fungiert und wo
 //  Gefangene stetig gefoltert und ihr Blut von Vampiren geraubt wird."
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  DAS ROTE SIND BLUTSTROEME, KEIN LICHT (Al 25.9.): aus den dunklen
-//  Fenstern laeuft Blut die Mauern hinab und sammelt sich in Lachen; unter
-//  dem Fallgitter quillt es hervor und laeuft die Treppe hinab. Nichts
+//  DAS ROTE SIND BLUTSTRÖME, KEIN LICHT (Al 25.9.): aus den dunklen
+//  Fenstern läuft Blut die Mauern hinab und sammelt sich in Lachen; unter
+//  dem Fallgitter quillt es hervor und läuft die Treppe hinab. Nichts
 //  hier leuchtet.
 //
-//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 64 (Blutfels, Wehrmauer mit Turm, Zellen-
-//  fenster, Hof); keep.png — Torbau 96, mittig; mask-tile.png /
-//  mask-keep.png — Form der Stroeme, durch die flow.png (Schlieren, 8×16)
-//  nach unten laeuft; ripple.png — Aufschlag in der Lache (3 Bilder 7×2);
-//  mist.png — Blutnebel; bat.png (2 Bilder 5×4), vampire.png (2 Bilder
-//  5×6, Silhouette mit roten Augen).
+//  v1441 nach dem Kartenmotiv, auf dem Niveau der v1440-Szenen: hinter
+//  allem der Blutfels — gewölbte, facettierte Brocken mit Klüften und
+//  Schichtleisten, in den Fels gehauene vergitterte Verliese, aus denen
+//  Rinnsale laufen. Davor die Wehrmauer mit Zinnen (einige abgebrochen),
+//  Maschikuli, Schmutzspuren und Rissen, Zellenfenster mit Blutströmen,
+//  ein Galgenbalken mit Hängekäfig, Ketten mit Fesseln, ein gefesseltes
+//  Skelett, ein Kloakengitter, aus dem Blut in eine große Lache quillt;
+//  die Türme der Kachel stehen an der Naht (weit außen). Mitte: der
+//  Torbau wie auf der Karte — zwei vorspringende Flankentürme (Innen-
+//  seiten sichtbar), Hauptbau mit vier Bogennischen (Blut rinnt an der
+//  Rückwand herab, in einer hängt ein Skelett in Ketten), Wasserspeier,
+//  aus denen Blut stürzt, Rundbogentor mit halb hochgezogenem Fallgitter
+//  und Schädel-Schlussstein, darüber die lange vergitterte Zellengalerie
+//  mit rostroter Sturzkante und der Oberbau. Hof aus unregelmäßigen
+//  Platten in Tiefe, Blut in den Fugen, Lachen, Knochen, Geröll.
+//
+//  Ebenen (Kunsthöhe 100; Generator scratchpad gen/blood-rock.py, nicht
+//  im Projekt): tile.png — Kachel 128; keep.png — Torbau 164, mittig;
+//  keep-front.png — Brustwehr des Hauptbaus (vor der Wache);
+//  mask-tile.png / mask-keep.png — Form der Ströme, durch die flow.png
+//  (helle Schlieren, 8×16) nach unten läuft; ripple.png — Aufschlag in
+//  der Lache (3 Bilder 9×3); mist.png — Blutnebel (Kachel 128×14);
+//  bat.png (3 Bilder 7×5), bat-far.png (2 Bilder 5×3); vampire.png —
+//  Vampirfürst (3 Bilder 11×9, Umhang weht); guard.png — Vampirwache
+//  (2 Bilder 7×9); cage.png — Hängekäfig mit Gefangenem (4 Bilder 15×26,
+//  pendelt); rat.png (2 Bilder 6×3); hands.png — Hände am Gitter.
+//
+//  Animiert: Blut läuft in allen Strömen, schlägt in den Lachen auf und
+//  tropft aus Galerie, Verliesen und Käfig; der Käfig pendelt; hinter
+//  den Gittern greifen ab und zu Hände nach den Stäben; der Vampirfürst
+//  steht mit wehendem Umhang auf dem Oberbau, eine Wache patrouilliert
+//  hinter der Brustwehr; Fledermäuse in zwei Tiefen (die fernen hinter
+//  dem Torbau), Ratten huschen über den Hof, Blutnebel zieht. Licht
+//  IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const BR = '/areas/blood-rock/';
-const BR_KEEP_W = 96;
-// Fuesse der Blutstroeme (Kunstpixel neben der Brettmitte): Kachel-Stroeme
-// wiederholen sich alle 64, der Torbau deckt |x| < 48 ab.
-const BR_KACHEL_FUESSE = [-0.5, -24.5, 22.5];
-const BR_TORBAU_FUESSE = [[-42, 72], [-24.5, 72], [23.5, 72], [41, 72], [0, 79]];
+const BR_KEEP_W = 164;
+const BR_KACHEL = 128;
+// Füße der Ströme = Lachen (Kunstpixel neben der Brettmitte). Kachel-Lachen
+// wiederholen sich alle 128, der Torbau deckt |x| < 82 ab.
+const BR_KACHEL_FUESSE = [[0, 79], [-44, 79], [14, 79], [-54, 79], [-18, 81]];
+const BR_TORBAU_FUESSE = [[-72, 83], [70, 83], [-46, 82], [-28, 82], [28, 82], [47, 82], [-49, 82], [49, 82], [0, 92], [-5, 93], [6, 92]];
+const BR_KAEFIG = [34, 45];                 // Haken (neben der Mitte, Kachel), Käfig 15×26
+const BR_HAENDE_KACHEL = [[-28, 60]];       // Zellenfenster ohne Strom
+const BR_HAENDE_TORBAU = [[51, 25], [99, 25], [75, 25]];   // Galerie (Stück-x, y)
+const BR_GALERIE_TROPFEN = [54, 66, 90, 102];              // Sims der Galerie (Stück-x), y 30
+// Tropfsteinspitzen am Felsüberhang (Kachel): Blut tropft bis hinter die Zinnen
+const BR_TROPFSTEINE = [[-58, 9], [-42, 13], [-20, 8], [24, 10], [40, 7], [56, 9]];
+// Kachel-Positionen (x neben der Mitte) für alle sichtbaren Wiederholungen
+const brKachelX = (x, rand = 4) => {
+  const out = [];
+  for (let k = -3; k <= 3; k++) {
+    const xx = x + k * BR_KACHEL;
+    if (Math.abs(xx) > BR_KEEP_W / 2 + rand) out.push(xx);
+  }
+  return out;
+};
 
 const BloodRockOverlay = React.memo(function BloodRockOverlay() {
-  const bats = useMemo(() => Array.from({ length: ppFxN(5) }, (_, i) => ({
-    y: 2 + Math.random() * 18,
-    dur: 16 + Math.random() * 14,
-    delay: -Math.random() * 30,
-    bob: 1 + Math.random() * 2,
-    bobDur: 1.6 + Math.random() * 1.4,
-    flap: 0.2 + Math.random() * 0.12,
-    rtl: i % 2 === 1,
+  const bats = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: 3 + Math.random() * 22, dur: 18 + Math.random() * 14, delay: -Math.random() * 30,
+    bob: 1 + Math.round(Math.random() * 2), bobDur: 1.4 + Math.random() * 1.2, flap: .3 + Math.random() * .12, rtl: i % 2 === 1,
   })), []);
-  // Aufschlag der Stroeme in ihren Lachen
+  const batsFern = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 2 + Math.random() * 14, dur: 34 + Math.random() * 16, delay: -Math.random() * 40,
+    flap: .26 + Math.random() * .1, rtl: i % 2 === 0,
+  })), []);
   const ripples = useMemo(() => {
-    const out = [];
-    for (let k = -4; k <= 4; k++) {
-      for (const x0 of BR_KACHEL_FUESSE) {
-        const x = x0 + k * 64;
-        if (Math.abs(x) >= BR_KEEP_W / 2) out.push([x, 72]);
-      }
-    }
-    return [...BR_TORBAU_FUESSE, ...out].slice(0, ppFxN(40)).map(([x, y]) => ({
-      x, y, dur: 0.5 + Math.random() * 0.3, delay: -Math.random(),
-    }));
+    const out = [...BR_TORBAU_FUESSE];
+    for (const [x, y] of BR_KACHEL_FUESSE) for (const xx of brKachelX(x)) out.push([xx, y]);
+    return out.slice(0, ppFxN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
   }, []);
-  // Tropfen aus den vergitterten Fensterreihen des Torbaus
-  const drips = useMemo(() => [
-    { x: 30, y0: 34, y1: 37, dur: 5.2, delay: -3.3 },
-    { x: 66, y0: 34, y1: 37, dur: 4.6, delay: -0.9 },
-    { x: 44, y0: 19, y1: 21, dur: 3.9, delay: -2.0 },
-    { x: 55, y0: 19, y1: 21, dur: 4.4, delay: -0.3 },
-  ].slice(0, ppFxN(4)), []);
+  const kaefige = useMemo(() => brKachelX(BR_KAEFIG[0], 8).map((x) => ({
+    x, dur: 3.2 + Math.random() * .8, delay: -Math.random() * 4,
+  })), []);
+  const haende = useMemo(() => {
+    const out = BR_HAENDE_TORBAU.map(([x, y]) => ({ left: ppArtX(x - 2, BR_KEEP_W), y }));
+    for (const [x, y] of BR_HAENDE_KACHEL) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx - 2, 0), y });
+    return out.slice(0, ppFxN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
+  }, []);
+  const tropfen = useMemo(() => {
+    const out = BR_GALERIE_TROPFEN.map((x) => ({ left: ppArtX(x, BR_KEEP_W), y0: 30, y1: 33 }));
+    for (const [x, y] of BR_TROPFSTEINE) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx, 0), y0: y, y1: 29 });
+    for (const k of kaefige) out.push({ left: ppArtX(k.x + 1, 0), y0: BR_KAEFIG[1] + 25, y1: 78 });
+    return out.slice(0, ppFxN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
+  }, [kaefige]);
+  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 86 + i * 7 + Math.random() * 3, dur: 26 + Math.random() * 14, delay: -Math.random() * 30 - i * 11, rtl: i === 1,
+  })), []);
+  const wand = BR_KEEP_W;
   return (
     <PixelScene artH={100} bg="#140606" className="blood-rock-overlay">
       <PixelBand src={BR + 'tile.png'} />
       <div className="pp-pixel-layer br-strom" style={ppMaske(BR + 'mask-tile.png', true)} />
-      <PixelPiece src={BR + 'keep.png'} w={BR_KEEP_W} />
+      {batsFern.map((b, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="br-bat-fern" style={{ transform: b.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${b.flap.toFixed(2)}s` }} />
+        </div>
+      ))}
+      <PixelPiece src={BR + 'keep.png'} w={wand} />
       <div className="pp-pixel-layer br-strom" style={{
-        left: `calc(50% - ${BR_KEEP_W / 2} * var(--px))`, right: 'auto', width: ppArt(BR_KEEP_W),
+        left: `calc(50% - ${wand / 2} * var(--px))`, right: 'auto', width: ppArt(wand),
         ...ppMaske(BR + 'mask-keep.png', false),
       }} />
-      {ripples.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn br-kraeusel" style={{
-          left: ppArtX(r.x - 3.5, 0), top: ppArt(r.y),
-          animation: `brKraeusel ${r.dur}s steps(1) ${r.delay}s infinite`,
+      {/* Wache hinter der Brustwehr des Hauptbaus (Weg x 46–111, Füße y 40) */}
+      <div className="br-wache-bahn" style={{ left: ppArtX(46, wand), top: ppArt(31) }}>
+        <i className="br-wache" />
+      </div>
+      <PixelPiece src={BR + 'keep-front.png'} w={wand} />
+      <i className="br-vampir" style={{ left: ppArtX(86, wand), top: 0 }} />
+      {kaefige.map((k, i) => (
+        <i key={'k' + i} className="br-kaefig" style={{
+          left: ppArtX(k.x - 7, 0), top: ppArt(BR_KAEFIG[1]),
+          animationDuration: `${k.dur.toFixed(2)}s`, animationDelay: `${k.delay.toFixed(2)}s`,
         }} />
       ))}
-      <i className="br-vampir" style={{ left: ppArtX(57, BR_KEEP_W), top: ppArt(0) }} />
-      <div className="pp-pixel-layer br-mist" style={{ top: ppArt(76) }} />
-      <div className="pp-pixel-layer br-mist br-mist-hoch" style={{ top: ppArt(18) }} />
-      {bats.map((b, i) => (
-        <div key={'b' + i} className="pp-area-dyn br-bat-bahn" style={{
-          top: ppArt(b.y), animation: `${b.rtl ? 'brBatRtl' : 'brBatLtr'} ${b.dur}s linear ${b.delay}s infinite`,
+      {haende.map((h, i) => (
+        <i key={'h' + i} className="pp-area-dyn br-haende" style={{
+          left: h.left, top: ppArt(h.y), animation: `brHaende ${h.dur.toFixed(2)}s steps(1) ${h.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {ripples.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn br-kraeusel" style={{
+          left: ppArtX(r.x - 4, 0), top: ppArt(r.y - 1),
+          animation: `ppSprite3 ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {tropfen.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
+          left: d.left, top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
+          '--tropfen': '#8a120d', '--tropfen-dunkel': '#3d0506',
+          animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer br-mist" style={{ top: ppArt(70) }} />
+      {ratten.map((r, i) => (
+        <div key={'t' + i} className="pp-area-dyn br-ratte-bahn" style={{
+          top: ppArt(r.y), animation: `${r.rtl ? 'brRatteRtl' : 'brRatteLtr'} ${r.dur.toFixed(1)}s linear ${r.delay.toFixed(1)}s infinite`,
         }}>
-          <div className="br-bat" style={{
-            '--bob': ppArt(b.bob),
-            transform: b.rtl ? 'scaleX(-1)' : undefined,
-            animation: `brBatFlap ${b.flap}s steps(1) infinite, brBatBob ${b.bobDur}s ease-in-out infinite alternate`,
+          <i className="br-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <div className="pp-pixel-layer br-mist br-mist-nah" style={{ top: ppArt(84) }} />
+      {bats.map((b, i) => (
+        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="br-bat" style={{
+            '--bob': ppArt(b.bob), transform: b.rtl ? 'scaleX(-1)' : undefined,
+            animationDuration: `${b.flap.toFixed(2)}s, ${b.bobDur.toFixed(2)}s`,
           }} />
         </div>
       ))}
-      {drips.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
-          left: ppArtX(d.x, BR_KEEP_W), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-          '--tropfen': '#8c0c0a', '--tropfen-dunkel': '#3f0606',
-          animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay}s infinite`,
-        }} />
-      ))}
-      <div className="br-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        /* Blut laeuft: helle Schlieren wandern durch die Stroeme nach unten */
+        /* Blut läuft: helle Schlieren wandern durch die Ströme nach unten */
         .br-strom {
           position: absolute; inset: 0;
           background: url(${BR}flow.png) 0 0 / calc(8 * var(--px)) calc(16 * var(--px)) repeat;
-          animation: brStrom .7s linear infinite;
+          animation: brStrom .8s steps(16) infinite;
         }
         @keyframes brStrom { from { background-position: 0 0; } to { background-position: 0 calc(16 * var(--px)); } }
         .br-kraeusel {
-          position: absolute; width: calc(7 * var(--px)); height: calc(2 * var(--px));
+          position: absolute; width: calc(9 * var(--px)); height: calc(3 * var(--px));
           background: url(${BR}ripple.png) 0 0 / 300% 100% no-repeat;
         }
-        @keyframes brKraeusel { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
         .br-vampir {
-          position: absolute; width: calc(5 * var(--px)); height: calc(6 * var(--px));
-          background: url(${BR}vampire.png) 0 0 / 200% 100% no-repeat;
-          animation: brUmhang .9s steps(1) infinite;
+          position: absolute; width: calc(11 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BR}vampire.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 1.2s steps(1) infinite;
         }
-        @keyframes brUmhang { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        .br-wache-bahn { position: absolute; animation: brWacheWeg 26s steps(65) infinite; }
+        .br-wache {
+          display: block; width: calc(7 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BR}guard.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .7s steps(1) infinite, brWacheWende 26s steps(1) infinite;
+        }
+        @keyframes brWacheWeg {
+          0%, 8% { transform: translateX(0); }
+          46%, 54% { transform: translateX(calc(65 * var(--px))); }
+          92%, 100% { transform: translateX(0); }
+        }
+        @keyframes brWacheWende { 0% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+        .br-kaefig {
+          position: absolute; width: calc(15 * var(--px)); height: calc(26 * var(--px));
+          background: url(${BR}cage.png) 0 0 / 400% 100% no-repeat;
+          animation-name: brPendel; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes brPendel {
+          0% { background-position: 0 0; } 25% { background-position: 33.333% 0; }
+          50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; }
+        }
+        .br-haende {
+          position: absolute; width: calc(5 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
+          background: url(${BR}hands.png) 0 0 / 100% 100% no-repeat;
+        }
+        @keyframes brHaende { 0%, 55% { opacity: 0; } 56%, 88% { opacity: 1; } 89%, 100% { opacity: 0; } }
         .br-mist {
           position: absolute; left: 0; right: 0; height: calc(14 * var(--px));
-          background: url(${BR}mist.png) 0 0 / auto 100% repeat-x; opacity: .55;
-          animation: brNebel 48s steps(64) infinite;
+          background: url(${BR}mist.png) 0 0 / auto 100% repeat-x; opacity: .45;
+          animation: brNebel 64s steps(128) infinite;
         }
-        .br-mist-hoch { opacity: .45; animation-duration: 70s; animation-direction: reverse; }
-        @keyframes brNebel { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        .br-bat-bahn { position: absolute; left: 0; }
+        .br-mist-nah { opacity: .55; animation-duration: 44s; animation-direction: reverse; }
+        @keyframes brNebel { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         .br-bat {
-          width: calc(5 * var(--px)); height: calc(4 * var(--px));
-          background: url(${BR}bat.png) 0 0 / 200% 100% no-repeat;
+          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
+          background: url(${BR}bat.png) 0 0 / 300% 100% no-repeat;
+          animation-name: ppSprite3, ppBob; animation-timing-function: steps(1), ease-in-out;
+          animation-iteration-count: infinite; animation-direction: normal, alternate;
         }
-        @keyframes brBatFlap { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
-        @keyframes brBatBob { from { translate: 0 0; } to { translate: 0 var(--bob); } }
-        @keyframes brBatLtr { from { transform: translateX(calc(-10 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
-        @keyframes brBatRtl { from { transform: translateX(calc(100cqw + 10 * var(--px))); } to { transform: translateX(calc(-10 * var(--px))); } }
-        .br-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        .br-bat-fern {
+          display: block; width: calc(5 * var(--px)); height: calc(3 * var(--px));
+          background: url(${BR}bat-far.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite;
+        }
+        .br-ratte-bahn { position: absolute; left: 0; }
+        .br-ratte {
+          display: block; width: calc(7 * var(--px)); height: calc(3 * var(--px));
+          background: url(${BR}rat.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .18s steps(1) infinite;
+        }
+        @keyframes brRatteLtr {
+          0% { transform: translateX(calc(-10 * var(--px))); }
+          28%, 100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+        }
+        @keyframes brRatteRtl {
+          0% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          28%, 100% { transform: translateX(calc(-10 * var(--px))); }
         }
       `}</style>
     </PixelScene>
