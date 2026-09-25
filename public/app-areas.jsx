@@ -466,61 +466,223 @@ const PangaiaOverlay = React.memo(function PangaiaOverlay() {
 });
 
 
-// ── BOARD OF KINGS ───────────────────────────────────────────────────
-//  v1438 (Al 25.9.) nach dem Kartenmotiv: ein riesiges Schachbrett aus
+// ═══════════════════════════════════════════════════════════════════
+//  BOARD OF KINGS — das riesige Marmor-Schachbrett im Königsgarten
+//  (v1438, Al 25.9.; Überarbeitung v1441 (Al 25.9.))
+//
+//  Nach dem Kartenmotiv (Al, v1438): ein riesiges Schachbrett aus
 //  poliertem Marmor (Felder mit Fase — oben/rechts im Licht, unten/links
 //  im Schatten —, feinen Adern), dunkle Einfassung, violettgrauer
 //  Pflasterrand, dahinter Blumenhecken. Die Schachfiguren des Motivs
-//  bleiben WEG (Al). Animiert: Glanz huscht ueber einzelne Felder, ein
-//  Wolkenschatten zieht, Blueten wiegen, Bluetenblaetter treiben.
+//  bleiben WEG (Al). Das Brett ist so groß, dass es oben und unten aus
+//  dem Bild läuft (10 Spalten à 12 Kunstpixel, wie abgenommen).
+//
+//  v1441 (Al: „deine haben ein anderes Level"): dieselbe Szene, deutlich
+//  feiner gemalt. Jedes Marmorfeld ist ein eigenes Stück: fließende Adern
+//  mit weichem Hof (in den hellen Feldern graublau, ab und zu golden; in
+//  den dunklen silbrig), zweistufige Fase, Politurglanz oben rechts, ein
+//  leiser Schimmer schräg über das Brett, dazu Absplitterungen an Ecken,
+//  zwei Haarrisse, verwehte Blütenblätter und Blätter. Die Einfassung ist
+//  dunkler Stein mit einer Bronze-Einlage und Nieten auf Höhe der Fugen.
+//  Der Pflasterrand besteht aus einzeln schattierten Kopfsteinen mit
+//  bemoosten Fugen, Unkraut und Kieseln; Brett und Hecken werfen Schatten
+//  darauf, die Hecken hängen über. Dahinter ein Heckengarten von oben:
+//  Heckenreihen aus Blattballen (jede Reihe eigene Laubfarbe und Blüten —
+//  Rosa/Weiß, Gelb/Rot, Lila/Weiß, Rot/Rosa/Orange), Rasenstreifen mit
+//  Gänseblümchen und Klee, Durchgänge mit Trittsteinen, ein Kiesweg.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): hedge.png — Kachel 128 (Heckengarten ohne Blüten);
+//  blossoms.png — die Blüten und Blattspitzen, 3 Bilder übereinander
+//  (Wiegen im Wind, räumlich zusammenhängend); board.png — Versatzstück
+//  160, mittig (Brett, Einfassung, Pflaster, überhängende Hecke — passt
+//  pixelgenau auf die Kachel); glint.png (8 Bilder 11×11), petal.png
+//  (4×3 Bilder 3×3), butterfly.png (2×3 Bilder 5×4), dove.png (3 Bilder
+//  11×9), ladybug.png (2 Bilder 3×4), cloud.png (Wolkenschatten).
+//
+//  Animiert: Blüten und Blattspitzen wiegen, ein Glanzstreif huscht über
+//  einzelne Felder, die Bronzenieten funkeln, Wolkenschatten ziehen über
+//  Garten und Brett, Blütenblätter treiben taumelnd vorbei, Schmetterlinge
+//  gaukeln über den Hecken (einer quert das Brett), Bienen summen um die
+//  Blüten, ab und zu fliegt eine weiße Taube samt Schatten über die
+//  Szene, Marienkäfer krabbeln über das Pflaster.
 //  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const BOK = '/areas/board-of-kings/';
-const BOK_W = 144, BOK_FELD = 12, BOK_SPALTEN = 10, BOK_OY = -4;
+const BOK_W = 160;                                   // Brett-Versatzstück
+const BOK_BRETT = { feld: 12, spalten: 10, oy: -4 };  // Felder 12, 10 Spalten, erste Reihe bei y −4
+// Kachel-x t (0..127) → Kunstpixel neben der Brettmitte, k-te Wiederholung
+const bokKachel = (t, k) => t - 64 + 128 * k;
+// Heckenmitten (Kachel-x) und sichtbare Wiederholungen links (k −1) / rechts (k 0/1)
+const BOK_HECKEN = [[21, [-1, 1]], [51, [-1, 1]], [79, [-1, 1]], [107, [-1, 1]]];
+const BOK_HECKEN_X = BOK_HECKEN.flatMap(([t, ks]) => ks.map(k => bokKachel(t, k)))
+  .filter(x => Math.abs(x) > 80).sort((a, b) => Math.abs(a) - Math.abs(b));
+
 const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
-  const glanz = useMemo(() => ppZufall(ppFxN(5), () => {
-    const col = Math.floor(Math.random() * BOK_SPALTEN), row = Math.floor(Math.random() * 8);
+  const glanz = useMemo(() => ppZufall(ppFxN(6), () => {
+    const col = Math.floor(Math.random() * BOK_BRETT.spalten), row = 1 + Math.floor(Math.random() * 7);
     return {
-      x: -BOK_W / 2 + 12 + col * BOK_FELD + 1, y: BOK_OY + row * BOK_FELD + 1,
-      dur: 4 + Math.random() * 4, delay: -Math.random() * 8,
+      x: -BOK_BRETT.feld * BOK_BRETT.spalten / 2 + col * BOK_BRETT.feld + 1, y: BOK_BRETT.oy + row * BOK_BRETT.feld + 1,
+      dunkel: (col + row) % 2 === 1, dur: 6 + Math.random() * 6, delay: -Math.random() * 12,
     };
   }), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(7), (i) => ({
-    y: 5 + Math.random() * 85, dur: 12 + Math.random() * 10, delay: -Math.random() * 20, rtl: i % 2 === 1,
+  const funkeln = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    x: i % 2 ? 61 : -62, y: BOK_BRETT.oy + BOK_BRETT.feld * (1 + Math.floor(Math.random() * 8)),
+    dur: 5 + Math.random() * 5, delay: -Math.random() * 10,
+  })), []);
+  const blaetter = useMemo(() => ppZufall(ppFxN(8), (i) => ({
+    y: 4 + Math.random() * 86, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, rtl: i % 2 === 1,
+    farbe: i % 3, bob: 2 + Math.floor(Math.random() * 4), tumble: .5 + Math.random() * .5,
+  })), []);
+  const falter = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    x: BOK_HECKEN_X[i % BOK_HECKEN_X.length] + (Math.random() - .5) * 8, y: 12 + Math.random() * 70,
+    farbe: i % 3, dur: 7 + Math.random() * 5, delay: -Math.random() * 12, b: i % 2 === 1,
+  })), []);
+  const quer = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 20 + Math.random() * 50, dur: 34 + Math.random() * 10, delay: -Math.random() * 30, rtl: Math.random() < .5,
+  })), []);
+  const bienen = useMemo(() => ppZufall(ppFxN(6), (i) => ({
+    x: BOK_HECKEN_X[i % 4] + (Math.random() - .5) * 12, y: 8 + Math.random() * 82,
+    dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, b: i % 2 === 1, drift: 2 + Math.floor(Math.random() * 3),
+  })), []);
+  const tauben = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 14 + Math.random() * 50, dur: 46 + Math.random() * 14, delay: -Math.random() * 20, rtl: Math.random() < .5,
+  })), []);
+  const kaefer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    x: i ? 68 : -71, dur: 70 + Math.random() * 30, delay: -Math.random() * 80, ab: i === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#305a2a" className="board-of-kings-overlay">
-      <PixelBand src={BOK + 'hedge.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
+    <PixelScene artH={100} bg="#1c3a18" className="board-of-kings-overlay">
+      <PixelBand src={BOK + 'hedge.png'} />
+      <PixelBand src={BOK + 'blossoms.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
       <PixelPiece src={BOK + 'board.png'} w={BOK_W} />
+      {kaefer.map((k, i) => (
+        <i key={'k' + i} className={'pp-area-dyn bok-kaefer' + (k.ab ? ' ab' : '')} style={{ left: ppArtX(k.x, 0), animationDuration: `${k.dur.toFixed(1)}s, .4s`, animationDelay: `${k.delay.toFixed(1)}s, 0s` }} />
+      ))}
       {glanz.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn bok-glanz" style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `bokGlanz ${g.dur.toFixed(2)}s steps(10) ${g.delay.toFixed(2)}s infinite` }} />
+        <i key={'g' + i} className={'pp-area-dyn bok-glanz' + (g.dunkel ? ' dunkel' : '')} style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `bokGlanz ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {funkeln.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln bok-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur.toFixed(2)}s linear ${f.delay.toFixed(2)}s infinite` }} />
       ))}
       <i className="pp-area-dyn bok-wolke" />
+      <i className="pp-area-dyn bok-wolke b" />
+      {tauben.map((t, i) => (
+        <div key={'ts' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y + 8), marginLeft: ppArt(-6), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
+          <i className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {bienen.map((b, i) => (
+        <div key={'b' + i} className="pp-area-dyn bok-biene-ort" style={{ left: ppArtX(b.x, 0), top: ppArt(b.y), '--bob': ppArt(b.drift), animation: `ppBob ${(b.drift * 1.1).toFixed(2)}s steps(3) infinite alternate` }}>
+          <i className="bok-biene" style={{ animation: `${b.b ? 'bokSummB' : 'bokSummA'} ${b.dur.toFixed(2)}s steps(2) ${b.delay.toFixed(2)}s infinite, bokFluegel .1s steps(1) infinite` }} />
+        </div>
+      ))}
+      {falter.map((f, i) => (
+        <div key={'s' + i} className="pp-area-dyn bok-falter-ort" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `${f.b ? 'bokGaukelnB' : 'bokGaukelnA'} ${f.dur.toFixed(2)}s steps(24) ${f.delay.toFixed(2)}s infinite` }}>
+          <i className="bok-falter" style={{ backgroundPositionY: `${f.farbe * 50}%` }} />
+        </div>
+      ))}
+      {quer.map((q, i) => (
+        <div key={'q' + i} className="pp-area-dyn pp-quer" style={ppQuer(q.y, q.dur, q.delay, q.rtl)}>
+          <i className="bok-falter" style={{ backgroundPositionY: '50%', animation: 'bokFlattern .32s steps(1) infinite, ppBob 1.6s steps(4) infinite alternate', '--bob': ppArt(6) }} />
+        </div>
+      ))}
       {blaetter.map((b, i) => (
-        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
-          <i className="bok-blatt" />
+        <div key={'p' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="bok-blatt" style={{ backgroundPositionY: `${b.farbe * 50}%`, '--bob': ppArt(b.bob), animation: `bokTaumeln ${b.tumble.toFixed(2)}s steps(1) infinite, ppBob ${(b.bob * .55).toFixed(2)}s steps(${b.bob}) infinite alternate` }} />
+        </div>
+      ))}
+      {tauben.map((t, i) => (
+        <div key={'t' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
+          <i className="bok-taube" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
         .bok-glanz {
-          position: absolute; width: calc(10 * var(--px)); height: calc(10 * var(--px));
-          background: url(${BOK}glint.png) 0 0 / 100% 100% no-repeat; opacity: 0;
+          position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px));
+          background: url(${BOK}glint.png) 0 0 / 800% 100% no-repeat; opacity: .85;
         }
+        .bok-glanz.dunkel { opacity: .45; }
         @keyframes bokGlanz {
-          0%, 80% { opacity: 0; transform: translate(calc(-6 * var(--px)), calc(6 * var(--px))); }
-          84% { opacity: 1; } 96% { opacity: 1; }
-          100% { opacity: 0; transform: translate(calc(6 * var(--px)), calc(-6 * var(--px))); }
+          0%, 88% { background-position-x: 0%; }
+          89.5% { background-position-x: 14.29%; } 91% { background-position-x: 28.57%; }
+          92.5% { background-position-x: 42.86%; } 94% { background-position-x: 57.14%; }
+          95.5% { background-position-x: 71.43%; } 97% { background-position-x: 85.71%; }
+          98.5%, 100% { background-position-x: 0%; }
         }
+        .bok-funkeln { filter: sepia(1) saturate(2.2) brightness(1.05); }
         .bok-wolke {
-          position: absolute; top: 0; left: 0; width: calc(110 * var(--px)); height: calc(70 * var(--px));
-          background: radial-gradient(ellipse, rgba(20,24,40,.22) 0%, rgba(20,24,40,.12) 45%, rgba(20,24,40,0) 70%);
-          animation: bokWolke 38s linear infinite;
+          position: absolute; top: 0; left: 0; width: calc(112 * var(--px)); height: calc(60 * var(--px));
+          background: url(${BOK}cloud.png) 0 0 / 100% 100% no-repeat;
+          animation: bokWolke 52s linear infinite;
         }
+        .bok-wolke.b { width: calc(56 * var(--px)); height: calc(30 * var(--px)); animation-duration: 37s; animation-delay: -21s; --wy: calc(58 * var(--px)); }
         @keyframes bokWolke {
-          from { transform: translate(calc(-120 * var(--px)), calc(10 * var(--px))); }
-          to { transform: translate(calc(100cqw + 10 * var(--px)), calc(30 * var(--px))); }
+          from { transform: translate(calc(-120 * var(--px)), var(--wy, calc(4 * var(--px)))); }
+          to { transform: translate(calc(100cqw + 10 * var(--px)), calc(var(--wy, calc(4 * var(--px))) + 14 * var(--px))); }
         }
-        .bok-blatt { display: block; width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: url(${BOK}petal.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .9s steps(1) infinite, ppBob 1.3s ease-in-out infinite alternate; --bob: calc(4 * var(--px)); }
+        .bok-blatt {
+          display: block; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background-image: url(${BOK}petal.png); background-size: 400% 300%; background-repeat: no-repeat;
+        }
+        @keyframes bokTaumeln { 0% { background-position-x: 0%; } 25% { background-position-x: 33.33%; } 50% { background-position-x: 66.67%; } 75% { background-position-x: 100%; } }
+        .bok-falter-ort { position: absolute; width: calc(5 * var(--px)); height: calc(4 * var(--px)); }
+        .bok-falter {
+          display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px));
+          background-image: url(${BOK}butterfly.png); background-size: 200% 300%; background-repeat: no-repeat;
+          animation: bokFlattern .3s steps(1) infinite;
+        }
+        @keyframes bokFlattern { 0% { background-position-x: 0%; } 50% { background-position-x: 100%; } }
+        @keyframes bokGaukelnA {
+          0%, 100% { transform: translate(0, 0); } 15% { transform: translate(calc(5 * var(--px)), calc(-4 * var(--px))); }
+          30% { transform: translate(calc(9 * var(--px)), calc(1 * var(--px))); } 45% { transform: translate(calc(4 * var(--px)), calc(6 * var(--px))); }
+          60% { transform: translate(calc(-3 * var(--px)), calc(4 * var(--px))); } 75% { transform: translate(calc(-7 * var(--px)), calc(-2 * var(--px))); }
+          88% { transform: translate(calc(-3 * var(--px)), calc(-5 * var(--px))); }
+        }
+        @keyframes bokGaukelnB {
+          0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(-6 * var(--px)), calc(-3 * var(--px))); }
+          40% { transform: translate(calc(-2 * var(--px)), calc(-9 * var(--px))); } 55% { transform: translate(calc(5 * var(--px)), calc(-6 * var(--px))); }
+          70% { transform: translate(calc(7 * var(--px)), calc(1 * var(--px))); } 85% { transform: translate(calc(2 * var(--px)), calc(4 * var(--px))); }
+        }
+        .bok-biene-ort { position: absolute; width: var(--px); height: var(--px); }
+        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1e1406 50%, #f0c23a 50%); }
+        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(230, 236, 245, .8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(230, 236, 245, .55); } }
+        @keyframes bokSummA {
+          0%, 100% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
+          25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
+          50% { transform: translate(0, 0); } 62.5% { transform: translate(calc(-3 * var(--px)), calc(-2 * var(--px))); }
+          75% { transform: translate(calc(-5 * var(--px)), 0); } 87.5% { transform: translate(calc(-3 * var(--px)), calc(2 * var(--px))); }
+        }
+        @keyframes bokSummB {
+          0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
+          40% { transform: translate(calc(2 * var(--px)), calc(-5 * var(--px))); } 60% { transform: translate(calc(-3 * var(--px)), calc(-4 * var(--px))); }
+          80% { transform: translate(calc(-4 * var(--px)), calc(-1 * var(--px))); }
+        }
+        .bok-flug { position: absolute; left: 0; }
+        @keyframes bokFlugLtr { 0% { transform: translateX(calc(-30 * var(--px))); } 45%, 100% { transform: translateX(calc(100cqw + 20 * var(--px))); } }
+        @keyframes bokFlugRtl { 0% { transform: translateX(calc(100cqw + 20 * var(--px))); } 45%, 100% { transform: translateX(calc(-30 * var(--px))); } }
+        .bok-taube {
+          display: block; width: calc(11 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BOK}dove.png) 0 0 / 300% 100% no-repeat;
+          animation: bokSchlag .6s steps(1) infinite;
+        }
+        .bok-taube.schatten { filter: brightness(0); opacity: .22; }
+        @keyframes bokSchlag { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
+        .bok-kaefer {
+          position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(4 * var(--px));
+          background: url(${BOK}ladybug.png) 0 0 / 200% 100% no-repeat;
+          animation-name: bokKrabbeln, ppSprite2; animation-timing-function: steps(120), steps(1); animation-iteration-count: infinite;
+        }
+        .bok-kaefer.ab { animation-name: bokKrabbelnAb, ppSprite2; }
+        @keyframes bokKrabbeln {
+          0% { transform: translateY(calc(104 * var(--px))); } 40% { transform: translateY(calc(50 * var(--px))); }
+          55% { transform: translateY(calc(50 * var(--px))); } 100% { transform: translateY(calc(-8 * var(--px))); }
+        }
+        @keyframes bokKrabbelnAb {
+          0% { transform: translateY(calc(-8 * var(--px))) rotate(180deg); } 45% { transform: translateY(calc(40 * var(--px))) rotate(180deg); }
+          60% { transform: translateY(calc(40 * var(--px))) rotate(180deg); } 100% { transform: translateY(calc(104 * var(--px))) rotate(180deg); }
+        }
       `}</style>
     </PixelScene>
   );
@@ -872,7 +1034,10 @@ const CottageOverlay = React.memo(function CottageOverlay() {
   );
 });
 
-// ── CRYSTAL WELL ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  CRYSTAL WELL — Edelsteinbrunnen im magischen blauen Gras
+//  (v1415, Brunnen v1418; Überarbeitung v1441 (Al 25.9.))
+//
 //  Karte: Brunnen mit einem Ring aus bunten Edelsteinen, ringsum
 //  MAGISCHES BLAUES GRAS (kein Wasser — Al 25.9.), ein Erdweg, Funkeln.
 //  Nachbesserung v1416–v1418 (Al 25.9.): Brunnen gross, mit Tiefe, wie
@@ -884,38 +1049,154 @@ const CottageOverlay = React.memo(function CottageOverlay() {
 //  mit dunklen Luecken, Beulen und holprige Oberkante. Konturen in
 //  dunklen Toenen der jeweiligen Steinfarbe. Wasserspiegel tiefer als
 //  der Rand, bewegt (Wellen, Ringe, Funkeln).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): der
+//  Brunnen bleibt (nur die Innenwand wird zum Wasser hin dunkler und
+//  nass), neu gemalt sind Umgebung, Wasser und alles Lebendige. Die
+//  Wiese ist jetzt echtes Gras — Rauschen aus Blautönen, darauf fächernde
+//  Büschel mit hellen Spitzen, große helle und dunkle Wiesenflecken.
+//  Hinten dunkle blaue Büsche und ein Zaunrest, dann der gewundene Erdweg
+//  aus Erdklumpen mit Kieseln, Radspuren und Uferschatten unter der
+//  Grasbank; im Gras bemooste Felsen, Kristalldrusen in den Farben des
+//  Brunnens, Leuchtpilze und Leuchtblumen. Der Brunnen steht auf einem
+//  Pflasterkranz (graue Steine wie auf der Karte, Gras in den Fugen) und
+//  wirft seinen Schatten nach links unten; vorne wachsen Büschel über
+//  den Kranz. Im Schacht liegt das Wasser tief: oben die Spiegelung der
+//  bunten Innenwand, zur Mitte ein magisches Glühen aus der Tiefe.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128 (Wiese, Weg, Büsche, Zaun, Felsen,
+//  Drusen, Pilze, Blumen); glow.png — Leuchthöfe der Drusen, Pilze und
+//  Blumen (Kachel, pulsiert); sway-a.png / sway-b.png — hohe Halme in
+//  drei Neigungen übereinander (wiegen versetzt im Wind); ground.png —
+//  Pflasterkranz und Schlagschatten (150, mittig); water.png — Wasser-
+//  spiegel, 4 Bilder übereinander (Lichtringe laufen nach außen, die
+//  Spiegelung zittert, Glitzer); well.png — der Brunnen; caustics.png —
+//  Lichtspiel des Wassers an der Innenwand (3 Bilder); front.png —
+//  Grasbüschel vor dem Kranz; well-glow.png — magischer Schein über dem
+//  Brunnenmund (atmet); ring.png — Wasserring (4 Bilder 21×7);
+//  butterfly.png — blauer Falter (2 Bilder 7×5).
+//
+//  Animiert: Gras wiegt in zwei Gruppen, Leuchthöfe und Brunnenschein
+//  atmen, Wasser wogt, Tropfenringe breiten sich aus, Lichtflecken
+//  tanzen an der Innenwand, Funken steigen aus dem Schacht, Edelsteine
+//  und Drusen funkeln, Glühwürmchen schweben über der Wiese, Falter
+//  flattern vorbei. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const CWL = '/areas/crystal-well/';
-const CWL_W = 150;                          // Brunnen-Stueck; Rand-Mitte (75, 44), Wasser (75, 57)
+const CWL_W = 150;                          // Brunnen-Stueck; Rand-Mitte (75, 44), Wasser (75, 51)
+// Kachel-x t (0..127) → Kunstpixel neben der Brettmitte, k-te Wiederholung
+const cwlKachel = (t, k) => t - 64 + 128 * k;
+// Spitzen der Kristalldrusen in der Kachel (t, y)
+const CWL_DRUSEN = [[104, 28], [101, 32], [107, 31], [40, 86], [74, 24]];
+
 const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
-  const funken = useMemo(() => ppZufall(ppFxN(18), (i) => {
+  const funken = useMemo(() => ppZufall(ppFxN(22), (i) => {
     const a = Math.random() * Math.PI * 2;
-    if (i < 9) return { x: Math.cos(a) * 56, y: 44 + Math.sin(a) * 19, dur: 1.6 + Math.random() * 1.8, delay: -Math.random() * 3 };
-    if (i < 14) return { x: (Math.random() - .5) * 64, y: 54 + Math.random() * 8, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
-    return { x: (Math.random() - .5) * 240, y: 30 + Math.random() * 66, dur: 2 + Math.random() * 2, delay: -Math.random() * 4 };
+    if (i < 10) return { x: Math.cos(a) * 58, y: 50 + Math.sin(a) * 22, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4 };
+    if (i < 13) return { x: (Math.random() - .5) * 50, y: 47 + Math.random() * 9, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
+    const [t, y] = CWL_DRUSEN[i % CWL_DRUSEN.length];
+    const k = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
+    return { x: cwlKachel(t, k) + Math.round((Math.random() - .5) * 4), y: y + Math.round(Math.random() * 5), dur: 2.4 + Math.random() * 2, delay: -Math.random() * 5 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(3), () => ({
-    x: (Math.random() - .5) * 46, y: 55 + Math.random() * 6, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
+  const ringe = useMemo(() => ppZufall(ppFxN(4), () => ({
+    x: Math.round((Math.random() - .5) * 40), y: 49 + Math.round(Math.random() * 5), dur: 3.2 + Math.random() * 2.4, delay: -Math.random() * 6,
+  })), []);
+  const steigen = useMemo(() => ppZufall(ppFxN(8), () => ({
+    x: Math.round((Math.random() - .5) * 52), y: 50 + Math.round(Math.random() * 6), dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7,
+  })), []);
+  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.round((Math.random() - .5) * 420), y: 26 + Math.round(Math.random() * 70),
+    dur: 5 + Math.random() * 5, delay: -Math.random() * 10, b: Math.random() < .5,
+  })).filter(g => !(Math.abs(g.x) < 70 && g.y > 18 && g.y < 94)), []);
+  const falter = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 30 + Math.random() * 50, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1, bob: 2 + Math.random() * 2,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1f6ef0" className="crystal-well-overlay">
+    <PixelScene artH={100} bg="#1664e8" className="crystal-well-overlay">
       <PixelBand src={CWL + 'tile.png'} />
-      <PixelBand src={CWL + 'grass-wind.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 1.6s steps(1) infinite' }} />
-      <PixelPiece src={CWL + 'well-shadow.png'} w={CWL_W} />
-      <PixelPiece src={CWL + 'well-water.png'} w={CWL_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 .9s steps(1) infinite' }} />
+      <PixelBand src={CWL + 'glow.png'} className="cwl-atmen" />
+      <PixelBand src={CWL + 'sway-b.png'} className="cwl-wiegen b" style={{ backgroundSize: 'auto 300%' }} />
+      <PixelBand src={CWL + 'sway-a.png'} className="cwl-wiegen" style={{ backgroundSize: 'auto 300%' }} />
+      <PixelPiece src={CWL + 'ground.png'} w={CWL_W} />
+      <PixelPiece src={CWL + 'water.png'} w={CWL_W} className="cwl-wasser" style={{ backgroundSize: '100% 400%' }} />
       {ringe.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn cwl-ring" style={{ left: ppArtX(r.x - 8, 0), top: ppArt(r.y - 3), animation: `cwlRing ${r.dur}s ease-out ${r.delay}s infinite` }} />
+        <i key={'r' + i} className="pp-area-dyn cwl-ring" style={{ left: ppArtX(r.x - 10, 0), top: ppArt(r.y - 3), animation: `cwlRing ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
       ))}
       <PixelPiece src={CWL + 'well.png'} w={CWL_W} />
+      <PixelPiece src={CWL + 'caustics.png'} w={CWL_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.2s steps(1) infinite' }} />
+      <PixelPiece src={CWL + 'front.png'} w={CWL_W} />
+      <PixelPiece src={CWL + 'well-glow.png'} w={CWL_W} className="cwl-atmen b" />
+      {steigen.map((s, i) => (
+        <i key={'s' + i} className="pp-area-dyn cwl-funke" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `cwlSteigen ${s.dur.toFixed(2)}s steps(26) ${s.delay.toFixed(2)}s infinite` }} />
+      ))}
       {funken.map((f, i) => (
-        <i key={i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {gluehen.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn cwl-gluehwurm" style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `${g.b ? 'cwlSchwebenB' : 'cwlSchwebenA'} ${g.dur.toFixed(2)}s steps(24) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {falter.map((f, i) => (
+        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="cwl-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .cwl-ring {
-          position: absolute; width: calc(16 * var(--px)); height: calc(6 * var(--px));
-          border: var(--px) solid rgba(150, 205, 255, .85); border-radius: 50%; opacity: 0;
+        .cwl-atmen { animation: cwlAtmen 3.4s ease-in-out infinite alternate; }
+        .cwl-atmen.b { animation-duration: 2.6s; animation-delay: -1.3s; }
+        @keyframes cwlAtmen { from { opacity: .45; } to { opacity: 1; } }
+        /* Halme: Bild 0 links, 1 mitte, 2 rechts (übereinander) */
+        .cwl-wiegen { animation: cwlWiegen 2.8s steps(1) infinite; }
+        .cwl-wiegen.b { animation-duration: 3.5s; animation-delay: -1.1s; }
+        @keyframes cwlWiegen {
+          0% { background-position: 50% 50%; } 30% { background-position: 50% 100%; }
+          55% { background-position: 50% 50%; } 80% { background-position: 50% 0%; }
         }
-        @keyframes cwlRing { 0% { transform: scale(.2); opacity: 0; } 15% { opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+        .cwl-wasser { animation: cwlWasser 1.6s steps(1) infinite; }
+        @keyframes cwlWasser {
+          0% { background-position: 0 0%; } 25% { background-position: 0 33.333%; }
+          50% { background-position: 0 66.667%; } 75% { background-position: 0 100%; }
+        }
+        .cwl-ring {
+          position: absolute; width: calc(21 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${CWL}ring.png) 0 0 / 400% 100% no-repeat;
+        }
+        @keyframes cwlRing {
+          0% { opacity: 1; background-position: 0 0; } 10% { background-position: 33.333% 0; }
+          20% { background-position: 66.667% 0; } 30% { background-position: 100% 0; } 40%, 100% { opacity: 0; }
+        }
+        .cwl-funke {
+          position: absolute; width: var(--px); height: var(--px); background: #e8fcff; opacity: 0;
+          box-shadow: 0 var(--px) 0 rgba(120, 210, 255, .55);
+        }
+        @keyframes cwlSteigen {
+          0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 70% { opacity: .8; }
+          100% { transform: translateY(calc(-26 * var(--px))); opacity: 0; }
+        }
+        .cwl-gluehwurm {
+          position: absolute; width: var(--px); height: var(--px); background: #f2ffff; opacity: 0;
+          box-shadow: var(--px) 0 0 rgba(140, 225, 255, .45), calc(-1 * var(--px)) 0 0 rgba(140, 225, 255, .45),
+                      0 var(--px) 0 rgba(140, 225, 255, .45), 0 calc(-1 * var(--px)) 0 rgba(140, 225, 255, .45);
+        }
+        @keyframes cwlSchwebenA {
+          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; }
+          35% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); opacity: .5; }
+          55% { transform: translate(calc(7 * var(--px)), calc(-2 * var(--px))); opacity: 1; }
+          80% { transform: translate(calc(9 * var(--px)), calc(-6 * var(--px))); opacity: .7; }
+          100% { transform: translate(calc(11 * var(--px)), calc(-8 * var(--px))); opacity: 0; }
+        }
+        @keyframes cwlSchwebenB {
+          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; }
+          40% { transform: translate(calc(-3 * var(--px)), calc(-4 * var(--px))); opacity: .4; }
+          60% { transform: translate(calc(-6 * var(--px)), calc(-3 * var(--px))); opacity: 1; }
+          100% { transform: translate(calc(-9 * var(--px)), calc(-9 * var(--px))); opacity: 0; }
+        }
+        .cwl-falter {
+          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
+          background: url(${CWL}butterfly.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite, ppBob 1.2s steps(3) infinite alternate;
+        }
       `}</style>
     </PixelScene>
   );
