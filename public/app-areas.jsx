@@ -254,141 +254,248 @@ function PixelPiece({ src, w, x = 0, style, className }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  BLOOD ROCK — Festungsgefaengnis im Blutfels (v1410, Kartenstil v1413)
+//  BLOOD ROCK — Festungsgefängnis im Blutfels (v1410, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
-//  Al 25.9.: „eine alte Festung, die als Gefaengnis fungiert und wo
+//  Al 25.9.: „eine alte Festung, die als Gefängnis fungiert und wo
 //  Gefangene stetig gefoltert und ihr Blut von Vampiren geraubt wird."
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  DAS ROTE SIND BLUTSTROEME, KEIN LICHT (Al 25.9.): aus den dunklen
-//  Fenstern laeuft Blut die Mauern hinab und sammelt sich in Lachen; unter
-//  dem Fallgitter quillt es hervor und laeuft die Treppe hinab. Nichts
+//  DAS ROTE SIND BLUTSTRÖME, KEIN LICHT (Al 25.9.): aus den dunklen
+//  Fenstern läuft Blut die Mauern hinab und sammelt sich in Lachen; unter
+//  dem Fallgitter quillt es hervor und läuft die Treppe hinab. Nichts
 //  hier leuchtet.
 //
-//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 64 (Blutfels, Wehrmauer mit Turm, Zellen-
-//  fenster, Hof); keep.png — Torbau 96, mittig; mask-tile.png /
-//  mask-keep.png — Form der Stroeme, durch die flow.png (Schlieren, 8×16)
-//  nach unten laeuft; ripple.png — Aufschlag in der Lache (3 Bilder 7×2);
-//  mist.png — Blutnebel; bat.png (2 Bilder 5×4), vampire.png (2 Bilder
-//  5×6, Silhouette mit roten Augen).
+//  v1441 nach dem Kartenmotiv, auf dem Niveau der v1440-Szenen: hinter
+//  allem der Blutfels — gewölbte, facettierte Brocken mit Klüften und
+//  Schichtleisten, in den Fels gehauene vergitterte Verliese, aus denen
+//  Rinnsale laufen. Davor die Wehrmauer mit Zinnen (einige abgebrochen),
+//  Maschikuli, Schmutzspuren und Rissen, Zellenfenster mit Blutströmen,
+//  ein Galgenbalken mit Hängekäfig, Ketten mit Fesseln, ein gefesseltes
+//  Skelett, ein Kloakengitter, aus dem Blut in eine große Lache quillt;
+//  die Türme der Kachel stehen an der Naht (weit außen). Mitte: der
+//  Torbau wie auf der Karte — zwei vorspringende Flankentürme (Innen-
+//  seiten sichtbar), Hauptbau mit vier Bogennischen (Blut rinnt an der
+//  Rückwand herab, in einer hängt ein Skelett in Ketten), Wasserspeier,
+//  aus denen Blut stürzt, Rundbogentor mit halb hochgezogenem Fallgitter
+//  und Schädel-Schlussstein, darüber die lange vergitterte Zellengalerie
+//  mit rostroter Sturzkante und der Oberbau. Hof aus unregelmäßigen
+//  Platten in Tiefe, Blut in den Fugen, Lachen, Knochen, Geröll.
+//
+//  Ebenen (Kunsthöhe 100; Generator scratchpad gen/blood-rock.py, nicht
+//  im Projekt): tile.png — Kachel 128; keep.png — Torbau 164, mittig;
+//  keep-front.png — Brustwehr des Hauptbaus (vor der Wache);
+//  mask-tile.png / mask-keep.png — Form der Ströme, durch die flow.png
+//  (helle Schlieren, 8×16) nach unten läuft; ripple.png — Aufschlag in
+//  der Lache (3 Bilder 9×3); mist.png — Blutnebel (Kachel 128×14);
+//  bat.png (3 Bilder 7×5), bat-far.png (2 Bilder 5×3); vampire.png —
+//  Vampirfürst (3 Bilder 11×9, Umhang weht); guard.png — Vampirwache
+//  (2 Bilder 7×9); cage.png — Hängekäfig mit Gefangenem (4 Bilder 15×26,
+//  pendelt); rat.png (2 Bilder 6×3); hands.png — Hände am Gitter.
+//
+//  Animiert: Blut läuft in allen Strömen, schlägt in den Lachen auf und
+//  tropft aus Galerie, Verliesen und Käfig; der Käfig pendelt; hinter
+//  den Gittern greifen ab und zu Hände nach den Stäben; der Vampirfürst
+//  steht mit wehendem Umhang auf dem Oberbau, eine Wache patrouilliert
+//  hinter der Brustwehr; Fledermäuse in zwei Tiefen (die fernen hinter
+//  dem Torbau), Ratten huschen über den Hof, Blutnebel zieht. Licht
+//  IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const BR = '/areas/blood-rock/';
-const BR_KEEP_W = 96;
-// Fuesse der Blutstroeme (Kunstpixel neben der Brettmitte): Kachel-Stroeme
-// wiederholen sich alle 64, der Torbau deckt |x| < 48 ab.
-const BR_KACHEL_FUESSE = [-0.5, -24.5, 22.5];
-const BR_TORBAU_FUESSE = [[-42, 72], [-24.5, 72], [23.5, 72], [41, 72], [0, 79]];
+const BR_KEEP_W = 164;
+const BR_KACHEL = 128;
+// Füße der Ströme = Lachen (Kunstpixel neben der Brettmitte). Kachel-Lachen
+// wiederholen sich alle 128, der Torbau deckt |x| < 82 ab.
+const BR_KACHEL_FUESSE = [[0, 79], [-44, 79], [14, 79], [-54, 79], [-18, 81]];
+const BR_TORBAU_FUESSE = [[-72, 83], [70, 83], [-46, 82], [-28, 82], [28, 82], [47, 82], [-49, 82], [49, 82], [0, 92], [-5, 93], [6, 92]];
+const BR_KAEFIG = [34, 45];                 // Haken (neben der Mitte, Kachel), Käfig 15×26
+const BR_HAENDE_KACHEL = [[-28, 60]];       // Zellenfenster ohne Strom
+const BR_HAENDE_TORBAU = [[51, 25], [99, 25], [75, 25]];   // Galerie (Stück-x, y)
+const BR_GALERIE_TROPFEN = [54, 66, 90, 102];              // Sims der Galerie (Stück-x), y 30
+// Tropfsteinspitzen am Felsüberhang (Kachel): Blut tropft bis hinter die Zinnen
+const BR_TROPFSTEINE = [[-58, 9], [-42, 13], [-20, 8], [24, 10], [40, 7], [56, 9]];
+// Kachel-Positionen (x neben der Mitte) für alle sichtbaren Wiederholungen
+const brKachelX = (x, rand = 4) => {
+  const out = [];
+  for (let k = -3; k <= 3; k++) {
+    const xx = x + k * BR_KACHEL;
+    if (Math.abs(xx) > BR_KEEP_W / 2 + rand) out.push(xx);
+  }
+  return out;
+};
 
 const BloodRockOverlay = React.memo(function BloodRockOverlay() {
-  const bats = useMemo(() => Array.from({ length: ppFxN(5) }, (_, i) => ({
-    y: 2 + Math.random() * 18,
-    dur: 16 + Math.random() * 14,
-    delay: -Math.random() * 30,
-    bob: 1 + Math.random() * 2,
-    bobDur: 1.6 + Math.random() * 1.4,
-    flap: 0.2 + Math.random() * 0.12,
-    rtl: i % 2 === 1,
+  const bats = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: 3 + Math.random() * 22, dur: 18 + Math.random() * 14, delay: -Math.random() * 30,
+    bob: 1 + Math.round(Math.random() * 2), bobDur: 1.4 + Math.random() * 1.2, flap: .3 + Math.random() * .12, rtl: i % 2 === 1,
   })), []);
-  // Aufschlag der Stroeme in ihren Lachen
+  const batsFern = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 2 + Math.random() * 14, dur: 34 + Math.random() * 16, delay: -Math.random() * 40,
+    flap: .26 + Math.random() * .1, rtl: i % 2 === 0,
+  })), []);
   const ripples = useMemo(() => {
-    const out = [];
-    for (let k = -4; k <= 4; k++) {
-      for (const x0 of BR_KACHEL_FUESSE) {
-        const x = x0 + k * 64;
-        if (Math.abs(x) >= BR_KEEP_W / 2) out.push([x, 72]);
-      }
-    }
-    return [...BR_TORBAU_FUESSE, ...out].slice(0, ppFxN(40)).map(([x, y]) => ({
-      x, y, dur: 0.5 + Math.random() * 0.3, delay: -Math.random(),
-    }));
+    const out = [...BR_TORBAU_FUESSE];
+    for (const [x, y] of BR_KACHEL_FUESSE) for (const xx of brKachelX(x)) out.push([xx, y]);
+    return out.slice(0, ppFxN(30)).map(([x, y]) => ({ x, y, dur: .6 + Math.random() * .5, delay: -Math.random() * 2 }));
   }, []);
-  // Tropfen aus den vergitterten Fensterreihen des Torbaus
-  const drips = useMemo(() => [
-    { x: 30, y0: 34, y1: 37, dur: 5.2, delay: -3.3 },
-    { x: 66, y0: 34, y1: 37, dur: 4.6, delay: -0.9 },
-    { x: 44, y0: 19, y1: 21, dur: 3.9, delay: -2.0 },
-    { x: 55, y0: 19, y1: 21, dur: 4.4, delay: -0.3 },
-  ].slice(0, ppFxN(4)), []);
+  const kaefige = useMemo(() => brKachelX(BR_KAEFIG[0], 8).map((x) => ({
+    x, dur: 3.2 + Math.random() * .8, delay: -Math.random() * 4,
+  })), []);
+  const haende = useMemo(() => {
+    const out = BR_HAENDE_TORBAU.map(([x, y]) => ({ left: ppArtX(x - 2, BR_KEEP_W), y }));
+    for (const [x, y] of BR_HAENDE_KACHEL) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx - 2, 0), y });
+    return out.slice(0, ppFxN(6)).map((h) => ({ ...h, dur: 9 + Math.random() * 9, delay: -Math.random() * 18 }));
+  }, []);
+  const tropfen = useMemo(() => {
+    const out = BR_GALERIE_TROPFEN.map((x) => ({ left: ppArtX(x, BR_KEEP_W), y0: 30, y1: 33 }));
+    for (const [x, y] of BR_TROPFSTEINE) for (const xx of brKachelX(x)) out.push({ left: ppArtX(xx, 0), y0: y, y1: 29 });
+    for (const k of kaefige) out.push({ left: ppArtX(k.x + 1, 0), y0: BR_KAEFIG[1] + 25, y1: 78 });
+    return out.slice(0, ppFxN(12)).map((d) => ({ ...d, dur: 3.2 + Math.random() * 2.6, delay: -Math.random() * 6 }));
+  }, [kaefige]);
+  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 86 + i * 7 + Math.random() * 3, dur: 26 + Math.random() * 14, delay: -Math.random() * 30 - i * 11, rtl: i === 1,
+  })), []);
+  const wand = BR_KEEP_W;
   return (
     <PixelScene artH={100} bg="#140606" className="blood-rock-overlay">
       <PixelBand src={BR + 'tile.png'} />
       <div className="pp-pixel-layer br-strom" style={ppMaske(BR + 'mask-tile.png', true)} />
-      <PixelPiece src={BR + 'keep.png'} w={BR_KEEP_W} />
+      {batsFern.map((b, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="br-bat-fern" style={{ transform: b.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${b.flap.toFixed(2)}s` }} />
+        </div>
+      ))}
+      <PixelPiece src={BR + 'keep.png'} w={wand} />
       <div className="pp-pixel-layer br-strom" style={{
-        left: `calc(50% - ${BR_KEEP_W / 2} * var(--px))`, right: 'auto', width: ppArt(BR_KEEP_W),
+        left: `calc(50% - ${wand / 2} * var(--px))`, right: 'auto', width: ppArt(wand),
         ...ppMaske(BR + 'mask-keep.png', false),
       }} />
-      {ripples.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn br-kraeusel" style={{
-          left: ppArtX(r.x - 3.5, 0), top: ppArt(r.y),
-          animation: `brKraeusel ${r.dur}s steps(1) ${r.delay}s infinite`,
+      {/* Wache hinter der Brustwehr des Hauptbaus (Weg x 46–111, Füße y 40) */}
+      <div className="br-wache-bahn" style={{ left: ppArtX(46, wand), top: ppArt(31) }}>
+        <i className="br-wache" />
+      </div>
+      <PixelPiece src={BR + 'keep-front.png'} w={wand} />
+      <i className="br-vampir" style={{ left: ppArtX(86, wand), top: 0 }} />
+      {kaefige.map((k, i) => (
+        <i key={'k' + i} className="br-kaefig" style={{
+          left: ppArtX(k.x - 7, 0), top: ppArt(BR_KAEFIG[1]),
+          animationDuration: `${k.dur.toFixed(2)}s`, animationDelay: `${k.delay.toFixed(2)}s`,
         }} />
       ))}
-      <i className="br-vampir" style={{ left: ppArtX(57, BR_KEEP_W), top: ppArt(0) }} />
-      <div className="pp-pixel-layer br-mist" style={{ top: ppArt(76) }} />
-      <div className="pp-pixel-layer br-mist br-mist-hoch" style={{ top: ppArt(18) }} />
-      {bats.map((b, i) => (
-        <div key={'b' + i} className="pp-area-dyn br-bat-bahn" style={{
-          top: ppArt(b.y), animation: `${b.rtl ? 'brBatRtl' : 'brBatLtr'} ${b.dur}s linear ${b.delay}s infinite`,
+      {haende.map((h, i) => (
+        <i key={'h' + i} className="pp-area-dyn br-haende" style={{
+          left: h.left, top: ppArt(h.y), animation: `brHaende ${h.dur.toFixed(2)}s steps(1) ${h.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {ripples.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn br-kraeusel" style={{
+          left: ppArtX(r.x - 4, 0), top: ppArt(r.y - 1),
+          animation: `ppSprite3 ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {tropfen.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
+          left: d.left, top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
+          '--tropfen': '#8a120d', '--tropfen-dunkel': '#3d0506',
+          animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer br-mist" style={{ top: ppArt(70) }} />
+      {ratten.map((r, i) => (
+        <div key={'t' + i} className="pp-area-dyn br-ratte-bahn" style={{
+          top: ppArt(r.y), animation: `${r.rtl ? 'brRatteRtl' : 'brRatteLtr'} ${r.dur.toFixed(1)}s linear ${r.delay.toFixed(1)}s infinite`,
         }}>
-          <div className="br-bat" style={{
-            '--bob': ppArt(b.bob),
-            transform: b.rtl ? 'scaleX(-1)' : undefined,
-            animation: `brBatFlap ${b.flap}s steps(1) infinite, brBatBob ${b.bobDur}s ease-in-out infinite alternate`,
+          <i className="br-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <div className="pp-pixel-layer br-mist br-mist-nah" style={{ top: ppArt(84) }} />
+      {bats.map((b, i) => (
+        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="br-bat" style={{
+            '--bob': ppArt(b.bob), transform: b.rtl ? 'scaleX(-1)' : undefined,
+            animationDuration: `${b.flap.toFixed(2)}s, ${b.bobDur.toFixed(2)}s`,
           }} />
         </div>
       ))}
-      {drips.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
-          left: ppArtX(d.x, BR_KEEP_W), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
-          '--tropfen': '#8c0c0a', '--tropfen-dunkel': '#3f0606',
-          animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay}s infinite`,
-        }} />
-      ))}
-      <div className="br-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        /* Blut laeuft: helle Schlieren wandern durch die Stroeme nach unten */
+        /* Blut läuft: helle Schlieren wandern durch die Ströme nach unten */
         .br-strom {
           position: absolute; inset: 0;
           background: url(${BR}flow.png) 0 0 / calc(8 * var(--px)) calc(16 * var(--px)) repeat;
-          animation: brStrom .7s linear infinite;
+          animation: brStrom .8s steps(16) infinite;
         }
         @keyframes brStrom { from { background-position: 0 0; } to { background-position: 0 calc(16 * var(--px)); } }
         .br-kraeusel {
-          position: absolute; width: calc(7 * var(--px)); height: calc(2 * var(--px));
+          position: absolute; width: calc(9 * var(--px)); height: calc(3 * var(--px));
           background: url(${BR}ripple.png) 0 0 / 300% 100% no-repeat;
         }
-        @keyframes brKraeusel { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
         .br-vampir {
-          position: absolute; width: calc(5 * var(--px)); height: calc(6 * var(--px));
-          background: url(${BR}vampire.png) 0 0 / 200% 100% no-repeat;
-          animation: brUmhang .9s steps(1) infinite;
+          position: absolute; width: calc(11 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BR}vampire.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 1.2s steps(1) infinite;
         }
-        @keyframes brUmhang { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        .br-wache-bahn { position: absolute; animation: brWacheWeg 26s steps(65) infinite; }
+        .br-wache {
+          display: block; width: calc(7 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BR}guard.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .7s steps(1) infinite, brWacheWende 26s steps(1) infinite;
+        }
+        @keyframes brWacheWeg {
+          0%, 8% { transform: translateX(0); }
+          46%, 54% { transform: translateX(calc(65 * var(--px))); }
+          92%, 100% { transform: translateX(0); }
+        }
+        @keyframes brWacheWende { 0% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+        .br-kaefig {
+          position: absolute; width: calc(15 * var(--px)); height: calc(26 * var(--px));
+          background: url(${BR}cage.png) 0 0 / 400% 100% no-repeat;
+          animation-name: brPendel; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes brPendel {
+          0% { background-position: 0 0; } 25% { background-position: 33.333% 0; }
+          50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; }
+        }
+        .br-haende {
+          position: absolute; width: calc(5 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
+          background: url(${BR}hands.png) 0 0 / 100% 100% no-repeat;
+        }
+        @keyframes brHaende { 0%, 55% { opacity: 0; } 56%, 88% { opacity: 1; } 89%, 100% { opacity: 0; } }
         .br-mist {
           position: absolute; left: 0; right: 0; height: calc(14 * var(--px));
-          background: url(${BR}mist.png) 0 0 / auto 100% repeat-x; opacity: .55;
-          animation: brNebel 48s steps(64) infinite;
+          background: url(${BR}mist.png) 0 0 / auto 100% repeat-x; opacity: .45;
+          animation: brNebel 64s steps(128) infinite;
         }
-        .br-mist-hoch { opacity: .45; animation-duration: 70s; animation-direction: reverse; }
-        @keyframes brNebel { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        .br-bat-bahn { position: absolute; left: 0; }
+        .br-mist-nah { opacity: .55; animation-duration: 44s; animation-direction: reverse; }
+        @keyframes brNebel { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         .br-bat {
-          width: calc(5 * var(--px)); height: calc(4 * var(--px));
-          background: url(${BR}bat.png) 0 0 / 200% 100% no-repeat;
+          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
+          background: url(${BR}bat.png) 0 0 / 300% 100% no-repeat;
+          animation-name: ppSprite3, ppBob; animation-timing-function: steps(1), ease-in-out;
+          animation-iteration-count: infinite; animation-direction: normal, alternate;
         }
-        @keyframes brBatFlap { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
-        @keyframes brBatBob { from { translate: 0 0; } to { translate: 0 var(--bob); } }
-        @keyframes brBatLtr { from { transform: translateX(calc(-10 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
-        @keyframes brBatRtl { from { transform: translateX(calc(100cqw + 10 * var(--px))); } to { transform: translateX(calc(-10 * var(--px))); } }
-        .br-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        .br-bat-fern {
+          display: block; width: calc(5 * var(--px)); height: calc(3 * var(--px));
+          background: url(${BR}bat-far.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite;
+        }
+        .br-ratte-bahn { position: absolute; left: 0; }
+        .br-ratte {
+          display: block; width: calc(7 * var(--px)); height: calc(3 * var(--px));
+          background: url(${BR}rat.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .18s steps(1) infinite;
+        }
+        @keyframes brRatteLtr {
+          0% { transform: translateX(calc(-10 * var(--px))); }
+          28%, 100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+        }
+        @keyframes brRatteRtl {
+          0% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          28%, 100% { transform: translateX(calc(-10 * var(--px))); }
         }
       `}</style>
     </PixelScene>
@@ -396,273 +503,652 @@ const BloodRockOverlay = React.memo(function BloodRockOverlay() {
 });
 
 
-// ── PANGAIA, THE DINO DOMAIN ─────────────────────────────────────────
-//  v1439 (Al 25.9.) nach dem Kartenmotiv: eine ganze Insel aus der
-//  Vogelperspektive — dichter Dschungel aus schattierten Baumkronen,
-//  Lichtungen, Erdflecken, Felsbrocken, Strand und Flachwasser an der
-//  Kueste, ein Fluss vom Vulkanfuss zur Bucht, ein See, der Vulkan mit
-//  Lavasee und Lavastrom. Darauf kleine (eigentlich riesige) Dinosaurier:
-//  eine Brachiosaurus-Herde grast, ein T-Rex streift umher, Raptoren
-//  flitzen, Flugsaurier ziehen mit Schatten ueber alles hinweg. Wasser
-//  glitzert, Lava glueht, der Vulkan raucht. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
+//  PANGAIA, THE DINO DOMAIN — die Dino-Insel (v1439, Al 25.9.)
+//  Überarbeitung v1441 (Al 25.9.)
+//
+//  Nach dem Kartenmotiv: eine ganze Insel aus der Vogelperspektive —
+//  dichter Dschungel aus schattierten Baumkronen, Lichtungen, Erdflecken,
+//  Felsbrocken, Strand und Flachwasser an der Küste, ein Fluss vom
+//  Vulkanfuß zur Bucht, ein See, der Vulkan mit Lavasee und Lavastrom.
+//  Darauf kleine (eigentlich riesige) Dinosaurier: eine Brachiosaurus-
+//  Herde grast, ein T-Rex streift umher, Raptoren flitzen, Flugsaurier
+//  ziehen mit Schatten über alles hinweg. Wasser glitzert, Lava glüht,
+//  der Vulkan raucht. Licht IMMER oben rechts.
+//
+//  v1441: jede Baumkrone einzeln aus kleinen Blattballen gemalt (Licht-
+//  sichel oben rechts, dunkle Fuge unten links, Schlagschatten aus einem
+//  Höhenpuffer), mehrere Baumarten (Laub in drei Grüntönen, blühende
+//  Kronen, Nadelbäume, Palmen am Strandsaum, Farne); der Vulkan als
+//  Höhenfeld mit Rinnen, Kraterwand und Lavasee, der Lavastrom läuft den
+//  Hang hinab und dampfend in die rechte Bucht; Fluss mit Schlammufern,
+//  See mit Flachwasser, Bach zur Küste, Lichtungen mit Trampelpfaden,
+//  Felsbrocken, Nest mit Eiern, Skelett, umgestürztem Stamm und Fuß-
+//  spuren im Sand; draußen Hochsee mit Felsinselchen und Riff.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): sea.png — Kachel 128 (Hochsee); island.png — die Insel (260,
+//  mittig; fernes Meer durchsichtig, dort liegt die Kachel); surf.png —
+//  Brandung (2 Bilder übereinander); mask-water.png / mask-river.png /
+//  mask-lava.png — Formen, durch die glitter.png (Glitzern, 32×96),
+//  flow-river.png (16×8) und flow-lava.png (8×8) laufen; lava-glow.png —
+//  gestufte Glut; brachio.png, trex.png, raptor.png, plesio.png (je 8
+//  Bilder: rechts 2× Laufen, 2× Pause, links dasselbe — Licht bleibt oben
+//  rechts); ptero.png + ptero-shadow.png (6 Bilder: R/L × 3 Flügel-
+//  schläge); smoke.png (4), steam.png (3), bubble.png (3), ripple.png (3).
+//
+//  Animiert: das Meer, der See und der Fluss glitzern, die Brandung
+//  schlägt an Strand und Seeufer, der Fluss strömt zur Bucht, die Lava
+//  fließt und glüht, im Lavasee platzen Blasen, der Vulkan raucht, wo
+//  die Lava ins Meer läuft, zischt Dampf. Die Brachiosaurier schreiten
+//  pixelweise über ihre Lichtung und grasen, der T-Rex patrouilliert und
+//  brüllt, ein Raptorenrudel rennt, hält schnuppernd an und rennt zurück,
+//  in der unteren Bucht taucht ein Plesiosaurier auf und ab, im See
+//  kräuselt es, Flugsaurier ziehen mit Schatten übers Brett.
+// ═══════════════════════════════════════════════════════════════════
 const PGN = '/areas/pangaia/';
-const PGN_W = 250;
-const PGN_VULKAN = { x: 150 - 125, y: 26 };
+const PGN_W = 260;
+const pgnX = (x) => x - PGN_W / 2;              // Insel-x → Kunstpixel neben der Brettmitte
+const PGN_KRATER = [[153, 22], [158, 24], [155, 26], [159, 21], [152, 25]];
+const PGN_DAMPF = [208, 40];                    // Lava trifft das Meer
+const PGN_SEE = [[181, 64], [192, 67], [186, 70], [196, 64]];
+// Dinos: Blatt, Größe, Start (Insel-Pixel, oben links), Plan, Takt (s).
+// Plan: ['w', n, dx, dy] = n Schritte laufen (je 1 Kunstpixel), ['g', n] = n Takte Pause.
 const PGN_DINOS = [
-  // Art, Breite, Hoehe, Start (neben der Mitte), Weg, Dauer
-  { art: 'brachio', w: 14, h: 7, x: -84, y: 44, weg: 18, dur: 16 },
-  { art: 'brachio', w: 14, h: 7, x: -70, y: 53, weg: 16, dur: 19 },
-  { art: 'trex', w: 9, h: 6, x: 56, y: 66, weg: 16, dur: 11 },
-  { art: 'raptor', w: 5, h: 3, x: -26, y: 74, weg: 24, dur: 5 },
-  { art: 'raptor', w: 5, h: 3, x: -20, y: 78, weg: 22, dur: 5.6 },
+  { art: 'brachio', w: 24, h: 14, x: 48, y: 40, takt: .34, plan: [['w', 10, 1, 0], ['g', 16], ['w', 10, -1, 0], ['g', 12]] },
+  { art: 'brachio', w: 24, h: 14, x: 72, y: 50, takt: .38, plan: [['g', 14], ['w', 9, -1, 0], ['g', 18], ['w', 9, 1, 0]] },
+  { art: 'trex', w: 19, h: 12, x: 174, y: 78, takt: .2, plan: [['w', 24, 1, 0], ['g', 10], ['w', 24, -1, 0], ['g', 14]] },
+  { art: 'raptor', w: 12, h: 7, x: 110, y: 74, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]] },
+  { art: 'raptor', w: 12, h: 7, x: 105, y: 77, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]], verz: -.5 },
+  { art: 'raptor', w: 12, h: 7, x: 102, y: 72, takt: .08, plan: [['w', 12, 1, 0], ['w', 4, 1, 1], ['w', 10, 1, 0], ['g', 30], ['w', 10, -1, 0], ['w', 4, -1, -1], ['w', 12, -1, 0], ['g', 40]], verz: -1.1 },
+  { art: 'plesio', w: 15, h: 9, x: 116, y: 90, takt: .55, plan: [['w', 10, 1, 0], ['g', 10], ['w', 10, -1, 0], ['g', 8]] },
 ];
+// Plan → Keyframes (steps(1): jeder Takt ein ganzer Kunstpixel bzw. ein Bild)
+function pgnGang(name, plan) {
+  const takte = [];
+  let x = 0, y = 0, dir = 1;
+  for (const [art, n, dx = 0, dy = 0] of plan) {
+    for (let i = 0; i < n; i++) {
+      if (art === 'w') { if (dx) dir = Math.sign(dx); x += dx; y += dy; }
+      const bild = (dir > 0 ? 0 : 4) + (art === 'w' ? i % 2 : 2 + (Math.floor(i / 3) % 2));
+      takte.push([x, y, bild]);
+    }
+  }
+  const N = takte.length;
+  const kf = (p, [x, y, b]) => `${p}% { transform: translate(calc(${x} * var(--px)), calc(${y} * var(--px))); background-position: ${(b / 7 * 100).toFixed(3)}% 0; }`;
+  return { css: `@keyframes ${name} { ${takte.map((t, i) => kf((i / N * 100).toFixed(3), t)).join(' ')} ${kf(100, takte[N - 1])} }`, n: N };
+}
+
 const PangaiaOverlay = React.memo(function PangaiaOverlay() {
-  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(3, ppFxN(PGN_DINOS.length))).map(d => ({
-    ...d, delay: -Math.random() * d.dur,
+  const dinos = useMemo(() => PGN_DINOS.slice(0, Math.max(4, ppFxN(PGN_DINOS.length))).map((d, i) => {
+    const g = pgnGang('pgnGang' + i, d.plan);
+    const dur = g.n * d.takt;
+    return { ...d, css: g.css, name: 'pgnGang' + i, dur, delay: d.verz !== undefined ? d.verz : -Math.random() * dur };
+  }), []);
+  const flieger = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: [6, 52, 30][i] + Math.random() * 8, dur: 20 + Math.random() * 10, delay: -Math.random() * 30, rtl: i % 2 === 1,
   })), []);
-  const flieger = useMemo(() => ppZufall(ppFxN(2), (i) => ({
-    y: 14 + i * 38 + Math.random() * 8, dur: 18 + Math.random() * 8, delay: -Math.random() * 20, rtl: i % 2 === 1,
-  })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(5), () => ({ dur: 4 + Math.random() * 2, delay: -Math.random() * 6 })), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => ({ dur: 5.5 + Math.random() * 2.5, delay: -i * 1.25 - Math.random(), dx: Math.round(Math.random() * 4) })), []);
+  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 2.6 + Math.random(), delay: -i * 1.0, dx: i - 1 })), []);
+  const blasen = useMemo(() => PGN_KRATER.slice(0, ppFxN(PGN_KRATER.length)).map(([x, y]) => ({ x, y, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4 })), []);
+  const kraeusel = useMemo(() => PGN_SEE.slice(0, ppFxN(PGN_SEE.length)).map(([x, y]) => ({ x, y, dur: 4 + Math.random() * 4, delay: -Math.random() * 8 })), []);
+  const mitte = { left: `calc(50% - ${PGN_W / 2} * var(--px))`, width: ppArt(PGN_W), right: 'auto' };
   return (
     <PixelScene artH={100} bg="#123a96" className="pangaia-overlay">
-      <PixelBand src={PGN + 'sea.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.8s steps(1) infinite' }} />
-      <PixelPiece src={PGN + 'island.png'} w={PGN_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.4s steps(1) infinite' }} />
-      <PixelPiece src={PGN + 'lava-glow.png'} w={PGN_W} className="pgn-lava" />
+      <PixelBand src={PGN + 'sea.png'} />
+      <PixelPiece src={PGN + 'island.png'} w={PGN_W} />
+      <div className="pp-pixel-layer pgn-glitzer" />
+      <PixelPiece src={PGN + 'surf.png'} w={PGN_W} className="pp-area-dyn" style={{ backgroundSize: '100% 200%', animation: 'ppBand2 3.4s steps(1) infinite' }} />
+      <div className="pp-pixel-layer pgn-fluss" style={{ ...mitte, ...ppMaske(PGN + 'mask-river.png', false) }} />
+      <PixelPiece src={PGN + 'lava-glow.png'} w={PGN_W} className="pgn-glut" />
+      <div className="pp-pixel-layer pgn-lava" style={{ ...mitte, ...ppMaske(PGN + 'mask-lava.png', false) }} />
+      {blasen.map((b, i) => (
+        <i key={'b' + i} className="pp-area-dyn pgn-blase" style={{ left: ppArtX(pgnX(b.x) - 1, 0), top: ppArt(b.y - 1), animation: `pgnBlubb ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {kraeusel.map((k, i) => (
+        <i key={'k' + i} className="pp-area-dyn pgn-kraeusel" style={{ left: ppArtX(pgnX(k.x) - 3, 0), top: ppArt(k.y - 1), animation: `pgnKraeusel ${k.dur.toFixed(2)}s steps(1) ${k.delay.toFixed(2)}s infinite` }} />
+      ))}
       {dinos.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pgn-dino" style={{
-          left: ppArtX(d.x, 0), top: ppArt(d.y), width: ppArt(d.w), height: ppArt(d.h), '--weg': ppArt(d.weg),
+        <i key={'d' + i} className={'pp-area-dyn pgn-dino'} style={{
+          left: ppArtX(pgnX(d.x), 0), top: ppArt(d.y), width: ppArt(d.w), height: ppArt(d.h),
           backgroundImage: `url(${PGN}${d.art}.png)`,
-          animation: `pgnWandern ${d.dur}s linear ${d.delay.toFixed(2)}s infinite, ppSprite2 ${d.art === 'raptor' ? .25 : .6}s steps(1) infinite`,
+          animation: `${d.name} ${d.dur.toFixed(2)}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
+      {dampf.map((r, i) => (
+        <i key={'s' + i} className="pp-area-dyn pgn-dampf" style={{ left: ppArtX(pgnX(PGN_DAMPF[0]) - 3 + r.dx, 0), top: ppArt(PGN_DAMPF[1] - 6), animation: `pgnDampf ${r.dur.toFixed(2)}s steps(10) ${r.delay.toFixed(2)}s infinite, pgnDampfBild ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
+      ))}
       {rauch.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn pgn-rauch" style={{ left: ppArtX(PGN_VULKAN.x - 3, 0), top: ppArt(PGN_VULKAN.y - 4), animation: `pgnRauch ${r.dur.toFixed(2)}s ease-out ${r.delay.toFixed(2)}s infinite` }} />
+        <i key={'r' + i} className="pp-area-dyn pgn-rauch" style={{ left: ppArtX(pgnX(156) - 6 + r.dx, 0), top: ppArt(24 - 10), animation: `pgnRauch ${r.dur.toFixed(2)}s steps(30) ${r.delay.toFixed(2)}s infinite, pgnRauchBild ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
       ))}
       {flieger.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <div style={{ position: 'relative', transform: f.rtl ? 'scaleX(-1)' : undefined }}>
-            <i className="pgn-schatten" />
-            <i className="pgn-ptero" />
+          <div style={{ position: 'relative' }}>
+            <i className={'pgn-ptero-schatten' + (f.rtl ? ' l' : '')} />
+            <i className={'pgn-ptero' + (f.rtl ? ' l' : '')} />
           </div>
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .pgn-lava { animation: pgnLava 2.2s ease-in-out infinite alternate; }
-        @keyframes pgnLava { from { opacity: .45; } to { opacity: 1; } }
-        .pgn-dino { position: absolute; background-size: 200% 100%; background-repeat: no-repeat; }
-        @keyframes pgnWandern {
-          0% { transform: translateX(0) scaleX(1); } 49.99% { transform: translateX(var(--weg)) scaleX(1); }
-          50% { transform: translateX(var(--weg)) scaleX(-1); } 100% { transform: translateX(0) scaleX(-1); }
+        ${dinos.map(d => d.css).join('\n')}
+        .pgn-dino { position: absolute; background-size: 800% 100%; background-repeat: no-repeat; }
+        /* Glitzern auf allem Wasser: Maske = Wasser der Insel + alles außerhalb des Versatzstücks */
+        .pgn-glitzer {
+          position: absolute; inset: 0;
+          background: url(${PGN}glitter.png) 0 0 / calc(32 * var(--px)) calc(96 * var(--px)) repeat;
+          -webkit-mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
+          mask-image: url(${PGN}mask-water.png), linear-gradient(to right, #fff calc(50% - ${PGN_W / 2} * var(--px)), transparent 0 calc(50% + ${PGN_W / 2} * var(--px)), #fff 0);
+          -webkit-mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%; mask-size: calc(${PGN_W} * var(--px)) 100%, 100% 100%;
+          -webkit-mask-position: 50% 0, 0 0; mask-position: 50% 0, 0 0;
+          -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+          animation: pgnGlitzer 2.7s steps(1) infinite;
         }
-        .pgn-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); border-radius: 50%; background: rgba(70, 64, 60, .75); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(40, 36, 34, .6); opacity: 0; }
-        @keyframes pgnRauch { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 15% { opacity: .85; } 100% { transform: translate(calc(8 * var(--px)), calc(-24 * var(--px))) scale(1.8); opacity: 0; } }
-        .pgn-ptero { display: block; width: calc(10 * var(--px)); height: calc(9 * var(--px)); background: url(${PGN}ptero.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; }
-        .pgn-schatten { position: absolute; left: calc(1 * var(--px)); top: calc(16 * var(--px)); width: calc(7 * var(--px)); height: calc(6 * var(--px)); border-radius: 50%; background: rgba(0, 20, 0, .35); }
+        @keyframes pgnGlitzer { 0% { background-position: 0 0; } 33.3% { background-position: calc(-11 * var(--px)) calc(32 * var(--px)); } 66.6% { background-position: calc(-5 * var(--px)) calc(64 * var(--px)); } }
+        .pgn-fluss {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${PGN}flow-river.png) 0 0 / calc(16 * var(--px)) calc(8 * var(--px)) repeat;
+          animation: pgnFluss 2.4s steps(16) infinite;
+        }
+        @keyframes pgnFluss { from { background-position: 0 0; } to { background-position: calc(-16 * var(--px)) 0; } }
+        .pgn-lava {
+          position: absolute; top: 0; bottom: 0;
+          background: url(${PGN}flow-lava.png) 0 0 / calc(8 * var(--px)) calc(8 * var(--px)) repeat;
+          animation: pgnLavaFluss 2.2s steps(8) infinite;
+        }
+        @keyframes pgnLavaFluss { from { background-position: 0 0; } to { background-position: calc(8 * var(--px)) calc(8 * var(--px)); } }
+        .pgn-glut { animation: pgnGlut 2.6s ease-in-out infinite alternate; }
+        @keyframes pgnGlut { from { opacity: .5; } to { opacity: 1; } }
+        .pgn-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${PGN}bubble.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnBlubb { 0%, 70% { opacity: 0; background-position: 0 0; } 72% { opacity: 1; background-position: 0 0; } 80% { background-position: 50% 0; } 88% { background-position: 100% 0; } 94%, 100% { opacity: 0; background-position: 100% 0; } }
+        .pgn-kraeusel { position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px)); background: url(${PGN}ripple.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnKraeusel { 0%, 76% { opacity: 0; background-position: 0 0; } 78% { opacity: 1; background-position: 0 0; } 85% { background-position: 50% 0; } 92% { background-position: 100% 0; } 98%, 100% { opacity: 0; background-position: 100% 0; } }
+        .pgn-rauch { position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px)); background: url(${PGN}smoke.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes pgnRauch {
+          0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .95; } 55% { opacity: .8; }
+          100% { transform: translate(calc(30 * var(--px)), calc(-22 * var(--px))); opacity: 0; }
+        }
+        @keyframes pgnRauchBild { 0% { background-position: 0 0; } 20% { background-position: 33.33% 0; } 45% { background-position: 66.67% 0; } 75% { background-position: 100% 0; } }
+        .pgn-dampf { position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); background: url(${PGN}steam.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        @keyframes pgnDampf { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .85; } 100% { transform: translate(calc(3 * var(--px)), calc(-10 * var(--px))); opacity: 0; } }
+        @keyframes pgnDampfBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 65% { background-position: 100% 0; } }
+        .pgn-ptero { position: absolute; left: 0; top: 0; width: calc(13 * var(--px)); height: calc(15 * var(--px)); background: url(${PGN}ptero.png) 0 0 / 600% 100% no-repeat; animation: pgnFlapR .66s steps(1) infinite; }
+        .pgn-ptero-schatten { position: absolute; left: calc(-7 * var(--px)); top: calc(14 * var(--px)); width: calc(13 * var(--px)); height: calc(15 * var(--px)); background: url(${PGN}ptero-shadow.png) 0 0 / 600% 100% no-repeat; animation: pgnFlapR .66s steps(1) infinite; }
+        .pgn-ptero.l, .pgn-ptero-schatten.l { animation-name: pgnFlapL; }
+        @keyframes pgnFlapR { 0% { background-position: 0 0; } 33.3% { background-position: 20% 0; } 66.6% { background-position: 40% 0; } }
+        @keyframes pgnFlapL { 0% { background-position: 60% 0; } 33.3% { background-position: 80% 0; } 66.6% { background-position: 100% 0; } }
       `}</style>
     </PixelScene>
   );
 });
 
 
-// ── BOARD OF KINGS ───────────────────────────────────────────────────
-//  v1438 (Al 25.9.) nach dem Kartenmotiv: ein riesiges Schachbrett aus
+// ═══════════════════════════════════════════════════════════════════
+//  BOARD OF KINGS — das riesige Marmor-Schachbrett im Königsgarten
+//  (v1438, Al 25.9.; Überarbeitung v1441 (Al 25.9.))
+//
+//  Nach dem Kartenmotiv (Al, v1438): ein riesiges Schachbrett aus
 //  poliertem Marmor (Felder mit Fase — oben/rechts im Licht, unten/links
 //  im Schatten —, feinen Adern), dunkle Einfassung, violettgrauer
 //  Pflasterrand, dahinter Blumenhecken. Die Schachfiguren des Motivs
-//  bleiben WEG (Al). Animiert: Glanz huscht ueber einzelne Felder, ein
-//  Wolkenschatten zieht, Blueten wiegen, Bluetenblaetter treiben.
+//  bleiben WEG (Al). Das Brett ist so groß, dass es oben und unten aus
+//  dem Bild läuft (10 Spalten à 12 Kunstpixel, wie abgenommen).
+//
+//  v1441 (Al: „deine haben ein anderes Level"): dieselbe Szene, deutlich
+//  feiner gemalt. Jedes Marmorfeld ist ein eigenes Stück: fließende Adern
+//  mit weichem Hof (in den hellen Feldern graublau, ab und zu golden; in
+//  den dunklen silbrig), zweistufige Fase, Politurglanz oben rechts, ein
+//  leiser Schimmer schräg über das Brett, dazu Absplitterungen an Ecken,
+//  zwei Haarrisse, verwehte Blütenblätter und Blätter. Die Einfassung ist
+//  dunkler Stein mit einer Bronze-Einlage und Nieten auf Höhe der Fugen.
+//  Der Pflasterrand besteht aus einzeln schattierten Kopfsteinen mit
+//  bemoosten Fugen, Unkraut und Kieseln; Brett und Hecken werfen Schatten
+//  darauf, die Hecken hängen über. Dahinter ein Heckengarten von oben:
+//  Heckenreihen aus Blattballen (jede Reihe eigene Laubfarbe und Blüten —
+//  Rosa/Weiß, Gelb/Rot, Lila/Weiß, Rot/Rosa/Orange), Rasenstreifen mit
+//  Gänseblümchen und Klee, Durchgänge mit Trittsteinen, ein Kiesweg.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): hedge.png — Kachel 128 (Heckengarten ohne Blüten);
+//  blossoms.png — die Blüten und Blattspitzen, 3 Bilder übereinander
+//  (Wiegen im Wind, räumlich zusammenhängend); board.png — Versatzstück
+//  160, mittig (Brett, Einfassung, Pflaster, überhängende Hecke — passt
+//  pixelgenau auf die Kachel); glint.png (8 Bilder 11×11), petal.png
+//  (4×3 Bilder 3×3), butterfly.png (2×3 Bilder 5×4), dove.png (3 Bilder
+//  11×9), ladybug.png (2 Bilder 3×4), cloud.png (Wolkenschatten).
+//
+//  Animiert: Blüten und Blattspitzen wiegen, ein Glanzstreif huscht über
+//  einzelne Felder, die Bronzenieten funkeln, Wolkenschatten ziehen über
+//  Garten und Brett, Blütenblätter treiben taumelnd vorbei, Schmetterlinge
+//  gaukeln über den Hecken (einer quert das Brett), Bienen summen um die
+//  Blüten, ab und zu fliegt eine weiße Taube samt Schatten über die
+//  Szene, Marienkäfer krabbeln über das Pflaster.
 //  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const BOK = '/areas/board-of-kings/';
-const BOK_W = 144, BOK_FELD = 12, BOK_SPALTEN = 10, BOK_OY = -4;
+const BOK_W = 160;                                   // Brett-Versatzstück
+const BOK_BRETT = { feld: 12, spalten: 10, oy: -4 };  // Felder 12, 10 Spalten, erste Reihe bei y −4
+// Kachel-x t (0..127) → Kunstpixel neben der Brettmitte, k-te Wiederholung
+const bokKachel = (t, k) => t - 64 + 128 * k;
+// Heckenmitten (Kachel-x) und sichtbare Wiederholungen links (k −1) / rechts (k 0/1)
+const BOK_HECKEN = [[21, [-1, 1]], [51, [-1, 1]], [79, [-1, 1]], [107, [-1, 1]]];
+const BOK_HECKEN_X = BOK_HECKEN.flatMap(([t, ks]) => ks.map(k => bokKachel(t, k)))
+  .filter(x => Math.abs(x) > 80).sort((a, b) => Math.abs(a) - Math.abs(b));
+
 const BoardOfKingsOverlay = React.memo(function BoardOfKingsOverlay() {
-  const glanz = useMemo(() => ppZufall(ppFxN(5), () => {
-    const col = Math.floor(Math.random() * BOK_SPALTEN), row = Math.floor(Math.random() * 8);
+  const glanz = useMemo(() => ppZufall(ppFxN(6), () => {
+    const col = Math.floor(Math.random() * BOK_BRETT.spalten), row = 1 + Math.floor(Math.random() * 7);
     return {
-      x: -BOK_W / 2 + 12 + col * BOK_FELD + 1, y: BOK_OY + row * BOK_FELD + 1,
-      dur: 4 + Math.random() * 4, delay: -Math.random() * 8,
+      x: -BOK_BRETT.feld * BOK_BRETT.spalten / 2 + col * BOK_BRETT.feld + 1, y: BOK_BRETT.oy + row * BOK_BRETT.feld + 1,
+      dunkel: (col + row) % 2 === 1, dur: 6 + Math.random() * 6, delay: -Math.random() * 12,
     };
   }), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(7), (i) => ({
-    y: 5 + Math.random() * 85, dur: 12 + Math.random() * 10, delay: -Math.random() * 20, rtl: i % 2 === 1,
+  const funkeln = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    x: i % 2 ? 61 : -62, y: BOK_BRETT.oy + BOK_BRETT.feld * (1 + Math.floor(Math.random() * 8)),
+    dur: 5 + Math.random() * 5, delay: -Math.random() * 10,
+  })), []);
+  const blaetter = useMemo(() => ppZufall(ppFxN(8), (i) => ({
+    y: 4 + Math.random() * 86, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, rtl: i % 2 === 1,
+    farbe: i % 3, bob: 2 + Math.floor(Math.random() * 4), tumble: .5 + Math.random() * .5,
+  })), []);
+  const falter = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    x: BOK_HECKEN_X[i % BOK_HECKEN_X.length] + (Math.random() - .5) * 8, y: 12 + Math.random() * 70,
+    farbe: i % 3, dur: 7 + Math.random() * 5, delay: -Math.random() * 12, b: i % 2 === 1,
+  })), []);
+  const quer = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 20 + Math.random() * 50, dur: 34 + Math.random() * 10, delay: -Math.random() * 30, rtl: Math.random() < .5,
+  })), []);
+  const bienen = useMemo(() => ppZufall(ppFxN(6), (i) => ({
+    x: BOK_HECKEN_X[i % 4] + (Math.random() - .5) * 12, y: 8 + Math.random() * 82,
+    dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, b: i % 2 === 1, drift: 2 + Math.floor(Math.random() * 3),
+  })), []);
+  const tauben = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 14 + Math.random() * 50, dur: 46 + Math.random() * 14, delay: -Math.random() * 20, rtl: Math.random() < .5,
+  })), []);
+  const kaefer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    x: i ? 68 : -71, dur: 70 + Math.random() * 30, delay: -Math.random() * 80, ab: i === 1,
   })), []);
   return (
-    <PixelScene artH={100} bg="#305a2a" className="board-of-kings-overlay">
-      <PixelBand src={BOK + 'hedge.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
+    <PixelScene artH={100} bg="#1c3a18" className="board-of-kings-overlay">
+      <PixelBand src={BOK + 'hedge.png'} />
+      <PixelBand src={BOK + 'blossoms.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.7s steps(1) infinite' }} />
       <PixelPiece src={BOK + 'board.png'} w={BOK_W} />
+      {kaefer.map((k, i) => (
+        <i key={'k' + i} className={'pp-area-dyn bok-kaefer' + (k.ab ? ' ab' : '')} style={{ left: ppArtX(k.x, 0), animationDuration: `${k.dur.toFixed(1)}s, .4s`, animationDelay: `${k.delay.toFixed(1)}s, 0s` }} />
+      ))}
       {glanz.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn bok-glanz" style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `bokGlanz ${g.dur.toFixed(2)}s steps(10) ${g.delay.toFixed(2)}s infinite` }} />
+        <i key={'g' + i} className={'pp-area-dyn bok-glanz' + (g.dunkel ? ' dunkel' : '')} style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `bokGlanz ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {funkeln.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln bok-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur.toFixed(2)}s linear ${f.delay.toFixed(2)}s infinite` }} />
       ))}
       <i className="pp-area-dyn bok-wolke" />
+      <i className="pp-area-dyn bok-wolke b" />
+      {tauben.map((t, i) => (
+        <div key={'ts' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y + 8), marginLeft: ppArt(-6), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
+          <i className="bok-taube schatten" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {bienen.map((b, i) => (
+        <div key={'b' + i} className="pp-area-dyn bok-biene-ort" style={{ left: ppArtX(b.x, 0), top: ppArt(b.y), '--bob': ppArt(b.drift), animation: `ppBob ${(b.drift * 1.1).toFixed(2)}s steps(3) infinite alternate` }}>
+          <i className="bok-biene" style={{ animation: `${b.b ? 'bokSummB' : 'bokSummA'} ${b.dur.toFixed(2)}s steps(2) ${b.delay.toFixed(2)}s infinite, bokFluegel .1s steps(1) infinite` }} />
+        </div>
+      ))}
+      {falter.map((f, i) => (
+        <div key={'s' + i} className="pp-area-dyn bok-falter-ort" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `${f.b ? 'bokGaukelnB' : 'bokGaukelnA'} ${f.dur.toFixed(2)}s steps(24) ${f.delay.toFixed(2)}s infinite` }}>
+          <i className="bok-falter" style={{ backgroundPositionY: `${f.farbe * 50}%` }} />
+        </div>
+      ))}
+      {quer.map((q, i) => (
+        <div key={'q' + i} className="pp-area-dyn pp-quer" style={ppQuer(q.y, q.dur, q.delay, q.rtl)}>
+          <i className="bok-falter" style={{ backgroundPositionY: '50%', animation: 'bokFlattern .32s steps(1) infinite, ppBob 1.6s steps(4) infinite alternate', '--bob': ppArt(6) }} />
+        </div>
+      ))}
       {blaetter.map((b, i) => (
-        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
-          <i className="bok-blatt" />
+        <div key={'p' + i} className="pp-area-dyn pp-quer" style={ppQuer(b.y, b.dur, b.delay, b.rtl)}>
+          <i className="bok-blatt" style={{ backgroundPositionY: `${b.farbe * 50}%`, '--bob': ppArt(b.bob), animation: `bokTaumeln ${b.tumble.toFixed(2)}s steps(1) infinite, ppBob ${(b.bob * .55).toFixed(2)}s steps(${b.bob}) infinite alternate` }} />
+        </div>
+      ))}
+      {tauben.map((t, i) => (
+        <div key={'t' + i} className="pp-area-dyn bok-flug" style={{ top: ppArt(t.y), animation: `${t.rtl ? 'bokFlugRtl' : 'bokFlugLtr'} ${t.dur.toFixed(1)}s linear ${t.delay.toFixed(1)}s infinite` }}>
+          <i className="bok-taube" style={{ transform: t.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
         .bok-glanz {
-          position: absolute; width: calc(10 * var(--px)); height: calc(10 * var(--px));
-          background: url(${BOK}glint.png) 0 0 / 100% 100% no-repeat; opacity: 0;
+          position: absolute; width: calc(11 * var(--px)); height: calc(11 * var(--px));
+          background: url(${BOK}glint.png) 0 0 / 800% 100% no-repeat; opacity: .85;
         }
+        .bok-glanz.dunkel { opacity: .45; }
         @keyframes bokGlanz {
-          0%, 80% { opacity: 0; transform: translate(calc(-6 * var(--px)), calc(6 * var(--px))); }
-          84% { opacity: 1; } 96% { opacity: 1; }
-          100% { opacity: 0; transform: translate(calc(6 * var(--px)), calc(-6 * var(--px))); }
+          0%, 88% { background-position-x: 0%; }
+          89.5% { background-position-x: 14.29%; } 91% { background-position-x: 28.57%; }
+          92.5% { background-position-x: 42.86%; } 94% { background-position-x: 57.14%; }
+          95.5% { background-position-x: 71.43%; } 97% { background-position-x: 85.71%; }
+          98.5%, 100% { background-position-x: 0%; }
         }
+        .bok-funkeln { filter: sepia(1) saturate(2.2) brightness(1.05); }
         .bok-wolke {
-          position: absolute; top: 0; left: 0; width: calc(110 * var(--px)); height: calc(70 * var(--px));
-          background: radial-gradient(ellipse, rgba(20,24,40,.22) 0%, rgba(20,24,40,.12) 45%, rgba(20,24,40,0) 70%);
-          animation: bokWolke 38s linear infinite;
+          position: absolute; top: 0; left: 0; width: calc(112 * var(--px)); height: calc(60 * var(--px));
+          background: url(${BOK}cloud.png) 0 0 / 100% 100% no-repeat;
+          animation: bokWolke 52s linear infinite;
         }
+        .bok-wolke.b { width: calc(56 * var(--px)); height: calc(30 * var(--px)); animation-duration: 37s; animation-delay: -21s; --wy: calc(58 * var(--px)); }
         @keyframes bokWolke {
-          from { transform: translate(calc(-120 * var(--px)), calc(10 * var(--px))); }
-          to { transform: translate(calc(100cqw + 10 * var(--px)), calc(30 * var(--px))); }
+          from { transform: translate(calc(-120 * var(--px)), var(--wy, calc(4 * var(--px)))); }
+          to { transform: translate(calc(100cqw + 10 * var(--px)), calc(var(--wy, calc(4 * var(--px))) + 14 * var(--px))); }
         }
-        .bok-blatt { display: block; width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: url(${BOK}petal.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .9s steps(1) infinite, ppBob 1.3s ease-in-out infinite alternate; --bob: calc(4 * var(--px)); }
+        .bok-blatt {
+          display: block; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background-image: url(${BOK}petal.png); background-size: 400% 300%; background-repeat: no-repeat;
+        }
+        @keyframes bokTaumeln { 0% { background-position-x: 0%; } 25% { background-position-x: 33.33%; } 50% { background-position-x: 66.67%; } 75% { background-position-x: 100%; } }
+        .bok-falter-ort { position: absolute; width: calc(5 * var(--px)); height: calc(4 * var(--px)); }
+        .bok-falter {
+          display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px));
+          background-image: url(${BOK}butterfly.png); background-size: 200% 300%; background-repeat: no-repeat;
+          animation: bokFlattern .3s steps(1) infinite;
+        }
+        @keyframes bokFlattern { 0% { background-position-x: 0%; } 50% { background-position-x: 100%; } }
+        @keyframes bokGaukelnA {
+          0%, 100% { transform: translate(0, 0); } 15% { transform: translate(calc(5 * var(--px)), calc(-4 * var(--px))); }
+          30% { transform: translate(calc(9 * var(--px)), calc(1 * var(--px))); } 45% { transform: translate(calc(4 * var(--px)), calc(6 * var(--px))); }
+          60% { transform: translate(calc(-3 * var(--px)), calc(4 * var(--px))); } 75% { transform: translate(calc(-7 * var(--px)), calc(-2 * var(--px))); }
+          88% { transform: translate(calc(-3 * var(--px)), calc(-5 * var(--px))); }
+        }
+        @keyframes bokGaukelnB {
+          0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(-6 * var(--px)), calc(-3 * var(--px))); }
+          40% { transform: translate(calc(-2 * var(--px)), calc(-9 * var(--px))); } 55% { transform: translate(calc(5 * var(--px)), calc(-6 * var(--px))); }
+          70% { transform: translate(calc(7 * var(--px)), calc(1 * var(--px))); } 85% { transform: translate(calc(2 * var(--px)), calc(4 * var(--px))); }
+        }
+        .bok-biene-ort { position: absolute; width: var(--px); height: var(--px); }
+        .bok-biene { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: linear-gradient(90deg, #1e1406 50%, #f0c23a 50%); }
+        @keyframes bokFluegel { 0% { box-shadow: 0 calc(-1 * var(--px)) 0 rgba(230, 236, 245, .8); } 50% { box-shadow: var(--px) calc(-1 * var(--px)) 0 rgba(230, 236, 245, .55); } }
+        @keyframes bokSummA {
+          0%, 100% { transform: translate(0, 0); } 12.5% { transform: translate(calc(3 * var(--px)), calc(-2 * var(--px))); }
+          25% { transform: translate(calc(5 * var(--px)), 0); } 37.5% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
+          50% { transform: translate(0, 0); } 62.5% { transform: translate(calc(-3 * var(--px)), calc(-2 * var(--px))); }
+          75% { transform: translate(calc(-5 * var(--px)), 0); } 87.5% { transform: translate(calc(-3 * var(--px)), calc(2 * var(--px))); }
+        }
+        @keyframes bokSummB {
+          0%, 100% { transform: translate(0, 0); } 20% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
+          40% { transform: translate(calc(2 * var(--px)), calc(-5 * var(--px))); } 60% { transform: translate(calc(-3 * var(--px)), calc(-4 * var(--px))); }
+          80% { transform: translate(calc(-4 * var(--px)), calc(-1 * var(--px))); }
+        }
+        .bok-flug { position: absolute; left: 0; }
+        @keyframes bokFlugLtr { 0% { transform: translateX(calc(-30 * var(--px))); } 45%, 100% { transform: translateX(calc(100cqw + 20 * var(--px))); } }
+        @keyframes bokFlugRtl { 0% { transform: translateX(calc(100cqw + 20 * var(--px))); } 45%, 100% { transform: translateX(calc(-30 * var(--px))); } }
+        .bok-taube {
+          display: block; width: calc(11 * var(--px)); height: calc(9 * var(--px));
+          background: url(${BOK}dove.png) 0 0 / 300% 100% no-repeat;
+          animation: bokSchlag .6s steps(1) infinite;
+        }
+        .bok-taube.schatten { filter: brightness(0); opacity: .22; }
+        @keyframes bokSchlag { 0% { background-position: 0 0; } 25% { background-position: 50% 0; } 50% { background-position: 100% 0; } 75% { background-position: 50% 0; } }
+        .bok-kaefer {
+          position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(4 * var(--px));
+          background: url(${BOK}ladybug.png) 0 0 / 200% 100% no-repeat;
+          animation-name: bokKrabbeln, ppSprite2; animation-timing-function: steps(120), steps(1); animation-iteration-count: infinite;
+        }
+        .bok-kaefer.ab { animation-name: bokKrabbelnAb, ppSprite2; }
+        @keyframes bokKrabbeln {
+          0% { transform: translateY(calc(104 * var(--px))); } 40% { transform: translateY(calc(50 * var(--px))); }
+          55% { transform: translateY(calc(50 * var(--px))); } 100% { transform: translateY(calc(-8 * var(--px))); }
+        }
+        @keyframes bokKrabbelnAb {
+          0% { transform: translateY(calc(-8 * var(--px))) rotate(180deg); } 45% { transform: translateY(calc(40 * var(--px))) rotate(180deg); }
+          60% { transform: translateY(calc(40 * var(--px))) rotate(180deg); } 100% { transform: translateY(calc(104 * var(--px))) rotate(180deg); }
+        }
       `}</style>
     </PixelScene>
   );
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  SHARED BLOOD TANKS — Blutkeller der Festung (v1411, Kartenstil v1413)
+//  SHARED BLOOD TANKS — Blutkeller der Festung (v1411, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
 //  Al 25.9.: „ein dunkler Kellerraum derselben Festung mit grossen Tanks
 //  voller Blut und Knochen/Schaedeln darin."
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  „Shared" sichtbar: alle Tanks haengen an EINEM Rohrnetz, in der Mitte
-//  steht das Pumpwerk. Der Blutspiegel steigt und faellt in ALLEN Tanks
-//  und im Sichtglas der Pumpe gleichzeitig; Blutpulse laufen im Pumptakt
-//  von der Pumpe nach aussen.
+//  „Shared" sichtbar: alle Tanks hängen an EINEM Rohrnetz, in der Mitte
+//  steht das Pumpwerk. Der Blutspiegel steigt und fällt in ALLEN Tanks
+//  und im Schauglas der Pumpe gleichzeitig; Blutpulse laufen im Pumptakt
+//  von der Pumpe nach außen.
 //
-//  Ebenen (Kunsthoehe 100): tile.png (Kachel 64: Ziegelwand, Tank mit
-//  Glas, Eisenpfeiler mit rot-weisser Manschette, Sockel, Boden),
-//  tile-front.png (Glanzlichter), blood.png (3 Wellenbilder, Schaedel)
-//  hinter mask-tank.png, flow.png hinter mask-tube.png, pump.png (48,
-//  mittig) + wheel/piston/stream.png.
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  dieselbe Szene, aber mit Tiefe und Material. Unter der Gewölbedecke
+//  läuft ein Sammelrohr mit Schellen, Flanschen und Messing-Schaugläsern
+//  (darin laufen die Pulse), von dem je ein Fallrohr mit Handrad in die
+//  genietete Eisenhaube jedes Tanks führt. Tanks: Glaszylinder mit Rand-
+//  schatten, Glanzstreifen, Messskala und Blutfilm unter der Haube,
+//  Bodenring mit Ablasshahn, heller Steinsockel mit übergelaufenem Blut.
+//  Zwischen den Tanks schmale Eisensäulen mit Laternen; das Verbindungs-
+//  rohr mit den rot-weißen Manschetten (Kartenmotiv) läuft durch ein
+//  Ventil mit rotem Hebel. Im Blut Schädel, Knochen, ein Brustkorb, eine
+//  Hand — je tiefer, desto trüber; oben treiben ein Schädel und ein
+//  Knochen. Das Pumpwerk: genieteter Kessel mit großem Schauglas, Mano-
+//  meter, Kolben, Schwungrad, Feuerrost, Sicherheitsventil, Steigrohr ins
+//  Sammelrohr. Boden aus Steinplatten mit Blutlachen, Abflussgittern,
+//  Knochen und einem Eimer unter dem tropfenden Ventil.
 //
-//  Tier `opaque` (vorher `partial`): die Szene ist ein ganzer Raum.
+//  Ebenen (Kunsthöhe 100; Generator gen/shared-blood-tanks.py im
+//  Scratchpad): tile.png — Kachel 128 (zwei verschiedene Tanks, zwei
+//  Säulen); blood.png (3 Wellenbilder, Kachel 128×300) hinter
+//  mask-tank.png; flow.png (16×100) hinter mask-flow.png (Schaugläser);
+//  tile-front.png (Glas vor dem Blut); tile-glow.png (Laternenschein);
+//  pump.png (72, mittig); sight.png (Blutsäule im Schauglas);
+//  flywheel.png (3 Bilder 17×17), piston.png (3×9), gauge.png (4 Bilder
+//  5×5), fire.png (3 Bilder 13×5), flame.png (3 Bilder 3×3), steam.png
+//  (3 Bilder 7×7), rat.png (2 Bilder 9×4), ripple.png (3 Bilder 5×2).
+//
+//  Animiert: Blutspiegel (alle Tanks + Schauglas, ganzzahlig im Sinus-
+//  takt), Wellen, aufsteigende Blasen, Pulse im Sammelrohr (von der Mitte
+//  nach außen, im Kolbentakt), Kolben, Schwungrad, Manometerzeiger,
+//  Glut im Feuerrost, Dampf aus dem Sicherheitsventil, flackernde
+//  Laternen, Tropfen aus den Ventilen mit Aufschlag, Tropfen vom
+//  Sammelrohr, gelegentlich eine Ratte.
+//  Tier `opaque`: die Szene ist ein ganzer Raum. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const SBT = '/areas/shared-blood-tanks/';
-const SBT_PUMP_W = 48;
-const SBT_LEVEL_S = 7.5;          // ein Heben/Senken des Blutspiegels
-const SBT_PULS_S = 1.1;           // Pumptakt (Kolben + Rohrpulse)
+const SBT_PUMP_W = 72;
+const SBT_LEVEL_S = 8;            // ein Heben und Senken des Blutspiegels
+const SBT_PULS_S = 1.2;           // Pumptakt (Kolben + Rohrpulse)
+const SBT_SPIEGEL = 3;            // Hub des Blutspiegels (Kunstpixel, ±)
+// Blutspiegel als ganzzahlige Stufen einer Sinuskurve (langsam an den Wenden)
+const SBT_SPIEGEL_KF = Array.from({ length: 25 }, (_, i) =>
+  `${(i / 24 * 100).toFixed(2)}% { transform: translateY(calc(${Math.round(-SBT_SPIEGEL * Math.cos(i / 24 * 2 * Math.PI))} * var(--px))); }`).join(' ');
 
 const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
-  // Blasen: je Tank (Tankmitte bei k·64 − 2 Kunstpixeln neben der Brettmitte)
-  const bubbles = useMemo(() => {
-    const out = [];
-    for (const k of [-2, -1, 1, 2]) {            // k = 0 steht hinter der Pumpe
-      for (let j = 0; j < ppFxN(3); j++) {
-        out.push({ x: k * 64 - 2 - 17 + Math.random() * 34, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 5 });
-      }
-    }
-    return out;
+  // Blasen: Tanks bei 64·k neben der Brettmitte (k = 0 steht hinter der Pumpe)
+  const blasen = useMemo(() => {
+    const tanks = [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5];
+    return ppZufall(ppFxN(24), (i) => ({
+      x: tanks[i % tanks.length] * 64 - 17 + Math.floor(Math.random() * 35),
+      dur: 3 + Math.random() * 3, delay: -Math.random() * 6, gross: Math.random() < .3,
+    }));
   }, []);
-  // Tropfen aus den beiden Ventilmanschetten neben der Pumpe
-  const drips = [{ x: 26, dur: 3.4, delay: -1 }, { x: -38, dur: 4.1, delay: -2.6 }];
+  // Tropfen aus den Ventilen an den Säulen (Säulen bei 32 + 64·k) und vom Sammelrohr
+  const tropfen = useMemo(() => [
+    { x: 32, y0: 47, y1: 86, dur: 3.6 }, { x: -32, y0: 47, y1: 85, dur: 4.3 },
+    { x: 96, y0: 47, y1: 86, dur: 5.1 }, { x: -96, y0: 47, y1: 85, dur: 3.9 },
+    { x: 160, y0: 47, y1: 86, dur: 4.7 }, { x: -160, y0: 47, y1: 85, dur: 5.5 },
+    { x: -37, y0: 10, y1: 37, dur: 6.2 }, { x: 37, y0: 10, y1: 37, dur: 5.8 }, { x: 91, y0: 10, y1: 37, dur: 6.8 },
+  ].slice(0, ppFxN(9)).map(d => ({ ...d, delay: -Math.random() * d.dur })), []);
+  const laternen = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    x: 32 + 64 * (i - 6), dur: 1.6 + Math.random() * 1.4, delay: -Math.random() * 3,
+  })), []);
+  const ratten = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 94 + i * 3, dur: 26 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1,
+  })), []);
+  const dampf = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 3.2, delay: -i * 1.07 })), []);
   return (
-    <PixelScene artH={100} bg="#101010" className="shared-blood-tanks-overlay">
+    <PixelScene artH={100} bg="#120d0d" className="shared-blood-tanks-overlay">
       <PixelBand src={SBT + 'tile.png'} />
+      {/* Blut in den Tanks: Maske = Glasinneres, darin hebt/senkt sich die Blutebene */}
       <div className="pp-pixel-layer" style={{ position: 'absolute', inset: 0, ...ppMaske(SBT + 'mask-tank.png', true) }}>
-        <div className="sbt-blut" style={{ backgroundImage: `url(${SBT}blood.png)` }} />
-        {bubbles.map((b, i) => (
-          <i key={'bl' + i} className="pp-area-dyn sbt-blase" style={{
-            left: ppArtX(b.x, 0), top: ppArt(62),
-            animation: `sbtBlase ${b.dur}s linear ${b.delay}s infinite`,
+        <div className="sbt-spiegel">
+          <PixelBand src={SBT + 'blood.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 .9s steps(1) infinite' }} />
+        </div>
+        {blasen.map((b, i) => (
+          <i key={'b' + i} className={'pp-area-dyn sbt-blase' + (b.gross ? ' gross' : '')} style={{
+            left: ppArtX(b.x, 0), top: ppArt(59),
+            animation: `sbtBlase ${b.dur.toFixed(2)}s steps(22) ${b.delay.toFixed(2)}s infinite`,
           }} />
         ))}
       </div>
-      <div className="pp-pixel-layer sbt-fluss links" style={{ ...ppMaske(SBT + 'mask-tube.png', true), backgroundImage: `url(${SBT}flow.png)` }} />
-      <div className="pp-pixel-layer sbt-fluss rechts" style={{ ...ppMaske(SBT + 'mask-tube.png', true), backgroundImage: `url(${SBT}flow.png)` }} />
+      {/* Pulse im Sammelrohr: links nach links, rechts nach rechts */}
+      <div className="pp-pixel-layer sbt-puls links" style={ppMaske(SBT + 'mask-flow.png', true)} />
+      <div className="pp-pixel-layer sbt-puls rechts" style={ppMaske(SBT + 'mask-flow.png', true)} />
       <PixelBand src={SBT + 'tile-front.png'} />
+      {/* hinter dem Pumpwerk: Kolbenstange und Glut */}
+      <i className="sbt-kolben" style={{ left: ppArtX(19, SBT_PUMP_W), top: ppArt(4) }} />
+      <i className="sbt-glut" style={{ left: ppArtX(30, SBT_PUMP_W), top: ppArt(52) }} />
       <PixelPiece src={SBT + 'pump.png'} w={SBT_PUMP_W} />
-      <div className="sbt-sicht" style={{ left: ppArtX(21, SBT_PUMP_W), top: ppArt(37) }}>
+      <div className="sbt-sicht" style={{ left: ppArtX(32, SBT_PUMP_W), top: ppArt(26) }}>
         <i className="sbt-sicht-blut" />
       </div>
-      <i className="sbt-strahl" style={{ left: ppArtX(23, SBT_PUMP_W), top: ppArt(10) }} />
-      <i className="sbt-zeiger" style={{ left: ppArtX(14, SBT_PUMP_W), top: ppArt(37) }} />
-      <i className="sbt-rad" style={{ left: ppArtX(30, SBT_PUMP_W), top: ppArt(38) }} />
-      <i className="sbt-kolben" style={{ left: ppArtX(32, SBT_PUMP_W), top: ppArt(14) }} />
-      {drips.map((d, i) => (
-        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
-          left: ppArtX(d.x, 0), top: ppArt(48), '--fall': ppArt(30),
-          '--tropfen': '#88070a', '--tropfen-dunkel': '#5f0706',
-          animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay}s infinite`,
+      <i className="sbt-mano" style={{ left: ppArtX(47, SBT_PUMP_W), top: ppArt(27) }} />
+      <i className="sbt-rad" style={{ left: ppArtX(0, SBT_PUMP_W), top: ppArt(46) }} />
+      {dampf.map((d, i) => (
+        <i key={'s' + i} className="pp-area-dyn sbt-dampf" style={{
+          left: ppArtX(46, SBT_PUMP_W), top: ppArt(3),
+          animation: `sbtDampf ${d.dur}s steps(12) ${d.delay.toFixed(2)}s infinite, sbtDampfBild ${d.dur}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="sbt-dim" />
+      {laternen.map((l, i) => (
+        <i key={'l' + i} className="sbt-flamme" style={{
+          left: ppArtX(l.x - 1, 0), top: ppArt(22),
+          animation: `ppSprite3 ${(l.dur / 3).toFixed(2)}s steps(1) ${l.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <PixelBand src={SBT + 'tile-glow.png'} className="sbt-schein" />
+      {tropfen.map((d, i) => (
+        <React.Fragment key={'d' + i}>
+          <i className="pp-area-dyn pp-px-tropfen" style={{
+            left: ppArtX(d.x, 0), top: ppArt(d.y0), '--fall': ppArt(d.y1 - d.y0),
+            '--tropfen': '#9a1614', '--tropfen-dunkel': '#4a0607',
+            animation: `ppPxTropfen ${d.dur}s ease-in ${d.delay.toFixed(2)}s infinite`,
+          }} />
+          <i className="pp-area-dyn sbt-kraeusel" style={{
+            left: ppArtX(d.x - 2, 0), top: ppArt(d.y1 + 1),
+            animation: `sbtKraeusel ${d.dur}s steps(1) ${d.delay.toFixed(2)}s infinite`,
+          }} />
+        </React.Fragment>
+      ))}
+      {ratten.map((r, i) => (
+        <div key={'r' + i} className="pp-area-dyn sbt-ratte-bahn" style={{
+          top: ppArt(r.y), animation: `${r.rtl ? 'sbtRatteRtl' : 'sbtRatteLtr'} ${r.dur.toFixed(1)}s linear ${r.delay.toFixed(1)}s infinite`,
+        }}>
+          <i className="sbt-ratte" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <div className="pp-rand-dim" />
       <style>{`
-        .sbt-blut {
-          position: absolute; left: 0; right: 0; top: 0; height: 100%;
-          background-repeat: repeat-x; background-size: auto 300%; background-position: 50% 0%;
-          animation: sbtWelle .6s steps(1) infinite, sbtSpiegel ${SBT_LEVEL_S}s ease-in-out infinite alternate;
-        }
-        @keyframes sbtWelle {
-          0% { background-position: 50% 0%; } 33.3% { background-position: 50% 50%; } 66.6% { background-position: 50% 100%; }
-        }
-        @keyframes sbtSpiegel { from { transform: translateY(calc(-2 * var(--px))); } to { transform: translateY(calc(2 * var(--px))); } }
-        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #c4686a; opacity: 0; }
+        .sbt-spiegel { position: absolute; inset: 0; animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite; }
+        @keyframes sbtSpiegel { ${SBT_SPIEGEL_KF} }
+        .sbt-blase { position: absolute; width: var(--px); height: var(--px); background: #d0564a; opacity: 0; }
+        .sbt-blase.gross { box-shadow: var(--px) 0 0 #a8302a, 0 var(--px) 0 #a8302a, var(--px) var(--px) 0 #7c1a18; background: #e27a6c; }
         @keyframes sbtBlase {
           0% { transform: translate(0, 0); opacity: 0; }
-          10% { opacity: .9; }
-          50% { transform: translate(var(--px), calc(-11 * var(--px))); }
-          88% { opacity: .9; }
-          100% { transform: translate(0, calc(-22 * var(--px))); opacity: 0; }
+          8% { opacity: .9; }
+          40% { transform: translate(var(--px), calc(-9 * var(--px))); }
+          70% { transform: translate(0, calc(-16 * var(--px))); opacity: .9; }
+          100% { transform: translate(var(--px), calc(-22 * var(--px))); opacity: 0; }
         }
-        .sbt-fluss {
-          position: absolute; inset: 0; background-repeat: repeat-x; background-size: auto 100%;
-          animation: sbtFlussL ${SBT_PULS_S}s steps(8) infinite;
+        .sbt-puls {
+          position: absolute; inset: 0;
+          background: url(${SBT}flow.png) 0 0 / calc(16 * var(--px)) 100% repeat-x;
+          animation: sbtPulsL ${SBT_PULS_S}s steps(16) infinite;
         }
-        .sbt-fluss.links { clip-path: inset(0 50% 0 0); }
-        .sbt-fluss.rechts { clip-path: inset(0 0 0 50%); animation-name: sbtFlussR; }
-        @keyframes sbtFlussL { from { background-position: 0 0; } to { background-position: calc(-8 * var(--px)) 0; } }
-        @keyframes sbtFlussR { from { background-position: 0 0; } to { background-position: calc(8 * var(--px)) 0; } }
-        .sbt-sicht { position: absolute; width: calc(6 * var(--px)); height: calc(26 * var(--px)); overflow: hidden; }
-        .sbt-sicht-blut {
-          position: absolute; left: 0; right: 0; top: calc(9 * var(--px)); height: calc(30 * var(--px));
-          background: linear-gradient(180deg, #aa4c4e 0, #aa4c4e var(--px), #85292c var(--px), #85292c calc(12 * var(--px)), #5f0706 calc(12 * var(--px)));
-          animation: sbtSpiegel ${SBT_LEVEL_S}s ease-in-out infinite alternate;
-        }
-        .sbt-strahl {
-          position: absolute; width: calc(2 * var(--px)); height: calc(13 * var(--px));
-          background: url(${SBT}stream.png) 0 0 / 100% calc(8 * var(--px)) repeat-y;
-          animation: sbtStrahl .5s steps(8) infinite;
-        }
-        @keyframes sbtStrahl { from { background-position: 0 0; } to { background-position: 0 calc(8 * var(--px)); } }
-        .sbt-zeiger {
-          position: absolute; width: var(--px); height: calc(3 * var(--px)); background: #b01e18;
-          transform-origin: 50% 100%; animation: sbtZeiger 2.3s steps(1) infinite;
-        }
-        @keyframes sbtZeiger {
-          0% { rotate: 30deg; } 12% { rotate: 40deg; } 20% { rotate: 25deg; } 41% { rotate: 50deg; }
-          47% { rotate: 58deg; } 55% { rotate: 42deg; } 74% { rotate: 34deg; } 88% { rotate: 52deg; }
-        }
-        .sbt-rad {
-          position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px));
-          background: url(${SBT}wheel.png) 0 0 / 200% 100% no-repeat;
-          animation: sbtRad 1.6s steps(1) infinite;
-        }
-        @keyframes sbtRad { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        /* rechte Hälfte = gespiegelte linke (die Schaugläser liegen symmetrisch zur Mitte) */
+        .sbt-puls { clip-path: inset(0 50% 0 0); }
+        .sbt-puls.rechts { transform: scaleX(-1); }
+        @keyframes sbtPulsL { from { background-position: 0 0; } to { background-position: calc(-16 * var(--px)) 0; } }
         .sbt-kolben {
-          position: absolute; width: calc(2 * var(--px)); height: calc(14 * var(--px));
+          position: absolute; width: calc(3 * var(--px)); height: calc(9 * var(--px));
           background: url(${SBT}piston.png) 0 0 / 100% 100% no-repeat;
           animation: sbtKolben ${SBT_PULS_S}s steps(1) infinite;
         }
         @keyframes sbtKolben {
-          0% { transform: translateY(0); } 25% { transform: translateY(calc(-2 * var(--px))); }
-          50% { transform: translateY(calc(-4 * var(--px))); } 75% { transform: translateY(calc(-2 * var(--px))); }
+          0% { transform: translateY(0); } 20% { transform: translateY(calc(-1 * var(--px))); }
+          35% { transform: translateY(calc(-2 * var(--px))); } 50% { transform: translateY(calc(-3 * var(--px))); }
+          65% { transform: translateY(calc(-2 * var(--px))); } 80% { transform: translateY(calc(-1 * var(--px))); }
         }
-        .sbt-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        .sbt-glut {
+          position: absolute; width: calc(13 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SBT}fire.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 .5s steps(1) infinite;
+        }
+        .sbt-sicht { position: absolute; width: calc(9 * var(--px)); height: calc(21 * var(--px)); overflow: hidden; }
+        .sbt-sicht-blut {
+          position: absolute; left: 0; top: calc(3 * var(--px)); width: 100%; height: calc(44 * var(--px));
+          background: url(${SBT}sight.png) 0 0 / 100% 100% no-repeat;
+          animation: sbtSpiegel ${SBT_LEVEL_S}s steps(1) infinite;
+        }
+        .sbt-mano {
+          position: absolute; width: calc(5 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SBT}gauge.png) 0 0 / 400% 100% no-repeat;
+          animation: sbtMano 2.4s steps(1) infinite;
+        }
+        @keyframes sbtMano {
+          0% { background-position: 33.33% 0; } 18% { background-position: 66.67% 0; } 26% { background-position: 33.33% 0; }
+          45% { background-position: 66.67% 0; } 52% { background-position: 100% 0; } 58% { background-position: 66.67% 0; }
+          77% { background-position: 0 0; } 86% { background-position: 33.33% 0; }
+        }
+        .sbt-rad {
+          position: absolute; width: calc(17 * var(--px)); height: calc(17 * var(--px));
+          background: url(${SBT}flywheel.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 ${(SBT_PULS_S / 3).toFixed(2)}s steps(1) infinite;
+        }
+        .sbt-dampf {
+          position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${SBT}steam.png) 0 0 / 300% 100% no-repeat;
+        }
+        @keyframes sbtDampf {
+          0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .75; } 60% { opacity: .5; }
+          100% { transform: translate(calc(4 * var(--px)), calc(-12 * var(--px))); opacity: 0; }
+        }
+        @keyframes sbtDampfBild { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 65% { background-position: 100% 0; } }
+        .sbt-flamme {
+          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background: url(${SBT}flame.png) 0 0 / 300% 100% no-repeat;
+        }
+        .sbt-schein { animation: sbtFlackern 3.1s steps(1) infinite; }
+        @keyframes sbtFlackern {
+          0% { opacity: .9; } 11% { opacity: .75; } 17% { opacity: 1; } 34% { opacity: .82; } 41% { opacity: .95; }
+          58% { opacity: .7; } 63% { opacity: .9; } 79% { opacity: 1; } 88% { opacity: .8; }
+        }
+        .sbt-kraeusel {
+          position: absolute; width: calc(5 * var(--px)); height: calc(2 * var(--px));
+          background: url(${SBT}ripple.png) 0 0 / 300% 100% no-repeat; opacity: 0;
+        }
+        @keyframes sbtKraeusel {
+          0%, 89% { opacity: 0; background-position: 0 0; }
+          90% { opacity: 1; background-position: 0 0; } 94% { background-position: 50% 0; } 97% { background-position: 100% 0; }
+          100% { opacity: 0; }
+        }
+        .sbt-ratte-bahn { position: absolute; left: 0; }
+        .sbt-ratte {
+          display: block; width: calc(9 * var(--px)); height: calc(4 * var(--px));
+          background: url(${SBT}rat.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .18s steps(1) infinite;
+        }
+        @keyframes sbtRatteLtr {
+          0% { transform: translateX(calc(-20 * var(--px))); }
+          30% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          30.01%, 100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+        }
+        @keyframes sbtRatteRtl {
+          0% { transform: translateX(calc(100cqw + 10 * var(--px))); }
+          30% { transform: translateX(calc(-20 * var(--px))); }
+          30.01%, 100% { transform: translateX(calc(-20 * var(--px))); }
         }
       `}</style>
     </PixelScene>
@@ -671,115 +1157,211 @@ const SharedBloodTanksOverlay = React.memo(function SharedBloodTanksOverlay() {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACID RAIN — Burghof im Saeureregen (v1412, Kartenstil v1413)
+//  ACID RAIN — Burghof im Säureregen (v1412, Kartenstil v1413,
+//  Überarbeitung v1441 (Al 25.9.))
 //
-//  Vorlage: das Kartenmotiv (warme Ziegelmauer, gemeisselte Steinbloecke,
-//  blauer Wassergraben, Pflasterplatz, dunkelroter Regen). „Saeure wird
-//  in diesem Spiel als dunkelrot dargestellt" (Al 25.9.).
-//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergruende sollen
+//  Vorlage: das Kartenmotiv (warme Ziegelmauer, gemeißelte Steinblöcke,
+//  blauer Wassergraben, Pflasterplatz, dunkelroter Regen). „Säure wird
+//  in diesem Spiel als DUNKELROT dargestellt" (Al 25.9.) — Regen,
+//  Pfützen, Laufspuren und Strahlen sind dunkelrot, nichts davon leuchtet.
+//  STIL (Al 25.9., nach den ersten drei Szenen): die Hintergründe sollen
 //  wie Als eigene Kartenmotive aussehen, nicht wie „gemalte" Szenen —
-//  grobe Pixel (Kunsthoehe 100 statt 200), Flaechen als unregelmaessiges
+//  grobe Pixel (Kunsthöhe 100 statt 200), Flächen als unregelmäßiges
 //  Pixelrauschen statt geordnetem Dithering, schwarze Fugen und Konturen,
 //  satte Farben, weiche Leuchtflecken, nur leichte Randabdunklung.
 //
-//  Ebenen (Kunsthoehe 100): tile.png (Kachel 64: Ziegelmauer mit
-//  Waechterblock, Graben), plaza.png (200, mittig, Pfuetzen), gate.png
-//  (44, mittig), haze.png (roter Dunst), rain-far/-near.png (Kacheln
-//  32×32), splash.png (4 Bilder), steam.png (3 Bilder), bolt.png.
+//  Die Szene: hinter den Zinnen ein dunkler Gewitterhimmel; eine warme
+//  Ziegelmauer mit Wehrgang-Gesims, Schießscharten, Wasserspeiern (aus
+//  deren Mäulern die Säure in den Graben schießt), toten Ranken, Moos und
+//  dunkelroten Säure-Laufspuren; ein Steinsockel mit Algen an der
+//  Wasserlinie. Im blauen Graben stehen gemeißelte Steinblöcke mit
+//  Relieffiguren in einer Rundbogennische (sitzender König mit Krone und
+//  Zepter, Ritter mit gesenktem Schwert), mit Säurespuren, Rissen und
+//  Moos, gespiegelt im Wasser; dazu Steine, tote Binsen, Treibholz. In
+//  der Mitte das Torhaus aus Quadern (eigene Zinnen, Wappenschild mit
+//  Goldkrone, Rundbogen mit Schlussstein, halb hochgezogenes Fallgitter
+//  vor dem beschlagenen Eichentor, zwei Wandlaternen, zerfressene blaue
+//  Banner), davor Stufen und der gepflasterte Hof mit Randsteinen,
+//  Säurepfützen, Gully, Fässern, Kisten, umgekipptem Eimer, rostigem
+//  Helm, Speer, Schutt und Unkraut.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt):
+//  sky.png — Gewitterhimmel (Kachel 128×12, zieht); tile.png — Kachel
+//  128 (Mauer, Graben, Steinblöcke); court.png — Torhaus + Hof, Stück
+//  224, mittig; glint.png — Lichtkräusel auf dem Wasser (3 Bilder
+//  übereinander); mist.png — Säuredunst über dem Graben; rain-far/
+//  -near.png — Regen-Kacheln 64×100 (nahtlos in x und y); bolt.png (2,
+//  Querblitz 28×8 im Himmelsstreifen),
+//  banner.png (3), spout.png (3), foam.png (3), splash.png (4),
+//  ring.png (4), bubble.png (4), steam.png (4).
+//
+//  Animiert: Regen in zwei Tiefen, Aufschläge auf dem Pflaster, Ringe
+//  auf dem Wasser, Säurestrahlen aus den Wasserspeiern mit Gischt,
+//  Pfützen blubbern und dampfen, Wolken ziehen, Blitze hinter den Zinnen
+//  mit Aufhellung, Banner wehen, Laternen flackern, Wasser kräuselt,
+//  Dunst treibt über den Graben.
 //
 //  Tier `opaque` (vorher `partial`): Al 25.9., die Area soll ein
-//  kompletter Hintergrund werden.
+//  kompletter Hintergrund werden. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const AR = '/areas/acid-rain/';
-const AR_PLAZA_W = 200;
-// Saeurepfuetzen auf dem Platz (Platz-Koordinaten, aus dem Generator) — dort dampft es
-const AR_PFUETZEN = [[95, 64], [112, 76], [76, 86], [130, 92], [100, 95]];
+const AR_W = 224;                                   // Hofstück; Stück-x 112 = Brettmitte
+// Wasserspeier (Kunstpixel neben der Brettmitte; Kachel 128 → alle 64 im Wechsel,
+// die inneren ±32 verdeckt das Torhaus). Mund bei y 42, Wasser bei y 54.
+const AR_SPEIER = [-224, -160, -96, 96, 160, 224];
+// Säurepfützen auf dem Hof (x neben der Mitte, y, halbe Breite) — aus dem Generator
+const AR_PFUETZEN = [[-18, 66, 4], [22, 72, 6], [-44, 84, 7], [48, 88, 8], [-4, 94, 6], [-80, 95, 7], [78, 95, 7]];
+const AR_LATERNEN = [93.5, 132.5];                  // Glasmitte (Stück-x), y 34
+const AR_BANNER = [81, 135];                        // linke Kante (Stück-x), hängt ab y 8
+// halbe Hofbreite je Zeile (wie im Generator)
+const arHofHalb = (y) => 36 + (y - 56) * (72 / 44);
 
 const AcidRainOverlay = React.memo(function AcidRainOverlay() {
-  const splashes = useMemo(() => Array.from({ length: ppFxN(22) }, () => ({
-    x: Math.random() * 100,                        // % der Brettbreite
-    y: 54 + Math.random() * 44,                    // Kunstpixel (Graben/Platz)
-    dur: 0.9 + Math.random() * 1.4,
-    delay: -Math.random() * 2.3,
+  const spritzer = useMemo(() => ppZufall(ppFxN(16), () => {
+    const y = 60 + Math.random() * 38;
+    const hw = arHofHalb(y) - 4;
+    return { x: (Math.random() * 2 - 1) * hw, y, dur: 0.8 + Math.random() * 1.3, delay: -Math.random() * 2 };
+  }), []);
+  const ringe = useMemo(() => ppZufall(ppFxN(16), () => {
+    const y = 57 + Math.random() * 41;
+    const rand = arHofHalb(y) + 5;
+    const x = (Math.random() < 0.5 ? -1 : 1) * (rand + Math.random() * (200 - rand));
+    return { x, y, dur: 1.1 + Math.random() * 1.4, delay: -Math.random() * 2.5 };
+  }), []);
+  const dampf = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+    x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 2.6 + Math.random() * 1.8, delay: -Math.random() * 4,
   })), []);
-  const steams = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(5)).map(([x, y]) => ({
-    x, y, dur: 2.4 + Math.random() * 1.8, delay: -Math.random() * 4,
+  const blasen = useMemo(() => AR_PFUETZEN.slice(0, ppFxN(AR_PFUETZEN.length)).map(([x, y, w]) => ({
+    x: x + (Math.random() * 2 - 1) * (w - 2), y, dur: 1.2 + Math.random() * 1.2, delay: -Math.random() * 2,
+  })), []);
+  const speier = useMemo(() => AR_SPEIER.slice(0, ppFxN(AR_SPEIER.length)).map(() => ({
+    dur: 0.3 + Math.random() * 0.12,
   })), []);
   return (
-    <PixelScene artH={100} bg="#2a1414" className="acid-rain-overlay">
+    <PixelScene artH={100} bg="#1e0e12" className="acid-rain-overlay">
+      <div className="pp-pixel-layer ar-wolken" />
+      <div className="pp-area-dyn ar-himmelblitz" />
+      <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(-74, 0), top: 0, animation: 'arBlitz 13s steps(1) -4s infinite, arBlitzForm 13s steps(1) -4s infinite' }} />
+      <i className="pp-area-dyn ar-blitz" style={{ left: ppArtX(58, 0), top: 0, animation: 'arBlitzFern 17s steps(1) -11s infinite', backgroundPosition: '100% 0' }} />
       <PixelBand src={AR + 'tile.png'} />
-      <PixelPiece src={AR + 'plaza.png'} w={AR_PLAZA_W} />
-      <PixelPiece src={AR + 'gate.png'} w={44} />
-      {steams.map((d, i) => (
-        <i key={'st' + i} className="pp-area-dyn ar-dampf" style={{
-          left: ppArtX(d.x - 2, AR_PLAZA_W), top: ppArt(d.y - 6),
-          animation: `arDampfBild .45s steps(1) infinite, arDampf ${d.dur}s ease-out ${d.delay}s infinite`,
+      <PixelBand src={AR + 'glint.png'} className="ar-glitzer" style={{ backgroundSize: 'auto 300%' }} />
+      {AR_SPEIER.slice(0, speier.length).map((x, i) => (
+        <React.Fragment key={'s' + i}>
+          <i className="pp-area-dyn ar-strahl" style={{ left: ppArtX(x - 1, 0), top: ppArt(43), animationDuration: `${speier[i].dur.toFixed(2)}s` }} />
+          <i className="pp-area-dyn ar-gischt" style={{ left: ppArtX(x - 3, 0), top: ppArt(54), animationDuration: `${(speier[i].dur * 1.3).toFixed(2)}s` }} />
+        </React.Fragment>
+      ))}
+      <div className="pp-pixel-layer ar-dunst" style={{ top: ppArt(47) }} />
+      <PixelPiece src={AR + 'court.png'} w={AR_W} />
+      {AR_LATERNEN.map((x, i) => (
+        <i key={'l' + i} className="ar-schein" style={{ left: ppArtX(x - 7, AR_W), top: ppArt(27), animationDelay: `${-i * .9}s` }} />
+      ))}
+      {AR_BANNER.map((x, i) => (
+        <i key={'b' + i} className="ar-banner" style={{ left: ppArtX(x, AR_W), top: ppArt(8), animationDuration: `${1.1 + i * .17}s` }} />
+      ))}
+      {blasen.map((b, i) => (
+        <i key={'bl' + i} className="pp-area-dyn ar-blase" style={{
+          left: ppArtX(b.x - 1, 0), top: ppArt(b.y - 2),
+          animation: `arBlase ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer ar-dunst" />
-      <div className="pp-pixel-layer ar-regen fern" />
-      {splashes.map((s, i) => (
+      {dampf.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn ar-dampf" style={{
+          left: ppArtX(d.x - 2, 0), top: ppArt(d.y - 8),
+          animation: `ppSprite2 .5s steps(1) infinite, arDampf ${d.dur.toFixed(2)}s steps(6) ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn ar-regen fern" />
+      {spritzer.map((s, i) => (
         <i key={'sp' + i} className="pp-area-dyn ar-spritzer" style={{
-          left: s.x + '%', top: ppArt(s.y - 2),
-          animation: `arSpritzer ${s.dur}s steps(1) ${s.delay}s infinite`,
+          left: ppArtX(s.x - 2, 0), top: ppArt(s.y - 2),
+          animation: `arTreffer ${s.dur.toFixed(2)}s steps(1) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer ar-regen nah" />
-      <i className="pp-area-dyn ar-blitz" style={{ left: '27%', top: 0 }} />
+      {ringe.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn ar-ring" style={{
+          left: ppArtX(r.x - 3, 0), top: ppArt(r.y - 1),
+          animation: `arTreffer ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn ar-regen nah" />
       <div className="pp-area-dyn ar-blitzlicht" />
-      <div className="ar-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        .ar-dunst {
-          position: absolute; left: 0; right: 0; top: calc(30 * var(--px)); height: calc(20 * var(--px));
-          background: url(${AR}haze.png) 0 0 / auto 100% repeat-x; opacity: .8;
-          animation: arDunst 60s linear infinite;
+        .ar-wolken {
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px));
+          background: url(${AR}sky.png) 50% 0 / calc(128 * var(--px)) 100% repeat-x;
+          animation: arWolken 90s steps(128) infinite;
         }
-        @keyframes arDunst { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) 0; } }
-        .ar-regen {
-          position: absolute; inset: 0;
-          background-size: calc(32 * var(--px)) calc(32 * var(--px)); background-repeat: repeat;
-        }
-        .ar-regen.fern { background-image: url(${AR}rain-far.png); animation: arRegen .6s linear infinite; }
-        .ar-regen.nah  { background-image: url(${AR}rain-near.png); animation: arRegen .34s linear infinite; }
-        @keyframes arRegen { from { background-position: 0 0; } to { background-position: 0 calc(32 * var(--px)); } }
-        .ar-spritzer {
-          position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px));
-          background: url(${AR}splash.png) 0 0 / 400% 100% no-repeat; opacity: 0;
-        }
-        @keyframes arSpritzer {
-          0%   { opacity: 1; background-position: 0 0; }
-          8%   { background-position: 33.33% 0; }
-          16%  { background-position: 66.66% 0; }
-          26%  { background-position: 100% 0; }
-          36%, 100% { opacity: 0; }
-        }
-        .ar-dampf {
-          position: absolute; width: calc(4 * var(--px)); height: calc(6 * var(--px));
-          background: url(${AR}steam.png) 0 0 / 300% 100% no-repeat; opacity: 0;
-        }
-        @keyframes arDampfBild { 0% { background-position: 0 0; } 33.3% { background-position: 50% 0; } 66.6% { background-position: 100% 0; } }
-        @keyframes arDampf {
-          0% { opacity: 0; transform: translateY(0); }
-          20% { opacity: .9; }
-          100% { opacity: 0; transform: translateY(calc(-5 * var(--px))); }
+        @keyframes arWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
+        /* Blitze zucken hinter den Zinnen: der Himmelsstreifen hellt auf, die Zinnen stehen als Scherenschnitt davor */
+        .ar-himmelblitz {
+          position: absolute; left: 0; right: 0; top: 0; height: calc(12 * var(--px)); background: #9c3a34; opacity: 0;
+          animation: arBlitzLicht 13s steps(1) -4s infinite;
         }
         .ar-blitz {
-          position: absolute; width: calc(9 * var(--px)); height: calc(18 * var(--px));
-          background: url(${AR}bolt.png) 0 0 / 100% 100% no-repeat; opacity: 0;
-          animation: arBlitz 13s steps(1) infinite;
+          position: absolute; width: calc(28 * var(--px)); height: calc(8 * var(--px));
+          background: url(${AR}bolt.png) 0 0 / 200% 100% no-repeat; opacity: 0;
         }
+        @keyframes arBlitz {
+          0%, 91% { opacity: 0; } 92% { opacity: 1; } 93% { opacity: 0; } 94.5% { opacity: 1; } 95.5%, 100% { opacity: 0; }
+        }
+        @keyframes arBlitzForm { 0%, 94% { background-position: 0 0; } 94.2%, 100% { background-position: 100% 0; } }
+        @keyframes arBlitzFern { 0%, 95% { opacity: 0; } 95.6% { opacity: .75; } 96.4%, 100% { opacity: 0; } }
         .ar-blitzlicht {
-          position: absolute; inset: 0; background: #ff5a4a; mix-blend-mode: soft-light; opacity: 0;
-          animation: arBlitz 13s steps(1) infinite;
+          position: absolute; inset: 0; background: #ff6a54; mix-blend-mode: soft-light; opacity: 0;
+          animation: arBlitzLicht 13s steps(1) -4s infinite;
+        }
+        @keyframes arBlitzLicht {
+          0%, 91% { opacity: 0; } 92% { opacity: .5; } 93% { opacity: .1; } 94.5% { opacity: .4; } 95.5% { opacity: .12; } 96.5%, 100% { opacity: 0; }
         }
         /* Telefon-Lite: das bildschirmweite Mischebenen-Licht kostet dort Bildrate */
         @media (pointer: coarse) and (max-height: 600px) { .ar-blitzlicht { display: none; } }
-        @keyframes arBlitz {
-          0%, 91% { opacity: 0; } 92% { opacity: .55; } 93% { opacity: 0; } 94.5% { opacity: .4; } 95.5%, 100% { opacity: 0; }
+        .ar-glitzer { animation: ppBand3 1.6s steps(1) infinite; }
+        .ar-dunst {
+          position: absolute; left: 0; right: 0; height: calc(16 * var(--px));
+          background: url(${AR}mist.png) 0 0 / calc(128 * var(--px)) 100% repeat-x; opacity: .7;
+          animation: arDunst 64s steps(128) infinite;
         }
-        .ar-dim {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.32) 100%);
+        @keyframes arDunst { from { background-position: 0 0; } to { background-position: calc(-128 * var(--px)) 0; } }
+        .ar-regen { position: absolute; inset: 0; background-size: calc(64 * var(--px)) calc(100 * var(--px)); background-repeat: repeat; }
+        .ar-regen.fern { background-image: url(${AR}rain-far.png); animation: arRegenFern .8s steps(100) infinite; }
+        .ar-regen.nah { background-image: url(${AR}rain-near.png); animation: arRegenNah 1.1s steps(200) infinite; }
+        @keyframes arRegenFern { from { background-position: 0 0; } to { background-position: 0 calc(100 * var(--px)); } }
+        @keyframes arRegenNah { from { background-position: 0 0; } to { background-position: 0 calc(200 * var(--px)); } }
+        .ar-strahl {
+          position: absolute; width: calc(3 * var(--px)); height: calc(12 * var(--px));
+          background: url(${AR}spout.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .33s steps(1) infinite;
+        }
+        .ar-gischt {
+          position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px));
+          background: url(${AR}foam.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .42s steps(1) infinite;
+        }
+        .ar-schein {
+          position: absolute; width: calc(14 * var(--px)); height: calc(14 * var(--px)); border-radius: 50%;
+          background: radial-gradient(circle, rgba(255,190,90,.34) 0%, rgba(255,150,60,.14) 45%, rgba(255,150,60,0) 70%);
+          animation: arSchein 1.7s steps(1) infinite;
+        }
+        @keyframes arSchein { 0% { opacity: .85; } 18% { opacity: 1; } 31% { opacity: .7; } 52% { opacity: .95; } 71% { opacity: .78; } 86% { opacity: 1; } }
+        .ar-banner {
+          position: absolute; width: calc(8 * var(--px)); height: calc(17 * var(--px));
+          background: url(${AR}banner.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.2s steps(1) infinite;
+        }
+        .ar-blase { position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}bubble.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes arBlase {
+          0%, 55% { background-position: 0 0; opacity: 0; } 56% { opacity: 1; background-position: 0 0; }
+          68% { background-position: 33.33% 0; } 80% { background-position: 66.66% 0; } 90% { background-position: 100% 0; } 97%, 100% { opacity: 0; }
+        }
+        .ar-dampf { position: absolute; width: calc(5 * var(--px)); height: calc(8 * var(--px)); background: url(${AR}steam.png) 0 0 / 400% 100% no-repeat; }
+        @keyframes arDampf {
+          0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 60% { opacity: .6; }
+          100% { transform: translateY(calc(-6 * var(--px))); opacity: 0; }
+        }
+        .ar-spritzer { position: absolute; width: calc(5 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}splash.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        .ar-ring { position: absolute; width: calc(7 * var(--px)); height: calc(3 * var(--px)); background: url(${AR}ring.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes arTreffer {
+          0% { opacity: 1; background-position: 0 0; } 9% { background-position: 33.33% 0; }
+          18% { background-position: 66.66% 0; } 28% { background-position: 100% 0; } 38%, 100% { opacity: 0; }
         }
       `}</style>
     </PixelScene>
@@ -802,77 +1384,181 @@ const ppQuer = (y, dur, delay, rtl) => ({
 });
 const ppZufall = (n, f) => Array.from({ length: n }, (_, i) => f(i));
 
-// ── COTTAGE AT THE FOREST'S EDGE ────────────────────────────────────
-//  Karte: Blockhuette mit Tuer, Fenstern, Efeu, Pfad, Wegweiser, Zaun.
-//  Ruhig (Als frueherer Wunsch): wiegende Efeublaetter, Schmetterlinge,
-//  einzelne fallende Blaetter.
-//  v1437 (Al 25.9.: „Detailgrad deutlich zu klein"): Kachel 128 breit.
-//  Dachtraufe mit Naegeln, Blockbohlen unterschiedlich lang mit Licht-
-//  kante, Maserung und Aesten, zwei Fenster mit Sprossen, Vorhaengen und
-//  warmem Innenlicht (eines mit Blumenkasten, eines mit gruenen Laeden),
-//  Kraeuterbuendel, Hufeisen, Steinsockel, Wiese mit Bueschen, Wildblumen,
-//  Steinen, Pilzen und Farnen, Efeuranken mit groesseren Blaettern. Mitte:
-//  Tuer mit Beschlaegen, Guckfenster und Sturz, Stufe, Fussmatte,
-//  Laterne, Schild mit Schnitzzeilen, Holzstapel, Hackklotz mit Axt,
-//  Zaun, Pfad mit Trittsteinen. Animiert zusaetzlich: Gras im Wind,
-//  Laterne und Fensterlicht flackern, ein Rotkehlchen auf dem Schild.
+// ═══════════════════════════════════════════════════════════════════
+//  COTTAGE AT THE FOREST'S EDGE (v1415, Kartenstil; Überarbeitung v1441
+//  (Al 25.9.))
+//
+//  Karte: Blockhütte mit Tür, Fenstern, Efeu, Pfad, Wegweiser, Zaun.
+//  Ruhig (Als früherer Wunsch): wiegende Efeublätter, Schmetterlinge,
+//  einzelne fallende Blätter.
+//  v1437 (Al 25.9.: „Detailgrad deutlich zu klein"): Dachtraufe mit
+//  Nägeln, Blockbohlen mit Lichtkante, Maserung und Ästen, zwei Fenster
+//  mit Sprossen, Vorhängen und warmem Innenlicht (eines mit Blumenkasten,
+//  eines mit grünen Läden), Kräuterbündel, Hufeisen, Steinsockel, Wiese
+//  mit Wildblumen, Steinen, Pilzen und Farnen, Efeu mit größeren
+//  Blättern; Tür mit Beschlägen und Sturz, Stufe, Fußmatte, Laterne,
+//  Schild mit Schnitzzeilen (keine Schrift), Holzstapel, Hackklotz mit
+//  Axt, Zaun, Pfad mit Trittsteinen, Rotkehlchen auf dem Schild.
+//
+//  Überarbeitung v1441 (Al 25.9.): auf das Niveau der v1440-Szenen. Die
+//  Hütte ist jetzt EIN Versatzstück (184 breit) mit Tiefe statt einer
+//  endlosen Wand: bemoostes Schindeldach mit First und Ortgang, Stein-
+//  schornstein, runde Blockbohlen mit Eckköpfen (Stirnholz mit Jahres-
+//  ringen und Rissen), Feldsteinsockel. An den Seiten und hinter dem
+//  Dach der WALDRAND in drei Tiefen (ferne dunstige Baumreihen im
+//  Abendlicht, mittlere Stämme, nahe Bäume mit Borke, Wurzeln und Moos),
+//  Unterholz mit Farnen, ein Staketenzaun an der Hauskante, davor die
+//  Wiese. Abendstimmung: warmes Fenster- und Laternenlicht, schräge
+//  Lichtbahnen durchs Laub. Schatten von Schild, Tonne, Traufe und Haus
+//  fallen nach links unten.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt): far.png —
+//  Kachel 96 (Abendhimmel, ferne Baumreihen, Bodendunst); tile.png —
+//  Kachel 128 (Bäume, Unterholz, Zaun, Wiese mit Blumen, Steinen,
+//  Pilzen, Klee); canopy.png — Laubkronen, 3 Bilder; shafts.png —
+//  Lichtbahnen; grass.png — hohe Vordergrund-Halme mit Blüten, 3 Bilder;
+//  cottage.png — die Hütte (Stück 184): Tür mit Füllungen, Beschlägen,
+//  Knauf und Sturz, Stufe mit Matte, Hufeisen, zwei Fenster mit Kerze/
+//  Krug und roten Vorhängen (links grüne Läden mit Herz, rechts Blumen-
+//  kasten), Kräuterbündel, Laterne, Topfgeranie, Holzstapel, Regentonne,
+//  Wegweiser, Hackklotz mit Axt, Pfad mit Trittsteinen; ivy.png — Efeu,
+//  3 Bilder; glow.png / lantern-glow.png — Lichtschein; Sprites:
+//  smoke.png (5), cat.png (4), robin.png (4), rabbit.png (4),
+//  butterfly.png (2), leaf.png (3).
+//
+//  Animiert: Laub und Efeu wiegen, hohe Halme im Wind, Lichtbahnen
+//  atmen, Rauch aus dem Schornstein zieht nach links, Fenster- und
+//  Laternenlicht flackern, eine Katze auf der Fensterbank (Schwanz,
+//  Blinzeln, Ohr), das Rotkehlchen auf dem Wegweiser, ein Hase in der
+//  Wiese, Glühwürmchen am Waldrand, Schmetterlinge, fallende Blätter.
 //  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const COT = '/areas/cottage/';
+const COT_W = 184;                         // Hüttenstück; Stück-x 92 = Brettmitte
+const COT_KAMIN = [143, 6];                // Schornsteinmündung (Stück-x, y)
 const CottageOverlay = React.memo(function CottageOverlay() {
   const falter = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    y: 34 + Math.random() * 50, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
-    bob: 2 + Math.random() * 3, rtl: i % 2 === 1,
+    y: 40 + Math.random() * 46, dur: 22 + Math.random() * 14, delay: -Math.random() * 30,
+    bob: 2 + Math.random() * 3, rtl: i % 2 === 1, farbe: i === 1 ? 'hue-rotate(160deg) saturate(.6) brightness(1.3)' : undefined,
   })), []);
-  const blaetter = useMemo(() => ppZufall(ppFxN(5), () => ({
-    x: Math.random() * 100, dur: 8 + Math.random() * 6, delay: -Math.random() * 12,
+  const blaetter = useMemo(() => ppZufall(ppFxN(6), () => ({
+    x: Math.random() * 100, dur: 9 + Math.random() * 7, delay: -Math.random() * 14,
   })), []);
+  // Glühwürmchen am Waldrand links und rechts der Hütte (und ein paar vorn in der Wiese)
+  const gluehw = useMemo(() => ppZufall(ppFxN(14), (i) => {
+    const seite = i % 2 ? 1 : -1;
+    const vorn = i >= 10;
+    return {
+      x: vorn ? (Math.random() - .5) * 170 : seite * (96 + Math.random() * 90),
+      y: vorn ? 74 + Math.random() * 20 : 34 + Math.random() * 36,
+      dur: 2.4 + Math.random() * 2.6, delay: -Math.random() * 5,
+      wdur: 6 + Math.random() * 6, wdelay: -Math.random() * 10,
+    };
+  }), []);
+  const rauch = useMemo(() => ppZufall(ppFxN(4), (i) => ({ delay: -i * 1.6 })), []);
   return (
-    <PixelScene artH={100} bg="#3a2a14" className="cottage-overlay">
+    <PixelScene artH={100} bg="#2e3c24" className="cottage-overlay">
+      <PixelBand src={COT + 'far.png'} />
       <PixelBand src={COT + 'tile.png'} />
-      <PixelBand src={COT + 'window-glow.png'} className="cot-licht" />
-      <PixelBand src={COT + 'grass-wind.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
-      <PixelBand src={COT + 'leaves.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
-      <PixelPiece src={COT + 'front.png'} w={140} />
-      <PixelPiece src={COT + 'lantern-glow.png'} w={140} className="cot-laterne" />
-      <i className="cot-vogel" style={{ left: ppArtX(26, 0), top: ppArt(33) }} />
+      <PixelBand src={COT + 'shafts.png'} className="cot-strahlen" />
+      <PixelBand src={COT + 'canopy.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 3.3s steps(1) infinite' }} />
+      {gluehw.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn cot-gluehw" style={{
+          left: ppArtX(g.x, 0), top: ppArt(g.y),
+          animation: `cotGlueh ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite, cotSchweb ${g.wdur.toFixed(2)}s steps(6) ${g.wdelay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      <PixelBand src={COT + 'grass.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn cot-rauch" style={{
+          left: ppArtX(COT_KAMIN[0] - 3.5, COT_W), top: ppArt(COT_KAMIN[1] - 6), animationDelay: `${r.delay}s`,
+        }} />
+      ))}
+      <PixelPiece src={COT + 'cottage.png'} w={COT_W} />
+      <PixelPiece src={COT + 'ivy.png'} w={COT_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
+      <PixelPiece src={COT + 'glow.png'} w={COT_W} className="cot-licht" />
+      <PixelPiece src={COT + 'lantern-glow.png'} w={COT_W} className="cot-laterne" />
+      <i className="cot-katze" style={{ left: ppArtX(37, COT_W), top: ppArt(46) }} />
+      <i className="cot-vogel" style={{ left: ppArtX(108, COT_W), top: ppArt(33) }} />
+      <i className="cot-hase" style={{ left: ppArtX(30, COT_W), top: ppArt(80) }} />
       {blaetter.map((b, i) => (
-        <i key={'l' + i} className="pp-area-dyn cot-blatt" style={{ left: b.x + '%', animation: `cotFall ${b.dur}s linear ${b.delay}s infinite, ppSprite3 .9s steps(1) infinite` }} />
+        <i key={'l' + i} className="pp-area-dyn cot-blatt" style={{ left: b.x + '%', animation: `cotFall ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite, ppSprite3 .9s steps(1) infinite` }} />
       ))}
       {falter.map((f, i) => (
         <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+          <i className="cot-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined, filter: f.farbe }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .cot-licht { animation: cotLicht 3.1s ease-in-out infinite alternate; }
-        @keyframes cotLicht { from { opacity: .6; } to { opacity: 1; } }
+        .cot-strahlen { animation: cotStrahl 7s steps(1) infinite; }
+        @keyframes cotStrahl { 0% { opacity: .7; } 20% { opacity: .85; } 40% { opacity: 1; } 60% { opacity: .9; } 80% { opacity: .75; } }
+        .cot-licht { animation: cotLicht 3.1s steps(1) infinite; }
+        @keyframes cotLicht { 0% { opacity: .85; } 18% { opacity: 1; } 36% { opacity: .78; } 44% { opacity: .95; } 70% { opacity: .82; } 84% { opacity: 1; } }
         .cot-laterne { animation: cotLaterne 1.7s steps(1) infinite; }
         @keyframes cotLaterne { 0% { opacity: 1; } 23% { opacity: .75; } 27% { opacity: 1; } 61% { opacity: .85; } 64% { opacity: .65; } 68% { opacity: 1; } }
-        .cot-vogel { position: absolute; width: calc(7 * var(--px)); height: calc(6 * var(--px)); background: url(${COT}bird.png) 0 0 / 300% 100% no-repeat; animation: cotVogel 4.2s steps(1) infinite; }
-        @keyframes cotVogel { 0%, 50% { background-position: 0 0; } 54%, 58% { background-position: 50% 0; } 62%, 66% { background-position: 0 0; } 70%, 74% { background-position: 50% 0; } 78%, 90% { background-position: 100% 0; } 94%, 100% { background-position: 0 0; } }
+        .cot-rauch {
+          position: absolute; width: calc(7 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${COT}smoke.png) 0 0 / 500% 100% no-repeat;
+          animation: cotRauch 6.4s steps(1) infinite, cotRauchZug 6.4s steps(26) infinite;
+        }
+        @keyframes cotRauch {
+          0% { background-position: 0 0; opacity: .95; } 20% { background-position: 25% 0; }
+          40% { background-position: 50% 0; opacity: .85; } 60% { background-position: 75% 0; opacity: .7; }
+          80% { background-position: 100% 0; opacity: .45; } 100% { background-position: 100% 0; opacity: 0; }
+        }
+        @keyframes cotRauchZug { from { transform: translate(0, 0); } to { transform: translate(calc(-26 * var(--px)), calc(-7 * var(--px))); } }
+        .cot-gluehw {
+          position: absolute; width: var(--px); height: var(--px); background: #f4ff9a; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(220, 255, 120, .55);
+        }
+        @keyframes cotGlueh { 0%, 45% { opacity: 0; } 50% { opacity: .6; } 56%, 74% { opacity: 1; } 80% { opacity: .5; } 85%, 100% { opacity: 0; } }
+        @keyframes cotSchweb { from { translate: 0 0; } to { translate: calc(4 * var(--px)) calc(-3 * var(--px)); } }
+        .cot-katze { position: absolute; width: calc(9 * var(--px)); height: calc(10 * var(--px)); background: url(${COT}cat.png) 0 0 / 400% 100% no-repeat; animation: cotKatze 7.3s steps(1) infinite; }
+        @keyframes cotKatze {
+          0% { background-position: 0 0; } 18% { background-position: 33.33% 0; } 24% { background-position: 0 0; }
+          30% { background-position: 33.33% 0; } 36% { background-position: 0 0; } 55% { background-position: 66.67% 0; }
+          57% { background-position: 0 0; } 78% { background-position: 100% 0; } 82% { background-position: 0 0; }
+          90% { background-position: 66.67% 0; } 92%, 100% { background-position: 0 0; }
+        }
+        .cot-vogel { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${COT}robin.png) 0 0 / 400% 100% no-repeat; animation: cotVogel 4.6s steps(1) infinite; }
+        @keyframes cotVogel {
+          0%, 30% { background-position: 0 0; } 34%, 44% { background-position: 33.33% 0; } 48% { background-position: 0 0; }
+          56% { background-position: 100% 0; } 60% { background-position: 0 0; } 64% { background-position: 100% 0; }
+          68% { background-position: 0 0; } 80%, 88% { background-position: 66.67% 0; } 92%, 100% { background-position: 0 0; }
+        }
+        .cot-hase { position: absolute; width: calc(11 * var(--px)); height: calc(10 * var(--px)); background: url(${COT}rabbit.png) 0 0 / 400% 100% no-repeat; animation: cotHase 5.9s steps(1) infinite; }
+        @keyframes cotHase {
+          0% { background-position: 0 0; } 14% { background-position: 100% 0; } 16% { background-position: 0 0; }
+          18% { background-position: 100% 0; } 20% { background-position: 0 0; } 40% { background-position: 33.33% 0; }
+          46% { background-position: 0 0; } 60%, 72% { background-position: 66.67% 0; } 74% { background-position: 0 0; }
+          76%, 86% { background-position: 66.67% 0; } 88%, 100% { background-position: 0 0; }
+        }
         .cot-falter {
           display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px));
           background: url(${COT}butterfly.png) 0 0 / 200% 100% no-repeat;
           animation: ppSprite2 .26s steps(1) infinite, ppBob 1.3s ease-in-out infinite alternate;
         }
         .cot-blatt {
-          position: absolute; top: 0; width: calc(2 * var(--px)); height: calc(2 * var(--px));
+          position: absolute; top: 0; width: calc(3 * var(--px)); height: calc(3 * var(--px));
           background: url(${COT}leaf.png) 0 0 / 300% 100% no-repeat; opacity: 0;
         }
         @keyframes cotFall {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: 1; }
-          25% { transform: translate(calc(4 * var(--px)), calc(18 * var(--px))); }
-          50% { transform: translate(calc(-2 * var(--px)), calc(40 * var(--px))); }
-          75% { transform: translate(calc(3 * var(--px)), calc(62 * var(--px))); }
-          92% { opacity: 1; } 100% { transform: translate(0, calc(80 * var(--px))); opacity: 0; }
+          25% { transform: translate(calc(4 * var(--px)), calc(20 * var(--px))); }
+          50% { transform: translate(calc(-2 * var(--px)), calc(44 * var(--px))); }
+          75% { transform: translate(calc(3 * var(--px)), calc(68 * var(--px))); }
+          92% { opacity: 1; } 100% { transform: translate(0, calc(90 * var(--px))); opacity: 0; }
         }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── CRYSTAL WELL ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  CRYSTAL WELL — Edelsteinbrunnen im magischen blauen Gras
+//  (v1415, Brunnen v1418; Überarbeitung v1441 (Al 25.9.))
+//
 //  Karte: Brunnen mit einem Ring aus bunten Edelsteinen, ringsum
 //  MAGISCHES BLAUES GRAS (kein Wasser — Al 25.9.), ein Erdweg, Funkeln.
 //  Nachbesserung v1416–v1418 (Al 25.9.): Brunnen gross, mit Tiefe, wie
@@ -884,151 +1570,541 @@ const CottageOverlay = React.memo(function CottageOverlay() {
 //  mit dunklen Luecken, Beulen und holprige Oberkante. Konturen in
 //  dunklen Toenen der jeweiligen Steinfarbe. Wasserspiegel tiefer als
 //  der Rand, bewegt (Wellen, Ringe, Funkeln).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): der
+//  Brunnen bleibt (nur die Innenwand wird zum Wasser hin dunkler und
+//  nass), neu gemalt sind Umgebung, Wasser und alles Lebendige. Die
+//  Wiese ist jetzt echtes Gras — Rauschen aus Blautönen, darauf fächernde
+//  Büschel mit hellen Spitzen, große helle und dunkle Wiesenflecken.
+//  Hinten dunkle blaue Büsche und ein Zaunrest, dann der gewundene Erdweg
+//  aus Erdklumpen mit Kieseln, Radspuren und Uferschatten unter der
+//  Grasbank; im Gras bemooste Felsen, Kristalldrusen in den Farben des
+//  Brunnens, Leuchtpilze und Leuchtblumen. Der Brunnen steht auf einem
+//  Pflasterkranz (graue Steine wie auf der Karte, Gras in den Fugen) und
+//  wirft seinen Schatten nach links unten; vorne wachsen Büschel über
+//  den Kranz. Im Schacht liegt das Wasser tief: oben die Spiegelung der
+//  bunten Innenwand, zur Mitte ein magisches Glühen aus der Tiefe.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128 (Wiese, Weg, Büsche, Zaun, Felsen,
+//  Drusen, Pilze, Blumen); glow.png — Leuchthöfe der Drusen, Pilze und
+//  Blumen (Kachel, pulsiert); sway-a.png / sway-b.png — hohe Halme in
+//  drei Neigungen übereinander (wiegen versetzt im Wind); ground.png —
+//  Pflasterkranz und Schlagschatten (150, mittig); water.png — Wasser-
+//  spiegel, 4 Bilder übereinander (Lichtringe laufen nach außen, die
+//  Spiegelung zittert, Glitzer); well.png — der Brunnen; caustics.png —
+//  Lichtspiel des Wassers an der Innenwand (3 Bilder); front.png —
+//  Grasbüschel vor dem Kranz; well-glow.png — magischer Schein über dem
+//  Brunnenmund (atmet); ring.png — Wasserring (4 Bilder 21×7);
+//  butterfly.png — blauer Falter (2 Bilder 7×5).
+//
+//  Animiert: Gras wiegt in zwei Gruppen, Leuchthöfe und Brunnenschein
+//  atmen, Wasser wogt, Tropfenringe breiten sich aus, Lichtflecken
+//  tanzen an der Innenwand, Funken steigen aus dem Schacht, Edelsteine
+//  und Drusen funkeln, Glühwürmchen schweben über der Wiese, Falter
+//  flattern vorbei. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const CWL = '/areas/crystal-well/';
-const CWL_W = 150;                          // Brunnen-Stueck; Rand-Mitte (75, 44), Wasser (75, 57)
+const CWL_W = 150;                          // Brunnen-Stueck; Rand-Mitte (75, 44), Wasser (75, 51)
+// Kachel-x t (0..127) → Kunstpixel neben der Brettmitte, k-te Wiederholung
+const cwlKachel = (t, k) => t - 64 + 128 * k;
+// Spitzen der Kristalldrusen in der Kachel (t, y)
+const CWL_DRUSEN = [[104, 28], [101, 32], [107, 31], [40, 86], [74, 24]];
+
 const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
-  const funken = useMemo(() => ppZufall(ppFxN(18), (i) => {
+  const funken = useMemo(() => ppZufall(ppFxN(22), (i) => {
     const a = Math.random() * Math.PI * 2;
-    if (i < 9) return { x: Math.cos(a) * 56, y: 44 + Math.sin(a) * 19, dur: 1.6 + Math.random() * 1.8, delay: -Math.random() * 3 };
-    if (i < 14) return { x: (Math.random() - .5) * 64, y: 54 + Math.random() * 8, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
-    return { x: (Math.random() - .5) * 240, y: 30 + Math.random() * 66, dur: 2 + Math.random() * 2, delay: -Math.random() * 4 };
+    if (i < 10) return { x: Math.cos(a) * 58, y: 50 + Math.sin(a) * 22, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4 };
+    if (i < 13) return { x: (Math.random() - .5) * 50, y: 47 + Math.random() * 9, dur: 1.4 + Math.random() * 1.6, delay: -Math.random() * 3 };
+    const [t, y] = CWL_DRUSEN[i % CWL_DRUSEN.length];
+    const k = [-2, -1, 1, 2][Math.floor(Math.random() * 4)];
+    return { x: cwlKachel(t, k) + Math.round((Math.random() - .5) * 4), y: y + Math.round(Math.random() * 5), dur: 2.4 + Math.random() * 2, delay: -Math.random() * 5 };
   }), []);
-  const ringe = useMemo(() => ppZufall(ppFxN(3), () => ({
-    x: (Math.random() - .5) * 46, y: 55 + Math.random() * 6, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
+  const ringe = useMemo(() => ppZufall(ppFxN(4), () => ({
+    x: Math.round((Math.random() - .5) * 40), y: 49 + Math.round(Math.random() * 5), dur: 3.2 + Math.random() * 2.4, delay: -Math.random() * 6,
+  })), []);
+  const steigen = useMemo(() => ppZufall(ppFxN(8), () => ({
+    x: Math.round((Math.random() - .5) * 52), y: 50 + Math.round(Math.random() * 6), dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7,
+  })), []);
+  const gluehen = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.round((Math.random() - .5) * 420), y: 26 + Math.round(Math.random() * 70),
+    dur: 5 + Math.random() * 5, delay: -Math.random() * 10, b: Math.random() < .5,
+  })).filter(g => !(Math.abs(g.x) < 70 && g.y > 18 && g.y < 94)), []);
+  const falter = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 30 + Math.random() * 50, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i % 2 === 1, bob: 2 + Math.random() * 2,
   })), []);
   return (
-    <PixelScene artH={100} bg="#1f6ef0" className="crystal-well-overlay">
+    <PixelScene artH={100} bg="#1664e8" className="crystal-well-overlay">
       <PixelBand src={CWL + 'tile.png'} />
-      <PixelBand src={CWL + 'grass-wind.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 1.6s steps(1) infinite' }} />
-      <PixelPiece src={CWL + 'well-shadow.png'} w={CWL_W} />
-      <PixelPiece src={CWL + 'well-water.png'} w={CWL_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 .9s steps(1) infinite' }} />
+      <PixelBand src={CWL + 'glow.png'} className="cwl-atmen" />
+      <PixelBand src={CWL + 'sway-b.png'} className="cwl-wiegen b" style={{ backgroundSize: 'auto 300%' }} />
+      <PixelBand src={CWL + 'sway-a.png'} className="cwl-wiegen" style={{ backgroundSize: 'auto 300%' }} />
+      <PixelPiece src={CWL + 'ground.png'} w={CWL_W} />
+      <PixelPiece src={CWL + 'water.png'} w={CWL_W} className="cwl-wasser" style={{ backgroundSize: '100% 400%' }} />
       {ringe.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn cwl-ring" style={{ left: ppArtX(r.x - 8, 0), top: ppArt(r.y - 3), animation: `cwlRing ${r.dur}s ease-out ${r.delay}s infinite` }} />
+        <i key={'r' + i} className="pp-area-dyn cwl-ring" style={{ left: ppArtX(r.x - 10, 0), top: ppArt(r.y - 3), animation: `cwlRing ${r.dur.toFixed(2)}s steps(1) ${r.delay.toFixed(2)}s infinite` }} />
       ))}
       <PixelPiece src={CWL + 'well.png'} w={CWL_W} />
-      {funken.map((f, i) => (
-        <i key={i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+      <PixelPiece src={CWL + 'caustics.png'} w={CWL_W} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.2s steps(1) infinite' }} />
+      <PixelPiece src={CWL + 'front.png'} w={CWL_W} />
+      <PixelPiece src={CWL + 'well-glow.png'} w={CWL_W} className="cwl-atmen b" />
+      {steigen.map((s, i) => (
+        <i key={'s' + i} className="pp-area-dyn cwl-funke" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `cwlSteigen ${s.dur.toFixed(2)}s steps(26) ${s.delay.toFixed(2)}s infinite` }} />
       ))}
-      <div className="pp-rand-dim" />
-      <style>{`
-        .cwl-ring {
-          position: absolute; width: calc(16 * var(--px)); height: calc(6 * var(--px));
-          border: var(--px) solid rgba(150, 205, 255, .85); border-radius: 50%; opacity: 0;
-        }
-        @keyframes cwlRing { 0% { transform: scale(.2); opacity: 0; } 15% { opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
-      `}</style>
-    </PixelScene>
-  );
-});
-
-// ── DARK OCEAN ───────────────────────────────────────────────────────
-//  Karte: dunkelgraue, farblose Meeresoberflaeche. Als Vorgabe (5.8.):
-//  dunkelgrau, entsaettigt, bedrohlich, mit Seegang — die Karten duerfen
-//  nicht verschleiert werden. Zwei Wellenebenen ziehen gegeneinander,
-//  darunter gleitet ab und zu ein grosser Schatten vorbei.
-const DOC = '/areas/dark-ocean/';
-const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
-  return (
-    <PixelScene artH={100} bg="#323335" className="dark-ocean-overlay">
-      <PixelBand src={DOC + 'tile.png'} />
-      <i className="pp-area-dyn doc-schatten" />
-      <div className="pp-pixel-layer doc-welle a" />
-      <div className="pp-pixel-layer doc-welle b" />
-      <div className="doc-dim" />
-      <style>{`
-        .doc-welle { position: absolute; inset: 0; background-size: auto 100%; background-repeat: repeat-x; }
-        .doc-welle.a { background-image: url(${DOC}waves-a.png); animation: docZugL 9s steps(64) infinite, docHebung 3.1s ease-in-out infinite alternate; }
-        .doc-welle.b { background-image: url(${DOC}waves-b.png); animation: docZugR 13s steps(64) infinite, docHebung 4.3s ease-in-out -1.2s infinite alternate; }
-        @keyframes docZugL { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) 0; } }
-        @keyframes docZugR { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        @keyframes docHebung { from { transform: translateY(0); } to { transform: translateY(calc(2 * var(--px))); } }
-        .doc-schatten {
-          position: absolute; top: 0; left: 0; width: calc(90 * var(--px)); height: calc(30 * var(--px));
-          background: url(${DOC}shadow.png) 0 0 / 100% 100% no-repeat;
-          animation: docSchatten 46s linear infinite;
-        }
-        @keyframes docSchatten {
-          0% { transform: translate(calc(-100 * var(--px)), calc(48 * var(--px))); }
-          100% { transform: translate(calc(100cqw + 10 * var(--px)), calc(40 * var(--px))); }
-        }
-        .doc-dim { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 45%, rgba(0,0,0,.45) 100%); }
-      `}</style>
-    </PixelScene>
-  );
-});
-
-// ── DEEPSEA CASTLE ───────────────────────────────────────────────────
-//  Karte: tuerkisfarbene Burg mit violetten Spitzdaechern unter einem
-//  fahlen Lichtstrahl, lavendelfarbenes Wasser. Tiefsee: Blasen steigen,
-//  Schwebeteilchen sinken, Fische ziehen vorbei, Seegras wiegt.
-//  Neubau v1419 (Al 25.9.: „mehr Detail und mehr Shading"): Tuerme als
-//  schattierte Zylinder mit Ziegelreihen, Kegeldaecher mit Schindeln und
-//  Spitzkugel, Spitzbogenfenster mit hellem Rahmen, Gesimse und Zinnen,
-//  Algen, Korallen, Seepocken. Licht IMMER von oben rechts. Die Fenster
-//  glimmen unten tuerkis (eigene Ebene, atmet).
-const DSC = '/areas/deepsea-castle/';
-const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
-  const blasen = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, dur: 5 + Math.random() * 5, delay: -Math.random() * 10, gross: Math.random() < .3,
-  })), []);
-  const schnee = useMemo(() => ppZufall(ppFxN(16), () => ({
-    x: Math.random() * 100, dur: 14 + Math.random() * 10, delay: -Math.random() * 24,
-  })), []);
-  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    y: 30 + Math.random() * 45, dur: 20 + Math.random() * 14, delay: -Math.random() * 30, rtl: i % 2 === 0,
-  })), []);
-  return (
-    <PixelScene artH={100} bg="linear-gradient(180deg, #e3cefd 0%, #c1b3e5 30%, #9e9dc7 62%, #74739f 100%)" className="deepsea-castle-overlay">
-      <PixelBand src={DSC + 'tile.png'} />
-      <PixelPiece src={DSC + 'beam.png'} w={40} className="dsc-strahl" />
-      {fische.map((f, i) => (
-        <div key={'fi' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
-          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(f.x - 1, 0), top: ppArt(f.y - 1), animation: `ppFunkeln ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {gluehen.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn cwl-gluehwurm" style={{ left: ppArtX(g.x, 0), top: ppArt(g.y), animation: `${g.b ? 'cwlSchwebenB' : 'cwlSchwebenA'} ${g.dur.toFixed(2)}s steps(24) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {falter.map((f, i) => (
+        <div key={'b' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="cwl-falter" style={{ '--bob': ppArt(f.bob), transform: f.rtl ? 'scaleX(-1)' : undefined }} />
         </div>
       ))}
-      <PixelPiece src={DSC + 'castle.png'} w={128} />
-      <PixelPiece src={DSC + 'castle-glow.png'} w={128} className="dsc-fenster" />
-      <PixelBand src={DSC + 'seaweed.png'} style={{ backgroundSize: 'auto 200%', animation: 'ppBand2 1.4s steps(1) infinite' }} />
+      <div className="pp-rand-dim" />
+      <style>{`
+        .cwl-atmen { animation: cwlAtmen 3.4s ease-in-out infinite alternate; }
+        .cwl-atmen.b { animation-duration: 2.6s; animation-delay: -1.3s; }
+        @keyframes cwlAtmen { from { opacity: .45; } to { opacity: 1; } }
+        /* Halme: Bild 0 links, 1 mitte, 2 rechts (übereinander) */
+        .cwl-wiegen { animation: cwlWiegen 2.8s steps(1) infinite; }
+        .cwl-wiegen.b { animation-duration: 3.5s; animation-delay: -1.1s; }
+        @keyframes cwlWiegen {
+          0% { background-position: 50% 50%; } 30% { background-position: 50% 100%; }
+          55% { background-position: 50% 50%; } 80% { background-position: 50% 0%; }
+        }
+        .cwl-wasser { animation: cwlWasser 1.6s steps(1) infinite; }
+        @keyframes cwlWasser {
+          0% { background-position: 0 0%; } 25% { background-position: 0 33.333%; }
+          50% { background-position: 0 66.667%; } 75% { background-position: 0 100%; }
+        }
+        .cwl-ring {
+          position: absolute; width: calc(21 * var(--px)); height: calc(7 * var(--px)); opacity: 0;
+          background: url(${CWL}ring.png) 0 0 / 400% 100% no-repeat;
+        }
+        @keyframes cwlRing {
+          0% { opacity: 1; background-position: 0 0; } 10% { background-position: 33.333% 0; }
+          20% { background-position: 66.667% 0; } 30% { background-position: 100% 0; } 40%, 100% { opacity: 0; }
+        }
+        .cwl-funke {
+          position: absolute; width: var(--px); height: var(--px); background: #e8fcff; opacity: 0;
+          box-shadow: 0 var(--px) 0 rgba(120, 210, 255, .55);
+        }
+        @keyframes cwlSteigen {
+          0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 70% { opacity: .8; }
+          100% { transform: translateY(calc(-26 * var(--px))); opacity: 0; }
+        }
+        .cwl-gluehwurm {
+          position: absolute; width: var(--px); height: var(--px); background: #f2ffff; opacity: 0;
+          box-shadow: var(--px) 0 0 rgba(140, 225, 255, .45), calc(-1 * var(--px)) 0 0 rgba(140, 225, 255, .45),
+                      0 var(--px) 0 rgba(140, 225, 255, .45), 0 calc(-1 * var(--px)) 0 rgba(140, 225, 255, .45);
+        }
+        @keyframes cwlSchwebenA {
+          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; }
+          35% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); opacity: .5; }
+          55% { transform: translate(calc(7 * var(--px)), calc(-2 * var(--px))); opacity: 1; }
+          80% { transform: translate(calc(9 * var(--px)), calc(-6 * var(--px))); opacity: .7; }
+          100% { transform: translate(calc(11 * var(--px)), calc(-8 * var(--px))); opacity: 0; }
+        }
+        @keyframes cwlSchwebenB {
+          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; }
+          40% { transform: translate(calc(-3 * var(--px)), calc(-4 * var(--px))); opacity: .4; }
+          60% { transform: translate(calc(-6 * var(--px)), calc(-3 * var(--px))); opacity: 1; }
+          100% { transform: translate(calc(-9 * var(--px)), calc(-9 * var(--px))); opacity: 0; }
+        }
+        .cwl-falter {
+          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
+          background: url(${CWL}butterfly.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite, ppBob 1.2s steps(3) infinite alternate;
+        }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  DARK OCEAN — offene, dunkle See (v1415; Überarbeitung v1441, Al 25.9.)
+//
+//  Karte: dunkelgraue, FARBLOSE Meeresoberfläche. Als Vorgabe (5.8.):
+//  dunkelgrau, entsättigt, bedrohlich, mit Seegang — die Karten dürfen
+//  nicht verschleiert werden. Farblos bleibt farblos: alles in Grautönen
+//  (nur der leichte Kaltstich des alten #323335).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): mehr
+//  Tiefe und Leben im Wasser. Leichte Perspektive (fern oben: kleinere
+//  Wellen, Dunst; nah unten: größere, dunklere See), die Kräuselstriche
+//  der Karte (heller Strich über dunklem, schwarze Grübchen), rollende
+//  Wellenkämme in Sichelstücken mit Lichtkante, beleuchteter Rückseite
+//  und dunkler Vorderflanke, Schaum auf den nahen Kämmen, Schaumkronen
+//  mit Gischt, Strömungsschlieren, Wolkenschatten, Nebel, Regen, dunkle
+//  Schemen unter der Oberfläche, Treibgut, eine Rückenflosse.
+//
+//  Ebenen (Kunsthöhe 100; Generator `dark-ocean.py`, nicht im Projekt):
+//  tile.png — Kachel 128 (Grundwasser, Tiefenflecken, Kräuselstriche);
+//  swell.png — Seegang, 18 Bilder übereinander (Kachel 128, Kämme rollen
+//  auf den Betrachter zu, Periode drei Wellen); ripples.png — Windsee,
+//  Kachel 96; current.png — Schaumschlieren, Kachel 192; shade.png —
+//  Wolkenschatten, Kachel 256; fog.png — Nebel, Kachel 192; rain.png —
+//  Regen 100×100 (nahtlos in x und y); ring.png — Tropfenring (5);
+//  cap-l.png / cap-s.png — brechende Schaumkrone mit Gischt (8);
+//  beast.png — Leviathan-Schemen (2); school.png — Fischschwarm-Schatten
+//  (2); fin.png — Rückenflosse mit Kielwasser (3); debris.png — Treibgut
+//  (Planke, Fass, Mastbruch mit Tau, Kiste; je 2 Bilder, Zeilen).
+//
+//  Animiert: der Seegang rollt heran, Windsee und Strömung treiben nach
+//  links (Wind von rechts), Wolkenschatten und Nebel ziehen, Schaumkronen
+//  brechen mit Gischt, Regen fällt schräg und setzt Tropfenringe, ab und
+//  zu gleitet ein riesiger Schatten unter der Oberfläche vorbei, ein
+//  Fischschwarm huscht, eine Flosse schneidet durchs Wasser, Treibgut
+//  dümpelt vorüber, fernes Wetterleuchten. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
+const DOC = '/areas/dark-ocean/';
+const DOC_TREIBGUT = [0, 1, 2, 3];                  // Zeilen in debris.png (26×10 je Bild)
+const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
+  const kronen = useMemo(() => ppZufall(ppFxN(11), (i) => {
+    const y = 18 + Math.random() * 78;
+    return { x: 3 + Math.random() * 94, y, gross: y > 46, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
+  }), []);
+  const tropfen = useMemo(() => ppZufall(ppFxN(18), () => ({
+    x: Math.random() * 100, y: 4 + Math.random() * 93, dur: 1.3 + Math.random() * 1.6, delay: -Math.random() * 3,
+  })), []);
+  const treibgut = useMemo(() => {
+    const start = Math.floor(Math.random() * 4);          // jedes Stück nur einmal
+    return ppZufall(ppFxN(3), (i) => ({
+    art: DOC_TREIBGUT[(start + i) % 4], y: 20 + i * 24 + Math.random() * 12,
+    dur: 120 + Math.random() * 60, delay: -Math.random() * 180, bob: 1.7 + Math.random() * 1.2,
+    }));
+  }, []);
+  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 25 + Math.random() * 55, dur: 26 + Math.random() * 12, delay: -Math.random() * 40, rtl: i === 0,
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#303134" className="dark-ocean-overlay">
+      <PixelBand src={DOC + 'tile.png'} />
+      <div className="pp-area-dyn doc-tier-bahn"><i className="doc-tier" /></div>
+      {fische.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="doc-schwarm" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <PixelBand src={DOC + 'swell.png'} className="doc-see" style={{ backgroundSize: 'auto 1800%' }} />
+      <PixelBand src={DOC + 'ripples.png'} className="doc-kraeusel" />
+      <PixelBand src={DOC + 'current.png'} className="doc-stroemung" />
+      <PixelBand src={DOC + 'shade.png'} className="doc-schatten" />
+      {treibgut.map((t, i) => (
+        <div key={'t' + i} className="pp-area-dyn pp-quer" style={ppQuer(t.y, t.dur, t.delay, true)}>
+          <i className="doc-treibgut" style={{ backgroundPositionY: `${t.art * 100 / 3}%`, animationDuration: `1.3s, ${t.bob.toFixed(2)}s` }} />
+        </div>
+      ))}
+      <div className="pp-area-dyn doc-flossen-bahn"><i className="doc-flosse" /></div>
+      {kronen.map((k, i) => (
+        <i key={'k' + i} className={'pp-area-dyn doc-krone' + (k.gross ? ' gross' : '')} style={{
+          left: k.x + '%', top: ppArt(Math.round(k.y)),
+          animation: `docKrone ${k.dur.toFixed(2)}s steps(1) ${k.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {tropfen.map((t, i) => (
+        <i key={'r' + i} className="pp-area-dyn doc-ring" style={{
+          left: t.x + '%', top: ppArt(Math.round(t.y)),
+          animation: `docRing ${t.dur.toFixed(2)}s steps(1) ${t.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn doc-regen" />
+      <PixelBand src={DOC + 'fog.png'} className="doc-nebel" />
+      <div className="pp-area-dyn doc-blitz" />
+      <div className="pp-rand-dim" />
+      <style>{`
+        .doc-see { animation: docSee 8.1s steps(18) infinite; }
+        @keyframes docSee { from { background-position: 50% 0; } to { background-position: 50% calc(-1800 * var(--px)); } }
+        .doc-kraeusel { animation: docKraeusel 34s steps(96) infinite; opacity: .6; }
+        @keyframes docKraeusel { from { background-position: 50% 0; } to { background-position: calc(50% - 96 * var(--px)) 0; } }
+        .doc-stroemung { animation: docStroemung 110s steps(192) infinite; }
+        @keyframes docStroemung { from { background-position: 50% 0; } to { background-position: calc(50% - 192 * var(--px)) 0; } }
+        .doc-schatten { animation: docWolke 170s steps(256) infinite; }
+        @keyframes docWolke { from { background-position: 50% 0; } to { background-position: calc(50% - 256 * var(--px)) 0; } }
+        .doc-nebel { animation: docNebel 130s steps(192) infinite; }
+        @keyframes docNebel { from { background-position: 50% 0; } to { background-position: calc(50% - 192 * var(--px)) 0; } }
+        .doc-regen {
+          position: absolute; inset: 0; opacity: .5;
+          background: url(${DOC}rain.png) 0 0 / calc(100 * var(--px)) calc(100 * var(--px)) repeat;
+          animation: docRegen 2.4s steps(100) infinite;
+        }
+        @keyframes docRegen { from { background-position: 0 0; } to { background-position: calc(-100 * var(--px)) calc(200 * var(--px)); } }
+        .doc-ring { position: absolute; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DOC}ring.png) 0 0 / 500% 100% no-repeat; opacity: 0; }
+        @keyframes docRing {
+          0% { opacity: 1; background-position: 0 0; } 6% { background-position: 25% 0; } 12% { background-position: 50% 0; }
+          19% { background-position: 75% 0; } 27% { background-position: 100% 0; } 35%, 100% { opacity: 0; }
+        }
+        .doc-krone { position: absolute; width: calc(14 * var(--px)); height: calc(8 * var(--px)); margin-left: calc(-7 * var(--px)); background: url(${DOC}cap-s.png) 0 0 / 800% 100% no-repeat; opacity: 0; }
+        .doc-krone.gross { width: calc(22 * var(--px)); height: calc(12 * var(--px)); margin-left: calc(-11 * var(--px)); background-image: url(${DOC}cap-l.png); }
+        @keyframes docKrone {
+          0% { opacity: 1; background-position: 0 0; } 4% { background-position: 14.286% 0; } 8% { background-position: 28.571% 0; }
+          12% { background-position: 42.857% 0; } 16% { background-position: 57.143% 0; } 21% { background-position: 71.429% 0; }
+          27% { background-position: 85.714% 0; } 34% { background-position: 100% 0; } 42%, 100% { opacity: 0; }
+        }
+        .doc-tier-bahn { position: absolute; left: 0; top: calc(38 * var(--px)); animation: docTierZug 84s linear -20s infinite; }
+        .doc-tier {
+          display: block; width: calc(84 * var(--px)); height: calc(30 * var(--px));
+          background: url(${DOC}beast.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 2.2s steps(1) infinite;
+        }
+        @keyframes docTierZug {
+          0% { transform: translate(calc(-90 * var(--px)), calc(6 * var(--px))); }
+          62% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-4 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-4 * var(--px))); }
+        }
+        .doc-schwarm { display: block; width: calc(26 * var(--px)); height: calc(12 * var(--px)); background: url(${DOC}school.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; opacity: .9; }
+        .doc-flossen-bahn { position: absolute; left: 0; top: calc(66 * var(--px)); animation: docFlosseZug 58s linear -8s infinite; }
+        .doc-flosse { display: block; width: calc(24 * var(--px)); height: calc(10 * var(--px)); background: url(${DOC}fin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .6s steps(1) infinite; }
+        @keyframes docFlosseZug {
+          0% { transform: translate(calc(-30 * var(--px)), 0); }
+          38% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-5 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-5 * var(--px))); }
+        }
+        .doc-treibgut {
+          display: block; width: calc(26 * var(--px)); height: calc(10 * var(--px));
+          background: url(${DOC}debris.png) 0 0 / 200% 400% no-repeat;
+          animation-name: docDuempeln, docWippen; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes docDuempeln { 0% { background-position-x: 0; } 50% { background-position-x: 100%; } }
+        @keyframes docWippen { 0% { translate: 0 0; } 50% { translate: 0 var(--px); } }
+        .doc-blitz {
+          position: absolute; inset: 0; opacity: 0;
+          background: linear-gradient(180deg, rgba(205,207,214,.2) 0%, rgba(205,207,214,.07) 45%, rgba(205,207,214,0) 80%);
+          animation: docBlitz 23s steps(1) infinite;
+        }
+        @keyframes docBlitz { 0%, 88% { opacity: 0; } 88.4% { opacity: .8; } 88.9% { opacity: .15; } 89.6% { opacity: .55; } 90.3%, 100% { opacity: 0; } }
+      `}</style>
+    </PixelScene>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  DEEPSEA CASTLE — versunkene Burg (v1419, Überarbeitung v1441, Al 25.9.)
+//
+//  Karte: türkisfarbene Burg mit violetten Spitzdächern unter einem
+//  fahlen Lichtstrahl, lavendelfarbenes Wasser. Tiefsee: Blasen steigen,
+//  Schwebeteilchen sinken, Fische ziehen vorbei, Seegras wiegt.
+//  Neubau v1419 (Al 25.9.: „mehr Detail und mehr Shading"): Türme als
+//  schattierte Zylinder mit Ziegelreihen, Kegeldächer mit Schindeln und
+//  Spitzkugel, Spitzbogenfenster mit hellem Rahmen, Gesimse und Zinnen,
+//  Algen, Korallen, Seepocken. Licht IMMER von oben rechts. Die Fenster
+//  glimmen unten türkis (eigene Ebene, atmet).
+//
+//  Überarbeitung v1441 (Al 25.9.): gleiche Burg, gleiche Palette, aber
+//  neu gemalt und mit Tiefe. Burg (Stück 176): sieben Türme wie bisher,
+//  jetzt vollständig (die äußeren kleinen Türme waren abgeschnitten),
+//  Quader in versetzten Reihen mit Lichtkante, Kragsteinfriese unter den
+//  Traufen, Gesimse mit Schlagschatten, Schindeldächer mit Glanzstreifen,
+//  gestufter Bergfried mit violett gedeckten Zinnen, Rundfenster über
+//  dem Spitzbogentor (Keilsteine, Bohlen, Eisenbänder, Ringe), Stufen und
+//  Plattenweg. Bewuchs: Algenflecken (unten dichter), hängende Tangfäden,
+//  Seepocken, Risse, Seesterne an der Mauer; am Fuß Sandverwehungen,
+//  Felsbrocken, Ast-, Hirn- und Fächerkorallen, Röhrenschwämme, Anemonen,
+//  eine versunkene Schatztruhe und eine Amphore.
+//  Hintergrund in drei Tiefen statt der blassen Säulen: ganz fern eine
+//  versunkene Stadt im Dunst (Türme mit Spitzdächern, Kuppelhalle,
+//  Brückenbogen, gebrochener Turm), davor ein Felsgrat mit Säulen und
+//  Tangstängeln, vorne ein Riff (facettierte Felsen, Korallen, Säulen-
+//  ruine) und Sandboden mit Rippeln, Kieseln, Muscheln, Seesternen und
+//  Seeigeln.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt): back.png —
+//  Kachel 128 (Wasser als Pixelrauschen, ferne Stadt, Felsgrat);
+//  rays.png — schräge Lichtfahnen (Kachel); kelp.png — hoher Tang hinter
+//  der Burg (4 Bilder übereinander); tile.png — Riff und Meeresboden
+//  (Kachel); caustics.png — Lichtnetz auf dem Sand (3 Bilder); beam.png —
+//  der Lichtstrahl der Karte (48); castle.png / castle-glow.png — Burg und
+//  Glimmen (176); weed.png — Seegras vorne (4 Bilder); fish.png (2 Arten
+//  × 2 Bilder), school.png (Schwarm, 2), whale.png (Wal, 2), jelly.png (4),
+//  crab.png (2), pennant.png (Wimpel, 3).
+//
+//  Animiert: Lichtfahnen wandern langsam und atmen, der Strahl pulsiert,
+//  Kaustik flimmert auf dem Sand, Tang und Seegras wiegen, Fenster, Ro-
+//  sette und Anemonen glimmen, Wimpel flattern in der Strömung, Glanz-
+//  punkte an Turmspitzen und Truhe, ein Wal zieht fern vorbei, ein
+//  Fischschwarm, einzelne Fische (vor und hinter der Burg), Quallen
+//  steigen pulsierend auf, eine Krabbe läuft über den Sand, Blasen
+//  steigen (auch aus der Truhe), Schwebeteilchen sinken.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
+const DSC = '/areas/deepsea-castle/';
+const DSC_W = 176;                                   // Burgstück; Stück-x 88 = Brettmitte
+const DSC_WIMPEL = [[53, 19], [123, 19]];            // Mastspitzen (Stück-x, y); wehen zur Mitte
+const DSC_GLANZ = [[87, 1], [36, 1], [138, 1], [20, 35], [154, 35], [69, 89], [73, 89]];
+const DSC_TRUHE = [70, 88];                          // Blasen aus dem Truhenspalt
+const DeepseaCastleOverlay = React.memo(function DeepseaCastleOverlay() {
+  const blasen = useMemo(() => ppZufall(ppFxN(12), () => ({
+    x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 11, gross: Math.random() < .3,
+  })), []);
+  const truhe = useMemo(() => ppZufall(ppFxN(3), (i) => ({ dur: 5.5 + i * .7, delay: -i * 2.1 - Math.random() })), []);
+  const schnee = useMemo(() => ppZufall(ppFxN(18), () => ({
+    x: Math.random() * 100, dur: 16 + Math.random() * 12, delay: -Math.random() * 28, hell: Math.random() < .4,
+  })), []);
+  const fische = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: 34 + Math.random() * 40, dur: 22 + Math.random() * 16, delay: -Math.random() * 36, rtl: i % 2 === 0,
+    art: i % 2, vorne: i >= 2,
+  })), []);
+  const quallen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    x: [14, 81, 58][i] + Math.random() * 8, dur: 46 + Math.random() * 20, delay: -Math.random() * 60, puls: 1.5 + Math.random() * .5,
+  })), []);
+  const glanz = useMemo(() => DSC_GLANZ.slice(0, ppFxN(DSC_GLANZ.length)).map(() => ({
+    dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
+  })), []);
+  return (
+    <PixelScene artH={100} bg="#bdb4e1" className="deepsea-castle-overlay">
+      <PixelBand src={DSC + 'back.png'} />
+      <div className="pp-area-dyn pp-quer" style={ppQuer(14, 120, -50, true)}><i className="dsc-wal" /></div>
+      <div className="pp-area-dyn pp-quer" style={ppQuer(40, 52, -12, false)}><i className="dsc-schwarm" /></div>
+      <PixelBand src={DSC + 'rays.png'} className="dsc-fahnen" />
+      <PixelBand src={DSC + 'kelp.png'} className="dsc-wiegen" style={{ backgroundSize: 'auto 400%', animationDuration: '3.8s' }} />
+      <PixelBand src={DSC + 'tile.png'} />
+      <PixelBand src={DSC + 'caustics.png'} className="dsc-kaustik" style={{ backgroundSize: 'auto 300%' }} />
+      {fische.filter(f => !f.vorne).map((f, i) => (
+        <div key={'fh' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined, backgroundPositionY: f.art ? '100%' : '0%' }} />
+        </div>
+      ))}
+      <PixelPiece src={DSC + 'castle.png'} w={DSC_W} />
+      <PixelPiece src={DSC + 'castle-glow.png'} w={DSC_W} className="dsc-fenster" />
+      <PixelPiece src={DSC + 'beam.png'} w={48} className="dsc-strahl" />
+      {DSC_WIMPEL.map(([x, y], i) => (
+        <i key={'w' + i} className="dsc-wimpel" style={{
+          left: ppArtX(i ? x - 13 : x + 1, DSC_W), top: ppArt(y),
+          transform: i ? 'scaleX(-1)' : undefined, animationDuration: `${1.1 + i * .17}s`,
+        }} />
+      ))}
+      {glanz.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{
+          left: ppArtX(DSC_GLANZ[i][0] - 1, DSC_W), top: ppArt(DSC_GLANZ[i][1] - 1),
+          animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {quallen.map((q, i) => (
+        <div key={'q' + i} className="pp-area-dyn dsc-qualle-weg" style={{ left: q.x + '%', animation: `dscAufsteigen ${q.dur.toFixed(1)}s steps(${Math.round(q.dur * 4)}) ${q.delay.toFixed(1)}s infinite` }}>
+          <i className="dsc-qualle" style={{ animationDuration: `${q.puls.toFixed(2)}s` }} />
+        </div>
+      ))}
+      {fische.filter(f => f.vorne).map((f, i) => (
+        <div key={'fv' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y + 8, f.dur * .8, f.delay, f.rtl)}>
+          <i className="dsc-fisch" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined, backgroundPositionY: f.art ? '100%' : '0%' }} />
+        </div>
+      ))}
+      <div className="pp-area-dyn pp-quer" style={ppQuer(90, 84, -20, false)}><i className="dsc-krabbe" /></div>
+      <PixelBand src={DSC + 'weed.png'} className="dsc-wiegen" style={{ backgroundSize: 'auto 400%', animationDuration: '2.9s' }} />
       {schnee.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn dsc-schnee" style={{ left: s.x + '%', animation: `dscSinken ${s.dur}s linear ${s.delay}s infinite` }} />
+        <i key={'s' + i} className={'pp-area-dyn dsc-schnee' + (s.hell ? ' hell' : '')} style={{ left: s.x + '%', animation: `dscSinken ${s.dur.toFixed(1)}s steps(100) ${s.delay.toFixed(1)}s infinite` }} />
       ))}
       {blasen.map((b, i) => (
-        <i key={'b' + i} className={'pp-area-dyn dsc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `dscSteigen ${b.dur}s linear ${b.delay}s infinite` }} />
+        <i key={'b' + i} className={'pp-area-dyn dsc-blase' + (b.gross ? ' gross' : '')} style={{ left: b.x + '%', animation: `dscSteigen ${b.dur.toFixed(1)}s steps(98) ${b.delay.toFixed(1)}s infinite` }} />
+      ))}
+      {truhe.map((b, i) => (
+        <i key={'t' + i} className={'pp-area-dyn dsc-blase' + (i === 1 ? ' gross' : '')} style={{
+          left: ppArtX(DSC_TRUHE[0], DSC_W), top: ppArt(DSC_TRUHE[1]),
+          animation: `dscTruhe ${b.dur.toFixed(1)}s steps(88) ${b.delay.toFixed(1)}s infinite`,
+        }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        .dsc-fahnen { animation: dscFahnen 96s steps(128) infinite, dscAtmen 7s ease-in-out infinite alternate; }
+        @keyframes dscFahnen { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
+        @keyframes dscAtmen { from { opacity: .55; } to { opacity: 1; } }
+        .dsc-wiegen { animation: dscWiegen 3.4s steps(1) infinite; }
+        @keyframes dscWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; } 50% { background-position: 50% 66.667%; } 75% { background-position: 50% 100%; } }
+        .dsc-kaustik { opacity: .8; animation: ppBand3 2.4s steps(1) infinite; }
         .dsc-strahl { animation: dscStrahl 4.2s ease-in-out infinite alternate; }
-        @keyframes dscStrahl { from { opacity: .65; } to { opacity: 1; } }
+        @keyframes dscStrahl { from { opacity: .6; } to { opacity: 1; } }
         .dsc-fenster { animation: dscFenster 3.6s ease-in-out infinite alternate; }
         @keyframes dscFenster { from { opacity: .45; } to { opacity: 1; } }
-        .dsc-fisch { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DSC}fish.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; }
-        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .7; }
+        .dsc-wimpel { position: absolute; width: calc(11 * var(--px)); height: calc(7 * var(--px)); background: url(${DSC}pennant.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.1s steps(1) infinite; }
+        .dsc-fisch { display: block; width: calc(8 * var(--px)); height: calc(5 * var(--px)); background: url(${DSC}fish.png) 0 0 / 200% 200% no-repeat; animation: dscFlosse .5s steps(1) infinite; }
+        @keyframes dscFlosse { 0% { background-position-x: 0%; } 50% { background-position-x: 100%; } }
+        .dsc-schwarm { display: block; width: calc(24 * var(--px)); height: calc(10 * var(--px)); opacity: .7; background: url(${DSC}school.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .6s steps(1) infinite, ppBob 3.2s steps(3) infinite alternate; --bob: calc(3 * var(--px)); }
+        .dsc-wal { display: block; width: calc(40 * var(--px)); height: calc(13 * var(--px)); opacity: .42; transform: scaleX(-1); background: url(${DSC}whale.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 3.4s steps(1) infinite, ppBob 6.8s steps(3) infinite alternate; --bob: calc(3 * var(--px)); }
+        @keyframes dscVier { 0% { background-position: 0 0; } 25% { background-position: 33.333% 0; } 50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; } }
+        .dsc-qualle-weg { position: absolute; top: 0; width: calc(7 * var(--px)); height: calc(11 * var(--px)); }
+        .dsc-qualle { display: block; width: 100%; height: 100%; opacity: .85; background: url(${DSC}jelly.png) 0 0 / 400% 100% no-repeat; animation: dscVier 1.6s steps(1) infinite; }
+        @keyframes dscAufsteigen {
+          0% { transform: translate(0, calc(104 * var(--px))); }
+          25% { transform: translate(calc(3 * var(--px)), calc(76 * var(--px))); }
+          50% { transform: translate(0, calc(48 * var(--px))); }
+          75% { transform: translate(calc(-3 * var(--px)), calc(20 * var(--px))); }
+          100% { transform: translate(0, calc(-12 * var(--px))); }
+        }
+        .dsc-krabbe { display: block; width: calc(9 * var(--px)); height: calc(6 * var(--px)); background: url(${DSC}crab.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .34s steps(1) infinite; }
+        .dsc-schnee { position: absolute; top: 0; width: var(--px); height: var(--px); background: #efe6ff; opacity: .55; }
+        .dsc-schnee.hell { opacity: .85; }
         @keyframes dscSinken { from { transform: translate(0, 0); } 50% { transform: translate(calc(3 * var(--px)), calc(50 * var(--px))); } to { transform: translate(0, calc(100 * var(--px))); } }
-        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); border: 0; background: #f4eeff; opacity: 0; }
+        .dsc-blase { position: absolute; top: calc(96 * var(--px)); width: var(--px); height: var(--px); background: #f4eeff; opacity: 0; }
         .dsc-blase.gross { width: calc(2 * var(--px)); height: calc(2 * var(--px)); background: transparent; box-shadow: inset 0 0 0 var(--px) #f4eeff; }
         @keyframes dscSteigen {
           0% { transform: translate(0, 0); opacity: 0; } 8% { opacity: .9; }
           50% { transform: translate(calc(2 * var(--px)), calc(-48 * var(--px))); }
           100% { transform: translate(0, calc(-98 * var(--px))); opacity: .2; }
         }
+        @keyframes dscTruhe {
+          0% { transform: translate(0, 0); opacity: 0; } 6% { opacity: .95; }
+          30% { transform: translate(calc(-1 * var(--px)), calc(-26 * var(--px))); }
+          60% { transform: translate(calc(1 * var(--px)), calc(-53 * var(--px))); }
+          100% { transform: translate(0, calc(-90 * var(--px))); opacity: .15; }
+        }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── DOOM CLOCK ───────────────────────────────────────────────────────
-//  Karte: grosse dunkelrote Uhr mit Spirale und Totenschaedeln an den
-//  Viertelmarken. Als Vorgabe (5.8.): „aehnlich Big Gwen, aber
+// ═══════════════════════════════════════════════════════════════════
+//  DOOM CLOCK — die Uhr, die bis Mitternacht zählt
+//  (v1415 Kartenstil, v1420 Doom Counter; Überarbeitung v1441 (Al 25.9.))
+//
+//  Karte: große dunkelrote Uhr mit Spirale und Totenschädeln an den
+//  Viertelmarken. Als Vorgabe (5.8.): „ähnlich Big Gwen, aber
 //  bedrohlicher", Sekunden TICKEN (60 harte Schritte, echte Uhrzeit).
-//  v1420 (Al 25.9.): Himmel in dunklem, GEFAEHRLICHEM Rot. Stunden- und
+//  v1420 (Al 25.9.): Himmel in dunklem, GEFÄHRLICHEM Rot. Stunden- und
 //  Minutenzeiger zeigen die DOOM COUNTER: 0 = 11 Uhr, 20 = 12 Uhr,
-//  dazwischen fliessend (Minutenzeiger eine Umdrehung, Stundenzeiger
-//  von der 11 zur 12). Liegen zwei Doom Clocks, zaehlt die, die dem
-//  Ende naeher ist. Je naeher Mitternacht, desto schneller und heller
+//  dazwischen fließend (Minutenzeiger eine Umdrehung, Stundenzeiger
+//  von der 11 zur 12). Liegen zwei Doom Clocks, zählt die, die dem
+//  Ende näher ist. Je näher Mitternacht, desto schneller und heller
 //  pocht der rote Schein hinter der Uhr.
+//
+//  Überarbeitung v1441: dieselbe Szene, neu gemalt. Die Uhr hängt an
+//  einer Kette mit geriffelter Krone wie eine riesige Taschenuhr über
+//  einem Wolkenmeer: gewölbter Eisenrand mit Rille, Nieten, gehämmerten
+//  Dellen und Rost, darin der weinrote Zifferring mit Minutenstrichen,
+//  Stundennieten und vier Schädeln (rote Augen), das Zifferblatt mit
+//  schrägen Pinselschlieren wie auf der Karte und einem Riss. Die
+//  Spirale ist eine eigene Ebene und zieht langsam nach innen in den
+//  schwarzen Abgrund unter der Achse — je näher Mitternacht, desto
+//  schneller. Ringsum statt Verlauf ein gemalter Himmel: dunkles Rot mit
+//  schrägen Schlieren und violetten Strähnen, oben hängende Rauchbänke,
+//  hinten ferne Gewittertürme vor dem glühenden Horizont (dort zucken
+//  Blitze), vorn ein Wolkenmeer mit glühenden Kanten und vor dem unteren
+//  Uhrrand dünne Schwaden.
+//
+//  Ebenen (Kunsthöhe 100; Generator gen/doom-clock.py, nicht im
+//  Projekt): sky.png, smoke.png, clouds-far.png, clouds-near.png,
+//  wisps.png (Kacheln 128), clock.png (Versatzstück 91), spiral.png
+//  (14 Bilder 61×61 übereinander), hand-hour/-min/-sec.png, cap.png
+//  (Achsschädel), gear.png / gear-s.png (je 3 Bilder, Zahnrad dreht
+//  sich), crow.png (2 Bilder 7×4), bolt.png (3 Blitze 11×30).
+//
+//  Animiert: Zeiger (Doom Counter, gleiten bei Änderung hinüber),
+//  Sekundenzeiger tickt, Spirale zieht nach innen, roter Schein pocht,
+//  Schädelaugen glühen, Blitze in der Ferne, Wolken und Rauch ziehen
+//  (je Ebene eigenes Tempo), Zahnräder schweben und drehen sich,
+//  Krähen ziehen vorbei, Asche und Glut steigen. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const DCL = '/areas/doom-clock/';
 const DC_MITTE_Y = 49.5;
 const DC_MAX = 20;
+// Schädel an den Viertelmarken (Kunstpixel neben der Uhrmitte)
+const DC_SCHAEDEL = [[0, -33], [33, 0], [0, 33], [-33, 0]];
+// Zeigerbilder: Breite, Höhe, Drehpunkt (Pixel im Bild)
+const DC_ZEIGER = { std: [9, 28, 4, 22], min: [7, 37, 3, 31], sek: [5, 44, 2, 34] };
+// Schwebende Zahnräder (x neben der Mitte, y, groß?) — nur neben der Uhr
+const DC_RAEDER = [[-60, 22, 0], [-86, 44, 1], [-140, 30, 0], [62, 30, 1], [96, 14, 0], [138, 46, 1]];
+// Blitze in der Ferne (x neben der Mitte)
+const DC_BLITZE = [-138, -96, -62, 66, 104, 146];
 const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], spielstand = {} }) {
   const zaehler = Math.max(0, ...besitzer.map(i => spielstand.doomCounters?.[i] || 0));
   const t = Math.min(1, zaehler / DC_MAX);
@@ -1038,39 +2114,69 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
   const asche = useMemo(() => ppZufall(ppFxN(18), () => ({
     x: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, glut: Math.random() < .5,
   })), []);
-  const zeiger = (cls, L, w, stil) => (
-    <i className={'dc-zeiger ' + cls} style={{
-      left: `calc(50% - ${(w + 2) / 2} * var(--px))`, top: ppArt(DC_MITTE_Y - L + 1),
-      width: ppArt(w + 2), height: ppArt(L), ...stil,
-    }} />
-  );
+  const raeder = useMemo(() => DC_RAEDER.slice(0, ppFxN(6)).map(([x, y, gross], i) => ({
+    x, y, gross, dreh: (gross ? 1.8 : 1.1) + Math.random() * .8, bob: 3 + Math.random() * 2.5,
+    delay: -Math.random() * 6, rueck: i % 2 === 1,
+  })), []);
+  const blitze = useMemo(() => DC_BLITZE.slice(0, ppFxN(6)).map((x, i) => ({
+    x, y: 18 + Math.random() * 8, bild: i % 3, dur: 7 + Math.random() * 9, delay: -Math.random() * 16,
+  })), []);
+  const kraehen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 6 + Math.random() * 26, dur: 22 + Math.random() * 16, delay: -Math.random() * 30, rtl: i % 2 === 0,
+  })), []);
+  const zeiger = (cls, stil) => {
+    const [bw, bh, zx, zy] = DC_ZEIGER[cls];
+    return (
+      <i className={'dc-zeiger ' + cls} style={{
+        left: ppArtX(-(zx + .5), 0), top: ppArt(DC_MITTE_Y - zy - .5), width: ppArt(bw), height: ppArt(bh),
+        transformOrigin: `${ppArt(zx + .5)} ${ppArt(zy + .5)}`, ...stil,
+      }} />
+    );
+  };
   return (
-    <PixelScene artH={100} bg="radial-gradient(ellipse 70% 85% at 50% 52%, #7a0c10 0%, #520709 32%, #2c0405 62%, #140102 100%)" className="doom-clock-overlay">
-      <div className="pp-pixel-layer dc-rauch" />
-      <div className="pp-pixel-layer dc-wolken" />
-      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
-      <PixelPiece src={DCL + 'clock.png'} w={90} style={{ top: ppArt(5), bottom: 'auto', height: ppArt(90) }} />
-      {[[0, -30], [30, 0], [0, 30], [-30, 0]].map(([dx, dy], i) => (
-        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4), animationDelay: (-i * .7) + 's' }} />
+    <PixelScene artH={100} bg="#1a0409" className="doom-clock-overlay">
+      <PixelBand src={DCL + 'sky.png'} />
+      {blitze.map((b, i) => (
+        <React.Fragment key={'b' + i}>
+          <i className="pp-area-dyn dc-blitzschein" style={{ left: ppArtX(b.x - 20, 0), top: ppArt(b.y - 6), animation: `dcBlitz ${b.dur.toFixed(2)}s linear ${b.delay.toFixed(2)}s infinite` }} />
+          <i className="pp-area-dyn dc-blitz" style={{ left: ppArtX(b.x - 5.5, 0), top: ppArt(b.y), backgroundPosition: `${b.bild * 50}% 0`, animation: `dcBlitz ${b.dur.toFixed(2)}s steps(1) ${b.delay.toFixed(2)}s infinite` }} />
+        </React.Fragment>
       ))}
-      {zeiger('std', 19, 3, { rotate: winkelStd + 'deg' })}
-      {zeiger('min', 28, 3, { rotate: winkelMin + 'deg' })}
-      {zeiger('sek', 33, 1, { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
+      <PixelBand src={DCL + 'clouds-far.png'} className="dc-ferne" />
+      {kraehen.map((k, i) => (
+        <div key={'k' + i} className="pp-area-dyn pp-quer" style={ppQuer(k.y, k.dur, k.delay, k.rtl)}>
+          <i className="dc-kraehe" style={{ '--bob': ppArt(2), animation: 'ppSprite2 .3s steps(1) infinite, ppBob 1.7s ease-in-out infinite alternate', scale: k.rtl ? '-1 1' : undefined }} />
+        </div>
+      ))}
+      {raeder.map((r, i) => (
+        <i key={'r' + i} className={'pp-area-dyn dc-rad' + (r.gross ? ' gross' : '')} style={{
+          left: ppArtX(r.x - (r.gross ? 6.5 : 4.5), 0), top: ppArt(r.y), '--bob': ppArt(3),
+          animation: `ppSprite3 ${r.dreh.toFixed(2)}s steps(1) infinite ${r.rueck ? 'reverse' : ''}, ppBob ${r.bob.toFixed(2)}s steps(3) ${r.delay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      <PixelBand src={DCL + 'clouds-near.png'} className="dc-nah" />
+      <PixelBand src={DCL + 'smoke.png'} className="dc-rauch" />
+      <i className="dc-puls" style={{ '--dc-t': t, animationDuration: (3.2 - 2.4 * t).toFixed(2) + 's' }} />
+      <PixelPiece src={DCL + 'clock.png'} w={91} />
+      <i className="dc-spirale" style={{ animationDuration: (7 - 5 * t).toFixed(2) + 's' }} />
+      {DC_SCHAEDEL.map(([dx, dy], i) => (
+        <i key={'g' + i} className="pp-area-dyn dc-glut" style={{ left: ppArtX(dx - 4, 0), top: ppArt(DC_MITTE_Y + dy - 4.5), animationDelay: (-i * .7) + 's' }} />
+      ))}
+      {zeiger('std', { rotate: winkelStd + 'deg' })}
+      {zeiger('min', { rotate: winkelMin + 'deg' })}
+      {zeiger('sek', { animation: `ppDrehen 60s steps(60) ${sek}s infinite` })}
       <i className="dc-kappe" style={{ left: ppArtX(-3.5, 0), top: ppArt(DC_MITTE_Y - 3.5) }} />
+      <PixelBand src={DCL + 'wisps.png'} className="dc-schwaden" />
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn dc-asche' + (a.glut ? ' glut' : '')} style={{ left: a.x + '%', animation: `dcAsche ${a.dur}s linear ${a.delay}s infinite` }} />
       ))}
-      <div className="dc-dim" />
+      <div className="pp-rand-dim" />
       <style>{`
-        .dc-rauch {
-          position: absolute; left: 0; right: 0; top: 0; height: calc(40 * var(--px));
-          background: url(${DCL}smoke.png) 0 0 / auto 100% repeat-x; animation: dcWolken 110s linear infinite reverse;
-        }
-        .dc-wolken {
-          position: absolute; left: 0; right: 0; top: calc(64 * var(--px)); height: calc(30 * var(--px));
-          background: url(${DCL}clouds.png) 0 0 / auto 100% repeat-x; animation: dcWolken 80s linear infinite;
-        }
         @keyframes dcWolken { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+        .dc-ferne { animation: dcWolken 300s steps(128) infinite; }
+        .dc-nah { animation: dcWolken 170s steps(128) infinite; }
+        .dc-rauch { animation: dcWolken 210s steps(128) infinite reverse; }
+        .dc-schwaden { animation: dcWolken 75s steps(128) infinite; }
         .dc-puls {
           position: absolute; left: calc(50% - 60 * var(--px)); top: calc(${DC_MITTE_Y} * var(--px) - 60 * var(--px));
           width: calc(120 * var(--px)); height: calc(120 * var(--px)); border-radius: 50%;
@@ -1083,7 +2189,14 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           30% { opacity: calc(.3 + .45 * var(--dc-t)); transform: scale(.98); }
           42% { opacity: calc(.4 + .55 * var(--dc-t)); transform: scale(1.02); }
         }
-        .dc-zeiger { position: absolute; transform-origin: 50% 100%; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
+        .dc-spirale {
+          position: absolute; left: calc(50% - 30.5 * var(--px)); top: calc(${DC_MITTE_Y - 30.5} * var(--px));
+          width: calc(61 * var(--px)); height: calc(61 * var(--px));
+          background: url(${DCL}spiral.png) 0 0 / calc(61 * var(--px)) calc(854 * var(--px)) no-repeat;
+          animation: dcSpirale 7s steps(14) infinite;
+        }
+        @keyframes dcSpirale { from { background-position: 0 0; } to { background-position: 0 calc(-854 * var(--px)); } }
+        .dc-zeiger { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; transition: rotate 1.4s cubic-bezier(.5, 0, .2, 1); }
         .dc-zeiger.std { background-image: url(${DCL}hand-hour.png); }
         .dc-zeiger.min { background-image: url(${DCL}hand-min.png); }
         .dc-zeiger.sek { background-image: url(${DCL}hand-sec.png); transition: none; }
@@ -1094,259 +2207,661 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
           animation: dcGlut 2.8s ease-in-out infinite alternate;
         }
         @keyframes dcGlut { from { opacity: .25; } to { opacity: 1; } }
+        .dc-blitz { position: absolute; width: calc(11 * var(--px)); height: calc(30 * var(--px)); background: url(${DCL}bolt.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
+        .dc-blitzschein {
+          position: absolute; width: calc(40 * var(--px)); height: calc(40 * var(--px)); opacity: 0;
+          background: radial-gradient(circle, rgba(255,120,80,.35) 0%, rgba(255,60,40,.12) 45%, rgba(255,40,20,0) 70%);
+        }
+        @keyframes dcBlitz { 0%, 90% { opacity: 0; } 91% { opacity: 1; } 92% { opacity: .15; } 93.5% { opacity: 1; } 96%, 100% { opacity: 0; } }
+        .dc-rad { position: absolute; width: calc(9 * var(--px)); height: calc(9 * var(--px)); background: url(${DCL}gear-s.png) 0 0 / 300% 100% no-repeat; }
+        .dc-rad.gross { width: calc(13 * var(--px)); height: calc(13 * var(--px)); background-image: url(${DCL}gear.png); }
+        .dc-kraehe { display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DCL}crow.png) 0 0 / 200% 100% no-repeat; }
         .dc-asche { position: absolute; top: calc(98 * var(--px)); width: var(--px); height: var(--px); background: #3a0a0a; opacity: 0; }
         .dc-asche.glut { background: #ff5a2a; }
         @keyframes dcAsche { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translate(calc(4 * var(--px)), calc(-64 * var(--px))); opacity: 0; } }
-        .dc-dim { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 50%, rgba(0,0,0,.45) 100%); }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── GRAVEYARD OF LIMITED POWER ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  GRAVEYARD OF LIMITED POWER — Friedhof im Kies (v1415, Kartenstil;
+//  Überarbeitung v1441 (Al 25.9.))
+//
 //  Karte: Kiesboden, rosa Grabsteine mit rotem Schein, dunkler Baum mit
-//  Laterne. Der rote Schein pulsiert, Seelen steigen aus den Graebern,
-//  Bodennebel zieht, die Laterne flackert.
+//  Laterne. Der rote Schein pulsiert, Seelen steigen aus den Gräbern,
+//  Bodennebel zieht, die Laterne flackert. Draufsicht leicht von vorn
+//  wie auf der Karte.
+//
+//  Überarbeitung v1441 (Al 25.9.: die neuen Szenen „haben ein anderes
+//  Level"): Kies aus einzelnen, schattierten Steinchen statt flachem
+//  Rauschen, Erdflecken, Unkraut, Laub, ein paar Knöchelchen. Die Gräber
+//  stehen versetzt statt im Raster, hinten kleiner, vorn größer:
+//  Rundbogensteine mit eingemeißeltem Kreuz und Inschriftstrichen,
+//  Steinkreuze, ein zerbrochener Stein mit abgebrochenem Stück daneben,
+//  ein hoher Spitzbogenstein; jeder auf einem Sockel mit Grabhügel davor,
+//  mit Schlagschatten, Rissen, Moos, Flechten und Grasbüscheln; rote
+//  Grablichter. Der Baum ist jetzt ein großer knorriger Baum mit Wurzeln,
+//  Astloch, dürren Zweigen und Schlagschatten; die Laterne hängt an einer
+//  Kette an seinem langen linken Ast und wirft einen warmen Lichtfleck
+//  auf den Kies. Licht IMMER oben rechts.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128 (Kies + zwölf Gräber); glow-a.png /
+//  glow-b.png — roter Schein zweier Gräbergruppen (pulsieren versetzt,
+//  die eingemeißelten Kreuze glühen mit); candles.png — Flammen der
+//  Grablichter (3 Bilder übereinander); tree.png — Baum, Stück 104,
+//  rechts neben der Mitte; tree-glow.png — Laternenschein; lantern.png
+//  (7×10), crow.png (10×8), soul.png (7×11) — je 3–4 Bilder
+//  nebeneinander; fog.png — Bodennebel, Kachel 128.
+//
+//  Animiert: der rote Schein pulsiert (zwei Gruppen im Wechsel), Seelen
+//  steigen schwankend aus den Gräbern und verblassen, rote Funken
+//  glimmen auf, Grablichter und Laterne flackern (mit Schein), Motten
+//  umschwirren die Laterne, eine Krähe im Baum dreht den Kopf und
+//  krächzt, dürre Blätter fallen, Bodennebel zieht in zwei Lagen.
+// ═══════════════════════════════════════════════════════════════════
 const GYD = '/areas/graveyard/';
-const GYD_GRAEBER = [[14, 18], [46, 44], [16, 70], [48, 88]];     // Kachel-Koordinaten
+const GYD_TREE_W = 104, GYD_TREE_X = 64;                 // Baum-Stück, Mitte neben der Brettmitte
+// Gräber in Kachel-Koordinaten: [Mitte x, Oberkante Stein, Sockel-Unterkante]
+const GYD_GRAEBER = [[34, 8, 22], [62, 3, 20], [88, 9, 23], [48, 31, 46], [80, 28, 47], [30, 60, 71],
+  [64, 53, 69], [98, 52, 72], [10, 79, 96], [46, 74, 95], [80, 80, 97], [114, 72, 94]];
+// Kachel-x → Kunstpixel neben der Brettmitte (Kachelmitte = Brettmitte), Wiederholung k
+const gydX = (x, k) => x - 64 + k * 128;
+const GYD_LATERNE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 27, y: 26 };   // Mitte, Oberkante
+const GYD_KRAEHE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 74, y: 6 };     // Mitte, Oberkante
 const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPowerOverlay() {
-  const seelen = useMemo(() => ppZufall(ppFxN(8), () => {
-    const [gx, gy] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
-    const k = Math.floor(Math.random() * 7) - 3;
-    return { x: gx - 32 + k * 64, y: gy - 10, dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7 };
+  const seelen = useMemo(() => ppZufall(ppFxN(9), () => {
+    const [gx, , gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
+    const k = Math.floor(Math.random() * 3) - 1;
+    return { x: gydX(gx, k), y: gb - 12, dur: 6 + Math.random() * 4, delay: -Math.random() * 10, bild: .5 + Math.random() * .3 };
   }), []);
+  const funken = useMemo(() => ppZufall(ppFxN(14), () => {
+    const [gx, gt, gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
+    const k = Math.floor(Math.random() * 5) - 2;
+    return {
+      x: gydX(gx, k) + Math.round((Math.random() - .5) * 12), y: gt + Math.round(Math.random() * (gb - gt)),
+      dx: Math.round((Math.random() - .5) * 4), dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
+    };
+  }), []);
+  const blaetter = useMemo(() => ppZufall(ppFxN(3), () => ({
+    x: GYD_TREE_X - 40 + Math.round(Math.random() * 80), y: 4 + Math.round(Math.random() * 18),
+    dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rot: Math.random() < .5,
+  })), []);
+  const motten = useMemo(() => ppZufall(ppFxN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
   return (
-    <PixelScene artH={100} bg="#484848" className="graveyard-overlay">
+    <PixelScene artH={100} bg="#322e2f" className="graveyard-overlay">
       <PixelBand src={GYD + 'tile.png'} />
-      <PixelBand src={GYD + 'tile-glow.png'} className="gyd-schein" />
-      <div className="pp-pixel-layer gyd-nebel" style={{ top: ppArt(36) }} />
-      {/* Baum rechts, Stamm in der freien Spalte der Grabkachel (Kachel-x 30:
-          x 62 neben der Mitte → (62 + 32) mod 64 = 30) — kein Grab darunter. */}
-      <PixelPiece src={GYD + 'tree.png'} w={40} x={62} />
-      <PixelPiece src={GYD + 'tree-glow.png'} w={40} x={62} className="gyd-laterne" />
+      <PixelBand src={GYD + 'glow-a.png'} className="gyd-schein" />
+      <PixelBand src={GYD + 'glow-b.png'} className="gyd-schein b" />
+      <PixelBand src={GYD + 'candles.png'} className="gyd-kerzen" style={{ backgroundSize: 'auto 300%' }} />
+      <div className="pp-pixel-layer gyd-nebel" style={{ top: ppArt(30) }} />
       {seelen.map((s, i) => (
-        <i key={i} className="pp-area-dyn gyd-seele" style={{ left: ppArtX(s.x - 2, 0), top: ppArt(s.y), animation: `ppSprite3 .5s steps(1) infinite, gydSteigen ${s.dur}s ease-out ${s.delay}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn gyd-seele" style={{
+          left: ppArtX(s.x - 3, 0), top: ppArt(s.y),
+          animation: `gydBild ${s.bild.toFixed(2)}s steps(1) infinite, gydSteigen ${s.dur.toFixed(2)}s steps(24) ${s.delay.toFixed(2)}s infinite`,
+        }} />
       ))}
-      <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(76) }} />
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn gyd-funke" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx),
+          animation: `gydFunke ${f.dur.toFixed(2)}s steps(10) ${f.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <PixelPiece src={GYD + 'tree.png'} w={GYD_TREE_W} x={GYD_TREE_X} />
+      <PixelPiece src={GYD + 'tree-glow.png'} w={GYD_TREE_W} x={GYD_TREE_X} className="gyd-laternenschein" />
+      <i className="gyd-laterne" style={{ left: ppArtX(GYD_LATERNE.x - 3, 0), top: ppArt(GYD_LATERNE.y) }} />
+      {motten.map((m, i) => (
+        <i key={'m' + i} className="pp-area-dyn gyd-motte" style={{
+          left: ppArtX(GYD_LATERNE.x, 0), top: ppArt(GYD_LATERNE.y + 4),
+          animation: `gydMotte ${m.dur.toFixed(2)}s steps(1) ${m.delay.toFixed(2)}s infinite${m.rev ? ' reverse' : ''}`,
+        }} />
+      ))}
+      <i className="gyd-kraehe" style={{ left: ppArtX(GYD_KRAEHE.x - 5, 0), top: ppArt(GYD_KRAEHE.y) }} />
+      {blaetter.map((b, i) => (
+        <i key={'b' + i} className={'pp-area-dyn gyd-blatt' + (b.rot ? ' rot' : '')} style={{
+          left: ppArtX(b.x, 0), top: ppArt(b.y),
+          animation: `gydFallen ${b.dur.toFixed(2)}s steps(40) ${b.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(72) }} />
       <div className="pp-rand-dim" />
       <style>{`
-        .gyd-schein { animation: gydPuls 3.2s ease-in-out infinite alternate; }
-        @keyframes gydPuls { from { opacity: .45; } to { opacity: 1; } }
-        .gyd-laterne { animation: gydFlackern 2.3s steps(1) infinite; }
-        @keyframes gydFlackern { 0% { opacity: 1; } 21% { opacity: .7; } 24% { opacity: 1; } 55% { opacity: .85; } 58% { opacity: .6; } 61% { opacity: 1; } }
-        .gyd-nebel {
-          position: absolute; left: 0; right: 0; height: calc(20 * var(--px));
-          background: url(${GYD}fog.png) 0 0 / auto 100% repeat-x; opacity: .7; animation: gydNebel 55s linear infinite;
+        .gyd-schein { animation: gydPuls 3.4s ease-in-out infinite alternate; }
+        .gyd-schein.b { animation-delay: -3.4s; }
+        @keyframes gydPuls { from { opacity: .35; } to { opacity: 1; } }
+        .gyd-kerzen { animation: gydKerze .9s steps(1) infinite; }
+        @keyframes gydKerze {
+          0% { background-position: 50% 0%; } 22% { background-position: 50% 50%; } 38% { background-position: 50% 0%; }
+          55% { background-position: 50% 100%; } 72% { background-position: 50% 50%; } 86% { background-position: 50% 100%; }
         }
-        .gyd-nebel.b { animation-duration: 80s; animation-direction: reverse; opacity: .5; }
-        @keyframes gydNebel { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        .gyd-seele { position: absolute; width: calc(4 * var(--px)); height: calc(5 * var(--px)); background: url(${GYD}wisp.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
-        @keyframes gydSteigen { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: .9; } 100% { transform: translateY(calc(-14 * var(--px))); opacity: 0; } }
+        .gyd-laternenschein { animation: gydFlackern 2.3s steps(1) infinite; }
+        @keyframes gydFlackern { 0% { opacity: 1; } 21% { opacity: .72; } 24% { opacity: 1; } 55% { opacity: .86; } 58% { opacity: .6; } 61% { opacity: .95; } 80% { opacity: .8; } 83% { opacity: 1; } }
+        .gyd-laterne {
+          position: absolute; width: calc(7 * var(--px)); height: calc(10 * var(--px));
+          background: url(${GYD}lantern.png) 0 0 / 300% 100% no-repeat;
+          animation: gydLaterne 1.15s steps(1) infinite;
+        }
+        @keyframes gydLaterne { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 42% { background-position: 0 0; } 70% { background-position: 100% 0; } 84% { background-position: 50% 0; } }
+        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #d8cdb8; }
+        @keyframes gydMotte {
+          0% { transform: translate(calc(4 * var(--px)), calc(-2 * var(--px))); }
+          12% { transform: translate(calc(5 * var(--px)), calc(1 * var(--px))); }
+          25% { transform: translate(calc(3 * var(--px)), calc(4 * var(--px))); }
+          37% { transform: translate(calc(-1 * var(--px)), calc(5 * var(--px))); }
+          50% { transform: translate(calc(-5 * var(--px)), calc(3 * var(--px))); }
+          62% { transform: translate(calc(-6 * var(--px)), calc(0 * var(--px))); }
+          75% { transform: translate(calc(-4 * var(--px)), calc(-3 * var(--px))); }
+          87% { transform: translate(calc(0 * var(--px)), calc(-4 * var(--px))); }
+        }
+        .gyd-kraehe {
+          position: absolute; width: calc(10 * var(--px)); height: calc(8 * var(--px));
+          background: url(${GYD}crow.png) 0 0 / 300% 100% no-repeat;
+          animation: gydKraehe 9s steps(1) infinite;
+        }
+        @keyframes gydKraehe {
+          0%, 38% { background-position: 0 0; } 40%, 52% { background-position: 50% 0; } 54%, 70% { background-position: 0 0; }
+          72%, 74% { background-position: 100% 0; } 76%, 78% { background-position: 0 0; } 80%, 82% { background-position: 100% 0; }
+          84%, 100% { background-position: 0 0; }
+        }
+        .gyd-nebel {
+          position: absolute; left: 0; right: 0; height: calc(24 * var(--px));
+          background: url(${GYD}fog.png) 0 0 / auto 100% repeat-x; opacity: .75;
+          animation: gydNebel 64s steps(128) infinite;
+        }
+        .gyd-nebel.b { animation-duration: 92s; animation-direction: reverse; opacity: .6; }
+        @keyframes gydNebel { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+        .gyd-seele { position: absolute; width: calc(7 * var(--px)); height: calc(11 * var(--px)); background: url(${GYD}soul.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes gydBild { 0% { background-position: 0 0; } 25% { background-position: 33.333% 0; } 50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; } }
+        @keyframes gydSteigen {
+          0% { transform: translate(0, 0); opacity: 0; }
+          15% { opacity: .85; }
+          30% { transform: translate(var(--px), calc(-7 * var(--px))); }
+          55% { transform: translate(calc(-1 * var(--px)), calc(-13 * var(--px))); opacity: .7; }
+          80% { transform: translate(var(--px), calc(-19 * var(--px))); }
+          100% { transform: translate(0, calc(-24 * var(--px))); opacity: 0; }
+        }
+        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5060; opacity: 0; }
+        @keyframes gydFunke {
+          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 50% { opacity: .4; } 70% { opacity: .8; }
+          100% { transform: translate(var(--dx), calc(-10 * var(--px))); opacity: 0; }
+        }
+        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #5a2620; box-shadow: var(--px) 0 0 #7c3a26; opacity: 0; }
+        .gyd-blatt.rot { background: #6a2c22; box-shadow: var(--px) 0 0 #3c1a17; }
+        @keyframes gydFallen {
+          0% { transform: translate(0, 0); opacity: 0; } 2% { opacity: 1; }
+          10% { transform: translate(calc(2 * var(--px)), calc(6 * var(--px))); }
+          20% { transform: translate(calc(-1 * var(--px)), calc(13 * var(--px))); }
+          30% { transform: translate(calc(2 * var(--px)), calc(20 * var(--px))); }
+          40% { transform: translate(0, calc(27 * var(--px))); opacity: 1; }
+          55% { transform: translate(0, calc(27 * var(--px))); opacity: 0; }
+          100% { transform: translate(0, calc(27 * var(--px))); opacity: 0; }
+        }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── PARASEED GREENHOUSE ──────────────────────────────────────────────
-//  Karte: Gewaechshaus mit grauen, diagonal gestreiften Glasscheiben, ein
-//  Pflanztrog voll wucherndem Fleisch mit grellbunten Blueten. Als
-//  frueherer Wunsch (5.9.): „grellbunte Blumen, die ungesund und abartig
+// ═══════════════════════════════════════════════════════════════════
+//  PARASEED GREENHOUSE — Gewächshaus mit Fleischbeet (v1415, Kartenstil)
+//  Überarbeitung v1441 (Al 25.9.)
+//
+//  Karte: Gewächshaus mit grauen, diagonal gestreiften Glasscheiben, ein
+//  Pflanztrog voll wucherndem Fleisch mit grellbunten Blüten. Als
+//  früherer Wunsch (5.9.): „grellbunte Blumen, die ungesund und abartig
 //  wirken".
-//  v1428 (Al 25.9.): Schattengestalten raus, dafuer mehr Detail: Stahl-
-//  rahmen mit Nieten und Dachrinne, Scheiben mit trueben Pflanzen
+//  v1428 (Al 25.9.): Schattengestalten raus, dafür mehr Detail: Stahl-
+//  rahmen mit Nieten und Dachrinne, Scheiben mit trüben Pflanzen
 //  dahinter, Kondenstropfen und einem Sprung, Kletterranken mit
-//  Saugnaepfen, Fleischerde mit Adern, pochenden Pusteln und Knochen-
+//  Saugnäpfen, Fleischerde mit Adern, pochenden Pusteln und Knochen-
 //  splittern, Trogfront mit Rippen, Rost und Schildchen.
 //  v1429 (Al 25.9.: „die Pflanze mit dem Auge passt gar nicht", Pflanzen
-//  brauchen mehr Detail): grosse Bluetenkoepfe mit einzelnen Blaettern
-//  (Tulpe, Glocke mit Staubgefaessen, Stachelbluete mit Samenkern), breite
-//  Blaetter mit Mittelrippe, Stiele mit Knoten und Dornen. In der Mitte
-//  statt der Augenbluete ein wucherndes Samengewaechs: klumpige, geaederte
-//  Fleischkapsel, aufgeplatzt, Samen gluehen giftgruen durch, Ranken an
-//  der Spitze, Schleim tropft. Licht IMMER oben rechts. Animiert: Blueten
-//  wiegen einzeln und versetzt (8 Bilder, v1430), Pusteln pochen, Samen gluehen, Schleim tropft, Tropfen laufen
-//  am Glas herab, Sporen steigen.
+//  brauchen mehr Detail): große Blütenköpfe mit einzelnen Blättern
+//  (Tulpe, Glocke mit Staubgefäßen, Stachelblüte mit Samenkern), breite
+//  Blätter mit Mittelrippe, Stiele mit Knoten und Dornen. In der Mitte
+//  statt der Augenblüte ein wucherndes Samengewächs: klumpige, geäderte
+//  Fleischkapsel, aufgeplatzt, Samen glühen giftgrün durch, Ranken an
+//  der Spitze, Schleim tropft.
+//  v1430 (Al 25.9.: „die Pflanzen bewegen sich alle perfekt im Takt",
+//  mehr als zwei Bilder): jede Blume ist ein EIGENES Element mit eigenem
+//  Bildband (8 Bilder: Mitte → rechts → Mitte → links, Stiel biegt sich
+//  von unten nach oben) und eigener, zufälliger Dauer und Phase.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  dieselbe Szene, neu gemalt und mit Tiefe. Kachel 128 statt 64 (vier
+//  verschiedene Scheibenspalten statt einer), das Fleisch in zwei Reihen
+//  schattierter, nasser Wülste mit Blutergüssen, Adern, Pusteln,
+//  Knochensplittern, Maden und einer Zahnreihe; die Blumen wurzeln
+//  ZWISCHEN den Reihen und stehen nicht mehr im Raster, sondern werden je
+//  Spiel verstreut (zehn Sorten: Tulpen, Glocken mit Staubgefäßen,
+//  Stachelblüten mit Samenkern, Fleischtrauben mit Schlitzen, Schlund-
+//  blüten mit Zähnen — grellbunt, fleckig). Die Kapsel ist größer, atmet
+//  und hat Wurzeln, die übers Beet kriechen.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128: Dachscheiben, Traufbalken mit Nieten
+//  und Rinne, Bewässerungsrohr mit Düsen und Handrad, Glaswand (trübe
+//  Pflanzen dahinter, Streifen, Kondensat, Laufspuren, Schmutz und Moos
+//  unten, Sprung mit Loch, Klebeband, gekippte Lüftungsklappe), Stahl-
+//  rahmen mit Knotenblechen und Rost, Kletterranken mit Saugnäpfen,
+//  hinterer Trogrand, hintere Fleischwülste mit Knospen; shafts.png —
+//  Sonnenstrahlen durchs Glas; bloom.png — Blumen (8 Bilder × 10 Sorten,
+//  Zelle 26×46); front.png — vordere Wülste, über den Rand hängendes
+//  Fleisch und Schleimfäden, Trogrand mit Nieten, Rippenblech mit Laschen,
+//  Rost, zwei Schildchen und einem Riss, durch den Fleisch quillt,
+//  Fliesenboden mit Blut- und Schleimlache; tile-glow/front-glow.png —
+//  Pusteln; pod.png — Samengewächs 64 breit (3 Bilder übereinander);
+//  pod-glow.png — Samen; haze.png — fauliger Dunst (Kachel 128×26);
+//  drop.png, fly.png, slug.png.
+//
+//  Animiert: Blumen wiegen einzeln (8 Bilder, eigene Dauer/Phase), die
+//  Kapsel atmet, Samen glühen, Schleim tropft aus dem Riss, Pusteln
+//  pochen, Wasser tropft aus den Düsen, Kondenstropfen laufen am Glas
+//  herab, Sonnenstrahlen wandern (Wolken), fauliger Dunst zieht übers
+//  Beet, Fleischfliegen schwirren
+//  übers Beet, eine Nacktschnecke kriecht am Glas, Sporen steigen.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const PSG = '/areas/paraseed-greenhouse/';
-// Scheiben der Kachel (x-Bereiche), in denen Tropfen laufen duerfen.
-const PSG_SCHEIBEN = [[3, 29], [35, 61]];
-// v1430 (Al 25.9.: „die Pflanzen bewegen sich alle perfekt im Takt",
-// mehr als zwei Bilder): jede Blume ist ein EIGENES Element mit eigenem
-// Bildband (8 Bilder: Mitte → rechts → Mitte → links, Stiel biegt sich
-// von unten nach oben) und eigener, zufaelliger Dauer und Phase.
-// Plaetze je 64er-Kachel wie im Generator; Fuss bei Kunst-y 69.
-const PSG_PFLANZEN_X = [8, 24, 40, 55];
-const PSG_PFLANZE = { w: 28, h: 34, fussX: 13, top: 37, bilder: 8 };
+const PSG_KACHEL = 128;
+// Scheiben der Kachel (x-Bereiche, Kachel-x) und Scheibenreihen (y-Bereiche).
+const PSG_SCHEIBEN = [[3, 29], [35, 61], [67, 93], [99, 125]];
+const PSG_REIHEN = [[11, 24], [32, 43], [51, 62]];
+// Düsen des Bewässerungsrohrs (Kachel-x), Wasser fällt bis ins Beet.
+const PSG_DUESEN = [44, 108];
+// Blumen: Zelle 26×46, Fuß bei (12, 45), 8 Bilder, 10 Sorten (Zeilen).
+const PSG_BLUME = { w: 26, h: 46, fussX: 12, fussY: 45, bilder: 8, sorten: 10 };
+const PSG_POD_W = 64;
 const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay() {
-  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, dur: 6 + Math.random() * 5, delay: -Math.random() * 10, farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
-  })), []);
-  const pflanzen = useMemo(() => {
+  // Blumen verstreut (nicht im Raster), die Kapsel in der Mitte frei lassen
+  const blumen = useMemo(() => {
     const out = [];
-    for (let k = -4; k <= 4; k++) {
-      PSG_PFLANZEN_X.forEach((px, art) => out.push({
-        x: px - 32 + k * 64, art,
-        dur: 2.2 + Math.random() * 1.6, delay: -Math.random() * 4,
-      }));
+    let letzte = -1;
+    for (let x = -262 + Math.random() * 6; x < 262; x += 10 + Math.random() * 8) {
+      if (Math.abs(x) < 19) continue;
+      let sorte;
+      do { sorte = Math.floor(Math.random() * PSG_BLUME.sorten); } while (sorte === letzte);
+      letzte = sorte;
+      out.push({
+        x: Math.round(x), fuss: 76 + Math.floor(Math.random() * 5), sorte,
+        dur: 2.4 + Math.random() * 1.8, delay: -Math.random() * 4,
+      });
     }
     return out;
   }, []);
-  const tropfen = useMemo(() => ppZufall(ppFxN(6), () => {
-    const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 2)];
-    const k = Math.floor(Math.random() * 7) - 3;
-    return { x: a + Math.random() * (e - a) - 32 + k * 64, y: 5 + Math.random() * 20, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
+  const tropfen = useMemo(() => ppZufall(ppFxN(8), () => {
+    const [a, e] = PSG_SCHEIBEN[Math.floor(Math.random() * 4)];
+    const [r0, r1] = PSG_REIHEN[Math.floor(Math.random() * 3)];
+    const k = Math.floor(Math.random() * 5) - 2;
+    const y = r0 + Math.random() * (r1 - r0 - 5);
+    return {
+      x: Math.round(a + 1 + Math.random() * (e - a - 3)) - PSG_KACHEL / 2 + k * PSG_KACHEL, y: Math.round(y),
+      fall: Math.max(3, Math.round(r1 - y - 2)), dur: 6 + Math.random() * 7, delay: -Math.random() * 13,
+    };
   }), []);
+  const duesen = useMemo(() => {
+    const out = [];
+    for (let k = -2; k <= 2; k++) PSG_DUESEN.forEach((x) => out.push({ x: x - PSG_KACHEL / 2 + k * PSG_KACHEL, dur: 2.6 + Math.random() * 2.4, delay: -Math.random() * 4 }));
+    return out.slice(0, ppFxN(out.length));
+  }, []);
+  const fliegen = useMemo(() => ppZufall(ppFxN(4), () => ({
+    x: Math.round((Math.random() - .5) * 220), y: 58 + Math.round(Math.random() * 10),
+    dur: 3.5 + Math.random() * 3, delay: -Math.random() * 6, rtl: Math.random() < .5,
+  })), []);
+  const schnecke = useMemo(() => ppZufall(Math.min(1, ppFxN(1)), () => ({
+    y: 55 + Math.floor(Math.random() * 4), dur: 260 + Math.random() * 80, delay: -Math.random() * 260,
+  })), []);
+  const sporen = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.random() * 100, y: 66 + Math.round(Math.random() * 8), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
+    farbe: Math.random() < .5 ? '#c9ff2f' : '#ff6ad5',
+  })), []);
+  const B = PSG_BLUME;
   return (
     <PixelScene artH={100} bg="#7c807a" className="paraseed-greenhouse-overlay">
       <PixelBand src={PSG + 'tile.png'} />
       <PixelBand src={PSG + 'tile-glow.png'} className="psg-pochen" />
-      <PixelBand src={PSG + 'glass.png'} />
+      <PixelBand src={PSG + 'shafts.png'} className="psg-strahlen" />
       {tropfen.map((t, i) => (
-        <i key={'t' + i} className="pp-area-dyn psg-tropfen" style={{ left: ppArtX(t.x, 0), top: ppArt(t.y), animation: `psgTropfen ${t.dur}s ease-in ${t.delay}s infinite` }} />
-      ))}
-      {pflanzen.map((p, i) => (
-        <i key={'p' + i} className="psg-pflanze" style={{
-          left: ppArtX(p.x - PSG_PFLANZE.fussX, 0), top: ppArt(PSG_PFLANZE.top),
-          backgroundImage: `url(${PSG}plant-${p.art}.png)`,
-          animation: `psgWiegen ${p.dur.toFixed(2)}s steps(${PSG_PFLANZE.bilder}) ${p.delay.toFixed(2)}s infinite`,
+        <i key={'t' + i} className="pp-area-dyn psg-tropfen" style={{
+          left: ppArtX(t.x, 0), top: ppArt(t.y), '--fall': ppArt(t.fall),
+          animation: `psgTropfen ${t.dur.toFixed(2)}s steps(${t.fall * 2}) ${t.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      <PixelPiece src={PSG + 'pod.png'} w={40} />
-      <PixelPiece src={PSG + 'pod-glow.png'} w={40} className="psg-samen" />
+      {schnecke.map((s, i) => (
+        <div key={'n' + i} className="pp-area-dyn pp-quer" style={{ top: ppArt(s.y), animation: `ppQuerRtl ${s.dur.toFixed(0)}s linear ${s.delay.toFixed(0)}s infinite` }}>
+          <i className="psg-schnecke" />
+        </div>
+      ))}
+      {duesen.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn pp-px-tropfen" style={{
+          left: ppArtX(d.x, 0), top: ppArt(18), '--fall': ppArt(42),
+          '--tropfen': '#c4d0cc', '--tropfen-dunkel': '#7e8a86',
+          animation: `ppPxTropfen ${d.dur.toFixed(2)}s ease-in ${d.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {blumen.map((b, i) => (
+        <i key={'b' + i} className="psg-blume" style={{
+          left: ppArtX(b.x - B.fussX, 0), top: ppArt(b.fuss - B.fussY),
+          backgroundPositionY: `${(b.sorte / (B.sorten - 1)) * 100}%`,
+          animation: `psgWiegen ${b.dur.toFixed(2)}s steps(${B.bilder}) ${b.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer psg-dunst" style={{ top: ppArt(52) }} />
+      <PixelBand src={PSG + 'front.png'} />
+      <PixelBand src={PSG + 'front-glow.png'} className="psg-pochen b" />
+      <PixelPiece src={PSG + 'pod.png'} w={PSG_POD_W} className="psg-atmen" style={{ backgroundSize: '100% 300%' }} />
+      <PixelPiece src={PSG + 'pod-glow.png'} w={PSG_POD_W} className="psg-samen" />
       <i className="pp-area-dyn pp-px-tropfen" style={{
-        left: ppArtX(3, 0), top: ppArt(38), '--fall': ppArt(25),
+        left: ppArtX(-1, 0), top: ppArt(56), '--fall': ppArt(18),
         '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
         animation: 'ppPxTropfen 4.6s ease-in -1.2s infinite',
       }} />
+      <i className="pp-area-dyn pp-px-tropfen" style={{
+        left: ppArtX(1, 0), top: ppArt(51), '--fall': ppArt(22),
+        '--tropfen': '#b6f25a', '--tropfen-dunkel': '#5c8a1c',
+        animation: 'ppPxTropfen 6.1s ease-in -3.9s infinite',
+      }} />
+      <div className="pp-pixel-layer psg-dunst b" style={{ top: ppArt(64) }} />
+      {fliegen.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn psg-fliege" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), transform: f.rtl ? 'scaleX(-1)' : undefined,
+          animation: `ppSprite2 .12s steps(1) infinite, ${f.rtl ? 'psgSchwirrenB' : 'psgSchwirren'} ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
       {sporen.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn psg-spore" style={{ left: s.x + '%', background: s.farbe, animation: `psgSpore ${s.dur}s linear ${s.delay}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn psg-spore" style={{
+          left: s.x + '%', top: ppArt(s.y), background: s.farbe,
+          animation: `psgSpore ${s.dur.toFixed(2)}s steps(40) ${s.delay.toFixed(2)}s infinite`,
+        }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .psg-pflanze {
-          position: absolute; width: calc(${PSG_PFLANZE.w} * var(--px)); height: calc(${PSG_PFLANZE.h} * var(--px));
-          background-size: ${PSG_PFLANZE.bilder * 100}% 100%; background-repeat: no-repeat; background-position: 0 0;
+        .psg-blume {
+          position: absolute; width: calc(${B.w} * var(--px)); height: calc(${B.h} * var(--px));
+          background: url(${PSG}bloom.png) 0 0 / ${B.bilder * 100}% ${B.sorten * 100}% no-repeat;
         }
-        @keyframes psgWiegen { from { background-position: 0 0; } to { background-position: calc(-${PSG_PFLANZE.w * PSG_PFLANZE.bilder} * var(--px)) 0; } }
+        @keyframes psgWiegen { from { background-position-x: 0; } to { background-position-x: calc(-${B.w * B.bilder} * var(--px)); } }
         .psg-pochen { animation: psgPochen 1.9s ease-in-out infinite; }
-        @keyframes psgPochen { 0%, 100% { opacity: .35; } 18% { opacity: 1; } 32% { opacity: .55; } 44% { opacity: .9; } }
+        .psg-pochen.b { animation-delay: -.7s; animation-duration: 2.3s; }
+        @keyframes psgPochen { 0%, 100% { opacity: .3; } 18% { opacity: 1; } 32% { opacity: .5; } 44% { opacity: .9; } }
+        .psg-strahlen { animation: psgStrahlen 17s ease-in-out infinite; }
+        @keyframes psgStrahlen { 0%, 100% { opacity: .9; } 30% { opacity: .35; } 45% { opacity: .15; } 60% { opacity: .6; } 80% { opacity: 1; } }
+        .psg-atmen { animation: psgAtmen 3.8s steps(1) infinite; }
+        @keyframes psgAtmen {
+          0% { background-position: 0 0%; } 30% { background-position: 0 50%; } 45% { background-position: 0 100%; }
+          70% { background-position: 0 50%; } 85% { background-position: 0 0%; }
+        }
+        .psg-samen { animation: psgSamen 2.6s ease-in-out infinite alternate; }
+        @keyframes psgSamen { from { opacity: .3; } to { opacity: 1; } }
         .psg-tropfen {
           position: absolute; width: calc(2 * var(--px)); height: calc(3 * var(--px));
           background: url(${PSG}drop.png) 0 0 / 100% 100% no-repeat; opacity: 0;
         }
         @keyframes psgTropfen {
-          0% { transform: translateY(0); opacity: 0; } 8% { opacity: 1; }
-          40% { transform: translateY(calc(6 * var(--px))); }
-          55% { transform: translateY(calc(8 * var(--px))); }
-          92% { opacity: 1; } 100% { transform: translateY(calc(34 * var(--px))); opacity: 0; }
+          0% { transform: translateY(0); opacity: 0; } 6% { opacity: 1; }
+          45% { transform: translateY(calc(var(--fall) * .15)); }
+          60% { transform: translateY(calc(var(--fall) * .25)); }
+          94% { opacity: 1; } 100% { transform: translateY(var(--fall)); opacity: 0; }
         }
-        .psg-samen { animation: psgSamen 2.6s ease-in-out infinite alternate; }
-        @keyframes psgSamen { from { opacity: .35; } to { opacity: 1; } }
-        .psg-spore { position: absolute; top: calc(66 * var(--px)); width: var(--px); height: var(--px); opacity: 0; }
-        @keyframes psgSpore { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: .9; } 50% { transform: translate(calc(3 * var(--px)), calc(-30 * var(--px))); } 100% { transform: translate(calc(-2 * var(--px)), calc(-62 * var(--px))); opacity: 0; } }
+        .psg-schnecke {
+          display: block; width: calc(7 * var(--px)); height: calc(4 * var(--px));
+          background: url(${PSG}slug.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 1.6s steps(1) infinite;
+        }
+        .psg-fliege {
+          position: absolute; width: calc(3 * var(--px)); height: calc(3 * var(--px));
+          background: url(${PSG}fly.png) 0 0 / 200% 100% no-repeat;
+        }
+        @keyframes psgSchwirren {
+          0% { translate: 0 0; } 10% { translate: calc(3 * var(--px)) calc(-2 * var(--px)); } 20% { translate: calc(6 * var(--px)) calc(-1 * var(--px)); }
+          30% { translate: calc(8 * var(--px)) calc(-4 * var(--px)); } 40% { translate: calc(5 * var(--px)) calc(-6 * var(--px)); }
+          50% { translate: calc(2 * var(--px)) calc(-5 * var(--px)); } 60% { translate: calc(-2 * var(--px)) calc(-3 * var(--px)); }
+          70% { translate: calc(-5 * var(--px)) calc(-4 * var(--px)); } 80% { translate: calc(-4 * var(--px)) calc(-1 * var(--px)); }
+          90% { translate: calc(-1 * var(--px)) calc(1 * var(--px)); } 100% { translate: 0 0; }
+        }
+        @keyframes psgSchwirrenB {
+          0% { translate: 0 0; } 12% { translate: calc(-2 * var(--px)) calc(-3 * var(--px)); } 25% { translate: calc(2 * var(--px)) calc(-6 * var(--px)); }
+          37% { translate: calc(6 * var(--px)) calc(-5 * var(--px)); } 50% { translate: calc(7 * var(--px)) calc(-2 * var(--px)); }
+          62% { translate: calc(4 * var(--px)) 0; } 75% { translate: calc(1 * var(--px)) calc(-2 * var(--px)); }
+          87% { translate: calc(-3 * var(--px)) calc(-1 * var(--px)); } 100% { translate: 0 0; }
+        }
+        .psg-dunst {
+          position: absolute; left: 0; right: 0; height: calc(26 * var(--px));
+          background: url(${PSG}haze.png) 0 0 / auto 100% repeat-x; opacity: .8; animation: psgDunst 70s steps(128) infinite;
+        }
+        .psg-dunst.b { opacity: .55; animation-duration: 95s; animation-direction: reverse; }
+        @keyframes psgDunst { from { background-position: 0 0; } to { background-position: calc(${PSG_KACHEL} * var(--px)) 0; } }
+        .psg-spore { position: absolute; width: var(--px); height: var(--px); opacity: 0; }
+        @keyframes psgSpore {
+          0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: .9; }
+          50% { transform: translate(calc(3 * var(--px)), calc(-28 * var(--px))); }
+          100% { transform: translate(calc(-2 * var(--px)), calc(-58 * var(--px))); opacity: 0; }
+        }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── RIOTING VILLAGE ──────────────────────────────────────────────────
-//  Neubau v1431 (Al 25.9.): Das rote Auge ist NICHT an die Wand gemalt —
-//  es gehoert einer Schattengestalt, die aus einem Eingang schaut. Die
-//  Mauern haben Risse, Scherben und Truemmer liegen herum, es brennt.
-//  Kachel: Bruchsteinmauer mit Rissen und Loechern, ein zerbrochenes und
-//  ein brennendes Fenster (Russ darueber), Schutt, Planken, Scherben,
-//  Trampelpfad, ein verkohlter Truemmerhaufen. Mitte: Steinbogen-Eingang,
-//  der Tuerfluegel aus der Angel gerissen, darin die Kapuzengestalt mit
-//  Feuerschein-Kante; ihr Auge schaut umher und blinzelt. Brandherde
-//  lodern (eigene Flammenbilder), Rauch und Funken steigen, der
-//  Feuerschein flackert. Licht IMMER oben rechts.
-//  v1432 (Al 25.9.: „die Fenster haben nur 2 Modi, die Feuer am Boden
-//  sind perfekt gleichmaessig"): Kachel 192 breit (drei Hausabschnitte,
-//  leicht verschiedene Steintoene) mit sechs Fensterzustaenden —
-//  zerbrochen, brennend, vernagelt, heil und dunkel, Fensterladen
-//  haengt schief, herausgebrochenes Mauerloch mit Schutt. Truemmer,
-//  Planken und Scherben liegen zufaellig. Die Bodenfeuer stehen NICHT
-//  mehr in der Kachel: jedes Spiel wuerfelt Anzahl, Lage und Groesse
-//  (drei Flammengroessen, jede mit eigenem verkohlten Haufen und Schein).
+// ═══════════════════════════════════════════════════════════════════
+//  RIOTING VILLAGE — Überarbeitung v1441 (Al 25.9.)
+//
+//  Karte: graue Bruchsteinmauer, dunkler Eingang, darin ein rotes Auge,
+//  staubiger Trampelpfad auf grauem Grund. Ein Dorf im Aufruhr.
+//
+//  Als Vorgaben (bleiben):
+//  • Neubau v1431: Das rote Auge ist NICHT an die Wand gemalt — es gehört
+//    einer Schattengestalt, die aus einem Eingang schaut; das Auge schaut
+//    umher und blinzelt. Die Mauern haben Risse, Scherben und Trümmer
+//    liegen herum, es brennt (Brandherde, Rauch, Funken, Feuerschein).
+//  • v1432 („die Fenster haben nur 2 Modi, die Feuer am Boden sind perfekt
+//    gleichmäßig"): Kachel 192 breit, drei Hausabschnitte in leicht
+//    verschiedenen Steintönen, sechs Fensterzustände — zerbrochen,
+//    brennend, vernagelt, heil und dunkel, Fensterladen hängt schief,
+//    herausgebrochenes Mauerloch mit Schutt. Trümmer, Planken und Scherben
+//    liegen ZUFÄLLIG. Die Bodenfeuer stehen NICHT in der Kachel: jedes
+//    Spiel würfelt Anzahl, Lage und Größe (drei Flammengrößen, jede mit
+//    eigenem verkohlten Haufen und Schein).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): statt
+//  einer flachen Wand jetzt eine Häuserzeile mit Dächern und Tiefe.
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt liegt):
+//  sky.png — Kachel 128: verrauchter Nachthimmel, von unten rot angeleuchtet,
+//  ferne Dachsilhouetten mit Kirchturm und fernen Bränden (sky-glow.png
+//  flackert); haze.png — Rauchschwaden, ziehen langsam nach links;
+//  tile.png — Kachel 192: Stroh-Walmdach mit Brandloch, Giebelhaus mit
+//  Ziegeln und Fachwerk (vernagelte Tür, Fackelhalter), Schieferhaus mit
+//  aufgerissenem Dach, Esse und angelehnter Leiter; Bruchsteinmauern mit
+//  Rissen und Ruß, die sechs Fensterzustände, Gassen, Pflaster, Straße mit
+//  Spurrillen, Pfütze, Fass, Kisten, Bretter, Wagenrad (tile-glow.png:
+//  Feuerschein, flackert); house.png — Mittelstück 76: Treppengiebelhaus
+//  mit Rundbogen-Eingang, die Tür aus der Angel gerissen, darin die
+//  Kapuzengestalt mit Feuerschein-Kante (von der Fackel daneben), oben ein
+//  zerbrochenes Fenster mit herauswehendem Vorhang und eins mit Brand
+//  dahinter, schiefe Wetterfahne, Stufen, Schutt (house-glow.png).
+//  Sprites: eye (5), sign (4), shutter (3), fire-s/m/l (6) + heap-s/m/l,
+//  fire-win (6), fire-roof (6), torch (4), smoke (8), puff (4),
+//  debris (10 Varianten), rioter (2 Figuren × 2 Richtungen × 4 Bilder).
+//
+//  Animiert: Bodenfeuer (zufällig) mit Glut, Schein und Rauchwölkchen,
+//  Fensterflammen schlagen heraus, das Strohdach brennt, eine Rauchsäule
+//  quillt, Fackeln flackern, Funken steigen, Asche rieselt, Rauch zieht,
+//  ferne Brände glimmen, der Fensterladen und das Wirtshausschild
+//  schaukeln, Aufrührer mit Fackel und Mistgabel ziehen an den Häusern
+//  vorbei (HINTER dem Mittelhaus), das Auge schaut umher und blinzelt.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const RVG = '/areas/rioting-village/';
-const RVG_TUER_W = 56;
+const RVG_HAUS_W = 76;
 const RVG_KACHEL = 192;
-// brennende Fenster der Kachel: Mitte x (neben Kachelmitte 96), Flammen-Oberkante
-const RVG_FENSTERFEUER = [{ x: 33 - 96, y: 16 }, { x: 157.5 - 96, y: 16 }];
-const RVG_FEUER = { s: { w: 7, h: 9 }, m: { w: 9, h: 12 }, l: { w: 12, h: 16 } };
+// Positionen in der Kachel (Kunstpixel neben der Kachelmitte 96) — vom Generator
+const RVG_FENSTERFEUER = [{ x: 45.5 - 96, y: 35 }, { x: 168.5 - 96, y: 34 }];   // Fenster-Oberkante
+const RVG_DACHFEUER = [{ x: 42 - 96, y: 23 }];                                 // Unterkante Flammen
+const RVG_FACKELN = [{ x: 107.5 - 96, y: 41 }];                                // Fackel-Fuß
+const RVG_LADEN = { x: 127 - 96, y: 34 };                                       // Ladenbild oben links
+// Mittelhaus (Stück-x → Brett-x: x - 38)
+const RVG_AUGE = { x: 32.5 - 38, y: 46 };
+const RVG_SCHILD = { x: 50 - 38, y: 45 };
+const RVG_HAUSFACKEL = { x: 52.5 - 38, y: 49 };
+const RVG_FEUER = { s: { w: 8, h: 10, hh: 4 }, m: { w: 10, h: 13, hh: 4 }, l: { w: 13, h: 17, hh: 5 } };
+const RVG_BILDER = 6;
 const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
-  const feuer = useMemo(() => {
-    const out = [];
-    // Bodenfeuer: zufaellig verteilt, mit Mindestabstand, drei Groessen
-    const n = ppFxN(7);
-    for (let tries = 0; out.length < n && tries < 200; tries++) {
-      const x = (Math.random() - .5) * 280, fuss = 70 + Math.random() * 26;
-      if (Math.abs(x) < 16 && fuss < 72) continue;                    // nicht in den Eingang
-      if (out.some(f => Math.abs(f.x - x) < 18 && Math.abs(f.fuss - fuss) < 10)) continue;
-      const g = ['s', 'm', 'm', 'l'][Math.floor(Math.random() * 4)];
-      const { w, h } = RVG_FEUER[g];
-      out.push({ art: 'boden', g, x, fuss, y: fuss - h + 1, w, h });
-    }
-    for (let k = -2; k <= 2; k++) {
-      for (const f of RVG_FENSTERFEUER) {
-        const x = f.x + k * RVG_KACHEL;
-        if (Math.abs(x) > RVG_TUER_W / 2 + 2) out.push({ art: 'fenster', x, y: f.y, w: 7, h: 10 });
+  // Kachel-Dinge über die ganze Breite (−2 … +2 Kacheln), hinter dem Mittelhaus weglassen
+  const kachel = useMemo(() => {
+    const auf = (liste, verdeckt) => {
+      const out = [];
+      for (let k = -2; k <= 2; k++) for (const p of liste) {
+        const x = p.x + k * RVG_KACHEL;
+        if (Math.abs(x) < 230 && Math.abs(x) > verdeckt) out.push({ ...p, x });
       }
-    }
-    return out.map(f => ({ ...f, dur: .38 + Math.random() * .3, delay: -Math.random() }));
+      return out;
+    };
+    return {
+      fenster: auf(RVG_FENSTERFEUER, 36).map(f => ({ ...f, dur: .5 + Math.random() * .25, delay: -Math.random() })),
+      dach: auf(RVG_DACHFEUER, 30).map(f => ({ ...f, dur: .6 + Math.random() * .2, delay: -Math.random() })),
+      fackeln: auf(RVG_FACKELN, 36).map(f => ({ ...f, dur: .4 + Math.random() * .15 })),
+      laeden: auf([RVG_LADEN], 44).map(l => ({ ...l, dur: 2.6 + Math.random() * 1.4, delay: -Math.random() * 3 })),
+    };
   }, []);
-  const rauch = useMemo(() => feuer.filter(f => f.art === 'boden' || Math.random() < .6).slice(0, ppFxN(14)).map(f => ({
-    x: f.x, y: f.y, dur: 3.5 + Math.random() * 2.5, delay: -Math.random() * 6,
-  })), [feuer]);
-  const funken = useMemo(() => ppZufall(ppFxN(18), () => {
-    const f = feuer[Math.floor(Math.random() * feuer.length)];
-    return { x: f.x + (Math.random() - .5) * 6, y: f.y + 4, dur: 1.6 + Math.random() * 1.6, delay: -Math.random() * 3 };
-  }), [feuer]);
+  const feuer = useMemo(() => {
+    // Bodenfeuer: zufällig verteilt, mit Mindestabstand, drei Größen
+    const out = [];
+    const n = ppFxN(7);
+    for (let tries = 0; out.length < n && tries < 300; tries++) {
+      const x = (Math.random() - .5) * 300, fuss = 72 + Math.random() * 25;
+      if (Math.abs(x) < 26 && fuss < 76) continue;                         // nicht auf die Stufen
+      if (out.some(f => Math.abs(f.x - x) < 22 && Math.abs(f.fuss - fuss) < 12)) continue;
+      const g = ['s', 'm', 'm', 'l'][Math.floor(Math.random() * 4)];
+      out.push({ g, x, fuss, ...RVG_FEUER[g], dur: .55 + Math.random() * .3, delay: -Math.random(),
+        schein: (0.9 + Math.random() * .6).toFixed(2), pDur: 3.2 + Math.random() * 2, pDelay: -Math.random() * 5 });
+    }
+    return out;
+  }, []);
+  const truemmer = useMemo(() => {
+    // Planken, Scherben, Kisten … zufällig, nicht auf den Feuern
+    const out = [];
+    for (let tries = 0; out.length < 14 && tries < 400; tries++) {
+      const x = Math.round((Math.random() - .5) * 340), y = Math.round(67 + Math.random() * 31);
+      if (Math.abs(x) < 30 && y < 71) continue;
+      if (feuer.some(f => Math.abs(f.x - x) < 14 && Math.abs(f.fuss - y) < 7)) continue;
+      if (out.some(t => Math.abs(t.x - x) < 18 && Math.abs(t.y - y) < 8)) continue;
+      out.push({ x, y, v: Math.floor(Math.random() * 10) });
+    }
+    return out;
+  }, [feuer]);
+  const funken = useMemo(() => {
+    const quellen = [...feuer.map(f => ({ x: f.x, y: f.fuss - f.h + 3 })), ...kachel.dach.map(d => ({ x: d.x, y: d.y - 14 }))];
+    return ppZufall(ppFxN(20), () => {
+      const q = quellen[Math.floor(Math.random() * quellen.length)];
+      return { x: Math.round(q.x + (Math.random() - .5) * 6), y: Math.round(q.y), dur: 1.8 + Math.random() * 1.8, delay: -Math.random() * 3.6, hell: Math.random() < .4 };
+    });
+  }, [feuer, kachel]);
+  const asche = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.random() * 100, y: Math.round(Math.random() * 40), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
+  })), []);
+  const aufruehrer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    rtl: i === 1, figur: i, dur: 42 + Math.random() * 18, delay: -Math.random() * 50 - i * 20,
+  })), []);
   return (
     <PixelScene artH={100} bg="#3a3531" className="rioting-village-overlay">
+      <PixelBand src={RVG + 'sky.png'} />
+      <PixelBand src={RVG + 'sky-glow.png'} className="rvg-fern" />
+      <PixelBand src={RVG + 'haze.png'} className="pp-area-dyn rvg-dunst" />
       <PixelBand src={RVG + 'tile.png'} />
-      <PixelBand src={RVG + 'window-glow.png'} className="rvg-schein" />
-      {feuer.filter(f => f.art === 'boden').map((f, i) => (
+      <PixelBand src={RVG + 'tile-glow.png'} className="rvg-schein" />
+      {kachel.dach.map((d, i) => (
+        <React.Fragment key={'d' + i}>
+          <i className="rvg-rauchsaeule" style={{ left: ppArtX(d.x - 31, 0), top: ppArt(d.y - 38), animationDelay: (-i * .4) + 's' }} />
+          <i className="rvg-dachfeuer" style={{ left: ppArtX(d.x - 9, 0), top: ppArt(d.y - 16), animation: `rvgDach ${d.dur.toFixed(2)}s steps(${RVG_BILDER}) ${d.delay.toFixed(2)}s infinite` }} />
+        </React.Fragment>
+      ))}
+      {kachel.fenster.map((f, i) => (
+        <i key={'w' + i} className="rvg-fensterfeuer" style={{ left: ppArtX(f.x - 4.5, 0), top: ppArt(f.y - 8), animation: `rvgFenster ${f.dur.toFixed(2)}s steps(${RVG_BILDER}) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {kachel.fackeln.map((f, i) => (
+        <i key={'t' + i} className="rvg-fackel" style={{ left: ppArtX(f.x - 2.5, 0), top: ppArt(f.y - 6), animationDuration: f.dur.toFixed(2) + 's' }} />
+      ))}
+      {kachel.laeden.map((l, i) => (
+        <i key={'l' + i} className="rvg-laden" style={{ left: ppArtX(l.x, 0), top: ppArt(l.y), animationDuration: l.dur.toFixed(2) + 's', animationDelay: l.delay.toFixed(2) + 's' }} />
+      ))}
+      {aufruehrer.map((a, i) => (
+        <div key={'a' + i} className="pp-area-dyn pp-quer" style={ppQuer(43, a.dur, a.delay, a.rtl)}>
+          <i className="rvg-aufruehrer" style={{ backgroundPositionY: `${(a.figur * 2 + (a.rtl ? 1 : 0)) * 100 / 3}%` }} />
+        </div>
+      ))}
+      <PixelPiece src={RVG + 'house.png'} w={RVG_HAUS_W} />
+      <PixelPiece src={RVG + 'house-glow.png'} w={RVG_HAUS_W} className="rvg-schein" />
+      <i className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
+      <i className="rvg-auge" style={{ left: ppArtX(RVG_AUGE.x, 0), top: ppArt(RVG_AUGE.y) }} />
+      <i className="rvg-fackel" style={{ left: ppArtX(RVG_HAUSFACKEL.x - 2.5, 0), top: ppArt(RVG_HAUSFACKEL.y - 6), animationDuration: '.47s' }} />
+      <i className="rvg-schild" style={{ left: ppArtX(RVG_SCHILD.x, 0), top: ppArt(RVG_SCHILD.y) }} />
+      {truemmer.map((t, i) => (
+        <i key={'m' + i} className="rvg-truemmer" style={{ left: ppArtX(t.x - 8, 0), top: ppArt(t.y - 7), backgroundPositionX: `${t.v * 100 / 9}%` }} />
+      ))}
+      {feuer.map((f, i) => (
         <React.Fragment key={'b' + i}>
           <i className="rvg-bodenschein" style={{
-            left: ppArtX(f.x - f.w * 1.6, 0), top: ppArt(f.fuss - f.w * 1.6), width: ppArt(f.w * 3.2), height: ppArt(f.w * 2.4),
-            animationDuration: (0.9 + Math.random() * .6).toFixed(2) + 's', animationDelay: (-Math.random()).toFixed(2) + 's',
+            left: ppArtX(f.x - f.w * 1.7, 0), top: ppArt(f.fuss - f.w * 1.5), width: ppArt(f.w * 3.4), height: ppArt(f.w * 2.4),
+            animationDuration: f.schein + 's', animationDelay: (-f.schein * i / 3).toFixed(2) + 's',
+          }} />
+          <i className="rvg-flamme" style={{
+            left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.fuss - f.h + 1), width: ppArt(f.w), height: ppArt(f.h),
+            backgroundImage: `url(${RVG}fire-${f.g}.png)`,
+            '--rvg-lauf': `calc(${-RVG_BILDER * f.w} * var(--px))`,
+            animation: `rvgFlackern ${f.dur.toFixed(2)}s steps(${RVG_BILDER}) ${f.delay.toFixed(2)}s infinite`,
           }} />
           <i className="rvg-haufen" style={{
-            left: ppArtX(f.x - (f.w + 4) / 2, 0), top: ppArt(f.fuss - Math.max(4, Math.floor((f.w + 4) / 2)) + 2),
-            width: ppArt(f.w + 4), height: ppArt(Math.max(4, Math.floor((f.w + 4) / 2))),
-            backgroundImage: `url(${RVG}embers-${f.w}.png)`,
+            left: ppArtX(f.x - (f.w + 4) / 2, 0), top: ppArt(f.fuss - f.hh + 2), width: ppArt(f.w + 4), height: ppArt(f.hh),
+            backgroundImage: `url(${RVG}heap-${f.g}.png)`,
+          }} />
+          <i className="pp-area-dyn rvg-puff" style={{
+            left: ppArtX(Math.round(f.x) - 4, 0), top: ppArt(f.fuss - f.h - 6),
+            animation: `rvgPuffBild ${f.pDur.toFixed(2)}s steps(1) ${f.pDelay.toFixed(2)}s infinite, rvgPuffWeg ${f.pDur.toFixed(2)}s steps(14) ${f.pDelay.toFixed(2)}s infinite`,
           }} />
         </React.Fragment>
       ))}
-      <PixelPiece src={RVG + 'doorway.png'} w={RVG_TUER_W} />
-      <i className="rvg-augenglut" style={{ left: ppArtX(-8, 0), top: ppArt(26) }} />
-      <i className="rvg-auge" style={{ left: ppArtX(-5.5, 0), top: ppArt(29.5) }} />
-      {feuer.map((f, i) => (
-        <i key={'f' + i} className="rvg-flamme" style={{
-          left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.y), width: ppArt(f.w), height: ppArt(f.h),
-          backgroundImage: `url(${RVG}${f.art === 'fenster' ? 'flames-window' : 'flames-' + f.g}.png)`,
-          '--rvg-lauf': `calc(${-4 * f.w} * var(--px))`,
-          animation: `rvgFlackern ${f.dur.toFixed(2)}s steps(4) ${f.delay.toFixed(2)}s infinite`,
-        }} />
-      ))}
-      {rauch.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn rvg-rauch" style={{ left: ppArtX(r.x - 3, 0), top: ppArt(r.y - 5), animation: `rvgRauch ${r.dur.toFixed(2)}s ease-out ${r.delay.toFixed(2)}s infinite` }} />
-      ))}
       {funken.map((f, i) => (
-        <i key={'s' + i} className="pp-area-dyn rvg-funke" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `rvgFunke ${f.dur.toFixed(2)}s linear ${f.delay.toFixed(2)}s infinite` }} />
+        <i key={'s' + i} className={'pp-area-dyn rvg-funke' + (f.hell ? ' hell' : '')} style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `rvgFunke ${f.dur.toFixed(2)}s steps(26) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {asche.map((a, i) => (
+        <i key={'x' + i} className="pp-area-dyn rvg-asche" style={{ left: a.x + '%', top: ppArt(a.y), animation: `rvgAsche ${a.dur.toFixed(2)}s steps(60) ${a.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        .rvg-fern { animation: rvgFern 3.4s steps(1) infinite; }
+        @keyframes rvgFern { 0% { opacity: .7; } 20% { opacity: 1; } 45% { opacity: .8; } 70% { opacity: .95; } 85% { opacity: .65; } }
+        .rvg-dunst { animation: rvgDunst 150s steps(128) infinite; opacity: .85; }
+        @keyframes rvgDunst { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         .rvg-schein { animation: rvgSchein 1.1s steps(1) infinite; }
         @keyframes rvgSchein { 0% { opacity: .85; } 20% { opacity: 1; } 35% { opacity: .7; } 55% { opacity: .95; } 75% { opacity: .78; } }
-        .rvg-flamme { position: absolute; background-repeat: no-repeat; background-size: 400% 100%; }
+        .rvg-dachfeuer { position: absolute; width: calc(18 * var(--px)); height: calc(17 * var(--px)); background: url(${RVG}fire-roof.png) 0 0 / ${RVG_BILDER * 100}% 100% no-repeat; }
+        @keyframes rvgDach { from { background-position: 0 0; } to { background-position: calc(${-RVG_BILDER * 18} * var(--px)) 0; } }
+        .rvg-fensterfeuer { position: absolute; width: calc(9 * var(--px)); height: calc(12 * var(--px)); background: url(${RVG}fire-win.png) 0 0 / ${RVG_BILDER * 100}% 100% no-repeat; }
+        @keyframes rvgFenster { from { background-position: 0 0; } to { background-position: calc(${-RVG_BILDER * 9} * var(--px)) 0; } }
+        .rvg-fackel { position: absolute; width: calc(5 * var(--px)); height: calc(7 * var(--px)); background: url(${RVG}torch.png) 0 0 / 400% 100% no-repeat; animation: rvgFackel .45s steps(4) infinite; }
+        @keyframes rvgFackel { from { background-position: 0 0; } to { background-position: calc(-20 * var(--px)) 0; } }
+        .rvg-rauchsaeule { position: absolute; width: calc(36 * var(--px)); height: calc(30 * var(--px)); background: url(${RVG}smoke.png) 0 0 / 800% 100% no-repeat; animation: rvgSaeule 2.2s steps(8) infinite; }
+        @keyframes rvgSaeule { from { background-position: 0 0; } to { background-position: calc(-288 * var(--px)) 0; } }
+        .rvg-laden { position: absolute; width: calc(10 * var(--px)); height: calc(14 * var(--px)); background: url(${RVG}shutter.png) 0 0 / 300% 100% no-repeat; animation: rvgLaden 3s steps(1) infinite; }
+        @keyframes rvgLaden { 0%, 30% { background-position: 50% 0; } 38%, 55% { background-position: 100% 0; } 62%, 80% { background-position: 50% 0; } 88%, 96% { background-position: 0 0; } }
+        .rvg-schild { position: absolute; width: calc(16 * var(--px)); height: calc(16 * var(--px)); background: url(${RVG}sign.png) 0 0 / 400% 100% no-repeat; animation: rvgSchild 3.6s steps(1) infinite; }
+        @keyframes rvgSchild { 0% { background-position: 0 0; } 25% { background-position: 33.33% 0; } 50% { background-position: 66.67% 0; } 75% { background-position: 100% 0; } }
+        .rvg-aufruehrer {
+          display: block; width: calc(10 * var(--px)); height: calc(16 * var(--px));
+          background-image: url(${RVG}rioter.png); background-size: 400% 400%; background-repeat: no-repeat;
+          animation: rvgLaufen .8s steps(4) infinite;
+        }
+        @keyframes rvgLaufen { from { background-position-x: 0; } to { background-position-x: calc(-40 * var(--px)); } }
+        .rvg-truemmer { position: absolute; width: calc(16 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}debris.png) 0 0 / 1000% 100% no-repeat; }
+        .rvg-flamme { position: absolute; background-repeat: no-repeat; background-size: ${RVG_BILDER * 100}% 100%; }
         @keyframes rvgFlackern { from { background-position: 0 0; } to { background-position: var(--rvg-lauf) 0; } }
         .rvg-haufen { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .rvg-bodenschein {
           position: absolute; border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,140,40,.45) 0%, rgba(255,90,20,.18) 45%, rgba(255,90,20,0) 70%);
+          background: radial-gradient(ellipse, rgba(255,140,40,.42) 0%, rgba(255,90,20,.16) 45%, rgba(255,90,20,0) 70%);
           animation: rvgSchein 1.1s steps(1) infinite;
         }
+        .rvg-puff { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}puff.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes rvgPuffBild { 0% { background-position: 0 0; opacity: .9; } 25% { background-position: 33.33% 0; opacity: .85; } 50% { background-position: 66.67% 0; opacity: .7; } 75% { background-position: 100% 0; opacity: .45; } 100% { background-position: 100% 0; opacity: 0; } }
+        @keyframes rvgPuffWeg { from { transform: translate(0, 0); } to { transform: translate(calc(-4 * var(--px)), calc(-14 * var(--px))); } }
         .rvg-auge {
           position: absolute; width: calc(11 * var(--px)); height: calc(5 * var(--px));
           background: url(${RVG}eye.png) 0 0 / 500% 100% no-repeat;
@@ -1359,138 +2874,271 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
           94% { background-position: 100% 0; } 96% { background-position: 75% 0; } 98%, 100% { background-position: 0 0; }
         }
         .rvg-augenglut {
-          position: absolute; width: calc(16 * var(--px)); height: calc(11 * var(--px));
-          background: radial-gradient(ellipse, rgba(255,30,20,.55) 0%, rgba(255,30,20,0) 70%);
+          position: absolute; width: calc(19 * var(--px)); height: calc(13 * var(--px));
+          background: radial-gradient(ellipse, rgba(255,30,20,.5) 0%, rgba(255,30,20,0) 70%);
           animation: rvgAugenglut 2.4s ease-in-out infinite alternate;
         }
         @keyframes rvgAugenglut { from { opacity: .45; } to { opacity: 1; } }
-        .rvg-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); background: url(${RVG}smoke.png) 0 0 / 100% 100% no-repeat; opacity: 0; }
-        @keyframes rvgRauch {
-          0% { transform: translate(0, 0) scale(.6); opacity: 0; } 12% { opacity: .85; }
-          100% { transform: translate(calc(5 * var(--px)), calc(-30 * var(--px))) scale(1.6); opacity: 0; }
-        }
-        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
-        @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(calc(3 * var(--px)), calc(-24 * var(--px))); opacity: 0; } }
+        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f47a1c; opacity: 0; }
+        .rvg-funke.hell { background: #ffd060; }
+        @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(calc(-5 * var(--px)), calc(-26 * var(--px))); opacity: 0; } }
+        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #7a716b; opacity: 0; }
+        @keyframes rvgAsche { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: .7; } 85% { opacity: .6; } 100% { transform: translate(calc(-18 * var(--px)), calc(60 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
   );
 });
 
 // ── SLIPPERY ICE ─────────────────────────────────────────────────────
-//  Karte: lavendelweisse Eisflaeche mit diagonalen Glanzstreifen, blaues
+//  Karte: lavendelweiße Eisfläche mit diagonalen Glanzstreifen, blaues
 //  Wasser mit Wellenzeichen, Pinguine rutschen auf dem Bauch.
-//  v1433 (Al 25.9.): Wasser aufgehuebscht — treppige Eiskante wie auf der
+//  v1433 (Al 25.9.): Wasser aufgehübscht — treppige Eiskante wie auf der
 //  Karte mit sichtbarer Eisdicke, Schaum an der Kante, Tiefe nach unten,
-//  Wellenzeichen und Lichtreflexe, die ueber drei Bilder wandern, dazu
+//  Wellenzeichen und Lichtreflexe, die über drei Bilder wandern, dazu
 //  treibende Schollen. Pinguine detaillierter (Gesicht mit roter Wange,
-//  Glanz auf dem Ruecken, schlagende Flossen) mit dem Bewegungsschleier
+//  Glanz auf dem Rücken, schlagende Flossen) mit dem Bewegungsschleier
 //  der Karte. Statt des Schilds ein STACHELIGER EISBLOCK, der ebenfalls
 //  herumrutscht. Eis mit Rissen und Schneewehen. Licht IMMER oben rechts.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level" — auf
+//  das Niveau der v1440-Szenen gebracht). Dieselbe Szene, neu gemalt:
+//  tile.png — Kachel 128: Eis als unregelmäßiges Pixelrauschen mit den
+//  diagonalen Glanzstreifen der Karte (/, Rillen mit Glanzkante, breite
+//  weiche Glanzbahnen), klare dunkle Eisfenster, gerade Eisrisse mit
+//  heller Bruchfläche, eingeschlossene Luftblasen, Kratzspuren entlang
+//  der Rutschbahnen, flache Schneewehen (Schweif nach links, oben rechts
+//  beleuchtet, Schlagschatten unten links); treppige Eiskante mit heller
+//  Lippe, Schneewülsten, 5 Pixel Eisdicke (Schichtlinie, Glanzstriche,
+//  Tropfnasen) und dunkler Wasserlinie. water.png — 3 Bilder: Rauschen,
+//  Dünung, untergetauchter Eissockel unter der Kante, Wellenzeichen der
+//  Karte in versetzten Reihen, wandernde Glanzlichter. foam.png — Schaum
+//  an der Wasserlinie (3 Bilder). center.png — Mittelstück 256, damit die
+//  Kachel nicht sichtbar wiederholt: links eine treppige Eiszunge mit
+//  einem unter klarem Eis eingefrorenen Fisch und Eisbrocken, rechts eine
+//  große treibende Scholle mit Schneewehe, oben ein Rissnetz;
+//  center-foam.png — deren Schaum (3 Bilder). drift.png — Schneefahnen.
+//  Sprites: penguin.png (3 Bilder mit Schleier + Eissplittern),
+//  spikeblock.png (2 Bilder, Deckfläche/Seite/Stirn, Schatten, eingefro-
+//  rener Fisch, wandernder Glanz), floe.png (3 Schollen), swimmer.png
+//  (schwimmender Pinguin mit Bugwelle), fish.png (springender Fisch).
+//  Animiert: Wasser und Schaum, Schneetreiben zieht nach links (Wind von
+//  rechts), Pinguine rutschen und schlagen mit den Flossen, der Eisblock
+//  ruckt an und rutscht, Schollen treiben, ein Pinguin schwimmt, Fische
+//  springen, Eis funkelt. Licht IMMER oben rechts.
 const SLI = '/areas/slippery-ice/';
-// v1434 (Al 25.9.: „zu viele Akteure, sie ueberlappen sich staendig —
-// pro Hoehenebene nur einen"): feste Bahnen, jede mit genau EINEM
-// Akteur. Die Bahnen ueberschneiden sich nicht (Pinguin 8 hoch, Eisblock
-// 30 hoch), und die unterste endet ueber der hoechsten Stufe der
-// Eiskante (y 60) — so rutscht nie etwas auf etwas anderem oder im Wasser.
+const SLI_MITTE = 256;              // Mittelstück; Stück-x 128 = Brettmitte
+// v1434 (Al 25.9.: „zu viele Akteure, sie überlappen sich ständig —
+// pro Höhenebene nur einen"): feste Bahnen, jede mit genau EINEM
+// Akteur. Die Bahnen überschneiden sich nicht (Pinguin 10 hoch, Eisblock
+// 30 hoch), und die unterste endet über der höchsten Stufe der
+// Eiskante (Lippe y 61) — so rutscht nie etwas auf etwas anderem oder im Wasser.
 const SLI_BAHNEN = [
-  { art: 'pinguin', y: 1 },
+  { art: 'pinguin', y: 0 },
   { art: 'block', y: 11 },
-  { art: 'pinguin', y: 42 },
+  { art: 'pinguin', y: 41 },
   { art: 'pinguin', y: 51 },
 ];
+// Schollen treiben nur dort, wo das Mittelstück (Eiszunge links, große
+// Scholle rechts) frei lässt.
+const SLI_SCHOLLEN = [-170, -40, 5, 105, 160];
+const SLI_FISCHE = [[-150, 90], [-30, 93], [100, 89], [175, 92]];   // Sprungstellen (x neben der Mitte, y)
 const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
   const bahnen = useMemo(() => SLI_BAHNEN.slice(0, Math.max(2, ppFxN(SLI_BAHNEN.length))), []);
   // v1435 (Al 25.9.): Richtungen fest — der zweite Pinguin rutscht nach
   // links, die anderen nach rechts; der Block startet nach links.
   const pinguine = useMemo(() => bahnen.filter(b => b.art === 'pinguin').map((b, i) => ({
-    y: b.y, dur: 6 + Math.random() * 6, delay: -Math.random() * 12, rtl: i === 1,
-    bob: 1.1 + Math.random() * .8,
+    y: b.y, dur: 7 + Math.random() * 6, delay: -Math.random() * 12, rtl: i === 1,
+    bob: 1.1 + Math.random() * .8, flosse: .38 + Math.random() * .14,
   })), [bahnen]);
   const bloecke = useMemo(() => bahnen.filter(b => b.art === 'block').map(b => ({
     y: b.y, von: 50 + Math.random() * 60, bis: -120 + Math.random() * 40,
     dur: 7 + Math.random() * 5, delay: 0,
   })), [bahnen]);
-  const schollen = useMemo(() => ppZufall(ppFxN(4), () => ({
-    x: (Math.random() - .5) * 220, y: 78 + Math.random() * 14, dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
+  const schollen = useMemo(() => SLI_SCHOLLEN.slice(0, ppFxN(SLI_SCHOLLEN.length)).map((x, i) => ({
+    x: x + (Math.random() - .5) * 10, y: 86 + Math.random() * 8, v: i % 3,
+    dur: 9 + Math.random() * 6, delay: -Math.random() * 10,
+  })), []);
+  const schwimmer = useMemo(() => ppZufall(ppFxN(1), () => ({
+    y: 92 + Math.random() * 2, dur: 55 + Math.random() * 20, delay: -Math.random() * 50, rtl: Math.random() < .5,
+  })), []);
+  const fische = useMemo(() => SLI_FISCHE.slice(0, ppFxN(SLI_FISCHE.length)).map(() => ({
+    dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
   })), []);
   const funken = useMemo(() => ppZufall(ppFxN(10), () => ({
-    x: Math.random() * 100, y: 4 + Math.random() * 52, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
+    x: Math.random() * 100, y: 3 + Math.random() * 54, dur: 1.8 + Math.random() * 2, delay: -Math.random() * 4,
   })), []);
   return (
-    <PixelScene artH={100} bg="#dad9f7" className="slippery-ice-overlay">
-      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.5s steps(1) infinite' }} />
+    <PixelScene artH={100} bg="#d2d1f7" className="slippery-ice-overlay">
+      <PixelBand src={SLI + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.1s steps(1) infinite' }} />
       {schollen.map((s, i) => (
-        <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{ left: ppArtX(s.x, 0), top: ppArt(s.y), animation: `sliTreiben ${s.dur.toFixed(2)}s ease-in-out ${s.delay.toFixed(2)}s infinite alternate` }} />
+        <i key={'s' + i} className="pp-area-dyn sli-scholle" style={{
+          left: ppArtX(s.x, 0), top: ppArt(s.y), backgroundPosition: `${s.v * 50}% 0`,
+          animation: `sliTreiben ${s.dur.toFixed(2)}s steps(8) ${s.delay.toFixed(2)}s infinite alternate`,
+        }} />
+      ))}
+      {schwimmer.map((s, i) => (
+        <div key={'w' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(s.y), animation: `${s.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${s.dur.toFixed(1)}s linear ${s.delay.toFixed(1)}s infinite` }}>
+          <i className="sli-schwimmer" style={{ transform: s.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {fische.map((f, i) => (
+        <i key={'h' + i} className="pp-area-dyn sli-fisch" style={{
+          left: ppArtX(SLI_FISCHE[i][0] - 6, 0), top: ppArt(SLI_FISCHE[i][1] - 11),
+          animationDuration: f.dur.toFixed(2) + 's', animationDelay: f.delay.toFixed(2) + 's',
+        }} />
       ))}
       <PixelBand src={SLI + 'tile.png'} />
+      <PixelBand src={SLI + 'foam.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
+      <PixelPiece src={SLI + 'center.png'} w={SLI_MITTE} />
+      <PixelPiece src={SLI + 'center-foam.png'} w={SLI_MITTE} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.6s steps(1) infinite' }} />
+      <div className="pp-pixel-layer pp-area-dyn sli-wind" />
       {funken.map((f, i) => (
-        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: f.x + '%', top: ppArt(f.y), animation: `ppFunkeln ${f.dur}s steps(1) ${f.delay}s infinite` }} />
+        <i key={'f' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: f.x + '%', top: ppArt(f.y), animation: `ppFunkeln ${f.dur.toFixed(2)}s steps(1) ${f.delay.toFixed(2)}s infinite` }} />
       ))}
       {bloecke.map((b, i) => (
         <i key={'b' + i} className="sli-block" style={{
-          left: ppArtX(-17, 0), top: ppArt(b.y), '--von': ppArt(b.von), '--bis': ppArt(b.bis),
-          animation: `sliBlock ${b.dur.toFixed(2)}s cubic-bezier(.35,0,.25,1) ${b.delay.toFixed(2)}s infinite alternate`,
+          left: ppArtX(-18, 0), top: ppArt(b.y), '--von': ppArt(b.von), '--bis': ppArt(b.bis),
+          animation: `sliBlock ${b.dur.toFixed(2)}s cubic-bezier(.35,0,.25,1) ${b.delay.toFixed(2)}s infinite alternate, sliGlanz 3.2s steps(1) infinite`,
         }} />
       ))}
       {pinguine.map((p, i) => (
-        <div key={'p' + i} className="pp-area-dyn pp-quer" style={ppQuer(p.y, p.dur, p.delay, p.rtl)}>
+        <div key={'p' + i} className="pp-area-dyn sli-quer" style={{ top: ppArt(p.y), animation: `${p.rtl ? 'sliQuerRtl' : 'sliQuerLtr'} ${p.dur.toFixed(2)}s linear ${p.delay.toFixed(2)}s infinite` }}>
           <div className="sli-rutscher" style={{ transform: p.rtl ? 'scaleX(-1)' : undefined, animationDuration: p.bob.toFixed(2) + 's' }}>
-            <i className="sli-spur" /><i className="sli-pinguin" />
+            <i className="sli-pinguin" style={{ animationDuration: p.flosse.toFixed(2) + 's' }} />
           </div>
         </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .sli-rutscher { display: flex; align-items: flex-start; animation: sliRuckeln 1.4s steps(2) infinite; }
+        .sli-quer { position: absolute; left: 0; }
+        @keyframes sliQuerLtr { from { transform: translateX(calc(-60 * var(--px))); } to { transform: translateX(calc(100cqw + 4 * var(--px))); } }
+        @keyframes sliQuerRtl { from { transform: translateX(calc(100cqw + 4 * var(--px))); } to { transform: translateX(calc(-60 * var(--px))); } }
+        .sli-rutscher { animation: sliRuckeln 1.4s steps(2) infinite; }
         @keyframes sliRuckeln { 0% { translate: 0 0; } 50% { translate: 0 calc(-1 * var(--px)); } }
-        .sli-spur { display: block; width: calc(26 * var(--px)); height: calc(8 * var(--px)); background: url(${SLI}trail.png) 0 0 / 100% 100% no-repeat; margin-right: calc(-2 * var(--px)); }
-        .sli-pinguin { display: block; width: calc(22 * var(--px)); height: calc(8 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .45s steps(1) infinite; }
+        .sli-pinguin { display: block; width: calc(56 * var(--px)); height: calc(10 * var(--px)); background: url(${SLI}penguin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .45s steps(1) infinite; }
         .sli-block {
-          position: absolute; width: calc(34 * var(--px)); height: calc(30 * var(--px));
-          background: url(${SLI}spikeblock.png) 0 0 / 100% 100% no-repeat;
+          position: absolute; width: calc(36 * var(--px)); height: calc(30 * var(--px));
+          background: url(${SLI}spikeblock.png) 0 0 / 200% 100% no-repeat;
         }
         @keyframes sliBlock {
           0% { transform: translateX(var(--von)); } 8% { transform: translateX(var(--von)) translateY(calc(-1 * var(--px))); }
           12% { transform: translateX(var(--von)); } 100% { transform: translateX(var(--bis)); }
         }
-        .sli-scholle { position: absolute; width: calc(9 * var(--px)); height: calc(4 * var(--px)); background: url(${SLI}floe.png) 0 0 / 100% 100% no-repeat; }
+        @keyframes sliGlanz { 0% { background-position: 0 0; } 50% { background-position: 100% 0; } }
+        .sli-scholle { position: absolute; width: calc(12 * var(--px)); height: calc(6 * var(--px)); background: url(${SLI}floe.png) 0 0 / 300% 100% no-repeat; }
         @keyframes sliTreiben {
           0% { transform: translate(0, 0); } 25% { transform: translate(calc(2 * var(--px)), var(--px)); }
           50% { transform: translate(calc(4 * var(--px)), 0); } 75% { transform: translate(calc(6 * var(--px)), var(--px)); }
           100% { transform: translate(calc(8 * var(--px)), 0); }
         }
+        .sli-schwimmer { display: block; width: calc(20 * var(--px)); height: calc(7 * var(--px)); background: url(${SLI}swimmer.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .7s steps(1) infinite; }
+        .sli-fisch {
+          position: absolute; width: calc(12 * var(--px)); height: calc(12 * var(--px));
+          background: url(${SLI}fish.png) 0 0 / 800% 100% no-repeat; animation-name: sliFisch; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes sliFisch {
+          0% { background-position: 0 0; } 1.6% { background-position: calc(100% / 7) 0; } 3.2% { background-position: calc(200% / 7) 0; }
+          4.8% { background-position: calc(300% / 7) 0; } 6.4% { background-position: calc(400% / 7) 0; } 8% { background-position: calc(500% / 7) 0; }
+          9.6% { background-position: calc(600% / 7) 0; } 11.2%, 100% { background-position: 0 0; }
+        }
+        .sli-wind {
+          position: absolute; inset: 0; background: url(${SLI}drift.png) 50% 0 / auto 100% repeat-x; opacity: .7;
+          animation: sliWind 16s steps(128) infinite;
+        }
+        @keyframes sliWind { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
       `}</style>
     </PixelScene>
   );
 });
 
-// ── SMUGGLER'S PIER ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  SMUGGLER'S PIER — Holzsteg im tiefblauen Meer (v1415, Überarbeitung
+//  v1441, Al 25.9.)
+//
 //  Karte: tiefblaues Wasser, Holzsteg mit Pfosten, Kiste, Tauring,
-//  Pfuetze, Moewen. v1435 (Al 25.9.): Proportionen wie auf der Karte —
-//  grosse Moewen (fliegend 27 breit, mit Schatten aufs Wasser). Das
-//  Beiboot ist wieder raus (v1436, Al: perspektivisch unstimmig). Meer mit wandernden Wellenstrichen und aufblitzenden
-//  Kaemmen, Pfuetze mit wanderndem Reflex und Kraeuselring. Kiste mit
-//  Deckel, Eckleisten, Strebe, Rahmen und Schlagschatten — klar vom Steg
-//  abgesetzt. Mehr Detail: Planken mit Maserung, Naegeln und Stoessen,
-//  Stirnbalken, Pfaehle mit Schaum und Algen, Tauwicklung an den Pfosten,
-//  Fass, Fischernetz. Licht IMMER oben rechts.
+//  Pfütze, Möwen. v1435 (Al 25.9.): Proportionen wie auf der Karte —
+//  große Möwen (fliegend 27 breit, mit Schatten aufs Wasser). Das
+//  Beiboot ist wieder raus (v1436, Al: perspektivisch unstimmig) und
+//  bleibt raus. Kiste mit Deckel, Eckleisten, Strebe, Rahmen und
+//  Schlagschatten — klar vom Steg abgesetzt. Mehr Detail: Planken mit
+//  Maserung, Nägeln und Stößen, Stirnbalken, Pfähle mit Schaum und
+//  Algen, Tauwicklung an den Pfosten, Fass, Fischernetz.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  Meer wie auf der Karte aus kurzen Wellenstrichen in neun Blautönen,
+//  zwei Wellenzüge wandern darüber, auf den Kämmen blitzen helle Striche.
+//  Der Steg läuft jetzt nach links bis an den Brettrand (Kachel, rechts-
+//  bündig am Stegstück) — Pfosten im Kartenabstand (64), Planken unter-
+//  schiedlich breit mit Maserung, Astlöchern, Stößen mit Lichtkante,
+//  Nägeln an den Querträgern, Moos in den Fugen, Möwenklecksen; Stirn-
+//  balken mit Bolzen, Seitenbalken mit Licht von rechts und Pfahlköpfen
+//  mit Algen. Kiste in Aufsicht mit Vorderseite (Brandzeichen Anker,
+//  Eisenwinkel), Tauring mit klar getrennten Windungen und dem Ende quer
+//  darüber (wie auf der Karte), Fass mit gewölbtem Mantel und Reifen,
+//  Fischernetz mit Rautenmaschen und Korkschwimmern, Schmugglerluke mit
+//  Scharnieren und Ring, Klampe mit Tau, das über die Kante ins Wasser
+//  abtaucht. Rechts im Wasser ein Dalben (drei gebundene Pfähle mit
+//  Seepocken), ein einzelner Pfahlstumpf, ein treibender Tangteppich
+//  und Felsen mit Tang und Seestern.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt):
+//  water.png — Kachel 128, 3 Bilder übereinander; deck.png — Steg-
+//  Kachel 128 (links vom Stück); pier.png — Stegkopf + Wasser-Beiwerk,
+//  Stück 336 (Stück-x 160 = Brettmitte); foam.png — Schaum und
+//  Spiegelung, 3 Bilder übereinander; puddle.png, gull-fly.png (4),
+//  gull-side.png / gull-front.png (je 3), gull-shadow.png, barrel.png
+//  (Treibfass, 3), fish.png (Fischschwarm-Schatten, 2), crab.png (2),
+//  cloud.png (Wolkenschatten).
+//
+//  Animiert: Wellenzüge und Kämme, Schaum am Steg, am Dalben und an den
+//  Felsen, Spiegelung des Dalbens, Pfütze mit wanderndem Reflex und
+//  Kräuselring, Möwen fliegen (Schatten aufs Wasser), zwei sitzende
+//  Möwen (Kopf drehen, blinzeln, rufen), Treibfass dümpelt, Fisch-
+//  schwärme ziehen unter dem Steg durch, eine Krabbe läuft über den
+//  Stirnbalken, Wolkenschatten ziehen, Glitzern auf dem Wasser.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const SMP = '/areas/smugglers-pier/';
-const SMP_W = 210;                  // Stegstueck; Stueck-x 105 = Brettmitte
-const smpX = (x) => x - SMP_W / 2;  // Stueck-x → x neben der Mitte
+const SMP_W = 336;                  // Stegstück; Stück-x 160 = Brettmitte
+const SMP_L = -160;                 // linker Rand des Stücks neben der Mitte
+const SMP_GLITZER = [               // Wasserstellen (x neben der Mitte, y)
+  [-150, 6], [-122, 24], [-86, 9], [-58, 28], [-18, 5], [8, 22], [44, 12], [62, 32],
+  [78, 48], [104, 26], [120, 62], [132, 44], [150, 18], [166, 70], [110, 92], [170, 34],
+];
 const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
   const moewen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    // eigene Hoehe je Moewe (13 hoch, 12er-Abstand) — sie fliegen nie uebereinander
+    // eigene Höhe je Möwe (13 hoch, 12er-Abstand) — sie fliegen nie übereinander
     y: [1, 13, 25][i] + Math.random() * 2, dur: 14 + Math.random() * 10, delay: -Math.random() * 25, rtl: i % 2 === 1,
     schlag: .55 + Math.random() * .25,
   })), []);
+  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: [8, 58, 84][i] + Math.random() * 6, dur: 40 + Math.random() * 20, delay: -Math.random() * 60, rtl: i % 2 === 0,
+  })), []);
+  const wolken = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: [-6, 44][i] + Math.random() * 10, dur: 90 + Math.random() * 40, delay: -Math.random() * 130,
+  })), []);
+  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppFxN(16)).map(([x, y]) => ({
+    x, y, dur: 3 + Math.random() * 4, delay: -Math.random() * 7,
+  })), []);
   return (
-    <PixelScene artH={100} bg="#1646ca" className="smugglers-pier-overlay">
-      <PixelBand src={SMP + 'tile.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.8s steps(1) infinite' }} />
-      <PixelPiece src={SMP + 'pier.png'} w={SMP_W} />
-      <i className="smp-pfuetze" style={{ left: ppArtX(smpX(86), 0), top: ppArt(52) }} />
-      <i className="smp-kiste" style={{ left: ppArtX(smpX(12), 0), top: ppArt(40) }} />
-      <i className="smp-moewe-sitzt" style={{ left: ppArtX(smpX(20), 0), top: ppArt(31) }} />
-      <i className="smp-moewe-sitzt b" style={{ left: ppArtX(smpX(112), 0), top: ppArt(76) }} />
+    <PixelScene artH={100} bg="#1646cc" className="smugglers-pier-overlay">
+      <PixelBand src={SMP + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
+      {fische.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="smp-fische" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {glitzer.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      <div className="pp-pixel-layer smp-steg" />
+      <PixelPiece src={SMP + 'pier.png'} w={SMP_W} x={SMP_L + SMP_W / 2} />
+      <PixelPiece src={SMP + 'foam.png'} w={SMP_W} x={SMP_L + SMP_W / 2} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.5s steps(1) infinite' }} />
+      <i className="smp-pfuetze" style={{ left: ppArtX(7, 0), top: ppArt(49) }} />
+      <i className="smp-fass" style={{ left: ppArtX(74, 0), top: ppArt(17) }} />
+      <i className="pp-area-dyn smp-krabbe" style={{ left: ppArtX(-20, 0), top: ppArt(36) }} />
+      <i className="smp-moewe-vorn" style={{ left: ppArtX(-48, 0), top: ppArt(35) }} />
+      <i className="smp-moewe-seite" style={{ left: ppArtX(17, 0), top: ppArt(80) }} />
       {moewen.map((m, i) => (
         <div key={'m' + i} className="pp-area-dyn pp-quer" style={ppQuer(m.y, m.dur, m.delay, m.rtl)}>
           <div style={{ transform: m.rtl ? 'scaleX(-1)' : undefined, position: 'relative' }}>
@@ -1499,13 +3147,21 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
           </div>
         </div>
       ))}
+      {wolken.map((w, i) => (
+        <i key={'w' + i} className="pp-area-dyn smp-wolke" style={{ top: ppArt(w.y), animation: `smpWolke ${w.dur.toFixed(1)}s linear ${w.delay.toFixed(1)}s infinite` }} />
+      ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .smp-pfuetze { position: absolute; width: calc(26 * var(--px)); height: calc(16 * var(--px)); background: url(${SMP}puddle.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.3s steps(1) infinite; }
-        .smp-kiste { position: absolute; width: calc(32 * var(--px)); height: calc(34 * var(--px)); background: url(${SMP}crate.png) 0 0 / 100% 100% no-repeat; }
-        .smp-moewe-sitzt { position: absolute; width: calc(15 * var(--px)); height: calc(13 * var(--px)); background: url(${SMP}gull-sit.png) 0 0 / 300% 100% no-repeat; animation: smpSitzen 5.5s steps(1) infinite; }
-        .smp-moewe-sitzt.b { transform: scaleX(-1); animation-duration: 7.3s; animation-delay: -2.1s; }
-        @keyframes smpSitzen { 0%, 60% { background-position: 0 0; } 64%, 76% { background-position: 50% 0; } 80% { background-position: 0 0; } 88% { background-position: 100% 0; } 92%, 100% { background-position: 0 0; } }
+        .smp-steg {
+          position: absolute; top: 0; bottom: 0; left: 0; width: calc(50% + ${SMP_L} * var(--px));
+          background: url(${SMP}deck.png) 100% 0 / auto 100% repeat-x;
+        }
+        .smp-pfuetze { position: absolute; width: calc(28 * var(--px)); height: calc(18 * var(--px)); background: url(${SMP}puddle.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.4s steps(1) infinite; }
+        .smp-fass { position: absolute; width: calc(18 * var(--px)); height: calc(12 * var(--px)); background: url(${SMP}barrel.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 2.2s steps(1) infinite; }
+        .smp-moewe-vorn { position: absolute; width: calc(15 * var(--px)); height: calc(17 * var(--px)); background: url(${SMP}gull-front.png) 0 0 / 300% 100% no-repeat; animation: smpVorn 6.3s steps(1) infinite; }
+        @keyframes smpVorn { 0%, 44% { background-position: 0 0; } 46%, 49% { background-position: 100% 0; } 51%, 70% { background-position: 0 0; } 72%, 90% { background-position: 50% 0; } 92%, 100% { background-position: 0 0; } }
+        .smp-moewe-seite { position: absolute; width: calc(24 * var(--px)); height: calc(15 * var(--px)); background: url(${SMP}gull-side.png) 0 0 / 300% 100% no-repeat; animation: smpSeite 8.1s steps(1) -2.4s infinite; }
+        @keyframes smpSeite { 0%, 40% { background-position: 0 0; } 42%, 58% { background-position: 50% 0; } 60%, 78% { background-position: 0 0; } 80%, 83% { background-position: 100% 0; } 85% { background-position: 0 0; } 87%, 90% { background-position: 100% 0; } 92%, 100% { background-position: 0 0; } }
         .smp-moewe {
           display: block; width: calc(27 * var(--px)); height: calc(13 * var(--px));
           background: url(${SMP}gull-fly.png) 0 0 / 400% 100% no-repeat;
@@ -1513,9 +3169,24 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
         }
         @keyframes smpFluegel { from { background-position: 0 0; } to { background-position: calc(-108 * var(--px)) 0; } }
         .smp-moewe-schatten {
-          position: absolute; left: calc(8 * var(--px)); top: calc(34 * var(--px)); width: calc(14 * var(--px)); height: calc(4 * var(--px));
+          position: absolute; left: calc(6 * var(--px)); top: calc(34 * var(--px)); width: calc(16 * var(--px)); height: calc(5 * var(--px));
           background: url(${SMP}gull-shadow.png) 0 0 / 100% 100% no-repeat;
         }
+        .smp-fische { display: block; width: calc(16 * var(--px)); height: calc(7 * var(--px)); background: url(${SMP}fish.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .9s steps(1) infinite; }
+        .smp-krabbe {
+          position: absolute; width: calc(9 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SMP}crab.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite, smpKrabbe 14s steps(36) infinite;
+        }
+        @keyframes smpKrabbe {
+          0%, 12% { translate: 0 0; } 30%, 44% { translate: calc(18 * var(--px)) 0; } 52%, 60% { translate: calc(12 * var(--px)) 0; }
+          78%, 88% { translate: calc(32 * var(--px)) 0; } 100% { translate: 0 0; }
+        }
+        .smp-wolke {
+          position: absolute; left: 0; width: calc(72 * var(--px)); height: calc(26 * var(--px));
+          background: url(${SMP}cloud.png) 0 0 / 100% 100% no-repeat;
+        }
+        @keyframes smpWolke { from { transform: translateX(calc(-80 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
       `}</style>
     </PixelScene>
   );
@@ -2082,11 +3753,12 @@ const StinkyStablesOverlay = React.memo(function StinkyStablesOverlay() {
 //  Fluss + Wasserfall (3 Bilder übereinander); sway.png — Blumen und
 //  Grasbüschel (2 Bilder); mist.png — Gischt am Fuß des Falls (3 Bilder);
 //  clouds-front.png — Kachel 256, Schwaden vorn, zieht schneller;
-//  bird.png (3 Bilder 7×5), butterfly.png (2 Bilder 5×4).
+//  bird.png (Schwalbe im Profil, 4 Bilder 11×7), butterfly.png (2 Bilder 5×4).
 //
 //  Animiert: Fluss und Wasserfall fließen, Gischt wallt und steigt,
 //  die große Insel und die kleinen schweben auf und ab (ganze
-//  Kunstpixel), Wolken ziehen in zwei Ebenen, Schwalben fliegen,
+//  Kunstpixel), Wolken ziehen in zwei Ebenen, Schwalben fliegen im Profil
+//  (Kopf in Flugrichtung, Rückflüge gespiegelt),
 //  Blumen und Gras wiegen, Schmetterlinge flattern über der Wiese,
 //  Erdkrümel rieseln von den Zacken, Wasser glitzert.
 //  Licht IMMER oben rechts.
@@ -2179,7 +3851,7 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
       <PixelBand src={FI + 'clouds-front.png'} className="fi-wolken-vorn" />
       {voegel.map((v, i) => (
         <div key={'v' + i} className="pp-area-dyn pp-quer" style={ppQuer(v.y, v.dur, v.delay, v.rtl)}>
-          <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 1.9s` }} />
+          <i className="fi-vogel" style={{ transform: v.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${v.schlag.toFixed(2)}s, 2.3s` }} />
         </div>
       ))}
       <div className="pp-rand-dim" />
@@ -2212,11 +3884,14 @@ const FloatingIslandOverlay = React.memo(function FloatingIslandOverlay() {
           80% { transform: translate(calc(-2 * var(--px)), calc(2 * var(--px))); } 100% { transform: translate(0, 0); }
         }
         .fi-falter { display: block; width: calc(5 * var(--px)); height: calc(4 * var(--px)); background: url(${FI}butterfly.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .24s steps(1) infinite; }
+        /* Schwalbe im Profil, Bild schaut nach rechts (= ppQuerLtr); Rückflüge
+           (ppQuerRtl) werden gespiegelt. Flügelschlag 4 Bilder, kaum Auf und Ab. */
         .fi-vogel {
-          display: block; width: calc(7 * var(--px)); height: calc(5 * var(--px));
-          background: url(${FI}bird.png) 0 0 / 300% 100% no-repeat;
-          animation: ppSprite3 .5s steps(1) infinite, ppBob 1.9s ease-in-out infinite alternate; --bob: calc(2 * var(--px));
+          display: block; width: calc(11 * var(--px)); height: calc(7 * var(--px));
+          background: url(${FI}bird.png) 0 0 / 400% 100% no-repeat;
+          animation: fiFluegel .5s steps(4) infinite, ppBob 2.3s steps(2) infinite alternate; --bob: var(--px);
         }
+        @keyframes fiFluegel { from { background-position: 0 0; } to { background-position: calc(-44 * var(--px)) 0; } }
       `}</style>
     </PixelScene>
   );
@@ -2397,9 +4072,12 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
 //
 //  Karte: ein Zauber rund um „Skeleton"-Kreaturen — im Kerker steht ein
 //  eisernes Gerüst mit Kettenrahmen, darin zermahlen gezahnte Walzen
-//  Knochen; links ein Skelett mit rotem Helmbusch und grünem Umhang,
-//  rechts ein zweites. Oben verrauschter Bruchstein, darunter Mauerwerk
-//  aus dunkelbraun-grauen und sandfarbenen Ziegeln.
+//  Knochen; links der Skeleton Healer, rechts der Loyal Bone Dog. Oben
+//  verrauschter Bruchstein, darunter Mauerwerk aus dunkelbraun-grauen
+//  und sandfarbenen Ziegeln.
+//  Korrektur (Al 25.9.): der Linke trägt keinen Helmbusch, sondern einen
+//  Helm mit ROTEM KREUZ — der Healer (grüne Handschuhe und Stiefel,
+//  Sanitätstasche); rechts steht kein Skelett, sondern ein Knochenhund.
 //
 //  Ebenen (Kunsthöhe 100): tile.png (Kachel 128: Bruchstein-Gewölbe mit
 //  Moos und Rinnspuren, Ziegelwand mit Abplatzern, Wandfackel im Halter
@@ -2410,14 +4088,15 @@ const TempleOfSacrificeOverlay = React.memo(function TempleOfSacrificeOverlay() 
 //  Eisengerüst, Trichter voller Knochen, Mahlgehäuse mit Fenster, Rutsche,
 //  Wanne mit Knochenmehl, Knochenhaufen, Mehlsäcke, Schaufel),
 //  mill-rollers.png / mill-wheels.png (je 3 Bilder: Mahlwalzen, Schwung-
-//  rad, Zahnrad), skel-a.png / skel-b.png (je 3 Bilder), bone.png,
+//  rad, Zahnrad), healer.png (3 Bilder), dog.png (4 Bilder), bone.png,
 //  flame.png, meal.png, rat.png.
 //
 //  Animiert: die Walzen drehen gegenläufig und ziehen einen Knochen ein,
 //  Schwungrad und Zahnrad laufen mit, Knochen fallen aus dem Deckenschacht
 //  in den Trichter, Knochenmehl rieselt aus der Rutsche und staubt auf dem
-//  Haufen, die Ketten pendeln, Fackeln flackern mit warmem Schein, die
-//  Skelette klappern mit dem Kiefer, wippen und heben Speer bzw. Keule,
+//  Haufen, die Ketten pendeln, Fackeln flackern mit warmem Schein, der
+//  Healer klappert mit dem Kiefer, wippt und winkt mit dem grünen
+//  Handschuh; der Hund wedelt, schnüffelt am Boden und bellt (Kiefer),
 //  Staub schwebt, ab und zu huscht eine Ratte über den Boden.
 //  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
@@ -2425,10 +4104,8 @@ const BGR = '/areas/bonegrinder/';
 const BGR_MUEHLE_W = 100;
 const BGR_KACHEL = 128;
 const BGR_FACKEL_Y = 36;          // Oberkante Pechkopf; Fackeln bei u = 0 der Kachel
-const BGR_SKELETTE = [
-  { bild: 'skel-a', x: -60, dur: 7.4, delay: -1.2 },
-  { bild: 'skel-b', x: 60, dur: 6.1, delay: -4.3 },
-];
+const BGR_HEILER_X = -60;         // Skeleton Healer links (Füße bei y 91)
+const BGR_HUND_X = 63;            // Loyal Bone Dog rechts
 
 const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
   // Fackeln: Kachel-u 0 liegt bei x = -64 + k·128 neben der Brettmitte
@@ -2480,12 +4157,8 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           animation: `bgStauben ${s.dur.toFixed(2)}s steps(6) ${s.delay.toFixed(2)}s infinite`,
         }} />
       ))}
-      {BGR_SKELETTE.map((s, i) => (
-        <i key={'s' + i} className="bg-skelett" style={{
-          left: ppArtX(s.x - 10.5, 0), top: ppArt(60), backgroundImage: `url(${BGR}${s.bild}.png)`,
-          animation: `bgKlappern ${s.dur}s steps(1) ${s.delay}s infinite`,
-        }} />
-      ))}
+      <i className="bg-heiler" style={{ left: ppArtX(BGR_HEILER_X - 10.5, 0), top: ppArt(60) }} />
+      <i className="bg-hund" style={{ left: ppArtX(BGR_HUND_X - 12.5, 0), top: ppArt(75) }} />
       <div className="pp-area-dyn pp-quer" style={ppQuer(92, ratte.dur, ratte.delay, ratte.rtl)}>
         <i className="bg-ratte" style={{ transform: ratte.rtl ? undefined : 'scaleX(-1)' }} />
       </div>
@@ -2534,9 +4207,10 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .8; }
           100% { transform: translate(var(--dx), calc(-7 * var(--px))); opacity: 0; }
         }
-        .bg-skelett {
+        .bg-heiler {
           position: absolute; width: calc(21 * var(--px)); height: calc(32 * var(--px));
-          background-size: 300% 100%; background-repeat: no-repeat; background-position: 0 0;
+          background: url(${BGR}healer.png) 0 0 / 300% 100% no-repeat;
+          animation: bgKlappern 7.4s steps(1) -1.2s infinite;
         }
         @keyframes bgKlappern {
           0%, 38% { background-position: 0 0; }
@@ -2544,6 +4218,23 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
           44% { background-position: 50% 0; } 46% { background-position: 0 0; }
           48% { background-position: 50% 0; } 50% { background-position: 0 0; }
           74% { background-position: 100% 0; } 90% { background-position: 0 0; }
+        }
+        /* Knochenhund: 4 Bilder — Ruhe, Schwanz, Schnüffeln, Bellen */
+        .bg-hund {
+          position: absolute; width: calc(25 * var(--px)); height: calc(17 * var(--px));
+          background: url(${BGR}dog.png) 0 0 / 400% 100% no-repeat;
+          animation: bgHund 6.8s steps(1) -2.5s infinite;
+        }
+        @keyframes bgHund {
+          0% { background-position: 0 0; } 4% { background-position: 33.333% 0; } 8% { background-position: 0 0; }
+          12% { background-position: 33.333% 0; } 16% { background-position: 0 0; } 20% { background-position: 33.333% 0; }
+          24% { background-position: 0 0; }
+          36% { background-position: 66.667% 0; } 54% { background-position: 0 0; }
+          62% { background-position: 100% 0; } 64% { background-position: 0 0; }
+          66% { background-position: 100% 0; } 68% { background-position: 0 0; }
+          70% { background-position: 100% 0; } 72% { background-position: 0 0; }
+          80% { background-position: 33.333% 0; } 84% { background-position: 0 0; }
+          88% { background-position: 33.333% 0; } 92% { background-position: 0 0; }
         }
         .bg-ratte {
           display: block; width: calc(9 * var(--px)); height: calc(4 * var(--px));
@@ -2564,39 +4255,42 @@ const BonegrinderOverlay = React.memo(function BonegrinderOverlay() {
 //  THE COSMIC DEPTHS — der tiefe Weltraum (v1440, Al 25.9.)
 //
 //  Nach dem Kartenmotiv: tiefes Nachtblau voller Sterne, oben ein blass
-//  grün-grauer Mond, rechts ein blau-weißer, erdähnlicher Planet mit
-//  Wolken, links der rote, längliche Kristall-Riss (das „Auge", aus dem
-//  die Wesen der Cosmic Depths kommen), schwache Nebelschleier.
+//  grün-grauer Mond, rechts „die Erde" — in Pixel Parties ausdrücklich
+//  ein WÜRFEL (Al; wie auf The Cosmic Depths und Arrival from the Cosmic
+//  Depths), links ARGOS, das rote Auge des Kosmos, in seinem schwarzen,
+//  schattenhaften Körper (Al: kein lila Nebel). Kein Ringplanet (Al).
 //
 //  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
 //  liegt): tile.png — Kachel 128 (Nachtblau als Pixelrauschen, violette
 //  und blaue Nebel, dunkle Staubbahnen, Sterne in Größen und Farben,
-//  ferne Galaxien, Sternhaufen);
-//  twinkle.png — 3 Bilder der hellen Sterne (funkeln); nebula.png —
-//  durchsichtige Schleier, die langsam wandern und atmen; center.png —
-//  Versatzstück 200, mittig: Mond mit Kratern und Maria, Planet mit
-//  Ozeanen, Kontinenten, Wüsten, Polkappe, Meeresglanz, Atmosphären-
-//  saum und Halo, dazu ein ferner Ringplanet mit Eismond (oben links).
-//  Die WOLKEN des Planeten liegen getrennt (clouds.png, 3 Lichtstufen)
-//  und ziehen durch drei Masken (cmask-0/1/2.png = Tag, Dämmerung,
-//  Nacht), so bleibt die Schattierung auf den wandernden Wolken richtig.
-//  rift.png (3 Bilder, atmet) + rift-glow.png (pulsiert); Sprites:
-//  saucer.png (Invader-Untertasse, Lichter blinken), analyzer-r/l.png
-//  (Analyzer-Drohnen im Dreierschwarm, je Richtung eigens beleuchtet),
-//  asteroid-s/l.png (4 Drehbilder, Licht bleibt oben rechts), comet.png,
+//  ferne Galaxien, Sternhaufen); twinkle.png — 3 Bilder der hellen
+//  Sterne (funkeln); nebula.png — durchsichtige Schleier, die langsam
+//  wandern und atmen; center.png — Versatzstück 200, mittig: Mond mit
+//  Kratern und Maria, der Erd-Würfel (orthografisch gedreht, drei
+//  Flächen: oben am hellsten, rechts im Licht, links im Schatten; Ozeane,
+//  Kontinente, Wüsten, Eis, Küstensäume, Atmosphärensaum an den Kanten,
+//  Halo). cube-clouds.png — 32 Bilder NUR mit den Wolken des Würfels, je
+//  Fläche schattiert; darin ziehen die Wolken um die Hochachse.
+//  argos-body.png (3 Bilder, wabert: tiefschwarz, Rand sehr dunkles Blau/
+//  Rot, Rauchsaum, Tentakelfetzen), rift.png (Argos' Auge, 3 Bilder: der
+//  Spalt öffnet sich) + rift-glow.png (pulsiert). Sprites: saucer.png
+//  (Invader-Untertasse, Lichter blinken), analyzer-r/l.png (Analyzer-
+//  Drohnen im Dreierschwarm, je Richtung eigens beleuchtet), asteroid-
+//  s/l.png (4 Drehbilder, Licht bleibt oben rechts), comet.png,
 //  shoot.png (Sternschnuppe).
 //
 //  Animiert: Sterne funkeln (Kachelbilder + Funkelkreuze), Wolken ziehen
-//  über den Planeten, der Riss atmet und glüht, rote Funken werden in
-//  ihn hineingesogen, Nebel wabert, Sternschnuppen, ab und zu ein Komet,
-//  treibende Asteroiden und eine ferne Untertasse (beide ziehen HINTER
-//  Mond und Planet vorbei), ein Analyzer-Schwarm. Licht IMMER oben rechts.
+//  über den Erd-Würfel, Argos' Schatten wabert, sein Auge atmet und
+//  glüht, rote Funken werden hineingesogen, Nebel wabert, Sternschnuppen,
+//  ab und zu ein Komet, treibende Asteroiden und eine ferne Untertasse
+//  (beide ziehen HINTER Mond und Würfel vorbei), ein Analyzer-Schwarm.
+//  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const CD = '/areas/cosmic-depths/';
 const CD_W = 200;
-const CD_PLANET = { x: 150, y: 50, r: 24 };        // im Versatzstück
-const CD_RISS = { x: 38, y: 60, w: 19, h: 37 };    // Mitte des Risses
-const CD_WOLKEN_W = 96;                            // Breite der Wolkentextur
+const CD_WUERFEL_WOLKEN = { x: 126, y: 24, w: 48, h: 52, n: 32 };   // Wolkenbilder über dem Erd-Würfel (im Versatzstück)
+const CD_AUGE = { x: 40, y: 58, w: 23, h: 45 };                      // Mitte von Argos' Auge
+const CD_KOERPER = { w: 76, h: 98 };                                 // Schattenkörper, um das Auge zentriert
 
 const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
   const funkeln = useMemo(() => ppZufall(ppFxN(10), () => ({
@@ -2616,7 +4310,6 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
     const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 14;
     return { dx: Math.cos(a) * d, dy: Math.sin(a) * d * 1.3, dur: 2.2 + Math.random() * 2.2, delay: -Math.random() * 4.4 };
   }), []);
-  const P = CD_PLANET, D = 2 * P.r + 1;
   return (
     <PixelScene artH={100} bg="#01021f" className="cosmic-depths-overlay">
       <PixelBand src={CD + 'tile.png'} />
@@ -2640,17 +4333,16 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
         </div>
       ))}
       <PixelPiece src={CD + 'center.png'} w={CD_W} />
-      {[0, 1, 2].map(z => (
-        <div key={'w' + z} className="cd-wolken" style={{
-          left: ppArtX(P.x - P.r, CD_W), top: ppArt(P.y - P.r), width: ppArt(D), height: ppArt(D),
-          backgroundPositionY: `${z * 50}%`, ...ppMaske(CD + `cmask-${z}.png`, false),
-        }} />
-      ))}
-      <i className="cd-riss-schein" style={{ left: ppArtX(CD_RISS.x - 32, CD_W), top: ppArt(CD_RISS.y - 36) }} />
-      <i className="cd-riss" style={{ left: ppArtX(CD_RISS.x - Math.floor(CD_RISS.w / 2), CD_W), top: ppArt(CD_RISS.y - Math.floor(CD_RISS.h / 2)) }} />
+      <i className="cd-wuerfel-wolken" style={{
+        left: ppArtX(CD_WUERFEL_WOLKEN.x, CD_W), top: ppArt(CD_WUERFEL_WOLKEN.y),
+        width: ppArt(CD_WUERFEL_WOLKEN.w), height: ppArt(CD_WUERFEL_WOLKEN.h),
+      }} />
+      <i className="cd-koerper" style={{ left: ppArtX(CD_AUGE.x - CD_KOERPER.w / 2, CD_W), top: ppArt(CD_AUGE.y - CD_KOERPER.h / 2) }} />
+      <i className="cd-riss-schein" style={{ left: ppArtX(CD_AUGE.x - 22, CD_W), top: ppArt(CD_AUGE.y - 32) }} />
+      <i className="cd-riss" style={{ left: ppArtX(CD_AUGE.x - Math.floor(CD_AUGE.w / 2), CD_W), top: ppArt(CD_AUGE.y - Math.floor(CD_AUGE.h / 2)) }} />
       {funken.map((f, i) => (
         <i key={'k' + i} className="pp-area-dyn cd-funke" style={{
-          left: ppArtX(CD_RISS.x, CD_W), top: ppArt(CD_RISS.y), '--dx': ppArt(f.dx.toFixed(1)), '--dy': ppArt(f.dy.toFixed(1)),
+          left: ppArtX(CD_AUGE.x, CD_W), top: ppArt(CD_AUGE.y), '--dx': ppArt(f.dx.toFixed(1)), '--dy': ppArt(f.dy.toFixed(1)),
           animation: `cdSog ${f.dur.toFixed(2)}s ease-in ${f.delay.toFixed(2)}s infinite`,
         }} />
       ))}
@@ -2676,21 +4368,28 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
         }
         @keyframes cdNebelZug { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
         @keyframes cdNebelAtmen { from { opacity: .45; } to { opacity: .9; } }
-        .cd-wolken {
+        /* Wolken des Erd-Würfels: fertig gezeichnete Bilder (je Fläche richtig
+           schattiert), die Wolken ziehen darin um die Hochachse. */
+        .cd-wuerfel-wolken {
           position: absolute;
-          background-image: url(${CD}clouds.png); background-repeat: repeat-x;
-          background-size: calc(${CD_WOLKEN_W} * var(--px)) 300%;
-          animation: cdWolken 110s steps(${CD_WOLKEN_W}) infinite;
+          background: url(${CD}cube-clouds.png) 0 0 / ${CD_WUERFEL_WOLKEN.n * 100}% 100% no-repeat;
+          animation: cdWuerfelWolken 40s steps(${CD_WUERFEL_WOLKEN.n}, jump-none) infinite;
         }
-        @keyframes cdWolken { from { background-position-x: 0; } to { background-position-x: calc(${CD_WOLKEN_W} * var(--px)); } }
+        @keyframes cdWuerfelWolken { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+        /* Argos' Schattenkörper wabert (3 Bilder, hin und zurück) */
+        .cd-koerper {
+          position: absolute; width: calc(${CD_KOERPER.w} * var(--px)); height: calc(${CD_KOERPER.h} * var(--px));
+          background: url(${CD}argos-body.png) 0 0 / 300% 100% no-repeat;
+          animation: cdRiss 6.4s steps(1) infinite;
+        }
         .cd-riss-schein {
-          position: absolute; width: calc(64 * var(--px)); height: calc(72 * var(--px));
+          position: absolute; width: calc(44 * var(--px)); height: calc(64 * var(--px));
           background: url(${CD}rift-glow.png) 0 0 / 100% 100% no-repeat;
           animation: cdSchein 2.8s ease-in-out infinite alternate;
         }
         @keyframes cdSchein { from { opacity: .45; } to { opacity: 1; } }
         .cd-riss {
-          position: absolute; width: calc(${CD_RISS.w} * var(--px)); height: calc(${CD_RISS.h} * var(--px));
+          position: absolute; width: calc(${CD_AUGE.w} * var(--px)); height: calc(${CD_AUGE.h} * var(--px));
           background: url(${CD}rift.png) 0 0 / 300% 100% no-repeat;
           animation: cdRiss 2.8s steps(1) infinite;
         }
@@ -2746,144 +4445,141 @@ const CosmicDepthsOverlay = React.memo(function CosmicDepthsOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  THE FIRST CIRCLE OF HELL — der Limbus (v1440, Al 25.9.)
+//  THE FIRST CIRCLE OF HELL — die Vorhoelle (v1440, Al 25.9.)
 //
-//  Karte: grauer, verrauschter Steinboden, blasse, kahle, verlorene
-//  Seelen in grauen Lumpen stehen verwirrt herum, eine mit „?" ueber
-//  dem Kopf. Leitmotiv der frueheren Szene: „hier ist alles Staub".
-//  Szene: eine riesige graue Hoehle — Felswand aus Bloecken mit dunklen
-//  Spalten, Deckenueberhang mit Stalaktiten, Nischen mit Knochen,
-//  verdorrte Baeume, Stalagmiten und Geroell am Wandfuss, ein staubiger
-//  Boden mit Kieseln, Felsbrocken, Aschehaufen, Knochen, Baumstuempfen
-//  und Rissen, aus denen schwach rotes Glimmen der tieferen Kreise
-//  dringt. Mittig ein verfallenes Steintor (Keilsteinbogen mit Schaedel-
-//  Schlussstein, Quaderpfeiler, Spinnweben, herabgestuerzte Steine), in
-//  dem eine Treppe hinab in die Tiefe fuehrt — unten glueht es rot.
-//  Farbarm, grau in grau. Licht IMMER oben rechts.
+//  Karte: grauer, verrauschter Boden in mehreren nahen Grautoenen,
+//  blasse, kahle, verlorene Seelen in grauen Lumpen stehen verwirrt
+//  herum, eine mit „?" ueber dem Kopf.
+//  Al 25.9.: „die ‚Vorhoelle': eine graue, triste, ENDLOSE Landschaft an
+//  Kargheit, KEINEN felsigen Untergrund" — also keine Hoehle, kein Tor.
+//  Szene: eine flache, endlose graue Ebene bis zum Horizont, darueber
+//  ein trueber, konturloser Dunsthimmel, der am Horizont in den Boden
+//  uebergeht. Tiefe durch Perspektive: nah grobe, kontrastreiche
+//  Pixelklumpen, zur Ferne hin feiner, heller, dunstiger. Karg: nur
+//  flache Rillen, flache Staubverwehungen, vereinzelte kleine Steine und
+//  Fussspurketten, die ziellos im Kreis laufen. Licht IMMER oben rechts.
 //
 //  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 128; tile-glow.png — Glimmen der Risse;
-//  gate.png / gate-glow.png — Tor 120, mittig; dust.png — Staub-
-//  schwaden (Kachel 128×24); soul.png — Seelen (6 Bilder 7×11: stehen,
+//  liegt): tile.png — Kachel 128 (Himmel + Ebene); haze.png — Dunst-
+//  schwaden am Horizont (128×40); dust.png — Staub-/Ascheschleier ueber
+//  dem Boden (128×24); soul.png — nahe Seelen (6 Bilder 9×14: stehen,
 //  Schritt, Schritt, dasselbe nach links; 3 Varianten untereinander);
-//  ask.png — das „?" (6×8).
-//  Animiert: Seelen schlurfen ziellos hin und her (ganze Kunstpixel),
-//  bleiben stehen, sehen sich um, ab und zu erscheint ein „?"; zwei
-//  stehen nur herum und drehen den Kopf. Asche rieselt, Staub rinnt von
-//  den Stalaktiten, Staubschwaden ziehen ueber den Boden, die Risse und
-//  die Tiefe hinter dem Tor glimmen und pulsieren, Glutfunken steigen
-//  die Treppe herauf.
+//  soul-mid.png — weiter entfernte Seelen (6 Bilder 6×10, 2 Varianten,
+//  etwas dunstiger); soul-far.png — ferne blasse Silhouetten (2 Bilder
+//  3×5); ask.png — das „?" (6×8).
+//  Animiert: nahe und mittlere Seelen schlurfen ziellos hin und her
+//  (ganze Kunstpixel), bleiben stehen, sehen sich um, ab und zu erscheint
+//  ein „?"; zwei stehen nur herum und drehen den Kopf. Ferne Silhouetten
+//  tauchen im Dunst auf, wanken und verschwinden wieder. Dunst wabert am
+//  Horizont, Staubschleier ziehen ueber den Boden, Asche treibt langsam.
 // ═══════════════════════════════════════════════════════════════════
 const FC = '/areas/first-circle-of-hell/';
-const FC_TOR_W = 120;
-const FC_TIEFE = { x: 0, y: 37 };                 // Fluchtpunkt der Treppe (neben der Mitte)
-// Stalaktitenspitzen der Kachel (neben der Mitte, wiederholen sich alle 128)
-const FC_SPITZEN = [[-56, 22], [-24, 18], [30, 23], [52, 20], [14, 15]];
+const FC_HORIZONT = 35;
 // Steher: bleiben an ihrem Platz und sehen sich nur um (auch ohne Animation sichtbar)
-const FC_STEHER = [{ x: -70, y: 70, v: 1, dur: 7 }, { x: 96, y: 84, v: 0, dur: 9, links: true }];
+const FC_STEHER = [{ x: -62, y: 74, v: 1, dur: 7 }, { x: 88, y: 86, v: 0, dur: 9, links: true }];
 const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() {
   const seelen = useMemo(() => {
     const plaetze = FC_STEHER.map(s => [s.x, s.y]);
-    return ppZufall(ppFxN(9), (i) => {
-      // die Haelfte nahe der Mitte (auch schmale Bretter sehen genug Seelen), der Rest weit verstreut
+    return ppZufall(ppFxN(10), (i) => {
+      // ein Drittel weiter hinten (klein), die Haelfte nahe der Mitte, der Rest weit verstreut
+      const mitte = i % 3 === 2;
       let x, y, n = 0;
       do {
         x = (Math.random() - .5) * (i % 2 ? 340 : 170);
-        y = 60 + Math.random() * 34;
-      } while (n++ < 40 && ((Math.abs(x) < 46 && y < 66) || plaetze.some(([px, py]) => Math.abs(px - x) < 14 && Math.abs(py - y) < 9)));
+        y = mitte ? 46 + Math.random() * 14 : 64 + Math.random() * 32;
+      } while (n++ < 40 && plaetze.some(([px, py]) => Math.abs(px - x) < (mitte ? 11 : 16) && Math.abs(py - y) < 11));
       plaetze.push([x, y]);
       const dur = 14 + Math.random() * 10;
       return {
-        x: Math.round(x), y: Math.round(y), v: i % 3, dur, delay: -Math.random() * dur,
-        weg: 4 + Math.floor(Math.random() * 7), links: Math.random() < .5,
+        x: Math.round(x), y: Math.round(y), mitte, v: mitte ? i % 2 : i % 3, dur, delay: -Math.random() * dur,
+        weg: (mitte ? 3 : 4) + Math.floor(Math.random() * (mitte ? 4 : 7)), links: Math.random() < .5,
         frage: Math.random() < .5, runde: Math.floor(Math.random() * 2),
       };
     });
   }, []);
-  const asche = useMemo(() => ppZufall(ppFxN(22), () => ({
-    x: Math.random() * 100, dur: 12 + Math.random() * 12, delay: -Math.random() * 24,
-    art: Math.random() < .25 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
+  const ferne = useMemo(() => ppZufall(ppFxN(9), () => ({
+    x: (Math.random() - .5) * 360, y: FC_HORIZONT + 1 + Math.random() * 6,
+    dur: 18 + Math.random() * 18, delay: -Math.random() * 36, weg: 3 + Math.floor(Math.random() * 5),
+    links: Math.random() < .5,
   })), []);
-  const riesel = useMemo(() => {
-    const alle = [];
-    for (let k = -2; k <= 2; k++) {
-      for (const [x, y] of FC_SPITZEN) {
-        const xx = x + k * 128;
-        if (Math.abs(xx) > 44 && Math.abs(xx) < 190) alle.push([xx, y]);
-      }
-    }
-    return alle.sort(() => Math.random() - .5).slice(0, ppFxN(6)).map(([x, y]) => ({
-      x, y, fall: 44 + Math.random() * 8 - y, dur: 6 + Math.random() * 7, delay: -Math.random() * 12,
-    }));
-  }, []);
-  const glut = useMemo(() => ppZufall(ppFxN(4), () => ({
-    x: (Math.random() - .5) * 8, dur: 3 + Math.random() * 2.5, delay: -Math.random() * 5,
+  const asche = useMemo(() => ppZufall(ppFxN(16), () => ({
+    y: Math.random() * 90, dur: 30 + Math.random() * 30, delay: -Math.random() * 60,
+    art: Math.random() < .3 ? ' dunkel' : Math.random() < .2 ? ' gross' : '',
   })), []);
-  const seele = (s, key, dyn) => (
-    <div key={key} className={(dyn ? 'pp-area-dyn ' : '') + 'fc-seele'} style={{
-      left: ppArtX(s.x - 3.5, 0), top: ppArt(s.y - 10), zIndex: s.y,
-      '--weg': ppArt(s.links ? -s.weg : s.weg),
-      animation: dyn ? `fcWandern ${s.dur}s steps(${s.weg}) ${s.delay}s infinite` : undefined,
-    }}>
-      <i className="fc-leib" style={{
-        backgroundPositionY: `${s.v * 50}%`, transform: s.links ? 'scaleX(-1)' : undefined,
-        animation: `${dyn ? 'fcSchritte' : 'fcUmsehen'} ${s.dur}s steps(1) ${s.delay || 0}s infinite`,
-      }} />
-      {s.frage && (
-        <i className="pp-area-dyn fc-frage" style={{
-          animation: `fcFrage ${2 * s.dur}s steps(1) ${(s.delay || 0) - s.runde * s.dur}s infinite`,
+  const seele = (s, key, dyn) => {
+    const w = s.mitte ? 6 : 9, h = s.mitte ? 10 : 14;
+    return (
+      <div key={key} className={(dyn ? 'pp-area-dyn ' : '') + 'fc-seele'} style={{
+        left: ppArtX(s.x - w / 2, 0), top: ppArt(s.y - h + 1), width: ppArt(w), height: ppArt(h), zIndex: s.y,
+        '--weg': ppArt(s.links ? -s.weg : s.weg),
+        animation: dyn ? `fcWandern ${s.dur}s steps(${s.weg}) ${s.delay}s infinite` : undefined,
+      }}>
+        <i className="fc-leib" style={{
+          backgroundImage: `url(${FC}${s.mitte ? 'soul-mid' : 'soul'}.png)`,
+          backgroundSize: s.mitte ? '600% 200%' : '600% 300%',
+          backgroundPositionY: s.mitte ? `${s.v * 100}%` : `${s.v * 50}%`,
+          transform: s.links ? 'scaleX(-1)' : undefined,
+          animation: `${dyn ? 'fcSchritte' : 'fcUmsehen'} ${s.dur}s steps(1) ${s.delay || 0}s infinite`,
         }} />
-      )}
-    </div>
-  );
+        {s.frage && (
+          <i className="pp-area-dyn fc-frage" style={{
+            left: ppArt(w / 2 - 3), animation: `fcFrage ${2 * s.dur}s steps(1) ${(s.delay || 0) - s.runde * s.dur}s infinite`,
+          }} />
+        )}
+      </div>
+    );
+  };
   return (
-    <PixelScene artH={100} bg="#2a2725" className="first-circle-overlay">
+    <PixelScene artH={100} bg="#4f4e4b" className="first-circle-overlay">
       <PixelBand src={FC + 'tile.png'} />
-      <PixelBand src={FC + 'tile-glow.png'} className="fc-glimmen" />
-      <div className="pp-pixel-layer fc-staub hinten" style={{ top: ppArt(40) }} />
-      <PixelPiece src={FC + 'gate.png'} w={FC_TOR_W} />
-      <PixelPiece src={FC + 'gate-glow.png'} w={FC_TOR_W} className="fc-tiefe" />
-      {glut.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn fc-glut" style={{
-          left: ppArtX(FC_TIEFE.x + g.x, 0), top: ppArt(FC_TIEFE.y - 1),
-          animation: `fcGlut ${g.dur}s steps(12) ${g.delay}s infinite`,
-        }} />
+      {ferne.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn fc-fern" style={{
+          left: ppArtX(f.x - 1.5, 0), top: ppArt(f.y - 4), '--weg': ppArt(f.links ? -f.weg : f.weg),
+          animation: `fcFern ${f.dur}s steps(${f.weg * 2}) ${f.delay}s infinite`,
+        }}><i style={{ transform: f.links ? 'scaleX(-1)' : undefined }} /></div>
       ))}
-      {riesel.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn fc-riesel" style={{
-          left: ppArtX(r.x - .5, 0), top: ppArt(r.y), '--fall': ppArt(r.fall),
-          animation: `fcRieseln ${r.dur}s linear ${r.delay}s infinite`,
-        }} />
-      ))}
+      <div className="pp-pixel-layer fc-dunst" style={{ top: ppArt(FC_HORIZONT - 17) }} />
+      <div className="pp-pixel-layer fc-dunst b" style={{ top: ppArt(FC_HORIZONT - 21) }} />
+      <div className="pp-pixel-layer fc-staub hinten" style={{ top: ppArt(44) }} />
       <div className="fc-volk">
         {FC_STEHER.map((s, i) => seele({ ...s, frage: i === 0, runde: 0, delay: -i * 2.3 }, 'st' + i, false))}
         {seelen.map((s, i) => seele(s, 's' + i, true))}
       </div>
       {asche.map((a, i) => (
         <i key={'a' + i} className={'pp-area-dyn fc-asche' + a.art} style={{
-          left: a.x + '%', animation: `fcAsche ${a.dur}s linear ${a.delay}s infinite`,
+          top: ppArt(a.y), animation: `fcAsche ${a.dur}s linear ${a.delay}s infinite`,
         }} />
       ))}
-      <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(78) }} />
+      <div className="pp-pixel-layer fc-staub vorn" style={{ top: ppArt(74) }} />
       <div className="pp-rand-dim" />
       <style>{`
-        .fc-glimmen { animation: fcPuls 3.4s ease-in-out infinite alternate; }
-        .fc-tiefe { animation: fcPuls 2.6s ease-in-out -1s infinite alternate; }
-        @keyframes fcPuls { from { opacity: .35; } to { opacity: 1; } }
+        .fc-dunst {
+          position: absolute; left: 0; right: 0; height: calc(40 * var(--px));
+          background: url(${FC}haze.png) 0 0 / auto 100% repeat-x; opacity: .7;
+          animation: fcZiehen 140s steps(128) infinite, fcWabern 9s ease-in-out infinite alternate;
+        }
+        .fc-dunst.b { opacity: .45; animation-duration: 200s, 13s; animation-direction: reverse, alternate; }
+        @keyframes fcWabern { from { opacity: .35; } to { opacity: .75; } }
         .fc-staub {
           position: absolute; left: 0; right: 0; height: calc(24 * var(--px));
           background: url(${FC}dust.png) 0 0 / auto 100% repeat-x;
           animation: fcZiehen 90s steps(128) infinite;
         }
-        .fc-staub.hinten { opacity: .45; animation-duration: 130s; animation-direction: reverse; }
-        .fc-staub.vorn { opacity: .6; }
+        .fc-staub.hinten { opacity: .45; height: calc(12 * var(--px)); animation-duration: 130s; animation-direction: reverse; }
+        .fc-staub.vorn { opacity: .55; }
         @keyframes fcZiehen { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
-        .fc-volk { position: absolute; inset: 0; }
-        .fc-seele { position: absolute; width: calc(7 * var(--px)); height: calc(11 * var(--px)); }
-        .fc-leib {
-          position: absolute; inset: 0;
-          background: url(${FC}soul.png) 0 0 / 600% 300% no-repeat;
+        .fc-fern { position: absolute; width: calc(3 * var(--px)); height: calc(5 * var(--px)); opacity: 0; }
+        .fc-fern i {
+          position: absolute; inset: 0; background: url(${FC}soul-far.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 1.4s steps(1) infinite;
         }
+        @keyframes fcFern {
+          0% { opacity: 0; transform: translateX(0); } 20% { opacity: .9; }
+          80% { opacity: .9; } 100% { opacity: 0; transform: translateX(var(--weg)); }
+        }
+        .fc-volk { position: absolute; inset: 0; }
+        .fc-seele { position: absolute; }
+        .fc-leib { position: absolute; inset: 0; background-repeat: no-repeat; background-position-x: 0; }
         /* Bilder: 0 stehen, 1/2 Schritt (rechts), 3 stehen, 4/5 Schritt (links) */
         @keyframes fcWandern {
           0% { transform: translateX(0); } 40%, 55% { transform: translateX(var(--weg)); } 95%, 100% { transform: translateX(0); }
@@ -2903,7 +4599,7 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           80% { background-position-x: 60%; } 84% { background-position-x: 0%; }
         }
         .fc-frage {
-          position: absolute; left: calc(.5 * var(--px)); top: calc(-9 * var(--px));
+          position: absolute; top: calc(-9 * var(--px));
           width: calc(6 * var(--px)); height: calc(8 * var(--px));
           background: url(${FC}ask.png) 0 0 / 100% 100% no-repeat; opacity: 0;
         }
@@ -2914,28 +4610,15 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
           26.9% { opacity: 1; transform: translateY(0); }
           27%, 100% { opacity: 0; transform: translateY(0); }
         }
-        .fc-glut { position: absolute; width: var(--px); height: var(--px); background: #e0582a; opacity: 0; }
-        @keyframes fcGlut {
-          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .9; }
-          100% { transform: translate(calc(2 * var(--px)), calc(-12 * var(--px))); opacity: 0; }
-        }
-        .fc-riesel {
-          position: absolute; width: var(--px); height: calc(3 * var(--px)); opacity: 0;
-          background: linear-gradient(#9a9284 0 33%, #7a7368 33% 66%, #5a544c 66%);
-        }
-        @keyframes fcRieseln {
-          0%, 70% { transform: translateY(0); opacity: 0; } 72% { opacity: .9; }
-          96% { transform: translateY(var(--fall)); opacity: .9; } 97%, 100% { transform: translateY(var(--fall)); opacity: 0; }
-        }
-        .fc-asche { position: absolute; top: calc(-2 * var(--px)); width: var(--px); height: var(--px); background: #8e877c; opacity: .75; }
-        .fc-asche.dunkel { background: #4e4943; }
-        .fc-asche.gross { width: calc(2 * var(--px)); background: #a39b8e; }
+        .fc-asche { position: absolute; left: 0; width: var(--px); height: var(--px); background: #9a978f; opacity: .6; }
+        .fc-asche.dunkel { background: #4a4946; }
+        .fc-asche.gross { width: calc(2 * var(--px)); background: #a8a59d; }
         @keyframes fcAsche {
-          0% { transform: translate(0, 0); }
-          25% { transform: translate(calc(5 * var(--px)), calc(26 * var(--px))); }
-          50% { transform: translate(calc(1 * var(--px)), calc(52 * var(--px))); }
-          75% { transform: translate(calc(6 * var(--px)), calc(78 * var(--px))); }
-          100% { transform: translate(calc(2 * var(--px)), calc(104 * var(--px))); }
+          0% { transform: translate(calc(-10 * var(--px)), 0); }
+          25% { transform: translate(calc(25cqw), calc(3 * var(--px))); }
+          50% { transform: translate(calc(50cqw), calc(-1 * var(--px))); }
+          75% { transform: translate(calc(75cqw), calc(4 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 10 * var(--px)), calc(8 * var(--px))); }
         }
       `}</style>
     </PixelScene>
@@ -2952,8 +4635,9 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  Hinten Fabriken mit Sägezahndach, Schlote mit roten Warnlichtern und
 //  ein Gasometer, davor eine Häuserzeile (Ziegel und Putz, Gauben,
 //  Schornsteine, Läden mit Markisen), ein blauer Park mit runden
-//  violetten Bäumen, Laternen und einer bunten Lichterkette (die bunten
-//  Lichter der Karte), vorn Kopfsteinpflaster. Mittig der Turm über
+//  violetten Bäumen, Laternen und Blumenrabatten vor den Bäumen — das
+//  Bunte der Karte sind BLUMEN (Al 25.9.): rosa, gelbe, orange, weiße
+//  und hellblaue Blüten auf dunklem Blaugrün —, vorn Kopfsteinpflaster. Mittig der Turm über
 //  fast die ganze Höhe: Sockel mit Portal, Schaft mit Lisenen und
 //  Lanzettfenstern, Maßwerk-Galerie, Uhrenstube mit Ecktürmchen,
 //  Glockenstube, Spitzhelm mit Fialen, Krabben und Turmknauf.
@@ -2962,7 +4646,8 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  liegt): sky.png (Kachel 128, Himmel mit Smogschlieren), moon.png,
 //  city.png (Kachel 128, Stadt + Park, Himmel durchsichtig),
 //  lights-a/b/c.png (erleuchtete Fenster), beacons.png, lamp-glow.png,
-//  bulbs.png (3 Ebenen übereinander), smog.png (Kachel), tower.png und
+//  flowers.png (Rabatten, 3 Ebenen übereinander: gerade, rechts, links
+//  geneigt), smog.png (Kachel), tower.png und
 //  tower-glow.png (Versatzstück 64), hand-min.png / hand-hour.png (je
 //  60 Bilder 23×23 — die Zeiger sind für jeden Winkel pixelgenau
 //  gerastert, also KEINE Browser-Rotation), daw.png (2 Bilder 7×4),
@@ -2974,7 +4659,8 @@ const FirstCircleOfHellOverlay = React.memo(function FirstCircleOfHellOverlay() 
 //  kreisen um die Turmspitze (hinter dem Helm verschwinden sie) und
 //  ziehen übers Brett, Rauch steigt aus Schloten und Schornsteinen,
 //  Fenster gehen an und aus, Warnlichter blinken, Smog treibt, Laternen
-//  flackern, die Lichterkette funkelt. Licht IMMER oben rechts.
+//  flackern, die Blumen wiegen sich im Wind, Glühwürmchen tanzen über
+//  den Beeten. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const GW = '/areas/big-gwen/';
 const GW_TURM_W = 64;
@@ -3009,6 +4695,10 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       ...r, dur: (r.gross ? 5 : 3.6) + Math.random() * 2.5, delay: -Math.random() * 7,
     }));
   }, []);
+  const gluehen = useMemo(() => ppZufall(ppFxN(12), () => ({
+    x: (Math.random() - .5) * 300, y: 70 + Math.random() * 9,
+    dur: 5 + Math.random() * 4, delay: -Math.random() * 9, blink: 1.6 + Math.random() * 1.8,
+  })), []);
   const dohlen = useMemo(() => ppZufall(ppFxN(4), () => ({
     rx: 12 + Math.random() * 16, ry: 2 + Math.random() * 4, cy: 7 + Math.random() * 12,
     dur: 3.5 + Math.random() * 3, delay: -Math.random() * 12, flap: .22 + Math.random() * .12,
@@ -3032,8 +4722,14 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
       <PixelBand src={GW + 'lights-b.png'} className="gw-licht-b" />
       <PixelBand src={GW + 'lights-c.png'} className="gw-licht-c" />
       <PixelBand src={GW + 'beacons.png'} className="gw-warnlicht" />
-      <PixelBand src={GW + 'bulbs.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
+      <PixelBand src={GW + 'flowers.png'} style={{ backgroundSize: 'auto 300%', animation: 'gwWiegen 3.2s steps(1) infinite' }} />
       <PixelBand src={GW + 'lamp-glow.png'} className="gw-laterne" />
+      {gluehen.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn gw-gluehwurm" style={{
+          left: ppArtX(g.x, 0), top: ppArt(g.y),
+          animation: `gwSchwirren ${g.dur.toFixed(2)}s ease-in-out ${g.delay.toFixed(2)}s infinite, gwLeuchten ${g.blink.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
       {rauch.map((r, i) => (
         <i key={'r' + i} className={'pp-area-dyn gw-rauch' + (r.gross ? ' gross' : '')} style={{
           left: ppArtX(r.x - (r.gross ? 4.5 : 3), 0), top: ppArt(r.y - (r.gross ? 6 : 4)),
@@ -3081,6 +4777,17 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
         @keyframes gwBlink { 0% { opacity: 1; } 45% { opacity: .12; } }
         .gw-laterne { animation: gwLaterne 1.9s steps(1) infinite; }
         @keyframes gwLaterne { 0% { opacity: 1; } 21% { opacity: .8; } 25% { opacity: 1; } 58% { opacity: .88; } 62% { opacity: .7; } 66% { opacity: 1; } }
+        /* Blumen wiegen: gerade – rechts – gerade – links */
+        @keyframes gwWiegen { 0% { background-position: 50% 0%; } 25% { background-position: 50% 50%; } 50% { background-position: 50% 0%; } 75% { background-position: 50% 100%; } }
+        .gw-gluehwurm {
+          position: absolute; width: var(--px); height: var(--px); background: #e4f47a; opacity: 0;
+          box-shadow: 0 0 calc(2 * var(--px)) calc(.5 * var(--px)) rgba(210, 240, 110, .45);
+        }
+        @keyframes gwSchwirren {
+          0%, 100% { transform: translate(0, 0); } 25% { transform: translate(calc(4 * var(--px)), calc(-3 * var(--px))); }
+          50% { transform: translate(calc(7 * var(--px)), calc(-1 * var(--px))); } 75% { transform: translate(calc(3 * var(--px)), calc(2 * var(--px))); }
+        }
+        @keyframes gwLeuchten { 0% { opacity: 0; } 30% { opacity: .5; } 40% { opacity: 1; } 70% { opacity: .5; } 80%, 100% { opacity: 0; } }
         .gw-schein { animation: gwSchein 5.5s ease-in-out infinite alternate; }
         @keyframes gwSchein { from { opacity: .55; } to { opacity: 1; } }
         .gw-zeiger {
@@ -3110,142 +4817,145 @@ const BigGwenOverlay = React.memo(function BigGwenOverlay() {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  WAR COUNCIL GATHERING PLACE — Kriegsrats-Halle der Festung (v1440, Al 25.9.)
+//  WAR COUNCIL GATHERING PLACE — Kriegsrat auf der Festungsbruecke (v1440, Al 25.9.)
 //
-//  Nach dem Kartenmotiv: violettgraue Quadermauer einer Burghalle,
-//  grauer, unregelmaessiger Steinboden, Krieger mit roten Helmbueschen.
-//  Die Figuren selbst bleiben WEG (darauf liegen die Karten) — gezeigt
-//  wird der Ort, an dem sie sich versammeln.
+//  Al 25.9.: „Gathering Place soll eine BRUECKE darstellen, keinen
+//  Innenraum!" Nach dem Kartenmotiv: die violettgraue Quadermauer ist die
+//  Bruestung der Bruecke, der graue unregelmaessige Steinboden ihr Deck,
+//  auf dem sich die Krieger mit den roten Helmbueschen versammeln. Die
+//  Figuren selbst bleiben WEG (darauf liegen die Karten) — gezeigt wird
+//  der Ort. Blick schraeg von oben auf das breite Steindeck.
 //
-//  Kachel 128 (tile.png): Holzdecke mit Steingesims und Zahnschnitt,
-//  Quadermauer mit Lichtkanten, Rissen und Abplatzern, Halbsaeulen mit
-//  Kapitell und Basis, daran Fackeln in Eisenhaltern (Russ darueber),
-//  in der einen Bucht eine Trophaee (Bronzeschild vor gekreuzten
-//  Speeren) ueber einem Speerstaender mit Helm und rotem Schild, in der
-//  anderen eine Bank unter einem langen roten Banner (banner.png, drei
-//  Bilder: weht). Boden aus Flagsteinen mit Perspektive, Stroh, Kiesel,
-//  Risse. Mitte 144 (hall.png): Kamin mit vorspringendem Aufsatz, grosser
-//  Bronzehelm mit rotem Busch vor gekreuzten Schwertern, Sims mit Kerzen,
-//  Feuerboecke und Scheite, Herdplatte; davor vier hohe Lehnstuehle, der
-//  schwere Kriegstisch mit ausgebreiteter Karte (Kueste, Fluss, Waelder,
-//  Berge, Grenze, rote und blaue Steine, ein Dolch steckt darin), Helm,
-//  Kerzen, Schriftrolle; darunter ein roter Teppich mit Goldborte.
+//  Ebenen (Kunsthoehe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): sky.png — Kachel 128, Himmel mit fernen Bergketten (Schnee
+//  im Licht) und Waldtal; castle.png — ferne Burg auf einem Felsgrat
+//  (40, links der Mitte); river.png — Kachel, die Tiefe unter der
+//  Bruecke (Felsen, Fluss mit Schaum); tile.png — Kachel 128: hintere
+//  Bruestung mit Zinnen und Schiessscharten, Pfeiler mit Zinnenkrone,
+//  Fahnenstange und Laterne, Feuerschale und Wasserfass, Speerstaender
+//  mit Rundschilden und Helm, Flagsteindeck (Moos in den Fugen, Gras,
+//  Flechten, Laub, eine Pfuetze mit Himmelsspiegel), vorn Bordstein,
+//  Stirnwand und Konsolen, darunter der Blick in die Tiefe; flags.png —
+//  4 Bilder, rote Fahnen mit goldenem Helm; council.png — Mitte 144:
+//  Rundplatz ueber dem Mittelpfeiler (das Deck buchtet vorn aus), darauf
+//  der Kriegstisch mit Karte (Kueste, Fluss, Waelder, Berge, Grenze,
+//  rote und blaue Steine, ein Dolch steckt darin), Helm, Tischlaterne,
+//  Schriftrolle, vier Lehnstuehle, zwei Feuerschalen; glow.png /
+//  council-glow.png — Laternen- und Feuerschein.
 //
-//  Animiert: Fackeln (torch.png, 4 Bilder) und Kerzen (candle.png, 3
-//  Bilder) flackern, das Kaminfeuer lodert (fire.png, 4 Bilder), die
-//  Leuchtflecken (glow.png, hall-glow.png) pulsieren, das Banner weht,
-//  Funken steigen im Kamin, Rauchfaeden ueber den Kerzen, Staubkoerner
-//  treiben im Licht, ab und zu huscht eine Maus (mouse.png) die Wand
-//  entlang. Licht IMMER oben rechts.
+//  Animiert: Fahnen wehen kraeftig im Wind (nach rechts), Feuer in den
+//  Schalen flackern (fire.png, 4 Bilder) mit Funken und Rauch, die der
+//  Wind nach rechts treibt, der Schein pulsiert, Wolken ziehen, Voegel
+//  kreisen vorbei, der Fluss tief unten fliesst, Laub weht ueber das
+//  Deck. Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const WC = '/areas/war-council/';
 const WC_W = 144;
 const WC_KACHEL = 128;
-const WC_FACKELN = [32 - 64, 96 - 64];          // Saeulen (neben der Kachelmitte)
-const WC_FACKEL_Y = 11;
-// Kerzen: Docht (x neben der Mitte, y)
-const WC_KERZEN = [[-40, 60], [-37, 63], [-43, 64], [-23, 28], [22, 28]];
+const WC_KACHEL_SCHALE = { x: 32 - 64, fuss: 47 };     // Feuerschale der Kachel (neben der Kachelmitte)
+const WC_MITTE_SCHALEN = [-54, 54];                     // Feuerschalen auf dem Rundplatz
+const WC_MITTE_FUSS = 64;
 
 const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
-  const fackeln = useMemo(() => {
-    const out = [];
+  const schalen = useMemo(() => {
+    const out = WC_MITTE_SCHALEN.map(x => ({ x, fuss: WC_MITTE_FUSS }));
     for (let k = -3; k <= 3; k++) {
-      for (const x of WC_FACKELN) out.push({ x: x + k * WC_KACHEL, dur: .5 + Math.random() * .25, delay: -Math.random() });
+      const x = WC_KACHEL_SCHALE.x + k * WC_KACHEL;
+      if (Math.abs(x) > WC_W / 2 - 4) out.push({ x, fuss: WC_KACHEL_SCHALE.fuss });
     }
-    return out;
+    return out.map(s => ({ ...s, dur: .5 + Math.random() * .25, delay: -Math.random() }));
   }, []);
-  const kerzen = useMemo(() => WC_KERZEN.map(([x, y]) => ({ x, y, dur: .45 + Math.random() * .3, delay: -Math.random() })), []);
-  const funken = useMemo(() => ppZufall(ppFxN(8), () => ({
-    x: (Math.random() - .5) * 18, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3, drift: Math.round((Math.random() - .5) * 6),
+  const funken = useMemo(() => ppZufall(ppFxN(10), (i) => {
+    const s = schalen[i % schalen.length];
+    return { x: s.x + Math.round((Math.random() - .5) * 4), y: s.fuss - 16, dur: 1.4 + Math.random() * 1.2, delay: -Math.random() * 3 };
+  }), [schalen]);
+  const rauch = useMemo(() => ppZufall(ppFxN(6), (i) => {
+    const s = schalen[i % schalen.length];
+    return { x: s.x, y: s.fuss - 22, dur: 4 + Math.random() * 2, delay: -Math.random() * 6 };
+  }), [schalen]);
+  const wolken = useMemo(() => ppZufall(ppFxN(4), (i) => ({
+    y: -1 + Math.random() * 9, dur: 70 + Math.random() * 50, delay: -Math.random() * 120, art: i % 2,
   })), []);
-  const rauch = useMemo(() => ppZufall(ppFxN(5), (i) => ({
-    k: i % WC_KERZEN.length, dur: 3 + Math.random() * 2, delay: -Math.random() * 5,
+  const voegel = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: 3 + Math.random() * 10, dur: 26 + Math.random() * 14, delay: -Math.random() * 40, bob: 1 + Math.random() * 2, rtl: i === 2,
   })), []);
-  const staub = useMemo(() => ppZufall(ppFxN(14), () => ({
-    x: Math.random() * 100, y: 12 + Math.random() * 70, dur: 9 + Math.random() * 8, delay: -Math.random() * 16,
+  const laub = useMemo(() => ppZufall(ppFxN(6), () => ({
+    y: 44 + Math.random() * 36, dur: 9 + Math.random() * 7, delay: -Math.random() * 16, bob: 2 + Math.random() * 3,
   })), []);
-  const maus = useMemo(() => ppZufall(ppFxN(1), () => ({ dur: 34 + Math.random() * 12, delay: -Math.random() * 30, rtl: Math.random() < .5 })), []);
   return (
-    <PixelScene artH={100} bg="#2f2a35" className="war-council-overlay">
-      <PixelBand src={WC + 'tile.png'} />
-      <PixelBand src={WC + 'banner.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.6s steps(1) infinite' }} />
-      <PixelBand src={WC + 'glow.png'} className="wc-schein" />
-      {maus.map((m, i) => (
-        <div key={'m' + i} className="pp-area-dyn wc-maus-bahn" style={{ animation: `${m.rtl ? 'wcMausRtl' : 'wcMausLtr'} ${m.dur.toFixed(1)}s linear ${m.delay.toFixed(1)}s infinite` }}>
-          <i className="wc-maus" style={{ transform: m.rtl ? 'scaleX(-1)' : undefined }} />
+    <PixelScene artH={100} bg="#4a66a2" className="war-council-overlay">
+      <PixelBand src={WC + 'sky.png'} />
+      {wolken.map((w, i) => (
+        <div key={'w' + i} className="pp-area-dyn pp-quer" style={ppQuer(w.y, w.dur.toFixed(1), w.delay.toFixed(1), false)}>
+          <i className="wc-wolke" style={{ backgroundPosition: w.art ? '100% 0' : '0 0' }} />
         </div>
       ))}
-      <PixelPiece src={WC + 'hall.png'} w={WC_W} />
-      <i className="wc-feuer" style={{ left: ppArtX(-12, 0), top: ppArt(38) }} />
-      <PixelPiece src={WC + 'hall-glow.png'} w={WC_W} className="wc-kaminschein" />
-      {fackeln.map((f, i) => (
-        <i key={'f' + i} className="wc-fackel" style={{ left: ppArtX(f.x - 3, 0), top: ppArt(WC_FACKEL_Y), animation: `wcFackel ${f.dur.toFixed(2)}s steps(4) ${f.delay.toFixed(2)}s infinite` }} />
+      <PixelPiece src={WC + 'castle.png'} w={40} x={-28} />
+      {voegel.map((v, i) => (
+        <div key={'v' + i} className="pp-area-dyn pp-quer" style={ppQuer(v.y, v.dur.toFixed(1), v.delay.toFixed(1), v.rtl)}>
+          <i className="wc-vogel" style={{ '--bob': ppArt(v.bob), transform: v.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
       ))}
-      {kerzen.map((k, i) => (
-        <i key={'k' + i} className="wc-kerze" style={{ left: ppArtX(k.x - 1, 0), top: ppArt(k.y - 3), animation: `wcKerze ${k.dur.toFixed(2)}s steps(3) ${k.delay.toFixed(2)}s infinite` }} />
+      <PixelBand src={WC + 'river.png'} className="wc-fluss" />
+      <PixelBand src={WC + 'tile.png'} />
+      <PixelBand src={WC + 'flags.png'} style={{ backgroundSize: 'auto 400%', animation: 'wcFahnen .84s steps(1) infinite' }} />
+      <PixelBand src={WC + 'glow.png'} className="wc-schein" />
+      <PixelPiece src={WC + 'council.png'} w={WC_W} />
+      <PixelPiece src={WC + 'council-glow.png'} w={WC_W} className="wc-schein b" />
+      {schalen.map((s, i) => (
+        <i key={'f' + i} className="wc-feuer" style={{ left: ppArtX(s.x - 4, 0), top: ppArt(s.fuss - 19), animation: `wcFeuer ${s.dur.toFixed(2)}s steps(4) ${s.delay.toFixed(2)}s infinite` }} />
       ))}
       {funken.map((f, i) => (
-        <i key={'s' + i} className="pp-area-dyn wc-funke" style={{ left: ppArtX(Math.round(f.x), 0), top: ppArt(50), '--drift': ppArt(f.drift), animation: `wcFunke ${f.dur.toFixed(2)}s steps(12) ${f.delay.toFixed(2)}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn wc-funke" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `wcFunke ${f.dur.toFixed(2)}s steps(14) ${f.delay.toFixed(2)}s infinite` }} />
       ))}
-      {rauch.map((r, i) => {
-        const [x, y] = WC_KERZEN[r.k];
-        return <i key={'r' + i} className="pp-area-dyn wc-rauch" style={{ left: ppArtX(x, 0), top: ppArt(y - 5), animation: `wcRauch ${r.dur.toFixed(2)}s steps(10) ${r.delay.toFixed(2)}s infinite` }} />;
-      })}
-      {staub.map((s, i) => (
-        <i key={'d' + i} className="pp-area-dyn wc-staub" style={{ left: s.x + '%', top: ppArt(s.y), animation: `wcStaub ${s.dur.toFixed(1)}s steps(24) ${s.delay.toFixed(1)}s infinite` }} />
+      {rauch.map((r, i) => (
+        <i key={'r' + i} className="pp-area-dyn wc-rauch" style={{ left: ppArtX(r.x - 2, 0), top: ppArt(r.y), animation: `wcRauch ${r.dur.toFixed(2)}s steps(16) ${r.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {laub.map((l, i) => (
+        <div key={'l' + i} className="pp-area-dyn pp-quer" style={ppQuer(l.y, l.dur.toFixed(1), l.delay.toFixed(1), false)}>
+          <i className="wc-blatt" style={{ '--bob': ppArt(l.bob) }} />
+        </div>
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        @keyframes wcFahnen {
+          0% { background-position: 50% 0%; } 25% { background-position: 50% 33.333%; }
+          50% { background-position: 50% 66.667%; } 75% { background-position: 50% 100%; }
+        }
+        .wc-fluss { animation: wcFluss 16s steps(128) infinite; }
+        @keyframes wcFluss { from { background-position: 50% 0; } to { background-position: calc(50% + 128 * var(--px)) 0; } }
         .wc-schein { animation: wcSchein 1.3s steps(1) infinite; }
-        .wc-kaminschein { animation: wcSchein 1.7s steps(1) -.4s infinite; }
+        .wc-schein.b { animation-duration: 1.7s; animation-delay: -.4s; }
         @keyframes wcSchein { 0% { opacity: .85; } 18% { opacity: 1; } 34% { opacity: .72; } 52% { opacity: .95; } 70% { opacity: .8; } 86% { opacity: 1; } }
-        .wc-fackel {
-          position: absolute; width: calc(5 * var(--px)); height: calc(8 * var(--px));
-          background: url(${WC}torch.png) 0 0 / 400% 100% no-repeat;
-        }
-        @keyframes wcFackel { from { background-position: 0 0; } to { background-position: calc(-20 * var(--px)) 0; } }
-        .wc-kerze {
-          position: absolute; width: calc(3 * var(--px)); height: calc(4 * var(--px));
-          background: url(${WC}candle.png) 0 0 / 300% 100% no-repeat;
-        }
-        @keyframes wcKerze { from { background-position: 0 0; } to { background-position: calc(-9 * var(--px)) 0; } }
         .wc-feuer {
-          position: absolute; width: calc(24 * var(--px)); height: calc(15 * var(--px));
+          position: absolute; width: calc(9 * var(--px)); height: calc(10 * var(--px));
           background: url(${WC}fire.png) 0 0 / 400% 100% no-repeat;
-          animation: wcFeuer .6s steps(4) infinite;
         }
-        @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-96 * var(--px)) 0; } }
+        @keyframes wcFeuer { from { background-position: 0 0; } to { background-position: calc(-36 * var(--px)) 0; } }
         .wc-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
         @keyframes wcFunke {
           0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; }
-          100% { transform: translate(var(--drift), calc(-12 * var(--px))); opacity: 0; }
+          60% { transform: translate(calc(5 * var(--px)), calc(-9 * var(--px))); }
+          100% { transform: translate(calc(12 * var(--px)), calc(-15 * var(--px))); opacity: 0; }
         }
-        .wc-rauch { position: absolute; width: var(--px); height: calc(2 * var(--px)); background: rgba(190, 180, 200, .5); opacity: 0; }
+        .wc-rauch {
+          position: absolute; width: calc(4 * var(--px)); height: calc(3 * var(--px)); opacity: 0;
+          background: rgba(96, 90, 112, .55); box-shadow: inset calc(-1 * var(--px)) calc(1 * var(--px)) 0 rgba(60, 54, 74, .5);
+        }
         @keyframes wcRauch {
-          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .7; }
-          35% { transform: translate(var(--px), calc(-3 * var(--px))); }
-          60% { transform: translate(calc(-1 * var(--px)), calc(-6 * var(--px))); opacity: .45; }
-          100% { transform: translate(var(--px), calc(-11 * var(--px))); opacity: 0; }
+          0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: .75; }
+          100% { transform: translate(calc(18 * var(--px)), calc(-14 * var(--px))); opacity: 0; }
         }
-        .wc-staub { position: absolute; width: var(--px); height: var(--px); background: #f2dcb0; opacity: 0; }
-        @keyframes wcStaub {
-          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .45; }
-          50% { transform: translate(calc(4 * var(--px)), calc(-5 * var(--px))); opacity: .3; }
-          80% { opacity: .45; }
-          100% { transform: translate(calc(-2 * var(--px)), calc(-10 * var(--px))); opacity: 0; }
+        .wc-wolke { display: block; width: calc(24 * var(--px)); height: calc(8 * var(--px)); background-image: url(${WC}cloud.png); background-size: 200% 100%; background-repeat: no-repeat; }
+        .wc-vogel {
+          display: block; width: calc(5 * var(--px)); height: calc(3 * var(--px));
+          background: url(${WC}bird.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .42s steps(1) infinite, ppBob 1.6s ease-in-out infinite alternate;
         }
-        .wc-maus-bahn { position: absolute; left: 0; top: calc(60 * var(--px)); }
-        .wc-maus {
-          display: block; width: calc(6 * var(--px)); height: calc(3 * var(--px));
-          background: url(${WC}mouse.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .16s steps(1) infinite;
-        }
-        @keyframes wcMausLtr {
-          0%, 70% { transform: translateX(calc(-10 * var(--px))); }
-          100% { transform: translateX(calc(100cqw + 10 * var(--px))); }
-        }
-        @keyframes wcMausRtl {
-          0%, 70% { transform: translateX(calc(100cqw + 10 * var(--px))); }
-          100% { transform: translateX(calc(-10 * var(--px))); }
+        .wc-blatt {
+          display: block; width: calc(2 * var(--px)); height: calc(2 * var(--px));
+          background: url(${WC}leaf.png) 0 0 / 300% 100% no-repeat;
+          animation: ppSprite3 .5s steps(1) infinite, ppBob .9s ease-in-out infinite alternate;
         }
       `}</style>
     </PixelScene>
@@ -3255,84 +4965,88 @@ const WarCouncilOverlay = React.memo(function WarCouncilOverlay() {
 // ═══════════════════════════════════════════════════════════════════
 //  WOWHALLA, THE HALL OF THE COOL (v1440, Al 25.9.)
 //
-//  Karte: eine verschneite Hallenanlage mit steilen, dunkel türkis-
-//  schiefergrauen Spitzdächern und Türmen, sandfarbene Mauern mit
-//  rötlichen Flecken, kalter hellblauer Himmel, Schnee am Boden, rechts
-//  steigt eine große dunkle Rauchsäule auf. Das Walhalla der Coolness.
+//  Karte (Als große Fassung): eine STEAMPUNK-Hallenstadt auf dem Eis —
+//  Bauten aus goldbraunen, vernieteten Blechplatten mit schmalen dunklen
+//  Schlitzfenstern und Rundbögen, dunkelgrüne, geschwungene Pagodendächer
+//  mit hornartig hochgebogenen Spitzen und Dachreitern, GROSSE Zahnräder
+//  aus Bronze (und graue aus Stahl), teils halb hinter den Bauten, teils
+//  an den Wänden; Stahl-Gitterstelzen, ein schwarzer Schornstein auf
+//  einem Gitterturm mit riesiger dunkler Rauchsäule. Türkiser Himmel mit
+//  Pixelwolken, Boden aus diagonal gestreiftem Eis, ein Pfad aus Eis-
+//  schollen zum Tor, dunkle wurzelartige Eisrisse am Gebäudefuß.
+//  Al 25.9.: „Es soll einen STEAMPUNK-Vibe haben!" — kein Fachwerk.
 //
 //  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
-//  liegt): tile.png — Kachel 128 (kalter Himmel, ferne und nahe
-//  Schneeberge, Hügel mit Nadelwald und zwei kleinen Holzhäusern, ver-
-//  schneiter Vordergrund mit Wehen, Grasbüscheln und Steinen);
-//  clouds.png — Pixelwolken (Kachel 128); hall.png — die Halle, Stück
-//  170: Giebelhalle mit gekreuzten Drachenkopf-Balken, Fachwerk auf
-//  Sandsteinputz mit abgeplatzten Ziegelstellen, Tor mit Steinbogen und
-//  Eisenbändern, Schildreihe, zwei Flügel mit Walmdächern und grünen
-//  Läden, zwei Türme mit steilen Schieferhelmen, Esse, Feuerschalen,
-//  Schneewehen, Stufen und Trampelpfad; hall-glow.png — warmes Fenster-
-//  licht; smoke.png — Rauchsäule (8 Bilder); flag.png (3), fire.png (4),
-//  raven.png (2), drift.png (6, Pulverschnee vom First); snow-far.png /
-//  snow-near.png — Schneefall-Kacheln 64×100, nahtlos in x und y.
+//  liegt): tile.png — Kachel 128 (Himmel, ferne Dampf-Stadt im Dunst mit
+//  Türmen, Zahnrädern, Gittermasten und einer Rohrleitung auf Stelzen,
+//  Eisfläche mit Brocken, Rissen und Wehen); clouds.png — Wolken (Kachel
+//  128); hall.png — die Hallen, Stück WH_W breit, OHNE die drehenden
+//  Zahnräder; gears.png — Atlas: je Zahnrad eine Zeile mit 4 Bildern (=
+//  eine Zahnteilung); smoke.png — Rauchsäule (8 Bilder); steam.png —
+//  Dampfstoß (6 Bilder); snow-far.png / snow-near.png — Schneefall-
+//  Kacheln 64×100, nahtlos in x und y.
 //
-//  Animiert: Schneefall in zwei Tiefen (der ferne fällt HINTER der
-//  Halle), die Rauchsäule quillt und steigt, Wimpel wehen, Feuerschalen
-//  am Tor lodern, Fensterlicht flackert warm, Pulverschnee weht von
-//  Firsten und Turmspitzen, Eiszapfen glitzern, Wolken ziehen, Raben
-//  fliegen hinter den Türmen vorbei. Wind von rechts nach links.
+//  Animiert: die Zahnräder DREHEN sich in Pixelbildern (kein weiches
+//  Rotieren) — alle mit demselben Takt je Zahnteilung, also gleicher
+//  Umfangsgeschwindigkeit; wo sie sich berühren, greifen sie gegenläufig
+//  ineinander (Phase vom Generator). Die Rauchsäule quillt und steigt,
+//  Dampf zischt aus Rohrenden, Schnee fällt in zwei Tiefen (der ferne
+//  hinter den Hallen), Eisschollen und Eis glitzern, Wolken ziehen.
 //  Licht IMMER oben rechts.
 // ═══════════════════════════════════════════════════════════════════
 const WH = '/areas/wowhalla/';
-const WH_W = 170;                                   // Hallenstück; Stück-x 85 = Brettmitte
-const WH_FAHNEN = [[130, 0], [34, 4]];              // Mastspitzen (Stück-x, y)
-const WH_SCHALEN = [65, 106];                       // Feuerschalen (Mitte), Rand bei y 71
-const WH_RAUCH = { x: 133, w: 48, h: 40, n: 8 };    // Rauchbild, linke Kante im Stück
-const WH_FIRSTE = [[130, 7], [34, 11], [31, 41], [48, 41], [138, 43], [156, 43], [85, 12]];
-const WH_ZAPFEN = [                                // Spitzen der langen Eiszapfen (vom Generator)
-  [117, 31], [132, 31], [137, 30], [23, 35], [29, 35], [42, 35], [3, 60], [7, 59], [15, 60], [18, 59],
-  [31, 59], [35, 60], [39, 60], [46, 59], [53, 60], [56, 59], [109, 61], [118, 62], [120, 62], [135, 61],
-  [139, 61], [143, 62], [146, 61], [149, 61], [167, 62], [169, 62], [59, 54], [113, 53],
+// <gen> (vom Generator geschrieben — nicht von Hand ändern)
+const WH_W = 176;                                   // Hallenstück; Stück-x 88 = Brettmitte
+const WH_ATLAS = [128, 248];                        // gears.png (Kunstpixel)
+// Zahnräder: Mitte (Stück-x, y), Größe S, Zeile im Atlas, hinten = hinter den Hallen
+const WH_ZAHNRAEDER = [
+  { x: 65, y: 36, s: 32, zeile: 0, hinten: true },   // b1: 14 Zähne, bronze
+  { x: 113, y: 31, s: 22, zeile: 32, hinten: true },   // b2: 9 Zähne, steel
+  { x: 16, y: 33, s: 22, zeile: 54, hinten: true },   // b3: 9 Zähne, steel
+  { x: 118, y: 50, s: 22, zeile: 76, hinten: true },   // b4: 8 Zähne, bronze
+  { x: 176, y: 64, s: 24, zeile: 98, hinten: true },   // b5: 10 Zähne, bronze
+  { x: 38, y: 57, s: 22, zeile: 122, hinten: false },   // l1: 8 Zähne, bronze
+  { x: 25, y: 52, s: 20, zeile: 144, hinten: false },   // l2: 7 Zähne, bronze
+  { x: 36, y: 70, s: 20, zeile: 164, hinten: false },   // l3: 7 Zähne, bronze
+  { x: 57, y: 70, s: 22, zeile: 184, hinten: false },   // m1: 8 Zähne, bronze
+  { x: 111, y: 72, s: 22, zeile: 206, hinten: false },   // r1: 8 Zähne, bronze
+  { x: 101, y: 63, s: 20, zeile: 228, hinten: false },   // r2: 7 Zähne, bronze
 ];
+const WH_RAUCH = { x: 112, w: 48, h: 33, n: 8 };    // Rauchbild, linke Kante im Stück
+const WH_DAMPF = [[110, 29], [54, 43], [150, 38]];   // offene Rohrenden
+const WH_GLITZER = [[98, 99], [87, 93], [91, 96], [89, 96], [80, 92], [98, 93]];   // Eisschollen
+// </gen>
+const WH_TAKT = 0.9;                 // Sekunden je Zahnteilung (für ALLE Räder gleich)
 const WowhallaOverlay = React.memo(function WowhallaOverlay() {
-  const raben = useMemo(() => ppZufall(ppFxN(2), (i) => ({
-    y: [5, 16][i] + Math.random() * 4, dur: 24 + Math.random() * 12, delay: -Math.random() * 30, rtl: i === 0,
-    schlag: .32 + Math.random() * .12,
+  const dampf = useMemo(() => WH_DAMPF.slice(0, ppFxN(WH_DAMPF.length)).map(() => ({
+    dur: 3.2 + Math.random() * 3, delay: -Math.random() * 6,
   })), []);
-  const wehen = useMemo(() => WH_FIRSTE.slice(0, ppFxN(WH_FIRSTE.length)).map(() => ({
-    dur: 5 + Math.random() * 6, delay: -Math.random() * 10,
-  })), []);
-  const glitzer = useMemo(() => [...WH_ZAPFEN].sort(() => Math.random() - .5).slice(0, ppFxN(9)).map(([x, y]) => ({
-    x, y, dur: 2.2 + Math.random() * 2.5, delay: -Math.random() * 4,
-  })), []);
+  const glitzer = useMemo(() => ppZufall(ppFxN(12), (i) => i < WH_GLITZER.length
+    ? { x: WH_GLITZER[i][0] - WH_W / 2, y: WH_GLITZER[i][1], dur: 2 + Math.random() * 2.5, delay: -Math.random() * 4 }
+    : { x: (Math.random() - .5) * 340, y: 74 + Math.random() * 24, dur: 2.4 + Math.random() * 2.5, delay: -Math.random() * 5 }), []);
+  const rad = (g, i) => (
+    <i key={'z' + i} className="wh-rad" style={{
+      left: ppArtX(g.x - g.s / 2, WH_W), top: ppArt(g.y - g.s / 2), width: ppArt(g.s), height: ppArt(g.s),
+      '--s': ppArt(g.s), backgroundPositionY: `calc(${-g.zeile} * var(--px))`,
+    }} />
+  );
   return (
-    <PixelScene artH={100} bg="#8cc6e2" className="wowhalla-overlay">
+    <PixelScene artH={100} bg="#8fd6dc" className="wowhalla-overlay">
       <PixelBand src={WH + 'tile.png'} />
       <PixelBand src={WH + 'clouds.png'} className="wh-wolken" />
       <div className="pp-pixel-layer pp-area-dyn wh-schnee fern" />
-      {raben.map((r, i) => (
-        <div key={'r' + i} className="pp-area-dyn pp-quer" style={ppQuer(r.y, r.dur, r.delay, r.rtl)}>
-          <i className="wh-rabe" style={{ transform: r.rtl ? 'scaleX(-1)' : undefined, animationDuration: `${r.schlag.toFixed(2)}s, 1.9s` }} />
-        </div>
-      ))}
+      {WH_ZAHNRAEDER.map((g, i) => g.hinten ? rad(g, i) : null)}
       <PixelPiece src={WH + 'hall.png'} w={WH_W} />
-      <PixelPiece src={WH + 'hall-glow.png'} w={WH_W} className="wh-licht" />
-      {WH_SCHALEN.map((x, i) => (
-        <React.Fragment key={'f' + i}>
-          <i className="wh-schein" style={{ left: ppArtX(x - 9, WH_W), top: ppArt(58), animationDelay: `${-i * .7}s` }} />
-          <i className="wh-feuer" style={{ left: ppArtX(x - 3, WH_W), top: ppArt(63), animationDuration: `${.5 + i * .08}s` }} />
-        </React.Fragment>
-      ))}
-      {WH_FAHNEN.map(([x, y], i) => (
-        <i key={'w' + i} className="wh-fahne" style={{ left: ppArtX(x - 10, WH_W), top: ppArt(y), animationDuration: `${.75 + i * .13}s` }} />
-      ))}
+      {WH_ZAHNRAEDER.map((g, i) => g.hinten ? null : rad(g, i))}
       <i className="wh-rauch" style={{ left: ppArtX(WH_RAUCH.x, WH_W), top: 0 }} />
-      {wehen.map((w, i) => (
-        <i key={'d' + i} className="pp-area-dyn wh-pulver" style={{
-          left: ppArtX(WH_FIRSTE[i][0] - 12, WH_W), top: ppArt(WH_FIRSTE[i][1] - 4),
-          animation: `whPulver ${w.dur.toFixed(2)}s steps(1) ${w.delay.toFixed(2)}s infinite`,
+      {dampf.map((d, i) => (
+        <i key={'d' + i} className="pp-area-dyn wh-dampf" style={{
+          left: ppArtX(WH_DAMPF[i][0] - 3, WH_W), top: ppArt(WH_DAMPF[i][1] - 8),
+          animation: `whDampf ${d.dur.toFixed(2)}s steps(1) ${d.delay.toFixed(2)}s infinite`,
         }} />
       ))}
       {glitzer.map((g, i) => (
-        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, WH_W), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y - 1), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-pixel-layer pp-area-dyn wh-schnee nah" />
       <div className="pp-rand-dim" />
@@ -3340,37 +5054,27 @@ const WowhallaOverlay = React.memo(function WowhallaOverlay() {
         .wh-wolken { animation: whWolken 140s steps(128) infinite; }
         @keyframes whWolken { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         .wh-schnee { position: absolute; inset: 0; background-size: calc(64 * var(--px)) calc(100 * var(--px)); background-repeat: repeat; }
-        .wh-schnee.fern { background-image: url(${WH}snow-far.png); opacity: .75; animation: whFallFern 24s steps(200) infinite; }
+        .wh-schnee.fern { background-image: url(${WH}snow-far.png); opacity: .7; animation: whFallFern 24s steps(200) infinite; }
         .wh-schnee.nah { background-image: url(${WH}snow-near.png); animation: whFallNah 11s steps(300) infinite; }
         @keyframes whFallFern { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) calc(200 * var(--px)); } }
         @keyframes whFallNah { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) calc(300 * var(--px)); } }
-        .wh-licht { animation: whLicht 2.6s steps(1) infinite; }
-        @keyframes whLicht { 0% { opacity: .9; } 14% { opacity: .7; } 22% { opacity: 1; } 47% { opacity: .82; } 55% { opacity: .95; } 78% { opacity: .75; } 86% { opacity: 1; } }
-        .wh-feuer { position: absolute; width: calc(7 * var(--px)); height: calc(8 * var(--px)); background: url(${WH}fire.png) 0 0 / 400% 100% no-repeat; animation: whFeuer .5s steps(4) infinite; }
-        @keyframes whFeuer { from { background-position: 0 0; } to { background-position: calc(-28 * var(--px)) 0; } }
-        .wh-schein {
-          position: absolute; width: calc(18 * var(--px)); height: calc(16 * var(--px)); border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,170,70,.42) 0%, rgba(255,130,40,.16) 45%, rgba(255,130,40,0) 70%);
-          animation: whSchein 1.3s steps(1) infinite;
+        .wh-rad {
+          position: absolute; background-image: url(${WH}gears.png); background-repeat: no-repeat;
+          background-size: calc(${WH_ATLAS[0]} * var(--px)) calc(${WH_ATLAS[1]} * var(--px));
+          background-position-x: 0; animation: whRad ${WH_TAKT}s steps(4) infinite;
         }
-        @keyframes whSchein { 0% { opacity: .8; } 25% { opacity: 1; } 45% { opacity: .7; } 70% { opacity: .95; } }
-        .wh-fahne { position: absolute; width: calc(11 * var(--px)); height: calc(6 * var(--px)); background: url(${WH}flag.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .8s steps(1) infinite; }
+        @keyframes whRad { from { background-position-x: 0; } to { background-position-x: calc(-4 * var(--s)); } }
         .wh-rauch {
           position: absolute; width: calc(${WH_RAUCH.w} * var(--px)); height: calc(${WH_RAUCH.h} * var(--px));
           background: url(${WH}smoke.png) 0 0 / ${WH_RAUCH.n * 100}% 100% no-repeat;
           animation: whRauch 1.9s steps(${WH_RAUCH.n}) infinite;
         }
         @keyframes whRauch { from { background-position: 0 0; } to { background-position: calc(${-WH_RAUCH.n * WH_RAUCH.w} * var(--px)) 0; } }
-        .wh-pulver { position: absolute; width: calc(14 * var(--px)); height: calc(6 * var(--px)); background: url(${WH}drift.png) 0 0 / 600% 100% no-repeat; }
-        @keyframes whPulver {
-          0% { background-position: 0 0; } 5% { background-position: 20% 0; } 10% { background-position: 40% 0; }
-          15% { background-position: 60% 0; } 20% { background-position: 80% 0; } 25% { background-position: 100% 0; }
-          30%, 100% { background-position: 0 0; }
-        }
-        .wh-rabe {
-          display: block; width: calc(11 * var(--px)); height: calc(5 * var(--px));
-          background: url(${WH}raven.png) 0 0 / 200% 100% no-repeat;
-          animation: ppSprite2 .36s steps(1) infinite, ppBob 1.9s ease-in-out infinite alternate; --bob: calc(2 * var(--px));
+        .wh-dampf { position: absolute; width: calc(8 * var(--px)); height: calc(9 * var(--px)); background: url(${WH}steam.png) 0 0 / 600% 100% no-repeat; }
+        @keyframes whDampf {
+          0% { background-position: 0 0; } 4% { background-position: 20% 0; } 8% { background-position: 40% 0; }
+          12% { background-position: 60% 0; } 16% { background-position: 80% 0; } 20% { background-position: 100% 0; }
+          24%, 100% { background-position: 0 0; }
         }
       `}</style>
     </PixelScene>
