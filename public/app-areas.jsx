@@ -2083,33 +2083,94 @@ const SlipperyIceOverlay = React.memo(function SlipperyIceOverlay() {
   );
 });
 
-// ── SMUGGLER'S PIER ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  SMUGGLER'S PIER — Holzsteg im tiefblauen Meer (v1415, Überarbeitung
+//  v1441, Al 25.9.)
+//
 //  Karte: tiefblaues Wasser, Holzsteg mit Pfosten, Kiste, Tauring,
-//  Pfuetze, Moewen. v1435 (Al 25.9.): Proportionen wie auf der Karte —
-//  grosse Moewen (fliegend 27 breit, mit Schatten aufs Wasser). Das
-//  Beiboot ist wieder raus (v1436, Al: perspektivisch unstimmig). Meer mit wandernden Wellenstrichen und aufblitzenden
-//  Kaemmen, Pfuetze mit wanderndem Reflex und Kraeuselring. Kiste mit
-//  Deckel, Eckleisten, Strebe, Rahmen und Schlagschatten — klar vom Steg
-//  abgesetzt. Mehr Detail: Planken mit Maserung, Naegeln und Stoessen,
-//  Stirnbalken, Pfaehle mit Schaum und Algen, Tauwicklung an den Pfosten,
-//  Fass, Fischernetz. Licht IMMER oben rechts.
+//  Pfütze, Möwen. v1435 (Al 25.9.): Proportionen wie auf der Karte —
+//  große Möwen (fliegend 27 breit, mit Schatten aufs Wasser). Das
+//  Beiboot ist wieder raus (v1436, Al: perspektivisch unstimmig) und
+//  bleibt raus. Kiste mit Deckel, Eckleisten, Strebe, Rahmen und
+//  Schlagschatten — klar vom Steg abgesetzt. Mehr Detail: Planken mit
+//  Maserung, Nägeln und Stößen, Stirnbalken, Pfähle mit Schaum und
+//  Algen, Tauwicklung an den Pfosten, Fass, Fischernetz.
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"):
+//  Meer wie auf der Karte aus kurzen Wellenstrichen in neun Blautönen,
+//  zwei Wellenzüge wandern darüber, auf den Kämmen blitzen helle Striche.
+//  Der Steg läuft jetzt nach links bis an den Brettrand (Kachel, rechts-
+//  bündig am Stegstück) — Pfosten im Kartenabstand (64), Planken unter-
+//  schiedlich breit mit Maserung, Astlöchern, Stößen mit Lichtkante,
+//  Nägeln an den Querträgern, Moos in den Fugen, Möwenklecksen; Stirn-
+//  balken mit Bolzen, Seitenbalken mit Licht von rechts und Pfahlköpfen
+//  mit Algen. Kiste in Aufsicht mit Vorderseite (Brandzeichen Anker,
+//  Eisenwinkel), Tauring mit klar getrennten Windungen und dem Ende quer
+//  darüber (wie auf der Karte), Fass mit gewölbtem Mantel und Reifen,
+//  Fischernetz mit Rautenmaschen und Korkschwimmern, Schmugglerluke mit
+//  Scharnieren und Ring, Klampe mit Tau, das über die Kante ins Wasser
+//  abtaucht. Rechts im Wasser ein Dalben (drei gebundene Pfähle mit
+//  Seepocken), ein einzelner Pfahlstumpf, ein treibender Tangteppich
+//  und Felsen mit Tang und Seestern.
+//
+//  Ebenen (Kunsthöhe 100; Generator liegt nicht im Projekt):
+//  water.png — Kachel 128, 3 Bilder übereinander; deck.png — Steg-
+//  Kachel 128 (links vom Stück); pier.png — Stegkopf + Wasser-Beiwerk,
+//  Stück 336 (Stück-x 160 = Brettmitte); foam.png — Schaum und
+//  Spiegelung, 3 Bilder übereinander; puddle.png, gull-fly.png (4),
+//  gull-side.png / gull-front.png (je 3), gull-shadow.png, barrel.png
+//  (Treibfass, 3), fish.png (Fischschwarm-Schatten, 2), crab.png (2),
+//  cloud.png (Wolkenschatten).
+//
+//  Animiert: Wellenzüge und Kämme, Schaum am Steg, am Dalben und an den
+//  Felsen, Spiegelung des Dalbens, Pfütze mit wanderndem Reflex und
+//  Kräuselring, Möwen fliegen (Schatten aufs Wasser), zwei sitzende
+//  Möwen (Kopf drehen, blinzeln, rufen), Treibfass dümpelt, Fisch-
+//  schwärme ziehen unter dem Steg durch, eine Krabbe läuft über den
+//  Stirnbalken, Wolkenschatten ziehen, Glitzern auf dem Wasser.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const SMP = '/areas/smugglers-pier/';
-const SMP_W = 210;                  // Stegstueck; Stueck-x 105 = Brettmitte
-const smpX = (x) => x - SMP_W / 2;  // Stueck-x → x neben der Mitte
+const SMP_W = 336;                  // Stegstück; Stück-x 160 = Brettmitte
+const SMP_L = -160;                 // linker Rand des Stücks neben der Mitte
+const SMP_GLITZER = [               // Wasserstellen (x neben der Mitte, y)
+  [-150, 6], [-122, 24], [-86, 9], [-58, 28], [-18, 5], [8, 22], [44, 12], [62, 32],
+  [78, 48], [104, 26], [120, 62], [132, 44], [150, 18], [166, 70], [110, 92], [170, 34],
+];
 const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
   const moewen = useMemo(() => ppZufall(ppFxN(3), (i) => ({
-    // eigene Hoehe je Moewe (13 hoch, 12er-Abstand) — sie fliegen nie uebereinander
+    // eigene Höhe je Möwe (13 hoch, 12er-Abstand) — sie fliegen nie übereinander
     y: [1, 13, 25][i] + Math.random() * 2, dur: 14 + Math.random() * 10, delay: -Math.random() * 25, rtl: i % 2 === 1,
     schlag: .55 + Math.random() * .25,
   })), []);
+  const fische = useMemo(() => ppZufall(ppFxN(3), (i) => ({
+    y: [8, 58, 84][i] + Math.random() * 6, dur: 40 + Math.random() * 20, delay: -Math.random() * 60, rtl: i % 2 === 0,
+  })), []);
+  const wolken = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: [-6, 44][i] + Math.random() * 10, dur: 90 + Math.random() * 40, delay: -Math.random() * 130,
+  })), []);
+  const glitzer = useMemo(() => SMP_GLITZER.slice(0, ppFxN(16)).map(([x, y]) => ({
+    x, y, dur: 3 + Math.random() * 4, delay: -Math.random() * 7,
+  })), []);
   return (
-    <PixelScene artH={100} bg="#1646ca" className="smugglers-pier-overlay">
-      <PixelBand src={SMP + 'tile.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 1.8s steps(1) infinite' }} />
-      <PixelPiece src={SMP + 'pier.png'} w={SMP_W} />
-      <i className="smp-pfuetze" style={{ left: ppArtX(smpX(86), 0), top: ppArt(52) }} />
-      <i className="smp-kiste" style={{ left: ppArtX(smpX(12), 0), top: ppArt(40) }} />
-      <i className="smp-moewe-sitzt" style={{ left: ppArtX(smpX(20), 0), top: ppArt(31) }} />
-      <i className="smp-moewe-sitzt b" style={{ left: ppArtX(smpX(112), 0), top: ppArt(76) }} />
+    <PixelScene artH={100} bg="#1646cc" className="smugglers-pier-overlay">
+      <PixelBand src={SMP + 'water.png'} style={{ backgroundSize: 'auto 300%', animation: 'ppBand3 2.4s steps(1) infinite' }} />
+      {fische.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="smp-fische" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      {glitzer.map((g, i) => (
+        <i key={'g' + i} className="pp-area-dyn pp-px-funkeln" style={{ left: ppArtX(g.x - 1, 0), top: ppArt(g.y), animation: `ppFunkeln ${g.dur.toFixed(2)}s steps(1) ${g.delay.toFixed(2)}s infinite` }} />
+      ))}
+      <div className="pp-pixel-layer smp-steg" />
+      <PixelPiece src={SMP + 'pier.png'} w={SMP_W} x={SMP_L + SMP_W / 2} />
+      <PixelPiece src={SMP + 'foam.png'} w={SMP_W} x={SMP_L + SMP_W / 2} style={{ backgroundSize: '100% 300%', animation: 'ppBand3 1.5s steps(1) infinite' }} />
+      <i className="smp-pfuetze" style={{ left: ppArtX(7, 0), top: ppArt(49) }} />
+      <i className="smp-fass" style={{ left: ppArtX(74, 0), top: ppArt(17) }} />
+      <i className="pp-area-dyn smp-krabbe" style={{ left: ppArtX(-20, 0), top: ppArt(36) }} />
+      <i className="smp-moewe-vorn" style={{ left: ppArtX(-48, 0), top: ppArt(35) }} />
+      <i className="smp-moewe-seite" style={{ left: ppArtX(17, 0), top: ppArt(80) }} />
       {moewen.map((m, i) => (
         <div key={'m' + i} className="pp-area-dyn pp-quer" style={ppQuer(m.y, m.dur, m.delay, m.rtl)}>
           <div style={{ transform: m.rtl ? 'scaleX(-1)' : undefined, position: 'relative' }}>
@@ -2118,13 +2179,21 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
           </div>
         </div>
       ))}
+      {wolken.map((w, i) => (
+        <i key={'w' + i} className="pp-area-dyn smp-wolke" style={{ top: ppArt(w.y), animation: `smpWolke ${w.dur.toFixed(1)}s linear ${w.delay.toFixed(1)}s infinite` }} />
+      ))}
       <div className="pp-rand-dim" />
       <style>{`
-        .smp-pfuetze { position: absolute; width: calc(26 * var(--px)); height: calc(16 * var(--px)); background: url(${SMP}puddle.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.3s steps(1) infinite; }
-        .smp-kiste { position: absolute; width: calc(32 * var(--px)); height: calc(34 * var(--px)); background: url(${SMP}crate.png) 0 0 / 100% 100% no-repeat; }
-        .smp-moewe-sitzt { position: absolute; width: calc(15 * var(--px)); height: calc(13 * var(--px)); background: url(${SMP}gull-sit.png) 0 0 / 300% 100% no-repeat; animation: smpSitzen 5.5s steps(1) infinite; }
-        .smp-moewe-sitzt.b { transform: scaleX(-1); animation-duration: 7.3s; animation-delay: -2.1s; }
-        @keyframes smpSitzen { 0%, 60% { background-position: 0 0; } 64%, 76% { background-position: 50% 0; } 80% { background-position: 0 0; } 88% { background-position: 100% 0; } 92%, 100% { background-position: 0 0; } }
+        .smp-steg {
+          position: absolute; top: 0; bottom: 0; left: 0; width: calc(50% + ${SMP_L} * var(--px));
+          background: url(${SMP}deck.png) 100% 0 / auto 100% repeat-x;
+        }
+        .smp-pfuetze { position: absolute; width: calc(28 * var(--px)); height: calc(18 * var(--px)); background: url(${SMP}puddle.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 1.4s steps(1) infinite; }
+        .smp-fass { position: absolute; width: calc(18 * var(--px)); height: calc(12 * var(--px)); background: url(${SMP}barrel.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 2.2s steps(1) infinite; }
+        .smp-moewe-vorn { position: absolute; width: calc(15 * var(--px)); height: calc(17 * var(--px)); background: url(${SMP}gull-front.png) 0 0 / 300% 100% no-repeat; animation: smpVorn 6.3s steps(1) infinite; }
+        @keyframes smpVorn { 0%, 44% { background-position: 0 0; } 46%, 49% { background-position: 100% 0; } 51%, 70% { background-position: 0 0; } 72%, 90% { background-position: 50% 0; } 92%, 100% { background-position: 0 0; } }
+        .smp-moewe-seite { position: absolute; width: calc(24 * var(--px)); height: calc(15 * var(--px)); background: url(${SMP}gull-side.png) 0 0 / 300% 100% no-repeat; animation: smpSeite 8.1s steps(1) -2.4s infinite; }
+        @keyframes smpSeite { 0%, 40% { background-position: 0 0; } 42%, 58% { background-position: 50% 0; } 60%, 78% { background-position: 0 0; } 80%, 83% { background-position: 100% 0; } 85% { background-position: 0 0; } 87%, 90% { background-position: 100% 0; } 92%, 100% { background-position: 0 0; } }
         .smp-moewe {
           display: block; width: calc(27 * var(--px)); height: calc(13 * var(--px));
           background: url(${SMP}gull-fly.png) 0 0 / 400% 100% no-repeat;
@@ -2132,9 +2201,24 @@ const SmugglersPierOverlay = React.memo(function SmugglersPierOverlay() {
         }
         @keyframes smpFluegel { from { background-position: 0 0; } to { background-position: calc(-108 * var(--px)) 0; } }
         .smp-moewe-schatten {
-          position: absolute; left: calc(8 * var(--px)); top: calc(34 * var(--px)); width: calc(14 * var(--px)); height: calc(4 * var(--px));
+          position: absolute; left: calc(6 * var(--px)); top: calc(34 * var(--px)); width: calc(16 * var(--px)); height: calc(5 * var(--px));
           background: url(${SMP}gull-shadow.png) 0 0 / 100% 100% no-repeat;
         }
+        .smp-fische { display: block; width: calc(16 * var(--px)); height: calc(7 * var(--px)); background: url(${SMP}fish.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .9s steps(1) infinite; }
+        .smp-krabbe {
+          position: absolute; width: calc(9 * var(--px)); height: calc(5 * var(--px));
+          background: url(${SMP}crab.png) 0 0 / 200% 100% no-repeat;
+          animation: ppSprite2 .3s steps(1) infinite, smpKrabbe 14s steps(36) infinite;
+        }
+        @keyframes smpKrabbe {
+          0%, 12% { translate: 0 0; } 30%, 44% { translate: calc(18 * var(--px)) 0; } 52%, 60% { translate: calc(12 * var(--px)) 0; }
+          78%, 88% { translate: calc(32 * var(--px)) 0; } 100% { translate: 0 0; }
+        }
+        .smp-wolke {
+          position: absolute; left: 0; width: calc(72 * var(--px)); height: calc(26 * var(--px));
+          background: url(${SMP}cloud.png) 0 0 / 100% 100% no-repeat;
+        }
+        @keyframes smpWolke { from { transform: translateX(calc(-80 * var(--px))); } to { transform: translateX(calc(100cqw + 10 * var(--px))); } }
       `}</style>
     </PixelScene>
   );
