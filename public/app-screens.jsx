@@ -44,14 +44,6 @@ function PasswordInput({ value, onChange, placeholder, onEnter, autoFocus, autoC
 }
 window.PasswordInput = PasswordInput;
 
-// Official Discord wordmark logo, scaled by `size` (width); height keeps
-// the brand 127.14×96.36 aspect ratio. Inherits `currentColor`.
-const DiscordIcon = ({ size = 22 }) => (
-  <svg width={size} height={(size * 96.36 / 127.14).toFixed(1)} viewBox="0 0 127.14 96.36" fill="currentColor" aria-hidden="true">
-    <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" />
-  </svg>
-);
-
 // Button that opens the community Discord invite in a new tab. Reused on
 // the auth/title screen (compact pill) and the main menu (`block` — a
 // full-width banner whose logo fills the width, so its height scales with
@@ -61,7 +53,8 @@ function DiscordButton({ size = 22, label, block, style, className }) {
     <a href="https://discord.gg/K8PFRjr" target="_blank" rel="noopener noreferrer"
       className={'discord-btn' + (block ? ' discord-btn--block' : '') + (className ? ' ' + className : '')}
       title="Join our Discord" style={style}>
-      <DiscordIcon size={size} />
+      {/* Pixel-Logo statt Vektor-Marke — passt zu den Pixel-Knoepfen. */}
+      <PixelIcon name="discord" className="discord-btn-logo" style={block ? undefined : { width: size }} />
       {label && !block && <span className="discord-btn-label">{label}</span>}
     </a>
   );
@@ -664,7 +657,7 @@ function AuthScreen() {
       // Spalte schmaler, dort 250. Dieselbe Schwelle wie die Media Query.
       const kompakt = !!(window.matchMedia && window.matchMedia('(max-height: 600px)').matches);
       gid.renderButton(googleBtnRef.current, {
-        theme: 'filled_black', size: 'large', shape: 'pill', width: kompakt ? 250 : 280,
+        theme: 'filled_black', size: 'large', shape: 'rectangular', width: kompakt ? 250 : 280,
         locale: 'en',
         text: 'signin_with',
       });
@@ -819,7 +812,13 @@ function AuthScreen() {
                   </button>
                 </div>
               ) : (
-                <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+                <div style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }}>
+                  {/* Google zeichnet seinen Knopf in einen iframe — dessen
+                      Inneres laesst sich nicht gestalten. Eckig (shape
+                      'rectangular') und in einen Pixelrahmen gefasst passt
+                      er trotzdem zu den anderen Knoepfen. */}
+                  <div ref={googleBtnRef} className="google-pixelrahmen" />
+                </div>
               )}
             </>
           )}
@@ -1435,115 +1434,6 @@ function menuZoomFaktor(el, rect) {
   return (el.offsetWidth > 0 && r.width > 0) ? r.width / el.offsetWidth : 1;
 }
 
-// ── PIXEL-ICONS DES HAUPTMENUES ─────────────────────────────────────────
-// Kleine handgesetzte Sinnbilder (13×13 Raster) fuer die Ueberschriften der
-// Seitenkaesten, dazu der Hover-Pfeil der Menueknoepfe (die Knoepfe selbst
-// tragen bewusst keine Icons). '#' = Hauptfarbe (currentColor,
-// also die Spielerfarbe des Knopfes), '+' = Glanz (weiss), 'o' = dunkel.
-// Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
-// je Farbe EIN Pfad aus Zeilenlaeufen.
-const PIXEL_ICONS = {
-  schwerter: [
-    '++.........++',
-    '+##.......##+',
-    '.###.....###.',
-    '..###...###..',
-    '...###.###...',
-    '....#####....',
-    '.....###.....',
-    '....#####....',
-    '.++.##.##.++.',
-    '..++.....++..',
-    '..#++...++#..',
-    '.##.......##.',
-    '+#.........#+',
-  ],
-  karten: [
-    '.....#######.',
-    '.....#ooooo#.',
-    '.....#ooooo#.',
-    '.#######ooo#.',
-    '.#oo+oo#ooo#.',
-    '.#o+++o#ooo#.',
-    '.#+++++#ooo#.',
-    '.#o+++o#####.',
-    '.#oo+oo#.....',
-    '.#ooooo#.....',
-    '.#######.....',
-    '.............',
-    '.............',
-  ],
-  pokal: [
-    '..#########..',
-    '###+#######o#',
-    '#.#+#######.#',
-    '#.#+#######.#',
-    '.##+######o#.',
-    '...#+####o...',
-    '....#####....',
-    '.....###.....',
-    '.....###.....',
-    '....#####....',
-    '...#######...',
-    '...#######...',
-    '.............',
-  ],
-  stern: [
-    '......#......',
-    '.....###.....',
-    '.....+##.....',
-    '....#+###....',
-    '#############',
-    '.##+########.',
-    '..#########..',
-    '...#######...',
-    '...#######...',
-    '..####.####..',
-    '..###...###..',
-    '.###.....###.',
-    '.#.........#.',
-  ],
-  pfeil: [
-    '##.....',
-    '###....',
-    '.###...',
-    '..###..',
-    '...###.',
-    '..###..',
-    '.###...',
-    '###....',
-    '##.....',
-  ],
-};
-const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#0b0712' };
-const PIXEL_ICON_PFADE = {};
-function pixelIconPfade(rows) {
-  const pfade = {};
-  rows.forEach((r, y) => {
-    for (let x = 0; x < r.length;) {
-      const c = r[x];
-      if (c === '.') { x++; continue; }
-      let e = x;
-      while (e < r.length && r[e] === c) e++;
-      pfade[c] = (pfade[c] || '') + 'M' + x + ' ' + y + 'h' + (e - x) + 'v1h' + (x - e) + 'z';
-      x = e;
-    }
-  });
-  return pfade;
-}
-function PixelIcon({ name, className }) {
-  const rows = PIXEL_ICONS[name];
-  if (!rows) return null;
-  const pfade = PIXEL_ICON_PFADE[name] || (PIXEL_ICON_PFADE[name] = pixelIconPfade(rows));
-  return (
-    <svg className={'pp-pixel-icon' + (className ? ' ' + className : '')}
-      viewBox={'0 0 ' + rows[0].length + ' ' + rows.length}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false">
-      {Object.keys(pfade).map(c => <path key={c} d={pfade[c]} fill={PIXEL_ICON_FARBEN[c]} />)}
-    </svg>
-  );
-}
-
 // ═══════════════════════════════════════════
 //  MAIN MENU
 // ═══════════════════════════════════════════
@@ -1819,7 +1709,7 @@ function MainMenu() {
     if (!(dailyOpen || puzzleBrowserOpen || tutorialBrowserOpen || logoutConfirm)) return;
     const el = document.activeElement;
     if (el && el.tagName === 'BUTTON' && screenRef.current?.contains(el)
-        && !el.closest('.menu-logout-confirm-wrap > div')) el.blur();
+        && !el.closest('.menu-logout-frage')) el.blur();
   }, [dailyOpen, puzzleBrowserOpen, tutorialBrowserOpen, logoutConfirm]);
 
   // Fetch puzzle list when browser opens
@@ -2097,16 +1987,16 @@ function MainMenu() {
             {/* v1263 (Al 21.9.): so hoch wie Elo/SC-Plakette (46 px), Breite skaliert mit — Masse in .menu-logout-btn--gross */}
             <button className="btn menu-logout-btn menu-logout-btn--gross" onClick={() => setLogoutConfirm(v => !v)}>LOGOUT</button>
             {logoutConfirm && (
-              /* Eine Nummer groesser (Als Vorgabe 17.8.): Rahmen 2px,
-                 mehr Innenabstand, Text 15 statt 12, Knoepfe 13 statt 11.
-                 Die Position bleibt — das Feld haengt weiterhin unter dem
-                 LOGOUT-Knopf und rechtsbuendig, sonst wanderte es aus der
-                 Ablage heraus. */
-              <div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, background: 'var(--bg2)', border: '2px solid var(--danger)', borderRadius: 8, padding: '16px 20px', boxShadow: '0 6px 22px rgba(0,0,0,.6)', whiteSpace: 'nowrap', zIndex: 20 }}>
-                <div style={{ fontSize: 15, color: 'var(--text1)', marginBottom: 12, textAlign: 'center' }}>Really log out?</div>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                  <button className="btn btn-danger" style={{ padding: '7px 24px', fontSize: 13 }} onClick={logout}>YES</button>
-                  <button className="btn" style={{ padding: '7px 24px', fontSize: 13 }} onClick={() => setLogoutConfirm(false)}>NO</button>
+              /* Eine Nummer groesser (Als Vorgabe 17.8.). Die Position
+                 bleibt — das Feld haengt unter dem LOGOUT-Knopf und
+                 rechtsbuendig, sonst wanderte es aus der Ablage heraus.
+                 Aussehen (Pixelfenster, Knoepfe im Kartenstil) in
+                 style.css unter `.menu-logout-frage`. */
+              <div className="menu-logout-frage" role="dialog" aria-label="Log out">
+                <div className="menu-logout-frage-text">Really log out?</div>
+                <div className="menu-logout-frage-knoepfe">
+                  <button className="btn menu-logout-ja" onClick={logout}>YES</button>
+                  <button className="btn menu-logout-nein" onClick={() => setLogoutConfirm(false)}>NO</button>
                 </div>
               </div>
             )}

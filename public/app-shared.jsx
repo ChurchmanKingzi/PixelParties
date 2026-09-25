@@ -3206,6 +3206,189 @@ function CardFoil({ card, foilType }) {
   );
 }
 
+// ── PIXEL-ICONS ─────────────────────────────────────────────────────────
+// Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,
+// Hover-Pfeil der Menueknoepfe (die Knoepfe selbst tragen bewusst keine
+// Icons), das Discord-Logo und der Lautsprecher des Lautstaerkereglers
+// (laut0/1/2 = eine/zwei/drei aktive Wellen, stumm). Hier in app-shared,
+// weil der Regler auf fast allen Bildschirmen steht. '#' = Hauptfarbe (currentColor,
+// also die Spielerfarbe des Knopfes), '+' = Glanz (weiss), 'o' = dunkel.
+// Gezeichnet als SVG mit `crispEdges` — scharfe Bloecke in jeder Groesse,
+// je Farbe EIN Pfad aus Zeilenlaeufen.
+const PIXEL_ICONS = {
+  discord: [
+    '...##..........##...',
+    '..#####......#####..',
+    '..################..',
+    '.##################.',
+    '.##################.',
+    '.######.####.######.',
+    '######...##...######',
+    '######...##...######',
+    '######...##...######',
+    '#######.####.#######',
+    '####################',
+    '.##################.',
+    '.#######....#######.',
+    '..####........####..',
+    '...##..........##...',
+  ],
+  laut0: [
+    '....##......-..',
+    '...###.......-.',
+    '..####.....-..-',
+    '#####+......-.-',
+    '####++..#...-.-',
+    '####++..#...-.-',
+    '####++..#...-.-',
+    '#####+......-.-',
+    '..####.....-..-',
+    '...###.......-.',
+    '....##......-..',
+  ],
+  laut1: [
+    '....##......#..',
+    '...###.......-.',
+    '..####.....#..-',
+    '#####+......#.-',
+    '####++..#...#.-',
+    '####++..#...#.-',
+    '####++..#...#.-',
+    '#####+......#.-',
+    '..####.....#..-',
+    '...###.......-.',
+    '....##......#..',
+  ],
+  laut2: [
+    '....##......#..',
+    '...###.......#.',
+    '..####.....#..#',
+    '#####+......#.#',
+    '####++..#...#.#',
+    '####++..#...#.#',
+    '####++..#...#.#',
+    '#####+......#.#',
+    '..####.....#..#',
+    '...###.......#.',
+    '....##......#..',
+  ],
+  stumm: [
+    '....##.........',
+    '...###.........',
+    '..####.........',
+    '#####+..##..##.',
+    '####++...####..',
+    '####++....##...',
+    '####++...####..',
+    '#####+..##..##.',
+    '..####.........',
+    '...###.........',
+    '....##.........',
+  ],
+  schwerter: [
+    '++.........++',
+    '+##.......##+',
+    '.###.....###.',
+    '..###...###..',
+    '...###.###...',
+    '....#####....',
+    '.....###.....',
+    '....#####....',
+    '.++.##.##.++.',
+    '..++.....++..',
+    '..#++...++#..',
+    '.##.......##.',
+    '+#.........#+',
+  ],
+  karten: [
+    '.....#######.',
+    '.....#ooooo#.',
+    '.....#ooooo#.',
+    '.#######ooo#.',
+    '.#oo+oo#ooo#.',
+    '.#o+++o#ooo#.',
+    '.#+++++#ooo#.',
+    '.#o+++o#####.',
+    '.#oo+oo#.....',
+    '.#ooooo#.....',
+    '.#######.....',
+    '.............',
+    '.............',
+  ],
+  pokal: [
+    '..#########..',
+    '###+#######o#',
+    '#.#+#######.#',
+    '#.#+#######.#',
+    '.##+######o#.',
+    '...#+####o...',
+    '....#####....',
+    '.....###.....',
+    '.....###.....',
+    '....#####....',
+    '...#######...',
+    '...#######...',
+    '.............',
+  ],
+  stern: [
+    '......#......',
+    '.....###.....',
+    '.....+##.....',
+    '....#+###....',
+    '#############',
+    '.##+########.',
+    '..#########..',
+    '...#######...',
+    '...#######...',
+    '..####.####..',
+    '..###...###..',
+    '.###.....###.',
+    '.#.........#.',
+  ],
+  pfeil: [
+    '##.....',
+    '###....',
+    '.###...',
+    '..###..',
+    '...###.',
+    '..###..',
+    '.###...',
+    '###....',
+    '##.....',
+  ],
+};
+// '-' = Hauptfarbe gedimmt (inaktive Lautsprecher-Wellen).
+const PIXEL_ICON_FARBEN = { '#': 'currentColor', '+': '#ffffff', 'o': '#0b0712', '-': 'currentColor' };
+const PIXEL_ICON_DECKUNG = { '-': 0.28 };
+const PIXEL_ICON_PFADE = {};
+function pixelIconPfade(rows) {
+  const pfade = {};
+  rows.forEach((r, y) => {
+    for (let x = 0; x < r.length;) {
+      const c = r[x];
+      if (c === '.') { x++; continue; }
+      let e = x;
+      while (e < r.length && r[e] === c) e++;
+      pfade[c] = (pfade[c] || '') + 'M' + x + ' ' + y + 'h' + (e - x) + 'v1h' + (x - e) + 'z';
+      x = e;
+    }
+  });
+  return pfade;
+}
+function PixelIcon({ name, className, style }) {
+  const rows = PIXEL_ICONS[name];
+  if (!rows) return null;
+  const pfade = PIXEL_ICON_PFADE[name] || (PIXEL_ICON_PFADE[name] = pixelIconPfade(rows));
+  return (
+    <svg className={'pp-pixel-icon' + (className ? ' ' + className : '')}
+      viewBox={'0 0 ' + rows[0].length + ' ' + rows.length}
+      shapeRendering="crispEdges" aria-hidden="true" focusable="false" style={style}>
+      {Object.keys(pfade).map(c => <path key={c} d={pfade[c]} fill={PIXEL_ICON_FARBEN[c]} fillOpacity={PIXEL_ICON_DECKUNG[c]} />)}
+    </svg>
+  );
+}
+window.PixelIcon = PixelIcon;
+
 // ═══════════════════════════════════════════════════════════════════
 //  GLANZBAND + LOTSE (v1264)
 //
@@ -4337,14 +4520,18 @@ function VolumeControl() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const icon = muted || volume === 0 ? '🔇' : volume < 0.25 ? '🔈' : volume < 0.6 ? '🔉' : '🔊';
+  // Pixel-Lautsprecher statt Emoji, dieselben Stufen wie vorher: immer drei
+  // Wellen, davon eine/zwei/drei hell (leise/mittel/laut), der Rest
+  // gedimmt — eine kleine Pegelanzeige. Stumm: ein X statt der Wellen.
+  const icon = muted || volume === 0 ? 'stumm' : volume < 0.25 ? 'laut0' : volume < 0.6 ? 'laut1' : 'laut2';
 
   return (
     <div className="volume-control" ref={ref}>
       <button className="volume-btn"
         onClick={() => setOpen(o => !o)}
-        onContextMenu={(e) => { e.preventDefault(); setMuted(m => !m); }}>
-        {icon}
+        onContextMenu={(e) => { e.preventDefault(); setMuted(m => !m); }}
+        title="Volume (right-click: mute)" aria-label="Volume">
+        <PixelIcon name={icon} className="volume-icon" />
       </button>
       {open && (
         <div className="volume-slider-popup">
