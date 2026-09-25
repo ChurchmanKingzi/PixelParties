@@ -169,8 +169,8 @@ function TutorialBrowserModal({ onClose, tutorialList, onStart, onViewRules }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ff44cc', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,68,204,.2)' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+      <div className="menu-popup-dither pp-fenster" style={{ '--zier': 'var(--player-color, #ff44cc)', background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
           <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>HOW TO PLAY</h3>
           <button className="btn" onClick={onClose} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
         </div>
@@ -2058,8 +2058,8 @@ function MainMenu() {
       {dailyOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeDaily(); }}>
-          <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ffd700', borderRadius: 8, width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,215,0,.25)', position: 'relative' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+          <div className="menu-popup-dither pp-fenster" style={{ '--zier': '#ffd700', background: 'var(--bg2)', width: 700, maxWidth: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+            <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>DAILY CHALLENGE</h3>
               <button className="btn" onClick={closeDaily} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>
@@ -2136,8 +2136,8 @@ function MainMenu() {
       {puzzleBrowserOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPuzzleBrowserOpen(false); }}>
-          <div className="menu-popup-dither" style={{ background: 'var(--bg2)', border: '1px solid #ff8800', borderRadius: 8, width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 0 40px rgba(255,136,0,.2)', position: 'relative' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--bg4)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
+          <div className="menu-popup-dither pp-fenster" style={{ '--zier': '#ff8800', background: 'var(--bg2)', width: 420, maxHeight: '80vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+            <div className="pp-fenster-kopf" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'relative' }}>
               <h3 className="orbit-font title-outline" style={{ fontSize: 22, fontWeight: 800, color: 'var(--player-color)', margin: 0, whiteSpace: 'nowrap', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>PUZZLE LIBRARY</h3>
               <button className="btn" onClick={() => setPuzzleBrowserOpen(false)} style={{ padding: '2px 10px', fontSize: 10 }}>✕</button>
             </div>

@@ -1565,8 +1565,8 @@ function PlayScreen() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} className="lobby-content animate-in">
         {/* Open Games */}
-        <div style={{ flex: 1, borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column' }}>
-          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', borderBottom: '1px solid var(--bg4)' }}>
+        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>
             OPEN GAMES ({openRooms.length})
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
@@ -1601,8 +1601,8 @@ function PlayScreen() {
         </div>
 
         {/* In Progress */}
-        <div style={{ flex: 1, borderRight: '1px solid var(--bg4)', display: 'flex', flexDirection: 'column' }}>
-          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--player-color)', borderBottom: '1px solid var(--bg4)' }}>
+        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--player-color)' }}>
             IN PROGRESS ({activeRooms.length})
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
@@ -1631,8 +1631,8 @@ function PlayScreen() {
             the list). 1st = gold crown + gold name, 2nd = smaller silver
             crown + silver name, 3rd = bronze name, 4–10 use each
             player's own profile color. */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div className="orbit-font" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent4)', borderBottom: '1px solid var(--bg4)' }}>
+        <div className="lobby-spalte" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="orbit-font lobby-spalten-titel" style={{ padding: '10px 16px', fontSize: 12, fontWeight: 700, color: 'var(--accent4)' }}>
             LEADERBOARD ({leaderboard.length})
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
