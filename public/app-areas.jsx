@@ -2323,105 +2323,227 @@ const ParaseedGreenhouseOverlay = React.memo(function ParaseedGreenhouseOverlay(
   );
 });
 
-// ── RIOTING VILLAGE ──────────────────────────────────────────────────
-//  Neubau v1431 (Al 25.9.): Das rote Auge ist NICHT an die Wand gemalt —
-//  es gehoert einer Schattengestalt, die aus einem Eingang schaut. Die
-//  Mauern haben Risse, Scherben und Truemmer liegen herum, es brennt.
-//  Kachel: Bruchsteinmauer mit Rissen und Loechern, ein zerbrochenes und
-//  ein brennendes Fenster (Russ darueber), Schutt, Planken, Scherben,
-//  Trampelpfad, ein verkohlter Truemmerhaufen. Mitte: Steinbogen-Eingang,
-//  der Tuerfluegel aus der Angel gerissen, darin die Kapuzengestalt mit
-//  Feuerschein-Kante; ihr Auge schaut umher und blinzelt. Brandherde
-//  lodern (eigene Flammenbilder), Rauch und Funken steigen, der
-//  Feuerschein flackert. Licht IMMER oben rechts.
-//  v1432 (Al 25.9.: „die Fenster haben nur 2 Modi, die Feuer am Boden
-//  sind perfekt gleichmaessig"): Kachel 192 breit (drei Hausabschnitte,
-//  leicht verschiedene Steintoene) mit sechs Fensterzustaenden —
-//  zerbrochen, brennend, vernagelt, heil und dunkel, Fensterladen
-//  haengt schief, herausgebrochenes Mauerloch mit Schutt. Truemmer,
-//  Planken und Scherben liegen zufaellig. Die Bodenfeuer stehen NICHT
-//  mehr in der Kachel: jedes Spiel wuerfelt Anzahl, Lage und Groesse
-//  (drei Flammengroessen, jede mit eigenem verkohlten Haufen und Schein).
+// ═══════════════════════════════════════════════════════════════════
+//  RIOTING VILLAGE — Überarbeitung v1441 (Al 25.9.)
+//
+//  Karte: graue Bruchsteinmauer, dunkler Eingang, darin ein rotes Auge,
+//  staubiger Trampelpfad auf grauem Grund. Ein Dorf im Aufruhr.
+//
+//  Als Vorgaben (bleiben):
+//  • Neubau v1431: Das rote Auge ist NICHT an die Wand gemalt — es gehört
+//    einer Schattengestalt, die aus einem Eingang schaut; das Auge schaut
+//    umher und blinzelt. Die Mauern haben Risse, Scherben und Trümmer
+//    liegen herum, es brennt (Brandherde, Rauch, Funken, Feuerschein).
+//  • v1432 („die Fenster haben nur 2 Modi, die Feuer am Boden sind perfekt
+//    gleichmäßig"): Kachel 192 breit, drei Hausabschnitte in leicht
+//    verschiedenen Steintönen, sechs Fensterzustände — zerbrochen,
+//    brennend, vernagelt, heil und dunkel, Fensterladen hängt schief,
+//    herausgebrochenes Mauerloch mit Schutt. Trümmer, Planken und Scherben
+//    liegen ZUFÄLLIG. Die Bodenfeuer stehen NICHT in der Kachel: jedes
+//    Spiel würfelt Anzahl, Lage und Größe (drei Flammengrößen, jede mit
+//    eigenem verkohlten Haufen und Schein).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): statt
+//  einer flachen Wand jetzt eine Häuserzeile mit Dächern und Tiefe.
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt liegt):
+//  sky.png — Kachel 128: verrauchter Nachthimmel, von unten rot angeleuchtet,
+//  ferne Dachsilhouetten mit Kirchturm und fernen Bränden (sky-glow.png
+//  flackert); haze.png — Rauchschwaden, ziehen langsam nach links;
+//  tile.png — Kachel 192: Stroh-Walmdach mit Brandloch, Giebelhaus mit
+//  Ziegeln und Fachwerk (vernagelte Tür, Fackelhalter), Schieferhaus mit
+//  aufgerissenem Dach, Esse und angelehnter Leiter; Bruchsteinmauern mit
+//  Rissen und Ruß, die sechs Fensterzustände, Gassen, Pflaster, Straße mit
+//  Spurrillen, Pfütze, Fass, Kisten, Bretter, Wagenrad (tile-glow.png:
+//  Feuerschein, flackert); house.png — Mittelstück 76: Treppengiebelhaus
+//  mit Rundbogen-Eingang, die Tür aus der Angel gerissen, darin die
+//  Kapuzengestalt mit Feuerschein-Kante (von der Fackel daneben), oben ein
+//  zerbrochenes Fenster mit herauswehendem Vorhang und eins mit Brand
+//  dahinter, schiefe Wetterfahne, Stufen, Schutt (house-glow.png).
+//  Sprites: eye (5), sign (4), shutter (3), fire-s/m/l (6) + heap-s/m/l,
+//  fire-win (6), fire-roof (6), torch (4), smoke (8), puff (4),
+//  debris (10 Varianten), rioter (2 Figuren × 2 Richtungen × 4 Bilder).
+//
+//  Animiert: Bodenfeuer (zufällig) mit Glut, Schein und Rauchwölkchen,
+//  Fensterflammen schlagen heraus, das Strohdach brennt, eine Rauchsäule
+//  quillt, Fackeln flackern, Funken steigen, Asche rieselt, Rauch zieht,
+//  ferne Brände glimmen, der Fensterladen und das Wirtshausschild
+//  schaukeln, Aufrührer mit Fackel und Mistgabel ziehen an den Häusern
+//  vorbei (HINTER dem Mittelhaus), das Auge schaut umher und blinzelt.
+//  Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const RVG = '/areas/rioting-village/';
-const RVG_TUER_W = 56;
+const RVG_HAUS_W = 76;
 const RVG_KACHEL = 192;
-// brennende Fenster der Kachel: Mitte x (neben Kachelmitte 96), Flammen-Oberkante
-const RVG_FENSTERFEUER = [{ x: 33 - 96, y: 16 }, { x: 157.5 - 96, y: 16 }];
-const RVG_FEUER = { s: { w: 7, h: 9 }, m: { w: 9, h: 12 }, l: { w: 12, h: 16 } };
+// Positionen in der Kachel (Kunstpixel neben der Kachelmitte 96) — vom Generator
+const RVG_FENSTERFEUER = [{ x: 45.5 - 96, y: 35 }, { x: 168.5 - 96, y: 34 }];   // Fenster-Oberkante
+const RVG_DACHFEUER = [{ x: 42 - 96, y: 23 }];                                 // Unterkante Flammen
+const RVG_FACKELN = [{ x: 107.5 - 96, y: 41 }];                                // Fackel-Fuß
+const RVG_LADEN = { x: 127 - 96, y: 34 };                                       // Ladenbild oben links
+// Mittelhaus (Stück-x → Brett-x: x - 38)
+const RVG_AUGE = { x: 32.5 - 38, y: 46 };
+const RVG_SCHILD = { x: 50 - 38, y: 45 };
+const RVG_HAUSFACKEL = { x: 52.5 - 38, y: 49 };
+const RVG_FEUER = { s: { w: 8, h: 10, hh: 4 }, m: { w: 10, h: 13, hh: 4 }, l: { w: 13, h: 17, hh: 5 } };
+const RVG_BILDER = 6;
 const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
-  const feuer = useMemo(() => {
-    const out = [];
-    // Bodenfeuer: zufaellig verteilt, mit Mindestabstand, drei Groessen
-    const n = ppFxN(7);
-    for (let tries = 0; out.length < n && tries < 200; tries++) {
-      const x = (Math.random() - .5) * 280, fuss = 70 + Math.random() * 26;
-      if (Math.abs(x) < 16 && fuss < 72) continue;                    // nicht in den Eingang
-      if (out.some(f => Math.abs(f.x - x) < 18 && Math.abs(f.fuss - fuss) < 10)) continue;
-      const g = ['s', 'm', 'm', 'l'][Math.floor(Math.random() * 4)];
-      const { w, h } = RVG_FEUER[g];
-      out.push({ art: 'boden', g, x, fuss, y: fuss - h + 1, w, h });
-    }
-    for (let k = -2; k <= 2; k++) {
-      for (const f of RVG_FENSTERFEUER) {
-        const x = f.x + k * RVG_KACHEL;
-        if (Math.abs(x) > RVG_TUER_W / 2 + 2) out.push({ art: 'fenster', x, y: f.y, w: 7, h: 10 });
+  // Kachel-Dinge über die ganze Breite (−2 … +2 Kacheln), hinter dem Mittelhaus weglassen
+  const kachel = useMemo(() => {
+    const auf = (liste, verdeckt) => {
+      const out = [];
+      for (let k = -2; k <= 2; k++) for (const p of liste) {
+        const x = p.x + k * RVG_KACHEL;
+        if (Math.abs(x) < 230 && Math.abs(x) > verdeckt) out.push({ ...p, x });
       }
-    }
-    return out.map(f => ({ ...f, dur: .38 + Math.random() * .3, delay: -Math.random() }));
+      return out;
+    };
+    return {
+      fenster: auf(RVG_FENSTERFEUER, 36).map(f => ({ ...f, dur: .5 + Math.random() * .25, delay: -Math.random() })),
+      dach: auf(RVG_DACHFEUER, 30).map(f => ({ ...f, dur: .6 + Math.random() * .2, delay: -Math.random() })),
+      fackeln: auf(RVG_FACKELN, 36).map(f => ({ ...f, dur: .4 + Math.random() * .15 })),
+      laeden: auf([RVG_LADEN], 44).map(l => ({ ...l, dur: 2.6 + Math.random() * 1.4, delay: -Math.random() * 3 })),
+    };
   }, []);
-  const rauch = useMemo(() => feuer.filter(f => f.art === 'boden' || Math.random() < .6).slice(0, ppFxN(14)).map(f => ({
-    x: f.x, y: f.y, dur: 3.5 + Math.random() * 2.5, delay: -Math.random() * 6,
-  })), [feuer]);
-  const funken = useMemo(() => ppZufall(ppFxN(18), () => {
-    const f = feuer[Math.floor(Math.random() * feuer.length)];
-    return { x: f.x + (Math.random() - .5) * 6, y: f.y + 4, dur: 1.6 + Math.random() * 1.6, delay: -Math.random() * 3 };
-  }), [feuer]);
+  const feuer = useMemo(() => {
+    // Bodenfeuer: zufällig verteilt, mit Mindestabstand, drei Größen
+    const out = [];
+    const n = ppFxN(7);
+    for (let tries = 0; out.length < n && tries < 300; tries++) {
+      const x = (Math.random() - .5) * 300, fuss = 72 + Math.random() * 25;
+      if (Math.abs(x) < 26 && fuss < 76) continue;                         // nicht auf die Stufen
+      if (out.some(f => Math.abs(f.x - x) < 22 && Math.abs(f.fuss - fuss) < 12)) continue;
+      const g = ['s', 'm', 'm', 'l'][Math.floor(Math.random() * 4)];
+      out.push({ g, x, fuss, ...RVG_FEUER[g], dur: .55 + Math.random() * .3, delay: -Math.random(),
+        schein: (0.9 + Math.random() * .6).toFixed(2), pDur: 3.2 + Math.random() * 2, pDelay: -Math.random() * 5 });
+    }
+    return out;
+  }, []);
+  const truemmer = useMemo(() => {
+    // Planken, Scherben, Kisten … zufällig, nicht auf den Feuern
+    const out = [];
+    for (let tries = 0; out.length < 14 && tries < 400; tries++) {
+      const x = Math.round((Math.random() - .5) * 340), y = Math.round(67 + Math.random() * 31);
+      if (Math.abs(x) < 30 && y < 71) continue;
+      if (feuer.some(f => Math.abs(f.x - x) < 14 && Math.abs(f.fuss - y) < 7)) continue;
+      if (out.some(t => Math.abs(t.x - x) < 18 && Math.abs(t.y - y) < 8)) continue;
+      out.push({ x, y, v: Math.floor(Math.random() * 10) });
+    }
+    return out;
+  }, [feuer]);
+  const funken = useMemo(() => {
+    const quellen = [...feuer.map(f => ({ x: f.x, y: f.fuss - f.h + 3 })), ...kachel.dach.map(d => ({ x: d.x, y: d.y - 14 }))];
+    return ppZufall(ppFxN(20), () => {
+      const q = quellen[Math.floor(Math.random() * quellen.length)];
+      return { x: Math.round(q.x + (Math.random() - .5) * 6), y: Math.round(q.y), dur: 1.8 + Math.random() * 1.8, delay: -Math.random() * 3.6, hell: Math.random() < .4 };
+    });
+  }, [feuer, kachel]);
+  const asche = useMemo(() => ppZufall(ppFxN(14), () => ({
+    x: Math.random() * 100, y: Math.round(Math.random() * 40), dur: 7 + Math.random() * 6, delay: -Math.random() * 12,
+  })), []);
+  const aufruehrer = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    rtl: i === 1, figur: i, dur: 42 + Math.random() * 18, delay: -Math.random() * 50 - i * 20,
+  })), []);
   return (
     <PixelScene artH={100} bg="#3a3531" className="rioting-village-overlay">
+      <PixelBand src={RVG + 'sky.png'} />
+      <PixelBand src={RVG + 'sky-glow.png'} className="rvg-fern" />
+      <PixelBand src={RVG + 'haze.png'} className="pp-area-dyn rvg-dunst" />
       <PixelBand src={RVG + 'tile.png'} />
-      <PixelBand src={RVG + 'window-glow.png'} className="rvg-schein" />
-      {feuer.filter(f => f.art === 'boden').map((f, i) => (
+      <PixelBand src={RVG + 'tile-glow.png'} className="rvg-schein" />
+      {kachel.dach.map((d, i) => (
+        <React.Fragment key={'d' + i}>
+          <i className="rvg-rauchsaeule" style={{ left: ppArtX(d.x - 31, 0), top: ppArt(d.y - 38), animationDelay: (-i * .4) + 's' }} />
+          <i className="rvg-dachfeuer" style={{ left: ppArtX(d.x - 9, 0), top: ppArt(d.y - 16), animation: `rvgDach ${d.dur.toFixed(2)}s steps(${RVG_BILDER}) ${d.delay.toFixed(2)}s infinite` }} />
+        </React.Fragment>
+      ))}
+      {kachel.fenster.map((f, i) => (
+        <i key={'w' + i} className="rvg-fensterfeuer" style={{ left: ppArtX(f.x - 4.5, 0), top: ppArt(f.y - 8), animation: `rvgFenster ${f.dur.toFixed(2)}s steps(${RVG_BILDER}) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {kachel.fackeln.map((f, i) => (
+        <i key={'t' + i} className="rvg-fackel" style={{ left: ppArtX(f.x - 2.5, 0), top: ppArt(f.y - 6), animationDuration: f.dur.toFixed(2) + 's' }} />
+      ))}
+      {kachel.laeden.map((l, i) => (
+        <i key={'l' + i} className="rvg-laden" style={{ left: ppArtX(l.x, 0), top: ppArt(l.y), animationDuration: l.dur.toFixed(2) + 's', animationDelay: l.delay.toFixed(2) + 's' }} />
+      ))}
+      {aufruehrer.map((a, i) => (
+        <div key={'a' + i} className="pp-area-dyn pp-quer" style={ppQuer(43, a.dur, a.delay, a.rtl)}>
+          <i className="rvg-aufruehrer" style={{ backgroundPositionY: `${(a.figur * 2 + (a.rtl ? 1 : 0)) * 100 / 3}%` }} />
+        </div>
+      ))}
+      <PixelPiece src={RVG + 'house.png'} w={RVG_HAUS_W} />
+      <PixelPiece src={RVG + 'house-glow.png'} w={RVG_HAUS_W} className="rvg-schein" />
+      <i className="rvg-augenglut" style={{ left: ppArtX(RVG_AUGE.x - 4, 0), top: ppArt(RVG_AUGE.y - 4) }} />
+      <i className="rvg-auge" style={{ left: ppArtX(RVG_AUGE.x, 0), top: ppArt(RVG_AUGE.y) }} />
+      <i className="rvg-fackel" style={{ left: ppArtX(RVG_HAUSFACKEL.x - 2.5, 0), top: ppArt(RVG_HAUSFACKEL.y - 6), animationDuration: '.47s' }} />
+      <i className="rvg-schild" style={{ left: ppArtX(RVG_SCHILD.x, 0), top: ppArt(RVG_SCHILD.y) }} />
+      {truemmer.map((t, i) => (
+        <i key={'m' + i} className="rvg-truemmer" style={{ left: ppArtX(t.x - 8, 0), top: ppArt(t.y - 7), backgroundPositionX: `${t.v * 100 / 9}%` }} />
+      ))}
+      {feuer.map((f, i) => (
         <React.Fragment key={'b' + i}>
           <i className="rvg-bodenschein" style={{
-            left: ppArtX(f.x - f.w * 1.6, 0), top: ppArt(f.fuss - f.w * 1.6), width: ppArt(f.w * 3.2), height: ppArt(f.w * 2.4),
-            animationDuration: (0.9 + Math.random() * .6).toFixed(2) + 's', animationDelay: (-Math.random()).toFixed(2) + 's',
+            left: ppArtX(f.x - f.w * 1.7, 0), top: ppArt(f.fuss - f.w * 1.5), width: ppArt(f.w * 3.4), height: ppArt(f.w * 2.4),
+            animationDuration: f.schein + 's', animationDelay: (-f.schein * i / 3).toFixed(2) + 's',
+          }} />
+          <i className="rvg-flamme" style={{
+            left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.fuss - f.h + 1), width: ppArt(f.w), height: ppArt(f.h),
+            backgroundImage: `url(${RVG}fire-${f.g}.png)`,
+            '--rvg-lauf': `calc(${-RVG_BILDER * f.w} * var(--px))`,
+            animation: `rvgFlackern ${f.dur.toFixed(2)}s steps(${RVG_BILDER}) ${f.delay.toFixed(2)}s infinite`,
           }} />
           <i className="rvg-haufen" style={{
-            left: ppArtX(f.x - (f.w + 4) / 2, 0), top: ppArt(f.fuss - Math.max(4, Math.floor((f.w + 4) / 2)) + 2),
-            width: ppArt(f.w + 4), height: ppArt(Math.max(4, Math.floor((f.w + 4) / 2))),
-            backgroundImage: `url(${RVG}embers-${f.w}.png)`,
+            left: ppArtX(f.x - (f.w + 4) / 2, 0), top: ppArt(f.fuss - f.hh + 2), width: ppArt(f.w + 4), height: ppArt(f.hh),
+            backgroundImage: `url(${RVG}heap-${f.g}.png)`,
+          }} />
+          <i className="pp-area-dyn rvg-puff" style={{
+            left: ppArtX(Math.round(f.x) - 4, 0), top: ppArt(f.fuss - f.h - 6),
+            animation: `rvgPuffBild ${f.pDur.toFixed(2)}s steps(1) ${f.pDelay.toFixed(2)}s infinite, rvgPuffWeg ${f.pDur.toFixed(2)}s steps(14) ${f.pDelay.toFixed(2)}s infinite`,
           }} />
         </React.Fragment>
       ))}
-      <PixelPiece src={RVG + 'doorway.png'} w={RVG_TUER_W} />
-      <i className="rvg-augenglut" style={{ left: ppArtX(-8, 0), top: ppArt(26) }} />
-      <i className="rvg-auge" style={{ left: ppArtX(-5.5, 0), top: ppArt(29.5) }} />
-      {feuer.map((f, i) => (
-        <i key={'f' + i} className="rvg-flamme" style={{
-          left: ppArtX(f.x - f.w / 2, 0), top: ppArt(f.y), width: ppArt(f.w), height: ppArt(f.h),
-          backgroundImage: `url(${RVG}${f.art === 'fenster' ? 'flames-window' : 'flames-' + f.g}.png)`,
-          '--rvg-lauf': `calc(${-4 * f.w} * var(--px))`,
-          animation: `rvgFlackern ${f.dur.toFixed(2)}s steps(4) ${f.delay.toFixed(2)}s infinite`,
-        }} />
-      ))}
-      {rauch.map((r, i) => (
-        <i key={'r' + i} className="pp-area-dyn rvg-rauch" style={{ left: ppArtX(r.x - 3, 0), top: ppArt(r.y - 5), animation: `rvgRauch ${r.dur.toFixed(2)}s ease-out ${r.delay.toFixed(2)}s infinite` }} />
-      ))}
       {funken.map((f, i) => (
-        <i key={'s' + i} className="pp-area-dyn rvg-funke" style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `rvgFunke ${f.dur.toFixed(2)}s linear ${f.delay.toFixed(2)}s infinite` }} />
+        <i key={'s' + i} className={'pp-area-dyn rvg-funke' + (f.hell ? ' hell' : '')} style={{ left: ppArtX(f.x, 0), top: ppArt(f.y), animation: `rvgFunke ${f.dur.toFixed(2)}s steps(26) ${f.delay.toFixed(2)}s infinite` }} />
+      ))}
+      {asche.map((a, i) => (
+        <i key={'x' + i} className="pp-area-dyn rvg-asche" style={{ left: a.x + '%', top: ppArt(a.y), animation: `rvgAsche ${a.dur.toFixed(2)}s steps(60) ${a.delay.toFixed(2)}s infinite` }} />
       ))}
       <div className="pp-rand-dim" />
       <style>{`
+        .rvg-fern { animation: rvgFern 3.4s steps(1) infinite; }
+        @keyframes rvgFern { 0% { opacity: .7; } 20% { opacity: 1; } 45% { opacity: .8; } 70% { opacity: .95; } 85% { opacity: .65; } }
+        .rvg-dunst { animation: rvgDunst 150s steps(128) infinite; opacity: .85; }
+        @keyframes rvgDunst { from { background-position: 50% 0; } to { background-position: calc(50% - 128 * var(--px)) 0; } }
         .rvg-schein { animation: rvgSchein 1.1s steps(1) infinite; }
         @keyframes rvgSchein { 0% { opacity: .85; } 20% { opacity: 1; } 35% { opacity: .7; } 55% { opacity: .95; } 75% { opacity: .78; } }
-        .rvg-flamme { position: absolute; background-repeat: no-repeat; background-size: 400% 100%; }
+        .rvg-dachfeuer { position: absolute; width: calc(18 * var(--px)); height: calc(17 * var(--px)); background: url(${RVG}fire-roof.png) 0 0 / ${RVG_BILDER * 100}% 100% no-repeat; }
+        @keyframes rvgDach { from { background-position: 0 0; } to { background-position: calc(${-RVG_BILDER * 18} * var(--px)) 0; } }
+        .rvg-fensterfeuer { position: absolute; width: calc(9 * var(--px)); height: calc(12 * var(--px)); background: url(${RVG}fire-win.png) 0 0 / ${RVG_BILDER * 100}% 100% no-repeat; }
+        @keyframes rvgFenster { from { background-position: 0 0; } to { background-position: calc(${-RVG_BILDER * 9} * var(--px)) 0; } }
+        .rvg-fackel { position: absolute; width: calc(5 * var(--px)); height: calc(7 * var(--px)); background: url(${RVG}torch.png) 0 0 / 400% 100% no-repeat; animation: rvgFackel .45s steps(4) infinite; }
+        @keyframes rvgFackel { from { background-position: 0 0; } to { background-position: calc(-20 * var(--px)) 0; } }
+        .rvg-rauchsaeule { position: absolute; width: calc(36 * var(--px)); height: calc(30 * var(--px)); background: url(${RVG}smoke.png) 0 0 / 800% 100% no-repeat; animation: rvgSaeule 2.2s steps(8) infinite; }
+        @keyframes rvgSaeule { from { background-position: 0 0; } to { background-position: calc(-288 * var(--px)) 0; } }
+        .rvg-laden { position: absolute; width: calc(10 * var(--px)); height: calc(14 * var(--px)); background: url(${RVG}shutter.png) 0 0 / 300% 100% no-repeat; animation: rvgLaden 3s steps(1) infinite; }
+        @keyframes rvgLaden { 0%, 30% { background-position: 50% 0; } 38%, 55% { background-position: 100% 0; } 62%, 80% { background-position: 50% 0; } 88%, 96% { background-position: 0 0; } }
+        .rvg-schild { position: absolute; width: calc(16 * var(--px)); height: calc(16 * var(--px)); background: url(${RVG}sign.png) 0 0 / 400% 100% no-repeat; animation: rvgSchild 3.6s steps(1) infinite; }
+        @keyframes rvgSchild { 0% { background-position: 0 0; } 25% { background-position: 33.33% 0; } 50% { background-position: 66.67% 0; } 75% { background-position: 100% 0; } }
+        .rvg-aufruehrer {
+          display: block; width: calc(10 * var(--px)); height: calc(16 * var(--px));
+          background-image: url(${RVG}rioter.png); background-size: 400% 400%; background-repeat: no-repeat;
+          animation: rvgLaufen .8s steps(4) infinite;
+        }
+        @keyframes rvgLaufen { from { background-position-x: 0; } to { background-position-x: calc(-40 * var(--px)); } }
+        .rvg-truemmer { position: absolute; width: calc(16 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}debris.png) 0 0 / 1000% 100% no-repeat; }
+        .rvg-flamme { position: absolute; background-repeat: no-repeat; background-size: ${RVG_BILDER * 100}% 100%; }
         @keyframes rvgFlackern { from { background-position: 0 0; } to { background-position: var(--rvg-lauf) 0; } }
         .rvg-haufen { position: absolute; background-size: 100% 100%; background-repeat: no-repeat; }
         .rvg-bodenschein {
           position: absolute; border-radius: 50%;
-          background: radial-gradient(ellipse, rgba(255,140,40,.45) 0%, rgba(255,90,20,.18) 45%, rgba(255,90,20,0) 70%);
+          background: radial-gradient(ellipse, rgba(255,140,40,.42) 0%, rgba(255,90,20,.16) 45%, rgba(255,90,20,0) 70%);
           animation: rvgSchein 1.1s steps(1) infinite;
         }
+        .rvg-puff { position: absolute; width: calc(9 * var(--px)); height: calc(8 * var(--px)); background: url(${RVG}puff.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes rvgPuffBild { 0% { background-position: 0 0; opacity: .9; } 25% { background-position: 33.33% 0; opacity: .85; } 50% { background-position: 66.67% 0; opacity: .7; } 75% { background-position: 100% 0; opacity: .45; } 100% { background-position: 100% 0; opacity: 0; } }
+        @keyframes rvgPuffWeg { from { transform: translate(0, 0); } to { transform: translate(calc(-4 * var(--px)), calc(-14 * var(--px))); } }
         .rvg-auge {
           position: absolute; width: calc(11 * var(--px)); height: calc(5 * var(--px));
           background: url(${RVG}eye.png) 0 0 / 500% 100% no-repeat;
@@ -2434,18 +2556,16 @@ const RiotingVillageOverlay = React.memo(function RiotingVillageOverlay() {
           94% { background-position: 100% 0; } 96% { background-position: 75% 0; } 98%, 100% { background-position: 0 0; }
         }
         .rvg-augenglut {
-          position: absolute; width: calc(16 * var(--px)); height: calc(11 * var(--px));
-          background: radial-gradient(ellipse, rgba(255,30,20,.55) 0%, rgba(255,30,20,0) 70%);
+          position: absolute; width: calc(19 * var(--px)); height: calc(13 * var(--px));
+          background: radial-gradient(ellipse, rgba(255,30,20,.5) 0%, rgba(255,30,20,0) 70%);
           animation: rvgAugenglut 2.4s ease-in-out infinite alternate;
         }
         @keyframes rvgAugenglut { from { opacity: .45; } to { opacity: 1; } }
-        .rvg-rauch { position: absolute; width: calc(6 * var(--px)); height: calc(5 * var(--px)); background: url(${RVG}smoke.png) 0 0 / 100% 100% no-repeat; opacity: 0; }
-        @keyframes rvgRauch {
-          0% { transform: translate(0, 0) scale(.6); opacity: 0; } 12% { opacity: .85; }
-          100% { transform: translate(calc(5 * var(--px)), calc(-30 * var(--px))) scale(1.6); opacity: 0; }
-        }
-        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #ffb040; opacity: 0; }
-        @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(calc(3 * var(--px)), calc(-24 * var(--px))); opacity: 0; } }
+        .rvg-funke { position: absolute; width: var(--px); height: var(--px); background: #f47a1c; opacity: 0; }
+        .rvg-funke.hell { background: #ffd060; }
+        @keyframes rvgFunke { 0% { transform: translate(0,0); opacity: 0; } 8% { opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(calc(-5 * var(--px)), calc(-26 * var(--px))); opacity: 0; } }
+        .rvg-asche { position: absolute; width: var(--px); height: var(--px); background: #7a716b; opacity: 0; }
+        @keyframes rvgAsche { 0% { transform: translate(0,0); opacity: 0; } 10% { opacity: .7; } 85% { opacity: .6; } 100% { transform: translate(calc(-18 * var(--px)), calc(60 * var(--px))); opacity: 0; } }
       `}</style>
     </PixelScene>
   );
