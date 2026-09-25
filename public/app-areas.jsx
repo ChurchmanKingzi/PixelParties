@@ -921,37 +921,157 @@ const CrystalWellOverlay = React.memo(function CrystalWellOverlay() {
   );
 });
 
-// ── DARK OCEAN ───────────────────────────────────────────────────────
-//  Karte: dunkelgraue, farblose Meeresoberflaeche. Als Vorgabe (5.8.):
-//  dunkelgrau, entsaettigt, bedrohlich, mit Seegang — die Karten duerfen
-//  nicht verschleiert werden. Zwei Wellenebenen ziehen gegeneinander,
-//  darunter gleitet ab und zu ein grosser Schatten vorbei.
+// ═══════════════════════════════════════════════════════════════════
+//  DARK OCEAN — offene, dunkle See (v1415; Überarbeitung v1441, Al 25.9.)
+//
+//  Karte: dunkelgraue, FARBLOSE Meeresoberfläche. Als Vorgabe (5.8.):
+//  dunkelgrau, entsättigt, bedrohlich, mit Seegang — die Karten dürfen
+//  nicht verschleiert werden. Farblos bleibt farblos: alles in Grautönen
+//  (nur der leichte Kaltstich des alten #323335).
+//
+//  Überarbeitung v1441 (Al 25.9.: „deine haben ein anderes Level"): mehr
+//  Tiefe und Leben im Wasser. Leichte Perspektive (fern oben: kleinere
+//  Wellen, Dunst; nah unten: größere, dunklere See), die Kräuselstriche
+//  der Karte (heller Strich über dunklem, schwarze Grübchen), rollende
+//  Wellenkämme in Sichelstücken mit Lichtkante, beleuchteter Rückseite
+//  und dunkler Vorderflanke, Schaum auf den nahen Kämmen, Schaumkronen
+//  mit Gischt, Strömungsschlieren, Wolkenschatten, Nebel, Regen, dunkle
+//  Schemen unter der Oberfläche, Treibgut, eine Rückenflosse.
+//
+//  Ebenen (Kunsthöhe 100; Generator `dark-ocean.py`, nicht im Projekt):
+//  tile.png — Kachel 128 (Grundwasser, Tiefenflecken, Kräuselstriche);
+//  swell.png — Seegang, 18 Bilder übereinander (Kachel 128, Kämme rollen
+//  auf den Betrachter zu, Periode drei Wellen); ripples.png — Windsee,
+//  Kachel 96; current.png — Schaumschlieren, Kachel 192; shade.png —
+//  Wolkenschatten, Kachel 256; fog.png — Nebel, Kachel 192; rain.png —
+//  Regen 100×100 (nahtlos in x und y); ring.png — Tropfenring (5);
+//  cap-l.png / cap-s.png — brechende Schaumkrone mit Gischt (8);
+//  beast.png — Leviathan-Schemen (2); school.png — Fischschwarm-Schatten
+//  (2); fin.png — Rückenflosse mit Kielwasser (3); debris.png — Treibgut
+//  (Planke, Fass, Mastbruch mit Tau, Kiste; je 2 Bilder, Zeilen).
+//
+//  Animiert: der Seegang rollt heran, Windsee und Strömung treiben nach
+//  links (Wind von rechts), Wolkenschatten und Nebel ziehen, Schaumkronen
+//  brechen mit Gischt, Regen fällt schräg und setzt Tropfenringe, ab und
+//  zu gleitet ein riesiger Schatten unter der Oberfläche vorbei, ein
+//  Fischschwarm huscht, eine Flosse schneidet durchs Wasser, Treibgut
+//  dümpelt vorüber, fernes Wetterleuchten. Licht IMMER oben rechts.
+// ═══════════════════════════════════════════════════════════════════
 const DOC = '/areas/dark-ocean/';
+const DOC_TREIBGUT = [0, 1, 2, 3];                  // Zeilen in debris.png (26×10 je Bild)
 const DarkOceanOverlay = React.memo(function DarkOceanOverlay() {
+  const kronen = useMemo(() => ppZufall(ppFxN(11), (i) => {
+    const y = 18 + Math.random() * 78;
+    return { x: 3 + Math.random() * 94, y, gross: y > 46, dur: 5 + Math.random() * 6, delay: -Math.random() * 11 };
+  }), []);
+  const tropfen = useMemo(() => ppZufall(ppFxN(18), () => ({
+    x: Math.random() * 100, y: 4 + Math.random() * 93, dur: 1.3 + Math.random() * 1.6, delay: -Math.random() * 3,
+  })), []);
+  const treibgut = useMemo(() => {
+    const start = Math.floor(Math.random() * 4);          // jedes Stück nur einmal
+    return ppZufall(ppFxN(3), (i) => ({
+    art: DOC_TREIBGUT[(start + i) % 4], y: 20 + i * 24 + Math.random() * 12,
+    dur: 120 + Math.random() * 60, delay: -Math.random() * 180, bob: 1.7 + Math.random() * 1.2,
+    }));
+  }, []);
+  const fische = useMemo(() => ppZufall(ppFxN(2), (i) => ({
+    y: 25 + Math.random() * 55, dur: 26 + Math.random() * 12, delay: -Math.random() * 40, rtl: i === 0,
+  })), []);
   return (
-    <PixelScene artH={100} bg="#323335" className="dark-ocean-overlay">
+    <PixelScene artH={100} bg="#303134" className="dark-ocean-overlay">
       <PixelBand src={DOC + 'tile.png'} />
-      <i className="pp-area-dyn doc-schatten" />
-      <div className="pp-pixel-layer doc-welle a" />
-      <div className="pp-pixel-layer doc-welle b" />
-      <div className="doc-dim" />
+      <div className="pp-area-dyn doc-tier-bahn"><i className="doc-tier" /></div>
+      {fische.map((f, i) => (
+        <div key={'f' + i} className="pp-area-dyn pp-quer" style={ppQuer(f.y, f.dur, f.delay, f.rtl)}>
+          <i className="doc-schwarm" style={{ transform: f.rtl ? 'scaleX(-1)' : undefined }} />
+        </div>
+      ))}
+      <PixelBand src={DOC + 'swell.png'} className="doc-see" style={{ backgroundSize: 'auto 1800%' }} />
+      <PixelBand src={DOC + 'ripples.png'} className="doc-kraeusel" />
+      <PixelBand src={DOC + 'current.png'} className="doc-stroemung" />
+      <PixelBand src={DOC + 'shade.png'} className="doc-schatten" />
+      {treibgut.map((t, i) => (
+        <div key={'t' + i} className="pp-area-dyn pp-quer" style={ppQuer(t.y, t.dur, t.delay, true)}>
+          <i className="doc-treibgut" style={{ backgroundPositionY: `${t.art * 100 / 3}%`, animationDuration: `1.3s, ${t.bob.toFixed(2)}s` }} />
+        </div>
+      ))}
+      <div className="pp-area-dyn doc-flossen-bahn"><i className="doc-flosse" /></div>
+      {kronen.map((k, i) => (
+        <i key={'k' + i} className={'pp-area-dyn doc-krone' + (k.gross ? ' gross' : '')} style={{
+          left: k.x + '%', top: ppArt(Math.round(k.y)),
+          animation: `docKrone ${k.dur.toFixed(2)}s steps(1) ${k.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      {tropfen.map((t, i) => (
+        <i key={'r' + i} className="pp-area-dyn doc-ring" style={{
+          left: t.x + '%', top: ppArt(Math.round(t.y)),
+          animation: `docRing ${t.dur.toFixed(2)}s steps(1) ${t.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer pp-area-dyn doc-regen" />
+      <PixelBand src={DOC + 'fog.png'} className="doc-nebel" />
+      <div className="pp-area-dyn doc-blitz" />
+      <div className="pp-rand-dim" />
       <style>{`
-        .doc-welle { position: absolute; inset: 0; background-size: auto 100%; background-repeat: repeat-x; }
-        .doc-welle.a { background-image: url(${DOC}waves-a.png); animation: docZugL 9s steps(64) infinite, docHebung 3.1s ease-in-out infinite alternate; }
-        .doc-welle.b { background-image: url(${DOC}waves-b.png); animation: docZugR 13s steps(64) infinite, docHebung 4.3s ease-in-out -1.2s infinite alternate; }
-        @keyframes docZugL { from { background-position: 0 0; } to { background-position: calc(-64 * var(--px)) 0; } }
-        @keyframes docZugR { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        @keyframes docHebung { from { transform: translateY(0); } to { transform: translateY(calc(2 * var(--px))); } }
-        .doc-schatten {
-          position: absolute; top: 0; left: 0; width: calc(90 * var(--px)); height: calc(30 * var(--px));
-          background: url(${DOC}shadow.png) 0 0 / 100% 100% no-repeat;
-          animation: docSchatten 46s linear infinite;
+        .doc-see { animation: docSee 8.1s steps(18) infinite; }
+        @keyframes docSee { from { background-position: 50% 0; } to { background-position: 50% calc(-1800 * var(--px)); } }
+        .doc-kraeusel { animation: docKraeusel 34s steps(96) infinite; opacity: .6; }
+        @keyframes docKraeusel { from { background-position: 50% 0; } to { background-position: calc(50% - 96 * var(--px)) 0; } }
+        .doc-stroemung { animation: docStroemung 110s steps(192) infinite; }
+        @keyframes docStroemung { from { background-position: 50% 0; } to { background-position: calc(50% - 192 * var(--px)) 0; } }
+        .doc-schatten { animation: docWolke 170s steps(256) infinite; }
+        @keyframes docWolke { from { background-position: 50% 0; } to { background-position: calc(50% - 256 * var(--px)) 0; } }
+        .doc-nebel { animation: docNebel 130s steps(192) infinite; }
+        @keyframes docNebel { from { background-position: 50% 0; } to { background-position: calc(50% - 192 * var(--px)) 0; } }
+        .doc-regen {
+          position: absolute; inset: 0; opacity: .5;
+          background: url(${DOC}rain.png) 0 0 / calc(100 * var(--px)) calc(100 * var(--px)) repeat;
+          animation: docRegen 2.4s steps(100) infinite;
         }
-        @keyframes docSchatten {
-          0% { transform: translate(calc(-100 * var(--px)), calc(48 * var(--px))); }
-          100% { transform: translate(calc(100cqw + 10 * var(--px)), calc(40 * var(--px))); }
+        @keyframes docRegen { from { background-position: 0 0; } to { background-position: calc(-100 * var(--px)) calc(200 * var(--px)); } }
+        .doc-ring { position: absolute; width: calc(7 * var(--px)); height: calc(4 * var(--px)); background: url(${DOC}ring.png) 0 0 / 500% 100% no-repeat; opacity: 0; }
+        @keyframes docRing {
+          0% { opacity: 1; background-position: 0 0; } 6% { background-position: 25% 0; } 12% { background-position: 50% 0; }
+          19% { background-position: 75% 0; } 27% { background-position: 100% 0; } 35%, 100% { opacity: 0; }
         }
-        .doc-dim { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0,0,0,0) 45%, rgba(0,0,0,.45) 100%); }
+        .doc-krone { position: absolute; width: calc(14 * var(--px)); height: calc(8 * var(--px)); margin-left: calc(-7 * var(--px)); background: url(${DOC}cap-s.png) 0 0 / 800% 100% no-repeat; opacity: 0; }
+        .doc-krone.gross { width: calc(22 * var(--px)); height: calc(12 * var(--px)); margin-left: calc(-11 * var(--px)); background-image: url(${DOC}cap-l.png); }
+        @keyframes docKrone {
+          0% { opacity: 1; background-position: 0 0; } 4% { background-position: 14.286% 0; } 8% { background-position: 28.571% 0; }
+          12% { background-position: 42.857% 0; } 16% { background-position: 57.143% 0; } 21% { background-position: 71.429% 0; }
+          27% { background-position: 85.714% 0; } 34% { background-position: 100% 0; } 42%, 100% { opacity: 0; }
+        }
+        .doc-tier-bahn { position: absolute; left: 0; top: calc(38 * var(--px)); animation: docTierZug 84s linear -20s infinite; }
+        .doc-tier {
+          display: block; width: calc(84 * var(--px)); height: calc(30 * var(--px));
+          background: url(${DOC}beast.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 2.2s steps(1) infinite;
+        }
+        @keyframes docTierZug {
+          0% { transform: translate(calc(-90 * var(--px)), calc(6 * var(--px))); }
+          62% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-4 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-4 * var(--px))); }
+        }
+        .doc-schwarm { display: block; width: calc(26 * var(--px)); height: calc(12 * var(--px)); background: url(${DOC}school.png) 0 0 / 200% 100% no-repeat; animation: ppSprite2 .5s steps(1) infinite; opacity: .9; }
+        .doc-flossen-bahn { position: absolute; left: 0; top: calc(66 * var(--px)); animation: docFlosseZug 58s linear -8s infinite; }
+        .doc-flosse { display: block; width: calc(24 * var(--px)); height: calc(10 * var(--px)); background: url(${DOC}fin.png) 0 0 / 300% 100% no-repeat; animation: ppSprite3 .6s steps(1) infinite; }
+        @keyframes docFlosseZug {
+          0% { transform: translate(calc(-30 * var(--px)), 0); }
+          38% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-5 * var(--px))); }
+          100% { transform: translate(calc(100cqw + 6 * var(--px)), calc(-5 * var(--px))); }
+        }
+        .doc-treibgut {
+          display: block; width: calc(26 * var(--px)); height: calc(10 * var(--px));
+          background: url(${DOC}debris.png) 0 0 / 200% 400% no-repeat;
+          animation-name: docDuempeln, docWippen; animation-timing-function: steps(1); animation-iteration-count: infinite;
+        }
+        @keyframes docDuempeln { 0% { background-position-x: 0; } 50% { background-position-x: 100%; } }
+        @keyframes docWippen { 0% { translate: 0 0; } 50% { translate: 0 var(--px); } }
+        .doc-blitz {
+          position: absolute; inset: 0; opacity: 0;
+          background: linear-gradient(180deg, rgba(205,207,214,.2) 0%, rgba(205,207,214,.07) 45%, rgba(205,207,214,0) 80%);
+          animation: docBlitz 23s steps(1) infinite;
+        }
+        @keyframes docBlitz { 0%, 88% { opacity: 0; } 88.4% { opacity: .8; } 88.9% { opacity: .15; } 89.6% { opacity: .55; } 90.3%, 100% { opacity: 0; } }
       `}</style>
     </PixelScene>
   );
@@ -1103,45 +1223,179 @@ const DoomClockOverlay = React.memo(function DoomClockOverlay({ besitzer = [], s
   );
 });
 
-// ── GRAVEYARD OF LIMITED POWER ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  GRAVEYARD OF LIMITED POWER — Friedhof im Kies (v1415, Kartenstil;
+//  Überarbeitung v1441 (Al 25.9.))
+//
 //  Karte: Kiesboden, rosa Grabsteine mit rotem Schein, dunkler Baum mit
-//  Laterne. Der rote Schein pulsiert, Seelen steigen aus den Graebern,
-//  Bodennebel zieht, die Laterne flackert.
+//  Laterne. Der rote Schein pulsiert, Seelen steigen aus den Gräbern,
+//  Bodennebel zieht, die Laterne flackert. Draufsicht leicht von vorn
+//  wie auf der Karte.
+//
+//  Überarbeitung v1441 (Al 25.9.: die neuen Szenen „haben ein anderes
+//  Level"): Kies aus einzelnen, schattierten Steinchen statt flachem
+//  Rauschen, Erdflecken, Unkraut, Laub, ein paar Knöchelchen. Die Gräber
+//  stehen versetzt statt im Raster, hinten kleiner, vorn größer:
+//  Rundbogensteine mit eingemeißeltem Kreuz und Inschriftstrichen,
+//  Steinkreuze, ein zerbrochener Stein mit abgebrochenem Stück daneben,
+//  ein hoher Spitzbogenstein; jeder auf einem Sockel mit Grabhügel davor,
+//  mit Schlagschatten, Rissen, Moos, Flechten und Grasbüscheln; rote
+//  Grablichter. Der Baum ist jetzt ein großer knorriger Baum mit Wurzeln,
+//  Astloch, dürren Zweigen und Schlagschatten; die Laterne hängt an einer
+//  Kette an seinem langen linken Ast und wirft einen warmen Lichtfleck
+//  auf den Kies. Licht IMMER oben rechts.
+//
+//  Ebenen (Kunsthöhe 100; per Generator gemalt, der nicht im Projekt
+//  liegt): tile.png — Kachel 128 (Kies + zwölf Gräber); glow-a.png /
+//  glow-b.png — roter Schein zweier Gräbergruppen (pulsieren versetzt,
+//  die eingemeißelten Kreuze glühen mit); candles.png — Flammen der
+//  Grablichter (3 Bilder übereinander); tree.png — Baum, Stück 104,
+//  rechts neben der Mitte; tree-glow.png — Laternenschein; lantern.png
+//  (7×10), crow.png (10×8), soul.png (7×11) — je 3–4 Bilder
+//  nebeneinander; fog.png — Bodennebel, Kachel 128.
+//
+//  Animiert: der rote Schein pulsiert (zwei Gruppen im Wechsel), Seelen
+//  steigen schwankend aus den Gräbern und verblassen, rote Funken
+//  glimmen auf, Grablichter und Laterne flackern (mit Schein), Motten
+//  umschwirren die Laterne, eine Krähe im Baum dreht den Kopf und
+//  krächzt, dürre Blätter fallen, Bodennebel zieht in zwei Lagen.
+// ═══════════════════════════════════════════════════════════════════
 const GYD = '/areas/graveyard/';
-const GYD_GRAEBER = [[14, 18], [46, 44], [16, 70], [48, 88]];     // Kachel-Koordinaten
+const GYD_TREE_W = 104, GYD_TREE_X = 64;                 // Baum-Stück, Mitte neben der Brettmitte
+// Gräber in Kachel-Koordinaten: [Mitte x, Oberkante Stein, Sockel-Unterkante]
+const GYD_GRAEBER = [[34, 8, 22], [62, 3, 20], [88, 9, 23], [48, 31, 46], [80, 28, 47], [30, 60, 71],
+  [64, 53, 69], [98, 52, 72], [10, 79, 96], [46, 74, 95], [80, 80, 97], [114, 72, 94]];
+// Kachel-x → Kunstpixel neben der Brettmitte (Kachelmitte = Brettmitte), Wiederholung k
+const gydX = (x, k) => x - 64 + k * 128;
+const GYD_LATERNE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 27, y: 26 };   // Mitte, Oberkante
+const GYD_KRAEHE = { x: GYD_TREE_X - GYD_TREE_W / 2 + 74, y: 6 };     // Mitte, Oberkante
 const GraveyardOfLimitedPowerOverlay = React.memo(function GraveyardOfLimitedPowerOverlay() {
-  const seelen = useMemo(() => ppZufall(ppFxN(8), () => {
-    const [gx, gy] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
-    const k = Math.floor(Math.random() * 7) - 3;
-    return { x: gx - 32 + k * 64, y: gy - 10, dur: 3.5 + Math.random() * 3, delay: -Math.random() * 7 };
+  const seelen = useMemo(() => ppZufall(ppFxN(9), () => {
+    const [gx, , gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
+    const k = Math.floor(Math.random() * 3) - 1;
+    return { x: gydX(gx, k), y: gb - 12, dur: 6 + Math.random() * 4, delay: -Math.random() * 10, bild: .5 + Math.random() * .3 };
   }), []);
+  const funken = useMemo(() => ppZufall(ppFxN(14), () => {
+    const [gx, gt, gb] = GYD_GRAEBER[Math.floor(Math.random() * GYD_GRAEBER.length)];
+    const k = Math.floor(Math.random() * 5) - 2;
+    return {
+      x: gydX(gx, k) + Math.round((Math.random() - .5) * 12), y: gt + Math.round(Math.random() * (gb - gt)),
+      dx: Math.round((Math.random() - .5) * 4), dur: 3 + Math.random() * 3, delay: -Math.random() * 6,
+    };
+  }), []);
+  const blaetter = useMemo(() => ppZufall(ppFxN(3), () => ({
+    x: GYD_TREE_X - 40 + Math.round(Math.random() * 80), y: 4 + Math.round(Math.random() * 18),
+    dur: 9 + Math.random() * 6, delay: -Math.random() * 15, rot: Math.random() < .5,
+  })), []);
+  const motten = useMemo(() => ppZufall(ppFxN(2), (i) => ({ dur: 1.6 + i * .5, delay: -Math.random() * 2, rev: i % 2 === 1 })), []);
   return (
-    <PixelScene artH={100} bg="#484848" className="graveyard-overlay">
+    <PixelScene artH={100} bg="#322e2f" className="graveyard-overlay">
       <PixelBand src={GYD + 'tile.png'} />
-      <PixelBand src={GYD + 'tile-glow.png'} className="gyd-schein" />
-      <div className="pp-pixel-layer gyd-nebel" style={{ top: ppArt(36) }} />
-      {/* Baum rechts, Stamm in der freien Spalte der Grabkachel (Kachel-x 30:
-          x 62 neben der Mitte → (62 + 32) mod 64 = 30) — kein Grab darunter. */}
-      <PixelPiece src={GYD + 'tree.png'} w={40} x={62} />
-      <PixelPiece src={GYD + 'tree-glow.png'} w={40} x={62} className="gyd-laterne" />
+      <PixelBand src={GYD + 'glow-a.png'} className="gyd-schein" />
+      <PixelBand src={GYD + 'glow-b.png'} className="gyd-schein b" />
+      <PixelBand src={GYD + 'candles.png'} className="gyd-kerzen" style={{ backgroundSize: 'auto 300%' }} />
+      <div className="pp-pixel-layer gyd-nebel" style={{ top: ppArt(30) }} />
       {seelen.map((s, i) => (
-        <i key={i} className="pp-area-dyn gyd-seele" style={{ left: ppArtX(s.x - 2, 0), top: ppArt(s.y), animation: `ppSprite3 .5s steps(1) infinite, gydSteigen ${s.dur}s ease-out ${s.delay}s infinite` }} />
+        <i key={'s' + i} className="pp-area-dyn gyd-seele" style={{
+          left: ppArtX(s.x - 3, 0), top: ppArt(s.y),
+          animation: `gydBild ${s.bild.toFixed(2)}s steps(1) infinite, gydSteigen ${s.dur.toFixed(2)}s steps(24) ${s.delay.toFixed(2)}s infinite`,
+        }} />
       ))}
-      <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(76) }} />
+      {funken.map((f, i) => (
+        <i key={'f' + i} className="pp-area-dyn gyd-funke" style={{
+          left: ppArtX(f.x, 0), top: ppArt(f.y), '--dx': ppArt(f.dx),
+          animation: `gydFunke ${f.dur.toFixed(2)}s steps(10) ${f.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <PixelPiece src={GYD + 'tree.png'} w={GYD_TREE_W} x={GYD_TREE_X} />
+      <PixelPiece src={GYD + 'tree-glow.png'} w={GYD_TREE_W} x={GYD_TREE_X} className="gyd-laternenschein" />
+      <i className="gyd-laterne" style={{ left: ppArtX(GYD_LATERNE.x - 3, 0), top: ppArt(GYD_LATERNE.y) }} />
+      {motten.map((m, i) => (
+        <i key={'m' + i} className="pp-area-dyn gyd-motte" style={{
+          left: ppArtX(GYD_LATERNE.x, 0), top: ppArt(GYD_LATERNE.y + 4),
+          animation: `gydMotte ${m.dur.toFixed(2)}s steps(1) ${m.delay.toFixed(2)}s infinite${m.rev ? ' reverse' : ''}`,
+        }} />
+      ))}
+      <i className="gyd-kraehe" style={{ left: ppArtX(GYD_KRAEHE.x - 5, 0), top: ppArt(GYD_KRAEHE.y) }} />
+      {blaetter.map((b, i) => (
+        <i key={'b' + i} className={'pp-area-dyn gyd-blatt' + (b.rot ? ' rot' : '')} style={{
+          left: ppArtX(b.x, 0), top: ppArt(b.y),
+          animation: `gydFallen ${b.dur.toFixed(2)}s steps(40) ${b.delay.toFixed(2)}s infinite`,
+        }} />
+      ))}
+      <div className="pp-pixel-layer gyd-nebel b" style={{ top: ppArt(72) }} />
       <div className="pp-rand-dim" />
       <style>{`
-        .gyd-schein { animation: gydPuls 3.2s ease-in-out infinite alternate; }
-        @keyframes gydPuls { from { opacity: .45; } to { opacity: 1; } }
-        .gyd-laterne { animation: gydFlackern 2.3s steps(1) infinite; }
-        @keyframes gydFlackern { 0% { opacity: 1; } 21% { opacity: .7; } 24% { opacity: 1; } 55% { opacity: .85; } 58% { opacity: .6; } 61% { opacity: 1; } }
-        .gyd-nebel {
-          position: absolute; left: 0; right: 0; height: calc(20 * var(--px));
-          background: url(${GYD}fog.png) 0 0 / auto 100% repeat-x; opacity: .7; animation: gydNebel 55s linear infinite;
+        .gyd-schein { animation: gydPuls 3.4s ease-in-out infinite alternate; }
+        .gyd-schein.b { animation-delay: -3.4s; }
+        @keyframes gydPuls { from { opacity: .35; } to { opacity: 1; } }
+        .gyd-kerzen { animation: gydKerze .9s steps(1) infinite; }
+        @keyframes gydKerze {
+          0% { background-position: 50% 0%; } 22% { background-position: 50% 50%; } 38% { background-position: 50% 0%; }
+          55% { background-position: 50% 100%; } 72% { background-position: 50% 50%; } 86% { background-position: 50% 100%; }
         }
-        .gyd-nebel.b { animation-duration: 80s; animation-direction: reverse; opacity: .5; }
-        @keyframes gydNebel { from { background-position: 0 0; } to { background-position: calc(64 * var(--px)) 0; } }
-        .gyd-seele { position: absolute; width: calc(4 * var(--px)); height: calc(5 * var(--px)); background: url(${GYD}wisp.png) 0 0 / 300% 100% no-repeat; opacity: 0; }
-        @keyframes gydSteigen { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: .9; } 100% { transform: translateY(calc(-14 * var(--px))); opacity: 0; } }
+        .gyd-laternenschein { animation: gydFlackern 2.3s steps(1) infinite; }
+        @keyframes gydFlackern { 0% { opacity: 1; } 21% { opacity: .72; } 24% { opacity: 1; } 55% { opacity: .86; } 58% { opacity: .6; } 61% { opacity: .95; } 80% { opacity: .8; } 83% { opacity: 1; } }
+        .gyd-laterne {
+          position: absolute; width: calc(7 * var(--px)); height: calc(10 * var(--px));
+          background: url(${GYD}lantern.png) 0 0 / 300% 100% no-repeat;
+          animation: gydLaterne 1.15s steps(1) infinite;
+        }
+        @keyframes gydLaterne { 0% { background-position: 0 0; } 30% { background-position: 50% 0; } 42% { background-position: 0 0; } 70% { background-position: 100% 0; } 84% { background-position: 50% 0; } }
+        .gyd-motte { position: absolute; width: var(--px); height: var(--px); background: #d8cdb8; }
+        @keyframes gydMotte {
+          0% { transform: translate(calc(4 * var(--px)), calc(-2 * var(--px))); }
+          12% { transform: translate(calc(5 * var(--px)), calc(1 * var(--px))); }
+          25% { transform: translate(calc(3 * var(--px)), calc(4 * var(--px))); }
+          37% { transform: translate(calc(-1 * var(--px)), calc(5 * var(--px))); }
+          50% { transform: translate(calc(-5 * var(--px)), calc(3 * var(--px))); }
+          62% { transform: translate(calc(-6 * var(--px)), calc(0 * var(--px))); }
+          75% { transform: translate(calc(-4 * var(--px)), calc(-3 * var(--px))); }
+          87% { transform: translate(calc(0 * var(--px)), calc(-4 * var(--px))); }
+        }
+        .gyd-kraehe {
+          position: absolute; width: calc(10 * var(--px)); height: calc(8 * var(--px));
+          background: url(${GYD}crow.png) 0 0 / 300% 100% no-repeat;
+          animation: gydKraehe 9s steps(1) infinite;
+        }
+        @keyframes gydKraehe {
+          0%, 38% { background-position: 0 0; } 40%, 52% { background-position: 50% 0; } 54%, 70% { background-position: 0 0; }
+          72%, 74% { background-position: 100% 0; } 76%, 78% { background-position: 0 0; } 80%, 82% { background-position: 100% 0; }
+          84%, 100% { background-position: 0 0; }
+        }
+        .gyd-nebel {
+          position: absolute; left: 0; right: 0; height: calc(24 * var(--px));
+          background: url(${GYD}fog.png) 0 0 / auto 100% repeat-x; opacity: .75;
+          animation: gydNebel 64s steps(128) infinite;
+        }
+        .gyd-nebel.b { animation-duration: 92s; animation-direction: reverse; opacity: .6; }
+        @keyframes gydNebel { from { background-position: 0 0; } to { background-position: calc(128 * var(--px)) 0; } }
+        .gyd-seele { position: absolute; width: calc(7 * var(--px)); height: calc(11 * var(--px)); background: url(${GYD}soul.png) 0 0 / 400% 100% no-repeat; opacity: 0; }
+        @keyframes gydBild { 0% { background-position: 0 0; } 25% { background-position: 33.333% 0; } 50% { background-position: 66.667% 0; } 75% { background-position: 100% 0; } }
+        @keyframes gydSteigen {
+          0% { transform: translate(0, 0); opacity: 0; }
+          15% { opacity: .85; }
+          30% { transform: translate(var(--px), calc(-7 * var(--px))); }
+          55% { transform: translate(calc(-1 * var(--px)), calc(-13 * var(--px))); opacity: .7; }
+          80% { transform: translate(var(--px), calc(-19 * var(--px))); }
+          100% { transform: translate(0, calc(-24 * var(--px))); opacity: 0; }
+        }
+        .gyd-funke { position: absolute; width: var(--px); height: var(--px); background: #ff5060; opacity: 0; }
+        @keyframes gydFunke {
+          0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: .9; } 50% { opacity: .4; } 70% { opacity: .8; }
+          100% { transform: translate(var(--dx), calc(-10 * var(--px))); opacity: 0; }
+        }
+        .gyd-blatt { position: absolute; width: calc(2 * var(--px)); height: var(--px); background: #5a2620; box-shadow: var(--px) 0 0 #7c3a26; opacity: 0; }
+        .gyd-blatt.rot { background: #6a2c22; box-shadow: var(--px) 0 0 #3c1a17; }
+        @keyframes gydFallen {
+          0% { transform: translate(0, 0); opacity: 0; } 2% { opacity: 1; }
+          10% { transform: translate(calc(2 * var(--px)), calc(6 * var(--px))); }
+          20% { transform: translate(calc(-1 * var(--px)), calc(13 * var(--px))); }
+          30% { transform: translate(calc(2 * var(--px)), calc(20 * var(--px))); }
+          40% { transform: translate(0, calc(27 * var(--px))); opacity: 1; }
+          55% { transform: translate(0, calc(27 * var(--px))); opacity: 0; }
+          100% { transform: translate(0, calc(27 * var(--px))); opacity: 0; }
+        }
       `}</style>
     </PixelScene>
   );
