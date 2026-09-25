@@ -3206,6 +3206,25 @@ function CardFoil({ card, foilType }) {
   );
 }
 
+// ── KONTURFARBE FUER TEXT IN SPIELERFARBE ────────────────────────────────
+// Schwarz — ausser die Farbe ist so dunkel, dass Weiss mehr Kontrast gibt
+// (relative Leuchtdichte nach WCAG, Umschlagpunkt 0.179 = gleicher
+// Kontrast zu Schwarz und Weiss). Benutzt fuer Spielernamen und die
+// Aussenkontur des Logos (`--pp-umriss`).
+function ppUmrissFarbe(farbe) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(farbe || '').trim());
+  if (!m) return '#000';
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const lin = (i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  return L < 0.179 ? '#fff' : '#000';
+}
+window.ppUmrissFarbe = ppUmrissFarbe;
+
 // ── PIXEL-ICONS ─────────────────────────────────────────────────────────
 // Kleine handgesetzte Sinnbilder: Ueberschriften der Menue-Seitenkaesten,
 // Hover-Pfeil der Menueknoepfe (die Knoepfe selbst tragen bewusst keine

@@ -696,6 +696,7 @@ function AuthScreen() {
         <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
         <div className="pp-logo-tint" aria-hidden="true"></div>
         <div className="pp-logo-licht" aria-hidden="true"></div>
+        <div className="pp-logo-umriss" aria-hidden="true"></div>
       </div>
       <div className="orbit-font auth-subtitle">
         TRADING CARD GAME
@@ -1133,7 +1134,7 @@ function MenuLeaderboardPanel({ top, height }) {
                     + (p.rank <= 3 ? ' menu-lb-medal rank-' + p.rank : '')
                     + (p.username === user.username ? ' is-me' : '')}>
                   <span className={'menu-lb-rank' + (p.rank <= 3 ? ' top' : '')}>{p.rank}</span>
-                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)' }}>{p.username}</span>
+                  <span className="menu-lb-name" style={{ color: p.color || 'var(--accent)', '--pp-umriss': ppUmrissFarbe(p.color || '#00f0ff') }}>{p.username}</span>
                   <span className="menu-lb-elo">{p.elo}</span>
                 </li>
               ))}
@@ -1904,6 +1905,9 @@ function MainMenu() {
            // ornate frames on the menu strip + side panels can all pick it
            // up via inheritance.
            '--player-color': user.color || '#00f0ff',
+           // Konturfarbe fuer Spielername und Logo-Aussenkante: schwarz,
+           // bei sehr dunkler Spielerfarbe weiss (ppUmrissFarbe).
+           '--pp-umriss': ppUmrissFarbe(user.color || '#00f0ff'),
            // Once the collapsed-state top is captured, anchor it via
            // `padding-top` + `flex-start` so submenu toggles only
            // grow the menu downward.
@@ -1931,6 +1935,7 @@ function MainMenu() {
           <img src="/data/logo.png" alt="Pixel Parties" className="pp-logo-img" />
           <div className="pp-logo-tint" aria-hidden="true"></div>
           <div className="pp-logo-licht" aria-hidden="true"></div>
+          <div className="pp-logo-umriss" aria-hidden="true"></div>
           {/* ★ v1264 (Al 22.9.): wandernder Foil-Glanz ueber dem
               Schriftzug, auf die Buchstaben maskiert (style.css,
               `.pp-glanz--logo`). */}

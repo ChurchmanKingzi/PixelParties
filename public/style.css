@@ -2454,6 +2454,17 @@ select optgroup {
   -webkit-mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
 }
+/* Aussenkontur des Logos (data/logo-umriss-mask.png, 2 Rasterpixel):
+   im Bild schwarz; `--pp-umriss` (ppUmrissFarbe) macht sie weiss, wenn
+   die Spielerfarbe so dunkel ist, dass Schwarz im Menue verschwaende. */
+.pp-logo-umriss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--pp-umriss, #000);
+  -webkit-mask: url(/data/logo-umriss-mask.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo-umriss-mask.png) center / 100% 100% no-repeat;
+}
 /* ── PIXEL-PARTIKEL HINTER DEM MENUE (v808) ──────────────────────────
    Al: „Solche moechte ich ueberall im Hintergrund haben (hinter dem
    Menue selbst), aber um den Schriftzug herum mehr."
@@ -21782,9 +21793,33 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 .main-menu-screen .menu-stat-value { text-shadow: 2px 2px 0 #000, 0 0 10px currentColor; }
 
-/* Name + Avatar */
-.main-menu-screen .menu-player-name { text-shadow: 2px 2px 0 #000; }
-.main-menu-screen .menu-player-name:hover { text-shadow: 2px 2px 0 #000, 0 0 12px currentColor; }
+/* Name + Avatar. Namen und Decknamen tragen eine Pixel-Kontur rundum:
+   schwarz, bei sehr dunkler Spielerfarbe weiss (`--pp-umriss`, gesetzt
+   am Menue fuer den eigenen Namen und je Zeile in der Bestenliste).
+   Decknamen sind weiss — dort immer Schwarz. */
+.main-menu-screen .menu-player-name,
+.main-menu-screen .menu-lb-name,
+.main-menu-screen .menu-deck-name {
+  --umriss-farbe: var(--pp-umriss, #000);
+  --umriss-2:
+    2px 0 0 var(--umriss-farbe), -2px 0 0 var(--umriss-farbe),
+    0 2px 0 var(--umriss-farbe), 0 -2px 0 var(--umriss-farbe),
+    2px 2px 0 var(--umriss-farbe), -2px -2px 0 var(--umriss-farbe),
+    2px -2px 0 var(--umriss-farbe), -2px 2px 0 var(--umriss-farbe);
+  text-shadow: var(--umriss-2);
+}
+.main-menu-screen .menu-deck-name { --umriss-farbe: #000; }
+/* Kleinere Schrift (Bestenliste, Decks): 1 px Kontur plus Schatten. */
+.main-menu-screen .menu-lb-name,
+.main-menu-screen .menu-deck-name {
+  text-shadow:
+    1px 0 0 var(--umriss-farbe), -1px 0 0 var(--umriss-farbe),
+    0 1px 0 var(--umriss-farbe), 0 -1px 0 var(--umriss-farbe),
+    1px 1px 0 var(--umriss-farbe), -1px -1px 0 var(--umriss-farbe),
+    1px -1px 0 var(--umriss-farbe), -1px 1px 0 var(--umriss-farbe),
+    2px 2px 0 var(--umriss-farbe);
+}
+.main-menu-screen .menu-player-name:hover { text-shadow: var(--umriss-2), 0 0 12px currentColor; }
 .main-menu-screen .menu-profile-avatar { outline: 3px solid var(--pp-kontur); }
 
 /* ── Kacheln in den Seitenkaesten ───────────────────────────────────── */
