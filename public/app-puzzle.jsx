@@ -3813,25 +3813,9 @@ function PuzzleCreator() {
         <h2 className="orbit-font" style={{ fontSize: 26, fontWeight: 800, color: 'var(--player-color)' }}>PUZZLE CREATOR</h2>
         <input className="input" value={puzzleName} onChange={(e) => { setPuzzleName(e.target.value); setValidated(false); }}
           placeholder="Puzzle name..." style={{ width: 240, padding: '9px 14px', fontSize: 14, borderColor: 'rgba(255,136,0,.4)', color: '#ff8800' }} />
-        {/* Doom Clock: Startzaehler je Seite. Erscheint nur, wenn
-            ueberhaupt eine Uhr in einer Area-Zone liegt (Als Vorgabe
-            5.8.). Max 19 — 20 waere sofortige Niederlage und als
-            AUFBAU sinnlos. */}
-        {[0, 1].map((si) => (
-          (areaZones[si] || []).includes('Doom Clock') ? (
-            <label key={'dcin' + si} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ff8f8f' }}>
-              ☠️ {si === 0 ? 'Me' : 'Opp'}
-              <input className="input" type="number" min="0" max="19"
-                value={doomCounters[si] ?? 0}
-                onChange={(e) => {
-                  const v = Math.max(0, Math.min(19, parseInt(e.target.value, 10) || 0));
-                  setDoomCounters(prev => { const n = [...prev]; n[si] = v; return n; });
-                  setValidated(false);
-                }}
-                style={{ width: 64, padding: '8px 8px', fontSize: 14, borderColor: 'rgba(220,70,70,.5)', color: '#ff8f8f' }} />
-            </label>
-          ) : null
-        ))}
+        {/* Der Doom-Clock-Startzaehler wird NUR per Klick auf die Karte
+            selbst eingestellt (Area-Editor, `oeffneAreaEditor`) — die
+            fruehere Eingabe hier in der Kopfzeile war doppelt. */}
         <div style={{ flex: 1 }} />
         {/* ★ v1202: Ansichtsschalter fuer die Area-Hintergruende. Steht
             bewusst VOR den Aktionsknoepfen und ist immer sichtbar —
