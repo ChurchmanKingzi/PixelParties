@@ -314,8 +314,6 @@ body {
 .btn-format-active {
   border-color: #ffd700 !important;
   color: #ffd700 !important;
-  background: rgba(255,215,0,.2) !important;
-  box-shadow: 0 0 12px rgba(255,215,0,.4), inset 0 0 8px rgba(255,215,0,.1);
   font-weight: 700;
 }
 .btn-big { padding: 16px 32px; font-size: 15px; }
@@ -12702,11 +12700,6 @@ body:has(.modal-overlay) .tooltip {
   letter-spacing: 1px;
   border-color: var(--accent) !important;
   color: var(--accent) !important;
-  background: rgba(0,240,255,.12) !important;
-}
-.shop-skin-toggle:hover {
-  background: rgba(0,240,255,.24) !important;
-  box-shadow: 0 0 10px rgba(0,240,255,.35);
 }
 
 .shop-buy-btn {
@@ -12715,14 +12708,9 @@ body:has(.modal-overlay) .tooltip {
   font-size: 11px !important;
   border-color: #ffd700 !important;
   color: #ffd700 !important;
-  background: rgba(255,215,0,.08) !important;
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.shop-buy-btn:hover:not(:disabled) {
-  background: rgba(255,215,0,.2) !important;
-  box-shadow: 0 0 10px rgba(255,215,0,.3);
 }
 .shop-buy-btn:disabled {
   opacity: .4;
@@ -12761,14 +12749,9 @@ body:has(.modal-overlay) .tooltip {
   font-size: 14px !important;
   border-color: var(--player-color) !important;
   color: var(--player-color) !important;
-  background: color-mix(in srgb, var(--player-color) 8%, transparent) !important;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.shop-random-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--player-color) 20%, transparent) !important;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--player-color) 35%, transparent);
 }
 .shop-random-btn:disabled {
   opacity: .4;
@@ -14216,7 +14199,6 @@ body:has(.reaction-chain-overlay) .board-tooltip-token {
    hängen an der Seite (blau für den Spieler, orange für den Gegner). */
 .pz-debuff-btn { transition: background .12s, border-color .12s, filter .12s; }
 .pz-debuff-btn:hover {
-  background: rgba(255, 255, 255, .14) !important;
   border-color: currentColor !important;
   filter: brightness(1.25);
 }
@@ -17227,40 +17209,10 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
   background: color-mix(in srgb, var(--accent) 18%, var(--menu-surface)) !important;
 }
 
-/* Modal buttons (e.g. the Create Game submenu) sit on the dithered .modal
-   surface and are translucent, so the dither shines through and they read as
-   "background-less". Give them the same opaque tinted surface treatment as the
-   menu buttons — mixed with the modal's own --bg2 so they blend in — per
-   button variant. Variant rules come after the base so they win (equal
-   specificity, later source). */
-.modal .btn {
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg2)) !important;
-}
-.modal .btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 24%, var(--bg2)) !important;
-}
-.modal .btn-accent2 {
-  background: color-mix(in srgb, var(--accent2) 12%, var(--bg2)) !important;
-}
-.modal .btn-accent2:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent2) 24%, var(--bg2)) !important;
-}
-.modal .btn-success {
-  background: color-mix(in srgb, var(--success) 12%, var(--bg2)) !important;
-}
-.modal .btn-success:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--success) 24%, var(--bg2)) !important;
-}
-.modal .btn-danger {
-  background: color-mix(in srgb, var(--danger) 12%, var(--bg2)) !important;
-}
-.modal .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 24%, var(--bg2)) !important;
-}
-/* Active format/selection pills keep a stronger gold fill, still opaque. */
-.modal .btn-format-active {
-  background: color-mix(in srgb, #ffd700 22%, var(--bg2)) !important;
-}
+/* Modal buttons: ihre deckende, getoente Flaeche kommt seit dem
+   Pixel-System („KNOPFRAHMEN FUER ALLE MENUE-SCREENS") aus der Textfarbe
+   jedes Knopfes — die frueheren `.modal .btn*`-Hintergruende sind dort
+   aufgegangen. */
 
 
 /* Als Kosmetik-Ruling: Effekt-Quelle leuchtet auf, bevor ihre
@@ -18010,18 +17962,13 @@ img, .card-tooltip-img img { image-rendering: pixelated; }
    allein faerbt im Modal nur mit 12% Rot (siehe `.modal .btn-danger`),
    damit sah der Abriss-Knopf aus wie jeder andere. Diese Variante ist
    fuer Aktionen gedacht, die etwas kaputt machen: satte Fuellung,
-   heller Text. `!important` ist hier noetig, weil `.modal .btn` seine
-   Fuellung selbst mit `!important` setzt. */
+   dunkler Text. Die Fuellung setzt das Pixel-System (gefuellte Variante,
+   `--knopf-farbe`). */
 .btn-danger-solid,
 .modal .btn-danger-solid {
-  background: var(--danger) !important;
   border-color: var(--danger);
   color: #12040a;
   font-weight: 700;
-}
-.btn-danger-solid:hover:not(:disabled),
-.modal .btn-danger-solid:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 82%, #fff) !important;
 }
 
 /* ── Trials-Animationen (Als Vorgaben 18.8.) ─────────────────────────
@@ -21393,6 +21340,329 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   24%  { transform: translateY(0) scale(1); }
   70%  { opacity: 1; transform: translateY(-16px) scale(1); }
   100% { opacity: 0; transform: translateY(-30px) scale(.95); }
+}
+
+/* ═══ KNOPFRAHMEN FUER ALLE MENUE-SCREENS ═══════════════════════════════
+   Dieselbe Tasten-Sprache wie im Hauptmenue, fuer JEDEN `.btn` ausserhalb
+   des Kampffelds (`.ui-noscale` traegt den ganzen Kampfbildschirm und
+   bleibt unberuehrt): schwarze Kontur, eingekerbte Pixel-Ecken, Licht-
+   und Schattenkante, Kopf-/Fussband mit je einer Dither-Pixelreihe als
+   Uebergang (2 px, damit auch kleine Knoepfe wie „✕" lesbar bleiben),
+   Sockel.
+
+   ★ Die Toenung kommt aus der TEXTFARBE des Knopfes (`currentColor`):
+   `.btn-danger`, `.btn-success`, `.btn-gold`, Spielerfarbe und alle
+   Inline-Farben behalten so ihre Bedeutung, ohne dass jeder Knopf
+   einzeln angefasst werden muss. Gefuellte Varianten setzen stattdessen
+   `--knopf-farbe` (ihr Text ist dunkel).
+
+   Spezifitaet bewusst niedrig (`:where`), damit die Knoepfe von
+   Hauptmenue und Login (weiter unten, eigene Regeln) weiter gewinnen.
+   Der Hintergrund braucht `!important`, weil viele Knoepfe ihn inline
+   setzen. */
+.btn:where(:not(.ui-noscale .btn)) {
+  --kf-basis: var(--knopf-farbe, currentColor);
+  --knopf-tiefe: 3px;
+  --kf-oben: color-mix(in srgb, var(--kf-basis) 26%, var(--menu-surface));
+  --kf-mitte: color-mix(in srgb, var(--kf-basis) 11%, var(--menu-surface));
+  --kf-fuss: color-mix(in srgb, var(--kf-basis) 4%, var(--menu-surface));
+  --kf-kante: color-mix(in srgb, var(--kf-basis) 40%, transparent);
+  --kf-schein: 0 0 0 transparent;
+  border-width: 3px;
+  border-style: solid;
+  border-radius: 0;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.22'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.22'/%3E%3C/svg%3E") 0 4px / 4px 2px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000' fill-opacity='0.35'/%3E%3C/svg%3E") 0 calc(100% - 6px) / 4px 2px repeat-x,
+    linear-gradient(180deg,
+      var(--kf-oben) 0 4px,
+      var(--kf-mitte) 4px calc(100% - 4px),
+      var(--kf-fuss) calc(100% - 4px)) !important;
+  box-shadow:
+    inset 2px 2px 0 var(--kf-kante),
+    inset -2px -2px 0 rgba(0, 0, 0, .5),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--kf-basis) 45%, var(--pp-kontur)),
+    var(--kf-schein);
+  transition: transform .1s ease, box-shadow .1s ease, color .12s ease, border-color .12s ease;
+}
+.btn:where(:not(.ui-noscale .btn))::before,
+.btn:where(:not(.ui-noscale .btn)):active::before { background: none; }
+/* Eingekerbte Ecken: die Eckpixel des Rahmens in Konturfarbe. */
+.btn:where(:not(.ui-noscale .btn))::after {
+  inset: -3px;
+  opacity: 1;
+  transition: none;
+  background:
+    linear-gradient(var(--pp-kontur) 0 0) left top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) left bottom / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right bottom / 3px 3px no-repeat;
+}
+.btn:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+  --knopf-tiefe: 5px;
+  --kf-oben: color-mix(in srgb, var(--kf-basis) 46%, var(--menu-surface));
+  --kf-mitte: color-mix(in srgb, var(--kf-basis) 24%, var(--menu-surface));
+  --kf-fuss: color-mix(in srgb, var(--kf-basis) 11%, var(--menu-surface));
+  --kf-kante: color-mix(in srgb, var(--kf-basis) 60%, #fff);
+  --kf-schein: 0 0 16px color-mix(in srgb, var(--kf-basis) 45%, transparent);
+  box-shadow:
+    inset 2px 2px 0 var(--kf-kante),
+    inset -2px -2px 0 rgba(0, 0, 0, .5),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--kf-basis) 45%, var(--pp-kontur)),
+    var(--kf-schein);
+  transform: translateY(-2px);
+  filter: none;
+}
+.btn:where(:not(.ui-noscale .btn)):active:not(:disabled) {
+  --knopf-tiefe: 0px;
+  box-shadow:
+    inset 2px 2px 0 var(--kf-kante),
+    inset -2px -2px 0 rgba(0, 0, 0, .5),
+    0 0 0 2px var(--pp-kontur),
+    0 var(--knopf-tiefe) 0 2px color-mix(in srgb, var(--kf-basis) 45%, var(--pp-kontur)),
+    var(--kf-schein);
+  transform: translateY(3px);
+  transition-duration: .04s;
+}
+.btn:where(:not(.ui-noscale .btn)):disabled {
+  box-shadow: 0 0 0 2px var(--pp-kontur);
+  transform: none;
+}
+/* Gefuellte Varianten: Zerstoeren (rot, dunkler Text) und aktive
+   Format-/Auswahl-Pillen (gold, kraeftig getoent). */
+.btn-danger-solid:where(:not(.ui-noscale .btn)),
+.btn-danger-solid:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+  --knopf-farbe: var(--danger, #ff3366);
+  --kf-oben: color-mix(in srgb, var(--kf-basis) 55%, #fff);
+  --kf-mitte: var(--kf-basis);
+  --kf-fuss: color-mix(in srgb, var(--kf-basis) 70%, #000);
+  --kf-kante: rgba(255, 255, 255, .5);
+}
+.btn-format-active:where(:not(.ui-noscale .btn)),
+.btn-format-active:where(:not(.ui-noscale .btn)):hover:not(:disabled) {
+  --knopf-farbe: #ffd700;
+  --kf-oben: color-mix(in srgb, var(--kf-basis) 55%, var(--menu-surface));
+  --kf-mitte: color-mix(in srgb, var(--kf-basis) 32%, var(--menu-surface));
+  --kf-fuss: color-mix(in srgb, var(--kf-basis) 18%, var(--menu-surface));
+  --kf-kante: color-mix(in srgb, var(--kf-basis) 70%, #fff);
+  --kf-schein: 0 0 12px color-mix(in srgb, var(--kf-basis) 45%, transparent);
+}
+
+/* ── Kopfzeile der Bildschirme ─────────────────────────────────────── */
+.top-bar:where(:not(.ui-noscale .top-bar)) {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.04'/%3E%3C/svg%3E") 0 0 / 8px 8px,
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--player-color, var(--accent)) 12%, var(--bg2)),
+      var(--bg2));
+  border-bottom: 3px solid var(--player-color, var(--accent));
+  box-shadow: 0 2px 0 var(--pp-kontur), 0 8px 0 rgba(0, 0, 0, .25);
+  z-index: 3;
+}
+
+/* ── Eingabefelder und Auswahllisten: versenkt ─────────────────────── */
+:where(.input, .select, .db-filter-input, .db-filter-select):where(:not(.ui-noscale *)) {
+  border-radius: 0;
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .5), 0 0 0 2px var(--pp-kontur);
+}
+:where(.input, .select, .db-filter-input, .db-filter-select):where(:not(.ui-noscale *)):focus {
+  outline: none;
+  border-color: var(--player-color, var(--accent));
+  box-shadow: inset 3px 3px 0 rgba(0, 0, 0, .5), 0 0 0 2px var(--pp-kontur),
+              0 0 0 5px color-mix(in srgb, var(--player-color, var(--accent)) 25%, transparent);
+}
+
+/* ── Modals: Pixelfenster ──────────────────────────────────────────── */
+/* Rahmenfarbe bleibt, wie jedes Modal sie setzt; dazu Kontur, Relief und
+   ein harter Schatten. */
+.modal:where(:not(.ui-noscale .modal)) {
+  border-width: 3px;
+  border-style: solid;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, .07),
+    inset -2px -2px 0 rgba(0, 0, 0, .45),
+    0 0 0 2px var(--pp-kontur),
+    10px 10px 0 2px rgba(0, 0, 0, .5);
+}
+
+/* ── Pop-up-Fenster des Hauptmenues (Daily, How to Play, Puzzle-
+   Bibliothek): dieselbe Rahmen-Sprache wie die Menuekaesten, in ihrer
+   eigenen Zierfarbe (`--zier`, inline: Gold, Spielerfarbe, Orange) —
+   Lichtkante, Doppelring, Eck-Schnoerkel und Seitenkeile (oben/unten
+   keine Mittelstuecke, dort sitzen Titel und Knoepfe). */
+.pp-fenster {
+  --zier: var(--player-color, var(--accent));
+  position: relative;
+  border-radius: 0;
+  border: 4px solid;
+  border-color:
+    color-mix(in srgb, var(--zier) 68%, #fff)
+    color-mix(in srgb, var(--zier) 76%, #000)
+    color-mix(in srgb, var(--zier) 70%, #000)
+    color-mix(in srgb, var(--zier) 80%, #fff);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--zier) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--zier) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    inset 0 0 0 2px var(--pp-kontur),
+    inset 0 0 30px color-mix(in srgb, var(--zier) 12%, transparent),
+    0 0 50px color-mix(in srgb, var(--zier) 25%, transparent),
+    14px 16px 0 rgba(0, 0, 0, .45);
+}
+.pp-fenster::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  z-index: 2;
+  pointer-events: none;
+  --eck-e: 3px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  background: color-mix(in srgb, var(--zier) 72%, #fff);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}
+/* Kopf: Trennband wie zwischen Bild- und Textfenster einer Karte. */
+.pp-fenster-kopf {
+  border-bottom: 3px solid color-mix(in srgb, var(--zier) 70%, #000);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3C/svg%3E") 0 calc(100% - 4px) / 4px 4px repeat-x,
+    linear-gradient(180deg, color-mix(in srgb, var(--zier) 16%, transparent), transparent);
+}
+/* Der Schliessen-Knopf liegt ueber den Ecken-Schnoerkeln. */
+.pp-fenster-kopf .btn { position: relative; z-index: 3; }
+
+.modal:where(:not(.ui-noscale .modal))::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: 2;
+  pointer-events: none;
+  --eck-e: 3px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  background: color-mix(in srgb, var(--pp-modal-zier, var(--player-color, var(--accent))) 72%, #fff);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}
+.modal:where(:not(.ui-noscale .modal)) { position: relative; }
+
+/* ── Kaesten der Bildschirme ───────────────────────────────────────── */
+/* Deck-Sektionen, Profil-Sektionen, Puzzle-Handleisten, Lobby-Spalten:
+   gerahmt wie kleine Menuekaesten — Kontur, Rand in gedaempfter
+   Spielerfarbe mit Lichtkante, Relief, harter Schatten, Lichtschein
+   von oben. Ruhiger als die Menuekaesten (keine Ornamente), weil hier
+   viele davon nebeneinander stehen. */
+:where(.deck-section, .profile-section, .profile-identity-panel, .pz-hand, .lobby-spalte):where(:not(.ui-noscale *)) {
+  --kasten: var(--player-color, var(--accent));
+  border-style: solid !important;
+  border-width: 3px !important;
+  border-color:
+    color-mix(in srgb, var(--kasten) 50%, #2a2a44)
+    color-mix(in srgb, var(--kasten) 30%, #12121f)
+    color-mix(in srgb, var(--kasten) 26%, #0a0a12)
+    color-mix(in srgb, var(--kasten) 44%, #2a2a44) !important;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    inset 2px 2px 0 rgba(255, 255, 255, .05),
+    inset -2px -2px 0 rgba(0, 0, 0, .4),
+    6px 7px 0 rgba(0, 0, 0, .35);
+  background-color: color-mix(in srgb, var(--kasten) 4%, var(--bg2));
+}
+/* Sektionskoepfe: Kopfband mit Dither-Kante statt Haarlinie. */
+:where(.deck-section-header, .profile-section-label, .lobby-spalten-titel):where(:not(.ui-noscale *)) {
+  border-bottom: 2px solid color-mix(in srgb, var(--player-color, var(--accent)) 35%, #1a1a2e);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+  text-shadow: 2px 2px 0 #000;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E") 0 calc(100% - 4px) / 4px 4px repeat-x,
+    linear-gradient(180deg, color-mix(in srgb, var(--player-color, var(--accent)) 12%, transparent), transparent);
+}
+/* Lobby: drei Kaesten mit Luft statt dreier Spalten mit Haarlinien. */
+.lobby-content { gap: 16px; padding: 14px 16px 16px; }
+.lobby-spalte { min-width: 0; overflow: hidden; }
+/* Seitenleisten (Deck-Editor, Puzzle-Creator): kraeftige Innenkante in
+   gedaempfter Spielerfarbe mit Konturlinie statt 1-px-Haarlinie. */
+.db-panel-left:where(:not(.ui-noscale *)) {
+  border-right: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 45%, #1a1a2e) !important;
+  box-shadow: 2px 0 0 var(--pp-kontur), 8px 0 0 rgba(0, 0, 0, .25);
+  z-index: 2;
+}
+.db-panel-right:where(:not(.ui-noscale *)),
+.pz-search-panel:where(:not(.ui-noscale *)) {
+  box-shadow: -2px 0 0 var(--pp-kontur), -8px 0 0 rgba(0, 0, 0, .25);
+}
+.pz-search-panel:where(:not(.ui-noscale *)) {
+  border-right: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 45%, #1a1a2e);
+  box-shadow: 2px 0 0 var(--pp-kontur), 8px 0 0 rgba(0, 0, 0, .25);
+}
+
+
+/* ── Shop-Reiter: Tasten wie der Segmentschalter im Login ─────────── */
+.shop-tabs {
+  gap: 10px;
+  padding: 12px 16px 12px;
+  border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 35%, #1a1a2e);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+}
+.shop-tab {
+  position: relative;
+  padding: 10px 22px;
+  border: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  text-shadow: 2px 2px 0 #000;
+}
+.shop-tab:hover {
+  border-color: color-mix(in srgb, var(--player-color, var(--accent)) 30%, transparent);
+  background: color-mix(in srgb, var(--player-color, var(--accent)) 8%, transparent);
+}
+.shop-tab-active,
+.shop-tab-active:hover {
+  color: #ffd700;
+  border-color: #ffd700;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.2'/%3E%3C/svg%3E") 0 4px / 4px 2px repeat-x,
+    linear-gradient(180deg, color-mix(in srgb, #ffd700 30%, var(--menu-surface)) 0 4px, color-mix(in srgb, #ffd700 13%, var(--menu-surface)) 4px);
+  box-shadow: inset 2px 2px 0 rgba(255, 240, 150, .45), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 0 0 2px var(--pp-kontur), 0 3px 0 2px color-mix(in srgb, #ffd700 45%, var(--pp-kontur));
+}
+.shop-tab-count { border-radius: 0; box-shadow: 0 0 0 1px var(--pp-kontur); }
+.shop-random-wrap {
+  border-bottom: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 25%, #1a1a2e);
+  box-shadow: 0 2px 0 var(--pp-kontur);
+}
+
+/* ── VS CPU: das Gitter der Gegner als Kasten ─────────────────────── */
+.vscpu-content {
+  border: 3px solid color-mix(in srgb, var(--player-color, var(--accent)) 30%, #1a1a2e);
+  box-shadow: 0 0 0 2px var(--pp-kontur), 8px 9px 0 rgba(0, 0, 0, .35);
+  margin-top: 14px;
 }
 
 /* ═══ HAUPTMENUE-AUFHUEBSCHUNG ═════════════════════════════════════════
