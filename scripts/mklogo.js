@@ -15,7 +15,8 @@
 //                        zu hellen/dunklen Toenen DER Spielerfarbe.
 //
 //  Die Glyphen sind von Hand gesetzt (siehe GLYPHEN), aeussere Ecken
-//  werden automatisch um einen Pixel abgerundet. Alles wird im Raster
+//  werden automatisch um einen Pixel abgerundet. Der Schriftzug steht auf
+//  einem Bogen (BOGEN), die Mitte liegt oben. Alles wird im Raster
 //  gerechnet und dann um SCALE vergroessert — die Datei traegt also
 //  scharfe Bloecke, und die CSS-Hoehe (`.pp-logo-img`) ist ein
 //  Vielfaches der Rasterhoehe.
@@ -151,13 +152,13 @@ const GLYPHEN = {
   ],
 };
 
-// Party-Welle: jeder Buchstabe huepft ein wenig auf und ab (Rasterpixel,
-// negativ = hoeher). Je Wort eine eigene Folge, damit beide Woerter
-// fuer sich eine Welle ergeben.
-const WORTE = [
-  { text: 'PIXEL',   welle: [1, 0, -1, 0, 1] },
-  { text: 'PARTIES', welle: [1, 0, -1, -2, -1, 0, 1] },
-];
+const WORTE = ['PIXEL', 'PARTIES'];
+
+// Bogen: der ganze Schriftzug woelbt sich nach oben. Jeder Buchstabe
+// sitzt auf einer Parabel ueber die GESAMTBREITE — die Mitte liegt oben,
+// die aeusseren Buchstaben um BOGEN Rasterpixel tiefer. Verschoben wird
+// je Buchstabe (nicht je Spalte), damit die Glyphen nicht verzerren.
+const BOGEN = 7;
 
 // Aeussere Ecken abrunden: ein Flaechenpixel, das in zwei senkrecht
 // zueinander stehenden Richtungen frei liegt, faellt weg.
@@ -172,21 +173,24 @@ function abrunden(rows) {
 }
 
 // ── Raster aufbauen ──
-const MAXHUB = 2;   // groesster Huepfer nach oben
 let breite = 0;
 const platz = [];   // { g, x, y }
 WORTE.forEach((wort, wi) => {
   if (wi > 0) breite += WORD_GAP - GAP;
-  wort.text.split('').forEach((ch, i) => {
+  wort.split('').forEach((ch) => {
     const g = abrunden(GLYPHEN[ch]);
-    platz.push({ g, x: breite, y: wort.welle[i] + MAXHUB, ch });
+    platz.push({ g, x: breite, y: 0, ch });
     breite += g[0].length + GAP;
   });
 });
 breite -= GAP;
+for (const p of platz) {
+  const t = (p.x + p.g[0].length / 2 - breite / 2) / (breite / 2);   // -1 … 1
+  p.y = Math.round(BOGEN * t * t);
+}
 
 const W = breite + RAND * 2 + 1;               // +1: Kontur rechts
-const H = CAP + MAXHUB + 1 + DEPTH + RAND * 2 + 1;
+const H = CAP + BOGEN + DEPTH + RAND * 2 + 1;
 const neu = (v) => Array.from({ length: H }, () => new Array(W).fill(v));
 const flaeche = neu(0);     // 1 = Buchstabenflaeche
 const zeile = neu(-1);      // Zeile innerhalb des Buchstabens (fuer Baender)

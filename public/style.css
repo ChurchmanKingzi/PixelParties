@@ -2398,8 +2398,9 @@ select optgroup {
 
 /* ===== PIXEL PARTIES brand logo (main menu) =====
    ★ Neu gezeichnet: data/logo.png entsteht mit `node scripts/mklogo.js`
-   (Raster 194×34, Datei 4-fach). Bonbon-Blockschrift mit 3D-Kante, dunkler
-   Doppelkontur, Lichtkante, Glanzstrichen und zwei Funkelsternen. Die
+   (Raster 194×38, Datei 4-fach). Bonbon-Blockschrift auf einem Bogen, mit
+   3D-Kante, dunkler Doppelkontur, Lichtkante, Glanzstrichen und zwei
+   Funkelsternen. Die
    Buchstabenflaechen sind GRAUSTUFEN — die Spielerfarbe kommt ueber
    `.pp-logo-tint` (Multiplizieren) dazu, siehe unten.
    Pixelated scaling keeps the chunky pixels crisp; the drop-shadow lifts it
@@ -2419,9 +2420,9 @@ select optgroup {
 .pp-logo-img {
   display: block;
   filter: drop-shadow(0 6px 0 rgba(0,0,0,.45)) drop-shadow(0 0 18px color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent));
-  /* 3 Bildschirmpixel je Rasterpixel (34 Rasterzeilen) — ganzzahlig,
+  /* 3 Bildschirmpixel je Rasterpixel (38 Rasterzeilen) — ganzzahlig,
      damit die Bloecke gleich breit bleiben. */
-  height: 102px;
+  height: 114px;
   width: auto;
   /* Shrink to fit short windows; width re-derives to keep the aspect ratio. */
   max-height: calc(24dvh / var(--ui-scale, 1));
@@ -2546,7 +2547,7 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 
 @media (max-width: 900px) {
-  .pp-logo-img { height: 51px; }
+  .pp-logo-img { height: 57px; }
   .pp-logo-particles { inset: -34px -50px; }
 }
 
@@ -15677,7 +15678,7 @@ body:has(.textbox-overlay) .tooltip {
        unteren Rand statt exakt so hoch wie der Streifen zu sein. */
 @media (max-height: 600px) {
   .main-menu-screen { justify-content: flex-start !important; padding-top: 84px !important; gap: 0 !important; }
-  .main-menu-screen .pp-logo-img { height: 51px; }
+  .main-menu-screen .pp-logo-img { height: 57px; }
   /* Kopfzeile links */
   .menu-topleft {
     display: flex; align-items: center; gap: 12px;
@@ -21392,13 +21393,68 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 
 /* ── Kaesten (Knopfstreifen + Seitenkaesten) ───────────────────────── */
+/* Der Rahmen in Schichten, von aussen nach innen:
+     schwarze Aussenkontur · schmaler Farbring · dunkles Band ·
+     schwarze Kontur · 4-px-Hauptrahmen mit Lichtkante (oben/links heller,
+     unten/rechts dunkler) · schwarze Innenkontur · feine Zierlinie
+     (::before) · Pixel-Ornamente an Ecken und Kantenmitten (::after). */
 .main-menu-screen .ornate-frame {
+  border-color:
+    color-mix(in srgb, var(--player-color, #00f0ff) 68%, #fff)
+    color-mix(in srgb, var(--player-color, #00f0ff) 76%, #000)
+    color-mix(in srgb, var(--player-color, #00f0ff) 70%, #000)
+    color-mix(in srgb, var(--player-color, #00f0ff) 80%, #fff);
   box-shadow:
-    0 0 0 3px var(--pp-kontur),
-    inset 0 0 0 1px rgba(0, 0, 0, .45),
+    0 0 0 2px var(--pp-kontur),
+    0 0 0 5px color-mix(in srgb, var(--player-color, #00f0ff) 22%, var(--pp-kontur)),
+    0 0 0 7px color-mix(in srgb, var(--player-color, #00f0ff) 75%, #000),
+    0 0 0 9px var(--pp-kontur),
+    inset 0 0 0 2px var(--pp-kontur),
     inset 0 0 30px color-mix(in srgb, var(--player-color, #00f0ff) 14%, transparent),
-    0 0 36px color-mix(in srgb, var(--player-color, #00f0ff) 28%, transparent),
+    0 0 40px color-mix(in srgb, var(--player-color, #00f0ff) 28%, transparent),
     0 18px 44px rgba(0, 0, 0, .6);
+}
+/* Feine Zierlinie innen: 2 px, genau auf dem inneren Winkel der
+   Eck-Ornamente (::after bei 4 px + zwei Einheiten = 12 px), damit Linie
+   und Schnoerkel ineinander uebergehen statt sich zu kreuzen. */
+.main-menu-screen .ornate-frame::before {
+  inset: 12px;
+  border: 2px solid color-mix(in srgb, var(--player-color, #00f0ff) 32%, transparent);
+  border-radius: 0;
+}
+/* Ornamente: gestufte Eck-Schnoerkel (8×8 Raster) mit Innenwinkel, ein
+   Zierstueck oben und unten in der Mitte (Spitze zeigt
+   ins Innere) und je ein Keil links und rechts. Eine Maske, eine Farbe —
+   die Spielerfarbe, aufgehellt, damit die Zier auf dem Rahmen leuchtet.
+   Einheit 4 px (--eck-e), passend zum 8-px-Dither-Raster. Gilt nur hier;
+   die kleinen Plaketten (.pp-eckzier) behalten ihre schlichten Ecken. */
+.main-menu-screen .ornate-frame::after {
+  --eck-e: 4px;
+  --eck-gr: calc(var(--eck-e) * 8);
+  inset: 4px;
+  background: color-mix(in srgb, var(--player-color, #00f0ff) 72%, #fff);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h13v1h-13zM1 1h2v1h-2zM4 1h5v1h-5zM10 1h2v1h-2zM5 2h3v1h-3zM6 3h1v1h-1z'/%3E%3C/svg%3E") center top / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M6 0h1v1h-1zM5 1h3v1h-3zM1 2h2v1h-2zM4 2h5v1h-5zM10 2h2v1h-2zM0 3h13v1h-13z'/%3E%3C/svg%3E") center bottom / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM0 1h2v1h-2zM0 2h1v1h-1zM2 2h4v1h-4zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM0 6h1v1h-1zM0 7h1v1h-1z'/%3E%3C/svg%3E") left top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h8v1h-8zM6 1h2v1h-2zM2 2h4v1h-4zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM7 5h1v1h-1zM7 6h1v1h-1zM7 7h1v1h-1z'/%3E%3C/svg%3E") right top / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h1v1h-1zM0 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM0 5h1v1h-1zM2 5h4v1h-4zM0 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") left bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M7 0h1v1h-1zM7 1h1v1h-1zM7 2h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM2 5h4v1h-4zM7 5h1v1h-1zM6 6h2v1h-2zM0 7h8v1h-8z'/%3E%3C/svg%3E") right bottom / var(--eck-gr) var(--eck-gr) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h13v1h-13zM1 1h2v1h-2zM4 1h5v1h-5zM10 1h2v1h-2zM5 2h3v1h-3zM6 3h1v1h-1z'/%3E%3C/svg%3E") center top / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 4' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M6 0h1v1h-1zM5 1h3v1h-3zM1 2h2v1h-2zM4 2h5v1h-5zM10 2h2v1h-2zM0 3h13v1h-13z'/%3E%3C/svg%3E") center bottom / calc(var(--eck-e) * 13) calc(var(--eck-e) * 4) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M0 0h1v1h-1zM0 1h2v1h-2zM0 2h3v1h-3zM0 3h4v1h-4zM0 4h3v1h-3zM0 5h2v1h-2zM0 6h1v1h-1z'/%3E%3C/svg%3E") left center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 7' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' d='M3 0h1v1h-1zM2 1h2v1h-2zM1 2h3v1h-3zM0 3h4v1h-4zM1 4h3v1h-3zM2 5h2v1h-2zM3 6h1v1h-1z'/%3E%3C/svg%3E") right center / calc(var(--eck-e) * 4) calc(var(--eck-e) * 7) no-repeat;
+}
+@media (max-height: 600px) {
+  .main-menu-screen .ornate-frame::after { --eck-e: 3px; }
+  .main-menu-screen .ornate-frame::before { inset: 10px; }
 }
 /* Dither wie bisher, darunter ein Lichtschein in der Spielerfarbe von oben
    und ein Schattenfuss unten — der Kasten bekommt Tiefe statt einer
@@ -21469,8 +21525,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   letter-spacing: 2px;
   filter: none;
   transform: none;
-  padding-left: 58px;
-  padding-right: 58px;
+  padding-left: 40px;
+  padding-right: 40px;
   transition: transform .12s ease, box-shadow .12s ease, color .12s ease, background .12s ease;
 }
 /* Der allgemeine Knopf-Verlauf (.btn::before) lag doppelt auf dem neuen
@@ -21509,26 +21565,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   outline-offset: 5px;
 }
 
-/* Pixel-Icon links, Pfeil rechts. Das Icon behaelt die Spielerfarbe, auch
-   wenn die Schrift beim Ueberfahren weiss wird. */
-.menu-nav-icon {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  width: 26px;
-  height: 26px;
-  margin-top: -13px;
-  color: var(--knopf, var(--player-color, #00f0ff));
-  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .85));
-  pointer-events: none;
-}
-.menu-nav-btn:hover .menu-nav-icon {
-  animation: menu-icon-hopser .52s steps(2, jump-none) infinite alternate;
-}
-@keyframes menu-icon-hopser {
-  from { transform: translateY(0); }
-  to   { transform: translateY(-3px); }
-}
+/* Pfeil rechts, der beim Ueberfahren hineingleitet und wippt. (Die
+   Knoepfe tragen bewusst KEINE Icons.) */
 .menu-nav-pfeil {
   position: absolute;
   right: 20px;
@@ -21588,7 +21626,6 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   text-shadow:
     2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
 }
-.menu-nav-btn--primary .menu-nav-icon { color: #fff; }
 .menu-nav-btn--primary .menu-nav-pfeil { color: #fff; }
 /* Glanzband ueber dem Hauptknopf: breit und gemaechlich. */
 .pp-glanz--knopf {
@@ -21742,15 +21779,13 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   outline-color: color-mix(in srgb, var(--player-color, #00f0ff) 45%, transparent);
 }
 
-/* ── Telefon quer: kleinere Icons, Pfeil aus (zwei Knopfspalten) ─────── */
+/* ── Telefon quer: Pfeil aus (zwei schmale Knopfspalten) ──────────────── */
 @media (max-height: 600px) {
-  .main-menu-screen .menu-buttons .menu-nav-btn { padding-left: 34px; padding-right: 12px; letter-spacing: 1px; }
-  .menu-nav-icon { left: 9px; width: 18px; height: 18px; margin-top: -9px; }
+  .main-menu-screen .menu-buttons .menu-nav-btn { padding-left: 12px; padding-right: 12px; letter-spacing: 1px; }
   .menu-nav-pfeil { display: none; }
   .menu-side-title-icon { width: 16px; height: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .menu-nav-btn:hover .menu-nav-icon,
   .menu-nav-btn:hover .menu-nav-pfeil,
   .menu-nav-badge { animation: none; }
 }
