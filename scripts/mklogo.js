@@ -26,13 +26,19 @@
 //    logo-licht-mask.png  Lichtkanten. `.pp-logo-licht` deckt sie mit einer
 //                         aufgehellten Spielerfarbe ab (Multiplizieren kann
 //                         nicht aufhellen, daher eine eigene Schicht).
+//    logo-umriss-mask.png Aeussere Kontur (2 Rasterpixel). Im Bild schwarz;
+//                         `.pp-logo-umriss` faerbt sie weiss, wenn die
+//                         Spielerfarbe so dunkel ist, dass eine schwarze
+//                         Kontur im dunklen Menue verschwaende.
+//  Die Kontur der SCHRIFT ist immer schwarz (weisse Schrift mit weisser
+//  Kontur wuerde verlaufen).
 //
 //  Alles wird im Raster gerechnet und um SCALE vergroessert — die Dateien
 //  tragen scharfe Bloecke; die CSS-Hoehe (`.pp-logo-img`) ist ein
 //  Vielfaches der Rasterhoehe.
 //
 //  Aufruf:  node scripts/mklogo.js
-//           node scripts/mklogo.js --preview out.png '#ff44cc'
+//           node scripts/mklogo.js --preview out.png '#ff44cc' [--umriss-weiss]
 //             (zusaetzlich eine eingefaerbte Vorschau auf dunklem Grund)
 // ════════════════════════════════════════════════════════════════
 const zlib = require('zlib');
@@ -125,9 +131,11 @@ const obenLinks = (form, x, y, d) => !ist(form, x, y - d - 1) || !ist(form, x - 
 // ── Farben ──
 //   { art: 'tint', g }   Graustufe, wird mit der Spielerfarbe multipliziert
 //   { art: 'licht' }     Lichtkante, aufgehellte Spielerfarbe
-//   { art: 'fest', rgb } feste Farbe (Aussenkante, Schrift)
+//   { art: 'fest', rgb } feste Farbe (Schrift, Schriftkontur)
+//   { art: 'umriss' }    aeussere Kontur (schwarz, bei dunkler Farbe weiss)
 const HELL = 228, FUSS = 186, SAUM = 150, DUNKEL = 78, ENDE = 172, ENDE_FUSS = 132;
 const SCHWARZ = { art: 'fest', rgb: [10, 6, 18] };
+const UMRISS = { art: 'umriss' };
 const bild = neu(null);
 
 // 1) Bandenden (hinten): Rahmen wie das Band, Flaeche dunkler, keine
@@ -136,7 +144,7 @@ const eE = randAbstand(enden);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   const d = eE[y][x];
   if (d < 0) continue;
-  if (d === 0) bild[y][x] = SCHWARZ;
+  if (d === 0) bild[y][x] = UMRISS;
   else if (d <= 2) bild[y][x] = { art: 'tint', g: DUNKEL };
   else {
     const t = (y - bogenY(x) - ENDE_TIEF) / endH;
@@ -159,7 +167,7 @@ const eB = randAbstand(band);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   const d = eB[y][x];
   if (d < 0) continue;
-  if (d === 0) { bild[y][x] = SCHWARZ; continue; }
+  if (d === 0) { bild[y][x] = UMRISS; continue; }
   if (d <= 2) { bild[y][x] = { art: 'tint', g: DUNKEL }; continue; }
   if (d === 3) { bild[y][x] = obenLinks(band, x, y, 3) ? { art: 'licht' } : { art: 'tint', g: SAUM }; continue; }
   const t = (y - bogenY(x) - 4) / (BAND_H - 8);
@@ -170,9 +178,10 @@ for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   bild[y][x] = px;
 }
 
-// 3) Schrift: weiss wie auf den Karten, mit 1-px-Kontur und hartem
-//    Schatten in dunkler Spielerfarbe. Jeder Buchstabe folgt dem Bogen an seiner Mitte.
-const schrift = neu(0), schatten = neu(0);
+// 3) Schrift: weiss wie auf den Karten, mit schwarzer 1-px-Kontur und
+//    hartem Schatten in dunkler Spielerfarbe. Jeder Buchstabe folgt dem
+//    Bogen an seiner Mitte.
+const schrift = neu(0), schatten = neu(0), schriftKontur = neu(0);
 const textX0 = bx0 + 4 + POLSTER;
 const textOben = Math.round((BAND_H - 7 * FS) / 2) - 1;
 for (const z of zeichen) {
@@ -188,17 +197,31 @@ for (const z of zeichen) {
 }
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   if (schrift[y][x]) continue;
-  // 1-px-Kontur rundum (Kontrast auch auf hellen Spielerfarben) plus ein
-  // harter Schatten nach unten rechts.
+  // Schwarze 1-px-Kontur rundum plus ein harter Schatten nach unten rechts.
   let kontur = false;
   for (let dy = -1; dy <= 1 && !kontur; dy++) for (let dx = -1; dx <= 1; dx++) if (ist(schrift, x + dx, y + dy)) { kontur = true; break; }
-  if (kontur || ist(schrift, x - 1, y - 2) || ist(schrift, x, y - 2) || ist(schrift, x - 2, y - 2) || ist(schrift, x - 2, y - 1)) schatten[y][x] = 1;
+  if (kontur) schriftKontur[y][x] = 1;
+  else if (ist(schrift, x - 1, y - 2) || ist(schrift, x, y - 2) || ist(schrift, x - 2, y - 2) || ist(schrift, x - 2, y - 1)) schatten[y][x] = 1;
 }
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   if (schatten[y][x]) bild[y][x] = { art: 'tint', g: DUNKEL };
+  if (schriftKontur[y][x]) bild[y][x] = SCHWARZ;
   const r = schrift[y][x];
   if (!r) continue;
   bild[y][x] = { art: 'fest', rgb: [255, 255, 255] };
+}
+
+// 4) Aeussere Kontur auf 2 Rasterpixel verdicken: jeder leere Pixel neben
+//    dem Logo wird ebenfalls Umriss.
+{
+  const aussen = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (bild[y][x]) continue;
+    let an = false;
+    for (let dy = -1; dy <= 1 && !an; dy++) for (let dx = -1; dx <= 1; dx++) if (ist(bild, x + dx, y + dy)) { an = true; break; }
+    if (an) aussen.push([x, y]);
+  }
+  for (const [x, y] of aussen) bild[y][x] = UMRISS;
 }
 
 // ── PNG schreiben ──
@@ -224,15 +247,18 @@ const logoPx = (x, y) => {
   if (!q) return LEER;
   if (q.art === 'tint') return [q.g, q.g, q.g, 255];
   if (q.art === 'licht') return WEISS;
+  if (q.art === 'umriss') return [10, 6, 18, 255];
   return [...q.rgb, 255];
 };
 const tintPx = (x, y) => (bild[y][x] && bild[y][x].art === 'tint') ? WEISS : LEER;
 const lichtPx = (x, y) => (bild[y][x] && bild[y][x].art === 'licht') ? WEISS : LEER;
+const umrissPx = (x, y) => (bild[y][x] && bild[y][x].art === 'umriss') ? WEISS : LEER;
 
 fs.writeFileSync(path.join(OUT, 'logo.png'), png(W, H, logoPx));
 fs.writeFileSync(path.join(OUT, 'logo-tint-mask.png'), png(W, H, tintPx));
 fs.writeFileSync(path.join(OUT, 'logo-licht-mask.png'), png(W, H, lichtPx));
-console.log(`wrote data/logo.png + logo-tint-mask.png + logo-licht-mask.png  (${W * SCALE}x${H * SCALE}, Raster ${W}x${H})`);
+fs.writeFileSync(path.join(OUT, 'logo-umriss-mask.png'), png(W, H, umrissPx));
+console.log(`wrote data/logo.png + logo-tint/-licht/-umriss-mask.png  (${W * SCALE}x${H * SCALE}, Raster ${W}x${H})`);
 
 // ── Vorschau (nur zum Pruefen, nicht fuer das Spiel) ──
 // Rechnet dieselben Schichten wie style.css: Multiplizieren mit der
@@ -243,6 +269,7 @@ if (vi > 0) {
   const hex = (process.argv[vi + 2] || '#00f0ff').replace('#', '');
   const farbe = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
   const licht = farbe.map(v => Math.round(v * 0.45 + 255 * 0.55));
+  const umrissWeiss = process.argv.includes('--umriss-weiss');
   const bg = [14, 10, 24];
   const PAD = 6;
   fs.writeFileSync(ziel, png(W + PAD * 2, H + PAD * 2, (x, y) => {
@@ -251,6 +278,7 @@ if (vi > 0) {
     if (!q) return [...bg, 255];
     if (q.art === 'tint') return [...farbe.map(v => Math.round(v * q.g / 255)), 255];
     if (q.art === 'licht') return [...licht, 255];
+    if (q.art === 'umriss') return umrissWeiss ? [255, 255, 255, 255] : [10, 6, 18, 255];
     return [...q.rgb, 255];
   }));
   console.log(`preview → ${ziel}`);

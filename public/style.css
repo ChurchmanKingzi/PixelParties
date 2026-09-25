@@ -2454,6 +2454,17 @@ select optgroup {
   -webkit-mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
   mask: url(/data/logo-licht-mask.png) center / 100% 100% no-repeat;
 }
+/* Aussenkontur des Logos (data/logo-umriss-mask.png, 2 Rasterpixel):
+   im Bild schwarz; `--pp-umriss` (ppUmrissFarbe) macht sie weiss, wenn
+   die Spielerfarbe so dunkel ist, dass Schwarz im Menue verschwaende. */
+.pp-logo-umriss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--pp-umriss, #000);
+  -webkit-mask: url(/data/logo-umriss-mask.png) center / 100% 100% no-repeat;
+  mask: url(/data/logo-umriss-mask.png) center / 100% 100% no-repeat;
+}
 /* ── PIXEL-PARTIKEL HINTER DEM MENUE (v808) ──────────────────────────
    Al: „Solche moechte ich ueberall im Hintergrund haben (hinter dem
    Menue selbst), aber um den Schriftzug herum mehr."
@@ -21536,7 +21547,8 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 
 /* ── KNOPFRAHMEN IM KARTENSTIL ──────────────────────────────────────
-   Gilt fuer die Menueknoepfe, LOGOUT und die Login-Knoepfe. Aufbau wie
+   Gilt fuer die Menueknoepfe, LOGOUT, die Lautsprecher-Tasten in Menue
+   und Login, Discord, die Logout-Frage und die Login-Knoepfe. Aufbau wie
    die Titelplatte einer Karte, von aussen nach innen:
      schwarze Kontur · 3-px-Rahmen in der Knopffarbe mit EINGEKERBTEN
      Pixel-Ecken (::after malt die Eckpixel in Konturfarbe) · Lichtkante
@@ -21551,7 +21563,11 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .main-menu-screen .menu-logout-btn,
 .auth-screen .auth-rumpf .btn-big,
 .auth-screen .auth-gast .auth-gast-btn,
-.auth-screen .auth-corner .menu-logout-btn {
+.auth-screen .auth-corner .menu-logout-btn,
+.main-menu-screen .menu-corner .volume-btn,
+.auth-screen .auth-corner .volume-btn,
+.discord-btn,
+.main-menu-screen .menu-logout-frage .btn {
   --knopf: var(--player-color, #00f0ff);
   --knopf-tiefe: 5px;
   --knopf-licht: color-mix(in srgb, var(--knopf) 55%, #fff);
@@ -21586,13 +21602,21 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .main-menu-screen .menu-logout-btn::before,
 .auth-screen .auth-rumpf .btn-big::before,
 .auth-screen .auth-gast .auth-gast-btn::before,
-.auth-screen .auth-corner .menu-logout-btn::before { background: none !important; }
+.auth-screen .auth-corner .menu-logout-btn::before,
+.main-menu-screen .menu-corner .volume-btn::before,
+.auth-screen .auth-corner .volume-btn::before,
+.discord-btn::before,
+.main-menu-screen .menu-logout-frage .btn::before { background: none !important; }
 /* Eingekerbte Ecken + Nieten. Ueberdeckt den Rahmen (inset -3px). */
 .main-menu-screen .menu-buttons .menu-nav-btn::after,
 .main-menu-screen .menu-logout-btn::after,
 .auth-screen .auth-rumpf .btn-big::after,
 .auth-screen .auth-gast .auth-gast-btn::after,
-.auth-screen .auth-corner .menu-logout-btn::after {
+.auth-screen .auth-corner .menu-logout-btn::after,
+.main-menu-screen .menu-corner .volume-btn::after,
+.auth-screen .auth-corner .volume-btn::after,
+.discord-btn::after,
+.main-menu-screen .menu-logout-frage .btn::after {
   inset: -3px;
   opacity: 1;
   transition: none;
@@ -21610,7 +21634,11 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .main-menu-screen .menu-logout-btn:hover:not(:disabled),
 .auth-screen .auth-rumpf .btn-big:hover:not(:disabled),
 .auth-screen .auth-gast .auth-gast-btn:hover:not(:disabled),
-.auth-screen .auth-corner .menu-logout-btn:hover:not(:disabled) {
+.auth-screen .auth-corner .menu-logout-btn:hover:not(:disabled),
+.main-menu-screen .menu-corner .volume-btn:hover:not(:disabled),
+.auth-screen .auth-corner .volume-btn:hover:not(:disabled),
+.discord-btn:hover:not(:disabled),
+.main-menu-screen .menu-logout-frage .btn:hover:not(:disabled) {
   --knopf-tiefe: 8px;
   --kf-oben: color-mix(in srgb, var(--knopf) 52%, var(--menu-surface));
   --kf-mitte: color-mix(in srgb, var(--knopf) 27%, var(--menu-surface));
@@ -21628,7 +21656,11 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .main-menu-screen .menu-logout-btn:active:not(:disabled),
 .auth-screen .auth-rumpf .btn-big:active:not(:disabled),
 .auth-screen .auth-gast .auth-gast-btn:active:not(:disabled),
-.auth-screen .auth-corner .menu-logout-btn:active:not(:disabled) {
+.auth-screen .auth-corner .menu-logout-btn:active:not(:disabled),
+.main-menu-screen .menu-corner .volume-btn:active:not(:disabled),
+.auth-screen .auth-corner .volume-btn:active:not(:disabled),
+.discord-btn:active:not(:disabled),
+.main-menu-screen .menu-logout-frage .btn:active:not(:disabled) {
   --knopf-tiefe: 1px;
   transform: translateY(4px);
   transition-duration: .04s;
@@ -21682,7 +21714,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    Knopffarbe gefuellt (dieselben drei Baender, nur hell), weisse Schrift
    mit schwarzer Pixelkontur (liest sich auf jeder Farbe), Glanzband. */
 .main-menu-screen .menu-buttons .menu-nav-btn--primary,
-.auth-screen .auth-gast .auth-gast-btn {
+.auth-screen .auth-gast .auth-gast-btn,
+.discord-btn,
+.main-menu-screen .menu-logout-frage .menu-logout-ja {
   --kf-oben: color-mix(in srgb, var(--knopf) 55%, #fff);
   --kf-mitte: var(--knopf);
   --kf-fuss: color-mix(in srgb, var(--knopf) 68%, #000);
@@ -21694,7 +21728,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
     2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 2px 0 0 #000, 0 2px 0 #000;
 }
 .main-menu-screen .menu-buttons .menu-nav-btn--primary:hover,
-.auth-screen .auth-gast .auth-gast-btn:hover:not(:disabled) {
+.auth-screen .auth-gast .auth-gast-btn:hover:not(:disabled),
+.discord-btn:hover,
+.main-menu-screen .menu-logout-frage .menu-logout-ja:hover:not(:disabled) {
   --kf-oben: color-mix(in srgb, var(--knopf) 40%, #fff);
   --kf-mitte: color-mix(in srgb, var(--knopf) 85%, #fff);
   --kf-fuss: color-mix(in srgb, var(--knopf) 80%, #000);
@@ -21757,9 +21793,33 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 }
 .main-menu-screen .menu-stat-value { text-shadow: 2px 2px 0 #000, 0 0 10px currentColor; }
 
-/* Name + Avatar */
-.main-menu-screen .menu-player-name { text-shadow: 2px 2px 0 #000; }
-.main-menu-screen .menu-player-name:hover { text-shadow: 2px 2px 0 #000, 0 0 12px currentColor; }
+/* Name + Avatar. Namen und Decknamen tragen eine Pixel-Kontur rundum:
+   schwarz, bei sehr dunkler Spielerfarbe weiss (`--pp-umriss`, gesetzt
+   am Menue fuer den eigenen Namen und je Zeile in der Bestenliste).
+   Decknamen sind weiss — dort immer Schwarz. */
+.main-menu-screen .menu-player-name,
+.main-menu-screen .menu-lb-name,
+.main-menu-screen .menu-deck-name {
+  --umriss-farbe: var(--pp-umriss, #000);
+  --umriss-2:
+    2px 0 0 var(--umriss-farbe), -2px 0 0 var(--umriss-farbe),
+    0 2px 0 var(--umriss-farbe), 0 -2px 0 var(--umriss-farbe),
+    2px 2px 0 var(--umriss-farbe), -2px -2px 0 var(--umriss-farbe),
+    2px -2px 0 var(--umriss-farbe), -2px 2px 0 var(--umriss-farbe);
+  text-shadow: var(--umriss-2);
+}
+.main-menu-screen .menu-deck-name { --umriss-farbe: #000; }
+/* Kleinere Schrift (Bestenliste, Decks): 1 px Kontur plus Schatten. */
+.main-menu-screen .menu-lb-name,
+.main-menu-screen .menu-deck-name {
+  text-shadow:
+    1px 0 0 var(--umriss-farbe), -1px 0 0 var(--umriss-farbe),
+    0 1px 0 var(--umriss-farbe), 0 -1px 0 var(--umriss-farbe),
+    1px 1px 0 var(--umriss-farbe), -1px -1px 0 var(--umriss-farbe),
+    1px -1px 0 var(--umriss-farbe), -1px 1px 0 var(--umriss-farbe),
+    2px 2px 0 var(--umriss-farbe);
+}
+.main-menu-screen .menu-player-name:hover { text-shadow: var(--umriss-2), 0 0 12px currentColor; }
 .main-menu-screen .menu-profile-avatar { outline: 3px solid var(--pp-kontur); }
 
 /* ── Kacheln in den Seitenkaesten ───────────────────────────────────── */
@@ -21885,3 +21945,244 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   height: 2px;
   background: repeating-linear-gradient(90deg, var(--auth-linie) 0 4px, transparent 4px 8px);
 }
+
+/* ═══ PIXEL-LOOK FUER DIE KLEINTEILE ═══════════════════════════════════
+   Discord, Lautsprecher, Scrollbars, Google-Knopf und die Logout-Frage —
+   dieselbe Sprache wie Knoepfe und Kaesten: eckig, schwarze Kontur,
+   Licht-/Schattenkante, Dithering statt Verlauf. Die Knopfflaechen
+   selbst kommen aus „KNOPFRAHMEN IM KARTENSTIL" oben; hier stehen nur
+   Farben, Masse und was darueber hinausgeht. */
+
+/* ── Discord: Blurple-Taste mit Pixel-Logo ─────────────────────────────── */
+.discord-btn {
+  --knopf: #5865f2;
+  --knopf-tiefe: 4px;
+  position: relative;
+  border-radius: 0;
+  color: #fff;
+}
+.discord-btn-logo {
+  display: block;
+  width: 22px;
+  height: auto;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .45));
+}
+/* Block-Variante (Menue/Login-Ecke): Logo ueber die Hoehe (Menue, siehe
+   `.menu-corner .discord-btn--block svg`) bzw. 34 % der Breite (Login). */
+.discord-btn--block .discord-btn-logo { width: 34%; }
+
+/* ── Lautsprecher ─────────────────────────────────────────────────────── */
+/* Das Icon waechst mit der Schriftgroesse des Knopfes (34 px, im
+   Kampf-Telefon-Layout 22 px) — so bleiben alle Stellen gleich gross. */
+.volume-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  border-radius: 0;
+  opacity: .85;
+  color: var(--player-color, var(--accent));
+}
+.volume-btn:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--player-color, var(--accent)) 45%, transparent);
+  background: color-mix(in srgb, var(--player-color, var(--accent)) 10%, transparent);
+}
+.volume-icon {
+  display: block;
+  width: 1em;
+  height: auto;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .8));
+}
+/* In der Ecke von Hauptmenue und Login: eine quadratische Taste neben
+   LOGOUT, so hoch wie dieser. */
+.main-menu-screen .menu-corner .volume-btn,
+.auth-screen .auth-corner .volume-btn {
+  position: relative;
+  opacity: 1;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  font-size: 32px;
+}
+.auth-screen .auth-corner .volume-btn { width: 42px; height: 42px; font-size: 22px; }
+/* Telefon quer: Kopfzeile ist eine flache Zeile — kleinere Taste. */
+@media (max-height: 600px) {
+  .main-menu-screen .menu-corner .volume-btn,
+  .auth-screen .auth-corner .volume-btn { width: 38px; height: 38px; font-size: 22px; }
+}
+/* Das Fenster mit den Reglern: Pixelfenster, Regler als Pixel-Schieber. */
+.volume-slider-popup {
+  border-radius: 0;
+  border: 3px solid var(--player-color, var(--accent));
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 8px 8px,
+    var(--bg2);
+  box-shadow: 0 0 0 2px var(--pp-kontur), 6px 6px 0 2px rgba(0, 0, 0, .55);
+}
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  background: transparent;
+}
+.volume-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #07060e;
+  border: 2px solid var(--pp-kontur);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .6), 0 0 0 1px color-mix(in srgb, var(--player-color, var(--accent)) 35%, transparent);
+}
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 18px;
+  margin-top: -7px;
+  background: var(--player-color, var(--accent));
+  border: 2px solid var(--pp-kontur);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .5), inset -2px -2px 0 rgba(0, 0, 0, .35);
+  cursor: pointer;
+}
+.volume-slider::-moz-range-track {
+  height: 4px;
+  background: #07060e;
+  border: 2px solid var(--pp-kontur);
+}
+.volume-slider::-moz-range-thumb {
+  width: 8px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--player-color, var(--accent));
+  border: 2px solid var(--pp-kontur);
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────── */
+/* Versenkte Schiene (gedithert, Schatten innen) und ein eckiger Griff in
+   der Spielerfarbe mit Lichtkante und drei Griffrillen. Die schmalen
+   Leisten im Kampf (Chat, Log, Brett) behalten ihre eigenen Regeln. */
+::-webkit-scrollbar { width: 14px; height: 14px; }
+::-webkit-scrollbar-track {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 4px 4px,
+    #07060e;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 255, 255, .06);
+}
+::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) 50% calc(50% - 4px) / 6px 2px no-repeat,
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) 50% 50% / 6px 2px no-repeat,
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) 50% calc(50% + 4px) / 6px 2px no-repeat,
+    var(--player-color, var(--accent));
+  border: 2px solid var(--pp-kontur);
+  border-radius: 0;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .45), inset -2px -2px 0 rgba(0, 0, 0, .35);
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background:
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) calc(50% - 4px) 50% / 2px 6px no-repeat,
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) 50% 50% / 2px 6px no-repeat,
+    linear-gradient(rgba(0, 0, 0, .45) 0 0) calc(50% + 4px) 50% / 2px 6px no-repeat,
+    var(--player-color, var(--accent));
+  min-width: 32px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--player-color, var(--accent)) 70%, #fff);
+}
+::-webkit-scrollbar-corner { background: #07060e; }
+/* Chrome ignoriert die Gestaltung oben, sobald ein Element
+   `scrollbar-width`/`scrollbar-color` traegt — die Deckliste im Menue
+   hatte `thin`. In Browsern mit ::-webkit-scrollbar zurueck auf `auto`;
+   Firefox (kann nur Farben) bekommt dort wenigstens die Spielerfarbe. */
+@supports selector(::-webkit-scrollbar) {
+  .menu-side-scroll { scrollbar-width: auto; }
+}
+@supports not selector(::-webkit-scrollbar) {
+  .menu-side-scroll { scrollbar-color: var(--player-color, var(--accent)) #07060e; }
+}
+
+/* ── Google-Knopf ────────────────────────────────────────────────────── */
+/* Web: Google zeichnet den Knopf in einen iframe (Inneres nicht
+   gestaltbar). Er ist eckig bestellt (`shape: 'rectangular'`) und
+   bekommt hier einen Pixelrahmen mit Kontur, Sockel, eingekerbten Ecken
+   und dem ruhigen Aufmerksamkeits-Puls des Desktop-Knopfes. */
+.google-pixelrahmen {
+  position: relative;
+  display: inline-flex;
+  line-height: 0;
+  border: 3px solid var(--accent);
+  background: #131314;
+  box-shadow: 0 0 0 2px var(--pp-kontur), 0 5px 0 2px color-mix(in srgb, var(--accent) 45%, var(--pp-kontur));
+  animation: google-rahmen-puls 2.4s ease-in-out infinite;
+}
+.google-pixelrahmen:empty { display: none; }
+.google-pixelrahmen::after,
+.google-btn--prominent::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--pp-kontur) 0 0) left top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right top / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) left bottom / 3px 3px no-repeat,
+    linear-gradient(var(--pp-kontur) 0 0) right bottom / 3px 3px no-repeat;
+}
+@keyframes google-rahmen-puls {
+  0%, 100% { box-shadow: 0 0 0 2px var(--pp-kontur), 0 5px 0 2px color-mix(in srgb, var(--accent) 45%, var(--pp-kontur)), 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent); }
+  50%      { box-shadow: 0 0 0 2px var(--pp-kontur), 0 5px 0 2px color-mix(in srgb, var(--accent) 45%, var(--pp-kontur)), 0 0 0 10px color-mix(in srgb, var(--accent) 8%, transparent); }
+}
+/* Desktop-Gehaeuse: der eigene Knopf, gleich gebaut. */
+.google-btn { border-radius: 0; }
+.google-btn--prominent {
+  position: relative;
+  border: 3px solid var(--accent);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, .12), inset -2px -2px 0 rgba(0, 0, 0, .5),
+    0 0 0 2px var(--pp-kontur), 0 5px 0 2px color-mix(in srgb, var(--accent) 45%, var(--pp-kontur));
+  animation: google-rahmen-puls 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .google-pixelrahmen, .google-btn--prominent { animation: none; }
+}
+
+/* ── Logout-Frage ────────────────────────────────────────────────────── */
+/* Pixelfenster mit rotem Rahmen und einem gestuften Zipfel, der auf
+   LOGOUT zeigt; darin YES (gefuellt, rot) und NO (Spielerfarbe). */
+.menu-logout-frage {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: 0;
+  z-index: 20;
+  white-space: nowrap;
+  padding: 16px 20px 20px;
+  border: 3px solid var(--danger);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23ffffff' fill-opacity='0.05'/%3E%3C/svg%3E") 0 0 / 8px 8px,
+    var(--bg2);
+  box-shadow:
+    0 0 0 2px var(--pp-kontur),
+    8px 8px 0 2px rgba(0, 0, 0, .55),
+    0 0 28px color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.menu-logout-frage::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  right: 34px;
+  width: 15px;
+  height: 9px;
+  background:
+    linear-gradient(var(--danger) 0 0) 5px 0 / 5px 3px no-repeat,
+    linear-gradient(var(--danger) 0 0) 2px 3px / 11px 3px no-repeat,
+    linear-gradient(var(--danger) 0 0) 0 6px / 15px 3px no-repeat;
+}
+.menu-logout-frage-text {
+  font-size: 15px;
+  color: var(--text);
+  text-align: center;
+  text-shadow: 2px 2px 0 #000;
+  margin-bottom: 16px;
+}
+.menu-logout-frage-knoepfe { display: flex; gap: 16px; justify-content: center; }
+.main-menu-screen .menu-logout-frage .btn { padding: 8px 26px; font-size: 14px; }
+.main-menu-screen .menu-logout-frage .menu-logout-ja { --knopf: var(--danger, #ff3366); }
