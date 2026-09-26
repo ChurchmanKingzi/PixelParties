@@ -90,8 +90,9 @@ def face(a, i):
         for x in (7, 8, 11, 12):
             a[y, x + PL] = SKIN
     if t % 8 in (2, 3):                                # Finger tippt ans Kinn
-        a[16 + PT, 11 + PL] = rgb('f6bc97')
-        a[15 + PT, 11 + PL] = rgb('f6bc97')
+        # nur die Fingerlinie im Inneren der Hand wandert, der braune Rand bleibt
+        a[16 + PT, 9 + PL] = rgb('3a2409')
+        a[16 + PT, 10 + PL] = rgb('f6bc97')
 
 
 QUESTION = ["###", "..#", ".##", "...", ".#."]      # 3x5-Fragezeichen

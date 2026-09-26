@@ -47,9 +47,12 @@ def is_arm(x, oy):
 
 
 def arm_lift(x, i):
-    """Hubhöhe pro Spalte: an der Schulter 0, an der Faust bis 2 px."""
-    reach = (9 - x) / 5 if x <= 9 else (x - 19) / 4
-    return int(round(min(1.0, max(0.0, reach)) * 2.0 * flex(i)))
+    """Hubhöhe pro Spalte: Schulter 0, Oberarm halb, die ganze Faust gleichmäßig
+    (sonst ragen einzelne Randspalten wie Finger nach oben)."""
+    full = int(round(2.0 * flex(i)))
+    if x <= 7 or x >= 21:
+        return full
+    return (full + 1) // 2                               # x8 / x20: Übergang
 
 
 def offset(x, y, i):
