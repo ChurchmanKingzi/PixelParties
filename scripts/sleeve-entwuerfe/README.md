@@ -10,7 +10,6 @@ sowie aus den Area-Sprites unter `public/areas/`.
 | Skript | Sleeve |
 |---|---|
 | `s01_deepsea.py` | 01 Tiefsee-Abgrund |
-| `s02_mary.py` (+ `mary_sprite.py`) | 02 Engelsherz (Cute) |
 | `s03_blueprint.py` | 03 Future-Tech-Blaupause |
 | `s04_cosmic.py` | 04 Kosmische Tiefen |
 | `s05_cool.py` | 05 Wowhalla-Regenbogen |
