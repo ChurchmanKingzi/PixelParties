@@ -40841,23 +40841,6 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
               Kartenreihe weiter auf der ZEILE zentriert bleibt und
               nicht auf dem Rest neben dem Cluster. */}
           <div className="game-hand-topleft">
-            {isSpectator ? (
-              <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
-                👁 ✕ LEAVE
-              </button>
-            ) : cubeMatchInfo && !result ? (
-              // Cube tournament match — surrender ends the WHOLE match (Bo-set
-              // included), not just the current game. Player keeps parent-room
-              // membership and becomes a spectator like other eliminated players.
-              <button className="btn btn-danger game-hand-quit"
-                onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
-                🏳 SURRENDER MATCH
-              </button>
-            ) : (
-              <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
-                {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
-              </button>
-            )}
           <div className="game-hand-info" ref={speechOppRef} style={oppAvatarHighlight}>
             {/* Porträt im verzierten Pixelrahmen in der Farbe des Spielers
                 (`.pp-portraet`, style.css). Im Tutorial: Monia Bot bzw.
@@ -40875,19 +40858,41 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   : null}
               <span className="pp-portraet-zier" aria-hidden="true" />
             </span>
-            <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: tutorialGegner ? tutorialGegner.color : opp.color }}>{
-              // CPU opponents are labelled "CPU" server-side; show their
-              // middle Hero instead so they read as a character. Als
-              // Ruling: nur der NAME, ohne Titel ("Bomb Berserker Bartas"
-              // → "Bartas", "Maya, the Nature Fairy" → "Maya") — siehe
-              // heroDisplayName in app-shared.jsx. Falls back to the
-              // first living Hero, then CPU.
-              tutorialGegner ? tutorialGegner.name
-              : (gameState.isCpuBattle && opp.username === 'CPU')
-                ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
-                : opp.username
-            }</span>
-            {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
+            {/* ★ Als Vorgabe 26.9.: Knopf RECHTS NEBEN dem Avatar (unter dem
+                Namen) statt darueber — der Stapel Knopf-ueber-Avatar hat die
+                Gegnerzeile hoeher gemacht als die eigene. */}
+            <div className="game-hand-namensspalte">
+              <span className="orbit-font game-hand-name" style={{ fontSize: 18, fontWeight: 800, color: tutorialGegner ? tutorialGegner.color : opp.color }}>{
+                // CPU opponents are labelled "CPU" server-side; show their
+                // middle Hero instead so they read as a character. Als
+                // Ruling: nur der NAME, ohne Titel ("Bomb Berserker Bartas"
+                // → "Bartas", "Maya, the Nature Fairy" → "Maya") — siehe
+                // heroDisplayName in app-shared.jsx. Falls back to the
+                // first living Hero, then CPU.
+                tutorialGegner ? tutorialGegner.name
+                : (gameState.isCpuBattle && opp.username === 'CPU')
+                  ? heroDisplayName(opp.heroes?.[1]?.name || opp.heroes?.find(h => h?.name)?.name || opp.username)
+                  : opp.username
+              }</span>
+              {oppDisconnected && <span style={{ fontSize: 10, color: 'var(--danger)', animation: 'pulse 1.5s infinite' }}>DISCONNECTED</span>}
+              {isSpectator ? (
+                <button className="btn btn-danger game-hand-quit" onClick={handleLeave}>
+                  👁 ✕ LEAVE
+                </button>
+              ) : cubeMatchInfo && !result ? (
+                // Cube tournament match — surrender ends the WHOLE match (Bo-set
+                // included), not just the current game. Player keeps parent-room
+                // membership and becomes a spectator like other eliminated players.
+                <button className="btn btn-danger game-hand-quit"
+                  onClick={() => setShowSurrender(true)} title="Forfeit this match — you stay in the cube as a spectator">
+                  🏳 SURRENDER MATCH
+                </button>
+              ) : (
+                <button className="btn btn-danger game-hand-quit" onClick={() => result ? handleLeave() : setShowSurrender(true)}>
+                  {result ? '✕ LEAVE' : gameState.isPuzzle ? '✕ EXIT' : '⚑ SURRENDER'}
+                </button>
+              )}
+            </div>
           </div>
           </div>{/* /game-hand-topleft (v1258) */}
           <div className={"game-hand-cards"

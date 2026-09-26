@@ -3188,7 +3188,11 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
 }
 .game-hand-opp {
   border-bottom: 1px solid var(--bg4);
-  padding: calc(6px * var(--board-scale)) calc(16px * var(--board-scale));
+  /* Senkrecht dasselbe Polster wie `.game-hand` (4 statt 6): sonst
+     waechst die Zeile ueber die gemeinsame Mindesthoehe hinaus. */
+  padding: calc(4px * var(--board-scale)) calc(16px * var(--board-scale));
+  /* Gleich hoch wie die eigene Handzeile (`.game-hand-me`). */
+  min-height: calc(var(--hand-min-h) - var(--hand-senkung));
   /* ★ v1258 (Als Befund 19.9.: „Gegner-Handkarten werden UNTER dem
      Board gerendert — eine offene Karte expandiert unter die Support
      Zones"). Die Zeile steht VOR dem Brett im DOM, und beide sind
@@ -3224,15 +3228,27 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    oberen Rand war deutlich groesser als die zum Avatar), der Avatar
    ueber die groessere Luecke ein Stueck runter, und der
    Lautstaerkeregler rechts schliesst oben mit der Knopf-Oberkante ab. */
+/* ★ Als Vorgabe 26.9.: der Knopf steht jetzt RECHTS NEBEN dem Avatar
+   (unter dem Namen, `.game-hand-namensspalte`) statt darueber. Der
+   Stapel war 160 px hoch und zwang die Gegnerzeile auf die volle
+   `--hand-min-h`, waehrend die eigene um `--hand-senkung` kuerzer ist.
+   Jetzt sind beide Zeilen gleich hoch, und der Cluster sitzt wie der
+   eigene Avatar mittig in seiner Zeile. */
 .game-hand-topleft {
   position: absolute;
   left: calc(12px * var(--board-scale));
-  top: calc(10px * var(--board-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 3;
+}
+.game-hand-namensspalte {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: calc(16px * var(--board-scale));
-  z-index: 3;
+  gap: calc(10px * var(--board-scale));
+  min-width: 0;
 }
 /* Der Avatar gibt seine eigene absolute Lage im Cluster auf — er ist
    hier ein gewoehnliches Flex-Element neben dem Knopf. */
@@ -5856,7 +5872,10 @@ body:has(.anim-backdrop) .pp-bg-particles { display: none; }
    Hover-Vergrößerung gehen nach unten. */
 .game-hand-opp .game-hand-cards {
   padding: var(--fan-pad-unten) var(--fan-pad-x) calc(var(--hand-card-h) * 0.8 + 20px);
-  margin-top: calc(var(--fan-pad-unten) * -1);
+  /* Spiegel der eigenen Hand (Als Vorgabe 26.9.): die Zeile ist um
+     `--hand-senkung` kuerzer, die Karten ragen dafuer OBEN hinaus —
+     genau wie die eigenen unten. */
+  margin-top: calc(var(--fan-pad-unten) * -1 - var(--hand-senkung));
   margin-bottom: calc(var(--hand-card-h) * -0.8 - 20px);
   /* (v1261: die 260-px-Raender stehen jetzt fuer beide Haende in der
      Basisregel `.game-hand-cards`.) */
@@ -15908,9 +15927,10 @@ body:has(.textbox-overlay) .tooltip {
      Ziel also ≈ 46px. Der Massstab-Floor steigt in derselben Welle auf
      0.59, darum reicht hier 1.22: 64 x 0.59 x 1.22 ≈ 46px. */
   :root { --hand-card-scale: 1.22; }
-  /* Compact opponent hand */
+  /* Compact opponent hand — gleich hoch wie die eigene (54px, s.
+     „Compact player hand"; Als Vorgabe 26.9.: beide Handzeilen gleich). */
   .game-hand-opp {
-    min-height: 40px !important;
+    min-height: 54px !important;
     padding: 2px 8px !important;
   }
   .game-hand-opp .game-hand-avatar-big {
@@ -16027,9 +16047,10 @@ body:has(.textbox-overlay) .tooltip {
   .hand-rechts { gap: calc(10px * var(--board-scale)); }
   .hand-actions { gap: 3px; }
   .hand-action-btn { font-size: 9px !important; padding: 3px 7px !important; min-height: 0 !important; }
-  .game-hand-topleft, .game-hand-topright { top: 2px; }
+  /* Der linke Cluster bleibt mittig (Knopf neben dem Avatar, 26.9.). */
+  .game-hand-topright { top: 2px; }
   .game-hand-topright .volume-btn { font-size: 22px; padding: 2px 6px; }
-  .game-hand-topleft { gap: 3px; }
+  .game-hand-namensspalte { gap: 3px; }
   .game-hand-topright { gap: 2px; }
   .game-hand-me {
     position: absolute; bottom: 0; left: 0; right: 0;
