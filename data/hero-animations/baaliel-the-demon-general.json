@@ -1,0 +1,11 @@
+{
+  "hero": "Baaliel, the Demon General",
+  "sheet": "baaliel-the-demon-general.png",
+  "frameWidth": 30,
+  "frameHeight": 35,
+  "frames": 40,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 3
+}

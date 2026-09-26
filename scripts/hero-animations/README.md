@@ -42,6 +42,11 @@ kopiert, daneben liegt eine JSON-Datei mit den Metadaten. Die erzeugten
 | `rafflesia.py` | `final` | `rafflesia_idle_final_sheet.png` | `rafflesia-the-poison-princess` |
 | `dante.py` | `final` | `dante_idle_final_sheet.png` | `dante-the-wanderer-of-hell` |
 | `zsos.py` | `final` | `zsos_idle_final_sheet.png` | `zsos-ssar-the-serpent-warlord` |
+| `baaliel.py` | `final` | `baaliel_idle_final_sheet.png` | `baaliel-the-demon-general` |
+| `bubbles.py` | `final gross` | `bubbles_idle_final_gross_sheet.png` | `bubbles-the-bouncy-bunny` |
+
+`bubbles.py` ohne `gross` erzeugt eine auf Hero-Größe verkleinerte Variante
+(Sprite aus `bubbles_downscale.py`), die aktuell nicht verwendet wird.
 
 Alle Skripte sind deterministisch und reproduzieren die eingecheckten Sheets
 pixelgenau.

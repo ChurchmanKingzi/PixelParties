@@ -119,17 +119,14 @@ def frame(i):
     for y in range(H):
         for x in range(W):
             ox, oy = x - PL, y - PT
-            if oy >= 25:
-                dy = 0                                  # Füße
-            elif oy <= 14:
-                dy = breath(i, 1)
-            else:
-                dy = breath(i)
+            # Oberkörper, Kopf und gehobener Arm atmen gemeinsam (keine Naht,
+            # die die Outline von Arm/Hand zerreißen könnte); Füße fest
+            dy = 0 if oy >= 25 else breath(i)
             sx, sy = x, y - dy
             if 0 <= sy < H and s[sy, sx, 3] and (sx - PL, sy - PT) not in ALL_FEATHER:
                 out[y, x] = s[sy, sx]
     # Federn: jede dreht sich als Ganzes um ihren Ansatz am Hut (Rückwärts-Mapping)
-    hb = breath(i, 1)
+    hb = breath(i)
     for name, pts in FEATHER_PX.items():
         (ax, ay), period, ph = FEATHERS[name]
         ang = 0.32 * wave(i, period, ph)
