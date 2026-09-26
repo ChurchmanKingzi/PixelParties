@@ -7,7 +7,7 @@ PAL={
 }
 Wd,Hd=48,78
 OY=6
-def build():
+def build(props=True):
     g=[['.']*Wd for _ in range(Hd)]
     def P(x,y,c,mirror=True):
         y=y+OY
@@ -66,28 +66,29 @@ def build():
     # hands gripping pommel
     rect(18,24,21,28,'B'); rect(18,28,21,28,'c'); P(18,25,'b'); P(18,27,'b'); P(21,26,'K')
     # ---- sword (center) ----
-    # pommel
-    rect(22,20,23,22,'G'); P(22,20,'Y'); rect(21,21,21,21,'g')
-    # grip under hands
-    rect(22,23,23,29,'q')
-    # crossguard: sun-shaped
-    rect(14,30,23,31,'G'); rect(14,32,23,32,'g'); P(13,30,'G'); P(13,31,'g'); P(12,29,'G'); P(12,32,'G')
-    P(15,30,'Y'); P(16,30,'Y')
-    # sun disc at guard center
-    for y in range(26,37):
-        for x in range(17,24):
-            d=(x-23.5)**2+(y-31)**2
-            if d<=22: P(x,y,'G' if d>8 else 'Y')
-            elif d<=26: P(x,y,'g')
-    P(22,31,'R'); P(23,31,'R'); P(23,30,'R')
-    # sun rays
-    for (x,y) in [(18,25),(16,27),(15,34),(18,37),(20,24),(20,38)]: P(x,y,'G')
-    # blade
-    for y in range(37,66):
-        P(21,y,'K'); P(22,y,'S'); P(23,y,'s' if y%2 else 'S')
-    P(22,66,'S'); P(23,66,'S'); P(22,67,'K'); P(23,67,'s'); P(23,68,'K')
-    for y in range(37,66): P(22,y,'S'); P(25,y,'s',False)  # right side darker (asymmetric)
-    for y in range(37,66): g[y+OY][24]='S'
+    if props:
+        # pommel
+        rect(22,20,23,22,'G'); P(22,20,'Y'); rect(21,21,21,21,'g')
+        # grip under hands
+        rect(22,23,23,29,'q')
+        # crossguard: sun-shaped
+        rect(14,30,23,31,'G'); rect(14,32,23,32,'g'); P(13,30,'G'); P(13,31,'g'); P(12,29,'G'); P(12,32,'G')
+        P(15,30,'Y'); P(16,30,'Y')
+        # sun disc at guard center
+        for y in range(26,37):
+            for x in range(17,24):
+                d=(x-23.5)**2+(y-31)**2
+                if d<=22: P(x,y,'G' if d>8 else 'Y')
+                elif d<=26: P(x,y,'g')
+        P(22,31,'R'); P(23,31,'R'); P(23,30,'R')
+        # sun rays
+        for (x,y) in [(18,25),(16,27),(15,34),(18,37),(20,24),(20,38)]: P(x,y,'G')
+        # blade
+        for y in range(37,66):
+            P(21,y,'K'); P(22,y,'S'); P(23,y,'s' if y%2 else 'S')
+        P(22,66,'S'); P(23,66,'S'); P(22,67,'K'); P(23,67,'s'); P(23,68,'K')
+        for y in range(37,66): P(22,y,'S'); P(25,y,'s',False)  # right side darker (asymmetric)
+        for y in range(37,66): g[y+OY][24]='S'
     # ---- neck ----
     rect(21,16,23,18,'b')
     # ---- skull ----
@@ -111,15 +112,16 @@ def build():
     # cheekbone
     P(16,12,'c'); P(17,13,'c')
     # ---- crown ----
-    rect(13,3,23,5,'G'); rect(13,6,23,6,'g')
-    for (x,h) in [(13,4),(17,5),(21,7)]:
-        for k in range(h): P(x,3-k,'G'); P(x+1,3-k,'g' if k<h-1 else 'G')
-        P(x,3-h,'Y')
-    P(23,-1,'G') 
-    rect(22,0,23,2,'G')
-    # gems
-    P(15,4,'R'); P(19,4,'Q'); P(22,4,'R'); P(23,4,'R')
-    P(22,-3+4,'Y')
+    if props:
+        rect(13,3,23,5,'G'); rect(13,6,23,6,'g')
+        for (x,h) in [(13,4),(17,5),(21,7)]:
+            for k in range(h): P(x,3-k,'G'); P(x+1,3-k,'g' if k<h-1 else 'G')
+            P(x,3-h,'Y')
+        P(23,-1,'G') 
+        rect(22,0,23,2,'G')
+        # gems
+        P(15,4,'R'); P(19,4,'Q'); P(22,4,'R'); P(23,4,'R')
+        P(22,-3+4,'Y')
     # outline pass
     out=[row[:] for row in g]
     for y in range(Hd):

@@ -17,8 +17,8 @@ MATS={'B':dict(ramp=BONE,pillow=3,k=1.5,noise=0.6),
       'S':dict(ramp=STEEL,pillow=2,k=2.0,spec=True),
       'W':dict(ramp=FUR,pillow=3,k=1.2,noise=1.4,nscale=2),
       'X':dict(ramp=VOID,pillow=1,k=0.8,bias=-0.1)}
-def build_rgba():
-    rows=SK.build()
+def build_rgba(props=True):
+    rows=SK.build(props)
     chars=sorted(set(''.join(rows))); cid={c:i for i,c in enumerate(chars)}
     A=np.array([[cid[c] for c in r] for r in rows])
     A3=scale3x_labels(A)

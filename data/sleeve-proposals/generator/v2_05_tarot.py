@@ -89,30 +89,12 @@ for y in range(AY0,AY1):
         if dd<95 and BAYER4[y%4,x%4]<(1-dd/95)*0.35:
             cv.px(x,y,lerp(tuple(cv.a[y,x]),(150,60,200),0.3))
 # ---------- king ----------
-king=SK2.build_rgba()
+king=SK2.build_rgba(props=False)
 kh,kw=king.shape[:2]
 KX,KY=125-kw//2,AY1-kh+2
 cv.paste(king,KX,KY)
 # paint-overs (in king coordinates *3 of design)
 def kp(x,y,c): cv.px(KX+x,KY+y,c)
-# sword fuller + runes
-for y in range(3*43,3*72):
-    for x in (3*23+1,3*24+1):
-        if king[y,x,3] and tuple(king[y,x,:3])!=(18,10,24): kp(x,y,SK2.STEEL[1])
-    if y%9==0:
-        for (dx,dy) in [(0,0),(1,1),(-1,1),(0,2)]: kp(3*24+dx,y+dy,(200,120,255))
-# skull cracks
-for (x,y) in [(3*18,3*7+18),(3*18+1,3*7+19),(3*18+1,3*7+20),(3*18+2,3*7+21),(3*27,3*7+17),(3*27-1,3*7+18),(3*27,3*7+19)]:
-    if king[y,x,3]: kp(x,y,SK2.BONE[1])
-# glowing eyes halo
-for (ex,ey) in [(3*18+5,3*16+4),(3*29+2,3*16+4)]:
-    for dy in range(-8,9):
-        for dx in range(-8,9):
-            dd=math.hypot(dx,dy)
-            X,Y=KX+ex+dx,KY+ey+dy
-            if dd<8 and BAYER4[Y%4,X%4]<(1-dd/8)*0.55: cv.px(X,Y,lerp(tuple(cv.a[Y,X]),(255,60,50),0.45))
-    for dy in range(-1,2):
-        for dx in range(-1,2): kp(ex+dx,ey+dy,(255,200,170) if dx==0 and dy==0 else (255,90,70))
 # cape gold trim along lining edge
 for y in range(kh):
     for x in range(kw):
@@ -121,6 +103,9 @@ for y in range(kh):
                 kp(x+2,y,SK2.GOLD[3]); kp(x+2,y+1,SK2.GOLD[2])
             if x-3>=0 and tuple(king[y,x-3,:3]) in [tuple(c) for c in SK2.CAPE]:
                 kp(x-2,y,SK2.GOLD[3]); kp(x-2,y+1,SK2.GOLD[2])
+# ---------- detailed parts (drawn at full resolution) ----------
+import detail_skull_king as DK
+DK.draw_all(cv,KX,KY)
 # ---------- soul wisps ----------
 def wisp(x,y,s=1):
     F=[(220,255,245),(120,236,214),(50,170,176),(30,100,120)]
@@ -184,8 +169,9 @@ FMk2=FMk&~Mplate
 relief(cv,FH,np.zeros((H,W),np.int32),[GOLD],FMk2,k=1.3,bias=0.02)
 for y,x in zip(*np.where(Mplate)): cv.px(x,y,PLATEC[1] if (x+y)%2 else PLATEC[0])
 # embossed gold text
-def gold_text(t,size,cx,y):
+def gold_text(t,size,cx,cy):
     m=text_mask(t,size); mh,mw=m.shape
+    y=int(round(cy-mh/2))
     x0=cx-mw//2
     TH2=np.zeros((H,W),np.float32); TM2=np.zeros((H,W),bool)
     mm=np.pad(m,1)
@@ -199,8 +185,8 @@ def gold_text(t,size,cx,y):
         for xx_ in range(mw):
             if m[yy_,xx_]: cv.px(x0+xx_+1,y+yy_+2,(8,4,10))
     relief(cv,TH2,np.zeros((H,W),np.int32),[GOLD],TM2,k=1.2,bias=0.12,blur=0.4)
-gold_text('XIII',24,125,13)
-gold_text('HAIL SKULLMAEL!',16,125,315)
+gold_text('XIII',24,125,24)
+gold_text('HAIL SKULLMAEL!',16,125,323)
 # plate ornaments: small skulls
 def tiny_skull(x,y):
     S=[".###.","#####","#.#.#","#####",".#.#."]
