@@ -42,6 +42,9 @@ const http = require('http');
 const https = require('https');
 const { Server } = require('socket.io');
 const db = require('./db');
+// Standardfarbe fuer Nicht-Menschen (CPU, Puzzle-/Tutorial-Gegner) —
+// Als Vorgabe 26.9.: rot statt des Spieler-Standards Cyan.
+const NICHT_MENSCH_FARBE = '#ff4444';
 const bcrypt = require('bcryptjs');
 // const multer = require('multer'); // Replaced by base64 uploads
 const cookieParser = require('cookie-parser');
@@ -12459,7 +12462,7 @@ async function setupGameState(room) {
     // Divine Gift of Edge consume names directly from this list.
     const sideDeck = (room._currentDecks?.[idx]?.sideDeck || []).slice();
     playerStates.push({ userId:p.userId, username:(usr?.username||p.username), socketId:p.socketId,
-      color:usr?.color||'#00f0ff', avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
+      color:usr ? (usr.color||'#00f0ff') : NICHT_MENSCH_FARBE, avatar:usr?.avatar||null, cardback:usr?.cardback||null, board:usr?.board||null,
       victoryMsg, defeatMsg, heroKilledMsg, middleHeroKilledMsg, greetingMsg, barkBounce,
       heroes, abilityZones, surpriseZones:[[],[],[]], supportZones:[[[],[],[]],[[],[],[]],[[],[],[]]],
       // Top-first list of card names that are publicly known to be on
@@ -14492,7 +14495,9 @@ io.on('connection', (socket) => {
 
       return {
         userId, username, socketId,
-        color: '#00f0ff', avatar: null, cardback: null, board: null,
+        // Menschen bekommen unten ihre Profilfarbe; stehen bleibt das
+        // hier nur fuer den CPU-Gegner.
+        color: NICHT_MENSCH_FARBE, avatar: null, cardback: null, board: null,
         heroes,
         abilityZones: (pz.abilityZones || [[], [], []]).map(hz => (hz || [[], [], []]).map(slot => [...(slot || [])])),
         surpriseZones: (pz.surpriseZones || [[], [], []]).map(sz => [...(sz || [])]),
