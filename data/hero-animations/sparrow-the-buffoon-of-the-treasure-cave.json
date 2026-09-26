@@ -1,0 +1,10 @@
+{
+  "hero": "Sparrow, the Buffoon of the Treasure Cave",
+  "sheet": "sparrow-the-buffoon-of-the-treasure-cave.png",
+  "frameWidth": 50,
+  "frameHeight": 45,
+  "frames": 40,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}
