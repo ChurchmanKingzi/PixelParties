@@ -2066,7 +2066,7 @@ function ElectricStrikeEffect({ x, y }) {
           '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
           '--rotation': b.rotation + 'deg',
           animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
-        }}>⚡</div>
+        }}><PxZeichen z="⚡" /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'es'+i} className="anim-explosion-particle" style={{
@@ -2151,7 +2151,7 @@ function BlackFlameStrikeEffect({ x, y, intensity = 1 }) {
         <div key={'bfl'+i} className="anim-black-flame-shard" style={{
           '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
           animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-        }}>{f.char}</div>
+        }}><PxZeichen z={f.char} variante="schwarz" /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'bfs'+i} className="anim-explosion-particle" style={{
@@ -2555,31 +2555,34 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
   const P = 3;                                        // Pixelgroesse
   // Schwein 14×11 Pixel: . leer, r rosa, d dunkelrosa, s Schnauze,
   // n Nasenloch, k Auge, o Ohr (dunkel), m Maul.
+  // v1445: Glanzlicht oben links (h), geditherter Schatten unten rechts (d).
   const schwein = [
     '..o......o....',
     '.odr....rdo...',
-    '.rrrrrrrrrr...',
-    'rrrrrrrrrrrr..',
-    'rrkrrrrrkrrr..',
-    'rrrrssssrrrr..',
-    'rrrsnssnsrrr..',
-    'drrrssssrrrd..',
-    '.drrmmmmrrd...',
-    '..ddrrrrdd....',
+    '.rhhrrrrrrr...',
+    'rhhrrrrrrrrd..',
+    'rhkrrrrrkrdr..',
+    'rrrrssssrrrd..',
+    'rrrsnssnsdrd..',
+    'drrrssssrdrd..',
+    '.drrmmmmdrd...',
+    '..ddrdrdrd....',
     '...dddddd.....',
   ];
-  const FARBE = { r: '#f4a2b4', d: '#c86a82', s: '#ff8fa6', n: '#6b2436', k: '#1a1016', o: '#9c4a60', m: '#4a1422' };
+  const FARBE = { r: '#f4a2b4', d: '#c86a82', h: '#ffd6de', s: '#ff8fa6', n: '#6b2436', k: '#1a1016', o: '#9c4a60', m: '#4a1422' };
   const fackel = [
     '..y..',
-    '.yoy.',
-    'yooor',
+    '.ywy.',
+    'yoyor',
+    'rooor',
     '.oro.',
+    '.bBb.',
     '..b..',
-    '..b..',
+    '..B..',
     '..b..',
     '..B..',
   ];
-  const FF = { y: '#ffe36b', o: '#ff9a2e', r: '#e8421c', b: '#8a5a2e', B: '#5a3a1c' };
+  const FF = { w: '#fff8d0', y: '#ffe36b', o: '#ff9a2e', r: '#e8421c', b: '#8a5a2e', B: '#5a3a1c' };
   const TP = 4;                                       // Fackel etwas groeber
   const pixel = (zeilen, farben, key, q = P) => zeilen.flatMap((z, zy) => [...z].map((c, zx) => (
     farben[c] ? <rect key={key + zx + '-' + zy} x={zx * q} y={zy * q} width={q} height={q} fill={farben[c]} /> : null
@@ -2604,14 +2607,14 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
   const kopfY = -h * 0.28;                             // Kopfhoehe des Helden
   const sx = w * 0.42, sy = -h * 0.62;                 // Schwein oben rechts
   // Flugbahn der Fackel: Flamme voran (70° gedreht) ins Maul des Schweins.
-  // Drehpunkt 50%/80% der Fackel; die Flammenmitte liegt 4.4 Fackelpixel
-  // darueber und wandert durch die Drehung nach rechts oben.
+  // Drehpunkt 50%/80% der Fackel (10 Pixel hoch); die Flammenmitte liegt
+  // 6 Fackelpixel darueber und wandert durch die Drehung nach rechts oben.
   const fx = -w * 0.2, fy = -h * 0.8;                  // Fackel links oben
-  const drehX = fx + 2.5 * TP, drehY = fy + 6.4 * TP;
+  const drehX = fx + 2.5 * TP, drehY = fy + 8 * TP;
   const maulX = sx - 1.5 * P, maulY = sy + 3 * P;
   const rad = 70 * Math.PI / 180;
-  const zx = maulX - drehX - 4.4 * TP * Math.sin(rad);
-  const zy = maulY - drehY + 4.4 * TP * Math.cos(rad);
+  const zx = maulX - drehX - 6 * TP * Math.sin(rad);
+  const zy = maulY - drehY + 6 * TP * Math.cos(rad);
   return (
     <div className="torchure" style={{ left: x, top: y }} aria-hidden="true">
       <span className="torchure-glut" style={{ width: w * 1.25, height: h * 1.15, left: -w * 0.625, top: -h * 0.575 }} />
@@ -2624,7 +2627,7 @@ function TorchureEffect({ x, y, w = 80, h = 110 }) {
       <div className="torchure-fackel" style={{
         left: fx, top: fy, '--zx': zx + 'px', '--zy': zy + 'px',
       }}>
-        <svg width={5 * TP} height={8 * TP} shapeRendering="crispEdges" className="torchure-flackern">
+        <svg width={5 * TP} height={10 * TP} shapeRendering="crispEdges" className="torchure-flackern">
           {pixel(fackel, FF, 'f', TP)}
         </svg>
       </div>
@@ -3498,7 +3501,7 @@ function FlameStrikeEffect({ x, y }) {
         <div key={'fl'+i} className="anim-flame-shard" style={{
           '--startX': f.startX + 'px', '--startY': f.startY + 'px', '--size': f.size + 'px',
           animationDelay: f.delay + 'ms', animationDuration: f.dur + 'ms',
-        }}>{f.char}</div>
+        }}><PxZeichen z={f.char} /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'fs'+i} className="anim-explosion-particle" style={{
@@ -5512,14 +5515,14 @@ function StunStrikeEffect({ x, y }) {
   return (
     <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
       <div className="anim-stun-flash" />
-      <div className="anim-stun-megabolt anim-stun-megabolt-1">⚡</div>
-      <div className="anim-stun-megabolt anim-stun-megabolt-2">⚡</div>
+      <div className="anim-stun-megabolt anim-stun-megabolt-1"><PxZeichen z="⚡" einfarbig /></div>
+      <div className="anim-stun-megabolt anim-stun-megabolt-2"><PxZeichen z="⚡" einfarbig /></div>
       {bolts.map((b, i) => (
         <div key={'sb'+i} className="anim-stun-bolt" style={{
           '--startX': b.startX + 'px', '--startY': b.startY + 'px', '--size': b.size + 'px',
           '--rotation': b.rotation + 'deg',
           animationDelay: b.delay + 'ms', animationDuration: b.dur + 'ms',
-        }}>⚡</div>
+        }}><PxZeichen z="⚡" einfarbig /></div>
       ))}
       {sparks.map((s, i) => (
         <div key={'ss'+i} className="anim-explosion-particle" style={{
@@ -13630,7 +13633,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(130,0,180,.8) 0%, rgba(100,0,160,.3) 40%, transparent 70%)', 40)} />
           {bubbles.map((b, i) => (
             <div key={'pt'+i} className="anim-beer-bubble" style={{
               '--xOff': b.xOff + 'px', '--size': b.size + 'px', '--wobble': b.wobble + 'px',
@@ -13658,7 +13661,7 @@ const ANIM_REGISTRY = {
       })), []);
       return (
         <div style={{ position: 'fixed', left: x, top: y, pointerEvents: 'none', zIndex: 10100 }}>
-          <div className="anim-gold-flash" style={{ background: 'radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)' }} />
+          <div className="anim-gold-flash" style={pxHintergrund('radial-gradient(circle, rgba(100,0,160,.9) 0%, rgba(80,0,140,.4) 40%, transparent 70%)', 40)} />
           {ooze.map((o, i) => (
             <div key={'po'+i} className="anim-beer-bubble" style={{
               '--xOff': o.xOff + 'px', '--size': o.size + 'px', '--wobble': o.wobble + 'px',
@@ -13670,7 +13673,7 @@ const ANIM_REGISTRY = {
               '--xOff': s.xOff + 'px', '--size': '14px', '--wobble': '0px',
               '--color': 'rgba(150,50,200,.6)', animationDelay: s.delay + 'ms', animationDuration: s.dur + 'ms',
               fontSize: 14, opacity: 0,
-            }}>💀</div>
+            }}><PxZeichen z="💀" /></div>
           ))}
         </div>
       );
@@ -15434,9 +15437,7 @@ const ANIM_REGISTRY = {
               position: 'absolute',
               left: p.x, top: p.y,
               width: p.size, height: p.size,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, #88ffaa, #44ff88, #22cc66)`,
-              boxShadow: '0 0 6px #44ff88, 0 0 12px #22cc66',
+              ...pxHintergrund('radial-gradient(circle, #88ffaa, #44ff88, #22cc66)', p.size),   // v1445 Pixel
               opacity: 0,
               animation: `healSparkleParticle ${p.dur}s ease-out ${p.delay}s forwards`,
               '--spark-tx': `${Math.cos(p.angle) * p.dist}px`,

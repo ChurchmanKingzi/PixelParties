@@ -192,6 +192,457 @@ function ppFxN(n) {
 }
 window.ppFxN = ppFxN;
 
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1445 — PIXEL-BAUKASTEN FUER ANIMATIONEN
+//  (Als Vorgabe 26.9.: „Diese und sicher auch andere Animationen nutzen
+//   einfarbige Flaechen, was aussieht wie Vektorillustrationen. Stelle
+//   alle solchen Grafiken auf Pixelart mit Dithering um!")
+//
+//  Ein globaler SVG-Filter ueber alle Animationen war der erste Versuch —
+//  verworfen: im Test 60 → 21 fps schon bei EINER Animation, und feine
+//  Partikel gingen verloren. Stattdessen werden die Grafiken hier EINMAL
+//  als kleine Pixelbilder gemalt (Canvas → data-URL, gemerkt) und dann
+//  wie jedes Bild gezeigt. Kostet zur Laufzeit praktisch nichts.
+//
+//  Bausteine:
+//    ppPxVerlaufUrl(gradient)  radial-gradient(...) → Pixelbild mit
+//                              Bayer-Dithering zwischen den Farbstopps
+//                              und gestufter, geditherter Deckkraft.
+//    pxHintergrund(gradient)   dasselbe als Style-Objekt fuer Inline-
+//                              `background` (Rueckfall: der Verlauf).
+//    ppPxScheibeUrl / ppPxSchattenUrl
+//                              Maske + Schattierung fuer runde Partikel
+//                              (Farbe bleibt `var(--color)`).
+//    PxZeichen                 Emoji/Glyphe → Pixel-Sprite (🔥 💀 ✦ ❄ …),
+//                              einfarbige Glyphen folgen `color`.
+//    PP_PX_KLASSEN             Freigabeliste der CSS-Klassen, deren
+//                              Verlauf/Partikel zur Laufzeit ersetzt
+//                              werden. Die Umstellung laeuft in Paketen
+//                              (Als Wahl 26.9.) — jedes Paket traegt hier
+//                              seine Klassen ein.
+// ═══════════════════════════════════════════════════════════════════
+const PP_BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function ppBayer(x, y) { return (PP_BAYER4[y & 3][x & 3] + 0.5) / 16; }
+
+const _ppPxCache = new Map();
+const PP_PX_CACHE_MAX = 800;
+/**
+ * Pixelbild malen und merken. `male(setze)` ruft `setze(x, y, [r,g,b,a])`
+ * je Pixel. Gemalt wird `faktor`-fach vergroessert mit harten Kanten, damit
+ * das Bild auch ohne `image-rendering: pixelated` scharf bleibt (Masken
+ * und manche Browser ignorieren die Eigenschaft).
+ */
+function ppPxBild(key, w, h, male, faktor = 4) {
+  const hit = _ppPxCache.get(key);
+  if (hit !== undefined) return hit;
+  let url = '';
+  try {
+    const c = document.createElement('canvas');
+    c.width = w * faktor; c.height = h * faktor;
+    const ctx = c.getContext('2d');
+    male((x, y, f) => {
+      if (!f || !(f[3] > 0)) return;
+      ctx.fillStyle = `rgba(${f[0] | 0},${f[1] | 0},${f[2] | 0},${f[3]})`;
+      ctx.fillRect(x * faktor, y * faktor, faktor, faktor);
+    });
+    url = c.toDataURL('image/png');
+  } catch { url = ''; }
+  if (_ppPxCache.size >= PP_PX_CACHE_MAX) _ppPxCache.delete(_ppPxCache.keys().next().value);
+  _ppPxCache.set(key, url);
+  return url;
+}
+
+let _ppFarbCtx = null;
+/** Beliebige CSS-Farbe → [r, g, b, a]. */
+function ppFarbe(s) {
+  if (Array.isArray(s)) return s;
+  s = String(s || '').trim().toLowerCase();
+  if (!s || s === 'transparent') return [0, 0, 0, 0];
+  let m = s.match(/^#([0-9a-f]{3,8})$/);
+  if (m) {
+    let h = m[1];
+    if (h.length === 3 || h.length === 4) h = [...h].map(c => c + c).join('');
+    const n = parseInt(h.slice(0, 6), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, h.length === 8 ? parseInt(h.slice(6), 16) / 255 : 1];
+  }
+  m = s.match(/^rgba?\(([^)]*)\)$/);
+  if (m) {
+    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(v => v.endsWith('%') ? parseFloat(v) / 100 : parseFloat(v));
+    return [p[0] || 0, p[1] || 0, p[2] || 0, p[3] == null || isNaN(p[3]) ? 1 : p[3]];
+  }
+  try {
+    _ppFarbCtx = _ppFarbCtx || document.createElement('canvas').getContext('2d');
+    _ppFarbCtx.fillStyle = '#000'; _ppFarbCtx.fillStyle = s;
+    const n = _ppFarbCtx.fillStyle;
+    if (n && n !== s) return ppFarbe(n);
+  } catch {}
+  return [255, 255, 255, 1];
+}
+
+/** Oberste Ebene an Kommas trennen (Klammern beachten). */
+function _ppTeile(s) {
+  const out = []; let tiefe = 0, akt = '';
+  for (const ch of s) {
+    if (ch === '(') tiefe++;
+    if (ch === ')') tiefe--;
+    if (ch === ',' && tiefe === 0) { out.push(akt.trim()); akt = ''; } else akt += ch;
+  }
+  if (akt.trim()) out.push(akt.trim());
+  return out;
+}
+
+/**
+ * `radial-gradient(...)` / `linear-gradient(...)` zerlegen →
+ * { linear, winkel, kreis, cx, cy, stopps:[{f, p}] } oder null.
+ */
+function ppVerlaufLesen(g) {
+  const lin = String(g || '').match(/linear-gradient\((.*)\)\s*$/s);
+  if (lin) {
+    const teile = _ppTeile(lin[1]);
+    let winkel = 180;
+    const RICHTUNG = { 'to top': 0, 'to right': 90, 'to bottom': 180, 'to left': 270,
+      'to top right': 45, 'to right top': 45, 'to bottom right': 135, 'to right bottom': 135,
+      'to bottom left': 225, 'to left bottom': 225, 'to top left': 315, 'to left top': 315 };
+    if (teile.length && /^-?[\d.]+deg$/.test(teile[0])) winkel = parseFloat(teile.shift());
+    else if (teile.length && RICHTUNG[teile[0]] != null) winkel = RICHTUNG[teile.shift()];
+    const stopps = _ppStopps(teile);
+    return stopps ? { linear: true, winkel, stopps } : null;
+  }
+  const m = String(g || '').match(/radial-gradient\((.*)\)\s*$/s);
+  if (!m) return null;
+  const teile = _ppTeile(m[1]);
+  let kreis = false, cx = 0.5, cy = 0.5;
+  const istForm = (t) => /^(circle|ellipse|closest|farthest|at\s)/.test(t) || /\sat\s/.test(' ' + t);
+  if (teile.length && istForm(teile[0])) {
+    const kopf = teile.shift();
+    kreis = /circle/.test(kopf);
+    const at = kopf.match(/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/);
+    if (at) { cx = parseFloat(at[1]) / 100; cy = parseFloat(at[2]) / 100; }
+    else if (/at\s+center/.test(kopf)) { cx = 0.5; cy = 0.5; }
+  }
+  const stopps = _ppStopps(teile);
+  return stopps ? { kreis, cx, cy, stopps } : null;
+}
+
+/** Farbstopps lesen und ohne Lage gleichmaessig verteilen (CSS-Regel, vereinfacht). */
+function _ppStopps(teile) {
+  const stopps = teile.map(t => {
+    // „<farbe> <lage>" — die Lage steht am Ende; px wird wie % gelesen
+    // (die Kaestchen sind um die 100 px gross).
+    const pm = t.match(/^(.*\S)\s+(-?[\d.]+)(%|px)?$/);
+    if (pm) return { f: ppFarbe(pm[1]), p: parseFloat(pm[2]) / 100 };
+    return { f: ppFarbe(t), p: null };
+  });
+  if (!stopps.length) return null;
+  // Stopps ohne Angabe gleichmaessig verteilen (CSS-Regel, vereinfacht).
+  if (stopps[0].p == null) stopps[0].p = 0;
+  if (stopps[stopps.length - 1].p == null) stopps[stopps.length - 1].p = 1;
+  for (let i = 1; i < stopps.length - 1; i++) {
+    if (stopps[i].p != null) continue;
+    let j = i; while (stopps[j].p == null) j++;
+    const a = stopps[i - 1].p, b = stopps[j].p;
+    for (let k = i; k < j; k++) stopps[k].p = a + (b - a) * (k - i + 1) / (j - i + 1);
+  }
+  for (let i = 1; i < stopps.length; i++) stopps[i].p = Math.max(stopps[i].p, stopps[i - 1].p);
+  return stopps;
+}
+
+/**
+ * Deckkraft → deckend oder leer, per Bayer-Matrix gedithert. Halbe
+ * Deckkraft sah ueber dunklem Grund matschig aus (Orange zu 50 % wird
+ * Braun) — Pixelart setzt stattdessen deckende Punkte in wechselnder
+ * Dichte. Leicht angehoben, damit schwache Scheine nicht verschwinden.
+ */
+function _ppAlphaStufe(a, x, y) {
+  if (a >= 1) return 1;
+  if (a <= 0) return 0;
+  return Math.pow(a, 0.8) > ppBayer(x + 2, y + 1) ? 1 : 0;
+}
+
+/** Pixelzahl je Seite: ~3 Bildschirmpunkte pro Pixel, schmale Baender (Ringe) bekommen mehr. */
+function _ppAufloesung(v, breitePx) {
+  let minLuecke = 1;
+  for (let i = 1; i < v.stopps.length; i++) {
+    const d = v.stopps[i].p - v.stopps[i - 1].p;
+    if (d > 0.001 && d < minLuecke) minLuecke = d;
+  }
+  const fuerRinge = Math.ceil(2.2 / (minLuecke * 0.707));
+  const fuerGroesse = breitePx > 0 ? Math.round(breitePx / 3) : 24;
+  return Math.max(4, Math.min(72, Math.max(fuerGroesse, Math.min(fuerRinge, 72)))) & ~1;
+}
+
+/**
+ * Radialen Verlauf als Pixelbild. Zwischen zwei Farbstopps wird nicht
+ * gemischt, sondern per Bayer-Matrix zwischen BEIDEN Stoppfarben
+ * gewaehlt — das ist das Dithering. Aufloesung passt sich an: schmale
+ * Baender (Ringe) bekommen mehr Pixel, damit sie nicht verschwinden.
+ */
+function ppPxVerlaufUrl(gradient, breitePx = 0) {
+  const v = ppVerlaufLesen(gradient);
+  if (!v) return '';
+  const n = _ppAufloesung(v, breitePx);
+  return ppPxBild('vl:' + n + ':' + gradient, n, n, (setze) => {
+    const cx = v.linear ? 0.5 : v.cx, cy = v.linear ? 0.5 : v.cy;
+    const rx = Math.SQRT2 * Math.max(cx, 1 - cx), ry = Math.SQRT2 * Math.max(cy, 1 - cy);
+    const rk = Math.hypot(Math.max(cx, 1 - cx), Math.max(cy, 1 - cy));
+    // Linear: CSS-Winkel (0deg = nach oben, 90deg = nach rechts); die
+    // Verlaufslinie ist |sin| + |cos| lang (Quadrat).
+    const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
+    const laenge = Math.abs(sn) + Math.abs(cs);
+    const S = v.stopps;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const u = (x + 0.5) / n - cx, w = (y + 0.5) / n - cy;
+        const t = v.linear ? 0.5 + (u * sn - w * cs) / laenge
+          : v.kreis ? Math.hypot(u, w) / rk : Math.hypot(u / rx, w / ry);
+        let f;
+        if (t <= S[0].p) f = S[0].f;
+        else if (t >= S[S.length - 1].p) f = S[S.length - 1].f;
+        else {
+          let i = 1; while (i < S.length - 1 && S[i].p < t) i++;
+          const a = S[i - 1], b = S[i];
+          const anteil = b.p > a.p ? (t - a.p) / (b.p - a.p) : 1;
+          f = anteil > ppBayer(x, y) ? b.f : a.f;
+        }
+        const alpha = _ppAlphaStufe(f[3], x, y);
+        if (alpha > 0) setze(x, y, [f[0], f[1], f[2], alpha]);
+      }
+    }
+  });
+}
+
+/** Ist der Verlauf bis zum Rand deckend (dann braucht er eine Pixel-Scheibe als Umriss)? */
+function _ppRandDeckend(gradient) {
+  const v = ppVerlaufLesen(gradient);
+  return !!v && !v.linear && v.stopps[v.stopps.length - 1].f[3] > 0.05;
+}
+
+/**
+ * Inline-`background: radial-/linear-gradient(...)` → Pixelbild. Aufruf an
+ * Stelle der Eigenschaft: `style={{ ...pxHintergrund('radial-gradient(...)',
+ * breitePx) }}` — `breitePx` (Elementbreite) haelt die Pixel bei ~3 px.
+ * Andere Werte (Farben, mehrere Ebenen) gehen unveraendert durch.
+ */
+function pxHintergrund(gradient, breitePx = 0) {
+  const url = typeof gradient === 'string' && /(radial|linear)-gradient/.test(gradient)
+    && !/,\s*(radial|linear)-gradient/.test(gradient)          // mehrere Ebenen: nicht anfassen
+    ? ppPxVerlaufUrl(gradient, breitePx) : '';
+  if (!url) return { background: gradient };
+  const stil = {
+    backgroundImage: `url(${url})`, backgroundSize: '100% 100%',
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'center', imageRendering: 'pixelated',
+  };
+  if (_ppRandDeckend(gradient)) {
+    const m = `url(${ppPxScheibeUrl()}) center / 100% 100% no-repeat`;
+    Object.assign(stil, { borderRadius: 0, WebkitMask: m, mask: m });
+  }
+  return stil;
+}
+
+/** Runde Pixel-Scheibe (Maske) — 8×8 mit abgeschnittenen Ecken. */
+function ppPxScheibeUrl() {
+  const Z = ['..####..', '.######.', '########', '########', '########', '########', '.######.', '..####..'];
+  return ppPxBild('scheibe', 8, 8, (setze) => {
+    Z.forEach((z, y) => [...z].forEach((c, x) => { if (c === '#') setze(x, y, [255, 255, 255, 1]); }));
+  });
+}
+/** Schattierung fuer Pixel-Partikel: Lichtpunkt oben links, geditherter Schatten unten rechts. */
+function ppPxSchattenUrl() {
+  return ppPxBild('schatten', 8, 8, (setze) => {
+    [[2, 1], [3, 1], [1, 2], [2, 2], [1, 3]].forEach(([x, y]) => setze(x, y, [255, 255, 255, 0.75]));
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const s = x + y;
+      if (s >= 10 || (s >= 8 && (x + y) % 2 === 0)) setze(x, y, [0, 0, 0, 0.35]);
+    }
+  });
+}
+
+// ── Pixel-Sprites fuer Emoji/Glyphen ──────────────────────────────
+// Farbig: eigene Palette. Einfarbig (`mono`): '#' voll, '+' halb — die
+// Farbe kommt aus `color` des Elements (wie bei der Glyphe vorher).
+const PP_PX_SPRITES = {
+  flamme: { pal: { W: '#fff6c8', Y: '#ffd23e', O: '#ff8a1e', R: '#e03a12', D: '#9c1e0a' }, z: [
+    '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
+    '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
+  schaedel: { pal: { W: '#f4f1e6', G: '#bdb6a2', K: '#1a1414' }, z: [
+    '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
+    '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
+  knall: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#ff8a1e', R: '#e03a12' }, z: [
+    'R...R...R', '.R.RYR.R.', '..RYOYR..', '.RYOWOYR.', 'RYOWWWOYR', '.RYOWOYR.',
+    '..RYOYR..', '.R.RYR.R.', 'R...R...R'] },
+  herz: { pal: { R: '#e8324a', D: '#a01a30', P: '#ff9aa8' }, z: [
+    '.RR...RR.', 'RPPR.RRRR', 'RPRRRRRRD', 'RRRRRRRRD', '.RRRRRRD.', '..RRRRD..',
+    '...RRD...', '....D....'] },
+  blatt: { pal: { G: '#5fbf3a', D: '#2e7d22', L: '#a8e070' }, z: [
+    '......DG', '....DGGG', '..DGLGGG', '.DGLGGGD', 'DGLGGGD.', 'DGGGGD..', '.DGDD...', 'D.......'] },
+  spinne: { pal: { K: '#1a1016', R: '#c0283c' }, z: [
+    'K.K...K.K', '.K.KKK.K.', '..KKKKK..', 'KKKRKRKKK', '..KKKKK..', '.K.KKK.K.', 'K.K...K.K'] },
+  knochen: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
+    'WW.....WW', 'WWWWWWWWG', '.WWWWWWG.', 'WWWWWWWWG', 'GG.....GG'] },
+  wolke: { pal: { W: '#ffffff', G: '#cfd8e6', S: '#9aa8bc' }, z: [
+    '...WWW....', '.WWWWWWW..', 'WWWWWWWWWW', 'WWWWWWWWWG', 'GWWWWWWWGS', '.GGSGGSGS.'] },
+  geist: { pal: { W: '#f4f6ff', G: '#b8c0d8', K: '#1a1a2a' }, z: [
+    '..WWWW..', '.WWWWWW.', 'WWKWWKWW', 'WWKWWKWW', 'WWWWWWWG', 'WWWKKWWG', 'WWWWWWWG', 'WWWWWWGG', 'W.WW.WG.'] },
+  blitz: { pal: { W: '#ffffff', Y: '#ffe36b', O: '#f0a000' }, z: [
+    '....YY.', '...YY..', '..YYW..', '.YYW...', 'YYYYYYO', '..YWYO.', '..YYO..', '.YYO...', '.YO....', 'YO.....', 'O......'] },
+  blitz_mono: { mono: true, z: [
+    '....##.', '...##..', '..##+..', '.##+...', '#######', '..#+#..', '..##...', '.##....', '.#.....', '##.....', '#......'] },
+  flamme_schwarz: { pal: { W: '#8a3ab0', Y: '#5a1a7a', O: '#34104a', R: '#180424', D: '#000000' }, z: [
+    '....R....', '...ROR...', '...ROR..R', '..ROYOR.R', '..ROYYORR', '.ROYWYYOR',
+    '.ROYWWYOR', 'ROYYWWYOR', 'ROYWWWYOR', 'DROYYYORD', '.DRROORD.'] },
+  funke4: { mono: true, z: ['...#...', '...#...', '..###..', '#######', '..###..', '...#...', '...#...'] },
+  funke4hohl: { mono: true, z: ['...#...', '...#...', '..#+#..', '##+.+##', '..#+#..', '...#...', '...#...'] },
+  stern5: { mono: true, z: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.#.....#.'] },
+  punkt: { mono: true, z: ['.#.', '###', '.#.'] },
+  kugel: { mono: true, z: ['.###.', '#####', '#####', '#####', '.###.'] },
+  schnee: { mono: true, z: ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '....#....'] },
+  note: { mono: true, z: ['...##.', '...#.#', '...#..', '...#..', '...#..', '.###..', '####..', '.##...'] },
+  noten: { mono: true, z: ['..######', '..#....#', '..#....#', '..#....#', '..#..###', '###.####', '####.##.', '.##.....'] },
+  dreieck: { mono: true, z: ['....#....', '...###...', '...###...', '..#####..', '..#####..', '.#######.', '#########'] },
+  raute: { mono: true, z: ['...#...', '..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'] },
+};
+const PP_PX_ZEICHEN = {
+  '🔥': 'flamme', '💀': 'schaedel', '☠️': 'schaedel', '☠': 'schaedel', '💥': 'knall',
+  '❤️': 'herz', '❤': 'herz', '♥': 'herz', '💗': 'herz', '💖': 'herz', '🍃': 'blatt', '🕷': 'spinne', '🕷️': 'spinne',
+  '🦴': 'knochen', '☁': 'wolke', '☁️': 'wolke', '👻': 'geist', '⚡': 'blitz',
+  '✦': 'funke4', '✧': 'funke4hohl', '⋆': 'funke4', '✶': 'funke4', '✺': 'funke4', '✨': 'funke4',
+  '★': 'stern5', '⭐': 'stern5', '☆': 'stern5', '·': 'punkt', '•': 'punkt', '●': 'kugel',
+  '❄': 'schnee', '❆': 'schnee', '❅': 'schnee', '❄️': 'schnee',
+  '♪': 'note', '♩': 'note', '♫': 'noten', '♬': 'noten', '🎵': 'note', '🎶': 'noten',
+  '▲': 'dreieck', '◆': 'raute', '⬢': 'raute',
+};
+
+function ppPxSpriteUrl(name) {
+  const s = PP_PX_SPRITES[name];
+  if (!s) return '';
+  const h = s.z.length, w = Math.max(...s.z.map(z => z.length));
+  return ppPxBild('spr:' + name, w, h, (setze) => {
+    s.z.forEach((z, y) => [...z].forEach((c, x) => {
+      if (s.mono) {
+        if (c === '#') setze(x, y, [255, 255, 255, 1]);
+        else if (c === '+') setze(x, y, [255, 255, 255, 0.5]);
+      } else if (s.pal[c]) setze(x, y, ppFarbe(s.pal[c]));
+    }));
+  });
+}
+
+/**
+ * Emoji/Glyphe als Pixel-Sprite. Groesse 1em (erbt `font-size` wie die
+ * Glyphe vorher). Unbekannte Zeichen bleiben Text.
+ */
+function PxZeichen({ z, groesse, einfarbig, variante }) {
+  // `einfarbig`: die einfarbige Fassung (folgt `color`, z. B. hellblaue
+  // Betaeubungsblitze); `variante`: eine eigene Palette (`schwarz`).
+  const basis = PP_PX_ZEICHEN[z];
+  const name = basis && einfarbig && PP_PX_SPRITES[basis + '_mono'] ? basis + '_mono'
+    : basis && variante && PP_PX_SPRITES[basis + '_' + variante] ? basis + '_' + variante : basis;
+  const s = name ? PP_PX_SPRITES[name] : null;
+  const url = s ? ppPxSpriteUrl(name) : '';
+  if (!url) return z == null ? null : String(z);
+  const h = s.z.length, w = Math.max(...s.z.map(r => r.length));
+  const g = groesse || '1em';
+  const breite = `calc(${g} * ${(w / Math.max(w, h)).toFixed(3)})`;
+  const hoehe = `calc(${g} * ${(h / Math.max(w, h)).toFixed(3)})`;
+  if (!s.mono) {
+    return <img src={url} alt="" draggable={false} className="pp-px"
+      style={{ width: breite, height: hoehe, display: 'inline-block', verticalAlign: 'middle' }} />;
+  }
+  const m = `url(${url}) center / 100% 100% no-repeat`;
+  return <span className="pp-px" style={{
+    width: breite, height: hoehe, display: 'inline-block', verticalAlign: 'middle',
+    background: 'currentColor', WebkitMask: m, mask: m,
+  }} />;
+}
+
+// ── Freigabeliste der CSS-Klassen (pro Paket ergaenzt) ─────────────
+// `verlauf`: der radial-gradient der Klasse wird Pixelbild (Farben aus
+//   style.css gelesen — die Klasse bleibt die einzige Quelle).
+// `partikel`: runde Partikel mit `var(--color)` → Pixel-Scheibe mit
+//   Lichtpunkt und geditherter Schattierung.
+// `ohneFilter`: weicher `drop-shadow`/`blur`-Schein faellt weg.
+const PP_PX_KLASSEN = {
+  // Paket 1 (v1445): die haeufigsten Status-, Schadens- und Feuerbilder.
+  verlauf: ['.anim-explosion-flash', '.anim-freeze-flash', '.anim-flame-flash', '.anim-gold-flash',
+    '.anim-snowball', '.anim-stun-flash', '.anim-creature-death-flash', '.anim-black-flame-flash',
+    '.anim-electric-flash', '.anim-shield-bubble-core', '.anim-shield-bubble-glint',
+    '.torchure-glut', '.torchure-giftflamme'],
+  partikel: ['.anim-explosion-particle', '.anim-beer-bubble', '.anim-creature-death-spark',
+    '.anim-creature-death-soul'],
+  ohneFilter: ['.anim-flame-shard', '.anim-stun-megabolt', '.anim-electric-bolt', '.anim-stun-bolt',
+    '.anim-black-flame-shard'],
+  // Einzelregeln, wo ein entfernter Filter mehr tat als weichzeichnen.
+  extra: [
+    // Black Flame: `brightness(0)` faerbte auch die Glyphen schwarz.
+    '.anim-black-flame-shard{color:#3a0a52;}',
+  ],
+  // Umrisse aus `border` + weichem Schein → Pixelring (eigener Verlauf).
+  ersatz: [
+    { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(200,230,255,.5) 71%, transparent 73%)' },
+    { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(120,220,90,.55) 61%, #be5aff 63%, #be5aff 67%, rgba(160,60,230,.5) 69%, transparent 71%)' },
+  ],
+};
+
+function _ppPxRegelnBauen() {
+  const regeln = [];
+  // Den Verlauf jeder Klasse ueber ein kurz eingehaengtes Probe-Element
+  // lesen: `getComputedStyle` klappt immer, `cssRules` nicht (fremde
+  // Herkunft, file://). Die Klassen der Liste sind einfache Klassen.
+  const verlaufVon = {};
+  try {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;animation:none;';
+    document.body.appendChild(probe);
+    for (const sel of PP_PX_KLASSEN.verlauf) {
+      probe.className = sel.replace(/^\./, '').split('.').join(' ');
+      const cs = getComputedStyle(probe);
+      const bg = cs.backgroundImage;
+      if (bg && /(radial|linear)-gradient/.test(bg)) verlaufVon[sel] = { g: bg, b: parseFloat(cs.width) || 0 };
+    }
+    probe.remove();
+  } catch {}
+  for (const sel of PP_PX_KLASSEN.verlauf) {
+    const g = verlaufVon[sel]?.g;
+    const url = g ? ppPxVerlaufUrl(g, verlaufVon[sel].b) : '';
+    if (!url) continue;
+    let r = `${sel}{background:url(${url}) center/100% 100% no-repeat;image-rendering:pixelated;box-shadow:none;`;
+    if (_ppRandDeckend(g)) {
+      const m = `url(${ppPxScheibeUrl()}) center/100% 100% no-repeat`;
+      r += `border-radius:0;-webkit-mask:${m};mask:${m};`;
+    }
+    regeln.push(r + '}');
+  }
+  for (const e of PP_PX_KLASSEN.ersatz || []) {
+    const url = ppPxVerlaufUrl(e.verlauf, e.breite || 0);
+    if (url) regeln.push(`${e.sel}{background:url(${url}) center/100% 100% no-repeat;image-rendering:pixelated;border:none;box-shadow:none;}`);
+  }
+  const scheibe = `url(${ppPxScheibeUrl()}) center/100% 100% no-repeat`;
+  for (const sel of PP_PX_KLASSEN.partikel) {
+    regeln.push(`${sel}{border-radius:0!important;box-shadow:none!important;`
+      + `background:url(${ppPxSchattenUrl()}) center/100% 100% no-repeat,var(--color)!important;`
+      + `-webkit-mask:${scheibe};mask:${scheibe};image-rendering:pixelated;}`);
+  }
+  for (const sel of PP_PX_KLASSEN.ohneFilter) regeln.push(`${sel}{filter:none!important;}`);
+  for (const r of PP_PX_KLASSEN.extra || []) regeln.push(r);
+  regeln.push('.pp-px{image-rendering:pixelated;}');
+  return regeln.join('\n');
+}
+
+function ppPxRegelnAnwenden() {
+  try {
+    let el = document.getElementById('pp-px-regeln');
+    if (!el) { el = document.createElement('style'); el.id = 'pp-px-regeln'; document.head.appendChild(el); }
+    el.textContent = '';                      // die Probe soll die ORIGINAL-Verlaeufe lesen
+    el.textContent = _ppPxRegelnBauen();
+  } catch {}
+}
+window.PxZeichen = PxZeichen;
+window.pxHintergrund = pxHintergrund;
+window.ppPxVerlaufUrl = ppPxVerlaufUrl;
+window.ppPxRegelnAnwenden = ppPxRegelnAnwenden;
+// Nach dem Laden der Stylesheets — `style.css` liefert die Farben.
+if (document.readyState === 'complete') ppPxRegelnAnwenden();
+else window.addEventListener('load', ppPxRegelnAnwenden, { once: true });
+
 // ★ v1442 — DER WAAGERECHTE BILDLAUF-RIEGEL, an EINER Stelle.
 // Kampfbrett (`.board-center.can-scroll`, app-board.jsx) und Puzzle-
 // Editor (`.pz-board-wrap.pz-can-hscroll`, app-puzzle.jsx) entscheiden
