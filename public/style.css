@@ -23089,12 +23089,11 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    Journey, Telekinesis. Keyframes hier global (Regel ④).
    ════════════════════════════════════════════════════════════════════ */
 
-/* Hilfsattribut: blendet den INHALT einer Brettzone aus, solange eine
-   Animation eine Kopie der Karte bewegt (Telekinesis, Chaorc-Wurf,
-   Gate to the Armory). Ein Datenattribut statt einer Klasse, weil React
-   `className` bei jedem Rendern neu setzt, fremde Attribute aber stehen
-   laesst. Die Zone selbst (Rahmen) bleibt sichtbar. */
-[data-pp-verborgen] > * { visibility: hidden !important; }
+/* Hilfsattribut: blendet eine Brettkarte (`.board-card`) aus, solange
+   eine Animation eine Kopie davon bewegt (Telekinesis). Ein Datenattribut
+   statt einer Klasse, weil React `className` bei jedem Rendern neu setzt,
+   fremde Attribute aber stehen laesst. Die Zone (Rahmen) bleibt sichtbar. */
+[data-pp-karte-weg] { visibility: hidden !important; }
 
 /* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
 .anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
@@ -23353,30 +23352,24 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 @keyframes cwebOverlayWeg { 0% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes cwebSchimmer { 0%, 100% { stroke: #a50f1c; } 50% { stroke: #d42535; } }
 
-/* ── Kartenflug-Stile 'flammen' (Perilous Journey) und 'gewaltsam'
-      (Forceful Revival) — siehe onPileTransfer. ─────────────────── */
-.pt-flammenzunge {
+/* ── Kartenflug-Stil 'flammen' (Perilous Journey): Pixel-Flammen ── */
+.pt-pixelflamme {
   position: absolute; display: block; pointer-events: none; z-index: 2;
-  border-radius: 50% 50% 38% 38% / 72% 72% 28% 28%;
-  background: linear-gradient(to top, rgba(210,30,10,.95) 0%, #ff7a1a 40%, #ffd23a 78%, rgba(255,245,190,0) 100%);
-  filter: drop-shadow(0 0 4px rgba(255,120,20,.9));
-  transform-origin: 50% 100%;
-  animation-name: ptFlammenzunge; animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite; animation-direction: alternate;
+  background-repeat: no-repeat; background-size: 300% 100%;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+  animation-name: ptPixelFlamme; animation-timing-function: steps(3, jump-none);
+  animation-iteration-count: infinite;
 }
-.pt-glutspur, .pt-energiespur {
+.pt-glutpixel {
   position: fixed; display: block; pointer-events: none; z-index: 10199;
-  animation-name: ptGlutSpur; animation-timing-function: ease-out; animation-fill-mode: forwards;
+  animation-name: ptGlutPixel; animation-timing-function: steps(5, end); animation-fill-mode: forwards;
 }
-.pt-energiespur { clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%); }
-@keyframes ptFlammenzunge {
-  0% { transform: scale(.8, .75) skewX(-6deg); opacity: .85; }
-  100% { transform: scale(1.1, 1.2) skewX(6deg); opacity: 1; }
+@keyframes ptPixelFlamme { 0% { background-position: 0% 0; } 100% { background-position: 100% 0; } }
+@keyframes ptGlutPixel {
+  0% { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; transform: translate(var(--gsx), var(--gsy)); }
 }
-@keyframes ptGlutSpur {
-  0% { opacity: 1; transform: translate(0, 0) scale(1); }
-  100% { opacity: 0; transform: translate(var(--gsx), var(--gsy)) scale(.2); }
-}
+
 
 /* ── Divine Gift of Death: die grosse Erweckung ─────────────────── */
 .tge { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
@@ -23385,15 +23378,31 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
   border-radius: 50%; background: radial-gradient(circle, rgba(10,4,20,.0) 0%, rgba(10,4,20,.55) 18%, rgba(6,2,12,.35) 45%, transparent 70%);
   opacity: 0; animation: tgeDunkel 2600ms ease-in-out forwards; z-index: -1;
 }
-.tge-wirbel {
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, rgba(120,40,200,.0), rgba(150,60,230,.75), rgba(40,10,70,.2), rgba(190,120,255,.7), rgba(120,40,200,.0));
-  -webkit-mask: radial-gradient(circle, transparent 28%, #000 32%, #000 62%, transparent 70%);
-          mask: radial-gradient(circle, transparent 28%, #000 32%, #000 62%, transparent 70%);
-  opacity: 0; animation: tgeWirbel 1700ms ease-in-out forwards;
+.tge > div { position: absolute; }
+.tge-kreis { position: absolute; left: 0; top: 0; overflow: visible; }
+.tge-boden { transform: scaleY(.42); opacity: 0; animation: tgeKreisAn 2600ms ease-out forwards; }
+.tge-oben { opacity: 0; animation: tgeKreisOben 2600ms ease-out forwards; }
+.tge-kreis-boden { animation: tgeKreisDreh 2600ms linear forwards; }
+.tge-kreis-oben { animation: tgeKreisDrehZurueck 2600ms linear forwards; }
+.tge-k-linie { fill: none; stroke: #c9a8ff; stroke-width: 2.4; filter: drop-shadow(0 0 3px #9d6bff) drop-shadow(0 0 6px rgba(160,110,255,.7)); }
+.tge-k-duenn { stroke-width: 1.4; stroke: #e6d8ff; }
+.tge-k-rune { fill: #9ff0ff; filter: drop-shadow(0 0 3px #7fe6ff); }
+.tge-strom { border-radius: 50%; opacity: 0; animation: tgeStrom 900ms cubic-bezier(.5,.05,.7,.4) forwards; }
+@keyframes tgeKreisAn { 0% { opacity: 0; } 15% { opacity: 1; } 55% { opacity: 1; } 80%, 100% { opacity: 0; } }
+@keyframes tgeKreisOben {
+  0%, 4% { opacity: 0; transform: scale(.3); }
+  18% { opacity: 1; transform: scale(1); }
+  44% { opacity: 1; transform: scale(1.04); }
+  52% { opacity: .9; transform: scale(.85); }
+  62%, 100% { opacity: 0; transform: scale(1.6); }
 }
-.tge-tod { overflow: visible; opacity: 0; filter: drop-shadow(0 0 8px rgba(160,90,255,.8)); animation: tgeTod 2600ms ease-in-out forwards; }
-.tge-auge { fill: #7ff3ff; animation: tgeAuge 600ms ease-in-out infinite alternate; }
+@keyframes tgeKreisDreh { 0% { transform: rotate(0); } 100% { transform: rotate(240deg); } }
+@keyframes tgeKreisDrehZurueck { 0% { transform: rotate(0); } 100% { transform: rotate(-300deg); } }
+@keyframes tgeStrom {
+  0% { opacity: 0; transform: rotate(0) translate(var(--sx), var(--sy)) scale(.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--sd)) translate(0, 0) scale(1.2); }
+}
 .tge-seele {
   left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
   background: radial-gradient(circle, #ffffff 0%, #bff6ff 40%, rgba(120,220,255,.4) 70%, transparent 75%);
@@ -23418,18 +23427,9 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 .tge-ring2 { border-color: rgba(170,240,255,.85); animation-delay: 1400ms; }
 .tge-funke { border-radius: 50%; opacity: 0; animation: tgeFunke 1100ms ease-out forwards; }
 @keyframes tgeDunkel { 0% { opacity: 0; } 20% { opacity: 1; } 55% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes tgeWirbel { 0% { opacity: 0; transform: rotate(0) scale(.6); } 30% { opacity: 1; } 75% { opacity: .9; transform: rotate(420deg) scale(1.05); } 100% { opacity: 0; transform: rotate(560deg) scale(.4); } }
-@keyframes tgeTod {
-  0%, 5% { opacity: 0; transform: translateY(-34px) scale(.9); }
-  20% { opacity: .95; transform: translateY(0) scale(1); }
-  45% { opacity: .95; transform: translateY(4px) scale(1); }
-  62% { opacity: .9; transform: translateY(-4px) scale(1.02); }
-  76%, 100% { opacity: 0; transform: translateY(-40px) scale(1.08); }
-}
-@keyframes tgeAuge { 0% { fill: #7ff3ff; } 100% { fill: #e6fdff; } }
 @keyframes tgeSeele {
-  0%, 24% { opacity: 0; transform: translate(var(--sx0), var(--sy0)) scale(.4); }
-  30% { opacity: 1; transform: translate(var(--sx0), var(--sy0)) scale(1.1); }
+  0%, 12% { opacity: 0; transform: translate(var(--sx0), var(--sy0)) scale(.2); }
+  38% { opacity: 1; transform: translate(var(--sx0), var(--sy0)) scale(1.35); }
   47% { opacity: 1; transform: translate(0, 0) scale(.9); }
   49%, 100% { opacity: 0; transform: translate(0, 0) scale(2.2); }
 }
@@ -23438,74 +23438,40 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
 @keyframes tgeRing { 0% { opacity: 0; transform: scale(.2); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(2.2); } }
 @keyframes tgeFunke { 0% { opacity: 0; transform: translateY(0) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(var(--fh)) scale(.3); } }
 
-/* ── Forceful Revival: gewaltsame Erweckung ─────────────────────── */
+/* ── Forceful Revival: der Crash an der Support Zone ────────────── */
 .gwe { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
-.gwe > span, .gwe-held > span { position: absolute; display: block; }
-.gwe-held { position: absolute; width: 0; height: 0; }
-.gwe-schlag {
-  border-radius: 50%; mix-blend-mode: screen;
-  background: radial-gradient(circle, #fbffd0 0%, rgba(200,255,80,.8) 30%, rgba(120,220,40,.3) 55%, transparent 70%);
-  opacity: 0; animation: gweSchlag 460ms ease-out forwards;
-}
-.gwe-druck {
-  border-radius: 50%; border: 3px solid rgba(214,255,100,.95); box-shadow: 0 0 12px rgba(170,255,70,.8);
-  opacity: 0; transform: scale(.3); animation: gweDruck 480ms ease-out 40ms forwards;
-}
-.gwe-heldrot {
-  border-radius: 16%; mix-blend-mode: screen;
-  background: radial-gradient(ellipse, rgba(255,40,40,.55) 0%, rgba(200,0,20,.25) 50%, transparent 72%);
-  opacity: 0; animation: gweHeldRot 700ms ease-out 1150ms forwards;
-}
-.gwe-kette polyline {
-  fill: none; stroke: #e9ff7a; stroke-width: 3; stroke-linejoin: round;
-  filter: drop-shadow(0 0 4px #b6ff3a) drop-shadow(0 0 8px rgba(150,255,40,.7));
-  opacity: 0; animation: gweKette 900ms steps(1, end) 120ms forwards;
-}
-.gwe-riss path {
-  fill: none; stroke: #d7ff5a; stroke-width: 3; stroke-linecap: round;
-  filter: drop-shadow(0 0 4px #9dff2a);
-  stroke-dasharray: 100; stroke-dashoffset: 100; animation: gweRiss 1600ms ease-out 150ms forwards;
+.gwe > span { position: absolute; display: block; }
+.gwe-blitz {
+  border-radius: 30%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, #ffffff 0%, #fbffc8 22%, rgba(200,255,80,.75) 42%, rgba(120,220,40,.25) 60%, transparent 72%);
+  opacity: 0; animation: gweBlitz 520ms ease-out forwards;
 }
 .gwe-saeule {
   border-radius: 45%; mix-blend-mode: screen; transform-origin: 50% 100%;
   background: linear-gradient(to top, rgba(210,255,90,.95) 0%, rgba(160,255,60,.7) 40%, rgba(240,255,170,.35) 75%, transparent 100%);
-  opacity: 0; animation: gweSaeule 700ms ease-out 1000ms forwards;
+  opacity: 0; animation: gweSaeule 650ms ease-out forwards;
 }
 .gwe-ring {
-  border-radius: 50%; border: 3px solid rgba(200,255,90,.9); box-shadow: 0 0 10px rgba(160,255,60,.8);
-  opacity: 0; transform: scale(.3); animation: gweRing 600ms ease-out 1020ms forwards;
+  border-radius: 50%; border: 4px solid rgba(255,250,200,.95); box-shadow: 0 0 12px rgba(200,255,90,.85);
+  opacity: 0; transform: scale(.25); animation: gweRing 520ms ease-out forwards;
 }
-.gwe-brocken { opacity: 0; animation: gweBrocken 650ms cubic-bezier(.2,.7,.4,1) 1020ms forwards; }
-.gwe-blut {
-  left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
-  background: radial-gradient(circle, #ffb0b0 0%, #e0101c 50%, #6a0008 100%);
-  box-shadow: 0 0 8px rgba(255,30,40,.9);
-  opacity: 0; animation: gweBlut 560ms ease-in forwards;
+.gwe-ring2 { border-color: rgba(190,255,90,.85); animation-delay: 90ms; }
+.gwe-brocken { opacity: 0; animation: gweBrocken 620ms cubic-bezier(.2,.7,.4,1) forwards; }
+.gwe-stern {
+  left: -6px; top: -6px; width: 12px; height: 12px; background: #fff3c4;
+  clip-path: polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);
+  filter: drop-shadow(0 0 3px #ffd36a); opacity: 0;
+  animation: ckStern 600ms ease-out forwards;
 }
-@keyframes gweSchlag { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
-@keyframes gweDruck { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.9); } }
-@keyframes gweHeldRot { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes gweKette {
-  0% { opacity: 1; transform: translate(0, 0); }
-  12% { opacity: .35; transform: translate(1px, -1px); }
-  24% { opacity: 1; transform: translate(-1px, 1px); }
-  40% { opacity: .5; transform: translate(0, 0); }
-  52% { opacity: 1; transform: translate(1px, 1px); }
-  70% { opacity: .6; }
-  85% { opacity: .9; }
-  100% { opacity: 0; }
+.gwe-staub {
+  border-radius: 50%; background: radial-gradient(ellipse, rgba(200,180,140,.75) 0%, rgba(150,130,100,.35) 55%, transparent 72%);
+  opacity: 0; animation: gweStaub 700ms ease-out forwards;
 }
-@keyframes gweRiss { 0% { stroke-dashoffset: 100; opacity: 1; } 30% { stroke-dashoffset: 0; opacity: 1; } 75% { opacity: .9; } 100% { stroke-dashoffset: 0; opacity: 0; } }
-@keyframes gweSaeule { 0% { opacity: 0; transform: scaleY(.1); } 25% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(1.1); } }
-@keyframes gweRing { 0% { opacity: 0; transform: scale(.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.8); } }
-@keyframes gweBrocken { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--bx), var(--by)) rotate(220deg); } }
-@keyframes gweBlut {
-  0% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(.6); }
-  15% { opacity: 1; }
-  55% { transform: translate(calc(var(--sx) * .45 + var(--seit)), calc(var(--sy) * .45)) scale(1); }
-  90% { opacity: 1; }
-  100% { opacity: 0; transform: translate(0, 0) scale(.4); }
-}
+@keyframes gweBlitz { 0% { opacity: 0; transform: scale(.4); } 12% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes gweSaeule { 0% { opacity: 0; transform: scaleY(.05); } 20% { opacity: 1; transform: scaleY(1.05); } 100% { opacity: 0; transform: scaleY(1.1); } }
+@keyframes gweRing { 0% { opacity: 0; transform: scale(.25); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(1.9); } }
+@keyframes gweBrocken { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--bx), var(--by)) rotate(240deg); } }
+@keyframes gweStaub { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px) scale(1.4); } }
 
 /* ── Gate to the Armory: goldenes Portal ────────────────────────── */
 .rtor { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10206; }
