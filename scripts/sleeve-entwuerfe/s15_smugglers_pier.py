@@ -509,6 +509,10 @@ dkf = dk.astype(float)
 tintc = np.array([150, 84, 104])
 mix = dither_mask(None, far * 0.55)
 dkf[mix, :3] = dkf[mix, :3] * 0.55 + tintc * 0.45
+# Abendglanz auf den hinteren, hellen Planken
+far2 = np.clip((Zd - 2.2) / (ZEND - 2.2), 0, 1)
+sheen = (idx >= 5) & ~(gap | joint) & dither_mask(None, far2 * 0.9)
+dkf[sheen, :3] = dkf[sheen, :3] * 0.45 + np.array([226, 138, 108]) * 0.55
 dkf[..., :3] = dkf[..., :3] * np.array([0.84, 0.76, 0.86]) + np.array([6, 2, 14])
 a[deck] = np.clip(dkf, 0, 255).astype(np.uint8)[deck]
 # Kanten: linke/rechte Deckkante dunkel, Stirnkante hell
@@ -655,14 +659,24 @@ def wpx(a, x, y, col):
 
 
 def foam_ring(a, cx, yw, w):
-    FO = [(207, 230, 255), (140, 196, 255)]
+    """Schaumkranz an der Wasserlinie (Abendtöne), unregelmäßig."""
+    FO = [(236, 216, 230), (178, 168, 220), (130, 128, 204)]
+    r = random.Random(int(cx * 31 + yw * 7))
     x0 = int(round(cx - w / 2)) - 1; x1 = x0 + w + 1
     for x in range(x0, x1 + 1):
-        wpx(a, x, yw, FO[0] if (x - x0) % 3 else FO[1])
-    wpx(a, x0 - 1, yw, FO[1]); wpx(a, x1 + 1, yw, FO[1])
-    if w >= 6:
-        for x in range(x0 + 1, x1, 2):
-            wpx(a, x, yw + 1, FO[1])
+        v = r.random()
+        wpx(a, x, yw, FO[0] if v < 0.55 else FO[1] if v < 0.85 else FO[2])
+    for x in (x0 - 1, x1 + 1):
+        if r.random() < 0.7:
+            wpx(a, x, yw, FO[2])
+    if w >= 5:
+        for x in range(x0, x1 + 1):
+            if r.random() < 0.35:
+                wpx(a, x, yw + 1, FO[1] if r.random() < 0.5 else FO[2])
+        if r.random() < 0.8:
+            wpx(a, x0 - 2 - r.randrange(2), yw + 1, FO[2])
+        if r.random() < 0.8:
+            wpx(a, x1 + 2 + r.randrange(2), yw + 1, FO[2])
 
 
 def reflection(a, cx, yw, w, length, col):
@@ -704,7 +718,7 @@ for (z, side, X, i) in POSTS:
             px(a, x0, y, (61, 36, 12))
             if w == 2:
                 px(a, x0 + 1, y, (111, 74, 30))
-        px(a, x0, int(round(yw)), (140, 196, 255))
+        px(a, x0, int(round(yw)), (178, 168, 220))
         continue
     lantern = (i % 2 == 1)
     rope_at = int(round((ytop + (ydeck - ytop) * 0.3) - y0))
@@ -948,7 +962,7 @@ comp(a, dusk(BOAT), BX, BY)
 for x in range(BX, BX + BOAT.width):
     ys = np.nonzero(bm[:, x - BX])[0]
     if len(ys) and (x * 7 % 5) < 2:
-        wpx(a, x, BY + ys.max() + 1, (140, 196, 255) if x % 2 else (207, 230, 255))
+        wpx(a, x, BY + ys.max() + 1, (178, 168, 220) if x % 2 else (236, 216, 230))
 # Festmacherleine zum Pfahl
 post_z = [p_ for p_ in POSTS if p_[1] == 'L' and abs(p_[0] - 2.66) < 0.05][0][0]
 tx, ty = sx(post_z, XL - 5) - 2, sy(post_z, 10)
@@ -985,6 +999,13 @@ gz = gp[0]
 gcx = sx(gz, XR + 5)
 gtop = int(round(sy(gz, PH_UP)))
 comp(a, dusk(GS, k=(0.86, 0.8, 0.9), add=(4, 2, 12)), int(round(gcx - 13)), gtop - 14)
+
+# Funkeln auf dem Glitzerpfad und am Steg
+dsp = ImageDraw.Draw(img_tmp := Image.fromarray(a, 'RGBA'))
+for (x, y, sz) in [(176, 152, 2), (196, 178, 1), (236, 214, 1), (224, 262, 2), (228, 300, 1), (150, 142, 1)]:
+    if not DECK[y, x]:
+        sparkle(dsp, x, y, sz, (255, 214, 140), core=(255, 250, 226))
+a = np.array(img_tmp)
 
 # ================================================================ RAHMEN + TITEL
 img = Image.fromarray(a, 'RGBA')
