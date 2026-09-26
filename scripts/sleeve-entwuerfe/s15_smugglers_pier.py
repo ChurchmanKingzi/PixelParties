@@ -66,7 +66,7 @@ def darken(col, f):
 HY = 136            # Horizont
 VPX = 104           # Fluchtpunkt x
 DH = 350 - HY       # Augenhöhe über Deck (Pixel bei z = 1)
-XL, XR = -92, 84    # Deckkanten (Welt-x in Pixel bei z = 1)
+XL, XR = -76, 70    # Deckkanten (Welt-x in Pixel bei z = 1)
 WATER = 46          # Wasserspiegel unter dem Deck
 ZEND = 4.7          # Stegende
 
@@ -148,24 +148,40 @@ def cloud(cx, cy, w, h, seed, body, under, rim2, rim, tilt=0.0):
     return m
 
 
-cloud(62, 58, 104, 7, 11, (78, 46, 104), (132, 64, 118), (208, 104, 116), (250, 160, 112), tilt=-0.02)
-cloud(212, 44, 84, 6, 12, (70, 42, 98), (122, 60, 114), (200, 98, 112), (248, 166, 116))
-cloud(122, 90, 108, 6, 13, (150, 62, 106), (188, 84, 104), (236, 128, 100), (255, 196, 128), tilt=0.02)
-cloud(26, 108, 70, 5, 14, (168, 70, 102), (206, 96, 100), (246, 148, 102), (255, 206, 136))
-cloud(238, 112, 52, 4, 15, (186, 80, 98), (220, 108, 96), (250, 160, 106), (255, 216, 146))
+cloud(58, 62, 110, 10, 11, (96, 52, 112), (140, 66, 118), (214, 108, 114), (252, 164, 114), tilt=-0.02)
+cloud(206, 46, 92, 9, 12, (86, 48, 108), (132, 62, 116), (206, 102, 112), (250, 170, 118))
+cloud(124, 92, 110, 7, 13, (160, 66, 106), (196, 88, 104), (238, 132, 100), (255, 198, 130), tilt=0.02)
+cloud(24, 110, 70, 5, 14, (176, 74, 102), (210, 100, 100), (246, 150, 102), (255, 208, 138))
+cloud(236, 112, 54, 5, 15, (190, 82, 98), (222, 110, 96), (250, 162, 106), (255, 218, 148))
 
 # ================================================================ MEER
 q = np.clip((YY - HY) / (H - HY), 0, 1)
 WAT = [(0.0, (222, 124, 98)), (0.035, (168, 80, 112)), (0.1, (98, 54, 124)), (0.24, (46, 46, 142)),
        (0.45, (20, 58, 172)), (0.7, (12, 46, 156)), (1.0, (6, 30, 122))]
-sea = np.array(dither_gradient((W, H), WAT, func=lambda x, y: np.clip(q ** 0.85, 0, 1)))
 # Wellenzüge: horizontale Streifen, nach vorn länger (wie water.png)
-big = value_noise(W * 8, H, 20, seed=1, octaves=2)
-wave = np.zeros((H, W))
-for y in range(HY + 1, H):
-    k = 1 + q[y, 0] * 9
-    xs = ((np.arange(W) - SUN_X) / k * 1.0 + y * 37.3 + 900) % (W * 8)
-    wave[y] = big[y, xs.astype(int)]
+def streaks(seed, scale, stretch):
+    big_ = value_noise(W * 8, H, scale, seed=seed, octaves=2)
+    out = np.zeros((H, W))
+    for y in range(HY + 1, H):
+        k = 1 + q[y, 0] * stretch
+        xs = ((np.arange(W) - SUN_X) / k + y * 37.3 + 900) % (W * 8)
+        out[y] = big_[y, xs.astype(int)]
+    return out
+
+
+wave = streaks(1, 20, 9)
+fine = streaks(5, 6, 6)
+# Rang-Transformation -> gleichverteilte Schwelle; Übergänge folgen den Wellenstreifen statt Bayer-Karos
+rk = np.argsort(np.argsort(fine[HY + 1:].ravel())).reshape(fine[HY + 1:].shape) / fine[HY + 1:].size
+thr = np.zeros((H, W)); thr[HY + 1:] = rk
+tw = np.clip(q ** 0.85 + (wave - 0.5) * 0.16, 0, 1)
+sea = np.zeros((H, W, 4), np.uint8); sea[..., 3] = 255
+for i in range(len(WAT) - 1):
+    p0, c0 = WAT[i]; p1, c1 = WAT[i + 1]
+    m = (tw >= p0) & (tw <= p1)
+    loc = (tw - p0) / (p1 - p0)
+    sea[m & (loc <= thr), :3] = c0
+    sea[m & (loc > thr), :3] = c1
 hi = (wave > 0.6) & (YY > HY)
 hi2 = (wave > 0.68) & (YY > HY)
 lo = (wave < 0.38) & (YY > HY)
@@ -180,12 +196,13 @@ a[HY, :] = P((238, 150, 102))
 # Glitzerpfad unter der Sonne: Wellenkämme leuchten in einer Bahn zum Betrachter auf
 qq = np.clip((YY - HY) / (H - HY), 0, 1)
 cxp = SUN_X + (YY - HY) * 0.22
-half = 7 + qq * 34
+half = 5 + qq * 24
 g = np.exp(-((XX - cxp) / half) ** 2) * (1 - qq * 0.35)
 sea_m = YY > HY
-gl1 = sea_m & (wave > 1 - 0.5 * g)
-gl2 = sea_m & (wave > 1 - 0.36 * g)
-gl3 = sea_m & (wave > 1 - 0.26 * g) & (g > 0.5)
+CREST = (wave >= np.roll(wave, 1, 0)) & (wave >= np.roll(wave, -1, 0))
+gl1 = sea_m & CREST & (wave > 1 - 0.62 * g)
+gl2 = sea_m & CREST & (wave > 1 - 0.46 * g)
+gl3 = sea_m & CREST & (wave > 1 - 0.34 * g) & (g > 0.45)
 setm(a, gl1, (212, 116, 112))
 setm(a, gl2, (250, 176, 112))
 setm(a, gl3, (255, 230, 160))
@@ -237,26 +254,34 @@ cliff_p = profile([(0, 72), (8, 70), (16, 74), (24, 73), (30, 78), (38, 84), (44
                    (62, 104), (68, 112), (74, 118), (82, 126), (90, 134), (98, 141), (104, 146)], 0, 106, 8, jag=1)
 CB = 146
 CLIFF = fill_profile(cliff_p, CB)
-CL = [(30, 18, 42), (42, 24, 56), (56, 32, 70), (74, 42, 84)]
-nc = value_noise(W, H, 5, seed=13, octaves=2)
-strata = (np.sin((YY * 0.9 + XX * 0.35) * 0.9 + nc * 6) + 1) / 2
-lv = np.clip(0.25 + (strata - 0.5) * 0.5 + (nc - 0.5) * 0.6 + XX / 400, 0, 0.99)
-ci = np.clip(np.floor(lv * 3 + BAYER4[YY % 4, XX % 4] * 0.8), 0, 3).astype(int)
+CL = [(28, 16, 40), (40, 23, 54), (54, 31, 68), (70, 40, 82), (92, 50, 92)]
+# Gegenlicht-Klippe: dunkle Masse, oben vom Himmel etwas aufgehellt, Felsbänder als Simse
+nc = value_noise(W, H, 6, seed=13, octaves=2)
+ctop = np.array([min(cliff_p.get(x, CB), CB) for x in range(W)])
+depth = np.clip((YY - ctop[None, :]) / 40.0, 0, 1)
+lvl = np.clip(0.62 - depth * 0.55 + (nc - 0.5) * 0.35, 0, 0.999)
+ci = np.clip(np.floor(lvl * 4 + BAYER4[YY % 4, XX % 4] * 0.9), 0, 4).astype(int)
 cc = np.array([P(c) for c in CL], np.uint8)[ci]
 a[CLIFF] = cc[CLIFF]
-# Risse
+# Simse: leicht schräge Felsbänder (oben hell, darunter Schattenfuge)
+rv = random.Random(23)
+for _ in range(26):
+    x0 = rv.randrange(0, 100)
+    if x0 not in cliff_p:
+        continue
+    y0 = rv.randrange(cliff_p[x0] + 3, CB - 1) if cliff_p[x0] + 3 < CB - 1 else None
+    if y0 is None:
+        continue
+    ln = rv.randint(5, 16)
+    y = float(y0)
+    for i in range(ln):
+        x = x0 + i
+        yi = int(round(y))
+        if x in cliff_p and CLIFF[yi, x] and CLIFF[yi + 1, x] and yi + 1 < CB:
+            a[yi, x] = P(CL[3] if yi - cliff_p[x] < 22 else CL[2])
+            a[yi + 1, x] = P(CL[0])
+        y += 0.35
 rr_ = random.Random(17)
-for _ in range(16):
-    x = rr_.randrange(4, 96)
-    if x not in cliff_p:
-        continue
-    y = rr_.randrange(cliff_p[x] + 4, CB - 2) if cliff_p[x] + 4 < CB - 2 else None
-    if y is None:
-        continue
-    for k in range(rr_.randint(3, 8)):
-        if CLIFF[y + k, x] and y + k < CB:
-            a[y + k, x] = P(CL[0])
-        x += rr_.choice([0, 0, 1, -1])
 # Sonnenkante: Oberkante + nach rechts abfallende Flanken warm
 topc = CLIFF & ~np.roll(CLIFF, 1, 0)
 rightc = CLIFF & ~np.roll(CLIFF, -1, 1)
@@ -278,26 +303,54 @@ for x in range(2, 60):
         px(a, x, cliff_p[x] - 1, (46, 40, 60))
         if rr_.random() < 0.3:
             px(a, x, cliff_p[x] - 2, (46, 40, 60))
-# Brandung am Fuß
-for x in range(0, 106):
-    if CLIFF[CB, x] or CLIFF[CB - 1, x]:
-        if rr_.random() < 0.7:
-            px(a, x, CB + 1, (200, 150, 170) if x % 3 else (236, 196, 196))
-        if rr_.random() < 0.3:
-            px(a, x, CB, (170, 120, 160))
+# Findlinge am Fuß + Brandung
+BOULD = [(8, 7, 3), (27, 5, 2), (44, 9, 4), (58, 5, 2), (84, 5, 2), (98, 4, 2)]
+for (bx, bw, bh) in BOULD:
+    for i in range(bw):
+        f = (i + 0.5) / bw
+        hgt = int(round(bh * math.sqrt(max(0, 1 - (2 * f - 1) ** 2)) + 0.3))
+        for k in range(hgt):
+            y = CB + 1 - k
+            px(a, bx + i, y, CL[1] if k < hgt - 1 else (CL[3] if f < 0.6 else (214, 108, 100)))
+        CLIFF[CB + 1 - max(0, hgt - 1):CB + 2, bx + i] = True
+rf_ = random.Random(19)
+for x in range(0, 108):
+    col_ = np.nonzero(CLIFF[:, x])[0] if x < W else []
+    if len(col_) == 0:
+        continue
+    yb = col_.max()
+    r_ = rf_.random()
+    if r_ < 0.75:
+        px(a, x, yb + 1, (236, 200, 200) if rf_.random() < 0.4 else (196, 150, 176))
+    if rf_.random() < 0.3:
+        px(a, x + rf_.choice([-1, 1]), yb + 2, (170, 126, 170))
+
+# Schmugglerhöhle am Klippenfuß: dunkler Eingang, drinnen Laternenschein
+CVX, CVW, CVH = 72, 6.5, 8
+cvm = (((XX - CVX) / CVW) ** 2 + ((YY - (CB + 0.5)) / CVH) ** 2 <= 1) & (YY <= CB)
+dcv = np.hypot(XX - CVX, (YY - (CB - 2)) * 1.3)
+setm(a, cvm, (16, 8, 20))
+setm(a, cvm & (dcv < 6) & dither_mask(None, np.clip(1 - dcv / 6, 0, 1) * 1.2), (64, 30, 30))
+setm(a, cvm & (dcv < 3.5) & dither_mask(None, np.clip(1 - dcv / 3.5, 0, 1) * 1.4), (122, 58, 34))
+rimcv = ndimage.binary_dilation(cvm) & ~cvm & CLIFF & (YY <= CB)
+setm(a, rimcv & (XX >= CVX), (92, 50, 92))
+setm(a, rimcv & (XX < CVX), CL[0])
+# Kiste + Laterne im Eingang
+for (x, y, c) in [(CVX - 4, CB, (111, 74, 30)), (CVX - 3, CB, (142, 96, 43)), (CVX - 4, CB - 1, (160, 110, 52)), (CVX - 3, CB - 1, (111, 74, 30)),
+                  (CVX + 2, CB - 3, (28, 18, 26)), (CVX + 2, CB - 2, (255, 214, 120)), (CVX + 2, CB - 1, (240, 150, 60)), (CVX + 2, CB, (28, 18, 26))]:
+    px(a, x, y, c)
 # Spiegelung der Klippe
 for y in range(CB + 2, CB + 26):
     my = CB - (y - CB) * 1
     if my < 0:
         break
     row = CLIFF[my]
-    br = (wave[y] > 0.62)
-    m = row & ~br & ~DECK_ANY[y] if False else row & ~br
     k = (y - CB) / 26
-    m &= dither_mask(None, np.full((H, W), 0.9 - k * 0.7))[y]
+    m = row & (wave[y] < 0.78 - k * 0.42)
     a[y, m, :3] = (a[y, m, :3].astype(int) * 0.45 + np.array([28, 16, 44]) * 0.55).astype(np.uint8)
 
 # Leuchtturm auf der Klippe
+PRE_LH = a.copy()
 LX = 17
 ly = cliff_p[LX] + 1
 tower_h = 19
@@ -328,6 +381,17 @@ for i in range(-1, 2):
     px(a, LX + i, ty - 5, (34, 20, 44))
 px(a, LX, ty - 6, (34, 20, 44))
 LH_LIGHT = (LX, ty - 2)
+TOWER = (a != PRE_LH).any(2)
+# Leuchtfeuer: Schein + schwacher Lichtkegel nach links
+lx_, ly_ = LH_LIGHT
+dl = np.hypot(XX - lx_, YY - ly_)
+ang = np.abs((YY - ly_) / np.maximum(lx_ - XX, 1e-3))
+beam = (XX < lx_ - 3) & (ang < 0.16) & (YY < CB)
+bt = np.clip(1 - (lx_ - XX) / 40, 0, 1) * 0.5
+setm(a, beam & dither_mask(None, bt) & ~CLIFF & ~TOWER, (228, 170, 150))
+for rad, col in ((6.5, (206, 112, 120)), (4.5, (240, 160, 128))):
+    ring = (dl <= rad) & (dl > 2.2) & ~CLIFF & ~TOWER & dither_mask(None, np.full((H, W), 0.5 if rad > 5 else 1.0))
+    setm(a, ring, col)
 
 # ================================================================ SCHIFF
 def ship_img():
@@ -424,7 +488,7 @@ jl = 0.95
 zz = (Zd - 1 + np.array(joints)[pl]) / jl
 jf = zz - np.floor(zz)
 dzpx = Zd ** 2 / DH                             # Tiefe pro Pixelzeile
-joint = jf < dzpx / jl * 1.0
+joint = (jf < dzpx / jl * 1.0) & (1 / pxw >= 3.2)
 # Holztöne
 WOOD = [(44, 24, 6), (61, 36, 12), (79, 48, 15), (94, 61, 23), (111, 74, 30), (126, 85, 36), (142, 96, 43), (160, 110, 52), (181, 129, 63)]
 grain = value_noise(400, 400, 6, seed=7, octaves=2)
@@ -483,6 +547,9 @@ vg = np.clip((YY - 290) / 60, 0, 1) * 0.55
 vm = deck & dither_mask(None, vg)
 a[vm, :3] = (a[vm, :3] * 0.82).astype(np.uint8)
 yend = int(round(sy(ZEND)))
+# Stegende fängt das Abendlicht
+endrow = deck & (YY == yend + 1) & ~edgeL & ~edgeR
+setm(a, endrow, (206, 124, 98))
 DECK = deck.copy()
 
 
@@ -502,10 +569,11 @@ def water_sprite(a, sp, x, yw, refl=True, foam=True):
             if src is None:
                 break
             sh = r.choice([-1, 0, 0, 0, 1]) if k > 2 else 0
+            kk = k / (hh * 0.7)
             for i in range(ww):
-                if src[i, 3] > 200 and r.random() > k / (hh * 0.7) * 0.8:
+                if src[i, 3] > 200:
                     xx_ = x + i + sh
-                    if 0 <= xx_ < W and not DECK[yy_, xx_] and wave[yy_, xx_] < 0.64:
+                    if 0 <= xx_ < W and not DECK[yy_, xx_] and wave[yy_, xx_] < 0.72 - kk * 0.3:
                         c = a[yy_, xx_, :3].astype(int)
                         a[yy_, xx_, :3] = np.clip(c * 0.5 + src[i, :3] * 0.18 + np.array([12, 6, 24]), 0, 255)
     comp(a, dusk(sp), x, y0)
@@ -617,7 +685,7 @@ LANT = []
 POSTS = []
 PW, PH_UP = 13, 30          # Pfahlbreite / Höhe über Deck (Welt)
 for side, X in (('L', XL - 5), ('R', XR + 5)):
-    zs = np.arange(0.98, ZEND + 0.01, 0.42)
+    zs = list(np.arange(0.98, ZEND - 0.2, 0.42)) + [ZEND - 0.03]
     for i, z in enumerate(zs):
         POSTS.append((z, side, X, i))
 POSTS.sort(key=lambda p: -p[0])
@@ -691,11 +759,12 @@ def warm_glow(a, cx, cy, r, strength=1.0, add=(200, 112, 24), only=None, water_g
         m &= only
     amt = (lv * 0.55)[m][:, None]
     c = a[m, :3].astype(float)
-    a[m, :3] = np.clip(c + np.array(add) * amt, 0, 255).astype(np.uint8)
+    lum = c.mean(1, keepdims=True) / 255
+    a[m, :3] = np.clip(c + np.array(add) * amt * (1 - lum) ** 1.5, 0, 255).astype(np.uint8)
     if water_glint:
         tw = np.clip(1 - d, 0, 1) * strength
-        g1 = isw & (d < 1) & (wave > 1 - 0.45 * tw)
-        g2 = isw & (d < 1) & (wave > 1 - 0.3 * tw)
+        g1 = isw & CREST & (d < 1) & (wave > 1 - 0.55 * tw)
+        g2 = isw & CREST & (d < 1) & (wave > 1 - 0.38 * tw)
         setm(a, g1, (196, 104, 110))
         setm(a, g2, (244, 150, 84))
 
@@ -732,9 +801,12 @@ for (z, side, cx, y0, w) in sorted(LANT, key=lambda l: -l[0]):
             if not (0 <= x < W) or DECK[y, x]:
                 continue
             gg = np.exp(-((x - gx) / (hw * (0.7 + k))) ** 2) * (1 - k)
-            if wave[y, x] > 1 - 0.42 * gg:
+            if CREST[y, x] and wave[y, x] > 1 - 0.5 * gg:
                 a[y, x] = P((255, 214, 130) if gg > 0.55 else (236, 140, 72))
 
+
+# Höhlenlicht auf dem Wasser
+warm_glow(a, CVX, CB + 1, 13, 1.3, only=(YY > CB + 1))
 
 # ================================================================ DECKLADUNG (Area-Sprites 1x)
 def crate():
@@ -789,12 +861,12 @@ def shadow_on_deck(a, x0, x1, y, h=2):
                 a[y + k, x, :3] = (a[y + k, x, :3] * 0.6).astype(np.uint8)
 
 
-shadow_on_deck(a, 34, 66, 316)
-comp(a, dusk(CRATE), 34, 283)
-comp(a, dusk(CRATE), 37, 272)
-shadow_on_deck(a, 68, 88, 318)
-comp(a, dusk(BTOP), 67, 299)
-comp(a, dusk(COIL), 128, 300)
+shadow_on_deck(a, 46, 78, 316)
+comp(a, dusk(CRATE), 46, 283)
+comp(a, dusk(CRATE), 49, 272)
+shadow_on_deck(a, 80, 100, 318)
+comp(a, dusk(BTOP), 79, 299)
+comp(a, dusk(COIL), 126, 302)
 
 
 # ================================================================ RUDERBOOT (links, am Steg vertäut)
@@ -860,16 +932,17 @@ def rowboat():
 
 BOAT = rowboat()
 BX, BY = 18, 206
-# Spiegelung/Schatten unter dem Boot
+# Spiegelung unter dem Boot (von Wellen zerrissen)
 bm = np.array(BOAT)[..., 3] > 0
-for k in range(1, 7):
-    y = BY + BOAT.height - 1 + k
+ba_ = np.array(dusk(BOAT))
+bh_ = BOAT.height
+for k in range(1, 8):
+    y = BY + bh_ - 1 + k
+    src = bh_ - 1 - k
     for x in range(BOAT.width):
-        col_has = bm[:, x].any()
-        if col_has and (x + k) % (1 + k // 2) == 0 and wave[y, BX + x] < 0.6:
-            X = BX + x
-            if not DECK[y, X]:
-                a[y, X, :3] = (a[y, X, :3].astype(int) * 0.5 + np.array([10, 8, 30]) * 0.5).astype(np.uint8)
+        X = BX + x
+        if src >= 0 and bm[src, x] and not DECK[y, X] and wave[y, X] < 0.74 - k * 0.05:
+            a[y, X, :3] = np.clip(a[y, X, :3].astype(int) * 0.5 + ba_[src, x, :3] * 0.22 + np.array([6, 4, 18]), 0, 255)
 comp(a, dusk(BOAT), BX, BY)
 # Schaumkranz
 for x in range(BX, BX + BOAT.width):
@@ -943,6 +1016,32 @@ for (cx_, cy_, fx, fy) in [(0, 0, 1, 1), (W - 1, 0, -1, 1), (0, H - 1, 1, -1), (
     for (i, j) in [(2, 2), (8, 2), (2, 8)]:
         px(a, cx_ + fx * i, cy_ + fy * j, IRON[3])
         px(a, cx_ + fx * (i + 1), cy_ + fy * (j + 1), IRON[0])
+
+# Titel
+ti = text_img("SMUGGLER'S PIER", 13, (255, 214, 128, 255), (34, 16, 34, 255))
+ta = np.array(ti)
+# zweifarbig: untere Hälfte orange
+body = (ta[..., 3] > 0) & (np.abs(ta[..., :3].astype(int) - [255, 214, 128]).sum(2) < 10)
+hh_ = ta.shape[0]
+ys_ = np.nonzero(body.any(1))[0]
+mid = (ys_.min() + ys_.max()) / 2 + 1
+low = body & (np.arange(hh_)[:, None] > mid)
+ta[low, :3] = (246, 160, 84)
+ta[body & (np.arange(hh_)[:, None] == ys_.min()), :3] = (255, 240, 190)
+ti = Image.fromarray(ta, 'RGBA')
+tx = (W - ti.width) // 2
+tyy = 13
+shadow = silhouette(ti, (12, 6, 24, 255))
+img2 = Image.fromarray(a, 'RGBA')
+img2.alpha_composite(shadow, (tx + 1, tyy + 1))
+img2.alpha_composite(ti, (tx, tyy))
+a = np.array(img2)
+dd = ImageDraw.Draw(img2)
+for sx_ in (tx - 9, tx + ti.width + 8):
+    cy_ = tyy + ti.height // 2
+    img2 = Image.fromarray(a, 'RGBA'); dd = ImageDraw.Draw(img2)
+    sparkle(dd, sx_, cy_, 2, (246, 160, 84), core=(255, 240, 190))
+    a = np.array(img2)
 
 img = Image.fromarray(a, 'RGBA')
 img.convert('RGB').resize((W * 3, H * 3), Image.NEAREST).save(os.path.join(TMP, 'v.png'))

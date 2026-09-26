@@ -269,16 +269,52 @@ for (box, pos) in [((78, 10, 110, 32), (196, 22)), ((26, 68, 46, 86), (14, 300))
 keep = (B_LAND | B_INNER) & BAND
 img[keep] = B_RGB[keep]
 
-# ------------------------------------------------------------------ neues Land: Strand, Lichtungen, Dschungel
+# ------------------------------------------------------------------ neues Land: Strand, Lichtungen, Bäche, Dschungel
 din = ndimage.distance_transform_edt(LAND)
-sandw = 1.2 + np.clip(nz_lo * 5 + 0.6, 0, 2.2) + (rs.rand(H, W) - 0.5) * 0.7
+sandw = 1.7 + np.clip(nz_lo * 5 + 0.8, 0, 2.0) + (rs.rand(H, W) - 0.5) * 0.7
 SANDM = EXT & (din <= sandw)
 
-# Lichtungen (Form + Gras + Erde + Pfad)
+# Lichtungen
 CLR = np.zeros((H, W), bool)
 for (cx, cy, rx, ry, sd_) in [(112, 86, 17, 10, 3), (52, 246, 20, 13, 4), (196, 262, 13, 17, 5)]:
     e = ell(cx, cy, rx, ry) + (value_noise(W, H, 5, seed=sd_, octaves=2) - 0.5) * 7
     CLR |= (e < 0) & EXT & (din > 4)
+
+
+def catmull(pts, n=16):
+    P = [pts[0]] + list(pts) + [pts[-1]]
+    out = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = [np.array(p, float) for p in P[i - 1:i + 3]]
+        for t in np.linspace(0, 1, n, endpoint=False):
+            out.append(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    out.append(np.array(pts[-1], float))
+    return np.array(out)
+
+
+def nearest_water(x, y):
+    ys, xs = np.where(WATER & ~BAND)
+    i = np.argmin((xs - x) ** 2 + (ys - y) ** 2)
+    return int(xs[i]), int(ys[i])
+
+
+def stream(pts, w0, w1):
+    cs = catmull(pts)
+    m = np.zeros((H, W), bool); core = np.zeros((H, W), bool)
+    for i, (x, y) in enumerate(cs):
+        t = i / (len(cs) - 1); r = (w0 + (w1 - w0) * t) / 2
+        d2 = (XX + 0.5 - x) ** 2 + (YY + 0.5 - y) ** 2
+        m |= d2 <= r * r
+        core |= d2 <= max(0.5, (r - 0.8)) ** 2
+    return m, core
+
+
+RIV = np.zeros((H, W), bool); RIVC = np.zeros((H, W), bool)
+mx, my = nearest_water(96, 50)
+for pts, w0, w1 in [([(108, 82), (101, 75), (99, 67), (103, 60), (mx + 1, my + 1)], 2.8, 4.2),
+                    ([(66, 243), (76, 238), (86, 244), nearest_water(104, 243)], 2.8, 4.0)]:
+    m_, c_ = stream(pts, w0, w1)
+    RIV |= m_ & LAND & ~BAND; RIVC |= c_ & LAND & ~BAND
 spec_noise = value_noise(W, H, 14, seed=77, octaves=2)
 
 
@@ -287,13 +323,14 @@ def species(x, y, r):
     if v_ > 0.64:
         return r.choices([0, 1, 2], [0.35, 0.1, 0.55])[0]
     if v_ < 0.36:
-        return r.choices([0, 1, 2], [0.45, 0.45, 0.1])[0]
-    return r.choices([0, 1, 2], [0.78, 0.1, 0.12])[0]
+        return r.choices([0, 1, 2], [0.6, 0.3, 0.1])[0]
+    return r.choices([0, 1, 2], [0.8, 0.08, 0.12])[0]
 
 
 SEAM = np.zeros((H, W), bool)
 SEAM[BY - 1:BY + 3] = True; SEAM[BY + BH - 3:BY + BH + 1] = True
-CANM = (EXT & ~SANDM & ~ndimage.binary_erosion(CLR, iterations=2)) | (SEAM & LAND & ndimage.binary_erosion(LAND, iterations=3))
+CANM = (EXT & ~SANDM & ~ndimage.binary_erosion(CLR, iterations=2) & ~ndimage.binary_dilation(RIV, iterations=1)) \
+    | (SEAM & LAND & ndimage.binary_erosion(LAND, iterations=3))
 can, crown, Hc, tcy = canopy(CANM, 7, species)
 
 m = EXT & ~SANDM
@@ -302,7 +339,6 @@ img[m] = can[m]
 gv = value_noise(W, H, 4, seed=9, octaves=2) * 0.6 + rs.rand(H, W) * 0.4
 GW = np.array([186, 163, 248, 636, 553, 166.0]); cum = np.cumsum(GW) / GW.sum()
 gidx = np.searchsorted(cum, np.clip(gv, 0, 0.999))
-# Baumschatten am oberen/rechten Rand der Lichtung
 treeup = np.zeros((H, W), bool)
 for d in range(1, 4):
     sh = np.zeros((H, W), bool); sh[d:, :W - d] = (crown & ~CLR)[:H - d, d:]
@@ -310,19 +346,48 @@ for d in range(1, 4):
 gidx = np.where(treeup, np.maximum(gidx - 3, 0), gidx)
 cl = CLR & ~crown
 img[cl] = np.array(GRASS, np.uint8)[gidx[cl]]
-cl2 = CLR & crown & (din > 1)                                  # Kronen am Lichtungsrand bleiben
-# Erdflecken + Trampelpfad
 soil = CLR & ~crown & (value_noise(W, H, 3, seed=21, octaves=1) > 0.72) & ~treeup
 img[soil] = SOIL[2]
 img[soil & (rs.rand(H, W) < 0.3)] = SOIL[1]
 
 # Sand
 sv = rs.rand(H, W)
-sidx = np.where(din <= 1.0, 0, np.where(sv < 0.55, 1, 2))
-sidx = np.where((din > 1.0) & (din <= 1.8) & (sv < 0.3), 0, sidx)
+sidx = np.where(din <= 1.0, np.where(sv < 0.6, 0, 1), np.where(sv < 0.5, 1, 2))
 img[SANDM] = np.array(SAND, np.uint8)[sidx[SANDM]]
-m = EXT & SANDM & crown & (din > 1.0)
+peb = SANDM & (din > 1.0) & (rs.rand(H, W) < 0.03)
+img[peb] = ROCK[6]
+m = EXT & SANDM & crown & (din > 1.4)
 img[m] = can[m]
+
+# Bäche: Wasser, Schlammufer, Schatten der Kronen, Kronen dürfen überhängen
+riv_sh = np.zeros((H, W), bool)
+for d in range(1, 3):
+    sh = np.zeros((H, W), bool); sh[d:, :W - d] = crown[:H - d, d:]
+    riv_sh |= sh
+rv = rs.rand(H, W)
+img[RIV] = np.where(rv[RIV, None] < 0.5, np.array((31, 102, 182)), np.array((36, 120, 192)))
+img[RIVC] = np.where(rv[RIVC, None] < 0.6, np.array((36, 120, 192)), np.array((42, 138, 198)))
+m = RIV & riv_sh
+img[m] = np.where(rv[m, None] < 0.5, np.array((25, 80, 127)), np.array((28, 92, 131)))
+bank = ndimage.binary_dilation(RIV, iterations=1) & ~RIV & EXT & ~crown & ~SANDM & (rv < 0.7)
+img[bank] = np.where(rv[bank, None] < 0.35, np.array(SOIL[1]), np.array(SOIL[2]))
+m = RIV & crown & (din > 1.4) & ~RIVC
+img[m] = can[m]
+
+# Blüten in einzelnen Kronen (wie im Spiel: orange und rosa Punkte)
+cand = np.argwhere(EXT & crown & ~SANDM & (img.sum(2) > 250))
+rsel = random.Random(8)
+for (y, x) in rsel.sample(list(map(tuple, cand)), 16):
+    img[y, x] = (224, 176, 64) if rsel.random() < 0.6 else (216, 106, 140)
+
+# Felsbrocken (Licht oben rechts, Schatten unten links)
+for (x, y, w_, h_) in [(120, 84, 3, 2), (104, 90, 2, 2), (44, 250, 3, 2), (60, 238, 2, 2), (200, 256, 3, 2), (190, 270, 2, 1)]:
+    if not CLR[y, x]:
+        continue
+    img[y + 1:y + h_ + 1, x - 1:x + w_ - 1] = (img[y + 1:y + h_ + 1, x - 1:x + w_ - 1] * 0.55).astype(np.uint8)
+    img[y:y + h_, x:x + w_] = ROCK[4]
+    img[y, x + 1:x + w_] = ROCK[7]
+    img[y + h_ - 1, x] = ROCK[2]
 # Kronen über der Bandkante
 over = BAND & crown & LAND & (((tcy < BY) & (YY < BY + 4)) | ((tcy > BY + BH - 1) & (YY > BY + BH - 5)))
 img[over] = can[over]
@@ -452,29 +517,35 @@ def billow(circles, light=(0.62, -0.62, 0.5)):
 
 # Rauchfahne: einzelne Rauchballen wie smoke.png, vom Krater nach oben rechts treibend,
 # wachsend, heller und durchsichtiger werdend
-rr = random.Random(3)
-path = [(150, 140), (152, 127), (158, 111), (170, 95), (188, 80), (212, 66), (240, 52), (270, 40)]
-
-
-def along(tt):
-    f = tt * (len(path) - 1); j = min(int(f), len(path) - 2); u = f - j
-    (x0, y0), (x1, y1) = path[j], path[j + 1]
-    return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, x1 - x0, y1 - y0
-
-
 SMOKE = [(18, 16, 16), (30, 26, 25), (44, 38, 36), (60, 53, 51), (82, 74, 69), (110, 100, 92), (138, 130, 122), (166, 160, 152), (194, 190, 184), (222, 220, 216), (240, 240, 238)]
-PUFFS = []
-tt = 0.0
-while tt < 1.0:
-    r0 = (2.4 + 13 * tt ** 0.8) * rr.uniform(0.72, 1.3)
-    cx, cy, dx_, dy_ = along(tt)
-    nl = math.hypot(dx_, dy_); px_, py_ = -dy_ / nl, dx_ / nl      # quer zur Fahne
-    side = rr.uniform(-1, 1) * (1.5 + 9 * tt)
-    PUFFS.append((cx + px_ * side, cy + py_ * side, r0, tt, rr.uniform(-0.08, 0.08)))
-    if tt > 0.3 and rr.random() < 0.7:                              # Fahne fächert auf
-        side2 = -math.copysign(1, side) * rr.uniform(0.5, 1) * (4 + 12 * tt)
-        PUFFS.append((cx + px_ * side2 + rr.uniform(-2, 2), cy + py_ * side2, r0 * rr.uniform(0.55, 0.8), tt + 0.01, rr.uniform(-0.08, 0.08)))
-    tt += (r0 * rr.uniform(0.85, 1.25)) / 240.0
+STEAM = [(122, 138, 148), (152, 168, 176), (184, 196, 202), (212, 220, 224), (236, 240, 242), (250, 252, 252)]
+
+
+def make_plume(path, seed, r_a, r_b, spread, length, fan=True):
+    rr = random.Random(seed)
+
+    def along(tt):
+        f = tt * (len(path) - 1); j = min(int(f), len(path) - 2); u = f - j
+        (x0, y0), (x1, y1) = path[j], path[j + 1]
+        return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, x1 - x0, y1 - y0
+
+    out = []
+    tt = 0.0
+    while tt < 1.0:
+        r0 = (r_a + r_b * tt ** 0.8) * rr.uniform(0.72, 1.3)
+        cx, cy, dx_, dy_ = along(tt)
+        nl = math.hypot(dx_, dy_); px_, py_ = -dy_ / nl, dx_ / nl      # quer zur Fahne
+        side = rr.uniform(-1, 1) * spread * (0.15 + tt)
+        out.append((cx + px_ * side, cy + py_ * side, r0, tt, rr.uniform(-0.08, 0.08)))
+        if fan and tt > 0.3 and rr.random() < 0.7:                    # Fahne fächert auf
+            side2 = -math.copysign(1, side) * rr.uniform(0.5, 1) * spread * (0.4 + 1.2 * tt)
+            out.append((cx + px_ * side2 + rr.uniform(-2, 2), cy + py_ * side2, r0 * rr.uniform(0.55, 0.8), tt + 0.01, rr.uniform(-0.08, 0.08)))
+        tt += (max(r0, 4.5) * rr.uniform(0.85, 1.25)) / length
+    return out
+
+
+PUFFS = make_plume([(156, 135), (161, 123), (170, 108), (186, 92), (206, 76), (230, 60), (262, 42)], 3, 2.0, 13.5, 10, 240)
+STEAMP = make_plume([(204, 157), (208, 148), (214, 139), (223, 131), (234, 124)], 4, 2.0, 5.5, 3, 70, fan=False)
 
 
 def puff_layer(cx, cy, r0, tt, seed):
@@ -549,7 +620,7 @@ def cumulus(cx, cy, rx, ry, seed, big):
     return out
 
 
-clouds = cumulus(20, 70, 26, 11, 51, 10) + cumulus(226, 306, 28, 12, 52, 11)
+clouds = cumulus(24, 76, 30, 12, 51, 11) + cumulus(224, 302, 32, 13, 52, 12)
 CM, cl_ = balls_render(clouds)
 holes_ = ndimage.binary_fill_holes(CM) & ~CM
 CM |= holes_; cl_[holes_] = 0.3
@@ -566,26 +637,33 @@ img[shd] = (img[shd].astype(float) * np.array([0.5, 0.55, 0.68])).astype(np.uint
 # Flugsaurier mit Schatten (Spiel-Sprites 1x)
 pt = frames('ptero', 6)
 pts_ = frames('ptero-shadow', 6)
-PTEROS = [(64, 36, 2), (176, 214, 4), (84, 292, 3)]
+PTEROS = [(52, 34, 2), (36, 42, 1), (32, 25, 0), (98, 290, 4)]
 for (x, y, f) in PTEROS:
-    comp_sprite(img, pts_[f], x - 11, y + 15)
+    comp_sprite(img, pts_[f], x - 12, y + 16, 1.4)
 
-# Rauch: erst alle Schatten (Höhe wächst mit dem Alter), dann die Ballen, alpha-gemischt
-imgf = img.astype(float)
-for k, (cx, cy, r0, tt, br_) in enumerate(PUFFS):
-    m, val = puff_layer(cx, cy, r0, tt, 100 + k)
-    dx, dy = int(round(-4 - 14 * tt)), int(round(5 + 15 * tt))
-    ms = shifted(m, dx, dy)
-    al = 0.55 * (1 - 0.45 * tt)
-    imgf[ms] *= (1 - al)
-for k, (cx, cy, r0, tt, br_) in enumerate(PUFFS):
-    m, val = puff_layer(cx, cy, r0, tt, 100 + k)
-    v_ = np.clip(val * 0.62 + tt * 0.42 + 0.05 + br_, 0, 1)
-    idx = ordered(v_, len(SMOKE))
-    col = np.array(SMOKE, float)[idx]
-    al = np.clip(min(0.55 + tt * 3, 0.92) - max(0, tt - 0.3) * 0.8, 0.28, 0.92)
-    imgf[m] = imgf[m] * (1 - al) + col[m] * al
-img = np.clip(imgf + 0.5, 0, 255).astype(np.uint8)
+# Rauch + Dampf: erst die Schatten (Höhe wächst mit dem Alter), dann die Ballen, alpha-gemischt
+def draw_plume(img, puffs, pal, alpha_fn, sh_a, sh_off, seed0, light_mix=(0.62, 0.42, 0.05), glow=None):
+    imgf = img.astype(float)
+    for k, (cx, cy, r0, tt, br_) in enumerate(puffs):
+        m, val = puff_layer(cx, cy, r0, tt, seed0 + k)
+        dx, dy = int(round(sh_off[0] * (0.25 + tt))), int(round(sh_off[1] * (0.25 + tt)))
+        imgf[shifted(m, dx, dy)] *= (1 - sh_a * (1 - 0.45 * tt) * min(1, alpha_fn(tt) / 0.9))
+    for k, (cx, cy, r0, tt, br_) in enumerate(puffs):
+        m, val = puff_layer(cx, cy, r0, tt, seed0 + k)
+        v_ = np.clip(val * light_mix[0] + tt * light_mix[1] + light_mix[2] + br_, 0, 1)
+        col = np.array(pal, float)[ordered(v_, len(pal))]
+        if glow is not None and tt < 0.16:          # Unterseite glüht vom Lavasee
+            g = m & (val < 0.5)
+            ga = 0.45 * (1 - tt / 0.16)
+            col[g] = col[g] * (1 - ga) + np.array(glow, float) * ga
+        al = alpha_fn(tt)
+        imgf[m] = imgf[m] * (1 - al) + col[m] * al
+    return np.clip(imgf + 0.5, 0, 255).astype(np.uint8)
+
+
+img = draw_plume(img, STEAMP, STEAM, lambda t: 0.8 - 0.6 * t, 0.3, (-4, 5), 300, (0.6, 0.2, 0.25))
+img = draw_plume(img, PUFFS, SMOKE, lambda t: float(np.clip(min(0.3 + t * 5, 0.92) - max(0, t - 0.3) * 0.8, 0.28, 0.92)),
+                 0.55, (-14, 16), 100, glow=(214, 96, 30))
 
 for (x, y, f) in PTEROS:
     comp_sprite(img, pt[f], x, y)
@@ -603,8 +681,17 @@ img = np.clip(imgf + 0.5, 0, 255).astype(np.uint8)
 dbg(img, 'v_all')
 im = Image.fromarray(img).convert('RGBA')
 tt_ = text_img('PANGAIA', 20, (255, 214, 120, 255), outline_col=(70, 26, 10, 255), shadow=(8, 20, 60, 255))
-im.alpha_composite(tt_, (W // 2 - tt_.width // 2 - 8, 16))
+TX = W // 2 - tt_.width // 2 - 6
+im.alpha_composite(tt_, (TX, 14))
+st_ = text_img('THE DINO DOMAIN', 10, (170, 232, 240, 255), outline_col=(8, 30, 70, 255))
+im.alpha_composite(st_, (TX + tt_.width // 2 - st_.width // 2, 14 + tt_.height + 3))
 
 # ------------------------------------------------------------------ Rahmen
 bevel_frame(im, (24, 12, 8), (255, 170, 70), (150, 64, 26), (84, 30, 14), (24, 12, 8), width=6)
+dfr = ImageDraw.Draw(im)
+for (x, y) in [(3, 3), (W - 4, 3), (3, H - 4), (W - 4, H - 4)]:
+    dfr.polygon([(x, y - 3), (x + 3, y), (x, y + 3), (x - 3, y)], fill=(40, 14, 6))
+    dfr.polygon([(x, y - 2), (x + 2, y), (x, y + 2), (x - 2, y)], fill=(210, 64, 14))
+    dfr.point([(x, y - 1), (x + 1, y)], fill=(255, 154, 40))
+    dfr.point((x, y), fill=(255, 240, 138))
 print(save(im, '14_pangaia'))
