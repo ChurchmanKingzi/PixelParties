@@ -8071,15 +8071,15 @@ function GameBoard({ gameState, lobby, onLeave }) {
         <div className={'game-board' + (showFirstChoice ? ' game-board-dimmed' : '') + (pt?.config?.greenSelect ? ' beer-targeting' : '') + (pt?.config?.redSelect ? ' sacrifice-targeting' : '')}>
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={oppDiscardHidden > 0 ? opp.discardPile.slice(0, -oppDiscardHidden) : opp.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={myDiscardHidden > 0 ? me.discardPile.slice(0, -myDiscardHidden) : me.discardPile} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} /></div>
             </div>
           </div>
 
@@ -8545,27 +8545,23 @@ function GameBoard({ gameState, lobby, onLeave }) {
       {/* Pile viewer (discard/deleted) */}
       {pileViewer && (() => {
         const TYPE_ORDER = ['Hero','Creature','Spell','Attack','Artifact','Ability','Potion','Ascended Hero','Token'];
-        const sorted = [...(pileViewer.cards || [])].sort((a, b) => {
+        // Index je Karte mitfuehren — die Lethe-Stempel stehen je
+        // STAPELPLATZ (v1443), nicht je Name.
+        const sortedIdx = (pileViewer.cards || []).map((name, idx) => ({ name, idx })).sort((x, y) => {
+          const a = x.name, b = y.name;
           const ca = CARDS_BY_NAME[a], cb = CARDS_BY_NAME[b];
           const ta = TYPE_ORDER.indexOf(ca?.cardType || ''), tb = TYPE_ORDER.indexOf(cb?.cardType || '');
           if (ta !== tb) return ta - tb;
           return a.localeCompare(b);
         });
-        // Lethe per-pile stamps — the owner-side player state carries a
-        // `_letheStamps[name] = [...occurrenceCounts]` map. Max stamp per
-        // name is what `effectiveCardLevel` uses for revival gates, so
-        // we display that as the +N badge on each rendered Creature.
+        const sorted = sortedIdx.map(e => e.name);
+        // Lethe per-pile stamps — `letheStamps = { discard: [...],
+        // deleted: [...] }`, ein Eintrag je Stapelplatz.
         const owner = pileViewer.ownerIdx != null
           ? gameState.players?.[pileViewer.ownerIdx]
           : null;
-        const stampsByName = (owner?.letheStamps || {});
-        const maxStampFor = (name) => {
-          const arr = stampsByName[name];
-          if (!arr || !arr.length) return 0;
-          let m = 0;
-          for (const v of arr) if (v > m) m = v;
-          return m;
-        };
+        const pileStamps = (pileViewer.pile && owner?.letheStamps?.[pileViewer.pile]) || [];
+        const stampAt = (i) => pileStamps[sortedIdx[i]?.idx] || 0;
         return (
           <div className="modal-overlay" onClick={() => setPileViewer(null)}>
             <DraggablePanel className="modal animate-in deck-viewer-modal">
@@ -8580,7 +8576,7 @@ function GameBoard({ gameState, lobby, onLeave }) {
                   {sorted.map((name, i) => {
                     const card = CARDS_BY_NAME[name];
                     if (!card) return null;
-                    const stamp = card.cardType === 'Creature' ? maxStampFor(name) : 0;
+                    const stamp = card.cardType === 'Creature' ? stampAt(i) : 0;
                     const isCreature = card.cardType === 'Creature' && card.level != null;
                     const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
                     // Stamped Creatures get a synthetic card so the

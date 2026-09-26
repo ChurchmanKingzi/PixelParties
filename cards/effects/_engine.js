@@ -6,6 +6,13 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { SPEED, HOOKS, PHASES, PHASE_NAMES, ZONES, STATUS_EFFECTS, getNegativeStatuses, BUFF_EFFECTS, hasCardType, hasSpellSchool, isArtifactCreature, POISON_BASE_DAMAGE, BURN_BASE_DAMAGE, baseCardName, BLIND_STATUSES, getCleansableStatuses } = require('./_hooks');
+// v1443: Hooks, deren Kontext die ausloesende Karte mitbekommt
+// (`ausloeserName`, s. `runHooks`) — fuer Reaktionen, die zeigen, worauf
+// sie reagieren.
+const AUSLOESER_HOOKS = new Set([
+  HOOKS.BEFORE_DRAW_BATCH, HOOKS.ON_CARD_ADDED_TO_HAND,
+  HOOKS.ON_CARD_ADDED_FROM_DISCARD_TO_HAND, HOOKS.BEFORE_CREATURE_DAMAGE_BATCH,
+]);
 const { handSizeWithoutResolving } = require('./_hand-resolve');   // v1288
 const { loadCardEffect } = require('./_loader');
 const { gainedNames, heroScriptsOf, heroScriptOf, eigenesHeldenSkript } = require('./_gained-effects-shared');
@@ -2723,6 +2730,15 @@ class GameEngine {
     // derselben Regel wie `pileOutAllowed`: ausdrueckliche Quelle, sonst
     // die laufende Effektquelle, sonst die aktivierende Karte, sonst der
     // Zugspieler.
+    // ★ v1443 — WELCHE KARTE LOEST AUS? (Als Befund 26.9.: Skeleton Demon
+    // und Cool Rescuer Monia zeigten nicht, worauf sie reagieren.) Aus
+    // demselben Grund wie oben hier VOR der Zuhoerer-Runde festgehalten:
+    // waehrend ein Zuhoerer laeuft, ist `_currentEffectSource` er selbst.
+    // Reagierende Karten reichen `ctx.ausloeserName` als
+    // `triggerCardName` an ihren Prompt weiter.
+    if (hookCtx && hookCtx.ausloeserName === undefined && AUSLOESER_HOOKS.has(hookName)) {
+      hookCtx.ausloeserName = this._effectSourceName();
+    }
     if (hookName === HOOKS.ON_CARD_LEAVE_ZONE && hookCtx && hookCtx.entferntVon === undefined) {
       const q = hookCtx.source;
       const qOwner = (typeof hookCtx.sourceOwner === 'number') ? hookCtx.sourceOwner
@@ -4991,6 +5007,9 @@ class GameEngine {
           // card; a caller can override (e.g. preview the equip it's
           // offering) by passing `previewCardName` explicitly.
           previewCardName: config.previewCardName || cardInstance.name,
+          // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
+          // links im Zielpanel, „Triggered by".
+          triggerCardName: config.triggerCardName,
           _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           // Optional override for the cancel button label. Used when
           // cancelling means "step back" rather than "abort" — e.g.
@@ -5561,6 +5580,9 @@ class GameEngine {
           cancellable: config.cancellable !== false,
           // General rule: show the source card's image in the picker.
           previewCardName: config.previewCardName || cardInstance.name,
+          // v1443: die AUSLOESENDE Karte einer Reaktion (Skeleton Demon) —
+          // links im Zielpanel, „Triggered by".
+          triggerCardName: config.triggerCardName,
           _callerHandlesSurprise: true,   // v920: dieser Weg oeffnet das Fenster selbst
           maxTotal: max,
           minRequired: min,
@@ -17234,8 +17256,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
+    // Nach Namen: bei Lethe-Stempeln die Kopie mit dem niedrigsten —
+    // dieselbe, die die Level-Tore als waehlbar sahen (v1443).
     const idx = typeof what === 'number' ? what
-      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+      : (opts.last ? arr.lastIndexOf(what)
+        : (pile === 'discard' || pile === 'deleted') ? this._letheLowestStampIdx(ps, pile, what)
+          : arr.indexOf(what));
     if (idx < 0 || idx >= arr.length) return null;
     const name = arr[idx];
     if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
@@ -17283,8 +17309,12 @@ this._deathWatch = (this._deathWatchStack || []).length
     const ps = this.gs.players[pi];
     const arr = this._pileArray(ps, pile);
     if (!arr) return null;
+    // Nach Namen: bei Lethe-Stempeln die Kopie mit dem niedrigsten —
+    // dieselbe, die die Level-Tore als waehlbar sahen (v1443).
     const idx = typeof what === 'number' ? what
-      : (opts.last ? arr.lastIndexOf(what) : arr.indexOf(what));
+      : (opts.last ? arr.lastIndexOf(what)
+        : (pile === 'discard' || pile === 'deleted') ? this._letheLowestStampIdx(ps, pile, what)
+          : arr.indexOf(what));
     if (idx < 0 || idx >= arr.length) return null;
     const name = arr[idx];
     if ((pile === 'deck' || pile === 'discard') && !this.pileOutAllowed(pi, pile, opts)) {
@@ -17309,6 +17339,7 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   _takeFromPileCore(pi, ps, arr, pile, idx, name, opts) {
+    this._letheTakeAt(ps, pile, idx);   // v1443: Stempel GENAU dieses Platzes
     arr.splice(idx, 1);
     // ★★ v1222: Verlaesst eine Karte die HAND, wird sofort abgeglichen.
     // Der Client verdeckt den Startplatz einer abfliegenden Handkarte
@@ -23542,7 +23573,8 @@ this._deathWatch = (this._deathWatchStack || []).length
       // dieser Zweig selbst. `opts.pileOwner` = fremde Ablage.
       const _pileOwner = opts.pileOwner ?? playerIdx;
       const _pile = gs.players[_pileOwner]?.discardPile || [];
-      const idx = opts.sourceIdx != null ? opts.sourceIdx : _pile.indexOf(cardName);
+      const idx = opts.sourceIdx != null ? opts.sourceIdx
+        : this._letheLowestStampIdx(gs.players[_pileOwner], 'discard', cardName);
       if (idx < 0 || _pile[idx] !== cardName) return null;
       if (!this.darfAusAblageAufsFeld(cardName)) {
         this.log('revive_blocked', { card: cardName, by: opts.sourceName || 'Placement' });
@@ -25482,6 +25514,7 @@ this._deathWatch = (this._deathWatchStack || []).length
           // a placement is fronting, etc.) so the player has visual
           // confirmation of what their click will do.
           previewCardName: config.previewCardName,
+          triggerCardName: config.triggerCardName,   // v1443
           // Auto-confirm: when set, the first click that fills the
           // selection up to `maxTotal` commits immediately, skipping
           // the Confirm-button step. Used by direct-click pickers
@@ -39692,8 +39725,8 @@ this._deathWatch = (this._deathWatchStack || []).length
     // pass `opts.pileSide`). Stacks across the standard gap-coverage
     // walk below — same as if the printed level were higher, so
     // Divinity / Wisdom can still pay it off.
-    if (opts.pileSide && cardData.cardType === 'Creature' && cardData.name) {
-      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+    if (opts.pileSide && opts.pileSide !== 'deck' && cardData.cardType === 'Creature' && cardData.name) {
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name, opts.pileSide);
       if (bonus > 0) rawLevel += bonus;
     }
     if (rawLevel <= 0 && !cardData.spellSchool1) return true;
@@ -40093,7 +40126,7 @@ this._deathWatch = (this._deathWatchStack || []).length
     // text: stamps wipe only on move-to-hand/deck). Returns the highest
     // stamp on any current occupant of `cardName` across both piles.
     if (pileSide && pileSide !== 'deck' && cardData.cardType === 'Creature' && cardData.name && ps) {
-      const bonus = this._getLetheStampBonus(playerIdx, cardData.name);
+      const bonus = this._getLetheStampBonus(playerIdx, cardData.name, pileSide);
       if (bonus > 0) raw += bonus;
     }
 
@@ -40103,107 +40136,250 @@ this._deathWatch = (this._deathWatchStack || []).length
   }
 
   // ─── LETHE PILE LEVEL STAMPS ─────────────────
+  //
+  // ★ PRO KARTE, NICHT PRO NAME (Als Befund 26.9.: „Lethes Effekt erhoeht
+  //   auch die Level von Creatures, die erst NACHTRAEGLICH in den Discard
+  //   kommen.")
+  //
+  // Vorher lag je NAME eine Stempelliste ueber beide Stapel, gelesen wurde
+  // das MAXIMUM, und abgeglichen wurde nur faul beim Lesen. Zwei Luecken:
+  //   • eine spaeter abgelegte zweite Kopie zeigte den Stempel der ersten
+  //     (Maximum ueber alle Kopien);
+  //   • verliess eine gestempelte Karte den Stapel ohne Abgleich (Hand,
+  //     Brett) und kam wieder, stimmte die Anzahl — der alte Stempel
+  //     klebte an der Neuankunft.
+  //
+  // Jetzt: `ps._letheStamps = { discard: { [name]: [s, …] }, deleted: … }`
+  // — je Stapel und Name die Stempel der Vorkommen in STAPELREIHENFOLGE
+  // (aelteste zuerst; Neuankuenfte werden hinten angehaengt). Abgeglichen
+  // wird bei jedem `sync()`, vor jeder Welle, vor jeder Entnahme und bei
+  // jedem Lesen. Eine Neuankunft beginnt bei 0 — ausser sie ist im selben
+  // Schritt aus dem ANDEREN Stapel herueber gewandert (Ablage ↔ Geloescht
+  // behaelt die Stempel, Kartentext: sie enden nur auf Hand/Deck).
+  //
+  // Die Stapel sind Namenslisten; welche von zwei GLEICHNAMIGEN Kopien ging,
+  // weiss nur `takeFromPile` genau (es kennt den Index). Wo das nicht
+  // bekannt ist, gilt die Kopie mit dem NIEDRIGSTEN Stempel als die, die
+  // ging — dieselbe, die die Level-Tore (Minimum) als waehlbar ansehen.
+
+  /** Normalisierte Stempelablage oder null (auch Altform migrieren). */
+  _letheStampStore(ps, create = false) {
+    if (!ps) return null;
+    let st = ps._letheStamps;
+    if (st && !(st.discard && typeof st.discard === 'object' && !Array.isArray(st.discard))) {
+      // Altform `{ [name]: [...] }` — als Ablage-Stempel uebernehmen,
+      // der Abgleich schneidet sie auf die wirklichen Vorkommen zu.
+      const alt = st;
+      st = { discard: {}, deleted: {} };
+      for (const [n, arr] of Object.entries(alt)) {
+        if (Array.isArray(arr)) st.discard[n] = arr.slice();
+      }
+      ps._letheStamps = st;
+    }
+    if (!st && create) st = ps._letheStamps = { discard: {}, deleted: {} };
+    if (st) { st.discard = st.discard || {}; st.deleted = st.deleted || {}; }
+    return st || null;
+  }
+
+  /** Creature-Vorkommen je Name in einem Stapel. */
+  _letheCreatureCounts(pile) {
+    const cardDB = this._getCardDB();
+    const counts = {};
+    for (const name of (pile || [])) {
+      const cd = cardDB[name];
+      if (!cd || cd.cardType !== 'Creature') continue;
+      counts[name] = (counts[name] || 0) + 1;
+    }
+    return counts;
+  }
+
   /**
-   * Reconcile `ps._letheStamps` against the COMBINED contents of both
-   * piles (discard + deleted). Per-name arrays are resized to the
-   * total occurrence count across both piles — keeping the highest
-   * stamps when shrinking (player-friendly: the unstamped occurrence
-   * is treated as the one that left) and padding with `0` when
-   * growing. Non-Creature pile entries are ignored entirely (per the
-   * card text: Creatures only). Called lazily from every stamp read/
-   * write so we don't have to intercept every pile mutation across
-   * the codebase. The unified model is what lets stamps survive a
-   * discard↔deleted move: the total occupancy count is unchanged, so
-   * no shrink fires.
-   *
+   * Stempel gegen die aktuellen Stapel abgleichen (s. Kopfkommentar).
+   * Gegangene Vorkommen verlieren ihren Stempel (niedrigster zuerst),
+   * neue beginnen bei 0 bzw. erben einen im selben Schritt aus dem
+   * anderen Stapel gegangenen Stempel gleichen Namens.
    * @param {object} ps - Player state.
    */
   _reconcileLetheStamps(ps) {
-    if (!ps) return;
-    if (!ps._letheStamps) ps._letheStamps = {};
-    const cardDB = this._getCardDB();
-    const counts = {};
-    const piles = [ps.discardPile || [], ps.deletedPile || []];
-    for (const pile of piles) {
-      for (const name of pile) {
-        const cd = cardDB[name];
-        if (!cd || cd.cardType !== 'Creature') continue;
-        counts[name] = (counts[name] || 0) + 1;
+    const st = this._letheStampStore(ps);
+    if (!st) return;
+    const PILES = { discard: ps.discardPile || [], deleted: ps.deletedPile || [] };
+    const counts = {
+      discard: this._letheCreatureCounts(PILES.discard),
+      deleted: this._letheCreatureCounts(PILES.deleted),
+    };
+    const gegangen = { discard: {}, deleted: {} };
+    for (const pile of ['discard', 'deleted']) {
+      for (const name of Object.keys(st[pile])) {
+        const arr = st[pile][name];
+        const want = counts[pile][name] || 0;
+        while (arr.length > want) {
+          let mi = 0;
+          for (let i = 1; i < arr.length; i++) if (arr[i] < arr[mi]) mi = i;
+          (gegangen[pile][name] = gegangen[pile][name] || []).push(arr.splice(mi, 1)[0]);
+        }
       }
     }
-    const stamps = ps._letheStamps;
-    for (const name of Object.keys(stamps)) {
-      const want = counts[name] || 0;
-      if (want === 0) { delete stamps[name]; continue; }
-      if (stamps[name].length > want) {
-        // Keep highest-stamp entries when shrinking.
-        stamps[name].sort((a, b) => b - a);
-        stamps[name] = stamps[name].slice(0, want);
+    for (const pile of ['discard', 'deleted']) {
+      const anderer = pile === 'discard' ? 'deleted' : 'discard';
+      for (const name of Object.keys(counts[pile])) {
+        const want = counts[pile][name];
+        const arr = st[pile][name] || [];
+        const herueber = gegangen[anderer][name] || [];
+        herueber.sort((a, b) => a - b);
+        while (arr.length < want) arr.push(herueber.length ? herueber.pop() : 0);
+        st[pile][name] = arr;
+      }
+      // Reine Nullen tragen nichts — weg damit (Nullen sind der Normalfall).
+      for (const name of Object.keys(st[pile])) {
+        if (!st[pile][name].some(v => v > 0)) delete st[pile][name];
       }
     }
-    for (const name of Object.keys(counts)) {
-      if (!stamps[name]) stamps[name] = [];
-      while (stamps[name].length < counts[name]) stamps[name].push(0);
+    if (!Object.keys(st.discard).length && !Object.keys(st.deleted).length) {
+      delete ps._letheStamps;
     }
   }
 
   /**
-   * Highest stamp on any current pile occurrence of `cardName` across
-   * either of `playerIdx`'s piles. Returns 0 when there is none.
+   * Lethe-Aufschlag fuer `cardName` in den Stapeln von `playerIdx`. Die
+   * Stapel werden nach Namen gewaehlt — waehlbar ist also die Kopie mit
+   * dem NIEDRIGSTEN Stempel (eine frisch abgelegte Kopie hat 0). `pile`
+   * ('discard' | 'deleted') grenzt auf einen Stapel ein, sonst beide.
    */
-  _getLetheStampBonus(playerIdx, cardName) {
+  _getLetheStampBonus(playerIdx, cardName, pile = null) {
     const ps = this.gs.players[playerIdx];
-    if (!ps || !cardName) return 0;
-    if (!ps._letheStamps) return 0;
+    if (!ps || !cardName || !ps._letheStamps) return 0;
     this._reconcileLetheStamps(ps);
-    const arr = ps._letheStamps[cardName];
-    if (!arr || arr.length === 0) return 0;
-    let best = 0;
-    for (const v of arr) if (v > best) best = v;
-    return best;
+    const st = this._letheStampStore(ps);
+    if (!st) return 0;
+    const stapel = (pile === 'discard' || pile === 'deleted') ? [pile] : ['discard', 'deleted'];
+    let best = null;
+    for (const p of stapel) {
+      const n = this._letheCreatureCounts(p === 'discard' ? ps.discardPile : ps.deletedPile)[cardName] || 0;
+      if (n === 0) continue;
+      const arr = st[p][cardName] || [];
+      for (let k = 0; k < n; k++) {
+        const v = arr[k] || 0;
+        if (best == null || v < best) best = v;
+      }
+    }
+    return best || 0;
   }
 
   /**
-   * Consume one Lethe stamp on `cardName` for `playerIdx`. Called by
-   * every revival path (Necromancy, Forceful Revival, Reincarnation,
-   * Xuanwu, …) AFTER it splices the Creature out of its pile but
-   * BEFORE reconciliation. The HIGHEST stamp leaves with the revived
-   * Creature so the player gets the value they see on the badge, and
-   * the remaining same-named copies in the piles keep their (lower or
-   * equal) stamps intact. Returns the consumed stamp (or 0 if none).
-   * Caller is responsible for stashing the return value onto the new
-   * board instance (`inst.counters._letheLevelBonus = stamp`) so the
-   * bonus follows the Creature onto the board.
+   * Stempel je Stapelplatz fuer den Client:
+   * `{ discard: [s0, s1, …], deleted: […] }` parallel zu den Stapeln,
+   * oder null, wenn nichts gestempelt ist.
+   */
+  getLetheStampView(playerIdx) {
+    const ps = this.gs.players[playerIdx];
+    if (!ps?._letheStamps) return null;
+    this._reconcileLetheStamps(ps);
+    const st = this._letheStampStore(ps);
+    if (!st) return null;
+    const view = {};
+    for (const pile of ['discard', 'deleted']) {
+      const seen = {};
+      view[pile] = ((pile === 'discard' ? ps.discardPile : ps.deletedPile) || []).map(name => {
+        const k = seen[name] = (seen[name] ?? -1) + 1;
+        return st[pile][name]?.[k] || 0;
+      });
+    }
+    return view;
+  }
+
+  /**
+   * Stapelplatz der Kopie von `cardName` mit dem niedrigsten Stempel —
+   * fuer Entnahmen nach NAMEN, damit sie dieselbe Kopie treffen, die die
+   * Level-Tore als waehlbar gesehen haben. -1, wenn nicht vorhanden.
+   */
+  _letheLowestStampIdx(ps, pile, cardName) {
+    const arr = pile === 'discard' ? ps?.discardPile : pile === 'deleted' ? ps?.deletedPile : null;
+    if (!arr) return -1;
+    const first = arr.indexOf(cardName);
+    if (first < 0 || !ps._letheStamps) return first;
+    this._reconcileLetheStamps(ps);
+    const stamps = this._letheStampStore(ps)?.[pile]?.[cardName];
+    if (!stamps) return first;
+    let bestIdx = first, bestVal = Infinity, k = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] !== cardName) continue;
+      const v = stamps[k++] || 0;
+      if (v < bestVal) { bestVal = v; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+
+  /**
+   * Von `_takeFromPileCore` VOR dem Splice gerufen: den Stempel genau
+   * dieses Stapelplatzes herausnehmen und fuer `consumeLetheStamp`
+   * bereitlegen (die Entnahme kennt den Index, der Abgleich nicht).
+   */
+  _letheTakeAt(ps, pile, idx) {
+    if (!ps?._letheStamps || (pile !== 'discard' && pile !== 'deleted')) return;
+    this._reconcileLetheStamps(ps);
+    const st = this._letheStampStore(ps);
+    const arr = pile === 'discard' ? ps.discardPile : ps.deletedPile;
+    const name = arr?.[idx];
+    if (!st || !name) return;
+    let k = 0;
+    for (let i = 0; i < idx; i++) if (arr[i] === name) k++;
+    const stamps = st[pile][name];
+    const stamp = stamps && k < stamps.length ? stamps.splice(k, 1)[0] : 0;
+    if (stamps && !stamps.some(v => v > 0)) delete st[pile][name];
+    ps._letheTaken = { pile, name, stamp: stamp || 0 };
+  }
+
+  /**
+   * Consume the Lethe stamp of a Creature that just LEFT a pile for the
+   * board. Called by every revival path AFTER it took the Creature out.
+   * Went it through `takeFromPile`, the exact stamp of that pile slot is
+   * waiting; otherwise the pile that is one short gives up its LOWEST
+   * stamp (s. Kopfkommentar). Returns the consumed stamp (or 0). Caller
+   * stashes it onto the new board instance
+   * (`inst.counters._letheLevelBonus = stamp`).
    */
   consumeLetheStamp(playerIdx, cardName) {
     const ps = this.gs.players[playerIdx];
     if (!ps || !cardName) return 0;
-    if (!ps._letheStamps) return 0;
-    const arr = ps._letheStamps[cardName];
-    if (!Array.isArray(arr) || arr.length === 0) return 0;
-    // Pop the highest entry — the revival took the most-stamped copy.
-    arr.sort((a, b) => b - a);
-    const consumed = arr.shift() || 0;
-    if (arr.length === 0) delete ps._letheStamps[cardName];
-    return consumed;
+    const taken = ps._letheTaken;
+    delete ps._letheTaken;
+    if (taken && taken.name === cardName) return taken.stamp || 0;
+    const st = this._letheStampStore(ps);
+    if (!st) return 0;
+    for (const pile of ['discard', 'deleted']) {
+      const stamps = st[pile][cardName];
+      if (!stamps) continue;
+      const n = this._letheCreatureCounts(pile === 'discard' ? ps.discardPile : ps.deletedPile)[cardName] || 0;
+      if (stamps.length <= n) continue;
+      let mi = 0;
+      for (let i = 1; i < stamps.length; i++) if (stamps[i] < stamps[mi]) mi = i;
+      const consumed = stamps.splice(mi, 1)[0] || 0;
+      this._reconcileLetheStamps(ps);
+      return consumed;
+    }
+    return 0;
   }
 
   /**
-   * Apply a Lethe stamp wave: +1 to every existing Creature occurrence
-   * across BOTH of `playerIdx`'s piles. Fired by Lethe after each of
-   * her own Necromancy resolutions. Reconciles first so newly-arrived
-   * Creatures (without stamps yet) start at 0 and then receive their
-   * first +1 from this wave.
+   * Apply a Lethe stamp wave: +1 to every Creature occurrence CURRENTLY
+   * in either of `playerIdx`'s piles. Fired by Lethe after each of her
+   * own Necromancy resolutions. Creatures that arrive later start at 0.
    */
   applyLetheStampWave(playerIdx) {
     const ps = this.gs.players[playerIdx];
     if (!ps) return;
-    if (!ps._letheStamps) ps._letheStamps = {};
     this._reconcileLetheStamps(ps);
-    const stamps = ps._letheStamps;
-    for (const name of Object.keys(stamps)) {
-      for (let i = 0; i < stamps[name].length; i++) stamps[name][i] += 1;
+    const st = this._letheStampStore(ps, true);
+    for (const pile of ['discard', 'deleted']) {
+      const counts = this._letheCreatureCounts(pile === 'discard' ? ps.discardPile : ps.deletedPile);
+      for (const [name, n] of Object.entries(counts)) {
+        const arr = st[pile][name] || (st[pile][name] = []);
+        while (arr.length < n) arr.push(0);
+        for (let i = 0; i < arr.length; i++) arr[i] += 1;
+      }
     }
+    if (!Object.keys(st.discard).length && !Object.keys(st.deleted).length) delete ps._letheStamps;
   }
 
   /**
@@ -44524,6 +44700,14 @@ this._deathWatch = (this._deathWatchStack || []).length
     // it, and MCTS rollouts that call sync() should count as progress too.
     this._hookProgressTick = (this._hookProgressTick || 0) + 1;
     this._refreshAscensionReadiness();
+    // v1443: Lethe-Stempel je Karte — bei jedem Abgleich nachziehen, damit
+    // eine gegangene und wiedergekommene Karte nicht den alten Stempel
+    // erbt. Kostet nichts, solange niemand gestempelt ist.
+    for (const _lps of (this.gs.players || [])) {
+      if (!_lps) continue;
+      delete _lps._letheTaken;
+      if (_lps._letheStamps) this._reconcileLetheStamps(_lps);
+    }
     // Re-apply Weakening Crystal's negation aura before every state
     // push. Runs in fast mode too — MCTS rollouts need the negated
     // status visible to the hook gates so a simulated Hero with a

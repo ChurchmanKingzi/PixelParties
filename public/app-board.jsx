@@ -169,6 +169,30 @@ function setBoardTooltip(card) {
   window._boardTooltipSetter?.(card);
 }
 
+// ★ v1443 (Als Befund 26.9.): WORAUF reagiert eine Karte gerade? Prompts
+// von Reaktionen (Skeleton Demon, Cool Rescuer Monia) tragen die
+// ausloesende Karte als `triggerCardName` — sie steht LINKS im Panel mit
+// der Zeile „Triggered by", rechts bleibt die reagierende Karte selbst.
+function TriggerCardSlot({ name }) {
+  const data = name ? CARDS_BY_NAME[name] : null;
+  if (!data) return null;
+  const img = cardImageUrl(name);
+  return (
+    <div style={{ width: 90, flexShrink: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ fontSize: 9, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1 }}>Triggered by</div>
+      <div className="board-card" style={{ width: 90, minHeight: 120, borderRadius: 6, overflow: 'hidden', border: '2px solid var(--bg4)', background: 'var(--bg3)' }}
+        onMouseEnter={() => { _boardTooltipLocked = true; setBoardTooltip(data); }}
+        onMouseLeave={() => { _boardTooltipLocked = false; setBoardTooltip(null); }}>
+        {img ? (
+          <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center', fontSize: 11, color: 'var(--text2)' }}>{name}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 // ── Rusting Crystal / BGG cost helpers ───────────────────────
 // Mirror of `applyRustingCrystalCostMultiplier` in server.js so the
@@ -367,16 +391,14 @@ function BoardZone({ type, cards, label, faceDown, flipped, stackLabel, children
   const topCardName = cards && cards.length > 0 && !faceDown ? cards[cards.length - 1] : null;
   const suppressChildTooltip = !!onClick && !!onHoverCard;
   // For discard/deleted zones, the top card's effective level is the
-  // base printed level plus the max Lethe stamp on any copy of that
-  // name in the owner's combined piles. The same value `effectiveCardLevel`
-  // uses, so the player sees exactly what the revival gates will see.
+  // base printed level plus the Lethe stamp of THAT pile slot (v1443:
+  // `ownerLetheStamps = { discard: [...], deleted: [...] }`, ein Eintrag
+  // je Stapelplatz — eine spaeter abgelegte Kopie hat ihren eigenen Wert).
   const topLevelInfo = (() => {
     if (!topCardName || (type !== 'discard' && type !== 'deleted')) return null;
     const cd = CARDS_BY_NAME[topCardName];
     if (!cd || cd.cardType !== 'Creature' || cd.level == null) return null;
-    const arr = ownerLetheStamps?.[topCardName];
-    let stamp = 0;
-    if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
+    const stamp = ownerLetheStamps?.[type]?.[cards.length - 1] || 0;
     return { effectiveLevel: (cd.level || 0) + stamp, stampBonus: stamp };
   })();
   // BoardZone-level hover dispatch. The shared pile-hover tooltip
@@ -22150,15 +22172,10 @@ function PileSearchModal({ title, cards, onClose, preserveOrder = false, ownerLe
                 const eintrag = entries?.[idx] || null;
                 // Lethe per-pile stamp lookup — when the modal was
                 // opened on a pile, the caller threads the owner's
-                // `letheStamps` map. Max stamp on any current
-                // occurrence of this name is what `effectiveCardLevel`
-                // uses, so the badge matches the engine's gates.
+                // stamps for THIS pile, one entry per pile slot (v1443:
+                // pro Karte, nicht mehr das Maximum ueber den Namen).
                 const isCreature = card.cardType === 'Creature' && card.level != null;
-                let stamp = 0;
-                if (isCreature && ownerLetheStamps) {
-                  const arr = ownerLetheStamps[name];
-                  if (Array.isArray(arr)) for (const v of arr) if (v > stamp) stamp = v;
-                }
+                const stamp = (isCreature && ownerLetheStamps?.[idx]) || 0;
                 const effectiveLevel = isCreature ? (card.level || 0) + stamp : null;
                 const displayCard = stamp > 0
                   ? { ...card, level: effectiveLevel, _liveLevel: effectiveLevel, _stampBonus: stamp }
@@ -23399,8 +23416,12 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
   }, [result, iWon, isSpectator, tutorialOutroPending, gameState?.isTutorial, gameState?.isPuzzle, setBgmMode]);
 
   // ── Shared board tooltip (single instance, driven by BoardCard/CardRevealEntry) ──
+  // v1443 (Als Befund 26.9.): `.bday-present-reveal-card` gehoert dazu —
+  // die Aufdeck-Karten von Timeless King Zi / Birthday Present sind keine
+  // `.board-card`, und die 300-ms-Sicherung in `useCardTooltip` raeumte
+  // ihren Tooltip deshalb sofort wieder ab.
   const { tooltipCard, setTooltipCard } = useCardTooltip({
-    hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover',
+    hoverSelectors: '.board-card:hover, .card-reveal-entry:hover, .card-mini:hover, .card-name-picker-row:hover, .revealed-hand-card:hover, .status-badge:hover, .buff-icon:hover, .option-tooltip-hover:hover, .bday-present-reveal-card:hover',
   });
 
   // ── Phasenleiste auf die optische Naht des Spielfelds setzen ───────
@@ -42178,15 +42199,15 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           })()}
           <div className="board-util board-util-left">
             <div className="board-util-side">
-              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
-              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
+              <div data-opp-discard="1"><BoardZone type="discard" cards={ablageSicht(opp.discardPile, oppIdx, oppDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'Opponent Discard', pile: 'discard', cards: opp.discardPile, ownerIdx: oppIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={oppBoardZone('discard')} ownerLetheStamps={opp.letheStamps} pileIdentities={opp.discardEntries} /></div>
+              <div data-opp-deleted="1"><BoardZone type="deleted" cards={oppDeletedHidden > 0 ? opp.deletedPile.slice(0, -oppDeletedHidden) : opp.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'Opponent Deleted', pile: 'deleted', cards: opp.deletedPile, ownerIdx: oppIdx })} onHoverCard={setHoveredPileCard} style={oppBoardZone('delete')} ownerLetheStamps={opp.letheStamps} /></div>
               <div className="board-util-spacer" />
             </div>
             <div className="board-util-mid" />
             <div className="board-util-side">
               <div className="board-util-spacer" />
-              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
-              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
+              <div data-my-deleted="1"><BoardZone type="deleted" cards={myDeletedHidden > 0 ? me.deletedPile.slice(0, -myDeletedHidden) : me.deletedPile} label="Deleted" onClick={() => setPileViewer({ title: 'My Deleted', pile: 'deleted', cards: me.deletedPile, ownerIdx: myIdx })} onHoverCard={setHoveredPileCard} style={myBoardZone('delete')} ownerLetheStamps={me.letheStamps} /></div>
+              <div data-my-discard="1"><BoardZone type="discard" cards={ablageSicht(me.discardPile, myIdx, myDiscardHidden)} label="Discard" onClick={() => setPileViewer({ title: 'My Discard', pile: 'discard', cards: me.discardPile, ownerIdx: myIdx, isDiscard: true })} onHoverCard={setHoveredPileCard} style={myBoardZone('discard')} ownerLetheStamps={me.letheStamps} pileIdentities={me.discardEntries}
                 /* Liegt etwas Benutzbares in der Ablage (Future Tech
                    Prototypes), leuchtet der STAPEL — sonst muesste man
                    ihn jede Runde aufklappen, um nachzusehen. Das
@@ -44367,8 +44388,8 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
           title={pileViewer.title}
           cards={pileViewer.cards || []}
           preserveOrder={pileViewer.preserveOrder}
-          ownerLetheStamps={pileViewer.ownerIdx != null
-            ? (gameState.players?.[pileViewer.ownerIdx]?.letheStamps || null)
+          ownerLetheStamps={pileViewer.ownerIdx != null && pileViewer.pile
+            ? (gameState.players?.[pileViewer.ownerIdx]?.letheStamps?.[pileViewer.pile] || null)
             : null}
           // ★ Ein Eintrag je Stapelplatz — trägt Identität und
           //   Benutzbarkeit der EINZELNEN Karte. Nur für Ablagen; der
@@ -44485,6 +44506,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* ── Effect Prompt: Option Picker (generic multi-option) ── */}
       {isMyEffectPrompt && ep.type === 'optionPicker' && (
         <DraggablePanel className="first-choice-panel animate-in" style={{ borderColor: 'var(--accent)', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <TriggerCardSlot name={ep.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="orbit-font" style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>{ep.title || 'Choose'}</div>
           {ep.description && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{ep.description}</div>}
@@ -44629,15 +44651,24 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         // revival cost. Source is `entry.source`; ownership is implicit
         // (own piles only — every live caller passes the activator's
         // side). Stamps are Creature-only by spec.
+        // v1443: Stempel je Stapelplatz. Die Galerie waehlt nach Namen —
+        // waehlbar ist die Kopie mit dem NIEDRIGSTEN Stempel (so rechnet
+        // auch der Server: `_getLetheStampBonus`).
         const myStamps = (gameState?.players?.[myIdx]?.letheStamps) || {};
+        const myMe = gameState?.players?.[myIdx] || {};
         const stampForEntry = (entry, cardData) => {
           if (!cardData || cardData.cardType !== 'Creature') return 0;
           if (entry.source !== 'discard' && entry.source !== 'deleted') return 0;
-          const arr = myStamps[entry.name];
-          if (!arr || !arr.length) return 0;
-          let m = 0;
-          for (const v of arr) if (v > m) m = v;
-          return m;
+          const pile = entry.source === 'discard' ? myMe.discardPile : myMe.deletedPile;
+          const arr = myStamps[entry.source];
+          if (!Array.isArray(pile) || !Array.isArray(arr)) return 0;
+          let m = null;
+          pile.forEach((n, i) => {
+            if (n !== entry.name) return;
+            const v = arr[i] || 0;
+            if (m == null || v < m) m = v;
+          });
+          return m || 0;
         };
         const effectiveLevelFor = (entry, cardData) => {
           if (!cardData || cardData.cardType !== 'Creature' || cardData.level == null) return null;
@@ -45507,6 +45538,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
       {/* Potion/Artifact targeting panel */}
       {!isSpectator && isTargeting && pt && !gameState.effectPrompt && (
         <DraggablePanel className="first-choice-panel" style={{ borderColor: 'var(--danger)', animation: 'fadeIn .2s ease-out', display: 'flex', gap: 16, alignItems: 'stretch' }}>
+          <TriggerCardSlot name={pt.config?.triggerCardName} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="pixel-font" style={{ fontSize: 12, color: pt.config?.goldSelect ? '#ffd700' : pt.config?.greenSelect ? '#33dd55' : 'var(--danger)', marginBottom: 8 }}>{pt.potionName}</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>{pt.config?.description || 'Select targets'}</div>

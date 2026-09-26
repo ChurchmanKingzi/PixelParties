@@ -4218,13 +4218,13 @@ function sendGameState(room, playerIdx, extra) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, pi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(pi) : [],
-      // Lethe per-pile +1 stamps — `{ [cardName]: [stampCount, ...] }`
-      // sized to combined discard+deleted occurrences. Forwarded to the
-      // client so pile-viewer / cardGallery / BoardCard renderings can
+      // Lethe per-pile +1 stamps — `{ discard: [s, …], deleted: [s, …] }`,
+      // ein Eintrag je STAPELPLATZ (v1443: pro Karte, nicht pro Name).
+      // Forwarded to the client so pile-viewer / cardGallery / BoardCard renderings can
       // surface the effective level on stamped Creatures. Shared with
       // both sides (no hidden-info concern: stamps are derived from
       // public actions — every Lethe Necromancy resolution is logged).
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(pi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
@@ -5220,7 +5220,7 @@ function sendSpectatorGameState(room) {
       discardIdentities: require('./cards/effects/_future-tech-shared')
         .ablageIdentitaeten(gs, spi),
       discardEntries: room.engine ? room.engine.getDiscardEntries(spi) : [],
-      letheStamps: ps._letheStamps || {},
+      letheStamps: (room.engine && room.engine.getLetheStampView(spi)) || {},
       disconnected: ps.disconnected || false, left: ps.left || false,
       // Gold display can be temporarily frozen for cost-bypass flows
       // (Swagdri's free-play of an X-cost Artifact bumps gold by a
