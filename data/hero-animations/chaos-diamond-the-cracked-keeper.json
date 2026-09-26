@@ -1,0 +1,10 @@
+{
+  "hero": "Chaos-Diamond, the Cracked Keeper",
+  "sheet": "chaos-diamond-the-cracked-keeper.png",
+  "frameWidth": 48,
+  "frameHeight": 55,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal"
+}
