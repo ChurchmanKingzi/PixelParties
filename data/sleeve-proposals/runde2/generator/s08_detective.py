@@ -1,29 +1,42 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Ermittlungswand von Great Detective Doq – Fotos der Verdächtigen (Kartenausschnitte),
-verbunden mit rotem Faden (Farben des Crimson-Skull-Spider-Fadens), Doqs Lupe vergrößert einen Ausschnitt.
-Wand: Ziegel aus „Great Detective Doq“."""
+"""Sleeve: Ermittlungswand von Great Detective Doq – Fotos der Verdächtigen, verbunden mit rotem Faden
+(Farben des Crimson-Skull-Spider-Fadens), Doqs Lupe vergrößert einen Ausschnitt.
+Fotos, Ziegelwand und Lupe stammen pixelgenau aus den „Sichtbar“-Szenen bzw. Ebenen der xcf-Dateien
+(Repo PixelPartiesSprites); die Szenen wurden per Bildabgleich mit den Kartenbildern gefunden."""
 import numpy as np
 from kit import *
+from xcfkit import scene_sprite, sprite, part_at
+
+# Karte -> (xcf-Datei, Szenen-Ebene, linke obere Ecke des Kartenbilds in der Szene)
+SCENES = {
+    'Great Detective Doq': ('Motive', 109, (100, 160)),
+    'Kaito Sid the Phantom Thief': ('Motive', 849, (259, 98)),
+    'Rakah the Loan Shark': ('MotiveDeepsea', 46, (204, 156)),
+    'Devlin the Masked Butcher': ('MotiveGrailWar', 182, (207, 148)),
+    'Criminal Monkee': ('MotiveIndia', 26, (122, 366)),
+    'Black Marketeer': ('MotiveMoe', 590, (166, 277)),
+}
+def scene(card, box, key):
+    b, s, loc = SCENES[card]
+    return scene_sprite(key, b, s, loc, box)
 
 cv = Canvas(W, H)
-doq = nat('Great Detective Doq')
-tile = doq[2:10, 14:30]
+tile = scene('Great Detective Doq', (14, 2, 30, 10), 'mo_doq_wall')[..., :3]
 T2 = up(np.dstack([tile, np.full(tile.shape[:2], 255, np.uint8)]), 2)
 fill_tiles(cv, hsv_shift(T2, 0, 0.9, 0.78))
 vignette(cv, 0.55, 0.35)
 
 PAPER = (236, 230, 214); PAPER_S = (190, 180, 160); INK = (40, 30, 30)
 photos = [  # (Karte, Ausschnitt, Position, Beschriftung)
-    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (14, 14), 'PHANTOM THIEF'),
-    ('Rakah the Loan Shark', (12, 8, 58, 40), (140, 34), 'LOAN SHARK'),
-    ('Devlin the Masked Butcher', (24, 3, 68, 35), (10, 140), 'THE BUTCHER'),
-    ('Criminal Monkee', (8, 9, 52, 43), (142, 152), 'MONKEE'),
-    ('Black Marketeer', (16, 10, 56, 44), (62, 250), 'MARKETEER'),
+    ('Kaito Sid the Phantom Thief', (24, 2, 64, 36), (14, 14), 'photo_kaito'),
+    ('Rakah the Loan Shark', (12, 8, 58, 40), (140, 34), 'photo_rakah'),
+    ('Devlin the Masked Butcher', (24, 3, 68, 35), (10, 140), 'photo_devlin'),
+    ('Criminal Monkee', (8, 9, 52, 43), (142, 152), 'photo_monkee'),
+    ('Black Marketeer', (16, 10, 56, 44), (62, 250), 'photo_marketeer'),
 ]
 boxes = []
-for n, b, (px, py), cap in photos:
-    a = nat(n)[b[1]:b[3], b[0]:b[2]]
-    img = up(np.dstack([a, np.full(a.shape[:2], 255, np.uint8)]), 2)
+for n, b, (px, py), key in photos:
+    img = up(scene(n, b, key), 2)
     h, w = img.shape[:2]
     fw, fh = w + 8, h + 16
     cv.paste(silhouette(np.full((fh, fw, 4), 255, np.uint8), (0, 0, 0)), px + 3, py + 3, alpha=0.45)
@@ -47,11 +60,24 @@ for a, b in [(0, 1), (0, 2), (1, 3), (2, 3), (2, 4), (3, 4), (0, 3)]:
 for (x, y) in pins:
     cv.rect(x - 3, y - 3, x + 4, y + 4, (60, 0, 0)); cv.rect(x - 2, y - 2, x + 3, y + 3, (190, 20, 10)); cv.px(x - 1, y - 1, (255, 170, 150))
 
-# Doqs Lupe (Ring aus der Karte, links gespiegelt ergänzt) über dem Monkee-Foto
-def bluerule(c):
-    h = hsv_of(c); return (h[..., 0] > 136) & (h[..., 0] < 168) & (h[..., 1] > 180)
-lupe = cutrule('Great Detective Doq', (27, 13, 50, 36), lambda c: bluerule(c) | (c.min(-1) > 215), largest=1)
-full = lupe
+# Doqs Lupe (Ebene „Doq“ aus Motive.xcf): Ring aus der linken, unverdeckten Hälfte gespiegelt ergänzt, Griff original
+doq = part_at(sprite('mo_doq_layer', 'Motive', [1437]), 8, 10).astype(int)
+r_, g_, b_ = doq[..., 0], doq[..., 1], doq[..., 2]
+yy, xx = np.mgrid[:doq.shape[0], :doq.shape[1]]
+ringm = (b_ > r_ + 30) & (b_ > g_) & (doq[..., 3] > 0) & (xx <= 6) & (yy <= 16)
+ringm[:, :7] |= ringm[:, :7]                                   # linke Hälfte (Spalten 0–6)
+ringm = ringm | np.pad(ringm[:, :6][:, ::-1], ((0, 0), (7, doq.shape[1] - 13)))[:, :doq.shape[1]]
+ringm &= ((xx - 6) ** 2 + (yy - 9.5) ** 2) > 4.2 ** 2        # Glasinneres frei lassen
+band = (np.abs(xx - yy + 1) <= 2) & (xx >= 12) & (yy >= 14)
+handm = band & (((b_ > r_ + 20) | (doq[..., :3].min(-1) > 150)) & (doq[..., 3] > 0))
+full = np.zeros(doq.shape, np.uint8); full[..., :3] = doq[..., :3]; full[..., 3] = (ringm | handm) * 255
+# Griff dort, wo Doqs Hand ihn verdeckt, mit dem sichtbaren Griffstück (4 px weiter unten) ergänzen
+for y in range(18, 13, -1):
+    for x in range(11, doq.shape[1] - 4):
+        if not full[y, x, 3] and y + 4 < doq.shape[0] and full[y + 4, x + 4, 3] and x - y >= -3:
+            full[y, x] = full[y + 4, x + 4]
+_n, _lab, _st, _ = cv2.connectedComponentsWithStats((full[..., 3] > 0).astype(np.uint8), connectivity=8)
+full[..., 3] = (_lab == 1 + int(np.argmax(_st[1:, cv2.CC_STAT_AREA]))) * 255
 K = 5
 R = up(full, K)
 ys, xs = np.where(full[:15, :15, 3] > 0)

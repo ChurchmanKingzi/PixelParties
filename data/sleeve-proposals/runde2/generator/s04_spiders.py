@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Sleeve: Spinnennest – das Netz aus „Trapping“ (Viertel gespiegelt, gedreht), die Crimson Skull
-Spider am roten Faden, dazu Baby-, Brain-, Diamond- und Cute Spider. Höhlenboden aus „Spider Hive“."""
+"""Sleeve: Spinnennest – das Netz aus „Trapping“ (Viertel gespiegelt, gedreht), darin die Spinnen direkt
+aus den Ebenen von MotiveGN.xcf (Repo PixelPartiesSprites): Crimson Skull Spider am roten Faden, Brain-,
+Diamond- und Cute Spider, kleine Spinnen aus „Spider Hive“. Felsboden: Ebene „Klippen“."""
 import numpy as np
 from kit import *
+from xcfkit import sprite, parts
 
+G = 'MotiveGN'
 cv = Canvas(W, H)
-# --- Höhlenboden: Spider Hive, Spinnen/Netze herausretuschiert, gespiegelt gekachelt, abgedunkelt
-hv = nat('Spider Hive')
-m = not_dirt(hv.astype(int))
-m = cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
-hv = inpaint_h(hv, m)
-t = np.concatenate([hv, hv[:, ::-1]], 1); t = np.concatenate([t, t[::-1]], 0)
-tile = hsv_shift(up(np.dstack([t, np.full(t.shape[:2], 255, np.uint8)]), 2), 0, 0.95, 0.68)
-fill_tiles(cv, tile, ox=30, oy=20)
+# --- Felsboden der Spinnenkarten (Ebene „Klippen“), 2×, abgedunkelt
+kl = sprite('gn_klippen', G, [421])
+band = kl[150:240, 100:225]                          # Felsband ohne Büsche
+bg = up(np.concatenate([band[::-1], band], 0)[:175], 2)
+cv.a[:] = hsv_shift(bg, 0, 0.95, 0.62)[..., :3]
 vignette(cv, 0.8, 0.3)
 
 # --- Netz: oberes linkes Viertel aus Trapping, zu vollem Rad gespiegelt, um 90° gedreht, 5×
@@ -36,21 +36,13 @@ for y in range(fh):
             cv.rect(ox + x * K, oy + y * K, ox + x * K + K, oy + y * K + K, WEB)
 HX, HY = ox + 25 * K + K // 2, oy + 38 * K + K // 2   # Nabe
 
-# --- Spinnen
-def sp(n, box, clear=()):
-    return fill_holes(cutrule(n, box, not_dirt, clear=clear))
-boss = cutrule('Crimson Skull Spider', (26, 12, 51, 41),
-               lambda c: ((c.max(-1) < 115) & ((c.max(-1) - c.min(-1)) < 38)) |
-                         ((c[..., 0] > 2.2 * c[..., 1]) & (c[..., 0] > 40) & (c[..., 0] > 2.2 * c[..., 2])),
-               clear=[(26, 12, 32, 17)])
-boss = fill_holes(boss)
-_r = (boss[:6, :, 0].astype(int) > 2 * boss[:6, :, 1].astype(int) + 20) & (boss[:6, :, 3] > 0)
-THREAD_X = int(np.argmax(_r.sum(0)))   # Spalte des roten Fadens
-baby = sp('Crimson Skull Spider', (51, 27, 68, 38))
-baby2 = sp('Crimson Skull Spider', (20, 9, 34, 18))
-brain = sp('Brain Spider', (27, 17, 46, 36))
-dia = sp('Diamond Spider', (27, 15, 45, 34))
-cute = sp('Cute Spider', (27, 11, 52, 34), clear=[(27, 11, 52, 14)])
+# --- Spinnen (xcf-Ebenen)
+boss = sprite('gn_crimson_skull_spider', G, [259])      # mit rotem Faden
+brain = sprite('gn_brain_spider', G, [251])             # mit weißem Faden
+dia = sprite('gn_diamond_spider', G, [260])
+cute = sprite('gn_cute_spider', G, [264, 265, 266])     # Flügel + Körper + Herzaugen
+hive = [p for p in parts(sprite('gn_spodders', G, [267]), dil=1) if p.shape[0] >= 8 and p.shape[1] >= 10]
+baby, baby2 = hive[0], hive[5]
 
 def put(s, x, y, k, fl=False, r=0, sh=(3, 3)):
     s2 = up(rot90(flip(s) if fl else s, r), k)
@@ -58,20 +50,30 @@ def put(s, x, y, k, fl=False, r=0, sh=(3, 3)):
     cv.paste(s2, x, y)
     return s2
 
-# roter Faden der Crimson Skull Spider (Farben vom Kartenfaden) von oben bis zur Nabe
+# Crimson Skull Spider an der Nabe; ihr Faden (Kartenpixel) wird nach oben bis zum Rand verlängert
 B = up(boss, 5)
-bx = HX - B.shape[1] // 2; by = HY - B.shape[0] // 2 + 6
-TH = [(149, 5, 3), (112, 2, 0)]
-tx = bx + THREAD_X * 5
-for y in range(0, by + 5):
-    cv.rect(tx, y, tx + 5, y + 1, TH[(y // 5) % 2])
+tcol = int(np.argmax(boss[0, :, 3] > 0))
+bx = HX - B.shape[1] // 2; by = HY - B.shape[0] + 12 * 5
+thread = up(boss[0:4, tcol:tcol + 1], 5)
+y = by
+while y > 0:
+    y -= thread.shape[0]; cv.paste(thread, bx + tcol * 5, y)
 cv.paste(silhouette(B, (0, 0, 0)), bx + 4, by + 4, alpha=0.5)
 cv.paste(B, bx, by)
 
-put(baby, 26, 40, 3); put(baby2, 190, 70, 3, True, 1); put(baby, 186, 250, 3, False, 2); put(baby2, 30, 300, 3, False, 3)
-put(dia, 28, 150, 3, r=1); put(brain, 176, 146, 3, True); put(dia, 100, 290, 3, True)
-put(cute, 150, 20, 3, r=0)
-put(baby, 120, 24, 2, r=1); put(baby2, 60, 226, 2); put(baby, 210, 320, 2, r=3)
+def hang(s, x, y, k):
+    """Spinne mit eigenem Faden; Faden (oberste Pixelzeilen) bis zum oberen Rand verlängern."""
+    S = up(s, k); col = int(np.argmax(s[0, :, 3] > 0))
+    seg = up(s[0:2, col:col + 1], k); yy = y
+    while yy > 0:
+        yy -= seg.shape[0]; cv.paste(seg, x + col * k, yy)
+    cv.paste(silhouette(S, (0, 0, 0)), x + 3, y + 3, alpha=0.45); cv.paste(S, x, y)
+
+hang(brain, 186, 30, 3)
+put(cute, 14, 18, 3)
+put(dia, 24, 168, 3, r=1); put(dia, 196, 214, 3, r=3)
+put(baby, 110, 30, 3); put(baby2, 30, 110, 3, True, 1); put(baby, 190, 300, 3, False, 2); put(baby2, 26, 296, 3, False, 3)
+put(hive[2], 120, 300, 3); put(hive[8], 210, 176, 2, r=1); put(hive[3], 70, 250, 2); put(hive[9], 140, 110, 2, r=3)
 
 for i, c in enumerate([(20, 12, 8), (120, 0, 0), (170, 10, 5), (20, 12, 8)]):
     cv.a[i, :] = c; cv.a[-1 - i, :] = c; cv.a[:, i] = c; cv.a[:, -1 - i] = c
