@@ -182,46 +182,83 @@ SUIT = [(8, 8, 20), (18, 16, 40), (30, 28, 64), (46, 44, 92), (70, 70, 126)]
 VIS = [(34, 34, 46), (70, 70, 88), (116, 116, 136), (172, 172, 192), (224, 224, 236)]
 SCARF = [(40, 14, 70), (74, 30, 130), (112, 56, 190), (156, 100, 236), (206, 170, 255)]
 
-f = Fig(W, H)
+# Figur in Grundkoordinaten entworfen, dann um den Rumpf skaliert (K) und leicht nach vorn geneigt (ROT)
+K = 1.28
+C0 = (88, 140); C1 = (86, 146); ROT = math.radians(-10)
+
+
+def S(x, y):
+    dx, dy = (x - C0[0]) * K, (y - C0[1]) * K
+    return (C1[0] + dx * math.cos(ROT) - dy * math.sin(ROT), C1[1] + dx * math.sin(ROT) + dy * math.cos(ROT))
+
+
+def SP(pts):
+    return [S(*p) for p in pts]
+
+
+class SF(Fig):
+    """Fig mit Transformation S() für alle Koordinaten"""
+    def limb(self, x0, y0, x1, y1, r0, r1, k, **kw):
+        a_, b_ = S(x0, y0), S(x1, y1)
+        return Fig.limb(self, a_[0], a_[1], b_[0], b_[1], r0 * K, r1 * K, k, **kw)
+
+    def ellipse(self, cx, cy, rx, ry, k, **kw):
+        c_ = S(cx, cy)
+        return Fig.ellipse(self, c_[0], c_[1], rx * K, ry * K, k, **kw)
+
+    def poly(self, pts, k, **kw):
+        return Fig.poly(self, SP(pts), k, **kw)
+
+    def rect(self, x0, y0, x1, y1, k, **kw):
+        return Fig.poly(self, SP([(x0, y0), (x1, y0), (x1, y1), (x0, y1)]), k, **kw)
+
+    def curve(self, pts, k, w=1.0, w1=None, **kw):
+        return Fig.curve(self, SP(pts), k, w=w * K, w1=(w1 if w1 is None else w1 * K), **kw)
+
+
+f = SF(W, H)
 # ---- Schal, weht nach links
 f.part('scarf')
-f.curve([(80, 122), (66, 118), (52, 110), (40, 114), (26, 106), (18, 110)], 's', w=8, w1=4)
-f.curve([(80, 124), (64, 126), (50, 124), (36, 130), (24, 126)], 's', w=6, w1=3)
-# ---- Beine (nach hinten wehend)
-f.part('thighL'); f.limb(81, 160, 68, 182, 6.5, 5.5, 'n')
-f.part('shinL'); f.limb(68, 182, 54, 194, 5.5, 4.5, 'a')
-f.part('footL'); f.poly([(44, 190), (58, 188), (60, 196), (46, 199)], 'a')
-f.part('kneeL'); f.ellipse(68, 182, 5, 5, 'a')
-f.part('thighR'); f.limb(95, 162, 98, 188, 6.5, 5.5, 'n')
-f.part('shinR'); f.limb(98, 188, 86, 202, 5.5, 4.5, 'a')
-f.part('footR'); f.poly([(76, 200), (88, 198), (90, 207), (76, 208)], 'a')
-f.part('kneeR'); f.ellipse(98, 188, 5, 5, 'a')
+f.curve([(80, 122), (66, 118), (54, 110), (44, 114), (34, 106), (26, 110)], 's', w=7, w1=3.5)
+f.part('scarf2')
+f.curve([(80, 124), (66, 128), (54, 126), (44, 132), (34, 128)], 's', w=5.5, w1=2.5)
+# ---- Beine (angewinkelt, nach hinten wehend)
+f.part('thighL'); f.limb(81, 160, 70, 180, 6.2, 5.4, 'n')
+f.part('shinL'); f.limb(70, 180, 57, 190, 5.0, 4.2, 'a')
+f.part('footL'); f.poly([(46, 186), (58, 184), (61, 192), (48, 196)], 'a')
+f.part('kneeL'); f.ellipse(70, 180, 4.6, 4.6, 'a')
+f.part('thighR'); f.limb(95, 162, 97, 184, 6.2, 5.4, 'n')
+f.part('shinR'); f.limb(97, 184, 87, 198, 5.0, 4.2, 'a')
+f.part('footR'); f.poly([(78, 197), (89, 195), (91, 203), (78, 205)], 'a')
+f.part('kneeR'); f.ellipse(97, 184, 4.6, 4.6, 'a')
 # ---- Rumpf
-f.part('torso'); f.poly([(72, 126), (102, 126), (100, 144), (98, 160), (78, 160), (74, 144)], 'n')
-f.part('chest'); f.poly([(74, 127), (100, 127), (99, 142), (88, 148), (76, 142)], 'a')
-f.part('emblem'); f.poly([(83, 130), (93, 130), (93, 140), (88, 143), (83, 140)], 'v')
-f.part('belt'); f.poly([(76, 152), (100, 152), (100, 158), (76, 158)], 'a')
-f.part('tassets'); f.poly([(76, 158), (87, 158), (84, 170), (74, 168)], 'a'); f.poly([(89, 158), (100, 158), (102, 168), (92, 170)], 'a')
+f.part('torso'); f.poly([(73, 126), (101, 126), (99, 144), (97, 160), (79, 160), (75, 144)], 'n')
+f.part('chest'); f.poly([(74, 127), (100, 127), (99, 142), (87, 149), (75, 142)], 'a')
+f.part('emblem'); f.poly([(82, 130), (92, 130), (92, 140), (87, 143), (82, 140)], 'v')
+f.part('belt'); f.poly([(77, 151), (99, 151), (99, 157), (77, 157)], 'a')
+f.part('tassets'); f.poly([(77, 157), (87, 157), (84, 168), (75, 166)], 'a'); f.poly([(89, 157), (99, 157), (101, 166), (92, 168)], 'a')
 # ---- rechter Arm hoch (schleudert den Blitz)
-f.part('uarmR'); f.limb(74, 130, 61, 108, 5.5, 4.8, 'n')
-f.part('farmR'); f.limb(61, 108, 64, 86, 4.8, 4.2, 'a')
-f.part('fistR'); f.ellipse(64, 81, 5.5, 5.5, 'a')
-f.part('paulR'); f.ellipse(73, 128, 8, 7, 'a')
+f.part('uarmR'); f.limb(75, 130, 64, 110, 5.2, 4.6, 'n')
+f.part('farmR'); f.limb(64, 110, 68, 90, 4.6, 4.2, 'a')
+f.part('fistR'); f.ellipse(69, 86, 5, 5, 'a')
+f.part('paulR'); f.ellipse(74, 127, 7.5, 6.5, 'a')
+f.poly([(68, 124), (64, 116), (72, 121)], 'a')
 # ---- linker Arm ausgestreckt zum Turm
-f.part('uarmL'); f.limb(100, 132, 117, 138, 5.5, 4.8, 'n')
-f.part('farmL'); f.limb(117, 138, 133, 134, 4.8, 4.2, 'a')
-f.part('handL'); f.ellipse(137, 133, 4.5, 4, 'n')
+f.part('uarmL'); f.limb(99, 132, 114, 137, 5.2, 4.6, 'n')
+f.part('farmL'); f.limb(114, 137, 128, 134, 4.6, 4.2, 'a')
+f.part('handL'); f.ellipse(132, 133, 4, 3.6, 'n')
 for (dx, dy) in [(4, -3), (5, -1), (5, 1), (4, 3)]:
-    f.limb(139, 133 + dy * 0.5, 141 + dx, 133 + dy, 1.4, 1.1, 'n')
-f.part('paulL'); f.ellipse(101, 129, 8, 7, 'a')
+    f.limb(134, 133 + dy * 0.5, 136 + dx, 133 + dy, 1.2, 1.0, 'n')
+f.part('paulL'); f.ellipse(100, 128, 7.5, 6.5, 'a')
+f.poly([(106, 124), (110, 116), (102, 121)], 'a')
 # ---- Kopf mit Helm, Visierband und Maske
-f.part('neck'); f.rect(82, 116, 92, 126, 'n')
-f.part('helm'); f.ellipse(87, 106, 16, 15, 'a')
-f.poly([(76, 96), (84, 84), (92, 84), (100, 96)], 'a')
-f.part('crest'); f.poly([(86, 90), (90, 90), (96, 72), (92, 74), (88, 82)], 'v')
-f.part('visor'); f.poly([(72, 101), (102, 101), (102, 106), (72, 106)], 'g')
-f.part('eyes'); f.poly([(76, 106), (99, 106), (98, 112), (77, 112)], 'e')
-f.part('mask'); f.poly([(74, 112), (101, 112), (99, 118), (92, 123), (82, 123), (75, 118)], 'n')
+f.part('neck'); f.rect(83, 116, 91, 126, 'n')
+f.part('helm'); f.ellipse(87, 106, 14, 13, 'a')
+f.poly([(76, 98), (83, 88), (91, 88), (98, 98)], 'a')
+f.part('crest'); f.poly([(85, 92), (89, 92), (95, 76), (91, 78), (87, 86)], 'v')
+f.part('visor'); f.poly([(73, 101), (101, 101), (101, 105), (73, 105)], 'g')
+f.part('eyes'); f.poly([(76, 105), (98, 105), (97, 111), (77, 111)], 'e')
+f.part('mask'); f.poly([(74, 111), (100, 111), (98, 117), (91, 121), (83, 121), (76, 117)], 'n')
 f.outline()
 MATS = {
     'a': mat(ARM, pillow=3, k=1.9, bias=0.02, spec=True, spec_col=(230, 220, 255)),
@@ -239,44 +276,51 @@ for y, x in zip(*np.where((d_out > 0) & (d_out < 7))):
     if in_art(x, y) and BAYER4[y % 4, x % 4] + 0.03 < (1 - d_out[y, x] / 7) * 0.9:
         blend_px(cv, x, y, (160, 120, 255), 0.4)
 cv.paste(fig, 0, 0)
-# Augen: grimmig, weiß-violett leuchtend
-for (ex, sd) in [(80, 1), (94, -1)]:
-    for i in range(5):
-        top = 108 - (i * sd - 2 * sd) * 0.4
-        for y in range(int(round(top)), 111):
-            px(cv, ex + i - 2, y, (250, 248, 255))
-    px(cv, ex + sd, 109, (120, 60, 220)); px(cv, ex + sd, 110, (70, 30, 150))
-for x in range(76, 99):
-    px(cv, x, 107, (40, 24, 40)) if x in (76, 77, 97, 98) else None
+# Augen im Sehschlitz (Detail direkt im Endbild, Positionen über S())
+for (ex, sd) in [(81, 1), (93, -1)]:
+    for i in range(-3, 4):
+        for j in range(0, 4):
+            x, y = S(ex + i * 0.8, 106.5 + j * 0.9)
+            hi = (i * sd) * 0.5 + 1.2
+            if j >= hi:
+                px(cv, x, y, (250, 248, 255) if j < 3 else (200, 190, 240))
+    x, y = S(ex + sd * 0.8, 108.3)
+    px(cv, x, y, (110, 50, 220)); px(cv, x, y + 1, (60, 24, 140))
+    glow2(cv, *S(ex, 108), 5, (220, 200, 255), k=0.4, mix=0.3)
+# Brauenfalte (grimmig)
+for (a_, b_) in [((77, 105.5), (84, 107.5)), ((97, 105.5), (90, 107.5))]:
+    p0, p1 = S(*a_), S(*b_)
+    bline(cv, p0[0], p0[1], p1[0], p1[1], (40, 20, 40))
 # Schachbrett-Emblem auf der Brust (weiß/violett wie auf der Karte)
-for y in range(131, 140):
-    for x in range(84, 93):
-        if ((x - 84) // 3 + (y - 131) // 3) % 2 == 0:
-            px(cv, x, y, (236, 232, 255) if x < 88 else (200, 196, 236))
+EM = f.L == 'v'
+ys_, xs_ = np.where(EM)
+e_top = ys_.min() if len(ys_) else 0
+for y, x in zip(ys_, xs_):
+    if y > S(87, 90)[1] + 20:
+        if ((x // 3) + (y // 3)) % 2 == 0:
+            px(cv, x, y, (240, 236, 255))
         else:
-            px(cv, x, y, ARM[3] if x < 88 else ARM[2])
-# Glanzkanten der Rüstung (Blitzlicht)
-for (x, y) in [(66, 78), (67, 79), (97, 122), (98, 123), (106, 126), (108, 127), (99, 96), (100, 97)]:
-    px(cv, x, y, ARM[5])
+            px(cv, x, y, ARM[3])
+FIST = S(69, 84)
 
 # ---------------------------------------------------------------- Der geschleuderte Blitz
 BOLT = dict(core=(255, 255, 255), mid=(220, 210, 255), outer=(150, 110, 255), glow_col=(170, 140, 255), glow_r=10, glow_k=0.55)
-main = bolt_path(66, 74, 181, 90, seed=21, jag=0.16, depth=6)
+main = bolt_path(FIST[0], FIST[1] - 4, 181, 92, seed=21, jag=0.16, depth=6)
 draw_bolt(cv, main, width=2, **BOLT)
 for (fr, ang, L, sd) in [(0.45, -0.9, 22, 3), (0.8, 0.6, 18, 4), (0.3, 0.8, 14, 5), (0.62, -0.5, 16, 6)]:
     x0, y0 = main[int(fr * (len(main) - 1))]
     br = bolt_path(x0, y0, x0 + math.cos(ang) * L, y0 + math.sin(ang) * L, seed=sd, jag=0.3, depth=4)
     draw_bolt(cv, br, width=0, **BOLT)
 # Einschlag an der Turmspitze
-glow2(cv, 182, 90, 22, (255, 250, 220), k=0.8, mix=0.45)
-sparkle(cv, 182, 90, (255, 255, 255), r=6, c2=(200, 180, 255))
+glow2(cv, 182, 90, 14, (255, 250, 220), k=0.7, mix=0.4)
+sparkle(cv, 182, 90, (255, 255, 255), r=5, c2=(200, 180, 255))
 for i in range(14):
     a = rnd.uniform(0, 2 * math.pi); L = rnd.uniform(5, 12)
     bline(cv, 182 + math.cos(a) * 3, 90 + math.sin(a) * 3, 182 + math.cos(a) * L, 90 + math.sin(a) * L, (255, 240, 200), 0.7)
 # Knistern um die Faust
 for sd in range(3):
     a = -math.pi / 2 + (sd - 1) * 0.9
-    br = bolt_path(64, 80, 64 + math.cos(a) * 12, 80 + math.sin(a) * 12, seed=40 + sd, jag=0.4, depth=3)
+    br = bolt_path(FIST[0], FIST[1], FIST[0] + math.cos(a) * 12, FIST[1] + math.sin(a) * 12, seed=40 + sd, jag=0.4, depth=3)
     draw_bolt(cv, br, width=0, **BOLT)
 
 # ---------------------------------------------------------------- stürzende Gestalten + Feuertropfen

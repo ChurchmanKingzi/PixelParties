@@ -176,46 +176,62 @@ PINK = [(150, 30, 80), (210, 60, 120), (246, 110, 160), (255, 170, 204), (255, 2
 MY = 84           # Kopfmitte
 
 
-WO, WC, WR = (40, 64), (74, 52), (113, 104)     # Flügelbug: äußeres Ende, Kontrollpunkt, Schulter
+WO, WC, WR = (64, 72), (88, 74), (113, 104)     # Handgelenk des Flügels, Kontrollpunkt, Schulter
 
 
 def wing_P(t):
+    """Flügelbug vom Handgelenk (t=0) zur Schulter (t=1)"""
     return ((1 - t) ** 2 * WO[0] + 2 * (1 - t) * t * WC[0] + t * t * WR[0],
             (1 - t) ** 2 * WO[1] + 2 * (1 - t) * t * WC[1] + t * t * WR[1])
 
 
 def wing_feathers():
-    """(Lage, Material, Start, Ende, r0, r1) für den linken Flügel – von hinten nach vorn"""
+    """(Lage, Material, Start, Ende, r0, r1) für den linken Flügel – von hinten nach vorn.
+    Lage 0: Handschwingen (fächern vom Handgelenk nach oben/außen), 1: Armschwingen (hängen nach unten),
+    2: große Deckfedern, 3: Handdecken"""
     out = []
-    n = 10
-    for layer, (lf, r0, r1, key, tshift) in enumerate([(1.0, 4.2, 3.4, 'p', 0.0), (0.7, 4.6, 3.8, 'x', 0.03),
-                                                        (0.42, 5.0, 4.4, 'c', 0.06)]):
-        for i in range(n):
-            t = 0.04 + i / (n - 1) * 0.86 + tshift
-            sx, sy = wing_P(min(t, 0.97))
-            th = math.radians(250 + 35 * (i / (n - 1)))
-            dx, dy = math.cos(th), -math.sin(th)
-            L = (34 - 16 * i / (n - 1)) * lf
-            out.append((layer, key, (sx, sy), (sx + dx * L, sy + dy * L), r0, r1))
+    wx, wy = wing_P(0)
+    for i in range(7):
+        a = math.radians(128 + i * 11)
+        L = 22 + i * 1.7
+        sx, sy = wx + i * 0.8, wy + i * 0.8
+        out.append((0, 'p', (sx, sy), (sx + math.cos(a) * L, sy - math.sin(a) * L), 4.0, 3.2))
+    for i in range(8):
+        t = 0.08 + i / 7 * 0.8
+        sx, sy = wing_P(t)
+        a = math.radians(205 + t * 58)
+        L = 30 - 12 * t
+        out.append((1, 'x', (sx, sy), (sx + math.cos(a) * L, sy - math.sin(a) * L), 4.4, 3.6))
+    for i in range(8):
+        t = 0.08 + i / 7 * 0.8
+        sx, sy = wing_P(t)
+        a = math.radians(205 + t * 58)
+        L = (30 - 12 * t) * 0.5
+        out.append((2, 'c', (sx, sy), (sx + math.cos(a) * L, sy - math.sin(a) * L), 5.0, 4.4))
+    for i in range(7):
+        a = math.radians(128 + i * 11)
+        L = (22 + i * 1.7) * 0.42
+        sx, sy = wx + i * 0.8, wy + i * 0.8
+        out.append((3, 'c', (sx, sy), (sx + math.cos(a) * L, sy - math.sin(a) * L), 4.6, 4.0))
     return out
 
 
 def wing(f, side):
-    """Engelsflügel in Lagen: Handschwingen, Armschwingen, große und kleine Deckfedern, Flügelbug"""
+    """Engelsflügel in Lagen: Hand- und Armschwingen, Deckfedern, kleine Deckfedern, Flügelbug"""
     X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
     for j, (layer, key, (sx, sy), (ex, ey), r0, r1) in enumerate(wing_feathers()):
         f.part('w%d_%d' % (side, j))
         f.limb(X(sx), sy, X(ex), ey, r0, r1, key)
-    # kleine Deckfedern: schuppenartige Reihen am Flügelbug
+    # kleine Deckfedern: schuppenartige Reihen entlang des Flügelbugs
     k_ = 0
-    for row, (off, rr) in enumerate([(7, 3.6), (3.5, 3.4)]):
-        for t in np.linspace(0.06 + row * 0.04, 0.94, 9 - row):
+    for row, (off, rr) in enumerate([(5, 3.4), (2, 3.2)]):
+        for t in np.linspace(0.05 + row * 0.05, 0.92, 8 - row):
             x, y = wing_P(t)
             f.part('lc%d_%d' % (side, k_)); k_ += 1
-            f.ellipse(X(x + off * 0.25), y + off, rr, rr * 0.9, 'z')
+            f.ellipse(X(x - off * 0.5), y + off, rr, rr * 0.9, 'z')
     f.part('warm%d' % side)
     pts = [wing_P(t) for t in np.linspace(0, 1, 14)]
-    f.curve([(X(x), y) for (x, y) in pts], 'z', w=6, w1=9)
+    f.curve([(X(x), y) for (x, y) in pts], 'z', w=7, w1=9)
 
 
 def molinda(f):
@@ -355,19 +371,15 @@ for (dx, dy) in [(-2, 0), (-1, 1), (0, 1), (1, 1), (2, 0)]:
     px(cv, mx_ + dx, my_ + dy, (170, 60, 80))
 nx_, ny_ = T(125, MY + 8)
 px(cv, nx_, ny_, SKIN[3])
-# Federkiele (Schaft) auf Hand- und Armschwingen, dunkle Spitzen der Handschwingen
+# Federkiele (Schaft) auf Hand- und Armschwingen, dunklere Spitzen der Handschwingen
 for side in (-1, 1):
     X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
     for (layer, key, (sx, sy), (ex, ey), r0, r1) in wing_feathers():
-        if layer == 2:
+        if layer >= 2:
             continue
-        for u in np.arange(0.45 if layer == 0 else 0.3, 0.92, 0.02):
+        for u in np.arange(0.5, 0.9, 0.02):
             qx, qy = T(X(sx + (ex - sx) * u), sy + (ey - sy) * u)
-            recolor_on(cv, fm, qx, qy, PRIM[4] if layer == 0 else COV[4], key)
-        if layer == 0:
-            qx, qy = T(X(ex), ey)
-            for (dx, dy) in [(0, -1), (-1, -1), (1, -1), (0, -2)]:
-                recolor_on(cv, fm, qx + dx, qy + dy, PRIM[1], 'p')
+            recolor_on(cv, fm, qx, qy, PRIM[4] if layer == 0 else COV[3], key)
 # Haarglanz
 for (x, y) in [(115, MY - 11), (117, MY - 11), (119, MY - 12), (131, MY - 12), (133, MY - 11), (135, MY - 11)]:
     X_, Y_ = T(x, y)

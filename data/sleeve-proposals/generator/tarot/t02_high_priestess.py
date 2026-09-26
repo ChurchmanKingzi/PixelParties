@@ -242,8 +242,8 @@ f.part('bangs')   # Pony aus vielen spitzen Strähnen
 bang = [(cx - 19, cy + 6), (cx - 20, cy - 4), (cx - 13, cy - 15), (cx, cy - 19), (cx + 13, cy - 15), (cx + 20, cy - 4), (cx + 19, cy + 6)]
 tips = [(18, 0), (15, -7), (13, -4), (10, -9), (7, -4), (4, -10), (1, -5), (-2, -10), (-5, -4), (-8, -9), (-11, -4), (-13, -7), (-17, 0)]
 f.poly(bang + [(cx + dx, cy + dy) for dx, dy in tips], 'h')
-f.part('sideL'); f.poly([(cx - 19, cy - 4), (cx - 15, cy + 1), (cx - 15, cy + 18), (cx - 17, cy + 32), (cx - 23, cy + 22)], 'h')
-f.part('sideR'); f.poly([(cx + 19, cy - 4), (cx + 15, cy + 1), (cx + 15, cy + 18), (cx + 17, cy + 32), (cx + 23, cy + 22)], 'h')
+f.part('sideL'); f.poly([(cx - 19, cy - 4), (cx - 17, cy + 1), (cx - 16, cy + 18), (cx - 17, cy + 32), (cx - 23, cy + 22)], 'h')
+f.part('sideR'); f.poly([(cx + 19, cy - 4), (cx + 17, cy + 1), (cx + 16, cy + 18), (cx + 17, cy + 32), (cx + 23, cy + 22)], 'h')
 # Stirnreif mit Mondsichel
 f.part('circlet'); f.curve([(cx - 18, cy - 7), (cx - 8, cy - 12), (cx, cy - 13), (cx + 8, cy - 12), (cx + 18, cy - 7)], 'S', w=2)
 f.part('gem'); f.ellipse(cx, cy - 14, 3, 3, 'S')
@@ -270,19 +270,19 @@ def inside(x, y):
 
 # ---------------------------------------------------------------- Details
 EYE = (224, 146, 40)
-big_eye(cv, 110, 128, EYE, w=7, h=9)
-big_eye(cv, 133, 128, EYE, w=7, h=9, flip=True)
+big_eye(cv, 112, 128, EYE, w=6, h=9)
+big_eye(cv, 132, 128, EYE, w=6, h=9, flip=True)
 # Brauen (zart, über dem Pony sichtbar)
-for (bx, d) in [(111, 1), (134, -1)]:
+for (bx, d) in [(112, 1), (132, -1)]:
     for i in range(6):
         yb = 123 - (1 if 1 <= i <= 3 - (0 if d > 0 else -1) else 0)
         px(cv, bx + i, yb, HAIR[1])
 # Nase + kleiner Mund + Rouge
 px(cv, 126, 139, SKIN[2]); px(cv, 125, 140, SKIN[3])
-for x in range(123, 128): px(cv, x, 143, (140, 50, 60))
-px(cv, 122, 142, (140, 50, 60)); px(cv, 128, 142, (140, 50, 60))
-for x in range(124, 127): px(cv, x, 144, (220, 120, 120))
-for (bx, by) in [(110, 139), (134, 139)]:
+for x in range(123, 128): px(cv, x, 143, (110, 34, 44))
+px(cv, 122, 142, (110, 34, 44)); px(cv, 128, 142, (110, 34, 44))
+for x in range(124, 127): px(cv, x, 144, (214, 104, 110))
+for (bx, by) in [(111, 139), (133, 139)]:
     for dy in range(2):
         for dx in range(6):
             if (bx + dx + by + dy) % 2 == 0:

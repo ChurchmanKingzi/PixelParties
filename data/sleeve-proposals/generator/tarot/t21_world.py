@@ -293,7 +293,7 @@ x_ = Fig(W, H)
 x_.part('tailx'); x_.limb(TX_ - 26, TY_ + 1, TX_ - 34, TY_ + 6, 3, 1, 's')
 x_.part('legB'); x_.limb(TX_ - 18, TY_ + 1, TX_ - 27, TY_ + 12, 5, 4, 's'); x_.ellipse(TX_ - 28, TY_ + 14, 5, 2.6, 's')
 x_.part('legF'); x_.limb(TX_ + 20, TY_ + 1, TX_ + 29, TY_ + 11, 5.4, 4.4, 's'); x_.ellipse(TX_ + 31, TY_ + 13, 5.4, 2.8, 's')
-x_.part('plastron'); x_.ellipse(TX_, TY_ + 4, 22, 4, 'p')
+x_.part('plastron'); x_.ellipse(TX_, TY_ + 6, 24, 4, 'p')
 x_.part('neck'); x_.limb(TX_ + 26, TY_ - 6, TX_ + 36, TY_ - 16, 6, 5.4, 's')
 x_.part('head')
 x_.ellipse(TX_ + 41, TY_ - 21, 7.5, 6.4, 's')
@@ -307,9 +307,10 @@ clip_paste(x_.render({'s': mat(XS, pillow=3, k=1.5, bias=0.05), 'r': mat([(60, 6
 scale_pattern(x_, ['s'], XS[1], XS[3], (AX0, 250, 110, AY1))
 # Panzer als Relief: gewölbte Kuppel mit sechseckigen Platten (Voronoi auf Sechseckgitter)
 yy, xx = np.indices((H, W)).astype(np.float32)
-RX, RY = 31, 22
-dome = ((xx - TX_) / RX) ** 2 + ((yy - TY_) / RY) ** 2
-Msh = (dome <= 1) & (yy <= TY_)
+RX, RY = 31, 24
+rim_y = lambda x: TY_ + 3 * (1 - min(1, ((x - TX_) / RX) ** 2))      # Randlinie: in der Mitte tiefer (Wölbung)
+dome = ((xx - TX_) / RX) ** 2 + ((yy - TY_ - 2) / RY) ** 2
+Msh = (dome <= 1) & (yy <= TY_ + 3 * (1 - np.minimum(1, ((xx - TX_) / RX) ** 2)))
 cents = []
 for j in range(-4, 2):
     for i in range(-6, 7):
@@ -325,15 +326,17 @@ for y, x in zip(*np.where(Msh)):
     if edge[y, x] < 1.0:
         px(cv, x, y, SH[0] if (x + y) % 3 else SH[1])
 # Panzerrand (heller Saum mit Kerben) + Umriss
-for x in range(TX_ - RX - 1, TX_ + RX + 2):
-    for y in range(TY_ - 1, TY_ + 4):
-        if abs(x - TX_) <= RX + 1 - (y - TY_) * 0.5 and in_art(x, y):
-            px(cv, x, y, OUT if y == TY_ + 3 else (SH[4] if y == TY_ - 1 else rampc(SH, 0.75 - (y - TY_) * 0.12, x, y)))
-    if x % 6 == 0 and in_art(x, TY_ + 1):
-        px(cv, x, TY_ + 1, SH[1]); px(cv, x, TY_ + 2, SH[1])
+for x in range(TX_ - RX, TX_ + RX + 1):
+    ry_ = int(round(rim_y(x)))
+    for k in range(-1, 4):
+        y = ry_ + k
+        if in_art(x, y):
+            px(cv, x, y, OUT if k == 3 else (SH[4] if k == -1 else rampc(SH, 0.75 - k * 0.12, x, y)))
+    if x % 6 == 0 and in_art(x, ry_ + 1):
+        px(cv, x, ry_ + 1, SH[1]); px(cv, x, ry_ + 2, SH[1])
 ring = cv2.dilate(Msh.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
 for y, x in zip(*np.where(ring & ~Msh)):
-    if in_art(x, y) and y < TY_:
+    if in_art(x, y) and y < rim_y(x):
         px(cv, x, y, OUT)
 # Schlange windet sich über den Panzer, Kopf erhoben – Blick zur Schildkröte (klassisches Xuanwu-Motiv)
 sn = Fig(W, H)
@@ -384,15 +387,17 @@ b_.outline()
 clip_paste(b_.render({'w': mat(BT, pillow=4, k=1.5, bias=0.04, noise=0.6, nscale=2), 'f': mat(WHITE_CLOTH, pillow=3, k=1.4, noise=0.8, nscale=2, bias=0.05),
                       'm': mat([(40, 4, 14), (100, 10, 30), (160, 30, 50)], pillow=2, k=1.3), 'n': mat([(140, 60, 90), (220, 120, 150)], pillow=1, k=1)}))
 TL_ = b_.L
-def stripe(pts, w=1.6):
-    for (x, y) in pts:
-        for dx in range(-int(w // 2), int(math.ceil(w / 2))):
+def stripe(pts, w=1.6, taper=False):
+    n = len(pts)
+    for i, (x, y) in enumerate(pts):
+        ww = w * (1 - 0.7 * i / max(1, n - 1)) if taper else w
+        for dx in range(-int(ww // 2), max(1, int(math.ceil(ww / 2)))):
             X, Y = int(round(x + dx)), int(round(y))
             if TL_[Y, X] == 'w' and tuple(cv.a[Y, X]) != OUT:
                 px(cv, X, Y, STR)
 # Körperstreifen (schwarz, geschwungen)
 for (x0, top, bot, bend) in [(184, 268, 286, 3), (192, 267, 289, 3), (200, 267, 290, 2), (208, 268, 288, 2), (216, 271, 285, 1), (224, 273, 284, 1)]:
-    stripe(bezier((x0, top), (x0 + bend + 2, (top + bot) / 2), (x0 - 1, bot - 5), 22), w=2 if x0 < 212 else 1.6)
+    stripe(bezier((x0 - 2, top - 1), (x0 + bend + 3, (top + bot) / 2), (x0 - 1, bot - 5), 22), w=3.4 if x0 < 212 else 2.6, taper=True)
 for (x0, y0) in [(210, 276), (218, 278)]:      # Keulenstreifen
     stripe(bezier((x0, y0), (x0 + 4, y0 + 4), (x0 + 3, y0 + 10), 14))
 for (y0,) in [(286,), (290,)]:                  # Beinstreifen
