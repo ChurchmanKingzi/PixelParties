@@ -4,9 +4,12 @@
 Idle in seiner Pose mit dem geklauten pinken Glas-Dreizack:
 * Ruhiges Atmen: der ganze Oberkörper samt Dreizack hebt sich als Einheit,
   die Füße bleiben stehen (keine Nähte, die Brille oder Arme zerreißen).
-* Windstöße von rechts: die lose Haarsträhne links weht kurz aus.
+* Schulterblick: der Kopf dreht sich kurz nach hinten (links), dazu ein
+  freches Grinsen; danach bewundert er die Beute (Kopf nach rechts, Brille
+  blitzt auf).
+* Windstöße von rechts: die Haarspitzen oben und die lose Strähne links
+  wehen kurz nach links.
 * Glas-Dreizack: Lichtband wandert über das Glas, dazu Glitzersterne.
-* Glanz huscht über die Brillengläser.
 """
 import sys
 from PIL import Image
@@ -24,6 +27,7 @@ GLASS = [rgb('e247e3'), rgb('fd51fe'), rgb('f7a5fe'), rgb('f9c0fe'), rgb('fbd8fe
 GLASS_SET = set(GLASS[:-1])
 LENS = [rgb('c2e4ff'), rgb('d5e9ff'), rgb('faffff'), rgb('ffffff')]
 LENS_SET = set(LENS[:-1])
+MOUTH = rgb('b8683c')
 
 
 def o(y):
@@ -44,12 +48,26 @@ def is_leg(x, oy):
     return oy >= 22 and 11 <= x <= 22
 
 
-GUST = [(10, 15), (30, 35)]                 # Windstöße (Start, Ende)
+GUST = [(18, 24), (40, 45)]                 # Windstöße (Start, Ende)
 
 
 def gust(i, lag=0):
     t = (i - lag) % N
     return any(a <= t < b for a, b in GUST)
+
+
+def head_dx(i):
+    """-1: Schulterblick nach hinten, +1: Blick auf die Beute."""
+    t = i % N
+    if 6 <= t < 16:
+        return -1
+    if 28 <= t < 37:
+        return 1
+    return 0
+
+
+def smirk(i):
+    return 9 <= i % N < 17
 
 
 def offset(x, y, i):
@@ -58,11 +76,38 @@ def offset(x, y, i):
     if is_leg(x, oy):
         return 0, 0                          # Füße bleiben stehen
     dx = 0
-    # Wind von rechts: nur die lose Strähne links weht kurz aus
-    # (rechte Kopfseite bleibt unangetastet, sonst wirkt sie eingedellt)
-    if 4 <= oy <= 6 and x <= 10 and gust(i):
-        dx = -1
+    sy = oy + inhale(i)                      # Wind-Zonen in Quellzeilen messen
+    if gust(i):
+        if sy <= 2:                          # Haarspitzen oben legen sich in den Wind
+            dx = -1
+        elif 4 <= sy <= 6 and x <= 10:
+            dx = -1                          # lose Strähne links weht aus
     return dx, -inhale(i)
+
+
+def face_rows():
+    """Gesichtszeilen (Brille bis Kinn) mit Innenbereich innerhalb der Kapuze."""
+    rows = {}
+    for oy in range(9, 15):
+        xs = [x for x in range(9, 25) if BASE[oy + PT, x, 3]]
+        rows[oy] = (min(xs) + 1, max(xs) - 1)
+    return rows
+
+
+FACE = face_rows()
+
+
+def turn_face(s, i):
+    """Kopfdrehung: nur das Gesicht wandert innerhalb der Kapuze (Umriss bleibt)."""
+    d = head_dx(i)
+    if not d:
+        return s
+    t = s.copy()
+    for oy, (lo, hi) in FACE.items():
+        y = oy + PT
+        for x in range(lo, hi + 1):
+            t[y, x] = s[y, min(hi, max(lo, x - d))]
+    return t
 
 
 # ---------------------------------------------------------------- Glanz
@@ -76,9 +121,9 @@ def glass_level(x, y, i):
 
 def lens_level(x, y, i):
     t = i % N
-    if not 20 <= t < 27:
+    if not 30 <= t < 37:
         return 0
-    pos = 11 + (t - 20) * 2
+    pos = 11 + (t - 30) * 2
     d = abs(x + (o(y) - 10) * 0.6 - pos)
     return 2 if d < 0.8 else 1 if d < 1.8 else 0
 
@@ -96,6 +141,10 @@ def frame(i):
                 lv = lens_level(x, y, i)
                 if lv:
                     s[y, x] = LENS[min(len(LENS) - 1, LENS.index(c) + lv + 1)]
+    if smirk(i):                             # freches Grinsen (Mundwinkel hoch)
+        s[13 + PT, 17] = MOUTH
+        s[12 + PT, 18] = MOUTH
+    s = turn_face(s, i)
     out = np.zeros_like(s)
     for y in range(H):
         for x in range(W):
