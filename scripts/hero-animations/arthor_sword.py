@@ -63,14 +63,14 @@ HAIR_TUFT = {(27, 95), (28, 94), (28, 95)}              # orange Haarsträhne bl
 def in_sword(x, y):
     if not OPAQUE[y, x] or (x, y) in HAIR_TUFT:
         return False
+    if 103 <= y <= 106 and 35 <= x <= 37:                     # Knaufstück rechts (rot/orange)
+        return True
     if 75 <= y <= 99:
         return x >= 27
     if 100 <= y <= 103:
         return 29 <= x <= 34
     if 104 <= y <= 105:                                       # Griffende + Knauf
         return 29 <= x <= 34
-    if 103 <= y <= 106 and 35 <= x <= 37:                     # Knaufstück rechts (rot/orange)
-        return True
     return 106 <= y <= 108 and 32 <= x <= 34                  # rechte Knaufseite
 
 
