@@ -180,36 +180,38 @@ def shift_layer(cv, bg, dx, dy=0):
             cv.a[Y, X] = fg[y, x]
 
 
-def big_eye(cv, x, y, iris, w=6, h=8, flip=False, lash=OUT, white=(250, 250, 255), glow_=False):
-    """größeres Anime-Auge: dicke Wimpernlinie, Iris-Verlauf, Pupille, zwei Glanzpunkte.
-    x,y = linke obere Ecke; flip spiegelt (rechtes Auge)."""
+def big_eye(cv, x, y, iris, w=6, h=8, flip=False, lash=OUT, white=(250, 250, 255), glow_=False, deep=False):
+    """größeres Anime-Auge: dicke Wimpernlinie mit Schwung nach außen, Iris-Verlauf, Pupille,
+    Weiß zur Nase hin, zwei Glanzpunkte. x,y = linke obere Ecke; nicht gespiegelt = linkes Auge
+    (außen = links), flip = rechtes Auge."""
     I = hair_ramp(iris)
     def P(i, j, c):
         ii = w - 1 - i if flip else i
         px(cv, x + ii, y + j, c)
     for i in range(-1, w + 1):
         P(i, 0, lash)
-    P(w, -1, lash)                       # Wimpernschwung außen
+    P(-1, -1, lash); P(-2, -1, lash)             # Wimpernschwung außen
     for i in range(w):
         P(i, 1, lash if i in (0, w - 1) else I[0])
     for j in range(2, h):
         t = (j - 2) / max(1, h - 3)
         for i in range(w):
-            if i == 0:
-                c = white if j < h - 1 else I[1]
-            else:
-                c = I[1] if t < 0.3 else (I[2] if t < 0.65 else I[3])
-                if glow_ and t > 0.6:
-                    c = I[4]
+            c = I[1] if t < 0.3 else (I[2] if t < 0.65 else I[3])
+            if deep:
+                c = I[0] if t < 0.25 else (I[1] if t < 0.6 else I[2])
+            if glow_ and t > 0.6:
+                c = I[4]
+            if i == w - 1:
+                c = white if j < h - 1 else I[1]        # Weiß zur Nase hin
             P(i, j, c)
     # Pupille
     for j in range(3, h - 2):
-        P(w // 2, j, I[0])
-        if w >= 6:
-            P(w // 2 - 1, j, I[0]) if j < h - 3 else None
-    # Glanz
-    P(w - 2, 2, (255, 255, 255)); P(w - 2, 3, (255, 255, 255)); P(w - 3, 2, (255, 255, 255))
-    P(1, h - 2, lerp(I[4], (255, 255, 255), 0.5))
+        P((w - 1) // 2, j, I[0])
+        if w >= 6 and j < h - 3:
+            P((w - 1) // 2 + 1, j, I[0])
+    # Glanz oben außen (2x2) + kleiner Glanz unten
+    P(1, 2, (255, 255, 255)); P(2, 2, (255, 255, 255)); P(1, 3, (255, 255, 255)); P(2, 3, (235, 240, 255))
+    P(w - 3, h - 2, lerp(I[4], (255, 255, 255), 0.5))
     # Unterlid
     for i in range(1, w - 1):
         P(i, h, lerp(lash, (200, 120, 100), 0.6)) if i % 2 else None

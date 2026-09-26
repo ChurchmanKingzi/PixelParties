@@ -408,7 +408,7 @@ def grave_front(f, cx, by, w):
     f.ellipse(cx, by + 6, w * 0.5, 4.5, 'e', a0=0, a1=180)
     f.ellipse(cx, by + 3, w * 0.42, 2.5, 'e', a0=0, a1=180)
 
-LAYOUT = [(52, 276, 36, 1.35, 'bow', 'g', 'grave'), (125, 286, 42, 1.6, 'up', None, 'coffin'), (199, 276, 36, 1.35, 'cast', 'h', 'grave')]
+LAYOUT = [(58, 276, 36, 1.35, 'bow', 'g', 'grave'), (125, 286, 42, 1.6, 'up', None, 'coffin'), (199, 276, 36, 1.35, 'cast', 'h', 'grave')]
 # Sargdeckel, abgehoben und schräg neben den Sarg gekippt (mit geschnitztem Kreuz)
 lf = Fig(W, H)
 lc = (96, 290); la = math.radians(-24)
@@ -484,7 +484,7 @@ for (cx, by, w, sc, pose, hood, kind) in LAYOUT:
 
 # Erdbrocken fliegen aus den aufgebrochenen Gräbern
 CLOD = [(30, 14, 18), (70, 40, 36), (110, 70, 52), (150, 104, 72)]
-for (cx, by) in [(52, 276), (199, 276)]:
+for (cx, by) in [(58, 276), (199, 276)]:
     rr = random.Random(cx)
     for i in range(9):
         a = rr.uniform(-2.8, -0.35); d = rr.uniform(16, 30)

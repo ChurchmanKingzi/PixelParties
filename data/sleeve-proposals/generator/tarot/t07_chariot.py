@@ -144,18 +144,24 @@ BLUE = [(10, 20, 70), (20, 50, 140), (40, 90, 200), (100, 150, 240)]
 RY = 104       # Kopfmitte
 
 
+# Rubin wird als Materialkarte gezeichnet und vor dem Rendern um SKR (um die Wagenkante) vergrößert
+SKR, SCXR, SCYR = 1.1, 125, 198
+
+
+def T(x, y):
+    return SCXR + (x - SCXR) * SKR, SCYR + (y - SCYR) * SKR
+
+
+def TP(x, y):
+    X_, Y_ = T(x, y)
+    return int(round(X_)), int(round(Y_))
+
+
 def rubin(f):
     # Umhang hinter dem Körper
     f.part('cape'); f.poly([(98, 126), (152, 126), (170, 150), (180, 200), (70, 200), (80, 150)], 'C')
-    # Hörner
-    f.part('hornL'); f.curve([(117, RY - 10), (113, RY - 24), (110, RY - 36), (111, RY - 44)], 'H', w=8, w1=1.5)
-    f.part('hornR'); f.curve([(133, RY - 10), (137, RY - 24), (140, RY - 36), (139, RY - 44)], 'H', w=8, w1=1.5)
-    # Nackenkrause / Stachelkamm hinter dem Kopf
-    f.part('frill')
-    f.poly([(104, RY - 2), (96, RY - 12), (102, RY - 10), (100, RY - 20), (108, RY - 12), (125, RY - 14), (142, RY - 12),
-            (150, RY - 20), (148, RY - 10), (154, RY - 12), (146, RY - 2), (150, RY + 8), (100, RY + 8)], 'R')
     # Hals, Körper
-    f.part('neck'); f.rect(117, RY + 12, 133, RY + 26, 'R')
+    f.part('neck'); f.rect(117, RY + 14, 133, RY + 28, 'R')
     f.part('torso'); f.poly([(104, 128), (146, 128), (150, 176), (100, 176)], 'R')
     f.part('plate'); f.poly([(106, 130), (144, 130), (146, 166), (136, 176), (125, 178), (114, 176), (104, 166)], 'S')
     f.part('plate2'); f.poly([(112, 146), (138, 146), (136, 170), (125, 174), (114, 170)], 'S')
@@ -166,34 +172,54 @@ def rubin(f):
         f.poly([(x0, 182), (x0 + 12, 182), (x0 + 11, 198), (x0 + 1, 198)], 'S')
     # rechter Arm (Bildseite links) mit Speer
     f.part('upperR'); f.limb(102, 134, 90, 160, 7, 6, 'R')
-    f.part('spear'); f.rect(88, 52, 91, 200, 'w')
-    f.part('spearhead'); f.poly([(89.5, 36), (95, 48), (92, 56), (87, 56), (84, 48)], 'm')
-    f.part('spearguard'); f.rect(84, 56, 95, 59, 'g')
-    f.part('pennant'); f.poly([(91, 60), (108, 64), (100, 68), (110, 74), (91, 74)], 'C')
-    f.part('forearmR'); f.limb(90, 160, 90, 176, 5.5, 5, 'R')
+    f.part('spear'); f.rect(88, 70, 91, 200, 'w')
+    f.part('spearhead'); f.poly([(89.5, 56), (94, 65), (92, 71), (87, 71), (85, 65)], 'm')
+    f.part('spearguard'); f.rect(84, 71, 95, 73, 'g')
+    f.part('pennant'); f.poly([(91, 75), (106, 78), (99, 82), (107, 87), (91, 87)], 'C')
+    f.part('forearmR'); f.limb(90, 158, 90, 172, 5.5, 5, 'R')
     f.part('fistR'); f.ellipse(90, 170, 6, 5.5, 'R')
-    # linker Arm (Bildseite rechts) hält die Flamme
-    f.part('upperL'); f.limb(148, 134, 162, 156, 7, 6, 'R')
-    f.part('forearmL'); f.limb(162, 156, 164, 142, 5.5, 5, 'R')
-    f.part('handL'); f.ellipse(164, 140, 6, 4.5, 'R')
-    f.part('flame', line=False)
-    f.poly([(156, 138), (158, 128), (160, 132), (162, 120), (165, 128), (168, 114), (170, 128), (173, 124), (172, 138), (164, 142)], 'f')
-    f.part('flamecore', line=False)
-    f.poly([(160, 138), (162, 130), (165, 133), (167, 124), (169, 134), (168, 139)], 'F')
+    f.part('thumbR'); f.ellipse(93.5, 165, 2.6, 2.2, 'R')
+    # linker Arm (Bildseite rechts) hält die Flamme auf der offenen Klaue
+    f.part('upperL'); f.limb(148, 136, 163, 152, 7, 6, 'R')
     # Schulterstücke (Gold/Blau-Streifen wie auf der Karte)
     f.part('pauldL'); f.ellipse(100, 132, 10, 8, 'S')
     f.part('pauldR'); f.ellipse(150, 132, 10, 8, 'S')
-    # Kopf: Drachenkopf von vorn (breite Stirn, lange Schnauze)
-    f.part('head'); f.ellipse(125, RY - 2, 14, 11,'Q')
-    f.part('jaw'); f.poly([(113, RY + 4), (137, RY + 4), (134, RY + 18), (125, RY + 24), (116, RY + 18)],'Q')
-    f.part('snout'); f.poly([(117, RY + 1), (133, RY + 1), (132, RY + 14), (129, RY + 20), (121, RY + 20), (118, RY + 14)],'Q')
-    f.part('browL'); f.poly([(109, RY - 5), (121, RY - 1), (123, RY - 5), (113, RY - 10)],'Q')
-    f.part('browR'); f.poly([(141, RY - 5), (129, RY - 1), (127, RY - 5), (137, RY - 10)],'Q')
+    # linker Unterarm erhoben, die Flamme auf der offenen Klaue
+    f.part('forearmL'); f.limb(163, 152, 160, 128, 5.5, 5, 'R')
+    f.part('handL'); f.ellipse(160, 126, 6.5, 4, 'R')
+    f.part('flame')
+    f.poly([(x - 4, y - 16) for (x, y) in [(156, 139), (158, 128), (160, 132), (162, 120), (165, 128), (168, 114), (170, 128), (173, 124), (172, 139), (164, 142)]], 'f')
+    f.part('flamecore', line=False)
+    f.poly([(x - 4, y - 16) for (x, y) in [(160, 139), (162, 130), (165, 133), (167, 124), (169, 134), (168, 140)]], 'F')
+    for i, fx in enumerate((154, 158, 162, 166)):
+        f.part('fingerL%d' % i); f.limb(fx + (0.6 if fx < 160 else -0.6), 125, fx - (1.5 if fx < 160 else -1.5), 119, 1.8, 1.4, 'R')
+    # ---- Kopf: Drachenkopf von vorn
+    # Ohrflossen mit Stachelstrahlen (links gezeichnet, gespiegelt)
+    f.part('fins')
+    f.poly([(113, RY - 4), (98, RY - 16), (101, RY - 8), (92, RY - 8), (99, RY - 2), (91, RY + 4), (102, RY + 4), (111, RY + 7)], 'o', mirror=True)
+    # Hörner: aus der Stirn nach oben/außen und hinten geschwungen
+    f.part('hornL'); f.curve([(116, RY - 8), (111, RY - 18), (104, RY - 26), (97, RY - 30), (92, RY - 29)], 'H', w=7, w1=1.5)
+    f.part('hornR'); f.curve([(134, RY - 8), (139, RY - 18), (146, RY - 26), (153, RY - 30), (158, RY - 29)], 'H', w=7, w1=1.5)
+    f.part('crest'); f.poly([(119, RY - 9), (121, RY - 18), (125, RY - 12), (129, RY - 18), (131, RY - 9)], 'H')
+    f.part('skull'); f.ellipse(125, RY - 3, 13, 10, 'Q')
+    f.part('jaw'); f.poly([(113, RY + 5), (137, RY + 5), (136, RY + 20), (131, RY + 27), (119, RY + 27), (114, RY + 20)], 'Q')
+    f.part('jawspikes')
+    f.poly([(114, RY + 12), (107, RY + 15), (114, RY + 17)], 'H', mirror=True)
+    f.poly([(116, RY + 19), (111, RY + 24), (118, RY + 23)], 'H', mirror=True)
+    f.part('mouth'); f.poly([(117, RY + 17), (133, RY + 17), (131, RY + 24), (119, RY + 24)], 'M')
+    f.part('chin'); f.poly([(119, RY + 23), (131, RY + 23), (129, RY + 27), (121, RY + 27)], 'Q')
+    f.part('snout'); f.poly([(118, RY + 1), (132, RY + 1), (134, RY + 10), (134, RY + 15), (130, RY + 19), (120, RY + 19), (116, RY + 15), (116, RY + 10)], 'Q')
+    f.part('nose'); f.ellipse(125, RY + 15, 5.5, 3, 'N')
+    f.part('browL'); f.poly([(108, RY - 6), (122, RY + 1), (124, RY - 3), (118, RY - 8), (110, RY - 10)], 'Q')
+    f.part('browR'); f.poly([(142, RY - 6), (128, RY + 1), (126, RY - 3), (132, RY - 8), (140, RY - 10)], 'Q')
 
 
 MATS = {
     'R': mat(RUB, pillow=4, k=1.5, noise=0.5, nscale=1, bias=0.02),
-    'Q': mat(RUB, pillow=4, k=1.6, bias=0.05),
+    'Q': mat(RUB, pillow=3.5, k=1.7, bias=0.06),
+    'N': mat(RUB[1:], pillow=3, k=1.6, bias=0.12),
+    'M': mat([(24, 2, 10), (60, 6, 20), (110, 20, 34)], pillow=1.5, k=1.0),
+    'o': mat([(90, 20, 20), (150, 40, 34), (210, 84, 56), (240, 140, 90), (255, 200, 150)], pillow=2.5, k=1.4, bias=0.02),
     'C': mat(CAPE, pillow=6, k=1.4, folds=(0.3, 0.02, 0.9)),
     'H': mat(HORN, pillow=2, k=1.7, spec=True),
     'S': mat(STEEL, pillow=3, k=1.8, spec=True, spec_col=(255, 255, 255)),
@@ -204,58 +230,115 @@ MATS = {
     'f': mat(FIRE[1:], pillow=3, k=1.2, bias=0.1),
     'F': mat(FIRE[3:], pillow=2, k=1.0, bias=0.2),
 }
-glow(cv, 125, 130, 60, (255, 200, 140), k=0.3, mix=0.25)
-fr, rb = fig_draw(cv, rubin, MATS)
+glow(cv, 125, 130, 64, (255, 200, 140), k=0.3, mix=0.25)
+glow(cv, *T(160, 106), 22, (255, 200, 90), k=0.55, mix=0.35)     # Schein der Flamme (hinter der Figur)
+fr = Fig(W, H)
+rubin(fr)
+scale_fig(fr, SKR, SCXR, SCYR)
+fr.outline()
+fr.inner_mask = fr.inner_lines()
+rb = fr.render(MATS)
+rb[:AY0, :, 3] = 0; rb[AY1:, :, 3] = 0; rb[:, :AX0, 3] = 0; rb[:, AX1:, 3] = 0      # nur im Bildfeld
+cv.paste(rb, 0, 0)
+
+
+def ramp_step(ramp, c, d):
+    """Farbe c auf die nächste Rampenstufe setzen und um d Stufen verschieben"""
+    i = min(range(len(ramp)), key=lambda k: sum((int(c[j]) - ramp[k][j]) ** 2 for j in range(3)))
+    return ramp[max(0, min(len(ramp) - 1, i + d))]
+
+
+# Schuppen: kleine versetzte Bögen, eine Stufe dunkler (Haut) bzw. heller (Gesicht, oben) – gedithert
+for y in range(AY0, 210):
+    for x in range(70, 185):
+        if fr.L[y, x] in 'RQ' and not fr.inner_mask[y, x] and tuple(cv.a[y, x]) != OUT:
+            u = (x + (2 if (y // 3) % 2 else 0)) % 4
+            v = y % 3
+            if (v == 0 and u == 0) or (v == 1 and u in (1, 3)):
+                cv.a[y, x] = ramp_step(RUB, cv.a[y, x], -1)
+            elif v == 2 and u == 2 and BAYER4[y % 4, x % 4] < 0.5:
+                cv.a[y, x] = ramp_step(RUB, cv.a[y, x], 1)
 # Streifen auf den Schulterstücken
 for (cx, sg) in ((100, -1), (150, 1)):
-    for x in range(cx - 10, cx + 11):
-        for (y, c) in [(129, GOLD[3]), (130, GOLD[2]), (132, BLUE[2]), (133, BLUE[1]), (135, GOLD[3])]:
-            recolor_on(cv, fr, x, y, c, 'S')
-# Schuppen auf der roten Haut (kleine Bögen)
-for y in range(90, 200, 4):
-    for x in range(80, 175, 4):
-        xo = x + (2 if (y // 4) % 2 else 0)
-        recolor_on(cv, fr, xo, y, RUB[1], 'R'); recolor_on(cv, fr, xo + 1, y + 1, RUB[1], 'R')
-        recolor_on(cv, fr, xo - 1, y + 1, RUB[1], 'R')
-# Gesicht: schmale, glühende Augen unter den Brauenwülsten, Nüstern, Reißzähne, Mittelkamm
-for y in range(RY - 12, RY + 18):
-    recolor_on(cv, fr, 125, y, RUB[4] if y % 3 else RUB[3], 'RQ')
-for sg in (1, -1):
-    X = lambda x: 125 - sg * (125 - x)
-    glow(cv, X(116), RY - 1, 7, (255, 220, 140), k=0.6, mix=0.35)
-    # schräges, glühendes Mandelauge (Kontur oben dick)
-    for (x, y) in [(111, RY - 4), (112, RY - 4), (113, RY - 4), (114, RY - 3), (115, RY - 3), (116, RY - 2), (117, RY - 2),
-                   (118, RY - 1), (119, RY), (120, RY + 1), (112, RY - 3), (111, RY - 3), (112, RY - 1), (113, RY), (114, RY + 1),
-                   (115, RY + 1), (116, RY + 2), (117, RY + 2), (118, RY + 2), (119, RY + 1)]:
-        px(cv, X(x), y, OUT)
-    for (x, y, c) in [(113, RY - 3, (255, 255, 255)), (113, RY - 2, (255, 255, 230)), (114, RY - 2, (255, 255, 255)),
-                      (115, RY - 2, (255, 250, 200)), (114, RY - 1, (255, 240, 170)), (115, RY - 1, (255, 230, 130)),
-                      (116, RY - 1, (255, 210, 100)), (117, RY - 1, (255, 190, 80)), (115, RY, (255, 200, 90)),
-                      (116, RY, (250, 150, 50)), (117, RY, (240, 120, 40)), (118, RY, (230, 100, 30)), (116, RY + 1, (220, 80, 20)),
-                      (117, RY + 1, (200, 60, 20)), (118, RY + 1, (180, 50, 20)), (114, RY, (255, 220, 120))]:
-        px(cv, X(x), y, c)
-    px(cv, X(122), RY + 17, RUB[0]); px(cv, X(122), RY + 16, RUB[1])          # Nüstern
-    for (x, y) in [(118, RY + 19), (118, RY + 20), (118, RY + 21), (119, RY + 19)]:                         # Hauer
-        px(cv, X(x), y, (255, 255, 240))
-    px(cv, X(118), RY + 22, (200, 200, 190))
-for x in range(119, 132):
-    px(cv, x, RY + 19 + (1 if 122 <= x <= 128 else 0), OUT)
+    for x0 in range(cx - 10, cx + 11):
+        for (y0, c) in [(129, GOLD[3]), (130, GOLD[2]), (132, BLUE[2]), (133, BLUE[1]), (135, GOLD[3])]:
+            X_, Y_ = TP(x0, y0)
+            recolor_on(cv, fr, X_, Y_, c, 'S'); recolor_on(cv, fr, X_ + 1, Y_, c, 'S')
 # Rippen der Brustplatte
-for y in (138, 144, 150, 156, 162):
-    for x in range(104, 147):
-        recolor_on(cv, fr, x, y, STEEL[1], 'S'); recolor_on(cv, fr, x, y + 1, STEEL[4], 'S')
-# weiße Klauen
-for (x, y) in [(84, 168), (84, 171), (84, 174), (158, 139), (161, 137), (167, 137), (170, 139)]:
-    px(cv, x, y, (255, 255, 250)); px(cv, x - (1 if x < 125 else 0), y + 1, (190, 190, 200))
-# Rüstungsnieten + Glanzlinie
+for y0 in (138, 144, 150, 156, 162):
+    _, Y_ = TP(0, y0)
+    for x in range(95, 158):
+        recolor_on(cv, fr, x, Y_, STEEL[1], 'S'); recolor_on(cv, fr, x, Y_ + 1, STEEL[4], 'S')
+for y0 in range(132, 164):
+    X_, Y_ = TP(116 - (y0 - 132) * 0.1, y0)
+    recolor_on(cv, fr, X_, Y_, STEEL[5] if y0 % 3 else STEEL[4], 'S')
 for (x, y) in [(108, 134), (142, 134), (110, 160), (140, 160)]:
-    px(cv, x, y, STEEL[5]); px(cv, x + 1, y + 1, STEEL[1])
-for y in range(132, 164):
-    recolor_on(cv, fr, 116 - (y - 132) * 0.1, y, STEEL[5] if y % 3 else STEEL[4], 'S')
+    X_, Y_ = TP(x, y)
+    px(cv, X_, Y_, STEEL[5]); px(cv, X_ + 1, Y_ + 1, STEEL[1])
 # Rubin-Brosche
-for (dx, dy, c) in [(0, 0, RUBY[2]), (-1, 0, RUBY[3]), (-1, -1, RUBY[4]), (1, 0, RUBY[1]), (0, 1, RUBY[1]), (0, -1, RUBY[3])]:
-    px(cv, 125 + dx, 150 + dy, c)
-glow(cv, 164, 128, 18, (255, 200, 90), k=0.5, mix=0.35)
+bx_, by_ = TP(125, 150)
+for (dx, dy, c) in [(0, 0, RUBY[2]), (-1, 0, RUBY[3]), (-1, -1, RUBY[4]), (1, 0, RUBY[1]), (0, 1, RUBY[1]), (0, -1, RUBY[3]), (1, 1, RUBY[0])]:
+    px(cv, bx_ + dx, by_ + dy, c)
+# Gesicht: Mittelkamm, glühende Augen unter den Brauenwülsten, Nüstern, Maul mit Zähnen und Zunge
+for y0 in range(RY - 10, RY + 9):
+    X_, Y_ = TP(125, y0)
+    recolor_on(cv, fr, X_, Y_, RUB[4] if y0 % 3 else RUB[3], 'Q')
+for sg in (1, -1):
+    ax, ay = TP(116 if sg > 0 else 134, RY)       # Augenmitte
+    glow(cv, ax, ay, 8, (255, 220, 140), k=0.6, mix=0.35)
+    Xo = lambda dx: ax + sg * dx
+    for (dx, dy) in [(-5, -2), (-4, -2), (-3, -2), (-2, -2), (-1, -2), (0, -2), (1, -1), (2, -1), (3, 0), (4, 1),
+                     (-5, -1), (-5, 0), (-4, 1), (-3, 2), (-2, 2), (-1, 2), (0, 2), (1, 2), (2, 2), (3, 1)]:
+        px(cv, Xo(dx), ay + dy, OUT)
+    for (dx, dy, c) in [(-4, -1, (255, 255, 255)), (-4, 0, (255, 255, 240)), (-3, 1, (255, 240, 160)), (0, -1, (255, 240, 170)),
+                        (1, -0, (255, 210, 100)), (-3, -1, (255, 255, 255)), (-2, -1, (255, 255, 255)), (-1, -1, (255, 255, 230)),
+                        (-3, 0, (255, 255, 230)), (-2, 0, (255, 250, 190)), (-1, 0, (255, 240, 150)), (0, 0, (255, 220, 110)),
+                        (1, 0, (255, 200, 90)), (2, 0, (250, 170, 60)), (-2, 1, (255, 230, 130)), (-1, 1, (255, 200, 90)),
+                        (0, 1, (250, 160, 60)), (1, 1, (240, 130, 50)), (2, 1, (220, 100, 40))]:
+        px(cv, Xo(dx), ay + dy, c)
+    px(cv, Xo(0), ay, (60, 10, 6)); px(cv, Xo(0), ay + 1, (90, 20, 10))     # Schlitzpupille
+    nx_, ny_ = TP(122 if sg > 0 else 128, RY + 14)       # Nüstern: schräge Schlitze
+    px(cv, nx_, ny_, RUB[0]); px(cv, nx_ - sg, ny_ - 1, RUB[0]); px(cv, nx_ + sg, ny_ + 1, RUB[1])
+    # Zähne: obere Reihe mit Fangzahn außen, untere Hauer
+    for k_ in range(4):
+        tx_, ty_ = TP((119 + k_ * 2) if sg > 0 else (131 - k_ * 2), RY + 19)
+        px(cv, tx_, ty_, (255, 255, 240))
+        if k_ == 0:
+            px(cv, tx_, ty_ + 1, (255, 255, 240)); px(cv, tx_, ty_ + 2, (210, 210, 200))
+    lx_, ly_ = TP(121 if sg > 0 else 129, RY + 24)
+    px(cv, lx_, ly_, (255, 255, 240)); px(cv, lx_, ly_ - 1, (230, 230, 220))
+# Zunge
+tx_, ty_ = TP(125, RY + 22)
+for (dx, dy, c) in [(-2, 0, (200, 50, 70)), (-1, 0, (230, 90, 100)), (0, 0, (240, 110, 120)), (1, 0, (230, 90, 100)), (2, 0, (200, 50, 70)),
+                    (-1, 1, (180, 40, 60)), (0, 1, (210, 70, 90)), (1, 1, (180, 40, 60))]:
+    px(cv, tx_ + dx, ty_ + dy, c)
+# Glanz auf der Schnauze
+gx_, gy_ = TP(122, RY + 11)
+px(cv, gx_, gy_, RUB[5]); px(cv, gx_ + 1, gy_, RUB[4])
+# Strahlen der Ohrflossen
+for sg in (1, -1):
+    for (ex, ey) in [(98, RY - 16), (92, RY - 8), (91, RY + 4)]:
+        for k_ in range(14):
+            t = k_ / 13
+            x0 = 112 + (ex - 112) * t; y0 = RY + 2 + (ey - RY - 2) * t
+            if sg < 0:
+                x0 = 250 - x0
+            X_, Y_ = T(x0, y0)
+            recolor_on(cv, fr, X_, Y_, (120, 30, 30), 'o')
+# Faust am Speer: Fingerfugen + weiße Krallen
+for y0 in (166, 169, 172):
+    X0, Y_ = TP(85, y0)
+    for x in range(X0, X0 + 12):
+        if not (86 <= x <= 89):
+            recolor_on(cv, fr, x, Y_, RUB[0], 'R')
+for y0 in (167, 170, 173):
+    X_, Y_ = TP(96, y0)
+    px(cv, X_, Y_, (255, 255, 250)); px(cv, X_ + 1, Y_ + 1, (200, 200, 210))
+# Krallen an der offenen Hand
+for (fx, sgn) in ((152.5, -1), (156.5, -1), (163.5, 1), (167.5, 1)):
+    X_, Y_ = TP(fx, 118)
+    px(cv, X_, Y_, (255, 255, 250)); px(cv, X_, Y_ - 1, (255, 255, 250)); px(cv, X_ + 1, Y_, (200, 200, 214))
+    px(cv, X_ - sgn, Y_ - 2, (230, 230, 240)); px(cv, X_, Y_ + 1, OUT)
 
 # ---------------------------------------------------------------- Wagenkasten vorn + vordere Säulen
 

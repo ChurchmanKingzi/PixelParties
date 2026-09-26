@@ -112,10 +112,11 @@ def ribbon_bow(cx, cy, up):
 ribbon_bow(WX, WY - WRY, True)
 ribbon_bow(WX, WY + WRY, False)
 
-# ---------------------------------------------------------------- Wolken in den Ecken
+# ---------------------------------------------------------------- Wolken in den Ecken (Sitz der vier Bestien)
 CLOUD = [(60, 70, 120), (100, 120, 170), (150, 180, 220), (200, 226, 246), (240, 250, 255)]
-for (cx_, cy_, w_, h_, sd) in [(40, 104, 52, 12, 1), (210, 104, 52, 12, 2), (42, 292, 54, 12, 3), (208, 292, 54, 12, 4)]:
+for (cx_, cy_, w_, h_, sd) in [(40, 122, 60, 13, 1), (212, 134, 60, 13, 2), (46, 300, 70, 13, 3), (204, 302, 76, 13, 4)]:
     puffy_cloud(cv, cx_, cy_, w_, h_, CLOUD, seed=sd)
+
 
 class TF:
     """Fig mit Verschiebung/Skalierung: Bestien in lokalen Koordinaten zeichnen"""
@@ -134,167 +135,292 @@ class TF:
     def curve(self, pts, k, w=1.0, w1=None, **kw):
         self.f.curve([self.T(*p) for p in pts], k, w=w * self.sc, w1=None if w1 is None else w1 * self.sc, **kw)
 
+
+def clip_paste(rgba):
+    """nur innerhalb des Bildfelds einfügen"""
+    rgba = rgba.copy()
+    m = np.zeros(rgba.shape[:2], bool); m[AY0:AY1, AX0:AX1] = True
+    rgba[~m, 3] = 0
+    cv.paste(rgba, 0, 0)
+    return rgba
+
+
 def bolt(pts, c=(120, 240, 255), c2=(230, 255, 255)):
     for i in range(len(pts) - 1):
         (x0, y0), (x1, y1) = pts[i], pts[i + 1]
-        for t in np.linspace(0, 1, 12):
+        for t in np.linspace(0, 1, 14):
             x = x0 + (x1 - x0) * t; y = y0 + (y1 - y0) * t
             if in_art(x, y):
-                px(cv, x, y, c2); blend_px(cv, x + 1, y, c, 0.7)
+                px(cv, x, y, c2); blend_px(cv, x + 1, y, c, 0.7); blend_px(cv, x - 1, y, c, 0.35)
+
+
+def scale_pattern(fig, keys, dark, light, box, step=4, mask_fn=None):
+    """Schuppen: versetzte Bögen, gedithert auf die Fläche gesetzt"""
+    x0, y0, x1, y1 = box
+    for y in range(max(AY0, y0), min(AY1, y1)):
+        for x in range(max(AX0, x0), min(AX1, x1)):
+            if fig.L[y, x] not in keys or tuple(cv.a[y, x]) == OUT:
+                continue
+            if mask_fn is not None and not mask_fn(x, y):
+                continue
+            row = y // 3
+            u = (x + (row % 2) * (step // 2)) % step
+            v = y % 3
+            if v == 0 and u in (1, 2):
+                px(cv, x, y, dark)
+            elif v == 2 and u == 0:
+                px(cv, x, y, dark)
+            elif v == 1 and u == 2 and BAYER4[y % 4, x % 4] < 0.5:
+                px(cv, x, y, light)
+
 
 # ---------------------------------------------------------------- Qinglong (oben links): Blauer Drache
 QL = [(30, 44, 80), (60, 86, 130), (100, 134, 180), (150, 180, 220), (200, 222, 246), (240, 248, 255)]
 QB = [(120, 120, 110), (180, 176, 150), (226, 220, 190), (250, 246, 226)]
-QO, QY0 = 38, 76
-q = Fig(W, H); Q = TF(q, QO, QY0)
+q = Fig(W, H); Q = TF(q, 44, 92, 1.4)
 Q.part('tail'); Q.curve([(-18, 24), (-8, 30), (6, 28), (12, 22)], 'q', w=6, w1=1)
+Q.part('tailfin', line=False); Q.poly([(11, 23), (17, 16), (15, 25), (19, 28)], 'm')
 Q.part('body'); Q.curve([(-18, 24), (-10, 18), (-20, 6), (-12, -6), (0, -8)], 'q', w=10, w1=9)
 Q.part('belly', line=False); Q.curve([(-14, 23), (-7, 17), (-16, 7), (-9, -3)], 'b', w=3, w1=3)
 Q.part('mane', line=False)
-for (x, y, dx, dy) in [(-22, 18, -7, -2), (-24, 6, -7, -4), (-18, -6, -6, -6), (-8, -12, -3, -8)]:
+for (x, y, dx, dy) in [(-22, 18, -7, -2), (-24, 6, -7, -4), (-18, -6, -6, -6), (-8, -12, -3, -8), (-2, -16, 0, -7)]:
     Q.poly([(x, y), (x + dx, y + dy), (x + 3, y - 3)], 'm')
 Q.part('claw'); Q.limb(-4, -2, 4, 8, 3, 2.4, 'q')
+Q.part('talon')
+for k_ in (-1, 0, 1):
+    Q.limb(4, 8, 7 + k_ * 1.5, 11 + abs(k_), 1, 0.6, 'g')
 Q.part('horn2'); Q.poly([(2, -18), (-6, -26), (-2, -20)], 'm')
 Q.part('head')
 Q.ellipse(6, -12, 9, 7.5, 'q')
 Q.poly([(10, -18), (25, -16), (28, -11), (13, -7)], 'q')              # Oberkiefer
+Q.part('brow'); Q.poly([(4, -17), (13, -18), (11, -15), (5, -14)], 'm')
 Q.part('mouth'); Q.poly([(12, -8), (27, -10), (26, -4), (12, -4)], 'r')
 Q.part('jaw'); Q.poly([(8, -6), (25, -4), (24, 0), (9, 0)], 'q')
 Q.part('horn')                                                         # goldener Blitz-Horn (wie im Sprite)
 Q.poly([(4, -18), (0, -27), (5, -27), (1, -36), (10, -25), (5, -25), (9, -17)], 'g')
 Q.part('whisk', line=False)
-Q.curve([(27, -12), (33, -18), (34, -26)], 'm', w=1.3)
-Q.curve([(24, -2), (30, 3), (28, 10)], 'm', w=1.3)
+Q.curve([(27, -12), (33, -18), (34, -26)], 'm', w=1.1)
+Q.curve([(24, -2), (30, 3), (28, 10)], 'm', w=1.1)
 q.outline()
-cv.paste(q.render({'q': mat(QL, pillow=4, k=1.6, bias=0.1, spec=True), 'b': mat(QB, pillow=1.5, k=1.2),
-                   'g': mat(GOLD, pillow=1.5, k=1.8, spec=True), 'r': mat([(60, 6, 20), (120, 20, 40), (180, 50, 60)], pillow=1.5, k=1.2),
-                   'm': mat([(70, 180, 230), (130, 230, 255), (220, 255, 255)], pillow=1, k=1)}), 0, 0)
-# Bauchschuppen-Linien, Auge, Zähne, Nüstern
-for (x, y) in [(-14, 21), (-10, 17), (-15, 11), (-14, 5), (-11, 0)]:
-    X_, Y_ = Q.T(x, y); px(cv, X_, Y_, QB[0])
+clip_paste(q.render({'q': mat(QL, pillow=4, k=1.6, bias=0.1, spec=True), 'b': mat(QB, pillow=1.5, k=1.2, folds=(0.0, 1.6, 0.4)),
+                     'g': mat(GOLD, pillow=1.5, k=1.8, spec=True), 'r': mat([(60, 6, 20), (120, 20, 40), (180, 50, 60)], pillow=1.5, k=1.2),
+                     'm': mat([(70, 180, 230), (130, 230, 255), (220, 255, 255)], pillow=1, k=1)}))
+hx_, hy_ = Q.T(6, -12)
+scale_pattern(q, ['q'], QL[1], QL[4], (AX0, 50, 100, 140), mask_fn=lambda x, y: math.hypot(x - hx_, y - hy_) > 11 and y < Q.T(0, 20)[1] + 20)
+# Auge, Zähne, Nüstern
 X_, Y_ = Q.T(9, -14)
-px(cv, X_, Y_, (255, 240, 90)); px(cv, X_ + 1, Y_, (255, 200, 40)); px(cv, X_ + 1, Y_ - 1, (20, 20, 40)); px(cv, X_, Y_ - 1, (20, 20, 40))
+for (dx, dy, c) in [(0, 0, (255, 240, 90)), (1, 0, (255, 200, 40)), (0, 1, (230, 170, 30)), (1, 1, (20, 20, 40)), (-1, 0, (20, 20, 40)), (2, -1, (20, 20, 40)), (0, -1, (20, 20, 40)), (1, -1, (20, 20, 40))]:
+    px(cv, X_ + dx, Y_ + dy, c)
 for xx in (15, 19, 23):
-    X_, Y_ = Q.T(xx, -8); px(cv, X_, Y_, (255, 255, 255))
-    X_, Y_ = Q.T(xx + 1, -4); px(cv, X_, Y_, (255, 255, 255))
-X_, Y_ = Q.T(25, -15); px(cv, X_, Y_, QL[0])
+    X_, Y_ = Q.T(xx, -9); px(cv, X_, Y_, (255, 255, 255)); px(cv, X_, Y_ + 1, (220, 220, 230))
+    X_, Y_ = Q.T(xx + 1, -4); px(cv, X_, Y_, (255, 255, 255)); px(cv, X_, Y_ - 1, (220, 220, 230))
+X_, Y_ = Q.T(25, -15); px(cv, X_, Y_, QL[0]); px(cv, X_ + 1, Y_, QL[0])
 # türkise Blitze um den Drachen (wie im Sprite)
-bolt([(70, 46), (66, 52), (71, 55), (64, 64)])
-bolt([(18, 50), (22, 57), (18, 61), (23, 68)])
-bolt([(66, 86), (62, 92), (67, 95)])
+bolt([(84, 44), (79, 52), (85, 55), (77, 66)])
+bolt([(20, 46), (25, 55), (20, 60), (26, 70)])
+bolt([(86, 100), (80, 108), (86, 112)])
 
 # ---------------------------------------------------------------- Zhuque (oben rechts): Zinnoberroter Phönix
-ZR = [(50, 14, 14), (100, 30, 28), (150, 50, 40), (200, 84, 56), (236, 136, 90)]
+ZR = [(50, 14, 14), (100, 30, 28), (150, 50, 40), (200, 84, 56), (236, 136, 90), (255, 190, 130)]
 ZC = [(150, 110, 70), (210, 170, 110), (244, 220, 160), (255, 244, 210)]
 ZB = [(10, 16, 40), (24, 40, 80), (50, 76, 130), (100, 130, 190)]
-z = Fig(W, H); Z = TF(z, 208, 78)
+ZX, ZY, ZS = 204, 90, 1.38
+z = Fig(W, H); Z = TF(z, ZX, ZY, ZS)
+FEATH = [(28, -32, 4.4), (29, -22, 4.4), (27, -12, 4.2), (23, -3, 4), (17, 4, 3.6)]
 for s_ in (-1, 1):
-    Zs = TF(z, 208, 78, flip=s_)
-    # Schwungfedern: jede eine eigene Fläche -> gefiederte Kontur
-    for i, (ex, ey, w0) in enumerate([(28, -32, 4.2), (29, -22, 4.2), (27, -12, 4), (23, -3, 3.8), (17, 4, 3.4)]):
+    Zs = TF(z, ZX, ZY, ZS, flip=s_)
+    Zs.part('membrane%d' % s_)            # geschlossene Flügelfläche unter den Schwungfedern
+    Zs.poly([(3, -3)] + [(4 + (ex - 4) * 0.72, -2 + (ey + 2) * 0.72) for (ex, ey, w0) in FEATH] + [(8, 4)], 'o')
+    for i, (ex, ey, w0) in enumerate(FEATH):
         Zs.part('f%d_%d' % (s_, i)); Zs.limb(4, -2, ex, ey, w0 * 0.8, 1.6, 'r')
+    Zs.part('sec%d' % s_)                    # Armschwingen (kürzere Federreihe)
+    for i, (ex, ey) in enumerate([(20, -20), (19, -11), (16, -3), (12, 3)]):
+        Zs.part('s%d_%d' % (s_, i)); Zs.limb(4, -2, ex, ey, 3.2, 1.6, 'o')
     Zs.part('cov%d' % s_)
-    Zs.poly([(3, -4), (12, -16), (20, -24), (16, -8), (8, 4)], 'r')
+    Zs.poly([(3, -4), (12, -16), (18, -22), (14, -8), (8, 3)], 'c2')
     Zs.part('edge%d' % s_)
     Zs.curve([(6, -8), (14, -20), (22, -28), (27, -33)], 'c', w=2.6, w1=1.4)
-Z.part('tail')
-for i, dx in enumerate((-6, 0, 6)):
-    Z.part('t%d' % i); Z.curve([(0, 8), (dx * 1.1, 18), (dx * 1.6, 25)], 'r', w=4, w1=2)
+for i, (dx, ln) in enumerate([(-10, 22), (-5, 26), (0, 28), (5, 26), (10, 22)]):
+    Z.part('t%d' % i); Z.curve([(dx * 0.2, 8), (dx * 0.6, 8 + ln * 0.5), (dx * 1.3, 8 + ln)], 'o' if i % 2 else 'r', w=5, w1=1.6)
 Z.part('spirals')
-for s_ in (-1, 1):
-    Z.ellipse(s_ * 9, 27, 4.4, 4.2, 'd')
-Z.ellipse(0, 29, 3.4, 3.4, 'd')
+for (dx, ln) in [(-10, 22), (0, 28), (10, 22)]:
+    Z.ellipse(dx * 1.3, 8 + ln + 1, 3.6, 3.4, 'd')
 Z.part('body'); Z.ellipse(0, 2, 6, 9, 'r')
-Z.part('breast'); Z.ellipse(0, 4, 3.6, 6, 'c')
+Z.part('breast'); Z.ellipse(0, 3, 3, 4.6, 'c')
 Z.part('head'); Z.ellipse(0, -9, 4.6, 4.4, 'r')
 Z.part('crest')
-Z.curve([(0, -12), (-3, -18), (1, -24)], 'c', w=2.2, w1=1)
-Z.curve([(1, -12), (4, -17), (7, -19)], 'c', w=1.8, w1=1)
+Z.curve([(0, -12), (-3, -18), (1, -24)], 'o', w=2.6, w1=1)
+Z.curve([(1, -12), (4, -17), (7, -19)], 'o', w=2.2, w1=1)
+Z.curve([(-1, -12), (-5, -15), (-7, -14)], 'o', w=1.8, w1=1)
 Z.part('beak'); Z.poly([(-1.8, -7.5), (1.8, -7.5), (0, -3.5)], 'y')
 z.outline()
-cv.paste(z.render({'r': mat(ZR, pillow=3, k=1.5, bias=0.1), 'c': mat(ZC, pillow=2, k=1.4, bias=0.05),
-                   'd': mat(ZB, pillow=2, k=1.4), 'y': mat(GOLD, pillow=1, k=1.5)}), 0, 0)
-for (cx_, cy_, rr) in [(208 - 9, 105, 3.2), (208 + 9, 105, 3.2), (208, 107, 2.4)]:     # Spiralen
-    for t in np.linspace(0, 3 * math.pi, 40):
-        r = rr * (1 - t / (3.3 * math.pi))
-        px(cv, cx_ + math.cos(t) * r, cy_ + math.sin(t) * r, ZB[3])
-px(cv, 206, 68, (255, 230, 120)); px(cv, 210, 68, (255, 230, 120))
-glow(cv, 208, 72, 26, (255, 150, 90), k=0.35, mix=0.2)
+clip_paste(z.render({'r': mat(ZR, pillow=3, k=1.5, bias=0.1), 'o': mat(ZR, pillow=2, k=1.4, bias=0.2),
+                     'c': mat(ZC, pillow=2, k=1.4, bias=0.05), 'c2': mat(ZR, pillow=3, k=1.4, bias=0.1),
+                     'd': mat(ZB, pillow=2, k=1.4), 'y': mat(GOLD, pillow=1, k=1.5)}))
+# Federkiele + gedithertes Federmuster
+for s_ in (-1, 1):
+    Zs = TF(z, ZX, ZY, ZS, flip=s_)
+    for (ex, ey, w0) in FEATH:
+        for t in np.linspace(0.25, 0.92, 22):
+            x, y = Zs.T(4 + (ex - 4) * t, -2 + (ey + 2) * t)
+            if in_art(x, y) and tuple(cv.a[int(round(y)), int(round(x))]) != OUT:
+                px(cv, x, y, ZR[5] if t < 0.6 else ZR[4])
+scale_pattern(z, ['c2'], ZR[2], ZR[5], (150, 44, AX1, 110), step=4)
+for (cx_, cy_, rr) in [(-13, 31, 3.5), (13, 31, 3.5), (0, 37, 3.3)]:     # Spiralen in den Schwanzfedern
+    X0, Y0 = Z.T(cx_, cy_)
+    for t in np.linspace(0, 3 * math.pi, 50):
+        r = rr * ZS * (1 - t / (3.3 * math.pi))
+        px(cv, X0 + math.cos(t) * r, Y0 + math.sin(t) * r, ZB[3])
+X_, Y_ = Z.T(0, -10)
+px(cv, X_ - 3, Y_, (255, 230, 120)); px(cv, X_ + 3, Y_, (255, 230, 120)); px(cv, X_ - 3, Y_ + 1, (40, 10, 10)); px(cv, X_ + 3, Y_ + 1, (40, 10, 10))
+glow(cv, ZX, ZY - 6, 30, (255, 150, 90), k=0.35, mix=0.2)
+for (x, y) in [(176, 60), (228, 100), (190, 110), (222, 52)]:     # Glutfunken
+    sparkle(cv, x, y, (255, 220, 150), r=1, c2=(230, 120, 60))
 
-# ---------------------------------------------------------------- Xuanwu (unten links): Schwarze Schildkröte
-SH = [(26, 28, 40), (52, 56, 74), (84, 90, 110), (122, 128, 150), (170, 176, 196), (214, 218, 232)]
-XS = [(50, 44, 50), (96, 86, 90), (144, 132, 130), (186, 176, 166), (222, 214, 204)]
-x_ = Fig(W, H); XT = TF(x_, 42, 282, 1.15)
-XT.part('tailx'); XT.limb(-20, 0, -27, 4, 2.4, 1, 's')
-XT.part('legs')
-for (lx, ly) in [(-15, 3), (-1, 4), (13, 3)]:
-    XT.limb(lx, ly, lx - 1, ly + 8, 3.6, 3.2, 's')
-XT.part('neck'); XT.limb(16, -2, 24, -8, 4.6, 4.2, 's')
-XT.part('shell')
-XT.ellipse(0, 0, 22, 16, 'h', a0=180, a1=360)
-XT.part('rim'); XT.poly([(-23, -1), (23, -1), (21, 4), (-21, 4)], 'k')
-XT.part('head'); XT.ellipse(27, -11, 6.5, 5.5, 's')
-XT.part('ears')                     # kleine Fledermausohren (wie im Sprite)
-XT.poly([(23, -15), (21, -22), (26, -16)], 's'); XT.poly([(28, -16), (30, -23), (31, -15)], 's')
-XT.part('snout'); XT.poly([(30, -13), (37, -11), (36, -7), (29, -7)], 's')
-XT.part('mouthx'); XT.poly([(29, -8), (36, -8), (34, -5), (29, -5)], 'r')
+# ---------------------------------------------------------------- Xuanwu (unten links): Schildkröte mit Schlange
+SH = [(24, 26, 36), (46, 50, 66), (74, 80, 100), (108, 116, 136), (150, 158, 178), (196, 202, 218)]
+XS = [(44, 40, 46), (86, 80, 84), (130, 122, 120), (174, 166, 156), (214, 206, 196)]
+SN = [(6, 8, 16), (14, 22, 32), (28, 42, 56), (50, 72, 84), (90, 120, 120)]
+SNB = [(120, 100, 30), (190, 160, 60), (236, 214, 120)]
+TX_, TY_ = 50, 280                       # Panzermitte (Unterkante)
+# Schlangenschwanz hinter dem Panzer
+sb = Fig(W, H)
+sb.part('snakeback'); sb.curve([(40, 298), (22, 296), (14, 284), (16, 268), (24, 258)], 's', w=5.5, w1=5)
+sb.outline()
+clip_paste(sb.render({'s': mat(SN, pillow=2, k=1.5, bias=0.08)}))
+# Beine, Hals, Kopf, Schwanz
+x_ = Fig(W, H)
+x_.part('tailx'); x_.limb(TX_ - 26, TY_ + 1, TX_ - 34, TY_ + 6, 3, 1, 's')
+x_.part('legB'); x_.limb(TX_ - 18, TY_ + 1, TX_ - 27, TY_ + 12, 5, 4, 's'); x_.ellipse(TX_ - 28, TY_ + 14, 5, 2.6, 's')
+x_.part('legF'); x_.limb(TX_ + 20, TY_ + 1, TX_ + 29, TY_ + 11, 5.4, 4.4, 's'); x_.ellipse(TX_ + 31, TY_ + 13, 5.4, 2.8, 's')
+x_.part('plastron'); x_.ellipse(TX_, TY_ + 4, 22, 4, 'p')
+x_.part('neck'); x_.limb(TX_ + 26, TY_ - 6, TX_ + 36, TY_ - 16, 6, 5.4, 's')
+x_.part('head')
+x_.ellipse(TX_ + 41, TY_ - 21, 7.5, 6.4, 's')
+x_.ellipse(TX_ + 47, TY_ - 20, 5.5, 4.4, 's')             # stumpfe Schildkrötenschnauze
+x_.part('ears')                          # kleine Fledermausohren (wie im Sprite)
+x_.poly([(TX_ + 36, TY_ - 25), (TX_ + 35, TY_ - 30), (TX_ + 39, TY_ - 26)], 's')
+x_.part('mouthx'); x_.poly([(TX_ + 45, TY_ - 18), (TX_ + 52, TY_ - 19), (TX_ + 50, TY_ - 16), (TX_ + 45, TY_ - 16)], 'r')
 x_.outline()
-cv.paste(x_.render({'h': mat(SH, pillow=6, k=1.7, bias=0.05), 'k': mat(SH, pillow=1.5, k=1.2, bias=0.15), 's': mat(XS, pillow=3, k=1.5, bias=0.05),
-                    'r': mat([(60, 6, 20), (130, 30, 50)], pillow=1, k=1)}), 0, 0)
-# Panzerplatten: Sechsecke mit hellen Kanten
-for (cx_, cy_, rx_, ry_) in [(0, -9, 6, 4.5), (-12, -5, 5, 4), (12, -5, 5, 4), (-19, -1, 3, 2.5), (19, -1, 3, 2.5)]:
-    X0, Y0 = XT.T(cx_, cy_); rx_ *= 1.15; ry_ *= 1.15
-    for k in range(6):
-        a0_ = k * math.pi / 3; a1_ = (k + 1) * math.pi / 3
-        for t in np.linspace(0, 1, 8):
-            a = a0_ + (a1_ - a0_) * t
-            xx = X0 + math.cos(a) * rx_; yy = Y0 + math.sin(a) * ry_
-            if x_.L[int(round(yy)), int(round(xx))] == 'h':
-                px(cv, xx, yy, SH[1] if math.sin(a) > -0.3 else SH[4])
-    px(cv, X0 - 1, Y0 - 1, SH[5])
-X_, Y_ = XT.T(28, -13); px(cv, X_, Y_, (255, 80, 90)); px(cv, X_ + 1, Y_, (30, 10, 14))
-for xx in (31, 34):
-    X_, Y_ = XT.T(xx, -8); px(cv, X_, Y_, (255, 255, 255)); px(cv, X_, Y_ + 1, (230, 230, 230))
-X_, Y_ = XT.T(25, -9); blush(cv, X_, Y_, (240, 140, 160))
+clip_paste(x_.render({'s': mat(XS, pillow=3, k=1.5, bias=0.05), 'r': mat([(60, 6, 20), (130, 30, 50)], pillow=1, k=1),
+                      'p': mat([(120, 100, 60), (180, 160, 100), (226, 210, 150)], pillow=2, k=1.3)}))
+scale_pattern(x_, ['s'], XS[1], XS[3], (AX0, 250, 110, AY1))
+# Panzer als Relief: gewölbte Kuppel mit sechseckigen Platten (Voronoi auf Sechseckgitter)
+yy, xx = np.indices((H, W)).astype(np.float32)
+RX, RY = 31, 22
+dome = ((xx - TX_) / RX) ** 2 + ((yy - TY_) / RY) ** 2
+Msh = (dome <= 1) & (yy <= TY_)
+cents = []
+for j in range(-4, 2):
+    for i in range(-6, 7):
+        cents.append((TX_ + i * 9 + (4.5 if j % 2 else 0), TY_ + j * 7.5 + 2))
+cents = np.array(cents, np.float32)
+D = np.stack([np.hypot((xx - cx_) * 1.0, (yy - cy_) * 1.2) for (cx_, cy_) in cents])
+Ds = np.sort(D, axis=0)
+edge = Ds[1] - Ds[0]
+Hsh = np.sqrt(np.clip(1 - dome, 0, 1)) * 6 + np.minimum(edge, 3) * 0.55 + (noise(H, W, 2, seed=44) - 0.5) * 0.5
+Msh &= (yy >= AY0) & (xx >= AX0)
+relief(cv, Hsh, np.zeros((H, W), np.int32), [SH], Msh, k=1.2, bias=0.06)
+for y, x in zip(*np.where(Msh)):
+    if edge[y, x] < 1.0:
+        px(cv, x, y, SH[0] if (x + y) % 3 else SH[1])
+# Panzerrand (heller Saum mit Kerben) + Umriss
+for x in range(TX_ - RX - 1, TX_ + RX + 2):
+    for y in range(TY_ - 1, TY_ + 4):
+        if abs(x - TX_) <= RX + 1 - (y - TY_) * 0.5 and in_art(x, y):
+            px(cv, x, y, OUT if y == TY_ + 3 else (SH[4] if y == TY_ - 1 else rampc(SH, 0.75 - (y - TY_) * 0.12, x, y)))
+    if x % 6 == 0 and in_art(x, TY_ + 1):
+        px(cv, x, TY_ + 1, SH[1]); px(cv, x, TY_ + 2, SH[1])
+ring = cv2.dilate(Msh.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+for y, x in zip(*np.where(ring & ~Msh)):
+    if in_art(x, y) and y < TY_:
+        px(cv, x, y, OUT)
+# Schlange windet sich über den Panzer, Kopf erhoben – Blick zur Schildkröte (klassisches Xuanwu-Motiv)
+sn = Fig(W, H)
+sn.part('snake')
+sn.curve([(24, 258), (36, 254), (48, 262), (60, 256), (70, 250), (74, 240), (70, 230)], 's', w=5.5, w1=4.5)
+sn.part('snakehead')
+sn.ellipse(74, 225, 5, 3.8, 's')
+sn.poly([(76, 222), (83, 224), (82, 228), (76, 229)], 's')
+sn.part('tongue', line=False); sn.curve([(83, 226), (87, 228), (89, 227)], 'r', w=1)
+sn.outline()
+clip_paste(sn.render({'s': mat(SN, pillow=2.5, k=1.6, bias=0.1, spec=True), 'r': mat([(160, 20, 30), (230, 60, 60)], pillow=1)}))
+scale_pattern(sn, ['s'], SN[1], SN[4], (20, 216, 92, 270), step=3)
+# gelbes Bauchband der Schlange
+for (x, y) in bezier((25, 260), (48, 266), (68, 252), 26):
+    if tuple(cv.a[int(y), int(x)]) != OUT:
+        px(cv, x, y, SNB[1] if int(x) % 2 else SNB[2])
+px(cv, 77, 224, (255, 220, 60)); px(cv, 78, 224, (20, 10, 10))
+# Schildkröte: rotes Auge, Fangzähne, Nüstern, Wangenröte
+px(cv, TX_ + 42, TY_ - 23, (255, 80, 90)); px(cv, TX_ + 43, TY_ - 23, (30, 10, 14)); px(cv, TX_ + 42, TY_ - 24, (30, 10, 14))
+for xx_ in (TX_ + 47, TX_ + 50):
+    px(cv, xx_, TY_ - 18, (255, 255, 255)); px(cv, xx_, TY_ - 17, (220, 220, 230))
+px(cv, TX_ + 51, TY_ - 21, XS[0])
+blush(cv, TX_ + 38, TY_ - 18, (240, 140, 160))
+for (lx, ly) in [(TX_ - 29, TY_ + 15), (TX_ + 32, TY_ + 14)]:      # Krallen
+    for k_ in (-2, 0, 2):
+        px(cv, lx + k_, ly + 1, (230, 222, 206)); px(cv, lx + k_, ly + 2, (120, 110, 100))
 
 # ---------------------------------------------------------------- Baihu (unten rechts): Weißer Tiger
-BT = [(50, 40, 90), (100, 90, 150), (150, 144, 200), (200, 198, 236), (236, 236, 252), (255, 255, 255)]
+BT = [(60, 56, 90), (116, 114, 158), (176, 176, 212), (222, 222, 244), (246, 246, 255), (255, 255, 255)]
+STR = (26, 20, 38)
 b_ = Fig(W, H)
-BX, BY = 206, 266
-b_.part('spikes')                    # stachelige Schnurrhaar-Büschel (wie im Sprite)
-for s in (-1, 1):
-    for (dy, L) in [(-4, 14), (2, 16), (8, 12)]:
-        b_.poly([(BX + s * 8, BY + dy - 2), (BX + s * (10 + L), BY + dy - 1), (BX + s * 8, BY + dy + 2)], 'w')
-b_.part('paws')
-b_.ellipse(BX - 9, BY + 22, 6, 4, 'w'); b_.ellipse(BX + 9, BY + 22, 6, 4, 'w')
-b_.part('head')
-b_.ellipse(BX, BY, 12, 11, 'w')
+b_.part('tail'); b_.curve([(222, 282), (232, 272), (232, 258), (224, 248), (218, 246)], 'w', w=5.5, w1=3.2)
+b_.part('legBack'); b_.limb(174, 280, 170, 295, 4.6, 4, 'w'); b_.ellipse(166, 296, 5.5, 3, 'w')
+b_.part('body'); b_.ellipse(198, 279, 25, 12.5, 'w')
+b_.part('haunch'); b_.ellipse(215, 281, 12, 11, 'w')
+b_.part('hindpaw'); b_.ellipse(207, 295, 9, 3.6, 'w')
+b_.part('chest'); b_.poly([(170, 262), (190, 266), (192, 282), (180, 288), (168, 280)], 'f')
+b_.part('legFront'); b_.limb(184, 280, 183, 294, 5.6, 5, 'w'); b_.ellipse(179, 297, 7.5, 3.4, 'w')
+b_.part('ruffL'); b_.poly([(158, 254), (150, 256), (156, 260), (149, 264), (157, 266), (152, 271), (162, 268)], 'f')
+b_.part('ruffR'); b_.poly([(186, 252), (194, 252), (189, 257), (196, 261), (188, 263), (193, 268), (184, 266)], 'f')
+b_.part('head'); b_.ellipse(172, 256, 15, 13, 'w')
 b_.part('ears')
-b_.poly([(BX - 11, BY - 5), (BX - 13, BY - 18), (BX - 4, BY - 10)], 'w'); b_.poly([(BX + 11, BY - 5), (BX + 13, BY - 18), (BX + 4, BY - 10)], 'w')
-b_.part('ruff')                      # weiße Mähne
-ruff = []
-for i in range(15):
-    a = math.pi * (0.05 + i / 14 * 0.9)
-    r = 14 if i % 2 == 0 else 10
-    ruff.append((BX + math.cos(a) * r * 1.2, BY + 8 + math.sin(a) * r * 0.8))
-b_.poly([(BX - 14, BY + 8), (BX + 14, BY + 8)] + ruff[::-1], 'f')
-b_.part('muzzle'); b_.ellipse(BX, BY + 4, 6, 4.5, 'f')
-b_.part('mouth'); b_.ellipse(BX, BY + 7, 4, 3, 'm')
+b_.poly([(160, 248), (157, 236), (168, 243)], 'w'); b_.poly([(178, 243), (186, 234), (186, 248)], 'w')
+b_.part('muzzle'); b_.ellipse(168, 264, 8.5, 5.5, 'f')
+b_.part('mouth'); b_.ellipse(168, 268, 3.8, 2.2, 'm')
+b_.part('nose'); b_.poly([(165, 260), (170, 260), (167.5, 262.5)], 'n')
 b_.outline()
-cv.paste(b_.render({'w': mat(BT, pillow=3, k=1.5, bias=0.02), 'f': mat(WHITE_CLOTH, pillow=3, k=1.4, noise=0.8, nscale=2),
-                    'm': mat([(40, 4, 14), (100, 10, 30), (160, 30, 50)], pillow=2, k=1.3)}), 0, 0)
-# Streifen, rote Augen, Zähne
-for s in (-1, 1):
-    for (dx, dy) in [(3, -10), (3, -9), (4, -8), (8, -7), (9, -6), (9, -5), (10, -1), (11, 0), (11, 2), (10, 3)]:
-        px(cv, BX + s * dx, BY + dy, BT[0])
-    px(cv, BX, BY - 9, BT[0]); px(cv, BX, BY - 8, BT[0]); px(cv, BX - 1, BY - 10, BT[0]); px(cv, BX + 1, BY - 10, BT[0])
-    ex = BX + s * 5
-    px(cv, ex, BY - 2, (240, 40, 50)); px(cv, ex - s, BY - 2, (140, 10, 20)); px(cv, ex, BY - 3, (40, 10, 30)); px(cv, ex - s, BY - 3, (40, 10, 30))
-    px(cv, BX + s * 3, BY + 5, (255, 255, 255)); px(cv, BX + s * 3, BY + 6, (255, 255, 255))
-    px(cv, BX + s * 2, BY + 10, (255, 255, 255))
-px(cv, BX, BY + 1, (60, 20, 50)); px(cv, BX - 1, BY + 1, (60, 20, 50)); px(cv, BX + 1, BY + 1, (60, 20, 50))
-for dx in (-10, -8, 8, 10):          # Krallen
-    px(cv, BX + dx, BY + 25, BT[0])
+clip_paste(b_.render({'w': mat(BT, pillow=4, k=1.5, bias=0.04, noise=0.6, nscale=2), 'f': mat(WHITE_CLOTH, pillow=3, k=1.4, noise=0.8, nscale=2, bias=0.05),
+                      'm': mat([(40, 4, 14), (100, 10, 30), (160, 30, 50)], pillow=2, k=1.3), 'n': mat([(140, 60, 90), (220, 120, 150)], pillow=1, k=1)}))
+TL_ = b_.L
+def stripe(pts, w=1.6):
+    for (x, y) in pts:
+        for dx in range(-int(w // 2), int(math.ceil(w / 2))):
+            X, Y = int(round(x + dx)), int(round(y))
+            if TL_[Y, X] == 'w' and tuple(cv.a[Y, X]) != OUT:
+                px(cv, X, Y, STR)
+# Körperstreifen (schwarz, geschwungen)
+for (x0, top, bot, bend) in [(184, 268, 286, 3), (192, 267, 289, 3), (200, 267, 290, 2), (208, 268, 288, 2), (216, 271, 285, 1), (224, 273, 284, 1)]:
+    stripe(bezier((x0, top), (x0 + bend + 2, (top + bot) / 2), (x0 - 1, bot - 5), 22), w=2 if x0 < 212 else 1.6)
+for (x0, y0) in [(210, 276), (218, 278)]:      # Keulenstreifen
+    stripe(bezier((x0, y0), (x0 + 4, y0 + 4), (x0 + 3, y0 + 10), 14))
+for (y0,) in [(286,), (290,)]:                  # Beinstreifen
+    stripe([(181, y0), (182, y0), (183, y0), (184, y0)], 1)
+    stripe([(169, y0 - 1), (170, y0 - 1), (171, y0 - 1)], 1)
+for i, t in enumerate(np.linspace(0.15, 0.9, 5)):   # Schwanzringe
+    x, y = bezier((222, 282), (236, 262), (218, 246), 50)[int(t * 49)]
+    stripe([(x - 2, y), (x - 1, y), (x, y), (x + 1, y), (x + 2, y)], 1)
+# Stirnzeichnung + Wangenstreifen
+for (pts) in [[(170, 245), (174, 245)], [(169, 248), (175, 248)], [(172, 244), (172, 250)],
+              [(160, 252), (163, 253)], [(159, 256), (163, 256)], [(181, 252), (184, 251)], [(182, 256), (186, 256)], [(166, 246), (167, 249)], [(178, 246), (177, 249)]]:
+    stripe(bezier(pts[0], ((pts[0][0] + pts[-1][0]) / 2, (pts[0][1] + pts[-1][1]) / 2), pts[-1], 8), w=1)
+# rote Augen (wie im Sprite), Fangzähne, Innenohr
+for (ex, s_) in [(164, -1), (179, 1)]:
+    for (dx, dy, c) in [(-1, 0, (240, 40, 50)), (0, 0, (255, 70, 70)), (1, 0, (240, 40, 50)), (-1, 1, (160, 16, 26)), (0, 1, (200, 24, 36)),
+                        (1, 1, (160, 16, 26)), (-2, -1, STR), (-1, -1, STR), (0, -1, STR), (1, -1, STR), (2, -1, STR), (s_ * 3, -2, STR),
+                        (-s_ * 2, 0, STR)]:
+        px(cv, ex + dx, 254 + dy, c)
+    px(cv, ex, 254, (255, 230, 200))
+for (x, y) in [(165, 267), (171, 267)]:
+    px(cv, x, y, (255, 255, 255)); px(cv, x, y + 1, (230, 230, 240))
+for (x, y) in [(160, 243), (161, 244), (183, 241), (183, 243)]:
+    px(cv, x, y, (230, 150, 180))
+for (x, y) in [(160, 264), (162, 266), (175, 264), (173, 266)]:
+    px(cv, x, y, BT[1])
+for dx in (-4, -1, 2):                          # Krallen
+    px(cv, 179 + dx, 299, BT[0])
+glow(cv, 196, 270, 34, (230, 230, 255), k=0.25, mix=0.15)
 
 # ---------------------------------------------------------------- Crestina
 HAIRC = [(10, 10, 34), (20, 24, 70), (34, 44, 110), (50, 80, 150), (80, 150, 190), (150, 230, 240)]
@@ -335,17 +461,28 @@ f.part('hairback')
 f.poly([(111, 110), (106, 128), (108, 146), (116, 140), (125, 136), (134, 140), (142, 146), (144, 128), (139, 110)], 'h')
 # gebeugtes Bein (hinter dem Standbein, klassische "4"-Pose)
 f.part('legB')
-f.limb(129, 182, 141, 202, 5.8, 4.6, 's')
-f.limb(141, 202, 127, 218, 4.4, 3.4, 's')
-f.poly([(127, 215), (120, 220), (123, 223), (130, 219)], 's')
+f.limb(129, 182, 140, 201, 5.8, 4.4, 's')
+f.ellipse(140.5, 201.5, 4.5, 4.3, 's')                  # rundes Knie
+f.limb(140, 203, 129, 217, 4.0, 2.9, 's')
+f.part('shoeB')                                         # zierlicher Schuh, Spitze nach hinten
+f.ellipse(129, 218, 3.2, 2.8, 'k')
+f.limb(129, 218, 121, 221, 2.6, 1.3, 'k')
 # Standbein
 f.part('legF')
-f.limb(121, 182, 119, 208, 6, 4.6, 's')
-f.limb(119, 208, 118, 234, 4.4, 3.2, 's')
-f.poly([(115, 232), (121, 232), (120, 242), (117, 245)], 's')
+f.limb(121, 182, 119, 207, 6, 4.4, 's')
+f.ellipse(119, 207, 4.3, 3.8, 's')
+f.limb(119, 208, 118, 232, 4.2, 2.9, 's')
+f.part('shoeF')                                         # auf Zehenspitzen: Schuh mit Spann, Spitze nach unten
+f.ellipse(118, 235, 3.4, 3.4, 'k')
+f.limb(118, 236, 116.5, 245, 3.0, 1.4, 'k')
 # Kleid: Mieder + wehender Rock
 f.part('skirt')
-f.poly([(115, 158), (135, 158), (142, 172), (152, 186), (144, 190), (136, 186), (128, 192), (120, 186), (110, 190), (104, 184), (112, 172)], 'd')
+skirt = [(115, 157), (135, 157), (140, 168), (148, 180), (156, 188)]
+for i in range(9):                       # wellenförmiger Saum
+    u = i / 8
+    skirt.append((154 - u * 56, 190 + (4 if i % 2 else 0) - 3 * math.sin(u * math.pi) + u * 1))
+skirt += [(100, 186), (106, 176), (111, 166)]
+f.poly(skirt, 'd')
 f.part('bodice')
 f.poly([(116, 136), (134, 136), (136, 148), (134, 160), (116, 160), (114, 148)], 'd')
 f.part('neck'); f.rect(122, 126, 128, 137, 's')
@@ -353,14 +490,12 @@ f.part('neck'); f.rect(122, 126, 128, 137, 's')
 f.part('staffR')                     # rechter Stab (erhoben)
 f.limb(166, 132, 158, 78, 1.6, 1.6, 't')
 f.part('armR')
-f.limb(135, 139, 150, 128, 3.6, 3, 's')
-f.limb(150, 128, 160, 112, 3, 2.6, 's')
+f.curve([(135, 139), (144, 133), (151, 125), (156, 117), (160, 111)], 's', w=7.2, w1=5)
 f.part('handR'); f.ellipse(161, 109, 3.4, 3.2, 's')
 f.part('staffL')                     # linker Stab (gesenkt)
 f.limb(84, 190, 94, 138, 1.6, 1.6, 't')
 f.part('armL')
-f.limb(115, 139, 104, 152, 3.6, 3, 's')
-f.limb(104, 152, 92, 162, 3, 2.6, 's')
+f.curve([(115, 139), (108, 146), (102, 153), (96, 159), (91, 162)], 's', w=7.2, w1=5)
 f.part('handL'); f.ellipse(90, 163, 3.4, 3.2, 's')
 # Schärpe: um die Taille geschlungen, weht zu beiden Seiten
 f.part('sash')
@@ -385,7 +520,8 @@ f.outline()
 MATS = {
     's': mat(SKIN, pillow=3, k=1.3, bias=0.12),
     'h': mat(HAIRC, pillow=4, k=1.7, noise=0.8, nscale=2, bias=0.05),
-    'd': mat(DRESS, pillow=4, k=1.5, folds=(0.5, 0.1, 0.6)),
+    'd': mat(DRESS, pillow=4, k=1.5, folds=(0.55, 0.1, 0.6)),
+    'k': mat([(10, 50, 60), (20, 100, 110), (60, 170, 170), (150, 236, 220), (230, 255, 245)], pillow=2, k=1.6, spec=True),
     'v': mat(SASH, pillow=2, k=1.5, folds=(0.4, 0.4, 0.5)),
     't': mat(STAFF, pillow=1.2, k=1.6, spec=True),
 }
@@ -399,6 +535,22 @@ ring &= ~FM
 for y, x in zip(*np.where(ring)):
     if in_art(x, y) and BAYER4[y % 4, x % 4] < 0.7:
         blend_px(cv, x, y, (170, 255, 230), 0.55)
+# Leuchtsaum am Rocksaum + Faltenlichter
+DM_ = f.L == 'd'
+for y in range(170, 200):
+    for x in range(98, 160):
+        if DM_[y, x] and not DM_[y + 1, x] and not DM_[y + 2, x]:
+            px(cv, x, y - 1, (190, 255, 230)); px(cv, x, y - 2, DRESS[4] if x % 2 else (190, 255, 230))
+            blend_px(cv, x, y + 2, (160, 255, 210), 0.5)
+for (x0, x1) in [(118, 108), (125, 125), (132, 144)]:
+    for t_ in np.linspace(0.15, 0.9, 12):
+        x = 125 + (x0 - 125) * 0.2 + (x1 - x0 * 0.2 - 125 * 0.8) * t_; y = 160 + t_ * 28
+        if DM_[int(y), int(round(x))] and tuple(cv.a[int(y), int(round(x))]) != OUT:
+            px(cv, x, y, DRESS[4])
+for (x, y) in [(110, 186), (122, 190), (136, 188), (148, 186)]:
+    sparkle(cv, x, y + 2, (220, 255, 240), r=1, c2=(120, 220, 190))
+for (x, y) in [(117, 233), (119, 232), (128, 216), (130, 216)]:   # Schuhbänder
+    px(cv, x, y, GOLD[4])
 # Gesicht
 anime_eye(cv, 117, 117, (40, 210, 230), h=7, w=5)
 anime_eye(cv, 128, 117, (40, 210, 230), h=7, w=5, flip=True)

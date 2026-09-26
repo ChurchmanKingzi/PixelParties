@@ -144,6 +144,24 @@ for (x0, y0, L, sd) in [(118, 262, 16, 1), (140, 208, 12, 2), (84, 236, 10, 3)]:
             if Mp[y, x]:
                 px(cv, x, y, (255, 150, 50))
 mask_outline(cv, Mp, (4, 2, 4))
+# eingravierte, glühende Rahmenlinie und Siegel (kleines umgedrehtes Pentagramm) über dem Ring
+for x in range(PX0 + 8, PX1 - 7):
+    for y in (PT + 8, PB - 9):
+        if (x // 3) % 2 == 0:
+            px(cv, x, y, (150, 30, 14))
+for y in range(PT + 8, PB - 8):
+    for x in (PX0 + 8, PX1 - 8):
+        if (y // 3) % 2 == 0:
+            px(cv, x, y, (150, 30, 14))
+SGX, SGY, SGR = 125, 222, 8
+glow2(cv, SGX, SGY, 14, (255, 70, 20), k=0.55, mix=0.35)
+sp = [(SGX + math.cos(math.radians(90 + k * 72)) * SGR, SGY + math.sin(math.radians(90 + k * 72)) * SGR) for k in range(5)]
+for i in range(5):
+    a_, b_ = sp[[0, 2, 4, 1, 3, 0][i]], sp[[0, 2, 4, 1, 3, 0][i + 1]]
+    for (x, y) in pts_line(a_[0], a_[1], b_[0], b_[1]):
+        px(cv, x, y, (255, 140, 50))
+for t in np.linspace(0, 2 * math.pi, 70):
+    px(cv, SGX + math.cos(t) * (SGR + 2), SGY + math.sin(t) * (SGR + 2), (220, 70, 24))
 # Ring für die Ketten
 RX, RY = 125, 240
 IRON = [(14, 12, 16), (34, 30, 36), (60, 54, 62), (96, 90, 100), (146, 140, 150), (210, 206, 216)]

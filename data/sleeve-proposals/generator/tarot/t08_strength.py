@@ -146,11 +146,10 @@ lemniscate(cv, 80, 64, 17, th=1.6)
 FUR = [(92, 30, 8), (160, 64, 14), (214, 108, 24), (242, 150, 40), (255, 196, 86), (255, 232, 160)]
 STRIPE = [(12, 6, 12), (20, 10, 16), (32, 16, 20), (50, 26, 24), (72, 40, 30), (96, 56, 36)]
 MANE = [(120, 70, 10), (196, 146, 24), (240, 206, 60), (255, 236, 120), (255, 250, 196), (255, 255, 240)]
-WFUR = [(118, 104, 114), (166, 156, 164), (210, 202, 202), (238, 232, 226), (255, 252, 246)]
-MASK = [(70, 8, 18), (130, 16, 30), (196, 30, 44), (236, 70, 70), (255, 130, 120)]
-NOSE = [(70, 24, 34), (130, 56, 66), (196, 100, 110), (240, 164, 170)]
+WFUR = [(104, 92, 104), (150, 140, 150), (196, 188, 190), (228, 222, 216), (246, 242, 234), (255, 254, 250)]
+MASK = [(80, 8, 20), (140, 18, 32), (196, 34, 44), (230, 72, 66), (250, 120, 100)]
+NOSE = [(70, 24, 34), (120, 50, 62), (176, 88, 100), (220, 136, 146), (246, 184, 190)]
 EARIN = [(120, 80, 90), (180, 140, 146), (226, 196, 196), (250, 232, 228)]
-MOUTH = [(34, 4, 12), (80, 12, 26), (140, 30, 50), (200, 70, 90)]
 TX, TY, S = 160, 172, 1.25     # Kopfmitte + Maßstab des Kopfes
 def P(pts):
     return [(TX + x * S, TY + y * S) for (x, y) in pts]
@@ -167,10 +166,7 @@ t.part('tail'); t.curve([(237, 282), (232, 294), (216, 300), (200, 298), (192, 2
 # ---- ferne Vorderpfote
 t.part('legF'); t.limb(210, 236, 208, 283, 12, 9, 'y')
 t.part('pawF'); t.ellipse(207, 291, 13, 7, 'y')
-# ---- Brust-Latz (weißes Fell) + nahe Vorderpfote mit Ellbogen
-t.part('chest', line=False)
-t.ellipse(185, 222, 20, 26, 'w')
-t.poly([(166, 236), (170, 254), (175, 246), (179, 264), (184, 250), (189, 266), (193, 250), (198, 258), (201, 244), (204, 230)], 'w')
+# ---- nahe Vorderpfote mit Ellbogen (der weiße Brustlatz wird unten als Fell-Relief gemalt)
 t.part('legN')
 t.limb(174, 230, 167, 258, 13, 10.5, 'y')
 t.limb(167, 258, 162, 284, 10.5, 9.5, 'y')
@@ -185,85 +181,51 @@ for i in range(N):
     rr = (37 + 9 * max(0, top)) if i % 2 == 0 else 29
     mane.append(Q(2 + math.cos(a) * rr * 1.08, 4 + math.sin(a) * rr))
 t.poly(mane, 'm')
-# ---- Ohren
-t.part('earF'); t.ellipse(*Q(17, -19), 7.5 * S, 8.5 * S, 'y')
-t.part('earN'); t.ellipse(*Q(-15, -20), 7.5 * S, 8.5 * S, 'y')
-t.part('earIn', line=False); t.ellipse(*Q(-15, -18), 4.5 * S, 5.5 * S, 'e'); t.ellipse(*Q(17, -17), 4.5 * S, 5.5 * S, 'e')
-# ---- Kopf mit gezackten Wangenkrausen
-t.part('head')
-t.poly(P([(-22, -15), (-12, -21), (4, -22), (18, -19), (26, -11), (29, -3), (36, 3), (30, 7), (35, 13), (28, 16), (30, 23),
-          (18, 25), (6, 30), (-10, 31), (-22, 27), (-31, 24), (-28, 18), (-36, 13), (-29, 8), (-33, 1), (-27, -5), (-26, -11)]), 'y')
-t.part('white', line=False)
-t.poly(P([(-33, 1), (-24, 4), (-18, 12), (-20, 22), (-31, 24), (-28, 18), (-36, 13), (-29, 8)]), 'w')
-t.poly(P([(36, 3), (24, 4), (14, 12), (16, 24), (30, 23), (28, 16), (35, 13), (30, 7)]), 'w')
-# rote Maske (Hu): Raute auf der Stirn, Nasenrücken und flammenartige Brauen
-t.part('redmask', line=False)
-t.poly(P([(-5, -21), (1, -14), (1, -9), (-1, 5), (-11, 5), (-11, -9), (-11, -14)]), 'r')
-t.poly(P([(-10, -10), (-19, -11), (-28, -7), (-22, -6), (-12, -6)]), 'r')
-t.poly(P([(0, -10), (10, -12), (24, -9), (18, -6), (0, -6)]), 'r')
-# Schnauze: Kinn, Maul, Schnurrhaarpolster, Nase
-t.part('chin'); t.ellipse(*Q(-6, 25), 9 * S, 5 * S, 'w')
-t.part('mouth'); t.poly(P([(-19, 15), (7, 15), (3, 22), (-15, 22)]), 'M')
-t.part('padL'); t.ellipse(*Q(-13, 13), 8.5 * S, 6 * S, 'w')
-t.part('padR'); t.ellipse(*Q(2, 13), 8.5 * S, 6 * S, 'w')
-t.part('nose'); t.poly(P([(-14, 5), (2, 5), (-2, 11), (-10, 11)]), 'N')
+# ---- Ohren (rund, innen helles Fell)
+t.part('earF'); t.ellipse(*Q(18, -20), 7.5 * S, 8.5 * S, 'y')
+t.part('earN'); t.ellipse(*Q(-13, -21), 7.5 * S, 8.5 * S, 'y')
+t.part('earIn', line=False); t.ellipse(*Q(-13, -19), 4.5 * S, 5.5 * S, 'e'); t.ellipse(*Q(18, -18), 4.5 * S, 5.5 * S, 'e')
 t.outline()
 TMATS = {
     'y': mat(FUR, pillow=7, k=1.5, bias=0.06),
     'm': mat(MANE, pillow=5, k=1.8, noise=0.8, nscale=2, bias=0.05),
-    'w': mat(WFUR, pillow=3, k=1.4, bias=0.08),
-    'r': mat(MASK, pillow=2, k=1.2, bias=0.06),
     'e': mat(EARIN, pillow=2, k=1.2),
-    'N': mat(NOSE, pillow=1.5, k=1.6, bias=0.1, spec=True, spec_col=(255, 220, 230)),
-    'M': mat(MOUTH, pillow=1.5, k=1.2),
 }
 trgba = t.render(TMATS)
-# ---- Tigerstreifen als verjüngte Pinselstriche auf das schattierte Fell
+# ---- Körperstreifen: geschwungene, vom Rücken her verjüngte Pinselstriche (teils gegabelt)
 SM = np.zeros((H, W), bool)
-def TS(pts, w0, w1=0.6):
-    taper(SM, [Q(x, y) for (x, y) in pts], w0 * S, w1)
-# Kopf: Stirnstreifen seitlich der roten Raute, Ohrrücken, Wangenkeile
-TS([(4, -19), (10, -16), (14, -14)], 2.0, 0.6)
-TS([(6, -15), (12, -13)], 1.8, 0.6)
-TS([(-14, -19), (-19, -15), (-22, -13)], 2.0, 0.6)
-TS([(-15, -15), (-20, -13)], 1.8, 0.6)
-TS([(18, -18), (22, -14)], 1.6, 0.6)
-TS([(-21, -24), (-17, -27)], 2.2, 1)
-TS([(23, -23), (19, -26)], 2.2, 1)
-for (y, dy) in [(5, 0), (11, 2), (17, 1)]:
-    TS([(-34, y), (-24, y + 1 + dy)], 2.6)
-    TS([(33, y - 2), (22, y - 1 + dy)], 2.6)
-# Körper: spindelförmige Keile vom Rücken nach unten
-def spindle(pts, w):
-    taper(SM, pts[:2], 1.0, w); taper(SM, pts[1:], w, 0.6)
-for i, x0 in enumerate(range(200, 240, 9)):
+for i, x0 in enumerate([194, 203, 212, 221, 230]):
     top = 196 + (x0 - 178) * 0.42
-    wob = 2 if i % 2 else -2
-    L_ = 20 + (i % 3) * 7
-    spindle([(x0 + 1, top + 2), (x0 - 1 + wob, top + L_ * 0.45), (x0 + wob * 0.5 - 2, top + L_)], 2.6)
-# Flanke/Keule: geschwungene Keile von rechts
-for (y0_, L_) in [(234, 16), (248, 22), (262, 24), (276, 22), (289, 14)]:
-    spindle([(237, y0_ - 2), (237 - L_ * 0.5, y0_ + 3), (237 - L_, y0_ + 1)], 2.8)
-# Beine: waagrechte Bänder
-for y in range(240, 282, 7):
-    xl = 160 + (y - 240) * -0.05
-    spindle([(xl, y), (xl + 7, y + 1), (xl + 14, y - 1)], 2.4)
+    L_ = 24 + (i % 3) * 6
+    taper(SM, [(x0, top), (x0 + 3, top + L_ * 0.3), (x0 + 5, top + L_ * 0.6), (x0 + 2 + (i % 2) * 3, top + L_)], 3.8, 0.5)
+    if i % 2 == 0:
+        taper(SM, [(x0 + 4, top + L_ * 0.35), (x0 + 8, top + L_ * 0.55), (x0 + 9, top + L_ * 0.75)], 2.2, 0.5)
+# Flanke/Keule: Bögen von hinten nach vorn
+for k, (y0_, L_) in enumerate([(236, 16), (249, 22), (262, 25), (276, 22), (289, 14)]):
+    taper(SM, [(238, y0_), (232, y0_ + 3), (226, y0_ + 3 - (k % 2) * 2), (238 - L_, y0_ - 2)], 3.4, 0.5)
+# Vorderbein: Bänder setzen an der Hinterkante an, umlaufen das Bein und laufen spitz aus
+for k, y in enumerate(range(238, 282, 7)):
+    tt = (y - 230) / 54
+    xl = 161 - tt * 9
+    L_ = 12 + (k % 2) * 5
+    taper(SM, [(xl, y + 2), (xl + L_ * 0.4, y), (xl + L_, y + 1.5)], 3.0, 0.5)
 # Schwanz: Ringe
 for x in (230, 216, 204):
     taper(SM, [(x, 290), (x - 1, 296), (x - 2, 302)], 3, 1.2)
-# Streifen nur innerhalb des jeweiligen Teils (keine Überläufe über Konturen hinweg)
 PID = lambda n: t.P == t.parts[n][0]
 body_m = PID('body') | PID('haunch')
 legF_m = PID('legF')
 SMb = SM.copy()
 SMb[legF_m] = False
-# Umgebungsverdeckung: Körper neben dem fernen Bein etwas dunkler
 occ = cv2.dilate(legF_m.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool) & body_m & (t.L == 'y')
 shift_ramp(trgba, occ, FUR, -1)
-occ2 = cv2.dilate(PID('legN').astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool) & PID('chest') & (t.L == 'w')
-shift_ramp(trgba, occ2, WFUR, -1)
 recolor(trgba, SMb & (t.L == 'y'), FUR, STRIPE)
-recolor(trgba, SM & (t.L == 'w') & (yy < TY + 26), WFUR, [STRIPE[2], STRIPE[3], STRIPE[4], STRIPE[5], STRIPE[5]])
+# Ohrrücken: dunkler Rand oben
+for (ex_, ey_) in (Q(-13, -21), Q(18, -20)):
+    for y in range(int(ey_ - 11), int(ey_ - 4)):
+        for x in range(int(ex_ - 10), int(ex_ + 11)):
+            if (t.L[y, x] == 'y') and (PID('earN') | PID('earF'))[y, x] and ((x - ex_) / 9.4) ** 2 + ((y - ey_) / 10.6) ** 2 > 0.55:
+                trgba[y, x, :3] = STRIPE[2] if (x + y) % 3 else STRIPE[3]
 # Zehen an den Pfoten
 for (cx_, cy_, rx_) in [(158, 291, 15), (207, 291, 13)]:
     for k in (-1, 0, 1):
@@ -272,48 +234,161 @@ for (cx_, cy_, rx_) in [(158, 291, 15), (207, 291, 13)]:
             if trgba[y, x, 3] and tuple(trgba[y, x, :3]) != OUT:
                 trgba[y, x, :3] = FUR[0]
 cv.paste(trgba, 0, 0)
-# ---- Gesicht des Tigers in voller Auflösung
-EYEI = [(20, 60, 90), (60, 140, 190), (140, 210, 240), (220, 250, 255)]
-def tiger_eye(x0, y0, w, flip=False):
-    """ruhiges, halb geschlossenes Katzenauge (Mandelform) mit Schlitzpupille"""
-    for i in range(w):
-        ii = (w - 1 - i) if flip else i
-        X = x0 + ii
-        hgt = 5 if 2 < i < w - 3 else (4 if 0 < i < w - 1 else 2)
-        yo = 0 if 0 < i < w - 1 else 1
-        for j in range(hgt):
-            Y = y0 + yo + j
-            c = EYEI[1] if j == 0 else (EYEI[2] if j < 3 else EYEI[3])
-            if j == hgt - 1 and hgt >= 4:
-                c = EYEI[3]
-            if i in (w // 2, w // 2 - 1) and j < hgt:
-                c = (10, 10, 20) if j > 0 else EYEI[0]
-            px(cv, X, Y, c)
-        px(cv, X, y0 + yo - 1, OUT)
-        px(cv, X, y0 + yo + hgt, MASK[0])
-    px(cv, x0 + (w - 3 if flip else 2), y0 + 1, (255, 255, 255))
-    px(cv, (x0 - 1) if not flip else (x0 + w), y0 - 1, OUT)
-    px(cv, (x0 - 2) if not flip else (x0 + w + 1), y0 - 2, OUT)
-ex, ey = Q(-20, -5); tiger_eye(int(ex), int(ey), 10)
-ex, ey = Q(6, -6); tiger_eye(int(ex), int(ey), 10, flip=True)
+
+# ---- Brustlatz: weißes Fell-Relief mit gezackten Rändern (hinter dem nahen Vorderbein)
+Hc = np.zeros((H, W), np.float32); Mc = np.zeros((H, W), bool)
+nf = noise(H, W, 2, seed=77)
+for y in range(192, 272):
+    ty_ = (y - 190) / 82
+    cxc = 185 + (y - 196) * 0.04
+    hw = 19 * math.sin(math.pi * min(0.999, 0.18 + ty_ * 0.82)) ** 0.6 + 2.0 * math.sin(y * 1.05) + 1.0 * math.sin(y * 2.3)
+    for x in range(int(cxc - hw) - 1, int(cxc + hw) + 2):
+        dx = (x - cxc) / max(1, hw)
+        ybot = 262 + 6 * abs(math.sin((x - 160) * 0.5)) - abs(dx) * 10
+        if abs(dx) <= 1 and y < ybot:
+            Mc[y, x] = True
+            Hc[y, x] = math.sqrt(max(0, 1 - dx * dx)) * 5 + 0.25 * math.sin(x * 0.9 + y * 0.5 + nf[y, x] * 5) + (nf[y, x] - 0.5) * 1.2 + (y - 190) * 0.02
+Mc &= body_m                                # nur auf dem Körper, das Vorderbein bleibt davor
+relief(cv, Hc, np.zeros((H, W), np.int32), [WFUR], Mc, k=1.0, bias=0.1)
+# Übergang Fell orange -> weiß: kleine dunkle Büschel außen am Rand
+ring_c = cv2.dilate(Mc.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & ~Mc & body_m & (t.L == 'y')
+for y, x in zip(*np.where(ring_c)):
+    if (x + 2 * y) % 3:
+        px(cv, x, y, FUR[1])
+# Schatten des Vorderbeins auf dem Latz
+occ2 = cv2.dilate(PID('legN').astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool) & Mc
+for y, x in zip(*np.where(occ2)):
+    px(cv, x, y, WFUR[1] if (x + y) % 2 else WFUR[2])
+
+# ---- Kopf als modelliertes Höhenrelief: Schädel, vorspringende Schnauze, Nasenrücken, Backenbart
+hx = (xx - TX) / S; hy = (yy - TY) / S
+def ell(cx_, cy_, rx_, ry_, h_):
+    d = ((hx - cx_) / rx_) ** 2 + ((hy - cy_) / ry_) ** 2
+    return np.where(d < 1, np.sqrt(np.maximum(0, 1 - d)) * h_, 0).astype(np.float32), d < 1
+skull, mS = ell(3, -4, 24, 20, 7)
+muz, mMz = ell(-12, 10, 12.5, 9.5, 6)
+chin, mCh = ell(-9, 20, 8.5, 5.5, 4)
+chkL, mL = ell(-21, 9, 11, 11, 4)
+chkR, mR = ell(19, 8, 12, 12, 4)
+jaw, mJ = ell(3, 17, 18, 10, 3)
+nfh = noise(H, W, 2, seed=81)
+# gezackte Backenbart-Büschel außen
+tuft = np.zeros((H, W), bool)
+for (bx, by, side) in [(-30, 2, -1), (-33, 8, -1), (-32, 14, -1), (-29, 20, -1), (29, 0, 1), (32, 6, 1), (32, 12, 1), (29, 18, 1)]:
+    pts = P([(bx - side * 4, by - 2.5), (bx + side * 5, by + 1), (bx - side * 4, by + 3.5)])
+    m = np.zeros((H, W), np.uint8); cv2.fillPoly(m, [np.round(np.array(pts)).astype(np.int32)], 1)
+    tuft |= m > 0
+Hh = np.maximum.reduce([skull, np.where(mMz, muz + 5.5, 0), np.where(mCh, chin + 4.5, 0),
+                        np.where(mL, chkL + 3.5, 0), np.where(mR, chkR + 3.5, 0), np.where(tuft, 2.5, 0), np.where(mJ, jaw + 2.5, 0)]).astype(np.float32)
+# Nasenrücken als Grat zwischen den Augen hinunter zur Nase
+ax_, ay_, bx_, by_ = -5, -12, -11, 3
+dxr, dyr = bx_ - ax_, by_ - ay_
+tt = np.clip(((hx - ax_) * dxr + (hy - ay_) * dyr) / (dxr * dxr + dyr * dyr), 0, 1)
+dr = np.hypot(hx - (ax_ + tt * dxr), hy - (ay_ + tt * dyr))
+Hh += np.where(dr < 4.2, (1 - dr / 4.2) * (1.5 + tt * 2.5), 0)
+# Brauenwülste, Augenhöhlen, Fellstruktur
+Hh += ell(-15, -9, 7, 2.6, 1.3)[0] + ell(7, -10, 7, 2.6, 1.3)[0]
+Hh -= ell(-15, -4, 5.5, 3.2, 1.6)[0] + ell(7, -5, 5.5, 3.2, 1.6)[0]
+Mh = mS | mMz | mCh | mL | mR | tuft | mJ
+Hh += np.where(mL | mR | tuft, (nfh - 0.5) * 2.0, (nfh - 0.5) * 0.6)
+# Materialkarte: 0 Fell, 1 weißes Fell, 2 Nase, 3 rotes Hu-Mal, 4 Streifen
+Mat = np.zeros((H, W), np.int32)
+white = (mMz & (hy > 3.5)) | (mMz & (hx < -19)) | mCh | ((mL | mR | tuft | mJ) & (hy > 5) & ~mMz)
+white |= ell(-16, -11, 3.6, 1.8, 1)[1] | ell(7, -12, 3.6, 1.8, 1)[1]          # helle Flecken über den Augen
+Mat[white] = 1
+nose_m = np.zeros((H, W), np.uint8)
+cv2.fillPoly(nose_m, [np.round(np.array(P([(-18.5, 2.5), (-5.5, 2.5), (-9, 7), (-12, 9), (-15, 7)]))).astype(np.int32)], 1)
+Mat[nose_m > 0] = 2
+# rotes Stirnmal (Hu): kleine Flammenraute + feine Winkelstreifen, in das Streifenmuster eingebettet
+RM = np.zeros((H, W), bool)
+taper(RM, [Q(-4, -24), Q(-4, -20), Q(-4, -16)], 0.8, 3.0)
+taper(RM, [Q(-4, -16), Q(-4, -14)], 3.0, 0.6)
+taper(RM, [Q(-12, -16), Q(-8, -14), Q(-5, -12)], 0.6, 1.8)
+taper(RM, [Q(4, -17), Q(0, -14), Q(-3, -12)], 0.6, 1.8)
+Mat[RM & Mh & (Mat == 0)] = 3
+# schwarze Kopfstreifen: Stirnseiten, Schläfen, Backen
+HS = np.zeros((H, W), bool)
+def TS(pts, w0, w1=0.5):
+    taper(HS, [Q(x, y) for (x, y) in pts], w0 * S, w1)
+TS([(-20, -17), (-16, -15), (-12, -14)], 2.2)
+TS([(-21, -13), (-17, -12)], 1.8)
+TS([(12, -20), (8, -17), (5, -15)], 2.2)
+TS([(15, -16), (10, -14)], 1.8)
+TS([(-4, -26), (-4, -24)], 1.6)
+TS([(22, -9), (17, -8)], 1.8)
+TS([(-26, -5), (-22, -3)], 1.6)
+for (y, dy) in [(3, 0), (9, 1), (15, 1), (20, 0)]:
+    TS([(-35, y), (-29, y + 0.5), (-24, y + 1 + dy)], 2.4)
+    TS([(34, y - 2), (28, y - 1.5), (22, y - 1 + dy)], 2.4)
+Mat[HS & Mh & (Mat != 2) & (Mat != 3)] = 4
+# gezackter Silhouettenrand erhält eine Umrisslinie
+relief(cv, Hh, Mat, [FUR, WFUR, NOSE, MASK, STRIPE], Mh, k=0.95, bias=0.06, blur=0.8,
+       albedo=np.where(Mat == 1, 0.14, 0.0))
+ring_h = cv2.dilate(Mh.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & ~Mh
+for y, x in zip(*np.where(ring_h)):
+    px(cv, x, y, OUT)
+# Kontur zwischen Schnauze und Wangen (nur unten, weich), Nasenumriss
+edge_m = cv2.dilate(mMz.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & ~mMz & Mh & (hy > 8)
+for y, x in zip(*np.where(edge_m)):
+    px(cv, x, y, WFUR[0] if Mat[y, x] == 1 else FUR[1])
+nr = cv2.dilate(nose_m, np.ones((3, 3), np.uint8)).astype(bool) & ~(nose_m > 0)
+for y, x in zip(*np.where(nr & (yy >= TY + 2.5 * S))):
+    px(cv, x, y, NOSE[0])
+X, Y = Q(-14, 4); px(cv, X, Y, (255, 226, 230)); px(cv, X + 1, Y, (255, 206, 214)); px(cv, X, Y + 1, NOSE[3])
+X, Y = Q(-15.5, 6.5); px(cv, X, Y, NOSE[0]); X, Y = Q(-8.5, 6.5); px(cv, X, Y, NOSE[0])      # Nasenlöcher
+# Maul: Philtrum + geschlossene Lippenlinie ("ω"), Reißzähne ragen über die Unterlippe
+def polyline(pts, c):
+    for (a, b) in zip(pts[:-1], pts[1:]):
+        n = int(max(abs(b[0] - a[0]), abs(b[1] - a[1]))) + 1
+        for i in range(n + 1):
+            px(cv, a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, c)
+MOUTHL = (40, 10, 18)
+polyline(P([(-12, 9), (-12, 12)]), MOUTHL)
+polyline(P([(-12, 12), (-15, 13.5), (-19, 13.5), (-22, 12), (-24, 12.5)]), MOUTHL)
+polyline(P([(-12, 12), (-9, 13.5), (-5, 13.5), (-2, 12), (0, 12.5)]), MOUTHL)
+for fx in (-18, -6):
+    X, Y = Q(fx, 13.5)
+    for j in range(1, 6):
+        px(cv, X, Y + j, (252, 250, 240) if j < 5 else (190, 186, 180))
+        if j < 4:
+            px(cv, X + 1, Y + j, (214, 210, 200))
+    px(cv, X - 1, Y + 1, MOUTHL); px(cv, X + 2, Y + 1, MOUTHL)
 # Schnurrhaarpunkte + Schnurrhaare
-for (x, y) in [(-16, 12), (-12, 14), (-18, 15), (3, 12), (6, 14), (1, 15)]:
+for (x, y) in [(-19, 6.5), (-21, 8.5), (-17, 9), (-4, 6.5), (-2, 8.5), (-6, 9), (-20, 10.5), (-3, 10.5)]:
     px(cv, *Q(x, y), WFUR[1])
-for (x0, y0, dx, dy) in [(-21, 12, -1, -0.2), (-21, 15, -1, 0.05), (10, 12, 1, -0.25), (10, 15, 1, 0.0)]:
+for (x0, y0, dx, dy) in [(-25, 8, -1, -0.25), (-25, 10, -1, 0.0), (-25, 12, -1, 0.2), (1, 8, 1, -0.3), (1, 10, 1, -0.1)]:
     X0, Y0 = Q(x0, y0)
-    for s in range(1, 17):
+    for s in range(1, 16):
         x = X0 + dx * s; y = Y0 + dy * s + (s * s) * 0.012
         if (s % 5) != 4:
-            blend_px(cv, x, y, (255, 255, 250), 0.85)
-# Reißzähne über der Unterlippe
-for fx in (-14, 2):
-    X, Y = Q(fx, 15)
-    for j in range(5):
-        px(cv, X, Y + 1 + j, (250, 248, 236) if j < 4 else (200, 196, 190))
-        if j < 3:
-            px(cv, X + 1, Y + 1 + j, (222, 218, 208))
-# Glanz auf der Nase
-X, Y = Q(-8, 6); px(cv, X, Y, (255, 226, 230)); px(cv, X + 1, Y, (255, 200, 210))
+            blend_px(cv, x, y, (255, 255, 250), 0.8)
+# ---- Augen: ruhige, halb geschlossene Katzenaugen mit Schlitzpupille und dunklem Lidstrich
+EYEI = [(20, 60, 90), (60, 140, 190), (140, 210, 240), (220, 250, 255)]
+def cat_eye(cx_, cy_, w, h, flip=False):
+    sgn = -1 if flip else 1
+    for i in range(w):
+        x = int(round(cx_ - w / 2 + i))
+        tq = (i + 0.5) / w * 2 - 1                              # -1 innen .. 1 außen (bei sgn=1: links = außen)
+        outer = -tq * sgn
+        half = h / 2 * math.sqrt(max(0, 1 - tq * tq)) + 0.3
+        yc = cy_ - outer * 1.2                                  # äußerer Winkel leicht angehoben
+        top = int(round(yc - half * 0.35)); bot = int(round(yc + half))   # schweres Oberlid
+        for y in range(top, bot + 1):
+            f_ = (y - top) / max(1, bot - top)
+            c = EYEI[1] if f_ < 0.3 else EYEI[2] if f_ < 0.75 else EYEI[3]
+            if abs(x - cx_) < 0.9:
+                c = (8, 8, 16)
+            px(cv, x, y, c)
+        px(cv, x, top - 1, OUT)
+        px(cv, x, bot + 1, STRIPE[2])
+    # Lidstrich zum äußeren Winkel und Tränenlinie Richtung Nase
+    xo = cx_ + sgn * (-w / 2 - 1)
+    px(cv, xo, cy_ - 2, OUT); px(cv, xo - sgn, cy_ - 3, OUT); px(cv, xo - 2 * sgn, cy_ - 3, OUT)
+    xi = cx_ + sgn * (w / 2)
+    px(cv, xi, cy_ + 1, OUT); px(cv, xi + sgn * 0.5, cy_ + 2, STRIPE[2]); px(cv, xi + sgn, cy_ + 3, STRIPE[3])
+    px(cv, cx_ - 2 * sgn, cy_ - 1, (255, 255, 255))
+ex, ey = Q(-15, -4); cat_eye(ex, ey, 10, 5.5)
+ex, ey = Q(7, -5); cat_eye(ex, ey, 9, 5, flip=True)
 
 # ================================================================= Thorad
 HAIR = [(50, 12, 8), (96, 26, 12), (150, 50, 20), (196, 84, 34), (226, 124, 60)]

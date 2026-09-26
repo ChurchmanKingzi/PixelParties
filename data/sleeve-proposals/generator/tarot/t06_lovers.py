@@ -13,7 +13,7 @@ rnd = random.Random(66)
 sky(cv, [(40, 70, 190), (64, 110, 220), (120, 150, 236), (200, 170, 230), (250, 196, 214), (255, 226, 214)], y1=240)
 stars(cv, 24, y1=120, seed=6, cols=[(255, 255, 255), (255, 220, 240), (220, 230, 255)], big=0.2)
 # Herz-Sonne mit Strahlen
-HX, HY0, HS = 125, 106, 46
+HX, HY0, HS = 125, 104, 50
 yy, xx = np.indices((H, W))
 Xn = (xx - HX) / HS; Yn = -(yy - HY0) / HS
 heart = (Xn ** 2 + Yn ** 2 - 1) ** 3 - Xn ** 2 * Yn ** 3 <= 0
@@ -176,25 +176,46 @@ PINK = [(150, 30, 80), (210, 60, 120), (246, 110, 160), (255, 170, 204), (255, 2
 MY = 84           # Kopfmitte
 
 
-def wing(f, side):
-    """Engelsflügel: Oberarm-Bogen oben, Schwungfedern hängen fächerförmig nach außen/unten"""
-    X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
-    O, C, R = (44, 50), (74, 50), (113, 104)
-    def P(t):
-        return ((1 - t) ** 2 * O[0] + 2 * (1 - t) * t * C[0] + t * t * R[0], (1 - t) ** 2 * O[1] + 2 * (1 - t) * t * C[1] + t * t * R[1])
+WO, WC, WR = (40, 64), (74, 52), (113, 104)     # Flügelbug: äußeres Ende, Kontrollpunkt, Schulter
+
+
+def wing_P(t):
+    return ((1 - t) ** 2 * WO[0] + 2 * (1 - t) * t * WC[0] + t * t * WR[0],
+            (1 - t) ** 2 * WO[1] + 2 * (1 - t) * t * WC[1] + t * t * WR[1])
+
+
+def wing_feathers():
+    """(Lage, Material, Start, Ende, r0, r1) für den linken Flügel – von hinten nach vorn"""
+    out = []
     n = 10
-    for layer, (lf, r0, r1, key, t1) in enumerate([(1.0, 5.2, 3.0, 'p', 0.92), (0.62, 5.8, 3.6, 'c', 0.95), (0.34, 6.0, 4.4, 'c', 0.98)]):
+    for layer, (lf, r0, r1, key, tshift) in enumerate([(1.0, 4.2, 3.4, 'p', 0.0), (0.7, 4.6, 3.8, 'x', 0.03),
+                                                        (0.42, 5.0, 4.4, 'c', 0.06)]):
         for i in range(n):
-            t = i / (n - 1) * t1
-            sx, sy = P(t)
-            th = math.radians(196 + 72 * t)
+            t = 0.04 + i / (n - 1) * 0.86 + tshift
+            sx, sy = wing_P(min(t, 0.97))
+            th = math.radians(250 + 35 * (i / (n - 1)))
             dx, dy = math.cos(th), -math.sin(th)
-            L = (46 - 24 * t) * lf
-            f.part('w%d_%d_%d' % (side, layer, i))
-            f.limb(X(sx), sy, X(sx + dx * L), sy + dy * L, r0, r1, key)
+            L = (34 - 16 * i / (n - 1)) * lf
+            out.append((layer, key, (sx, sy), (sx + dx * L, sy + dy * L), r0, r1))
+    return out
+
+
+def wing(f, side):
+    """Engelsflügel in Lagen: Handschwingen, Armschwingen, große und kleine Deckfedern, Flügelbug"""
+    X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
+    for j, (layer, key, (sx, sy), (ex, ey), r0, r1) in enumerate(wing_feathers()):
+        f.part('w%d_%d' % (side, j))
+        f.limb(X(sx), sy, X(ex), ey, r0, r1, key)
+    # kleine Deckfedern: schuppenartige Reihen am Flügelbug
+    k_ = 0
+    for row, (off, rr) in enumerate([(7, 3.6), (3.5, 3.4)]):
+        for t in np.linspace(0.06 + row * 0.04, 0.94, 9 - row):
+            x, y = wing_P(t)
+            f.part('lc%d_%d' % (side, k_)); k_ += 1
+            f.ellipse(X(x + off * 0.25), y + off, rr, rr * 0.9, 'z')
     f.part('warm%d' % side)
-    pts = [P(t) for t in np.linspace(0, 1, 12)]
-    f.curve([(X(x), y) for (x, y) in pts], 'c', w=7, w1=9)
+    pts = [wing_P(t) for t in np.linspace(0, 1, 14)]
+    f.curve([(X(x), y) for (x, y) in pts], 'z', w=6, w1=9)
 
 
 def molinda(f):
@@ -276,11 +297,13 @@ MATS = {
     'g': mat(GOLD7, pillow=1.5, k=1.8, spec=True),
     'y': mat(GOLD7, pillow=1.2, k=1.6, bias=0.15, spec=True),
     'a': mat(BROWN, pillow=1, k=1.2, bias=0.1),
-    'p': mat(PRIM, pillow=3, k=1.5, bias=0.02),
-    'c': mat(COV, pillow=3, k=1.5, bias=0.06),
+    'p': mat(PRIM, pillow=3, k=1.4, bias=0.0),
+    'x': mat([(84, 64, 150), (128, 110, 200), (170, 160, 232), (210, 206, 248), (238, 238, 255)], pillow=3, k=1.4, bias=0.03),
+    'c': mat(COV, pillow=3, k=1.4, bias=0.06),
+    'z': mat(COV, pillow=2.5, k=1.3, bias=0.14),
 }
 # Molinda wird als Materialkarte gezeichnet und vor dem Rendern um SK vergrößert
-SK, SCX, SCY = 1.18, 125, 112
+SK, SCX, SCY = 1.12, 125, 112
 
 
 def T(x, y):
@@ -332,20 +355,19 @@ for (dx, dy) in [(-2, 0), (-1, 1), (0, 1), (1, 1), (2, 0)]:
     px(cv, mx_ + dx, my_ + dy, (170, 60, 80))
 nx_, ny_ = T(125, MY + 8)
 px(cv, nx_, ny_, SKIN[3])
-# Federkiele auf den Schwungfedern
+# Federkiele (Schaft) auf Hand- und Armschwingen, dunkle Spitzen der Handschwingen
 for side in (-1, 1):
     X = (lambda x: x) if side < 0 else (lambda x: 250 - x)
-    O, C, R = (44, 50), (74, 50), (113, 104)
-    for i in range(10):
-        t = i / 9 * 0.92
-        sx = (1 - t) ** 2 * O[0] + 2 * (1 - t) * t * C[0] + t * t * R[0]
-        sy = (1 - t) ** 2 * O[1] + 2 * (1 - t) * t * C[1] + t * t * R[1]
-        th = math.radians(196 + 72 * t)
-        dx, dy = math.cos(th), -math.sin(th)
-        L = 46 - 24 * t
-        for s_ in np.arange(L * 0.66, L - 3, 0.5):
-            qx, qy = T(X(sx + dx * s_), sy + dy * s_)
-            recolor_on(cv, fm, qx, qy, PRIM[3], 'p')
+    for (layer, key, (sx, sy), (ex, ey), r0, r1) in wing_feathers():
+        if layer == 2:
+            continue
+        for u in np.arange(0.45 if layer == 0 else 0.3, 0.92, 0.02):
+            qx, qy = T(X(sx + (ex - sx) * u), sy + (ey - sy) * u)
+            recolor_on(cv, fm, qx, qy, PRIM[4] if layer == 0 else COV[4], key)
+        if layer == 0:
+            qx, qy = T(X(ex), ey)
+            for (dx, dy) in [(0, -1), (-1, -1), (1, -1), (0, -2)]:
+                recolor_on(cv, fm, qx + dx, qy + dy, PRIM[1], 'p')
 # Haarglanz
 for (x, y) in [(115, MY - 11), (117, MY - 11), (119, MY - 12), (131, MY - 12), (133, MY - 11), (135, MY - 11)]:
     X_, Y_ = T(x, y)

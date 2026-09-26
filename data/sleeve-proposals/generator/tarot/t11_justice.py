@@ -121,7 +121,7 @@ POLE = [(8, 8, 12), (22, 20, 28), (44, 40, 54), (70, 66, 84)]
 HX, HY = 125, 120
 f = Fig(W, H)
 # ---- Klingenfahne (statt des Schwerts), aufrecht in der rechten Hand
-PXP = 72
+PXP = 86
 f.part('pole'); f.rect(PXP - 1, 56, PXP + 1, FY + 30, 'p')
 f.part('finial'); f.ellipse(PXP, 53, 2.5, 3, 'g')
 f.part('flagblade')
@@ -158,10 +158,11 @@ f.part('waist'); f.rect(108, 174, 142, 180, 'k')
 f.part('sleeveL'); f.ellipse(103, 148, 9, 9, 'd')
 f.part('sleeveR'); f.ellipse(147, 148, 9, 9, 'd')
 # ---- rechter Arm (Bildseite links): hält die Stange
-f.part('armR'); f.limb(99, 154, 90, 176, 5.5, 5, 'd')
-f.part('foreR'); f.limb(90, 176, 78, 166, 5, 4.5, 'd')
-f.part('cuffR'); f.limb(80, 167, 77, 165, 5, 5, 'c')
-f.part('handR'); f.ellipse(PXP + 1, 164, 5, 5, 's')
+# Oberarm hängt am Körper, Ellbogen angewinkelt, Unterarm nach vorn zur Stange
+f.part('armR'); f.limb(101, 152, 97, 176, 5.5, 5, 'd')
+f.part('foreR'); f.limb(97, 176, 92, 183, 5, 4.5, 'd')
+f.part('cuffR'); f.limb(93, 182, 91, 184, 4.8, 4.8, 'c')
+f.part('handR'); f.ellipse(PXP + 1, 184, 3.8, 4.3, 's'); f.ellipse(PXP + 3, 180, 1.6, 1.4, 's')
 # ---- Kopf
 f.part('neck'); f.rect(119, 132, 131, 142, 's')
 f.part('collar'); f.poly([(112, 140), (125, 146), (138, 140), (136, 136), (125, 140), (114, 136)], 'w')
@@ -181,10 +182,11 @@ pts += [(HX + 15, HY - 16)]
 f.poly(pts, 'g')
 f.part('crownband'); f.rect(HX - 15, HY - 19, HX + 15, HY - 15, 'g')
 # ---- linker Arm (Bildseite rechts): hält die Waage
-f.part('armL'); f.limb(151, 154, 160, 174, 5.5, 5, 'd')
-f.part('foreL'); f.limb(160, 174, 172, 160, 5, 4.5, 'd')
-f.part('cuffL'); f.limb(171, 161, 174, 158, 5, 5, 'c')
-f.part('handL'); f.ellipse(177, 154, 5, 5, 's')
+# Ellbogen angewinkelt, Hand hebt die Waage auf Schulterhöhe
+f.part('armL'); f.limb(150, 153, 161, 175, 5.5, 5, 'd')
+f.part('foreL'); f.limb(161, 175, 172, 154, 5, 4.5, 'd')
+f.part('cuffL'); f.limb(171, 156, 173, 152, 4.8, 4.8, 'c')
+f.part('handL'); f.ellipse(175, 147, 3.8, 4.3, 's'); f.ellipse(172, 144, 1.5, 1.5, 's')
 f.outline()
 MATS = {
     's': mat(SKIN, pillow=2, k=1.0, bias=0.3),
@@ -212,6 +214,12 @@ for x in range(84, 167):
         if f.P[y, x] == f.parts['skirt'][0] and f.L[y + 1, x] in ('K', '.', 'v'):
             px(cv, x, y - 1, DRESS[3] if x % 3 else DRESS[4]); px(cv, x, y - 2, DRESS[2] if x % 3 != 1 else DRESS[3])
             break
+# Glanzkante an der Fahnenstange (sonst verschwindet sie vor dem dunklen Vorhang)
+for y in range(56, AY1):
+    if f.L[y, PXP - 1] == 'p':
+        px(cv, PXP - 1, y, (150, 146, 172) if y % 6 else (200, 196, 220))
+    if f.L[y, PXP] == 'p':
+        px(cv, PXP, y, (70, 66, 88))
 # Blutige Schneide der Fahne (roter Streifen entlang der Diagonale, wie auf ihrer Karte)
 for i in range(60):
     t_ = i / 59
@@ -246,9 +254,6 @@ for y in (146, 152, 158, 164):
 # Brosche
 for (dx, dy, c) in [(0, 0, RUBY[2]), (-1, 0, RUBY[3]), (0, -1, RUBY[4]), (1, 0, RUBY[1]), (0, 1, RUBY[1])]:
     px(cv, 125 + dx, 144 + dy, c)
-# Finger um die Stange
-for y in (161, 164, 167):
-    px(cv, PXP + 3, y, SKIN[1])
 
 # ---------------------------------------------------------------- Korb mit Kohlköpfen neben dem Schemel (schwarzer Humor)
 WICK = [(50, 30, 14), (96, 62, 30), (150, 106, 56), (196, 150, 90), (230, 196, 140)]
@@ -276,11 +281,12 @@ for (cx_, cy_) in [(185, 253), (202, 256)]:          # Kohlblätter: gewölbte B
         px(cv, cx_ - k * 0.5, cy_ + 3 - k, CAB[4])
 
 # ---------------------------------------------------------------- Waage: Krone gegen Kuchen – exakt im Gleichgewicht
-SCX, SCY = 177, 138
-BR = 30
+SCX, SCY = 176, 158          # Waage hängt am Ring in ihrer Hand (Ring bei y≈141)
+BR = 26
 sc = Fig(W, H)
-sc.part('post'); sc.rect(SCX - 1, SCY - 6, SCX + 1, SCY + 12, 'g')
-sc.part('top'); sc.ellipse(SCX, SCY - 7, 2.5, 2.5, 'g')
+sc.part('post'); sc.rect(SCX - 1, SCY - 14, SCX + 1, SCY + 3, 'g')
+sc.part('top'); sc.ellipse(SCX, SCY - 16, 3, 3, 'g'); sc.ellipse(SCX, SCY - 16, 1.2, 1.2, '.')
+sc.part('point'); sc.poly([(SCX - 2, SCY + 3), (SCX + 2, SCY + 3), (SCX, SCY + 7)], 'g')
 sc.part('beam'); sc.rect(SCX - BR, SCY - 1, SCX + BR, SCY + 1, 'g')
 sc.ellipse(SCX - BR, SCY, 2, 2, 'g'); sc.ellipse(SCX + BR, SCY, 2, 2, 'g')
 for side in (-1, 1):
@@ -318,8 +324,19 @@ for j, r in enumerate(cake):
         if ch in cols:
             px(cv, cx_ - 3 + i, cy_ + j, cols[ch])
 px(cv, cx_ + 1, cy_ - 1, (220, 30, 50)); px(cv, cx_ + 1, cy_ - 2, (60, 120, 40))     # Kirsche
-sparkle(cv, SCX, SCY - 11, (255, 255, 240), r=3, c2=(255, 210, 90))
+sparkle(cv, SCX + BR, SCY - 4, (255, 255, 240), r=3, c2=(255, 210, 90))
 
+# Hand mit dem Waagen-Ring wieder vor den Ring legen, dann feine Finger
+for part_ in ('handL', 'handR'):
+    hm = f.P == f.parts[part_][0]
+    hm2 = hm | (cv2.dilate(hm.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & (f.L == 'K'))
+    for y, x in zip(*np.where(hm2)):
+        cv.a[y, x] = fig[y, x, :3]
+for (x0, x1, ys) in [(PXP - 2, PXP + 4, (182, 184, 186)), (173, 179, (146, 148, 150))]:
+    for y in ys:
+        for x in range(x0, x1):
+            if f.L[y, x] == 's' and f.L[y, x + 1] == 's' and f.L[y, x - 1] == 's':
+                px(cv, x, y, SKIN[1] if x % 2 else SKIN[2])
 vignette(cv, strength=0.5, r0=0.6)
 finish(cv, 'XI', 'GUILLOTINE', out='11_justice_guillotine', emblem=emblem_generic(
     ["#######", "#....##", "#...##.", "#..##..", "#.##...", "###....", "#......"], {'#': (220, 224, 236)}))
