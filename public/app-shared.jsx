@@ -2369,6 +2369,24 @@ function heroDisplayName(fullName) {
   return parts.length > 1 ? parts[parts.length - 1] : name;
 }
 
+// ★ v1443 (Als Vorgabe 26.9.): Starting-Ability-Filter (Deck-Builder,
+// Puzzle-Creator). Jede gewaehlte Ability muss der Held in IRGENDEINER
+// seiner beiden Zonen haben, die Reihenfolge ist egal. Wird dieselbe
+// Ability zweimal gewaehlt, muss er sie auch ZWEIMAL haben — gezaehlt
+// wird als Multimenge, jede Zone deckt nur eine Wahl.
+function matchesStartingAbilities(card, ...wanted) {
+  const want = wanted.filter(Boolean);
+  if (want.length === 0) return true;
+  const have = [card?.startingAbility1, card?.startingAbility2].filter(Boolean);
+  for (const w of want) {
+    const i = have.indexOf(w);
+    if (i < 0) return false;
+    have.splice(i, 1);
+  }
+  return true;
+}
+window.matchesStartingAbilities = matchesStartingAbilities;
+
 function cardImageUrl(cardName, skinOverrides) {
   // If a skin is selected for this card, use the skin image
   if (skinOverrides && skinOverrides[cardName]) {
@@ -5592,7 +5610,8 @@ function useCardTooltip(opts) {
   // clear below doesn't wipe the card preview while the cursor is over a
   // status badge or buff icon (both hang off the card's bounds and aren't
   // .board-card elements themselves).
-  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover, .status-badge:hover, .buff-icon:hover';
+  // v1443: `.bday-present-reveal-card` — Aufdeck-Karten (Zi, Birthday Present).
+  const hoverSelectors = (opts && opts.hoverSelectors) || '.board-card:hover, .card-mini:hover, .pz-search-card:hover, .pz-hand-card:hover, .status-badge:hover, .buff-icon:hover, .bday-present-reveal-card:hover';
   const [tooltipCard, setTooltipCard] = useState(null);
   const [tooltipSide, setTooltipSide] = useState(defaultSide);
 
