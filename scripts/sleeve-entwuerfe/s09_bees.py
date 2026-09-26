@@ -491,6 +491,40 @@ def insect_head(R, cols, eye='white', seed=0):
     return im_, (cx_, cy_), tips
 
 
+def bumble_head():
+    """Kleiner, flauschiger Hummelkopf (wie auf der Karte): orange-braun, breiter als hoch, rote Augen, kurze Fühler."""
+    im_ = Image.new('RGBA', (15, 14), (0, 0, 0, 0))
+    a_ = np.array(im_)
+    cx_, cy_ = 7, 8
+    rnd = random.Random(7)
+    for y in range(14):
+        for x in range(15):
+            nx_, ny_ = (x + 0.5 - cx_ - 0.5) / 5.2, (y + 0.5 - cy_) / 3.9
+            r2 = nx_ ** 2 + ny_ ** 2
+            fuzz = 1.0 + (0.22 if (x * 3 + y * 5) % 4 == 0 else 0)
+            if r2 <= fuzz:
+                t_ = 0.62 - 0.35 * nx_ - 0.4 * ny_
+                i_ = int(np.clip(t_ * 5, 0, 4))
+                a_[y, x, :3] = BUMBLE[i_]; a_[y, x, 3] = 255
+    im_ = Image.fromarray(a_)
+    d_ = ImageDraw.Draw(im_)
+    # Fellsträhnen oben
+    for x in (4, 7, 10):
+        d_.point((x, cy_ - 4), fill=BUMBLE[4] + (255,))
+    # rote Augen (seitlich, wie auf der Karte)
+    for ex in (4, 10):
+        d_.rectangle((ex, cy_ - 1, ex + 1, cy_), fill=REDH[1] + (255,))
+        d_.point((ex, cy_ - 1), fill=REDH[2] + (255,))
+    # kleines Lächeln
+    d_.point([(6, cy_ + 2), (9, cy_ + 2)], fill=BUMBLE[0] + (255,))
+    d_.line((7, cy_ + 3, 8, cy_ + 3), fill=BUMBLE[0] + (255,))
+    # Fühler
+    d_.line((5, cy_ - 4, 3, cy_ - 7), fill=K + (255,)); d_.line((10, cy_ - 4, 12, cy_ - 7), fill=K + (255,))
+    d_.point([(3, cy_ - 7), (12, cy_ - 7)], fill=BUMBLE[1] + (255,))
+    im_ = outline(im_, K + (255,))
+    return im_, (cx_ + 1, cy_ + 1)
+
+
 BEEHEAD = [(20, 16, 24), (36, 32, 44), (58, 54, 72), (90, 88, 110), (132, 132, 156)]
 BUMBLE = [(70, 30, 10), (120, 58, 18), (168, 92, 30), (208, 132, 52), (240, 176, 92)]
 
@@ -645,8 +679,8 @@ def carpet_rider(seed=61):
     body_ = outline(body_, K + (255,))
     im_.alpha_composite(body_)
     # Kopf: orange-brauner Hummelkopf mit roten Augen und Fühlern
-    hd_, hc_, _t = insect_head(6.5, BUMBLE, eye='red', seed=seed)
-    px_, py_ = int(cx_ - hc_[0]), int(sy_ - 24 - hc_[1])
+    hd_, hc_ = bumble_head()
+    px_, py_ = int(cx_ - hc_[0]), int(sy_ - 21 - hc_[1])
     im_.alpha_composite(hd_, (px_, py_))
     # Bombe in der erhobenen Hand
     bm_, bc_, bsp_ = small_bomb(4, seed + 3, fuse_dir=-1)
