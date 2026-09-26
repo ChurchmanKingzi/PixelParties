@@ -1,0 +1,13 @@
+{
+  "hero": "Dante, the Wanderer of Hell",
+  "sheet": "dante-the-wanderer-of-hell.png",
+  "frameWidth": 25,
+  "frameHeight": 32,
+  "frames": 48,
+  "frameMs": 90,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 1,
+  "padLeft": 1,
+  "padRight": 1
+}
