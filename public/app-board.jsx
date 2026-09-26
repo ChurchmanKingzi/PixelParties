@@ -2488,23 +2488,32 @@ function FuriousAngerEffect({ x, y, w = 80, h = 110 }) {
   );
 }
 
+// Seitenverhaeltnis der Kartenbilder (750 × 1050). Kopien von Brettkarten,
+// die eine Animation bewegt, nehmen die BREITE der Karte auf dem Brett
+// und diese Hoehe — das Bildschirm-Rechteck der gekippten Karte ist zu
+// flach und liesse `object-fit: cover` das Bild beschneiden.
+const PP_KARTEN_FORMAT = 1.4;
+
 // ── Pixel-Flamme (Perilous Journey, Als Vorgabe 26.9.) ─────────────
-// Ein Sprite aus drei Bildern zu je 8×12 Pixeln, harte Farbstufen
+// Ein Sprite aus fuenf Bildern zu je 8×12 Pixeln, harte Farbstufen
 // (R dunkelrot, O orange, Y gelb, W hellgelb). Als SVG-Daten-URI mit
-// `crispEdges`; CSS blaettert per `steps(3)` durch die Bilder und
-// skaliert mit `image-rendering: pixelated`.
+// `crispEdges`; CSS blaettert per `steps(5)` durch die Bilder und
+// skaliert mit `image-rendering: pixelated`. Dazu tanzt jede Flamme in
+// Pixelschritten (`ptFlammeTanz`) — sonst wirkten sie steif.
 const PP_PIXELFLAMME = (() => {
   const bilder = [
     ['...R....', '...RR...', '..RRR...', '..RORR.R', '.RROORRR', '.ROOYOR.', 'RROYYOOR', 'ROOYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['....R...', '....RR..', '...RRR..', 'R..ROR..', 'RR.ROORR', '.RROOOR.', 'RROYYOR.', 'ROYYWOOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
     ['..R.....', '..RR....', '..RRR...', '.RROR..R', '.ROORRRR', 'RROYOOR.', 'ROOYYOR.', 'ROYWYOOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
+    ['.....R..', '.R...RR.', '.RR.RRR.', '.RRRROR.', 'RROOORR.', 'ROOYYORR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
+    ['........', '...R....', '..RR..R.', '..RORRR.', '.RROOOR.', '.ROOYOOR', 'RROYYYOR', 'ROYYWYOR', 'ROYWWYOR', 'ROYWWYOR', '.ROYYOR.', '..RRRR..'],
   ];
   const FARBE = { R: '#b8200e', O: '#ff7a14', Y: '#ffd23a', W: '#fff3a8' };
   let rects = '';
   bilder.forEach((zeilen, b) => zeilen.forEach((z, y) => [...z].forEach((c, x) => {
     if (FARBE[c]) rects += `<rect x="${b * 8 + x}" y="${y}" width="1" height="1" fill="${FARBE[c]}"/>`;
   })));
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12" viewBox="0 0 24 12" shape-rendering="crispEdges">${rects}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bilder.length * 8}" height="12" viewBox="0 0 ${bilder.length * 8} 12" shape-rendering="crispEdges">${rects}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 })();
 
@@ -2921,6 +2930,9 @@ function GewaltsameErweckungEffect({ x, y, w = 70, h = 100 }) {
 // Der Server legt die echte Karte zum Landezeitpunkt in die Zone.
 function RuestkammerTorEffect({ x, y, w = 70, h = 100, cardName }) {
   const bild = cardName && window.cardImageUrl ? window.cardImageUrl(cardName) : null;
+  // Karte im echten Format (s. `PP_KARTEN_FORMAT`), sonst schneidet
+  // `object-fit: cover` das Bild auf das gekippte Zonen-Rechteck zu.
+  const kw = w * 0.92, kh = kw * PP_KARTEN_FORMAT;
   const PW = w * 1.6, PH = h * 1.45;               // Portalmass — die Karte passt hinein
   const oben = -h * 0.5 - PH * 0.46;               // Portalmitte ueber der Zone
   const funken = useMemo(() => Array.from({ length: ppFxN(14) }, (_, i) => {
@@ -2953,7 +2965,7 @@ function RuestkammerTorEffect({ x, y, w = 70, h = 100, cardName }) {
           }} />
         ))}
       </div>
-      <div className="rtor-karte" style={{ width: w, height: h, left: -w / 2, top: -h / 2, '--oben': oben + 'px' }}>
+      <div className="rtor-karte" style={{ width: kw, height: kh, left: -kw / 2, top: -kh / 2, '--oben': oben + 'px' }}>
         {bild ? <img src={bild} alt="" draggable="false" /> : <span className="rtor-karte-leer" />}
         <span className="rtor-glanz" />
       </div>
@@ -2987,12 +2999,16 @@ function TelekineseEffect({ x, y, w = 70, h = 100, cardName, ankerSel, eigeneSei
   const [mass] = useState(() => {
     const zone = ankerSel ? document.querySelector(ankerSel) : null;
     const karte = zone ? zone.querySelector('.board-card') : null;
-    if (!zone || !karte) return { dx: 0, dy: 0, w: w * 0.94, h: h * 0.95, karte: null };
+    // Hoehe im ECHTEN Kartenformat, nicht die des Bildschirm-Rechtecks:
+    // das Brett ist perspektivisch gekippt, sein Rechteck fast quadratisch
+    // — `object-fit: cover` schnitt das Kartenbild dann stark ab (Als
+    // Befund 26.9.). Die abhebende Karte richtet sich damit auf.
+    if (!zone || !karte) return { dx: 0, dy: 0, w: w * 0.94, h: w * 0.94 * PP_KARTEN_FORMAT, karte: null };
     const zr = zone.getBoundingClientRect(), kr = karte.getBoundingClientRect();
     return {
       dx: (kr.left + kr.width / 2) - (zr.left + zr.width / 2),
       dy: (kr.top + kr.height / 2) - (zr.top + zr.height / 2),
-      w: kr.width, h: kr.height, karte,
+      w: kr.width, h: kr.width * PP_KARTEN_FORMAT, karte,
     };
   });
   const kw = mass.w, kh = mass.h;
@@ -34869,12 +34885,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             `top:calc(${ty.toFixed(1)}% - ${hoch * 0.85}px)`,
             `width:${breit}px`, `height:${hoch}px`,
             `background-image:url("${PP_PIXELFLAMME}")`,
-            `animation-duration:${Math.round(300 + (i % 4) * 60)}ms`,
-            `animation-delay:${-(i * 70) % 300}ms`,
+            // zwei Takte: Bildwechsel + Tanz, je Flamme leicht versetzt
+            `animation-duration:${Math.round(210 + (i % 4) * 35)}ms, ${Math.round(260 + (i % 5) * 45)}ms`,
+            `animation-delay:${-((i * 53) % 250)}ms, ${-((i * 71) % 300)}ms`,
           ].join(';');
           card.appendChild(z);
         }
         const FARBEN = ['#ffd23a', '#ff9a1a', '#ff5a10', '#fff3a8', '#b8200e'];
+        let takt = 0;
         const spurStart = (laneDelay || 0);
         const spurEnde = spurStart + Math.round(durationMs * 0.9);
         const t0 = Date.now();
@@ -34899,6 +34917,23 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
             ].join(';');
             document.body.appendChild(s);
             setTimeout(() => s.remove(), 720);
+          }
+          // Zuengelnde Flammen: jede dritte Runde loest sich eine kleine
+          // Pixelflamme vom Kartenrand, steigt auf und verlischt.
+          if ((takt++ % 3) === 0) {
+            const z = document.createElement('i');
+            const g = PX - 1 + Math.round(Math.random());
+            z.className = 'pt-pixelflamme pt-zuengel';
+            z.style.cssText = [
+              'position:fixed',
+              `left:${Math.round(r.left + Math.random() * r.width - 4 * g)}px`,
+              `top:${Math.round(r.top + r.height * Math.random() * 0.6 - 12 * g)}px`,
+              `width:${8 * g}px`, `height:${12 * g}px`,
+              `background-image:url("${PP_PIXELFLAMME}")`,
+              `--zx:${Math.round((Math.random() - 0.5) * 14)}px`,
+            ].join(';');
+            document.body.appendChild(z);
+            setTimeout(() => z.remove(), 560);
           }
         }, 40);
       }
@@ -35467,7 +35502,9 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
         if (window.ppBattleCamFocus) { window.ppBattleCamFocus(srcEl); window.ppBattleCamFocus(tgtEl); }
         const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
         const wA = window.ppFxWeltAnker ? window.ppFxWeltAnker(tgtEl) : { welt: false, dx: 0, dy: 0 };
-        const cw = sr.width, ch = sr.height;
+        // Kartenformat statt Zonen-Rechteck (das Brett ist gekippt, sein
+        // Rechteck fast quadratisch — das Bild wurde sonst beschnitten).
+        const cw = sr.width * 0.92, ch = cw * PP_KARTEN_FORMAT;
         const sx = sr.left + cw / 2 + wA.dx, sy = sr.top + ch / 2 + wA.dy;
         // Aufprallpunkt: Zielmitte, leicht zur Wurfseite versetzt — die
         // Karte klatscht VOR das Ziel, nicht genau darauf.
