@@ -1753,7 +1753,7 @@ function ImmuneIcon({ heroName, statusType }) {
     <div className={'status-immune-icon' + (statusType === 'shielded' ? ' status-shielded-icon' : '')}
       onMouseEnter={() => { window._immuneTooltip = heroName; window._immuneTooltipType = tooltipKey; window.dispatchEvent(new Event('immuneHover')); }}
       onMouseLeave={() => { window._immuneTooltip = null; window._immuneTooltipType = null; window.dispatchEvent(new Event('immuneHover')); }}>
-      🛡️
+      <PxIcon z="🛡️" />
     </div>
   );
 }
@@ -4414,6 +4414,8 @@ const BuffColumn = window.BuffColumn;
 // uses it) — borrowed here to render CPU / avatar-less player portraits
 // next to the hand in-game using the same cropped hero art.
 const HeroArtCrop = window.HeroArtCrop;
+// v1448: Abzeichen-Symbole als Pixel-Sprites (app-shared.jsx, Paket 3).
+const PxIcon = window.PxIcon;
 
 /**
  * ★ v1447 — PORTRAET NEBEN DER HAND, mit zwei Rueckfaellen
@@ -40236,7 +40238,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="status-immune-icon puppet-counter-badge badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it to another target you control.')}
                     onMouseLeave={hideGameTooltip}
-                  >🍀{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
+                  ><PxIcon z="🍀" />{hero._luckCounter > 1 ? <span className="puppet-counter-num">×{hero._luckCounter}</span> : null}</div>
                 )}
                 {/* v904 (Vena, the Bounty Huntress): Kopfgeld-Marke. Liegt als
                     `hero._bountyBy` auf dem MARKIERTEN Helden und traegt den
@@ -40249,14 +40251,14 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       ? 'Bounty: your Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.'
                       : "Bounty: your opponent's Vena, the Bounty Huntress has marked this Hero. Her effects target it until she collects the bounty herself.")}
                     onMouseLeave={hideGameTooltip}
-                  >🎯</div>
+                  ><PxIcon z="🎯" /></div>
                 )}
                 {/* Aktionssperre (v642, Plant Golem u.a.): vom Server abgeleitet, kein Status */}
                 {hero?.name && p.actionBlockedHeroes?.[i] && !isFrozen && !isStunned && (
                   <div className="status-immune-icon status-action-blocked-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, 'This Hero cannot perform Actions (blocked by a card in its zones or its own effect).')}
                     onMouseLeave={hideGameTooltip}
-                  >⛔</div>
+                  ><PxIcon z="⛔" /></div>
                 )}
                 {/* Stealth (v634): Abzeichen strikt aus der Ability-Zone abgeleitet —
                     kein Status, nichts fuer den Puzzle-Editor. Level = Belegungen. */}
@@ -40267,7 +40269,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div className="status-immune-icon status-stealth-icon badge-buff"
                       onMouseEnter={e => showGameTooltip(e, `Stealth ${lvl}: cannot be chosen by the opponent's level ${lvl} or lower Attacks/Spells while you control other Heroes that can be chosen.`)}
                       onMouseLeave={hideGameTooltip}
-                    >🥷<span className="status-stealth-lvl">{lvl}</span></div>
+                    ><PxIcon z="🥷" /><span className="status-stealth-lvl">{lvl}</span></div>
                   );
                 })()}
                 {/* Alliance (v870): Abzeichen am VERBUENDETEN Helden. Abgeleitet
@@ -40282,7 +40284,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     <div className="status-immune-icon status-alliance-icon badge-debuff"
                       onMouseEnter={e => showGameTooltip(e, `Allied with ${partner.userName}: these two Heroes cannot choose each other with Attacks or non-Support Spells while other targets exist.`)}
                       onMouseLeave={hideGameTooltip}
-                    >🤝</div>
+                    ><PxIcon z="🤝" /></div>
                   );
                 })()}
                 {/* damage_proof (Storm Piano, v628): Schadensschutz bis zum Ende des naechsten eigenen Zuges */}
@@ -40290,20 +40292,20 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                   <div className="status-immune-icon status-damage-proof-icon badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Damage-proof (Storm Piano): this Hero takes no damage until the end of its controller\'s next turn. Damage that cannot be negated still hits.')}
                     onMouseLeave={hideGameTooltip}
-                  >🎹</div>
+                  ><PxIcon z="🎹" /></div>
                 )}
                 {/* ★ v1341 — Cheat Chair: eigener Schutz fuer den Rest des Zuges (eigenes Abzeichen, Als Vorgabe) */}
                 {hero?.name && hero?.statuses?.cheat_chair_guard && !isShielded && (
                   <div className="status-immune-icon status-cheat-chair-icon badge-buff"
                     onMouseEnter={e => showGameTooltip(e, 'Cheat Chair: any damage this Hero would take for the rest of this turn becomes 0. Damage that cannot be reduced or negated still hits.')}
                     onMouseLeave={hideGameTooltip}
-                  >🪑</div>
+                  ><PxIcon z="🪑" /></div>
                 )}
                 {hero?.name && (p.supportZones?.[i] || []).some(slot => (slot || []).includes('Mummy Token')) && (
                   <div className="mummified-icon badge-debuff"
                     onMouseEnter={e => showGameTooltip(e, "This Hero's effect has been replaced by a Mummy Token's.")}
                     onMouseLeave={hideGameTooltip}
-                  >🧟</div>
+                  ><PxIcon z="🧟" /></div>
                 )}
                 {/* ── Lethe self-lock badge (cannot perform Actions) ── */}
                 {hero?.name && hero.hp > 0 && hero._letheActionLocked === gameState.turn && (
@@ -40329,7 +40331,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `${hero.name.split(',')[0]} cannot perform Actions this turn: a target you control was defeated since the end of your last turn.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🚫
+                    <PxIcon z="🚫" />
                   </div>
                 )}
                 {hero?.name && <BuffColumn buffs={hero.buffs} statuses={hero.statuses} cardName={hero.name} />}
@@ -40357,7 +40359,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Deepsea Counters: ${hero.deepseaCounters}`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🌊{hero.deepseaCounters}
+                    <PxIcon z="🌊" />{hero.deepseaCounters}
                   </div>
                 )}
                 {/* ── Time Counter badge (Carris, the Time Keeper) ── */}
@@ -40384,7 +40386,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Time Counters: ${hero._timeCounters}. At the end of each of your turns Carris gains 1; at 3 or more, you lose the game.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    ⏳{hero._timeCounters}
+                    <PxIcon z="⏳" />{hero._timeCounters}
                   </div>
                 )}
                 {/* ── Divinity Counter badge (Pharaoh, the Lone Living Being) ── */}
@@ -40411,7 +40413,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     onMouseEnter={e => showGameTooltip(e, `Divinity Counters: ${hero._divinityCounters}. At the end of your turn, Pharaoh sacrifices a target you control, removes 1 counter and you draw 2 cards.`)}
                     onMouseLeave={hideGameTooltip}
                   >
-                    ☥{hero._divinityCounters}
+                    <PxIcon z="☥" />{hero._divinityCounters}
                   </div>
                 )}
                 {/* ── Devour-Zaehler (Pseudonia, the Skill Devourer, v1275) ──
@@ -40428,7 +40430,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                     })())}
                     onMouseLeave={hideGameTooltip}
                   >
-                    🦷{(hero._pseudoniaAbsorbiert || []).length}/3
+                    <PxIcon z="🦷" />{(hero._pseudoniaAbsorbiert || []).length}/3
                   </div>
                 )}
                 {/* ── Evolution Counters (Waflav) ── */}
@@ -40447,7 +40449,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       textShadow: '0 0 4px #2fbf7a',
                     }}
                   >
-                    🧬{hero._evolutionCounters}
+                    <PxIcon z="🧬" />{hero._evolutionCounters}
                   </div>
                 )}
                 {/* ── Invest Counters (Logan, the Investment Monkee) ── */}
@@ -40471,7 +40473,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       textShadow: '0 0 4px #d9a520',
                     }}
                   >
-                    🪙{hero._investCounters}
+                    <PxIcon z="🪙" />{hero._investCounters}
                   </div>
                 )}
                 {/* ── Change Counters (Cosmic Depths) ── */}
@@ -40494,7 +40496,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       zIndex: 5, pointerEvents: 'auto',
                     }}
                   >
-                    <span style={{ fontSize: 'calc(12px * var(--board-scale))', filter: 'drop-shadow(0 0 2px rgba(170,100,255,0.7))' }}>🌌</span>
+                    <span style={{ fontSize: 'calc(12px * var(--board-scale))', display: 'inline-flex' }}><PxIcon z="🌌" /></span>
                     <span style={{ fontWeight: 'bold' }}>×{hero._changeCounters}</span>
                   </div>
                 )}
@@ -41678,13 +41680,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                           <div className="status-immune-icon puppet-counter-badge"
                             onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
                             onMouseLeave={hideGameTooltip}
-                          >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                          ><PxIcon z="🍀" />{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
                         ) : null}
                         {cc?.preserve > 0 ? (
                           <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
                             onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
                             onMouseLeave={hideGameTooltip}
-                          >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                          ><PxIcon z="🔒" />{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                         ) : null}
                         {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                         {cc?.balance > 0 ? (
@@ -41947,7 +41949,7 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                         onMouseLeave={hideGameTooltip}
                         style={{ background: 'linear-gradient(135deg, #6644cc, #2a0d66)', borderColor: '#aa66ff', color: '#ffe9ff' }}
                       >
-                        <span className="head-counter-icon">🌌</span>
+                        <span className="head-counter-icon"><PxIcon z="🌌" /></span>
                         <span className="head-counter-num">×{cc.changeCounter}</span>
                       </div>
                     ) : null}
@@ -42022,13 +42024,13 @@ function GameBoard({ gameState, lobby, onLeave, decks, sampleDecks, selectedDeck
                       <div className="status-immune-icon puppet-counter-badge"
                         onMouseEnter={e => showGameTooltip(e, 'Luck Counter (Lucky Puppet Laki): when this target is chosen by an opponent\'s card or effect, Laki may remove all Luck Counters to redirect it.')}
                         onMouseLeave={hideGameTooltip}
-                      >🍀{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
+                      ><PxIcon z="🍀" />{cc.luck > 1 ? <span className="puppet-counter-num">×{cc.luck}</span> : null}</div>
                     ) : null}
                     {cc?.preserve > 0 ? (
                       <div className="status-immune-icon puppet-counter-badge puppet-counter-badge-2"
                         onMouseEnter={e => showGameTooltip(e, 'Preserve Counter (Preserving Puppet Vinny): when an opponent\'s card or effect would affect this Creature, Vinny may remove all Preserve Counters to negate its effects on the preserved Creatures.')}
                         onMouseLeave={hideGameTooltip}
-                      >🔒{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
+                      ><PxIcon z="🔒" />{cc.preserve > 1 ? <span className="puppet-counter-num">×{cc.preserve}</span> : null}</div>
                     ) : null}
                     {cc ? <BuffColumn buffs={cc.buffs} statuses={cc} cardName={cards[cards.length-1]} /> : null}
                     {ladung ? (

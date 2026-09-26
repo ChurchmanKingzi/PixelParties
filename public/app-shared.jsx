@@ -536,6 +536,196 @@ const PP_PX_ZEICHEN = {
   '💢': 'wut', '💧': 'tropfen', '💦': 'tropfen', '✚': 'kreuz', '✙': 'kreuz', '➕': 'kreuz',
 };
 
+// ── Pixel-Sprites fuer Status-, Buff- und Debuff-Abzeichen (v1448) ──
+// Je ~9×9, mit dunkler Kontur, damit sie auf den farbigen Plaketten lesbar
+// bleiben. Grossbuchstaben = Palette, '.' = leer.
+const PP_PX_ABZEICHEN_SPRITES = {
+  eis: { pal: { W: '#ffffff', B: '#6fd0ff', D: '#2a8ad0' }, z: [
+    '....W....', '.W..B..W.', '..W.B.W..', '...DBD...', 'WBBBWBBBW',
+    '...DBD...', '..W.B.W..', '.W..B..W.', '....W....'] },
+  moai: { pal: { G: '#a8a296', D: '#6c675e', K: '#2a2622', L: '#cfc9bc' }, z: [
+    '..KKKKK..', '.KLGGGGK.', '.KLGGGGK.', '.KKKGKKK.', '.KGGGGDK.',
+    '..KGGGDK.', '.KGDDDGK.', '.KGGGGDK.', '.KKKKKKK.'] },
+  verbot: { pal: { R: '#e8243a', W: '#ffd0d6' }, z: [
+    '..RRRRR..', '.RR...RR.', 'RRRW...RR', 'R.WRW...R', 'R..WRW..R',
+    'R...WRW.R', 'RR...WRRR', '.RR...RR.', '..RRRRR..'] },
+  halt: { pal: { R: '#e8243a', D: '#9a1020', W: '#ffffff' }, z: [
+    '..DDDDD..', '.DDRRRDD.', 'DDRRRRRDD', 'DRRRRRRRD', 'DRWWWWWRD',
+    'DRRRRRRRD', 'DDRRRRRDD', '.DDRRRDD.', '..DDDDD..'] },
+  fels: { pal: { G: '#8d8a84', L: '#bbb7ae', D: '#5c5a56', K: '#2b2a28' }, z: [
+    '.........', '...KKK...', '..KLLGK..', '.KLLGGGK.', '.KLGGGGK.',
+    'KLGGGGGDK', 'KGGGGGDDK', '.KDDDDDK.', '..KKKKK..'] },
+  blut: { pal: { R: '#d0203a', D: '#8a1024', W: '#ff9aa8', K: '#3a0610' }, z: [
+    '....K....', '...KRK...', '...KRK...', '..KRRRK..', '.KRWRRRK.',
+    '.KWRRRDK.', '.KRRRRDK.', '..KDDDK..', '...KKK...'] },
+  schaedel_gift: { pal: { W: '#d8f4b8', G: '#7fbf5a', K: '#12200c' }, z: [
+    '..WWWWW..', '.WWWWWWW.', 'WWWWWWWWG', 'WKKWWWKKG', 'WKKWWWKKG', 'WWWWKWWWG',
+    '.WWWWWWG.', '..WKWKWG.', '..WGWGWG.'] },
+  mund_zu: { pal: { Y: '#ffc83a', O: '#d8901a', K: '#3a2408', G: '#d8dce6' }, z: [
+    '..YYYYY..', '.YYYYYYY.', 'YYKYYYKYY', 'YYKYYYKYO', 'YYYYYYYYO',
+    'YKGKGKGKO', 'YYYYYYYYO', '.YYYYYYO.', '..OOOOO..'] },
+  stumm: { pal: { W: '#e4e4ee', K: '#2a2a36', R: '#ff4050' }, z: [
+    '...K.....', '..KK.....', 'KKWK.R..R', 'KWWK..RR.', 'KWWK..RR.',
+    'KKWK.R..R', '..KK.....', '...K.....', '.........'] },
+  glocke_aus: { pal: { Y: '#ffcc40', D: '#a87010', R: '#ff3040' }, z: [
+    'R...D....', '.R.YYY...', '..RYYYY..', '..YRYYY..', '..YYRYY..',
+    '.YYYYRYY.', 'DDDDDDRDD', '....Y..R.', '........R'] },
+  schreck: { pal: { B: '#6aa8e8', Y: '#ffd040', W: '#ffffff', K: '#1a1a2a', O: '#d89a20' }, z: [
+    '..BBBBB..', '.BBBBBBB.', 'BBWWBWWBB', 'YBWKBWKBY', 'YYYYYYYYO',
+    'YYYKKKYYO', 'YYYKKKYYO', '.YYKKKYO.', '..OOOOO..'] },
+  wut_gesicht: { pal: { R: '#e8402a', D: '#a82410', K: '#2a0804' }, z: [
+    '..RRRRR..', '.RRRRRRR.', 'RKKRRRKKR', 'RRRKRKRRD', 'RRKKRKKRD',
+    'RRRRRRRRD', 'RRRKKKRRD', '.RKRRRKD.', '..DDDDD..'] },
+  nazar: { pal: { B: '#1f4fc8', W: '#ffffff', L: '#6ac0ff', K: '#101018' }, z: [
+    '..BBBBB..', '.BBBWBBB.', 'BBWWLWWBB', 'BBWLLLWBB', 'BWLLKLLWB',
+    'BBWLLLWBB', 'BBWWLWWBB', '.BBBWBBB.', '..BBBBB..'] },
+  kerze: { pal: { Y: '#ffd23e', O: '#ff8a1e', W: '#f4efe0', G: '#b8b0a0' }, z: [
+    '....Y....', '...YOY...', '...YWY...', '....O....', '...WWG...',
+    '...WWG...', '...WWG...', '...WWG...', '..GGGGG..'] },
+  sanduhr: { pal: { K: '#7a5230', Y: '#f0c050', G: '#bfe4ff' }, z: [
+    'KKKKKKKKK', '.KYYYYYK.', '..KYYYK..', '...KYK...', '....Y....',
+    '...KGK...', '..KGYGK..', '.KYYYYYK.', 'KKKKKKKKK'] },
+  kette: { pal: { L: '#dfe3ec', D: '#8a90a0' }, z: [
+    '.LLL.....', 'L...L....', 'L...L....', 'L..DLDD..', '.LLLD..D.',
+    '....D..D.', '....D..D.', '.....DD..', '.........'] },
+  auge: { pal: { W: '#ffffff', B: '#4a90d0', K: '#1a1a2a' }, z: [
+    '.........', '..KKKKK..', '.KWWWWWK.', 'KWWBBBWWK', 'KWWBKBWWK',
+    'KWWBBBWWK', '.KWWWWWK.', '..KKKKK..', '.........'] },
+  nebel: { pal: { G: '#d8dce8', L: '#9aa0b4' }, z: [
+    '.........', '.GGGGGG..', '.........', '...LLLLLL', '.........',
+    'GGGGGG...', '.........', '..LLLLLLL', '.........'] },
+  flagge: { mono: true, z: [
+    '#######..', '#+++++##.', '#+++++###', '#++++##..', '######...',
+    '#........', '#........', '#........', '#........'] },
+  blasen: { pal: { B: '#8ad0ff', L: '#d8f2ff', W: '#ffffff' }, z: [
+    '......LL.', '.....L..L', '.....L..L', '..BBB.LL.', '.B.W.B...',
+    'B.WW..B..', 'B.....B..', '.B...B...', '..BBB....'] },
+  zweig: { pal: { G: '#4caf3a', L: '#8ee06a', D: '#2a7022' }, z: [
+    '......LG.', '....LGG..', '.LG.GD...', '..GGD.LG.', '...D.GG..',
+    '.LG.D....', '..GGD....', '...D.....', '..D......'] },
+  welle: { pal: { B: '#3a8ae0', W: '#e8f6ff', D: '#1f4f9a' }, z: [
+    '.........', '...BBBB..', '..BWWWBB.', '.BW..BWB.', '.B..BBB..',
+    'BB.BBBBBB', 'BBBBBBBBB', 'DBBBDBBBD', 'DDDDDDDDD'] },
+  glanz: { pal: { Y: '#ffd84a', W: '#fffbe0', O: '#d89a20' }, z: [
+    '...Y.....', '...Y.....', '..YWY....', 'YYWWWYY..', '..YWY..Y.',
+    '...Y..YWY', '...Y...Y.', '.......O.', '.........'] },
+  schild: { pal: { B: '#4a7ad0', L: '#8ab4ff', D: '#2a4a90', K: '#141a2a' }, z: [
+    '.KKKKKKK.', 'KLLBBBBBK', 'KLBBBBBDK', 'KLBBBBBDK', 'KBBBBBBDK',
+    '.KBBBBDK.', '.KBBBBDK.', '..KBBDK..', '...KKK...'] },
+  falter: { pal: { B: '#3a9aff', L: '#aee0ff', K: '#1a1a2a' }, z: [
+    'BB.....BB', 'BLB...BLB', 'BLBB.BBLB', '.BBBKBBB.', '..BBKBB..',
+    '.BBBKBBB.', 'BLBB.BBLB', 'BBB...BBB', '.........'] },
+  hut: { pal: { K: '#3a3a4c', G: '#6a6a82', L: '#a8a8c0', Y: '#ffd23e' }, z: [
+    '.........', '....L....', '..LLGLL..', 'LLGGGGGLL', '..KKGKK.Y',
+    '..KKKKK.Y', '..KKKKK.Y', '.......YY', '.........'] },
+  zahnrad: { pal: { G: '#a8aebc', D: '#6a7080', K: '#2a2e38' }, z: [
+    '...GGG...', '.G.GGG.D.', '.GGGGGGD.', 'GGGK.KGDD', 'GGG...GDD',
+    'GGGK.KDDD', '.GGGDDDD.', '.D.DDD.D.', '...DDD...'] },
+  taube: { pal: { W: '#ffffff', G: '#b8c0d0', K: '#1a1a2a', O: '#f0a030' }, z: [
+    '.WW......', 'WWWW.....', '.WWWW..WW', '..WWWWWKW', '..GWWWWWO',
+    '.GWWWWWW.', 'GGWWWWW..', '....WW...', '.........'] },
+  katze: { pal: { O: '#f0a040', D: '#b86a1a', K: '#1a1008', P: '#ff8aa0' }, z: [
+    'O.......O', 'OO.....OO', 'OOOOOOOOO', 'OOKOOOKOD', 'OOKOOOKOD',
+    'OOOOPOOOD', '.OOOOOOD.', '..DDDDD..', '.........'] },
+  schloss: { pal: { G: '#b8bcc8', Y: '#f0c040', D: '#b08010', K: '#3a2808' }, z: [
+    '..GGGGG..', '.G.....G.', '.G.....G.', 'YYYYYYYYD', 'YYYYKYYYD',
+    'YYYYKYYYD', 'YYYYKYYYD', 'YYYYYYYYD', 'DDDDDDDDD'] },
+  sonnenbrille: { pal: { Y: '#ffc83a', O: '#d8901a', K: '#16161e', L: '#6a6a80' }, z: [
+    '..YYYYY..', '.YYYYYYY.', 'KKKKKKKKK', 'YKLKYKLKO', 'YYKKYKKYO',
+    'YYYYYYYYO', 'YYKYYYKYO', '.YYKKKYO.', '..OOOOO..'] },
+  fluegel: { pal: { W: '#ffe07a', L: '#d8a020', K: '#6a4a08' }, z: [
+    '......WW.', '....WWWLW', '..WWWLLW.', '.WWLLWW..', 'WWLLWWW..',
+    'WLLWWWW..', '.WWWWWK..', '..KKKK...', '.........'] },
+  zielscheibe: { pal: { R: '#e8243a', W: '#ffffff' }, z: [
+    '..RRRRR..', '.RWWWWWR.', 'RWRRRRRWR', 'RWRWWWRWR', 'RWRWRWRWR',
+    'RWRWWWRWR', 'RWRRRRRWR', '.RWWWWWR.', '..RRRRR..'] },
+  bueffel: { pal: { W: '#e8e0d0', G: '#5a5a66', K: '#101010', P: '#34343c' }, z: [
+    'W.......W', 'WW.....WW', '.WGGGGGW.', '..GKGKG..', '..GGGGG..',
+    '..GGGGG..', '...GPG...', '...GGG...', '.........'] },
+  hund: { pal: { B: '#8a5a2a', O: '#d8a060', K: '#1a1008', P: '#ff7a8a' }, z: [
+    '.........', 'BB.....BB', 'BBOOOOOBB', 'BBOKOKOBB', '.BOOOOOB.',
+    '..OOKOO..', '..OOOOO..', '...OPO...', '.........'] },
+  neumond: { pal: { D: '#3a3a5a', G: '#50507a', L: '#c8d0f0' }, z: [
+    '..DDDDD..', '.DDDDDDL.', 'DDGDDDDLL', 'DDDDDDDDL', 'DDDDGDDDL',
+    'DGDDDDDDL', 'DDDDDDDLL', '.DDDDDLL.', '..LLLLL..'] },
+  arm: { pal: { Y: '#ffc040', D: '#c8801a' }, z: [
+    '......YY.', '.....YYYY', '.....YYYD', '.....YYD.', '..YY.YYD.',
+    '.YYYYYYD.', 'YYYYYYYD.', 'YYYYYYD..', '.DDDDD...'] },
+  geodreieck: { pal: { B: '#4a90d0', L: '#a8d4ff' }, z: [
+    'B........', 'BB.......', 'BLB......', 'BL.B.....', 'BL..B....',
+    'BL...B...', 'BLLLLLB..', 'BBBBBBBB.', '.........'] },
+  feder: { pal: { W: '#f0f4ff', G: '#8a9ab8' }, z: [
+    '.......WG', '......WWG', '.....WWG.', '....WWG..', '...WWG...',
+    '..WWG....', '..WG.....', '.G.......', 'G........'] },
+  kaefer: { pal: { G: '#3aa060', L: '#8ae0a0', K: '#1a1a1a' }, z: [
+    '..K...K..', '...KKK...', '..KGGGK..', '.KGLKLGK.', 'KKGGKGGKK',
+    '.KGGKGGK.', 'KKGGKGGKK', '.KGGKGGK.', '..KKKKK..'] },
+  raute_blau: { pal: { D: '#1f5fb8', B: '#4aa8ff', L: '#a8dcff', W: '#ffffff' }, z: [
+    '....D....', '...DLD...', '..DLWLD..', '.DLLBLLD.', 'DBBBBBBBD',
+    '.DBBBBBD.', '..DBBBD..', '...DBD...', '....D....'] },
+  radioaktiv: { pal: { Y: '#ffd83a', K: '#1a1a10' }, z: [
+    '..YYYYY..', '.YKKYKKY.', 'YKKKYKKKY', 'YYKKYKKYY', 'YYYYKYYYY',
+    'YYYYYYYYY', 'YYYKKKYYY', '.YYKKKYY.', '..YYYYY..'] },
+  buch: { pal: { B: '#3a6ad8', L: '#1f3f90', Y: '#ffe070', W: '#f0f0e0' }, z: [
+    '.BBBBBBB.', '.LBBBBBBW', '.LBBBBBBW', '.LBYYYBBW', '.LBBBBBBW',
+    '.LBBBBBBW', '.LBBBBBBW', '.LBBBBBBW', '..WWWWWWW'] },
+  klee: { pal: { G: '#4cc04a', L: '#9af08a', D: '#2a8030' }, z: [
+    '.GG...GG.', 'GLGG.GGLG', 'GGGG.GGGG', '.GGGDGGG.', '...DDD...',
+    '.GGGDGGG.', 'GGGG.GGGD', 'GGGD.DGDD', '.DD...DD.'] },
+  ninja: { pal: { K: '#23232e', S: '#f0c8a0', R: '#d02a2a' }, z: [
+    '..KKKKK..', '.KKKKKKK.', 'RRRRRRRRR', 'KSSSSSSSK', 'KSKSSSKSK',
+    'KKKKKKKKK', 'KKKKKKKKK', '.KKKKKKK.', '..KKKKK..'] },
+  haende: { pal: { Y: '#ffcc5a', O: '#e08a3a', B: '#4a7ad0', R: '#d04a4a' }, z: [
+    '.........', '.........', 'BBY...ORR', 'BBYYYOORR', 'BBYYOYORR',
+    '..YOYOYO.', '...YOYO..', '.........', '.........'] },
+  klavier: { pal: { K: '#16161e', W: '#f4f4f0', G: '#9aa0a8' }, z: [
+    'KKKKKKKKK', 'WKWKWWKWK', 'WKWKWWKWK', 'WKWKWWKWK', 'WGWGWGWGW',
+    'WGWGWGWGW', 'KKKKKKKKK'] },
+  stuhl: { pal: { B: '#d0902a', D: '#8a5a1a' }, z: [
+    '.BD......', '.BD......', '.BD......', '.BD......', '.BBBBBBB.',
+    '.DDDDDDD.', '.B.....B.', '.B.....B.', '.D.....D.'] },
+  zombie: { pal: { G: '#7ab870', D: '#3a5a30', K: '#101810', R: '#e03030', W: '#e8e0c8' }, z: [
+    '..DDDDD..', '.DGGGGGD.', 'GGGGGGGGG', 'GKRGGGKRG', 'GGGGGGGGD',
+    'GGWKWKWGD', '.GKKKKKD.', '..DDDDD..', '.........'] },
+  ankh: { pal: { Y: '#ffd84a', D: '#b88a10' }, z: [
+    '..YYY..', '.Y...Y.', '.Y...D.', '..Y.D..', 'YYYYYYD',
+    '...Y...', '...Y...', '...YD..', '...YD..'] },
+  zahn: { pal: { W: '#f4f1e6', G: '#bdb6a2' }, z: [
+    '.WWW.WWW.', 'WWWWWWWWG', 'WWWWWWWWG', 'WWWWWWWWG', '.WWWWWWG.',
+    '.WWWGWWG.', '.WWG.WWG.', '.WG...WG.', '..G....G.'] },
+  dna: { pal: { B: '#4a8aff', R: '#ff5a7a', L: '#c8c8d8' }, z: [
+    'B.....R', '.B...R.', '..BLR..', '...B...', '..RLB..',
+    '.R...B.', 'R.....B', '.R...B.', '..RLB..'] },
+  muenze: { pal: { Y: '#ffd23e', D: '#b8860b', L: '#fff2a8' }, z: [
+    '..DDDDD..', '.DDLDYDD.', 'DDDDYDDDD', 'DLDYYYDYD', 'DDYYYYYDD',
+    'DYDYYYDYD', 'DDDDYDDDD', '.DDYDYDD.', '..DDDDD..'] },
+  galaxie: { pal: { D: '#2a1450', P: '#8a4ae8', L: '#d0a8ff', W: '#ffffff' }, z: [
+    '..DDDDD..', '.DDPPPDD.', 'DDPDDDPDD', 'DPDLLDDPD', 'DPDLWLDPD',
+    'DPDDLLDPD', 'DDPDDDPDD', '.DDPPPDD.', '..DDDDD..'] },
+};
+
+// Emoji → Sprite fuer die Abzeichen. Vorrang vor PP_PX_ZEICHEN
+// (Frost bekommt hier den farbigen Kristall statt der Schneeflocke,
+// Gift den gruenen Schaedel).
+const PP_PX_ICONS = {
+  '❄️': 'eis', '❄': 'eis', '🗿': 'moai', '🚫': 'verbot', '⛔': 'halt', '🪨': 'fels',
+  '🩸': 'blut', '☠️': 'schaedel_gift', '☠': 'schaedel_gift', '🤐': 'mund_zu', '🔇': 'stumm',
+  '🔕': 'glocke_aus', '😱': 'schreck', '😡': 'wut_gesicht', '🧿': 'nazar', '🕯️': 'kerze',
+  '🕯': 'kerze', '⏳': 'sanduhr', '⛓️': 'kette', '⛓': 'kette', '👁️': 'auge', '👁': 'auge',
+  '🌫️': 'nebel', '🌫': 'nebel', '⚑': 'flagge', '🫧': 'blasen', '🌿': 'zweig', '🌊': 'welle',
+  '✨': 'glanz', '🛡️': 'schild', '🛡': 'schild', '🦋': 'falter', '🎓': 'hut', '⚙️': 'zahnrad',
+  '⚙': 'zahnrad', '🕊️': 'taube', '🕊': 'taube', '🐈': 'katze', '🔒': 'schloss',
+  '😎': 'sonnenbrille', '🪽': 'fluegel', '🎯': 'zielscheibe', '🐃': 'bueffel', '🐕': 'hund',
+  '🌑': 'neumond', '💪': 'arm', '📐': 'geodreieck', '🪶': 'feder', '🪲': 'kaefer',
+  '💠': 'raute_blau', '☢️': 'radioaktiv', '☢': 'radioaktiv', '📘': 'buch', '🍀': 'klee',
+  '🥷': 'ninja', '🤝': 'haende', '🎹': 'klavier', '🪑': 'stuhl', '🧟': 'zombie',
+  '☥': 'ankh', '🦷': 'zahn', '🧬': 'dna', '🪙': 'muenze', '🌌': 'galaxie',
+};
+Object.assign(PP_PX_SPRITES, PP_PX_ABZEICHEN_SPRITES);
+// Die Animationen (Pixelierer, PxZeichen) bekommen die neuen Zeichen mit,
+// wo sie noch keines hatten — bestehende Zuordnungen bleiben.
+for (const [z, name] of Object.entries(PP_PX_ICONS)) if (!PP_PX_ZEICHEN[z]) PP_PX_ZEICHEN[z] = name;
+
 /**
  * Scale2x (EPX): verdoppelt ein Zeichenraster und rundet Diagonalen ab,
  * ohne den Pixel-Charakter zu verlieren — fuer grosse Darstellungen,
@@ -614,6 +804,109 @@ function PxZeichen({ z, groesse, einfarbig, variante }) {
   }} />;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  ★ v1448 — PAKET 3: STATUS-, BUFF- UND DEBUFF-ABZEICHEN
+//  (Als Vorgabe 27.9.: „Was jetzt noch fehlt, sind Icons/Badges
+//   (Status, Buffs, Debuffs …). Kannst du die auch durch
+//   Pixel-Grafiken ersetzen?")
+//
+//  Zwei Teile:
+//    PxIcon            Zeichen eines Abzeichens → handgezeichnetes Sprite
+//                      (PP_PX_ICONS vor PP_PX_ZEICHEN); ohne eigenes
+//                      Sprite das automatisch pixelierte Emoji; sonst Text.
+//                      Die Groesse setzt CSS (`.pp-px-icon`, style.css).
+//    ppPxPlaketteUrl   die runde Plakette dahinter: Kontur, Rand mit
+//                      Lichtkante, Flaeche (gedithert, wenn Verlauf) mit
+//                      Glanzpunkt und Schatten. Farben kommen aus
+//                      style.css (`PP_PX_KLASSEN.plaketten`).
+// ═══════════════════════════════════════════════════════════════════
+function _ppIconSprite(z) {
+  const k = String(z).trim();
+  return PP_PX_ICONS[k] || PP_PX_ICONS[k.replace(/️/g, '')] || PP_PX_ZEICHEN[k] || null;
+}
+
+function PxIcon({ z }) {
+  if (z == null || z === '') return null;
+  const k = String(z).trim();
+  const name = _ppIconSprite(k);
+  const s = name ? PP_PX_SPRITES[name] : null;
+  if (s && s.mono) {
+    const url = ppPxSpriteUrl(name);
+    if (url) {
+      const m = `url(${url}) center / contain no-repeat`;
+      return <span className="pp-px pp-px-icon" aria-hidden="true"
+        style={{ background: 'currentColor', WebkitMask: m, mask: m }} />;
+    }
+  }
+  const url = s ? ppPxSpriteUrl(name)
+    : PP_EMOJI_MUSTER.test(k) ? ppPxEmojiUrl(k, 24) : '';
+  if (!url) return k;
+  return <img src={url} alt="" draggable={false} className="pp-px pp-px-icon" />;
+}
+
+/** Halbtransparente Farbe auf dunklen Grund rechnen — Pixelart ist deckend. */
+const PP_PX_PLAKETTE_GRUND = [22, 16, 28];
+function _ppAufGrund(f) {
+  const a = f[3] == null ? 1 : f[3];
+  return [0, 1, 2].map(i => PP_PX_PLAKETTE_GRUND[i] * (1 - a) + f[i] * a).concat([1]);
+}
+
+/** Farbe eines Verlaufs an Stelle (px, py) ∈ [0,1]², zwischen den Stopps gedithert. */
+function _ppVerlaufBei(v, px, py, x, y) {
+  let t;
+  if (v.linear) {
+    const wr = (v.winkel || 0) * Math.PI / 180, sn = Math.sin(wr), cs = Math.cos(wr);
+    t = 0.5 + ((px - 0.5) * sn - (py - 0.5) * cs) / ((Math.abs(sn) + Math.abs(cs)) || 1);
+  } else {
+    const rk = Math.hypot(Math.max(v.cx, 1 - v.cx), Math.max(v.cy, 1 - v.cy));
+    t = Math.hypot(px - v.cx, py - v.cy) / (v.kreis ? rk : Math.SQRT2 * Math.max(v.cx, 1 - v.cx));
+  }
+  const S = v.stopps;
+  if (t <= S[0].p) return S[0].f;
+  if (t >= S[S.length - 1].p) return S[S.length - 1].f;
+  let i = 1; while (i < S.length - 1 && S[i].p < t) i++;
+  const a = S[i - 1], b = S[i];
+  return (b.p > a.p ? (t - a.p) / (b.p - a.p) : 1) > ppBayer(x, y) ? b.f : a.f;
+}
+
+/**
+ * Runde Pixel-Plakette, 12×12: 1 Pixel dunkle Kontur, 1 Pixel Rand
+ * (oben links heller), Flaeche aus Farbe oder Verlauf mit Glanzpunkt
+ * oben links und gedithertem Schatten unten rechts.
+ */
+function ppPxPlaketteUrl(flaeche, rand) {
+  const N = 12, M = N / 2;
+  const v = /gradient/.test(flaeche || '') ? ppVerlaufLesen(flaeche) : null;
+  const voll = v ? null : _ppAufGrund(ppFarbe(flaeche));
+  const r = ppFarbe(rand);
+  const randF = _ppAufGrund([r[0], r[1], r[2], Math.max(r[3], 0.85)]);
+  const randHell = _ppMisch(randF, [255, 255, 255], 0.4);
+  const kontur = [14, 9, 18, 1];
+  return ppPxBild('pl:' + flaeche + '|' + rand, N, N, (setze) => {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const d = Math.hypot(x + 0.5 - M, y + 0.5 - M);
+      if (d > 6) continue;
+      if (d > 5) { setze(x, y, kontur); continue; }
+      if (d > 4) { setze(x, y, x + y <= 8 ? randHell : randF); continue; }
+      let f = v ? _ppAufGrund(_ppVerlaufBei(v, (x + 0.5) / N, (y + 0.5) / N, x, y)) : voll;
+      if ((y === 3 && (x === 3 || x === 4)) || (x === 3 && y === 4)) f = _ppMisch(f, [255, 255, 255], 0.35);
+      else if (x + y >= 14 && (x + y) % 2 === 0) f = _ppMisch(f, [0, 0, 0], 0.3);
+      setze(x, y, f);
+    }
+  });
+}
+
+/** Pixel-Schraegstrich fuer „Blinded" (ueber der Plakette, 12×12). */
+function ppPxSchraegstrichUrl() {
+  return ppPxBild('schraeg', 12, 12, (setze) => {
+    for (let i = 2; i <= 9; i++) {
+      setze(i, 11 - i, [255, 80, 80, 1]);
+      setze(i + 1, 11 - i, [200, 30, 40, 1]);
+      setze(i, 10 - i, [255, 235, 235, 1]);
+    }
+  });
+}
+
 // ── Freigabeliste der CSS-Klassen (pro Paket ergaenzt) ─────────────
 // `verlauf`: der radial-gradient der Klasse wird Pixelbild (Farben aus
 //   style.css gelesen — die Klasse bleibt die einzige Quelle).
@@ -640,6 +933,30 @@ const PP_PX_KLASSEN = {
     { sel: '.anim-shield-bubble-rim', breite: 110, verlauf: 'radial-gradient(ellipse, transparent 64%, rgba(255,255,255,.95) 66%, rgba(255,255,255,.95) 69%, rgba(200,230,255,.5) 71%, transparent 73%)' },
     { sel: '.torchure-ring', breite: 72, verlauf: 'radial-gradient(circle, transparent 58%, rgba(120,220,90,.55) 61%, #be5aff 63%, #be5aff 67%, rgba(160,60,230,.5) 69%, transparent 71%)' },
   ],
+  // Paket 3 (v1448): runde Abzeichen → Pixel-Plakette. `klassen` ist die
+  // Klassenliste fuer die Probe (Flaeche und Rand werden aus style.css
+  // gelesen), `sel` der Selektor der erzeugten Regel.
+  plaketten: [
+    { sel: '.status-badge', klassen: 'status-badge' },
+    { sel: '.status-badge.status-positiv', klassen: 'status-badge status-positiv' },
+    { sel: '.buff-icon', klassen: 'buff-icon' },
+    { sel: '.buff-icon.buff-icon-debuff', klassen: 'buff-icon buff-icon-debuff' },
+    { sel: '.status-action-blocked-icon', klassen: 'status-immune-icon status-action-blocked-icon' },
+    { sel: '.status-stealth-icon', klassen: 'status-immune-icon status-stealth-icon' },
+    { sel: '.status-damage-proof-icon', klassen: 'status-immune-icon status-damage-proof-icon' },
+    { sel: '.status-cheat-chair-icon', klassen: 'status-immune-icon status-cheat-chair-icon' },
+  ],
+  // Abzeichen ohne Plakette: weicher Schein → harter Pixelschatten bzw.
+  // 1-Pixel-Umriss in der Scheinfarbe.
+  abzeichenExtra: [
+    '.status-immune-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8));}',
+    '.status-immune-icon.status-shielded-icon{filter:drop-shadow(1px 0 0 #ffd84a) drop-shadow(-1px 0 0 #ffd84a) drop-shadow(0 1px 0 #ffd84a) drop-shadow(0 -1px 0 #ffd84a) drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    '.status-immune-icon.vena-bounty-badge{box-shadow:none;filter:drop-shadow(1px 0 0 #ff5060) drop-shadow(-1px 0 0 #ff5060) drop-shadow(0 1px 0 #ff5060) drop-shadow(0 -1px 0 #ff5060);}',
+    '.mummified-icon{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.8))!important;}',
+    // Buff-Puls: statt weichem Schein ein gestufter Helligkeitswechsel.
+    '.buff-icon{animation:ppPxBuffPuls 2s steps(2,jump-none) infinite;}',
+    '.buff-icon.buff-icon-debuff{animation:none;}',
+  ],
 };
 
 function _ppPxRegelnBauen() {
@@ -647,7 +964,7 @@ function _ppPxRegelnBauen() {
   // Den Verlauf jeder Klasse ueber ein kurz eingehaengtes Probe-Element
   // lesen: `getComputedStyle` klappt immer, `cssRules` nicht (fremde
   // Herkunft, file://). Die Klassen der Liste sind einfache Klassen.
-  const verlaufVon = {};
+  const verlaufVon = {}, plaketteVon = {};
   try {
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;animation:none;';
@@ -657,6 +974,15 @@ function _ppPxRegelnBauen() {
       const cs = getComputedStyle(probe);
       const bg = cs.backgroundImage;
       if (bg && /(radial|linear)-gradient/.test(bg)) verlaufVon[sel] = { g: bg, b: parseFloat(cs.width) || 0, h: parseFloat(cs.height) || 0 };
+    }
+    // v1448: Flaeche und Rand der Abzeichen-Plaketten.
+    for (const p of PP_PX_KLASSEN.plaketten || []) {
+      probe.className = p.klassen;
+      const cs = getComputedStyle(probe);
+      const bg = cs.backgroundImage;
+      const flaeche = bg && /(radial|linear)-gradient/.test(bg) && !/,\s*(radial|linear)-gradient/.test(bg)
+        ? bg : cs.backgroundColor;
+      plaketteVon[p.sel] = { flaeche, rand: cs.borderTopColor };
     }
     probe.remove();
   } catch {}
@@ -683,6 +1009,18 @@ function _ppPxRegelnBauen() {
   }
   for (const sel of PP_PX_KLASSEN.ohneFilter) regeln.push(`${sel}{filter:none!important;}`);
   for (const r of PP_PX_KLASSEN.extra || []) regeln.push(r);
+  // v1448: Abzeichen. Der Rand bleibt als (durchsichtiger) Platzhalter
+  // stehen, damit sich die Groesse nicht aendert; das Bild deckt ihn mit.
+  for (const p of PP_PX_KLASSEN.plaketten || []) {
+    const f = plaketteVon[p.sel];
+    const url = f ? ppPxPlaketteUrl(f.flaeche, f.rand) : '';
+    if (!url) continue;
+    regeln.push(`${p.sel}{background:url(${url}) center/100% 100% no-repeat!important;background-origin:border-box!important;`
+      + 'border-color:transparent!important;border-radius:0!important;box-shadow:none!important;'
+      + 'filter:drop-shadow(1px 1px 0 rgba(0,0,0,.75));image-rendering:pixelated;}');
+  }
+  for (const r of PP_PX_KLASSEN.abzeichenExtra || []) regeln.push(r);
+  regeln.push(`.status-badge.status-blinded::after{background:url(${ppPxSchraegstrichUrl()}) center/100% 100% no-repeat;border-radius:0;image-rendering:pixelated;}`);
   regeln.push('.pp-px{image-rendering:pixelated;}');
   return regeln.join('\n');
 }
@@ -1068,6 +1406,7 @@ function ppPixeliererAnhaengen(wurzel) {
 window.ppPixeliererAnhaengen = ppPixeliererAnhaengen;
 
 window.PxZeichen = PxZeichen;
+window.PxIcon = PxIcon;
 window.pxHintergrund = pxHintergrund;
 window.ppPxVerlaufUrl = ppPxVerlaufUrl;
 window.ppPxRegelnAnwenden = ppPxRegelnAnwenden;
@@ -6143,7 +6482,7 @@ function StatusBadges({ statuses, counters, buffs, isHero, player, cardName, isO
         <div key={b.key} className={'status-badge' + (b.className ? ' ' + b.className : '')}
           onMouseEnter={e => { showGameTooltip(e, b.tooltip); showBoardTip(); }}
           onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-          {b.icon}
+          <PxIcon z={b.icon} />
           {b.duration != null && <span className="status-badge-duration">{b.duration}</span>}
         </div>
       ))}
@@ -6262,7 +6601,7 @@ function BuffColumn({ buffs, cardName, statuses }) {
           <div key={key} className={'buff-icon ' + (istDebuff(key) ? 'badge-debuff buff-icon-debuff' : 'badge-buff')}
             onMouseEnter={e => { showGameTooltip(e, tooltipText); showBoardTip(); }}
             onMouseLeave={() => { hideGameTooltip(); hideBoardTip(); }}>
-            {def.icon}
+            <PxIcon z={def.icon} />
           </div>
         );
       })}
