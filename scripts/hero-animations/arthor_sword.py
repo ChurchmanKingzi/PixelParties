@@ -5,8 +5,9 @@
   weichen, geschlossenen Verschiebungsfeld verzerrt und pulsiert in der
   Deckkraft. Stellen hinter der Figur werden vorher aus der Umgebung aufgefüllt,
   damit beim Verzerren keine Löcher entstehen.
-* Er hebt das Schwert langsam bis 3 px an und senkt es wieder (Klinge,
-  Parierstange, Griff und Hand als Einheit; der Arm streckt sich mit).
+* Er hebt das Schwert zweimal pro Loop bis 3 px an und senkt es wieder
+  (Klinge, Parierstange, Griff mit Knauf und Hand als Einheit – der Knauf
+  wird dabei nicht verlängert, darunter wird der Körper sichtbar).
 * Die fünf Kerzen flackern: ihre Flammen werden jedes Frame neu gezeichnet
   (Höhe, Neigung und Glut wechseln).
 """
@@ -64,15 +65,17 @@ def in_sword(x, y):
         return False
     if 75 <= y <= 99:
         return x >= 27
-    return 100 <= y <= 103 and 29 <= x <= 34
+    if 100 <= y <= 103:
+        return 29 <= x <= 34
+    return 104 <= y <= 105 and 29 <= x <= 32                 # Griffende + Knauf
 
 
-SWORD = [(x, y) for y in range(75, 104) for x in range(W) if in_sword(x, y)]
+SWORD = [(x, y) for y in range(75, 106) for x in range(W) if in_sword(x, y)]
 SWORD_SET = set(SWORD)
 
 
 def lift(i):
-    return int(round(1.5 - 1.5 * math.cos(2 * math.pi * i / N)))   # 0..3
+    return int(round(1.5 - 1.5 * math.cos(2 * math.pi * i / 24)))  # 0..3, zweimal pro Loop
 
 
 def under(x, y, sprite):
@@ -82,7 +85,7 @@ def under(x, y, sprite):
             if 0 <= x - d and OPAQUE[y, x - d] and (x - d, y) not in SWORD_SET:
                 return sprite[y, x - d]
         return None
-    for d in range(1, 6):                                 # unter der Hand: Arm streckt sich
+    for d in range(1, 6):                                 # unter dem Knauf: Körper
         if y + d < H and OPAQUE[y + d, x] and (x, y + d) not in SWORD_SET:
             return sprite[y + d, x]
     return None
