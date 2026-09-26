@@ -69,7 +69,16 @@ crag = [(126, 302), (138, 280), (150, 266), (160, 252), (168, 247), (200, 246), 
 Mc = np.zeros((H, W), np.uint8)
 cv2.fillPoly(Mc, [np.array(crag, np.int32)], 1)
 Mc = Mc.astype(bool) & (yy < AY1) & (xx < AX1)
-Hc = dome(Mc, 8) + (noise(H, W, 3, seed=31, octaves=3) - 0.5) * 3.0 + np.sin(xx * 0.4 + yy * 0.9) * 0.4
+# facettierte Felsbrocken: Zellen um zufällige Keime, jede Zelle eine schräge Ebene
+seeds = [(rnd.uniform(126, 240), rnd.uniform(246, 306)) for _ in range(26)]
+cell = np.full((H, W), 1e9); cid = np.zeros((H, W), int)
+for i, (sx_, sy_) in enumerate(seeds):
+    d = np.hypot(xx - sx_, (yy - sy_) * 1.4)
+    m = d < cell
+    cell = np.where(m, d, cell); cid = np.where(m, i, cid)
+tilt = np.array([rnd.uniform(-0.25, 0.25) for _ in seeds]); tilty = np.array([rnd.uniform(-0.3, 0.05) for _ in seeds])
+Hc = dome(Mc, 8) * 0.6 - cell * 0.18 + tilt[cid] * xx * 0.3 + tilty[cid] * yy * 0.3 \
+    + (noise(H, W, 2, seed=31, octaves=2) - 0.5) * 1.2
 relief(cv, Hc.astype(np.float32), np.zeros((H, W), np.int32), [ROCK], Mc, k=1.5, bias=0.02)
 mask_outline(cv, Mc, (4, 2, 10))
 

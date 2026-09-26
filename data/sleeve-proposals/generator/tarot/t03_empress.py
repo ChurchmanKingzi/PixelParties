@@ -101,6 +101,7 @@ IVORY = [(150, 130, 100), (200, 184, 150), (232, 222, 196), (248, 244, 228), (25
 
 MATS = {
     's': mat(SKINV, pillow=5, k=0.9, bias=0.06),
+    'S': mat(SKINV, pillow=2, k=0.7, bias=0.18),
     'h': mat(HAIRV, pillow=4, k=1.8, noise=0.9, nscale=2, bias=0.05),
     'r': mat(ROBEB, pillow=5, k=1.5, folds=(0.3, 0.03, 0.7), bias=0.05),
     'q': mat(ROBEB[:4], pillow=1, k=1.0, bias=-0.25),
@@ -209,13 +210,13 @@ f.part('cuffLl'); f.limb(93, 198, 96, 202, 5.5, 5.5, 'g')
 f.part('scepter'); f.limb(102, 238, 88, 108, 1.8, 1.8, 'g')
 f.part('scepterOrb'); f.ellipse(88, 104, 5, 5, 'g')
 f.part('scepterCross'); f.rect(87, 92, 89, 99, 'g'); f.rect(85, 95, 91, 96, 'g')
-f.part('handLl'); f.poly([(95, 199), (103, 198), (105, 203), (104, 209), (97, 210), (94, 205)], 's')
+f.part('handLl'); f.poly([(95, 199), (103, 198), (105, 203), (104, 209), (97, 210), (94, 205)], 'S')
 # rechter Arm: Unterarm liegt auf dem Oberschenkel, Hand ruht auf dem Knie
 f.part('armRr'); f.limb(155, 168, 162, 192, 6, 5.5, 'r')
 f.part('armRf', line=False); f.limb(158, 172, 162, 188, 0.4, 1.2, 'q')
 f.part('foreRr'); f.limb(162, 192, 148, 208, 5.5, 5, 'r')
 f.part('cuffRr'); f.limb(152, 204, 149, 207, 5.5, 5.5, 'g')
-f.part('handRr'); f.poly([(146, 203), (140, 206), (135, 212), (136, 215), (142, 214), (148, 211), (150, 206)], 's')
+f.part('handRr'); f.poly([(146, 203), (140, 206), (135, 212), (136, 215), (142, 214), (148, 211), (150, 206)], 'S')
 # Kopf
 f.part('neck'); f.rect(121, 141, 129, 151, 's')
 cx, cy = 125, 128
@@ -310,17 +311,28 @@ for (tx, ty) in [(61, 200), (189, 200), (66, 250), (184, 250)]:
         px(cv, tx, ty + k, GOLD[3] if k < 3 else GOLD[1])
     px(cv, tx - 1, ty + 3, GOLD[2]); px(cv, tx + 1, ty + 3, GOLD[2])
 # Finger
-# Finger um das Zepter (quer über den Stab) und auf dem Knie
-for fy in (201, 204, 207):
+# Zepterhand: vier Finger quer um den Stab (Fugen dunkel), Daumen oben, Knöchel rechts
+FD, FM, FL = SKINV[0], SKINV[2], SKINV[4]
+for fy in (202, 204, 206, 208):
     for fx in range(96, 104):
-        if (fx + fy) % 3 != 0 and inside(fx, fy):
-            px(cv, fx, fy, SKINV[1]) if fx in (96, 103) or fy == 207 else None
-for fy in (201, 204, 207):
-    px(cv, 98, fy, SKINV[1]); px(cv, 101, fy, SKINV[1])
-px(cv, 100, 199, SKINV[4]); px(cv, 101, 199, SKINV[4])
-for (x0, y0) in [(139, 209), (141, 210), (143, 209)]:
-    px(cv, x0, y0, SKINV[1]); px(cv, x0 - 1, y0 + 1, SKINV[1]); px(cv, x0 - 2, y0 + 2, SKINV[1])
-px(cv, 147, 205, SKINV[4]); px(cv, 145, 206, SKINV[4])
+        if inside(fx, fy):
+            px(cv, fx, fy, FD if fx < 103 else FM)
+for fx in range(99, 104):
+    if inside(fx, 200):
+        px(cv, fx, 200, FL)                      # Daumen
+px(cv, 98, 200, FD); px(cv, 104, 201, FM)
+for fy in (203, 205, 207):
+    if inside(103, fy):
+        px(cv, 103, fy, FL)                      # Knöchel-Glanz
+# Hand auf dem Knie: Finger schräg nach unten, dunkle Fugen, heller Handrücken
+for (x0, y0) in [(142, 205), (144, 207), (146, 209)]:
+    for k in range(5):
+        x, y = x0 - k, y0 + k * 1.1
+        if inside(x, y):
+            px(cv, x, y, FD)
+for (x, y) in [(147, 204), (146, 204), (148, 205)]:
+    if inside(x, y):
+        px(cv, x, y, FL)
 
 # ---------------------------------------------------------------- Weizenfeld (vorne)
 WHEAT = [(110, 60, 10), (160, 100, 18), (204, 144, 30), (234, 184, 56), (250, 214, 100), (255, 238, 160)]
