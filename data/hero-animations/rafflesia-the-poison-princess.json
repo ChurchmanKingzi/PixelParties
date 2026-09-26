@@ -1,0 +1,14 @@
+{
+  "hero": "Rafflesia, the Poison Princess",
+  "sheet": "rafflesia-the-poison-princess.png",
+  "frameWidth": 50,
+  "frameHeight": 46,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 6,
+  "padLeft": 2,
+  "padRight": 2,
+  "padBottom": 1
+}

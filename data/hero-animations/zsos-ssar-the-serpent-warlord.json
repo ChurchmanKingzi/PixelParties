@@ -1,0 +1,12 @@
+{
+  "hero": "Zsos'Ssar, the Serpent Warlord",
+  "sheet": "zsos-ssar-the-serpent-warlord.png",
+  "frameWidth": 30,
+  "frameHeight": 40,
+  "frames": 48,
+  "frameMs": 80,
+  "loop": true,
+  "layout": "horizontal",
+  "padTop": 2,
+  "padRight": 1
+}
