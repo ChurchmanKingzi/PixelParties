@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""09 Bomblebee-Wabe: Flug durch einen Wabengang im Bienenstock, dem Licht des Fluglochs entgegen.
-Alles direkt in 1x-Leinwandpixeln gezeichnet (perspektivische Waben, Honig, Bienen nach den Kartenbildern
-"Bomblebee", "Dive Bomblebee", "Burning Fuse" usw.) – keine hochskalierten Sprites."""
+"""09 Bomblebee-Wabe „Welcome to the Hive!“: Flug durch einen Wabengang im Bienenstock, dem Licht des Fluglochs entgegen.
+Waben, Honig, Bomblebees und Dive Bomblebees sind direkt in 1x-Leinwandpixeln gezeichnet (nach den Kartenbildern).
+Time Bomblebee, Carpet Bomblebee sowie Sparkfly Worker/Attendant sind aus den nativen Kartenpixeln (native()) ausgeschnitten,
+die Sparkfly Queen stammt aus dem Shop-Avatar, die Sparkfly Architect ist Pixel für Pixel nach der Karte nachgesetzt."""
 from lib import *
 
 SQ3 = math.sqrt(3)
@@ -392,6 +393,117 @@ def falling_drop(d, x, y, r=2):
 
 
 
+# ------------------------------------------------------------------ Figuren aus den Karten (native Pixel, 1x)
+def _cardcut(name, box, is_bg, nkeep=1, minsz=20):
+    nv = native(name).crop(box)
+    a = np.array(nv).astype(int)
+    bg = is_bg(a)
+    lab, k = ndimage.label(~bg)
+    sz = ndimage.sum(~bg, lab, range(1, k + 1))
+    keep = np.isin(lab, np.argsort(sz)[::-1][:nkeep] + 1) & np.isin(lab, np.where(sz >= minsz)[0] + 1)
+    keep = ndimage.binary_fill_holes(keep)
+    o = np.array(nv)
+    o[..., 3] = np.where(keep, 255, 0)
+    im_ = Image.fromarray(o)
+    return im_.crop(im_.getbbox())
+
+
+def _bg_nature(a):
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    L = a[..., :3].mean(2)
+    blue = (b - r > 50) & (L < 175)
+    brown = (r - b > 30) & (L < 135) & (g > 0.5 * r) & (r < 205)
+    grass = (g > r + 8) & (g > b)
+    return blue | brown | grass
+
+
+def _bg_comb(a):
+    """Sparkfly-Karten: heller Wabenhintergrund; Figuren sind grün/dunkelgrün (+ rot)."""
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    L = a[..., :3].mean(2)
+    fig = ((g - r > 10) & (L < 172)) | ((r - g > 50) & (r > 150) & (b < 120))
+    return ~fig
+
+
+def _revive(img, contrast=1.45, sat=1.5, bright=0.92):
+    """Die Sparkfly-Karten liegen unter einem hellen Schleier – Farben wieder kräftig machen."""
+    return adjust(img, bright=bright, contrast=contrast, sat=sat)
+
+
+def time_bomblebee():
+    s_ = _cardcut('Time Bomblebee', (0, 0, 76, 51), _bg_nature, nkeep=6)
+    a_ = np.array(s_).astype(int)
+    r, g, b = a_[..., 0], a_[..., 1], a_[..., 2]
+    L = a_[..., :3].mean(2)
+    # Flügel über Wasser sind bläulich -> neutral beige wie auf der Holzseite
+    wingish = (a_[..., 3] > 0) & (b > r) & (L > 110) & (L < 215) & (np.abs(r - g) < 40)
+    a_[wingish, :3] = np.clip(np.stack([L[wingish] * 1.02 + 6, L[wingish] * 0.96, L[wingish] * 0.84 - 4], -1), 0, 255)
+    # Rinden-Reste (dunkles Braun außerhalb der Figur) entfernen
+    bark = (a_[..., 3] > 0) & (r - b > 25) & (g > 0.45 * r) & (L < 110) & (r > 60)
+    a_[bark, 3] = 0
+    a_[:16, 50:, 3] = 0                                   # Rindenstücke oben rechts
+    a_[(a_[..., 2] - a_[..., 0] > 40), 3] = 0             # Wasserpixel
+    out = Image.fromarray(a_.clip(0, 255).astype(np.uint8))
+    out = keep_largest(out, 5)
+    return out.crop(out.getbbox())
+
+
+def carpet_bomblebee():
+    s_ = _cardcut('Carpet Bomblebee', (12, 8, 66, 36), _bg_nature)
+    a_ = np.array(s_).astype(int)
+    r, g, b = a_[..., 0], a_[..., 1], a_[..., 2]
+    pink = (r > 180) & (b > 120) & (g < r - 30)
+    grn = (g > r + 5)
+    a_[pink | grn, 3] = 0
+    out = keep_largest(Image.fromarray(a_.astype(np.uint8)), 1)
+    return out.crop(out.getbbox())
+
+
+def sparkfly(name, box):
+    s_ = _cardcut(name, box, _bg_comb)
+    return _revive(s_)
+
+
+def sparkfly_queen():
+    q = Image.open(os.path.join(ROOT, 'data', 'shop', 'avatars', 'SparkflyQueen.png')).convert('RGBA')
+    a_ = np.array(q)[20::40, 20::40].copy()
+    out = Image.fromarray(a_)
+    return out.crop(out.getbbox())
+
+
+ARCH_PAL = {'k': (18, 40, 40), 'd': (30, 70, 62), 'D': (22, 54, 52), 'g': (112, 156, 64), 'G': (150, 196, 88),
+            'h': (196, 228, 132), 'w': (70, 110, 56), 'y': (176, 206, 84), 'e': (120, 210, 80), 'E': (220, 255, 170),
+            'r': (170, 60, 60), 'R': (226, 104, 92), 'l': (26, 56, 54), 'p': (236, 220, 170)}
+ARCH_MAP = [
+    "...kkk.......kkk....",
+    "..kgGGk.....kGGgk...",
+    ".kgGhGgk...kgGhGgk..",
+    ".kgGGGgkkkkkgGGGgk..",
+    "kgggGGgkyyykgGGgggk.",
+    "kwggggkdddddkggggwk.",
+    "kwwgggkyyyyykgggwwk.",
+    ".kwwggkdddddkggwwk..",
+    "..kkwkkyyyyykkwkk...",
+    "pRr.kkdddddddkk.....",
+    ".pRrkdDdddddddDk....",
+    "..rRkDdedDdDedDk....",
+    "...rkDdEdDDDEdDk....",
+    "....kkDDdddddDkk....",
+    "...l.kkDDDDDDkk.l...",
+    "..l...kkkkkkkk...l..",
+]
+
+
+def sparkfly_architect():
+    h_, w_ = len(ARCH_MAP), len(ARCH_MAP[0])
+    a_ = np.zeros((h_, w_, 4), np.uint8)
+    for y_, row in enumerate(ARCH_MAP):
+        for x_, ch in enumerate(row):
+            if ch in ARCH_PAL:
+                a_[y_, x_, :3] = ARCH_PAL[ch]; a_[y_, x_, 3] = 255
+    return Image.fromarray(a_)
+
+
 # ============================================================ Szene: Wabengang im Bienenstock
 VPX, VPY, F = 125.0, 118.0, 118.0
 HC, HF, ZE = 1.35, 2.5, 7.0
@@ -560,10 +672,10 @@ BR = 0.1
 swarm3d = [
     (0.1, -0.12, 6.4, 0, False, 0),
     (-0.22, 0.02, 5.7, 0, False, 0), (0.26, 0.06, 5.4, 0, True, 0), (-0.05, 0.3, 5.0, 0, False, 0),
-    (0.3, 0.3, 4.4, 0, True, 0), (-0.32, -0.14, 4.0, 0, False, 0), (0.05, -0.3, 3.7, 0, False, 0), (0.36, -0.06, 3.5, 0, True, 0),
+    (0.3, 0.3, 4.4, 0, True, 0), (-0.32, -0.14, 4.0, 0, False, 0), (0.05, -0.3, 3.7, 0, False, 0),
     (-0.45, 0.35, 3.2, 8, False, 0.2), (0.5, 0.42, 2.8, -8, True, 0.1), (-0.12, -0.46, 2.6, 4, False, 0.3), (0.42, -0.4, 2.3, -10, True, 0.2),
-    (-0.58, -0.3, 2.0, 10, False, 0.1), (0.62, 0.2, 1.7, -12, True, 0.3), (-0.6, 0.5, 1.5, 12, False, 0.0), (-0.34, -0.72, 1.3, 6, False, 0.2),
-    (-0.78, -0.2, 0.95, 14, False, 0.3), (0.8, 0.62, 0.9, -8, True, 0.1), (-0.72, 1.12, 0.72, 16, False, 0.2),
+    (-0.58, -0.3, 2.0, 10, False, 0.1), (-0.6, 0.5, 1.5, 12, False, 0.0), (-0.34, -0.72, 1.3, 6, False, 0.2),
+    (0.8, 0.62, 0.9, -8, True, 0.1),
 ]
 swarm3d.sort(key=lambda s_: -s_[2])
 sparks = []
@@ -599,6 +711,68 @@ for i, (Xw, Yw, zw, tl, fl, wg) in enumerate(swarm3d):
         sparks.append((bx + sp[0], by + sp[1], 3 if R_ >= 9 else (2 if R_ >= 6 else 1)))
 for (x_, y_, s_) in sparks:
     draw_spark(d, x_, y_, s_, random.Random(int(x_ * 7 + y_)))
+
+
+# ---- Hive-Bewohner aus den Karten ----
+def spark_glow(img, spr, xy, col=(120, 210, 96, 255), strength=0.35, radius=3):
+    """Weicher Leuchtschein in wenigen Stufen (ohne Punktraster)."""
+    m_ = np.zeros((H, W), np.uint8)
+    sa_ = np.array(spr)[..., 3]
+    x0, y0 = int(xy[0]), int(xy[1])
+    ys_, xs_ = np.nonzero(sa_)
+    ok = (ys_ + y0 >= 0) & (ys_ + y0 < H) & (xs_ + x0 >= 0) & (xs_ + x0 < W)
+    m_[ys_[ok] + y0, xs_[ok] + x0] = 255
+    bl = np.array(Image.fromarray(m_).filter(ImageFilter.GaussianBlur(radius))).astype(float) / 255
+    t_ = np.clip(bl * 2.4 * strength, 0, 0.75)
+    tq = (np.floor(t_ * 4) / 4)[..., None]
+    a_ = np.array(img)
+    a_[..., :3] = np.clip(a_[..., :3] * (1 - tq) + np.array(col[:3]) * tq, 0, 255).astype(np.uint8)
+    img.paste(Image.fromarray(a_))
+
+
+def put_sprite(img, spr, xy, glowc=None, ol=None, **kw):
+    if ol:
+        spr = outline(spr, ol)
+    if glowc:
+        spark_glow(img, spr, xy, glowc, **kw)
+    paste(img, spr, xy)
+
+
+def green_sparks(img, cx, cy, n, rad, seed):
+    rs = random.Random(seed)
+    d_ = ImageDraw.Draw(img)
+    for _ in range(n):
+        a0 = rs.uniform(0, 2 * math.pi); r0 = rs.uniform(rad * 0.4, rad)
+        x_, y_ = cx + math.cos(a0) * r0, cy + math.sin(a0) * r0
+        if rs.random() < 0.3:
+            d_.point([(x_ - 1, y_), (x_ + 1, y_), (x_, y_ - 1), (x_, y_ + 1)], fill=(150, 230, 110))
+        d_.point((x_, y_), fill=rs.choice([(220, 255, 170), (170, 240, 120)]))
+
+
+SPOL = (16, 30, 26, 255)
+# Sparkfly-Königin mit Leibwache an der rechten Wand
+queen = up(sparkfly_queen(), 2)
+QX, QY = 176, 86
+put_sprite(im, queen, (QX, QY), (130, 220, 100, 255), strength=0.55, radius=5)
+green_sparks(im, QX + 34, QY + 28, 22, 44, 7)
+att = sparkfly('Sparkfly Attendant', (28, 24, 50, 44))
+put_sprite(im, att, (150, 134), (130, 220, 100, 255), ol=SPOL)
+put_sprite(im, att.transpose(Image.FLIP_LEFT_RIGHT), (224, 148), (130, 220, 100, 255), ol=SPOL)
+# Arbeiterinnen krabbeln über die linke Wabenwand
+wrk = sparkfly('Sparkfly Worker', (17, 2, 36, 26))
+for (x_, y_, fl_) in [(8, 166, False), (40, 190, True), (16, 222, False)]:
+    put_sprite(im, wrk.transpose(Image.FLIP_LEFT_RIGHT) if fl_ else wrk, (x_, y_), (120, 210, 96, 255), ol=SPOL, strength=0.3)
+# Architektin schwebt unter der Decke
+arch = up(sparkfly_architect(), 2)
+put_sprite(im, arch, (106, 8), (130, 220, 100, 255), ol=SPOL, strength=0.45, radius=4)
+green_sparks(im, 126, 24, 12, 26, 3)
+# Time Bomblebee (groß, nah, links oben)
+tb = time_bomblebee()
+TBX, TBY = 4, 58
+put_sprite(im, tb, (TBX, TBY), (255, 214, 120, 255), ol=K + (255,), strength=0.3)
+d = ImageDraw.Draw(im)
+for (x_, y_) in [(TBX + 15, TBY + 8), (TBX + 34, TBY + 2), (TBX + 15, TBY + 36), (TBX + 48, TBY + 36)]:
+    draw_spark(d, x_, y_, 2, random.Random(x_))
 
 # ---- Held ----
 hero, hc, hsp = bee(33, tilt=-5, seed=3, wing=0.15)
@@ -707,7 +881,29 @@ def dive_bee(img, cx, cy, L, ang, seed=0):
 
 
 dive_bee(im, 198, 52, 30, 132, seed=1)
-dive_bee(im, 42, 150, 18, 66, seed=2)
+dive_bee(im, 58, 148, 18, 66, seed=2)
+
+# ---- Carpet Bomblebee auf fliegendem Teppich (vorne links) ----
+cb = carpet_bomblebee()
+CBX, CBY = 6, 258
+put_sprite(im, cb, (CBX, CBY), (255, 200, 110, 255), ol=K + (255,), strength=0.3)
+d = ImageDraw.Draw(im)
+# Tempolinien hinter dem Teppich + abgeworfene Bombe
+for k_, yl in enumerate((CBY + 14, CBY + 19, CBY + 23)):
+    x1 = CBX + cb.width + 2
+    for xq in range(x1, x1 + 14 + 5 * (k_ % 2)):
+        if (xq - x1) < 8 or (xq % 2 == 0):
+            d.point((xq, yl), fill=(255, 236, 190))
+bxx, byy = CBX + 30, CBY + 40
+d.ellipse((bxx - 4, byy - 4, bxx + 4, byy + 4), fill=K)
+d.ellipse((bxx - 3, byy - 3, bxx + 3, byy + 3), fill=BLACK[2])
+d.ellipse((bxx - 3, byy - 3, bxx + 1, byy + 1), fill=BLACK[3])
+d.point([(bxx - 2, byy - 2), (bxx - 1, byy - 2)], fill=BLACK[6])
+d.rectangle((bxx - 1, byy - 6, bxx + 1, byy - 5), fill=BLACK[4])
+d.line((bxx, byy - 7, bxx + 2, byy - 9), fill=(90, 60, 36))
+draw_spark(d, bxx + 3, byy - 10, 1, random.Random(5))
+for k_ in range(3):
+    d.point((bxx - 1 + k_, byy - 12 - 3 * k_), fill=(255, 236, 190))
 
 
 # ---- Explosion (eine Bombe ist schon hochgegangen) ----
@@ -814,20 +1010,24 @@ def title(txt, size):
     return base_.crop(base_.getbbox())
 
 
-t_img = title('BOMBLEBEES', 18)
-tx, ty = W // 2 - t_img.width // 2, 318
+t1 = title('WELCOME TO', 12)
+t2 = title('THE HIVE!', 22)
+ty1 = 303
+ty2 = ty1 + t1.height + 2
 # dunkler Grund hinter dem Titel (weich)
-dd_ = np.hypot((xx - W / 2) / 90, (yy - (ty + 8)) / 18)
+dd_ = np.hypot((xx - W / 2) / 92, (yy - (ty1 + 16)) / 26)
 a_ = np.array(im)
-f_ = (np.floor(np.clip(1.1 - dd_, 0, 1) * 3 + thr * 0.999) / 3 * 0.55)[..., None]
+f_ = (np.floor(np.clip(1.1 - dd_, 0, 1) * 3 + thr * 0.999) / 3 * 0.6)[..., None]
 a_[..., :3] = np.clip(a_[..., :3] * (1 - f_) + np.array((40, 16, 6)) * f_, 0, 255).astype(np.uint8)
 im = Image.fromarray(a_)
-paste(im, t_img, (tx, ty))
+paste(im, t1, (W // 2 - t1.width // 2, ty1))
+tx, ty = W // 2 - t2.width // 2, ty2
+paste(im, t2, (tx, ty))
 d = ImageDraw.Draw(im)
 # Honig tropft von den Buchstaben
-for (ox_, L_) in [(9, 5), (38, 8), (70, 4), (101, 7)]:
+for (ox_, L_) in [(6, 6), (31, 9), (58, 4), (84, 8), (104, 5)]:
     x_ = tx + ox_
-    col_ = np.nonzero(np.array(t_img)[:, ox_, 3] > 0)[0]
+    col_ = np.nonzero(np.array(t2)[:, ox_, 3] > 0)[0]
     if len(col_) == 0:
         continue
     y_ = ty + col_[-1]
