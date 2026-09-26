@@ -75,7 +75,7 @@ before = np.array(im)
 stars(im, 40, [(255, 255, 255), (200, 200, 255), (255, 220, 240)], seed=5, box=(8, 8, W - 8, H - 8), big=0.15)
 a = np.array(im); a[bm] = before[bm]; im = Image.fromarray(a)
 # Schrift
-t = text_img('COSMIC DEPTHS', 14, (255, 220, 230, 255), outline_col=(40, 8, 30, 255))
+t = text_img('THE EYE SEES YOU', 14, (255, 220, 230, 255), outline_col=(40, 8, 30, 255))
 paste(im, t, (cx - t.width // 2, 318))
 # Rahmen
 bevel_frame(im, (10, 4, 20), (150, 110, 220), (60, 36, 110), (30, 16, 60), (10, 4, 20), width=6)

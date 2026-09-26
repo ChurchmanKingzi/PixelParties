@@ -69,16 +69,6 @@ sx, sy = (W - bp.width) // 2, 58
 d.rectangle((sx - 6, sy - 6, sx + bp.width + 5, sy + bp.height + 5), fill=BG)
 paste(im, bp, (sx, sy))
 d = ImageDraw.Draw(im)
-# Bemaßung
-arrow_h(d, sx, sx + bp.width - 1, sy + bp.height + 12)
-t = text_img('%d PX' % sci.width, 10, WHITE)
-d.rectangle((sx + bp.width // 2 - t.width // 2 - 2, sy + bp.height + 8, sx + bp.width // 2 + t.width // 2 + 2, sy + bp.height + 16), fill=BG)
-paste(im, t, (sx + bp.width // 2 - t.width // 2, sy + bp.height + 9))
-arrow_v(d, sx - 14, sy, sy + bp.height - 1)
-t = text_img('%d PX' % sci.height, 10, WHITE).rotate(90, expand=True)
-d.rectangle((sx - 18, sy + bp.height // 2 - t.height // 2 - 2, sx - 10, sy + bp.height // 2 + t.height // 2 + 2), fill=BG)
-paste(im, t, (sx - 18, sy + bp.height // 2 - t.height // 2))
-
 # Callouts
 def callout(px, py, lx, ly, label, right=True):
     dd = ImageDraw.Draw(im)

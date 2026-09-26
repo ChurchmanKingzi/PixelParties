@@ -12,38 +12,47 @@ for cx, wdt in [(40, 18), (120, 26), (200, 14), (250, 20)]:
 m = dither_mask(None, t)
 a = np.array(im); a[m] = np.clip(a[m].astype(int) + np.array([22, 38, 44, 0]), 0, 255); im = Image.fromarray(a)
 
-# Tiefseegott als Silhouette
-g = art('Dark Deepsea God').crop((10, 8, 600, 392))
-ga = np.array(g).astype(int)
-r, gg, b = ga[..., 0], ga[..., 1], ga[..., 2]
-body = ((b - gg) < 30) & (gg > 40) | ((r > 150) & (r > gg + 60))
-body = ndimage.binary_opening(body, iterations=2)
+# Tiefseegott (native Pixel, x4)
+nv = native('Dark Deepsea God').crop((4, 1, 72, 51))
+na = np.array(nv).astype(int)
+r, gg, b = na[..., 0], na[..., 1], na[..., 2]
+eyes = (r > 70) & (r > gg + 30)
+body = (((b - gg) < 30) & (gg > 36)) | eyes
 lab, k = ndimage.label(body)
 sizes = ndimage.sum(body, lab, range(1, k + 1))
 body = lab == (np.argmax(sizes) + 1)
+body = ndimage.binary_closing(body, iterations=1)
 body = ndimage.binary_fill_holes(body)
-ga8 = np.array(g)
-ga8[..., 3] = np.where(body, 255, 0)
-god = Image.fromarray(ga8)
-god = shrink(god, 290 / 590)
+eyes &= body
+lum = na[..., :3].mean(2)
+lum = np.clip((lum - 36) * 2.4, 0, 90)
+col = np.stack([10 + lum * 0.20, 24 + lum * 0.45, 44 + lum * 0.55], -1)
+# Augenrand (dunkelrot), Augen (3 Rottöne), Glanzpunkt
+rim = ndimage.binary_dilation(eyes, iterations=1) & body & ~eyes
+col[rim] = (58, 14, 40)
+glint = eyes & (gg > 80)
+col[eyes] = (150, 16, 48)
+col[eyes & (r > 110)] = (214, 30, 64)
+col[eyes & (r > 150)] = (255, 70, 96)
+col[glint] = (255, 214, 224)
+ga = np.dstack([col, np.where(body, 255, 0)]).clip(0, 255).astype(np.uint8)
+god = up(Image.fromarray(ga), 4)
 ga = np.array(god).astype(int)
-eyes = (ga[..., 0] > 140) & (ga[..., 0] > ga[..., 1] + 60)
-lum = ga[..., :3].mean(2)
-lum = np.clip((lum - 38) * 2.2, 0, 90)
-dark = np.stack([10 + lum * 0.20, 24 + lum * 0.45, 44 + lum * 0.55], -1)
-ga[..., :3] = np.where(eyes[..., None], np.stack([np.clip(ga[..., 0] + 40, 0, 255), ga[..., 1] * 0.4, ga[..., 2] * 0.5], -1), dark)
 hh = ga.shape[0]
 fy = np.mgrid[0:hh, 0:ga.shape[1]][0]
 fadeT = np.clip((hh - 4 - fy) / 60, 0, 1)
 ga[..., 3] = np.where(dither_mask(None, fadeT) & (ga[..., 3] > 0), 255, 0)
-god = Image.fromarray(ga.clip(0, 255).astype(np.uint8))
-# Augen-Glühen
-eyeimg = Image.fromarray(np.dstack([np.full(eyes.shape, 255), np.full(eyes.shape, 40), np.full(eyes.shape, 60), eyes * 255]).astype(np.uint8))
-gl, p = glow(eyeimg, (140, 20, 50, 255), radius=3, strength=0.8)
-gx, gy = (W - god.width) // 2, 8
-paste(im, god, (gx, gy))
+god = Image.fromarray(ga.astype(np.uint8))
+gx, gy = (W - god.width) // 2, 6
+# weiches Rotlicht hinter dem Kopf
+eyeimg = Image.fromarray(np.dstack([np.full(eyes.shape, 255), np.zeros(eyes.shape), np.zeros(eyes.shape), eyes * 255]).astype(np.uint8))
+gl, p = glow(up(eyeimg, 4), (40, 30, 70, 255), radius=6, strength=0.5)
 paste(im, gl, (gx - p, gy - p))
-paste(im, Image.fromarray(np.where(eyes[..., None], np.array(god), 0).astype(np.uint8)), (gx, gy))
+paste(im, god, (gx, gy))
+godmask = np.zeros((H, W), bool)
+gm = np.array(god)[..., 3] > 0
+y0, x0 = max(gy, 0), max(gx, 0)
+godmask[y0:y0 + gm.shape[0], x0:x0 + gm.shape[1]] = gm[:H - y0, :W - x0][:, :W - x0] if gx >= 0 else gm[:H - y0, -gx:-gx + W]
 
 # Nebel-Schloss im Hintergrund
 back = area('deepsea-castle/back')
@@ -67,9 +76,11 @@ d = ImageDraw.Draw(im)
 d.rectangle((0, H - 10, W, H), fill=(24, 20, 44))
 # Blasen
 rnd = random.Random(7)
-for _ in range(28):
+for _ in range(60):
     x = rnd.randrange(8, W - 8); y = rnd.randrange(20, 250); s = rnd.choice([1, 1, 1, 2, 2, 3])
     c = (150, 210, 230)
+    if godmask[max(0, y - 1):y + 2 * s + 2, max(0, x - 1):x + 2 * s + 2].any():
+        continue
     if s == 1:
         d.point((x, y), fill=c)
     else:

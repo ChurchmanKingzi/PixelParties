@@ -590,3 +590,29 @@ def save_overlay(img, name, overlays):
     os.makedirs(OUT, exist_ok=True)
     out.convert('RGB').save(p)
     return p
+
+
+def scale3x(img):
+    """AdvMAME3x/Scale3x: pixelgenaues 3-fach-Upscaling mit geglätteten Diagonalen."""
+    a = np.array(img.convert('RGBA'))
+    h, w = a.shape[:2]
+    p = np.pad(a, ((1, 1), (1, 1), (0, 0)), mode='edge')
+    key = p[..., 0].astype(np.int64) << 24 | p[..., 1].astype(np.int64) << 16 | p[..., 2].astype(np.int64) << 8 | p[..., 3].astype(np.int64)
+    A, B, C = key[:-2, :-2], key[:-2, 1:-1], key[:-2, 2:]
+    D, E, F = key[1:-1, :-2], key[1:-1, 1:-1], key[1:-1, 2:]
+    G, Hh, I = key[2:, :-2], key[2:, 1:-1], key[2:, 2:]
+    cond = (B != Hh) & (D != F)
+    out = np.zeros((h * 3, w * 3), np.int64)
+    E0 = np.where(cond & (D == B), D, E)
+    E1 = np.where(cond & (((D == B) & (E != C)) | ((B == F) & (E != A))), B, E)
+    E2 = np.where(cond & (B == F), F, E)
+    E3 = np.where(cond & (((D == B) & (E != G)) | ((D == Hh) & (E != A))), D, E)
+    E4 = E
+    E5 = np.where(cond & (((B == F) & (E != I)) | ((Hh == F) & (E != C))), F, E)
+    E6 = np.where(cond & (D == Hh), D, E)
+    E7 = np.where(cond & (((D == Hh) & (E != I)) | ((Hh == F) & (E != G))), Hh, E)
+    E8 = np.where(cond & (Hh == F), F, E)
+    for i, Ei in enumerate([E0, E1, E2, E3, E4, E5, E6, E7, E8]):
+        out[i // 3::3, i % 3::3] = Ei
+    res = np.stack([(out >> 24) & 255, (out >> 16) & 255, (out >> 8) & 255, out & 255], -1).astype(np.uint8)
+    return Image.fromarray(res, 'RGBA')
