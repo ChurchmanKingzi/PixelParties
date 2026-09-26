@@ -178,12 +178,11 @@ for y,r in enumerate(art):
     for x,c in enumerate(r):
         if c in cmap: lv[y,x]=cmap[c]
 # scale2x on level map
-rgba=np.zeros((hh,ww,4),np.uint8); rgba[...,0]=np.where(lv>=0,lv*40,0); rgba[...,3]=np.where(lv>=0,255,0)
-big=scale2x(rgba); L2=np.where(big[...,3]>0,big[...,0].astype(int)//40,-1)
+L2=scale3x_labels(lv)
 # add form shading from distance field
 m=L2>=0
 dist=cv2.distanceTransform(np.pad(m.astype(np.uint8),1),cv2.DIST_L2,3)[1:-1,1:-1]
-bx=125-L2.shape[1]//2; by=FY1-L2.shape[0]+2
+bx=125-L2.shape[1]//2; by=FY0+3
 for y in range(L2.shape[0]):
     for x in range(L2.shape[1]):
         v=L2[y,x]
@@ -209,7 +208,7 @@ for y in range(L2.shape[0]):
 # beard highlight strands (wavy)
 for y in range(L2.shape[0]):
     for x in range(L2.shape[1]):
-        if L2[y,x]==0 and 38<y<80 and ((x+int(2.5*math.sin(y*0.35+x*0.1)))%6==0):
+        if L2[y,x]==0 and 57<y<120 and ((x+int(3.5*math.sin(y*0.25+x*0.07)))%8==0):
             X,Y=bx+x,by+y
             if FY0<=Y<FY1: cv.px(X,Y,DK)
 # ---------- name + reward ----------
@@ -225,19 +224,6 @@ ink_text('999.999',22,x0+w//2,292,INK,shadow=MD)
 cv.paste(coin,x0+w+GAP,292+h//2-coin.shape[0]//2)   # coin vertically centred on the digits
 star(52,306); star(198,306)
 ink_text('PAYABLE IN SMUG COINS',9,125,316,DK)
-# ---------- red stamp ----------
-RS=(170,36,36); RSL=(200,70,60)
-sx0,sy0=62,194
-for y in range(sy0,sy0+24):
-    for x in range(sx0,sx0+50):
-        e=min(x-sx0,sx0+49-x,y-sy0,sy0+23-y)
-        if (e in (0,2)) and st2[y,x]<0.75: cv.px(x,y,RS)
-m=text_mask('PIXEL',9); ys,xs=np.where(m)
-for yy,xx in zip(ys,xs):
-    if st2[sy0+4+yy,sx0+8+xx]<0.8: cv.px(sx0+8+xx,sy0+4+yy,RS)
-m=text_mask('NAVY',9); ys,xs=np.where(m)
-for yy,xx in zip(ys,xs):
-    if st2[sy0+13+yy,sx0+12+xx]<0.8: cv.px(sx0+12+xx,sy0+13+yy,RSL)
 # ---------- bullet holes ----------
 def hole(cx,cy):
     for dy in range(-5,6):

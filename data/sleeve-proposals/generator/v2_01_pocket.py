@@ -1,6 +1,7 @@
 from px2 import *
 from font35 import text35, width35
 import art_barker_back as BB
+import art_barker_front as BF
 random.seed(1)
 W,H=W2,H2
 cv=C2((20,16,32))
@@ -100,13 +101,42 @@ def gbq_plain(rgba,cuts=(0.22,0.5,0.8)):
     a=rgba.copy(); L=lum(a[...,:3].astype(float)); op=a[...,3]>0
     q=np.quantile(L[op],cuts); lev=np.digitize(L,q)
     a[...,:3]=np.array(GB)[lev]; return a
-g4=scale2x(outline(gbq_plain(quant_colors(gi,10)),GB[0]))
+def gbq_classes(rgba):
+    # map by colour class so the outer heads' red eyes / white horns stay readable
+    a=rgba.copy(); op=a[...,3]>0
+    rgb=a[...,:3].astype(int); r,g,b=rgb[...,0],rgb[...,1],rgb[...,2]
+    L=lum(rgb.astype(float)); sat=rgb.max(-1)-rgb.min(-1)
+    skin=op&(sat<=90)&(L>=70)&(L<=175)
+    med=np.median(L[skin]) if skin.any() else 110
+    lev=np.full(L.shape,1)
+    lev[skin&(L>=med)]=2
+    lev[op&(L<60)]=0
+    lev[op&(L>175)&(sat<60)]=3          # horns / claws / tusks
+    lev[op&(r>g+45)&(r>b+30)]=0         # red eyes -> darkest
+    a[...,:3]=np.array(GB)[lev]
+    # eyes: add a light glint so they read as eyes, not holes
+    return a
+gq=gbq_classes(gi)
+# retouch the three heads so each reads clearly: outlined face, light skin, dark eyes, small mouth
+def head(cx,cy,rx,ry):
+    for y in range(int(cy-ry)-1,int(cy+ry)+2):
+        for x in range(int(cx-rx)-1,int(cx+rx)+2):
+            if not(0<=y<gq.shape[0] and 0<=x<gq.shape[1]): continue
+            d=((x-cx)/rx)**2+((y-cy)/ry)**2
+            if d<=1.0:
+                lv=2 if y>cy-ry+1 else 3
+                if d>0.62: lv=0
+                gq[y,x,:3]=GB[lv]; gq[y,x,3]=255
+    for ex in (int(round(cx-1.5)),int(round(cx+1.5))):
+        gq[int(cy),ex,:3]=GB[0]
+    gq[int(cy)+2,int(cx),:3]=GB[1]; gq[int(cy)+2,int(cx)+ (1 if rx>3 else 0),:3]=GB[1]
+head(9.5,9.2,3.3,3.3); head(26.5,9.2,3.3,3.3); head(18,5.6,3.4,3.0)
+g4=scale2x(outline(gq,GB[0]))
 cv.paste(g4,170-g4.shape[1]//2,98-g4.shape[0]+1)
 # player platform
-gellipse(88,150,56,9,2,1)
-bb=scale2x(BB.to_rgba(BB.build(),GB))
-bb=bb[:150-82]
-cv.paste(bb,40,82)
+gellipse(88,148,40,7,2,1)
+bb=scale2x(BF.to_rgba(BF.build(),GB))
+cv.paste(bb,62,150-bb.shape[0])
 # ---------- HUDs ----------
 def hpbar(x,y,w,frac):
     for i in range(w):
