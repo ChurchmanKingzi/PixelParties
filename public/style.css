@@ -23095,6 +23095,74 @@ body.pp-dialog-offen .foil-diamond-rare:not(.modal-overlay *) {
    fremde Attribute aber stehen laesst. Die Zone (Rahmen) bleibt sichtbar. */
 [data-pp-karte-weg] { visibility: hidden !important; }
 
+/* ── Torchure: das Schwein frisst die Fackel ──────────────────────── */
+.torchure { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
+.torchure-glut {
+  position: absolute; border-radius: 18%;
+  background: radial-gradient(ellipse at 50% 40%, rgba(150,40,210,.5) 0%, rgba(90,190,60,.22) 45%, transparent 70%);
+  opacity: 0; animation: torchureGlut 2000ms ease-out forwards;
+}
+.torchure-ring {
+  position: absolute; border-radius: 50%; box-sizing: border-box;
+  border: 3px solid rgba(190,90,255,.9); box-shadow: 0 0 8px rgba(160,60,230,.8), inset 0 0 6px rgba(120,220,90,.5);
+  opacity: 0; transform: scale(2.4); animation: torchureRing 700ms ease-in forwards;
+}
+.torchure-fackel {
+  position: absolute; opacity: 0; transform-origin: 50% 80%;
+  animation: torchureFackel 2000ms cubic-bezier(.3,.8,.4,1) forwards;
+}
+.torchure-flackern { display: block; animation: torchureFlackern 160ms steps(2) infinite; }
+.torchure-schwein {
+  position: absolute; opacity: 0; transform: scale(0); transform-origin: 50% 90%;
+  animation: torchureSchwein 2000ms cubic-bezier(.2,.9,.3,1.25) forwards;
+}
+.torchure-kauen { display: block; transform-origin: 50% 100%; animation: torchureKauen 2000ms linear forwards; }
+.torchure-giftflamme {
+  position: absolute; width: 12px; height: 16px; border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(ellipse at 50% 70%, #d9ff7a 0%, #7fd63a 35%, #9b3ad6 75%, transparent 100%);
+  opacity: 0; transform: scale(.2); transform-origin: 50% 100%;
+  animation: torchureGiftflamme 2000ms ease-out forwards;
+}
+@keyframes torchureGlut { 0%, 45% { opacity: 0; } 58% { opacity: 1; } 80% { opacity: .8; } 100% { opacity: 0; } }
+@keyframes torchureRing {
+  0% { opacity: 0; transform: scale(2.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(.35); }
+}
+@keyframes torchureFackel {
+  0% { opacity: 0; transform: translate(0, -24px) rotate(-18deg); }
+  12% { opacity: 1; transform: translate(0, 0) rotate(8deg); }
+  18%, 30% { opacity: 1; transform: translate(0, 0) rotate(-4deg); }
+  40% { opacity: 1; transform: translate(var(--zx), var(--zy)) rotate(70deg); }
+  44% { opacity: 1; transform: translate(var(--zx), var(--zy)) rotate(70deg) scaleY(.4); }
+  46%, 100% { opacity: 0; transform: translate(var(--zx), var(--zy)) rotate(70deg) scale(.1); }
+}
+@keyframes torchureFlackern { 0% { filter: brightness(1); } 100% { filter: brightness(1.35); } }
+@keyframes torchureSchwein {
+  0%, 14% { opacity: 0; transform: scale(0); }
+  22% { opacity: 1; transform: scale(1.15); }
+  27%, 86% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(.6) translateY(-6px); }
+}
+@keyframes torchureKauen {
+  0%, 30% { transform: scaleY(1) scaleX(1); }
+  34% { transform: scaleY(.8) scaleX(1.12); }
+  38% { transform: scaleY(1.05) scaleX(.96); }
+  42% { transform: scaleY(.8) scaleX(1.12); }
+  46% { transform: scaleY(1) scaleX(1); filter: none; }
+  52%, 70% { filter: drop-shadow(0 0 4px #9b3ad6) hue-rotate(-40deg); }
+  60% { transform: scaleY(1.06); }
+  78%, 100% { transform: scaleY(1); filter: none; }
+}
+@keyframes torchureGiftflamme {
+  0%, 44% { opacity: 0; transform: scale(.2); }
+  52% { opacity: 1; transform: scale(1.2); }
+  60% { transform: scale(.9) translateY(-2px); }
+  68% { transform: scale(1.15) translateY(-4px); }
+  80% { opacity: .9; transform: scale(1) translateY(-6px); }
+  100% { opacity: 0; transform: scale(.6) translateY(-12px); }
+}
+
 /* ── Accusation: wuetende Sprechblase ─────────────────────────────── */
 .anklage { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 10205; }
 .anklage-glut {
