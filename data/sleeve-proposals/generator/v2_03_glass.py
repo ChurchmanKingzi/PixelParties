@@ -190,7 +190,10 @@ for y in range(H):
         n=len(ramp)-1; vv=min(0.999,max(0,v))*n; i=int(vv); f=vv-i
         c=ramp[min(n,i+1)] if f>BAYER4[y%4,x%4] else ramp[i]
         cv.px(x,y,c)
-# hairline cracks through some of Johanna's shards
+def piece_ramp(y,x):
+    L_=lab[y,x]
+    return glass_ramp(JCOL[chars[L_-FIG]] if L_>=FIG else color_for(L_))
+# hairline cracks through some of Johanna's shards (darkest/lightest tone of the shard's OWN colour)
 crng=np.random.RandomState(9)
 plist=sorted(set(pid[fig_mask&~lead].ravel().tolist()))
 for p in crng.choice(plist,26,replace=False):
@@ -203,47 +206,36 @@ for p in crng.choice(plist,26,replace=False):
         x+=math.cos(ang); y+=math.sin(ang)
         X,Y=int(round(x)),int(round(y))
         if not (0<=X<W and 0<=Y<H) or pid[Y,X]!=p or lead[Y,X]: break
-        base=tuple(int(v) for v in cv.a[Y,X])
-        cv.px(X,Y,lerp(base,(30,20,36),0.55))
-        if pid[Y-1,X]==p and not lead[Y-1,X]: cv.px(X,Y-1,lerp(tuple(int(v) for v in cv.a[Y-1,X]),(255,255,245),0.45))
+        rp=piece_ramp(Y,X)
+        cv.px(X,Y,rp[0])
+        if pid[Y-1,X]==p and not lead[Y-1,X]: cv.px(X,Y-1,rp[4])
         if crng.rand()<0.12:   # small side branch
             bx,by=X,Y; ba=ang+crng.choice([-1.2,1.2])
             for _ in range(crng.randint(2,5)):
                 bx+=math.cos(ba); by+=math.sin(ba); BX,BY=int(round(bx)),int(round(by))
                 if pid[BY,BX]!=p or lead[BY,BX]: break
-                cv.px(BX,BY,lerp(tuple(int(v) for v in cv.a[BY,BX]),(30,20,36),0.45))
+                cv.px(BX,BY,piece_ramp(BY,BX)[1])
 # painted details on glass (grisaille lines)
-def paint(x,y,c=(40,30,40)):
-    if win[y,x] and not lead[y,x]: cv.px(x,y,c)
+def paint(x,y,c=None):
+    if win[y,x] and not lead[y,x] and lab[y,x]>=0: cv.px(x,y,piece_ramp(y,x)[4])
 # ray panes: radial streaks
 for k in range(28):
     a=(k+0.5)/28*2*math.pi-math.pi
     for r in range(30,84,1):
         x=int(JCX+math.cos(a)*r); y=int(JCY+math.sin(a)*r/0.9)
         if 0<=y<H and lab[y,x]>=0 and lab[y,x]<FIG and inv[lab[y,x]][0]=='ray' and r%3!=0:
-            cv.px(x,y,lerp(tuple(cv.a[y,x]),(255,250,220),0.35))
+            cv.px(x,y,piece_ramp(y,x)[4])
 # ---------- face / hair details (painted) ----------
 ox,oy=FX,FY
 fcx=ox+fw//2
-# eyes (closed, serene) with lashes, brows, blush, nose, lips
-EYE=(80,34,40)
-for sgn in (-1,1):
-    ex=fcx+sgn*10
-    for dx in range(-5,6):
-        yy=oy+37+int(round(2.0*(1-(dx/5.5)**2)))
-        cv.px(ex+dx,yy,EYE)
-    cv.px(ex+sgn*6,oy+37,EYE); cv.px(ex+sgn*7,oy+36,EYE)
-    for dx in range(-4,5): cv.px(ex+dx,oy+31-(1 if abs(dx)<3 else 0),(160,50,44))
-cv.px(fcx,oy+42,(214,160,130)); cv.px(fcx+1,oy+43,(214,160,130))
-for dx in range(-3,4): cv.px(fcx+dx,oy+49+(1 if abs(dx)<2 else 0),(196,70,76))
-for dx in range(-1,2): cv.px(fcx+dx,oy+51,(236,130,130))
-# orb glow
+# orb glow (each shard only brightens within its own colour ramp)
+ox,oy=FX,FY; fcx=ox+fw//2
 ocx,ocy=fcx,oy+100
 for y in range(ocy-26,ocy+27):
     for x in range(ocx-26,ocx+27):
         d=math.hypot(x-ocx,y-ocy)
         if d<24 and win[y,x] and not lead[y,x] and BAYER4[y%4,x%4]<(1-d/24)*0.8:
-            cv.px(x,y,lerp(tuple(cv.a[y,x]),(255,250,220),0.45))
+            cv.px(x,y,piece_ramp(y,x)[3 if d>12 else 4])
 # sparkles in glass
 for (sx,sy) in [(60,96),(190,92),(56,196),(196,204),(86,70),(168,66)]:
     for k in range(-3,4): paint(sx+k,sy,(255,255,240)); paint(sx,sy+k,(255,255,240))
