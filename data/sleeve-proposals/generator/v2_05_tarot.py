@@ -163,12 +163,13 @@ def plate(x0,y0,x1,y1):
             e=min(x-x0,x1-1-x,y-y0,y1-1-y)
             FMk[y,x]=True
             FH[y,x]=[0.8,2.2,2.6,2.0][e] if e<4 else -9
-plate(70,8,180,40); plate(30,304,220,342)
+plate(70,8,180,40); plate(44,304,206,342)
 # corner filigree: spirals
-for (cx,cy,sx,sy) in [(14,14,1,1),(W-15,14,-1,1),(14,H-15,1,-1),(W-15,H-15,-1,-1)]:
+# spirals sit fully inside the free corner pockets (between outer frame, panel border and plates)
+for (cx,cy,sx,sy) in [(27,25,1,1),(W-1-27,25,-1,1),(27,322,1,-1),(W-1-27,322,-1,-1)]:
     for t in np.linspace(0,3.5*math.pi,140):
-        r=12*(1-t/(4*math.pi))
-        x=int(cx+sx*(6+math.cos(t)*r)); y=int(cy+sy*(6+math.sin(t)*r))
+        r=9*(1-t/(4*math.pi))
+        x=int(round(cx+sx*math.cos(t)*r)); y=int(round(cy+sy*math.sin(t)*r))
         for dx in range(2):
             FMk[y,x+dx]=True; FH[y,x+dx]=2.8
 GOLD=SK2.GOLD
@@ -195,7 +196,7 @@ def gold_text(t,size,cx,cy):
             if m[yy_,xx_]: cv.px(x0+xx_+1,y+yy_+2,(8,4,10))
     relief(cv,TH2,np.zeros((H,W),np.int32),[GOLD],TM2,k=1.2,bias=0.12,blur=0.4)
 gold_text('XIII',24,125,24)
-gold_text('DEATH',24,125,323)
+gold_text('SKULLMAEL',22,125,323)
 # plate ornaments: small skulls
 def tiny_skull(x,y):
     S=[".###.","#####","#.#.#","#####",".#.#."]
@@ -203,5 +204,5 @@ def tiny_skull(x,y):
         for i,ch in enumerate(r):
             if ch=='#': cv.px(x+i,y+j,(236,228,206))
             elif j==2: cv.px(x+i,y+j,(200,40,40))
-tiny_skull(78,21); tiny_skull(167,21); tiny_skull(38,320); tiny_skull(207,320)
+tiny_skull(78,21); tiny_skull(167,21); tiny_skull(49,321); tiny_skull(196,321)
 save2(cv,'05_tarot_skeleton_king')

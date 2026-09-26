@@ -29,53 +29,48 @@ def gem(cv,cx,cy,rx,ry,R):
     px(cv,cx-rx*0.4,cy-ry*0.45,R[4]); px(cv,cx-rx*0.4+1,cy-ry*0.45,R[3]); px(cv,cx+rx*0.35,cy+ry*0.4,R[3])
 def draw_crown(cv):
     CX=124.5
-    # velvet cap behind the points
-    for y in range(80,98):
-        for x in range(97,154):
-            d=((x-CX)/28)**2+((y-98)/17)**2
-            if d<=1: px(cv,x,y,rampc([(40,10,50),(70,20,90),(110,40,140),(150,70,180)],0.7-0.5*(x-CX)/28-0.3*(y-80)/18,x,y))
-    # points (fleur spikes)
-    pts=[(96,88),(110,80),(125,72),(140,80),(154,88)]
-    for (tx,ty) in pts:
-        base=98; hw=6 if tx!=125 else 7
-        tx0=tx
-        for y in range(ty,base+1):
-            t=(y-ty)/(base-ty); w=max(1,hw*t**0.9)
-            for x in range(int(tx-w),int(tx+w)+1):
+    B0,B1=100,108          # band rows (sits on the forehead)
+    HW=22                  # band half width (skull is ~23 half-wide here)
+    # velvet cap
+    for y in range(86,B0+1):
+        for x in range(int(CX-HW),int(CX+HW)+1):
+            dd=((x-CX)/(HW-3))**2+((y-B0)/13)**2
+            if dd<=1: px(cv,x,y,rampc([(40,10,50),(70,20,90),(110,40,140),(150,70,180)],0.7-0.4*(x-CX)/HW-0.3*(y-86)/14,x,y))
+    # five points with ball finials
+    for (dx,ty,hw) in [(-18,90,3.5),(-9,86,3.5),(0,82,4.5),(9,86,3.5),(18,90,3.5)]:
+        tx=CX+dx
+        for y in range(ty,B0+1):
+            t=(y-ty)/(B0-ty); w=max(0.8,hw*t**0.9)
+            for x in range(int(round(tx-w)),int(round(tx+w))+1):
                 u=(x-tx)/max(1,w)
-                v=0.78-0.45*u-0.15*t
+                v=0.8-0.45*u-0.15*t
                 if u>0.45: v=0.3
                 px(cv,x,y,rampc(GOLD,v,x,y))
-            px(cv,tx-w-1,y,OUT); px(cv,tx+w+1,y,OUT)
-        # ball finial
-        for y in range(ty-5,ty+1):
-            for x in range(tx-3,tx+4):
-                d=math.hypot(x-tx,y-(ty-2.5))
-                if d<=3: px(cv,x,y,rampc(GOLD,0.9-0.2*(x-tx)-0.15*(y-ty+2.5),x,y))
-                elif d<=3.9: px(cv,x,y,OUT)
-        px(cv,tx-1,ty-4,GOLD[6])
-    # band
-    for y in range(96,110):
-        for x in range(90,161):
-            e=min(x-90,160-x)
-            t=[0.95,0.8,0.7,0.62,0.58,0.55,0.52,0.5,0.48,0.45,0.4,0.35,0.28,0.2][y-96]
-            if e<2: t-=0.2
+            px(cv,round(tx-w)-1,y,OUT); px(cv,round(tx+w)+1,y,OUT)
+        for y in range(ty-4,ty+1):
+            for x in range(int(tx)-3,int(tx)+4):
+                dd=math.hypot(x-tx,y-(ty-2))
+                if dd<=2.2: px(cv,x,y,rampc(GOLD,0.95-0.2*(x-tx)-0.15*(y-ty+2),x,y))
+                elif dd<=3.0: px(cv,x,y,OUT)
+        px(cv,tx-1,ty-3,GOLD[6])
+    # band (slightly flared towards the bottom)
+    for y in range(B0,B1+1):
+        hw=HW-1+ (y-B0)*0.25
+        for x in range(int(CX-hw),int(CX+hw)+1):
+            e=min(x-(CX-hw),(CX+hw)-x)
+            t=[0.95,0.78,0.66,0.6,0.55,0.5,0.44,0.36,0.26][y-B0]
+            if e<1.5: t-=0.2
             c=rampc(GOLD,t,x,y)
-            # engraved scroll pattern in the middle of the band
-            if 100<=y<=105 and ((x-90)%10 in (2,7) and y in (101,104) or ((x-90)%10 in (3,4,5,6) and y in (100,105))):
-                c=GOLD[1]
+            if y in (103,105) and int(x-CX)%6 in (2,3): c=GOLD[1]    # engraving
             px(cv,x,y,c)
-    # beaded rims
-    for x in range(91,160,3):
-        px(cv,x,97,GOLD[6]); px(cv,x,107,GOLD[5]); px(cv,x+1,107,GOLD[2])
-    for x in range(89,162): px(cv,x,95,OUT); px(cv,x,110,OUT)
-    for y in range(95,111): px(cv,89,y,OUT); px(cv,161,y,OUT)
+        px(cv,CX-hw-1,y,OUT); px(cv,CX+hw+1,y,OUT)
+    for x in range(int(CX-HW)-1,int(CX+HW)+3): px(cv,x,B0-1,OUT) if abs(x-CX)>6 else None; px(cv,x,B1+1,OUT)
+    for x in range(int(CX-HW)+1,int(CX+HW),3): px(cv,x,B1-1,GOLD[5])
     # gems
-    gem(cv,CX,102.5,4.5,4.2,RUBY); gem(cv,CX-19,102.5,2.8,2.8,SAPH); gem(cv,CX+19,102.5,2.8,2.8,SAPH); gem(cv,CX-29,102.5,2,2.4,EMER); gem(cv,CX+29,102.5,2,2.4,EMER)
-    gem(cv,CX,86,2.5,3,RUBY)
+    gem(cv,CX,104,3.2,3.0,RUBY); gem(cv,CX-12,104,2.0,2.0,SAPH); gem(cv,CX+12,104,2.0,2.0,SAPH)
     # glints
-    for (gx,gy) in [(100,97),(132,97),(118,80)]:
-        for k in range(-2,3): px(cv,gx+k,gy,GOLD[6]); px(cv,gx,gy+k,GOLD[6])
+    for (gx,gy) in [(108,101),(121,84)]:
+        for k in range(-1,2): px(cv,gx+k,gy,GOLD[6]); px(cv,gx,gy+k,GOLD[6])
 def draw_sword(cv):
     CX=124.5
     # pommel
@@ -179,7 +174,6 @@ def draw_skull(cv):
             cheek=abs(u)<=22-max(0,y-124)*0.9 and 118<=y<=132
             jaw=abs(u)<=14-max(0,y-132)*0.8 and 128<=y<=139
             if cran or cheek or jaw: m[y,x]=True
-    m[:109]=False   # hidden under the crown band
     d=cv2.distanceTransform(np.pad(m.astype(np.uint8),1),cv2.DIST_L2,3)[1:-1,1:-1]
     for y,x in zip(*np.where(m)):
         u=(x-CX)/26; v=(y-CY)/20
@@ -188,7 +182,7 @@ def draw_skull(cv):
     # outline
     ring=(cv2.dilate(m.astype(np.uint8),np.ones((3,3),np.uint8))>0)&~m
     for y,x in zip(*np.where(ring)):
-        if y>=109: px(cv,x,y,OUT)
+        px(cv,x,y,OUT)
     # eye sockets (deep) with glowing pupils
     for sx in (-1,1):
         ex,ey=CX+sx*10,119
@@ -250,37 +244,23 @@ def draw_forearms(cv):
 def draw_mouth(cv):
     CX=124.5
     DARK=(30,14,20)
-    # mouth cavity
-    for y in range(130,141):
-        for x in range(108,142):
-            u=abs(x-CX)
-            if u<=14-max(0,y-135)*1.4: px(cv,x,y,DARK)
-    # upper row: 8 teeth, individually outlined, lit from above
-    for i in range(7):
-        x0=int(round(CX-12+i*3.5))
-        for y in range(131,135):
-            for x in range(x0,x0+2):
-                c=BONE[5] if y==131 else (BONE[4] if y<134 else BONE[3])
-                if x==x0+1 and y>131: c=BONE[3]
-                px(cv,x,y,c)
-    # lower row: 7 teeth, slightly smaller, a bit darker (in shadow)
-    for i in range(6):
-        x0=int(round(CX-10.25+i*3.5))
-        for y in range(136,139):
-            for x in range(x0,x0+2):
-                c=BONE[4] if y==136 else BONE[3]
-                if x==x0+1: c=BONE[2]
-                px(cv,x,y,c)
-    # jaw bone under the lower teeth
-    for y in range(139,142):
-        for x in range(110,140):
-            u=abs(x-CX)
-            if u<=12-(y-139)*2: px(cv,x,y,rampc(BONE,0.55-0.1*(y-139),x,y))
-    for x in range(108,142):
-        if abs(x-CX)<=12: px(cv,x,142,OUT)
-    # jaw hinges
-    for side in (-1,1):
-        for k in range(6): px(cv,CX+side*(15-k*0.2),129+k,BONE[1])
+    U=12.5
+    top=lambda u: 131.0-2.6*(u/U)**2
+    mid=lambda u: 134.6-2.9*(u/U)**2
+    bot=lambda u: 138.0-3.2*(u/U)**2
+    for x in range(int(CX-U)-1,int(CX+U)+2):
+        u=x-CX
+        if abs(u)>U+0.5: continue
+        yt,ym,yb=int(round(top(u))),int(round(mid(u))),int(round(bot(u)))
+        gap=(int(round(u+0.5))%3==0)          # 1px fugue between 2px teeth (symmetric)
+        for y in range(yt,yb+1):
+            if y==yt or y==yb or y==ym or gap: c=DARK
+            elif y<ym: c=BONE[5] if y==yt+1 else BONE[4]
+            else: c=BONE[3] if y==ym+1 else BONE[2]
+            px(cv,x,y,c)
+    # corners
+    for s in (-1,1):
+        x=CX+s*(U+1); px(cv,x,round(mid(U)),DARK)
 def draw_all(cv,KX,KY):
     draw_skull(cv)
     draw_mouth(cv)
