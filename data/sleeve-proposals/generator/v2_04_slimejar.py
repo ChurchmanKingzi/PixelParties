@@ -1,6 +1,6 @@
 from px2 import *
 from font35 import text35, width35
-from slimes2 import make, KINDS
+from slimes2 import make, KINDS, variant
 random.seed(4)
 W,H=W2,H2
 cv=C2((40,28,54))
@@ -92,7 +92,7 @@ def blit(dst,s,x,y,flip=False):
             if s[yy,xx,3]:
                 X,Y=x+xx,y+yy
                 if 0<=X<W and 0<=Y<H: dst[Y,X]=s[yy,xx]
-cache={k:scale2x(make(k)) for k in KINDS}
+vrng=np.random.RandomState(42)
 order=['rocky','slimy','splashy','hardy','icy','fiery','cloudy','shadowy','sparky','slimy','splashy','rocky','icy','hardy','fiery','shadowy','cloudy','slimy','sparky','splashy','icy','rocky','hardy','fiery','cloudy','shadowy','slimy','splashy','sparky','icy','rocky','hardy','fiery']
 placed=[]; idx=0
 yb=JBOT-3; row=0
@@ -100,7 +100,7 @@ while yb>JTOP-6:
     x=JX0-6+(row%2)*18
     while x<JX1-14:
         k=order[idx%len(order)]; idx+=1
-        s=cache[k]
+        s=variant(k,vrng)
         placed.append((yb,x+random.randint(-3,3),s,random.random()<0.5))
         x+=s.shape[1]-8+random.randint(-2,2)
     yb-=24; row+=1
@@ -214,8 +214,8 @@ text35(cv,'DO NOT SHAKE!',126,ly0+38,(200,50,90),center=True)
 ic=make('slimy')
 
 # ---------- escaped slimes on the shelf ----------
-e1=scale2x(make('splashy')); cv.paste(e1,2,SY-e1.shape[0]+3)
-e2=scale2x(make('icy')); cv.paste(e2[:,::-1],W-e2.shape[1]-2,SY-e2.shape[0]+2)
+e1=variant('splashy',vrng); cv.paste(e1,2,SY-e1.shape[0]+3)
+e2=variant('icy',vrng); cv.paste(e2[:,::-1],W-e2.shape[1]-2,SY-e2.shape[0]+2)
 for x in range(8,44):
     if x%3: cv.px(x,SY+1,(70,150,230))
 # dust motes in lamp light

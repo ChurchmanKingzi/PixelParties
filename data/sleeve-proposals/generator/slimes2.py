@@ -101,3 +101,132 @@ if __name__=='__main__':
     for k in KINDS:
         s=scale2x(make(k)); cv2_.paste(s,x,2); x+=s.shape[1]+4
     cv2_.save(SP+'/slimes2.png',3)
+
+# ---------------- per-exemplar variation ----------------
+# eye boxes (x0,y0,x1,y1 inclusive, native coords of make(kind)), found by inspecting the sprites
+def find_eyes(a):
+    """dark blobs inside the body (not touching transparency) in the middle band -> eye boxes (left,right)"""
+    h,w=a.shape[:2]; op=a[...,3]>0
+    L=lum(a[...,:3].astype(float))
+    med=np.median(L[op])
+    inner=cv2.erode(op.astype(np.uint8),np.ones((3,3),np.uint8))>0
+    dark=inner&(L<med*0.62)
+    num,lab,st,cen=cv2.connectedComponentsWithStats(dark.astype(np.uint8),connectivity=8)
+    ys,xs=np.where(op); top,bot=ys.min(),ys.max()
+    cands=[]
+    for i in range(1,num):
+        x,y,ww,hh,area=st[i]
+        cy=y+hh/2
+        if 1<=area<=12 and ww<=4 and hh<=3 and top+(bot-top)*0.25<cy<top+(bot-top)*0.75:
+            cands.append((x,y,x+ww-1,y+hh-1,cen[i][0]))
+    cands.sort(key=lambda c:c[4])
+    if len(cands)>=2:
+        # pick the pair most symmetric around the body centre
+        cx=(xs.min()+xs.max())/2; best=None
+        for i in range(len(cands)):
+            for j in range(i+1,len(cands)):
+                a_,b_=cands[i],cands[j]
+                if a_[4]<cx<b_[4] and abs(a_[1]-b_[1])<=1:
+                    sc=abs((a_[4]+b_[4])/2-cx)
+                    if best is None or sc<best[0]: best=(sc,a_,b_)
+        if best: return best[1][:4],best[2][:4]
+    return None
+_BODY_EYES=((5,4,6,6),(9,4,10,6))
+_PADS={'slimy':(2,2),'splashy':(5,5),'hardy':(1,7),'shiny':(1,7),'shadowy':(3,6)}
+EYES={'sparky':((9,15,11,16),(16,15,18,16)),'fiery':((14,19,16,20),(19,19,21,20)),
+      'icy':((4,9,6,10),(12,9,13,10)),'rocky':((7,9,9,11),(12,9,14,11)),'cloudy':((14,8,15,10),(18,8,19,10))}
+for k_,(px_,py_) in _PADS.items():
+    EYES[k_]=tuple((x0+px_,y0+py_,x1+px_,y1+py_) for (x0,y0,x1,y1) in _BODY_EYES)
+def set_expression(a,expr,rng,kind=None):
+    eyes=EYES.get(kind) if kind else find_eyes(a)
+    if eyes is None or expr=='normal': return a
+    a=a.copy(); L=lum(a[...,:3].astype(float))
+    op=a[...,3]>0
+    body=tuple(int(v) for v in np.median(a[op][:,:3],axis=0))
+    def eyecol(box):
+        x0,y0,x1,y1=box; sub=a[y0:y1+1,x0:x1+1,:3].reshape(-1,3)
+        return tuple(int(v) for v in sub[np.argmin(lum(sub.astype(float)))])
+    def neighbour_body(box):
+        x0,y0,x1,y1=box
+        cand=[a[y0-1,x] for x in range(x0,x1+1)]+[a[y1+1,x] for x in range(x0,x1+1)]
+        cand=[c[:3] for c in cand if c[3]>0]
+        return tuple(int(v) for v in np.median(cand,axis=0)) if cand else body
+    def clear(box):
+        x0,y0,x1,y1=box
+        fill=neighbour_body(box)
+        # also clear bright glints right next to the eye
+        for y in range(y0-1,y1+2):
+            for x in range(x0-1,x1+2):
+                if 0<=y<a.shape[0] and 0<=x<a.shape[1] and a[y,x,3]:
+                    if (x0<=x<=x1 and y0<=y<=y1) or L[y,x]>230: a[y,x,:3]=fill
+    def closed(box,happy=True):
+        c=eyecol(box); x0,y0,x1,y1=box
+        clear(box)
+        w=x1-x0+1; yb=y1
+        if happy and w>=3:   # ^ shape
+            for x in range(x0,x1+1): a[yb if x in (x0,x1) else yb-1,x,:3]=c
+        else:
+            for x in range(x0,x1+1): a[yb,x,:3]=c
+    le,re=eyes
+    if expr=='closed': closed(le); closed(re)
+    elif expr=='wink': closed(re if rng.rand()<0.5 else le)
+    elif expr=='look':
+        # move the glint: brightest pixel near eyes to the other side
+        for box in (le,re):
+            x0,y0,x1,y1=box; c=eyecol(box)
+            for y in range(y0,y1+1):
+                for x in range(x0,x1+1): a[y,x,:3]=c
+            gx=x0 if rng.rand()<0.5 else x1
+            a[y0,gx,:3]=(250,250,250)
+    elif expr=='angry':
+        c=eyecol(le)
+        for box,s in ((le,1),(re,-1)):
+            x0,y0,x1,y1=box
+            xs_=[x0,x1] if s>0 else [x1,x0]
+            if y0-2>=0:
+                a[y0-2,xs_[0],:3]=c; a[y0-1,xs_[1],:3]=c
+                mid=(x0+x1)//2; a[y0-1 if s>0 else y0-2, mid,:3]=c
+    return a
+def flame_variant(a,rng):
+    """Fiery: bend/mirror the flame crown (rows above the body)"""
+    a=a.copy(); h,w=a.shape[:2]
+    top=15  # first body row of the fiery sprite
+    fl=a[:top].copy(); body=a[top:]
+    mode=rng.choice(['bendL','bendR','mirror','tall'])
+    if mode=='mirror': fl=fl[:,::-1]
+    out=np.zeros_like(fl)
+    for y in range(top):
+        k=top-y
+        if mode=='bendL': s=-int(k*0.2)
+        elif mode=='bendR': s=int(k*0.2)
+        else: s=0
+        row=np.roll(fl[y],s,axis=0)
+        if s>0: row[:s]=0
+        elif s<0: row[s:]=0
+        out[y]=row
+    if mode=='tall':
+        out=np.zeros_like(fl); out[:-2]=fl[2:]; out[:3]=0
+        # stretch: duplicate middle rows upward
+        out=np.concatenate([fl[2:6],fl[4:]],axis=0)[:top]
+    a[:top]=out
+    a[top:]=body
+    return a
+def rotsprite(a,angle,sy=1.0):
+    """RotSprite-style rotation at 2x: scale2x x3 (8x) -> rotate nearest -> sample to 2x"""
+    pad=4
+    a=np.pad(a,((pad,pad),(pad,pad),(0,0)))
+    s8=scale2x(scale2x(scale2x(a)))
+    h,w=s8.shape[:2]
+    M=cv2.getRotationMatrix2D((w/2,h*0.8),angle,1.0)
+    M[1]*=sy; M[1,2]+=h*0.8*(1-sy)
+    r=cv2.warpAffine(s8,M,(w,h),flags=cv2.INTER_NEAREST,borderMode=cv2.BORDER_CONSTANT,borderValue=(0,0,0,0))
+    out=r[2::4,2::4].copy()
+    out[out[...,3]<128]=0; out[...,3]=np.where(out[...,3]>0,255,0)
+    ys,xs=np.where(out[...,3]>0)
+    return out[ys.min():ys.max()+1,xs.min():xs.max()+1]
+def variant(kind,rng):
+    a=make(kind)
+    if kind=='fiery': a=flame_variant(a,rng)
+    a=set_expression(a,rng.choice(['normal','normal','closed','wink','look','angry']),rng,kind)
+    ang=rng.uniform(-11,11); sy=rng.uniform(0.9,1.06)
+    return rotsprite(a,ang,sy)
