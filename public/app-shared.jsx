@@ -5817,6 +5817,99 @@ function tutorialStartsWithAntonia(num) {
   return !!script && script.opts?.speaker === ANTONIA_PORTRAIT;
 }
 
+// ── Tutorial-Gegner (Als Vorgabe 26.9.) ─────────────────────────────
+// Der CPU-Gegner im Tutorial heisst serverseitig schlicht "CPU" und hat
+// keinen Avatar. Angezeigt wird stattdessen immer Monia Bot ODER Antonia:
+//   • zu Beginn eines Durchgangs die, die im Skript ZUERST spricht,
+//   • nach jeder Gespraechsszene die, die darin MEHR gesprochen hat.
+// „Mehr gesprochen" zaehlt Buchstaben und Ziffern des sichtbaren Texts —
+// ein „..." ist also kein Redeanteil. Gleichstand laesst den bisherigen
+// Gegner stehen. Wie `_antoniaPresent` ein sequenzuebergreifender Zustand
+// mit Mini-Abo, weil Textbox (app-shared) und Brett (app-board) ihn
+// getrennt lesen und schreiben.
+const TUTORIAL_GEGNER = {
+  monia:   { key: 'monia',   name: 'Monia Bot', avatar: '/MoniaBot.png', color: '#00f0ff' },
+  antonia: { key: 'antonia', name: 'Antonia',   avatar: ANTONIA_PORTRAIT, color: '#ff4444' },
+};
+const MONIA_PORTRAIT = '/MoniaBot.png';
+
+/** Wer spricht diese Seite? 'monia' | 'antonia' | null. Seite links oder
+ *  rechts bestimmt das Portraet; ohne erkennbares Portraet entscheidet
+ *  der Sprechername („Jetpack Raccoon" ist Antonia vor ihrer Enthuellung). */
+function tutorialSprecherDerSeite(opts, page) {
+  const rechts = (page?.side || 'left') === 'right';
+  const portraet = rechts ? opts?.rightSpeaker : (opts?.speaker || MONIA_PORTRAIT);
+  if (portraet === ANTONIA_PORTRAIT) return 'antonia';
+  if (portraet === MONIA_PORTRAIT) return 'monia';
+  const name = String(page?.speakerName || (rechts ? opts?.rightSpeakerName : opts?.speakerName) || '');
+  if (/antonia|raccoon/i.test(name)) return 'antonia';
+  if (/monia/i.test(name)) return 'monia';
+  return null;
+}
+
+function tutorialSeitenText(page) {
+  const raw = typeof page === 'string' ? page : (page?.text || '');
+  return parseInlineMarkdown(raw).plainText;
+}
+
+/** Wer von beiden hat in dieser Szene mehr gesprochen? null bei Gleichstand. */
+function tutorialMehrGesprochen(opts, pages) {
+  const anteil = { monia: 0, antonia: 0 };
+  for (const p of (pages || [])) {
+    const wer = tutorialSprecherDerSeite(opts, p);
+    if (!wer) continue;
+    anteil[wer] += (tutorialSeitenText(p).match(/[\p{L}\p{N}]/gu) || []).length;
+  }
+  if (anteil.monia === anteil.antonia) return null;
+  return anteil.monia > anteil.antonia ? 'monia' : 'antonia';
+}
+
+/** Wer bekommt in diesem Tutorial den ersten Text? (Intro, sonst Outro.) */
+function tutorialErsterSprecher(num) {
+  const script = TUTORIAL_SCRIPTS[num];
+  if (!script) return 'monia';
+  const opts = { speaker: MONIA_PORTRAIT, speakerName: 'Monia Bot', ...(script.opts || {}) };
+  for (const teil of [script.intro, script.outro]) {
+    const seiten = Array.isArray(teil) ? teil : (teil ? [{ text: teil }] : []);
+    for (const p of seiten) {
+      // Ein reines „..." ist noch kein Text — wer zuerst WORTE bekommt.
+      if (!/[\p{L}\p{N}]/u.test(tutorialSeitenText(p))) continue;
+      const wer = tutorialSprecherDerSeite(opts, p);
+      if (wer) return wer;
+    }
+  }
+  return 'monia';
+}
+
+let _tutorialGegner = null;
+const _tutorialGegnerSubs = new Set();
+function setTutorialGegner(key) {
+  const val = key && TUTORIAL_GEGNER[key] ? key : null;
+  if (_tutorialGegner === val) return;
+  _tutorialGegner = val;
+  for (const fn of _tutorialGegnerSubs) { try { fn(val); } catch {} }
+}
+/** Anzeige-Daten des Tutorial-Gegners ({ name, avatar, color }) oder null. */
+function useTutorialGegner() {
+  const [key, setKey] = useState(_tutorialGegner);
+  useEffect(() => {
+    _tutorialGegnerSubs.add(setKey);
+    setKey(_tutorialGegner);
+    return () => { _tutorialGegnerSubs.delete(setKey); };
+  }, []);
+  return key ? TUTORIAL_GEGNER[key] : null;
+}
+
+// ── Sprecherfarben der Textbox ──────────────────────────────────────
+// Rahmen, Namensschild und Portraetrahmen der Textbox tragen die Farbe
+// des Sprechers. Vorrang: `nameColor` der Seite (Tutorial-Skripte),
+// dann `speakerColor` / `rightSpeakerColor` aus den Optionen (fuer die
+// Kampagne), dann die bekannten Portraets, sonst die Akzentfarbe.
+const TEXTBOX_PORTRAET_FARBEN = {
+  [MONIA_PORTRAIT]: TUTORIAL_GEGNER.monia.color,
+  [ANTONIA_PORTRAIT]: TUTORIAL_GEGNER.antonia.color,
+};
+
 
 /**
  * Misst ein Highlight-Ziel so, dass es SPAETER exakt wie das Original
@@ -6126,6 +6219,12 @@ function TextBox() {
           setTimeout(() => setAntoniaPresent(false), 600);
         }
       }
+      // Szene zu Ende: im Tutorial wird, wer mehr gesprochen hat, zum
+      // angezeigten Gegner (s. `setTutorialGegner`).
+      if (window._currentTutorialNum) {
+        const wer = tutorialMehrGesprochen(opts, pages);
+        if (wer) setTutorialGegner(wer);
+      }
       // Fade out then dismiss
       setFading(true);
       const cb = opts.onDismiss;
@@ -6188,10 +6287,24 @@ function TextBox() {
   const leftSticky = findLastName(false);
   const rightSticky = findLastName(true);
   const leftName = leftSticky?.name || opts.speakerName;
-  const leftNameColor = leftSticky?.color;
   const rightName = rightSticky?.name || opts.rightSpeakerName;
-  const rightNameColor = rightSticky?.color;
   const hasRight = opts.rightSpeaker && rightVisible;
+  // Sprecherfarben (s. TEXTBOX_PORTRAET_FARBEN): jede Seite traegt ihre
+  // eigene, der Rahmen der ganzen Box die des gerade Sprechenden.
+  const farbeFuer = (rechts) => {
+    const sticky = rechts ? rightSticky : leftSticky;
+    if (sticky?.color) return sticky.color;
+    const eigene = rechts ? opts.rightSpeakerColor : opts.speakerColor;
+    if (eigene) return eigene;
+    return TEXTBOX_PORTRAET_FARBEN[rechts ? opts.rightSpeaker : opts.speaker] || null;
+  };
+  const linksFarbe = farbeFuer(false);
+  const rechtsFarbe = farbeFuer(true);
+  const aktivFarbe = (activeSide === 'right' ? rechtsFarbe : linksFarbe) || linksFarbe || rechtsFarbe;
+  const farbStil = {};
+  if (aktivFarbe) farbStil['--tb-farbe'] = aktivFarbe;
+  if (linksFarbe) farbStil['--tb-links'] = linksFarbe;
+  if (rechtsFarbe) farbStil['--tb-rechts'] = rechtsFarbe;
 
   return (
     <div className={'textbox-overlay' + (fading ? ' textbox-fading' : '')}>
@@ -6245,22 +6358,24 @@ function TextBox() {
           </div>
         );
       })}
-      <div className="textbox">
+      {/* Pixel-Fenster wie die Menue-Fenster (`.pp-fenster`), Rahmen in
+          der Farbe des gerade Sprechenden (`--tb-farbe`). */}
+      <div className="textbox pp-fenster" style={farbStil}>
         {opts.speaker && leftVisible && (
-          <div className={'textbox-portrait' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
+          <div className={'textbox-portrait textbox-portrait-left' + (hasRight && activeSide !== 'left' ? ' textbox-portrait-inactive' : '') + (leftExiting ? ' textbox-portrait-exit-left' : '')}>
             <div className="textbox-portrait-frame">
               <img src={opts.speaker} alt={opts.speakerName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.35) + 's', top: [10,60,5,50,30,65,15,45][i] + '%', left: [5,70,55,10,80,35,90,60][i] + '%' }} />)}
             </div>
-            {leftName && <span className="textbox-speaker-name" style={leftNameColor ? { color: leftNameColor } : undefined}>{leftName}</span>}
+            {leftName && <span className="textbox-speaker-name">{leftName}</span>}
           </div>
         )}
         <div className="textbox-body" ref={bodyRef}>
           <span className="textbox-text">{(() => { const els = renderMarkdownSlice(parsedRef.current.segments, charCount); return page?.shakeText ? applyShake(els) : els; })()}</span>
-          {done && <span className="textbox-advance">{isLastPage ? '▼' : '▶'}</span>}
+          {done && <span className={'textbox-advance' + (isLastPage ? ' textbox-advance-ende' : '')} aria-label={isLastPage ? 'Close' : 'Next'} />}
           {pages.length > 1 && (
             <div className="textbox-footer">
-              {pageIdx > 0 && <span className="textbox-back" onClick={handleBack}>◀</span>}
+              {pageIdx > 0 && <span className="textbox-back" onClick={handleBack} aria-label="Back" />}
               <span className="textbox-page-indicator">{pageIdx + 1}/{pages.length}</span>
             </div>
           )}
@@ -6271,7 +6386,7 @@ function TextBox() {
               <img src={opts.rightSpeaker} alt={opts.rightSpeakerName || ''} draggable={false} />
               {[...Array(8)].map((_, i) => <span key={i} className="textbox-sparkle" style={{ animationDelay: (i * 0.25 + 0.1) + 's', top: [15,55,8,48,35,62,20,42][i] + '%', left: [8,65,50,15,75,30,85,55][i] + '%' }} />)}
             </div>
-            {rightName && <span className="textbox-speaker-name" style={rightNameColor ? { color: rightNameColor } : undefined}>{rightName}</span>}
+            {rightName && <span className="textbox-speaker-name">{rightName}</span>}
           </div>
         )}
       </div>
@@ -6601,6 +6716,10 @@ window.useAntoniaPresent = useAntoniaPresent;
 window.isAntoniaPresent = isAntoniaPresent;
 window.setAntoniaPresent = setAntoniaPresent;
 window.tutorialStartsWithAntonia = tutorialStartsWithAntonia;
+// Tutorial-Gegner: Monia Bot oder Antonia (s. `setTutorialGegner`).
+window.setTutorialGegner = setTutorialGegner;
+window.useTutorialGegner = useTutorialGegner;
+window.tutorialErsterSprecher = tutorialErsterSprecher;
 // v809: bisher nur ueber die zufaellige Sichtbarkeit oberster
 // Deklarationen zwischen den Bundles erreichbar. Ausdruecklich
 // weiterreichen, damit die Abhaengigkeit sichtbar und pruefbar ist.
