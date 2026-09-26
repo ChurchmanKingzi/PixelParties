@@ -122,7 +122,18 @@ module.exports = {
       const bakhmZoneSlot = target.bakhmZoneSlot ?? -1;
       const activateOpts = isBakhmSlot ? { isBakhmSlot: true, bakhmZoneSlot } : {};
 
-      await engine._activateSurprise(pi, heroIdx, surpriseCardName, sourceInfo, script, activateOpts);
+      // Eigenes Aufdecken (Als Vorgabe 26.9.): die Surprise schwebt mit
+      // Schatten hoch, wackelt, dreht sich in der Luft um und landet offen
+      // in ihrer Zone — erst dann laeuft ihr Effekt, ohne das uebliche
+      // Aufdeck-Blitzen.
+      engine._broadcastEvent('play_zone_animation', {
+        type: 'telekinese', owner: pi, heroIdx,
+        ...(isBakhmSlot ? { zoneSlot: bakhmZoneSlot } : { zoneSlot: -1, zoneType: 'surprise' }),
+        cardName: surpriseCardName, duration: 2000,
+      });
+      await engine._delay(1800);
+
+      await engine._activateSurprise(pi, heroIdx, surpriseCardName, sourceInfo, script, { ...activateOpts, ohneFlip: true });
     },
   },
 };
