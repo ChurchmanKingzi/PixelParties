@@ -129,31 +129,23 @@ def despeckle(rgba,passes=2):
                     best=max(set(nb),key=nb.count)
                     if nb.count(best)>=3: a[y,x,:3]=best
     return a
-gq=gbq_classes(gi)
-# retouch the three heads so each reads clearly: outlined face, light skin, dark eyes, small mouth
-def head(cx,cy,rx,ry):
-    for y in range(int(cy-ry)-1,int(cy+ry)+2):
-        for x in range(int(cx-rx)-1,int(cx+rx)+2):
-            if not(0<=y<gq.shape[0] and 0<=x<gq.shape[1]): continue
-            d=((x-cx)/rx)**2+((y-cy)/ry)**2
-            if d<=1.0:
-                lv=2 if y>cy-ry+1 else 3
-                if d>0.62: lv=0
-                gq[y,x,:3]=GB[lv]; gq[y,x,3]=255
-    for ex in (int(round(cx-1.5)),int(round(cx+1.5))):
-        gq[int(cy),ex,:3]=GB[0]
-    gq[int(cy)+2,int(cx),:3]=GB[1]; gq[int(cy)+2,int(cx)+ (1 if rx>3 else 0),:3]=GB[1]
-gq=despeckle(gq)
-head(9.5,9.2,3.3,3.3); head(26.5,9.2,3.3,3.3); head(18,5.6,3.4,3.0)
-g4=scale2x(outline(gq,GB[0]))
+def gb_dither(rgba):
+    """plain recolour of a normal sprite to the 4 greens: 2x (scale2x), luminance -> shade with ordered dithering"""
+    s2=scale2x(rgba)
+    L=lum(s2[...,:3].astype(float)); op=s2[...,3]>0
+    lo,hi=np.quantile(L[op],[0.02,0.98]); v=np.clip((L-lo)/(hi-lo),0,1)*3
+    h,w=L.shape
+    Bm=BAYER4[np.arange(h)[:,None]%4,np.arange(w)[None,:]%4]
+    lev=np.floor(v+(Bm-0.5)*0.55+0.5).clip(0,3).astype(int)
+    out=s2.copy(); out[...,:3]=np.array(GB)[lev]; out[~op]=0
+    return outline(out,GB[0])
+# ---- 3-Headed Giant: the normal card sprite, recoloured + dithered ----
+g4=gb_dither(gi)
 cv.paste(g4,170-g4.shape[1]//2,98-g4.shape[0]+1)
 # player platform
 gellipse(88,148,40,7,2,1)
-bs=BI.sprite()
-L_=lum(bs[...,:3].astype(float)); op_=bs[...,3]>0
-q_=np.quantile(L_[op_],[0.3,0.62,0.86]); lev_=np.digitize(L_,q_)
-bs[...,:3]=np.array(GB)[lev_]
-bb=scale2x(outline(despeckle(bs,1),GB[0]))
+# ---- Barker: the normal card sprite (no contrast filter), recoloured + dithered ----
+bb=gb_dither(BI.sprite(stretch=False))
 cv.paste(bb,86-bb.shape[1]//2,150-bb.shape[0])
 # ---------- HUDs ----------
 def hpbar(x,y,w,frac):
